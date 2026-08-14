@@ -25,15 +25,13 @@ production 코드·기존 테스트·브라우저 관찰은 조사 자료이지 
 - Medium/High 카드는 `scripts/oracle-lock.mjs`로 잠그고 각 단계 전 자동 검증한다.
   사용자가 명령을 실행하게 하지 않으며 mismatch를 통과하려고 재잠금하지 않는다.
 - locator·fixture·대기 방법·관찰 계층만 테스트 단계에서 정할 수 있다.
-- FSD 레포의 테스트는 slice 밖 중앙 디렉터리로 빼지 않는다. 여러 segment를 관통하는
-  scenario·Playwright 테스트는 `<slice>/__test__/`, 한 segment에 국한된 unit·component
-  테스트는 해당 `model|api|hooks|ui/__test__/`에 두어 production과 함께 이동·삭제되게 한다.
-  레포가 다른 위치를 명시적으로 강제할 때만 그 관례를 우선하고 사유를 기록한다.
+- 테스트는 중앙 디렉터리로 빼지 않고 소유 경계와 함께 이동·삭제되게 둔다. FSD
+  레포의 배치는 `references/fsd.md`의 `__test__/` 규칙을 따르고, 레포가 다른 위치를
+  명시적으로 강제할 때만 그 관례를 우선하고 사유를 기록한다.
 - TDD 시작 시 network 경계는 MSW를 최대한 쓴다. `fetch`·transport 모듈 직접 mocking은
-  MSW로 표현할 수 없는 경우에만 사유와 함께 쓴다. MSW handler와 예시 데이터는 FSD
-  slice 안에서 제일 가까운 곳에 둔다. 한 segment만 쓰면 `<slice>/api/__mocks__/`,
-  여러 segment를 관통하면 `<slice>/__mocks__/`에 두고, 실제로 여러 slice가 공유할 때만
-  상위 layer로 올린다. 편의상 루트 `mocks/`로 모으지 않는다.
+  MSW로 표현할 수 없는 경우에만 사유와 함께 쓴다. handler와 예시 데이터는 그 경계를
+  소유한 가장 가까운 곳에 두고 편의상 루트 `mocks/`로 모으지 않는다. FSD 배치는
+  `references/fsd.md`를 따른다.
 - assertion 약화, `test.skip` 전환, 임의 sleep으로 GREEN을 만들지 않는다.
 - 브라우저와 subagent는 증거와 비평을 제공하지만 정책을 새로 정하지 않는다.
 - AI가 만든 visual direction과 디자인 skill의 결과는 제안이지 정책 출처가 아니다.
@@ -58,6 +56,7 @@ production 코드·기존 테스트·브라우저 관찰은 조사 자료이지 
 | 모든 실행의 시작                                                                                       | [`references/bva.md`](references/bva.md), [`references/oracle-card.md`](references/oracle-card.md)                                                                                                                                                                               |
 | 새 UI·redesign 또는 보이는 layout·palette·type·copy·motion·responsive·identity 변경을 카드로 만들기 전 | [`references/visual-design.md`](references/visual-design.md)                                                                                                                                                                                                                     |
 | Delivery 진입 직후                                                                                     | [`../test/SKILL.md`](../test/SKILL.md), [`references/implementation-loop.md`](references/implementation-loop.md), [`references/frontend-implementation.md`](references/frontend-implementation.md), [`references/architecture-contract.md`](references/architecture-contract.md) |
+| 대상 레포가 FSD이거나 greenfield에서 FSD 도입이 승인됨                                                 | [`references/fsd.md`](references/fsd.md)                                                                                                                                                                                                                                         |
 | backend·full-stack·DB 또는 data-access 경계를 만들거나 바꾸기 전                                       | [`references/backend.md`](references/backend.md)                                                                                                                                                                                                                                 |
 | GREEN 후 브라우저로 열 수 있음                                                                         | [`references/browser-verification.md`](references/browser-verification.md); Design Intent가 있으면 [`references/visual-design.md`](references/visual-design.md)도 다시 읽음                                                                                                      |
 | 구현·브라우저 검증 후                                                                                  | [`references/subagent-review.md`](references/subagent-review.md); identity-shaping이면 [`references/visual-design.md`](references/visual-design.md)도 다시 읽음                                                                                                                  |
@@ -101,9 +100,8 @@ production 코드·기존 테스트·브라우저 관찰은 조사 자료이지 
    `NEEDS_DECISION`, 손상·도구 오류면 `FAIL`로 멈춘다.
 5. High risk면 카드 전문과 SHA-256에 대한 사용자 확인 전에는 진행하지 않는다.
 6. sibling `test` skill 계약으로 테스트를 먼저 작성·실행해 `VALID_RED`를 확인한다.
-   network 경계는 MSW handler로 세우고, handler와 예시 데이터를 그 경계를 소유한
-   가장 가까운 slice·segment에 둔다. FSD이면 테스트 위치도 승인된 architecture
-   source와 대조해 가장 가까운 slice 또는 segment의 `__test__/`에 둔다. 편의상 루트
+   network 경계는 MSW handler로 세운다. 테스트·handler 배치는 승인된 architecture
+   source와 대조하고, FSD면 `references/fsd.md` 규칙을 따른다. 편의상 루트
    `e2e/`·`mocks/`로 모으지 않는다.
 7. production 수정 전 `implementation-loop.md`와 `frontend-implementation.md`로 구현
    결정을 기록한 뒤 최소 구현→GREEN을 수행한다.
@@ -161,7 +159,7 @@ Delivery의 정상 완료 상태는 `REVIEW_VERIFIED`다.
 카드: O1→test name, O2→browser scenario, O3→N/A 사유 형식의 전 행 증거 매핑
 revision: Oracle SHA-256, source hashes, 마지막 verify command와 exit code
 결정: Target, State ownership, Server/Client, Async, Hook, Sources, Rejected
-아키텍처: unit별 architecture.md, 승인 답변, Oracle source hash, 레포 구조 검증 또는 reviewer 증거
+아키텍처: unit별 architecture.md, 승인 답변, Oracle source hash, 레포 구조 검증 또는 reviewer 증거; FSD면 layer·segment·public API·테스트 배치 준수 증거
 디자인: Visual scope, Subject, Audience, Single job, Thesis, Signature, Risk, Rejected
 디자인 확인: Design Change Confirmation의 사용자 답변 위치
 시각 증거: D1→test/browser/reviewer, D2→N/A 사유 형식의 전 행 매핑

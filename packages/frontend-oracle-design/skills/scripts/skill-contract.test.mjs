@@ -54,14 +54,41 @@ test('carries the locked revision through browser and independent review', async
   assert.match(subagentReview, /NON_ORACLE_OPINION/)
 })
 
-test('starts TDD with MSW and colocates handlers in the nearest FSD slice', async () => {
-  const [skill, implementationLoop] = await Promise.all([read('SKILL.md'), read('references/implementation-loop.md')])
+test('starts TDD with MSW and colocates handlers in the nearest owning boundary', async () => {
+  const [skill, implementationLoop, fsd] = await Promise.all([
+    read('SKILL.md'),
+    read('references/implementation-loop.md'),
+    read('references/fsd.md'),
+  ])
 
   assert.match(skill, /MSW를 최대한 쓴다/)
-  assert.match(skill, /<slice>\/api\/__mocks__\//)
-  assert.match(skill, /<slice>\/__mocks__\//)
+  assert.match(skill, /가장 가까운 곳에 두고/)
   assert.match(implementationLoop, /MSW handler로 세운다/)
-  assert.match(implementationLoop, /가장 가까운 slice·segment의 `__mocks__\/`/)
+  assert.match(implementationLoop, /fsd\.md/)
+  assert.match(fsd, /<slice>\/api\/__mocks__\//)
+  assert.match(fsd, /<slice>\/__mocks__\//)
+})
+
+test('defines the FSD contract and wires it through loading, architecture, implementation, and review', async () => {
+  const [skill, fsd, architectureContract, frontendImplementation, subagentReview] = await Promise.all([
+    read('SKILL.md'),
+    read('references/fsd.md'),
+    read('references/architecture-contract.md'),
+    read('references/frontend-implementation.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  assert.match(skill, /references\/fsd\.md/)
+  assert.match(fsd, /app → pages → widgets → features → entities → shared/)
+  assert.match(fsd, /`components`, `hooks`, `utils`는 FSD segment가 아니다/)
+  assert.match(fsd, /ui\|model\|api\|lib\/__test__\//)
+  assert.match(fsd, /deep import하지 않는다/)
+  assert.match(fsd, /steiger/)
+  assert.match(fsd, /NEEDS_DECISION/)
+  assert.match(architectureContract, /fsd\.md/)
+  assert.match(architectureContract, /steiger/)
+  assert.match(frontendImplementation, /fsd\.md/)
+  assert.match(subagentReview, /fsd\.md/)
 })
 
 test('loads visual design guidance only for UI-shaping work and carries its contract through delivery', async () => {

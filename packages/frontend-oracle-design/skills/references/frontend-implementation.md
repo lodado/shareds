@@ -92,8 +92,9 @@ FSD는 기존 구조가 FSD이거나 greenfield 제안이 승인된 때만 사�
 ## 4. Architecture unit과 코드 경계를 지킨다
 
 - 기존 레포 architecture가 일관되면 보존하고 FSD migration을 끼워 넣지 않는다.
-- greenfield 또는 승인된 FSD에서는 `app → pages → widgets → features → entities → shared`
-  방향과 slice public API를 지킨다. 사용하지 않는 layer·segment는 만들지 않는다.
+- greenfield 또는 승인된 FSD에서는 [`fsd.md`](fsd.md)를 전부 읽고 layer 방향,
+  segment 규칙, slice public API 계약을 지킨다. 사용하지 않는 layer·segment는
+  만들지 않는다.
 - FSD가 아니면 기존 레포의 architecture 문서와 import 관례를 그대로 적용한다.
   AI가 구현 중 새 profile이나 migration을 발명하지 않는다.
 - component는 상태 소유권, async/error boundary, 접근성 책임, 독립 테스트 또는 재사용

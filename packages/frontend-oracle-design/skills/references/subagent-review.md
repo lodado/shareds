@@ -94,6 +94,8 @@ reviewer는 코드를 수정하지 않고 다음 형식으로 finding만 반환�
   늘리지 않았는가?
 - 승인된 architecture unit 문서와 실제 import/data flow가 일치하는가?
 - 기존 구조에 불필요한 FSD migration이나 빈 layer·segment를 만들지 않았는가?
+- FSD면 [`fsd.md`](fsd.md)를 전부 읽고 「자주 나오는 위반」 표에 해당하는 항목이
+  없는가?
 - component가 상태·async/error·접근성 책임에 따라 분리되고 한 파일에 독립 component를
   몰아넣거나 반대로 trivial wrapper를 늘리지 않았는가?
 - UI가 network transport를 직접 호출하지 않고 api/model/public API 경계를 지키는가?

@@ -1,6 +1,6 @@
 {
   "name": "frontend-oracle-design",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Oracle-driven frontend contracts, TDD, browser verification, and review.",
   "author": {
     "name": "lodado",

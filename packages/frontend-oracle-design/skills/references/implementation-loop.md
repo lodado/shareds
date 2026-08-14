@@ -35,8 +35,8 @@
 2. 카드의 모든 비-N/A 행을 관찰 가능한 테스트로 번역한다.
 3. network 경계가 있으면 MSW handler로 세운다. 레포에 MSW가 없으면 설치 여부를 먼저
    확인하고, MSW로 표현할 수 없는 경우에만 다른 mocking 수단을 사유와 함께 쓴다.
-   handler와 예시 데이터는 그 경계를 소유한 가장 가까운 slice·segment의 `__mocks__/`에
-   두고, 실제로 여러 slice가 공유할 때만 상위 layer로 올린다.
+   handler와 예시 데이터는 그 경계를 소유한 가장 가까운 곳에 두고, FSD 배치는
+   [`fsd.md`](fsd.md)의 `__mocks__/` 규칙을 따른다.
 4. 각 행의 `Then`, `Never`, 부작용 종류·횟수를 함께 assert한다. 요청 횟수와 순서는
    handler에서 관찰한다.
 5. 테스트를 실제로 실행한다.

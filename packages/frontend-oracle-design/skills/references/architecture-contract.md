@@ -16,8 +16,12 @@ architecture(FSD 포함)를 강제하지 않는다.
 - 기존 architecture 문서와 import-boundary 검증 수단
 
 확인한 경로와 책임을 승인 문서에 구체적으로 기록한다. 기존 구조가 없거나 사용자가
-새 구조를 승인한 경우에만 FSD 같은 architecture를 도입한다. intake 결과가 미결이거나
-대화 중 바뀌면 문서를 잠그지 않고 `NEEDS_DECISION`으로 돌려보낸다.
+새 구조를 승인한 경우에만 FSD 같은 architecture를 도입한다. FSD를 채택하면
+[`fsd.md`](fsd.md)를 전부 읽고 layer·segment·public API 계약을 적용한다. 사용자
+전역 rules나 repo instruction의 폴더 관례(예: `components/`·`hooks/` 조직)가 FSD와
+충돌하면 임의로 절충하지 말고 `NEEDS_DECISION`으로 우선순위를 확인해 승인된
+결정을 문서에 기록한다. intake 결과가 미결이거나 대화 중 바뀌면 문서를 잠그지
+않고 `NEEDS_DECISION`으로 돌려보낸다.
 
 ## Architecture unit
 
@@ -85,6 +89,11 @@ generic AST checker를 만들지 않는다.
 섹션은 해당할 때만 구체적으로 작성하고, 적용하지 않는 항목은 N/A 사유를 남긴다.
 문서가 코드보다 커지는 template 채우기나 빈 layer·folder 생성을 금지한다.
 
+FSD unit이면 다음을 반드시 포함한다: `Responsibilities and public entry points`에
+layer·segment 매핑과 slice public API(`index.ts`)의 정확한 export 목록,
+`Component boundaries`에 허용·금지 import 경계(deep import 금지 포함),
+`Test boundaries`에 `__test__/`·`__mocks__/` 배치. 기준은 [`fsd.md`](fsd.md)다.
+
 ## 구현 판단
 
 - component는 상태 소유권, async/error boundary, 접근성 책임, 독립 테스트 또는 재사용
@@ -101,8 +110,11 @@ generic AST checker를 만들지 않는다.
 
 generic skill이 import graph, component 수, effect 수를 추측해 검사하지 않는다.
 대상 레포에 이미 ESLint import-boundary 규칙, dependency-cruiser, Nx module boundary,
-TypeScript project reference 또는 동등한 검증이 있으면 해당 명령을 실행한다. 없으면
-승인된 architecture 문서와 production diff의 일치 여부를 독립 reviewer가 검토한다.
+TypeScript project reference 또는 동등한 검증이 있으면 해당 명령을 실행한다.
+greenfield 또는 검증 수단이 없는 FSD 레포면 steiger(공식 FSD linter)나 ESLint
+boundary 규칙 도입을 사용자에게 제안하고, 승인되면 devDependency로 추가해 GREEN
+게이트 검증 명령에 포함한다. 도입이 거절되거나 불가하면 승인된 architecture
+문서와 production diff의 일치 여부를 독립 reviewer가 검토한다.
 
 강한 승인 권한이 필요하면 `**/__docs__/architecture.md`와 Oracle lock path를
 CODEOWNERS 및 CI human approval로 보호한다. Oracle source lock은 drift 검출 장치이며
