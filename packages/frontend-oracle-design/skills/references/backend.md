@@ -17,6 +17,10 @@ database 또는 frontend architecture를 강제하지 않는다.
 경계가 미결이면 새 layer를 먼저 만들지 않는다. `NEEDS_DECISION`으로 돌아가 승인된
 architecture가 안정된 뒤 잠근다.
 
+FSD 레포면 server 도메인 코드 배치는 [`fsd.md`](fsd.md)의 「Server 코드 배치」를
+따른다 — layer 밖 `src/server/` 루트를 만들지 않고 소유 slice의 `api` segment에
+`server-only` 경계로 둔다.
+
 ## 최소 data-access 경계
 
 - DB driver·ORM import와 query 실행은 승인된 repository/data-access module 안에만 둔다.

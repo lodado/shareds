@@ -4,20 +4,45 @@
 이 문서는 FSD를 강제하지 않는다 — `architecture-contract.md`의 승인 게이트를
 통과한 architecture 문서가 FSD를 채택했을 때 그 구조 결정의 기준이 된다.
 레포의 명시적 관례가 이 문서와 다르면 레포 관례를 따르고 사유를 기록한다.
+기준 버전은 FSD v2.1([fsd.how](https://fsd.how),
+[feature-sliced/skills](https://github.com/feature-sliced/skills))이다.
 
 ## Layer와 import 방향
 
 - 표준 layer: `app → pages → widgets → features → entities → shared`.
   상위 layer는 하위 layer만 import한다. 역방향 import는 금지다.
-- 같은 layer의 다른 slice를 import하지 않는다. entities 간 결합이 정말 필요하면
-  `@x` cross-import notation으로 공개하고 architecture 문서에 기록한다.
+- 같은 layer의 다른 slice를 import하지 않는다. 충돌 해결은
+  「Cross-import 해결」을 따른다.
+- **widgets layer는 신규 채택을 비권장한다**(v2.1). UI 블록은 대개 user-flow
+  로직을 포함해 features와 책임이 겹친다. 화면 전용 조합은 pages에, 여러
+  페이지가 재사용하는 액션과 그 UI는 features에, 비즈니스 맥락 없는 공용 UI는
+  `shared/ui`에, 앱 전역 layout은 app에 둔다. 이미 widgets를 쓰는 레포는
+  기존 관례를 유지한다.
+- 최소 구성 `app + pages + shared`도 유효한 FSD다. features·entities는 실제
+  사용처가 생겼을 때만 추가하고, 빈 layer·slice·segment는 만들지 않는다.
 - `shared`는 slice 없이 segment로 직접 구성한다(`shared/api`, `shared/ui`,
-  `shared/lib`, `shared/config`). 앱 전역 fetch wrapper·api client는 layer 밖에
-  두지 않고 `shared/api`가 소유한다.
-- 실제로 쓰는 layer만 만든다. 빈 layer·slice·segment 생성은 금지다.
-- Next.js App Router에서 `app/` 디렉터리는 framework 라우팅이 소유한다. FSD
-  `pages` layer가 필요하면 `views` 등 충돌하지 않는 이름을 architecture 문서에
-  기록하고 일관되게 쓴다. route 파일은 조립만 하고 로직은 slice로 내린다.
+  `shared/lib`, `shared/auth`, `shared/config`). shared 내부 segment끼리는
+  서로 import할 수 있다. 앱 전역 fetch wrapper·api client는 layer 밖에 두지
+  않고 `shared/api`가 소유한다.
+- Next.js는 `app/`·`pages/` 폴더명을 라우팅에 쓰므로 FSD layer와 충돌한다.
+  공식 관례대로 FSD layer를 `_app/`·`_pages/`로 개명해 architecture 문서에
+  기록하고 일관되게 쓴다. route 파일(`app/**/page.tsx`)은 FSD `_pages/`
+  slice를 re-export·조립만 하고 로직은 slice로 내린다.
+
+## 추출 판단 — Pages-first
+
+- **"Start simple, extract when needed."** 새 코드는 우선 그것을 쓰는
+  `pages/` slice에 둔다. 페이지 간 중복은 허용이며 자동 추출 사유가 아니다.
+- 추출 조건 세 가지를 모두 만족할 때만 하위 layer로 내린다: 같은 코드가
+  **현재** 2곳 이상에서 실사용되고, 사용처들이 항상 같이 변하지 않으며,
+  경계의 책임이 명확하다. 가설적 재사용으로 추출하지 않는다.
+- 한 페이지만 쓰는 feature·entity는 그 페이지에 둔다
+  (Steiger `insignificant-slice`).
+- entities는 보수적으로 쓴다. entities 없는 FSD도 유효하다. CRUD는
+  `shared/api`, auth 토큰·세션·login DTO는 `shared/auth`(또는 `shared/api`)에
+  둔다 — auth 데이터 때문에 user entity를 만들지 않는다.
+- 책임이 과도하게 넓은 god slice는 집중된 slice로 분리한다
+  (예: `user-management` → `auth`·`profile-edit`).
 
 ## Slice와 segment
 
@@ -30,6 +55,9 @@
   - 순수 계산·헬퍼는 `lib`에 둔다.
 - interaction workflow를 소유한 hook(예: mutation hook)은 `model` 소속이다.
   `hooks/` 폴더를 만들어 model과 ui 책임을 섞지 않는다.
+- segment 안 파일명은 도메인 기반으로 짓는다(`model/user.ts`,
+  `api/fetch-profile.ts`). `types.ts`·`utils.ts`·`helpers.ts` 같은
+  technical-role 이름은 무관한 도메인을 한 파일에 섞으므로 금지다.
 
 ## Public API
 
@@ -38,9 +66,37 @@
   `@/features/x/ui/Foo` 금지, `@/features/x`만 허용.
 - index는 외부가 실제로 쓰는 최소 표면만 export한다. 내부 lib 함수·테스트 전용
   helper를 관성으로 export하지 않는다.
+- shared는 최상위 `shared/index.ts`를 만들지 않고 segment별 public
+  API(`shared/ui/index.ts`, `shared/api/index.ts` 등)를 둔다.
 - server-only 코드는 client public API에 섞지 않는다. client가 쓰는 계약 타입은
   `shared`(또는 승인된 entities) 소유 모듈로 옮기고, client 코드가 server 도메인
-  모듈을 직접 import하지 않게 한다.
+  모듈을 직접 import하지 않게 한다. 단일 `index.ts`로 runtime 경계를 지킬 수
+  없을 때만 `index.server.ts` 같은 환경별 entry를 추가한다.
+
+## Cross-import 해결
+
+같은 layer 간 cross-import는 code smell이다. 도입하면 반드시 architecture
+문서에 사유를 기록한다.
+
+- **entities**: 먼저 경계 병합을 검토한다. `@x` notation은 병합이 정말 불가할
+  때의 최후 수단이지 권장 패턴이 아니다.
+- **features**: 네 전략 중 상황에 맞는 것을 쓴다 — A) slice 병합(항상 같이
+  변하면), B) 공유 도메인 로직을 entities로 강등, C) 상위 layer(pages·app)에서
+  render props·slot·DI로 조합(IoC), D) 불가피하면 상대 slice의 `index.ts`
+  public API로만 접근. `@x`는 entities 전용이다.
+
+## Server 코드 배치
+
+- full-stack Next.js에서 한 도메인의 server 로직(service, repository port·adapter,
+  검증·재계산)은 layer 밖 `src/server/` 루트로 빼지 않는다. 그 도메인을 소유한
+  slice의 `api` segment에 둔다.
+- server 전용 모듈은 `server-only` import로 경계를 표시하고 client public
+  API(`index.ts`)에 섞지 않는다. server 소비자용 진입점은 `index.server.ts` 또는
+  `<slice>/api/server.ts` 같은 별도 entry로 공개한다.
+- route handler(`app/api/**/route.ts`)와 RSC는 조립·전달만 하고 도메인 로직은
+  slice `api`를 호출한다.
+- 여러 slice가 실제로 공유하는 DB client·connection·container 같은 인프라만
+  `shared/api`에 둔다.
 
 ## 테스트·mock 배치
 
@@ -75,3 +131,8 @@
 | index가 내부 구현 함수까지 export                   | 외부 사용 표면만 남기고 제거           |
 | 테스트를 소스 옆에 colocation                       | slice·segment `__test__/`로 이동       |
 | fetch wrapper가 layer 밖(`src/lib` 등)에 부유       | `shared/api`로 이동                    |
+| server 도메인 코드가 layer 밖 `src/server/`에 부유  | 소유 slice의 `api` segment로 이동      |
+| 단일 사용 코드를 feature·entity로 조기 추출         | 사용하는 page slice로 되돌림           |
+| `model/types.ts`·`utils.ts` technical-role 파일명   | 도메인 기반 파일명으로 변경            |
+| widgets layer 신규 채택                             | pages·features·shared·app으로 라우팅   |
+| CRUD·auth 토큰을 entities로 승격                    | `shared/api`·`shared/auth`에 유지      |

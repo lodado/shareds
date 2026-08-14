@@ -70,12 +70,13 @@ test('starts TDD with MSW and colocates handlers in the nearest owning boundary'
 })
 
 test('defines the FSD contract and wires it through loading, architecture, implementation, and review', async () => {
-  const [skill, fsd, architectureContract, frontendImplementation, subagentReview] = await Promise.all([
+  const [skill, fsd, architectureContract, frontendImplementation, subagentReview, backend] = await Promise.all([
     read('SKILL.md'),
     read('references/fsd.md'),
     read('references/architecture-contract.md'),
     read('references/frontend-implementation.md'),
     read('references/subagent-review.md'),
+    read('references/backend.md'),
   ])
 
   assert.match(skill, /references\/fsd\.md/)
@@ -85,8 +86,19 @@ test('defines the FSD contract and wires it through loading, architecture, imple
   assert.match(fsd, /deep import하지 않는다/)
   assert.match(fsd, /steiger/)
   assert.match(fsd, /NEEDS_DECISION/)
+  assert.match(fsd, /Server 코드 배치/)
+  assert.match(fsd, /`src\/server\/` 루트로 빼지 않는다/)
+  assert.match(fsd, /server-only/)
+  assert.match(fsd, /Pages-first/)
+  assert.match(fsd, /widgets layer는 신규 채택을 비권장/)
+  assert.match(fsd, /shared\/auth/)
+  assert.match(fsd, /Cross-import 해결/)
+  assert.match(fsd, /`_app\/`·`_pages\/`/)
+  assert.match(fsd, /technical-role/)
   assert.match(architectureContract, /fsd\.md/)
   assert.match(architectureContract, /steiger/)
+  assert.match(backend, /fsd\.md/)
+  assert.match(backend, /Server 코드 배치/)
   assert.match(frontendImplementation, /fsd\.md/)
   assert.match(subagentReview, /fsd\.md/)
 })
