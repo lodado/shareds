@@ -12,11 +12,25 @@
       "name": "vibe-coding-helper",
       "description": "ESLint preset adoption and repo conventions for lodado projects.",
       "version": "0.1.0",
-      "author": { "name": "lodado" },
+      "author": {
+        "name": "lodado"
+      },
       "source": "./packages/vibe-coding-helper",
       "category": "development",
       "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
       "tags": ["eslint", "monorepo", "conventions"]
+    },
+    {
+      "name": "frontend-oracle-design",
+      "description": "Oracle-driven frontend contracts, TDD, browser verification, and review.",
+      "version": "0.1.0",
+      "author": {
+        "name": "lodado"
+      },
+      "source": "./packages/frontend-oracle-design",
+      "category": "development",
+      "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+      "tags": ["frontend", "tdd", "oracle"]
     }
   ]
 }

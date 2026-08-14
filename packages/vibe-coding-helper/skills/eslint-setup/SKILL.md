@@ -26,21 +26,57 @@ module.exports = {
     '@lodado/eslint-config/next', // Next.js apps only
     '@lodado/eslint-config/a11y', // JSX that renders user-facing markup
     '@lodado/eslint-config/turbo', // Turborepo workspaces - catches undeclared env vars
-    '@lodado/eslint-config/local-rules', // lodado custom rules (no-console-log)
+    '@lodado/eslint-config/local-rules', // lodado custom rules - see the table below
+    '@lodado/eslint-config/testing', // Vitest/Testing Library + Playwright, scoped by file path
+    '@lodado/eslint-config/query', // packages using TanStack Query
   ],
 }
 ```
 
 ## Which presets
 
-| Package kind                   | Presets                                  |
-| ------------------------------ | ---------------------------------------- |
-| Node/TS library, no JSX        | base                                     |
-| React component library        | base + react + a11y + local-rules        |
-| Next.js app                    | base + react + next + a11y + local-rules |
-| Any package inside a turborepo | add turbo                                |
+| Package kind                     | Presets                                            |
+| -------------------------------- | -------------------------------------------------- |
+| Node/TS library, no JSX          | base                                               |
+| React component library          | base + react + a11y + local-rules + testing        |
+| Next.js app                      | base + react + next + a11y + local-rules + testing |
+| Any package inside a turborepo   | add turbo                                          |
+| Any package using TanStack Query | add query                                          |
+
+`testing` routes by path on its own: `*.test.*` / `*.spec.*` get the Vitest and Testing Library
+rules, `e2e/**`, `*.e2e.*` and `playwright/**` get the Playwright rules. Nothing else is touched,
+so it is safe to enable package-wide.
 
 Order matters: later entries win. Keep the base preset first.
+
+## Local rules
+
+`@lodado/eslint-config/local-rules` turns these on. Severity comes from each rule - certain
+defects are errors, judgement calls are warnings, and rules that clash with an existing repo
+convention ship off.
+
+| Rule                               | Severity | What it catches                                                                 |
+| ---------------------------------- | -------- | ------------------------------------------------------------------------------- |
+| `no-console-log`                   | error    | `console.log` left in source                                                    |
+| `require-exact-call-count`         | error    | `toHaveBeenCalled()` where the contract is 0 / exactly 1 / 2+ calls             |
+| `require-skip-reason`              | error    | `test.skip` / `it.todo` with no comment saying which layer covers it instead    |
+| `no-arbitrary-sleep-in-tests`      | error    | `await sleep(100)` / `new Promise(r => setTimeout(r, n))` in test files         |
+| `no-css-locator-without-reason`    | error    | `page.locator('.thing')` in e2e specs with no justification comment             |
+| `no-refetch-in-effect`             | error    | `refetch()` inside an effect instead of putting the input in the query key      |
+| `no-fetch-in-component`            | error    | `fetch` / `axios` called straight from a component                              |
+| `require-abort-signal-passthrough` | error    | a queryFn that destructures `signal` but never hands it to `fetch`              |
+| `require-effect-annotation`        | warn     | `useEffect` with no comment naming the external system, reason and cleanup      |
+| `no-use-client-above-leaf`         | warn     | `'use client'` on a Next.js `page`/`layout`/`template`/`default` route file     |
+| `no-derived-state-effect`          | warn     | an effect whose only job is `setX(<value derived from the deps>)`               |
+| `scenario-test-filename`           | off      | test files that do not name their layer (`*.scenario.test.*` / `*.unit.test.*`) |
+
+Turn an off-by-default rule on per project:
+
+```js
+rules: {
+  '@lodado/local-rules/scenario-test-filename': 'warn',
+}
+```
 
 ## Rules
 

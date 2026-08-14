@@ -9,7 +9,7 @@ const path = require('path')
 const { ESLint } = require('eslint')
 
 const BASE = path.join(__dirname, 'index.js')
-const OPTIONAL_PRESETS = ['react', 'next', 'a11y', 'turbo', 'local-rules']
+const OPTIONAL_PRESETS = ['react', 'next', 'a11y', 'turbo', 'local-rules', 'testing', 'query']
 
 const SAMPLE = 'export const answer = 42\n'
 
@@ -59,6 +59,57 @@ const main = async () => {
     'local-rules: no-console-log did not report on console.log',
   )
   console.log('ok  local-rules/no-console-log reports')
+
+  // Severity comes from each rule's meta.docs.recommended - judgement calls stay warnings.
+  const effect = await lint(
+    [BASE, path.join(__dirname, 'local-rules.js')],
+    'useEffect(() => {}, [])\n',
+    'sample-effect.tsx',
+  )
+  const annotation = effect.messages.find(
+    (message) => message.ruleId === '@lodado/local-rules/require-effect-annotation',
+  )
+  assert.ok(annotation, 'local-rules: require-effect-annotation did not report on an undocumented effect')
+  assert.strictEqual(annotation.severity, 1, 'local-rules: require-effect-annotation should be a warning')
+  console.log('ok  local-rules severity follows meta.docs.recommended')
+
+  // Opt-in rules ship off, so a repo with its own test-file convention is not flooded.
+  const optIn = await lint(
+    [BASE, path.join(__dirname, 'local-rules.js')],
+    'export const x = 1\n',
+    'sample-optin.test.tsx',
+  )
+  assert.ok(
+    !optIn.messages.some((message) => message.ruleId === '@lodado/local-rules/scenario-test-filename'),
+    'local-rules: scenario-test-filename should be off by default',
+  )
+  console.log('ok  local-rules opt-in rules stay off')
+
+  // The testing preset routes by file path - unit rules and Playwright rules must land separately.
+  const assertReports = async (extendsList, code, fileName, ruleId) => {
+    const result = await lint(extendsList, code, fileName)
+    assert.ok(
+      result.messages.some((message) => message.ruleId === ruleId),
+      `${ruleId} did not report on ${fileName}: ${JSON.stringify(result.messages)}`,
+    )
+    console.log(`ok  ${ruleId} reports on ${fileName}`)
+  }
+
+  const TESTING = [BASE, path.join(__dirname, 'testing.js')]
+  await assertReports(TESTING, 'test.only("submits", () => {})\n', 'sample.test.tsx', 'vitest/no-focused-tests')
+  await assertReports(
+    TESTING,
+    'test("submits", async ({ page }) => { await page.waitForTimeout(1000) })\n',
+    'e2e/sample.spec.ts',
+    'playwright/no-wait-for-timeout',
+  )
+  await assertReports(
+    [BASE, path.join(__dirname, 'query.js')],
+    // The rule only inspects query calls inside a component or hook, not module scope.
+    'export function Item({ id }) {\n  return useQuery({ queryKey: ["item"], queryFn: () => fetchItem(id) })\n}\n',
+    'sample-query.tsx',
+    '@tanstack/query/exhaustive-deps',
+  )
 }
 
 main().catch((error) => {

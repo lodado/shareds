@@ -1,7 +1,22 @@
 const { rules } = require('@lodado/eslint-plugin-local-rules')
 
-const localRules = Object.keys(rules).reduce((acc, ruleName) => {
-  acc[`@lodado/local-rules/${ruleName}`] = 'error'
+/**
+ * Rules that flag a judgement call rather than a certain defect ship as warnings.
+ * `recommended: false` means the rule exists but conflicts with repos that have their own
+ * convention - it ships off and each project turns it on deliberately.
+ */
+const severityOf = (rule) => {
+  const { recommended } = rule.meta.docs
+
+  if (recommended === false) {
+    return 'off'
+  }
+
+  return recommended === 'warn' ? 'warn' : 'error'
+}
+
+const localRules = Object.entries(rules).reduce((acc, [ruleName, rule]) => {
+  acc[`@lodado/local-rules/${ruleName}`] = severityOf(rule)
   return acc
 }, {})
 

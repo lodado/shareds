@@ -25,7 +25,7 @@ module.exports = {
 }
 ```
 
-Available: base (`.`), `react`, `next`, `a11y`, `turbo`, `local-rules`.
+Available: base (`.`), `react`, `next`, `a11y`, `turbo`, `local-rules`, `testing`, `query`.
 Full guidance lives in the plugin's [`eslint-setup` skill](packages/vibe-coding-helper/skills/eslint-setup/SKILL.md).
 
 ## Agent plugin

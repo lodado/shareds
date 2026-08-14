@@ -10,7 +10,9 @@
     "./next": "./next.js",
     "./a11y": "./a11y.js",
     "./turbo": "./turbo.js",
-    "./local-rules": "./local-rules.js"
+    "./local-rules": "./local-rules.js",
+    "./testing": "./testing.js",
+    "./query": "./query.js"
   },
   "files": [
     "index.js",
@@ -18,7 +20,9 @@
     "next.js",
     "a11y.js",
     "turbo.js",
-    "local-rules.js"
+    "local-rules.js",
+    "testing.js",
+    "query.js"
   ],
   "repository": {
     "type": "git",
@@ -30,10 +34,11 @@
   },
   "scripts": {
     "test": "node test.js",
-    "lint": "eslint index.js react.js next.js a11y.js turbo.js local-rules.js test.js"
+    "lint": "eslint index.js react.js next.js a11y.js turbo.js local-rules.js testing.js query.js test.js"
   },
   "dependencies": {
     "@lodado/eslint-plugin-local-rules": "workspace:*",
+    "@tanstack/eslint-plugin-query": "^5.101.4",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "eslint-config-airbnb": "^19.0.4",
@@ -42,9 +47,12 @@
     "eslint-config-turbo": "^1.13.4",
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-jsx-a11y": "^6.8.0",
+    "eslint-plugin-playwright": "^2.11.0",
     "eslint-plugin-react": "^7.34.1",
     "eslint-plugin-react-hooks": "^4.6.2",
-    "eslint-plugin-simple-import-sort": "^12.1.0"
+    "eslint-plugin-simple-import-sort": "^12.1.0",
+    "eslint-plugin-testing-library": "^7.16.2",
+    "eslint-plugin-vitest": "^0.5.4"
   },
   "peerDependencies": {
     "eslint": "^8.57.0"

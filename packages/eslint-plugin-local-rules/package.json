@@ -18,7 +18,8 @@
     "access": "public"
   },
   "scripts": {
-    "lint": "eslint index.js rules"
+    "test": "node test.js",
+    "lint": "eslint index.js rules test.js"
   },
   "peerDependencies": {
     "eslint": "^8.57.0"
