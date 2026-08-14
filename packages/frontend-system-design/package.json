@@ -1,0 +1,10 @@
+{
+  "name": "@lodado/frontend-system-design-plugin",
+  "version": "0.1.0",
+  "description": "Claude Code / Codex plugin for well-known frontend system design problems.",
+  "private": true,
+  "scripts": {
+    "test": "node --test skills/scripts/*.test.mjs"
+  },
+  "license": "MIT"
+}

@@ -31,6 +31,18 @@
       "category": "development",
       "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
       "tags": ["frontend", "tdd", "oracle"]
+    },
+    {
+      "name": "frontend-system-design",
+      "description": "Policy candidates and verification duties for well-known frontend system design problems.",
+      "version": "0.1.0",
+      "author": {
+        "name": "lodado"
+      },
+      "source": "./packages/frontend-system-design",
+      "category": "development",
+      "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+      "tags": ["frontend", "system-design", "patterns"]
     }
   ]
 }

@@ -106,43 +106,14 @@ test('defines the FSD contract and wires it through loading, architecture, imple
   assert.match(subagentReview, /fsd\.md/)
 })
 
-test('routes feature pattern references as policy candidates rather than policy', async () => {
-  const [skill, infiniteScroll, searchTypeahead] = await Promise.all([
-    read('SKILL.md'),
-    read('references/infinite-scroll.md'),
-    read('references/search-typeahead.md'),
-  ])
+test('delegates well-known feature problems without depending on the sibling plugin being installed', async () => {
+  const skill = await read('SKILL.md')
 
-  assert.match(skill, /references\/infinite-scroll\.md/)
-  assert.match(skill, /references\/search-typeahead\.md/)
-  assert.match(skill, /정책 후보와\n\s*검증 의무/)
-
-  for (const reference of [infiniteScroll, searchTypeahead]) {
-    assert.match(reference, /이 문서는 정책을 만들지 않는다/)
-    assert.match(reference, /NEEDS_DECISION/)
-    assert.match(reference, /MSW handler로 세운다/)
-    assert.match(reference, /임의 sleep으로 GREEN을 만들지 않는다/)
-    assert.match(reference, /fsd\.md/)
-    assert.match(reference, /<slice>\/api\/__mocks__\//)
-  }
-})
-
-test('pins the race and duplicate-request obligations each feature pattern must verify', async () => {
-  const [infiniteScroll, searchTypeahead] = await Promise.all([
-    read('references/infinite-scroll.md'),
-    read('references/search-typeahead.md'),
-  ])
-
-  assert.match(infiniteScroll, /응답 순서 역전/)
-  assert.match(infiniteScroll, /요청\s+\*\*총 횟수\*\*/)
-  assert.match(infiniteScroll, /cursor인가 offset인가/)
-  assert.match(infiniteScroll, /스크롤 복원/)
-
-  assert.match(searchTypeahead, /응답 순서 역전/)
-  assert.match(searchTypeahead, /요청\s+\*\*총 횟수\*\*/)
-  assert.match(searchTypeahead, /IME 조합 정책은 한국어 제품에서 생략 금지다/)
-  assert.match(searchTypeahead, /compositionstart/)
-  assert.match(searchTypeahead, /AbortSignal/)
+  assert.match(skill, /frontend-system-design/)
+  assert.match(skill, /설치돼 있으면 해당 reference를 먼저 읽는다/)
+  assert.match(skill, /기본 추천과\s+다를 항목만 Grill로/)
+  assert.match(skill, /정책 출처가 아니라 구현 선택지다/)
+  assert.doesNotMatch(skill, /references\/(infinite-scroll|search-typeahead)\.md/)
 })
 
 test('loads visual design guidance only for UI-shaping work and carries its contract through delivery', async () => {

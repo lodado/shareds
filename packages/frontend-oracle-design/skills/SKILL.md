@@ -44,9 +44,11 @@ production 코드·기존 테스트·브라우저 관찰은 조사 자료이지 
   `NON_ORACLE_OPINION`으로 처리한다.
 - 구현 best practice는 정책 출처가 아니다. 대상 레포 규칙과 실제 설치 버전을 먼저
   확인하고, 외부 가이드는 충돌하지 않는 구현 선택에만 사용한다.
-- 기능 패턴 reference(`infinite-scroll.md`, `search-typeahead.md`)는 **정책 후보와
-  검증 의무**만 제공한다. 표의 항목을 관례로 채우지 말고 미결이면
-  `NEEDS_DECISION`으로 카드에 답을 받은 뒤 잠근다.
+- 무한 스크롤·검색·채팅·업로드·결제처럼 잘 알려진 기능을 다룰 때는
+  `frontend-system-design` skill이 설치돼 있으면 해당 reference를 먼저 읽는다.
+  그 문서의 `판단이 갈리는 지점` 중 이 제품의 답이 기본 추천과 다를 항목만 Grill로
+  확인해 카드에 잠그고, `남길 검증`을 카드 증거 행으로 매핑한다. 문서의 권장 구조와
+  구현은 정책 출처가 아니라 구현 선택지다.
 - 정책 변경이 필요하면 언제든 카드 현재본과 함께 `NEEDS_DECISION`으로 복귀한다.
 
 ## Reference 로딩
@@ -59,8 +61,6 @@ production 코드·기존 테스트·브라우저 관찰은 조사 자료이지 
 | 모든 실행의 시작                                                                                       | [`references/bva.md`](references/bva.md), [`references/oracle-card.md`](references/oracle-card.md)                                                                                                                                                                                                                                                                                                                                   |
 | 새 UI·redesign 또는 보이는 layout·palette·type·copy·motion·responsive·identity 변경을 카드로 만들기 전 | [`references/visual-design.md`](references/visual-design.md)                                                                                                                                                                                                                                                                                                                                                                         |
 | Delivery 진입 직후                                                                                     | sibling `test` skill의 SKILL.md 전문 — 레포 checkout에선 [`../test/SKILL.md`](../test/SKILL.md), 플러그인 설치본에는 미포함이므로 설치된 `test` skill을 이름으로 로드하고 못 찾으면 `FAIL`; [`references/implementation-loop.md`](references/implementation-loop.md), [`references/frontend-implementation.md`](references/frontend-implementation.md), [`references/architecture-contract.md`](references/architecture-contract.md) |
-| 페이지를 이어 붙이는 목록·무한 스크롤·커서 피드를 만들거나 바꾸기 전                                   | [`references/infinite-scroll.md`](references/infinite-scroll.md)                                                                                                                                                                                                                                                                                                                                                                     |
-| 입력에 따라 원격 결과를 갱신하는 검색·자동완성·combobox를 만들거나 바꾸기 전                           | [`references/search-typeahead.md`](references/search-typeahead.md)                                                                                                                                                                                                                                                                                                                                                                   |
 | 대상 레포가 FSD이거나, FSD 도입이 승인됐거나, FSD 채택·폴더 구조를 **제안·설계·리뷰하기 전**           | [`references/fsd.md`](references/fsd.md)                                                                                                                                                                                                                                                                                                                                                                                             |
 | backend·full-stack·DB 또는 data-access 경계를 만들거나 바꾸기 전                                       | [`references/backend.md`](references/backend.md)                                                                                                                                                                                                                                                                                                                                                                                     |
 | GREEN 후 브라우저로 열 수 있음                                                                         | [`references/browser-verification.md`](references/browser-verification.md); Design Intent가 있으면 [`references/visual-design.md`](references/visual-design.md)도 다시 읽음                                                                                                                                                                                                                                                          |
