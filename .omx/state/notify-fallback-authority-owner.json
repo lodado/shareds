@@ -2,13 +2,12 @@
   "owner": "hud",
   "pid": 55256,
   "cwd": "/Users/chungheon/orca/my-Vibe-Coding-Helper",
-  "heartbeat_at": "2026-08-14T02:17:43.994Z",
+  "heartbeat_at": "2026-08-14T02:29:03.018Z",
   "cooldown_ms": 5000,
-  "jitter_ms": 43,
-  "skip_count": 1087,
-  "last_status": "skipped",
-  "last_reason": "rate_limited",
-  "last_spawn_at": "2026-08-14T02:17:40.996Z",
-  "last_skip_at": "2026-08-14T02:17:43.994Z",
-  "next_allowed_at": "2026-08-14T02:17:46.039Z"
+  "jitter_ms": 23,
+  "skip_count": 1650,
+  "last_status": "spawned",
+  "last_reason": "spawned",
+  "last_spawn_at": "2026-08-14T02:29:03.018Z",
+  "next_allowed_at": "2026-08-14T02:29:08.041Z"
 }
