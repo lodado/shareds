@@ -3,5 +3,8 @@
   "version": "0.1.2",
   "description": "Claude Code / Codex plugin for Oracle-driven frontend delivery.",
   "private": true,
+  "scripts": {
+    "test": "node --test skills/scripts/*.test.mjs"
+  },
   "license": "MIT"
 }
