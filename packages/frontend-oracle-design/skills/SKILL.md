@@ -53,6 +53,7 @@ production 코드·기존 테스트·브라우저 관찰은 조사 자료이지 
 | 모든 실행의 시작                                                                                       | [`references/bva.md`](references/bva.md), [`references/oracle-card.md`](references/oracle-card.md)                                                                                                                                                                               |
 | 새 UI·redesign 또는 보이는 layout·palette·type·copy·motion·responsive·identity 변경을 카드로 만들기 전 | [`references/visual-design.md`](references/visual-design.md)                                                                                                                                                                                                                     |
 | Delivery 진입 직후                                                                                     | [`../test/SKILL.md`](../test/SKILL.md), [`references/implementation-loop.md`](references/implementation-loop.md), [`references/frontend-implementation.md`](references/frontend-implementation.md), [`references/architecture-contract.md`](references/architecture-contract.md) |
+| backend·full-stack·DB 또는 data-access 경계를 만들거나 바꾸기 전                                       | [`references/backend.md`](references/backend.md)                                                                                                                                                                                                                                 |
 | GREEN 후 브라우저로 열 수 있음                                                                         | [`references/browser-verification.md`](references/browser-verification.md); Design Intent가 있으면 [`references/visual-design.md`](references/visual-design.md)도 다시 읽음                                                                                                      |
 | 구현·브라우저 검증 후                                                                                  | [`references/subagent-review.md`](references/subagent-review.md); identity-shaping이면 [`references/visual-design.md`](references/visual-design.md)도 다시 읽음                                                                                                                  |
 
@@ -88,18 +89,21 @@ production 코드·기존 테스트·브라우저 관찰은 조사 자료이지 
    읽고, 생성·수정할 정확한 본문과 diff를 보여준 뒤 명시적 사용자 확인을 받는다.
    승인 전에는 architecture 문서·테스트·production을 수정하지 않는다. 승인된 문서를
    Oracle lock의 local source로 포함한다.
-3. 각 단계 직전 revision lock을 자동 검증한다. mismatch면 기존 증거를 폐기하고
+3. backend·DB·data-access 변경이면 `backend.md`로 기존 데이터 경계와 persistence
+   정책을 확인하고, 승인된 architecture source에 결정을 반영한 뒤 Oracle source로
+   잠근다. 데이터 경계가 안정되기 전에는 lock을 만들지 않는다.
+4. 각 단계 직전 revision lock을 자동 검증한다. mismatch면 기존 증거를 폐기하고
    `NEEDS_DECISION`, 손상·도구 오류면 `FAIL`로 멈춘다.
-4. High risk면 카드 전문과 SHA-256에 대한 사용자 확인 전에는 진행하지 않는다.
-5. sibling `test` skill 계약으로 테스트를 먼저 작성·실행해 `VALID_RED`를 확인한다.
+5. High risk면 카드 전문과 SHA-256에 대한 사용자 확인 전에는 진행하지 않는다.
+6. sibling `test` skill 계약으로 테스트를 먼저 작성·실행해 `VALID_RED`를 확인한다.
    FSD이면 테스트 위치도 승인된 architecture source와 대조해 가장 가까운 slice 또는
    segment의 `__test__/`에 둔다. 편의상 루트 `e2e/`로 모으지 않는다.
-6. production 수정 전 `implementation-loop.md`와 `frontend-implementation.md`로 구현
+7. production 수정 전 `implementation-loop.md`와 `frontend-implementation.md`로 구현
    결정을 기록한 뒤 최소 구현→GREEN을 수행한다.
-7. High risk면 sibling `test` skill의 mutation kill·원복·재-GREEN을 먼저 수행한다.
-8. 브라우저 대상이면 `browser-verification.md`로 실제 조작·증거·자가개선을 수행하고,
+8. High risk면 sibling `test` skill의 mutation kill·원복·재-GREEN을 먼저 수행한다.
+9. 브라우저 대상이면 `browser-verification.md`로 실제 조작·증거·자가개선을 수행하고,
    Design Intent가 있으면 모든 `D*` 행도 증거에 매핑한다.
-9. `subagent-review.md`로 독립 카드 리뷰, 유효 finding 개선, 최종 재검증을 수행한다.
+10. `subagent-review.md`로 독립 카드 리뷰, 유효 finding 개선, 최종 재검증을 수행한다.
 
 ## 피드백 라우팅
 

@@ -4,6 +4,21 @@ React production을 새로 만들거나 구조를 바꿀 때, 영향받는 archi
 구조 결정을 사용자 승인과 Oracle source lock으로 고정한다. 이 문서는 특정
 architecture(FSD 포함)를 강제하지 않는다.
 
+## Architecture intake
+
+승인 문서나 Oracle lock을 만들기 전에 다음을 실제 파일과 import에서 확인한다.
+
+- 적용되는 `AGENTS.md`, `CLAUDE.md`와 repo-local instruction
+- source root(`src/` 포함)와 영향받는 architecture unit의 정확한 경로
+- 외부 호출자가 쓰는 public API와 client/server entry point
+- 기존 segment별 책임, state와 async ownership
+- unit·segment별 테스트 소유 위치와 실행 명령
+- 기존 architecture 문서와 import-boundary 검증 수단
+
+확인한 경로와 책임을 승인 문서에 구체적으로 기록한다. 기존 구조가 없거나 사용자가
+새 구조를 승인한 경우에만 FSD 같은 architecture를 도입한다. intake 결과가 미결이거나
+대화 중 바뀌면 문서를 잠그지 않고 `NEEDS_DECISION`으로 돌려보낸다.
+
 ## Architecture unit
 
 문서는 모든 leaf component가 아니라 함께 변경되는 책임 경계에 둔다.
@@ -29,6 +44,10 @@ unit은 기존 레포의 feature, package, route module, component group 또는 
    `--source <architecture.md>`를 포함한다.
 6. 테스트, production, 브라우저, 리뷰 직전의 `oracle-lock.mjs verify`가 문서 변경을
    감지한다. `SOURCE_CHANGED`면 기존 증거를 폐기하고 새 본문을 다시 승인받는다.
+
+사용자가 승인한 architecture와 repo instruction이 충돌하거나 어느 한쪽이 바뀌면
+승인 당시의 결정을 추측하지 않는다. 현재 문서와 instruction을 다시 대조하고 필요한
+최소 diff를 재승인받은 뒤 새 revision을 잠근다.
 
 문서 자체의 SHA-256은 `oracle-lock.mjs` 출력의 source hash가 권위다. 별도 hash 파일이나
 generic AST checker를 만들지 않는다.
