@@ -129,7 +129,7 @@ UI가 단순해도 부작용이 위험하면 High다.
 
 Design Intent가 있으면 `visual-design.md`의 형식을 행동 매트릭스 바로 앞에 둔다.
 Design Intent·`D*` 행·행동 `O*` 행은 모두 같은 Oracle bytes로 잠근다. 모든 비-N/A
-`D*` 행도 `test | browser scenario | reviewer finding` 중 알맞은 증거 또는 출처 있는
+`D*` 행도 `test | reviewer finding` 중 알맞은 증거 또는 출처 있는
 N/A 사유에 매핑한다. 아래 행동 행에는 기존 BVA 규칙을 그대로 적용한다.
 `local`·`identity-shaping`이면 Design Change Confirmation의 사용자 답변 위치를 같은
 Design Intent에 기록한다.
@@ -211,9 +211,9 @@ node <skill-dir>/scripts/oracle-lock.mjs verify \
   lock은 덮어쓰지 않는다. 승인된 새 revision은 이전 artifact를 보존하고 새 경로에
   생성한다.
 - High risk는 카드 전문과 digest를 함께 보여준 뒤 사용자 확인을 받는다.
-- 테스트 작성, production 수정, 브라우저 검증, 독립 리뷰, 완료 상태 발급 직전에
+- 테스트 작성, production 수정, 독립 리뷰, 완료 상태 발급 직전에
   `verify`를 다시 실행한다.
-- `ORACLE_CHANGED`·`SOURCE_CHANGED`면 기존 RED·GREEN·브라우저·리뷰 증거를 폐기하고
+- `ORACLE_CHANGED`·`SOURCE_CHANGED`면 기존 RED·GREEN·리뷰 증거를 폐기하고
   변경 diff와 카드 현재본을 제시해 `NEEDS_DECISION`으로 돌아간다.
 - `LOCK_INVALID`·도구 부재·실행 불가는 결정론 판정 실패이므로 `FAIL`이다.
 - mismatch를 없애려고 자동 재생성하지 않는다. 재잠금은 source gate와 self-review를

@@ -11,10 +11,10 @@
 
 ## 권위와 진입 조건
 
-먼저 sibling `test` skill의 SKILL.md를 전부 읽고(레포 checkout에선
-`../test/SKILL.md`, 플러그인 설치본에선 설치된 `test` skill을 이름으로 로드 —
-못 찾으면 `FAIL`) Oracle 게이트, 테스트 작성, 실행, `VALID_RED` 판정과 보정
-예산을 그대로 따른다. 이 문서는 production 구현과
+테스트 파일을 작성하기 직전에 설치된 `$test` 스킬을 이름으로 명시적으로 로드·호출해
+SKILL.md 전문과 판정 계약을 활성화한다. 파일을 참고만 하는 것으로 대체하지 않으며,
+스킬을 찾거나 로드할 수 없으면 `FAIL`로 멈춘다. `$test`의 Oracle 게이트, 테스트 작성,
+실행, `VALID_RED` 판정과 보정 예산을 그대로 따른다. 이 문서는 production 구현과
 자가피드백만 추가한다. frontend production을 수정할 때는
 [`frontend-implementation.md`](frontend-implementation.md)도 전부 읽는다.
 
@@ -30,6 +30,21 @@
   명시적 문서 승인과 Oracle local-source lock을 완료해야 테스트를 작성할 수 있다.
   기존 승인 문서가 변경을 정확히 허용하면 새 승인 없이 경로와 source hash를 기록한다.
 - 기존 worktree 변경을 보존하고 관련 없는 파일을 수정하지 않는다.
+
+## 압축 스케줄
+
+시각 운영 질문은 `evidence`, `screenshot strictness`, `baseline authority`, `naming`,
+`designer`, `direct-browser`를 한 intake에 묶는다. lock 전에는 서로 독립적인 read-only
+조사를 병렬 실행할 수 있지만, 모든 결과 변경 결정이 끝난 뒤 final lock을 1회 만든다.
+정책 승인과 baseline 사용자 승인은 직렬 gate로 유지한다.
+
+`VALID_RED` 전에는 production을 수정하지 않는다. 이후 독립 구현 작업이 둘 이상일 때만
+겹치지 않는 파일 소유권으로 worker를 최대 2개까지 병렬 실행하고, 합친 뒤 targeted
+GREEN을 1회 실행한다. 작은 diff는 agent를 만들지 않는다.
+
+targeted GREEN 뒤에는 root test·lint·format과 독립 review를 병렬 실행한다. 모든 결과가
+합류하고 유효 finding이 반영된 뒤 final verify를 직렬로 1회 실행한다. 어느 한 결과만으로
+완료 처리하지 않는다.
 
 ## 1. 테스트로 계약 상태 확인
 
@@ -120,7 +135,7 @@ package 검증을 실행한다. 필수 root 명령이 없거나 무관한 기존
 
 최종 evidence manifest에는 Oracle SHA-256·source hashes·마지막 verify command/exit,
 실제 검증 command/PASS·FAIL 수와 모든 행동·시각 Oracle 행의
-`행 ID → test name | browser scenario | reviewer finding | 출처 있는 N/A 사유`를 기록한다. 결과에 영향을
+`행 ID → test name | reviewer finding | 출처 있는 N/A 사유`를 기록한다. 결과에 영향을
 주는 commit·runtime/browser version·locale/timezone·viewport/theme·role·clock/seed·
 데이터 초기화만 함께 기록한다. 비-N/A 행이 매핑되지 않거나 revision이 다르면 GREEN을
 발급하지 않는다.

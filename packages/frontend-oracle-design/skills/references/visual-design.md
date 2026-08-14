@@ -10,9 +10,10 @@ visual identity를 바꿀 때만 읽는다. 기존 시각 계약을 그대로 �
 2. Design Proposal과 Design Change Confirmation
 3. Design Intent 형식
 4. 증거 계층
-5. 두 번의 설계 pass
-6. Delivery 증거와 피드백
-7. 금지
+5. 승인 결과 Visual Lock
+6. 두 번의 설계 pass
+7. Delivery 증거와 피드백
+8. 금지
 
 ## 1. 권위와 시각 범위
 
@@ -136,7 +137,40 @@ N/A 사유를 남긴다.
 - 현재 production screenshot을 승인 없이 golden image로 채택하지 않는다.
 - 같은 fixture·mock·reference를 공유하는 증거는 서로 완전히 독립적이라고 보고하지 않는다.
 
-## 5. 두 번의 설계 pass
+## 5. 승인 결과 Visual Lock
+
+사용자가 디자인 drift 방지를 요청했거나 승인된 시각 baseline이 있으면, 관련 `D*` 행을
+서로 보완하는 세 증거로 잠근다.
+
+1. stable copy·role·의미 구조는 semantic DOM snapshot으로 비교한다.
+2. 승인된 computed style whitelist와 선택한 landmark의 relative layout snapshot으로
+   색·font·간격·크기·배치의 원인을 비교한다.
+3. Chromium·OS·font·viewport·theme·reduced motion을 고정하고 font readiness와 animation
+   종료를 통제한 headless `*.style.test/spec`에서 exact screenshot을 비교한다.
+
+raw HTML 전체, CSS source bytes, class name, 전체 DOM tree는 잠그지 않는다. screenshot은
+실제 렌더 drift를 잡고 앞의 좁은 snapshot은 실패 원인을 설명한다. 현재 production
+화면이나 최초 자동 생성 screenshot은 사용자 승인 없이 baseline이 아니다.
+
+일반 compare는 approved baseline을 read×1하고 baseline write×0을 유지한다. mismatch면
+변경 행과 actual/expected diff를 보고하고 baseline을 자동 갱신하지 않는다. 승인 근거가
+없으면 intentional update를 거부한다. 승인된 update만 변경 전후 diff를 사용자에게
+보여주고 명시적 승인을 받은 뒤 새 revision을 정확히 한 번 만들며, 기존 revision은
+보존하고 덮어쓰지 않는다.
+
+시각 계약 테스트는 소유 대상 가까이에 `*.style.test.ts` 또는 `*.style.test.tsx`로 둔다.
+기존 runner가 `.spec`만 수집하면 `*.style.spec.ts`를 쓰고 naming만을 위해 test 설정을
+변경하지 않는다. 레포의 실제 test command가 수집하는지 반드시 실행해 확인한다.
+
+기존 승인 UI는 production 변경 전에 baseline을 승인해 TDD RED에 쓴다. 새 UI는
+semantic DOM과 style/layout 계약을 먼저 RED로 만들고, 최초 구현 screenshot은 사용자
+승인 뒤 이후 변경의 baseline으로만 쓴다.
+
+`JUDGMENT` 행 또는 intentional baseline 변경이 있으면 deterministic 증거 생성 뒤 독립
+`designer` 검수를 필수로 수행한다. 둘 다 없고 deterministic comparison이 그대로
+통과하면 추가 designer 검수는 N/A와 사유를 기록할 수 있다.
+
+## 6. 두 번의 설계 pass
 
 ### Pass 1 — subject 기반 계획
 
@@ -164,17 +198,17 @@ N/A 사유를 남긴다.
 6. 한 요소를 제거하면 더 명확해지는가?
 7. 실제 content, 긴 문자열, empty·error 상태에서도 방향이 유지되는가?
 
-## 6. Delivery 증거와 피드백
+## 7. Delivery 증거와 피드백
 
 - `HARD` 행은 가장 좁은 관찰 계층에서 테스트하고 `Then`·`Never`를 함께 확인한다.
-- `RELATIONAL` 행은 사전 지정 viewport·theme·motion·state의 실제 브라우저에서 본다.
+- `RELATIONAL` 행은 사전 지정 viewport·theme·motion·state의 headless style test로 본다.
 - UI-shaping 작업은 실패 때뿐 아니라 통과한 핵심 상태 screenshot도 증거로 보존한다.
 - 대상 레포가 요구하는 320px, 양 theme, visible focus, reduced motion, AA contrast를
   생략하지 않는다.
 - `JUDGMENT` 행은 승인 기준·Design Intent·성공 screenshot을 독립 `designer`에게
   전달한다. reviewer는 정책을 새로 만들지 않는다.
-- 모든 `D*` 행을 `test | browser scenario | reviewer finding | 출처 있는 N/A`에 매핑한다.
-- 새 상태를 만들지 않고 기존 `BROWSER_VERIFIED`와 `REVIEW_VERIFIED`에 포함한다.
+- 모든 `D*` 행을 `test | reviewer finding | 출처 있는 N/A`에 매핑한다.
+- 새 상태를 만들지 않고 기존 `IMPLEMENTED_GREEN`과 `REVIEW_VERIFIED`에 포함한다.
 
 피드백은 기존 라우터를 그대로 사용한다.
 
@@ -187,7 +221,7 @@ N/A 사유를 남긴다.
 | 카드 범위 안 시각 증거 누락                            | `EVIDENCE_GAP`       |
 | 출처 없는 reviewer 취향                                | `NON_ORACLE_OPINION` |
 
-## 7. 금지
+## 8. 금지
 
 - 모든 UI 변경에 새 palette·font·signature 계획 강제
 - reviewer나 에이전트 제안을 승인 없이 Oracle로 잠금

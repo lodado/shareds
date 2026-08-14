@@ -1,0 +1,23 @@
+{
+  "name": "test",
+  "version": "0.1.1",
+  "description": "Oracle-driven frontend behavior and headless visual regression testing.",
+  "author": {
+    "name": "lodado",
+    "url": "https://github.com/lodado"
+  },
+  "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "repository": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "license": "MIT",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Frontend Test",
+    "shortDescription": "Verify locked frontend behavior contracts",
+    "longDescription": "Generate and run frontend behavior and headless visual regression tests against an approved Oracle Card.",
+    "developerName": "lodado",
+    "category": "development",
+    "capabilities": [],
+    "defaultPrompt": "Use $test to write and verify frontend behavior tests against the approved Oracle Card.",
+    "websiteURL": "https://github.com/lodado/my-Vibe-Coding-Helper"
+  }
+}

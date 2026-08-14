@@ -22,8 +22,8 @@
     },
     {
       "name": "frontend-oracle-design",
-      "description": "Oracle-driven frontend contracts, TDD, browser verification, and review.",
-      "version": "0.1.6",
+      "description": "Oracle-driven frontend contracts, TDD, automated visual regression, and review.",
+      "version": "0.1.8",
       "author": {
         "name": "lodado"
       },
@@ -43,6 +43,18 @@
       "category": "development",
       "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
       "tags": ["frontend", "system-design", "patterns"]
+    },
+    {
+      "name": "test",
+      "description": "Oracle-driven frontend behavior and headless visual regression testing.",
+      "version": "0.1.1",
+      "author": {
+        "name": "lodado"
+      },
+      "source": "./packages/test",
+      "category": "development",
+      "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+      "tags": ["frontend", "testing", "tdd", "oracle"]
     }
   ]
 }

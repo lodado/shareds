@@ -20,7 +20,7 @@ reviewer를 호출하지 않고 기존 증거를 폐기한다.
 1. 승인된 기획서·PRD·수용 기준·디자인 시스템·Figma 원본 파일/프레임
 2. 위 외부 기준을 실행 가능한 계약으로 옮긴 Oracle Card
 3. 대상 레포의 필수 아키텍처·접근성·보안 계약
-4. production 코드·기존 테스트·브라우저 관찰은 증거일 뿐 정답 권위가 아님
+4. production 코드·기존 headless test 관찰은 증거일 뿐 정답 권위가 아님
 
 Figma가 기준이면 정확한 파일·페이지·프레임·버전을 확인하고, 접근할 수 없으면
 추측하거나 스크린샷 기억으로 대체하지 말고 미검증으로 보고한다. 외부 기준과
@@ -35,10 +35,11 @@ Oracle Card가 충돌하면 reviewer가 임의로 하나를 택하거나 코드�
 - 역할 라우팅이 지원되지 않으면 역할을 프롬프트로 가장하지 말고 지원되는 독립
   review 표면을 사용하거나 `FAIL`로 보고한다.
 
-`identity-shaping`이면 위 code review와 별도로 설치된 `designer` 역할을 명시해
-시각 계약을 검토한다. mixed 작업은 `code-reviewer`가 기술·행동 계약을,
-`designer`가 Design Intent·`D*` 행을 맡는다. `behavior-only`·단순 `local` 변경에는
-추가 reviewer를 만들지 않는다. 어느 reviewer도 정책을 새로 정하지 않는다.
+`identity-shaping`, `JUDGMENT` 행 또는 intentional visual baseline 변경이면 위 code
+review와 별도로 설치된 `designer` 역할을 명시해 시각 계약을 검토한다. mixed 작업은
+`code-reviewer`가 기술·행동 계약을, `designer`가 Design Intent·`D*` 행을 맡는다.
+어느 reviewer도 정책을 새로 정하지 않는다. deterministic comparison이 그대로 통과하고
+`JUDGMENT` 행과 baseline 변경이 모두 없으면 추가 designer 검수는 N/A와 사유를 기록한다.
 
 ## Reviewer 입력
 
@@ -52,14 +53,18 @@ Oracle Card가 충돌하면 reviewer가 임의로 하나를 택하거나 코드�
 6. production diff
 7. 추가·변경한 테스트 diff
 8. 테스트·typecheck·lint·build의 실제 출력
-9. 브라우저 증거 또는 N/A 사유
+9. headless style/screenshot test 증거 또는 N/A 사유
 10. High risk mutation 증거
 11. 미검증 항목
-12. `Oracle 행 ID → test/browser/N/A 증거` 전체 매핑
+12. `Oracle 행 ID → test/reviewer/N/A 증거` 전체 매핑
 13. Design Intent가 있으면 승인된 reference·anti-reference, `D*` 행과
     viewport·theme·motion별 성공 screenshot
+14. `JUDGMENT` 행 또는 visual baseline 변경이면 잠긴 Oracle revision, 승인 baseline,
+    actual screenshot, exact diff와 viewport·theme·motion 조건
 
 reviewer는 코드를 수정하지 않고 다음 형식으로 finding만 반환한다.
+정책과 baseline을 수정하거나 승인하는 것은 금지하며, baseline 최종 승인은 사용자에게
+남긴다.
 
 | 분류 | 기준 출처 | 카드 행 | 상태 | 발견 | 증거 | 심각도 | 최소 권장 수정 |
 | ---- | --------- | ------- | ---- | ---- | ---- | ------ | -------------- |
@@ -77,7 +82,7 @@ reviewer는 코드를 수정하지 않고 다음 형식으로 finding만 반환�
 - 외부 기준의 각 요구가 Oracle Card에 정확히 번역됐으며 누락·왜곡되지 않았는가?
 - Source Registry의 각 기준이 자신의 관할 안에서만 적용됐고 version이 여전히 같은가?
 - Oracle SHA-256과 source hashes가 마지막 verify 결과와 일치하는가?
-- 모든 Oracle 행에 test, browser scenario 또는 출처 있는 N/A 증거가 매핑됐는가?
+- 모든 Oracle 행에 test, reviewer finding 또는 출처 있는 N/A 증거가 매핑됐는가?
 - 모든 비-N/A 카드 행이 테스트에 대응하는가?
 - 각 행이 `Then`, `Never`, 부작용 종류·횟수를 검증하는가?
 - UI 상태와 실제 부작용 횟수를 별도로 검증하는가?
@@ -108,9 +113,9 @@ reviewer는 코드를 수정하지 않고 다음 형식으로 finding만 반환�
   사용자 답변 위치가 카드에 있는가?
 - `identity-shaping`이면 다른 제품에도 그대로 붙을 generic 선택을 제거하고 boldness를
   signature 한 곳에 집중했는가?
-- 모든 `D*` 행에 test, browser scenario, designer finding 또는 출처 있는 N/A가
+- 모든 `D*` 행에 test, designer finding 또는 출처 있는 N/A가
   매핑됐으며 같은 fixture·reference를 공유하는 증거를 독립 증거로 과장하지 않았는가?
-- 브라우저 증거가 사전 매핑된 모든 browser-relevant 카드 행을 실제로 판정하는가?
+- headless style/screenshot test가 사전 매핑된 모든 시각 카드 행을 실제로 판정하는가?
 - 보안, 접근성, 데이터 유실 방지 같은 레포 필수 계약을 훼손하지 않았는가?
 
 ## Finding 개선
@@ -120,7 +125,7 @@ reviewer는 코드를 수정하지 않고 다음 형식으로 finding만 반환�
 2. 정책을 새로 정해야 하는 finding은 수정하지 않고 `NEEDS_DECISION`으로 복귀한다.
 3. 수정 후 finding을 재현하는 targeted test를 실행한다.
 4. 카드 전체 테스트와 레포 필수 검증을 다시 실행한다.
-5. 영향을 받은 브라우저 시나리오를 다시 실행한다.
+5. 영향을 받은 headless style/screenshot test를 다시 실행한다.
 6. 가능하면 같은 reviewer에 원시 재검증 증거를 전달해 finding 해소 여부만 확인한다.
 
 reviewer와 fixer를 분리한다. reviewer가 직접 수정하고 자신의 수정을 최종 승인하게
