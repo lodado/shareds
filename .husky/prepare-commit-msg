@@ -1,0 +1,24 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Get the current branch name
+BRANCH_NAME=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+# Skip if branch name couldn't be determined or if it's main/master
+if [ -z "$BRANCH_NAME" ] || [ "$BRANCH_NAME" = "main" ] || [ "$BRANCH_NAME" = "master" ]; then
+  exit 0
+fi
+
+# Extract ticket/issue number from branch name (e.g., feature/SDUI-123-description -> SDUI-123)
+TICKET=$(echo "$BRANCH_NAME" | grep -oE '[A-Z]+-[0-9]+' | head -1)
+
+# If ticket found and not already in commit message, prepend it
+if [ -n "$TICKET" ]; then
+  COMMIT_MSG_FILE=$1
+  COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+  # Check if ticket is already in the message
+  if ! echo "$COMMIT_MSG" | grep -q "$TICKET"; then
+    echo "[$TICKET] $COMMIT_MSG" > "$COMMIT_MSG_FILE"
+  fi
+fi

@@ -1,0 +1,13 @@
+{
+  "name": "vibe-coding-helper",
+  "version": "0.1.0",
+  "description": "Shared coding helpers for lodado projects - ESLint preset adoption and repo conventions.",
+  "author": {
+    "name": "lodado",
+    "url": "https://github.com/lodado"
+  },
+  "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "repository": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "license": "MIT",
+  "keywords": ["eslint", "monorepo", "conventions", "claude-code"]
+}
