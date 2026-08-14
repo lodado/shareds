@@ -97,6 +97,10 @@
   slice `api`를 호출한다.
 - 여러 slice가 실제로 공유하는 DB client·connection·container 같은 인프라만
   `shared/api`에 둔다.
+- DB driver·ORM import와 query 실행은 `shared/api`의 db 인프라
+  (client·migration·seed)와 각 slice `api`의 repository 안에만 둔다.
+  repository는 mapping·keyset pagination·hasNext 판정을 소유하고, route
+  handler·RSC·`ui`·`model`은 driver를 직접 import하지 않는다.
 
 ## 테스트·mock 배치
 
@@ -107,6 +111,8 @@
 - MSW handler와 예시 데이터: 한 segment만 쓰면 `<slice>/api/__mocks__/`, 여러
   segment를 관통하면 `<slice>/__mocks__/`, 실제로 여러 slice가 공유할 때만 상위
   layer로 올린다.
+- MSW 배선(`setupServer`·`setupWorker`)은 `shared/config/msw`에 두되 handler를
+  포함하지 않는다. handler는 소유 slice가 export하고 배선이 조립만 한다.
 
 ## Greenfield bootstrap
 
@@ -120,6 +126,33 @@
   `hooks/`, `lib/` 조직)를 권장해 FSD와 충돌하면 임의로 절충하지 않는다.
   `NEEDS_DECISION`으로 우선순위를 물어 승인된 결정을 architecture 문서에
   기록한 뒤 진행한다.
+
+## 예시 — full-stack Next.js 목록 + 좋아요
+
+```text
+src/
+├── app/                      # Next 라우팅 전용 — page.tsx·route.ts는 조립만
+├── _pages/product-list/      # 페이지 전용 조합 (widgets 아님)
+│   ├── model/useProductsInfinite.ts
+│   ├── ui/                   # List·Skeleton·Empty·Error·LoadMoreSentinel
+│   ├── api/                  # 목록 GET + cursor (단일 사용이면 여기)
+│   └── __test__/
+├── entities/product/         # 여러 소비자가 실공유하는 것만
+│   ├── model/product.ts      # 도메인 파일명 — types.ts 금지
+│   ├── api/product.repository.ts   # server-only
+│   ├── api/__mocks__/
+│   └── ui/ProductCard.tsx
+├── features/product-like/
+│   ├── api/like.repository.ts      # server-only
+│   ├── api/likeApi.ts + __mocks__/
+│   ├── model/useToggleLike.ts + likeCachePatch.ts
+│   ├── ui/LikeButton.tsx
+│   └── __test__/             # segment 관통 scenario
+└── shared/
+    ├── api/httpClient.ts + db/     # driver·client·migration·seed
+    ├── auth/
+    └── config/msw/           # setupServer 배선만, handler 없음
+```
 
 ## 자주 나오는 위반
 
