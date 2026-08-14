@@ -41,10 +41,7 @@ async function sha256(path) {
 }
 
 function assertManifest(manifest) {
-  const validEntry = (entry) =>
-    entry &&
-    typeof entry.path === 'string' &&
-    /^[a-f0-9]{64}$/.test(entry.sha256)
+  const validEntry = (entry) => entry && typeof entry.path === 'string' && /^[a-f0-9]{64}$/.test(entry.sha256)
 
   if (
     manifest?.schemaVersion !== 1 ||
@@ -59,25 +56,19 @@ function assertManifest(manifest) {
 
 function sameEntries(left, right) {
   if (left.length !== right.length) return false
-  const byPath = (first, second) =>
-    first.path < second.path ? -1 : first.path > second.path ? 1 : 0
+  const byPath = (first, second) => (first.path < second.path ? -1 : first.path > second.path ? 1 : 0)
   const sortedLeft = [...left].sort(byPath)
   const sortedRight = [...right].sort(byPath)
 
   return sortedLeft.every(
-    (entry, index) =>
-      entry.path === sortedRight[index].path &&
-      entry.sha256 === sortedRight[index].sha256,
+    (entry, index) => entry.path === sortedRight[index].path && entry.sha256 === sortedRight[index].sha256,
   )
 }
 
 async function assertExistingLockUnchanged(lockPath, manifest) {
   const existing = await readManifest(lockPath)
 
-  if (
-    existing.oracle.path !== manifest.oracle.path ||
-    existing.oracle.sha256 !== manifest.oracle.sha256
-  ) {
+  if (existing.oracle.path !== manifest.oracle.path || existing.oracle.sha256 !== manifest.oracle.sha256) {
     throw new CliError('ORACLE_CHANGED', 'Existing lock belongs to different Oracle bytes')
   }
 
@@ -102,9 +93,7 @@ async function createLock(options) {
       sha256: await sha256(path),
     })),
   )
-  sources.sort((left, right) =>
-    left.path < right.path ? -1 : left.path > right.path ? 1 : 0,
-  )
+  sources.sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0))
 
   const manifest = {
     schemaVersion: 1,
@@ -183,10 +172,7 @@ async function main() {
 try {
   await main()
 } catch (error) {
-  const cliError =
-    error instanceof CliError
-      ? error
-      : new CliError('INPUT_UNREADABLE', error.message ?? String(error))
+  const cliError = error instanceof CliError ? error : new CliError('INPUT_UNREADABLE', error.message ?? String(error))
   process.stderr.write(`${cliError.code}: ${cliError.message}\n`)
   process.exitCode = cliError.exitCode
 }

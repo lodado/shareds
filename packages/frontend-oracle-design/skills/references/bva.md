@@ -105,7 +105,10 @@ deferred.resolve(new Response(JSON.stringify({ id: 'n1' }), { status: 200 }))
 // 순서 역전: deferred 두 개를 만들어 뒤 요청을 먼저 resolve
 ```
 
-Playwright면 `page.route` handler 안에서 같은 barrier로 완료 시점을 통제한다.
+MSW를 쓰면 같은 barrier를 handler 안에 둔다. `http.post(path, async () => {
+await deferred.promise; return HttpResponse.json({ id: 'n1' }) })`처럼 완료 시점을
+테스트가 쥐고, 요청 횟수·순서도 handler에서 관찰한다. Playwright면 `page.route`
+handler 안에서 같은 barrier를 쓴다.
 
 ## Adversarial 반례 예시
 

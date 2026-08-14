@@ -33,9 +33,14 @@
 
 1. bundled `oracle-lock.mjs verify`를 실행하고 revision과 exit code를 기록한다.
 2. 카드의 모든 비-N/A 행을 관찰 가능한 테스트로 번역한다.
-3. 각 행의 `Then`, `Never`, 부작용 종류·횟수를 함께 assert한다.
-4. 테스트를 실제로 실행한다.
-5. 실패가 sibling `test` skill의 `VALID_RED` 술어를 만족할 때만 production을 수정한다.
+3. network 경계가 있으면 MSW handler로 세운다. 레포에 MSW가 없으면 설치 여부를 먼저
+   확인하고, MSW로 표현할 수 없는 경우에만 다른 mocking 수단을 사유와 함께 쓴다.
+   handler와 예시 데이터는 그 경계를 소유한 가장 가까운 slice·segment의 `__mocks__/`에
+   두고, 실제로 여러 slice가 공유할 때만 상위 layer로 올린다.
+4. 각 행의 `Then`, `Never`, 부작용 종류·횟수를 함께 assert한다. 요청 횟수와 순서는
+   handler에서 관찰한다.
+5. 테스트를 실제로 실행한다.
+6. 실패가 sibling `test` skill의 `VALID_RED` 술어를 만족할 때만 production을 수정한다.
 
 요청된 동작이 이미 GREEN이면 production을 억지로 바꾸거나 RED를 만들지 않는다.
 기존 구현이 카드를 충족한다는 증거를 기록하고 전체 검증으로 간다. High risk는

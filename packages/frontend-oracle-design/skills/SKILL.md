@@ -29,6 +29,11 @@ production 코드·기존 테스트·브라우저 관찰은 조사 자료이지 
   scenario·Playwright 테스트는 `<slice>/__test__/`, 한 segment에 국한된 unit·component
   테스트는 해당 `model|api|hooks|ui/__test__/`에 두어 production과 함께 이동·삭제되게 한다.
   레포가 다른 위치를 명시적으로 강제할 때만 그 관례를 우선하고 사유를 기록한다.
+- TDD 시작 시 network 경계는 MSW를 최대한 쓴다. `fetch`·transport 모듈 직접 mocking은
+  MSW로 표현할 수 없는 경우에만 사유와 함께 쓴다. MSW handler와 예시 데이터는 FSD
+  slice 안에서 제일 가까운 곳에 둔다. 한 segment만 쓰면 `<slice>/api/__mocks__/`,
+  여러 segment를 관통하면 `<slice>/__mocks__/`에 두고, 실제로 여러 slice가 공유할 때만
+  상위 layer로 올린다. 편의상 루트 `mocks/`로 모으지 않는다.
 - assertion 약화, `test.skip` 전환, 임의 sleep으로 GREEN을 만들지 않는다.
 - 브라우저와 subagent는 증거와 비평을 제공하지만 정책을 새로 정하지 않는다.
 - AI가 만든 visual direction과 디자인 skill의 결과는 제안이지 정책 출처가 아니다.
@@ -96,8 +101,10 @@ production 코드·기존 테스트·브라우저 관찰은 조사 자료이지 
    `NEEDS_DECISION`, 손상·도구 오류면 `FAIL`로 멈춘다.
 5. High risk면 카드 전문과 SHA-256에 대한 사용자 확인 전에는 진행하지 않는다.
 6. sibling `test` skill 계약으로 테스트를 먼저 작성·실행해 `VALID_RED`를 확인한다.
-   FSD이면 테스트 위치도 승인된 architecture source와 대조해 가장 가까운 slice 또는
-   segment의 `__test__/`에 둔다. 편의상 루트 `e2e/`로 모으지 않는다.
+   network 경계는 MSW handler로 세우고, handler와 예시 데이터를 그 경계를 소유한
+   가장 가까운 slice·segment에 둔다. FSD이면 테스트 위치도 승인된 architecture
+   source와 대조해 가장 가까운 slice 또는 segment의 `__test__/`에 둔다. 편의상 루트
+   `e2e/`·`mocks/`로 모으지 않는다.
 7. production 수정 전 `implementation-loop.md`와 `frontend-implementation.md`로 구현
    결정을 기록한 뒤 최소 구현→GREEN을 수행한다.
 8. High risk면 sibling `test` skill의 mutation kill·원복·재-GREEN을 먼저 수행한다.

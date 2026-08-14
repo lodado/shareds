@@ -28,32 +28,19 @@ async function fixture(t) {
 test('creates and verifies an exact-byte lock', async (t) => {
   const { lock, oracle, source } = await fixture(t)
 
-  const created = run(
-    'create',
-    '--oracle',
-    oracle,
-    '--lock',
-    lock,
-    '--source',
-    source,
-  )
+  const created = run('create', '--oracle', oracle, '--lock', lock, '--source', source)
   assert.equal(created.status, 0, created.stderr)
 
   const manifest = JSON.parse(await readFile(lock, 'utf8'))
   const firstLock = await readFile(lock, 'utf8')
   assert.equal(manifest.schemaVersion, 1)
   assert.match(manifest.oracle.sha256, /^[a-f0-9]{64}$/)
-  assert.deepEqual(manifest.sources.map(({ path }) => path), ['prd.md'])
-
-  const recreated = run(
-    'create',
-    '--oracle',
-    oracle,
-    '--lock',
-    lock,
-    '--source',
-    source,
+  assert.deepEqual(
+    manifest.sources.map(({ path }) => path),
+    ['prd.md'],
   )
+
+  const recreated = run('create', '--oracle', oracle, '--lock', lock, '--source', source)
   assert.equal(recreated.status, 0, recreated.stderr)
   assert.equal(await readFile(lock, 'utf8'), firstLock)
 
@@ -63,15 +50,7 @@ test('creates and verifies an exact-byte lock', async (t) => {
 
 test('rejects changed Oracle and source bytes', async (t) => {
   const { lock, oracle, source } = await fixture(t)
-  const created = run(
-    'create',
-    '--oracle',
-    oracle,
-    '--lock',
-    lock,
-    '--source',
-    source,
-  )
+  const created = run('create', '--oracle', oracle, '--lock', lock, '--source', source)
   assert.equal(created.status, 0, created.stderr)
 
   await writeFile(oracle, '# Changed Oracle\n')
@@ -88,43 +67,19 @@ test('rejects changed Oracle and source bytes', async (t) => {
 
 test('refuses to overwrite a changed existing lock', async (t) => {
   const { lock, oracle, source } = await fixture(t)
-  const created = run(
-    'create',
-    '--oracle',
-    oracle,
-    '--lock',
-    lock,
-    '--source',
-    source,
-  )
+  const created = run('create', '--oracle', oracle, '--lock', lock, '--source', source)
   assert.equal(created.status, 0, created.stderr)
   const originalLock = await readFile(lock, 'utf8')
 
   await writeFile(oracle, '# Changed Oracle\n')
-  const changedOracle = run(
-    'create',
-    '--oracle',
-    oracle,
-    '--lock',
-    lock,
-    '--source',
-    source,
-  )
+  const changedOracle = run('create', '--oracle', oracle, '--lock', lock, '--source', source)
   assert.equal(changedOracle.status, 1)
   assert.match(changedOracle.stderr, /ORACLE_CHANGED/)
   assert.equal(await readFile(lock, 'utf8'), originalLock)
 
   await writeFile(oracle, '# Oracle\n')
   await writeFile(source, '# Changed Requirement\n')
-  const changedSource = run(
-    'create',
-    '--oracle',
-    oracle,
-    '--lock',
-    lock,
-    '--source',
-    source,
-  )
+  const changedSource = run('create', '--oracle', oracle, '--lock', lock, '--source', source)
   assert.equal(changedSource.status, 1)
   assert.match(changedSource.stderr, /SOURCE_CHANGED/)
   assert.equal(await readFile(lock, 'utf8'), originalLock)

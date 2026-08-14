@@ -11,10 +11,7 @@ async function read(relativePath) {
 }
 
 test('requires automatic deterministic locking at delivery boundaries', async () => {
-  const [skill, oracleCard] = await Promise.all([
-    read('SKILL.md'),
-    read('references/oracle-card.md'),
-  ])
+  const [skill, oracleCard] = await Promise.all([read('SKILL.md'), read('references/oracle-card.md')])
 
   assert.match(skill, /scripts\/oracle-lock\.mjs/)
   assert.match(skill, /각 단계 직전 revision lock을 자동 검증/)
@@ -26,10 +23,7 @@ test('requires automatic deterministic locking at delivery boundaries', async ()
 })
 
 test('keeps feedback routing and evidence tied to the locked revision', async () => {
-  const [skill, implementationLoop] = await Promise.all([
-    read('SKILL.md'),
-    read('references/implementation-loop.md'),
-  ])
+  const [skill, implementationLoop] = await Promise.all([read('SKILL.md'), read('references/implementation-loop.md')])
 
   for (const classification of [
     'POLICY_GAP',
@@ -60,22 +54,26 @@ test('carries the locked revision through browser and independent review', async
   assert.match(subagentReview, /NON_ORACLE_OPINION/)
 })
 
+test('starts TDD with MSW and colocates handlers in the nearest FSD slice', async () => {
+  const [skill, implementationLoop] = await Promise.all([read('SKILL.md'), read('references/implementation-loop.md')])
+
+  assert.match(skill, /MSW를 최대한 쓴다/)
+  assert.match(skill, /<slice>\/api\/__mocks__\//)
+  assert.match(skill, /<slice>\/__mocks__\//)
+  assert.match(implementationLoop, /MSW handler로 세운다/)
+  assert.match(implementationLoop, /가장 가까운 slice·segment의 `__mocks__\/`/)
+})
+
 test('loads visual design guidance only for UI-shaping work and carries its contract through delivery', async () => {
-  const [
-    skill,
-    visualDesign,
-    oracleCard,
-    frontendImplementation,
-    browserVerification,
-    subagentReview,
-  ] = await Promise.all([
-    read('SKILL.md'),
-    read('references/visual-design.md'),
-    read('references/oracle-card.md'),
-    read('references/frontend-implementation.md'),
-    read('references/browser-verification.md'),
-    read('references/subagent-review.md'),
-  ])
+  const [skill, visualDesign, oracleCard, frontendImplementation, browserVerification, subagentReview] =
+    await Promise.all([
+      read('SKILL.md'),
+      read('references/visual-design.md'),
+      read('references/oracle-card.md'),
+      read('references/frontend-implementation.md'),
+      read('references/browser-verification.md'),
+      read('references/subagent-review.md'),
+    ])
 
   assert.match(skill, /references\/visual-design\.md/)
   assert.match(skill, /behavior-only/)
