@@ -11,8 +11,10 @@
 
 ## 권위와 진입 조건
 
-먼저 sibling `test/SKILL.md`를 전부 읽고 Oracle 게이트, 테스트 작성, 실행,
-`VALID_RED` 판정과 보정 예산을 그대로 따른다. 이 문서는 production 구현과
+먼저 sibling `test` skill의 SKILL.md를 전부 읽고(레포 checkout에선
+`../test/SKILL.md`, 플러그인 설치본에선 설치된 `test` skill을 이름으로 로드 —
+못 찾으면 `FAIL`) Oracle 게이트, 테스트 작성, 실행, `VALID_RED` 판정과 보정
+예산을 그대로 따른다. 이 문서는 production 구현과
 자가피드백만 추가한다. frontend production을 수정할 때는
 [`frontend-implementation.md`](frontend-implementation.md)도 전부 읽는다.
 

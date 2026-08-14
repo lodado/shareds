@@ -236,4 +236,78 @@ ruleTester.run('no-derived-state-effect', rules['no-derived-state-effect'], {
   ],
 })
 
+ruleTester.run('fsd-no-deep-import', rules['fsd-no-deep-import'], {
+  valid: [
+    { code: "import { LoginForm } from '@/features/auth'", filename: '/repo/src/views/login/ui/Page.tsx' },
+    { code: "import { auth } from '@/features/auth/index'", filename: '/repo/src/views/login/ui/Page.tsx' },
+    { code: "import { repo } from '@/features/auth/index.server'", filename: '/repo/src/app/api/login/route.ts' },
+    { code: "import { repo } from '@/features/auth/api/server'", filename: '/repo/src/app/api/login/route.ts' },
+    { code: "import { UserRef } from '@/entities/user/@x/order'", filename: '/repo/src/entities/order/model/order.ts' },
+    // internal imports within the same slice stay free
+    {
+      code: "import { store } from '@/features/auth/model/store'",
+      filename: '/repo/src/features/auth/ui/LoginForm.tsx',
+    },
+    { code: "import { store } from '../model/store'", filename: '/repo/src/features/auth/ui/LoginForm.tsx' },
+    { code: "import { format } from '@/shared/lib/format-date'", filename: '/repo/src/views/login/ui/Page.tsx' },
+  ],
+  invalid: [
+    {
+      code: "import { LoginForm } from '@/features/auth/ui/LoginForm'",
+      filename: '/repo/src/views/login/ui/Page.tsx',
+      errors: [{ messageId: 'deepImport' }],
+    },
+    {
+      code: "import { store } from '../../features/auth/model/store'",
+      filename: '/repo/src/views/login/ui/Page.tsx',
+      errors: [{ messageId: 'deepImport' }],
+    },
+    {
+      code: "export { likePost } from '@/features/like/model/mutation'",
+      filename: '/repo/src/widgets/feed/index.ts',
+      errors: [{ messageId: 'deepImport' }],
+    },
+  ],
+})
+
+ruleTester.run('fsd-no-banned-segments', rules['fsd-no-banned-segments'], {
+  valid: [
+    { code: 'export {}', filename: '/repo/src/features/auth/ui/LoginForm.tsx' },
+    { code: 'export {}', filename: '/repo/src/features/auth/model/useLogin.ts' },
+    // outside sliced layers the convention does not apply
+    { code: 'export {}', filename: '/repo/src/shared/hooks/useDebounce.ts' },
+  ],
+  invalid: [
+    { code: 'export {}', filename: '/repo/src/features/auth/components/LoginForm.tsx', errors: 1 },
+    { code: 'export {}', filename: '/repo/src/features/auth/hooks/useLogin.ts', errors: 1 },
+    { code: 'export {}', filename: '/repo/src/entities/product/utils/format.ts', errors: 1 },
+  ],
+})
+
+ruleTester.run('fsd-no-driver-outside-repository', rules['fsd-no-driver-outside-repository'], {
+  valid: [
+    { code: "import { drizzle } from 'drizzle-orm'", filename: '/repo/src/shared/api/db/client.ts' },
+    { code: "import pg from 'pg'", filename: '/repo/src/entities/product/api/product.repository.ts' },
+    { code: "import { sql } from 'drizzle-orm/sql'", filename: '/repo/src/shared/api/db/seed.ts' },
+    { code: "import { z } from 'zod'", filename: '/repo/src/app/api/products/route.ts' },
+  ],
+  invalid: [
+    {
+      code: "import pg from 'pg'",
+      filename: '/repo/src/app/api/products/route.ts',
+      errors: [{ messageId: 'driverOutsideBoundary' }],
+    },
+    {
+      code: "import { drizzle } from 'drizzle-orm'",
+      filename: '/repo/src/features/like/model/useToggleLike.ts',
+      errors: [{ messageId: 'driverOutsideBoundary' }],
+    },
+    {
+      code: "const pg = require('pg')",
+      filename: '/repo/src/views/products/ui/Page.tsx',
+      errors: [{ messageId: 'driverOutsideBoundary' }],
+    },
+  ],
+})
+
 console.log(`ok  ${Object.keys(rules).length} rules pass RuleTester`)

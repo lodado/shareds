@@ -80,6 +80,9 @@ test('defines the FSD contract and wires it through loading, architecture, imple
   ])
 
   assert.match(skill, /references\/fsd\.md/)
+  assert.match(skill, /Feature-Sliced Design/)
+  assert.match(skill, /제안·설계·리뷰하기 전/)
+  assert.match(skill, /설치된 `test` skill을 이름으로 로드/)
   assert.match(fsd, /app → pages → widgets → features → entities → shared/)
   assert.match(fsd, /`components`, `hooks`, `utils`는 FSD segment가 아니다/)
   assert.match(fsd, /ui\|model\|api\|lib\/__test__\//)

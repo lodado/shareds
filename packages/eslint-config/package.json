@@ -12,7 +12,8 @@
     "./turbo": "./turbo.js",
     "./local-rules": "./local-rules.js",
     "./testing": "./testing.js",
-    "./query": "./query.js"
+    "./query": "./query.js",
+    "./fsd": "./fsd.js"
   },
   "files": [
     "index.js",
@@ -22,7 +23,8 @@
     "turbo.js",
     "local-rules.js",
     "testing.js",
-    "query.js"
+    "query.js",
+    "fsd.js"
   ],
   "repository": {
     "type": "git",
@@ -34,7 +36,7 @@
   },
   "scripts": {
     "test": "node test.js",
-    "lint": "eslint index.js react.js next.js a11y.js turbo.js local-rules.js testing.js query.js test.js"
+    "lint": "eslint index.js react.js next.js a11y.js turbo.js local-rules.js testing.js query.js fsd.js test.js"
   },
   "dependencies": {
     "@lodado/eslint-plugin-local-rules": "workspace:*",

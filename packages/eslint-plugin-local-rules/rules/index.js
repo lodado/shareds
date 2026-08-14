@@ -1,5 +1,8 @@
 /* eslint-disable global-require */
 module.exports = {
+  'fsd-no-banned-segments': require('./fsd-no-banned-segments'),
+  'fsd-no-deep-import': require('./fsd-no-deep-import'),
+  'fsd-no-driver-outside-repository': require('./fsd-no-driver-outside-repository'),
   'no-arbitrary-sleep-in-tests': require('./no-arbitrary-sleep-in-tests'),
   'no-console-log': require('./no-console-log'),
   'no-css-locator-without-reason': require('./no-css-locator-without-reason'),

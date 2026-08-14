@@ -118,8 +118,10 @@
 
 - 승인된 layer만 생성하고 path alias(`@/*` 등) 매핑을 architecture 문서에
   기록한다.
-- import-boundary 검증이 없으면 도입을 **제안**한다: steiger(공식 FSD linter)
-  또는 `eslint-plugin-boundaries`·`import/no-internal-modules` 동등 규칙.
+- import-boundary 검증이 없으면 도입을 **제안**한다: `@lodado/eslint-config`를
+  이미 쓰는 레포는 `fsd` preset(`@lodado/eslint-config/fsd` — deep import·비표준
+  segment·driver 경계 강제), 그 외에는 steiger(공식 FSD linter) 또는
+  `eslint-plugin-boundaries`·`import/no-internal-modules` 동등 규칙.
   사용자 승인 후 devDependency로 추가하고 GREEN 게이트의 구조 검증 명령에
   포함한다. 승인 없이는 추가하지 않는다.
 - 사용자 전역 rules나 repo instruction이 다른 폴더 구조(예: `components/`,
