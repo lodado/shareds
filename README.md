@@ -8,7 +8,7 @@ Monorepo distributing lodado's shared ESLint configuration and coding-agent plug
 | [`@lodado/eslint-plugin-local-rules`](packages/eslint-plugin-local-rules) | npm (changesets)                       | Custom ESLint rules                                   |
 | [`vibe-coding-helper`](packages/vibe-coding-helper)                       | Claude Code / Codex plugin marketplace | Skills shared with coding agents                      |
 | [`frontend-oracle-design`](packages/frontend-oracle-design)               | Claude Code / Codex plugin marketplace | Oracle-driven frontend contracts, TDD, and review     |
-| [`frontend-system-design`](packages/frontend-system-design)               | Claude Code / Codex plugin marketplace | Policy questions for well-known frontend problems     |
+| [`frontend-system-design`](packages/frontend-system-design)               | Claude Code / Codex plugin marketplace | Oracle-dependent patterns for known frontend problems |
 | [`test`](packages/test)                                                   | Claude Code / Codex plugin marketplace | Oracle-driven frontend behavior testing               |
 
 ## ESLint config

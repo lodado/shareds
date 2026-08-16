@@ -4,6 +4,9 @@
 없을 수 있고, 담을 때 가격이 결제할 때 다를 수 있다. 여기에 수량 조절이라는 연타되기
 쉬운 조작과, 로그인 시 장바구니 병합이라는 데이터 합치기 문제가 붙는다.
 
+> **Oracle 우선:** 이 문서는 `frontend-oracle-design`의 활성 카드 아래에서만 쓴다.
+> `ORACLE_READY` 전에는 구현하지 않는다. 추천과 코드는 정책 출처가 아니다. 코드는 구현 선택지다.
+
 ## 1. 언제 읽는가
 
 옵션을 골라 담는 상품 화면, 수량을 바꾸는 장바구니, 결제 직전 확인 화면.
@@ -12,11 +15,17 @@
 
 ## 2. 권장 구조
 
+수량 변경의 멱등성·낙관적 갱신·서버 재검증은 [S1][S2]에 맞춰 API의 최신 의도와 authoritative 값을 구분한다.
+
 **수량 변경은 델타가 아니라 최종 수량을 보낸다.** `+1`을 보내면 재시도와 중복 전송이
 그대로 수량 증가가 된다. `quantity = 3`은 몇 번 도착해도 결과가 같다.
 
 **연속 조작은 마지막 의도만 서버에 반영한다.** `+` 버튼을 다섯 번 누르면 요청 다섯
 개가 아니라 최종 수량 하나여야 한다. 화면은 즉시 반응하고 서버 요청만 합친다.
+
+**같은 상품의 응답이 뒤섞여도 최신 의도를 보존한다.** 이전 수량 변경의 실패 rollback이
+나중에 고른 수량을 덮으면 안 된다. 항목별로 요청을 직렬화하거나 intent revision을 붙여
+현재 의도와 같은 응답만 cache에 반영한다.
 
 **최종 금액은 서버 값을 따른다.** 표시용 합계는 클라이언트에서 계산해도 되지만 그
 값으로 결제를 진행하면 안 된다. 할인·쿠폰·배송비 규칙은 클라이언트가 완전히 알 수 없다.
@@ -36,24 +45,36 @@
 export function useSetCartQuantity() {
   const queryClient = useQueryClient()
   const key = ['cart'] as const
+  const latestIntents = useRef(new Map<string, number>())
 
   return useMutation({
     // 델타가 아니라 최종 수량. 재시도가 멱등이 된다.
     mutationFn: ({ lineId, quantity }: SetQuantity) => setCartQuantity(lineId, quantity),
     onMutate: async ({ lineId, quantity }) => {
+      const intent = (latestIntents.current.get(lineId) ?? 0) + 1
+      latestIntents.current.set(lineId, intent)
       await queryClient.cancelQueries({ queryKey: key })
+      if (intent !== latestIntents.current.get(lineId)) return { intent, lineId }
       const snapshot = queryClient.getQueryData<Cart>(key)
+      const previousLine = snapshot?.lines.find((line) => line.id === lineId)
       queryClient.setQueryData<Cart>(key, (cart) =>
         cart ? { ...cart, lines: cart.lines.map((line) => (line.id === lineId ? { ...line, quantity } : line)) } : cart,
       )
-      return { snapshot }
+      return { intent, lineId, previousLine }
     },
     onError: (_error, _input, context) => {
-      queryClient.setQueryData(key, context?.snapshot)
+      if (!context || latestIntents.current.get(context.lineId) !== context.intent) return
+      queryClient.setQueryData<Cart>(key, (cart) =>
+        cart && context.previousLine
+          ? { ...cart, lines: cart.lines.map((line) => (line.id === context.lineId ? context.previousLine : line)) }
+          : cart,
+      )
       showToast('수량을 변경하지 못했어요')
     },
     // 서버가 재고 상한으로 깎았을 수 있으므로 최종 값을 다시 읽는다.
-    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
+    onSettled: (_data, _error, { lineId }, context) => {
+      if (context?.intent === latestIntents.current.get(lineId)) return queryClient.invalidateQueries({ queryKey: key })
+    },
   })
 }
 ```
@@ -102,7 +123,7 @@ showMergeSummary(merged) // 합쳐진 항목, 수량 조정된 항목, 담기지
 
 ## 4. 판단이 갈리는 지점
 
-| 선택           | 기본 추천                   | 다른 선택이 맞는 때                              |
+| 선택           | 추천안 (정책 아님)          | 다른 선택이 맞는 때                              |
 | -------------- | --------------------------- | ------------------------------------------------ |
 | 옵션 재고 조회 | 상품 진입 시 조합 전체      | 조합이 수백 개면 선택 시점에 조회                |
 | 품절 처리      | 표시 유지 + 결제 차단       | 목록이 길면 자동 제거 후 안내                    |
@@ -135,6 +156,7 @@ network 경계는 MSW handler로 세운다. 금액·상한 계산은 순수 함�
 - **응답 순서 역전**: 수량 변경 응답이 뒤바뀌어 도착해도 최종 값이 마지막 의도와 같은지
   확인한다.
 - **낙관적 실패 복구**: 실패 시 이전 수량으로 돌아가고 오류가 보이는지 확인한다.
+- **최신 의도 보존**: 이전 요청의 실패가 최신 의도를 덮지 않는지 확인한다.
 - **수량 상한**: 상한 초과 입력에서 요청이 발생하지 않고 이유가 보이는지 확인한다.
 - **품절·가격 변동**: 결제 진입이 차단되고 변경 내용이 안내되는지 확인한다.
 - **병합**: 로그인 후 항목이 중복되거나 사라지지 않는지 확인한다.
@@ -153,3 +175,10 @@ network 경계는 MSW handler로 세운다. 금액·상한 계산은 순수 함�
 
 FSD 레포가 아니면 같은 역할을 레포의 기존 경계 관례에 매핑한다. 새 폴더 규칙을
 발명하지 않는다.
+
+## 8. 근거
+
+| ID   | 등급 | 자료                                                                                                                    | 이 문서에서 지지하는 주장                                          |
+| ---- | ---- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| [S1] | 표준 | [RFC 9110 §9.2.2 — Idempotent Methods](https://www.rfc-editor.org/rfc/rfc9110#section-9.2.2)                            | 델타가 아닌 최종 수량을 보내 재시도 의미를 명확히 한다.            |
+| [S2] | 공식 | [TanStack Query — Optimistic Updates](https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates) | optimistic update의 취소·snapshot·rollback·재검증 순서를 확인한다. |

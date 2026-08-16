@@ -4,6 +4,9 @@
 않는다. 한글은 여기에 조합 입력이 더해져서 `ㅎ`·`하`·`한`이 각각 요청이 된다. 결과가
 최신 입력과 어긋나는 순간 사용자는 잘못된 목록을 보고 선택한다.
 
+> **Oracle 우선:** 이 문서는 `frontend-oracle-design`의 활성 카드 아래에서만 쓴다.
+> `ORACLE_READY` 전에는 구현하지 않는다. 추천과 코드는 정책 출처가 아니다. 코드는 구현 선택지다.
+
 ## 1. 언제 읽는가
 
 검색창, typeahead, combobox, 필터 검색, mention picker. 입력에 따라 원격 결과를
@@ -12,6 +15,8 @@
 제출 버튼으로만 조회하는 폼이나 메모리 안에서 거르는 필터에는 필요 없다.
 
 ## 2. 권장 구조
+
+combobox의 키보드·focus 계약과 query 취소 전달은 [S1][S2]의 실제 버전·브라우저 동작을 따른다.
 
 **정규화한 쿼리를 query key에 넣는다. 이게 순서 역전 문제를 구조적으로 없앤다.**
 직접 `fetch` + `setState`로 만들면 늦게 온 `사과` 응답이 최신 `사과나무` 결과를
@@ -85,7 +90,11 @@ const [raw, setRaw] = useState('')
 const composingRef = useRef(false)
 
 <input
+  role="combobox"
   value={raw}
+  aria-expanded={isOpen}
+  aria-controls="product-search-options"
+  aria-activedescendant={activeOptionId}
   onCompositionStart={() => {
     composingRef.current = true
   }}
@@ -101,6 +110,9 @@ const composingRef = useRef(false)
 />
 ```
 
+`aria-expanded`·`aria-controls`·`aria-activedescendant`와 화살표·Escape·Enter의 세부
+동작은 ARIA Combobox 패턴 [S1]에 맞춰 제품이 실제로 제공하는 선택 흐름만 구현한다.
+
 `keyCode === 229` 같은 브라우저별 우회를 쓰지 않는다. composition 이벤트가 표준
 경로다. 안드로이드 키보드는 조합 이벤트 발생 양상이 기기마다 달라서, 실제 대상 기기에서
 한 번은 직접 확인한다.
@@ -110,7 +122,7 @@ const composingRef = useRef(false)
 
 ## 4. 판단이 갈리는 지점
 
-| 선택              | 기본 추천                  | 다른 선택이 맞는 때                                    |
+| 선택              | 추천안 (정책 아님)         | 다른 선택이 맞는 때                                    |
 | ----------------- | -------------------------- | ------------------------------------------------------ |
 | IME 조합 중 조회  | 확정 후에만                | 초성 검색을 제품 기능으로 제공하는 경우                |
 | debounce 시간     | 250~350ms                  | 로컬 인덱스처럼 응답이 즉각적이면 더 짧게              |
@@ -158,3 +170,11 @@ network 경계는 MSW handler로 세운다. 아래는 이 기능에서 실제로
 
 FSD 레포가 아니면 같은 역할을 레포의 기존 경계 관례에 매핑한다. 새 폴더 규칙을
 발명하지 않는다.
+
+## 8. 근거
+
+| ID   | 등급 | 자료                                                                                                                    | 이 문서에서 지지하는 주장                                     |
+| ---- | ---- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [S1] | 표준 | [WAI-ARIA APG — Combobox Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/)                                   | combobox의 role, focus, 키보드와 활성 항목 연결을 확인한다.   |
+| [S2] | 공식 | [TanStack Query — Query Cancellation](https://tanstack.com/query/latest/docs/framework/react/guides/query-cancellation) | query의 `AbortSignal`을 실제 요청에 전달하는 패턴을 확인한다. |
+| [S3] | 공식 | [MDN — compositionend](https://developer.mozilla.org/en-US/docs/Web/API/Element/compositionend_event)                   | IME 조합 확정은 composition 이벤트로 다룬다.                  |

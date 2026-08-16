@@ -1,7 +1,7 @@
 {
   "name": "@lodado/frontend-system-design-plugin",
-  "version": "0.1.0",
-  "description": "Claude Code / Codex plugin for well-known frontend system design problems.",
+  "version": "0.2.0",
+  "description": "Oracle-dependent companion for well-known frontend system design problems.",
   "private": true,
   "scripts": {
     "test": "node --test skills/scripts/*.test.mjs"

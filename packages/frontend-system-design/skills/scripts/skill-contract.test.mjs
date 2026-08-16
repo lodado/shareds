@@ -6,6 +6,8 @@ import test from 'node:test'
 
 const skillDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
 const referenceDirectory = join(skillDirectory, 'references')
+const packageDirectory = dirname(skillDirectory)
+const repositoryDirectory = dirname(dirname(packageDirectory))
 
 const REQUIRED_SECTIONS = [
   '## 1. 언제 읽는가',
@@ -15,9 +17,10 @@ const REQUIRED_SECTIONS = [
   '## 5. 함정',
   '## 6. 남길 검증',
   '## 7. 배치',
+  '## 8. 근거',
 ]
 
-const CHOICE_HEADER = /^\|\s*선택\s*\|\s*기본 추천\s*\|\s*다른 선택이 맞는 때\s*\|/
+const CHOICE_HEADER = /^\|\s*선택\s*\|\s*추천안 \(정책 아님\)\s*\|\s*다른 선택이 맞는 때\s*\|/
 const PITFALL_HEADER = /^\|\s*증상\s*\|\s*원인\s*\|\s*교정\s*\|/
 
 async function read(relativePath) {
@@ -63,7 +66,7 @@ function tableRows(section, headerPattern, name, label) {
   return rows
 }
 
-test('every reference follows the seven-section guide shape', async () => {
+test('every reference follows the eight-section guide shape', async () => {
   for (const { name, body } of await readReferences()) {
     let searchFrom = 0
 
@@ -81,7 +84,18 @@ test('every reference opens with the core difficulty it exists to solve', async 
   }
 })
 
-test('every reference ships runnable code, not just prose', async () => {
+test('every reference is subordinate to the active Oracle contract', async () => {
+  for (const { name, body } of await readReferences()) {
+    assert.match(body, /> \*\*Oracle 우선:\*\*/, `${name}: Oracle 우선 계약이 없다`)
+    assert.match(body, /frontend-oracle-design/, `${name}: 선행 스킬 이름이 없다`)
+    assert.match(body, /ORACLE_READY/, `${name}: Oracle 준비 상태를 요구하지 않는다`)
+    assert.match(body, /정책 출처가 아니다/, `${name}: 추천을 정책과 구분하지 않는다`)
+    assert.match(body, /구현 선택지/, `${name}: 예제 코드의 권한이 불명확하다`)
+    assert.doesNotMatch(body, /기본값이 있지만/, `${name}: 추천안을 기본 정책처럼 표현한다`)
+  }
+})
+
+test('every reference ships structural implementation code, not just prose', async () => {
   for (const { name, body } of await readReferences()) {
     const implementation = sectionOf(body, '## 3. 구현', name)
     const blocks = implementation.match(/```(ts|tsx)\n[\s\S]*?```/g) ?? []
@@ -90,6 +104,27 @@ test('every reference ships runnable code, not just prose', async () => {
 
     const longest = Math.max(...blocks.map((block) => block.split('\n').length))
     assert.ok(longest >= 8, `${name}: 구현 코드가 구조를 보여주기에 너무 짧다`)
+  }
+})
+
+test('every reference maps material claims to official or upstream sources', async () => {
+  for (const { name, body } of await readReferences()) {
+    const sources = sectionOf(body, '## 8. 근거', name)
+    const sourceRows = sources.split('\n').filter((line) => /\[S\d+\]/.test(line))
+    const sourceIds = new Set()
+
+    assert.ok(sourceRows.length > 0, `${name}: 근거 식별자가 없다`)
+    for (const row of sourceRows) {
+      const match = row.match(/^\|\s*\[S(\d+)\]\s*\|\s*(표준|공식|upstream)\s*\|.*https:\/\//i)
+      assert.ok(match, `${name}: 근거 행 '${row}'에 등급 또는 URL이 없다`)
+      sourceIds.add(match[1])
+    }
+
+    const citations = [...body.slice(0, body.indexOf('\n## 8. 근거\n')).matchAll(/\[S(\d+)\]/g)]
+    assert.ok(citations.length > 0, `${name}: 본문의 주장이 근거에 연결되지 않는다`)
+    for (const [, id] of citations) {
+      assert.ok(sourceIds.has(id), `${name}: 본문의 [S${id}]에 해당하는 근거 행이 없다`)
+    }
   }
 })
 
@@ -113,8 +148,8 @@ test('every reference separates product choices from failure modes', async () =>
 
     for (const row of choices) {
       assert.equal(row.length, 3, `${name}: 선택 행 '${row[0]}'의 열이 3개가 아니다`)
-      // 기본 추천이 비어 있으면 가이드가 아니라 질문지다.
-      assert.ok(row[1].length > 0, `${name}: 선택 '${row[0]}'에 기본 추천이 없다`)
+      // 추천안은 정책이 아니지만, 비교할 구체안이 없으면 유용한 설계 참고서가 아니다.
+      assert.ok(row[1].length > 0, `${name}: 선택 '${row[0]}'에 비교할 추천안이 없다`)
       assert.ok(row[2].length > 0, `${name}: 선택 '${row[0]}'에 예외 조건이 없다`)
     }
 
@@ -152,7 +187,7 @@ test('the routing table and the reference directory stay in sync', async () => {
   }
 })
 
-test('SKILL.md presents itself as a guide and defers to the target repo', async () => {
+test('SKILL.md is an Oracle-dependent companion and defers to the target repo', async () => {
   const skill = await read('SKILL.md')
 
   assert.match(skill, /검증된 구현 방법/)
@@ -160,9 +195,58 @@ test('SKILL.md presents itself as a guide and defers to the target repo', async 
   assert.match(skill, /설치된\n?\s*버전의 문서로 확인/)
   assert.match(skill, /그대로 붙여 넣는 스니펫이\n?\s*아니라/)
   assert.match(skill, /frontend-oracle-design/)
+  assert.match(skill, /frontend-oracle-design.*먼저/s)
+  assert.match(skill, /ORACLE_READY/)
+  assert.match(skill, /NEEDS_DECISION/)
+  assert.match(skill, /VALID_RED/)
+  assert.match(skill, /단독으로 실행하지 않는다/)
+  assert.doesNotMatch(skill, /단독으로 써도 된다/)
+  assert.doesNotMatch(skill, /나머지는 기본값대로 진행/)
 
   for (const section of REQUIRED_SECTIONS) {
     assert.match(skill, new RegExp(section.replace('## ', '').replace(/\./g, '\\.')))
+  }
+})
+
+test('SKILL.md defines the compact result returned after a reference is loaded', async () => {
+  const skill = await read('SKILL.md')
+
+  for (const label of ['로드한 reference', '필수 정책 질문', '구현 불변식', '버전 확인', 'Oracle 증거 매핑', '근거']) {
+    assert.match(skill, new RegExp(label), `SKILL.md에 '${label}' 로드 결과 항목이 없다`)
+  }
+})
+
+test('the Oracle remains the orchestrator when it loads system-design references', async () => {
+  const oracleSkill = await readFile(
+    join(repositoryDirectory, 'packages/frontend-oracle-design/skills/SKILL.md'),
+    'utf8',
+  )
+
+  assert.match(oracleSkill, /frontend-system-design/)
+  assert.match(oracleSkill, /정책 후보/)
+  assert.match(oracleSkill, /제어권|오케스트레이션/)
+  assert.doesNotMatch(oracleSkill, /기본 추천과 다를 항목만/)
+})
+
+test('plugin metadata publishes the Oracle-first contract under a new cache identity', async () => {
+  const packageJson = JSON.parse(await readFile(join(packageDirectory, 'package.json'), 'utf8'))
+  const codexPlugin = JSON.parse(await readFile(join(packageDirectory, '.codex-plugin/plugin.json'), 'utf8'))
+  const claudePlugin = JSON.parse(await readFile(join(packageDirectory, '.claude-plugin/plugin.json'), 'utf8'))
+  const marketplace = JSON.parse(await readFile(join(repositoryDirectory, '.claude-plugin/marketplace.json'), 'utf8'))
+  const listing = marketplace.plugins.find((plugin) => plugin.name === 'frontend-system-design')
+
+  assert.equal(packageJson.version, '0.2.0')
+  assert.equal(codexPlugin.version, '0.2.0')
+  assert.equal(claudePlugin.version, '0.2.0')
+  assert.equal(listing?.version, '0.2.0')
+
+  for (const description of [
+    packageJson.description,
+    codexPlugin.description,
+    claudePlugin.description,
+    listing?.description,
+  ]) {
+    assert.match(description, /Oracle/i)
   }
 })
 
@@ -173,13 +257,26 @@ test('pins the load-bearing techniques that must never drift out', async () => {
 
   assert.match(reference['infinite-scroll'], /cursor를 쓴다/)
   assert.match(reference['infinite-scroll'], /IntersectionObserver/)
+  assert.match(reference['infinite-scroll'], /useSuspenseInfiniteQuery/)
+  assert.match(reference['infinite-scroll'], /QueryErrorResetBoundary/)
+  assert.match(reference['infinite-scroll'], /Error Boundary/)
+  assert.match(
+    reference['infinite-scroll'],
+    /`enabled`,[\s\S]*placeholder[\s\S]*취소 계약[\s\S]*일반 `useInfiniteQuery`/,
+  )
+  assert.match(reference['infinite-scroll'], /더 보기\n\s*<\/button>/)
 
   assert.match(reference['search-typeahead'], /query key에 넣는다/)
   assert.match(reference['search-typeahead'], /compositionstart|onCompositionStart/)
   assert.match(reference['search-typeahead'], /normalize\('NFC'\)/)
+  assert.match(reference['search-typeahead'], /aria-expanded/)
 
   assert.match(reference.feed, /델타가 아니라 원하는 최종 상태/)
   assert.match(reference.feed, /cancelQueries/)
+  assert.match(reference.feed, /최신 의도/)
+  assert.match(reference.feed, /context\?\.intent === latestIntent\.current/)
+  assert.match(reference.feed, /await queryClient\.cancelQueries\([\s\S]*intent !== latestIntent\.current/)
+  assert.match(reference.feed, /이전 요청의 실패가 최신 의도를 덮지 않는지/)
 
   assert.match(reference.chat, /clientId/)
   assert.match(reference.chat, /mergeIncoming/)
@@ -187,12 +284,18 @@ test('pins the load-bearing techniques that must never drift out', async () => {
   assert.match(reference['media-upload'], /fetch`로는 안 된다|fetch`는 업로드 진행 이벤트를 주지 않는다/)
   assert.match(reference['media-upload'], /imageOrientation: 'from-image'/)
   assert.match(reference['media-upload'], /revokeObjectURL/)
+  assert.match(reference['media-upload'], /addEventListener\('abort'/)
+  assert.match(reference['media-upload'], /signal\?\.aborted/)
 
   // 결제 문서는 이중 결제를 막는 기법이 사라지면 안 된다.
   assert.match(reference['payment-flow'], /`성공`·`실패` 두 개로 만들지 않는다/)
   assert.match(reference['payment-flow'], /unconfirmed/)
   assert.match(reference['payment-flow'], /재시도에도 같은 값을 유지/)
   assert.match(reference['payment-flow'], /단방향으로만 전이/)
+  assert.match(reference['payment-flow'], /새로고침·복귀를 견디는 저장소/)
+  assert.match(reference['payment-flow'], /확정된 결과는 다시 바뀌지 않는다/)
+  assert.match(reference['payment-flow'], /nextPollDelay/)
+  assert.match(reference['payment-flow'], /2 \*\* attempt/)
   assert.match(reference['payment-flow'], /이 목록은 축약 대상이 아니다/)
 
   assert.match(reference['notification-realtime'], /visibilityState/)
@@ -203,7 +306,15 @@ test('pins the load-bearing techniques that must never drift out', async () => {
 
   assert.match(reference['commerce-cart'], /델타가 아니라 최종 수량/)
   assert.match(reference['commerce-cart'], /결제 진입 시 재검증|결제로 넘어갈 때 한 번/)
+  assert.match(reference['commerce-cart'], /최신 의도/)
+  assert.match(reference['commerce-cart'], /latestIntents\.current\.get\(lineId\)/)
+  assert.match(
+    reference['commerce-cart'],
+    /await queryClient\.cancelQueries\([\s\S]*intent !== latestIntents\.current\.get\(lineId\)/,
+  )
+  assert.match(reference['commerce-cart'], /이전 요청의 실패가 최신 의도를 덮지 않는지/)
 
   assert.match(reference['multi-step-form'], /현재 단계를 주소로 표현한다/)
   assert.match(reference['multi-step-form'], /민감한 값은 주소에 넣지 않는다/)
+  assert.match(reference['multi-step-form'], /STEPS\.includes/)
 })

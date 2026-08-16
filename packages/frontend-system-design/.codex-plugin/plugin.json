@@ -1,7 +1,7 @@
 {
   "name": "frontend-system-design",
-  "version": "0.1.0",
-  "description": "Policy candidates and verification duties for well-known frontend system design problems.",
+  "version": "0.2.0",
+  "description": "Oracle-dependent policy candidates and verification duties for well-known frontend system design problems.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
@@ -12,7 +12,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Frontend System Design",
-    "shortDescription": "Pin down policy before building feed, search, chat, upload, or payment UI",
+    "shortDescription": "Extend an active Oracle with proven frontend system patterns",
     "category": "development",
     "websiteURL": "https://github.com/lodado/my-Vibe-Coding-Helper"
   }

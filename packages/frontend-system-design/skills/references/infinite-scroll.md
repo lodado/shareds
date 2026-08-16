@@ -4,6 +4,9 @@
 동안 1페이지 내용이 바뀌므로 중복·누락이 구조적으로 발생한다. 여기에 스크롤이라는
 연속 신호가 트리거로 붙어서 중복 요청과 응답 순서 역전이 기본값으로 따라온다.
 
+> **Oracle 우선:** 이 문서는 `frontend-oracle-design`의 활성 카드 아래에서만 쓴다.
+> `ORACLE_READY` 전에는 구현하지 않는다. 추천과 코드는 정책 출처가 아니다. 코드는 구현 선택지다.
+
 ## 1. 언제 읽는가
 
 무한 스크롤, `더 보기`, 커서 피드, 점진 로딩 테이블. 목록을 나눠 이어 붙이는 모든 UI.
@@ -11,6 +14,8 @@
 번호 페이지네이션(1·2·3 이동)이나 한 번에 다 받는 목록에는 필요 없다.
 
 ## 2. 권장 구조
+
+cursor·페이지 파라미터와 observer 동작은 실제 설치된 query 라이브러리와 브라우저 지원 범위를 [S1][S2]로 확인한다.
 
 **서버가 cursor를 지원하면 cursor를 쓴다.** offset은 목록이 변하면 반드시 깨진다.
 `LIMIT 20 OFFSET 20`을 요청하는 사이에 앞쪽에 항목 하나가 추가되면 20번째 항목이
@@ -26,19 +31,29 @@
 `scrollHeight - scrollTop < threshold`를 계산하는 방식은 스크롤마다 레이아웃을 읽어
 성능이 나쁘고, 컨테이너가 바뀔 때마다 계산이 틀어진다.
 
+**자동 로드에는 `더 보기` 버튼을 함께 둔다.** observer는 편의 기능이지 유일한 조작
+수단이 아니다. 키보드·보조기술 사용자는 버튼으로 같은 다음 페이지 요청을 실행할 수 있어야
+한다. [S3]
+
 **가상화는 기본이 아니다.** DOM 항목이 수백 개로 늘어 실제 느려질 때 도입한다. 먼저
 넣으면 키보드 탐색·포커스 유지·스크린 리더 항목 수를 전부 직접 관리해야 한다.
 
 ## 3. 구현
 
-데이터 계층. cursor 기반이고 취소 신호를 요청까지 넘긴다.
+먼저 Oracle이 async/error boundary를 정한다. 첫 조회가 무조건 실행되고 취소가 제품
+계약이 아니면 `useSuspenseInfiniteQuery`와 가까운 Suspense·Error Boundary를 쓰고,
+재시도는 `QueryErrorResetBoundary`로 같은 query 범위만 reset한다. `enabled`,
+placeholder 또는 실제 취소 계약이 있으면 Oracle 근거와 함께 일반 `useInfiniteQuery`와
+명시적 초기 상태 UI를 쓴다. 아래는 기본 Suspense 경로다.
+
+데이터 계층. cursor 기반이고 초기 pending/error는 가까운 boundary에 맡긴다.
 
 ```ts
 // <slice>/model/useProductFeed.ts
 export function useProductFeed(filters: ProductFilters) {
-  return useInfiniteQuery({
+  return useSuspenseInfiniteQuery({
     queryKey: ['products', filters],
-    queryFn: ({ pageParam, signal }) => fetchProducts({ cursor: pageParam, filters, signal }),
+    queryFn: ({ pageParam }) => fetchProducts({ cursor: pageParam, filters }),
     initialPageParam: null as string | null,
     // nextCursor가 없을 때만 undefined를 돌려 종료를 알린다.
     // 빈 배열과 종료를 같은 것으로 다루면 마지막 페이지 뒤에 요청이 한 번 더 나간다.
@@ -85,7 +100,7 @@ export function useLoadMoreOnVisible(query: {
 export function ProductFeed({ filters }: { filters: ProductFilters }) {
   const query = useProductFeed(filters)
   const sentinelRef = useLoadMoreOnVisible(query)
-  const products = query.data?.pages.flatMap((page) => page.items) ?? []
+  const products = query.data.pages.flatMap((page) => page.items)
 
   return (
     <>
@@ -94,9 +109,16 @@ export function ProductFeed({ filters }: { filters: ProductFilters }) {
           <ProductRow key={product.id} product={product} />
         ))}
       </ul>
-      {query.hasNextPage && <div ref={sentinelRef} aria-hidden />}
+      {query.hasNextPage && (
+        <>
+          <div ref={sentinelRef} aria-hidden />
+          <button type="button" onClick={() => query.fetchNextPage()} disabled={query.isFetchingNextPage}>
+            더 보기
+          </button>
+        </>
+      )}
       {query.isFetchingNextPage && <FeedSpinner />}
-      {query.error && <FeedRetry onRetry={() => query.fetchNextPage()} />}
+      {query.isFetchNextPageError && <FeedRetry onRetry={() => query.fetchNextPage()} />}
     </>
   )
 }
@@ -107,10 +129,10 @@ export function ProductFeed({ filters }: { filters: ProductFilters }) {
 
 ## 4. 판단이 갈리는 지점
 
-기본값이 있지만 제품 맥락에 따라 달라지는 것들이다. 답이 결과를 바꾸므로 추측하지
-말고 확인한다.
+아래 추천안은 비교를 돕는 정책 후보일 뿐이다. 답이 결과를 바꾸므로 승인된 source나
+사용자 답변 없이 적용하지 않는다.
 
-| 선택            | 기본 추천                          | 다른 선택이 맞는 때                                            |
+| 선택            | 추천안 (정책 아님)                 | 다른 선택이 맞는 때                                            |
 | --------------- | ---------------------------------- | -------------------------------------------------------------- |
 | cursor / offset | cursor                             | 서버가 cursor를 지원하지 않거나, 목록이 사실상 고정된 아카이브 |
 | 부분 실패       | 앞 페이지 유지 + 실패 지점 재시도  | 목록 전체 일관성이 제품 요구인 경우 전체 폐기                  |
@@ -156,3 +178,11 @@ network 경계는 MSW handler로 세운다. 아래 네 개는 이 기능에서 �
 
 FSD 레포가 아니면 같은 역할을 레포의 기존 경계 관례에 매핑한다. 새 폴더 규칙을
 발명하지 않는다.
+
+## 8. 근거
+
+| ID   | 등급 | 자료                                                                                                                | 이 문서에서 지지하는 주장                                                 |
+| ---- | ---- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [S1] | 공식 | [TanStack Query — Infinite Queries](https://tanstack.com/query/latest/docs/framework/react/guides/infinite-queries) | `pageParam`·`getNextPageParam`·다음 페이지 상태는 설치 버전으로 확인한다. |
+| [S2] | 공식 | [MDN — Intersection Observer API](https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API)       | viewport 교차 관찰은 scroll 이벤트 계산과 다른 브라우저 API다.            |
+| [S3] | 표준 | [WCAG 2.2](https://www.w3.org/TR/WCAG22/)                                                                           | 자동 로드만 쓰지 않고 키보드로 실행 가능한 대안을 제공할지 검토한다.      |

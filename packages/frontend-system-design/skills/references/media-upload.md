@@ -4,6 +4,9 @@
 하나의 게시물로 인식한다. 여기에 취소·재시도·순서·진행률이 붙고, 모바일 사진은 회전
 정보를 갖고 있어서 리사이즈하면 눕는다.
 
+> **Oracle 우선:** 이 문서는 `frontend-oracle-design`의 활성 카드 아래에서만 쓴다.
+> `ORACLE_READY` 전에는 구현하지 않는다. 추천과 코드는 정책 출처가 아니다. 코드는 구현 선택지다.
+
 ## 1. 언제 읽는가
 
 사용자가 고른 이미지·동영상·파일을 업로드하는 UI. 여러 개를 한 번에 올리거나 진행률을
@@ -12,6 +15,8 @@
 서버가 이미 가진 미디어를 고르기만 하는 선택기에는 필요 없다.
 
 ## 2. 권장 구조
+
+업로드 진행·이미지 변환·서버 신뢰 경계는 [S1][S2][S3]으로 실제 지원 범위를 확인한다.
 
 **파일별 독립 작업으로 다룬다.** 각 파일이 자기 상태·진행률·취소 수단·재시도 대상을
 갖는다. 전체를 하나의 요청으로 묶으면 한 장 실패에 전부 다시 올려야 한다.
@@ -54,6 +59,11 @@ export function uploadWithProgress(
       request.status < 400 ? resolve(JSON.parse(request.responseText)) : reject(new UploadError(request.status)),
     )
     request.addEventListener('error', () => reject(new UploadError()))
+    request.addEventListener('abort', () => reject(new DOMException('Upload canceled', 'AbortError')))
+    if (signal?.aborted) {
+      reject(new DOMException('Upload canceled', 'AbortError'))
+      return
+    }
     // 취소 신호를 실제 전송까지 전달한다.
     signal?.addEventListener('abort', () => request.abort(), { once: true })
 
@@ -126,7 +136,7 @@ export function useObjectUrl(file: File) {
 
 ## 4. 판단이 갈리는 지점
 
-| 선택                | 기본 추천                        | 다른 선택이 맞는 때                              |
+| 선택                | 추천안 (정책 아님)               | 다른 선택이 맞는 때                              |
 | ------------------- | -------------------------------- | ------------------------------------------------ |
 | 부분 실패           | 성공분으로 제출 허용 + 실패 표시 | 전부 있어야 의미가 있는 묶음이면 전체 차단       |
 | 동시 업로드 수      | 3개                              | 파일이 크거나 모바일 회선이 주력이면 순차        |
@@ -175,3 +185,11 @@ network 경계는 MSW handler로 세운다.
 
 FSD 레포가 아니면 같은 역할을 레포의 기존 경계 관례에 매핑한다. 새 폴더 규칙을
 발명하지 않는다.
+
+## 8. 근거
+
+| ID   | 등급 | 자료                                                                                                                         | 이 문서에서 지지하는 주장                                                |
+| ---- | ---- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [S1] | 공식 | [MDN — XMLHttpRequestUpload: progress](https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequestUpload/progress_event) | 실제 업로드 진행률은 upload progress 이벤트로 관찰한다.                  |
+| [S2] | 공식 | [MDN — createImageBitmap](https://developer.mozilla.org/en-US/docs/Web/API/Window/createImageBitmap)                         | `imageOrientation`을 포함한 이미지 변환 옵션은 브라우저 지원을 확인한다. |
+| [S3] | 공식 | [OWASP — File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)               | client 검증은 UX용이고 파일 형식·크기·저장 경계는 서버가 재검증한다.     |

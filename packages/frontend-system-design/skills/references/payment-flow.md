@@ -6,6 +6,9 @@
 
 이 문서의 실수는 사용자 돈에 직접 영향을 준다. 추측한 기본값으로 넘어가지 않는다.
 
+> **Oracle 우선:** 이 문서는 `frontend-oracle-design`의 활성 카드 아래에서만 쓴다.
+> `ORACLE_READY` 전에는 구현하지 않는다. 추천과 코드는 정책 출처가 아니다. 코드는 구현 선택지다.
+
 ## 1. 언제 읽는가
 
 금액이 실제로 움직이는 클라이언트 플로우. 결제, 송금, 정기결제 등록·해지, 환불 요청.
@@ -14,6 +17,8 @@
 담기·수량 변경·가격 표시는 `commerce-cart.md`가 다룬다.
 
 ## 2. 권장 구조
+
+멱등 키와 outcome-unknown 처리의 서버 계약은 [S1][S2]로 확인하고, 재조회 대기는 [S3]의 backoff 원칙과 수단별 계약을 따른다.
 
 **상태를 `성공`·`실패` 두 개로 만들지 않는다. `확인 중`이 반드시 필요하다.** 응답을 못
 받은 상태는 세 번째 상태다. 이 상태를 만들지 않으면 개발자는 어쩔 수 없이 실패로
@@ -48,28 +53,31 @@ export type PaymentStatus =
   | { kind: 'unconfirmed'; attemptId: string } // 응답 없음. 실패가 아니다.
   | { kind: 'settled'; result: 'succeeded' | 'failed'; reason?: string }
 
-// 확정된 결과는 되돌리지 않는다.
+// 확정된 결과는 다시 바뀌지 않는다.
 export function transition(current: PaymentStatus, next: PaymentStatus): PaymentStatus {
-  if (current.kind === 'settled' && next.kind !== 'settled') return current
+  if (current.kind === 'settled') return current
   return next
 }
 ```
 
-멱등 키. 시도 시작 시 1개 만들고 재시도에서 재사용한다.
+멱등 키. 시도 시작 시 1개 만들고 재시도에서 재사용한다. 새로고침·복귀를 견디는 저장소에
+보관하고, 그 값에는 카드·계좌·인증값 같은 민감 정보를 넣지 않는다.
 
 ```ts
 // <slice>/model/useCheckout.ts
-const attemptIdRef = useRef<string | null>(null)
-
 function beginAttempt() {
   // 이미 진행 중인 시도가 있으면 그 키를 유지한다. 재시도는 새 시도가 아니다.
-  attemptIdRef.current ??= crypto.randomUUID()
-  return attemptIdRef.current
+  const existing = readAttemptIdFromDurableStore()
+  if (existing) return existing
+
+  const attemptId = crypto.randomUUID()
+  writeAttemptIdToDurableStore(attemptId)
+  return attemptId
 }
 
 function resetAttempt() {
   // 결과가 확정되고 사용자가 새 결제를 시작할 때만 키를 버린다.
-  attemptIdRef.current = null
+  clearAttemptIdFromDurableStore()
 }
 ```
 
@@ -92,14 +100,21 @@ async function submitPayment(input: CheckoutInput): Promise<PaymentStatus> {
 }
 ```
 
-상태 확정. 상한을 두고, 상한까지 못 정하면 사용자에게 안내한다.
+상태 확정. 상한과 backoff를 두고, 상한까지 못 정하면 사용자에게 안내한다. 결제 수단이
+`Retry-After`를 준다면 그 값이 이 예시보다 우선한다.
 
 ```ts
-async function confirmAttempt(attemptId: string, { attempts = 5, intervalMs = 2_000 } = {}) {
+const nextPollDelay = (attempt: number) => Math.min(1_000 * 2 ** attempt, 10_000) + Math.round(Math.random() * 250)
+
+async function confirmAttempt(attemptId: string, { attempts = 5 } = {}) {
   for (let i = 0; i < attempts; i += 1) {
-    const status = await fetchPaymentStatus(attemptId)
-    if (status.settled) return status
-    await wait(intervalMs)
+    try {
+      const status = await fetchPaymentStatus(attemptId)
+      if (status.settled) return status
+    } catch (error) {
+      if (!isRetryableStatusError(error)) throw error
+    }
+    if (i < attempts - 1) await wait(nextPollDelay(i))
   }
   // 여기서도 실패로 단정하지 않는다. 사용자에게 확인 경로를 준다.
   return { settled: false as const }
@@ -131,7 +146,7 @@ router.replace(`/orders/${orderId}/complete`)
 
 ## 4. 판단이 갈리는 지점
 
-| 선택           | 기본 추천                            | 다른 선택이 맞는 때                                |
+| 선택           | 추천안 (정책 아님)                   | 다른 선택이 맞는 때                                |
 | -------------- | ------------------------------------ | -------------------------------------------------- |
 | 멱등 키 주체   | 서버 발급 시도 토큰                  | 서버가 제공하지 않으면 클라이언트 생성 + 계약 명시 |
 | 키 보관 위치   | 새로고침·복귀를 견디는 저장소        | 세션 내 완결이 보장되면 메모리                     |
@@ -187,3 +202,11 @@ network 경계는 MSW handler로 세운다. 이 목록은 축약 대상이 아�
 승인·검증·금액 확정 같은 server 로직은 client public API에 섞지 않는다.
 FSD 레포가 아니면 같은 역할을 레포의 기존 경계 관례에 매핑한다. 새 폴더 규칙을
 발명하지 않는다.
+
+## 8. 근거
+
+| ID   | 등급     | 자료                                                                                                                                                   | 이 문서에서 지지하는 주장                             |
+| ---- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| [S1] | 공식     | [Stripe — Idempotent requests](https://docs.stripe.com/api/idempotent_requests)                                                                        | 같은 시도의 재시도는 같은 idempotency key를 사용한다. |
+| [S2] | 표준     | [RFC 9110 §9.2.2 — Idempotent Methods](https://www.rfc-editor.org/rfc/rfc9110#section-9.2.2)                                                           | 재시도 안전성은 요청 의미와 서버 계약으로 판단한다.   |
+| [S3] | upstream | [AWS Builders’ Library — Timeouts, retries and backoff with jitter](https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/) | 상태 조회 재시도에는 상한과 backoff를 둔다.           |

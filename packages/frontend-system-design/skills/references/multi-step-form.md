@@ -5,6 +5,9 @@
 갔더니 다 날아갔다"가 결정되고, 인앱브라우저는 복귀 시 화면을 새로 만드는 일이 잦아서
 이 위험이 데스크톱보다 크다.
 
+> **Oracle 우선:** 이 문서는 `frontend-oracle-design`의 활성 카드 아래에서만 쓴다.
+> `ORACLE_READY` 전에는 구현하지 않는다. 추천과 코드는 정책 출처가 아니다. 코드는 구현 선택지다.
+
 ## 1. 언제 읽는가
 
 여러 화면에 걸쳐 입력을 모아 한 번에 제출하는 흐름. 가입, 인증, 신청, 설문, 주문 정보
@@ -13,6 +16,8 @@
 한 화면에서 끝나는 폼이나 단계마다 저장이 확정되는 설정 화면에는 필요 없다.
 
 ## 2. 권장 구조
+
+URL의 민감값 배제와 제출 재시도의 멱등성은 [S1][S2]를 기준으로 저장소·서버 계약과 함께 정한다.
 
 **현재 단계를 주소로 표현한다.** 그러면 뒤로가기가 저절로 이전 단계가 되고, 새로고침
 복구 지점이 생기고, 특정 단계로 보내는 링크가 가능해진다. 단계를 컴포넌트 내부
@@ -46,12 +51,14 @@ export type Step = (typeof STEPS)[number]
 export function useFunnelStep() {
   const params = useSearchParams()
   const router = useRouter()
-  const step = (params.get('step') ?? STEPS[0]) as Step
+  const candidate = params.get('step')
+  const step = STEPS.includes(candidate as Step) ? (candidate as Step) : STEPS[0]
+  const nextStep = STEPS[STEPS.indexOf(step) + 1]
 
   return {
     step,
     // push여야 뒤로가기가 이전 단계로 간다. replace면 퍼널을 벗어난다.
-    goNext: () => router.push(`?step=${STEPS[STEPS.indexOf(step) + 1]}`),
+    goNext: () => nextStep && router.push(`?step=${nextStep}`),
     goTo: (target: Step) => router.push(`?step=${target}`),
   }
 }
@@ -118,7 +125,7 @@ export function useSubmitFunnel(funnelId: string) {
 
 ## 4. 판단이 갈리는 지점
 
-| 선택           | 기본 추천                | 다른 선택이 맞는 때                                       |
+| 선택           | 추천안 (정책 아님)       | 다른 선택이 맞는 때                                       |
 | -------------- | ------------------------ | --------------------------------------------------------- |
 | 단계 표현      | 주소 질의값              | 단계 노출이 정책상 불가하면 내부 상태 + 뒤로가기 가로채기 |
 | 값 보관        | 새로고침을 견디는 저장소 | 민감도가 높아 남기면 안 되면 메모리만 + 재입력 안내       |
@@ -168,3 +175,10 @@ network 경계는 MSW handler로 세운다.
 
 FSD 레포가 아니면 같은 역할을 레포의 기존 경계 관례에 매핑한다. 새 폴더 규칙을
 발명하지 않는다.
+
+## 8. 근거
+
+| ID   | 등급 | 자료                                                                                                                   | 이 문서에서 지지하는 주장                                    |
+| ---- | ---- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [S1] | 공식 | [CWE-598 — Information Exposure Through Query Strings in GET Request](https://cwe.mitre.org/data/definitions/598.html) | 개인정보·인증값을 URL query에 두지 않는다.                   |
+| [S2] | 표준 | [RFC 9110 §9.2.2 — Idempotent Methods](https://www.rfc-editor.org/rfc/rfc9110#section-9.2.2)                           | 제출 재시도의 중복 방지는 API 의미와 서버 계약으로 확인한다. |
