@@ -12,6 +12,14 @@ Oracle Card와 원시 증거를 검토한다. reviewer는 정책을 정하거나
 primary agent는 리뷰 직전 bundled `oracle-lock.mjs verify`를 실행한다. mismatch면
 reviewer를 호출하지 않고 기존 증거를 폐기한다.
 
+리뷰는 LLM 판단이라 같은 입력에도 결과가 흔들린다. 아래 두 장치로 판정을 고정한다.
+
+1. reviewer 입력은 파일로 고정한다. 잠긴 카드, ledger runId, evidence 매핑, diff를
+   그대로 넘기고 의도한 결론이나 요약된 해석을 넣지 않는다.
+2. High risk는 **같은 입력으로 독립 리뷰를 2회** 실행한다. `(카드 행, 분류)`가 두
+   결과 모두에 나온 finding만 완료를 차단하고, 한쪽에만 나온 finding은 advisory로
+   기록한다. Medium risk는 단일 리뷰와 스키마 검증만 요구한다.
+
 ## 리뷰 기준 우선순위
 
 사용자가 제공했거나 작업의 승인된 기준으로 지정된 자료가 있으면 다음 순서로
@@ -47,7 +55,8 @@ review와 별도로 설치된 `designer` 역할을 명시해 시각 계약을 �
 
 1. 승인된 기획서·PRD·수용 기준·Figma 링크와 정확한 frame/version 등 외부 기준
 2. Oracle Card 전문과 Risk
-3. Oracle SHA-256·source hashes·마지막 verify command와 exit code
+3. Oracle SHA-256·source hashes·마지막 verify command와 exit code, 인용한 ledger
+   runId와 그 run의 label·exit code·grade
 4. `implementation-loop.md`의 Implementation Decision 기록
 5. architecture unit별 승인 문서 전문·Oracle source hash·사용자 승인 위치와 레포 구조 검증 출력 또는 N/A 사유
 6. production diff
@@ -62,16 +71,47 @@ review와 별도로 설치된 `designer` 역할을 명시해 시각 계약을 �
 14. `JUDGMENT` 행 또는 visual baseline 변경이면 잠긴 Oracle revision, 승인 baseline,
     actual screenshot, exact diff와 viewport·theme·motion 조건
 
-reviewer는 코드를 수정하지 않고 다음 형식으로 finding만 반환한다.
-정책과 baseline을 수정하거나 승인하는 것은 금지하며, baseline 최종 승인은 사용자에게
-남긴다.
+reviewer는 코드를 수정하지 않고 finding만 반환한다. 정책과 baseline을 수정하거나
+승인하는 것은 금지하며, baseline 최종 승인은 사용자에게 남긴다.
 
-| 분류 | 기준 출처 | 카드 행 | 상태 | 발견 | 증거 | 심각도 | 최소 권장 수정 |
-| ---- | --------- | ------- | ---- | ---- | ---- | ------ | -------------- |
+finding은 자유 서술 대신 아래 스키마 파일로 제출해 기계로 검증한다.
+
+```json
+{
+  "schemaVersion": 1,
+  "reviewer": "code-reviewer",
+  "findings": [
+    {
+      "id": "f-1",
+      "row": "O3",
+      "classification": "PRODUCT_DEFECT",
+      "severity": "high",
+      "source": "S1",
+      "finding": "5xx 응답에서 입력이 초기화된다",
+      "evidence": "r-007 저장 > 5xx 후 입력 유지",
+      "fix": "실패 경로에서 form reset을 제거한다"
+    }
+  ]
+}
+```
+
+```bash
+node <skill-dir>/scripts/oracle-verify.mjs findings \
+  --file .ai/oracles/<oracle-id>/findings-code-reviewer.json \
+  --oracle .ai/oracles/<oracle-id>/oracle.md
+
+node <skill-dir>/scripts/oracle-verify.mjs findings \
+  --file .ai/oracles/<oracle-id>/findings-a.json \
+  --intersect .ai/oracles/<oracle-id>/findings-b.json \
+  --oracle .ai/oracles/<oracle-id>/oracle.md
+```
 
 분류는 상위 피드백 라우터의 `POLICY_GAP`, `EVIDENCE_GAP`, `HARNESS_DEFECT`,
-`PRODUCT_DEFECT`, `ENVIRONMENT_DEFECT`, `NON_ORACLE_OPINION` 중 하나다. 승인된
-레포 보안·접근성 계약 위반은 `PRODUCT_DEFECT`, 카드에 그 계약이 누락됐으면
+`PRODUCT_DEFECT`, `ENVIRONMENT_DEFECT`, `NON_ORACLE_OPINION` 중 하나다. 그 밖의
+분류나 카드에 없는 행 ID는 `FINDINGS_INVALID`로 거부된다. 카드 행을 인용하지 않은
+finding은 자동으로 `NON_ORACLE_OPINION`으로 강등되어 완료를 차단하지 못한다.
+
+승인된 레포 보안·접근성 계약 위반은 `PRODUCT_DEFECT`, 카드에 그 계약이 누락됐으면
 `POLICY_GAP`이다. 단순 선호는 `NON_ORACLE_OPINION`이며 완료를 차단하지 않는다.
 출처 있는 미적 요구의 불일치는 단순 선호가 아니다. 구현이 다르면
 `PRODUCT_DEFECT`, 카드가 누락·왜곡했으면 `POLICY_GAP`으로 분류한다.
@@ -82,7 +122,9 @@ reviewer는 코드를 수정하지 않고 다음 형식으로 finding만 반환�
 - 외부 기준의 각 요구가 Oracle Card에 정확히 번역됐으며 누락·왜곡되지 않았는가?
 - Source Registry의 각 기준이 자신의 관할 안에서만 적용됐고 version이 여전히 같은가?
 - Oracle SHA-256과 source hashes가 마지막 verify 결과와 일치하는가?
-- 모든 Oracle 행에 test, reviewer finding 또는 출처 있는 N/A 증거가 매핑됐는가?
+- 보고된 통과가 ledger runId로 뒷받침되며 grade가 `reported`인가?
+- 모든 Oracle 행에 test, reviewer finding 또는 출처 있는 N/A 증거가 매핑됐고
+  `oracle-verify.mjs evidence`가 통과했는가?
 - 모든 비-N/A 카드 행이 테스트에 대응하는가?
 - 각 행이 `Then`, `Never`, 부작용 종류·횟수를 검증하는가?
 - UI 상태와 실제 부작용 횟수를 별도로 검증하는가?
@@ -129,5 +171,7 @@ reviewer는 코드를 수정하지 않고 다음 형식으로 finding만 반환�
 6. 가능하면 같은 reviewer에 원시 재검증 증거를 전달해 finding 해소 여부만 확인한다.
 
 reviewer와 fixer를 분리한다. reviewer가 직접 수정하고 자신의 수정을 최종 승인하게
-하지 않는다. `NON_ORACLE_OPINION`은 기록하되 수정이나 정책 변경의 근거로 쓰지 않는다.
-유효 finding이 없거나 모두 해소되고 필수 재검증이 통과해야 `REVIEW_VERIFIED`다.
+하지 않는다. `NON_ORACLE_OPINION`과 advisory finding은 기록하되 수정이나 정책 변경의
+근거로 쓰지 않는다. 재검증도 `oracle-run.mjs exec`로 실행하고 그 runId로
+`--to REVIEW_VERIFIED` 전이를 기록한다. blocking finding이 없거나 모두 해소되고 필수
+재검증이 통과해야 `REVIEW_VERIFIED`다.

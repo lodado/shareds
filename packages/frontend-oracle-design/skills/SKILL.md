@@ -25,8 +25,17 @@ production 코드·기존 테스트 관찰은 조사 자료이지 정책 출처�
   대체하지 않으며, 스킬을 찾거나 로드할 수 없으면 `FAIL`로 멈춘다.
 - 정책 출처는 사용자의 명시적 답변 또는 승인된 명세 위치뿐이다.
 - 카드의 정책·`Then`·`Never`·부작용 종류와 횟수는 이후 단계에서 바꾸지 않는다.
-- Medium/High 카드는 `scripts/oracle-lock.mjs`로 잠그고 각 단계 전 자동 검증한다.
+- Medium/High 카드는 `scripts/oracle-verify.mjs card`로 구조를 검사한 뒤
+  `scripts/oracle-lock.mjs`로 잠그고 각 단계 전 자동 검증한다.
   사용자가 명령을 실행하게 하지 않으며 mismatch를 통과하려고 재잠금하지 않는다.
+- **판정에 쓰는 명령은 `scripts/oracle-run.mjs exec`로 실행한다.** 실행 결과는 append-only
+  ledger에 기록되고 보고는 자유 서술 대신 runId를 인용한다. ledger에 없는 실행을
+  통과로 보고하지 않는다.
+- Delivery 상태 전이는 `scripts/oracle-run.mjs transition`으로만 기록한다. 스크립트가
+  TDD 순서, flakiness, 테스트 약화, lock을 검사하며 거부된 전이를 우회하지 않는다.
+- 반복 예산은 `scripts/oracle-run.mjs budget`이 계수한다. 머릿속으로 세지 않는다.
+- 카드 행 증거는 `evidence.json`에 적고 `scripts/oracle-verify.mjs evidence`로 실제
+  run 결과와 대조한다. 존재하지 않는 테스트 이름을 증거로 쓰지 않는다.
 - locator·fixture·대기 방법·관찰 계층만 테스트 단계에서 정할 수 있다.
 - 테스트는 중앙 디렉터리로 빼지 않고 소유 경계와 함께 이동·삭제되게 둔다. FSD
   레포의 배치는 `references/fsd.md`의 `__test__/` 규칙을 따르고, 레포가 다른 위치를
@@ -85,8 +94,8 @@ production 코드·기존 테스트 관찰은 조사 자료이지 정책 출처�
 4. Risk를 판정하고 정책 출처를 조사한다.
 5. 필요한 Grill 질문과 BVA를 수행한다.
 6. Oracle Card를 adversarial self-review한다.
-7. Medium/High 카드를 파일로 저장하고 결정적 revision lock을 생성한다. High risk면
-   카드 전문과 SHA-256을 함께 확인받는다.
+7. Medium/High 카드를 파일로 저장하고 `oracle-verify.mjs card` lint를 통과시킨 뒤
+   결정적 revision lock을 생성한다. High risk면 카드 전문과 SHA-256을 함께 확인받는다.
 8. lock 검증 뒤 `ORACLE_READY`, `NEEDS_DECISION` 또는 도구 실패면 `FAIL`에서 종료한다.
 9. 테스트와 production 코드를 작성하지 않는다.
 
@@ -103,7 +112,8 @@ production 코드·기존 테스트 관찰은 조사 자료이지 정책 출처�
 3. backend·DB·data-access 변경이면 `backend.md`로 기존 데이터 경계와 persistence
    정책을 확인하고, 승인된 architecture source에 결정을 반영한 뒤 Oracle source로
    잠근다. 데이터 경계가 안정되기 전에는 lock을 만들지 않는다.
-4. 각 단계 직전 revision lock을 자동 검증한다. mismatch면 기존 증거를 폐기하고
+4. `oracle-run.mjs init`으로 run ledger와 상태 파일을 만들고,
+   각 단계 직전 revision lock을 자동 검증한다. mismatch면 기존 증거를 폐기하고
    `NEEDS_DECISION`, 손상·도구 오류면 `FAIL`로 멈춘다.
 5. High risk면 카드 전문과 SHA-256에 대한 사용자 확인 전에는 진행하지 않는다.
 6. 테스트 파일 작성 직전에 `$test` 스킬을 명시적으로 호출하고, 그 계약으로 테스트를
@@ -135,13 +145,14 @@ production 코드·기존 테스트 관찰은 조사 자료이지 정책 출처�
 
 ## 반복 예산
 
-| 활동             |         한도 |
-| ---------------- | -----------: |
-| 정책 질문        | 최대 2라운드 |
-| 테스트 기계 보정 |     최대 2회 |
-| production 개선  | 최대 3라운드 |
+| 활동             |         한도 | 계수                                    |
+| ---------------- | -----------: | --------------------------------------- |
+| 정책 질문        | 최대 2라운드 | `oracle-run.mjs budget --spend policy`  |
+| 테스트 기계 보정 |     최대 2회 | `oracle-run.mjs budget --spend harness` |
+| production 개선  | 최대 3라운드 | `oracle-run.mjs budget --spend product` |
 
-예산은 서로 대체하지 않는다. 소진하면 마지막 실제 실패와 함께 `FAIL`로 보고한다.
+예산은 서로 대체하지 않는다. 스크립트가 `BUDGET_EXHAUSTED`를 내면 마지막 실제 실패와
+함께 `FAIL`로 보고하고 다른 예산으로 우회하지 않는다.
 
 ## Delivery 상태
 
@@ -160,6 +171,8 @@ Delivery의 정상 완료 상태는 `REVIEW_VERIFIED`다.
 상태: ORACLE_READY | IMPLEMENTED_GREEN | REVIEW_VERIFIED | NEEDS_DECISION | FAIL
 카드: O1→test name, O2→reviewer finding, O3→N/A 사유 형식의 전 행 증거 매핑
 revision: Oracle SHA-256, source hashes, 마지막 verify command와 exit code
+runs: 인용한 ledger runId와 label·exit·grade, evidence verify 출력
+상태 기계: 기록된 전이와 마지막 상태, 사용한 예산 n/한도, ENV_DRIFT 유무
 결정: Target, State ownership, Server/Client, Async, Hook, Sources, Rejected
 아키텍처: unit별 architecture.md, 승인 답변, Oracle source hash, 레포 구조 검증 또는 reviewer 증거; FSD면 layer·segment·public API·테스트 배치 준수 증거
 디자인: Visual scope, Subject, Audience, Single job, Thesis, Signature, Risk, Rejected

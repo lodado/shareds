@@ -1,6 +1,6 @@
 {
   "name": "frontend-oracle-design",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Oracle-driven frontend contracts, TDD, automated visual regression, and review.",
   "author": {
     "name": "lodado",

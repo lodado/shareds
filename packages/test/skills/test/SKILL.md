@@ -87,6 +87,12 @@ Visual Lock은 headless `*.style.test.ts(x)` 또는 기존 runner가 `.spec`만 
 
 작성한 테스트를 **실제로 실행**한다. 실행 없이 통과 주장 금지.
 
+`frontend-oracle-design`의 Delivery 오케스트레이션 안에서 실행할 때는 판정 명령을
+`scripts/oracle-run.mjs exec`로 돌린다. 실행이 append-only ledger에 runId로 기록되고,
+보고의 실행 증거는 그 runId를 인용한다. reporter 출력 경로(`--report`)를 함께 넘기면
+테스트 이름과 상태까지 기록되어 카드 행 증거를 기계로 대조할 수 있다. 보정 1회를 쓸
+때마다 `oracle-run.mjs budget --spend harness --reason ...`으로 계수한다.
+
 FAIL이면 원인 분류. **기계장치 문제만 보정 가능** — 도합 2회이며,
 1회 = 허용된 수정 한 묶음 + 해당 실패 재실행:
 
@@ -94,7 +100,12 @@ FAIL이면 원인 분류. **기계장치 문제만 보정 가능** — 도합 2�
   role·name 유지, 단일 요소로 resolve) / pending barrier 연결 / dev 서버 기동
 - 금지: assertion 약화, visible→attached 전환, `test.skip` 전환, fixture에 기대
   결과 인코딩, 단정 대상 자체를 기다려서 race를 직렬화, `first()`/`nth()`로
-  cardinality 오류 은폐
+  cardinality 오류 은폐, screenshot 허용치(`maxDiffPixels`·`maxDiffPixelRatio`·
+  `threshold`) 상향
+
+금지 항목은 GREEN 전이에서 기계로 검사된다. `VALID_RED` 시점 대비 assertion 수가
+줄거나 위 토큰이 새로 들어오면 `TEST_WEAKENED`로 거부되므로, 보정은 허용 항목
+안에서만 한다.
 
 ### VALID_RED 술어 — 전부 만족해야 발급
 
@@ -133,7 +144,7 @@ mutation은 로컬 소스 변경이지 라이브 부작용 실행이 아니다. 
 ```text
 상태: GREEN | VALID_RED | NEEDS_DECISION | FAIL
 카드: O1→test name, O2→N/A 사유 형식의 전 행 증거 매핑
-실행: command + PASS/FAIL 수 (실제 출력에서)
+실행: command + PASS/FAIL 수 (실제 출력에서), ledger를 썼으면 runId와 grade
 보정: 사용 횟수/2 + 내역
 mutation: High risk면 kill + 원복 증거, 아니면 N/A
 남은 것: 커버 못 한 행과 사유

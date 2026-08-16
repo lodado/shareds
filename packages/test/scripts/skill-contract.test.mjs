@@ -21,6 +21,17 @@ test('ships the frontend test contract with its required BVA reference', async (
   assert.equal(bundledBva, oracleBva)
 })
 
+test('O31: records runs through the oracle ledger and blocks weakened tests', async () => {
+  const skill = await readFile(join(skillDirectory, 'SKILL.md'), 'utf8')
+
+  assert.match(skill, /oracle-run\.mjs exec/)
+  assert.match(skill, /runId/)
+  assert.match(skill, /--report/)
+  assert.match(skill, /budget --spend harness/)
+  assert.match(skill, /maxDiffPixels/)
+  assert.match(skill, /TEST_WEAKENED/)
+})
+
 test('runs visual locks as headless style tests without a direct browser loop', async () => {
   const skill = await readFile(join(skillDirectory, 'SKILL.md'), 'utf8')
 

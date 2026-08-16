@@ -158,6 +158,13 @@ raw HTML 전체, CSS source bytes, class name, 전체 DOM tree는 잠그지 않�
 보여주고 명시적 승인을 받은 뒤 새 revision을 정확히 한 번 만들며, 기존 revision은
 보존하고 덮어쓰지 않는다.
 
+**screenshot diff 허용치는 잠긴 정책값이다.** `maxDiffPixels`·`maxDiffPixelRatio`·
+`threshold`는 승인된 값을 Oracle Card에 기록하고, 테스트를 통과시키려고 테스트
+단계에서 올리지 않는다. 허용치를 올려야 한다고 판단되면 mismatch 원인을 먼저
+분류하고, 실제로 정책이 바뀌어야 하면 `POLICY_GAP`으로 `NEEDS_DECISION`에 돌아간다.
+`oracle-run.mjs`의 GREEN 전이는 RED 기준선 대비 허용치 상향을 `TEST_WEAKENED`로
+거부한다.
+
 시각 계약 테스트는 소유 대상 가까이에 `*.style.test.ts` 또는 `*.style.test.tsx`로 둔다.
 기존 runner가 `.spec`만 수집하면 `*.style.spec.ts`를 쓰고 naming만을 위해 test 설정을
 변경하지 않는다. 레포의 실제 test command가 수집하는지 반드시 실행해 확인한다.
@@ -224,6 +231,7 @@ semantic DOM과 style/layout 계약을 먼저 RED로 만들고, 최초 구현 sc
 ## 8. 금지
 
 - 모든 UI 변경에 새 palette·font·signature 계획 강제
+- screenshot 허용치를 올려 mismatch를 통과 처리
 - reviewer나 에이전트 제안을 승인 없이 Oracle로 잠금
 - 디자인 품질을 근거 없는 단일 점수로 축약
 - 현재 구현 screenshot을 자동 golden으로 승인

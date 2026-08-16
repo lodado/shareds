@@ -9,7 +9,7 @@
 4. 정책 출처
 5. 카드 형식
 6. Adversarial self-review
-7. 결정적 revision lock
+7. 결정적 revision lock — 카드 lint, lock, run artifact 초기화
 8. 설계 종료 상태
 
 ## 0. 외부 기준 게이트
@@ -188,7 +188,25 @@ Medium/High 카드는 self-review 뒤 exact bytes를 파일로 저장하고 bund
 ```text
 <repo>/.ai/oracles/<oracle-id>/oracle.md
 <repo>/.ai/oracles/<oracle-id>/oracle.lock.json
+<repo>/.ai/oracles/<oracle-id>/run-state.json
+<repo>/.ai/oracles/<oracle-id>/runs.jsonl
+<repo>/.ai/oracles/<oracle-id>/evidence.json
 ```
+
+### 카드 구조 lint
+
+lock 전에 `oracle-verify.mjs card`를 실행해 구조적 최소선을 기계로 확인한다. lint는
+adversarial self-review를 대신하지 않으며, 의미 심사는 6절이 계속 담당한다.
+
+```bash
+node <skill-dir>/scripts/oracle-verify.mjs card \
+  --oracle .ai/oracles/<oracle-id>/oracle.md
+```
+
+검사 항목은 Source Registry 존재, 모든 정책 줄의 `(출처: …)` 표기, 모든 계약 행의
+`Never`·부작용 채움, `Then`·`Never`의 모호어 부재, 자동 추가 TC 7종의 행 또는 N/A
+표기, `D*` 행의 출처와 증거 계층이다. `CARD_LINT_FAILED`는 lock 전에 카드를 고쳐야
+한다는 뜻이며, 검사를 우회하려고 문구만 바꾸지 않는다.
 
 에이전트가 직접 실행하며 사용자에게 명령 실행을 요청하지 않는다. 승인된 로컬
 명세 파일은 `--source`를 반복해 함께 잠근다. URL·Figma 같은 원격 기준은 카드에
@@ -212,7 +230,8 @@ node <skill-dir>/scripts/oracle-lock.mjs verify \
   생성한다.
 - High risk는 카드 전문과 digest를 함께 보여준 뒤 사용자 확인을 받는다.
 - 테스트 작성, production 수정, 독립 리뷰, 완료 상태 발급 직전에
-  `verify`를 다시 실행한다.
+  `verify`를 다시 실행한다. `oracle-run.mjs`의 `exec`와 `transition`은 매 호출마다
+  같은 검증을 자동으로 수행한다.
 - `ORACLE_CHANGED`·`SOURCE_CHANGED`면 기존 RED·GREEN·리뷰 증거를 폐기하고
   변경 diff와 카드 현재본을 제시해 `NEEDS_DECISION`으로 돌아간다.
 - `LOCK_INVALID`·도구 부재·실행 불가는 결정론 판정 실패이므로 `FAIL`이다.
@@ -223,7 +242,27 @@ node <skill-dir>/scripts/oracle-lock.mjs verify \
 
 SHA-256은 drift 검출 장치다. 같은 actor가 lockfile까지 다시 쓸 수 있는 환경에서
 승인 권한을 보장하지는 않는다. 강한 승인 통제가 필요하면 lockfile 변경에 CI human
-approval·CODEOWNERS·외부 서명을 추가한다.
+approval·CODEOWNERS·외부 서명을 추가한다. 같은 한계가 run ledger와 상태 파일에도
+적용된다.
+
+### Run artifact 초기화
+
+Delivery로 진입하면 lock 직후 run ledger와 상태 파일을 만든다. Design-only로
+끝나면 생성하지 않는다.
+
+```bash
+node <skill-dir>/scripts/oracle-run.mjs init \
+  --dir .ai/oracles/<oracle-id> \
+  --lock .ai/oracles/<oracle-id>/oracle.lock.json \
+  --risk low|medium|high
+```
+
+- `init`은 lock을 검증하고 현재 worktree digest를 `ORACLE_READY` 기준선으로 저장한다.
+  이 기준선이 이후 TDD 순서 판정의 근거다.
+- `--scan-root`는 기본값이 현재 작업 디렉터리다. monorepo에서 판정 범위를 좁힐 때만
+  명시한다.
+- 상태 파일이 이미 있으면 `init`은 실패한다. 예산과 기준선을 초기화하려고 다시
+  실행하지 않는다. 새 revision은 새 `<oracle-id>` 디렉터리를 쓴다.
 
 ## 8. 설계 종료 상태
 
@@ -241,7 +280,7 @@ approval·CODEOWNERS·외부 서명을 추가한다.
 - 모든 행의 `Never`와 부작용 횟수가 완성됨
 - 자동 추가 TC 7종을 추가하거나 N/A 사유를 기록함
 - adversarial self-review를 통과함
-- Medium/High면 revision lock 검증이 통과함
+- Medium/High면 `oracle-verify.mjs card` lint와 revision lock 검증이 통과함
 - High risk면 사용자가 카드 전문과 SHA-256을 확인함
 
 ### `NEEDS_DECISION`

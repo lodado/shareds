@@ -2,12 +2,12 @@
 
 ## 목차
 
-1. 권위와 진입 조건
-2. 테스트로 계약 상태 확인
-3. Frontend 구현 결정
-4. 최소 구현·셀프피드백
-5. GREEN 게이트
-6. 금지
+0. 판정 명령은 ledger로 실행한다
+1. 테스트로 계약 상태 확인
+2. Frontend 구현 결정
+3. 최소 구현·셀프피드백
+4. GREEN 게이트와 evidence manifest
+5. 금지
 
 ## 권위와 진입 조건
 
@@ -46,9 +46,56 @@ targeted GREEN 뒤에는 root test·lint·format과 독립 review를 병렬 실�
 합류하고 유효 finding이 반영된 뒤 final verify를 직렬로 1회 실행한다. 어느 한 결과만으로
 완료 처리하지 않는다.
 
+## 0. 판정 명령은 ledger로 실행한다
+
+이 문서의 모든 판정용 실행은 bundled `oracle-run.mjs exec`를 거친다. `exec`는 실행
+직전 lock을 검증하고, 실행 후 runId·exit code·reporter 결과·env fingerprint를
+append-only ledger에 남긴다. ledger에 없는 실행은 증거가 아니다.
+
+```bash
+node <skill-dir>/scripts/oracle-run.mjs exec \
+  --dir .ai/oracles/<oracle-id> --label red-1 \
+  --report <reporter-output-path> \
+  -- <레포의 실제 테스트 명령>
+```
+
+- reporter 경로를 넘기면 테스트 이름과 상태까지 기록되어 grade가 `reported`가 된다.
+  vitest·jest의 `--reporter=json --outputFile`, Playwright의 `--reporter=json`,
+  `node --test --test-reporter=json`을 지원한다.
+- reporter가 없거나 형식을 모르면 grade는 `exit-only`로 격하된다. 격하된 run으로는
+  카드 행의 테스트 이름을 증거로 확정할 수 없으므로, 가능하면 reporter를 붙인다.
+- node:test 레포는 번들 `scripts/oracle-node-reporter.mjs`를 쓴다. `--test-reporter`는
+  module specifier라 `./` 또는 절대 경로로 넘긴다.
+- 상태 전이는 `oracle-run.mjs transition`으로만 기록한다. 스크립트가 TDD 순서,
+  연속 통과 횟수, 테스트 약화, lock을 검사하고 거부 사유를 코드로 출력한다.
+- TDD 순서 판정은 `init` 시점의 worktree를 기준선으로 쓴다. 에디터 캐시나 agent
+  runtime 파일이 계속 바뀌는 레포는 `init` 전에 worktree를 정리하거나 `--scan-root`로
+  판정 범위를 대상 package로 좁힌다. 무관한 변경이 `PRODUCTION_TOUCHED_BEFORE_RED`를
+  만들면 범위를 좁히고 다시 시작하며, 검사를 끄지 않는다.
+- 판정 범위는 git 레포에서 `git ls-files -c -o --exclude-standard`, git이 없으면
+  `node_modules`·빌드 산출물을 제외한 파일 목록이다. **gitignore된 경로의 변경은
+  production 변경으로 세지 않는다.** 빌드 산출물이 아니라 실제 production인데
+  gitignore돼 있으면 이 게이트가 그 파일을 보지 못하므로 `--scan-root`나 레포의
+  ignore 설정을 먼저 정리한다.
+
+### 이 하네스가 판정하지 못하는 것
+
+- `evidence verify`는 인용한 테스트 이름이 그 run에서 **실제로 통과했는지**만 본다.
+  그 테스트가 해당 카드 행을 정말 검증하는지는 판정하지 못하므로, 행과 테스트의
+  대응은 독립 reviewer 체크리스트가 계속 담당한다.
+- `run-state.json`·`runs.jsonl`을 지울 수 있는 actor는 기준선과 예산을 새로 시작할 수
+  있다. `init`은 ledger가 남아 있으면 거부하지만, 이는 drift 검출이지 권한 통제가
+  아니다. 강한 통제가 필요하면 `.ai/oracles/**`를 CODEOWNERS와 CI human approval로
+  보호한다.
+- 비결정 소스 scan은 알려진 토큰 목록 기반이라 우회할 수 있다. 검출 실패를 무결성
+  증거로 쓰지 않는다.
+- 예산을 쓸 때마다 `oracle-run.mjs budget --spend policy|harness|product --reason ...`을
+  호출한다. `BUDGET_EXHAUSTED`면 다른 예산으로 우회하지 않고 `FAIL`로 보고한다.
+
 ## 1. 테스트로 계약 상태 확인
 
 1. bundled `oracle-lock.mjs verify`를 실행하고 revision과 exit code를 기록한다.
+   `exec`·`transition`은 매 호출마다 같은 검증을 자동으로 수행한다.
 2. 카드의 모든 비-N/A 행을 관찰 가능한 테스트로 번역한다.
 3. network 경계가 있으면 MSW handler로 세운다. 레포에 MSW가 없으면 설치 여부를 먼저
    확인하고, MSW로 표현할 수 없는 경우에만 다른 mocking 수단을 사유와 함께 쓴다.
@@ -56,12 +103,23 @@ targeted GREEN 뒤에는 root test·lint·format과 독립 review를 병렬 실�
    [`fsd.md`](fsd.md)의 `__mocks__/` 규칙을 따른다.
 4. 각 행의 `Then`, `Never`, 부작용 종류·횟수를 함께 assert한다. 요청 횟수와 순서는
    handler에서 관찰한다.
-5. 테스트를 실제로 실행한다.
-6. 실패가 sibling `test` skill의 `VALID_RED` 술어를 만족할 때만 production을 수정한다.
+5. 테스트를 `exec`로 실제 실행한다.
+6. 실패가 sibling `test` skill의 `VALID_RED` 술어를 만족하면 그 runId로 전이를
+   기록하고, 전이가 통과한 뒤에만 production을 수정한다.
+
+```bash
+node <skill-dir>/scripts/oracle-run.mjs transition \
+  --dir .ai/oracles/<oracle-id> --to VALID_RED --run r-001
+```
+
+`PRODUCTION_TOUCHED_BEFORE_RED`는 테스트보다 production을 먼저 건드렸다는 기계
+증거다. 변경 파일을 되돌려 순서를 지키고, 우회하지 않는다. 전이는 이 시점의
+테스트 파일 digest와 assertion 수를 GREEN 게이트의 기준선으로 저장한다.
 
 요청된 동작이 이미 GREEN이면 production을 억지로 바꾸거나 RED를 만들지 않는다.
-기존 구현이 카드를 충족한다는 증거를 기록하고 전체 검증으로 간다. High risk는
-sibling `test` skill의 mutation 단계로 테스트 민감도를 별도 확인한다.
+기존 구현이 카드를 충족한다는 증거를 기록하고 `--to IMPLEMENTED_GREEN --reason ...`으로
+전이한다. 이 경로는 `ORACLE_READY` 이후 production 변경이 없을 때만 통과한다.
+High risk는 sibling `test` skill의 mutation 단계로 테스트 민감도를 별도 확인한다.
 
 ## 2. Frontend 구현 결정
 
@@ -120,7 +178,7 @@ revision mismatch는 피드백 분류 대상이 아니다. 기존 증거를 즉�
 
 ## 4. GREEN 게이트
 
-카드 테스트가 통과하면 레포가 요구하는 검증을 실제로 실행한다.
+카드 테스트가 통과하면 레포가 요구하는 검증을 `exec`로 실제 실행한다.
 
 1. targeted test
 2. 영향 범위 test
@@ -131,18 +189,74 @@ revision mismatch는 피드백 분류 대상이 아니다. 기존 증거를 즉�
 레포 규칙에 정의된 명령이 우선이다. 실행하지 않은 검증을 통과했다고 보고하지
 않는다. 문서화된 명령이 없으면 package scripts를 읽어 targeted + 가장 가까운
 package 검증을 실행한다. 필수 root 명령이 없거나 무관한 기존 실패가 있으면 원문과
-영향을 분리해 보고하며 GREEN으로 숨기지 않는다. 모두 통과해야 `IMPLEMENTED_GREEN`이다.
+영향을 분리해 보고하며 GREEN으로 숨기지 않는다.
 
-최종 evidence manifest에는 Oracle SHA-256·source hashes·마지막 verify command/exit,
-실제 검증 command/PASS·FAIL 수와 모든 행동·시각 Oracle 행의
-`행 ID → test name | reviewer finding | 출처 있는 N/A 사유`를 기록한다. 결과에 영향을
-주는 commit·runtime/browser version·locale/timezone·viewport/theme·role·clock/seed·
-데이터 초기화만 함께 기록한다. 비-N/A 행이 매핑되지 않거나 revision이 다르면 GREEN을
-발급하지 않는다.
+그다음 `--to IMPLEMENTED_GREEN` 전이를 시도한다. 스크립트가 아래를 기계로 검사한다.
+
+| 거부 코드         | 뜻                                               | 올바른 대응                                        |
+| ----------------- | ------------------------------------------------ | -------------------------------------------------- |
+| `ORACLE_CHANGED`  | 카드·source bytes가 잠긴 값과 다름               | 증거를 폐기하고 `NEEDS_DECISION`                   |
+| `RUN_NOT_GREEN`   | 인용한 run이 통과하지 않음                       | 실제 통과 run을 만들고 인용                        |
+| `FLAKINESS_GATE`  | 같은 명령의 연속 통과가 risk 필요 횟수에 못 미침 | 같은 명령을 그대로 다시 실행해 연속 통과를 확보    |
+| `TEST_WEAKENED`   | RED 기준선 대비 assertion 감소·금지 토큰·삭제    | 테스트를 원래 강도로 되돌린다                      |
+| `ENV_DRIFT`(경고) | RED와 GREEN의 실행 환경이 다름                   | 환경 차이가 결과를 바꿨는지 확인하고 보고에 남긴다 |
+
+flakiness 필요 횟수는 Low 1회, Medium 2회, High 3회다. 재실행으로 통과를 뽑아내는
+것이 아니라 **같은 명령이 반복해도 결정론적으로 통과함**을 보이는 절차다. 실패가
+섞이면 `HARNESS_DEFECT`로 분류하고 조용히 다시 굴리지 않는다.
+
+`TEST_WEAKENED`가 가리키는 금지 토큰은 `test.skip`·`it.skip`·`describe.skip`·`.only(`·
+`waitForTimeout(`·`toBeTruthy(`·`toBeFalsy(`·`.first()`·`.nth(`·`setTimeout(`과
+screenshot 허용치(`maxDiffPixels`·`maxDiffPixelRatio`·`threshold`) 상향이다.
+
+전이가 통과하고 레포 필수 검증이 모두 통과해야 `IMPLEMENTED_GREEN`이다.
+
+### Evidence manifest
+
+증거 매핑은 산문이 아니라 `.ai/oracles/<oracle-id>/evidence.json`으로 관리하고
+기계로 검증한다.
+
+```json
+{
+  "schemaVersion": 1,
+  "rows": {
+    "O1": { "kind": "test", "name": "저장 > pending 표시와 POST 1회" },
+    "O2": { "kind": "reviewer", "finding": "f-3", "role": "code-reviewer" },
+    "O3": { "kind": "na", "reason": "이 기능에 취소 경로가 없다", "source": "S1" }
+  }
+}
+```
+
+```bash
+node <skill-dir>/scripts/oracle-verify.mjs evidence \
+  --oracle .ai/oracles/<oracle-id>/oracle.md \
+  --map .ai/oracles/<oracle-id>/evidence.json \
+  --ledger .ai/oracles/<oracle-id>/runs.jsonl \
+  --run r-007
+```
+
+`kind: test`는 인용한 run의 reporter 결과에 같은 이름이 통과로 존재해야 한다.
+`EVIDENCE_NOT_IN_RUN`은 매핑이 실제 실행과 어긋난다는 뜻이고, `EVIDENCE_UNVERIFIABLE`은
+run이 `exit-only`라 이름을 확인할 수 없다는 뜻이다. 둘 다 이름을 지어내지 말고
+reporter를 붙여 다시 실행한다.
+
+최종 보고에는 Oracle SHA-256·source hashes·마지막 verify command/exit, 인용한 runId와
+실제 검증 command/PASS·FAIL 수, `oracle-verify.mjs evidence` 출력을 기록한다. 결과에
+영향을 주는 commit·runtime/browser version·locale/timezone·viewport/theme·role·
+clock/seed·데이터 초기화만 함께 기록한다. 비-N/A 행이 매핑되지 않거나 revision이
+다르면 GREEN을 발급하지 않는다.
+
+production diff에 비결정 소스가 새로 들어왔는지 확인하려면 `oracle-verify.mjs scan`을
+변경 파일에 실행한다. 검출된 `Date.now`·`Math.random`·`crypto.randomUUID`·`toLocale`·
+`new Intl.`은 주입 seam으로 바꾸거나 `oracle:nondeterminism <사유>` 주석으로 면제를
+기록한다.
 
 ## 금지
 
 - 카드의 정책·`Then`·`Never`·부작용 횟수 변경
+- ledger를 거치지 않은 실행을 증거로 보고
+- 거부된 전이를 우회하거나 `run-state.json`·`runs.jsonl`을 직접 편집
+- 예산을 계수하지 않고 보정·개선 라운드를 반복
 - assertion 약화, `test.skip`, `first()`/`nth()`로 오류 은폐
 - fixture에 기대 결과 인코딩
 - 임의 sleep 또는 단정 대상을 기다려 race 직렬화

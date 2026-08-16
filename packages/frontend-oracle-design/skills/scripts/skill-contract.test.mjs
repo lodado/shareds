@@ -10,6 +10,75 @@ async function read(relativePath) {
   return readFile(join(skillDirectory, relativePath), 'utf8')
 }
 
+test('O26: backs reported verification with a run ledger, machine transitions and counted budgets', async () => {
+  const skill = await read('SKILL.md')
+
+  assert.match(skill, /scripts\/oracle-run\.mjs exec/)
+  assert.match(skill, /append-only\s*\n?\s*ledger에 기록되고 보고는 자유 서술 대신 runId를 인용한다/)
+  assert.match(skill, /ledger에 없는 실행을\s*\n?\s*통과로 보고하지 않는다/)
+  assert.match(skill, /scripts\/oracle-run\.mjs transition`으로만 기록한다/)
+  assert.match(skill, /oracle-run\.mjs budget`이 계수한다/)
+  assert.match(skill, /scripts\/oracle-verify\.mjs evidence`로 실제/)
+  assert.match(skill, /runs: 인용한 ledger runId/)
+  assert.match(skill, /상태 기계: 기록된 전이와 마지막 상태/)
+})
+
+test('O27: lints the card structure and initializes run artifacts around the lock', async () => {
+  const oracleCard = await read('references/oracle-card.md')
+
+  assert.match(oracleCard, /oracle-verify\.mjs card/)
+  assert.match(oracleCard, /CARD_LINT_FAILED/)
+  assert.match(oracleCard, /자동 추가 TC 7종의 행 또는 N\/A/)
+  assert.match(oracleCard, /oracle-run\.mjs init/)
+  assert.match(oracleCard, /run-state\.json/)
+  assert.match(oracleCard, /runs\.jsonl/)
+  assert.match(oracleCard, /상태 파일이 이미 있으면 `init`은 실패한다/)
+  assert.match(oracleCard, /`oracle-verify\.mjs card` lint와 revision lock 검증이 통과함/)
+})
+
+test('O28: routes delivery runs through exec and gates GREEN on flakiness and test strength', async () => {
+  const implementationLoop = await read('references/implementation-loop.md')
+
+  assert.match(implementationLoop, /oracle-run\.mjs exec/)
+  assert.match(implementationLoop, /oracle-run\.mjs transition/)
+  assert.match(implementationLoop, /PRODUCTION_TOUCHED_BEFORE_RED/)
+  assert.match(implementationLoop, /FLAKINESS_GATE/)
+  assert.match(implementationLoop, /Low 1회, Medium 2회, High 3회/)
+  assert.match(implementationLoop, /TEST_WEAKENED/)
+  assert.match(implementationLoop, /ENV_DRIFT/)
+  assert.match(implementationLoop, /evidence\.json/)
+  assert.match(implementationLoop, /EVIDENCE_NOT_IN_RUN/)
+  assert.match(implementationLoop, /EVIDENCE_UNVERIFIABLE/)
+  assert.match(implementationLoop, /oracle-verify\.mjs scan/)
+  assert.match(implementationLoop, /oracle:nondeterminism/)
+  assert.match(implementationLoop, /ledger를 거치지 않은 실행을 증거로 보고/)
+})
+
+test('O29: gives reviewers raw run evidence and a validated finding schema', async () => {
+  const subagentReview = await read('references/subagent-review.md')
+
+  assert.match(subagentReview, /ledger\s*\n?\s*runId/)
+  assert.match(subagentReview, /oracle-verify\.mjs findings/)
+  assert.match(subagentReview, /--intersect/)
+  assert.match(subagentReview, /독립 리뷰를 2회\*\* 실행한다/)
+  assert.match(subagentReview, /결과 모두에 나온 finding만 완료를 차단/)
+  assert.match(subagentReview, /한쪽에만 나온 finding은 advisory/)
+  assert.match(subagentReview, /FINDINGS_INVALID/)
+  assert.match(subagentReview, /자동으로 `NON_ORACLE_OPINION`으로 강등/)
+  assert.match(subagentReview, /grade가 `reported`인가/)
+})
+
+test('O30: locks screenshot diff tolerance as an approved policy value', async () => {
+  const visualDesign = await read('references/visual-design.md')
+
+  assert.match(visualDesign, /screenshot diff 허용치는 잠긴 정책값이다/)
+  assert.match(visualDesign, /maxDiffPixels/)
+  assert.match(visualDesign, /maxDiffPixelRatio/)
+  assert.match(visualDesign, /테스트\s*\n?\s*단계에서 올리지 않는다/)
+  assert.match(visualDesign, /TEST_WEAKENED/)
+  assert.match(visualDesign, /screenshot 허용치를 올려 mismatch를 통과 처리/)
+})
+
 test('requires automatic deterministic locking at delivery boundaries', async () => {
   const [skill, oracleCard] = await Promise.all([read('SKILL.md'), read('references/oracle-card.md')])
 

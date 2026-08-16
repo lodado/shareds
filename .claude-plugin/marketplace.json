@@ -6,7 +6,7 @@
     "name": "lodado",
     "url": "https://github.com/lodado"
   },
-  "version": "0.1.6",
+  "version": "0.2.1",
   "plugins": [
     {
       "name": "vibe-coding-helper",
@@ -23,7 +23,7 @@
     {
       "name": "frontend-oracle-design",
       "description": "Oracle-driven frontend contracts, TDD, automated visual regression, and review.",
-      "version": "0.1.8",
+      "version": "0.1.9",
       "author": {
         "name": "lodado"
       },
@@ -34,8 +34,8 @@
     },
     {
       "name": "frontend-system-design",
-      "description": "Policy candidates and verification duties for well-known frontend system design problems.",
-      "version": "0.1.0",
+      "description": "Oracle-dependent policy candidates and verification duties for well-known frontend system design problems.",
+      "version": "0.2.0",
       "author": {
         "name": "lodado"
       },
@@ -47,7 +47,7 @@
     {
       "name": "test",
       "description": "Oracle-driven frontend behavior and headless visual regression testing.",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "author": {
         "name": "lodado"
       },
