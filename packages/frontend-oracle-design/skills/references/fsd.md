@@ -28,6 +28,9 @@
   공식 관례대로 FSD layer를 `_app/`·`_pages/`로 개명해 architecture 문서에
   기록하고 일관되게 쓴다. route 파일(`app/**/page.tsx`)은 FSD `_pages/`
   slice를 re-export·조립만 하고 로직은 slice로 내린다.
+- Steiger를 함께 쓰면 기본 `fsd/typo-in-layer-name` 규칙이 `_app`·`_pages`를
+  오타로 볼 수 있다. 이 Next.js 관례를 승인했다면 아래 bootstrap 설정처럼
+  그 규칙만 끄고 구조 사유를 architecture 문서에 남긴다.
 
 ## 추출 판단 — Pages-first
 
@@ -118,12 +121,32 @@
 
 - 승인된 layer만 생성하고 path alias(`@/*` 등) 매핑을 architecture 문서에
   기록한다.
-- import-boundary 검증이 없으면 도입을 **제안**한다: `@lodado/eslint-config`를
-  이미 쓰는 레포는 `fsd` preset(`@lodado/eslint-config/fsd` — deep import·비표준
-  segment·driver 경계 강제), 그 외에는 steiger(공식 FSD linter) 또는
-  `eslint-plugin-boundaries`·`import/no-internal-modules` 동등 규칙.
+- import-boundary 검증이 없으면 도입을 **제안**한다. 대상 workspace가
+  `@lodado/eslint-config`를 이미 사용하고 `@lodado/eslint-config/fsd`를 실제로 resolve할
+  수 있을 때만 그 preset을 재사용한다. 외부 레포에 이 내부 workspace 패키지
+  설치를 권하지 않는다.
+- 그 외에는 Steiger(공식 FSD linter) 또는
+  `eslint-plugin-boundaries`·`import/no-internal-modules` 동등 규칙을 쓴다. Steiger는 runner와
+  FSD plugin이 별도 패키지다.
+
+  ```bash
+  pnpm add -D steiger @feature-sliced/steiger-plugin
+  ```
+
+  Next.js에서 `_app`·`_pages` 관례를 쓰면 최소 설정은 다음과 같다.
+
+  ```js
+  // steiger.config.js
+  import fsd from '@feature-sliced/steiger-plugin'
+  import { defineConfig } from 'steiger'
+
+  export default defineConfig([...fsd.configs.recommended, { rules: { 'fsd/typo-in-layer-name': 'off' } }])
+  ```
+
+  `pnpm exec steiger ./src`를 구조 검증 명령으로 기록한다.
   사용자 승인 후 devDependency로 추가하고 GREEN 게이트의 구조 검증 명령에
   포함한다. 승인 없이는 추가하지 않는다.
+
 - 사용자 전역 rules나 repo instruction이 다른 폴더 구조(예: `components/`,
   `hooks/`, `lib/` 조직)를 권장해 FSD와 충돌하면 임의로 절충하지 않는다.
   `NEEDS_DECISION`으로 우선순위를 물어 승인된 결정을 architecture 문서에
