@@ -28,8 +28,12 @@ test('O27: lints the card structure and initializes run artifacts around the loc
 
   assert.match(oracleCard, /oracle-verify\.mjs card/)
   assert.match(oracleCard, /CARD_LINT_FAILED/)
-  assert.match(oracleCard, /자동 추가 TC 7종의 행 또는 N\/A/)
+  assert.match(oracleCard, /자동 추가 TC.*실제 계약 행 또는 출처 있는 N\/A/s)
+  assert.match(oracleCard, /User Confirmation/)
+  assert.match(oracleCard, /Draft Oracle/)
+  assert.match(oracleCard, /새 카드.*revision.*사용자.*확인/s)
   assert.match(oracleCard, /oracle-run\.mjs init/)
+  assert.match(oracleCard, /--required-label/)
   assert.match(oracleCard, /run-state\.json/)
   assert.match(oracleCard, /runs\.jsonl/)
   assert.match(oracleCard, /상태 파일이 이미 있으면 `init`은 실패한다/)
@@ -47,6 +51,10 @@ test('O28: routes delivery runs through exec and gates GREEN on flakiness and te
   assert.match(implementationLoop, /TEST_WEAKENED/)
   assert.match(implementationLoop, /ENV_DRIFT/)
   assert.match(implementationLoop, /evidence\.json/)
+  assert.match(implementationLoop, /oracle-verify\.mjs red/)
+  assert.match(implementationLoop, /EVIDENCE_REQUIRED/)
+  assert.match(implementationLoop, /REQUIRED_RUN_MISSING/)
+  assert.match(implementationLoop, /oracle-verify\.mjs review/)
   assert.match(implementationLoop, /EVIDENCE_NOT_IN_RUN/)
   assert.match(implementationLoop, /EVIDENCE_UNVERIFIABLE/)
   assert.match(implementationLoop, /oracle-verify\.mjs scan/)
@@ -61,22 +69,22 @@ test('O29: gives reviewers raw run evidence and a validated finding schema', asy
   assert.match(subagentReview, /oracle-verify\.mjs findings/)
   assert.match(subagentReview, /--intersect/)
   assert.match(subagentReview, /독립 리뷰를 2회\*\* 실행한다/)
-  assert.match(subagentReview, /결과 모두에 나온 finding만 완료를 차단/)
-  assert.match(subagentReview, /한쪽에만 나온 finding은 advisory/)
+  assert.match(subagentReview, /critical.*high.*단독.*blocking/s)
+  assert.match(subagentReview, /medium.*low.*교집합/s)
   assert.match(subagentReview, /FINDINGS_INVALID/)
-  assert.match(subagentReview, /자동으로 `NON_ORACLE_OPINION`으로 강등/)
+  assert.match(subagentReview, /medium\/low finding은 `NON_ORACLE_OPINION`으로 강등/)
+  assert.match(subagentReview, /행이 없는 critical\/high.*blocking/s)
   assert.match(subagentReview, /grade가 `reported`인가/)
 })
 
-test('O30: locks screenshot diff tolerance as an approved policy value', async () => {
-  const visualDesign = await read('references/visual-design.md')
+test('O30: delegates screenshot and direct-browser execution to a separate skill', async () => {
+  const [skill, visualDesign] = await Promise.all([read('SKILL.md'), read('references/visual-design.md')])
 
-  assert.match(visualDesign, /screenshot diff 허용치는 잠긴 정책값이다/)
-  assert.match(visualDesign, /maxDiffPixels/)
-  assert.match(visualDesign, /maxDiffPixelRatio/)
-  assert.match(visualDesign, /테스트\s*\n?\s*단계에서 올리지 않는다/)
-  assert.match(visualDesign, /TEST_WEAKENED/)
-  assert.match(visualDesign, /screenshot 허용치를 올려 mismatch를 통과 처리/)
+  assert.match(skill, /\$frontend-visual-qa/)
+  assert.match(skill, /명시적으로 요청.*호출/s)
+  assert.match(visualDesign, /\$frontend-visual-qa/)
+  assert.match(visualDesign, /screenshot.*직접 브라우저.*소유/s)
+  assert.doesNotMatch(skill, /BROWSER_VERIFIED/)
 })
 
 test('requires automatic deterministic locking at delivery boundaries', async () => {
@@ -110,15 +118,16 @@ test('keeps feedback routing and evidence tied to the locked revision', async ()
   assert.match(implementationLoop, /revision mismatch/)
 })
 
-test('carries the locked revision through tests and independent review without a direct browser loop', async () => {
+test('carries the locked revision through tests and review without owning visual QA', async () => {
   const [skill, implementationLoop, subagentReview] = await Promise.all([
     read('SKILL.md'),
     read('references/implementation-loop.md'),
     read('references/subagent-review.md'),
   ])
 
+  assert.match(skill, /\$frontend-visual-qa/)
   assert.doesNotMatch(skill, /browser-verification\.md|BROWSER_VERIFIED|브라우저 검증·자가개선/)
-  assert.doesNotMatch(implementationLoop, /browser scenario/)
+  assert.doesNotMatch(implementationLoop, /browser scenario|BROWSER_VERIFIED/)
   assert.match(subagentReview, /Oracle SHA-256/)
   assert.match(subagentReview, /마지막 verify/)
   assert.match(subagentReview, /NON_ORACLE_OPINION/)
@@ -152,14 +161,7 @@ test('explicitly invokes $test before writing frontend tests', async () => {
 test('batches delivery decisions and parallelizes only across safe gates', async () => {
   const implementationLoop = await read('references/implementation-loop.md')
 
-  for (const intakeItem of [
-    'evidence',
-    'screenshot strictness',
-    'baseline authority',
-    'naming',
-    'designer',
-    'direct-browser',
-  ]) {
+  for (const intakeItem of ['policy', 'architecture', 'evidence', 'naming', 'review']) {
     assert.match(implementationLoop, new RegExp(intakeItem))
   }
 
@@ -209,6 +211,28 @@ test('defines the FSD contract and wires it through loading, architecture, imple
   assert.match(subagentReview, /fsd\.md/)
 })
 
+test('gates approved hook encapsulation and reviews UI/business responsibility boundaries', async () => {
+  const [skill, architectureContract, frontendImplementation, subagentReview] = await Promise.all([
+    read('SKILL.md'),
+    read('references/architecture-contract.md'),
+    read('references/frontend-implementation.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  assert.match(skill, /Hook Encapsulation/)
+  assert.match(frontendImplementation, /eslint-plugin-use-encapsulation/)
+  assert.match(frontendImplementation, /use-encapsulation\/prefer-custom-hooks/)
+  assert.match(frontendImplementation, /allow.*block/s)
+  assert.match(frontendImplementation, /응집도.*증명하지/s)
+  assert.match(architectureContract, /orchestration-only/)
+  assert.match(architectureContract, /target glob.*rule ID.*allow.*block.*lint command/s)
+  assert.match(architectureContract, /hook-encapsulation/)
+  assert.match(frontendImplementation, /UI.*비즈니스 로직/s)
+  assert.match(subagentReview, /micro-hook.*UI.*비즈니스 로직/s)
+  assert.match(subagentReview, /trivial wrapper.*거대 hook/s)
+  assert.doesNotMatch(subagentReview, /lint|hook-encapsulation|eslint-disable/)
+})
+
 test('keeps Oracle control while consuming optional system-design references', async () => {
   const skill = await read('SKILL.md')
 
@@ -248,46 +272,25 @@ test('loads visual design guidance only for UI-shaping work and carries its cont
   assert.match(subagentReview, /Design Change Confirmation/)
 })
 
-test('locks approved visual results with complementary deterministic evidence', async () => {
+test('keeps visual policy in Oracle while delegating visual execution details', async () => {
   const visualDesign = await read('references/visual-design.md')
 
-  assert.match(visualDesign, /semantic DOM snapshot/)
-  assert.match(visualDesign, /computed style whitelist/)
-  assert.match(visualDesign, /relative layout snapshot/)
-  assert.match(visualDesign, /exact screenshot/)
-  assert.match(visualDesign, /Chromium.*OS.*font.*viewport.*theme.*reduced motion/s)
-  assert.match(visualDesign, /raw HTML.*CSS source bytes.*잠그지 않는다/s)
-  assert.match(visualDesign, /baseline.*변경 전후 diff.*사용자.*명시적 승인/s)
-  assert.match(visualDesign, /approved baseline.*read×1.*write×0/s)
-  assert.match(visualDesign, /승인 근거가\s+없으면.*update.*거부/s)
-  assert.match(visualDesign, /기존 revision.*보존/s)
-  assert.doesNotMatch(visualDesign, /baseline을 쓰지 않는다/)
-  assert.match(visualDesign, /headless.*`\*\.style\.(?:test|spec)/s)
+  assert.match(visualDesign, /HARD/)
+  assert.match(visualDesign, /RELATIONAL/)
+  assert.match(visualDesign, /JUDGMENT/)
+  assert.match(visualDesign, /baseline.*사용자.*명시적 승인/s)
+  assert.match(visualDesign, /\$frontend-visual-qa/)
+  assert.doesNotMatch(visualDesign, /`\*\.style\.(?:test|spec)/)
   assert.doesNotMatch(visualDesign, /BROWSER_VERIFIED/)
 })
 
-test('names visual contract tests without bypassing repository discovery', async () => {
-  const visualDesign = await read('references/visual-design.md')
-
-  assert.match(visualDesign, /`\*\.style\.test\.ts`.*`\*\.style\.test\.tsx`/s)
-  assert.match(visualDesign, /`\*\.style\.spec\.ts`/)
-  assert.match(visualDesign, /실제 test command가 수집/)
-  assert.match(visualDesign, /naming만을 위해.*test 설정.*변경하지 않는다/s)
-  assert.match(visualDesign, /소유 대상 가까이/)
-})
-
-test('requires independent design review only for judgment or baseline changes', async () => {
+test('requires independent design review for judgment while visual QA owns baseline execution', async () => {
   const [visualDesign, subagentReview] = await Promise.all([
     read('references/visual-design.md'),
     read('references/subagent-review.md'),
   ])
 
-  assert.match(visualDesign, /`JUDGMENT`.*baseline 변경.*`designer`/s)
-  assert.match(
-    subagentReview,
-    /`JUDGMENT` 행 또는 visual baseline 변경.*Oracle revision.*baseline.*actual screenshot.*diff/s,
-  )
-  assert.match(subagentReview, /Oracle revision.*baseline.*actual screenshot.*diff/s)
-  assert.match(subagentReview, /정책.*baseline.*수정.*승인.*금지/s)
-  assert.match(subagentReview, /deterministic comparison.*그대로 통과.*N\/A/s)
+  assert.match(visualDesign, /`JUDGMENT`.*`designer`/s)
+  assert.match(subagentReview, /`JUDGMENT` 행.*승인 기준.*Design Intent/s)
+  assert.match(subagentReview, /\$frontend-visual-qa.*artifact/s)
 })

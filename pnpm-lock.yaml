@@ -93,6 +93,14 @@ importers:
         specifier: ^8.57.0
         version: 8.57.1
 
+  packages/frontend-oracle-design: {}
+
+  packages/frontend-system-design: {}
+
+  packages/frontend-visual-qa: {}
+
+  packages/test: {}
+
   packages/vibe-coding-helper: {}
 
 packages:

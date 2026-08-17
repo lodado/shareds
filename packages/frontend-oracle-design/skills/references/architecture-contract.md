@@ -94,6 +94,27 @@ layer·segment 매핑과 slice public API(`index.ts`)의 정확한 export 목록
 `Component boundaries`에 허용·금지 import 경계(deep import 금지 포함),
 `Test boundaries`에 `__test__/`·`__mocks__/` 배치. 기준은 [`fsd.md`](fsd.md)다.
 
+## Hook Encapsulation 계약 — 조건부
+
+Page/UI component를 orchestration-free 경계로 만들기로 사용자가 승인한 경우에만
+정책을 `orchestration-only`로 기록한다. component LOC, effect 수 또는 reviewer 취향으로
+이 정책을 추론하지 않는다. 승인 문서에는 다음 값을 exact value로 남긴다.
+
+| policy               | target glob              | rule ID             | allow                 | block                 | lint command        | config source                |
+| -------------------- | ------------------------ | ------------------- | --------------------- | --------------------- | ------------------- | ---------------------------- |
+| `orchestration-only` | 적용할 Page/UI 파일 glob | 실제 ESLint rule ID | 직접 허용할 hook 이름 | 직접 금지할 hook 이름 | 실제 repo lint 명령 | config 경로와 실제 설치 버전 |
+
+- 기존에 동등한 lint rule이 있으면 그것을 사용한다. 없을 때만
+  `eslint-plugin-use-encapsulation`의 `use-encapsulation/prefer-custom-hooks` 도입을
+  제안하며 dependency 설치와 config 변경도 architecture 승인 대상이다.
+- `allow`와 `block`은 plugin default에 맡기지 않는다. target runtime의 React·router·
+  query·form hook을 실제 설치 버전에서 확인해 명시한다.
+- config source를 Oracle local source로 잠그고 `oracle-run.mjs init`의 필수 label에
+  `hook-encapsulation`을 추가한다. GREEN과 review 뒤 고정한 lint command를 같은
+  label로 실행한다.
+- 이 계약은 금지된 직접 호출을 막는 구조 gate다. custom hook의 응집도나 동작 계약은
+  테스트와 독립 review가 담당한다.
+
 ## 구현 판단
 
 - component는 상태 소유권, async/error boundary, 접근성 책임, 독립 테스트 또는 재사용

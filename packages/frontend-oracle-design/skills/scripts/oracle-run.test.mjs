@@ -11,6 +11,30 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const script = join(scriptDirectory, 'oracle-run.mjs')
 const lockScript = join(scriptDirectory, 'oracle-lock.mjs')
 
+const ORACLE = `# Oracle
+
+## Behavior Contract
+
+| ID | Given | When | Then | Never | 부작용(종류×횟수) | BVA |
+| --- | --- | --- | --- | --- | --- | --- |
+| O1 | 입력 | 저장 | pending | 조기 성공 | POST×1 | 상태 |
+`
+
+const EVIDENCE = {
+  schemaVersion: 1,
+  rows: {
+    O1: { kind: 'test', name: 'save > pending' },
+  },
+}
+
+const RED_REPORT = {
+  testResults: [{ assertionResults: [{ fullName: 'save > pending', status: 'failed' }] }],
+}
+
+const GREEN_REPORT = {
+  testResults: [{ assertionResults: [{ fullName: 'save > pending', status: 'passed' }] }],
+}
+
 function run(args, environment) {
   // 바깥 `node --test`가 남긴 NODE_TEST_CONTEXT를 물려주면 자식 node --test가
   // test-child 모드로 돌아 exit code와 reporter 출력을 내지 않는다.
@@ -45,7 +69,10 @@ async function snapshotOf(root, prefix = '') {
     const path = prefix ? `${prefix}/${entry.name}` : entry.name
 
     if (entry.isDirectory()) Object.assign(digests, await snapshotOf(root, path))
-    else if (entry.isFile()) digests[path] = createHash('sha256').update(await readFile(join(root, path))).digest('hex')
+    else if (entry.isFile())
+      digests[path] = createHash('sha256')
+        .update(await readFile(join(root, path)))
+        .digest('hex')
   }
 
   return digests
@@ -61,7 +88,7 @@ async function markerCount(markerPath) {
   }
 }
 
-async function workspace(t, { risk = 'medium', git = false } = {}) {
+async function workspace(t, { risk = 'medium', git = false, requiredLabels = ['behavior'] } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'oracle-run-'))
   t.after(() => rm(root, { recursive: true, force: true }))
 
@@ -77,17 +104,48 @@ async function workspace(t, { risk = 'medium', git = false } = {}) {
 
   const oracle = join(oracleDirectory, 'oracle.md')
   const lock = join(oracleDirectory, 'oracle.lock.json')
-  await writeFile(oracle, '# Oracle\n')
+  await writeFile(oracle, ORACLE)
+  await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify(EVIDENCE))
+  await writeFile(join(oracleDirectory, 'red-report.json'), JSON.stringify(RED_REPORT))
+  await writeFile(join(oracleDirectory, 'green-report.json'), JSON.stringify(GREEN_REPORT))
+  await writeFile(
+    join(oracleDirectory, 'findings.json'),
+    JSON.stringify({ schemaVersion: 1, reviewer: 'code-reviewer', findings: [] }),
+  )
 
   const locked = spawnSync(process.execPath, [lockScript, 'create', '--oracle', oracle, '--lock', lock], {
     encoding: 'utf8',
   })
   assert.equal(locked.status, 0, locked.stderr)
 
-  const initialized = run(['init', '--dir', oracleDirectory, '--lock', lock, '--risk', risk, '--scan-root', root])
+  const initArgs = ['init', '--dir', oracleDirectory, '--lock', lock, '--risk', risk, '--scan-root', root]
+  for (const label of requiredLabels) initArgs.push('--required-label', label)
+
+  const initialized = run(initArgs)
   assert.equal(initialized.status, 0, initialized.stderr)
 
   return { root, oracleDirectory, oracle, lock, marker: join(root, 'marker.txt') }
+}
+
+function transition(oracleDirectory, to, runId, extra = []) {
+  const args = ['transition', '--dir', oracleDirectory, '--to', to, '--run', runId]
+
+  if (to === 'VALID_RED') {
+    args.push('--evidence', join(oracleDirectory, 'evidence.json'), '--row', 'O1')
+  } else if (to === 'IMPLEMENTED_GREEN' || to === 'REVIEW_VERIFIED') {
+    args.push('--evidence', join(oracleDirectory, 'evidence.json'))
+  }
+
+  if (to === 'REVIEW_VERIFIED') args.push('--findings', join(oracleDirectory, 'findings.json'))
+
+  return run([...args, ...extra])
+}
+
+function redRun(oracleDirectory, { exitCode = 1, report = true, environment } = {}) {
+  const args = ['exec', '--dir', oracleDirectory, '--label', 'red']
+  if (report) args.push('--report', join(oracleDirectory, 'red-report.json'))
+  args.push('--', process.execPath, '-e', `process.exit(${exitCode})`)
+  return run(args, environment)
 }
 
 test('O1: exec는 명령을 한 번 실행하고 ledger에 한 줄을 남긴다', async (t) => {
@@ -125,10 +183,7 @@ test('O1: exec는 명령을 한 번 실행하고 ledger에 한 줄을 남긴다'
 
   // product write×0 — oracle artifact와 실행 marker 외에는 어떤 파일도 바뀌지 않는다.
   const changed = Object.entries(await snapshotOf(root)).filter(([path, digest]) => before[path] !== digest)
-  assert.deepEqual(
-    changed.map(([path]) => path).sort(),
-    ['.ai/oracles/sample/runs.jsonl', 'marker.txt'],
-  )
+  assert.deepEqual(changed.map(([path]) => path).sort(), ['.ai/oracles/sample/runs.jsonl', 'marker.txt'])
 })
 
 test('O2: lock mismatch면 명령을 실행하지 않고 ORACLE_CHANGED로 멈춘다', async (t) => {
@@ -347,20 +402,10 @@ test('O5: 테스트 파일만 바뀐 상태의 non-zero run은 VALID_RED로 전�
   const { root, oracleDirectory } = await workspace(t)
   await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
 
-  const executed = run([
-    'exec',
-    '--dir',
-    oracleDirectory,
-    '--label',
-    'red-1',
-    '--',
-    process.execPath,
-    '-e',
-    'process.exit(1)',
-  ])
+  const executed = redRun(oracleDirectory)
   assert.equal(executed.status, 0, executed.stderr)
 
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', 'r-001'])
+  const transitioned = transition(oracleDirectory, 'VALID_RED', 'r-001')
   assert.equal(transitioned.status, 0, transitioned.stderr)
   assert.match(transitioned.stdout, /^STATE_VALID_RED run:r-001\n$/)
 
@@ -376,8 +421,8 @@ test('O6: RED 전에 production 파일이 바뀌면 PRODUCTION_TOUCHED_BEFORE_RE
   await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
   await writeFile(join(root, 'src', 'save.mjs'), 'export const save = () => null\n')
 
-  run(['exec', '--dir', oracleDirectory, '--label', 'red-1', '--', process.execPath, '-e', 'process.exit(1)'])
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', 'r-001'])
+  redRun(oracleDirectory)
+  const transitioned = transition(oracleDirectory, 'VALID_RED', 'r-001')
 
   assert.equal(transitioned.status, 1)
   assert.match(transitioned.stderr, /^PRODUCTION_TOUCHED_BEFORE_RED: /)
@@ -395,8 +440,8 @@ test('O6: git 레포에서 gitignore된 파일은 production 변경으로 세지
   await mkdir(join(root, 'node_modules', 'later'), { recursive: true })
   await writeFile(join(root, 'node_modules', 'later', 'index.js'), 'module.exports = 2\n')
 
-  run(['exec', '--dir', oracleDirectory, '--label', 'red-1', '--', process.execPath, '-e', 'process.exit(1)'])
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', 'r-001'])
+  redRun(oracleDirectory)
+  const transitioned = transition(oracleDirectory, 'VALID_RED', 'r-001')
 
   assert.equal(transitioned.status, 0, transitioned.stderr)
   assert.equal(Object.keys((await state(oracleDirectory)).testFiles).length, 1)
@@ -455,25 +500,49 @@ test('O11: 예산 기록은 run 번호를 소비하지 않는다', async (t) => 
 
 test('O7: exit 0 run으로는 VALID_RED로 전이하지 못한다', async (t) => {
   const { oracleDirectory } = await workspace(t)
-  run(['exec', '--dir', oracleDirectory, '--label', 'red-1', '--', process.execPath, '-e', 'process.exit(0)'])
+  redRun(oracleDirectory, { exitCode: 0 })
 
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', 'r-001'])
+  const transitioned = transition(oracleDirectory, 'VALID_RED', 'r-001')
 
   assert.equal(transitioned.status, 1)
   assert.match(transitioned.stderr, /^RUN_NOT_RED: /)
   assert.equal((await state(oracleDirectory)).state, 'ORACLE_READY')
 })
 
+test('O7: reporter와 지정 행의 실패 증거가 없는 non-zero run은 VALID_RED가 아니다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
+  redRun(oracleDirectory, { report: false })
+
+  const transitioned = transition(oracleDirectory, 'VALID_RED', 'r-001')
+
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^RED_EVIDENCE_UNVERIFIABLE: /)
+  assert.equal((await state(oracleDirectory)).state, 'ORACLE_READY')
+})
+
 async function reachValidRed(oracleDirectory, root) {
   await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
-  run(['exec', '--dir', oracleDirectory, '--label', 'red-1', '--', process.execPath, '-e', 'process.exit(1)'])
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', 'r-001'])
+  redRun(oracleDirectory)
+  const transitioned = transition(oracleDirectory, 'VALID_RED', 'r-001')
   assert.equal(transitioned.status, 0, transitioned.stderr)
 }
 
 function greenRun(oracleDirectory, label, environment) {
   return run(
-    ['exec', '--dir', oracleDirectory, '--label', label, '--', process.execPath, '-e', 'process.exit(0)'],
+    [
+      'exec',
+      '--dir',
+      oracleDirectory,
+      '--label',
+      'behavior',
+      '--report',
+      join(oracleDirectory, 'green-report.json'),
+      '--',
+      process.execPath,
+      '-e',
+      'process.exit(0)',
+    ],
     environment,
   )
 }
@@ -484,11 +553,31 @@ test('O8: 연속 통과 횟수를 채운 GREEN 전이는 lock을 재검증하고
   greenRun(oracleDirectory, 'green-1')
   greenRun(oracleDirectory, 'green-2')
 
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN', '--run', 'r-003'])
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
 
   assert.equal(transitioned.status, 0, transitioned.stderr)
   assert.match(transitioned.stdout, /^STATE_IMPLEMENTED_GREEN run:r-003\n$/)
   assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+})
+
+test('O8: evidence manifest나 init에서 선언한 필수 label이 없으면 GREEN을 거부한다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { requiredLabels: ['behavior', 'lint'] })
+  await reachValidRed(oracleDirectory, root)
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+
+  const withoutEvidence = run(['transition', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN', '--run', 'r-003'])
+  assert.equal(withoutEvidence.status, 1)
+  assert.match(withoutEvidence.stderr, /^EVIDENCE_REQUIRED: /)
+
+  const withoutLint = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(withoutLint.status, 1)
+  assert.match(withoutLint.stderr, /^REQUIRED_RUN_MISSING: /)
+  assert.match(withoutLint.stderr, /lint/)
+
+  run(['exec', '--dir', oracleDirectory, '--label', 'lint', '--', process.execPath, '-e', 'process.exit(0)'])
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(transitioned.status, 0, transitioned.stderr)
 })
 
 test('O8: GREEN 전이 직전 lock mismatch면 ORACLE_CHANGED로 멈춘다', async (t) => {
@@ -498,7 +587,7 @@ test('O8: GREEN 전이 직전 lock mismatch면 ORACLE_CHANGED로 멈춘다', asy
   greenRun(oracleDirectory, 'green-2')
   await writeFile(oracle, '# Tampered Oracle\n')
 
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN', '--run', 'r-003'])
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
 
   assert.equal(transitioned.status, 1)
   assert.match(transitioned.stderr, /^ORACLE_CHANGED: /)
@@ -510,7 +599,7 @@ test('O9: 연속 통과가 risk 필요 횟수보다 적으면 FLAKINESS_GATE로 
   await reachValidRed(oracleDirectory, root)
   greenRun(oracleDirectory, 'green-1')
 
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN', '--run', 'r-002'])
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002')
 
   assert.equal(transitioned.status, 1)
   assert.match(transitioned.stderr, /^FLAKINESS_GATE: /)
@@ -525,12 +614,12 @@ test('O9: High risk는 연속 통과 3회를 요구한다', async (t) => {
   greenRun(oracleDirectory, 'green-1')
   greenRun(oracleDirectory, 'green-2')
 
-  const blocked = run(['transition', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN', '--run', 'r-003'])
+  const blocked = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
   assert.equal(blocked.status, 1)
   assert.match(blocked.stderr, /required 3/)
 
   greenRun(oracleDirectory, 'green-3')
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN', '--run', 'r-004'])
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-004')
   assert.equal(transitioned.status, 0, transitioned.stderr)
 })
 
@@ -540,14 +629,14 @@ test('O10: assertion이 줄면 TEST_WEAKENED로 GREEN을 거부한다', async (t
     join(root, 'src', 'save.test.mjs'),
     "import assert from 'node:assert'\nassert.equal(1, 1)\nassert.equal(2, 2)\n",
   )
-  run(['exec', '--dir', oracleDirectory, '--label', 'red-1', '--', process.execPath, '-e', 'process.exit(1)'])
-  assert.equal(run(['transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', 'r-001']).status, 0)
+  redRun(oracleDirectory)
+  assert.equal(transition(oracleDirectory, 'VALID_RED', 'r-001').status, 0)
 
   await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
   greenRun(oracleDirectory, 'green-1')
   greenRun(oracleDirectory, 'green-2')
 
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN', '--run', 'r-003'])
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
 
   assert.equal(transitioned.status, 1)
   assert.match(transitioned.stderr, /^TEST_WEAKENED: /)
@@ -567,7 +656,7 @@ test('O10: 금지 토큰이 새로 들어오면 TEST_WEAKENED로 GREEN을 거부
   greenRun(oracleDirectory, 'green-1')
   greenRun(oracleDirectory, 'green-2')
 
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN', '--run', 'r-003'])
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
 
   assert.equal(transitioned.status, 1)
   assert.match(transitioned.stderr, /^TEST_WEAKENED: /)
@@ -580,8 +669,8 @@ test('O10: screenshot 허용치를 올리면 TEST_WEAKENED로 GREEN을 거부한
     join(root, 'src', 'hero.style.test.ts'),
     "import assert from 'node:assert'\nassert.equal(1, 1)\n// maxDiffPixels: 0\n",
   )
-  run(['exec', '--dir', oracleDirectory, '--label', 'red-1', '--', process.execPath, '-e', 'process.exit(1)'])
-  assert.equal(run(['transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', 'r-001']).status, 0)
+  redRun(oracleDirectory)
+  assert.equal(transition(oracleDirectory, 'VALID_RED', 'r-001').status, 0)
 
   await writeFile(
     join(root, 'src', 'hero.style.test.ts'),
@@ -590,7 +679,7 @@ test('O10: screenshot 허용치를 올리면 TEST_WEAKENED로 GREEN을 거부한
   greenRun(oracleDirectory, 'green-1')
   greenRun(oracleDirectory, 'green-2')
 
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN', '--run', 'r-003'])
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
 
   assert.equal(transitioned.status, 1)
   assert.match(transitioned.stderr, /maxDiffPixelRatio/)
@@ -602,8 +691,8 @@ test('O10: 토큰 수를 늘리지 않고 screenshot 허용치 값만 올려도 
     join(root, 'src', 'hero.style.test.ts'),
     "import assert from 'node:assert'\nassert.equal(1, 1)\nawait expectScreenshot({ maxDiffPixels: 10 })\n",
   )
-  run(['exec', '--dir', oracleDirectory, '--label', 'red-1', '--', process.execPath, '-e', 'process.exit(1)'])
-  assert.equal(run(['transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', 'r-001']).status, 0)
+  redRun(oracleDirectory)
+  assert.equal(transition(oracleDirectory, 'VALID_RED', 'r-001').status, 0)
 
   // 토큰 수는 그대로 1회, 값만 상향한다.
   await writeFile(
@@ -613,7 +702,7 @@ test('O10: 토큰 수를 늘리지 않고 screenshot 허용치 값만 올려도 
   greenRun(oracleDirectory, 'green-1')
   greenRun(oracleDirectory, 'green-2')
 
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN', '--run', 'r-003'])
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
 
   assert.equal(transitioned.status, 1)
   assert.match(transitioned.stderr, /^TEST_WEAKENED: /)
@@ -627,8 +716,8 @@ test('O10: 허용치를 낮추거나 유지하면 GREEN을 막지 않는다', as
     join(root, 'src', 'hero.style.test.ts'),
     "import assert from 'node:assert'\nassert.equal(1, 1)\nawait expectScreenshot({ maxDiffPixels: 10 })\n",
   )
-  run(['exec', '--dir', oracleDirectory, '--label', 'red-1', '--', process.execPath, '-e', 'process.exit(1)'])
-  assert.equal(run(['transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', 'r-001']).status, 0)
+  redRun(oracleDirectory)
+  assert.equal(transition(oracleDirectory, 'VALID_RED', 'r-001').status, 0)
 
   await writeFile(
     join(root, 'src', 'hero.style.test.ts'),
@@ -637,7 +726,7 @@ test('O10: 허용치를 낮추거나 유지하면 GREEN을 막지 않는다', as
   greenRun(oracleDirectory, 'green-1')
   greenRun(oracleDirectory, 'green-2')
 
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN', '--run', 'r-003'])
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
 
   assert.equal(transitioned.status, 0, transitioned.stderr)
 })
@@ -650,7 +739,7 @@ test('O10: RED에 기록된 테스트 파일이 사라지면 TEST_WEAKENED로 GR
   greenRun(oracleDirectory, 'green-1')
   greenRun(oracleDirectory, 'green-2')
 
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN', '--run', 'r-003'])
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
 
   assert.equal(transitioned.status, 1)
   assert.match(transitioned.stderr, /^TEST_WEAKENED: /)
@@ -677,16 +766,13 @@ test('O11: 예산은 한도까지만 사용되고 초과 요청은 BUDGET_EXHAUS
 test('O12: RED와 GREEN의 env fingerprint가 다르면 전이는 통과하되 ENV_DRIFT를 남긴다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
   await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
-  run(
-    ['exec', '--dir', oracleDirectory, '--label', 'red-1', '--', process.execPath, '-e', 'process.exit(1)'],
-    { TZ: 'UTC' },
-  )
-  assert.equal(run(['transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', 'r-001']).status, 0)
+  redRun(oracleDirectory, { environment: { TZ: 'UTC' } })
+  assert.equal(transition(oracleDirectory, 'VALID_RED', 'r-001').status, 0)
 
   greenRun(oracleDirectory, 'green-1', { TZ: 'Asia/Seoul' })
   greenRun(oracleDirectory, 'green-2', { TZ: 'Asia/Seoul' })
 
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN', '--run', 'r-003'])
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
 
   assert.equal(transitioned.status, 0, transitioned.stderr)
   assert.match(transitioned.stdout, /ENV_DRIFT/)
@@ -709,7 +795,7 @@ test('O13: 허용되지 않는 전이는 TRANSITION_NOT_ALLOWED로 거부한다'
 test('O14: ledger에 없는 runId를 인용하면 RUN_NOT_FOUND로 거부한다', async (t) => {
   const { oracleDirectory } = await workspace(t)
 
-  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', 'r-009'])
+  const transitioned = transition(oracleDirectory, 'VALID_RED', 'r-009')
 
   assert.equal(transitioned.status, 1)
   assert.match(transitioned.stderr, /^RUN_NOT_FOUND: /)
@@ -734,18 +820,11 @@ test('O16: production 변경이 없으면 사유와 함께 RED 없이 GREEN으�
   greenRun(oracleDirectory, 'green-1')
   greenRun(oracleDirectory, 'green-2')
 
-  const withoutReason = run(['transition', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN', '--run', 'r-002'])
+  const withoutReason = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002')
   assert.equal(withoutReason.status, 1)
   assert.match(withoutReason.stderr, /^MISSING_REASON: /)
 
-  const transitioned = run([
-    'transition',
-    '--dir',
-    oracleDirectory,
-    '--to',
-    'IMPLEMENTED_GREEN',
-    '--run',
-    'r-002',
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002', [
     '--reason',
     '기존 구현이 카드를 이미 충족함',
   ])
@@ -762,14 +841,7 @@ test('O16: production이 바뀐 상태에서는 RED 없이 GREEN으로 갈 수 �
   greenRun(oracleDirectory, 'green-1')
   greenRun(oracleDirectory, 'green-2')
 
-  const transitioned = run([
-    'transition',
-    '--dir',
-    oracleDirectory,
-    '--to',
-    'IMPLEMENTED_GREEN',
-    '--run',
-    'r-002',
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002', [
     '--reason',
     '기존 구현이 카드를 이미 충족함',
   ])
@@ -777,4 +849,47 @@ test('O16: production이 바뀐 상태에서는 RED 없이 GREEN으로 갈 수 �
   assert.equal(transitioned.status, 1)
   assert.match(transitioned.stderr, /^PRODUCTION_TOUCHED_BEFORE_RED: /)
   assert.equal((await state(oracleDirectory)).state, 'ORACLE_READY')
+})
+
+test('O17: REVIEW_VERIFIED는 clear findings와 GREEN 이후 필수 재실행을 요구한다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+
+  const withoutRerun = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-003')
+  assert.equal(withoutRerun.status, 1)
+  assert.match(withoutRerun.stderr, /^REQUIRED_RUN_MISSING: /)
+
+  await writeFile(
+    join(oracleDirectory, 'findings.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      reviewer: 'code-reviewer',
+      findings: [
+        {
+          id: 'f-1',
+          row: 'O1',
+          classification: 'PRODUCT_DEFECT',
+          severity: 'high',
+          finding: 'pending이 표시되지 않는다',
+          evidence: 'r-003',
+          fix: 'pending UI 추가',
+        },
+      ],
+    }),
+  )
+  greenRun(oracleDirectory, 'review')
+  const blocked = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-004')
+  assert.equal(blocked.status, 1)
+  assert.match(blocked.stderr, /^FINDINGS_BLOCKING: /)
+
+  await writeFile(
+    join(oracleDirectory, 'findings.json'),
+    JSON.stringify({ schemaVersion: 1, reviewer: 'code-reviewer', findings: [] }),
+  )
+  const verified = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-004')
+  assert.equal(verified.status, 0, verified.stderr)
+  assert.equal((await state(oracleDirectory)).state, 'REVIEW_VERIFIED')
 })

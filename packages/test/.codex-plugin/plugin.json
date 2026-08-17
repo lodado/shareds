@@ -1,7 +1,7 @@
 {
   "name": "test",
-  "version": "0.1.2",
-  "description": "Oracle-driven frontend behavior and headless visual regression testing.",
+  "version": "0.2.0",
+  "description": "Oracle-driven deterministic frontend behavior testing.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
@@ -13,7 +13,7 @@
   "interface": {
     "displayName": "Frontend Test",
     "shortDescription": "Verify locked frontend behavior contracts",
-    "longDescription": "Generate and run frontend behavior and headless visual regression tests against an approved Oracle Card.",
+    "longDescription": "Generate and run deterministic frontend behavior tests against an approved Oracle Card.",
     "developerName": "lodado",
     "category": "development",
     "capabilities": [],

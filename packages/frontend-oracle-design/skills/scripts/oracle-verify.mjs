@@ -2,7 +2,7 @@
 
 import { readFile } from 'node:fs/promises'
 
-const FLAG_NAMES = ['oracle', 'map', 'ledger', 'run', 'file', 'intersect', 'path']
+const FLAG_NAMES = ['oracle', 'map', 'ledger', 'run', 'row', 'file', 'intersect', 'path']
 
 const CLASSIFICATIONS = [
   'POLICY_GAP',
@@ -132,6 +132,23 @@ function isEmptyCell(value) {
   return value === '' || value === '-' || value.toUpperCase() === 'TBD'
 }
 
+function sectionLines(lines, title) {
+  const section = []
+  let active = false
+
+  for (const line of lines) {
+    if (line.startsWith('## ')) {
+      if (active) break
+      active = line.trim() === `## ${title}`
+      continue
+    }
+
+    if (active) section.push(line)
+  }
+
+  return section
+}
+
 async function lintCard(options) {
   if (!options.oracle) throw new CliError('USAGE', 'card requires --oracle', 2)
 
@@ -146,6 +163,32 @@ async function lintCard(options) {
     issues.push('source-registry: card has no `## Source Registry` section')
   }
 
+  const confirmation = sectionLines(lines, 'User Confirmation')
+  if (confirmation.length === 0) {
+    issues.push('user-confirmation: card has no `## User Confirmation` section')
+  } else {
+    if (!confirmation.some((line) => /^- Status:\s*approved\s*$/i.test(line.trim()))) {
+      issues.push('user-confirmation-status: final card must have `- Status: approved`')
+    }
+
+    const source = confirmation
+      .find((line) => /^- Source:/i.test(line.trim()))
+      ?.split(':')
+      .slice(1)
+      .join(':')
+      .trim()
+    if (!source || isEmptyCell(source)) {
+      issues.push('user-confirmation-source: final card must cite the approving user response')
+    }
+  }
+
+  const sourceIds = new Set(
+    sectionLines(lines, 'Source Registry')
+      .filter((line) => line.trim().startsWith('|'))
+      .map((line) => splitRow(line.trim())[0])
+      .filter((id) => /^S\d+$/.test(id)),
+  )
+
   let inPolicySection = false
   lines.forEach((line, index) => {
     if (line.startsWith('## ')) inPolicySection = line.includes('결정된 정책')
@@ -159,16 +202,28 @@ async function lintCard(options) {
     issues.push('no-rows: card has no O*/D* contract rows')
   }
 
+  const seenRows = new Set()
   for (const row of rows) {
     const never = cellOf(row, 'Never')
     const then = cellOf(row, 'Then')
 
+    if (seenRows.has(row.id)) issues.push(`duplicate-row: ${row.id}: contract row ID is repeated`)
+    seenRows.add(row.id)
+
     if (isEmptyCell(never)) issues.push(`empty-never: ${row.id}: Never is empty`)
 
     if (row.id.startsWith('O')) {
+      if (isEmptyCell(then)) issues.push(`empty-then: ${row.id}: Then is empty`)
       if (isEmptyCell(cellOf(row, '부작용'))) issues.push(`empty-side-effect: ${row.id}: side effect count is empty`)
     } else {
-      if (isEmptyCell(cellOf(row, '출처'))) issues.push(`visual-source: ${row.id}: visual contract has no source`)
+      if (isEmptyCell(cellOf(row, '계약'))) {
+        issues.push(`empty-visual-contract: ${row.id}: visual contract is empty`)
+      }
+      const source = cellOf(row, '출처')
+      if (isEmptyCell(source)) issues.push(`visual-source: ${row.id}: visual contract has no source`)
+      for (const id of source.match(/\bS\d+\b/g) ?? []) {
+        if (!sourceIds.has(id)) issues.push(`unknown-source: ${row.id}: ${id} is not in Source Registry`)
+      }
       const tier = cellOf(row, '증거 계층')
       if (!EVIDENCE_TIERS.includes(tier)) {
         issues.push(`visual-evidence-tier: ${row.id}: evidence tier must be one of ${EVIDENCE_TIERS.join(', ')}`)
@@ -182,8 +237,11 @@ async function lintCard(options) {
     }
   }
 
+  const contractText = rows.flatMap((row) => Object.values(row.cells)).join(' ')
+  const sourcedNaText = lines.filter((line) => /\bN\/A\b/i.test(line) && line.includes('(출처:')).join(' ')
+
   for (const { kind, tokens } of AUTO_TEST_CASES) {
-    if (!tokens.some((token) => card.includes(token))) {
+    if (!tokens.some((token) => contractText.includes(token) || sourcedNaText.includes(token))) {
       issues.push(`missing-auto-tc: ${kind}: add a row or a sourced N/A reason`)
     }
   }
@@ -205,6 +263,63 @@ function assertEvidenceShape(id, entry) {
   for (const field of required) {
     if (!entry[field]) throw new CliError('EVIDENCE_INVALID', `${id}: ${entry.kind} evidence requires ${field}`)
   }
+}
+
+async function ledgerRun(options) {
+  const ledger = await readFile(options.ledger, 'utf8').catch((error) => {
+    throw new CliError('LEDGER_INVALID', `Cannot read ${options.ledger}: ${error.message}`)
+  })
+  const run = ledger
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+    .find((entry) => entry.runId === options.run)
+
+  if (!run) {
+    throw new CliError('RUN_NOT_FOUND', `${options.run} is not recorded in the run ledger`)
+  }
+
+  return run
+}
+
+async function verifyRedEvidence(options) {
+  if (!options.oracle || !options.map || !options.ledger || !options.run || !options.row) {
+    throw new CliError('USAGE', 'red requires --oracle, --map, --ledger, --run and --row', 2)
+  }
+
+  const card = await readFile(options.oracle, 'utf8').catch((error) => {
+    throw new CliError('CARD_UNREADABLE', `Cannot read ${options.oracle}: ${error.message}`)
+  })
+  const rows = parseRows(card).map((row) => row.id)
+  const map = await readJson(options.map, 'EVIDENCE_INVALID')
+  const entry = map?.rows?.[options.row]
+
+  if (!rows.includes(options.row) || !entry) {
+    throw new CliError('RED_EVIDENCE_MISSING', `${options.row} has no planned evidence in the locked card`)
+  }
+
+  assertEvidenceShape(options.row, entry)
+  if (entry.kind !== 'test') {
+    throw new CliError('RED_EVIDENCE_MISSING', `${options.row} must map to a test for VALID_RED`)
+  }
+
+  const run = await ledgerRun(options)
+  if (run.exitCode === 0 || run.grade !== 'reported') {
+    throw new CliError(
+      'RED_EVIDENCE_UNVERIFIABLE',
+      `${run.runId} must be a non-zero reported run for VALID_RED; got exit ${run.exitCode} grade ${run.grade}`,
+    )
+  }
+
+  const observed = (run.tests ?? []).find((test) => test.name === entry.name)
+  if (!observed || observed.status !== 'failed') {
+    throw new CliError(
+      'RED_EVIDENCE_MISSING',
+      `${options.row}: "${entry.name}" must be failed in ${run.runId}; observed ${observed?.status ?? 'missing'}`,
+    )
+  }
+
+  process.stdout.write(`RED_EVIDENCE_VERIFIED ${options.row} ${entry.name}\n`)
 }
 
 async function verifyEvidence(options) {
@@ -231,18 +346,7 @@ async function verifyEvidence(options) {
 
   for (const id of rows) assertEvidenceShape(id, map.rows[id])
 
-  const ledger = await readFile(options.ledger, 'utf8').catch((error) => {
-    throw new CliError('LEDGER_INVALID', `Cannot read ${options.ledger}: ${error.message}`)
-  })
-  const run = ledger
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => JSON.parse(line))
-    .find((entry) => entry.runId === options.run)
-
-  if (!run) {
-    throw new CliError('RUN_NOT_FOUND', `${options.run} is not recorded in the run ledger`)
-  }
+  const run = await ledgerRun(options)
 
   const needsRunEvidence = rows.filter((id) => map.rows[id].kind === 'test')
 
@@ -295,7 +399,8 @@ function normalizeFindings(document, rows, source) {
       throw new CliError('FINDINGS_INVALID', `${source}: finding ${finding.id} cites unknown card row ${finding.row}`)
     }
 
-    const downgraded = !finding.row && finding.classification !== 'NON_ORACLE_OPINION'
+    const mandatory = finding.severity === 'critical' || finding.severity === 'high'
+    const downgraded = !finding.row && !mandatory && finding.classification !== 'NON_ORACLE_OPINION'
 
     return {
       ...finding,
@@ -306,7 +411,15 @@ function normalizeFindings(document, rows, source) {
   })
 }
 
-async function verifyFindings(options) {
+function findingKey(finding) {
+  const normalized = finding.finding
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+  return `${finding.row}|${finding.classification}|${normalized}`
+}
+
+async function findingsResult(options) {
   if (!options.file || !options.oracle) {
     throw new CliError('USAGE', 'findings requires --file and --oracle', 2)
   }
@@ -320,25 +433,26 @@ async function verifyFindings(options) {
     ? normalizeFindings(await readJson(options.intersect, 'FINDINGS_INVALID'), rows, options.intersect)
     : null
 
-  const key = (finding) => `${finding.row}|${finding.classification}`
   const opinions = (findings) => findings.filter((finding) => finding.classification === 'NON_ORACLE_OPINION')
   const claims = (findings) => findings.filter((finding) => finding.classification !== 'NON_ORACLE_OPINION')
+  const mandatory = (finding) => finding.severity === 'critical' || finding.severity === 'high'
 
   let blocking
   let advisory
 
   if (secondary) {
-    const secondaryKeys = new Set(claims(secondary).map(key))
-    const primaryKeys = new Set(claims(primary).map(key))
+    const secondaryKeys = new Set(claims(secondary).map(findingKey))
+    const primaryKeys = new Set(claims(primary).map(findingKey))
     const seen = new Set()
 
     blocking = []
     advisory = [...opinions(primary), ...opinions(secondary)]
 
     for (const finding of [...claims(primary), ...claims(secondary)]) {
-      if (seen.has(key(finding))) continue
-      seen.add(key(finding))
-      if (secondaryKeys.has(key(finding)) && primaryKeys.has(key(finding))) blocking.push(finding)
+      const key = findingKey(finding)
+      if (seen.has(key)) continue
+      seen.add(key)
+      if (mandatory(finding) || (secondaryKeys.has(key) && primaryKeys.has(key))) blocking.push(finding)
       else advisory.push(finding)
     }
   } else {
@@ -359,7 +473,27 @@ async function verifyFindings(options) {
       .map((finding) => `DOWNGRADED ${finding.id} NON_ORACLE_OPINION`),
   )
 
-  process.stdout.write(`${lines.join('\n')}\n`)
+  return { blocking, advisory, lines }
+}
+
+async function verifyFindings(options) {
+  const result = await findingsResult(options)
+  process.stdout.write(`${result.lines.join('\n')}\n`)
+}
+
+async function verifyReview(options) {
+  const result = await findingsResult(options)
+
+  if (result.blocking.length > 0) {
+    throw new CliError(
+      'FINDINGS_BLOCKING',
+      `${result.blocking.length} blocking findings remain:\n  ${result.blocking
+        .map((finding) => `${finding.id} ${finding.row} ${finding.severity} ${finding.finding}`)
+        .join('\n  ')}`,
+    )
+  }
+
+  process.stdout.write(`REVIEW_CLEAR advisory:${result.advisory.length}\n`)
 }
 
 async function scanNondeterminism(options) {
@@ -398,10 +532,12 @@ async function main() {
   const options = parseOptions(args)
 
   if (command === 'card') await lintCard(options)
+  else if (command === 'red') await verifyRedEvidence(options)
   else if (command === 'evidence') await verifyEvidence(options)
   else if (command === 'findings') await verifyFindings(options)
+  else if (command === 'review') await verifyReview(options)
   else if (command === 'scan') await scanNondeterminism(options)
-  else throw new CliError('USAGE', 'Expected card, evidence, findings or scan', 2)
+  else throw new CliError('USAGE', 'Expected card, red, evidence, findings, review or scan', 2)
 }
 
 try {

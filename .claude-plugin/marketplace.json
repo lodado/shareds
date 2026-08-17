@@ -6,7 +6,7 @@
     "name": "lodado",
     "url": "https://github.com/lodado"
   },
-  "version": "0.2.1",
+  "version": "0.3.0",
   "plugins": [
     {
       "name": "vibe-coding-helper",
@@ -22,8 +22,8 @@
     },
     {
       "name": "frontend-oracle-design",
-      "description": "Oracle-driven frontend contracts, TDD, automated visual regression, and review.",
-      "version": "0.1.9",
+      "description": "Risk-aware Oracle-driven frontend contracts, TDD, evidence gates, and review.",
+      "version": "0.2.0",
       "author": {
         "name": "lodado"
       },
@@ -46,8 +46,8 @@
     },
     {
       "name": "test",
-      "description": "Oracle-driven frontend behavior and headless visual regression testing.",
-      "version": "0.1.2",
+      "description": "Oracle-driven deterministic frontend behavior testing.",
+      "version": "0.2.0",
       "author": {
         "name": "lodado"
       },
@@ -55,6 +55,18 @@
       "category": "development",
       "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
       "tags": ["frontend", "testing", "tdd", "oracle"]
+    },
+    {
+      "name": "frontend-visual-qa",
+      "description": "Screenshot comparison and direct-browser frontend QA against approved visual sources.",
+      "version": "0.1.0",
+      "author": {
+        "name": "lodado"
+      },
+      "source": "./packages/frontend-visual-qa",
+      "category": "development",
+      "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+      "tags": ["frontend", "visual-regression", "browser", "qa", "oracle"]
     }
   ]
 }

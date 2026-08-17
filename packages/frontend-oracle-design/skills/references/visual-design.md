@@ -10,9 +10,9 @@ visual identity를 바꿀 때만 읽는다. 기존 시각 계약을 그대로 �
 2. Design Proposal과 Design Change Confirmation
 3. Design Intent 형식
 4. 증거 계층
-5. 승인 결과 Visual Lock
+5. baseline 권위와 외부 Visual QA handoff
 6. 두 번의 설계 pass
-7. Delivery 증거와 피드백
+7. Delivery 증거 책임
 8. 금지
 
 ## 1. 권위와 시각 범위
@@ -137,45 +137,27 @@ N/A 사유를 남긴다.
 - 현재 production screenshot을 승인 없이 golden image로 채택하지 않는다.
 - 같은 fixture·mock·reference를 공유하는 증거는 서로 완전히 독립적이라고 보고하지 않는다.
 
-## 5. 승인 결과 Visual Lock
+## 5. baseline 권위와 외부 Visual QA handoff
 
-사용자가 디자인 drift 방지를 요청했거나 승인된 시각 baseline이 있으면, 관련 `D*` 행을
-서로 보완하는 세 증거로 잠근다.
+시각 baseline은 자동 생성 결과가 아니라 사용자에게 승인받은 정책 source다. 현재
+production screenshot이나 최초 생성 결과를 golden image로 자동 채택하지 않는다.
+baseline을 새로 만들거나 바꾸려면 변경 전후 차이, 대상 viewport·theme·motion과
+허용치를 사용자에게 보여주고 **명시적 승인**을 받은 뒤 새 Oracle revision에 기록한다.
+기존 revision을 덮어쓰지 않는다.
 
-1. stable copy·role·의미 구조는 semantic DOM snapshot으로 비교한다.
-2. 승인된 computed style whitelist와 선택한 landmark의 relative layout snapshot으로
-   색·font·간격·크기·배치의 원인을 비교한다.
-3. Chromium·OS·font·viewport·theme·reduced motion을 고정하고 font readiness와 animation
-   종료를 통제한 headless `*.style.test/spec`에서 exact screenshot을 비교한다.
+screenshot 비교와 사람이 직접 브라우저에 들어가는 실행은 별도
+`$frontend-visual-qa`가 소유한다. 이 스킬이나 `$test`가 암묵적으로 대신 실행하지
+않으며 사용자가 그 검증을 명시적으로 요청했을 때만 이름으로 호출한다.
+`$frontend-visual-qa`는 다음만 반환한다.
 
-raw HTML 전체, CSS source bytes, class name, 전체 DOM tree는 잠그지 않는다. screenshot은
-실제 렌더 drift를 잡고 앞의 좁은 snapshot은 실패 원인을 설명한다. 현재 production
-화면이나 최초 자동 생성 screenshot은 사용자 승인 없이 baseline이 아니다.
+- 인용한 Oracle revision과 승인 baseline
+- 요청받은 D/O 행별 PASS·FAIL·N/A
+- 환경과 artifact 경로
+- 정책이 필요하면 `NEEDS_DECISION`, 실행 환경이 깨졌으면 `FAIL`
 
-일반 compare는 approved baseline을 read×1하고 baseline write×0을 유지한다. mismatch면
-변경 행과 actual/expected diff를 보고하고 baseline을 자동 갱신하지 않는다. 승인 근거가
-없으면 intentional update를 거부한다. 승인된 update만 변경 전후 diff를 사용자에게
-보여주고 명시적 승인을 받은 뒤 새 revision을 정확히 한 번 만들며, 기존 revision은
-보존하고 덮어쓰지 않는다.
-
-**screenshot diff 허용치는 잠긴 정책값이다.** `maxDiffPixels`·`maxDiffPixelRatio`·
-`threshold`는 승인된 값을 Oracle Card에 기록하고, 테스트를 통과시키려고 테스트
-단계에서 올리지 않는다. 허용치를 올려야 한다고 판단되면 mismatch 원인을 먼저
-분류하고, 실제로 정책이 바뀌어야 하면 `POLICY_GAP`으로 `NEEDS_DECISION`에 돌아간다.
-`oracle-run.mjs`의 GREEN 전이는 RED 기준선 대비 허용치 상향을 `TEST_WEAKENED`로
-거부한다.
-
-시각 계약 테스트는 소유 대상 가까이에 `*.style.test.ts` 또는 `*.style.test.tsx`로 둔다.
-기존 runner가 `.spec`만 수집하면 `*.style.spec.ts`를 쓰고 naming만을 위해 test 설정을
-변경하지 않는다. 레포의 실제 test command가 수집하는지 반드시 실행해 확인한다.
-
-기존 승인 UI는 production 변경 전에 baseline을 승인해 TDD RED에 쓴다. 새 UI는
-semantic DOM과 style/layout 계약을 먼저 RED로 만들고, 최초 구현 screenshot은 사용자
-승인 뒤 이후 변경의 baseline으로만 쓴다.
-
-`JUDGMENT` 행 또는 intentional baseline 변경이 있으면 deterministic 증거 생성 뒤 독립
-`designer` 검수를 필수로 수행한다. 둘 다 없고 deterministic comparison이 그대로
-통과하면 추가 designer 검수는 N/A와 사유를 기록할 수 있다.
+외부 visual QA artifact는 Oracle의 보조 evidence다. 새 Delivery 상태를 만들거나
+`IMPLEMENTED_GREEN`·`REVIEW_VERIFIED`를 대신하지 않는다. visual QA가 제품 결함을
+발견해도 직접 production을 고치지 않고 이 스킬의 `VALID_RED` 흐름으로 돌려보낸다.
 
 ## 6. 두 번의 설계 pass
 
@@ -205,17 +187,17 @@ semantic DOM과 style/layout 계약을 먼저 RED로 만들고, 최초 구현 sc
 6. 한 요소를 제거하면 더 명확해지는가?
 7. 실제 content, 긴 문자열, empty·error 상태에서도 방향이 유지되는가?
 
-## 7. Delivery 증거와 피드백
+## 7. Delivery 증거 책임
 
-- `HARD` 행은 가장 좁은 관찰 계층에서 테스트하고 `Then`·`Never`를 함께 확인한다.
-- `RELATIONAL` 행은 사전 지정 viewport·theme·motion·state의 headless style test로 본다.
-- UI-shaping 작업은 실패 때뿐 아니라 통과한 핵심 상태 screenshot도 증거로 보존한다.
-- 대상 레포가 요구하는 320px, 양 theme, visible focus, reduced motion, AA contrast를
-  생략하지 않는다.
-- `JUDGMENT` 행은 승인 기준·Design Intent·성공 screenshot을 독립 `designer`에게
-  전달한다. reviewer는 정책을 새로 만들지 않는다.
-- 모든 `D*` 행을 `test | reviewer finding | 출처 있는 N/A`에 매핑한다.
-- 새 상태를 만들지 않고 기존 `IMPLEMENTED_GREEN`과 `REVIEW_VERIFIED`에 포함한다.
+- `HARD` 행은 가장 좁은 DOM·a11y·component 관찰 계층에서 `Then`·`Never`를 함께
+  확인한다.
+- `RELATIONAL` 행의 screenshot 또는 직접 브라우저 증거가 필요하고 사용자가 별도
+  검증을 요청했다면 `$frontend-visual-qa` artifact를 매핑한다.
+- `JUDGMENT` 행은 승인 기준과 Design Intent를 독립 `designer`에게 전달한다.
+  reviewer는 정책을 새로 만들지 않는다.
+- 모든 `D*` 행을 `test | reviewer finding | frontend-visual-qa artifact | 출처 있는 N/A`에
+  매핑한다.
+- 외부 visual QA 결과를 위해 이 스킬의 상태를 추가하지 않는다.
 
 피드백은 기존 라우터를 그대로 사용한다.
 
@@ -231,7 +213,6 @@ semantic DOM과 style/layout 계약을 먼저 RED로 만들고, 최초 구현 sc
 ## 8. 금지
 
 - 모든 UI 변경에 새 palette·font·signature 계획 강제
-- screenshot 허용치를 올려 mismatch를 통과 처리
 - reviewer나 에이전트 제안을 승인 없이 Oracle로 잠금
 - 디자인 품질을 근거 없는 단일 점수로 축약
 - 현재 구현 screenshot을 자동 golden으로 승인
@@ -239,4 +220,4 @@ semantic DOM과 style/layout 계약을 먼저 RED로 만들고, 최초 구현 sc
 - 고유성을 이유로 새 디자인 시스템·animation dependency·icon library를 기본 추가
 - 여러 signature element와 산발적인 animation 추가
 - 접근성·성능·responsive 기본기를 aesthetic risk로 희생
-- 시각 검증만을 위한 새 Delivery 상태 머신 추가
+- screenshot·직접 브라우저 실행을 이 스킬이나 `$test`에 다시 포함

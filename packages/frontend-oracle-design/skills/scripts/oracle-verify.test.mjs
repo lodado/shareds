@@ -27,6 +27,11 @@ const VALID_CARD = `# Sample Oracle Card
 | --- | --------- | ---- | --------------- | --------- |
 | S1  | 저장 정책 | PRD  | docs/save.md#v3 | approved  |
 
+## User Confirmation
+
+- Status: approved
+- Source: user message Q-confirmation
+
 ## 결정된 정책
 
 - 저장 중 추가 제출은 무시한다. (출처: 유저 Q1=A)
@@ -74,6 +79,22 @@ test('O17: 구조가 완전한 카드는 lint를 통과한다', async (t) => {
   assert.equal(linted.stdout, 'CARD_LINT_OK 9 rows\n')
 })
 
+test('O17: 새 카드의 사용자 확인 근거가 없으면 lock 전 lint를 거부한다', async (t) => {
+  const withoutConfirmation = VALID_CARD.replace(
+    '## User Confirmation\n\n- Status: approved\n- Source: user message Q-confirmation\n\n',
+    '',
+  )
+  const draftConfirmation = VALID_CARD.replace('- Status: approved', '- Status: draft')
+
+  const missing = run('card', '--oracle', await cardFile(t, withoutConfirmation))
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /user-confirmation/)
+
+  const draft = run('card', '--oracle', await cardFile(t, draftConfirmation))
+  assert.equal(draft.status, 1)
+  assert.match(draft.stderr, /user-confirmation-status/)
+})
+
 test('O17: 출처 없는 정책 줄을 위치와 함께 거부한다', async (t) => {
   const oracle = await cardFile(t, VALID_CARD.replace(' (출처: 유저 Q1=A)', ''))
 
@@ -82,11 +103,14 @@ test('O17: 출처 없는 정책 줄을 위치와 함께 거부한다', async (t)
   assert.equal(linted.status, 1)
   assert.match(linted.stderr, /^CARD_LINT_FAILED: /)
   assert.match(linted.stderr, /policy-source/)
-  assert.match(linted.stderr, /line 11/)
+  assert.match(linted.stderr, /policy has no approved source/)
 })
 
 test('O17: Never나 부작용이 빈 행을 거부한다', async (t) => {
-  const emptyNever = await cardFile(t, withRow('O1', '| O1 | 유효 입력 | 저장 클릭 | pending 표시 |  | POST×1 | 상태 |'))
+  const emptyNever = await cardFile(
+    t,
+    withRow('O1', '| O1 | 유효 입력 | 저장 클릭 | pending 표시 |  | POST×1 | 상태 |'),
+  )
   const emptySideEffect = await cardFile(
     t,
     withRow('O1', '| O1 | 유효 입력 | 저장 클릭 | pending 표시 | 응답 전 성공 UI | - | 상태 |'),
@@ -101,6 +125,24 @@ test('O17: Never나 부작용이 빈 행을 거부한다', async (t) => {
   assert.equal(withoutSideEffect.status, 1)
   assert.match(withoutSideEffect.stderr, /empty-side-effect/)
   assert.match(withoutSideEffect.stderr, /O1/)
+})
+
+test('O17: O 행의 Then과 D 행의 계약이 비어 있으면 거부한다', async (t) => {
+  const emptyThen = await cardFile(
+    t,
+    withRow('O1', '| O1 | 유효 입력 | 저장 클릭 |  | 응답 전 성공 UI | POST×1 | 상태 |'),
+  )
+  const emptyVisualContract = await cardFile(t, withRow('D1', '| D1 | copy | - | 다른 문구 | S1 | HARD |'))
+
+  const behavior = run('card', '--oracle', emptyThen)
+  assert.equal(behavior.status, 1)
+  assert.match(behavior.stderr, /empty-then/)
+  assert.match(behavior.stderr, /O1/)
+
+  const visual = run('card', '--oracle', emptyVisualContract)
+  assert.equal(visual.status, 1)
+  assert.match(visual.stderr, /empty-visual-contract/)
+  assert.match(visual.stderr, /D1/)
 })
 
 test('O17: Then·Never의 모호어를 거부한다', async (t) => {
@@ -145,6 +187,37 @@ test('O17: D 행의 출처나 증거 계층이 없으면 거부한다', async (t
   assert.match(missingSource.stderr, /D1/)
 })
 
+test('O17: 중복 행 ID와 존재하지 않는 Source Registry 참조를 거부한다', async (t) => {
+  const duplicate = VALID_CARD.replace('| O2  | pending', '| O1  | pending')
+  const unknownSource = await cardFile(
+    t,
+    withRow('D1', '| D1 | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S9 | HARD |'),
+  )
+
+  const duplicateIds = run('card', '--oracle', await cardFile(t, duplicate))
+  assert.equal(duplicateIds.status, 1)
+  assert.match(duplicateIds.stderr, /duplicate-row/)
+  assert.match(duplicateIds.stderr, /O1/)
+
+  const missingSource = run('card', '--oracle', unknownSource)
+  assert.equal(missingSource.status, 1)
+  assert.match(missingSource.stderr, /unknown-source/)
+  assert.match(missingSource.stderr, /S9/)
+})
+
+test('O17: 자동 TC 단어가 계약 행 밖에만 있으면 충족으로 보지 않는다', async (t) => {
+  const movedToProse = VALID_CARD.replace(
+    '| O7  | 연속 요청     | out-of-order 응답 | 최신 결과만 남는다    | 늦은 응답이 덮어씀 | GET×2            | 순서: 역전    |',
+    '| O7  | 연속 요청     | 응답 도착          | 최신 결과만 남는다    | 늦은 응답이 덮어씀 | GET×2            | 순서 변경     |',
+  ).replace('## Behavior Contract', 'out-of-order는 일반 설명에만 등장한다.\n\n## Behavior Contract')
+
+  const linted = run('card', '--oracle', await cardFile(t, movedToProse))
+
+  assert.equal(linted.status, 1)
+  assert.match(linted.stderr, /missing-auto-tc/)
+  assert.match(linted.stderr, /out-of-order/)
+})
+
 const EVIDENCE_CARD = `# Card
 
 ## Behavior Contract
@@ -166,6 +239,16 @@ const REPORTED_RUN = JSON.stringify({
   ],
 })
 
+const REPORTED_RED_RUN = JSON.stringify({
+  runId: 'r-001',
+  exitCode: 1,
+  grade: 'reported',
+  tests: [
+    { name: 'save > pending 표시', status: 'failed' },
+    { name: 'save > 실패 후 재시도', status: 'passed' },
+  ],
+})
+
 async function evidenceFixture(t, rows, { ledger = `${REPORTED_RUN}\n` } = {}) {
   const base = await directory(t)
   const oracle = join(base, 'oracle.md')
@@ -178,6 +261,21 @@ async function evidenceFixture(t, rows, { ledger = `${REPORTED_RUN}\n` } = {}) {
 
   return ['evidence', '--oracle', oracle, '--map', map, '--ledger', ledgerPath, '--run', 'r-001']
 }
+
+test('O18: RED evidence는 지정한 카드 행의 reported test가 실제로 실패해야 한다', async (t) => {
+  const rows = {
+    O1: { kind: 'test', name: 'save > pending 표시' },
+  }
+  const args = await evidenceFixture(t, rows, { ledger: `${REPORTED_RED_RUN}\n` })
+  const red = run('red', ...args.slice(1), '--row', 'O1')
+
+  assert.equal(red.status, 0, red.stderr)
+  assert.equal(red.stdout, 'RED_EVIDENCE_VERIFIED O1 save > pending 표시\n')
+
+  const wrongRow = run('red', ...args.slice(1), '--row', 'O2')
+  assert.equal(wrongRow.status, 1)
+  assert.match(wrongRow.stderr, /RED_EVIDENCE_MISSING/)
+})
 
 test('O18: 모든 비-N/A 행이 통과 테스트에 매핑되면 검증을 통과한다', async (t) => {
   const args = await evidenceFixture(t, {
@@ -360,6 +458,79 @@ test('O23: 2-sample 교집합만 완료를 차단하고 한쪽 finding은 adviso
   assert.match(intersected.stdout, /ADVISORY O3 EVIDENCE_GAP/)
 })
 
+test('O23: 서로 다른 high finding과 행 없는 high finding은 단독으로도 모두 blocking이다', async (t) => {
+  const oracle = await cardFile(t, EVIDENCE_CARD)
+  const first = await findingsFile(
+    t,
+    [
+      {
+        id: 'f-1',
+        row: 'O2',
+        classification: 'PRODUCT_DEFECT',
+        severity: 'high',
+        finding: '오류 메시지가 없다',
+        evidence: 'r-003',
+        fix: '오류 메시지 추가',
+      },
+      {
+        id: 'f-2',
+        classification: 'PRODUCT_DEFECT',
+        severity: 'high',
+        finding: '전역 권한 검사가 없다',
+        evidence: 'src/auth.ts',
+        fix: '권한 검사 추가',
+      },
+    ],
+    'first.json',
+  )
+  const second = await findingsFile(
+    t,
+    [
+      {
+        id: 'f-3',
+        row: 'O2',
+        classification: 'PRODUCT_DEFECT',
+        severity: 'high',
+        finding: '오류 상태에서 입력이 사라진다',
+        evidence: 'r-003',
+        fix: '입력 유지',
+      },
+    ],
+    'second.json',
+  )
+
+  const checked = run('findings', '--file', first, '--intersect', second, '--oracle', oracle)
+
+  assert.equal(checked.status, 0, checked.stderr)
+  assert.match(checked.stdout, /^FINDINGS_OK blocking:3 advisory:0\n/)
+  assert.match(checked.stdout, /BLOCKING - PRODUCT_DEFECT 전역 권한 검사가 없다/)
+  assert.doesNotMatch(checked.stdout, /DOWNGRADED f-2/)
+})
+
+test('O23: review 명령은 blocking finding이 있으면 실패하고 해소되면 통과한다', async (t) => {
+  const oracle = await cardFile(t, EVIDENCE_CARD)
+  const blocking = await findingsFile(t, [
+    {
+      id: 'f-1',
+      row: 'O2',
+      classification: 'PRODUCT_DEFECT',
+      severity: 'high',
+      finding: '오류 표시가 없다',
+      evidence: 'r-003',
+      fix: 'error UI 추가',
+    },
+  ])
+  const clear = await findingsFile(t, [], 'clear.json')
+
+  const rejected = run('review', '--file', blocking, '--oracle', oracle)
+  assert.equal(rejected.status, 1)
+  assert.match(rejected.stderr, /^FINDINGS_BLOCKING: /)
+
+  const accepted = run('review', '--file', clear, '--oracle', oracle)
+  assert.equal(accepted.status, 0, accepted.stderr)
+  assert.equal(accepted.stdout, 'REVIEW_CLEAR advisory:0\n')
+})
+
 test('O24: 비결정 API를 파일·줄과 함께 보고한다', async (t) => {
   const path = join(await directory(t), 'clock.ts')
   await writeFile(path, 'export const now = () => Date.now()\nexport const id = () => crypto.randomUUID()\n')
@@ -379,7 +550,7 @@ test('O24: 인자 없는 new Date()는 검출하고 인자가 있는 new Date(�
   const clock = join(base, 'clock.ts')
   const parser = join(base, 'parser.ts')
   await writeFile(clock, 'export const stamp = () => new Date().getTime()\n')
-  await writeFile(parser, "export const parse = (iso: string) => new Date(iso).getTime()\n")
+  await writeFile(parser, 'export const parse = (iso: string) => new Date(iso).getTime()\n')
 
   const detected = run('scan', '--path', clock)
   assert.equal(detected.status, 1)

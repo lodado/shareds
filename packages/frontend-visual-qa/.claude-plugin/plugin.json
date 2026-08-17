@@ -1,7 +1,7 @@
 {
-  "name": "test",
-  "version": "0.2.0",
-  "description": "Oracle-driven deterministic frontend behavior testing.",
+  "name": "frontend-visual-qa",
+  "version": "0.1.0",
+  "description": "Screenshot comparison and direct-browser frontend QA against approved visual sources.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
@@ -9,5 +9,5 @@
   "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
   "repository": "https://github.com/lodado/my-Vibe-Coding-Helper",
   "license": "MIT",
-  "keywords": ["frontend", "testing", "tdd", "oracle", "claude-code"]
+  "keywords": ["frontend", "visual-regression", "browser", "qa", "oracle"]
 }

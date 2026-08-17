@@ -1,6 +1,6 @@
 ---
 name: test
-description: Use when writing, executing, or auditing frontend behavior and headless visual regression tests — new or changed behavior, regression reproduction, async flows with loading, errors, retry, duplicate submits or out-of-order responses.
+description: Use when writing, executing, or auditing deterministic frontend behavior tests — new or changed behavior, regression reproduction, async flows with loading, errors, retry, duplicate submits or out-of-order responses. Screenshot comparison and direct-browser QA belong to the separate frontend-visual-qa skill.
 ---
 
 # $test — Oracle 기반 테스트 생성·실행·검증
@@ -8,6 +8,10 @@ description: Use when writing, executing, or auditing frontend behavior and head
 이 스킬은 승인된 Oracle Card를 테스트 코드로 번역하고 실행한다.
 **제품 정책 판단은 하지 않는다** — 정책 문제가 나오면 NEEDS_DECISION으로
 frontend-oracle-design에 복귀한다.
+
+screenshot 비교와 사람이 직접 브라우저에 들어가는 QA는 `$frontend-visual-qa`에
+위임한다. 이 스킬은 deterministic unit·component·integration·Playwright behavior
+test만 소유하며 visual baseline을 만들거나 `BROWSER_VERIFIED`를 발급하지 않는다.
 
 ## 종료 상태 (넷 중 하나)
 
@@ -76,10 +80,6 @@ Playwright 규칙 (예외 없음):
 5. 어느 계층에서도 판정 불가한 것만 `test.skip` + 사유 — 계층 이동(unit/API)을
    먼저 검토
 
-Visual Lock은 headless `*.style.test.ts(x)` 또는 기존 runner가 `.spec`만 수집할 때
-`*.style.spec.ts`에서 실행한다. semantic DOM, computed style/layout, exact screenshot을
-같은 test command로 판정하며 별도 직접 브라우저 조작·자가개선 단계는 실행하지 않는다.
-
 비-N/A Oracle 행이 skip되면 `GREEN`을 발급하지 않는다.
 다른 계층에서 검증하거나, 출처 있는 N/A로 Oracle에 복귀하거나, `FAIL`로 보고한다.
 
@@ -100,8 +100,7 @@ FAIL이면 원인 분류. **기계장치 문제만 보정 가능** — 도합 2�
   role·name 유지, 단일 요소로 resolve) / pending barrier 연결 / dev 서버 기동
 - 금지: assertion 약화, visible→attached 전환, `test.skip` 전환, fixture에 기대
   결과 인코딩, 단정 대상 자체를 기다려서 race를 직렬화, `first()`/`nth()`로
-  cardinality 오류 은폐, screenshot 허용치(`maxDiffPixels`·`maxDiffPixelRatio`·
-  `threshold`) 상향
+  cardinality 오류 은폐
 
 금지 항목은 GREEN 전이에서 기계로 검사된다. `VALID_RED` 시점 대비 assertion 수가
 줄거나 위 토큰이 새로 들어오면 `TEST_WEAKENED`로 거부되므로, 보정은 허용 항목

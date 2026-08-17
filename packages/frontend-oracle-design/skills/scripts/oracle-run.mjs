@@ -7,8 +7,26 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const lockScript = join(dirname(fileURLToPath(import.meta.url)), 'oracle-lock.mjs')
+const verifyScript = join(dirname(fileURLToPath(import.meta.url)), 'oracle-verify.mjs')
 
-const FLAG_NAMES = ['dir', 'lock', 'risk', 'scan-root', 'label', 'report', 'env-note', 'to', 'run', 'reason', 'spend']
+const FLAG_NAMES = [
+  'dir',
+  'lock',
+  'risk',
+  'scan-root',
+  'required-label',
+  'label',
+  'report',
+  'env-note',
+  'to',
+  'run',
+  'row',
+  'evidence',
+  'findings',
+  'intersect',
+  'reason',
+  'spend',
+]
 
 const REQUIRED_CONSECUTIVE_PASSES = { low: 1, medium: 2, high: 3 }
 
@@ -58,7 +76,7 @@ class CliError extends Error {
 }
 
 function parseOptions(args) {
-  const options = { command: null }
+  const options = { command: null, requiredLabels: [] }
 
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index]
@@ -75,7 +93,8 @@ function parseOptions(args) {
       throw new CliError('USAGE', `Unknown or incomplete option: ${flag}`, 2)
     }
 
-    options[name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = value
+    if (name === 'required-label') options.requiredLabels.push(value)
+    else options[name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = value
     index += 1
   }
 
@@ -237,6 +256,29 @@ function verifyLock(directory, state) {
   return verified.stdout.trim().replace('ORACLE_VERIFIED sha256:', '')
 }
 
+async function lockedOraclePath(directory, state) {
+  const lock = resolve(directory, state.lock)
+  const manifest = await readFile(lock, 'utf8')
+    .then(JSON.parse)
+    .catch((error) => {
+      throw new CliError('LOCK_INVALID', `Cannot read locked Oracle path: ${error.message}`)
+    })
+
+  if (!manifest?.oracle?.path) throw new CliError('LOCK_INVALID', 'Lock manifest has no Oracle path')
+  return resolve(dirname(lock), manifest.oracle.path)
+}
+
+function runVerifier(args) {
+  const verified = spawnSync(process.execPath, [verifyScript, ...args], { encoding: 'utf8' })
+
+  if (verified.status !== 0) {
+    const [code, ...message] = (verified.stderr || 'VERIFY_FAILED: oracle-verify failed').split(': ')
+    throw new CliError(code.trim(), message.join(': ').trim() || 'oracle-verify failed')
+  }
+
+  return verified.stdout.trim()
+}
+
 function fingerprint(options) {
   return {
     node: process.version,
@@ -341,16 +383,23 @@ async function initialize(options) {
     )
   }
 
+  const requiredLabels = [...new Set(options.requiredLabels.map((label) => label.trim()).filter(Boolean))]
+  if (requiredLabels.length === 0) {
+    throw new CliError(
+      'REQUIRED_LABEL_REQUIRED',
+      'init requires at least one --required-label from the repository checks',
+    )
+  }
+
   const state = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     lock: portablePath(directory, resolve(options.lock)),
     scanRoot: portablePath(directory, scanRoot),
     risk,
+    requiredLabels,
     state: 'ORACLE_READY',
     history: [],
-    budgets: Object.fromEntries(
-      Object.entries(BUDGET_LIMITS).map(([name, limit]) => [name, { limit, spent: 0 }]),
-    ),
+    budgets: Object.fromEntries(Object.entries(BUDGET_LIMITS).map(([name, limit]) => [name, { limit, spent: 0 }])),
     snapshot: {},
     testFiles: null,
     envDrift: [],
@@ -456,6 +505,31 @@ function assertConsecutivePasses(state, ledger, run) {
   }
 }
 
+function assertRequiredRuns(state, ledger, started) {
+  for (const label of state.requiredLabels ?? []) {
+    const latest = ledger
+      .slice(started)
+      .filter((entry) => entry.label === label)
+      .at(-1)
+
+    if (!latest || latest.exitCode !== 0) {
+      throw new CliError(
+        'REQUIRED_RUN_MISSING',
+        `required label "${label}" needs a passing run after the previous state transition`,
+      )
+    }
+  }
+}
+
+function assertSameCommand(expected, actual) {
+  if (JSON.stringify(expected.command) !== JSON.stringify(actual.command)) {
+    throw new CliError(
+      'REVIEW_COMMAND_CHANGED',
+      `${actual.runId} must rerun the IMPLEMENTED_GREEN command from ${expected.runId}`,
+    )
+  }
+}
+
 async function assertTestsNotWeakened(state, scanRoot) {
   if (!state.testFiles) return
 
@@ -536,8 +610,26 @@ async function transition(options) {
       throw new CliError('RUN_NOT_RED', `${run.runId} exited 0 — a valid RED needs a failing run`)
     }
 
+    if (!options.evidence || !options.row) {
+      throw new CliError('EVIDENCE_REQUIRED', 'VALID_RED requires --evidence and --row')
+    }
+
     const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
     assertNoProductionChange(changedPaths(state.snapshot, current))
+
+    runVerifier([
+      'red',
+      '--oracle',
+      await lockedOraclePath(directory, state),
+      '--map',
+      resolve(options.evidence),
+      '--ledger',
+      ledgerPath(directory),
+      '--run',
+      run.runId,
+      '--row',
+      options.row,
+    ])
 
     state.testFiles = {}
     for (const path of Object.keys(current).filter(isTestPath)) {
@@ -550,6 +642,14 @@ async function transition(options) {
       throw new CliError('RUN_NOT_GREEN', `${run.runId} exited ${run.exitCode} — GREEN needs a passing run`)
     }
 
+    if (!options.evidence) {
+      throw new CliError('EVIDENCE_REQUIRED', 'IMPLEMENTED_GREEN requires --evidence')
+    }
+
+    if (run.grade !== 'reported') {
+      throw new CliError('EVIDENCE_UNVERIFIABLE', `${run.runId} must have a parsed reporter for GREEN`)
+    }
+
     if (state.state === 'ORACLE_READY') {
       if (!options.reason) {
         throw new CliError('MISSING_REASON', 'skipping VALID_RED requires --reason with the existing-GREEN evidence')
@@ -559,8 +659,21 @@ async function transition(options) {
       assertNoProductionChange(changedPaths(state.snapshot, current))
     }
 
+    const started = lastEntryFor(state, 'VALID_RED')?.runCount ?? lastEntryFor(state, 'ORACLE_READY')?.runCount ?? 0
+    assertRequiredRuns(state, ledger, started)
     assertConsecutivePasses(state, ledger, run)
     await assertTestsNotWeakened(state, scanRoot)
+    runVerifier([
+      'evidence',
+      '--oracle',
+      await lockedOraclePath(directory, state),
+      '--map',
+      resolve(options.evidence),
+      '--ledger',
+      ledgerPath(directory),
+      '--run',
+      run.runId,
+    ])
 
     const redEntry = lastEntryFor(state, 'VALID_RED')
     const drift = envDrift(state, redEntry ? findRun(ledger, redEntry.runId) : null, run)
@@ -570,8 +683,46 @@ async function transition(options) {
     }
   }
 
-  if (options.to === 'REVIEW_VERIFIED' && run.exitCode !== 0) {
-    throw new CliError('RUN_NOT_GREEN', `${run.runId} exited ${run.exitCode} — review needs a passing re-verification`)
+  if (options.to === 'REVIEW_VERIFIED') {
+    if (run.exitCode !== 0) {
+      throw new CliError(
+        'RUN_NOT_GREEN',
+        `${run.runId} exited ${run.exitCode} — review needs a passing re-verification`,
+      )
+    }
+
+    if (!options.evidence || !options.findings) {
+      throw new CliError('EVIDENCE_REQUIRED', 'REVIEW_VERIFIED requires --evidence and --findings')
+    }
+
+    if (state.risk === 'high' && !options.intersect) {
+      throw new CliError('REVIEW_EVIDENCE_REQUIRED', 'High risk REVIEW_VERIFIED requires --intersect')
+    }
+
+    if (run.grade !== 'reported') {
+      throw new CliError('EVIDENCE_UNVERIFIABLE', `${run.runId} must have a parsed reporter for review`)
+    }
+
+    const greenEntry = lastEntryFor(state, 'IMPLEMENTED_GREEN')
+    assertRequiredRuns(state, ledger, greenEntry.runCount)
+    assertSameCommand(findRun(ledger, greenEntry.runId), run)
+
+    const oracle = await lockedOraclePath(directory, state)
+    runVerifier([
+      'evidence',
+      '--oracle',
+      oracle,
+      '--map',
+      resolve(options.evidence),
+      '--ledger',
+      ledgerPath(directory),
+      '--run',
+      run.runId,
+    ])
+
+    const reviewArgs = ['review', '--oracle', oracle, '--file', resolve(options.findings)]
+    if (options.intersect) reviewArgs.push('--intersect', resolve(options.intersect))
+    runVerifier(reviewArgs)
   }
 
   state.state = options.to
@@ -579,6 +730,10 @@ async function transition(options) {
     state: options.to,
     runId: run?.runId ?? null,
     reason: options.reason ?? null,
+    row: options.row ?? null,
+    evidence: options.evidence ? portablePath(directory, resolve(options.evidence)) : null,
+    findings: options.findings ? portablePath(directory, resolve(options.findings)) : null,
+    intersect: options.intersect ? portablePath(directory, resolve(options.intersect)) : null,
     runCount: ledger.length,
     at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
   })

@@ -9,8 +9,9 @@
 4. 정책 출처
 5. 카드 형식
 6. Adversarial self-review
-7. 결정적 revision lock — 카드 lint, lock, run artifact 초기화
-8. 설계 종료 상태
+7. Draft Oracle과 사용자 확인
+8. 결정적 revision lock — 카드 lint, lock, run artifact 초기화
+9. 설계 종료 상태
 
 ## 0. 외부 기준 게이트
 
@@ -128,11 +129,23 @@ UI가 단순해도 부작용이 위험하면 High다.
 `references/bva.md`의 네 축과 자동 추가 TC 7종을 적용한다.
 
 Design Intent가 있으면 `visual-design.md`의 형식을 행동 매트릭스 바로 앞에 둔다.
-Design Intent·`D*` 행·행동 `O*` 행은 모두 같은 Oracle bytes로 잠근다. 모든 비-N/A
-`D*` 행도 `test | reviewer finding` 중 알맞은 증거 또는 출처 있는
-N/A 사유에 매핑한다. 아래 행동 행에는 기존 BVA 규칙을 그대로 적용한다.
+Design Intent·`D*` 행·행동 `O*` 행과 아래 확인 근거는 모두 같은 Oracle bytes로
+잠근다. 모든 비-N/A `D*` 행도 `test | reviewer finding` 중 알맞은 증거 또는 출처
+있는 N/A 사유에 매핑한다. 아래 행동 행에는 기존 BVA 규칙을 그대로 적용한다.
 `local`·`identity-shaping`이면 Design Change Confirmation의 사용자 답변 위치를 같은
 Design Intent에 기록한다.
+
+```markdown
+## User Confirmation
+
+- Status: draft | approved
+- Source: 사용자 승인 응답의 메시지·issue·문서 위치
+- Delta: new card 또는 이전 revision 대비 의미 변경 요약
+```
+
+Draft 단계에서는 `Status: draft`로 유지한다. 사용자가 카드 전문과 delta를 확인하고
+명시적으로 승인한 뒤에만 `approved`와 실제 응답 위치를 기록한다. 에이전트의 추천이나
+“사용자가 원할 것”이라는 추론을 Source로 쓰지 않는다.
 
 | ID  | Given | When | Then | Never | 부작용(종류×횟수) | BVA |
 | --- | ----- | ---- | ---- | ----- | ----------------- | --- |
@@ -180,10 +193,27 @@ Design Intent가 있으면 `visual-design.md`의 genericity·restraint 비평도
 출처 있는 미적 요구를 자동화하기 어렵다는 이유로 `NON_ORACLE_OPINION`이나 N/A로
 내리지 않는다.
 
-## 7. 결정적 revision lock
+## 7. Draft Oracle과 사용자 확인
 
-Medium/High 카드는 self-review 뒤 exact bytes를 파일로 저장하고 bundled script로
-잠근다. 대상 레포가 agent artifact 위치를 정하지 않았다면 아래 경로를 사용한다.
+새 카드나 의미가 바뀐 revision은 다음 직렬 gate를 반드시 거친다.
+
+1. production을 수정하지 않고 외부 기준과 기존 revision을 조사한다.
+2. **Draft Oracle**과 semantic delta, 미결 질문을 만든다.
+3. 전체 카드와 delta를 사용자에게 보여주고 다시 확인한다.
+4. 승인되면 `User Confirmation`을 `approved`로 바꾸고 실제 응답 위치를 기록한다.
+5. 수정 요청이면 Draft를 고쳐 다시 확인한다.
+6. 답이 없거나 정책이 충돌하면 `NEEDS_DECISION`으로 멈춘다.
+
+기존 locked Oracle 범위 안의 구현·테스트 보정에는 새 카드를 만들지 않는다. 그러나
+`Then`·`Never`·부작용·BVA·Design Intent·정책 출처 중 하나라도 의미가 바뀌면 잠긴
+파일을 제자리에서 고치지 않고 새 경로에 Draft revision을 만든다. 새 revision도
+사용자 확인 전에는 lint·lock·테스트·production 수정으로 넘어가지 않는다.
+
+## 8. 결정적 revision lock
+
+사용자가 확인한 카드는 self-review 뒤 exact bytes를 파일로 저장하고 bundled
+script로 잠근다. Low fast path처럼 새 정책과 카드가 없는 작업은 이 절차에 들어오지
+않는다. 대상 레포가 agent artifact 위치를 정하지 않았다면 아래 경로를 사용한다.
 
 ```text
 <repo>/.ai/oracles/<oracle-id>/oracle.md
@@ -203,10 +233,11 @@ node <skill-dir>/scripts/oracle-verify.mjs card \
   --oracle .ai/oracles/<oracle-id>/oracle.md
 ```
 
-검사 항목은 Source Registry 존재, 모든 정책 줄의 `(출처: …)` 표기, 모든 계약 행의
-`Never`·부작용 채움, `Then`·`Never`의 모호어 부재, 자동 추가 TC 7종의 행 또는 N/A
-표기, `D*` 행의 출처와 증거 계층이다. `CARD_LINT_FAILED`는 lock 전에 카드를 고쳐야
-한다는 뜻이며, 검사를 우회하려고 문구만 바꾸지 않는다.
+검사 항목은 Source Registry와 승인된 User Confirmation 존재, 모든 정책 줄의
+`(출처: …)` 표기, 중복 없는 행 ID, `O*` 행의 `Then`·`Never`·부작용,
+`D*` 행의 계약·출처·증거 계층과 Source Registry 참조, 모호어 부재, 자동 추가 TC
+7종의 실제 계약 행 또는 출처 있는 N/A 표기다. `CARD_LINT_FAILED`는 lock 전에
+카드를 고쳐야 한다는 뜻이며, 검사를 우회하려고 문구만 바꾸지 않는다.
 
 에이전트가 직접 실행하며 사용자에게 명령 실행을 요청하지 않는다. 승인된 로컬
 명세 파일은 `--source`를 반복해 함께 잠근다. URL·Figma 같은 원격 기준은 카드에
@@ -228,15 +259,16 @@ node <skill-dir>/scripts/oracle-lock.mjs verify \
 - `create`는 동일 bytes의 기존 lock에는 idempotent하지만 변경된 카드·source의 기존
   lock은 덮어쓰지 않는다. 승인된 새 revision은 이전 artifact를 보존하고 새 경로에
   생성한다.
-- High risk는 카드 전문과 digest를 함께 보여준 뒤 사용자 확인을 받는다.
+- 모든 새 카드와 revision은 7절에서 카드 전문과 delta를 사용자에게 확인받는다.
+  digest는 그 확인된 bytes를 식별하며 사용자 확인을 대신하지 않는다.
 - 테스트 작성, production 수정, 독립 리뷰, 완료 상태 발급 직전에
   `verify`를 다시 실행한다. `oracle-run.mjs`의 `exec`와 `transition`은 매 호출마다
   같은 검증을 자동으로 수행한다.
 - `ORACLE_CHANGED`·`SOURCE_CHANGED`면 기존 RED·GREEN·리뷰 증거를 폐기하고
   변경 diff와 카드 현재본을 제시해 `NEEDS_DECISION`으로 돌아간다.
 - `LOCK_INVALID`·도구 부재·실행 불가는 결정론 판정 실패이므로 `FAIL`이다.
-- mismatch를 없애려고 자동 재생성하지 않는다. 재잠금은 source gate와 self-review를
-  다시 거치고, High risk면 새 digest를 재확인받은 뒤에만 한다.
+- mismatch를 없애려고 자동 재생성하지 않는다. 재잠금은 source gate, Draft delta,
+  사용자 재확인과 self-review를 다시 거친 뒤에만 한다.
 - Low risk로 카드를 생략했으면 lock N/A 사유를 남긴다. Medium/High에서 파일시스템이나
   Node가 없으면 Design-only와 Delivery 모두 LLM 판정으로 대체하지 않고 `FAIL`이다.
 
@@ -254,9 +286,14 @@ Delivery로 진입하면 lock 직후 run ledger와 상태 파일을 만든다. D
 node <skill-dir>/scripts/oracle-run.mjs init \
   --dir .ai/oracles/<oracle-id> \
   --lock .ai/oracles/<oracle-id>/oracle.lock.json \
-  --risk low|medium|high
+  --risk low|medium|high \
+  --required-label behavior \
+  --required-label lint
 ```
 
+- `--required-label`은 대상 레포에서 실제 적용되는 targeted test, lint, typecheck,
+  build label을 반복해 선언한다. 최소 하나가 필요하며 GREEN과 리뷰 후 재검증에서
+  모두 다시 확인한다.
 - `init`은 lock을 검증하고 현재 worktree digest를 `ORACLE_READY` 기준선으로 저장한다.
   이 기준선이 이후 TDD 순서 판정의 근거다.
 - `--scan-root`는 기본값이 현재 작업 디렉터리다. monorepo에서 판정 범위를 좁힐 때만
@@ -264,7 +301,7 @@ node <skill-dir>/scripts/oracle-run.mjs init \
 - 상태 파일이 이미 있으면 `init`은 실패한다. 예산과 기준선을 초기화하려고 다시
   실행하지 않는다. 새 revision은 새 `<oracle-id>` 디렉터리를 쓴다.
 
-## 8. 설계 종료 상태
+## 9. 설계 종료 상태
 
 ### `ORACLE_READY`
 
@@ -272,6 +309,8 @@ node <skill-dir>/scripts/oracle-run.mjs init \
   또는 N/A 사유를 기록함
 - 카드가 외부 기준의 상태·문구·interaction·부작용을 누락·왜곡하지 않음
 - 모든 정책에 인정되는 출처가 있음
+- `User Confirmation`이 `approved`이고 새 카드 또는 semantic delta를 승인한 실제
+  사용자 응답 위치가 있음
 - UI 시각 범위를 기록하고, `local`·`identity-shaping`이면 승인된 Design Intent와
   모든 `D*` 행의 `Never`·출처·증거 계층을 완성함
 - `local`·`identity-shaping`이면 Design Change Confirmation의 명시적 사용자 답변
@@ -280,8 +319,7 @@ node <skill-dir>/scripts/oracle-run.mjs init \
 - 모든 행의 `Never`와 부작용 횟수가 완성됨
 - 자동 추가 TC 7종을 추가하거나 N/A 사유를 기록함
 - adversarial self-review를 통과함
-- Medium/High면 `oracle-verify.mjs card` lint와 revision lock 검증이 통과함
-- High risk면 사용자가 카드 전문과 SHA-256을 확인함
+- `oracle-verify.mjs card` lint와 revision lock 검증이 통과함
 
 ### `NEEDS_DECISION`
 

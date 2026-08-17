@@ -112,6 +112,18 @@ FSD는 기존 구조가 FSD이거나 greenfield 제안이 승인된 때만 사�
 
 여기서 micro-hook은 **짧은 코드**가 아니라 **작은 소유권 경계**다.
 
+UI와 비즈니스 로직은 다음 책임으로 나눈다.
+
+| 소유자              | 맡는 것                                                                          | 맡지 않는 것                                                         |
+| ------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| UI component        | semantic JSX, 접근성, 시각 상태 표현, view-local interaction, 사용자 intent 전달 | domain 판정, DTO 변환, query/cache, navigation·storage·observer 조율 |
+| micro-hook          | 하나의 interaction workflow 또는 하나의 외부 시스템과 React lifecycle 연결       | JSX·class·token·문구, unrelated workflow 묶음                        |
+| pure model function | 필터·그룹·정렬·검증·상태 전이 같은 React 비의존 비즈니스 규칙                    | hook lifecycle과 화면 표현                                           |
+
+Page는 필요한 micro-hook을 조합하고 render-ready 값과 intent 이름의 action으로 UI를
+그린다. event handler에 domain 분기나 둘 이상의 부작용 순서가 생기면 hook이 workflow를
+소유하고, React가 필요 없는 계산은 hook으로 감싸지 말고 pure model function에 둔다.
+
 - 하나의 interaction workflow 또는 외부 시스템 동기화를 소유하면 hook으로 분리한다.
 - query key/options와 remote operation은 해당 server-state 경계에 둔다.
 - view는 렌더링과 접근 가능한 interaction 표현에 집중하고 data/action을 받는다.
@@ -124,6 +136,27 @@ effect`다.
 - effect는 architecture 문서에 외부 시스템·이유·cleanup을 기록한 동기화에만 쓰고, prop/state 파생,
   event 처리, query key 대신 수동 refetch, URL↔local state 양방향 동기화에 쓰지 않는다.
 - 각 effect에는 external system·reason·cleanup이 있어야 한다.
+
+### Hook Encapsulation Gate — 승인된 경우만
+
+architecture 문서가 `orchestration-only`를 명시적으로 선택했을 때만 Page/UI target
+glob에 결정적 lint gate를 적용한다. LOC나 effect 개수로 자동 선택하지 않는다.
+
+1. 레포에 같은 경계를 강제하는 ESLint 규칙이 있으면 그대로 재사용한다.
+2. 동등 규칙이 없을 때만 `eslint-plugin-use-encapsulation`의
+   `use-encapsulation/prefer-custom-hooks` 도입을 제안한다. 설치와 config 변경은 사용자
+   승인 뒤 architecture source에 기록·잠그며 조용히 추가하지 않는다.
+3. 실제 설치 버전과 함께 target glob, rule ID, `allow`, `block`, lint command, config
+   source를 고정한다. render-local primitive는 승인된 `allow`에, lifecycle·navigation·
+   query·form 같은 외부 orchestration hook은 승인된 `block`에 **이름을 명시한다**.
+   plugin 기본 목록이나 최신 React/Next hook 자동 인식을 가정하지 않는다.
+4. 고정한 lint command를 `oracle-run.mjs exec --label hook-encapsulation`으로 실행하고
+   GREEN과 독립 review 뒤 모두 같은 필수 label로 재실행한다.
+
+이 gate가 증명하는 것은 대상 component에 금지된 hook의 **직접 호출이 없다**는
+구조뿐이다. 추출된 hook의 책임 응집도나 동작 정확성을 증명하지 않으므로 trivial
+wrapper, UI 표현을 숨긴 hook, unrelated 책임을 합친 거대 hook은 테스트와 독립
+reviewer가 별도로 판정한다.
 
 ## 6. 승인된 Design Intent를 구현한다
 

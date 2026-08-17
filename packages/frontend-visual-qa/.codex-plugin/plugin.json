@@ -1,7 +1,7 @@
 {
-  "name": "frontend-oracle-design",
-  "version": "0.2.0",
-  "description": "Risk-aware Oracle-driven frontend contracts, TDD, evidence gates, and review.",
+  "name": "frontend-visual-qa",
+  "version": "0.1.0",
+  "description": "Screenshot comparison and direct-browser frontend QA against approved visual sources.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
@@ -11,9 +11,10 @@
   "license": "MIT",
   "skills": "./skills/",
   "interface": {
-    "displayName": "Frontend Oracle Design",
-    "shortDescription": "Lock frontend contracts before implementation",
+    "displayName": "Frontend Visual QA",
+    "shortDescription": "Verify screenshots and browser journeys",
     "category": "development",
+    "defaultPrompt": "Use $frontend-visual-qa to compare approved screenshots and verify a browser journey.",
     "websiteURL": "https://github.com/lodado/my-Vibe-Coding-Helper"
   }
 }

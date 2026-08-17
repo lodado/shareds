@@ -21,22 +21,25 @@ SKILL.md 전문과 판정 계약을 활성화한다. 파일을 참고만 하는 
 **TDD가 우선이다.** `ORACLE_READY` 뒤 테스트를 먼저 작성·실행하고, sibling `test` skill이
 인정하는 `VALID_RED`를 확보하기 전에는 production 코드를 작성하거나 수정하지 않는다.
 
-- Medium/High risk는 `ORACLE_READY` 카드가 필수다.
-- Medium/High risk는 revision lock이 유효해야 하고, High risk는 사용자에게 카드와
-  SHA-256을 확인받아야 한다.
+- Medium/High risk는 `ORACLE_READY` 카드가 필수다. Low fast path는 새 정책·카드가
+  없고 기존 승인 계약 안의 되돌리기 쉬운 수정에만 쓴다.
+- 새 카드와 의미가 바뀐 revision은 risk와 무관하게 Draft와 delta를 사용자에게
+  다시 확인받은 뒤 lock한다.
 - 대상 레포의 `AGENTS.md`, `CLAUDE.md`, 테스트 스크립트, 인접 테스트와 필수
   아키텍처 문서를 production 수정 전에 읽는다.
-- React production 변경은 [`architecture-contract.md`](architecture-contract.md)의
-  명시적 문서 승인과 Oracle local-source lock을 완료해야 테스트를 작성할 수 있다.
-  기존 승인 문서가 변경을 정확히 허용하면 새 승인 없이 경로와 source hash를 기록한다.
+- React architecture 경계·state ownership·public API가 바뀔 때만
+  [`architecture-contract.md`](architecture-contract.md)의 명시적 문서 승인과
+  Oracle local-source lock을 완료한다. 기존 승인 문서가 변경을 정확히 허용하면
+  새 승인 없이 경로와 source hash를 기록한다.
 - 기존 worktree 변경을 보존하고 관련 없는 파일을 수정하지 않는다.
 
 ## 압축 스케줄
 
-시각 운영 질문은 `evidence`, `screenshot strictness`, `baseline authority`, `naming`,
-`designer`, `direct-browser`를 한 intake에 묶는다. lock 전에는 서로 독립적인 read-only
-조사를 병렬 실행할 수 있지만, 모든 결과 변경 결정이 끝난 뒤 final lock을 1회 만든다.
-정책 승인과 baseline 사용자 승인은 직렬 gate로 유지한다.
+`policy`, `architecture`, `evidence`, `naming`, `review` 질문을 한 intake에 묶는다.
+lock 전에는 서로 독립적인 read-only 조사를 병렬 실행할 수 있지만, 모든 결과 변경
+결정이 끝난 뒤 final lock을 1회 만든다. Draft Oracle 사용자 승인은 직렬 gate다.
+screenshot과 direct-browser 실행은 이 문서에 넣지 않고 사용자가 명시적으로 요청한
+별도 `$frontend-visual-qa`가 소유한다.
 
 `VALID_RED` 전에는 production을 수정하지 않는다. 이후 독립 구현 작업이 둘 이상일 때만
 겹치지 않는 파일 소유권으로 worker를 최대 2개까지 병렬 실행하고, 합친 뒤 targeted
@@ -67,7 +70,8 @@ node <skill-dir>/scripts/oracle-run.mjs exec \
 - node:test 레포는 번들 `scripts/oracle-node-reporter.mjs`를 쓴다. `--test-reporter`는
   module specifier라 `./` 또는 절대 경로로 넘긴다.
 - 상태 전이는 `oracle-run.mjs transition`으로만 기록한다. 스크립트가 TDD 순서,
-  연속 통과 횟수, 테스트 약화, lock을 검사하고 거부 사유를 코드로 출력한다.
+  행별 RED/GREEN evidence, `--required-label` 실행, 연속 통과 횟수, 테스트 약화,
+  review artifact와 lock을 검사하고 거부 사유를 코드로 출력한다.
 - TDD 순서 판정은 `init` 시점의 worktree를 기준선으로 쓴다. 에디터 캐시나 agent
   runtime 파일이 계속 바뀌는 레포는 `init` 전에 worktree를 정리하거나 `--scan-root`로
   판정 범위를 대상 package로 좁힌다. 무관한 변경이 `PRODUCTION_TOUCHED_BEFORE_RED`를
@@ -96,7 +100,8 @@ node <skill-dir>/scripts/oracle-run.mjs exec \
 
 1. bundled `oracle-lock.mjs verify`를 실행하고 revision과 exit code를 기록한다.
    `exec`·`transition`은 매 호출마다 같은 검증을 자동으로 수행한다.
-2. 카드의 모든 비-N/A 행을 관찰 가능한 테스트로 번역한다.
+2. 카드의 모든 비-N/A 행을 관찰 가능한 테스트로 번역하고 test name을
+   `evidence.json`의 해당 행에 먼저 매핑한다.
 3. network 경계가 있으면 MSW handler로 세운다. 레포에 MSW가 없으면 설치 여부를 먼저
    확인하고, MSW로 표현할 수 없는 경우에만 다른 mocking 수단을 사유와 함께 쓴다.
    handler와 예시 데이터는 그 경계를 소유한 가장 가까운 곳에 두고, FSD 배치는
@@ -104,17 +109,33 @@ node <skill-dir>/scripts/oracle-run.mjs exec \
 4. 각 행의 `Then`, `Never`, 부작용 종류·횟수를 함께 assert한다. 요청 횟수와 순서는
    handler에서 관찰한다.
 5. 테스트를 `exec`로 실제 실행한다.
-6. 실패가 sibling `test` skill의 `VALID_RED` 술어를 만족하면 그 runId로 전이를
-   기록하고, 전이가 통과한 뒤에만 production을 수정한다.
+6. 실패가 sibling `test` skill의 `VALID_RED` 술어를 만족하면
+   `oracle-verify.mjs red`로 지정 행의 reported test가 실제로 실패했는지 확인한다.
+   그 runId와 행으로 전이를 기록하고, 전이가 통과한 뒤에만 production을 수정한다.
+
+```bash
+node <skill-dir>/scripts/oracle-verify.mjs red \
+  --oracle .ai/oracles/<oracle-id>/oracle.md \
+  --map .ai/oracles/<oracle-id>/evidence.json \
+  --ledger .ai/oracles/<oracle-id>/runs.jsonl \
+  --run r-001 \
+  --row O1
+```
 
 ```bash
 node <skill-dir>/scripts/oracle-run.mjs transition \
-  --dir .ai/oracles/<oracle-id> --to VALID_RED --run r-001
+  --dir .ai/oracles/<oracle-id> \
+  --to VALID_RED \
+  --run r-001 \
+  --evidence .ai/oracles/<oracle-id>/evidence.json \
+  --row O1
 ```
 
-`PRODUCTION_TOUCHED_BEFORE_RED`는 테스트보다 production을 먼저 건드렸다는 기계
-증거다. 변경 파일을 되돌려 순서를 지키고, 우회하지 않는다. 전이는 이 시점의
-테스트 파일 digest와 assertion 수를 GREEN 게이트의 기준선으로 저장한다.
+`RED_EVIDENCE_UNVERIFIABLE`·`RED_EVIDENCE_MISSING`은 무관한 compile/setup 실패나
+exit-only run을 RED로 쓰지 못하게 한다. `PRODUCTION_TOUCHED_BEFORE_RED`는 테스트보다
+production을 먼저 건드렸다는 기계 증거다. 변경 파일을 되돌려 순서를 지키고,
+우회하지 않는다. 전이는 이 시점의 테스트 파일 digest와 assertion 수를 GREEN
+게이트의 기준선으로 저장한다.
 
 요청된 동작이 이미 GREEN이면 production을 억지로 바꾸거나 RED를 만들지 않는다.
 기존 구현이 카드를 충족한다는 증거를 기록하고 `--to IMPLEMENTED_GREEN --reason ...`으로
@@ -178,7 +199,8 @@ revision mismatch는 피드백 분류 대상이 아니다. 기존 증거를 즉�
 
 ## 4. GREEN 게이트
 
-카드 테스트가 통과하면 레포가 요구하는 검증을 `exec`로 실제 실행한다.
+카드 테스트가 통과하면 init에서 `--required-label`로 고정한 레포 검증을 각 label의
+`exec`로 실제 실행한다.
 
 1. targeted test
 2. 영향 범위 test
@@ -193,13 +215,15 @@ package 검증을 실행한다. 필수 root 명령이 없거나 무관한 기존
 
 그다음 `--to IMPLEMENTED_GREEN` 전이를 시도한다. 스크립트가 아래를 기계로 검사한다.
 
-| 거부 코드         | 뜻                                               | 올바른 대응                                        |
-| ----------------- | ------------------------------------------------ | -------------------------------------------------- |
-| `ORACLE_CHANGED`  | 카드·source bytes가 잠긴 값과 다름               | 증거를 폐기하고 `NEEDS_DECISION`                   |
-| `RUN_NOT_GREEN`   | 인용한 run이 통과하지 않음                       | 실제 통과 run을 만들고 인용                        |
-| `FLAKINESS_GATE`  | 같은 명령의 연속 통과가 risk 필요 횟수에 못 미침 | 같은 명령을 그대로 다시 실행해 연속 통과를 확보    |
-| `TEST_WEAKENED`   | RED 기준선 대비 assertion 감소·금지 토큰·삭제    | 테스트를 원래 강도로 되돌린다                      |
-| `ENV_DRIFT`(경고) | RED와 GREEN의 실행 환경이 다름                   | 환경 차이가 결과를 바꿨는지 확인하고 보고에 남긴다 |
+| 거부 코드              | 뜻                                               | 올바른 대응                                        |
+| ---------------------- | ------------------------------------------------ | -------------------------------------------------- |
+| `ORACLE_CHANGED`       | 카드·source bytes가 잠긴 값과 다름               | 증거를 폐기하고 `NEEDS_DECISION`                   |
+| `RUN_NOT_GREEN`        | 인용한 run이 통과하지 않음                       | 실제 통과 run을 만들고 인용                        |
+| `EVIDENCE_REQUIRED`    | evidence manifest 없이 상태 전이를 시도함        | 잠긴 카드 전 행을 매핑하고 `--evidence`로 인용     |
+| `REQUIRED_RUN_MISSING` | 선언한 필수 label의 최신 통과가 없음             | 해당 repo 명령을 `exec --label`로 다시 실행        |
+| `FLAKINESS_GATE`       | 같은 명령의 연속 통과가 risk 필요 횟수에 못 미침 | 같은 명령을 그대로 다시 실행해 연속 통과를 확보    |
+| `TEST_WEAKENED`        | RED 기준선 대비 assertion 감소·금지 토큰·삭제    | 테스트를 원래 강도로 되돌린다                      |
+| `ENV_DRIFT`(경고)      | RED와 GREEN의 실행 환경이 다름                   | 환경 차이가 결과를 바꿨는지 확인하고 보고에 남긴다 |
 
 flakiness 필요 횟수는 Low 1회, Medium 2회, High 3회다. 재실행으로 통과를 뽑아내는
 것이 아니라 **같은 명령이 반복해도 결정론적으로 통과함**을 보이는 절차다. 실패가
@@ -209,7 +233,9 @@ flakiness 필요 횟수는 Low 1회, Medium 2회, High 3회다. 재실행으로 
 `waitForTimeout(`·`toBeTruthy(`·`toBeFalsy(`·`.first()`·`.nth(`·`setTimeout(`과
 screenshot 허용치(`maxDiffPixels`·`maxDiffPixelRatio`·`threshold`) 상향이다.
 
-전이가 통과하고 레포 필수 검증이 모두 통과해야 `IMPLEMENTED_GREEN`이다.
+선택한 GREEN run은 parsed reporter가 있는 카드 test run이어야 한다. 별도 lint·typecheck·
+build는 각각 선언한 label로 기록한다. 전이는 모든 필수 label과 evidence manifest를
+직접 검사하며, 전이가 통과해야 `IMPLEMENTED_GREEN`이다.
 
 ### Evidence manifest
 
@@ -235,6 +261,16 @@ node <skill-dir>/scripts/oracle-verify.mjs evidence \
   --run r-007
 ```
 
+GREEN 전이는 같은 manifest를 필수 입력으로 받는다.
+
+```bash
+node <skill-dir>/scripts/oracle-run.mjs transition \
+  --dir .ai/oracles/<oracle-id> \
+  --to IMPLEMENTED_GREEN \
+  --run r-007 \
+  --evidence .ai/oracles/<oracle-id>/evidence.json
+```
+
 `kind: test`는 인용한 run의 reporter 결과에 같은 이름이 통과로 존재해야 한다.
 `EVIDENCE_NOT_IN_RUN`은 매핑이 실제 실행과 어긋난다는 뜻이고, `EVIDENCE_UNVERIFIABLE`은
 run이 `exit-only`라 이름을 확인할 수 없다는 뜻이다. 둘 다 이름을 지어내지 말고
@@ -250,6 +286,28 @@ production diff에 비결정 소스가 새로 들어왔는지 확인하려면 `o
 변경 파일에 실행한다. 검출된 `Date.now`·`Math.random`·`crypto.randomUUID`·`toLocale`·
 `new Intl.`은 주입 seam으로 바꾸거나 `oracle:nondeterminism <사유>` 주석으로 면제를
 기록한다.
+
+### 최종 review 전이
+
+`IMPLEMENTED_GREEN` 뒤 reviewer finding을 반영하면 init에서 선언한 필수 label을
+전부 다시 실행한다. 선택한 test run은 GREEN 때와 같은 command여야 하며, review
+artifact에 blocking finding이 없어야 한다.
+
+```bash
+node <skill-dir>/scripts/oracle-verify.mjs review \
+  --oracle .ai/oracles/<oracle-id>/oracle.md \
+  --file .ai/oracles/<oracle-id>/findings-code-reviewer.json
+
+node <skill-dir>/scripts/oracle-run.mjs transition \
+  --dir .ai/oracles/<oracle-id> \
+  --to REVIEW_VERIFIED \
+  --run r-010 \
+  --evidence .ai/oracles/<oracle-id>/evidence.json \
+  --findings .ai/oracles/<oracle-id>/findings-code-reviewer.json
+```
+
+High risk는 두 번째 reviewer 파일을 `--intersect`로 함께 넘긴다. 다만 critical/high
+finding은 한쪽에만 있어도 review를 막는다.
 
 ## 금지
 

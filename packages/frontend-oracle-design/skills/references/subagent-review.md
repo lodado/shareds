@@ -7,7 +7,9 @@ Oracle Card와 원시 증거를 검토한다. reviewer는 정책을 정하거나
 다시 쓰지 않는다.
 
 카드가 `identity-shaping` Design Intent를 포함하면 [`visual-design.md`](visual-design.md)를
-전부 다시 읽고, 승인된 시각 계약과 성공 screenshot을 디자인 관할에서도 검토한다.
+전부 다시 읽고 승인된 시각 계약을 디자인 관할에서도 검토한다. 사용자가 별도
+`$frontend-visual-qa`를 명시적으로 실행했다면 그 artifact를 원시 입력으로 추가하되,
+reviewer가 screenshot이나 직접 브라우저 실행을 대신 소유하지 않는다.
 
 primary agent는 리뷰 직전 bundled `oracle-lock.mjs verify`를 실행한다. mismatch면
 reviewer를 호출하지 않고 기존 증거를 폐기한다.
@@ -16,8 +18,9 @@ reviewer를 호출하지 않고 기존 증거를 폐기한다.
 
 1. reviewer 입력은 파일로 고정한다. 잠긴 카드, ledger runId, evidence 매핑, diff를
    그대로 넘기고 의도한 결론이나 요약된 해석을 넣지 않는다.
-2. High risk는 **같은 입력으로 독립 리뷰를 2회** 실행한다. `(카드 행, 분류)`가 두
-   결과 모두에 나온 finding만 완료를 차단하고, 한쪽에만 나온 finding은 advisory로
+2. High risk는 **같은 입력으로 독립 리뷰를 2회** 실행한다. critical과 high finding은
+   한쪽에만 나온 단독 finding도 blocking이다. medium과 low finding만 행·분류·
+   정규화한 finding 내용의 교집합일 때 완료를 차단하고, 한쪽에만 나오면 advisory로
    기록한다. Medium risk는 단일 리뷰와 스키마 검증만 요구한다.
 
 ## 리뷰 기준 우선순위
@@ -61,15 +64,14 @@ review와 별도로 설치된 `designer` 역할을 명시해 시각 계약을 �
 5. architecture unit별 승인 문서 전문·Oracle source hash·사용자 승인 위치와 레포 구조 검증 출력 또는 N/A 사유
 6. production diff
 7. 추가·변경한 테스트 diff
-8. 테스트·typecheck·lint·build의 실제 출력
-9. headless style/screenshot test 증거 또는 N/A 사유
+8. 테스트·typecheck·build의 실제 출력
+9. 사용자가 `$frontend-visual-qa`를 실행했으면 그 artifact, 아니면 N/A
 10. High risk mutation 증거
 11. 미검증 항목
 12. `Oracle 행 ID → test/reviewer/N/A 증거` 전체 매핑
-13. Design Intent가 있으면 승인된 reference·anti-reference, `D*` 행과
-    viewport·theme·motion별 성공 screenshot
-14. `JUDGMENT` 행 또는 visual baseline 변경이면 잠긴 Oracle revision, 승인 baseline,
-    actual screenshot, exact diff와 viewport·theme·motion 조건
+13. Design Intent가 있으면 승인된 reference·anti-reference와 `D*` 행
+14. `JUDGMENT` 행이면 승인 기준과 Design Intent, designer finding
+15. 변경한 Page/UI component와 micro-hook·pure model source, 그 사이 import와 호출 관계
 
 reviewer는 코드를 수정하지 않고 finding만 반환한다. 정책과 baseline을 수정하거나
 승인하는 것은 금지하며, baseline 최종 승인은 사용자에게 남긴다.
@@ -104,12 +106,20 @@ node <skill-dir>/scripts/oracle-verify.mjs findings \
   --file .ai/oracles/<oracle-id>/findings-a.json \
   --intersect .ai/oracles/<oracle-id>/findings-b.json \
   --oracle .ai/oracles/<oracle-id>/oracle.md
+
+node <skill-dir>/scripts/oracle-verify.mjs review \
+  --file .ai/oracles/<oracle-id>/findings-a.json \
+  --intersect .ai/oracles/<oracle-id>/findings-b.json \
+  --oracle .ai/oracles/<oracle-id>/oracle.md
 ```
 
 분류는 상위 피드백 라우터의 `POLICY_GAP`, `EVIDENCE_GAP`, `HARNESS_DEFECT`,
 `PRODUCT_DEFECT`, `ENVIRONMENT_DEFECT`, `NON_ORACLE_OPINION` 중 하나다. 그 밖의
 분류나 카드에 없는 행 ID는 `FINDINGS_INVALID`로 거부된다. 카드 행을 인용하지 않은
-finding은 자동으로 `NON_ORACLE_OPINION`으로 강등되어 완료를 차단하지 못한다.
+medium/low finding은 `NON_ORACLE_OPINION`으로 강등된다. 행이 없는 critical/high
+finding은 전역 보안·권한·데이터 손실 문제일 수 있으므로 강등하지 않고 blocking으로
+유지한다. `oracle-verify.mjs review`는 blocking이 남으면 `FINDINGS_BLOCKING`으로
+실패한다.
 
 승인된 레포 보안·접근성 계약 위반은 `PRODUCT_DEFECT`, 카드에 그 계약이 누락됐으면
 `POLICY_GAP`이다. 단순 선호는 `NON_ORACLE_OPINION`이며 완료를 차단하지 않는다.
@@ -137,8 +147,13 @@ finding은 자동으로 `NON_ORACLE_OPINION`으로 강등되어 완료를 차단
 - Suspense/Error Boundary가 필요한 subtree에만 있고 initial load·background refetch·
   mutation pending을 같은 상태로 취급하지 않았는가?
 - retry가 실패한 query/boundary 범위만 복구하고 전체 cache를 무차별 reset하지 않는가?
-- micro-hook이 응집된 interaction/query 책임을 분리하며 trivial wrapper와 거대 hook을
-  늘리지 않았는가?
+- micro-hook이 UI와 비즈니스 로직의 책임을 정확히 분리하는가? UI component는 semantic
+  JSX·접근성·시각 상태·사용자 intent 연결만 소유하고, domain 판정·DTO 변환·query/cache·
+  navigation·storage·observer 조율을 직접 소유하지 않는가?
+- 각 micro-hook이 하나의 interaction workflow 또는 외부 시스템 연결만 소유하고
+  render-ready 값과 intent action만 반환하며 JSX·class·token·문구를 숨기지 않는가?
+- React가 필요 없는 필터·그룹·정렬·검증·상태 전이는 pure model function에 있고,
+  단순 rename인 trivial wrapper나 unrelated 책임을 합친 거대 hook을 만들지 않았는가?
 - 승인된 architecture unit 문서와 실제 import/data flow가 일치하는가?
 - 기존 구조에 불필요한 FSD migration이나 빈 layer·segment를 만들지 않았는가?
 - FSD면 [`fsd.md`](fsd.md)를 전부 읽고 「자주 나오는 위반」 표에 해당하는 항목이
@@ -157,7 +172,8 @@ finding은 자동으로 `NON_ORACLE_OPINION`으로 강등되어 완료를 차단
   signature 한 곳에 집중했는가?
 - 모든 `D*` 행에 test, designer finding 또는 출처 있는 N/A가
   매핑됐으며 같은 fixture·reference를 공유하는 증거를 독립 증거로 과장하지 않았는가?
-- headless style/screenshot test가 사전 매핑된 모든 시각 카드 행을 실제로 판정하는가?
+- `$frontend-visual-qa` artifact가 있다면 같은 Oracle revision을 인용하고 사전
+  합의한 시각·브라우저 행을 빠짐없이 판정하는가?
 - 보안, 접근성, 데이터 유실 방지 같은 레포 필수 계약을 훼손하지 않았는가?
 
 ## Finding 개선
@@ -167,11 +183,15 @@ finding은 자동으로 `NON_ORACLE_OPINION`으로 강등되어 완료를 차단
 2. 정책을 새로 정해야 하는 finding은 수정하지 않고 `NEEDS_DECISION`으로 복귀한다.
 3. 수정 후 finding을 재현하는 targeted test를 실행한다.
 4. 카드 전체 테스트와 레포 필수 검증을 다시 실행한다.
-5. 영향을 받은 headless style/screenshot test를 다시 실행한다.
+5. 사용자가 별도 `$frontend-visual-qa`를 요청했고 영향받은 artifact가 있으면 그
+   스킬로 돌아가 다시 실행한다.
 6. 가능하면 같은 reviewer에 원시 재검증 증거를 전달해 finding 해소 여부만 확인한다.
 
 reviewer와 fixer를 분리한다. reviewer가 직접 수정하고 자신의 수정을 최종 승인하게
 하지 않는다. `NON_ORACLE_OPINION`과 advisory finding은 기록하되 수정이나 정책 변경의
 근거로 쓰지 않는다. 재검증도 `oracle-run.mjs exec`로 실행하고 그 runId로
 `--to REVIEW_VERIFIED` 전이를 기록한다. blocking finding이 없거나 모두 해소되고 필수
-재검증이 통과해야 `REVIEW_VERIFIED`다.
+재검증이 통과해야 `REVIEW_VERIFIED`다. init에서 선언한 모든 필수 label을 GREEN
+이후 다시 실행하고, 같은 카드 test command의 reported run과 clear findings를
+`oracle-run.mjs transition --to REVIEW_VERIFIED --evidence ... --findings ...`에
+넘긴다. High risk는 두 번째 reviewer 파일도 `--intersect`로 넘긴다.

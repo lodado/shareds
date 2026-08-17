@@ -28,14 +28,15 @@ test('O31: records runs through the oracle ledger and blocks weakened tests', as
   assert.match(skill, /runId/)
   assert.match(skill, /--report/)
   assert.match(skill, /budget --spend harness/)
-  assert.match(skill, /maxDiffPixels/)
+  assert.doesNotMatch(skill, /maxDiffPixels/)
   assert.match(skill, /TEST_WEAKENED/)
 })
 
-test('runs visual locks as headless style tests without a direct browser loop', async () => {
+test('keeps behavior tests here and delegates screenshot or direct-browser QA', async () => {
   const skill = await readFile(join(skillDirectory, 'SKILL.md'), 'utf8')
 
-  assert.match(skill, /headless.*`\*\.style\.(?:test|spec)/s)
-  assert.match(skill, /별도 직접 브라우저.*실행하지 않는다/s)
-  assert.doesNotMatch(skill, /BROWSER_VERIFIED|브라우저 루프/)
+  assert.match(skill, /\$frontend-visual-qa/)
+  assert.match(skill, /screenshot.*직접 브라우저.*위임/s)
+  assert.doesNotMatch(skill, /headless.*`\*\.style\.(?:test|spec)/s)
+  assert.match(skill, /BROWSER_VERIFIED.*발급하지 않는다/s)
 })
