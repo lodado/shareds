@@ -32,6 +32,7 @@ test('O27: lints the card structure and initializes run artifacts around the loc
   assert.match(oracleCard, /User Confirmation/)
   assert.match(oracleCard, /Draft Oracle/)
   assert.match(oracleCard, /새 카드.*revision.*사용자.*확인/s)
+  assert.match(oracleCard, /정책 ID.*행 ID.*양방향/s)
   assert.match(oracleCard, /oracle-run\.mjs init/)
   assert.match(oracleCard, /--required-label/)
   assert.match(oracleCard, /run-state\.json/)

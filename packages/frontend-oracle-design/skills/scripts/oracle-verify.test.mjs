@@ -34,27 +34,29 @@ const VALID_CARD = `# Sample Oracle Card
 
 ## 결정된 정책
 
-- 저장 중 추가 제출은 무시한다. (출처: 유저 Q1=A)
-- 5xx 실패 시 입력을 유지한다. (출처: docs/save.md#failure-policy)
+- P1: 저장 중 추가 제출은 무시한다. (출처: 유저 Q1=A) (행: O1, O2)
+- P2: 5xx 실패 시 입력을 유지하고 재시도할 수 있다. (출처: docs/save.md#failure-policy) (행: O3, O4)
+- P3: 목록 요청의 경계 상태는 최신 화면만 갱신한다. (출처: docs/save.md#list-policy) (행: O5, O6, O7, O8)
+- P4: 저장 action의 문구는 "저장"이다. (출처: S1) (행: D1)
 
 ## Behavior Contract
 
-| ID  | Given         | When              | Then                  | Never             | 부작용(종류×횟수) | BVA           |
-| --- | ------------- | ----------------- | --------------------- | ----------------- | ----------------- | ------------- |
-| O1  | 유효 입력     | 저장 클릭         | pending 표시          | 응답 전 성공 UI   | POST×1            | 상태: pending |
-| O2  | pending       | 중복 클릭         | pending 유지          | 두 번째 POST      | POST×1(총)        | 횟수: 1/2     |
-| O3  | pending       | 서버 5xx 오류     | 오류 표시와 입력 유지 | 성공 UI           | 성공 저장×0       | 상태: error   |
-| O4  | 오류 상태     | 재시도 제출       | 새 요청 1회           | 중복 저장         | POST×1            | 횟수: 1       |
-| O5  | 빈 목록 응답  | 목록 조회         | 0건 안내 표시         | 이전 목록 잔존    | GET×1             | 값: 0건       |
-| O6  | 비동기 요청   | 로딩 시작         | loading 표시 후 해제  | 무한 로딩         | GET×1             | 상태: loading |
-| O7  | 연속 요청     | out-of-order 응답 | 최신 결과만 남는다    | 늦은 응답이 덮어씀 | GET×2            | 순서: 역전    |
-| O8  | 저장 대기 중  | 취소 후 늦은 응답 | 화면을 갱신하지 않는다 | 이탈 후 화면 오염 | 저장×0           | 상태: cancel  |
+| ID  | 정책 | Given         | When              | Then                  | Never             | 부작용(종류×횟수) | BVA           |
+| --- | ---- | ------------- | ----------------- | --------------------- | ----------------- | ----------------- | ------------- |
+| O1  | P1   | 유효 입력     | 저장 클릭         | pending 표시          | 응답 전 성공 UI   | POST×1            | 상태: pending |
+| O2  | P1   | pending       | 중복 클릭         | pending 유지          | 두 번째 POST      | POST×1(총)        | 횟수: 1/2     |
+| O3  | P2   | pending       | 서버 5xx 오류     | 오류 표시와 입력 유지 | 성공 UI           | 성공 저장×0       | 상태: error   |
+| O4  | P2   | 오류 상태     | 재시도 제출       | 새 요청 1회           | 중복 저장         | POST×1            | 횟수: 1       |
+| O5  | P3   | 빈 목록 응답  | 목록 조회         | 0건 안내 표시         | 이전 목록 잔존    | GET×1             | 값: 0건       |
+| O6  | P3   | 비동기 요청   | 로딩 시작         | loading 표시 후 해제  | 무한 로딩         | GET×1             | 상태: loading |
+| O7  | P3   | 연속 요청     | out-of-order 응답 | 최신 결과만 남는다    | 늦은 응답이 덮어씀 | GET×2            | 순서: 역전    |
+| O8  | P3   | 저장 대기 중  | 취소 후 늦은 응답 | 화면을 갱신하지 않는다 | 이탈 후 화면 오염 | 저장×0           | 상태: cancel  |
 
 ## Visual Contract
 
-| ID  | 축   | 계약                  | Never     | 출처 | 증거 계층 |
-| --- | ---- | --------------------- | --------- | ---- | --------- |
-| D1  | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1   | HARD      |
+| ID  | 정책 | 축   | 계약                  | Never     | 출처 | 증거 계층 |
+| --- | ---- | ---- | --------------------- | --------- | ---- | --------- |
+| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1   | HARD      |
 `
 
 async function cardFile(t, content = VALID_CARD) {
@@ -106,14 +108,38 @@ test('O17: 출처 없는 정책 줄을 위치와 함께 거부한다', async (t)
   assert.match(linted.stderr, /policy has no approved source/)
 })
 
+test('O17: 정책과 계약 행의 양방향 참조가 어긋나면 거부한다', async (t) => {
+  const missingId = VALID_CARD.replace('- P1:', '-')
+  const unknownRow = VALID_CARD.replace('(행: O1, O2)', '(행: O1, O99)')
+  const unknownPolicy = withRow(
+    'O1',
+    '| O1 | P9 | 유효 입력 | 저장 클릭 | pending 표시 | 응답 전 성공 UI | POST×1 | 상태 |',
+  )
+  const asymmetric = withRow(
+    'O2',
+    '| O2 | P3 | pending | 중복 클릭 | pending 유지 | 두 번째 POST | POST×1(총) | 횟수 |',
+  )
+
+  for (const [card, issue] of [
+    [missingId, 'policy-id'],
+    [unknownRow, 'policy-row-unknown'],
+    [unknownPolicy, 'row-policy-unknown'],
+    [asymmetric, 'policy-row-asymmetric'],
+  ]) {
+    const linted = run('card', '--oracle', await cardFile(t, card))
+    assert.equal(linted.status, 1)
+    assert.match(linted.stderr, new RegExp(issue))
+  }
+})
+
 test('O17: Never나 부작용이 빈 행을 거부한다', async (t) => {
   const emptyNever = await cardFile(
     t,
-    withRow('O1', '| O1 | 유효 입력 | 저장 클릭 | pending 표시 |  | POST×1 | 상태 |'),
+    withRow('O1', '| O1 | P1 | 유효 입력 | 저장 클릭 | pending 표시 |  | POST×1 | 상태 |'),
   )
   const emptySideEffect = await cardFile(
     t,
-    withRow('O1', '| O1 | 유효 입력 | 저장 클릭 | pending 표시 | 응답 전 성공 UI | - | 상태 |'),
+    withRow('O1', '| O1 | P1 | 유효 입력 | 저장 클릭 | pending 표시 | 응답 전 성공 UI | - | 상태 |'),
   )
 
   const withoutNever = run('card', '--oracle', emptyNever)
@@ -130,9 +156,9 @@ test('O17: Never나 부작용이 빈 행을 거부한다', async (t) => {
 test('O17: O 행의 Then과 D 행의 계약이 비어 있으면 거부한다', async (t) => {
   const emptyThen = await cardFile(
     t,
-    withRow('O1', '| O1 | 유효 입력 | 저장 클릭 |  | 응답 전 성공 UI | POST×1 | 상태 |'),
+    withRow('O1', '| O1 | P1 | 유효 입력 | 저장 클릭 |  | 응답 전 성공 UI | POST×1 | 상태 |'),
   )
-  const emptyVisualContract = await cardFile(t, withRow('D1', '| D1 | copy | - | 다른 문구 | S1 | HARD |'))
+  const emptyVisualContract = await cardFile(t, withRow('D1', '| D1 | P4 | copy | - | 다른 문구 | S1 | HARD |'))
 
   const behavior = run('card', '--oracle', emptyThen)
   assert.equal(behavior.status, 1)
@@ -148,7 +174,7 @@ test('O17: O 행의 Then과 D 행의 계약이 비어 있으면 거부한다', a
 test('O17: Then·Never의 모호어를 거부한다', async (t) => {
   const oracle = await cardFile(
     t,
-    withRow('O1', '| O1 | 유효 입력 | 저장 클릭 | 적절히 표시한다 | 응답 전 성공 UI | POST×1 | 상태 |'),
+    withRow('O1', '| O1 | P1 | 유효 입력 | 저장 클릭 | 적절히 표시한다 | 응답 전 성공 UI | POST×1 | 상태 |'),
   )
 
   const linted = run('card', '--oracle', oracle)
@@ -173,8 +199,8 @@ test('O17: 자동 추가 TC가 빠지면 어떤 종류가 없는지 보고한다
 })
 
 test('O17: D 행의 출처나 증거 계층이 없으면 거부한다', async (t) => {
-  const withoutTier = await cardFile(t, withRow('D1', '| D1 | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1 |  |'))
-  const withoutSource = await cardFile(t, withRow('D1', '| D1 | copy | 버튼 문구는 "저장"이다 | 다른 문구 |  | HARD |'))
+  const withoutTier = await cardFile(t, withRow('D1', '| D1 | P4 | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1 |  |'))
+  const withoutSource = await cardFile(t, withRow('D1', '| D1 | P4 | copy | 버튼 문구는 "저장"이다 | 다른 문구 |  | HARD |'))
 
   const missingTier = run('card', '--oracle', withoutTier)
   assert.equal(missingTier.status, 1)
@@ -188,10 +214,10 @@ test('O17: D 행의 출처나 증거 계층이 없으면 거부한다', async (t
 })
 
 test('O17: 중복 행 ID와 존재하지 않는 Source Registry 참조를 거부한다', async (t) => {
-  const duplicate = VALID_CARD.replace('| O2  | pending', '| O1  | pending')
+  const duplicate = VALID_CARD.replace('| O2  | P1', '| O1  | P1')
   const unknownSource = await cardFile(
     t,
-    withRow('D1', '| D1 | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S9 | HARD |'),
+    withRow('D1', '| D1 | P4 | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S9 | HARD |'),
   )
 
   const duplicateIds = run('card', '--oracle', await cardFile(t, duplicate))
@@ -207,8 +233,8 @@ test('O17: 중복 행 ID와 존재하지 않는 Source Registry 참조를 거부
 
 test('O17: 자동 TC 단어가 계약 행 밖에만 있으면 충족으로 보지 않는다', async (t) => {
   const movedToProse = VALID_CARD.replace(
-    '| O7  | 연속 요청     | out-of-order 응답 | 최신 결과만 남는다    | 늦은 응답이 덮어씀 | GET×2            | 순서: 역전    |',
-    '| O7  | 연속 요청     | 응답 도착          | 최신 결과만 남는다    | 늦은 응답이 덮어씀 | GET×2            | 순서 변경     |',
+    '| O7  | P3   | 연속 요청     | out-of-order 응답 | 최신 결과만 남는다    | 늦은 응답이 덮어씀 | GET×2            | 순서: 역전    |',
+    '| O7  | P3   | 연속 요청     | 응답 도착          | 최신 결과만 남는다    | 늦은 응답이 덮어씀 | GET×2            | 순서 변경     |',
   ).replace('## Behavior Contract', 'out-of-order는 일반 설명에만 등장한다.\n\n## Behavior Contract')
 
   const linted = run('card', '--oracle', await cardFile(t, movedToProse))

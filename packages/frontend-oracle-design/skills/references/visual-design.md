@@ -98,11 +98,11 @@ Figma·URL은 정확한 file·page·frame·version을 카드에 기록한다.
 
 ### Visual Contract
 
-| ID  | 축         | 계약 | Never | 출처      | 증거 계층  |
-| --- | ---------- | ---- | ----- | --------- | ---------- |
-| D1  | copy       | ...  | ...   | S1        | HARD       |
-| D2  | responsive | ...  | ...   | S2        | RELATIONAL |
-| D3  | identity   | ...  | ...   | 유저 Q1=A | JUDGMENT   |
+| ID  | 정책 | 축         | 계약 | Never | 출처      | 증거 계층  |
+| --- | ---- | ---------- | ---- | ----- | --------- | ---------- |
+| D1  | P1   | copy       | ...  | ...   | S1        | HARD       |
+| D2  | P2   | responsive | ...  | ...   | S2        | RELATIONAL |
+| D3  | P3   | identity   | ...  | ...   | 유저 Q1=A | JUDGMENT   |
 ```
 
 `behavior-only`이면 Visual scope와 기존 계약을 유지한다는 출처 있는 N/A만 기록한다.

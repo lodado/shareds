@@ -120,8 +120,8 @@ UI가 단순해도 부작용이 위험하면 High다.
 ```markdown
 ### 결정된 정책
 
-- 저장 중 추가 제출은 무시한다. (출처: 유저 Q1=A)
-- 5xx 실패 시 입력을 유지한다. (출처: docs/save.md#failure-policy)
+- P1: 저장 중 추가 제출은 무시한다. (출처: 유저 Q1=A) (행: O1, O2)
+- P2: 5xx 실패 시 입력을 유지한다. (출처: docs/save.md#failure-policy) (행: O3)
 ```
 
 ## 5. 카드 형식
@@ -147,8 +147,8 @@ Draft 단계에서는 `Status: draft`로 유지한다. 사용자가 카드 전�
 명시적으로 승인한 뒤에만 `approved`와 실제 응답 위치를 기록한다. 에이전트의 추천이나
 “사용자가 원할 것”이라는 추론을 Source로 쓰지 않는다.
 
-| ID  | Given | When | Then | Never | 부작용(종류×횟수) | BVA |
-| --- | ----- | ---- | ---- | ----- | ----------------- | --- |
+| ID  | 정책 | Given | When | Then | Never | 부작용(종류×횟수) | BVA |
+| --- | ---- | ----- | ---- | ---- | ----- | ----------------- | --- |
 
 | 열       | 의미                                       |
 | -------- | ------------------------------------------ |
@@ -162,6 +162,8 @@ Draft 단계에서는 `Status: draft`로 유지한다. 사용자가 카드 전�
 규칙:
 
 - `Never`와 부작용 횟수가 빈 행은 미완성이다.
+- 각 결정에는 stable 정책 ID(`P*`)와 적용 행을 쓰고, 각 `O*`·`D*` 행의 `정책` 열에도
+  같은 ID를 쓴다. 정책 ID와 행 ID의 양방향 참조가 정확히 일치해야 한다.
 - UI 상태와 실제 부작용 횟수를 각각 검증한다.
 - 전제가 있는 자동 추가 TC는 행으로 만들고, 없으면 N/A와 사유를 기록한다.
 - 존재하지 않는 retry, cancel, race를 테스트 목적으로 발명하지 않는다.
@@ -170,11 +172,11 @@ Draft 단계에서는 `Status: draft`로 유지한다. 사용자가 카드 전�
 축약 예시:
 
 ```markdown
-| ID  | Given     | When       | Then           | Never              | 부작용      | BVA           |
-| --- | --------- | ---------- | -------------- | ------------------ | ----------- | ------------- |
-| O1  | 유효 입력 | 저장 클릭  | pending 표시   | 응답 전 성공 UI    | POST×1      | 상태: pending |
-| O2  | pending   | 클릭+Enter | pending 유지   | 두 번째 POST       | POST×1(총)  | 횟수: 1/2     |
-| O3  | pending   | 서버 5xx   | 오류+입력 유지 | 성공 UI, 입력 유실 | 성공 저장×0 | 상태: error   |
+| ID  | 정책 | Given     | When       | Then           | Never              | 부작용      | BVA           |
+| --- | ---- | --------- | ---------- | -------------- | ------------------ | ----------- | ------------- |
+| O1  | P1   | 유효 입력 | 저장 클릭  | pending 표시   | 응답 전 성공 UI    | POST×1      | 상태: pending |
+| O2  | P1   | pending   | 클릭+Enter | pending 유지   | 두 번째 POST       | POST×1(총)  | 횟수: 1/2     |
+| O3  | P2   | pending   | 서버 5xx   | 오류+입력 유지 | 성공 UI, 입력 유실 | 성공 저장×0 | 상태: error   |
 ```
 
 ## 6. Adversarial self-review
@@ -234,7 +236,8 @@ node <skill-dir>/scripts/oracle-verify.mjs card \
 ```
 
 검사 항목은 Source Registry와 승인된 User Confirmation 존재, 모든 정책 줄의
-`(출처: …)` 표기, 중복 없는 행 ID, `O*` 행의 `Then`·`Never`·부작용,
+stable ID·`(출처: …)`·적용 행, 정책 ID와 행 ID의 양방향 참조, 중복 없는 행 ID,
+`O*` 행의 `Then`·`Never`·부작용,
 `D*` 행의 계약·출처·증거 계층과 Source Registry 참조, 모호어 부재, 자동 추가 TC
 7종의 실제 계약 행 또는 출처 있는 N/A 표기다. `CARD_LINT_FAILED`는 lock 전에
 카드를 고쳐야 한다는 뜻이며, 검사를 우회하려고 문구만 바꾸지 않는다.

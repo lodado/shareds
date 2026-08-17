@@ -149,6 +149,14 @@ function sectionLines(lines, title) {
   return section
 }
 
+function policyIds(value) {
+  return [...new Set(value.match(/\bP\d+\b/g) ?? [])]
+}
+
+function rowIds(value) {
+  return [...new Set(value.match(/\b[OD]\d+\b/g) ?? [])]
+}
+
 async function lintCard(options) {
   if (!options.oracle) throw new CliError('USAGE', 'card requires --oracle', 2)
 
@@ -189,13 +197,30 @@ async function lintCard(options) {
       .filter((id) => /^S\d+$/.test(id)),
   )
 
+  const policies = new Map()
   let inPolicySection = false
   lines.forEach((line, index) => {
     if (line.startsWith('## ')) inPolicySection = line.includes('결정된 정책')
     if (!inPolicySection || !line.startsWith('- ')) return
+
     if (!line.includes('(출처:')) {
       issues.push(`policy-source: line ${index + 1}: policy has no approved source — ${line.trim()}`)
     }
+
+    const id = line.match(/^- (P\d+):/)?.[1]
+    if (!id) {
+      issues.push(`policy-id: line ${index + 1}: policy must start with a unique P* ID`)
+      return
+    }
+
+    if (policies.has(id)) issues.push(`duplicate-policy: ${id}: policy ID is repeated`)
+
+    const linked = line.match(/\(행:\s*([^)]+)\)/)?.[1] ?? ''
+    const linkedRows = rowIds(linked)
+    if (linkedRows.length === 0) {
+      issues.push(`policy-row-unlinked: ${id}: policy must cite at least one contract row`)
+    }
+    policies.set(id, { rows: linkedRows, line: index + 1 })
   })
 
   if (rows.length === 0) {
@@ -203,12 +228,19 @@ async function lintCard(options) {
   }
 
   const seenRows = new Set()
+  const policiesByRow = new Map()
   for (const row of rows) {
     const never = cellOf(row, 'Never')
     const then = cellOf(row, 'Then')
+    const linkedPolicies = policyIds(cellOf(row, '정책', 'Policy'))
+    policiesByRow.set(row.id, linkedPolicies)
 
     if (seenRows.has(row.id)) issues.push(`duplicate-row: ${row.id}: contract row ID is repeated`)
     seenRows.add(row.id)
+
+    if (linkedPolicies.length === 0) {
+      issues.push(`row-policy-unlinked: ${row.id}: contract row must cite at least one policy ID`)
+    }
 
     if (isEmptyCell(never)) issues.push(`empty-never: ${row.id}: Never is empty`)
 
@@ -233,6 +265,27 @@ async function lintCard(options) {
     for (const word of VAGUE_WORDS) {
       if (then.includes(word) || never.includes(word)) {
         issues.push(`vague-word: ${row.id}: "${word}" is not machine-checkable`)
+      }
+    }
+  }
+
+  for (const [policyId, policy] of policies) {
+    for (const rowId of policy.rows) {
+      if (!seenRows.has(rowId)) {
+        issues.push(`policy-row-unknown: ${policyId}: ${rowId} is not a contract row`)
+      } else if (!policiesByRow.get(rowId)?.includes(policyId)) {
+        issues.push(`policy-row-asymmetric: ${policyId} cites ${rowId}, but ${rowId} does not cite ${policyId}`)
+      }
+    }
+  }
+
+  for (const [rowId, linkedPolicies] of policiesByRow) {
+    for (const policyId of linkedPolicies) {
+      const policy = policies.get(policyId)
+      if (!policy) {
+        issues.push(`row-policy-unknown: ${rowId}: ${policyId} is not a decided policy`)
+      } else if (!policy.rows.includes(rowId)) {
+        issues.push(`policy-row-asymmetric: ${rowId} cites ${policyId}, but ${policyId} does not cite ${rowId}`)
       }
     }
   }
