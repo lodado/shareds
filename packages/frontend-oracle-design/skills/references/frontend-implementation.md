@@ -9,11 +9,12 @@ Oracle Card의 관찰 가능한 계약을 React·Next.js·TanStack Query 코드�
 구현 전에 대상 package의 `package.json`, router 구조, framework config와 레포의
 `AGENTS.md`·`CLAUDE.md`·필수 아키텍처 문서를 읽는다. 권위는 다음 순서다.
 
-1. 승인된 Oracle Card와 기획·디자인·API 계약
-2. 대상 레포의 아키텍처·보안·접근성·테스트 규칙
-3. **실제 설치 버전**의 React·Next.js·TanStack Query 공식 문서
-4. Vercel Engineering 같은 framework maintainer의 적용 가능한 휴리스틱
-5. 커뮤니티 전문가의 반례와 보완 의견
+1. 보안·개인정보·법적·접근성·데이터 정합성의 강제 제약
+2. 승인된 Oracle Card와 기획·디자인·API 계약
+3. 대상 레포의 아키텍처·테스트·호환성 규칙
+4. **실제 설치 버전**의 React·Next.js·TanStack Query 공식 문서
+5. Vercel Engineering 같은 framework maintainer의 적용 가능한 휴리스틱
+6. 커뮤니티 전문가의 반례와 보완 의견
 
 하위 출처가 상위 출처를 덮어쓰지 않는다. 예를 들어 bundle guide가 barrel import를
 피하라고 해도 레포가 FSD slice의 Public API import를 요구하면 레포 규칙을 따른다.
@@ -41,6 +42,16 @@ Oracle, 대상 레포 계약과 실제 설치 버전이 항상 우선한다.
 상태 소유권, Server/Client, async, Hook과 effect의 구체 구현은 아래 절을 적용한다.
 변경 비용을 비교하거나 숨은 부작용·공통화·public surface·새 abstraction을 판단할
 때는 같은 정의를 복제하지 말고 `changeability.md`를 기준으로 삼는다.
+
+## TypeScript 계약 — material할 때만
+
+- trust boundary와 public API의 입력·성공 결과·실패 형태를 정확히 표현한다. 내부에서
+  충분히 추론되는 타입을 반복하지 않는다.
+- boolean 조합이 실제 불가능 상태를 만들 때만 discriminated union이나 단일 status로
+  전이를 제한한다. 단순 toggle을 state machine으로 바꾸지 않는다.
+- `any`, 광범위한 assertion, 의미 없는 optional로 카드의 오류·상태 계약을 숨기지 않는다.
+- exported shared/package API가 바뀔 때만 소비자 추론과 오류 형태를 type test로 검증한다.
+  로컬 구현 하나를 위해 interface·factory·adapter를 추가하지 않는다.
 
 ## 1. 상태 소유권부터 정한다
 
@@ -198,11 +209,19 @@ reviewer가 별도로 판정한다.
 - RSC 경계 직렬화와 client bundle 최소화
 - 무거운 선택 기능만 `next/dynamic` 등으로 지연
 - static JSX와 provider를 필요한 범위에 배치
-- loading은 `role="status"`, 오류는 `role="alert"` 등 레포의 접근성 계약 준수
-- retry 후 focus와 이전 입력 유지 여부를 Oracle대로 복구
+- interactive control은 semantic element·accessible name·키보드 동등성을 갖고, loading은
+  `role="status"` 또는 `aria-live`, 오류는 `role="alert"` 등 레포 계약에 맞게 전달
+- retry 후 focus와 이전 입력 유지 여부를 Oracle대로 복구하고 dialog·popover는 필요한
+  Escape·tab order·trigger focus 복귀를 검증
 - 320px·양 theme·reduced motion 등 대상 레포의 필수 UI 검증 수행
 - 승인된 모든 architecture 문서가 Oracle source lock과 일치하고, 레포에 이미 존재하는
   구조 검증 명령이 있으면 통과
+
+성능 요구나 성능 개선 주장이 있을 때만 같은 환경의 `metric·budget`, baseline run,
+after run과 차이를 기록한다. 기존 benchmark·bundle script를 우선하고 해당 명령을
+`oracle-run.mjs init --required-label performance`와 ledger run으로 고정한다. 비교 가능한
+환경이 없으면 “개선됨”을 주장하지 않는다. 성능 요구가 없는 일반 변경에는 benchmark나
+새 측정 dependency를 추가하지 않고 N/A 사유만 남긴다.
 
 ## Source Registry
 

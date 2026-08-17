@@ -5,8 +5,9 @@ description: Use when frontend behavior or approved visual intent must be pinned
 
 # Frontend Oracle Design
 
-요구사항을 **실행 가능한 정답 계약(Oracle Card)**으로 바꾼다. 기본 동작은 카드
-설계에서 멈춘다. 사용자가 구현·자가검증·독립 리뷰까지 명시하면
+요구사항을 **제품 결과·강제 제약·실행 가능한 정답 계약(Oracle Card)**으로 바꾼다.
+요구사항을 대체하지 않고 `Outcome Brief → Source Registry → 행동·시각 계약`으로
+구체화한다. 기본 동작은 카드 설계에서 멈춘다. 사용자가 구현·자가검증·독립 리뷰까지 명시하면
 같은 카드를 불변 기준으로 삼아 Delivery 모드를 끝까지 오케스트레이션한다.
 
 보이는 UI를 만들거나 바꾸면 승인된 디자인 의도도 같은 카드에 포함한다. 디자인을
@@ -24,7 +25,11 @@ production 코드·기존 테스트 관찰은 조사 자료이지 정책 출처�
 - 테스트 파일을 작성하기 직전에 `$test` 스킬을 이름으로 명시적으로 로드·호출하고
   테스트 작성·실행·판정 권한을 위임한다. `$test`의 파일을 참고만 하는 것으로
   대체하지 않으며, 스킬을 찾거나 로드할 수 없으면 `FAIL`로 멈춘다.
-- 정책 출처는 사용자의 명시적 답변 또는 승인된 명세 위치뿐이다.
+- 제품 정책 출처는 사용자의 명시적 답변 또는 승인된 명세 위치뿐이다. 강제 제약과
+  project 계약은 Source Registry에 정확한 위치·version·관할을 별도로 기록한다.
+- 모든 새 카드는 사용자·상황, 관찰 가능한 성공, 비목표, 최악 회귀, 가역성을 적은
+  `Outcome Brief`와 source `Kind`가 있는 Source Registry를 포함한다. 보안·개인정보·
+  법적·접근성·금융 및 데이터 정합성 제약은 제품·시각 선호로 낮추지 않는다.
 - 결정된 정책과 계약 행은 stable ID로 양방향 연결하며, 연결되지 않은 정책이나 행을
   lock하지 않는다.
 - **새 카드와 의미가 바뀐 모든 revision은 다시 확인받는다.** read-only 조사로
@@ -53,10 +58,11 @@ production 코드·기존 테스트 관찰은 조사 자료이지 정책 출처�
 - 테스트는 중앙 디렉터리로 빼지 않고 소유 경계와 함께 이동·삭제되게 둔다. FSD
   레포의 배치는 `references/fsd.md`의 `__test__/` 규칙을 따르고, 레포가 다른 위치를
   명시적으로 강제할 때만 그 관례를 우선하고 사유를 기록한다.
-- TDD 시작 시 network 경계는 MSW를 최대한 쓴다. `fetch`·transport 모듈 직접 mocking은
-  MSW로 표현할 수 없는 경우에만 사유와 함께 쓴다. handler와 예시 데이터는 그 경계를
-  소유한 가장 가까운 곳에 두고 편의상 루트 `mocks/`로 모으지 않는다. FSD 배치는
-  `references/fsd.md`를 따른다.
+- TDD 시작 시 대상 레포가 이미 쓰는 network test 경계를 우선한다. MSW가 설치됐거나
+  도입이 승인됐으면 MSW handler를 쓰고, 그렇지 않으면 기존 transport seam을 사용한다.
+  테스트 편의를 위해 dependency를 조용히 추가하지 않는다. handler와 예시 데이터는
+  그 경계를 소유한 가장 가까운 곳에 두고 편의상 루트 `mocks/`로 모으지 않는다. FSD
+  배치는 `references/fsd.md`를 따른다.
 - assertion 약화, `test.skip` 전환, 임의 sleep으로 GREEN을 만들지 않는다.
 - test와 subagent는 증거와 비평을 제공하지만 정책을 새로 정하지 않는다.
 - AI가 만든 visual direction과 디자인 skill의 결과는 제안이지 정책 출처가 아니다.
@@ -117,23 +123,28 @@ production 코드·기존 테스트 관찰은 조사 자료이지 정책 출처�
 
 사용자가 Oracle Card, 요구사항 정리, 정책 결정 또는 테스트 계약만 요청하면:
 
-1. 승인된 기획서·PRD·수용 기준·디자인 시스템·Figma가 있는지 먼저 조사하고,
+1. 사용자·상황, 관찰 가능한 성공, 비목표, 최악 회귀와 가역성을 `Outcome Brief`로
+   정리한다. KPI가 없으면 수치를 발명하지 않는다.
+2. 승인된 기획서·PRD·수용 기준·디자인 시스템·Figma가 있는지 조사하고,
    정확한 위치·frame·version을 기준 자료로 고정한다.
-2. 외부 기준이 서로 충돌하거나 필수 자료에 접근할 수 없으면 `NEEDS_DECISION`.
-3. 보이는 UI 변경이면 `visual-design.md`로 `behavior-only`·`local`·
+3. 각 source를 `product-policy`·`mandatory-constraint`·`project-constraint`·
+   `implementation-reference`로 분류한다. 강제 제약과 다른 source가 충돌하면 안전한
+   쪽을 임의로 낮추지 말고 `NEEDS_DECISION`.
+4. 외부 기준이 서로 충돌하거나 필수 자료에 접근할 수 없으면 `NEEDS_DECISION`.
+5. 보이는 UI 변경이면 `visual-design.md`로 `behavior-only`·`local`·
    `identity-shaping` 범위를 기록한다. 시각 결과를 바꾸는 제안은 승인받은 뒤 카드에
    Design Intent로 포함한다. `local`·`identity-shaping`은 Design Change Confirmation을
    명시적으로 받고 카드에 기록하며, 미확인·미결이면 `NEEDS_DECISION`.
-4. Risk를 판정하고 정책 출처를 조사한다.
-5. 필요한 Grill 질문과 BVA를 수행해 **Draft Oracle**을 만든다.
-6. 기존 revision이 있으면 semantic delta를, 새 카드면 전체 정책과 미결 질문을
+6. Risk를 판정하고 정책 출처를 조사한다.
+7. 필요한 Grill 질문과 BVA를 수행해 **Draft Oracle**을 만든다.
+8. 기존 revision이 있으면 semantic delta를, 새 카드면 전체 정책과 미결 질문을
    사용자에게 보여주고 명시적으로 다시 확인받는다.
-7. 승인 응답 위치를 `User Confirmation`에 기록하고 Oracle Card를 adversarial
+9. 승인 응답 위치를 `User Confirmation`에 기록하고 Oracle Card를 adversarial
    self-review한다. 수정 요청이면 Draft를 고쳐 다시 확인하며 응답이 없으면
    `NEEDS_DECISION`이다.
-8. `oracle-verify.mjs card` lint를 통과시킨 뒤 결정적 revision lock을 생성한다.
-9. lock 검증 뒤 `ORACLE_READY`, `NEEDS_DECISION` 또는 도구 실패면 `FAIL`에서 종료한다.
-10. 테스트와 production 코드를 작성하지 않는다.
+10. `oracle-verify.mjs card` lint를 통과시킨 뒤 결정적 revision lock을 생성한다.
+11. lock 검증 뒤 `ORACLE_READY`, `NEEDS_DECISION` 또는 도구 실패면 `FAIL`에서 종료한다.
+12. 테스트와 production 코드를 작성하지 않는다.
 
 ### Delivery — 명시적 요청만
 
@@ -160,9 +171,10 @@ production 코드·기존 테스트 관찰은 조사 자료이지 정책 출처�
 6. 테스트 파일 작성 직전에 `$test` 스킬을 명시적으로 호출하고, 그 계약으로 테스트를
    먼저 작성·실행한다. reporter의 실패 test name을 카드 행에 매핑한 뒤
    `oracle-verify.mjs red`가 통과한 run만 `VALID_RED`로 전이한다.
-   network 경계는 MSW handler로 세운다. 테스트·handler 배치는 승인된 architecture
+   network 경계는 레포가 이미 쓰는 test boundary를 우선하고, MSW가 설치됐거나 도입이
+   승인된 경우에만 MSW handler를 쓴다. 테스트·handler 배치는 승인된 architecture
    source와 대조하고, FSD면 `references/fsd.md` 규칙을 따른다. 편의상 루트
-   `e2e/`·`mocks/`로 모으지 않는다.
+   `e2e/`·`mocks/`로 모으거나 test만 위해 dependency를 조용히 추가하지 않는다.
 7. production 수정 전 `implementation-loop.md`와 `frontend-implementation.md`로 구현
    결정을 기록한 뒤 최소 구현→GREEN을 수행한다.
 8. High risk면 sibling `test` skill의 mutation kill·원복·재-GREEN을 먼저 수행한다.
@@ -213,19 +225,19 @@ Delivery의 정상 완료 상태는 `REVIEW_VERIFIED`다.
 
 ```text
 상태: ORACLE_READY | IMPLEMENTED_GREEN | REVIEW_VERIFIED | NEEDS_DECISION | FAIL
-카드: O1→test name, O2→reviewer finding, O3→N/A 사유 형식의 전 행 증거 매핑
-revision: Oracle SHA-256, source hashes, 마지막 verify command와 exit code
-runs: 인용한 ledger runId와 label·exit·grade, evidence verify 출력
-상태 기계: 기록된 전이와 마지막 상태, 사용한 예산 n/한도, ENV_DRIFT 유무
-결정: Target, State ownership, Server/Client, Async, Hook, Sources, Rejected
+결과: Actor/context, Observable success, 실제 달성 결과, Non-goals
+결정: 선택한 최소 경계, State ownership, Server/Client, Async, Type contract, Sources, Rejected
+변경: path별 관찰 가능한 행동 변화
+검증: targeted test·영향 test·typecheck·lint·build, 접근성, 성능 claim 또는 N/A
+위험과 복구: Worst regression, 남은 위험, Reversibility·rollback 또는 N/A
 아키텍처: unit별 architecture.md, 승인 답변, Oracle source hash, 레포 구조 검증 또는 reviewer 증거; FSD면 layer·segment·public API·테스트 배치 준수 증거
 디자인: Visual scope, Subject, Audience, Single job, Thesis, Signature, Risk, Rejected
 디자인 확인: Design Change Confirmation의 사용자 답변 위치
 외부 시각 QA: 명시적으로 `$frontend-visual-qa`를 실행했으면 artifact 경로와 판정, 아니면 N/A
 구현: 라운드별 카드 행, 가설, 최소 변경, 결과
-실행: 실제 command와 PASS/FAIL 수
 mutation: High risk kill·원복·재통과 증거 또는 N/A
 subagent: 역할, finding, 반영 여부
-재검증: 테스트·레포 필수 검증 결과
-남은 것: 미검증 항목과 사유
+증거 부록: O*/D* 전 행 매핑, Oracle SHA-256, source hashes, 마지막 verify command와 exit code
+runs: 인용한 ledger runId와 label·exit·grade, evidence verify 출력
+상태 기계: 기록된 전이와 마지막 상태, 사용한 예산 n/한도, ENV_DRIFT 유무
 ```

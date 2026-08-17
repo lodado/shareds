@@ -22,6 +22,17 @@ const CHANGEABILITY_STATUSES = ['PASS', 'FINDING', 'N/A']
 
 const EVIDENCE_TIERS = ['HARD', 'RELATIONAL', 'JUDGMENT']
 
+const OUTCOME_FIELDS = [
+  'Actor and context',
+  'Observable success',
+  'Non-goals',
+  'Worst regression',
+  'Reversibility',
+  'Sources',
+]
+
+const SOURCE_KINDS = ['product-policy', 'mandatory-constraint', 'project-constraint', 'implementation-reference']
+
 const VAGUE_WORDS = [
   '적절히',
   '적절한',
@@ -172,8 +183,58 @@ async function lintCard(options) {
   const rows = parseRows(card)
   const issues = []
 
-  if (!card.includes('## Source Registry')) {
+  const sourceSection = sectionLines(lines, 'Source Registry')
+  if (sourceSection.length === 0) {
     issues.push('source-registry: card has no `## Source Registry` section')
+  }
+
+  let sourceHeaders = null
+  const sources = []
+  for (const line of sourceSection) {
+    if (!line.trim().startsWith('|')) continue
+
+    const cells = splitRow(line.trim())
+    if (cells[0] === 'ID') {
+      sourceHeaders = cells
+      continue
+    }
+    if (!sourceHeaders || !/^S\d+$/.test(cells[0])) continue
+
+    sources.push(Object.fromEntries(sourceHeaders.map((header, index) => [header, cells[index] ?? ''])))
+  }
+
+  const sourceIds = new Set(sources.map(({ ID }) => ID))
+  if (!sourceHeaders?.includes('Kind')) {
+    issues.push('source-kind: Source Registry must include a `Kind` column')
+  } else {
+    for (const source of sources) {
+      if (!SOURCE_KINDS.includes(source.Kind)) {
+        issues.push(`source-kind: ${source.ID}: ${source.Kind || '(empty)'} must be one of ${SOURCE_KINDS.join(', ')}`)
+      }
+    }
+  }
+
+  const outcome = sectionLines(lines, 'Outcome Brief')
+  if (outcome.length === 0) {
+    issues.push('outcome-brief: card has no `## Outcome Brief` section')
+  } else {
+    for (const field of OUTCOME_FIELDS) {
+      const value = outcome
+        .find((line) => line.trim().startsWith(`- ${field}:`))
+        ?.split(':')
+        .slice(1)
+        .join(':')
+        .trim()
+
+      if (!value || isEmptyCell(value)) {
+        issues.push(`outcome-field: ${field} must have a concrete value`)
+      }
+    }
+
+    const citedSources = outcome.find((line) => line.trim().startsWith('- Sources:'))?.match(/\bS\d+\b/g) ?? []
+    for (const id of citedSources) {
+      if (!sourceIds.has(id)) issues.push(`outcome-source: ${id} is not in Source Registry`)
+    }
   }
 
   const confirmation = sectionLines(lines, 'User Confirmation')
@@ -201,13 +262,6 @@ async function lintCard(options) {
       issues.push('visual-qa-authorization: RELATIONAL rows require `- Visual QA authorization: approved | declined`')
     }
   }
-
-  const sourceIds = new Set(
-    sectionLines(lines, 'Source Registry')
-      .filter((line) => line.trim().startsWith('|'))
-      .map((line) => splitRow(line.trim())[0])
-      .filter((id) => /^S\d+$/.test(id)),
-  )
 
   const policies = new Map()
   let inPolicySection = false

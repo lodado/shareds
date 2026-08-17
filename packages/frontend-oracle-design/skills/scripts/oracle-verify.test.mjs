@@ -22,11 +22,20 @@ async function directory(t) {
 /** 자동 추가 TC 7종과 출처·Never·부작용을 모두 채운 최소 통과 카드. */
 const VALID_CARD = `# Sample Oracle Card
 
+## Outcome Brief
+
+- Actor and context: 저장 화면을 사용하는 사용자
+- Observable success: 저장 결과가 정확히 한 번 반영된다.
+- Non-goals: 저장 API 재설계
+- Worst regression: 중복 저장 또는 입력 유실
+- Reversibility: 변경 commit revert
+- Sources: S1
+
 ## Source Registry
 
-| ID  | 관할      | 기준 | 위치·version    | 승인 상태 |
-| --- | --------- | ---- | --------------- | --------- |
-| S1  | 저장 정책 | PRD  | docs/save.md#v3 | approved  |
+| ID  | Kind           | 관할      | 기준 | 위치·version    | 승인 상태 |
+| --- | -------------- | --------- | ---- | --------------- | --------- |
+| S1  | product-policy | 저장 정책 | PRD  | docs/save.md#v3 | approved  |
 
 ## User Confirmation
 
@@ -80,6 +89,45 @@ test('O17: 구조가 완전한 카드는 lint를 통과한다', async (t) => {
 
   assert.equal(linted.status, 0, linted.stderr)
   assert.equal(linted.stdout, 'CARD_LINT_OK 9 rows\n')
+})
+
+test('O3: Outcome Brief가 없는 카드를 거부한다', async (t) => {
+  const withoutOutcome = VALID_CARD.replace(/## Outcome Brief\n[\s\S]*?- Sources: S1\n\n/, '')
+
+  const linted = run('card', '--oracle', await cardFile(t, withoutOutcome))
+
+  assert.equal(linted.status, 1)
+  assert.match(linted.stderr, /outcome-brief/)
+})
+
+test('O4: Outcome Brief의 필수 값이 비거나 TBD면 거부한다', async (t) => {
+  for (const value of ['', 'TBD']) {
+    const card = VALID_CARD.replace(
+      '- Observable success: 저장 결과가 정확히 한 번 반영된다.',
+      `- Observable success: ${value}`,
+    )
+    const linted = run('card', '--oracle', await cardFile(t, card))
+
+    assert.equal(linted.status, 1)
+    assert.match(linted.stderr, /outcome-field/)
+    assert.match(linted.stderr, /Observable success/)
+  }
+})
+
+test('O5-O6: Source Registry의 Kind 누락과 허용되지 않은 값을 거부한다', async (t) => {
+  const withoutKind = VALID_CARD.replace('| ID  | Kind           | 관할', '| ID  | 관할')
+    .replace('| --- | -------------- | ---------', '| --- | ---------')
+    .replace('| S1  | product-policy | 저장 정책', '| S1  | 저장 정책')
+  const invalidKind = VALID_CARD.replace('product-policy', 'visual-preference')
+
+  const missing = run('card', '--oracle', await cardFile(t, withoutKind))
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /source-kind/)
+
+  const invalid = run('card', '--oracle', await cardFile(t, invalidKind))
+  assert.equal(invalid.status, 1)
+  assert.match(invalid.stderr, /source-kind/)
+  assert.match(invalid.stderr, /visual-preference/)
 })
 
 test('O17: 새 카드의 사용자 확인 근거가 없으면 lock 전 lint를 거부한다', async (t) => {

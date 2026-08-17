@@ -20,23 +20,47 @@ Risk와 Grill보다 먼저 사용자가 제공했거나 레포가 승인된 기�
 
 우선순위:
 
-1. 승인된 기획서·PRD·수용 기준·디자인 시스템·Figma 원본
-2. 사용자의 명시적 답변
-3. 레포의 필수 아키텍처·접근성·보안 계약
-4. production 코드·기존 테스트·브라우저 관찰은 조사 증거일 뿐 정책 출처가 아님
+1. 보안·개인정보·법적 제약·접근성·금융 및 데이터 정합성
+2. 사용자의 명시적 행동 계약과 공개 호환성
+3. 레포의 필수 아키텍처·API·테스트 계약
+4. 승인된 기획서·PRD·수용 기준·디자인 시스템·Figma 원본의 해당 관할
+5. production 코드·기존 테스트·브라우저 관찰은 조사 증거일 뿐 정책 출처가 아님
 
-Oracle Card 상단에 기준 자료와 각 자료의 관할을 먼저 기록한다.
+Oracle Card 상단에는 먼저 이번 변경의 제품 결과와 범위를 기록한다. KPI가 없으면
+수치를 발명하지 않고 사용자가 관찰할 수 있는 성공 결과를 쓴다.
 
 ```markdown
-### Source Registry
+## Outcome Brief
 
-| ID  | 관할                     | 기준          | 위치·version                        | 승인 상태 |
-| --- | ------------------------ | ------------- | ----------------------------------- | --------- |
-| S1  | 비즈니스 결과            | PRD           | docs/profile.md#save-flow, revision | approved  |
-| S2  | UI·문구·interaction      | Figma         | file/page/frame/version             | approved  |
-| S3  | payload·오류·idempotency | API 계약      | endpoint/version                    | approved  |
-| S4  | 접근성·토큰              | 디자인 시스템 | 문서 위치/version                   | approved  |
+- Actor and context: 누가 어떤 상황에서 사용하는가
+- Observable success: 관찰 가능한 성공 결과
+- Non-goals: 이번 변경에서 하지 않을 일
+- Worst regression: false GREEN의 가장 큰 피해
+- Reversibility: 되돌리는 방법 또는 N/A 사유
+- Sources: S1, S2
 ```
+
+그다음 기준 자료의 종류와 관할을 기록한다.
+
+```markdown
+## Source Registry
+
+| ID  | Kind                 | 관할                     | 기준          | 위치·version                        | 승인 상태 |
+| --- | -------------------- | ------------------------ | ------------- | ----------------------------------- | --------- |
+| S1  | product-policy       | 비즈니스 결과            | PRD           | docs/profile.md#save-flow, revision | approved  |
+| S2  | product-policy       | UI·문구·interaction      | Figma         | file/page/frame/version             | approved  |
+| S3  | project-constraint   | payload·오류·idempotency | API 계약      | endpoint/version                    | approved  |
+| S4  | mandatory-constraint | 접근성·토큰              | 디자인 시스템 | 문서 위치/version                   | approved  |
+```
+
+허용하는 `Kind`는 다음 네 가지다.
+
+- `product-policy`: 사용자 답변과 승인된 PRD·Figma처럼 제품 결과를 정하는 자료
+- `mandatory-constraint`: 보안·개인정보·법·접근성·데이터 정합성처럼 제품 선호로
+  낮출 수 없는 제약
+- `project-constraint`: 저장소의 공개 API·architecture·테스트·호환성 계약
+- `implementation-reference`: 실제 설치 버전의 공식 문서나 구현 휴리스틱. 제품 결과를
+  정하지 못한다.
 
 - Figma는 가능한 도구로 원본 파일의 정확한 page·frame·variant를 직접 확인한다.
 - 링크·파일을 열 수 없으면 기억이나 유사 스크린샷으로 대체하지 않는다.
@@ -47,6 +71,8 @@ Oracle Card 상단에 기준 자료와 각 자료의 관할을 먼저 기록한�
   문구, interaction, 부작용 요구가 누락·왜곡되지 않았는지 대조한다.
 - 기준은 자신의 관할 안에서만 우선한다. Figma로 idempotency를 정하거나 API 계약으로
   시각 레이아웃을 덮어쓰지 않는다. 관할이 겹치거나 불명확하면 `NEEDS_DECISION`.
+- `mandatory-constraint`와 다른 source가 충돌하면 보안·접근성·정합성을 낮춰 통과하지
+  않는다. 충돌과 가능한 안전한 대안을 제시하고 `NEEDS_DECISION`으로 멈춘다.
 - 기준의 revision/version이 바뀌면 기존 `ORACLE_READY`를 무효화하고 다시 대조한다.
 
 ## 1. UI 디자인 의도 게이트
@@ -106,6 +132,8 @@ UI가 단순해도 부작용이 위험하면 High다.
 
 1. 사용자의 명시적 답변
 2. 승인된 기획서·PRD·수용 기준·디자인 시스템·Figma의 정확한 위치와 version
+3. 적용되는 보안·개인정보·법적·접근성·데이터 정합성 제약
+4. 레포가 공개 계약으로 지정한 API·architecture·호환성 문서
 
 인정하지 않음:
 
@@ -113,6 +141,7 @@ UI가 단순해도 부작용이 위험하면 High다.
 - production 코드
 - 기존 테스트
 - 브라우저에서 관찰한 현재 동작
+- `implementation-reference`로 분류한 framework 문서와 구현 휴리스틱
 
 결정된 정책마다 출처를 붙인다. 출처 없는 정책이 하나라도 있으면
 `ORACLE_READY`가 아니다.
@@ -127,6 +156,10 @@ UI가 단순해도 부작용이 위험하면 High다.
 ## 5. 카드 형식
 
 `references/bva.md`의 네 축과 자동 추가 TC 7종을 적용한다.
+
+모든 새 카드는 `Outcome Brief → Source Registry → User Confirmation → 결정된 정책 →
+계약 행` 순서로 작성한다. `oracle-verify.mjs card`는 Outcome Brief의 필수 값과 Source
+Registry의 `Kind`를 lock 전에 검사한다.
 
 Design Intent가 있으면 `visual-design.md`의 형식을 행동 매트릭스 바로 앞에 둔다.
 Design Intent·`D*` 행·행동 `O*` 행과 아래 확인 근거는 모두 같은 Oracle bytes로
@@ -242,8 +275,9 @@ node <skill-dir>/scripts/oracle-verify.mjs card \
   --oracle .ai/oracles/<oracle-id>/oracle.md
 ```
 
-검사 항목은 Source Registry와 승인된 User Confirmation 존재, 모든 정책 줄의
-stable ID·`(출처: …)`·적용 행, 정책 ID와 행 ID의 양방향 참조, 중복 없는 행 ID,
+검사 항목은 완전한 Outcome Brief, `Kind`가 있는 Source Registry, 승인된 User
+Confirmation 존재, 모든 정책 줄의 stable ID·`(출처: …)`·적용 행, 정책 ID와 행 ID의
+양방향 참조, 중복 없는 행 ID,
 `O*` 행의 `Then`·`Never`·부작용,
 `D*` 행의 계약·출처·증거 계층과 Source Registry 참조, 모호어 부재, 자동 추가 TC
 7종의 실제 계약 행 또는 출처 있는 N/A 표기다. `CARD_LINT_FAILED`는 lock 전에
@@ -324,8 +358,8 @@ node <skill-dir>/scripts/oracle-run.mjs init \
 
 ### `ORACLE_READY`
 
-- 외부 기준을 확인하고 카드 상단 Source Registry에 관할·위치·version·승인 상태
-  또는 N/A 사유를 기록함
+- Outcome Brief를 완성하고 카드 상단 Source Registry에 Kind·관할·위치·version·승인
+  상태 또는 N/A 사유를 기록함
 - 카드가 외부 기준의 상태·문구·interaction·부작용을 누락·왜곡하지 않음
 - 모든 정책에 인정되는 출처가 있음
 - `User Confirmation`이 `approved`이고 새 카드 또는 semantic delta를 승인한 실제

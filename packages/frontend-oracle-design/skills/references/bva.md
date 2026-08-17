@@ -69,7 +69,9 @@ frontend-oracle-design과 test 스킬이 공유하는 참조. 카드 작성 전�
 - optimistic UI → 실패 시 정확한 이전 상태 복원, 동시 사용자 변경 보존, 중복 항목 없음
 - cache → mutation 후 정확한 query 무효화, stale 응답이 최신 데이터를 덮지 않음, 뒤로가기·새로고침 후 상태
 - navigation → 성공/실패 시 URL·history 정확성, 중복 클릭으로 entry 2개 금지, 이탈 후 늦은 응답
-- interactive UI → 키보드 동등성(Enter=클릭 결과 동일), focus 이동·복귀, loading/error의 보조기술 전달(role, aria)
+- interactive UI → semantic element와 accessible name, 키보드 동등성, focus 이동·복귀,
+  loading/error의 보조기술 전달(role, aria-live). dialog·popover처럼 focus를 가두거나
+  되돌려야 하는 UI는 Escape·tab order·trigger 복귀를 각각 검증한다.
 - 비결정 소스 → clock/timezone/seed/응답 순서 통제, 테스트별 storage·데이터 격리, 실제 외부 서비스 의존 금지
 
 ## 오류 subtype

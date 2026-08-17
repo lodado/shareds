@@ -180,23 +180,25 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.4.0')
+  assert.equal(version, '0.5.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.4.0')
+  assert.equal(marketplace.version, '0.5.0')
 })
 
-test('starts TDD with MSW and colocates handlers in the nearest owning boundary', async () => {
+test('reuses the repository network boundary and colocates approved MSW handlers', async () => {
   const [skill, implementationLoop, fsd] = await Promise.all([
     read('SKILL.md'),
     read('references/implementation-loop.md'),
     read('references/fsd.md'),
   ])
 
-  assert.match(skill, /MSW를 최대한 쓴다/)
+  assert.match(skill, /이미 쓰는 network test 경계를 우선/)
+  assert.match(skill, /MSW가 설치됐거나.*승인/s)
   assert.match(skill, /가장 가까운 곳에 두고/)
-  assert.match(implementationLoop, /MSW handler로 세운다/)
+  assert.match(implementationLoop, /이미 쓰는 test boundary를 우선/)
+  assert.match(implementationLoop, /dependency를 조용히 추가하지 않는다/)
   assert.match(implementationLoop, /fsd\.md/)
   assert.match(fsd, /<slice>\/api\/__mocks__\//)
   assert.match(fsd, /<slice>\/__mocks__\//)
@@ -421,4 +423,49 @@ test('O8-O10: reviews with the same changeability reference without turning tast
   assert.match(subagentReview, /NON_ORACLE_OPINION/)
   assert.match(subagentReview, /전면 리팩터링/)
   assert.match(subagentReview, /최소 수정/)
+})
+
+test('O2: 기존 Oracle Delivery gate를 유지한다', async () => {
+  const [skill, oracleCard, implementationLoop] = await Promise.all([
+    read('SKILL.md'),
+    read('references/oracle-card.md'),
+    read('references/implementation-loop.md'),
+  ])
+
+  for (const contract of ['VALID_RED', 'oracle-lock.mjs', 'oracle-run.mjs', 'evidence.json']) {
+    assert.match(`${skill}\n${oracleCard}\n${implementationLoop}`, new RegExp(contract.replace('.', '\\.')))
+  }
+})
+
+test('O7: 조건부 품질 계약과 human-first 보고를 안내한다', async () => {
+  const [skill, oracleCard, frontendImplementation, implementationLoop, architecture, review] = await Promise.all([
+    read('SKILL.md'),
+    read('references/oracle-card.md'),
+    read('references/frontend-implementation.md'),
+    read('references/implementation-loop.md'),
+    read('references/architecture-contract.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  assert.match(oracleCard, /## Outcome Brief/)
+  assert.match(oracleCard, /mandatory-constraint/)
+  assert.match(frontendImplementation, /## TypeScript 계약/)
+  assert.match(frontendImplementation, /accessible name/)
+  assert.match(frontendImplementation, /baseline run/)
+  assert.match(implementationLoop, /Type contract/)
+  assert.match(implementationLoop, /Performance: claim/)
+  assert.match(architecture, /## Exported Public API 계약 — 조건부/)
+  assert.match(review, /mandatory constraint/)
+  assert.match(skill, /결과: Actor\/context/)
+  assert.match(skill, /증거 부록:/)
+})
+
+test('O8: 카드 schema version 분기와 migration을 추가하지 않는다', async () => {
+  const [oracleCard, verifier] = await Promise.all([
+    read('references/oracle-card.md'),
+    read('scripts/oracle-verify.mjs'),
+  ])
+
+  assert.doesNotMatch(oracleCard, /Oracle-Card-Version/)
+  assert.doesNotMatch(verifier, /ORACLE_CARD_VERSION|cardSchemaVersion/)
 })

@@ -33,10 +33,12 @@ reviewer를 호출하지 않고 기존 증거를 폐기한다.
 사용자가 제공했거나 작업의 승인된 기준으로 지정된 자료가 있으면 다음 순서로
 우선한다.
 
-1. 승인된 기획서·PRD·수용 기준·디자인 시스템·Figma 원본 파일/프레임
-2. 위 외부 기준을 실행 가능한 계약으로 옮긴 Oracle Card
-3. 대상 레포의 필수 아키텍처·접근성·보안 계약
-4. production 코드·기존 headless test 관찰은 증거일 뿐 정답 권위가 아님
+1. 보안·개인정보·법적·접근성·금융 및 데이터 정합성의 강제 제약
+2. 사용자의 명시적 행동 계약과 공개 호환성
+3. 대상 레포의 필수 아키텍처·API·테스트 계약
+4. 승인된 기획서·PRD·수용 기준·디자인 시스템·Figma 원본의 해당 관할
+5. 위 기준을 실행 가능한 계약으로 옮긴 Oracle Card
+6. production 코드·기존 headless test 관찰은 증거일 뿐 정답 권위가 아님
 
 Figma가 기준이면 정확한 파일·페이지·프레임·버전을 확인하고, 접근할 수 없으면
 추측하거나 스크린샷 기억으로 대체하지 말고 미검증으로 보고한다. 외부 기준과
@@ -166,8 +168,11 @@ field에 대조한다. 다섯 축을 모두 PASS로 채우는 것이 목적이 �
 구체 N/A 이유를 쓴다.
 
 - 승인된 기획서·Figma의 레이아웃, 상태, 문구, interaction과 구현이 일치하는가?
+- Outcome Brief의 사용자·상황과 관찰 가능한 성공이 실제 diff로 달성됐고 Non-goals를
+  침범하지 않았는가?
 - 외부 기준의 각 요구가 Oracle Card에 정확히 번역됐으며 누락·왜곡되지 않았는가?
-- Source Registry의 각 기준이 자신의 관할 안에서만 적용됐고 version이 여전히 같은가?
+- Source Registry의 `Kind`·관할·version이 정확하며 mandatory constraint를 제품·시각
+  선호로 낮추지 않았는가?
 - Oracle SHA-256과 source hashes가 마지막 verify 결과와 일치하는가?
 - 보고된 통과가 ledger runId로 뒷받침되며 grade가 `reported`인가?
 - 모든 Oracle 행에 tier owner의 증거 또는 출처 있는 N/A가 매핑됐고
@@ -179,6 +184,8 @@ field에 대조한다. 다섯 축을 모두 PASS로 채우는 것이 목적이 �
 - loading, retry, race, out-of-order가 결정론적으로 통제되는가?
 - 구현이 카드 밖의 정책이나 동작을 임의로 추가하지 않았는가?
 - 실제 package version과 레포 계약을 확인하고 외부 best practice보다 우선했는가?
+- material한 입력·성공·실패·상태가 TypeScript로 표현되고 `any`나 광범위한 assertion으로
+  불가능 상태를 숨기지 않았는가? 단순 상태에 불필요한 state machine도 만들지 않았는가?
 - server state를 query cache와 local/global state가 중복 소유하지 않는가?
 - Server Component로 충분한 일을 Client Component·TanStack Query로 옮기지 않았는가?
 - Suspense/Error Boundary가 필요한 subtree에만 있고 initial load·background refetch·
@@ -197,7 +204,13 @@ field에 대조한다. 다섯 축을 모두 PASS로 채우는 것이 목적이 �
   없는가?
 - component가 상태·async/error·접근성 책임에 따라 분리되고 한 파일에 독립 component를
   몰아넣거나 반대로 trivial wrapper를 늘리지 않았는가?
+- interactive UI가 semantic element·accessible name·keyboard·focus·상태 전달 계약을
+  충족하고, dialog·popover의 Escape와 focus 복귀가 해당할 때 검증됐는가?
 - UI가 network transport를 직접 호출하지 않고 api/model/public API 경계를 지키는가?
+- 성능 claim이 있으면 동일 환경의 metric·budget과 baseline/after ledger run이 있고,
+  claim이 없는데 benchmark·memoization dependency를 추가하지 않았는가?
+- exported shared/package API가 바뀐 경우에만 consumer·호환성·type/runtime·pack·migration
+  증거가 있으며, 앱 내부 변경에 release gate를 강제하지 않았는가?
 - 순수 함수·render 파생·event handler로 가능한 일을 effect로 옮기지 않았으며 모든
   effect가 승인 문서의 외부 시스템·이유·cleanup에 대응하는가?
 - architecture 문서 bytes와 Oracle source lock, 레포 구조 검증 또는 reviewer 증거가 모두 일치하는가?

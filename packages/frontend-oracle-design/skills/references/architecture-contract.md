@@ -97,6 +97,21 @@ layer·segment 매핑과 slice public API(`index.ts`)의 정확한 export 목록
 `Component boundaries`에 허용·금지 import 경계(deep import 금지 포함),
 `Test boundaries`에 `__test__/`·`__mocks__/` 배치. 기준은 [`fsd.md`](fsd.md)다.
 
+## Exported Public API 계약 — 조건부
+
+shared/package export를 새로 만들거나 바꿀 때만 다음을 architecture 문서와
+Implementation Decision에 기록한다.
+
+- 실제 consumer와 함께 바뀌는 이유. 구체 사용 사례가 하나뿐이면 먼저 local API로 둔다.
+- platform API와 이미 설치된 dependency로 해결할 수 없는 이유
+- 입력·출력·오류 타입, 호환성 범위, breaking 여부와 migration
+- 대상 레포가 이미 제공하는 runtime·type test, build/pack/export 검사와 changeset
+- 실패 시 rollback. 앱 내부 local 구현에는 이 gate와 release 절차를 적용하지 않는다.
+
+공용 API를 위해 새 검사 도구가 필요하면 자동 설치하지 않고 비용과 대안을 사용자에게
+제시한다. speculative consumer, option flag 또는 미래 교체 가능성만으로 public surface를
+늘리지 않는다.
+
 ## Hook Encapsulation 계약 — 조건부
 
 Page/UI component를 orchestration-free 경계로 만들기로 사용자가 승인한 경우에만

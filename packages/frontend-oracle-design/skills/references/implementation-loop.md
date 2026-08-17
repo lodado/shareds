@@ -102,10 +102,11 @@ node <skill-dir>/scripts/oracle-run.mjs exec \
    `exec`·`transition`은 매 호출마다 같은 검증을 자동으로 수행한다.
 2. 카드의 모든 비-N/A 행을 관찰 가능한 테스트로 번역하고 test name을
    `evidence.json`의 해당 행에 먼저 매핑한다.
-3. network 경계가 있으면 MSW handler로 세운다. 레포에 MSW가 없으면 설치 여부를 먼저
-   확인하고, MSW로 표현할 수 없는 경우에만 다른 mocking 수단을 사유와 함께 쓴다.
-   handler와 예시 데이터는 그 경계를 소유한 가장 가까운 곳에 두고, FSD 배치는
-   [`fsd.md`](fsd.md)의 `__mocks__/` 규칙을 따른다.
+3. network 경계가 있으면 레포가 이미 쓰는 test boundary를 우선한다. MSW가 설치됐거나
+   도입이 승인됐으면 MSW handler를 쓰고, 그렇지 않으면 기존 transport seam을 쓴다.
+   테스트만 위해 dependency를 조용히 추가하지 않는다. handler와 예시 데이터는 그
+   경계를 소유한 가장 가까운 곳에 두고, FSD 배치는 [`fsd.md`](fsd.md)의
+   `__mocks__/` 규칙을 따른다.
 4. 각 행의 `Then`, `Never`, 부작용 종류·횟수를 함께 assert한다. 요청 횟수와 순서는
    handler에서 관찰한다.
 5. 테스트를 `exec`로 실제 실행한다.
@@ -186,6 +187,7 @@ version과 레포 규칙을 근거로 아래 기록을 남긴다. 외부 best pr
 - Server/Client boundary: server에 남길 것과 최소 client leaf
 - Async boundary: initial loading, refetch, error, retry, mutation pending 처리
 - Hook boundary: 분리할 interaction/query 책임과 분리하지 않을 trivial logic
+- Type contract: material한 입력·성공·실패·상태 전이와 불가능 상태, 또는 N/A 사유
 - Architecture: 영향 unit, 승인된 architecture 문서, 기존 관례·data/effect 경계와
   Oracle source hash
 - Changeability: material한 Readability·Predictability·Cohesion·Coupling 판단,
@@ -195,6 +197,10 @@ version과 레포 규칙을 근거로 아래 기록을 남긴다. 외부 best pr
   code 중 처음 요구를 만족한 단계
 - Design: Design Intent가 있으면 visual scope, component·token 재사용, typography,
   responsive, motion·reduced motion, copy, signature와 버린 generic 선택; 없으면 N/A
+- Accessibility: interactive UI의 semantic name·keyboard·focus·상태 전달 증거, 또는 N/A
+- Performance: claim이 있으면 metric·budget·동일 환경 baseline/after runId, 없으면 N/A
+- Public API: exported shared/package surface가 바뀌면 consumer·호환성·type/runtime·pack·
+  migration 계약, 아니면 N/A
 - Sources: 적용한 레포 계약·공식 문서·휴리스틱
 - Rejected: 실제 검토했지만 적용하지 않은 대안, 관련 품질 축과 구체 이유
 ```
@@ -242,6 +248,11 @@ revision mismatch는 피드백 분류 대상이 아니다. 기존 증거를 즉�
 3. typecheck와 lint
 4. Oracle source lock verify 및 레포에 존재하는 구조 검증 명령
 5. 루트 또는 패키지 필수 test/build
+
+성능 요구나 개선 claim이 있으면 동일 조건의 baseline/after를 검사하는 기존 repo 명령을
+`performance` 필수 label로 추가한다. exported shared/package API가 바뀌면 대상 레포가
+이미 제공하는 type test, runtime test, pack/export 및 changeset 검증만 필수 label로
+추가한다. 해당하지 않는 작업에 이 명령이나 새 dependency를 만들지 않는다.
 
 레포 규칙에 정의된 명령이 우선이다. 실행하지 않은 검증을 통과했다고 보고하지
 않는다. 문서화된 명령이 없으면 package scripts를 읽어 targeted + 가장 가까운
@@ -318,8 +329,10 @@ node <skill-dir>/scripts/oracle-run.mjs transition \
 run이 `exit-only`라 이름을 확인할 수 없다는 뜻이다. 둘 다 이름을 지어내지 말고
 reporter를 붙여 다시 실행한다.
 
-최종 보고에는 Oracle SHA-256·source hashes·마지막 verify command/exit, 인용한 runId와
-실제 검증 command/PASS·FAIL 수, `oracle-verify.mjs evidence` 출력을 기록한다. 결과에
+최종 보고는 Outcome Brief의 사용자·성공 결과·비목표, 선택한 최소 경계, path별 변화,
+검증, 남은 위험과 가역성을 먼저 쓴다. 그 뒤 증거 부록에 Oracle SHA-256·source hashes·
+마지막 verify command/exit, 인용한 runId와 실제 검증 command/PASS·FAIL 수,
+`oracle-verify.mjs evidence` 출력을 기록한다. 결과에
 영향을 주는 commit·runtime/browser version·locale/timezone·viewport/theme·role·
 clock/seed·데이터 초기화만 함께 기록한다. 비-N/A 행이 매핑되지 않거나 revision이
 다르면 GREEN을 발급하지 않는다.

@@ -1,6 +1,6 @@
 {
   "name": "@lodado/test-plugin",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Claude Code / Codex plugin for Oracle-driven frontend behavior testing.",
   "private": true,
   "scripts": {

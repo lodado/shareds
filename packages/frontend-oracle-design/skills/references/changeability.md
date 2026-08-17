@@ -8,11 +8,12 @@
 
 권위는 항상 다음 순서다.
 
-1. 승인된 Oracle과 그 Source Registry
-2. 대상 레포의 `AGENTS.md`·`CLAUDE.md`, architecture·보안·접근성 계약
-3. 대상 레포의 실제 설치 버전과 기존 구현 관례
-4. 이 문서의 범용 구현 휴리스틱
-5. 외부 project convention과 case study
+1. Oracle Source Registry와 레포가 지정한 보안·개인정보·법적·접근성·정합성 제약
+2. 승인된 Oracle의 제품·시각 계약
+3. 대상 레포의 `AGENTS.md`·`CLAUDE.md`, architecture·API·테스트 계약
+4. 대상 레포의 실제 설치 버전과 기존 구현 관례
+5. 이 문서의 범용 구현 휴리스틱
+6. 외부 project convention과 case study
 
 Oracle, 대상 레포 계약과 실제 설치 버전, 구현 휴리스틱이 충돌하면 상위 기준을
 따른다. 적용하지 않은 하위 기준이 이번 변경에 중요하면 Implementation Decision의
