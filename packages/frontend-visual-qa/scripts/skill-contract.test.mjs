@@ -38,6 +38,31 @@ test('requires approved baselines and reproducible browser evidence', async () =
   assert.match(skill, /임의 sleep을 사용하지 않는다/)
 })
 
+test('drives the browser through Playwright or a connected browser MCP only', async () => {
+  const skill = await read('SKILL.md')
+
+  assert.match(skill, /Playwright 또는 이미 연결된 browser MCP/)
+  assert.match(skill, /둘 다 없으면 `NEEDS_DECISION`/)
+  assert.match(skill, /driver\(playwright\|mcp:<name>\)/)
+})
+
+test('keeps Visual QA plugin release metadata versions aligned', async () => {
+  const [packageJson, claudePluginJson, codexPluginJson, marketplaceJson] = await Promise.all([
+    readFile(join(packageDirectory, 'package.json'), 'utf8'),
+    readFile(join(packageDirectory, '.claude-plugin/plugin.json'), 'utf8'),
+    readFile(join(packageDirectory, '.codex-plugin/plugin.json'), 'utf8'),
+    readFile(join(repositoryDirectory, '.claude-plugin/marketplace.json'), 'utf8'),
+  ])
+  const version = JSON.parse(packageJson).version
+  const marketplaceVersion = JSON.parse(marketplaceJson).plugins.find(
+    ({ name }) => name === 'frontend-visual-qa',
+  )?.version
+
+  assert.equal(JSON.parse(claudePluginJson).version, version)
+  assert.equal(JSON.parse(codexPluginJson).version, version)
+  assert.equal(marketplaceVersion, version)
+})
+
 test('returns append-only artifacts compatible with Oracle evidence', async () => {
   const skill = await read('SKILL.md')
 

@@ -19,8 +19,9 @@ Oracle 작성, behavior TDD, production 수정은 소유하지 않는다.
 - 새 정책·baseline 선택·허용치 변경이 필요하면 `NEEDS_DECISION`으로 돌아간다.
 - product source와 테스트 assertion을 수정하지 않는다. 제품 결함은 재현 증거와 함께
   `frontend-oracle-design`의 `VALID_RED` 흐름으로 돌려보낸다.
-- repo에 이미 설치된 browser/Playwright/visual regression 도구를 먼저 사용한다.
-  이 스킬만을 위해 dependency나 새 runner를 추가하지 않는다.
+- 브라우저 조작은 **Playwright 또는 이미 연결된 browser MCP** 중 하나로만 수행한다.
+  repo에 이미 설치된 쪽을 먼저 쓰고, 이 스킬만을 위해 dependency나 새 runner를
+  추가하지 않는다. 둘 다 없으면 `NEEDS_DECISION`으로 멈추고 어느 쪽을 쓸지 묻는다.
 - 새 Oracle Delivery 상태를 만들지 않는다. 결과는 보조 artifact이며
   `IMPLEMENTED_GREEN`이나 `REVIEW_VERIFIED`를 대신하지 않는다.
 
@@ -55,6 +56,7 @@ Oracle이 없으면 exploratory observation은 가능하지만 `VERIFIED`를 발
 재현에 영향을 주는 값만 기록한다.
 
 - commit과 dirty state
+- driver: Playwright 또는 browser MCP 이름
 - browser 이름·version, OS, font readiness
 - viewport, device scale
 - light/dark theme와 color scheme
@@ -132,7 +134,7 @@ locator나 fixture 문제가 있으면 최대 2회만 보정한다. assertion �
 모드: screenshot | direct-browser
 Oracle: revision 또는 N/A
 baseline: source·revision 또는 N/A
-환경: browser/version, viewport, theme, motion, locale/TZ, fixture
+환경: driver(playwright|mcp:<name>), browser/version, viewport, theme, motion, locale/TZ, fixture
 행: D1/O1 → PASS|FAIL|N/A + 실제 관찰
 artifact: actual/diff/trace 경로와 digest
 network: 요청 횟수·payload·실패 또는 N/A

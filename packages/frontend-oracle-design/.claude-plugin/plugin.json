@@ -1,6 +1,6 @@
 {
   "name": "frontend-oracle-design",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Risk-aware Oracle-driven frontend contracts, TDD, evidence gates, and review.",
   "author": {
     "name": "lodado",

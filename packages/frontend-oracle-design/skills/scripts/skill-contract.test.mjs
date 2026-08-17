@@ -167,6 +167,25 @@ test('generates reviewer input from raw locked artifacts without a hand-written 
   assert.match(subagentReview, /micro-hook·pure model source/)
 })
 
+test('keeps Oracle plugin release metadata versions aligned', async () => {
+  const packageDirectory = dirname(skillDirectory)
+  const repositoryDirectory = dirname(dirname(packageDirectory))
+  const [packageJson, claudePluginJson, codexPluginJson, marketplaceJson] = await Promise.all([
+    readFile(join(packageDirectory, 'package.json'), 'utf8'),
+    readFile(join(packageDirectory, '.claude-plugin/plugin.json'), 'utf8'),
+    readFile(join(packageDirectory, '.codex-plugin/plugin.json'), 'utf8'),
+    readFile(join(repositoryDirectory, '.claude-plugin/marketplace.json'), 'utf8'),
+  ])
+  const version = JSON.parse(packageJson).version
+  const marketplaceVersion = JSON.parse(marketplaceJson).plugins.find(
+    ({ name }) => name === 'frontend-oracle-design',
+  )?.version
+
+  assert.equal(JSON.parse(claudePluginJson).version, version)
+  assert.equal(JSON.parse(codexPluginJson).version, version)
+  assert.equal(marketplaceVersion, version)
+})
+
 test('starts TDD with MSW and colocates handlers in the nearest owning boundary', async () => {
   const [skill, implementationLoop, fsd] = await Promise.all([
     read('SKILL.md'),
