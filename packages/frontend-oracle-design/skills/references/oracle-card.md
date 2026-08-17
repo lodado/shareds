@@ -299,7 +299,9 @@ node <skill-dir>/scripts/oracle-run.mjs init \
   --risk low|medium|high \
   --required-label behavior \
   --required-label lint \
-  --harness-path vitest.config.ts
+  --harness-path vitest.config.ts \
+  --milestone list:O1,O2 \
+  --milestone detail:O3,O4
 ```
 
 - `--required-label`은 대상 레포에서 실제 적용되는 targeted test, lint, typecheck,
@@ -312,6 +314,9 @@ node <skill-dir>/scripts/oracle-run.mjs init \
 - RED 전에 바꿔야 하는 config·setup·mock 배선은 `--harness-path`로 scan root
   기준의 정확한 상대 파일 경로를 반복 선언한다. glob·디렉터리·root 밖 경로는
   허용하지 않으며, 실제로 존재하고 worktree snapshot에 포함되는 파일만 받는다.
+- 큰 카드는 `--milestone <name>:O1,O2`를 반복해 서로 겹치지 않는 test-owned
+  행을 묶을 수 있다. 행은 Oracle에 존재해야 하며 두 milestone이 같은 행을
+  소유하지 않는다. 작은 카드에는 선언하지 않는다.
 - 상태 파일이 이미 있으면 `init`은 실패한다. 예산과 기준선을 초기화하려고 다시
   실행하지 않는다. 새 revision은 새 `<oracle-id>` 디렉터리를 쓴다.
 

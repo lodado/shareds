@@ -16,6 +16,7 @@ const FLAG_NAMES = [
   'scan-root',
   'required-label',
   'harness-path',
+  'milestone',
   'label',
   'report',
   'env-note',
@@ -77,7 +78,7 @@ class CliError extends Error {
 }
 
 function parseOptions(args) {
-  const options = { command: null, requiredLabels: [], harnessPaths: [] }
+  const options = { command: null, requiredLabels: [], harnessPaths: [], milestones: [] }
 
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index]
@@ -96,6 +97,7 @@ function parseOptions(args) {
 
     if (name === 'required-label') options.requiredLabels.push(value)
     else if (name === 'harness-path') options.harnessPaths.push(value)
+    else if (name === 'milestone') options.milestones.push(value)
     else options[name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = value
     index += 1
   }
@@ -171,6 +173,59 @@ function selectedDigests(snapshot, paths) {
 
 function sameDigests(left, right) {
   return JSON.stringify(left) === JSON.stringify(right)
+}
+
+function contractRowIds(card) {
+  return [...card.matchAll(/^\|\s*([OD]\d+)\s*\|/gm)].map((match) => match[1])
+}
+
+function parseMilestones(values, availableRows) {
+  const names = new Set()
+  const claimedRows = new Set()
+
+  return values.map((value) => {
+    const separator = value.indexOf(':')
+    const name = value.slice(0, separator).trim()
+    const rows = value
+      .slice(separator + 1)
+      .split(',')
+      .map((row) => row.trim())
+      .filter(Boolean)
+
+    if (separator < 1 || !/^[a-z0-9][a-z0-9_-]*$/.test(name) || rows.length === 0 || names.has(name)) {
+      throw new CliError('MILESTONE_INVALID', `${value}: expected unique name:O1,O2`)
+    }
+
+    for (const row of rows) {
+      if (!availableRows.includes(row)) throw new CliError('MILESTONE_INVALID', `${value}: unknown row ${row}`)
+      if (claimedRows.has(row))
+        throw new CliError('MILESTONE_INVALID', `${row}: row belongs to more than one milestone`)
+      claimedRows.add(row)
+    }
+    names.add(name)
+    return { name, rows }
+  })
+}
+
+function requiredMilestoneRuns(milestones, ledger) {
+  return milestones.map((milestone) => {
+    let index = -1
+    for (let candidate = 0; candidate < ledger.length; candidate += 1) {
+      if (ledger[candidate].label === `red:${milestone.name}`) index = candidate
+    }
+    if (index < 0) {
+      throw new CliError(
+        'MILESTONE_RED_MISSING',
+        `${milestone.name}: expected reported run labeled red:${milestone.name}`,
+      )
+    }
+
+    const run = ledger[index]
+    if (run.exitCode === 0 || run.grade !== 'reported' || !run.tests?.some((test) => test.status === 'failed')) {
+      throw new CliError('MILESTONE_RED_INVALID', `${run.runId}: red:${milestone.name} must be a reported failing run`)
+    }
+    return { ...milestone, index, run }
+  })
 }
 
 function countOccurrences(content, token) {
@@ -452,6 +507,7 @@ async function initialize(options) {
     scanRoot: portablePath(directory, scanRoot),
     risk,
     requiredLabels,
+    milestones: [],
     harnessPaths,
     harnessAtValidRed: null,
     harnessBudgetAtValidRed: null,
@@ -464,6 +520,8 @@ async function initialize(options) {
   }
 
   const revision = verifyLock(directory, state)
+  const oracle = await readFile(await lockedOraclePath(directory, state), 'utf8')
+  state.milestones = parseMilestones(options.milestones, contractRowIds(oracle))
   state.snapshot = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
   const untrackedHarness = harnessPaths.filter((path) => !(path in state.snapshot))
   if (untrackedHarness.length > 0) {
@@ -703,34 +761,69 @@ async function transition(options) {
   const run = options.run ? findRun(ledger, options.run) : null
 
   if (options.to === 'VALID_RED') {
-    if (run.exitCode === 0) {
-      throw new CliError('RUN_NOT_RED', `${run.runId} exited 0 — a valid RED needs a failing run`)
-    }
+    const milestones = state.milestones ?? []
 
-    if (!options.evidence || !options.row) {
-      throw new CliError('EVIDENCE_REQUIRED', 'VALID_RED requires --evidence and --row')
+    if (!options.evidence || (milestones.length === 0 && !options.row)) {
+      throw new CliError(
+        'EVIDENCE_REQUIRED',
+        milestones.length > 0 ? 'milestone VALID_RED requires --evidence' : 'VALID_RED requires --evidence and --row',
+      )
     }
 
     const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
     assertNoProductionChange(changedPaths(state.snapshot, current), state.harnessPaths)
     const currentHarness = selectedDigests(current, state.harnessPaths ?? [])
-    if ((state.harnessPaths ?? []).length > 0 && !sameDigests(run.harnessSha256, currentHarness)) {
-      throw new CliError('HARNESS_RED_REQUIRED', 'the selected RED predates the current harness bytes')
-    }
+    const oracle = await lockedOraclePath(directory, state)
 
-    runVerifier([
-      'red',
-      '--oracle',
-      await lockedOraclePath(directory, state),
-      '--map',
-      resolve(options.evidence),
-      '--ledger',
-      ledgerPath(directory),
-      '--run',
-      run.runId,
-      '--row',
-      options.row,
-    ])
+    if (milestones.length > 0) {
+      const milestoneRuns = requiredMilestoneRuns(milestones, ledger)
+      const last = milestoneRuns.reduce((latest, entry) => (entry.index > latest.index ? entry : latest))
+      if (run.runId !== last.run.runId) {
+        throw new CliError('MILESTONE_RUN_INVALID', `--run must cite the last milestone RED: ${last.run.runId}`)
+      }
+
+      for (const milestone of milestoneRuns) {
+        if ((state.harnessPaths ?? []).length > 0 && !sameDigests(milestone.run.harnessSha256, currentHarness)) {
+          throw new CliError('HARNESS_RED_REQUIRED', `${milestone.run.runId} predates the current harness bytes`)
+        }
+        for (const row of milestone.rows) {
+          runVerifier([
+            'red',
+            '--oracle',
+            oracle,
+            '--map',
+            resolve(options.evidence),
+            '--ledger',
+            ledgerPath(directory),
+            '--run',
+            milestone.run.runId,
+            '--row',
+            row,
+          ])
+        }
+      }
+    } else {
+      if (run.exitCode === 0) {
+        throw new CliError('RUN_NOT_RED', `${run.runId} exited 0 — a valid RED needs a failing run`)
+      }
+      if ((state.harnessPaths ?? []).length > 0 && !sameDigests(run.harnessSha256, currentHarness)) {
+        throw new CliError('HARNESS_RED_REQUIRED', 'the selected RED predates the current harness bytes')
+      }
+
+      runVerifier([
+        'red',
+        '--oracle',
+        oracle,
+        '--map',
+        resolve(options.evidence),
+        '--ledger',
+        ledgerPath(directory),
+        '--run',
+        run.runId,
+        '--row',
+        options.row,
+      ])
+    }
 
     state.testFiles = {}
     for (const path of Object.keys(current).filter(isTestPath)) {

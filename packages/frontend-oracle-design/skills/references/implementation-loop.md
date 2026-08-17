@@ -113,6 +113,21 @@ node <skill-dir>/scripts/oracle-run.mjs exec \
    `oracle-verify.mjs red`로 지정 행의 reported test가 실제로 실패했는지 확인한다.
    그 runId와 행으로 전이를 기록하고, 전이가 통과한 뒤에만 production을 수정한다.
 
+카드가 커서 init에 milestone을 선언했다면 각 묶음을 작성하는 즉시
+`red:<name>` label로 reported RED를 실행한다. 모든 묶음이 해당 run에서 실제로
+실패한 후 마지막 milestone run을 `--run`으로 인용해 전역 `VALID_RED`로
+전이한다. 하나라도 없으면 `MILESTONE_RED_MISSING`이며 독립 lock·상태를
+만들지 않는다. milestone은 초기 RED 피드백만 앞당기고 GREEN·review는 기존
+전역 gate를 그대로 쓴다.
+
+```bash
+node <skill-dir>/scripts/oracle-run.mjs exec \
+  --dir .ai/oracles/<oracle-id> \
+  --label red:list \
+  --report .ai/oracles/<oracle-id>/red-list.json \
+  -- <targeted-test-command>
+```
+
 ```bash
 node <skill-dir>/scripts/oracle-verify.mjs red \
   --oracle .ai/oracles/<oracle-id>/oracle.md \

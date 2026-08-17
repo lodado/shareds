@@ -29,6 +29,16 @@ const VISUAL_ORACLE = `# Oracle
 | D1 | P1 | layout | relation | overlap | S1 | RELATIONAL |
 `
 
+const MILESTONE_ORACLE = `# Oracle
+
+## Behavior Contract
+
+| ID | Given | When | Then | Never | 부작용(종류×횟수) | BVA |
+| --- | --- | --- | --- | --- | --- | --- |
+| O1 | list input | load | list shown | blank | GET×1 | state |
+| O2 | detail input | open | detail shown | wrong item | GET×1 | state |
+`
+
 const EVIDENCE = {
   schemaVersion: 1,
   rows: {
@@ -40,6 +50,14 @@ const VISUAL_EVIDENCE = {
   schemaVersion: 1,
   rows: {
     D1: { kind: 'pending', reason: 'visual QA execution is pending', owner: 'frontend-visual-qa' },
+  },
+}
+
+const MILESTONE_EVIDENCE = {
+  schemaVersion: 1,
+  rows: {
+    O1: { kind: 'test', name: 'list > shown' },
+    O2: { kind: 'test', name: 'detail > shown' },
   },
 }
 
@@ -113,6 +131,7 @@ async function workspace(
     oracleContent = ORACLE,
     evidence = EVIDENCE,
     harnessFiles = {},
+    milestones = [],
     initialize = true,
   } = {},
 ) {
@@ -152,6 +171,7 @@ async function workspace(
   const initArgs = ['init', '--dir', oracleDirectory, '--lock', lock, '--risk', risk, '--scan-root', root]
   for (const label of requiredLabels) initArgs.push('--required-label', label)
   for (const path of Object.keys(harnessFiles)) initArgs.push('--harness-path', path)
+  for (const milestone of milestones) initArgs.push('--milestone', milestone)
 
   if (initialize) {
     const initialized = run(initArgs)
@@ -520,6 +540,90 @@ test('O6: 등록한 harness는 RED 전에 바꿀 수 있고 RED 후 변경은 �
   greenRun(oracleDirectory, 'green-4')
   const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-006')
   assert.equal(transitioned.status, 0, transitioned.stderr)
+})
+
+test('O6: milestone은 알려진 행을 중복 없이 한 번씩만 소유한다', async (t) => {
+  const { root, oracleDirectory, lock } = await workspace(t, { initialize: false })
+  const base = [
+    'init',
+    '--dir',
+    oracleDirectory,
+    '--lock',
+    lock,
+    '--risk',
+    'medium',
+    '--scan-root',
+    root,
+    '--required-label',
+    'behavior',
+  ]
+
+  for (const definitions of [['bad'], ['one:O99'], ['one:O1', 'two:O1']]) {
+    const args = [...base]
+    for (const definition of definitions) args.push('--milestone', definition)
+    const initialized = run(args)
+    assert.equal(initialized.status, 1, definitions.join(' '))
+    assert.match(initialized.stderr, /^MILESTONE_INVALID: /)
+  }
+})
+
+test('O6: 모든 milestone의 red:<name> reported RED 후에만 전역 VALID_RED로 간다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, {
+    oracleContent: MILESTONE_ORACLE,
+    evidence: MILESTONE_EVIDENCE,
+    milestones: ['list:O1', 'detail:O2'],
+  })
+  await writeFile(join(root, 'src', 'milestones.test.mjs'), "import 'node:assert'\n")
+  const listReport = join(oracleDirectory, 'red-list.json')
+  const detailReport = join(oracleDirectory, 'red-detail.json')
+  await writeFile(
+    listReport,
+    JSON.stringify({ testResults: [{ assertionResults: [{ fullName: 'list > shown', status: 'failed' }] }] }),
+  )
+  await writeFile(
+    detailReport,
+    JSON.stringify({ testResults: [{ assertionResults: [{ fullName: 'detail > shown', status: 'failed' }] }] }),
+  )
+
+  for (const [label, report] of [
+    ['red:list', listReport],
+    ['red:detail', detailReport],
+  ]) {
+    const executed = run([
+      'exec',
+      '--dir',
+      oracleDirectory,
+      '--label',
+      label,
+      '--report',
+      report,
+      '--',
+      process.execPath,
+      '-e',
+      'process.exit(1)',
+    ])
+    assert.equal(executed.status, 0, executed.stderr)
+
+    const transitioned = run([
+      'transition',
+      '--dir',
+      oracleDirectory,
+      '--to',
+      'VALID_RED',
+      '--run',
+      label === 'red:list' ? 'r-001' : 'r-002',
+      '--evidence',
+      join(oracleDirectory, 'evidence.json'),
+    ])
+    if (label === 'red:list') {
+      assert.equal(transitioned.status, 1)
+      assert.match(transitioned.stderr, /^MILESTONE_RED_MISSING: /)
+    } else {
+      assert.equal(transitioned.status, 0, transitioned.stderr)
+    }
+  }
+
+  assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
 })
 
 test('O6: git 레포에서 gitignore된 파일은 production 변경으로 세지 않는다', async (t) => {
