@@ -100,6 +100,20 @@ test('requires automatic deterministic locking at delivery boundaries', async ()
   assert.match(oracleCard, /LOCK_INVALID/)
 })
 
+test('locks all approved Delivery sources once instead of extending an existing lock', async () => {
+  const [skill, oracleCard, implementationLoop] = await Promise.all([
+    read('SKILL.md'),
+    read('references/oracle-card.md'),
+    read('references/implementation-loop.md'),
+  ])
+
+  assert.match(skill, /Delivery.*lock.*미룬다/s)
+  assert.match(skill, /architecture.*backend.*final lock.*1회/s)
+  assert.match(oracleCard, /Design-only.*Delivery.*새 revision/s)
+  assert.match(implementationLoop, /모든 결과 변경.*final lock을 1회/s)
+  assert.doesNotMatch(`${skill}\n${oracleCard}`, /add-source/)
+})
+
 test('keeps feedback routing and evidence tied to the locked revision', async () => {
   const [skill, implementationLoop] = await Promise.all([read('SKILL.md'), read('references/implementation-loop.md')])
 

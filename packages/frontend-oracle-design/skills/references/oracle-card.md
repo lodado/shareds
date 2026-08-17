@@ -217,6 +217,11 @@ Design Intent가 있으면 `visual-design.md`의 genericity·restraint 비평도
 script로 잠근다. Low fast path처럼 새 정책과 카드가 없는 작업은 이 절차에 들어오지
 않는다. 대상 레포가 agent artifact 위치를 정하지 않았다면 아래 경로를 사용한다.
 
+Design-only로 잠근 revision을 나중에 Delivery로 확장하면서 architecture·backend 등
+새 local source가 필요해지면 기존 lock에 덧붙이지 않는다. source delta를 사용자에게
+보여주고 새 revision 경로에서 카드와 전체 source 집합을 한 번에 잠근다. 처음부터
+Delivery가 요청됐으면 모든 source 승인을 마칠 때까지 lock을 미룬다.
+
 ```text
 <repo>/.ai/oracles/<oracle-id>/oracle.md
 <repo>/.ai/oracles/<oracle-id>/oracle.lock.json

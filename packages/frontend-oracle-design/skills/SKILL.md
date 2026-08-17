@@ -139,30 +139,34 @@ production 코드·기존 테스트 관찰은 조사 자료이지 정책 출처�
 
 사용자가 구현, 테스트 기반 자가검증 또는 subagent 리뷰까지 명시하면:
 
-1. 먼저 Design-only 절차로 잠긴 `ORACLE_READY`를 만든다.
+1. Design-only의 조사·Draft·사용자 확인 절차까지 수행하되, Delivery가 처음부터
+   알려졌으면 architecture·backend source 결정 전에는 lock을 만들지 않고 미룬다.
    Design Intent가 있으면 기록된 Design Change Confirmation 없이는 진행하지 않는다.
 2. React architecture 경계·state ownership·public API가 바뀔 때만
    `architecture-contract.md`로 영향 unit의 기존 문서를 읽고, 생성·수정할 정확한
    본문과 diff를 보여준 뒤 명시적 사용자 확인을 받는다. 기존 승인 architecture를
    그대로 따르는 변경은 source hash만 기록하고 이 gate를 반복하지 않는다.
 3. backend·DB·data-access 변경이면 `backend.md`로 기존 데이터 경계와 persistence
-   정책을 확인하고, 승인된 architecture source에 결정을 반영한 뒤 Oracle source로
-   잠근다. 데이터 경계가 안정되기 전에는 lock을 만들지 않는다.
-4. `oracle-run.mjs init`의 `--required-label`로 실제 repo의 targeted test,
+   정책을 확인하고 승인된 architecture source에 결정을 반영한다. 데이터 경계가
+   안정되기 전에는 lock을 만들지 않는다.
+4. architecture·backend를 포함한 모든 결과 변경 결정과 local source가 확정되면
+   card lint 후 같은 source 집합으로 final lock을 1회 만든다. 기존 Design-only lock에
+   필요한 source가 없으면 덧붙이지 않고 새 revision을 사용자에게 확인받아 잠근다.
+5. `oracle-run.mjs init`의 `--required-label`로 실제 repo의 targeted test,
    lint·typecheck·build 중 적용되는 필수 명령 label을 고정하고 run ledger와 상태
    파일을 만든다.
    각 단계 직전 revision lock을 자동 검증한다. mismatch면 기존 증거를 폐기하고
    `NEEDS_DECISION`, 손상·도구 오류면 `FAIL`로 멈춘다.
-5. 테스트 파일 작성 직전에 `$test` 스킬을 명시적으로 호출하고, 그 계약으로 테스트를
+6. 테스트 파일 작성 직전에 `$test` 스킬을 명시적으로 호출하고, 그 계약으로 테스트를
    먼저 작성·실행한다. reporter의 실패 test name을 카드 행에 매핑한 뒤
    `oracle-verify.mjs red`가 통과한 run만 `VALID_RED`로 전이한다.
    network 경계는 MSW handler로 세운다. 테스트·handler 배치는 승인된 architecture
    source와 대조하고, FSD면 `references/fsd.md` 규칙을 따른다. 편의상 루트
    `e2e/`·`mocks/`로 모으지 않는다.
-6. production 수정 전 `implementation-loop.md`와 `frontend-implementation.md`로 구현
+7. production 수정 전 `implementation-loop.md`와 `frontend-implementation.md`로 구현
    결정을 기록한 뒤 최소 구현→GREEN을 수행한다.
-7. High risk면 sibling `test` skill의 mutation kill·원복·재-GREEN을 먼저 수행한다.
-8. `subagent-review.md`로 독립 카드 리뷰, 유효 finding 개선, 필수 label 전체 재실행과
+8. High risk면 sibling `test` skill의 mutation kill·원복·재-GREEN을 먼저 수행한다.
+9. `subagent-review.md`로 독립 카드 리뷰, 유효 finding 개선, 필수 label 전체 재실행과
    `oracle-verify.mjs review`를 수행한다.
 
 ## 피드백 라우팅

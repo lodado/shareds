@@ -53,6 +53,9 @@ unit은 기존 레포의 feature, package, route module, component group 또는 
 승인 당시의 결정을 추측하지 않는다. 현재 문서와 instruction을 다시 대조하고 필요한
 최소 diff를 재승인받은 뒤 새 revision을 잠근다.
 
+이미 Design-only lock이 있는데 이 문서가 새 source로 추가되면 기존 lock을 확장하지
+않는다. 승인된 source delta를 포함한 새 Oracle revision에서 전체 source를 함께 잠근다.
+
 문서 자체의 SHA-256은 `oracle-lock.mjs` 출력의 source hash가 권위다. 별도 hash 파일이나
 generic AST checker를 만들지 않는다.
 
