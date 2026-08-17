@@ -663,7 +663,7 @@ async function transition(options) {
     assertRequiredRuns(state, ledger, started)
     assertConsecutivePasses(state, ledger, run)
     await assertTestsNotWeakened(state, scanRoot)
-    runVerifier([
+    const evidenceResult = runVerifier([
       'evidence',
       '--oracle',
       await lockedOraclePath(directory, state),
@@ -673,7 +673,11 @@ async function transition(options) {
       ledgerPath(directory),
       '--run',
       run.runId,
+      '--phase',
+      'green',
     ])
+    const visualPending = evidenceResult.split('\n').find((line) => line.startsWith('VISUAL_EVIDENCE_PENDING '))
+    if (visualPending) notices.push(visualPending)
 
     const redEntry = lastEntryFor(state, 'VALID_RED')
     const drift = envDrift(state, redEntry ? findRun(ledger, redEntry.runId) : null, run)
@@ -718,6 +722,8 @@ async function transition(options) {
       ledgerPath(directory),
       '--run',
       run.runId,
+      '--phase',
+      'review',
     ])
 
     const reviewArgs = ['review', '--oracle', oracle, '--file', resolve(options.findings)]

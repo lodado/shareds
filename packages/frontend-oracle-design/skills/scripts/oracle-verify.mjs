@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
+import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
+import { dirname, isAbsolute, relative, resolve } from 'node:path'
 
-const FLAG_NAMES = ['oracle', 'map', 'ledger', 'run', 'row', 'file', 'intersect', 'path']
+const FLAG_NAMES = ['oracle', 'map', 'ledger', 'run', 'row', 'file', 'intersect', 'path', 'phase']
 
 const CLASSIFICATIONS = [
   'POLICY_GAP',
@@ -190,6 +192,15 @@ async function lintCard(options) {
     }
   }
 
+  if (rows.some((row) => cellOf(row, '증거 계층') === 'RELATIONAL')) {
+    const authorization = confirmation.find((line) => /^- Visual QA authorization:/i.test(line.trim()))
+    if (!authorization || !/:\s*(approved|declined)\s*$/i.test(authorization.trim())) {
+      issues.push(
+        'visual-qa-authorization: RELATIONAL rows require `- Visual QA authorization: approved | declined`',
+      )
+    }
+  }
+
   const sourceIds = new Set(
     sectionLines(lines, 'Source Registry')
       .filter((line) => line.trim().startsWith('|'))
@@ -307,14 +318,52 @@ async function lintCard(options) {
 }
 
 function assertEvidenceShape(id, entry) {
-  const required = { test: ['name'], na: ['reason', 'source'], reviewer: ['finding', 'role'] }[entry?.kind]
+  const required = {
+    test: ['name'],
+    na: ['reason', 'source'],
+    reviewer: ['finding', 'role'],
+    visual: ['artifact'],
+    pending: ['reason', 'owner'],
+  }[entry?.kind]
 
   if (!required) {
-    throw new CliError('EVIDENCE_INVALID', `${id}: kind must be test, na or reviewer`)
+    throw new CliError('EVIDENCE_INVALID', `${id}: kind must be test, na, reviewer, visual or pending`)
   }
 
   for (const field of required) {
     if (!entry[field]) throw new CliError('EVIDENCE_INVALID', `${id}: ${entry.kind} evidence requires ${field}`)
+  }
+}
+
+function assertEvidenceOwner(row, entry) {
+  if (!row.id.startsWith('D') || entry.kind === 'na') return
+
+  const tier = cellOf(row, '증거 계층')
+  const valid =
+    (tier === 'HARD' && entry.kind === 'test') ||
+    (tier === 'RELATIONAL' && ['visual', 'pending'].includes(entry.kind)) ||
+    (tier === 'JUDGMENT' && entry.kind === 'reviewer' && entry.role === 'designer')
+
+  if (!valid) {
+    throw new CliError('EVIDENCE_OWNER_INVALID', `${row.id}: ${tier} cannot use ${entry.kind} evidence`)
+  }
+}
+
+async function verifyVisualArtifact(id, entry, mapPath, oracleSha256) {
+  const base = dirname(resolve(mapPath))
+  const artifactPath = resolve(base, entry.artifact)
+  const portable = relative(base, artifactPath)
+
+  if (portable.startsWith('..') || isAbsolute(portable)) {
+    throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: visual artifact must stay inside the Oracle directory`)
+  }
+
+  const artifact = await readJson(artifactPath, 'VISUAL_EVIDENCE_INVALID')
+  if (artifact?.schemaVersion !== 1 || artifact.oracleSha256 !== oracleSha256 || artifact.rows?.[id] !== 'passed') {
+    throw new CliError(
+      'VISUAL_EVIDENCE_INVALID',
+      `${id}: visual artifact must cite this Oracle SHA and a passed row result`,
+    )
   }
 }
 
@@ -384,8 +433,14 @@ async function verifyEvidence(options) {
     throw new CliError('CARD_UNREADABLE', `Cannot read ${options.oracle}: ${error.message}`)
   })
   const map = await readJson(options.map, 'EVIDENCE_INVALID')
-  const rows = parseRows(card).map((row) => row.id)
+  const contracts = parseRows(card)
+  const rows = contracts.map((row) => row.id)
   const mapped = Object.keys(map?.rows ?? {})
+  const phase = options.phase ?? 'review'
+
+  if (!['green', 'review'].includes(phase)) {
+    throw new CliError('USAGE', 'evidence --phase must be green or review', 2)
+  }
 
   const unknown = mapped.filter((id) => !rows.includes(id))
   if (unknown.length > 0) {
@@ -397,7 +452,20 @@ async function verifyEvidence(options) {
     throw new CliError('EVIDENCE_MISSING_ROW', `card rows have no evidence entry: ${missing.join(', ')}`)
   }
 
-  for (const id of rows) assertEvidenceShape(id, map.rows[id])
+  for (const row of contracts) {
+    assertEvidenceShape(row.id, map.rows[row.id])
+    assertEvidenceOwner(row, map.rows[row.id])
+  }
+
+  const pending = contracts.filter((row) => map.rows[row.id].kind === 'pending').map((row) => row.id)
+  if (pending.length > 0 && phase === 'review') {
+    throw new CliError('EVIDENCE_PENDING', `review requires completed visual evidence: ${pending.join(', ')}`)
+  }
+
+  const oracleSha256 = createHash('sha256').update(card).digest('hex')
+  for (const row of contracts.filter((entry) => map.rows[entry.id].kind === 'visual')) {
+    await verifyVisualArtifact(row.id, map.rows[row.id], options.map, oracleSha256)
+  }
 
   const run = await ledgerRun(options)
 
@@ -423,7 +491,8 @@ async function verifyEvidence(options) {
     }
   }
 
-  process.stdout.write(`EVIDENCE_VERIFIED ${rows.length} rows\n`)
+  const notices = pending.length > 0 ? `VISUAL_EVIDENCE_PENDING ${pending.join(', ')}\n` : ''
+  process.stdout.write(`EVIDENCE_VERIFIED ${rows.length} rows\n${notices}`)
 }
 
 function normalizeFindings(document, rows, source) {

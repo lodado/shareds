@@ -7,8 +7,8 @@ Oracle Card와 원시 증거를 검토한다. reviewer는 정책을 정하거나
 다시 쓰지 않는다.
 
 카드가 `identity-shaping` Design Intent를 포함하면 [`visual-design.md`](visual-design.md)를
-전부 다시 읽고 승인된 시각 계약을 디자인 관할에서도 검토한다. 사용자가 별도
-`$frontend-visual-qa`를 명시적으로 실행했다면 그 artifact를 원시 입력으로 추가하되,
+전부 다시 읽고 승인된 시각 계약을 디자인 관할에서도 검토한다. `RELATIONAL`
+행의 `$frontend-visual-qa` artifact는 원시 입력으로 추가하되,
 reviewer가 screenshot이나 직접 브라우저 실행을 대신 소유하지 않는다.
 
 primary agent는 리뷰 직전 bundled `oracle-lock.mjs verify`를 실행한다. mismatch면
@@ -65,7 +65,7 @@ review와 별도로 설치된 `designer` 역할을 명시해 시각 계약을 �
 6. production diff
 7. 추가·변경한 테스트 diff
 8. 테스트·typecheck·build의 실제 출력
-9. 사용자가 `$frontend-visual-qa`를 실행했으면 그 artifact, 아니면 N/A
+9. `RELATIONAL` 행의 `$frontend-visual-qa` artifact 또는 visual pending과 사유
 10. High risk mutation 증거
 11. 미검증 항목
 12. `Oracle 행 ID → test/reviewer/N/A 증거` 전체 매핑
@@ -133,7 +133,7 @@ finding은 전역 보안·권한·데이터 손실 문제일 수 있으므로 �
 - Source Registry의 각 기준이 자신의 관할 안에서만 적용됐고 version이 여전히 같은가?
 - Oracle SHA-256과 source hashes가 마지막 verify 결과와 일치하는가?
 - 보고된 통과가 ledger runId로 뒷받침되며 grade가 `reported`인가?
-- 모든 Oracle 행에 test, reviewer finding 또는 출처 있는 N/A 증거가 매핑됐고
+- 모든 Oracle 행에 tier owner의 증거 또는 출처 있는 N/A가 매핑됐고
   `oracle-verify.mjs evidence`가 통과했는가?
 - 모든 비-N/A 카드 행이 테스트에 대응하는가?
 - 각 행이 `Then`, `Never`, 부작용 종류·횟수를 검증하는가?
@@ -170,7 +170,8 @@ finding은 전역 보안·권한·데이터 손실 문제일 수 있으므로 �
   사용자 답변 위치가 카드에 있는가?
 - `identity-shaping`이면 다른 제품에도 그대로 붙을 generic 선택을 제거하고 boldness를
   signature 한 곳에 집중했는가?
-- 모든 `D*` 행에 test, designer finding 또는 출처 있는 N/A가
+- 모든 `D*` 행에 `HARD` test, `RELATIONAL` visual artifact, `JUDGMENT`
+  designer finding 또는 출처 있는 N/A가
   매핑됐으며 같은 fixture·reference를 공유하는 증거를 독립 증거로 과장하지 않았는가?
 - `$frontend-visual-qa` artifact가 있다면 같은 Oracle revision을 인용하고 사전
   합의한 시각·브라우저 행을 빠짐없이 판정하는가?

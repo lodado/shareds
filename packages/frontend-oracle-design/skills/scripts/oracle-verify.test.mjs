@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -213,6 +214,21 @@ test('O17: D 행의 출처나 증거 계층이 없으면 거부한다', async (t
   assert.match(missingSource.stderr, /D1/)
 })
 
+test('O17: RELATIONAL 행은 카드 승인에 Visual QA 실행 여부를 요구한다', async (t) => {
+  const relational = VALID_CARD.replace('| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1   | HARD', '| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1   | RELATIONAL')
+  const approved = relational.replace(
+    '- Source: user message Q-confirmation',
+    '- Source: user message Q-confirmation\n- Visual QA authorization: approved',
+  )
+
+  const missing = run('card', '--oracle', await cardFile(t, relational))
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /visual-qa-authorization/)
+
+  const authorized = run('card', '--oracle', await cardFile(t, approved))
+  assert.equal(authorized.status, 0, authorized.stderr)
+})
+
 test('O17: 중복 행 ID와 존재하지 않는 Source Registry 참조를 거부한다', async (t) => {
   const duplicate = VALID_CARD.replace('| O2  | P1', '| O1  | P1')
   const unknownSource = await cardFile(
@@ -253,6 +269,17 @@ const EVIDENCE_CARD = `# Card
 | O1  | a     | b     | pending 표시 | 성공 UI     | POST×1            | 상태      |
 | O2  | a     | b     | 오류 표시    | 성공 저장   | 저장×0            | 상태      |
 | O3  | a     | b     | 재시도 가능  | 중복 저장   | POST×1            | 횟수      |
+`
+
+const VISUAL_EVIDENCE_CARD = `# Card
+
+## Visual Contract
+
+| ID | 정책 | 축 | 계약 | Never | 출처 | 증거 계층 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D1 | P1 | layout | relation | overlap | S1 | RELATIONAL |
+| D2 | P2 | identity | signature | generic | S1 | JUDGMENT |
+| D3 | P3 | copy | exact copy | other copy | S1 | HARD |
 `
 
 const REPORTED_RUN = JSON.stringify({
@@ -314,6 +341,103 @@ test('O18: 모든 비-N/A 행이 통과 테스트에 매핑되면 검증을 통�
 
   assert.equal(verified.status, 0, verified.stderr)
   assert.equal(verified.stdout, 'EVIDENCE_VERIFIED 3 rows\n')
+})
+
+test('O18: visual evidence owner를 tier별로 강제하고 pending은 GREEN에서만 허용한다', async (t) => {
+  const base = await directory(t)
+  const oracle = join(base, 'oracle.md')
+  const map = join(base, 'evidence.json')
+  const ledger = join(base, 'runs.jsonl')
+
+  await writeFile(oracle, VISUAL_EVIDENCE_CARD)
+  await writeFile(
+    map,
+    JSON.stringify({
+      schemaVersion: 2,
+      rows: {
+        D1: { kind: 'pending', reason: 'visual QA 실행 미승인', owner: 'frontend-visual-qa' },
+        D2: { kind: 'reviewer', finding: 'd-1', role: 'designer' },
+        D3: { kind: 'test', name: 'visual > exact copy' },
+      },
+    }),
+  )
+  await writeFile(
+    ledger,
+    `${JSON.stringify({
+      runId: 'r-001',
+      exitCode: 0,
+      grade: 'reported',
+      tests: [{ name: 'visual > exact copy', status: 'passed' }],
+    })}\n`,
+  )
+  const args = ['evidence', '--oracle', oracle, '--map', map, '--ledger', ledger, '--run', 'r-001']
+
+  const green = run(...args, '--phase', 'green')
+  assert.equal(green.status, 0, green.stderr)
+  assert.match(green.stdout, /VISUAL_EVIDENCE_PENDING D1/)
+
+  const review = run(...args, '--phase', 'review')
+  assert.equal(review.status, 1)
+  assert.match(review.stderr, /^EVIDENCE_PENDING: /)
+})
+
+test('O18: visual artifact는 같은 Oracle과 행의 PASS를 증명해야 한다', async (t) => {
+  const base = await directory(t)
+  const oracle = join(base, 'oracle.md')
+  const map = join(base, 'evidence.json')
+  const ledger = join(base, 'runs.jsonl')
+  const artifact = join(base, 'visual-evidence.json')
+  const oracleSha256 = createHash('sha256').update(VISUAL_EVIDENCE_CARD).digest('hex')
+
+  await writeFile(oracle, VISUAL_EVIDENCE_CARD)
+  await writeFile(
+    artifact,
+    JSON.stringify({ schemaVersion: 1, oracleSha256, rows: { D1: 'passed' } }),
+  )
+  await writeFile(
+    map,
+    JSON.stringify({
+      schemaVersion: 2,
+      rows: {
+        D1: { kind: 'visual', artifact: 'visual-evidence.json' },
+        D2: { kind: 'reviewer', finding: 'd-1', role: 'designer' },
+        D3: { kind: 'na', reason: 'copy contract is not part of this fixture', source: 'S1' },
+      },
+    }),
+  )
+  await writeFile(ledger, `${JSON.stringify({ runId: 'r-001', exitCode: 0, grade: 'reported', tests: [] })}\n`)
+
+  const verified = run(
+    'evidence',
+    '--oracle',
+    oracle,
+    '--map',
+    map,
+    '--ledger',
+    ledger,
+    '--run',
+    'r-001',
+    '--phase',
+    'review',
+  )
+  assert.equal(verified.status, 0, verified.stderr)
+
+  await writeFile(artifact, JSON.stringify({ schemaVersion: 1, oracleSha256: '0'.repeat(64), rows: { D1: 'passed' } }))
+  const stale = run(
+    'evidence',
+    '--oracle',
+    oracle,
+    '--map',
+    map,
+    '--ledger',
+    ledger,
+    '--run',
+    'r-001',
+    '--phase',
+    'review',
+  )
+  assert.equal(stale.status, 1)
+  assert.match(stale.stderr, /^VISUAL_EVIDENCE_INVALID: /)
 })
 
 test('O19: run 결과에 없거나 통과하지 않은 테스트 이름을 거부한다', async (t) => {

@@ -130,8 +130,9 @@ UI가 단순해도 부작용이 위험하면 High다.
 
 Design Intent가 있으면 `visual-design.md`의 형식을 행동 매트릭스 바로 앞에 둔다.
 Design Intent·`D*` 행·행동 `O*` 행과 아래 확인 근거는 모두 같은 Oracle bytes로
-잠근다. 모든 비-N/A `D*` 행도 `test | reviewer finding` 중 알맞은 증거 또는 출처
-있는 N/A 사유에 매핑한다. 아래 행동 행에는 기존 BVA 규칙을 그대로 적용한다.
+잠근다. 비-N/A `D*` 행은 `HARD → test`, `RELATIONAL → visual | pending`,
+`JUDGMENT → designer reviewer`로 매핑한다. 아래 행동 행에는 기존 BVA 규칙을
+그대로 적용한다.
 `local`·`identity-shaping`이면 Design Change Confirmation의 사용자 답변 위치를 같은
 Design Intent에 기록한다.
 
@@ -141,6 +142,7 @@ Design Intent에 기록한다.
 - Status: draft | approved
 - Source: 사용자 승인 응답의 메시지·issue·문서 위치
 - Delta: new card 또는 이전 revision 대비 의미 변경 요약
+- Visual QA authorization: approved | declined # RELATIONAL 행이 있을 때
 ```
 
 Draft 단계에서는 `Status: draft`로 유지한다. 사용자가 카드 전문과 delta를 확인하고

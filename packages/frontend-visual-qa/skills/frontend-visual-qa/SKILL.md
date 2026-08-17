@@ -11,7 +11,9 @@ Oracle 작성, behavior TDD, production 수정은 소유하지 않는다.
 ## 불변 경계
 
 - 사용자가 screenshot 비교 또는 직접 브라우저 QA를 명시적으로 요청했을 때만
-  실행한다. `frontend-oracle-design`이 필요성을 추측해 자동 실행하지 않는다.
+  실행한다. 승인된 Oracle의 `Visual QA authorization: approved`도 명시적 요청으로 인정한다.
+  둘 다 없으면 `frontend-oracle-design`이 필요성을 추측해
+  자동 실행하지 않는다.
 - 승인된 Oracle Card, Figma, 디자인 시스템, baseline과 사용자의 명시적 답변만
   기대 결과의 출처다. 현재 production 화면은 관찰 자료일 뿐 자동 baseline이 아니다.
 - 새 정책·baseline 선택·허용치 변경이 필요하면 `NEEDS_DECISION`으로 돌아간다.
@@ -38,7 +40,8 @@ Oracle 작성, behavior TDD, production 수정은 소유하지 않는다.
 
 1. 대상 레포의 `AGENTS.md`·`CLAUDE.md`, 실제 실행 script와 기존 browser 관례를 읽는다.
 2. Oracle이 있으면 lock을 검증하고 revision을 기록한다. mismatch면 실행하지 않는다.
-3. 검증할 D/O 행, route, state, viewport와 baseline source를 사용자 요청에서 고정한다.
+3. 검증할 D/O 행, route, state, viewport와 baseline source를 사용자 요청 또는
+   승인된 Oracle authorization에서 고정한다.
 4. baseline 권위나 기대 결과가 미결이면 현재 자료와 한 번에 묶은 질문을 제시하고
    `NEEDS_DECISION`으로 멈춘다.
 5. local/test/staging 환경을 우선한다. production/live는 명시적으로 허용된 read-only
@@ -116,6 +119,7 @@ locator나 fixture 문제가 있으면 최대 2회만 보정한다. assertion �
 ```text
 .ai/oracles/<oracle-id>/visual-qa/<run-id>/
   report.md
+  evidence.json      # Oracle evidence manifest가 인용하는 기계 판독 결과
   actual.png        # Screenshot 모드일 때
   diff.png          # mismatch가 있을 때
   trace/            # Direct browser 도구가 제공할 때
@@ -137,17 +141,28 @@ console: uncaught error·console error 또는 없음
 남은 것: 미검증 항목과 이유
 ```
 
-Oracle evidence에 연결할 때 기존 schema를 재사용한다.
+`evidence.json`은 잠긴 Oracle bytes의 SHA-256과 통과한 행만 기록한다.
 
 ```json
 {
-  "kind": "reviewer",
-  "finding": "visual-qa/<run-id>/report.md#D1",
-  "role": "frontend-visual-qa"
+  "schemaVersion": 1,
+  "oracleSha256": "<64-hex-digest>",
+  "rows": { "D1": "passed" }
 }
 ```
 
-artifact 경로만 쓰지 말고 Oracle revision, 행, 판정과 실제 관찰을 함께 인용한다.
+Oracle의 전체 evidence manifest에서는 이 artifact를 Oracle 디렉터리 상대 경로로
+인용한다.
+
+```json
+{
+  "kind": "visual",
+  "artifact": "visual-qa/<run-id>/evidence.json"
+}
+```
+
+artifact 경로만 쓰지 말고 `report.md`에 Oracle revision, 행, 판정과 실제 관찰을
+함께 남긴다.
 
 ## 금지
 

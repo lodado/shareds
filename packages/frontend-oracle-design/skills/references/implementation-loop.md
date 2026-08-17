@@ -248,7 +248,9 @@ build는 각각 선언한 label로 기록한다. 전이는 모든 필수 label�
   "rows": {
     "O1": { "kind": "test", "name": "저장 > pending 표시와 POST 1회" },
     "O2": { "kind": "reviewer", "finding": "f-3", "role": "code-reviewer" },
-    "O3": { "kind": "na", "reason": "이 기능에 취소 경로가 없다", "source": "S1" }
+    "O3": { "kind": "na", "reason": "이 기능에 취소 경로가 없다", "source": "S1" },
+    "D1": { "kind": "visual", "artifact": "visual-qa/v-001/evidence.json" },
+    "D2": { "kind": "reviewer", "finding": "d-1", "role": "designer" }
   }
 }
 ```
@@ -258,8 +260,13 @@ node <skill-dir>/scripts/oracle-verify.mjs evidence \
   --oracle .ai/oracles/<oracle-id>/oracle.md \
   --map .ai/oracles/<oracle-id>/evidence.json \
   --ledger .ai/oracles/<oracle-id>/runs.jsonl \
-  --run r-007
+  --run r-007 \
+  --phase green
 ```
+
+`D*` 행의 owner는 `HARD → test`, `RELATIONAL → visual | pending`, `JUDGMENT →
+designer reviewer`다. visual `pending`은 GREEN 증거 검증에서 미검증 항목으로 보고되지만
+review 증거 검증에서는 `EVIDENCE_PENDING`으로 완료를 차단한다.
 
 GREEN 전이는 같은 manifest를 필수 입력으로 받는다.
 

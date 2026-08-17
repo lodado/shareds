@@ -20,10 +20,26 @@ const ORACLE = `# Oracle
 | O1 | 입력 | 저장 | pending | 조기 성공 | POST×1 | 상태 |
 `
 
+const VISUAL_ORACLE = `# Oracle
+
+## Visual Contract
+
+| ID | 정책 | 축 | 계약 | Never | 출처 | 증거 계층 |
+| --- | --- | --- | --- | --- | --- | --- |
+| D1 | P1 | layout | relation | overlap | S1 | RELATIONAL |
+`
+
 const EVIDENCE = {
   schemaVersion: 1,
   rows: {
     O1: { kind: 'test', name: 'save > pending' },
+  },
+}
+
+const VISUAL_EVIDENCE = {
+  schemaVersion: 1,
+  rows: {
+    D1: { kind: 'pending', reason: 'visual QA execution is pending', owner: 'frontend-visual-qa' },
   },
 }
 
@@ -88,7 +104,10 @@ async function markerCount(markerPath) {
   }
 }
 
-async function workspace(t, { risk = 'medium', git = false, requiredLabels = ['behavior'] } = {}) {
+async function workspace(
+  t,
+  { risk = 'medium', git = false, requiredLabels = ['behavior'], oracleContent = ORACLE, evidence = EVIDENCE } = {},
+) {
   const root = await mkdtemp(join(tmpdir(), 'oracle-run-'))
   t.after(() => rm(root, { recursive: true, force: true }))
 
@@ -104,8 +123,8 @@ async function workspace(t, { risk = 'medium', git = false, requiredLabels = ['b
 
   const oracle = join(oracleDirectory, 'oracle.md')
   const lock = join(oracleDirectory, 'oracle.lock.json')
-  await writeFile(oracle, ORACLE)
-  await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify(EVIDENCE))
+  await writeFile(oracle, oracleContent)
+  await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify(evidence))
   await writeFile(join(oracleDirectory, 'red-report.json'), JSON.stringify(RED_REPORT))
   await writeFile(join(oracleDirectory, 'green-report.json'), JSON.stringify(GREEN_REPORT))
   await writeFile(
@@ -557,6 +576,29 @@ test('O8: 연속 통과 횟수를 채운 GREEN 전이는 lock을 재검증하고
 
   assert.equal(transitioned.status, 0, transitioned.stderr)
   assert.match(transitioned.stdout, /^STATE_IMPLEMENTED_GREEN run:r-003\n$/)
+  assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+})
+
+test('O18: visual pending은 GREEN에 남기되지만 review 완료를 차단한다', async (t) => {
+  const { oracleDirectory } = await workspace(t, {
+    risk: 'low',
+    oracleContent: VISUAL_ORACLE,
+    evidence: VISUAL_EVIDENCE,
+  })
+  greenRun(oracleDirectory, 'green')
+
+  const green = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-001', [
+    '--reason',
+    'existing implementation already satisfies deterministic rows',
+  ])
+  assert.equal(green.status, 0, green.stderr)
+  assert.match(green.stdout, /VISUAL_EVIDENCE_PENDING D1/)
+  assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+
+  greenRun(oracleDirectory, 'review')
+  const review = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-002')
+  assert.equal(review.status, 1)
+  assert.match(review.stderr, /^EVIDENCE_PENDING: /)
   assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
 })
 

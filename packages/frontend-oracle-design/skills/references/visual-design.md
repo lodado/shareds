@@ -147,7 +147,9 @@ baseline을 새로 만들거나 바꾸려면 변경 전후 차이, 대상 viewpo
 
 screenshot 비교와 사람이 직접 브라우저에 들어가는 실행은 별도
 `$frontend-visual-qa`가 소유한다. 이 스킬이나 `$test`가 암묵적으로 대신 실행하지
-않으며 사용자가 그 검증을 명시적으로 요청했을 때만 이름으로 호출한다.
+않는다. `RELATIONAL` 행이 있으면 카드 승인 시 `Visual QA authorization: approved |
+declined`를 같이 받는다. `approved`는 명시적 요청으로 간주해 이름으로
+호출하고, `declined`는 해당 행을 visual owner의 `pending`으로 남긴다.
 `$frontend-visual-qa`는 다음만 반환한다.
 
 - 인용한 Oracle revision과 승인 baseline
@@ -191,12 +193,13 @@ screenshot 비교와 사람이 직접 브라우저에 들어가는 실행은 별
 
 - `HARD` 행은 가장 좁은 DOM·a11y·component 관찰 계층에서 `Then`·`Never`를 함께
   확인한다.
-- `RELATIONAL` 행의 screenshot 또는 직접 브라우저 증거가 필요하고 사용자가 별도
-  검증을 요청했다면 `$frontend-visual-qa` artifact를 매핑한다.
+- `RELATIONAL` 행은 `$frontend-visual-qa` artifact 또는 같은 owner의 `pending`에
+  매핑한다. `pending`은 `IMPLEMENTED_GREEN`에는 남을 수 있지만
+  `REVIEW_VERIFIED`를 차단한다.
 - `JUDGMENT` 행은 승인 기준과 Design Intent를 독립 `designer`에게 전달한다.
   reviewer는 정책을 새로 만들지 않는다.
-- 모든 `D*` 행을 `test | reviewer finding | frontend-visual-qa artifact | 출처 있는 N/A`에
-  매핑한다.
+- 행의 주 owner는 `HARD → test`, `RELATIONAL → visual`, `JUDGMENT → designer`다.
+  출처 있는 `N/A`는 어느 계층에나 쓸 수 있다.
 - 외부 visual QA 결과를 위해 이 스킬의 상태를 추가하지 않는다.
 
 피드백은 기존 라우터를 그대로 사용한다.

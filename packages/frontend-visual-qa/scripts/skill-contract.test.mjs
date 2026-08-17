@@ -43,10 +43,18 @@ test('returns append-only artifacts compatible with Oracle evidence', async () =
 
   assert.match(skill, /\.ai\/oracles\/<oracle-id>\/visual-qa\/<run-id>/)
   assert.match(skill, /기존 run을 덮어쓰지 않는다/)
-  assert.match(skill, /"kind": "reviewer"/)
-  assert.match(skill, /"role": "frontend-visual-qa"/)
+  assert.match(skill, /evidence\.json/)
+  assert.match(skill, /"kind": "visual"/)
+  assert.match(skill, /oracleSha256/)
   assert.match(skill, /VISUAL_VERIFIED/)
   assert.match(skill, /BROWSER_VERIFIED/)
+})
+
+test('treats an approved Oracle visual authorization as an explicit request', async () => {
+  const skill = await read('SKILL.md')
+
+  assert.match(skill, /Visual QA authorization: approved/)
+  assert.match(skill, /명시적 요청으로 인정/)
 })
 
 test('is referenced as a separate responsibility by Oracle and behavior test skills', async () => {
