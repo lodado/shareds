@@ -2,8 +2,8 @@
 
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { appendFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { appendFile, mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const lockScript = join(dirname(fileURLToPath(import.meta.url)), 'oracle-lock.mjs')
@@ -15,6 +15,7 @@ const FLAG_NAMES = [
   'risk',
   'scan-root',
   'required-label',
+  'harness-path',
   'label',
   'report',
   'env-note',
@@ -76,7 +77,7 @@ class CliError extends Error {
 }
 
 function parseOptions(args) {
-  const options = { command: null, requiredLabels: [] }
+  const options = { command: null, requiredLabels: [], harnessPaths: [] }
 
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index]
@@ -94,6 +95,7 @@ function parseOptions(args) {
     }
 
     if (name === 'required-label') options.requiredLabels.push(value)
+    else if (name === 'harness-path') options.harnessPaths.push(value)
     else options[name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = value
     index += 1
   }
@@ -118,6 +120,57 @@ function isTestPath(path) {
     /\.(test|spec)\.[a-z]+$/.test(name) ||
     name.endsWith('.snap')
   )
+}
+
+async function validateHarnessPaths(root, values) {
+  const rootRealPath = await realpath(root).catch((error) => {
+    throw new CliError('HARNESS_PATH_INVALID', `Cannot read scan root: ${error.message}`)
+  })
+  const paths = []
+
+  for (const value of values) {
+    const path = value.trim()
+    const hasPattern = ['*', '?', '[', ']', '{', '}'].some((token) => path.includes(token))
+    if (!path || isAbsolute(path) || path.includes('\\') || hasPattern) {
+      throw new CliError('HARNESS_PATH_INVALID', `${value}: expected an exact relative file path`)
+    }
+
+    const absolute = resolve(root, path)
+    const portable = portablePath(root, absolute)
+    if (!portable || portable === '..' || portable.startsWith('../')) {
+      throw new CliError('HARNESS_PATH_INVALID', `${value}: path must stay inside the scan root`)
+    }
+
+    let details
+    try {
+      details = await Promise.all([stat(absolute), realpath(absolute)])
+    } catch (error) {
+      throw new CliError('HARNESS_PATH_INVALID', `${value}: ${error.message}`)
+    }
+
+    const [metadata, real] = details
+    const realRelative = relative(rootRealPath, real)
+    if (
+      !metadata.isFile() ||
+      realRelative === '..' ||
+      realRelative.startsWith(`..${sep}`) ||
+      isAbsolute(realRelative)
+    ) {
+      throw new CliError('HARNESS_PATH_INVALID', `${value}: expected a file inside the scan root`)
+    }
+
+    if (!paths.includes(portable)) paths.push(portable)
+  }
+
+  return paths
+}
+
+function selectedDigests(snapshot, paths) {
+  return Object.fromEntries(paths.map((path) => [path, snapshot[path] ?? null]))
+}
+
+function sameDigests(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right)
 }
 
 function countOccurrences(content, token) {
@@ -372,6 +425,8 @@ async function initialize(options) {
     throw new CliError('USAGE', `Unknown risk: ${risk}`, 2)
   }
 
+  const harnessPaths = await validateHarnessPaths(scanRoot, options.harnessPaths)
+
   await mkdir(directory, { recursive: true })
 
   // run-state를 지우고 다시 init해 기준선·예산을 되살리는 우회를 막는다.
@@ -397,6 +452,9 @@ async function initialize(options) {
     scanRoot: portablePath(directory, scanRoot),
     risk,
     requiredLabels,
+    harnessPaths,
+    harnessAtValidRed: null,
+    harnessBudgetAtValidRed: null,
     state: 'ORACLE_READY',
     history: [],
     budgets: Object.fromEntries(Object.entries(BUDGET_LIMITS).map(([name, limit]) => [name, { limit, spent: 0 }])),
@@ -407,6 +465,13 @@ async function initialize(options) {
 
   const revision = verifyLock(directory, state)
   state.snapshot = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+  const untrackedHarness = harnessPaths.filter((path) => !(path in state.snapshot))
+  if (untrackedHarness.length > 0) {
+    throw new CliError(
+      'HARNESS_PATH_INVALID',
+      `harness path is outside the tracked scan snapshot: ${untrackedHarness.join(', ')}`,
+    )
+  }
   // oracle:nondeterminism 상태 이력은 실제 시각을 기록한다
   state.history.push({ state: 'ORACLE_READY', runId: null, reason: null, runCount: 0, at: new Date().toISOString() })
 
@@ -441,6 +506,7 @@ async function execute(options) {
   const report = await readReport(options.report)
   const scanRoot = resolve(directory, state.scanRoot)
   const runId = `r-${String((await readRuns(directory)).length + 1).padStart(3, '0')}`
+  const worktree = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
   const record = {
     type: 'run',
     runId,
@@ -452,7 +518,8 @@ async function execute(options) {
     reportError: report.error,
     env: fingerprint(options),
     lockSha256: revision,
-    worktreeSha256: sha256(JSON.stringify(await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`))),
+    worktreeSha256: sha256(JSON.stringify(worktree)),
+    harnessSha256: selectedDigests(worktree, state.harnessPaths ?? []),
     at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
   }
 
@@ -474,8 +541,8 @@ function lastEntryFor(state, name) {
   return [...state.history].reverse().find((entry) => entry.state === name) ?? null
 }
 
-function assertNoProductionChange(changed) {
-  const production = changed.filter((path) => !isTestPath(path))
+function assertNoProductionChange(changed, harnessPaths = []) {
+  const production = changed.filter((path) => !isTestPath(path) && !harnessPaths.includes(path))
 
   if (production.length > 0) {
     throw new CliError(
@@ -485,8 +552,12 @@ function assertNoProductionChange(changed) {
   }
 }
 
-function assertConsecutivePasses(state, ledger, run) {
-  const started = lastEntryFor(state, 'VALID_RED')?.runCount ?? lastEntryFor(state, 'ORACLE_READY')?.runCount ?? 0
+function assertConsecutivePasses(
+  state,
+  ledger,
+  run,
+  started = lastEntryFor(state, 'VALID_RED')?.runCount ?? lastEntryFor(state, 'ORACLE_READY')?.runCount ?? 0,
+) {
   const command = JSON.stringify(run.command)
   const candidates = ledger.slice(started).filter((entry) => JSON.stringify(entry.command) === command)
 
@@ -503,6 +574,32 @@ function assertConsecutivePasses(state, ledger, run) {
       `${state.risk} risk needs required ${required} consecutive passing runs of the same command, found consecutive ${consecutive}`,
     )
   }
+}
+
+function harnessRedIndex(state, ledger, started, run, current) {
+  if (!state.harnessAtValidRed || sameDigests(state.harnessAtValidRed, current)) return null
+
+  if (state.budgets.harness.spent <= (state.harnessBudgetAtValidRed ?? 0)) {
+    throw new CliError('HARNESS_BUDGET_REQUIRED', 'harness changed after VALID_RED — spend harness budget')
+  }
+
+  let redIndex = -1
+  for (let index = started; index < ledger.length; index += 1) {
+    const entry = ledger[index]
+    const isReportedRed =
+      entry.exitCode !== 0 && entry.grade === 'reported' && entry.tests?.some((test) => test.status === 'failed')
+    if (isReportedRed && sameDigests(entry.harnessSha256, current)) redIndex = index
+  }
+
+  const greenIndex = ledger.findIndex((entry) => entry.runId === run.runId)
+  if (redIndex < 0 || greenIndex <= redIndex) {
+    throw new CliError(
+      'HARNESS_RED_REQUIRED',
+      'harness changed after VALID_RED — record a reported RED with the current harness, then rerun GREEN',
+    )
+  }
+
+  return redIndex
 }
 
 function assertRequiredRuns(state, ledger, started) {
@@ -615,7 +712,11 @@ async function transition(options) {
     }
 
     const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
-    assertNoProductionChange(changedPaths(state.snapshot, current))
+    assertNoProductionChange(changedPaths(state.snapshot, current), state.harnessPaths)
+    const currentHarness = selectedDigests(current, state.harnessPaths ?? [])
+    if ((state.harnessPaths ?? []).length > 0 && !sameDigests(run.harnessSha256, currentHarness)) {
+      throw new CliError('HARNESS_RED_REQUIRED', 'the selected RED predates the current harness bytes')
+    }
 
     runVerifier([
       'red',
@@ -635,6 +736,8 @@ async function transition(options) {
     for (const path of Object.keys(current).filter(isTestPath)) {
       state.testFiles[path] = measureTestFile(await readFile(join(scanRoot, path), 'utf8'))
     }
+    state.harnessAtValidRed = currentHarness
+    state.harnessBudgetAtValidRed = state.budgets.harness.spent
   }
 
   if (options.to === 'IMPLEMENTED_GREEN') {
@@ -650,18 +753,30 @@ async function transition(options) {
       throw new CliError('EVIDENCE_UNVERIFIABLE', `${run.runId} must have a parsed reporter for GREEN`)
     }
 
+    let current = null
+    if (state.state === 'ORACLE_READY' || (state.harnessPaths ?? []).length > 0) {
+      current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+    }
+
     if (state.state === 'ORACLE_READY') {
       if (!options.reason) {
         throw new CliError('MISSING_REASON', 'skipping VALID_RED requires --reason with the existing-GREEN evidence')
       }
 
-      const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
-      assertNoProductionChange(changedPaths(state.snapshot, current))
+      assertNoProductionChange(changedPaths(state.snapshot, current), state.harnessPaths)
     }
 
-    const started = lastEntryFor(state, 'VALID_RED')?.runCount ?? lastEntryFor(state, 'ORACLE_READY')?.runCount ?? 0
+    let started = lastEntryFor(state, 'VALID_RED')?.runCount ?? lastEntryFor(state, 'ORACLE_READY')?.runCount ?? 0
+    if (state.state === 'VALID_RED' && (state.harnessPaths ?? []).length > 0) {
+      const currentHarness = selectedDigests(current, state.harnessPaths)
+      if (Object.values(currentHarness).some((digest) => digest === null)) {
+        throw new CliError('HARNESS_PATH_INVALID', 'a registered harness file no longer exists')
+      }
+      const redIndex = harnessRedIndex(state, ledger, started, run, currentHarness)
+      if (redIndex !== null) started = redIndex + 1
+    }
     assertRequiredRuns(state, ledger, started)
-    assertConsecutivePasses(state, ledger, run)
+    assertConsecutivePasses(state, ledger, run, started)
     await assertTestsNotWeakened(state, scanRoot)
     const evidenceResult = runVerifier([
       'evidence',

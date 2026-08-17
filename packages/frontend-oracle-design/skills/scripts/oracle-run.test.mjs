@@ -106,7 +106,15 @@ async function markerCount(markerPath) {
 
 async function workspace(
   t,
-  { risk = 'medium', git = false, requiredLabels = ['behavior'], oracleContent = ORACLE, evidence = EVIDENCE } = {},
+  {
+    risk = 'medium',
+    git = false,
+    requiredLabels = ['behavior'],
+    oracleContent = ORACLE,
+    evidence = EVIDENCE,
+    harnessFiles = {},
+    initialize = true,
+  } = {},
 ) {
   const root = await mkdtemp(join(tmpdir(), 'oracle-run-'))
   t.after(() => rm(root, { recursive: true, force: true }))
@@ -131,6 +139,10 @@ async function workspace(
     join(oracleDirectory, 'findings.json'),
     JSON.stringify({ schemaVersion: 1, reviewer: 'code-reviewer', findings: [] }),
   )
+  for (const [path, content] of Object.entries(harnessFiles)) {
+    await mkdir(dirname(join(root, path)), { recursive: true })
+    await writeFile(join(root, path), content)
+  }
 
   const locked = spawnSync(process.execPath, [lockScript, 'create', '--oracle', oracle, '--lock', lock], {
     encoding: 'utf8',
@@ -139,9 +151,12 @@ async function workspace(
 
   const initArgs = ['init', '--dir', oracleDirectory, '--lock', lock, '--risk', risk, '--scan-root', root]
   for (const label of requiredLabels) initArgs.push('--required-label', label)
+  for (const path of Object.keys(harnessFiles)) initArgs.push('--harness-path', path)
 
-  const initialized = run(initArgs)
-  assert.equal(initialized.status, 0, initialized.stderr)
+  if (initialize) {
+    const initialized = run(initArgs)
+    assert.equal(initialized.status, 0, initialized.stderr)
+  }
 
   return { root, oracleDirectory, oracle, lock, marker: join(root, 'marker.txt') }
 }
@@ -448,6 +463,63 @@ test('O6: RED 전에 production 파일이 바뀌면 PRODUCTION_TOUCHED_BEFORE_RE
   assert.match(transitioned.stderr, /src\/save\.mjs/)
   assert.doesNotMatch(transitioned.stderr, /src\/save\.test\.mjs/)
   assert.equal((await state(oracleDirectory)).state, 'ORACLE_READY')
+})
+
+test('O6: harness-path는 scan root 안의 존재하는 정확한 파일만 받는다', async (t) => {
+  const { root, oracleDirectory, lock } = await workspace(t, { initialize: false })
+  await mkdir(join(root, 'config'), { recursive: true })
+  const base = [
+    'init',
+    '--dir',
+    oracleDirectory,
+    '--lock',
+    lock,
+    '--risk',
+    'medium',
+    '--scan-root',
+    root,
+    '--required-label',
+    'behavior',
+  ]
+
+  for (const path of ['vitest*.ts', 'config', '../outside.ts', 'missing.ts']) {
+    const initialized = run([...base, '--harness-path', path])
+    assert.equal(initialized.status, 1, path)
+    assert.match(initialized.stderr, /^HARNESS_PATH_INVALID: /, path)
+  }
+})
+
+test('O6: 등록한 harness는 RED 전에 바꿀 수 있고 RED 후 변경은 예산과 새 RED를 요구한다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, {
+    harnessFiles: { 'vitest.config.mjs': 'export default { setup: 1 }\n' },
+  })
+  const harness = join(root, 'vitest.config.mjs')
+  await writeFile(harness, 'export default { setup: 2 }\n')
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
+  redRun(oracleDirectory)
+  assert.equal(transition(oracleDirectory, 'VALID_RED', 'r-001').status, 0)
+
+  await writeFile(harness, 'export default { setup: 3 }\n')
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+
+  const withoutBudget = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(withoutBudget.status, 1)
+  assert.match(withoutBudget.stderr, /^HARNESS_BUDGET_REQUIRED: /)
+
+  assert.equal(
+    run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'test setup changed']).status,
+    0,
+  )
+  const withoutRed = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(withoutRed.status, 1)
+  assert.match(withoutRed.stderr, /^HARNESS_RED_REQUIRED: /)
+
+  redRun(oracleDirectory)
+  greenRun(oracleDirectory, 'green-3')
+  greenRun(oracleDirectory, 'green-4')
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-006')
+  assert.equal(transitioned.status, 0, transitioned.stderr)
 })
 
 test('O6: git 레포에서 gitignore된 파일은 production 변경으로 세지 않는다', async (t) => {

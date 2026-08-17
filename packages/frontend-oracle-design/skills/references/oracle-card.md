@@ -298,7 +298,8 @@ node <skill-dir>/scripts/oracle-run.mjs init \
   --lock .ai/oracles/<oracle-id>/oracle.lock.json \
   --risk low|medium|high \
   --required-label behavior \
-  --required-label lint
+  --required-label lint \
+  --harness-path vitest.config.ts
 ```
 
 - `--required-label`은 대상 레포에서 실제 적용되는 targeted test, lint, typecheck,
@@ -308,6 +309,9 @@ node <skill-dir>/scripts/oracle-run.mjs init \
   이 기준선이 이후 TDD 순서 판정의 근거다.
 - `--scan-root`는 기본값이 현재 작업 디렉터리다. monorepo에서 판정 범위를 좁힐 때만
   명시한다.
+- RED 전에 바꿔야 하는 config·setup·mock 배선은 `--harness-path`로 scan root
+  기준의 정확한 상대 파일 경로를 반복 선언한다. glob·디렉터리·root 밖 경로는
+  허용하지 않으며, 실제로 존재하고 worktree snapshot에 포함되는 파일만 받는다.
 - 상태 파일이 이미 있으면 `init`은 실패한다. 예산과 기준선을 초기화하려고 다시
   실행하지 않는다. 새 revision은 새 `<oracle-id>` 디렉터리를 쓴다.
 

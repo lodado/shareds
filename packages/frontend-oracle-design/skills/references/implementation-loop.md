@@ -137,6 +137,12 @@ production을 먼저 건드렸다는 기계 증거다. 변경 파일을 되돌�
 우회하지 않는다. 전이는 이 시점의 테스트 파일 digest와 assertion 수를 GREEN
 게이트의 기준선으로 저장한다.
 
+`--harness-path`로 등록한 파일은 해당 bytes로 reported RED를 기록하기 전까지
+바꿀 수 있다. `VALID_RED` 후 그 파일을 다시 바꾸면 harness 예산을 쓰지
+않은 경우 `HARNESS_BUDGET_REQUIRED`, 변경된 bytes로 새 reported RED→GREEN을 실행하지
+않은 경우 `HARNESS_RED_REQUIRED`로 완료를 차단한다. 대상이 아닌 production 파일을
+harness로 등록해 순서 게이트를 우회하지 않는다.
+
 요청된 동작이 이미 GREEN이면 production을 억지로 바꾸거나 RED를 만들지 않는다.
 기존 구현이 카드를 충족한다는 증거를 기록하고 `--to IMPLEMENTED_GREEN --reason ...`으로
 전이한다. 이 경로는 `ORACLE_READY` 이후 production 변경이 없을 때만 통과한다.
