@@ -17,6 +17,9 @@ const CLASSIFICATIONS = [
 
 const SEVERITIES = ['critical', 'high', 'medium', 'low']
 
+const CHANGEABILITY_AXES = ['Readability', 'Predictability', 'Cohesion', 'Coupling', 'Simplicity']
+const CHANGEABILITY_STATUSES = ['PASS', 'FINDING', 'N/A']
+
 const EVIDENCE_TIERS = ['HARD', 'RELATIONAL', 'JUDGMENT']
 
 const VAGUE_WORDS = [
@@ -195,9 +198,7 @@ async function lintCard(options) {
   if (rows.some((row) => cellOf(row, '증거 계층') === 'RELATIONAL')) {
     const authorization = confirmation.find((line) => /^- Visual QA authorization:/i.test(line.trim()))
     if (!authorization || !/:\s*(approved|declined)\s*$/i.test(authorization.trim())) {
-      issues.push(
-        'visual-qa-authorization: RELATIONAL rows require `- Visual QA authorization: approved | declined`',
-      )
+      issues.push('visual-qa-authorization: RELATIONAL rows require `- Visual QA authorization: approved | declined`')
     }
   }
 
@@ -501,6 +502,47 @@ function normalizeFindings(document, rows, source) {
   if (!Array.isArray(findings)) {
     throw new CliError('FINDINGS_INVALID', `${source}: findings must be an array`)
   }
+  if (document.schemaVersion !== 1 && document.schemaVersion !== 2) {
+    throw new CliError('FINDINGS_INVALID', `${source}: schemaVersion must be 1 or 2`)
+  }
+
+  if (document.schemaVersion === 2) {
+    const review = document.changeabilityReview
+    if (!Array.isArray(review)) {
+      throw new CliError('FINDINGS_INVALID', `${source}: schemaVersion 2 requires changeabilityReview`)
+    }
+
+    const seen = new Set()
+    for (const entry of review) {
+      if (!CHANGEABILITY_AXES.includes(entry?.axis)) {
+        throw new CliError('FINDINGS_INVALID', `${source}: unknown changeability axis ${entry?.axis ?? '?'}`)
+      }
+      if (seen.has(entry.axis)) {
+        throw new CliError('FINDINGS_INVALID', `${source}: duplicate changeability axis ${entry.axis}`)
+      }
+      seen.add(entry.axis)
+
+      if (!CHANGEABILITY_STATUSES.includes(entry.status)) {
+        throw new CliError('FINDINGS_INVALID', `${source}: ${entry.axis} has invalid status ${entry.status ?? '?'}`)
+      }
+      if (typeof entry.evidence !== 'string' || !entry.evidence.trim()) {
+        throw new CliError('FINDINGS_INVALID', `${source}: ${entry.axis} requires evidence`)
+      }
+
+      if (entry.status === 'FINDING') {
+        if (!entry.findingId || !findings.some((finding) => finding?.id === entry.findingId)) {
+          throw new CliError('FINDINGS_INVALID', `${source}: ${entry.axis} must cite an existing findingId`)
+        }
+      } else if (entry.findingId) {
+        throw new CliError('FINDINGS_INVALID', `${source}: ${entry.axis} ${entry.status} cannot cite a findingId`)
+      }
+    }
+
+    const missing = CHANGEABILITY_AXES.filter((axis) => !seen.has(axis))
+    if (missing.length > 0) {
+      throw new CliError('FINDINGS_INVALID', `${source}: missing changeability axes ${missing.join(', ')}`)
+    }
+  }
 
   return findings.map((finding) => {
     for (const field of ['id', 'classification', 'severity', 'finding', 'evidence', 'fix']) {
@@ -642,7 +684,9 @@ async function scanNondeterminism(options) {
   if (hits.length > 0) {
     throw new CliError(
       'NONDETERMINISM_FOUND',
-      `nondeterministic sources need an injection seam or an \`${EXEMPTION_MARKER} <reason>\` comment:\n  ${hits.join('\n  ')}`,
+      `nondeterministic sources need an injection seam or an \`${EXEMPTION_MARKER} <reason>\` comment:\n  ${hits.join(
+        '\n  ',
+      )}`,
     )
   }
 

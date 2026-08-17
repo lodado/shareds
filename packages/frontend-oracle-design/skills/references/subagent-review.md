@@ -6,6 +6,11 @@
 Oracle Card와 원시 증거를 검토한다. reviewer는 정책을 정하거나 처음부터 구현을
 다시 쓰지 않는다.
 
+변경 용이성을 판정하기 전에 [`changeability.md`](changeability.md)를 전부 읽는다.
+구현자와 같은 정의·질문·React 예시·반례·trade-off를 사용하되, 이 reference를 제품
+정책이나 새로운 architecture 권위로 승격하지 않는다. raw Implementation Decision의
+주장과 실제 diff가 일치하는지를 독립적으로 반증한다.
+
 카드가 `identity-shaping` Design Intent를 포함하면 [`visual-design.md`](visual-design.md)를
 전부 다시 읽고 승인된 시각 계약을 디자인 관할에서도 검토한다. `RELATIONAL`
 행의 `$frontend-visual-qa` artifact는 원시 입력으로 추가하되,
@@ -59,13 +64,16 @@ review와 별도로 설치된 `designer` 역할을 명시해 시각 계약을 �
 ```bash
 node <skill-dir>/scripts/oracle-run.mjs review-packet \
   --dir .ai/oracles/<oracle-id> \
+  --decision .ai/oracles/<oracle-id>/implementation-decision.md \
   --output .ai/oracles/<oracle-id>/review-input.json
 ```
 
 패킷은 마지막 lock verify command·exit, lock manifest, Oracle 전문, 잠긴 local source
 전문, run state, ledger, evidence mapping, init 이후 변경 파일 digest, git diff, visual
-pending을 원시 필드로 담는다. 결론·의도한 해결책·유리한 요약을 추가하지
-않는다. 패킷을 손으로 고치지 말고 입력이 바뀌면 다시 생성한다. URL·Figma처럼
+pending과 Implementation Decision의 path·sha256·content를 원시 필드로 담는다.
+reviewer는 `implementation-decision.md`의 주장과 실제 diff를 대조한다. 결론·의도한
+해결책·유리한 요약을 추가하지 않는다. 패킷을 손으로 고치지 말고 입력이 바뀌면 다시
+생성한다. URL·Figma처럼
 lock에 내용을 담을 수 없는 외부 기준만 Oracle Registry에 적힌 정확한
 revision으로 별도 전달한다.
 
@@ -81,8 +89,20 @@ finding은 자유 서술 대신 아래 스키마 파일로 제출해 기계로 �
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewer": "code-reviewer",
+  "changeabilityReview": [
+    { "axis": "Readability", "status": "PASS", "evidence": "src/form.tsx:10-30" },
+    {
+      "axis": "Predictability",
+      "status": "FINDING",
+      "evidence": "src/fetch-balance.ts:8",
+      "findingId": "f-1"
+    },
+    { "axis": "Cohesion", "status": "N/A", "evidence": "변경된 소유 경계가 없다" },
+    { "axis": "Coupling", "status": "PASS", "evidence": "새 public API가 없다" },
+    { "axis": "Simplicity", "status": "PASS", "evidence": "기존 platform API를 재사용한다" }
+  ],
   "findings": [
     {
       "id": "f-1",
@@ -90,13 +110,18 @@ finding은 자유 서술 대신 아래 스키마 파일로 제출해 기계로 �
       "classification": "PRODUCT_DEFECT",
       "severity": "high",
       "source": "S1",
-      "finding": "5xx 응답에서 입력이 초기화된다",
-      "evidence": "r-007 저장 > 5xx 후 입력 유지",
-      "fix": "실패 경로에서 form reset을 제거한다"
+      "finding": "fetchBalance가 이름과 반환값에 드러나지 않는 analytics logging을 수행한다",
+      "evidence": "review-input.json diff:src/fetch-balance.ts:8",
+      "fix": "analytics logging을 이름 붙은 event boundary로 이동한다"
     }
   ]
 }
 ```
+
+`changeabilityReview`는 다섯 축을 정확히 한 번씩 `PASS | FINDING | N/A`로 판정한다.
+모든 판정은 path·line 또는 packet field evidence가 필요하다. `FINDING`은 아래
+`findings`의 실제 ID를 인용하고, `N/A`는 적용되지 않는 이유를 evidence에 쓴다.
+schema v1은 과거 artifact 검증에만 허용하고 새 review는 v2를 사용한다.
 
 ```bash
 node <skill-dir>/scripts/oracle-verify.mjs findings \
@@ -127,7 +152,18 @@ finding은 전역 보안·권한·데이터 손실 문제일 수 있으므로 �
 출처 있는 미적 요구의 불일치는 단순 선호가 아니다. 구현이 다르면
 `PRODUCT_DEFECT`, 카드가 누락·왜곡했으면 `POLICY_GAP`으로 분류한다.
 
+숨은 부작용, 실제 drift 결함 위험, 승인된 architecture·public API 경계 위반은 구체
+evidence와 카드 행이 있을 때 `PRODUCT_DEFECT`다. 필요한 검증이 없으면
+`EVIDENCE_GAP`, 관찰 결과나 API shape를 새로 정해야 하면 `POLICY_GAP`이다. 더 선호하는
+이름·폴더·추상화 방식은 `NON_ORACLE_OPINION`이며 blocking 근거가 아니다.
+
 ## Reviewer 체크리스트
+
+변경 용이성은 [`changeability.md`](changeability.md)의 canonical 기준으로
+Readability·Predictability·Cohesion·Coupling·Simplicity를 먼저 판정한다. 각 축의
+`Implementation Decision evidence`와 `Reviewer 판정 기준`을 실제 path·line 또는 packet
+field에 대조한다. 다섯 축을 모두 PASS로 채우는 것이 목적이 아니며, 적용되지 않는 축은
+구체 N/A 이유를 쓴다.
 
 - 승인된 기획서·Figma의 레이아웃, 상태, 문구, interaction과 구현이 일치하는가?
 - 외부 기준의 각 요구가 Oracle Card에 정확히 번역됐으며 누락·왜곡되지 않았는가?
@@ -190,8 +226,9 @@ finding은 전역 보안·권한·데이터 손실 문제일 수 있으므로 �
 6. 가능하면 같은 reviewer에 원시 재검증 증거를 전달해 finding 해소 여부만 확인한다.
 
 reviewer와 fixer를 분리한다. reviewer가 직접 수정하고 자신의 수정을 최종 승인하게
-하지 않는다. `NON_ORACLE_OPINION`과 advisory finding은 기록하되 수정이나 정책 변경의
-근거로 쓰지 않는다. 재검증도 `oracle-run.mjs exec`로 실행하고 그 runId로
+하지 않는다. reviewer는 각 finding에 한 위험과 최소 수정만 제안하고 품질 명목의
+전면 리팩터링을 요구하지 않는다. `NON_ORACLE_OPINION`과 advisory finding은 기록하되
+수정이나 정책 변경의 근거로 쓰지 않는다. 재검증도 `oracle-run.mjs exec`로 실행하고 그 runId로
 `--to REVIEW_VERIFIED` 전이를 기록한다. blocking finding이 없거나 모두 해소되고 필수
 재검증이 통과해야 `REVIEW_VERIFIED`다. init에서 선언한 모든 필수 label을 GREEN
 이후 다시 실행하고, 같은 카드 test command의 reported run과 clear findings를

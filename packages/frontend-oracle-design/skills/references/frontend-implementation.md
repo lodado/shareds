@@ -31,6 +31,17 @@ React production 변경이면 [`architecture-contract.md`](architecture-contract
 명시적 문서 승인과 Oracle source lock 없이 테스트나 production을 작성하지 않는다.
 FSD는 기존 구조가 FSD이거나 greenfield 제안이 승인된 때만 사용한다.
 
+## 변경 용이성 reference
+
+React production 변경이면 [`changeability.md`](changeability.md)를 전부 읽고, 이번
+변경에 material한 품질 축과 trade-off만 Implementation Decision에 기록한다. 이
+reference는 기술적으로 동등한 구현을 고르는 휴리스틱이며 제품 정책이 아니다. 승인된
+Oracle, 대상 레포 계약과 실제 설치 버전이 항상 우선한다.
+
+상태 소유권, Server/Client, async, Hook과 effect의 구체 구현은 아래 절을 적용한다.
+변경 비용을 비교하거나 숨은 부작용·공통화·public surface·새 abstraction을 판단할
+때는 같은 정의를 복제하지 말고 `changeability.md`를 기준으로 삼는다.
+
 ## 1. 상태 소유권부터 정한다
 
 | 종류                                        | 기본 소유자                                            | 금지할 중복                                |
@@ -205,3 +216,4 @@ reviewer가 별도로 판정한다.
 | TanStack Query Suspense/reset/SSR | [Suspense](https://tanstack.com/query/latest/docs/framework/react/guides/suspense), [QueryErrorResetBoundary](https://tanstack.com/query/latest/docs/framework/react/reference/QueryErrorResetBoundary), [Advanced SSR](https://tanstack.com/query/latest/docs/framework/react/guides/advanced-ssr)                            |
 | Vercel performance heuristics     | [React Best Practices](https://vercel.com/blog/introducing-react-best-practices), [Dashboard frontend optimization](https://vercel.com/blog/how-we-made-the-vercel-dashboard-twice-as-fast)                                                                                                                                    |
 | Community cross-check             | [TkDodo: Practical React Query](https://tkdodo.eu/blog/practical-react-query), [Kent C. Dodds: State Colocation](https://kentcdodds.com/blog/state-colocation-will-make-your-react-app-faster)                                                                                                                                 |
+| Changeability 구현·review         | [`changeability.md`](changeability.md)의 canonical 정의·React 예시·trade-off·Decision evidence·review 기준. 외부 근거와 고정 revision도 그 reference가 소유한다.                                                                                                                                                               |

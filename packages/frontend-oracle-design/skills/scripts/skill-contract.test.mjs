@@ -177,13 +177,14 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
     readFile(join(repositoryDirectory, '.claude-plugin/marketplace.json'), 'utf8'),
   ])
   const version = JSON.parse(packageJson).version
-  const marketplaceVersion = JSON.parse(marketplaceJson).plugins.find(
-    ({ name }) => name === 'frontend-oracle-design',
-  )?.version
+  const marketplace = JSON.parse(marketplaceJson)
+  const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
+  assert.equal(version, '0.4.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
+  assert.equal(marketplace.version, '0.4.0')
 })
 
 test('starts TDD with MSW and colocates handlers in the nearest owning boundary', async () => {
@@ -348,4 +349,76 @@ test('requires independent design review for judgment while visual QA owns basel
   assert.match(visualDesign, /`JUDGMENT`.*`designer`/s)
   assert.match(subagentReview, /`JUDGMENT` 행.*승인 기준.*Design Intent/s)
   assert.match(subagentReview, /\$frontend-visual-qa.*artifact/s)
+})
+
+test('O1-O7: loads one detailed changeability reference before implementation decisions', async () => {
+  const [skill, changeability, frontendImplementation, implementationLoop] = await Promise.all([
+    read('SKILL.md'),
+    read('references/changeability.md'),
+    read('references/frontend-implementation.md'),
+    read('references/implementation-loop.md'),
+  ])
+
+  for (const term of ['Readability', 'Predictability', 'Cohesion', 'Coupling', 'Simplicity']) {
+    assert.match(changeability, new RegExp(`## ${term}`))
+  }
+
+  assert.match(changeability, /제품 정책.*아니다/)
+  assert.match(changeability, /Oracle.*대상 레포.*실제 설치 버전.*구현 휴리스틱/s)
+  assert.match(changeability, /구현 전 질문/)
+  assert.match(changeability, /React 구현 기준/)
+  assert.match(changeability, /위험 신호/)
+  assert.match(changeability, /적용하지 않는 경우/)
+  assert.match(changeability, /Implementation Decision evidence/)
+  assert.match(changeability, /Reviewer 판정 기준/)
+  assert.match(changeability, /숨은 부작용/)
+  assert.match(changeability, /반복.*이유만으로.*공통화/s)
+  assert.match(changeability, /기존 레포.*기본 기능.*설치.*dependency.*최소/s)
+  assert.match(changeability, /축 사이 trade-off/)
+  assert.match(changeability, /161d3d6a0d6d372eacd75036de567511643f6265/)
+  assert.match(changeability, /85d19c3816afca9a84ffbd5b7ff581962cb5db4c/)
+  assert.match(changeability, /5dc4477f838b8cee2b6b09af4f373be2b3aaaa54/)
+  assert.match(changeability, /hook.*반환.*대상 레포.*관례/is)
+  assert.doesNotMatch(changeability, /^## React 구현 교차 점검$/m)
+  assert.doesNotMatch(changeability, /^## Implementation Decision 형식$/m)
+  assert.doesNotMatch(changeability, /^## Reviewer 판정과 최소 수정$/m)
+  assert.match(changeability, /frontend-implementation\.md/)
+  assert.match(changeability, /implementation-loop\.md/)
+  assert.match(changeability, /subagent-review\.md/)
+
+  assert.match(skill, /references\/changeability\.md/)
+  assert.match(frontendImplementation, /changeability\.md/)
+  assert.doesNotMatch(frontendImplementation, /## 변경 용이성 렌즈/)
+  assert.match(implementationLoop, /changeability\.md/)
+
+  assert.match(implementationLoop, /\.ai\/oracles\/<oracle-id>\/implementation-decision\.md/)
+  assert.match(implementationLoop, /Changeability/)
+  assert.match(implementationLoop, /Side effects/)
+  assert.match(implementationLoop, /Simplicity/)
+  assert.match(implementationLoop, /material.*trade-off/s)
+  assert.match(implementationLoop, /boilerplate/)
+})
+
+test('O8-O10: reviews with the same changeability reference without turning taste into a blocker', async () => {
+  const [changeability, subagentReview] = await Promise.all([
+    read('references/changeability.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  for (const term of ['Readability', 'Predictability', 'Cohesion', 'Coupling', 'Simplicity']) {
+    assert.match(changeability, new RegExp(`## ${term}`))
+  }
+
+  assert.match(subagentReview, /changeability\.md/)
+  assert.match(subagentReview, /implementation-decision\.md/)
+  assert.match(subagentReview, /review-packet[\s\S]*--decision/)
+  assert.match(subagentReview, /changeabilityReview/)
+  assert.match(subagentReview, /PASS\s*\|\s*FINDING\s*\|\s*N\/A/)
+  assert.match(subagentReview, /숨은 부작용/)
+  assert.match(subagentReview, /PRODUCT_DEFECT/)
+  assert.match(subagentReview, /EVIDENCE_GAP/)
+  assert.match(subagentReview, /POLICY_GAP/)
+  assert.match(subagentReview, /NON_ORACLE_OPINION/)
+  assert.match(subagentReview, /전면 리팩터링/)
+  assert.match(subagentReview, /최소 수정/)
 })

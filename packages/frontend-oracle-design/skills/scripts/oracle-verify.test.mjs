@@ -200,8 +200,14 @@ test('O17: 자동 추가 TC가 빠지면 어떤 종류가 없는지 보고한다
 })
 
 test('O17: D 행의 출처나 증거 계층이 없으면 거부한다', async (t) => {
-  const withoutTier = await cardFile(t, withRow('D1', '| D1 | P4 | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1 |  |'))
-  const withoutSource = await cardFile(t, withRow('D1', '| D1 | P4 | copy | 버튼 문구는 "저장"이다 | 다른 문구 |  | HARD |'))
+  const withoutTier = await cardFile(
+    t,
+    withRow('D1', '| D1 | P4 | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1 |  |'),
+  )
+  const withoutSource = await cardFile(
+    t,
+    withRow('D1', '| D1 | P4 | copy | 버튼 문구는 "저장"이다 | 다른 문구 |  | HARD |'),
+  )
 
   const missingTier = run('card', '--oracle', withoutTier)
   assert.equal(missingTier.status, 1)
@@ -215,7 +221,10 @@ test('O17: D 행의 출처나 증거 계층이 없으면 거부한다', async (t
 })
 
 test('O17: RELATIONAL 행은 카드 승인에 Visual QA 실행 여부를 요구한다', async (t) => {
-  const relational = VALID_CARD.replace('| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1   | HARD', '| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1   | RELATIONAL')
+  const relational = VALID_CARD.replace(
+    '| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1   | HARD',
+    '| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1   | RELATIONAL',
+  )
   const approved = relational.replace(
     '- Source: user message Q-confirmation',
     '- Source: user message Q-confirmation\n- Visual QA authorization: approved',
@@ -390,10 +399,7 @@ test('O18: visual artifact는 같은 Oracle과 행의 PASS를 증명해야 한�
   const oracleSha256 = createHash('sha256').update(VISUAL_EVIDENCE_CARD).digest('hex')
 
   await writeFile(oracle, VISUAL_EVIDENCE_CARD)
-  await writeFile(
-    artifact,
-    JSON.stringify({ schemaVersion: 1, oracleSha256, rows: { D1: 'passed' } }),
-  )
+  await writeFile(artifact, JSON.stringify({ schemaVersion: 1, oracleSha256, rows: { D1: 'passed' } }))
   await writeFile(
     map,
     JSON.stringify({
@@ -516,8 +522,12 @@ test('O21: 카드에 없는 행 인용과 비-N/A 행 누락을 각각 거부한
 })
 
 async function findingsFile(t, findings, name = 'findings.json') {
+  return findingsDocument(t, { schemaVersion: 1, reviewer: 'code-reviewer', findings }, name)
+}
+
+async function findingsDocument(t, document, name = 'findings.json') {
   const path = join(await directory(t), name)
-  await writeFile(path, JSON.stringify({ schemaVersion: 1, reviewer: 'code-reviewer', findings }))
+  await writeFile(path, JSON.stringify(document))
   return path
 }
 
@@ -679,6 +689,60 @@ test('O23: review 명령은 blocking finding이 있으면 실패하고 해소되
   const accepted = run('review', '--file', clear, '--oracle', oracle)
   assert.equal(accepted.status, 0, accepted.stderr)
   assert.equal(accepted.stdout, 'REVIEW_CLEAR advisory:0\n')
+})
+
+test('O8-O10: changeability review v2의 축·상태·근거·finding 연결을 검증하고 v1은 유지한다', async (t) => {
+  const oracle = await cardFile(t, EVIDENCE_CARD)
+  const findings = [
+    {
+      id: 'f-1',
+      row: 'O2',
+      classification: 'PRODUCT_DEFECT',
+      severity: 'high',
+      finding: '숨은 logging 부작용이 있다',
+      evidence: 'src/fetch-balance.ts:8',
+      fix: 'event boundary로 logging을 이동한다',
+    },
+  ]
+  const review = [
+    { axis: 'Readability', status: 'PASS', evidence: 'src/form.tsx:10-30' },
+    { axis: 'Predictability', status: 'FINDING', evidence: 'src/fetch-balance.ts:8', findingId: 'f-1' },
+    { axis: 'Cohesion', status: 'N/A', evidence: '변경된 소유 경계가 없다' },
+    { axis: 'Coupling', status: 'PASS', evidence: '새 public API가 없다' },
+    { axis: 'Simplicity', status: 'PASS', evidence: '기존 platform API를 재사용한다' },
+  ]
+
+  const valid = await findingsDocument(
+    t,
+    { schemaVersion: 2, reviewer: 'code-reviewer', changeabilityReview: review, findings },
+    'changeability-valid.json',
+  )
+  const checked = run('findings', '--file', valid, '--oracle', oracle)
+  assert.equal(checked.status, 0, checked.stderr)
+
+  const invalidDocuments = [
+    ['missing-axis', review.slice(0, -1)],
+    ['duplicate-axis', [...review.slice(0, -1), review[0]]],
+    ['unknown-status', review.map((entry, index) => (index === 0 ? { ...entry, status: 'SKIP' } : entry))],
+    ['empty-evidence', review.map((entry, index) => (index === 0 ? { ...entry, evidence: '' } : entry))],
+    ['unknown-finding', review.map((entry) => (entry.status === 'FINDING' ? { ...entry, findingId: 'f-404' } : entry))],
+    ['pass-with-finding', review.map((entry, index) => (index === 0 ? { ...entry, findingId: 'f-1' } : entry))],
+  ]
+
+  for (const [name, changeabilityReview] of invalidDocuments) {
+    const path = await findingsDocument(
+      t,
+      { schemaVersion: 2, reviewer: 'code-reviewer', changeabilityReview, findings },
+      `${name}.json`,
+    )
+    const rejected = run('findings', '--file', path, '--oracle', oracle)
+    assert.equal(rejected.status, 1, name)
+    assert.match(rejected.stderr, /^FINDINGS_INVALID: /, name)
+  }
+
+  const legacy = await findingsFile(t, [], 'legacy-v1.json')
+  const legacyChecked = run('findings', '--file', legacy, '--oracle', oracle)
+  assert.equal(legacyChecked.status, 0, legacyChecked.stderr)
 })
 
 test('O24: 비결정 API를 파일·줄과 함께 보고한다', async (t) => {

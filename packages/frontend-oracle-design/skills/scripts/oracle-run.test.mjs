@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -831,6 +831,79 @@ test('O20: review-packet은 lock·source·state·ledger·evidence·diff만 결�
   const outside = run(['review-packet', '--dir', oracleDirectory, '--output', join(root, 'src', 'save.mjs')])
   assert.equal(outside.status, 1)
   assert.match(outside.stderr, /^REVIEW_PACKET_OUTPUT_INVALID: /)
+})
+
+test('O7-O8: review-packet은 검증된 implementation decision 원문과 digest를 포함한다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  const decision = join(oracleDirectory, 'implementation-decision.md')
+  const content = '# Implementation Decision\n\n- Changeability: Predictability\n'
+  await writeFile(decision, content)
+
+  const output = join(oracleDirectory, 'review-input-v2.json')
+  const generated = run(['review-packet', '--dir', oracleDirectory, '--decision', decision, '--output', output])
+
+  assert.equal(generated.status, 0, generated.stderr)
+  const packet = JSON.parse(await readFile(output, 'utf8'))
+  assert.equal(packet.schemaVersion, 2)
+  assert.deepEqual(packet.implementationDecision, {
+    path: 'implementation-decision.md',
+    sha256: createHash('sha256').update(content).digest('hex'),
+    content,
+  })
+
+  const outside = join(root, 'src', 'decision.md')
+  await writeFile(outside, content)
+  const escaped = run([
+    'review-packet',
+    '--dir',
+    oracleDirectory,
+    '--decision',
+    outside,
+    '--output',
+    join(oracleDirectory, 'escaped.json'),
+  ])
+  assert.equal(escaped.status, 1)
+  assert.match(escaped.stderr, /^IMPLEMENTATION_DECISION_INVALID: /)
+
+  const empty = join(oracleDirectory, 'empty-decision.md')
+  await writeFile(empty, ' \n')
+  const emptyResult = run([
+    'review-packet',
+    '--dir',
+    oracleDirectory,
+    '--decision',
+    empty,
+    '--output',
+    join(oracleDirectory, 'empty.json'),
+  ])
+  assert.equal(emptyResult.status, 1)
+  assert.match(emptyResult.stderr, /^IMPLEMENTATION_DECISION_INVALID: /)
+
+  const linked = join(oracleDirectory, 'linked-decision.md')
+  await symlink(decision, linked)
+  const linkedResult = run([
+    'review-packet',
+    '--dir',
+    oracleDirectory,
+    '--decision',
+    linked,
+    '--output',
+    join(oracleDirectory, 'linked.json'),
+  ])
+  assert.equal(linkedResult.status, 1)
+  assert.match(linkedResult.stderr, /^IMPLEMENTATION_DECISION_INVALID: /)
+
+  const directoryResult = run([
+    'review-packet',
+    '--dir',
+    oracleDirectory,
+    '--decision',
+    oracleDirectory,
+    '--output',
+    join(oracleDirectory, 'directory.json'),
+  ])
+  assert.equal(directoryResult.status, 1)
+  assert.match(directoryResult.stderr, /^IMPLEMENTATION_DECISION_INVALID: /)
 })
 
 test('O8: evidence manifest나 init에서 선언한 필수 label이 없으면 GREEN을 거부한다', async (t) => {

@@ -30,6 +30,7 @@ const FLAG_NAMES = [
   'reason',
   'spend',
   'output',
+  'decision',
 ]
 
 const REQUIRED_CONSECUTIVE_PASSES = { low: 1, medium: 2, high: 3 }
@@ -491,7 +492,10 @@ async function initialize(options) {
   if ((await readLedger(directory)).length > 0) {
     throw new CliError(
       'RUN_ARTIFACTS_EXIST',
-      `${portablePath(process.cwd(), ledgerPath(directory))} already records runs for this oracle — start a new <oracle-id> directory for a new revision`,
+      `${portablePath(
+        process.cwd(),
+        ledgerPath(directory),
+      )} already records runs for this oracle — start a new <oracle-id> directory for a new revision`,
     )
   }
 
@@ -1065,6 +1069,53 @@ async function reviewPacket(options) {
     throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', '--output cannot be a symbolic link')
   }
 
+  let decisionPath
+  let implementationDecision
+  if (options.decision) {
+    decisionPath = resolve(options.decision)
+    const decisionRelative = relative(directory, decisionPath)
+    if (
+      !decisionRelative ||
+      decisionRelative === '..' ||
+      decisionRelative.startsWith(`..${sep}`) ||
+      isAbsolute(decisionRelative)
+    ) {
+      throw new CliError('IMPLEMENTATION_DECISION_INVALID', '--decision must be a file inside the Oracle directory')
+    }
+
+    let metadata
+    let decisionReal
+    try {
+      ;[metadata, decisionReal] = await Promise.all([lstat(decisionPath), realpath(decisionPath)])
+    } catch (error) {
+      throw new CliError('IMPLEMENTATION_DECISION_INVALID', `Cannot read decision: ${error.message}`)
+    }
+
+    const decisionRealRelative = relative(directoryReal, decisionReal)
+    if (
+      !metadata.isFile() ||
+      metadata.isSymbolicLink() ||
+      decisionRealRelative === '..' ||
+      decisionRealRelative.startsWith(`..${sep}`) ||
+      isAbsolute(decisionRealRelative)
+    ) {
+      throw new CliError(
+        'IMPLEMENTATION_DECISION_INVALID',
+        '--decision must be a regular file inside the Oracle directory',
+      )
+    }
+
+    const content = await readFile(decisionPath, 'utf8')
+    if (!content.trim()) {
+      throw new CliError('IMPLEMENTATION_DECISION_INVALID', '--decision cannot be empty')
+    }
+    implementationDecision = {
+      path: portablePath(directory, decisionPath),
+      sha256: sha256(content),
+      content,
+    }
+  }
+
   const state = await readState(directory)
   const revision = verifyLock(directory, state)
   const lock = resolve(directory, state.lock)
@@ -1088,6 +1139,7 @@ async function reviewPacket(options) {
     ledgerPath(directory),
     oraclePath,
     evidencePath,
+    ...(decisionPath ? [decisionPath] : []),
     ...manifest.sources.map((source) => resolve(lockDirectory, source.path)),
   ])
   if (protectedPaths.has(output)) {
@@ -1114,7 +1166,7 @@ async function reviewPacket(options) {
     .sort((left, right) => left.row.localeCompare(right.row))
 
   const packet = {
-    schemaVersion: 1,
+    schemaVersion: implementationDecision ? 2 : 1,
     lockVerification: {
       command: [process.execPath, lockScript, 'verify', '--lock', lock],
       exitCode: 0,
@@ -1129,6 +1181,7 @@ async function reviewPacket(options) {
     state,
     ledger: await readLedger(directory),
     evidence,
+    ...(implementationDecision ? { implementationDecision } : {}),
     changedFiles,
     diff: gitDiff(scanRoot, changed, state.snapshot, current),
     pending,
