@@ -132,6 +132,8 @@ async function workspace(
     evidence = EVIDENCE,
     harnessFiles = {},
     milestones = [],
+    initialFiles = {},
+    sourceFiles = {},
     initialize = true,
   } = {},
 ) {
@@ -158,12 +160,14 @@ async function workspace(
     join(oracleDirectory, 'findings.json'),
     JSON.stringify({ schemaVersion: 1, reviewer: 'code-reviewer', findings: [] }),
   )
-  for (const [path, content] of Object.entries(harnessFiles)) {
+  for (const [path, content] of Object.entries({ ...initialFiles, ...sourceFiles, ...harnessFiles })) {
     await mkdir(dirname(join(root, path)), { recursive: true })
     await writeFile(join(root, path), content)
   }
 
-  const locked = spawnSync(process.execPath, [lockScript, 'create', '--oracle', oracle, '--lock', lock], {
+  const lockArgs = ['create', '--oracle', oracle, '--lock', lock]
+  for (const path of Object.keys(sourceFiles)) lockArgs.push('--source', join(root, path))
+  const locked = spawnSync(process.execPath, [lockScript, ...lockArgs], {
     encoding: 'utf8',
   })
   assert.equal(locked.status, 0, locked.stderr)
@@ -776,6 +780,57 @@ test('O18: visual pending은 GREEN에 남기되지만 review 완료를 차단한
   assert.equal(review.status, 1)
   assert.match(review.stderr, /^EVIDENCE_PENDING: /)
   assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+})
+
+test('O20: review-packet은 lock·source·state·ledger·evidence·diff만 결정론적으로 쓴다', async (t) => {
+  const created = await workspace(t, {
+    git: true,
+    initialFiles: { 'src/save.mjs': 'export const save = 1\n' },
+    sourceFiles: { 'src/__docs__/architecture.md': '# Architecture\n\nApproved boundary.\n' },
+  })
+  if (!created) return t.skip('git 미설치로 review diff를 검증할 수 없다')
+  const { root, oracleDirectory } = created
+  const added = spawnSync('git', ['-C', root, 'add', '.'], { encoding: 'utf8' })
+  assert.equal(added.status, 0, added.stderr)
+  const committed = spawnSync(
+    'git',
+    ['-C', root, '-c', 'user.name=Oracle Test', '-c', 'user.email=oracle@example.test', 'commit', '-qm', 'baseline'],
+    { encoding: 'utf8' },
+  )
+  assert.equal(committed.status, 0, committed.stderr)
+
+  await reachValidRed(oracleDirectory, root)
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 2\n')
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+
+  const first = join(oracleDirectory, 'review-input-a.json')
+  const second = join(oracleDirectory, 'review-input-b.json')
+  for (const output of [first, second]) {
+    const generated = run(['review-packet', '--dir', oracleDirectory, '--output', output])
+    assert.equal(generated.status, 0, generated.stderr)
+    assert.match(generated.stdout, /^REVIEW_PACKET_WRITTEN /)
+  }
+
+  const firstBytes = await readFile(first, 'utf8')
+  assert.equal(firstBytes, await readFile(second, 'utf8'))
+  const packet = JSON.parse(firstBytes)
+  assert.equal(packet.schemaVersion, 1)
+  assert.equal(packet.lockVerification.exitCode, 0)
+  assert.equal(packet.state.state, 'IMPLEMENTED_GREEN')
+  assert.equal(packet.ledger.length, 3)
+  assert.deepEqual(packet.evidence, EVIDENCE)
+  assert.equal(packet.lockedSources[0].content, '# Architecture\n\nApproved boundary.\n')
+  assert.ok(packet.changedFiles.some((entry) => entry.path === 'src/save.mjs'))
+  assert.match(packet.diff, /save\.mjs/)
+  assert.deepEqual(packet.pending, [])
+  assert.equal('summary' in packet, false)
+  assert.equal('conclusion' in packet, false)
+
+  const outside = run(['review-packet', '--dir', oracleDirectory, '--output', join(root, 'src', 'save.mjs')])
+  assert.equal(outside.status, 1)
+  assert.match(outside.stderr, /^REVIEW_PACKET_OUTPUT_INVALID: /)
 })
 
 test('O8: evidence manifest나 init에서 선언한 필수 label이 없으면 GREEN을 거부한다', async (t) => {

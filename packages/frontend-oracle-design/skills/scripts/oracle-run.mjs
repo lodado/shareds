@@ -2,7 +2,8 @@
 
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { appendFile, mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
+import { appendFile, lstat, mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
+import { devNull } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -28,6 +29,7 @@ const FLAG_NAMES = [
   'intersect',
   'reason',
   'spend',
+  'output',
 ]
 
 const REQUIRED_CONSECUTIVE_PASSES = { low: 1, medium: 2, high: 3 }
@@ -991,6 +993,151 @@ async function spendBudget(options) {
   process.stdout.write(`BUDGET_SPENT ${options.spend} ${budget.spent}/${budget.limit}\n`)
 }
 
+function gitDiff(root, changed, before, current) {
+  if (changed.length === 0) return ''
+
+  const gitOptions = { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 }
+  const listed = spawnSync('git', ['-C', root, 'ls-files', '-z'], gitOptions)
+  if (listed.status !== 0) return `GIT_DIFF_UNAVAILABLE: ${listed.stderr.trim() || 'not a git worktree'}`
+
+  const tracked = new Set(listed.stdout.split('\0').filter(Boolean))
+  const head = spawnSync('git', ['-C', root, 'diff', '--no-ext-diff', '--binary', 'HEAD', '--', ...changed], gitOptions)
+  const parts = []
+
+  if (head.status === 0) {
+    if (head.stdout.trim()) parts.push(head.stdout.trimEnd())
+  } else {
+    for (const args of [
+      ['diff', '--no-ext-diff', '--binary', '--', ...changed],
+      ['diff', '--cached', '--no-ext-diff', '--binary', '--', ...changed],
+    ]) {
+      const fallback = spawnSync('git', ['-C', root, ...args], gitOptions)
+      if (fallback.status === 0 && fallback.stdout.trim()) parts.push(fallback.stdout.trimEnd())
+    }
+  }
+
+  for (const path of changed.filter((entry) => !tracked.has(entry))) {
+    if (before[path] === undefined && current[path] !== undefined) {
+      const addition = spawnSync('git', ['-C', root, 'diff', '--no-index', '--binary', '--', devNull, path], gitOptions)
+      if ([0, 1].includes(addition.status) && addition.stdout.trim()) parts.push(addition.stdout.trimEnd())
+    } else {
+      parts.push(`GIT_DIFF_UNAVAILABLE_FOR_UNTRACKED_BASELINE: ${path}`)
+    }
+  }
+
+  return parts.join('\n')
+}
+
+async function reviewPacket(options) {
+  if (!options.dir || !options.output) {
+    throw new CliError('USAGE', 'review-packet requires --dir and --output', 2)
+  }
+
+  const directory = resolve(options.dir)
+  const output = resolve(options.output)
+  const outputRelative = relative(directory, output)
+  if (
+    !outputRelative ||
+    outputRelative === '..' ||
+    outputRelative.startsWith(`..${sep}`) ||
+    isAbsolute(outputRelative)
+  ) {
+    throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', '--output must be a file inside the Oracle directory')
+  }
+  const [directoryReal, outputParentReal] = await Promise.all([realpath(directory), realpath(dirname(output))]).catch(
+    (error) => {
+      throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', `Cannot resolve output directory: ${error.message}`)
+    },
+  )
+  const outputParentRelative = relative(directoryReal, outputParentReal)
+  if (
+    outputParentRelative === '..' ||
+    outputParentRelative.startsWith(`..${sep}`) ||
+    isAbsolute(outputParentRelative)
+  ) {
+    throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', '--output parent must stay inside the Oracle directory')
+  }
+  const outputMetadata = await lstat(output).catch((error) => {
+    if (error.code === 'ENOENT') return null
+    throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', `Cannot inspect output: ${error.message}`)
+  })
+  if (outputMetadata?.isSymbolicLink()) {
+    throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', '--output cannot be a symbolic link')
+  }
+
+  const state = await readState(directory)
+  const revision = verifyLock(directory, state)
+  const lock = resolve(directory, state.lock)
+  const lockDirectory = dirname(lock)
+  const manifest = JSON.parse(await readFile(lock, 'utf8'))
+  const oraclePath = resolve(lockDirectory, manifest.oracle.path)
+  const evidenceEntry = [...state.history].reverse().find((entry) => entry.evidence)
+  const evidencePath = evidenceEntry?.evidence
+    ? resolve(directory, evidenceEntry.evidence)
+    : join(directory, 'evidence.json')
+  let evidence
+  try {
+    evidence = JSON.parse(await readFile(evidencePath, 'utf8'))
+  } catch (error) {
+    throw new CliError('EVIDENCE_INVALID', `Cannot read review evidence: ${error.message}`)
+  }
+
+  const protectedPaths = new Set([
+    lock,
+    statePath(directory),
+    ledgerPath(directory),
+    oraclePath,
+    evidencePath,
+    ...manifest.sources.map((source) => resolve(lockDirectory, source.path)),
+  ])
+  if (protectedPaths.has(output)) {
+    throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', '--output cannot overwrite a review input artifact')
+  }
+
+  const scanRoot = resolve(directory, state.scanRoot)
+  const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+  const changed = changedPaths(state.snapshot, current)
+  const changedFiles = changed.map((path) => ({
+    path,
+    beforeSha256: state.snapshot[path] ?? null,
+    afterSha256: current[path] ?? null,
+  }))
+  const lockedSources = await Promise.all(
+    manifest.sources.map(async (source) => ({
+      ...source,
+      content: await readFile(resolve(lockDirectory, source.path), 'utf8'),
+    })),
+  )
+  const pending = Object.entries(evidence.rows ?? {})
+    .filter(([, entry]) => entry.kind === 'pending')
+    .map(([row, entry]) => ({ row, ...entry }))
+    .sort((left, right) => left.row.localeCompare(right.row))
+
+  const packet = {
+    schemaVersion: 1,
+    lockVerification: {
+      command: [process.execPath, lockScript, 'verify', '--lock', lock],
+      exitCode: 0,
+      stdout: `ORACLE_VERIFIED sha256:${revision}`,
+    },
+    lock: manifest,
+    oracle: {
+      ...manifest.oracle,
+      content: await readFile(oraclePath, 'utf8'),
+    },
+    lockedSources,
+    state,
+    ledger: await readLedger(directory),
+    evidence,
+    changedFiles,
+    diff: gitDiff(scanRoot, changed, state.snapshot, current),
+    pending,
+  }
+
+  await writeFile(output, `${JSON.stringify(packet, null, 2)}\n`)
+  process.stdout.write(`REVIEW_PACKET_WRITTEN ${portablePath(directory, output)}\n`)
+}
+
 async function main() {
   const [command, ...args] = process.argv.slice(2)
   const options = parseOptions(args)
@@ -999,7 +1146,8 @@ async function main() {
   else if (command === 'exec') await execute(options)
   else if (command === 'transition') await transition(options)
   else if (command === 'budget') await spendBudget(options)
-  else throw new CliError('USAGE', 'Expected init, exec, transition or budget', 2)
+  else if (command === 'review-packet') await reviewPacket(options)
+  else throw new CliError('USAGE', 'Expected init, exec, transition, budget or review-packet', 2)
 }
 
 try {

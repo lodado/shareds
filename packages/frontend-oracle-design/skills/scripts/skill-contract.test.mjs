@@ -156,6 +156,17 @@ test('carries the locked revision through tests and review without owning visual
   await assert.rejects(read('references/browser-verification.md'), { code: 'ENOENT' })
 })
 
+test('generates reviewer input from raw locked artifacts without a hand-written conclusion', async () => {
+  const [skill, subagentReview] = await Promise.all([read('SKILL.md'), read('references/subagent-review.md')])
+
+  assert.match(skill, /oracle-run\.mjs review-packet/)
+  assert.match(subagentReview, /oracle-run\.mjs review-packet/)
+  assert.match(subagentReview, /review-input\.json/)
+  assert.match(subagentReview, /lock manifest.*run state.*ledger.*evidence mapping.*git diff/s)
+  assert.match(subagentReview, /손으로 고치지 말고/)
+  assert.match(subagentReview, /micro-hook·pure model source/)
+})
+
 test('starts TDD with MSW and colocates handlers in the nearest owning boundary', async () => {
   const [skill, implementationLoop, fsd] = await Promise.all([
     read('SKILL.md'),

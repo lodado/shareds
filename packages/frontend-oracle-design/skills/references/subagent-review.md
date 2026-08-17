@@ -54,24 +54,25 @@ review와 별도로 설치된 `designer` 역할을 명시해 시각 계약을 �
 
 ## Reviewer 입력
 
-의도한 해결책이나 선행 결론 대신 다음 원시 자료를 전달한다.
+리뷰 직전 다음 명령으로 기계 생성한 입력을 고정한다.
 
-1. 승인된 기획서·PRD·수용 기준·Figma 링크와 정확한 frame/version 등 외부 기준
-2. Oracle Card 전문과 Risk
-3. Oracle SHA-256·source hashes·마지막 verify command와 exit code, 인용한 ledger
-   runId와 그 run의 label·exit code·grade
-4. `implementation-loop.md`의 Implementation Decision 기록
-5. architecture unit별 승인 문서 전문·Oracle source hash·사용자 승인 위치와 레포 구조 검증 출력 또는 N/A 사유
-6. production diff
-7. 추가·변경한 테스트 diff
-8. 테스트·typecheck·build의 실제 출력
-9. `RELATIONAL` 행의 `$frontend-visual-qa` artifact 또는 visual pending과 사유
-10. High risk mutation 증거
-11. 미검증 항목
-12. `Oracle 행 ID → test/reviewer/N/A 증거` 전체 매핑
-13. Design Intent가 있으면 승인된 reference·anti-reference와 `D*` 행
-14. `JUDGMENT` 행이면 승인 기준과 Design Intent, designer finding
-15. 변경한 Page/UI component와 micro-hook·pure model source, 그 사이 import와 호출 관계
+```bash
+node <skill-dir>/scripts/oracle-run.mjs review-packet \
+  --dir .ai/oracles/<oracle-id> \
+  --output .ai/oracles/<oracle-id>/review-input.json
+```
+
+패킷은 마지막 lock verify command·exit, lock manifest, Oracle 전문, 잠긴 local source
+전문, run state, ledger, evidence mapping, init 이후 변경 파일 digest, git diff, visual
+pending을 원시 필드로 담는다. 결론·의도한 해결책·유리한 요약을 추가하지
+않는다. 패킷을 손으로 고치지 말고 입력이 바뀌면 다시 생성한다. URL·Figma처럼
+lock에 내용을 담을 수 없는 외부 기준만 Oracle Registry에 적힌 정확한
+revision으로 별도 전달한다.
+
+reviewer는 패킷의 diff에서 변경한 Page/UI component와 micro-hook·pure model source,
+그 사이 import·호출 관계를 직접 대조한다.
+`JUDGMENT` 행은 패킷의 승인 기준·Design Intent와 designer finding을 함께
+대조한다.
 
 reviewer는 코드를 수정하지 않고 finding만 반환한다. 정책과 baseline을 수정하거나
 승인하는 것은 금지하며, baseline 최종 승인은 사용자에게 남긴다.

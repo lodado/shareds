@@ -166,7 +166,8 @@ production 코드·기존 테스트 관찰은 조사 자료이지 정책 출처�
 7. production 수정 전 `implementation-loop.md`와 `frontend-implementation.md`로 구현
    결정을 기록한 뒤 최소 구현→GREEN을 수행한다.
 8. High risk면 sibling `test` skill의 mutation kill·원복·재-GREEN을 먼저 수행한다.
-9. `subagent-review.md`로 독립 카드 리뷰, 유효 finding 개선, 필수 label 전체 재실행과
+9. `oracle-run.mjs review-packet`으로 원시 리뷰 입력을 생성한 뒤
+   `subagent-review.md`로 독립 카드 리뷰, 유효 finding 개선, 필수 label 전체 재실행과
    `oracle-verify.mjs review`를 수행한다.
 
 ## 피드백 라우팅
