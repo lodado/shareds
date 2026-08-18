@@ -378,6 +378,7 @@ test('O1-O7: loads one detailed changeability reference before implementation de
   assert.match(changeability, /기존 레포.*기본 기능.*설치.*dependency.*최소/s)
   assert.match(changeability, /축 사이 trade-off/)
   assert.match(changeability, /161d3d6a0d6d372eacd75036de567511643f6265/)
+  assert.match(changeability, /abec04157e2c6eac5be1e59b1a82863a138c6c66/)
   assert.match(changeability, /85d19c3816afca9a84ffbd5b7ff581962cb5db4c/)
   assert.match(changeability, /5dc4477f838b8cee2b6b09af4f373be2b3aaaa54/)
   assert.match(changeability, /hook.*반환.*대상 레포.*관례/is)
