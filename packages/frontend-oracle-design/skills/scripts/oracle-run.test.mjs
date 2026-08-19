@@ -69,14 +69,26 @@ const GREEN_REPORT = {
   testResults: [{ assertionResults: [{ fullName: 'save > pending', status: 'passed' }] }],
 }
 
-function run(args, environment) {
+/**
+ * git hook 안에서 테스트가 돌면 GIT_DIR·GIT_INDEX_FILE 등이 환경에 남아 있어
+ * fixture의 `git -C <tmpdir>`가 -C를 무시하고 실제 저장소를 건드린다.
+ */
+function isolatedEnvironment(environment) {
   // 바깥 `node --test`가 남긴 NODE_TEST_CONTEXT를 물려주면 자식 node --test가
   // test-child 모드로 돌아 exit code와 reporter 출력을 내지 않는다.
-  const { NODE_TEST_CONTEXT, ...cleanEnvironment } = process.env
+  const { NODE_TEST_CONTEXT, ...clean } = process.env
 
+  for (const name of Object.keys(clean)) {
+    if (name.startsWith('GIT_')) delete clean[name]
+  }
+
+  return { ...clean, ...environment }
+}
+
+function run(args, environment) {
   return spawnSync(process.execPath, [script, ...args], {
     encoding: 'utf8',
-    env: { ...cleanEnvironment, ...environment },
+    env: isolatedEnvironment(environment),
   })
 }
 
@@ -141,7 +153,7 @@ async function workspace(
   t.after(() => rm(root, { recursive: true, force: true }))
 
   if (git) {
-    const initialized = spawnSync('git', ['init', '-q', root], { encoding: 'utf8' })
+    const initialized = spawnSync('git', ['init', '-q', root], { encoding: 'utf8', env: isolatedEnvironment() })
     if (initialized.status !== 0) return null
     await writeFile(join(root, '.gitignore'), 'node_modules/\n')
   }
@@ -169,6 +181,7 @@ async function workspace(
   for (const path of Object.keys(sourceFiles)) lockArgs.push('--source', join(root, path))
   const locked = spawnSync(process.execPath, [lockScript, ...lockArgs], {
     encoding: 'utf8',
+    env: isolatedEnvironment(),
   })
   assert.equal(locked.status, 0, locked.stderr)
 
@@ -790,12 +803,12 @@ test('O20: review-packet은 lock·source·state·ledger·evidence·diff만 결�
   })
   if (!created) return t.skip('git 미설치로 review diff를 검증할 수 없다')
   const { root, oracleDirectory } = created
-  const added = spawnSync('git', ['-C', root, 'add', '.'], { encoding: 'utf8' })
+  const added = spawnSync('git', ['-C', root, 'add', '.'], { encoding: 'utf8', env: isolatedEnvironment() })
   assert.equal(added.status, 0, added.stderr)
   const committed = spawnSync(
     'git',
     ['-C', root, '-c', 'user.name=Oracle Test', '-c', 'user.email=oracle@example.test', 'commit', '-qm', 'baseline'],
-    { encoding: 'utf8' },
+    { encoding: 'utf8', env: isolatedEnvironment() },
   )
   assert.equal(committed.status, 0, committed.stderr)
 
