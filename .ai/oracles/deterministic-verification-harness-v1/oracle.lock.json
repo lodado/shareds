@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 1,
-  "algorithm": "sha256",
-  "oracle": {
-    "path": "oracle.md",
-    "sha256": "4d7e5759f30393a2df7e38781f47248ad3175a49f604ac0cfa1b1f4a76e71def"
-  },
-  "sources": []
-}

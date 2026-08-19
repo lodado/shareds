@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "algorithm": "sha256",
+  "oracle": {
+    "path": "oracle.md",
+    "sha256": "ac51c5222988748fd67520de391bac272772ad2396b6f2dd869f7fcb514ec721"
+  },
+  "sources": [
+    {
+      "path": "../../../src/__docs__/architecture.md",
+      "sha256": "19395411ab959890dfb74de62ff4286c557c3a417691f98c7117f26f57485b4b"
+    }
+  ]
+}

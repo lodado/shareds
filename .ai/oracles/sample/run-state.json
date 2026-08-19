@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "lock": "oracle.lock.json",
+  "scanRoot": "../../..",
+  "risk": "medium",
+  "requiredLabels": [
+    "behavior"
+  ],
+  "milestones": [],
+  "harnessPaths": [],
+  "harnessAtValidRed": null,
+  "harnessBudgetAtValidRed": null,
+  "state": "ORACLE_READY",
+  "history": [
+    {
+      "state": "ORACLE_READY",
+      "runId": null,
+      "reason": null,
+      "runCount": 0,
+      "at": "2026-08-19T13:16:43.162Z"
+    }
+  ],
+  "budgets": {
+    "policy": {
+      "limit": 2,
+      "spent": 0
+    },
+    "harness": {
+      "limit": 2,
+      "spent": 0
+    },
+    "product": {
+      "limit": 3,
+      "spent": 0
+    }
+  },
+  "snapshot": {
+    ".gitignore": "4d56952b0fb13bf8f9b6c13a6d4c34a075bac3af447636a1df4335d7576e2f97",
+    "src/__docs__/architecture.md": "19395411ab959890dfb74de62ff4286c557c3a417691f98c7117f26f57485b4b",
+    "src/save.mjs": "ad821dc51c7386ec94fe8d2904c36c446d66376363cce1a3c9e34ddef941d0a5"
+  },
+  "testFiles": null,
+  "envDrift": []
+}
