@@ -11,7 +11,7 @@
     {
       "name": "vibe-coding-helper",
       "description": "ESLint preset adoption and repo conventions for lodado projects.",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "author": {
         "name": "lodado"
       },

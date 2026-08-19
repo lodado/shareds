@@ -310,4 +310,71 @@ ruleTester.run('fsd-no-driver-outside-repository', rules['fsd-no-driver-outside-
   ],
 })
 
+/** The state-modeling rules read TypeScript type nodes, so they need the TS parser. */
+const typedRuleTester = new RuleTester({
+  parser: require.resolve('@typescript-eslint/parser'),
+  parserOptions: { ecmaVersion: 2022, sourceType: 'module', ecmaFeatures: { jsx: true } },
+})
+
+typedRuleTester.run('require-discriminated-state', rules['require-discriminated-state'], {
+  valid: [
+    // One member per state - every field belongs to the state that owns it.
+    "type S = { status: 'editing'; amount: number } | { status: 'success'; paymentId: string }",
+    // A discriminant with no optional siblings is already exhaustive.
+    "type S = { status: 'idle' | 'done'; amount: number }",
+    // Optional fields without a state discriminant are ordinary props.
+    'type Props = { label?: string; icon?: string }',
+  ],
+  invalid: [
+    {
+      code: "type S = { status: 'idle' | 'loading' | 'failure'; data?: Payload; error?: string }",
+      errors: [{ messageId: 'optionalSoup' }],
+    },
+    {
+      code: "interface S { phase: 'draft' | 'sent'; sentAt?: string }",
+      errors: [{ messageId: 'optionalSoup' }],
+    },
+  ],
+})
+
+typedRuleTester.run('no-boolean-state-flags', rules['no-boolean-state-flags'], {
+  valid: [
+    "type S = { status: 'loading' | 'error' }",
+    // A single flag cannot contradict another one.
+    'type S = { isOpen: boolean; label: string }',
+    'function Panel() { const [isOpen, setOpen] = useState(false); return isOpen }',
+    // Non-boolean state is not a flag pair.
+    'function Panel() { const [isOpen] = useState(false); const [name] = useState("") }',
+  ],
+  invalid: [
+    {
+      code: 'type S = { isLoading: boolean; isError: boolean; data: Payload }',
+      errors: [{ messageId: 'parallelFlags' }],
+    },
+    {
+      code: 'function Form() { const [isSubmitting] = useState(false); const [isDone] = useState(false) }',
+      errors: [{ messageId: 'parallelState' }],
+    },
+  ],
+})
+
+typedRuleTester.run('no-response-type-assertion', rules['no-response-type-assertion'], {
+  valid: [
+    'const payload = schema.parse(await response.json())',
+    // Asserting to unknown still forces narrowing afterwards.
+    'const payload = (await response.json()) as unknown',
+    'const count = value as number',
+  ],
+  invalid: [
+    {
+      code: 'const payload = (await response.json()) as PaymentResponse',
+      errors: [{ messageId: 'assertedPayload' }],
+    },
+    {
+      code: 'const cached = JSON.parse(raw) as CartState',
+      errors: [{ messageId: 'assertedPayload' }],
+    },
+  ],
+})
+
 console.log(`ok  ${Object.keys(rules).length} rules pass RuleTester`)

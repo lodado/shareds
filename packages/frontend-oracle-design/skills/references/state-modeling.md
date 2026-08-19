@@ -98,6 +98,18 @@ type PaymentEvent =
 | lint gate  | `@typescript-eslint/switch-exhaustiveness-check` — `@lodado/eslint-config`를 쓰는 레포는 `strict-types` preset을 extends, 아니면 rule 직접 설정 (plugin v8+면 `considerDefaultExhaustiveForUnions: false` 추가) | 레포가 typed lint를 이미 쓰거나 도입이 승인됨 |
 | 라이브러리 | `ts-pattern` `.exhaustive()`, XState v5                                                                                                                                                                         | **설치돼 있거나 도입이 승인된 경우만**        |
 
+타입 **형태** 자체도 일부는 기계로 잡는다. `@lodado/eslint-config/local-rules`를 쓰는
+레포는 다음 규칙이 이미 켜져 있으므로 별도 설정 없이 위반이 드러난다.
+
+| 규칙                          | 잡는 것                                                     | 이 문서의 대응 절  |
+| ----------------------------- | ----------------------------------------------------------- | ------------------ |
+| `no-response-type-assertion`  | boundary payload를 파싱 대신 `as`로 단언                    | 2절 trust boundary |
+| `require-discriminated-state` | `status` literal union 옆의 optional 형제 필드              | 2절 상태별 필드    |
+| `no-boolean-state-flags`      | 한 흐름을 병렬 boolean flag나 boolean `useState` 2개로 표현 | 2절 discriminant   |
+
+나머지 규칙(실패 subtype 분리, 카드에 없는 전이 차단, query 상태 재구현 금지)은
+카드 지식을 요구하므로 lint가 아니라 카드 lint와 독립 review가 판정한다.
+
 - `assertNever`는 레포에 이미 있으면 재사용하고, 없으면 공용 위치 하나에만 만든다.
 - lint 규칙·config 변경은 [`frontend-implementation.md`](frontend-implementation.md)의
   Hook Encapsulation Gate와 같은 절차를 따른다: 사용자 승인 후 rule ID·target glob·
