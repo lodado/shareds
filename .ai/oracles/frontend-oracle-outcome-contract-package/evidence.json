@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "rows": {
+    "O1": {
+      "kind": "test",
+      "name": "O17: 구조가 완전한 카드는 lint를 통과한다"
+    },
+    "O2": {
+      "kind": "test",
+      "name": "O2: 기존 Oracle Delivery gate를 유지한다"
+    },
+    "O3": {
+      "kind": "test",
+      "name": "O3: Outcome Brief가 없는 카드를 거부한다"
+    },
+    "O4": {
+      "kind": "test",
+      "name": "O4: Outcome Brief의 필수 값이 비거나 TBD면 거부한다"
+    },
+    "O5": {
+      "kind": "test",
+      "name": "O5-O6: Source Registry의 Kind 누락과 허용되지 않은 값을 거부한다"
+    },
+    "O6": {
+      "kind": "test",
+      "name": "O5-O6: Source Registry의 Kind 누락과 허용되지 않은 값을 거부한다"
+    },
+    "O7": {
+      "kind": "test",
+      "name": "O7: 조건부 품질 계약과 human-first 보고를 안내한다"
+    },
+    "O8": {
+      "kind": "test",
+      "name": "O8: 카드 schema version 분기와 migration을 추가하지 않는다"
+    }
+  }
+}

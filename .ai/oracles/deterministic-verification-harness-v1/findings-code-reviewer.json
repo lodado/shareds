@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "code-reviewer",
+  "findings": [
+    {
+      "id": "f-1",
+      "row": "O6",
+      "classification": "HARNESS_DEFECT",
+      "severity": "critical",
+      "source": "S2",
+      "finding": "init은 run-state.json 존재 여부만 검사해 실패하며({flag:'wx'}), run-state.json만 지우고 같은 --dir으로 재실행하면 예산과 ORACLE_READY 기준선(snapshot)이 통째로 초기화된다. 재-init 시점에 이미 존재하던 미커밋 production 변경이 새 기준선에 '원래 있던 것'으로 편입되어, 이후 --to VALID_RED가 PRODUCTION_TOUCHED_BEFORE_RED 없이 통과한다.",
+      "evidence": "oracle-run.mjs:328-331 (writeFile(...,{flag:'wx'}) 및 에러 메시지 'Run state already exists — remove it explicitly to restart the run'). Repro: src/save.mjs를 uncommitted 상태로 만든 뒤 재-init 없이 --to VALID_RED 시도 → 정상적으로 'PRODUCTION_TOUCHED_BEFORE_RED: production changed before a valid RED:\\n  src/save.mjs'로 거부됨을 확인. 이어서 상태 파일을 삭제한 뒤 init을 동일 --dir/--lock/--risk/--scan-root로 재실행하고, 같은 파일이 여전히 uncommitted인 채로 --to VALID_RED를 다시 시도 → 'STATE_VALID_RED run:r-002'로 성공(exit 0). oracle-card.md:245-274 '### Run artifact 초기화' 절의 '상태 파일이 이미 있으면 init은 실패한다. 예산과 기준선을 초기화하려고 다시 실행하지 않는다.'는 명문 금지와 정면으로 배치되며, 도구 자신의 에러 메시지가 그 금지된 행동(상태 파일 삭제 후 재실행)을 그대로 안내한다.",
+      "fix": "initialize()가 run-state.json 유무가 아니라 같은 디렉터리에 runs.jsonl이 이미 존재하는지(=이전에 판정이 시작됐는지)로 재-init을 차단하게 하거나, 최소한 에러 메시지에서 상태 파일 삭제를 유도하는 문구를 제거하고 새 --dir(새 oracle-id) 사용을 안내한다."
+    },
+    {
+      "id": "f-2",
+      "row": "O11",
+      "classification": "HARNESS_DEFECT",
+      "severity": "high",
+      "source": "S3",
+      "finding": "f-1과 동일한 재-init 경로가 budgets.{policy,harness,product}.spent도 0으로 되돌려, 이미 소진된 예산 한도(policy 2 / harness 2 / product 3)를 다시 처음부터 소비할 수 있게 한다.",
+      "evidence": "oracle-run.mjs:315-318 (budgets: Object.fromEntries(...)가 매 init 호출마다 새로 생성되며 과거 runs.jsonl의 budget 이벤트 이력을 반영하지 않음). Repro: product 예산을 3/3까지 소진해 4번째 spend 요청이 'BUDGET_EXHAUSTED: product budget is spent (3/3)'로 정상 거부됨을 확인. 이후 상태 파일을 삭제하고 동일 --dir로 init을 재실행 → run-state.json의 budgets가 {\"policy\":{\"spent\":0},\"harness\":{\"spent\":0},\"product\":{\"spent\":0}}로 리셋됨을 확인. 동일 --dir에서 budget --spend product 재요청 → 'BUDGET_SPENT product 1/3'로 다시 성공.",
+      "fix": "f-1과 근본 원인이 동일 — runs.jsonl 존재 여부로 재-init을 막거나, 재-init을 허용할 경우 과거 ledger의 budget 이벤트를 합산해 카운터를 복원한다."
+    },
+    {
+      "id": "f-3",
+      "row": "O10",
+      "classification": "HARNESS_DEFECT",
+      "severity": "critical",
+      "source": "S2",
+      "finding": "TEST_WEAKENED 검사(measureTestFile/countOccurrences)는 금지 토큰의 '등장 횟수'만 VALID_RED 시점과 비교하고, maxDiffPixels/maxDiffPixelRatio/threshold 뒤에 오는 숫자 값 자체는 비교하지 않는다. 이미 코드에 있던 예: `// maxDiffPixels: 10` 줄의 숫자만 `99999`로 바꿔도 토큰 등장 횟수는 RED 때와 동일(1회)하므로 약화로 탐지되지 않는다.",
+      "evidence": "oracle-run.mjs:101-114 (countOccurrences는 부분 문자열 등장 횟수만 집계, 값 파싱 없음). Repro: RED 시점 테스트 파일에 `// maxDiffPixels: 10`, GREEN 시점에 같은 줄만 `// maxDiffPixels: 99999`로 수정(새 토큰 추가 없음) 후 --to IMPLEMENTED_GREEN 실행 → 'STATE_IMPLEMENTED_GREEN run:r-003'로 성공(exit 0). oracle.md:48 'screenshot diff 허용치는 카드에 잠그는 정책값이며 테스트 단계에서 조정하지 않는다'와 O10 Then의 '사유(assertion 감소·금지 토큰·삭제)'가 막아야 한다고 명시한 바로 그 공격이며, Adversarial Self-review 절도 'screenshot 허용치를 올려 시각 회귀를 통과시킬 수 있음 → O10 금지 토큰과 O30 정책 잠금으로 함께 막는다'고 명시적으로 방어를 주장한다.",
+      "fix": "maxDiffPixels/maxDiffPixelRatio/threshold 3개 토큰은 등장 횟수 대신 정규식으로 뒤따르는 숫자를 추출해 RED 시점 기록값과 비교하고, 값이 하나라도 증가했으면 TEST_WEAKENED로 거부한다."
+    },
+    {
+      "id": "f-4",
+      "row": "O24",
+      "classification": "POLICY_GAP",
+      "severity": "medium",
+      "source": "S2",
+      "finding": "oracle.md:76 정책 문구는 'Date.now, Math.random, crypto.randomUUID, toLocale, new Intl. 같은 비결정 원천'이라고 적어 예시 나열로 읽히지만, 실제 NONDETERMINISM_TOKENS는 이 5개 리터럴 문자열로 고정된 폐집합이라 new Date().getTime(), performance.now() 같은 동등한 비결정 API는 조용히 통과한다.",
+      "evidence": "oracle-verify.mjs:48 (const NONDETERMINISM_TOKENS = ['Date.now','Math.random','crypto.randomUUID','toLocale','new Intl.']) vs oracle.md:76('...같은 비결정 원천이 들어오면'). Repro: new Date().getTime()만 사용하는 파일에 verify scan 실행 → 'SCAN_OK 1 files'(exit 0)로 통과, 비결정 API 미검출.",
+      "fix": "정책 문구를 O10/O30처럼 '이 5개로 잠근 폐집합이다'로 명시해 모호어를 없애거나, NONDETERMINISM_TOKENS에 .getTime(, performance.now(, process.hrtime( 등 흔한 동의어를 추가하고 카드·evidence·lock을 함께 갱신한다."
+    },
+    {
+      "id": "f-5",
+      "row": "O6",
+      "classification": "POLICY_GAP",
+      "severity": "medium",
+      "source": "S2",
+      "finding": "production 변경 여부를 판정하는 파일 목록이 git ls-files -c -o --exclude-standard(gitignore 매치 파일 제외)로 스코프되는데, 이 git/gitignore 기반 'production 파일' 정의는 oracle.md의 '결정된 정책' 22-83행 어디에도 문장으로 없고 출처(S1-S4) 표기도 없다. 이 동작은 실제로는 의도된 것으로 테스트에 고정되어 있어, gitignore에 걸리는 어떤 production 경로(.env, 생성 산출물 등)든 RED 이전에 고쳐도 PRODUCTION_TOUCHED_BEFORE_RED가 잡지 못하는 우회면이 된다.",
+      "evidence": "oracle-run.mjs:138 (spawnSync('git', ['-C', root, 'ls-files', '-c', '-o', '--exclude-standard', '-z'])); oracle-run.test.mjs:369 (\"O6: git 레포에서 gitignore된 파일은 production 변경으로 세지 않는다\" 테스트로 이 동작을 고정). oracle.md 22-83행 '결정된 정책' 전체에 git/gitignore 또는 'production 파일'의 스코프 정의 문장이 없음 — 같은 카드가 O17 lint로 '모든 정책 줄의 출처 표기'를 강제하는 것과 대비됨.",
+      "fix": "'결정된 정책'에 'production 파일은 git 추적 대상이면서 .gitignore에 매치되지 않는 파일이다'를 출처와 함께 명시적으로 추가하거나, gitignore 예외가 의도가 아니라면 --exclude-standard를 제거해 미추적이지만 무시된 파일도 스코프에 포함한다."
+    },
+    {
+      "id": "f-6",
+      "row": "O18",
+      "classification": "POLICY_GAP",
+      "severity": "medium",
+      "source": "S1",
+      "finding": "verify evidence는 인용된 테스트 이름이 지정 run에서 통과했는지만 확인하고, 그 테스트가 실제로 매핑된 행의 동작을 검사하는지는 판단하지 않는다. 서로 무관하지만 실재하고 통과한 테스트를 아무 행에나 매핑해도 EVIDENCE_VERIFIED로 통과한다.",
+      "evidence": "Repro: '결제 성공 시 이메일 발송' 행(O1)에 evidence.json으로 완전히 무관한 '1 더하기 1은 2다 (아무 관련 없는 sanity check)'라는, 같은 run에서 실제로 통과한 테스트 이름을 매핑하고 oracle-verify.mjs evidence 실행 → 'EVIDENCE_VERIFIED 1 rows'(exit 0). oracle.md 79-82행 '한계 기록'은 actor가 ledger/state/lock을 다시 쓸 수 있다는 위협만 기록할 뿐, '실재하고 통과했지만 무관한 테스트를 매핑'하는 이 위협은 기록·완화 대상에 없다.",
+      "fix": "'한계 기록'에 이 한계를 최소한 명문화하거나, Medium/High risk에서 test 증거 중 일부를 표본으로 뽑아 reviewer 증거(사람 검토)를 요구해 이름-일치만으로 검증이 끝나지 않게 한다."
+    },
+    {
+      "id": "f-7",
+      "row": "O1",
+      "classification": "EVIDENCE_GAP",
+      "severity": "low",
+      "source": "S2",
+      "finding": "O1의 부작용 열은 'product write×0'을 명시하지만, 해당 테스트는 이미 알고 있는 파일(oracle.md) 하나의 내용이 안 바뀌었는지만 재확인할 뿐, exec 전후로 scan-root 전체의 파일 목록을 스냅샷 비교해 '어디에도 새 파일이 생기지 않았음'을 확인하지 않는다.",
+      "evidence": "oracle-run.test.mjs의 O1 테스트('O1: exec는 명령을 한 번 실행하고 ledger에 한 줄을 남긴다')는 readFile(join(root,'oracle.md'))의 내용 불변만 assert하며, walkFiles류의 재귀 스냅샷 비교는 수행하지 않는다.",
+      "fix": "O1 테스트에 exec 실행 전/후 walkFiles(또는 동등 재귀 목록)로 얻은 경로 집합을 비교하는 assert를 추가해 'product write×0'을 scan-root 전역에서 검증한다."
+    }
+  ]
+}

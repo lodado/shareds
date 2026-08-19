@@ -1,0 +1,10 @@
+{
+  "name": "@lodado/frontend-system-design-plugin",
+  "version": "0.2.0",
+  "description": "Oracle-dependent companion for well-known frontend system design problems.",
+  "private": true,
+  "scripts": {
+    "test": "node --test skills/scripts/*.test.mjs"
+  },
+  "license": "MIT"
+}

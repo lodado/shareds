@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 2,
+  "lock": "oracle.lock.json",
+  "scanRoot": "../../../packages/frontend-oracle-design",
+  "risk": "medium",
+  "requiredLabels": ["package-test", "root-lint", "root-test"],
+  "milestones": [],
+  "harnessPaths": [],
+  "harnessAtValidRed": {},
+  "harnessBudgetAtValidRed": 0,
+  "state": "REVIEW_VERIFIED",
+  "history": [
+    {
+      "state": "ORACLE_READY",
+      "runId": null,
+      "reason": null,
+      "runCount": 0,
+      "at": "2026-08-17T15:46:36.633Z"
+    },
+    {
+      "state": "VALID_RED",
+      "runId": "r-001",
+      "reason": null,
+      "row": "O3",
+      "evidence": "evidence.json",
+      "findings": null,
+      "intersect": null,
+      "runCount": 1,
+      "at": "2026-08-17T15:47:09.483Z"
+    },
+    {
+      "state": "IMPLEMENTED_GREEN",
+      "runId": "r-010",
+      "reason": null,
+      "row": null,
+      "evidence": "evidence.json",
+      "findings": null,
+      "intersect": null,
+      "runCount": 11,
+      "at": "2026-08-17T15:57:22.421Z"
+    },
+    {
+      "state": "REVIEW_VERIFIED",
+      "runId": "r-017",
+      "reason": null,
+      "row": null,
+      "evidence": "evidence.json",
+      "findings": "findings-code-reviewer.json",
+      "intersect": null,
+      "runCount": 17,
+      "at": "2026-08-17T16:05:37.225Z"
+    }
+  ],
+  "budgets": {
+    "policy": {
+      "limit": 2,
+      "spent": 0
+    },
+    "harness": {
+      "limit": 2,
+      "spent": 0
+    },
+    "product": {
+      "limit": 3,
+      "spent": 0
+    }
+  },
+  "snapshot": {
+    ".claude-plugin/plugin.json": "e6825e33504e261786ca93d9e55e9a724e1645fb7c685524ca56755e4747fec5",
+    ".codex-plugin/plugin.json": "fea2696ee0a36e92665400944ebd7bbbf4d44879d4db7dbd6ff48ebcbdf66409",
+    "package.json": "2d3cbe9f6b93fa7e7914693a742e74d8484d340ecf579e5fb0683a5da280efe4",
+    "skills/SKILL.md": "d5ab64f68486b1f3a13c365fc6502af2927973362eadb24ba33a80287d3e6b3b",
+    "skills/references/architecture-contract.md": "390331d6dec51e27b2be07f99205f62073838b0852e709c049c5bbf4b72a9e97",
+    "skills/references/backend.md": "911330293de4dd894a50cdc05b9d8bad66037ff968f530190ee9c9343b499d06",
+    "skills/references/bva.md": "f5d1c10befc77ffd9b5cd09e99291e2b6beaaa610918f5f497e036603450a6d0",
+    "skills/references/changeability.md": "850d5d248e649ff5529f32a81e397240968856457a1c1d6ea9e67d3a9d00c919",
+    "skills/references/frontend-implementation.md": "b0814fbf11de505654c7bbd9fd67b7cde4bdc27885a11033f8cea3ae03947d19",
+    "skills/references/fsd.md": "a67583e5c19c22da52ddefbb52da19aa0bc8c41dec92c9201760d620588d27be",
+    "skills/references/implementation-loop.md": "5245a7b3240fdc714198605d309247fdeeeb4215d0e42ecdb6d7eb7663c239c2",
+    "skills/references/oracle-card.md": "040df88e0a5e1645d88e6c9906e322efa0f3f08e2414f1593080fdb617fc6c67",
+    "skills/references/subagent-review.md": "f1a319be609a4b8ac5285ca29b587985b0440f0a8661459c60d6001e4e6d4cbc",
+    "skills/references/visual-design.md": "7f72bd66bf668ba76561c4f3c7d47bdcaf9c4e6a7eba544a6e8e53205a4559db",
+    "skills/scripts/oracle-lock.mjs": "71ca54c9fa37d33996f4cdffffcb58e080d4f847f46fac5030e4d81303ef0ebc",
+    "skills/scripts/oracle-lock.test.mjs": "bd0a888b86b2cae294ac5de6ea757e9ab25c99c12c3f49ef59d16303c5678c10",
+    "skills/scripts/oracle-node-reporter.mjs": "c7963475f7cad5e94a22cc36d7eed03c40b5efcd9ef1eaea8d12f06eb5a53bb7",
+    "skills/scripts/oracle-run.mjs": "31a881b34e3a8316fc4fc4fc454767b4be95ace0053384190ddfbfb9881b6656",
+    "skills/scripts/oracle-run.test.mjs": "32199865f7f04a5e0d51a33d3f7ebdc485246b336be3121784fc633499973f91",
+    "skills/scripts/oracle-verify.mjs": "6c2554f56a4193f8f02684eba97e50e16c34183604c3dc44f4b4dc4edc4fd625",
+    "skills/scripts/oracle-verify.test.mjs": "af0dff4f5a3b72024cfb9df25bcde4f4ff19e7de58af6fb018995df35e0fd71e",
+    "skills/scripts/skill-contract.test.mjs": "bb1b11b548a4a352d1bd7099ddc50278c9bbfd9b5a07d00439e97354e43765ab"
+  },
+  "testFiles": {
+    "skills/scripts/oracle-lock.test.mjs": {
+      "sha256": "bd0a888b86b2cae294ac5de6ea757e9ab25c99c12c3f49ef59d16303c5678c10",
+      "assertions": 21,
+      "banned": {},
+      "tolerances": {}
+    },
+    "skills/scripts/oracle-run.test.mjs": {
+      "sha256": "32199865f7f04a5e0d51a33d3f7ebdc485246b336be3121784fc633499973f91",
+      "assertions": 220,
+      "banned": {
+        "test.skip": 1,
+        "maxDiffPixels": 7,
+        "maxDiffPixelRatio": 2
+      },
+      "tolerances": {
+        "maxDiffPixels": 99999,
+        "maxDiffPixelRatio": 0.2
+      }
+    },
+    "skills/scripts/oracle-verify.test.mjs": {
+      "sha256": "6f214774bc1522b043f55ee0b1cd9349e83285830250e6375ab7f95a6d935cea",
+      "assertions": 129,
+      "banned": {},
+      "tolerances": {}
+    },
+    "skills/scripts/skill-contract.test.mjs": {
+      "sha256": "bb1b11b548a4a352d1bd7099ddc50278c9bbfd9b5a07d00439e97354e43765ab",
+      "assertions": 231,
+      "banned": {},
+      "tolerances": {}
+    }
+  },
+  "envDrift": []
+}

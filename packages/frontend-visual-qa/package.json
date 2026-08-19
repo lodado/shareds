@@ -1,0 +1,10 @@
+{
+  "name": "@lodado/frontend-visual-qa-plugin",
+  "version": "0.2.0",
+  "description": "Claude Code / Codex plugin for screenshot and direct-browser frontend QA.",
+  "private": true,
+  "scripts": {
+    "test": "node --test scripts/*.test.mjs"
+  },
+  "license": "MIT"
+}

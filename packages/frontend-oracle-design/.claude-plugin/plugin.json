@@ -1,0 +1,13 @@
+{
+  "name": "frontend-oracle-design",
+  "version": "0.6.0",
+  "description": "Risk-aware Oracle-driven frontend contracts, TDD, evidence gates, and review.",
+  "author": {
+    "name": "lodado",
+    "url": "https://github.com/lodado"
+  },
+  "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "repository": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "license": "MIT",
+  "keywords": ["frontend", "tdd", "oracle", "claude-code"]
+}

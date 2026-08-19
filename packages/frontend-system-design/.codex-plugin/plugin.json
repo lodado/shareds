@@ -1,0 +1,19 @@
+{
+  "name": "frontend-system-design",
+  "version": "0.2.0",
+  "description": "Oracle-dependent policy candidates and verification duties for well-known frontend system design problems.",
+  "author": {
+    "name": "lodado",
+    "url": "https://github.com/lodado"
+  },
+  "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "repository": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "license": "MIT",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Frontend System Design",
+    "shortDescription": "Extend an active Oracle with proven frontend system patterns",
+    "category": "development",
+    "websiteURL": "https://github.com/lodado/my-Vibe-Coding-Helper"
+  }
+}

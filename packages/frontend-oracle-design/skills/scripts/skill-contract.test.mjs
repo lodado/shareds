@@ -1,0 +1,521 @@
+import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import test from 'node:test'
+
+const skillDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
+
+async function read(relativePath) {
+  return readFile(join(skillDirectory, relativePath), 'utf8')
+}
+
+test('O26: backs reported verification with a run ledger, machine transitions and counted budgets', async () => {
+  const skill = await read('SKILL.md')
+
+  assert.match(skill, /scripts\/oracle-run\.mjs exec/)
+  assert.match(skill, /append-only\s*\n?\s*ledger에 기록되고 보고는 자유 서술 대신 runId를 인용한다/)
+  assert.match(skill, /ledger에 없는 실행을\s*\n?\s*통과로 보고하지 않는다/)
+  assert.match(skill, /scripts\/oracle-run\.mjs transition`으로만 기록한다/)
+  assert.match(skill, /oracle-run\.mjs budget`이 계수한다/)
+  assert.match(skill, /scripts\/oracle-verify\.mjs evidence`로 실제/)
+  assert.match(skill, /runs: 인용한 ledger runId/)
+  assert.match(skill, /상태 기계: 기록된 전이와 마지막 상태/)
+})
+
+test('O27: lints the card structure and initializes run artifacts around the lock', async () => {
+  const oracleCard = await read('references/oracle-card.md')
+
+  assert.match(oracleCard, /oracle-verify\.mjs card/)
+  assert.match(oracleCard, /CARD_LINT_FAILED/)
+  assert.match(oracleCard, /자동 추가 TC.*실제 계약 행 또는 출처 있는 N\/A/s)
+  assert.match(oracleCard, /User Confirmation/)
+  assert.match(oracleCard, /Draft Oracle/)
+  assert.match(oracleCard, /새 카드.*revision.*사용자.*확인/s)
+  assert.match(oracleCard, /정책 ID.*행 ID.*양방향/s)
+  assert.match(oracleCard, /oracle-run\.mjs init/)
+  assert.match(oracleCard, /--required-label/)
+  assert.match(oracleCard, /--harness-path/)
+  assert.match(oracleCard, /--milestone/)
+  assert.match(oracleCard, /정확한.*상대 파일 경로/s)
+  assert.match(oracleCard, /run-state\.json/)
+  assert.match(oracleCard, /runs\.jsonl/)
+  assert.match(oracleCard, /상태 파일이 이미 있으면 `init`은 실패한다/)
+  assert.match(oracleCard, /`oracle-verify\.mjs card` lint와 revision lock 검증이 통과함/)
+})
+
+test('O28: routes delivery runs through exec and gates GREEN on flakiness and test strength', async () => {
+  const implementationLoop = await read('references/implementation-loop.md')
+
+  assert.match(implementationLoop, /oracle-run\.mjs exec/)
+  assert.match(implementationLoop, /oracle-run\.mjs transition/)
+  assert.match(implementationLoop, /PRODUCTION_TOUCHED_BEFORE_RED/)
+  assert.match(implementationLoop, /HARNESS_BUDGET_REQUIRED/)
+  assert.match(implementationLoop, /HARNESS_RED_REQUIRED/)
+  assert.match(implementationLoop, /MILESTONE_RED_MISSING/)
+  assert.match(implementationLoop, /red:<name>/)
+  assert.match(implementationLoop, /FLAKINESS_GATE/)
+  assert.match(implementationLoop, /Low 1회, Medium 2회, High 3회/)
+  assert.match(implementationLoop, /TEST_WEAKENED/)
+  assert.match(implementationLoop, /ENV_DRIFT/)
+  assert.match(implementationLoop, /evidence\.json/)
+  assert.match(implementationLoop, /oracle-verify\.mjs red/)
+  assert.match(implementationLoop, /EVIDENCE_REQUIRED/)
+  assert.match(implementationLoop, /REQUIRED_RUN_MISSING/)
+  assert.match(implementationLoop, /oracle-verify\.mjs review/)
+  assert.match(implementationLoop, /EVIDENCE_NOT_IN_RUN/)
+  assert.match(implementationLoop, /EVIDENCE_UNVERIFIABLE/)
+  assert.match(implementationLoop, /oracle-verify\.mjs scan/)
+  assert.match(implementationLoop, /oracle:nondeterminism/)
+  assert.match(implementationLoop, /ledger를 거치지 않은 실행을 증거로 보고/)
+})
+
+test('O29: gives reviewers raw run evidence and a validated finding schema', async () => {
+  const subagentReview = await read('references/subagent-review.md')
+
+  assert.match(subagentReview, /ledger\s*\n?\s*runId/)
+  assert.match(subagentReview, /oracle-verify\.mjs findings/)
+  assert.match(subagentReview, /--intersect/)
+  assert.match(subagentReview, /독립 리뷰를 2회\*\* 실행한다/)
+  assert.match(subagentReview, /critical.*high.*단독.*blocking/s)
+  assert.match(subagentReview, /medium.*low.*교집합/s)
+  assert.match(subagentReview, /FINDINGS_INVALID/)
+  assert.match(subagentReview, /medium\/low finding은 `NON_ORACLE_OPINION`으로 강등/)
+  assert.match(subagentReview, /행이 없는 critical\/high.*blocking/s)
+  assert.match(subagentReview, /grade가 `reported`인가/)
+})
+
+test('O30: delegates screenshot and direct-browser execution to a separate skill', async () => {
+  const [skill, visualDesign] = await Promise.all([read('SKILL.md'), read('references/visual-design.md')])
+
+  assert.match(skill, /\$frontend-visual-qa/)
+  assert.match(skill, /명시적으로 요청.*호출/s)
+  assert.match(visualDesign, /\$frontend-visual-qa/)
+  assert.match(visualDesign, /screenshot.*직접 브라우저.*소유/s)
+  assert.doesNotMatch(skill, /BROWSER_VERIFIED/)
+})
+
+test('requires automatic deterministic locking at delivery boundaries', async () => {
+  const [skill, oracleCard] = await Promise.all([read('SKILL.md'), read('references/oracle-card.md')])
+
+  assert.match(skill, /scripts\/oracle-lock\.mjs/)
+  assert.match(skill, /각 단계 직전 revision lock을 자동 검증/)
+  assert.match(oracleCard, /\.ai\/oracles\/<oracle-id>/)
+  assert.match(oracleCard, /사용자에게 명령 실행을 요청하지 않는다/)
+  assert.match(oracleCard, /ORACLE_CHANGED/)
+  assert.match(oracleCard, /SOURCE_CHANGED/)
+  assert.match(oracleCard, /LOCK_INVALID/)
+})
+
+test('locks all approved Delivery sources once instead of extending an existing lock', async () => {
+  const [skill, oracleCard, implementationLoop] = await Promise.all([
+    read('SKILL.md'),
+    read('references/oracle-card.md'),
+    read('references/implementation-loop.md'),
+  ])
+
+  assert.match(skill, /Delivery.*lock.*미룬다/s)
+  assert.match(skill, /architecture.*backend.*final lock.*1회/s)
+  assert.match(oracleCard, /Design-only.*Delivery.*새 revision/s)
+  assert.match(implementationLoop, /모든 결과 변경.*final lock을 1회/s)
+  assert.doesNotMatch(`${skill}\n${oracleCard}`, /add-source/)
+})
+
+test('keeps feedback routing and evidence tied to the locked revision', async () => {
+  const [skill, implementationLoop] = await Promise.all([read('SKILL.md'), read('references/implementation-loop.md')])
+
+  for (const classification of [
+    'POLICY_GAP',
+    'EVIDENCE_GAP',
+    'HARNESS_DEFECT',
+    'PRODUCT_DEFECT',
+    'ENVIRONMENT_DEFECT',
+    'NON_ORACLE_OPINION',
+  ]) {
+    assert.match(skill, new RegExp(classification))
+    assert.match(implementationLoop, new RegExp(classification))
+  }
+
+  assert.match(implementationLoop, /evidence manifest/)
+  assert.match(implementationLoop, /revision mismatch/)
+})
+
+test('carries the locked revision through tests and review without owning visual QA', async () => {
+  const [skill, implementationLoop, subagentReview] = await Promise.all([
+    read('SKILL.md'),
+    read('references/implementation-loop.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  assert.match(skill, /\$frontend-visual-qa/)
+  assert.doesNotMatch(skill, /browser-verification\.md|BROWSER_VERIFIED|브라우저 검증·자가개선/)
+  assert.doesNotMatch(implementationLoop, /browser scenario|BROWSER_VERIFIED/)
+  assert.match(subagentReview, /Oracle SHA-256/)
+  assert.match(subagentReview, /마지막 verify/)
+  assert.match(subagentReview, /NON_ORACLE_OPINION/)
+  await assert.rejects(read('references/browser-verification.md'), { code: 'ENOENT' })
+})
+
+test('generates reviewer input from raw locked artifacts without a hand-written conclusion', async () => {
+  const [skill, subagentReview] = await Promise.all([read('SKILL.md'), read('references/subagent-review.md')])
+
+  assert.match(skill, /oracle-run\.mjs review-packet/)
+  assert.match(subagentReview, /oracle-run\.mjs review-packet/)
+  assert.match(subagentReview, /review-input\.json/)
+  assert.match(subagentReview, /lock manifest.*run state.*ledger.*evidence mapping.*git diff/s)
+  assert.match(subagentReview, /손으로 고치지 말고/)
+  assert.match(subagentReview, /micro-hook·pure model source/)
+})
+
+test('keeps Oracle plugin release metadata versions aligned', async () => {
+  const packageDirectory = dirname(skillDirectory)
+  const repositoryDirectory = dirname(dirname(packageDirectory))
+  const [packageJson, claudePluginJson, codexPluginJson, marketplaceJson] = await Promise.all([
+    readFile(join(packageDirectory, 'package.json'), 'utf8'),
+    readFile(join(packageDirectory, '.claude-plugin/plugin.json'), 'utf8'),
+    readFile(join(packageDirectory, '.codex-plugin/plugin.json'), 'utf8'),
+    readFile(join(repositoryDirectory, '.claude-plugin/marketplace.json'), 'utf8'),
+  ])
+  const version = JSON.parse(packageJson).version
+  const marketplace = JSON.parse(marketplaceJson)
+  const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
+
+  assert.equal(version, '0.6.0')
+  assert.equal(JSON.parse(claudePluginJson).version, version)
+  assert.equal(JSON.parse(codexPluginJson).version, version)
+  assert.equal(marketplaceVersion, version)
+  assert.equal(marketplace.version, '0.6.0')
+})
+
+test('reuses the repository network boundary and colocates approved MSW handlers', async () => {
+  const [skill, implementationLoop, fsd] = await Promise.all([
+    read('SKILL.md'),
+    read('references/implementation-loop.md'),
+    read('references/fsd.md'),
+  ])
+
+  assert.match(skill, /이미 쓰는 network test 경계를 우선/)
+  assert.match(skill, /MSW가 설치됐거나.*승인/s)
+  assert.match(skill, /가장 가까운 곳에 두고/)
+  assert.match(implementationLoop, /이미 쓰는 test boundary를 우선/)
+  assert.match(implementationLoop, /dependency를 조용히 추가하지 않는다/)
+  assert.match(implementationLoop, /fsd\.md/)
+  assert.match(fsd, /<slice>\/api\/__mocks__\//)
+  assert.match(fsd, /<slice>\/__mocks__\//)
+})
+
+test('explicitly invokes $test before writing frontend tests', async () => {
+  const [skill, implementationLoop] = await Promise.all([read('SKILL.md'), read('references/implementation-loop.md')])
+
+  assert.match(skill, /테스트 파일을 작성하기 직전에 `\$test` 스킬을 이름으로 명시적으로 로드·호출/)
+  assert.match(skill, /테스트 파일 작성 직전에 `\$test` 스킬을 명시적으로 호출/)
+  assert.match(implementationLoop, /테스트 파일을 작성하기 직전에 설치된 `\$test` 스킬을 이름으로 명시적으로 로드·호출/)
+  assert.match(implementationLoop, /파일을 참고만 하는 것으로 대체하지 않으며/)
+})
+
+test('batches delivery decisions and parallelizes only across safe gates', async () => {
+  const implementationLoop = await read('references/implementation-loop.md')
+
+  for (const intakeItem of ['policy', 'architecture', 'evidence', 'naming', 'review']) {
+    assert.match(implementationLoop, new RegExp(intakeItem))
+  }
+
+  assert.match(implementationLoop, /read-only.*병렬/s)
+  assert.match(implementationLoop, /모든.*결정.*뒤.*final lock.*1회/s)
+  assert.match(implementationLoop, /`VALID_RED` 전.*production.*수정하지 않는다/s)
+  assert.match(implementationLoop, /겹치지 않는 파일.*worker.*최대 2/s)
+  assert.match(implementationLoop, /targeted GREEN.*1회/s)
+  assert.match(implementationLoop, /root test.*lint.*format.*독립 review.*병렬/s)
+  assert.match(implementationLoop, /모든 결과.*합류.*final verify/s)
+})
+
+test('defines the FSD contract and wires it through loading, architecture, implementation, and review', async () => {
+  const [skill, fsd, architectureContract, frontendImplementation, subagentReview, backend] = await Promise.all([
+    read('SKILL.md'),
+    read('references/fsd.md'),
+    read('references/architecture-contract.md'),
+    read('references/frontend-implementation.md'),
+    read('references/subagent-review.md'),
+    read('references/backend.md'),
+  ])
+
+  assert.match(skill, /references\/fsd\.md/)
+  assert.match(skill, /Feature-Sliced Design/)
+  assert.match(skill, /제안·설계·리뷰하기 전/)
+  assert.match(skill, /설치된 `\$test` 스킬을 이름으로 명시적으로 로드·호출/)
+  assert.match(fsd, /app → pages → widgets → features → entities → shared/)
+  assert.match(fsd, /`components`, `hooks`, `utils`는 FSD segment가 아니다/)
+  assert.match(fsd, /ui\|model\|api\|lib\/__test__\//)
+  assert.match(fsd, /deep import하지 않는다/)
+  assert.match(fsd, /steiger/)
+  assert.match(fsd, /pnpm add -D steiger @feature-sliced\/steiger-plugin/)
+  assert.match(fsd, /'fsd\/typo-in-layer-name': 'off'/)
+  assert.match(fsd, /`@lodado\/eslint-config`.*이미.*사용/s)
+  assert.match(fsd, /NEEDS_DECISION/)
+  assert.match(fsd, /Server 코드 배치/)
+  assert.match(fsd, /`src\/server\/` 루트로 빼지 않는다/)
+  assert.match(fsd, /server-only/)
+  assert.match(fsd, /Pages-first/)
+  assert.match(fsd, /widgets layer는 신규 채택을 비권장/)
+  assert.match(fsd, /shared\/auth/)
+  assert.match(fsd, /Cross-import 해결/)
+  assert.match(fsd, /`_app\/`·`_pages\/`/)
+  assert.match(fsd, /technical-role/)
+  assert.match(architectureContract, /fsd\.md/)
+  assert.match(architectureContract, /steiger/)
+  assert.match(backend, /fsd\.md/)
+  assert.match(backend, /Server 코드 배치/)
+  assert.match(frontendImplementation, /fsd\.md/)
+  assert.match(subagentReview, /fsd\.md/)
+})
+
+test('gates approved hook encapsulation and reviews UI/business responsibility boundaries', async () => {
+  const [skill, architectureContract, frontendImplementation, subagentReview] = await Promise.all([
+    read('SKILL.md'),
+    read('references/architecture-contract.md'),
+    read('references/frontend-implementation.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  assert.match(skill, /Hook Encapsulation/)
+  assert.match(frontendImplementation, /eslint-plugin-use-encapsulation/)
+  assert.match(frontendImplementation, /use-encapsulation\/prefer-custom-hooks/)
+  assert.match(frontendImplementation, /allow.*block/s)
+  assert.match(frontendImplementation, /응집도.*증명하지/s)
+  assert.match(architectureContract, /orchestration-only/)
+  assert.match(architectureContract, /target glob.*rule ID.*allow.*block.*lint command/s)
+  assert.match(architectureContract, /hook-encapsulation/)
+  assert.match(frontendImplementation, /UI.*비즈니스 로직/s)
+  assert.match(subagentReview, /micro-hook.*UI.*비즈니스 로직/s)
+  assert.match(subagentReview, /trivial wrapper.*거대 hook/s)
+  assert.doesNotMatch(subagentReview, /lint|hook-encapsulation|eslint-disable/)
+})
+
+test('keeps Oracle control while consuming optional system-design references', async () => {
+  const skill = await read('SKILL.md')
+
+  assert.match(skill, /frontend-system-design/)
+  assert.match(skill, /설치돼 있으면 Oracle intake와 제어권을 유지한 채/)
+  assert.match(skill, /모든 선택은 정책 후보/)
+  assert.match(skill, /POLICY_GAP.*NEEDS_DECISION/s)
+  assert.match(skill, /구현 선택지이며 Oracle의 오케스트레이션/)
+  assert.doesNotMatch(skill, /references\/(infinite-scroll|search-typeahead)\.md/)
+})
+
+test('loads visual design guidance only for UI-shaping work and carries its contract through delivery', async () => {
+  const [skill, visualDesign, oracleCard, frontendImplementation, subagentReview] = await Promise.all([
+    read('SKILL.md'),
+    read('references/visual-design.md'),
+    read('references/oracle-card.md'),
+    read('references/frontend-implementation.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  assert.match(skill, /references\/visual-design\.md/)
+  assert.match(skill, /behavior-only/)
+  assert.match(skill, /identity-shaping/)
+  assert.match(skill, /Design Change Confirmation/)
+  assert.match(visualDesign, /Design Proposal/)
+  assert.match(visualDesign, /Design Intent/)
+  assert.match(visualDesign, /Design Change Confirmation/)
+  assert.match(visualDesign, /local[\s\S]*identity-shaping[\s\S]*명시적 사용자 확인/)
+  assert.match(visualDesign, /HARD/)
+  assert.match(visualDesign, /RELATIONAL/)
+  assert.match(visualDesign, /JUDGMENT/)
+  assert.match(oracleCard, /Design Intent/)
+  assert.match(oracleCard, /Design Change Confirmation/)
+  assert.match(frontendImplementation, /Design Intent/)
+  assert.match(subagentReview, /designer/)
+  assert.match(subagentReview, /출처 있는 미적 요구/)
+  assert.match(subagentReview, /Design Change Confirmation/)
+})
+
+test('keeps visual policy in Oracle while delegating visual execution details', async () => {
+  const visualDesign = await read('references/visual-design.md')
+
+  assert.match(visualDesign, /HARD/)
+  assert.match(visualDesign, /RELATIONAL/)
+  assert.match(visualDesign, /JUDGMENT/)
+  assert.match(visualDesign, /baseline.*사용자.*명시적 승인/s)
+  assert.match(visualDesign, /\$frontend-visual-qa/)
+  assert.doesNotMatch(visualDesign, /`\*\.style\.(?:test|spec)/)
+  assert.doesNotMatch(visualDesign, /BROWSER_VERIFIED/)
+})
+
+test('requires independent design review for judgment while visual QA owns baseline execution', async () => {
+  const [visualDesign, subagentReview] = await Promise.all([
+    read('references/visual-design.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  assert.match(visualDesign, /`JUDGMENT`.*`designer`/s)
+  assert.match(subagentReview, /`JUDGMENT` 행.*승인 기준.*Design Intent/s)
+  assert.match(subagentReview, /\$frontend-visual-qa.*artifact/s)
+})
+
+test('O1-O7: loads one detailed changeability reference before implementation decisions', async () => {
+  const [skill, changeability, frontendImplementation, implementationLoop] = await Promise.all([
+    read('SKILL.md'),
+    read('references/changeability.md'),
+    read('references/frontend-implementation.md'),
+    read('references/implementation-loop.md'),
+  ])
+
+  for (const term of ['Readability', 'Predictability', 'Cohesion', 'Coupling', 'Simplicity']) {
+    assert.match(changeability, new RegExp(`## ${term}`))
+  }
+
+  assert.match(changeability, /제품 정책.*아니다/)
+  assert.match(changeability, /Oracle.*대상 레포.*실제 설치 버전.*구현 휴리스틱/s)
+  assert.match(changeability, /구현 전 질문/)
+  assert.match(changeability, /React 구현 기준/)
+  assert.match(changeability, /위험 신호/)
+  assert.match(changeability, /적용하지 않는 경우/)
+  assert.match(changeability, /Implementation Decision evidence/)
+  assert.match(changeability, /Reviewer 판정 기준/)
+  assert.match(changeability, /숨은 부작용/)
+  assert.match(changeability, /반복.*이유만으로.*공통화/s)
+  assert.match(changeability, /기존 레포.*기본 기능.*설치.*dependency.*최소/s)
+  assert.match(changeability, /축 사이 trade-off/)
+  assert.match(changeability, /161d3d6a0d6d372eacd75036de567511643f6265/)
+  assert.match(changeability, /abec04157e2c6eac5be1e59b1a82863a138c6c66/)
+  assert.match(changeability, /85d19c3816afca9a84ffbd5b7ff581962cb5db4c/)
+  assert.match(changeability, /5dc4477f838b8cee2b6b09af4f373be2b3aaaa54/)
+  assert.match(changeability, /8f0e59ca653932b44dc19d5002c7dea253682c53/)
+  assert.match(changeability, /c9ada0a088fe6fdb14440935edf01b7a0680d1ae/)
+  assert.match(changeability, /26a9aa78723b84178e40eadab38378a052dcaf12/)
+  assert.match(changeability, /내부 상태 전이와 lifecycle을 모호한 자동화로 숨기지 않는다/)
+  assert.match(changeability, /복구 가능한 오류만 처리하고 나머지는 상위로 전파한다/)
+  assert.match(changeability, /pure transition core와 얇은 adapter/)
+  assert.match(changeability, /미래 가능성만으로\s*\n?\s*단일 runtime에 adapter를 추가하지 않는다/)
+  assert.match(changeability, /hook.*반환.*대상 레포.*관례/is)
+  assert.doesNotMatch(changeability, /^## React 구현 교차 점검$/m)
+  assert.doesNotMatch(changeability, /^## Implementation Decision 형식$/m)
+  assert.doesNotMatch(changeability, /^## Reviewer 판정과 최소 수정$/m)
+  assert.match(changeability, /frontend-implementation\.md/)
+  assert.match(changeability, /implementation-loop\.md/)
+  assert.match(changeability, /subagent-review\.md/)
+
+  assert.match(skill, /references\/changeability\.md/)
+  assert.match(frontendImplementation, /changeability\.md/)
+  assert.doesNotMatch(frontendImplementation, /## 변경 용이성 렌즈/)
+  assert.match(implementationLoop, /changeability\.md/)
+
+  assert.match(implementationLoop, /\.ai\/oracles\/<oracle-id>\/implementation-decision\.md/)
+  assert.match(implementationLoop, /Changeability/)
+  assert.match(implementationLoop, /Side effects/)
+  assert.match(implementationLoop, /Simplicity/)
+  assert.match(implementationLoop, /material.*trade-off/s)
+  assert.match(implementationLoop, /boilerplate/)
+})
+
+test('O8-O10: reviews with the same changeability reference without turning taste into a blocker', async () => {
+  const [changeability, subagentReview] = await Promise.all([
+    read('references/changeability.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  for (const term of ['Readability', 'Predictability', 'Cohesion', 'Coupling', 'Simplicity']) {
+    assert.match(changeability, new RegExp(`## ${term}`))
+  }
+
+  assert.match(subagentReview, /changeability\.md/)
+  assert.match(subagentReview, /implementation-decision\.md/)
+  assert.match(subagentReview, /review-packet[\s\S]*--decision/)
+  assert.match(subagentReview, /changeabilityReview/)
+  assert.match(subagentReview, /PASS\s*\|\s*FINDING\s*\|\s*N\/A/)
+  assert.match(subagentReview, /숨은 부작용/)
+  assert.match(subagentReview, /PRODUCT_DEFECT/)
+  assert.match(subagentReview, /EVIDENCE_GAP/)
+  assert.match(subagentReview, /POLICY_GAP/)
+  assert.match(subagentReview, /NON_ORACLE_OPINION/)
+  assert.match(subagentReview, /Decision 반증 질문 — 적용 가능한 항목만/)
+  for (const question of [
+    '왜 이 범위까지 변경했는가',
+    '왜 이 상태는 local 또는 global owner가 소유하는가',
+    '요구가 바뀌면 어디를 수정하고 어디까지 전파되는가',
+    '왜 이 component·abstraction을 공유하는가',
+    '왜 중복을 남겼는가',
+    '왜 이 type·state model의 복잡성이 필요한가',
+    '이 경계는 어떤 오류를 복구하고 무엇을 상위로 전파하는가',
+    '검증하지 않은 계약은 무엇이며 왜 제외했는가',
+    '성능 문제나 개선 claim의 근거가 있는가',
+    '다음 우선순위는 무엇인가',
+  ]) {
+    assert.match(subagentReview, new RegExp(question.replaceAll('?', '\\?')))
+  }
+  assert.match(subagentReview, /문장력만으로 finding을 만들지 않는다/)
+  assert.match(subagentReview, /전면 리팩터링/)
+  assert.match(subagentReview, /최소 수정/)
+})
+
+test('O2: 기존 Oracle Delivery gate를 유지한다', async () => {
+  const [skill, oracleCard, implementationLoop] = await Promise.all([
+    read('SKILL.md'),
+    read('references/oracle-card.md'),
+    read('references/implementation-loop.md'),
+  ])
+
+  for (const contract of ['VALID_RED', 'oracle-lock.mjs', 'oracle-run.mjs', 'evidence.json']) {
+    assert.match(`${skill}\n${oracleCard}\n${implementationLoop}`, new RegExp(contract.replace('.', '\\.')))
+  }
+})
+
+test('O7: 조건부 품질 계약과 human-first 보고를 안내한다', async () => {
+  const [skill, oracleCard, frontendImplementation, implementationLoop, architecture, review] = await Promise.all([
+    read('SKILL.md'),
+    read('references/oracle-card.md'),
+    read('references/frontend-implementation.md'),
+    read('references/implementation-loop.md'),
+    read('references/architecture-contract.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  assert.match(oracleCard, /## Outcome Brief/)
+  assert.match(oracleCard, /mandatory-constraint/)
+  assert.match(frontendImplementation, /## TypeScript 계약/)
+  assert.match(frontendImplementation, /accessible name/)
+  assert.match(frontendImplementation, /baseline run/)
+  assert.match(implementationLoop, /Type contract/)
+  assert.match(implementationLoop, /Performance: claim/)
+  assert.match(architecture, /## Exported Public API 계약 — 조건부/)
+  assert.match(review, /mandatory constraint/)
+  assert.match(skill, /결과: Actor\/context/)
+  assert.match(skill, /증거 부록:/)
+})
+
+test('O8: 카드 schema version 분기와 migration을 추가하지 않는다', async () => {
+  const [oracleCard, verifier] = await Promise.all([
+    read('references/oracle-card.md'),
+    read('scripts/oracle-verify.mjs'),
+  ])
+
+  assert.doesNotMatch(oracleCard, /Oracle-Card-Version/)
+  assert.doesNotMatch(verifier, /ORACLE_CARD_VERSION|cardSchemaVersion/)
+})
+
+test('state-modeling: derives discriminated union state contracts from card rows only', async () => {
+  const [skill, oracleCard, frontendImplementation, stateModeling, verifier] = await Promise.all([
+    read('SKILL.md'),
+    read('references/oracle-card.md'),
+    read('references/frontend-implementation.md'),
+    read('references/state-modeling.md'),
+    read('scripts/oracle-verify.mjs'),
+  ])
+
+  assert.match(verifier, /state-model-missing/)
+  assert.match(verifier, /state-model-row-unlinked/)
+  assert.match(verifier, /state-model-row-unknown/)
+  assert.match(verifier, /ASYNC_STATE_TOKENS/)
+
+  assert.match(skill, /references\/state-modeling\.md/)
+  assert.match(skill, /discriminated union 타입 계약/)
+  assert.match(oracleCard, /## State Model/)
+  assert.match(oracleCard, /참조 없는 전이는 발명된 정책이다/)
+  assert.match(frontendImplementation, /state-modeling\.md/)
+  assert.match(stateModeling, /단일 `status` 문자열 literal discriminant/)
+  assert.match(stateModeling, /`POLICY_GAP`으로 `NEEDS_DECISION`/)
+  assert.match(stateModeling, /switch-exhaustiveness-check/)
+  assert.match(stateModeling, /설치돼 있거나 도입이 승인된 경우만/)
+  assert.doesNotMatch(stateModeling, /단순 toggle을 위해 XState/)
+})
