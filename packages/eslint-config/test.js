@@ -111,6 +111,20 @@ const main = async () => {
     '@tanstack/query/exhaustive-deps',
   )
 
+  // The state-modeling rules read TS type nodes through the base preset's parser.
+  await assertReports(
+    [BASE, path.join(__dirname, 'local-rules.js')],
+    "type Save = { status: 'idle' | 'saving'; error?: string }\n",
+    'sample-state.tsx',
+    '@lodado/local-rules/require-discriminated-state',
+  )
+  await assertReports(
+    [BASE, path.join(__dirname, 'local-rules.js')],
+    'export const payload = (await response.json()) as Payment\n',
+    'sample-boundary.tsx',
+    '@lodado/local-rules/no-response-type-assertion',
+  )
+
   // strict-types needs type information, so it lints a real on-disk fixture file.
   const strictFixture = path.join(__dirname, 'strict-types-fixture')
   const strictEslint = new ESLint({

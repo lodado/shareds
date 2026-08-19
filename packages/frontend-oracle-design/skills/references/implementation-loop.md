@@ -45,9 +45,10 @@ screenshot과 direct-browser 실행은 이 문서에 넣지 않고 사용자가 
 겹치지 않는 파일 소유권으로 worker를 최대 2개까지 병렬 실행하고, 합친 뒤 targeted
 GREEN을 1회 실행한다. 작은 diff는 agent를 만들지 않는다.
 
-targeted GREEN 뒤에는 root test·lint·format과 독립 review를 병렬 실행한다. 모든 결과가
-합류하고 유효 finding이 반영된 뒤 final verify를 직렬로 1회 실행한다. 어느 한 결과만으로
-완료 처리하지 않는다.
+targeted GREEN 뒤에는 root test·lint·format과 독립 review를 병렬 실행한다. 각 명령의
+`exec`가 runId reservation을 원자적으로 만들므로 같은 ledger를 병렬 사용해도 runId가
+충돌하지 않는다. 모든 결과가 합류하고 유효 finding이 반영된 뒤 final verify를 직렬로
+1회 실행한다. 어느 한 결과만으로 완료 처리하지 않는다.
 
 ## 0. 판정 명령은 ledger로 실행한다
 
@@ -361,8 +362,26 @@ node <skill-dir>/scripts/oracle-run.mjs transition \
   --findings .ai/oracles/<oracle-id>/findings-code-reviewer.json
 ```
 
-High risk는 두 번째 reviewer 파일을 `--intersect`로 함께 넘긴다. 다만 critical/high
-finding은 한쪽에만 있어도 review를 막는다.
+High risk는 GREEN 뒤 guard를 제거한 reported failing run과 영향받은 카드 행을
+`--mutation-run`·`--mutation-row`로 넘기고, guard 복구 뒤 위와 같은 GREEN command를
+review run으로 다시 통과시킨다. runner는 GREEN 대비 production digest가 mutation에서
+바뀌고 review 전에 정확히 돌아왔는지도 검사한다. 둘 중 하나가 없으면
+`MUTATION_EVIDENCE_REQUIRED`, 순서·실패·reporter·digest 조건이 맞지 않으면
+`MUTATION_EVIDENCE_INVALID`로 전이를 막는다.
+두 번째 reviewer 파일도 `--intersect`로 함께 넘긴다. 다만 critical/high finding은
+한쪽에만 있어도 review를 막는다.
+
+```bash
+node <skill-dir>/scripts/oracle-run.mjs transition \
+  --dir .ai/oracles/<oracle-id> \
+  --to REVIEW_VERIFIED \
+  --run r-012 \
+  --evidence .ai/oracles/<oracle-id>/evidence.json \
+  --findings .ai/oracles/<oracle-id>/findings-code-reviewer.json \
+  --intersect .ai/oracles/<oracle-id>/findings-second-reviewer.json \
+  --mutation-run r-011 \
+  --mutation-row O3
+```
 
 ## 금지
 

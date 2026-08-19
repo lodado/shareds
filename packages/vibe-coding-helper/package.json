@@ -1,6 +1,6 @@
 {
   "name": "@lodado/vibe-coding-helper-plugin",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Claude Code / Codex plugin - distributed via the repo marketplace, not npm",
   "private": true,
   "license": "MIT"
