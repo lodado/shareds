@@ -110,6 +110,23 @@ const main = async () => {
     'sample-query.tsx',
     '@tanstack/query/exhaustive-deps',
   )
+
+  // strict-types needs type information, so it lints a real on-disk fixture file.
+  const strictFixture = path.join(__dirname, 'strict-types-fixture')
+  const strictEslint = new ESLint({
+    useEslintrc: false,
+    cwd: strictFixture,
+    baseConfig: {
+      extends: [BASE, path.join(__dirname, 'strict-types.js')],
+      parserOptions: { project: path.join(strictFixture, 'tsconfig.json'), tsconfigRootDir: strictFixture },
+    },
+  })
+  const [strictResult] = await strictEslint.lintFiles([path.join(strictFixture, 'sample.ts')])
+  assert.ok(
+    strictResult.messages.some((message) => message.ruleId === '@typescript-eslint/switch-exhaustiveness-check'),
+    `strict-types: switch-exhaustiveness-check did not report: ${JSON.stringify(strictResult.messages)}`,
+  )
+  console.log('ok  strict-types/switch-exhaustiveness-check reports')
 }
 
 main().catch((error) => {

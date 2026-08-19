@@ -42,6 +42,11 @@ test만 소유하며 visual baseline을 만들거나 `BROWSER_VERIFIED`를 발�
 그것에 위임한다. production 코드는 public surface·wiring 조사 자료일 뿐 기대
 결과의 출처가 아니다.
 
+새 테스트 파일을 만들기 전에 같은 Oracle 행과 사용자 관찰 결과를 검증하는 기존
+테스트를 찾는다. **가능한 기존 테스트가 있다면 재활용한다.** 단, Then·Never·부작용
+횟수를 정확히 assert하고 테스트 독립성과 소유 경계를 유지할 수 있어야 한다. 그렇지
+않을 때만 가장 가까운 owner에 새 테스트를 추가한다.
+
 FSD 레포에서는 테스트 locality도 architecture 계약으로 취급한다. 레포가 다른 위치를
 명시적으로 강제하지 않으면 테스트를 slice 밖의 중앙 `tests/`·`e2e/`에 만들지 않는다.
 

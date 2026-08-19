@@ -67,6 +67,20 @@ const VALID_CARD = `# Sample Oracle Card
 | ID  | 정책 | 축   | 계약                  | Never     | 출처 | 증거 계층 |
 | --- | ---- | ---- | --------------------- | --------- | ---- | --------- |
 | D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1   | HARD      |
+
+## State Model
+
+- States: idle, pending, error, done
+- Events: SUBMIT, DUPLICATE_SUBMIT, ERROR_5XX, RETRY, RESPONSE_OK, LATE_RESPONSE, CANCEL
+
+| From    | Event            | To      | 행             |
+| ------- | ---------------- | ------- | -------------- |
+| idle    | SUBMIT           | pending | O1             |
+| pending | DUPLICATE_SUBMIT | pending | O2             |
+| pending | ERROR_5XX        | error   | O3             |
+| error   | RETRY            | pending | O4             |
+| pending | RESPONSE_OK      | done    | O5, O6, O7     |
+| pending | CANCEL           | idle    | O8             |
 `
 
 async function cardFile(t, content = VALID_CARD) {
@@ -315,6 +329,92 @@ test('O17: 자동 TC 단어가 계약 행 밖에만 있으면 충족으로 보�
   assert.equal(linted.status, 1)
   assert.match(linted.stderr, /missing-auto-tc/)
   assert.match(linted.stderr, /out-of-order/)
+})
+
+test('state-model: async 행이 있는데 State Model 섹션이 없으면 실패한다', async (t) => {
+  const withoutStateModel = VALID_CARD.slice(0, VALID_CARD.indexOf('## State Model'))
+
+  const linted = run('card', '--oracle', await cardFile(t, withoutStateModel))
+
+  assert.equal(linted.status, 1)
+  assert.match(linted.stderr, /state-model-missing/)
+  assert.match(linted.stderr, /O1/)
+})
+
+test('state-model: 전이가 카드 행을 인용하지 않거나 없는 행을 인용하면 실패한다', async (t) => {
+  const unlinked = VALID_CARD.replace(
+    '| idle    | SUBMIT           | pending | O1             |',
+    '| idle    | SUBMIT           | pending | -              |',
+  )
+  const unknown = VALID_CARD.replace(
+    '| idle    | SUBMIT           | pending | O1             |',
+    '| idle    | SUBMIT           | pending | O99            |',
+  )
+
+  const missingCite = run('card', '--oracle', await cardFile(t, unlinked))
+  assert.equal(missingCite.status, 1)
+  assert.match(missingCite.stderr, /state-model-row-unlinked/)
+
+  const unknownCite = run('card', '--oracle', await cardFile(t, unknown))
+  assert.equal(unknownCite.status, 1)
+  assert.match(unknownCite.stderr, /state-model-row-unknown/)
+  assert.match(unknownCite.stderr, /O99/)
+})
+
+test('state-model: States·Events가 비어 있거나 전이표가 없으면 실패한다', async (t) => {
+  const emptyStates = VALID_CARD.replace('- States: idle, pending, error, done', '- States: TBD')
+  const noTable = VALID_CARD.replace(/\| From[\s\S]*?\| pending \| CANCEL[^\n]*\n/, '')
+
+  const states = run('card', '--oracle', await cardFile(t, emptyStates))
+  assert.equal(states.status, 1)
+  assert.match(states.stderr, /state-model-field: State Model must list concrete States/)
+
+  const table = run('card', '--oracle', await cardFile(t, noTable))
+  assert.equal(table.status, 1)
+  assert.match(table.stderr, /state-model-transitions/)
+})
+
+test('state-model: async 토큰이 없는 카드는 State Model 없이 통과한다', async (t) => {
+  const syncCard = `# Static Card
+
+## Outcome Brief
+
+- Actor and context: 안내 문구를 읽는 사용자
+- Observable success: 안내 문구가 표시된다.
+- Non-goals: 문구 재작성
+- Worst regression: 문구 누락
+- Reversibility: 변경 commit revert
+- Sources: S1
+
+## Source Registry
+
+| ID  | Kind           | 관할      | 기준 | 위치·version    | 승인 상태 |
+| --- | -------------- | --------- | ---- | --------------- | --------- |
+| S1  | product-policy | 안내 정책 | PRD  | docs/info.md#v1 | approved  |
+
+## User Confirmation
+
+- Status: approved
+- Source: user message Q-confirmation
+
+## 결정된 정책
+
+- P1: 안내 문구를 항상 표시한다. (출처: S1) (행: O1)
+
+자동 추가 TC: 중복 N/A (출처: S1), 오류 N/A (출처: S1), 재시도 N/A (출처: S1),
+빈 데이터 0건 N/A (출처: S1), 로딩 N/A (출처: S1), out-of-order N/A (출처: S1),
+취소 N/A (출처: S1)
+
+## Behavior Contract
+
+| ID  | 정책 | Given     | When      | Then           | Never     | 부작용(종류×횟수) | BVA       |
+| --- | ---- | --------- | --------- | -------------- | --------- | ----------------- | --------- |
+| O1  | P1   | 화면 진입 | 렌더 완료 | 안내 문구 표시 | 문구 누락 | 요청×0            | 값: 문구  |
+`
+
+  const linted = run('card', '--oracle', await cardFile(t, syncCard))
+
+  assert.equal(linted.status, 0, linted.stderr)
 })
 
 const EVIDENCE_CARD = `# Card

@@ -214,6 +214,36 @@ Draft 단계에서는 `Status: draft`로 유지한다. 사용자가 카드 전�
 | O3  | P2   | pending   | 서버 5xx   | 오류+입력 유지 | 성공 UI, 입력 유실 | 성공 저장×0 | 상태: error   |
 ```
 
+### State Model — async 흐름이 있는 Medium/High만
+
+카드에 async·순서 역전·중복 제출·retry·다단계 상태 `O*` 행이 있으면 계약 행 뒤에
+`## State Model`을 추가한다. 정적 표시나 단순 toggle에는 만들지 않는다.
+`oracle-verify.mjs card`가 이를 기계로 강제한다: `O*` 행의 `Given`·`When`·`BVA`에
+pending·loading·retry·역전·중복·timeout·취소류 토큰이 있으면 `## State Model` 섹션,
+비어 있지 않은 `States`·`Events`, 그리고 모든 전이가 실제 `O*` 행을 인용하는
+전이표 없이는 `CARD_LINT_FAILED`로 lock이 막힌다.
+
+```markdown
+## State Model
+
+- States: editing, submitting, success, failure
+- Events: SUBMIT, RESPONSE_OK, RESPONSE_ERROR
+
+| From       | Event          | To         | 행  |
+| ---------- | -------------- | ---------- | --- |
+| editing    | SUBMIT         | submitting | O1  |
+| submitting | SUBMIT         | submitting | O2  |
+| submitting | RESPONSE_OK    | success    | O4  |
+| submitting | RESPONSE_ERROR | failure    | O3  |
+```
+
+- 상태·이벤트는 `O*` 행의 `Given`·`When`·`Then`에서만 도출하고, 표의 모든 전이는
+  행 ID를 참조한다. 참조 없는 전이는 발명된 정책이다.
+- `상태 × 이벤트`에서 빈 조합은 불가능(타입으로 표현 불가)인지, 미결 정책인지
+  구분한다. 미결이면 `NEEDS_DECISION`이며 "무시"를 기본값으로 채우지 않는다.
+- 이 섹션은 카드 bytes에 포함되어 함께 잠긴다. 구현 시 discriminated union 번역은
+  [`state-modeling.md`](state-modeling.md)가 담당한다.
+
 ## 6. Adversarial self-review
 
 각 행에 네 질문을 적용하고 반례가 나오면 행을 보강한다.

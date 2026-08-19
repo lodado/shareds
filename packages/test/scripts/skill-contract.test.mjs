@@ -18,6 +18,7 @@ test('ships the frontend test contract with its required BVA reference', async (
   assert.match(skill, /name: test/)
   assert.match(skill, /references\/bva\.md/)
   assert.match(skill, /VALID_RED 술어/)
+  assert.match(skill, /가능한 기존 테스트가 있다면 재활용한다/)
   assert.equal(bundledBva, oracleBva)
 })
 

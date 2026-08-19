@@ -69,7 +69,8 @@ const canSubmit = !isLoading && !isLocked && user != null && amount > 0
 
 호출자가 이름, 입력, 반환값으로 결과와 외부 부작용을 예상할 수 있어야 한다. 내부
 알고리즘은 숨길 수 있지만 request, navigation, storage, analytics, timer 같은 외부
-write의 종류·시점·횟수는 이름 붙은 owner와 경계에서 보여야 한다.
+write의 종류·시점·횟수는 이름 붙은 owner와 경계에서 보여야 한다. 외부 API는 사용자
+intent로 읽히게 만들되 내부 상태 전이와 lifecycle을 모호한 자동화로 숨기지 않는다.
 
 ### 핵심 패턴
 
@@ -79,6 +80,8 @@ write의 종류·시점·횟수는 이름 붙은 owner와 경계에서 보여야
 | render·selector가 외부 상태를 쓴다   | event·mutation·외부 동기화 effect로 옮긴다            | 해당하지 않음                             |
 | 성공·실패 handler가 write를 중복한다 | 실행 owner와 정확한 횟수를 한 경계로 모은다           | 서로 다른 승인 부작용이다                 |
 | timer·subscription cleanup이 없다    | 생성한 경계에서 cleanup한다                           | runtime이 lifecycle을 명시적으로 소유한다 |
+| 닫힘·제거·결과 확정이 한 boolean이다 | 관찰 결과가 다른 전이만 이름과 owner를 나눈다         | 같은 시점의 원자적 전이다                 |
+| 국소 경계가 모든 오류를 소비한다     | 복구 가능한 오류만 처리하고 나머지는 상위로 전파한다  | 앱 최상위 격리·관측 경계다                |
 
 ```ts
 const balance = await fetchBalance()
@@ -95,12 +98,17 @@ saveLastViewedBalance(balance)
   않는다.
 - effect는 observer, subscription, timer, DOM 또는 외부 SDK 동기화에만 쓰며 대상과
   cleanup을 드러낸다.
+- 요청·overlay·다단계 flow는 시작·취소·성공·실패·시각적 닫힘·resource 제거가 실제로
+  다른 결과나 cleanup을 만들 때만 별도 전이로 모델링한다. 단순 toggle은 늘리지 않는다.
+- 국소 catch·Error Boundary는 자신이 복구할 수 있는 오류만 처리한다. 알 수 없는 오류와
+  fallback 자체 오류는 원인을 보존해 상위 경계로 전파한다.
 - SSR code는 browser global 접근 시점과 server fallback을 경계에서 예측할 수 있게 한다.
 - 기존 logging·telemetry boundary나 캡슐화된 workflow를 개인 선호로 해체하지 않는다.
 
 ### Implementation Decision evidence · Reviewer 판정 기준
 
-- Decision에는 외부 write의 owner, 실행 시점과 실패·재시도 시 횟수를 기록한다.
+- Decision에는 외부 write의 owner, 실행 시점과 실패·재시도 시 횟수, material한
+  lifecycle 전이와 오류 전파 경계를 기록한다.
 - 호출자가 알 수 없는 write, cleanup 누락이나 중복 부작용은 구체 evidence가 있으면
   `PRODUCT_DEFECT`, 필요한 검증만 없으면 `EVIDENCE_GAP`이다.
 - 관찰 결과를 새로 정해야 하면 `POLICY_GAP`, explicit handler 선호만 다르면
@@ -157,6 +165,7 @@ const isCouponCodeValid = couponCode.length <= 20
 | UI가 transport DTO·query key를 안다              | mapper/model owner에서 render-ready 값으로 바꾼다 | UI 자체가 그 contract의 owner다        |
 | 짧은 props 전달 때문에 store·context를 만든다    | 가장 가까운 common owner에서 전달한다             | 실제로 넓게 공유하는 상태다            |
 | interface·adapter가 구현 하나를 감싼다           | 구현을 직접 사용한다                              | 현재 여러 구현 또는 호환성 계약이 있다 |
+| 동일 flow가 여러 platform API에 직접 묶인다      | pure transition core와 얇은 adapter로 나눈다      | 현재 runtime 하나만 지원한다           |
 
 ```tsx
 function BalanceCard({ balance }: { balance: number }) {
@@ -172,12 +181,16 @@ UI가 `BalanceApiResponse` 전체를 받을 필요가 없으면 필요한 값만
 - FSD는 대상 레포가 이미 사용하거나 도입이 승인됐을 때만 그 public API를 따른다.
 - custom hook은 consumer가 필요한 값과 intent action만 반환한다. tuple/object 형태는
   대상 레포 관례를 따르며 transport, cache와 UI copy를 동시에 노출하지 않는다.
+- 둘 이상의 승인된 router·runtime이 같은 flow를 공유할 때만 순수 state·transition을
+  core에 두고 URL·navigation·browser API를 adapter가 소유하게 한다. 미래 가능성만으로
+  단일 runtime에 adapter를 추가하지 않는다.
 - 승인된 design system·domain API나 동일한 권한·통화·identity invariant를 local 복제로
   우회하지 않는다.
 
 ### Implementation Decision evidence · Reviewer 판정 기준
 
-- Decision에는 public/global/shared surface와 실제 consumer, DTO 변환 owner를 기록한다.
+- Decision에는 public/global/shared surface와 실제 consumer, DTO 변환 owner, platform
+  adapter가 있으면 현재 공유 runtime을 기록한다.
 - 불필요하게 넓은 surface, transport 누수나 승인된 import boundary 위반이 구체 변경
   전파 위험을 만들면 `FINDING`이다.
 - context·props·barrel에 대한 개인 선호만 다르면 `NON_ORACLE_OPINION`이다.
@@ -263,3 +276,6 @@ memoization·cache·lazy loading과 단일 request를 위한 global state다.
 - 변경 용이성 정의와 사례: [Frontend Fundamentals](https://github.com/toss/frontend-fundamentals/blob/161d3d6a0d6d372eacd75036de567511643f6265/fundamentals/code-quality/code/index.md), commit `161d3d6a0d6d372eacd75036de567511643f6265`.
 - React lifecycle·SSR·cleanup 보조 근거: [react-simplikit](https://github.com/toss/react-simplikit/blob/85d19c3816afca9a84ffbd5b7ff581962cb5db4c/docs/ko/core/design-principles.md), commit `85d19c3816afca9a84ffbd5b7ff581962cb5db4c`.
 - built-in·단순 API·측정 원칙: [es-toolkit](https://github.com/toss/es-toolkit/blob/5dc4477f838b8cee2b6b09af4f373be2b3aaaa54/AGENTS.md), commit `5dc4477f838b8cee2b6b09af4f373be2b3aaaa54`.
+- 관찰 결과가 다른 close·unmount lifecycle: [overlay-kit event contract](https://github.com/toss/overlay-kit/blob/8f0e59ca653932b44dc19d5002c7dea253682c53/packages/src/event.ts), commit `8f0e59ca653932b44dc19d5002c7dea253682c53`.
+- 처리 가능한 오류만 잡고 나머지를 전파하는 경계: [Suspensive ErrorBoundary](https://github.com/toss/suspensive/blob/c9ada0a088fe6fdb14440935edf01b7a0680d1ae/packages/react/src/ErrorBoundary.tsx), commit `c9ada0a088fe6fdb14440935edf01b7a0680d1ae`.
+- typed transition core와 router adapter 분리: [use-funnel core](https://github.com/toss/use-funnel/blob/26a9aa78723b84178e40eadab38378a052dcaf12/packages/core/src/core.ts), [Next adapter](https://github.com/toss/use-funnel/blob/26a9aa78723b84178e40eadab38378a052dcaf12/packages/next/src/useFunnel.tsx), commit `26a9aa78723b84178e40eadab38378a052dcaf12`.

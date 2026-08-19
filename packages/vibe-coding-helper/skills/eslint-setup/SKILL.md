@@ -29,6 +29,7 @@ module.exports = {
     '@lodado/eslint-config/local-rules', // lodado custom rules - see the table below
     '@lodado/eslint-config/testing', // Vitest/Testing Library + Playwright, scoped by file path
     '@lodado/eslint-config/query', // packages using TanStack Query
+    '@lodado/eslint-config/strict-types', // typed lint - exhaustive discriminated union switches
   ],
 }
 ```
@@ -42,6 +43,13 @@ module.exports = {
 | Next.js app                      | base + react + next + a11y + local-rules + testing |
 | Any package inside a turborepo   | add turbo                                          |
 | Any package using TanStack Query | add query                                          |
+| Any package with a tsconfig      | add strict-types                                   |
+
+`strict-types` needs type information. It ships `parserOptions.project: true` (nearest
+tsconfig.json); override `parserOptions.project` in the consuming config when that guess is
+wrong (for example a monorepo package linting files owned by a different tsconfig). It turns on
+`@typescript-eslint/switch-exhaustiveness-check` as an error with redundant defaults also
+reported, so every switch over a discriminated union must name all states.
 
 `testing` routes by path on its own: `*.test.*` / `*.spec.*` get the Vitest and Testing Library
 rules, `e2e/**`, `*.e2e.*` and `playwright/**` get the Playwright rules. Nothing else is touched,

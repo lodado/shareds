@@ -180,11 +180,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.5.0')
+  assert.equal(version, '0.6.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.5.0')
+  assert.equal(marketplace.version, '0.6.0')
 })
 
 test('reuses the repository network boundary and colocates approved MSW handlers', async () => {
@@ -381,6 +381,13 @@ test('O1-O7: loads one detailed changeability reference before implementation de
   assert.match(changeability, /abec04157e2c6eac5be1e59b1a82863a138c6c66/)
   assert.match(changeability, /85d19c3816afca9a84ffbd5b7ff581962cb5db4c/)
   assert.match(changeability, /5dc4477f838b8cee2b6b09af4f373be2b3aaaa54/)
+  assert.match(changeability, /8f0e59ca653932b44dc19d5002c7dea253682c53/)
+  assert.match(changeability, /c9ada0a088fe6fdb14440935edf01b7a0680d1ae/)
+  assert.match(changeability, /26a9aa78723b84178e40eadab38378a052dcaf12/)
+  assert.match(changeability, /내부 상태 전이와 lifecycle을 모호한 자동화로 숨기지 않는다/)
+  assert.match(changeability, /복구 가능한 오류만 처리하고 나머지는 상위로 전파한다/)
+  assert.match(changeability, /pure transition core와 얇은 adapter/)
+  assert.match(changeability, /미래 가능성만으로\s*\n?\s*단일 runtime에 adapter를 추가하지 않는다/)
   assert.match(changeability, /hook.*반환.*대상 레포.*관례/is)
   assert.doesNotMatch(changeability, /^## React 구현 교차 점검$/m)
   assert.doesNotMatch(changeability, /^## Implementation Decision 형식$/m)
@@ -422,6 +429,22 @@ test('O8-O10: reviews with the same changeability reference without turning tast
   assert.match(subagentReview, /EVIDENCE_GAP/)
   assert.match(subagentReview, /POLICY_GAP/)
   assert.match(subagentReview, /NON_ORACLE_OPINION/)
+  assert.match(subagentReview, /Decision 반증 질문 — 적용 가능한 항목만/)
+  for (const question of [
+    '왜 이 범위까지 변경했는가',
+    '왜 이 상태는 local 또는 global owner가 소유하는가',
+    '요구가 바뀌면 어디를 수정하고 어디까지 전파되는가',
+    '왜 이 component·abstraction을 공유하는가',
+    '왜 중복을 남겼는가',
+    '왜 이 type·state model의 복잡성이 필요한가',
+    '이 경계는 어떤 오류를 복구하고 무엇을 상위로 전파하는가',
+    '검증하지 않은 계약은 무엇이며 왜 제외했는가',
+    '성능 문제나 개선 claim의 근거가 있는가',
+    '다음 우선순위는 무엇인가',
+  ]) {
+    assert.match(subagentReview, new RegExp(question.replaceAll('?', '\\?')))
+  }
+  assert.match(subagentReview, /문장력만으로 finding을 만들지 않는다/)
   assert.match(subagentReview, /전면 리팩터링/)
   assert.match(subagentReview, /최소 수정/)
 })
@@ -469,4 +492,30 @@ test('O8: 카드 schema version 분기와 migration을 추가하지 않는다', 
 
   assert.doesNotMatch(oracleCard, /Oracle-Card-Version/)
   assert.doesNotMatch(verifier, /ORACLE_CARD_VERSION|cardSchemaVersion/)
+})
+
+test('state-modeling: derives discriminated union state contracts from card rows only', async () => {
+  const [skill, oracleCard, frontendImplementation, stateModeling, verifier] = await Promise.all([
+    read('SKILL.md'),
+    read('references/oracle-card.md'),
+    read('references/frontend-implementation.md'),
+    read('references/state-modeling.md'),
+    read('scripts/oracle-verify.mjs'),
+  ])
+
+  assert.match(verifier, /state-model-missing/)
+  assert.match(verifier, /state-model-row-unlinked/)
+  assert.match(verifier, /state-model-row-unknown/)
+  assert.match(verifier, /ASYNC_STATE_TOKENS/)
+
+  assert.match(skill, /references\/state-modeling\.md/)
+  assert.match(skill, /discriminated union 타입 계약/)
+  assert.match(oracleCard, /## State Model/)
+  assert.match(oracleCard, /참조 없는 전이는 발명된 정책이다/)
+  assert.match(frontendImplementation, /state-modeling\.md/)
+  assert.match(stateModeling, /단일 `status` 문자열 literal discriminant/)
+  assert.match(stateModeling, /`POLICY_GAP`으로 `NEEDS_DECISION`/)
+  assert.match(stateModeling, /switch-exhaustiveness-check/)
+  assert.match(stateModeling, /설치돼 있거나 도입이 승인된 경우만/)
+  assert.doesNotMatch(stateModeling, /단순 toggle을 위해 XState/)
 })
