@@ -103,10 +103,18 @@ Oracle, 대상 레포 계약과 실제 설치 버전이 항상 우선한다.
   `useSuspenseQuery`를 기본으로 한다. polling이나 background refetch가 있다는 이유만으로
   일반 `useQuery`로 내리지 않는다. Suspense는 data가 없는 첫 read를, query의
   `isFetching`·`error`는 cached content가 있는 후속 동기화를 표현할 수 있다.
+- **경계로 올릴 수 있는 분기를 컴포넌트 안에 남기지 않는다.** 위 표에서 Suspense가
+  기본인 상황인데 컴포넌트 본문에 `status` 분기를 두면 리뷰 `FINDING`이다. 표의
+  다른 행에 해당해서 분기가 필요하면 그 실격 사유를 Implementation Decision에 적는다.
+- Suspense 경계 아래 query의 입력이 바뀌면 다시 data 없는 첫 read가 되어 fallback이
+  올라온다. 카드가 기존 content 유지를 요구하면 입력 변경을 `startTransition`으로
+  감싸고 pending 표시는 레이아웃을 흔들지 않는 수단으로 처리한다.
 - query retry는 `QueryErrorResetBoundary`와 Error Boundary를 함께 reset하되, 전체 cache를
   무차별 reset하지 말고 실패한 query/boundary 범위로 제한한다.
 - TanStack Query가 cached data가 있는 refetch error를 항상 boundary로 throw한다고
-  가정하지 않는다. stale content 유지·오류 노출 정책을 카드에서 확인한다.
+  가정하지 않는다. stale content 유지·오류 노출 정책을 카드에서 확인한다. 카드가
+  기존 content 유지를 요구하면 `throwOnError`를 data 부재 조건으로 좁혀 boundary가
+  이미 로드된 화면을 지우지 않게 한다.
 - `useSuspenseQuery`에 `enabled`·`placeholderData`가 있다고 가정하지 않으며, 취소가
   제품 계약이면 대상 버전의 제한을 확인하고 일반 query 등 더 맞는 수단을 택한다.
 - query key는 dependency처럼 다룬다. `queryFn` 결과에 영향을 주는 입력을 모두

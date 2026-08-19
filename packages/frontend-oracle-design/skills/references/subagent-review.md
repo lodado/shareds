@@ -211,6 +211,9 @@ reviewer는 아래 질문으로 사용자를 다시 인터뷰하거나 새 정�
 - Server Component로 충분한 일을 Client Component·TanStack Query로 옮기지 않았는가?
 - Suspense/Error Boundary가 필요한 subtree에만 있고 initial load·background refetch·
   mutation pending을 같은 상태로 취급하지 않았는가?
+- 무조건 실행되는 첫 조회의 loading·error를 경계로 올리지 않고 컴포넌트 안에서
+  분기했는가? 조건부 query·placeholder·취소 제약 같은 실격 사유가 Implementation
+  Decision에 없으면 `FINDING`이다.
 - retry가 실패한 query/boundary 범위만 복구하고 전체 cache를 무차별 reset하지 않는가?
 - micro-hook이 UI와 비즈니스 로직의 책임을 정확히 분리하는가? UI component는 semantic
   JSX·접근성·시각 상태·사용자 intent 연결만 소유하고, domain 판정·DTO 변환·query/cache·

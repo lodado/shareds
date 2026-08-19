@@ -54,10 +54,14 @@ union 작성은 3단이다. 1·2단에서 끝나는 문제에 3단을 쓰지 않
    `status`·`fetchStatus`, mutation의 `isPending`/`isSuccess`/`isError`는 이미
    discriminated contract고 최신 호출 기준 시간축 처리까지 포함한다. 같은 상태를
    `useState` 기계로 복사하지 않는다. 필수 파라미터가 없으면 non-null assertion
-   대신 `skipToken` 또는 API 부재로 표현한다. 로딩·로드 실패 분기는
-   Suspense·ErrorBoundary 경계로 올려 컴포넌트에서 제거할 수 있고, 세로 나열
-   가독성과 exhaustive 강제가 필요하면 자작 union 없이 라이브러리 union에
-   ts-pattern을 직접 물린다
+   대신 `skipToken` 또는 API 부재로 표현한다.
+   **로딩·로드 실패의 기본은 컴포넌트 분기가 아니라 경계다.** 무조건 실행되는 첫
+   조회는 `useSuspenseQuery`를 기본으로 두고 loading·error 분기를 국소
+   `<Suspense>`와 Error Boundary로 올려 컴포넌트 본문에서 제거한다. 상황별 판정
+   표는 [`frontend-implementation.md`](frontend-implementation.md) 3절이 소유하며
+   이 문서가 그 기본값을 덮지 않는다. 조건부 query·placeholder·취소 제약처럼
+   경계로 올릴 수 없는 나머지에만 분기를 남기고, 그때도 자작 union 없이 라이브러리
+   union에 ts-pattern을 직접 물린다
    (`match(mutation).with({ status: 'error', error: { code: 'CONFLICT' } }, …)`).
 3. **그래도 남는 진짜 client 상태만 `useState<Union>` + 의도 함수 hook으로 만든다.**
    raw `setState`·setter를 hook 밖으로 노출하지 않고, 도메인 의도를 표현하는 함수
@@ -232,6 +236,9 @@ literal 보존용 `as const`, 검증 함수 내부에 격리된 브랜드 생성
 - 파생 가능한 값을 별도 상태로 저장했거나, query·mutation 상태를 로컬 기계로
   복사했거나, raw setter를 hook 밖으로 노출했거나, 스키마·연산 union에서 파생
   가능한 타입을 수기로 복제 선언했으면 `FINDING`이다.
+- 무조건 실행되는 첫 조회의 loading·error를 경계로 올리지 않고 컴포넌트 안에서
+  분기했으면 `FINDING`이다. 조건부 query·placeholder·취소 제약 같은 실제 실격
+  사유를 Implementation Decision에 적었으면 아니다.
 - 사다리 1·2단으로 끝나는 문제에 union·기계를 도입했거나, 상태 분기에
   exhaustiveness 강제(기본 계층 이상)가 없으면 Decision의 예외 사유 없이는
   `FINDING`이다.

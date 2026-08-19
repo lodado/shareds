@@ -195,11 +195,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.7.2')
+  assert.equal(version, '0.7.3')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.7.2')
+  assert.equal(marketplace.version, '0.7.3')
 })
 
 test('reuses the repository network boundary and colocates approved MSW handlers', async () => {
@@ -548,4 +548,23 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
   assert.doesNotMatch(typeConstraints, /switch-exhaustiveness-check|`switch`/)
   assert.match(typeConstraints, /설치돼 있거나 도입이 승인된 경우만/)
   assert.doesNotMatch(typeConstraints, /단순 toggle을 위해 XState/)
+})
+
+test('prefers Suspense and Error Boundary over in-component loading branches', async () => {
+  const [frontendImplementation, typeConstraints, subagentReview] = await Promise.all([
+    read('references/frontend-implementation.md'),
+    read('references/type-constraints.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  assert.match(typeConstraints, /로딩·로드 실패의 기본은 컴포넌트 분기가 아니라 경계다/)
+  assert.match(typeConstraints, /frontend-implementation\.md.*3절이 소유/s)
+  assert.doesNotMatch(typeConstraints, /경계로 올려 컴포넌트에서 제거할 수 있고/)
+  assert.match(typeConstraints, /무조건 실행되는 첫 조회의 loading·error를 경계로 올리지 않고/)
+
+  assert.match(frontendImplementation, /경계로 올릴 수 있는 분기를 컴포넌트 안에 남기지 않는다/)
+  assert.match(frontendImplementation, /startTransition/)
+  assert.match(frontendImplementation, /throwOnError.*data 부재 조건으로 좁혀/s)
+
+  assert.match(subagentReview, /실격 사유가 Implementation\n  Decision에 없으면 `FINDING`이다/)
 })
