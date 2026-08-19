@@ -5,6 +5,7 @@ module.exports = {
   'fsd-no-driver-outside-repository': require('./fsd-no-driver-outside-repository'),
   'no-arbitrary-sleep-in-tests': require('./no-arbitrary-sleep-in-tests'),
   'no-boolean-state-flags': require('./no-boolean-state-flags'),
+  'no-complex-ternary': require('./no-complex-ternary'),
   'no-console-log': require('./no-console-log'),
   'no-css-locator-without-reason': require('./no-css-locator-without-reason'),
   'no-derived-state-effect': require('./no-derived-state-effect'),

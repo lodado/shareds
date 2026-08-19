@@ -242,7 +242,7 @@ pending·loading·retry·역전·중복·timeout·취소류 토큰이 있으면 
 - `상태 × 이벤트`에서 빈 조합은 불가능(타입으로 표현 불가)인지, 미결 정책인지
   구분한다. 미결이면 `NEEDS_DECISION`이며 "무시"를 기본값으로 채우지 않는다.
 - 이 섹션은 카드 bytes에 포함되어 함께 잠긴다. 구현 시 discriminated union 번역은
-  [`state-modeling.md`](state-modeling.md)가 담당한다.
+  [`type-constraints.md`](type-constraints.md)가 담당한다.
 
 ## 6. Adversarial self-review
 

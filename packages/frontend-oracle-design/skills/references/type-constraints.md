@@ -1,0 +1,220 @@
+# 타입 제약 설계 — AI 비결정성을 컴파일 계약으로 줄인다
+
+## 목적과 권위
+
+카드에 async·순서 역전·중복 제출·retry·다단계 상태 `O*` 행이 있거나, client 상태·
+Props·boundary 타입의 형태를 새로 만들거나 바꿀 때 사용한다. 이 문서는 제품 정책을
+만들지 않는다. 상태·전이·오류 분류는 전부 카드의 `O*` 행에서 도출하며, 카드에 없는
+상태나 전이가 필요해지면 발명하지 말고 `POLICY_GAP`으로 `NEEDS_DECISION`에 돌아간다.
+
+권위 순서는 [`frontend-implementation.md`](frontend-implementation.md)와 같다.
+이 문서의 도구·라이브러리 선택은 구현 휴리스틱이며 정책 출처가 아니다.
+
+모든 설계는 다음 질문으로 판정한다.
+
+> AI가 생성할 수 있었던 잘못된 코드 중 **무엇이 이제 컴파일되지 않는가?**
+
+이 질문에 구체적으로 답할 수 없는 타입 복잡성은 추가하지 않는다. 근거: LLM이 생성한
+TypeScript 컴파일 오류의 약 94%는 문법이 아니라 타입 위반이고(PLDI 2025), 스키마
+준수는 모델 개선(93%)이 아니라 결정적 제약으로만 100%가 됐다(OpenAI Structured
+Outputs). 프롬프트가 아니라 표현 불가능성이 결정성을 만든다.
+
+## 세 종류의 비결정성
+
+| 종류   | 문제                                                            | 담당                                                      |
+| ------ | --------------------------------------------------------------- | --------------------------------------------------------- |
+| 스냅샷 | 한 렌더 시점에 모순 조합이 표현 가능 (`isLoading && isSuccess`) | 타입 — discriminated union                                |
+| 선택   | 키·문자열·Props 조합·오류 처리를 AI가 임의로 고름               | 타입 — 닫힌 union, factory, registry                      |
+| 시간축 | 응답 순서 역전, 중복 제출, unmount 후 도착                      | **런타임** — abort signal, `isPending`, 멱등키, 서버 검증 |
+
+시간축은 타입으로 증명되지 않는다. union을 만들었다고 순서 문제가 "해결됨"이라고
+선언하면 `FINDING`이다. 남은 시간축 비결정성과 그 런타임 방어는 Implementation
+Decision에 반드시 기록한다.
+
+설계 전에 변경 대상에서 아래 여섯 지점을 찾고, **컴파일되지 않아야 할 잘못된
+사용을 최소 세 개 먼저 적는다** — exported API면 그대로 `.test-d.ts`의
+`@ts-expect-error` 케이스가 된다.
+
+| 찾을 것 | 예                                            | 치환                                 |
+| ------- | --------------------------------------------- | ------------------------------------ |
+| 값      | 넓은 `string`·`number`·`Date`                 | 브랜드·의미 타입                     |
+| 조합    | 관련 boolean 여러 개, 배타적인 optional Props | discriminated union, union + `never` |
+| 관계    | mode가 값·반환 타입을 결정하는데 타입에 없음  | generic lookup map, 별도 컴포넌트    |
+| 경로·키 | route·query key·field path 자유 문자열        | factory·`keyof`·파생 union           |
+| 결과    | 성공·실패·부재·유지·삭제가 `undefined` 하나에 | `Result`·연산 union                  |
+| 확장    | 소비자가 확장할 key가 `string`으로 열림       | typed registry·module augmentation   |
+
+## 상태 설계 사다리
+
+union 작성은 3단이다. 1·2단에서 끝나는 문제에 3단을 쓰지 않는다.
+
+1. **파생 가능하면 저장하지 않는다.** 원본에서 계산한다(`itemCount = items.length`).
+   타입이 강해도 중복 저장된 상태는 한쪽만 갱신된다.
+2. **라이브러리가 이미 union을 소유하면 그대로 소비한다.** TanStack Query의
+   `status`·`fetchStatus`, mutation의 `isPending`/`isSuccess`/`isError`는 이미
+   discriminated contract고 최신 호출 기준 시간축 처리까지 포함한다. 같은 상태를
+   `useState` 기계로 복사하지 않는다. 필수 파라미터가 없으면 non-null assertion
+   대신 `skipToken` 또는 API 부재로 표현한다. 로딩·로드 실패 분기는
+   Suspense·ErrorBoundary 경계로 올려 컴포넌트에서 제거할 수 있고, 세로 나열
+   가독성과 exhaustive 강제가 필요하면 자작 union 없이 라이브러리 union에
+   ts-pattern을 직접 물린다
+   (`match(mutation).with({ status: 'error', error: { code: 'CONFLICT' } }, …)`).
+3. **그래도 남는 진짜 client 상태만 `useState<Union>` + 의도 함수 hook으로 만든다.**
+   raw `setState`·setter를 hook 밖으로 노출하지 않고, 도메인 의도를 표현하는 함수
+   (`pick`, `submit`, `reset`)만 반환한다. 잘못된 상태에서 온 호출은 카드가 정한
+   대로 무시·오류 처리하고, 카드에 없으면 `POLICY_GAP`으로 `NEEDS_DECISION`이다.
+
+reducer·전이표·상태 기계는 기본값이 아니다. 순서 위반 자체가 카드의 도메인 오류인
+흐름(결제·다단계 제출·낙관적 롤백)에서만, 새 state-machine dependency는 필요가
+입증될 때만 쓴다. XState는 계층·병렬 상태나 actor 조율이 카드에 실제로 있을 때만
+후보이며, 설치돼 있거나 도입이 승인된 경우만 쓴다.
+
+## 카드에서 상태를 도출한다
+
+카드의 `## State Model` 섹션이 상태·이벤트·전이의 유일한 출처다.
+
+| 카드 열  | 타입 대응                                                |
+| -------- | -------------------------------------------------------- |
+| `Given`  | 출발 상태와 그 상태에서만 유효한 필드                    |
+| `When`   | 이벤트 (사용자 행동, 응답, 시간·순서 변화)               |
+| `Then`   | 도착 상태와 관찰 결과                                    |
+| `Never`  | 금지 상태 또는 금지 전이 — 타입으로 표현 불가하게 만든다 |
+| `부작용` | 전이에 결합된 외부 write의 종류와 횟수                   |
+
+`상태 × 이벤트`에서 빈 조합은 불가능(타입으로 표현 불가)인지 미결 정책인지
+구분한다. 미결이면 `NEEDS_DECISION`이며 "아마 무시"를 기본값으로 채우지 않는다.
+카드 행 ID를 참조하지 않는 전이는 발명된 정책이다.
+
+## 타입 작성 규칙
+
+**선언보다 파생.** 수기로 선언하는 타입은 정책이 담긴 두 종류 — 연산 union과 실패
+union — 뿐이다. entity·ID는 스키마에서 `z.output`으로, 부분집합은
+`Extract`·`Exclude`로, 유한 문자열 union은 `as const` 상수에서 파생한다. 파생
+가능한 타입을 수기로 복제하면 variant 추가 시 두 권위가 어긋난다. 수기 선언 수가
+파생 수보다 많아지면 설계를 재검토한다.
+
+```typescript
+type PaymentState =
+  | { status: 'editing'; amount: number; fieldErrors: FieldErrors }
+  | { status: 'submitting'; amount: number; requestId: string }
+  | { status: 'success'; paymentId: string }
+  | { status: 'failure'; amount: number; reason: PaymentFailure }
+```
+
+- 단일 `status` 문자열 literal discriminant를 쓴다. boolean 병렬 flag
+  (`isLoading`·`isError`·`isSuccess`)로 같은 흐름을 표현하지 않는다.
+- 각 상태의 필드는 **그 상태에서만 의미 있는 값**만 담는다. 전 상태 공통 optional
+  필드로 합치지 않는다. 상태가 4개 이상이면 variant record에서 union을 파생해
+  discriminant 오타와 중복을 없앨 수 있다:
+  ```typescript
+  type Steps = {
+    editing: { amount: number; fieldErrors: FieldErrors }
+    submitting: { amount: number; requestId: string }
+  }
+  type State = { [K in keyof Steps]: { status: K } & Steps[K] }[keyof Steps]
+  ```
+- 실패는 카드가 subtype을 구분하면 (`network`·`validation`·`5xx`) `reason`도
+  discriminated union으로 만든다. 문자열 하나로 뭉개지 않는다. 예상 가능한 실패를
+  반환값으로 처리해야 하면 `Result<T, ErrorUnion>` 형태의 닫힌 union을 쓰고,
+  `throw`는 결함(깨진 invariant) 전용으로 남긴다.
+- trust boundary(API 응답, storage, URL, message)의 값은 `unknown`에서 시작해
+  **파싱**으로 도메인 타입을 획득한다. 레포에 zod가 있으면 `z.discriminatedUnion()`
+  을 쓰고 타입은 `z.output`으로 파생한다 — 스키마와 interface를 중복 선언하지
+  않는다. 응답에 `as DomainType` 단언을 쓰지 않는다.
+- mutation payload는 entity의 `Partial`이 아니라 실제 연산 union으로 모델링한다
+  (`rename`·`clear-description`처럼). `undefined`가 "유지"인지 "삭제"인지 모호한
+  patch 타입을 만들지 않는다. 유지·설정·삭제가 모두 가능하면 연산을 분리한다.
+
+## Props와 API 표면
+
+- 상호 배타 Props는 union + `never`로 표현한다 (`href` 있는 link와 `onClick` 있는
+  action, controlled `value`와 uncontrolled `defaultValue`). 전부 optional인 한
+  객체로 만들지 않는다.
+- union 상태를 자식에 통째로 내리지 않는다. `Extract<State, { status: 'failure' }>`
+  로 좁힌 variant만 전달하고, 자식 안에서 재분기하지 않는다.
+- 유한한 문자열 집합은 `as const` 상수 하나에서 union·schema·registry를 파생한다.
+  route·query key·analytics event 이름은 factory를 경유하고 호출부에서 문자열을
+  조립하지 않는다.
+- 같은 원시 타입인데 혼동 시 실제 장애가 나는 값(서로 다른 ID, 단위, 검증 완료
+  값)만 tagged/branded type을 쓴다. 생성은 검증 함수 한 곳에 격리한다. 모든
+  문자열을 브랜드화하지 않는다.
+- helper는 타입 추론을 보존한다. 반환 타입을 넓게 annotation하거나 호출부에
+  generic 반복을 요구하는 helper는 만들지 않는다 (`queryOptions` 패턴).
+- 입력을 변경하지 않는 함수는 `readonly T[]`를 받는다.
+- mode가 값·반환 타입을 기계적으로 결정하면 generic lookup map으로 관계를
+  보존한다 (`{ single: Id | null; multiple: ReadonlySet<Id> }[M]`). mode별
+  hook·lifecycle·사용 의미가 다르면 generic 대신 별도 컴포넌트로 나눈다
+  (`Calendar.Single`·`Calendar.Range`). 제품이 일부 mode만 쓰면 그 mode만
+  구현하고 mode prop 자체를 만들지 않는다.
+- 제품 컴포넌트는 controlled-first — 한 값의 권위를 하나로 유지한다.
+  uncontrolled 병행 지원은 범용 라이브러리를 만들 때만 한다.
+- 닫힌 union(도메인 상태·오류·이벤트)과 소비자가 확장하는 열린 집합(플러그인
+  key, 앱 query key)을 구분한다. 열린 집합은 넓은 `string`이 아니라 typed
+  registry나 module augmentation으로 연다.
+- 타입 오류 메시지도 공개 API 품질이다. 소비자가 볼 오류가 "X is not assignable
+  to CalendarDate | null" 수준으로 읽히지 않으면 generic을 단순화하거나 API를
+  나눈다.
+
+## Exhaustiveness 강제
+
+dependency 없는 수단부터 쓰고, 라이브러리는 조건이 맞을 때만 도입한다.
+
+| 계층        | 수단                                                   | 조건                                   |
+| ----------- | ------------------------------------------------------ | -------------------------------------- |
+| 기본        | 상태별 early return·guard chain 뒤 공용 `assertNever`  | 항상. dependency 불필요                |
+| 선언적 매핑 | lookup 객체 + `satisfies Record<State['status'], ...>` | 상태별 결과가 정적 값·render 함수일 때 |
+| 라이브러리  | `ts-pattern`의 `.exhaustive()`                         | **설치돼 있거나 도입이 승인된 경우만** |
+
+variant별 설정(라벨·메시지·핸들러·권한)도 `satisfies Record<Union, Config>`로
+전체 union 커버를 강제한다. 새 variant 추가 시 모든 필수 소비 지점이 컴파일
+오류로 드러나야 하며, catch-all 기본 분기로 누락을 숨기지 않는다.
+
+타입 **형태** 일부는 기계로 잡는다. `@lodado/eslint-config/local-rules`를 쓰는
+레포는 다음 규칙이 이미 켜져 있다.
+
+| 규칙                          | 잡는 것                                                     |
+| ----------------------------- | ----------------------------------------------------------- |
+| `no-response-type-assertion`  | boundary payload를 파싱 대신 `as`로 단언                    |
+| `require-discriminated-state` | `status` literal union 옆의 optional 형제 필드              |
+| `no-boolean-state-flags`      | 한 흐름을 병렬 boolean flag나 boolean `useState` 2개로 표현 |
+
+`assertNever`는 레포에 이미 있으면 재사용하고, 없으면 공용 위치 하나에만 만든다.
+
+## 단언과 `any` 정책
+
+제품 코드에서 `value as DomainType`, `as unknown as`, non-null assertion,
+`@ts-ignore`, `any`로 타입 오류를 숨기지 않는다. 허용은 세 가지뿐이다:
+literal 보존용 `as const`, 검증 함수 내부에 격리된 브랜드 생성자, 라이브러리
+한계를 잇는 adapter 내부 단언. 격리된 단언에는 런타임 invariant 근거를 남긴다.
+외부 패키지가 `any`를 반환하면 즉시 `unknown`으로 받아 좁힌다.
+
+타입 오류가 나면 구현이 계약을 위반했는지, 계약이 실제 요구사항과 다른지 먼저
+판정한다. 근거 없이 필수 필드를 optional로 바꾸거나 union을 `string`으로 넓혀서
+오류를 없애지 않는다.
+
+## 검증 매핑
+
+- 카드 행 → 실패 테스트 매핑은 `$test` 계약대로 유지한다. 별도 "타입 테스트
+  layer"를 전 상태에 만들지 않는다.
+- exported shared/package API로 상태·Props 타입이 노출될 때만 불가능 사용이
+  컴파일되지 않음을 `@ts-expect-error` type test(`.test-d.ts` 또는 vitest
+  `expectTypeOf`)로 증명한다. 로컬 상태에는 추가하지 않는다.
+- Implementation Decision에는 (1) 도출한 상태·이벤트 집합과 카드 행 매핑,
+  (2) 선택한 사다리 단과 exhaustiveness 계층, (3) **이제 컴파일되지 않는 잘못된
+  사용 목록**, (4) 타입으로 못 잡아 런타임으로 방어한 시간축 항목을 기록한다.
+
+## Reviewer 판정 기준
+
+- boolean 조합이 카드 `Never` 행을 타입상 허용하는데 union으로 만들지 않았으면
+  `FINDING`이다. 카드에 없는 전이가 구현에 있으면 `FINDING`이다.
+- boundary 값을 파싱 없이 단언했거나, `any`가 application 계층으로 새거나,
+  `Partial<DomainEntity>` mutation을 도입했으면 `FINDING`이다.
+- 파생 가능한 값을 별도 상태로 저장했거나, query·mutation 상태를 로컬 기계로
+  복사했거나, raw setter를 hook 밖으로 노출했거나, 스키마·연산 union에서 파생
+  가능한 타입을 수기로 복제 선언했으면 `FINDING`이다.
+- 사다리 1·2단으로 끝나는 문제에 union·기계를 도입했거나, 상태 분기에
+  exhaustiveness 강제(기본 계층 이상)가 없으면 Decision의 예외 사유 없이는
+  `FINDING`이다.
+- 시간축 비결정성을 타입만으로 "해결됨" 처리했으면 `FINDING`이다.
+- 상태 이름 취향, reducer 대 개별 handler 문법 선호, 패턴 매칭 라이브러리 선호만  
+  다르면 `NON_ORACLE_OPINION`이다.

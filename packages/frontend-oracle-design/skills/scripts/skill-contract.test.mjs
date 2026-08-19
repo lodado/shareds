@@ -509,12 +509,12 @@ test('O8: 카드 schema version 분기와 migration을 추가하지 않는다', 
   assert.doesNotMatch(verifier, /ORACLE_CARD_VERSION|cardSchemaVersion/)
 })
 
-test('state-modeling: derives discriminated union state contracts from card rows only', async () => {
-  const [skill, oracleCard, frontendImplementation, stateModeling, verifier] = await Promise.all([
+test('type-constraints: derives state contracts from card rows and narrows AI choice space', async () => {
+  const [skill, oracleCard, frontendImplementation, typeConstraints, verifier] = await Promise.all([
     read('SKILL.md'),
     read('references/oracle-card.md'),
     read('references/frontend-implementation.md'),
-    read('references/state-modeling.md'),
+    read('references/type-constraints.md'),
     read('scripts/oracle-verify.mjs'),
   ])
 
@@ -523,16 +523,21 @@ test('state-modeling: derives discriminated union state contracts from card rows
   assert.match(verifier, /state-model-row-unknown/)
   assert.match(verifier, /ASYNC_STATE_TOKENS/)
 
-  assert.match(skill, /references\/state-modeling\.md/)
+  assert.match(skill, /references\/type-constraints\.md/)
+  assert.doesNotMatch(skill, /state-modeling\.md/)
   assert.match(skill, /discriminated union 타입 계약/)
   assert.match(oracleCard, /## State Model/)
   assert.match(oracleCard, /참조 없는 전이는 발명된 정책이다/)
-  assert.match(frontendImplementation, /state-modeling\.md/)
-  assert.match(stateModeling, /단일 `status` 문자열 literal discriminant/)
-  assert.match(stateModeling, /`POLICY_GAP`으로 `NEEDS_DECISION`/)
-  assert.match(stateModeling, /early return/)
-  assert.match(stateModeling, /satisfies Record/)
-  assert.doesNotMatch(stateModeling, /switch-exhaustiveness-check|`switch`/)
-  assert.match(stateModeling, /설치돼 있거나 도입이 승인된 경우만/)
-  assert.doesNotMatch(stateModeling, /단순 toggle을 위해 XState/)
+  assert.match(frontendImplementation, /type-constraints\.md/)
+  assert.doesNotMatch(frontendImplementation, /state-modeling\.md/)
+  assert.match(typeConstraints, /무엇이 이제 컴파일되지 않는가/)
+  assert.match(typeConstraints, /상태 설계 사다리/)
+  assert.match(typeConstraints, /단일 `status` 문자열 literal discriminant/)
+  assert.match(typeConstraints, /`POLICY_GAP`으로 `NEEDS_DECISION`/)
+  assert.match(typeConstraints, /skipToken/)
+  assert.match(typeConstraints, /early return/)
+  assert.match(typeConstraints, /satisfies Record/)
+  assert.doesNotMatch(typeConstraints, /switch-exhaustiveness-check|`switch`/)
+  assert.match(typeConstraints, /설치돼 있거나 도입이 승인된 경우만/)
+  assert.doesNotMatch(typeConstraints, /단순 toggle을 위해 XState/)
 })
