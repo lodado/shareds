@@ -88,15 +88,15 @@ type PaymentEvent =
   query 상태와 1:1이면 query 상태를 그대로 쓴다. 기계가 필요한 것은 query 밖의
   workflow(다단계 제출, 낙관적 롤백 순서)뿐이다.
 
-## 3. Exhaustiveness 강제 — 세 계층
+## 3. Exhaustiveness 강제
 
-낮은 계층부터 쓰고, 상위 계층은 조건이 맞을 때만 올라간다.
+dependency 없는 수단부터 쓰고, 라이브러리는 조건이 맞을 때만 도입한다.
 
-| 계층       | 수단                                                                                                                                                                                                            | 조건                                          |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| 기본       | `switch` + `default: satisfies never` 또는 공용 `assertNever`                                                                                                                                                   | 항상. dependency 불필요                       |
-| lint gate  | `@typescript-eslint/switch-exhaustiveness-check` — `@lodado/eslint-config`를 쓰는 레포는 `strict-types` preset을 extends, 아니면 rule 직접 설정 (plugin v8+면 `considerDefaultExhaustiveForUnions: false` 추가) | 레포가 typed lint를 이미 쓰거나 도입이 승인됨 |
-| 라이브러리 | `ts-pattern` `.exhaustive()`, XState v5                                                                                                                                                                         | **설치돼 있거나 도입이 승인된 경우만**        |
+| 계층        | 수단                                                   | 조건                                   |
+| ----------- | ------------------------------------------------------ | -------------------------------------- |
+| 기본        | 상태별 early return·guard chain 뒤 공용 `assertNever`  | 항상. dependency 불필요                |
+| 선언적 매핑 | lookup 객체 + `satisfies Record<State['status'], ...>` | 상태별 결과가 정적 값·render 함수일 때 |
+| 라이브러리  | `ts-pattern`의 `.exhaustive()`                         | **설치돼 있거나 도입이 승인된 경우만** |
 
 타입 **형태** 자체도 일부는 기계로 잡는다. `@lodado/eslint-config/local-rules`를 쓰는
 레포는 다음 규칙이 이미 켜져 있으므로 별도 설정 없이 위반이 드러난다.
@@ -111,15 +111,16 @@ type PaymentEvent =
 카드 지식을 요구하므로 lint가 아니라 카드 lint와 독립 review가 판정한다.
 
 - `assertNever`는 레포에 이미 있으면 재사용하고, 없으면 공용 위치 하나에만 만든다.
-- lint 규칙·config 변경은 [`frontend-implementation.md`](frontend-implementation.md)의
-  Hook Encapsulation Gate와 같은 절차를 따른다: 사용자 승인 후 rule ID·target glob·
-  lint command를 잠그고 `oracle-run.mjs exec --label state-exhaustiveness`로 실행하며,
-  조용히 dependency를 추가하지 않는다.
-- JSX 안에서 상태별 분기가 표현식으로 필요하면 상태별 render를 반환하는 pure
-  함수나 lookup 객체로 충분한지 먼저 확인하고, `ts-pattern`은 그것이 반복적으로
-  불충분할 때 승인받아 도입한다.
+  guard chain의 마지막에서 남은 값을 넘겨 새 union member가 추가될 때 컴파일 오류가
+  나게 한다.
+- JSX는 상태별 early return으로 충분한지 먼저 확인한다. 정적 결과면 lookup 객체를,
+  payload까지 좁혀야 하는 표현식 분기가 반복되면 승인 후 `ts-pattern`을 쓴다.
+- `ts-pattern` 도입은 사용자 승인 후 target glob·typecheck command를 잠그고
+  `oracle-run.mjs exec --label state-exhaustiveness`로 실행한다. dependency를 조용히
+  추가하지 않는다.
 - XState는 계층·병렬 상태나 actor 조율이 카드에 실제로 있을 때만 후보다. 단일
-  흐름 union을 위해 도입하지 않는다.
+  흐름 union의 exhaustiveness만을 위해 도입하지 않으며, 설치돼 있거나 도입이 승인된
+  경우에만 쓴다.
 
 ## 4. 검증 매핑
 
@@ -150,6 +151,5 @@ type PaymentEvent =
 | 관할                     | 자료                                                                                                                                                                                                                                                                                    |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 개념 canon               | [Kent C. Dodds: Make Impossible States Impossible](https://kentcdodds.com/blog/make-impossible-states-impossible), [Stop using isLoading booleans](https://kentcdodds.com/blog/stop-using-isloading-booleans), Scott Wlaschin: Designing with Types, Alexis King: Parse, don't validate |
-| exhaustiveness lint      | [switch-exhaustiveness-check](https://typescript-eslint.io/rules/switch-exhaustiveness-check/)                                                                                                                                                                                          |
 | 라이브러리               | [ts-pattern](https://github.com/gvergnaud/ts-pattern), [XState v5 setup()](https://stately.ai/docs/setup)                                                                                                                                                                               |
 | TanStack Query 상태 계약 | [TkDodo: Status Checks in React Query](https://tkdodo.eu/blog/status-checks-in-react-query)                                                                                                                                                                                             |

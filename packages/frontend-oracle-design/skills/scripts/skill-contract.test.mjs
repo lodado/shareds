@@ -195,11 +195,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.7.0')
+  assert.equal(version, '0.7.1')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.7.0')
+  assert.equal(marketplace.version, '0.7.1')
 })
 
 test('reuses the repository network boundary and colocates approved MSW handlers', async () => {
@@ -530,7 +530,9 @@ test('state-modeling: derives discriminated union state contracts from card rows
   assert.match(frontendImplementation, /state-modeling\.md/)
   assert.match(stateModeling, /단일 `status` 문자열 literal discriminant/)
   assert.match(stateModeling, /`POLICY_GAP`으로 `NEEDS_DECISION`/)
-  assert.match(stateModeling, /switch-exhaustiveness-check/)
+  assert.match(stateModeling, /early return/)
+  assert.match(stateModeling, /satisfies Record/)
+  assert.doesNotMatch(stateModeling, /switch-exhaustiveness-check|`switch`/)
   assert.match(stateModeling, /설치돼 있거나 도입이 승인된 경우만/)
   assert.doesNotMatch(stateModeling, /단순 toggle을 위해 XState/)
 })
