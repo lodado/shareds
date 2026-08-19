@@ -127,6 +127,25 @@ type PaymentState =
 
 ## Props와 API 표면
 
+### 공용 API 승격 델타
+
+exported shared/package API를 만들거나 바꿀 때는 구현 타입보다 **호출부 먼저** 쓴다.
+대표 제품 호출부에서 컴파일러가 추론할 수 있는 component generic을 명시하지 않는 것을
+목표로 하고, config 정의처럼 값만으로 Row를 추론할 수 없는 경계에서만 generic을 한 번
+고정한다. 이후 아래 델타만 설계한다.
+
+1. 대표 정상 호출부를 명시적 component type argument 없이 작성한다.
+2. 변경 전 허용되던 넓은 값·optional 조합·끊어진 관계 중 실제 오용을 적는다.
+3. 값·조합·관계·경로·결과·확장 중 이번 API가 닫아야 할 항목만 고른다.
+4. schema·config·`as const` 값에서 key와 union을 파생하고 수기 권위를 늘리지 않는다.
+5. controlled surface와 현재 제품이 쓰는 mode만 공개하고 나머지는 API 부재로 둔다.
+6. type test에 generic 명시 없는 대표 정상 호출 1개와 컴파일되지 않아야 할 사용 최소
+   3개를 함께 둔다. JSX를 쓰면 파일은 `.test-d.tsx`로 만든다.
+
+정상 호출도 추론되지 않으면 부정 테스트가 통과해도 좋은 공개 API가 아니다. helper의
+추론을 보존하거나 generic을 단순화하고, 호출부가 같은 type argument를 반복하게 두지
+않는다.
+
 - 상호 배타 Props는 union + `never`로 표현한다 (`href` 있는 link와 `onClick` 있는
   action, controlled `value`와 uncontrolled `defaultValue`). 전부 optional인 한
   객체로 만들지 않는다.
@@ -197,8 +216,9 @@ literal 보존용 `as const`, 검증 함수 내부에 격리된 브랜드 생성
 - 카드 행 → 실패 테스트 매핑은 `$test` 계약대로 유지한다. 별도 "타입 테스트
   layer"를 전 상태에 만들지 않는다.
 - exported shared/package API로 상태·Props 타입이 노출될 때만 불가능 사용이
-  컴파일되지 않음을 `@ts-expect-error` type test(`.test-d.ts` 또는 vitest
-  `expectTypeOf`)로 증명한다. 로컬 상태에는 추가하지 않는다.
+  컴파일되지 않음을 `@ts-expect-error` type test(`.test-d.ts`, JSX면 `.test-d.tsx`,
+  또는 vitest `expectTypeOf`)로 증명한다. generic API면 명시적 type argument가 없는
+  대표 정상 호출도 같은 typecheck에서 증명한다. 로컬 상태에는 추가하지 않는다.
 - Implementation Decision에는 (1) 도출한 상태·이벤트 집합과 카드 행 매핑,
   (2) 선택한 사다리 단과 exhaustiveness 계층, (3) **이제 컴파일되지 않는 잘못된
   사용 목록**, (4) 타입으로 못 잡아 런타임으로 방어한 시간축 항목을 기록한다.

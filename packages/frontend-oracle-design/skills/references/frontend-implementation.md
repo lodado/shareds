@@ -47,11 +47,12 @@ Oracle, 대상 레포 계약과 실제 설치 버전이 항상 우선한다.
 
 - trust boundary와 public API의 입력·성공 결과·실패 형태를 정확히 표현한다. 내부에서
   충분히 추론되는 타입을 반복하지 않는다.
-- 카드에 async·순서 역전·중복 제출·retry·다단계 상태 행이 있으면
-  [`type-constraints.md`](type-constraints.md)를 전부 읽고 상태 설계 사다리와
-  discriminated union 계약을 따른다. 카드 `O*` 행에서 상태·이벤트를 도출하며, 카드에
-  없는 전이는 발명하지 않는다. 단순 toggle·독립 boolean 하나는 state machine으로
-  바꾸지 않는다.
+- 카드에 async·순서 역전·중복 제출·retry·다단계 상태 행이 있거나 client state·
+  exported Props·shared/package API·trust boundary 타입 형태를 만들거나 바꾸면
+  [`type-constraints.md`](type-constraints.md)를 전부 읽는다. 상태·이벤트는 카드 `O*`
+  행에서 도출하고 상태 설계 사다리와 discriminated union 계약을 따르며, 카드에 없는
+  전이는 발명하지 않는다. 단순 toggle·독립 boolean 하나는 state machine으로 바꾸지
+  않는다.
 - `any`, 광범위한 assertion, 의미 없는 optional로 카드의 오류·상태 계약을 숨기지 않는다.
 - exported shared/package API가 바뀔 때만 소비자 추론과 오류 형태를 type test로 검증한다.
   로컬 구현 하나를 위해 interface·factory·adapter를 추가하지 않는다.
