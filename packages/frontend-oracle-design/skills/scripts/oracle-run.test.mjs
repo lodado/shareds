@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -89,6 +89,20 @@ function run(args, environment) {
   return spawnSync(process.execPath, [script, ...args], {
     encoding: 'utf8',
     env: isolatedEnvironment(environment),
+  })
+}
+
+function runAsync(args, environment) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [script, ...args], {
+      env: isolatedEnvironment(environment),
+    })
+    let stdout = ''
+    let stderr = ''
+
+    child.stdout.on('data', (chunk) => (stdout += chunk))
+    child.stderr.on('data', (chunk) => (stderr += chunk))
+    child.on('close', (status) => resolve({ status, stdout, stderr }))
   })
 }
 
@@ -249,12 +263,17 @@ test('O1: exec는 명령을 한 번 실행하고 ledger에 한 줄을 남긴다'
   assert.equal(record.command[0], process.execPath)
   assert.match(record.lockSha256, /^[a-f0-9]{64}$/)
   assert.match(record.worktreeSha256, /^[a-f0-9]{64}$/)
+  assert.match(record.productionSha256, /^[a-f0-9]{64}$/)
   assert.equal(typeof record.env.node, 'string')
   assert.match(record.at, /^\d{4}-\d{2}-\d{2}T/)
 
   // product write×0 — oracle artifact와 실행 marker 외에는 어떤 파일도 바뀌지 않는다.
   const changed = Object.entries(await snapshotOf(root)).filter(([path, digest]) => before[path] !== digest)
-  assert.deepEqual(changed.map(([path]) => path).sort(), ['.ai/oracles/sample/runs.jsonl', 'marker.txt'])
+  assert.deepEqual(changed.map(([path]) => path).sort(), [
+    '.ai/oracles/sample/.run-ids/r-001',
+    '.ai/oracles/sample/runs.jsonl',
+    'marker.txt',
+  ])
 })
 
 test('O2: lock mismatch면 명령을 실행하지 않고 ORACLE_CHANGED로 멈춘다', async (t) => {
@@ -1194,6 +1213,20 @@ test('O16: production 변경이 없으면 사유와 함께 RED 없이 GREEN으�
   assert.equal(current.history.at(-1).reason, '기존 구현이 카드를 이미 충족함')
 })
 
+test('O1: 병렬 exec는 서로 다른 runId를 예약한다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await Promise.all(
+    Array.from({ length: 3000 }, (_, index) => writeFile(join(root, 'src', `fixture-${index}.txt`), `${index}`)),
+  )
+
+  const command = (label) => ['exec', '--dir', oracleDirectory, '--label', label, '--', process.execPath, '-e', '']
+  const results = await Promise.all([runAsync(command('behavior')), runAsync(command('lint'))])
+
+  for (const result of results) assert.equal(result.status, 0, result.stderr)
+  const records = (await ledgerLines(oracleDirectory)).map(JSON.parse)
+  assert.deepEqual(records.map(({ runId }) => runId).sort(), ['r-001', 'r-002'])
+})
+
 test('O16: production이 바뀐 상태에서는 RED 없이 GREEN으로 갈 수 없다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
   await writeFile(join(root, 'src', 'save.mjs'), 'export const save = () => null\n')
@@ -1251,4 +1284,55 @@ test('O17: REVIEW_VERIFIED는 clear findings와 GREEN 이후 필수 재실행을
   const verified = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-004')
   assert.equal(verified.status, 0, verified.stderr)
   assert.equal((await state(oracleDirectory)).state, 'REVIEW_VERIFIED')
+})
+
+test('O17: High risk REVIEW_VERIFIED는 GREEN 이후 mutation kill 증거를 요구한다', async (t) => {
+  const source = 'src/save.mjs'
+  const original = 'export const guarded = true\n'
+  const { root, oracleDirectory } = await workspace(t, {
+    risk: 'high',
+    initialFiles: { [source]: original },
+  })
+  await reachValidRed(oracleDirectory, root)
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  greenRun(oracleDirectory, 'green-3')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-004').status, 0)
+
+  redRun(oracleDirectory)
+  greenRun(oracleDirectory, 'review')
+  const secondFindings = join(oracleDirectory, 'findings-second.json')
+  await writeFile(secondFindings, JSON.stringify({ schemaVersion: 1, reviewer: 'second-code-reviewer', findings: [] }))
+
+  const missing = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-006', ['--intersect', secondFindings])
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /^MUTATION_EVIDENCE_REQUIRED: /)
+
+  const unchanged = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-006', [
+    '--intersect',
+    secondFindings,
+    '--mutation-run',
+    'r-005',
+    '--mutation-row',
+    'O1',
+  ])
+  assert.equal(unchanged.status, 1)
+  assert.match(unchanged.stderr, /^MUTATION_EVIDENCE_INVALID: /)
+
+  await writeFile(join(root, source), 'export const guarded = false\n')
+  redRun(oracleDirectory)
+  await writeFile(join(root, source), original)
+  greenRun(oracleDirectory, 'review-restored')
+  const verified = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-008', [
+    '--intersect',
+    secondFindings,
+    '--mutation-run',
+    'r-007',
+    '--mutation-row',
+    'O1',
+  ])
+  assert.equal(verified.status, 0, verified.stderr)
+  const current = await state(oracleDirectory)
+  assert.equal(current.history.at(-1).mutationRunId, 'r-007')
+  assert.equal(current.history.at(-1).mutationRow, 'O1')
 })

@@ -68,6 +68,21 @@ test('O28: routes delivery runs through exec and gates GREEN on flakiness and te
   assert.match(implementationLoop, /oracle-verify\.mjs scan/)
   assert.match(implementationLoop, /oracle:nondeterminism/)
   assert.match(implementationLoop, /ledger를 거치지 않은 실행을 증거로 보고/)
+  assert.match(implementationLoop, /--mutation-run/)
+  assert.match(implementationLoop, /--mutation-row/)
+  assert.match(implementationLoop, /MUTATION_EVIDENCE_REQUIRED/)
+})
+
+test('keeps automatic routing narrow and leaves sibling concerns with their owners', async () => {
+  const skill = await read('SKILL.md')
+  const description = skill.match(/^description:\s*(.+)$/m)?.[1] ?? ''
+
+  assert.match(description, /medium|high/i)
+  assert.match(description, /Do not auto-invoke/i)
+  assert.match(description, /low-risk/i)
+  assert.match(skill, /Low fast path.*reference.*로드하지/s)
+  assert.match(skill, /Oracle.*Outcome Brief.*Source Registry.*lock.*상태 전이/s)
+  assert.match(skill, /FSD.*단독.*자동 호출하지 않는다/s)
 })
 
 test('O29: gives reviewers raw run evidence and a validated finding schema', async () => {
@@ -180,11 +195,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.6.0')
+  assert.equal(version, '0.7.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.6.0')
+  assert.equal(marketplace.version, '0.7.0')
 })
 
 test('reuses the repository network boundary and colocates approved MSW handlers', async () => {

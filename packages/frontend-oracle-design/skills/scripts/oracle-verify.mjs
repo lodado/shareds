@@ -118,18 +118,44 @@ async function readJson(path, code) {
 }
 
 function splitRow(line) {
-  return line
-    .slice(1, line.lastIndexOf('|'))
-    .split('|')
-    .map((cell) => cell.trim())
+  const cells = []
+  let cell = ''
+  let escaped = false
+
+  for (const character of line.slice(1, line.lastIndexOf('|'))) {
+    if (character === '|' && !escaped) {
+      cells.push(cell.trim())
+      cell = ''
+    } else {
+      cell += character
+    }
+    escaped = character === '\\' && !escaped
+  }
+  cells.push(cell.trim())
+  return cells
+}
+
+function markdownLines(card) {
+  let fence = null
+
+  return card.split('\n').map((line) => {
+    const marker = line.trimStart().match(/^(`{3,}|~{3,})/)?.[1]
+    if (marker) {
+      if (!fence) fence = marker
+      else if (marker[0] === fence[0] && marker.length >= fence.length) fence = null
+      return ''
+    }
+    return fence ? '' : line
+  })
 }
 
 /** 카드의 `| ID |` 표에서 `O1`·`D1` 형식의 계약 행만 헤더 이름과 함께 뽑는다. */
-function parseRows(card) {
+function parseRows(document) {
+  const lines = Array.isArray(document) ? document : markdownLines(document)
   const rows = []
   let headers = null
 
-  card.split('\n').forEach((line, index) => {
+  lines.forEach((line, index) => {
     const trimmed = line.trim()
     if (!trimmed.startsWith('|')) {
       headers = null
@@ -195,8 +221,8 @@ async function lintCard(options) {
   const card = await readFile(options.oracle, 'utf8').catch((error) => {
     throw new CliError('CARD_UNREADABLE', `Cannot read ${options.oracle}: ${error.message}`)
   })
-  const lines = card.split('\n')
-  const rows = parseRows(card)
+  const lines = markdownLines(card)
+  const rows = parseRows(lines)
   const issues = []
 
   const sourceSection = sectionLines(lines, 'Source Registry')

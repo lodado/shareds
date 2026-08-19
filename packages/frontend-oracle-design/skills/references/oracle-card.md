@@ -292,13 +292,16 @@ Delivery가 요청됐으면 모든 source 승인을 마칠 때까지 lock을 미
 <repo>/.ai/oracles/<oracle-id>/oracle.lock.json
 <repo>/.ai/oracles/<oracle-id>/run-state.json
 <repo>/.ai/oracles/<oracle-id>/runs.jsonl
+<repo>/.ai/oracles/<oracle-id>/.run-ids/ # 병렬 exec의 원자적 runId reservation
 <repo>/.ai/oracles/<oracle-id>/evidence.json
 ```
 
 ### 카드 구조 lint
 
 lock 전에 `oracle-verify.mjs card`를 실행해 구조적 최소선을 기계로 확인한다. lint는
-adversarial self-review를 대신하지 않으며, 의미 심사는 6절이 계속 담당한다.
+escaped pipe와 fenced example을 계약으로 오인하지 않지만, token·표 구조 검사일 뿐
+semantic approval이 아니다. adversarial self-review를 대신하지 않으며 의미 심사는
+6절이 계속 담당한다.
 
 ```bash
 node <skill-dir>/scripts/oracle-verify.mjs card \

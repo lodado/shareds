@@ -267,4 +267,5 @@ reviewer와 fixer를 분리한다. reviewer가 직접 수정하고 자신의 수
 재검증이 통과해야 `REVIEW_VERIFIED`다. init에서 선언한 모든 필수 label을 GREEN
 이후 다시 실행하고, 같은 카드 test command의 reported run과 clear findings를
 `oracle-run.mjs transition --to REVIEW_VERIFIED --evidence ... --findings ...`에
-넘긴다. High risk는 두 번째 reviewer 파일도 `--intersect`로 넘긴다.
+넘긴다. High risk는 두 번째 reviewer 파일도 `--intersect`로 넘기고, GREEN 이후의
+mutation kill run과 해당 행을 `--mutation-run`·`--mutation-row`로 함께 기록한다.

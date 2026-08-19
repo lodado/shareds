@@ -27,6 +27,8 @@ const FLAG_NAMES = [
   'evidence',
   'findings',
   'intersect',
+  'mutation-run',
+  'mutation-row',
   'reason',
   'spend',
   'output',
@@ -71,6 +73,8 @@ const WEAKENING_TOKENS = [
 const TOLERANCE_TOKENS = ['maxDiffPixels', 'maxDiffPixelRatio', 'threshold']
 
 const IGNORED_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'build', 'coverage', '.next', '.turbo', '.cache'])
+
+const SNAPSHOT_CONCURRENCY = 32
 
 class CliError extends Error {
   constructor(code, message, exitCode = 1) {
@@ -293,24 +297,36 @@ async function listFiles(root) {
 }
 
 async function snapshot(root, excludedPrefix) {
-  const paths = (await listFiles(root)).filter((path) => !path.startsWith(excludedPrefix))
-  const entries = {}
+  const paths = (await listFiles(root)).filter((path) => !path.startsWith(excludedPrefix)).sort()
+  const entries = new Array(paths.length)
+  let cursor = 0
+  const workers = Array.from({ length: Math.min(SNAPSHOT_CONCURRENCY, paths.length) }, async () => {
+    while (cursor < paths.length) {
+      const index = cursor
+      cursor += 1
+      const path = paths[index]
 
-  for (const path of paths.sort()) {
-    try {
-      entries[path] = sha256(await readFile(join(root, path)))
-    } catch {
-      // 읽을 수 없는 항목(심볼릭 링크, 경합 중 삭제)은 비교 대상에서 제외한다.
+      try {
+        entries[index] = [path, sha256(await readFile(join(root, path)))]
+      } catch {
+        // 읽을 수 없는 항목(심볼릭 링크, 경합 중 삭제)은 비교 대상에서 제외한다.
+      }
     }
-  }
+  })
+  await Promise.all(workers)
 
-  return entries
+  return Object.fromEntries(entries.filter(Boolean))
 }
 
 function changedPaths(before, after) {
   const paths = new Set([...Object.keys(before), ...Object.keys(after)])
 
   return [...paths].filter((path) => before[path] !== after[path]).sort()
+}
+
+function productionSha256(worktree, harnessPaths = []) {
+  const production = Object.entries(worktree).filter(([path]) => !isTestPath(path) && !harnessPaths.includes(path))
+  return sha256(JSON.stringify(production))
 }
 
 function statePath(directory) {
@@ -336,10 +352,17 @@ async function writeState(directory, state) {
 async function readLedger(directory) {
   try {
     const raw = await readFile(ledgerPath(directory), 'utf8')
-    return raw
+    const entries = raw
       .split('\n')
       .filter(Boolean)
       .map((line) => JSON.parse(line))
+    const runIds = new Set()
+    for (const entry of entries) {
+      if (!entry.runId) continue
+      if (runIds.has(entry.runId)) throw new Error(`duplicate runId: ${entry.runId}`)
+      runIds.add(entry.runId)
+    }
+    return entries
   } catch (error) {
     if (error.code === 'ENOENT') return []
     throw new CliError('LEDGER_INVALID', `Cannot read run ledger: ${error.message}`)
@@ -353,6 +376,23 @@ async function readRuns(directory) {
 
 async function appendLedger(directory, record) {
   await appendFile(ledgerPath(directory), `${JSON.stringify(record)}\n`)
+}
+
+async function reserveRunId(directory) {
+  const reservations = join(directory, '.run-ids')
+  await mkdir(reservations, { recursive: true })
+  let number = (await readRuns(directory)).length + 1
+
+  for (;;) {
+    const runId = `r-${String(number).padStart(3, '0')}`
+    try {
+      await writeFile(join(reservations, runId), '', { flag: 'wx' })
+      return runId
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error
+      number += 1
+    }
+  }
 }
 
 function verifyLock(directory, state) {
@@ -569,7 +609,7 @@ async function execute(options) {
 
   const report = await readReport(options.report)
   const scanRoot = resolve(directory, state.scanRoot)
-  const runId = `r-${String((await readRuns(directory)).length + 1).padStart(3, '0')}`
+  const runId = await reserveRunId(directory)
   const worktree = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
   const record = {
     type: 'run',
@@ -583,6 +623,7 @@ async function execute(options) {
     env: fingerprint(options),
     lockSha256: revision,
     worktreeSha256: sha256(JSON.stringify(worktree)),
+    productionSha256: productionSha256(worktree, state.harnessPaths),
     harnessSha256: selectedDigests(worktree, state.harnessPaths ?? []),
     at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
   }
@@ -917,15 +958,55 @@ async function transition(options) {
       throw new CliError('REVIEW_EVIDENCE_REQUIRED', 'High risk REVIEW_VERIFIED requires --intersect')
     }
 
+    if (state.risk === 'high' && (!options.mutationRun || !options.mutationRow)) {
+      throw new CliError(
+        'MUTATION_EVIDENCE_REQUIRED',
+        'High risk REVIEW_VERIFIED requires --mutation-run and --mutation-row',
+      )
+    }
+
     if (run.grade !== 'reported') {
       throw new CliError('EVIDENCE_UNVERIFIABLE', `${run.runId} must have a parsed reporter for review`)
     }
 
     const greenEntry = lastEntryFor(state, 'IMPLEMENTED_GREEN')
     assertRequiredRuns(state, ledger, greenEntry.runCount)
-    assertSameCommand(findRun(ledger, greenEntry.runId), run)
+    const greenRun = findRun(ledger, greenEntry.runId)
+    assertSameCommand(greenRun, run)
 
     const oracle = await lockedOraclePath(directory, state)
+    if (state.risk === 'high') {
+      const mutationRun = findRun(ledger, options.mutationRun)
+      const mutationIndex = ledger.findIndex((entry) => entry.runId === mutationRun.runId)
+      const reviewIndex = ledger.findIndex((entry) => entry.runId === run.runId)
+      if (
+        mutationIndex < greenEntry.runCount ||
+        reviewIndex <= mutationIndex ||
+        mutationRun.exitCode === 0 ||
+        mutationRun.grade !== 'reported' ||
+        !greenRun.productionSha256 ||
+        mutationRun.productionSha256 === greenRun.productionSha256 ||
+        run.productionSha256 !== greenRun.productionSha256
+      ) {
+        throw new CliError(
+          'MUTATION_EVIDENCE_INVALID',
+          `${mutationRun.runId} must change production after GREEN, fail with a reporter, and be exactly restored before review`,
+        )
+      }
+      runVerifier([
+        'red',
+        '--oracle',
+        oracle,
+        '--map',
+        resolve(options.evidence),
+        '--ledger',
+        ledgerPath(directory),
+        '--run',
+        mutationRun.runId,
+        '--row',
+        options.mutationRow,
+      ])
+    }
     runVerifier([
       'evidence',
       '--oracle',
@@ -954,6 +1035,8 @@ async function transition(options) {
     evidence: options.evidence ? portablePath(directory, resolve(options.evidence)) : null,
     findings: options.findings ? portablePath(directory, resolve(options.findings)) : null,
     intersect: options.intersect ? portablePath(directory, resolve(options.intersect)) : null,
+    mutationRunId: options.mutationRun ?? null,
+    mutationRow: options.mutationRow ?? null,
     runCount: ledger.length,
     at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
   })

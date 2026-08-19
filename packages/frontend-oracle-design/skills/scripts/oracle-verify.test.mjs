@@ -105,6 +105,18 @@ test('O17: 구조가 완전한 카드는 lint를 통과한다', async (t) => {
   assert.equal(linted.stdout, 'CARD_LINT_OK 9 rows\n')
 })
 
+test('O17: escaped pipe와 fenced 예시 표는 계약 열이나 행으로 오인하지 않는다', async (t) => {
+  const card = `${VALID_CARD.replace(
+    '| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1   | HARD      |',
+    '| D1  | P4   | copy | 버튼 문구는 "저장" \\| "Save"다 | 다른 문구 | S1   | HARD      |',
+  )}\n\n\`\`\`markdown\n| ID | 정책 | Given | When | Then | Never | 부작용(종류×횟수) | BVA |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| O99 | P999 | example | example | example | example | GET×1 | example |\n\`\`\`\n`
+
+  const linted = run('card', '--oracle', await cardFile(t, card))
+
+  assert.equal(linted.status, 0, linted.stderr)
+  assert.equal(linted.stdout, 'CARD_LINT_OK 9 rows\n')
+})
+
 test('O3: Outcome Brief가 없는 카드를 거부한다', async (t) => {
   const withoutOutcome = VALID_CARD.replace(/## Outcome Brief\n[\s\S]*?- Sources: S1\n\n/, '')
 
