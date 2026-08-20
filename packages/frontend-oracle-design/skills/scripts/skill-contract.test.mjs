@@ -215,11 +215,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.9.1')
+  assert.equal(version, '0.10.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.9.1')
+  assert.equal(marketplace.version, '0.10.0')
 })
 
 test('reuses the repository network boundary and colocates approved MSW handlers', async () => {
@@ -555,6 +555,11 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
   assert.match(frontendImplementation, /exported Props·shared\/package API·trust boundary/)
   assert.doesNotMatch(frontendImplementation, /state-modeling\.md/)
   assert.match(typeConstraints, /무엇이 이제 컴파일되지 않는가/)
+  assert.match(typeConstraints, /수용 판정 결정성/)
+  assert.match(typeConstraints, /새로 설계하는 exported shared\/package API에서 generic 자체는 목표가 아니다/)
+  assert.match(typeConstraints, /기존 library generic 사용은\s+대상이 아니다/)
+  assert.match(typeConstraints, /생성 자체를 결정론화/)
+  assert.doesNotMatch(typeConstraints, /같은\s+카드에서 같은 설계가 나온다/)
   assert.match(typeConstraints, /공용 API 승격 델타/)
   assert.match(typeConstraints, /호출부 먼저/)
   assert.match(typeConstraints, /generic 명시 없는 대표 정상 호출 1개/)

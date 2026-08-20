@@ -14,10 +14,9 @@ Props·boundary 타입의 형태를 새로 만들거나 바꿀 때 사용한다.
 
 > AI가 생성할 수 있었던 잘못된 코드 중 **무엇이 이제 컴파일되지 않는가?**
 
-이 질문에 구체적으로 답할 수 없는 타입 복잡성은 추가하지 않는다. 근거: LLM이 생성한
-TypeScript 컴파일 오류의 약 94%는 문법이 아니라 타입 위반이고(PLDI 2025), 스키마
-준수는 모델 개선(93%)이 아니라 결정적 제약으로만 100%가 됐다(OpenAI Structured
-Outputs). 프롬프트가 아니라 표현 불가능성이 결정성을 만든다.
+이 질문에 구체적으로 답할 수 없는 타입 복잡성은 추가하지 않는다. AI 생성 자체는 계속
+비결정적이다. 이 문서의 목표는 동일한 source·TypeScript·tsconfig에서 후보를 같은
+결과로 통과·거절하는 **수용 판정 결정성**이다.
 
 컴파일 통과는 건전성 증명이 아니라 결정적 고효율 필터다. TypeScript는 의도적으로
 불건전하고(bivariance, 리터럴에만 적용되는 excess property check), 필터 강도는
@@ -25,17 +24,19 @@ tsconfig·컴파일러 버전의 함수다. 전제 환경 검증은
 [`type-environment.md`](type-environment.md)가 소유한다 — 레포당 1회 검증하고
 여기서는 반복하지 않는다.
 
-## 세 종류의 비결정성
+## 제약 소유권
 
-| 종류   | 문제                                                            | 담당                                                      |
-| ------ | --------------------------------------------------------------- | --------------------------------------------------------- |
-| 스냅샷 | 한 렌더 시점에 모순 조합이 표현 가능 (`isLoading && isSuccess`) | 타입 — discriminated union                                |
-| 선택   | 키·문자열·Props 조합·오류 처리를 AI가 임의로 고름               | 타입 — 닫힌 union, factory, registry                      |
-| 시간축 | 응답 순서 역전, 중복 제출, unmount 후 도착                      | **런타임** — abort signal, `isPending`, 멱등키, 서버 검증 |
+| 대상                                      | 담당                                        |
+| ----------------------------------------- | ------------------------------------------- |
+| 값·Props·상태 조합·입출력 관계            | 타입                                        |
+| API·storage·URL·message 같은 외부 입력    | `unknown`에서 runtime parser                |
+| 관찰 가능한 제품 행동                     | `$test`                                     |
+| 순서 역전·중복 제출·retry·unmount 후 도착 | abort signal·pending guard·멱등키·서버 검증 |
+| 같은 prompt의 생성 재현성                 | 모델·provider — 이 문서가 보장하지 않음     |
 
 시간축은 타입으로 증명되지 않는다. union을 만들었다고 순서 문제가 "해결됨"이라고
 선언하면 `FINDING`이다. 남은 시간축 비결정성과 그 런타임 방어는 Implementation
-Decision에 반드시 기록한다.
+Decision에 반드시 기록한다. type-valid를 behavior-correct로 보고해도 `FINDING`이다.
 
 설계 전에 변경 대상에서 아래 여섯 지점을 찾고, **컴파일되지 않아야 할 잘못된
 사용을 최소 세 개 먼저 적는다** — exported API면 그대로 `.test-d.ts`의
@@ -143,17 +144,21 @@ function useDetail(id: DetailId): { state: DetailState; retry: () => void }
 구분한다. 미결이면 `NEEDS_DECISION`이며 "아마 무시"를 기본값으로 채우지 않는다.
 카드 행 ID를 참조하지 않는 전이는 발명된 정책이다.
 
-## 메커니즘 선택 순서
+## 제약 선택 순서
 
 같은 잘못된 사용을 여러 도구가 닫을 수 있으면 **앞 단부터** 검토하고, 앞 단으로
-닫히면 뒷 단을 쓰지 않는다. 도구 선택 자체가 비결정성이다 — 순서를 고정해야 같은
-카드에서 같은 설계가 나온다.
+닫히면 뒷 단을 쓰지 않는다. 생성 결과를 같게 만들려는 규칙이 아니라, 불필요하게
+복잡한 뒷 단 메커니즘을 일관되게 탈락시키는 우선순위다.
 
 ```text
-API 분리 → discriminated union → satisfies → keyof / typeof / indexed access
-→ const type parameter → type predicate → lookup map → NoInfer
-→ tagged type → overload → mapped / conditional type → recursive type
+기존 owner 재사용·API 부재 → schema·config·값에서 파생 → boundary parse
+→ capability·API 분리 → union + never → discriminated union → satisfies·exhaustiveness
+→ keyof / typeof / indexed access → 관계형 generic·lookup map·NoInfer → tagged type
+→ overload → mapped / conditional type → recursive type
 ```
+
+trust boundary의 parse는 선택 사항이 아니다. 나머지는 앞 단으로 실제 오용이 닫히면
+뒤 단을 사용하지 않는다.
 
 내장 utility로 표현되는 관계(`Awaited`·`ReturnType`·`Parameters`·`Extract`·
 `Exclude`·`NonNullable`·`NoInfer`·`Readonly`·`Record`·`Pick`·`Omit`)를 custom
@@ -220,6 +225,11 @@ exported shared/package API를 만들거나 바꿀 때는 구현 타입보다 **
 정상 호출도 추론되지 않으면 부정 테스트가 통과해도 좋은 공개 API가 아니다. helper의
 추론을 보존하거나 generic을 단순화하고, 호출부가 같은 type argument를 반복하게 두지
 않는다.
+
+새로 설계하는 exported shared/package API에서 generic 자체는 목표가 아니다. 둘 이상의
+public 위치 사이 관계를 만들고, 일반 제품 호출부에서 자동 추론되며, 추론 권위가 하나이고,
+구체적 오답을 컴파일 실패시키는 경우에만 쓴다. config·schema 정의 경계의 1회 고정은
+허용한다. 하나라도 아니면 concrete type·파생 union·API 분리를 우선한다.
 
 - 상호 배타 Props는 union + `never`로 표현한다 (`href` 있는 link와 `onClick` 있는
   action, controlled `value`와 uncontrolled `defaultValue`). 전부 optional인 한
@@ -314,7 +324,8 @@ literal 보존용 `as const`, 검증 함수 내부에 격리된 브랜드 생성
   대표 정상 호출도 같은 typecheck에서 증명한다. 로컬 상태에는 추가하지 않는다.
 - Implementation Decision에는 (1) 도출한 상태·이벤트 집합과 카드 행 매핑,
   (2) 선택한 사다리 단과 exhaustiveness 계층, (3) **이제 컴파일되지 않는 잘못된
-  사용 목록**, (4) 타입으로 못 잡아 런타임으로 방어한 시간축 항목을 기록한다.
+  사용 목록과 실패 증거**, (4) 타입으로 못 잡아 런타임으로 방어한 행동·시간축 항목을
+  기록한다.
 
 ## Reviewer 판정 기준
 
@@ -342,7 +353,13 @@ literal 보존용 `as const`, 검증 함수 내부에 격리된 브랜드 생성
 - 앞 단 메커니즘으로 닫히는 문제에 뒷 단 타입을 썼거나, feature 코드에 자작
   mapped·conditional·recursive utility가 있거나, 내장 utility 재구현이나 type
   test 없는 고급 utility가 있으면 `FINDING`이다.
+- 이번 변경에서 새로 설계한 exported shared/package API의 generic이 둘 이상의 public
+  위치 사이 관계를 만들지 않거나 일반 제품 호출부가 type argument를 반복해야 하면
+  `FINDING`이다. config·schema 정의 경계의 1회 고정과 기존 library generic 사용은
+  대상이 아니다.
 - 시간축 비결정성을 타입만으로 "해결됨" 처리했으면 `FINDING`이다.
+- 생성 후 typecheck를 실행했을 뿐인데 생성 자체를 결정론화했다고 보고하면
+  `FINDING`이다.
 - 구현 diff가 `.test-d.*`의 `@ts-expect-error` 케이스를 삭제·약화했거나, 계약
   타입·스키마를 넓혀(필수 필드→optional, union→`string`) 타입 오류를 없앴는데
   카드 행 인용이 없으면 `FINDING`이다. 계약 파일은 검수의 신뢰 뿌리다 — 완화는
