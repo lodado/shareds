@@ -89,6 +89,16 @@ command 같은 런타임 기계를 만들지 않는다. 카드의 State Model은
 하나의 로딩·성공·실패는 2단에서 끝나며, 3단에서도 필요한 것은 상태 union 하나와
 의도 함수 몇 개다.
 
+### 상태 소유권은 하나다
+
+하나의 async 흐름에는 canonical state owner를 하나만 둔다. TanStack Query처럼
+framework가 상태를 소유하면 그 결과를 `NextPageState` 같은 새 `status` union으로
+재포장하거나 같은 의미의 application 타입으로 복제하지 않는다. 공통 UI가 전체
+lifecycle이 아니라 다음 행동 가능 여부만 필요하면 `onLoadMore?: () => void`처럼
+callback 존재 자체가 capability가 되게 한다. loading·error·retry 표시는 원래 query를
+소유한 feature가 렌더링한다. 카드의 State Model은 정책 명세이지 구현마다 union을
+생성하라는 명령이 아니다.
+
 ## 상태는 데이터, action은 형제
 
 **상태는 데이터만 담는다.** union 멤버의 필드는 그 상태에서 참인 값이고, action은
@@ -315,6 +325,8 @@ literal 보존용 `as const`, 검증 함수 내부에 격리된 브랜드 생성
 - 파생 가능한 값을 별도 상태로 저장했거나, query·mutation 상태를 로컬 기계로
   복사했거나, raw setter를 hook 밖으로 노출했거나, 스키마·연산 union에서 파생
   가능한 타입을 수기로 복제 선언했으면 `FINDING`이다.
+- 기존 query·router·form 상태를 이름만 바꾼 새 `status` union으로 재포장했거나,
+  단일 capability만 필요한 공통 UI에 전체 lifecycle 타입을 만들었으면 `FINDING`이다.
 - state union이나 state 값에 action을 저장했거나, 쓸 수 없는 상태에 no-op action을
   채웠거나, 기존 `refetch`가 있는데 같은 일을 하는 action을 새로 만들었으면
   `FINDING`이다.

@@ -88,7 +88,9 @@ Oracle 절차는 설치된 `$agent-graph-engineering`을 이름으로 명시적�
 - 카드에 async·순서·중복 제출·다단계 상태 행이 있거나 client state·exported Props·
   shared/package API·trust boundary 타입 형태를 만들거나 바꾸면 구현 전에
   `references/type-constraints.md`를 읽는다. 상태·이벤트·전이표는 카드 `O*` 행에서
-  도출해 discriminated union 타입 계약으로 옮긴다. 카드에 없는 상태나 전이가
+  도출하되 구현 타입은 그 문서의 상태 설계 사다리를 따른다. 기존 query·router·form이
+  상태를 소유하면 새 `status` union을 만들지 않는다. discriminated union은 기존
+  소유자가 표현하지 못하는 진짜 client state에만 만든다. 카드에 없는 상태나 전이가
   필요하면 발명하지 않고 `POLICY_GAP`으로 `NEEDS_DECISION`이다.
 - locator·fixture·대기 방법·관찰 계층만 테스트 단계에서 정할 수 있다.
 - 테스트는 중앙 디렉터리로 빼지 않고 소유 경계와 함께 이동·삭제되게 둔다. FSD

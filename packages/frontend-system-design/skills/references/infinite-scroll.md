@@ -62,34 +62,31 @@ export function useProductFeed(filters: ProductFilters) {
 }
 ```
 
-트리거. `hasNextPage`가 없으면 관찰 자체를 하지 않고, 진행 중이면 호출하지 않는다.
+트리거. query가 이미 lifecycle을 소유하므로 새 `status` union으로 재포장하지 않는다.
+공통 observer에는 지금 실행 가능한 `onLoadMore` capability만 넘긴다. 다음 페이지가
+없거나 진행 중이면 callback이 없으므로 관찰 자체를 하지 않는다.
 
 ```ts
 // <slice>/ui/useLoadMoreOnVisible.ts
-export function useLoadMoreOnVisible(query: {
-  hasNextPage: boolean
-  isFetchingNextPage: boolean
-  fetchNextPage: () => void
-}) {
+export function useLoadMoreOnVisible(onLoadMore?: () => void) {
   const sentinelRef = useRef<HTMLDivElement>(null)
-  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query
 
   useEffect(() => {
     const sentinel = sentinelRef.current
-    if (!sentinel || !hasNextPage || isFetchingNextPage) return
+    if (!sentinel || !onLoadMore) return
 
     const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) fetchNextPage()
+      if (entry.isIntersecting) onLoadMore()
     })
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+  }, [onLoadMore])
 
   return sentinelRef
 }
 ```
 
-`isFetchingNextPage`를 의존성에 넣어 진행 중에는 observer를 아예 떼는 게 핵심이다.
+`onLoadMore`를 `undefined`로 바꿔 진행 중에는 observer를 아예 떼는 게 핵심이다.
 쿼리 라이브러리가 동시 호출을 합쳐 주더라도 그 동작에 기대지 말고 트리거 쪽에서
 막는다. 설치된 버전이 실제로 어떻게 합치는지는 그 버전 문서로 확인한다.
 
@@ -99,7 +96,9 @@ export function useLoadMoreOnVisible(query: {
 // <slice>/ui/ProductFeed.tsx
 export function ProductFeed({ filters }: { filters: ProductFilters }) {
   const query = useProductFeed(filters)
-  const sentinelRef = useLoadMoreOnVisible(query)
+  const onLoadMore =
+    query.hasNextPage && !query.isFetchingNextPage && !query.isFetchNextPageError ? query.fetchNextPage : undefined
+  const sentinelRef = useLoadMoreOnVisible(onLoadMore)
   const products = query.data.pages.flatMap((page) => page.items)
 
   return (

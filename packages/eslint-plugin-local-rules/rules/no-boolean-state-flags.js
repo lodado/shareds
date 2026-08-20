@@ -1,9 +1,9 @@
 /**
- * Parallel boolean flags for one flow encode states the flow can never be in -
- * `isLoading && isSuccess`, `isError && isSubmitting`. One `status` literal union
- * makes those combinations unrepresentable instead of merely unlikely.
+ * Parallel boolean flags in locally-owned state encode combinations the flow can
+ * never enter. Framework projections and component props are not state ownership.
  */
 const FLAG_PATTERN = /^(is|has|should|can)[A-Z]/
+const TYPE_WRAPPERS = new Set(['Readonly', 'Required', 'Partial'])
 
 const calleeName = (callee) => {
   if (callee.type === 'Identifier') {
@@ -39,11 +39,27 @@ const reportShape = (context, node, members) => {
   })
 }
 
+const stateShape = (typeNode) => {
+  if (typeNode?.type === 'TSTypeLiteral') {
+    return { node: typeNode, members: typeNode.members }
+  }
+
+  if (typeNode?.type !== 'TSTypeReference' || typeNode.typeName.type !== 'Identifier') {
+    return null
+  }
+
+  if (TYPE_WRAPPERS.has(typeNode.typeName.name)) {
+    return stateShape(typeNode.typeArguments?.params[0])
+  }
+
+  return { reference: typeNode.typeName.name }
+}
+
 module.exports = {
   meta: {
     type: 'suggestion',
     docs: {
-      description: 'disallow parallel boolean flags for one flow - use a single status literal union',
+      description: 'disallow parallel boolean flags in locally-owned state',
       category: 'Best Practices',
       recommended: 'warn',
     },
@@ -57,16 +73,22 @@ module.exports = {
   },
   create(context) {
     const functionStack = []
+    const namedShapes = new Map()
+    const usedStateTypes = new Set()
 
     const enterFunction = () => functionStack.push({ booleanStates: [] })
     const exitFunction = () => functionStack.pop()
 
     return {
-      TSTypeLiteral(node) {
-        reportShape(context, node, node.members)
+      TSTypeAliasDeclaration(node) {
+        const shape = stateShape(node.typeAnnotation)
+
+        if (shape?.members) {
+          namedShapes.set(node.id.name, shape)
+        }
       },
-      TSInterfaceBody(node) {
-        reportShape(context, node, node.body)
+      TSInterfaceDeclaration(node) {
+        namedShapes.set(node.id.name, { node: node.body, members: node.body.body })
       },
       FunctionDeclaration: enterFunction,
       'FunctionDeclaration:exit': exitFunction,
@@ -81,6 +103,15 @@ module.exports = {
           return
         }
 
+        const [stateType] = (node.typeArguments ?? node.typeParameters)?.params ?? []
+        const shape = stateShape(stateType)
+
+        if (shape?.members) {
+          reportShape(context, shape.node, shape.members)
+        } else if (shape?.reference) {
+          usedStateTypes.add(shape.reference)
+        }
+
         const [initial] = node.arguments
         if (initial?.type !== 'Literal' || typeof initial.value !== 'boolean') {
           return
@@ -90,6 +121,15 @@ module.exports = {
 
         if (current.booleanStates.length === 2) {
           context.report({ node, messageId: 'parallelState' })
+        }
+      },
+      'Program:exit'() {
+        for (const name of usedStateTypes) {
+          const shape = namedShapes.get(name)
+
+          if (shape) {
+            reportShape(context, shape.node, shape.members)
+          }
         }
       },
     }

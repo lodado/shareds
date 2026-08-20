@@ -215,11 +215,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.9.0')
+  assert.equal(version, '0.9.1')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.9.0')
+  assert.equal(marketplace.version, '0.9.1')
 })
 
 test('reuses the repository network boundary and colocates approved MSW handlers', async () => {
@@ -547,7 +547,7 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
   assert.match(skill, /client state·exported Props/)
   assert.match(skill, /shared\/package API·trust boundary/)
   assert.doesNotMatch(skill, /state-modeling\.md/)
-  assert.match(skill, /discriminated union 타입 계약/)
+  assert.match(skill, /기존 query·router·form이\s+상태를 소유하면 새 `status` union을 만들지 않는다/)
   assert.match(oracleCard, /## State Model/)
   assert.match(oracleCard, /참조 없는 전이는 발명된 정책이다/)
   assert.match(frontendImplementation, /type-constraints\.md/)
@@ -560,6 +560,9 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
   assert.match(typeConstraints, /generic 명시 없는 대표 정상 호출 1개/)
   assert.match(typeConstraints, /\.test-d\.tsx/)
   assert.match(typeConstraints, /상태 설계 사다리/)
+  assert.match(typeConstraints, /상태 소유권은 하나다/)
+  assert.match(typeConstraints, /capability/)
+  assert.match(typeConstraints, /새 `status` union으로 재포장/)
   assert.match(typeConstraints, /단일 `status` 문자열 literal discriminant/)
   assert.match(typeConstraints, /`POLICY_GAP`으로 `NEEDS_DECISION`/)
   assert.match(typeConstraints, /skipToken/)

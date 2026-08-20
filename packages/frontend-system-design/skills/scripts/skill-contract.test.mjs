@@ -235,10 +235,10 @@ test('plugin metadata publishes the Oracle-first contract under a new cache iden
   const marketplace = JSON.parse(await readFile(join(repositoryDirectory, '.claude-plugin/marketplace.json'), 'utf8'))
   const listing = marketplace.plugins.find((plugin) => plugin.name === 'frontend-system-design')
 
-  assert.equal(packageJson.version, '0.2.0')
-  assert.equal(codexPlugin.version, '0.2.0')
-  assert.equal(claudePlugin.version, '0.2.0')
-  assert.equal(listing?.version, '0.2.0')
+  assert.equal(packageJson.version, '0.2.1')
+  assert.equal(codexPlugin.version, '0.2.1')
+  assert.equal(claudePlugin.version, '0.2.1')
+  assert.equal(listing?.version, '0.2.1')
 
   for (const description of [
     packageJson.description,
@@ -258,6 +258,12 @@ test('pins the load-bearing techniques that must never drift out', async () => {
   assert.match(reference['infinite-scroll'], /cursor를 쓴다/)
   assert.match(reference['infinite-scroll'], /IntersectionObserver/)
   assert.match(reference['infinite-scroll'], /useSuspenseInfiniteQuery/)
+  assert.match(reference['infinite-scroll'], /onLoadMore/)
+  assert.match(reference['infinite-scroll'], /새 `status` union으로 재포장하지 않는다/)
+  assert.match(
+    reference['infinite-scroll'],
+    /query\.hasNextPage\s*&&\s*!query\.isFetchingNextPage\s*&&\s*!query\.isFetchNextPageError/,
+  )
   assert.match(reference['infinite-scroll'], /QueryErrorResetBoundary/)
   assert.match(reference['infinite-scroll'], /Error Boundary/)
   assert.match(

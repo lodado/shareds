@@ -373,13 +373,25 @@ typedRuleTester.run('no-boolean-state-flags', rules['no-boolean-state-flags'], {
     "type S = { status: 'loading' | 'error' }",
     // A single flag cannot contradict another one.
     'type S = { isOpen: boolean; label: string }',
+    // Framework projections and component props are not locally-owned state.
+    'type QueryControls = { hasNextPage: boolean; isFetchingNextPage: boolean }',
+    'type QueryState = { hasNextPage: boolean; isFetchingNextPage: boolean }',
+    'interface FeedProps { hasNextPage: boolean; isFetchingNextPage: boolean }',
     'function Panel() { const [isOpen, setOpen] = useState(false); return isOpen }',
     // Non-boolean state is not a flag pair.
     'function Panel() { const [isOpen] = useState(false); const [name] = useState("") }',
   ],
   invalid: [
     {
-      code: 'type S = { isLoading: boolean; isError: boolean; data: Payload }',
+      code: 'type LoadState = { isLoading: boolean; isError: boolean; data: Payload }; function Panel() { useState<LoadState>({ isLoading: false, isError: false, data }) }',
+      errors: [{ messageId: 'parallelFlags' }],
+    },
+    {
+      code: 'interface SubmitState { isSubmitting: boolean; isDone: boolean }; function Form() { useState<SubmitState>({ isSubmitting: false, isDone: false }) }',
+      errors: [{ messageId: 'parallelFlags' }],
+    },
+    {
+      code: 'function Panel() { useState<Readonly<{ isLoading: boolean; isError: boolean }>>({ isLoading: false, isError: false }) }',
       errors: [{ messageId: 'parallelFlags' }],
     },
     {

@@ -1,6 +1,6 @@
 {
   "name": "@lodado/frontend-system-design-plugin",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Oracle-dependent companion for well-known frontend system design problems.",
   "private": true,
   "scripts": {
