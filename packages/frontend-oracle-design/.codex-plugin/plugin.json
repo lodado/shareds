@@ -1,6 +1,6 @@
 {
   "name": "frontend-oracle-design",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "Medium/high-risk Oracle-driven frontend contracts, TDD, evidence gates, and review.",
   "author": {
     "name": "lodado",

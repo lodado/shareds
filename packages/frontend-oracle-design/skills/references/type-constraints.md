@@ -89,6 +89,23 @@ reducer·전이표·상태 기계는 기본값이 아니다. 순서 위반 자�
 구분한다. 미결이면 `NEEDS_DECISION`이며 "아마 무시"를 기본값으로 채우지 않는다.
 카드 행 ID를 참조하지 않는 전이는 발명된 정책이다.
 
+## 메커니즘 선택 순서
+
+같은 잘못된 사용을 여러 도구가 닫을 수 있으면 **앞 단부터** 검토하고, 앞 단으로
+닫히면 뒷 단을 쓰지 않는다. 도구 선택 자체가 비결정성이다 — 순서를 고정해야 같은
+카드에서 같은 설계가 나온다.
+
+```text
+API 분리 → discriminated union → satisfies → keyof / typeof / indexed access
+→ const type parameter → type predicate → lookup map → NoInfer
+→ tagged type → overload → mapped / conditional type → recursive type
+```
+
+내장 utility로 표현되는 관계(`Awaited`·`ReturnType`·`Parameters`·`Extract`·
+`Exclude`·`NonNullable`·`NoInfer`·`Readonly`·`Record`·`Pick`·`Omit`)를 custom
+conditional type으로 재구현하지 않는다. 뒷 단 세 개(overload·mapped/conditional·
+recursive)는 「Props와 API 표면」의 격리 조건을 만족할 때만 쓴다.
+
 ## 타입 작성 규칙
 
 **선언보다 파생.** 수기로 선언하는 타입은 정책이 담긴 두 종류 — 연산 union과 실패
@@ -163,6 +180,13 @@ exported shared/package API를 만들거나 바꿀 때는 구현 타입보다 **
   문자열을 브랜드화하지 않는다.
 - helper는 타입 추론을 보존한다. 반환 타입을 넓게 annotation하거나 호출부에
   generic 반복을 요구하는 helper는 만들지 않는다 (`queryOptions` 패턴).
+- literal factory는 `const` type parameter로 호출부의 `as const` 반복 없이
+  key·tuple literal 추론을 보존한다. 여러 인자 중 하나만 추론 권위면 나머지
+  인자에 `NoInfer`를 붙여 추론 지점을 하나로 고정한다:
+  ```typescript
+  function defineRoutes<const T extends readonly string[]>(paths: T): T
+  function pick<T>(options: readonly T[], fallback: NoInfer<T>): T
+  ```
 - 입력을 변경하지 않는 함수는 `readonly T[]`를 받는다.
 - mode가 값·반환 타입을 기계적으로 결정하면 generic lookup map으로 관계를
   보존한다 (`{ single: Id | null; multiple: ReadonlySet<Id> }[M]`). mode별
@@ -177,6 +201,11 @@ exported shared/package API를 만들거나 바꿀 때는 구현 타입보다 **
 - 타입 오류 메시지도 공개 API 품질이다. 소비자가 볼 오류가 "X is not assignable
   to CalendarDate | null" 수준으로 읽히지 않으면 generic을 단순화하거나 API를
   나눈다.
+- 공개 variant가 2~3개고 입·출력 타입 관계만 다르면 overload를 검토한다.
+  variant마다 동작이 다르면 overload 대신 API를 분리한다.
+- mapped·conditional·recursive 타입 계산은 공용 라이브러리의 `types/internal`에
+  격리하고 type test를 함께 둔다. feature 컴포넌트 안에 자작 고급 utility를
+  작성하지 않는다. Props에 generic이 4개 이상 노출되면 공개 API 분리를 검토한다.
 
 ## Exhaustiveness 강제
 
@@ -242,6 +271,9 @@ literal 보존용 `as const`, 검증 함수 내부에 격리된 브랜드 생성
 - 사다리 1·2단으로 끝나는 문제에 union·기계를 도입했거나, 상태 분기에
   exhaustiveness 강제(기본 계층 이상)가 없으면 Decision의 예외 사유 없이는
   `FINDING`이다.
+- 앞 단 메커니즘으로 닫히는 문제에 뒷 단 타입을 썼거나, feature 코드에 자작
+  mapped·conditional·recursive utility가 있거나, 내장 utility 재구현이나 type
+  test 없는 고급 utility가 있으면 `FINDING`이다.
 - 시간축 비결정성을 타입만으로 "해결됨" 처리했으면 `FINDING`이다.
 - 상태 이름 취향, reducer 대 개별 handler 문법 선호, 패턴 매칭 라이브러리 선호만  
   다르면 `NON_ORACLE_OPINION`이다.

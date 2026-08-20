@@ -1,6 +1,6 @@
 {
   "name": "@lodado/frontend-oracle-design-plugin",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "Claude Code / Codex plugin for medium/high-risk Oracle-driven frontend delivery.",
   "private": true,
   "scripts": {
