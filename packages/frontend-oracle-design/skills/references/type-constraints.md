@@ -19,6 +19,12 @@ TypeScript 컴파일 오류의 약 94%는 문법이 아니라 타입 위반이�
 준수는 모델 개선(93%)이 아니라 결정적 제약으로만 100%가 됐다(OpenAI Structured
 Outputs). 프롬프트가 아니라 표현 불가능성이 결정성을 만든다.
 
+컴파일 통과는 건전성 증명이 아니라 결정적 고효율 필터다. TypeScript는 의도적으로
+불건전하고(bivariance, 리터럴에만 적용되는 excess property check), 필터 강도는
+tsconfig·컴파일러 버전의 함수다. 전제 환경 검증은
+[`type-environment.md`](type-environment.md)가 소유한다 — 레포당 1회 검증하고
+여기서는 반복하지 않는다.
+
 ## 세 종류의 비결정성
 
 | 종류   | 문제                                                            | 담당                                                      |
@@ -201,6 +207,11 @@ exported shared/package API를 만들거나 바꿀 때는 구현 타입보다 **
 - 타입 오류 메시지도 공개 API 품질이다. 소비자가 볼 오류가 "X is not assignable
   to CalendarDate | null" 수준으로 읽히지 않으면 generic을 단순화하거나 API를
   나눈다.
+- 소비 루프에 단언이 필요하면 API 형태가 틀린 것이다. union·mapped 타입 config를
+  소비자가 `map`으로 펼치는 순간 key↔value 관계가 끊긴다. 관계는 값 생성 시점에
+  묶고(`accessor(key, { cell })`이 `render(row)`를 반환), 남는 단언은 그 생성
+  함수 안 한 줄로 격리한다. 정의 지점만 닫고 소비 지점에 `as`를 남기는 설계는
+  공용 API 승격 실격이다.
 - 공개 variant가 2~3개고 입·출력 타입 관계만 다르면 overload를 검토한다.
   variant마다 동작이 다르면 overload 대신 API를 분리한다.
 - mapped·conditional·recursive 타입 계산은 공용 라이브러리의 `types/internal`에
@@ -275,5 +286,9 @@ literal 보존용 `as const`, 검증 함수 내부에 격리된 브랜드 생성
   mapped·conditional·recursive utility가 있거나, 내장 utility 재구현이나 type
   test 없는 고급 utility가 있으면 `FINDING`이다.
 - 시간축 비결정성을 타입만으로 "해결됨" 처리했으면 `FINDING`이다.
+- 구현 diff가 `.test-d.*`의 `@ts-expect-error` 케이스를 삭제·약화했거나, 계약
+  타입·스키마를 넓혀(필수 필드→optional, union→`string`) 타입 오류를 없앴는데
+  카드 행 인용이 없으면 `FINDING`이다. 계약 파일은 검수의 신뢰 뿌리다 — 완화는
+  구현 결정이 아니라 정책 변경이며 `POLICY_GAP`으로 `NEEDS_DECISION`이다.
 - 상태 이름 취향, reducer 대 개별 handler 문법 선호, 패턴 매칭 라이브러리 선호만  
   다르면 `NON_ORACLE_OPINION`이다.

@@ -195,11 +195,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.7.4')
+  assert.equal(version, '0.8.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.7.4')
+  assert.equal(marketplace.version, '0.8.0')
 })
 
 test('reuses the repository network boundary and colocates approved MSW handlers', async () => {
@@ -548,6 +548,38 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
   assert.doesNotMatch(typeConstraints, /switch-exhaustiveness-check|`switch`/)
   assert.match(typeConstraints, /설치돼 있거나 도입이 승인된 경우만/)
   assert.doesNotMatch(typeConstraints, /단순 toggle을 위해 XState/)
+})
+
+test('type-environment: pins compiler environment once per repo and protects contract files', async () => {
+  const [skill, typeConstraints, typeEnvironment] = await Promise.all([
+    read('SKILL.md'),
+    read('references/type-constraints.md'),
+    read('references/type-environment.md'),
+  ])
+
+  // 셋업 시 1회 로딩 — 매 카드마다 반복하지 않는다
+  assert.match(skill, /references\/type-environment\.md/)
+  assert.match(skill, /레포당 1회/)
+  assert.match(typeEnvironment, /레포당 1회/)
+  assert.match(typeEnvironment, /매 카드마다 다시 읽지 않는다/)
+  assert.match(typeEnvironment, /tsc --showConfig/)
+  assert.match(typeEnvironment, /`strict`/)
+  assert.match(typeEnvironment, /noUncheckedIndexedAccess/)
+  assert.match(typeEnvironment, /exactOptionalPropertyTypes/)
+  assert.match(typeEnvironment, /project-constraint/)
+  assert.match(typeEnvironment, /tsconfig를 조용히\s+바꾸지 않는다/)
+  assert.match(typeEnvironment, /NEEDS_DECISION/)
+
+  // type-constraints는 환경 전제를 소유하지 않고 가리키기만 한다
+  assert.match(typeConstraints, /건전성 증명이 아니라 결정적 고효율 필터/)
+  assert.match(typeConstraints, /type-environment\.md/)
+  assert.doesNotMatch(typeConstraints, /noUncheckedIndexedAccess/)
+
+  // 소비 지점 단언 금지와 계약 파일 보호
+  assert.match(typeConstraints, /소비 루프에 단언이 필요하면 API 형태가 틀린 것이다/)
+  assert.match(typeConstraints, /공용 API 승격 실격/)
+  assert.match(typeConstraints, /`@ts-expect-error` 케이스를 삭제·약화/)
+  assert.match(typeConstraints, /계약 파일은 검수의 신뢰 뿌리다/)
 })
 
 test('prefers Suspense and Error Boundary over in-component loading branches', async () => {
