@@ -408,4 +408,37 @@ typedRuleTester.run('no-response-type-assertion', rules['no-response-type-assert
   ],
 })
 
+typedRuleTester.run('no-action-in-state', rules['no-action-in-state'], {
+  valid: [
+    // Data-only union members - the action lives beside the state, not inside it.
+    "type S = { status: 'loading' } | { status: 'failure'; reason: 'network' }",
+    // A callback on an ordinary props object is not a state field.
+    'type Props = { onRetry: () => void; label: string }',
+    // Union members keyed by presence, not by a state discriminant.
+    'type Link = { href: string } | { onClick: () => void }',
+    // The hook returns the action as a sibling of the state.
+    "function useDetail() { const [state] = useState({ status: 'loading' }); return { state, retry } }",
+    // A plain object with handlers and no state discriminant stays a handler map.
+    'const handlers = { retry: () => load(), cancel: () => abort() }',
+  ],
+  invalid: [
+    {
+      code: "type S = { status: 'loading' } | { status: 'failure'; retry: () => void }",
+      errors: [{ messageId: 'actionInStateType' }],
+    },
+    {
+      code: "type S = { phase: 'idle'; start: () => Promise<void> } | { phase: 'done' }",
+      errors: [{ messageId: 'actionInStateType' }],
+    },
+    {
+      code: "const initial = { status: 'failure', retry: () => undefined }",
+      errors: [{ messageId: 'actionInStateValue' }],
+    },
+    {
+      code: "setState({ status: 'failure', reservationId: id, retry: load })",
+      errors: [{ messageId: 'actionInStateValue' }],
+    },
+  ],
+})
+
 console.log(`ok  ${Object.keys(rules).length} rules pass RuleTester`)

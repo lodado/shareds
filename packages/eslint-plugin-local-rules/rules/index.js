@@ -3,6 +3,7 @@ module.exports = {
   'fsd-no-banned-segments': require('./fsd-no-banned-segments'),
   'fsd-no-deep-import': require('./fsd-no-deep-import'),
   'fsd-no-driver-outside-repository': require('./fsd-no-driver-outside-repository'),
+  'no-action-in-state': require('./no-action-in-state'),
   'no-arbitrary-sleep-in-tests': require('./no-arbitrary-sleep-in-tests'),
   'no-boolean-state-flags': require('./no-boolean-state-flags'),
   'no-complex-ternary': require('./no-complex-ternary'),

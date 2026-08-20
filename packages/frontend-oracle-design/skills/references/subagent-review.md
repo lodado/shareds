@@ -207,6 +207,11 @@ reviewer는 아래 질문으로 사용자를 다시 인터뷰하거나 새 정�
 - 실제 package version과 레포 계약을 확인하고 외부 best practice보다 우선했는가?
 - material한 입력·성공·실패·상태가 TypeScript로 표현되고 `any`나 광범위한 assertion으로
   불가능 상태를 숨기지 않았는가? 단순 상태에 불필요한 state machine도 만들지 않았는가?
+- state에 저장된 action(`retry`·`submit`)이나 no-op action이 있는가? 상태는 데이터만
+  담고 action은 hook 반환의 형제여야 하며, 서버 상태면 기존 `refetch`를 재사용해야
+  한다. 위반이면 `FINDING`이다.
+- 기존 query API로 표현되는 서버 상태를 `useState`+`useEffect`로 다시 구현했는가?
+  unmount·route 변경 뒤 늦은 응답이 상태를 덮을 수 있는가?
 - server state를 query cache와 local/global state가 중복 소유하지 않는가?
 - Server Component로 충분한 일을 Client Component·TanStack Query로 옮기지 않았는가?
 - Suspense/Error Boundary가 필요한 subtree에만 있고 initial load·background refetch·

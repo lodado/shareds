@@ -195,11 +195,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.8.0')
+  assert.equal(version, '0.9.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.8.0')
+  assert.equal(marketplace.version, '0.9.0')
 })
 
 test('reuses the repository network boundary and colocates approved MSW handlers', async () => {
@@ -599,4 +599,39 @@ test('prefers Suspense and Error Boundary over in-component loading branches', a
   assert.match(frontendImplementation, /throwOnError.*data 부재 조건으로 좁혀/s)
 
   assert.match(subagentReview, /실격 사유가 Implementation\n  Decision에 없으면 `FINDING`이다/)
+})
+
+test('keeps client state data-only and hands actions back beside it', async () => {
+  const [typeConstraints, frontendImplementation, subagentReview] = await Promise.all([
+    read('references/type-constraints.md'),
+    read('references/frontend-implementation.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  // 1·2: 기존 query·framework 상태를 먼저 쓰고, 남는 것만 최소 data-only union으로 만든다
+  assert.match(typeConstraints, /기존 query·framework 상태를 최우선으로 재사용한다/)
+  assert.match(typeConstraints, /상태는 데이터만 담는다/)
+
+  // 3·4·6: 함수는 state에 넣지 않고 sibling으로 주며 없는 action은 만들지 않는다
+  assert.match(typeConstraints, /retry`·`submit`·`reset` 같은 함수를 state 값에 저장하지 않는다/)
+  assert.match(typeConstraints, /hook 반환 객체의 sibling/)
+  assert.match(typeConstraints, /refetch`를 그대로 다시 노출한다/)
+  assert.match(typeConstraints, /\(\) => undefined/)
+  assert.match(typeConstraints, /no-action-in-state/)
+
+  // 5: 잘못된 입력은 UI 동작·문구가 다를 때만 별도 상태다
+  assert.match(typeConstraints, /UI 동작·문구가 실제로 다를 때만\s*\n?\s*별도 상태로 나눈다/)
+
+  // 8: 카드의 State Model은 정책 표기이지 런타임 기계 지시가 아니다
+  assert.match(typeConstraints, /카드에 `## State Model`이 있다는 사실만으로/)
+  assert.match(typeConstraints, /Event union·전이 함수·transition command/)
+
+  // 7: unmount·route 변경 뒤 도착한 응답은 타입이 아니라 런타임이 막는다
+  assert.match(frontendImplementation, /unmount·route 변경 뒤 도착한 응답/)
+  assert.match(frontendImplementation, /AbortController/)
+  assert.match(frontendImplementation, /직접 만든 async 상태에도 같은 방어를\s*\n?\s*적용한다/)
+  assert.match(frontendImplementation, /state와 action을 형제로 반환한다/)
+
+  // 리뷰는 같은 계약으로 판정한다
+  assert.match(subagentReview, /state에 저장된 action/)
 })

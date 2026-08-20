@@ -63,23 +63,24 @@ Order matters: later entries win. Keep the base preset first.
 defects are errors, judgement calls are warnings, and rules that clash with an existing repo
 convention ship off.
 
-| Rule                               | Severity | What it catches                                                                                 |
-| ---------------------------------- | -------- | ----------------------------------------------------------------------------------------------- |
-| `no-console-log`                   | error    | `console.log` left in source                                                                    |
-| `require-exact-call-count`         | error    | `toHaveBeenCalled()` where the contract is 0 / exactly 1 / 2+ calls                             |
-| `require-skip-reason`              | error    | `test.skip` / `it.todo` with no comment saying which layer covers it instead                    |
-| `no-arbitrary-sleep-in-tests`      | error    | `await sleep(100)` / `new Promise(r => setTimeout(r, n))` in test files                         |
-| `no-css-locator-without-reason`    | error    | `page.locator('.thing')` in e2e specs with no justification comment                             |
-| `no-refetch-in-effect`             | error    | `refetch()` inside an effect instead of putting the input in the query key                      |
-| `no-fetch-in-component`            | error    | `fetch` / `axios` called straight from a component                                              |
-| `require-abort-signal-passthrough` | error    | a queryFn that destructures `signal` but never hands it to `fetch`                              |
-| `no-response-type-assertion`       | error    | `(await res.json()) as Payload` — asserting a boundary payload instead of parsing it            |
-| `require-discriminated-state`      | warn     | a `status` literal union sitting next to optional siblings instead of one member per state      |
-| `no-boolean-state-flags`           | warn     | parallel `isLoading` / `isError` flags for one flow, or two boolean `useState` in one component |
-| `require-effect-annotation`        | warn     | `useEffect` with no comment naming the external system, reason and cleanup                      |
-| `no-use-client-above-leaf`         | warn     | `'use client'` on a Next.js `page`/`layout`/`template`/`default` route file                     |
-| `no-derived-state-effect`          | warn     | an effect whose only job is `setX(<value derived from the deps>)`                               |
-| `scenario-test-filename`           | off      | test files that do not name their layer (`*.scenario.test.*` / `*.unit.test.*`)                 |
+| Rule                               | Severity | What it catches                                                                                     |
+| ---------------------------------- | -------- | --------------------------------------------------------------------------------------------------- |
+| `no-console-log`                   | error    | `console.log` left in source                                                                        |
+| `require-exact-call-count`         | error    | `toHaveBeenCalled()` where the contract is 0 / exactly 1 / 2+ calls                                 |
+| `require-skip-reason`              | error    | `test.skip` / `it.todo` with no comment saying which layer covers it instead                        |
+| `no-arbitrary-sleep-in-tests`      | error    | `await sleep(100)` / `new Promise(r => setTimeout(r, n))` in test files                             |
+| `no-css-locator-without-reason`    | error    | `page.locator('.thing')` in e2e specs with no justification comment                                 |
+| `no-refetch-in-effect`             | error    | `refetch()` inside an effect instead of putting the input in the query key                          |
+| `no-fetch-in-component`            | error    | `fetch` / `axios` called straight from a component                                                  |
+| `require-abort-signal-passthrough` | error    | a queryFn that destructures `signal` but never hands it to `fetch`                                  |
+| `no-response-type-assertion`       | error    | `(await res.json()) as Payload` — asserting a boundary payload instead of parsing it                |
+| `require-discriminated-state`      | warn     | a `status` literal union sitting next to optional siblings instead of one member per state          |
+| `no-boolean-state-flags`           | warn     | parallel `isLoading` / `isError` flags for one flow, or two boolean `useState` in one component     |
+| `no-action-in-state`               | warn     | an action (`retry`, `reset`) stored inside a state union member or state value instead of beside it |
+| `require-effect-annotation`        | warn     | `useEffect` with no comment naming the external system, reason and cleanup                          |
+| `no-use-client-above-leaf`         | warn     | `'use client'` on a Next.js `page`/`layout`/`template`/`default` route file                         |
+| `no-derived-state-effect`          | warn     | an effect whose only job is `setX(<value derived from the deps>)`                                   |
+| `scenario-test-filename`           | off      | test files that do not name their layer (`*.scenario.test.*` / `*.unit.test.*`)                     |
 
 Turn an off-by-default rule on per project:
 

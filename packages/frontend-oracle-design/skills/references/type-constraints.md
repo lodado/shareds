@@ -69,6 +69,10 @@ union 작성은 3단이다. 1·2단에서 끝나는 문제에 3단을 쓰지 않
    경계로 올릴 수 없는 나머지에만 분기를 남기고, 그때도 자작 union 없이 라이브러리
    union에 ts-pattern을 직접 물린다
    (`match(mutation).with({ status: 'error', error: { code: 'CONFLICT' } }, …)`).
+   같은 이유로 **기존 query·framework 상태를 최우선으로 재사용한다.** 이미 있는
+   query API·router state·form state로 표현되는 서버 상태를 직접 관리하는 hook으로
+   다시 만들지 않는다. 카드가 요구하는 데이터가 기존 경계에 없을 때만 3단으로
+   내려간다.
 3. **그래도 남는 진짜 client 상태만 `useState<Union>` + 의도 함수 hook으로 만든다.**
    raw `setState`·setter를 hook 밖으로 노출하지 않고, 도메인 의도를 표현하는 함수
    (`pick`, `submit`, `reset`)만 반환한다. 잘못된 상태에서 온 호출은 카드가 정한
@@ -78,6 +82,40 @@ reducer·전이표·상태 기계는 기본값이 아니다. 순서 위반 자�
 흐름(결제·다단계 제출·낙관적 롤백)에서만, 새 state-machine dependency는 필요가
 입증될 때만 쓴다. XState는 계층·병렬 상태나 actor 조율이 카드에 실제로 있을 때만
 후보이며, 설치돼 있거나 도입이 승인된 경우만 쓴다.
+
+**카드에 `## State Model`이 있다는 사실만으로** Event union·전이 함수·transition
+command 같은 런타임 기계를 만들지 않는다. 카드의 State Model은 정책을 빠짐없이
+적어 두는 표기이고, 그 정책을 무엇으로 구현할지는 이 사다리가 정한다. 단순 조회
+하나의 로딩·성공·실패는 2단에서 끝나며, 3단에서도 필요한 것은 상태 union 하나와
+의도 함수 몇 개다.
+
+## 상태는 데이터, action은 형제
+
+**상태는 데이터만 담는다.** union 멤버의 필드는 그 상태에서 참인 값이고, action은
+그 값으로 다음에 할 수 있는 일이다. 둘은 수명이 다르므로 한 값에 섞지 않는다.
+
+- `retry`·`submit`·`reset` 같은 함수를 state 값에 저장하지 않는다. 저장한 함수는
+  그것을 만든 render의 closure에 고정되므로, 이후 props·param이 바뀌어도 낡은 값을
+  계속 캡처한다. `@lodado/eslint-config/local-rules`를 쓰는 레포에서는
+  `no-action-in-state`가 타입과 값 양쪽에서 이 형태를 잡는다.
+- action은 **hook 반환 객체의 sibling**으로 준다 (`{ state, retry }`). 서버 상태면
+  새 action을 만들지 말고 query의 `refetch`를 그대로 다시 노출한다.
+- 어떤 상태에서 쓸 수 없는 action은 만들지 않는다. `retry: () => undefined`처럼
+  타입을 맞추려고 넣는 no-op action은 UI에 "재시도할 수 있다"는 거짓 정보를 준다.
+  action이 상태별로 달라지면 상태를 좁힌 자식에 좁힌 action을 넘긴다.
+- 잘못된 입력(파싱 실패한 ID, 없는 route param)은 **UI 동작·문구가 실제로 다를 때만
+  별도 상태로 나눈다.** 화면과 복구 경로가 같으면 기존 실패 상태에 합치고, 나누면
+  그 상태만의 필드와 action을 각각 채운다. 카드에 구분이 없으면 발명하지 말고
+  `POLICY_GAP`으로 `NEEDS_DECISION`이다.
+
+```typescript
+// 금지 — 상태에 action이 들어가 stale closure와 가짜 retry가 동시에 생긴다
+type DetailState = { status: 'loading' } | { status: 'failure'; retry: () => void }
+
+// 허용 — 상태는 데이터, action은 형제
+type DetailState = { status: 'loading' } | { status: 'failure'; reason: LoadFailure }
+function useDetail(id: DetailId): { state: DetailState; retry: () => void }
+```
 
 ## 카드에서 상태를 도출한다
 
@@ -240,6 +278,7 @@ variant별 설정(라벨·메시지·핸들러·권한)도 `satisfies Record<Uni
 | `no-response-type-assertion`  | boundary payload를 파싱 대신 `as`로 단언                    |
 | `require-discriminated-state` | `status` literal union 옆의 optional 형제 필드              |
 | `no-boolean-state-flags`      | 한 흐름을 병렬 boolean flag나 boolean `useState` 2개로 표현 |
+| `no-action-in-state`          | state union·state 값 안에 저장된 `retry` 같은 action        |
 
 `assertNever`는 레포에 이미 있으면 재사용하고, 없으면 공용 위치 하나에만 만든다.
 
@@ -276,6 +315,12 @@ literal 보존용 `as const`, 검증 함수 내부에 격리된 브랜드 생성
 - 파생 가능한 값을 별도 상태로 저장했거나, query·mutation 상태를 로컬 기계로
   복사했거나, raw setter를 hook 밖으로 노출했거나, 스키마·연산 union에서 파생
   가능한 타입을 수기로 복제 선언했으면 `FINDING`이다.
+- state union이나 state 값에 action을 저장했거나, 쓸 수 없는 상태에 no-op action을
+  채웠거나, 기존 `refetch`가 있는데 같은 일을 하는 action을 새로 만들었으면
+  `FINDING`이다.
+- 카드의 State Model을 근거로 단순 조회에 Event union·전이 함수·transition command를
+  도입했으면 `FINDING`이다. 사다리 단 선택 사유가 Implementation Decision에 있으면
+  아니다.
 - 무조건 실행되는 첫 조회의 loading·error를 경계로 올리지 않고 컴포넌트 안에서
   분기했으면 `FINDING`이다. 조건부 query·placeholder·취소 제약 같은 실제 실격
   사유를 Implementation Decision에 적었으면 아니다.

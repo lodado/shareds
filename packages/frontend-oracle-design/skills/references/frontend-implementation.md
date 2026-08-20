@@ -71,6 +71,14 @@ Oracle, 대상 레포 계약과 실제 설치 버전이 항상 우선한다.
 서버 원본을 편집용 draft로 복사해야 하면 `초기화 시점`, `저장`, `취소`, `원격 갱신과 충돌` 정책이 Oracle에 있어야 한다. 단일 source of truth를 유지하고, query 변환은
 가능하면 query `select` 또는 render 중 파생으로 처리한다.
 
+서버 상태에는 레포에 이미 있는 query API·router state·form state를 먼저 쓴다. 같은
+데이터를 `useState` + `useEffect` + `useRef`로 직접 관리하는 hook을 새로 만들면
+freshness·중복 요청·취소를 전부 다시 구현하게 되므로, 기존 경계에 없는 데이터일
+때만 직접 관리하고 그 사유를 Implementation Decision에 적는다. 직접 관리하더라도
+상태 값에는 데이터만 담고 `retry` 같은 함수는 넣지 않는다 —
+[`type-constraints.md`](type-constraints.md)의 「상태는 데이터, action은 형제」를
+따른다.
+
 ## 2. 실행 위치를 고른다
 
 1. 초기 route render에서 서버가 안전하게 읽을 수 있고 브라우저에서 지속 동기화할
@@ -121,6 +129,11 @@ Oracle, 대상 레포 계약과 실제 설치 버전이 항상 우선한다.
   serializable key에 포함하고, effect에서 수동 `refetch`로 입력 변화를 맞추지 않는다.
 - 취소가 계약이면 `queryFn`이 제공된 `AbortSignal`을 실제 요청에 전달하는지 확인하고,
   응답 순서 역전에서도 최신 입력 결과만 남는지 결정론적으로 검증한다.
+- **unmount·route 변경 뒤 도착한 응답으로 상태를 갱신하지 않는다.** query를 쓰면
+  라이브러리가 최신 호출 기준으로 처리하지만, 직접 만든 async 상태에도 같은 방어를
+  적용한다: effect cleanup에서 `AbortController`로 요청을 끊거나 무효화 token으로
+  늦은 응답을 버린다. 이건 타입이 아니라 런타임 방어이므로 Implementation Decision에
+  기록한다.
 - mutation pending은 duplicate submit 차단과 실제 요청 총 횟수를 각각 검증한다.
 
 ## 4. Architecture unit과 코드 경계를 지킨다
@@ -161,6 +174,9 @@ Page는 필요한 micro-hook을 조합하고 render-ready 값과 intent 이름�
 소유하고, React가 필요 없는 계산은 hook으로 감싸지 말고 pure model function에 둔다.
 
 - 하나의 interaction workflow 또는 외부 시스템 동기화를 소유하면 hook으로 분리한다.
+- hook은 **state와 action을 형제로 반환한다** (`{ state, retry }`). action을 상태 값
+  안에 넣지 않고, 서버 상태면 새 action 대신 query의 `refetch`를 다시 노출한다.
+  해당 상태에서 할 수 없는 일에는 no-op action을 채우지 않는다.
 - query key/options와 remote operation은 해당 server-state 경계에 둔다.
 - view는 렌더링과 접근 가능한 interaction 표현에 집중하고 data/action을 받는다.
 - 순수 계산은 함수 또는 render 중 표현으로 남긴다. `useMemo`는 순수성 도구가 아니라
