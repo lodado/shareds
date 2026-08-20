@@ -1,0 +1,209 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#official-rules"
+  - banner [ref=e3]:
+    - navigation "Header" [ref=e4]:
+      - generic [ref=e5] [cursor=pointer]
+      - generic [ref=e9]:
+        - generic [ref=e10]: AI Agents Hackathon 2025
+        - generic: Rules
+      - generic [ref=e12]:
+        - radio "Switch to dark mode"
+        - generic "Switch to dark mode" [ref=e13] [cursor=pointer]
+        - radio "Switch to light mode"
+      - generic [ref=e17]:
+        - button "Select language" [ref=e18] [cursor=pointer]
+        - generic:
+          - list:
+            - listitem [ref=e21]:
+              - link "English" [ref=e22] [cursor=pointer]:
+                - /url: ./
+            - listitem [ref=e23]:
+              - link "Español" [ref=e24] [cursor=pointer]:
+                - /url: ../es/rules/
+            - listitem [ref=e25]:
+              - link "Português" [ref=e26] [cursor=pointer]:
+                - /url: ../pt/rules/
+            - listitem [ref=e27]:
+              - link "中文" [ref=e28] [cursor=pointer]:
+                - /url: ../zh/rules/
+  - generic [ref=e29]:
+    - main [ref=e30]:
+      - generic [ref=e31]:
+        - navigation "Navigation" [ref=e34]:
+          - generic [ref=e35] [cursor=pointer]:
+            - link "AI Agents Hackathon 2025" [ref=e36]:
+              - /url: ..
+              - img "logo" [ref=e37]
+            - text: AI Agents Hackathon 2025
+          - list [ref=e38]:
+            - listitem [ref=e39]:
+              - link "Overview" [ref=e40] [cursor=pointer]:
+                - /url: ..
+            - listitem [ref=e42]:
+              - link "Rules" [ref=e43] [cursor=pointer]:
+                - /url: ./
+            - listitem [ref=e45]:
+              - link "Submission" [ref=e46] [cursor=pointer]:
+                - /url: ../submission/
+            - listitem [ref=e48]:
+              - link "Winners" [ref=e49] [cursor=pointer]:
+                - /url: ../winners/
+            - listitem [ref=e51]:
+              - link "Discussions" [ref=e52] [cursor=pointer]:
+                - /url: https://github.com/microsoft/AI_Agents_Hackathon/discussions
+        - navigation "Table of contents" [ref=e57]:
+          - list [ref=e59]:
+            - listitem [ref=e60]:
+              - link "Official Rules" [ref=e61] [cursor=pointer]:
+                - /url: "#official-rules_1"
+            - listitem [ref=e63]:
+              - link "Terms and Conditions" [ref=e64] [cursor=pointer]:
+                - /url: "#terms-and-conditions"
+        - article [ref=e67]:
+          - heading "Official Rules" [level=1] [ref=e68]
+          - paragraph [ref=e69]: "These are the official rules for Hack Together: AI Agents Hackathon."
+          - heading "Official Rules" [level=2] [ref=e70]
+          - paragraph [ref=e71]:
+            - strong [ref=e72]: 1. SPONSOR
+          - paragraph [ref=e73]: "These Official Rules (“Rules”) govern the operation of the Hack Together: AI Agents Hackathon Contest (“Contest”). Microsoft Corporation, One Microsoft Way, Redmond, WA, 98052, USA, is the Contest sponsor (“Sponsor”)."
+          - paragraph [ref=e74]:
+            - strong [ref=e75]: 2. DEFINITIONS
+          - paragraph [ref=e76]: In these Rules, “Microsoft,” “we,” “our,” and “us” refer to Sponsor and “you” and “yourself” refers to a Contest participant, or the parent/legal guardian of any Contest entrant who has not reached the age of majority to contractually obligate themselves in their legal place of residence. “Team” and “Teams” refers to a group of up to four (4) Contest participants working together to produce a single entry. By entering you (your parent/legal guardian if you are not the age of majority in your legal place of residence) agree to be bound by these Rules.
+          - paragraph [ref=e77]:
+            - strong [ref=e78]: 3. ENTRY PERIOD
+          - paragraph [ref=e79]: The Contest starts at 12:01 a.m. Pacific Time (PT) on April 8, 2025, and ends at 11:59 p.m. PT on April 30, 2025 (“Entry Period”).
+          - paragraph [ref=e80]: To enter, you must be eighteen (18) years of age or older. If you are eighteen (18) years of age or older but have not reached the age of majority in your legal place of residence, then you must have consent of a parent/legal guardian.
+          - paragraph [ref=e81]: "The Contest is a closed promotion open only to individual entrants or Teams that meet the following criteria:"
+          - paragraph [ref=e82]:
+            - strong [ref=e83]: "Teams:"
+            - text: Each Team must be comprised of no more than four (4) Team Members. The Team Leader counts as one of the Team Members. Only one (1) Entry per Team may be submitted in the Contest; we will accept no more than one (1) Entry per Team.
+          - paragraph [ref=e84]:
+            - strong [ref=e85]: "Team Members:"
+            - text: Each member of a Team (“Team Member”) must be, as of April 8, 2025, eighteen (18) years of age or older. Each Team Member may only be a member of one (1) Team.
+          - paragraph [ref=e86]:
+            - strong [ref=e87]: "Team Leaders:"
+            - text: Each Team Leader (“Team Leader”) must be, as of April 8, 2025, eighteen (18) years of age or older. Each Team Leader may only lead one (1) Team. Each Team Leader is responsible for the team project submission along with any communications between the organizers and their team.
+          - paragraph [ref=e88]: You are fully responsible for (i) the conduct of your Team Members; and (ii) the consequences of any misconduct by your Team Members. By registering a Team for the Contest, you represent and warrant that you have obtained the written consent of each Team Member (as defined below) or, for any Team Member who has not reached the age of majority in their legal place of residence, their parent or guardian, to participate in the Contest.
+          - paragraph [ref=e89]: Employees and directors of Microsoft Corporation and its subsidiaries, affiliates, advertising agencies, and Contest Parties are not eligible, nor are persons involved in the execution or administration of this promotion, or the family members of each above (parents, children, siblings, spouse/domestic partners, or individuals residing in the same household). Void in Cuba, Iran, North Korea, Sudan, Syria, Regions of Crimea, Donetsk, and Luhansk in Ukraine, Russia, and where otherwise prohibited by law.
+          - paragraph [ref=e90]:
+            - strong [ref=e91]: 4. HOW TO ENTER
+          - paragraph [ref=e92]: No Purchase Necessary.
+          - paragraph [ref=e93]: To enter, visit https://aka.ms/agenthack to submit a project. By submitting a project, you will receive one (1) entry into the Contest.
+          - paragraph [ref=e94]: There is an overall limit of 1 entry per team. You can only be a member of one team. Only one person from a team needs to submit the project, with all team member names included. Any attempt by you to obtain more than the stated number of entries by using multiple/different accounts, identities, registrations, logins, or any other methods will void your entries and you may be disqualified. Use of any automated system to participate is prohibited.
+          - paragraph [ref=e95]: We are not responsible for excess, lost, late, or incomplete entries. If disputed, entries will be deemed submitted by the “authorized account holder” of the email address, social media account, or other method used to enter. The “authorized account holder” is the natural person assigned to an email address by an internet or online service provider, or other organization responsible for assigning email addresses.
+          - paragraph [ref=e96]:
+            - strong [ref=e97]: 5. ELIGIBLE ENTRY
+          - paragraph [ref=e98]: "To be eligible, an entry must meet the following content/technical requirements:"
+          - paragraph [ref=e99]: Your entry must be your own original work; and please note the video portion of your entry must be solely your own work, including but not limited to, the actual filming, editing, graphic design, etc. of the video.
+          - paragraph [ref=e100]: Your entry cannot have been selected as a winner in any other contest; and
+          - paragraph [ref=e101]: You must have obtained all consents, approvals, or licenses required for you to submit your entry; and
+          - paragraph [ref=e102]: To the extent that entry requires the submission of user-generated content such as software, photos, videos, music, artwork, essays, etc., entrants warrant that their entry is their original work, has not been copied from others without permission or apparent rights, and does not violate the privacy, intellectual property rights, or other rights of any other person or entity. You may include Microsoft trademarks, logos, and designs, for which Microsoft grants you a limited license to use for the sole purposes of submitting an entry into this Contest; and
+          - paragraph [ref=e103]: Your entry may NOT contain, as determined by us in our sole and absolute discretion, any content that is obscene or offensive, violent, defamatory, disparaging, or illegal, or that promotes alcohol, illegal drugs, tobacco or a particular political agenda, or that communicates messages that may reflect negatively on the goodwill of Microsoft; and
+          - paragraph [ref=e104]: The video portion of your entry must be no more than five (5) minutes in length; and
+          - paragraph [ref=e105]: "The video portion of your entry must include the following content:"
+          - paragraph [ref=e106]: A demonstration of your entry;
+          - paragraph [ref=e107]: A description of your experience building your entry;
+          - paragraph [ref=e108]: An explanation of why you chose to create the entry that you did; and
+          - paragraph [ref=e109]: "An answer to the question: “How did an agentic framework help you build this solution?"
+          - paragraph [ref=e110]:
+            - strong [ref=e111]: 6. USE OF YOUR ENTRY
+          - paragraph [ref=e112]: We are not claiming ownership rights to your Submission. However, by submitting an entry, you grant us an irrevocable, royalty-free, worldwide right and license to use, review, assess, test and otherwise analyze your entry and all its content in connection with this Contest and use your entry in any media whatsoever now known or later invented for any non-commercial or commercial purpose, including, but not limited to, the marketing, sale or promotion of Microsoft products or services, without further permission from you. You will not receive any compensation or credit for use of your entry, other than what is described in these Official Rules. By entering you acknowledge that we may have developed or commissioned materials similar or identical to your entry and you waive any claims resulting from any similarities to your entry. Further you understand that we will not restrict work assignments of representatives who have had access to your entry, and you agree that use of information in our representatives’ unaided memories in the development or deployment of our products or services does not create liability for us under this agreement or copyright or trade secret law. Your entry may be posted on a public website. We are not responsible for any unauthorized use of your entry by visitors to this website. We are not obligated to use your entry for any purpose, even if it has been selected as a winning entry.
+          - paragraph [ref=e113]:
+            - strong [ref=e114]: 7. WINNER SELECTION AND NOTIFICATION
+          - paragraph [ref=e115]: "Pending confirmation of eligibility, potential prize winners will be selected by Microsoft or their Agent or a qualified judging panel from among all eligible entries received based on the following judging criteria:"
+          - paragraph [ref=e116]: 20% - Innovation
+          - list [ref=e117]:
+            - listitem [ref=e118]: Is the project premise interesting and original?
+            - listitem [ref=e119]: Is the implementation creatively done or does it go beyond traditional methods?
+            - listitem [ref=e120]: Is the demo video engaging and representative of the project?
+          - paragraph [ref=e121]: 20% - Impact
+          - list [ref=e122]:
+            - listitem [ref=e123]: Would you or others find this use case valuable?
+            - listitem [ref=e124]: Could the project be utilized by an organization, school, or company?
+            - listitem [ref=e125]: Is the project's value or purpose evident?
+          - paragraph [ref=e126]: 20% - Usability
+          - list [ref=e127]:
+            - listitem [ref=e128]: Does the project solve or address a real-world problem or scenario?
+            - listitem [ref=e129]: Does the project feature advanced usability aspects, such as Human-in-the-Loop processes?
+            - listitem [ref=e130]: Does the project align with Responsible AI principles?
+          - paragraph [ref=e131]: 20% - Solution Quality
+          - list [ref=e132]:
+            - listitem [ref=e133]: Is the repository complete with clear documentation, comments, instructions, and security best practices?
+            - listitem [ref=e134]: Is the implementation substantial, original, and sophisticated (not merely copied)?
+            - listitem [ref=e135]: Is there a detailed architecture diagram, especially where non-Microsoft technologies are integrated?
+          - paragraph [ref=e136]: 20% - Alignment with Hackathon Category
+          - list [ref=e137]:
+            - listitem [ref=e138]: Does the project fit its category (e.g., built with Python, C#, Microsoft technologies like Azure AI Agent, Copilot Studio, etc.)?
+            - listitem [ref=e139]: How well does the project demonstrate the features of the corresponding programming language or technology?
+            - listitem [ref=e140]: Are AI technologies central to the functionality or just a minor addition?
+          - paragraph [ref=e141]: Winners will be selected within fourteen (14) days following the Entry Period from among all eligible entries received. In the event of a tie between any eligible entries, an additional judge will break the tie based on the judging criteria described above. The decisions of the judges are final and binding. If we do not receive enough entries meeting the entry requirements, we may, at our discretion, select fewer winners than the number of Contest Prizes described below. The Prize will be awarded to each Team Member including the Team Leader.
+          - paragraph [ref=e142]: Winners will be notified via the contact information provided during entry no more than seven (7) days following judging with prize claim instructions, including submission deadlines. If a selected winner or Team Leader cannot be contacted, is ineligible, fails to claim a prize or fails to return any forms, the selected winner will forfeit their prize and an alternate winner will be selected time allowing. If you are a potential winner and you are eighteen (18) years of age or older but have not reached the age of majority in your legal place of residence, we may require your parent/legal guardian to sign all required forms on your behalf. Only three (3) alternate winners will be selected, after which unclaimed prizes will remain unawarded.
+          - paragraph [ref=e143]:
+            - strong [ref=e144]: 8. PRIZES
+          - paragraph [ref=e145]: "Each winning team in the categories below will receive the following prizes, equally distributed among each team member and team leader, in the form of a wire transfer (all amounts in USD):"
+          - list [ref=e146]:
+            - listitem [ref=e147]: "Best Overall Agent: $20,000"
+            - listitem [ref=e148]: "Best Agent in Python: $5,000"
+            - listitem [ref=e149]: "Best Agent in C#: $5,000"
+            - listitem [ref=e150]: "Best Agent in Java: $5,000"
+            - listitem [ref=e151]: "Best Agent in JavaScript/TypeScript: $5,000"
+            - listitem [ref=e152]: "Best Copilot Agent (using Microsoft Copilot Studio or Microsoft 365 Agents SDK): $5,000"
+            - listitem [ref=e153]: "Best Azure AI Agent Service Usage: $5,000"
+          - paragraph [ref=e154]:
+            - img "fca504d0-f649-47d2-8f8e-3b28a7727b09" [ref=e155]
+          - paragraph [ref=e156]: "Unfortunately, due to local payment laws, Sponsor is unable to provide any gratuity options to participants residing in the following regions: Uganda, Myanmar, Liberia, Haiti, Pakistan, Russia, Belarus, Burkina Faso, and Commonwealth of Dominica."
+          - paragraph [ref=e157]:
+            - strong [ref=e158]: 9. ODDS
+          - paragraph [ref=e159]: The odds of winning are based on the number of eligible entries received.
+          - paragraph [ref=e160]:
+            - strong [ref=e161]: 10. GENERAL CONDITIONS AND RELEASE OF LIABILITY
+          - paragraph [ref=e162]: To the extent allowed by law, by entering you agree to release and hold harmless Microsoft and its respective parents, partners, subsidiaries, affiliates, employees, and agents from any and all liability or any injury, loss, or damage of any kind arising in connection with this Contest or any prize won.
+          - paragraph [ref=e163]: All local laws apply. The decisions of Microsoft are final and binding.
+          - paragraph [ref=e164]: We reserve the right to cancel, change, or suspend this Contest for any reason, including cheating, technology failure, catastrophe, war, or any other unforeseen or unexpected event that affects the integrity of this Contest, whether human or mechanical. If the integrity of the Contest cannot be restored, we may select winners from among all eligible entries received before we had to cancel, change or suspend the Contest.
+          - paragraph [ref=e165]: If you attempt or we have strong reason to believe that you have compromised the integrity or the legitimate operation of this Contest by cheating, hacking, creating a bot or other automated program, or by committing fraud in any way, we may seek damages from you to the full extent of the law and you may be banned from participation in future Microsoft promotions.
+          - paragraph [ref=e166]:
+            - strong [ref=e167]: 11. PRIVACY
+          - paragraph [ref=e168]: Team Leaders will not provide any individual Team Member’s personal data to Microsoft except as explicitly requested by Microsoft, and then only after notifying Team Members that their personal data will be submitted to Microsoft in connection with the Contest. Team Leaders will not include any individual Team Member’s personal data in the information or submissions they provide to Microsoft in connection with the Contest.
+          - paragraph [ref=e169]: Personal data you provide while entering this Contest will be used by Microsoft and/or its agents and prize fulfillers acting on Microsoft’s behalf only for the administration and operation of this Contest and in accordance with the Microsoft Privacy Statement.
+          - paragraph [ref=e170]:
+            - strong [ref=e171]: 12. GOVERNING LAW
+          - paragraph [ref=e172]: This Contest will be governed by the laws of the State of Washington, and you consent to the exclusive jurisdiction and venue of the courts of the State of Washington for any disputes arising out of this Contest.
+          - paragraph [ref=e173]:
+            - strong [ref=e174]: 13. WINNERS LIST
+          - paragraph [ref=e175]: Send an email to hacktogether@gmail.com with the subject line “AI Agents Hackathon winners” within thirty (30) days of April 30, 2025 to receive a list of winners that received a prize.
+          - heading "Terms and Conditions" [level=2] [ref=e176]
+          - paragraph [ref=e177]: In the event of a dispute regarding who submitted an online entry, the entry will be deemed submitted by the authorized account holder of the e-mail address submitted at the time of entry. “Authorized account holder” is defined as the natural person who is assigned to an e-mail address by an Internet access provider, online service provider or other organization that is responsible for assigning e-mail addresses for the domain associated with the submitted e-mail address. A selected entrant may be required to provide Sponsors with proof that he/she is the authorized account holder of the e-mail address associated with the selected entry. Anyone found to be using multiple accounts to enter will be disqualified.
+          - paragraph [ref=e178]: Sponsors reserve the right at their sole discretion to disqualify, from this Contest and any future Contest or other promotion conducted by Sponsors, any individual that they find or believe to be tampering with the entry process or the operation of the Contest or Contest Website; to be acting in violation of the Official Rules or in an unsportsmanlike or disruptive manner, or with intent to annoy, abuse, threaten or harass any other person. ANY ATTEMPT BY AN ENTRANT OR ANY OTHER PERSON TO DELIBERATELY DAMAGE ANY WEBSITE OR UNDERMINE THE LEGITIMATE OPERATION OF THE CONTEST IS A VIOLATION OF CRIMINAL AND CIVIL LAWS AND SHOULD SUCH AN ATTEMPT BE MADE, SPONSOR RESERVES THE RIGHT TO SEEK DAMAGES FROM ANY SUCH PERSON TO THE FULLEST EXTENT PERMITTED BY LAW.
+    - contentinfo [ref=e179]:
+      - navigation "Footer" [ref=e180]:
+        - 'link "Previous: Overview" [ref=e181] [cursor=pointer]':
+          - /url: ..
+          - generic [ref=e185]:
+            - text: Previous
+            - generic [ref=e186]: Overview
+        - 'link "Next: Submission" [ref=e187] [cursor=pointer]':
+          - /url: ../submission/
+          - generic [ref=e188]:
+            - text: Next
+            - generic [ref=e189]: Submission
+      - generic [ref=e196]:
+        - text: © 2025 Microsoft |
+        - link "Privacy" [ref=e197] [cursor=pointer]:
+          - /url: https://go.microsoft.com/fwlink/?LinkId=521839
+        - text: "|"
+        - link "Consumer Health Privacy" [ref=e198] [cursor=pointer]:
+          - /url: https://go.microsoft.com/fwlink/?LinkId=2259814
+        - text: "| Cookies |"
+        - link "Terms of Use" [ref=e199] [cursor=pointer]:
+          - /url: https://go.microsoft.com/fwlink/?LinkID=206977
+        - text: "|"
+        - link "Trademarks" [ref=e200] [cursor=pointer]:
+          - /url: https://www.microsoft.com/trademarks
+  - complementary [ref=e202]:
+    - generic [ref=e203]:
+      - heading "Cookie consent" [level=4] [ref=e204]
+      - paragraph [ref=e205]: We use cookies to recognize your repeated visits and preferences, as well as to measure the effectiveness of our documentation and whether users find what they're searching for. With your consent, you're helping us to make our documentation better.
+      - generic [ref=e206]:
+        - button "Accept" [ref=e207] [cursor=pointer]
+        - text: Manage settings

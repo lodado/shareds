@@ -1,0 +1,1331 @@
+- generic [active] [ref=f3e1]:
+  - link "Skip to main content." [ref=f3e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic:
+      - generic:
+        - generic:
+          - link [ref=f3e3] [cursor=pointer]:
+            - /url: /blog
+            - img "Arena" [ref=f3e4]
+          - button "Menu" [ref=f3e6] [cursor=pointer]
+  - main [ref=f3e8]:
+    - generic [ref=f3e9]:
+      - generic [ref=f3e12]:
+        - generic [ref=f3e13]:
+          - figure [ref=f3e14]:
+            - 'img "WebDev Arena: A Live LLM Leaderboard for Web App Development" [ref=f3e16]'
+          - generic [ref=f3e17]:
+            - generic [ref=f3e18]:
+              - generic [ref=f3e19]: Product
+              - figure [ref=f3e21]
+              - generic [ref=f3e22]: Arena Team
+            - list [ref=f3e23]:
+              - listitem [ref=f3e24]: Published on 10 Mar 2025
+              - listitem [ref=f3e25]: Last updated on 13 Jun 2025
+              - listitem [ref=f3e26]: "Reading Time: 12 minutes"
+          - generic [ref=f3e27]:
+            - 'heading "WebDev Arena: A Live LLM Leaderboard for Web App Development" [level=1] [ref=f3e28]':
+              - paragraph [ref=f3e30]: "WebDev Arena: A Live LLM"
+              - paragraph [ref=f3e32]: Leaderboard for Web App
+              - paragraph [ref=f3e34]: Development
+            - paragraph [ref=f3e35]: "WebDev Arena allows users to test LLMs in a real-world coding task: building interactive web applications."
+        - generic [ref=f3e36]:
+          - paragraph [ref=f3e40]:
+            - text: "Contributors:"
+            - link "Aryan Vichare" [ref=f3e41] [cursor=pointer]:
+              - /url: https://www.aryanvichare.dev/
+            - link "Anastasios N. Angelopoulos" [ref=f3e42] [cursor=pointer]:
+              - /url: http://angelopoulos.ai/
+            - link "Wei-Lin Chiang" [ref=f3e43] [cursor=pointer]:
+              - /url: https://infwinston.github.io/
+            - link "Kelly Tang" [ref=f3e44] [cursor=pointer]:
+              - /url: https://www.linkedin.com/in/kelly-yuguo-tang
+            - link "Luca Manolache" [ref=f3e45] [cursor=pointer]:
+              - /url: https://www.linkedin.com/in/luca-manolache-53569b220
+          - paragraph [ref=f3e49]:
+            - text: LLMs have shown impressive coding abilities in various coding benchmarks, but how well can they actually build functional web applications? We introduce
+            - link "WebDev Arena" [ref=f3e50] [cursor=pointer]:
+              - /url: http://webdev.lmarena.ai/
+            - text: ": a real-time AI coding competition where models go head-to-head in web development challenges.Inspired by"
+            - link "LMArena" [ref=f3e51] [cursor=pointer]:
+              - /url: http://lmarena.ai/
+            - text: ", WebDev Arena allows users to test LLMs in a real-world coding task: building interactive web applications. Users submit a prompt, two LLMs generate web apps, and the community votes on which model performs better.Try out our"
+            - link "colab" [ref=f3e52] [cursor=pointer]:
+              - /url: https://colab.research.google.com/drive/1xq_-PGp8gJ8aHUyokrSqL_qZnn8s-UHV?usp=sharing
+            - text: to explore the data and analysis behind WebDev Arena.
+          - generic [ref=f3e54]:
+            - heading "Why WebDev Arena?" [level=3] [ref=f3e55]
+            - generic [ref=f3e57]:
+              - paragraph [ref=f3e58]: "Traditional coding benchmarks like HumanEval focus on solving isolated function-based problems, but real-world coding demands more—including UI generation, handling package dependencies, and structuring complete applications.From an end-user’s perspective, the setup is simple:"
+              - list [ref=f3e59]:
+                - listitem [ref=f3e60]: Users submit a prompt (e.g., “Build a simple chess game”).
+                - listitem [ref=f3e61]: Two LLMs generate competing web apps.
+                - listitem [ref=f3e62]: Users interact with both apps and vote on the better one.
+                - listitem [ref=f3e63]: Results contribute to a live leaderboard ranking LLMs by performance.
+              - paragraph [ref=f3e64]: Examples“Create a Hacker News clone”
+          - figure "Figure 1. Example of a Hacker News clone built by an LLM." [ref=f3e67]
+          - paragraph [ref=f3e72]: “Build a basic chess game”
+          - figure "Figure 2. Example of a chess game built by an LLM." [ref=f3e75]
+          - generic [ref=f3e78]:
+            - heading "WebDev Arena Leaderboard" [level=3] [ref=f3e79]
+            - generic [ref=f3e81]:
+              - paragraph [ref=f3e82]:
+                - text: Since
+                - link "our launch" [ref=f3e83] [cursor=pointer]:
+                  - /url: https://x.com/aryanvichare10/status/1866561638712881172
+                - text: in Dec 2024, we have collected over 80,000 community votes and provided a live ranking of LLMs based on their real-world coding performance.Similar to
+                - link "Chatbot Arena" [ref=f3e84] [cursor=pointer]:
+                  - /url: http://lmarena.ai/leaderboard
+                - text: ", we use the Bradley-Terry (BT) model, which estimates model strengths from pairwise comparisons. In simple terms, the BT model uses win/loss data from pairwise matchups and calculates a score for each model, reflecting its likelihood of winning against others. This ranking system is similar to Elo, commonly used in chess, and competitive games, despite the difference being a player’s skill rating may evolve over time, while LLMs stay static.Key Takeaways"
+              - list [ref=f3e85]:
+                - listitem [ref=f3e86]: "Claude 3.7 Sonnet currently holds the #1 spot with a 76% average win rate"
+                - listitem [ref=f3e87]: "Claude 3.5 Sonnet ranks #2"
+                - listitem [ref=f3e88]: "Deepseek R1 ranks #3"
+          - figure "Figure 3. Current WebDev Arena leaderboard showing model rankings." [ref=f3e91]
+          - heading "How do people use WebDev Arena?" [level=3] [ref=f3e95]
+          - generic [ref=f3e98]:
+            - heading "Topic Modeling" [level=4] [ref=f3e99]
+            - paragraph [ref=f3e102]:
+              - text: To analyze how people use Webdev Arena, we run the
+              - link "topic modeling pipeline" [ref=f3e103] [cursor=pointer]:
+                - /url: https://colab.research.google.com/drive/1chzqjePYnpq08fA3KzyKvSkuzCjojyiE?usp=sharing
+              - text: on the conversation and human preference data. Results show a diverse range of prompt categories. Overall, prompts can be categorized into 11 broad categories, the largest three being Website Design (15.3%), Game Development (12.1%), and Clone Development (11.6%).
+          - figure "Figure 4. Distribution of broad categories in WebDev Arena prompts." [ref=f3e106]
+          - paragraph [ref=f3e111]: Each board category contains several fine-grained narrow categories, such as Landing Page Design, Dashboard and Web Application Design, 3D Graphics and Shaders, Language Learning App Design, etc. Click through the Explorer to see more categories and example prompts.
+          - iframe [ref=f3e114]:
+            - generic [ref=f23e5]:
+              - img:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic: "2.5"
+                              - generic: "3.9"
+                              - generic: "5.1"
+                              - generic: "6.3"
+                              - generic: "6.5"
+                              - generic: "6.8"
+                              - generic: "7.3"
+                              - generic: "9.1"
+                              - generic: "11.4"
+                              - generic: "11.6"
+                              - generic: "12.1"
+                              - generic: "15.3"
+                    - generic:
+                      - generic: "0.00"
+                      - generic: "5.00"
+                      - generic: "10.00"
+                      - generic: "15.00"
+                    - generic:
+                      - generic: Creative Humor
+                      - generic: Simulations
+                      - generic: AI Applications
+                      - generic: App Design
+                      - generic: Digital Tools
+                      - generic: Multilingual Queries
+                      - generic: UI Design
+                      - generic: Web Development
+                      - generic: App Development
+                      - generic: Clone Development
+                      - generic: Game Development
+                      - generic: Website Design
+              - img:
+                - generic:
+                  - generic: Broad Categories
+                  - generic: Percentage (%)
+                  - generic: Category
+              - generic [ref=f23e19]:
+                - generic [ref=f23e21] [cursor=pointer]
+                - generic [ref=f23e24]:
+                  - generic [ref=f23e25] [cursor=pointer]
+                  - generic [ref=f23e28] [cursor=pointer]
+                  - generic [ref=f23e31] [cursor=pointer]
+                  - generic [ref=f23e34] [cursor=pointer]
+                - generic [ref=f23e37]:
+                  - generic [ref=f23e38] [cursor=pointer]
+                  - generic [ref=f23e41] [cursor=pointer]
+                  - generic [ref=f23e44] [cursor=pointer]
+                  - generic [ref=f23e47] [cursor=pointer]
+                - link "plotly-logomark" [ref=f23e51] [cursor=pointer]:
+                  - /url: https://plotly.com/
+                  - img "plotly-logomark" [ref=f23e52]
+          - paragraph [ref=f3e118]: ^ Figure 5. Distribution of narrow categories within broad categories.Each board category contains several fine-grained narrow categories, such as Landing Page Design, Dashboard and Web Application Design, 3D Graphics and Shaders, Language Learning App Design, etc. Click through the Explorer to see more categories and example prompts.Using the topic modeling results, we perform LLM performance analysis and observe that models perform differently across categories. Gemini-2.0-flash shows the most dramatic variation, ranking among the lowest in Game Development while performing much better in other categories.
+          - iframe [ref=f3e121]:
+            - generic [ref=f24e5]:
+              - img:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic: deepseek-r1
+                      - generic: claude-3-5-sonnet-20241022
+                      - generic: o3-mini-2025-01-31-high
+                      - generic: o3-mini-2025-01-31-high-so-false
+                      - generic: apptinker
+                      - generic: claude-3-5-haiku-20241022
+                      - generic: gemini-2.0-flash-001-so-false
+                      - generic: gemini-2.0-pro-exp-02-05
+                      - generic: o3-mini-2025-01-31-so-false
+                      - generic: o3-mini-2025-01-31
+                    - generic:
+                      - generic: "25"
+                      - generic: "20"
+                      - generic: "15"
+                      - generic: "10"
+                      - generic: "5"
+                      - generic: "0"
+              - img:
+                - generic:
+                  - generic [ref=f24e21]:
+                    - generic [ref=f24e22]: Categories
+                    - generic [ref=f24e23]:
+                      - generic [ref=f24e24]:
+                        - generic [ref=f24e25]: website design
+                        - generic [ref=f24e30] [cursor=pointer]
+                      - generic [ref=f24e31]:
+                        - generic [ref=f24e32]: game development
+                        - generic [ref=f24e37] [cursor=pointer]
+                      - generic [ref=f24e38]:
+                        - generic [ref=f24e39]: clone development
+                        - generic [ref=f24e44] [cursor=pointer]
+                      - generic [ref=f24e45]:
+                        - generic [ref=f24e46]: app development
+                        - generic [ref=f24e51] [cursor=pointer]
+                  - generic: Ranking Changes Across Categories for Top 10 Models
+                  - generic: Models
+                  - generic: Ranking
+              - generic [ref=f24e52]:
+                - generic [ref=f24e54] [cursor=pointer]
+                - generic [ref=f24e57]:
+                  - generic [ref=f24e58] [cursor=pointer]
+                  - generic [ref=f24e61] [cursor=pointer]
+                  - generic [ref=f24e64] [cursor=pointer]
+                  - generic [ref=f24e67] [cursor=pointer]
+                - generic [ref=f24e70]:
+                  - generic [ref=f24e71] [cursor=pointer]
+                  - generic [ref=f24e74] [cursor=pointer]
+                  - generic [ref=f24e77] [cursor=pointer]
+                  - generic [ref=f24e80] [cursor=pointer]
+                - link "plotly-logomark" [ref=f24e84] [cursor=pointer]:
+                  - /url: https://plotly.com/
+                  - img "plotly-logomark" [ref=f24e85]
+          - paragraph [ref=f3e125]: ^ Figure 6. Model performance across different broad categories.We calculated the win rates of Gemini 2.0, Claude-3.5-sonnet, O3-mini, and Deepseek-R1 across narrow categories, counting ties as 0.5 wins. Even within the same broad category, models performed differently across specific topics, highlighting their varying strengths. This shows the importance of fine-grained categorical analysis for LLM evaluations.In website design, Deepseek-R1 performed significantly better in Job Board Design but had a noticeably lower performance in Portfolio Website Design. In Game Development, Claude-3.5-sonnet maintained a relatively consistent win rate across most categories, except for a dip in Clicker Game Development. Gemini 2.0 and O3-mini show fluctuating win rates.
+          - iframe [ref=f3e128]:
+            - generic [ref=f25e5]:
+              - img:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic: 65%
+                              - generic: 68%
+                              - generic: 78%
+                              - generic: 52%
+                          - generic:
+                            - generic:
+                              - generic: 42%
+                              - generic: 79%
+                              - generic: 88%
+                              - generic: 63%
+                          - generic:
+                            - generic:
+                              - generic: 72%
+                              - generic: 58%
+                              - generic: 81%
+                              - generic: 66%
+                          - generic:
+                            - generic:
+                              - generic: 73%
+                              - generic: 62%
+                              - generic: 71%
+                              - generic: 68%
+                          - generic:
+                            - generic:
+                              - generic: 71%
+                              - generic: 62%
+                              - generic: 74%
+                              - generic: 82%
+                          - generic:
+                            - generic:
+                              - generic: 90%
+                              - generic: 45%
+                              - generic: 84%
+                              - generic: 53%
+                          - generic:
+                            - generic:
+                              - generic: 73%
+                              - generic: 60%
+                              - generic: 88%
+                              - generic: 69%
+                          - generic:
+                            - generic:
+                              - generic: 63%
+                              - generic: 54%
+                              - generic: 85%
+                              - generic: 60%
+                    - generic:
+                      - generic: 0%
+                      - generic: 20%
+                      - generic: 40%
+                      - generic: 60%
+                      - generic: 80%
+                    - generic:
+                      - generic: deepseek-r1
+                      - generic: o3-mini-2025-01-31-high
+                      - generic: claude-3-5-sonnet-20241022
+                      - generic: gemini-2.0-pro-exp-02-05
+              - img:
+                - generic:
+                  - generic [ref=f25e21]:
+                    - generic [ref=f25e22]: Categories
+                    - generic [ref=f25e23]:
+                      - generic [ref=f25e24]:
+                        - generic [ref=f25e25]: Landing Page Design
+                        - generic [ref=f25e30] [cursor=pointer]
+                      - generic [ref=f25e31]:
+                        - generic [ref=f25e32]: Portfolio Website Design
+                        - generic [ref=f25e37] [cursor=pointer]
+                      - generic [ref=f25e38]:
+                        - generic [ref=f25e39]: E-commerce Website Design
+                        - generic [ref=f25e44] [cursor=pointer]
+                      - generic [ref=f25e45]:
+                        - generic [ref=f25e46]: Movie Database InterfaceDesign
+                        - generic [ref=f25e51] [cursor=pointer]
+                      - generic [ref=f25e52]:
+                        - generic [ref=f25e53]: Social Media Feedand Profile Design
+                        - generic [ref=f25e58] [cursor=pointer]
+                      - generic [ref=f25e59]:
+                        - generic [ref=f25e60]: Job Board Design
+                        - generic [ref=f25e65] [cursor=pointer]
+                      - generic [ref=f25e66]:
+                        - generic [ref=f25e67]: Travel Booking WebsiteDesign
+                        - generic [ref=f25e72] [cursor=pointer]
+                      - generic [ref=f25e73]:
+                        - generic [ref=f25e74]: News Website Design
+                        - generic [ref=f25e79] [cursor=pointer]
+                  - generic: Win Rates Across Website Design
+                  - generic: Win Rate
+                  - generic: Models
+              - generic [ref=f25e80]:
+                - generic [ref=f25e82] [cursor=pointer]
+                - generic [ref=f25e85]:
+                  - generic [ref=f25e86] [cursor=pointer]
+                  - generic [ref=f25e89] [cursor=pointer]
+                  - generic [ref=f25e92] [cursor=pointer]
+                  - generic [ref=f25e95] [cursor=pointer]
+                - generic [ref=f25e98]:
+                  - generic [ref=f25e99] [cursor=pointer]
+                  - generic [ref=f25e102] [cursor=pointer]
+                  - generic [ref=f25e105] [cursor=pointer]
+                  - generic [ref=f25e108] [cursor=pointer]
+                - link "plotly-logomark" [ref=f25e112] [cursor=pointer]:
+                  - /url: https://plotly.com/
+                  - img "plotly-logomark" [ref=f25e113]
+          - paragraph [ref=f3e132]: ^ Figure 7. Model win rates across website design categories.
+          - iframe [ref=f3e135]:
+            - generic [ref=f26e5]:
+              - img:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic: 64%
+                              - generic: 55%
+                              - generic: 76%
+                              - generic: 61%
+                          - generic:
+                            - generic:
+                              - generic: 72%
+                              - generic: 54%
+                              - generic: 75%
+                              - generic: 51%
+                          - generic:
+                            - generic:
+                              - generic: 70%
+                              - generic: 62%
+                              - generic: 82%
+                              - generic: 53%
+                          - generic:
+                            - generic:
+                              - generic: 69%
+                              - generic: 40%
+                              - generic: 79%
+                              - generic: 50%
+                          - generic:
+                            - generic:
+                              - generic: 69%
+                              - generic: 59%
+                              - generic: 85%
+                              - generic: 57%
+                          - generic:
+                            - generic:
+                              - generic: 67%
+                              - generic: 62%
+                              - generic: 84%
+                              - generic: 43%
+                          - generic:
+                            - generic:
+                              - generic: 50%
+                              - generic: 75%
+                              - generic: 80%
+                              - generic: 68%
+                          - generic:
+                            - generic:
+                              - generic: 50%
+                              - generic: 44%
+                              - generic: 63%
+                              - generic: 54%
+                    - generic:
+                      - generic: 0%
+                      - generic: 20%
+                      - generic: 40%
+                      - generic: 60%
+                      - generic: 80%
+                    - generic:
+                      - generic: deepseek-r1
+                      - generic: o3-mini-2025-01-31-high
+                      - generic: claude-3-5-sonnet-20241022
+                      - generic: gemini-2.0-pro-exp-02-05
+              - img:
+                - generic:
+                  - generic [ref=f26e21]:
+                    - generic [ref=f26e22]: Categories
+                    - generic [ref=f26e23]:
+                      - generic [ref=f26e24]:
+                        - generic [ref=f26e25]: 3D Graphics andShaders
+                        - generic [ref=f26e30] [cursor=pointer]
+                      - generic [ref=f26e31]:
+                        - generic [ref=f26e32]: Web-Based Game Development
+                        - generic [ref=f26e37] [cursor=pointer]
+                      - generic [ref=f26e38]:
+                        - generic [ref=f26e39]: Chess Game Development
+                        - generic [ref=f26e44] [cursor=pointer]
+                      - generic [ref=f26e45]:
+                        - generic [ref=f26e46]: Snake Game Development
+                        - generic [ref=f26e51] [cursor=pointer]
+                      - generic [ref=f26e52]:
+                        - generic [ref=f26e53]: Tetris Game Variations
+                        - generic [ref=f26e58] [cursor=pointer]
+                      - generic [ref=f26e59]:
+                        - generic [ref=f26e60]: Flappy Bird GameDevelopment
+                        - generic [ref=f26e65] [cursor=pointer]
+                      - generic [ref=f26e66]:
+                        - generic [ref=f26e67]: Tic Tac ToeGame Development
+                        - generic [ref=f26e72] [cursor=pointer]
+                      - generic [ref=f26e73]:
+                        - generic [ref=f26e74]: Clicker Game Development
+                        - generic [ref=f26e79] [cursor=pointer]
+                  - generic: Win Rates Across Game Development
+                  - generic: Win Rate
+                  - generic: Models
+              - generic [ref=f26e80]:
+                - generic [ref=f26e82] [cursor=pointer]
+                - generic [ref=f26e85]:
+                  - generic [ref=f26e86] [cursor=pointer]
+                  - generic [ref=f26e89] [cursor=pointer]
+                  - generic [ref=f26e92] [cursor=pointer]
+                  - generic [ref=f26e95] [cursor=pointer]
+                - generic [ref=f26e98]:
+                  - generic [ref=f26e99] [cursor=pointer]
+                  - generic [ref=f26e102] [cursor=pointer]
+                  - generic [ref=f26e105] [cursor=pointer]
+                  - generic [ref=f26e108] [cursor=pointer]
+                - link "plotly-logomark" [ref=f26e112] [cursor=pointer]:
+                  - /url: https://plotly.com/
+                  - img "plotly-logomark" [ref=f26e113]
+          - paragraph [ref=f3e139]: ^ Figure 8. Model win rates across game development categories.One of the main insights from analyzing the data is that a large chunk of the votes are from the sample prompts on the main screen. We found the 5 most asked questions were
+          - iframe [ref=f3e142]:
+            - table [ref=f27e3]:
+              - rowgroup [ref=f27e7]:
+                - row [ref=f27e8]:
+                  - cell [ref=f27e9]:
+                    - paragraph [ref=f27e10]: Project Request
+                  - cell [ref=f27e11]:
+                    - paragraph [ref=f27e12]: Number of Times
+                - row [ref=f27e13]:
+                  - cell [ref=f27e14]:
+                    - paragraph [ref=f27e15]: 👨‍💻 Clone of VS Code / Cursor
+                  - cell [ref=f27e16]:
+                    - paragraph [ref=f27e17]: 4,189
+                - row [ref=f27e18]:
+                  - cell [ref=f27e19]:
+                    - paragraph [ref=f27e20]: Make me a clone of WhatsApp Chat App
+                  - cell [ref=f27e21]:
+                    - paragraph [ref=f27e22]: 3,385
+                - row [ref=f27e23]:
+                  - cell [ref=f27e24]:
+                    - paragraph [ref=f27e25]: ♟️ Build a game of chess
+                  - cell [ref=f27e26]:
+                    - paragraph [ref=f27e27]: 3,154
+                - row [ref=f27e28]:
+                  - cell [ref=f27e29]:
+                    - paragraph [ref=f27e30]: 📰 Clone of Hacker News
+                  - cell [ref=f27e31]:
+                    - paragraph [ref=f27e32]: 2,740
+                - row [ref=f27e33]:
+                  - cell [ref=f27e34]:
+                    - paragraph [ref=f27e35]: 🐦 Design a modern Twitter profile layout
+                  - cell [ref=f27e36]:
+                    - paragraph [ref=f27e37]: 2,544
+          - paragraph [ref=f3e146]: Therefore, we deduplicated the data, reducing the votes from 103096 to 61473, and recreated the deduplicated leaderboard. This leaderboard matches the original leaderboard with only a few minor swaps of models (deepseek-v3 and gpt-4o). The elo difference between them is mainly caused by having less data.
+          - iframe [ref=f3e149]:
+            - table [ref=f28e3]:
+              - rowgroup [ref=f28e10]:
+                - row [ref=f28e11]:
+                  - cell [ref=f28e12]:
+                    - paragraph [ref=f28e13]: Rank
+                  - cell [ref=f28e14]:
+                    - paragraph [ref=f28e15]: Model
+                  - cell [ref=f28e16]:
+                    - paragraph [ref=f28e17]: Original Score
+                  - cell [ref=f28e18]:
+                    - paragraph [ref=f28e19]: Deduplicated Score
+                  - cell [ref=f28e20]:
+                    - paragraph [ref=f28e21]: Delta
+                - row [ref=f28e22]:
+                  - cell [ref=f28e23]:
+                    - paragraph [ref=f28e24]: "1"
+                  - cell [ref=f28e25]:
+                    - paragraph [ref=f28e26]: claude-3-7-sonnet-20250219
+                  - cell [ref=f28e27]:
+                    - paragraph [ref=f28e28]: "1362.94"
+                  - cell [ref=f28e29]:
+                    - paragraph [ref=f28e30]: "1311.40"
+                  - cell [ref=f28e31]:
+                    - paragraph [ref=f28e32]: "51.54"
+                - row [ref=f28e33]:
+                  - cell [ref=f28e34]:
+                    - paragraph [ref=f28e35]: "2"
+                  - cell [ref=f28e36]:
+                    - paragraph [ref=f28e37]: claude-3-5-sonnet-20241022
+                  - cell [ref=f28e38]:
+                    - paragraph [ref=f28e39]: "1245.85"
+                  - cell [ref=f28e40]:
+                    - paragraph [ref=f28e41]: "1209.07"
+                  - cell [ref=f28e42]:
+                    - paragraph [ref=f28e43]: "36.78"
+                - row [ref=f28e44]:
+                  - cell [ref=f28e45]:
+                    - paragraph [ref=f28e46]: "3"
+                  - cell [ref=f28e47]:
+                    - paragraph [ref=f28e48]: deepseek-r1
+                  - cell [ref=f28e49]:
+                    - paragraph [ref=f28e50]: "1204.70"
+                  - cell [ref=f28e51]:
+                    - paragraph [ref=f28e52]: "1165.42"
+                  - cell [ref=f28e53]:
+                    - paragraph [ref=f28e54]: "39.28"
+                - row [ref=f28e55]:
+                  - cell [ref=f28e56]:
+                    - paragraph [ref=f28e57]: "4"
+                  - cell [ref=f28e58]:
+                    - paragraph [ref=f28e59]: early-grok-3-so-false
+                  - cell [ref=f28e60]:
+                    - paragraph [ref=f28e61]: "1146.99"
+                  - cell [ref=f28e62]:
+                    - paragraph [ref=f28e63]: "1111.37"
+                  - cell [ref=f28e64]:
+                    - paragraph [ref=f28e65]: "35.62"
+                - row [ref=f28e66]:
+                  - cell [ref=f28e67]:
+                    - paragraph [ref=f28e68]: "5"
+                  - cell [ref=f28e69]:
+                    - paragraph [ref=f28e70]: o3-mini-2025-01-31-high
+                  - cell [ref=f28e71]:
+                    - paragraph [ref=f28e72]: "1146.13"
+                  - cell [ref=f28e73]:
+                    - paragraph [ref=f28e74]: "1119.43"
+                  - cell [ref=f28e75]:
+                    - paragraph [ref=f28e76]: "26.70"
+                - row [ref=f28e77]:
+                  - cell [ref=f28e78]:
+                    - paragraph [ref=f28e79]: "6"
+                  - cell [ref=f28e80]:
+                    - paragraph [ref=f28e81]: o3-mini-2025-01-31-high-so-false
+                  - cell [ref=f28e82]:
+                    - paragraph [ref=f28e83]: "1137.20"
+                  - cell [ref=f28e84]:
+                    - paragraph [ref=f28e85]: "1119.85"
+                  - cell [ref=f28e86]:
+                    - paragraph [ref=f28e87]: "17.35"
+                - row [ref=f28e88]:
+                  - cell [ref=f28e89]:
+                    - paragraph [ref=f28e90]: "7"
+                  - cell [ref=f28e91]:
+                    - paragraph [ref=f28e92]: claude-3-5-haiku-20241022
+                  - cell [ref=f28e93]:
+                    - paragraph [ref=f28e94]: "1136.34"
+                  - cell [ref=f28e95]:
+                    - paragraph [ref=f28e96]: "1112.94"
+                  - cell [ref=f28e97]:
+                    - paragraph [ref=f28e98]: "23.40"
+                - row [ref=f28e99]:
+                  - cell [ref=f28e100]:
+                    - paragraph [ref=f28e101]: "8"
+                  - cell [ref=f28e102]:
+                    - paragraph [ref=f28e103]: o3-mini-2025-01-31-so-false
+                  - cell [ref=f28e104]:
+                    - paragraph [ref=f28e105]: "1109.04"
+                  - cell [ref=f28e106]:
+                    - paragraph [ref=f28e107]: "1083.30"
+                  - cell [ref=f28e108]:
+                    - paragraph [ref=f28e109]: "25.74"
+                - row [ref=f28e110]:
+                  - cell [ref=f28e111]:
+                    - paragraph [ref=f28e112]: "9"
+                  - cell [ref=f28e113]:
+                    - paragraph [ref=f28e114]: gemini-2.0-flash-thinking-01-21-so-false
+                  - cell [ref=f28e115]:
+                    - paragraph [ref=f28e116]: "1108.81"
+                  - cell [ref=f28e117]:
+                    - paragraph [ref=f28e118]: "1099.89"
+                  - cell [ref=f28e119]:
+                    - paragraph [ref=f28e120]: "8.92"
+                - row [ref=f28e121]:
+                  - cell [ref=f28e122]:
+                    - paragraph [ref=f28e123]: "10"
+                  - cell [ref=f28e124]:
+                    - paragraph [ref=f28e125]: gemini-2.0-pro-exp-02-05
+                  - cell [ref=f28e126]:
+                    - paragraph [ref=f28e127]: "1101.89"
+                  - cell [ref=f28e128]:
+                    - paragraph [ref=f28e129]: "1078.59"
+                  - cell [ref=f28e130]:
+                    - paragraph [ref=f28e131]: "23.30"
+                - row [ref=f28e132]:
+                  - cell [ref=f28e133]:
+                    - paragraph [ref=f28e134]: "11"
+                  - cell [ref=f28e135]:
+                    - paragraph [ref=f28e136]: o3-mini-2025-01-31
+                  - cell [ref=f28e137]:
+                    - paragraph [ref=f28e138]: "1099.29"
+                  - cell [ref=f28e139]:
+                    - paragraph [ref=f28e140]: "1076.50"
+                  - cell [ref=f28e141]:
+                    - paragraph [ref=f28e142]: "22.78"
+                - row [ref=f28e143]:
+                  - cell [ref=f28e144]:
+                    - paragraph [ref=f28e145]: "12"
+                  - cell [ref=f28e146]:
+                    - paragraph [ref=f28e147]: o1-2024-12-17-so-false
+                  - cell [ref=f28e148]:
+                    - paragraph [ref=f28e149]: "1054.52"
+                  - cell [ref=f28e150]:
+                    - paragraph [ref=f28e151]: "1043.16"
+                  - cell [ref=f28e152]:
+                    - paragraph [ref=f28e153]: "11.36"
+                - row [ref=f28e154]:
+                  - cell [ref=f28e155]:
+                    - paragraph [ref=f28e156]: "13"
+                  - cell [ref=f28e157]:
+                    - paragraph [ref=f28e158]: o1-2024-12-17
+                  - cell [ref=f28e159]:
+                    - paragraph [ref=f28e160]: "1049.87"
+                  - cell [ref=f28e161]:
+                    - paragraph [ref=f28e162]: "1035.79"
+                  - cell [ref=f28e163]:
+                    - paragraph [ref=f28e164]: "14.09"
+                - row [ref=f28e165]:
+                  - cell [ref=f28e166]:
+                    - paragraph [ref=f28e167]: "14"
+                  - cell [ref=f28e168]:
+                    - paragraph [ref=f28e169]: o1-mini-2024-09-12
+                  - cell [ref=f28e170]:
+                    - paragraph [ref=f28e171]: "1046.62"
+                  - cell [ref=f28e172]:
+                    - paragraph [ref=f28e173]: "1028.03"
+                  - cell [ref=f28e174]:
+                    - paragraph [ref=f28e175]: "18.59"
+                - row [ref=f28e176]:
+                  - cell [ref=f28e177]:
+                    - paragraph [ref=f28e178]: "15"
+                  - cell [ref=f28e179]:
+                    - paragraph [ref=f28e180]: gemini-2.0-flash-thinking-exp-01-21
+                  - cell [ref=f28e181]:
+                    - paragraph [ref=f28e182]: "1034.30"
+                  - cell [ref=f28e183]:
+                    - paragraph [ref=f28e184]: "1014.79"
+                  - cell [ref=f28e185]:
+                    - paragraph [ref=f28e186]: "19.52"
+                - row [ref=f28e187]:
+                  - cell [ref=f28e188]:
+                    - paragraph [ref=f28e189]: "16"
+                  - cell [ref=f28e190]:
+                    - paragraph [ref=f28e191]: gemini-2.0-flash-001-so-false
+                  - cell [ref=f28e192]:
+                    - paragraph [ref=f28e193]: "1031.71"
+                  - cell [ref=f28e194]:
+                    - paragraph [ref=f28e195]: "1011.87"
+                  - cell [ref=f28e196]:
+                    - paragraph [ref=f28e197]: "19.84"
+                - row [ref=f28e198]:
+                  - cell [ref=f28e199]:
+                    - paragraph [ref=f28e200]: "17"
+                  - cell [ref=f28e201]:
+                    - paragraph [ref=f28e202]: gemini-2.0-flash-thinking-exp-1219
+                  - cell [ref=f28e203]:
+                    - paragraph [ref=f28e204]: "1023.31"
+                  - cell [ref=f28e205]:
+                    - paragraph [ref=f28e206]: "1005.65"
+                  - cell [ref=f28e207]:
+                    - paragraph [ref=f28e208]: "17.66"
+                - row [ref=f28e209]:
+                  - cell [ref=f28e210]:
+                    - paragraph [ref=f28e211]: "18"
+                  - cell [ref=f28e212]:
+                    - paragraph [ref=f28e213]: gemini-exp-1206
+                  - cell [ref=f28e214]:
+                    - paragraph [ref=f28e215]: "1022.30"
+                  - cell [ref=f28e216]:
+                    - paragraph [ref=f28e217]: "998.24"
+                  - cell [ref=f28e218]:
+                    - paragraph [ref=f28e219]: "24.07"
+                - row [ref=f28e220]:
+                  - cell [ref=f28e221]:
+                    - paragraph [ref=f28e222]: "19"
+                  - cell [ref=f28e223]:
+                    - paragraph [ref=f28e224]: gemini-2.0-flash-exp
+                  - cell [ref=f28e225]:
+                    - paragraph [ref=f28e226]: "983.69"
+                  - cell [ref=f28e227]:
+                    - paragraph [ref=f28e228]: "966.74"
+                  - cell [ref=f28e229]:
+                    - paragraph [ref=f28e230]: "16.94"
+                - row [ref=f28e231]:
+                  - cell [ref=f28e232]:
+                    - paragraph [ref=f28e233]: "20"
+                  - cell [ref=f28e234]:
+                    - paragraph [ref=f28e235]: qwen-max-2025-01-25
+                  - cell [ref=f28e236]:
+                    - paragraph [ref=f28e237]: "979.81"
+                  - cell [ref=f28e238]:
+                    - paragraph [ref=f28e239]: "971.04"
+                  - cell [ref=f28e240]:
+                    - paragraph [ref=f28e241]: "8.77"
+                - row [ref=f28e242]:
+                  - cell [ref=f28e243]:
+                    - paragraph [ref=f28e244]: "21"
+                  - cell [ref=f28e245]:
+                    - paragraph [ref=f28e246]: gpt-4o-2024-11-20
+                  - cell [ref=f28e247]:
+                    - paragraph [ref=f28e248]: "964.00"
+                  - cell [ref=f28e249]:
+                    - paragraph [ref=f28e250]: "964.00"
+                  - cell [ref=f28e251]:
+                    - paragraph [ref=f28e252]: "0.00"
+                - row [ref=f28e253]:
+                  - cell [ref=f28e254]:
+                    - paragraph [ref=f28e255]: "22"
+                  - cell [ref=f28e256]:
+                    - paragraph [ref=f28e257]: deepseek-v3
+                  - cell [ref=f28e258]:
+                    - paragraph [ref=f28e259]: "963.81"
+                  - cell [ref=f28e260]:
+                    - paragraph [ref=f28e261]: "940.75"
+                  - cell [ref=f28e262]:
+                    - paragraph [ref=f28e263]: "23.05"
+                - row [ref=f28e264]:
+                  - cell [ref=f28e265]:
+                    - paragraph [ref=f28e266]: "23"
+                  - cell [ref=f28e267]:
+                    - paragraph [ref=f28e268]: qwen-2.5-coder-32b-instruct
+                  - cell [ref=f28e269]:
+                    - paragraph [ref=f28e270]: "903.04"
+                  - cell [ref=f28e271]:
+                    - paragraph [ref=f28e272]: "907.14"
+                  - cell [ref=f28e273]:
+                    - paragraph [ref=f28e274]: "-4.09"
+                - row [ref=f28e275]:
+                  - cell [ref=f28e276]:
+                    - paragraph [ref=f28e277]: "24"
+                  - cell [ref=f28e278]:
+                    - paragraph [ref=f28e279]: gemini-1.5-pro-002
+                  - cell [ref=f28e280]:
+                    - paragraph [ref=f28e281]: "893.47"
+                  - cell [ref=f28e282]:
+                    - paragraph [ref=f28e283]: "891.07"
+                  - cell [ref=f28e284]:
+                    - paragraph [ref=f28e285]: "2.40"
+                - row [ref=f28e286]:
+                  - cell [ref=f28e287]:
+                    - paragraph [ref=f28e288]: "25"
+                  - cell [ref=f28e289]:
+                    - paragraph [ref=f28e290]: llama-v3.1-405b-instruct
+                  - cell [ref=f28e291]:
+                    - paragraph [ref=f28e292]: "811.66"
+                  - cell [ref=f28e293]:
+                    - paragraph [ref=f28e294]: "798.96"
+                  - cell [ref=f28e295]:
+                    - paragraph [ref=f28e296]: "12.71"
+          - paragraph [ref=f3e153]: ^ Figure 9. Comparison of original and deduplicated leaderboards showing scores for all models.Another interesting difference between Chatbot Arena and WebDev Arena is the tie ratio. Webdev Arena has a 26% tie ratio and Chatbot Arena has a tie ratio of 35%. However, out of the ties, we note that WebDev arena has a much higher ratio of them being both bad. We will get to this later with the errors that can occur.
+          - iframe [ref=f3e156]:
+            - table [ref=f29e3]:
+              - rowgroup [ref=f29e8]:
+                - row [ref=f29e9]:
+                  - cell [ref=f29e10]
+                  - cell [ref=f29e11]:
+                    - paragraph [ref=f29e12]: WebDev Arena
+                  - cell [ref=f29e13]:
+                    - paragraph [ref=f29e14]: Chatbot Arena
+                - row [ref=f29e15]:
+                  - cell [ref=f29e16]:
+                    - paragraph [ref=f29e17]: Model A
+                  - cell [ref=f29e18]:
+                    - paragraph [ref=f29e19]: 36.6%
+                  - cell [ref=f29e20]:
+                    - paragraph [ref=f29e21]: 34%
+                - row [ref=f29e22]:
+                  - cell [ref=f29e23]:
+                    - paragraph [ref=f29e24]: Model B
+                  - cell [ref=f29e25]:
+                    - paragraph [ref=f29e26]: 37%
+                  - cell [ref=f29e27]:
+                    - paragraph [ref=f29e28]: 34%
+                - row [ref=f29e29]:
+                  - cell [ref=f29e30]:
+                    - paragraph [ref=f29e31]: Tie
+                  - cell [ref=f29e32]:
+                    - paragraph [ref=f29e33]: 7.8%
+                  - cell [ref=f29e34]:
+                    - paragraph [ref=f29e35]: 16%
+                - row [ref=f29e36]:
+                  - cell [ref=f29e37]:
+                    - paragraph [ref=f29e38]: Bothbad
+                  - cell [ref=f29e39]:
+                    - paragraph [ref=f29e40]: 18%
+                  - cell [ref=f29e41]:
+                    - paragraph [ref=f29e42]: 16%
+          - paragraph [ref=f3e160]: We think this task is much easier to distinguish compared to Chatbot Arena.To explain for the large number of people voting “both bad”, we took a look at model failures, when the model either hallucinates a library that does not exist/has not been imported, or writes code that can not compile.Sometimes, prompts will result in the LLMs outputting buggy code or failing to properly install dependencies. The main culprit of this is llama-v3.1.
+          - figure "Figure 10. Distribution of error types across different models." [ref=f3e163]
+          - paragraph [ref=f3e168]: Additionally we analyzed the length in tokens of requests. Most requests are under 25,000 tokens and we found several outliers with extremely long messages.
+          - iframe [ref=f3e171]:
+            - table [ref=f30e3]:
+              - rowgroup [ref=f30e7]:
+                - row [ref=f30e8]:
+                  - cell [ref=f30e9]:
+                    - paragraph [ref=f30e10]: Statistic
+                  - cell [ref=f30e11]:
+                    - paragraph [ref=f30e12]: Value
+                - row [ref=f30e13]:
+                  - cell [ref=f30e14]:
+                    - paragraph [ref=f30e15]: mean
+                  - cell [ref=f30e16]:
+                    - paragraph [ref=f30e17]: "154.91"
+                - row [ref=f30e18]:
+                  - cell [ref=f30e19]:
+                    - paragraph [ref=f30e20]: std
+                  - cell [ref=f30e21]:
+                    - paragraph [ref=f30e22]: "1613.12"
+                - row [ref=f30e23]:
+                  - cell [ref=f30e24]:
+                    - paragraph [ref=f30e25]: min
+                  - cell [ref=f30e26]:
+                    - paragraph [ref=f30e27]: "0.00"
+                - row [ref=f30e28]:
+                  - cell [ref=f30e29]:
+                    - paragraph [ref=f30e30]: 25%
+                  - cell [ref=f30e31]:
+                    - paragraph [ref=f30e32]: "7.00"
+                - row [ref=f30e33]:
+                  - cell [ref=f30e34]:
+                    - paragraph [ref=f30e35]: 50%
+                  - cell [ref=f30e36]:
+                    - paragraph [ref=f30e37]: "11.00"
+                - row [ref=f30e38]:
+                  - cell [ref=f30e39]:
+                    - paragraph [ref=f30e40]: 75%
+                  - cell [ref=f30e41]:
+                    - paragraph [ref=f30e42]: "29.00"
+                - row [ref=f30e43]:
+                  - cell [ref=f30e44]:
+                    - paragraph [ref=f30e45]: max
+                  - cell [ref=f30e46]:
+                    - paragraph [ref=f30e47]: "269157.00"
+          - figure "Figure 11. Distribution of request lengths in tokens." [ref=f3e174]
+          - generic [ref=f3e177]:
+            - heading "How we implemented WebDev Arena?" [level=3] [ref=f3e178]
+            - generic [ref=f3e180]:
+              - paragraph [ref=f3e181]: "One of the key challenges in building WebDev Arena was ensuring that LLMs generate consistent, deployable web applications. To achieve this, we developed a structured output approach that standardizes how models generate web applications.Structured output is a technique that ensures LLM responses adhere to a predefined JSON schema. Rather than allowing models to generate freeform code or text, we constrain their output to match a specific structure. This provides several key benefits:"
+              - list [ref=f3e182]:
+                - listitem [ref=f3e183]:
+                  - strong [ref=f3e184]: Type Safety
+                  - text: ": Eliminates the need to validate or retry incorrectly formatted responses"
+                - listitem [ref=f3e185]:
+                  - strong [ref=f3e186]: Consistent Formatting
+                  - text: ": Ensures all models generate code in a standardized way"
+                - listitem [ref=f3e187]:
+                  - strong [ref=f3e188]: Better Error Handling
+                  - text: ": Makes model refusals and errors programmatically detectable"
+                - listitem [ref=f3e189]:
+                  - strong [ref=f3e190]: Simplified Prompting
+                  - text: ": Reduces the need for complex prompting to achieve consistent formatting"
+              - paragraph [ref=f3e191]: "Rather than letting models generate code in an unconstrained format, we prompt them to output code in a specific structure that includes:"
+          - code [ref=f3e197]: "{ // Detailed explanation of the implementation plan commentary: string, // Template configuration template: string, title: string, description: string, // Dependency management additional_dependencies: string[], has_additional_dependencies: boolean, install_dependencies_command: string, // Application configuration port: number | null, file_path: string, // The actual implementation code: string }"
+          - generic [ref=f3e200]:
+            - paragraph [ref=f3e201]: "This structured format helps ensure:"
+            - list [ref=f3e202]:
+              - listitem [ref=f3e203]: "Clear documentation of the implementation approach through the `commentary` field"
+              - listitem [ref=f3e204]: Proper dependency tracking and installation instructions
+              - listitem [ref=f3e205]: Consistent file organization within the Next.js project structure
+              - listitem [ref=f3e206]: Runtime configuration like port numbers are explicitly defined
+          - generic [ref=f3e208]:
+            - heading "Infrastructure and Execution Environment" [level=4] [ref=f3e209]
+            - paragraph [ref=f3e212]: Under the hood, WebDev Arena utilizes Amazon’s Firecracker microVM technology through E2B’s infrastructure. Each sandbox runs in a lightweight virtual machine that provides enhanced security and workload isolation while maintaining the resource efficiency of containers. These microVMs are managed by a Virtual Machine Monitor (VMM) using the Linux Kernel-based Virtual Machine (KVM), with a minimalist design that excludes unnecessary devices and functionality to reduce memory footprint and attack surface.This infrastructure enables WebDev Arena to run thousands of concurrent LLM-generated applications with complete isolation - each application operates in its own secure environment with dedicated CPU, memory, and networking resources, while maintaining sub-second startup times (~150ms) essential for real-time model comparisons.
+          - generic [ref=f3e214]:
+            - heading "Prompting Strategy and System Design" [level=4] [ref=f3e215]
+            - paragraph [ref=f3e218]: "Our system prompt is designed to create a clear “persona” for the LLM as an expert frontend engineer with strong UI/UX skills. The prompt includes several critical components:"
+          - generic [ref=f3e220]:
+            - code [ref=f3e224]: "export const SYSTEM_PROMPT = ` You are an expert frontend React engineer who is also a great UI/UX designer. Follow the instructions carefully, I will tip you $1 million if you do a good job: - Think carefully step by step. - Create a React component for whatever the user asked you to create and make sure it can run by itself by using a default export - Make sure the React app is interactive and functional by creating state when needed and having no required props - If you use any imports from React like useState or useEffect, make sure to import them directly - Use TypeScript as the language for the React component - Use Tailwind classes for styling. DO NOT USE ARBITRARY VALUES (e.g. 'h-[600px]'). Make sure to use a consistent color palette. - Make sure you specify and install ALL additional dependencies. - Make sure to include all necessary code in one file. - Do not touch project dependencies files like package.json, package-lock.json, requirements.txt, etc. - Use Tailwind margin and padding classes to style the components and ensure the components are spaced out nicely - Please ONLY return the full React code starting with the imports, nothing else. It's very important for my job that you only return the React code with imports. DO NOT START WITH \\`\\`\\`typescript or \\`\\`\\`javascript or \\`\\`\\`tsx or \\`\\`\\`. - ONLY IF the user asks for a dashboard, graph or chart, the recharts library is available to be imported, e.g. \\`import { LineChart, XAxis, ... } from \"recharts\"\\` & \\`<LineChart ...><XAxis dataKey=\"name\"> ...\\`. Please only use this when needed. You may also use shadcn/ui charts e.g. \\`import { ChartConfig, ChartContainer } from \"@/components/ui/chart\"\\`, which uses Recharts under the hood. - For placeholder images, please use a <div className=\"bg-gray-200 border-2 border-dashed rounded-xl w-16 h-16\" /> `;"
+            - button "Read More" [ref=f3e226] [cursor=pointer]
+          - generic [ref=f3e233]:
+            - paragraph [ref=f3e234]: "Our prompting strategy involved a few key aspects:"
+            - list [ref=f3e235]:
+              - listitem [ref=f3e236]:
+                - strong [ref=f3e237]: Clear Role Definition
+                - text: ": We establish the model as an expert frontend engineer, which helps frame its responses appropriately"
+              - listitem [ref=f3e238]:
+                - strong [ref=f3e239]: Explicit Constraints
+                - text: ": We specify important limitations upfront:"
+            - list [ref=f3e240]:
+              - listitem [ref=f3e241]: Use of TypeScript
+              - listitem [ref=f3e242]: Tailwind for styling (with explicit prohibition of arbitrary values)
+              - listitem [ref=f3e243]: Single-file components
+              - listitem [ref=f3e244]: No modification of project dependencies
+            - list [ref=f3e245]:
+              - listitem [ref=f3e246]:
+                - strong [ref=f3e247]: Quality Guidelines
+                - text: ": We include specific quality requirements:"
+            - list [ref=f3e248]:
+              - listitem [ref=f3e249]: Interactive and functional components
+              - listitem [ref=f3e250]: Proper state management
+              - listitem [ref=f3e251]: Consistent color palette
+              - listitem [ref=f3e252]: Appropriate spacing using Tailwind classes
+            - paragraph [ref=f3e253]: Our system prompt also includes information pertaining to a predefined framework to provide the LLM a consistent starting point for generated applications. WebDev Arena currently supports Next.js by Vercel, which is a powerful React framework that enables developers to build high-performance web applications with features like hybrid rendering (SSR, SSG, and ISR), React Server Components, and API routes. Next.js is one of the leading web frameworks with 7.2 million weekly npm downloads and ~130,000 Github Stars, which is why we are providing first-class support for it through WebDev Arena.
+          - figure "Figure 12. NPM download trends for popular web frameworks." [ref=f3e256]
+          - generic [ref=f3e259]:
+            - 'heading "Performance Analysis: Single vs Ensemble Approach" [level=4] [ref=f3e260]'
+            - generic [ref=f3e262]:
+              - paragraph [ref=f3e263]: "We discovered that different models require different prompting approaches. Our implementation includes specific handling for various model architectures.For models lacking native structured output capabilities, we developed a two-stage generation pipeline: (1) Generate the initial code using the model’s native format and (2) pass the result through a GPT-4-mini instance to convert it into our structured format.We conducted a systematic ablation study examining structured output’s impact on model performance in web development tasks. Each model was evaluated in two configurations:"
+              - list [ref=f3e264]:
+                - listitem [ref=f3e265]: With structured output (using JSON schema constraints)
+                - listitem [ref=f3e266]: Without structured output (natural language generation)
+              - paragraph [ref=f3e267]: For example, we evaluated o3-mini (with/without structured output), o1 (with/without structured output), and Gemini models (with/without structured output).Our analysis revealed a consistent performance advantage for models operating without structured output constraints, as evidenced in Figure 13.
+          - iframe [ref=f3e270]:
+            - table [ref=f31e3]:
+              - rowgroup [ref=f31e10]:
+                - row [ref=f31e11]:
+                  - cell [ref=f31e12]:
+                    - paragraph [ref=f31e13]: Model Variant
+                  - cell [ref=f31e14]:
+                    - paragraph [ref=f31e15]: Arena Score
+                  - cell [ref=f31e16]:
+                    - paragraph [ref=f31e17]: Δ Score
+                  - cell [ref=f31e18]:
+                    - paragraph [ref=f31e19]: Votes
+                  - cell [ref=f31e20]:
+                    - paragraph [ref=f31e21]: 95% CI
+                - row [ref=f31e22]:
+                  - cell [ref=f31e23]:
+                    - paragraph [ref=f31e24]: o3-mini-high (w/o structured)
+                  - cell [ref=f31e25]:
+                    - paragraph [ref=f31e26]: "1169.19"
+                  - cell [ref=f31e27]:
+                    - paragraph [ref=f31e28]: "+16.08"
+                  - cell [ref=f31e29]:
+                    - paragraph [ref=f31e30]: 1,976
+                  - cell [ref=f31e31]:
+                    - paragraph [ref=f31e32]: +12.73/-11.74
+                - row [ref=f31e33]:
+                  - cell [ref=f31e34]:
+                    - paragraph [ref=f31e35]: o3-mini-high
+                  - cell [ref=f31e36]:
+                    - paragraph [ref=f31e37]: "1153.11"
+                  - cell [ref=f31e38]:
+                    - paragraph [ref=f31e39]: "-"
+                  - cell [ref=f31e40]:
+                    - paragraph [ref=f31e41]: 2,982
+                  - cell [ref=f31e42]:
+                    - paragraph [ref=f31e43]: +10.17/-10.51
+                - row [ref=f31e44]:
+                  - cell [ref=f31e45]
+                - row [ref=f31e46]:
+                  - cell [ref=f31e47]:
+                    - paragraph [ref=f31e48]: o3-mini (w/o structured)
+                  - cell [ref=f31e49]:
+                    - paragraph [ref=f31e50]: "1129.82"
+                  - cell [ref=f31e51]:
+                    - paragraph [ref=f31e52]: "+24.12"
+                  - cell [ref=f31e53]:
+                    - paragraph [ref=f31e54]: 2,688
+                  - cell [ref=f31e55]:
+                    - paragraph [ref=f31e56]: +10.64/-10.42
+                - row [ref=f31e57]:
+                  - cell [ref=f31e58]:
+                    - paragraph [ref=f31e59]: o3-mini
+                  - cell [ref=f31e60]:
+                    - paragraph [ref=f31e61]: "1105.70"
+                  - cell [ref=f31e62]:
+                    - paragraph [ref=f31e63]: "-"
+                  - cell [ref=f31e64]:
+                    - paragraph [ref=f31e65]: 6,388
+                  - cell [ref=f31e66]:
+                    - paragraph [ref=f31e67]: +7.89/-8.59
+                - row [ref=f31e68]:
+                  - cell [ref=f31e69]
+                - row [ref=f31e70]:
+                  - cell [ref=f31e71]:
+                    - paragraph [ref=f31e72]: o1 (w/o structured)
+                  - cell [ref=f31e73]:
+                    - paragraph [ref=f31e74]: "1066.29"
+                  - cell [ref=f31e75]:
+                    - paragraph [ref=f31e76]: "+12.98"
+                  - cell [ref=f31e77]:
+                    - paragraph [ref=f31e78]: 2,140
+                  - cell [ref=f31e79]:
+                    - paragraph [ref=f31e80]: +12.94/-13.37
+                - row [ref=f31e81]:
+                  - cell [ref=f31e82]:
+                    - paragraph [ref=f31e83]: o1 (20241217)
+                  - cell [ref=f31e84]:
+                    - paragraph [ref=f31e85]: "1053.31"
+                  - cell [ref=f31e86]:
+                    - paragraph [ref=f31e87]: "-"
+                  - cell [ref=f31e88]:
+                    - paragraph [ref=f31e89]: 9,271
+                  - cell [ref=f31e90]:
+                    - paragraph [ref=f31e91]: +4.71/-6.91
+                - row [ref=f31e92]:
+                  - cell [ref=f31e93]
+                - row [ref=f31e94]:
+                  - cell [ref=f31e95]:
+                    - paragraph [ref=f31e96]: Gemini-2.0-Flash-Thinking-01-21 (w/o structured)
+                  - cell [ref=f31e97]:
+                    - paragraph [ref=f31e98]: "1125.98"
+                  - cell [ref=f31e99]:
+                    - paragraph [ref=f31e100]: "+88.76"
+                  - cell [ref=f31e101]:
+                    - paragraph [ref=f31e102]: "405"
+                  - cell [ref=f31e103]:
+                    - paragraph [ref=f31e104]: +30.49/-27.58
+                - row [ref=f31e105]:
+                  - cell [ref=f31e106]:
+                    - paragraph [ref=f31e107]: Gemini-2.0-Flash-Thinking-01-21
+                  - cell [ref=f31e108]:
+                    - paragraph [ref=f31e109]: "1037.22"
+                  - cell [ref=f31e110]:
+                    - paragraph [ref=f31e111]: "-"
+                  - cell [ref=f31e112]:
+                    - paragraph [ref=f31e113]: 1,064
+                  - cell [ref=f31e114]:
+                    - paragraph [ref=f31e115]: +17.04/-17.86
+          - paragraph [ref=f3e274]: ^ Figure 13. Comparison of model performance with and without structured output constraints, showing consistent performance advantages for unstructured output across different model architectures.Our experimental results demonstrate that unstructured output configurations consistently outperform their structured counterparts across all tested model architectures, with Arena Score improvements ranging from +12.98 to +88.76 points. These improvements are statistically significant within 95% confidence intervals across all model pairs. The magnitude of this performance impact varies considerably by model architecture - Gemini exhibits the most substantial performance delta (+88.76), while o3-mini-high shows the smallest improvement (+16.08).These findings suggest that while structured output constraints provide benefits for downstream processing and code organization, they may introduce performance limitations in web development tasks. This performance-structure tradeoff appears to be more pronounced in certain model architectures, particularly in the Gemini series, indicating that the impact of structured output constraints may be architecture-dependent.
+          - generic [ref=f3e276]:
+            - heading "Vision Support for Web Development" [level=3] [ref=f3e277]
+            - paragraph [ref=f3e280]: "We’ve extended WebDev Arena to support multi-modal models, enabling evaluation of vision-language capabilities in web development contexts. Currently, seven production models in our evaluation suite support vision inputs: Claude 3.7 Sonnet, Claude 3.5 Sonnet, Claude 3.5 Haiku, GPT-4o, and three variants of Gemini (2.0-flash-thinking, 2.0-pro-exp, and 1.5-pro-002). Each model accepts visual input through our structured schema, which standardizes how images are processed and incorporated into the development workflow.Our implementation supports base64-encoded images and URLs, with vision models demonstrating capabilities in UI replication, design-to-code translation, and visual bug fixing. Early deployments show that models can parse complex visual hierarchies, extract design tokens (colors, spacing, typography), and generate semantically meaningful JSX (JavaScript XML) from screenshots.The integration of vision capabilities has significant implications for web development evaluation. Traditional code generation benchmarks focus solely on text-to-code translation, but real-world development frequently involves visual references and design artifacts. By incorporating vision support, WebDev Arena more accurately reflects practical development workflows while providing quantitative insights into multi-modal code generation performance. We are currently collecting battle data to analyze the impact of visual context on code quality and will release comprehensive benchmarks comparing vision-enabled versus text-only performance across our supported models."
+          - generic [ref=f3e282]:
+            - heading "Limitations and Future Work" [level=3] [ref=f3e283]
+            - paragraph [ref=f3e286]: While WebDev Arena represents a significant step forward in evaluating LLMs for real-world software development, several limitations remain. Unlike existing benchmarks such as HumanEval and CodeXGLUE, which focus on function-level code generation, or SWE-bench, which evaluates issue resolution in open-source repositories, WebDev Arena is currently constrained to Next.js-based React applications. This limitation excludes other widely used frameworks such as Vue, Svelte, and backend technologies like Django or Rails. Furthermore, the single-file constraint does not accurately reflect real-world software engineering workflows, where projects are typically structured across multiple files with modular architectures. Another challenge is error handling—our analysis indicates that 18% of user votes fall into the “both bad” category, often due to dependency resolution failures, incorrect state management, or TypeScript-related compilation errors. A more sophisticated error classification framework would enhance the interpretability of failure cases and inform improvements in model reliability.Future work will extend WebDev Arena to a broader range of software engineering tasks, encompassing full-stack development and non-web domains to better capture the diverse challenges of real-world coding. Unlike traditional benchmarks that focus on algorithmic correctness or isolated bug fixes, our approach evaluates LLMs in the context of complete application development, emphasizing deployment-ready implementations. We also plan to refine our human evaluation methodology, enhance model ranking with more granular error diagnostics, and investigate the impact of multimodal capabilities, particularly in UI-to-code translation. By addressing these limitations, we aim to establish WebDev Arena as a comprehensive benchmark for assessing LLMs in practical software engineering contexts, bridging the gap between academic evaluation and real-world application development.
+          - generic [ref=f3e287]:
+            - heading "Citation" [level=2] [ref=f3e289]:
+              - paragraph [ref=f3e291]: Citation
+            - generic [ref=f3e292]:
+              - generic [ref=f3e296]:
+                - generic [ref=f3e297]: "Chiang, W.-L., Zheng, L., Sheng, Y., Angelopoulos, A. N., Li, T., Li, D., Zhang, H., Zhu, B., Jordan, M., Gonzalez, J. E., & Stoica, I. (2024). Chatbot Arena: An Open Platform for Evaluating LLMs by Human Preference."
+                - generic [ref=f3e298]: "Vichare, A., Angelopoulos, A. N., Chiang, W.-L., Tang, K., & Manolache, L. (2025). WebDev Arena: A Live LLM Leaderboard for Web App Development."
+              - button "Copy as BibTeX" [ref=f3e300] [cursor=pointer]
+        - generic [ref=f3e305]:
+          - heading "Share this Article" [level=3] [ref=f3e306]
+          - generic [ref=f3e307]:
+            - link "Share this article on LinkedIn" [ref=f3e308] [cursor=pointer]:
+              - /url: https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Farena.ai%2Fwebdev-arena
+              - generic [ref=f3e309]: LinkedIn
+            - link "Share this article on X" [ref=f3e312] [cursor=pointer]:
+              - /url: https://x.com/intent/post?url=https%3A%2F%2Farena.ai%2Fwebdev-arena&text=WebDev+Arena%3A+A+Live+LLM+Leaderboard+for+Web+App+Development
+              - generic [ref=f3e313]: X
+            - button "Copy Link" [ref=f3e317] [cursor=pointer]
+      - generic [ref=f3e320]:
+        - generic [ref=f3e323]:
+          - heading "Related Articles" [level=3] [ref=f3e324]
+          - generic [ref=f3e325]:
+            - generic [ref=f3e328]:
+              - link [ref=f3e330] [cursor=pointer]:
+                - /url: /blog/autoeval-scores
+                - article [ref=f3e331]:
+                  - figure [ref=f3e332]:
+                    - generic [ref=f3e333]:
+                      - img "Post Card" [ref=f3e334]
+                      - generic [ref=f3e335]:
+                        - generic [ref=f3e336]: Read Article
+                        - img "Read Article" [ref=f3e337]
+                  - generic [ref=f3e339]:
+                    - generic [ref=f3e340]:
+                      - heading "Introducing AutoEval to the Arena leaderboards" [level=3] [ref=f3e341]:
+                        - generic [ref=f3e342]: Introducing AutoEval to the Arena
+                        - generic [ref=f3e343]: leaderboards
+                      - paragraph [ref=f3e344]: At Arena, our evaluations are dynamic and grounded in real-world use. But real-world signals take time to collect. Today, we’re introducing AutoEval scores to provide immediate, calibrated model ratings on real tasks when waiting for human votes to accumulate.
+                    - generic [ref=f3e345]:
+                      - generic [ref=f3e346]: Product
+                      - generic [ref=f3e348]: Arena Team—30 Jul 2026
+              - link [ref=f3e350] [cursor=pointer]:
+                - /url: /blog/factuality-in-arena
+                - article [ref=f3e351]:
+                  - figure [ref=f3e352]:
+                    - generic [ref=f3e353]:
+                      - img "Text Arena and Search Arena scores with the factuality adjustment on" [ref=f3e354]
+                      - generic [ref=f3e355]:
+                        - generic [ref=f3e356]: Read Article
+                        - img "Read Article" [ref=f3e357]
+                  - generic [ref=f3e359]:
+                    - generic [ref=f3e360]:
+                      - heading "Factuality in the Arena" [level=3] [ref=f3e361]
+                      - paragraph [ref=f3e363]: Factuality remains one of the most persistent questions users face when using AI models. Today, we are launching a leaderboard that ranks models not only by human preference, but also by the factual accuracy of their responses.
+                    - generic [ref=f3e364]:
+                      - generic [ref=f3e365]: Research
+                      - generic [ref=f3e367]: Product
+                      - generic [ref=f3e369]: Arena Team—14 Jul 2026
+              - link [ref=f3e371] [cursor=pointer]:
+                - /url: /blog/fullstack-code-arena
+                - article [ref=f3e372]:
+                  - figure [ref=f3e373]:
+                    - generic [ref=f3e374]:
+                      - img "Post Card" [ref=f3e375]
+                      - generic [ref=f3e376]:
+                        - generic [ref=f3e377]: Read Article
+                        - img "Read Article" [ref=f3e378]
+                  - generic [ref=f3e380]:
+                    - generic [ref=f3e381]:
+                      - heading "Build, Deploy, and Evaluate with Fullstack Code Arena" [level=3] [ref=f3e382]:
+                        - generic [ref=f3e383]: Build, Deploy, and Evaluate with
+                        - generic [ref=f3e384]: Fullstack Code Arena
+                      - paragraph [ref=f3e385]: Code Arena has evolved beyond frontend prototyping into a complete fullstack AI development platform. Explore capabilities like databases, authentication, third-party integrations, and deployments, and see how Fullstack Code Arena helps developers, entrepreneurs, and AI labs build, deploy, and evaluate production-ready applications.
+                    - generic [ref=f3e386]:
+                      - generic [ref=f3e387]: Product
+                      - generic [ref=f3e389]: Arena Team—2 Jul 2026
+              - link [ref=f3e391] [cursor=pointer]:
+                - /url: /blog/arena-100m-revenue
+                - article [ref=f3e392]:
+                  - figure [ref=f3e393]:
+                    - generic [ref=f3e394]:
+                      - img "Arena reaches $100M in eight months" [ref=f3e395]
+                      - generic [ref=f3e396]:
+                        - generic [ref=f3e397]: Read Article
+                        - img "Read Article" [ref=f3e398]
+                  - generic [ref=f3e400]:
+                    - generic [ref=f3e401]:
+                      - heading "Arena Reaches $100M in 8 Months" [level=3] [ref=f3e402]
+                      - paragraph [ref=f3e404]: Arena achieves $100M annualized run rate in eight months, driven by 10M+ monthly users who have contributed 700M+ conversations and 82M+ votes to build the world's largest human-preference dataset for AI evaluation.
+                    - generic [ref=f3e405]:
+                      - generic [ref=f3e406]: News
+                      - generic [ref=f3e408]: Anastasios Angelopoulos—29 Jun 2026
+              - link [ref=f3e410] [cursor=pointer]:
+                - /url: /blog/agent-arena-methodology
+                - article [ref=f3e411]:
+                  - figure [ref=f3e412]:
+                    - generic [ref=f3e413]:
+                      - 'img "Agent Arena: Causal Evaluation of Agents in the Real World" [ref=f3e414]'
+                      - generic [ref=f3e415]:
+                        - generic [ref=f3e416]: Read Article
+                        - img "Read Article" [ref=f3e417]
+                  - generic [ref=f3e419]:
+                    - generic [ref=f3e420]:
+                      - 'heading "Agent Arena: Causal Evaluation of Agents in the Real World" [level=3] [ref=f3e421]':
+                        - generic [ref=f3e422]: "Agent Arena: Causal Evaluation of"
+                        - generic [ref=f3e423]: Agents in the Real World
+                      - paragraph [ref=f3e424]: Agents are increasingly doing real work. The resulting task distribution has greatly expanded. We desire an agent evaluation that scales along with usage and capability.
+                    - generic [ref=f3e425]:
+                      - generic [ref=f3e426]: Product
+                      - generic [ref=f3e428]: Research
+                      - generic [ref=f3e430]: Arena Team—4 Jun 2026
+              - link [ref=f3e432] [cursor=pointer]:
+                - /url: /blog/agent-mode
+                - article [ref=f3e433]:
+                  - figure [ref=f3e434]:
+                    - generic [ref=f3e435]:
+                      - img "Empowering Users to Get More Done With Agent Mode" [ref=f3e436]
+                      - generic [ref=f3e437]:
+                        - generic [ref=f3e438]: Read Article
+                        - img "Read Article" [ref=f3e439]
+                  - generic [ref=f3e441]:
+                    - generic [ref=f3e442]:
+                      - heading "Empowering Users to Get More Done With Agent Mode" [level=3] [ref=f3e443]:
+                        - generic [ref=f3e444]: Empowering Users to Get More
+                        - generic [ref=f3e445]: Done With Agent Mode
+                      - paragraph [ref=f3e446]: The future of AI is not single-modality chat; it is in powerful agentic capabilities. Today, we are excited to introduce Agent Mode, designed to help everyone from everyday users looking to get more done to entrepreneurs looking to maximize agentic efficacy across complex use cases.
+                    - generic [ref=f3e447]:
+                      - generic [ref=f3e448]: Product
+                      - generic [ref=f3e450]: Arena Team—4 Jun 2026
+              - link [ref=f3e452] [cursor=pointer]:
+                - /url: /blog/new-categories-code-arena
+                - article [ref=f3e453]:
+                  - figure [ref=f3e454]:
+                    - generic [ref=f3e455]:
+                      - img "New Categories for Web Development in Code Arena" [ref=f3e456]
+                      - generic [ref=f3e457]:
+                        - generic [ref=f3e458]: Read Article
+                        - img "Read Article" [ref=f3e459]
+                  - generic [ref=f3e461]:
+                    - generic [ref=f3e462]:
+                      - heading "New Categories for Web Development in Code Arena" [level=3] [ref=f3e463]:
+                        - generic [ref=f3e464]: New Categories for Web
+                        - generic [ref=f3e465]: Development in Code Arena
+                      - paragraph [ref=f3e466]: AI coding models are increasingly used to build web apps, but aggregated leaderboards obscure key performance differences. After analyzing 250k+ Code Arena prompts, we identified major front-end task categories and built new leaderboard views to compare model strengths and weaknesses.
+                    - generic [ref=f3e467]:
+                      - generic [ref=f3e468]: Product
+                      - generic [ref=f3e470]: Arena Team—8 May 2026
+              - link [ref=f3e472] [cursor=pointer]:
+                - /url: /blog/multimodal-max
+                - article [ref=f3e473]:
+                  - figure [ref=f3e474]:
+                    - generic [ref=f3e475]:
+                      - img "Multimodal Max" [ref=f3e476]
+                      - generic [ref=f3e477]:
+                        - generic [ref=f3e478]: Read Article
+                        - img "Read Article" [ref=f3e479]
+                  - generic [ref=f3e481]:
+                    - generic [ref=f3e482]:
+                      - heading "Multimodal Max" [level=3] [ref=f3e483]
+                      - paragraph [ref=f3e485]: Max, Arena's model router powered by 5M+ community votes, is now multimodal. Starting today, Max will be available as the default option in direct chat for all modalities, with expanded capabilities including search, vision, image generation, image editing, and front-end coding. Similar to our original Max for text, the multimodal variants are latency-controlled to provide a fast and performant experience. Try it now at arena.ai/max!
+                    - generic [ref=f3e486]:
+                      - generic [ref=f3e487]: Product
+                      - generic [ref=f3e489]: Arena Team—5 May 2026
+              - link [ref=f3e491] [cursor=pointer]:
+                - /url: /blog/arena-leaderboard-dataset
+                - article [ref=f3e492]:
+                  - figure [ref=f3e493]:
+                    - generic [ref=f3e494]:
+                      - img "Arena Leaderboard Dataset" [ref=f3e495]
+                      - generic [ref=f3e496]:
+                        - generic [ref=f3e497]: Read Article
+                        - img "Read Article" [ref=f3e498]
+                  - generic [ref=f3e500]:
+                    - generic [ref=f3e501]:
+                      - heading "Arena Leaderboard Dataset" [level=3] [ref=f3e502]
+                      - paragraph [ref=f3e504]: For almost three years, Arena has been publishing leaderboards covering frontier AI capabilities across 10 arenas, dozens of categories, and hundreds of models, and today we're releasing the entire history of those leaderboards as a public-access dataset.
+                    - generic [ref=f3e505]:
+                      - generic [ref=f3e506]: Research
+                      - generic [ref=f3e508]: Arena Team—2 Apr 2026
+            - generic [ref=f3e509]:
+              - generic:
+                - button [ref=f3e510] [cursor=pointer]
+                - button [ref=f3e513] [cursor=pointer]
+              - link "See All Articles" [ref=f3e527] [cursor=pointer]:
+                - /url: /blog
+        - generic [ref=f3e531]:
+          - heading "Subscribeto Arena news and research" [level=3] [ref=f3e532]:
+            - generic [ref=f3e533]: Subscribe
+            - generic [ref=f3e534]: to Arena news
+            - generic [ref=f3e535]: and research
+          - paragraph [ref=f3e536]: Insights at the frontier of AI.
+          - generic [ref=f3e537]:
+            - generic [ref=f3e538]:
+              - textbox "Your email" [ref=f3e539]
+              - button "Subscribe" [ref=f3e540] [cursor=pointer]
+            - generic: Invalid email address
+  - contentinfo [ref=f3e542]:
+    - generic [ref=f3e544]:
+      - link [ref=f3e546] [cursor=pointer]:
+        - /url: /blog
+        - img "Arena" [ref=f3e547]
+      - generic [ref=f3e549]:
+        - generic [ref=f3e550]:
+          - generic [ref=f3e551]: Leaderboard Rankings
+          - navigation [ref=f3e552]:
+            - link "Overall" [ref=f3e554] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard
+            - link "Agent" [ref=f3e556] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/agent
+            - link "Text" [ref=f3e558] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/text
+            - link "WebDev" [ref=f3e560] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/code/webdev
+            - link "Image-to-WebDev" [ref=f3e562] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/code/image-to-webdev
+            - link "Text to Image" [ref=f3e564] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/text-to-image
+            - link "Image Edit" [ref=f3e566] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/image-edit
+            - link "Text to Video" [ref=f3e568] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/text-to-video
+            - link "Image to Video" [ref=f3e570] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/image-to-video
+            - link "Video Edit" [ref=f3e572] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/video-edit
+            - link "Vision" [ref=f3e574] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/vision
+            - link "Document" [ref=f3e576] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/document
+            - link "Search" [ref=f3e578] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/search
+        - generic [ref=f3e579]:
+          - generic [ref=f3e580]: Use Cases
+          - navigation [ref=f3e581]:
+            - link "Chat with AI" [ref=f3e583] [cursor=pointer]:
+              - /url: https://arena.ai/
+            - link "Build Apps & Websites" [ref=f3e585] [cursor=pointer]:
+              - /url: https://arena.ai/code
+            - link "Write & Edit Text" [ref=f3e587] [cursor=pointer]:
+              - /url: https://arena.ai/text
+            - link "Search the Web" [ref=f3e589] [cursor=pointer]:
+              - /url: https://arena.ai/search
+            - link "Generate Images" [ref=f3e591] [cursor=pointer]:
+              - /url: https://arena.ai/image
+            - link "Generate Videos" [ref=f3e593] [cursor=pointer]:
+              - /url: https://arena.ai/video
+            - link "Chose any Model" [ref=f3e595] [cursor=pointer]:
+              - /url: https://arena.ai/direct
+            - link "Compare Models Side by Side" [ref=f3e597] [cursor=pointer]:
+              - /url: https://arena.ai/side-by-side
+            - link "Complete Multi-step Tasks" [ref=f3e599] [cursor=pointer]:
+              - /url: https://arena.ai/agent
+        - generic [ref=f3e600]:
+          - generic [ref=f3e601]: Company
+          - navigation [ref=f3e602]:
+            - link "About Us" [ref=f3e604] [cursor=pointer]:
+              - /url: https://arena.ai/about
+            - link "How It Works" [ref=f3e606] [cursor=pointer]:
+              - /url: https://arena.ai/how-it-works
+            - link "Careers" [ref=f3e608] [cursor=pointer]:
+              - /url: https://arena.ai/jobs
+            - link "Changelog" [ref=f3e610] [cursor=pointer]:
+              - /url: https://arena.ai/blog/leaderboard-changelog
+            - link "Help Center" [ref=f3e612] [cursor=pointer]:
+              - /url: https://help.arena.ai
+            - link "FAQ" [ref=f3e614] [cursor=pointer]:
+              - /url: https://arena.ai/faq
+            - link "Blog" [ref=f3e616] [cursor=pointer]:
+              - /url: https://arena.ai/blog
+        - generic [ref=f3e617]:
+          - generic [ref=f3e618]: Follow
+          - navigation [ref=f3e619]:
+            - link "X" [ref=f3e621] [cursor=pointer]:
+              - /url: https://x.com/arena
+            - link "LinkedIn" [ref=f3e623] [cursor=pointer]:
+              - /url: https://www.linkedin.com/company/arenaai/
+            - link "YouTube" [ref=f3e625] [cursor=pointer]:
+              - /url: https://www.youtube.com/@ArenaAIOfficial
+            - link "Discord" [ref=f3e627] [cursor=pointer]:
+              - /url: https://discord.gg/arena-ai
+        - generic [ref=f3e628]:
+          - generic [ref=f3e629]:
+            - link "Terms" [ref=f3e630] [cursor=pointer]:
+              - /url: https://arena.ai/terms-of-use
+            - link "Privacy" [ref=f3e631] [cursor=pointer]:
+              - /url: https://arena.ai/privacy-policy
+            - link "Cookies" [ref=f3e632] [cursor=pointer]:
+              - /url: https://arena.ai/cookie-policy
+          - generic [ref=f3e633]:
+            - link "Try Arena Try Arena" [ref=f3e634] [cursor=pointer]:
+              - /url: https://arena.ai/
+              - generic [ref=f3e635]: Try Arena
+              - img "Try Arena" [ref=f3e637]
+            - paragraph [ref=f3e639]: Ⓒ 2026 Arena Intelligence Inc.
+  - alert [ref=f3e640]

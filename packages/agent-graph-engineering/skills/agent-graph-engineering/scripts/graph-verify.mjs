@@ -1,0 +1,329 @@
+#!/usr/bin/env node
+
+import { readFile } from 'node:fs/promises'
+import { isAbsolute, resolve, win32 } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const NODE_KINDS = new Set(['agent', 'tool', 'gate', 'join', 'terminal'])
+const DISPATCH_MODES = new Set(['one', 'all'])
+const JOIN_MODES = new Set(['all', 'any'])
+
+export class GraphValidationError extends Error {
+  constructor(issues) {
+    super(issues.map(({ code, message }) => `${code}: ${message}`).join('\n'))
+    this.name = 'GraphValidationError'
+    this.issues = issues
+  }
+}
+
+export class TransitionError extends Error {
+  constructor(code, message) {
+    super(message)
+    this.name = 'TransitionError'
+    this.code = code
+  }
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function isStringArray(value) {
+  return Array.isArray(value) && value.every(isNonEmptyString)
+}
+
+function isJsonPrimitive(value) {
+  return value === null || ['string', 'number', 'boolean'].includes(typeof value)
+}
+
+function isRepoRelativeScope(scope) {
+  const normalized = scope.replaceAll('\\', '/')
+  return !isAbsolute(scope) && !win32.isAbsolute(scope) && !normalized.split('/').includes('..')
+}
+
+function normalizedScope(scope) {
+  return scope
+    .replaceAll('\\', '/')
+    .replace(/\/{0,1}\*{1,2}$/, '')
+    .replace(/\/$/, '')
+}
+
+function scopesOverlap(left, right) {
+  const a = normalizedScope(left)
+  const b = normalizedScope(right)
+
+  return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`)
+}
+
+function canWriteTogether(left, right) {
+  return !left.some((leftScope) => right.some((rightScope) => scopesOverlap(leftScope, rightScope)))
+}
+
+function reachableFrom(starts, adjacency) {
+  const visited = new Set()
+  const queue = starts.filter(Boolean)
+
+  while (queue.length > 0) {
+    const current = queue.shift()
+    if (visited.has(current)) continue
+    visited.add(current)
+    queue.push(...(adjacency.get(current) ?? []))
+  }
+
+  return visited
+}
+
+export function validateGraph(graph) {
+  const issues = []
+  const addIssue = (code, message) => issues.push({ code, message })
+
+  if (!isRecord(graph)) {
+    throw new GraphValidationError([{ code: 'GRAPH_INVALID', message: 'graph must be an object' }])
+  }
+
+  for (const field of ['id', 'outcome', 'stopCondition', 'entry']) {
+    if (!isNonEmptyString(graph[field])) addIssue('GRAPH_FIELD_INVALID', `${field} must be a non-empty string`)
+  }
+
+  // ponytail: one graph-wide maxSteps bounds every cycle; add per-cycle counters only when independent loops need them.
+  if (!Number.isInteger(graph.maxSteps) || graph.maxSteps <= 0) {
+    addIssue('MAX_STEPS_INVALID', 'maxSteps must be a positive integer')
+  }
+
+  if (!Array.isArray(graph.nodes) || graph.nodes.length === 0) {
+    addIssue('NODES_INVALID', 'nodes must be a non-empty array')
+  }
+  if (!Array.isArray(graph.edges)) addIssue('EDGES_INVALID', 'edges must be an array')
+  if (!isStringArray(graph.terminals) || graph.terminals.length === 0) {
+    addIssue('TERMINALS_INVALID', 'terminals must be a non-empty string array')
+  }
+
+  const nodes = Array.isArray(graph.nodes) ? graph.nodes : []
+  const edges = Array.isArray(graph.edges) ? graph.edges : []
+  const terminals = isStringArray(graph.terminals) ? graph.terminals : []
+  const nodeById = new Map()
+
+  for (const [index, node] of nodes.entries()) {
+    if (!isRecord(node)) {
+      addIssue('NODE_INVALID', `nodes[${index}] must be an object`)
+      continue
+    }
+    if (!isNonEmptyString(node.id)) {
+      addIssue('NODE_ID_INVALID', `nodes[${index}].id must be a non-empty string`)
+      continue
+    }
+    if (nodeById.has(node.id)) addIssue('NODE_ID_DUPLICATE', `${node.id} is declared more than once`)
+    else nodeById.set(node.id, node)
+
+    if (!NODE_KINDS.has(node.kind)) addIssue('NODE_KIND_INVALID', `${node.id}: unsupported kind ${node.kind}`)
+    if (!isNonEmptyString(node.task)) addIssue('NODE_TASK_INVALID', `${node.id}: task must be a non-empty string`)
+    if (!isStringArray(node.input)) addIssue('NODE_INPUT_INVALID', `${node.id}: input must be a string array`)
+    if (!isStringArray(node.output)) addIssue('NODE_OUTPUT_INVALID', `${node.id}: output must be a string array`)
+    if (!isStringArray(node.writeScope)) {
+      addIssue('NODE_WRITE_SCOPE_INVALID', `${node.id}: writeScope must be a string array`)
+    } else {
+      for (const scope of node.writeScope) {
+        if (!isRepoRelativeScope(scope)) {
+          addIssue('NODE_WRITE_SCOPE_OUTSIDE_REPO', `${node.id}: writeScope must stay inside the target repository`)
+        }
+      }
+    }
+    if (node.kind === 'agent' && !isNonEmptyString(node.owner)) {
+      addIssue('NODE_OWNER_MISSING', `${node.id}: agent nodes require an owner role`)
+    }
+    if (node.retryLimit !== undefined && (!Number.isInteger(node.retryLimit) || node.retryLimit < 0)) {
+      addIssue('NODE_RETRY_INVALID', `${node.id}: retryLimit must be a non-negative integer`)
+    }
+    if (node.dispatch !== undefined && !DISPATCH_MODES.has(node.dispatch)) {
+      addIssue('NODE_DISPATCH_INVALID', `${node.id}: dispatch must be one or all`)
+    }
+    if (node.kind === 'join' && !JOIN_MODES.has(node.join)) {
+      addIssue('NODE_JOIN_INVALID', `${node.id}: join nodes require join: all or any`)
+    }
+  }
+
+  if (isNonEmptyString(graph.entry) && !nodeById.has(graph.entry)) {
+    addIssue('ENTRY_UNKNOWN', `${graph.entry} does not identify a node`)
+  }
+
+  if (new Set(terminals).size !== terminals.length) {
+    addIssue('TERMINAL_DUPLICATE', 'terminals must not contain duplicates')
+  }
+  for (const terminal of terminals) {
+    const node = nodeById.get(terminal)
+    if (!node) addIssue('TERMINAL_UNKNOWN', `${terminal} does not identify a node`)
+    else if (node.kind !== 'terminal') addIssue('TERMINAL_KIND_INVALID', `${terminal} must have kind terminal`)
+  }
+
+  const adjacency = new Map([...nodeById.keys()].map((id) => [id, []]))
+  const reverseAdjacency = new Map([...nodeById.keys()].map((id) => [id, []]))
+  const outgoing = new Map([...nodeById.keys()].map((id) => [id, []]))
+  const edgeSignatures = new Set()
+
+  for (const [index, edge] of edges.entries()) {
+    if (!isRecord(edge)) {
+      addIssue('EDGE_INVALID', `edges[${index}] must be an object`)
+      continue
+    }
+
+    const source = nodeById.get(edge.from)
+    const target = nodeById.get(edge.to)
+    if (!source) addIssue('EDGE_SOURCE_UNKNOWN', `edges[${index}] references unknown source ${edge.from}`)
+    if (!target) addIssue('EDGE_TARGET_UNKNOWN', `edges[${index}] references unknown target ${edge.to}`)
+
+    if (source && target) {
+      adjacency.get(edge.from).push(edge.to)
+      reverseAdjacency.get(edge.to).push(edge.from)
+      outgoing.get(edge.from).push(edge)
+    }
+
+    const signature = JSON.stringify([edge.from, edge.to, edge.when])
+    if (edgeSignatures.has(signature)) addIssue('EDGE_DUPLICATE', `edges[${index}] duplicates another edge`)
+    else edgeSignatures.add(signature)
+
+    if (edge.when === 'always') continue
+    if (!isRecord(edge.when) || !isNonEmptyString(edge.when.field) || !Object.hasOwn(edge.when, 'equals')) {
+      addIssue('EDGE_CONDITION_INVALID', `edges[${index}] must use always or { field, equals }`)
+      continue
+    }
+    if (!isJsonPrimitive(edge.when.equals)) {
+      addIssue('EDGE_CONDITION_INVALID', `edges[${index}].when.equals must be a JSON primitive`)
+    }
+    if (source && (!Array.isArray(source.output) || !source.output.includes(edge.when.field))) {
+      addIssue(
+        'EDGE_FIELD_UNDECLARED',
+        `edges[${index}] reads ${edge.when.field}, which ${edge.from} does not declare as output`,
+      )
+    }
+  }
+
+  for (const terminal of terminals) {
+    if ((outgoing.get(terminal) ?? []).length > 0) {
+      addIssue('TERMINAL_HAS_EDGE', `${terminal} must not have outgoing edges`)
+    }
+  }
+
+  if (nodeById.has(graph.entry)) {
+    const reachable = reachableFrom([graph.entry], adjacency)
+    for (const id of nodeById.keys()) {
+      if (!reachable.has(id)) addIssue('NODE_UNREACHABLE', `${id} is not reachable from ${graph.entry}`)
+    }
+  }
+
+  const reachesTerminal = reachableFrom(
+    terminals.filter((id) => nodeById.has(id)),
+    reverseAdjacency,
+  )
+  for (const id of nodeById.keys()) {
+    if (!reachesTerminal.has(id)) {
+      addIssue('TERMINAL_UNREACHABLE_FROM_NODE', `${id} has no path to a terminal`)
+    }
+  }
+
+  for (const source of nodes.filter((node) => isRecord(node) && node.dispatch === 'all')) {
+    const targets = (outgoing.get(source.id) ?? [])
+      .map(({ to }) => nodeById.get(to))
+      .filter((node) => node?.kind === 'agent')
+
+    for (let left = 0; left < targets.length; left += 1) {
+      for (let right = left + 1; right < targets.length; right += 1) {
+        const leftScope = isStringArray(targets[left].writeScope) ? targets[left].writeScope : []
+        const rightScope = isStringArray(targets[right].writeScope) ? targets[right].writeScope : []
+        if (!canWriteTogether(leftScope, rightScope)) {
+          addIssue(
+            'PARALLEL_WRITE_CONFLICT',
+            `${source.id} fans out to overlapping writers ${targets[left].id} and ${targets[right].id}`,
+          )
+        }
+      }
+    }
+  }
+
+  if (issues.length > 0) throw new GraphValidationError(issues)
+  return graph
+}
+
+export function selectTransitions(graph, nodeId, output) {
+  validateGraph(graph)
+
+  const node = graph.nodes.find(({ id }) => id === nodeId)
+  if (!node) throw new TransitionError('NODE_UNKNOWN', `${nodeId} does not identify a node`)
+  if (!isRecord(output)) throw new TransitionError('OUTPUT_INVALID', 'node output must be an object')
+  if (node.kind === 'terminal') return []
+
+  const matched = graph.edges.filter(
+    (edge) => edge.from === nodeId && (edge.when === 'always' || output[edge.when.field] === edge.when.equals),
+  )
+
+  if (matched.length === 0) {
+    throw new TransitionError('NO_TRANSITION', `${nodeId} output matches no edge`)
+  }
+  if ((node.dispatch ?? 'one') === 'one' && matched.length > 1) {
+    throw new TransitionError('AMBIGUOUS_TRANSITION', `${nodeId} output matches ${matched.length} edges`)
+  }
+
+  return matched.map(({ to }) => to)
+}
+
+function parseOptions(args) {
+  const options = {}
+  for (let index = 0; index < args.length; index += 2) {
+    const flag = args[index]
+    const value = args[index + 1]
+    if (!['--graph', '--node', '--output'].includes(flag) || !value) {
+      throw new TransitionError('USAGE', `invalid argument ${flag ?? ''}`.trim())
+    }
+    options[flag.slice(2)] = value
+  }
+  return options
+}
+
+async function readJson(path, label) {
+  try {
+    return JSON.parse(await readFile(resolve(path), 'utf8'))
+  } catch (error) {
+    throw new TransitionError('JSON_INVALID', `cannot read ${label}: ${error.message}`)
+  }
+}
+
+async function main() {
+  const [command, ...args] = process.argv.slice(2)
+  const options = parseOptions(args)
+
+  if (command === 'verify' && options.graph && !options.node && !options.output) {
+    const graph = await readJson(options.graph, 'graph')
+    validateGraph(graph)
+    process.stdout.write(`GRAPH_VALID ${graph.id}\n`)
+    return
+  }
+
+  if (command === 'next' && options.graph && options.node && options.output) {
+    const [graph, output] = await Promise.all([readJson(options.graph, 'graph'), readJson(options.output, 'output')])
+    const next = selectTransitions(graph, options.node, output)
+    process.stdout.write(`${JSON.stringify({ node: options.node, next })}\n`)
+    return
+  }
+
+  throw new TransitionError(
+    'USAGE',
+    'use verify --graph <graph.json> or next --graph <graph.json> --node <id> --output <output.json>',
+  )
+}
+
+const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+if (isMain) {
+  main().catch((error) => {
+    if (error instanceof GraphValidationError) {
+      process.stderr.write(`GRAPH_INVALID: ${error.message}\n`)
+    } else if (error instanceof TransitionError) {
+      process.stderr.write(`${error.code}: ${error.message}\n`)
+    } else {
+      process.stderr.write(`UNEXPECTED: ${error.message}\n`)
+    }
+    process.exitCode = 1
+  })
+}

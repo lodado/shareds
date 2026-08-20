@@ -1,0 +1,23 @@
+{
+  "name": "agent-graph-engineering",
+  "version": "0.1.0",
+  "description": "Design and run bounded native-agent workflows as explicit node and edge graphs.",
+  "author": {
+    "name": "lodado",
+    "url": "https://github.com/lodado"
+  },
+  "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "repository": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "license": "MIT",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Agent Graph Engineering",
+    "shortDescription": "Orchestrate native agents as a bounded workflow graph",
+    "longDescription": "Model multi-agent work as validated nodes and edges, then route native agents through bounded branches, joins, retries, and human gates.",
+    "developerName": "lodado",
+    "category": "development",
+    "capabilities": ["Agent orchestration", "Workflow validation"],
+    "websiteURL": "https://github.com/lodado/my-Vibe-Coding-Helper",
+    "defaultPrompt": ["Turn this task into a bounded agent graph and execute it."]
+  }
+}

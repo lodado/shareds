@@ -1,0 +1,184 @@
+- generic [ref=f15e2]:
+  - generic [ref=f15e3]:
+    - link "DuckDuckGo" [ref=f15e4] [cursor=pointer]:
+      - /url: /html/
+    - generic [ref=f15e5]:
+      - generic [ref=f15e6]:
+        - textbox [ref=f15e7]: ESLint disallow useEffect in components only custom hooks
+        - button "Submit" [ref=f15e8] [cursor=pointer]
+      - combobox [ref=f15e10] [cursor=pointer]:
+        - option "All Regions" [selected]
+        - option "Argentina"
+        - option "Australia"
+        - option "Austria"
+        - option "Belgium (fr)"
+        - option "Belgium (nl)"
+        - option "Brazil"
+        - option "Bulgaria"
+        - option "Canada (en)"
+        - option "Canada (fr)"
+        - option "Catalonia"
+        - option "Chile"
+        - option "China"
+        - option "Colombia"
+        - option "Croatia"
+        - option "Czech Republic"
+        - option "Denmark"
+        - option "Estonia"
+        - option "Finland"
+        - option "France"
+        - option "Germany"
+        - option "Greece"
+        - option "Hong Kong"
+        - option "Hungary"
+        - option "Iceland"
+        - option "India (en)"
+        - option "Indonesia (en)"
+        - option "Ireland"
+        - option "Israel (en)"
+        - option "Italy"
+        - option "Japan"
+        - option "Korea"
+        - option "Latvia"
+        - option "Lithuania"
+        - option "Malaysia (en)"
+        - option "Mexico"
+        - option "Netherlands"
+        - option "New Zealand"
+        - option "Norway"
+        - option "Pakistan (en)"
+        - option "Peru"
+        - option "Philippines (en)"
+        - option "Poland"
+        - option "Portugal"
+        - option "Romania"
+        - option "Russia"
+        - option "Saudi Arabia"
+        - option "Singapore"
+        - option "Slovakia"
+        - option "Slovenia"
+        - option "South Africa"
+        - option "Spain (ca)"
+        - option "Spain (es)"
+        - option "Sweden"
+        - option "Switzerland (de)"
+        - option "Switzerland (fr)"
+        - option "Taiwan"
+        - option "Thailand (en)"
+        - option "Turkey"
+        - option "US (English)"
+        - option "US (Spanish)"
+        - option "Ukraine"
+        - option "United Kingdom"
+        - option "Vietnam (en)"
+      - combobox [ref=f15e12] [cursor=pointer]:
+        - option "Any Time" [selected]
+        - option "Past Day"
+        - option "Past Week"
+        - option "Past Month"
+        - option "Past Year"
+  - generic [ref=f15e15]:
+    - generic [ref=f15e17]:
+      - heading [level=2] [ref=f15e18]:
+        - 'link "Understanding the ESLint Warning: useEffect and useCallback" [ref=f15e19] [cursor=pointer]':
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fdeniapps.com%2Fblog%2Funderstanding%2Dthe%2Deslint%2Dwarning%2Duseeffect%2Dand%2Dusecallback&rut=4ee05f5a5516f3702e05e566bd44cbe0f22079b26b00fc67e854b29bca5acab9
+      - generic [ref=f15e21]:
+        - link [ref=f15e23] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fdeniapps.com%2Fblog%2Funderstanding%2Dthe%2Deslint%2Dwarning%2Duseeffect%2Dand%2Dusecallback&rut=4ee05f5a5516f3702e05e566bd44cbe0f22079b26b00fc67e854b29bca5acab9
+        - link "deniapps.com/blog/understanding-the-eslint-warning-useeffect-and-usecallback" [ref=f15e24] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fdeniapps.com%2Fblog%2Funderstanding%2Dthe%2Deslint%2Dwarning%2Duseeffect%2Dand%2Dusecallback&rut=4ee05f5a5516f3702e05e566bd44cbe0f22079b26b00fc67e854b29bca5acab9
+        - text: 2025-04-18T00:00:00.0000000
+      - 'link "Note: The name useCustomHook is also critical. React and ESLint enforce hook rules only for functions starting with use. If you named it customHookFunction, the hook rules wouldn''t apply — but you''d break React''s expectations for custom hooks. How to fix the warning Option 1: Use useCallback Wrap the function in useCallback:" [ref=f15e25] [cursor=pointer]':
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fdeniapps.com%2Fblog%2Funderstanding%2Dthe%2Deslint%2Dwarning%2Duseeffect%2Dand%2Dusecallback&rut=4ee05f5a5516f3702e05e566bd44cbe0f22079b26b00fc67e854b29bca5acab9
+    - generic [ref=f15e27]:
+      - heading [level=2] [ref=f15e28]:
+        - link "Can I utilize eslint-disable-line to disable react-hooks/exhaustive ..." [ref=f15e29] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fstackoverflow.com%2Fquestions%2F76209918%2Fcan%2Di%2Dutilize%2Deslint%2Ddisable%2Dline%2Dto%2Ddisable%2Dreact%2Dhooks%2Dexhaustive%2Ddeps%2Dbut%2Dex&rut=83173762c9181935be07362b0e70ae9f2a19e44424eeb237f4368861a52e10eb
+      - generic [ref=f15e31]:
+        - link [ref=f15e33] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fstackoverflow.com%2Fquestions%2F76209918%2Fcan%2Di%2Dutilize%2Deslint%2Ddisable%2Dline%2Dto%2Ddisable%2Dreact%2Dhooks%2Dexhaustive%2Ddeps%2Dbut%2Dex&rut=83173762c9181935be07362b0e70ae9f2a19e44424eeb237f4368861a52e10eb
+        - link "stackoverflow.com/questions/76209918/can-i-utilize-eslint-disable-line-to-disable-react-hooks-exhaustive-deps-but-ex" [ref=f15e34] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fstackoverflow.com%2Fquestions%2F76209918%2Fcan%2Di%2Dutilize%2Deslint%2Ddisable%2Dline%2Dto%2Ddisable%2Dreact%2Dhooks%2Dexhaustive%2Ddeps%2Dbut%2Dex&rut=83173762c9181935be07362b0e70ae9f2a19e44424eeb237f4368861a52e10eb
+      - link "Now when you include a callback function as a dependency, this will make the hook run each time this function is recreated, I don't think you want to achieve that. maybe you just need to keep the callback function recreated each time it needs to, and trigger useEffect to run only when id is changed:" [ref=f15e35] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fstackoverflow.com%2Fquestions%2F76209918%2Fcan%2Di%2Dutilize%2Deslint%2Ddisable%2Dline%2Dto%2Ddisable%2Dreact%2Dhooks%2Dexhaustive%2Ddeps%2Dbut%2Dex&rut=83173762c9181935be07362b0e70ae9f2a19e44424eeb237f4368861a52e10eb
+    - generic [ref=f15e37]:
+      - heading [level=2] [ref=f15e38]:
+        - link "React useEffect hook and eslint warning - Stack Overflow" [ref=f15e39] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fstackoverflow.com%2Fquestions%2F70189522%2Freact%2Duseeffect%2Dhook%2Dand%2Deslint%2Dwarning&rut=eac281995473f14c0a0389c4c4795b46f0189c3b7be93093bb85582c431703e8
+      - generic [ref=f15e41]:
+        - link [ref=f15e43] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fstackoverflow.com%2Fquestions%2F70189522%2Freact%2Duseeffect%2Dhook%2Dand%2Deslint%2Dwarning&rut=eac281995473f14c0a0389c4c4795b46f0189c3b7be93093bb85582c431703e8
+        - link "stackoverflow.com/questions/70189522/react-useeffect-hook-and-eslint-warning" [ref=f15e44] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fstackoverflow.com%2Fquestions%2F70189522%2Freact%2Duseeffect%2Dhook%2Dand%2Deslint%2Dwarning&rut=eac281995473f14c0a0389c4c4795b46f0189c3b7be93093bb85582c431703e8
+      - 'link "I''m looking for recommendations about how to solve the following problem: I have a component A that has two states, state1 and state2. If I want to run an effect only when state1 changes but in the useEFfect callback I use the value of state2, how can I solve the issue about array dependencies eslint react hooks warning ? Ex." [ref=f15e45] [cursor=pointer]':
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fstackoverflow.com%2Fquestions%2F70189522%2Freact%2Duseeffect%2Dhook%2Dand%2Deslint%2Dwarning&rut=eac281995473f14c0a0389c4c4795b46f0189c3b7be93093bb85582c431703e8
+    - generic [ref=f15e47]:
+      - heading [level=2] [ref=f15e48]:
+        - link "Beware! If you make custom React hooks, eslint-plugin-react-hooks may ..." [ref=f15e49] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fcmdcolin.github.io%2Fposts%2F2025%2D12%2D27%2Dbewarehooks%2F&rut=d59d98b18a0c8d33922bdb71d15368e3e93d31c176b4fe01ef29dbd155a29568
+      - generic [ref=f15e51]:
+        - link [ref=f15e53] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fcmdcolin.github.io%2Fposts%2F2025%2D12%2D27%2Dbewarehooks%2F&rut=d59d98b18a0c8d33922bdb71d15368e3e93d31c176b4fe01ef29dbd155a29568
+        - link "cmdcolin.github.io/posts/2025-12-27-bewarehooks/" [ref=f15e54] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fcmdcolin.github.io%2Fposts%2F2025%2D12%2D27%2Dbewarehooks%2F&rut=d59d98b18a0c8d33922bdb71d15368e3e93d31c176b4fe01ef29dbd155a29568
+        - text: 2025-12-27T00:00:00.0000000
+      - link "Footnote 2 Part of this issue is really the use of complex objects in useEffect hooks. I have half the mind to make a type-aware eslint rule that type checks all arguments to be primitives, and require an eslint-disable-next-line for any non-primitive object" [ref=f15e55] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fcmdcolin.github.io%2Fposts%2F2025%2D12%2D27%2Dbewarehooks%2F&rut=d59d98b18a0c8d33922bdb71d15368e3e93d31c176b4fe01ef29dbd155a29568
+    - generic [ref=f15e57]:
+      - heading [level=2] [ref=f15e58]:
+        - link "exhaustive-deps - React" [ref=f15e59] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Freact.dev%2Freference%2Feslint%2Dplugin%2Dreact%2Dhooks%2Flints%2Fexhaustive%2Ddeps&rut=5c79f26326b638b319eb7714a48084aadf4f7b3eea79ffe7f40fb6bf1b1f8796
+      - generic [ref=f15e61]:
+        - link [ref=f15e63] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Freact.dev%2Freference%2Feslint%2Dplugin%2Dreact%2Dhooks%2Flints%2Fexhaustive%2Ddeps&rut=5c79f26326b638b319eb7714a48084aadf4f7b3eea79ffe7f40fb6bf1b1f8796
+        - link "react.dev/reference/eslint-plugin-react-hooks/lints/exhaustive-deps" [ref=f15e64] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Freact.dev%2Freference%2Feslint%2Dplugin%2Dreact%2Dhooks%2Flints%2Fexhaustive%2Ddeps&rut=5c79f26326b638b319eb7714a48084aadf4f7b3eea79ffe7f40fb6bf1b1f8796
+      - link "React hooks like useEffect, useMemo, and useCallback accept dependency arrays. When a value referenced inside these hooks isn't included in the dependency array, React won't re-run the effect or recalculate the value when that dependency changes." [ref=f15e65] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Freact.dev%2Freference%2Feslint%2Dplugin%2Dreact%2Dhooks%2Flints%2Fexhaustive%2Ddeps&rut=5c79f26326b638b319eb7714a48084aadf4f7b3eea79ffe7f40fb6bf1b1f8796
+    - generic [ref=f15e67]:
+      - heading [level=2] [ref=f15e68]:
+        - link "useEncapsulation | Kyle Shevlin" [ref=f15e69] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fkyleshevlin.com%2Fuse%2Dencapsulation%2F&rut=bca9e21e849bb205bc6f56c91b6593496735ef49d06950ccaf5f92f890de444e
+      - generic [ref=f15e71]:
+        - link [ref=f15e73] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fkyleshevlin.com%2Fuse%2Dencapsulation%2F&rut=bca9e21e849bb205bc6f56c91b6593496735ef49d06950ccaf5f92f890de444e
+        - link "kyleshevlin.com/use-encapsulation/" [ref=f15e74] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fkyleshevlin.com%2Fuse%2Dencapsulation%2F&rut=bca9e21e849bb205bc6f56c91b6593496735ef49d06950ccaf5f92f890de444e
+      - link "Following the installation instructions, you'll see that prefer-custom-hooks will warn you whenever you use a React hook directly inside a component. The only way around the warning (other than disabling the rule), is to use the React hooks from within a custom hook. Summary" [ref=f15e75] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fkyleshevlin.com%2Fuse%2Dencapsulation%2F&rut=bca9e21e849bb205bc6f56c91b6593496735ef49d06950ccaf5f92f890de444e
+    - generic [ref=f15e77]:
+      - heading [level=2] [ref=f15e78]:
+        - link "rules-of-hooks - React" [ref=f15e79] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Freact.dev%2Freference%2Feslint%2Dplugin%2Dreact%2Dhooks%2Flints%2Frules%2Dof%2Dhooks&rut=45331a6ad1477dd67f3424f0dbbdef1d95ba36b385fd41a8f3e2eda2ef5890c7
+      - generic [ref=f15e81]:
+        - link [ref=f15e83] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Freact.dev%2Freference%2Feslint%2Dplugin%2Dreact%2Dhooks%2Flints%2Frules%2Dof%2Dhooks&rut=45331a6ad1477dd67f3424f0dbbdef1d95ba36b385fd41a8f3e2eda2ef5890c7
+        - link "react.dev/reference/eslint-plugin-react-hooks/lints/rules-of-hooks" [ref=f15e84] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Freact.dev%2Freference%2Feslint%2Dplugin%2Dreact%2Dhooks%2Flints%2Frules%2Dof%2Dhooks&rut=45331a6ad1477dd67f3424f0dbbdef1d95ba36b385fd41a8f3e2eda2ef5890c7
+      - link "This allows useEffectEvent and similar event functions to be called from your custom effect hooks. This shared configuration is used by both rules-of-hooks and exhaustive-deps rules, ensuring consistent behavior across all hook-related linting." [ref=f15e85] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Freact.dev%2Freference%2Feslint%2Dplugin%2Dreact%2Dhooks%2Flints%2Frules%2Dof%2Dhooks&rut=45331a6ad1477dd67f3424f0dbbdef1d95ba36b385fd41a8f3e2eda2ef5890c7
+    - generic [ref=f15e87]:
+      - heading [level=2] [ref=f15e88]:
+        - link "How To Remove useEffect ESLint Warnings in React - Medium" [ref=f15e89] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fmedium.com%2Fbetter%2Dprogramming%2Fwhy%2Deslint%2Dhates%2Dyour%2Duseeffect%2Ddependencies%2Dreact%2Djs%2D560fcac0b1f&rut=ad431bf9c3e22782f6417e922593ed5567e920c58ccd4239e55222990cc2bd43
+      - generic [ref=f15e91]:
+        - link [ref=f15e93] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fmedium.com%2Fbetter%2Dprogramming%2Fwhy%2Deslint%2Dhates%2Dyour%2Duseeffect%2Ddependencies%2Dreact%2Djs%2D560fcac0b1f&rut=ad431bf9c3e22782f6417e922593ed5567e920c58ccd4239e55222990cc2bd43
+        - link "medium.com/better-programming/why-eslint-hates-your-useeffect-dependencies-react-js-560fcac0b1f" [ref=f15e94] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fmedium.com%2Fbetter%2Dprogramming%2Fwhy%2Deslint%2Dhates%2Dyour%2Duseeffect%2Ddependencies%2Dreact%2Djs%2D560fcac0b1f&rut=ad431bf9c3e22782f6417e922593ed5567e920c58ccd4239e55222990cc2bd43
+      - link "How To Remove useEffect ESLint Warnings in React without using eslint-disable-line Are you a React developer? Do you use Hooks and functional components? Do you use ESLint to ensure your code does …" [ref=f15e95] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fmedium.com%2Fbetter%2Dprogramming%2Fwhy%2Deslint%2Dhates%2Dyour%2Duseeffect%2Ddependencies%2Dreact%2Djs%2D560fcac0b1f&rut=ad431bf9c3e22782f6417e922593ed5567e920c58ccd4239e55222990cc2bd43
+    - generic [ref=f15e97]:
+      - heading [level=2] [ref=f15e98]:
+        - link "eslint-plugin-react-hooks - npm" [ref=f15e99] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.npmjs.com%2Fpackage%2Feslint%2Dplugin%2Dreact%2Dhooks&rut=a2af4db3378449ab372ac544fa7af7f566c2bd3aa30f48ba21446d08eb4e1e14
+      - generic [ref=f15e101]:
+        - link [ref=f15e103] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.npmjs.com%2Fpackage%2Feslint%2Dplugin%2Dreact%2Dhooks&rut=a2af4db3378449ab372ac544fa7af7f566c2bd3aa30f48ba21446d08eb4e1e14
+        - link "www.npmjs.com/package/eslint-plugin-react-hooks" [ref=f15e104] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.npmjs.com%2Fpackage%2Feslint%2Dplugin%2Dreact%2Dhooks&rut=a2af4db3378449ab372ac544fa7af7f566c2bd3aa30f48ba21446d08eb4e1e14
+      - 'link "ESLint rules for React Hooks. Latest version: 7.1.1, last published: 3 months ago. Start using eslint-plugin-react-hooks in your project by running `npm i eslint-plugin-react-hooks`. There are 10174 other projects in the npm registry using eslint-plugin-react-hooks." [ref=f15e105] [cursor=pointer]':
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.npmjs.com%2Fpackage%2Feslint%2Dplugin%2Dreact%2Dhooks&rut=a2af4db3378449ab372ac544fa7af7f566c2bd3aa30f48ba21446d08eb4e1e14
+    - button "Next" [ref=f15e108] [cursor=pointer]
+    - link "Feedback" [ref=f15e110] [cursor=pointer]:
+      - /url: //duckduckgo.com/feedback.html

@@ -1,0 +1,116 @@
+- generic [ref=f14e2]:
+  - generic [ref=f14e3]:
+    - link "DuckDuckGo" [ref=f14e4] [cursor=pointer]:
+      - /url: /html/
+    - generic [ref=f14e5]:
+      - generic [ref=f14e6]:
+        - textbox [ref=f14e7]: "\"max-hooks\" ESLint React"
+        - button "Submit" [ref=f14e8] [cursor=pointer]
+      - combobox [ref=f14e10] [cursor=pointer]:
+        - option "All Regions" [selected]
+        - option "Argentina"
+        - option "Australia"
+        - option "Austria"
+        - option "Belgium (fr)"
+        - option "Belgium (nl)"
+        - option "Brazil"
+        - option "Bulgaria"
+        - option "Canada (en)"
+        - option "Canada (fr)"
+        - option "Catalonia"
+        - option "Chile"
+        - option "China"
+        - option "Colombia"
+        - option "Croatia"
+        - option "Czech Republic"
+        - option "Denmark"
+        - option "Estonia"
+        - option "Finland"
+        - option "France"
+        - option "Germany"
+        - option "Greece"
+        - option "Hong Kong"
+        - option "Hungary"
+        - option "Iceland"
+        - option "India (en)"
+        - option "Indonesia (en)"
+        - option "Ireland"
+        - option "Israel (en)"
+        - option "Italy"
+        - option "Japan"
+        - option "Korea"
+        - option "Latvia"
+        - option "Lithuania"
+        - option "Malaysia (en)"
+        - option "Mexico"
+        - option "Netherlands"
+        - option "New Zealand"
+        - option "Norway"
+        - option "Pakistan (en)"
+        - option "Peru"
+        - option "Philippines (en)"
+        - option "Poland"
+        - option "Portugal"
+        - option "Romania"
+        - option "Russia"
+        - option "Saudi Arabia"
+        - option "Singapore"
+        - option "Slovakia"
+        - option "Slovenia"
+        - option "South Africa"
+        - option "Spain (ca)"
+        - option "Spain (es)"
+        - option "Sweden"
+        - option "Switzerland (de)"
+        - option "Switzerland (fr)"
+        - option "Taiwan"
+        - option "Thailand (en)"
+        - option "Turkey"
+        - option "US (English)"
+        - option "US (Spanish)"
+        - option "Ukraine"
+        - option "United Kingdom"
+        - option "Vietnam (en)"
+      - combobox [ref=f14e12] [cursor=pointer]:
+        - option "Any Time" [selected]
+        - option "Past Day"
+        - option "Past Week"
+        - option "Past Month"
+        - option "Past Year"
+  - generic [ref=f14e15]:
+    - generic [ref=f14e17]:
+      - heading [level=2] [ref=f14e18]:
+        - link "GitHub - clefern/react-max-hooks" [ref=f14e19] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fclefern%2Freact%2Dmax%2Dhooks&rut=0f637e394845db947cd9107c8d75fedeb962e62d42981332f0c6e73e9e4b9142
+      - generic [ref=f14e21]:
+        - link [ref=f14e23] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fclefern%2Freact%2Dmax%2Dhooks&rut=0f637e394845db947cd9107c8d75fedeb962e62d42981332f0c6e73e9e4b9142
+        - link "github.com/clefern/react-max-hooks" [ref=f14e24] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fclefern%2Freact%2Dmax%2Dhooks&rut=0f637e394845db947cd9107c8d75fedeb962e62d42981332f0c6e73e9e4b9142
+      - link "Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them." [ref=f14e25] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fclefern%2Freact%2Dmax%2Dhooks&rut=0f637e394845db947cd9107c8d75fedeb962e62d42981332f0c6e73e9e4b9142
+    - generic [ref=f14e27]:
+      - heading [level=2] [ref=f14e28]:
+        - link "react-max-hooks/README.md at master - GitHub" [ref=f14e29] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fclefern%2Freact%2Dmax%2Dhooks%2Fblob%2Fmaster%2FREADME.md%3Fplain%3D1&rut=5914f7ff7ec24fd936a243a0b09959bdef60ed1185a3e72cd18d993c4a7b8008
+      - generic [ref=f14e31]:
+        - link [ref=f14e33] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fclefern%2Freact%2Dmax%2Dhooks%2Fblob%2Fmaster%2FREADME.md%3Fplain%3D1&rut=5914f7ff7ec24fd936a243a0b09959bdef60ed1185a3e72cd18d993c4a7b8008
+        - link "github.com/clefern/react-max-hooks/blob/master/README.md?plain=1" [ref=f14e34] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fclefern%2Freact%2Dmax%2Dhooks%2Fblob%2Fmaster%2FREADME.md%3Fplain%3D1&rut=5914f7ff7ec24fd936a243a0b09959bdef60ed1185a3e72cd18d993c4a7b8008
+      - link "Contribute to clefern/react-max-hooks development by creating an account on GitHub." [ref=f14e35] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fclefern%2Freact%2Dmax%2Dhooks%2Fblob%2Fmaster%2FREADME.md%3Fplain%3D1&rut=5914f7ff7ec24fd936a243a0b09959bdef60ed1185a3e72cd18d993c4a7b8008
+    - generic [ref=f14e37]:
+      - heading [level=2] [ref=f14e38]:
+        - link "Releases · clefern/react-max-hooks · GitHub" [ref=f14e39] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fclefern%2Freact%2Dmax%2Dhooks%2Freleases&rut=b05174cb54d4f6fad2d32a5f42c834b8ea1c520ca05f91846ef0ebd0a424016f
+      - generic [ref=f14e41]:
+        - link [ref=f14e43] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fclefern%2Freact%2Dmax%2Dhooks%2Freleases&rut=b05174cb54d4f6fad2d32a5f42c834b8ea1c520ca05f91846ef0ebd0a424016f
+        - link "github.com/clefern/react-max-hooks/releases" [ref=f14e44] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fclefern%2Freact%2Dmax%2Dhooks%2Freleases&rut=b05174cb54d4f6fad2d32a5f42c834b8ea1c520ca05f91846ef0ebd0a424016f
+      - link "Contribute to clefern/react-max-hooks development by creating an account on GitHub." [ref=f14e45] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fclefern%2Freact%2Dmax%2Dhooks%2Freleases&rut=b05174cb54d4f6fad2d32a5f42c834b8ea1c520ca05f91846ef0ebd0a424016f
+    - button "Next" [ref=f14e48] [cursor=pointer]
+    - link "Feedback" [ref=f14e50] [cursor=pointer]:
+      - /url: //duckduckgo.com/feedback.html

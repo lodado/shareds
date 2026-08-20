@@ -1,0 +1,274 @@
+- generic [ref=f59e2]:
+  - generic [ref=f59e3]:
+    - generic [ref=f59e5]:
+      - link [ref=f59e9] [cursor=pointer]:
+        - /url: /
+        - img "METR Logo" [ref=f59e10]
+      - list [ref=f59e12]:
+        - listitem [ref=f59e13]:
+          - link "Our Work" [ref=f59e14] [cursor=pointer]:
+            - /url: "#"
+          - generic:
+            - link "Research":
+              - /url: /research
+            - link "Notes":
+              - /url: /notes
+            - link "Updates":
+              - /url: /blog
+            - link "Risk Assessment":
+              - /url: /risk-assessment
+        - listitem [ref=f59e17]:
+          - link "About" [ref=f59e18] [cursor=pointer]:
+            - /url: /about
+        - listitem [ref=f59e19]:
+          - link "Donate" [ref=f59e20] [cursor=pointer]:
+            - /url: /donate
+        - listitem [ref=f59e21]:
+          - link "Careers" [ref=f59e22] [cursor=pointer]:
+            - /url: /careers
+        - listitem [ref=f59e23]:
+          - generic [ref=f59e24]:
+            - link "Search" [ref=f59e25] [cursor=pointer]:
+              - /url: "#"
+            - search:
+              - generic:
+                - textbox "Search..."
+    - generic [ref=f59e28]:
+      - generic [ref=f59e29]: We are Changing our Developer Productivity Experiment Design
+      - generic [ref=f59e31]:
+        - generic [ref=f59e32]:
+          - heading "CONTRIBUTORS" [level=5] [ref=f59e33]
+          - generic [ref=f59e34]:
+            - link "Joel Becker" [ref=f59e36] [cursor=pointer]:
+              - /url: /team/joel-becker/
+            - text: ","
+            - link "Nate Rush" [ref=f59e38] [cursor=pointer]:
+              - /url: /team/nate-rush/
+            - text: ","
+            - link "Tom Cunningham" [ref=f59e40] [cursor=pointer]:
+              - /url: /team/tom-cunningham/
+            - text: ","
+            - link "David Rein" [ref=f59e42] [cursor=pointer]:
+              - /url: /team/david-rein/
+            - text: ", and"
+            - link "Khalid Mahamud" [ref=f59e44] [cursor=pointer]:
+              - /url: /team/khalid-mahamud/
+        - generic [ref=f59e45]:
+          - heading "DATE" [level=5] [ref=f59e46]
+          - text: February 24, 2026
+        - generic [ref=f59e47]:
+          - heading "SHARE" [level=5] [ref=f59e48]
+          - generic [ref=f59e49]:
+            - button "Copy Link" [ref=f59e50] [cursor=pointer]
+            - button "Citation" [ref=f59e52] [cursor=pointer]
+    - generic [ref=f59e57]:
+      - generic [ref=f59e58]:
+        - navigation [ref=f59e59]:
+          - list [ref=f59e61]:
+            - listitem [ref=f59e62]:
+              - link "Wider adoption of AI has made it more difficult to measure task-level productivity" [ref=f59e63] [cursor=pointer]:
+                - /url: "#wider-adoption-of-ai-has-made-it-more-difficult-to-measure-task-level-productivity"
+            - listitem [ref=f59e64]:
+              - link "Selected developer quotes" [ref=f59e65] [cursor=pointer]:
+                - /url: "#selected-developer-quotes"
+            - listitem [ref=f59e66]:
+              - link "Other means of measuring productivity" [ref=f59e67] [cursor=pointer]:
+                - /url: "#other-means-of-measuring-productivity"
+            - listitem [ref=f59e68]:
+              - link "Details of the productivity study" [ref=f59e69] [cursor=pointer]:
+                - /url: "#details-of-the-productivity-study"
+          - generic [ref=f59e71]:
+            - textbox "Email address" [ref=f59e72]:
+              - /placeholder: Join our newsletter
+            - button "Subscribe" [ref=f59e73] [cursor=pointer]
+        - paragraph [ref=f59e74]:
+          - text: METR previously published a
+          - link "paper" [ref=f59e75] [cursor=pointer]:
+            - /url: https://arxiv.org/pdf/2507.09089
+          - text: which found the use of AI tools caused a 20% slowdown in completing tasks among experienced open-source developers, using data from February to June 2025.
+        - paragraph [ref=f59e76]: To understand how AI is impacting developer productivity over time, we started a new experiment in August 2025 with a larger pool of developers using the latest AI tools.
+        - paragraph [ref=f59e77]: Unfortunately, given participant feedback and surveys, we believe that the data from our new experiment gives us an unreliable signal of the current productivity effect of AI tools. The primary reason is that we have observed a significant increase in developers choosing not to participate in the study because they do not wish to work without AI, which likely biases downwards our estimate of AI-assisted speedup. We additionally believe there have been selection effects due to a lower pay rate (we reduced the pay from $150/hr to $50/hr), and that our measurements of time-spent on each task are unreliable for the fraction of developers who use multiple AI agents concurrently.
+        - paragraph [ref=f59e78]: Based on conversations with study participants, we believe it is likely that developers are more sped up from AI tools now — in early 2026 — compared to our estimates from early 2025. However, because of the selection effects in our experiment, our data is only very weak evidence for the size of this increase.
+        - paragraph [ref=f59e79]: Our raw results show some evidence for speedup. Our early 2025 study found the use of AI causes tasks to take 19% longer, with a confidence interval between +2% and +39%. For the subset of the original developers who participated in the later study, we now estimate a speedup of -18% with a confidence interval between -38% and +9%. Among newly-recruited developers the estimated speedup is -4%, with a confidence interval between -15% and +9%.
+        - paragraph [ref=f59e80]:
+          - img "Late-2025 AI likely accelerated open-source developers, but selection effects obscure the true speedup." [ref=f59e81]
+        - paragraph [ref=f59e82]: However the true speedup could be much higher among the developers and tasks which are selected out of the experiment. Some developers self-report very high speedups, though as we documented in our earlier study those estimates can be quite unreliable.
+        - paragraph [ref=f59e83]: Due to the severity of these selection effects, we are working on changes to the design of our study. Below, we provide further detail and describe our plans for other means of studying the impact of AI on developer productivity.
+        - heading "Wider adoption of AI has made it more difficult to measure task-level productivity" [level=2] [ref=f59e84]
+        - paragraph [ref=f59e85]: Our second study, starting in August, consisted of 10 developers from the original study, plus a new set of 47 developers recruited from a more diverse set of open-source projects. The participants were paid $50/hour for their participation.
+        - paragraph [ref=f59e86]: As in the initial study, developers were asked to pre-specify each task that they intended to work on, and then submit the task-description for randomization. Each task was assigned to an “AI allowed” or “AI disallowed” condition. The developers would record the amount of time it took to complete the task, and we could thus compare the average time required to complete a typical task with and without AI.
+        - paragraph [ref=f59e87]: "Throughout 2025 there was an increase in the use of agentic tools among open-source developers, such as Claude Code and Codex. This wider adoption of AI has had two important effects in our study:"
+        - list [ref=f59e88]:
+          - listitem [ref=f59e89]:
+            - paragraph [ref=f59e90]:
+              - strong [ref=f59e91]: Recruitment and retention of developers has become more difficult.
+              - text: An increased share of developers say they would not want to do 50% of their work without AI, even though our study pays them $50/hour to work on tasks of their own choosing. Our study is thus systematically missing developers who have the most optimistic expectations about AI’s value.
+          - listitem [ref=f59e92]:
+            - paragraph [ref=f59e93]:
+              - strong [ref=f59e94]: Developers have become more selective in which tasks they submit.
+              - text: When surveyed, 30% to 50% of developers told us that they were choosing not to submit some tasks because they did not want to do them without AI. This implies we are systematically missing tasks which have high expected uplift from AI.
+        - paragraph [ref=f59e95]: Together, these effects make it likely that our estimate reported above is a lower-bound on the true productivity effects of AI on these developers. The selection effects seem to affect a minority share of developers and of tasks, which limits the degree of bias. However we are likely missing data on the most active adopters of AI, who may be of most interest. As AI capabilities continue to increase and developers’ expectations grow as well, these effects will only get more dramatic, further limiting the validity of this study design.
+        - paragraph [ref=f59e96]: Based on our interviews and surveys we believe the increase in selection is primarily due to higher expectation of AI-driven uplift by our developers. However the second study also had a lower pay rate, $50/hour instead of $150/hour in the original study, and this also likely contributed to the higher selection.
+        - paragraph [ref=f59e97]: "We also noticed some other problems, though we judged the magnitude of these to be less severe:"
+        - list [ref=f59e98]:
+          - listitem [ref=f59e99]:
+            - paragraph [ref=f59e100]: Some developers told us the types of tasks they attempted were different with agentic AI, leaning on the strengths of AI. This has two effects (a) the task-selection will be different between those in our study and those outside it; (b) the time-differences within the study may not represent value-differences, due to the substitution in task-type.
+          - listitem [ref=f59e101]:
+            - paragraph [ref=f59e102]: Some developers told us the quality of the final work, for a given task, was different between AI-allowed and AI-disallowed conditions, e.g. differences in subjective code quality, or the amount of documentation or tests they chose to create.
+          - listitem [ref=f59e103]:
+            - paragraph [ref=f59e104]: Some developers were less likely to complete tasks that they submitted if they were assigned to the AI-disallowed condition. One developer did not complete any of the tasks that were assigned to the AI-disallowed condition.
+          - listitem [ref=f59e105]:
+            - paragraph [ref=f59e106]: Some developers reported it was challenging to report time-spent in completing tasks when they used agentic tools, because they would often work an unrelated task while waiting for the agent to complete its work.
+        - paragraph [ref=f59e107]: Altogether, these issues make it challenging to interpret our central estimate, and we believe it is likely a bad proxy for the real productivity impact of AI tools on these developers.
+        - heading "Selected developer quotes" [level=2] [ref=f59e108]
+        - paragraph [ref=f59e109]:
+          - emphasis [ref=f59e110]: “I’m torn. I’d like to help provide updated data on this question but also I really like using AI!”
+          - text: — a developer from the original study early-2025 when asked to participate in the late-2025 study.
+        - paragraph [ref=f59e111]:
+          - emphasis [ref=f59e112]: “I found I am actually heavily biased sampling the issues … I avoid issues like AI can finish things in just 2 hours, but I have to spend 20 hours. I will feel so painful if the task is decided as AI-disallowed.”
+          - text: — a developer from the new study noting selection effects when choosing what tasks to include in the study.
+        - paragraph [ref=f59e113]:
+          - emphasis [ref=f59e114]: “my head’s going to explode if I try to do too much the old fashioned way because it’s like trying to get across the city walking when all of a sudden I was more used to taking an Uber.”
+          - text: — a developer from the new study noting selection effects when choosing what tasks to include in the study.
+        - heading "Other means of measuring productivity" [level=2] [ref=f59e115]
+        - paragraph [ref=f59e116]: "The impact of AI tools on developer productivity is an important input to AI R&D acceleration, and so we plan to continue exploring the following lines of research:"
+        - list [ref=f59e117]:
+          - listitem [ref=f59e118]:
+            - paragraph [ref=f59e119]:
+              - strong [ref=f59e120]: More intensive experiments.
+              - text: The selection issues would be alleviated if we had higher compliance, which could be achieved if we run shorter intense experiments, and possibly pay higher rates.
+          - listitem [ref=f59e121]:
+            - paragraph [ref=f59e122]:
+              - strong [ref=f59e123]: Observational data.
+              - text: There are many rich data sources on AI use in software development – from aggregate statistics (e.g.
+              - link "approximately 4% of GitHub commits are authored by Claude Code" [ref=f59e124] [cursor=pointer]:
+                - /url: https://newsletter.semianalysis.com/p/claude-code-is-the-inflection-point
+              - text: ) to fine-grained transcripts (e.g.
+              - link "Sarkar (2025)" [ref=f59e125] [cursor=pointer]:
+                - /url: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5713646
+              - text: ). We intend to continue observation of our pool of open-source developers to understand how AI is used.
+          - listitem [ref=f59e126]:
+            - paragraph [ref=f59e127]:
+              - strong [ref=f59e128]: Questionnaires.
+              - text: Despite the difficulty of interpreting self-reported productivity counterfactuals, and thus their potential biases, we are optimistic that careful choice of survey questions, along with time-use studies, could produce useful signals.
+          - listitem [ref=f59e129]:
+            - paragraph [ref=f59e130]:
+              - strong [ref=f59e131]: Fixed-task experiments.
+              - text: Our original study was novel in letting developers choose their own tasks, before randomization was applied. We could revert to a simpler design in which developers are given a fixed task to complete, either with or without AI assistance.
+          - listitem [ref=f59e132]:
+            - paragraph [ref=f59e133]:
+              - strong [ref=f59e134]: Evaluations.
+              - text: METR is continuing to build task evals, to measure the ability of agents to autonomously complete tasks, which has a clear relevance to productivity effects of agent adoption.
+          - listitem [ref=f59e135]:
+            - paragraph [ref=f59e136]:
+              - strong [ref=f59e137]: Developer-level experiments.
+              - text: An alternative design is to randomize at the developer level instead of the task level, i.e. each participant either uses AI for all their tasks or for none. This alleviates some of the task-level selection problems, however it makes the developer-level selection problems worse, and has lower power in detecting productivity effects.
+        - paragraph [ref=f59e138]: As model capabilities continue to increase, we expect to continue to need to redesign some portions of our capability and measurement techniques.
+        - heading "Details of the productivity study" [level=2] [ref=f59e139]
+        - paragraph [ref=f59e140]: We paid developers $50/hour to work on their existing open-source projects, randomizing issues into working with AI-allowed or AI-disallowed. Developers were experienced open-source contributors with median 10 years experience. We have data from 57 developers, across 143 repos, and 800+ tasks.
+        - paragraph [ref=f59e141]: 10 of these developers are from the original study, and the remaining developers are new and recruited from a more diverse set of repositories—including smaller, more greenfield, and less mature repositories.
+        - paragraph [ref=f59e142]:
+          - text: The full dataset from the early study is available
+          - link "here" [ref=f59e143] [cursor=pointer]:
+            - /url: https://github.com/METR/Measuring-Early-2025-AI-on-Exp-OSS-Devs
+          - text: ", and the most recent study"
+          - link "here" [ref=f59e144] [cursor=pointer]:
+            - /url: https://github.com/METR/Measuring-Late-2025-AI-on-OSS-Devs
+          - text: .
+      - button "Cite" [ref=f59e145] [cursor=pointer]
+      - generic [ref=f59e146]:
+        - img "METR Logo" [ref=f59e147]
+        - paragraph [ref=f59e148]:
+          - strong [ref=f59e149]: METR
+          - text: researches, develops, and evaluates frontier AI systems to measure how well they can perform complex tasks autonomously. Subscribe to our newsletter for updates.
+        - generic [ref=f59e151]:
+          - textbox "Email address" [ref=f59e152]:
+            - /placeholder: Join our newsletter
+          - button "Subscribe" [ref=f59e153] [cursor=pointer]
+        - paragraph [ref=f59e154]:
+          - text: "Want to contribute to this work? METR is hiring:"
+          - link "View open roles" [ref=f59e155] [cursor=pointer]:
+            - /url: /careers
+      - generic [ref=f59e157]:
+        - heading "Featured research" [level=2] [ref=f59e159]
+        - paragraph [ref=f59e160]: METR researches, develops and runs cutting-edge tests of AI capabilities, including broad autonomous capabilities and the ability of AI systems to conduct AI R&D.
+        - tabpanel [ref=f59e163]:
+          - generic [ref=f59e164]:
+            - img "Measuring the Self-Reported Impact of Early-2026 AI on Technical Worker Productivity" [ref=f59e166]
+            - heading "Measuring the Self-Reported Impact of Early-2026 AI on Technical Worker Productivity" [level=3] [ref=f59e167]
+            - paragraph [ref=f59e168]: A survey of 349 technical workers finds a median 1.4–2x self-reported change in value of work due to AI tools, expected to grow over time, though there are reasons to be skeptical of the magnitude.
+            - link "Read more" [ref=f59e170] [cursor=pointer]:
+              - /url: /blog/2026-05-11-ai-usage-survey/
+          - generic [ref=f59e172]:
+            - img "Early Work on Monitorability Evaluations" [ref=f59e174]
+            - heading "Early Work on Monitorability Evaluations" [level=3] [ref=f59e175]
+            - paragraph [ref=f59e176]: We show preliminary results on a prototype evaluation that tests monitors' ability to catch AI agents doing side tasks, and AI agents' ability to bypass this monitoring.
+            - link "Read more" [ref=f59e178] [cursor=pointer]:
+              - /url: /blog/2026-01-19-early-work-on-monitorability-evaluations/
+          - generic [ref=f59e180]:
+            - img "How Does Time Horizon Vary Across Domains?" [ref=f59e182]
+            - heading "How Does Time Horizon Vary Across Domains?" [level=3] [ref=f59e183]
+            - paragraph [ref=f59e184]: We build on our time-horizon work and analyze 9 benchmarks for scientific reasoning, math, robotics, computer use, and self-driving in terms of time-horizon trends; we observe generally similar rates of improvement to the 7-month doubling time in our original time-horizon work.
+            - link "Read more" [ref=f59e186] [cursor=pointer]:
+              - /url: /blog/2025-07-14-how-does-time-horizon-vary-across-domains/
+  - contentinfo [ref=f59e189]:
+    - generic [ref=f59e191]:
+      - generic [ref=f59e192]:
+        - link [ref=f59e194] [cursor=pointer]:
+          - /url: /
+          - img "METR Logo" [ref=f59e195]
+        - paragraph [ref=f59e196]: METR (pronounced 'meter') is a research nonprofit that scientifically measures whether and when AI systems might threaten catastrophic harm to society.
+        - generic [ref=f59e197]:
+          - textbox "Email address" [ref=f59e198]:
+            - /placeholder: Join our newsletter
+          - button "Subscribe" [ref=f59e199] [cursor=pointer]
+      - generic [ref=f59e201]:
+        - generic [ref=f59e202]:
+          - heading "Resources" [level=4] [ref=f59e203]
+          - list [ref=f59e204]:
+            - listitem [ref=f59e205]:
+              - link "Research" [ref=f59e206] [cursor=pointer]:
+                - /url: /research
+            - listitem [ref=f59e207]:
+              - link "Notes" [ref=f59e208] [cursor=pointer]:
+                - /url: /notes
+            - listitem [ref=f59e209]:
+              - link "Updates" [ref=f59e210] [cursor=pointer]:
+                - /url: /blog
+            - listitem [ref=f59e211]:
+              - link "Frontier AI Safety Policies" [ref=f59e212] [cursor=pointer]:
+                - /url: /fsp
+        - generic [ref=f59e213]:
+          - heading "Follow METR" [level=4] [ref=f59e214]
+          - list [ref=f59e215]:
+            - listitem [ref=f59e216]:
+              - link "Substack" [ref=f59e217] [cursor=pointer]:
+                - /url: https://metr.substack.com
+            - listitem [ref=f59e220]:
+              - link "X (Twitter)" [ref=f59e221] [cursor=pointer]:
+                - /url: https://x.com/METR_Evals
+            - listitem [ref=f59e224]:
+              - link "Bluesky" [ref=f59e225] [cursor=pointer]:
+                - /url: https://bsky.app/profile/metr.org
+            - listitem [ref=f59e228]:
+              - link "LinkedIn" [ref=f59e229] [cursor=pointer]:
+                - /url: https://www.linkedin.com/company/metr-evals/
+            - listitem [ref=f59e232]:
+              - link "GitHub" [ref=f59e233] [cursor=pointer]:
+                - /url: https://github.com/METR/
+        - generic [ref=f59e236]:
+          - heading "Company" [level=4] [ref=f59e237]
+          - list [ref=f59e238]:
+            - listitem [ref=f59e239]:
+              - link "About Us" [ref=f59e240] [cursor=pointer]:
+                - /url: /about
+            - listitem [ref=f59e241]:
+              - link "Careers" [ref=f59e242] [cursor=pointer]:
+                - /url: /careers
+            - listitem [ref=f59e243]:
+              - link "Donate" [ref=f59e244] [cursor=pointer]:
+                - /url: /donate
+            - listitem [ref=f59e245]:
+              - link "Privacy" [ref=f59e246] [cursor=pointer]:
+                - /url: /privacy
+      - generic [ref=f59e247]: © 2026 METR. All rights reserved.

@@ -33,6 +33,8 @@ importers:
         specifier: 1.10.15
         version: 1.10.15
 
+  packages/agent-graph-engineering: {}
+
   packages/eslint-config:
     dependencies:
       '@lodado/eslint-plugin-local-rules':

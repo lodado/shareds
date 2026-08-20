@@ -1,0 +1,192 @@
+- generic [active] [ref=f56e1]:
+  - generic [ref=f56e2]:
+    - text: For the complete documentation index, see
+    - link "llms.txt" [ref=f56e3] [cursor=pointer]:
+      - /url: /llms.txt
+    - text: . Markdown versions of documentation pages are available by appending
+    - code [ref=f56e4]: .md
+    - text: to the page URL.
+  - banner [ref=f56e5]:
+    - generic [ref=f56e6]:
+      - link [ref=f56e7] [cursor=pointer]:
+        - /url: /
+        - img "OpenAI Developers" [ref=f56e8]
+      - navigation [ref=f56e9]:
+        - link "Home" [ref=f56e11] [cursor=pointer]:
+          - /url: /
+        - link "API" [ref=f56e13] [cursor=pointer]:
+          - /url: /api/docs
+        - link "Codex" [ref=f56e15] [cursor=pointer]:
+          - /url: https://learn.chatgpt.com/docs
+        - link "ChatGPT" [ref=f56e19] [cursor=pointer]:
+          - /url: /chatgpt
+        - link "Resources" [ref=f56e23] [cursor=pointer]:
+          - /url: /learn
+      - generic [ref=f56e26]:
+        - link "API Dashboard" [ref=f56e30] [cursor=pointer]:
+          - /url: https://platform.openai.com/login
+        - button "Toggle light and dark theme" [ref=f56e35] [cursor=pointer]
+        - button "Search the API docs" [ref=f56e38] [cursor=pointer]
+  - navigation "API sections" [ref=f56e43]:
+    - link "Overview" [ref=f56e44] [cursor=pointer]:
+      - /url: /api/docs
+    - link "Models" [ref=f56e47] [cursor=pointer]:
+      - /url: /api/docs/models
+    - link "Agents" [ref=f56e49] [cursor=pointer]:
+      - /url: /api/docs/guides/agents
+    - link "Tools" [ref=f56e51] [cursor=pointer]:
+      - /url: /api/docs/guides/tools
+    - link "Voice & Audio" [ref=f56e53] [cursor=pointer]:
+      - /url: /api/docs/guides/realtime
+    - link "Production" [ref=f56e55] [cursor=pointer]:
+      - /url: /api/docs/guides/production-best-practices
+    - link "API reference" [ref=f56e57] [cursor=pointer]:
+      - /url: /api/reference/overview
+  - generic [ref=f56e60]:
+    - navigation [ref=f56e62]:
+      - list [ref=f56e64]:
+        - listitem [ref=f56e65]:
+          - link "Home" [ref=f56e66] [cursor=pointer]:
+            - /url: /api/docs
+      - generic [ref=f56e68]:
+        - heading "Get started" [level=3] [ref=f56e69]
+        - list [ref=f56e70]:
+          - listitem [ref=f56e71]:
+            - link "Quickstart" [ref=f56e72] [cursor=pointer]:
+              - /url: /api/docs/quickstart
+          - listitem [ref=f56e74]:
+            - link "Using GPT-5.6" [ref=f56e75] [cursor=pointer]:
+              - /url: /api/docs/guides/latest-model
+          - listitem [ref=f56e77]:
+            - link "Key concepts" [ref=f56e78] [cursor=pointer]:
+              - /url: /api/docs/concepts
+      - generic [ref=f56e80]:
+        - heading "Core concepts" [level=3] [ref=f56e81]
+        - list [ref=f56e82]:
+          - listitem [ref=f56e83]:
+            - link "Responses API" [ref=f56e84] [cursor=pointer]:
+              - /url: /api/docs/guides/migrate-to-responses
+          - listitem [ref=f56e86]:
+            - link "Conversation state" [ref=f56e87] [cursor=pointer]:
+              - /url: /api/docs/guides/conversation-state
+          - listitem [ref=f56e89]:
+            - link "Background mode" [ref=f56e90] [cursor=pointer]:
+              - /url: /api/docs/guides/background
+          - listitem [ref=f56e92]:
+            - link "Streaming" [ref=f56e93] [cursor=pointer]:
+              - /url: /api/docs/guides/streaming-responses
+          - listitem [ref=f56e95]:
+            - link "WebSocket mode" [ref=f56e96] [cursor=pointer]:
+              - /url: /api/docs/guides/websocket-mode
+          - listitem [ref=f56e98]:
+            - link "Multi-agent" [ref=f56e99] [cursor=pointer]:
+              - /url: /api/docs/guides/responses-multi-agent
+          - listitem [ref=f56e101]:
+            - link "Webhooks" [ref=f56e102] [cursor=pointer]:
+              - /url: /api/docs/guides/webhooks
+          - listitem [ref=f56e104]:
+            - link "File inputs" [ref=f56e105] [cursor=pointer]:
+              - /url: /api/docs/guides/file-inputs
+          - listitem [ref=f56e107]:
+            - link "Compaction" [ref=f56e108] [cursor=pointer]:
+              - /url: /api/docs/guides/compaction
+          - listitem [ref=f56e110]:
+            - link "Counting tokens" [ref=f56e111] [cursor=pointer]:
+              - /url: /api/docs/guides/token-counting
+      - generic [ref=f56e113]:
+        - heading "SDKs and CLI" [level=3] [ref=f56e114]
+        - list [ref=f56e115]:
+          - listitem [ref=f56e116]:
+            - link "OpenAI SDK" [ref=f56e117] [cursor=pointer]:
+              - /url: /api/docs/libraries
+          - listitem [ref=f56e119]:
+            - link "OpenAI CLI" [ref=f56e120] [cursor=pointer]:
+              - /url: /api/docs/libraries/openai-cli
+      - generic [ref=f56e122]:
+        - heading "Resources" [level=3] [ref=f56e123]
+        - list [ref=f56e124]:
+          - listitem [ref=f56e125]:
+            - link "Changelog" [ref=f56e126] [cursor=pointer]:
+              - /url: /api/docs/changelog
+          - listitem [ref=f56e128]:
+            - link "Deprecations" [ref=f56e129] [cursor=pointer]:
+              - /url: /api/docs/deprecations
+          - listitem [ref=f56e131]:
+            - link "Supported countries" [ref=f56e132] [cursor=pointer]:
+              - /url: /api/docs/supported-countries
+          - listitem [ref=f56e134]:
+            - link "OpenAI Crawlers" [ref=f56e135] [cursor=pointer]:
+              - /url: /api/docs/bots
+          - listitem [ref=f56e137]:
+            - link "Terms and policies" [ref=f56e138] [cursor=pointer]:
+              - /url: https://openai.com/policies
+      - generic [ref=f56e142]:
+        - heading "Legacy APIs" [level=3] [ref=f56e143]
+        - list [ref=f56e144]:
+          - listitem [ref=f56e145]:
+            - group [ref=f56e146]:
+              - generic "Agent Builder" [ref=f56e147] [cursor=pointer]
+          - listitem [ref=f56e151]:
+            - group [ref=f56e152]:
+              - generic "Evals" [ref=f56e153] [cursor=pointer]
+          - listitem [ref=f56e157]:
+            - group [ref=f56e158]:
+              - generic "Fine-tuning" [ref=f56e159] [cursor=pointer]
+          - listitem [ref=f56e163]:
+            - group [ref=f56e164]:
+              - generic "Assistants API" [ref=f56e165] [cursor=pointer]
+    - main [ref=f56e169]:
+      - generic [ref=f56e172]:
+        - generic [ref=f56e174]:
+          - heading "Trace grading" [level=1] [ref=f56e176]
+          - paragraph [ref=f56e177]: Grade model outputs with reproducible evaluations.
+          - button "Copy Page" [ref=f56e181] [cursor=pointer]
+        - article [ref=f56e186]:
+          - paragraph [ref=f56e187]: Trace grading is the process of assigning structured scores or labels to an agent’s trace—the end-to-end log of decisions, tool calls, and reasoning steps—to assess correctness, quality, or adherence to expectations. These annotations help identify where the agent did well or made mistakes, enabling targeted improvements in orchestration or behavior.
+          - paragraph [ref=f56e188]: Trace evals use those graded traces to systematically evaluate agent performance across many examples, helping to benchmark changes, identify regressions, or validate improvements. Unlike black-box evaluations, trace evals provide more data to better understand why an agent succeeds or fails.
+          - paragraph [ref=f56e189]: Use both features to track, analyze, and optimize the performance of groups of agents.
+          - heading "Get started with traces Copy link to get started with traces" [level=2] [ref=f56e190]:
+            - generic [ref=f56e191]: Get started with traces
+            - button "Copy link to get started with traces" [ref=f56e192] [cursor=pointer]
+          - list [ref=f56e195]:
+            - listitem [ref=f56e196]:
+              - text: In the dashboard, navigate to Logs >
+              - link "Traces" [ref=f56e197] [cursor=pointer]:
+                - /url: https://platform.openai.com/logs?api=traces
+              - text: .
+            - listitem [ref=f56e198]:
+              - text: Select a workflow. You’ll see traces from SDK-based apps, and from existing
+              - link "Agent Builder" [ref=f56e199] [cursor=pointer]:
+                - /url: /api/docs/guides/agent-builder
+              - text: workflows during the transition window.
+            - listitem [ref=f56e200]: Select a trace to inspect your workflow.
+            - listitem [ref=f56e201]: Create a grader, and run it to grade your agents’ performance against grader criteria.
+          - paragraph [ref=f56e202]:
+            - text: Trace grading is a valuable tool for error identification at scale, which is critical for building resilience into your AI applications. Learn more about our recommended process in our
+            - link "cookbook" [ref=f56e203] [cursor=pointer]:
+              - /url: /cookbook/examples/evaluation/building_resilient_prompts_using_an_evaluation_flywheel
+            - text: .
+          - heading "Evaluate traces with runs Copy link to evaluate traces with runs" [level=2] [ref=f56e204]:
+            - generic [ref=f56e205]: Evaluate traces with runs
+            - button "Copy link to evaluate traces with runs" [ref=f56e206] [cursor=pointer]
+          - list [ref=f56e209]:
+            - listitem [ref=f56e210]:
+              - text: Select
+              - strong [ref=f56e211]: Grade all
+              - text: . This takes you to the evaluation dashboard.
+            - listitem [ref=f56e212]: In the evaluation dashboard, add and edit test criteria.
+            - listitem [ref=f56e213]: Add a run to evaluate outputs. You can configure run options like model, date range, and tool calls to get more specificity in your eval.
+          - paragraph [ref=f56e214]:
+            - text: Learn more about how you can use evals
+            - link "here" [ref=f56e215] [cursor=pointer]:
+              - /url: /api/docs/guides/evals
+            - text: .
+  - generic:
+    - button "Ask AI" [ref=f56e216] [cursor=pointer]
+    - dialog [ref=f56e218]:
+      - banner [ref=f56e219]:
+        - heading "Docs agent" [level=2] [ref=f56e220]
+        - generic [ref=f56e221]:
+          - button "Start a new docs agent chat" [ref=f56e222] [cursor=pointer]
+          - button "Close docs agent" [ref=f56e225] [cursor=pointer]
+      - paragraph [ref=f56e230]: Loading docs agent...

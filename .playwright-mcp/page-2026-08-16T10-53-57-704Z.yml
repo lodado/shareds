@@ -1,0 +1,852 @@
+- generic [active] [ref=f54e1]:
+  - generic [ref=f54e2]:
+    - text: For the complete documentation index, see
+    - link "llms.txt" [ref=f54e3] [cursor=pointer]:
+      - /url: /llms.txt
+    - text: . Markdown versions of documentation pages are available by appending
+    - code [ref=f54e4]: .md
+    - text: to the page URL.
+  - banner [ref=f54e5]:
+    - generic [ref=f54e6]:
+      - link [ref=f54e7] [cursor=pointer]:
+        - /url: /
+        - img "OpenAI Developers" [ref=f54e8]
+      - navigation [ref=f54e9]:
+        - link "Home" [ref=f54e11] [cursor=pointer]:
+          - /url: /
+        - link "API" [ref=f54e13] [cursor=pointer]:
+          - /url: /api/docs
+        - link "Codex" [ref=f54e15] [cursor=pointer]:
+          - /url: https://learn.chatgpt.com/docs
+        - link "ChatGPT" [ref=f54e19] [cursor=pointer]:
+          - /url: /chatgpt
+        - link "Resources" [ref=f54e23] [cursor=pointer]:
+          - /url: /learn
+      - generic [ref=f54e26]:
+        - link "API Dashboard" [ref=f54e30] [cursor=pointer]:
+          - /url: https://platform.openai.com/login
+        - button "Toggle light and dark theme" [ref=f54e35] [cursor=pointer]
+        - button "Search the API docs" [ref=f54e38] [cursor=pointer]
+  - navigation "API sections" [ref=f54e43]:
+    - link "Overview" [ref=f54e44] [cursor=pointer]:
+      - /url: /api/docs
+    - link "Models" [ref=f54e47] [cursor=pointer]:
+      - /url: /api/docs/models
+    - link "Agents" [ref=f54e49] [cursor=pointer]:
+      - /url: /api/docs/guides/agents
+    - link "Tools" [ref=f54e51] [cursor=pointer]:
+      - /url: /api/docs/guides/tools
+    - link "Voice & Audio" [ref=f54e53] [cursor=pointer]:
+      - /url: /api/docs/guides/realtime
+    - link "Production" [ref=f54e55] [cursor=pointer]:
+      - /url: /api/docs/guides/production-best-practices
+    - link "API reference" [ref=f54e57] [cursor=pointer]:
+      - /url: /api/reference/overview
+  - generic [ref=f54e60]:
+    - navigation [ref=f54e62]:
+      - list [ref=f54e64]:
+        - listitem [ref=f54e65]:
+          - link "Home" [ref=f54e66] [cursor=pointer]:
+            - /url: /api/docs
+      - generic [ref=f54e68]:
+        - heading "Get started" [level=3] [ref=f54e69]
+        - list [ref=f54e70]:
+          - listitem [ref=f54e71]:
+            - link "Quickstart" [ref=f54e72] [cursor=pointer]:
+              - /url: /api/docs/quickstart
+          - listitem [ref=f54e74]:
+            - link "Using GPT-5.6" [ref=f54e75] [cursor=pointer]:
+              - /url: /api/docs/guides/latest-model
+          - listitem [ref=f54e77]:
+            - link "Key concepts" [ref=f54e78] [cursor=pointer]:
+              - /url: /api/docs/concepts
+      - generic [ref=f54e80]:
+        - heading "Core concepts" [level=3] [ref=f54e81]
+        - list [ref=f54e82]:
+          - listitem [ref=f54e83]:
+            - link "Responses API" [ref=f54e84] [cursor=pointer]:
+              - /url: /api/docs/guides/migrate-to-responses
+          - listitem [ref=f54e86]:
+            - link "Conversation state" [ref=f54e87] [cursor=pointer]:
+              - /url: /api/docs/guides/conversation-state
+          - listitem [ref=f54e89]:
+            - link "Background mode" [ref=f54e90] [cursor=pointer]:
+              - /url: /api/docs/guides/background
+          - listitem [ref=f54e92]:
+            - link "Streaming" [ref=f54e93] [cursor=pointer]:
+              - /url: /api/docs/guides/streaming-responses
+          - listitem [ref=f54e95]:
+            - link "WebSocket mode" [ref=f54e96] [cursor=pointer]:
+              - /url: /api/docs/guides/websocket-mode
+          - listitem [ref=f54e98]:
+            - link "Multi-agent" [ref=f54e99] [cursor=pointer]:
+              - /url: /api/docs/guides/responses-multi-agent
+          - listitem [ref=f54e101]:
+            - link "Webhooks" [ref=f54e102] [cursor=pointer]:
+              - /url: /api/docs/guides/webhooks
+          - listitem [ref=f54e104]:
+            - link "File inputs" [ref=f54e105] [cursor=pointer]:
+              - /url: /api/docs/guides/file-inputs
+          - listitem [ref=f54e107]:
+            - link "Compaction" [ref=f54e108] [cursor=pointer]:
+              - /url: /api/docs/guides/compaction
+          - listitem [ref=f54e110]:
+            - link "Counting tokens" [ref=f54e111] [cursor=pointer]:
+              - /url: /api/docs/guides/token-counting
+      - generic [ref=f54e113]:
+        - heading "SDKs and CLI" [level=3] [ref=f54e114]
+        - list [ref=f54e115]:
+          - listitem [ref=f54e116]:
+            - link "OpenAI SDK" [ref=f54e117] [cursor=pointer]:
+              - /url: /api/docs/libraries
+          - listitem [ref=f54e119]:
+            - link "OpenAI CLI" [ref=f54e120] [cursor=pointer]:
+              - /url: /api/docs/libraries/openai-cli
+      - generic [ref=f54e122]:
+        - heading "Resources" [level=3] [ref=f54e123]
+        - list [ref=f54e124]:
+          - listitem [ref=f54e125]:
+            - link "Changelog" [ref=f54e126] [cursor=pointer]:
+              - /url: /api/docs/changelog
+          - listitem [ref=f54e128]:
+            - link "Deprecations" [ref=f54e129] [cursor=pointer]:
+              - /url: /api/docs/deprecations
+          - listitem [ref=f54e131]:
+            - link "Supported countries" [ref=f54e132] [cursor=pointer]:
+              - /url: /api/docs/supported-countries
+          - listitem [ref=f54e134]:
+            - link "OpenAI Crawlers" [ref=f54e135] [cursor=pointer]:
+              - /url: /api/docs/bots
+          - listitem [ref=f54e137]:
+            - link "Terms and policies" [ref=f54e138] [cursor=pointer]:
+              - /url: https://openai.com/policies
+      - generic [ref=f54e142]:
+        - heading "Legacy APIs" [level=3] [ref=f54e143]
+        - list [ref=f54e144]:
+          - listitem [ref=f54e145]:
+            - group [ref=f54e146]:
+              - generic "Agent Builder" [ref=f54e147] [cursor=pointer]
+          - listitem [ref=f54e151]:
+            - group [ref=f54e152]:
+              - generic "Evals" [ref=f54e153] [cursor=pointer]
+              - list [ref=f54e157]:
+                - listitem [ref=f54e158]:
+                  - link "Getting started" [ref=f54e159] [cursor=pointer]:
+                    - /url: /api/docs/guides/evaluation-getting-started
+                - listitem [ref=f54e161]:
+                  - link "Working with evals" [ref=f54e162] [cursor=pointer]:
+                    - /url: /api/docs/guides/evals
+                - listitem [ref=f54e164]:
+                  - link "Prompt optimizer" [ref=f54e165] [cursor=pointer]:
+                    - /url: /api/docs/guides/prompt-optimizer
+                - listitem [ref=f54e167]:
+                  - link "External models" [ref=f54e168] [cursor=pointer]:
+                    - /url: /api/docs/guides/external-models
+                - listitem [ref=f54e170]:
+                  - link "Best practices" [ref=f54e171] [cursor=pointer]:
+                    - /url: /api/docs/guides/evaluation-best-practices
+                - listitem [ref=f54e173]:
+                  - link "Graders" [ref=f54e174] [cursor=pointer]:
+                    - /url: /api/docs/guides/graders
+          - listitem [ref=f54e176]:
+            - group [ref=f54e177]:
+              - generic "Fine-tuning" [ref=f54e178] [cursor=pointer]
+          - listitem [ref=f54e182]:
+            - group [ref=f54e183]:
+              - generic "Assistants API" [ref=f54e184] [cursor=pointer]
+    - main [ref=f54e188]:
+      - generic [ref=f54e191]:
+        - generic [ref=f54e192]:
+          - button "Responses" [ref=f54e198] [cursor=pointer]
+          - generic [ref=f54e203]:
+            - heading "Working with evals" [level=1] [ref=f54e205]
+            - paragraph [ref=f54e206]: Test and improve model outputs through evaluations.
+            - button "Copy Page" [ref=f54e210] [cursor=pointer]
+        - article [ref=f54e215]:
+          - paragraph [ref=f54e216]:
+            - text: Evaluations (often called
+            - strong [ref=f54e217]: evals
+            - text: ) test model outputs to ensure they meet style and content criteria that you specify. Writing evals to understand how your LLM applications are performing against your expectations, especially when upgrading or trying new models, is an essential component to building reliable applications.
+          - paragraph [ref=f54e218]:
+            - text: In this guide, we will focus on
+            - strong [ref=f54e219]:
+              - text: configuring evals programmatically using the
+              - link "Evals API" [ref=f54e220] [cursor=pointer]:
+                - /url: /api/docs/api-reference/evals
+            - text: . If you prefer, you can also configure evals
+            - link "in the OpenAI dashboard" [ref=f54e221] [cursor=pointer]:
+              - /url: https://platform.openai.com/evaluations
+            - text: .
+          - paragraph [ref=f54e231]:
+            - text: OpenAI is deprecating the Evals platform. Existing evals content remains available during the transition window. Evals will become read-only for existing users on October 31, 2026, and the platform is scheduled to shut down on November 30, 2026. See the
+            - link "deprecations page" [ref=f54e232] [cursor=pointer]:
+              - /url: /api/docs/deprecations#2026-06-03-evals-platform
+            - text: for the current timeline.
+          - paragraph [ref=f54e242]:
+            - text: If you’re new to evaluations, or want a more iterative environment to experiment in as you build your eval, consider trying
+            - link "Datasets" [ref=f54e243] [cursor=pointer]:
+              - /url: /api/docs/guides/evaluation-getting-started
+            - text: instead.
+          - paragraph [ref=f54e244]: Broadly, there are three steps to build and run evals for your LLM application.
+          - list [ref=f54e245]:
+            - listitem [ref=f54e246]: Describe the task to be done as an eval
+            - listitem [ref=f54e247]: Run your eval with test inputs (a prompt and input data)
+            - listitem [ref=f54e248]: Analyze the results, then iterate and improve on your prompt
+          - paragraph [ref=f54e249]:
+            - text: This process is somewhat similar to behavior-driven development (BDD), where you begin by specifying how the system should behave before implementing and testing the system. Let’s see how we would complete each of the steps above using the
+            - link "Evals API" [ref=f54e250] [cursor=pointer]:
+              - /url: /api/docs/api-reference/evals
+            - text: .
+          - heading "Create an eval for a task Copy link to create an eval for a task" [level=2] [ref=f54e251]:
+            - generic [ref=f54e252]: Create an eval for a task
+            - button "Copy link to create an eval for a task" [ref=f54e253] [cursor=pointer]
+          - paragraph [ref=f54e256]:
+            - text: "Creating an eval begins by describing a task to be done by a model. Let’s say that we would like to use a model to classify the contents of IT support tickets into one of three categories:"
+            - code [ref=f54e257]: Hardware
+            - text: ","
+            - code [ref=f54e258]: Software
+            - text: ", or"
+            - code [ref=f54e259]: Other
+            - text: .
+          - paragraph [ref=f54e260]:
+            - text: To implement this use case, you can use either the
+            - link "Chat Completions API" [ref=f54e261] [cursor=pointer]:
+              - /url: /api/docs/api-reference/chat
+            - text: or the
+            - link "Responses API" [ref=f54e262] [cursor=pointer]:
+              - /url: /api/docs/api-reference/responses
+            - text: . Both examples below combine a
+            - link "developer message" [ref=f54e263] [cursor=pointer]:
+              - /url: /api/docs/guides/text
+            - text: with a user message containing the text of a support ticket.
+          - generic [ref=f54e266]:
+            - generic [ref=f54e267]:
+              - generic [ref=f54e268]: Categorize IT support tickets
+              - button "Python" [ref=f54e270] [cursor=pointer]
+              - button "Copy code" [ref=f54e275] [cursor=pointer]
+            - code [ref=f54e285]:
+              - generic [ref=f54e286]:
+                - generic [ref=f54e287]: "1"
+                - generic [ref=f54e288]: "2"
+                - generic [ref=f54e289]: "3"
+                - generic [ref=f54e290]: "4"
+                - generic [ref=f54e291]: "5"
+                - generic [ref=f54e292]: "6"
+                - generic [ref=f54e293]: "7"
+                - generic [ref=f54e294]: "8"
+                - generic [ref=f54e295]: "9"
+                - generic [ref=f54e296]: "10"
+                - generic [ref=f54e297]: "11"
+                - generic [ref=f54e298]: "12"
+                - generic [ref=f54e299]: "13"
+                - generic [ref=f54e300]: "14"
+                - generic [ref=f54e301]: "15"
+                - generic [ref=f54e302]: "16"
+                - generic [ref=f54e303]: "17"
+                - generic [ref=f54e304]: "18"
+                - generic [ref=f54e305]: "19"
+                - generic [ref=f54e306]: "20"
+                - text: "21"
+              - generic [ref=f54e307]: from openai import OpenAI
+              - generic [ref=f54e308]: client = OpenAI()
+              - generic [ref=f54e309]: instructions = """
+              - generic [ref=f54e310]: You are an expert in categorizing IT support tickets. Given the support
+              - generic [ref=f54e311]: ticket below, categorize the request into one of "Hardware", "Software",
+              - generic [ref=f54e312]: or "Other". Respond with only one of those words.
+              - generic [ref=f54e313]: "\"\"\""
+              - generic [ref=f54e314]: ticket = "My monitor won't turn on - help!"
+              - generic [ref=f54e315]: response = client.responses.create(
+              - generic [ref=f54e316]: model="gpt-5.6",
+              - generic [ref=f54e317]: input=[
+              - generic [ref=f54e318]: "{\"role\": \"developer\", \"content\": instructions},"
+              - generic [ref=f54e319]: "{\"role\": \"user\", \"content\": ticket},"
+              - generic [ref=f54e320]: "],"
+              - generic [ref=f54e321]: )
+              - generic [ref=f54e322]: print(response.output_text)
+          - paragraph [ref=f54e323]:
+            - text: Let’s set up an eval to test this behavior
+            - link "via API" [ref=f54e324] [cursor=pointer]:
+              - /url: /api/docs/api-reference/evals
+            - text: ". An eval needs two key ingredients:"
+          - list [ref=f54e325]:
+            - listitem [ref=f54e326]:
+              - code [ref=f54e327]: data_source_config
+              - text: ": A schema for the test data you will use along with the eval."
+            - listitem [ref=f54e328]:
+              - code [ref=f54e329]: testing_criteria
+              - text: ": The"
+              - link "graders" [ref=f54e330] [cursor=pointer]:
+                - /url: /api/docs/guides/graders
+              - text: that determine if the model output is correct.
+          - generic [ref=f54e332]:
+            - generic [ref=f54e333]:
+              - generic [ref=f54e334]: Create an eval
+              - button "curl" [ref=f54e336] [cursor=pointer]
+              - button "Copy code" [ref=f54e341] [cursor=pointer]
+            - code [ref=f54e351]:
+              - generic [ref=f54e352]:
+                - generic [ref=f54e353]: "1"
+                - generic [ref=f54e354]: "2"
+                - generic [ref=f54e355]: "3"
+                - generic [ref=f54e356]: "4"
+                - generic [ref=f54e357]: "5"
+                - generic [ref=f54e358]: "6"
+                - generic [ref=f54e359]: "7"
+                - generic [ref=f54e360]: "8"
+                - generic [ref=f54e361]: "9"
+                - generic [ref=f54e362]: "10"
+                - generic [ref=f54e363]: "11"
+                - generic [ref=f54e364]: "12"
+                - generic [ref=f54e365]: "13"
+                - generic [ref=f54e366]: "14"
+                - generic [ref=f54e367]: "15"
+                - generic [ref=f54e368]: "16"
+                - generic [ref=f54e369]: "17"
+                - generic [ref=f54e370]: "18"
+                - generic [ref=f54e371]: "19"
+                - generic [ref=f54e372]: "20"
+                - generic [ref=f54e373]: "21"
+                - generic [ref=f54e374]: "22"
+                - generic [ref=f54e375]: "23"
+                - generic [ref=f54e376]: "24"
+                - generic [ref=f54e377]: "25"
+                - generic [ref=f54e378]: "26"
+                - text: "27"
+              - generic [ref=f54e379]: curl https://api.openai.com/v1/evals \
+              - generic [ref=f54e380]: "-H \"Authorization: Bearer $OPENAI_API_KEY\" \\"
+              - generic [ref=f54e381]: "-H \"Content-Type: application/json\" \\"
+              - generic [ref=f54e382]: "-d '{"
+              - generic [ref=f54e383]: "\"name\": \"IT Ticket Categorization\","
+              - generic [ref=f54e384]: "\"data_source_config\": {"
+              - generic [ref=f54e385]: "\"type\": \"custom\","
+              - generic [ref=f54e386]: "\"item_schema\": {"
+              - generic [ref=f54e387]: "\"type\": \"object\","
+              - generic [ref=f54e388]: "\"properties\": {"
+              - generic [ref=f54e389]: "\"ticket_text\": { \"type\": \"string\" },"
+              - generic [ref=f54e390]: "\"correct_label\": { \"type\": \"string\" }"
+              - generic [ref=f54e391]: "},"
+              - generic [ref=f54e392]: "\"required\": [\"ticket_text\", \"correct_label\"]"
+              - generic [ref=f54e393]: "},"
+              - generic [ref=f54e394]: "\"include_sample_schema\": true"
+              - generic [ref=f54e395]: "},"
+              - generic [ref=f54e396]: "\"testing_criteria\": ["
+              - generic [ref=f54e397]: "{"
+              - generic [ref=f54e398]: "\"type\": \"string_check\","
+              - generic [ref=f54e399]: "\"name\": \"Match output to human label\","
+              - generic [ref=f54e400]: "\"input\": \"{{ sample.output_text }}\","
+              - generic [ref=f54e401]: "\"operation\": \"eq\","
+              - generic [ref=f54e402]: "\"reference\": \"{{ item.correct_label }}\""
+              - generic [ref=f54e403]: "}"
+              - generic [ref=f54e404]: "]"
+              - generic [ref=f54e405]: "}'"
+          - 'button "Explanation: data_source_config parameter" [ref=f54e408] [cursor=pointer]'
+          - 'button "Explanation: testing_criteria parameter" [ref=f54e415] [cursor=pointer]'
+          - paragraph [ref=f54e420]: After creating the eval, it will be assigned a UUID that you will need to address it later when kicking off a run.
+          - generic [ref=f54e421]:
+            - generic [ref=f54e422]:
+              - generic [ref=f54e423]: "1"
+              - generic [ref=f54e424]: "2"
+              - generic [ref=f54e425]: "3"
+              - generic [ref=f54e426]: "4"
+              - generic [ref=f54e427]: "5"
+              - generic [ref=f54e428]: "6"
+              - generic [ref=f54e429]: "7"
+              - generic [ref=f54e430]: "8"
+              - generic [ref=f54e431]: "9"
+              - generic [ref=f54e432]: "10"
+              - generic [ref=f54e433]: "11"
+              - generic [ref=f54e434]: "12"
+              - generic [ref=f54e435]: "13"
+              - generic [ref=f54e436]: "14"
+              - generic [ref=f54e437]: "15"
+              - generic [ref=f54e438]: "16"
+              - generic [ref=f54e439]: "17"
+              - generic [ref=f54e440]: "18"
+              - generic [ref=f54e441]: "19"
+              - generic [ref=f54e442]: "20"
+              - generic [ref=f54e443]: "21"
+            - code [ref=f54e444]:
+              - generic [ref=f54e445]: "{"
+              - generic [ref=f54e446]: "\"object\": \"eval\","
+              - generic [ref=f54e447]: "\"id\": \"eval_67e321d23b54819096e6bfe140161184\","
+              - generic [ref=f54e448]: "\"data_source_config\": {"
+              - generic [ref=f54e449]: "\"type\": \"custom\","
+              - generic [ref=f54e450]: "\"schema\": { ... omitted for brevity... }"
+              - generic [ref=f54e451]: "},"
+              - generic [ref=f54e452]: "\"testing_criteria\": ["
+              - generic [ref=f54e453]: "{"
+              - generic [ref=f54e454]: "\"name\": \"Match output to human label\","
+              - generic [ref=f54e455]: "\"id\": \"Match output to human label-c4fdf789-2fa5-407f-8a41-a6f4f9afd482\","
+              - generic [ref=f54e456]: "\"type\": \"string_check\","
+              - generic [ref=f54e457]: "\"input\": \"{{ sample.output_text }}\","
+              - generic [ref=f54e458]: "\"reference\": \"{{ item.correct_label }}\","
+              - generic [ref=f54e459]: "\"operation\": \"eq\""
+              - generic [ref=f54e460]: "}"
+              - generic [ref=f54e461]: "],"
+              - generic [ref=f54e462]: "\"name\": \"IT Ticket Categorization\","
+              - generic [ref=f54e463]: "\"created_at\": 1742938578,"
+              - generic [ref=f54e464]: "\"metadata\": {}"
+              - generic [ref=f54e465]: "}"
+            - generic [ref=f54e466]:
+              - button "Copy code to clipboard" [ref=f54e467] [cursor=pointer]
+              - status [ref=f54e470]
+          - paragraph [ref=f54e471]: Now that we’ve created an eval that describes the desired behavior of our application, let’s test a prompt with a set of test data.
+          - heading "Test a prompt with your eval Copy link to test a prompt with your eval" [level=2] [ref=f54e472]:
+            - generic [ref=f54e473]: Test a prompt with your eval
+            - button "Copy link to test a prompt with your eval" [ref=f54e474] [cursor=pointer]
+          - paragraph [ref=f54e477]: Now that we have defined how we want our app to behave in an eval, let’s construct a prompt that reliably generates the correct output for a representative sample of test data.
+          - heading "Uploading test data Copy link to uploading test data" [level=3] [ref=f54e478]:
+            - generic [ref=f54e479]: Uploading test data
+            - button "Copy link to uploading test data" [ref=f54e480] [cursor=pointer]
+          - paragraph [ref=f54e483]:
+            - text: There are several ways to provide test data for eval runs, but it may be convenient to upload a
+            - link "JSONL" [ref=f54e484] [cursor=pointer]:
+              - /url: https://jsonlines.org/
+            - text: "file that contains data in the schema we specified when we created our eval. A sample JSONL file that conforms to the schema we set up is below:"
+          - generic [ref=f54e485]:
+            - generic [ref=f54e486]:
+              - generic [ref=f54e487]: "1"
+              - generic [ref=f54e488]: "2"
+              - generic [ref=f54e489]: "3"
+            - code [ref=f54e490]:
+              - generic [ref=f54e491]: "{ \"item\": { \"ticket_text\": \"My monitor won't turn on!\", \"correct_label\": \"Hardware\" } }"
+              - generic [ref=f54e492]: "{ \"item\": { \"ticket_text\": \"I'm in vim and I can't quit!\", \"correct_label\": \"Software\" } }"
+              - generic [ref=f54e493]: "{ \"item\": { \"ticket_text\": \"Best restaurants in Cleveland?\", \"correct_label\": \"Other\" } }"
+            - generic [ref=f54e494]:
+              - button "Copy code to clipboard" [ref=f54e495] [cursor=pointer]
+              - status [ref=f54e498]
+          - paragraph [ref=f54e499]: This data set contains both test inputs and ground truth labels to compare model outputs against.
+          - paragraph [ref=f54e500]:
+            - text: Next, let’s upload our test data file to the OpenAI platform so we can reference it later. You can upload files
+            - link "in the dashboard here" [ref=f54e501] [cursor=pointer]:
+              - /url: https://platform.openai.com/storage/files
+            - text: ", but it’s possible to"
+            - link "upload files via API" [ref=f54e502] [cursor=pointer]:
+              - /url: /api/docs/api-reference/files/create
+            - text: as well. The samples below assume you are running the command in a directory where you saved the sample JSON data above to a file called
+            - code [ref=f54e503]: tickets.jsonl
+            - text: ":"
+          - generic [ref=f54e505]:
+            - generic [ref=f54e506]:
+              - generic [ref=f54e507]: Upload a test data file
+              - button "curl" [ref=f54e509] [cursor=pointer]
+              - button "Copy code" [ref=f54e514] [cursor=pointer]
+            - code [ref=f54e524]:
+              - generic [ref=f54e525]:
+                - generic [ref=f54e526]: "1"
+                - generic [ref=f54e527]: "2"
+                - generic [ref=f54e528]: "3"
+                - text: "4"
+              - generic [ref=f54e529]: curl https://api.openai.com/v1/files \
+              - generic [ref=f54e530]: "-H \"Authorization: Bearer $OPENAI_API_KEY\" \\"
+              - generic [ref=f54e531]: "-F purpose=\"evals\" \\"
+              - generic [ref=f54e532]: "-F file=\"@tickets.jsonl\""
+          - paragraph [ref=f54e533]:
+            - text: When you upload the file, make note of the unique
+            - code [ref=f54e534]: id
+            - text: "property in the response payload (also available in the UI if you uploaded via the browser) - we will need to reference that value later:"
+          - generic [ref=f54e535]:
+            - generic [ref=f54e536]:
+              - generic [ref=f54e537]: "1"
+              - generic [ref=f54e538]: "2"
+              - generic [ref=f54e539]: "3"
+              - generic [ref=f54e540]: "4"
+              - generic [ref=f54e541]: "5"
+              - generic [ref=f54e542]: "6"
+              - generic [ref=f54e543]: "7"
+              - generic [ref=f54e544]: "8"
+              - generic [ref=f54e545]: "9"
+              - generic [ref=f54e546]: "10"
+              - generic [ref=f54e547]: "11"
+            - code [ref=f54e548]:
+              - generic [ref=f54e549]: "{"
+              - generic [ref=f54e550]: "\"object\": \"file\","
+              - generic [ref=f54e551]: "\"id\": \"file-CwHg45Fo7YXwkWRPUkLNHW\","
+              - generic [ref=f54e552]: "\"purpose\": \"evals\","
+              - generic [ref=f54e553]: "\"filename\": \"tickets.jsonl\","
+              - generic [ref=f54e554]: "\"bytes\": 208,"
+              - generic [ref=f54e555]: "\"created_at\": 1742834798,"
+              - generic [ref=f54e556]: "\"expires_at\": null,"
+              - generic [ref=f54e557]: "\"status\": \"processed\","
+              - generic [ref=f54e558]: "\"status_details\": null"
+              - generic [ref=f54e559]: "}"
+            - generic [ref=f54e560]:
+              - button "Copy code to clipboard" [ref=f54e561] [cursor=pointer]
+              - status [ref=f54e564]
+          - heading "Creating an eval run Copy link to creating an eval run" [level=3] [ref=f54e565]:
+            - generic [ref=f54e566]: Creating an eval run
+            - button "Copy link to creating an eval run" [ref=f54e567] [cursor=pointer]
+          - paragraph [ref=f54e570]:
+            - text: With our test data in place, let’s evaluate a prompt and see how it performs against our test criteria. Via API, we can do this by
+            - link "creating an eval run" [ref=f54e571] [cursor=pointer]:
+              - /url: /api/docs/api-reference/evals/createRun
+            - text: .
+          - paragraph [ref=f54e572]:
+            - text: Make sure to replace
+            - code [ref=f54e573]: YOUR_EVAL_ID
+            - text: and
+            - code [ref=f54e574]: YOUR_FILE_ID
+            - text: with the unique IDs of the eval configuration and test data files you created in the steps above.
+          - generic [ref=f54e577]:
+            - generic [ref=f54e578]:
+              - generic [ref=f54e579]: Create an eval run
+              - button "curl" [ref=f54e581] [cursor=pointer]
+              - button "Copy code" [ref=f54e586] [cursor=pointer]
+            - code [ref=f54e596]:
+              - generic [ref=f54e597]:
+                - generic [ref=f54e598]: "1"
+                - generic [ref=f54e599]: "2"
+                - generic [ref=f54e600]: "3"
+                - generic [ref=f54e601]: "4"
+                - generic [ref=f54e602]: "5"
+                - generic [ref=f54e603]: "6"
+                - generic [ref=f54e604]: "7"
+                - generic [ref=f54e605]: "8"
+                - generic [ref=f54e606]: "9"
+                - generic [ref=f54e607]: "10"
+                - generic [ref=f54e608]: "11"
+                - generic [ref=f54e609]: "12"
+                - generic [ref=f54e610]: "13"
+                - generic [ref=f54e611]: "14"
+                - generic [ref=f54e612]: "15"
+                - generic [ref=f54e613]: "16"
+                - generic [ref=f54e614]: "17"
+                - text: "18"
+              - generic [ref=f54e615]: curl https://api.openai.com/v1/evals/YOUR_EVAL_ID/runs \
+              - generic [ref=f54e616]: "-H \"Authorization: Bearer $OPENAI_API_KEY\" \\"
+              - generic [ref=f54e617]: "-H \"Content-Type: application/json\" \\"
+              - generic [ref=f54e618]: "-d '{"
+              - generic [ref=f54e619]: "\"name\": \"Categorization text run\","
+              - generic [ref=f54e620]: "\"data_source\": {"
+              - generic [ref=f54e621]: "\"type\": \"responses\","
+              - generic [ref=f54e622]: "\"model\": \"gpt-5.6\","
+              - generic [ref=f54e623]: "\"input_messages\": {"
+              - generic [ref=f54e624]: "\"type\": \"template\","
+              - generic [ref=f54e625]: "\"template\": ["
+              - generic [ref=f54e626]: "{\"role\": \"developer\", \"content\": \"You are an expert in categorizing IT support tickets. Given the support ticket below, categorize the request into one of Hardware, Software, or Other. Respond with only one of those words.\"},"
+              - generic [ref=f54e627]: "{\"role\": \"user\", \"content\": \"{{ item.ticket_text }}\"}"
+              - generic [ref=f54e628]: "]"
+              - generic [ref=f54e629]: "},"
+              - generic [ref=f54e630]: "\"source\": { \"type\": \"file_id\", \"id\": \"YOUR_FILE_ID\" }"
+              - generic [ref=f54e631]: "}"
+              - generic [ref=f54e632]: "}'"
+          - paragraph [ref=f54e633]:
+            - text: When we create the run, we set up a prompt using either a
+            - link "Chat Completions" [ref=f54e634] [cursor=pointer]:
+              - /url: /api/docs/guides/text?api-mode=chat
+            - text: messages array or a
+            - link "Responses" [ref=f54e635] [cursor=pointer]:
+              - /url: /api/docs/api-reference/responses
+            - text: input. This prompt is used to generate a model response for every line of test data in your data set. We can use the double curly brace syntax to template in the dynamic variable
+            - code [ref=f54e636]: item.ticket_text
+            - text: ", which is drawn from the current test data item."
+          - paragraph [ref=f54e637]: "If the eval run is successfully created, you’ll receive an API response that looks like this:"
+          - generic [ref=f54e639]:
+            - generic [ref=f54e640]:
+              - generic [ref=f54e641]: "1"
+              - generic [ref=f54e642]: "2"
+              - generic [ref=f54e643]: "3"
+              - generic [ref=f54e644]: "4"
+              - generic [ref=f54e645]: "5"
+              - generic [ref=f54e646]: "6"
+              - generic [ref=f54e647]: "7"
+              - generic [ref=f54e648]: "8"
+              - generic [ref=f54e649]: "9"
+              - generic [ref=f54e650]: "10"
+              - generic [ref=f54e651]: "11"
+              - generic [ref=f54e652]: "12"
+              - generic [ref=f54e653]: "13"
+              - generic [ref=f54e654]: "14"
+              - generic [ref=f54e655]: "15"
+              - generic [ref=f54e656]: "16"
+              - generic [ref=f54e657]: "17"
+              - generic [ref=f54e658]: "18"
+              - generic [ref=f54e659]: "19"
+              - generic [ref=f54e660]: "20"
+              - generic [ref=f54e661]: "21"
+              - generic [ref=f54e662]: "22"
+              - generic [ref=f54e663]: "23"
+              - generic [ref=f54e664]: "24"
+              - generic [ref=f54e665]: "25"
+              - generic [ref=f54e666]: "26"
+              - generic [ref=f54e667]: "27"
+              - generic [ref=f54e668]: "28"
+              - generic [ref=f54e669]: "29"
+              - generic [ref=f54e670]: "30"
+              - generic [ref=f54e671]: "31"
+              - generic [ref=f54e672]: "32"
+              - generic [ref=f54e673]: "33"
+              - generic [ref=f54e674]: "34"
+              - generic [ref=f54e675]: "35"
+              - generic [ref=f54e676]: "36"
+              - generic [ref=f54e677]: "37"
+              - generic [ref=f54e678]: "38"
+              - generic [ref=f54e679]: "39"
+              - generic [ref=f54e680]: "40"
+              - generic [ref=f54e681]: "41"
+              - generic [ref=f54e682]: "42"
+              - generic [ref=f54e683]: "43"
+              - generic [ref=f54e684]: "44"
+              - generic [ref=f54e685]: "45"
+            - code [ref=f54e686]:
+              - generic [ref=f54e687]: "{"
+              - generic [ref=f54e688]: "\"object\": \"eval.run\","
+              - generic [ref=f54e689]: "\"id\": \"evalrun_67e44c73eb6481909f79a457749222c7\","
+              - generic [ref=f54e690]: "\"eval_id\": \"eval_67e44c5becec81909704be0318146157\","
+              - generic [ref=f54e691]: "\"report_url\": \"https://platform.openai.com/evaluation/evals/abc123\","
+              - generic [ref=f54e692]: "\"status\": \"queued\","
+              - generic [ref=f54e693]: "\"model\": \"gpt-4.1\","
+              - generic [ref=f54e694]: "\"name\": \"Categorization text run\","
+              - generic [ref=f54e695]: "\"created_at\": 1743015028,"
+              - generic [ref=f54e696]: "\"result_counts\": { ... },"
+              - generic [ref=f54e697]: "\"per_model_usage\": null,"
+              - generic [ref=f54e698]: "\"per_testing_criteria_results\": null,"
+              - generic [ref=f54e699]: "\"data_source\": {"
+              - generic [ref=f54e700]: "\"type\": \"responses\","
+              - generic [ref=f54e701]: "\"source\": {"
+              - generic [ref=f54e702]: "\"type\": \"file_id\","
+              - generic [ref=f54e703]: "\"id\": \"file-J7MoX9ToHXp2TutMEeYnwj\""
+              - generic [ref=f54e704]: "},"
+              - generic [ref=f54e705]: "\"input_messages\": {"
+              - generic [ref=f54e706]: "\"type\": \"template\","
+              - generic [ref=f54e707]: "\"template\": ["
+              - generic [ref=f54e708]: "{"
+              - generic [ref=f54e709]: "\"type\": \"message\","
+              - generic [ref=f54e710]: "\"role\": \"developer\","
+              - generic [ref=f54e711]: "\"content\": {"
+              - generic [ref=f54e712]: "\"type\": \"input_text\","
+              - generic [ref=f54e713]: "\"text\": \"You are an expert in....\""
+              - generic [ref=f54e714]: "}"
+              - generic [ref=f54e715]: "},"
+              - generic [ref=f54e716]: "{"
+              - generic [ref=f54e717]: "\"type\": \"message\","
+              - generic [ref=f54e718]: "\"role\": \"user\","
+              - generic [ref=f54e719]: "\"content\": {"
+              - generic [ref=f54e720]: "\"type\": \"input_text\","
+              - generic [ref=f54e721]: "\"text\": \"{{item.ticket_text}}\""
+              - generic [ref=f54e722]: "}"
+              - generic [ref=f54e723]: "}"
+              - generic [ref=f54e724]: "]"
+              - generic [ref=f54e725]: "},"
+              - generic [ref=f54e726]: "\"model\": \"gpt-4.1\","
+              - generic [ref=f54e727]: "\"sampling_params\": null"
+              - generic [ref=f54e728]: "},"
+              - generic [ref=f54e729]: "\"error\": null,"
+              - generic [ref=f54e730]: "\"metadata\": {}"
+              - generic [ref=f54e731]: "}"
+            - generic [ref=f54e732]:
+              - button "Copy code to clipboard" [ref=f54e733] [cursor=pointer]
+              - status [ref=f54e736]
+          - paragraph [ref=f54e737]: Your eval run has now been queued, and it will execute asynchronously as it processes every row in your data set, generating responses for testing with the prompt and model we specified.
+          - heading "Analyze the results Copy link to analyze the results" [level=2] [ref=f54e738]:
+            - generic [ref=f54e739]: Analyze the results
+            - button "Copy link to analyze the results" [ref=f54e740] [cursor=pointer]
+          - paragraph [ref=f54e743]:
+            - text: To receive updates when a run succeeds, fails, or is canceled, create a webhook endpoint and subscribe to the
+            - code [ref=f54e744]: eval.run.succeeded
+            - text: ","
+            - code [ref=f54e745]: eval.run.failed
+            - text: ", and"
+            - code [ref=f54e746]: eval.run.canceled
+            - text: events. See the
+            - link "webhooks guide" [ref=f54e747] [cursor=pointer]:
+              - /url: /api/docs/guides/webhooks
+            - text: for more details.
+          - paragraph [ref=f54e748]:
+            - text: Depending on the size of your dataset, the eval run may take some time to complete. You can view current status in the dashboard, but you can also
+            - link "fetch the current status of an eval run via API" [ref=f54e749] [cursor=pointer]:
+              - /url: /api/docs/api-reference/evals/getRun
+            - text: ":"
+          - generic [ref=f54e751]:
+            - generic [ref=f54e752]:
+              - generic [ref=f54e753]: Retrieve eval run status
+              - button "curl" [ref=f54e755] [cursor=pointer]
+              - button "Copy code" [ref=f54e760] [cursor=pointer]
+            - code [ref=f54e770]:
+              - generic [ref=f54e771]:
+                - generic [ref=f54e772]: "1"
+                - generic [ref=f54e773]: "2"
+                - text: "3"
+              - generic [ref=f54e774]: curl https://api.openai.com/v1/evals/YOUR_EVAL_ID/runs/YOUR_RUN_ID \
+              - generic [ref=f54e775]: "-H \"Authorization: Bearer $OPENAI_API_KEY\" \\"
+              - generic [ref=f54e776]: "-H \"Content-Type: application/json\""
+          - paragraph [ref=f54e777]: "You’ll need the UUID of both your eval and eval run to fetch its status. When you do, you’ll see eval run data that looks like this:"
+          - generic [ref=f54e779]:
+            - generic [ref=f54e780]:
+              - generic [ref=f54e781]: "1"
+              - generic [ref=f54e782]: "2"
+              - generic [ref=f54e783]: "3"
+              - generic [ref=f54e784]: "4"
+              - generic [ref=f54e785]: "5"
+              - generic [ref=f54e786]: "6"
+              - generic [ref=f54e787]: "7"
+              - generic [ref=f54e788]: "8"
+              - generic [ref=f54e789]: "9"
+              - generic [ref=f54e790]: "10"
+              - generic [ref=f54e791]: "11"
+              - generic [ref=f54e792]: "12"
+              - generic [ref=f54e793]: "13"
+              - generic [ref=f54e794]: "14"
+              - generic [ref=f54e795]: "15"
+              - generic [ref=f54e796]: "16"
+              - generic [ref=f54e797]: "17"
+              - generic [ref=f54e798]: "18"
+              - generic [ref=f54e799]: "19"
+              - generic [ref=f54e800]: "20"
+              - generic [ref=f54e801]: "21"
+              - generic [ref=f54e802]: "22"
+              - generic [ref=f54e803]: "23"
+              - generic [ref=f54e804]: "24"
+              - generic [ref=f54e805]: "25"
+              - generic [ref=f54e806]: "26"
+              - generic [ref=f54e807]: "27"
+              - generic [ref=f54e808]: "28"
+              - generic [ref=f54e809]: "29"
+              - generic [ref=f54e810]: "30"
+              - generic [ref=f54e811]: "31"
+              - generic [ref=f54e812]: "32"
+              - generic [ref=f54e813]: "33"
+              - generic [ref=f54e814]: "34"
+              - generic [ref=f54e815]: "35"
+              - generic [ref=f54e816]: "36"
+              - generic [ref=f54e817]: "37"
+              - generic [ref=f54e818]: "38"
+              - generic [ref=f54e819]: "39"
+              - generic [ref=f54e820]: "40"
+              - generic [ref=f54e821]: "41"
+              - generic [ref=f54e822]: "42"
+              - generic [ref=f54e823]: "43"
+              - generic [ref=f54e824]: "44"
+              - generic [ref=f54e825]: "45"
+              - generic [ref=f54e826]: "46"
+              - generic [ref=f54e827]: "47"
+              - generic [ref=f54e828]: "48"
+              - generic [ref=f54e829]: "49"
+              - generic [ref=f54e830]: "50"
+              - generic [ref=f54e831]: "51"
+              - generic [ref=f54e832]: "52"
+              - generic [ref=f54e833]: "53"
+              - generic [ref=f54e834]: "54"
+              - generic [ref=f54e835]: "55"
+              - generic [ref=f54e836]: "56"
+              - generic [ref=f54e837]: "57"
+              - generic [ref=f54e838]: "58"
+              - generic [ref=f54e839]: "59"
+              - generic [ref=f54e840]: "60"
+              - generic [ref=f54e841]: "61"
+              - generic [ref=f54e842]: "62"
+              - generic [ref=f54e843]: "63"
+              - generic [ref=f54e844]: "64"
+              - generic [ref=f54e845]: "65"
+            - code [ref=f54e846]:
+              - generic [ref=f54e847]: "{"
+              - generic [ref=f54e848]: "\"object\": \"eval.run\","
+              - generic [ref=f54e849]: "\"id\": \"evalrun_67e44c73eb6481909f79a457749222c7\","
+              - generic [ref=f54e850]: "\"eval_id\": \"eval_67e44c5becec81909704be0318146157\","
+              - generic [ref=f54e851]: "\"report_url\": \"https://platform.openai.com/evaluation/evals/xxx\","
+              - generic [ref=f54e852]: "\"status\": \"completed\","
+              - generic [ref=f54e853]: "\"model\": \"gpt-4.1\","
+              - generic [ref=f54e854]: "\"name\": \"Categorization text run\","
+              - generic [ref=f54e855]: "\"created_at\": 1743015028,"
+              - generic [ref=f54e856]: "\"result_counts\": {"
+              - generic [ref=f54e857]: "\"total\": 3,"
+              - generic [ref=f54e858]: "\"errored\": 0,"
+              - generic [ref=f54e859]: "\"failed\": 0,"
+              - generic [ref=f54e860]: "\"passed\": 3"
+              - generic [ref=f54e861]: "},"
+              - generic [ref=f54e862]: "\"per_model_usage\": ["
+              - generic [ref=f54e863]: "{"
+              - generic [ref=f54e864]: "\"model_name\": \"gpt-4o-2024-08-06\","
+              - generic [ref=f54e865]: "\"invocation_count\": 3,"
+              - generic [ref=f54e866]: "\"prompt_tokens\": 166,"
+              - generic [ref=f54e867]: "\"completion_tokens\": 6,"
+              - generic [ref=f54e868]: "\"total_tokens\": 172,"
+              - generic [ref=f54e869]: "\"cached_tokens\": 0"
+              - generic [ref=f54e870]: "}"
+              - generic [ref=f54e871]: "],"
+              - generic [ref=f54e872]: "\"per_testing_criteria_results\": ["
+              - generic [ref=f54e873]: "{"
+              - generic [ref=f54e874]: "\"testing_criteria\": \"Match output to human label-40d67441-5000-4754-ab8c-181c125803ce\","
+              - generic [ref=f54e875]: "\"passed\": 3,"
+              - generic [ref=f54e876]: "\"failed\": 0"
+              - generic [ref=f54e877]: "}"
+              - generic [ref=f54e878]: "],"
+              - generic [ref=f54e879]: "\"data_source\": {"
+              - generic [ref=f54e880]: "\"type\": \"responses\","
+              - generic [ref=f54e881]: "\"source\": {"
+              - generic [ref=f54e882]: "\"type\": \"file_id\","
+              - generic [ref=f54e883]: "\"id\": \"file-J7MoX9ToHXp2TutMEeYnwj\""
+              - generic [ref=f54e884]: "},"
+              - generic [ref=f54e885]: "\"input_messages\": {"
+              - generic [ref=f54e886]: "\"type\": \"template\","
+              - generic [ref=f54e887]: "\"template\": ["
+              - generic [ref=f54e888]: "{"
+              - generic [ref=f54e889]: "\"type\": \"message\","
+              - generic [ref=f54e890]: "\"role\": \"developer\","
+              - generic [ref=f54e891]: "\"content\": {"
+              - generic [ref=f54e892]: "\"type\": \"input_text\","
+              - generic [ref=f54e893]: "\"text\": \"You are an expert in categorizing IT support tickets. Given the support ticket below, categorize the request into one of Hardware, Software, or Other. Respond with only one of those words.\""
+              - generic [ref=f54e894]: "}"
+              - generic [ref=f54e895]: "},"
+              - generic [ref=f54e896]: "{"
+              - generic [ref=f54e897]: "\"type\": \"message\","
+              - generic [ref=f54e898]: "\"role\": \"user\","
+              - generic [ref=f54e899]: "\"content\": {"
+              - generic [ref=f54e900]: "\"type\": \"input_text\","
+              - generic [ref=f54e901]: "\"text\": \"{{item.ticket_text}}\""
+              - generic [ref=f54e902]: "}"
+              - generic [ref=f54e903]: "}"
+              - generic [ref=f54e904]: "]"
+              - generic [ref=f54e905]: "},"
+              - generic [ref=f54e906]: "\"model\": \"gpt-4.1\","
+              - generic [ref=f54e907]: "\"sampling_params\": null"
+              - generic [ref=f54e908]: "},"
+              - generic [ref=f54e909]: "\"error\": null,"
+              - generic [ref=f54e910]: "\"metadata\": {}"
+              - generic [ref=f54e911]: "}"
+            - generic [ref=f54e912]:
+              - button "Copy code to clipboard" [ref=f54e913] [cursor=pointer]
+              - status [ref=f54e916]
+          - paragraph [ref=f54e917]:
+            - text: The API response contains granular information about test criteria results, API usage for generating model responses, and a
+            - code [ref=f54e918]: report_url
+            - text: property that takes you to a page in the dashboard where you can explore the results visually.
+          - paragraph [ref=f54e919]: In our simple test, the model reliably generated the content we wanted for a small test case sample. In reality, you will often have to run your eval with more criteria, different prompts, and different data sets. But the process above gives you all the tools you need to build robust evals for your LLM apps!
+          - heading "Next steps Copy link to next steps" [level=2] [ref=f54e920]:
+            - generic [ref=f54e921]: Next steps
+            - button "Copy link to next steps" [ref=f54e922] [cursor=pointer]
+          - paragraph [ref=f54e925]: Now you know how to create and run evals via API, and using the dashboard! Here are a few other resources that may be useful to you as you continue to improve your model results.
+          - 'link "Cookbook: Detecting prompt regressions Keep tabs on the performance of your prompts as you iterate on them." [ref=f54e926] [cursor=pointer]':
+            - /url: https://cookbook.openai.com/examples/evaluation/use-cases/regression
+            - generic [ref=f54e932]:
+              - generic [ref=f54e933]: "Cookbook: Detecting prompt regressions"
+              - paragraph [ref=f54e939]: Keep tabs on the performance of your prompts as you iterate on them.
+          - 'link "Cookbook: Bulk model and prompt experimentation Compare the results of many different prompts and models at once." [ref=f54e940] [cursor=pointer]':
+            - /url: https://cookbook.openai.com/examples/evaluation/use-cases/bulk-experimentation
+            - generic [ref=f54e946]:
+              - generic [ref=f54e947]: "Cookbook: Bulk model and prompt experimentation"
+              - paragraph [ref=f54e953]: Compare the results of many different prompts and models at once.
+          - 'link "Cookbook: Monitoring stored completions Examine stored completions to test for prompt regressions." [ref=f54e954] [cursor=pointer]':
+            - /url: https://cookbook.openai.com/examples/evaluation/use-cases/completion-monitoring
+            - generic [ref=f54e960]:
+              - generic [ref=f54e961]: "Cookbook: Monitoring stored completions"
+              - paragraph [ref=f54e967]: Examine stored completions to test for prompt regressions.
+          - link "Fine-tuning Improve a model’s ability to generate responses tailored to your use case." [ref=f54e968] [cursor=pointer]:
+            - /url: /api/docs/guides/fine-tuning
+            - generic [ref=f54e974]:
+              - generic [ref=f54e975]: Fine-tuning
+              - paragraph [ref=f54e981]: Improve a model’s ability to generate responses tailored to your use case.
+          - link "Model distillation Learn how to distill large model results to smaller, cheaper, and faster models." [ref=f54e982] [cursor=pointer]:
+            - /url: /api/docs/guides/distillation
+            - generic [ref=f54e988]:
+              - generic [ref=f54e989]: Model distillation
+              - paragraph [ref=f54e995]: Learn how to distill large model results to smaller, cheaper, and faster models.
+  - generic:
+    - button "Ask AI" [ref=f54e996] [cursor=pointer]
+    - dialog [ref=f54e998]:
+      - banner [ref=f54e999]:
+        - heading "Docs agent" [level=2] [ref=f54e1000]
+        - generic [ref=f54e1001]:
+          - button "Start a new docs agent chat" [ref=f54e1002] [cursor=pointer]
+          - button "Close docs agent" [ref=f54e1005] [cursor=pointer]
+      - paragraph [ref=f54e1010]: Loading docs agent...

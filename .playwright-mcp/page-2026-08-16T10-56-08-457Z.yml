@@ -1,0 +1,316 @@
+- generic [ref=f76e1]:
+  - link "Skip to content" [ref=f76e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner [ref=f76e3]:
+    - link "Vitsœ" [ref=f76e5] [cursor=pointer]:
+      - /url: /us
+    - generic [ref=f76e6]:
+      - navigation:
+        - list:
+          - listitem [ref=f76e7]:
+            - link "Home" [ref=f76e8] [cursor=pointer]:
+              - /url: /us
+          - listitem [ref=f76e9]:
+            - link "About us" [ref=f76e10] [cursor=pointer]:
+              - /url: /us/about
+          - listitem [ref=f76e11]:
+            - link "606 Universal Shelving System" [ref=f76e12] [cursor=pointer]:
+              - /url: /us/606
+          - listitem [ref=f76e13]:
+            - link "620 Chair Programme" [ref=f76e14] [cursor=pointer]:
+              - /url: /us/620
+          - listitem [ref=f76e15]:
+            - link "621 Table" [ref=f76e16] [cursor=pointer]:
+              - /url: /us/621
+      - navigation [ref=f76e17]:
+        - button "Search" [ref=f76e18] [cursor=pointer]
+        - list [ref=f76e19]:
+          - listitem [ref=f76e20]:
+            - link "Select language/region" [ref=f76e21] [cursor=pointer]:
+              - /url: "#"
+          - listitem [ref=f76e24]:
+            - link "Log in to My Vitsœ" [ref=f76e25] [cursor=pointer]:
+              - /url: /us/login
+          - listitem [ref=f76e26]:
+            - link "Contact us" [ref=f76e27] [cursor=pointer]:
+              - /url: /us/contactus
+          - listitem [ref=f76e28]:
+            - link "Voice" [ref=f76e29] [cursor=pointer]:
+              - /url: /us/voice
+          - listitem [ref=f76e30]:
+            - link "Careers" [ref=f76e31] [cursor=pointer]:
+              - /url: /us/careers
+        - generic [ref=f76e32]:
+          - generic [ref=f76e33]:
+            - searchbox "Search" [ref=f76e34]
+            - button "Search" [ref=f76e35] [cursor=pointer]
+          - button "Close" [ref=f76e36] [cursor=pointer]
+    - navigation [ref=f76e37]:
+      - list [ref=f76e39]:
+        - listitem [ref=f76e40]:
+          - link "Introduction" [ref=f76e41] [cursor=pointer]:
+            - /url: /us/about
+        - listitem [ref=f76e42]:
+          - link "Ethos" [ref=f76e43] [cursor=pointer]:
+            - /url: /us/about/ethos
+        - listitem [ref=f76e44]:
+          - link "History" [ref=f76e45] [cursor=pointer]:
+            - /url: /us/about/history
+        - listitem [ref=f76e46]:
+          - link "Dieter Rams" [ref=f76e47] [cursor=pointer]:
+            - /url: /us/about/dieter-rams
+        - listitem [ref=f76e48]:
+          - link "Good design" [ref=f76e49] [cursor=pointer]:
+            - /url: /us/about/good-design
+  - status [ref=f76e50]:
+    - generic [ref=f76e51]:
+      - generic [ref=f76e54]:
+        - paragraph [ref=f76e55]: Should you be on our RW site?
+        - link "Switch to RW site" [ref=f76e56] [cursor=pointer]:
+          - /url: /rw/about/good-design
+      - button "Dismiss notification" [ref=f76e57] [cursor=pointer]: Dismiss
+  - main [ref=f76e58]:
+    - generic [ref=f76e59]:
+      - heading "The power of good design" [level=1] [ref=f76e60]
+      - generic: Dieter Rams’s ideology, engrained within Vitsœ
+    - generic [ref=f76e62]:
+      - generic [ref=f76e63]:
+        - generic [ref=f76e64]:
+          - heading "Good design at Vitsœ" [level=2] [ref=f76e66]
+          - figure [ref=f76e68]:
+            - img "620 Chair high back in red leather with off-white shell. 606 Universal Shelving System in the background." [ref=f76e69]
+          - generic [ref=f76e70]:
+            - paragraph [ref=f76e71]: "Here at Vitsœ we stand for the inordinate power of good design in everything we do: designing thoughtfully, responsibly and intelligently for our company, our furniture and the many people who share a profound interest in all of our tomorrows."
+            - paragraph [ref=f76e72]: For over 65 years, Vitsœ has worked continuously with Dieter Rams. He still improves his designs to this day and is often cited by a new generation as a key influence on their work that is shaping the 21st century.
+        - generic [ref=f76e74]:
+          - paragraph [ref=f76e76]: “In 1957 I began to develop a storage system that formed the basis of the company Vitsœ, which was founded in 1959. Thus the ideology behind my design is engrained within the company.”
+          - generic [ref=f76e77]: Dieter Rams
+        - generic [ref=f76e79]:
+          - heading "Ten principles for good design" [level=2] [ref=f76e81]
+          - generic [ref=f76e82]:
+            - paragraph [ref=f76e83]: "Back in the late 1970s, Dieter Rams was becoming increasingly concerned by the state of the world around him: “An impenetrable confusion of forms, colours and noises.”"
+            - paragraph [ref=f76e84]: "Aware that he was a significant contributor to that world, he asked himself an important question: is my design good design?"
+            - paragraph [ref=f76e85]: His answer is expressed in his ten principles for good design.
+          - figure "Vitsœ’s designer, Dieter Rams. Photograph by Abisag Tüllmann" [ref=f76e86]:
+            - img "Dieter Rams, Vitsœ's furniture designer. Photograph by Abisag Tüllmann" [ref=f76e87]
+        - generic [ref=f76e89]:
+          - generic [ref=f76e90]: "1"
+          - generic [ref=f76e91]:
+            - heading "Good design is innovative" [level=2] [ref=f76e92]
+            - paragraph [ref=f76e93]: The possibilities for innovation are not, by any means, exhausted. Technological development is always offering new opportunities for innovative design. But innovative design always develops in tandem with innovative technology, and can never be an end in itself.
+          - figure "TP 1 radio/phono combination, 1959, by Dieter Rams for Braun" [ref=f76e94]:
+            - img "Braun TP 1 radio/phono designed by Dieter Rams" [ref=f76e95]
+        - generic [ref=f76e97]:
+          - generic [ref=f76e98]: "2"
+          - generic [ref=f76e99]:
+            - heading "Good design makes a product useful" [level=2] [ref=f76e100]
+            - paragraph [ref=f76e101]: A product is bought to be used. It has to satisfy certain criteria, not only functional, but also psychological and aesthetic. Good design emphasizes the usefulness of a product whilst disregarding anything that could possibly detract from it.
+          - figure "MPZ 21 multipress citrus juicer, 1972, by Dieter Rams and Jürgen Greubel for Braun" [ref=f76e102]:
+            - img "Braun MPZ 21 multipress citrus juicer designed by Dieter Rams" [ref=f76e103]
+        - generic [ref=f76e105]:
+          - generic [ref=f76e106]: "3"
+          - generic [ref=f76e107]:
+            - heading "Good design is aesthetic" [level=2] [ref=f76e108]
+            - paragraph [ref=f76e109]: The aesthetic quality of a product is integral to its usefulness because products we use every day affect our person and our well-being. But only well-executed objects can be beautiful.
+          - figure "RT 20 tischsuper radio, 1961, by Dieter Rams for Braun" [ref=f76e110]:
+            - img "Braun RT 20 tisch super radio, designed by Dieter Rams" [ref=f76e111]
+        - generic [ref=f76e113]:
+          - generic [ref=f76e114]: "4"
+          - generic [ref=f76e115]:
+            - heading "Good design makes a product understandable" [level=2] [ref=f76e116]
+            - paragraph [ref=f76e117]: It clarifies the product’s structure. Better still, it can make the product talk. At best, it is self-explanatory.
+          - figure "T 1000 world receiver, 1963, by Dieter Rams for Braun" [ref=f76e118]:
+            - img "Braun T 1000 world receiver, designed by Dieter Rams" [ref=f76e119]
+        - generic [ref=f76e121]:
+          - generic [ref=f76e122]: "5"
+          - generic [ref=f76e123]:
+            - heading "Good design is unobtrusive" [level=2] [ref=f76e124]
+            - paragraph [ref=f76e125]: Products fulfilling a purpose are like tools. They are neither decorative objects nor works of art. Their design should therefore be both neutral and restrained, to leave room for the user’s self-expression.
+          - figure "Cylindric T 2 lighter, 1968, by Dieter Rams for Braun" [ref=f76e126]:
+            - img "Braun Cylindric T 2 lighter, designed by Dieter Rams" [ref=f76e127]
+        - generic [ref=f76e129]:
+          - generic [ref=f76e130]: "6"
+          - generic [ref=f76e131]:
+            - heading "Good design is honest" [level=2] [ref=f76e132]
+            - paragraph [ref=f76e133]: It does not make a product more innovative, powerful or valuable than it really is. It does not attempt to manipulate the consumer with promises that cannot be kept.
+          - figure "L 450 flat loudspeaker, TG 60 reel-to-reel tape recorder and TS 45 control unit, 1962-64, by Dieter Rams for Braun" [ref=f76e134]:
+            - img "Braun L 450 flat loudspeaker, designed by Dieter Rams" [ref=f76e135]
+        - generic [ref=f76e137]:
+          - generic [ref=f76e138]: "7"
+          - generic [ref=f76e139]:
+            - heading "Good design is long-lasting" [level=2] [ref=f76e140]
+            - paragraph [ref=f76e141]: It avoids being fashionable and therefore never appears antiquated. Unlike fashionable design, it lasts many years – even in today’s throwaway society.
+          - figure [ref=f76e142]:
+            - img "620 Chair Programme. Hand made by Vitsœ" [ref=f76e143]
+            - generic [ref=f76e144]:
+              - link "620 Chair Program" [ref=f76e145] [cursor=pointer]:
+                - /url: /us/620
+              - text: ", 1962, by Dieter Rams for Vitsœ"
+        - generic [ref=f76e146]:
+          - generic [ref=f76e147]: "8"
+          - generic [ref=f76e148]:
+            - heading "Good design is thorough down to the last detail" [level=2] [ref=f76e149]
+            - paragraph [ref=f76e150]: Nothing must be arbitrary or left to chance. Care and accuracy in the design process show respect towards the user.
+          - figure "ET 66 calculator, 1987, by Dietrich Lubs for Braun" [ref=f76e151]:
+            - img "Braun ET 66 calculatorv, designed by Dieter Rams" [ref=f76e152]
+        - generic [ref=f76e154]:
+          - generic [ref=f76e155]: "9"
+          - generic [ref=f76e156]:
+            - heading "Good design is environmentally-friendly" [level=2] [ref=f76e157]
+            - paragraph [ref=f76e158]: Design makes an important contribution to the preservation of the environment. It conserves resources and minimizes physical and visual pollution throughout the lifecycle of the product.
+          - figure [ref=f76e159]:
+            - img "Modular shelving, 606 Universal Shelving System with drawer cabinets." [ref=f76e160]
+            - generic [ref=f76e161]:
+              - link "606 Universal Shelving System" [ref=f76e162] [cursor=pointer]:
+                - /url: /us/606
+              - text: ", 1960, by Dieter Rams for Vitsœ"
+        - generic [ref=f76e163]:
+          - generic [ref=f76e164]: "10"
+          - generic [ref=f76e165]:
+            - heading "Good design is as little design as possible" [level=2] [ref=f76e166]
+            - paragraph [ref=f76e167]: Less, but better – because it concentrates on the essential aspects, and the products are not burdened with non-essentials.
+            - paragraph [ref=f76e168]: Back to purity, back to simplicity.
+          - figure "L 2 speaker, 1958, by Dieter Rams for Braun" [ref=f76e169]:
+            - img "Braun L 2 speaker, designed by Dieter Rams" [ref=f76e170]
+        - generic [ref=f76e174]:
+          - text: These principles can be shared accurately and fairly under the Creative Commons CC-BY-NC-ND 4.0 licence.
+          - link [ref=f76e176] [cursor=pointer]:
+            - /url: http://creativecommons.org/licenses/by-nc-nd/4.0/
+            - img "Creative Commons License" [ref=f76e177]
+        - generic [ref=f76e178]:
+          - heading "Subscribe to our occasional newsletter" [level=2] [ref=f76e179]
+          - generic [ref=f76e180]:
+            - paragraph [ref=f76e181]: You will only hear from us when we have something of interest to share.
+            - link "Subscribe" [ref=f76e183] [cursor=pointer]:
+              - /url: /us/newsletter
+      - generic [ref=f76e184]:
+        - link [ref=f76e186] [cursor=pointer]:
+          - /url: /us/606
+          - generic [ref=f76e190]:
+            - paragraph [ref=f76e191]: Start small. Add to it. Take it with you when you move.
+            - generic [ref=f76e192]: 606 Universal Shelving System
+        - link [ref=f76e194] [cursor=pointer]:
+          - /url: /us/620
+          - generic [ref=f76e198]:
+            - paragraph [ref=f76e199]: Start with a single chair. Add another to make a sofa.
+            - generic [ref=f76e200]: 620 Chair Programme
+        - link [ref=f76e202] [cursor=pointer]:
+          - /url: /us/621
+          - generic [ref=f76e206]:
+            - paragraph [ref=f76e207]: Surprisingly useful, on its own or as a pair.
+            - generic [ref=f76e208]: 621 Side Table
+  - contentinfo [ref=f76e209]:
+    - generic [ref=f76e210]:
+      - generic [ref=f76e211]:
+        - heading "Keep in touch" [level=2] [ref=f76e212]
+        - paragraph [ref=f76e213]: You will only hear from us when we have something of interest to share.
+        - link "Subscribe" [ref=f76e214] [cursor=pointer]:
+          - /url: /us/newsletter
+        - list [ref=f76e215]:
+          - listitem [ref=f76e216]:
+            - link "Follow us on Instagram" [ref=f76e217] [cursor=pointer]:
+              - /url: https://www.instagram.com/vitsoe/
+          - listitem [ref=f76e218]:
+            - link "Follow us on Pinterest" [ref=f76e219] [cursor=pointer]:
+              - /url: https://www.pinterest.co.uk/vitsoe/
+          - listitem [ref=f76e220]:
+            - link "Follow us on Facebook" [ref=f76e221] [cursor=pointer]:
+              - /url: https://www.facebook.com/vitsoe
+          - listitem [ref=f76e222]:
+            - link "Follow us on LinkedIn" [ref=f76e223] [cursor=pointer]:
+              - /url: https://uk.linkedin.com/company/vitsoe
+          - listitem [ref=f76e224]:
+            - link "Follow us on Threads" [ref=f76e225] [cursor=pointer]:
+              - /url: https://www.threads.com/@vitsoe
+          - listitem [ref=f76e226]:
+            - link "Follow us on Substack" [ref=f76e227] [cursor=pointer]:
+              - /url: https://substack.com/@vitsoe
+      - generic [ref=f76e228]:
+        - generic [ref=f76e229]:
+          - generic [ref=f76e230]:
+            - heading "Company" [level=3] [ref=f76e231]
+            - list [ref=f76e232]:
+              - listitem [ref=f76e233]:
+                - link "Ethos" [ref=f76e234] [cursor=pointer]:
+                  - /url: /us/about/ethos
+              - listitem [ref=f76e235]:
+                - link "Honest pricing" [ref=f76e236] [cursor=pointer]:
+                  - /url: /us/honest-pricing
+              - listitem [ref=f76e237]:
+                - link "From our customers" [ref=f76e238] [cursor=pointer]:
+                  - /url: /us/customer-comments
+          - generic [ref=f76e239]:
+            - heading "Customer care" [level=3] [ref=f76e240]
+            - list [ref=f76e241]:
+              - listitem [ref=f76e242]:
+                - link "Secure payments" [ref=f76e243] [cursor=pointer]:
+                  - /url: /us/help/payment
+              - listitem [ref=f76e244]:
+                - link "Delivery & collection" [ref=f76e245] [cursor=pointer]:
+                  - /url: /us/help/delivery
+              - listitem [ref=f76e246]:
+                - link "Terms & conditions" [ref=f76e247] [cursor=pointer]:
+                  - /url: /us/terms-and-conditions
+          - generic [ref=f76e248]:
+            - heading "Professionals" [level=3] [ref=f76e249]
+            - list [ref=f76e250]:
+              - listitem [ref=f76e251]:
+                - link "Specify Vitsœ" [ref=f76e252] [cursor=pointer]:
+                  - /url: /us/specify
+              - listitem [ref=f76e253]:
+                - link "Selected projects" [ref=f76e254] [cursor=pointer]:
+                  - /url: /us/specify/projects
+              - listitem [ref=f76e255]:
+                - link "CAD assets" [ref=f76e256] [cursor=pointer]:
+                  - /url: /us/specify/cad
+        - generic [ref=f76e257]:
+          - generic [ref=f76e258]:
+            - heading "Contact us" [level=3] [ref=f76e259]
+            - list [ref=f76e260]:
+              - listitem [ref=f76e261]:
+                - link "Where to find us" [ref=f76e262] [cursor=pointer]:
+                  - /url: /us/contactus
+              - listitem [ref=f76e263]:
+                - link "Careers" [ref=f76e264] [cursor=pointer]:
+                  - /url: /us/careers
+          - generic [ref=f76e265]:
+            - heading "Resources" [level=3] [ref=f76e266]
+            - list [ref=f76e267]:
+              - listitem [ref=f76e268]:
+                - link "Brochures & prices" [ref=f76e269] [cursor=pointer]:
+                  - /url: /us/brochures
+              - listitem [ref=f76e270]:
+                - link "FAQs" [ref=f76e271] [cursor=pointer]:
+                  - /url: /us/faqs
+    - generic [ref=f76e273]:
+      - generic [ref=f76e274]: © 2026 Vitsœ
+      - list [ref=f76e277]:
+        - listitem [ref=f76e278]:
+          - link "Cookie settings" [ref=f76e279] [cursor=pointer]:
+            - /url: "#"
+        - listitem [ref=f76e280]:
+          - link "Cookie policy" [ref=f76e281] [cursor=pointer]:
+            - /url: /us/cookie-policy
+        - listitem [ref=f76e282]:
+          - link "Privacy policy" [ref=f76e283] [cursor=pointer]:
+            - /url: /us/privacy
+  - region "Cookie banner" [active] [ref=f76e285]:
+    - alertdialog "Privacy" [ref=f76e286]:
+      - generic [ref=f76e288]:
+        - generic [ref=f76e291]:
+          - paragraph [ref=f76e292]:
+            - text: We use cookies to understand how you use our website and to improve your experience. This may include sharing data with our
+            - link "partners" [ref=f76e293] [cursor=pointer]:
+              - /url: "#"
+            - text: to help us serve you better and to deliver relevant content.
+          - paragraph [ref=f76e294]:
+            - text: You can
+            - link "change your preferences" [ref=f76e295] [cursor=pointer]:
+              - /url: "#"
+            - text: at any time. Please see our
+            - link "cookie policy" [ref=f76e296] [cursor=pointer]:
+              - /url: /cookie-policy
+            - text: for more details.
+        - generic [ref=f76e298]:
+          - button "Preferences" [ref=f76e299] [cursor=pointer]
+          - button "Accept" [ref=f76e300] [cursor=pointer]

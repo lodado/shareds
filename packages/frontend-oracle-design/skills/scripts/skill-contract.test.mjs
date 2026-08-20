@@ -1,14 +1,34 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
 const skillDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
 
 async function read(relativePath) {
   return readFile(join(skillDirectory, relativePath), 'utf8')
 }
+
+test('runs the Oracle contract through the bundled deterministic workflow graph', async () => {
+  const [skill, graphSource] = await Promise.all([read('SKILL.md'), read('references/oracle-workflow.graph.json')])
+  const graph = JSON.parse(graphSource)
+  const verifier = join(
+    skillDirectory,
+    '../../agent-graph-engineering/skills/agent-graph-engineering/scripts/graph-verify.mjs',
+  )
+  const graphPath = join(skillDirectory, 'references/oracle-workflow.graph.json')
+  const verified = spawnSync(process.execPath, [verifier, 'verify', '--graph', graphPath], { encoding: 'utf8' })
+
+  assert.match(skill, /설치된 `\$agent-graph-engineering`을 이름으로 명시적으로 로드·호출/)
+  assert.match(skill, /\.ai\/agent-graphs\/<oracle-id>\/graph\.json/)
+  assert.match(skill, /graph-verify\.mjs next/)
+  assert.equal(graph.entry, 'draft-oracle')
+  assert.deepEqual(graph.terminals, ['oracle-ready', 'review-verified', 'cancelled', 'failed'])
+  assert.equal(verified.status, 0, verified.stderr)
+  assert.equal(verified.stdout, 'GRAPH_VALID frontend-oracle-design\n')
+})
 
 test('O26: backs reported verification with a run ledger, machine transitions and counted budgets', async () => {
   const skill = await read('SKILL.md')
@@ -598,5 +618,5 @@ test('prefers Suspense and Error Boundary over in-component loading branches', a
   assert.match(frontendImplementation, /startTransition/)
   assert.match(frontendImplementation, /throwOnError.*data 부재 조건으로 좁혀/s)
 
-  assert.match(subagentReview, /실격 사유가 Implementation\n  Decision에 없으면 `FINDING`이다/)
+  assert.match(subagentReview, /실격 사유가 Implementation\n {2}Decision에 없으면 `FINDING`이다/)
 })

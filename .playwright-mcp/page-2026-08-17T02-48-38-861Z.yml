@@ -1,0 +1,498 @@
+- generic [active] [ref=f3e1]:
+  - generic [ref=f3e2]:
+    - complementary [ref=f3e3]:
+      - generic [ref=f3e4]:
+        - generic [ref=f3e5]:
+          - link "logo ESLint React" [ref=f3e6] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f3e7]:
+              - img "logo" [ref=f3e8]
+              - generic [ref=f3e9]: ESLint React
+          - button "Collapse Sidebar" [ref=f3e10] [cursor=pointer]
+        - button "Search ⌘ K" [ref=f3e13] [cursor=pointer]:
+          - text: Search
+          - generic [ref=f3e17]:
+            - generic [ref=f3e18]: ⌘
+            - generic [ref=f3e19]: K
+      - generic [ref=f3e22]:
+        - generic [ref=f3e23]:
+          - link "Getting Started" [ref=f3e24] [cursor=pointer]:
+            - /url: /docs/getting-started
+          - generic [ref=f3e28]:
+            - link "JavaScript" [ref=f3e29] [cursor=pointer]:
+              - /url: /docs/getting-started/javascript
+            - link "TypeScript" [ref=f3e30] [cursor=pointer]:
+              - /url: /docs/getting-started/typescript
+        - link "Migrating from eslint-plugin-react" [ref=f3e31] [cursor=pointer]:
+          - /url: /docs/migrating-from-eslint-plugin-react
+        - link "Migrating from eslint-plugin-react-hooks" [ref=f3e32] [cursor=pointer]:
+          - /url: /docs/migrating-from-eslint-plugin-react-hooks
+        - paragraph [ref=f3e33]: Core Reference
+        - generic [ref=f3e34]:
+          - link "Rules" [ref=f3e35] [cursor=pointer]:
+            - /url: /docs/rules
+          - generic [ref=f3e39]:
+            - paragraph [ref=f3e40]: X Rules
+            - link "error-boundaries" [ref=f3e41] [cursor=pointer]:
+              - /url: /docs/rules/error-boundaries
+            - link "exhaustive-deps" [ref=f3e42] [cursor=pointer]:
+              - /url: /docs/rules/exhaustive-deps
+            - link "globals" [ref=f3e43] [cursor=pointer]:
+              - /url: /docs/rules/globals
+            - link "immutability" [ref=f3e44] [cursor=pointer]:
+              - /url: /docs/rules/immutability
+            - link "no-access-state-in-setstate" [ref=f3e45] [cursor=pointer]:
+              - /url: /docs/rules/no-access-state-in-setstate
+            - link "no-array-index-key" [ref=f3e46] [cursor=pointer]:
+              - /url: /docs/rules/no-array-index-key
+            - link "no-children-count" [ref=f3e47] [cursor=pointer]:
+              - /url: /docs/rules/no-children-count
+            - link "no-children-for-each" [ref=f3e48] [cursor=pointer]:
+              - /url: /docs/rules/no-children-for-each
+            - link "no-children-map" [ref=f3e49] [cursor=pointer]:
+              - /url: /docs/rules/no-children-map
+            - link "no-children-only" [ref=f3e50] [cursor=pointer]:
+              - /url: /docs/rules/no-children-only
+            - link "no-children-to-array" [ref=f3e51] [cursor=pointer]:
+              - /url: /docs/rules/no-children-to-array
+            - link "no-class-component" [ref=f3e52] [cursor=pointer]:
+              - /url: /docs/rules/no-class-component
+            - link "no-clone-element" [ref=f3e53] [cursor=pointer]:
+              - /url: /docs/rules/no-clone-element
+            - link "no-component-will-mount" [ref=f3e54] [cursor=pointer]:
+              - /url: /docs/rules/no-component-will-mount
+            - link "no-component-will-receive-props" [ref=f3e55] [cursor=pointer]:
+              - /url: /docs/rules/no-component-will-receive-props
+            - link "no-component-will-update" [ref=f3e56] [cursor=pointer]:
+              - /url: /docs/rules/no-component-will-update
+            - link "no-context-provider" [ref=f3e57] [cursor=pointer]:
+              - /url: /docs/rules/no-context-provider
+            - link "no-create-ref" [ref=f3e58] [cursor=pointer]:
+              - /url: /docs/rules/no-create-ref
+            - link "no-direct-mutation-state" [ref=f3e59] [cursor=pointer]:
+              - /url: /docs/rules/no-direct-mutation-state
+            - link "no-duplicate-key" [ref=f3e60] [cursor=pointer]:
+              - /url: /docs/rules/no-duplicate-key
+            - link "no-forward-ref" [ref=f3e61] [cursor=pointer]:
+              - /url: /docs/rules/no-forward-ref
+            - link "no-implicit-children" [ref=f3e62] [cursor=pointer]:
+              - /url: /docs/rules/no-implicit-children
+            - link "no-implicit-key" [ref=f3e63] [cursor=pointer]:
+              - /url: /docs/rules/no-implicit-key
+            - link "no-implicit-ref" [ref=f3e64] [cursor=pointer]:
+              - /url: /docs/rules/no-implicit-ref
+            - link "no-leaked-conditional-rendering" [ref=f3e65] [cursor=pointer]:
+              - /url: /docs/rules/no-leaked-conditional-rendering
+            - link "no-missing-component-display-name" [ref=f3e66] [cursor=pointer]:
+              - /url: /docs/rules/no-missing-component-display-name
+            - link "no-missing-context-display-name" [ref=f3e67] [cursor=pointer]:
+              - /url: /docs/rules/no-missing-context-display-name
+            - link "no-missing-key" [ref=f3e68] [cursor=pointer]:
+              - /url: /docs/rules/no-missing-key
+            - link "no-misused-capture-owner-stack" [ref=f3e69] [cursor=pointer]:
+              - /url: /docs/rules/no-misused-capture-owner-stack
+            - link "no-nested-component-definitions" [ref=f3e70] [cursor=pointer]:
+              - /url: /docs/rules/no-nested-component-definitions
+            - link "no-nested-lazy-component-declarations" [ref=f3e71] [cursor=pointer]:
+              - /url: /docs/rules/no-nested-lazy-component-declarations
+            - link "no-set-state-in-component-did-mount" [ref=f3e72] [cursor=pointer]:
+              - /url: /docs/rules/no-set-state-in-component-did-mount
+            - link "no-set-state-in-component-did-update" [ref=f3e73] [cursor=pointer]:
+              - /url: /docs/rules/no-set-state-in-component-did-update
+            - link "no-set-state-in-component-will-update" [ref=f3e74] [cursor=pointer]:
+              - /url: /docs/rules/no-set-state-in-component-will-update
+            - link "no-unnecessary-use-prefix" [ref=f3e75] [cursor=pointer]:
+              - /url: /docs/rules/no-unnecessary-use-prefix
+            - link "no-unsafe-component-will-mount" [ref=f3e76] [cursor=pointer]:
+              - /url: /docs/rules/no-unsafe-component-will-mount
+            - link "no-unsafe-component-will-receive-props" [ref=f3e77] [cursor=pointer]:
+              - /url: /docs/rules/no-unsafe-component-will-receive-props
+            - link "no-unsafe-component-will-update" [ref=f3e78] [cursor=pointer]:
+              - /url: /docs/rules/no-unsafe-component-will-update
+            - link "no-unstable-context-value" [ref=f3e79] [cursor=pointer]:
+              - /url: /docs/rules/no-unstable-context-value
+            - link "no-unstable-default-props" [ref=f3e80] [cursor=pointer]:
+              - /url: /docs/rules/no-unstable-default-props
+            - link "no-unused-class-component-members" [ref=f3e81] [cursor=pointer]:
+              - /url: /docs/rules/no-unused-class-component-members
+            - link "no-unused-props" [ref=f3e82] [cursor=pointer]:
+              - /url: /docs/rules/no-unused-props
+            - link "no-unused-state" [ref=f3e83] [cursor=pointer]:
+              - /url: /docs/rules/no-unused-state
+            - link "no-use-context" [ref=f3e84] [cursor=pointer]:
+              - /url: /docs/rules/no-use-context
+            - link "purity" [ref=f3e85] [cursor=pointer]:
+              - /url: /docs/rules/purity
+            - link "refs" [ref=f3e86] [cursor=pointer]:
+              - /url: /docs/rules/refs
+            - link "rules-of-hooks" [ref=f3e87] [cursor=pointer]:
+              - /url: /docs/rules/rules-of-hooks
+            - link "set-state-in-effect" [ref=f3e88] [cursor=pointer]:
+              - /url: /docs/rules/set-state-in-effect
+            - link "set-state-in-render" [ref=f3e89] [cursor=pointer]:
+              - /url: /docs/rules/set-state-in-render
+            - link "static-components" [ref=f3e90] [cursor=pointer]:
+              - /url: /docs/rules/static-components
+            - link "unsupported-syntax" [ref=f3e91] [cursor=pointer]:
+              - /url: /docs/rules/unsupported-syntax
+            - link "use-memo" [ref=f3e92] [cursor=pointer]:
+              - /url: /docs/rules/use-memo
+            - link "use-state" [ref=f3e93] [cursor=pointer]:
+              - /url: /docs/rules/use-state
+            - paragraph [ref=f3e94]: JSX Rules
+            - link "no-children-prop" [ref=f3e95] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-children-prop
+            - link "no-children-prop-with-children" [ref=f3e96] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-children-prop-with-children
+            - link "no-comment-textnodes" [ref=f3e97] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-comment-textnodes
+            - link "no-key-after-spread" [ref=f3e98] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-key-after-spread
+            - link "no-leaked-dollar" [ref=f3e99] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-leaked-dollar
+            - link "no-leaked-semicolon" [ref=f3e100] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-leaked-semicolon
+            - link "no-namespace" [ref=f3e101] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-namespace
+            - link "no-useless-fragment" [ref=f3e102] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-useless-fragment
+            - paragraph [ref=f3e103]: RSC Rules
+            - link "function-definition" [ref=f3e104] [cursor=pointer]:
+              - /url: /docs/rules/rsc-function-definition
+            - paragraph [ref=f3e105]: DOM Rules
+            - link "no-dangerously-set-innerhtml" [ref=f3e106] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-dangerously-set-innerhtml
+            - link "no-dangerously-set-innerhtml-with-children" [ref=f3e107] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-dangerously-set-innerhtml-with-children
+            - link "no-find-dom-node" [ref=f3e108] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-find-dom-node
+            - link "no-flush-sync" [ref=f3e109] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-flush-sync
+            - link "no-hydrate" [ref=f3e110] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-hydrate
+            - link "no-missing-button-type" [ref=f3e111] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-missing-button-type
+            - link "no-missing-iframe-sandbox" [ref=f3e112] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-missing-iframe-sandbox
+            - link "no-render" [ref=f3e113] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-render
+            - link "no-render-return-value" [ref=f3e114] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-render-return-value
+            - link "no-script-url" [ref=f3e115] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-script-url
+            - link "no-string-style-prop" [ref=f3e116] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-string-style-prop
+            - link "no-unknown-property" [ref=f3e117] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-unknown-property
+            - link "no-unsafe-iframe-sandbox" [ref=f3e118] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-unsafe-iframe-sandbox
+            - link "no-unsafe-target-blank" [ref=f3e119] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-unsafe-target-blank
+            - link "no-use-form-state" [ref=f3e120] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-use-form-state
+            - link "no-void-elements-with-children" [ref=f3e121] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-void-elements-with-children
+            - paragraph [ref=f3e122]: Web API Rules
+            - link "no-leaked-event-listener" [ref=f3e123] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-event-listener
+            - link "no-leaked-fetch" [ref=f3e124] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-fetch
+            - link "no-leaked-intersection-observer" [ref=f3e125] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-intersection-observer
+            - link "no-leaked-interval" [ref=f3e126] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-interval
+            - link "no-leaked-resize-observer" [ref=f3e127] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-resize-observer
+            - link "no-leaked-timeout" [ref=f3e128] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-timeout
+            - paragraph [ref=f3e129]: Naming Convention Rules
+            - link "context-name" [ref=f3e130] [cursor=pointer]:
+              - /url: /docs/rules/naming-convention-context-name
+            - link "id-name" [ref=f3e131] [cursor=pointer]:
+              - /url: /docs/rules/naming-convention-id-name
+            - link "ref-name" [ref=f3e132] [cursor=pointer]:
+              - /url: /docs/rules/naming-convention-ref-name
+            - paragraph [ref=f3e133]: Debug Rules
+            - link "function-component" [ref=f3e134] [cursor=pointer]:
+              - /url: /docs/rules/debug-function-component
+            - link "hook" [ref=f3e135] [cursor=pointer]:
+              - /url: /docs/rules/debug-hook
+            - link "is-from-react" [ref=f3e136] [cursor=pointer]:
+              - /url: /docs/rules/debug-is-from-react
+            - link "is-from-ref" [ref=f3e137] [cursor=pointer]:
+              - /url: /docs/rules/debug-is-from-ref
+            - link "jsx" [ref=f3e138] [cursor=pointer]:
+              - /url: /docs/rules/debug-jsx
+        - link "Presets" [ref=f3e139] [cursor=pointer]:
+          - /url: /docs/presets
+        - link "Recipes" [ref=f3e141] [cursor=pointer]:
+          - /url: /docs/recipes
+        - link "Packages" [ref=f3e145] [cursor=pointer]:
+          - /url: /docs/packages
+        - link "Configuration" [ref=f3e149] [cursor=pointer]:
+          - /url: /docs/configuration
+        - paragraph [ref=f3e152]: Project Information
+        - link "Roadmap" [ref=f3e153] [cursor=pointer]:
+          - /url: /docs/roadmap
+        - link "Changelog" [ref=f3e154] [cursor=pointer]:
+          - /url: /docs/changelog
+        - link "FAQ" [ref=f3e155] [cursor=pointer]:
+          - /url: /docs/faq
+        - link "Glossary" [ref=f3e156] [cursor=pointer]:
+          - /url: /docs/glossary
+        - link "Community" [ref=f3e157] [cursor=pointer]:
+          - /url: /docs/community
+        - link "Contributing" [ref=f3e158] [cursor=pointer]:
+          - /url: /docs/contributing
+        - link "Third-Party Plugins" [ref=f3e159] [cursor=pointer]:
+          - /url: /docs/third-party-plugins
+      - generic [ref=f3e161]:
+        - link "GitHub" [ref=f3e162] [cursor=pointer]:
+          - /url: https://github.com/Rel1cx/eslint-react
+        - button "Toggle Theme" [ref=f3e165] [cursor=pointer]
+    - generic:
+      - button "Collapse Sidebar"
+      - button "Open Search"
+    - banner [ref=f3e175]:
+      - button "0 no-unnecessary-use-prefix" [ref=f3e176] [cursor=pointer]:
+        - progressbar [ref=f3e177]
+        - generic [ref=f3e180]: no-unnecessary-use-prefix
+    - article [ref=f3e184]:
+      - link "Rules" [ref=f3e186] [cursor=pointer]:
+        - /url: /docs/rules
+      - heading "no-unnecessary-use-prefix" [level=1] [ref=f3e187]
+      - paragraph [ref=f3e188]: Enforces that a function with the 'use' prefix uses at least one Hook inside it.
+      - generic [ref=f3e189]:
+        - button "Copy Markdown" [ref=f3e190] [cursor=pointer]
+        - button "Open" [ref=f3e194] [cursor=pointer]
+      - generic [ref=f3e197]:
+        - paragraph [ref=f3e198]:
+          - strong [ref=f3e199]:
+            - text: Full Name in
+            - link [ref=f3e200] [cursor=pointer]:
+              - /url: https://npmx.dev/package/eslint-plugin-react-x/v/latest
+              - code [ref=f3e201]: eslint-plugin-react-x
+        - figure [ref=f3e202]:
+          - button "Copy Text" [ref=f3e204] [cursor=pointer]
+          - region [ref=f3e208]:
+            - code [ref=f3e210]:
+              - generic [ref=f3e211]: react-x/no-unnecessary-use-prefix
+        - paragraph [ref=f3e212]:
+          - strong [ref=f3e213]:
+            - text: Full Name in
+            - link [ref=f3e214] [cursor=pointer]:
+              - /url: https://npmx.dev/package/@eslint-react/eslint-plugin/v/latest
+              - code [ref=f3e215]: "@eslint-react/eslint-plugin"
+        - figure [ref=f3e216]:
+          - button "Copy Text" [ref=f3e218] [cursor=pointer]
+          - region [ref=f3e222]:
+            - code [ref=f3e224]:
+              - generic [ref=f3e225]: "@eslint-react/no-unnecessary-use-prefix"
+        - paragraph [ref=f3e226]:
+          - strong [ref=f3e227]: Presets
+        - paragraph [ref=f3e228]:
+          - code [ref=f3e229]: x
+          - code [ref=f3e230]: recommended
+          - code [ref=f3e231]: recommended-typescript
+          - code [ref=f3e232]: recommended-type-checked
+          - code [ref=f3e233]: strict
+          - code [ref=f3e234]: strict-typescript
+          - code [ref=f3e235]: strict-type-checked
+        - heading [level=2] [ref=f3e236]:
+          - link "Rule Details" [ref=f3e237] [cursor=pointer]:
+            - /url: "#rule-details"
+          - button "Copy Anchor Link" [ref=f3e238] [cursor=pointer]
+        - paragraph [ref=f3e242]:
+          - text: If your function doesn't call any Hooks, avoid the
+          - code [ref=f3e243]: use
+          - text: prefix and write it as a regular function. This allows the function to be called anywhere, including in conditions. You should only use the
+          - code [ref=f3e244]: use
+          - text: prefix when the function calls at least one Hook inside it.
+        - paragraph [ref=f3e245]:
+          - text: Technically, React does not enforce this. In principle, you could make a Hook that doesn't call other Hooks, but this is often confusing and limiting. However, there may be rare cases where it is helpful, such as when you plan to add Hook calls in the future. In that case, naming it with the
+          - code [ref=f3e246]: use
+          - text: prefix makes sense so that components won't be able to call it conditionally once Hooks are added. If you don't plan to use Hooks inside it (now or later), don't make it a Hook.
+        - heading [level=2] [ref=f3e247]:
+          - link "Examples" [ref=f3e248] [cursor=pointer]:
+            - /url: "#examples"
+          - button "Copy Anchor Link" [ref=f3e249] [cursor=pointer]
+        - heading [level=3] [ref=f3e253]:
+          - link [ref=f3e254] [cursor=pointer]:
+            - /url: "#using-the-use-prefix-without-calling-any-hooks"
+            - text: Using the
+            - code [ref=f3e255]: use
+            - text: prefix without calling any Hooks
+          - button "Copy Anchor Link" [ref=f3e256] [cursor=pointer]
+        - paragraph [ref=f3e260]:
+          - text: Functions with the
+          - code [ref=f3e261]: use
+          - text: prefix are treated as Hooks and must follow Hook rules (for example, they cannot be called conditionally). If a function doesn't call any Hooks, remove the
+          - code [ref=f3e262]: use
+          - text: prefix and make it a regular function.
+        - figure [ref=f3e263]:
+          - button "Copy Text" [ref=f3e265] [cursor=pointer]
+          - region [ref=f3e269]:
+            - code [ref=f3e271]:
+              - generic [ref=f3e272]: "// 🔴 Problem: The function doesn't call any Hooks but uses the use prefix"
+              - generic [ref=f3e273]: "function useSorted(items) {"
+              - generic [ref=f3e274]: return items.slice().sort();
+              - generic [ref=f3e275]: "}"
+        - figure [ref=f3e276]:
+          - button "Copy Text" [ref=f3e278] [cursor=pointer]
+          - region [ref=f3e282]:
+            - code [ref=f3e284]:
+              - generic [ref=f3e285]: "// 🟢 Recommended: Convert it to a regular function so it can be called anywhere"
+              - generic [ref=f3e286]: "function getSorted(items) {"
+              - generic [ref=f3e287]: return items.slice().sort();
+              - generic [ref=f3e288]: "}"
+        - paragraph [ref=f3e289]: "As a regular function, it can safely be called inside conditional statements:"
+        - figure [ref=f3e290]:
+          - button "Copy Text" [ref=f3e292] [cursor=pointer]
+          - region [ref=f3e296]:
+            - code [ref=f3e298]:
+              - generic [ref=f3e299]: "// 🔵 OK: Regular functions allow conditional calls"
+              - generic [ref=f3e300]: "function List({ items, shouldSort }) {"
+              - generic [ref=f3e301]: let displayedItems = items;
+              - generic [ref=f3e302]: "if (shouldSort) {"
+              - generic [ref=f3e303]: displayedItems = getSorted(items);
+              - generic [ref=f3e304]: "}"
+              - generic [ref=f3e305]: // ...
+              - generic [ref=f3e306]: "}"
+        - heading [level=3] [ref=f3e307]:
+          - link "Calling other Hooks inside the function" [ref=f3e308] [cursor=pointer]:
+            - /url: "#calling-other-hooks-inside-the-function"
+          - button "Copy Anchor Link" [ref=f3e309] [cursor=pointer]
+        - paragraph [ref=f3e313]:
+          - text: When a function calls at least one Hook internally, using the
+          - code [ref=f3e314]: use
+          - text: prefix is correct and necessary.
+        - figure [ref=f3e315]:
+          - button "Copy Text" [ref=f3e317] [cursor=pointer]
+          - region [ref=f3e321]:
+            - code [ref=f3e323]:
+              - generic [ref=f3e324]: "// 🟢 Recommended: The function calls useContext, so the use prefix is justified"
+              - generic [ref=f3e325]: "function useAuth() {"
+              - generic [ref=f3e326]: return useContext(Auth);
+              - generic [ref=f3e327]: "}"
+        - heading [level=3] [ref=f3e328]:
+          - link "Calling Hooks through tagged template literals" [ref=f3e329] [cursor=pointer]:
+            - /url: "#calling-hooks-through-tagged-template-literals"
+          - button "Copy Anchor Link" [ref=f3e330] [cursor=pointer]
+        - paragraph [ref=f3e334]:
+          - text: Hook calls written as tagged template literals (for example, Motion's
+          - code [ref=f3e335]: useMotionTemplate
+          - text: ) also count as Hook calls, so the
+          - code [ref=f3e336]: use
+          - text: prefix remains justified.
+        - figure [ref=f3e337]:
+          - button "Copy Text" [ref=f3e339] [cursor=pointer]
+          - region [ref=f3e343]:
+            - code [ref=f3e345]:
+              - generic [ref=f3e346]: "// 🔵 OK: useMotionTemplate is called as a tagged template literal, which counts as a Hook call"
+              - generic [ref=f3e347]: "function useFilter() {"
+              - generic [ref=f3e348]: "return useMotionTemplate`blur(${10}px) saturate(${50}%)`;"
+              - generic [ref=f3e349]: "}"
+        - heading [level=3] [ref=f3e350]:
+          - link "Not using Hooks now, but planning to add them later" [ref=f3e351] [cursor=pointer]:
+            - /url: "#not-using-hooks-now-but-planning-to-add-them-later"
+          - button "Copy Anchor Link" [ref=f3e352] [cursor=pointer]
+        - paragraph [ref=f3e356]:
+          - text: If a function doesn't currently call any Hooks but you plan to add Hook calls later, you can keep the
+          - code [ref=f3e357]: use
+          - text: prefix. Add a TODO comment that includes the planned Hook call — the rule treats such comments as a signal of intent and won't report the function.
+        - figure [ref=f3e358]:
+          - button "Copy Text" [ref=f3e360] [cursor=pointer]
+          - region [ref=f3e364]:
+            - code [ref=f3e366]:
+              - generic [ref=f3e367]: "// 🔴 Problem: No Hooks are used and there is no comment explaining future plans"
+              - generic [ref=f3e368]: "function useAuth() {"
+              - generic [ref=f3e369]: return TEST_USER;
+              - generic [ref=f3e370]: "}"
+        - figure [ref=f3e371]:
+          - button "Copy Text" [ref=f3e373] [cursor=pointer]
+          - region [ref=f3e377]:
+            - code [ref=f3e379]:
+              - generic [ref=f3e380]: "// 🟢 Recommended: Add an explicit TODO explaining it will be replaced with a Hook later"
+              - generic [ref=f3e381]: "function useAuth() {"
+              - generic [ref=f3e382]: "// TODO: Replace with this line when authentication is implemented:"
+              - generic [ref=f3e383]: // return useContext(Auth);
+              - generic [ref=f3e384]: return TEST_USER;
+              - generic [ref=f3e385]: "}"
+        - heading [level=3] [ref=f3e386]:
+          - link "MDX component factory functions" [ref=f3e387] [cursor=pointer]:
+            - /url: "#mdx-component-factory-functions"
+          - button "Copy Anchor Link" [ref=f3e388] [cursor=pointer]
+        - paragraph [ref=f3e392]:
+          - text: Some framework conventions (such as MDX) require factory functions with the
+          - code [ref=f3e393]: use
+          - text: prefix. These well-known functions are allowed even if they don't call any Hooks.
+        - figure [ref=f3e394]:
+          - button "Copy Text" [ref=f3e396] [cursor=pointer]
+          - region [ref=f3e400]:
+            - code [ref=f3e402]:
+              - generic [ref=f3e403]: "// 🔵 OK: Component mapping function that follows MDX conventions"
+              - generic [ref=f3e404]: "export function useMDXComponents(components) {"
+              - generic [ref=f3e405]: "return {"
+              - generic [ref=f3e406]: ...components,
+              - generic [ref=f3e407]: "};"
+              - generic [ref=f3e408]: "}"
+        - heading [level=2] [ref=f3e409]:
+          - link "Versions" [ref=f3e410] [cursor=pointer]:
+            - /url: "#versions"
+          - button "Copy Anchor Link" [ref=f3e411] [cursor=pointer]
+        - generic [ref=f3e415]:
+          - heading [level=3] [ref=f3e417]:
+            - button "[5.16.0] - 2026-07-15" [ref=f3e418] [cursor=pointer]
+          - heading [level=3] [ref=f3e422]:
+            - button "[5.14.9] - 2026-07-15" [ref=f3e423] [cursor=pointer]
+          - heading [level=3] [ref=f3e427]:
+            - button "[5.11.0] - 2026-07-05" [ref=f3e428] [cursor=pointer]
+          - heading [level=3] [ref=f3e432]:
+            - button "[2.0.5] - 2025-10-03" [ref=f3e433] [cursor=pointer]
+          - heading [level=3] [ref=f3e437]:
+            - button "[1.48.0] - 2025-04-17" [ref=f3e438] [cursor=pointer]
+          - heading [level=3] [ref=f3e442]:
+            - button "[1.47.4] - 2025-04-15" [ref=f3e443] [cursor=pointer]
+          - heading [level=3] [ref=f3e447]:
+            - button "[1.47.2] - 2025-04-14" [ref=f3e448] [cursor=pointer]
+          - heading [level=3] [ref=f3e452]:
+            - button "[1.45.1] - 2025-04-13" [ref=f3e453] [cursor=pointer]
+          - heading [level=3] [ref=f3e457]:
+            - button "[1.35.0] - 2025-03-18" [ref=f3e458] [cursor=pointer]
+          - heading [level=3] [ref=f3e462]:
+            - button "[1.21.0] - 2024-12-20" [ref=f3e463] [cursor=pointer]
+        - heading [level=2] [ref=f3e466]:
+          - link "Resources" [ref=f3e467] [cursor=pointer]:
+            - /url: "#resources"
+          - button "Copy Anchor Link" [ref=f3e468] [cursor=pointer]
+        - list [ref=f3e472]:
+          - listitem [ref=f3e473]:
+            - link "Rule Source" [ref=f3e474] [cursor=pointer]:
+              - /url: https://github.com/Rel1cx/eslint-react/tree/main/plugins/eslint-plugin-react-x/src/rules/no-unnecessary-use-prefix/no-unnecessary-use-prefix.ts
+          - listitem [ref=f3e475]:
+            - link "Test Source" [ref=f3e476] [cursor=pointer]:
+              - /url: https://github.com/Rel1cx/eslint-react/tree/main/plugins/eslint-plugin-react-x/src/rules/no-unnecessary-use-prefix/no-unnecessary-use-prefix.spec.ts
+          - listitem [ref=f3e477]:
+            - link "Rule Changelog" [ref=f3e478] [cursor=pointer]:
+              - /url: https://github.com/Rel1cx/eslint-react/tree/main/plugins/eslint-plugin-react-x/src/rules/no-unnecessary-use-prefix/CHANGELOG.md
+        - heading [level=2] [ref=f3e479]:
+          - link "Further Reading" [ref=f3e480] [cursor=pointer]:
+            - /url: "#further-reading"
+          - button "Copy Anchor Link" [ref=f3e481] [cursor=pointer]
+        - list [ref=f3e485]:
+          - listitem [ref=f3e486]:
+            - link [ref=f3e487] [cursor=pointer]:
+              - /url: https://react.dev/learn/reusing-logic-with-custom-hooks#should-all-functions-called-during-rendering-start-with-the-use-prefix
+              - text: "React Docs: Should all functions called during rendering start with the"
+              - code [ref=f3e488]: use
+              - text: prefix? (the deep dive)
+      - generic [ref=f3e489]:
+        - link [ref=f3e490] [cursor=pointer]:
+          - /url: /docs/rules/no-set-state-in-component-will-update
+          - paragraph [ref=f3e494]: no-set-state-in-component-will-update
+          - paragraph [ref=f3e495]: Disallows calling 'this.setState' in 'componentWillUpdate' outside functions such as callbacks.
+        - link [ref=f3e496] [cursor=pointer]:
+          - /url: /docs/rules/no-unsafe-component-will-mount
+          - paragraph [ref=f3e500]: no-unsafe-component-will-mount
+          - paragraph [ref=f3e501]: Warns about the use of 'UNSAFE_componentWillMount' in class components.
+  - alert [ref=f3e502]

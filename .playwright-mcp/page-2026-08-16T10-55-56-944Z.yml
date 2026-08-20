@@ -1,0 +1,670 @@
+- generic [active] [ref=f69e1]:
+  - region "We value your privacy" [ref=f69e2]:
+    - generic [ref=f69e3]:
+      - button "Close" [ref=f69e4] [cursor=pointer]
+      - generic [ref=f69e5]:
+        - heading "We value your privacy" [level=2] [ref=f69e6]
+        - generic [ref=f69e7]:
+          - paragraph [ref=f69e9]: This website or its third-party tools process personal data. You can opt out of the sale of your personal information by clicking on the “Do Not Sell or Share My Personal Information” link.
+          - group [ref=f69e10]:
+            - button "Do Not Sell or Share My Personal Information" [ref=f69e11] [cursor=pointer]
+  - link "Skip to content" [ref=f69e13] [cursor=pointer]:
+    - /url: "#main"
+  - generic [ref=f69e14]:
+    - generic [ref=f69e15]:
+      - paragraph [ref=f69e16]: September Exclusive | Buy 2, Get 3rd Free on Live Online Courses
+      - link "Enroll Today" [ref=f69e17] [cursor=pointer]:
+        - /url: https://www.nngroup.com/training/september/?utm_campaign=live-online-courses&utm_source=website&utm_medium=banner&utm_content=b2g1
+    - button "Close promotion banner" [ref=f69e18] [cursor=pointer]
+  - banner [ref=f69e21]:
+    - navigation "main" [ref=f69e22]:
+      - generic [ref=f69e23]:
+        - generic [ref=f69e24]:
+          - link "Nielsen Norman Group - Home" [ref=f69e25] [cursor=pointer]:
+            - /url: /
+            - img "Nielsen Norman Group" [ref=f69e26]
+          - list [ref=f69e28]:
+            - listitem [ref=f69e29]:
+              - button "UX Training & Courses" [ref=f69e30]
+            - listitem [ref=f69e33]:
+              - button "Articles & Resources" [ref=f69e34]
+            - listitem [ref=f69e37]:
+              - button "Consulting" [ref=f69e38]
+            - listitem [ref=f69e41]:
+              - button "About Us" [ref=f69e42]
+        - generic [ref=f69e45]:
+          - button "Search" [ref=f69e46] [cursor=pointer]
+          - generic [ref=f69e49]:
+            - link "Cart (empty)" [ref=f69e51] [cursor=pointer]:
+              - /url: /products/basket/
+            - link "Log In" [ref=f69e55] [cursor=pointer]:
+              - /url: /login/?next=%2Farticles%2Fusability-testing-101%2F
+  - main [ref=f69e56]:
+    - article [ref=f69e59]:
+      - generic [ref=f69e60]:
+        - heading "Usability (User) Testing 101" [level=1] [ref=f69e61]
+        - generic [ref=f69e65]:
+          - link "Kate Moran" [ref=f69e67] [cursor=pointer]:
+            - /url: /articles/author/kate-moran/
+          - paragraph [ref=f69e68]: December 1, 2019 · Last reviewed Jul. 15, 2026
+        - link [ref=f69e70] [cursor=pointer]:
+          - /url: "#"
+          - paragraph [ref=f69e72]: Share
+      - generic [ref=f69e73]:
+        - generic [ref=f69e74]:
+          - generic [ref=f69e75]: "Summary: UX researchers use this popular observational methodology to uncover problems and opportunities in designs."
+          - generic [ref=f69e76]:
+            - paragraph [ref=f69e77]:
+              - link "Usability" [ref=f69e78] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/usability-101-introduction-to-usability/
+              - text: testing (alternately called
+              - strong [ref=f69e79]: user testing
+              - text: ) is a popular UX-research methodology.
+            - blockquote [ref=f69e80]:
+              - paragraph [ref=f69e81]:
+                - text: In a
+                - strong [ref=f69e82]: usability-testing
+                - text: session, a researcher (called a “facilitator” or a “moderator”) asks a participant to perform tasks, usually using one or more specific user interfaces. While the participant completes each task, the researcher observes the participant’s behavior and listens for feedback.
+            - generic [ref=f69e84]:
+              - heading "In This Article:" [level=2] [ref=f69e87]
+              - list [ref=f69e88]:
+                - listitem [ref=f69e89]:
+                  - link "Why Usability Test?" [ref=f69e90] [cursor=pointer]:
+                    - /url: "#toc-why-usability-test-1"
+                - listitem [ref=f69e91]:
+                  - link "Elements of Usability Testing" [ref=f69e92] [cursor=pointer]:
+                    - /url: "#toc-elements-of-usability-testing-2"
+                - listitem [ref=f69e93]:
+                  - link "Types of Usability Testing" [ref=f69e94] [cursor=pointer]:
+                    - /url: "#toc-types-of-usability-testing-3"
+                - listitem [ref=f69e95]:
+                  - link "Cost of Usability Testing" [ref=f69e96] [cursor=pointer]:
+                    - /url: "#toc-cost-of-usability-testing-4"
+                - listitem [ref=f69e97]:
+                  - link "NN/g Resources for Usability Testing" [ref=f69e98] [cursor=pointer]:
+                    - /url: "#toc-nng-resources-for-usability-testing-5"
+            - heading "Why Usability Test?" [level=2] [ref=f69e99]
+            - paragraph [ref=f69e100]: "The goals of usability testing vary by study, but they usually include:"
+            - list [ref=f69e101]:
+              - listitem [ref=f69e102]:
+                - strong [ref=f69e103]: Identifying problems
+                - text: in the design of the product or service
+              - listitem [ref=f69e104]:
+                - strong [ref=f69e105]: Uncovering opportunities
+                - text: to improve
+              - listitem [ref=f69e106]:
+                - strong [ref=f69e107]: Learning about the target user’s
+                - text: behavior and preferences
+            - figure [ref=f69e109]:
+              - emphasis [ref=f69e111]: Usability testing helps us to uncover problems, discover opportunities, and learn about users.
+            - paragraph [ref=f69e112]:
+              - text: Why do we need to do usability testing?
+              - link "Won’t a good professional UX designer know" [ref=f69e113] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/the-myth-of-the-genius-designer/
+              - text: how to design a great user interface? Even the best UX designers can’t design a perfect — or even good enough — user experience without
+              - link [ref=f69e114] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/parallel-and-iterative-design/
+                - strong [ref=f69e115]: iterative design
+              - strong [ref=f69e116]: driven by observations of real users
+              - text: and of their interactions with the design.
+            - paragraph [ref=f69e117]:
+              - text: There are many variables in designing a modern user interface and there are even more variables in the
+              - link "human brain" [ref=f69e118] [cursor=pointer]:
+                - /url: https://www.nngroup.com/courses/human-mind/
+              - text: . The total number of combinations is huge.
+              - strong [ref=f69e119]: The only way to get UX design right is to test it.
+            - heading "Elements of Usability Testing" [level=2] [ref=f69e120]
+            - paragraph [ref=f69e121]:
+              - text: There are many different types of usability testing, but the core elements in most usability tests are
+              - strong [ref=f69e122]: the facilitator, the tasks, and the participant
+              - text: .
+            - figure [ref=f69e124]:
+              - emphasis [ref=f69e126]: A usability-testing session involves a participant and a facilitator who gives tasks to the participant and observes the participant’s behavior.
+            - paragraph [ref=f69e127]: The facilitator administers tasks to the participant. As the participant performs these tasks, the facilitator observes the participant’s behavior and listens for feedback. The facilitator may also ask followup questions to elicit detail from the participant.
+            - figure [ref=f69e129]:
+              - emphasis [ref=f69e131]: In a usability test, the facilitator gives instructions and task scenarios to the participant. The participant provides behavioral and verbal feedback about the interface while he performs those tasks.
+            - heading "Facilitator" [level=3] [ref=f69e132]
+            - paragraph [ref=f69e133]:
+              - text: The
+              - strong [ref=f69e134]: facilitator
+              - link "guides the participant" [ref=f69e135] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/usability-checklist/
+              - text: through the test process. She gives instructions, answers the participant’s questions, and asks followup questions.
+            - paragraph [ref=f69e136]:
+              - text: The facilitator works to ensure that the test results in high-quality, valid data, without
+              - link "accidentally influencing the participant’s behavior" [ref=f69e137] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/leading-questions/
+              - text: . Achieving this balance is difficult and requires training.
+            - paragraph [ref=f69e138]:
+              - text: (In one form of remote usability testing, called
+              - link "remote unmoderated testing" [ref=f69e139] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/unmoderated-usability-testing/
+              - text: ", an application may perform some of the facilitator’s roles.)"
+            - heading "Tasks" [level=3] [ref=f69e140]
+            - paragraph [ref=f69e141]:
+              - text: The
+              - strong [ref=f69e142]: tasks
+              - text: in a usability test are realistic activities that the participant might perform in real life. They can be very specific or very open-ended,
+              - link "depending on the research questions" [ref=f69e143] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/ux-research-goals-to-scenarios/
+              - text: and the type of usability testing.
+            - paragraph [ref=f69e144]: "Examples of tasks from real usability studies:"
+            - blockquote [ref=f69e145]:
+              - paragraph [ref=f69e146]:
+                - emphasis [ref=f69e147]: Your printer is showing “Error 5200”. How can you get rid of the error message?
+              - paragraph [ref=f69e148]:
+                - emphasis [ref=f69e149]: You're considering opening a new credit card with Wells Fargo. Please visit wellsfargo.com and decide which credit card you might want to open, if any.
+              - paragraph [ref=f69e150]:
+                - emphasis [ref=f69e151]: You’ve been told you need to speak to Tyler Smith from the Project Management department. Use the intranet to find out where they are located. Tell the researcher your answer.
+            - paragraph [ref=f69e152]:
+              - link "Task wording" [ref=f69e153] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/better-usability-tasks/
+              - text: is very important in usability testing. Small errors in the phrasing of a task can cause the participant to misunderstand what they’re asked to do or can influence how participants perform the task (a psychological phenomenon called
+              - link "priming" [ref=f69e154] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/priming/
+              - text: ).
+            - paragraph [ref=f69e155]: Task instructions can be delivered to the participant verbally (the facilitator might read them) or can be handed to a participant written on task sheets. We often ask participants to read the task instructions out loud. This helps ensure that the participant reads the instructions completely, and helps the researchers with their notetaking, because they always know which task the user is performing.
+            - complementary [ref=f69e156]:
+              - generic [ref=f69e157]:
+                - heading "Stuck on the task writing step?" [level=3] [ref=f69e158]
+                - paragraph [ref=f69e159]: Go from task-writing pro to task-writing expert using the tips and tricks used by real NN/G researchers in Task Writing for Usability Tests.
+              - link "What You'll Learn" [ref=f69e161] [cursor=pointer]:
+                - /url: https://www.nngroup.com/contents/self-paced-courses/task-writing-for-usability-tests/?promo_type=courses&promo_pos=inline
+            - heading "Participant" [level=3] [ref=f69e162]
+            - paragraph [ref=f69e163]:
+              - text: The
+              - strong [ref=f69e164]: participant
+              - text: should be a
+              - link "realistic user" [ref=f69e165] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/recruiting-test-participants-for-usability-studies/
+              - text: of the product or service being studied. That might mean that the user is already using the product or service in real life. Alternatively, in some cases, the participant might just have a similar background to the target user group, or might have the same needs, even if he isn’t already a user of the product.
+            - paragraph [ref=f69e166]:
+              - text: Participants are often asked to
+              - link [ref=f69e167] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/thinking-aloud-the-1-usability-tool/
+                - strong [ref=f69e168]: think out loud
+              - text: during usability testing (called the “think-aloud method”). The facilitator might ask the participants to narrate their actions and thoughts as they perform tasks. The goal of this approach is to understand participants’ behaviors, goals, thoughts, and motivations.
+            - figure [ref=f69e170]:
+              - emphasis [ref=f69e172]: In this usability-test session, the participant sits on the left, and the facilitator sits on the right. The participant uses a special testing laptop, which is running screen-recording software. The laptop has a webcam to capture the participant’s facial expressions and is connected to an external monitor for the facilitator. The facilitator listens to his feedback, administers tasks, and takes notes. The photo captures the moment after the participant’s task, when the facilitator is asking him followup questions.
+            - heading "Types of Usability Testing" [level=2] [ref=f69e173]
+            - heading "Qualitative vs. Quantitative" [level=3] [ref=f69e174]
+            - paragraph [ref=f69e175]:
+              - text: Usability testing can be either
+              - link "qualitative or quantitative" [ref=f69e176] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/quant-vs-qual/
+              - text: .
+            - blockquote [ref=f69e177]:
+              - paragraph [ref=f69e178]:
+                - strong [ref=f69e179]: Qualitative usability testing
+                - text: focuses on collecting insights, findings, and anecdotes about how people use the product or service. Qualitative usability testing is best for discovering problems in the user experience. This form of usability testing is more common than quantitative usability testing.
+              - paragraph [ref=f69e180]:
+                - strong [ref=f69e181]: Quantitative usability testing
+                - text: focuses on collecting metrics that describe the user experience. Two of the metrics most commonly collected in quantitative usability testing are task success and time on task. Quantitative usability testing is best for collecting
+                - link "benchmarks" [ref=f69e182] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/courses/measuring-ux/
+                - text: .
+            - paragraph [ref=f69e183]:
+              - text: The number of participants needed for a usability test varies depending on the type of study. For a typical
+              - strong [ref=f69e184]: qualitative usability study
+              - text: of a single user group, we recommend
+              - link [ref=f69e185] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/why-you-only-need-to-test-with-5-users/
+                - strong [ref=f69e186]: using five participants
+              - text: to uncover the majority of the most common problems in the product.
+            - heading "Remote vs. In-Person Testing" [level=3] [ref=f69e187]
+            - paragraph [ref=f69e188]:
+              - text: "Remote usability tests are popular because they often require less time and money than in-person studies. There are two types of remote usability testing:"
+              - link "moderated and unmoderated" [ref=f69e189] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/remote-usability-tests/
+              - text: .
+            - blockquote [ref=f69e190]:
+              - paragraph [ref=f69e191]:
+                - link [ref=f69e192] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/moderated-remote-usability-test/
+                  - strong [ref=f69e193]: Remote moderated
+                - text: usability tests work very similarly to in-person studies. The facilitator still interacts with the participant and asks her to perform tasks. However, the facilitator and participant are in different physical locations. Usually, moderated tests can be performed using screen-sharing software like Skype or GoToMeeting.
+              - paragraph [ref=f69e194]:
+                - link [ref=f69e195] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/unmoderated-usability-testing/
+                  - strong [ref=f69e196]: Remote unmoderated
+                - text: remote usability tests do not have the same facilitator–participant interaction as an in-person or moderated tests. The researcher uses a dedicated
+                - link "online remote-testing tool" [ref=f69e197] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/unmoderated-user-testing-tools/
+                - text: to set up written tasks for the participant. Then, the participant completes those tasks alone on her own time. The testing tool delivers the task instructions and any followup questions. After the participant completes her test, the researcher receives a recording of the session, along with metrics like task success.
+            - figure [ref=f69e199]:
+              - emphasis [ref=f69e201]: In remote unmoderated usability testing, the flow of information changes because the facilitator does not interact with the participant in the same way as an in a moderated test. The testing platform takes on the role of the facilitator, administering tasks to the participant. The researcher designs the study and upload task instructions on the platform, and then reviews the data after it’s collected, usually by observing video recordings of the tasks.
+            - heading "Cost of Usability Testing" [level=2] [ref=f69e202]
+            - paragraph [ref=f69e203]:
+              - text: Simple,
+              - link "“discount” usability" [ref=f69e204] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/discount-usability-20-years/
+              - text: "studies can be inexpensive, though you usually must pay a few hundred dollars as incentives to participants. The testing session can take place in a conference room, and the simplest study will take 3 days of your time (assuming that you have already learned how to do it, and you have access to participants):"
+            - list [ref=f69e205]:
+              - listitem [ref=f69e206]: "Day 1: Plan the study"
+              - listitem [ref=f69e207]: "Day 2: Test the 5 users"
+              - listitem [ref=f69e208]: "Day 3: Analyze the findings and convert them into redesign recommendations for the next iteration"
+            - paragraph [ref=f69e209]:
+              - text: On the other hand,
+              - link "more-expensive research" [ref=f69e210] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/when-high-cost-usability-makes-sense/
+              - text: is sometimes required, and the cost can run into several hundred thousand dollars for the most elaborate studies.
+            - paragraph [ref=f69e211]: "Things that add cost include:"
+            - list [ref=f69e212]:
+              - listitem [ref=f69e213]:
+                - link "Competitive testing" [ref=f69e214] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/competitive-usability-evaluations/
+                - text: of multiple designs
+              - listitem [ref=f69e215]:
+                - link "International testing" [ref=f69e216] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/international-usability-testing/
+                - text: in multiple countries
+              - listitem [ref=f69e217]:
+                - text: Testing with multiple user groups (or
+                - link "personas" [ref=f69e218] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/courses/personas/
+                - text: )
+              - listitem [ref=f69e219]: Quantitative studies
+              - listitem [ref=f69e220]:
+                - text: Use of fancy equipment like
+                - link "eyetrackers" [ref=f69e221] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/eyetracking-setup/
+              - listitem [ref=f69e222]:
+                - text: Needing a true usability lab or focus group room to
+                - link "allow others to observe" [ref=f69e223] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/observer-guidelines/
+              - listitem [ref=f69e224]:
+                - text: Wanting a detailed
+                - link "analysis and report" [ref=f69e225] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/formal-vs-quick-usability-reports/
+                - text: about the findings.
+            - paragraph [ref=f69e226]:
+              - text: The
+              - link "return on investment" [ref=f69e227] [cursor=pointer]:
+                - /url: https://www.nngroup.com/courses/measuring-ux/
+              - text: (ROI) for advanced studies can still be high, though usually not as high as that for simple studies.
+            - heading "NN/g Resources for Usability Testing" [level=2] [ref=f69e228]
+            - list [ref=f69e229]:
+              - listitem [ref=f69e230]:
+                - link "Qualitative Usability Testing" [ref=f69e231] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/qual-usability-testing-study-guide/
+                - text: (Study Guide)
+              - listitem [ref=f69e232]:
+                - 'link "User Testing: Why & How" [ref=f69e233] [cursor=pointer]':
+                  - /url: https://www.nngroup.com/videos/user-testing-jakob-nielsen/
+                - text: (Video)
+              - listitem [ref=f69e234]:
+                - link "How to Conduct Usability Studies" [ref=f69e235] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/reports/how-to-conduct-usability-studies/
+                - text: (Report)
+              - listitem [ref=f69e236]:
+                - link "How to Set Up a Desktop Usability Test" [ref=f69e237] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/videos/how-setup-desktop-usability-test/
+                - text: (Video)
+              - listitem [ref=f69e238]:
+                - link "How to Set Up a Mobile Usability Test" [ref=f69e239] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/videos/how-setup-mobile-usability-test/
+                - text: (Video)
+              - listitem [ref=f69e240]:
+                - link "Turning User Goals into Task Scenarios for Usability Testing" [ref=f69e241] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/task-scenarios-usability-testing/
+                - text: (Article)
+              - listitem [ref=f69e242]:
+                - link "Usability Testing for Mobile Is Easy" [ref=f69e243] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/mobile-usability-testing/
+                - text: (Article)
+            - heading "Facilitating a Usability Test" [level=3] [ref=f69e244]
+            - paragraph [ref=f69e245]:
+              - text: For hands-on training and help honing your facilitation skills, check out
+              - link "our full-day course on usability testing" [ref=f69e246] [cursor=pointer]:
+                - /url: https://www.nngroup.com/courses/usability-testing/
+              - text: .
+            - list [ref=f69e247]:
+              - listitem [ref=f69e248]:
+                - link "Talking with Participants During a Usability Test" [ref=f69e249] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/talking-to-users/
+                - text: (Article)
+              - listitem [ref=f69e250]:
+                - link "User Testing Facilitation Techniques" [ref=f69e251] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/videos/user-testing-facilitation-techniques/
+                - text: (Video)
+              - listitem [ref=f69e252]:
+                - link "Team Members Behaving Badly During Usability Tests" [ref=f69e253] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/team-members-user-test/
+                - text: (Article)
+              - listitem [ref=f69e254]:
+                - 'link "Thinking Aloud: The #1 Usability Tool" [ref=f69e255] [cursor=pointer]':
+                  - /url: https://www.nngroup.com/articles/thinking-aloud-the-1-usability-tool/
+                - text: (Article)
+            - heading "Recruiting Participants" [level=3] [ref=f69e256]
+            - list [ref=f69e257]:
+              - listitem [ref=f69e258]:
+                - link "Recruiting Test Participants for Usability Studies" [ref=f69e259] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/recruiting-test-participants-for-usability-studies/
+                - text: (Article)
+              - listitem [ref=f69e260]:
+                - link "Why You Only Need to Test with 5 Users" [ref=f69e261] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/why-you-only-need-to-test-with-5-users/
+                - text: (Article)
+              - listitem [ref=f69e262]:
+                - link "How Many Test Users in a Usability Study?" [ref=f69e263] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/how-many-test-users/
+                - text: (Article)
+              - listitem [ref=f69e264]:
+                - 'link "Usability Testing with 5 Users: Design Process" [ref=f69e265] [cursor=pointer]':
+                  - /url: https://www.nngroup.com/videos/usability-testing-w-5-users-design-process/?lm=user-testing-jakob-nielsen&pt=youtubevideo
+                - text: (Video)
+              - listitem [ref=f69e266]:
+                - 'link "Usability Testing with 5 Users: ROI Criteria" [ref=f69e267] [cursor=pointer]':
+                  - /url: https://www.nngroup.com/videos/usability-testing-w-5-users-roi-criteria/
+                - text: (Video)
+              - listitem [ref=f69e268]:
+                - 'link "Usability Testing with 5 Users: Information Foraging" [ref=f69e269] [cursor=pointer]':
+                  - /url: https://www.nngroup.com/videos/usability-testing-5-users-information-foraging/
+                - text: (Video)
+              - listitem [ref=f69e270]:
+                - link "Employees as Usability-Test Participants" [ref=f69e271] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/employees-user-test/
+                - text: (Article)
+              - listitem [ref=f69e272]:
+                - link "Using Usability-Test Participants Multiple Times" [ref=f69e273] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/videos/using-usability-test-participants-multiple-times/
+                - text: (Video)
+              - listitem [ref=f69e274]:
+                - link "Obtaining Consent for User Research" [ref=f69e275] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/informed-consent/
+                - text: (Article)
+            - heading "Remote Usability Testing" [level=3] [ref=f69e276]
+            - paragraph [ref=f69e277]:
+              - text: "For detailed help planning, conducting, and analyzing remote user testing, check out our full-day seminar:"
+              - link "Remote Usability Testing." [ref=f69e278] [cursor=pointer]:
+                - /url: https://www.nngroup.com/courses/remote-studies/
+            - list [ref=f69e279]:
+              - listitem [ref=f69e280]:
+                - 'link "Remote Usability Tests: Moderated and Unmoderated" [ref=f69e281] [cursor=pointer]':
+                  - /url: https://www.nngroup.com/articles/remote-usability-tests/
+                - text: (Article)
+              - listitem [ref=f69e282]:
+                - 'link "Remote Moderated Usability Tests: How and Why to Do Them" [ref=f69e283] [cursor=pointer]':
+                  - /url: https://www.nngroup.com/articles/moderated-remote-usability-test/
+                - text: (Article)
+              - listitem [ref=f69e284]:
+                - 'link "Remote Unmoderated User Tests: How and Why to Do Them" [ref=f69e285] [cursor=pointer]':
+                  - /url: https://www.nngroup.com/articles/unmoderated-usability-testing/
+                - text: (Article)
+              - listitem [ref=f69e286]:
+                - link "Tools for Unmoderated Usability Testing" [ref=f69e287] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/unmoderated-user-testing-tools/
+                - text: (Article)
+            - heading "Special Usability Testing Studies or User Groups" [level=3] [ref=f69e288]
+            - list [ref=f69e289]:
+              - listitem [ref=f69e290]:
+                - link "Quantitative vs. Qualitative Usability Tests" [ref=f69e291] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/quant-vs-qual/
+                - text: (Article)
+              - listitem [ref=f69e292]:
+                - link "Conducting Usability Testing with Real Users’ Real Data" [ref=f69e293] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/users-real-data/
+                - text: (Article)
+              - listitem [ref=f69e294]:
+                - link "How to Conduct Usability Studies for Accessibility" [ref=f69e295] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/reports/how-to-conduct-usability-studies-accessibility/
+                - text: (Report)
+              - listitem [ref=f69e296]:
+                - 'link "Paper Prototyping: Getting User Data Before You Code" [ref=f69e297] [cursor=pointer]':
+                  - /url: https://www.nngroup.com/articles/paper-prototyping/
+                - text: (Article)
+              - listitem [ref=f69e298]:
+                - link "Paper Prototyping 101" [ref=f69e299] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/videos/paper-prototyping-101/
+                - text: (Video)
+              - listitem [ref=f69e300]:
+                - 'link "Beyond the NPS: Measuring Perceived Usability" [ref=f69e301] [cursor=pointer]':
+                  - /url: https://www.nngroup.com/articles/measuring-perceived-usability/
+                - text: (Article)
+              - listitem [ref=f69e302]:
+                - link "International Usability Testing" [ref=f69e303] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/international-usability-testing/
+                - text: (Article)
+              - listitem [ref=f69e304]:
+                - link "Usability Testing with Minors" [ref=f69e305] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/usability-testing-minors/
+                - text: (Article)
+        - generic [ref=f69e307]:
+          - generic [ref=f69e308]:
+            - heading "Free Downloads" [level=2] [ref=f69e309]
+            - list [ref=f69e310]:
+              - listitem [ref=f69e311]:
+                - link "Usability Testing 101 Poster (A4 Size) (PDF)" [ref=f69e312] [cursor=pointer]:
+                  - /url: //media.nngroup.com/media/articles/attachments/Usability-Testing-101_SizeA4.pdf
+              - listitem [ref=f69e313]:
+                - link "Usability Testing 101 Poster (Letter Size) (PDF)" [ref=f69e314] [cursor=pointer]:
+                  - /url: //media.nngroup.com/media/articles/attachments/UsabilityTesting101_Letter_Size.pdf
+          - generic [ref=f69e315]:
+            - heading "Related Courses" [level=2] [ref=f69e316]
+            - list [ref=f69e317]:
+              - listitem [ref=f69e318]:
+                - link [ref=f69e319] [cursor=pointer]:
+                  - /url: /courses/usability-testing/?lm=usability-testing-101&pt=article
+                  - heading "Usability Testing" [level=4] [ref=f69e320]
+                  - paragraph [ref=f69e321]: Plan, conduct, and analyze your own studies, whether in person or remote
+                  - paragraph [ref=f69e326]: Research
+              - listitem [ref=f69e327]:
+                - link [ref=f69e328] [cursor=pointer]:
+                  - /url: /courses/researchops/?lm=usability-testing-101&pt=article
+                  - 'heading "ResearchOps: Scaling User Research" [level=4] [ref=f69e329]'
+                  - paragraph [ref=f69e330]: Orchestrate and optimize research to amplify its impact
+                  - generic [ref=f69e331]:
+                    - paragraph [ref=f69e335]: Research
+                    - paragraph [ref=f69e339]: Management
+              - listitem [ref=f69e340]:
+                - link [ref=f69e341] [cursor=pointer]:
+                  - /url: /courses/surveys/?lm=usability-testing-101&pt=article
+                  - heading "Survey Design and Execution" [level=4] [ref=f69e342]
+                  - paragraph [ref=f69e343]: Use surveys to drive and evaluate UX design
+                  - paragraph [ref=f69e348]: Research
+          - generic [ref=f69e349]:
+            - heading "Related Topics" [level=2] [ref=f69e350]
+            - list [ref=f69e351]:
+              - listitem [ref=f69e352]:
+                - link "User Testing" [ref=f69e353] [cursor=pointer]:
+                  - /url: /topic/user-testing/
+              - listitem [ref=f69e354]:
+                - link "Research Methods" [ref=f69e355] [cursor=pointer]:
+                  - /url: /topic/research-methods/
+    - generic [ref=f69e358]:
+      - heading "Learn More:" [level=2] [ref=f69e359]
+      - generic [ref=f69e360]:
+        - iframe [ref=f69e363]:
+          - generic [ref=f70e1]:
+            - generic "YouTube 동영상 플레이어" [ref=f70e3]
+            - generic [ref=f70e5]:
+              - generic:
+                - generic:
+                  - generic [ref=f70e6] [cursor=pointer]
+                  - button "동영상 재생" [ref=f70e10] [cursor=pointer]
+                  - button "재생 컨트롤 숨기기" [ref=f70e12] [cursor=pointer]
+                  - generic [ref=f70e14]:
+                    - generic [ref=f70e19]:
+                      - generic [ref=f70e20]:
+                        - link "Usability Testing 101" [ref=f70e21] [cursor=pointer]:
+                          - /url: https://www.youtube.com/watch?v=n8MnoJyl3W4
+                        - link "NNgroup" [ref=f70e22] [cursor=pointer]:
+                          - /url: /channel/UC2oCugzU6W8-h95W7eBTUEg
+                      - generic [ref=f70e24]:
+                        - button [ref=f70e25] [cursor=pointer]
+                        - generic [ref=f70e27]:
+                          - generic: NNgroup
+                          - generic: 구독자 32만명
+                    - generic [ref=f70e28]:
+                      - button "공유" [ref=f70e31] [cursor=pointer]
+                      - link "YouTube에서 보기" [ref=f70e42] [cursor=pointer]:
+                        - /url: https://www.youtube.com/watch?v=n8MnoJyl3W4
+                        - generic [ref=f70e43]: "다음에서 보기:"
+        - generic [ref=f69e364]:
+          - paragraph [ref=f69e365]: Usability Testing 101
+          - text: Kate Moran · 2 min
+        - list [ref=f69e367]:
+          - listitem [ref=f69e368]:
+            - link [ref=f69e371] [cursor=pointer]:
+              - /url: /videos/5-reasons-to-test/?lm=usability-testing-101&pt=article
+              - generic [ref=f69e373]:
+                - paragraph [ref=f69e374]: 5 Reasons to Test Even When You “Know” the Answer
+                - paragraph [ref=f69e375]: Hoa Loranger · 4 min
+          - listitem [ref=f69e376]:
+            - link [ref=f69e379] [cursor=pointer]:
+              - /url: /videos/in-person-usability-testing/?lm=usability-testing-101&pt=article
+              - generic [ref=f69e381]:
+                - paragraph [ref=f69e382]: A Case for Returning to In-Person Usability Testing
+                - paragraph [ref=f69e383]: Hoa Loranger · 6 min
+          - listitem [ref=f69e384]:
+            - link [ref=f69e387] [cursor=pointer]:
+              - /url: /videos/what-is-user-research/?lm=usability-testing-101&pt=article
+              - generic [ref=f69e389]:
+                - paragraph [ref=f69e390]: What Is User Research?
+                - paragraph [ref=f69e391]: Caleb Sponheim · 3 min
+      - generic [ref=f69e392]:
+        - heading "Related Articles:" [level=2] [ref=f69e393]
+        - list [ref=f69e394]:
+          - listitem [ref=f69e395]:
+            - link [ref=f69e396] [cursor=pointer]:
+              - /url: /articles/leading-questions/?lm=usability-testing-101&pt=article
+              - paragraph [ref=f69e397]: Avoid Leading Questions to Get Better Insights from Participants
+              - paragraph [ref=f69e398]: Amy Schade · 4 min
+          - listitem [ref=f69e399]:
+            - link [ref=f69e400] [cursor=pointer]:
+              - /url: /articles/responding-skepticism-small-usability-tests/?lm=usability-testing-101&pt=article
+              - paragraph [ref=f69e401]: "‘But You Tested with Only 5 Users!’: Responding to Skepticism About Findings From Small Studies"
+              - paragraph [ref=f69e402]: Kathryn Whitenton · 8 min
+          - listitem [ref=f69e403]:
+            - link [ref=f69e404] [cursor=pointer]:
+              - /url: /articles/qual-usability-testing-study-guide/?lm=usability-testing-101&pt=article
+              - paragraph [ref=f69e405]: "Qualitative Usability Testing: Study Guide"
+              - paragraph [ref=f69e406]: Kate Moran · 5 min
+          - listitem [ref=f69e407]:
+            - link [ref=f69e408] [cursor=pointer]:
+              - /url: /articles/testing-visual-design/?lm=usability-testing-101&pt=article
+              - paragraph [ref=f69e409]: "Testing Visual Design: A Comprehensive Guide"
+              - paragraph [ref=f69e410]: Megan Chan · 10 min
+          - listitem [ref=f69e411]:
+            - link [ref=f69e412] [cursor=pointer]:
+              - /url: /articles/should-you-run-a-survey/?lm=usability-testing-101&pt=article
+              - paragraph [ref=f69e413]: Should You Run a Survey?
+              - paragraph [ref=f69e414]: Maddie Brown · 6 min
+          - listitem [ref=f69e415]:
+            - link [ref=f69e416] [cursor=pointer]:
+              - /url: /articles/quantitative-research-study-guide/?lm=usability-testing-101&pt=article
+              - paragraph [ref=f69e417]: "Quantitative Research: Study Guide"
+              - paragraph [ref=f69e418]: Kate Moran · 8 min
+  - contentinfo [ref=f69e419]:
+    - generic [ref=f69e423]:
+      - generic [ref=f69e424]:
+        - heading "Never miss an update" [level=2] [ref=f69e425]
+        - paragraph [ref=f69e426]: Get weekly UX articles, videos, upcoming courses, and job openings straight to your inbox with our newsletter.
+      - group "Newsletter subscribe" [ref=f69e428]:
+        - generic [ref=f69e429]: Email
+        - textbox "Email" [ref=f69e431]
+        - button "Subscribe" [ref=f69e432] [cursor=pointer]
+    - list [ref=f69e436]:
+      - listitem [ref=f69e437]:
+        - heading "Courses" [level=3] [ref=f69e438]
+        - list [ref=f69e439]:
+          - listitem [ref=f69e440]:
+            - link "Live Online Training Events" [ref=f69e441] [cursor=pointer]:
+              - /url: /courses/
+          - listitem [ref=f69e442]:
+            - link "Group-Discount Pricing" [ref=f69e443] [cursor=pointer]:
+              - /url: /contents/train-your-team/group-discount-pricing/
+          - listitem [ref=f69e444]:
+            - link "Private Team Training" [ref=f69e445] [cursor=pointer]:
+              - /url: /contents/train-your-team/private-team-training-ux-certification/
+          - listitem [ref=f69e446]:
+            - link "Self-Paced Courses" [ref=f69e447] [cursor=pointer]:
+              - /url: /contents/self-paced-courses/
+      - listitem [ref=f69e448]:
+        - heading "Consulting" [level=3] [ref=f69e449]
+        - list [ref=f69e450]:
+          - listitem [ref=f69e451]:
+            - link "Intensive Applied Workshops" [ref=f69e452] [cursor=pointer]:
+              - /url: /consulting/applied-workshops/
+          - listitem [ref=f69e453]:
+            - link "Customized Research" [ref=f69e454] [cursor=pointer]:
+              - /url: /consulting/user-research/
+          - listitem [ref=f69e455]:
+            - link "Expert Review" [ref=f69e456] [cursor=pointer]:
+              - /url: /consulting/expert-review/
+          - listitem [ref=f69e457]:
+            - link "Keynote Speaking" [ref=f69e458] [cursor=pointer]:
+              - /url: /consulting/keynote-speaking/
+          - listitem [ref=f69e459]:
+            - link "User Testing" [ref=f69e460] [cursor=pointer]:
+              - /url: /consulting/user-testing/
+          - listitem [ref=f69e461]:
+            - link "UX Maturity Assessment" [ref=f69e462] [cursor=pointer]:
+              - /url: /consulting/ux-maturity-assessment/
+      - listitem [ref=f69e463]:
+        - heading "Help" [level=3] [ref=f69e464]
+        - list [ref=f69e465]:
+          - listitem [ref=f69e466]:
+            - link "Terms & Conditions" [ref=f69e467] [cursor=pointer]:
+              - /url: /terms-and-conditions/
+          - listitem [ref=f69e468]:
+            - link "Privacy Policy" [ref=f69e469] [cursor=pointer]:
+              - /url: /privacy-policy/
+          - listitem [ref=f69e470]:
+            - link "Live Course Tech Support" [ref=f69e471] [cursor=pointer]:
+              - /url: /virtual-help
+          - listitem [ref=f69e472]:
+            - link "FAQs" [ref=f69e473] [cursor=pointer]:
+              - /url: /faqs/
+      - listitem [ref=f69e474]:
+        - heading "Company" [level=3] [ref=f69e475]
+        - list [ref=f69e476]:
+          - listitem [ref=f69e477]:
+            - link "About NNGroup" [ref=f69e478] [cursor=pointer]:
+              - /url: /about/
+          - listitem [ref=f69e479]:
+            - link "People" [ref=f69e480] [cursor=pointer]:
+              - /url: /people/
+          - listitem [ref=f69e481]:
+            - link "News & Careers" [ref=f69e482] [cursor=pointer]:
+              - /url: /news/
+          - listitem [ref=f69e483]:
+            - link "Contact Us" [ref=f69e484] [cursor=pointer]:
+              - /url: /about/contact/
+    - generic [ref=f69e485]:
+      - generic [ref=f69e486]:
+        - paragraph [ref=f69e487]: Copyright © 1998-2026 Nielsen Norman Group, All Rights Reserved.
+        - list [ref=f69e488]:
+          - listitem [ref=f69e489]:
+            - button "Cookie Preferences" [ref=f69e490]
+          - listitem [ref=f69e491]:
+            - text: "|"
+            - link "Cookie Declaration" [ref=f69e492] [cursor=pointer]:
+              - /url: /cookie-declaration/
+      - generic [ref=f69e493]:
+        - heading "Follow Us" [level=2] [ref=f69e494]
+        - list [ref=f69e495]:
+          - listitem [ref=f69e496]:
+            - link "Youtube" [ref=f69e497] [cursor=pointer]:
+              - /url: https://www.youtube.com/channel/UC2oCugzU6W8-h95W7eBTUEg
+          - listitem [ref=f69e498]:
+            - link "LinkedIn" [ref=f69e499] [cursor=pointer]:
+              - /url: https://www.linkedin.com/company/nielsen-norman-group
+          - listitem [ref=f69e500]:
+            - link "Instagram" [ref=f69e501] [cursor=pointer]:
+              - /url: https://www.instagram.com/nngux
+          - listitem [ref=f69e502]:
+            - link "Threads" [ref=f69e503] [cursor=pointer]:
+              - /url: https://www.threads.com/@nngux
+          - listitem [ref=f69e504]:
+            - link "Bluesky" [ref=f69e505] [cursor=pointer]:
+              - /url: https://bsky.app/profile/nngroupux.bsky.social
+          - listitem [ref=f69e506]:
+            - link "X" [ref=f69e507] [cursor=pointer]:
+              - /url: https://x.com/nngroup
+          - listitem [ref=f69e508]:
+            - link "Facebook" [ref=f69e509] [cursor=pointer]:
+              - /url: https://www.facebook.com/nngux
+          - listitem [ref=f69e510]:
+            - link "Spotify" [ref=f69e511] [cursor=pointer]:
+              - /url: https://podcasters.spotify.com/pod/show/nngroup
