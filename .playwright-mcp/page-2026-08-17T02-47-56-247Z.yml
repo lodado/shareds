@@ -1,0 +1,426 @@
+- generic [active] [ref=f2e1]:
+  - generic [ref=f2e2]:
+    - complementary [ref=f2e3]:
+      - generic [ref=f2e4]:
+        - generic [ref=f2e5]:
+          - link "logo ESLint React" [ref=f2e6] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f2e7]:
+              - img "logo" [ref=f2e8]
+              - generic [ref=f2e9]: ESLint React
+          - button "Collapse Sidebar" [ref=f2e10] [cursor=pointer]
+        - button "Search ⌘ K" [ref=f2e13] [cursor=pointer]:
+          - text: Search
+          - generic [ref=f2e17]:
+            - generic [ref=f2e18]: ⌘
+            - generic [ref=f2e19]: K
+      - generic [ref=f2e22]:
+        - generic [ref=f2e23]:
+          - link "Getting Started" [ref=f2e24] [cursor=pointer]:
+            - /url: /docs/getting-started
+          - generic [ref=f2e28]:
+            - link "JavaScript" [ref=f2e29] [cursor=pointer]:
+              - /url: /docs/getting-started/javascript
+            - link "TypeScript" [ref=f2e30] [cursor=pointer]:
+              - /url: /docs/getting-started/typescript
+        - link "Migrating from eslint-plugin-react" [ref=f2e31] [cursor=pointer]:
+          - /url: /docs/migrating-from-eslint-plugin-react
+        - link "Migrating from eslint-plugin-react-hooks" [ref=f2e32] [cursor=pointer]:
+          - /url: /docs/migrating-from-eslint-plugin-react-hooks
+        - paragraph [ref=f2e33]: Core Reference
+        - generic [ref=f2e34]:
+          - link "Rules" [ref=f2e35] [cursor=pointer]:
+            - /url: /docs/rules
+          - generic [ref=f2e39]:
+            - paragraph [ref=f2e40]: X Rules
+            - link "error-boundaries" [ref=f2e41] [cursor=pointer]:
+              - /url: /docs/rules/error-boundaries
+            - link "exhaustive-deps" [ref=f2e42] [cursor=pointer]:
+              - /url: /docs/rules/exhaustive-deps
+            - link "globals" [ref=f2e43] [cursor=pointer]:
+              - /url: /docs/rules/globals
+            - link "immutability" [ref=f2e44] [cursor=pointer]:
+              - /url: /docs/rules/immutability
+            - link "no-access-state-in-setstate" [ref=f2e45] [cursor=pointer]:
+              - /url: /docs/rules/no-access-state-in-setstate
+            - link "no-array-index-key" [ref=f2e46] [cursor=pointer]:
+              - /url: /docs/rules/no-array-index-key
+            - link "no-children-count" [ref=f2e47] [cursor=pointer]:
+              - /url: /docs/rules/no-children-count
+            - link "no-children-for-each" [ref=f2e48] [cursor=pointer]:
+              - /url: /docs/rules/no-children-for-each
+            - link "no-children-map" [ref=f2e49] [cursor=pointer]:
+              - /url: /docs/rules/no-children-map
+            - link "no-children-only" [ref=f2e50] [cursor=pointer]:
+              - /url: /docs/rules/no-children-only
+            - link "no-children-to-array" [ref=f2e51] [cursor=pointer]:
+              - /url: /docs/rules/no-children-to-array
+            - link "no-class-component" [ref=f2e52] [cursor=pointer]:
+              - /url: /docs/rules/no-class-component
+            - link "no-clone-element" [ref=f2e53] [cursor=pointer]:
+              - /url: /docs/rules/no-clone-element
+            - link "no-component-will-mount" [ref=f2e54] [cursor=pointer]:
+              - /url: /docs/rules/no-component-will-mount
+            - link "no-component-will-receive-props" [ref=f2e55] [cursor=pointer]:
+              - /url: /docs/rules/no-component-will-receive-props
+            - link "no-component-will-update" [ref=f2e56] [cursor=pointer]:
+              - /url: /docs/rules/no-component-will-update
+            - link "no-context-provider" [ref=f2e57] [cursor=pointer]:
+              - /url: /docs/rules/no-context-provider
+            - link "no-create-ref" [ref=f2e58] [cursor=pointer]:
+              - /url: /docs/rules/no-create-ref
+            - link "no-direct-mutation-state" [ref=f2e59] [cursor=pointer]:
+              - /url: /docs/rules/no-direct-mutation-state
+            - link "no-duplicate-key" [ref=f2e60] [cursor=pointer]:
+              - /url: /docs/rules/no-duplicate-key
+            - link "no-forward-ref" [ref=f2e61] [cursor=pointer]:
+              - /url: /docs/rules/no-forward-ref
+            - link "no-implicit-children" [ref=f2e62] [cursor=pointer]:
+              - /url: /docs/rules/no-implicit-children
+            - link "no-implicit-key" [ref=f2e63] [cursor=pointer]:
+              - /url: /docs/rules/no-implicit-key
+            - link "no-implicit-ref" [ref=f2e64] [cursor=pointer]:
+              - /url: /docs/rules/no-implicit-ref
+            - link "no-leaked-conditional-rendering" [ref=f2e65] [cursor=pointer]:
+              - /url: /docs/rules/no-leaked-conditional-rendering
+            - link "no-missing-component-display-name" [ref=f2e66] [cursor=pointer]:
+              - /url: /docs/rules/no-missing-component-display-name
+            - link "no-missing-context-display-name" [ref=f2e67] [cursor=pointer]:
+              - /url: /docs/rules/no-missing-context-display-name
+            - link "no-missing-key" [ref=f2e68] [cursor=pointer]:
+              - /url: /docs/rules/no-missing-key
+            - link "no-misused-capture-owner-stack" [ref=f2e69] [cursor=pointer]:
+              - /url: /docs/rules/no-misused-capture-owner-stack
+            - link "no-nested-component-definitions" [ref=f2e70] [cursor=pointer]:
+              - /url: /docs/rules/no-nested-component-definitions
+            - link "no-nested-lazy-component-declarations" [ref=f2e71] [cursor=pointer]:
+              - /url: /docs/rules/no-nested-lazy-component-declarations
+            - link "no-set-state-in-component-did-mount" [ref=f2e72] [cursor=pointer]:
+              - /url: /docs/rules/no-set-state-in-component-did-mount
+            - link "no-set-state-in-component-did-update" [ref=f2e73] [cursor=pointer]:
+              - /url: /docs/rules/no-set-state-in-component-did-update
+            - link "no-set-state-in-component-will-update" [ref=f2e74] [cursor=pointer]:
+              - /url: /docs/rules/no-set-state-in-component-will-update
+            - link "no-unnecessary-use-prefix" [ref=f2e75] [cursor=pointer]:
+              - /url: /docs/rules/no-unnecessary-use-prefix
+            - link "no-unsafe-component-will-mount" [ref=f2e76] [cursor=pointer]:
+              - /url: /docs/rules/no-unsafe-component-will-mount
+            - link "no-unsafe-component-will-receive-props" [ref=f2e77] [cursor=pointer]:
+              - /url: /docs/rules/no-unsafe-component-will-receive-props
+            - link "no-unsafe-component-will-update" [ref=f2e78] [cursor=pointer]:
+              - /url: /docs/rules/no-unsafe-component-will-update
+            - link "no-unstable-context-value" [ref=f2e79] [cursor=pointer]:
+              - /url: /docs/rules/no-unstable-context-value
+            - link "no-unstable-default-props" [ref=f2e80] [cursor=pointer]:
+              - /url: /docs/rules/no-unstable-default-props
+            - link "no-unused-class-component-members" [ref=f2e81] [cursor=pointer]:
+              - /url: /docs/rules/no-unused-class-component-members
+            - link "no-unused-props" [ref=f2e82] [cursor=pointer]:
+              - /url: /docs/rules/no-unused-props
+            - link "no-unused-state" [ref=f2e83] [cursor=pointer]:
+              - /url: /docs/rules/no-unused-state
+            - link "no-use-context" [ref=f2e84] [cursor=pointer]:
+              - /url: /docs/rules/no-use-context
+            - link "purity" [ref=f2e85] [cursor=pointer]:
+              - /url: /docs/rules/purity
+            - link "refs" [ref=f2e86] [cursor=pointer]:
+              - /url: /docs/rules/refs
+            - link "rules-of-hooks" [ref=f2e87] [cursor=pointer]:
+              - /url: /docs/rules/rules-of-hooks
+            - link "set-state-in-effect" [ref=f2e88] [cursor=pointer]:
+              - /url: /docs/rules/set-state-in-effect
+            - link "set-state-in-render" [ref=f2e89] [cursor=pointer]:
+              - /url: /docs/rules/set-state-in-render
+            - link "static-components" [ref=f2e90] [cursor=pointer]:
+              - /url: /docs/rules/static-components
+            - link "unsupported-syntax" [ref=f2e91] [cursor=pointer]:
+              - /url: /docs/rules/unsupported-syntax
+            - link "use-memo" [ref=f2e92] [cursor=pointer]:
+              - /url: /docs/rules/use-memo
+            - link "use-state" [ref=f2e93] [cursor=pointer]:
+              - /url: /docs/rules/use-state
+            - paragraph [ref=f2e94]: JSX Rules
+            - link "no-children-prop" [ref=f2e95] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-children-prop
+            - link "no-children-prop-with-children" [ref=f2e96] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-children-prop-with-children
+            - link "no-comment-textnodes" [ref=f2e97] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-comment-textnodes
+            - link "no-key-after-spread" [ref=f2e98] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-key-after-spread
+            - link "no-leaked-dollar" [ref=f2e99] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-leaked-dollar
+            - link "no-leaked-semicolon" [ref=f2e100] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-leaked-semicolon
+            - link "no-namespace" [ref=f2e101] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-namespace
+            - link "no-useless-fragment" [ref=f2e102] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-useless-fragment
+            - paragraph [ref=f2e103]: RSC Rules
+            - link "function-definition" [ref=f2e104] [cursor=pointer]:
+              - /url: /docs/rules/rsc-function-definition
+            - paragraph [ref=f2e105]: DOM Rules
+            - link "no-dangerously-set-innerhtml" [ref=f2e106] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-dangerously-set-innerhtml
+            - link "no-dangerously-set-innerhtml-with-children" [ref=f2e107] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-dangerously-set-innerhtml-with-children
+            - link "no-find-dom-node" [ref=f2e108] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-find-dom-node
+            - link "no-flush-sync" [ref=f2e109] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-flush-sync
+            - link "no-hydrate" [ref=f2e110] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-hydrate
+            - link "no-missing-button-type" [ref=f2e111] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-missing-button-type
+            - link "no-missing-iframe-sandbox" [ref=f2e112] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-missing-iframe-sandbox
+            - link "no-render" [ref=f2e113] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-render
+            - link "no-render-return-value" [ref=f2e114] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-render-return-value
+            - link "no-script-url" [ref=f2e115] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-script-url
+            - link "no-string-style-prop" [ref=f2e116] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-string-style-prop
+            - link "no-unknown-property" [ref=f2e117] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-unknown-property
+            - link "no-unsafe-iframe-sandbox" [ref=f2e118] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-unsafe-iframe-sandbox
+            - link "no-unsafe-target-blank" [ref=f2e119] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-unsafe-target-blank
+            - link "no-use-form-state" [ref=f2e120] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-use-form-state
+            - link "no-void-elements-with-children" [ref=f2e121] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-void-elements-with-children
+            - paragraph [ref=f2e122]: Web API Rules
+            - link "no-leaked-event-listener" [ref=f2e123] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-event-listener
+            - link "no-leaked-fetch" [ref=f2e124] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-fetch
+            - link "no-leaked-intersection-observer" [ref=f2e125] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-intersection-observer
+            - link "no-leaked-interval" [ref=f2e126] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-interval
+            - link "no-leaked-resize-observer" [ref=f2e127] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-resize-observer
+            - link "no-leaked-timeout" [ref=f2e128] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-timeout
+            - paragraph [ref=f2e129]: Naming Convention Rules
+            - link "context-name" [ref=f2e130] [cursor=pointer]:
+              - /url: /docs/rules/naming-convention-context-name
+            - link "id-name" [ref=f2e131] [cursor=pointer]:
+              - /url: /docs/rules/naming-convention-id-name
+            - link "ref-name" [ref=f2e132] [cursor=pointer]:
+              - /url: /docs/rules/naming-convention-ref-name
+            - paragraph [ref=f2e133]: Debug Rules
+            - link "function-component" [ref=f2e134] [cursor=pointer]:
+              - /url: /docs/rules/debug-function-component
+            - link "hook" [ref=f2e135] [cursor=pointer]:
+              - /url: /docs/rules/debug-hook
+            - link "is-from-react" [ref=f2e136] [cursor=pointer]:
+              - /url: /docs/rules/debug-is-from-react
+            - link "is-from-ref" [ref=f2e137] [cursor=pointer]:
+              - /url: /docs/rules/debug-is-from-ref
+            - link "jsx" [ref=f2e138] [cursor=pointer]:
+              - /url: /docs/rules/debug-jsx
+        - link "Presets" [ref=f2e139] [cursor=pointer]:
+          - /url: /docs/presets
+        - link "Recipes" [ref=f2e141] [cursor=pointer]:
+          - /url: /docs/recipes
+        - link "Packages" [ref=f2e145] [cursor=pointer]:
+          - /url: /docs/packages
+        - link "Configuration" [ref=f2e149] [cursor=pointer]:
+          - /url: /docs/configuration
+        - paragraph [ref=f2e152]: Project Information
+        - link "Roadmap" [ref=f2e153] [cursor=pointer]:
+          - /url: /docs/roadmap
+        - link "Changelog" [ref=f2e154] [cursor=pointer]:
+          - /url: /docs/changelog
+        - link "FAQ" [ref=f2e155] [cursor=pointer]:
+          - /url: /docs/faq
+        - link "Glossary" [ref=f2e156] [cursor=pointer]:
+          - /url: /docs/glossary
+        - link "Community" [ref=f2e157] [cursor=pointer]:
+          - /url: /docs/community
+        - link "Contributing" [ref=f2e158] [cursor=pointer]:
+          - /url: /docs/contributing
+        - link "Third-Party Plugins" [ref=f2e159] [cursor=pointer]:
+          - /url: /docs/third-party-plugins
+      - generic [ref=f2e161]:
+        - link "GitHub" [ref=f2e162] [cursor=pointer]:
+          - /url: https://github.com/Rel1cx/eslint-react
+        - button "Toggle Theme" [ref=f2e165] [cursor=pointer]
+    - generic:
+      - button "Collapse Sidebar"
+      - button "Open Search"
+    - banner [ref=f2e175]:
+      - button "0 function-component" [ref=f2e176] [cursor=pointer]:
+        - progressbar [ref=f2e177]
+        - generic [ref=f2e180]: function-component
+    - article [ref=f2e184]:
+      - link "Rules" [ref=f2e186] [cursor=pointer]:
+        - /url: /docs/rules
+      - heading "function-component" [level=1] [ref=f2e187]
+      - paragraph [ref=f2e188]: Reports all function components in JSON format. Useful for debugging. This rule should only be used for debugging purposes; otherwise leave it off.
+      - generic [ref=f2e189]:
+        - button "Copy Markdown" [ref=f2e190] [cursor=pointer]
+        - button "Open" [ref=f2e194] [cursor=pointer]
+      - generic [ref=f2e197]:
+        - paragraph [ref=f2e198]:
+          - strong [ref=f2e199]:
+            - text: Full Name in
+            - code [ref=f2e200]: eslint-plugin-react-debug
+        - figure [ref=f2e201]:
+          - button "Copy Text" [ref=f2e203] [cursor=pointer]
+          - region [ref=f2e207]:
+            - code [ref=f2e209]:
+              - generic [ref=f2e210]: react-debug/function-component
+        - paragraph [ref=f2e211]:
+          - strong [ref=f2e212]: Features
+        - paragraph [ref=f2e213]:
+          - code [ref=f2e214]: 🐞
+        - heading [level=2] [ref=f2e215]:
+          - link "Rule Details" [ref=f2e216] [cursor=pointer]:
+            - /url: "#rule-details"
+          - button "Copy Anchor Link" [ref=f2e217] [cursor=pointer]
+        - paragraph [ref=f2e221]:
+          - text: This rule reports all function components in JSON format. It detects function declarations, arrow functions, components wrapped with
+          - code [ref=f2e222]: React.memo
+          - text: or
+          - code [ref=f2e223]: React.forwardRef
+          - text: ", components that call Hooks, and components containing the"
+          - code [ref=f2e224]: "\"use memo\""
+          - text: or
+          - code [ref=f2e225]: "\"use no memo\""
+          - text: directive.
+        - heading [level=2] [ref=f2e226]:
+          - link "Examples" [ref=f2e227] [cursor=pointer]:
+            - /url: "#examples"
+          - button "Copy Anchor Link" [ref=f2e228] [cursor=pointer]
+        - heading [level=3] [ref=f2e232]:
+          - link "Function declaration as a component" [ref=f2e233] [cursor=pointer]:
+            - /url: "#function-declaration-as-a-component"
+          - button "Copy Anchor Link" [ref=f2e234] [cursor=pointer]
+        - figure [ref=f2e238]:
+          - button "Copy Text" [ref=f2e240] [cursor=pointer]
+          - region [ref=f2e244]:
+            - code [ref=f2e246]:
+              - generic [ref=f2e247]: // This rule reports function declarations that return JSX.
+              - generic [ref=f2e248]: "function MyComponent() {"
+              - generic [ref=f2e249]: return <button />;
+              - generic [ref=f2e250]: "}"
+        - heading [level=3] [ref=f2e251]:
+          - link "Arrow function as a component" [ref=f2e252] [cursor=pointer]:
+            - /url: "#arrow-function-as-a-component"
+          - button "Copy Anchor Link" [ref=f2e253] [cursor=pointer]
+        - figure [ref=f2e257]:
+          - button "Copy Text" [ref=f2e259] [cursor=pointer]
+          - region [ref=f2e263]:
+            - code [ref=f2e265]:
+              - generic [ref=f2e266]: // This rule reports arrow functions that return JSX.
+              - generic [ref=f2e267]: const MyComponent = () => <button />;
+        - heading [level=3] [ref=f2e268]:
+          - link "Component wrapped with React.memo" [ref=f2e269] [cursor=pointer]:
+            - /url: "#component-wrapped-with-reactmemo"
+          - button "Copy Anchor Link" [ref=f2e270] [cursor=pointer]
+        - figure [ref=f2e274]:
+          - button "Copy Text" [ref=f2e276] [cursor=pointer]
+          - region [ref=f2e280]:
+            - code [ref=f2e282]:
+              - generic [ref=f2e283]: import React from "react";
+              - generic [ref=f2e285]: // This rule reports components wrapped with React.memo.
+              - generic [ref=f2e286]: const MyComponent = React.memo(() => <button />);
+        - heading [level=3] [ref=f2e287]:
+          - link "Component wrapped with React.forwardRef" [ref=f2e288] [cursor=pointer]:
+            - /url: "#component-wrapped-with-reactforwardref"
+          - button "Copy Anchor Link" [ref=f2e289] [cursor=pointer]
+        - figure [ref=f2e293]:
+          - button "Copy Text" [ref=f2e295] [cursor=pointer]
+          - region [ref=f2e299]:
+            - code [ref=f2e301]:
+              - generic [ref=f2e302]: import React from "react";
+              - generic [ref=f2e304]: // This rule reports components wrapped with React.forwardRef.
+              - generic [ref=f2e305]: const MyComponent = React.forwardRef(() => <button />);
+        - heading [level=3] [ref=f2e306]:
+          - link "Component that calls a Hook inside" [ref=f2e307] [cursor=pointer]:
+            - /url: "#component-that-calls-a-hook-inside"
+          - button "Copy Anchor Link" [ref=f2e308] [cursor=pointer]
+        - figure [ref=f2e312]:
+          - button "Copy Text" [ref=f2e314] [cursor=pointer]
+          - region [ref=f2e318]:
+            - code [ref=f2e320]:
+              - generic [ref=f2e321]: "import React, { useEffect } from \"react\";"
+              - generic [ref=f2e323]: // This rule reports function components that use React Hooks.
+              - generic [ref=f2e324]: "function MyComponent() {"
+              - generic [ref=f2e325]: "useEffect(() => {}, []);"
+              - generic [ref=f2e326]: "}"
+        - heading [level=3] [ref=f2e327]:
+          - link "Component with the \"use memo\" directive" [ref=f2e328] [cursor=pointer]:
+            - /url: "#component-with-the-use-memo-directive"
+          - button "Copy Anchor Link" [ref=f2e329] [cursor=pointer]
+        - figure [ref=f2e333]:
+          - button "Copy Text" [ref=f2e335] [cursor=pointer]
+          - region [ref=f2e339]:
+            - code [ref=f2e341]:
+              - generic [ref=f2e342]: // This rule reports components that contain the "use memo" directive.
+              - generic [ref=f2e343]: "function MyComponent() {"
+              - generic [ref=f2e344]: "\"use memo\";"
+              - generic [ref=f2e345]: "}"
+        - heading [level=3] [ref=f2e346]:
+          - link "Component with the \"use no memo\" directive" [ref=f2e347] [cursor=pointer]:
+            - /url: "#component-with-the-use-no-memo-directive"
+          - button "Copy Anchor Link" [ref=f2e348] [cursor=pointer]
+        - figure [ref=f2e352]:
+          - button "Copy Text" [ref=f2e354] [cursor=pointer]
+          - region [ref=f2e358]:
+            - code [ref=f2e360]:
+              - generic [ref=f2e361]: // This rule reports components that contain the "use no memo" directive.
+              - generic [ref=f2e362]: "function MyComponent() {"
+              - generic [ref=f2e363]: "\"use no memo\";"
+              - generic [ref=f2e364]: "}"
+        - heading [level=2] [ref=f2e365]:
+          - link "Versions" [ref=f2e366] [cursor=pointer]:
+            - /url: "#versions"
+          - button "Copy Anchor Link" [ref=f2e367] [cursor=pointer]
+        - generic [ref=f2e371]:
+          - heading [level=3] [ref=f2e373]:
+            - button "[5.16.0] - 2026-07-15" [ref=f2e374] [cursor=pointer]
+          - heading [level=3] [ref=f2e378]:
+            - button "[4.2.1] - 2026-04-01" [ref=f2e379] [cursor=pointer]
+          - heading [level=3] [ref=f2e383]:
+            - button "[0.9.0] - 2023-12-01" [ref=f2e384] [cursor=pointer]
+        - heading [level=2] [ref=f2e387]:
+          - link "Resources" [ref=f2e388] [cursor=pointer]:
+            - /url: "#resources"
+          - button "Copy Anchor Link" [ref=f2e389] [cursor=pointer]
+        - list [ref=f2e393]:
+          - listitem [ref=f2e394]:
+            - link "Rule Source" [ref=f2e395] [cursor=pointer]:
+              - /url: https://github.com/Rel1cx/eslint-react/tree/main/plugins/eslint-plugin-react-debug/src/rules/function-component/function-component.ts
+          - listitem [ref=f2e396]:
+            - link "Test Source" [ref=f2e397] [cursor=pointer]:
+              - /url: https://github.com/Rel1cx/eslint-react/tree/main/plugins/eslint-plugin-react-debug/src/rules/function-component/function-component.spec.ts
+          - listitem [ref=f2e398]:
+            - link "Rule Changelog" [ref=f2e399] [cursor=pointer]:
+              - /url: https://github.com/Rel1cx/eslint-react/tree/main/plugins/eslint-plugin-react-debug/src/rules/function-component/CHANGELOG.md
+        - separator [ref=f2e400]
+        - heading [level=2] [ref=f2e401]:
+          - link "See Also" [ref=f2e402] [cursor=pointer]:
+            - /url: "#see-also"
+          - button "Copy Anchor Link" [ref=f2e403] [cursor=pointer]
+        - list [ref=f2e407]:
+          - listitem [ref=f2e408]:
+            - link [ref=f2e409] [cursor=pointer]:
+              - /url: ./debug-hook
+              - code [ref=f2e410]: react-debug/hook
+            - text: Reports all React Hooks in JSON format.
+      - generic [ref=f2e411]:
+        - link [ref=f2e412] [cursor=pointer]:
+          - /url: /docs/rules/naming-convention-ref-name
+          - paragraph [ref=f2e416]: ref-name
+          - paragraph [ref=f2e417]: Enforces identifier names assigned from 'useRef' calls to be either 'ref' or end with 'Ref'.
+        - link [ref=f2e418] [cursor=pointer]:
+          - /url: /docs/rules/debug-hook
+          - paragraph [ref=f2e422]: hook
+          - paragraph [ref=f2e423]: Reports all React Hooks in JSON format. Useful for debugging. This rule should be used only for debugging purposes; otherwise, leave it off.
+  - alert [ref=f2e424]

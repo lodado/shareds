@@ -1,0 +1,1538 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - link "logo ESLint React" [ref=e6] [cursor=pointer]:
+            - /url: /
+            - generic [ref=e7]:
+              - img "logo" [ref=e8]
+              - generic [ref=e9]: ESLint React
+          - button "Collapse Sidebar" [ref=e10] [cursor=pointer]
+        - button "Search ⌘ K" [ref=e13] [cursor=pointer]:
+          - text: Search
+          - generic [ref=e17]:
+            - generic [ref=e18]: ⌘
+            - generic [ref=e19]: K
+      - generic [ref=e22]:
+        - generic [ref=e23]:
+          - link "Getting Started" [ref=e24] [cursor=pointer]:
+            - /url: /docs/getting-started
+          - generic [ref=e28]:
+            - link "JavaScript" [ref=e29] [cursor=pointer]:
+              - /url: /docs/getting-started/javascript
+            - link "TypeScript" [ref=e30] [cursor=pointer]:
+              - /url: /docs/getting-started/typescript
+        - link "Migrating from eslint-plugin-react" [ref=e31] [cursor=pointer]:
+          - /url: /docs/migrating-from-eslint-plugin-react
+        - link "Migrating from eslint-plugin-react-hooks" [ref=e32] [cursor=pointer]:
+          - /url: /docs/migrating-from-eslint-plugin-react-hooks
+        - paragraph [ref=e33]: Core Reference
+        - generic [ref=e34]:
+          - link "Rules" [ref=e35] [cursor=pointer]:
+            - /url: /docs/rules
+          - generic [ref=e39]:
+            - paragraph [ref=e40]: X Rules
+            - link "error-boundaries" [ref=e41] [cursor=pointer]:
+              - /url: /docs/rules/error-boundaries
+            - link "exhaustive-deps" [ref=e42] [cursor=pointer]:
+              - /url: /docs/rules/exhaustive-deps
+            - link "globals" [ref=e43] [cursor=pointer]:
+              - /url: /docs/rules/globals
+            - link "immutability" [ref=e44] [cursor=pointer]:
+              - /url: /docs/rules/immutability
+            - link "no-access-state-in-setstate" [ref=e45] [cursor=pointer]:
+              - /url: /docs/rules/no-access-state-in-setstate
+            - link "no-array-index-key" [ref=e46] [cursor=pointer]:
+              - /url: /docs/rules/no-array-index-key
+            - link "no-children-count" [ref=e47] [cursor=pointer]:
+              - /url: /docs/rules/no-children-count
+            - link "no-children-for-each" [ref=e48] [cursor=pointer]:
+              - /url: /docs/rules/no-children-for-each
+            - link "no-children-map" [ref=e49] [cursor=pointer]:
+              - /url: /docs/rules/no-children-map
+            - link "no-children-only" [ref=e50] [cursor=pointer]:
+              - /url: /docs/rules/no-children-only
+            - link "no-children-to-array" [ref=e51] [cursor=pointer]:
+              - /url: /docs/rules/no-children-to-array
+            - link "no-class-component" [ref=e52] [cursor=pointer]:
+              - /url: /docs/rules/no-class-component
+            - link "no-clone-element" [ref=e53] [cursor=pointer]:
+              - /url: /docs/rules/no-clone-element
+            - link "no-component-will-mount" [ref=e54] [cursor=pointer]:
+              - /url: /docs/rules/no-component-will-mount
+            - link "no-component-will-receive-props" [ref=e55] [cursor=pointer]:
+              - /url: /docs/rules/no-component-will-receive-props
+            - link "no-component-will-update" [ref=e56] [cursor=pointer]:
+              - /url: /docs/rules/no-component-will-update
+            - link "no-context-provider" [ref=e57] [cursor=pointer]:
+              - /url: /docs/rules/no-context-provider
+            - link "no-create-ref" [ref=e58] [cursor=pointer]:
+              - /url: /docs/rules/no-create-ref
+            - link "no-direct-mutation-state" [ref=e59] [cursor=pointer]:
+              - /url: /docs/rules/no-direct-mutation-state
+            - link "no-duplicate-key" [ref=e60] [cursor=pointer]:
+              - /url: /docs/rules/no-duplicate-key
+            - link "no-forward-ref" [ref=e61] [cursor=pointer]:
+              - /url: /docs/rules/no-forward-ref
+            - link "no-implicit-children" [ref=e62] [cursor=pointer]:
+              - /url: /docs/rules/no-implicit-children
+            - link "no-implicit-key" [ref=e63] [cursor=pointer]:
+              - /url: /docs/rules/no-implicit-key
+            - link "no-implicit-ref" [ref=e64] [cursor=pointer]:
+              - /url: /docs/rules/no-implicit-ref
+            - link "no-leaked-conditional-rendering" [ref=e65] [cursor=pointer]:
+              - /url: /docs/rules/no-leaked-conditional-rendering
+            - link "no-missing-component-display-name" [ref=e66] [cursor=pointer]:
+              - /url: /docs/rules/no-missing-component-display-name
+            - link "no-missing-context-display-name" [ref=e67] [cursor=pointer]:
+              - /url: /docs/rules/no-missing-context-display-name
+            - link "no-missing-key" [ref=e68] [cursor=pointer]:
+              - /url: /docs/rules/no-missing-key
+            - link "no-misused-capture-owner-stack" [ref=e69] [cursor=pointer]:
+              - /url: /docs/rules/no-misused-capture-owner-stack
+            - link "no-nested-component-definitions" [ref=e70] [cursor=pointer]:
+              - /url: /docs/rules/no-nested-component-definitions
+            - link "no-nested-lazy-component-declarations" [ref=e71] [cursor=pointer]:
+              - /url: /docs/rules/no-nested-lazy-component-declarations
+            - link "no-set-state-in-component-did-mount" [ref=e72] [cursor=pointer]:
+              - /url: /docs/rules/no-set-state-in-component-did-mount
+            - link "no-set-state-in-component-did-update" [ref=e73] [cursor=pointer]:
+              - /url: /docs/rules/no-set-state-in-component-did-update
+            - link "no-set-state-in-component-will-update" [ref=e74] [cursor=pointer]:
+              - /url: /docs/rules/no-set-state-in-component-will-update
+            - link "no-unnecessary-use-prefix" [ref=e75] [cursor=pointer]:
+              - /url: /docs/rules/no-unnecessary-use-prefix
+            - link "no-unsafe-component-will-mount" [ref=e76] [cursor=pointer]:
+              - /url: /docs/rules/no-unsafe-component-will-mount
+            - link "no-unsafe-component-will-receive-props" [ref=e77] [cursor=pointer]:
+              - /url: /docs/rules/no-unsafe-component-will-receive-props
+            - link "no-unsafe-component-will-update" [ref=e78] [cursor=pointer]:
+              - /url: /docs/rules/no-unsafe-component-will-update
+            - link "no-unstable-context-value" [ref=e79] [cursor=pointer]:
+              - /url: /docs/rules/no-unstable-context-value
+            - link "no-unstable-default-props" [ref=e80] [cursor=pointer]:
+              - /url: /docs/rules/no-unstable-default-props
+            - link "no-unused-class-component-members" [ref=e81] [cursor=pointer]:
+              - /url: /docs/rules/no-unused-class-component-members
+            - link "no-unused-props" [ref=e82] [cursor=pointer]:
+              - /url: /docs/rules/no-unused-props
+            - link "no-unused-state" [ref=e83] [cursor=pointer]:
+              - /url: /docs/rules/no-unused-state
+            - link "no-use-context" [ref=e84] [cursor=pointer]:
+              - /url: /docs/rules/no-use-context
+            - link "purity" [ref=e85] [cursor=pointer]:
+              - /url: /docs/rules/purity
+            - link "refs" [ref=e86] [cursor=pointer]:
+              - /url: /docs/rules/refs
+            - link "rules-of-hooks" [ref=e87] [cursor=pointer]:
+              - /url: /docs/rules/rules-of-hooks
+            - link "set-state-in-effect" [ref=e88] [cursor=pointer]:
+              - /url: /docs/rules/set-state-in-effect
+            - link "set-state-in-render" [ref=e89] [cursor=pointer]:
+              - /url: /docs/rules/set-state-in-render
+            - link "static-components" [ref=e90] [cursor=pointer]:
+              - /url: /docs/rules/static-components
+            - link "unsupported-syntax" [ref=e91] [cursor=pointer]:
+              - /url: /docs/rules/unsupported-syntax
+            - link "use-memo" [ref=e92] [cursor=pointer]:
+              - /url: /docs/rules/use-memo
+            - link "use-state" [ref=e93] [cursor=pointer]:
+              - /url: /docs/rules/use-state
+            - paragraph [ref=e94]: JSX Rules
+            - link "no-children-prop" [ref=e95] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-children-prop
+            - link "no-children-prop-with-children" [ref=e96] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-children-prop-with-children
+            - link "no-comment-textnodes" [ref=e97] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-comment-textnodes
+            - link "no-key-after-spread" [ref=e98] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-key-after-spread
+            - link "no-leaked-dollar" [ref=e99] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-leaked-dollar
+            - link "no-leaked-semicolon" [ref=e100] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-leaked-semicolon
+            - link "no-namespace" [ref=e101] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-namespace
+            - link "no-useless-fragment" [ref=e102] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-useless-fragment
+            - paragraph [ref=e103]: RSC Rules
+            - link "function-definition" [ref=e104] [cursor=pointer]:
+              - /url: /docs/rules/rsc-function-definition
+            - paragraph [ref=e105]: DOM Rules
+            - link "no-dangerously-set-innerhtml" [ref=e106] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-dangerously-set-innerhtml
+            - link "no-dangerously-set-innerhtml-with-children" [ref=e107] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-dangerously-set-innerhtml-with-children
+            - link "no-find-dom-node" [ref=e108] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-find-dom-node
+            - link "no-flush-sync" [ref=e109] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-flush-sync
+            - link "no-hydrate" [ref=e110] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-hydrate
+            - link "no-missing-button-type" [ref=e111] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-missing-button-type
+            - link "no-missing-iframe-sandbox" [ref=e112] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-missing-iframe-sandbox
+            - link "no-render" [ref=e113] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-render
+            - link "no-render-return-value" [ref=e114] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-render-return-value
+            - link "no-script-url" [ref=e115] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-script-url
+            - link "no-string-style-prop" [ref=e116] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-string-style-prop
+            - link "no-unknown-property" [ref=e117] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-unknown-property
+            - link "no-unsafe-iframe-sandbox" [ref=e118] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-unsafe-iframe-sandbox
+            - link "no-unsafe-target-blank" [ref=e119] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-unsafe-target-blank
+            - link "no-use-form-state" [ref=e120] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-use-form-state
+            - link "no-void-elements-with-children" [ref=e121] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-void-elements-with-children
+            - paragraph [ref=e122]: Web API Rules
+            - link "no-leaked-event-listener" [ref=e123] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-event-listener
+            - link "no-leaked-fetch" [ref=e124] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-fetch
+            - link "no-leaked-intersection-observer" [ref=e125] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-intersection-observer
+            - link "no-leaked-interval" [ref=e126] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-interval
+            - link "no-leaked-resize-observer" [ref=e127] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-resize-observer
+            - link "no-leaked-timeout" [ref=e128] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-timeout
+            - paragraph [ref=e129]: Naming Convention Rules
+            - link "context-name" [ref=e130] [cursor=pointer]:
+              - /url: /docs/rules/naming-convention-context-name
+            - link "id-name" [ref=e131] [cursor=pointer]:
+              - /url: /docs/rules/naming-convention-id-name
+            - link "ref-name" [ref=e132] [cursor=pointer]:
+              - /url: /docs/rules/naming-convention-ref-name
+            - paragraph [ref=e133]: Debug Rules
+            - link "function-component" [ref=e134] [cursor=pointer]:
+              - /url: /docs/rules/debug-function-component
+            - link "hook" [ref=e135] [cursor=pointer]:
+              - /url: /docs/rules/debug-hook
+            - link "is-from-react" [ref=e136] [cursor=pointer]:
+              - /url: /docs/rules/debug-is-from-react
+            - link "is-from-ref" [ref=e137] [cursor=pointer]:
+              - /url: /docs/rules/debug-is-from-ref
+            - link "jsx" [ref=e138] [cursor=pointer]:
+              - /url: /docs/rules/debug-jsx
+        - link "Presets" [ref=e139] [cursor=pointer]:
+          - /url: /docs/presets
+        - link "Recipes" [ref=e141] [cursor=pointer]:
+          - /url: /docs/recipes
+        - link "Packages" [ref=e145] [cursor=pointer]:
+          - /url: /docs/packages
+        - link "Configuration" [ref=e149] [cursor=pointer]:
+          - /url: /docs/configuration
+        - paragraph [ref=e152]: Project Information
+        - link "Roadmap" [ref=e153] [cursor=pointer]:
+          - /url: /docs/roadmap
+        - link "Changelog" [ref=e154] [cursor=pointer]:
+          - /url: /docs/changelog
+        - link "FAQ" [ref=e155] [cursor=pointer]:
+          - /url: /docs/faq
+        - link "Glossary" [ref=e156] [cursor=pointer]:
+          - /url: /docs/glossary
+        - link "Community" [ref=e157] [cursor=pointer]:
+          - /url: /docs/community
+        - link "Contributing" [ref=e158] [cursor=pointer]:
+          - /url: /docs/contributing
+        - link "Third-Party Plugins" [ref=e159] [cursor=pointer]:
+          - /url: /docs/third-party-plugins
+      - generic [ref=e161]:
+        - link "GitHub" [ref=e162] [cursor=pointer]:
+          - /url: https://github.com/Rel1cx/eslint-react
+        - button "Toggle Theme" [ref=e165] [cursor=pointer]
+    - generic:
+      - button "Collapse Sidebar"
+      - button "Open Search"
+    - banner [ref=e175]:
+      - button "0 Rules" [ref=e176] [cursor=pointer]:
+        - progressbar [ref=e177]
+        - generic [ref=e180]: Rules
+    - article [ref=e184]:
+      - heading "Rules" [level=1] [ref=e185]
+      - generic [ref=e186]:
+        - button "Copy Markdown" [ref=e187] [cursor=pointer]
+        - button "Open" [ref=e191] [cursor=pointer]
+      - generic [ref=e194]:
+        - paragraph [ref=e200]:
+          - text: Linter rules can have false positives, false negatives, and some rules depend on the
+          - code [ref=e201]: react
+          - text: or
+          - code [ref=e202]: react-dom
+          - link "version" [ref=e203] [cursor=pointer]:
+            - /url: https://react.dev/versions
+          - text: you are using.
+        - button "Table of Contents" [ref=e205] [cursor=pointer]
+        - list [ref=e208]:
+          - listitem [ref=e209]: 🌟 Feature - Enhanced or special functionality
+          - listitem [ref=e210]: ⚙️ Configurable - Accepts custom options via rule configuration
+          - listitem [ref=e211]: 🧪 Experimental - Beta feature, subject to change
+          - listitem [ref=e212]: 🐞 Debug - For analysis, metrics, or custom tooling
+          - listitem [ref=e213]: 💭 Type Checking - Requires TypeScript type information
+          - listitem [ref=e214]: 🔧 Fixable - Provides automatic or interactive fixes
+          - listitem [ref=e215]: 🔄 Codemod - Safe AST transformations for deprecations
+          - listitem [ref=e216]: 0️⃣ Severity 0 - Disabled by default
+          - listitem [ref=e217]: 1️⃣ Severity 1 - Warning level
+          - listitem [ref=e218]: 2️⃣ Severity 2 - Error level
+          - listitem [ref=e219]:
+            - text: 🎛️ Severity in
+            - code [ref=e220]: recommended
+            - text: and/or
+            - code [ref=e221]: strict
+            - text: presets
+        - heading [level=2] [ref=e222]:
+          - link "X Rules" [ref=e223] [cursor=pointer]:
+            - /url: "#x-rules"
+          - button "Copy Anchor Link" [ref=e224] [cursor=pointer]
+        - table [ref=e229]:
+          - rowgroup [ref=e230]:
+            - row [ref=e231]:
+              - columnheader "Rule" [ref=e232]
+              - columnheader "🎛️" [ref=e233]
+              - columnheader "🌟" [ref=e234]
+              - columnheader "Description" [ref=e235]
+              - columnheader [ref=e236]:
+                - code [ref=e237]: react
+          - rowgroup [ref=e238]:
+            - row [ref=e239]:
+              - cell [ref=e240]:
+                - link [ref=e241] [cursor=pointer]:
+                  - /url: /docs/rules/error-boundaries
+                  - code [ref=e242]: error-boundaries
+              - cell "2️⃣ 2️⃣" [ref=e243]
+              - cell [ref=e244]
+              - cell "Validates usage of Error Boundaries instead of try/catch for errors in child components" [ref=e245]
+              - cell [ref=e246]
+            - row [ref=e247]:
+              - cell [ref=e248]:
+                - link [ref=e249] [cursor=pointer]:
+                  - /url: /docs/rules/exhaustive-deps
+                  - code [ref=e250]: exhaustive-deps
+              - cell "1️⃣ 1️⃣" [ref=e251]
+              - cell [ref=e252]:
+                - code [ref=e253]: ⚙️
+                - code [ref=e254]: 🔧
+              - cell [ref=e255]:
+                - text: Verifies the list of dependencies for Hooks like
+                - code [ref=e256]: useEffect
+                - text: and similar
+              - cell [ref=e257]
+            - row [ref=e258]:
+              - cell [ref=e259]:
+                - link [ref=e260] [cursor=pointer]:
+                  - /url: /docs/rules/globals
+                  - code [ref=e261]: globals
+              - cell "0️⃣ 0️⃣" [ref=e262]
+              - cell [ref=e263]:
+                - code [ref=e264]: 🧪
+              - cell "Validates against assignment/mutation of globals during render, part of ensuring that side effects must run outside of render" [ref=e265]
+              - cell [ref=e266]
+            - row [ref=e267]:
+              - cell [ref=e268]:
+                - link [ref=e269] [cursor=pointer]:
+                  - /url: /docs/rules/immutability
+                  - code [ref=e270]: immutability
+              - cell "0️⃣ 0️⃣" [ref=e271]
+              - cell [ref=e272]:
+                - code [ref=e273]: 🧪
+              - cell "Validates against passing functions that mutate captured local variables into frozen contexts such as JSX props, hook arguments, and hook return values" [ref=e274]
+              - cell [ref=e275]
+            - row [ref=e276]:
+              - cell [ref=e277]:
+                - link [ref=e278] [cursor=pointer]:
+                  - /url: /docs/rules/no-access-state-in-setstate
+                  - code [ref=e279]: no-access-state-in-setstate
+              - cell "2️⃣ 2️⃣" [ref=e280]
+              - cell [ref=e281]
+              - cell [ref=e282]:
+                - text: Disallows accessing
+                - code [ref=e283]: this.state
+                - text: inside
+                - code [ref=e284]: setState
+                - text: calls
+              - cell [ref=e285]
+            - row [ref=e286]:
+              - cell [ref=e287]:
+                - link [ref=e288] [cursor=pointer]:
+                  - /url: /docs/rules/no-array-index-key
+                  - code [ref=e289]: no-array-index-key
+              - cell "1️⃣ 1️⃣" [ref=e290]
+              - cell [ref=e291]
+              - cell "Disallows using an item's index in the array as its key" [ref=e292]
+              - cell [ref=e293]
+            - row [ref=e294]:
+              - cell [ref=e295]:
+                - link [ref=e296] [cursor=pointer]:
+                  - /url: /docs/rules/no-children-count
+                  - code [ref=e297]: no-children-count
+              - cell "1️⃣ 1️⃣" [ref=e298]
+              - cell [ref=e299]
+              - cell [ref=e300]:
+                - text: Disallows the use of
+                - code [ref=e301]: Children.count
+                - text: from the
+                - code [ref=e302]: react
+                - text: package
+              - cell [ref=e303]
+            - row [ref=e304]:
+              - cell [ref=e305]:
+                - link [ref=e306] [cursor=pointer]:
+                  - /url: /docs/rules/no-children-for-each
+                  - code [ref=e307]: no-children-for-each
+              - cell "1️⃣ 1️⃣" [ref=e308]
+              - cell [ref=e309]
+              - cell [ref=e310]:
+                - text: Disallows the use of
+                - code [ref=e311]: Children.forEach
+                - text: from the
+                - code [ref=e312]: react
+                - text: package
+              - cell [ref=e313]
+            - row [ref=e314]:
+              - cell [ref=e315]:
+                - link [ref=e316] [cursor=pointer]:
+                  - /url: /docs/rules/no-children-map
+                  - code [ref=e317]: no-children-map
+              - cell "1️⃣ 1️⃣" [ref=e318]
+              - cell [ref=e319]
+              - cell [ref=e320]:
+                - text: Disallows the use of
+                - code [ref=e321]: Children.map
+                - text: from the
+                - code [ref=e322]: react
+                - text: package
+              - cell [ref=e323]
+            - row [ref=e324]:
+              - cell [ref=e325]:
+                - link [ref=e326] [cursor=pointer]:
+                  - /url: /docs/rules/no-children-only
+                  - code [ref=e327]: no-children-only
+              - cell "1️⃣ 1️⃣" [ref=e328]
+              - cell [ref=e329]
+              - cell [ref=e330]:
+                - text: Disallows the use of
+                - code [ref=e331]: Children.only
+                - text: from the
+                - code [ref=e332]: react
+                - text: package
+              - cell [ref=e333]
+            - row [ref=e334]:
+              - cell [ref=e335]:
+                - link [ref=e336] [cursor=pointer]:
+                  - /url: /docs/rules/no-children-to-array
+                  - code [ref=e337]: no-children-to-array
+              - cell "1️⃣ 1️⃣" [ref=e338]
+              - cell [ref=e339]
+              - cell [ref=e340]:
+                - text: Disallows the use of
+                - code [ref=e341]: Children.toArray
+                - text: from the
+                - code [ref=e342]: react
+                - text: package
+              - cell [ref=e343]
+            - row [ref=e344]:
+              - cell [ref=e345]:
+                - link [ref=e346] [cursor=pointer]:
+                  - /url: /docs/rules/no-class-component
+                  - code [ref=e347]: no-class-component
+              - cell "0️⃣ 2️⃣" [ref=e348]
+              - cell [ref=e349]
+              - cell "Disallows class components except for error boundaries" [ref=e350]
+              - cell [ref=e351]
+            - row [ref=e352]:
+              - cell [ref=e353]:
+                - link [ref=e354] [cursor=pointer]:
+                  - /url: /docs/rules/no-clone-element
+                  - code [ref=e355]: no-clone-element
+              - cell "1️⃣ 1️⃣" [ref=e356]
+              - cell [ref=e357]
+              - cell [ref=e358]:
+                - text: Disallows
+                - code [ref=e359]: cloneElement
+              - cell [ref=e360]
+            - row [ref=e361]:
+              - cell [ref=e362]:
+                - link [ref=e363] [cursor=pointer]:
+                  - /url: /docs/rules/no-component-will-mount
+                  - code [ref=e364]: no-component-will-mount
+              - cell "2️⃣ 2️⃣" [ref=e365]
+              - cell [ref=e366]:
+                - code [ref=e367]: 🔄
+              - cell [ref=e368]:
+                - text: Replaces usage of
+                - code [ref=e369]: componentWillMount
+                - text: with
+                - code [ref=e370]: UNSAFE_componentWillMount
+              - cell ">=16.3.0" [ref=e371]
+            - row [ref=e372]:
+              - cell [ref=e373]:
+                - link [ref=e374] [cursor=pointer]:
+                  - /url: /docs/rules/no-component-will-receive-props
+                  - code [ref=e375]: no-component-will-receive-props
+              - cell "2️⃣ 2️⃣" [ref=e376]
+              - cell [ref=e377]:
+                - code [ref=e378]: 🔄
+              - cell [ref=e379]:
+                - text: Replaces usage of
+                - code [ref=e380]: componentWillReceiveProps
+                - text: with
+                - code [ref=e381]: UNSAFE_componentWillReceiveProps
+              - cell ">=16.3.0" [ref=e382]
+            - row [ref=e383]:
+              - cell [ref=e384]:
+                - link [ref=e385] [cursor=pointer]:
+                  - /url: /docs/rules/no-component-will-update
+                  - code [ref=e386]: no-component-will-update
+              - cell "2️⃣ 2️⃣" [ref=e387]
+              - cell [ref=e388]:
+                - code [ref=e389]: 🔄
+              - cell [ref=e390]:
+                - text: Replaces usage of
+                - code [ref=e391]: componentWillUpdate
+                - text: with
+                - code [ref=e392]: UNSAFE_componentWillUpdate
+              - cell ">=16.3.0" [ref=e393]
+            - row [ref=e394]:
+              - cell [ref=e395]:
+                - link [ref=e396] [cursor=pointer]:
+                  - /url: /docs/rules/no-context-provider
+                  - code [ref=e397]: no-context-provider
+              - cell "1️⃣ 1️⃣" [ref=e398]
+              - cell [ref=e399]:
+                - code [ref=e400]: 🔄
+              - cell [ref=e401]:
+                - text: Replaces usage of
+                - code [ref=e402]: <Context.Provider>
+                - text: with
+                - code [ref=e403]: <Context>
+              - cell ">=19.0.0" [ref=e404]
+            - row [ref=e405]:
+              - cell [ref=e406]:
+                - link [ref=e407] [cursor=pointer]:
+                  - /url: /docs/rules/no-create-ref
+                  - code [ref=e408]: no-create-ref
+              - cell "2️⃣ 2️⃣" [ref=e409]
+              - cell [ref=e410]
+              - cell [ref=e411]:
+                - text: Disallows
+                - code [ref=e412]: createRef
+                - text: in function components and Hooks
+              - cell [ref=e413]
+            - row [ref=e414]:
+              - cell [ref=e415]:
+                - link [ref=e416] [cursor=pointer]:
+                  - /url: /docs/rules/no-direct-mutation-state
+                  - code [ref=e417]: no-direct-mutation-state
+              - cell "2️⃣ 2️⃣" [ref=e418]
+              - cell [ref=e419]
+              - cell [ref=e420]:
+                - text: Disallows direct mutation of
+                - code [ref=e421]: this.state
+              - cell [ref=e422]
+            - row [ref=e423]:
+              - cell [ref=e424]:
+                - link [ref=e425] [cursor=pointer]:
+                  - /url: /docs/rules/no-duplicate-key
+                  - code [ref=e426]: no-duplicate-key
+              - cell "0️⃣ 0️⃣" [ref=e427]
+              - cell [ref=e428]:
+                - code [ref=e429]: 🧪
+              - cell [ref=e430]:
+                - text: Prevents duplicate
+                - code [ref=e431]: key
+                - text: props on sibling elements when rendering lists
+              - cell [ref=e432]
+            - row [ref=e433]:
+              - cell [ref=e434]:
+                - link [ref=e435] [cursor=pointer]:
+                  - /url: /docs/rules/no-forward-ref
+                  - code [ref=e436]: no-forward-ref
+              - cell "1️⃣ 1️⃣" [ref=e437]
+              - cell [ref=e438]:
+                - code [ref=e439]: 🔄
+              - cell [ref=e440]:
+                - text: Replaces usage of
+                - code [ref=e441]: forwardRef
+                - text: with passing
+                - code [ref=e442]: ref
+                - text: as a prop
+              - cell ">=19.0.0" [ref=e443]
+            - row [ref=e444]:
+              - cell [ref=e445]:
+                - link [ref=e446] [cursor=pointer]:
+                  - /url: /docs/rules/no-implicit-children
+                  - code [ref=e447]: no-implicit-children
+              - cell "0️⃣ 0️⃣" [ref=e448]
+              - cell [ref=e449]:
+                - code [ref=e450]: 💭
+                - code [ref=e451]: 🧪
+              - cell [ref=e452]:
+                - text: Prevents implicitly passing the
+                - code [ref=e453]: children
+                - text: prop to components
+              - cell [ref=e454]
+            - row [ref=e455]:
+              - cell [ref=e456]:
+                - link [ref=e457] [cursor=pointer]:
+                  - /url: /docs/rules/no-implicit-key
+                  - code [ref=e458]: no-implicit-key
+              - cell "0️⃣ 0️⃣" [ref=e459]
+              - cell [ref=e460]:
+                - code [ref=e461]: 💭
+                - code [ref=e462]: 🧪
+              - cell [ref=e463]:
+                - text: Prevents implicitly passing the
+                - code [ref=e464]: key
+                - text: prop to components
+              - cell [ref=e465]
+            - row [ref=e466]:
+              - cell [ref=e467]:
+                - link [ref=e468] [cursor=pointer]:
+                  - /url: /docs/rules/no-implicit-ref
+                  - code [ref=e469]: no-implicit-ref
+              - cell "0️⃣ 0️⃣" [ref=e470]
+              - cell [ref=e471]:
+                - code [ref=e472]: 💭
+                - code [ref=e473]: 🧪
+              - cell [ref=e474]:
+                - text: Prevents implicitly passing the
+                - code [ref=e475]: ref
+                - text: prop to components
+              - cell [ref=e476]
+            - row [ref=e477]:
+              - cell [ref=e478]:
+                - link [ref=e479] [cursor=pointer]:
+                  - /url: /docs/rules/no-leaked-conditional-rendering
+                  - code [ref=e480]: no-leaked-conditional-rendering
+              - cell "0️⃣ 0️⃣" [ref=e481]
+              - cell [ref=e482]:
+                - code [ref=e483]: 💭
+              - cell "Prevents problematic leaked values from being rendered" [ref=e484]
+              - cell [ref=e485]
+            - row [ref=e486]:
+              - cell [ref=e487]:
+                - link [ref=e488] [cursor=pointer]:
+                  - /url: /docs/rules/no-missing-component-display-name
+                  - code [ref=e489]: no-missing-component-display-name
+              - cell "0️⃣ 0️⃣" [ref=e490]
+              - cell [ref=e491]
+              - cell [ref=e492]:
+                - text: Enforces that all components have a
+                - code [ref=e493]: displayName
+                - text: that can be used in DevTools
+              - cell [ref=e494]
+            - row [ref=e495]:
+              - cell [ref=e496]:
+                - link [ref=e497] [cursor=pointer]:
+                  - /url: /docs/rules/no-missing-context-display-name
+                  - code [ref=e498]: no-missing-context-display-name
+              - cell "0️⃣ 0️⃣" [ref=e499]
+              - cell [ref=e500]:
+                - code [ref=e501]: 🔧
+              - cell [ref=e502]:
+                - text: Enforces that all contexts have a
+                - code [ref=e503]: displayName
+                - text: that can be used in DevTools
+              - cell [ref=e504]
+            - row [ref=e505]:
+              - cell [ref=e506]:
+                - link [ref=e507] [cursor=pointer]:
+                  - /url: /docs/rules/no-missing-key
+                  - code [ref=e508]: no-missing-key
+              - cell "2️⃣ 2️⃣" [ref=e509]
+              - cell [ref=e510]
+              - cell [ref=e511]:
+                - text: Disallows missing
+                - code [ref=e512]: key
+                - text: on items in list rendering
+              - cell [ref=e513]
+            - row [ref=e514]:
+              - cell [ref=e515]:
+                - link [ref=e516] [cursor=pointer]:
+                  - /url: /docs/rules/no-misused-capture-owner-stack
+                  - code [ref=e517]: no-misused-capture-owner-stack
+              - cell "0️⃣ 2️⃣" [ref=e518]
+              - cell [ref=e519]:
+                - code [ref=e520]: 🧪
+              - cell [ref=e521]:
+                - text: Prevents incorrect usage of
+                - code [ref=e522]: captureOwnerStack
+              - cell [ref=e523]
+            - row [ref=e524]:
+              - cell [ref=e525]:
+                - link [ref=e526] [cursor=pointer]:
+                  - /url: /docs/rules/no-nested-component-definitions
+                  - code [ref=e527]: no-nested-component-definitions
+              - cell "2️⃣ 2️⃣" [ref=e528]
+              - cell [ref=e529]
+              - cell "Disallows nesting component definitions inside other components" [ref=e530]
+              - cell [ref=e531]
+            - row [ref=e532]:
+              - cell [ref=e533]:
+                - link [ref=e534] [cursor=pointer]:
+                  - /url: /docs/rules/no-nested-lazy-component-declarations
+                  - code [ref=e535]: no-nested-lazy-component-declarations
+              - cell "2️⃣ 2️⃣" [ref=e536]
+              - cell [ref=e537]
+              - cell "Disallows nesting lazy component declarations inside other components or hooks" [ref=e538]
+              - cell [ref=e539]
+            - row [ref=e540]:
+              - cell [ref=e541]:
+                - link [ref=e542] [cursor=pointer]:
+                  - /url: /docs/rules/no-set-state-in-component-did-mount
+                  - code [ref=e543]: no-set-state-in-component-did-mount
+              - cell "1️⃣ 1️⃣" [ref=e544]
+              - cell [ref=e545]
+              - cell [ref=e546]:
+                - text: Disallows calling
+                - code [ref=e547]: this.setState
+                - text: in
+                - code [ref=e548]: componentDidMount
+                - text: outside functions such as callbacks
+              - cell [ref=e549]
+            - row [ref=e550]:
+              - cell [ref=e551]:
+                - link [ref=e552] [cursor=pointer]:
+                  - /url: /docs/rules/no-set-state-in-component-did-update
+                  - code [ref=e553]: no-set-state-in-component-did-update
+              - cell "1️⃣ 1️⃣" [ref=e554]
+              - cell [ref=e555]
+              - cell [ref=e556]:
+                - text: Disallows calling
+                - code [ref=e557]: this.setState
+                - text: in
+                - code [ref=e558]: componentDidUpdate
+                - text: outside functions such as callbacks
+              - cell [ref=e559]
+            - row [ref=e560]:
+              - cell [ref=e561]:
+                - link [ref=e562] [cursor=pointer]:
+                  - /url: /docs/rules/no-set-state-in-component-will-update
+                  - code [ref=e563]: no-set-state-in-component-will-update
+              - cell "1️⃣ 1️⃣" [ref=e564]
+              - cell [ref=e565]
+              - cell [ref=e566]:
+                - text: Disallows calling
+                - code [ref=e567]: this.setState
+                - text: in
+                - code [ref=e568]: componentWillUpdate
+                - text: outside functions such as callbacks
+              - cell [ref=e569]
+            - row [ref=e570]:
+              - cell [ref=e571]:
+                - link [ref=e572] [cursor=pointer]:
+                  - /url: /docs/rules/no-unnecessary-use-prefix
+                  - code [ref=e573]: no-unnecessary-use-prefix
+              - cell "1️⃣ 1️⃣" [ref=e574]
+              - cell [ref=e575]
+              - cell [ref=e576]:
+                - text: Enforces that a function with the
+                - code [ref=e577]: use
+                - text: prefix uses at least one Hook inside it
+              - cell [ref=e578]
+            - row [ref=e579]:
+              - cell [ref=e580]:
+                - link [ref=e581] [cursor=pointer]:
+                  - /url: /docs/rules/no-unsafe-component-will-mount
+                  - code [ref=e582]: no-unsafe-component-will-mount
+              - cell "1️⃣ 1️⃣" [ref=e583]
+              - cell [ref=e584]
+              - cell [ref=e585]:
+                - text: Warns about the use of
+                - code [ref=e586]: UNSAFE_componentWillMount
+                - text: in class components
+              - cell [ref=e587]
+            - row [ref=e588]:
+              - cell [ref=e589]:
+                - link [ref=e590] [cursor=pointer]:
+                  - /url: /docs/rules/no-unsafe-component-will-receive-props
+                  - code [ref=e591]: no-unsafe-component-will-receive-props
+              - cell "1️⃣ 1️⃣" [ref=e592]
+              - cell [ref=e593]
+              - cell [ref=e594]:
+                - text: Warns about the use of
+                - code [ref=e595]: UNSAFE_componentWillReceiveProps
+                - text: in class components
+              - cell [ref=e596]
+            - row [ref=e597]:
+              - cell [ref=e598]:
+                - link [ref=e599] [cursor=pointer]:
+                  - /url: /docs/rules/no-unsafe-component-will-update
+                  - code [ref=e600]: no-unsafe-component-will-update
+              - cell "1️⃣ 1️⃣" [ref=e601]
+              - cell [ref=e602]
+              - cell [ref=e603]:
+                - text: Warns about the use of
+                - code [ref=e604]: UNSAFE_componentWillUpdate
+                - text: in class components
+              - cell [ref=e605]
+            - row [ref=e606]:
+              - cell [ref=e607]:
+                - link [ref=e608] [cursor=pointer]:
+                  - /url: /docs/rules/no-unstable-context-value
+                  - code [ref=e609]: no-unstable-context-value
+              - cell "0️⃣ 1️⃣" [ref=e610]
+              - cell [ref=e611]
+              - cell [ref=e612]:
+                - text: Prevents non-stable values (i.e., object literals) from being used as a value for
+                - code [ref=e613]: Context.Provider
+              - cell [ref=e614]
+            - row [ref=e615]:
+              - cell [ref=e616]:
+                - link [ref=e617] [cursor=pointer]:
+                  - /url: /docs/rules/no-unstable-default-props
+                  - code [ref=e618]: no-unstable-default-props
+              - cell "0️⃣ 1️⃣" [ref=e619]
+              - cell [ref=e620]:
+                - code [ref=e621]: ⚙️
+              - cell "Prevents using referential-type values as default props in object destructuring" [ref=e622]
+              - cell [ref=e623]
+            - row [ref=e624]:
+              - cell [ref=e625]:
+                - link [ref=e626] [cursor=pointer]:
+                  - /url: /docs/rules/no-unused-class-component-members
+                  - code [ref=e627]: no-unused-class-component-members
+              - cell "1️⃣ 1️⃣" [ref=e628]
+              - cell [ref=e629]
+              - cell "Warns about unused class component methods and properties" [ref=e630]
+              - cell [ref=e631]
+            - row [ref=e632]:
+              - cell [ref=e633]:
+                - link [ref=e634] [cursor=pointer]:
+                  - /url: /docs/rules/no-unused-props
+                  - code [ref=e635]: no-unused-props
+              - cell "0️⃣ 0️⃣" [ref=e636]
+              - cell [ref=e637]:
+                - code [ref=e638]: 💭
+                - code [ref=e639]: 🧪
+              - cell "Warns about component props that are defined but never used" [ref=e640]
+              - cell [ref=e641]
+            - row [ref=e642]:
+              - cell [ref=e643]:
+                - link [ref=e644] [cursor=pointer]:
+                  - /url: /docs/rules/no-unused-state
+                  - code [ref=e645]: no-unused-state
+              - cell "0️⃣ 0️⃣" [ref=e646]
+              - cell [ref=e647]:
+                - code [ref=e648]: 🧪
+              - cell "Warns about state variables that are defined but never used" [ref=e649]
+              - cell [ref=e650]
+            - row [ref=e651]:
+              - cell [ref=e652]:
+                - link [ref=e653] [cursor=pointer]:
+                  - /url: /docs/rules/no-use-context
+                  - code [ref=e654]: no-use-context
+              - cell "1️⃣ 1️⃣" [ref=e655]
+              - cell [ref=e656]:
+                - code [ref=e657]: 🔄
+              - cell [ref=e658]:
+                - text: Replaces usage of
+                - code [ref=e659]: useContext
+                - text: with
+                - code [ref=e660]: use
+              - cell ">=19.0.0" [ref=e661]
+            - row [ref=e662]:
+              - cell [ref=e663]:
+                - link [ref=e664] [cursor=pointer]:
+                  - /url: /docs/rules/purity
+                  - code [ref=e665]: purity
+              - cell "1️⃣ 1️⃣" [ref=e666]
+              - cell [ref=e667]
+              - cell "Validates that components and hooks are pure by checking that they do not call known-impure functions during render" [ref=e668]
+              - cell [ref=e669]
+            - row [ref=e670]:
+              - cell [ref=e671]:
+                - link [ref=e672] [cursor=pointer]:
+                  - /url: /docs/rules/refs
+                  - code [ref=e673]: refs
+              - cell "0️⃣ 0️⃣" [ref=e674]
+              - cell [ref=e675]:
+                - code [ref=e676]: 🧪
+              - cell [ref=e677]:
+                - text: Validates correct usage of refs by checking that
+                - code [ref=e678]: ref.current
+                - text: is not read or written during render
+              - cell [ref=e679]
+            - row [ref=e680]:
+              - cell [ref=e681]:
+                - link [ref=e682] [cursor=pointer]:
+                  - /url: /docs/rules/rules-of-hooks
+                  - code [ref=e683]: rules-of-hooks
+              - cell "2️⃣ 2️⃣" [ref=e684]
+              - cell [ref=e685]:
+                - code [ref=e686]: ⚙️
+                - code [ref=e687]: 🔧
+              - cell "Enforces the Rules of Hooks" [ref=e688]
+              - cell [ref=e689]
+            - row [ref=e690]:
+              - cell [ref=e691]:
+                - link [ref=e692] [cursor=pointer]:
+                  - /url: /docs/rules/set-state-in-effect
+                  - code [ref=e693]: set-state-in-effect
+              - cell "1️⃣ 1️⃣" [ref=e694]
+              - cell [ref=e695]
+              - cell "Validates against setting state synchronously in an effect, which can lead to re-renders that degrade performance" [ref=e696]
+              - cell [ref=e697]
+            - row [ref=e698]:
+              - cell [ref=e699]:
+                - link [ref=e700] [cursor=pointer]:
+                  - /url: /docs/rules/set-state-in-render
+                  - code [ref=e701]: set-state-in-render
+              - cell "2️⃣ 2️⃣" [ref=e702]
+              - cell [ref=e703]:
+                - code [ref=e704]: 🧪
+              - cell "Validates against unconditionally setting state during render, which can trigger additional renders and potential infinite render loops" [ref=e705]
+              - cell [ref=e706]
+            - row [ref=e707]:
+              - cell [ref=e708]:
+                - link [ref=e709] [cursor=pointer]:
+                  - /url: /docs/rules/static-components
+                  - code [ref=e710]: static-components
+              - cell "2️⃣ 2️⃣" [ref=e711]
+              - cell [ref=e712]:
+                - code [ref=e713]: 🧪
+              - cell "Validates that components are static, not recreated every render" [ref=e714]
+              - cell [ref=e715]
+            - row [ref=e716]:
+              - cell [ref=e717]:
+                - link [ref=e718] [cursor=pointer]:
+                  - /url: /docs/rules/unsupported-syntax
+                  - code [ref=e719]: unsupported-syntax
+              - cell "2️⃣ 2️⃣" [ref=e720]
+              - cell [ref=e721]
+              - cell "Validates against syntax that React Compiler does not support" [ref=e722]
+              - cell [ref=e723]
+            - row [ref=e724]:
+              - cell [ref=e725]:
+                - link [ref=e726] [cursor=pointer]:
+                  - /url: /docs/rules/use-memo
+                  - code [ref=e727]: use-memo
+              - cell "2️⃣ 2️⃣" [ref=e728]
+              - cell [ref=e729]
+              - cell [ref=e730]:
+                - text: Validates that
+                - code [ref=e731]: useMemo
+                - text: is called with a callback that returns a value
+              - cell [ref=e732]
+            - row [ref=e733]:
+              - cell [ref=e734]:
+                - link [ref=e735] [cursor=pointer]:
+                  - /url: /docs/rules/use-state
+                  - code [ref=e736]: use-state
+              - cell "1️⃣ 1️⃣" [ref=e737]
+              - cell [ref=e738]:
+                - code [ref=e739]: ⚙️
+              - cell [ref=e740]:
+                - text: Enforces correct usage of
+                - code [ref=e741]: useState
+                - text: ", including destructuring, symmetric naming of the value and setter, and wrapping expensive initializers in a lazy initializer function"
+              - cell [ref=e742]
+        - heading [level=2] [ref=e743]:
+          - link "JSX Rules" [ref=e744] [cursor=pointer]:
+            - /url: "#jsx-rules"
+          - button "Copy Anchor Link" [ref=e745] [cursor=pointer]
+        - paragraph [ref=e754]:
+          - text: JSX rules check for issues exclusive to JSX syntax, which are absent from standard JavaScript (like handwritten
+          - code [ref=e755]: createElement()
+          - text: calls).
+        - table [ref=e757]:
+          - rowgroup [ref=e758]:
+            - row [ref=e759]:
+              - columnheader "Rule" [ref=e760]
+              - columnheader "🎛️" [ref=e761]
+              - columnheader "🌟" [ref=e762]
+              - columnheader "Description" [ref=e763]
+              - columnheader [ref=e764]:
+                - code [ref=e765]: react
+          - rowgroup [ref=e766]:
+            - row [ref=e767]:
+              - cell [ref=e768]:
+                - link [ref=e769] [cursor=pointer]:
+                  - /url: /docs/rules/jsx-no-children-prop
+                  - code [ref=e770]: no-children-prop
+              - cell "1️⃣ 2️⃣" [ref=e771]
+              - cell [ref=e772]:
+                - code [ref=e773]: 🔧
+              - cell [ref=e774]:
+                - text: Disallows passing
+                - code [ref=e775]: children
+                - text: as a prop
+              - cell [ref=e776]
+            - row [ref=e777]:
+              - cell [ref=e778]:
+                - link [ref=e779] [cursor=pointer]:
+                  - /url: /docs/rules/jsx-no-children-prop-with-children
+                  - code [ref=e780]: no-children-prop-with-children
+              - cell "2️⃣ 2️⃣" [ref=e781]
+              - cell [ref=e782]:
+                - code [ref=e783]: 🔧
+              - cell [ref=e784]:
+                - text: Disallows passing
+                - code [ref=e785]: children
+                - text: as a prop when children are also passed as nested content
+              - cell [ref=e786]
+            - row [ref=e787]:
+              - cell [ref=e788]:
+                - link [ref=e789] [cursor=pointer]:
+                  - /url: /docs/rules/jsx-no-comment-textnodes
+                  - code [ref=e790]: no-comment-textnodes
+              - cell "1️⃣ 1️⃣" [ref=e791]
+              - cell [ref=e792]
+              - cell "Prevents comment strings from being accidentally inserted into a JSX element's text nodes" [ref=e793]
+              - cell [ref=e794]
+            - row [ref=e795]:
+              - cell [ref=e796]:
+                - link [ref=e797] [cursor=pointer]:
+                  - /url: /docs/rules/jsx-no-key-after-spread
+                  - code [ref=e798]: no-key-after-spread
+              - cell "2️⃣ 2️⃣" [ref=e799]
+              - cell [ref=e800]
+              - cell "Prevent patterns that cause deoptimization when using the automatic JSX runtime" [ref=e801]
+              - cell [ref=e802]
+            - row [ref=e803]:
+              - cell [ref=e804]:
+                - link [ref=e805] [cursor=pointer]:
+                  - /url: /docs/rules/jsx-no-leaked-dollar
+                  - code [ref=e806]: no-leaked-dollar
+              - cell "1️⃣ 1️⃣" [ref=e807]
+              - cell [ref=e808]:
+                - code [ref=e809]: 🔧
+              - cell [ref=e810]:
+                - text: Catches
+                - code [ref=e811]: $
+                - text: before
+                - code [ref=e812]: "{expr}"
+                - text: in JSX — typically from template literal
+                - code [ref=e813]: "${expr}"
+                - text: being copy-pasted into JSX without removing the
+                - code [ref=e814]: $
+                - text: . The
+                - code [ref=e815]: $
+                - text: "\"leaks\" into the rendered output"
+              - cell [ref=e816]
+            - row [ref=e817]:
+              - cell [ref=e818]:
+                - link [ref=e819] [cursor=pointer]:
+                  - /url: /docs/rules/jsx-no-leaked-semicolon
+                  - code [ref=e820]: no-leaked-semicolon
+              - cell "1️⃣ 1️⃣" [ref=e821]
+              - cell [ref=e822]:
+                - code [ref=e823]: 🔧
+              - cell [ref=e824]:
+                - text: Catches
+                - code [ref=e825]: ;
+                - text: at the start of JSX text nodes — typically from accidentally placing a statement-ending
+                - code [ref=e826]: ;
+                - text: inside JSX. The
+                - code [ref=e827]: ;
+                - text: "\"leaks\" into the rendered output"
+              - cell [ref=e828]
+            - row [ref=e829]:
+              - cell [ref=e830]:
+                - link [ref=e831] [cursor=pointer]:
+                  - /url: /docs/rules/jsx-no-namespace
+                  - code [ref=e832]: no-namespace
+              - cell "2️⃣ 2️⃣" [ref=e833]
+              - cell [ref=e834]
+              - cell "Disallow JSX namespace syntax, as React does not support them" [ref=e835]
+              - cell [ref=e836]
+            - row [ref=e837]:
+              - cell [ref=e838]:
+                - link [ref=e839] [cursor=pointer]:
+                  - /url: /docs/rules/jsx-no-useless-fragment
+                  - code [ref=e840]: no-useless-fragment
+              - cell "0️⃣ 1️⃣" [ref=e841]
+              - cell [ref=e842]:
+                - code [ref=e843]: ⚙️
+                - code [ref=e844]: 🔧
+              - cell "Disallows useless fragment elements" [ref=e845]
+              - cell [ref=e846]
+        - heading [level=2] [ref=e847]:
+          - link "RSC Rules" [ref=e848] [cursor=pointer]:
+            - /url: "#rsc-rules"
+          - button "Copy Anchor Link" [ref=e849] [cursor=pointer]
+        - paragraph [ref=e858]:
+          - text: RSC rules target
+          - link "React Server Components" [ref=e859] [cursor=pointer]:
+            - /url: https://react.dev/reference/rsc/server-components
+          - text: ","
+          - link "React Server Functions" [ref=e860] [cursor=pointer]:
+            - /url: https://react.dev/reference/rsc/server-functions
+          - text: and
+          - link "RSC Directives" [ref=e861] [cursor=pointer]:
+            - /url: https://react.dev/reference/rsc/directives
+          - text: .
+        - table [ref=e863]:
+          - rowgroup [ref=e864]:
+            - row [ref=e865]:
+              - columnheader "Rule" [ref=e866]
+              - columnheader "🎛️" [ref=e867]
+              - columnheader "🌟" [ref=e868]
+              - columnheader "Description" [ref=e869]
+              - columnheader [ref=e870]:
+                - code [ref=e871]: react
+          - rowgroup [ref=e872]:
+            - row [ref=e873]:
+              - cell [ref=e874]:
+                - link [ref=e875] [cursor=pointer]:
+                  - /url: /docs/rules/rsc-function-definition
+                  - code [ref=e876]: function-definition
+              - cell "2️⃣ 2️⃣" [ref=e877]
+              - cell [ref=e878]:
+                - code [ref=e879]: 🔧
+                - code [ref=e880]: 🧪
+              - cell "Validates and transforms React Client/Server Function definitions" [ref=e881]
+              - cell ">=19.0.0" [ref=e882]
+        - heading [level=2] [ref=e883]:
+          - link "DOM Rules" [ref=e884] [cursor=pointer]:
+            - /url: "#dom-rules"
+          - button "Copy Anchor Link" [ref=e885] [cursor=pointer]
+        - paragraph [ref=e894]:
+          - text: DOM rules target
+          - link "React DOM" [ref=e895] [cursor=pointer]:
+            - /url: https://react.dev/reference/react#react-dom
+          - text: "-specific concerns including security vulnerabilities, deprecated APIs, and DOM property usage."
+        - table [ref=e897]:
+          - rowgroup [ref=e898]:
+            - row [ref=e899]:
+              - columnheader "Rule" [ref=e900]
+              - columnheader "🎛️" [ref=e901]
+              - columnheader "🌟" [ref=e902]
+              - columnheader "Description" [ref=e903]
+              - columnheader [ref=e904]:
+                - code [ref=e905]: react-dom
+          - rowgroup [ref=e906]:
+            - row [ref=e907]:
+              - cell [ref=e908]:
+                - link [ref=e909] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-dangerously-set-innerhtml
+                  - code [ref=e910]: no-dangerously-set-innerhtml
+              - cell "1️⃣ 1️⃣" [ref=e911]
+              - cell [ref=e912]
+              - cell [ref=e913]:
+                - text: Disallows DOM elements from using
+                - code [ref=e914]: dangerouslySetInnerHTML
+              - cell [ref=e915]
+            - row [ref=e916]:
+              - cell [ref=e917]:
+                - link [ref=e918] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-dangerously-set-innerhtml-with-children
+                  - code [ref=e919]: no-dangerously-set-innerhtml-with-children
+              - cell "2️⃣ 2️⃣" [ref=e920]
+              - cell [ref=e921]
+              - cell [ref=e922]:
+                - text: Disallows DOM elements from using
+                - code [ref=e923]: dangerouslySetInnerHTML
+                - text: and
+                - code [ref=e924]: children
+                - text: at the same time
+              - cell [ref=e925]
+            - row [ref=e926]:
+              - cell [ref=e927]:
+                - link [ref=e928] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-find-dom-node
+                  - code [ref=e929]: no-find-dom-node
+              - cell "2️⃣ 2️⃣" [ref=e930]
+              - cell [ref=e931]
+              - cell [ref=e932]:
+                - text: Disallows
+                - code [ref=e933]: findDOMNode
+              - cell [ref=e934]
+            - row [ref=e935]:
+              - cell [ref=e936]:
+                - link [ref=e937] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-flush-sync
+                  - code [ref=e938]: no-flush-sync
+              - cell "2️⃣ 2️⃣" [ref=e939]
+              - cell [ref=e940]
+              - cell [ref=e941]:
+                - text: Disallows
+                - code [ref=e942]: flushSync
+              - cell [ref=e943]
+            - row [ref=e944]:
+              - cell [ref=e945]:
+                - link [ref=e946] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-hydrate
+                  - code [ref=e947]: no-hydrate
+              - cell "2️⃣ 2️⃣" [ref=e948]
+              - cell [ref=e949]:
+                - code [ref=e950]: 🔄
+              - cell [ref=e951]:
+                - text: Replaces usage of
+                - code [ref=e952]: ReactDOM.hydrate()
+                - text: with
+                - code [ref=e953]: hydrateRoot()
+              - cell ">=18.0.0" [ref=e954]
+            - row [ref=e955]:
+              - cell [ref=e956]:
+                - link [ref=e957] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-missing-button-type
+                  - code [ref=e958]: no-missing-button-type
+              - cell "0️⃣ 1️⃣" [ref=e959]
+              - cell [ref=e960]:
+                - code [ref=e961]: 🔧
+              - cell [ref=e962]:
+                - text: Enforces an explicit
+                - code [ref=e963]: type
+                - text: attribute for
+                - code [ref=e964]: button
+                - text: elements
+              - cell [ref=e965]
+            - row [ref=e966]:
+              - cell [ref=e967]:
+                - link [ref=e968] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-missing-iframe-sandbox
+                  - code [ref=e969]: no-missing-iframe-sandbox
+              - cell "0️⃣ 1️⃣" [ref=e970]
+              - cell [ref=e971]:
+                - code [ref=e972]: 🔧
+              - cell [ref=e973]:
+                - text: Enforces an explicit
+                - code [ref=e974]: sandbox
+                - text: attribute for
+                - code [ref=e975]: iframe
+                - text: elements
+              - cell [ref=e976]
+            - row [ref=e977]:
+              - cell [ref=e978]:
+                - link [ref=e979] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-render
+                  - code [ref=e980]: no-render
+              - cell "2️⃣ 2️⃣" [ref=e981]
+              - cell [ref=e982]:
+                - code [ref=e983]: 🔄
+              - cell [ref=e984]:
+                - text: Replaces usage of
+                - code [ref=e985]: ReactDOM.render()
+                - text: with
+                - code [ref=e986]: createRoot(node).render()
+              - cell ">=18.0.0" [ref=e987]
+            - row [ref=e988]:
+              - cell [ref=e989]:
+                - link [ref=e990] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-render-return-value
+                  - code [ref=e991]: no-render-return-value
+              - cell "2️⃣ 2️⃣" [ref=e992]
+              - cell [ref=e993]
+              - cell [ref=e994]:
+                - text: Disallows the return value of
+                - code [ref=e995]: ReactDOM.render
+              - cell [ref=e996]
+            - row [ref=e997]:
+              - cell [ref=e998]:
+                - link [ref=e999] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-script-url
+                  - code [ref=e1000]: no-script-url
+              - cell "1️⃣ 1️⃣" [ref=e1001]
+              - cell [ref=e1002]
+              - cell [ref=e1003]:
+                - text: Disallows
+                - code [ref=e1004]: "javascript:"
+                - text: URLs as attribute values
+              - cell [ref=e1005]
+            - row [ref=e1006]:
+              - cell [ref=e1007]:
+                - link [ref=e1008] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-string-style-prop
+                  - code [ref=e1009]: no-string-style-prop
+              - cell "0️⃣ 0️⃣" [ref=e1010]
+              - cell [ref=e1011]
+              - cell "Disallows the use of string style prop in JSX. Use an object instead" [ref=e1012]
+              - cell [ref=e1013]
+            - row [ref=e1014]:
+              - cell [ref=e1015]:
+                - link [ref=e1016] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-unknown-property
+                  - code [ref=e1017]: no-unknown-property
+              - cell "0️⃣ 0️⃣" [ref=e1018]
+              - cell [ref=e1019]:
+                - code [ref=e1020]: 🔧
+                - code [ref=e1021]: ⚙️
+              - cell [ref=e1022]:
+                - text: Disallows unknown
+                - code [ref=e1023]: DOM
+                - text: properties
+              - cell [ref=e1024]
+            - row [ref=e1025]:
+              - cell [ref=e1026]:
+                - link [ref=e1027] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-unsafe-iframe-sandbox
+                  - code [ref=e1028]: no-unsafe-iframe-sandbox
+              - cell "1️⃣ 1️⃣" [ref=e1029]
+              - cell [ref=e1030]
+              - cell [ref=e1031]:
+                - text: Enforces that the
+                - code [ref=e1032]: sandbox
+                - text: attribute for
+                - code [ref=e1033]: iframe
+                - text: elements is not set to unsafe combinations
+              - cell [ref=e1034]
+            - row [ref=e1035]:
+              - cell [ref=e1036]:
+                - link [ref=e1037] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-unsafe-target-blank
+                  - code [ref=e1038]: no-unsafe-target-blank
+              - cell "0️⃣ 1️⃣" [ref=e1039]
+              - cell [ref=e1040]:
+                - code [ref=e1041]: 🔧
+              - cell [ref=e1042]:
+                - text: Disallows
+                - code [ref=e1043]: target="_blank"
+                - text: without
+                - code [ref=e1044]: rel="noreferrer noopener"
+              - cell [ref=e1045]
+            - row [ref=e1046]:
+              - cell [ref=e1047]:
+                - link [ref=e1048] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-use-form-state
+                  - code [ref=e1049]: no-use-form-state
+              - cell "2️⃣ 2️⃣" [ref=e1050]
+              - cell [ref=e1051]:
+                - code [ref=e1052]: 🔄
+              - cell [ref=e1053]:
+                - text: Replaces usage of
+                - code [ref=e1054]: useFormState
+                - text: with
+                - code [ref=e1055]: useActionState
+              - cell ">=19.0.0" [ref=e1056]
+            - row [ref=e1057]:
+              - cell [ref=e1058]:
+                - link [ref=e1059] [cursor=pointer]:
+                  - /url: /docs/rules/dom-no-void-elements-with-children
+                  - code [ref=e1060]: no-void-elements-with-children
+              - cell "2️⃣ 2️⃣" [ref=e1061]
+              - cell [ref=e1062]
+              - cell [ref=e1063]:
+                - text: Disallows
+                - code [ref=e1064]: children
+                - text: in void DOM elements
+              - cell [ref=e1065]
+        - heading [level=2] [ref=e1066]:
+          - link "Web API Rules" [ref=e1067] [cursor=pointer]:
+            - /url: "#web-api-rules"
+          - button "Copy Anchor Link" [ref=e1068] [cursor=pointer]
+        - paragraph [ref=e1077]: Web API rules prevent resource leaks by detecting uncleaned Web API subscriptions in components and hooks.
+        - table [ref=e1079]:
+          - rowgroup [ref=e1080]:
+            - row [ref=e1081]:
+              - columnheader "Rule" [ref=e1082]
+              - columnheader "🎛️" [ref=e1083]
+              - columnheader "🌟" [ref=e1084]
+              - columnheader "Description" [ref=e1085]
+          - rowgroup [ref=e1086]:
+            - row [ref=e1087]:
+              - cell [ref=e1088]:
+                - link [ref=e1089] [cursor=pointer]:
+                  - /url: /docs/rules/web-api-no-leaked-event-listener
+                  - code [ref=e1090]: no-leaked-event-listener
+              - cell "1️⃣ 1️⃣" [ref=e1091]
+              - cell [ref=e1092]
+              - cell [ref=e1093]:
+                - text: Enforces that every
+                - code [ref=e1094]: addEventListener
+                - text: in a component or custom hook has a corresponding
+                - code [ref=e1095]: removeEventListener
+            - row [ref=e1096]:
+              - cell [ref=e1097]:
+                - link [ref=e1098] [cursor=pointer]:
+                  - /url: /docs/rules/web-api-no-leaked-fetch
+                  - code [ref=e1099]: no-leaked-fetch
+              - cell "1️⃣ 1️⃣" [ref=e1100]
+              - cell [ref=e1101]:
+                - code [ref=e1102]: 🧪
+              - cell [ref=e1103]:
+                - text: Enforces that every
+                - code [ref=e1104]: fetch
+                - text: in a component or custom hook has a corresponding
+                - code [ref=e1105]: AbortController
+                - text: abort in the cleanup function
+            - row [ref=e1106]:
+              - cell [ref=e1107]:
+                - link [ref=e1108] [cursor=pointer]:
+                  - /url: /docs/rules/web-api-no-leaked-intersection-observer
+                  - code [ref=e1109]: no-leaked-intersection-observer
+              - cell "1️⃣ 1️⃣" [ref=e1110]
+              - cell [ref=e1111]
+              - cell [ref=e1112]:
+                - text: Enforces that every
+                - code [ref=e1113]: IntersectionObserver
+                - text: created in a component or custom hook has a corresponding
+                - code [ref=e1114]: IntersectionObserver.disconnect()
+            - row [ref=e1115]:
+              - cell [ref=e1116]:
+                - link [ref=e1117] [cursor=pointer]:
+                  - /url: /docs/rules/web-api-no-leaked-interval
+                  - code [ref=e1118]: no-leaked-interval
+              - cell "1️⃣ 1️⃣" [ref=e1119]
+              - cell [ref=e1120]
+              - cell [ref=e1121]:
+                - text: Enforces that every
+                - code [ref=e1122]: setInterval
+                - text: in a component or custom hook has a corresponding
+                - code [ref=e1123]: clearInterval
+            - row [ref=e1124]:
+              - cell [ref=e1125]:
+                - link [ref=e1126] [cursor=pointer]:
+                  - /url: /docs/rules/web-api-no-leaked-resize-observer
+                  - code [ref=e1127]: no-leaked-resize-observer
+              - cell "1️⃣ 1️⃣" [ref=e1128]
+              - cell [ref=e1129]
+              - cell [ref=e1130]:
+                - text: Enforces that every
+                - code [ref=e1131]: ResizeObserver
+                - text: created in a component or custom hook has a corresponding
+                - code [ref=e1132]: ResizeObserver.disconnect()
+            - row [ref=e1133]:
+              - cell [ref=e1134]:
+                - link [ref=e1135] [cursor=pointer]:
+                  - /url: /docs/rules/web-api-no-leaked-timeout
+                  - code [ref=e1136]: no-leaked-timeout
+              - cell "1️⃣ 1️⃣" [ref=e1137]
+              - cell [ref=e1138]
+              - cell [ref=e1139]:
+                - text: Enforces that every
+                - code [ref=e1140]: setTimeout
+                - text: in a component or custom hook has a corresponding
+                - code [ref=e1141]: clearTimeout
+        - heading [level=2] [ref=e1142]:
+          - link "Naming Convention Rules" [ref=e1143] [cursor=pointer]:
+            - /url: "#naming-convention-rules"
+          - button "Copy Anchor Link" [ref=e1144] [cursor=pointer]
+        - paragraph [ref=e1153]:
+          - text: Naming convention rules enforce consistent naming patterns for
+          - code [ref=e1154]: React
+          - text: entities.
+        - table [ref=e1156]:
+          - rowgroup [ref=e1157]:
+            - row [ref=e1158]:
+              - columnheader "Rule" [ref=e1159]
+              - columnheader "🎛️" [ref=e1160]
+              - columnheader "🌟" [ref=e1161]
+              - columnheader "Description" [ref=e1162]
+          - rowgroup [ref=e1163]:
+            - row [ref=e1164]:
+              - cell [ref=e1165]:
+                - link [ref=e1166] [cursor=pointer]:
+                  - /url: /docs/rules/naming-convention-context-name
+                  - code [ref=e1167]: context-name
+              - cell "1️⃣ 1️⃣" [ref=e1168]
+              - cell [ref=e1169]
+              - cell [ref=e1170]:
+                - text: Enforces identifier names assigned from
+                - code [ref=e1171]: createContext
+                - text: calls to be a valid component name with the suffix
+                - code [ref=e1172]: Context
+            - row [ref=e1173]:
+              - cell [ref=e1174]:
+                - link [ref=e1175] [cursor=pointer]:
+                  - /url: /docs/rules/naming-convention-id-name
+                  - code [ref=e1176]: id-name
+              - cell "1️⃣ 1️⃣" [ref=e1177]
+              - cell [ref=e1178]
+              - cell [ref=e1179]:
+                - text: Enforces identifier names assigned from
+                - code [ref=e1180]: useId
+                - text: calls to be either
+                - code [ref=e1181]: id
+                - text: or end with
+                - code [ref=e1182]: Id
+            - row [ref=e1183]:
+              - cell [ref=e1184]:
+                - link [ref=e1185] [cursor=pointer]:
+                  - /url: /docs/rules/naming-convention-ref-name
+                  - code [ref=e1186]: ref-name
+              - cell "1️⃣ 1️⃣" [ref=e1187]
+              - cell [ref=e1188]
+              - cell [ref=e1189]:
+                - text: Enforces identifier names assigned from
+                - code [ref=e1190]: useRef
+                - text: calls to be either
+                - code [ref=e1191]: ref
+                - text: or end with
+                - code [ref=e1192]: Ref
+        - heading [level=2] [ref=e1193]:
+          - link "Debug Rules" [ref=e1194] [cursor=pointer]:
+            - /url: "#debug-rules"
+          - button "Copy Anchor Link" [ref=e1195] [cursor=pointer]
+        - generic [ref=e1203]:
+          - paragraph [ref=e1204]:
+            - text: The
+            - code [ref=e1205]: eslint-plugin-react-debug
+            - text: package is not included in the unified plugin. You need to install and configure it separately.
+          - paragraph [ref=e1206]:
+            - text: These rules are useful for code metrics, code transformation, issue reporting, or when building custom tooling that needs to identify specific patterns. They can also serve as a rule-based alternative to
+            - link "react-docgen" [ref=e1207] [cursor=pointer]:
+              - /url: https://react-docgen.dev/
+            - text: .
+        - table [ref=e1209]:
+          - rowgroup [ref=e1210]:
+            - row [ref=e1211]:
+              - columnheader "Rule" [ref=e1212]
+              - columnheader "🎛️" [ref=e1213]
+              - columnheader "🌟" [ref=e1214]
+              - columnheader "Description" [ref=e1215]
+          - rowgroup [ref=e1216]:
+            - row [ref=e1217]:
+              - cell [ref=e1218]:
+                - link [ref=e1219] [cursor=pointer]:
+                  - /url: /docs/rules/debug-function-component
+                  - code [ref=e1220]: function-component
+              - cell "0️⃣ 0️⃣" [ref=e1221]
+              - cell [ref=e1222]:
+                - code [ref=e1223]: 🐞
+              - cell "Reports all function components in JSON format" [ref=e1224]
+            - row [ref=e1225]:
+              - cell [ref=e1226]:
+                - link [ref=e1227] [cursor=pointer]:
+                  - /url: /docs/rules/debug-hook
+                  - code [ref=e1228]: hook
+              - cell "0️⃣ 0️⃣" [ref=e1229]
+              - cell [ref=e1230]:
+                - code [ref=e1231]: 🐞
+              - cell "Reports all React Hooks in JSON format" [ref=e1232]
+            - row [ref=e1233]:
+              - cell [ref=e1234]:
+                - link [ref=e1235] [cursor=pointer]:
+                  - /url: /docs/rules/debug-is-from-react
+                  - code [ref=e1236]: is-from-react
+              - cell "0️⃣ 0️⃣" [ref=e1237]
+              - cell [ref=e1238]:
+                - code [ref=e1239]: 🐞
+              - cell "Reports all identifiers initialized from React in JSON format" [ref=e1240]
+            - row [ref=e1241]:
+              - cell [ref=e1242]:
+                - link [ref=e1243] [cursor=pointer]:
+                  - /url: /docs/rules/debug-is-from-ref
+                  - code [ref=e1244]: is-from-ref
+              - cell "0️⃣ 0️⃣" [ref=e1245]
+              - cell [ref=e1246]:
+                - code [ref=e1247]: 🐞
+              - cell "Reports all identifiers initialized or derived from refs in JSON format" [ref=e1248]
+            - row [ref=e1249]:
+              - cell [ref=e1250]:
+                - link [ref=e1251] [cursor=pointer]:
+                  - /url: /docs/rules/debug-jsx
+                  - code [ref=e1252]: jsx
+              - cell "0️⃣ 0️⃣" [ref=e1253]
+              - cell [ref=e1254]:
+                - code [ref=e1255]: 🐞
+              - cell "Reports all JSX elements and fragments in JSON format" [ref=e1256]
+      - generic [ref=e1257]:
+        - link [ref=e1258] [cursor=pointer]:
+          - /url: /docs/migrating-from-eslint-plugin-react-hooks
+          - paragraph [ref=e1262]: Migrating from eslint-plugin-react-hooks
+          - paragraph [ref=e1263]: Complete guide for migrating from eslint-plugin-react-hooks to ESLint React
+        - link [ref=e1264] [cursor=pointer]:
+          - /url: /docs/rules/error-boundaries
+          - paragraph [ref=e1268]: error-boundaries
+          - paragraph [ref=e1269]: Validates usage of Error Boundaries instead of try/catch for errors in child components.
+  - alert [ref=e1270]

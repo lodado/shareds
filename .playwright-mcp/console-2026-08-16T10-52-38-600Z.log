@@ -1,0 +1,5 @@
+[     544ms] [WARNING] useTranslation: DISMISS is not available @ https://duckduckgo.com/dist/wpm.main.62ee72b8c95fc1cea639.js:0
+[     545ms] [WARNING] useTranslation: DISMISS is not available @ https://duckduckgo.com/dist/wpm.main.62ee72b8c95fc1cea639.js:0
+[     547ms] [WARNING] useTranslation: DISMISS is not available @ https://duckduckgo.com/dist/wpm.main.62ee72b8c95fc1cea639.js:0
+[    1457ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://external-content.duckduckgo.com/ip3/benchmarklist.com.ico:0
+[    2144ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://external-content.duckduckgo.com/ip3/www.toolcenter.ai.ico:0

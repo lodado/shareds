@@ -1,0 +1,434 @@
+- generic [active] [ref=f55e1]:
+  - generic [ref=f55e2]:
+    - text: For the complete documentation index, see
+    - link "llms.txt" [ref=f55e3] [cursor=pointer]:
+      - /url: /llms.txt
+    - text: . Markdown versions of documentation pages are available by appending
+    - code [ref=f55e4]: .md
+    - text: to the page URL.
+  - banner [ref=f55e5]:
+    - generic [ref=f55e6]:
+      - link [ref=f55e7] [cursor=pointer]:
+        - /url: /
+        - img "OpenAI Developers" [ref=f55e8]
+      - navigation [ref=f55e9]:
+        - link "Home" [ref=f55e11] [cursor=pointer]:
+          - /url: /
+        - link "API" [ref=f55e13] [cursor=pointer]:
+          - /url: /api/docs
+        - link "Codex" [ref=f55e15] [cursor=pointer]:
+          - /url: https://learn.chatgpt.com/docs
+        - link "ChatGPT" [ref=f55e19] [cursor=pointer]:
+          - /url: /chatgpt
+        - link "Resources" [ref=f55e23] [cursor=pointer]:
+          - /url: /learn
+      - generic [ref=f55e26]:
+        - link "API Dashboard" [ref=f55e30] [cursor=pointer]:
+          - /url: https://platform.openai.com/login
+        - button "Toggle light and dark theme" [ref=f55e35] [cursor=pointer]
+        - button "Search the API docs" [ref=f55e38] [cursor=pointer]
+  - navigation "API sections" [ref=f55e43]:
+    - link "Overview" [ref=f55e44] [cursor=pointer]:
+      - /url: /api/docs
+    - link "Models" [ref=f55e47] [cursor=pointer]:
+      - /url: /api/docs/models
+    - link "Agents" [ref=f55e49] [cursor=pointer]:
+      - /url: /api/docs/guides/agents
+    - link "Tools" [ref=f55e51] [cursor=pointer]:
+      - /url: /api/docs/guides/tools
+    - link "Voice & Audio" [ref=f55e53] [cursor=pointer]:
+      - /url: /api/docs/guides/realtime
+    - link "Production" [ref=f55e55] [cursor=pointer]:
+      - /url: /api/docs/guides/production-best-practices
+    - link "API reference" [ref=f55e57] [cursor=pointer]:
+      - /url: /api/reference/overview
+  - generic [ref=f55e60]:
+    - navigation [ref=f55e62]:
+      - list [ref=f55e64]:
+        - listitem [ref=f55e65]:
+          - link "Home" [ref=f55e66] [cursor=pointer]:
+            - /url: /api/docs
+      - generic [ref=f55e68]:
+        - heading "Get started" [level=3] [ref=f55e69]
+        - list [ref=f55e70]:
+          - listitem [ref=f55e71]:
+            - link "Quickstart" [ref=f55e72] [cursor=pointer]:
+              - /url: /api/docs/quickstart
+          - listitem [ref=f55e74]:
+            - link "Using GPT-5.6" [ref=f55e75] [cursor=pointer]:
+              - /url: /api/docs/guides/latest-model
+          - listitem [ref=f55e77]:
+            - link "Key concepts" [ref=f55e78] [cursor=pointer]:
+              - /url: /api/docs/concepts
+      - generic [ref=f55e80]:
+        - heading "Core concepts" [level=3] [ref=f55e81]
+        - list [ref=f55e82]:
+          - listitem [ref=f55e83]:
+            - link "Responses API" [ref=f55e84] [cursor=pointer]:
+              - /url: /api/docs/guides/migrate-to-responses
+          - listitem [ref=f55e86]:
+            - link "Conversation state" [ref=f55e87] [cursor=pointer]:
+              - /url: /api/docs/guides/conversation-state
+          - listitem [ref=f55e89]:
+            - link "Background mode" [ref=f55e90] [cursor=pointer]:
+              - /url: /api/docs/guides/background
+          - listitem [ref=f55e92]:
+            - link "Streaming" [ref=f55e93] [cursor=pointer]:
+              - /url: /api/docs/guides/streaming-responses
+          - listitem [ref=f55e95]:
+            - link "WebSocket mode" [ref=f55e96] [cursor=pointer]:
+              - /url: /api/docs/guides/websocket-mode
+          - listitem [ref=f55e98]:
+            - link "Multi-agent" [ref=f55e99] [cursor=pointer]:
+              - /url: /api/docs/guides/responses-multi-agent
+          - listitem [ref=f55e101]:
+            - link "Webhooks" [ref=f55e102] [cursor=pointer]:
+              - /url: /api/docs/guides/webhooks
+          - listitem [ref=f55e104]:
+            - link "File inputs" [ref=f55e105] [cursor=pointer]:
+              - /url: /api/docs/guides/file-inputs
+          - listitem [ref=f55e107]:
+            - link "Compaction" [ref=f55e108] [cursor=pointer]:
+              - /url: /api/docs/guides/compaction
+          - listitem [ref=f55e110]:
+            - link "Counting tokens" [ref=f55e111] [cursor=pointer]:
+              - /url: /api/docs/guides/token-counting
+      - generic [ref=f55e113]:
+        - heading "SDKs and CLI" [level=3] [ref=f55e114]
+        - list [ref=f55e115]:
+          - listitem [ref=f55e116]:
+            - link "OpenAI SDK" [ref=f55e117] [cursor=pointer]:
+              - /url: /api/docs/libraries
+          - listitem [ref=f55e119]:
+            - link "OpenAI CLI" [ref=f55e120] [cursor=pointer]:
+              - /url: /api/docs/libraries/openai-cli
+      - generic [ref=f55e122]:
+        - heading "Resources" [level=3] [ref=f55e123]
+        - list [ref=f55e124]:
+          - listitem [ref=f55e125]:
+            - link "Changelog" [ref=f55e126] [cursor=pointer]:
+              - /url: /api/docs/changelog
+          - listitem [ref=f55e128]:
+            - link "Deprecations" [ref=f55e129] [cursor=pointer]:
+              - /url: /api/docs/deprecations
+          - listitem [ref=f55e131]:
+            - link "Supported countries" [ref=f55e132] [cursor=pointer]:
+              - /url: /api/docs/supported-countries
+          - listitem [ref=f55e134]:
+            - link "OpenAI Crawlers" [ref=f55e135] [cursor=pointer]:
+              - /url: /api/docs/bots
+          - listitem [ref=f55e137]:
+            - link "Terms and policies" [ref=f55e138] [cursor=pointer]:
+              - /url: https://openai.com/policies
+      - generic [ref=f55e142]:
+        - heading "Legacy APIs" [level=3] [ref=f55e143]
+        - list [ref=f55e144]:
+          - listitem [ref=f55e145]:
+            - group [ref=f55e146]:
+              - generic "Agent Builder" [ref=f55e147] [cursor=pointer]
+          - listitem [ref=f55e151]:
+            - group [ref=f55e152]:
+              - generic "Evals" [ref=f55e153] [cursor=pointer]
+              - list [ref=f55e157]:
+                - listitem [ref=f55e158]:
+                  - link "Getting started" [ref=f55e159] [cursor=pointer]:
+                    - /url: /api/docs/guides/evaluation-getting-started
+                - listitem [ref=f55e161]:
+                  - link "Working with evals" [ref=f55e162] [cursor=pointer]:
+                    - /url: /api/docs/guides/evals
+                - listitem [ref=f55e164]:
+                  - link "Prompt optimizer" [ref=f55e165] [cursor=pointer]:
+                    - /url: /api/docs/guides/prompt-optimizer
+                - listitem [ref=f55e167]:
+                  - link "External models" [ref=f55e168] [cursor=pointer]:
+                    - /url: /api/docs/guides/external-models
+                - listitem [ref=f55e170]:
+                  - link "Best practices" [ref=f55e171] [cursor=pointer]:
+                    - /url: /api/docs/guides/evaluation-best-practices
+                - listitem [ref=f55e173]:
+                  - link "Graders" [ref=f55e174] [cursor=pointer]:
+                    - /url: /api/docs/guides/graders
+          - listitem [ref=f55e176]:
+            - group [ref=f55e177]:
+              - generic "Fine-tuning" [ref=f55e178] [cursor=pointer]
+          - listitem [ref=f55e182]:
+            - group [ref=f55e183]:
+              - generic "Assistants API" [ref=f55e184] [cursor=pointer]
+    - main [ref=f55e188]:
+      - generic [ref=f55e191]:
+        - generic [ref=f55e192]:
+          - button "Responses" [ref=f55e198] [cursor=pointer]
+          - generic [ref=f55e203]:
+            - heading "Getting started with datasets" [level=1] [ref=f55e205]
+            - paragraph [ref=f55e206]: Evaluate prompts rapidly, before writing your own evals.
+            - button "Copy Page" [ref=f55e210] [cursor=pointer]
+        - article [ref=f55e215]:
+          - paragraph [ref=f55e216]:
+            - text: Evaluations (often called
+            - strong [ref=f55e217]: evals
+            - text: ) test model outputs to ensure they meet your specified style and content criteria. Writing evals is an essential part of building reliable applications.
+            - link "Datasets" [ref=f55e218] [cursor=pointer]:
+              - /url: https://platform.openai.com/evaluation/datasets
+            - text: ", a feature of the OpenAI platform, provide a quick way to get started with evals and test prompts."
+          - paragraph [ref=f55e228]:
+            - text: OpenAI is deprecating the Evals platform. Existing evals content remains available during the transition window. Evals will become read-only for existing users on October 31, 2026, and the platform is scheduled to shut down on November 30, 2026. See the
+            - link "deprecations page" [ref=f55e229] [cursor=pointer]:
+              - /url: /api/docs/deprecations#2026-06-03-evals-platform
+            - text: for the current timeline.
+          - paragraph [ref=f55e239]:
+            - text: If you need advanced features such as evaluation against external models, want to interact with your eval runs via API, or want to run evaluations on a larger scale, consider using
+            - link "Evals" [ref=f55e240] [cursor=pointer]:
+              - /url: /api/docs/guides/evals
+            - text: instead.
+          - heading "Create a dataset Copy link to create a dataset" [level=2] [ref=f55e241]:
+            - generic [ref=f55e242]: Create a dataset
+            - button "Copy link to create a dataset" [ref=f55e243] [cursor=pointer]
+          - paragraph [ref=f55e246]: First, create a dataset in the dashboard.
+          - list [ref=f55e247]:
+            - listitem [ref=f55e248]:
+              - text: On the
+              - link "evaluation page" [ref=f55e249] [cursor=pointer]:
+                - /url: https://platform.openai.com/evaluation
+              - text: ", navigate to the"
+              - strong [ref=f55e250]: Datasets
+              - text: tab.
+            - listitem [ref=f55e251]:
+              - text: Click the
+              - strong [ref=f55e252]: Create
+              - text: button in the top right to get started.
+            - listitem [ref=f55e253]: Add a name for your dataset in the input field. In this guide, we’ll name our dataset “Investment memo generation.”
+            - listitem [ref=f55e254]:
+              - text: Add data. To build your dataset from scratch, click
+              - strong [ref=f55e255]: Create
+              - text: and start adding data through our visual interface. If you already have a saved prompt or a CSV with data, upload it.
+          - paragraph [ref=f55e257]: We recommend using your dataset as a dynamic space, expanding your set of evaluation data over time. As you identify edge cases or blind spots that need monitoring, add them using the dashboard interface.
+          - heading "Uploading a CSV Copy link to uploading a csv" [level=3] [ref=f55e258]:
+            - generic [ref=f55e259]: Uploading a CSV
+            - button "Copy link to uploading a csv" [ref=f55e260] [cursor=pointer]
+          - paragraph [ref=f55e263]: We have a simple CSV containing company names and actual values for their revenue from past quarters.
+          - paragraph [ref=f55e265]:
+            - text: The columns in your CSV are accessible to both your prompt and graders. For example, our CSV contains input columns (
+            - code [ref=f55e266]: company
+            - text: ) and ground truth columns (
+            - code [ref=f55e267]: correct_revenue
+            - text: ","
+            - code [ref=f55e268]: correct_income
+            - text: ) for our graders to use as reference.
+          - heading "Using the visual data interface Copy link to using the visual data interface" [level=3] [ref=f55e269]:
+            - generic [ref=f55e270]: Using the visual data interface
+            - button "Copy link to using the visual data interface" [ref=f55e271] [cursor=pointer]
+          - paragraph [ref=f55e274]:
+            - text: After opening your dataset, you can manipulate your data in the
+            - strong [ref=f55e275]: Data
+            - text: tab. Click a cell to edit its contents. Add a row to add more data. You can also delete or duplicate rows in the overflow menu at the right edge of each row.
+          - paragraph [ref=f55e276]:
+            - text: To save your changes, click
+            - strong [ref=f55e277]: Save
+            - text: button in the top right.
+          - heading "Build a prompt Copy link to build a prompt" [level=2] [ref=f55e278]:
+            - generic [ref=f55e279]: Build a prompt
+            - button "Copy link to build a prompt" [ref=f55e280] [cursor=pointer]
+          - paragraph [ref=f55e283]: The tabs in the datasets dashboard let multiple prompts interact with the same data.
+          - list [ref=f55e284]:
+            - listitem [ref=f55e285]:
+              - paragraph [ref=f55e286]:
+                - text: To add a new prompt, click
+                - strong [ref=f55e287]: Add prompt
+                - text: .
+              - paragraph [ref=f55e288]:
+                - text: Datasets are designed to be used with your OpenAI
+                - link "prompts" [ref=f55e289] [cursor=pointer]:
+                  - /url: /api/docs/guides/prompt-engineering#version-prompts-in-code
+                - text: . If you’ve saved a prompt on the OpenAI platform, you’ll be able to select it from the dropdown and make changes in this interface. To save your prompt changes, click
+                - strong [ref=f55e290]: Save
+                - text: .
+              - paragraph [ref=f55e300]:
+                - text: Our prompts use a versioning system so you can safely make updates. Clicking
+                - strong [ref=f55e301]: Save
+                - text: creates a new version of your prompt, which you can refer to or use anywhere in the OpenAI platform.
+            - listitem [ref=f55e302]:
+              - paragraph [ref=f55e303]: "In the prompt panel, use the provided fields and settings to control the inference call:"
+          - list [ref=f55e304]:
+            - listitem [ref=f55e305]:
+              - text: Click the slider icon in the top right to control model
+              - link [ref=f55e306] [cursor=pointer]:
+                - /url: /api/docs/api-reference/responses/create#responses-create-temperature
+                - code [ref=f55e307]: temperature
+              - text: and
+              - link [ref=f55e308] [cursor=pointer]:
+                - /url: /api/docs/api-reference/responses/create#responses-create-top_p
+                - code [ref=f55e309]: top_p
+              - text: .
+            - listitem [ref=f55e310]: Add tools to grant your inference call the ability to access the web, use an MCP, or complete other tool-call actions.
+            - listitem [ref=f55e311]:
+              - text: Add variables. The prompt and your
+              - link "graders" [ref=f55e312] [cursor=pointer]:
+                - /url: "#add-graders"
+              - text: can both refer to these variables.
+            - listitem [ref=f55e313]: Type your system message directly, or click the pencil icon to have a model help generate a prompt for you, based on basic instructions you provide.
+          - paragraph [ref=f55e314]:
+            - text: In our example, we’ll add the
+            - link "web search" [ref=f55e315] [cursor=pointer]:
+              - /url: /api/docs/guides/tools-web-search
+            - text: tool so our model call can pull financial data from the internet. In our variables list, we’ll add
+            - code [ref=f55e316]: company
+            - text: so our prompt can reference the company column in our dataset. And for the prompt, we’ll generate one by telling the model to “generate a financial report.”
+          - heading "Generate and annotate outputs Copy link to generate and annotate outputs" [level=2] [ref=f55e317]:
+            - generic [ref=f55e318]: Generate and annotate outputs
+            - button "Copy link to generate and annotate outputs" [ref=f55e319] [cursor=pointer]
+          - paragraph [ref=f55e322]: With your data and prompt set up, you’re ready to generate outputs. The model’s output gives you a sense of how the model performs your task with the prompt and tools you provided. You’ll then annotate the outputs so the model can improve its performance over time.
+          - list [ref=f55e324]:
+            - listitem [ref=f55e325]:
+              - paragraph [ref=f55e326]:
+                - text: In the top right, click
+                - strong [ref=f55e327]: Generate output
+                - text: .
+              - paragraph [ref=f55e328]:
+                - text: You’ll see a new special
+                - strong [ref=f55e329]: output
+                - text: column in the dataset begin to populate with results. This column contains the results from running your prompt on each row in your dataset.
+            - listitem [ref=f55e330]:
+              - paragraph [ref=f55e331]:
+                - text: Once your generated outputs are ready, annotate them. Open the annotation view by clicking the
+                - strong [ref=f55e332]: output
+                - text: ","
+                - strong [ref=f55e333]: rating
+                - text: ", or"
+                - strong [ref=f55e334]: output_feedback
+                - text: column.
+              - paragraph [ref=f55e335]: Annotate as little or as much as you want. Datasets are designed to work with any degree and type of annotation, but the higher quality of information you can provide, the better your results will be.
+          - heading "What annotation does Copy link to what annotation does" [level=3] [ref=f55e336]:
+            - generic [ref=f55e337]: What annotation does
+            - button "Copy link to what annotation does" [ref=f55e338] [cursor=pointer]
+          - paragraph [ref=f55e341]: "Annotations are a key part of evaluating and improving model output. A good annotation:"
+          - list [ref=f55e342]:
+            - listitem [ref=f55e343]: Serves as ground truth for desired model behavior, even for highly specific cases—including subjective elements, like style and tone
+            - listitem [ref=f55e344]: Provides information-dense context enabling automatic prompt improvement (via our prompt optimizer)
+            - listitem [ref=f55e345]: Enables diagnosing prompt shortcomings, particularly in subtle or infrequent cases
+            - listitem [ref=f55e346]: Helps ensure that graders are aligned with your intent
+          - paragraph [ref=f55e347]:
+            - text: You can choose to annotate as little or as much as you want. Datasets are designed to work with any degree and type of annotation, but the higher quality of information you can provide, the better your results will be. Additionally, if you’re not an expert on the contents of your dataset, we recommend that a subject matter expert performs the annotation — this is the most valuable way for their expertise to be incorporated into your optimization process. Explore
+            - link "our cookbook" [ref=f55e348] [cursor=pointer]:
+              - /url: /cookbook/examples/evaluation/building_resilient_prompts_using_an_evaluation_flywheel
+            - text: to learn more about what we have found to be most effective in using evals to improve our prompt resilience.
+          - heading "Annotation starting points Copy link to annotation starting points" [level=3] [ref=f55e349]:
+            - generic [ref=f55e350]: Annotation starting points
+            - button "Copy link to annotation starting points" [ref=f55e351] [cursor=pointer]
+          - paragraph [ref=f55e354]: "Here are a few types of annotations you can use to get started:"
+          - list [ref=f55e355]:
+            - listitem [ref=f55e356]: A Good/Bad rating, indicating your judgment of the output
+            - listitem [ref=f55e357]:
+              - text: A text critique in the
+              - strong [ref=f55e358]: output_feedback
+              - text: section
+            - listitem [ref=f55e359]:
+              - text: Custom annotation categories that you added in the
+              - strong [ref=f55e360]: Columns
+              - text: dropdown in the top right
+          - heading "Incorporate expert annotations Copy link to incorporate expert annotations" [level=3] [ref=f55e361]:
+            - generic [ref=f55e362]: Incorporate expert annotations
+            - button "Copy link to incorporate expert annotations" [ref=f55e363] [cursor=pointer]
+          - paragraph [ref=f55e366]:
+            - text: If you’re not an expert on the contents of your dataset, have a subject matter expert perform the annotation. This is the best way to incorporate expertise into the optimization process. Explore
+            - link "our cookbook" [ref=f55e367] [cursor=pointer]:
+              - /url: /cookbook/examples/evaluation/building_resilient_prompts_using_an_evaluation_flywheel
+            - text: to learn more.
+          - heading "Add graders Copy link to add graders" [level=2] [ref=f55e368]:
+            - generic [ref=f55e369]: Add graders
+            - button "Copy link to add graders" [ref=f55e370] [cursor=pointer]
+          - paragraph [ref=f55e373]: While annotations are the most effective way to incorporate human feedback into your evaluation process, graders let you run evaluations at scale. Graders are automated assessments that can produce a variety of inputs depending on their type.
+          - table [ref=f55e375]:
+            - rowgroup [ref=f55e376]:
+              - row [ref=f55e377]:
+                - columnheader [ref=f55e378]:
+                  - strong [ref=f55e379]: Type
+                - columnheader [ref=f55e380]:
+                  - strong [ref=f55e381]: Details
+                - columnheader [ref=f55e382]:
+                  - strong [ref=f55e383]: Use case
+            - rowgroup [ref=f55e384]:
+              - row [ref=f55e385]:
+                - cell [ref=f55e386]:
+                  - strong [ref=f55e387]: String check
+                - cell "Compares model output to the reference using exact string matching" [ref=f55e388]
+                - cell "Check whether your response exactly matches a ground truth column" [ref=f55e389]
+              - row [ref=f55e390]:
+                - cell [ref=f55e391]:
+                  - strong [ref=f55e392]: Text similarity
+                - cell "Uses embeddings to compute semantic similarity between model output and reference" [ref=f55e393]
+                - cell "Check how close your response is to your ground truth reference, when exact matching is not needed" [ref=f55e394]
+              - row [ref=f55e395]:
+                - cell [ref=f55e396]:
+                  - strong [ref=f55e397]: Score model grader
+                - cell "Uses an LLM to assign a numeric score" [ref=f55e398]
+                - cell "Measure subjective properties such as friendliness on a numeric scale" [ref=f55e399]
+              - row [ref=f55e400]:
+                - cell [ref=f55e401]:
+                  - strong [ref=f55e402]: Label model grader
+                - cell "Uses an LLM to select a categorical label" [ref=f55e403]
+                - cell "Categorize your response based on fix labels, such as “concise” or “verbose”" [ref=f55e404]
+              - row [ref=f55e405]:
+                - cell [ref=f55e406]:
+                  - strong [ref=f55e407]: Python code execution
+                - cell "Runs custom Python code to compute a result programmatically" [ref=f55e408]
+                - cell "Check whether the output contains fewer than 50 words" [ref=f55e409]
+          - list [ref=f55e411]:
+            - listitem [ref=f55e412]:
+              - text: In the top right, navigate to Grade >
+              - strong [ref=f55e413]: New grader
+              - text: .
+            - listitem [ref=f55e414]: From the dropdown, choose your grader type, and fill out the form to compose your grader.
+            - listitem [ref=f55e415]: Reference the columns from your dataset to check against ground truth values.
+            - listitem [ref=f55e416]: Create the grader.
+            - listitem [ref=f55e417]:
+              - text: Once you’ve added at least one grader, use the
+              - strong [ref=f55e418]: Grade
+              - text: dropdown menu to run specific graders or all graders on your dataset. When a run is complete, you’ll see pass/fail ratings in your dataset in a dedicated column for each grader.
+          - paragraph [ref=f55e419]: After saving your dataset, graders persist as you make changes to your dataset and prompt, making them a great way to quickly assess whether a prompt or model parameter change leads to improvements, or whether adding edge cases reveals shortcomings in your prompt. The datasets dashboard supports multiple tabs for simultaneously tracking results from automated graders across multiple variants of a prompt.
+          - generic [ref=f55e428]:
+            - text: Learn more about our
+            - link "graders" [ref=f55e429] [cursor=pointer]:
+              - /url: /api/docs/guides/graders
+            - text: .
+          - heading "Next steps Copy link to next steps" [level=2] [ref=f55e430]:
+            - generic [ref=f55e431]: Next steps
+            - button "Copy link to next steps" [ref=f55e432] [cursor=pointer]
+          - paragraph [ref=f55e435]:
+            - text: Datasets are great for rapid iteration. When you’re ready to track performance over time or run at scale, export your dataset to an
+            - link "Eval" [ref=f55e436] [cursor=pointer]:
+              - /url: /api/docs/guides/evals
+            - text: . Evals run asynchronously, support larger data volumes, and let you monitor performance across versions.
+          - paragraph [ref=f55e437]:
+            - text: For more inspiration, visit the
+            - link "OpenAI Cookbook" [ref=f55e438] [cursor=pointer]:
+              - /url: /cookbook/topic/evals
+            - text: ", which contains example code and links to third-party resources, or learn more about our evaluation tools:"
+          - 'link "Cookbook: Building resilient prompts with evals Operate a flywheel of continuous improvement using evaluations." [ref=f55e439] [cursor=pointer]':
+            - /url: https://cookbook.openai.com/examples/evaluation/building_resilient_prompts_using_an_evaluation_flywheel
+            - generic [ref=f55e445]:
+              - generic [ref=f55e446]: "Cookbook: Building resilient prompts with evals"
+              - paragraph [ref=f55e452]: Operate a flywheel of continuous improvement using evaluations.
+          - link "Working with evals Evaluate against external models, interact with evals via API, and more." [ref=f55e453] [cursor=pointer]:
+            - /url: /api/docs/guides/evals
+            - generic [ref=f55e459]:
+              - generic [ref=f55e460]: Working with evals
+              - paragraph [ref=f55e466]: Evaluate against external models, interact with evals via API, and more.
+          - link "Prompt optimizer Use your dataset to automatically improve your prompts." [ref=f55e467] [cursor=pointer]:
+            - /url: /api/docs/guides/prompt-optimizer
+            - generic [ref=f55e473]:
+              - generic [ref=f55e474]: Prompt optimizer
+              - paragraph [ref=f55e480]: Use your dataset to automatically improve your prompts.
+          - link "Graders Build sophisticated graders to improve the effectiveness of your evals." [ref=f55e481] [cursor=pointer]:
+            - /url: /api/docs/guides/graders
+            - generic [ref=f55e487]:
+              - generic [ref=f55e488]: Graders
+              - paragraph [ref=f55e494]: Build sophisticated graders to improve the effectiveness of your evals.
+  - generic:
+    - button "Ask AI" [ref=f55e495] [cursor=pointer]
+    - dialog [ref=f55e497]:
+      - banner [ref=f55e498]:
+        - heading "Docs agent" [level=2] [ref=f55e499]
+        - generic [ref=f55e500]:
+          - button "Start a new docs agent chat" [ref=f55e501] [cursor=pointer]
+          - button "Close docs agent" [ref=f55e504] [cursor=pointer]
+      - paragraph [ref=f55e509]: Loading docs agent...

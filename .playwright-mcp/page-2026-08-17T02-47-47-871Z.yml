@@ -1,0 +1,355 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - complementary [ref=f1e3]:
+      - generic [ref=f1e4]:
+        - generic [ref=f1e5]:
+          - link "logo ESLint React" [ref=f1e6] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f1e7]:
+              - img "logo" [ref=f1e8]
+              - generic [ref=f1e9]: ESLint React
+          - button "Collapse Sidebar" [ref=f1e10] [cursor=pointer]
+        - button "Search ⌘ K" [ref=f1e13] [cursor=pointer]:
+          - text: Search
+          - generic [ref=f1e17]:
+            - generic [ref=f1e18]: ⌘
+            - generic [ref=f1e19]: K
+      - generic [ref=f1e22]:
+        - generic [ref=f1e23]:
+          - link "Getting Started" [ref=f1e24] [cursor=pointer]:
+            - /url: /docs/getting-started
+          - generic [ref=f1e28]:
+            - link "JavaScript" [ref=f1e29] [cursor=pointer]:
+              - /url: /docs/getting-started/javascript
+            - link "TypeScript" [ref=f1e30] [cursor=pointer]:
+              - /url: /docs/getting-started/typescript
+        - link "Migrating from eslint-plugin-react" [ref=f1e31] [cursor=pointer]:
+          - /url: /docs/migrating-from-eslint-plugin-react
+        - link "Migrating from eslint-plugin-react-hooks" [ref=f1e32] [cursor=pointer]:
+          - /url: /docs/migrating-from-eslint-plugin-react-hooks
+        - paragraph [ref=f1e33]: Core Reference
+        - generic [ref=f1e34]:
+          - link "Rules" [ref=f1e35] [cursor=pointer]:
+            - /url: /docs/rules
+          - generic [ref=f1e39]:
+            - paragraph [ref=f1e40]: X Rules
+            - link "error-boundaries" [ref=f1e41] [cursor=pointer]:
+              - /url: /docs/rules/error-boundaries
+            - link "exhaustive-deps" [ref=f1e42] [cursor=pointer]:
+              - /url: /docs/rules/exhaustive-deps
+            - link "globals" [ref=f1e43] [cursor=pointer]:
+              - /url: /docs/rules/globals
+            - link "immutability" [ref=f1e44] [cursor=pointer]:
+              - /url: /docs/rules/immutability
+            - link "no-access-state-in-setstate" [ref=f1e45] [cursor=pointer]:
+              - /url: /docs/rules/no-access-state-in-setstate
+            - link "no-array-index-key" [ref=f1e46] [cursor=pointer]:
+              - /url: /docs/rules/no-array-index-key
+            - link "no-children-count" [ref=f1e47] [cursor=pointer]:
+              - /url: /docs/rules/no-children-count
+            - link "no-children-for-each" [ref=f1e48] [cursor=pointer]:
+              - /url: /docs/rules/no-children-for-each
+            - link "no-children-map" [ref=f1e49] [cursor=pointer]:
+              - /url: /docs/rules/no-children-map
+            - link "no-children-only" [ref=f1e50] [cursor=pointer]:
+              - /url: /docs/rules/no-children-only
+            - link "no-children-to-array" [ref=f1e51] [cursor=pointer]:
+              - /url: /docs/rules/no-children-to-array
+            - link "no-class-component" [ref=f1e52] [cursor=pointer]:
+              - /url: /docs/rules/no-class-component
+            - link "no-clone-element" [ref=f1e53] [cursor=pointer]:
+              - /url: /docs/rules/no-clone-element
+            - link "no-component-will-mount" [ref=f1e54] [cursor=pointer]:
+              - /url: /docs/rules/no-component-will-mount
+            - link "no-component-will-receive-props" [ref=f1e55] [cursor=pointer]:
+              - /url: /docs/rules/no-component-will-receive-props
+            - link "no-component-will-update" [ref=f1e56] [cursor=pointer]:
+              - /url: /docs/rules/no-component-will-update
+            - link "no-context-provider" [ref=f1e57] [cursor=pointer]:
+              - /url: /docs/rules/no-context-provider
+            - link "no-create-ref" [ref=f1e58] [cursor=pointer]:
+              - /url: /docs/rules/no-create-ref
+            - link "no-direct-mutation-state" [ref=f1e59] [cursor=pointer]:
+              - /url: /docs/rules/no-direct-mutation-state
+            - link "no-duplicate-key" [ref=f1e60] [cursor=pointer]:
+              - /url: /docs/rules/no-duplicate-key
+            - link "no-forward-ref" [ref=f1e61] [cursor=pointer]:
+              - /url: /docs/rules/no-forward-ref
+            - link "no-implicit-children" [ref=f1e62] [cursor=pointer]:
+              - /url: /docs/rules/no-implicit-children
+            - link "no-implicit-key" [ref=f1e63] [cursor=pointer]:
+              - /url: /docs/rules/no-implicit-key
+            - link "no-implicit-ref" [ref=f1e64] [cursor=pointer]:
+              - /url: /docs/rules/no-implicit-ref
+            - link "no-leaked-conditional-rendering" [ref=f1e65] [cursor=pointer]:
+              - /url: /docs/rules/no-leaked-conditional-rendering
+            - link "no-missing-component-display-name" [ref=f1e66] [cursor=pointer]:
+              - /url: /docs/rules/no-missing-component-display-name
+            - link "no-missing-context-display-name" [ref=f1e67] [cursor=pointer]:
+              - /url: /docs/rules/no-missing-context-display-name
+            - link "no-missing-key" [ref=f1e68] [cursor=pointer]:
+              - /url: /docs/rules/no-missing-key
+            - link "no-misused-capture-owner-stack" [ref=f1e69] [cursor=pointer]:
+              - /url: /docs/rules/no-misused-capture-owner-stack
+            - link "no-nested-component-definitions" [ref=f1e70] [cursor=pointer]:
+              - /url: /docs/rules/no-nested-component-definitions
+            - link "no-nested-lazy-component-declarations" [ref=f1e71] [cursor=pointer]:
+              - /url: /docs/rules/no-nested-lazy-component-declarations
+            - link "no-set-state-in-component-did-mount" [ref=f1e72] [cursor=pointer]:
+              - /url: /docs/rules/no-set-state-in-component-did-mount
+            - link "no-set-state-in-component-did-update" [ref=f1e73] [cursor=pointer]:
+              - /url: /docs/rules/no-set-state-in-component-did-update
+            - link "no-set-state-in-component-will-update" [ref=f1e74] [cursor=pointer]:
+              - /url: /docs/rules/no-set-state-in-component-will-update
+            - link "no-unnecessary-use-prefix" [ref=f1e75] [cursor=pointer]:
+              - /url: /docs/rules/no-unnecessary-use-prefix
+            - link "no-unsafe-component-will-mount" [ref=f1e76] [cursor=pointer]:
+              - /url: /docs/rules/no-unsafe-component-will-mount
+            - link "no-unsafe-component-will-receive-props" [ref=f1e77] [cursor=pointer]:
+              - /url: /docs/rules/no-unsafe-component-will-receive-props
+            - link "no-unsafe-component-will-update" [ref=f1e78] [cursor=pointer]:
+              - /url: /docs/rules/no-unsafe-component-will-update
+            - link "no-unstable-context-value" [ref=f1e79] [cursor=pointer]:
+              - /url: /docs/rules/no-unstable-context-value
+            - link "no-unstable-default-props" [ref=f1e80] [cursor=pointer]:
+              - /url: /docs/rules/no-unstable-default-props
+            - link "no-unused-class-component-members" [ref=f1e81] [cursor=pointer]:
+              - /url: /docs/rules/no-unused-class-component-members
+            - link "no-unused-props" [ref=f1e82] [cursor=pointer]:
+              - /url: /docs/rules/no-unused-props
+            - link "no-unused-state" [ref=f1e83] [cursor=pointer]:
+              - /url: /docs/rules/no-unused-state
+            - link "no-use-context" [ref=f1e84] [cursor=pointer]:
+              - /url: /docs/rules/no-use-context
+            - link "purity" [ref=f1e85] [cursor=pointer]:
+              - /url: /docs/rules/purity
+            - link "refs" [ref=f1e86] [cursor=pointer]:
+              - /url: /docs/rules/refs
+            - link "rules-of-hooks" [ref=f1e87] [cursor=pointer]:
+              - /url: /docs/rules/rules-of-hooks
+            - link "set-state-in-effect" [ref=f1e88] [cursor=pointer]:
+              - /url: /docs/rules/set-state-in-effect
+            - link "set-state-in-render" [ref=f1e89] [cursor=pointer]:
+              - /url: /docs/rules/set-state-in-render
+            - link "static-components" [ref=f1e90] [cursor=pointer]:
+              - /url: /docs/rules/static-components
+            - link "unsupported-syntax" [ref=f1e91] [cursor=pointer]:
+              - /url: /docs/rules/unsupported-syntax
+            - link "use-memo" [ref=f1e92] [cursor=pointer]:
+              - /url: /docs/rules/use-memo
+            - link "use-state" [ref=f1e93] [cursor=pointer]:
+              - /url: /docs/rules/use-state
+            - paragraph [ref=f1e94]: JSX Rules
+            - link "no-children-prop" [ref=f1e95] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-children-prop
+            - link "no-children-prop-with-children" [ref=f1e96] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-children-prop-with-children
+            - link "no-comment-textnodes" [ref=f1e97] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-comment-textnodes
+            - link "no-key-after-spread" [ref=f1e98] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-key-after-spread
+            - link "no-leaked-dollar" [ref=f1e99] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-leaked-dollar
+            - link "no-leaked-semicolon" [ref=f1e100] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-leaked-semicolon
+            - link "no-namespace" [ref=f1e101] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-namespace
+            - link "no-useless-fragment" [ref=f1e102] [cursor=pointer]:
+              - /url: /docs/rules/jsx-no-useless-fragment
+            - paragraph [ref=f1e103]: RSC Rules
+            - link "function-definition" [ref=f1e104] [cursor=pointer]:
+              - /url: /docs/rules/rsc-function-definition
+            - paragraph [ref=f1e105]: DOM Rules
+            - link "no-dangerously-set-innerhtml" [ref=f1e106] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-dangerously-set-innerhtml
+            - link "no-dangerously-set-innerhtml-with-children" [ref=f1e107] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-dangerously-set-innerhtml-with-children
+            - link "no-find-dom-node" [ref=f1e108] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-find-dom-node
+            - link "no-flush-sync" [ref=f1e109] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-flush-sync
+            - link "no-hydrate" [ref=f1e110] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-hydrate
+            - link "no-missing-button-type" [ref=f1e111] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-missing-button-type
+            - link "no-missing-iframe-sandbox" [ref=f1e112] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-missing-iframe-sandbox
+            - link "no-render" [ref=f1e113] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-render
+            - link "no-render-return-value" [ref=f1e114] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-render-return-value
+            - link "no-script-url" [ref=f1e115] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-script-url
+            - link "no-string-style-prop" [ref=f1e116] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-string-style-prop
+            - link "no-unknown-property" [ref=f1e117] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-unknown-property
+            - link "no-unsafe-iframe-sandbox" [ref=f1e118] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-unsafe-iframe-sandbox
+            - link "no-unsafe-target-blank" [ref=f1e119] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-unsafe-target-blank
+            - link "no-use-form-state" [ref=f1e120] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-use-form-state
+            - link "no-void-elements-with-children" [ref=f1e121] [cursor=pointer]:
+              - /url: /docs/rules/dom-no-void-elements-with-children
+            - paragraph [ref=f1e122]: Web API Rules
+            - link "no-leaked-event-listener" [ref=f1e123] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-event-listener
+            - link "no-leaked-fetch" [ref=f1e124] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-fetch
+            - link "no-leaked-intersection-observer" [ref=f1e125] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-intersection-observer
+            - link "no-leaked-interval" [ref=f1e126] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-interval
+            - link "no-leaked-resize-observer" [ref=f1e127] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-resize-observer
+            - link "no-leaked-timeout" [ref=f1e128] [cursor=pointer]:
+              - /url: /docs/rules/web-api-no-leaked-timeout
+            - paragraph [ref=f1e129]: Naming Convention Rules
+            - link "context-name" [ref=f1e130] [cursor=pointer]:
+              - /url: /docs/rules/naming-convention-context-name
+            - link "id-name" [ref=f1e131] [cursor=pointer]:
+              - /url: /docs/rules/naming-convention-id-name
+            - link "ref-name" [ref=f1e132] [cursor=pointer]:
+              - /url: /docs/rules/naming-convention-ref-name
+            - paragraph [ref=f1e133]: Debug Rules
+            - link "function-component" [ref=f1e134] [cursor=pointer]:
+              - /url: /docs/rules/debug-function-component
+            - link "hook" [ref=f1e135] [cursor=pointer]:
+              - /url: /docs/rules/debug-hook
+            - link "is-from-react" [ref=f1e136] [cursor=pointer]:
+              - /url: /docs/rules/debug-is-from-react
+            - link "is-from-ref" [ref=f1e137] [cursor=pointer]:
+              - /url: /docs/rules/debug-is-from-ref
+            - link "jsx" [ref=f1e138] [cursor=pointer]:
+              - /url: /docs/rules/debug-jsx
+        - link "Presets" [ref=f1e139] [cursor=pointer]:
+          - /url: /docs/presets
+        - link "Recipes" [ref=f1e141] [cursor=pointer]:
+          - /url: /docs/recipes
+        - link "Packages" [ref=f1e145] [cursor=pointer]:
+          - /url: /docs/packages
+        - link "Configuration" [ref=f1e149] [cursor=pointer]:
+          - /url: /docs/configuration
+        - paragraph [ref=f1e152]: Project Information
+        - link "Roadmap" [ref=f1e153] [cursor=pointer]:
+          - /url: /docs/roadmap
+        - link "Changelog" [ref=f1e154] [cursor=pointer]:
+          - /url: /docs/changelog
+        - link "FAQ" [ref=f1e155] [cursor=pointer]:
+          - /url: /docs/faq
+        - link "Glossary" [ref=f1e156] [cursor=pointer]:
+          - /url: /docs/glossary
+        - link "Community" [ref=f1e157] [cursor=pointer]:
+          - /url: /docs/community
+        - link "Contributing" [ref=f1e158] [cursor=pointer]:
+          - /url: /docs/contributing
+        - link "Third-Party Plugins" [ref=f1e159] [cursor=pointer]:
+          - /url: /docs/third-party-plugins
+      - generic [ref=f1e161]:
+        - link "GitHub" [ref=f1e162] [cursor=pointer]:
+          - /url: https://github.com/Rel1cx/eslint-react
+        - button "Toggle Theme" [ref=f1e165] [cursor=pointer]
+    - generic:
+      - button "Collapse Sidebar"
+      - button "Open Search"
+    - banner [ref=f1e175]:
+      - button "0 hook" [ref=f1e176] [cursor=pointer]:
+        - progressbar [ref=f1e177]
+        - generic [ref=f1e180]: hook
+    - article [ref=f1e184]:
+      - link "Rules" [ref=f1e186] [cursor=pointer]:
+        - /url: /docs/rules
+      - heading "hook" [level=1] [ref=f1e187]
+      - paragraph [ref=f1e188]: Reports all React Hooks in JSON format. Useful for debugging. This rule should be used only for debugging purposes; otherwise, leave it off.
+      - generic [ref=f1e189]:
+        - button "Copy Markdown" [ref=f1e190] [cursor=pointer]
+        - button "Open" [ref=f1e194] [cursor=pointer]
+      - generic [ref=f1e197]:
+        - paragraph [ref=f1e198]:
+          - strong [ref=f1e199]:
+            - text: Full Name in
+            - code [ref=f1e200]: eslint-plugin-react-debug
+        - figure [ref=f1e201]:
+          - button "Copy Text" [ref=f1e203] [cursor=pointer]
+          - region [ref=f1e207]:
+            - code [ref=f1e209]:
+              - generic [ref=f1e210]: react-debug/hook
+        - paragraph [ref=f1e211]:
+          - strong [ref=f1e212]: Features
+        - paragraph [ref=f1e213]:
+          - code [ref=f1e214]: 🐞
+        - heading [level=2] [ref=f1e215]:
+          - link "Rule Details" [ref=f1e216] [cursor=pointer]:
+            - /url: "#rule-details"
+          - button "Copy Anchor Link" [ref=f1e217] [cursor=pointer]
+        - paragraph [ref=f1e221]:
+          - text: This rule reports all React Hooks in JSON format. It detects built-in Hooks (such as
+          - code [ref=f1e222]: useState
+          - text: ","
+          - code [ref=f1e223]: useEffect
+          - text: ) as well as custom Hooks that follow the
+          - code [ref=f1e224]: use
+          - text: prefix naming convention.
+        - heading [level=2] [ref=f1e225]:
+          - link "Examples" [ref=f1e226] [cursor=pointer]:
+            - /url: "#examples"
+          - button "Copy Anchor Link" [ref=f1e227] [cursor=pointer]
+        - heading [level=3] [ref=f1e231]:
+          - link "Built-in hook used inside a custom hook" [ref=f1e232] [cursor=pointer]:
+            - /url: "#built-in-hook-used-inside-a-custom-hook"
+          - button "Copy Anchor Link" [ref=f1e233] [cursor=pointer]
+        - figure [ref=f1e237]:
+          - button "Copy Text" [ref=f1e239] [cursor=pointer]
+          - region [ref=f1e243]:
+            - code [ref=f1e245]:
+              - generic [ref=f1e246]: "import React, { useState } from \"react\";"
+              - generic [ref=f1e248]: // This rule reports calls to built-in React Hooks.
+              - generic [ref=f1e249]: "function useToggle() {"
+              - generic [ref=f1e250]: const [value, setValue] = useState(false);
+              - generic [ref=f1e252]: return [value, () => setValue((x) => !x)] as const;
+              - generic [ref=f1e253]: "}"
+        - heading [level=2] [ref=f1e254]:
+          - link "Versions" [ref=f1e255] [cursor=pointer]:
+            - /url: "#versions"
+          - button "Copy Anchor Link" [ref=f1e256] [cursor=pointer]
+        - generic [ref=f1e260]:
+          - heading [level=3] [ref=f1e262]:
+            - button "[5.16.0] - 2026-07-15" [ref=f1e263] [cursor=pointer]
+          - heading [level=3] [ref=f1e267]:
+            - button "[0.9.0] - 2023-12-01" [ref=f1e268] [cursor=pointer]
+        - heading [level=2] [ref=f1e271]:
+          - link "Resources" [ref=f1e272] [cursor=pointer]:
+            - /url: "#resources"
+          - button "Copy Anchor Link" [ref=f1e273] [cursor=pointer]
+        - list [ref=f1e277]:
+          - listitem [ref=f1e278]:
+            - link "Rule Source" [ref=f1e279] [cursor=pointer]:
+              - /url: https://github.com/Rel1cx/eslint-react/tree/main/plugins/eslint-plugin-react-debug/src/rules/hook/hook.ts
+          - listitem [ref=f1e280]:
+            - link "Test Source" [ref=f1e281] [cursor=pointer]:
+              - /url: https://github.com/Rel1cx/eslint-react/tree/main/plugins/eslint-plugin-react-debug/src/rules/hook/hook.spec.ts
+          - listitem [ref=f1e282]:
+            - link "Rule Changelog" [ref=f1e283] [cursor=pointer]:
+              - /url: https://github.com/Rel1cx/eslint-react/tree/main/plugins/eslint-plugin-react-debug/src/rules/hook/CHANGELOG.md
+        - separator [ref=f1e284]
+        - heading [level=2] [ref=f1e285]:
+          - link "See Also" [ref=f1e286] [cursor=pointer]:
+            - /url: "#see-also"
+          - button "Copy Anchor Link" [ref=f1e287] [cursor=pointer]
+        - list [ref=f1e291]:
+          - listitem [ref=f1e292]:
+            - link [ref=f1e293] [cursor=pointer]:
+              - /url: ./debug-function-component
+              - code [ref=f1e294]: react-debug/function-component
+            - text: Reports all function components in JSON format.
+      - generic [ref=f1e295]:
+        - link [ref=f1e296] [cursor=pointer]:
+          - /url: /docs/rules/debug-function-component
+          - paragraph [ref=f1e300]: function-component
+          - paragraph [ref=f1e301]: Reports all function components in JSON format. Useful for debugging. This rule should only be used for debugging purposes; otherwise leave it off.
+        - link [ref=f1e302] [cursor=pointer]:
+          - /url: /docs/rules/debug-is-from-react
+          - paragraph [ref=f1e306]: is-from-react
+          - paragraph [ref=f1e307]: Reports all identifiers initialized from React in JSON format. Useful for debugging. This rule should only be used for debugging purposes; otherwise, leave it off.
+  - alert [ref=f1e308]

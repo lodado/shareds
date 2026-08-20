@@ -1,0 +1,489 @@
+- generic [active] [ref=f53e1]:
+  - banner [ref=f53e2]:
+    - generic:
+      - link "Skip to main content" [ref=f53e3] [cursor=pointer]:
+        - /url: "#main-content"
+      - link "Skip to footer" [ref=f53e4] [cursor=pointer]:
+        - /url: "#footer"
+    - generic [ref=f53e5]:
+      - link "Home" [ref=f53e6] [cursor=pointer]:
+        - /url: /
+      - generic [ref=f53e9]:
+        - navigation [ref=f53e10]:
+          - list [ref=f53e11]:
+            - listitem [ref=f53e12] [cursor=pointer]:
+              - link "Research" [ref=f53e13]:
+                - /url: /research
+            - listitem [ref=f53e14] [cursor=pointer]:
+              - link "Policy" [ref=f53e15]:
+                - /url: /policy
+            - listitem [ref=f53e16] [cursor=pointer]:
+              - button "Commitments" [ref=f53e17]
+            - listitem [ref=f53e21] [cursor=pointer]:
+              - button "Learn" [ref=f53e22]
+            - listitem [ref=f53e26] [cursor=pointer]:
+              - link "News" [ref=f53e27]:
+                - /url: /news
+        - generic [ref=f53e28]:
+          - link "Try Claude" [ref=f53e29] [cursor=pointer]:
+            - /url: https://claude.ai/
+          - generic [ref=f53e30] [cursor=pointer]
+  - main [ref=f53e33]:
+    - region "Engineering Article Hero" [ref=f53e34]:
+      - link "Engineering at Anthropic" [ref=f53e35] [cursor=pointer]:
+        - /url: /engineering
+      - generic [ref=f53e36]:
+        - heading "Effective harnesses for long-running agents" [level=1] [ref=f53e39]
+        - generic [ref=f53e40]:
+          - paragraph [ref=f53e41]: Published Nov 26, 2025
+          - paragraph [ref=f53e42]: Agents still face challenges working across many context windows. We looked to human engineers for inspiration in creating a more effective harness for long-running agents.
+    - generic [ref=f53e43]:
+      - article [ref=f53e44]:
+        - generic [ref=f53e46]:
+          - paragraph [ref=f53e47]: As AI agents become more capable, developers are increasingly asking them to take on complex tasks requiring work that spans hours, or even days. However, getting agents to make consistent progress across multiple context windows remains an open problem.
+          - paragraph [ref=f53e48]: The core challenge of long-running agents is that they must work in discrete sessions, and each new session begins with no memory of what came before. Imagine a software project staffed by engineers working in shifts, where each new engineer arrives with no memory of what happened on the previous shift. Because context windows are limited, and because most complex projects cannot be completed within a single window, agents need a way to bridge the gap between coding sessions.
+          - paragraph [ref=f53e49]:
+            - text: We developed a two-fold solution to enable the
+            - link "Claude Agent SDK" [ref=f53e50] [cursor=pointer]:
+              - /url: https://platform.claude.com/docs/en/agent-sdk/overview
+            - text: "to work effectively across many context windows: an"
+            - strong [ref=f53e51]: initializer agent
+            - text: that sets up the environment on the first run, and a
+            - strong [ref=f53e52]: coding agent
+            - text: that is tasked with making incremental progress in every session, while leaving clear artifacts for the next session. You can find code examples in the accompanying
+            - link "quickstart." [ref=f53e53] [cursor=pointer]:
+              - /url: https://github.com/anthropics/claude-quickstarts/tree/main/autonomous-coding
+          - heading "The long-running agent problem" [level=2] [ref=f53e54]
+          - paragraph [ref=f53e55]: The Claude Agent SDK is a powerful, general-purpose agent harness adept at coding, as well as other tasks that require the model to use tools to gather context, plan, and execute. It has context management capabilities such as compaction, which enables an agent to work on a task without exhausting the context window. Theoretically, given this setup, it should be possible for an agent to continue to do useful work for an arbitrarily long time.
+          - paragraph [ref=f53e56]:
+            - text: However, compaction isn’t sufficient. Out of the box, even a frontier coding model like Opus 4.5 running on the Claude Agent SDK in a loop across multiple context windows will fall short of building a production-quality web app if it’s only given a high-level prompt, such as “build a clone of
+            - link "claude.ai" [ref=f53e57] [cursor=pointer]:
+              - /url: http://claude.ai/redirect/website.v1.3307435e-1cdf-4ea8-addf-c0041489739f
+            - text: .”
+          - paragraph [ref=f53e58]: Claude’s failures manifested in two patterns. First, the agent tended to try to do too much at once—essentially to attempt to one-shot the app. Often, this led to the model running out of context in the middle of its implementation, leaving the next session to start with a feature half-implemented and undocumented. The agent would then have to guess at what had happened, and spend substantial time trying to get the basic app working again. This happens even with compaction, which doesn’t always pass perfectly clear instructions to the next agent.
+          - paragraph [ref=f53e59]: A second failure mode would often occur later in a project. After some features had already been built, a later agent instance would look around, see that progress had been made, and declare the job done.
+          - paragraph [ref=f53e60]:
+            - text: This decomposes the problem into two parts. First, we need to set up an initial environment that lays the foundation for
+            - emphasis [ref=f53e61]: all
+            - text: "the features that a given prompt requires, which sets up the agent to work step-by-step and feature-by-feature. Second, we should prompt each agent to make incremental progress towards its goal while also leaving the environment in a clean state at the end of a session. By “clean state” we mean the kind of code that would be appropriate for merging to a main branch: there are no major bugs, the code is orderly and well-documented, and in general, a developer could easily begin work on a new feature without first having to clean up an unrelated mess."
+          - paragraph [ref=f53e62]: "When experimenting internally, we addressed these problems using a two-part solution:"
+          - list [ref=f53e63]:
+            - listitem [ref=f53e64]:
+              - text: "Initializer agent: The very first agent session uses a specialized prompt that asks the model to set up the initial environment: an"
+              - code [ref=f53e65]: init.sh
+              - text: script, a claude-progress.txt file that keeps a log of what agents have done, and an initial git commit that shows what files were added.
+            - listitem [ref=f53e66]:
+              - text: "Coding agent: Every subsequent session asks the model to make incremental progress, then leave structured updates."
+              - superscript [ref=f53e67]: "1"
+          - paragraph [ref=f53e68]: The key insight here was finding a way for agents to quickly understand the state of work when starting with a fresh context window, which is accomplished with the claude-progress.txt file alongside the git history. Inspiration for these practices came from knowing what effective software engineers do every day.
+          - heading "Environment management" [level=2] [ref=f53e69]
+          - paragraph [ref=f53e70]:
+            - text: In the updated
+            - link "Claude 4 prompting guide" [ref=f53e71] [cursor=pointer]:
+              - /url: https://docs.claude.com/en/docs/build-with-claude/prompt-engineering/claude-4-best-practices#multi-context-window-workflows
+            - text: ", we shared some best practices for multi-context window workflows, including a harness structure that uses “a different prompt for the very first context window.” This “different prompt” requests that the initializer agent set up the environment with all the necessary context that future coding agents will need to work effectively. Here, we provide a deeper dive on some of the key components of such an environment."
+          - heading "Feature list" [level=3] [ref=f53e72]
+          - paragraph [ref=f53e73]:
+            - text: To address the problem of the agent one-shotting an app or prematurely considering the project complete, we prompted the initializer agent to write a comprehensive file of feature requirements expanding on the user’s initial prompt. In the
+            - link "claude.ai" [ref=f53e74] [cursor=pointer]:
+              - /url: http://claude.ai/redirect/website.v1.3307435e-1cdf-4ea8-addf-c0041489739f
+            - text: clone example, this meant over 200 features, such as “a user can open a new chat, type in a query, press enter, and see an AI response.” These features were all initially marked as “failing” so that later coding agents would have a clear outline of what full functionality looked like.
+          - paragraph
+          - generic [ref=f53e76]:
+            - code [ref=f53e78]: "{ \"category\": \"functional\", \"description\": \"New chat button creates a fresh conversation\", \"steps\": [ \"Navigate to main interface\", \"Click the 'New Chat' button\", \"Verify a new conversation is created\", \"Check that chat area shows welcome state\", \"Verify conversation appears in sidebar\" ], \"passes\": false }"
+            - button "Copy code" [ref=f53e80] [cursor=pointer]:
+              - generic [ref=f53e83]: Copy
+          - paragraph [ref=f53e84]: We prompt coding agents to edit this file only by changing the status of a passes field, and we use strongly-worded instructions like “It is unacceptable to remove or edit tests because this could lead to missing or buggy functionality.” After some experimentation, we landed on using JSON for this, as the model is less likely to inappropriately change or overwrite JSON files compared to Markdown files.
+          - heading "Incremental progress" [level=3] [ref=f53e85]
+          - paragraph [ref=f53e86]: Given this initial environment scaffolding, the next iteration of the coding agent was then asked to work on only one feature at a time. This incremental approach turned out to be critical to addressing the agent’s tendency to do too much at once.
+          - paragraph [ref=f53e87]: Once working incrementally, it’s still essential that the model leaves the environment in a clean state after making a code change. In our experiments, we found that the best way to elicit this behavior was to ask the model to commit its progress to git with descriptive commit messages and to write summaries of its progress in a progress file. This allowed the model to use git to revert bad code changes and recover working states of the code base.
+          - paragraph [ref=f53e88]: These approaches also increased efficiency, as they eliminated the need for an agent to have to guess at what had happened and spend its time trying to get the basic app working again.
+          - heading "Testing" [level=3] [ref=f53e89]
+          - paragraph [ref=f53e90]:
+            - text: One final major failure mode that we observed was Claude’s tendency to mark a feature as complete without proper testing. Absent explicit prompting, Claude tended to make code changes, and even do testing with unit tests or
+            - code [ref=f53e91]: curl
+            - text: commands against a development server, but would fail recognize that the feature didn’t work end-to-end.
+          - paragraph [ref=f53e92]: In the case of building a web app, Claude mostly did well at verifying features end-to-end once explicitly prompted to use browser automation tools and do all testing as a human user would.
+          - figure "Screenshots taken by Claude through the Puppeteer MCP server as it tested the claude.ai clone." [ref=f53e94]:
+            - img "Screenshots taken by Claude through the Puppeteer MCP server as it tested the claude.ai clone." [ref=f53e95]
+          - paragraph [ref=f53e97]: Providing Claude with these kinds of testing tools dramatically improved performance, as the agent was able to identify and fix bugs that weren’t obvious from the code alone.
+          - paragraph [ref=f53e98]: Some issues remain, like limitations to Claude’s vision and to browser automation tools making it difficult to identify every kind of bug. For example, Claude can’t see browser-native alert modals through the Puppeteer MCP, and features relying on these modals tended to be buggier as a result.
+          - heading "Getting up to speed" [level=2] [ref=f53e99]
+          - paragraph [ref=f53e100]: "With all of the above in place, every coding agent is prompted to run through a series of steps to get its bearings, some quite basic but still helpful:"
+          - list [ref=f53e101]:
+            - listitem [ref=f53e102]:
+              - emphasis [ref=f53e103]:
+                - text: Run
+                - code [ref=f53e104]: pwd
+                - text: to see the directory you’re working in. You’ll only be able to edit files in this directory.
+            - listitem [ref=f53e105]:
+              - emphasis [ref=f53e106]: Read the git logs and progress files to get up to speed on what was recently worked on.
+            - listitem [ref=f53e107]:
+              - emphasis [ref=f53e108]: Read the features list file and choose the highest-priority feature that’s not yet done to work on.
+          - paragraph [ref=f53e109]: This approach saves Claude some tokens in every session since it doesn’t have to figure out how to test the code. It also helps to ask the initializer agent to write an init.sh script that can run the development server, and then run through a basic end-to-end test before implementing a new feature.
+          - paragraph [ref=f53e110]: In the case of the claude.ai clone, this meant that the agent always started the local development server and used the Puppeteer MCP to start a new chat, send a message, and receive a response. This ensured that Claude could quickly identify if the app had been left in a broken state, and immediately fix any existing bugs. If the agent had instead started implementing a new feature, it would likely make the problem worse.
+          - paragraph [ref=f53e111]: "Given all this, a typical session starts off with the following assistant messages:"
+          - generic [ref=f53e113]:
+            - code [ref=f53e115]: "[Assistant] I'll start by getting my bearings and understanding the current state of the project. [Tool Use] <bash - pwd> [Tool Use] <read - claude-progress.txt> [Tool Use] <read - feature_list.json> [Assistant] Let me check the git log to see recent work. [Tool Use] <bash - git log --oneline -20> [Assistant] Now let me check if there's an init.sh script to restart the servers. <Starts the development server> [Assistant] Excellent! Now let me navigate to the application and verify that some fundamental features are still working. <Tests basic functionality> [Assistant] Based on my verification testing, I can see that the fundamental functionality is working well. The core chat features, theme switching, conversation loading, and error handling are all functioning correctly. Now let me review the tests.json file more comprehensively to understand what needs to be implemented next. <Starts work on a new feature>"
+            - button "Copy code" [ref=f53e117] [cursor=pointer]:
+              - generic [ref=f53e120]: Copy
+          - generic [ref=f53e122]:
+            - region "Summarizing four common failure modes and solutions in long-running AI agents." [ref=f53e123]:
+              - paragraph [ref=f53e124]: Agent failure modes and solutions
+              - table [ref=f53e125]:
+                - rowgroup [ref=f53e126]:
+                  - row [ref=f53e127]:
+                    - columnheader [ref=f53e128]:
+                      - strong [ref=f53e129]: Problem
+                    - columnheader [ref=f53e130]:
+                      - strong [ref=f53e131]: Initializer Agent Behavior
+                    - columnheader [ref=f53e132]:
+                      - strong [ref=f53e133]: Coding Agent Behavior
+                  - row [ref=f53e134]:
+                    - cell "Claude declares victory on the entire project too early." [ref=f53e135]
+                    - 'cell "Set up a feature list file: based on the input spec, set up a structured JSON file with a list of end-to-end feature descriptions." [ref=f53e136]'
+                    - cell "Read the feature list file at the beginning of a session. Choose a single feature to start working on." [ref=f53e137]
+                  - row [ref=f53e138]:
+                    - cell "Claude leaves the environment in a state with bugs or undocumented progress." [ref=f53e139]
+                    - cell "An initial git repo and progress notes file is written." [ref=f53e140]
+                    - cell "Start the session by reading the progress notes file and git commit logs, and run a basic test on the development server to catch any undocumented bugs. End the session by writing a git commit and progress update." [ref=f53e141]
+                  - row [ref=f53e142]:
+                    - cell "Claude marks features as done prematurely." [ref=f53e143]
+                    - cell "Set up a feature list file." [ref=f53e144]
+                    - cell "Self-verify all features. Only mark features as “passing” after careful testing." [ref=f53e145]
+                  - row [ref=f53e146]:
+                    - cell "Claude has to spend time figuring out how to run the app." [ref=f53e147]
+                    - cell [ref=f53e148]:
+                      - text: Write an
+                      - code [ref=f53e149]: init.sh
+                      - text: script that can run the development server.
+                    - cell [ref=f53e150]:
+                      - text: Start the session by reading
+                      - code [ref=f53e151]: init.sh
+                      - text: .
+            - generic [ref=f53e152]: Summarizing four common failure modes and solutions in long-running AI agents.
+          - heading "Future work" [level=2] [ref=f53e153]
+          - paragraph [ref=f53e154]: This research demonstrates one possible set of solutions in a long-running agent harness to enable the model to make incremental progress across many context windows. However, there remain open questions.
+          - paragraph [ref=f53e155]: Most notably, it’s still unclear whether a single, general-purpose coding agent performs best across contexts, or if better performance can be achieved through a multi-agent architecture. It seems reasonable that specialized agents like a testing agent, a quality assurance agent, or a code cleanup agent, could do an even better job at sub-tasks across the software development lifecycle.
+          - paragraph [ref=f53e156]: Additionally, this demo is optimized for full-stack web app development. A future direction is to generalize these findings to other fields. It’s likely that some or all of these lessons can be applied to the types of long-running agentic tasks required in, for example, scientific research or financial modeling.
+          - paragraph
+          - paragraph
+          - paragraph
+          - heading "Acknowledgements" [level=3] [ref=f53e157]
+          - paragraph [ref=f53e158]: Written by Justin Young. Special thanks to David Hershey, Prithvi Rajasakeran, Jeremy Hadfield, Naia Bouscal, Michael Tingley, Jesse Mu, Jake Eaton, Marius Buleandara, Maggie Vo, Pedram Navid, Nadine Yasser, and Alex Notov for their contributions.
+          - paragraph [ref=f53e159]:
+            - text: This work reflects the collective efforts of several teams across Anthropic who made it possible for Claude to safely do long-horizon autonomous software engineering, especially the code RL & Claude Code teams. Interested candidates who would like to contribute are welcome to apply at
+            - link "anthropic.com/careers" [ref=f53e160] [cursor=pointer]:
+              - /url: http://anthropic.com/careers
+            - text: .
+          - paragraph
+          - heading "Footnotes" [level=3] [ref=f53e161]
+          - paragraph [ref=f53e162]: 1. We refer to these as separate agents in this context only because they have different initial user prompts. The system prompt, set of tools, and overall agent harness was otherwise identical.
+      - generic [ref=f53e164]:
+        - generic [ref=f53e165]:
+          - heading "Get the developer newsletter" [level=2] [ref=f53e166]
+          - paragraph [ref=f53e168]: Product updates, how-tos, community spotlights, and more. Delivered monthly to your inbox.
+        - generic [ref=f53e170]:
+          - generic [ref=f53e171]:
+            - textbox "Email address" [ref=f53e172]:
+              - /placeholder: Enter your email
+            - button "Subscribe" [ref=f53e173] [cursor=pointer]
+          - paragraph [ref=f53e176]: Please provide your email address if you'd like to receive our monthly developer newsletter. You can unsubscribe at any time.
+  - contentinfo "Site footer" [ref=f53e177]:
+    - generic [ref=f53e178]:
+      - link "Return to homepage" [ref=f53e180] [cursor=pointer]:
+        - /url: /
+      - navigation "Footer navigation" [ref=f53e183]:
+        - generic [ref=f53e184]:
+          - generic [ref=f53e185]:
+            - heading "Products" [level=3] [ref=f53e186]
+            - list [ref=f53e187]:
+              - listitem [ref=f53e188]:
+                - link "Claude" [ref=f53e189] [cursor=pointer]:
+                  - /url: https://claude.com/product/overview
+              - listitem [ref=f53e190]:
+                - link "Claude Code" [ref=f53e191] [cursor=pointer]:
+                  - /url: https://claude.com/product/claude-code
+              - listitem [ref=f53e192]:
+                - link "Claude Code Enterprise" [ref=f53e193] [cursor=pointer]:
+                  - /url: https://claude.com/product/claude-code/enterprise
+              - listitem [ref=f53e194]:
+                - link "Claude Cowork" [ref=f53e195] [cursor=pointer]:
+                  - /url: https://claude.com/product/cowork
+              - listitem [ref=f53e196]:
+                - link "@Claude" [ref=f53e197] [cursor=pointer]:
+                  - /url: https://claude.com/product/tag
+              - listitem [ref=f53e198]:
+                - link "Claude Design" [ref=f53e199] [cursor=pointer]:
+                  - /url: https://claude.com/product/design
+              - listitem [ref=f53e200]:
+                - link "Claude Science" [ref=f53e201] [cursor=pointer]:
+                  - /url: https://claude.com/product/claude-science
+              - listitem [ref=f53e202]:
+                - link "Claude Security" [ref=f53e203] [cursor=pointer]:
+                  - /url: https://claude.com/product/claude-security
+              - listitem [ref=f53e204]:
+                - link "Claude in Chrome" [ref=f53e205] [cursor=pointer]:
+                  - /url: https://claude.com/claude-in-chrome
+              - listitem [ref=f53e206]:
+                - link "Claude for Microsoft 365" [ref=f53e207] [cursor=pointer]:
+                  - /url: https://claude.com/claude-for-microsoft-365
+              - listitem [ref=f53e208]:
+                - link "Skills" [ref=f53e209] [cursor=pointer]:
+                  - /url: https://www.claude.com/skills
+              - listitem [ref=f53e210]:
+                - link "Download app" [ref=f53e211] [cursor=pointer]:
+                  - /url: https://claude.ai/download
+              - listitem [ref=f53e212]:
+                - link "Pricing" [ref=f53e213] [cursor=pointer]:
+                  - /url: https://claude.com/pricing
+              - listitem [ref=f53e214]:
+                - link "Log in to Claude" [ref=f53e215] [cursor=pointer]:
+                  - /url: https://claude.ai/
+          - generic [ref=f53e216]:
+            - heading "Models" [level=3] [ref=f53e217]
+            - list [ref=f53e218]:
+              - listitem [ref=f53e219]:
+                - link "Mythos" [ref=f53e220] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/claude/mythos
+              - listitem [ref=f53e221]:
+                - link "Fable" [ref=f53e222] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/claude/fable
+              - listitem [ref=f53e223]:
+                - link "Opus" [ref=f53e224] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/claude/opus
+              - listitem [ref=f53e225]:
+                - link "Sonnet" [ref=f53e226] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/claude/sonnet
+              - listitem [ref=f53e227]:
+                - link "Haiku" [ref=f53e228] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/claude/haiku
+        - generic [ref=f53e229]:
+          - generic [ref=f53e230]:
+            - heading "Solutions" [level=3] [ref=f53e231]
+            - list [ref=f53e232]:
+              - listitem [ref=f53e233]:
+                - link "AI agents" [ref=f53e234] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/agents
+              - listitem [ref=f53e235]:
+                - link "Code modernization" [ref=f53e236] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/code-modernization
+              - listitem [ref=f53e237]:
+                - link "Coding" [ref=f53e238] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/coding
+              - listitem [ref=f53e239]:
+                - link "Customer support" [ref=f53e240] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/customer-support
+              - listitem [ref=f53e241]:
+                - link "Cybersecurity" [ref=f53e242] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/cybersecurity
+              - listitem [ref=f53e243]:
+                - link "Enterprise" [ref=f53e244] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/enterprise
+              - listitem [ref=f53e245]:
+                - link "Financial services" [ref=f53e246] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/financial-services
+              - listitem [ref=f53e247]:
+                - link "Government" [ref=f53e248] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/government
+              - listitem [ref=f53e249]:
+                - link "Healthcare" [ref=f53e250] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/healthcare
+              - listitem [ref=f53e251]:
+                - link "Higher education" [ref=f53e252] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/education
+              - listitem [ref=f53e253]:
+                - link "K-12 teachers" [ref=f53e254] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/teachers
+              - listitem [ref=f53e255]:
+                - link "Legal" [ref=f53e256] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/legal
+              - listitem [ref=f53e257]:
+                - link "Life sciences" [ref=f53e258] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/life-sciences
+              - listitem [ref=f53e259]:
+                - link "Nonprofits" [ref=f53e260] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/nonprofits
+              - listitem [ref=f53e261]:
+                - link "Small business" [ref=f53e262] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/small-business
+          - generic [ref=f53e263]:
+            - heading "Claude Platform" [level=3] [ref=f53e264]
+            - list [ref=f53e265]:
+              - listitem [ref=f53e266]:
+                - link "Overview" [ref=f53e267] [cursor=pointer]:
+                  - /url: https://claude.com/platform/api
+              - listitem [ref=f53e268]:
+                - link "Developer docs" [ref=f53e269] [cursor=pointer]:
+                  - /url: https://platform.claude.com/docs
+              - listitem [ref=f53e270]:
+                - link "Pricing" [ref=f53e271] [cursor=pointer]:
+                  - /url: https://claude.com/pricing#api
+              - listitem [ref=f53e272]:
+                - link "Ecosystem" [ref=f53e273] [cursor=pointer]:
+                  - /url: https://claude.com/ecosystem
+              - listitem [ref=f53e274]:
+                - link "Marketplace" [ref=f53e275] [cursor=pointer]:
+                  - /url: https://claude.com/platform/marketplace
+              - listitem [ref=f53e276]:
+                - link "Regional compliance" [ref=f53e277] [cursor=pointer]:
+                  - /url: https://claude.com/regional-compliance
+              - listitem [ref=f53e278]:
+                - link "Claude on AWS" [ref=f53e279] [cursor=pointer]:
+                  - /url: https://claude.com/partners/claude-on-aws
+              - listitem [ref=f53e280]:
+                - link "Google Cloud" [ref=f53e281] [cursor=pointer]:
+                  - /url: https://claude.com/partners/google-cloud-vertex-ai
+              - listitem [ref=f53e282]:
+                - link "Microsoft Foundry" [ref=f53e283] [cursor=pointer]:
+                  - /url: https://claude.com/partners/microsoft-foundry
+              - listitem [ref=f53e284]:
+                - link "Console login" [ref=f53e285] [cursor=pointer]:
+                  - /url: https://platform.claude.com/
+        - generic [ref=f53e286]:
+          - generic [ref=f53e287]:
+            - heading "Resources" [level=3] [ref=f53e288]
+            - list [ref=f53e289]:
+              - listitem [ref=f53e290]:
+                - link "Blog" [ref=f53e291] [cursor=pointer]:
+                  - /url: https://claude.com/blog
+              - listitem [ref=f53e292]:
+                - link "Claude partner network" [ref=f53e293] [cursor=pointer]:
+                  - /url: https://claude.com/partners
+              - listitem [ref=f53e294]:
+                - link "Community" [ref=f53e295] [cursor=pointer]:
+                  - /url: https://claude.com/community
+              - listitem [ref=f53e296]:
+                - link "Connectors" [ref=f53e297] [cursor=pointer]:
+                  - /url: https://claude.com/connectors
+              - listitem [ref=f53e298]:
+                - link "Courses" [ref=f53e299] [cursor=pointer]:
+                  - /url: /learn
+              - listitem [ref=f53e300]:
+                - link "Customer stories" [ref=f53e301] [cursor=pointer]:
+                  - /url: https://claude.com/customers
+              - listitem [ref=f53e302]:
+                - link "Engineering at Anthropic" [ref=f53e303] [cursor=pointer]:
+                  - /url: /engineering
+              - listitem [ref=f53e304]:
+                - link "Events" [ref=f53e305] [cursor=pointer]:
+                  - /url: /events
+              - listitem [ref=f53e306]:
+                - link "Plugins" [ref=f53e307] [cursor=pointer]:
+                  - /url: https://claude.com/plugins
+              - listitem [ref=f53e308]:
+                - link "Powered by Claude" [ref=f53e309] [cursor=pointer]:
+                  - /url: https://claude.com/partners/powered-by-claude
+              - listitem [ref=f53e310]:
+                - link "Service partners" [ref=f53e311] [cursor=pointer]:
+                  - /url: https://claude.com/partners/services
+              - listitem [ref=f53e312]:
+                - link "Tutorials" [ref=f53e313] [cursor=pointer]:
+                  - /url: https://claude.com/resources/tutorials
+              - listitem [ref=f53e314]:
+                - link "Use cases" [ref=f53e315] [cursor=pointer]:
+                  - /url: https://claude.com/resources/use-cases
+          - generic [ref=f53e316]:
+            - heading "Programs" [level=3] [ref=f53e317]
+            - list [ref=f53e318]:
+              - listitem [ref=f53e319]:
+                - link "Startups" [ref=f53e320] [cursor=pointer]:
+                  - /url: https://claude.com/programs/startups
+              - listitem [ref=f53e321]:
+                - link "Research Labs" [ref=f53e322] [cursor=pointer]:
+                  - /url: https://claude.com/programs/claude-team-plan-for-research-labs
+          - generic [ref=f53e323]:
+            - heading "Help and security" [level=3] [ref=f53e324]
+            - list [ref=f53e325]:
+              - listitem [ref=f53e326]:
+                - link "Availability" [ref=f53e327] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/supported-countries
+              - listitem [ref=f53e328]:
+                - link "Status" [ref=f53e329] [cursor=pointer]:
+                  - /url: https://status.anthropic.com/
+              - listitem [ref=f53e330]:
+                - link "Support center" [ref=f53e331] [cursor=pointer]:
+                  - /url: https://support.claude.com/en/
+        - generic [ref=f53e332]:
+          - generic [ref=f53e333]:
+            - heading "Company" [level=3] [ref=f53e334]
+            - list [ref=f53e335]:
+              - listitem [ref=f53e336]:
+                - link "Anthropic" [ref=f53e337] [cursor=pointer]:
+                  - /url: /company
+              - listitem [ref=f53e338]:
+                - link "Careers" [ref=f53e339] [cursor=pointer]:
+                  - /url: /careers
+              - listitem [ref=f53e340]:
+                - link "Policy" [ref=f53e341] [cursor=pointer]:
+                  - /url: /policy
+              - listitem [ref=f53e342]:
+                - link "Economic Futures" [ref=f53e343] [cursor=pointer]:
+                  - /url: /economic-futures
+              - listitem [ref=f53e344]:
+                - link "Research" [ref=f53e345] [cursor=pointer]:
+                  - /url: /research
+              - listitem [ref=f53e346]:
+                - link "News" [ref=f53e347] [cursor=pointer]:
+                  - /url: /news
+              - listitem [ref=f53e348]:
+                - link "Claude’s Constitution" [ref=f53e349] [cursor=pointer]:
+                  - /url: /constitution
+              - listitem [ref=f53e350]:
+                - link "Claude Corps" [ref=f53e351] [cursor=pointer]:
+                  - /url: /claude-corps
+              - listitem [ref=f53e352]:
+                - link "Keep thinking" [ref=f53e353] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/path-to-hope
+              - listitem [ref=f53e354]:
+                - link "Policy on the AI Exponential" [ref=f53e355] [cursor=pointer]:
+                  - /url: /policy-on-the-ai-exponential
+              - listitem [ref=f53e356]:
+                - link "Responsible Scaling Policy" [ref=f53e357] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/news/announcing-our-updated-responsible-scaling-policy
+              - listitem [ref=f53e358]:
+                - link "Security and compliance" [ref=f53e359] [cursor=pointer]:
+                  - /url: https://trust.anthropic.com/
+              - listitem [ref=f53e360]:
+                - link "Transparency" [ref=f53e361] [cursor=pointer]:
+                  - /url: /transparency
+          - generic [ref=f53e362]:
+            - heading "Terms and policies" [level=3] [ref=f53e363]
+            - list [ref=f53e364]:
+              - listitem [ref=f53e365]:
+                - link "Privacy policy" [ref=f53e366] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/legal/privacy
+              - listitem [ref=f53e367]:
+                - link "Consumer health data privacy policy" [ref=f53e368] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/legal/consumer-health-data-privacy-policy
+              - listitem [ref=f53e369]:
+                - link "Responsible disclosure policy" [ref=f53e370] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/responsible-disclosure-policy
+              - listitem [ref=f53e371]:
+                - 'link "Terms of service: Commercial" [ref=f53e372] [cursor=pointer]':
+                  - /url: https://www.anthropic.com/legal/commercial-terms
+              - listitem [ref=f53e373]:
+                - 'link "Terms of service: Consumer" [ref=f53e374] [cursor=pointer]':
+                  - /url: https://www.anthropic.com/legal/consumer-terms
+              - listitem [ref=f53e375]:
+                - 'link "Terms of Service: US K-12" [ref=f53e376] [cursor=pointer]':
+                  - /url: https://anthropic.com/legal/k12-terms
+              - listitem [ref=f53e377]:
+                - 'link "Data Processing Agreement: US K-12" [ref=f53e378] [cursor=pointer]':
+                  - /url: https://anthropic.com/legal/k12-dpa
+              - listitem [ref=f53e379]:
+                - link "Usage policy" [ref=f53e380] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/legal/aup
+      - generic [ref=f53e381]:
+        - contentinfo [ref=f53e382]: © 2026 Anthropic PBC
+        - navigation "Social media links" [ref=f53e383]:
+          - listitem [ref=f53e384]:
+            - link "Visit our LinkedIn page" [ref=f53e385] [cursor=pointer]:
+              - /url: https://www.linkedin.com/company/anthropicresearch
+          - listitem [ref=f53e388]:
+            - link "Visit our X (formerly Twitter) profile" [ref=f53e389] [cursor=pointer]:
+              - /url: https://x.com/AnthropicAI
+          - listitem [ref=f53e392]:
+            - link "Visit our YouTube channel" [ref=f53e393] [cursor=pointer]:
+              - /url: https://www.youtube.com/@anthropic-ai
+  - alert [ref=f53e396]

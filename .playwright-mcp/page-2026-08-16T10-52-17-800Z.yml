@@ -1,0 +1,513 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#ai-agents-hackathon-2025-category-winners-showcase"
+  - banner [ref=e3]:
+    - navigation "Header" [ref=e4]:
+      - generic [ref=e5] [cursor=pointer]
+      - generic [ref=e9]:
+        - generic [ref=e10]: AI Agents Hackathon 2025
+        - generic: Winners
+      - generic [ref=e12]:
+        - radio "Switch to dark mode"
+        - generic "Switch to dark mode" [ref=e13] [cursor=pointer]
+        - radio "Switch to light mode"
+      - generic [ref=e17]:
+        - button "Select language" [ref=e18] [cursor=pointer]
+        - generic:
+          - list:
+            - listitem [ref=e21]:
+              - link "English" [ref=e22] [cursor=pointer]:
+                - /url: ./
+            - listitem [ref=e23]:
+              - link "Español" [ref=e24] [cursor=pointer]:
+                - /url: ../es/winners/
+            - listitem [ref=e25]:
+              - link "Português" [ref=e26] [cursor=pointer]:
+                - /url: ../pt/winners/
+            - listitem [ref=e27]:
+              - link "中文" [ref=e28] [cursor=pointer]:
+                - /url: ../zh/winners/
+  - generic [ref=e29]:
+    - main [ref=e30]:
+      - generic [ref=e31]:
+        - navigation "Navigation" [ref=e34]:
+          - generic [ref=e35] [cursor=pointer]:
+            - link "AI Agents Hackathon 2025" [ref=e36]:
+              - /url: ..
+              - img "logo" [ref=e37]
+            - text: AI Agents Hackathon 2025
+          - list [ref=e38]:
+            - listitem [ref=e39]:
+              - link "Overview" [ref=e40] [cursor=pointer]:
+                - /url: ..
+            - listitem [ref=e42]:
+              - link "Rules" [ref=e43] [cursor=pointer]:
+                - /url: ../rules/
+            - listitem [ref=e45]:
+              - link "Submission" [ref=e46] [cursor=pointer]:
+                - /url: ../submission/
+            - listitem [ref=e48]:
+              - link "Winners" [ref=e49] [cursor=pointer]:
+                - /url: ./
+            - listitem [ref=e51]:
+              - link "Discussions" [ref=e52] [cursor=pointer]:
+                - /url: https://github.com/microsoft/AI_Agents_Hackathon/discussions
+        - navigation "Table of contents" [ref=e57]:
+          - list [ref=e59]:
+            - listitem [ref=e60]:
+              - 'link "🏆 Best Overall Winner – RiskWise: Supply Chain Risk Analysis System" [ref=e61] [cursor=pointer]':
+                - /url: "#best-overall-winner-riskwise-supply-chain-risk-analysis-system"
+            - listitem [ref=e63]:
+              - link "🥇 Best C# Agent – \"Apollo\" – Deep Research Meta Agent" [ref=e64] [cursor=pointer]:
+                - /url: "#best-c-agent-apollo-deep-research-meta-agent"
+            - listitem [ref=e66]:
+              - 'link "🥇 Best Java Agent – Bit2Brain: Personalized Wellness Agent" [ref=e67] [cursor=pointer]':
+                - /url: "#best-java-agent-bit2brain-personalized-wellness-agent"
+            - listitem [ref=e69]:
+              - link "🥇 Best Copilot Agent – WorkWizee" [ref=e70] [cursor=pointer]:
+                - /url: "#best-copilot-agent-workwizee"
+            - listitem [ref=e72]:
+              - 'link "🥇 Best JavaScript/TypeScript Agent – ModelProof: Sentinel AI Chat" [ref=e73] [cursor=pointer]':
+                - /url: "#best-javascripttypescript-agent-modelproof-sentinel-ai-chat"
+            - listitem [ref=e75]:
+              - link "🥇 Best Use of Azure AI Agent Service – TARIFFED!" [ref=e76] [cursor=pointer]:
+                - /url: "#best-use-of-azure-ai-agent-service-tariffed"
+            - listitem [ref=e78]:
+              - 'link "🥇 Best Python Agent – Konveyor: AI-Powered Knowledge Transfer Agent" [ref=e79] [cursor=pointer]':
+                - /url: "#best-python-agent-konveyor-ai-powered-knowledge-transfer-agent"
+            - listitem [ref=e81]:
+              - link "🤝 Honorable Mentions" [ref=e82] [cursor=pointer]:
+                - /url: "#honorable-mentions"
+            - listitem [ref=e84]:
+              - link "Conclusion" [ref=e85] [cursor=pointer]:
+                - /url: "#conclusion"
+        - article [ref=e88]:
+          - heading "AI Agents Hackathon 2025 – Category Winners Showcase" [level=1] [ref=e89]
+          - paragraph [ref=e90]:
+            - strong [ref=e91]: 2025 is the year of AI agents, and the recent AI Agents Hackathon proved it in style.
+          - paragraph [ref=e92]: This free, three-week virtual hackathon (April 8–30, 2025) brought together developers worldwide to build innovative AI agent solutions. Participants had access to over 20 expert-led sessions on frameworks like Semantic Kernel, Autogen, the new Azure AI Agents SDK, and Microsoft 365 Copilot SDK.
+          - paragraph [ref=e93]:
+            - text: The response was tremendous with over
+            - strong [ref=e94]: 18,000 developers registered and 570 project submissions
+            - text: spanning diverse use cases. Projects were judged on innovation, impact, usability, solution quality, and category alignment, across multiple award categories (Best Overall, Python, C#, Java, JavaScript/TypeScript, Copilot, and Best use of Azure AI Agent Service).
+          - paragraph [ref=e95]: The results are in! Below we highlight the standout winners in each category—the creativity and technical prowess on display are truly inspiring.
+          - paragraph [ref=e96]:
+            - img "Winners AI Agents Hackathon 2025" [ref=e97]
+          - 'heading "🏆 Best Overall Winner – RiskWise: Supply Chain Risk Analysis System" [level=2] [ref=e98]'
+          - paragraph [ref=e99]:
+            - strong [ref=e100]: RiskWise
+            - text: emerged as the Best Overall winner with its innovative approach to
+            - strong [ref=e101]: supply chain risk analysis
+            - text: .
+          - paragraph [ref=e102]:
+            - img "Riskwise" [ref=e103]
+          - paragraph [ref=e104]:
+            - text: Built using
+            - strong [ref=e105]: Python
+            - text: (for AI logic), a
+            - strong [ref=e106]: React/Next.js
+            - text: front-end,
+            - strong [ref=e107]: Azure AI Agent Service
+            - text: ","
+            - strong [ref=e108]: Semantic Kernel
+            - text: ", and"
+            - strong [ref=e109]: SQL
+            - text: for data, RiskWise showcases end-to-end excellence. The project tackles the complex problem of identifying and analyzing risks in global supply chains. By leveraging AI agents, RiskWise can sift through vast amounts of supply chain data (e.g. shipping schedules, news about trade disruptions, etc.) to
+            - strong [ref=e110]: flag potential risks
+            - text: – from port delays to geopolitical events – that might impact production or delivery. It likely uses Semantic Kernel to plan and orchestrate calls to various tools or data sources, and Azure AI Agent Service to integrate advanced language models for understanding queries. The
+            - strong [ref=e111]: user interface
+            - text: built in Next.js allows analysts to query the system in natural language and visualize risk insights. In short, RiskWise helps businesses
+            - strong [ref=e112]: anticipate supply disruptions
+            - text: and make informed decisions in real-time, which is a game-changer for operational resilience.
+          - paragraph [ref=e113]:
+            - strong [ref=e114]: "Technologies:"
+            - text: Python, React/Next.js, Azure AI Agent Service, Semantic Kernel, SQL
+            - 'link "Learn more: Project Issue #526 (GitHub)" [ref=e115] [cursor=pointer]':
+              - /url: https://github.com/microsoft/AI_Agents_Hackathon/issues/526
+          - heading "🥇 Best C# Agent – \"Apollo\" – Deep Research Meta Agent" [level=2] [ref=e116]
+          - paragraph [ref=e117]:
+            - strong [ref=e118]: Apollo
+            - text: is an AI agent that acts as a
+            - strong [ref=e119]: deep research assistant
+            - text: ", capable of transforming complex queries into comprehensive research reports. Written in C# on the backend (ASP.NET Core) with a React frontend, Apollo orchestrates multiple specialized sub-agents to collaborate on answering a query."
+          - paragraph [ref=e120]:
+            - img "Apollo" [ref=e121]
+          - paragraph [ref=e122]: "Its architecture is particularly impressive:"
+          - list [ref=e123]:
+            - listitem [ref=e124]:
+              - strong [ref=e125]: "Multi-agent orchestration:"
+              - text: Apollo the coordinator manages two expert agents –
+              - emphasis [ref=e126]: Athena
+              - text: ", the research engine, and"
+              - emphasis [ref=e127]: Hermes
+              - text: ", the analyzer. Using Semantic Kernel's AI orchestration, these agents work together in a group chat to tackle different aspects of a research task."
+            - listitem [ref=e128]:
+              - strong [ref=e129]: "Self-reflective RAG (Retrieval-Augmented Generation):"
+              - text: Apollo performs iterative information gathering and checks for knowledge gaps using a vector memory (PostgreSQL/pgvector). It retrieves relevant web content (via an agent using Bing/Exa AI search) and stores it, then Hermes analyzes completeness and identifies missing pieces.
+            - listitem [ref=e130]:
+              - strong [ref=e131]: "Two-stage synthesis:"
+              - text: The system first generates section-specific content and then synthesizes a final, well-structured report with proper citations.
+            - listitem [ref=e132]:
+              - strong [ref=e133]: "State machine & async workflow:"
+              - text: A state machine architecture allows Apollo to maintain context across steps outside a single chat session, and an asynchronous event pipeline ensures the complex research process is handled efficiently.
+          - paragraph [ref=e134]:
+            - text: Using
+            - strong [ref=e135]: Azure AI Agent Service
+            - text: and Azure OpenAI (GPT-4), Apollo can answer, for example,
+            - emphasis [ref=e136]: "\"Analyze the impacts of climate change on global agriculture\""
+            - text: by breaking it down into subtopics, researching each, and compiling an in-depth report. This project brilliantly demonstrates how C# and .NET can be used with Semantic Kernel to coordinate multiple AI agents in a sophisticated workflow. The result is a
+            - strong [ref=e137]: research meta-agent
+            - text: that could save users countless hours in gathering and summarizing information.
+          - paragraph [ref=e138]:
+            - strong [ref=e139]: "Technologies:"
+            - text: C# (.NET 7/ASP.NET Core), Semantic Kernel, Azure AI Agents Service (with GPT-4), React (frontend), PostgreSQL (vector DB)
+            - 'link "Learn more: Apollo – Deep Research Meta Agent (#681)" [ref=e140] [cursor=pointer]':
+              - /url: https://github.com/microsoft/AI_Agents_Hackathon/issues/681
+          - 'heading "🥇 Best Java Agent – Bit2Brain: Personalized Wellness Agent" [level=2] [ref=e141]'
+          - paragraph [ref=e142]:
+            - text: Bits2Brain is an AI-powered system designed to capture and connect fragmented information, turning everyday learning moments into an evolving
+            - strong [ref=e143]: Knowledge Star Map
+            - text: . Whether it's a tip from a video, a breakthrough in tech news, or an insightful article, the platform enables users to store, structure, and visualize their knowledge in an interactive way.
+          - paragraph [ref=e144]:
+            - img "Bits2Brain" [ref=e145]
+          - paragraph [ref=e146]: "The key features of Bits2Brain include:"
+          - list [ref=e147]:
+            - listitem [ref=e148]:
+              - strong [ref=e149]: Knowledge Star Map Generation
+              - text: – Users can upload snippets of knowledge (links, videos, screenshots), with AI automatically identifying connections between related nodes.
+            - listitem [ref=e150]:
+              - strong [ref=e151]: Node Expansion & Cognitive Completion
+              - text: – AI suggests relevant topics and additional knowledge nodes based on context, allowing users to explore and grow their understanding.
+            - listitem [ref=e152]:
+              - strong [ref=e153]: Knowledge Fusion & Summarization
+              - text: – Related nodes can be merged into a refined summary, compressing information while maintaining key connections and resources.
+            - listitem [ref=e154]:
+              - strong [ref=e155]: Multimodal Input Support
+              - text: – Supports various formats, including text, images, and videos, with AI-powered analysis tools (OCR, video indexing) to extract meaningful data.
+            - listitem [ref=e156]:
+              - strong [ref=e157]: Conversational AI with Agent System
+              - text: – Users interact with an AI Agent to ask questions, receive video recommendations, and navigate their personalized knowledge graph.
+          - paragraph [ref=e158]:
+            - strong [ref=e159]: Technologies
+            - text: Langchain4j, Azure Video Indexer, Azure Computer Vision, Neo4j, Java, JavaScript.
+          - paragraph [ref=e160]:
+            - 'link "Learn more: Bits2Brain (#638)" [ref=e161] [cursor=pointer]':
+              - /url: https://github.com/microsoft/AI_Agents_Hackathon/issues/638
+          - heading "🥇 Best Copilot Agent – WorkWizee" [level=2] [ref=e162]
+          - paragraph [ref=e163]:
+            - strong [ref=e164]: WorkWizee
+            - text: "won the Copilots category by addressing a common corporate challenge:"
+            - strong [ref=e165]: managing P1/P2 incident calls
+            - text: . These calls often involve multiple updates across Jira, ServiceNow, and Confluence, alongside notifying managers and teams. The goal? Automating these repetitive tasks with an intelligent agent integrated within Microsoft Teams—allowing developers to focus on fixing bugs instead of juggling updates.
+          - paragraph [ref=e166]:
+            - img "WorkWizee" [ref=e167]
+          - paragraph [ref=e168]: "WorkWizee enables seamless, natural language interactions to handle workflow tasks. Instead of manually updating Jira tickets or sending notifications, users can simply type commands like:"
+          - blockquote [ref=e169]:
+            - paragraph [ref=e170]: "\"Add the workflow is working now comment to WOWZEE-12 Jira ticket.\""
+          - paragraph [ref=e171]: The agent processes the request and executes the necessary API calls, eliminating tedious steps.
+          - paragraph [ref=e172]: "The key features of WorkWizee include:"
+          - list [ref=e173]:
+            - listitem [ref=e174]:
+              - strong [ref=e175]: Microsoft Teams
+            - listitem [ref=e176]: Create groups with active users
+            - listitem [ref=e177]: Send reminders to multiple users
+            - listitem [ref=e178]: Direct message designated responders
+            - listitem [ref=e179]:
+              - strong [ref=e180]: Jira
+            - listitem [ref=e181]: Create and assign Jira tickets dynamically
+            - listitem [ref=e182]: Comment on tickets
+            - listitem [ref=e183]: Retrieve the latest comments
+            - listitem [ref=e184]:
+              - strong [ref=e185]: Bitbucket
+            - listitem [ref=e186]: Create pull requests (PRs) for various branches
+            - listitem [ref=e187]: Retrieve prioritized open PRs
+            - listitem [ref=e188]: Comment on PRs and notify users via Teams
+          - paragraph [ref=e189]: "The technical stack is robust and leverages several Microsoft technologies:"
+          - list [ref=e190]:
+            - listitem [ref=e191]:
+              - strong [ref=e192]: Copilot Studio
+              - text: – Bot development & automation
+            - listitem [ref=e193]:
+              - strong [ref=e194]: Python
+              - text: – Backend API logic
+            - listitem [ref=e195]:
+              - strong [ref=e196]: Azure Functions
+              - text: – Scalable & cost-effective API hosting
+            - listitem [ref=e197]:
+              - strong [ref=e198]: Jira API, BitBucket API, Confluence API, Outlook API
+              - text: – Handling integrations with corresponding platforms
+          - paragraph [ref=e199]: WorkWizee improves team efficiency by cutting down the manual workload, saving up to 40% of time spent on incident management. It transforms reactive operations into proactive automation—getting teams back to coding faster.
+          - paragraph [ref=e200]:
+            - strong [ref=e201]: "Technologies:"
+            - text: Microsoft 365 Copilot Studio, Python, Azure Functions, Jira API, BitBucket API
+          - paragraph [ref=e202]:
+            - 'link "Learn more: WorkWizee – Issue #587" [ref=e203] [cursor=pointer]':
+              - /url: https://github.com/microsoft/AI_Agents_Hackathon/issues/587
+          - 'heading "🥇 Best JavaScript/TypeScript Agent – ModelProof: Sentinel AI Chat" [level=2] [ref=e204]'
+          - paragraph [ref=e205]:
+            - strong [ref=e206]: "ModelProof: Sentinel AI Chat"
+            - text: took the JS/TS category by demonstrating how to make AI outputs more
+            - strong [ref=e207]: trustworthy and transparent
+            - text: . In an era concerned with AI hallucinations and bias, ModelProof acts as a
+            - strong [ref=e208]: sentinel guard
+            - text: for AI-generated answers.
+          - paragraph [ref=e209]:
+            - img "ModelProof" [ref=e210]
+          - list [ref=e211]:
+            - listitem [ref=e212]:
+              - strong [ref=e213]: "Dual-LM consistency check:"
+              - text: ModelProof runs two large language models in parallel for each user query and compares their responses
+              - link "https://www.youtube.com/watch?v=qPX_TDM4DSE" [ref=e214] [cursor=pointer]:
+                - /url: https://www.youtube.com/watch?v=qPX_TDM4DSE
+              - text: . The idea is that if both models agree on an answer, confidence in correctness is higher – and if they differ, that's a flag for potential issues. For example, it might query both GPT-4 and another model, and then automatically cross-verify the outputs.
+            - listitem [ref=e215]:
+              - strong [ref=e216]: "Real-time auditing for safety:"
+              - text: Every answer is audited in real-time for
+              - strong [ref=e217]: hallucinations, bias, toxicity, and intent alignment
+              - text: . The agent uses content moderation and evaluation techniques (likely via Azure AI Content Safety or custom prompts) to detect if the response contains made-up facts, overly biased statements, or unsafe content.
+            - listitem [ref=e218]:
+              - strong [ref=e219]: "Clear \"risk insight\" reporting:"
+              - text: ModelProof doesn't just give the user an answer – it gives a confidence or risk report. If there were discrepancies between the two models or any red flags (say, one model produced a potentially toxic sentence), the agent will highlight that. This way, the
+              - strong [ref=e220]: user gets the answer plus a heads-up on reliability
+              - text: ", essentially an automatic second opinion with explanation."
+            - listitem [ref=e221]:
+              - strong [ref=e222]: "Tech stack:"
+              - text: It's built in
+              - strong [ref=e223]: TypeScript/JavaScript
+              - text: ", using Node.js for the backend to orchestrate calls to two models using Azure OpenAI and an open-source model API. The front-end would show the chat interface along with \"sentinel\" indicators. This category emphasizes front-end or full-stack JS skills, and ModelProof delivered a polished solution."
+          - paragraph [ref=e224]:
+            - text: The innovation here is treating AI responses almost like an AI safety officer would – by
+            - strong [ref=e225]: validating consistency and scanning for issues
+            - text: . This approach can be extremely useful for high stakes use cases where you want extra assurance from AI outputs. ModelProof is a great example of how developers can build
+            - emphasis [ref=e226]: meta
+            - text: agents that supervise other AI agents for better results.
+          - paragraph [ref=e227]:
+            - emphasis [ref=e228]: "Technologies:"
+            - text: JavaScript/TypeScript, dual LLM APIs (e.g., Azure OpenAI + another model), AI content moderation tools (for toxicity/bias checks).
+            - emphasis [ref=e229]: "Learn more:"
+            - link "ModelProof – Sentinel AI Chat (#517)" [ref=e230] [cursor=pointer]:
+              - /url: https://github.com/microsoft/AI_Agents_Hackathon/issues/517
+          - heading "🥇 Best Use of Azure AI Agent Service – TARIFFED!" [level=2] [ref=e231]
+          - paragraph [ref=e232]:
+            - text: The
+            - strong [ref=e233]: TARIFFED!
+            - text: project won the Azure AI Agent Service category by applying AI agents to a niche but impactful domain –
+            - strong [ref=e234]: trade tariffs
+            - text: .
+          - paragraph [ref=e235]:
+            - img "TARIFFED" [ref=e236]
+            - text: It explores how changes in import/export tariffs affect businesses and consumers, showcasing Azure AI Agent Service's capabilities in a data-intensive scenario.
+          - list [ref=e237]:
+            - listitem [ref=e238]:
+              - strong [ref=e239]: "Problem tackled:"
+              - text: Tariff schedules (like the Harmonized Tariff Schedule of the US) are complex and often bewildering, yet they have real impacts on economies and supply chains. TARIFFED! set out to make sense of this by having agents' pore over huge tariff data and answer salient questions in plain language.
+            - listitem [ref=e240]:
+              - strong [ref=e241]: "AI agents for Q&A:"
+              - text: The project built several AI agents (powered by Azure OpenAI) that can answer specific questions such as
+              - emphasis [ref=e242]: "\"Which countries are the primary importers of goods into the US?\""
+              - text: ","
+              - emphasis [ref=e243]: "\"What's the average duty rate if policy X changes?\""
+              - text: ", or"
+              - emphasis [ref=e244]: "\"What are some domestic substitutes for a product that might get a tariff hike?\""
+              - text: . This is like having a trade expert at your fingertips.
+            - listitem [ref=e245]:
+              - strong [ref=e246]: "Custom knowledge base:"
+              - text: The team created a custom SQL database representing the entire tariff schedule and potential duty rates across all countries. This structured data is the grounding for the agents. When a query comes in, the agent can query this database (using tools or function calls) to fetch relevant information before formulating answers.
+            - listitem [ref=e247]:
+              - strong [ref=e248]: "Web interface:"
+              - text: TARIFFED! includes a Blazor web application that lets users input questions and then sets the agents to work, displaying answers and even visualizations. From the example figures provided, the app can show search results or recommendations with accompanying data like tariff codes and even related info from Bing searches.
+            - listitem [ref=e249]:
+              - strong [ref=e250]: "Architecture & tech:"
+              - text: The solution heavily uses
+              - strong [ref=e251]: Azure AI Agent Service
+              - text: for orchestrating the agents and integrating external tools (like Bing Search for grounding). It's built with
+              - strong [ref=e252]: C#/.NET
+              - text: (including .NET 9 and .NET "Aspire"), and the front-end is in
+              - strong [ref=e253]: Blazor
+              - text: (WebAssembly). Data is stored in
+              - strong [ref=e254]: SQL Server 2022
+              - text: . They also containerized it (Docker) for deployment. This tech stack demonstrates how enterprise-grade tech (SQL Server, .NET, Azure AI) can come together in an AI hack project.
+            - listitem [ref=e255]:
+              - strong [ref=e256]: "Insight:"
+              - text: For a user like a supply chain manager or policy analyst, TARIFFED! can provide quick insights. For example, if there's news of a tariff on electronics from country X, the agent could quickly list which products are affected and suggest alternative source countries or domestic products along with the tariff details. It essentially makes dense government data accessible and actionable.
+          - paragraph [ref=e257]:
+            - text: TARIFFED! is an excellent showcase of
+            - strong [ref=e258]: Azure AI Agent Service
+            - text: "because it uses many facets: data grounding, tool use (search), and orchestrating a multi-step reasoning process. It demonstrates the service's potential in building agents that reason over private data and open data simultaneously."
+          - paragraph [ref=e259]:
+            - emphasis [ref=e260]: "Technologies:"
+            - text: Azure AI Agent Service, Azure OpenAI (GPT-4),
+            - strong [ref=e261]: Bing Search grounding
+            - text: ", C# (.NET 9, .NET Aspire, Blazor), SQL Server database, Docker."
+            - emphasis [ref=e262]: "Learn more:"
+            - link "TARIFFED! – Azure AI Agent Service Winner (#349)" [ref=e263] [cursor=pointer]:
+              - /url: https://github.com/microsoft/AI_Agents_Hackathon/issues/349
+          - 'heading "🥇 Best Python Agent – Konveyor: AI-Powered Knowledge Transfer Agent" [level=2] [ref=e264]'
+          - paragraph [ref=e265]:
+            - strong [ref=e266]: Konveyor
+            - text: earned the top spot in the Python category with its focus on
+            - strong [ref=e267]: knowledge transfer within organizations
+            - text: . In large organizations, important knowledge is often trapped in silos or in the heads of experts. Konveyor aims to
+            - strong [ref=e268]: "\"convey\" knowledge from where it resides to where it's needed"
+            - text: ", using AI agents."
+          - list [ref=e269]:
+            - listitem [ref=e270]:
+              - strong [ref=e271]: "Use case:"
+              - text: Konveyor appears to help with capturing and sharing expertise. This could be used, for example, when a senior engineer is about to leave a team – Konveyor might assist in transferring that person's knowledge to the rest of the team by
+              - strong [ref=e272]: ingesting documents, code, and Q&A sessions
+              - text: ", then answering questions in the future as if it were the expert. It could also work for onboarding new team members by giving them an AI mentor trained on company-specific information."
+            - listitem [ref=e273]:
+              - strong [ref=e274]: "AI approach:"
+              - text: Built in
+              - strong [ref=e275]: Python
+              - text: ", Konveyor leverages"
+              - strong [ref=e276]: Semantic Kernel
+              - text: to orchestrate its tasks. Semantic Kernel's planners and memory to ingest knowledge and to plan answers to queries that might require multi-step reasoning (like retrieving from multiple sources and composing an answer). The "agents" use tools to pull information from documentation, wikis, or even past chat logs.
+            - listitem [ref=e277]:
+              - strong [ref=e278]: "Features:"
+            - listitem [ref=e279]:
+              - emphasis [ref=e280]: "Automated documentation:"
+              - text: Ability to generate summaries or documentation snippets from internal resources.
+            - listitem [ref=e281]:
+              - emphasis [ref=e282]: "Expert Q&A:"
+              - text: Team members can ask it questions, and it will answer based on the accumulated knowledge of predecessors or domain documents.
+            - listitem [ref=e283]:
+              - emphasis [ref=e284]: "Context awareness:"
+              - text: Using histories and vector databases to provide answers with context and reference sources (to build trust in the info).
+            - listitem [ref=e285]:
+              - strong [ref=e286]: "Impact:"
+              - text: Konveyor stands out because it addresses the perennial challenge of knowledge loss. By using an AI agent to preserve and disseminate knowledge, it can improve productivity and reduce the learning curve when team composition changes or when moving between projects.
+          - paragraph [ref=e287]:
+            - img "KONVEYOR" [ref=e288]
+          - paragraph [ref=e289]: The team's decision to use Python and Semantic Kernel suggests they wanted flexibility in designing complex logic for the agent. Python's rich AI ecosystem (libraries for NLP, embeddings, etc.) would support building such a system, and Semantic Kernel would help in managing prompts, memories, and skill functions in a modular way.
+          - paragraph [ref=e290]:
+            - emphasis [ref=e291]: "Technologies:"
+            - text: Python, Semantic Kernel, OpenAI for language understanding, vector database for knowledge storage, and any necessary integration (e.g., reading files, using Q&A REST APIs, etc.).
+            - emphasis [ref=e292]: "Learn more:"
+            - link "Konveyor – Knowledge Transfer Agent (#645)" [ref=e293] [cursor=pointer]:
+              - /url: https://github.com/microsoft/AI_Agents_Hackathon/issues/645
+          - heading "🤝 Honorable Mentions" [level=2] [ref=e294]
+          - paragraph [ref=e295]:
+            - text: In addition to the winners above, several other projects earned
+            - strong [ref=e296]: Honourable Mentions
+            - text: "for their creativity and technical strength. These teams deserve a shout-out:"
+          - list [ref=e297]:
+            - listitem [ref=e298]:
+              - strong [ref=e299]: DeepStudy – Virtual Classroom for K12
+              - text: ": An AI-driven virtual classroom for school students. DeepStudy creates an interactive learning environment, likely with AI tutors or study buddies for various subjects."
+              - emphasis [ref=e300]: "(Tech: Python, Semantic Kernel, Azure AI Agent Service)"
+              - text: .
+            - listitem [ref=e301]:
+              - strong [ref=e302]: Agent Groot – Multi-Modal Retail Agent
+              - text: ": A retail-focused AI agent that is"
+              - strong [ref=e303]: multi-modal
+              - text: ", meaning it can handle different types of inputs ( text, images, or voice). This agent might help customers in a store or online – for example, by recognizing products in an image or answering questions about inventory and pricing."
+            - listitem [ref=e304]:
+              - strong [ref=e305]: Nuroxa – Dementia Risk Analysis Assistant
+              - text: ": An AI health assistant that helps assess the risk of dementia. Nuroxa likely interviews patients or analyzes medical data to identify early warning signs of cognitive decline. It could provide risk scores or suggest preventative measures, serving as a support tool for healthcare providers and families."
+              - emphasis [ref=e306]: "(Tech: Python, Azure AI Agent Service)"
+              - text: .
+            - listitem [ref=e307]:
+              - strong [ref=e308]: DocAssistant.Researchy
+              - text: ": DocAssistant.Researchy: is an AI-powered research assistant that automates deep, agent-driven research workflows in internet and best selected web sites/domains based on intent. It rapidly generates structured reports for academic assignments, compliance assessments, financial market forecasting, and news fact-checking."
+              - emphasis [ref=e309]: "(Tech: C#, Azure AI Agent Service)"
+              - text: .
+            - listitem [ref=e310]:
+              - strong [ref=e311]: Agentic Software Factory
+              - text: ": An ambitious project that acts as a"
+              - strong [ref=e312]: collaborative multi-agent ecosystem
+              - text: "for software development. It includes multiple sub-systems: one for human-in-the-loop collaboration, one for automated issue research, and autonomous coding agents. Essentially, it's like an entire mini factory of agents (for coding, testing, researching) working together with human guidance. The team used advanced frameworks like"
+              - strong [ref=e313]: Semantic Kernel
+              - text: ","
+              - strong [ref=e314]: Autogen
+              - text: ","
+              - strong [ref=e315]: Magentic-One
+              - text: ", and"
+              - strong [ref=e316]: MCP
+              - text: ", all orchestrated via Azure AI Agent Service in Python. This is more of a meta-framework demonstrating how a complex pipeline of AI agents could increase developer productivity."
+              - emphasis [ref=e317]: "(Tech: Python, Semantic Kernel, Autogen, Azure AI Agent Service, etc.)"
+              - text: .
+            - listitem [ref=e318]:
+              - strong [ref=e319]: RegulAIte
+              - text: ": This agent deals with"
+              - strong [ref=e320]: regulatory compliance
+              - text: ("Regulate"). RegulAIte helps users navigate complicated regulations or ensures that documents/actions meet certain regulations using AI. It analyzes text (like policy documents or code) to flag compliance issues or answer questions about regulations.
+              - emphasis [ref=e321]: "(Tech: Python & TypeScript)"
+              - text: .
+            - listitem [ref=e322]:
+              - strong [ref=e323]: Sirius
+              - text: ": An AI agent service project built with Azure AI Agent Service and both Python and TypeScript. The name \"Sirius\" evokes a personal assistant (a nod to"
+              - emphasis [ref=e324]: Siri
+              - text: ). This is a general-purpose personal AI assistant that integrates various tools – possibly controlling smart home devices, managing your calendar/email, or answering general knowledge questions with an agent twist.
+              - emphasis [ref=e325]: "(Tech: Azure AI Agent Service, Python, JS/TS)"
+              - text: .
+            - listitem [ref=e326]:
+              - strong [ref=e327]: Personal Finance Manager
+              - text: ": An AI agent to help individuals manage their finances. Connect to your financial data (bank statements, budgets) and act like a financial advisor chatbot – answering questions like \"How much did I spend on groceries last month?\" or giving budgeting tips. By using Python and Azure AI Agent Service, integrate financial APIs with natural language understanding to make personal finance advice easily accessible."
+              - emphasis [ref=e328]: "(Tech: Python, Azure AI Agent Service)"
+              - text: .
+            - listitem [ref=e329]:
+              - strong [ref=e330]: Seveum – AI Interview Recruiter
+              - text: ":"
+              - emphasis [ref=e331]: Seveum
+              - text: is an AI agent designed to conduct or assist in initial HR
+              - strong [ref=e332]: screening interviews
+              - text: . Think of it as an AI interviewer that can talk to job candidates and evaluate their responses. Built with a Python-based
+              - strong [ref=e333]: LiveKit Agent Framework
+              - text: . Seveum can ask typical HR questions and possibly even do a preliminary assessment (sentiment, keyword matching against job requirements, etc.). This could help HR teams handle large volumes of applications by automating the first-round interviews and spotting the promising candidates.
+              - emphasis [ref=e334]: "(Tech: Python, LiveKit for live interactions)"
+              - text: .
+          - paragraph [ref=e335]: "Each of these honourable mention projects showcases the wide range of possibilities with AI agents from education and healthcare to retail, finance, and developer tools. They also highlight how participants used different technologies: some leaned into cloud services and enterprise data, while others experimented with frameworks and multi-agent systems."
+          - heading "Conclusion" [level=2] [ref=e336]
+          - paragraph [ref=e337]:
+            - text: The AI Agents Hackathon 2025 demonstrated the incredible passion of developers to
+            - strong [ref=e338]: build the future of AI agents
+            - text: ". The winners and honourable mentions solved real problems making research easier, supply chains safer, onboarding smoother, health more personalized, AI more trustworthy, and much more. Equally impressive is the tech diversity: participants used everything from pre-built SDKs and cloud AI services to custom-crafted multi-agent frameworks."
+          - paragraph [ref=e339]:
+            - text: What's the significance of all this? It signals that AI agents are
+            - emphasis [ref=e340]: truly here
+            - text: to transform how we interact with software and data. As the Best Overall project
+            - strong [ref=e341]: RiskWise
+            - text: showed, even traditionally complex domains like supply chain risk can be tackled by an intelligent agent providing timely insights. The success of projects like
+            - strong [ref=e342]: Apollo
+            - text: and
+            - strong [ref=e343]: HealthIA
+            - text: hints that in the near future, we might all have specialized AI "co-workers" whether it's an AI research analyst or an AI fitness coach working alongside us.
+          - paragraph [ref=e344]:
+            - text: For developers, these projects are an inspiration to start developing their own agents. The hackathon provided a playground for innovation, and the results will likely spark further ideas. If you're a developer reading this, think about tasks in your domain that an autonomous or semiautonomous agent could help with. With the abundance of tools (Azure AI Agent Service, Semantic Kernel, LangChain/LangGraph, etc.) and powerful models, there's never been a better time to get started. So check out the resources at the
+            - link "Agent Hack site" [ref=e345] [cursor=pointer]:
+              - /url: https://aka.ms/agentshack
+            - text: and get started with our
+            - link "AI Agents for Beginners" [ref=e346] [cursor=pointer]:
+              - /url: https://aka.ms/ai-agents-beginners
+            - text: .
+          - paragraph [ref=e347]:
+            - strong [ref=e348]: Congratulations to all the winning teams and participants
+            - text: for pushing the boundaries of what AI agents can do. We can't wait to see these projects evolve and inspire even more developers to build the next generation of AI agents.
+    - contentinfo [ref=e349]:
+      - navigation "Footer" [ref=e350]:
+        - 'link "Previous: Submission" [ref=e351] [cursor=pointer]':
+          - /url: ../submission/
+          - generic [ref=e355]:
+            - text: Previous
+            - generic [ref=e356]: Submission
+      - generic [ref=e360]:
+        - text: © 2025 Microsoft |
+        - link "Privacy" [ref=e361] [cursor=pointer]:
+          - /url: https://go.microsoft.com/fwlink/?LinkId=521839
+        - text: "|"
+        - link "Consumer Health Privacy" [ref=e362] [cursor=pointer]:
+          - /url: https://go.microsoft.com/fwlink/?LinkId=2259814
+        - text: "| Cookies |"
+        - link "Terms of Use" [ref=e363] [cursor=pointer]:
+          - /url: https://go.microsoft.com/fwlink/?LinkID=206977
+        - text: "|"
+        - link "Trademarks" [ref=e364] [cursor=pointer]:
+          - /url: https://www.microsoft.com/trademarks
+  - complementary [ref=e366]:
+    - generic [ref=e367]:
+      - heading "Cookie consent" [level=4] [ref=e368]
+      - paragraph [ref=e369]: We use cookies to recognize your repeated visits and preferences, as well as to measure the effectiveness of our documentation and whether users find what they're searching for. With your consent, you're helping us to make our documentation better.
+      - generic [ref=e370]:
+        - button "Accept" [ref=e371] [cursor=pointer]
+        - text: Manage settings

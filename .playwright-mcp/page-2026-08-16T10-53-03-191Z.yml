@@ -1,0 +1,393 @@
+- generic [active] [ref=f33e1]:
+  - link "Skip to main content." [ref=f33e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner:
+    - generic:
+      - generic:
+        - generic:
+          - link [ref=f33e3] [cursor=pointer]:
+            - /url: /blog
+            - img "Arena" [ref=f33e4]
+          - button "Menu" [ref=f33e6] [cursor=pointer]
+  - main [ref=f33e8]:
+    - generic [ref=f33e9]:
+      - generic [ref=f33e12]:
+        - generic [ref=f33e13]:
+          - figure [ref=f33e14]
+          - generic [ref=f33e16]:
+            - generic [ref=f33e17]:
+              - generic [ref=f33e18]: Product
+              - figure [ref=f33e20]
+              - generic [ref=f33e21]: Arena Team
+            - list [ref=f33e22]:
+              - listitem [ref=f33e23]: Published on 2 Jul 2026
+              - listitem [ref=f33e24]: Last updated on 8 Jul 2026
+              - listitem [ref=f33e25]: "Reading Time: 4 minutes"
+          - generic [ref=f33e26]:
+            - heading "Build, Deploy, and Evaluate with Fullstack Code Arena" [level=1] [ref=f33e27]:
+              - paragraph [ref=f33e29]: Build, Deploy, and Evaluate with
+              - paragraph [ref=f33e31]: Fullstack Code Arena
+            - paragraph [ref=f33e32]: Code Arena has evolved beyond frontend prototyping into a complete fullstack AI development platform. Explore capabilities like databases, authentication, third-party integrations, and deployments, and see how Fullstack Code Arena helps developers, entrepreneurs, and AI labs build, deploy, and evaluate production-ready applications.
+        - generic [ref=f33e33]:
+          - generic [ref=f33e36]:
+            - paragraph [ref=f33e37]:
+              - text: AI coding models are evolving faster than ever before. The question is no longer simply whether a model can write static code, but how well it can build real end-to-end applications. That’s why we’re evolving
+              - link "Code Arena" [ref=f33e38] [cursor=pointer]:
+                - /url: https://arena.ai/code?ref=arena.ai
+              - text: to incorporate fullstack capabilities.
+            - paragraph [ref=f33e39]:
+              - text: When we first
+              - link "launched Code Arena last year" [ref=f33e40] [cursor=pointer]:
+                - /url: https://arena.ai/blog/code-arena/
+              - text: ", our goal was to change how AI coding models were evaluated. Seeing the positive response and adoption from our community, we’re now doubling down with the addition of measuring fullstack development abilities of the AI models. Starting today, Code Arena evolves from solely a frontend prototyping tool to a complete, fullstack AI development platform. The following is a look at what this new era of Code Arena unlocks for developers and builders."
+          - generic [ref=f33e42]:
+            - 'heading "What’s Different: The Fullstack Leap" [level=3] [ref=f33e43]'
+            - paragraph [ref=f33e46]: We initially introduced Code Arena to measure "coding in motion," as developers could watch models build frontend web apps step-by-step, then vote on their performance & benchmark in the Code Leaderboard. With today's launch, we are continuing to innovate, evolving our architecture to support true fullstack web development, complete with databases, API keys, and live deployments.
+          - figure "Fig 1. Building an ecommerce store for sneakerheads in Fullstack Code Arena" [ref=f33e49]:
+            - img "Fig 1. Building an ecommerce store for sneakerheads in Fullstack Code Arena" [ref=f33e50]
+          - generic [ref=f33e54]:
+            - paragraph [ref=f33e55]: "With Fullstack, we now support building more complex apps, including:"
+            - list [ref=f33e56]:
+              - listitem [ref=f33e57]: Apps that have a sign up or login flow, like a members-only ecommerce app where you need to login to browse and purchase
+              - listitem [ref=f33e58]: The ability to connect to third party services via an API key, such as bringing in an OpenAI key to make API calls for an AI chatbot product.
+              - listitem [ref=f33e59]: Apps that store a user’s progress for them to come back to, like an education or learning app where a user continually logs in over multiple days or weeks to pick up where they left off.
+            - paragraph [ref=f33e60]: This changes Code Arena from more of an experimental prototyping environment to a daily-use tool where real work gets done.
+            - paragraph:
+              - strong
+            - paragraph [ref=f33e61]:
+              - strong [ref=f33e62]: "Key new features and benefits include:"
+            - list [ref=f33e63]:
+              - listitem [ref=f33e64]:
+                - strong [ref=f33e65]: "Database Integration:"
+                - text: Database layer allowing agents to generate code for PostgreSQL, user authentication, and Row Level Security.
+              - listitem [ref=f33e66]:
+                - strong [ref=f33e67]: "Third party access:"
+                - text: The ability to safely connect to third party services and apps, such as calling an LLM, or connecting to a payments API to accept payments for an ecommerce app, for example.
+              - listitem [ref=f33e68]:
+                - strong [ref=f33e69]: "Persistent Dev Server & Visual Terminal:"
+                - text: A live dev server running inside the sandbox with hot reloading.
+              - listitem [ref=f33e70]:
+                - strong [ref=f33e71]: "Bash and Web Search Tools:"
+                - text: We’ve moved beyond reading and editing files — Agents are now equipped to run any bash command, as well as search the web for real-time information or documentation via search, vastly expanding what’s possible to build.
+              - listitem [ref=f33e72]:
+                - strong [ref=f33e73]: "Fast Deployments:"
+                - text: A seamless build-to-ship pipeline that allows you to deploy your fullstack web apps directly to Vercel.
+          - generic [ref=f33e75]:
+            - heading "Empowering Builders To Do More" [level=3] [ref=f33e76]
+            - generic [ref=f33e78]:
+              - paragraph [ref=f33e79]: "By removing the limitations of the single-page frontend, Fullstack Code Arena is now a daily-use tool designed for three key audiences:"
+              - paragraph [ref=f33e80]:
+                - strong [ref=f33e81]:
+                  - strong [ref=f33e82]: "1. For Entrepreneurs and Small Businesses:"
+                - text: Code Arena removes the technical barriers that limit your potential. By providing full data persistence and user management, we enable you to transform ideas into complex, functional applications without hitting technical ceilings.
+              - paragraph [ref=f33e83]:
+                - strong [ref=f33e84]:
+                  - strong [ref=f33e85]: "2. For Developers:"
+                - text: Code Arena provides a production-grade environment built for real work. With persistent, long-running sandboxes, you can seamlessly build, iterate, and ship complete applications within a single, integrated workspace.
+              - paragraph [ref=f33e86]:
+                - strong [ref=f33e87]:
+                  - strong [ref=f33e88]: "3. For AI Model Labs:"
+                - text: Code Arena delivers the high-fidelity evaluations necessary to advance software-engineering AI. By testing models on complex backend tasks—such as database operations and multi-file generation—you gain the critical data required to train the next generation of intelligent systems.
+              - paragraph [ref=f33e89]:
+                - text: We’re excited to usher in this next stage of AI coding, which isn't just about just writing code—it's about building complete, real-world software.
+                - strong [ref=f33e90]:
+                  - strong [ref=f33e91]:
+                    - text: Ready to build? Try out the new
+                    - link "Fullstack Code Arena" [ref=f33e92] [cursor=pointer]:
+                      - /url: https://arena.ai/code?ref=arena.ai
+                    - text: today.
+              - paragraph [ref=f33e93]:
+                - text: Have additional questions? Visit our
+                - link "help center" [ref=f33e94] [cursor=pointer]:
+                  - /url: https://help.arena.ai/articles/5701270322-arena-how-to-code-arena?ref=arena.ai
+                - text: for more.
+          - iframe [ref=f33e97]
+        - generic [ref=f33e98]:
+          - heading "Share this Article" [level=3] [ref=f33e99]
+          - generic [ref=f33e100]:
+            - link "Share this article on LinkedIn" [ref=f33e101] [cursor=pointer]:
+              - /url: https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Farena.ai%2Ffullstack-code-arena
+              - generic [ref=f33e102]: LinkedIn
+            - link "Share this article on X" [ref=f33e105] [cursor=pointer]:
+              - /url: https://x.com/intent/post?url=https%3A%2F%2Farena.ai%2Ffullstack-code-arena&text=Build%2C+Deploy%2C+and+Evaluate+with+Fullstack+Code+Arena
+              - generic [ref=f33e106]: X
+            - button "Copy Link" [ref=f33e110] [cursor=pointer]
+      - generic [ref=f33e113]:
+        - generic [ref=f33e116]:
+          - heading "Related Articles" [level=3] [ref=f33e117]
+          - generic [ref=f33e118]:
+            - generic [ref=f33e121]:
+              - link [ref=f33e123] [cursor=pointer]:
+                - /url: /blog/autoeval-scores
+                - article [ref=f33e124]:
+                  - figure [ref=f33e125]:
+                    - generic [ref=f33e126]:
+                      - img "Post Card" [ref=f33e127]
+                      - generic [ref=f33e128]:
+                        - generic [ref=f33e129]: Read Article
+                        - img "Read Article" [ref=f33e130]
+                  - generic [ref=f33e132]:
+                    - generic [ref=f33e133]:
+                      - heading "Introducing AutoEval to the Arena leaderboards" [level=3] [ref=f33e134]:
+                        - generic [ref=f33e135]: Introducing AutoEval to the Arena
+                        - generic [ref=f33e136]: leaderboards
+                      - paragraph [ref=f33e137]: At Arena, our evaluations are dynamic and grounded in real-world use. But real-world signals take time to collect. Today, we’re introducing AutoEval scores to provide immediate, calibrated model ratings on real tasks when waiting for human votes to accumulate.
+                    - generic [ref=f33e138]:
+                      - generic [ref=f33e139]: Product
+                      - generic [ref=f33e141]: Arena Team—30 Jul 2026
+              - link [ref=f33e143] [cursor=pointer]:
+                - /url: /blog/factuality-in-arena
+                - article [ref=f33e144]:
+                  - figure [ref=f33e145]:
+                    - generic [ref=f33e146]:
+                      - img "Text Arena and Search Arena scores with the factuality adjustment on" [ref=f33e147]
+                      - generic [ref=f33e148]:
+                        - generic [ref=f33e149]: Read Article
+                        - img "Read Article" [ref=f33e150]
+                  - generic [ref=f33e152]:
+                    - generic [ref=f33e153]:
+                      - heading "Factuality in the Arena" [level=3] [ref=f33e154]
+                      - paragraph [ref=f33e156]: Factuality remains one of the most persistent questions users face when using AI models. Today, we are launching a leaderboard that ranks models not only by human preference, but also by the factual accuracy of their responses.
+                    - generic [ref=f33e157]:
+                      - generic [ref=f33e158]: Research
+                      - generic [ref=f33e160]: Product
+                      - generic [ref=f33e162]: Arena Team—14 Jul 2026
+              - link [ref=f33e164] [cursor=pointer]:
+                - /url: /blog/arena-100m-revenue
+                - article [ref=f33e165]:
+                  - figure [ref=f33e166]:
+                    - generic [ref=f33e167]:
+                      - img "Arena reaches $100M in eight months" [ref=f33e168]
+                      - generic [ref=f33e169]:
+                        - generic [ref=f33e170]: Read Article
+                        - img "Read Article" [ref=f33e171]
+                  - generic [ref=f33e173]:
+                    - generic [ref=f33e174]:
+                      - heading "Arena Reaches $100M in 8 Months" [level=3] [ref=f33e175]
+                      - paragraph [ref=f33e177]: Arena achieves $100M annualized run rate in eight months, driven by 10M+ monthly users who have contributed 700M+ conversations and 82M+ votes to build the world's largest human-preference dataset for AI evaluation.
+                    - generic [ref=f33e178]:
+                      - generic [ref=f33e179]: News
+                      - generic [ref=f33e181]: Anastasios Angelopoulos—29 Jun 2026
+              - link [ref=f33e183] [cursor=pointer]:
+                - /url: /blog/agent-arena-methodology
+                - article [ref=f33e184]:
+                  - figure [ref=f33e185]:
+                    - generic [ref=f33e186]:
+                      - 'img "Agent Arena: Causal Evaluation of Agents in the Real World" [ref=f33e187]'
+                      - generic [ref=f33e188]:
+                        - generic [ref=f33e189]: Read Article
+                        - img "Read Article" [ref=f33e190]
+                  - generic [ref=f33e192]:
+                    - generic [ref=f33e193]:
+                      - 'heading "Agent Arena: Causal Evaluation of Agents in the Real World" [level=3] [ref=f33e194]':
+                        - generic [ref=f33e195]: "Agent Arena: Causal Evaluation of"
+                        - generic [ref=f33e196]: Agents in the Real World
+                      - paragraph [ref=f33e197]: Agents are increasingly doing real work. The resulting task distribution has greatly expanded. We desire an agent evaluation that scales along with usage and capability.
+                    - generic [ref=f33e198]:
+                      - generic [ref=f33e199]: Product
+                      - generic [ref=f33e201]: Research
+                      - generic [ref=f33e203]: Arena Team—4 Jun 2026
+              - link [ref=f33e205] [cursor=pointer]:
+                - /url: /blog/agent-mode
+                - article [ref=f33e206]:
+                  - figure [ref=f33e207]:
+                    - generic [ref=f33e208]:
+                      - img "Empowering Users to Get More Done With Agent Mode" [ref=f33e209]
+                      - generic [ref=f33e210]:
+                        - generic [ref=f33e211]: Read Article
+                        - img "Read Article" [ref=f33e212]
+                  - generic [ref=f33e214]:
+                    - generic [ref=f33e215]:
+                      - heading "Empowering Users to Get More Done With Agent Mode" [level=3] [ref=f33e216]:
+                        - generic [ref=f33e217]: Empowering Users to Get More
+                        - generic [ref=f33e218]: Done With Agent Mode
+                      - paragraph [ref=f33e219]: The future of AI is not single-modality chat; it is in powerful agentic capabilities. Today, we are excited to introduce Agent Mode, designed to help everyone from everyday users looking to get more done to entrepreneurs looking to maximize agentic efficacy across complex use cases.
+                    - generic [ref=f33e220]:
+                      - generic [ref=f33e221]: Product
+                      - generic [ref=f33e223]: Arena Team—4 Jun 2026
+              - link [ref=f33e225] [cursor=pointer]:
+                - /url: /blog/new-categories-code-arena
+                - article [ref=f33e226]:
+                  - figure [ref=f33e227]:
+                    - generic [ref=f33e228]:
+                      - img "New Categories for Web Development in Code Arena" [ref=f33e229]
+                      - generic [ref=f33e230]:
+                        - generic [ref=f33e231]: Read Article
+                        - img "Read Article" [ref=f33e232]
+                  - generic [ref=f33e234]:
+                    - generic [ref=f33e235]:
+                      - heading "New Categories for Web Development in Code Arena" [level=3] [ref=f33e236]:
+                        - generic [ref=f33e237]: New Categories for Web
+                        - generic [ref=f33e238]: Development in Code Arena
+                      - paragraph [ref=f33e239]: AI coding models are increasingly used to build web apps, but aggregated leaderboards obscure key performance differences. After analyzing 250k+ Code Arena prompts, we identified major front-end task categories and built new leaderboard views to compare model strengths and weaknesses.
+                    - generic [ref=f33e240]:
+                      - generic [ref=f33e241]: Product
+                      - generic [ref=f33e243]: Arena Team—8 May 2026
+              - link [ref=f33e245] [cursor=pointer]:
+                - /url: /blog/multimodal-max
+                - article [ref=f33e246]:
+                  - figure [ref=f33e247]:
+                    - generic [ref=f33e248]:
+                      - img "Multimodal Max" [ref=f33e249]
+                      - generic [ref=f33e250]:
+                        - generic [ref=f33e251]: Read Article
+                        - img "Read Article" [ref=f33e252]
+                  - generic [ref=f33e254]:
+                    - generic [ref=f33e255]:
+                      - heading "Multimodal Max" [level=3] [ref=f33e256]
+                      - paragraph [ref=f33e258]: Max, Arena's model router powered by 5M+ community votes, is now multimodal. Starting today, Max will be available as the default option in direct chat for all modalities, with expanded capabilities including search, vision, image generation, image editing, and front-end coding. Similar to our original Max for text, the multimodal variants are latency-controlled to provide a fast and performant experience. Try it now at arena.ai/max!
+                    - generic [ref=f33e259]:
+                      - generic [ref=f33e260]: Product
+                      - generic [ref=f33e262]: Arena Team—5 May 2026
+              - link [ref=f33e264] [cursor=pointer]:
+                - /url: /blog/arena-leaderboard-dataset
+                - article [ref=f33e265]:
+                  - figure [ref=f33e266]:
+                    - generic [ref=f33e267]:
+                      - img "Arena Leaderboard Dataset" [ref=f33e268]
+                      - generic [ref=f33e269]:
+                        - generic [ref=f33e270]: Read Article
+                        - img "Read Article" [ref=f33e271]
+                  - generic [ref=f33e273]:
+                    - generic [ref=f33e274]:
+                      - heading "Arena Leaderboard Dataset" [level=3] [ref=f33e275]
+                      - paragraph [ref=f33e277]: For almost three years, Arena has been publishing leaderboards covering frontier AI capabilities across 10 arenas, dozens of categories, and hundreds of models, and today we're releasing the entire history of those leaderboards as a public-access dataset.
+                    - generic [ref=f33e278]:
+                      - generic [ref=f33e279]: Research
+                      - generic [ref=f33e281]: Arena Team—2 Apr 2026
+              - link [ref=f33e283] [cursor=pointer]:
+                - /url: /blog/march-2026-arena-updates
+                - article [ref=f33e284]:
+                  - figure [ref=f33e285]:
+                    - generic [ref=f33e286]:
+                      - 'img "March 2026: Arena Updates across Product, Leaderboard Rankings & Research" [ref=f33e287]'
+                      - generic [ref=f33e288]:
+                        - generic [ref=f33e289]: Read Article
+                        - img "Read Article" [ref=f33e290]
+                  - generic [ref=f33e292]:
+                    - generic [ref=f33e293]:
+                      - 'heading "March 2026: Arena Updates across Product, Leaderboard Rankings & Research" [level=3] [ref=f33e294]':
+                        - generic [ref=f33e295]: "March 2026: Arena Updates across"
+                        - generic [ref=f33e296]: Product, Leaderboard Rankings &
+                        - generic [ref=f33e297]: Research
+                      - paragraph [ref=f33e298]: March 2026 brought major updates to the Arena leaderboard, including new rankings across document, video, text, and code models. In this monthly roundup, we break down the best AI models, latest LLM benchmarks, and key trends shaping AI evaluation.
+                    - generic [ref=f33e299]:
+                      - generic [ref=f33e300]: News
+                      - generic [ref=f33e302]: Product
+                      - generic [ref=f33e304]: Arena Team—31 Mar 2026
+            - generic [ref=f33e305]:
+              - generic:
+                - button [ref=f33e306] [cursor=pointer]
+                - button [ref=f33e309] [cursor=pointer]
+              - link "See All Articles" [ref=f33e323] [cursor=pointer]:
+                - /url: /blog
+        - generic [ref=f33e327]:
+          - heading "Subscribeto Arena news and research" [level=3] [ref=f33e328]:
+            - generic [ref=f33e329]: Subscribe
+            - generic [ref=f33e330]: to Arena news
+            - generic [ref=f33e331]: and research
+          - paragraph [ref=f33e332]: Insights at the frontier of AI.
+          - generic [ref=f33e333]:
+            - generic [ref=f33e334]:
+              - textbox "Your email" [ref=f33e335]
+              - button "Subscribe" [ref=f33e336] [cursor=pointer]
+            - generic: Invalid email address
+  - contentinfo [ref=f33e338]:
+    - generic [ref=f33e340]:
+      - link [ref=f33e342] [cursor=pointer]:
+        - /url: /blog
+        - img "Arena" [ref=f33e343]
+      - generic [ref=f33e345]:
+        - generic [ref=f33e346]:
+          - generic [ref=f33e347]: Leaderboard Rankings
+          - navigation [ref=f33e348]:
+            - link "Overall" [ref=f33e350] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard
+            - link "Agent" [ref=f33e352] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/agent
+            - link "Text" [ref=f33e354] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/text
+            - link "WebDev" [ref=f33e356] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/code/webdev
+            - link "Image-to-WebDev" [ref=f33e358] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/code/image-to-webdev
+            - link "Text to Image" [ref=f33e360] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/text-to-image
+            - link "Image Edit" [ref=f33e362] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/image-edit
+            - link "Text to Video" [ref=f33e364] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/text-to-video
+            - link "Image to Video" [ref=f33e366] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/image-to-video
+            - link "Video Edit" [ref=f33e368] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/video-edit
+            - link "Vision" [ref=f33e370] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/vision
+            - link "Document" [ref=f33e372] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/document
+            - link "Search" [ref=f33e374] [cursor=pointer]:
+              - /url: https://arena.ai/leaderboard/search
+        - generic [ref=f33e375]:
+          - generic [ref=f33e376]: Use Cases
+          - navigation [ref=f33e377]:
+            - link "Chat with AI" [ref=f33e379] [cursor=pointer]:
+              - /url: https://arena.ai/
+            - link "Build Apps & Websites" [ref=f33e381] [cursor=pointer]:
+              - /url: https://arena.ai/code
+            - link "Write & Edit Text" [ref=f33e383] [cursor=pointer]:
+              - /url: https://arena.ai/text
+            - link "Search the Web" [ref=f33e385] [cursor=pointer]:
+              - /url: https://arena.ai/search
+            - link "Generate Images" [ref=f33e387] [cursor=pointer]:
+              - /url: https://arena.ai/image
+            - link "Generate Videos" [ref=f33e389] [cursor=pointer]:
+              - /url: https://arena.ai/video
+            - link "Chose any Model" [ref=f33e391] [cursor=pointer]:
+              - /url: https://arena.ai/direct
+            - link "Compare Models Side by Side" [ref=f33e393] [cursor=pointer]:
+              - /url: https://arena.ai/side-by-side
+            - link "Complete Multi-step Tasks" [ref=f33e395] [cursor=pointer]:
+              - /url: https://arena.ai/agent
+        - generic [ref=f33e396]:
+          - generic [ref=f33e397]: Company
+          - navigation [ref=f33e398]:
+            - link "About Us" [ref=f33e400] [cursor=pointer]:
+              - /url: https://arena.ai/about
+            - link "How It Works" [ref=f33e402] [cursor=pointer]:
+              - /url: https://arena.ai/how-it-works
+            - link "Careers" [ref=f33e404] [cursor=pointer]:
+              - /url: https://arena.ai/jobs
+            - link "Changelog" [ref=f33e406] [cursor=pointer]:
+              - /url: https://arena.ai/blog/leaderboard-changelog
+            - link "Help Center" [ref=f33e408] [cursor=pointer]:
+              - /url: https://help.arena.ai
+            - link "FAQ" [ref=f33e410] [cursor=pointer]:
+              - /url: https://arena.ai/faq
+            - link "Blog" [ref=f33e412] [cursor=pointer]:
+              - /url: https://arena.ai/blog
+        - generic [ref=f33e413]:
+          - generic [ref=f33e414]: Follow
+          - navigation [ref=f33e415]:
+            - link "X" [ref=f33e417] [cursor=pointer]:
+              - /url: https://x.com/arena
+            - link "LinkedIn" [ref=f33e419] [cursor=pointer]:
+              - /url: https://www.linkedin.com/company/arenaai/
+            - link "YouTube" [ref=f33e421] [cursor=pointer]:
+              - /url: https://www.youtube.com/@ArenaAIOfficial
+            - link "Discord" [ref=f33e423] [cursor=pointer]:
+              - /url: https://discord.gg/arena-ai
+        - generic [ref=f33e424]:
+          - generic [ref=f33e425]:
+            - link "Terms" [ref=f33e426] [cursor=pointer]:
+              - /url: https://arena.ai/terms-of-use
+            - link "Privacy" [ref=f33e427] [cursor=pointer]:
+              - /url: https://arena.ai/privacy-policy
+            - link "Cookies" [ref=f33e428] [cursor=pointer]:
+              - /url: https://arena.ai/cookie-policy
+          - generic [ref=f33e429]:
+            - link "Try Arena Try Arena" [ref=f33e430] [cursor=pointer]:
+              - /url: https://arena.ai/
+              - generic [ref=f33e431]: Try Arena
+              - img "Try Arena" [ref=f33e433]
+            - paragraph [ref=f33e435]: Ⓒ 2026 Arena Intelligence Inc.
+  - alert [ref=f33e436]

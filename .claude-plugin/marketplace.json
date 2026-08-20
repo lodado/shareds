@@ -33,6 +33,18 @@
       "tags": ["frontend", "tdd", "oracle"]
     },
     {
+      "name": "agent-graph-engineering",
+      "description": "Bounded node-and-edge orchestration for native agents, tools, joins, retries, and human gates.",
+      "version": "0.1.0",
+      "author": {
+        "name": "lodado"
+      },
+      "source": "./packages/agent-graph-engineering",
+      "category": "development",
+      "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+      "tags": ["agents", "graph", "orchestration"]
+    },
+    {
       "name": "frontend-system-design",
       "description": "Oracle-dependent policy candidates and verification duties for well-known frontend system design problems.",
       "version": "0.2.0",

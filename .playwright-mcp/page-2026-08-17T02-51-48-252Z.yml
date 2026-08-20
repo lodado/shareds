@@ -1,0 +1,198 @@
+- generic [ref=f20e2]:
+  - generic [ref=f20e3]:
+    - link "DuckDuckGo" [ref=f20e4] [cursor=pointer]:
+      - /url: /html/
+    - generic [ref=f20e5]:
+      - generic [ref=f20e6]:
+        - textbox [ref=f20e7]: React Doctor static analysis hooks component complexity 2026
+        - button "Submit" [ref=f20e8] [cursor=pointer]
+      - combobox [ref=f20e10] [cursor=pointer]:
+        - option "All Regions" [selected]
+        - option "Argentina"
+        - option "Australia"
+        - option "Austria"
+        - option "Belgium (fr)"
+        - option "Belgium (nl)"
+        - option "Brazil"
+        - option "Bulgaria"
+        - option "Canada (en)"
+        - option "Canada (fr)"
+        - option "Catalonia"
+        - option "Chile"
+        - option "China"
+        - option "Colombia"
+        - option "Croatia"
+        - option "Czech Republic"
+        - option "Denmark"
+        - option "Estonia"
+        - option "Finland"
+        - option "France"
+        - option "Germany"
+        - option "Greece"
+        - option "Hong Kong"
+        - option "Hungary"
+        - option "Iceland"
+        - option "India (en)"
+        - option "Indonesia (en)"
+        - option "Ireland"
+        - option "Israel (en)"
+        - option "Italy"
+        - option "Japan"
+        - option "Korea"
+        - option "Latvia"
+        - option "Lithuania"
+        - option "Malaysia (en)"
+        - option "Mexico"
+        - option "Netherlands"
+        - option "New Zealand"
+        - option "Norway"
+        - option "Pakistan (en)"
+        - option "Peru"
+        - option "Philippines (en)"
+        - option "Poland"
+        - option "Portugal"
+        - option "Romania"
+        - option "Russia"
+        - option "Saudi Arabia"
+        - option "Singapore"
+        - option "Slovakia"
+        - option "Slovenia"
+        - option "South Africa"
+        - option "Spain (ca)"
+        - option "Spain (es)"
+        - option "Sweden"
+        - option "Switzerland (de)"
+        - option "Switzerland (fr)"
+        - option "Taiwan"
+        - option "Thailand (en)"
+        - option "Turkey"
+        - option "US (English)"
+        - option "US (Spanish)"
+        - option "Ukraine"
+        - option "United Kingdom"
+        - option "Vietnam (en)"
+      - combobox [ref=f20e12] [cursor=pointer]:
+        - option "Any Time" [selected]
+        - option "Past Day"
+        - option "Past Week"
+        - option "Past Month"
+        - option "Past Year"
+  - generic [ref=f20e15]:
+    - generic [ref=f20e17]:
+      - heading [level=2] [ref=f20e18]:
+        - link "React Doctor 2026 - Static Analysis for AI-Generated React Code Quality" [ref=f20e19] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fbraindetox.kr%2Fen%2Fposts%2Freact_doctor_ai_code_analysis_2026.html&rut=3c25c759f7960b249e5f07279156661319a3ab654bcf13059594e58fdfe8fb18
+      - generic [ref=f20e21]:
+        - link [ref=f20e23] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fbraindetox.kr%2Fen%2Fposts%2Freact_doctor_ai_code_analysis_2026.html&rut=3c25c759f7960b249e5f07279156661319a3ab654bcf13059594e58fdfe8fb18
+        - link "braindetox.kr/en/posts/react_doctor_ai_code_analysis_2026.html" [ref=f20e24] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fbraindetox.kr%2Fen%2Fposts%2Freact_doctor_ai_code_analysis_2026.html&rut=3c25c759f7960b249e5f07279156661319a3ab654bcf13059594e58fdfe8fb18
+        - text: 2026-05-28T00:00:00.0000000
+      - link "React Doctor analyzes the AST (Abstract Syntax Tree) of React components to detect structural quality issues. Unlike ESLint plugins, it has its own rule engine specifically built around React's rendering model and the Hooks system." [ref=f20e25] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fbraindetox.kr%2Fen%2Fposts%2Freact_doctor_ai_code_analysis_2026.html&rut=3c25c759f7960b249e5f07279156661319a3ab654bcf13059594e58fdfe8fb18
+    - generic [ref=f20e27]:
+      - heading [level=2] [ref=f20e28]:
+        - link "React Doctor" [ref=f20e29] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.react.doctor%2F&rut=7d75814b4f5649ef31c9a6f65099e06f1b2d4b12521fa9a16e65d6c88b1ddef1
+      - generic [ref=f20e31]:
+        - link [ref=f20e33] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.react.doctor%2F&rut=7d75814b4f5649ef31c9a6f65099e06f1b2d4b12521fa9a16e65d6c88b1ddef1
+        - link "www.react.doctor" [ref=f20e34] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.react.doctor%2F&rut=7d75814b4f5649ef31c9a6f65099e06f1b2d4b12521fa9a16e65d6c88b1ddef1
+      - link "Find complex React functions, repeated JSX, and production risks with deterministic static analysis." [ref=f20e35] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.react.doctor%2F&rut=7d75814b4f5649ef31c9a6f65099e06f1b2d4b12521fa9a16e65d6c88b1ddef1
+    - generic [ref=f20e37]:
+      - heading [level=2] [ref=f20e38]:
+        - 'link "GitHub - millionco/react-doctor: Your agent writes bad React. This ..." [ref=f20e39] [cursor=pointer]':
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fmillionco%2Freact%2Ddoctor&rut=b6686edcaf1a702a56a25fbf96c45f7051b7c3f7221093ab31c2dba0588e75e9
+      - generic [ref=f20e41]:
+        - link [ref=f20e43] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fmillionco%2Freact%2Ddoctor&rut=b6686edcaf1a702a56a25fbf96c45f7051b7c3f7221093ab31c2dba0588e75e9
+        - link "github.com/millionco/react-doctor" [ref=f20e44] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fmillionco%2Freact%2Ddoctor&rut=b6686edcaf1a702a56a25fbf96c45f7051b7c3f7221093ab31c2dba0588e75e9
+        - text: 2026-02-17T15:47:00.0000000
+      - link "Your agent writes bad React. This catches it. Contribute to millionco/react-doctor development by creating an account on GitHub." [ref=f20e45] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fmillionco%2Freact%2Ddoctor&rut=b6686edcaf1a702a56a25fbf96c45f7051b7c3f7221093ab31c2dba0588e75e9
+    - generic [ref=f20e47]:
+      - heading [level=2] [ref=f20e48]:
+        - link "React Maintainability - Docs | React Doctor" [ref=f20e49] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.react.doctor%2Fdocs%2Foverview%2Freact%2Dmaintainability&rut=c1310edb21bd7b0860e26722b6939b0a571beb21c39d8cbe71b6d2b2721805d3
+      - generic [ref=f20e51]:
+        - link [ref=f20e53] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.react.doctor%2Fdocs%2Foverview%2Freact%2Dmaintainability&rut=c1310edb21bd7b0860e26722b6939b0a571beb21c39d8cbe71b6d2b2721805d3
+        - link "www.react.doctor/docs/overview/react-maintainability" [ref=f20e54] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.react.doctor%2Fdocs%2Foverview%2Freact%2Dmaintainability&rut=c1310edb21bd7b0860e26722b6939b0a571beb21c39d8cbe71b6d2b2721805d3
+      - link "React Doctor excludes ordinary JavaScript functions and nested callback complexity from the owning component. A reported function should become easier to understand when you extract independent branches into components or hooks." [ref=f20e55] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.react.doctor%2Fdocs%2Foverview%2Freact%2Dmaintainability&rut=c1310edb21bd7b0860e26722b6939b0a571beb21c39d8cbe71b6d2b2721805d3
+    - generic [ref=f20e57]:
+      - heading [level=2] [ref=f20e58]:
+        - link "React Doctor hits 11.1k stars as AI React audit layer - Devlery" [ref=f20e59] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fdevlery.com%2Fen%2Fblog%2Freact%2Ddoctor%2Dagent%2Dreact%2Daudit&rut=9e16b67ae72d23f8c41d0ada87122afaf58d2009251cbb9f8b2a0a351587406a
+      - generic [ref=f20e61]:
+        - link [ref=f20e63] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fdevlery.com%2Fen%2Fblog%2Freact%2Ddoctor%2Dagent%2Dreact%2Daudit&rut=9e16b67ae72d23f8c41d0ada87122afaf58d2009251cbb9f8b2a0a351587406a
+        - link "devlery.com/en/blog/react-doctor-agent-react-audit" [ref=f20e64] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fdevlery.com%2Fen%2Fblog%2Freact%2Ddoctor%2Dagent%2Dreact%2Daudit&rut=9e16b67ae72d23f8c41d0ada87122afaf58d2009251cbb9f8b2a0a351587406a
+        - text: 2026-05-28T00:00:00.0000000
+      - link "In the May 28, 2026 latest list, React Doctor was shared as a diagnostic tool that uses static analysis to verify AI-generated React code. At the time of verification, it had 17 points and one comment after roughly 20 hours." [ref=f20e65] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fdevlery.com%2Fen%2Fblog%2Freact%2Ddoctor%2Dagent%2Dreact%2Daudit&rut=9e16b67ae72d23f8c41d0ada87122afaf58d2009251cbb9f8b2a0a351587406a
+    - generic [ref=f20e67]:
+      - heading [level=2] [ref=f20e68]:
+        - 'link "React Doctor: Find React Anti-Patterns Fast - Better Stack Community" [ref=f20e69] [cursor=pointer]':
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fbetterstack.com%2Fcommunity%2Fguides%2Fscaling%2Dnodejs%2Freact%2Ddoctor%2F&rut=afdcc2f408f4756867dd8186893b5d3a61b0316d4d30f89b922123c7964582e6
+      - generic [ref=f20e71]:
+        - link [ref=f20e73] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fbetterstack.com%2Fcommunity%2Fguides%2Fscaling%2Dnodejs%2Freact%2Ddoctor%2F&rut=afdcc2f408f4756867dd8186893b5d3a61b0316d4d30f89b922123c7964582e6
+        - link "betterstack.com/community/guides/scaling-nodejs/react-doctor/" [ref=f20e74] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fbetterstack.com%2Fcommunity%2Fguides%2Fscaling%2Dnodejs%2Freact%2Ddoctor%2F&rut=afdcc2f408f4756867dd8186893b5d3a61b0316d4d30f89b922123c7964582e6
+        - text: 2026-02-22T00:00:00.0000000
+      - link "What is React Doctor? At its core, React Doctor is a simple yet incredibly powerful static analysis tool. You run a single command in your terminal, and it meticulously inspects your React project's source code, identifying potential issues and grading your codebase's overall health. It acts as an automated code reviewer, specifically trained to spot common mistakes in the React ecosystem. A ..." [ref=f20e75] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fbetterstack.com%2Fcommunity%2Fguides%2Fscaling%2Dnodejs%2Freact%2Ddoctor%2F&rut=afdcc2f408f4756867dd8186893b5d3a61b0316d4d30f89b922123c7964582e6
+    - generic [ref=f20e77]:
+      - heading [level=2] [ref=f20e78]:
+        - link "GitHub - softar-dev/React_Doctor" [ref=f20e79] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fsoftar%2Ddev%2FReact_Doctor&rut=15b52ac5094963e1793bf54f4c934782de7f6a641008063e84c53ee1ca38a361
+      - generic [ref=f20e81]:
+        - link [ref=f20e83] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fsoftar%2Ddev%2FReact_Doctor&rut=15b52ac5094963e1793bf54f4c934782de7f6a641008063e84c53ee1ca38a361
+        - link "github.com/softar-dev/React_Doctor" [ref=f20e84] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fsoftar%2Ddev%2FReact_Doctor&rut=15b52ac5094963e1793bf54f4c934782de7f6a641008063e84c53ee1ca38a361
+      - link "🩺 React Doctor Diagnose, analyze, and optimize your React applications — static code analysis + runtime performance profiling + intelligent suggestions + dashboard upload." [ref=f20e85] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fgithub.com%2Fsoftar%2Ddev%2FReact_Doctor&rut=15b52ac5094963e1793bf54f4c934782de7f6a641008063e84c53ee1ca38a361
+    - generic [ref=f20e87]:
+      - heading [level=2] [ref=f20e88]:
+        - 'link "react-doctor: Lint Layer for AI-Generated React Code Hits 1.7K Stars ..." [ref=f20e89] [cursor=pointer]':
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.nextbig.dev%2Fdaily%2F2026%2D05%2D12%2Freact%2Ddoctor%2Dlint%2Dlayer%2Dai%2Dgenerated%2Dreact%2Dcode%2Dhits%2D1&rut=0c5d40897d4769f24efa5812c88088f0ec301872d12ae5098f302429adbe41a9
+      - generic [ref=f20e91]:
+        - link [ref=f20e93] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.nextbig.dev%2Fdaily%2F2026%2D05%2D12%2Freact%2Ddoctor%2Dlint%2Dlayer%2Dai%2Dgenerated%2Dreact%2Dcode%2Dhits%2D1&rut=0c5d40897d4769f24efa5812c88088f0ec301872d12ae5098f302429adbe41a9
+        - link "www.nextbig.dev/daily/2026-05-12/react-doctor-lint-layer-ai-generated-react-code-hits-1" [ref=f20e94] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.nextbig.dev%2Fdaily%2F2026%2D05%2D12%2Freact%2Ddoctor%2Dlint%2Dlayer%2Dai%2Dgenerated%2Dreact%2Dcode%2Dhits%2D1&rut=0c5d40897d4769f24efa5812c88088f0ec301872d12ae5098f302429adbe41a9
+        - text: 2026-05-12T00:00:00.0000000
+      - link "Million.js just shipped react-doctor, a static analysis tool purpose-built to catch the specific anti-patterns that LLM coding agents produce in React codebases." [ref=f20e95] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.nextbig.dev%2Fdaily%2F2026%2D05%2D12%2Freact%2Ddoctor%2Dlint%2Dlayer%2Dai%2Dgenerated%2Dreact%2Dcode%2Dhits%2D1&rut=0c5d40897d4769f24efa5812c88088f0ec301872d12ae5098f302429adbe41a9
+    - generic [ref=f20e97]:
+      - heading [level=2] [ref=f20e98]:
+        - link "react-doctor — install, API, examples, gotchas | millionco/react-doctor" [ref=f20e99] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Flanglabs.io%2Fmillionco%2Freact%2Ddoctor&rut=d0f14839fdcfd17b2c17f3fa299b6c844fe5a14e54bf30321b491766e720dcc2
+      - generic [ref=f20e101]:
+        - link [ref=f20e103] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Flanglabs.io%2Fmillionco%2Freact%2Ddoctor&rut=d0f14839fdcfd17b2c17f3fa299b6c844fe5a14e54bf30321b491766e720dcc2
+        - link "langlabs.io/millionco/react-doctor" [ref=f20e104] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Flanglabs.io%2Fmillionco%2Freact%2Ddoctor&rut=d0f14839fdcfd17b2c17f3fa299b6c844fe5a14e54bf30321b491766e720dcc2
+      - link "eslint-plugin-react / eslint-plugin-react-hooks — the traditional alternative; react-doctor is faster (oxlint engine) and adds AI-slop-specific rules those plugins don't cover." [ref=f20e105] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Flanglabs.io%2Fmillionco%2Freact%2Ddoctor&rut=d0f14839fdcfd17b2c17f3fa299b6c844fe5a14e54bf30321b491766e720dcc2
+    - generic [ref=f20e107]:
+      - heading [level=2] [ref=f20e108]:
+        - 'link "React Doctor: One‑command React health scanner with actionable fixes" [ref=f20e109] [cursor=pointer]':
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Frefft.com%2Fen%2Fmillionco_react%2Ddoctor.html&rut=69beaac909b1accf39f8eeb8ec11eeb6337d5a7f50eaa7cd11b24eb2c33ea4f6
+      - generic [ref=f20e111]:
+        - link [ref=f20e113] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Frefft.com%2Fen%2Fmillionco_react%2Ddoctor.html&rut=69beaac909b1accf39f8eeb8ec11eeb6337d5a7f50eaa7cd11b24eb2c33ea4f6
+        - link "refft.com/en/millionco_react-doctor.html" [ref=f20e114] [cursor=pointer]:
+          - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Frefft.com%2Fen%2Fmillionco_react%2Ddoctor.html&rut=69beaac909b1accf39f8eeb8ec11eeb6337d5a7f50eaa7cd11b24eb2c33ea4f6
+      - link "React Doctor is a one‑command static scanner that scores React projects (0-100) and returns rule‑based, actionable diagnostics and fixes for CI, PRs, and local debugging." [ref=f20e115] [cursor=pointer]:
+        - /url: //duckduckgo.com/l/?uddg=https%3A%2F%2Frefft.com%2Fen%2Fmillionco_react%2Ddoctor.html&rut=69beaac909b1accf39f8eeb8ec11eeb6337d5a7f50eaa7cd11b24eb2c33ea4f6
+    - button "Next" [ref=f20e118] [cursor=pointer]
+    - link "Feedback" [ref=f20e120] [cursor=pointer]:
+      - /url: //duckduckgo.com/feedback.html

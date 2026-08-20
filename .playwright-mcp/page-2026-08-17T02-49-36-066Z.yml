@@ -1,0 +1,556 @@
+- generic [ref=f16e2]:
+  - banner [ref=f16e3]:
+    - generic [ref=f16e6]:
+      - generic [ref=f16e7]:
+        - link "Kyle Shevlin Software Engineer" [ref=f16e8] [cursor=pointer]:
+          - /url: /
+          - heading "Kyle Shevlin" [level=1] [ref=f16e9]
+          - generic [ref=f16e10]: Software Engineer
+        - button "Toggle theme" [ref=f16e11] [cursor=pointer]
+      - navigation [ref=f16e21]:
+        - link "Home" [ref=f16e22] [cursor=pointer]:
+          - /url: /
+        - link "All Posts" [ref=f16e24] [cursor=pointer]:
+          - /url: /all-posts
+        - link "Tags" [ref=f16e26] [cursor=pointer]:
+          - /url: /tags
+        - link "Courses" [ref=f16e28] [cursor=pointer]:
+          - /url: /courses
+        - link "Snippets" [ref=f16e30] [cursor=pointer]:
+          - /url: /snippets
+        - link "About" [ref=f16e32] [cursor=pointer]:
+          - /url: /about
+        - link "Impactful Resources" [ref=f16e34] [cursor=pointer]:
+          - /url: /impactful-resources
+  - generic [ref=f16e39]:
+    - main [ref=f16e40]:
+      - generic [ref=f16e41]:
+        - article [ref=f16e42]:
+          - generic [ref=f16e43]:
+            - generic [ref=f16e44]: January 28, 2021
+            - generic [ref=f16e52]:
+              - generic [ref=f16e53]:
+                - heading "useEncapsulation" [level=2] [ref=f16e54]
+                - generic [ref=f16e55]: or Why Your React Components Should Only Use Custom Hooks
+              - link "edit" [ref=f16e56] [cursor=pointer]:
+                - /url: https://github.com/kyleshevlin/blog/edit/main/src/content/posts/use-encapsulation/index.mdx
+            - paragraph [ref=f16e61]:
+              - strong [ref=f16e62]: "Update November 22nd, 2021:"
+              - text: I added a recording of my CascadiaJS on this topic to the end of this post. Enjoy!
+            - separator [ref=f16e63]
+            - paragraph [ref=f16e64]: "Recently, I shared this tweet:"
+            - generic [ref=f16e66]:
+              - link [ref=f16e68] [cursor=pointer]:
+                - /url: https://bsky.app/profile/kyleshevl.in
+                - img "Kyle Shevlin" [ref=f16e69]
+              - generic [ref=f16e71]:
+                - link "Kyle Shevlin @kyleshevl.in • 2020-11-23" [ref=f16e72] [cursor=pointer]:
+                  - /url: https://bsky.app/profile/kyleshevl.in
+                - generic [ref=f16e73]: "🔥 take I haven't fully thought through incoming: Every use of useEffect should be in a custom hook with a damn good name. It's frequently difficult to read & comprehend intention of the code when effects are strewn about. Better to encapsulate and provide context."
+            - paragraph [ref=f16e75]:
+              - text: This tweet was my response to some refactoring of our codebase, but having more than a month now to practice this a few more times, I’m convinced this pattern is the right way to go. I’ll go further and say
+              - strong [ref=f16e76]: most uses of React hooks should be encapsulated in a custom hook
+              - text: ", and I’m going to try and convince you of that on this post."
+            - paragraph [ref=f16e77]:
+              - text: Before we get started, it will benefit you greatly if you read my post on
+              - link "encapsulation" [ref=f16e78] [cursor=pointer]:
+                - /url: /encapsulation
+              - text: first. In that post, I argue that the primary purpose of a function is to encapuslate all the elements of a concern together into a single structure. We’re going to apply this pattern to how we work with React Hooks.
+            - heading "The Problem" [level=3] [ref=f16e79]
+            - paragraph [ref=f16e80]: Given the nature of our work, that requirements change frequently and therefore code changes frequently, too, it is not surprising that our codebases become messy. Our logic gets strewn about like tools left on a workbench. The problem is that hidden in the mess of functions and objects is important information that is getting lost. Important historical decisions left without explanation or context and more. I’ll try to come up with a contrived example quickly.
+            - paragraph [ref=f16e81]:
+              - text: Imagine we have a
+              - code [ref=f16e82]: Component
+              - text: "that can be toggled into two states:"
+              - code [ref=f16e83]: "off"
+              - text: and
+              - code [ref=f16e84]: "on"
+              - text: . We’ll use React Hooks to set this up.
+            - code [ref=f16e86]:
+              - generic [ref=f16e87]: "function Component() {"
+              - generic [ref=f16e88]: const [state, setState] = React.useState('off')
+              - generic [ref=f16e89]: "const on = React.useCallback(() => {"
+              - generic [ref=f16e90]: setState('on')
+              - generic [ref=f16e91]: "}, [])"
+              - generic [ref=f16e92]: "const off = React.useCallback(() => {"
+              - generic [ref=f16e93]: setState('off')
+              - generic [ref=f16e94]: "}, [])"
+              - generic [ref=f16e95]: "const toggle = React.useCallback(() => {"
+              - generic [ref=f16e96]: "setState(s => (s === 'on' ? 'off' : 'on'))"
+              - generic [ref=f16e97]: "}, [])"
+              - generic [ref=f16e98]: return (
+              - generic [ref=f16e99]: <div>
+              - generic [ref=f16e100]: "<div>State: {state}</div>"
+              - generic [ref=f16e101]: <div>
+              - generic [ref=f16e102]: "<button type=\"button\" onClick={on}>"
+              - generic [ref=f16e103]: Turn On
+              - generic [ref=f16e104]: </button>
+              - generic [ref=f16e105]: "<button type=\"button\" onClick={off}>"
+              - generic [ref=f16e106]: Turn Off
+              - generic [ref=f16e107]: </button>
+              - generic [ref=f16e108]: "<button type=\"button\" onClick={toggle}>"
+              - generic [ref=f16e109]: Toggle
+              - generic [ref=f16e110]: </button>
+              - generic [ref=f16e111]: </div>
+              - generic [ref=f16e112]: </div>
+              - generic [ref=f16e113]: )
+              - generic [ref=f16e114]: "}"
+            - paragraph [ref=f16e115]:
+              - text: Alright, so far so good. Our
+              - code [ref=f16e116]: Component
+              - text: is pretty simple so far and it feels like all of its concerns are handled in an orderly way. But requirements change and now perhaps our component also needs an input field (don’t ask me why, I told you this is contrived).
+            - code [ref=f16e118]:
+              - generic [ref=f16e119]: "function Component() {"
+              - generic [ref=f16e120]: const [toggleState, setToggleState] = React.useState('off')
+              - generic [ref=f16e121]: const [inputState, setInputState] = React.useState('')
+              - generic [ref=f16e122]: "const on = React.useCallback(() => {"
+              - generic [ref=f16e123]: setToggleState('on')
+              - generic [ref=f16e124]: "}, [])"
+              - generic [ref=f16e125]: "const off = React.useCallback(() => {"
+              - generic [ref=f16e126]: setToggleState('off')
+              - generic [ref=f16e127]: "}, [])"
+              - generic [ref=f16e128]: "const toggle = React.useCallback(() => {"
+              - generic [ref=f16e129]: "setToggleState(s => (s === 'on' ? 'off' : 'on'))"
+              - generic [ref=f16e130]: "}, [])"
+              - generic [ref=f16e131]: "const handleInputChange = React.useCallback(e => {"
+              - generic [ref=f16e132]: setInputState(e.target.value)
+              - generic [ref=f16e133]: "}, [])"
+              - generic [ref=f16e134]: "const resetInput = React.useCallback(() => {"
+              - generic [ref=f16e135]: setInputState('')
+              - generic [ref=f16e136]: "}, [])"
+              - generic [ref=f16e137]: return (
+              - generic [ref=f16e138]: <div>
+              - generic [ref=f16e139]: "<div>State: {toggleState}</div>"
+              - generic [ref=f16e140]: <div>
+              - generic [ref=f16e141]: "<button type=\"button\" onClick={on}>"
+              - generic [ref=f16e142]: Turn On
+              - generic [ref=f16e143]: </button>
+              - generic [ref=f16e144]: "<button type=\"button\" onClick={off}>"
+              - generic [ref=f16e145]: Turn Off
+              - generic [ref=f16e146]: </button>
+              - generic [ref=f16e147]: "<button type=\"button\" onClick={toggle}>"
+              - generic [ref=f16e148]: Toggle
+              - generic [ref=f16e149]: </button>
+              - generic [ref=f16e150]: </div>
+              - generic [ref=f16e151]: <div>
+              - generic [ref=f16e152]: <label htmlFor="randomWord">Random Word</label>
+              - generic [ref=f16e153]: <input
+              - generic [ref=f16e154]: type="text"
+              - generic [ref=f16e155]: id="randomWord"
+              - generic [ref=f16e156]: "onChange={handleInputChange}"
+              - generic [ref=f16e157]: "value={inputState}"
+              - generic [ref=f16e158]: />
+              - generic [ref=f16e159]: "<button type=\"button\" onClick={resetInput}>"
+              - generic [ref=f16e160]: Reset Input
+              - generic [ref=f16e161]: </button>
+              - generic [ref=f16e162]: </div>
+              - generic [ref=f16e163]: </div>
+              - generic [ref=f16e164]: )
+              - generic [ref=f16e165]: "}"
+            - paragraph [ref=f16e166]:
+              - text: Are you starting to see the problem I’m seeing? Even though we wrote relatively clean and clear code, we have started to create a
+              - strong [ref=f16e167]: gap
+              - text: between related implementation details.
+            - paragraph [ref=f16e168]:
+              - text: We
+              - emphasis [ref=f16e169]: need
+              - text: to call our hooks in the same order every render of
+              - code [ref=f16e170]: Component
+              - text: . Those are the rules. To accomplish this, we’ve followed a common organizational pattern with our declarations of state near the top of our component and our various event handlers further down. But in following this pattern, we’ve separated the toggle state and its event handlers with the interruption of declaring another instance of
+              - code [ref=f16e171]: useState
+              - text: . Even worse, our input state is separated from its related handlers by three unrelated function declarations.
+              - strong [ref=f16e172]: Just imagine this in your codebase and I’m sure you’ve seen far worse!
+              - text: This can quickly become a nightmare.
+            - paragraph [ref=f16e173]:
+              - text: "There is, fortunately, a very simple solution:"
+              - strong [ref=f16e174]: custom hooks
+              - text: .
+            - heading "Why Custom Hooks are the Solution" [level=3] [ref=f16e175]
+            - paragraph [ref=f16e176]:
+              - text: A custom hook is
+              - emphasis [ref=f16e177]: just a function
+              - text: and functions are structures we can use to encapsulate the related elements of a concern and expose an API to our function’s consumer. In the case of our
+              - code [ref=f16e178]: Component
+              - text: ", these custom hooks are fairly simple to create."
+            - code [ref=f16e180]:
+              - generic [ref=f16e181]: "function useOnOff() {"
+              - generic [ref=f16e182]: const [state, setState] = React.useState('off')
+              - generic [ref=f16e183]: const handlers = React.useMemo(
+              - generic [ref=f16e184]: "() => ({"
+              - generic [ref=f16e185]: "on: () => {"
+              - generic [ref=f16e186]: setState('on')
+              - generic [ref=f16e187]: "},"
+              - generic [ref=f16e188]: "off: () => {"
+              - generic [ref=f16e189]: setState('off')
+              - generic [ref=f16e190]: "},"
+              - generic [ref=f16e191]: "toggle: () => {"
+              - generic [ref=f16e192]: "setState(s => (s === 'on' ? 'off' : 'on'))"
+              - generic [ref=f16e193]: "},"
+              - generic [ref=f16e194]: "}),"
+              - generic [ref=f16e195]: "[],"
+              - generic [ref=f16e196]: )
+              - generic [ref=f16e197]: return [state, handlers]
+              - generic [ref=f16e198]: "}"
+              - generic [ref=f16e199]: "function useInput() {"
+              - generic [ref=f16e200]: const [state, setState] = React.useState('')
+              - generic [ref=f16e201]: const handlers = React.useMemo(
+              - generic [ref=f16e202]: "() => ({"
+              - generic [ref=f16e203]: "handleInputChange: e => {"
+              - generic [ref=f16e204]: setState(e.target.value)
+              - generic [ref=f16e205]: "},"
+              - generic [ref=f16e206]: "resetInput: () => {"
+              - generic [ref=f16e207]: setState('')
+              - generic [ref=f16e208]: "},"
+              - generic [ref=f16e209]: "}),"
+              - generic [ref=f16e210]: "[],"
+              - generic [ref=f16e211]: )
+              - generic [ref=f16e212]: return [state, handlers]
+              - generic [ref=f16e213]: "}"
+              - generic [ref=f16e214]: "function Component() {"
+              - generic [ref=f16e215]: "const [toggleState, { on, off, toggle }] = useOnOff()"
+              - generic [ref=f16e216]: "const [inputState, { handleInputChange, resetInput }] = useInput()"
+              - generic [ref=f16e217]: return (
+              - generic [ref=f16e218]: <div>
+              - generic [ref=f16e219]: "<div>State: {toggleState}</div>"
+              - generic [ref=f16e220]: <div>
+              - generic [ref=f16e221]: "<button type=\"button\" onClick={on}>"
+              - generic [ref=f16e222]: Turn On
+              - generic [ref=f16e223]: </button>
+              - generic [ref=f16e224]: "<button type=\"button\" onClick={off}>"
+              - generic [ref=f16e225]: Turn Off
+              - generic [ref=f16e226]: </button>
+              - generic [ref=f16e227]: "<button type=\"button\" onClick={toggle}>"
+              - generic [ref=f16e228]: Toggle
+              - generic [ref=f16e229]: </button>
+              - generic [ref=f16e230]: </div>
+              - generic [ref=f16e231]: <div>
+              - generic [ref=f16e232]: <label htmlFor="randomWord">Random Word</label>
+              - generic [ref=f16e233]: <input
+              - generic [ref=f16e234]: type="text"
+              - generic [ref=f16e235]: id="randomWord"
+              - generic [ref=f16e236]: "onChange={handleInputChange}"
+              - generic [ref=f16e237]: "value={inputState}"
+              - generic [ref=f16e238]: />
+              - generic [ref=f16e239]: "<button type=\"button\" onClick={resetInput}>"
+              - generic [ref=f16e240]: Reset Input
+              - generic [ref=f16e241]: </button>
+              - generic [ref=f16e242]: </div>
+              - generic [ref=f16e243]: </div>
+              - generic [ref=f16e244]: )
+              - generic [ref=f16e245]: "}"
+            - paragraph [ref=f16e246]:
+              - text: Take notice, our
+              - code [ref=f16e247]: Component
+              - text: now only consumes custom hooks. These custom hooks give us a little more context to what they mean, and we don’t have the implementation details of our state handler functions sitting in the middle of our component function.
+            - paragraph [ref=f16e248]:
+              - text: Another benefit of this pattern is that dependencies quickly become obvious
+              - emphasis [ref=f16e249]: because they end up being arguments to our custom hooks
+              - text: . What if our
+              - code [ref=f16e250]: useInput
+              - text: hook should begin with an initial state other than an empty string and we use that for resetting the input as well?
+            - code [ref=f16e252]:
+              - generic [ref=f16e253]: "function useInput(initialState = '') {"
+              - generic [ref=f16e254]: const [state, setState] = React.useState(initialState)
+              - generic [ref=f16e255]: const handlers = React.useMemo(
+              - generic [ref=f16e256]: "() => ({"
+              - generic [ref=f16e257]: "handleInputChange: e => {"
+              - generic [ref=f16e258]: setState(e.target.value)
+              - generic [ref=f16e259]: "},"
+              - generic [ref=f16e260]: "resetInput: () => {"
+              - generic [ref=f16e261]: setState(initialState)
+              - generic [ref=f16e262]: "},"
+              - generic [ref=f16e263]: "}),"
+              - generic [ref=f16e264]: "[initialState],"
+              - generic [ref=f16e265]: )
+              - generic [ref=f16e266]: return [state, handlers]
+              - generic [ref=f16e267]: "}"
+              - generic [ref=f16e268]: "function Component({ startingWord }) {"
+              - generic [ref=f16e269]: //...
+              - generic [ref=f16e270]: "const [inputState, { handleInputChange, resetInput }] = useInput(startingWord)"
+              - generic [ref=f16e271]: //...
+              - generic [ref=f16e272]: "}"
+            - paragraph [ref=f16e273]:
+              - text: There are even more benefits. By adding this layer of abstraction between our component and the standard React hooks, we can change the implementation of our custom hook’s API without changing the component. Perhaps I want to use a reducer instead of
+              - code [ref=f16e274]: useState
+              - text: for our
+              - code [ref=f16e275]: useOnOff
+              - text: "hook:"
+              - button "Toggle footnote" [ref=f16e276] [cursor=pointer]
+            - code [ref=f16e282]:
+              - generic [ref=f16e283]: "function onOffReducer(state, action) {"
+              - generic [ref=f16e284]: "switch (action) {"
+              - generic [ref=f16e285]: "case 'ON':"
+              - generic [ref=f16e286]: return 'on'
+              - generic [ref=f16e287]: "case 'OFF':"
+              - generic [ref=f16e288]: return 'off'
+              - generic [ref=f16e289]: "case 'TOGGLE':"
+              - generic [ref=f16e290]: "return state === 'on' ? 'off' : 'on'"
+              - generic [ref=f16e291]: "default:"
+              - generic [ref=f16e292]: return state
+              - generic [ref=f16e293]: "}"
+              - generic [ref=f16e294]: "}"
+              - generic [ref=f16e295]: "function useOnOff() {"
+              - generic [ref=f16e296]: const [state, dispatch] = React.useReducer(onOffReducer, 'off')
+              - generic [ref=f16e297]: const handlers = React.useMemo(
+              - generic [ref=f16e298]: "() => ({"
+              - generic [ref=f16e299]: "on: () => {"
+              - generic [ref=f16e300]: dispatch('ON')
+              - generic [ref=f16e301]: "},"
+              - generic [ref=f16e302]: "off: () => {"
+              - generic [ref=f16e303]: dispatch('OFF')
+              - generic [ref=f16e304]: "},"
+              - generic [ref=f16e305]: "toggle: () => {"
+              - generic [ref=f16e306]: dispatch('TOGGLE')
+              - generic [ref=f16e307]: "},"
+              - generic [ref=f16e308]: "}),"
+              - generic [ref=f16e309]: "[],"
+              - generic [ref=f16e310]: )
+              - generic [ref=f16e311]: return [state, handlers]
+              - generic [ref=f16e312]: "}"
+            - paragraph [ref=f16e313]: Obviously, this type of change might be completely unnecessary for my example, but I hope you can recognize where this layer of abstraction might be useful to you when you have to change the implementation details of a hook. We were able to replace the entire state management of our hook without changing the API, which means our component behaves the same way, even though the implementation of that behavior has changed quite a bit.
+            - heading "How to Enforce this Pattern" [level=3] [ref=f16e314]
+            - paragraph [ref=f16e315]:
+              - text: What good is a pattern if you can’t come up with a way to get others to use it? To steer them down the good path? We can do that for this pattern with an ESLint plugin and rule. Thus, I give you the
+              - code [ref=f16e316]: eslint-plugin-use-encapsulation
+              - text: and the
+              - code [ref=f16e317]: prefer-custom-hooks
+              - text: "rule! You can find it here:"
+              - link "https://github.com/kyleshevlin/eslint-plugin-use-encapsulation" [ref=f16e318] [cursor=pointer]:
+                - /url: https://github.com/kyleshevlin/eslint-plugin-use-encapsulation
+              - text: .
+            - paragraph [ref=f16e319]:
+              - text: Following the installation instructions, you’ll see that
+              - code [ref=f16e320]: prefer-custom-hooks
+              - text: will warn you whenever you use a React hook directly inside a component. The only way around the warning (other than disabling the rule), is to use the React hooks from within a custom hook.
+            - heading "Summary" [level=3] [ref=f16e321]
+            - paragraph [ref=f16e322]: By opting to write all the hooks consumed by your components as custom ones, you will be providing future devs (including yourself) useful context by encapsulating all the pieces of a concern into a single function. By doing this, you gain all the benefits of proper encapsulation and make your components more declarative. You might even gain a few useful reusable hooks in the process.
+            - heading "useEncapsulation Talk at CascadiaJS" [level=3] [ref=f16e323]
+            - paragraph [ref=f16e324]: I recently gave a talk on this topic at the CascadiaJS conference and wanted to share that recording with you. Enjoy!
+            - iframe [ref=f16e326]:
+              - generic [ref=f17e1]:
+                - generic "YouTube 동영상 플레이어" [ref=f17e3]
+                - generic [ref=f17e5]:
+                  - generic:
+                    - generic:
+                      - generic [ref=f17e6] [cursor=pointer]
+                      - button "동영상 재생" [ref=f17e10] [cursor=pointer]
+                      - button "재생 컨트롤 숨기기" [ref=f17e12] [cursor=pointer]
+                      - generic [ref=f17e14]:
+                        - generic [ref=f17e19]:
+                          - generic [ref=f17e20]:
+                            - 'link "useEncapsulation: Using React Hooks Sensibly | Kyle Shevlin | CascadiaJS 2021" [ref=f17e21] [cursor=pointer]':
+                              - /url: https://www.youtube.com/watch?v=cyM70d9IpSg
+                            - link "CascadiaJS" [ref=f17e22] [cursor=pointer]:
+                              - /url: /channel/UCIP244iNzbn4iEkDOgczvcQ
+                          - generic [ref=f17e24]:
+                            - button [ref=f17e25] [cursor=pointer]
+                            - generic [ref=f17e27]:
+                              - generic: CascadiaJS
+                              - generic: 구독자 4.24천명
+                        - generic [ref=f17e28]:
+                          - button "공유" [ref=f17e31] [cursor=pointer]
+                          - link "YouTube에서 보기" [ref=f17e42] [cursor=pointer]:
+                            - /url: https://www.youtube.com/watch?v=cyM70d9IpSg
+                            - generic [ref=f17e43]: "다음에서 보기:"
+        - separator [ref=f16e328]
+        - generic [ref=f16e329]:
+          - generic [ref=f16e330]: Liked the post?
+          - generic [ref=f16e331]: Give the author a dopamine boost with a few "beard strokes". Click the beard up to 50 times to show your appreciation.
+          - button "+0" [ref=f16e333] [cursor=pointer]
+        - generic [ref=f16e340]:
+          - generic [ref=f16e341]:
+            - generic [ref=f16e342]: Want to read more?
+            - generic [ref=f16e343]:
+              - generic [ref=f16e344]: "Related Posts:"
+              - list [ref=f16e345]:
+                - listitem [ref=f16e346]:
+                  - link [ref=f16e347] [cursor=pointer]:
+                    - /url: /why-use-use-reducer
+                    - generic [ref=f16e348]:
+                      - text: Why Use
+                      - code [ref=f16e349]: useReducer
+                      - text: "?"
+                - listitem [ref=f16e350]:
+                  - link "Prefer Function Updaters in State Setters" [ref=f16e351] [cursor=pointer]:
+                    - /url: /prefer-function-updaters-in-state-setters
+                - listitem [ref=f16e352]:
+                  - link "Encapsulation" [ref=f16e353] [cursor=pointer]:
+                    - /url: /encapsulation
+            - generic [ref=f16e354]:
+              - text: "Newer Post:"
+              - link "Facade Pattern" [ref=f16e355] [cursor=pointer]:
+                - /url: /facade-pattern
+            - generic [ref=f16e356]:
+              - text: "Older Post:"
+              - link "Encapsulation" [ref=f16e357] [cursor=pointer]:
+                - /url: /encapsulation
+          - generic [ref=f16e358]:
+            - generic [ref=f16e359]: Tags
+            - generic [ref=f16e364]:
+              - link "JavaScript" [ref=f16e365] [cursor=pointer]:
+                - /url: /tags/javascript
+              - link "React" [ref=f16e366] [cursor=pointer]:
+                - /url: /tags/react
+              - link "React Hooks" [ref=f16e367] [cursor=pointer]:
+                - /url: /tags/react-hooks
+              - link "Computer Science" [ref=f16e368] [cursor=pointer]:
+                - /url: /tags/computer-science
+        - generic [ref=f16e370]:
+          - img "Kyle Shevlin's face, which is mostly a beard with eyes" [ref=f16e372]
+          - paragraph [ref=f16e374]:
+            - text: Kyle Shevlin is the founder & lead software engineer of
+            - link "Agathist" [ref=f16e375] [cursor=pointer]:
+              - /url: https://agath.ist
+            - text: ", a software development firm with a mission to build good software with good people."
+    - generic [ref=f16e378]:
+      - generic [ref=f16e379]:
+        - generic [ref=f16e381]:
+          - img "Logo for Introduction to State Machines and XState" [ref=f16e382]
+          - generic [ref=f16e383]: Introduction to State Machines and XState
+        - generic [ref=f16e384]:
+          - generic [ref=f16e385]: Check out my courses!
+          - generic [ref=f16e386]:
+            - text: If you enjoy my posts, you might enjoy my courses, too. Click the button to view the course or go to
+            - link "Courses" [ref=f16e387] [cursor=pointer]:
+              - /url: /courses
+            - text: for more information.
+          - link "View the course" [ref=f16e389] [cursor=pointer]:
+            - /url: https://egghead.io/courses/introduction-to-state-machines-using-xstate
+      - generic [ref=f16e392]:
+        - generic [ref=f16e393]: Sign up for my newsletter
+        - generic [ref=f16e394]: Let's chat some more about TypeScript, React, and frontend web development. Unsubscribe at any time.
+        - generic [ref=f16e397]:
+          - generic [ref=f16e398]:
+            - generic [ref=f16e401]:
+              - generic [ref=f16e402]: First Name
+              - textbox "First Name" [ref=f16e403]:
+                - /placeholder: You
+            - generic [ref=f16e406]:
+              - generic [ref=f16e407]: Email Address
+              - textbox "Email Address" [ref=f16e408]:
+                - /placeholder: you@example.com
+          - button "Sign Up" [ref=f16e409] [cursor=pointer]
+  - contentinfo [ref=f16e410]:
+    - generic [ref=f16e412]:
+      - generic [ref=f16e413]:
+        - generic [ref=f16e416]:
+          - generic [ref=f16e417]:
+            - text: I would like give thanks to those who have contributed fixes and updates to this blog. If you see something that needs some love, you can join them. This blog is open sourced at
+            - link "https://github.com/kyleshevlin/blog" [ref=f16e418] [cursor=pointer]:
+              - /url: https://github.com/kyleshevlin/blog
+          - generic [ref=f16e419]:
+            - link "https://github.com/bryndyment bryndyment's Github Avatar" [ref=f16e420] [cursor=pointer]:
+              - /url: https://github.com/bryndyment
+              - generic [ref=f16e421]: https://github.com/bryndyment
+              - img "bryndyment's Github Avatar" [ref=f16e422]
+            - link "https://github.com/JacobMGEvans JacobMGEvans's Github Avatar" [ref=f16e423] [cursor=pointer]:
+              - /url: https://github.com/JacobMGEvans
+              - generic [ref=f16e424]: https://github.com/JacobMGEvans
+              - img "JacobMGEvans's Github Avatar" [ref=f16e425]
+            - link "https://github.com/eclectic-coding eclectic-coding's Github Avatar" [ref=f16e426] [cursor=pointer]:
+              - /url: https://github.com/eclectic-coding
+              - generic [ref=f16e427]: https://github.com/eclectic-coding
+              - img "eclectic-coding's Github Avatar" [ref=f16e428]
+            - link "https://github.com/jhsu jhsu's Github Avatar" [ref=f16e429] [cursor=pointer]:
+              - /url: https://github.com/jhsu
+              - generic [ref=f16e430]: https://github.com/jhsu
+              - img "jhsu's Github Avatar" [ref=f16e431]
+            - link "https://github.com/kgcreative kgcreative's Github Avatar" [ref=f16e432] [cursor=pointer]:
+              - /url: https://github.com/kgcreative
+              - generic [ref=f16e433]: https://github.com/kgcreative
+              - img "kgcreative's Github Avatar" [ref=f16e434]
+            - link "https://github.com/erikvorhes erikvorhes's Github Avatar" [ref=f16e435] [cursor=pointer]:
+              - /url: https://github.com/erikvorhes
+              - generic [ref=f16e436]: https://github.com/erikvorhes
+              - img "erikvorhes's Github Avatar" [ref=f16e437]
+            - link "https://github.com/Haroenv Haroenv's Github Avatar" [ref=f16e438] [cursor=pointer]:
+              - /url: https://github.com/Haroenv
+              - generic [ref=f16e439]: https://github.com/Haroenv
+              - img "Haroenv's Github Avatar" [ref=f16e440]
+            - link "https://github.com/marktnoonan marktnoonan's Github Avatar" [ref=f16e441] [cursor=pointer]:
+              - /url: https://github.com/marktnoonan
+              - generic [ref=f16e442]: https://github.com/marktnoonan
+              - img "marktnoonan's Github Avatar" [ref=f16e443]
+            - link "https://github.com/marcuslyons marcuslyons's Github Avatar" [ref=f16e444] [cursor=pointer]:
+              - /url: https://github.com/marcuslyons
+              - generic [ref=f16e445]: https://github.com/marcuslyons
+              - img "marcuslyons's Github Avatar" [ref=f16e446]
+            - link "https://github.com/brentmclark brentmclark's Github Avatar" [ref=f16e447] [cursor=pointer]:
+              - /url: https://github.com/brentmclark
+              - generic [ref=f16e448]: https://github.com/brentmclark
+              - img "brentmclark's Github Avatar" [ref=f16e449]
+            - link "https://github.com/federico-fiorini federico-fiorini's Github Avatar" [ref=f16e450] [cursor=pointer]:
+              - /url: https://github.com/federico-fiorini
+              - generic [ref=f16e451]: https://github.com/federico-fiorini
+              - img "federico-fiorini's Github Avatar" [ref=f16e452]
+            - link "https://github.com/medayz medayz's Github Avatar" [ref=f16e453] [cursor=pointer]:
+              - /url: https://github.com/medayz
+              - generic [ref=f16e454]: https://github.com/medayz
+              - img "medayz's Github Avatar" [ref=f16e455]
+            - link "https://github.com/TowardsDeath TowardsDeath's Github Avatar" [ref=f16e456] [cursor=pointer]:
+              - /url: https://github.com/TowardsDeath
+              - generic [ref=f16e457]: https://github.com/TowardsDeath
+              - img "TowardsDeath's Github Avatar" [ref=f16e458]
+            - link "https://github.com/FanchGadjo FanchGadjo's Github Avatar" [ref=f16e459] [cursor=pointer]:
+              - /url: https://github.com/FanchGadjo
+              - generic [ref=f16e460]: https://github.com/FanchGadjo
+              - img "FanchGadjo's Github Avatar" [ref=f16e461]
+            - link "https://github.com/noahmateen noahmateen's Github Avatar" [ref=f16e462] [cursor=pointer]:
+              - /url: https://github.com/noahmateen
+              - generic [ref=f16e463]: https://github.com/noahmateen
+              - img "noahmateen's Github Avatar" [ref=f16e464]
+            - link "https://github.com/brandonpittman brandonpittman's Github Avatar" [ref=f16e465] [cursor=pointer]:
+              - /url: https://github.com/brandonpittman
+              - generic [ref=f16e466]: https://github.com/brandonpittman
+              - img "brandonpittman's Github Avatar" [ref=f16e467]
+            - link "https://github.com/mattridley mattridley's Github Avatar" [ref=f16e468] [cursor=pointer]:
+              - /url: https://github.com/mattridley
+              - generic [ref=f16e469]: https://github.com/mattridley
+              - img "mattridley's Github Avatar" [ref=f16e470]
+            - link "https://github.com/stefanjudis stefanjudis's Github Avatar" [ref=f16e471] [cursor=pointer]:
+              - /url: https://github.com/stefanjudis
+              - generic [ref=f16e472]: https://github.com/stefanjudis
+              - img "stefanjudis's Github Avatar" [ref=f16e473]
+            - link "https://github.com/mike-healy mike-healy's Github Avatar" [ref=f16e474] [cursor=pointer]:
+              - /url: https://github.com/mike-healy
+              - generic [ref=f16e475]: https://github.com/mike-healy
+              - img "mike-healy's Github Avatar" [ref=f16e476]
+            - link "https://github.com/MarceloAlves MarceloAlves's Github Avatar" [ref=f16e477] [cursor=pointer]:
+              - /url: https://github.com/MarceloAlves
+              - generic [ref=f16e478]: https://github.com/MarceloAlves
+              - img "MarceloAlves's Github Avatar" [ref=f16e479]
+        - generic [ref=f16e480]:
+          - generic [ref=f16e481]: Sitemap
+          - generic [ref=f16e482]:
+            - link "Home" [ref=f16e483] [cursor=pointer]:
+              - /url: /
+            - link "All Posts" [ref=f16e484] [cursor=pointer]:
+              - /url: /all-posts
+            - link "Tags" [ref=f16e485] [cursor=pointer]:
+              - /url: /tags
+            - link "Courses" [ref=f16e486] [cursor=pointer]:
+              - /url: /courses
+            - link "Snippets" [ref=f16e487] [cursor=pointer]:
+              - /url: /snippets
+            - link "About" [ref=f16e488] [cursor=pointer]:
+              - /url: /about
+            - link "Contact" [ref=f16e489] [cursor=pointer]:
+              - /url: /contact
+            - link "Impactful Resources" [ref=f16e490] [cursor=pointer]:
+              - /url: /impactful-resources
+            - link "A.I. Usage" [ref=f16e491] [cursor=pointer]:
+              - /url: /ai
+      - generic [ref=f16e492]:
+        - generic [ref=f16e493]:
+          - link "Looking for my golf content instead?" [ref=f16e495] [cursor=pointer]:
+            - /url: https://kyleshevlingolf.com
+          - generic [ref=f16e496]:
+            - link "https://bsky.app/profile/kyleshevl.in" [ref=f16e497] [cursor=pointer]:
+              - /url: https://bsky.app/profile/kyleshevl.in
+            - link "https://github.com/kyleshevlin" [ref=f16e501] [cursor=pointer]:
+              - /url: https://github.com/kyleshevlin
+            - link "https://kyleshevlin.com/rss.xml" [ref=f16e506] [cursor=pointer]:
+              - /url: https://kyleshevlin.com/rss.xml
+        - generic [ref=f16e510]:
+          - generic [ref=f16e511]: ©2026
+          - text: Kyle Shevlin. All Rights Reserved.

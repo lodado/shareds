@@ -1,0 +1,495 @@
+- generic [active] [ref=f82e1]:
+  - generic [ref=f82e2]:
+    - generic [ref=f82e3]:
+      - link "Skip to content" [ref=f82e4] [cursor=pointer]:
+        - /url: "#start-of-content"
+      - banner [ref=f82e9]:
+        - heading "Navigation Menu" [level=2] [ref=f82e10]
+        - generic [ref=f82e11]:
+          - link "Homepage" [ref=f82e13] [cursor=pointer]:
+            - /url: /
+          - generic [ref=f82e16]:
+            - navigation "Global" [ref=f82e17]:
+              - list [ref=f82e18]:
+                - listitem [ref=f82e19]:
+                  - button "Platform" [ref=f82e21] [cursor=pointer]
+                - listitem [ref=f82e24]:
+                  - button "Solutions" [ref=f82e26] [cursor=pointer]
+                - listitem [ref=f82e29]:
+                  - button "Resources" [ref=f82e31] [cursor=pointer]
+                - listitem [ref=f82e34]:
+                  - button "Open Source" [ref=f82e36] [cursor=pointer]
+                - listitem [ref=f82e39]:
+                  - button "Enterprise" [ref=f82e41] [cursor=pointer]
+                - listitem [ref=f82e44]:
+                  - link "Pricing" [ref=f82e45] [cursor=pointer]:
+                    - /url: https://github.com/pricing
+            - generic [ref=f82e46]:
+              - button "Search or jump to, type / to search" [ref=f82e48] [cursor=pointer]
+              - link "Sign in" [ref=f82e55] [cursor=pointer]:
+                - /url: /login?return_to=https%3A%2F%2Fgithub.com%2FOpenAutoCoder%2FAgentless
+              - link "Sign up" [ref=f82e58] [cursor=pointer]:
+                - /url: /signup?ref_cta=Sign+up&ref_loc=header+logged+out&ref_page=%2F%3Cuser-name%3E%2F%3Crepo-name%3E&source=header-repo&source_repo=OpenAutoCoder%2FAgentless
+              - button "Appearance settings" [ref=f82e61] [cursor=pointer]
+    - main [ref=f82e68]:
+      - generic [ref=f82e69]:
+        - generic [ref=f82e70]:
+          - generic [ref=f82e72]:
+            - link "OpenAutoCoder" [ref=f82e76] [cursor=pointer]:
+              - /url: /OpenAutoCoder
+            - generic [ref=f82e77]: /
+            - strong [ref=f82e78]:
+              - link "Agentless" [ref=f82e79] [cursor=pointer]:
+                - /url: /OpenAutoCoder/Agentless
+            - generic [ref=f82e80]: Public
+          - generic [ref=f82e81]:
+            - list:
+              - listitem [ref=f82e82]:
+                - link "You must be signed in to change notification settings" [ref=f82e83] [cursor=pointer]:
+                  - /url: /login?return_to=%2FOpenAutoCoder%2FAgentless
+                  - text: Notifications
+              - listitem [ref=f82e86]:
+                - link "Fork 238" [ref=f82e87] [cursor=pointer]:
+                  - /url: /login?return_to=%2FOpenAutoCoder%2FAgentless
+                  - text: Fork
+                  - generic "238" [ref=f82e90]
+              - listitem [ref=f82e91]:
+                - link "You must be signed in to star a repository" [ref=f82e93] [cursor=pointer]:
+                  - /url: /login?return_to=%2FOpenAutoCoder%2FAgentless
+                  - text: Star
+                  - generic "2095 users starred this repository" [ref=f82e96]: 2.1k
+        - navigation "Repository" [ref=f82e97]:
+          - list [ref=f82e98]:
+            - listitem [ref=f82e99]:
+              - link "Code" [ref=f82e100] [cursor=pointer]:
+                - /url: /OpenAutoCoder/Agentless
+            - listitem [ref=f82e104]:
+              - link "Issues 52" [ref=f82e105] [cursor=pointer]:
+                - /url: /OpenAutoCoder/Agentless/issues
+                - generic [ref=f82e109]: Issues
+                - generic "52" [ref=f82e110]
+            - listitem [ref=f82e111]:
+              - link "Pull requests 2" [ref=f82e112] [cursor=pointer]:
+                - /url: /OpenAutoCoder/Agentless/pulls
+                - generic [ref=f82e115]: Pull requests
+                - generic "2" [ref=f82e116]
+            - listitem [ref=f82e117]:
+              - link "Actions" [ref=f82e118] [cursor=pointer]:
+                - /url: /OpenAutoCoder/Agentless/actions
+            - listitem [ref=f82e122]:
+              - link "Projects" [ref=f82e123] [cursor=pointer]:
+                - /url: /OpenAutoCoder/Agentless/projects
+            - listitem [ref=f82e127]:
+              - link "Security and quality" [ref=f82e128] [cursor=pointer]:
+                - /url: /OpenAutoCoder/Agentless/security
+            - listitem [ref=f82e132]:
+              - link "Insights" [ref=f82e133] [cursor=pointer]:
+                - /url: /OpenAutoCoder/Agentless/pulse
+      - generic [ref=f82e150]:
+        - generic [ref=f82e153]:
+          - generic [ref=f82e154]:
+            - generic [ref=f82e155]:
+              - button "main branch" [ref=f82e157] [cursor=pointer]:
+                - generic [ref=f82e158]: main
+              - generic [ref=f82e162]:
+                - link [ref=f82e163] [cursor=pointer]:
+                  - /url: /OpenAutoCoder/Agentless/branches
+                  - generic [ref=f82e166]:
+                    - strong [ref=f82e167]: "1"
+                    - text: Branch
+                - link [ref=f82e168] [cursor=pointer]:
+                  - /url: /OpenAutoCoder/Agentless/tags
+                  - generic [ref=f82e171]:
+                    - strong [ref=f82e172]: "2"
+                    - text: Tags
+            - generic [ref=f82e173]:
+              - combobox "Go to file" [ref=f82e181]
+              - button "Code" [ref=f82e182] [cursor=pointer]
+          - generic [ref=f82e185]:
+            - generic [ref=f82e186]:
+              - heading "Folders and files" [level=2] [ref=f82e187]
+              - table "Folders and files" [ref=f82e188]:
+                - rowgroup:
+                  - row "Name Last commit message Last commit date":
+                    - columnheader "Name"
+                    - columnheader "Last commit message"
+                    - columnheader "Last commit date"
+                - rowgroup [ref=f82e189]:
+                  - row [ref=f82e190]:
+                    - 'cell "Latest commit brutalsavage commits by brutalsavage fix: post-processing default value fix Commit 5ce5888 · Dec 23, 20242 years ago History 32 Commits" [ref=f82e191]':
+                      - generic [ref=f82e192]:
+                        - heading "Latest commit" [level=2] [ref=f82e193]
+                        - generic [ref=f82e194]:
+                          - generic [ref=f82e196]:
+                            - link [ref=f82e197] [cursor=pointer]:
+                              - /url: /brutalsavage
+                              - img "brutalsavage" [ref=f82e198]
+                            - link "commits by brutalsavage" [ref=f82e199] [cursor=pointer]:
+                              - /url: /OpenAutoCoder/Agentless/commits?author=brutalsavage
+                              - text: brutalsavage
+                          - 'link "fix: post-processing default value fix" [ref=f82e203] [cursor=pointer]':
+                            - /url: /OpenAutoCoder/Agentless/commit/5ce5888b9f149beaace393957a55ea8ee46c9f71
+                        - generic [ref=f82e204]:
+                          - generic [ref=f82e206]:
+                            - link "Commit 5ce5888" [ref=f82e207] [cursor=pointer]:
+                              - /url: /OpenAutoCoder/Agentless/commit/5ce5888b9f149beaace393957a55ea8ee46c9f71
+                              - text: 5ce5888
+                            - text: ·
+                            - generic "Dec 23, 2024, 4:29 AM GMT+9" [ref=f82e208]: Dec 23, 20242 years ago
+                          - generic [ref=f82e209]:
+                            - heading "History" [level=2] [ref=f82e210]
+                            - link "32 Commits" [ref=f82e211] [cursor=pointer]:
+                              - /url: /OpenAutoCoder/Agentless/commits/main/
+                  - row [ref=f82e214]:
+                    - cell [ref=f82e215]:
+                      - link "agentless, (Directory)" [ref=f82e222] [cursor=pointer]:
+                        - /url: /OpenAutoCoder/Agentless/tree/main/agentless
+                        - text: agentless
+                    - cell [ref=f82e223]:
+                      - 'link "fix: post-processing default value fix" [ref=f82e226] [cursor=pointer]':
+                        - /url: /OpenAutoCoder/Agentless/commit/5ce5888b9f149beaace393957a55ea8ee46c9f71
+                    - cell "Dec 23, 20242 years ago" [ref=f82e227]
+                  - row [ref=f82e229]:
+                    - cell [ref=f82e230]:
+                      - link "classification, (Directory)" [ref=f82e237] [cursor=pointer]:
+                        - /url: /OpenAutoCoder/Agentless/tree/main/classification
+                        - text: classification
+                    - cell [ref=f82e238]:
+                      - 'link "doc: manual classification results" [ref=f82e241] [cursor=pointer]':
+                        - /url: /OpenAutoCoder/Agentless/commit/00df3490c905f328c8ba086c60905470ee2c524a
+                    - cell "Jul 24, 20242 years ago" [ref=f82e242]
+                  - row [ref=f82e244]:
+                    - cell [ref=f82e245]:
+                      - link "dev/util, (Directory)" [ref=f82e252] [cursor=pointer]:
+                        - /url: /OpenAutoCoder/Agentless/tree/main/dev/util
+                        - text: dev/util
+                    - cell [ref=f82e253]:
+                      - 'link "feat: Agentless 1.5 update" [ref=f82e256] [cursor=pointer]':
+                        - /url: /OpenAutoCoder/Agentless/commit/cb5c622786fcda9a8e4045afddc2de6167afc9d3
+                    - cell "Oct 29, 20242 years ago" [ref=f82e257]
+                  - row [ref=f82e259]:
+                    - cell [ref=f82e260]:
+                      - link "get_repo_structure, (Directory)" [ref=f82e267] [cursor=pointer]:
+                        - /url: /OpenAutoCoder/Agentless/tree/main/get_repo_structure
+                        - text: get_repo_structure
+                    - cell [ref=f82e268]:
+                      - link "init" [ref=f82e271] [cursor=pointer]:
+                        - /url: /OpenAutoCoder/Agentless/commit/df092c28cf87936296c24af31cb90e33e6dd0fbc
+                    - cell "Jul 2, 20242 years ago" [ref=f82e272]
+                  - row [ref=f82e274]:
+                    - cell [ref=f82e275]:
+                      - link "resources, (Directory)" [ref=f82e282] [cursor=pointer]:
+                        - /url: /OpenAutoCoder/Agentless/tree/main/resources
+                        - text: resources
+                    - cell [ref=f82e283]:
+                      - 'link "fix: pdf to png" [ref=f82e286] [cursor=pointer]':
+                        - /url: /OpenAutoCoder/Agentless/commit/796fbea94fb3e2df9aa29c98d6d7cc454f9886e1
+                    - cell "Jul 7, 20242 years ago" [ref=f82e287]
+                  - row [ref=f82e289]:
+                    - cell [ref=f82e290]:
+                      - link ".gitignore, (File)" [ref=f82e297] [cursor=pointer]:
+                        - /url: /OpenAutoCoder/Agentless/blob/main/.gitignore
+                        - text: .gitignore
+                    - cell [ref=f82e298]:
+                      - 'link "feat: Agentless 1.5 update" [ref=f82e301] [cursor=pointer]':
+                        - /url: /OpenAutoCoder/Agentless/commit/cb5c622786fcda9a8e4045afddc2de6167afc9d3
+                    - cell "Oct 29, 20242 years ago" [ref=f82e302]
+                  - row [ref=f82e304]:
+                    - cell [ref=f82e305]:
+                      - link ".pre-commit-config.yaml, (File)" [ref=f82e312] [cursor=pointer]:
+                        - /url: /OpenAutoCoder/Agentless/blob/main/.pre-commit-config.yaml
+                        - text: .pre-commit-config.yaml
+                    - cell [ref=f82e313]:
+                      - link "init" [ref=f82e316] [cursor=pointer]:
+                        - /url: /OpenAutoCoder/Agentless/commit/df092c28cf87936296c24af31cb90e33e6dd0fbc
+                    - cell "Jul 2, 20242 years ago" [ref=f82e317]
+                  - row [ref=f82e319]:
+                    - cell [ref=f82e320]:
+                      - link "LICENSE, (File)" [ref=f82e327] [cursor=pointer]:
+                        - /url: /OpenAutoCoder/Agentless/blob/main/LICENSE
+                        - text: LICENSE
+                    - cell [ref=f82e328]:
+                      - link "Create LICENSE" [ref=f82e331] [cursor=pointer]:
+                        - /url: /OpenAutoCoder/Agentless/commit/7e63a97a3dab76274b35bba3f1e7b44ddc145087
+                    - cell "Jul 2, 20242 years ago" [ref=f82e332]
+                  - row [ref=f82e334]:
+                    - cell [ref=f82e335]:
+                      - link "README.md, (File)" [ref=f82e342] [cursor=pointer]:
+                        - /url: /OpenAutoCoder/Agentless/blob/main/README.md
+                        - text: README.md
+                    - cell [ref=f82e343]:
+                      - 'link "doc: news" [ref=f82e346] [cursor=pointer]':
+                        - /url: /OpenAutoCoder/Agentless/commit/35ab2a613994b96a7a346a9439826dbf120f789a
+                    - cell "Dec 10, 20242 years ago" [ref=f82e347]
+                  - row [ref=f82e349]:
+                    - cell [ref=f82e350]:
+                      - link "README_swebench.md, (File)" [ref=f82e357] [cursor=pointer]:
+                        - /url: /OpenAutoCoder/Agentless/blob/main/README_swebench.md
+                        - text: README_swebench.md
+                    - cell [ref=f82e358]:
+                      - 'link "doc: small fix to rerank command" [ref=f82e361] [cursor=pointer]':
+                        - /url: /OpenAutoCoder/Agentless/commit/c0d3ee612220c44941a85dce6d8fc3d0b75e4fde
+                    - cell "Nov 13, 20242 years ago" [ref=f82e362]
+                  - row [ref=f82e364]:
+                    - cell [ref=f82e365]:
+                      - link "requirements.txt, (File)" [ref=f82e372] [cursor=pointer]:
+                        - /url: /OpenAutoCoder/Agentless/blob/main/requirements.txt
+                        - text: requirements.txt
+                    - cell [ref=f82e373]:
+                      - 'link "feat: support claude 3.5 Sonnet with multi-file edits" [ref=f82e376] [cursor=pointer]':
+                        - /url: /OpenAutoCoder/Agentless/commit/59dc4b75e8590bc821867791de76350515ab38e8
+                    - cell "Dec 8, 20242 years ago" [ref=f82e377]
+            - generic [ref=f82e380]:
+              - generic [ref=f82e381]:
+                - heading "Repository files navigation" [level=2] [ref=f82e382]
+                - navigation "Repository files" [ref=f82e383]:
+                  - list [ref=f82e384]:
+                    - listitem [ref=f82e385]:
+                      - link "README" [ref=f82e386] [cursor=pointer]:
+                        - /url: "#"
+                    - listitem [ref=f82e388]:
+                      - link "MIT license" [ref=f82e389] [cursor=pointer]:
+                        - /url: "#"
+                - button "Outline" [ref=f82e391] [cursor=pointer]
+              - article [ref=f82e395]:
+                - generic [ref=f82e396]:
+                  - heading "😺 Agentless" [level=1] [ref=f82e397]
+                  - 'link "Permalink: 😺 Agentless" [ref=f82e398] [cursor=pointer]':
+                    - /url: "#-agentless"
+                - paragraph [ref=f82e401]:
+                  - link [ref=f82e402] [cursor=pointer]:
+                    - /url: https://arxiv.org/abs/2407.01489
+                  - link [ref=f82e404] [cursor=pointer]:
+                    - /url: https://github.com/OpenAutoCoder/Agentless/blob/master/LICENSE
+                - paragraph [ref=f82e406]:
+                  - link "😽News" [ref=f82e407] [cursor=pointer]:
+                    - /url: "#-news"
+                  - text: "|"
+                  - link "🐈Setup" [ref=f82e408] [cursor=pointer]:
+                    - /url: "#-setup"
+                  - text: "|"
+                  - link "🧶Comparison" [ref=f82e409] [cursor=pointer]:
+                    - /url: "#-comparison"
+                  - text: "|"
+                  - link "🐈‍⬛Artifacts" [ref=f82e410] [cursor=pointer]:
+                    - /url: "#-artifacts"
+                  - text: "|"
+                  - link "📝Citation" [ref=f82e411] [cursor=pointer]:
+                    - /url: "#-citation"
+                  - text: "|"
+                  - link "😻Acknowledgement" [ref=f82e412] [cursor=pointer]:
+                    - /url: "#-acknowledgement"
+                - generic [ref=f82e413]:
+                  - heading "😽 News" [level=2] [ref=f82e414]
+                  - 'link "Permalink: 😽 News" [ref=f82e415] [cursor=pointer]':
+                    - /url: "#-news"
+                - list [ref=f82e418]:
+                  - listitem [ref=f82e419]:
+                    - emphasis [ref=f82e420]: Dec 2nd, 2024
+                    - text: ": We integrated Agentless with Claude 3.5 Sonnet to achieve 40.7% and 50.8% solve rate on SWE-bench lite and verified"
+                  - listitem [ref=f82e421]:
+                    - emphasis [ref=f82e422]: Oct 28th, 2024
+                    - text: ": We just released OpenAutoCoder-Agentless 1.5!"
+                  - listitem [ref=f82e423]:
+                    - emphasis [ref=f82e424]: July 1st, 2024
+                    - text: ": We just released OpenAutoCoder-Agentless 1.0!"
+                    - strong [ref=f82e425]: Agentless
+                    - text: currently is the best open-source approach on SWE-bench lite with 82 fixes (27.3%) and costing on average $0.34 per issue.
+                - generic [ref=f82e426]:
+                  - heading "😺 About" [level=2] [ref=f82e427]
+                  - 'link "Permalink: 😺 About" [ref=f82e428] [cursor=pointer]':
+                    - /url: "#-about"
+                - paragraph [ref=f82e431]:
+                  - strong [ref=f82e432]: Agentless
+                  - text: is an
+                  - emphasis [ref=f82e433]: agentless
+                  - text: approach to automatically solve software development problems. To solve each issue,
+                  - strong [ref=f82e434]: Agentless
+                  - text: "follows a simple three phase process: localization, repair, and patch validation."
+                - list [ref=f82e435]:
+                  - listitem [ref=f82e436]:
+                    - text: 🙀
+                    - strong [ref=f82e437]: Localization
+                    - text: ": Agentless employs a hierarchical process to first localize the fault to specific files, then to relevant classes or functions, and finally to fine-grained edit locations"
+                  - listitem [ref=f82e438]:
+                    - text: 😼
+                    - strong [ref=f82e439]: Repair
+                    - text: ": Agentless takes the edit locations and samples multiple candidate patches per bug in a simple diff format"
+                  - listitem [ref=f82e440]:
+                    - text: 😸
+                    - strong [ref=f82e441]: Patch Validation
+                    - text: ": Agentless selects the regression tests to run and generates additional reproduction test to reproduce the original error. Using the test results, Agentless re-ranks all remaining patches to selects one to submit"
+                - generic [ref=f82e442]:
+                  - heading "🐈 Setup" [level=2] [ref=f82e443]
+                  - 'link "Permalink: 🐈 Setup" [ref=f82e444] [cursor=pointer]':
+                    - /url: "#-setup"
+                - paragraph [ref=f82e447]: First create the environment
+                - generic [ref=f82e448]:
+                  - generic [ref=f82e449]:
+                    - text: "git clone https://github.com/OpenAutoCoder/Agentless.git cd Agentless conda create -n agentless python=3.11 conda activate agentless pip install -r requirements.txt export PYTHONPATH=$PYTHONPATH:"
+                    - generic [ref=f82e450]: $(pwd)
+                  - button "Copy code to clipboard" [ref=f82e452] [cursor=pointer]
+                - group [ref=f82e456]:
+                  - generic "⏬ Developer Setup" [ref=f82e457] [cursor=pointer]
+                - paragraph [ref=f82e458]: Then export your OpenAI API key
+                - generic [ref=f82e459]:
+                  - generic [ref=f82e460]: "export OPENAI_API_KEY={key_here}"
+                  - button "Copy code to clipboard" [ref=f82e462] [cursor=pointer]
+                - paragraph [ref=f82e466]:
+                  - text: Now you are ready to run
+                  - strong [ref=f82e467]: Agentless
+                  - text: on the problems in SWE-bench!
+                - generic [ref=f82e468]:
+                  - paragraph [ref=f82e469]: Note
+                  - paragraph [ref=f82e472]:
+                    - text: To reproduce the full SWE-bench lite experiments and follow our exact setup as described in the paper. Please see this
+                    - link "README" [ref=f82e473] [cursor=pointer]:
+                      - /url: https://github.com/OpenAutoCoder/Agentless/blob/main/README_swebench.md
+                - generic [ref=f82e474]:
+                  - heading "🧶 Comparison" [level=2] [ref=f82e475]
+                  - 'link "Permalink: 🧶 Comparison" [ref=f82e476] [cursor=pointer]':
+                    - /url: "#-comparison"
+                - paragraph [ref=f82e479]:
+                  - text: Below shows the comparison graph between
+                  - strong [ref=f82e480]: Agentless
+                  - text: and the best open-source agent-based approaches on SWE-bench lite
+                - paragraph [ref=f82e481]:
+                  - link [ref=f82e482] [cursor=pointer]:
+                    - /url: /OpenAutoCoder/Agentless/blob/main/resources/comparison_graph.png
+                - generic [ref=f82e484]:
+                  - heading "🐈‍⬛ Artifacts" [level=2] [ref=f82e485]
+                  - 'link "Permalink: 🐈‍⬛ Artifacts" [ref=f82e486] [cursor=pointer]':
+                    - /url: "#‍-artifacts"
+                - paragraph [ref=f82e489]:
+                  - text: You can download the complete artifacts of
+                  - strong [ref=f82e490]: Agentless
+                  - text: in our
+                  - link "v1.5.0 release" [ref=f82e491] [cursor=pointer]:
+                    - /url: https://github.com/OpenAutoCoder/Agentless/releases/tag/v1.5.0
+                  - text: ":"
+                - list [ref=f82e492]:
+                  - listitem [ref=f82e493]: "🐈‍⬛ agentless_swebench_lite: complete Agentless run on SWE-bench Lite"
+                  - listitem [ref=f82e494]: "🐈‍⬛ agentless_swebench_verified: complete Agentless run on SWE-bench Verified"
+                  - listitem [ref=f82e495]: "🐈‍⬛ swebench_repo_structure: preprocessed structure information for each SWE-Bench problem"
+                - paragraph [ref=f82e496]:
+                  - text: You can also checkout
+                  - code [ref=f82e497]: classification/
+                  - text: folder to obtain our manual classifications of SWE-bench-lite as well as our filtered SWE-bench-lite-
+                  - emphasis [ref=f82e498]: S
+                  - text: problems.
+                - generic [ref=f82e499]:
+                  - heading "📝 Citation" [level=2] [ref=f82e500]
+                  - 'link "Permalink: 📝 Citation" [ref=f82e501] [cursor=pointer]':
+                    - /url: "#-citation"
+                - generic [ref=f82e504]:
+                  - generic [ref=f82e505]:
+                    - text: "@article{agentless, author ="
+                    - generic [ref=f82e506]: "{Xia, Chunqiu Steven and Deng, Yinlin and Dunn, Soren and Zhang, Lingming}"
+                    - text: ", title ="
+                    - generic [ref=f82e507]: "{Agentless: Demystifying LLM-based Software Engineering Agents}"
+                    - text: ", year ="
+                    - generic [ref=f82e508]: "{2024}"
+                    - text: ", journal ="
+                    - generic [ref=f82e509]: "{arXiv preprint}"
+                    - text: ", }"
+                  - button "Copy code to clipboard" [ref=f82e511] [cursor=pointer]
+                - generic [ref=f82e515]:
+                  - paragraph [ref=f82e516]: Note
+                  - paragraph [ref=f82e519]:
+                    - text: The first two authors contributed equally to this work, with author order determined via
+                    - link [ref=f82e520] [cursor=pointer]:
+                      - /url: https://senseis.xmp.net/?Nigiri
+                      - emphasis [ref=f82e521]: Nigiri
+                - generic [ref=f82e522]:
+                  - heading "😻 Acknowledgement" [level=2] [ref=f82e523]
+                  - 'link "Permalink: 😻 Acknowledgement" [ref=f82e524] [cursor=pointer]':
+                    - /url: "#-acknowledgement"
+                - list [ref=f82e527]:
+                  - listitem [ref=f82e528]:
+                    - link "SWE-bench" [ref=f82e529] [cursor=pointer]:
+                      - /url: https://www.swebench.com/
+                  - listitem [ref=f82e530]:
+                    - link "Aider" [ref=f82e531] [cursor=pointer]:
+                      - /url: https://github.com/paul-gauthier/aider
+                  - listitem [ref=f82e532]:
+                    - link "SWE-bench-docker" [ref=f82e533] [cursor=pointer]:
+                      - /url: https://github.com/aorwall/SWE-bench-docker
+        - generic [ref=f82e536]:
+          - generic [ref=f82e537]:
+            - heading "About" [level=2] [ref=f82e538]
+            - paragraph [ref=f82e539]: "Agentless🐱: an agentless approach to automatically solve software development problems"
+            - heading "Topics" [level=3] [ref=f82e540]
+            - generic [ref=f82e541]:
+              - link "agent" [ref=f82e542] [cursor=pointer]:
+                - /url: /topics/agent
+              - link "artificial-intelligence" [ref=f82e543] [cursor=pointer]:
+                - /url: /topics/artificial-intelligence
+              - link "llm" [ref=f82e544] [cursor=pointer]:
+                - /url: /topics/llm
+              - link "software-development" [ref=f82e545] [cursor=pointer]:
+                - /url: /topics/software-development
+            - heading "Resources" [level=3] [ref=f82e546]
+            - link "Readme" [ref=f82e548] [cursor=pointer]:
+              - /url: "#readme-ov-file"
+            - link "MIT license" [ref=f82e552] [cursor=pointer]:
+              - /url: "#MIT-1-ov-file"
+            - link "Activity" [ref=f82e556] [cursor=pointer]:
+              - /url: /OpenAutoCoder/Agentless/activity
+            - link "Custom properties" [ref=f82e560] [cursor=pointer]:
+              - /url: /OpenAutoCoder/Agentless/custom-properties
+            - heading "Stars" [level=3] [ref=f82e563]
+            - generic [ref=f82e565]:
+              - strong [ref=f82e568]: 2.1k
+              - text: stars
+            - heading "Watchers" [level=3] [ref=f82e569]
+            - generic [ref=f82e571]:
+              - strong [ref=f82e574]: "20"
+              - text: watching
+            - heading "Forks" [level=3] [ref=f82e575]
+            - link [ref=f82e577] [cursor=pointer]:
+              - /url: /OpenAutoCoder/Agentless/forks
+              - strong [ref=f82e581]: "238"
+              - text: forks
+            - link "Report repository" [ref=f82e583] [cursor=pointer]:
+              - /url: /contact/report-content?content_url=https%3A%2F%2Fgithub.com%2FOpenAutoCoder%2FAgentless&report=OpenAutoCoder+%28user%29
+          - heading "Releases" [level=2] [ref=f82e585]
+          - heading "Packages" [level=2] [ref=f82e589]
+          - heading "Used by" [level=2] [ref=f82e592]
+          - heading "Contributors" [level=2] [ref=f82e595]
+          - heading "Languages" [level=2] [ref=f82e598]
+    - contentinfo [ref=f82e601]:
+      - heading "Footer" [level=2] [ref=f82e602]
+      - generic [ref=f82e603]:
+        - generic [ref=f82e604]:
+          - link "GitHub Homepage" [ref=f82e605] [cursor=pointer]:
+            - /url: https://github.com
+          - generic [ref=f82e608]: © 2026 GitHub, Inc.
+        - navigation "Footer" [ref=f82e609]:
+          - heading "Footer navigation" [level=3] [ref=f82e610]
+          - list "Footer navigation" [ref=f82e611]:
+            - listitem [ref=f82e612]:
+              - link "Terms" [ref=f82e613] [cursor=pointer]:
+                - /url: https://docs.github.com/site-policy/github-terms/github-terms-of-service
+            - listitem [ref=f82e614]:
+              - link "Privacy" [ref=f82e615] [cursor=pointer]:
+                - /url: https://docs.github.com/site-policy/privacy-policies/github-privacy-statement
+            - listitem [ref=f82e616]:
+              - link "Security" [ref=f82e617] [cursor=pointer]:
+                - /url: https://github.com/security
+            - listitem [ref=f82e618]:
+              - link "Status" [ref=f82e619] [cursor=pointer]:
+                - /url: https://www.githubstatus.com/
+            - listitem [ref=f82e620]:
+              - link "Community" [ref=f82e621] [cursor=pointer]:
+                - /url: https://github.community/
+            - listitem [ref=f82e622]:
+              - link "Docs" [ref=f82e623] [cursor=pointer]:
+                - /url: https://docs.github.com/
+            - listitem [ref=f82e624]:
+              - link "Contact" [ref=f82e625] [cursor=pointer]:
+                - /url: https://support.github.com?tags=dotcom-footer
+            - listitem [ref=f82e626]:
+              - button "Manage cookies" [ref=f82e628] [cursor=pointer]
+            - listitem [ref=f82e629]:
+              - button "Do not share my personal information" [ref=f82e631] [cursor=pointer]
+  - alert [ref=f82e634]

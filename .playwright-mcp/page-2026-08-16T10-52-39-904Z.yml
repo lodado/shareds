@@ -1,0 +1,404 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - generic [ref=f1e4]:
+      - generic [ref=f1e5]:
+        - generic [ref=f1e6]:
+          - link "DuckDuckGo home" [ref=f1e7] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f1e8]: DuckDuckGo
+          - generic [ref=f1e15]:
+            - combobox "개인 정보 노출 없이 검색" [ref=f1e17]: WebDev Arena official blog human preference website generation benchmark
+            - button "search" [ref=f1e19] [cursor=pointer]
+        - button "메뉴 열기" [ref=f1e23] [cursor=pointer]
+      - navigation [ref=f1e31]:
+        - list [ref=f1e32]:
+          - listitem [ref=f1e33]:
+            - link "모두" [ref=f1e34] [cursor=pointer]:
+              - /url: /?q=WebDev+Arena+official+blog+human+preference+website+generation+benchmark&ia=web
+          - listitem [ref=f1e37]:
+            - link "이미지" [ref=f1e38] [cursor=pointer]:
+              - /url: /?q=WebDev+Arena+official+blog+human+preference+website+generation+benchmark&ia=images&iax=images
+          - listitem [ref=f1e39]:
+            - link "동영상" [ref=f1e40] [cursor=pointer]:
+              - /url: /?q=WebDev+Arena+official+blog+human+preference+website+generation+benchmark&ia=videos&iax=videos
+          - listitem [ref=f1e41]:
+            - link "뉴스" [ref=f1e42] [cursor=pointer]:
+              - /url: /?q=WebDev+Arena+official+blog+human+preference+website+generation+benchmark&ia=news&iar=news
+          - listitem [ref=f1e43]:
+            - link "지도" [ref=f1e44] [cursor=pointer]:
+              - /url: /?q=WebDev+Arena+official+blog+human+preference+website+generation+benchmark&iaxm=maps
+        - list [ref=f1e45]:
+          - listitem [ref=f1e46]:
+            - link "Search Assist" [ref=f1e49] [cursor=pointer]:
+              - /url: /?q=WebDev+Arena+official+blog+human+preference+website+generation+benchmark&ia=web&assist=true
+          - listitem [ref=f1e54]:
+            - link "Duck.ai" [ref=f1e56] [cursor=pointer]:
+              - /url: /?q=WebDev+Arena+official+blog+human+preference+website+generation+benchmark&ia=chat
+          - listitem [ref=f1e60]:
+            - button "검색 설정 ✀" [ref=f1e62] [cursor=pointer]:
+              - generic [ref=f1e65]: 검색 설정
+              - generic [ref=f1e66]: ✀
+    - generic [ref=f1e73]:
+      - navigation [ref=f1e75]:
+        - generic [ref=f1e78] [cursor=pointer]:
+          - generic [ref=f1e79]: 보호됨
+          - img [ref=f1e87]: ▼
+        - generic [ref=f1e91] [cursor=pointer]:
+          - generic [ref=f1e94]:
+            - switch "✓" [ref=f1e95]
+            - generic [ref=f1e97]: 대한민국
+          - img [ref=f1e98]: ▼
+        - generic [ref=f1e102] [cursor=pointer]:
+          - generic [ref=f1e103]: "안전 검색: 보통"
+          - img [ref=f1e104]: ▼
+        - generic [ref=f1e108] [cursor=pointer]:
+          - generic [ref=f1e109]: 모든 날짜
+          - img [ref=f1e110]: ▼
+      - generic [ref=f1e113]:
+        - list [ref=f1e114]:
+          - listitem [ref=f1e115]:
+            - article [ref=f1e116] [cursor=pointer]:
+              - button [ref=f1e118]
+              - generic [ref=f1e123]:
+                - link "arena.ai 도메인 검색" [ref=f1e125]:
+                  - /url: /?q=WebDev%20Arena%20official%20blog%20human%20preference%20website%20generation%20benchmark+site:arena.ai
+                - generic [ref=f1e128]:
+                  - paragraph [ref=f1e129]: arena.ai
+                  - link "https://arena.ai › blog › webdev-arena" [ref=f1e130]:
+                    - /url: https://arena.ai/blog/webdev-arena
+                    - paragraph [ref=f1e132]:
+                      - generic [ref=f1e133]: https://arena.ai
+                      - generic [ref=f1e134]: › blog › webdev-arena
+              - heading [level=2] [ref=f1e136]:
+                - 'link "WebDev Arena: A Live LLM Leaderboard for" [ref=f1e137]':
+                  - /url: https://arena.ai/blog/webdev-arena
+              - generic [ref=f1e142]:
+                - text: 2025년 3월 10일·
+                - generic [ref=f1e143]: To analyze how people use Webdev Arena, we run the topic modeling pipeline on the conversation and human preference data. Results show a diverse range of prompt categories. Overall, prompts can be categorized into 11 broad categories, the largest three being Website Design (15.3%), Game Development (12.1%), and Clone Development (11.6%). Figure 4.
+          - listitem [ref=f1e144]:
+            - article [ref=f1e145] [cursor=pointer]:
+              - button [ref=f1e147]
+              - generic [ref=f1e152]:
+                - link "arena.ai 도메인 검색" [ref=f1e154]:
+                  - /url: /?q=WebDev%20Arena%20official%20blog%20human%20preference%20website%20generation%20benchmark+site:arena.ai
+                - generic [ref=f1e157]:
+                  - paragraph [ref=f1e158]: arena.ai
+                  - link "https://arena.ai" [ref=f1e159]:
+                    - /url: https://arena.ai/
+                    - paragraph [ref=f1e161]:
+                      - generic [ref=f1e162]: https://arena.ai
+              - heading [level=2] [ref=f1e164]:
+                - 'link "Arena AI: The Official AI Ranking & LLM Leaderboard" [ref=f1e165]':
+                  - /url: https://arena.ai/
+              - generic [ref=f1e167]: Chat, compare, vote for the world's best AI models. Join the community shaping the public leaderboard for LLMs, image, and code models through real-world evaluation.
+          - listitem [ref=f1e171]:
+            - article [ref=f1e172] [cursor=pointer]:
+              - button [ref=f1e174]
+              - generic [ref=f1e179]:
+                - link "benchmarklist.com 도메인 검색" [ref=f1e181]:
+                  - /url: /?q=WebDev%20Arena%20official%20blog%20human%20preference%20website%20generation%20benchmark+site:benchmarklist.com
+                - generic [ref=f1e184]:
+                  - paragraph [ref=f1e185]: benchmarklist.com
+                  - link "https://benchmarklist.com › benchmarks › lmarena_webdev_arena" [ref=f1e186]:
+                    - /url: https://benchmarklist.com/benchmarks/lmarena_webdev_arena/
+                    - paragraph [ref=f1e188]:
+                      - generic [ref=f1e189]: https://benchmarklist.com
+                      - generic [ref=f1e190]: › benchmarks › lmarena_webdev_arena
+              - heading [level=2] [ref=f1e192]:
+                - link "LMArena WebDev Arena Benchmark Scores & AI Model Leaderboard ..." [ref=f1e193]:
+                  - /url: https://benchmarklist.com/benchmarks/lmarena_webdev_arena/
+              - generic [ref=f1e198]:
+                - text: 2025년 11월 12일·
+                - generic [ref=f1e199]: LMArena's WebDev Arena leaderboard for model performance on interactive web development tasks judged by human preference.
+          - listitem [ref=f1e200]:
+            - article [ref=f1e201] [cursor=pointer]:
+              - button [ref=f1e203]
+              - generic [ref=f1e208]:
+                - link "deepwiki.com 도메인 검색" [ref=f1e210]:
+                  - /url: /?q=WebDev%20Arena%20official%20blog%20human%20preference%20website%20generation%20benchmark+site:deepwiki.com
+                - generic [ref=f1e213]:
+                  - paragraph [ref=f1e214]: deepwiki.com
+                  - link "https://deepwiki.com › lmarena › lmarena.github.io › 2.3-webdev-arena" [ref=f1e215]:
+                    - /url: https://deepwiki.com/lmarena/lmarena.github.io/2.3-webdev-arena
+                    - paragraph [ref=f1e217]:
+                      - generic [ref=f1e218]: https://deepwiki.com
+                      - generic [ref=f1e219]: › lmarena › lmarena.github.io › 2.3-webdev-arena
+              - heading [level=2] [ref=f1e221]:
+                - link "WebDev Arena | lmarena/lmarena.github.io | DeepWiki" [ref=f1e222]:
+                  - /url: https://deepwiki.com/lmarena/lmarena.github.io/2.3-webdev-arena
+              - generic [ref=f1e227]:
+                - text: 2025년 6월 2일·
+                - generic [ref=f1e228]: WebDev Arena Relevant source files WebDev Arena is a specialized evaluation system within the LMArena platform that focuses on assessing Large Language Model (LLM) capabilities in web application development. The system enables real-time pairwise comparisons of LLM-generated web applications through community voting, providing quantitative rankings of model performance in practical web ...
+          - listitem [ref=f1e229]:
+            - article [ref=f1e230] [cursor=pointer]:
+              - button [ref=f1e232]
+              - generic [ref=f1e237]:
+                - link "aiwiki.ai 도메인 검색" [ref=f1e239]:
+                  - /url: /?q=WebDev%20Arena%20official%20blog%20human%20preference%20website%20generation%20benchmark+site:aiwiki.ai
+                - generic [ref=f1e242]:
+                  - paragraph [ref=f1e243]: aiwiki.ai
+                  - link "https://aiwiki.ai › wiki › webdev_arena" [ref=f1e244]:
+                    - /url: https://aiwiki.ai/wiki/webdev_arena
+                    - paragraph [ref=f1e246]:
+                      - generic [ref=f1e247]: https://aiwiki.ai
+                      - generic [ref=f1e248]: › wiki › webdev_arena
+              - heading [level=2] [ref=f1e250]:
+                - link "WebDev Arena - AI Wiki" [ref=f1e251]:
+                  - /url: https://aiwiki.ai/wiki/webdev_arena
+              - generic [ref=f1e256]:
+                - text: 2026년 3월 19일·
+                - generic [ref=f1e257]: WebDev Arena is a live, community-driven leaderboard that ranks large language models on their ability to generate working web applications.
+          - listitem [ref=f1e258]:
+            - article [ref=f1e259] [cursor=pointer]:
+              - button [ref=f1e261]
+              - generic [ref=f1e266]:
+                - link "datalearner.com 도메인 검색" [ref=f1e268]:
+                  - /url: /?q=WebDev%20Arena%20official%20blog%20human%20preference%20website%20generation%20benchmark+site:www.datalearner.com
+                - generic [ref=f1e271]:
+                  - paragraph [ref=f1e272]: 数据学习
+                  - link "https://www.datalearner.com › en › benchmarks › code-arena-webdev" [ref=f1e273]:
+                    - /url: https://www.datalearner.com/en/benchmarks/code-arena-webdev
+                    - paragraph [ref=f1e275]:
+                      - generic [ref=f1e276]: https://www.datalearner.com
+                      - generic [ref=f1e277]: › en › benchmarks › code-arena-webdev
+              - heading [level=2] [ref=f1e279]:
+                - link "Code Arena WebDev Benchmark Details | DataLearnerAI" [ref=f1e280]:
+                  - /url: https://www.datalearner.com/en/benchmarks/code-arena-webdev
+              - generic [ref=f1e285]:
+                - text: 2일 전·
+                - generic [ref=f1e286]: Code Arena WebDev is a live human-preference leaderboard for front-end web development. Users compare generated web applications in battle mode, and the aggregated votes produce Elo-style model ratings for practical multi-step web development. Explore Code Arena WebDev benchmark details, metrics, official dataset links, model scores, and current LLM rankings.
+          - listitem [ref=f1e287]:
+            - article [ref=f1e288] [cursor=pointer]:
+              - button [ref=f1e290]
+              - generic [ref=f1e295]:
+                - link "github.com 도메인 검색" [ref=f1e297]:
+                  - /url: /?q=WebDev%20Arena%20official%20blog%20human%20preference%20website%20generation%20benchmark+site:github.com
+                - generic [ref=f1e300]:
+                  - paragraph [ref=f1e301]: Github
+                  - link "https://github.com › lmarena › arena-hard-auto" [ref=f1e302]:
+                    - /url: https://github.com/lmarena/arena-hard-auto
+                    - paragraph [ref=f1e304]:
+                      - generic [ref=f1e305]: https://github.com
+                      - generic [ref=f1e306]: › lmarena › arena-hard-auto
+              - heading [level=2] [ref=f1e308]:
+                - 'link "GitHub - lmarena/arena-hard-auto: Arena-Hard-Auto: An automatic LLM ..." [ref=f1e309]':
+                  - /url: https://github.com/lmarena/arena-hard-auto
+              - generic [ref=f1e311]: Although both Arena-Hard-Auto and Chatbot Arena Category Hard (See Blog) employ similar pipeline to select hard prompts, Arena-Hard-Auto employs automatic judge as a cheaper and faster approximator to human preference. Checkout BenchBuilder folder for code and resources on how we curate Arena-Hard-Auto.
+          - listitem [ref=f1e316]:
+            - article [ref=f1e317] [cursor=pointer]:
+              - button [ref=f1e319]
+              - generic [ref=f1e324]:
+                - link "llm-registry.com 도메인 검색" [ref=f1e326]:
+                  - /url: /?q=WebDev%20Arena%20official%20blog%20human%20preference%20website%20generation%20benchmark+site:llm-registry.com
+                - generic [ref=f1e329]:
+                  - paragraph [ref=f1e330]: llm-registry.com
+                  - link "https://llm-registry.com › benchmark › lmarena-webdev-elo" [ref=f1e331]:
+                    - /url: https://llm-registry.com/benchmark/lmarena-webdev-elo
+                    - paragraph [ref=f1e333]:
+                      - generic [ref=f1e334]: https://llm-registry.com
+                      - generic [ref=f1e335]: › benchmark › lmarena-webdev-elo
+              - heading [level=2] [ref=f1e337]:
+                - link "LMArena WebDev ELO Benchmark Leaderboard - LLM Registry" [ref=f1e338]:
+                  - /url: https://llm-registry.com/benchmark/lmarena-webdev-elo
+              - generic [ref=f1e340]: WebDev Arena ELO score. Human preference ranking for web development tasks.
+          - listitem [ref=f1e345]:
+            - article [ref=f1e346] [cursor=pointer]:
+              - button [ref=f1e348]
+              - generic [ref=f1e353]:
+                - link "toolcenter.ai 도메인 검색" [ref=f1e355]:
+                  - /url: /?q=WebDev%20Arena%20official%20blog%20human%20preference%20website%20generation%20benchmark+site:www.toolcenter.ai
+                - generic [ref=f1e358]:
+                  - paragraph [ref=f1e359]: toolcenter.ai
+                  - link "https://www.toolcenter.ai › en › llm-leaderboard" [ref=f1e360]:
+                    - /url: https://www.toolcenter.ai/en/llm-leaderboard
+                    - paragraph [ref=f1e362]:
+                      - generic [ref=f1e363]: https://www.toolcenter.ai
+                      - generic [ref=f1e364]: › en › llm-leaderboard
+              - heading [level=2] [ref=f1e366]:
+                - 'link "LMArena LLM Leaderboard 2026: Top 10 AI Models (July)" [ref=f1e367]':
+                  - /url: https://www.toolcenter.ai/en/llm-leaderboard
+              - generic [ref=f1e372]:
+                - text: 2026년 7월 7일·
+                - generic [ref=f1e373]: "2026 AI model rankings: top 10 LLMs by LMArena (formerly LMSYS Chatbot Arena) human-preference Elo scores from 7M+ blind votes, synced July 2026, with task-based picking advice and FAQ."
+          - listitem [ref=f1e374]:
+            - article [ref=f1e375] [cursor=pointer]:
+              - button [ref=f1e377]
+              - generic [ref=f1e382]:
+                - link "madebyagents.com 도메인 검색" [ref=f1e384]:
+                  - /url: /?q=WebDev%20Arena%20official%20blog%20human%20preference%20website%20generation%20benchmark+site:www.madebyagents.com
+                - generic [ref=f1e387]:
+                  - paragraph [ref=f1e388]: madebyagents.com
+                  - link "https://www.madebyagents.com › benchmarks › webdev-arena" [ref=f1e389]:
+                    - /url: https://www.madebyagents.com/benchmarks/webdev-arena
+                    - paragraph [ref=f1e391]:
+                      - generic [ref=f1e392]: https://www.madebyagents.com
+                      - generic [ref=f1e393]: › benchmarks › webdev-arena
+              - heading [level=2] [ref=f1e395]:
+                - 'link "WebDev Arena Benchmark: Scores, Methodology, and Top AI Models" [ref=f1e396]':
+                  - /url: https://www.madebyagents.com/benchmarks/webdev-arena
+              - generic [ref=f1e398]: "WebDev Arena: Arena.ai WebDev Leaderboard Head-to-head human preference ranking for models that turn natural-language prompts into working web apps."
+          - listitem [ref=f1e403]:
+            - generic [ref=f1e411]:
+              - generic [ref=f1e412]:
+                - generic [ref=f1e414]:
+                  - strong [ref=f1e415]: WebDev Arena official blog human preference website generation benchmark
+                  - text: 에 대한 답변 생성
+                - generic [ref=f1e416]:
+                  - button "Learn More About Assist" [ref=f1e417] [cursor=pointer]
+                  - button "Assist 설정" [ref=f1e421] [cursor=pointer]
+              - button "Assist" [ref=f1e424] [cursor=pointer]: Search Assist
+        - button "검색 결과 더 보기" [ref=f1e430] [cursor=pointer]
+    - list [ref=f1e433]:
+      - button "메뉴 닫기" [ref=f1e434] [cursor=pointer]
+      - list [ref=f1e438]:
+        - listitem [ref=f1e439]: 검색
+        - listitem [ref=f1e440]:
+          - link "홈페이지" [ref=f1e441] [cursor=pointer]:
+            - /url: https://start.duckduckgo.com/
+        - listitem [ref=f1e442]:
+          - link "테마" [ref=f1e443] [cursor=pointer]:
+            - /url: /settings#appearance
+        - listitem [ref=f1e444]:
+          - link "설정" [ref=f1e445] [cursor=pointer]:
+            - /url: /settings
+      - list [ref=f1e446]:
+        - listitem [ref=f1e447]: 피드백 공유
+        - listitem [ref=f1e448]:
+          - generic [ref=f1e451]:
+            - button "Positive feedback" [ref=f1e452] [cursor=pointer]
+            - button "Negative feedback" [ref=f1e456] [cursor=pointer]
+      - list [ref=f1e460]:
+        - listitem [ref=f1e461]: 다운로드
+        - listitem [ref=f1e462]:
+          - link "iOS 브라우저" [ref=f1e463] [cursor=pointer]:
+            - /url: https://apps.apple.com/app/duckduckgo-private-browser/id663592361?platform=iphone&pt=866401&mt=8&ct=serp-atb-serp
+        - listitem [ref=f1e464]:
+          - link "Android 브라우저" [ref=f1e465] [cursor=pointer]:
+            - /url: https://play.google.com/store/apps/details?id=com.duckduckgo.mobile.android&referrer=utm_campaign%3Dserp-atb-serp%26origin%3Dfunnel_playstore_searchresults
+        - listitem [ref=f1e466]:
+          - link "Mac 브라우저" [ref=f1e467] [cursor=pointer]:
+            - /url: /mac?origin=funnel_browser_searchresults
+        - listitem [ref=f1e468]:
+          - link "Windows 브라우저" [ref=f1e469] [cursor=pointer]:
+            - /url: /windows?origin=funnel_browser_searchresults
+        - listitem [ref=f1e470]: 브라우저 확장 프로그램
+      - list [ref=f1e471]:
+        - listitem [ref=f1e472]: DuckDuckGo 더 알아보기
+        - listitem [ref=f1e473]:
+          - generic [ref=f1e476]:
+            - button "프로모션 무시하기" [ref=f1e477] [cursor=pointer]
+            - generic [ref=f1e480]:
+              - paragraph [ref=f1e482]: 비공개 브라우저로 업그레이드하세요
+              - paragraph [ref=f1e494]: 빠르게. 안전하게. 무료로.
+            - link "Mac 브라우저 설치" [ref=f1e495] [cursor=pointer]:
+              - /url: /mac
+        - listitem [ref=f1e498]:
+          - link "Duck.ai" [ref=f1e499] [cursor=pointer]:
+            - /url: https://duck.ai
+        - listitem [ref=f1e500]:
+          - link "이메일 보호" [ref=f1e501] [cursor=pointer]:
+            - /url: /email
+        - listitem [ref=f1e502]:
+          - link "뉴스레터" [ref=f1e503] [cursor=pointer]:
+            - /url: /newsletter
+        - listitem [ref=f1e504]:
+          - link "블로그" [ref=f1e505] [cursor=pointer]:
+            - /url: /blog
+        - listitem [ref=f1e506]:
+          - link "팟캐스트" [ref=f1e507] [cursor=pointer]:
+            - /url: https://insideduckduckgo.substack.com/?showWelcome=true
+        - listitem [ref=f1e508]:
+          - link "협업" [ref=f1e509] [cursor=pointer]:
+            - /url: /collaborations
+      - list [ref=f1e510]:
+        - listitem [ref=f1e511]: 더 알아보기
+        - listitem [ref=f1e512]:
+          - link "업데이트 소식" [ref=f1e513] [cursor=pointer]:
+            - /url: /updates
+        - listitem [ref=f1e514]:
+          - link "개인정보 보호 비교" [ref=f1e515] [cursor=pointer]:
+            - /url: /compare-privacy
+        - listitem [ref=f1e516]:
+          - link "브라우저 정보" [ref=f1e517] [cursor=pointer]:
+            - /url: /app
+        - listitem [ref=f1e518]:
+          - link "DuckDuckGo 소개" [ref=f1e519] [cursor=pointer]:
+            - /url: /about
+      - list [ref=f1e520]:
+        - listitem [ref=f1e521]: 기타 자료
+        - listitem [ref=f1e522]:
+          - link "도움말" [ref=f1e523] [cursor=pointer]:
+            - /url: /duckduckgo-help-pages
+        - listitem [ref=f1e524]:
+          - link "커뮤니티" [ref=f1e525] [cursor=pointer]:
+            - /url: https://www.reddit.com/r/duckduckgo/
+        - listitem [ref=f1e526]:
+          - link "채용 정보" [ref=f1e527] [cursor=pointer]:
+            - /url: /careers
+        - listitem [ref=f1e528]:
+          - link "개인정보 보호정책" [ref=f1e529] [cursor=pointer]:
+            - /url: /privacy
+        - listitem [ref=f1e530]:
+          - link "서비스 약관" [ref=f1e531] [cursor=pointer]:
+            - /url: /terms
+        - listitem [ref=f1e532]:
+          - link "보도 자료" [ref=f1e533] [cursor=pointer]:
+            - /url: /press
+        - listitem [ref=f1e534]:
+          - link "검색 광고" [ref=f1e535] [cursor=pointer]:
+            - /url: /duckduckgo-help-pages/company/advertise-on-duckduckgo-search
+  - generic [ref=f1e539]:
+    - generic [ref=f1e541]:
+      - generic [ref=f1e558]:
+        - heading "Mac용 브라우저 다운로드" [level=3] [ref=f1e559]
+        - paragraph [ref=f1e560]: 검색하고, 인터넷을 이용하고 AI를 사용하는 과정에서 데이터를 보호하세요.
+      - link "다운로드" [ref=f1e561] [cursor=pointer]:
+        - /url: https://duckduckgo.com/mac?origin=funnel_browser_searchresults__footercard
+    - generic [ref=f1e565]:
+      - generic [ref=f1e566]:
+        - heading "더 알아보기" [level=3] [ref=f1e567]
+        - list [ref=f1e568]:
+          - listitem [ref=f1e569]:
+            - link "업데이트 소식" [ref=f1e570] [cursor=pointer]:
+              - /url: https://duckduckgo.com/updates
+          - listitem [ref=f1e571]:
+            - link "브라우저 정보" [ref=f1e572] [cursor=pointer]:
+              - /url: https://duckduckgo.com/app
+          - listitem [ref=f1e573]:
+            - link "개인정보 보호 비교" [ref=f1e574] [cursor=pointer]:
+              - /url: https://duckduckgo.com/compare-privacy
+          - listitem [ref=f1e575]:
+            - link "도움말 페이지" [ref=f1e576] [cursor=pointer]:
+              - /url: https://duckduckgo.com/duckduckgo-help-pages/
+      - generic [ref=f1e577]:
+        - heading "더 알아보기" [level=3] [ref=f1e578]
+        - list [ref=f1e579]:
+          - listitem [ref=f1e580]:
+            - link "이메일 보호" [ref=f1e581] [cursor=pointer]:
+              - /url: https://duckduckgo.com/email
+          - listitem [ref=f1e582]:
+            - generic [ref=f1e583]:
+              - link "팟캐스트" [ref=f1e585] [cursor=pointer]:
+                - /url: https://insideduckduckgo.substack.com/?showWelcome=true
+              - generic [ref=f1e586]:
+                - text: "&"
+                - link "뉴스레터" [ref=f1e587] [cursor=pointer]:
+                  - /url: https://duckduckgo.com/newsletter
+          - listitem [ref=f1e588]:
+            - link "협업" [ref=f1e589] [cursor=pointer]:
+              - /url: https://duckduckgo.com/collaborations
+  - button "피드백 공유" [ref=f1e594] [cursor=pointer]
+  - generic [ref=f1e595]:
+    - generic [ref=f1e597]:
+      - banner [ref=f1e598]:
+        - paragraph [ref=f1e600]: DuckDuckGo 브라우저로 업그레이드하세요.
+      - generic [ref=f1e601]:
+        - paragraph [ref=f1e607]:
+          - generic [ref=f1e608]:
+            - strong [ref=f1e609]: DuckDuckGo
+            - text: 브라우저를 사용해 보세요. 빠른 검색. 무료 제공. 개인 정보 보호.
+        - link "브라우저 다운로드" [ref=f1e610] [cursor=pointer]:
+          - /url: https://duckduckgo.com/mac?origin=funnel_browser_searchresults__popover
+      - paragraph [ref=f1e616]:
+        - generic [ref=f1e617]: 무료
+    - button [ref=f1e619] [cursor=pointer]

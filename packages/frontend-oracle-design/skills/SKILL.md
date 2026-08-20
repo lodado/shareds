@@ -1,6 +1,6 @@
 ---
 name: frontend-oracle-design
-description: Use when the user explicitly requests an Oracle contract or delivery loop, or when medium/high-risk frontend behavior or approved visual intent has unresolved policy that must be locked before implementation. Typical cases are mutations, async ordering, duplicate submits, destructive actions, payments, permissions, or data-integrity boundaries. Do not auto-invoke for low-risk copy/token/isolated CSS, straightforward regression fixes inside already approved behavior, screenshot/browser QA, or FSD folder advice alone.
+description: Use when the user explicitly requests an Oracle contract or graph-orchestrated delivery loop, or when medium/high-risk frontend behavior or approved visual intent has unresolved policy that must be locked before implementation. Typical cases are mutations, async ordering, duplicate submits, destructive actions, payments, permissions, or data-integrity boundaries. Do not auto-invoke for low-risk copy/token/isolated CSS, straightforward regression fixes inside already approved behavior, screenshot/browser QA, or FSD folder advice alone.
 ---
 
 # Frontend Oracle Design
@@ -27,6 +27,27 @@ Oracle은 `Outcome Brief`·`Source Registry`·승인된 계약·revision lock·D
 진입 시 먼저 risk만 짧게 판정한다. **Low fast path는 reference를 로드하지 않고** 카드·lock·
 run artifact 없이 기존 레포 검증만 수행한다. 사용자가 Oracle 자체를 명시적으로 요청했거나
 Medium/High일 때만 아래 reference와 카드 절차로 들어간다.
+
+## 그래프 오케스트레이션
+
+Oracle 절차는 설치된 `$agent-graph-engineering`을 이름으로 명시적으로 로드·호출하고
+[`references/oracle-workflow.graph.json`](references/oracle-workflow.graph.json)을 실행한다.
+스킬이나 graph verifier를 찾을 수 없으면 순차 실행으로 우회하지 않고 `FAIL`로 멈춘다.
+
+- Graph Controller는 Node 실행과 Edge 선택만 소유하고, Oracle은 제품 정책·카드·lock·
+  ledger·상태 전이와 예산을 계속 소유한다.
+- bundled graph를 대상 레포의 `.ai/agent-graphs/<oracle-id>/graph.json`에 그대로 복사하고
+  실행 event는 같은 디렉터리의 `events.jsonl`에 append-only로 기록한다.
+- 실행 전 bundled `graph-verify.mjs verify`로 그래프를 검사하고, 각 Worker는 현재 Node의
+  `task`만 수행해 선언된 output field를 JSON으로 반환한다.
+- 다음 경로는 Worker가 고르지 않는다. Controller가 `graph-verify.mjs next`를 실행해
+  strict-equality로 일치한 Edge만 활성화한다.
+- graph의 `maxSteps`는 전체 runaway 방지 상한이고, policy·harness·product 개별 한도는
+  기존 `oracle-run.mjs budget` 판정을 대체하지 않는다.
+- graph Node 안에서 `$frontend-oracle-design`을 다시 호출해 재귀 진입하지 않는다. 현재
+  로드된 이 계약과 조건부 reference만 적용한다.
+- `user-confirmation` gate는 명시적 답변 전 `WAITING_USER`로 멈춘다. 카드·Design Change·
+  architecture 확인을 생략하거나 agent가 대신 승인하지 않는다.
 
 ## 불변 규칙
 

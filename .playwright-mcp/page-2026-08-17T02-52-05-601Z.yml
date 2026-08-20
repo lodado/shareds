@@ -1,0 +1,121 @@
+- generic [active] [ref=f21e1]:
+  - link "New Introducing React Bench, see how different models perform on React code" [ref=f21e2] [cursor=pointer]:
+    - /url: https://reactbench.com
+    - generic [ref=f21e3]:
+      - generic [ref=f21e4]: New
+      - generic [ref=f21e6]: Introducing React Bench, see how different models perform on React code
+  - generic [ref=f21e11]:
+    - banner [ref=f21e12]:
+      - generic [ref=f21e13]:
+        - link "React Doctor home" [ref=f21e14] [cursor=pointer]:
+          - /url: /
+          - img "React Doctor" [ref=f21e15]
+        - button "Open menu" [ref=f21e19]
+    - main [ref=f21e23]:
+      - article [ref=f21e25]:
+        - heading [level=1] [ref=f21e26]:
+          - link "Copy link to this section" [ref=f21e27] [cursor=pointer]:
+            - /url: "#how-does-react-doctor-find-hard-to-change-code"
+          - text: How does React Doctor find hard-to-change code?
+        - paragraph [ref=f21e35]: React Doctor finds React code that makes future changes slower or riskier. Complexity and repeated JSX checks run by default. Six optional rules add whole-project import graph analysis.
+        - heading [level=2] [ref=f21e36]:
+          - link "Copy link to this section" [ref=f21e37] [cursor=pointer]:
+            - /url: "#complex-react-components-and-hooks"
+          - text: Complex React components and hooks
+        - paragraph [ref=f21e45]:
+          - text: The
+          - code [ref=f21e46]: react-doctor/no-high-complexity-react-function
+          - text: rule measures control flow in functions identified as React components and custom hooks. It reports a function when cyclomatic or cognitive complexity exceeds 15.
+        - paragraph [ref=f21e47]: "Each diagnostic includes three measurements:"
+        - list [ref=f21e48]:
+          - listitem [ref=f21e49]:
+            - strong [ref=f21e50]: Cyclomatic complexity
+            - text: ": the number of reachable control-flow paths"
+          - listitem [ref=f21e51]:
+            - strong [ref=f21e52]: Cognitive complexity
+            - text: ": the reading cost added by branches and nesting"
+          - listitem [ref=f21e53]:
+            - strong [ref=f21e54]: Maximum nesting depth
+            - text: ": the deepest control-flow level in the function"
+        - paragraph [ref=f21e55]: React Doctor excludes ordinary JavaScript functions and nested callback complexity from the owning component. A reported function should become easier to understand when you extract independent branches into components or hooks.
+        - heading [level=2] [ref=f21e56]:
+          - link "Copy link to this section" [ref=f21e57] [cursor=pointer]:
+            - /url: "#repeated-jsx-structures"
+          - text: Repeated JSX structures
+        - paragraph [ref=f21e65]:
+          - text: The
+          - code [ref=f21e66]: react-doctor/duplicate-jsx-subtree
+          - text: check compares JSX structure across the project. It normalizes data leaves, such as labels and local variable names, while preserving component composition and expression behavior.
+        - paragraph [ref=f21e67]: "React Doctor reports substantial repeated trees instead of every matching element. A finding includes:"
+        - list [ref=f21e68]:
+          - listitem [ref=f21e69]: Every matching location
+          - listitem [ref=f21e70]: The lexical composition path for the primary copy
+          - listitem [ref=f21e71]: The copy count and tree node count
+          - listitem [ref=f21e72]: The estimated repeated line count
+        - paragraph [ref=f21e73]: Keep copies separate when the similarity is incidental or the interfaces are likely to evolve independently. Extract a component when the copies represent the same UI concept.
+        - heading [level=2] [ref=f21e74]:
+          - link "Copy link to this section" [ref=f21e75] [cursor=pointer]:
+            - /url: "#results-in-partial-scans"
+          - text: Results in partial scans
+        - paragraph [ref=f21e83]: Changed and staged scans check complexity in the selected source. Duplicate JSX analysis compares the full source corpus, then reports families connected to selected files or lines.
+        - paragraph [ref=f21e84]: This catches a new copy of existing JSX without flooding the report with unchanged findings. Pull request scans use the same baseline comparison as changed scans.
+        - heading [level=2] [ref=f21e85]:
+          - link "Copy link to this section" [ref=f21e86] [cursor=pointer]:
+            - /url: "#optional-whole-project-graph-rules"
+          - text: Optional whole-project graph rules
+        - paragraph [ref=f21e94]: "Six project graph rules are available for targeted cleanup. They are disabled by default and run only during full scans. Partial and baseline scans skip them because those scopes cannot prove whole-project reachability. The available rules are:"
+        - list [ref=f21e95]:
+          - listitem [ref=f21e96]:
+            - link [ref=f21e97] [cursor=pointer]:
+              - /url: /docs/rules/react-doctor/unused-file
+              - code [ref=f21e98]: react-doctor/unused-file
+            - text: ": finds source files that no discovered entry point can reach"
+          - listitem [ref=f21e99]:
+            - link [ref=f21e100] [cursor=pointer]:
+              - /url: /docs/rules/react-doctor/unused-export
+              - code [ref=f21e101]: react-doctor/unused-export
+            - text: ": finds value exports with no in-repository consumer"
+          - listitem [ref=f21e102]:
+            - link [ref=f21e103] [cursor=pointer]:
+              - /url: /docs/rules/react-doctor/unused-type
+              - code [ref=f21e104]: react-doctor/unused-type
+            - text: ": finds type exports with no in-repository consumer"
+          - listitem [ref=f21e105]:
+            - link [ref=f21e106] [cursor=pointer]:
+              - /url: /docs/rules/react-doctor/unused-dependency
+              - code [ref=f21e107]: react-doctor/unused-dependency
+            - text: ": finds production dependencies with no detected use"
+          - listitem [ref=f21e108]:
+            - link [ref=f21e109] [cursor=pointer]:
+              - /url: /docs/rules/react-doctor/unused-dev-dependency
+              - code [ref=f21e110]: react-doctor/unused-dev-dependency
+            - text: ": finds development dependencies with no detected use"
+          - listitem [ref=f21e111]:
+            - link [ref=f21e112] [cursor=pointer]:
+              - /url: /docs/rules/react-doctor/circular-dependency
+              - code [ref=f21e113]: react-doctor/circular-dependency
+            - text: ": finds runtime import cycles with top-level binding access"
+        - paragraph [ref=f21e114]:
+          - text: Enable only the checks you want in
+          - code [ref=f21e115]: doctor.config.json
+          - text: ":"
+        - generic [ref=f21e116]:
+          - button "Copy code" [ref=f21e117] [cursor=pointer]:
+            - status [ref=f21e124]
+          - code [ref=f21e127]:
+            - generic [ref=f21e128]: "{"
+            - generic [ref=f21e129]: "\"$schema\": \"https://react.doctor/schema/config.json\","
+            - generic [ref=f21e130]: "\"rules\": {"
+            - generic [ref=f21e131]: "\"react-doctor/unused-file\": \"warn\","
+            - generic [ref=f21e132]: "\"react-doctor/unused-export\": \"warn\","
+            - generic [ref=f21e133]: "\"react-doctor/unused-type\": \"warn\","
+            - generic [ref=f21e134]: "\"react-doctor/unused-dependency\": \"warn\","
+            - generic [ref=f21e135]: "\"react-doctor/unused-dev-dependency\": \"warn\","
+            - generic [ref=f21e136]: "\"react-doctor/circular-dependency\": \"warn\""
+            - generic [ref=f21e137]: "}"
+            - generic [ref=f21e138]: "}"
+        - paragraph [ref=f21e139]:
+          - text: Each rule page includes its detection boundary, false-positive checks, and a before-and-after example. A
+          - code [ref=f21e140]: Maintainability
+          - text: category override does not activate these rules. The explicit rule entry sets each enabled rule's severity.
+  - alert [ref=f21e141]

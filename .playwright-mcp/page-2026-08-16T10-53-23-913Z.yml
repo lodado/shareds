@@ -1,0 +1,605 @@
+- generic [active] [ref=f51e1]:
+  - banner [ref=f51e2]:
+    - generic:
+      - link "Skip to main content" [ref=f51e3] [cursor=pointer]:
+        - /url: "#main-content"
+      - link "Skip to footer" [ref=f51e4] [cursor=pointer]:
+        - /url: "#footer"
+    - generic [ref=f51e5]:
+      - link "Home" [ref=f51e6] [cursor=pointer]:
+        - /url: /
+      - generic [ref=f51e9]:
+        - navigation [ref=f51e10]:
+          - list [ref=f51e11]:
+            - listitem [ref=f51e12] [cursor=pointer]:
+              - link "Research" [ref=f51e13]:
+                - /url: /research
+            - listitem [ref=f51e14] [cursor=pointer]:
+              - link "Policy" [ref=f51e15]:
+                - /url: /policy
+            - listitem [ref=f51e16] [cursor=pointer]:
+              - button "Commitments" [ref=f51e17]
+            - listitem [ref=f51e21] [cursor=pointer]:
+              - button "Learn" [ref=f51e22]
+            - listitem [ref=f51e26] [cursor=pointer]:
+              - link "News" [ref=f51e27]:
+                - /url: /news
+        - generic [ref=f51e28]:
+          - link "Try Claude" [ref=f51e29] [cursor=pointer]:
+            - /url: https://claude.ai/
+          - generic [ref=f51e30] [cursor=pointer]
+  - main [ref=f51e33]:
+    - region "Engineering Article Hero" [ref=f51e34]:
+      - link "Engineering at Anthropic" [ref=f51e35] [cursor=pointer]:
+        - /url: /engineering
+      - generic [ref=f51e36]:
+        - heading "Building effective agents" [level=1] [ref=f51e39]
+        - generic [ref=f51e40]:
+          - paragraph [ref=f51e41]: Published Dec 19, 2024
+          - paragraph [ref=f51e42]: We've worked with dozens of teams building LLM agents across industries. Consistently, the most successful implementations use simple, composable patterns rather than complex frameworks.
+    - generic [ref=f51e43]:
+      - article [ref=f51e44]:
+        - generic [ref=f51e46]:
+          - paragraph [ref=f51e47]:
+            - emphasis [ref=f51e48]:
+              - text: "Note: Much of the tooling landscape described in this post has changed since December 2024. For our current approach, see"
+              - link [ref=f51e49] [cursor=pointer]:
+                - /url: https://www.anthropic.com/engineering/managed-agents
+                - strong [ref=f51e50]: how we built Claude Managed Agents
+            - emphasis [ref=f51e51]:
+              - text: and the
+              - link [ref=f51e52] [cursor=pointer]:
+                - /url: https://platform.claude.com/docs/en/managed-agents/overview
+                - strong [ref=f51e53]: Managed Agents documentation
+                - text: .
+            - text: Over the past year, we've worked with dozens of teams building large language model (LLM) agents across industries. Consistently, the most successful implementations weren't using complex frameworks or specialized libraries. Instead, they were building with simple, composable patterns.
+          - paragraph [ref=f51e54]: In this post, we share what we’ve learned from working with our customers and building agents ourselves, and give practical advice for developers on building effective agents.
+          - heading "What are agents?" [level=2] [ref=f51e55]
+          - paragraph [ref=f51e56]:
+            - text: "\"Agent\" can be defined in several ways. Some customers define agents as fully autonomous systems that operate independently over extended periods, using various tools to accomplish complex tasks. Others use the term to describe more prescriptive implementations that follow predefined workflows. At Anthropic, we categorize all these variations as"
+            - strong [ref=f51e57]: agentic systems
+            - text: ", but draw an important architectural distinction between"
+            - strong [ref=f51e58]: workflows
+            - text: and
+            - strong [ref=f51e59]: agents
+            - text: ":"
+          - list [ref=f51e60]:
+            - listitem [ref=f51e61]:
+              - strong [ref=f51e62]: Workflows
+              - text: are systems where LLMs and tools are orchestrated through predefined code paths.
+            - listitem [ref=f51e63]:
+              - strong [ref=f51e64]: Agents
+              - text: ", on the other hand, are systems where LLMs dynamically direct their own processes and tool usage, maintaining control over how they accomplish tasks."
+          - paragraph [ref=f51e65]: Below, we will explore both types of agentic systems in detail. In Appendix 1 (“Agents in Practice”), we describe two domains where customers have found particular value in using these kinds of systems.
+          - heading "When (and when not) to use agents" [level=2] [ref=f51e66]
+          - paragraph [ref=f51e67]: When building applications with LLMs, we recommend finding the simplest solution possible, and only increasing complexity when needed. This might mean not building agentic systems at all. Agentic systems often trade latency and cost for better task performance, and you should consider when this tradeoff makes sense.
+          - paragraph [ref=f51e68]: When more complexity is warranted, workflows offer predictability and consistency for well-defined tasks, whereas agents are the better option when flexibility and model-driven decision-making are needed at scale. For many applications, however, optimizing single LLM calls with retrieval and in-context examples is usually enough.
+          - heading "When and how to use frameworks" [level=2] [ref=f51e69]
+          - paragraph [ref=f51e70]: "There are many frameworks that make agentic systems easier to implement, including:"
+          - list [ref=f51e71]:
+            - listitem [ref=f51e72]:
+              - text: The
+              - link "Claude Agent SDK" [ref=f51e73] [cursor=pointer]:
+                - /url: https://platform.claude.com/docs/en/agent-sdk/overview
+              - text: ;
+            - listitem [ref=f51e74]:
+              - link "Strands Agents SDK by AWS" [ref=f51e75] [cursor=pointer]:
+                - /url: https://strandsagents.com/latest/
+              - text: ;
+            - listitem [ref=f51e76]:
+              - link "Rivet" [ref=f51e77] [cursor=pointer]:
+                - /url: https://rivet.ironcladapp.com/
+              - text: ", a drag and drop GUI LLM workflow builder; and"
+            - listitem [ref=f51e78]:
+              - link "Vellum" [ref=f51e79] [cursor=pointer]:
+                - /url: https://www.vellum.ai/
+              - text: ", another GUI tool for building and testing complex workflows."
+          - paragraph [ref=f51e80]: These frameworks make it easy to get started by simplifying standard low-level tasks like calling LLMs, defining and parsing tools, and chaining calls together. However, they often create extra layers of abstraction that can obscure the underlying prompts and responses, making them harder to debug. They can also make it tempting to add complexity when a simpler setup would suffice.
+          - paragraph [ref=f51e81]: "We suggest that developers start by using LLM APIs directly: many patterns can be implemented in a few lines of code. If you do use a framework, ensure you understand the underlying code. Incorrect assumptions about what's under the hood are a common source of customer error."
+          - paragraph [ref=f51e82]:
+            - text: See our
+            - link "cookbook" [ref=f51e83] [cursor=pointer]:
+              - /url: https://platform.claude.com/cookbook/patterns-agents-basic-workflows
+            - text: for some sample implementations.
+          - heading "Building blocks, workflows, and agents" [level=2] [ref=f51e84]
+          - paragraph [ref=f51e85]: In this section, we’ll explore the common patterns for agentic systems we’ve seen in production. We'll start with our foundational building block—the augmented LLM—and progressively increase complexity, from simple compositional workflows to autonomous agents.
+          - 'heading "Building block: The augmented LLM" [level=3] [ref=f51e86]'
+          - paragraph [ref=f51e87]: The basic building block of agentic systems is an LLM enhanced with augmentations such as retrieval, tools, and memory. Our current models can actively use these capabilities—generating their own search queries, selecting appropriate tools, and determining what information to retain.
+          - figure "The augmented LLM" [ref=f51e89]
+          - paragraph [ref=f51e92]:
+            - text: "We recommend focusing on two key aspects of the implementation: tailoring these capabilities to your specific use case and ensuring they provide an easy, well-documented interface for your LLM. While there are many ways to implement these augmentations, one approach is through our recently released"
+            - link "Model Context Protocol" [ref=f51e93] [cursor=pointer]:
+              - /url: https://www.anthropic.com/news/model-context-protocol
+            - text: ", which allows developers to integrate with a growing ecosystem of third-party tools with a simple"
+            - link "client implementation" [ref=f51e94] [cursor=pointer]:
+              - /url: https://modelcontextprotocol.io/tutorials/building-a-client#building-mcp-clients
+            - text: .
+          - paragraph [ref=f51e95]: For the remainder of this post, we'll assume each LLM call has access to these augmented capabilities.
+          - 'heading "Workflow: Prompt chaining" [level=3] [ref=f51e96]'
+          - paragraph [ref=f51e97]: Prompt chaining decomposes a task into a sequence of steps, where each LLM call processes the output of the previous one. You can add programmatic checks (see "gate” in the diagram below) on any intermediate steps to ensure that the process is still on track.
+          - figure "The prompt chaining workflow" [ref=f51e99]
+          - paragraph [ref=f51e102]:
+            - strong [ref=f51e103]: "When to use this workflow:"
+            - text: This workflow is ideal for situations where the task can be easily and cleanly decomposed into fixed subtasks. The main goal is to trade off latency for higher accuracy, by making each LLM call an easier task.
+          - paragraph [ref=f51e104]:
+            - strong [ref=f51e105]: "Examples where prompt chaining is useful:"
+          - list [ref=f51e106]:
+            - listitem [ref=f51e107]: Generating Marketing copy, then translating it into a different language.
+            - listitem [ref=f51e108]: Writing an outline of a document, checking that the outline meets certain criteria, then writing the document based on the outline.
+          - 'heading "Workflow: Routing" [level=3] [ref=f51e109]'
+          - paragraph [ref=f51e110]: Routing classifies an input and directs it to a specialized followup task. This workflow allows for separation of concerns, and building more specialized prompts. Without this workflow, optimizing for one kind of input can hurt performance on other inputs.
+          - figure "The routing workflow" [ref=f51e112]
+          - paragraph [ref=f51e115]:
+            - strong [ref=f51e116]: "When to use this workflow:"
+            - text: Routing works well for complex tasks where there are distinct categories that are better handled separately, and where classification can be handled accurately, either by an LLM or a more traditional classification model/algorithm.
+          - paragraph [ref=f51e117]:
+            - strong [ref=f51e118]: "Examples where routing is useful:"
+          - list [ref=f51e119]:
+            - listitem [ref=f51e120]: Directing different types of customer service queries (general questions, refund requests, technical support) into different downstream processes, prompts, and tools.
+            - listitem [ref=f51e121]: Routing easy/common questions to smaller, cost-efficient models like Claude Haiku 4.5 and hard/unusual questions to more capable models like Claude Sonnet 4.5 to optimize for best performance.
+          - 'heading "Workflow: Parallelization" [level=3] [ref=f51e122]'
+          - paragraph [ref=f51e123]: "LLMs can sometimes work simultaneously on a task and have their outputs aggregated programmatically. This workflow, parallelization, manifests in two key variations:"
+          - list [ref=f51e124]:
+            - listitem [ref=f51e125]:
+              - strong [ref=f51e126]: Sectioning
+              - text: ": Breaking a task into independent subtasks run in parallel."
+            - listitem [ref=f51e127]:
+              - strong [ref=f51e128]: "Voting:"
+              - text: Running the same task multiple times to get diverse outputs.
+          - figure "The parallelization workflow" [ref=f51e130]
+          - paragraph [ref=f51e133]:
+            - strong [ref=f51e134]: "When to use this workflow:"
+            - text: Parallelization is effective when the divided subtasks can be parallelized for speed, or when multiple perspectives or attempts are needed for higher confidence results. For complex tasks with multiple considerations, LLMs generally perform better when each consideration is handled by a separate LLM call, allowing focused attention on each specific aspect.
+          - paragraph [ref=f51e135]:
+            - strong [ref=f51e136]: "Examples where parallelization is useful:"
+          - list [ref=f51e137]:
+            - listitem [ref=f51e138]:
+              - strong [ref=f51e139]: Sectioning
+              - text: ":"
+              - list [ref=f51e140]:
+                - listitem [ref=f51e141]: Implementing guardrails where one model instance processes user queries while another screens them for inappropriate content or requests. This tends to perform better than having the same LLM call handle both guardrails and the core response.
+                - listitem [ref=f51e142]: Automating evals for evaluating LLM performance, where each LLM call evaluates a different aspect of the model’s performance on a given prompt.
+            - listitem [ref=f51e143]:
+              - strong [ref=f51e144]: Voting
+              - text: ":"
+              - list [ref=f51e145]:
+                - listitem [ref=f51e146]: Reviewing a piece of code for vulnerabilities, where several different prompts review and flag the code if they find a problem.
+                - listitem [ref=f51e147]: Evaluating whether a given piece of content is inappropriate, with multiple prompts evaluating different aspects or requiring different vote thresholds to balance false positives and negatives.
+          - 'heading "Workflow: Orchestrator-workers" [level=3] [ref=f51e148]'
+          - paragraph [ref=f51e149]: In the orchestrator-workers workflow, a central LLM dynamically breaks down tasks, delegates them to worker LLMs, and synthesizes their results.
+          - figure "The orchestrator-workers workflow" [ref=f51e151]
+          - paragraph [ref=f51e154]:
+            - strong [ref=f51e155]: "When to use this workflow:"
+            - text: This workflow is well-suited for complex tasks where you can’t predict the subtasks needed (in coding, for example, the number of files that need to be changed and the nature of the change in each file likely depend on the task). Whereas it’s topographically similar, the key difference from parallelization is its flexibility—subtasks aren't pre-defined, but determined by the orchestrator based on the specific input.
+          - paragraph [ref=f51e156]:
+            - strong [ref=f51e157]: "Example where orchestrator-workers is useful:"
+          - list [ref=f51e158]:
+            - listitem [ref=f51e159]: Coding products that make complex changes to multiple files each time.
+            - listitem [ref=f51e160]: Search tasks that involve gathering and analyzing information from multiple sources for possible relevant information.
+          - 'heading "Workflow: Evaluator-optimizer" [level=3] [ref=f51e161]'
+          - paragraph [ref=f51e162]: In the evaluator-optimizer workflow, one LLM call generates a response while another provides evaluation and feedback in a loop.
+          - figure "The evaluator-optimizer workflow" [ref=f51e164]
+          - paragraph [ref=f51e167]:
+            - strong [ref=f51e168]: "When to use this workflow:"
+            - text: This workflow is particularly effective when we have clear evaluation criteria, and when iterative refinement provides measurable value. The two signs of good fit are, first, that LLM responses can be demonstrably improved when a human articulates their feedback; and second, that the LLM can provide such feedback. This is analogous to the iterative writing process a human writer might go through when producing a polished document.
+          - paragraph [ref=f51e169]:
+            - strong [ref=f51e170]: "Examples where evaluator-optimizer is useful:"
+          - list [ref=f51e171]:
+            - listitem [ref=f51e172]: Literary translation where there are nuances that the translator LLM might not capture initially, but where an evaluator LLM can provide useful critiques.
+            - listitem [ref=f51e173]: Complex search tasks that require multiple rounds of searching and analysis to gather comprehensive information, where the evaluator decides whether further searches are warranted.
+          - heading "Agents" [level=3] [ref=f51e174]
+          - paragraph [ref=f51e175]: Agents are emerging in production as LLMs mature in key capabilities—understanding complex inputs, engaging in reasoning and planning, using tools reliably, and recovering from errors. Agents begin their work with either a command from, or interactive discussion with, the human user. Once the task is clear, agents plan and operate independently, potentially returning to the human for further information or judgement. During execution, it's crucial for the agents to gain “ground truth” from the environment at each step (such as tool call results or code execution) to assess its progress. Agents can then pause for human feedback at checkpoints or when encountering blockers. The task often terminates upon completion, but it’s also common to include stopping conditions (such as a maximum number of iterations) to maintain control.
+          - paragraph [ref=f51e176]: Agents can handle sophisticated tasks, but their implementation is often straightforward. They are typically just LLMs using tools based on environmental feedback in a loop. It is therefore crucial to design toolsets and their documentation clearly and thoughtfully. We expand on best practices for tool development in Appendix 2 ("Prompt Engineering your Tools").
+          - figure "Autonomous agent" [ref=f51e178]
+          - paragraph [ref=f51e181]:
+            - strong [ref=f51e182]: "When to use agents:"
+            - text: Agents can be used for open-ended problems where it’s difficult or impossible to predict the required number of steps, and where you can’t hardcode a fixed path. The LLM will potentially operate for many turns, and you must have some level of trust in its decision-making. Agents' autonomy makes them ideal for scaling tasks in trusted environments.
+          - paragraph [ref=f51e183]: The autonomous nature of agents means higher costs, and the potential for compounding errors. We recommend extensive testing in sandboxed environments, along with the appropriate guardrails.
+          - paragraph [ref=f51e184]:
+            - strong [ref=f51e185]: "Examples where agents are useful:"
+          - paragraph [ref=f51e186]: "The following examples are from our own implementations:"
+          - list [ref=f51e187]:
+            - listitem [ref=f51e188]:
+              - text: A coding Agent to resolve
+              - link "SWE-bench tasks" [ref=f51e189] [cursor=pointer]:
+                - /url: https://www.anthropic.com/research/swe-bench-sonnet
+              - text: ", which involve edits to many files based on a task description;"
+            - listitem [ref=f51e190]:
+              - text: Our
+              - link "“computer use” reference implementation" [ref=f51e191] [cursor=pointer]:
+                - /url: https://github.com/anthropics/anthropic-quickstarts/tree/main/computer-use-demo
+              - text: ", where Claude uses a computer to accomplish tasks."
+          - figure "High-level flow of a coding agent" [ref=f51e193]
+          - heading "Combining and customizing these patterns" [level=2] [ref=f51e196]
+          - paragraph [ref=f51e197]:
+            - text: "These building blocks aren't prescriptive. They're common patterns that developers can shape and combine to fit different use cases. The key to success, as with any LLM features, is measuring performance and iterating on implementations. To repeat: you should consider adding complexity"
+            - emphasis [ref=f51e198]: only
+            - text: when it demonstrably improves outcomes.
+          - heading "Summary" [level=2] [ref=f51e199]
+          - paragraph [ref=f51e200]:
+            - text: Success in the LLM space isn't about building the most sophisticated system. It's about building the
+            - emphasis [ref=f51e201]: right
+            - text: system for your needs. Start with simple prompts, optimize them with comprehensive evaluation, and add multi-step agentic systems only when simpler solutions fall short.
+          - paragraph [ref=f51e202]: "When implementing agents, we try to follow three core principles:"
+          - list [ref=f51e203]:
+            - listitem [ref=f51e204]:
+              - text: Maintain
+              - strong [ref=f51e205]: simplicity
+              - text: in your agent's design.
+            - listitem [ref=f51e206]:
+              - text: Prioritize
+              - strong [ref=f51e207]: transparency
+              - text: by explicitly showing the agent’s planning steps.
+            - listitem [ref=f51e208]:
+              - text: Carefully craft your agent-computer interface (ACI) through thorough tool
+              - strong [ref=f51e209]: documentation and testing
+              - text: .
+          - paragraph [ref=f51e210]: Frameworks can help you get started quickly, but don't hesitate to reduce abstraction layers and build with basic components as you move to production. By following these principles, you can create agents that are not only powerful but also reliable, maintainable, and trusted by their users.
+          - heading "Acknowledgements" [level=3] [ref=f51e211]
+          - paragraph [ref=f51e212]: Written by Erik S. and Barry Zhang. This work draws upon our experiences building agents at Anthropic and the valuable insights shared by our customers, for which we're deeply grateful.
+          - 'heading "Appendix 1: Agents in practice" [level=2] [ref=f51e213]'
+          - paragraph [ref=f51e214]: Our work with customers has revealed two particularly promising applications for AI agents that demonstrate the practical value of the patterns discussed above. Both applications illustrate how agents add the most value for tasks that require both conversation and action, have clear success criteria, enable feedback loops, and integrate meaningful human oversight.
+          - heading "A. Customer support" [level=3] [ref=f51e215]
+          - paragraph [ref=f51e216]: "Customer support combines familiar chatbot interfaces with enhanced capabilities through tool integration. This is a natural fit for more open-ended agents because:"
+          - list [ref=f51e217]:
+            - listitem [ref=f51e218]: Support interactions naturally follow a conversation flow while requiring access to external information and actions;
+            - listitem [ref=f51e219]: Tools can be integrated to pull customer data, order history, and knowledge base articles;
+            - listitem [ref=f51e220]: Actions such as issuing refunds or updating tickets can be handled programmatically; and
+            - listitem [ref=f51e221]: Success can be clearly measured through user-defined resolutions.
+          - paragraph [ref=f51e222]: Several companies have demonstrated the viability of this approach through usage-based pricing models that charge only for successful resolutions, showing confidence in their agents' effectiveness.
+          - heading "B. Coding agents" [level=3] [ref=f51e223]
+          - paragraph [ref=f51e224]: "The software development space has shown remarkable potential for LLM features, with capabilities evolving from code completion to autonomous problem-solving. Agents are particularly effective because:"
+          - list [ref=f51e225]:
+            - listitem [ref=f51e226]: Code solutions are verifiable through automated tests;
+            - listitem [ref=f51e227]: Agents can iterate on solutions using test results as feedback;
+            - listitem [ref=f51e228]: The problem space is well-defined and structured; and
+            - listitem [ref=f51e229]: Output quality can be measured objectively.
+          - paragraph [ref=f51e230]:
+            - text: In our own implementation, agents can now solve real GitHub issues in the
+            - link "SWE-bench Verified" [ref=f51e231] [cursor=pointer]:
+              - /url: https://www.anthropic.com/research/swe-bench-sonnet
+            - text: benchmark based on the pull request description alone. However, whereas automated testing helps verify functionality, human review remains crucial for ensuring solutions align with broader system requirements.
+          - 'heading "Appendix 2: Prompt engineering your tools" [level=2] [ref=f51e232]'
+          - paragraph [ref=f51e233]:
+            - text: No matter which agentic system you're building, tools will likely be an important part of your agent.
+            - link "Tools" [ref=f51e234] [cursor=pointer]:
+              - /url: https://www.anthropic.com/news/tool-use-ga
+            - text: enable Claude to interact with external services and APIs by specifying their exact structure and definition in our API. When Claude responds, it will include a
+            - link "tool use block" [ref=f51e235] [cursor=pointer]:
+              - /url: https://docs.anthropic.com/en/docs/build-with-claude/tool-use#example-api-response-with-a-tool-use-content-block
+            - text: in the API response if it plans to invoke a tool. Tool definitions and specifications should be given just as much prompt engineering attention as your overall prompts. In this brief appendix, we describe how to prompt engineer your tools.
+          - paragraph [ref=f51e236]: There are often several ways to specify the same action. For instance, you can specify a file edit by writing a diff, or by rewriting the entire file. For structured output, you can return code inside markdown or inside JSON. In software engineering, differences like these are cosmetic and can be converted losslessly from one to the other. However, some formats are much more difficult for an LLM to write than others. Writing a diff requires knowing how many lines are changing in the chunk header before the new code is written. Writing code inside JSON (compared to markdown) requires extra escaping of newlines and quotes.
+          - paragraph [ref=f51e237]: "Our suggestions for deciding on tool formats are the following:"
+          - list [ref=f51e238]:
+            - listitem [ref=f51e239]: Give the model enough tokens to "think" before it writes itself into a corner.
+            - listitem [ref=f51e240]: Keep the format close to what the model has seen naturally occurring in text on the internet.
+            - listitem [ref=f51e241]: Make sure there's no formatting "overhead" such as having to keep an accurate count of thousands of lines of code, or string-escaping any code it writes.
+          - paragraph [ref=f51e242]:
+            - text: One rule of thumb is to think about how much effort goes into human-computer interfaces (HCI), and plan to invest just as much effort in creating good
+            - emphasis [ref=f51e243]: agent
+            - text: "-computer interfaces (ACI). Here are some thoughts on how to do so:"
+          - list [ref=f51e244]:
+            - listitem [ref=f51e245]: Put yourself in the model's shoes. Is it obvious how to use this tool, based on the description and parameters, or would you need to think carefully about it? If so, then it’s probably also true for the model. A good tool definition often includes example usage, edge cases, input format requirements, and clear boundaries from other tools.
+            - listitem [ref=f51e246]: How can you change parameter names or descriptions to make things more obvious? Think of this as writing a great docstring for a junior developer on your team. This is especially important when using many similar tools.
+            - listitem [ref=f51e247]:
+              - text: "Test how the model uses your tools: Run many example inputs in our"
+              - link "workbench" [ref=f51e248] [cursor=pointer]:
+                - /url: https://console.anthropic.com/workbench
+              - text: to see what mistakes the model makes, and iterate.
+            - listitem [ref=f51e249]:
+              - link "Poka-yoke" [ref=f51e250] [cursor=pointer]:
+                - /url: https://en.wikipedia.org/wiki/Poka-yoke
+              - text: your tools. Change the arguments so that it is harder to make mistakes.
+          - paragraph [ref=f51e251]:
+            - text: While building our agent for
+            - link "SWE-bench" [ref=f51e252] [cursor=pointer]:
+              - /url: https://www.anthropic.com/research/swe-bench-sonnet
+            - text: ", we actually spent more time optimizing our tools than the overall prompt. For example, we found that the model would make mistakes with tools using relative filepaths after the agent had moved out of the root directory. To fix this, we changed the tool to always require absolute filepaths—and we found that the model used this method flawlessly."
+      - generic [ref=f51e254]:
+        - generic [ref=f51e255]:
+          - heading "Get the developer newsletter" [level=2] [ref=f51e256]
+          - paragraph [ref=f51e258]: Product updates, how-tos, community spotlights, and more. Delivered monthly to your inbox.
+        - generic [ref=f51e260]:
+          - generic [ref=f51e261]:
+            - textbox "Email address" [ref=f51e262]:
+              - /placeholder: Enter your email
+            - button "Subscribe" [ref=f51e263] [cursor=pointer]
+          - paragraph [ref=f51e266]: Please provide your email address if you'd like to receive our monthly developer newsletter. You can unsubscribe at any time.
+  - contentinfo "Site footer" [ref=f51e267]:
+    - generic [ref=f51e268]:
+      - link "Return to homepage" [ref=f51e270] [cursor=pointer]:
+        - /url: /
+      - navigation "Footer navigation" [ref=f51e273]:
+        - generic [ref=f51e274]:
+          - generic [ref=f51e275]:
+            - heading "Products" [level=3] [ref=f51e276]
+            - list [ref=f51e277]:
+              - listitem [ref=f51e278]:
+                - link "Claude" [ref=f51e279] [cursor=pointer]:
+                  - /url: https://claude.com/product/overview
+              - listitem [ref=f51e280]:
+                - link "Claude Code" [ref=f51e281] [cursor=pointer]:
+                  - /url: https://claude.com/product/claude-code
+              - listitem [ref=f51e282]:
+                - link "Claude Code Enterprise" [ref=f51e283] [cursor=pointer]:
+                  - /url: https://claude.com/product/claude-code/enterprise
+              - listitem [ref=f51e284]:
+                - link "Claude Cowork" [ref=f51e285] [cursor=pointer]:
+                  - /url: https://claude.com/product/cowork
+              - listitem [ref=f51e286]:
+                - link "@Claude" [ref=f51e287] [cursor=pointer]:
+                  - /url: https://claude.com/product/tag
+              - listitem [ref=f51e288]:
+                - link "Claude Design" [ref=f51e289] [cursor=pointer]:
+                  - /url: https://claude.com/product/design
+              - listitem [ref=f51e290]:
+                - link "Claude Science" [ref=f51e291] [cursor=pointer]:
+                  - /url: https://claude.com/product/claude-science
+              - listitem [ref=f51e292]:
+                - link "Claude Security" [ref=f51e293] [cursor=pointer]:
+                  - /url: https://claude.com/product/claude-security
+              - listitem [ref=f51e294]:
+                - link "Claude in Chrome" [ref=f51e295] [cursor=pointer]:
+                  - /url: https://claude.com/claude-in-chrome
+              - listitem [ref=f51e296]:
+                - link "Claude for Microsoft 365" [ref=f51e297] [cursor=pointer]:
+                  - /url: https://claude.com/claude-for-microsoft-365
+              - listitem [ref=f51e298]:
+                - link "Skills" [ref=f51e299] [cursor=pointer]:
+                  - /url: https://www.claude.com/skills
+              - listitem [ref=f51e300]:
+                - link "Download app" [ref=f51e301] [cursor=pointer]:
+                  - /url: https://claude.ai/download
+              - listitem [ref=f51e302]:
+                - link "Pricing" [ref=f51e303] [cursor=pointer]:
+                  - /url: https://claude.com/pricing
+              - listitem [ref=f51e304]:
+                - link "Log in to Claude" [ref=f51e305] [cursor=pointer]:
+                  - /url: https://claude.ai/
+          - generic [ref=f51e306]:
+            - heading "Models" [level=3] [ref=f51e307]
+            - list [ref=f51e308]:
+              - listitem [ref=f51e309]:
+                - link "Mythos" [ref=f51e310] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/claude/mythos
+              - listitem [ref=f51e311]:
+                - link "Fable" [ref=f51e312] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/claude/fable
+              - listitem [ref=f51e313]:
+                - link "Opus" [ref=f51e314] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/claude/opus
+              - listitem [ref=f51e315]:
+                - link "Sonnet" [ref=f51e316] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/claude/sonnet
+              - listitem [ref=f51e317]:
+                - link "Haiku" [ref=f51e318] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/claude/haiku
+        - generic [ref=f51e319]:
+          - generic [ref=f51e320]:
+            - heading "Solutions" [level=3] [ref=f51e321]
+            - list [ref=f51e322]:
+              - listitem [ref=f51e323]:
+                - link "AI agents" [ref=f51e324] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/agents
+              - listitem [ref=f51e325]:
+                - link "Code modernization" [ref=f51e326] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/code-modernization
+              - listitem [ref=f51e327]:
+                - link "Coding" [ref=f51e328] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/coding
+              - listitem [ref=f51e329]:
+                - link "Customer support" [ref=f51e330] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/customer-support
+              - listitem [ref=f51e331]:
+                - link "Cybersecurity" [ref=f51e332] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/cybersecurity
+              - listitem [ref=f51e333]:
+                - link "Enterprise" [ref=f51e334] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/enterprise
+              - listitem [ref=f51e335]:
+                - link "Financial services" [ref=f51e336] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/financial-services
+              - listitem [ref=f51e337]:
+                - link "Government" [ref=f51e338] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/government
+              - listitem [ref=f51e339]:
+                - link "Healthcare" [ref=f51e340] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/healthcare
+              - listitem [ref=f51e341]:
+                - link "Higher education" [ref=f51e342] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/education
+              - listitem [ref=f51e343]:
+                - link "K-12 teachers" [ref=f51e344] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/teachers
+              - listitem [ref=f51e345]:
+                - link "Legal" [ref=f51e346] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/legal
+              - listitem [ref=f51e347]:
+                - link "Life sciences" [ref=f51e348] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/life-sciences
+              - listitem [ref=f51e349]:
+                - link "Nonprofits" [ref=f51e350] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/nonprofits
+              - listitem [ref=f51e351]:
+                - link "Small business" [ref=f51e352] [cursor=pointer]:
+                  - /url: https://claude.com/solutions/small-business
+          - generic [ref=f51e353]:
+            - heading "Claude Platform" [level=3] [ref=f51e354]
+            - list [ref=f51e355]:
+              - listitem [ref=f51e356]:
+                - link "Overview" [ref=f51e357] [cursor=pointer]:
+                  - /url: https://claude.com/platform/api
+              - listitem [ref=f51e358]:
+                - link "Developer docs" [ref=f51e359] [cursor=pointer]:
+                  - /url: https://platform.claude.com/docs
+              - listitem [ref=f51e360]:
+                - link "Pricing" [ref=f51e361] [cursor=pointer]:
+                  - /url: https://claude.com/pricing#api
+              - listitem [ref=f51e362]:
+                - link "Ecosystem" [ref=f51e363] [cursor=pointer]:
+                  - /url: https://claude.com/ecosystem
+              - listitem [ref=f51e364]:
+                - link "Marketplace" [ref=f51e365] [cursor=pointer]:
+                  - /url: https://claude.com/platform/marketplace
+              - listitem [ref=f51e366]:
+                - link "Regional compliance" [ref=f51e367] [cursor=pointer]:
+                  - /url: https://claude.com/regional-compliance
+              - listitem [ref=f51e368]:
+                - link "Claude on AWS" [ref=f51e369] [cursor=pointer]:
+                  - /url: https://claude.com/partners/claude-on-aws
+              - listitem [ref=f51e370]:
+                - link "Google Cloud" [ref=f51e371] [cursor=pointer]:
+                  - /url: https://claude.com/partners/google-cloud-vertex-ai
+              - listitem [ref=f51e372]:
+                - link "Microsoft Foundry" [ref=f51e373] [cursor=pointer]:
+                  - /url: https://claude.com/partners/microsoft-foundry
+              - listitem [ref=f51e374]:
+                - link "Console login" [ref=f51e375] [cursor=pointer]:
+                  - /url: https://platform.claude.com/
+        - generic [ref=f51e376]:
+          - generic [ref=f51e377]:
+            - heading "Resources" [level=3] [ref=f51e378]
+            - list [ref=f51e379]:
+              - listitem [ref=f51e380]:
+                - link "Blog" [ref=f51e381] [cursor=pointer]:
+                  - /url: https://claude.com/blog
+              - listitem [ref=f51e382]:
+                - link "Claude partner network" [ref=f51e383] [cursor=pointer]:
+                  - /url: https://claude.com/partners
+              - listitem [ref=f51e384]:
+                - link "Community" [ref=f51e385] [cursor=pointer]:
+                  - /url: https://claude.com/community
+              - listitem [ref=f51e386]:
+                - link "Connectors" [ref=f51e387] [cursor=pointer]:
+                  - /url: https://claude.com/connectors
+              - listitem [ref=f51e388]:
+                - link "Courses" [ref=f51e389] [cursor=pointer]:
+                  - /url: /learn
+              - listitem [ref=f51e390]:
+                - link "Customer stories" [ref=f51e391] [cursor=pointer]:
+                  - /url: https://claude.com/customers
+              - listitem [ref=f51e392]:
+                - link "Engineering at Anthropic" [ref=f51e393] [cursor=pointer]:
+                  - /url: /engineering
+              - listitem [ref=f51e394]:
+                - link "Events" [ref=f51e395] [cursor=pointer]:
+                  - /url: /events
+              - listitem [ref=f51e396]:
+                - link "Plugins" [ref=f51e397] [cursor=pointer]:
+                  - /url: https://claude.com/plugins
+              - listitem [ref=f51e398]:
+                - link "Powered by Claude" [ref=f51e399] [cursor=pointer]:
+                  - /url: https://claude.com/partners/powered-by-claude
+              - listitem [ref=f51e400]:
+                - link "Service partners" [ref=f51e401] [cursor=pointer]:
+                  - /url: https://claude.com/partners/services
+              - listitem [ref=f51e402]:
+                - link "Tutorials" [ref=f51e403] [cursor=pointer]:
+                  - /url: https://claude.com/resources/tutorials
+              - listitem [ref=f51e404]:
+                - link "Use cases" [ref=f51e405] [cursor=pointer]:
+                  - /url: https://claude.com/resources/use-cases
+          - generic [ref=f51e406]:
+            - heading "Programs" [level=3] [ref=f51e407]
+            - list [ref=f51e408]:
+              - listitem [ref=f51e409]:
+                - link "Startups" [ref=f51e410] [cursor=pointer]:
+                  - /url: https://claude.com/programs/startups
+              - listitem [ref=f51e411]:
+                - link "Research Labs" [ref=f51e412] [cursor=pointer]:
+                  - /url: https://claude.com/programs/claude-team-plan-for-research-labs
+          - generic [ref=f51e413]:
+            - heading "Help and security" [level=3] [ref=f51e414]
+            - list [ref=f51e415]:
+              - listitem [ref=f51e416]:
+                - link "Availability" [ref=f51e417] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/supported-countries
+              - listitem [ref=f51e418]:
+                - link "Status" [ref=f51e419] [cursor=pointer]:
+                  - /url: https://status.anthropic.com/
+              - listitem [ref=f51e420]:
+                - link "Support center" [ref=f51e421] [cursor=pointer]:
+                  - /url: https://support.claude.com/en/
+        - generic [ref=f51e422]:
+          - generic [ref=f51e423]:
+            - heading "Company" [level=3] [ref=f51e424]
+            - list [ref=f51e425]:
+              - listitem [ref=f51e426]:
+                - link "Anthropic" [ref=f51e427] [cursor=pointer]:
+                  - /url: /company
+              - listitem [ref=f51e428]:
+                - link "Careers" [ref=f51e429] [cursor=pointer]:
+                  - /url: /careers
+              - listitem [ref=f51e430]:
+                - link "Policy" [ref=f51e431] [cursor=pointer]:
+                  - /url: /policy
+              - listitem [ref=f51e432]:
+                - link "Economic Futures" [ref=f51e433] [cursor=pointer]:
+                  - /url: /economic-futures
+              - listitem [ref=f51e434]:
+                - link "Research" [ref=f51e435] [cursor=pointer]:
+                  - /url: /research
+              - listitem [ref=f51e436]:
+                - link "News" [ref=f51e437] [cursor=pointer]:
+                  - /url: /news
+              - listitem [ref=f51e438]:
+                - link "Claude’s Constitution" [ref=f51e439] [cursor=pointer]:
+                  - /url: /constitution
+              - listitem [ref=f51e440]:
+                - link "Claude Corps" [ref=f51e441] [cursor=pointer]:
+                  - /url: /claude-corps
+              - listitem [ref=f51e442]:
+                - link "Keep thinking" [ref=f51e443] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/path-to-hope
+              - listitem [ref=f51e444]:
+                - link "Policy on the AI Exponential" [ref=f51e445] [cursor=pointer]:
+                  - /url: /policy-on-the-ai-exponential
+              - listitem [ref=f51e446]:
+                - link "Responsible Scaling Policy" [ref=f51e447] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/news/announcing-our-updated-responsible-scaling-policy
+              - listitem [ref=f51e448]:
+                - link "Security and compliance" [ref=f51e449] [cursor=pointer]:
+                  - /url: https://trust.anthropic.com/
+              - listitem [ref=f51e450]:
+                - link "Transparency" [ref=f51e451] [cursor=pointer]:
+                  - /url: /transparency
+          - generic [ref=f51e452]:
+            - heading "Terms and policies" [level=3] [ref=f51e453]
+            - list [ref=f51e454]:
+              - listitem [ref=f51e455]:
+                - link "Privacy policy" [ref=f51e456] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/legal/privacy
+              - listitem [ref=f51e457]:
+                - link "Consumer health data privacy policy" [ref=f51e458] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/legal/consumer-health-data-privacy-policy
+              - listitem [ref=f51e459]:
+                - link "Responsible disclosure policy" [ref=f51e460] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/responsible-disclosure-policy
+              - listitem [ref=f51e461]:
+                - 'link "Terms of service: Commercial" [ref=f51e462] [cursor=pointer]':
+                  - /url: https://www.anthropic.com/legal/commercial-terms
+              - listitem [ref=f51e463]:
+                - 'link "Terms of service: Consumer" [ref=f51e464] [cursor=pointer]':
+                  - /url: https://www.anthropic.com/legal/consumer-terms
+              - listitem [ref=f51e465]:
+                - 'link "Terms of Service: US K-12" [ref=f51e466] [cursor=pointer]':
+                  - /url: https://anthropic.com/legal/k12-terms
+              - listitem [ref=f51e467]:
+                - 'link "Data Processing Agreement: US K-12" [ref=f51e468] [cursor=pointer]':
+                  - /url: https://anthropic.com/legal/k12-dpa
+              - listitem [ref=f51e469]:
+                - link "Usage policy" [ref=f51e470] [cursor=pointer]:
+                  - /url: https://www.anthropic.com/legal/aup
+      - generic [ref=f51e471]:
+        - contentinfo [ref=f51e472]: © 2026 Anthropic PBC
+        - navigation "Social media links" [ref=f51e473]:
+          - listitem [ref=f51e474]:
+            - link "Visit our LinkedIn page" [ref=f51e475] [cursor=pointer]:
+              - /url: https://www.linkedin.com/company/anthropicresearch
+          - listitem [ref=f51e478]:
+            - link "Visit our X (formerly Twitter) profile" [ref=f51e479] [cursor=pointer]:
+              - /url: https://x.com/AnthropicAI
+          - listitem [ref=f51e482]:
+            - link "Visit our YouTube channel" [ref=f51e483] [cursor=pointer]:
+              - /url: https://www.youtube.com/@anthropic-ai
+  - alert [ref=f51e486]

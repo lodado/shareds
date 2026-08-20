@@ -1,0 +1,844 @@
+- generic [active] [ref=f63e1]:
+  - region "We value your privacy" [ref=f63e2]:
+    - generic [ref=f63e3]:
+      - button "Close" [ref=f63e4] [cursor=pointer]
+      - generic [ref=f63e5]:
+        - heading "We value your privacy" [level=2] [ref=f63e6]
+        - generic [ref=f63e7]:
+          - paragraph [ref=f63e9]: This website or its third-party tools process personal data. You can opt out of the sale of your personal information by clicking on the “Do Not Sell or Share My Personal Information” link.
+          - group [ref=f63e10]:
+            - button "Do Not Sell or Share My Personal Information" [ref=f63e11] [cursor=pointer]
+  - link "Skip to content" [ref=f63e13] [cursor=pointer]:
+    - /url: "#main"
+  - generic [ref=f63e14]:
+    - generic [ref=f63e15]:
+      - paragraph [ref=f63e16]: September Exclusive | Buy 2, Get 3rd Free on Live Online Courses
+      - link "Enroll Today" [ref=f63e17] [cursor=pointer]:
+        - /url: https://www.nngroup.com/training/september/?utm_campaign=live-online-courses&utm_source=website&utm_medium=banner&utm_content=b2g1
+    - button "Close promotion banner" [ref=f63e18] [cursor=pointer]
+  - banner [ref=f63e21]:
+    - navigation "main" [ref=f63e22]:
+      - generic [ref=f63e23]:
+        - generic [ref=f63e24]:
+          - link "Nielsen Norman Group - Home" [ref=f63e25] [cursor=pointer]:
+            - /url: /
+            - img "Nielsen Norman Group" [ref=f63e26]
+          - list [ref=f63e28]:
+            - listitem [ref=f63e29]:
+              - button "UX Training & Courses" [ref=f63e30]
+            - listitem [ref=f63e33]:
+              - button "Articles & Resources" [ref=f63e34]
+            - listitem [ref=f63e37]:
+              - button "Consulting" [ref=f63e38]
+            - listitem [ref=f63e41]:
+              - button "About Us" [ref=f63e42]
+        - generic [ref=f63e45]:
+          - button "Search" [ref=f63e46] [cursor=pointer]
+          - generic [ref=f63e49]:
+            - link "Cart (empty)" [ref=f63e51] [cursor=pointer]:
+              - /url: /products/basket/
+            - link "Log In" [ref=f63e55] [cursor=pointer]:
+              - /url: /login/?next=%2Farticles%2Ften-usability-heuristics%2F
+  - main [ref=f63e56]:
+    - article [ref=f63e59]:
+      - generic [ref=f63e60]:
+        - heading "10 Usability Heuristics for User Interface Design" [level=1] [ref=f63e61]
+        - generic [ref=f63e65]:
+          - link "Jakob Nielsen" [ref=f63e67] [cursor=pointer]:
+            - /url: /articles/author/jakob-nielsen/
+          - paragraph [ref=f63e68]: April 24, 1994 · Last reviewed Jan. 30, 2024
+        - link [ref=f63e70] [cursor=pointer]:
+          - /url: "#"
+          - paragraph [ref=f63e72]: Share
+      - generic [ref=f63e73]:
+        - generic [ref=f63e74]:
+          - generic [ref=f63e75]: "Summary: Jakob Nielsen's 10 general principles for interaction design. They are called \"heuristics\" because they are broad rules of thumb and not specific usability guidelines."
+          - generic [ref=f63e76]:
+            - paragraph [ref=f63e77]:
+              - emphasis [ref=f63e78]:
+                - text: Thank you to
+                - link "Kelley Gordon" [ref=f63e79] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/people/kelley-gordon/
+                - text: for designing the visuals and posters included in this article.
+            - paragraph [ref=f63e80]:
+              - emphasis [ref=f63e81]:
+                - text: Thank you to
+                - link "Kate Moran" [ref=f63e82] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/people/kate-moran/
+                - text: and
+                - link "Feifei Liu" [ref=f63e83] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/people/feifei-liu/
+                - text: for updating the heuristic names, descriptions, and examples.
+            - generic [ref=f63e85]:
+              - heading "In This Article:" [level=2] [ref=f63e88]
+              - list [ref=f63e89]:
+                - listitem [ref=f63e90]:
+                  - 'link "1: Visibility of System Status" [ref=f63e91] [cursor=pointer]':
+                    - /url: "#toc-1-visibility-of-system-status-1"
+                - listitem [ref=f63e92]:
+                  - 'link "2: Match Between the System and the Real World" [ref=f63e93] [cursor=pointer]':
+                    - /url: "#toc-2-match-between-the-system-and-the-real-world-2"
+                - listitem [ref=f63e94]:
+                  - 'link "3: User Control and Freedom" [ref=f63e95] [cursor=pointer]':
+                    - /url: "#toc-3-user-control-and-freedom-3"
+                - listitem [ref=f63e96]:
+                  - 'link "4: Consistency and Standards" [ref=f63e97] [cursor=pointer]':
+                    - /url: "#toc-4-consistency-and-standards-4"
+                - listitem [ref=f63e98]:
+                  - 'link "5: Error Prevention" [ref=f63e99] [cursor=pointer]':
+                    - /url: "#toc-5-error-prevention-5"
+                - listitem [ref=f63e100]:
+                  - 'link "6: Recognition Rather than Recall" [ref=f63e101] [cursor=pointer]':
+                    - /url: "#toc-6-recognition-rather-than-recall-6"
+                - listitem [ref=f63e102]:
+                  - 'link "7: Flexibility and Efficiency of Use" [ref=f63e103] [cursor=pointer]':
+                    - /url: "#toc-7-flexibility-and-efficiency-of-use-7"
+                - listitem [ref=f63e104]:
+                  - 'link "8: Aesthetic and Minimalist Design" [ref=f63e105] [cursor=pointer]':
+                    - /url: "#toc-8-aesthetic-and-minimalist-design-8"
+                - listitem [ref=f63e106]:
+                  - 'link "9: Help Users Recognize, Diagnose, and Recover from Errors" [ref=f63e107] [cursor=pointer]':
+                    - /url: "#toc-9-help-users-recognize-diagnose-and-recover-from-errors-9"
+                - listitem [ref=f63e108]:
+                  - 'link "10: Help and Documentation" [ref=f63e109] [cursor=pointer]':
+                    - /url: "#toc-10-help-and-documentation-10"
+                - listitem [ref=f63e110]:
+                  - link "Free 10 Heuristics Poster" [ref=f63e111] [cursor=pointer]:
+                    - /url: "#toc-free-10-heuristics-poster-11"
+            - 'heading "1: Visibility of System Status" [level=2] [ref=f63e112]'
+            - paragraph [ref=f63e113]:
+              - strong [ref=f63e114]: The design should always keep users informed about what is going on, through appropriate feedback within a reasonable amount of time.
+            - paragraph [ref=f63e115]: When users know the current system status, they learn the outcome of their prior interactions and determine next steps. Predictable interactions create trust in the product as well as the brand.
+            - complementary [ref=f63e116]:
+              - generic [ref=f63e117]:
+                - heading "Go one step further than definitions." [level=3] [ref=f63e118]
+                - paragraph [ref=f63e119]: Use the heuristics to defend and inform your design in our self-paced course, 10 Usability Heuristics — created by the team who brought you the framework first.
+              - link "What You'll Learn" [ref=f63e121] [cursor=pointer]:
+                - /url: https://www.nngroup.com/contents/self-paced-courses/10-usability-heuristics-from-theory-to-practice/?promo_type=courses&promo_pos=inline
+            - generic [ref=f63e122]:
+              - figure [ref=f63e124]:
+                - 'img "Usability Heuristic #1: Man beside “You Are Here” indicators on a mall maps to show him where he currently is." [ref=f63e125]'
+                - generic [ref=f63e126]:
+                  - strong [ref=f63e127]:
+                    - emphasis [ref=f63e128]: "Example of Usability Heuristic #1:"
+                  - text: You Are Here
+                  - emphasis [ref=f63e129]: indicators on mall maps show people where they currently are, to help them understand where to go next.
+              - generic [ref=f63e130]:
+                - paragraph [ref=f63e131]:
+                  - strong [ref=f63e132]: Tips
+                - list [ref=f63e133]:
+                  - listitem [ref=f63e134]: Communicate clearly to users what the system’s state is — no action with consequences to users should be taken without informing them.
+                  - listitem [ref=f63e135]: Present feedback to the user as quickly as possible (ideally, immediately).
+                  - listitem [ref=f63e136]:
+                    - text: Build trust through open and
+                    - link "continuous communication" [ref=f63e137] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/microinteractions/
+                    - text: .
+                - paragraph [ref=f63e138]:
+                  - strong [ref=f63e139]: Learn more
+                - list [ref=f63e140]:
+                  - listitem [ref=f63e141]:
+                    - link [ref=f63e142] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/visibility-system-status/
+                      - text: "Full article:"
+                      - emphasis [ref=f63e143]: Visibility of System Status
+                  - listitem [ref=f63e144]:
+                    - link [ref=f63e145] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/videos/usability-heuristic-system-status/
+                      - text: 3-minute video about the
+                      - emphasis [ref=f63e146]: Visibility Heuristic
+            - 'heading "2: Match Between the System and the Real World" [level=2] [ref=f63e147]'
+            - paragraph [ref=f63e148]:
+              - strong [ref=f63e149]: The design should speak the users' language. Use words, phrases, and concepts familiar to the user, rather than internal jargon. Follow real-world conventions, making information appear in a natural and logical order.
+            - paragraph [ref=f63e150]: The way you should design depends very much on your specific users. Terms, concepts, icons, and images that seem perfectly clear to you and your colleagues may be unfamiliar or confusing to your users.
+            - paragraph [ref=f63e151]:
+              - text: When a design’s controls follow real-world conventions and correspond to desired outcomes (called
+              - link "natural mapping" [ref=f63e152] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/natural-mappings/
+              - text: ), it’s easier for users to learn and remember how the interface works. This helps to build an experience that feels intuitive.
+            - generic [ref=f63e153]:
+              - figure [ref=f63e155]:
+                - 'img "Usability Heuristic #2: A stovetop that has controls that match the layout of the heating elements." [ref=f63e156]'
+                - generic [ref=f63e157]:
+                  - strong [ref=f63e158]:
+                    - emphasis [ref=f63e159]: "Example of Usability Heuristic #2:"
+                  - emphasis [ref=f63e160]: When stovetop controls match the layout of heating elements, users can quickly understand which control maps to which heating element.
+              - generic [ref=f63e161]:
+                - paragraph [ref=f63e162]:
+                  - strong [ref=f63e163]: Tips
+                - list [ref=f63e164]:
+                  - listitem [ref=f63e165]: Ensure that users can understand meaning without having to go look up a word’s definition.
+                  - listitem [ref=f63e166]: Never assume your understanding of words or concepts will match that of your users.
+                  - listitem [ref=f63e167]:
+                    - text: User research will uncover your
+                    - link "users' familiar terminology," [ref=f63e168] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/user-centric-language/
+                    - text: as well as their mental models around important concepts.
+                - paragraph [ref=f63e169]:
+                  - strong [ref=f63e170]: Learn more
+                - list [ref=f63e171]:
+                  - listitem [ref=f63e172]:
+                    - link [ref=f63e173] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/match-system-real-world/
+                      - text: "Full article:"
+                      - emphasis [ref=f63e174]: Match Between the System and the Real World
+                  - listitem [ref=f63e175]:
+                    - link [ref=f63e176] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/videos/match-system-real-world/
+                      - text: "2-minute video:"
+                      - emphasis [ref=f63e177]: Match Between the System and the Real World
+            - 'heading "3: User Control and Freedom" [level=2] [ref=f63e178]'
+            - paragraph [ref=f63e179]:
+              - strong [ref=f63e180]: Users often perform actions by mistake. They need a clearly marked "emergency exit" to leave the unwanted action without having to go through an extended process.
+            - paragraph [ref=f63e181]: When it's easy for people to back out of a process or undo an action, it fosters a sense of freedom and confidence. Exits allow users to remain in control of the system and avoid getting stuck and feeling frustrated.
+            - generic [ref=f63e182]:
+              - figure [ref=f63e184]:
+                - 'img "Usability Heuristic #3: A door with a light-up emergency exit above it." [ref=f63e185]'
+                - generic [ref=f63e186]:
+                  - strong [ref=f63e187]:
+                    - emphasis [ref=f63e188]: "Example of Usability Heuristic #3:"
+                  - emphasis [ref=f63e189]: Digital spaces need quick emergency exits, just like physical spaces do.
+              - generic [ref=f63e190]:
+                - paragraph [ref=f63e191]:
+                  - strong [ref=f63e192]: Tips
+                - list [ref=f63e193]:
+                  - listitem [ref=f63e194]:
+                    - text: Support
+                    - emphasis [ref=f63e195]: Undo
+                    - text: and
+                    - emphasis [ref=f63e196]: Redo
+                    - text: .
+                  - listitem [ref=f63e197]:
+                    - text: Show a clear way to exit the current interaction, like a
+                    - link [ref=f63e198] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/reset-and-cancel-buttons/
+                      - emphasis [ref=f63e199]: Cancel
+                      - text: button
+                    - text: .
+                  - listitem [ref=f63e200]: Make sure the exit is clearly labeled and discoverable.
+                - paragraph [ref=f63e201]:
+                  - strong [ref=f63e202]: Learn more
+                - list [ref=f63e203]:
+                  - listitem [ref=f63e204]:
+                    - link [ref=f63e205] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/user-control-and-freedom/
+                      - text: "Full article:"
+                      - emphasis [ref=f63e206]: User Control and Freedom
+                  - listitem [ref=f63e207]:
+                    - link [ref=f63e208] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/videos/usability-heuristic-user-control-freedom/
+                      - text: "2-minute video:"
+                      - emphasis [ref=f63e209]: User Control and Freedom
+            - 'heading "4: Consistency and Standards" [level=2] [ref=f63e210]'
+            - paragraph [ref=f63e211]:
+              - strong [ref=f63e212]: Users should not have to wonder whether different words, situations, or actions mean the same thing. Follow platform and industry conventions.
+            - paragraph [ref=f63e213]:
+              - link "Jakob's Law" [ref=f63e214] [cursor=pointer]:
+                - /url: https://www.nngroup.com/videos/jakobs-law-internet-ux/
+              - text: states that people spend most of their time using digital products
+              - emphasis [ref=f63e215]: other than yours
+              - text: . Users’ experiences with those other products set their expectations. Failing to maintain consistency may increase the users'
+              - link "cognitive load" [ref=f63e216] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/minimize-cognitive-load/
+              - text: by forcing them to learn something new.
+            - generic [ref=f63e217]:
+              - figure [ref=f63e219]:
+                - 'img "Usability Heuristic #4: A hotel check-in counter at that is always located at the front of a hotel." [ref=f63e220]'
+                - generic [ref=f63e221]:
+                  - strong [ref=f63e222]:
+                    - emphasis [ref=f63e223]: "Example of Usability Heuristic #4:"
+                  - emphasis [ref=f63e224]: Checkin counters are usually located at the front of hotels. This consistency meets customers’ expectations.
+              - generic [ref=f63e225]:
+                - paragraph [ref=f63e226]:
+                  - strong [ref=f63e227]: Tips
+                - list [ref=f63e228]:
+                  - listitem [ref=f63e229]:
+                    - text: Improve
+                    - link "learnability" [ref=f63e230] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/videos/learnability-efficiency-ui-design/
+                    - text: "by maintaining both types of consistency: internal and external."
+                  - listitem [ref=f63e231]:
+                    - text: Maintain
+                    - link "consistency" [ref=f63e232] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/omnichannel-consistency/
+                    - text: within a single product or a
+                    - link "family of products (internal consistency)." [ref=f63e233] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/videos/design-systems/
+                  - listitem [ref=f63e234]:
+                    - text: Follow established
+                    - link "industry conventions" [ref=f63e235] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/do-interface-standards-stifle-design-creativity/
+                    - text: (external consistency).
+                - paragraph [ref=f63e236]:
+                  - strong [ref=f63e237]: Learn more
+                - list [ref=f63e238]:
+                  - listitem [ref=f63e239]:
+                    - link [ref=f63e240] [cursor=pointer]:
+                      - /url: http://www.nngroup.com/articles/consistency-and-standards/
+                      - text: "Full article:"
+                      - emphasis [ref=f63e241]: Consistency and Standards
+                  - listitem [ref=f63e242]:
+                    - link [ref=f63e243] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/videos/usability-heuristic-consistency-standards/
+                      - text: "3-minute video:"
+                      - emphasis [ref=f63e244]: Consistency and Standards
+            - 'heading "5: Error Prevention" [level=2] [ref=f63e245]'
+            - paragraph [ref=f63e246]:
+              - strong [ref=f63e247]: Good error messages are important, but the best designs carefully prevent problems from occurring in the first place. Either eliminate error-prone conditions, or check for them and present users with a confirmation option before they commit to the action.
+            - paragraph [ref=f63e248]:
+              - text: "There are two types of errors:"
+              - link "slips and mistakes" [ref=f63e249] [cursor=pointer]:
+                - /url: https://www.nngroup.com/videos/slips-vs-mistakes/
+              - text: . Slips are unconscious errors caused by inattention. Mistakes are conscious errors based on a mismatch between the user’s mental model and the design.
+            - generic [ref=f63e250]:
+              - figure [ref=f63e252]:
+                - 'img "Usability Heuristic #5: A highway that has guard rails so a driver can''t drive off the side." [ref=f63e253]'
+                - generic [ref=f63e254]:
+                  - strong [ref=f63e255]:
+                    - emphasis [ref=f63e256]: "Example of Usability Heuristic #5:"
+                  - emphasis [ref=f63e257]: Guard rails on curvy mountain roads prevent drivers from falling off cliffs.
+              - generic [ref=f63e258]:
+                - paragraph [ref=f63e259]:
+                  - strong [ref=f63e260]: Tips
+                - list [ref=f63e261]:
+                  - listitem [ref=f63e262]: "Prioritize your effort: Prevent high-cost errors first, then little frustrations."
+                  - listitem [ref=f63e263]:
+                    - link "Avoid slips" [ref=f63e264] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/slips/
+                    - text: by providing helpful constraints and good
+                    - link "defaults" [ref=f63e265] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/the-power-of-defaults/
+                    - text: .
+                  - listitem [ref=f63e266]:
+                    - text: Prevent mistakes by removing memory burdens, supporting undo, and
+                    - link "warning your users" [ref=f63e267] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/confirmation-dialog/
+                    - text: .
+                - paragraph [ref=f63e268]:
+                  - strong [ref=f63e269]: Learn more
+                - list [ref=f63e270]:
+                  - listitem [ref=f63e271]:
+                    - link [ref=f63e272] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/slips/
+                      - text: "Full article:"
+                      - emphasis [ref=f63e273]: Preventing User Errors
+                  - listitem [ref=f63e274]:
+                    - link [ref=f63e275] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/videos/usability-heuristic-error-prevention/
+                      - text: "3-minute video:"
+                      - emphasis [ref=f63e276]: Error Prevention
+            - 'heading "6: Recognition Rather than Recall" [level=2] [ref=f63e277]'
+            - paragraph [ref=f63e278]:
+              - strong [ref=f63e279]: Minimize the user's memory load by making elements, actions, and options visible. The user should not have to remember information from one part of the interface to another. Information required to use the design (e.g. field labels or menu items) should be visible or easily retrievable when needed.
+            - paragraph [ref=f63e280]:
+              - text: Humans have limited short-term
+              - link "memories" [ref=f63e281] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/working-memory-external-memory/
+              - text: . Interfaces that promote recognition reduce the amount of cognitive effort required from users.
+            - generic [ref=f63e282]:
+              - figure [ref=f63e284]:
+                - 'img "Usability Heuristic #6: A castle that represents Lisbon. It is easier for people to hear the capital and place it''s country, rather than name a capital outright." [ref=f63e285]'
+                - generic [ref=f63e286]:
+                  - strong [ref=f63e287]:
+                    - emphasis [ref=f63e288]: "Example of Usability Heuristic #6:"
+                  - emphasis [ref=f63e289]: It’s easier for most people to recognize the capitals of countries, instead of having to remember them. People are more likely to correctly answer the question
+                  - text: Is Lisbon the capital of Portugal?
+                  - emphasis [ref=f63e290]: rather than
+                  - text: What’s the capital of Portugal?
+              - generic [ref=f63e291]:
+                - paragraph [ref=f63e292]:
+                  - strong [ref=f63e293]: Tips
+                - list [ref=f63e294]:
+                  - listitem [ref=f63e295]: Let people recognize information in the interface, rather than forcing them to remember (“recall”) it.
+                  - listitem [ref=f63e296]:
+                    - text: Offer
+                    - link "help in context" [ref=f63e297] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/videos/just-in-time-help/
+                    - text: ", instead of giving users a long tutorial to memorize."
+                  - listitem [ref=f63e298]: Reduce the information that users have to remember.
+                - paragraph [ref=f63e299]:
+                  - strong [ref=f63e300]: Learn more
+                - list [ref=f63e301]:
+                  - listitem [ref=f63e302]:
+                    - link [ref=f63e303] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/recognition-and-recall/
+                      - text: "Full article:"
+                      - emphasis [ref=f63e304]: Recognition vs. Recall in UX
+                  - listitem [ref=f63e305]:
+                    - link [ref=f63e306] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/videos/recognition-vs-recall/
+                      - text: "3-minute video:"
+                      - emphasis [ref=f63e307]: Recognition vs. Recall
+            - 'heading "7: Flexibility and Efficiency of Use" [level=2] [ref=f63e308]'
+            - paragraph [ref=f63e309]:
+              - strong [ref=f63e310]: Shortcuts — hidden from novice users — may speed up the interaction for the expert user so that the design can cater to both inexperienced and experienced users. Allow users to tailor frequent actions.
+            - paragraph [ref=f63e311]: Flexible processes can be carried out in different ways, so that people can pick whichever method works for them.
+            - generic [ref=f63e312]:
+              - figure [ref=f63e314]:
+                - 'img "Usability Heuristic #7: A picture of a map with 2 routes. The first is a regular route, the second is a shortcut." [ref=f63e315]'
+                - generic [ref=f63e316]:
+                  - strong [ref=f63e317]:
+                    - emphasis [ref=f63e318]: "Example of Usability Heuristic #7:"
+                  - emphasis [ref=f63e319]: Regular routes are listed on maps, but locals with knowledge of the area can take shortcuts.
+              - generic [ref=f63e320]:
+                - paragraph [ref=f63e321]:
+                  - strong [ref=f63e322]: Tips
+                - list [ref=f63e323]:
+                  - listitem [ref=f63e324]:
+                    - text: Provide
+                    - link "accelerators" [ref=f63e325] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/ui-accelerators/
+                    - text: like keyboard shortcuts and touch gestures.
+                  - listitem [ref=f63e326]:
+                    - text: Provide
+                    - link "personalization" [ref=f63e327] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/personalization/
+                    - text: by tailoring content and functionality for individual users.
+                  - listitem [ref=f63e328]:
+                    - text: Allow for
+                    - link "customization" [ref=f63e329] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/customization-personalization/
+                    - text: ", so users can make selections about how they want the product to work."
+                - paragraph [ref=f63e330]:
+                  - strong [ref=f63e331]: Learn more
+                - list [ref=f63e332]:
+                  - listitem [ref=f63e333]:
+                    - link [ref=f63e334] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/flexibility-efficiency-heuristic/
+                      - text: "Full article:"
+                      - emphasis [ref=f63e335]: "Flexibility and Efficiency of Use: The 7th Usability Heuristic Explained"
+                  - listitem [ref=f63e336]:
+                    - link [ref=f63e337] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/videos/flexibility-efficiency-use/
+                      - text: "3-minute video:"
+                      - emphasis [ref=f63e338]: Flexibility and Efficiency of Use
+            - 'heading "8: Aesthetic and Minimalist Design" [level=2] [ref=f63e339]'
+            - paragraph [ref=f63e340]:
+              - strong [ref=f63e341]: Interfaces should not contain information that is irrelevant or rarely needed. Every extra unit of information in an interface competes with the relevant units of information and diminishes their relative visibility.
+            - paragraph [ref=f63e342]:
+              - text: This heuristic doesn't mean you have to use a
+              - link "flat design" [ref=f63e343] [cursor=pointer]:
+                - /url: https://www.nngroup.com/articles/flat-design/
+              - text: — it's about making sure you're keeping the content and visual design focused on the essentials. Ensure that the visual elements of the interface support the user's primary goals.
+            - generic [ref=f63e344]:
+              - figure [ref=f63e346]:
+                - 'img "Usability Heuristic #8: Two teapots side by side. One basic and straightforward, the other ornate with a fancy handle and curvy spout." [ref=f63e347]'
+                - generic [ref=f63e348]:
+                  - strong [ref=f63e349]:
+                    - emphasis [ref=f63e350]: "Example of Usability Heuristic #8:"
+                  - emphasis [ref=f63e351]: An ornate teapot may have excessive decorative elements, like an uncomfortable handle or hard-to-wash nozzle, that can interfere with usability.
+              - generic [ref=f63e352]:
+                - paragraph [ref=f63e353]:
+                  - strong [ref=f63e354]: Tips
+                - list [ref=f63e355]:
+                  - listitem [ref=f63e356]:
+                    - text: Keep the
+                    - link "content" [ref=f63e357] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/how-little-do-users-read/
+                    - text: and
+                    - link "visual design" [ref=f63e358] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/principles-visual-design/
+                    - text: of UI focused on the essentials.
+                  - listitem [ref=f63e359]: Don't let unnecessary elements distract users from the information they really need.
+                  - listitem [ref=f63e360]:
+                    - link "Prioritize the content and features" [ref=f63e361] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/videos/less-is-more/
+                    - text: to support primary goals.
+                - paragraph [ref=f63e362]:
+                  - strong [ref=f63e363]: Learn more
+                - list [ref=f63e364]:
+                  - listitem [ref=f63e365]:
+                    - link [ref=f63e366] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/aesthetic-minimalist-design/
+                      - text: "Full article:"
+                      - emphasis [ref=f63e367]: "Aesthetic and Minimalist Design (Usability Heuristic #8)"
+                  - listitem [ref=f63e368]:
+                    - link [ref=f63e369] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/videos/aesthetic-and-minimalist-design/
+                      - text: "3-minute video:"
+                      - emphasis [ref=f63e370]: Aesthetic and Minimalist Design
+            - 'heading "9: Help Users Recognize, Diagnose, and Recover from Errors" [level=2] [ref=f63e371]'
+            - paragraph [ref=f63e372]:
+              - strong [ref=f63e373]: Error messages should be expressed in plain language (no error codes), precisely indicate the problem, and constructively suggest a solution.
+            - paragraph [ref=f63e374]: These error messages should also be presented with visual treatments that will help users notice and recognize them.
+            - generic [ref=f63e375]:
+              - figure [ref=f63e377]:
+                - 'img "Usability Heuristic #9: A picture of a road with a wrong way sign to the right that would warn drivers not to enter." [ref=f63e378]'
+                - generic [ref=f63e379]:
+                  - strong [ref=f63e380]:
+                    - emphasis [ref=f63e381]: "Example of Usability Heuristic #9:"
+                  - text: Wrong way
+                  - emphasis [ref=f63e382]: signs on the road remind drivers that they are heading in the wrong direction and ask them to stop.
+              - generic [ref=f63e383]:
+                - paragraph [ref=f63e384]:
+                  - strong [ref=f63e385]: Tips
+                - list [ref=f63e386]:
+                  - listitem [ref=f63e387]:
+                    - text: Use traditional
+                    - link "error-message" [ref=f63e388] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/error-message-guidelines/
+                    - text: visuals, like bold, red text.
+                  - listitem [ref=f63e389]:
+                    - text: Tell users what went wrong in
+                    - link "language they will understand" [ref=f63e390] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/plain-language-experts/
+                    - text: — avoid technical jargon.
+                  - listitem [ref=f63e391]: Offer users a solution, like a shortcut that can solve the error immediately.
+                - paragraph [ref=f63e392]:
+                  - strong [ref=f63e393]: Learn more
+                - list [ref=f63e394]:
+                  - listitem [ref=f63e395]:
+                    - link [ref=f63e396] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/error-message-guidelines/
+                      - text: "Full article:"
+                      - emphasis [ref=f63e397]: Error-Message Guidelines
+                  - listitem [ref=f63e398]:
+                    - link [ref=f63e399] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/videos/usability-heuristic-recognize-errors/
+                      - text: "2-minute video:"
+                      - emphasis [ref=f63e400]: Helping Users Overcome Errors
+            - 'heading "10: Help and Documentation" [level=2] [ref=f63e401]'
+            - paragraph [ref=f63e402]:
+              - strong [ref=f63e403]: It’s best if the system doesn’t need any additional explanation. However, it may be necessary to provide documentation to help users understand how to complete their tasks.
+            - paragraph [ref=f63e404]: Help and documentation content should be easy to search and focused on the user's task. Keep it concise, and list concrete steps that need to be carried out.
+            - generic [ref=f63e405]:
+              - figure [ref=f63e407]:
+                - generic [ref=f63e408]:
+                  - strong [ref=f63e409]:
+                    - emphasis [ref=f63e410]: "Example of Usability Heuristic #10:"
+                  - emphasis [ref=f63e411]: Information kiosks at airports are easily recognizable and solve customers’ problems in context and immediately.
+              - generic [ref=f63e412]:
+                - paragraph [ref=f63e413]:
+                  - strong [ref=f63e414]: Tips
+                - list [ref=f63e415]:
+                  - listitem [ref=f63e416]:
+                    - text: Ensure that the help documentation is easy to
+                    - link "search" [ref=f63e417] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/search-visible-and-simple/
+                    - text: .
+                  - listitem [ref=f63e418]: Whenever possible, present the documentation in context right at the moment that the user requires it.
+                  - listitem [ref=f63e419]: List concrete steps to be carried out.
+                - paragraph [ref=f63e420]:
+                  - strong [ref=f63e421]: Learn more
+                - list [ref=f63e422]:
+                  - listitem [ref=f63e423]:
+                    - link [ref=f63e424] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/articles/help-and-documentation/
+                      - text: "Full article:"
+                      - emphasis [ref=f63e425]: "Help and Documentation: The 10th Usability Heuristic"
+                  - listitem [ref=f63e426]:
+                    - link [ref=f63e427] [cursor=pointer]:
+                      - /url: https://www.nngroup.com/videos/help-and-documentation/
+                      - text: "3-minute video:"
+                      - emphasis [ref=f63e428]: Help and Documentation
+            - heading "Free 10 Heuristics Poster" [level=2] [ref=f63e429]
+            - paragraph [ref=f63e430]:
+              - text: Download a
+              - link "free summary poster" [ref=f63e431] [cursor=pointer]:
+                - /url: "#poster"
+              - text: or
+              - link "10 detailed posters" [ref=f63e432] [cursor=pointer]:
+                - /url: https://media.nngroup.com/media/articles/attachments/Jakob's10UsabilityHeuristics_AllPosters_5.zip
+              - text: of the 10 Usability Heuristics, designed by
+              - link "Kelley Gordon" [ref=f63e433] [cursor=pointer]:
+                - /url: https://www.nngroup.com/people/kelley-gordon/
+              - text: ","
+              - link "Kate Moran" [ref=f63e434] [cursor=pointer]:
+                - /url: https://www.nngroup.com/people/kate-moran/
+              - text: ", and"
+              - link "Feifei Liu" [ref=f63e435] [cursor=pointer]:
+                - /url: https://www.nngroup.com/people/feifei-liu/
+              - text: .
+            - figure [ref=f63e437]:
+              - img "Jakob's 10 Usability Heuristic Posters Hung on a Wall" [ref=f63e438]
+              - generic [ref=f63e439]:
+                - text: Download and print our
+                - link "free usability heuristic posters" [ref=f63e440] [cursor=pointer]:
+                  - /url: https://media.nngroup.com/media/articles/attachments/Jakob's10UsabilityHeuristics_AllPosters_5.zip
+                - text: . Hang them at home, in your office, or gift them to a colleague.
+            - heading "Note from Jakob" [level=3] [ref=f63e441]
+            - paragraph [ref=f63e442]: I originally developed the heuristics for heuristic evaluation in collaboration with Rolf Molich in 1990 [Molich and Nielsen 1990; Nielsen and Molich 1990]. Four years later, I refined the heuristics based on a factor analysis of 249 usability problems [Nielsen 1994a] to derive a set of heuristics with maximum explanatory power, resulting in this revised set of heuristics [Nielsen 1994b].
+            - paragraph [ref=f63e443]:
+              - text: In 2020, we updated this article, adding more explanation, examples, and related links. While we slightly refined the language of the definitions, the
+              - strong [ref=f63e444]: 10 heuristics themselves have remained relevant and unchanged since 1994.
+              - text: When something has remained true for 26 years, it will likely apply to future generations of user interfaces as well.
+            - heading "See Also" [level=3] [ref=f63e445]
+            - heading [level=4] [ref=f63e446]:
+              - strong [ref=f63e447]: Examples
+            - list [ref=f63e448]:
+              - listitem [ref=f63e449]:
+                - strong [ref=f63e450]:
+                  - link "10 Usability Heuristics Applied to C" [ref=f63e451] [cursor=pointer]:
+                    - /url: https://www.nngroup.com/articles/usability-heuristics-complex-applications/
+                - link [ref=f63e452] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/usability-heuristics-complex-applications/
+                  - strong [ref=f63e453]: omplex Applications
+                - text: — Examples of the heuristics applied to complex and domain-specific software applications.
+              - listitem [ref=f63e454]:
+                - strong [ref=f63e455]:
+                  - link "10 Usability Heuristics Applied to Virtual Reality" [ref=f63e456] [cursor=pointer]:
+                    - /url: https://www.nngroup.com/articles/usability-heuristics-virtual-reality/
+                - text: — See the heuristics applied to 3D virtual environments.
+              - listitem [ref=f63e457]:
+                - link [ref=f63e458] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/articles/usability-heuristics-applied-video-games/
+                  - strong [ref=f63e459]: 10 Usability Heuristics Applied to Video Games
+                - text: — Great examples of the 10 heuristics in highly interactive and highly visual user interfaces that have an entertainment purpose.
+              - listitem [ref=f63e460]:
+                - strong [ref=f63e461]:
+                  - link "10 Usability Heuristics Applied to Everyday Life" [ref=f63e462] [cursor=pointer]:
+                    - /url: http://www.zenhaiku.com/archives/usability_applied_to_life.html
+                - text: (Just for fun)
+            - heading [level=4] [ref=f63e463]:
+              - strong [ref=f63e464]: Checklists & Guidelines
+            - list [ref=f63e465]:
+              - listitem [ref=f63e466]:
+                - text: Full set of
+                - link "2,397 UX design guidelines" [ref=f63e467] [cursor=pointer]:
+                  - /url: https://www.nngroup.com/reports/
+                - text: (across multiple reports).
+              - listitem [ref=f63e468]:
+                - text: Bruce "Tog" Tognazzini's list of
+                - link "basic principles for interface design" [ref=f63e469] [cursor=pointer]:
+                  - /url: https://asktog.com/atc/principles-of-interaction-design/
+                - text: . The list is slightly too long for heuristic evaluation but serves as a useful checklist.
+            - heading [level=3] [ref=f63e470]:
+              - strong [ref=f63e471]: References
+            - paragraph [ref=f63e472]: Molich, R., and Nielsen, J. (1990). Improving a human-computer dialogue, Communications of the ACM 33, 3 (March), 338-348.
+            - paragraph [ref=f63e473]: Nielsen, J., and Molich, R. (1990). Heuristic evaluation of user interfaces, Proc. ACM CHI'90 Conf. (Seattle, WA, 1-5 April), 249-256.
+            - paragraph [ref=f63e474]: Nielsen, J. (1994a). Enhancing the explanatory power of usability heuristics. Proc. ACM CHI'94 Conf. (Boston, MA, April 24-28), 152-158.
+            - paragraph [ref=f63e475]: Nielsen, J. (1994b). Heuristic evaluation. In Nielsen, J., and Mack, R.L. (Eds.), Usability Inspection Methods, John Wiley & Sons, New York, NY.
+            - heading "Citing the Heuristics" [level=3] [ref=f63e476]
+            - paragraph [ref=f63e477]:
+              - text: You may use these heuristics in your own work. Please credit Jakob Nielsen and provide the address for this page [nngroup.com/articles/ten-usability-heuristics] or cite the paper above [Nielsen 1994a]. If you want to print copies of this page or reproduce the content online, however, please see our
+              - link "copyright info" [ref=f63e478] [cursor=pointer]:
+                - /url: https://www.nngroup.com/copyright-and-reprint-info/
+              - text: for details. Copyright © by Jakob Nielsen.ISSN 1548-5552
+        - generic [ref=f63e480]:
+          - generic [ref=f63e481]:
+            - heading "Free Downloads" [level=2] [ref=f63e482]
+            - list [ref=f63e483]:
+              - listitem [ref=f63e484]:
+                - link "All Posters - 10 Usability Heuristics (ZIP)" [ref=f63e485] [cursor=pointer]:
+                  - /url: //media.nngroup.com/media/articles/attachments/Jakob's10UsabilityHeuristics_AllPosters_5.zip
+              - listitem [ref=f63e486]:
+                - link "Summary Poster - 10 Usability Heuristics (PDF)" [ref=f63e487] [cursor=pointer]:
+                  - /url: //media.nngroup.com/media/articles/attachments/Heuristic_Summary1-compressed.pdf
+              - listitem [ref=f63e488]:
+                - link "Summary Poster, A4 Size - 10 Usability Heuristics (PDF)" [ref=f63e489] [cursor=pointer]:
+                  - /url: //media.nngroup.com/media/articles/attachments/Heuristic_Summary1_A4_compressed.pdf
+              - listitem [ref=f63e490]:
+                - link "Summary Poster, Letter Size - 10 Usability Heuristics (PDF)" [ref=f63e491] [cursor=pointer]:
+                  - /url: //media.nngroup.com/media/articles/attachments/Heuristic_Summary1_Letter-compressed.pdf
+          - generic [ref=f63e492]:
+            - heading "Related Courses" [level=2] [ref=f63e493]
+            - list [ref=f63e494]:
+              - listitem [ref=f63e495]:
+                - link [ref=f63e496] [cursor=pointer]:
+                  - /url: /courses/ux-basic-training/?lm=ten-usability-heuristics&pt=article
+                  - heading "UX Basic Training" [level=4] [ref=f63e497]
+                  - paragraph [ref=f63e498]: Foundational concepts that everyone should know
+                  - paragraph [ref=f63e503]: Interaction
+          - generic [ref=f63e504]:
+            - heading "Related Topics" [level=2] [ref=f63e505]
+            - list [ref=f63e506]:
+              - listitem [ref=f63e507]:
+                - link "Heuristic Evaluation" [ref=f63e508] [cursor=pointer]:
+                  - /url: /topic/heuristic-evaluation/
+    - generic [ref=f63e511]:
+      - heading "Learn More:" [level=2] [ref=f63e512]
+      - generic [ref=f63e513]:
+        - iframe [ref=f63e516]:
+          - generic [ref=f64e1]:
+            - generic "YouTube 동영상 플레이어" [ref=f64e3]
+            - generic [ref=f64e5]:
+              - generic:
+                - generic:
+                  - generic [ref=f64e6] [cursor=pointer]
+                  - button "동영상 재생" [ref=f64e10] [cursor=pointer]
+                  - button "재생 컨트롤 숨기기" [ref=f64e12] [cursor=pointer]
+                  - generic [ref=f64e14]:
+                    - generic [ref=f64e19]:
+                      - generic [ref=f64e20]:
+                        - link "Heuristic Evaluation of User Interfaces" [ref=f64e21] [cursor=pointer]:
+                          - /url: https://www.youtube.com/watch?v=6Bw0n6Jvwxk
+                        - link "NNgroup" [ref=f64e22] [cursor=pointer]:
+                          - /url: /channel/UC2oCugzU6W8-h95W7eBTUEg
+                      - generic [ref=f64e24]:
+                        - button [ref=f64e25] [cursor=pointer]
+                        - generic [ref=f64e27]:
+                          - generic: NNgroup
+                          - generic: 구독자 32만명
+                    - generic [ref=f64e28]:
+                      - button "공유" [ref=f64e31] [cursor=pointer]
+                      - link "YouTube에서 보기" [ref=f64e42] [cursor=pointer]:
+                        - /url: https://www.youtube.com/watch?v=6Bw0n6Jvwxk
+                        - generic [ref=f64e43]: "다음에서 보기:"
+        - generic [ref=f63e517]:
+          - paragraph [ref=f63e518]: Heuristic Evaluation of User Interfaces
+          - text: Jakob Nielsen · 3 min
+        - list [ref=f63e520]:
+          - listitem [ref=f63e521]:
+            - link [ref=f63e524] [cursor=pointer]:
+              - /url: /videos/aesthetic-and-minimalist-design/?lm=ten-usability-heuristics&pt=article
+              - generic [ref=f63e526]:
+                - paragraph [ref=f63e527]: "Usability Heuristic 8: Aesthetic and Minimalist Design"
+                - paragraph [ref=f63e528]: Kate Moran · 2 min
+          - listitem [ref=f63e529]:
+            - link [ref=f63e532] [cursor=pointer]:
+              - /url: /videos/usability-heuristic-consistency-standards/?lm=ten-usability-heuristics&pt=article
+              - generic [ref=f63e534]:
+                - paragraph [ref=f63e535]: "Usability Heuristic 4: Consistency and Standards"
+                - paragraph [ref=f63e536]: Kate Moran · 3 min
+          - listitem [ref=f63e537]:
+            - link [ref=f63e540] [cursor=pointer]:
+              - /url: /videos/usability-heuristic-user-control-freedom/?lm=ten-usability-heuristics&pt=article
+              - generic [ref=f63e542]:
+                - paragraph [ref=f63e543]: "Usability Heuristic 3: User Control & Freedom"
+                - paragraph [ref=f63e544]: Aurora Harley · 2 min
+      - generic [ref=f63e545]:
+        - heading "Related Articles:" [level=2] [ref=f63e546]
+        - list [ref=f63e547]:
+          - listitem [ref=f63e548]:
+            - link [ref=f63e549] [cursor=pointer]:
+              - /url: /articles/visibility-system-status/?lm=ten-usability-heuristics&pt=article
+              - paragraph [ref=f63e550]: "Visibility of System Status (Usability Heuristic #1)"
+              - paragraph [ref=f63e551]: Aurora Harley · 7 min
+          - listitem [ref=f63e552]:
+            - link [ref=f63e553] [cursor=pointer]:
+              - /url: /articles/error-message-guidelines/?lm=ten-usability-heuristics&pt=article
+              - paragraph [ref=f63e554]: Error-Message Guidelines
+              - paragraph [ref=f63e555]: Tim Neusesser and Evan Sunwall · 6 min
+          - listitem [ref=f63e556]:
+            - link [ref=f63e557] [cursor=pointer]:
+              - /url: /articles/visual-design-heuristics-posters/?lm=ten-usability-heuristics&pt=article
+              - paragraph [ref=f63e558]: "Applying UX Principles to the Visual Design of Graphical Artifacts: The Case of the Heuristics Posters"
+              - paragraph [ref=f63e559]: Kelley Gordon · 6 min
+          - listitem [ref=f63e560]:
+            - link [ref=f63e561] [cursor=pointer]:
+              - /url: /articles/how-to-conduct-a-heuristic-evaluation/?lm=ten-usability-heuristics&pt=article
+              - paragraph [ref=f63e562]: How to Conduct a Heuristic Evaluation
+              - paragraph [ref=f63e563]: Kate Moran and Kelley Gordon · 6 min
+          - listitem [ref=f63e564]:
+            - link [ref=f63e565] [cursor=pointer]:
+              - /url: /articles/consistency-and-standards/?lm=ten-usability-heuristics&pt=article
+              - paragraph [ref=f63e566]: "Maintain Consistency and Adhere to Standards (Usability Heuristic #4)"
+              - paragraph [ref=f63e567]: Rachel Krause · 9 min
+          - listitem [ref=f63e568]:
+            - link [ref=f63e569] [cursor=pointer]:
+              - /url: /articles/user-control-and-freedom/?lm=ten-usability-heuristics&pt=article
+              - paragraph [ref=f63e570]: "User Control and Freedom (Usability Heuristic #3)"
+              - paragraph [ref=f63e571]: Maria Rosala · 8 min
+  - contentinfo [ref=f63e572]:
+    - generic [ref=f63e576]:
+      - generic [ref=f63e577]:
+        - heading "Never miss an update" [level=2] [ref=f63e578]
+        - paragraph [ref=f63e579]: Get weekly UX articles, videos, upcoming courses, and job openings straight to your inbox with our newsletter.
+      - group "Newsletter subscribe" [ref=f63e581]:
+        - generic [ref=f63e582]: Email
+        - textbox "Email" [ref=f63e584]
+        - button "Subscribe" [ref=f63e585] [cursor=pointer]
+    - list [ref=f63e589]:
+      - listitem [ref=f63e590]:
+        - heading "Courses" [level=3] [ref=f63e591]
+        - list [ref=f63e592]:
+          - listitem [ref=f63e593]:
+            - link "Live Online Training Events" [ref=f63e594] [cursor=pointer]:
+              - /url: /courses/
+          - listitem [ref=f63e595]:
+            - link "Group-Discount Pricing" [ref=f63e596] [cursor=pointer]:
+              - /url: /contents/train-your-team/group-discount-pricing/
+          - listitem [ref=f63e597]:
+            - link "Private Team Training" [ref=f63e598] [cursor=pointer]:
+              - /url: /contents/train-your-team/private-team-training-ux-certification/
+          - listitem [ref=f63e599]:
+            - link "Self-Paced Courses" [ref=f63e600] [cursor=pointer]:
+              - /url: /contents/self-paced-courses/
+      - listitem [ref=f63e601]:
+        - heading "Consulting" [level=3] [ref=f63e602]
+        - list [ref=f63e603]:
+          - listitem [ref=f63e604]:
+            - link "Intensive Applied Workshops" [ref=f63e605] [cursor=pointer]:
+              - /url: /consulting/applied-workshops/
+          - listitem [ref=f63e606]:
+            - link "Customized Research" [ref=f63e607] [cursor=pointer]:
+              - /url: /consulting/user-research/
+          - listitem [ref=f63e608]:
+            - link "Expert Review" [ref=f63e609] [cursor=pointer]:
+              - /url: /consulting/expert-review/
+          - listitem [ref=f63e610]:
+            - link "Keynote Speaking" [ref=f63e611] [cursor=pointer]:
+              - /url: /consulting/keynote-speaking/
+          - listitem [ref=f63e612]:
+            - link "User Testing" [ref=f63e613] [cursor=pointer]:
+              - /url: /consulting/user-testing/
+          - listitem [ref=f63e614]:
+            - link "UX Maturity Assessment" [ref=f63e615] [cursor=pointer]:
+              - /url: /consulting/ux-maturity-assessment/
+      - listitem [ref=f63e616]:
+        - heading "Help" [level=3] [ref=f63e617]
+        - list [ref=f63e618]:
+          - listitem [ref=f63e619]:
+            - link "Terms & Conditions" [ref=f63e620] [cursor=pointer]:
+              - /url: /terms-and-conditions/
+          - listitem [ref=f63e621]:
+            - link "Privacy Policy" [ref=f63e622] [cursor=pointer]:
+              - /url: /privacy-policy/
+          - listitem [ref=f63e623]:
+            - link "Live Course Tech Support" [ref=f63e624] [cursor=pointer]:
+              - /url: /virtual-help
+          - listitem [ref=f63e625]:
+            - link "FAQs" [ref=f63e626] [cursor=pointer]:
+              - /url: /faqs/
+      - listitem [ref=f63e627]:
+        - heading "Company" [level=3] [ref=f63e628]
+        - list [ref=f63e629]:
+          - listitem [ref=f63e630]:
+            - link "About NNGroup" [ref=f63e631] [cursor=pointer]:
+              - /url: /about/
+          - listitem [ref=f63e632]:
+            - link "People" [ref=f63e633] [cursor=pointer]:
+              - /url: /people/
+          - listitem [ref=f63e634]:
+            - link "News & Careers" [ref=f63e635] [cursor=pointer]:
+              - /url: /news/
+          - listitem [ref=f63e636]:
+            - link "Contact Us" [ref=f63e637] [cursor=pointer]:
+              - /url: /about/contact/
+    - generic [ref=f63e638]:
+      - generic [ref=f63e639]:
+        - paragraph [ref=f63e640]: Copyright © 1998-2026 Nielsen Norman Group, All Rights Reserved.
+        - list [ref=f63e641]:
+          - listitem [ref=f63e642]:
+            - button "Cookie Preferences" [ref=f63e643]
+          - listitem [ref=f63e644]:
+            - text: "|"
+            - link "Cookie Declaration" [ref=f63e645] [cursor=pointer]:
+              - /url: /cookie-declaration/
+      - generic [ref=f63e646]:
+        - heading "Follow Us" [level=2] [ref=f63e647]
+        - list [ref=f63e648]:
+          - listitem [ref=f63e649]:
+            - link "Youtube" [ref=f63e650] [cursor=pointer]:
+              - /url: https://www.youtube.com/channel/UC2oCugzU6W8-h95W7eBTUEg
+          - listitem [ref=f63e651]:
+            - link "LinkedIn" [ref=f63e652] [cursor=pointer]:
+              - /url: https://www.linkedin.com/company/nielsen-norman-group
+          - listitem [ref=f63e653]:
+            - link "Instagram" [ref=f63e654] [cursor=pointer]:
+              - /url: https://www.instagram.com/nngux
+          - listitem [ref=f63e655]:
+            - link "Threads" [ref=f63e656] [cursor=pointer]:
+              - /url: https://www.threads.com/@nngux
+          - listitem [ref=f63e657]:
+            - link "Bluesky" [ref=f63e658] [cursor=pointer]:
+              - /url: https://bsky.app/profile/nngroupux.bsky.social
+          - listitem [ref=f63e659]:
+            - link "X" [ref=f63e660] [cursor=pointer]:
+              - /url: https://x.com/nngroup
+          - listitem [ref=f63e661]:
+            - link "Facebook" [ref=f63e662] [cursor=pointer]:
+              - /url: https://www.facebook.com/nngux
+          - listitem [ref=f63e663]:
+            - link "Spotify" [ref=f63e664] [cursor=pointer]:
+              - /url: https://podcasters.spotify.com/pod/show/nngroup

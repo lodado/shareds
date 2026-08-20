@@ -1,0 +1,429 @@
+- generic [active] [ref=f60e1]:
+  - generic [ref=f60e2]:
+    - generic [ref=f60e4]:
+      - generic [ref=f60e5]:
+        - generic [ref=f60e6]:
+          - link "DuckDuckGo home" [ref=f60e7] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f60e8]: DuckDuckGo
+          - generic [ref=f60e15]:
+            - combobox "개인 정보 노출 없이 검색" [ref=f60e17]: site:dora.dev 2025 AI software development report official
+            - button "search" [ref=f60e19] [cursor=pointer]
+        - button "메뉴 열기" [ref=f60e23] [cursor=pointer]
+      - navigation [ref=f60e31]:
+        - list [ref=f60e32]:
+          - listitem [ref=f60e33]:
+            - link "모두" [ref=f60e34] [cursor=pointer]:
+              - /url: /?q=site%3Adora.dev+2025+AI+software+development+report+official&ia=web
+          - listitem [ref=f60e37]:
+            - link "이미지" [ref=f60e38] [cursor=pointer]:
+              - /url: /?q=site%3Adora.dev+2025+AI+software+development+report+official&ia=images&iax=images
+          - listitem [ref=f60e39]:
+            - link "동영상" [ref=f60e40] [cursor=pointer]:
+              - /url: /?q=site%3Adora.dev+2025+AI+software+development+report+official&ia=videos&iax=videos
+          - listitem [ref=f60e41]:
+            - link "뉴스" [ref=f60e42] [cursor=pointer]:
+              - /url: /?q=site%3Adora.dev+2025+AI+software+development+report+official&ia=news&iar=news
+          - listitem [ref=f60e43]:
+            - link "지도" [ref=f60e44] [cursor=pointer]:
+              - /url: /?q=site%3Adora.dev+2025+AI+software+development+report+official&iaxm=maps
+        - list [ref=f60e45]:
+          - listitem [ref=f60e46]:
+            - link "Duck.ai" [ref=f60e48] [cursor=pointer]:
+              - /url: /?q=site%3Adora.dev+2025+AI+software+development+report+official&ia=chat
+          - listitem [ref=f60e52]:
+            - button "검색 설정 ✀" [ref=f60e54] [cursor=pointer]:
+              - generic [ref=f60e57]: 검색 설정
+              - generic [ref=f60e58]: ✀
+    - generic [ref=f60e65]:
+      - navigation [ref=f60e67]:
+        - generic [ref=f60e70] [cursor=pointer]:
+          - generic [ref=f60e71]: 보호됨
+          - img [ref=f60e79]: ▼
+        - generic [ref=f60e83] [cursor=pointer]:
+          - generic [ref=f60e86]:
+            - switch "✓" [ref=f60e87]
+            - generic [ref=f60e89]: 대한민국
+          - img [ref=f60e90]: ▼
+        - generic [ref=f60e94] [cursor=pointer]:
+          - generic [ref=f60e95]: "안전 검색: 보통"
+          - img [ref=f60e96]: ▼
+        - generic [ref=f60e100] [cursor=pointer]:
+          - generic [ref=f60e101]: 모든 날짜
+          - img [ref=f60e102]: ▼
+      - generic [ref=f60e105]:
+        - list [ref=f60e106]:
+          - listitem [ref=f60e107]:
+            - generic [ref=f60e108]:
+              - generic [ref=f60e111]:
+                - generic [ref=f60e112]: dora.dev
+                - text: 의 결과만 표시
+              - button "모든 결과 보기" [ref=f60e114] [cursor=pointer]
+          - listitem [ref=f60e115]:
+            - article [ref=f60e116] [cursor=pointer]:
+              - button [ref=f60e118]
+              - generic [ref=f60e123]:
+                - link "dora.dev 도메인 검색" [ref=f60e125]:
+                  - /url: /?q=site%3Adora.dev%202025%20AI%20software%20development%20report%20official
+                - generic [ref=f60e128]:
+                  - paragraph [ref=f60e129]: DORA
+                  - link "https://dora.dev › research › 2025 › dora-report" [ref=f60e130]:
+                    - /url: https://dora.dev/research/2025/dora-report/
+                    - paragraph [ref=f60e132]:
+                      - generic [ref=f60e133]: https://dora.dev
+                      - generic [ref=f60e134]: › research › 2025 › dora-report
+              - heading [level=2] [ref=f60e136]:
+                - link "DORA | State of AI-assisted Software Development 2025" [ref=f60e137]:
+                  - /url: https://dora.dev/research/2025/dora-report/
+              - generic [ref=f60e139]: The State of AI-assisted Software Development report reveals AI's primary role is as an amplifier, magnifying an organization's existing strengths and weaknesses. The greatest returns on AI investment come not from the tools themselves, but from a strategic focus on the underlying organizational system.
+          - listitem [ref=f60e144]:
+            - article [ref=f60e145] [cursor=pointer]:
+              - button [ref=f60e147]
+              - generic [ref=f60e152]:
+                - link "dora.dev 도메인 검색" [ref=f60e154]:
+                  - /url: /?q=site%3Adora.dev%202025%20AI%20software%20development%20report%20official
+                - generic [ref=f60e157]:
+                  - paragraph [ref=f60e158]: DORA
+                  - link "https://dora.dev › research › publications" [ref=f60e159]:
+                    - /url: https://dora.dev/research/publications/
+                    - paragraph [ref=f60e161]:
+                      - generic [ref=f60e162]: https://dora.dev
+                      - generic [ref=f60e163]: › research › publications
+              - heading [level=2] [ref=f60e165]:
+                - link "DORA | DORA Publications" [ref=f60e166]:
+                  - /url: https://dora.dev/research/publications/
+              - generic [ref=f60e168]: The 2025 State of AI-assisted Software Development report finds that AI's primary role is that of an amplifier, magnifying the strengths of high-performing organizations and the dysfunctions of struggling ones.
+          - listitem [ref=f60e173]:
+            - article [ref=f60e174] [cursor=pointer]:
+              - button [ref=f60e176]
+              - generic [ref=f60e181]:
+                - link "ai.dora.dev 도메인 검색" [ref=f60e183]:
+                  - /url: /?q=site%3Adora.dev%202025%20AI%20software%20development%20report%20official
+                - generic [ref=f60e186]:
+                  - paragraph [ref=f60e187]: ai.dora.dev
+                  - link "https://ai.dora.dev › research › 2025 › dora-report" [ref=f60e188]:
+                    - /url: https://ai.dora.dev/research/2025/dora-report/
+                    - paragraph [ref=f60e190]:
+                      - generic [ref=f60e191]: https://ai.dora.dev
+                      - generic [ref=f60e192]: › research › 2025 › dora-report
+              - heading [level=2] [ref=f60e194]:
+                - link "DORA | Artificial Intelligence" [ref=f60e195]:
+                  - /url: https://ai.dora.dev/research/2025/dora-report/
+              - generic [ref=f60e197]: How gen AI affects the value of development work Fostering developers' trust in generative artificial intelligence The 2024 DORA report includes deep dives into the adoption, attitudes, and downstream impacts of AI. Generative AI Guide link click to copy link How to enable your software delivery teams to innovate with generative AI
+          - listitem [ref=f60e202]:
+            - article [ref=f60e203] [cursor=pointer]:
+              - button [ref=f60e205]
+              - generic [ref=f60e210]:
+                - link "search.dora.dev 도메인 검색" [ref=f60e212]:
+                  - /url: /?q=site%3Adora.dev%202025%20AI%20software%20development%20report%20official
+                - generic [ref=f60e215]:
+                  - paragraph [ref=f60e216]: search.dora.dev
+                  - link "https://search.dora.dev" [ref=f60e217]:
+                    - /url: https://search.dora.dev/
+                    - paragraph [ref=f60e219]:
+                      - generic [ref=f60e220]: https://search.dora.dev
+              - heading [level=2] [ref=f60e222]:
+                - link "search.dora.dev" [ref=f60e223]:
+                  - /url: https://search.dora.dev/
+              - generic [ref=f60e225]: "We measure stability using time to restore a service after an incident and change failure rate.\",\"source_file_location\":\"gs://doradotdev-pdfs/2021-dora-accelerate-state-of-devops-report.pdf\"}]}"
+          - listitem [ref=f60e230]:
+            - article [ref=f60e231] [cursor=pointer]:
+              - button [ref=f60e233]
+              - generic [ref=f60e238]:
+                - link "dora.dev 도메인 검색" [ref=f60e240]:
+                  - /url: /?q=site%3Adora.dev%202025%20AI%20software%20development%20report%20official
+                - generic [ref=f60e243]:
+                  - paragraph [ref=f60e244]: DORA
+                  - link "https://dora.dev › research › 2025" [ref=f60e245]:
+                    - /url: https://dora.dev/research/2025/
+                    - paragraph [ref=f60e247]:
+                      - generic [ref=f60e248]: https://dora.dev
+                      - generic [ref=f60e249]: › research › 2025
+              - heading [level=2] [ref=f60e251]:
+                - 'link "DORA | DORA Research: 2025 Overview" [ref=f60e252]':
+                  - /url: https://dora.dev/research/2025/
+              - generic [ref=f60e254]: DORA is a long running research program that seeks to understand the capabilities that drive software delivery and operations performance. DORA helps teams apply those capabilities, leading to better organizational performance.
+          - listitem [ref=f60e259]:
+            - article [ref=f60e260] [cursor=pointer]:
+              - button [ref=f60e262]
+              - generic [ref=f60e267]:
+                - link "dora.dev 도메인 검색" [ref=f60e269]:
+                  - /url: /?q=site%3Adora.dev%202025%20AI%20software%20development%20report%20official
+                - generic [ref=f60e272]:
+                  - paragraph [ref=f60e273]: DORA
+                  - link "https://dora.dev" [ref=f60e274]:
+                    - /url: https://dora.dev/
+                    - paragraph [ref=f60e276]:
+                      - generic [ref=f60e277]: https://dora.dev
+              - heading [level=2] [ref=f60e279]:
+                - link "DORA | Get Better at Getting Better" [ref=f60e280]:
+                  - /url: https://dora.dev/
+              - generic [ref=f60e282]: DORA's ROI of AI-assisted Software Development report provides a practical framework to help you navigate the complexities of AI adoption. Whether you are managing the initial "productivity dip" of a new rollout or looking to defend your budget for the next fiscal year, this guide provides the calculations and conversation starters you need.
+          - listitem [ref=f60e287]:
+            - article [ref=f60e288] [cursor=pointer]:
+              - button [ref=f60e290]
+              - generic [ref=f60e295]:
+                - link "dora.dev 도메인 검색" [ref=f60e297]:
+                  - /url: /?q=site%3Adora.dev%202025%20AI%20software%20development%20report%20official
+                - generic [ref=f60e300]:
+                  - paragraph [ref=f60e301]: DORA
+                  - link "https://dora.dev › insights › dora-2025-year-in-review" [ref=f60e302]:
+                    - /url: https://dora.dev/insights/dora-2025-year-in-review/
+                    - paragraph [ref=f60e304]:
+                      - generic [ref=f60e305]: https://dora.dev
+                      - generic [ref=f60e306]: › insights › dora-2025-year-in-review
+              - heading [level=2] [ref=f60e308]:
+                - 'link "DORA 2025: Year in review" [ref=f60e309]':
+                  - /url: https://dora.dev/insights/dora-2025-year-in-review/
+              - generic [ref=f60e314]:
+                - text: 2026년 1월 7일·
+                - generic [ref=f60e315]: "State of AI-assisted Software Development: A breakdown of the 2025 report led by the report authors. Code Reviews: Adrienne Braganza Tacke joined the community to share insights on improving code reviews."
+          - listitem [ref=f60e316]:
+            - article [ref=f60e317] [cursor=pointer]:
+              - button [ref=f60e319]
+              - generic [ref=f60e324]:
+                - link "dora.dev 도메인 검색" [ref=f60e326]:
+                  - /url: /?q=site%3Adora.dev%202025%20AI%20software%20development%20report%20official
+                - generic [ref=f60e329]:
+                  - paragraph [ref=f60e330]: DORA
+                  - link "https://dora.dev › research › 2025 › ai-capabilities-model" [ref=f60e331]:
+                    - /url: https://dora.dev/research/2025/ai-capabilities-model/
+                    - paragraph [ref=f60e333]:
+                      - generic [ref=f60e334]: https://dora.dev
+                      - generic [ref=f60e335]: › research › 2025 › ai-capabilities-model
+              - heading [level=2] [ref=f60e337]:
+                - link "DORA | Download the DORA AI Capabilities Model report" [ref=f60e338]:
+                  - /url: https://dora.dev/research/2025/ai-capabilities-model/
+              - generic [ref=f60e343]:
+                - text: 2025년 11월 25일·
+                - generic [ref=f60e344]: The DORA AI Capabilities Model report, a companion guide to the 2025 State of AI-assisted Software Development report, serves as a practical guide to the seven capabilities that amplify the benefits of AI.
+          - listitem [ref=f60e345]:
+            - article [ref=f60e346] [cursor=pointer]:
+              - button [ref=f60e348]
+              - generic [ref=f60e353]:
+                - link "dora.dev 도메인 검색" [ref=f60e355]:
+                  - /url: /?q=site%3Adora.dev%202025%20AI%20software%20development%20report%20official
+                - generic [ref=f60e358]:
+                  - paragraph [ref=f60e359]: DORA
+                  - link "https://dora.dev › research › 2025 › 2025-DORA-Report-Infographic.pdf" [ref=f60e360]:
+                    - /url: https://dora.dev/research/2025/2025-DORA-Report-Infographic.pdf
+                    - paragraph [ref=f60e362]:
+                      - generic [ref=f60e363]: https://dora.dev
+                      - generic [ref=f60e364]: › research › 2025 › 2025-DORA-Report-Infographic.pdf
+              - heading [level=2] [ref=f60e366]:
+                - link "PDF 2025 DORA Inforgraphic-Final-23" [ref=f60e367]:
+                  - /url: https://dora.dev/research/2025/2025-DORA-Report-Infographic.pdf
+                  - generic [ref=f60e368]:
+                    - generic [ref=f60e369]: PDF
+                    - text: 2025 DORA Inforgraphic-Final-23
+              - generic [ref=f60e370]: DORA Google Cloud 2025 Al's primary role in software development is that of an amplifier as ecome vi 01. Adoption 90%
+          - listitem [ref=f60e375]:
+            - article [ref=f60e376] [cursor=pointer]:
+              - button [ref=f60e378]
+              - generic [ref=f60e383]:
+                - link "dora.dev 도메인 검색" [ref=f60e385]:
+                  - /url: /?q=site%3Adora.dev%202025%20AI%20software%20development%20report%20official
+                - generic [ref=f60e388]:
+                  - paragraph [ref=f60e389]: DORA
+                  - link "https://dora.dev › insights › balancing-ai-tensions" [ref=f60e390]:
+                    - /url: https://dora.dev/insights/balancing-ai-tensions/
+                    - paragraph [ref=f60e392]:
+                      - generic [ref=f60e393]: https://dora.dev
+                      - generic [ref=f60e394]: › insights › balancing-ai-tensions
+              - heading [level=2] [ref=f60e396]:
+                - 'link "Balancing AI tensions: Moving from AI adoption to effective SDLC use" [ref=f60e397]':
+                  - /url: https://dora.dev/insights/balancing-ai-tensions/
+              - generic [ref=f60e402]:
+                - text: 2026년 3월 10일·
+                - generic [ref=f60e403]: The 2025 DORA State of AI-assisted Software Development report found that 90% of technology professionals now use AI at work, and over 80% believe it has increased their productivity. Extensive qualitative analysis of enterprise software engineers reveals that AI's impact on the SDLC is not a simple linear improvement.
+          - listitem [ref=f60e404]:
+            - generic [ref=f60e406]:
+              - paragraph [ref=f60e407]: site:dora.dev 2025 AI software development report official 관련 검색
+              - generic [ref=f60e408]:
+                - list [ref=f60e409]:
+                  - listitem [ref=f60e410]:
+                    - link "2025 ai index report pdf" [ref=f60e411] [cursor=pointer]:
+                      - /url: "?q=2025%20ai%20index%20report%20pdf&origin=related"
+                  - listitem [ref=f60e414]:
+                    - link "global artificial intelligence report 2025" [ref=f60e415] [cursor=pointer]:
+                      - /url: "?q=global%20artificial%20intelligence%20report%202025&origin=related"
+                  - listitem [ref=f60e418]:
+                    - link "stanford artificial intelligence report 2025" [ref=f60e419] [cursor=pointer]:
+                      - /url: "?q=stanford%20artificial%20intelligence%20report%202025&origin=related"
+                  - listitem [ref=f60e422]:
+                    - link "artificial intelligence 2025 chart" [ref=f60e423] [cursor=pointer]:
+                      - /url: "?q=artificial%20intelligence%202025%20chart&origin=related"
+                  - listitem [ref=f60e426]:
+                    - link "global ai adoption index 2025" [ref=f60e427] [cursor=pointer]:
+                      - /url: "?q=global%20ai%20adoption%20index%202025&origin=related"
+                - list [ref=f60e430]:
+                  - listitem [ref=f60e431]:
+                    - link "ai current status" [ref=f60e432] [cursor=pointer]:
+                      - /url: "?q=ai%20current%20status&origin=related"
+                  - listitem [ref=f60e435]:
+                    - link "the global ai index 2025" [ref=f60e436] [cursor=pointer]:
+                      - /url: "?q=the%20global%20ai%20index%202025&origin=related"
+                  - listitem [ref=f60e439]:
+                    - link "mckinsey report on ai 2025" [ref=f60e440] [cursor=pointer]:
+                      - /url: "?q=mckinsey%20report%20on%20ai%202025&origin=related"
+                  - listitem [ref=f60e443]:
+                    - link "mckinsey 2025 report" [ref=f60e444] [cursor=pointer]:
+                      - /url: "?q=mckinsey%202025%20report&origin=related"
+                  - listitem [ref=f60e447]:
+                    - link "ai facts 2025" [ref=f60e448] [cursor=pointer]:
+                      - /url: "?q=ai%20facts%202025&origin=related"
+        - button "검색 결과 더 보기" [ref=f60e453] [cursor=pointer]
+    - list [ref=f60e456]:
+      - button "메뉴 닫기" [ref=f60e457] [cursor=pointer]
+      - list [ref=f60e461]:
+        - listitem [ref=f60e462]: 검색
+        - listitem [ref=f60e463]:
+          - link "홈페이지" [ref=f60e464] [cursor=pointer]:
+            - /url: https://start.duckduckgo.com/
+        - listitem [ref=f60e465]:
+          - link "테마" [ref=f60e466] [cursor=pointer]:
+            - /url: /settings#appearance
+        - listitem [ref=f60e467]:
+          - link "설정" [ref=f60e468] [cursor=pointer]:
+            - /url: /settings
+      - list [ref=f60e469]:
+        - listitem [ref=f60e470]: 피드백 공유
+        - listitem [ref=f60e471]:
+          - generic [ref=f60e474]:
+            - button "Positive feedback" [ref=f60e475] [cursor=pointer]
+            - button "Negative feedback" [ref=f60e479] [cursor=pointer]
+      - list [ref=f60e483]:
+        - listitem [ref=f60e484]: 다운로드
+        - listitem [ref=f60e485]:
+          - link "iOS 브라우저" [ref=f60e486] [cursor=pointer]:
+            - /url: https://apps.apple.com/app/duckduckgo-private-browser/id663592361?platform=iphone&pt=866401&mt=8&ct=serp-atb-serp
+        - listitem [ref=f60e487]:
+          - link "Android 브라우저" [ref=f60e488] [cursor=pointer]:
+            - /url: https://play.google.com/store/apps/details?id=com.duckduckgo.mobile.android&referrer=utm_campaign%3Dserp-atb-serp%26origin%3Dfunnel_playstore_searchresults
+        - listitem [ref=f60e489]:
+          - link "Mac 브라우저" [ref=f60e490] [cursor=pointer]:
+            - /url: /mac?origin=funnel_browser_searchresults
+        - listitem [ref=f60e491]:
+          - link "Windows 브라우저" [ref=f60e492] [cursor=pointer]:
+            - /url: /windows?origin=funnel_browser_searchresults
+        - listitem [ref=f60e493]: 브라우저 확장 프로그램
+      - list [ref=f60e494]:
+        - listitem [ref=f60e495]: DuckDuckGo 더 알아보기
+        - listitem [ref=f60e496]:
+          - generic [ref=f60e499]:
+            - button "프로모션 무시하기" [ref=f60e500] [cursor=pointer]
+            - generic [ref=f60e503]:
+              - paragraph [ref=f60e505]: 비공개 브라우저로 업그레이드하세요
+              - paragraph [ref=f60e517]: 빠르게. 안전하게. 무료로.
+            - link "Mac 브라우저 설치" [ref=f60e518] [cursor=pointer]:
+              - /url: /mac
+        - listitem [ref=f60e521]:
+          - link "Duck.ai" [ref=f60e522] [cursor=pointer]:
+            - /url: https://duck.ai
+        - listitem [ref=f60e523]:
+          - link "이메일 보호" [ref=f60e524] [cursor=pointer]:
+            - /url: /email
+        - listitem [ref=f60e525]:
+          - link "뉴스레터" [ref=f60e526] [cursor=pointer]:
+            - /url: /newsletter
+        - listitem [ref=f60e527]:
+          - link "블로그" [ref=f60e528] [cursor=pointer]:
+            - /url: /blog
+        - listitem [ref=f60e529]:
+          - link "팟캐스트" [ref=f60e530] [cursor=pointer]:
+            - /url: https://insideduckduckgo.substack.com/?showWelcome=true
+        - listitem [ref=f60e531]:
+          - link "협업" [ref=f60e532] [cursor=pointer]:
+            - /url: /collaborations
+      - list [ref=f60e533]:
+        - listitem [ref=f60e534]: 더 알아보기
+        - listitem [ref=f60e535]:
+          - link "업데이트 소식" [ref=f60e536] [cursor=pointer]:
+            - /url: /updates
+        - listitem [ref=f60e537]:
+          - link "개인정보 보호 비교" [ref=f60e538] [cursor=pointer]:
+            - /url: /compare-privacy
+        - listitem [ref=f60e539]:
+          - link "브라우저 정보" [ref=f60e540] [cursor=pointer]:
+            - /url: /app
+        - listitem [ref=f60e541]:
+          - link "DuckDuckGo 소개" [ref=f60e542] [cursor=pointer]:
+            - /url: /about
+      - list [ref=f60e543]:
+        - listitem [ref=f60e544]: 기타 자료
+        - listitem [ref=f60e545]:
+          - link "도움말" [ref=f60e546] [cursor=pointer]:
+            - /url: /duckduckgo-help-pages
+        - listitem [ref=f60e547]:
+          - link "커뮤니티" [ref=f60e548] [cursor=pointer]:
+            - /url: https://www.reddit.com/r/duckduckgo/
+        - listitem [ref=f60e549]:
+          - link "채용 정보" [ref=f60e550] [cursor=pointer]:
+            - /url: /careers
+        - listitem [ref=f60e551]:
+          - link "개인정보 보호정책" [ref=f60e552] [cursor=pointer]:
+            - /url: /privacy
+        - listitem [ref=f60e553]:
+          - link "서비스 약관" [ref=f60e554] [cursor=pointer]:
+            - /url: /terms
+        - listitem [ref=f60e555]:
+          - link "보도 자료" [ref=f60e556] [cursor=pointer]:
+            - /url: /press
+        - listitem [ref=f60e557]:
+          - link "검색 광고" [ref=f60e558] [cursor=pointer]:
+            - /url: /duckduckgo-help-pages/company/advertise-on-duckduckgo-search
+  - generic [ref=f60e562]:
+    - generic [ref=f60e564]:
+      - generic [ref=f60e575]:
+        - heading "DuckDuckGo 협업 소개" [level=3] [ref=f60e576]
+        - paragraph [ref=f60e577]: 개인 정보 보호를 덕히 중요하게 생각하는 사람들을 위해 전문성을 다해 만들었습니다.
+      - link "자세히 보기" [ref=f60e578] [cursor=pointer]:
+        - /url: https://duckduckgo.com/collaborations
+    - generic [ref=f60e580]:
+      - generic [ref=f60e581]:
+        - heading "더 알아보기" [level=3] [ref=f60e582]
+        - list [ref=f60e583]:
+          - listitem [ref=f60e584]:
+            - link "업데이트 소식" [ref=f60e585] [cursor=pointer]:
+              - /url: https://duckduckgo.com/updates
+          - listitem [ref=f60e586]:
+            - link "브라우저 정보" [ref=f60e587] [cursor=pointer]:
+              - /url: https://duckduckgo.com/app
+          - listitem [ref=f60e588]:
+            - link "개인정보 보호 비교" [ref=f60e589] [cursor=pointer]:
+              - /url: https://duckduckgo.com/compare-privacy
+          - listitem [ref=f60e590]:
+            - link "도움말 페이지" [ref=f60e591] [cursor=pointer]:
+              - /url: https://duckduckgo.com/duckduckgo-help-pages/
+      - generic [ref=f60e592]:
+        - heading "더 알아보기" [level=3] [ref=f60e593]
+        - list [ref=f60e594]:
+          - listitem [ref=f60e595]:
+            - link "이메일 보호" [ref=f60e596] [cursor=pointer]:
+              - /url: https://duckduckgo.com/email
+          - listitem [ref=f60e597]:
+            - generic [ref=f60e598]:
+              - link "팟캐스트" [ref=f60e600] [cursor=pointer]:
+                - /url: https://insideduckduckgo.substack.com/?showWelcome=true
+              - generic [ref=f60e601]:
+                - text: "&"
+                - link "뉴스레터" [ref=f60e602] [cursor=pointer]:
+                  - /url: https://duckduckgo.com/newsletter
+          - listitem [ref=f60e603]:
+            - link "협업" [ref=f60e604] [cursor=pointer]:
+              - /url: https://duckduckgo.com/collaborations
+  - button "피드백 공유" [ref=f60e609] [cursor=pointer]
+  - generic [ref=f60e610]:
+    - generic [ref=f60e612]:
+      - banner [ref=f60e613]:
+        - paragraph [ref=f60e615]: DuckDuckGo 브라우저로 업그레이드하세요.
+      - generic [ref=f60e616]:
+        - paragraph [ref=f60e622]:
+          - generic [ref=f60e623]:
+            - strong [ref=f60e624]: DuckDuckGo
+            - text: 브라우저를 사용해 보세요. 빠른 검색. 무료 제공. 개인 정보 보호.
+        - link "브라우저 다운로드" [ref=f60e625] [cursor=pointer]:
+          - /url: https://duckduckgo.com/mac?origin=funnel_browser_searchresults__popover
+      - paragraph [ref=f60e631]:
+        - generic [ref=f60e632]: 무료
+    - button [ref=f60e634] [cursor=pointer]

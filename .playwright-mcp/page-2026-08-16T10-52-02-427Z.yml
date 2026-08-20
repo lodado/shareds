@@ -1,0 +1,441 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - link "DuckDuckGo home" [ref=e7] [cursor=pointer]:
+            - /url: /
+            - generic [ref=e8]: DuckDuckGo
+          - generic [ref=e15]:
+            - combobox "개인 정보 노출 없이 검색" [ref=e17]: official AI hackathon winners judging criteria frontend 2025
+            - button "search" [ref=e19] [cursor=pointer]
+        - button "메뉴 열기" [ref=e23] [cursor=pointer]
+      - navigation [ref=e31]:
+        - list [ref=e32]:
+          - listitem [ref=e33]:
+            - link "모두" [ref=e34] [cursor=pointer]:
+              - /url: /?q=official+AI+hackathon+winners+judging+criteria+frontend+2025&ia=web
+          - listitem [ref=e37]:
+            - link "이미지" [ref=e38] [cursor=pointer]:
+              - /url: /?q=official+AI+hackathon+winners+judging+criteria+frontend+2025&ia=images&iax=images
+          - listitem [ref=e39]:
+            - link "동영상" [ref=e40] [cursor=pointer]:
+              - /url: /?q=official+AI+hackathon+winners+judging+criteria+frontend+2025&ia=videos&iax=videos
+          - listitem [ref=e41]:
+            - link "뉴스" [ref=e42] [cursor=pointer]:
+              - /url: /?q=official+AI+hackathon+winners+judging+criteria+frontend+2025&ia=news&iar=news
+          - listitem [ref=e43]:
+            - link "지도" [ref=e44] [cursor=pointer]:
+              - /url: /?q=official+AI+hackathon+winners+judging+criteria+frontend+2025&iaxm=maps
+        - list [ref=e45]:
+          - listitem [ref=e46]:
+            - link "Search Assist" [ref=e49] [cursor=pointer]:
+              - /url: /?q=official+AI+hackathon+winners+judging+criteria+frontend+2025&ia=web&assist=true
+          - listitem [ref=e54]:
+            - link "Duck.ai" [ref=e56] [cursor=pointer]:
+              - /url: /?q=official+AI+hackathon+winners+judging+criteria+frontend+2025&ia=chat
+          - listitem [ref=e60]:
+            - button "검색 설정 ✀" [ref=e62] [cursor=pointer]:
+              - generic [ref=e65]: 검색 설정
+              - generic [ref=e66]: ✀
+    - generic [ref=e73]:
+      - navigation [ref=e75]:
+        - generic [ref=e78] [cursor=pointer]:
+          - generic [ref=e79]: 보호됨
+          - img [ref=e87]: ▼
+        - generic [ref=e91] [cursor=pointer]:
+          - generic [ref=e94]:
+            - switch "✓" [ref=e95]
+            - generic [ref=e97]: 대한민국
+          - img [ref=e98]: ▼
+        - generic [ref=e102] [cursor=pointer]:
+          - generic [ref=e103]: "안전 검색: 보통"
+          - img [ref=e104]: ▼
+        - generic [ref=e108] [cursor=pointer]:
+          - generic [ref=e109]: 모든 날짜
+          - img [ref=e110]: ▼
+      - generic [ref=e113]:
+        - list [ref=e114]:
+          - listitem [ref=e115]:
+            - article [ref=e116] [cursor=pointer]:
+              - button [ref=e118]
+              - generic [ref=e123]:
+                - link "microsoft.github.io 도메인 검색" [ref=e125]:
+                  - /url: /?q=official%20AI%20hackathon%20winners%20judging%20criteria%20frontend%202025+site:microsoft.github.io
+                - generic [ref=e128]:
+                  - paragraph [ref=e129]: microsoft.github.io
+                  - link "https://microsoft.github.io › AI_Agents_Hackathon › winners" [ref=e130]:
+                    - /url: https://microsoft.github.io/AI_Agents_Hackathon/winners/
+                    - paragraph [ref=e132]:
+                      - generic [ref=e133]: https://microsoft.github.io
+                      - generic [ref=e134]: › AI_Agents_Hackathon › winners
+              - heading [level=2] [ref=e136]:
+                - link "Winners - AI Agents Hackathon 2025 - microsoft.github.io" [ref=e137]:
+                  - /url: https://microsoft.github.io/AI_Agents_Hackathon/winners/
+              - generic [ref=e139]: Conclusion The AI Agents Hackathon 2025 demonstrated the incredible passion of developers to build the future of AI agents. The winners and honourable mentions solved real problems making research easier, supply chains safer, onboarding smoother, health more personalized, AI more trustworthy, and much more.
+          - listitem [ref=e144]:
+            - article [ref=e145] [cursor=pointer]:
+              - button [ref=e147]
+              - generic [ref=e152]:
+                - link "raise.mit.edu 도메인 검색" [ref=e154]:
+                  - /url: /?q=official%20AI%20hackathon%20winners%20judging%20criteria%20frontend%202025+site:raise.mit.edu
+                - generic [ref=e157]:
+                  - paragraph [ref=e158]: raise.mit.edu
+                  - link "https://raise.mit.edu › news › app-inventor-foundation-announces-winners-of-2025-global-ai-hackathon" [ref=e159]:
+                    - /url: https://raise.mit.edu/news/app-inventor-foundation-announces-winners-of-2025-global-ai-hackathon/
+                    - paragraph [ref=e161]:
+                      - generic [ref=e162]: https://raise.mit.edu
+                      - generic [ref=e163]: › news › app-inventor-foundation-announces-winners-of-2025-global-ai-hackathon
+              - heading [level=2] [ref=e165]:
+                - link "App Inventor Foundation announces winners of 2025 Global AI Hackathon" [ref=e166]:
+                  - /url: https://raise.mit.edu/news/app-inventor-foundation-announces-winners-of-2025-global-ai-hackathon/
+              - generic [ref=e171]:
+                - text: 2025년 5월 19일·
+                - generic [ref=e172]: "The three winners — out of over 1,300 participants selected by over 50 judges — tackled remote health rehabilitation services, physical therapy technique, and waste recycling: The six-week event, which ran from March 3 to April 14, 2025, saw a record level of participation—1,313 individuals registered for the hackathon, marking a 42% increase from the inaugural competition in 2024 ..."
+          - listitem [ref=e173]:
+            - article [ref=e174] [cursor=pointer]:
+              - button [ref=e176]
+              - generic [ref=e181]:
+                - link "community.appinventor.mit.edu 도메인 검색" [ref=e183]:
+                  - /url: /?q=official%20AI%20hackathon%20winners%20judging%20criteria%20frontend%202025+site:community.appinventor.mit.edu
+                - generic [ref=e186]:
+                  - paragraph [ref=e187]: MIT App Inventor Community
+                  - link "https://community.appinventor.mit.edu › t › announcing-the-2025-global-ai-hackathon-winners › 148143" [ref=e188]:
+                    - /url: https://community.appinventor.mit.edu/t/announcing-the-2025-global-ai-hackathon-winners/148143
+                    - paragraph [ref=e190]:
+                      - generic [ref=e191]: https://community.appinventor.mit.edu
+                      - generic [ref=e192]: › t › announcing-the-2025-global-ai-hackathon-winners › 148143
+              - heading [level=2] [ref=e194]:
+                - link "Announcing the 2025 Global AI Hackathon Winners!" [ref=e195]:
+                  - /url: https://community.appinventor.mit.edu/t/announcing-the-2025-global-ai-hackathon-winners/148143
+              - generic [ref=e200]:
+                - text: 2025년 5월 16일·
+                - generic [ref=e201]: We're thrilled to share the results of our second annual Global AI Hackathon, which brought together 1,313 participants from 86 countries and regions to develop AI-powered mobile apps inspired by the UN SDGs (Sustainable Development Goals). Over the six-week competition, participants—who ranged from 5 to 77 years old—created impressive projects spanning all seventeen UN SDGs, with ...
+          - listitem [ref=e202]:
+            - article [ref=e203] [cursor=pointer]:
+              - button [ref=e205]
+              - generic [ref=e210]:
+                - link "computer.org 도메인 검색" [ref=e212]:
+                  - /url: /?q=official%20AI%20hackathon%20winners%20judging%20criteria%20frontend%202025+site:www.computer.org
+                - generic [ref=e215]:
+                  - paragraph [ref=e216]: IEEE Computer Society
+                  - link "https://www.computer.org › publications › tech-news › insider-membership-news › ieee-ocai-2025-hackathon" [ref=e217]:
+                    - /url: https://www.computer.org/publications/tech-news/insider-membership-news/ieee-ocai-2025-hackathon
+                    - paragraph [ref=e219]:
+                      - generic [ref=e220]: https://www.computer.org
+                      - generic [ref=e221]: › publications › tech-news › insider-membership-news › ieee-ocai-2025-hackathon
+              - heading [level=2] [ref=e223]:
+                - link "IEEE O.C A.I \" DEVHACK\" Hackathon 2025 Winner Celebration" [ref=e224]:
+                  - /url: https://www.computer.org/publications/tech-news/insider-membership-news/ieee-ocai-2025-hackathon
+              - generic [ref=e229]:
+                - text: 2025년 11월 3일·
+                - generic [ref=e230]: Designing Practical AI Agents — delivered by Pradyumna Amasebail Kodgi, focusing on applying design patterns for real-world adoption of AI-driven agents. Submissions were evaluated based on originality, impact, and adherence to hackathon guidelines, with all eligible participants receiving recognition certificates. Winners
+          - listitem [ref=e231]:
+            - article [ref=e232] [cursor=pointer]:
+              - button [ref=e234]
+              - generic [ref=e239]:
+                - link "raise.mit.edu 도메인 검색" [ref=e241]:
+                  - /url: /?q=official%20AI%20hackathon%20winners%20judging%20criteria%20frontend%202025+site:raise.mit.edu
+                - generic [ref=e244]:
+                  - paragraph [ref=e245]: raise.mit.edu
+                  - link "https://raise.mit.edu › events › global-ai-hackathon-2025" [ref=e246]:
+                    - /url: https://raise.mit.edu/events/global-ai-hackathon-2025/
+                    - paragraph [ref=e248]:
+                      - generic [ref=e249]: https://raise.mit.edu
+                      - generic [ref=e250]: › events › global-ai-hackathon-2025
+              - heading [level=2] [ref=e252]:
+                - link "Global AI Hackathon 2025 | MIT RAISE" [ref=e253]:
+                  - /url: https://raise.mit.edu/events/global-ai-hackathon-2025/
+              - generic [ref=e258]:
+                - text: 2025년 4월 14일·
+                - generic [ref=e259]: However, please do not re-submit apps that were previously submitted to any official App Inventor competition, such as a prior Global AI Hackathon, Regional Appathon, Summer Appathon, App of the Season, or App of the Month. The 2025 Global AI Hackathon has now ended. Learn more about the winners and honorable mentions below.
+          - listitem [ref=e260]:
+            - article [ref=e261] [cursor=pointer]:
+              - button [ref=e263]
+              - generic [ref=e268]:
+                - link "github.com 도메인 검색" [ref=e270]:
+                  - /url: /?q=official%20AI%20hackathon%20winners%20judging%20criteria%20frontend%202025+site:github.com
+                - generic [ref=e273]:
+                  - paragraph [ref=e274]: Github
+                  - link "https://github.com › AI-Hackathon-Winners › FrontEnd" [ref=e275]:
+                    - /url: https://github.com/AI-Hackathon-Winners/FrontEnd
+                    - paragraph [ref=e277]:
+                      - generic [ref=e278]: https://github.com
+                      - generic [ref=e279]: › AI-Hackathon-Winners › FrontEnd
+              - heading [level=2] [ref=e281]:
+                - link "GitHub - AI-Hackathon-Winners/FrontEnd" [ref=e282]:
+                  - /url: https://github.com/AI-Hackathon-Winners/FrontEnd
+              - generic [ref=e284]: Contribute to AI-Hackathon-Winners/FrontEnd development by creating an account on GitHub.
+          - listitem [ref=e289]:
+            - article [ref=e290] [cursor=pointer]:
+              - button [ref=e292]
+              - generic [ref=e297]:
+                - link "microsoft.github.io 도메인 검색" [ref=e299]:
+                  - /url: /?q=official%20AI%20hackathon%20winners%20judging%20criteria%20frontend%202025+site:microsoft.github.io
+                - generic [ref=e302]:
+                  - paragraph [ref=e303]: microsoft.github.io
+                  - link "https://microsoft.github.io › AI_Agents_Hackathon › rules" [ref=e304]:
+                    - /url: https://microsoft.github.io/AI_Agents_Hackathon/rules/
+                    - paragraph [ref=e306]:
+                      - generic [ref=e307]: https://microsoft.github.io
+                      - generic [ref=e308]: › AI_Agents_Hackathon › rules
+              - heading [level=2] [ref=e310]:
+                - link "Rules - AI Agents Hackathon 2025" [ref=e311]:
+                  - /url: https://microsoft.github.io/AI_Agents_Hackathon/rules/
+              - generic [ref=e313]: Are AI technologies central to the functionality or just a minor addition? Winners will be selected within fourteen (14) days following the Entry Period from among all eligible entries received. In the event of a tie between any eligible entries, an additional judge will break the tie based on the judging criteria described above.
+          - listitem [ref=e318]:
+            - article [ref=e319] [cursor=pointer]:
+              - button [ref=e321]
+              - generic [ref=e326]:
+                - link "competopia.ai 도메인 검색" [ref=e328]:
+                  - /url: /?q=official%20AI%20hackathon%20winners%20judging%20criteria%20frontend%202025+site:competopia.ai
+                - generic [ref=e331]:
+                  - paragraph [ref=e332]: competopia.ai
+                  - link "https://competopia.ai › news › winners-of-2025-global-ai-hackathon-to-present-innovations-at-mit-ai-education-summit" [ref=e333]:
+                    - /url: https://competopia.ai/news/winners-of-2025-global-ai-hackathon-to-present-innovations-at-mit-ai-education-summit/
+                    - paragraph [ref=e335]:
+                      - generic [ref=e336]: https://competopia.ai
+                      - generic [ref=e337]: › news › winners-of-2025-global-ai-hackathon-to-present-innovations-at-mit-ai-education-summit
+              - heading [level=2] [ref=e339]:
+                - link "Winners of 2025 Global AI Hackathon to Present Innovations at MIT AI ..." [ref=e340]:
+                  - /url: https://competopia.ai/news/winners-of-2025-global-ai-hackathon-to-present-innovations-at-mit-ai-education-summit/
+              - generic [ref=e345]:
+                - text: 2026년 6월 7일·
+                - generic [ref=e346]: The 2025 Global AI Hackathon, through the efforts of MIT RAISE and the App Inventor Foundation, continues its mission to inspire and empower a new generation of AI developers dedicated to making a tangible difference in the world.
+          - listitem [ref=e347]:
+            - article [ref=e348] [cursor=pointer]:
+              - button [ref=e350]
+              - generic [ref=e355]:
+                - link "linkedin.com 도메인 검색" [ref=e357]:
+                  - /url: /?q=official%20AI%20hackathon%20winners%20judging%20criteria%20frontend%202025+site:www.linkedin.com
+                - generic [ref=e360]:
+                  - paragraph [ref=e361]: LinkedIn
+                  - link "https://www.linkedin.com › posts › appinventorfoundation_2025-global-ai-hackathon-presentations-activity-7356460738493739008-U05X" [ref=e362]:
+                    - /url: https://www.linkedin.com/posts/appinventorfoundation_2025-global-ai-hackathon-presentations-activity-7356460738493739008-U05X
+                    - paragraph [ref=e364]:
+                      - generic [ref=e365]: https://www.linkedin.com
+                      - generic [ref=e366]: › posts › appinventorfoundation_2025-global-ai-hackathon-presentations-activity-7356460738493739008-U05X
+              - heading [level=2] [ref=e368]:
+                - link "2025 Global AI Hackathon Presentations | App Inventor Foundation - LinkedIn" [ref=e369]:
+                  - /url: https://www.linkedin.com/posts/appinventorfoundation_2025-global-ai-hackathon-presentations-activity-7356460738493739008-U05X
+              - generic [ref=e371]: Among others, winners developed projects to help with physical therapy, address kidney disease, improve road safety for pedestrians -- all part of a hackathon that received over 1,300 entries from ...
+          - listitem [ref=e376]:
+            - article [ref=e377] [cursor=pointer]:
+              - button [ref=e379]
+              - generic [ref=e384]:
+                - link "github.com 도메인 검색" [ref=e386]:
+                  - /url: /?q=official%20AI%20hackathon%20winners%20judging%20criteria%20frontend%202025+site:github.com
+                - generic [ref=e389]:
+                  - paragraph [ref=e390]: Github
+                  - link "https://github.com › microsoft › AI_Agents_Hackathon › discussions › 73" [ref=e391]:
+                    - /url: https://github.com/microsoft/AI_Agents_Hackathon/discussions/73
+                    - paragraph [ref=e393]:
+                      - generic [ref=e394]: https://github.com
+                      - generic [ref=e395]: › microsoft › AI_Agents_Hackathon › discussions › 73
+              - heading [level=2] [ref=e397]:
+                - link "Criteria for judging · microsoft AI_Agents_Hackathon - GitHub" [ref=e398]:
+                  - /url: https://github.com/microsoft/AI_Agents_Hackathon/discussions/73
+              - generic [ref=e403]:
+                - text: 2025년 4월 8일·
+                - generic [ref=e404]: "Criteria for judging Where can we find judging criteria and prompt for the hacks? Something that would state some technical requirements, like: Using RAG (1 to 10points) Using Multi-agent (1-20 points) Human in the Loop (1-20 points) Using Event Driven Architecture (1-50points) Production Ready (1-50 points) Scalability (1-50 points) Responsible AI (1-50 points) Deployed to on the web (100 ..."
+          - listitem [ref=e405]:
+            - generic [ref=e413]:
+              - generic [ref=e414]:
+                - generic [ref=e416]:
+                  - strong [ref=e417]: official AI hackathon winners judging criteria frontend 2025
+                  - text: 에 대한 답변 생성
+                - generic [ref=e418]:
+                  - button "Learn More About Assist" [ref=e419] [cursor=pointer]
+                  - button "Assist 설정" [ref=e423] [cursor=pointer]
+              - button "Assist" [ref=e426] [cursor=pointer]: Search Assist
+          - listitem [ref=e430]:
+            - generic [ref=e432]:
+              - paragraph [ref=e433]: official AI hackathon winners judging criteria frontend 2025 관련 검색
+              - generic [ref=e434]:
+                - list [ref=e435]:
+                  - listitem [ref=e436]:
+                    - link "ai hackathon 2025 upcoming" [ref=e437] [cursor=pointer]:
+                      - /url: "?q=ai%20hackathon%202025%20upcoming&origin=related"
+                  - listitem [ref=e440]:
+                    - link "global hackathon 2025" [ref=e441] [cursor=pointer]:
+                      - /url: "?q=global%20hackathon%202025&origin=related"
+                  - listitem [ref=e444]:
+                    - link "2025 global ai hackathon" [ref=e445] [cursor=pointer]:
+                      - /url: "?q=2025%20global%20ai%20hackathon&origin=related"
+                  - listitem [ref=e448]:
+                    - link "upcoming microsoft hackathon 2025" [ref=e449] [cursor=pointer]:
+                      - /url: "?q=upcoming%20microsoft%20hackathon%202025&origin=related"
+                  - listitem [ref=e452]:
+                    - link "simplify ai tools hackathon 2025" [ref=e453] [cursor=pointer]:
+                      - /url: "?q=simplify%20ai%20tools%20hackathon%202025&origin=related"
+                - list [ref=e456]:
+                  - listitem [ref=e457]:
+                    - link "online hackathon 2025" [ref=e458] [cursor=pointer]:
+                      - /url: "?q=online%20hackathon%202025&origin=related"
+                  - listitem [ref=e461]:
+                    - link "best ai for hackathon" [ref=e462] [cursor=pointer]:
+                      - /url: "?q=best%20ai%20for%20hackathon&origin=related"
+                  - listitem [ref=e465]:
+                    - link "mega ai hackathon 2025" [ref=e466] [cursor=pointer]:
+                      - /url: "?q=mega%20ai%20hackathon%202025&origin=related"
+                  - listitem [ref=e469]:
+                    - link "hackathon 2025 mit" [ref=e470] [cursor=pointer]:
+                      - /url: "?q=hackathon%202025%20mit&origin=related"
+                  - listitem [ref=e473]:
+                    - link "hackathon2025" [ref=e474] [cursor=pointer]:
+                      - /url: "?q=hackathon2025&origin=related"
+        - button "검색 결과 더 보기" [ref=e479] [cursor=pointer]
+    - list [ref=e482]:
+      - button "메뉴 닫기" [ref=e483] [cursor=pointer]
+      - list [ref=e487]:
+        - listitem [ref=e488]: 검색
+        - listitem [ref=e489]:
+          - link "홈페이지" [ref=e490] [cursor=pointer]:
+            - /url: https://start.duckduckgo.com/
+        - listitem [ref=e491]:
+          - link "테마" [ref=e492] [cursor=pointer]:
+            - /url: /settings#appearance
+        - listitem [ref=e493]:
+          - link "설정" [ref=e494] [cursor=pointer]:
+            - /url: /settings
+      - list [ref=e495]:
+        - listitem [ref=e496]: 피드백 공유
+        - listitem [ref=e497]:
+          - generic [ref=e500]:
+            - button "Positive feedback" [ref=e501] [cursor=pointer]
+            - button "Negative feedback" [ref=e505] [cursor=pointer]
+      - list [ref=e509]:
+        - listitem [ref=e510]: 다운로드
+        - listitem [ref=e511]:
+          - link "iOS 브라우저" [ref=e512] [cursor=pointer]:
+            - /url: https://apps.apple.com/app/duckduckgo-private-browser/id663592361?platform=iphone&pt=866401&mt=8&ct=serp-atb-serp
+        - listitem [ref=e513]:
+          - link "Android 브라우저" [ref=e514] [cursor=pointer]:
+            - /url: https://play.google.com/store/apps/details?id=com.duckduckgo.mobile.android&referrer=utm_campaign%3Dserp-atb-serp%26origin%3Dfunnel_playstore_searchresults
+        - listitem [ref=e515]:
+          - link "Mac 브라우저" [ref=e516] [cursor=pointer]:
+            - /url: /mac?origin=funnel_browser_searchresults
+        - listitem [ref=e517]:
+          - link "Windows 브라우저" [ref=e518] [cursor=pointer]:
+            - /url: /windows?origin=funnel_browser_searchresults
+        - listitem [ref=e519]: 브라우저 확장 프로그램
+      - list [ref=e520]:
+        - listitem [ref=e521]: DuckDuckGo 더 알아보기
+        - listitem [ref=e522]:
+          - generic [ref=e525]:
+            - button "프로모션 무시하기" [ref=e526] [cursor=pointer]
+            - generic [ref=e529]:
+              - paragraph [ref=e531]: 비공개 브라우저로 업그레이드하세요
+              - paragraph [ref=e543]: 빠르게. 안전하게. 무료로.
+            - link "Mac 브라우저 설치" [ref=e544] [cursor=pointer]:
+              - /url: /mac
+        - listitem [ref=e547]:
+          - link "Duck.ai" [ref=e548] [cursor=pointer]:
+            - /url: https://duck.ai
+        - listitem [ref=e549]:
+          - link "이메일 보호" [ref=e550] [cursor=pointer]:
+            - /url: /email
+        - listitem [ref=e551]:
+          - link "뉴스레터" [ref=e552] [cursor=pointer]:
+            - /url: /newsletter
+        - listitem [ref=e553]:
+          - link "블로그" [ref=e554] [cursor=pointer]:
+            - /url: /blog
+        - listitem [ref=e555]:
+          - link "팟캐스트" [ref=e556] [cursor=pointer]:
+            - /url: https://insideduckduckgo.substack.com/?showWelcome=true
+        - listitem [ref=e557]:
+          - link "협업" [ref=e558] [cursor=pointer]:
+            - /url: /collaborations
+      - list [ref=e559]:
+        - listitem [ref=e560]: 더 알아보기
+        - listitem [ref=e561]:
+          - link "업데이트 소식" [ref=e562] [cursor=pointer]:
+            - /url: /updates
+        - listitem [ref=e563]:
+          - link "개인정보 보호 비교" [ref=e564] [cursor=pointer]:
+            - /url: /compare-privacy
+        - listitem [ref=e565]:
+          - link "브라우저 정보" [ref=e566] [cursor=pointer]:
+            - /url: /app
+        - listitem [ref=e567]:
+          - link "DuckDuckGo 소개" [ref=e568] [cursor=pointer]:
+            - /url: /about
+      - list [ref=e569]:
+        - listitem [ref=e570]: 기타 자료
+        - listitem [ref=e571]:
+          - link "도움말" [ref=e572] [cursor=pointer]:
+            - /url: /duckduckgo-help-pages
+        - listitem [ref=e573]:
+          - link "커뮤니티" [ref=e574] [cursor=pointer]:
+            - /url: https://www.reddit.com/r/duckduckgo/
+        - listitem [ref=e575]:
+          - link "채용 정보" [ref=e576] [cursor=pointer]:
+            - /url: /careers
+        - listitem [ref=e577]:
+          - link "개인정보 보호정책" [ref=e578] [cursor=pointer]:
+            - /url: /privacy
+        - listitem [ref=e579]:
+          - link "서비스 약관" [ref=e580] [cursor=pointer]:
+            - /url: /terms
+        - listitem [ref=e581]:
+          - link "보도 자료" [ref=e582] [cursor=pointer]:
+            - /url: /press
+        - listitem [ref=e583]:
+          - link "검색 광고" [ref=e584] [cursor=pointer]:
+            - /url: /duckduckgo-help-pages/company/advertise-on-duckduckgo-search
+  - generic [ref=e588]:
+    - generic [ref=e590]:
+      - generic [ref=e601]:
+        - heading "DuckDuckGo 협업 소개" [level=3] [ref=e602]
+        - paragraph [ref=e603]: 개인 정보 보호를 덕히 중요하게 생각하는 사람들을 위해 전문성을 다해 만들었습니다.
+      - link "자세히 보기" [ref=e604] [cursor=pointer]:
+        - /url: https://duckduckgo.com/collaborations
+    - generic [ref=e606]:
+      - generic [ref=e607]:
+        - heading "더 알아보기" [level=3] [ref=e608]
+        - list [ref=e609]:
+          - listitem [ref=e610]:
+            - link "업데이트 소식" [ref=e611] [cursor=pointer]:
+              - /url: https://duckduckgo.com/updates
+          - listitem [ref=e612]:
+            - link "브라우저 정보" [ref=e613] [cursor=pointer]:
+              - /url: https://duckduckgo.com/app
+          - listitem [ref=e614]:
+            - link "개인정보 보호 비교" [ref=e615] [cursor=pointer]:
+              - /url: https://duckduckgo.com/compare-privacy
+          - listitem [ref=e616]:
+            - link "도움말 페이지" [ref=e617] [cursor=pointer]:
+              - /url: https://duckduckgo.com/duckduckgo-help-pages/
+      - generic [ref=e618]:
+        - heading "더 알아보기" [level=3] [ref=e619]
+        - list [ref=e620]:
+          - listitem [ref=e621]:
+            - link "이메일 보호" [ref=e622] [cursor=pointer]:
+              - /url: https://duckduckgo.com/email
+          - listitem [ref=e623]:
+            - generic [ref=e624]:
+              - link "팟캐스트" [ref=e626] [cursor=pointer]:
+                - /url: https://insideduckduckgo.substack.com/?showWelcome=true
+              - generic [ref=e627]:
+                - text: "&"
+                - link "뉴스레터" [ref=e628] [cursor=pointer]:
+                  - /url: https://duckduckgo.com/newsletter
+          - listitem [ref=e629]:
+            - link "협업" [ref=e630] [cursor=pointer]:
+              - /url: https://duckduckgo.com/collaborations
+  - button "피드백 공유" [ref=e635] [cursor=pointer]
+  - generic [ref=e636]:
+    - generic [ref=e638]:
+      - banner [ref=e639]:
+        - paragraph [ref=e641]: DuckDuckGo 브라우저로 업그레이드하세요.
+      - generic [ref=e642]:
+        - paragraph [ref=e648]:
+          - generic [ref=e649]:
+            - strong [ref=e650]: DuckDuckGo
+            - text: 브라우저를 사용해 보세요. 빠른 검색. 무료 제공. 개인 정보 보호.
+        - link "브라우저 다운로드" [ref=e651] [cursor=pointer]:
+          - /url: https://duckduckgo.com/mac?origin=funnel_browser_searchresults__popover
+      - paragraph [ref=e657]:
+        - generic [ref=e658]: 무료
+    - button [ref=e660] [cursor=pointer]

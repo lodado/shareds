@@ -1,0 +1,1323 @@
+- generic [active] [ref=f57e1]:
+  - generic [ref=f57e2]:
+    - generic [ref=f57e3]:
+      - link "Skip to content" [ref=f57e4] [cursor=pointer]:
+        - /url: "#start-of-content"
+      - banner [ref=f57e9]:
+        - heading "Navigation Menu" [level=2] [ref=f57e10]
+        - generic [ref=f57e11]:
+          - link "Homepage" [ref=f57e13] [cursor=pointer]:
+            - /url: /
+          - generic [ref=f57e16]:
+            - navigation "Global" [ref=f57e17]:
+              - list [ref=f57e18]:
+                - listitem [ref=f57e19]:
+                  - button "Platform" [ref=f57e21] [cursor=pointer]
+                - listitem [ref=f57e24]:
+                  - button "Solutions" [ref=f57e26] [cursor=pointer]
+                - listitem [ref=f57e29]:
+                  - button "Resources" [ref=f57e31] [cursor=pointer]
+                - listitem [ref=f57e34]:
+                  - button "Open Source" [ref=f57e36] [cursor=pointer]
+                - listitem [ref=f57e39]:
+                  - button "Enterprise" [ref=f57e41] [cursor=pointer]
+                - listitem [ref=f57e44]:
+                  - link "Pricing" [ref=f57e45] [cursor=pointer]:
+                    - /url: https://github.com/pricing
+            - generic [ref=f57e46]:
+              - button "Search or jump to, type / to search" [ref=f57e48] [cursor=pointer]
+              - link "Sign in" [ref=f57e55] [cursor=pointer]:
+                - /url: /login?return_to=https%3A%2F%2Fgithub.com%2Fgithub%2Fspec-kit
+              - link "Sign up" [ref=f57e58] [cursor=pointer]:
+                - /url: /signup?ref_cta=Sign+up&ref_loc=header+logged+out&ref_page=%2F%3Cuser-name%3E%2F%3Crepo-name%3E&source=header-repo&source_repo=github%2Fspec-kit
+              - button "Appearance settings" [ref=f57e61] [cursor=pointer]
+    - main [ref=f57e68]:
+      - generic [ref=f57e69]:
+        - generic [ref=f57e70]:
+          - generic [ref=f57e72]:
+            - link "github" [ref=f57e76] [cursor=pointer]:
+              - /url: /github
+            - generic [ref=f57e77]: /
+            - strong [ref=f57e78]:
+              - link "spec-kit" [ref=f57e79] [cursor=pointer]:
+                - /url: /github/spec-kit
+            - generic [ref=f57e80]: Public
+          - generic [ref=f57e81]:
+            - list:
+              - listitem [ref=f57e82]:
+                - link "You must be signed in to change notification settings" [ref=f57e83] [cursor=pointer]:
+                  - /url: /login?return_to=%2Fgithub%2Fspec-kit
+                  - text: Notifications
+              - listitem [ref=f57e86]:
+                - link "Fork 11.6k" [ref=f57e87] [cursor=pointer]:
+                  - /url: /login?return_to=%2Fgithub%2Fspec-kit
+                  - text: Fork
+                  - generic "11,570" [ref=f57e90]: 11.6k
+              - listitem [ref=f57e91]:
+                - link "You must be signed in to star a repository" [ref=f57e93] [cursor=pointer]:
+                  - /url: /login?return_to=%2Fgithub%2Fspec-kit
+                  - text: Star
+                  - generic "129378 users starred this repository" [ref=f57e96]: 129k
+        - navigation "Repository" [ref=f57e97]:
+          - list [ref=f57e98]:
+            - listitem [ref=f57e99]:
+              - link "Code" [ref=f57e100] [cursor=pointer]:
+                - /url: /github/spec-kit
+            - listitem [ref=f57e104]:
+              - link "Issues 159" [ref=f57e105] [cursor=pointer]:
+                - /url: /github/spec-kit/issues
+                - generic [ref=f57e109]: Issues
+                - generic "159" [ref=f57e110]
+            - listitem [ref=f57e111]:
+              - link "Pull requests 176" [ref=f57e112] [cursor=pointer]:
+                - /url: /github/spec-kit/pulls
+                - generic [ref=f57e115]: Pull requests
+                - generic "176" [ref=f57e116]
+            - listitem [ref=f57e117]:
+              - link "Discussions" [ref=f57e118] [cursor=pointer]:
+                - /url: /github/spec-kit/discussions
+            - listitem [ref=f57e122]:
+              - link "Actions" [ref=f57e123] [cursor=pointer]:
+                - /url: /github/spec-kit/actions
+            - listitem [ref=f57e127]:
+              - link "Projects" [ref=f57e128] [cursor=pointer]:
+                - /url: /github/spec-kit/projects
+            - listitem [ref=f57e132]:
+              - link "Security and quality" [ref=f57e133] [cursor=pointer]:
+                - /url: /github/spec-kit/security
+            - listitem [ref=f57e137]:
+              - link "Insights" [ref=f57e138] [cursor=pointer]:
+                - /url: /github/spec-kit/pulse
+      - generic [ref=f57e155]:
+        - generic [ref=f57e158]:
+          - generic [ref=f57e159]:
+            - generic [ref=f57e160]:
+              - button "main branch" [ref=f57e162] [cursor=pointer]:
+                - generic [ref=f57e163]: main
+              - generic [ref=f57e167]:
+                - link "Branches" [ref=f57e168] [cursor=pointer]:
+                  - /url: /github/spec-kit/branches
+                - link "Tags" [ref=f57e171] [cursor=pointer]:
+                  - /url: /github/spec-kit/tags
+            - button "Code" [ref=f57e175] [cursor=pointer]
+          - generic [ref=f57e178]:
+            - generic [ref=f57e179]:
+              - heading "Folders and files" [level=2] [ref=f57e180]
+              - table "Folders and files" [ref=f57e181]:
+                - rowgroup:
+                  - row "Name Last commit message Last commit date":
+                    - columnheader "Name"
+                    - columnheader "Last commit message"
+                    - columnheader "Last commit date"
+                - rowgroup [ref=f57e182]:
+                  - row [ref=f57e183]:
+                    - cell "Latest commit History 1,795 Commits" [ref=f57e184]:
+                      - generic [ref=f57e185]:
+                        - heading "Latest commit" [level=2] [ref=f57e186]
+                        - generic [ref=f57e189]:
+                          - heading "History" [level=2] [ref=f57e190]
+                          - link "1,795 Commits" [ref=f57e191] [cursor=pointer]:
+                            - /url: /github/spec-kit/commits/main/
+                  - row ".devcontainer, (Directory)" [ref=f57e194]:
+                    - cell [ref=f57e195]:
+                      - link ".devcontainer, (Directory)" [ref=f57e202] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/.devcontainer
+                        - text: .devcontainer
+                    - cell [ref=f57e203]
+                    - cell [ref=f57e205]
+                  - row ".github, (Directory)" [ref=f57e208]:
+                    - cell [ref=f57e209]:
+                      - link ".github, (Directory)" [ref=f57e216] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/.github
+                        - text: .github
+                    - cell [ref=f57e217]
+                    - cell [ref=f57e219]
+                  - row ".specify/memory, (Directory)" [ref=f57e222]:
+                    - cell [ref=f57e223]:
+                      - link ".specify/memory, (Directory)" [ref=f57e230] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/.specify/memory
+                        - text: .specify/memory
+                    - cell [ref=f57e231]
+                    - cell [ref=f57e233]
+                  - row "bundles, (Directory)" [ref=f57e236]:
+                    - cell [ref=f57e237]:
+                      - link "bundles, (Directory)" [ref=f57e244] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/bundles
+                        - text: bundles
+                    - cell [ref=f57e245]
+                    - cell [ref=f57e247]
+                  - row "docs, (Directory)" [ref=f57e250]:
+                    - cell [ref=f57e251]:
+                      - link "docs, (Directory)" [ref=f57e258] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/docs
+                        - text: docs
+                    - cell [ref=f57e259]
+                    - cell [ref=f57e261]
+                  - row "examples/bundles, (Directory)" [ref=f57e264]:
+                    - cell [ref=f57e265]:
+                      - link "examples/bundles, (Directory)" [ref=f57e272] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/examples/bundles
+                        - text: examples/bundles
+                    - cell [ref=f57e273]
+                    - cell [ref=f57e275]
+                  - row "extensions, (Directory)" [ref=f57e278]:
+                    - cell [ref=f57e279]:
+                      - link "extensions, (Directory)" [ref=f57e286] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/extensions
+                        - text: extensions
+                    - cell [ref=f57e287]
+                    - cell [ref=f57e289]
+                  - row "integrations, (Directory)" [ref=f57e292]:
+                    - cell [ref=f57e293]:
+                      - link "integrations, (Directory)" [ref=f57e300] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/integrations
+                        - text: integrations
+                    - cell [ref=f57e301]
+                    - cell [ref=f57e303]
+                  - row "media, (Directory)" [ref=f57e306]:
+                    - cell [ref=f57e307]:
+                      - link "media, (Directory)" [ref=f57e314] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/media
+                        - text: media
+                    - cell [ref=f57e315]
+                    - cell [ref=f57e317]
+                  - row "newsletters, (Directory)" [ref=f57e320]:
+                    - cell [ref=f57e321]:
+                      - link "newsletters, (Directory)" [ref=f57e328] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/newsletters
+                        - text: newsletters
+                    - cell [ref=f57e329]
+                    - cell [ref=f57e331]
+                  - row "presets, (Directory)" [ref=f57e334]:
+                    - cell [ref=f57e335]:
+                      - link "presets, (Directory)" [ref=f57e342] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/presets
+                        - text: presets
+                    - cell [ref=f57e343]
+                    - cell [ref=f57e345]
+                  - row "scripts, (Directory)" [ref=f57e348]:
+                    - cell [ref=f57e349]:
+                      - link "scripts, (Directory)" [ref=f57e356] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/scripts
+                        - text: scripts
+                    - cell [ref=f57e357]
+                    - cell [ref=f57e359]
+                  - row "src/specify_cli, (Directory)" [ref=f57e362]:
+                    - cell [ref=f57e363]:
+                      - link "src/specify_cli, (Directory)" [ref=f57e370] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/src/specify_cli
+                        - text: src/specify_cli
+                    - cell [ref=f57e371]
+                    - cell [ref=f57e373]
+                  - row "templates, (Directory)" [ref=f57e376]:
+                    - cell [ref=f57e377]:
+                      - link "templates, (Directory)" [ref=f57e384] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/templates
+                        - text: templates
+                    - cell [ref=f57e385]
+                    - cell [ref=f57e387]
+                  - row "tests, (Directory)" [ref=f57e390]:
+                    - cell [ref=f57e391]:
+                      - link "tests, (Directory)" [ref=f57e398] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/tests
+                        - text: tests
+                    - cell [ref=f57e399]
+                    - cell [ref=f57e401]
+                  - row "workflows, (Directory)" [ref=f57e404]:
+                    - cell [ref=f57e405]:
+                      - link "workflows, (Directory)" [ref=f57e412] [cursor=pointer]:
+                        - /url: /github/spec-kit/tree/main/workflows
+                        - text: workflows
+                    - cell [ref=f57e413]
+                    - cell [ref=f57e415]
+                  - row ".editorconfig, (File)" [ref=f57e418]:
+                    - cell [ref=f57e419]:
+                      - link ".editorconfig, (File)" [ref=f57e426] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/.editorconfig
+                        - text: .editorconfig
+                    - cell [ref=f57e427]
+                    - cell [ref=f57e429]
+                  - row ".gitattributes, (File)" [ref=f57e432]:
+                    - cell [ref=f57e433]:
+                      - link ".gitattributes, (File)" [ref=f57e440] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/.gitattributes
+                        - text: .gitattributes
+                    - cell [ref=f57e441]
+                    - cell [ref=f57e443]
+                  - row ".gitignore, (File)" [ref=f57e446]:
+                    - cell [ref=f57e447]:
+                      - link ".gitignore, (File)" [ref=f57e454] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/.gitignore
+                        - text: .gitignore
+                    - cell [ref=f57e455]
+                    - cell [ref=f57e457]
+                  - row ".markdownlint-cli2.jsonc, (File)" [ref=f57e460]:
+                    - cell [ref=f57e461]:
+                      - link ".markdownlint-cli2.jsonc, (File)" [ref=f57e468] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/.markdownlint-cli2.jsonc
+                        - text: .markdownlint-cli2.jsonc
+                    - cell [ref=f57e469]
+                    - cell [ref=f57e471]
+                  - row ".pre-commit-config.yaml, (File)" [ref=f57e474]:
+                    - cell [ref=f57e475]:
+                      - link ".pre-commit-config.yaml, (File)" [ref=f57e482] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/.pre-commit-config.yaml
+                        - text: .pre-commit-config.yaml
+                    - cell [ref=f57e483]
+                    - cell [ref=f57e485]
+                  - row ".zenodo.json, (File)" [ref=f57e488]:
+                    - cell [ref=f57e489]:
+                      - link ".zenodo.json, (File)" [ref=f57e496] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/.zenodo.json
+                        - text: .zenodo.json
+                    - cell [ref=f57e497]
+                    - cell [ref=f57e499]
+                  - row "AGENTS.md, (File)" [ref=f57e502]:
+                    - cell [ref=f57e503]:
+                      - link "AGENTS.md, (File)" [ref=f57e510] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/AGENTS.md
+                        - text: AGENTS.md
+                    - cell [ref=f57e511]
+                    - cell [ref=f57e513]
+                  - row "CHANGELOG.md, (File)" [ref=f57e516]:
+                    - cell [ref=f57e517]:
+                      - link "CHANGELOG.md, (File)" [ref=f57e524] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/CHANGELOG.md
+                        - text: CHANGELOG.md
+                    - cell [ref=f57e525]
+                    - cell [ref=f57e527]
+                  - row "CITATION.cff, (File)" [ref=f57e530]:
+                    - cell [ref=f57e531]:
+                      - link "CITATION.cff, (File)" [ref=f57e538] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/CITATION.cff
+                        - text: CITATION.cff
+                    - cell [ref=f57e539]
+                    - cell [ref=f57e541]
+                  - row "CODE_OF_CONDUCT.md, (File)" [ref=f57e544]:
+                    - cell [ref=f57e545]:
+                      - link "CODE_OF_CONDUCT.md, (File)" [ref=f57e552] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/CODE_OF_CONDUCT.md
+                        - text: CODE_OF_CONDUCT.md
+                    - cell [ref=f57e553]
+                    - cell [ref=f57e555]
+                  - row "CONTRIBUTING.md, (File)" [ref=f57e558]:
+                    - cell [ref=f57e559]:
+                      - link "CONTRIBUTING.md, (File)" [ref=f57e566] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/CONTRIBUTING.md
+                        - text: CONTRIBUTING.md
+                    - cell [ref=f57e567]
+                    - cell [ref=f57e569]
+                  - row "DEVELOPMENT.md, (File)" [ref=f57e572]:
+                    - cell [ref=f57e573]:
+                      - link "DEVELOPMENT.md, (File)" [ref=f57e580] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/DEVELOPMENT.md
+                        - text: DEVELOPMENT.md
+                    - cell [ref=f57e581]
+                    - cell [ref=f57e583]
+                  - row "LICENSE, (File)" [ref=f57e586]:
+                    - cell [ref=f57e587]:
+                      - link "LICENSE, (File)" [ref=f57e594] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/LICENSE
+                        - text: LICENSE
+                    - cell [ref=f57e595]
+                    - cell [ref=f57e597]
+                  - row "README.md, (File)" [ref=f57e600]:
+                    - cell [ref=f57e601]:
+                      - link "README.md, (File)" [ref=f57e608] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/README.md
+                        - text: README.md
+                    - cell [ref=f57e609]
+                    - cell [ref=f57e611]
+                  - row "README.zh-CN.md, (File)" [ref=f57e614]:
+                    - cell [ref=f57e615]:
+                      - link "README.zh-CN.md, (File)" [ref=f57e622] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/README.zh-CN.md
+                        - text: README.zh-CN.md
+                    - cell [ref=f57e623]
+                    - cell [ref=f57e625]
+                  - row "SECURITY.md, (File)" [ref=f57e628]:
+                    - cell [ref=f57e629]:
+                      - link "SECURITY.md, (File)" [ref=f57e636] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/SECURITY.md
+                        - text: SECURITY.md
+                    - cell [ref=f57e637]
+                    - cell [ref=f57e639]
+                  - row "SUPPORT.md, (File)" [ref=f57e642]:
+                    - cell [ref=f57e643]:
+                      - link "SUPPORT.md, (File)" [ref=f57e650] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/SUPPORT.md
+                        - text: SUPPORT.md
+                    - cell [ref=f57e651]
+                    - cell [ref=f57e653]
+                  - row "pyproject.toml, (File)" [ref=f57e656]:
+                    - cell [ref=f57e657]:
+                      - link "pyproject.toml, (File)" [ref=f57e664] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/pyproject.toml
+                        - text: pyproject.toml
+                    - cell [ref=f57e665]
+                    - cell [ref=f57e667]
+                  - row "spec-driven.md, (File)" [ref=f57e670]:
+                    - cell [ref=f57e671]:
+                      - link "spec-driven.md, (File)" [ref=f57e678] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/spec-driven.md
+                        - text: spec-driven.md
+                    - cell [ref=f57e679]
+                    - cell [ref=f57e681]
+                  - row "spec-kit.code-workspace, (File)" [ref=f57e684]:
+                    - cell [ref=f57e685]:
+                      - link "spec-kit.code-workspace, (File)" [ref=f57e692] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/spec-kit.code-workspace
+                        - text: spec-kit.code-workspace
+                    - cell [ref=f57e693]
+                    - cell [ref=f57e695]
+            - generic [ref=f57e699]:
+              - generic [ref=f57e700]:
+                - heading "Repository files navigation" [level=2] [ref=f57e701]
+                - navigation "Repository files" [ref=f57e702]:
+                  - list [ref=f57e703]:
+                    - listitem [ref=f57e704]:
+                      - link "README" [ref=f57e705] [cursor=pointer]:
+                        - /url: "#"
+                    - listitem [ref=f57e707]:
+                      - link "Code of conduct" [ref=f57e708] [cursor=pointer]:
+                        - /url: "#"
+                    - listitem [ref=f57e710]:
+                      - link "Contributing" [ref=f57e711] [cursor=pointer]:
+                        - /url: "#"
+                    - listitem [ref=f57e713]:
+                      - link "MIT license" [ref=f57e714] [cursor=pointer]:
+                        - /url: "#"
+                    - listitem [ref=f57e716]:
+                      - link "Security" [ref=f57e717] [cursor=pointer]:
+                        - /url: "#"
+                - button "Outline" [ref=f57e719] [cursor=pointer]
+              - article [ref=f57e723]:
+                - generic [ref=f57e724]:
+                  - link [ref=f57e725] [cursor=pointer]:
+                    - /url: https://raw.githubusercontent.com/github/spec-kit/main/media/logo_large.webp
+                    - img "Spec Kit Logo" [ref=f57e726]
+                  - generic [ref=f57e727]:
+                    - heading "🌱 Spec Kit" [level=1] [ref=f57e728]
+                    - 'link "Permalink: 🌱 Spec Kit" [ref=f57e729] [cursor=pointer]':
+                      - /url: "#-spec-kit"
+                  - generic [ref=f57e732]:
+                    - heading [level=3] [ref=f57e733]:
+                      - emphasis [ref=f57e734]: Define what to build before building it — with any AI coding agent.
+                    - 'link "Permalink: Define what to build before building it — with any AI coding agent." [ref=f57e735] [cursor=pointer]':
+                      - /url: "#define-what-to-build-before-building-it--with-any-ai-coding-agent"
+                - paragraph [ref=f57e738]:
+                  - strong [ref=f57e739]: An open source toolkit for building high-quality software with any AI coding agent — a ready-to-use spec-driven process (or bring your own), endlessly extensible, community-driven, and built for your whole organization.
+                - paragraph [ref=f57e740]:
+                  - link [ref=f57e741] [cursor=pointer]:
+                    - /url: https://github.com/github/spec-kit/releases/latest
+                    - img "Latest Release" [ref=f57e742]
+                  - link [ref=f57e743] [cursor=pointer]:
+                    - /url: https://github.com/github/spec-kit/stargazers
+                    - img "GitHub stars" [ref=f57e744]
+                  - link [ref=f57e745] [cursor=pointer]:
+                    - /url: https://github.com/github/spec-kit/blob/main/LICENSE
+                    - img "License" [ref=f57e746]
+                  - link [ref=f57e747] [cursor=pointer]:
+                    - /url: https://github.github.io/spec-kit/
+                    - img "Documentation" [ref=f57e748]
+                - paragraph [ref=f57e749]:
+                  - strong [ref=f57e750]: English
+                  - text: ·
+                  - link "简体中文" [ref=f57e751] [cursor=pointer]:
+                    - /url: /github/spec-kit/blob/main/README.zh-CN.md
+                - separator [ref=f57e752]
+                - generic [ref=f57e753]:
+                  - heading "Table of Contents" [level=2] [ref=f57e754]
+                  - 'link "Permalink: Table of Contents" [ref=f57e755] [cursor=pointer]':
+                    - /url: "#table-of-contents"
+                - list [ref=f57e758]:
+                  - listitem [ref=f57e759]:
+                    - link "🤔 What is Spec-Driven Development?" [ref=f57e760] [cursor=pointer]:
+                      - /url: "#-what-is-spec-driven-development"
+                  - listitem [ref=f57e761]:
+                    - link "⚡ Get Started" [ref=f57e762] [cursor=pointer]:
+                      - /url: "#-get-started"
+                  - listitem [ref=f57e763]:
+                    - link "📽️ Video Overview" [ref=f57e764] [cursor=pointer]:
+                      - /url: "#%EF%B8%8F-video-overview"
+                  - listitem [ref=f57e765]:
+                    - link "🌍 Community" [ref=f57e766] [cursor=pointer]:
+                      - /url: "#-community"
+                  - listitem [ref=f57e767]:
+                    - link "🤖 Supported AI Coding Agent Integrations" [ref=f57e768] [cursor=pointer]:
+                      - /url: "#-supported-ai-coding-agent-integrations"
+                  - listitem [ref=f57e769]:
+                    - link "🔧 Specify CLI Reference" [ref=f57e770] [cursor=pointer]:
+                      - /url: "#-specify-cli-reference"
+                  - listitem [ref=f57e771]:
+                    - 'link "🧩 Making Spec Kit Your Own: Extensions & Presets" [ref=f57e772] [cursor=pointer]':
+                      - /url: "#-making-spec-kit-your-own-extensions--presets"
+                  - listitem [ref=f57e773]:
+                    - 'link "📦 Bundles: Role-Based Setups" [ref=f57e774] [cursor=pointer]':
+                      - /url: "#-bundles-role-based-setups"
+                  - listitem [ref=f57e775]:
+                    - link "📚 Core Philosophy" [ref=f57e776] [cursor=pointer]:
+                      - /url: "#-core-philosophy"
+                  - listitem [ref=f57e777]:
+                    - link "🌟 Development Phases" [ref=f57e778] [cursor=pointer]:
+                      - /url: "#-development-phases"
+                  - listitem [ref=f57e779]:
+                    - link "🎯 Experimental Goals" [ref=f57e780] [cursor=pointer]:
+                      - /url: "#-experimental-goals"
+                  - listitem [ref=f57e781]:
+                    - link "🔧 Prerequisites" [ref=f57e782] [cursor=pointer]:
+                      - /url: "#-prerequisites"
+                  - listitem [ref=f57e783]:
+                    - link "📖 Learn More" [ref=f57e784] [cursor=pointer]:
+                      - /url: "#-learn-more"
+                  - listitem [ref=f57e785]:
+                    - link "💬 Support" [ref=f57e786] [cursor=pointer]:
+                      - /url: "#-support"
+                  - listitem [ref=f57e787]:
+                    - link "🙏 Acknowledgements" [ref=f57e788] [cursor=pointer]:
+                      - /url: "#-acknowledgements"
+                  - listitem [ref=f57e789]:
+                    - link "📄 License" [ref=f57e790] [cursor=pointer]:
+                      - /url: "#-license"
+                - generic [ref=f57e791]:
+                  - heading "🤔 What is Spec-Driven Development?" [level=2] [ref=f57e792]
+                  - 'link "Permalink: 🤔 What is Spec-Driven Development?" [ref=f57e793] [cursor=pointer]':
+                    - /url: "#-what-is-spec-driven-development"
+                - paragraph [ref=f57e796]:
+                  - text: Spec-Driven Development
+                  - strong [ref=f57e797]: flips the script
+                  - text: "on traditional software development. For decades, code has been king — specifications were just scaffolding we built and discarded once the \"real work\" of coding began. Spec-Driven Development changes this:"
+                  - strong [ref=f57e798]: specifications become executable
+                  - text: ", directly generating working implementations rather than just guiding them."
+                - generic [ref=f57e799]:
+                  - heading "⚡ Get Started" [level=2] [ref=f57e800]
+                  - 'link "Permalink: ⚡ Get Started" [ref=f57e801] [cursor=pointer]':
+                    - /url: "#-get-started"
+                - generic [ref=f57e804]:
+                  - heading "1. Install Specify CLI" [level=3] [ref=f57e805]
+                  - 'link "Permalink: 1. Install Specify CLI" [ref=f57e806] [cursor=pointer]':
+                    - /url: "#1-install-specify-cli"
+                - paragraph [ref=f57e809]:
+                  - text: Requires
+                  - strong [ref=f57e810]:
+                    - link "uv" [ref=f57e811] [cursor=pointer]:
+                      - /url: https://docs.astral.sh/uv/
+                  - text: (
+                  - link "install uv" [ref=f57e812] [cursor=pointer]:
+                    - /url: /github/spec-kit/blob/main/docs/install/uv.md
+                  - text: ). Replace
+                  - code [ref=f57e813]: vX.Y.Z
+                  - text: with the latest release tag from
+                  - link "Releases" [ref=f57e814] [cursor=pointer]:
+                    - /url: https://github.com/github/spec-kit/releases
+                  - text: — keep the leading
+                  - code [ref=f57e815]: v
+                  - text: (for example,
+                  - code [ref=f57e816]: v0.12.11
+                  - text: ", not"
+                  - code [ref=f57e817]: 0.12.11
+                  - text: "):"
+                - generic [ref=f57e818]:
+                  - generic [ref=f57e819]: uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@vX.Y.Z
+                  - button "Copy code to clipboard" [ref=f57e821] [cursor=pointer]
+                - paragraph [ref=f57e825]:
+                  - text: Prefer installing from PyPI? The
+                  - code [ref=f57e826]: specify-cli
+                  - text: "package is also published there:"
+                - generic [ref=f57e827]:
+                  - generic [ref=f57e828]: uv tool install specify-cli
+                  - button "Copy code to clipboard" [ref=f57e830] [cursor=pointer]
+                - paragraph [ref=f57e834]:
+                  - text: See the
+                  - link "Installation Guide" [ref=f57e835] [cursor=pointer]:
+                    - /url: /github/spec-kit/blob/main/docs/installation.md
+                  - text: for alternative methods, verification, upgrade, and troubleshooting.
+                - generic [ref=f57e836]:
+                  - heading "2. Initialize a project" [level=3] [ref=f57e837]
+                  - 'link "Permalink: 2. Initialize a project" [ref=f57e838] [cursor=pointer]':
+                    - /url: "#2-initialize-a-project"
+                - generic [ref=f57e841]:
+                  - generic [ref=f57e842]: specify init my-project --integration copilot cd my-project
+                  - button "Copy code to clipboard" [ref=f57e844] [cursor=pointer]
+                - paragraph [ref=f57e848]:
+                  - text: To check for updates or upgrade the installed CLI, use the self-management commands. See the
+                  - link "Upgrade Guide" [ref=f57e849] [cursor=pointer]:
+                    - /url: /github/spec-kit/blob/main/docs/upgrade.md
+                  - text: for detailed scenarios and customization options.
+                - generic [ref=f57e850]:
+                  - generic [ref=f57e851]:
+                    - generic [ref=f57e852]: "# Check whether a newer release is available (read-only — does not modify anything)"
+                    - text: specify self check
+                    - generic [ref=f57e853]: "# Preview what would run, without actually upgrading"
+                    - text: specify self upgrade --dry-run
+                    - generic [ref=f57e854]: "# Upgrade in place to the latest stable release (auto-detects uv tool vs pipx install)"
+                    - text: specify self upgrade
+                    - generic [ref=f57e855]: "# Or pin a specific release tag (replace vX.Y.Z[suffix] with your desired release tag)"
+                    - text: specify self upgrade --tag vX.Y.Z[suffix]
+                  - button "Copy code to clipboard" [ref=f57e857] [cursor=pointer]
+                - paragraph [ref=f57e861]:
+                  - text: Bare
+                  - code [ref=f57e862]: specify self upgrade
+                  - text: executes immediately, matching the no-prompt behavior of commands like
+                  - code [ref=f57e863]: pip install -U
+                  - text: and
+                  - code [ref=f57e864]: npm update
+                  - text: . For
+                  - code [ref=f57e865]: uv tool
+                  - text: installs, it runs
+                  - code [ref=f57e866]: uv tool install specify-cli --force --from <git ref>
+                  - text: under the hood so pinned release tags work, including dev, alpha/beta/rc, or build metadata suffixes.
+                  - code [ref=f57e867]: uvx
+                  - text: (ephemeral) runs and source checkouts are detected and produce path-specific guidance instead of running an installer. Set
+                  - code [ref=f57e868]: SPECIFY_UPGRADE_TIMEOUT_SECS
+                  - text: "to cap how long the installer subprocess may run (default: no timeout — interrupt with"
+                  - code [ref=f57e869]: Ctrl+C
+                  - text: if needed).
+                - generic [ref=f57e870]:
+                  - heading "3. Establish project principles" [level=3] [ref=f57e871]
+                  - 'link "Permalink: 3. Establish project principles" [ref=f57e872] [cursor=pointer]':
+                    - /url: "#3-establish-project-principles"
+                - paragraph [ref=f57e875]:
+                  - text: Launch your coding agent in the project directory. Most agents expose spec-kit as
+                  - code [ref=f57e876]: /speckit.*
+                  - text: slash commands; Codex CLI and Command Code in skills mode use
+                  - code [ref=f57e877]: $speckit-*
+                  - text: instead; GitHub Copilot CLI uses
+                  - code [ref=f57e878]: /agents
+                  - text: to select the agent or address it directly in a prompt.
+                - paragraph [ref=f57e879]:
+                  - text: Use the
+                  - strong [ref=f57e880]:
+                    - code [ref=f57e881]: /speckit.constitution
+                  - text: command to create your project's governing principles and development guidelines that will guide all subsequent development.
+                - generic [ref=f57e882]:
+                  - generic [ref=f57e883]: /speckit.constitution Create principles focused on code quality, testing standards, user experience consistency, and performance requirements
+                  - button "Copy code to clipboard" [ref=f57e885] [cursor=pointer]
+                - generic [ref=f57e889]:
+                  - heading "4. Create the spec" [level=3] [ref=f57e890]
+                  - 'link "Permalink: 4. Create the spec" [ref=f57e891] [cursor=pointer]':
+                    - /url: "#4-create-the-spec"
+                - paragraph [ref=f57e894]:
+                  - text: Use the
+                  - strong [ref=f57e895]:
+                    - code [ref=f57e896]: /speckit.specify
+                  - text: command to describe what you want to build. Focus on the
+                  - strong [ref=f57e897]: what
+                  - text: and
+                  - strong [ref=f57e898]: why
+                  - text: ", not the tech stack."
+                - generic [ref=f57e899]:
+                  - generic [ref=f57e900]: /speckit.specify Build an application that can help me organize my photos in separate photo albums. Albums are grouped by date and can be re-organized by dragging and dropping on the main page. Albums are never in other nested albums. Within each album, photos are previewed in a tile-like interface.
+                  - button "Copy code to clipboard" [ref=f57e902] [cursor=pointer]
+                - generic [ref=f57e906]:
+                  - heading "5. Create a technical implementation plan" [level=3] [ref=f57e907]
+                  - 'link "Permalink: 5. Create a technical implementation plan" [ref=f57e908] [cursor=pointer]':
+                    - /url: "#5-create-a-technical-implementation-plan"
+                - paragraph [ref=f57e911]:
+                  - text: Use the
+                  - strong [ref=f57e912]:
+                    - code [ref=f57e913]: /speckit.plan
+                  - text: command to provide your tech stack and architecture choices.
+                - generic [ref=f57e914]:
+                  - generic [ref=f57e915]: /speckit.plan The application uses Vite with minimal number of libraries. Use vanilla HTML, CSS, and JavaScript as much as possible. Images are not uploaded anywhere and metadata is stored in a local SQLite database.
+                  - button "Copy code to clipboard" [ref=f57e917] [cursor=pointer]
+                - generic [ref=f57e921]:
+                  - heading "6. Break down into tasks" [level=3] [ref=f57e922]
+                  - 'link "Permalink: 6. Break down into tasks" [ref=f57e923] [cursor=pointer]':
+                    - /url: "#6-break-down-into-tasks"
+                - paragraph [ref=f57e926]:
+                  - text: Use
+                  - strong [ref=f57e927]:
+                    - code [ref=f57e928]: /speckit.tasks
+                  - text: to create an actionable task list from your implementation plan.
+                - generic [ref=f57e929]:
+                  - generic [ref=f57e930]: /speckit.tasks
+                  - button "Copy code to clipboard" [ref=f57e932] [cursor=pointer]
+                - generic [ref=f57e936]:
+                  - heading "7. Execute implementation" [level=3] [ref=f57e937]
+                  - 'link "Permalink: 7. Execute implementation" [ref=f57e938] [cursor=pointer]':
+                    - /url: "#7-execute-implementation"
+                - paragraph [ref=f57e941]:
+                  - text: Use
+                  - strong [ref=f57e942]:
+                    - code [ref=f57e943]: /speckit.implement
+                  - text: to execute all tasks and build your feature according to the plan.
+                - generic [ref=f57e944]:
+                  - generic [ref=f57e945]: /speckit.implement
+                  - button "Copy code to clipboard" [ref=f57e947] [cursor=pointer]
+                - paragraph [ref=f57e951]:
+                  - text: For detailed step-by-step instructions, see our
+                  - link "comprehensive guide" [ref=f57e952] [cursor=pointer]:
+                    - /url: /github/spec-kit/blob/main/spec-driven.md
+                  - text: .
+                - generic [ref=f57e953]:
+                  - heading "📽️ Video Overview" [level=2] [ref=f57e954]
+                  - 'link "Permalink: 📽️ Video Overview" [ref=f57e955] [cursor=pointer]':
+                    - /url: "#️-video-overview"
+                - paragraph [ref=f57e958]:
+                  - text: Want to see Spec Kit in action? Watch our
+                  - link "video overview" [ref=f57e959] [cursor=pointer]:
+                    - /url: https://www.youtube.com/watch?v=a9eR1xsfvHg&pp=0gcJCckJAYcqIYzv
+                  - text: "!"
+                - paragraph [ref=f57e960]:
+                  - link [ref=f57e961] [cursor=pointer]:
+                    - /url: https://www.youtube.com/watch?v=a9eR1xsfvHg&pp=0gcJCckJAYcqIYzv
+                    - img "Spec Kit video header" [ref=f57e962]
+                - generic [ref=f57e963]:
+                  - heading "🌍 Community" [level=2] [ref=f57e964]
+                  - 'link "Permalink: 🌍 Community" [ref=f57e965] [cursor=pointer]':
+                    - /url: "#-community"
+                - paragraph [ref=f57e968]:
+                  - text: Explore community-contributed resources on the
+                  - link "Spec Kit docs site" [ref=f57e969] [cursor=pointer]:
+                    - /url: https://github.github.io/spec-kit/
+                  - text: ":"
+                - list [ref=f57e970]:
+                  - listitem [ref=f57e971]:
+                    - link "Extensions" [ref=f57e972] [cursor=pointer]:
+                      - /url: https://github.github.io/spec-kit/community/extensions.html
+                    - text: — commands, hooks, and capabilities
+                  - listitem [ref=f57e973]:
+                    - link "Presets" [ref=f57e974] [cursor=pointer]:
+                      - /url: https://github.github.io/spec-kit/community/presets.html
+                    - text: — template and terminology overrides
+                  - listitem [ref=f57e975]:
+                    - link "Bundles" [ref=f57e976] [cursor=pointer]:
+                      - /url: https://github.github.io/spec-kit/community/bundles.html
+                    - text: — role and team stacks composed from existing components
+                  - listitem [ref=f57e977]:
+                    - link "Walkthroughs" [ref=f57e978] [cursor=pointer]:
+                      - /url: https://github.github.io/spec-kit/community/walkthroughs.html
+                    - text: — end-to-end SDD scenarios
+                  - listitem [ref=f57e979]:
+                    - link "Friends" [ref=f57e980] [cursor=pointer]:
+                      - /url: https://github.github.io/spec-kit/community/friends.html
+                    - text: — projects that extend or build on Spec Kit
+                - generic [ref=f57e981]:
+                  - paragraph [ref=f57e982]: Note
+                  - paragraph [ref=f57e985]: Community contributions are independently created and maintained by their respective authors. Review source code before installation and use at your own discretion.
+                - paragraph [ref=f57e986]:
+                  - text: Want to contribute? See the
+                  - link "Extension Publishing Guide" [ref=f57e987] [cursor=pointer]:
+                    - /url: /github/spec-kit/blob/main/extensions/EXTENSION-PUBLISHING-GUIDE.md
+                  - text: ", the"
+                  - link "Presets Publishing Guide" [ref=f57e988] [cursor=pointer]:
+                    - /url: /github/spec-kit/blob/main/presets/PUBLISHING.md
+                  - text: ", or the"
+                  - link "Community Bundles guide" [ref=f57e989] [cursor=pointer]:
+                    - /url: /github/spec-kit/blob/main/docs/community/bundles.md
+                  - text: .
+                - generic [ref=f57e990]:
+                  - heading "🤖 Supported AI Coding Agent Integrations" [level=2] [ref=f57e991]
+                  - 'link "Permalink: 🤖 Supported AI Coding Agent Integrations" [ref=f57e992] [cursor=pointer]':
+                    - /url: "#-supported-ai-coding-agent-integrations"
+                - paragraph [ref=f57e995]:
+                  - text: Spec Kit works with 30+ AI coding agents — both CLI tools and IDE-based assistants. See the full list with notes and usage details in the
+                  - link "Supported AI Coding Agent Integrations" [ref=f57e996] [cursor=pointer]:
+                    - /url: https://github.github.io/spec-kit/reference/integrations.html
+                  - text: guide.
+                - paragraph [ref=f57e997]:
+                  - text: Run
+                  - code [ref=f57e998]: specify integration list
+                  - text: to see all available integrations in your installed version.
+                - generic [ref=f57e999]:
+                  - heading "Available Slash Commands" [level=2] [ref=f57e1000]
+                  - 'link "Permalink: Available Slash Commands" [ref=f57e1001] [cursor=pointer]':
+                    - /url: "#available-slash-commands"
+                - paragraph [ref=f57e1004]:
+                  - text: After running
+                  - code [ref=f57e1005]: specify init
+                  - text: ", your AI coding agent will have access to these slash commands for structured development. For integrations that support skills mode, passing"
+                  - code [ref=f57e1006]: "--integration <agent> --integration-options=\"--skills\""
+                  - text: installs agent skills instead of slash-command prompt files.
+                - generic [ref=f57e1007]:
+                  - heading "Core Commands" [level=3] [ref=f57e1008]
+                  - 'link "Permalink: Core Commands" [ref=f57e1009] [cursor=pointer]':
+                    - /url: "#core-commands"
+                - paragraph [ref=f57e1012]: "Essential commands for the Spec-Driven Development workflow:"
+                - table [ref=f57e1014]:
+                  - rowgroup [ref=f57e1015]:
+                    - row [ref=f57e1016]:
+                      - columnheader "Command" [ref=f57e1017]
+                      - columnheader "Agent Skill" [ref=f57e1018]
+                      - columnheader "Description" [ref=f57e1019]
+                  - rowgroup [ref=f57e1020]:
+                    - row [ref=f57e1021]:
+                      - cell [ref=f57e1022]:
+                        - code [ref=f57e1023]: /speckit.constitution
+                      - cell [ref=f57e1024]:
+                        - code [ref=f57e1025]: speckit-constitution
+                      - cell "Create or update project governing principles and development guidelines" [ref=f57e1026]
+                    - row [ref=f57e1027]:
+                      - cell [ref=f57e1028]:
+                        - code [ref=f57e1029]: /speckit.specify
+                      - cell [ref=f57e1030]:
+                        - code [ref=f57e1031]: speckit-specify
+                      - cell "Define what you want to build (requirements and user stories)" [ref=f57e1032]
+                    - row [ref=f57e1033]:
+                      - cell [ref=f57e1034]:
+                        - code [ref=f57e1035]: /speckit.plan
+                      - cell [ref=f57e1036]:
+                        - code [ref=f57e1037]: speckit-plan
+                      - cell "Create technical implementation plans with your chosen tech stack" [ref=f57e1038]
+                    - row [ref=f57e1039]:
+                      - cell [ref=f57e1040]:
+                        - code [ref=f57e1041]: /speckit.tasks
+                      - cell [ref=f57e1042]:
+                        - code [ref=f57e1043]: speckit-tasks
+                      - cell "Generate actionable task lists for implementation" [ref=f57e1044]
+                    - row [ref=f57e1045]:
+                      - cell [ref=f57e1046]:
+                        - code [ref=f57e1047]: /speckit.taskstoissues
+                      - cell [ref=f57e1048]:
+                        - code [ref=f57e1049]: speckit-taskstoissues
+                      - cell "Convert generated task lists into GitHub issues for tracking and execution" [ref=f57e1050]
+                    - row [ref=f57e1051]:
+                      - cell [ref=f57e1052]:
+                        - code [ref=f57e1053]: /speckit.implement
+                      - cell [ref=f57e1054]:
+                        - code [ref=f57e1055]: speckit-implement
+                      - cell "Execute all tasks to build the feature according to the plan" [ref=f57e1056]
+                    - row [ref=f57e1057]:
+                      - cell [ref=f57e1058]:
+                        - code [ref=f57e1059]: /speckit.converge
+                      - cell [ref=f57e1060]:
+                        - code [ref=f57e1061]: speckit-converge
+                      - cell "Assess the codebase against spec/plan/tasks and append remaining work as new tasks" [ref=f57e1062]
+                - generic [ref=f57e1063]:
+                  - heading "Optional Commands" [level=3] [ref=f57e1064]
+                  - 'link "Permalink: Optional Commands" [ref=f57e1065] [cursor=pointer]':
+                    - /url: "#optional-commands"
+                - paragraph [ref=f57e1068]: "Additional commands for enhanced quality and validation:"
+                - table [ref=f57e1070]:
+                  - rowgroup [ref=f57e1071]:
+                    - row [ref=f57e1072]:
+                      - columnheader "Command" [ref=f57e1073]
+                      - columnheader "Agent Skill" [ref=f57e1074]
+                      - columnheader "Description" [ref=f57e1075]
+                  - rowgroup [ref=f57e1076]:
+                    - row [ref=f57e1077]:
+                      - cell [ref=f57e1078]:
+                        - code [ref=f57e1079]: /speckit.clarify
+                      - cell [ref=f57e1080]:
+                        - code [ref=f57e1081]: speckit-clarify
+                      - cell [ref=f57e1082]:
+                        - text: Clarify underspecified areas (recommended before
+                        - code [ref=f57e1083]: /speckit.plan
+                        - text: ; formerly
+                        - code [ref=f57e1084]: /quizme
+                        - text: )
+                    - row [ref=f57e1085]:
+                      - cell [ref=f57e1086]:
+                        - code [ref=f57e1087]: /speckit.analyze
+                      - cell [ref=f57e1088]:
+                        - code [ref=f57e1089]: speckit-analyze
+                      - cell [ref=f57e1090]:
+                        - text: Cross-artifact consistency & coverage analysis (run after
+                        - code [ref=f57e1091]: /speckit.tasks
+                        - text: ", before"
+                        - code [ref=f57e1092]: /speckit.implement
+                        - text: )
+                    - row [ref=f57e1093]:
+                      - cell [ref=f57e1094]:
+                        - code [ref=f57e1095]: /speckit.checklist
+                      - cell [ref=f57e1096]:
+                        - code [ref=f57e1097]: speckit-checklist
+                      - cell "Generate custom quality checklists that validate requirements completeness, clarity, and consistency (like \"unit tests for English\")" [ref=f57e1098]
+                - generic [ref=f57e1099]:
+                  - heading "🔧 Specify CLI Reference" [level=2] [ref=f57e1100]
+                  - 'link "Permalink: 🔧 Specify CLI Reference" [ref=f57e1101] [cursor=pointer]':
+                    - /url: "#-specify-cli-reference"
+                - paragraph [ref=f57e1104]:
+                  - text: For full command details, options, and examples, see the
+                  - link "CLI Reference" [ref=f57e1105] [cursor=pointer]:
+                    - /url: https://github.github.io/spec-kit/reference/overview.html
+                  - text: .
+                - generic [ref=f57e1106]:
+                  - 'heading "🧩 Making Spec Kit Your Own: Extensions & Presets" [level=2] [ref=f57e1107]'
+                  - 'link "Permalink: 🧩 Making Spec Kit Your Own: Extensions & Presets" [ref=f57e1108] [cursor=pointer]':
+                    - /url: "#-making-spec-kit-your-own-extensions--presets"
+                - paragraph [ref=f57e1111]:
+                  - text: Spec Kit can be tailored to your needs through two complementary systems —
+                  - strong [ref=f57e1112]: extensions
+                  - text: and
+                  - strong [ref=f57e1113]: presets
+                  - text: "— plus project-local overrides for one-off adjustments:"
+                - table [ref=f57e1115]:
+                  - rowgroup [ref=f57e1116]:
+                    - row [ref=f57e1117]:
+                      - columnheader "Priority" [ref=f57e1118]
+                      - columnheader "Component Type" [ref=f57e1119]
+                      - columnheader "Location" [ref=f57e1120]
+                  - rowgroup [ref=f57e1121]:
+                    - row [ref=f57e1122]:
+                      - cell "⬆ 1" [ref=f57e1123]
+                      - cell "Project-Local Overrides" [ref=f57e1124]
+                      - cell [ref=f57e1125]:
+                        - code [ref=f57e1126]: .specify/templates/overrides/
+                    - row [ref=f57e1127]:
+                      - cell "2" [ref=f57e1128]
+                      - cell "Presets — Customize core & extensions" [ref=f57e1129]
+                      - cell [ref=f57e1130]:
+                        - code [ref=f57e1131]: .specify/presets/templates/
+                    - row [ref=f57e1132]:
+                      - cell "3" [ref=f57e1133]
+                      - cell "Extensions — Add new capabilities" [ref=f57e1134]
+                      - cell [ref=f57e1135]:
+                        - code [ref=f57e1136]: .specify/extensions/templates/
+                    - row [ref=f57e1137]:
+                      - cell "⬇ 4" [ref=f57e1138]
+                      - cell "Spec Kit Core — Built-in SDD commands & templates" [ref=f57e1139]
+                      - cell [ref=f57e1140]:
+                        - code [ref=f57e1141]: .specify/templates/
+                - list [ref=f57e1142]:
+                  - listitem [ref=f57e1143]:
+                    - strong [ref=f57e1144]: Templates
+                    - text: are resolved at
+                    - strong [ref=f57e1145]: runtime
+                    - text: — Spec Kit walks the stack top-down and uses the first match.
+                  - listitem [ref=f57e1146]:
+                    - text: Project-local overrides (
+                    - code [ref=f57e1147]: .specify/templates/overrides/
+                    - text: ) let you make one-off adjustments for a single project without creating a full preset.
+                  - listitem [ref=f57e1148]:
+                    - strong [ref=f57e1149]: Extension/preset commands
+                    - text: are applied at
+                    - strong [ref=f57e1150]: install time
+                    - text: — when you run
+                    - code [ref=f57e1151]: specify extension add
+                    - text: or
+                    - code [ref=f57e1152]: specify preset add
+                    - text: ", command files are written into agent directories (e.g.,"
+                    - code [ref=f57e1153]: .claude/commands/
+                    - text: ).
+                  - listitem [ref=f57e1154]: If multiple presets or extensions provide the same command, the highest-priority version wins. On removal, the next-highest-priority version is restored automatically.
+                  - listitem [ref=f57e1155]: If no overrides or customizations exist, Spec Kit uses its core defaults.
+                - generic [ref=f57e1156]:
+                  - heading "Extensions — Add New Capabilities" [level=3] [ref=f57e1157]
+                  - 'link "Permalink: Extensions — Add New Capabilities" [ref=f57e1158] [cursor=pointer]':
+                    - /url: "#extensions--add-new-capabilities"
+                - paragraph [ref=f57e1161]:
+                  - text: Use
+                  - strong [ref=f57e1162]: extensions
+                  - text: when you need functionality that goes beyond Spec Kit's core. Extensions introduce new commands and templates — for example, adding domain-specific workflows that are not covered by the built-in SDD commands, integrating with external tools, or adding entirely new development phases. They expand
+                  - emphasis [ref=f57e1163]: what Spec Kit can do
+                  - text: .
+                - generic [ref=f57e1164]:
+                  - generic [ref=f57e1165]:
+                    - generic [ref=f57e1166]: "# Search available extensions"
+                    - text: specify extension search
+                    - generic [ref=f57e1167]: "# Install an extension"
+                    - text: specify extension add <extension-name>
+                  - button "Copy code to clipboard" [ref=f57e1169] [cursor=pointer]
+                - paragraph [ref=f57e1173]: For example, extensions could add Jira integration, post-implementation code review, V-Model test traceability, or project health diagnostics.
+                - paragraph [ref=f57e1174]:
+                  - text: See the
+                  - link "Extensions reference" [ref=f57e1175] [cursor=pointer]:
+                    - /url: https://github.github.io/spec-kit/reference/extensions.html
+                  - text: for the full command guide. Browse the
+                  - link "community extensions" [ref=f57e1176] [cursor=pointer]:
+                    - /url: https://github.github.io/spec-kit/community/extensions.html
+                  - text: for what's available.
+                - generic [ref=f57e1177]:
+                  - heading "Presets — Customize Existing Workflows" [level=3] [ref=f57e1178]
+                  - 'link "Permalink: Presets — Customize Existing Workflows" [ref=f57e1179] [cursor=pointer]':
+                    - /url: "#presets--customize-existing-workflows"
+                - paragraph [ref=f57e1182]:
+                  - text: Use
+                  - strong [ref=f57e1183]: presets
+                  - text: when you want to change
+                  - emphasis [ref=f57e1184]: how
+                  - text: Spec Kit works without adding new capabilities. Presets override the templates and commands that ship with the core
+                  - emphasis [ref=f57e1185]: and
+                  - text: with installed extensions — for example, enforcing a compliance-oriented spec format, using domain-specific terminology, or applying organizational standards to plans and tasks. They customize the artifacts and instructions that Spec Kit and its extensions produce.
+                - generic [ref=f57e1186]:
+                  - generic [ref=f57e1187]:
+                    - generic [ref=f57e1188]: "# Search available presets"
+                    - text: specify preset search
+                    - generic [ref=f57e1189]: "# Install a preset"
+                    - text: specify preset add <preset-name>
+                  - button "Copy code to clipboard" [ref=f57e1191] [cursor=pointer]
+                - paragraph [ref=f57e1195]:
+                  - text: For example, presets could restructure spec templates to require regulatory traceability, adapt the workflow to fit the methodology you use (e.g., Agile, Kanban, Waterfall, jobs-to-be-done, or domain-driven design), add mandatory security review gates to plans, enforce test-first task ordering, or localize the entire workflow to a different language. The
+                  - link "pirate-speak demo" [ref=f57e1196] [cursor=pointer]:
+                    - /url: https://github.com/mnriem/spec-kit-pirate-speak-preset-demo
+                  - text: shows just how deep the customization can go. Multiple presets can be stacked with priority ordering.
+                - paragraph [ref=f57e1197]:
+                  - text: See the
+                  - link "Presets reference" [ref=f57e1198] [cursor=pointer]:
+                    - /url: https://github.github.io/spec-kit/reference/presets.html
+                  - text: for the full command guide, including resolution order and priority stacking.
+                - generic [ref=f57e1199]:
+                  - 'heading "📦 Bundles: Role-Based Setups" [level=2] [ref=f57e1200]'
+                  - 'link "Permalink: 📦 Bundles: Role-Based Setups" [ref=f57e1201] [cursor=pointer]':
+                    - /url: "#-bundles-role-based-setups"
+                - paragraph [ref=f57e1204]:
+                  - text: Extensions and presets are individual building blocks. A
+                  - strong [ref=f57e1205]: bundle
+                  - text: packages a curated set of them — extensions, presets, steps, and workflows — into a single, versioned, role-oriented setup so a whole team persona (product manager, business analyst, security researcher, developer, …) can be provisioned with one command.
+                - paragraph [ref=f57e1206]:
+                  - text: A bundle is described by a hand-written
+                  - code [ref=f57e1207]: bundle.yml
+                  - text: manifest. It pins each component to a version and, optionally, targets a specific integration; a bundle with no
+                  - code [ref=f57e1208]: integration
+                  - text: is
+                  - strong [ref=f57e1209]: agnostic
+                  - text: and inherits whatever integration the project already uses.
+                - generic [ref=f57e1210]:
+                  - generic [ref=f57e1211]:
+                    - generic [ref=f57e1212]: "# Discover bundles in the active catalog stack"
+                    - text: specify bundle search [<query>]
+                    - generic [ref=f57e1213]: "# Inspect the exact component set a bundle will add (equals what install does)"
+                    - text: specify bundle info <bundle-id>
+                    - generic [ref=f57e1214]: "# Install a bundle's full component set in one operation"
+                    - text: specify bundle install <bundle-id>
+                    - generic [ref=f57e1215]: "# See what's installed, then update or remove non-destructively"
+                    - text: specify bundle list specify bundle update <bundle-id>
+                    - generic [ref=f57e1216]: "# or --all"
+                    - text: specify bundle remove <bundle-id>
+                    - generic [ref=f57e1217]: "# removes only this bundle's components"
+                  - button "Copy code to clipboard" [ref=f57e1219] [cursor=pointer]
+                - paragraph [ref=f57e1223]:
+                  - text: Bundles resolve from a
+                  - strong [ref=f57e1224]: priority-ordered catalog stack
+                  - text: "(project > user > built-in). Each source carries an install policy:"
+                  - code [ref=f57e1225]: install-allowed
+                  - text: sources can be installed from, while
+                  - code [ref=f57e1226]: discovery-only
+                  - text: sources are visible in
+                  - code [ref=f57e1227]: search
+                  - text: /
+                  - code [ref=f57e1228]: info
+                  - text: but refuse installation. Manage the stack with
+                  - code [ref=f57e1229]: specify bundle catalog list|add|remove
+                  - text: .
+                - paragraph [ref=f57e1230]:
+                  - text: Authors validate and package bundles locally. Distribution is hosting the built artifact and adding a catalog source; community bundle submissions use the
+                  - link "Bundle Submission" [ref=f57e1231] [cursor=pointer]:
+                    - /url: https://github.com/github/spec-kit/issues/new?template=bundle_submission.yml
+                  - text: "issue template so required component catalogs and install evidence can be reviewed:"
+                - generic [ref=f57e1232]:
+                  - generic [ref=f57e1233]:
+                    - text: specify bundle validate --path ./my-bundle
+                    - generic [ref=f57e1234]: "# structural + reference checks"
+                    - text: specify bundle build --path ./my-bundle
+                    - generic [ref=f57e1235]: "# produce a versioned .zip artifact"
+                  - button "Copy code to clipboard" [ref=f57e1237] [cursor=pointer]
+                - paragraph [ref=f57e1241]:
+                  - text: Four ready-to-read example bundle manifests live under
+                  - link [ref=f57e1242] [cursor=pointer]:
+                    - /url: /github/spec-kit/blob/main/examples/bundles
+                    - code [ref=f57e1243]: examples/bundles/
+                  - text: (product manager, business analyst, security researcher, developer). These are bundle packaging examples, not filled generated feature specs; for end-to-end community examples, see the
+                  - link "community walkthroughs" [ref=f57e1244] [cursor=pointer]:
+                    - /url: https://github.github.io/spec-kit/community/walkthroughs.html
+                  - text: .
+                - paragraph [ref=f57e1245]:
+                  - text: "Key guarantees:"
+                  - code [ref=f57e1246]: info
+                  - text: shows exactly what
+                  - code [ref=f57e1247]: install
+                  - text: adds (transparency); installs are idempotent and confined to the project root;
+                  - code [ref=f57e1248]: remove
+                  - text: never touches components another installed bundle still needs; and all consume/author commands work
+                  - strong [ref=f57e1249]: offline
+                  - text: against local or pinned sources.
+                - generic [ref=f57e1250]:
+                  - heading "When to Use Which" [level=3] [ref=f57e1251]
+                  - 'link "Permalink: When to Use Which" [ref=f57e1252] [cursor=pointer]':
+                    - /url: "#when-to-use-which"
+                - table [ref=f57e1256]:
+                  - rowgroup [ref=f57e1257]:
+                    - row [ref=f57e1258]:
+                      - columnheader "Goal" [ref=f57e1259]
+                      - columnheader "Use" [ref=f57e1260]
+                  - rowgroup [ref=f57e1261]:
+                    - row [ref=f57e1262]:
+                      - cell "Add a brand-new command or workflow" [ref=f57e1263]
+                      - cell "Extension" [ref=f57e1264]
+                    - row [ref=f57e1265]:
+                      - cell "Customize the format of specs, plans, or tasks" [ref=f57e1266]
+                      - cell "Preset" [ref=f57e1267]
+                    - row [ref=f57e1268]:
+                      - cell "Integrate an external tool or service" [ref=f57e1269]
+                      - cell "Extension" [ref=f57e1270]
+                    - row [ref=f57e1271]:
+                      - cell "Enforce organizational or regulatory standards" [ref=f57e1272]
+                      - cell "Preset" [ref=f57e1273]
+                    - row [ref=f57e1274]:
+                      - cell "Ship reusable domain-specific templates" [ref=f57e1275]
+                      - cell "Either — presets for template overrides, extensions for templates bundled with new commands" [ref=f57e1276]
+                    - row [ref=f57e1277]:
+                      - cell "Provision a complete role-based setup in one command" [ref=f57e1278]
+                      - cell "Bundle" [ref=f57e1279]
+                - generic [ref=f57e1280]:
+                  - heading "📚 Core Philosophy" [level=2] [ref=f57e1281]
+                  - 'link "Permalink: 📚 Core Philosophy" [ref=f57e1282] [cursor=pointer]':
+                    - /url: "#-core-philosophy"
+                - paragraph [ref=f57e1285]: "Spec-Driven Development is a structured process that emphasizes:"
+                - list [ref=f57e1286]:
+                  - listitem [ref=f57e1287]:
+                    - strong [ref=f57e1288]: Intent-driven development
+                    - text: where specifications define the "
+                    - emphasis [ref=f57e1289]: what
+                    - text: "\" before the \""
+                    - emphasis [ref=f57e1290]: how
+                    - text: "\""
+                  - listitem [ref=f57e1291]:
+                    - strong [ref=f57e1292]: Rich specification creation
+                    - text: using guardrails and organizational principles
+                  - listitem [ref=f57e1293]:
+                    - strong [ref=f57e1294]: Multi-step refinement
+                    - text: rather than one-shot code generation from prompts
+                  - listitem [ref=f57e1295]:
+                    - strong [ref=f57e1296]: Heavy reliance
+                    - text: on advanced AI model capabilities for specification interpretation
+                - generic [ref=f57e1297]:
+                  - heading "🌟 Development Phases" [level=2] [ref=f57e1298]
+                  - 'link "Permalink: 🌟 Development Phases" [ref=f57e1299] [cursor=pointer]':
+                    - /url: "#-development-phases"
+                - table [ref=f57e1303]:
+                  - rowgroup [ref=f57e1304]:
+                    - row [ref=f57e1305]:
+                      - columnheader "Phase" [ref=f57e1306]
+                      - columnheader "Focus" [ref=f57e1307]
+                      - columnheader "Key Activities" [ref=f57e1308]
+                  - rowgroup [ref=f57e1309]:
+                    - row [ref=f57e1310]:
+                      - cell [ref=f57e1311]:
+                        - strong [ref=f57e1312]: 0-to-1 Development
+                        - text: ("Greenfield")
+                      - cell "Generate from scratch" [ref=f57e1313]
+                      - cell [ref=f57e1314]:
+                        - list [ref=f57e1315]:
+                          - listitem [ref=f57e1316]: Start with high-level requirements
+                          - listitem [ref=f57e1317]: Generate specifications
+                          - listitem [ref=f57e1318]: Plan implementation steps
+                          - listitem [ref=f57e1319]: Build production-ready applications
+                    - row [ref=f57e1320]:
+                      - cell [ref=f57e1321]:
+                        - strong [ref=f57e1322]: Creative Exploration
+                      - cell "Parallel implementations" [ref=f57e1323]
+                      - cell [ref=f57e1324]:
+                        - list [ref=f57e1325]:
+                          - listitem [ref=f57e1326]: Explore diverse solutions
+                          - listitem [ref=f57e1327]: Support multiple technology stacks & architectures
+                          - listitem [ref=f57e1328]: Experiment with UX patterns
+                    - row [ref=f57e1329]:
+                      - cell [ref=f57e1330]:
+                        - strong [ref=f57e1331]: Iterative Enhancement
+                        - text: ("Brownfield")
+                      - cell "Brownfield modernization" [ref=f57e1332]
+                      - cell [ref=f57e1333]:
+                        - list [ref=f57e1334]:
+                          - listitem [ref=f57e1335]: Add features iteratively
+                          - listitem [ref=f57e1336]: Modernize legacy systems
+                          - listitem [ref=f57e1337]: Adapt processes
+                - paragraph [ref=f57e1338]:
+                  - text: "For existing projects, keep Spec Kit tooling updates separate from feature artifact evolution: refresh managed project files when upgrading, and update"
+                  - code [ref=f57e1339]: specs/
+                  - text: artifacts when intended behavior changes. The
+                  - link "Evolving Specs guide" [ref=f57e1340] [cursor=pointer]:
+                    - /url: /github/spec-kit/blob/main/docs/guides/evolving-specs.md
+                  - text: describes the recommended brownfield loop.
+                - generic [ref=f57e1341]:
+                  - heading "🎯 Experimental Goals" [level=2] [ref=f57e1342]
+                  - 'link "Permalink: 🎯 Experimental Goals" [ref=f57e1343] [cursor=pointer]':
+                    - /url: "#-experimental-goals"
+                - paragraph [ref=f57e1346]: "Our research and experimentation focus on:"
+                - generic [ref=f57e1347]:
+                  - heading "Technology independence" [level=3] [ref=f57e1348]
+                  - 'link "Permalink: Technology independence" [ref=f57e1349] [cursor=pointer]':
+                    - /url: "#technology-independence"
+                - list [ref=f57e1352]:
+                  - listitem [ref=f57e1353]: Create applications using diverse technology stacks
+                  - listitem [ref=f57e1354]: Validate the hypothesis that Spec-Driven Development is a process not tied to specific technologies, programming languages, or frameworks
+                - generic [ref=f57e1355]:
+                  - heading "Enterprise constraints" [level=3] [ref=f57e1356]
+                  - 'link "Permalink: Enterprise constraints" [ref=f57e1357] [cursor=pointer]':
+                    - /url: "#enterprise-constraints"
+                - list [ref=f57e1360]:
+                  - listitem [ref=f57e1361]: Demonstrate mission-critical application development
+                  - listitem [ref=f57e1362]: Incorporate organizational constraints (cloud providers, tech stacks, engineering practices)
+                  - listitem [ref=f57e1363]: Support enterprise design systems and compliance requirements
+                - generic [ref=f57e1364]:
+                  - heading "User-centric development" [level=3] [ref=f57e1365]
+                  - 'link "Permalink: User-centric development" [ref=f57e1366] [cursor=pointer]':
+                    - /url: "#user-centric-development"
+                - list [ref=f57e1369]:
+                  - listitem [ref=f57e1370]: Build applications for different user cohorts and preferences
+                  - listitem [ref=f57e1371]: Support various development approaches (from vibe-coding to AI-native development)
+                - generic [ref=f57e1372]:
+                  - heading "Creative & iterative processes" [level=3] [ref=f57e1373]
+                  - 'link "Permalink: Creative & iterative processes" [ref=f57e1374] [cursor=pointer]':
+                    - /url: "#creative--iterative-processes"
+                - list [ref=f57e1377]:
+                  - listitem [ref=f57e1378]: Validate the concept of parallel implementation exploration
+                  - listitem [ref=f57e1379]: Provide robust iterative feature development workflows
+                  - listitem [ref=f57e1380]: Extend processes to handle upgrades and modernization tasks
+                - generic [ref=f57e1381]:
+                  - heading "🔧 Prerequisites" [level=2] [ref=f57e1382]
+                  - 'link "Permalink: 🔧 Prerequisites" [ref=f57e1383] [cursor=pointer]':
+                    - /url: "#-prerequisites"
+                - list [ref=f57e1386]:
+                  - listitem [ref=f57e1387]:
+                    - strong [ref=f57e1388]: Linux/macOS/Windows
+                  - listitem [ref=f57e1389]:
+                    - link "Supported" [ref=f57e1390] [cursor=pointer]:
+                      - /url: "#-supported-ai-coding-agent-integrations"
+                    - text: AI coding agent.
+                  - listitem [ref=f57e1391]:
+                    - link "uv" [ref=f57e1392] [cursor=pointer]:
+                      - /url: https://docs.astral.sh/uv/
+                    - text: for package management (recommended) or
+                    - link "pipx" [ref=f57e1393] [cursor=pointer]:
+                      - /url: https://pipx.pypa.io/
+                    - text: for persistent installation
+                  - listitem [ref=f57e1394]:
+                    - link "Python 3.11+" [ref=f57e1395] [cursor=pointer]:
+                      - /url: https://www.python.org/downloads/
+                  - listitem [ref=f57e1396]:
+                    - link "Git" [ref=f57e1397] [cursor=pointer]:
+                      - /url: https://git-scm.com/downloads
+                - paragraph [ref=f57e1398]: If you encounter issues with an agent, please open an issue so we can refine the integration.
+                - generic [ref=f57e1399]:
+                  - heading "📖 Learn More" [level=2] [ref=f57e1400]
+                  - 'link "Permalink: 📖 Learn More" [ref=f57e1401] [cursor=pointer]':
+                    - /url: "#-learn-more"
+                - list [ref=f57e1404]:
+                  - listitem [ref=f57e1405]:
+                    - strong [ref=f57e1406]:
+                      - link "Complete Spec-Driven Development Methodology" [ref=f57e1407] [cursor=pointer]:
+                        - /url: /github/spec-kit/blob/main/spec-driven.md
+                    - text: "- Deep dive into the full process"
+                  - listitem [ref=f57e1408]:
+                    - strong [ref=f57e1409]:
+                      - link "Quick Start Guide" [ref=f57e1410] [cursor=pointer]:
+                        - /url: https://github.github.io/spec-kit/quickstart.html
+                    - text: "- Step-by-step implementation walkthrough"
+                - separator [ref=f57e1411]
+                - generic [ref=f57e1412]:
+                  - heading "💬 Support" [level=2] [ref=f57e1413]
+                  - 'link "Permalink: 💬 Support" [ref=f57e1414] [cursor=pointer]':
+                    - /url: "#-support"
+                - paragraph [ref=f57e1417]:
+                  - text: For support, please open a
+                  - link "GitHub issue" [ref=f57e1418] [cursor=pointer]:
+                    - /url: https://github.com/github/spec-kit/issues/new
+                  - text: . We welcome bug reports, feature requests, and questions about using Spec-Driven Development.
+                - generic [ref=f57e1419]:
+                  - heading "🙏 Acknowledgements" [level=2] [ref=f57e1420]
+                  - 'link "Permalink: 🙏 Acknowledgements" [ref=f57e1421] [cursor=pointer]':
+                    - /url: "#-acknowledgements"
+                - paragraph [ref=f57e1424]:
+                  - text: This project is heavily influenced by and based on the work and research of
+                  - link "John Lam" [ref=f57e1425] [cursor=pointer]:
+                    - /url: https://github.com/jflam
+                  - text: .
+                - generic [ref=f57e1426]:
+                  - heading "📄 License" [level=2] [ref=f57e1427]
+                  - 'link "Permalink: 📄 License" [ref=f57e1428] [cursor=pointer]':
+                    - /url: "#-license"
+                - paragraph [ref=f57e1431]:
+                  - text: This project is licensed under the terms of the MIT open source license. Please refer to the
+                  - link "LICENSE" [ref=f57e1432] [cursor=pointer]:
+                    - /url: /github/spec-kit/blob/main/LICENSE
+                  - text: file for the full terms.
+        - generic [ref=f57e1435]:
+          - generic [ref=f57e1436]:
+            - heading "About" [level=2] [ref=f57e1437]
+            - paragraph [ref=f57e1438]: 💫 Toolkit to help you get started with Spec-Driven Development
+            - generic "https://github.github.com/spec-kit/" [ref=f57e1442]:
+              - link "github.github.com/spec-kit/" [ref=f57e1443] [cursor=pointer]:
+                - /url: https://github.github.com/spec-kit/
+            - heading "Topics" [level=3] [ref=f57e1444]
+            - generic [ref=f57e1445]:
+              - link "ai" [ref=f57e1446] [cursor=pointer]:
+                - /url: /topics/ai
+              - link "copilot" [ref=f57e1447] [cursor=pointer]:
+                - /url: /topics/copilot
+              - link "development" [ref=f57e1448] [cursor=pointer]:
+                - /url: /topics/development
+              - link "engineering" [ref=f57e1449] [cursor=pointer]:
+                - /url: /topics/engineering
+              - link "prd" [ref=f57e1450] [cursor=pointer]:
+                - /url: /topics/prd
+              - link "spec" [ref=f57e1451] [cursor=pointer]:
+                - /url: /topics/spec
+              - link "spec-driven" [ref=f57e1452] [cursor=pointer]:
+                - /url: /topics/spec-driven
+            - heading "Resources" [level=3] [ref=f57e1453]
+            - link "Readme" [ref=f57e1455] [cursor=pointer]:
+              - /url: "#readme-ov-file"
+            - link "MIT license" [ref=f57e1459] [cursor=pointer]:
+              - /url: "#MIT-1-ov-file"
+            - heading "Code of conduct" [level=3] [ref=f57e1462]
+            - link "Code of conduct" [ref=f57e1464] [cursor=pointer]:
+              - /url: /github/spec-kit#coc-ov-file
+            - heading "Contributing" [level=3] [ref=f57e1467]
+            - link "Contributing" [ref=f57e1469] [cursor=pointer]:
+              - /url: "#contributing-ov-file"
+            - heading "Security policy" [level=3] [ref=f57e1472]
+            - link "Security policy" [ref=f57e1474] [cursor=pointer]:
+              - /url: "#security-ov-file"
+            - button "Cite this repository" [ref=f57e1478] [cursor=pointer]
+            - link "Activity" [ref=f57e1484] [cursor=pointer]:
+              - /url: /github/spec-kit/activity
+            - link "Custom properties" [ref=f57e1488] [cursor=pointer]:
+              - /url: /github/spec-kit/custom-properties
+            - heading "Stars" [level=3] [ref=f57e1491]
+            - generic [ref=f57e1493]:
+              - strong [ref=f57e1496]: 129.4k
+              - text: stars
+            - heading "Watchers" [level=3] [ref=f57e1497]
+            - generic [ref=f57e1499]:
+              - strong [ref=f57e1502]: "670"
+              - text: watching
+            - heading "Forks" [level=3] [ref=f57e1503]
+            - link [ref=f57e1505] [cursor=pointer]:
+              - /url: /github/spec-kit/forks
+              - strong [ref=f57e1509]: 11.6k
+              - text: forks
+            - link "Report repository" [ref=f57e1511] [cursor=pointer]:
+              - /url: /contact/report-content?content_url=https%3A%2F%2Fgithub.com%2Fgithub%2Fspec-kit&report=github+%28user%29
+          - heading "Releases" [level=2] [ref=f57e1513]
+          - heading "Used by" [level=2] [ref=f57e1517]
+          - heading "Contributors" [level=2] [ref=f57e1520]
+          - heading "Languages" [level=2] [ref=f57e1523]
+    - contentinfo [ref=f57e1526]:
+      - heading "Footer" [level=2] [ref=f57e1527]
+      - generic [ref=f57e1528]:
+        - generic [ref=f57e1529]:
+          - link "GitHub Homepage" [ref=f57e1530] [cursor=pointer]:
+            - /url: https://github.com
+          - generic [ref=f57e1533]: © 2026 GitHub, Inc.
+        - navigation "Footer" [ref=f57e1534]:
+          - heading "Footer navigation" [level=3] [ref=f57e1535]
+          - list "Footer navigation" [ref=f57e1536]:
+            - listitem [ref=f57e1537]:
+              - link "Terms" [ref=f57e1538] [cursor=pointer]:
+                - /url: https://docs.github.com/site-policy/github-terms/github-terms-of-service
+            - listitem [ref=f57e1539]:
+              - link "Privacy" [ref=f57e1540] [cursor=pointer]:
+                - /url: https://docs.github.com/site-policy/privacy-policies/github-privacy-statement
+            - listitem [ref=f57e1541]:
+              - link "Security" [ref=f57e1542] [cursor=pointer]:
+                - /url: https://github.com/security
+            - listitem [ref=f57e1543]:
+              - link "Status" [ref=f57e1544] [cursor=pointer]:
+                - /url: https://www.githubstatus.com/
+            - listitem [ref=f57e1545]:
+              - link "Community" [ref=f57e1546] [cursor=pointer]:
+                - /url: https://github.community/
+            - listitem [ref=f57e1547]:
+              - link "Docs" [ref=f57e1548] [cursor=pointer]:
+                - /url: https://docs.github.com/
+            - listitem [ref=f57e1549]:
+              - link "Contact" [ref=f57e1550] [cursor=pointer]:
+                - /url: https://support.github.com?tags=dotcom-footer
+            - listitem [ref=f57e1551]:
+              - button "Manage cookies" [ref=f57e1553] [cursor=pointer]
+            - listitem [ref=f57e1554]:
+              - button "Do not share my personal information" [ref=f57e1556] [cursor=pointer]
+  - alert [ref=f57e1559]
