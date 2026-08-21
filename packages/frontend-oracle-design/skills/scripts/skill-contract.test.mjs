@@ -215,11 +215,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.17.2')
+  assert.equal(version, '0.17.3')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.17.2')
+  assert.equal(marketplace.version, '0.17.3')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
