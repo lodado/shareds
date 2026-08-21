@@ -166,6 +166,16 @@ visual identity 변경이면 카드 작성 전 [`visual-design.md`](visual-desig
 `.ai/oracles/<oracle-id>/journal.md`에 append한다. 답을 대화에만 남기지 않는다 —
 컨텍스트가 요약돼도 다음 단계는 journal과 카드에서 이어진다.
 
+문답 항목은 한 줄 규격으로 쓴다 — 질문·답·채택·매핑 행이 빠지면 미완성이다:
+
+```markdown
+## Grill Round 1 (P1~P3) — 2026-08-21
+
+- Q1(P1): 성공 판정 기준? → 답: 완료 화면+주문번호 → 채택: 추천 수용 → 행: P1, O1
+- Q2(P4): 409의 UI 결과? → 답: 기존 주문 화면 이동 → 채택: 수정 → 행: P3, O5
+- 가지치기: P7 스킵 — behavior-only
+```
+
 자주 필요한 질문(P5):
 
 - pending 중 중복 제출을 무시할지, 큐잉할지, 오류로 볼지

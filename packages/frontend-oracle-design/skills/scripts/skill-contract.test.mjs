@@ -215,11 +215,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.14.0')
+  assert.equal(version, '0.15.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.14.0')
+  assert.equal(marketplace.version, '0.15.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -297,8 +297,13 @@ test('explicitly invokes $test before writing frontend tests', async () => {
   assert.match(implementationLoop, /파일을 참고만 하는 것으로 대체하지 않으며/)
 })
 
-test('batches delivery decisions and parallelizes only across safe gates', async () => {
-  const implementationLoop = await read('references/implementation-loop.md')
+test('batches delivery decisions without prescribing an implementation topology', async () => {
+  const [implementationLoop, graphSource] = await Promise.all([
+    read('references/implementation-loop.md'),
+    read('references/oracle-workflow.graph.json'),
+  ])
+  const graph = JSON.parse(graphSource)
+  const implementationNode = graph.nodes.find((node) => node.id === 'implement-green')
 
   for (const intakeItem of ['policy', 'architecture', 'evidence', 'naming', 'review']) {
     assert.match(implementationLoop, new RegExp(intakeItem))
@@ -307,7 +312,10 @@ test('batches delivery decisions and parallelizes only across safe gates', async
   assert.match(implementationLoop, /read-only.*병렬/s)
   assert.match(implementationLoop, /모든.*결정.*뒤.*final lock.*1회/s)
   assert.match(implementationLoop, /`VALID_RED` 전.*production.*수정하지 않는다/s)
-  assert.match(implementationLoop, /겹치지 않는 파일.*worker.*최대 2/s)
+  assert.match(implementationLoop, /현재 agent.*직접.*위임.*병렬화.*강제하지 않는다/s)
+  assert.equal(implementationNode.kind, 'gate')
+  assert.equal(implementationNode.owner, undefined)
+  assert.match(implementationNode.task, /단일·위임·병렬 구현 방식을 강제하지 않는다/)
   assert.match(implementationLoop, /targeted GREEN.*1회/s)
   assert.match(implementationLoop, /root test.*lint.*format.*독립 review.*병렬/s)
   assert.match(implementationLoop, /모든 결과.*합류.*final verify/s)
@@ -555,6 +563,8 @@ test('pins document-driven stage journal and disk recall', async () => {
   assert.match(skill, /정책 출처도 lock 대상도 아니며.*카드가 이긴다/s)
   assert.match(oracleCard, /journal\.md.*append/s)
   assert.match(oracleCard, /답을 대화에만 남기지 않는다/)
+  assert.match(oracleCard, /문답 항목은 한 줄 규격/)
+  assert.match(oracleCard, /→ 답:.*→ 채택:.*→ 행:/)
   assert.match(oracleCard, /`journal\.md`는 예외다/)
 })
 
