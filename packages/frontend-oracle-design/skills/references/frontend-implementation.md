@@ -230,6 +230,8 @@ store, dynamic import를 일괄 추가하지 않는다.
 - 320px·양 theme·reduced motion 등 대상 레포의 필수 UI 검증
 - 승인된 architecture 문서가 Oracle source lock과 일치, 레포 구조 검증 명령 통과
 
+성능 요구·개선 주장이 있으면 먼저 [`performance.md`](performance.md)를 전부 읽고
+Initial-load·Runtime·Responsiveness 축 분류와 profiler 원인 확인을 마친다.
 성능 요구·개선 주장이 있을 때만 같은 환경의 `metric·budget`, baseline run, after run과
 차이를 기록한다. 기존 benchmark·bundle script를 우선하고 해당 명령을
 `oracle-run.mjs init --required-label performance`와 ledger run으로 고정. 비교 가능한

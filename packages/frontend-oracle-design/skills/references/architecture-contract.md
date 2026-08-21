@@ -103,6 +103,8 @@ shared/package export를 새로 만들거나 바꿀 때만 다음을 architectur
 Implementation Decision에 기록한다.
 
 - 실제 consumer와 함께 바뀌는 이유. 구체 사용 사례가 하나뿐이면 먼저 local API로 둔다.
+- 이 API가 해결하는 한 가지 문제와 non-goals. 기능 요청은 package 범위인지
+  application 범위인지 triage해 기록한다.
 - platform API와 이미 설치된 dependency로 해결할 수 없는 이유
 - 입력·출력·오류 타입, 호환성 범위, breaking 여부와 migration
 - 대상 레포가 이미 제공하는 runtime·type test, build/pack/export 검사와 changeset

@@ -183,6 +183,7 @@ reviewer는 아래 질문으로 사용자를 재인터뷰하거나 새 정책을
 | 이 경계는 어떤 오류를 복구하고 무엇을 상위로 전파하는가? | 예상 오류·알 수 없는 오류의 owner, fallback과 retry 계약        |
 | 검증하지 않은 계약은 무엇이며 왜 제외했는가?             | risk, 카드 행 evidence 또는 출처 있는 N/A                       |
 | 성능 문제나 개선 claim의 근거가 있는가?                  | 동일 환경 metric·budget·baseline/after 또는 claim 없음          |
+| 왜 새 dependency·framework를 도입했는가?                 | 해결하는 실제 문제, 실제 사용 기능, 대안 비용, 제거 경로        |
 | 다음 우선순위는 무엇인가?                                | 기술적 wishlist가 아니라 남은 사용자·보안·정합성·운영 위험 순서 |
 
 - 승인된 기획서·Figma의 레이아웃, 상태, 문구, interaction과 구현이 일치하는가?
@@ -222,6 +223,11 @@ reviewer는 아래 질문으로 사용자를 재인터뷰하거나 새 정책을
   render-ready 값과 intent action만 반환하며 JSX·class·token·문구를 숨기지 않는가?
 - React가 필요 없는 필터·그룹·정렬·검증·상태 전이는 pure model function에 있고, 단순
   rename인 trivial wrapper나 unrelated 책임을 합친 거대 hook을 만들지 않았는가?
+- 새 dependency·framework 도입의 최종 근거가 기술 이름·인기가 아니라 실제 문제와
+  사용할 기능인가? Implementation Decision의 Dependency 항목과 diff가 일치하는가?
+- 변경이 navigation·persistence·권한·결제·cross-unit 경계를 건드리면 diff 밖의 실제
+  route·사용자 journey·저장/복원 lifecycle·history 계약을 대조했는가? material한데
+  근거가 없으면 `EVIDENCE_GAP`이다.
 - 승인된 architecture unit 문서와 실제 import/data flow가 일치하는가?
 - 기존 구조에 불필요한 FSD migration이나 빈 layer·segment를 만들지 않았는가?
 - FSD면 [`fsd.md`](fsd.md)를 전부 읽고 「자주 나오는 위반」 표에 해당하는 항목이

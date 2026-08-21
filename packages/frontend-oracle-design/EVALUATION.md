@@ -1,5 +1,8 @@
 # frontend-oracle-design 0.1.9 상세 평가
 
+> **Historical evaluation** — 0.1.9 시점 기록이다. 이후 버전에서 상태 전이·증거
+> 게이트 등 일부 지적이 보완되었으므로 현재 상태 감사 결과로 읽지 않는다.
+
 > 평가 기준일: 2026-08-16  
 > 평가 대상: <code>@lodado/frontend-oracle-design-plugin</code> 0.1.9  
 > 기준 커밋: <code>b8f675b8801056cd21390eafcef2b5b144d32fbb</code>  

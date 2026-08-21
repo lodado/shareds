@@ -185,6 +185,8 @@ boilerplate 대신 material한 trade-off만 기록한다.
 - Side effects: request·navigation·storage·analytics·logging의 종류와 owner/boundary
 - Simplicity: 기존 구현→platform/framework 기본 기능→설치 dependency→최소 local
   code 중 처음 요구를 만족한 단계
+- Dependency: 새로 도입·교체한 framework/library가 있으면 해결하는 실제 문제,
+  실제로 사용할 기능, 검토한 대안, 비용과 제거 경로; 없으면 N/A
 - Design: Design Intent가 있으면 visual scope, component·token 재사용, typography,
   responsive, motion·reduced motion, copy, signature와 버린 generic 선택; 없으면 N/A
 - Accessibility: interactive UI의 semantic name·keyboard·focus·상태 전달 증거, 또는 N/A

@@ -215,11 +215,60 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.13.0')
+  assert.equal(version, '0.14.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.13.0')
+  assert.equal(marketplace.version, '0.14.0')
+})
+
+test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
+  const oracleCard = await read('references/oracle-card.md')
+
+  assert.match(oracleCard, /Requested mechanism check — 수단과 결과 분리/)
+  assert.match(oracleCard, /Intended outcome/)
+  assert.match(oracleCard, /Smallest reversible scope/)
+  assert.match(oracleCard, /Deferred scope.*Non-goals/s)
+  assert.match(oracleCard, /scope 축소는 사용자의 명시적\s*\n?\s*승인으로만/)
+  assert.match(oracleCard, /`mandatory-constraint`.*생략\s*\n?\s*근거로 쓰지 않는다/s)
+  assert.match(oracleCard, /요청된 수단이 의도한 결과를 얻는 최소 수단인지/)
+})
+
+test('loads the performance reference only for measured performance claims', async () => {
+  const [skill, performance, frontendImplementation] = await Promise.all([
+    read('SKILL.md'),
+    read('references/performance.md'),
+    read('references/frontend-implementation.md'),
+  ])
+
+  assert.match(skill, /references\/performance\.md/)
+  assert.match(skill, /성능 요구·개선 claim/)
+  assert.match(performance, /제품 정책이 아니다/)
+  assert.match(performance, /Initial-load/)
+  assert.match(performance, /Responsiveness/)
+  assert.match(performance, /profiler/)
+  assert.match(performance, /baseline/)
+  assert.match(performance, /trade-off/)
+  assert.match(performance, /측정 전에는 최적화하지 않는다/)
+  assert.match(performance, /가장 작은 병목만/)
+  assert.match(performance, /P95\/P99 측정을 모든 프로젝트에 강제하지 않는다/)
+  assert.match(performance, /`POLICY_GAP`으로 `NEEDS_DECISION`/)
+  assert.match(performance, /frontend-implementation\.md/)
+  assert.match(frontendImplementation, /performance\.md/)
+})
+
+test('records new dependency decisions and reviews them against real problems and context', async () => {
+  const [implementationLoop, subagentReview] = await Promise.all([
+    read('references/implementation-loop.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  assert.match(implementationLoop, /- Dependency: 새로 도입·교체한 framework\/library/)
+  assert.match(implementationLoop, /비용과 제거 경로; 없으면 N\/A/)
+  assert.match(subagentReview, /왜 새 dependency·framework를 도입했는가\?/)
+  assert.match(subagentReview, /기술 이름·인기가 아니라 실제 문제/)
+  assert.match(subagentReview, /navigation·persistence·권한·결제·cross-unit/)
+  assert.match(subagentReview, /diff 밖의 실제\s*\n?\s*route/)
 })
 
 test('reuses the repository network boundary and colocates approved MSW handlers', async () => {

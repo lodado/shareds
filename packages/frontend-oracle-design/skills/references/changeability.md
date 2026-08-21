@@ -137,6 +137,8 @@ const isCouponCodeValid = couponCode.length <= 20
 ### Implementation Decision evidence · Reviewer 판정 기준
 
 - Decision에는 함께 바뀌는 정책과 owner, 중복을 허용하거나 공통화한 drift 근거를 적는다.
+- feature·route를 삭제할 때 함께 제거될 source·test·mock·문서가 같은 경계에
+  모여 있는지 확인한다.
 - 동일 정책이 떨어져 drift를 만들거나 unrelated 책임이 한 abstraction에 묶이면
   `FINDING` 후보다.
 - 단순 중복 줄 수와 선호하는 폴더 구조는 blocking 근거가 아니다.
@@ -255,6 +257,8 @@ memoization·cache·lazy loading과 단일 request를 위한 global state다.
 - Toss의 조직 구조·내부 도구나 숫자 threshold를 blocker로 바꾸지 않는다.
 - FSD, monorepo, 특정 state/query library를 자동 도입하지 않는다.
 - hook 반환, `type`/`interface`, export와 함수 문법을 통일하지 않는다.
+- 함수형·객체지향 같은 패러다임 명칭만으로 component·hook·상태 구조를 판정하지
+  않는다. 상태 소유자, 외부 effect 위치, 입력·출력·오류 계약이 기준이다.
 - 100% coverage, zero dependency 또는 특정 React·Next 버전을 보편 규칙으로 만들지 않는다.
 - “Toss가 만들었다”는 이유만으로 build-vs-buy 결정을 하지 않는다.
 

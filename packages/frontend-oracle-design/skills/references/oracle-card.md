@@ -38,6 +38,24 @@ Risk·Grill 전에 사용자가 제공했거나 레포가 승인된 기준으로
 - Sources: S1, S2
 ```
 
+### Requested mechanism check — 수단과 결과 분리
+
+사용자가 구체적 수단(화면·필드·버튼·자동화·조건)을 요청했지만 의도한 결과나
+사용자가 불명확하면 Outcome Brief에 다음을 함께 기록한다. 수단과 결과가 이미
+일치하면 이 소절 없이 그대로 진행한다.
+
+- Requested mechanism: 사용자가 요청한 구체적 수단
+- Intended outcome: 실제로 해결하려는 사용자·비즈니스 문제
+- Smallest reversible scope: 그 결과를 확인할 수 있는 최소 가역 범위
+- Deferred scope: 검증 전에는 만들지 않을 범위 — Non-goals에 사유와 함께 기록
+
+규칙:
+
+- 더 작은 대안은 Draft Oracle에 제시만 한다. scope 축소는 사용자의 명시적
+  승인으로만 확정하며 에이전트가 임의로 줄이지 않는다.
+- 이 검토를 `mandatory-constraint`(보안·개인정보·법·접근성·데이터 정합성) 생략
+  근거로 쓰지 않는다.
+
 ```markdown
 ## Source Registry
 
@@ -121,6 +139,7 @@ visual identity 변경이면 카드 작성 전 [`visual-design.md`](visual-desig
 - A 후 B 요청, B 후 A 응답에서 어떤 결과가 이길지
 - 이탈·취소 후 늦은 응답을 어떻게 처리할지
 - outcome-unknown timeout에서 재시도와 idempotency를 어떻게 보장할지
+- 요청된 수단이 의도한 결과를 얻는 최소 수단인지, 더 작은 대안을 먼저 검증할지
 
 ## 4. 정책 출처
 
