@@ -10,38 +10,44 @@ The config ships composable presets. Enable only what the package actually is.
 ## Install
 
 ```bash
-pnpm add -D @lodado/eslint-config eslint@^8.57.0
+pnpm add -D @lodado/eslint-config eslint@^9.39.5
 ```
 
-`react`와 `next` preset을 함께 쓰는 pnpm 레포는 `eslint-plugin-react-hooks`를 한
-버전으로 고정해야 한다 — `eslint-config-next`가 자기 구버전을 물고 있어 ESLint 8이
-같은 plugin 이름의 두 복사본을 거부한다:
-
-```jsonc
-// package.json
-"pnpm": { "overrides": { "eslint-plugin-react-hooks": "^7.1.1" } }
-```
+v1.0.0부터 ESLint 9 flat config 전용이다 — `.eslintrc.*` 레포는 `eslint.config.mjs`로
+이전해야 쓸 수 있다. `next` preset은 `eslint-config-next@16`이 `next` 패키지 자체를
+require하므로 Next 앱(next 설치됨)에서만 동작한다. preset들이 공유 plugin 참조를
+내부에서 하나로 정규화하므로 별도 pnpm override는 필요 없다.
 
 ## Compose
 
-`.eslintrc.js` in the consuming package:
+`eslint.config.mjs` in the consuming package — every preset is a flat-config array, spread it:
 
 ```js
-module.exports = {
-  root: true,
-  extends: [
-    '@lodado/eslint-config', // always - TS parsing, import sort, prettier conflict removal
-    '@lodado/eslint-config/react', // React components (airbnb + hooks/effect discipline)
-    '@lodado/eslint-config/next', // Next.js apps only
-    '@lodado/eslint-config/a11y', // JSX that renders user-facing markup
-    '@lodado/eslint-config/turbo', // Turborepo workspaces - catches undeclared env vars
-    '@lodado/eslint-config/local-rules', // lodado custom rules - see the table below
-    '@lodado/eslint-config/testing', // Vitest/Testing Library + Playwright, scoped by file path
-    '@lodado/eslint-config/query', // packages using TanStack Query
-    '@lodado/eslint-config/strict-types', // typed lint - exhaustive discriminated union switches
-  ],
-}
+import base from '@lodado/eslint-config' // always - TS parsing, import sort, prettier conflict removal
+import react from '@lodado/eslint-config/react' // React recommended + hooks/effect discipline
+import next from '@lodado/eslint-config/next' // Next.js apps only
+import a11y from '@lodado/eslint-config/a11y' // JSX that renders user-facing markup
+import turbo from '@lodado/eslint-config/turbo' // Turborepo workspaces - catches undeclared env vars
+import localRules from '@lodado/eslint-config/local-rules' // lodado custom rules - see the table below
+import testing from '@lodado/eslint-config/testing' // Vitest/Testing Library + Playwright, scoped by file path
+import query from '@lodado/eslint-config/query' // packages using TanStack Query
+import strictTypes from '@lodado/eslint-config/strict-types' // typed lint - exhaustive discriminated union switches
+
+export default [
+  { ignores: ['dist/**', '.next/**', 'coverage/**'] },
+  ...base,
+  ...react,
+  ...next,
+  ...a11y,
+  ...turbo,
+  ...localRules,
+  ...testing,
+  ...query,
+  ...strictTypes,
+]
 ```
+
+CJS(`eslint.config.js`)면 `require`로 같은 배열을 spread한다.
 
 ## Which presets
 

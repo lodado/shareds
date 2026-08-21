@@ -8,7 +8,11 @@ const { RuleTester } = require('eslint')
 const rules = require('./rules')
 
 const ruleTester = new RuleTester({
-  parserOptions: { ecmaVersion: 2022, sourceType: 'module', ecmaFeatures: { jsx: true } },
+  languageOptions: {
+    ecmaVersion: 2022,
+    sourceType: 'module',
+    parserOptions: { ecmaFeatures: { jsx: true } },
+  },
 })
 
 ruleTester.run('no-console-log', rules['no-console-log'], {
@@ -343,8 +347,12 @@ ruleTester.run('fsd-no-driver-outside-repository', rules['fsd-no-driver-outside-
 
 /** The state-modeling rules read TypeScript type nodes, so they need the TS parser. */
 const typedRuleTester = new RuleTester({
-  parser: require.resolve('@typescript-eslint/parser'),
-  parserOptions: { ecmaVersion: 2022, sourceType: 'module', ecmaFeatures: { jsx: true } },
+  languageOptions: {
+    parser: require('@typescript-eslint/parser'),
+    ecmaVersion: 2022,
+    sourceType: 'module',
+    parserOptions: { ecmaFeatures: { jsx: true } },
+  },
 })
 
 typedRuleTester.run('require-discriminated-state', rules['require-discriminated-state'], {

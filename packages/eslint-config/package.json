@@ -1,6 +1,6 @@
 {
   "name": "@lodado/eslint-config",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Composable ESLint presets - enable only the ones you want",
   "license": "MIT",
   "main": "index.js",
@@ -41,25 +41,29 @@
     "lint": "eslint index.js react.js next.js a11y.js turbo.js local-rules.js testing.js query.js fsd.js test.js strict-types.js"
   },
   "dependencies": {
+    "@eslint/js": "^9.39.0",
     "@lodado/eslint-plugin-local-rules": "workspace:*",
     "@tanstack/eslint-plugin-query": "^5.101.4",
-    "@typescript-eslint/eslint-plugin": "^6.21.0",
-    "@typescript-eslint/parser": "^6.21.0",
-    "eslint-config-airbnb": "^19.0.4",
-    "eslint-config-next": "^14.2.5",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-config-turbo": "^1.13.4",
-    "eslint-plugin-import": "^2.29.1",
-    "eslint-plugin-jsx-a11y": "^6.8.0",
+    "@vitest/eslint-plugin": "^1.6.27",
+    "eslint-config-next": "^16.3.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-config-turbo": "^2.10.11",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-playwright": "^2.11.0",
-    "eslint-plugin-react": "^7.34.1",
+    "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-you-might-not-need-an-effect": "^1.0.2",
     "eslint-plugin-simple-import-sort": "^12.1.0",
     "eslint-plugin-testing-library": "^7.16.2",
-    "eslint-plugin-vitest": "^0.5.4"
+    "globals": "^16.4.0",
+    "typescript-eslint": "^8.67.0"
   },
   "peerDependencies": {
-    "eslint": "^8.57.0"
+    "eslint": "^9.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5",
+    "next": "^16.3.1"
   }
 }

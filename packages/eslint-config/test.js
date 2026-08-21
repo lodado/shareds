@@ -1,23 +1,31 @@
 /* eslint-disable @lodado/local-rules/no-console-log -- test progress output */
 /**
  * Smoke test for the presets. Each one is linted the way it is meant to be used -
- * layered on top of the base preset - so a missing plugin, a bad `extends` entry,
+ * layered on top of the base preset - so a missing plugin, a bad config entry,
  * or a preset that breaks parsing shows up as a failure instead of a silent message.
  */
 const assert = require('assert')
 const path = require('path')
 const { ESLint } = require('eslint')
 
-const BASE = path.join(__dirname, 'index.js')
-const OPTIONAL_PRESETS = ['react', 'next', 'a11y', 'turbo', 'local-rules', 'testing', 'query']
+const BASE = require('./index.js')
+const PRESETS = {
+  react: require('./react.js'),
+  next: require('./next.js'),
+  a11y: require('./a11y.js'),
+  turbo: require('./turbo.js'),
+  'local-rules': require('./local-rules.js'),
+  testing: require('./testing.js'),
+  query: require('./query.js'),
+}
 
 const SAMPLE = 'export const answer = 42\n'
 
-const lint = async (extendsList, code = SAMPLE, fileName = 'sample.tsx') => {
+const lint = async (configs, code = SAMPLE, fileName = 'sample.tsx') => {
   const eslint = new ESLint({
-    useEslintrc: false,
     cwd: __dirname,
-    baseConfig: { extends: extendsList },
+    overrideConfigFile: true,
+    overrideConfig: configs,
   })
 
   const [result] = await eslint.lintText(code, { filePath: path.join(__dirname, fileName) })
@@ -30,30 +38,25 @@ const assertNoFatal = (result, label) => {
 }
 
 const main = async () => {
-  const base = await lint([BASE])
+  const base = await lint(BASE)
   assertNoFatal(base, 'base')
   assert.strictEqual(base.messages.length, 0, `base: unexpected messages ${JSON.stringify(base.messages)}`)
   console.log('ok  base preset lints clean')
 
-  for (const preset of OPTIONAL_PRESETS) {
-    // eslint-disable-next-line no-await-in-loop
-    const result = await lint([BASE, path.join(__dirname, `${preset}.js`)])
+  for (const [preset, configs] of Object.entries(PRESETS)) {
+    const result = await lint([...BASE, ...configs])
     assertNoFatal(result, preset)
     assert.strictEqual(result.messages.length, 0, `${preset}: unexpected messages ${JSON.stringify(result.messages)}`)
     console.log(`ok  base + ${preset}`)
   }
 
-  const combined = await lint([BASE, ...OPTIONAL_PRESETS.map((preset) => path.join(__dirname, `${preset}.js`))])
+  const combined = await lint([...BASE, ...Object.values(PRESETS).flat()])
   assertNoFatal(combined, 'combined')
   assert.strictEqual(combined.messages.length, 0, `combined: unexpected messages ${JSON.stringify(combined.messages)}`)
   console.log('ok  every preset combined')
 
   // no-console-log is the one rule we ship ourselves - assert it actually fires.
-  const reported = await lint(
-    [BASE, path.join(__dirname, 'local-rules.js')],
-    'console.log("hi")\n',
-    'sample-console.tsx',
-  )
+  const reported = await lint([...BASE, ...PRESETS['local-rules']], 'console.log("hi")\n', 'sample-console.tsx')
   assert.ok(
     reported.messages.some((message) => message.ruleId === '@lodado/local-rules/no-console-log'),
     'local-rules: no-console-log did not report on console.log',
@@ -61,11 +64,7 @@ const main = async () => {
   console.log('ok  local-rules/no-console-log reports')
 
   // Severity comes from each rule's meta.docs.recommended - judgement calls stay warnings.
-  const effect = await lint(
-    [BASE, path.join(__dirname, 'local-rules.js')],
-    'useEffect(() => {}, [])\n',
-    'sample-effect.tsx',
-  )
+  const effect = await lint([...BASE, ...PRESETS['local-rules']], 'useEffect(() => {}, [])\n', 'sample-effect.tsx')
   const annotation = effect.messages.find(
     (message) => message.ruleId === '@lodado/local-rules/require-effect-annotation',
   )
@@ -74,11 +73,7 @@ const main = async () => {
   console.log('ok  local-rules severity follows meta.docs.recommended')
 
   // Opt-in rules ship off, so a repo with its own test-file convention is not flooded.
-  const optIn = await lint(
-    [BASE, path.join(__dirname, 'local-rules.js')],
-    'export const x = 1\n',
-    'sample-optin.test.tsx',
-  )
+  const optIn = await lint([...BASE, ...PRESETS['local-rules']], 'export const x = 1\n', 'sample-optin.test.tsx')
   assert.ok(
     !optIn.messages.some((message) => message.ruleId === '@lodado/local-rules/scenario-test-filename'),
     'local-rules: scenario-test-filename should be off by default',
@@ -86,8 +81,8 @@ const main = async () => {
   console.log('ok  local-rules opt-in rules stay off')
 
   // The testing preset routes by file path - unit rules and Playwright rules must land separately.
-  const assertReports = async (extendsList, code, fileName, ruleId) => {
-    const result = await lint(extendsList, code, fileName)
+  const assertReports = async (configs, code, fileName, ruleId) => {
+    const result = await lint(configs, code, fileName)
     assert.ok(
       result.messages.some((message) => message.ruleId === ruleId),
       `${ruleId} did not report on ${fileName}: ${JSON.stringify(result.messages)}`,
@@ -95,7 +90,7 @@ const main = async () => {
     console.log(`ok  ${ruleId} reports on ${fileName}`)
   }
 
-  const TESTING = [BASE, path.join(__dirname, 'testing.js')]
+  const TESTING = [...BASE, ...PRESETS.testing]
   await assertReports(TESTING, 'test.only("submits", () => {})\n', 'sample.test.tsx', 'vitest/no-focused-tests')
   await assertReports(
     TESTING,
@@ -104,7 +99,7 @@ const main = async () => {
     'playwright/no-wait-for-timeout',
   )
   await assertReports(
-    [BASE, path.join(__dirname, 'query.js')],
+    [...BASE, ...PRESETS.query],
     // The rule only inspects query calls inside a component or hook, not module scope.
     'export function Item({ id }) {\n  return useQuery({ queryKey: ["item"], queryFn: () => fetchItem(id) })\n}\n',
     'sample-query.tsx',
@@ -113,7 +108,7 @@ const main = async () => {
 
   // The react preset's effect discipline - deriving state inside an effect must
   // fire both the compiler rule and the you-might-not-need-an-effect rule.
-  const REACT = [BASE, path.join(__dirname, 'react.js')]
+  const REACT = [...BASE, ...PRESETS.react]
   const derivedEffect = [
     "import { useEffect, useState } from 'react'",
     'export const Count = ({ items }) => {',
@@ -133,19 +128,19 @@ const main = async () => {
 
   // The state-modeling rules read TS type nodes through the base preset's parser.
   await assertReports(
-    [BASE, path.join(__dirname, 'local-rules.js')],
+    [...BASE, ...PRESETS['local-rules']],
     "type Save = { status: 'idle' | 'saving'; error?: string }\n",
     'sample-state.tsx',
     '@lodado/local-rules/require-discriminated-state',
   )
   await assertReports(
-    [BASE, path.join(__dirname, 'local-rules.js')],
+    [...BASE, ...PRESETS['local-rules']],
     'export const payload = (await response.json()) as Payment\n',
     'sample-boundary.tsx',
     '@lodado/local-rules/no-response-type-assertion',
   )
   await assertReports(
-    [BASE, path.join(__dirname, 'local-rules.js')],
+    [...BASE, ...PRESETS['local-rules']],
     "export const failed = { status: 'failure', retry: () => undefined }\n",
     'sample-action-state.tsx',
     '@lodado/local-rules/no-action-in-state',
@@ -154,12 +149,17 @@ const main = async () => {
   // strict-types needs type information, so it lints a real on-disk fixture file.
   const strictFixture = path.join(__dirname, 'strict-types-fixture')
   const strictEslint = new ESLint({
-    useEslintrc: false,
     cwd: strictFixture,
-    baseConfig: {
-      extends: [BASE, path.join(__dirname, 'strict-types.js')],
-      parserOptions: { project: path.join(strictFixture, 'tsconfig.json'), tsconfigRootDir: strictFixture },
-    },
+    overrideConfigFile: true,
+    overrideConfig: [
+      ...BASE,
+      ...require('./strict-types.js'),
+      {
+        languageOptions: {
+          parserOptions: { project: path.join(strictFixture, 'tsconfig.json'), tsconfigRootDir: strictFixture },
+        },
+      },
+    ],
   })
   const [strictResult] = await strictEslint.lintFiles([path.join(strictFixture, 'sample.ts')])
   assert.ok(

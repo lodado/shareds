@@ -6,12 +6,12 @@
     "name": "lodado",
     "url": "https://github.com/lodado"
   },
-  "version": "0.17.1",
+  "version": "0.17.2",
   "plugins": [
     {
       "name": "vibe-coding-helper",
       "description": "ESLint preset adoption and repo conventions for lodado projects.",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "author": {
         "name": "lodado"
       },
@@ -23,7 +23,7 @@
     {
       "name": "frontend-oracle-design",
       "description": "Medium/high-risk Oracle-driven frontend contracts, TDD, evidence gates, and review.",
-      "version": "0.17.1",
+      "version": "0.17.2",
       "author": {
         "name": "lodado"
       },

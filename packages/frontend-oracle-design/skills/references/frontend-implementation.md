@@ -192,14 +192,14 @@ Encapsulation Gate와 같다 — 레포의 기존 규칙 재사용이 먼저고,
 1. `@lodado/eslint-config/react`를 쓰는 레포는 이미 켜져 있다 —
    `react-hooks/set-state-in-effect`·`set-state-in-render`(effect 안 동기
    setState, 파생 state와 chain의 시작점)와
-   `react-you-might-not-need-an-effect` legacy-strict
+   `react-you-might-not-need-an-effect` strict
    (`no-derived-state`·`no-chain-state-updates`·`no-event-handler`·
    `no-adjust-state-on-prop-change` 등 전 규칙 error)가 위 금지 목록과 대응한다.
 2. 그 외 레포는 `eslint-plugin-react-hooks` 6+(4.x는
    `rules-of-hooks`·`exhaustive-deps`뿐이라 잡지 못한다)와
-   `eslint-plugin-react-you-might-not-need-an-effect` 도입을 제안한다. pnpm에서
-   `next` preset과 함께 쓰면 `eslint-config-next`가 자기 구버전 react-hooks를
-   물고 있어 plugin 충돌이 나므로 root `pnpm.overrides`로 한 버전으로 고정한다.
+   `eslint-plugin-react-you-might-not-need-an-effect` 도입을 제안한다. flat config는 같은
+   plugin 이름에 하나의 인스턴스만 허용하므로, 직접 조합하는 레포는 공유 plugin
+   참조를 한 곳에서만 정의한다.
 
 lint는 effect의 **형태**만 잡는다. 남은 effect가 실제 외부 시스템 동기화인지,
 사유·cleanup이 있는지는 reviewer가 판정한다.

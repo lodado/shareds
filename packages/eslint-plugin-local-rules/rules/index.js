@@ -1,4 +1,3 @@
-/* eslint-disable global-require */
 module.exports = {
   'fsd-no-banned-segments': require('./fsd-no-banned-segments'),
   'fsd-no-deep-import': require('./fsd-no-deep-import'),

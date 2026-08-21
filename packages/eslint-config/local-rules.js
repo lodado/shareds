@@ -1,4 +1,4 @@
-const { rules } = require('@lodado/eslint-plugin-local-rules')
+const localRulesPlugin = require('@lodado/eslint-plugin-local-rules')
 
 /**
  * Rules that flag a judgement call rather than a certain defect ship as warnings.
@@ -15,13 +15,16 @@ const severityOf = (rule) => {
   return recommended === 'warn' ? 'warn' : 'error'
 }
 
-const localRules = Object.entries(rules).reduce((acc, [ruleName, rule]) => {
+const localRules = Object.entries(localRulesPlugin.rules).reduce((acc, [ruleName, rule]) => {
   acc[`@lodado/local-rules/${ruleName}`] = severityOf(rule)
   return acc
 }, {})
 
 /** Every rule shipped by @lodado/eslint-plugin-local-rules, switched on. */
-module.exports = {
-  plugins: ['@lodado/local-rules'],
-  rules: localRules,
-}
+module.exports = [
+  {
+    name: 'lodado/local-rules',
+    plugins: { '@lodado/local-rules': localRulesPlugin },
+    rules: localRules,
+  },
+]

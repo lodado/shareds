@@ -22,9 +22,10 @@
     "lint": "eslint index.js rules test.js"
   },
   "peerDependencies": {
-    "eslint": "^8.57.0"
+    "eslint": "^8.57.0 || ^9.0.0"
   },
   "devDependencies": {
-    "@typescript-eslint/parser": "^6.21.0"
+    "@typescript-eslint/parser": "^8.67.0",
+    "eslint": "^9.39.5"
   }
 }
