@@ -343,14 +343,12 @@ test('O17: 자동 TC 단어가 계약 행 밖에만 있으면 충족으로 보�
   assert.match(linted.stderr, /out-of-order/)
 })
 
-test('state-model: async 행이 있는데 State Model 섹션이 없으면 실패한다', async (t) => {
+test('state-model: 섹션은 선택이다 — async 행이 있어도 없으면 그냥 통과한다', async (t) => {
   const withoutStateModel = VALID_CARD.slice(0, VALID_CARD.indexOf('## State Model'))
 
   const linted = run('card', '--oracle', await cardFile(t, withoutStateModel))
 
-  assert.equal(linted.status, 1)
-  assert.match(linted.stderr, /state-model-missing/)
-  assert.match(linted.stderr, /O1/)
+  assert.equal(linted.status, 0, linted.stderr)
 })
 
 test('state-model: 전이가 카드 행을 인용하지 않거나 없는 행을 인용하면 실패한다', async (t) => {

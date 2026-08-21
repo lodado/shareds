@@ -199,13 +199,13 @@ Draft 단계는 `Status: draft` 유지. 사용자가 카드 전문·delta를 확
 | O3  | P2   | pending   | 서버 5xx   | 오류+입력 유지 | 성공 UI, 입력 유실 | 성공 저장×0 | 상태: error   |
 ```
 
-### State Model — async 흐름이 있는 Medium/High만
+### State Model — 선택 사항
 
-카드에 async·순서 역전·중복 제출·retry·다단계 상태 `O*` 행이 있으면 계약 행 뒤에
-`## State Model`을 추가한다. 정적 표시·단순 toggle에는 만들지 않는다.
-`oracle-verify.mjs card`가 기계로 강제한다: `O*` 행의 `Given`·`When`·`BVA`에
-pending·loading·retry·역전·중복·timeout·취소류 토큰이 있으면 `## State Model` 섹션,
-비어 있지 않은 `States`·`Events`, 모든 전이가 실제 `O*` 행을 인용하는 전이표 없이는
+기본값은 생략이다. async 행이 있어도 `O*` 행 자체가 계약이며, 섹션이 없다고
+lint가 막지 않는다. 전이 정책이 행 나열만으로 읽히지 않을 만큼 얽힌 카드
+(다단계 제출·낙관적 롤백·결제류)에만 계약 행 뒤에 `## State Model`을 추가한다.
+추가했다면 `oracle-verify.mjs card`가 구조를 검증한다: 비어 있지 않은
+`States`·`Events`, 모든 전이가 실제 `O*` 행을 인용하는 전이표 없이는
 `CARD_LINT_FAILED`로 lock이 막힌다.
 
 ```markdown

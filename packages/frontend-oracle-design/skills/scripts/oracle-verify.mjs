@@ -60,22 +60,6 @@ const AUTO_TEST_CASES = [
   { kind: '취소', tokens: ['취소', '이탈', 'cancel'] },
 ]
 
-/** O* 행의 Given·When·BVA에 이 토큰이 있으면 카드에 `## State Model`이 필수다. */
-const ASYNC_STATE_TOKENS = [
-  'pending',
-  'loading',
-  '로딩',
-  'retry',
-  '재시도',
-  '역전',
-  'out-of-order',
-  '중복',
-  'timeout',
-  '타임아웃',
-  '취소',
-  'cancel',
-]
-
 // oracle:nondeterminism scan이 찾는 토큰 목록 자체다 — 실행 경로가 아니다
 const NONDETERMINISM_TOKENS = ['Date.now', 'Math.random', 'crypto.randomUUID', 'toLocale', 'new Intl.', 'new Date()']
 
@@ -398,53 +382,40 @@ async function lintCard(options) {
     }
   }
 
-  const asyncRows = rows.filter((row) => {
-    if (!row.id.startsWith('O')) return false
-    const text = `${cellOf(row, 'Given')} ${cellOf(row, 'When')} ${cellOf(row, 'BVA')}`
-    return ASYNC_STATE_TOKENS.some((token) => text.includes(token))
-  })
+  // State Model 섹션은 선택이다 — 없어도 lint를 막지 않고, 있으면 구조를 검증한다.
+  const stateModel = sectionLines(lines, 'State Model')
 
-  if (asyncRows.length > 0) {
-    const stateModel = sectionLines(lines, 'State Model')
-
-    if (stateModel.length === 0) {
-      issues.push(
-        `state-model-missing: async rows (${asyncRows
-          .map((row) => row.id)
-          .join(', ')}) require a \`## State Model\` section`,
-      )
-    } else {
-      for (const field of ['States', 'Events']) {
-        const value = stateModel
-          .find((line) => line.trim().startsWith(`- ${field}:`))
-          ?.split(':')
-          .slice(1)
-          .join(':')
-          .trim()
-        if (!value || isEmptyCell(value)) {
-          issues.push(`state-model-field: State Model must list concrete ${field}`)
-        }
+  if (stateModel.length > 0) {
+    for (const field of ['States', 'Events']) {
+      const value = stateModel
+        .find((line) => line.trim().startsWith(`- ${field}:`))
+        ?.split(':')
+        .slice(1)
+        .join(':')
+        .trim()
+      if (!value || isEmptyCell(value)) {
+        issues.push(`state-model-field: State Model must list concrete ${field}`)
       }
+    }
 
-      const transitions = stateModel
-        .filter((line) => line.trim().startsWith('|'))
-        .map((line) => splitRow(line.trim()))
-        .filter((cells) => cells[0] !== 'From' && !/^:?-+:?$/.test(cells[0]))
+    const transitions = stateModel
+      .filter((line) => line.trim().startsWith('|'))
+      .map((line) => splitRow(line.trim()))
+      .filter((cells) => cells[0] !== 'From' && !/^:?-+:?$/.test(cells[0]))
 
-      if (transitions.length === 0) {
-        issues.push('state-model-transitions: State Model must include a From/Event/To transition table')
+    if (transitions.length === 0) {
+      issues.push('state-model-transitions: State Model must include a From/Event/To transition table')
+    }
+
+    for (const cells of transitions) {
+      const cited = rowIds(cells.join(' '))
+      if (cited.length === 0) {
+        issues.push(
+          `state-model-row-unlinked: transition "${cells.slice(0, 3).join(' → ')}" must cite at least one O* row`,
+        )
       }
-
-      for (const cells of transitions) {
-        const cited = rowIds(cells.join(' '))
-        if (cited.length === 0) {
-          issues.push(
-            `state-model-row-unlinked: transition "${cells.slice(0, 3).join(' → ')}" must cite at least one O* row`,
-          )
-        }
-        for (const id of cited) {
-          if (!seenRows.has(id)) issues.push(`state-model-row-unknown: ${id} is not a contract row`)
-        }
+      for (const id of cited) {
+        if (!seenRows.has(id)) issues.push(`state-model-row-unknown: ${id} is not a contract row`)
       }
     }
   }

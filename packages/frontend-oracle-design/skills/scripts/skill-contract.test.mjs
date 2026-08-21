@@ -215,11 +215,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.12.0')
+  assert.equal(version, '0.13.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.12.0')
+  assert.equal(marketplace.version, '0.13.0')
 })
 
 test('reuses the repository network boundary and colocates approved MSW handlers', async () => {
@@ -538,10 +538,11 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
     read('scripts/oracle-verify.mjs'),
   ])
 
-  assert.match(verifier, /state-model-missing/)
+  // State Model은 선택 섹션이다 — 부재를 lint로 강제하지 않고, 있을 때만 구조를 검증한다
+  assert.doesNotMatch(verifier, /state-model-missing/)
+  assert.doesNotMatch(verifier, /ASYNC_STATE_TOKENS/)
   assert.match(verifier, /state-model-row-unlinked/)
   assert.match(verifier, /state-model-row-unknown/)
-  assert.match(verifier, /ASYNC_STATE_TOKENS/)
 
   assert.match(skill, /references\/type-constraints\.md/)
   assert.match(skill, /client state·exported Props/)
@@ -549,6 +550,8 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
   assert.doesNotMatch(skill, /state-modeling\.md/)
   assert.match(skill, /기존 query·router·form이\s+상태를 소유하면 새 `status` union을 만들지 않는다/)
   assert.match(oracleCard, /## State Model/)
+  assert.match(oracleCard, /State Model — 선택 사항/)
+  assert.match(oracleCard, /섹션이 없다고\s*\n?\s*lint가 막지 않는다/)
   assert.match(oracleCard, /참조 없는 전이는 발명된 정책이다/)
   assert.match(frontendImplementation, /type-constraints\.md/)
   assert.match(frontendImplementation, /client state·/)
