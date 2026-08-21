@@ -149,19 +149,33 @@ function useDetail(id: DetailId): { state: DetailState; retry: () => void }
 
 ## 제약 선택 순서
 
-같은 잘못된 사용을 여러 도구가 닫을 수 있으면 **앞 단부터** 검토하고, 앞 단으로
-닫히면 뒷 단을 쓰지 않는다. 생성 결과를 같게 만들려는 규칙이 아니라, 불필요하게
-복잡한 뒷 단 메커니즘을 일관되게 탈락시키는 우선순위다.
+먼저 문제가 어느 종류인지 분류한다. 소유권·상태 공간·API 관계는 서로 다른 축이라
+하나의 전역 순서로 섞지 않는다 — `keyof`가 discriminated union보다 항상 뒤라는
+식의 전역 순서는 없다. 각 사다리 안에서만 **앞 단부터** 검토하고, 앞 단으로 실제
+오용이 닫히면 뒷 단을 쓰지 않는다. 생성 결과를 같게 만들려는 규칙이 아니라,
+불필요하게 복잡한 뒷 단 메커니즘을 일관되게 탈락시키는 우선순위다.
 
 ```text
-기존 owner 재사용·API 부재 → schema·config·값에서 파생 → boundary parse
-→ capability·API 분리 → union + never → discriminated union → satisfies·exhaustiveness
-→ keyof / typeof / indexed access → 관계형 generic·lookup map·NoInfer → tagged type
-→ overload → mapped / conditional type → recursive type
+A. 소유권·boundary
+   기존 owner 재사용 → 저장하지 않고 파생 → API 부재로 불가능하게
+   → 외부 값은 unknown에서 runtime parse → schema·config·상수에서 타입 파생
+
+B. 상태 공간
+   framework union 소비 → capability·API 분리 → union + never
+   → discriminated union → exhaustive lookup·assertNever
+   → 순서 위반 자체가 도메인 오류일 때만 transition machine
+
+C. API 관계
+   typeof·as const·satisfies → keyof·indexed access
+   → 내장 utility (Pick·Omit·Extract·Exclude·Parameters·ReturnType·Awaited)
+   → 관계형 generic·lookup map → tagged type → const type parameter·NoInfer
+   → 이산 입출력 관계 2~3개면 overload → 합성 가능한 관계면 mapped·conditional
+   → 중첩 구조 자체가 계약일 때만 recursive
 ```
 
-trust boundary의 parse는 선택 사항이 아니다. 나머지는 앞 단으로 실제 오용이 닫히면
-뒤 단을 사용하지 않는다.
+trust boundary의 parse는 선택 사항이 아니다. 서로 다른 종류의 문제는 각 사다리에서
+독립적으로 판정하고, 같은 사다리 안에서 앞 단으로 닫히는 문제에 뒷 단을 쓰면
+`FINDING`이다.
 
 내장 utility로 표현되는 관계(`Awaited`·`ReturnType`·`Parameters`·`Extract`·
 `Exclude`·`NonNullable`·`NoInfer`·`Readonly`·`Record`·`Pick`·`Omit`)를 custom
@@ -170,11 +184,14 @@ recursive)는 「Props와 API 표면」의 격리 조건을 만족할 때만 쓴
 
 ## 타입 작성 규칙
 
-**선언보다 파생.** 수기로 선언하는 타입은 정책이 담긴 두 종류 — 연산 union과 실패
-union — 뿐이다. entity·ID는 스키마에서 `z.output`으로, 부분집합은
-`Extract`·`Exclude`로, 유한 문자열 union은 `as const` 상수에서 파생한다. 파생
-가능한 타입을 수기로 복제하면 variant 추가 시 두 권위가 어긋난다. 수기 선언 수가
-파생 수보다 많아지면 설계를 재검토한다.
+**선언보다 파생.** 수기 선언은 타입 자체가 정책의 유일한 출처인 닫힌 계약 —
+상태·이벤트·실패·연산 union, tagged/branded type, 공개 API의 capability·상호
+배타 Props — 에만 쓴다. schema·config·상수·entity에서 계산 가능한 projection은
+수기로 복제하지 않는다: entity·ID는 `z.output`, 부분집합은 `Extract`·`Exclude`,
+유한 문자열 union은 `as const` 상수, 객체 key는 `keyof typeof`, 함수 관계는
+`Parameters`·`ReturnType`·`Awaited`에서 파생한다. 판정 기준은 수기 선언의 개수가
+아니라 **동일한 사실을 둘 이상의 위치가 소유하는지**다. 하나의 정책 사실을
+schema와 interface, 상수와 union이 동시에 소유하면 두 권위가 어긋난다.
 
 ```typescript
 type PaymentState =
@@ -187,14 +204,17 @@ type PaymentState =
 - 단일 `status` 문자열 literal discriminant를 쓴다. boolean 병렬 flag
   (`isLoading`·`isError`·`isSuccess`)로 같은 흐름을 표현하지 않는다.
 - 각 상태의 필드는 **그 상태에서만 의미 있는 값**만 담는다. 전 상태 공통 optional
-  필드로 합치지 않는다. 상태가 4개 이상이면 variant record에서 union을 파생해
-  discriminant 오타와 중복을 없앨 수 있다:
+  필드로 합치지 않는다. variant 수 자체는 variant record 도입 근거가 아니다 —
+  명시 union이 더 읽기 쉬우면 상태가 많아도 유지한다. 같은 record가 상태 union과
+  variant별 runtime lookup(config·renderer·메시지·권한) 중 둘 이상을 실제로
+  파생하는 단일 권위일 때만 record에서 union을 파생한다:
   ```typescript
   type Steps = {
     editing: { amount: number; fieldErrors: FieldErrors }
     submitting: { amount: number; requestId: string }
   }
   type State = { [K in keyof Steps]: { status: K } & Steps[K] }[keyof Steps]
+  const stepLabel = { editing: '입력 중', submitting: '처리 중' } satisfies Record<keyof Steps, string>
   ```
 - 실패는 카드가 subtype을 구분하면 (`network`·`validation`·`5xx`) `reason`도
   discriminated union으로 만든다. 문자열 하나로 뭉개지 않는다. 예상 가능한 실패를
@@ -207,6 +227,35 @@ type PaymentState =
 - mutation payload는 entity의 `Partial`이 아니라 실제 연산 union으로 모델링한다
   (`rename`·`clear-description`처럼). `undefined`가 "유지"인지 "삭제"인지 모호한
   patch 타입을 만들지 않는다. 유지·설정·삭제가 모두 가능하면 연산을 분리한다.
+
+## 런타임보다 강하게 말하지 않는다
+
+타입은 구현이 실제로 보장하는 범위까지만 약속한다. 아래는 컴파일은 되지만
+런타임보다 강한 거짓 계약이다.
+
+- **`Record<K, V>`는 totality 계약이다** — 모든 `K`가 결과에 존재한다는 뜻이다.
+  구현이 관찰된 key만 채우는 sparse lookup(`groupBy` 결과 등)이면
+  `Partial<Record<K, V>>` 또는 `Map<K, V>`를 쓴다. 전체 key를 사전 순회로
+  초기화하거나 누락 key에 기본값을 채울 때만 `Record<K, V>`다. 이것은
+  `Partial<DomainEntity>` mutation 금지와 다른 문제다 — 전자는 연산 의미를 잃는
+  patch고, 후자는 일부 key만 런타임에 존재한다는 결과 표현이다.
+- **type predicate는 검사 의무가 있다.** `value is T`는 본문이 `T`의 필수
+  invariant를 실제로 검사할 때만 쓴다. 항상 `true`를 반환하거나, `as`를 감싸거나,
+  일부 필드만 검사하고 전체 도메인 타입을 약속하는 predicate를 만들지 않는다.
+  boundary의 복잡한 도메인 타입은 predicate 수기 조립 대신 schema parser가
+  우선이고, `isNotNil` 수준의 단순·정확한 narrowing만 predicate로 남긴다.
+- **wrapper의 반환 계약은 실행 시점을 따른다.** `Parameters<F>`로 호출 계약은
+  보존하되, `ReturnType<F>`는 wrapper가 같은 호출에서 실제 값을 반환할 때만
+  보존한다. debounce·schedule처럼 실행이 지연되면 즉시 반환형은 `void`, 캐시
+  반환이면 `ReturnType<F> | undefined`, async wrapper면
+  `Promise<Awaited<ReturnType<F>>>`처럼 런타임 의미를 그대로 쓴다.
+- **excess property check는 sanitizer가 아니다.** object literal 대입에만
+  적용되며, `const user: PublicUser = source` 같은 annotation은 `source`의 민감
+  필드를 런타임에서 제거하지 않는다. 민감 필드 제거·exact object 보장은 runtime
+  projection이나 parser가 소유한다.
+- **key remapping 반환형은 런타임과 동형이어야 한다.** 함수가 실제로 key를
+  변환하지 않는데 `ToCamelCaseKeys<T>` 같은 key 변환 반환 타입만 붙이면 거짓
+  계약이다.
 
 ## Props와 API 표면
 
@@ -308,10 +357,20 @@ variant별 설정(라벨·메시지·핸들러·권한)도 `satisfies Record<Uni
 ## 단언과 `any` 정책
 
 제품 코드에서 `value as DomainType`, `as unknown as`, non-null assertion,
-`@ts-ignore`, `any`로 타입 오류를 숨기지 않는다. 허용은 세 가지뿐이다:
+`@ts-ignore`, `any`로 타입 오류를 숨기지 않는다. 허용은 네 가지뿐이다:
 literal 보존용 `as const`, 검증 함수 내부에 격리된 브랜드 생성자, 라이브러리
-한계를 잇는 adapter 내부 단언. 격리된 단언에는 런타임 invariant 근거를 남긴다.
-외부 패키지가 `any`를 반환하면 즉시 `unknown`으로 받아 좁힌다.
+한계를 잇는 adapter 내부 단언, 공용 generic helper 내부 한 지점의 construction
+assertion. 마지막은 TypeScript가 점진적 객체 구성을 증명하지 못하는
+`const result = {} as Pick<T, K>` 같은 경우로, 공개 반환 타입이 입력 generic에서
+기계적으로 도출되고 구현이 그 invariant를 실제로 만들며 소비자 호출부에 `as`가
+전파되지 않을 때만이다 — boundary 값을 도메인 타입으로 바꾸는 데는 쓰지 않는다.
+격리된 단언에는 런타임 invariant 근거를 남긴다. 외부 패키지가 `any`를 반환하면
+즉시 `unknown`으로 받아 좁힌다.
+
+`any` 금지는 application 값 기준이다. `(...args: any[]) => unknown` 같은 callable
+constraint처럼 `any`가 generic 연결에만 쓰이고 값으로 읽히거나 공개 반환형·Props로
+누출되지 않으면 `types/internal`·adapter 안에서만 허용한다. `unknown`으로 되는
+자리는 `unknown`을 쓴다.
 
 타입 오류가 나면 구현이 계약을 위반했는지, 계약이 실제 요구사항과 다른지 먼저
 판정한다. 근거 없이 필수 필드를 optional로 바꾸거나 union을 `string`으로 넓혀서
@@ -324,7 +383,10 @@ literal 보존용 `as const`, 검증 함수 내부에 격리된 브랜드 생성
 - exported shared/package API로 상태·Props 타입이 노출될 때만 불가능 사용이
   컴파일되지 않음을 `@ts-expect-error` type test(`.test-d.ts`, JSX면 `.test-d.tsx`,
   또는 vitest `expectTypeOf`)로 증명한다. generic API면 명시적 type argument가 없는
-  대표 정상 호출도 같은 typecheck에서 증명한다. 로컬 상태에는 추가하지 않는다.
+  대표 정상 호출도 같은 typecheck에서 증명한다. 해당되면 readonly·`as const`
+  tuple 입력 수용, type predicate narrowing, literal의 `string` widening 미발생도
+  같이 검증한다. 각 `@ts-expect-error`에는 어떤 오용을 차단하는지 한 줄 이유를
+  적는다. 로컬 상태에는 추가하지 않는다.
 - Implementation Decision에는 (1) 도출한 상태·이벤트 집합과 카드 행 매핑,
   (2) 선택한 사다리 단과 exhaustiveness 계층, (3) **이제 컴파일되지 않는 잘못된
   사용 목록과 실패 증거**, (4) 타입으로 못 잡아 런타임으로 방어한 행동·시간축 항목을
@@ -356,6 +418,15 @@ literal 보존용 `as const`, 검증 함수 내부에 격리된 브랜드 생성
 - 앞 단 메커니즘으로 닫히는 문제에 뒷 단 타입을 썼거나, feature 코드에 자작
   mapped·conditional·recursive utility가 있거나, 내장 utility 재구현이나 type
   test 없는 고급 utility가 있으면 `FINDING`이다.
+- 구현이 모든 key를 채우지 않는데 `Record<K, V>`로 total map을 약속했거나, 실행이
+  지연·캐시되는 wrapper가 즉시 `ReturnType<F>`를 반환한다고 선언했으면
+  `FINDING`이다. sparse lookup 결과의 `Partial<Record<K, V>>`는
+  `Partial<DomainEntity>` mutation 금지의 대상이 아니다 — 둘을 같은 규칙으로
+  금지하면 오적용이다.
+- 필수 invariant를 검사하지 않는 type predicate, runtime key 변환 없는
+  key-remapping 반환형, `satisfies`·`as const`·annotation·excess property check를
+  runtime 검증이나 sanitization으로 보고한 것, 단일 권위 없이 선언 줄 수만 줄이는
+  variant record는 `FINDING`이다.
 - 이번 변경에서 새로 설계한 exported shared/package API의 generic이 둘 이상의 public
   위치 사이 관계를 만들지 않거나 일반 제품 호출부가 type argument를 반복해야 하면
   `FINDING`이다. config·schema 정의 경계의 1회 고정과 기존 library generic 사용은

@@ -243,6 +243,8 @@ reviewer는 아래 질문으로 사용자를 재인터뷰하거나 새 정책을
   증거가 있으며, 앱 내부 변경에 release gate를 강제하지 않았는가?
 - 순수 함수·render 파생·event handler로 가능한 일을 effect로 옮기지 않았으며 모든
   effect가 승인 문서의 외부 시스템·이유·cleanup에 대응하는가?
+- setState → effect → setState로 이어지는 effect chain이나, 상태 변화를 구독해
+  event handler를 대신하는 effect가 없는가?
 - architecture 문서 bytes와 Oracle source lock, 레포 구조 검증 또는 reviewer 증거가
   모두 일치하는가?
 - Design Intent가 있으면 subject·audience·single job에서 palette·type·layout·copy·

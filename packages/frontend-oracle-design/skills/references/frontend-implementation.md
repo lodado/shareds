@@ -170,10 +170,39 @@ React가 필요 없는 계산은 pure model function에 둔다.
 - 한 번 쓰는 한 줄 `useState`, 단순 rename, JSX 조각 때문에 hook/file 금지.
 - unrelated query·form·modal 상태를 하나의 큰 hook 반환 객체로 합치지 않는다.
 - 구현 선택 순서: `순수 함수 → render 파생 → event handler → framework/query API →
-effect`.
-- effect는 architecture 문서에 외부 시스템·이유·cleanup을 기록한 동기화에만. prop/state
-  파생, event 처리, query key 대신 수동 refetch, URL↔local state 양방향 동기화 금지.
-- 각 effect에는 external system·reason·cleanup이 있어야 한다.
+effect`. effect는 이 사다리의 마지막 수단이다.
+- **데이터 흐름은 렌더 안에서 읽혀야 한다.** 사용자 행동의 결과는 그 행동의 event
+  handler에서 동기적으로 실행한다 — 상태 변화를 effect가 구독해 반응하는 순간
+  원인과 결과가 렌더 사이클 사이로 숨고, 값이 어디서 바뀌는지 추적할 수 없게
+  된다. `이벤트 → 순수 계산 → 상태 갱신 → render 파생` 한 방향으로 흐르게 한다.
+- effect는 architecture 문서에 외부 시스템·이유·cleanup을 기록한 동기화에만
+  (DOM 측정, 구독, non-React 위젯, analytics). prop/state 파생, event 처리,
+  query key 대신 수동 refetch, URL↔local state 양방향 동기화 금지.
+- **effect chain 금지.** setState가 다른 effect를 깨워 다시 setState하는 연쇄는
+  같은 데이터가 여러 렌더에 걸쳐 갈라지는 것이다 — 순수 함수 하나로 합치거나
+  event handler로 내린다. prop 변경에 따른 상태 리셋은 effect가 아니라 `key`로
+  한다.
+
+### Effect Lint Gate — 조건 맞을 때만
+
+파생 state·effect chain·event 대체는 lint로 기계 판정할 수 있다. 절차는 Hook
+Encapsulation Gate와 같다 — 레포의 기존 규칙 재사용이 먼저고, plugin 도입·설정
+변경은 사용자 승인 뒤 architecture source에 기록하며 조용히 추가하지 않는다.
+
+1. `eslint-plugin-react-hooks` 6+면 recommended의
+   `react-hooks/set-state-in-effect`·`set-state-in-render`가 effect 안 동기
+   setState — 파생 state와 chain의 시작점 — 를 잡는다. 4.x는
+   `rules-of-hooks`·`exhaustive-deps`뿐이라 잡지 못한다.
+2. 규칙 단위 판정이 필요하면 `eslint-plugin-react-you-might-not-need-an-effect`
+   도입을 제안한다 — `no-derived-state`·`no-chain-state-updates`·
+   `no-event-handler`·`no-adjust-state-on-prop-change`가 위 금지 목록과 1:1로
+   대응한다.
+3. dependency 없이 구조만 막으려면 `no-restricted-imports`로 승인된 glob 밖의
+   `useEffect`·`useLayoutEffect` import를 금지하고 오류 메시지에 이 사다리를
+   남긴다.
+
+lint는 effect의 **형태**만 잡는다. 남은 effect가 실제 외부 시스템 동기화인지,
+사유·cleanup이 있는지는 reviewer가 판정한다.
 
 ### Hook Encapsulation Gate — 승인된 경우만
 
