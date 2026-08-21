@@ -13,6 +13,15 @@ The config ships composable presets. Enable only what the package actually is.
 pnpm add -D @lodado/eslint-config eslint@^8.57.0
 ```
 
+`react`와 `next` preset을 함께 쓰는 pnpm 레포는 `eslint-plugin-react-hooks`를 한
+버전으로 고정해야 한다 — `eslint-config-next`가 자기 구버전을 물고 있어 ESLint 8이
+같은 plugin 이름의 두 복사본을 거부한다:
+
+```jsonc
+// package.json
+"pnpm": { "overrides": { "eslint-plugin-react-hooks": "^7.1.1" } }
+```
+
 ## Compose
 
 `.eslintrc.js` in the consuming package:
@@ -22,7 +31,7 @@ module.exports = {
   root: true,
   extends: [
     '@lodado/eslint-config', // always - TS parsing, import sort, prettier conflict removal
-    '@lodado/eslint-config/react', // React components (airbnb style guide)
+    '@lodado/eslint-config/react', // React components (airbnb + hooks/effect discipline)
     '@lodado/eslint-config/next', // Next.js apps only
     '@lodado/eslint-config/a11y', // JSX that renders user-facing markup
     '@lodado/eslint-config/turbo', // Turborepo workspaces - catches undeclared env vars

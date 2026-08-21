@@ -189,17 +189,17 @@ effect`. effect는 이 사다리의 마지막 수단이다.
 Encapsulation Gate와 같다 — 레포의 기존 규칙 재사용이 먼저고, plugin 도입·설정
 변경은 사용자 승인 뒤 architecture source에 기록하며 조용히 추가하지 않는다.
 
-1. `eslint-plugin-react-hooks` 6+면 recommended의
-   `react-hooks/set-state-in-effect`·`set-state-in-render`가 effect 안 동기
-   setState — 파생 state와 chain의 시작점 — 를 잡는다. 4.x는
-   `rules-of-hooks`·`exhaustive-deps`뿐이라 잡지 못한다.
-2. 규칙 단위 판정이 필요하면 `eslint-plugin-react-you-might-not-need-an-effect`
-   도입을 제안한다 — `no-derived-state`·`no-chain-state-updates`·
-   `no-event-handler`·`no-adjust-state-on-prop-change`가 위 금지 목록과 1:1로
-   대응한다.
-3. dependency 없이 구조만 막으려면 `no-restricted-imports`로 승인된 glob 밖의
-   `useEffect`·`useLayoutEffect` import를 금지하고 오류 메시지에 이 사다리를
-   남긴다.
+1. `@lodado/eslint-config/react`를 쓰는 레포는 이미 켜져 있다 —
+   `react-hooks/set-state-in-effect`·`set-state-in-render`(effect 안 동기
+   setState, 파생 state와 chain의 시작점)와
+   `react-you-might-not-need-an-effect` legacy-strict
+   (`no-derived-state`·`no-chain-state-updates`·`no-event-handler`·
+   `no-adjust-state-on-prop-change` 등 전 규칙 error)가 위 금지 목록과 대응한다.
+2. 그 외 레포는 `eslint-plugin-react-hooks` 6+(4.x는
+   `rules-of-hooks`·`exhaustive-deps`뿐이라 잡지 못한다)와
+   `eslint-plugin-react-you-might-not-need-an-effect` 도입을 제안한다. pnpm에서
+   `next` preset과 함께 쓰면 `eslint-config-next`가 자기 구버전 react-hooks를
+   물고 있어 plugin 충돌이 나므로 root `pnpm.overrides`로 한 버전으로 고정한다.
 
 lint는 effect의 **형태**만 잡는다. 남은 effect가 실제 외부 시스템 동기화인지,
 사유·cleanup이 있는지는 reviewer가 판정한다.

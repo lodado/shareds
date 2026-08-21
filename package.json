@@ -49,5 +49,10 @@
   },
   "lint-staged": {
     "*.{js,json,md}": "prettier --write"
+  },
+  "pnpm": {
+    "overrides": {
+      "eslint-plugin-react-hooks": "^7.1.1"
+    }
   }
 }

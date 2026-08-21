@@ -1,8 +1,15 @@
 /** React preset: airbnb style guide minus the rules TypeScript already covers. */
 module.exports = {
-  extends: ['airbnb', 'prettier'],
-  plugins: ['react'],
+  extends: ['airbnb', 'plugin:react-you-might-not-need-an-effect/legacy-strict', 'prettier'],
+  plugins: ['react', 'react-hooks'],
   rules: {
+    // Hooks contract + effect discipline: effects only synchronize external
+    // systems - derived state and effect chains must not compile past lint.
+    'react-hooks/rules-of-hooks': 'error',
+    'react-hooks/exhaustive-deps': 'warn',
+    'react-hooks/set-state-in-effect': 'error',
+    'react-hooks/set-state-in-render': 'error',
+
     // airbnb re-enables these on top of the base preset - keep the base decision.
     'no-underscore-dangle': 'off',
     'no-unused-vars': 'off',

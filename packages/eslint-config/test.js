@@ -111,6 +111,26 @@ const main = async () => {
     '@tanstack/query/exhaustive-deps',
   )
 
+  // The react preset's effect discipline - deriving state inside an effect must
+  // fire both the compiler rule and the you-might-not-need-an-effect rule.
+  const REACT = [BASE, path.join(__dirname, 'react.js')]
+  const derivedEffect = [
+    "import { useEffect, useState } from 'react'",
+    'export const Count = ({ items }) => {',
+    '  const [count, setCount] = useState(0)',
+    '  useEffect(() => { setCount(items.length) }, [items])',
+    '  return count',
+    '}',
+    '',
+  ].join('\n')
+  await assertReports(REACT, derivedEffect, 'sample-derived-effect.tsx', 'react-hooks/set-state-in-effect')
+  await assertReports(
+    REACT,
+    derivedEffect,
+    'sample-derived-effect.tsx',
+    'react-you-might-not-need-an-effect/no-derived-state',
+  )
+
   // The state-modeling rules read TS type nodes through the base preset's parser.
   await assertReports(
     [BASE, path.join(__dirname, 'local-rules.js')],
