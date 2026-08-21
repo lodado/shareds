@@ -76,6 +76,8 @@ generic AST checker를 만들지 않는다.
 
 ## Data and async flow
 
+## API contract
+
 ## Component boundaries
 
 ## Pure functions and effects
@@ -96,6 +98,64 @@ FSD unit이면 다음을 반드시 포함한다: `Responsibilities and public en
 layer·segment 매핑과 slice public API(`index.ts`)의 정확한 export 목록,
 `Component boundaries`에 허용·금지 import 경계(deep import 금지 포함),
 `Test boundaries`에 `__test__/`·`__mocks__/` 배치. 기준은 [`fsd.md`](fsd.md)다.
+
+## API 계약 — 조건부
+
+unit이 HTTP/RPC endpoint를 호출하거나 정의할 때만 `## API contract`을 endpoint마다
+채운다. 호출하는 endpoint가 없으면 N/A 사유만 남긴다.
+
+```markdown
+### `POST /api/orders` — 주문 생성
+
+| 항목        | 값                                                   |
+| ----------- | ---------------------------------------------------- |
+| Source      | S3 — API 계약 endpoint/version                       |
+| Auth        | 필요 여부와 scope                                    |
+| Idempotency | key 생성 주체·헤더·재전송 시 응답 재생 여부 또는 N/A |
+| Pagination  | 끝 판정 신호·token 규칙 또는 N/A                     |
+
+**Request parameters**
+
+| 위치              | 이름 | 타입 | 필수 | 제약 |
+| ----------------- | ---- | ---- | ---- | ---- |
+| path/query/header |      |      |      |      |
+
+**Request body**
+
+| 필드 | 타입 | 필수 | 제약 |
+| ---- | ---- | ---- | ---- |
+
+**Response 200**
+
+| 필드 | 타입 | nullable | 비고 |
+| ---- | ---- | -------- | ---- |
+
+**Error codes**
+
+| status | code           | 의미      | UI 결과        | 재시도 | 카드 행 |
+| ------ | -------------- | --------- | -------------- | ------ | ------- |
+| 400    | INVALID_FIELD  | 형식 오류 | 필드 오류 표시 | 금지   | O3      |
+| 409    | ALREADY_PLACED | 중복 제출 | 기존 주문 유지 | 금지   | O5      |
+```
+
+- 값은 승인된 API source(`project-constraint`)에서만 옮겨 적는다. 응답 관찰이나
+  추측으로 채우지 않으며, 스펙 소스가 없으면 `NEEDS_DECISION`.
+- 각 error code의 UI 결과·재시도는 제품 정책이다. 카드 `O*` 행에 매핑되지 않은
+  code가 남으면 `POLICY_GAP`으로 `NEEDS_DECISION`.
+- 서버가 problem+json([RFC 9457](https://www.rfc-editor.org/rfc/rfc9457))이면
+  `type` URI·machine-readable code로만 분기하고 UI가 `detail` 문자열을 파싱하지
+  않는다.
+- idempotency는 서버 계약을 그대로 기록한다 — key 생성 주체(권장: 클라이언트
+  UUID), 같은 key 재전송 시 저장된 응답 재생 여부, 같은 key·다른 파라미터의 처리
+  ([Stripe idempotent requests](https://docs.stripe.com/api/idempotent_requests)
+  방식 참조).
+- 목록 endpoint는 끝 판정 신호(예: 빈 `next_page_token`)와 token 불투명성(클라
+  파싱 금지), 페이지 간 파라미터 고정 규칙을 기록한다
+  ([AIP-158](https://google.aip.dev/158) 참조).
+- 생성 타입(OpenAPI codegen 등)이 이미 있으면 타입 이름과 생성 경로만 적고 필드를
+  복제하지 않는다. 문서와 생성 타입 중 하나만 권위를 갖는다.
+- 레포 전체 endpoint 카탈로그를 만들지 않는다. 이번 변경 unit이 실제 쓰는
+  endpoint만 기록한다.
 
 ## Exported Public API 계약 — 조건부
 

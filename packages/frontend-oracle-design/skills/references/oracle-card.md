@@ -121,7 +121,7 @@ visual identity 변경이면 카드 작성 전 [`visual-design.md`](visual-desig
 | Medium | 조회, 검색, 폼, 캐시                        | 카드 작성                               |
 | High   | 결제, 주문, 저장, 삭제, 권한, 외부 mutation | 카드 작성 + 사용자 카드 확인 필수       |
 
-## 3. 정책 Grill
+## 3. 정책 Grill — 시스템 디자인 인터뷰
 
 **답에 따라 예상 결과나 테스트가 달라지는 질문만** 한다.
 
@@ -131,13 +131,54 @@ visual identity 변경이면 카드 작성 전 [`visual-design.md`](visual-desig
 - 추천안은 결정이 아니며, 답이 없으면 default로 적용하지 않음
 - 2라운드 후에도 결과를 바꾸는 질문이 남으면 `NEEDS_DECISION`
 
-자주 필요한 질문:
+### Phase 순서
+
+질문은 **앞 답이 뒤 가지를 죽이는 순서**로 한다. 질문 전에 레포·PRD·Figma·API
+문서를 먼저 탐색해 답이 있는 질문을 제거한다. 코드 관찰로 얻은 답은
+`project-constraint` 후보일 뿐 제품 정책 출처가 아니다.
+
+| Phase | 관할            | 대표 질문                                                                                     | 산출물                               |
+| ----- | --------------- | --------------------------------------------------------------------------------------------- | ------------------------------------ |
+| P1    | 결과            | actor·상황, 관찰 가능한 성공, 비목표, 최악 회귀·가역성                                        | Outcome Brief                        |
+| P2    | 부작용·위험     | 서버 상태 변경 여부, 돈·데이터·권한 피해                                                      | Risk lane                            |
+| P3    | 데이터·아키텍처 | source of truth, stale 허용, 기존 상태 소유자(query·router·form), 핵심 entity와 소유 컴포넌트 | architecture intake, State ownership |
+| P4    | API 계약        | 스펙 소스 위치·version, error code별 UI 결과·재시도, idempotency key 주체, pagination 끝 판정 | Source Registry, `API contract` 절   |
+| P5    | 경합·비동기     | 아래 "자주 필요한 질문"                                                                       | 카드 `O*` 행                         |
+| P6    | 상태 모델       | 상태 수·불가능한 전이                                                                         | State Model(opt-in)                  |
+| P7    | 시각            | visual scope, 로딩·빈·에러 표시, 접근성 확인                                                  | Design Intent·`D*` 행                |
+| P8    | 성능·운영       | 성능 목표 수치·측정법, rollout·flag                                                           | performance 게이트                   |
+
+가지치기:
+
+- P1에서 Low 판정이면 grill을 끝내고 fast path로 간다.
+- endpoint가 없으면 P4, mutation·async가 없으면 P5, `behavior-only`면 P7, 성능
+  claim이 없으면 P8을 통째로 건너뛴다.
+- 기능이 설치된 `frontend-system-design` reference와 매칭되면 그 문서의 결정
+  포인트를 P4·P5 질문으로 변환해 일반 질문을 대체한다.
+- API 스펙 소스가 없으면 P4를 추측으로 채우지 않고 `NEEDS_DECISION`.
+
+라운드 구성: Round 1 = P1~P3 생존 질문, Round 2 = P4~P7 생존 질문. 사용자가
+명시적으로 1문1답 인터뷰를 요청하면(예: "grill me") Design-only 조사에 한해
+라운드 상한 없이 phase 순서로 진행한다. Delivery 중 정책 질문은 그대로
+`oracle-run.mjs budget` 2라운드를 따른다.
+
+자주 필요한 질문(P5):
 
 - pending 중 중복 제출을 무시할지, 큐잉할지, 오류로 볼지
 - 실패 후 입력·기존 데이터를 유지할지
 - 오류 subtype별 재시도 허용 여부
 - A 후 B 요청, B 후 A 응답에서 어떤 결과가 이길지
 - 이탈·취소 후 늦은 응답을 어떻게 처리할지
+
+방법 근거: phase 순서는
+[RADIO framework](https://www.greatfrontend.com/front-end-system-design-playbook/framework)의
+R→A→D→I→O 순서를, 질문·정책·예시 분리는
+[Example Mapping](https://cucumber.io/blog/bdd/example-mapping-introduction/)의
+rule(=`P*`)·example(=`O*`)·question(=red card) 카드 대응을 따른다. `Then`이
+불명확한 예시는 예시가 아니라 질문이다 — 그 행을 만들지 않고 red card로 기록한다.
+red card가 쌓이면 토론하지 않고 `NEEDS_DECISION`, rule이 쌓이면 카드가 너무 크다 —
+Requested mechanism check의 Smallest reversible scope 분할을 제안한다.
+
 - outcome-unknown timeout에서 재시도와 idempotency를 어떻게 보장할지
 - 요청된 수단이 의도한 결과를 얻는 최소 수단인지, 더 작은 대안을 먼저 검증할지
 

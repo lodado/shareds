@@ -545,6 +545,32 @@ test('O2: 기존 Oracle Delivery gate를 유지한다', async () => {
   }
 })
 
+test('pins the system-design grill phases and the conditional API contract format', async () => {
+  const [skill, oracleCard, architectureContract] = await Promise.all([
+    read('SKILL.md'),
+    read('references/oracle-card.md'),
+    read('references/architecture-contract.md'),
+  ])
+
+  assert.match(skill, /phase.*순서.*1문1답/s)
+  assert.match(oracleCard, /앞 답이 뒤 가지를 죽이는 순서/)
+  assert.match(oracleCard, /라운드당 3~5개, 최대 2라운드/)
+  assert.match(oracleCard, /RADIO framework/)
+  assert.match(oracleCard, /Example Mapping/)
+  assert.match(oracleCard, /frontend-system-design.*P4·P5 질문으로 변환/s)
+  assert.match(oracleCard, /1문1답 인터뷰를 요청하면.*라운드 상한 없이/s)
+  assert.match(oracleCard, /Delivery 중 정책 질문은 그대로[\s\S]*budget.*2라운드/)
+  assert.match(architectureContract, /## API contract/)
+  assert.match(architectureContract, /Request parameters/)
+  assert.match(architectureContract, /Request body/)
+  assert.match(architectureContract, /Error codes/)
+  assert.match(architectureContract, /O\*.*행에 매핑되지 않은.*POLICY_GAP/s)
+  assert.match(architectureContract, /rfc9457/)
+  assert.match(architectureContract, /idempotent_requests/)
+  assert.match(architectureContract, /next_page_token/)
+  assert.match(architectureContract, /카탈로그를 만들지 않는다/)
+})
+
 test('O7: 조건부 품질 계약과 human-first 보고를 안내한다', async () => {
   const [skill, oracleCard, frontendImplementation, implementationLoop, architecture, review] = await Promise.all([
     read('SKILL.md'),

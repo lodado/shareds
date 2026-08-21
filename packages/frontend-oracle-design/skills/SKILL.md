@@ -174,7 +174,9 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
    범위 기록. `local`·`identity-shaping`은 Design Change Confirmation을 받고 카드에
    기록. 미확인·미결이면 `NEEDS_DECISION`.
 6. Risk 판정 + 정책 출처 조사.
-7. 필요한 Grill 질문과 BVA로 **Draft Oracle** 작성.
+7. 필요한 Grill 질문과 BVA로 **Draft Oracle** 작성. Grill은 `oracle-card.md`의 phase
+   순서(결과→위험→데이터·아키텍처→API→경합·비동기→상태→시각→성능·운영)를 따르고,
+   사용자가 명시적으로 1문1답 인터뷰를 요청한 경우에만 라운드 상한 없이 진행한다.
 8. 기존 revision은 semantic delta, 새 카드는 전체 정책·미결 질문을 보여주고 명시적으로
    재확인.
 9. 승인 응답 위치를 `User Confirmation`에 기록하고 adversarial self-review. 수정 요청이면
