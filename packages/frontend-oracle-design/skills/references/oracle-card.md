@@ -162,6 +162,10 @@ visual identity 변경이면 카드 작성 전 [`visual-design.md`](visual-desig
 라운드 상한 없이 phase 순서로 진행한다. Delivery 중 정책 질문은 그대로
 `oracle-run.mjs budget` 2라운드를 따른다.
 
+각 라운드가 끝나면 질문·답·추천안 채택 여부와 가지치기 사유를
+`.ai/oracles/<oracle-id>/journal.md`에 append한다. 답을 대화에만 남기지 않는다 —
+컨텍스트가 요약돼도 다음 단계는 journal과 카드에서 이어진다.
+
 자주 필요한 질문(P5):
 
 - pending 중 중복 제출을 무시할지, 큐잉할지, 오류로 볼지
@@ -397,7 +401,8 @@ CODEOWNERS·외부 서명을 추가한다. run ledger·상태 파일도 같은 �
 ### Run artifact 초기화
 
 Delivery 진입 시 lock 직후 run ledger와 상태 파일을 만든다. Design-only로 끝나면
-생성하지 않는다.
+생성하지 않는다. `journal.md`는 예외다 — Grill부터 같은 디렉터리에 쌓이며 ledger와
+별개로 단계 근거만 담는다.
 
 ```bash
 node <skill-dir>/scripts/oracle-run.mjs init \

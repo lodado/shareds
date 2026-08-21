@@ -545,6 +545,19 @@ test('O2: 기존 Oracle Delivery gate를 유지한다', async () => {
   }
 })
 
+test('pins document-driven stage journal and disk recall', async () => {
+  const [skill, oracleCard] = await Promise.all([read('SKILL.md'), read('references/oracle-card.md')])
+
+  assert.match(skill, /### 문서 기준 진행/)
+  assert.match(skill, /대화 기억이 아니라 disk를 재독/)
+  assert.match(skill, /journal\.md.*append-only/s)
+  assert.match(skill, /implementation-decision\.md.*중복 기록하지/s)
+  assert.match(skill, /정책 출처도 lock 대상도 아니며.*카드가 이긴다/s)
+  assert.match(oracleCard, /journal\.md.*append/s)
+  assert.match(oracleCard, /답을 대화에만 남기지 않는다/)
+  assert.match(oracleCard, /`journal\.md`는 예외다/)
+})
+
 test('pins the system-design grill phases and the conditional API contract format', async () => {
   const [skill, oracleCard, architectureContract] = await Promise.all([
     read('SKILL.md'),

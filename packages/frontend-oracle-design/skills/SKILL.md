@@ -45,6 +45,19 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
 
 ## 불변 규칙
 
+### 문서 기준 진행
+
+- 각 단계 시작 시 대화 기억이 아니라 disk를 재독한다: 잠긴 카드, lock,
+  `journal.md`, `implementation-decision.md`, ledger·상태 파일. 컨텍스트가
+  요약된 뒤에는 필수다.
+- 단계를 끝낼 때마다 근거를 `.ai/oracles/<oracle-id>/journal.md`에 append-only로
+  기록한다: Grill 질문·답·추천안 채택, phase 가지치기 사유, 확인 응답 위치, 피드백
+  분류, 인용 runId. 기존 항목은 수정하지 않는다.
+- 구현 trade-off는 기존 `implementation-decision.md`에 두고 journal에 중복 기록하지
+  않는다.
+- journal은 조사 자료다. 정책 출처도 lock 대상도 아니며 카드·ledger를 대체하지
+  않는다. 카드와 어긋나면 카드가 이긴다.
+
 ### TDD와 판정 도구
 
 - TDD 기본: `ORACLE_READY` → 테스트 작성·실행 → `VALID_RED` 확인 전 production 작성·수정
