@@ -215,11 +215,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.15.0')
+  assert.equal(version, '0.16.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.15.0')
+  assert.equal(marketplace.version, '0.16.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -592,6 +592,12 @@ test('pins the system-design grill phases and the conditional API contract forma
   assert.match(architectureContract, /idempotent_requests/)
   assert.match(architectureContract, /next_page_token/)
   assert.match(architectureContract, /카탈로그를 만들지 않는다/)
+  assert.match(oracleCard, /RADIO 각 요소의 처리 위치/)
+  assert.match(oracleCard, /플랫폼·디바이스·offline·다국어/)
+  assert.match(oracleCard, /카드 행에서 draft.*schema를 도출/s)
+  assert.match(architectureContract, /### 스펙이 없을 때 — 카드에서 schema 도출/)
+  assert.match(architectureContract, /`Then` 관찰 결과.*그려야 하는 것만/s)
+  assert.match(architectureContract, /response 필드를 발명하지 않는다/)
 })
 
 test('O7: 조건부 품질 계약과 human-first 보고를 안내한다', async () => {

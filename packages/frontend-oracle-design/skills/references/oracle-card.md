@@ -139,7 +139,7 @@ visual identity 변경이면 카드 작성 전 [`visual-design.md`](visual-desig
 
 | Phase | 관할            | 대표 질문                                                                                     | 산출물                               |
 | ----- | --------------- | --------------------------------------------------------------------------------------------- | ------------------------------------ |
-| P1    | 결과            | actor·상황, 관찰 가능한 성공, 비목표, 최악 회귀·가역성                                        | Outcome Brief                        |
+| P1    | 결과            | actor·상황, 관찰 가능한 성공, 비목표, 최악 회귀·가역성, 플랫폼·디바이스·offline·다국어        | Outcome Brief                        |
 | P2    | 부작용·위험     | 서버 상태 변경 여부, 돈·데이터·권한 피해                                                      | Risk lane                            |
 | P3    | 데이터·아키텍처 | source of truth, stale 허용, 기존 상태 소유자(query·router·form), 핵심 entity와 소유 컴포넌트 | architecture intake, State ownership |
 | P4    | API 계약        | 스펙 소스 위치·version, error code별 UI 결과·재시도, idempotency key 주체, pagination 끝 판정 | Source Registry, `API contract` 절   |
@@ -155,7 +155,9 @@ visual identity 변경이면 카드 작성 전 [`visual-design.md`](visual-desig
   claim이 없으면 P8을 통째로 건너뛴다.
 - 기능이 설치된 `frontend-system-design` reference와 매칭되면 그 문서의 결정
   포인트를 P4·P5 질문으로 변환해 일반 질문을 대체한다.
-- API 스펙 소스가 없으면 P4를 추측으로 채우지 않고 `NEEDS_DECISION`.
+- API 스펙 소스가 없으면 P4를 추측으로 채우지 않는다. 대신 카드 행에서 draft
+  schema를 도출해 Draft Oracle과 함께 제시하고, 명시 승인 시 `project-constraint`
+  source로 등록해 함께 잠근다. 승인이 없으면 `NEEDS_DECISION`.
 
 라운드 구성: Round 1 = P1~P3 생존 질문, Round 2 = P4~P7 생존 질문. 사용자가
 명시적으로 1문1답 인터뷰를 요청하면(예: "grill me") Design-only 조사에 한해
@@ -192,6 +194,17 @@ rule(=`P*`)·example(=`O*`)·question(=red card) 카드 대응을 따른다. `Th
 불명확한 예시는 예시가 아니라 질문이다 — 그 행을 만들지 않고 red card로 기록한다.
 red card가 쌓이면 토론하지 않고 `NEEDS_DECISION`, rule이 쌓이면 카드가 너무 크다 —
 Requested mechanism check의 Smallest reversible scope 분할을 제안한다.
+
+RADIO 각 요소의 처리 위치 — grill이 전부 소유하지 않는다:
+
+| RADIO                   | 처리 위치                                                            |
+| ----------------------- | -------------------------------------------------------------------- |
+| R Requirements          | Grill P1·P2                                                          |
+| A Architecture          | Delivery architecture 게이트 — grill에서 구현 구조를 질문하지 않는다 |
+| D Data model            | Grill P3                                                             |
+| I Interface (server)    | Grill P4 → 스펙 없으면 카드 도출 draft → 승인 → `## API contract`    |
+| I Interface (component) | `type-constraints.md` — 카드 `O*` 행에서 도출                        |
+| O Optimizations         | P5 경합·P7 접근성·P8 성능 + Delivery 증거 행                         |
 
 - outcome-unknown timeout에서 재시도와 idempotency를 어떻게 보장할지
 - 요청된 수단이 의도한 결과를 얻는 최소 수단인지, 더 작은 대안을 먼저 검증할지

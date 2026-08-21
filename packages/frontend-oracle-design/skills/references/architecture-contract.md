@@ -157,6 +157,28 @@ unit이 HTTP/RPC endpoint를 호출하거나 정의할 때만 `## API contract`�
 - 레포 전체 endpoint 카탈로그를 만들지 않는다. 이번 변경 unit이 실제 쓰는
   endpoint만 기록한다.
 
+### 스펙이 없을 때 — 카드에서 schema 도출
+
+승인된 API source가 없으면 추측 대신 카드에서 draft schema를 도출해 제안한다.
+도출물은 Proposal이다 — 명시 승인 전에는 이 schema로 구현·mock을 작성하지 않고,
+승인되면 `project-constraint` source로 등록해 카드와 함께 잠근다.
+
+| 카드 요소             | schema로                                              |
+| --------------------- | ----------------------------------------------------- |
+| P3 entity 답          | 리소스 경로·필드                                      |
+| `O*` 부작용 종류×횟수 | method×endpoint 목록                                  |
+| `Given`·`When` 입력   | request parameters·body와 제약                        |
+| `Then` 관찰 결과      | response 필드 — UI가 그려야 하는 것만                 |
+| `Never`·실패 행       | error code 표 — 구분해야 하는 실패 정책마다 code 하나 |
+| P4·P5 답              | idempotency 헤더·pagination token 규칙                |
+
+- 기본값은 위 표준을 재사용한다: 에러 RFC 9457, idempotency 클라이언트 key,
+  pagination cursor. 레포에 기존 API 관례가 있으면 그것이 우선한다.
+- `Then`에 없는 response 필드를 발명하지 않는다. 카드가 요구하는 관찰 결과만
+  담는다.
+- 서버를 다른 팀이 소유하면 승인은 "이 draft로 서버팀과 합의한다"는 확인이며
+  journal에 기록한다.
+
 ## Exported Public API 계약 — 조건부
 
 shared/package export를 새로 만들거나 바꿀 때만 다음을 architecture 문서와
