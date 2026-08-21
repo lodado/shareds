@@ -4,17 +4,6 @@
 visual identity를 바꿀 때만 읽는다. 기존 시각 계약을 그대로 쓰는 behavior-only 작업은
 시각 범위와 N/A 사유만 기록하고 이 절차를 확장하지 않는다.
 
-## 목차
-
-1. 권위와 시각 범위
-2. Design Proposal과 Design Change Confirmation
-3. Design Intent 형식
-4. 증거 계층
-5. baseline 권위와 외부 Visual QA handoff
-6. 두 번의 설계 pass
-7. Delivery 증거 책임
-8. 금지
-
 ## 1. 권위와 시각 범위
 
 승인된 기획서·브랜드·디자인 시스템·Figma·content guide와 사용자의 명시적 답변만 시각
@@ -31,11 +20,9 @@ AI 시각 방향과 가용한 `frontend-design` skill의 결과는 **Design Prop
 
 Oracle Card에 시각 범위 하나를 기록한다:
 
-| 범위               | 조건                                                   | 처리                                                                   |
-| ------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------- |
-| `behavior-only`    | 기존 component·token·시각 결과를 그대로 유지           | 전체 디자인 계획 N/A와 사유 기록                                       |
-| `local`            | 기존 화면의 state·copy·hierarchy·reflow 일부 변경      | 기존 디자인 시스템을 재사용하고 영향 축만 계약한 뒤 명시적 사용자 확인 |
-| `identity-shaping` | 새 page·대규모 redesign·브랜드 인상을 만드는 핵심 화면 | 아래 두 pass와 명시적 사용자 확인을 거쳐 전체 Design Intent 잠금       |
+- `behavior-only` — 기존 component·token·시각 결과를 그대로 유지: 전체 디자인 계획 N/A와 사유 기록
+- `local` — 기존 화면의 state·copy·hierarchy·reflow 일부 변경: 기존 디자인 시스템을 재사용하고 영향 축만 계약한 뒤 명시적 사용자 확인
+- `identity-shaping` — 새 page·대규모 redesign·브랜드 인상을 만드는 핵심 화면: 아래 두 pass와 명시적 사용자 확인을 거쳐 전체 Design Intent 잠금
 
 시각 범위와 기능 Risk는 별개다. 단순 화면도 위험한 mutation이면 High risk일 수 있고,
 identity-shaping이어도 부작용 피해가 작으면 기존 Risk 규칙에 따라 판정한다. 두 판정은
@@ -125,11 +112,9 @@ Figma·URL은 정확한 file·page·frame·version을 카드에 기록.
 각 `D*` 행에 주 증거 계층 하나. 보조 증거는 evidence mapping에 추가하되 독립 증거
 개수로 과장하지 않는다.
 
-| 계층         | 대상                                                                        | 대표 증거                                                     |
-| ------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `HARD`       | 정확히 결정 가능한 copy·role·focus·theme·reduced motion·overflow·token 결과 | component test, Playwright, DOM/a11y, computed style          |
-| `RELATIONAL` | hierarchy·reading order·reflow·요소 간 시각 관계                            | 실제 browser, bounding box, 승인 frame 비교, screenshot       |
-| `JUDGMENT`   | subject 고유성·typography 성격·signature·절제·voice                         | 승인 brief와 screenshot을 보는 사용자 또는 독립 designer 리뷰 |
+- `HARD` — 정확히 결정 가능한 copy·role·focus·theme·reduced motion·overflow·token 결과: component test, Playwright, DOM/a11y, computed style
+- `RELATIONAL` — hierarchy·reading order·reflow·요소 간 시각 관계: 실제 browser, bounding box, 승인 frame 비교, screenshot
+- `JUDGMENT` — subject 고유성·typography 성격·signature·절제·voice: 승인 brief와 screenshot을 보는 사용자 또는 독립 designer 리뷰
 
 - `HARD`를 내부 class name이나 전체 DOM snapshot에 결합하지 않는다.
 - `RELATIONAL`을 모든 pixel의 exact coordinate로 바꾸지 않는다.
@@ -196,14 +181,12 @@ owner의 `pending`으로 남긴다. `$frontend-visual-qa`는 다음만 반환한
 
 피드백은 기존 라우터를 그대로 사용:
 
-| 관찰                                                   | 분류                 |
-| ------------------------------------------------------ | -------------------- |
-| 승인 Figma·Design Intent와 실제 UI 불일치              | `PRODUCT_DEFECT`     |
-| source의 시각 요구가 카드에 누락되거나 source끼리 충돌 | `POLICY_GAP`         |
-| 잘못된 viewport·font fixture·screenshot 조건           | `HARNESS_DEFECT`     |
-| 도구·font asset·브라우저 기동 문제로 판정 불가         | `ENVIRONMENT_DEFECT` |
-| 카드 범위 안 시각 증거 누락                            | `EVIDENCE_GAP`       |
-| 출처 없는 reviewer 취향                                | `NON_ORACLE_OPINION` |
+- 승인 Figma·Design Intent와 실제 UI 불일치 → `PRODUCT_DEFECT`
+- source의 시각 요구가 카드에 누락되거나 source끼리 충돌 → `POLICY_GAP`
+- 잘못된 viewport·font fixture·screenshot 조건 → `HARNESS_DEFECT`
+- 도구·font asset·브라우저 기동 문제로 판정 불가 → `ENVIRONMENT_DEFECT`
+- 카드 범위 안 시각 증거 누락 → `EVIDENCE_GAP`
+- 출처 없는 reviewer 취향 → `NON_ORACLE_OPINION`
 
 ## 8. 금지
 

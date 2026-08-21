@@ -2,16 +2,6 @@
 
 frontend-oracle-design과 test 스킬이 공유하는 참조. 카드 작성 전에 전부 읽는다.
 
-## 목차
-
-1. 값 경계
-2. 상태 경계
-3. 시간·순서 경계
-4. 부작용 횟수 경계
-5. 자동 추가 TC와 조건부 guard
-6. 오류 subtype과 pending barrier
-7. Adversarial 반례
-
 ## 1. 값 경계
 
 | 검토                | 예                                                    |

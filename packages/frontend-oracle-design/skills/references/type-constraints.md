@@ -26,13 +26,11 @@ tsconfig·컴파일러 버전의 함수다. 전제 환경 검증은
 
 ## 제약 소유권
 
-| 대상                                      | 담당                                        |
-| ----------------------------------------- | ------------------------------------------- |
-| 값·Props·상태 조합·입출력 관계            | 타입                                        |
-| API·storage·URL·message 같은 외부 입력    | `unknown`에서 runtime parser                |
-| 관찰 가능한 제품 행동                     | `$test`                                     |
-| 순서 역전·중복 제출·retry·unmount 후 도착 | abort signal·pending guard·멱등키·서버 검증 |
-| 같은 prompt의 생성 재현성                 | 모델·provider — 이 문서가 보장하지 않음     |
+- 값·Props·상태 조합·입출력 관계 → 타입
+- API·storage·URL·message 같은 외부 입력 → `unknown`에서 runtime parser
+- 관찰 가능한 제품 행동 → `$test`
+- 순서 역전·중복 제출·retry·unmount 후 도착 → abort signal·pending guard·멱등키·서버 검증
+- 같은 prompt의 생성 재현성 → 모델·provider — 이 문서가 보장하지 않음
 
 시간축은 타입으로 증명되지 않는다. union을 만들었다고 순서 문제가 "해결됨"이라고
 선언하면 `FINDING`이다. 남은 시간축 비결정성과 그 런타임 방어는 Implementation
@@ -42,14 +40,12 @@ Decision에 반드시 기록한다. type-valid를 behavior-correct로 보고해�
 사용을 최소 세 개 먼저 적는다** — exported API면 그대로 `.test-d.ts`의
 `@ts-expect-error` 케이스가 된다.
 
-| 찾을 것 | 예                                            | 치환                                 |
-| ------- | --------------------------------------------- | ------------------------------------ |
-| 값      | 넓은 `string`·`number`·`Date`                 | 브랜드·의미 타입                     |
-| 조합    | 관련 boolean 여러 개, 배타적인 optional Props | discriminated union, union + `never` |
-| 관계    | mode가 값·반환 타입을 결정하는데 타입에 없음  | generic lookup map, 별도 컴포넌트    |
-| 경로·키 | route·query key·field path 자유 문자열        | factory·`keyof`·파생 union           |
-| 결과    | 성공·실패·부재·유지·삭제가 `undefined` 하나에 | `Result`·연산 union                  |
-| 확장    | 소비자가 확장할 key가 `string`으로 열림       | typed registry·module augmentation   |
+- 값: 넓은 `string`·`number`·`Date` → 브랜드·의미 타입
+- 조합: 관련 boolean 여러 개, 배타적인 optional Props → discriminated union, union + `never`
+- 관계: mode가 값·반환 타입을 결정하는데 타입에 없음 → generic lookup map, 별도 컴포넌트
+- 경로·키: route·query key·field path 자유 문자열 → factory·`keyof`·파생 union
+- 결과: 성공·실패·부재·유지·삭제가 `undefined` 하나에 → `Result`·연산 union
+- 확장: 소비자가 확장할 key가 `string`으로 열림 → typed registry·module augmentation
 
 ## 상태 설계 사다리
 
@@ -332,11 +328,9 @@ public 위치 사이 관계를 만들고, 일반 제품 호출부에서 자동 �
 
 dependency 없는 수단부터 쓰고, 라이브러리는 조건이 맞을 때만 도입한다.
 
-| 계층        | 수단                                                   | 조건                                   |
-| ----------- | ------------------------------------------------------ | -------------------------------------- |
-| 기본        | 상태별 early return·guard chain 뒤 공용 `assertNever`  | 항상. dependency 불필요                |
-| 선언적 매핑 | lookup 객체 + `satisfies Record<State['status'], ...>` | 상태별 결과가 정적 값·render 함수일 때 |
-| 라이브러리  | `ts-pattern`의 `.exhaustive()`                         | **설치돼 있거나 도입이 승인된 경우만** |
+- 기본 (항상, dependency 불필요): 상태별 early return·guard chain 뒤 공용 `assertNever`
+- 선언적 매핑 (상태별 결과가 정적 값·render 함수일 때): lookup 객체 + `satisfies Record<State['status'], ...>`
+- 라이브러리 (**설치돼 있거나 도입이 승인된 경우만**): `ts-pattern`의 `.exhaustive()`
 
 variant별 설정(라벨·메시지·핸들러·권한)도 `satisfies Record<Union, Config>`로
 전체 union 커버를 강제한다. 새 variant 추가 시 모든 필수 소비 지점이 컴파일
@@ -345,12 +339,10 @@ variant별 설정(라벨·메시지·핸들러·권한)도 `satisfies Record<Uni
 타입 **형태** 일부는 기계로 잡는다. `@lodado/eslint-config/local-rules`를 쓰는
 레포는 다음 규칙이 이미 켜져 있다.
 
-| 규칙                          | 잡는 것                                                     |
-| ----------------------------- | ----------------------------------------------------------- |
-| `no-response-type-assertion`  | boundary payload를 파싱 대신 `as`로 단언                    |
-| `require-discriminated-state` | `status` literal union 옆의 optional 형제 필드              |
-| `no-boolean-state-flags`      | 한 흐름을 병렬 boolean flag나 boolean `useState` 2개로 표현 |
-| `no-action-in-state`          | state union·state 값 안에 저장된 `retry` 같은 action        |
+- `no-response-type-assertion`: boundary payload를 파싱 대신 `as`로 단언
+- `require-discriminated-state`: `status` literal union 옆의 optional 형제 필드
+- `no-boolean-state-flags`: 한 흐름을 병렬 boolean flag나 boolean `useState` 2개로 표현
+- `no-action-in-state`: state union·state 값 안에 저장된 `retry` 같은 action
 
 `assertNever`는 레포에 이미 있으면 재사용하고, 없으면 공용 위치 하나에만 만든다.
 

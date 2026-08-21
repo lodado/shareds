@@ -172,19 +172,17 @@ reviewer는 아래 질문으로 사용자를 재인터뷰하거나 새 정책을
 `POLICY_GAP`, 해당 없으면 구체 사유와 함께 N/A. 설명 취향이나
 문장력만으로 finding을 만들지 않는다.
 
-| 반증 질문                                                | 필요한 근거                                                     |
-| -------------------------------------------------------- | --------------------------------------------------------------- |
-| 왜 이 범위까지 변경했는가?                               | 사용자 가치, 명시된 제약, Outcome Brief의 성공·Non-goals        |
-| 왜 이 상태는 local 또는 global owner가 소유하는가?       | 실제 consumer 범위, 생성·유지·폐기 lifecycle                    |
-| 요구가 바뀌면 어디를 수정하고 어디까지 전파되는가?       | 정책 owner, public surface, import·data flow 영향 범위          |
-| 왜 이 component·abstraction을 공유하는가?                | 현재 consumer가 공유하는 stable invariant와 함께 바뀌는 계약    |
-| 왜 중복을 남겼는가?                                      | 독립 변경 방향, 공통화 결합 비용과 drift 위험                   |
-| 왜 이 type·state model의 복잡성이 필요한가?              | 타입이 막는 실제 불가능 상태·잘못된 전이                        |
-| 이 경계는 어떤 오류를 복구하고 무엇을 상위로 전파하는가? | 예상 오류·알 수 없는 오류의 owner, fallback과 retry 계약        |
-| 검증하지 않은 계약은 무엇이며 왜 제외했는가?             | risk, 카드 행 evidence 또는 출처 있는 N/A                       |
-| 성능 문제나 개선 claim의 근거가 있는가?                  | 동일 환경 metric·budget·baseline/after 또는 claim 없음          |
-| 왜 새 dependency·framework를 도입했는가?                 | 해결하는 실제 문제, 실제 사용 기능, 대안 비용, 제거 경로        |
-| 다음 우선순위는 무엇인가?                                | 기술적 wishlist가 아니라 남은 사용자·보안·정합성·운영 위험 순서 |
+- 왜 이 범위까지 변경했는가? — 사용자 가치, 명시된 제약, Outcome Brief의 성공·Non-goals
+- 왜 이 상태는 local 또는 global owner가 소유하는가? — 실제 consumer 범위, 생성·유지·폐기 lifecycle
+- 요구가 바뀌면 어디를 수정하고 어디까지 전파되는가? — 정책 owner, public surface, import·data flow 영향 범위
+- 왜 이 component·abstraction을 공유하는가? — 현재 consumer가 공유하는 stable invariant와 함께 바뀌는 계약
+- 왜 중복을 남겼는가? — 독립 변경 방향, 공통화 결합 비용과 drift 위험
+- 왜 이 type·state model의 복잡성이 필요한가? — 타입이 막는 실제 불가능 상태·잘못된 전이
+- 이 경계는 어떤 오류를 복구하고 무엇을 상위로 전파하는가? — 예상 오류·알 수 없는 오류의 owner, fallback과 retry 계약
+- 검증하지 않은 계약은 무엇이며 왜 제외했는가? — risk, 카드 행 evidence 또는 출처 있는 N/A
+- 성능 문제나 개선 claim의 근거가 있는가? — 동일 환경 metric·budget·baseline/after 또는 claim 없음
+- 왜 새 dependency·framework를 도입했는가? — 해결하는 실제 문제, 실제 사용 기능, 대안 비용, 제거 경로
+- 다음 우선순위는 무엇인가? — 기술적 wishlist가 아니라 남은 사용자·보안·정합성·운영 위험 순서
 
 - 승인된 기획서·Figma의 레이아웃, 상태, 문구, interaction과 구현이 일치하는가?
 - Outcome Brief의 사용자·상황과 관찰 가능한 성공이 실제 diff로 달성됐고 Non-goals를

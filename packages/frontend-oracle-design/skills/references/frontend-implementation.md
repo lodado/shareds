@@ -50,14 +50,14 @@ React production 변경이면 [`changeability.md`](changeability.md)도 전부 �
 
 ## 1. 상태 소유권부터 정한다
 
-| 종류                                        | 기본 소유자                                            | 금지할 중복                                |
-| ------------------------------------------- | ------------------------------------------------------ | ------------------------------------------ |
-| API·DB의 원본과 freshness                   | Server Component 혹은 TanStack Query cache후 hydration | query 결과를 `useState`·전역 store에 복사  |
-| 공유·북마크·뒤로가기가 필요한 필터          | URL `searchParams`·router                              | URL과 local state의 양방향 effect 동기화   |
-| 입력 중인 form draft                        | 가장 가까운 form/feature                               | 저장 전 draft를 server cache 원본으로 취급 |
-| modal·selection·hover 같은 일시 UI          | 가장 가까운 component/hook                             | 이유 없는 global store 승격                |
-| 현재 props/state로 계산 가능한 값           | render 중 파생(useMemo등)                              | effect로 계산값을 다시 state에 저장        |
-| 먼 하위 트리가 실제로 공유하는 client state | 가장 가까운 공통 provider/store                        | 앱 전체 provider를 기본값으로 사용         |
+각 항목은 `종류 → 기본 소유자. 금지: 중복 형태`다.
+
+- API·DB의 원본과 freshness → Server Component 혹은 TanStack Query cache후 hydration. 금지: query 결과를 `useState`·전역 store에 복사
+- 공유·북마크·뒤로가기가 필요한 필터 → URL `searchParams`·router. 금지: URL과 local state의 양방향 effect 동기화
+- 입력 중인 form draft → 가장 가까운 form/feature. 금지: 저장 전 draft를 server cache 원본으로 취급
+- modal·selection·hover 같은 일시 UI → 가장 가까운 component/hook. 금지: 이유 없는 global store 승격
+- 현재 props/state로 계산 가능한 값 → render 중 파생(useMemo등). 금지: effect로 계산값을 다시 state에 저장
+- 먼 하위 트리가 실제로 공유하는 client state → 가장 가까운 공통 provider/store. 금지: 앱 전체 provider를 기본값으로 사용
 
 서버 원본을 편집용 draft로 복사하려면 `초기화 시점`, `저장`, `취소`, `원격 갱신과
 충돌` 정책이 Oracle에 있어야 한다. 단일 source of truth 유지, query 변환은 가능하면
@@ -89,13 +89,11 @@ shell을 막지 말고 느린 부분 가까이에 Suspense boundary.
 
 ## 3. loading·error 경계를 상태별로 정한다
 
-| 상황                                      | 기본 선택                                                                           |
-| ----------------------------------------- | ----------------------------------------------------------------------------------- |
-| route/server 초기 조회                    | `loading.tsx` 또는 국소 `<Suspense>`, route `error.tsx`                             |
-| 무조건 실행되는 client query의 첫 조회    | `useSuspenseQuery` + 국소 Suspense + Error Boundary                                 |
-| 조건부 query·placeholder·세밀한 취소 제어 | 일반 `useQuery`를 허용하고 명시적 상태 UI                                           |
-| cache가 있는 background refetch           | 기존 content 유지 여부와 작은 progress/error UI를 Oracle대로 구현                   |
-| mutation                                  | `useMutation().isPending`과 명시적 오류 UI/`throwOnError`; Suspense로 처리하지 않음 |
+- route/server 초기 조회 → `loading.tsx` 또는 국소 `<Suspense>`, route `error.tsx`
+- 무조건 실행되는 client query의 첫 조회 → `useSuspenseQuery` + 국소 Suspense + Error Boundary
+- 조건부 query·placeholder·세밀한 취소 제어 → 일반 `useQuery`를 허용하고 명시적 상태 UI
+- cache가 있는 background refetch → 기존 content 유지 여부와 작은 progress/error UI를 Oracle대로 구현
+- mutation → `useMutation().isPending`과 명시적 오류 UI/`throwOnError`; Suspense로 처리하지 않음
 
 - fallback은 기다리는 subtree만 대체하고 레이아웃 크기를 가능한 유지.
 - 첫 조회가 무조건 실행되고 `enabled`·placeholder·취소 제약이 없으면
@@ -150,11 +148,9 @@ shell을 막지 말고 느린 부분 가까이에 Suspense boundary.
 
 micro-hook은 **짧은 코드**가 아니라 **작은 소유권 경계**다. UI와 비즈니스 로직 책임:
 
-| 소유자              | 맡는 것                                                                          | 맡지 않는 것                                                         |
-| ------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| UI component        | semantic JSX, 접근성, 시각 상태 표현, view-local interaction, 사용자 intent 전달 | domain 판정, DTO 변환, query/cache, navigation·storage·observer 조율 |
-| micro-hook          | 하나의 interaction workflow 또는 하나의 외부 시스템과 React lifecycle 연결       | JSX·class·token·문구, unrelated workflow 묶음                        |
-| pure model function | 필터·그룹·정렬·검증·상태 전이 같은 React 비의존 비즈니스 규칙                    | hook lifecycle과 화면 표현                                           |
+- UI component는 semantic JSX, 접근성, 시각 상태 표현, view-local interaction, 사용자 intent 전달만 맡는다. domain 판정, DTO 변환, query/cache, navigation·storage·observer 조율은 맡지 않는다.
+- micro-hook은 하나의 interaction workflow 또는 하나의 외부 시스템과 React lifecycle 연결만 맡는다. JSX·class·token·문구, unrelated workflow 묶음은 맡지 않는다.
+- pure model function은 필터·그룹·정렬·검증·상태 전이 같은 React 비의존 비즈니스 규칙만 맡는다. hook lifecycle과 화면 표현은 맡지 않는다.
 
 Page는 micro-hook을 조합해 render-ready 값과 intent action으로 UI를 그린다. event
 handler에 domain 분기나 둘 이상의 부작용 순서가 생기면 hook이 workflow를 소유하고,
@@ -272,11 +268,9 @@ dependency 없이 N/A 사유만.
 아래는 구현 근거다. 제품 정책은 반드시 Oracle의 승인된 출처에서. 링크 내용과 실제
 설치 버전이 다르면 설치 버전 문서 우선.
 
-| 관할                              | 자료                                                                                                                                                                                                                                                                                                                           |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| React state/effect/hook/Suspense  | [Choosing the State Structure](https://react.dev/learn/choosing-the-state-structure), [You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect), [Reusing Logic with Custom Hooks](https://react.dev/learn/reusing-logic-with-custom-hooks), [Suspense](https://react.dev/reference/react/Suspense) |
-| Next server/client/stream/error   | [Server and Client Components](https://nextjs.org/docs/app/getting-started/server-and-client-components), [loading.js](https://nextjs.org/docs/app/api-reference/file-conventions/loading), [error.js](https://nextjs.org/docs/app/api-reference/file-conventions/error)                                                       |
-| TanStack Query Suspense/reset/SSR | [Suspense](https://tanstack.com/query/latest/docs/framework/react/guides/suspense), [QueryErrorResetBoundary](https://tanstack.com/query/latest/docs/framework/react/reference/QueryErrorResetBoundary), [Advanced SSR](https://tanstack.com/query/latest/docs/framework/react/guides/advanced-ssr)                            |
-| Vercel performance heuristics     | [React Best Practices](https://vercel.com/blog/introducing-react-best-practices), [Dashboard frontend optimization](https://vercel.com/blog/how-we-made-the-vercel-dashboard-twice-as-fast)                                                                                                                                    |
-| Community cross-check             | [TkDodo: Practical React Query](https://tkdodo.eu/blog/practical-react-query), [Kent C. Dodds: State Colocation](https://kentcdodds.com/blog/state-colocation-will-make-your-react-app-faster)                                                                                                                                 |
-| Changeability 구현·review         | [`changeability.md`](changeability.md)의 canonical 정의·React 예시·trade-off·Decision evidence·review 기준. 외부 근거와 고정 revision도 그 reference가 소유한다.                                                                                                                                                               |
+- React state/effect/hook/Suspense: [Choosing the State Structure](https://react.dev/learn/choosing-the-state-structure), [You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect), [Reusing Logic with Custom Hooks](https://react.dev/learn/reusing-logic-with-custom-hooks), [Suspense](https://react.dev/reference/react/Suspense)
+- Next server/client/stream/error: [Server and Client Components](https://nextjs.org/docs/app/getting-started/server-and-client-components), [loading.js](https://nextjs.org/docs/app/api-reference/file-conventions/loading), [error.js](https://nextjs.org/docs/app/api-reference/file-conventions/error)
+- TanStack Query Suspense/reset/SSR: [Suspense](https://tanstack.com/query/latest/docs/framework/react/guides/suspense), [QueryErrorResetBoundary](https://tanstack.com/query/latest/docs/framework/react/reference/QueryErrorResetBoundary), [Advanced SSR](https://tanstack.com/query/latest/docs/framework/react/guides/advanced-ssr)
+- Vercel performance heuristics: [React Best Practices](https://vercel.com/blog/introducing-react-best-practices), [Dashboard frontend optimization](https://vercel.com/blog/how-we-made-the-vercel-dashboard-twice-as-fast)
+- Community cross-check: [TkDodo: Practical React Query](https://tkdodo.eu/blog/practical-react-query), [Kent C. Dodds: State Colocation](https://kentcdodds.com/blog/state-colocation-will-make-your-react-app-faster)
+- Changeability 구현·review: [`changeability.md`](changeability.md)의 canonical 정의·React 예시·trade-off·Decision evidence·review 기준. 외부 근거와 고정 revision도 그 reference가 소유한다.

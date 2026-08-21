@@ -28,12 +28,12 @@
 
 ### 핵심 패턴
 
-| 위험 신호                          | 기본 선택                                         | 적용하지 않는 경우                      |
-| ---------------------------------- | ------------------------------------------------- | --------------------------------------- |
-| 복잡한 조건이 반복된다             | domain 의미가 드러나는 이름을 붙인다              | 한 번만 쓰이고 이름이 조건보다 모호하다 |
-| 독립 state·async 흐름이 섞인다     | 상태 소유권·error boundary를 기준으로 분리한다    | LOC만 길고 변경 이유가 같다             |
-| 핵심 순서가 여러 effect에 흩어진다 | event 또는 이름 붙은 workflow에서 순서를 드러낸다 | 실제 외부 system 동기화다               |
-| 한 줄마다 helper·wrapper가 생긴다  | 정보를 추가하지 않는 indirection을 제거한다       | 여러 사용처가 동일 정책을 공유한다      |
+각 항목은 `위험 신호 → 기본 선택. 제외: 적용하지 않는 경우` 형식이다.
+
+- 복잡한 조건이 반복된다 → domain 의미가 드러나는 이름을 붙인다. 제외: 한 번만 쓰이고 이름이 조건보다 모호하다
+- 독립 state·async 흐름이 섞인다 → 상태 소유권·error boundary를 기준으로 분리한다. 제외: LOC만 길고 변경 이유가 같다
+- 핵심 순서가 여러 effect에 흩어진다 → event 또는 이름 붙은 workflow에서 순서를 드러낸다. 제외: 실제 외부 system 동기화다
+- 한 줄마다 helper·wrapper가 생긴다 → 정보를 추가하지 않는 indirection을 제거한다. 제외: 여러 사용처가 동일 정책을 공유한다
 
 ```tsx
 const canSubmit = !isLoading && !isLocked && user != null && amount > 0
@@ -64,14 +64,12 @@ intent로 읽히게 만들되 내부 상태 전이와 lifecycle을 모호한 자
 
 ### 핵심 패턴
 
-| 위험 신호                            | 기본 선택                                             | 적용하지 않는 경우                        |
-| ------------------------------------ | ----------------------------------------------------- | ----------------------------------------- |
-| `get*`·`fetch*`에 숨은 부작용이 있다 | caller에서 조합하거나 전체 workflow를 이름에 드러낸다 | 승인 계약이 원자적 workflow를 요구한다    |
-| render·selector가 외부 상태를 쓴다   | event·mutation·외부 동기화 effect로 옮긴다            | 해당하지 않음                             |
-| 성공·실패 handler가 write를 중복한다 | 실행 owner와 정확한 횟수를 한 경계로 모은다           | 서로 다른 승인 부작용이다                 |
-| timer·subscription cleanup이 없다    | 생성한 경계에서 cleanup한다                           | runtime이 lifecycle을 명시적으로 소유한다 |
-| 닫힘·제거·결과 확정이 한 boolean이다 | 관찰 결과가 다른 전이만 이름과 owner를 나눈다         | 같은 시점의 원자적 전이다                 |
-| 국소 경계가 모든 오류를 소비한다     | 복구 가능한 오류만 처리하고 나머지는 상위로 전파한다  | 앱 최상위 격리·관측 경계다                |
+- `get*`·`fetch*`에 숨은 부작용이 있다 → caller에서 조합하거나 전체 workflow를 이름에 드러낸다. 제외: 승인 계약이 원자적 workflow를 요구한다
+- render·selector가 외부 상태를 쓴다 → event·mutation·외부 동기화 effect로 옮긴다
+- 성공·실패 handler가 write를 중복한다 → 실행 owner와 정확한 횟수를 한 경계로 모은다. 제외: 서로 다른 승인 부작용이다
+- timer·subscription cleanup이 없다 → 생성한 경계에서 cleanup한다. 제외: runtime이 lifecycle을 명시적으로 소유한다
+- 닫힘·제거·결과 확정이 한 boolean이다 → 관찰 결과가 다른 전이만 이름과 owner를 나눈다. 제외: 같은 시점의 원자적 전이다
+- 국소 경계가 모든 오류를 소비한다 → 복구 가능한 오류만 처리하고 나머지는 상위로 전파한다. 제외: 앱 최상위 격리·관측 경계다
 
 ```ts
 const balance = await fetchBalance()
@@ -112,12 +110,10 @@ saveLastViewedBalance(balance)
 
 ### 핵심 패턴
 
-| 위험 신호                                          | 기본 선택                         | 적용하지 않는 경우                          |
-| -------------------------------------------------- | --------------------------------- | ------------------------------------------- |
-| 같은 business rule이 여러 곳에 복제된다            | 가장 가까운 domain owner로 모은다 | 정책과 release cadence가 서로 다르다        |
-| feature source·test·mock이 함께 이동하지 않는다    | 같은 architecture unit에 둔다     | 레포가 다른 경계를 강제한다                 |
-| generic util에 consumer별 option이 늘어난다        | 서로 다른 변경 이유를 분리한다    | 안정된 동일 invariant를 공유한다            |
-| consumer 하나를 미래 재사용 때문에 shared로 올린다 | local에 둔다                      | 현재 여러 consumer와 stable contract가 있다 |
+- 같은 business rule이 여러 곳에 복제된다 → 가장 가까운 domain owner로 모은다. 제외: 정책과 release cadence가 서로 다르다
+- feature source·test·mock이 함께 이동하지 않는다 → 같은 architecture unit에 둔다. 제외: 레포가 다른 경계를 강제한다
+- generic util에 consumer별 option이 늘어난다 → 서로 다른 변경 이유를 분리한다. 제외: 안정된 동일 invariant를 공유한다
+- consumer 하나를 미래 재사용 때문에 shared로 올린다 → local에 둔다. 제외: 현재 여러 consumer와 stable contract가 있다
 
 ```ts
 const isNicknameValid = nickname.length <= 20
@@ -151,13 +147,11 @@ const isCouponCodeValid = couponCode.length <= 20
 
 ### 핵심 패턴
 
-| 위험 신호                                        | 기본 선택                                         | 적용하지 않는 경우                     |
-| ------------------------------------------------ | ------------------------------------------------- | -------------------------------------- |
-| consumer 하나뿐인 global/public surface가 생긴다 | local state·module에 둔다                         | 승인된 public contract가 필요하다      |
-| UI가 transport DTO·query key를 안다              | mapper/model owner에서 render-ready 값으로 바꾼다 | UI 자체가 그 contract의 owner다        |
-| 짧은 props 전달 때문에 store·context를 만든다    | 가장 가까운 common owner에서 전달한다             | 실제로 넓게 공유하는 상태다            |
-| interface·adapter가 구현 하나를 감싼다           | 구현을 직접 사용한다                              | 현재 여러 구현 또는 호환성 계약이 있다 |
-| 동일 flow가 여러 platform API에 직접 묶인다      | pure transition core와 얇은 adapter로 나눈다      | 현재 runtime 하나만 지원한다           |
+- consumer 하나뿐인 global/public surface가 생긴다 → local state·module에 둔다. 제외: 승인된 public contract가 필요하다
+- UI가 transport DTO·query key를 안다 → mapper/model owner에서 render-ready 값으로 바꾼다. 제외: UI 자체가 그 contract의 owner다
+- 짧은 props 전달 때문에 store·context를 만든다 → 가장 가까운 common owner에서 전달한다. 제외: 실제로 넓게 공유하는 상태다
+- interface·adapter가 구현 하나를 감싼다 → 구현을 직접 사용한다. 제외: 현재 여러 구현 또는 호환성 계약이 있다
+- 동일 flow가 여러 platform API에 직접 묶인다 → pure transition core와 얇은 adapter로 나눈다. 제외: 현재 runtime 하나만 지원한다
 
 ```tsx
 function BalanceCard({ balance }: { balance: number }) {
@@ -227,13 +221,11 @@ memoization·cache·lazy loading과 단일 request를 위한 global state다.
 
 다섯 축은 동시에 최대화할 수 없다. 실제 선택에서 우선한 비용과 감수한 비용만 적는다.
 
-| 충돌                     | 기본 판단                                                             |
-| ------------------------ | --------------------------------------------------------------------- |
-| Readability ↔ Cohesion   | 독립 변경·테스트 책임이 없으면 가까이 두고, 생기면 이름 붙여 분리한다 |
-| Predictability ↔ 캡슐화  | 알고리즘은 숨기고 외부 write는 이름·계약에서 드러낸다                 |
-| Cohesion ↔ Coupling      | 같은 정책과 실제 drift 위험이 있을 때만 공통화한다                    |
-| Coupling ↔ Readability   | consumer가 적으면 local flow, 안정된 다수 consumer면 공용 경계를 쓴다 |
-| Simplicity ↔ Performance | 근거 전에는 단순 구현, 측정 뒤 필요한 범위만 최적화한다               |
+- Readability ↔ Cohesion: 독립 변경·테스트 책임이 없으면 가까이 두고, 생기면 이름 붙여 분리한다
+- Predictability ↔ 캡슐화: 알고리즘은 숨기고 외부 write는 이름·계약에서 드러낸다
+- Cohesion ↔ Coupling: 같은 정책과 실제 drift 위험이 있을 때만 공통화한다
+- Coupling ↔ Readability: consumer가 적으면 local flow, 안정된 다수 consumer면 공용 경계를 쓴다
+- Simplicity ↔ Performance: 근거 전에는 단순 구현, 측정 뒤 필요한 범위만 최적화한다
 
 ```markdown
 - Changeability: analytics 실행 순서를 드러내는 Predictability를 우선했다. handler의

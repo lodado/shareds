@@ -1,14 +1,5 @@
 # Oracle 기반 구현·자가검증 루프
 
-## 목차
-
-0. 판정 명령은 ledger로 실행한다
-1. 테스트로 계약 상태 확인
-2. Frontend 구현 결정
-3. 최소 구현·셀프피드백
-4. GREEN 게이트와 evidence manifest
-5. 금지
-
 ## 권위와 진입 조건
 
 테스트 파일을 작성하기 직전에 설치된 `$test` 스킬을 이름으로 명시적으로 로드·호출해
@@ -212,14 +203,12 @@ runtime 기준과 `changeability.md`의 변경 비용 기준으로 결정하고 
 5. 영향 범위 테스트 실행.
 6. 결과를 분류하고 다음 행동 결정.
 
-| 분류                 | 행동                                                         |
-| -------------------- | ------------------------------------------------------------ |
-| `POLICY_GAP`         | 카드 현재본과 질문을 출력하고 `NEEDS_DECISION`               |
-| `EVIDENCE_GAP`       | 잠긴 카드 범위 안에서 누락 테스트·증거만 추가                |
-| `HARNESS_DEFECT`     | sibling `test` skill 허용 항목과 공용 2회 예산 안에서만 보정 |
-| `PRODUCT_DEFECT`     | 같은 카드 행을 유지하고 최소 수정 후 재실행                  |
-| `ENVIRONMENT_DEFECT` | production을 건드리지 않고 `FAIL`                            |
-| `NON_ORACLE_OPINION` | 기록하되 정책·assertion·완료 상태를 바꾸지 않음              |
+- `POLICY_GAP` → 카드 현재본과 질문을 출력하고 `NEEDS_DECISION`
+- `EVIDENCE_GAP` → 잠긴 카드 범위 안에서 누락 테스트·증거만 추가
+- `HARNESS_DEFECT` → sibling `test` skill 허용 항목과 공용 2회 예산 안에서만 보정
+- `PRODUCT_DEFECT` → 같은 카드 행을 유지하고 최소 수정 후 재실행
+- `ENVIRONMENT_DEFECT` → production을 건드리지 않고 `FAIL`
+- `NON_ORACLE_OPINION` → 기록하되 정책·assertion·완료 상태를 바꾸지 않음
 
 revision mismatch는 피드백 분류 대상이 아니다. 기존 증거를 즉시 폐기하고
 `oracle-card.md`의 lock 규칙대로 `NEEDS_DECISION` 또는 `FAIL`로 이동.
@@ -252,15 +241,13 @@ revision mismatch는 피드백 분류 대상이 아니다. 기존 증거를 즉�
 
 그다음 `--to IMPLEMENTED_GREEN` 전이를 시도한다. 기계 검사:
 
-| 거부 코드              | 뜻                                               | 올바른 대응                                        |
-| ---------------------- | ------------------------------------------------ | -------------------------------------------------- |
-| `ORACLE_CHANGED`       | 카드·source bytes가 잠긴 값과 다름               | 증거를 폐기하고 `NEEDS_DECISION`                   |
-| `RUN_NOT_GREEN`        | 인용한 run이 통과하지 않음                       | 실제 통과 run을 만들고 인용                        |
-| `EVIDENCE_REQUIRED`    | evidence manifest 없이 상태 전이를 시도함        | 잠긴 카드 전 행을 매핑하고 `--evidence`로 인용     |
-| `REQUIRED_RUN_MISSING` | 선언한 필수 label의 최신 통과가 없음             | 해당 repo 명령을 `exec --label`로 다시 실행        |
-| `FLAKINESS_GATE`       | 같은 명령의 연속 통과가 risk 필요 횟수에 못 미침 | 같은 명령을 그대로 다시 실행해 연속 통과를 확보    |
-| `TEST_WEAKENED`        | RED 기준선 대비 assertion 감소·금지 토큰·삭제    | 테스트를 원래 강도로 되돌린다                      |
-| `ENV_DRIFT`(경고)      | RED와 GREEN의 실행 환경이 다름                   | 환경 차이가 결과를 바꿨는지 확인하고 보고에 남긴다 |
+- `ORACLE_CHANGED` — 카드·source bytes가 잠긴 값과 다름 → 증거를 폐기하고 `NEEDS_DECISION`
+- `RUN_NOT_GREEN` — 인용한 run이 통과하지 않음 → 실제 통과 run을 만들고 인용
+- `EVIDENCE_REQUIRED` — evidence manifest 없이 상태 전이를 시도함 → 잠긴 카드 전 행을 매핑하고 `--evidence`로 인용
+- `REQUIRED_RUN_MISSING` — 선언한 필수 label의 최신 통과가 없음 → 해당 repo 명령을 `exec --label`로 다시 실행
+- `FLAKINESS_GATE` — 같은 명령의 연속 통과가 risk 필요 횟수에 못 미침 → 같은 명령을 그대로 다시 실행해 연속 통과를 확보
+- `TEST_WEAKENED` — RED 기준선 대비 assertion 감소·금지 토큰·삭제 → 테스트를 원래 강도로 되돌린다
+- `ENV_DRIFT`(경고) — RED와 GREEN의 실행 환경이 다름 → 환경 차이가 결과를 바꿨는지 확인하고 보고에 남긴다
 
 flakiness 필요 횟수는 Low 1회, Medium 2회, High 3회. 재실행으로 통과를 뽑는 게 아니라
 **같은 명령이 반복해도 결정론적으로 통과함**을 보이는 절차다. 실패가 섞이면

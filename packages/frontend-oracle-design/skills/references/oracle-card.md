@@ -1,18 +1,5 @@
 # Oracle Card 설계 계약
 
-## 목차
-
-0. 외부 기준 게이트
-1. UI 디자인 의도 게이트
-2. Risk 판정
-3. 정책 Grill
-4. 정책 출처
-5. 카드 형식
-6. Adversarial self-review
-7. Draft Oracle과 사용자 확인
-8. 결정적 revision lock — 카드 lint, lock, run artifact 초기화
-9. 설계 종료 상태
-
 ## 0. 외부 기준 게이트
 
 Risk·Grill 전에 사용자가 제공했거나 레포가 승인된 기준으로 지정한 자료를 찾아 전부
@@ -115,11 +102,9 @@ visual identity 변경이면 카드 작성 전 [`visual-design.md`](visual-desig
 코드 복잡도가 아니라 **false GREEN의 최악 피해**로 판정한다. UI가 단순해도 부작용이
 위험하면 High다.
 
-| Risk   | 예                                          | 처리                                    |
-| ------ | ------------------------------------------- | --------------------------------------- |
-| Low    | 정적 표시, 순수 동기 helper                 | 카드 생략 가능 — risk와 사유 한 줄 기록 |
-| Medium | 조회, 검색, 폼, 캐시                        | 카드 작성                               |
-| High   | 결제, 주문, 저장, 삭제, 권한, 외부 mutation | 카드 작성 + 사용자 카드 확인 필수       |
+- Low (정적 표시, 순수 동기 helper) → 카드 생략 가능 — risk와 사유 한 줄 기록
+- Medium (조회, 검색, 폼, 캐시) → 카드 작성
+- High (결제, 주문, 저장, 삭제, 권한, 외부 mutation) → 카드 작성 + 사용자 카드 확인 필수
 
 ## 3. 정책 Grill — 시스템 디자인 인터뷰
 
@@ -137,16 +122,14 @@ visual identity 변경이면 카드 작성 전 [`visual-design.md`](visual-desig
 문서를 먼저 탐색해 답이 있는 질문을 제거한다. 코드 관찰로 얻은 답은
 `project-constraint` 후보일 뿐 제품 정책 출처가 아니다.
 
-| Phase | 관할            | 대표 질문                                                                                     | 산출물                               |
-| ----- | --------------- | --------------------------------------------------------------------------------------------- | ------------------------------------ |
-| P1    | 결과            | actor·상황, 관찰 가능한 성공, 비목표, 최악 회귀·가역성, 플랫폼·디바이스·offline·다국어        | Outcome Brief                        |
-| P2    | 부작용·위험     | 서버 상태 변경 여부, 돈·데이터·권한 피해                                                      | Risk lane                            |
-| P3    | 데이터·아키텍처 | source of truth, stale 허용, 기존 상태 소유자(query·router·form), 핵심 entity와 소유 컴포넌트 | architecture intake, State ownership |
-| P4    | API 계약        | 스펙 소스 위치·version, error code별 UI 결과·재시도, idempotency key 주체, pagination 끝 판정 | Source Registry, `API contract` 절   |
-| P5    | 경합·비동기     | 아래 "자주 필요한 질문"                                                                       | 카드 `O*` 행                         |
-| P6    | 상태 모델       | 상태 수·불가능한 전이                                                                         | State Model(opt-in)                  |
-| P7    | 시각            | visual scope, 로딩·빈·에러 표시, 접근성 확인                                                  | Design Intent·`D*` 행                |
-| P8    | 성능·운영       | 성능 목표 수치·측정법, rollout·flag                                                           | performance 게이트                   |
+- P1 결과: actor·상황, 관찰 가능한 성공, 비목표, 최악 회귀·가역성, 플랫폼·디바이스·offline·다국어 → Outcome Brief
+- P2 부작용·위험: 서버 상태 변경 여부, 돈·데이터·권한 피해 → Risk lane
+- P3 데이터·아키텍처: source of truth, stale 허용, 기존 상태 소유자(query·router·form), 핵심 entity와 소유 컴포넌트 → architecture intake, State ownership
+- P4 API 계약: 스펙 소스 위치·version, error code별 UI 결과·재시도, idempotency key 주체, pagination 끝 판정 → Source Registry, `API contract` 절
+- P5 경합·비동기: 아래 "자주 필요한 질문" → 카드 `O*` 행
+- P6 상태 모델: 상태 수·불가능한 전이 → State Model(opt-in)
+- P7 시각: visual scope, 로딩·빈·에러 표시, 접근성 확인 → Design Intent·`D*` 행
+- P8 성능·운영: 성능 목표 수치·측정법, rollout·flag → performance 게이트
 
 가지치기:
 
@@ -190,21 +173,18 @@ visual identity 변경이면 카드 작성 전 [`visual-design.md`](visual-desig
 [RADIO framework](https://www.greatfrontend.com/front-end-system-design-playbook/framework)의
 R→A→D→I→O 순서를, 질문·정책·예시 분리는
 [Example Mapping](https://cucumber.io/blog/bdd/example-mapping-introduction/)의
-rule(=`P*`)·example(=`O*`)·question(=red card) 카드 대응을 따른다. `Then`이
-불명확한 예시는 예시가 아니라 질문이다 — 그 행을 만들지 않고 red card로 기록한다.
-red card가 쌓이면 토론하지 않고 `NEEDS_DECISION`, rule이 쌓이면 카드가 너무 크다 —
-Requested mechanism check의 Smallest reversible scope 분할을 제안한다.
+rule(=`P*`)·example(=`O*`)·question(=red card) 대응을 따른다. `Then`이 불명확한
+예시는 질문이다 — 행을 만들지 않고 red card로 기록한다. red card가 쌓이면
+`NEEDS_DECISION`, rule이 쌓이면 Smallest reversible scope 분할을 제안한다.
 
 RADIO 각 요소의 처리 위치 — grill이 전부 소유하지 않는다:
 
-| RADIO                   | 처리 위치                                                            |
-| ----------------------- | -------------------------------------------------------------------- |
-| R Requirements          | Grill P1·P2                                                          |
-| A Architecture          | Delivery architecture 게이트 — grill에서 구현 구조를 질문하지 않는다 |
-| D Data model            | Grill P3                                                             |
-| I Interface (server)    | Grill P4 → 스펙 없으면 카드 도출 draft → 승인 → `## API contract`    |
-| I Interface (component) | `type-constraints.md` — 카드 `O*` 행에서 도출                        |
-| O Optimizations         | P5 경합·P7 접근성·P8 성능 + Delivery 증거 행                         |
+- R Requirements: Grill P1·P2
+- A Architecture: Delivery architecture 게이트 — grill에서 구현 구조를 질문하지 않는다
+- D Data model: Grill P3
+- I Interface (server): Grill P4 → 스펙 없으면 카드 도출 draft → 승인 → `## API contract`
+- I Interface (component): `type-constraints.md` — 카드 `O*` 행에서 도출
+- O Optimizations: P5 경합·P7 접근성·P8 성능 + Delivery 증거 행
 
 - outcome-unknown timeout에서 재시도와 idempotency를 어떻게 보장할지
 - 요청된 수단이 의도한 결과를 얻는 최소 수단인지, 더 작은 대안을 먼저 검증할지
@@ -417,9 +397,9 @@ node <skill-dir>/scripts/oracle-lock.mjs verify \
 - Low risk로 카드를 생략했으면 lock N/A 사유를 남긴다. Medium/High에서 파일시스템·
   Node가 없으면 Design-only와 Delivery 모두 LLM 판정으로 대체하지 않고 `FAIL`.
 
-SHA-256은 drift 검출 장치다. 같은 actor가 lockfile까지 다시 쓸 수 있는 환경에서 승인
-권한을 보장하지 않는다. 강한 통제가 필요하면 lockfile 변경에 CI human approval·
-CODEOWNERS·외부 서명을 추가한다. run ledger·상태 파일도 같은 한계.
+SHA-256은 drift 검출 장치일 뿐 lockfile을 다시 쓸 수 있는 actor의 승인 권한을
+보장하지 않는다. 강한 통제가 필요하면 CI human approval·CODEOWNERS·외부 서명을
+추가한다. run ledger·상태 파일도 같은 한계.
 
 ### Run artifact 초기화
 

@@ -158,18 +158,16 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
 
 조건 충족 시에만 지정 파일을 **전부 읽고**, 무관한 reference는 로드하지 않는다.
 
-| 시점                                                                                                                                                            | 읽을 파일                                                                                                                                                                                                                                                                                                                                                                                        |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 명시적 Oracle 요청 또는 Medium/High 판정 뒤 카드 작성 시작                                                                                                      | [`references/bva.md`](references/bva.md), [`references/oracle-card.md`](references/oracle-card.md)                                                                                                                                                                                                                                                                                               |
-| 새 UI·redesign 또는 보이는 layout·palette·type·copy·motion·responsive·identity 변경을 카드로 만들기 전                                                          | [`references/visual-design.md`](references/visual-design.md)                                                                                                                                                                                                                                                                                                                                     |
-| screenshot 비교·직접 브라우저 QA 명시 요청                                                                                                                      | 별도 `$frontend-visual-qa` 호출 — 이 스킬은 실행을 소유하지 않음                                                                                                                                                                                                                                                                                                                                 |
-| Delivery 진입 직후                                                                                                                                              | 설치된 `$test` 스킬을 이름으로 명시적으로 로드·호출해 판정 계약 활성화, 못 찾으면 `FAIL`; [`references/implementation-loop.md`](references/implementation-loop.md), [`references/changeability.md`](references/changeability.md), [`references/frontend-implementation.md`](references/frontend-implementation.md), [`references/architecture-contract.md`](references/architecture-contract.md) |
-| 카드에 async·순서 역전·중복 제출·retry·다단계 상태 `O*` 행이 있거나 client state·exported Props·shared/package API·trust boundary 타입 변경, production 수정 전 | [`references/type-constraints.md`](references/type-constraints.md)                                                                                                                                                                                                                                                                                                                               |
-| 레포당 1회 — 이 스킬로 타입 계약 첫 작성 전, 또는 diff가 tsconfig·TypeScript 버전을 바꿈                                                                        | [`references/type-environment.md`](references/type-environment.md) — 결과를 Source Registry에 기록하고 카드마다 반복하지 않음                                                                                                                                                                                                                                                                    |
-| Oracle Delivery 활성 + 레포가 FSD(또는 도입 승인) + 계약 영향 있는 FSD 채택·폴더 구조를 제안·설계·리뷰하기 전                                                   | [`references/fsd.md`](references/fsd.md)                                                                                                                                                                                                                                                                                                                                                         |
-| backend·full-stack·DB·data-access 경계를 만들거나 바꾸기 전                                                                                                     | [`references/backend.md`](references/backend.md)                                                                                                                                                                                                                                                                                                                                                 |
-| 성능 요구·개선 claim이 있는 카드 작성 또는 production 수정 전                                                                                                   | [`references/performance.md`](references/performance.md)                                                                                                                                                                                                                                                                                                                                         |
-| 구현·테스트 검증 후                                                                                                                                             | [`references/subagent-review.md`](references/subagent-review.md); Design Intent 있으면 [`references/visual-design.md`](references/visual-design.md) 재독                                                                                                                                                                                                                                         |
+- 명시적 Oracle 요청 또는 Medium/High 판정 뒤 카드 작성 시작 → [`bva.md`](references/bva.md), [`oracle-card.md`](references/oracle-card.md)
+- 새 UI·redesign 또는 보이는 layout·palette·type·copy·motion·responsive·identity 변경 전 → [`visual-design.md`](references/visual-design.md)
+- screenshot 비교·직접 브라우저 QA 명시 요청 → 별도 `$frontend-visual-qa` 호출, 이 스킬은 실행을 소유하지 않음
+- Delivery 진입 직후 → 설치된 `$test` 스킬을 이름으로 명시적으로 로드·호출, 못 찾으면 `FAIL`; [`implementation-loop.md`](references/implementation-loop.md), [`changeability.md`](references/changeability.md), [`frontend-implementation.md`](references/frontend-implementation.md), [`architecture-contract.md`](references/architecture-contract.md)
+- 카드에 async·순서·중복 제출·retry·다단계 상태 `O*` 행, 또는 client state·exported Props·shared/package API·trust boundary 타입 변경 전 → [`type-constraints.md`](references/type-constraints.md)
+- 레포당 1회 — 타입 계약 첫 작성 전, 또는 diff가 tsconfig·TS 버전을 바꿈 → [`type-environment.md`](references/type-environment.md), 결과를 Source Registry에 기록, 카드마다 반복하지 않음
+- Delivery 활성 + FSD 레포(또는 도입 승인) + FSD 채택·폴더 구조를 제안·설계·리뷰하기 전 → [`fsd.md`](references/fsd.md)
+- backend·full-stack·DB·data-access 경계를 만들거나 바꾸기 전 → [`backend.md`](references/backend.md)
+- 성능 요구·개선 claim이 있는 카드 작성 또는 production 수정 전 → [`performance.md`](references/performance.md)
+- 구현·테스트 검증 후 → [`subagent-review.md`](references/subagent-review.md); Design Intent 있으면 [`visual-design.md`](references/visual-design.md) 재독
 
 ## 모드 선택
 
@@ -230,14 +228,12 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
 
 테스트·리뷰의 새 관찰마다 주원인 하나를 기록하고 아래 경로만 사용한다.
 
-| 분류                 | 허용 행동                                                     |
-| -------------------- | ------------------------------------------------------------- |
-| `POLICY_GAP`         | 카드 현재본과 질문을 출력하고 `NEEDS_DECISION`                |
-| `EVIDENCE_GAP`       | 잠긴 카드 범위 안에서 누락된 테스트·reviewer 매핑만 추가      |
-| `HARNESS_DEFECT`     | locator·fixture·barrier 등 허용 항목만 공용 2회 예산으로 보정 |
-| `PRODUCT_DEFECT`     | 결정론 테스트의 `VALID_RED` 뒤 production 개선 예산 사용      |
-| `ENVIRONMENT_DEFECT` | production을 건드리지 않고 실제 원인과 함께 `FAIL`            |
-| `NON_ORACLE_OPINION` | 근거와 함께 기록하고 완료 차단이나 정책 변경에 사용하지 않음  |
+- `POLICY_GAP` → 카드 현재본과 질문을 출력하고 `NEEDS_DECISION`
+- `EVIDENCE_GAP` → 잠긴 카드 범위 안에서 누락된 테스트·reviewer 매핑만 추가
+- `HARNESS_DEFECT` → locator·fixture·barrier 등 허용 항목만 공용 2회 예산으로 보정
+- `PRODUCT_DEFECT` → 결정론 테스트의 `VALID_RED` 뒤 production 개선 예산 사용
+- `ENVIRONMENT_DEFECT` → production을 건드리지 않고 실제 원인과 함께 `FAIL`
+- `NON_ORACLE_OPINION` → 근거와 함께 기록하고 완료 차단이나 정책 변경에 사용하지 않음
 
 현재 구현·test 관찰·reviewer 선호는 분류 증거일 뿐 정책 출처가 아니다. 승인된 Design
 Intent 불일치는 단순 선호가 아니며 `visual-design.md` 기준으로 분류한다.
