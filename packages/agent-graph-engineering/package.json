@@ -1,6 +1,6 @@
 {
   "name": "@lodado/agent-graph-engineering-plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Claude Code / Codex plugin for native-agent workflow graph design and execution.",
   "private": true,
   "scripts": {

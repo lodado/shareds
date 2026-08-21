@@ -7,6 +7,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import {
+  enforceRuntimeBounds,
   GraphValidationError,
   selectTransitions,
   TransitionError,
@@ -24,6 +25,7 @@ function graph() {
     entry: 'plan',
     terminals: ['complete', 'failed'],
     maxSteps: 12,
+    context: ['request'],
     nodes: [
       {
         id: 'plan',
@@ -179,6 +181,104 @@ test('rejects write scopes outside the target repository', () => {
     (error) =>
       error instanceof GraphValidationError &&
       error.issues.filter(({ code }) => code === 'NODE_WRITE_SCOPE_OUTSIDE_REPO').length === 2,
+  )
+})
+
+test('rejects node inputs no upstream output or declared context provides', () => {
+  const value = graph()
+  value.nodes.find(({ id }) => id === 'review').input = ['artifacts', 'reviewPacket']
+
+  assert.throws(
+    () => validateGraph(value),
+    (error) =>
+      error instanceof GraphValidationError &&
+      error.issues.some(({ code, message }) => code === 'NODE_INPUT_UNSATISFIED' && message.includes('reviewPacket')),
+  )
+
+  value.context = ['request', 'reviewPacket']
+  assert.equal(validateGraph(value), value)
+})
+
+test('detects overlapping write scopes through mid-path glob segments', () => {
+  const value = graph()
+  value.nodes.find(({ id }) => id === 'plan').dispatch = 'all'
+  value.nodes.find(({ id }) => id === 'implement').writeScope = ['packages/*/auth/**']
+  value.nodes.push({
+    id: 'implement-sibling',
+    kind: 'agent',
+    owner: 'executor',
+    task: 'Write to a concrete scope a glob sibling also covers.',
+    input: ['plan'],
+    output: ['status'],
+    writeScope: ['packages/app/auth/tokens/**'],
+    dispatch: 'one',
+  })
+  value.edges.push({ from: 'plan', to: 'implement-sibling', when: { field: 'status', equals: 'success' } })
+  value.edges.push({ from: 'implement-sibling', to: 'complete', when: 'always' })
+
+  assert.throws(
+    () => validateGraph(value),
+    (error) =>
+      error instanceof GraphValidationError && error.issues.some(({ code }) => code === 'PARALLEL_WRITE_CONFLICT'),
+  )
+})
+
+test('accepts repo-relative write scope exclusions and keeps them out of overlap checks', () => {
+  const value = graph()
+  const implement = value.nodes.find(({ id }) => id === 'implement')
+  implement.writeScope = ['**', '!.ai/agent-graphs/**']
+  assert.equal(validateGraph(value), value)
+
+  implement.writeScope = ['**', '!../outside/**']
+  assert.throws(
+    () => validateGraph(value),
+    (error) =>
+      error instanceof GraphValidationError &&
+      error.issues.some(({ code }) => code === 'NODE_WRITE_SCOPE_OUTSIDE_REPO'),
+  )
+})
+
+test('enforces maxSteps and join readiness from the append-only events ledger', () => {
+  const value = graph()
+  value.nodes.push(
+    {
+      id: 'gather',
+      kind: 'join',
+      join: 'all',
+      task: 'Wait for review evidence before completing.',
+      input: ['findings'],
+      output: ['status'],
+      writeScope: [],
+    },
+    {
+      id: 'audit',
+      kind: 'agent',
+      owner: 'code-reviewer',
+      task: 'Provide a second review sample.',
+      input: ['artifacts'],
+      output: ['status', 'findings'],
+      writeScope: [],
+    },
+  )
+  value.nodes.find(({ id }) => id === 'implement').dispatch = 'all'
+  value.edges.push(
+    { from: 'implement', to: 'audit', when: { field: 'status', equals: 'success' } },
+    { from: 'review', to: 'gather', when: { field: 'status', equals: 'pass' } },
+    { from: 'audit', to: 'gather', when: 'always' },
+    { from: 'gather', to: 'complete', when: { field: 'status', equals: 'ready' } },
+  )
+  validateGraph(value)
+
+  const completed = (...nodes) => nodes.map((node) => ({ type: 'node.completed', node, status: 'SUCCEEDED' }))
+
+  assert.throws(
+    () => enforceRuntimeBounds(value, 'gather', completed('review')),
+    (error) => error instanceof TransitionError && error.code === 'JOIN_NOT_READY',
+  )
+  assert.equal(enforceRuntimeBounds(value, 'gather', completed('review', 'audit', 'gather')), undefined)
+  assert.throws(
+    () => enforceRuntimeBounds(value, 'plan', completed(...Array.from({ length: 12 }, () => 'plan'))),
+    (error) => error instanceof TransitionError && error.code === 'MAX_STEPS_EXCEEDED',
   )
 })
 

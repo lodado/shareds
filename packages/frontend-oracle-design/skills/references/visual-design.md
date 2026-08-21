@@ -17,19 +17,19 @@ visual identity를 바꿀 때만 읽는다. 기존 시각 계약을 그대로 �
 
 ## 1. 권위와 시각 범위
 
-승인된 기획서·브랜드·디자인 시스템·Figma·content guide와 사용자의 명시적 답변만
-시각 정책의 출처다. 각 자료는 자신의 관할 안에서만 사용한다. Figma는 layout·copy·
-interaction을 정할 수 있지만 API idempotency를 정하지 못하고, API 계약은 그 반대다.
+승인된 기획서·브랜드·디자인 시스템·Figma·content guide와 사용자의 명시적 답변만 시각
+정책의 출처다. 각 자료는 자신의 관할 안에서만 — Figma는 layout·copy·interaction을
+정하지만 API idempotency를 정하지 못하고, API 계약은 그 반대다.
 
-AI가 만든 시각 방향과 가용한 `frontend-design` skill의 결과는 **Design Proposal**이지
-정책 출처가 아니다. `frontend-design` skill은 identity-shaping 제안이 실제로 필요할
-때만 로드한다. 제안이 결과를 바꾸면 아래 Design Change Confirmation 전에는 카드에
-잠그지 않고 `NEEDS_DECISION`으로 멈춘다.
+AI 시각 방향과 가용한 `frontend-design` skill의 결과는 **Design Proposal**이지 정책
+출처가 아니다. `frontend-design` skill은 identity-shaping 제안이 실제로 필요할 때만
+로드한다. 제안이 결과를 바꾸면 Design Change Confirmation 전에는 잠그지 않고
+`NEEDS_DECISION`으로 멈춘다.
 
-승인된 시각 요구의 불일치는 `PRODUCT_DEFECT` 또는 카드 누락이면 `POLICY_GAP`이다.
-reviewer의 출처 없는 개인 취향만 `NON_ORACLE_OPINION`이다.
+승인된 시각 요구의 불일치는 `PRODUCT_DEFECT`, 카드 누락이면 `POLICY_GAP`. reviewer의
+출처 없는 개인 취향만 `NON_ORACLE_OPINION`.
 
-Oracle Card에 아래 시각 범위를 하나 기록한다.
+Oracle Card에 시각 범위 하나를 기록한다:
 
 | 범위               | 조건                                                   | 처리                                                                   |
 | ------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------- |
@@ -37,48 +37,49 @@ Oracle Card에 아래 시각 범위를 하나 기록한다.
 | `local`            | 기존 화면의 state·copy·hierarchy·reflow 일부 변경      | 기존 디자인 시스템을 재사용하고 영향 축만 계약한 뒤 명시적 사용자 확인 |
 | `identity-shaping` | 새 page·대규모 redesign·브랜드 인상을 만드는 핵심 화면 | 아래 두 pass와 명시적 사용자 확인을 거쳐 전체 Design Intent 잠금       |
 
-시각 범위와 기능 Risk는 별개다. 단순한 화면도 위험한 mutation이면 High risk일 수 있고,
-identity-shaping이어도 부작용 피해가 작으면 기존 Risk 규칙에 따라 판정한다.
+시각 범위와 기능 Risk는 별개다. 단순 화면도 위험한 mutation이면 High risk일 수 있고,
+identity-shaping이어도 부작용 피해가 작으면 기존 Risk 규칙에 따라 판정한다. 두 판정은
+별도로 기록.
 
 ## 2. Design Proposal과 Design Change Confirmation
 
 승인된 기준이 충분하면 그대로 실행 가능한 계약으로 번역한다. 기준이 부족한
-identity-shaping 작업만 다음 순서로 제안한다.
+identity-shaping 작업만 제안한다:
 
 1. subject, audience, page의 single job을 구체적으로 정한다.
-2. subject의 실제 재료·언어·도구·구조에서 시각 방향을 도출한다.
-3. color·type·layout·signature·copy·motion을 한 묶음으로 제안한다.
-4. genericity self-review로 다른 제품에도 그대로 붙을 선택을 수정한다.
-5. 수정한 제안과 버린 대안을 사용자에게 제시한다.
+2. subject의 실제 재료·언어·도구·구조에서 시각 방향 도출.
+3. color·type·layout·signature·copy·motion을 한 묶음으로 제안.
+4. genericity self-review로 다른 제품에도 그대로 붙을 선택 수정.
+5. 수정한 제안과 버린 대안을 사용자에게 제시.
 6. 승인된 답만 Source Registry에 등록하고 Design Intent에 잠근다.
 
 에이전트 추천을 무응답 default로 적용하지 않는다. 승인된 기준끼리 충돌하거나 결과를
-바꾸는 축이 남으면 현재 제안과 질문을 제시하고 `NEEDS_DECISION`으로 돌아간다.
+바꾸는 축이 남으면 현재 제안과 질문을 제시하고 `NEEDS_DECISION`.
 
 ### Design Change Confirmation — 필수 게이트
 
-`local`·`identity-shaping`처럼 보이는 디자인 결과를 바꾸면 Oracle lock·테스트 작성·
-production 수정 전에 반드시 사용자에게 아래 내용을 보여주고 명시적 확인을 받는다.
+`local`·`identity-shaping`처럼 보이는 디자인 결과를 바꾸면 Oracle lock·테스트·
+production 수정 전에 반드시 아래를 보여주고 명시적 사용자 확인을 받는다:
 
 1. 현재 결과에서 바뀌는 palette·type·layout·copy·motion·responsive·signature 축
 2. 승인된 source와 새 Design Intent
 3. 유지할 기존 요소와 버린 대안
 4. viewport·theme·reduced-motion에서 달라지는 결과
 
-승인된 Figma·PRD·디자인 시스템은 변경 방향의 출처지만 사용자 확인을 대신하지
-않는다. 포괄적인 “redesign”, “더 예쁘게” 요청도 구체 Design Intent의 승인으로
-간주하지 않는다. 이전 사용자 메시지는 **제시된 전체 Design Intent를 명시적으로
-확인한 답변**일 때만 재질문 없이 사용할 수 있다.
+승인된 Figma·PRD·디자인 시스템은 변경 방향의 출처지만 사용자 확인을 대신하지 않는다.
+포괄적 "redesign", "더 예쁘게" 요청도 구체 Design Intent의 승인이 아니다. 이전 사용자
+메시지는 **제시된 전체 Design Intent를 명시적으로 확인한 답변**일 때만 재질문 없이
+사용할 수 있다.
 
-확인 답변의 메시지 위치 또는 식별 가능한 인용을 Oracle Card에 기록한다. 답이 없거나
-일부 축만 승인되면 카드 현재본과 남은 질문을 출력하고 `NEEDS_DECISION`으로 멈춘다.
-`behavior-only`는 기존 시각 결과를 바꾸지 않으므로 이 게이트를 N/A로 기록한다.
+확인 답변의 메시지 위치 또는 식별 가능한 인용을 카드에 기록한다. 무응답이거나 일부
+축만 승인되면 카드 현재본과 남은 질문을 출력하고 `NEEDS_DECISION`. `behavior-only`는
+이 게이트를 N/A로 기록.
 
 ## 3. Design Intent 형식
 
 Design Intent와 Visual Contract는 별도 임시 파일이 아니라 **같은 Oracle Card bytes**에
 포함한다. 승인된 로컬 디자인 자료는 `oracle-lock.mjs --source`로 함께 잠그고, 원격
-Figma·URL은 정확한 file·page·frame·version을 카드에 기록한다.
+Figma·URL은 정확한 file·page·frame·version을 카드에 기록.
 
 ```markdown
 ### Design Intent
@@ -105,9 +106,8 @@ Figma·URL은 정확한 file·page·frame·version을 카드에 기록한다.
 | D3  | P3   | identity   | ...  | ...   | 유저 Q1=A | JUDGMENT   |
 ```
 
-`behavior-only`이면 Visual scope와 기존 계약을 유지한다는 출처 있는 N/A만 기록한다.
-`local`이면 영향받는 축만 작성한다. `identity-shaping`이면 아래 항목을 모두 결정하거나
-N/A 사유를 남긴다.
+`behavior-only`면 기존 계약 유지의 출처 있는 N/A만. `local`이면 영향 축만.
+`identity-shaping`이면 아래 항목을 모두 결정하거나 N/A 사유를 남긴다:
 
 - palette와 semantic token 역할
 - display·body·utility typography 역할과 실제 가용 font
@@ -122,8 +122,8 @@ N/A 사유를 남긴다.
 
 ## 4. 증거 계층
 
-각 `D*` 행에 주 증거 계층을 하나 기록한다. 여러 계층이 필요하면 evidence mapping에서
-보조 증거를 추가하되 독립 증거 개수로 과장하지 않는다.
+각 `D*` 행에 주 증거 계층 하나. 보조 증거는 evidence mapping에 추가하되 독립 증거
+개수로 과장하지 않는다.
 
 | 계층         | 대상                                                                        | 대표 증거                                                     |
 | ------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------- |
@@ -135,22 +135,20 @@ N/A 사유를 남긴다.
 - `RELATIONAL`을 모든 pixel의 exact coordinate로 바꾸지 않는다.
 - `JUDGMENT`를 자동화할 수 없다는 이유로 출처 없는 합격 처리하지 않는다.
 - 현재 production screenshot을 승인 없이 golden image로 채택하지 않는다.
-- 같은 fixture·mock·reference를 공유하는 증거는 서로 완전히 독립적이라고 보고하지 않는다.
+- 같은 fixture·mock·reference를 공유하는 증거를 서로 독립적이라고 보고하지 않는다.
 
 ## 5. baseline 권위와 외부 Visual QA handoff
 
-시각 baseline은 자동 생성 결과가 아니라 사용자에게 승인받은 정책 source다. 현재
-production screenshot이나 최초 생성 결과를 golden image로 자동 채택하지 않는다.
-baseline을 새로 만들거나 바꾸려면 변경 전후 차이, 대상 viewport·theme·motion과
-허용치를 사용자에게 보여주고 **명시적 승인**을 받은 뒤 새 Oracle revision에 기록한다.
-기존 revision을 덮어쓰지 않는다.
+시각 baseline은 자동 생성 결과가 아니라 사용자에게 승인받은 정책 source다. baseline을
+새로 만들거나 바꾸려면 변경 전후 차이, 대상 viewport·theme·motion과 허용치를
+사용자에게 보여주고 **명시적 승인**을 받은 뒤 새 Oracle revision에 기록한다. 기존
+revision을 덮어쓰지 않는다.
 
-screenshot 비교와 사람이 직접 브라우저에 들어가는 실행은 별도
-`$frontend-visual-qa`가 소유한다. 이 스킬이나 `$test`가 암묵적으로 대신 실행하지
-않는다. `RELATIONAL` 행이 있으면 카드 승인 시 `Visual QA authorization: approved |
-declined`를 같이 받는다. `approved`는 명시적 요청으로 간주해 이름으로
-호출하고, `declined`는 해당 행을 visual owner의 `pending`으로 남긴다.
-`$frontend-visual-qa`는 다음만 반환한다.
+screenshot 비교와 사람이 직접 브라우저에 들어가는 실행은 별도 `$frontend-visual-qa`가
+소유한다. 이 스킬이나 `$test`가 암묵적으로 대신 실행하지 않는다. `RELATIONAL` 행이
+있으면 카드 승인 시 `Visual QA authorization: approved | declined`를 같이 받는다.
+`approved`는 명시적 요청으로 간주해 이름으로 호출하고, `declined`는 해당 행을 visual
+owner의 `pending`으로 남긴다. `$frontend-visual-qa`는 다음만 반환한다:
 
 - 인용한 Oracle revision과 승인 baseline
 - 요청받은 D/O 행별 PASS·FAIL·N/A
@@ -163,46 +161,40 @@ declined`를 같이 받는다. `approved`는 명시적 요청으로 간주해 �
 
 ## 6. 두 번의 설계 pass
 
-### Pass 1 — subject 기반 계획
+### Pass 1 — subject 기반 계획 (`identity-shaping`만)
 
-`identity-shaping`일 때만 compact plan을 만든다.
-
-- **Color:** 기존 디자인 시스템을 우선한다. 새 identity면 4~6개 named color와
-  semantic 역할을 제안한다.
-- **Type:** display·body·utility 역할, 실제 설치·license·loading·fallback을 확인한다.
-- **Layout:** 정보 위계를 한 문장과 작은 ASCII wireframe으로 표현한다.
-- **Signature:** 이 화면을 기억하게 할 요소 하나만 고른다.
-- **Risk:** 접근성이나 사용성을 해치지 않는 시각적 위험 하나만 정당화한다.
-- **Motion:** 이해를 돕는 한 순간을 우선하고 산발적인 효과를 피한다.
-- **Copy:** 사용자가 인식하는 명사와 능동형 동사를 쓰고 action→pending→success의
-  어휘를 일관되게 유지한다.
+- **Color:** 기존 디자인 시스템 우선. 새 identity면 4~6개 named color와 semantic 역할.
+- **Type:** display·body·utility 역할, 실제 설치·license·loading·fallback 확인.
+- **Layout:** 정보 위계를 한 문장과 작은 ASCII wireframe으로.
+- **Signature:** 이 화면을 기억하게 할 요소 하나만.
+- **Risk:** 접근성·사용성을 해치지 않는 시각적 위험 하나만 정당화.
+- **Motion:** 이해를 돕는 한 순간을 우선, 산발적 효과 회피.
+- **Copy:** 사용자가 인식하는 명사와 능동형 동사, action→pending→success 어휘 일관.
 
 ### Pass 2 — genericity와 restraint 비평
 
-잠그기 전에 다음을 검토하고 수정한 선택과 이유를 기록한다.
+잠그기 전 검토하고 수정한 선택과 이유를 기록한다:
 
 1. 전혀 다른 제품에도 palette·type·layout을 그대로 붙일 수 있는가?
 2. hero 또는 첫 화면이 subject의 thesis인가, 템플릿형 큰 제목인가?
 3. numbering·divider·eyebrow가 실제 정보 구조를 표현하는가?
-4. signature 외 장식이나 motion이 주의를 경쟁하는가?
+4. signature 외 장식·motion이 주의를 경쟁하는가?
 5. 카피가 사용자 언어인가, 내부 구현 용어인가?
 6. 한 요소를 제거하면 더 명확해지는가?
 7. 실제 content, 긴 문자열, empty·error 상태에서도 방향이 유지되는가?
 
 ## 7. Delivery 증거 책임
 
-- `HARD` 행은 가장 좁은 DOM·a11y·component 관찰 계층에서 `Then`·`Never`를 함께
-  확인한다.
-- `RELATIONAL` 행은 `$frontend-visual-qa` artifact 또는 같은 owner의 `pending`에
-  매핑한다. `pending`은 `IMPLEMENTED_GREEN`에는 남을 수 있지만
-  `REVIEW_VERIFIED`를 차단한다.
-- `JUDGMENT` 행은 승인 기준과 Design Intent를 독립 `designer`에게 전달한다.
-  reviewer는 정책을 새로 만들지 않는다.
-- 행의 주 owner는 `HARD → test`, `RELATIONAL → visual`, `JUDGMENT → designer`다.
-  출처 있는 `N/A`는 어느 계층에나 쓸 수 있다.
+- `HARD` 행은 가장 좁은 DOM·a11y·component 관찰 계층에서 `Then`·`Never`를 함께 확인.
+- `RELATIONAL` 행은 `$frontend-visual-qa` artifact 또는 같은 owner의 `pending`에 매핑.
+  `pending`은 `IMPLEMENTED_GREEN`에는 남을 수 있지만 `REVIEW_VERIFIED`를 차단한다.
+- `JUDGMENT` 행은 승인 기준과 Design Intent를 독립 `designer`에게 전달한다. reviewer는
+  정책을 새로 만들지 않는다.
+- 행의 주 owner: `HARD → test`, `RELATIONAL → visual`, `JUDGMENT → designer`. 출처
+  있는 `N/A`는 어느 계층에나 가능.
 - 외부 visual QA 결과를 위해 이 스킬의 상태를 추가하지 않는다.
 
-피드백은 기존 라우터를 그대로 사용한다.
+피드백은 기존 라우터를 그대로 사용:
 
 | 관찰                                                   | 분류                 |
 | ------------------------------------------------------ | -------------------- |

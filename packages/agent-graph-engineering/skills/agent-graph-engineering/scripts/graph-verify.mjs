@@ -45,22 +45,40 @@ function isRepoRelativeScope(scope) {
   return !isAbsolute(scope) && !win32.isAbsolute(scope) && !normalized.split('/').includes('..')
 }
 
-function normalizedScope(scope) {
+function isExclusionScope(scope) {
+  return scope.startsWith('!')
+}
+
+function scopeSegments(scope) {
   return scope
     .replaceAll('\\', '/')
-    .replace(/\/{0,1}\*{1,2}$/, '')
-    .replace(/\/$/, '')
+    .split('/')
+    .filter((segment) => segment.length > 0)
+}
+
+// Pattern-intersection emptiness: '*' matches one segment, '**' matches zero or more.
+function globsIntersect(a, b) {
+  if (a.length === 0) return b.every((segment) => segment === '**')
+  if (b.length === 0) return a.every((segment) => segment === '**')
+  const [ha] = a
+  const [hb] = b
+  if (ha === '**') return globsIntersect(a.slice(1), b) || globsIntersect(a, b.slice(1))
+  if (hb === '**') return globsIntersect(a, b.slice(1)) || globsIntersect(a.slice(1), b)
+  if (ha === '*' || hb === '*' || ha === hb) return globsIntersect(a.slice(1), b.slice(1))
+  return false
 }
 
 function scopesOverlap(left, right) {
-  const a = normalizedScope(left)
-  const b = normalizedScope(right)
-
-  return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`)
+  // Every scope owns its subtree, so compare with an implicit trailing '**'.
+  return globsIntersect([...scopeSegments(left), '**'], [...scopeSegments(right), '**'])
 }
 
 function canWriteTogether(left, right) {
-  return !left.some((leftScope) => right.some((rightScope) => scopesOverlap(leftScope, rightScope)))
+  // Exclusions narrow what the Controller lets a worker touch; the parallel-write
+  // check stays conservative and only compares the positive scopes.
+  const a = left.filter((scope) => !isExclusionScope(scope))
+  const b = right.filter((scope) => !isExclusionScope(scope))
+  return !a.some((leftScope) => b.some((rightScope) => scopesOverlap(leftScope, rightScope)))
 }
 
 function reachableFrom(starts, adjacency) {
@@ -101,6 +119,9 @@ export function validateGraph(graph) {
   if (!isStringArray(graph.terminals) || graph.terminals.length === 0) {
     addIssue('TERMINALS_INVALID', 'terminals must be a non-empty string array')
   }
+  if (graph.context !== undefined && !isStringArray(graph.context)) {
+    addIssue('GRAPH_CONTEXT_INVALID', 'context must be a string array of externally provided input fields')
+  }
 
   const nodes = Array.isArray(graph.nodes) ? graph.nodes : []
   const edges = Array.isArray(graph.edges) ? graph.edges : []
@@ -127,7 +148,8 @@ export function validateGraph(graph) {
       addIssue('NODE_WRITE_SCOPE_INVALID', `${node.id}: writeScope must be a string array`)
     } else {
       for (const scope of node.writeScope) {
-        if (!isRepoRelativeScope(scope)) {
+        const target = isExclusionScope(scope) ? scope.slice(1) : scope
+        if (!isNonEmptyString(target) || !isRepoRelativeScope(target)) {
           addIssue('NODE_WRITE_SCOPE_OUTSIDE_REPO', `${node.id}: writeScope must stay inside the target repository`)
         }
       }
@@ -224,6 +246,25 @@ export function validateGraph(graph) {
     }
   }
 
+  const contextFields = new Set(isStringArray(graph.context) ? graph.context : [])
+  for (const node of nodeById.values()) {
+    if (!isStringArray(node.input)) continue
+    const producers = reachableFrom(reverseAdjacency.get(node.id) ?? [], reverseAdjacency)
+    const available = new Set(contextFields)
+    for (const producerId of producers) {
+      const producer = nodeById.get(producerId)
+      if (isStringArray(producer?.output)) for (const field of producer.output) available.add(field)
+    }
+    for (const field of node.input) {
+      if (!available.has(field)) {
+        addIssue(
+          'NODE_INPUT_UNSATISFIED',
+          `${node.id}: input ${field} is not produced by any upstream node output or declared graph context`,
+        )
+      }
+    }
+  }
+
   for (const source of nodes.filter((node) => isRecord(node) && node.dispatch === 'all')) {
     const targets = (outgoing.get(source.id) ?? [])
       .map(({ to }) => nodeById.get(to))
@@ -269,17 +310,63 @@ export function selectTransitions(graph, nodeId, output) {
   return matched.map(({ to }) => to)
 }
 
+// The Controller appends node.completed before asking for the next transition,
+// so the events ledger is the runtime state that bounds maxSteps and joins.
+export function enforceRuntimeBounds(graph, nodeId, events) {
+  if (!Array.isArray(events)) throw new TransitionError('EVENTS_INVALID', 'events must be an array')
+  const completed = events.filter((event) => isRecord(event) && event.type === 'node.completed')
+
+  if (completed.length >= graph.maxSteps) {
+    throw new TransitionError(
+      'MAX_STEPS_EXCEEDED',
+      `${completed.length} completed node runs reach maxSteps ${graph.maxSteps}`,
+    )
+  }
+
+  const node = graph.nodes.find(({ id }) => id === nodeId)
+  if (node?.kind !== 'join') return
+
+  const predecessors = [...new Set(graph.edges.filter(({ to }) => to === nodeId).map(({ from }) => from))]
+  const done = new Set(completed.map((event) => event.node))
+  const ready = node.join === 'any' ? predecessors.some((id) => done.has(id)) : predecessors.every((id) => done.has(id))
+  if (!ready) {
+    throw new TransitionError(
+      'JOIN_NOT_READY',
+      `${nodeId} requires ${node.join === 'any' ? 'at least one' : 'all'} of ${predecessors.join(', ')} to complete first`,
+    )
+  }
+}
+
 function parseOptions(args) {
   const options = {}
   for (let index = 0; index < args.length; index += 2) {
     const flag = args[index]
     const value = args[index + 1]
-    if (!['--graph', '--node', '--output'].includes(flag) || !value) {
+    if (!['--graph', '--node', '--output', '--events'].includes(flag) || !value) {
       throw new TransitionError('USAGE', `invalid argument ${flag ?? ''}`.trim())
     }
     options[flag.slice(2)] = value
   }
   return options
+}
+
+async function readEventsFile(path) {
+  let raw
+  try {
+    raw = await readFile(resolve(path), 'utf8')
+  } catch (error) {
+    throw new TransitionError('EVENTS_INVALID', `cannot read events: ${error.message}`)
+  }
+  return raw
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .map((line, index) => {
+      try {
+        return JSON.parse(line)
+      } catch {
+        throw new TransitionError('EVENTS_INVALID', `events line ${index + 1} is not valid JSON`)
+      }
+    })
 }
 
 async function readJson(path, label) {
@@ -304,13 +391,14 @@ async function main() {
   if (command === 'next' && options.graph && options.node && options.output) {
     const [graph, output] = await Promise.all([readJson(options.graph, 'graph'), readJson(options.output, 'output')])
     const next = selectTransitions(graph, options.node, output)
+    if (options.events) enforceRuntimeBounds(graph, options.node, await readEventsFile(options.events))
     process.stdout.write(`${JSON.stringify({ node: options.node, next })}\n`)
     return
   }
 
   throw new TransitionError(
     'USAGE',
-    'use verify --graph <graph.json> or next --graph <graph.json> --node <id> --output <output.json>',
+    'use verify --graph <graph.json> or next --graph <graph.json> --node <id> --output <output.json> [--events <events.jsonl>]',
   )
 }
 

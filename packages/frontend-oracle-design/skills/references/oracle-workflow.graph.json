@@ -5,6 +5,7 @@
   "entry": "draft-oracle",
   "terminals": ["oracle-ready", "review-verified", "cancelled", "failed"],
   "maxSteps": 30,
+  "context": ["request", "repositoryContext", "previousRevision"],
   "nodes": [
     {
       "id": "draft-oracle",
@@ -51,7 +52,7 @@
       "task": "테스트 파일을 쓰기 직전에 $test를 로드해 잠긴 카드의 실패 우선 테스트를 작성·실행한다. oracle-run.mjs ledger와 oracle-verify.mjs red가 인정한 경우에만 VALID_RED를 반환한다. 그 밖에는 POLICY_GAP, HARNESS_DEFECT, ENVIRONMENT_DEFECT 또는 FAIL을 반환하고 production은 수정하지 않는다.",
       "input": ["oraclePath", "oracleSha", "runState"],
       "output": ["classification", "runId", "evidence"],
-      "writeScope": ["**"],
+      "writeScope": ["**", "!.ai/agent-graphs/**"],
       "dispatch": "one"
     },
     {
@@ -61,7 +62,7 @@
       "task": "VALID_RED와 lock을 검증한 뒤 한 번의 최소 production 개선을 수행하고 필수 label을 oracle-run.mjs exec로 실행한다. High risk면 $test가 mutation kill·원복·재-GREEN까지 판정한다. 성공 시 risk에 따라 IMPLEMENTED_GREEN_STANDARD 또는 IMPLEMENTED_GREEN_HIGH를 반환하고, 그 밖에는 PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP, ENVIRONMENT_DEFECT 또는 FAIL을 반환한다.",
       "input": ["oraclePath", "oracleSha", "runState", "evidence"],
       "output": ["classification", "runId", "artifacts"],
-      "writeScope": ["**"],
+      "writeScope": ["**", "!.ai/agent-graphs/**"],
       "dispatch": "one"
     },
     {
@@ -71,7 +72,7 @@
       "task": "$test 계약과 Oracle budget 안에서 locator, fixture, barrier 또는 evidence mapping만 최소 보정한다. 정책·assertion·production을 바꾸지 않는다. EVIDENCE_READY, HARNESS_DEFECT, PRODUCT_DEFECT, POLICY_GAP, ENVIRONMENT_DEFECT 또는 FAIL을 반환한다.",
       "input": ["oraclePath", "oracleSha", "runState", "findings"],
       "output": ["classification", "runId", "evidence"],
-      "writeScope": ["**"],
+      "writeScope": ["**", "!.ai/agent-graphs/**"],
       "dispatch": "one"
     },
     {
@@ -118,7 +119,7 @@
       "kind": "join",
       "join": "all",
       "task": "두 High-risk reviewer 결과가 모두 도착할 때까지 기다린 뒤 원본 artifact와 status READY를 함께 전달한다.",
-      "input": ["highReviewA", "highReviewB"],
+      "input": ["status", "findings"],
       "output": ["status", "findings"],
       "writeScope": [],
       "dispatch": "one"
@@ -178,140 +179,425 @@
     {
       "from": "draft-oracle",
       "to": "user-confirmation",
-      "when": { "field": "classification", "equals": "CONFIRMATION_REQUIRED" }
+      "when": {
+        "field": "classification",
+        "equals": "CONFIRMATION_REQUIRED"
+      }
     },
-    { "from": "draft-oracle", "to": "failed", "when": { "field": "classification", "equals": "FAIL" } },
-    { "from": "user-confirmation", "to": "lock-oracle", "when": { "field": "decision", "equals": "APPROVE_DESIGN" } },
-    { "from": "user-confirmation", "to": "lock-oracle", "when": { "field": "decision", "equals": "APPROVE_DELIVERY" } },
-    { "from": "user-confirmation", "to": "draft-oracle", "when": { "field": "decision", "equals": "REVISE" } },
-    { "from": "user-confirmation", "to": "cancelled", "when": { "field": "decision", "equals": "CANCEL" } },
-    { "from": "lock-oracle", "to": "oracle-ready", "when": { "field": "route", "equals": "DESIGN_READY" } },
-    { "from": "lock-oracle", "to": "delivery-init", "when": { "field": "route", "equals": "DELIVERY_READY" } },
-    { "from": "lock-oracle", "to": "draft-oracle", "when": { "field": "route", "equals": "POLICY_GAP" } },
-    { "from": "lock-oracle", "to": "failed", "when": { "field": "route", "equals": "FAIL" } },
-    { "from": "delivery-init", "to": "valid-red", "when": { "field": "classification", "equals": "READY" } },
-    { "from": "delivery-init", "to": "draft-oracle", "when": { "field": "classification", "equals": "POLICY_GAP" } },
-    { "from": "delivery-init", "to": "failed", "when": { "field": "classification", "equals": "ENVIRONMENT_DEFECT" } },
-    { "from": "delivery-init", "to": "failed", "when": { "field": "classification", "equals": "FAIL" } },
-    { "from": "valid-red", "to": "implement-green", "when": { "field": "classification", "equals": "VALID_RED" } },
-    { "from": "valid-red", "to": "valid-red", "when": { "field": "classification", "equals": "HARNESS_DEFECT" } },
-    { "from": "valid-red", "to": "draft-oracle", "when": { "field": "classification", "equals": "POLICY_GAP" } },
-    { "from": "valid-red", "to": "failed", "when": { "field": "classification", "equals": "ENVIRONMENT_DEFECT" } },
-    { "from": "valid-red", "to": "failed", "when": { "field": "classification", "equals": "FAIL" } },
+    {
+      "from": "draft-oracle",
+      "to": "failed",
+      "when": {
+        "field": "classification",
+        "equals": "FAIL"
+      }
+    },
+    {
+      "from": "user-confirmation",
+      "to": "lock-oracle",
+      "when": {
+        "field": "decision",
+        "equals": "APPROVE_DESIGN"
+      }
+    },
+    {
+      "from": "user-confirmation",
+      "to": "lock-oracle",
+      "when": {
+        "field": "decision",
+        "equals": "APPROVE_DELIVERY"
+      }
+    },
+    {
+      "from": "user-confirmation",
+      "to": "draft-oracle",
+      "when": {
+        "field": "decision",
+        "equals": "REVISE"
+      }
+    },
+    {
+      "from": "user-confirmation",
+      "to": "cancelled",
+      "when": {
+        "field": "decision",
+        "equals": "CANCEL"
+      }
+    },
+    {
+      "from": "lock-oracle",
+      "to": "oracle-ready",
+      "when": {
+        "field": "route",
+        "equals": "DESIGN_READY"
+      }
+    },
+    {
+      "from": "lock-oracle",
+      "to": "delivery-init",
+      "when": {
+        "field": "route",
+        "equals": "DELIVERY_READY"
+      }
+    },
+    {
+      "from": "lock-oracle",
+      "to": "draft-oracle",
+      "when": {
+        "field": "route",
+        "equals": "POLICY_GAP"
+      }
+    },
+    {
+      "from": "lock-oracle",
+      "to": "failed",
+      "when": {
+        "field": "route",
+        "equals": "FAIL"
+      }
+    },
+    {
+      "from": "delivery-init",
+      "to": "valid-red",
+      "when": {
+        "field": "classification",
+        "equals": "READY"
+      }
+    },
+    {
+      "from": "delivery-init",
+      "to": "draft-oracle",
+      "when": {
+        "field": "classification",
+        "equals": "POLICY_GAP"
+      }
+    },
+    {
+      "from": "delivery-init",
+      "to": "failed",
+      "when": {
+        "field": "classification",
+        "equals": "ENVIRONMENT_DEFECT"
+      }
+    },
+    {
+      "from": "delivery-init",
+      "to": "failed",
+      "when": {
+        "field": "classification",
+        "equals": "FAIL"
+      }
+    },
+    {
+      "from": "valid-red",
+      "to": "implement-green",
+      "when": {
+        "field": "classification",
+        "equals": "VALID_RED"
+      }
+    },
+    {
+      "from": "valid-red",
+      "to": "valid-red",
+      "when": {
+        "field": "classification",
+        "equals": "HARNESS_DEFECT"
+      }
+    },
+    {
+      "from": "valid-red",
+      "to": "draft-oracle",
+      "when": {
+        "field": "classification",
+        "equals": "POLICY_GAP"
+      }
+    },
+    {
+      "from": "valid-red",
+      "to": "failed",
+      "when": {
+        "field": "classification",
+        "equals": "ENVIRONMENT_DEFECT"
+      }
+    },
+    {
+      "from": "valid-red",
+      "to": "failed",
+      "when": {
+        "field": "classification",
+        "equals": "FAIL"
+      }
+    },
     {
       "from": "implement-green",
       "to": "standard-review",
-      "when": { "field": "classification", "equals": "IMPLEMENTED_GREEN_STANDARD" }
+      "when": {
+        "field": "classification",
+        "equals": "IMPLEMENTED_GREEN_STANDARD"
+      }
     },
     {
       "from": "implement-green",
       "to": "high-review-fanout",
-      "when": { "field": "classification", "equals": "IMPLEMENTED_GREEN_HIGH" }
+      "when": {
+        "field": "classification",
+        "equals": "IMPLEMENTED_GREEN_HIGH"
+      }
     },
     {
       "from": "implement-green",
       "to": "implement-green",
-      "when": { "field": "classification", "equals": "PRODUCT_DEFECT" }
+      "when": {
+        "field": "classification",
+        "equals": "PRODUCT_DEFECT"
+      }
     },
     {
       "from": "implement-green",
       "to": "evidence-repair",
-      "when": { "field": "classification", "equals": "EVIDENCE_GAP" }
+      "when": {
+        "field": "classification",
+        "equals": "EVIDENCE_GAP"
+      }
     },
     {
       "from": "implement-green",
       "to": "evidence-repair",
-      "when": { "field": "classification", "equals": "HARNESS_DEFECT" }
+      "when": {
+        "field": "classification",
+        "equals": "HARNESS_DEFECT"
+      }
     },
-    { "from": "implement-green", "to": "draft-oracle", "when": { "field": "classification", "equals": "POLICY_GAP" } },
+    {
+      "from": "implement-green",
+      "to": "draft-oracle",
+      "when": {
+        "field": "classification",
+        "equals": "POLICY_GAP"
+      }
+    },
     {
       "from": "implement-green",
       "to": "failed",
-      "when": { "field": "classification", "equals": "ENVIRONMENT_DEFECT" }
+      "when": {
+        "field": "classification",
+        "equals": "ENVIRONMENT_DEFECT"
+      }
     },
-    { "from": "implement-green", "to": "failed", "when": { "field": "classification", "equals": "FAIL" } },
+    {
+      "from": "implement-green",
+      "to": "failed",
+      "when": {
+        "field": "classification",
+        "equals": "FAIL"
+      }
+    },
     {
       "from": "evidence-repair",
       "to": "implement-green",
-      "when": { "field": "classification", "equals": "EVIDENCE_READY" }
+      "when": {
+        "field": "classification",
+        "equals": "EVIDENCE_READY"
+      }
     },
     {
       "from": "evidence-repair",
       "to": "evidence-repair",
-      "when": { "field": "classification", "equals": "HARNESS_DEFECT" }
+      "when": {
+        "field": "classification",
+        "equals": "HARNESS_DEFECT"
+      }
     },
     {
       "from": "evidence-repair",
       "to": "implement-green",
-      "when": { "field": "classification", "equals": "PRODUCT_DEFECT" }
+      "when": {
+        "field": "classification",
+        "equals": "PRODUCT_DEFECT"
+      }
     },
-    { "from": "evidence-repair", "to": "draft-oracle", "when": { "field": "classification", "equals": "POLICY_GAP" } },
+    {
+      "from": "evidence-repair",
+      "to": "draft-oracle",
+      "when": {
+        "field": "classification",
+        "equals": "POLICY_GAP"
+      }
+    },
     {
       "from": "evidence-repair",
       "to": "failed",
-      "when": { "field": "classification", "equals": "ENVIRONMENT_DEFECT" }
+      "when": {
+        "field": "classification",
+        "equals": "ENVIRONMENT_DEFECT"
+      }
     },
-    { "from": "evidence-repair", "to": "failed", "when": { "field": "classification", "equals": "FAIL" } },
-    { "from": "standard-review", "to": "review-decision", "when": "always" },
-    { "from": "high-review-fanout", "to": "high-review-a", "when": { "field": "status", "equals": "READY" } },
-    { "from": "high-review-fanout", "to": "high-review-b", "when": { "field": "status", "equals": "READY" } },
-    { "from": "high-review-a", "to": "high-review-join", "when": "always" },
-    { "from": "high-review-b", "to": "high-review-join", "when": "always" },
-    { "from": "high-review-join", "to": "review-decision", "when": { "field": "status", "equals": "READY" } },
+    {
+      "from": "evidence-repair",
+      "to": "failed",
+      "when": {
+        "field": "classification",
+        "equals": "FAIL"
+      }
+    },
+    {
+      "from": "standard-review",
+      "to": "review-decision",
+      "when": "always"
+    },
+    {
+      "from": "high-review-fanout",
+      "to": "high-review-a",
+      "when": {
+        "field": "status",
+        "equals": "READY"
+      }
+    },
+    {
+      "from": "high-review-fanout",
+      "to": "high-review-b",
+      "when": {
+        "field": "status",
+        "equals": "READY"
+      }
+    },
+    {
+      "from": "high-review-a",
+      "to": "high-review-join",
+      "when": "always"
+    },
+    {
+      "from": "high-review-b",
+      "to": "high-review-join",
+      "when": "always"
+    },
+    {
+      "from": "high-review-join",
+      "to": "review-decision",
+      "when": {
+        "field": "status",
+        "equals": "READY"
+      }
+    },
     {
       "from": "review-decision",
       "to": "final-verify",
-      "when": { "field": "classification", "equals": "REVIEW_ACCEPTED" }
+      "when": {
+        "field": "classification",
+        "equals": "REVIEW_ACCEPTED"
+      }
     },
     {
       "from": "review-decision",
       "to": "final-verify",
-      "when": { "field": "classification", "equals": "NON_ORACLE_OPINION" }
+      "when": {
+        "field": "classification",
+        "equals": "NON_ORACLE_OPINION"
+      }
     },
     {
       "from": "review-decision",
       "to": "implement-green",
-      "when": { "field": "classification", "equals": "PRODUCT_DEFECT" }
+      "when": {
+        "field": "classification",
+        "equals": "PRODUCT_DEFECT"
+      }
     },
     {
       "from": "review-decision",
       "to": "evidence-repair",
-      "when": { "field": "classification", "equals": "EVIDENCE_GAP" }
+      "when": {
+        "field": "classification",
+        "equals": "EVIDENCE_GAP"
+      }
     },
     {
       "from": "review-decision",
       "to": "evidence-repair",
-      "when": { "field": "classification", "equals": "HARNESS_DEFECT" }
+      "when": {
+        "field": "classification",
+        "equals": "HARNESS_DEFECT"
+      }
     },
-    { "from": "review-decision", "to": "draft-oracle", "when": { "field": "classification", "equals": "POLICY_GAP" } },
+    {
+      "from": "review-decision",
+      "to": "draft-oracle",
+      "when": {
+        "field": "classification",
+        "equals": "POLICY_GAP"
+      }
+    },
     {
       "from": "review-decision",
       "to": "failed",
-      "when": { "field": "classification", "equals": "ENVIRONMENT_DEFECT" }
+      "when": {
+        "field": "classification",
+        "equals": "ENVIRONMENT_DEFECT"
+      }
     },
-    { "from": "review-decision", "to": "failed", "when": { "field": "classification", "equals": "FAIL" } },
+    {
+      "from": "review-decision",
+      "to": "failed",
+      "when": {
+        "field": "classification",
+        "equals": "FAIL"
+      }
+    },
     {
       "from": "final-verify",
       "to": "review-verified",
-      "when": { "field": "classification", "equals": "REVIEW_VERIFIED" }
+      "when": {
+        "field": "classification",
+        "equals": "REVIEW_VERIFIED"
+      }
     },
     {
       "from": "final-verify",
       "to": "implement-green",
-      "when": { "field": "classification", "equals": "PRODUCT_DEFECT" }
+      "when": {
+        "field": "classification",
+        "equals": "PRODUCT_DEFECT"
+      }
     },
     {
       "from": "final-verify",
       "to": "evidence-repair",
-      "when": { "field": "classification", "equals": "EVIDENCE_GAP" }
+      "when": {
+        "field": "classification",
+        "equals": "EVIDENCE_GAP"
+      }
     },
     {
       "from": "final-verify",
       "to": "evidence-repair",
-      "when": { "field": "classification", "equals": "HARNESS_DEFECT" }
+      "when": {
+        "field": "classification",
+        "equals": "HARNESS_DEFECT"
+      }
     },
-    { "from": "final-verify", "to": "draft-oracle", "when": { "field": "classification", "equals": "POLICY_GAP" } },
-    { "from": "final-verify", "to": "failed", "when": { "field": "classification", "equals": "ENVIRONMENT_DEFECT" } },
-    { "from": "final-verify", "to": "failed", "when": { "field": "classification", "equals": "FAIL" } }
+    {
+      "from": "final-verify",
+      "to": "draft-oracle",
+      "when": {
+        "field": "classification",
+        "equals": "POLICY_GAP"
+      }
+    },
+    {
+      "from": "final-verify",
+      "to": "failed",
+      "when": {
+        "field": "classification",
+        "equals": "ENVIRONMENT_DEFECT"
+      }
+    },
+    {
+      "from": "final-verify",
+      "to": "failed",
+      "when": {
+        "field": "classification",
+        "equals": "FAIL"
+      }
+    }
   ]
 }

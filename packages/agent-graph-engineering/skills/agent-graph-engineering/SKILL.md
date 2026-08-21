@@ -65,8 +65,10 @@ Node 종류는 다음 다섯 개뿐이다.
    `task`만 수행한다. 서로 독립이며 write scope가 겹치지 않는 Node만 병렬 실행한다.
 5. Worker 결과를 `{ status, summary, artifacts, findings }`처럼 Node 계약에 맞춘 JSON으로
    기록한다. 없는 값을 추측하거나 자유 서술에서 뽑아내지 않는다.
-6. `graph-verify.mjs next`가 고른 Edge만 활성화한다. 일치 Edge가 없거나 `dispatch: one`에
-   여러 Edge가 일치하면 `GRAPH_INVALID`로 멈춘다.
+6. `graph-verify.mjs next`가 고른 Edge만 활성화한다. `events.jsonl`을 유지하는 실행은
+   Node 완료 event를 append한 뒤 `--events`로 함께 전달해 `maxSteps` 초과와 join 준비를
+   기계 판정한다. 일치 Edge가 없거나 `dispatch: one`에 여러 Edge가 일치하면
+   `GRAPH_INVALID`로 멈춘다.
 7. 실패는 Node의 `retryLimit` 안에서만 재시도한 뒤 명시된 failure Edge를 따른다.
    그래프 전체 실행은 `maxSteps`를 넘기지 않는다.
 8. graph 수정이 필요하면 실행 중 몰래 바꾸지 않는다. 새 revision을 검증하고 변경

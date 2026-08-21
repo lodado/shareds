@@ -13,6 +13,7 @@ Graph Controller와 Worker가 같은 실행 경계를 공유하기 위한 최소
   "entry": "N1",
   "terminals": ["N5", "N6"],
   "maxSteps": 12,
+  "context": ["request"],
   "nodes": [],
   "edges": []
 }
@@ -22,6 +23,10 @@ Graph Controller와 Worker가 같은 실행 경계를 공유하기 위한 최소
 - `entry`는 존재하는 Node 하나를 가리킨다.
 - `terminals`는 `kind: terminal`인 Node만 가리키며 outgoing Edge를 갖지 않는다.
 - `maxSteps`는 retry와 cycle을 포함한 전체 Node 실행 횟수의 양의 정수 상한이다.
+- `context`는 그래프 밖에서(사용자 요청, Controller 초기 입력) 제공되는 input field
+  이름 목록이다. 모든 Node의 `input` field는 `context`에 있거나 해당 Node에 도달할 수
+  있는 상류 Node의 `output`에 선언되어야 하며, 아니면 `NODE_INPUT_UNSATISFIED`로
+  검증에 실패한다.
 
 `maxSteps`는 첫 버전의 전역 안전장치다. 독립 loop마다 다른 예산이 실제로 필요해질
 때만 per-cycle counter를 추가한다.
@@ -48,7 +53,9 @@ Graph Controller와 Worker가 같은 실행 경계를 공유하기 위한 최소
 - `input`과 `output`은 구조화된 field 이름이다. Edge 조건은 source Node의 `output`에
   선언된 field만 볼 수 있다.
 - `writeScope`는 agent가 수정할 수 있는 repo-relative 범위다. read-only agent는 빈
-  배열을 쓴다.
+  배열을 쓴다. `!`로 시작하는 항목은 제외 범위다 — 예: `["**", "!.ai/agent-graphs/**"]`는
+  실행 ledger를 제외한 전체 쓰기를 뜻한다. 제외 항목도 repo-relative여야 하며, 병렬
+  쓰기 충돌 검사는 보수적으로 positive 범위만 비교한다.
 - `retryLimit`은 0 이상의 정수이며 기본값은 0이다.
 - `dispatch` 기본값은 `one`이다. `all`은 일치하는 Edge 모두를 fan-out할 때만 쓴다.
 - `join` Node는 `join: all | any`를 추가한다.
@@ -85,9 +92,11 @@ Controller가 output을 validator에 전달하고 반환된 Edge만 따른다.
 
 ## 병렬 쓰기
 
-같은 `dispatch: all` fan-out에서 실행될 수 있는 agent Node의 `writeScope`가 같거나 한
-쪽이 다른 쪽의 상위 범위면 병렬 실행하지 않는다. graph를 직렬화하거나 scope를 실제
-소유 경계로 좁힌다. 빈 scope는 read-only로 취급한다.
+같은 `dispatch: all` fan-out에서 실행될 수 있는 agent Node의 `writeScope`가 겹치면
+병렬 실행하지 않는다. 겹침 판정은 glob-aware다 — `*`는 한 segment, `**`는 0개 이상의
+segment와 일치하며 모든 scope는 자기 하위 경로를 포함한다. `packages/*/auth/**`와
+`packages/app/auth/tokens/**`처럼 중간 glob을 통한 겹침도 충돌이다. graph를
+직렬화하거나 scope를 실제 소유 경계로 좁힌다. 빈 scope는 read-only로 취급한다.
 
 ## Event ledger
 
@@ -106,3 +115,16 @@ Controller가 output을 validator에 전달하고 반환된 Edge만 따른다.
 
 event는 append-only다. 이전 결과를 정정해야 하면 기존 줄을 수정하지 않고 새
 `graph.revised` 또는 `node.superseded` event를 추가한다.
+
+## 런타임 경계 강제
+
+`events.jsonl`을 유지하는 실행에서 Controller는 Node 완료마다 `node.completed` event를
+먼저 append하고, 전이 판정 시 `graph-verify.mjs next --events <events.jsonl>`로 ledger를
+함께 전달한다. validator는 다음을 기계 판정한다.
+
+- `node.completed` 수가 `maxSteps`에 도달하면 `MAX_STEPS_EXCEEDED`로 전이를 거부한다.
+- `join` Node의 전이는 incoming Edge의 source가 (`join: all`은 전부, `join: any`는 하나
+  이상) `node.completed`를 남겼을 때만 허용하고, 아니면 `JOIN_NOT_READY`로 거부한다.
+
+`gate` Node의 사용자 결정만은 기계 판정 대상이 아니다 — Controller는 명시적 답변 전
+`WAITING_USER`에서 멈춘다.
