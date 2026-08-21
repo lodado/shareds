@@ -172,6 +172,11 @@ unit이 HTTP/RPC endpoint를 호출하거나 정의할 때만 `## API contract`�
 | `Never`·실패 행       | error code 표 — 구분해야 하는 실패 정책마다 code 하나 |
 | P4·P5 답              | idempotency 헤더·pagination token 규칙                |
 
+- 도출 draft는 소유 unit의 `__docs__/architecture.md` `## API contract` 절에
+  쓴다 — 구조 결정과 같은 파일, 같은 승인·lock 흐름이다. 레포가 스펙 파일
+  위치(OpenAPI 등)를 명시적으로 강제할 때만 그 관례를 우선하고 이 절에는
+  위치·version 참조와 카드 행 매핑만 남긴다. 어느 쪽이든 파일로 존재해야 하고
+  `--source`로 lock에 포함한다 — 대화에만 있는 schema는 source가 아니다.
 - 기본값은 위 표준을 재사용한다: 에러 RFC 9457, idempotency 클라이언트 key,
   pagination cursor. 레포에 기존 API 관례가 있으면 그것이 우선한다.
 - `Then`에 없는 response 필드를 발명하지 않는다. 카드가 요구하는 관찰 결과만
