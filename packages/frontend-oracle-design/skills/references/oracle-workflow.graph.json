@@ -57,9 +57,8 @@
     },
     {
       "id": "implement-green",
-      "kind": "agent",
-      "owner": "executor",
-      "task": "VALID_RED와 lock을 검증한 뒤 한 번의 최소 production 개선을 수행하고 필수 label을 oracle-run.mjs exec로 실행한다. High risk면 $test가 mutation kill·원복·재-GREEN까지 판정한다. 성공 시 risk에 따라 IMPLEMENTED_GREEN_STANDARD 또는 IMPLEMENTED_GREEN_HIGH를 반환하고, 그 밖에는 PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP, ENVIRONMENT_DEFECT 또는 FAIL을 반환한다.",
+      "kind": "gate",
+      "task": "VALID_RED와 lock을 검증한 뒤 현재 실행 환경이 선택한 방식으로 최소 production 개선을 수행하고 필수 label을 oracle-run.mjs exec로 실행한 결과를 받는다. 이 Node는 단일·위임·병렬 구현 방식을 강제하지 않는다. High risk면 $test가 mutation kill·원복·재-GREEN까지 판정한다. 성공 시 risk에 따라 IMPLEMENTED_GREEN_STANDARD 또는 IMPLEMENTED_GREEN_HIGH를 반환하고, 그 밖에는 PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP, ENVIRONMENT_DEFECT 또는 FAIL을 반환한다.",
       "input": ["oraclePath", "oracleSha", "runState", "evidence"],
       "output": ["classification", "runId", "artifacts"],
       "writeScope": ["**", "!.ai/agent-graphs/**"],

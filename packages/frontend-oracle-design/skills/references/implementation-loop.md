@@ -40,9 +40,9 @@ lock 전에는 독립적인 read-only 조사를 병렬 실행할 수 있지만, 
 끝난 뒤 final lock을 1회 만든다. Draft Oracle 사용자 승인은 직렬 gate다. screenshot·
 direct-browser 실행은 사용자가 명시적으로 요청한 별도 `$frontend-visual-qa` 소유.
 
-`VALID_RED` 전에는 production을 수정하지 않는다. 이후 독립 구현 작업이 둘 이상일
-때만 겹치지 않는 파일 소유권으로 worker를 최대 2개까지 병렬 실행하고, 합친 뒤
-targeted GREEN을 1회 실행한다. 작은 diff는 agent를 만들지 않는다.
+`VALID_RED` 전에는 production을 수정하지 않는다. 이후 구현을 현재 agent가 직접
+수행할지, 위임할지, 병렬화할지는 이 계약이 강제하지 않는다. 선택한 실행 방식과
+무관하게 합친 production 기준으로 targeted GREEN을 1회 실행한다.
 
 targeted GREEN 뒤에는 root test·lint·format과 독립 review를 병렬 실행한다. 각 `exec`가
 runId reservation을 원자적으로 만들어 병렬에도 runId 충돌이 없다. 모든 결과가

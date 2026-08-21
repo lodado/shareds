@@ -260,8 +260,8 @@ reviewer는 아래 질문으로 사용자를 재인터뷰하거나 새 정책을
 
 ## Finding 개선
 
-1. primary agent가 finding을 상위 피드백 라우터로 처리하고, 별도의 `executor` 역할은
-   증거 있는 `PRODUCT_DEFECT`만 최소 수정한다.
+1. primary agent가 finding을 상위 피드백 라우터로 처리한다. 수정 실행 방식은 강제하지
+   않고, 증거 있는 `PRODUCT_DEFECT`만 최소 수정한다.
 2. 정책을 새로 정해야 하는 finding은 수정하지 않고 `NEEDS_DECISION`으로 복귀.
 3. 수정 후 finding을 재현하는 targeted test 실행.
 4. 카드 전체 테스트와 레포 필수 검증 재실행.
