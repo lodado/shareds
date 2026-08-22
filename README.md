@@ -1,11 +1,11 @@
 # shareds
 
-사이버펑크 2077의 '샤드'에서 이름을 따왔어요. 칩 하나 꽂으면 남의 지식이 바로 내
-것이 되잖아요? 여기서는 코딩 지식을 스킬로 만들어서, 코딩 에이전트에 그대로 꽂아
-써요.
+사이버펑크 2077에 '샤드'라는 아이템이 있어요. 칩 하나 꽂으면 다른 사람의 지식이
+통째로 내 것이 되는데, 이 레포가 딱 그거예요. 그동안 쌓아온 코딩 지식을 스킬로
+만들어 두고, 코딩 에이전트에 꽂아서 쓰는 곳이에요.
 
 ESLint 프리셋은 npm으로, 에이전트 스킬은 Claude Code / Codex 플러그인
-마켓플레이스로 배포해요. 꽂는 순간 바로 동작해요.
+마켓플레이스로 배포하고 있어요.
 
 ## 이런 게 들어 있어요
 
@@ -22,7 +22,8 @@ ESLint 프리셋은 npm으로, 에이전트 스킬은 Claude Code / Codex 플러
 
 ## ESLint 설정은 이렇게 써요
 
-base 프리셋은 항상 켜져 있고, 나머지는 뷔페처럼 필요한 것만 골라 담으면 끝이에요.
+base 프리셋은 항상 깔고 시작하고, 그 위에 프로젝트에 필요한 것만 골라서 얹으면
+돼요.
 
 ```js
 // .eslintrc.js
@@ -37,20 +38,22 @@ module.exports = {
 }
 ```
 
-쓸 수 있는 프리셋: base(`.`), `react`, `next`, `a11y`, `turbo`, `local-rules`, `testing`, `query`.
-자세한 안내는 [`eslint-setup` 스킬](packages/vibe-coding-helper/skills/eslint-setup/SKILL.md)에 있어요.
+쓸 수 있는 프리셋은 base(`.`), `react`, `next`, `a11y`, `turbo`, `local-rules`,
+`testing`, `query`가 있어요. 자세한 안내는
+[`eslint-setup` 스킬](packages/vibe-coding-helper/skills/eslint-setup/SKILL.md)에
+정리해 뒀어요.
 
 ## 스킬은 이렇게 꽂아요
 
-명령어 두 줄이면 설치 끝이에요.
+Claude Code에서 두 줄이면 끝나요.
 
 ```
 /plugin marketplace add lodado/shareds
 /plugin install vibe-coding-helper@my-vibe-coding-helper
 ```
 
-같은 패키지에 `.codex-plugin/plugin.json`이 들어 있어서, Codex도 동일한 `skills/`
-디렉터리를 그대로 읽어요. 한 번 만들면 양쪽에서 다 돌아가요.
+같은 패키지 안에 `.codex-plugin/plugin.json`도 함께 들어 있어서, Codex도 동일한
+`skills/` 디렉터리를 그대로 읽어요. 스킬 하나 만들면 두 에이전트가 같이 써요.
 
 ## 개발할 때는요
 
@@ -61,6 +64,6 @@ pnpm test          # 프리셋 스모크 테스트
 pnpm changeset     # 릴리스 기록
 ```
 
-릴리스는 `main`에서 `.github/workflows/intergrate_workflow.yml`로 돌아가요. 릴리스
-잡은 레포 변수 `ENABLE_NPM_RELEASE`가 `true`일 때만 실행되고, `@lodado/*` 패키지를
-만들 수 있는 `NPM_TOKEN` 시크릿이 필요해요.
+릴리스는 `main`에서 `.github/workflows/intergrate_workflow.yml`이 돌면서
+처리해요. 릴리스 잡은 레포 변수 `ENABLE_NPM_RELEASE`가 `true`일 때만 실행되고,
+`@lodado/*` 패키지를 배포할 수 있는 `NPM_TOKEN` 시크릿이 필요해요.
