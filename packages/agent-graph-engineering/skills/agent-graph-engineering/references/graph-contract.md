@@ -152,5 +152,11 @@ event는 append-only다. 이전 결과를 정정해야 하면 기존 줄을 수�
 - `join` Node의 전이는 incoming Edge의 source가 (`join: all`은 전부, `join: any`는 하나
   이상) `node.completed`를 남겼을 때만 허용하고, 아니면 `JOIN_NOT_READY`로 거부한다.
 
+거부는 실행의 끝이지 증발이 아니다. Controller는 `MAX_STEPS_EXCEEDED`를 받으면 거부
+코드와 마지막 Node를 담은 `node.completed`를 append하고 failure terminal에서 종료해,
+ledger만 읽어도 왜 멈췄는지 알 수 있게 한다. `JOIN_NOT_READY`는 종료가 아니라 대기다 —
+Controller는 join Node로 전이하기 전에 target join을 `graph-verify.mjs next`로 먼저
+판정해, 준비 안 된 join 본문을 실행해 반쪽 산출물을 남기지 않는다.
+
 `gate` Node의 사용자 결정만은 기계 판정 대상이 아니다 — Controller는 명시적 답변 전
 `WAITING_USER`에서 멈춘다.
