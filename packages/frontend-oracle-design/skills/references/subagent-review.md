@@ -52,6 +52,29 @@ review와 별도로 설치된 `designer` 역할을 명시해 시각 계약을 �
 reviewer도 정책을 새로 정하지 않는다. deterministic comparison이 그대로 통과하고
 `JUDGMENT` 행과 baseline 변경이 모두 없으면 추가 designer 검수는 N/A와 사유를 기록.
 
+## 리뷰 포인트 — 파일 링크로 전달
+
+리뷰 기준은 reviewer 프롬프트에 본문을 복붙하지 않고 **reference 파일 링크로
+전달한다.** primary agent가 diff가 실제로 건드린 영역에 해당하는 기준 파일만 골라
+`--review-point`로 packet에 등록하면, packet에는 경로와 SHA-256 digest만 기록된다 —
+reviewer는 링크된 파일을 직접 **전부** 읽고, digest로 어떤 revision의 기준을 읽었는지
+고정된다. 기준 본문을 요약·발췌해 프롬프트에 넣는 것은 입력 고정 원칙 위반이다.
+
+| 조건 (diff 기준)                          | 리뷰 포인트 파일                                                 |
+| ----------------------------------------- | ---------------------------------------------------------------- |
+| 항상                                      | [`changeability.md`](changeability.md) — 다섯 축 판정 기준       |
+| frontend production 변경                  | [`frontend-implementation.md`](frontend-implementation.md)       |
+| 타입·상태 계약 생성·변경                  | [`types/review-criteria.md`](types/review-criteria.md)           |
+| FSD 레포                                  | [`fsd.md`](fsd.md) — 「자주 나오는 위반」 표                     |
+| Design Intent 포함                        | [`visual-design.md`](visual-design.md) — 증거 계층·Delivery 책임 |
+| backend·DB·data-access 변경               | [`backend.md`](backend.md) — 경계·검증 절                        |
+| 성능 요구·개선 claim                      | [`performance.md`](performance.md)                               |
+
+조건에 해당하지 않는 기준 파일은 등록하지 않는다 — reviewer도 그래프 로딩 규칙을
+따르며 무관한 기준으로 finding을 만들지 않는다. 조건→노드 매핑은
+[`reference-graph.json`](reference-graph.json)의 `reviewPoints`에도 기계 판독 가능하게
+선언되어 있다.
+
 ## Reviewer 입력
 
 리뷰 직전 기계 생성한 입력으로 고정한다.
@@ -60,12 +83,15 @@ reviewer도 정책을 새로 정하지 않는다. deterministic comparison이 �
 node <skill-dir>/scripts/oracle-run.mjs review-packet \
   --dir .ai/oracles/<oracle-id> \
   --decision .ai/oracles/<oracle-id>/implementation-decision.md \
+  --review-point <skill-dir>/references/changeability.md \
+  --review-point <skill-dir>/references/types/review-criteria.md \
   --output .ai/oracles/<oracle-id>/review-input.json
 ```
 
 패킷은 마지막 lock verify command·exit, lock manifest, Oracle 전문, 잠긴 local source
 전문, run state, ledger, evidence mapping, init 이후 변경 파일 digest, git diff, visual
-pending과 Implementation Decision의 path·sha256·content를 원시 필드로 담는다.
+pending, Implementation Decision의 path·sha256·content와 등록한 리뷰 포인트의
+path·sha256(본문 없이 링크만)을 원시 필드로 담는다.
 reviewer는 `implementation-decision.md`의 주장과 실제 diff를 대조한다. 결론·의도한
 해결책·유리한 요약을 추가하지 않는다. 패킷을 손으로 고치지 말고 입력이 바뀌면 다시
 생성한다. URL·Figma처럼 lock에 담을 수 없는 외부 기준만 Oracle Registry의 정확한

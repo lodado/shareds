@@ -157,7 +157,7 @@ reference는 [`reference-graph.json`](references/reference-graph.json)에 선언
 - Delivery 활성 + FSD 레포(또는 도입 승인) + FSD 채택·폴더 구조를 제안·설계·리뷰하기 전 → [`fsd.md`](references/fsd.md)
 - backend·full-stack·DB·data-access 경계를 만들거나 바꾸기 전 → [`backend.md`](references/backend.md)
 - 성능 요구·개선 claim이 있는 카드 작성 또는 production 수정 전 → [`performance.md`](references/performance.md)
-- 구현·테스트 검증 후 → [`subagent-review.md`](references/subagent-review.md); 타입 계약을 만든 변경이면 [`types/review-criteria.md`](references/types/review-criteria.md); Design Intent 있으면 [`visual-design.md`](references/visual-design.md) 재독
+- 구현·테스트 검증 후 → [`subagent-review.md`](references/subagent-review.md); 타입 계약을 만든 변경이면 [`types/review-criteria.md`](references/types/review-criteria.md); Design Intent 있으면 [`visual-design.md`](references/visual-design.md) 재독. 리뷰 기준은 프롬프트에 복붙하지 않고 diff에 해당하는 reference 파일만 `review-packet --review-point`의 파일 링크로 전달한다
 
 ## 모드 선택
 

@@ -253,11 +253,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.18.0')
+  assert.equal(version, '0.18.1')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.18.0')
+  assert.equal(marketplace.version, '0.18.1')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -868,4 +868,33 @@ test('collects shared authority, policy sources, and feedback routing into one c
   assert.match(subagentReview, /common\.md/)
   assert.doesNotMatch(changeability, /권위 순서: 1\)/)
   assert.doesNotMatch(subagentReview, /^1\. 보안·개인정보·법적·접근성/m)
+})
+
+test('passes review criteria to reviewers as file links, not pasted text', async () => {
+  const [skill, subagentReview, graphSource, runner] = await Promise.all([
+    read('SKILL.md'),
+    read('references/subagent-review.md'),
+    read('references/reference-graph.json'),
+    read('scripts/oracle-run.mjs'),
+  ])
+  const graph = JSON.parse(graphSource)
+  const ids = new Set(graph.nodes.map((node) => node.id))
+
+  assert.match(skill, /--review-point/)
+  assert.match(subagentReview, /## 리뷰 포인트 — 파일 링크로 전달/)
+  assert.match(subagentReview, /--review-point/)
+  assert.match(subagentReview, /본문을 복붙하지 않고/)
+  assert.match(subagentReview, /경로와 SHA-256 digest만 기록/)
+  assert.match(subagentReview, /types\/review-criteria\.md/)
+  assert.match(subagentReview, /무관한 기준으로 finding을 만들지 않는다/)
+  assert.match(runner, /review-point/)
+  assert.match(runner, /REVIEW_POINT_INVALID/)
+
+  assert.ok(Array.isArray(graph.reviewPoints), 'reference-graph.json must declare reviewPoints routing')
+  for (const entry of graph.reviewPoints) {
+    assert.ok(entry.when, 'each review point routing needs a condition')
+    for (const node of entry.nodes) {
+      assert.ok(ids.has(node), `review point routing references unknown node ${node}`)
+    }
+  }
 })

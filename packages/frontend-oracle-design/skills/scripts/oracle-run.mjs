@@ -33,6 +33,7 @@ const FLAG_NAMES = [
   'spend',
   'output',
   'decision',
+  'review-point',
 ]
 
 const REQUIRED_CONSECUTIVE_PASSES = { low: 1, medium: 2, high: 3 }
@@ -85,7 +86,7 @@ class CliError extends Error {
 }
 
 function parseOptions(args) {
-  const options = { command: null, requiredLabels: [], harnessPaths: [], milestones: [] }
+  const options = { command: null, requiredLabels: [], harnessPaths: [], milestones: [], reviewPoints: [] }
 
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index]
@@ -105,6 +106,7 @@ function parseOptions(args) {
     if (name === 'required-label') options.requiredLabels.push(value)
     else if (name === 'harness-path') options.harnessPaths.push(value)
     else if (name === 'milestone') options.milestones.push(value)
+    else if (name === 'review-point') options.reviewPoints.push(value)
     else options[name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] = value
     index += 1
   }
@@ -1199,6 +1201,34 @@ async function reviewPacket(options) {
     }
   }
 
+  const reviewPoints = []
+  const seenReviewPoints = new Set()
+  for (const point of options.reviewPoints) {
+    const pointPath = resolve(point)
+    if (seenReviewPoints.has(pointPath)) {
+      throw new CliError('REVIEW_POINT_INVALID', `Duplicate review point: ${point}`)
+    }
+    seenReviewPoints.add(pointPath)
+
+    let metadata
+    try {
+      metadata = await lstat(pointPath)
+    } catch (error) {
+      throw new CliError('REVIEW_POINT_INVALID', `Cannot read review point: ${error.message}`)
+    }
+    if (!metadata.isFile() || metadata.isSymbolicLink()) {
+      throw new CliError('REVIEW_POINT_INVALID', '--review-point must be a regular file')
+    }
+
+    const content = await readFile(pointPath, 'utf8')
+    if (!content.trim()) {
+      throw new CliError('REVIEW_POINT_INVALID', '--review-point cannot be empty')
+    }
+    // 링크만 전달한다 — reviewer가 경로의 파일을 직접 전부 읽고, digest로 어떤
+    // revision의 기준을 읽었는지 고정한다. 본문을 packet에 복제하지 않는다.
+    reviewPoints.push({ path: point, sha256: sha256(content) })
+  }
+
   const state = await readState(directory)
   const revision = verifyLock(directory, state)
   const lock = resolve(directory, state.lock)
@@ -1265,6 +1295,7 @@ async function reviewPacket(options) {
     ledger: await readLedger(directory),
     evidence,
     ...(implementationDecision ? { implementationDecision } : {}),
+    ...(reviewPoints.length ? { reviewPoints } : {}),
     changedFiles,
     diff: gitDiff(scanRoot, changed, state.snapshot, current),
     pending,

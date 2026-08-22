@@ -3,6 +3,15 @@
   "version": 1,
   "description": "조건 충족 시에만 로드하는 reference 노드 그래프. 노드의 when이 참이면 path를 전부 읽고 requires 엣지의 노드를 함께 로드한다. 무관한 노드는 로드하지 않는다. Low fast path는 어떤 노드도 로드하지 않는다.",
   "entry": "common",
+  "reviewPoints": [
+    { "when": "항상", "nodes": ["changeability"] },
+    { "when": "frontend production 변경", "nodes": ["frontend-implementation"] },
+    { "when": "타입·상태 계약 생성·변경", "nodes": ["types-review-criteria"] },
+    { "when": "FSD 레포", "nodes": ["fsd"] },
+    { "when": "Design Intent 포함", "nodes": ["visual-design"] },
+    { "when": "backend·DB·data-access 변경", "nodes": ["backend"] },
+    { "when": "성능 요구·개선 claim", "nodes": ["performance"] }
+  ],
   "nodes": [
     {
       "id": "common",

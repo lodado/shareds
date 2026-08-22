@@ -1336,3 +1336,72 @@ test('O17: High risk REVIEW_VERIFIED는 GREEN 이후 mutation kill 증거를 요
   assert.equal(current.history.at(-1).mutationRunId, 'r-007')
   assert.equal(current.history.at(-1).mutationRow, 'O1')
 })
+
+test('review-packet은 리뷰 포인트를 본문 없이 path·digest 링크로만 기록한다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  const criteria = join(root, 'criteria.md')
+  const content = '# Review criteria\n\n- 다섯 축 판정\n'
+  await writeFile(criteria, content)
+
+  const output = join(oracleDirectory, 'review-input-points.json')
+  const generated = run([
+    'review-packet',
+    '--dir',
+    oracleDirectory,
+    '--review-point',
+    criteria,
+    '--output',
+    output,
+  ])
+
+  assert.equal(generated.status, 0, generated.stderr)
+  const packet = JSON.parse(await readFile(output, 'utf8'))
+  assert.deepEqual(packet.reviewPoints, [
+    { path: criteria, sha256: createHash('sha256').update(content).digest('hex') },
+  ])
+
+  const missing = run([
+    'review-packet',
+    '--dir',
+    oracleDirectory,
+    '--review-point',
+    join(root, 'absent.md'),
+    '--output',
+    join(oracleDirectory, 'missing.json'),
+  ])
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /^REVIEW_POINT_INVALID: /)
+
+  const empty = join(root, 'empty-criteria.md')
+  await writeFile(empty, ' \n')
+  const emptyResult = run([
+    'review-packet',
+    '--dir',
+    oracleDirectory,
+    '--review-point',
+    empty,
+    '--output',
+    join(oracleDirectory, 'empty-points.json'),
+  ])
+  assert.equal(emptyResult.status, 1)
+  assert.match(emptyResult.stderr, /^REVIEW_POINT_INVALID: /)
+
+  const duplicate = run([
+    'review-packet',
+    '--dir',
+    oracleDirectory,
+    '--review-point',
+    criteria,
+    '--review-point',
+    criteria,
+    '--output',
+    join(oracleDirectory, 'duplicate-points.json'),
+  ])
+  assert.equal(duplicate.status, 1)
+  assert.match(duplicate.stderr, /^REVIEW_POINT_INVALID: /)
+
+  const without = run(['review-packet', '--dir', oracleDirectory, '--output', join(oracleDirectory, 'no-points.json')])
+  assert.equal(without.status, 0, without.stderr)
+  const bare = JSON.parse(await readFile(join(oracleDirectory, 'no-points.json'), 'utf8'))
+  assert.equal('reviewPoints' in bare, false)
+})
