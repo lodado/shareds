@@ -6,10 +6,11 @@
 휴리스틱이다. 결과·문구·상태·부작용을 새로 정하거나 승인된 Oracle을 고치는 데 쓰지
 않는다.
 
-권위 순서: 1) 보안·개인정보·법적·접근성·정합성 제약과 승인된 Oracle, 2) 대상 레포의
-`AGENTS.md`·`CLAUDE.md`·architecture·API·테스트 계약, 3) 실제 설치 버전과 기존 구현
-관례, 4) 이 문서의 구현 휴리스틱과 외부 사례. 충돌하면 상위 기준을 따른다. Toss
-자료는 구현 후보를 찾는 근거일 뿐 다른 레포에 강제하는 권위가 아니다.
+권위 순서는 [`common.md`](common.md)의 공통 우선순위가 canonical이다 — 강제 제약과
+승인된 Oracle, 대상 레포의 `AGENTS.md`·`CLAUDE.md`·architecture·API·테스트 계약,
+실제 설치 버전과 기존 구현 관례, 마지막으로 이 문서의 구현 휴리스틱과 외부 사례.
+충돌하면 상위 기준을 따른다. Toss 자료는 구현 후보를 찾는 근거일 뿐 다른 레포에
+강제하는 권위가 아니다.
 
 ## 읽는 방법
 
@@ -240,7 +241,7 @@ memoization·cache·lazy loading과 단일 request를 위한 global state다.
 - React runtime 기준은 [`frontend-implementation.md`](frontend-implementation.md)가
   소유한다.
 - Implementation Decision의 경로·필드·작성 시점은
-  [`implementation-loop.md`](implementation-loop.md)가 소유한다.
+  [`delivery/implementation-decision.md`](delivery/implementation-decision.md)가 소유한다.
 - `PASS | FINDING | N/A`, finding router와 최소 수정 절차는
   [`subagent-review.md`](subagent-review.md)가 소유한다.
 

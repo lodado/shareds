@@ -2,7 +2,7 @@
 
 ## 언제 읽나
 
-대상 레포에서 이 스킬로 타입 계약([`type-constraints.md`](type-constraints.md))을
+대상 레포에서 이 스킬로 타입 계약([`types/state-ladder.md`](types/state-ladder.md))을
 처음 만들기 전 **레포당 1회**, 또는 diff가 tsconfig·TypeScript 버전을 바꿀 때만
 읽는다. 매 카드마다 다시 읽지 않는다.
 

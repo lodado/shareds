@@ -6,7 +6,7 @@
     "name": "lodado",
     "url": "https://github.com/lodado"
   },
-  "version": "0.17.6",
+  "version": "0.18.0",
   "plugins": [
     {
       "name": "vibe-coding-helper",
@@ -23,7 +23,7 @@
     {
       "name": "frontend-oracle-design",
       "description": "Medium/high-risk Oracle-driven frontend contracts, TDD, evidence gates, and review.",
-      "version": "0.17.6",
+      "version": "0.18.0",
       "author": {
         "name": "lodado"
       },

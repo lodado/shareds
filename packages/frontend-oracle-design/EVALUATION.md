@@ -24,10 +24,10 @@
 코드를 함께 읽었다.
 
 - <code>skills/SKILL.md</code> [L1]
-- <code>skills/references/oracle-card.md</code> [L2]
+- <code>skills/references/card/</code> (분할: policy-sources·risk-grill·card-format·confirmation-lock) [L2]
 - <code>skills/references/bva.md</code> [L3]
 - <code>skills/references/visual-design.md</code> [L4]
-- <code>skills/references/implementation-loop.md</code> [L5]
+- <code>skills/references/delivery/</code> (분할: ledger·red·implementation-decision·green-review) [L5]
 - <code>skills/references/frontend-implementation.md</code> [L6]
 - <code>skills/references/architecture-contract.md</code> [L7]
 - <code>skills/references/fsd.md</code>, <code>backend.md</code>,
@@ -783,10 +783,10 @@ Nielsen/Norman식 사용자 학습, 최신 agent harness의 환경 검증, Arena
 ### 로컬 구현
 
 [L1]: ./skills/SKILL.md 'frontend-oracle-design SKILL'
-[L2]: ./skills/references/oracle-card.md 'Oracle Card'
+[L2]: ./skills/references/card/policy-sources.md 'Oracle Card (card/*)'
 [L3]: ./skills/references/bva.md 'Boundary Value Analysis'
 [L4]: ./skills/references/visual-design.md 'Visual Design Contract'
-[L5]: ./skills/references/implementation-loop.md 'Implementation Loop'
+[L5]: ./skills/references/delivery/ledger.md 'Implementation Loop (delivery/*)'
 [L6]: ./skills/references/frontend-implementation.md 'Frontend Implementation'
 [L7]: ./skills/references/architecture-contract.md 'Architecture Contract'
 [L8]: ./skills/references/fsd.md 'FSD Guidance'

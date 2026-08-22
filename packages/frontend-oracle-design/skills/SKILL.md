@@ -87,7 +87,7 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
 
 - 카드에 async·순서·중복 제출·다단계 상태 행이 있거나 client state·exported Props·
   shared/package API·trust boundary 타입 형태를 만들거나 바꾸면 구현 전에
-  `references/type-constraints.md`를 읽는다. 상태·이벤트·전이표는 카드 `O*` 행에서
+  `references/types/state-ladder.md`를 읽는다. 상태·이벤트·전이표는 카드 `O*` 행에서
   도출하고 그 문서의 상태 설계 사다리를 따른다.
 - 기존 query·router·form이 상태를 소유하면 새 `status` union을 만들지 않는다.
   discriminated union은 기존 소유자가 표현 못 하는 진짜 client state에만. 카드에 없는
@@ -133,21 +133,31 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
   정책도 baseline도 아니다.
 - **Delivery Lane:** 사용자가 확인한 한 revision만 lock하고 TDD와 리뷰 수행.
 
-## Reference 로딩
+## Reference 로딩 — 그래프
 
-조건 충족 시에만 지정 파일을 **전부 읽고**, 무관한 reference는 로드하지 않는다.
+reference는 [`reference-graph.json`](references/reference-graph.json)에 선언된
+노드다. 각 노드는 로드 조건(`when`)과 함께 읽어야 하는 의존 노드(`requires` 엣지)를
+선언한다. 조건 충족 시에만 지정 노드 파일을 **전부 읽고** `requires` 엣지로 연결된
+노드를 함께 로드하며, 무관한 reference는 로드하지 않는다. 카드 절차에 진입하면 공통
+노드 [`common.md`](references/common.md)를 다른 노드보다 먼저 읽는다 — 권위 우선순위·
+정책 출처·피드백 라우팅의 canonical 정의가 거기 있다.
 
 - graph-orchestrated delivery loop를 명시적으로 요청받은 경우에만 → 설치된 `$agent-graph-engineering`을 이름으로 명시적으로 로드·호출하고 [`graph-orchestration.md`](references/graph-orchestration.md)를 전부 읽은 뒤 bundled workflow 실행
-- 명시적 Oracle 요청 또는 Medium/High 판정 뒤 카드 작성 시작 → [`bva.md`](references/bva.md), [`oracle-card.md`](references/oracle-card.md)
+- 명시적 Oracle 요청 또는 Medium/High 판정 뒤 카드 작성 시작 → [`card/policy-sources.md`](references/card/policy-sources.md), [`card/risk-grill.md`](references/card/risk-grill.md)
+- 계약 행(매트릭스) 작성 → [`bva.md`](references/bva.md), [`card/card-format.md`](references/card/card-format.md)
+- Draft 사용자 확인·lock·run artifact 초기화 직전 → [`card/confirmation-lock.md`](references/card/confirmation-lock.md)
 - 새 UI·redesign 또는 보이는 layout·palette·type·copy·motion·responsive·identity 변경 전 → [`visual-design.md`](references/visual-design.md)
 - screenshot 비교·직접 브라우저 QA 명시 요청 → 별도 `$frontend-visual-qa` 호출, 이 스킬은 실행을 소유하지 않음
-- Delivery 진입 직후 → 설치된 `$test` 스킬을 이름으로 명시적으로 로드·호출, 못 찾으면 `FAIL`; [`implementation-loop.md`](references/implementation-loop.md), [`changeability.md`](references/changeability.md), [`frontend-implementation.md`](references/frontend-implementation.md), [`architecture-contract.md`](references/architecture-contract.md)
-- 카드에 async·순서·중복 제출·retry·다단계 상태 `O*` 행, 또는 client state·exported Props·shared/package API·trust boundary 타입 변경 전 → [`type-constraints.md`](references/type-constraints.md)
+- Delivery 진입 직후 → 설치된 `$test` 스킬을 이름으로 명시적으로 로드·호출, 못 찾으면 `FAIL`; [`delivery/ledger.md`](references/delivery/ledger.md), [`delivery/red.md`](references/delivery/red.md)
+- `VALID_RED` 뒤 production 수정 직전 → [`delivery/implementation-decision.md`](references/delivery/implementation-decision.md), [`changeability.md`](references/changeability.md), [`frontend-implementation.md`](references/frontend-implementation.md); React architecture 경계·state ownership·public API 변경이면 [`architecture-contract.md`](references/architecture-contract.md)
+- 셀프피드백·GREEN 게이트·review 전이 → [`delivery/green-review.md`](references/delivery/green-review.md)
+- 카드에 async·순서·중복 제출·retry·다단계 상태 `O*` 행, 또는 client state·exported Props·shared/package API·trust boundary 타입 변경 전 → [`types/state-ladder.md`](references/types/state-ladder.md), [`types/authoring.md`](references/types/authoring.md)
+- exported shared/package API·Props 표면 변경 전 → [`types/api-surface.md`](references/types/api-surface.md)
 - 레포당 1회 — 타입 계약 첫 작성 전, 또는 diff가 tsconfig·TS 버전을 바꿈 → [`type-environment.md`](references/type-environment.md), 결과를 Source Registry에 기록, 카드마다 반복하지 않음
 - Delivery 활성 + FSD 레포(또는 도입 승인) + FSD 채택·폴더 구조를 제안·설계·리뷰하기 전 → [`fsd.md`](references/fsd.md)
 - backend·full-stack·DB·data-access 경계를 만들거나 바꾸기 전 → [`backend.md`](references/backend.md)
 - 성능 요구·개선 claim이 있는 카드 작성 또는 production 수정 전 → [`performance.md`](references/performance.md)
-- 구현·테스트 검증 후 → [`subagent-review.md`](references/subagent-review.md); Design Intent 있으면 [`visual-design.md`](references/visual-design.md) 재독
+- 구현·테스트 검증 후 → [`subagent-review.md`](references/subagent-review.md); 타입 계약을 만든 변경이면 [`types/review-criteria.md`](references/types/review-criteria.md); Design Intent 있으면 [`visual-design.md`](references/visual-design.md) 재독
 
 ## 모드 선택
 
@@ -165,7 +175,7 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
    범위 기록. `local`·`identity-shaping`은 Design Change Confirmation을 받고 카드에
    기록. 미확인·미결이면 `NEEDS_DECISION`.
 6. Risk 판정 + 정책 출처 조사.
-7. 필요한 Grill 질문과 BVA로 **Draft Oracle** 작성. Grill은 `oracle-card.md`의 phase
+7. 필요한 Grill 질문과 BVA로 **Draft Oracle** 작성. Grill은 `card/risk-grill.md`의 phase
    순서(결과→위험→데이터·아키텍처→API→경합·비동기→상태→시각→성능·운영)를 따르고,
    사용자가 명시적으로 1문1답 인터뷰를 요청한 경우에만 라운드 상한 없이 진행한다.
 8. 기존 revision은 semantic delta, 새 카드는 전체 정책·미결 질문을 보여주고 명시적으로
@@ -198,7 +208,7 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
    reporter의 실패 test name을 카드 행에 매핑하고 `oracle-verify.mjs red` 통과 run만
    `VALID_RED`로 전이. network·mock·테스트 배치는 불변 규칙과 승인된 architecture
    source, FSD면 `references/fsd.md` 규칙을 따른다.
-7. production 수정 전 `implementation-loop.md`·`frontend-implementation.md`로 구현 결정
+7. production 수정 전 `delivery/implementation-decision.md`·`frontend-implementation.md`로 구현 결정
    기록 후 최소 구현→GREEN.
 8. High risk는 sibling `test` skill의 mutation kill·원복·재-GREEN 먼저.
 9. `oracle-run.mjs review-packet`으로 원시 리뷰 입력 생성 → `subagent-review.md`로 독립
@@ -206,7 +216,8 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
 
 ## 피드백 라우팅
 
-테스트·리뷰의 새 관찰마다 주원인 하나를 기록하고 아래 경로만 사용한다.
+테스트·리뷰의 새 관찰마다 주원인 하나를 기록하고 아래 경로만 사용한다. 분류
+정의·라우팅의 canonical 표는 [`common.md`](references/common.md)의 피드백 라우팅이다.
 
 - `POLICY_GAP` → 카드 현재본과 질문을 출력하고 `NEEDS_DECISION`
 - `EVIDENCE_GAP` → 잠긴 카드 범위 안에서 누락된 테스트·reviewer 매핑만 추가
