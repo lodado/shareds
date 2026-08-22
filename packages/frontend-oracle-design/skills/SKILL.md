@@ -5,6 +5,26 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
 
 # Frontend Oracle Design
 
+## 진입 — 무조건 먼저
+
+1. **첫 tool call은 lane 진입 노드 1개를 Read 하는 것이다.** risk가 Low면
+   [`lanes/low-fast-path.md`](references/lanes/low-fast-path.md), 그 외에는
+   [`common.md`](references/common.md). repo 탐색·답변 작성·다른 도구 호출·다른
+   reference 로드는 전부 그 뒤에 온다.
+2. **응답 첫 줄에 lane 헤더를 출력한다.** 헤더 없이 본문을 쓰면 위반이다.
+
+   ```text
+   risk=<Low|Medium|High> lane=<low-fast-path|oracle> nodes=[실제로 Read 한 노드 id]
+   ```
+
+   `nodes`에는 읽을 예정이 아니라 **실제로 Read 한** 노드만 적는다. 읽지 않은 노드를
+   적는 것은 거짓 보고다. 단계가 진행돼 노드를 더 로드하면 그 응답의 헤더에 누적해
+   적는다.
+
+3. 플랜·설계·파일 구조·타입을 **말로 설명만** 하는 요청도 이 절차 안이다. 산문
+   답변이라는 이유로 진입 노드 로드와 헤더 출력을 건너뛰지 않는다. "이미 아는 내용"·
+   "명세가 충분히 상세함"·"코드를 안 고치니까"는 스킵 사유가 아니다.
+
 - 요구사항을 제품 결과·강제 제약·실행 가능한 정답 계약(Oracle Card)으로 구체화한다:
   `Outcome Brief → Source Registry → 행동·시각 계약`. 기본 동작은 카드 설계에서 멈추고,
   사용자가 구현·자가검증·독립 리뷰까지 명시하면 같은 카드를 불변 기준으로 Delivery를
@@ -145,6 +165,9 @@ reference는 [`reference-graph.json`](references/reference-graph.json)에 선언
 노드 [`common.md`](references/common.md)를 다른 노드보다 먼저 읽는다 — 권위 우선순위·
 정책 출처·피드백 라우팅의 canonical 정의가 거기 있다.
 
+이 목록은 조건별 카탈로그다. 「모드 선택」의 각 단계에 인라인된 읽기 지시가 실행
+순서를 소유하며, 이 섹션을 참조로 미루고 단계를 진행하지 않는다.
+
 - 진입 risk 판정이 Low → [`lanes/low-fast-path.md`](references/lanes/low-fast-path.md)만 로드 (exclusive lane — 다른 노드 로드 금지, 실격 조건이 나오면 아래 카드 절차로 승격)
 - graph-orchestrated delivery loop를 명시적으로 요청받은 경우에만 → 설치된 `$agent-graph-engineering`을 이름으로 명시적으로 로드·호출하고 [`graph-orchestration.md`](references/graph-orchestration.md)를 전부 읽은 뒤 bundled workflow 실행
 - 명시적 Oracle 요청 또는 Medium/High 판정 뒤 카드 작성 시작 → [`card/policy-sources.md`](references/card/policy-sources.md), [`card/risk-grill.md`](references/card/risk-grill.md)
@@ -169,7 +192,9 @@ reference는 [`reference-graph.json`](references/reference-graph.json)에 선언
 
 카드·요구사항 정리·정책 결정·테스트 계약만 요청 시:
 
-1. `Outcome Brief` 작성. KPI 없으면 수치 발명 금지.
+1. [`common.md`](references/common.md)와
+   [`card/policy-sources.md`](references/card/policy-sources.md)를 읽는다 → `Outcome Brief`
+   작성. KPI 없으면 수치 발명 금지.
 2. 승인된 기획서·PRD·수용 기준·디자인 시스템·Figma 조사, 정확한 위치·frame·version 고정.
 3. source를 `product-policy`·`mandatory-constraint`·`project-constraint`·
    `implementation-reference`로 분류. 강제 제약과 충돌 시 임의로 낮추지 말고
@@ -178,15 +203,18 @@ reference는 [`reference-graph.json`](references/reference-graph.json)에 선언
 5. 보이는 UI 변경이면 `visual-design.md`로 `behavior-only`·`local`·`identity-shaping`
    범위 기록. `local`·`identity-shaping`은 Design Change Confirmation을 받고 카드에
    기록. 미확인·미결이면 `NEEDS_DECISION`.
-6. Risk 판정 + 정책 출처 조사.
-7. 필요한 Grill 질문과 BVA로 **Draft Oracle** 작성. Grill은 `card/risk-grill.md`의 phase
+6. Risk 판정 + 정책 출처 조사. lane 헤더의 `risk`를 여기서 확정한다.
+7. [`card/risk-grill.md`](references/card/risk-grill.md)·[`bva.md`](references/bva.md)·
+   [`card/card-format.md`](references/card/card-format.md)를 읽는다 → 필요한 Grill 질문과
+   BVA로 **Draft Oracle** 작성. Grill은 `card/risk-grill.md`의 phase
    순서(결과→위험→데이터·아키텍처→API→경합·비동기→상태→시각→성능·운영)를 따르고,
    사용자가 명시적으로 1문1답 인터뷰를 요청한 경우에만 라운드 상한 없이 진행한다.
 8. 기존 revision은 semantic delta, 새 카드는 전체 정책·미결 질문을 보여주고 명시적으로
    재확인.
 9. 승인 응답 위치를 `User Confirmation`에 기록하고 adversarial self-review. 수정 요청이면
    Draft 고쳐 재확인, 무응답이면 `NEEDS_DECISION`.
-10. `oracle-verify.mjs card` lint 통과 후 결정적 revision lock 생성.
+10. [`card/confirmation-lock.md`](references/card/confirmation-lock.md)를 읽는다 →
+    `oracle-verify.mjs card` lint 통과 후 결정적 revision lock 생성.
 11. `ORACLE_READY` | `NEEDS_DECISION` | 도구 실패 `FAIL`에서 종료.
 12. 테스트·production 코드 작성 금지.
 
@@ -194,7 +222,9 @@ reference는 [`reference-graph.json`](references/reference-graph.json)에 선언
 
 구현·테스트 기반 자가검증·subagent 리뷰까지 명시 시:
 
-1. Design-only의 조사·Draft·확인 절차 수행. 단 Delivery가 처음부터 알려졌으면
+1. Design-only의 조사·Draft·확인 절차(각 단계의 인라인 읽기 포함) 수행 후
+   [`delivery/ledger.md`](references/delivery/ledger.md)·[`delivery/red.md`](references/delivery/red.md)를
+   읽는다. 단 Delivery가 처음부터 알려졌으면
    architecture·backend source 결정 전에는 lock을 만들지 않고 미룬다. Design Intent는
    기록된 Design Change Confirmation 없이 진행 금지.
 2. React architecture 경계·state ownership·public API 변경 시에만

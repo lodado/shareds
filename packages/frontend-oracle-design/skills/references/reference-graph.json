@@ -3,6 +3,11 @@
   "version": 1,
   "description": "조건 로드 reference 노드 그래프. 진입 risk 판정으로 lane 선택: Low는 low-fast-path 단일 노드 exclusive lane, 명시적 Oracle 요청·Medium/High는 common entry의 oracle lane. 노드 when 충족 시 path 전문과 requires 엣지를 함께 로드, 무관 노드 로드 금지. 로드 조건의 전체 서술은 SKILL.md 「Reference 로딩」이 소유한다.",
   "entry": "common",
+  "entryContract": {
+    "firstToolCall": "lane 진입 노드 1개 Read — risk=Low면 low-fast-path, 그 외 common",
+    "responseHeader": "risk=<Low|Medium|High> lane=<low-fast-path|oracle> nodes=[실제로 Read 한 노드 id]",
+    "appliesTo": "구현 요청과 설명·플랜 전용 요청 모두"
+  },
   "lanes": [
     {
       "id": "low-fast-path",

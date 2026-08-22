@@ -253,11 +253,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.18.4')
+  assert.equal(version, '0.19.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.18.4')
+  assert.equal(marketplace.version, '0.19.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -932,4 +932,57 @@ test('routes the low fast path as an explicit exclusive lane in the graph', asyn
   assert.match(skill, /lanes\/low-fast-path\.md/)
   assert.match(card, /lanes\/low-fast-path\.md/)
   assert.match(delivery, /lanes\/low-fast-path\.md/)
+})
+
+test('forces one entry-node read and a lane header before any other work', async () => {
+  const [skill, lane, graphSource] = await Promise.all([
+    read('SKILL.md'),
+    read('references/lanes/low-fast-path.md'),
+    read('references/reference-graph.json'),
+  ])
+  const graph = JSON.parse(graphSource)
+
+  // 진입 블록이 다른 어떤 절차보다 앞에 온다
+  const entryIndex = skill.indexOf('## 진입 — 무조건 먼저')
+  assert.ok(entryIndex > 0, 'SKILL.md must declare the unconditional entry block')
+  assert.ok(entryIndex < skill.indexOf('## 불변 규칙'))
+  assert.ok(entryIndex < skill.indexOf('## 모드 선택'))
+  assert.ok(entryIndex < skill.indexOf('## Reference 로딩'))
+
+  assert.match(skill, /첫 tool call은 lane 진입 노드 1개를 Read 하는 것이다/)
+  assert.match(skill, /repo 탐색·답변 작성·다른 도구 호출·다른\s*\n?\s*reference 로드는 전부 그 뒤에 온다/)
+  assert.match(skill, /응답 첫 줄에 lane 헤더를 출력한다.*헤더 없이 본문을 쓰면 위반이다/s)
+  assert.match(skill, /risk=<Low\|Medium\|High> lane=<low-fast-path\|oracle> nodes=\[/)
+  assert.match(skill, /실제로 Read 한\*\* 노드만 적는다/)
+
+  // 설명·플랜 전용 요청도 같은 절차 — 이전 실패 모드
+  assert.match(skill, /말로 설명만\*\* 하는 요청도 이 절차 안이다/)
+  assert.match(skill, /"이미 아는 내용"·\s*\n?\s*"명세가 충분히 상세함"·"코드를 안 고치니까"는 스킵 사유가 아니다/)
+
+  // Low lane도 같은 헤더를 낸다
+  assert.match(lane, /응답 첫 줄에 lane 헤더를 출력한다/)
+  assert.match(lane, /risk=Low lane=low-fast-path nodes=\[low-fast-path\]/)
+
+  // 그래프가 진입 계약을 기계 판독 가능하게 선언한다
+  assert.ok(graph.entryContract, 'reference-graph.json must declare entryContract')
+  assert.match(graph.entryContract.firstToolCall, /lane 진입 노드 1개 Read/)
+  assert.match(graph.entryContract.responseHeader, /^risk=<Low\|Medium\|High> lane=/)
+  assert.match(graph.entryContract.appliesTo, /설명·플랜 전용 요청/)
+})
+
+test('inlines the required reference reads into the mode steps instead of a separate section', async () => {
+  const skill = await read('SKILL.md')
+  const designOnly = skill.slice(skill.indexOf('### Design-only'), skill.indexOf('### Delivery'))
+  const delivery = skill.slice(skill.indexOf('### Delivery'), skill.indexOf('## 피드백 라우팅'))
+
+  assert.match(designOnly, /1\. \[`common\.md`\][^\n]*\n\s*\[`card\/policy-sources\.md`\][^\n]*를 읽는다 → `Outcome Brief`/)
+  assert.match(designOnly, /7\. \[`card\/risk-grill\.md`\]/)
+  assert.match(designOnly, /\[`bva\.md`\]/)
+  assert.match(designOnly, /\[`card\/card-format\.md`\]/)
+  assert.match(designOnly, /10\. \[`card\/confirmation-lock\.md`\]/)
+  assert.match(designOnly, /lane 헤더의 `risk`를 여기서 확정한다/)
+  assert.match(delivery, /\[`delivery\/ledger\.md`\][\s\S]*\[`delivery\/red\.md`\][^\n]*를\n?\s*읽는다/)
+
+  // 카탈로그 섹션은 실행 순서를 소유하지 않는다
+  assert.match(skill, /「모드 선택」의 각 단계에 인라인된 읽기 지시가 실행\s*\n?순서를 소유하며/)
 })

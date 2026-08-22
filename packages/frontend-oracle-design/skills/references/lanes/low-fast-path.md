@@ -13,7 +13,9 @@
 
 ## 절차
 
-1. risk 판정과 사유를 한 줄 기록한다 (예: `risk: low — 승인된 문구 계약 안의 copy 수정`).
+1. risk 판정과 사유를 한 줄 기록하고, 응답 첫 줄에 lane 헤더를 출력한다
+   (`risk=Low lane=low-fast-path nodes=[low-fast-path]`). 사유 예:
+   `risk: low — 승인된 문구 계약 안의 copy 수정`.
 2. 변경을 수행하고 관련 테스트와 레포 필수 검증(lint·typecheck·targeted test)만
    실행한다.
 3. 결과를 보고한다: 변경 path, 실행한 검증 명령과 실제 결과, risk 사유.
