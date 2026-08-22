@@ -22,11 +22,14 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
   카드·lock·run artifact 없이 기존 레포 검증만 수행한다. 명시적 Oracle 요청 또는
   Medium/High만 카드 절차로 들어간다.
 
-## 그래프 오케스트레이션
+## 그래프 오케스트레이션 — 명시적 요청만
 
-설치된 `$agent-graph-engineering`을 이름으로 명시적으로 로드·호출하고
+사용자가 graph-orchestrated delivery loop를 명시적으로 요청한 경우에만 설치된
+`$agent-graph-engineering`을 이름으로 명시적으로 로드·호출하고
 [`references/oracle-workflow.graph.json`](references/oracle-workflow.graph.json)을
-실행한다. 스킬이나 graph verifier를 찾을 수 없으면 순차 실행으로 우회하지 않고 `FAIL`.
+실행한다. 요청이 없으면 이 섹션을 건너뛰고 현재 agent가 같은 계약·게이트·상태 전이를
+순차 수행한다 — subagent 위임을 강제하지 않으며 agent 재량 선택만 허용한다. 그래프
+모드에서 스킬이나 graph verifier를 찾을 수 없으면 순차 실행으로 우회하지 않고 `FAIL`.
 
 - Controller는 Node 실행·Edge 선택만 소유. 제품 정책·카드·lock·ledger·상태 전이·예산은
   Oracle이 계속 소유.
