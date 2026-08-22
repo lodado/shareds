@@ -122,9 +122,13 @@ export function validateGraph(graph) {
   if (graph.context !== undefined && !isStringArray(graph.context)) {
     addIssue('GRAPH_CONTEXT_INVALID', 'context must be a string array of externally provided input fields')
   }
+  if (graph.fallback !== undefined && !Array.isArray(graph.fallback)) {
+    addIssue('FALLBACK_INVALID', 'fallback must be an array of { when, to } rules')
+  }
 
   const nodes = Array.isArray(graph.nodes) ? graph.nodes : []
   const edges = Array.isArray(graph.edges) ? graph.edges : []
+  const fallback = Array.isArray(graph.fallback) ? graph.fallback : []
   const terminals = isStringArray(graph.terminals) ? graph.terminals : []
   const nodeById = new Map()
 
@@ -223,14 +227,51 @@ export function validateGraph(graph) {
     }
   }
 
+  const fallbackSignatures = new Set()
+  const fallbackTargets = []
+
+  for (const [index, rule] of fallback.entries()) {
+    if (!isRecord(rule)) {
+      addIssue('FALLBACK_RULE_INVALID', `fallback[${index}] must be an object`)
+      continue
+    }
+    if (!nodeById.has(rule.to)) {
+      addIssue('FALLBACK_TARGET_UNKNOWN', `fallback[${index}] references unknown target ${rule.to}`)
+    } else {
+      fallbackTargets.push(rule.to)
+    }
+    if (!isRecord(rule.when) || !isNonEmptyString(rule.when.field) || !Object.hasOwn(rule.when, 'equals')) {
+      addIssue('FALLBACK_CONDITION_INVALID', `fallback[${index}] must use { field, equals }`)
+      continue
+    }
+    if (!isJsonPrimitive(rule.when.equals)) {
+      addIssue('FALLBACK_CONDITION_INVALID', `fallback[${index}].when.equals must be a JSON primitive`)
+    }
+    const signature = JSON.stringify([rule.when.field, rule.when.equals])
+    if (fallbackSignatures.has(signature)) {
+      addIssue('FALLBACK_DUPLICATE', `fallback[${index}] repeats a condition another rule already claims`)
+    } else fallbackSignatures.add(signature)
+  }
+
   for (const terminal of terminals) {
     if ((outgoing.get(terminal) ?? []).length > 0) {
       addIssue('TERMINAL_HAS_EDGE', `${terminal} must not have outgoing edges`)
     }
   }
 
+  // Fallback applies from every non-terminal node, so reachability must see those routes.
+  const routeAdjacency = new Map([...adjacency].map(([id, targets]) => [id, [...targets]]))
+  const reverseRouteAdjacency = new Map([...reverseAdjacency].map(([id, sources]) => [id, [...sources]]))
+  for (const [id, node] of nodeById) {
+    if (node.kind === 'terminal') continue
+    for (const target of fallbackTargets) {
+      routeAdjacency.get(id).push(target)
+      reverseRouteAdjacency.get(target).push(id)
+    }
+  }
+
   if (nodeById.has(graph.entry)) {
-    const reachable = reachableFrom([graph.entry], adjacency)
+    const reachable = reachableFrom([graph.entry], routeAdjacency)
     for (const id of nodeById.keys()) {
       if (!reachable.has(id)) addIssue('NODE_UNREACHABLE', `${id} is not reachable from ${graph.entry}`)
     }
@@ -238,7 +279,7 @@ export function validateGraph(graph) {
 
   const reachesTerminal = reachableFrom(
     terminals.filter((id) => nodeById.has(id)),
-    reverseAdjacency,
+    reverseRouteAdjacency,
   )
   for (const id of nodeById.keys()) {
     if (!reachesTerminal.has(id)) {
@@ -249,7 +290,10 @@ export function validateGraph(graph) {
   const contextFields = new Set(isStringArray(graph.context) ? graph.context : [])
   for (const node of nodeById.values()) {
     if (!isStringArray(node.input)) continue
-    const producers = reachableFrom(reverseAdjacency.get(node.id) ?? [], reverseAdjacency)
+    // Only a fallback target may count the graph-wide route as a producer; every other node keeps
+    // the strict explicit-edge check, or one fallback rule would satisfy every input in the graph.
+    const reverse = fallbackTargets.includes(node.id) ? reverseRouteAdjacency : reverseAdjacency
+    const producers = reachableFrom(reverse.get(node.id) ?? [], reverse)
     const available = new Set(contextFields)
     for (const producerId of producers) {
       const producer = nodeById.get(producerId)
@@ -301,7 +345,13 @@ export function selectTransitions(graph, nodeId, output) {
   )
 
   if (matched.length === 0) {
-    throw new TransitionError('NO_TRANSITION', `${nodeId} output matches no edge`)
+    // A node-specific edge always wins, so a node can opt out of a graph-wide route by declaring its own.
+    const rescued = (graph.fallback ?? []).filter((rule) => output[rule.when.field] === rule.when.equals)
+    if (rescued.length > 1) {
+      throw new TransitionError('AMBIGUOUS_TRANSITION', `${nodeId} output matches ${rescued.length} fallback rules`)
+    }
+    if (rescued.length === 1) return [rescued[0].to]
+    throw new TransitionError('NO_TRANSITION', `${nodeId} output matches no edge or fallback rule`)
   }
   if ((node.dispatch ?? 'one') === 'one' && matched.length > 1) {
     throw new TransitionError('AMBIGUOUS_TRANSITION', `${nodeId} output matches ${matched.length} edges`)

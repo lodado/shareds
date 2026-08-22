@@ -81,6 +81,67 @@ test('validates a bounded graph and selects one structured transition', () => {
   assert.deepEqual(selectTransitions(value, 'complete', {}), [])
 })
 
+test('routes a graph-wide fallback that node edges still override', () => {
+  const value = graph()
+  value.edges = value.edges.filter(({ to }) => to !== 'failed')
+  value.fallback = [{ when: { field: 'status', equals: 'failure' }, to: 'failed' }]
+  value.edges.push({ from: 'review', to: 'implement', when: { field: 'status', equals: 'failure' } })
+
+  assert.equal(validateGraph(value), value)
+  assert.deepEqual(selectTransitions(value, 'plan', { status: 'failure' }), ['failed'])
+  assert.deepEqual(selectTransitions(value, 'implement', { status: 'failure' }), ['failed'])
+  assert.deepEqual(selectTransitions(value, 'review', { status: 'failure' }), ['implement'])
+  assert.throws(
+    () => selectTransitions(value, 'plan', { status: 'unmodeled' }),
+    (error) => error instanceof TransitionError && error.code === 'NO_TRANSITION',
+  )
+})
+
+test('rejects fallback rules that are unresolvable, repeated or malformed', () => {
+  const unknownTarget = graph()
+  unknownTarget.fallback = [{ when: { field: 'status', equals: 'failure' }, to: 'missing' }]
+  assert.throws(
+    () => validateGraph(unknownTarget),
+    (error) =>
+      error instanceof GraphValidationError && error.issues.some(({ code }) => code === 'FALLBACK_TARGET_UNKNOWN'),
+  )
+
+  const repeated = graph()
+  repeated.fallback = [
+    { when: { field: 'status', equals: 'failure' }, to: 'failed' },
+    { when: { field: 'status', equals: 'failure' }, to: 'complete' },
+  ]
+  assert.throws(
+    () => validateGraph(repeated),
+    (error) => error instanceof GraphValidationError && error.issues.some(({ code }) => code === 'FALLBACK_DUPLICATE'),
+  )
+
+  const malformed = graph()
+  malformed.fallback = [{ when: 'always', to: 'failed' }]
+  assert.throws(
+    () => validateGraph(malformed),
+    (error) =>
+      error instanceof GraphValidationError && error.issues.some(({ code }) => code === 'FALLBACK_CONDITION_INVALID'),
+  )
+})
+
+test('counts the fallback route for reachability without loosening input satisfaction', () => {
+  const reachable = graph()
+  reachable.edges = reachable.edges.filter(({ to }) => to !== 'failed')
+  reachable.fallback = [{ when: { field: 'status', equals: 'failure' }, to: 'failed' }]
+  assert.equal(validateGraph(reachable), reachable)
+
+  const leaky = graph()
+  leaky.edges = leaky.edges.filter(({ to }) => to !== 'failed')
+  leaky.fallback = [{ when: { field: 'status', equals: 'failure' }, to: 'failed' }]
+  leaky.nodes.find(({ id }) => id === 'plan').input = ['request', 'findings']
+  assert.throws(
+    () => validateGraph(leaky),
+    (error) =>
+      error instanceof GraphValidationError && error.issues.some(({ code }) => code === 'NODE_INPUT_UNSATISFIED'),
+  )
+})
+
 test('rejects dangling edges and conditions on undeclared output fields', () => {
   const value = graph()
   value.edges.push({ from: 'missing', to: 'complete', when: 'always' })

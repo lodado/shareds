@@ -90,6 +90,32 @@ Graph Controller와 Worker가 같은 실행 경계를 공유하기 위한 최소
 Worker는 `status`와 evidence를 제출할 뿐 `to`나 다음 Node ID를 반환하지 않는다.
 Controller가 output을 validator에 전달하고 반환된 Edge만 따른다.
 
+## Fallback
+
+정책 위반이나 실패처럼 **모든 Node가 같은 곳으로 보내는** 결과는 Node마다 Edge를
+재선언하지 않고 그래프 최상위에 한 번만 선언한다.
+
+```json
+{
+  "fallback": [
+    { "when": { "field": "classification", "equals": "POLICY_GAP" }, "to": "draft-oracle" },
+    { "when": { "field": "classification", "equals": "FAIL" }, "to": "failed" }
+  ]
+}
+```
+
+- Node 전용 Edge가 언제나 우선한다. 일치하는 Edge가 하나도 없을 때만 fallback을 본다.
+  같은 조건에 다른 목적지가 필요한 Node는 자기 Edge를 선언해 그래프 규칙을 덮는다.
+- 조건은 Edge와 같은 `{ field, equals }` strict equality다. `always`는 쓸 수 없다 —
+  모든 Node의 모든 결과를 삼켜 `NO_TRANSITION`을 무력화하기 때문이다.
+- 한 조건은 규칙 하나만 가질 수 있다. 중복은 `FALLBACK_DUPLICATE`, 없는 Node를 가리키면
+  `FALLBACK_TARGET_UNKNOWN`이다.
+- fallback은 terminal이 아닌 모든 Node에서 출발하므로 도달성 검사가 이 경로를 함께 센다.
+  반면 `NODE_INPUT_UNSATISFIED`는 fallback 목적지에만 이 경로를 인정한다 — 모든 Node에
+  인정하면 규칙 하나로 그래프 전체 input이 만족된 것처럼 보이기 때문이다.
+- fallback으로도 일치하지 않으면 여전히 `NO_TRANSITION`이다. 모델링하지 않은 결과를
+  조용히 삼키지 않는다.
+
 ## 병렬 쓰기
 
 같은 `dispatch: all` fan-out에서 실행될 수 있는 agent Node의 `writeScope`가 겹치면

@@ -6,7 +6,7 @@
     "name": "lodado",
     "url": "https://github.com/lodado"
   },
-  "version": "0.20.0",
+  "version": "0.21.0",
   "plugins": [
     {
       "name": "vibe-coding-helper",
@@ -23,7 +23,7 @@
     {
       "name": "frontend-oracle-design",
       "description": "Medium/high-risk Oracle-driven frontend contracts, TDD, evidence gates, and review.",
-      "version": "0.20.0",
+      "version": "0.21.0",
       "author": {
         "name": "lodado"
       },
@@ -35,7 +35,7 @@
     {
       "name": "agent-graph-engineering",
       "description": "Bounded node-and-edge orchestration for native agents, tools, joins, retries, and human gates.",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "author": {
         "name": "lodado"
       },
