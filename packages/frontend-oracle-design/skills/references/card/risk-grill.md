@@ -4,18 +4,11 @@
 
 새 UI·redesign 또는 보이는 layout·palette·typography·copy·motion·responsive behavior·
 visual identity 변경이면 카드 작성 전 [`visual-design.md`](../visual-design.md)를 전부
-읽는다. 기존 시각 결과 유지 작업은 `behavior-only`와 N/A 사유만 기록.
-
-- `local`·`identity-shaping`이면 승인된 시각 기준을 Design Intent와 `D*` Visual
-  Contract 행으로 같은 카드에 포함.
-- AI·디자인 skill의 Design Proposal은 사용자 승인 전 정책 출처가 아니다.
-- 출처 있는 시각 요구마다 `HARD`·`RELATIONAL`·`JUDGMENT` 증거 계층을 정한다.
-- **Design Change Confirmation 필수.** `local`·`identity-shaping`은 변경 축과 전체
-  Design Intent를 보여주고 명시적 확인 전 잠그지 않는다. 승인된 디자인 source도 확인을
-  대신하지 않으며, 미확인이면 `NEEDS_DECISION`.
-- `identity-shaping`은 두 번의 설계 pass까지 마친 제안으로 확인받는다.
-- 승인된 로컬 디자인 자료는 `--source`로 함께 잠그고, 원격 자료는 정확한 version을
-  Design Intent와 Source Registry에 기록.
+읽는다 — 시각 범위 3종, Design Proposal 규칙, Design Change Confirmation 게이트,
+`HARD`·`RELATIONAL`·`JUDGMENT` 증거 계층은 그 문서가 소유한다. 기존 시각 결과 유지
+작업은 `behavior-only`와 N/A 사유만 기록. `local`·`identity-shaping`이면 승인된
+Design Intent와 `D*` 행을 같은 카드에 포함하고, Design Change Confirmation의 명시적
+확인 전에는 잠그지 않는다(`NEEDS_DECISION`).
 
 시각 범위는 기능 Risk를 대신하지 않는다. 두 판정은 별도로 기록.
 

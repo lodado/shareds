@@ -253,11 +253,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.18.2')
+  assert.equal(version, '0.18.3')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.18.2')
+  assert.equal(marketplace.version, '0.18.3')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -766,7 +766,7 @@ test('prefers Suspense and Error Boundary over in-component loading branches', a
   assert.match(frontendImplementation, /startTransition/)
   assert.match(frontendImplementation, /throwOnError.*data 부재 조건으로 좁혀/s)
 
-  assert.match(subagentReview, /실격 사유가 Implementation\n {2}Decision에 없으면 `FINDING`이다/)
+  assert.match(subagentReview, /types\/review-criteria\.md/)
 })
 
 test('keeps client state data-only and hands actions back beside it', async () => {
@@ -801,7 +801,7 @@ test('keeps client state data-only and hands actions back beside it', async () =
   assert.match(frontendImplementation, /state와 action을 형제로 반환한다/)
 
   // 리뷰는 같은 계약으로 판정한다
-  assert.match(subagentReview, /state에 저장된 action/)
+  assert.match(subagentReview, /state union과 action 배치/)
 })
 
 test('declares every reference as a loadable graph node with resolvable edges', async () => {

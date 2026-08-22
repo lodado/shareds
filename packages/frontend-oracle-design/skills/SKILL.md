@@ -220,16 +220,9 @@ reference는 [`reference-graph.json`](references/reference-graph.json)에 선언
 
 ## 피드백 라우팅
 
-테스트·리뷰의 새 관찰마다 주원인 하나를 기록하고 아래 경로만 사용한다. 분류
-정의·라우팅의 canonical 표는 [`common.md`](references/common.md)의 피드백 라우팅이다.
-
-- `POLICY_GAP` → 카드 현재본과 질문을 출력하고 `NEEDS_DECISION`
-- `EVIDENCE_GAP` → 잠긴 카드 범위 안에서 누락된 테스트·reviewer 매핑만 추가
-- `HARNESS_DEFECT` → locator·fixture·barrier 등 허용 항목만 공용 2회 예산으로 보정
-- `PRODUCT_DEFECT` → 결정론 테스트의 `VALID_RED` 뒤 production 개선 예산 사용
-- `ENVIRONMENT_DEFECT` → production을 건드리지 않고 실제 원인과 함께 `FAIL`
-- `NON_ORACLE_OPINION` → 근거와 함께 기록하고 완료 차단이나 정책 변경에 사용하지 않음
-
+테스트·리뷰의 새 관찰마다 주원인 하나를 `POLICY_GAP`·`EVIDENCE_GAP`·
+`HARNESS_DEFECT`·`PRODUCT_DEFECT`·`ENVIRONMENT_DEFECT`·`NON_ORACLE_OPINION` 중
+하나로 기록하고, [`common.md`](references/common.md)의 canonical 라우팅 표만 따른다.
 현재 구현·test 관찰·reviewer 선호는 분류 증거일 뿐 정책 출처가 아니다. 승인된 Design
 Intent 불일치는 단순 선호가 아니며 `visual-design.md` 기준으로 분류한다.
 

@@ -220,20 +220,13 @@ reviewer는 아래 질문으로 사용자를 재인터뷰하거나 새 정책을
 - loading, retry, race, out-of-order가 결정론적으로 통제되는가?
 - 구현이 카드 밖의 정책이나 동작을 임의로 추가하지 않았는가?
 - 실제 package version과 레포 계약을 확인하고 외부 best practice보다 우선했는가?
-- material한 입력·성공·실패·상태가 TypeScript로 표현되고 `any`나 광범위한 assertion으로
-  불가능 상태를 숨기지 않았는가? 단순 상태에 불필요한 state machine도 만들지 않았는가?
-- state에 저장된 action(`retry`·`submit`)이나 no-op action이 있는가? 상태는 데이터만
-  담고 action은 hook 반환의 형제여야 하며, 서버 상태면 기존 `refetch`를 재사용해야
-  한다. 위반이면 `FINDING`이다.
-- 기존 query API로 표현되는 서버 상태를 `useState`+`useEffect`로 다시 구현했는가?
-  unmount·route 변경 뒤 늦은 응답이 상태를 덮을 수 있는가?
+- 타입·상태 계약 — state union과 action 배치, 불가능 상태 은폐, 서버 상태 재구현,
+  Suspense/Error Boundary 분기, 늦은 응답 방어 — 는 리뷰 포인트로 받은
+  [`types/review-criteria.md`](types/review-criteria.md)와
+  [`frontend-implementation.md`](frontend-implementation.md) 기준으로만 판정한다.
+  같은 기준을 이 목록에 반복하지 않는다.
 - server state를 query cache와 local/global state가 중복 소유하지 않는가?
 - Server Component로 충분한 일을 Client Component·TanStack Query로 옮기지 않았는가?
-- Suspense/Error Boundary가 필요한 subtree에만 있고 initial load·background refetch·
-  mutation pending을 같은 상태로 취급하지 않았는가?
-- 무조건 실행되는 첫 조회의 loading·error를 경계로 올리지 않고 컴포넌트 안에서
-  분기했는가? 조건부 query·placeholder·취소 제약 같은 실격 사유가 Implementation
-  Decision에 없으면 `FINDING`이다.
 - retry가 실패한 query/boundary 범위만 복구하고 전체 cache를 무차별 reset하지 않는가?
 - micro-hook이 UI와 비즈니스 로직의 책임을 정확히 분리하는가? UI component는 semantic
   JSX·접근성·시각 상태·사용자 intent 연결만 소유하고, domain 판정·DTO 변환·query/cache·
