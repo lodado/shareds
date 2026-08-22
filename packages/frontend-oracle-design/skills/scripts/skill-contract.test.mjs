@@ -12,7 +12,11 @@ async function read(relativePath) {
 }
 
 test('runs the Oracle contract through the bundled deterministic workflow graph', async () => {
-  const [skill, graphSource] = await Promise.all([read('SKILL.md'), read('references/oracle-workflow.graph.json')])
+  const [skill, graphOrchestration, graphSource] = await Promise.all([
+    read('SKILL.md'),
+    read('references/graph-orchestration.md'),
+    read('references/oracle-workflow.graph.json'),
+  ])
   const graph = JSON.parse(graphSource)
   const verifier = join(
     skillDirectory,
@@ -21,11 +25,15 @@ test('runs the Oracle contract through the bundled deterministic workflow graph'
   const graphPath = join(skillDirectory, 'references/oracle-workflow.graph.json')
   const verified = spawnSync(process.execPath, [verifier, 'verify', '--graph', graphPath], { encoding: 'utf8' })
 
-  assert.match(skill, /## 그래프 오케스트레이션 — 명시적 요청만/)
-  assert.match(skill, /명시적으로 요청한 경우에만 설치된\s*\n?`\$agent-graph-engineering`을 이름으로 명시적으로 로드·호출/)
-  assert.match(skill, /subagent 위임을 강제하지 않으며 agent 재량 선택만 허용한다/)
-  assert.match(skill, /\.ai\/agent-graphs\/<oracle-id>\/graph\.json/)
-  assert.match(skill, /graph-verify\.mjs next/)
+  assert.match(skill, /명시적으로 요청받은 경우에만.*`\$agent-graph-engineering`.*graph-orchestration\.md/s)
+  assert.doesNotMatch(skill, /\.ai\/agent-graphs\/<oracle-id>\/graph\.json/)
+  assert.match(
+    graphOrchestration,
+    /명시적으로 요청한 경우에만 설치된\s*\n?`\$agent-graph-engineering`을 이름으로 명시적으로 로드·호출/,
+  )
+  assert.match(graphOrchestration, /subagent 위임을 강제하지 않으며\s*\n?agent 재량 선택만 허용한다/)
+  assert.match(graphOrchestration, /\.ai\/agent-graphs\/<oracle-id>\/graph\.json/)
+  assert.match(graphOrchestration, /graph-verify\.mjs next/)
   assert.equal(graph.entry, 'draft-oracle')
   assert.deepEqual(graph.terminals, ['oracle-ready', 'review-verified', 'cancelled', 'failed'])
   assert.equal(verified.status, 0, verified.stderr)
@@ -217,11 +225,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.17.4')
+  assert.equal(version, '0.17.5')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.17.4')
+  assert.equal(marketplace.version, '0.17.5')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
