@@ -84,6 +84,46 @@ test('routes already-satisfied red, blocked standard review and split reviewer s
   assert.deepEqual(node('high-review-join').input, ['status', 'findingsA', 'findingsB'])
 })
 
+test('owns repeated failure routes with fallback rules that node edges still override', async () => {
+  const { selectTransitions } = await import(
+    '../../../agent-graph-engineering/skills/agent-graph-engineering/scripts/graph-verify.mjs'
+  )
+  const graph = JSON.parse(await read('references/oracle-workflow.graph.json'))
+
+  assert.deepEqual(
+    graph.fallback.map(({ when, to }) => [when.equals, to]),
+    [
+      ['POLICY_GAP', 'draft-oracle'],
+      ['FAIL', 'failed'],
+      ['PRODUCT_DEFECT', 'implement-green'],
+      ['EVIDENCE_GAP', 'evidence-repair'],
+      ['HARNESS_DEFECT', 'evidence-repair'],
+    ],
+  )
+  // valid-red keeps its HARNESS_DEFECT self-loop as a node edge that beats the fallback rule.
+  assert.deepEqual(selectTransitions(graph, 'valid-red', { classification: 'HARNESS_DEFECT' }), ['valid-red'])
+  assert.deepEqual(selectTransitions(graph, 'review-decision', { classification: 'HARNESS_DEFECT' }), [
+    'evidence-repair',
+  ])
+  assert.deepEqual(selectTransitions(graph, 'implement-green', { classification: 'PRODUCT_DEFECT' }), [
+    'implement-green',
+  ])
+  assert.deepEqual(selectTransitions(graph, 'delivery-init', { classification: 'FAIL' }), ['failed'])
+
+  // ENVIRONMENT_DEFECT and NON_ORACLE_OPINION stay finding classifications but are not graph labels:
+  // nodes report FAIL with the reason in the ledger, and review-decision normalizes opinion-only
+  // verdicts to REVIEW_ACCEPTED, so an unnormalized output fails loudly instead of routing.
+  for (const source of graph.nodes) {
+    for (const label of ['ENVIRONMENT_DEFECT', 'NON_ORACLE_OPINION']) {
+      assert.doesNotMatch(source.task, new RegExp(`${label}(?!만)`))
+    }
+  }
+  assert.throws(
+    () => selectTransitions(graph, 'delivery-init', { classification: 'ENVIRONMENT_DEFECT' }),
+    /NO_TRANSITION|matches no edge/,
+  )
+})
+
 test('O26: backs reported verification with a run ledger, machine transitions and counted budgets', async () => {
   const skill = await read('SKILL.md')
 
@@ -269,11 +309,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.21.0')
+  assert.equal(version, '0.22.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.21.0')
+  assert.equal(marketplace.version, '0.22.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {

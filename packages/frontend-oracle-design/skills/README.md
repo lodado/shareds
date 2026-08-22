@@ -29,7 +29,7 @@ AI가 구현을 시작하기 전에 **무엇이 정답인지 먼저 잠그는** 
 
 위 5단계를 기계가 검사할 수 있게 옮긴 것이
 [`oracle-workflow.graph.json`](references/oracle-workflow.graph.json)입니다. 노드 18개,
-엣지 35개, fallback 규칙 3개, terminal 4개. 다음 노드는 Worker가 고르지 않고 컨트롤러가
+엣지 23개, fallback 규칙 5개, terminal 4개. 다음 노드는 Worker가 고르지 않고 컨트롤러가
 `graph-verify.mjs next`로 strict-equality 일치한 엣지만 활성화합니다.
 
 ```mermaid
@@ -55,7 +55,6 @@ flowchart TB
 
   G -->|IMPLEMENTED_GREEN_STANDARD| SR["standard-review<br/><i>agent · code-reviewer</i>"]
   G -->|IMPLEMENTED_GREEN_HIGH| FO["high-review-fanout<br/><i>tool · dispatch=all</i>"]
-  G -->|PRODUCT_DEFECT| G
 
   subgraph HIGH["High risk — 컨텍스트 분리된 이중 리뷰"]
     direction LR
@@ -67,32 +66,31 @@ flowchart TB
 
   SR -->|status=READY| RD["review-decision<br/><i>tool · 교집합 판정</i>"]
   J -->|status=READY| RD
-  RD -->|"REVIEW_ACCEPTED<br/>NON_ORACLE_OPINION"| FV["final-verify<br/><i>tool</i>"]
+  RD -->|REVIEW_ACCEPTED| FV["final-verify<br/><i>tool</i>"]
   FV -->|REVIEW_VERIFIED| RV(["review-verified<br/><i>Delivery 종료</i>"])
 
   SR -->|status=BLOCKED| E["evidence-repair<br/><i>agent · test-engineer</i>"]
-  G & RD & FV -->|"EVIDENCE_GAP<br/>HARNESS_DEFECT"| E
-  E -->|"EVIDENCE_READY<br/>PRODUCT_DEFECT"| G
-  E -->|HARNESS_DEFECT| E
-  RD & FV -->|PRODUCT_DEFECT| G
+  E -->|EVIDENCE_READY| G
 ```
 
-### 노드마다 반복하지 않는 세 경로
+### 반복 실패 경로는 fallback 규칙 5개가 소유
 
-`POLICY_GAP`·`ENVIRONMENT_DEFECT`·`FAIL`은 어느 노드에서 나오든 목적지가 같습니다.
-노드마다 엣지를 두면 21개가 되므로, 그래프 최상위 `fallback` 규칙 3개가 소유합니다.
-노드 전용 엣지가 있으면 그쪽이 우선하고, 어느 쪽도 일치하지 않으면 여전히
-`NO_TRANSITION`으로 멈춥니다.
+위 도식에 실패 화살표가 거의 없는 이유입니다. 어느 노드에서 나오든 목적지가 같은
+분류는 노드마다 엣지를 두지 않고 그래프 최상위 `fallback`이 한 번만 선언합니다.
+노드 전용 엣지가 있으면 그쪽이 우선하고(`valid-red`의 `HARNESS_DEFECT` 자기 재시도),
+어느 쪽도 일치하지 않으면 여전히 `NO_TRANSITION`으로 멈춥니다.
 
-| 분류                 | 뜻                             | 목적지                        | 이유                                   |
-| -------------------- | ------------------------------ | ----------------------------- | -------------------------------------- |
-| `POLICY_GAP`         | 카드에 없는 정책 판단이 필요함 | `draft-oracle`                | 정책은 카드만 소유 — 구현 중 신설 금지 |
-| `ENVIRONMENT_DEFECT` | 실행 환경이 깨짐               | `failed`                      | 조용한 우회 금지                       |
-| `FAIL`               | 복구 불가능한 실패             | `failed`                      | 마지막 오류와 runId를 ledger에 보존    |
-| `INVALID_RED`        | 테스트가 이미 통과함           | `draft-oracle`                | 카드 행이 현실과 어긋남 = 카드 delta   |
-| `PRODUCT_DEFECT`     | 제품 코드가 틀림               | `implement-green`             | 예산 안에서 구현 재시도                |
-| `EVIDENCE_GAP`       | 증거가 주장을 못 받침          | `evidence-repair`             | locator·fixture만 보정, 정책 불변      |
-| `HARNESS_DEFECT`     | 테스트 장치가 고장             | 자기 자신 · `evidence-repair` | 제품 탓으로 넘기지 않음                |
+| 분류             | 뜻                             | 목적지            | 이유                                   |
+| ---------------- | ------------------------------ | ----------------- | -------------------------------------- |
+| `POLICY_GAP`     | 카드에 없는 정책 판단이 필요함 | `draft-oracle`    | 정책은 카드만 소유 — 구현 중 신설 금지 |
+| `FAIL`           | 복구 불가능한 실패·환경 결함   | `failed`          | 마지막 오류와 runId를 ledger에 보존    |
+| `PRODUCT_DEFECT` | 제품 코드가 틀림               | `implement-green` | 예산 안에서 구현 재시도                |
+| `EVIDENCE_GAP`   | 증거가 주장을 못 받침          | `evidence-repair` | locator·fixture만 보정, 정책 불변      |
+| `HARNESS_DEFECT` | 테스트 장치가 고장             | `evidence-repair` | 제품 탓으로 넘기지 않음                |
+
+`ENVIRONMENT_DEFECT`와 `NON_ORACLE_OPINION`은 리뷰 finding 분류로만 남고 graph
+label이 아닙니다 — 환경 결함은 사유를 ledger에 남기고 `FAIL`로 보고하며, opinion만
+남은 판정은 `review-decision`이 `REVIEW_ACCEPTED`로 정규화합니다.
 
 ### 구조에 박아 둔 잠금 장치
 

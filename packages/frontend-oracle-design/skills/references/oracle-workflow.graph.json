@@ -8,8 +8,10 @@
   "context": ["request", "repositoryContext", "previousRevision"],
   "fallback": [
     { "when": { "field": "classification", "equals": "POLICY_GAP" }, "to": "draft-oracle" },
-    { "when": { "field": "classification", "equals": "ENVIRONMENT_DEFECT" }, "to": "failed" },
-    { "when": { "field": "classification", "equals": "FAIL" }, "to": "failed" }
+    { "when": { "field": "classification", "equals": "FAIL" }, "to": "failed" },
+    { "when": { "field": "classification", "equals": "PRODUCT_DEFECT" }, "to": "implement-green" },
+    { "when": { "field": "classification", "equals": "EVIDENCE_GAP" }, "to": "evidence-repair" },
+    { "when": { "field": "classification", "equals": "HARNESS_DEFECT" }, "to": "evidence-repair" }
   ],
   "nodes": [
     {
@@ -44,7 +46,7 @@
       "id": "delivery-init",
       "kind": "agent",
       "owner": "planner",
-      "task": "잠긴 Delivery source를 검증하고 조건부 reference를 로드한다. 설치된 $test를 명시적으로 호출한 뒤 oracle-run.mjs init으로 필수 run label, ledger, 상태와 예산을 초기화한다. classification은 READY, POLICY_GAP, ENVIRONMENT_DEFECT 또는 FAIL이다.",
+      "task": "잠긴 Delivery source를 검증하고 조건부 reference를 로드한다. 설치된 $test를 명시적으로 호출한 뒤 oracle-run.mjs init으로 필수 run label, ledger, 상태와 예산을 초기화한다. classification은 READY, POLICY_GAP 또는 FAIL이며, 환경 결함은 사유를 ledger에 남기고 FAIL로 보고한다.",
       "input": ["oraclePath", "oracleSha", "request"],
       "output": ["classification", "runState", "runId"],
       "writeScope": [".ai/oracles/**"],
@@ -54,7 +56,7 @@
       "id": "valid-red",
       "kind": "agent",
       "owner": "test-engineer",
-      "task": "테스트 파일을 쓰기 직전에 $test를 로드해 잠긴 카드의 실패 우선 테스트를 작성·실행한다. oracle-run.mjs ledger와 oracle-verify.mjs red가 인정한 경우에만 VALID_RED를 반환한다. 테스트가 잠긴 카드 행을 이미 만족해 빨갛지 않으면 INVALID_RED를 반환한다. 그 밖에는 POLICY_GAP, HARNESS_DEFECT, ENVIRONMENT_DEFECT 또는 FAIL을 반환하고 production은 수정하지 않는다.",
+      "task": "테스트 파일을 쓰기 직전에 $test를 로드해 잠긴 카드의 실패 우선 테스트를 작성·실행한다. oracle-run.mjs ledger와 oracle-verify.mjs red가 인정한 경우에만 VALID_RED를 반환한다. 테스트가 잠긴 카드 행을 이미 만족해 빨갛지 않으면 INVALID_RED를 반환한다. 그 밖에는 POLICY_GAP, HARNESS_DEFECT 또는 FAIL을 반환하고 production은 수정하지 않는다.",
       "input": ["oraclePath", "oracleSha", "runState"],
       "output": ["classification", "runId", "evidence"],
       "writeScope": ["**", "!.ai/agent-graphs/**"],
@@ -63,7 +65,7 @@
     {
       "id": "implement-green",
       "kind": "gate",
-      "task": "VALID_RED와 lock을 검증한 뒤 현재 실행 환경이 선택한 방식으로 최소 production 개선을 수행하고 필수 label을 oracle-run.mjs exec로 실행한 결과를 받는다. 이 Node는 단일·위임·병렬 구현 방식을 강제하지 않는다. High risk면 $test가 mutation kill·원복·재-GREEN까지 판정한다. 성공 시 risk에 따라 IMPLEMENTED_GREEN_STANDARD 또는 IMPLEMENTED_GREEN_HIGH를 반환하고, 그 밖에는 PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP, ENVIRONMENT_DEFECT 또는 FAIL을 반환한다.",
+      "task": "VALID_RED와 lock을 검증한 뒤 현재 실행 환경이 선택한 방식으로 최소 production 개선을 수행하고 필수 label을 oracle-run.mjs exec로 실행한 결과를 받는다. 이 Node는 단일·위임·병렬 구현 방식을 강제하지 않는다. High risk면 $test가 mutation kill·원복·재-GREEN까지 판정한다. 성공 시 risk에 따라 IMPLEMENTED_GREEN_STANDARD 또는 IMPLEMENTED_GREEN_HIGH를 반환하고, 그 밖에는 PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP 또는 FAIL을 반환한다.",
       "input": ["oraclePath", "oracleSha", "runState", "evidence"],
       "output": ["classification", "runId", "artifacts"],
       "writeScope": ["**", "!.ai/agent-graphs/**"],
@@ -73,7 +75,7 @@
       "id": "evidence-repair",
       "kind": "agent",
       "owner": "test-engineer",
-      "task": "$test 계약과 Oracle budget 안에서 locator, fixture, barrier 또는 evidence mapping만 최소 보정한다. 정책·assertion·production을 바꾸지 않는다. EVIDENCE_READY, HARNESS_DEFECT, PRODUCT_DEFECT, POLICY_GAP, ENVIRONMENT_DEFECT 또는 FAIL을 반환한다.",
+      "task": "$test 계약과 Oracle budget 안에서 locator, fixture, barrier 또는 evidence mapping만 최소 보정한다. 정책·assertion·production을 바꾸지 않는다. EVIDENCE_READY, HARNESS_DEFECT, PRODUCT_DEFECT, POLICY_GAP 또는 FAIL을 반환한다.",
       "input": ["oraclePath", "oracleSha", "runState", "findings"],
       "output": ["classification", "runId", "evidence"],
       "writeScope": ["**", "!.ai/agent-graphs/**"],
@@ -131,7 +133,7 @@
     {
       "id": "review-decision",
       "kind": "tool",
-      "task": "oracle-verify.mjs findings와 High-risk 교집합 규칙으로 review artifact를 판정한다. classification은 REVIEW_ACCEPTED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP, NON_ORACLE_OPINION, ENVIRONMENT_DEFECT 또는 FAIL이다.",
+      "task": "oracle-verify.mjs findings와 High-risk 교집합 규칙으로 review artifact를 판정한다. NON_ORACLE_OPINION만 남으면 finding artifact에는 그대로 두고 classification을 REVIEW_ACCEPTED로 정규화한다. classification은 REVIEW_ACCEPTED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP 또는 FAIL이다.",
       "input": ["oraclePath", "oracleSha", "findings"],
       "output": ["classification", "runId", "findings"],
       "writeScope": [".ai/oracles/**"],
@@ -140,7 +142,7 @@
     {
       "id": "final-verify",
       "kind": "tool",
-      "task": "lock, evidence, review와 모든 필수 run label을 다시 검증하고 oracle-run.mjs transition으로 REVIEW_VERIFIED를 기록한다. classification은 REVIEW_VERIFIED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP, ENVIRONMENT_DEFECT 또는 FAIL이다.",
+      "task": "lock, evidence, review와 모든 필수 run label을 다시 검증하고 oracle-run.mjs transition으로 REVIEW_VERIFIED를 기록한다. classification은 REVIEW_VERIFIED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP 또는 FAIL이다.",
       "input": ["oraclePath", "oracleSha", "runState", "findings"],
       "output": ["classification", "runId", "report"],
       "writeScope": [".ai/oracles/**"],
@@ -206,34 +208,9 @@
       "when": { "field": "classification", "equals": "IMPLEMENTED_GREEN_HIGH" }
     },
     {
-      "from": "implement-green",
-      "to": "implement-green",
-      "when": { "field": "classification", "equals": "PRODUCT_DEFECT" }
-    },
-    {
-      "from": "implement-green",
-      "to": "evidence-repair",
-      "when": { "field": "classification", "equals": "EVIDENCE_GAP" }
-    },
-    {
-      "from": "implement-green",
-      "to": "evidence-repair",
-      "when": { "field": "classification", "equals": "HARNESS_DEFECT" }
-    },
-    {
       "from": "evidence-repair",
       "to": "implement-green",
       "when": { "field": "classification", "equals": "EVIDENCE_READY" }
-    },
-    {
-      "from": "evidence-repair",
-      "to": "evidence-repair",
-      "when": { "field": "classification", "equals": "HARNESS_DEFECT" }
-    },
-    {
-      "from": "evidence-repair",
-      "to": "implement-green",
-      "when": { "field": "classification", "equals": "PRODUCT_DEFECT" }
     },
     { "from": "standard-review", "to": "review-decision", "when": { "field": "status", "equals": "READY" } },
     { "from": "standard-review", "to": "evidence-repair", "when": { "field": "status", "equals": "BLOCKED" } },
@@ -248,44 +225,9 @@
       "when": { "field": "classification", "equals": "REVIEW_ACCEPTED" }
     },
     {
-      "from": "review-decision",
-      "to": "final-verify",
-      "when": { "field": "classification", "equals": "NON_ORACLE_OPINION" }
-    },
-    {
-      "from": "review-decision",
-      "to": "implement-green",
-      "when": { "field": "classification", "equals": "PRODUCT_DEFECT" }
-    },
-    {
-      "from": "review-decision",
-      "to": "evidence-repair",
-      "when": { "field": "classification", "equals": "EVIDENCE_GAP" }
-    },
-    {
-      "from": "review-decision",
-      "to": "evidence-repair",
-      "when": { "field": "classification", "equals": "HARNESS_DEFECT" }
-    },
-    {
       "from": "final-verify",
       "to": "review-verified",
       "when": { "field": "classification", "equals": "REVIEW_VERIFIED" }
-    },
-    {
-      "from": "final-verify",
-      "to": "implement-green",
-      "when": { "field": "classification", "equals": "PRODUCT_DEFECT" }
-    },
-    {
-      "from": "final-verify",
-      "to": "evidence-repair",
-      "when": { "field": "classification", "equals": "EVIDENCE_GAP" }
-    },
-    {
-      "from": "final-verify",
-      "to": "evidence-repair",
-      "when": { "field": "classification", "equals": "HARNESS_DEFECT" }
     }
   ]
 }

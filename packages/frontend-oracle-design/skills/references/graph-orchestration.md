@@ -16,9 +16,13 @@ agent 재량 선택만 허용한다. 그래프 모드에서 스킬이나 graph v
 - 다음 경로는 Worker가 고르지 않는다. Controller가 `graph-verify.mjs next`를
   `--events events.jsonl`과 함께 실행해 strict-equality로 일치한 Edge만 활성화하고
   `maxSteps` 초과·join 준비를 기계 판정.
-- `POLICY_GAP`은 어느 Node에서 나오든 `draft-oracle`로, `ENVIRONMENT_DEFECT`와 `FAIL`은
-  `failed`로 간다. 이 세 경로는 Node마다 Edge를 두지 않고 그래프 `fallback`이 소유하며,
-  Node 전용 Edge가 있으면 그쪽이 우선한다.
+- 반복 실패 경로는 Node마다 Edge를 두지 않고 그래프 `fallback`이 소유한다 —
+  `POLICY_GAP`→`draft-oracle`, `FAIL`→`failed`, `PRODUCT_DEFECT`→`implement-green`,
+  `EVIDENCE_GAP`·`HARNESS_DEFECT`→`evidence-repair`. Node 전용 Edge가 있으면 그쪽이
+  우선한다(예: `valid-red`의 `HARNESS_DEFECT` 자기 재시도).
+- `ENVIRONMENT_DEFECT`와 `NON_ORACLE_OPINION`은 finding 분류로만 남고 graph label이
+  아니다. 환경 결함은 사유를 ledger에 남기고 `FAIL`로 보고하며, opinion만 남은 review
+  판정은 `review-decision`이 `REVIEW_ACCEPTED`로 정규화한다.
 - graph `maxSteps`는 runaway 상한일 뿐, `oracle-run.mjs budget` 판정을 대체하지 않는다.
 - graph Node 안에서 `$frontend-oracle-design` 재귀 호출 금지. 현재 로드된 계약과 조건부
   reference만 적용.
