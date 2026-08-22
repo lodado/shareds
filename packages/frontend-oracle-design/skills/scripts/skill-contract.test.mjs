@@ -243,11 +243,7 @@ test('requires automatic deterministic locking at delivery boundaries', async ()
 })
 
 test('locks all approved Delivery sources once instead of extending an existing lock', async () => {
-  const [skill, oracleCard, implementationLoop] = await Promise.all([
-    read('SKILL.md'),
-    readCard(),
-    readDelivery(),
-  ])
+  const [skill, oracleCard, implementationLoop] = await Promise.all([read('SKILL.md'), readCard(), readDelivery()])
 
   assert.match(skill, /Delivery.*lock.*미룬다/s)
   assert.match(skill, /architecture.*backend.*final lock.*1회/s)
@@ -315,11 +311,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.22.0')
+  assert.equal(version, '0.23.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.22.0')
+  assert.equal(marketplace.version, '0.23.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -637,11 +633,7 @@ test('O8-O10: reviews with the same changeability reference without turning tast
 })
 
 test('O2: 기존 Oracle Delivery gate를 유지한다', async () => {
-  const [skill, oracleCard, implementationLoop] = await Promise.all([
-    read('SKILL.md'),
-    readCard(),
-    readDelivery(),
-  ])
+  const [skill, oracleCard, implementationLoop] = await Promise.all([read('SKILL.md'), readCard(), readDelivery()])
 
   for (const contract of ['VALID_RED', 'oracle-lock.mjs', 'oracle-run.mjs', 'evidence.json']) {
     assert.match(`${skill}\n${oracleCard}\n${implementationLoop}`, new RegExp(contract.replace('.', '\\.')))
@@ -721,10 +713,7 @@ test('O7: 조건부 품질 계약과 human-first 보고를 안내한다', async 
 })
 
 test('O8: 카드 schema version 분기와 migration을 추가하지 않는다', async () => {
-  const [oracleCard, verifier] = await Promise.all([
-    readCard(),
-    read('scripts/oracle-verify.mjs'),
-  ])
+  const [oracleCard, verifier] = await Promise.all([readCard(), read('scripts/oracle-verify.mjs')])
 
   assert.doesNotMatch(oracleCard, /Oracle-Card-Version/)
   assert.doesNotMatch(verifier, /ORACLE_CARD_VERSION|cardSchemaVersion/)
@@ -780,6 +769,19 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
   assert.doesNotMatch(typeConstraints, /switch-exhaustiveness-check|`switch`/)
   assert.match(typeConstraints, /설치돼 있거나 도입이 승인된 경우만/)
   assert.doesNotMatch(typeConstraints, /단순 toggle을 위해 XState/)
+
+  // 과잉 타이핑도 미달만큼 FINDING이다 — 열린 key, 태그만 있는 union, 경계 밖 스키마
+  assert.match(typeConstraints, /ID·브랜드 문자열처럼 열린 도메인이면/)
+  assert.match(typeConstraints, /discriminant는 갈라지는 데이터가 있을 때 붙인다/)
+  // 예시 하나만 있으면 그 모양이 기본값이 된다 — object union 옆에 literal union 대조쌍 유지
+  assert.match(typeConstraints, /type PaymentBadge = 'unpaid' \| 'paid' \| 'refunded'/)
+  assert.match(typeConstraints, /위 두 예시 중 무엇을 베낄지 먼저 판정한다/)
+  assert.match(typeConstraints, /스키마는 경계에만 만든다/)
+  assert.match(typeConstraints, /규칙을 코드 주석으로 옮기지 않는다/)
+  assert.match(typeConstraints, /key는 \*\*분기하는 union 그 자체\*\*다/)
+  assert.match(typeConstraints, /라벨 맵이 필요하다는 사실은 태그 객체를 만들 근거가 아니다/)
+  assert.match(typeConstraints, /\*\*행 하나가 상태 하나가 아니다\.\*\*/)
+  assert.match(typeConstraints, /필드도 같은 규칙이다/)
 })
 
 test('type-environment: pins compiler environment once per repo and protects contract files', async () => {
@@ -921,7 +923,9 @@ test('declares every reference as a loadable graph node with resolvable edges', 
   const entries = await readdir(join(skillDirectory, 'references'), { recursive: true, withFileTypes: true })
   const files = entries
     .filter((entry) => entry.isFile())
-    .map((entry) => join(entry.parentPath ?? entry.path, entry.name).slice(join(skillDirectory, 'references').length + 1))
+    .map((entry) =>
+      join(entry.parentPath ?? entry.path, entry.name).slice(join(skillDirectory, 'references').length + 1),
+    )
     .map((relative) => `references/${relative}`)
   const nodePaths = new Set(graph.nodes.map((node) => node.path))
   for (const file of files) {
@@ -1070,7 +1074,10 @@ test('inlines the required reference reads into the mode steps instead of a sepa
   const designOnly = skill.slice(skill.indexOf('### Design-only'), skill.indexOf('### Delivery'))
   const delivery = skill.slice(skill.indexOf('### Delivery'), skill.indexOf('## 피드백 라우팅'))
 
-  assert.match(designOnly, /1\. \[`common\.md`\][^\n]*\n\s*\[`card\/policy-sources\.md`\][^\n]*를 읽는다 → `Outcome Brief`/)
+  assert.match(
+    designOnly,
+    /1\. \[`common\.md`\][^\n]*\n\s*\[`card\/policy-sources\.md`\][^\n]*를 읽는다 → `Outcome Brief`/,
+  )
   assert.match(designOnly, /7\. \[`card\/risk-grill\.md`\]/)
   assert.match(designOnly, /\[`bva\.md`\]/)
   assert.match(designOnly, /\[`card\/card-format\.md`\]/)

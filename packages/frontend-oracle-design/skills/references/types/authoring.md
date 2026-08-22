@@ -46,14 +46,27 @@ recursive)는 [`api-surface.md`](api-surface.md)의 격리 조건을 만족할 �
 아니라 **동일한 사실을 둘 이상의 위치가 소유하는지**다. 하나의 정책 사실을
 schema와 interface, 상수와 union이 동시에 소유하면 두 권위가 어긋난다.
 
+discriminated union은 **멤버마다 딸린 데이터가 실제로 다를 때** 쓴다. 아래 두 타입은
+같은 도메인의 서로 다른 사실을 표현하며, 어느 쪽을 고를지는 취향이 아니라 이 조건이
+정한다.
+
 ```typescript
+// object union — editing에만 fieldErrors, submitting에만 requestId가 있다.
+// 태그가 그 필드들의 유효 범위를 지킨다.
 type PaymentState =
   | { status: 'editing'; amount: number; fieldErrors: FieldErrors }
   | { status: 'submitting'; amount: number; requestId: string }
   | { status: 'success'; paymentId: string }
   | { status: 'failure'; amount: number; reason: PaymentFailure }
+
+// literal union — 딸린 데이터가 없다. 배지 문구·비활성 여부는 소비 지점이 정한다.
+// { kind: 'paid' } 같은 wrapper로 감싸도 새로 막히는 잘못된 코드는 없다.
+type PaymentBadge = 'unpaid' | 'paid' | 'refunded'
 ```
 
+- 위 두 예시 중 무엇을 베낄지 먼저 판정한다. 태그 객체는 멤버 **둘 이상**이 자기만의
+  필드를 가질 때만이고, 그렇지 않으면 literal union이다. 필드가 없는 멤버가 대부분인
+  object union은 union을 흉내 낸 문자열이다.
 - 단일 `status` 문자열 literal discriminant를 쓴다. boolean 병렬 flag
   (`isLoading`·`isError`·`isSuccess`)로 같은 흐름을 표현하지 않는다.
 - 각 상태의 필드는 **그 상태에서만 의미 있는 값**만 담는다. 전 상태 공통 optional
@@ -69,6 +82,14 @@ type PaymentState =
   type State = { [K in keyof Steps]: { status: K } & Steps[K] }[keyof Steps]
   const stepLabel = { editing: '입력 중', submitting: '처리 중' } satisfies Record<keyof Steps, string>
   ```
+- **discriminant는 갈라지는 데이터가 있을 때 붙인다.** 원본 상태를 조합해 만드는
+  파생 계산(`resolve*`)의 반환은 거의 언제나 literal union이다 — 태그를 씌우면
+  호출부마다 `.kind`를 벗기는 비용만 늘고 막히는 잘못된 코드는 없다.
+- **스키마는 경계에만 만든다.** 앱 안에서 사용자 조작으로 생성되는 유한 값은
+  파싱할 외부 입력이 아니므로 `as const` 상수나 literal union으로 선언한다. zod는
+  그 값이 storage·URL·응답에서 **돌아오는 읽기 지점**에 붙인다. 내부 생성 값에
+  스키마를 만들어 놓고 정작 읽기 지점이 `JSON.parse` 결과를 그대로 신뢰하면
+  경계를 정반대로 잡은 것이며 `FINDING`이다.
 - 실패는 카드가 subtype을 구분하면 (`network`·`validation`·`5xx`) `reason`도
   discriminated union으로 만든다. 문자열 하나로 뭉개지 않는다. 예상 가능한 실패를
   반환값으로 처리해야 하면 `Result<T, ErrorUnion>` 형태의 닫힌 union을 쓰고,
@@ -87,8 +108,10 @@ type PaymentState =
 런타임보다 강한 거짓 계약이다.
 
 - **`Record<K, V>`는 totality 계약이다** — 모든 `K`가 결과에 존재한다는 뜻이다.
-  구현이 관찰된 key만 채우는 sparse lookup(`groupBy` 결과 등)이면
-  `Partial<Record<K, V>>` 또는 `Map<K, V>`를 쓴다. 전체 key를 사전 순회로
+  구현이 관찰된 key만 채우는 sparse lookup(`groupBy` 결과 등)이면, key 도메인이
+  유한 union일 때 `Partial<Record<K, V>>`를, ID·브랜드 문자열처럼 열린 도메인이면
+  `Map<K, V>`를 쓴다. 열린 key에 `Partial<Record<K, V>>`를 씌우면 `Map`이 이미
+  주는 `V | undefined` 조회 계약을 손으로 다시 만들 뿐이다. 전체 key를 사전 순회로
   초기화하거나 누락 key에 기본값을 채울 때만 `Record<K, V>`다. 이것은
   `Partial<DomainEntity>` mutation 금지와 다른 문제다 — 전자는 연산 의미를 잃는
   patch고, 후자는 일부 key만 런타임에 존재한다는 결과 표현이다.
@@ -115,12 +138,19 @@ type PaymentState =
 dependency 없는 수단부터 쓰고, 라이브러리는 조건이 맞을 때만 도입한다.
 
 - 기본 (항상, dependency 불필요): 상태별 early return·guard chain 뒤 공용 `assertNever`
-- 선언적 매핑 (상태별 결과가 정적 값·render 함수일 때): lookup 객체 + `satisfies Record<State['status'], ...>`
+- 선언적 매핑 (상태별 결과가 정적 값·render 함수일 때): lookup 객체 +
+  `satisfies Record<Status, ...>`. key는 **분기하는 union 그 자체**다 — 문자열
+  literal union이면 `Record<DisplayStatus, string>`, discriminated object union일
+  때만 `Record<State['status'], string>`처럼 indexed access로 태그를 꺼낸다.
 - 라이브러리 (**설치돼 있거나 도입이 승인된 경우만**): `ts-pattern`의 `.exhaustive()`
 
 variant별 설정(라벨·메시지·핸들러·권한)도 `satisfies Record<Union, Config>`로
 전체 union 커버를 강제한다. 새 variant 추가 시 모든 필수 소비 지점이 컴파일
 오류로 드러나야 하며, catch-all 기본 분기로 누락을 숨기지 않는다.
+
+**라벨 맵이 필요하다는 사실은 태그 객체를 만들 근거가 아니다.** `satisfies Record`는
+literal union에 그대로 걸린다. 배지 문구·권한 맵을 쓰려고 `{ kind: 'confirmed' }`
+같은 wrapper를 만들면 union 판정을 뒤집는 것이므로 위 discriminant 규칙이 우선한다.
 
 타입 **형태** 일부는 기계로 잡는다. `@lodado/eslint-config/local-rules`를 쓰는
 레포는 다음 규칙이 이미 켜져 있다.
@@ -149,6 +179,14 @@ assertion. 마지막은 TypeScript가 점진적 객체 구성을 증명하지 �
 constraint처럼 `any`가 generic 연결에만 쓰이고 값으로 읽히거나 공개 반환형·Props로
 누출되지 않으면 `types/internal`·adapter 안에서만 허용한다. `unknown`으로 되는
 자리는 `unknown`을 쓴다.
+
+## 규칙을 코드 주석으로 옮기지 않는다
+
+이 문서의 규칙과 그 근거(`Record`는 totality 계약이다, sparse면 `Map`이다)는 왜
+그 타입을 골랐는지에 대한 설명이지 코드가 담을 내용이 아니다. 선택 사유는
+Implementation Decision에 적고, 코드 주석은 타입으로 표현할 수 없는 도메인 제약과
+그 근거 카드 행 ID(`// P6: 취소는 되돌릴 수 없다`)만 남긴다. 규칙 문장을 그대로
+붙여 넣은 주석은 리뷰에서 삭제 대상이다.
 
 타입 오류가 나면 구현이 계약을 위반했는지, 계약이 실제 요구사항과 다른지 먼저
 판정한다. 근거 없이 필수 필드를 optional로 바꾸거나 union을 `string`으로 넓혀서

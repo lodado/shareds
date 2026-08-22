@@ -33,6 +33,13 @@
   `FINDING`이다. sparse lookup 결과의 `Partial<Record<K, V>>`는
   `Partial<DomainEntity>` mutation 금지의 대상이 아니다 — 둘을 같은 규칙으로
   금지하면 오적용이다.
+- ID·브랜드 문자열처럼 열린 key 도메인에 `Partial<Record<K, V>>`를 썼거나, 자기
+  필드를 가진 멤버가 하나 이하인데 `{ kind }` 태그 객체 union으로 만들었거나,
+  앱 내부에서 생성되는 값에 스키마를 두고 정작 storage·URL·응답 읽기 지점을 파싱
+  없이 신뢰하면 `FINDING`이다.
+- 타입 선택 규칙과 그 근거를 코드 주석으로 옮겨 적었으면 `FINDING`이다. 선택
+  사유는 Implementation Decision이 소유하고, 주석은 카드 행 ID를 인용한 도메인
+  제약만 남긴다.
 - 필수 invariant를 검사하지 않는 type predicate, runtime key 변환 없는
   key-remapping 반환형, `satisfies`·`as const`·annotation·excess property check를
   runtime 검증이나 sanitization으로 보고한 것, 단일 권위 없이 선언 줄 수만 줄이는
@@ -41,6 +48,8 @@
   위치 사이 관계를 만들지 않거나 일반 제품 호출부가 type argument를 반복해야 하면
   `FINDING`이다. config·schema 정의 경계의 1회 고정과 기존 library generic 사용은
   대상이 아니다.
+- 화면·복구 경로가 같은 `O*` 행들을 별도 상태로 쪼갰거나, 카드가 구분하지 않는
+  값을 상태 필드로 발명했으면 `FINDING`이다. 구분이 필요하면 `POLICY_GAP`이다.
 - 시간축 비결정성을 타입만으로 "해결됨" 처리했으면 `FINDING`이다.
 - 생성 후 typecheck를 실행했을 뿐인데 생성 자체를 결정론화했다고 보고하면
   `FINDING`이다.
