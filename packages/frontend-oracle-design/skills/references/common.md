@@ -47,14 +47,14 @@ reference는 자기 단계의 특칙만 더하고, 이 문서와 어긋나면 �
 테스트·리뷰·구현의 새 관찰마다 주원인 하나를 기록하고 아래 경로만 사용한다. 현재
 구현·test 관찰·reviewer 선호는 분류 증거일 뿐 정책 출처가 아니다.
 
-| 분류                 | 뜻                                                     | 라우팅                                                        |
-| -------------------- | ------------------------------------------------------ | ------------------------------------------------------------- |
-| `POLICY_GAP`         | 결과를 바꾸는 정책이 카드에 없거나 미결               | 카드 현재본과 질문을 출력하고 `NEEDS_DECISION`                |
-| `EVIDENCE_GAP`       | 잠긴 카드 범위 안의 테스트·매핑 누락                  | 누락된 테스트·reviewer 매핑만 추가                            |
-| `HARNESS_DEFECT`     | locator·fixture·barrier 등 테스트 기계 결함           | 허용 항목만 공용 2회 예산(`budget --spend harness`)으로 보정  |
-| `PRODUCT_DEFECT`     | 잠긴 계약과 실제 구현의 불일치                        | 결정론 테스트의 `VALID_RED` 뒤 production 개선 예산 사용      |
-| `ENVIRONMENT_DEFECT` | 도구·환경 문제로 판정 불가                            | production을 건드리지 않고 실제 원인과 함께 `FAIL`            |
-| `NON_ORACLE_OPINION` | 출처 없는 선호·취향                                   | 근거와 함께 기록, 완료 차단이나 정책 변경에 사용하지 않음     |
+| 분류                 | 뜻                                          | 라우팅                                                       |
+| -------------------- | ------------------------------------------- | ------------------------------------------------------------ |
+| `POLICY_GAP`         | 결과를 바꾸는 정책이 카드에 없거나 미결     | 카드 현재본과 질문을 출력하고 `NEEDS_DECISION`               |
+| `EVIDENCE_GAP`       | 잠긴 카드 범위 안의 테스트·매핑 누락        | 누락된 테스트·reviewer 매핑만 추가                           |
+| `HARNESS_DEFECT`     | locator·fixture·barrier 등 테스트 기계 결함 | 허용 항목만 공용 2회 예산(`budget --spend harness`)으로 보정 |
+| `PRODUCT_DEFECT`     | 잠긴 계약과 실제 구현의 불일치              | 결정론 테스트의 `VALID_RED` 뒤 production 개선 예산 사용     |
+| `ENVIRONMENT_DEFECT` | 도구·환경 문제로 판정 불가                  | production을 건드리지 않고 실제 원인과 함께 `FAIL`           |
+| `NON_ORACLE_OPINION` | 출처 없는 선호·취향                         | 근거와 함께 기록, 완료 차단이나 정책 변경에 사용하지 않음    |
 
 - revision mismatch는 피드백 분류 대상이 아니다. 기존 증거를 즉시 폐기하고 lock
   규칙대로 `NEEDS_DECISION` 또는 `FAIL`로 이동한다.

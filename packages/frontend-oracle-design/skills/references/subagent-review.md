@@ -60,15 +60,15 @@ reviewer도 정책을 새로 정하지 않는다. deterministic comparison이 �
 reviewer는 링크된 파일을 직접 **전부** 읽고, digest로 어떤 revision의 기준을 읽었는지
 고정된다. 기준 본문을 요약·발췌해 프롬프트에 넣는 것은 입력 고정 원칙 위반이다.
 
-| 조건 (diff 기준)                          | 리뷰 포인트 파일                                                 |
-| ----------------------------------------- | ---------------------------------------------------------------- |
-| 항상                                      | [`changeability.md`](changeability.md) — 다섯 축 판정 기준       |
-| frontend production 변경                  | [`frontend-implementation.md`](frontend-implementation.md)       |
-| 타입·상태 계약 생성·변경                  | [`types/review-criteria.md`](types/review-criteria.md)           |
-| FSD 레포                                  | [`fsd.md`](fsd.md) — 「자주 나오는 위반」 표                     |
-| Design Intent 포함                        | [`visual-design.md`](visual-design.md) — 증거 계층·Delivery 책임 |
-| backend·DB·data-access 변경               | [`backend.md`](backend.md) — 경계·검증 절                        |
-| 성능 요구·개선 claim                      | [`performance.md`](performance.md)                               |
+| 조건 (diff 기준)            | 리뷰 포인트 파일                                                 |
+| --------------------------- | ---------------------------------------------------------------- |
+| 항상                        | [`changeability.md`](changeability.md) — 다섯 축 판정 기준       |
+| frontend production 변경    | [`frontend-implementation.md`](frontend-implementation.md)       |
+| 타입·상태 계약 생성·변경    | [`types/review-criteria.md`](types/review-criteria.md)           |
+| FSD 레포                    | [`fsd.md`](fsd.md) — 「자주 나오는 위반」 표                     |
+| Design Intent 포함          | [`visual-design.md`](visual-design.md) — 증거 계층·Delivery 책임 |
+| backend·DB·data-access 변경 | [`backend.md`](backend.md) — 경계·검증 절                        |
+| 성능 요구·개선 claim        | [`performance.md`](performance.md)                               |
 
 조건에 해당하지 않는 기준 파일은 등록하지 않는다 — reviewer도 그래프 로딩 규칙을
 따르며 무관한 기준으로 finding을 만들지 않는다. 조건→노드 매핑은
