@@ -7,7 +7,7 @@ SKILL.md 전문과 판정 계약을 활성화한다. 파일을 참고만 하는 
 못 찾으면 `FAIL`. `$test`의 Oracle 게이트·테스트 작성·실행·`VALID_RED` 판정·보정
 예산을 그대로 따른다. Delivery 노드들은 production 구현과 자가피드백만 추가한다.
 frontend production 수정 시
-[`frontend-implementation.md`](../frontend-implementation.md)도 전부 읽는다.
+[`frontend/decisions.md`](../frontend/decisions.md)·[`frontend/authoring.md`](../frontend/authoring.md)도 전부 읽는다.
 
 **TDD 우선.** `ORACLE_READY` 뒤 테스트 먼저 작성·실행, `VALID_RED` 확보 전 production
 작성·수정 금지.

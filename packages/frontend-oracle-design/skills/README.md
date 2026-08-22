@@ -123,9 +123,10 @@ flowchart LR
   BVA --> DR
   DL --> DGR["delivery-green-review"]
   COMMON --> CH["changeability"]
-  COMMON --> FI["frontend-implementation"]
+  COMMON --> FD["frontend-decisions"] --> FA["frontend-authoring"]
+  FQ["frontend-quality"] --> DGR
   CH --> DID["delivery-implementation-decision"]
-  FI --> DID
+  FA --> DID
   COMMON --> SR2["subagent-review"] --> TRC["types-review-criteria"]
   CH --> SR2
   COMMON --> TSL["types-state-ladder"] --> TA["types-authoring"] --> TAS["types-api-surface"]

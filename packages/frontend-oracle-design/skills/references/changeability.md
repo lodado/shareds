@@ -238,8 +238,8 @@ memoization·cache·lazy loading과 단일 request를 위한 global state다.
 
 이 문서는 변경 비용의 의미와 근거만 소유한다.
 
-- React runtime 기준은 [`frontend-implementation.md`](frontend-implementation.md)가
-  소유한다.
+- React runtime 기준은 [`frontend/decisions.md`](frontend/decisions.md)와
+  [`frontend/authoring.md`](frontend/authoring.md)가 소유한다.
 - Implementation Decision의 경로·필드·작성 시점은
   [`delivery/implementation-decision.md`](delivery/implementation-decision.md)가 소유한다.
 - `PASS | FINDING | N/A`, finding router와 최소 수정 절차는

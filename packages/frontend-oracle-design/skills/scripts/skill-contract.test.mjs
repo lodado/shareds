@@ -23,6 +23,11 @@ const DELIVERY_NODE_FILES = [
   'references/delivery/implementation-decision.md',
   'references/delivery/green-review.md',
 ]
+const FRONTEND_NODE_FILES = [
+  'references/frontend/decisions.md',
+  'references/frontend/authoring.md',
+  'references/frontend/quality.md',
+]
 const TYPES_NODE_FILES = [
   'references/types/state-ladder.md',
   'references/types/authoring.md',
@@ -38,6 +43,7 @@ async function readAll(relativePaths) {
 const readCard = () => readAll(CARD_NODE_FILES)
 const readDelivery = () => readAll(DELIVERY_NODE_FILES)
 const readTypes = () => readAll(TYPES_NODE_FILES)
+const readFrontend = () => readAll(FRONTEND_NODE_FILES)
 
 test('runs the Oracle contract through the bundled deterministic workflow graph', async () => {
   const [skill, graphOrchestration, graphSource] = await Promise.all([
@@ -332,7 +338,7 @@ test('loads the performance reference only for measured performance claims', asy
   const [skill, performance, frontendImplementation] = await Promise.all([
     read('SKILL.md'),
     read('references/performance.md'),
-    read('references/frontend-implementation.md'),
+    readFrontend(),
   ])
 
   assert.match(skill, /references\/performance\.md/)
@@ -347,7 +353,8 @@ test('loads the performance reference only for measured performance claims', asy
   assert.match(performance, /가장 작은 병목만/)
   assert.match(performance, /P95\/P99 측정을 모든 프로젝트에 강제하지 않는다/)
   assert.match(performance, /`POLICY_GAP`으로 `NEEDS_DECISION`/)
-  assert.match(performance, /frontend-implementation\.md/)
+  assert.match(performance, /frontend\/quality\.md/)
+  assert.match(performance, /frontend\/decisions\.md/)
   assert.match(frontendImplementation, /performance\.md/)
 })
 
@@ -420,7 +427,7 @@ test('defines the FSD contract and wires it through loading, architecture, imple
     read('SKILL.md'),
     read('references/fsd.md'),
     read('references/architecture-contract.md'),
-    read('references/frontend-implementation.md'),
+    readFrontend(),
     read('references/subagent-review.md'),
     read('references/backend.md'),
   ])
@@ -459,7 +466,7 @@ test('gates approved hook encapsulation and reviews UI/business responsibility b
   const [skill, architectureContract, frontendImplementation, subagentReview] = await Promise.all([
     read('SKILL.md'),
     read('references/architecture-contract.md'),
-    read('references/frontend-implementation.md'),
+    readFrontend(),
     read('references/subagent-review.md'),
   ])
 
@@ -493,7 +500,7 @@ test('loads visual design guidance only for UI-shaping work and carries its cont
     read('SKILL.md'),
     read('references/visual-design.md'),
     readCard(),
-    read('references/frontend-implementation.md'),
+    readFrontend(),
     read('references/subagent-review.md'),
   ])
 
@@ -543,7 +550,7 @@ test('O1-O7: loads one detailed changeability reference before implementation de
   const [skill, changeability, frontendImplementation, implementationLoop] = await Promise.all([
     read('SKILL.md'),
     read('references/changeability.md'),
-    read('references/frontend-implementation.md'),
+    readFrontend(),
     readDelivery(),
   ])
 
@@ -571,7 +578,8 @@ test('O1-O7: loads one detailed changeability reference before implementation de
   assert.doesNotMatch(changeability, /^## React 구현 교차 점검$/m)
   assert.doesNotMatch(changeability, /^## Implementation Decision 형식$/m)
   assert.doesNotMatch(changeability, /^## Reviewer 판정과 최소 수정$/m)
-  assert.match(changeability, /frontend-implementation\.md/)
+  assert.match(changeability, /frontend\/decisions\.md/)
+  assert.match(changeability, /frontend\/authoring\.md/)
   assert.match(changeability, /delivery\/implementation-decision\.md/)
   assert.match(changeability, /subagent-review\.md/)
 
@@ -693,7 +701,7 @@ test('O7: 조건부 품질 계약과 human-first 보고를 안내한다', async 
   const [skill, oracleCard, frontendImplementation, implementationLoop, architecture, review] = await Promise.all([
     read('SKILL.md'),
     readCard(),
-    read('references/frontend-implementation.md'),
+    readFrontend(),
     readDelivery(),
     read('references/architecture-contract.md'),
     read('references/subagent-review.md'),
@@ -726,7 +734,7 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
   const [skill, oracleCard, frontendImplementation, typeConstraints, verifier] = await Promise.all([
     read('SKILL.md'),
     readCard(),
-    read('references/frontend-implementation.md'),
+    readFrontend(),
     readTypes(),
     read('scripts/oracle-verify.mjs'),
   ])
@@ -808,13 +816,13 @@ test('type-environment: pins compiler environment once per repo and protects con
 
 test('prefers Suspense and Error Boundary over in-component loading branches', async () => {
   const [frontendImplementation, typeConstraints, subagentReview] = await Promise.all([
-    read('references/frontend-implementation.md'),
+    readFrontend(),
     readTypes(),
     read('references/subagent-review.md'),
   ])
 
   assert.match(typeConstraints, /로딩·로드 실패의 기본은 컴포넌트 분기가 아니라 경계다/)
-  assert.match(typeConstraints, /frontend-implementation\.md.*3절이 소유/s)
+  assert.match(typeConstraints, /frontend\/decisions\.md.*3절이 소유/s)
   assert.doesNotMatch(typeConstraints, /경계로 올려 컴포넌트에서 제거할 수 있고/)
   assert.match(typeConstraints, /무조건 실행되는 첫 조회의 loading·error를 경계로 올리지 않고/)
 
@@ -825,10 +833,41 @@ test('prefers Suspense and Error Boundary over in-component loading branches', a
   assert.match(subagentReview, /types\/review-criteria\.md/)
 })
 
+test('reads load conditions at the decision point, not at the write stage', async () => {
+  const [skill, typeConstraints, graphSource] = await Promise.all([
+    read('SKILL.md'),
+    readTypes(),
+    read('references/reference-graph.json'),
+  ])
+  const graph = JSON.parse(graphSource)
+  const byId = new Map(graph.nodes.map((node) => [node.id, node]))
+
+  // 범용 규칙 하나가 모든 노드의 when 해석을 소유한다
+  assert.match(graph.entryContract.loadConditionRule, /산출물 시점이 아니라 결정 시점/)
+  assert.match(graph.entryContract.loadConditionRule, /애매하면 로드한다/)
+  assert.match(graph.entryContract.loadConditionRule, /로드를 건너뛸지는 판정 대상이 아니다/)
+  assert.match(skill, /`when`은 산출물 시점이 아니라 결정 시점으로 읽는다/)
+  assert.match(skill, /조건 해당\s*\n?\s*여부가 애매하면 로드한다/)
+
+  // 설계 단계에 필요한 노드를 쓰기 단계에만 gate하지 않는다 — 이전 실패 모드
+  for (const id of ['frontend-decisions', 'frontend-authoring', 'changeability', 'fsd']) {
+    assert.doesNotMatch(
+      byId.get(id).when,
+      /^(Delivery|production|VALID_RED)/,
+      `${id} must not gate solely on the write stage`,
+    )
+  }
+
+  // 판정표는 requires 엣지로 딸려온다 — 조건 해석 여지 자체를 없앤다
+  assert.ok(byId.get('types-state-ladder').requires.includes('frontend-decisions'))
+  assert.match(skill, /state-ladder\.md\).*frontend\/decisions\.md/)
+  assert.match(typeConstraints, /판정표를 읽기 전에 로딩 수단을 고르지\s*\n?\s*않는다/)
+})
+
 test('keeps client state data-only and hands actions back beside it', async () => {
   const [typeConstraints, frontendImplementation, subagentReview] = await Promise.all([
     readTypes(),
-    read('references/frontend-implementation.md'),
+    readFrontend(),
     read('references/subagent-review.md'),
   ])
 

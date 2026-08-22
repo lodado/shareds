@@ -7,7 +7,7 @@ reference다. metric·threshold는 승인된 성능 계약이나 사용자 답�
 되며, 없으면 `POLICY_GAP`으로 `NEEDS_DECISION`.
 
 측정 명령·baseline/after run·`performance` 필수 label은
-[`frontend-implementation.md`](frontend-implementation.md) 7절과
+[`frontend/quality.md`](frontend/quality.md)의 성능·품질 확인 절과
 [`delivery/green-review.md`](delivery/green-review.md)의 GREEN 게이트가 소유한다. 이
 문서는 문제 분류·원인 확인·trade-off 판단만 소유한다.
 
@@ -40,7 +40,7 @@ reference다. metric·threshold는 승인된 성능 계약이나 사용자 답�
 - 모든 개선은 비용이 있다: 메모리, 코드량, bundle, 복잡성, 유지보수. 감수한
   비용을 Implementation Decision의 Performance 항목에 trade-off로 기록한다.
 - render 파생 값을 effect+setState 연쇄로 만들지 않는다 —
-  [`frontend-implementation.md`](frontend-implementation.md)의 상태 소유권 표를
+  [`frontend/decisions.md`](frontend/decisions.md)의 상태 소유권 표를
   따른다.
 
 ## 4. 검증

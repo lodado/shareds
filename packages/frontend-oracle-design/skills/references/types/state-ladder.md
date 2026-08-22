@@ -8,7 +8,7 @@ Props·boundary 타입의 형태를 새로 만들거나 바꿀 때 사용한다.
 상태나 전이가 필요해지면 발명하지 말고 `POLICY_GAP`으로 `NEEDS_DECISION`에 돌아간다.
 
 권위 순서는 [`common.md`](../common.md)의 공통 우선순위와
-[`frontend-implementation.md`](../frontend-implementation.md)를 따른다.
+[`frontend/decisions.md`](../frontend/decisions.md)를 따른다.
 이 문서의 도구·라이브러리 선택은 구현 휴리스틱이며 정책 출처가 아니다.
 
 모든 설계는 다음 질문으로 판정한다.
@@ -62,8 +62,10 @@ union 작성은 3단이다. 1·2단에서 끝나는 문제에 3단을 쓰지 않
    **로딩·로드 실패의 기본은 컴포넌트 분기가 아니라 경계다.** 무조건 실행되는 첫
    조회는 `useSuspenseQuery`를 기본으로 두고 loading·error 분기를 국소
    `<Suspense>`와 Error Boundary로 올려 컴포넌트 본문에서 제거한다. 상황별 판정
-   표는 [`frontend-implementation.md`](../frontend-implementation.md) 3절이 소유하며
-   이 문서가 그 기본값을 덮지 않는다. 조건부 query·placeholder·취소 제약처럼
+   표는 [`frontend/decisions.md`](../frontend/decisions.md) 3절이 소유하며
+   이 문서가 그 기본값을 덮지 않는다. **판정표를 읽기 전에 로딩 수단을 고르지
+   않는다** — 익숙한 API를 먼저 집으면 그 API의 제약이 요구사항인 것처럼 굳어
+   나머지 후보를 스스로 실격시키게 된다. 조건부 query·placeholder·취소 제약처럼
    경계로 올릴 수 없는 나머지에만 분기를 남기고, 그때도 자작 union 없이 라이브러리
    union에 ts-pattern을 직접 물린다
    (`match(mutation).with({ status: 'error', error: { code: 'CONFLICT' } }, …)`).

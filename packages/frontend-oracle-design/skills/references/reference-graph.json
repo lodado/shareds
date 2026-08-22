@@ -6,7 +6,8 @@
   "entryContract": {
     "firstToolCall": "lane 진입 노드 1개 Read — risk=Low면 low-fast-path, 그 외 common",
     "responseHeader": "risk=<Low|Medium|High> lane=<low-fast-path|oracle> nodes=[실제로 Read 한 노드 id]",
-    "appliesTo": "구현 요청과 설명·플랜 전용 요청 모두"
+    "appliesTo": "구현 요청과 설명·플랜 전용 요청 모두",
+    "loadConditionRule": "when은 산출물 시점이 아니라 결정 시점으로 읽는다 — 그 노드가 소유한 결정을 내리는 순간 로드하며, 파일에 쓰지 않고 예시·구조·플랜으로만 답하는 경우도 같다. 해당 여부가 애매하면 로드한다. 로드를 건너뛸지는 판정 대상이 아니다."
   },
   "lanes": [
     {
@@ -20,7 +21,7 @@
   ],
   "reviewPoints": [
     { "when": "항상", "nodes": ["changeability"] },
-    { "when": "frontend production 변경", "nodes": ["frontend-implementation"] },
+    { "when": "frontend production 변경", "nodes": ["frontend-decisions", "frontend-authoring"] },
     { "when": "타입·상태 계약 생성·변경", "nodes": ["types-review-criteria"] },
     { "when": "FSD 레포", "nodes": ["fsd"] },
     { "when": "Design Intent 포함", "nodes": ["visual-design"] },
@@ -92,25 +93,37 @@
       "id": "delivery-implementation-decision",
       "path": "references/delivery/implementation-decision.md",
       "when": "VALID_RED 뒤 production 수정 직전",
-      "requires": ["changeability", "frontend-implementation"]
+      "requires": ["changeability", "frontend-authoring"]
     },
     {
       "id": "delivery-green-review",
       "path": "references/delivery/green-review.md",
       "when": "셀프피드백·GREEN·review 전이",
-      "requires": ["delivery-ledger"]
+      "requires": ["delivery-ledger", "frontend-quality"]
     },
     {
       "id": "changeability",
       "path": "references/changeability.md",
-      "when": "production 수정 전·독립 리뷰",
+      "when": "구현 방식·경계·공통화를 고르기 전(production 수정 포함)·독립 리뷰",
       "requires": ["common"]
     },
     {
-      "id": "frontend-implementation",
-      "path": "references/frontend-implementation.md",
-      "when": "frontend production 수정 전",
+      "id": "frontend-decisions",
+      "path": "references/frontend/decisions.md",
+      "when": "frontend 구현 수단을 고르기 전 — 로딩·오류 경계 선택, 상태 소유권 배치, 실행 위치 결정. production 수정은 그 결정의 한 시점일 뿐이다",
       "requires": ["common"]
+    },
+    {
+      "id": "frontend-authoring",
+      "path": "references/frontend/authoring.md",
+      "when": "frontend production 코드·컴포넌트 구조 작성 직전 — component 분리·micro-hook·effect 경계",
+      "requires": ["frontend-decisions"]
+    },
+    {
+      "id": "frontend-quality",
+      "path": "references/frontend/quality.md",
+      "when": "GREEN 게이트·독립 리뷰 전 — Design Intent 구현·성능·접근성 확인",
+      "requires": []
     },
     {
       "id": "architecture-contract",
@@ -122,7 +135,7 @@
       "id": "types-state-ladder",
       "path": "references/types/state-ladder.md",
       "when": "async·중복 제출 O* 행 또는 client state·boundary 타입 변경 전",
-      "requires": ["common"]
+      "requires": ["common", "frontend-decisions"]
     },
     {
       "id": "types-authoring",
@@ -151,7 +164,7 @@
     {
       "id": "fsd",
       "path": "references/fsd.md",
-      "when": "Delivery + FSD 레포(또는 도입 승인)",
+      "when": "FSD 레포(또는 도입 승인) + FSD 채택·폴더 구조를 제안·설계·리뷰하기 전",
       "requires": []
     },
     {

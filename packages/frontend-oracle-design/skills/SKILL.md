@@ -161,7 +161,13 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
 reference는 [`reference-graph.json`](references/reference-graph.json)에 선언된
 노드다. 각 노드는 로드 조건(`when`)과 함께 읽어야 하는 의존 노드(`requires` 엣지)를
 선언한다. 조건 충족 시에만 지정 노드 파일을 **전부 읽고** `requires` 엣지로 연결된
-노드를 함께 로드하며, 무관한 reference는 로드하지 않는다. 카드 절차에 진입하면 공통
+노드를 함께 로드하며, 무관한 reference는 로드하지 않는다.
+
+**`when`은 산출물 시점이 아니라 결정 시점으로 읽는다.** 그 노드가 소유한 결정을 내리는
+순간 로드하며, 파일에 쓰지 않고 예시·구조·플랜으로만 답하는 경우도 같다. 조건 해당
+여부가 애매하면 로드한다 — 로드를 건너뛸지는 판정 대상이 아니다.
+
+카드 절차에 진입하면 공통
 노드 [`common.md`](references/common.md)를 다른 노드보다 먼저 읽는다 — 권위 우선순위·
 정책 출처·피드백 라우팅의 canonical 정의가 거기 있다.
 
@@ -176,12 +182,12 @@ reference는 [`reference-graph.json`](references/reference-graph.json)에 선언
 - 새 UI·redesign 또는 보이는 layout·palette·type·copy·motion·responsive·identity 변경 전 → [`visual-design.md`](references/visual-design.md)
 - screenshot 비교·직접 브라우저 QA 명시 요청 → 별도 `$frontend-visual-qa` 호출, 이 스킬은 실행을 소유하지 않음
 - Delivery 진입 직후 → 설치된 `$test` 스킬을 이름으로 명시적으로 로드·호출, 못 찾으면 `FAIL`; [`delivery/ledger.md`](references/delivery/ledger.md), [`delivery/red.md`](references/delivery/red.md)
-- `VALID_RED` 뒤 production 수정 직전 → [`delivery/implementation-decision.md`](references/delivery/implementation-decision.md), [`changeability.md`](references/changeability.md), [`frontend-implementation.md`](references/frontend-implementation.md); React architecture 경계·state ownership·public API 변경이면 [`architecture-contract.md`](references/architecture-contract.md)
-- 셀프피드백·GREEN 게이트·review 전이 → [`delivery/green-review.md`](references/delivery/green-review.md)
-- 카드에 async·순서·중복 제출·retry·다단계 상태 `O*` 행, 또는 client state·exported Props·shared/package API·trust boundary 타입 변경 전 → [`types/state-ladder.md`](references/types/state-ladder.md), [`types/authoring.md`](references/types/authoring.md)
+- `VALID_RED` 뒤 production 수정 직전 → [`delivery/implementation-decision.md`](references/delivery/implementation-decision.md), [`changeability.md`](references/changeability.md), [`frontend/authoring.md`](references/frontend/authoring.md) (requires로 [`frontend/decisions.md`](references/frontend/decisions.md) 동반); React architecture 경계·state ownership·public API 변경이면 [`architecture-contract.md`](references/architecture-contract.md)
+- 셀프피드백·GREEN 게이트·review 전이 → [`delivery/green-review.md`](references/delivery/green-review.md), [`frontend/quality.md`](references/frontend/quality.md)
+- 카드에 async·순서·중복 제출·retry·다단계 상태 `O*` 행, 또는 client state·exported Props·shared/package API·trust boundary 타입 변경 전 → [`types/state-ladder.md`](references/types/state-ladder.md), [`types/authoring.md`](references/types/authoring.md), [`frontend/decisions.md`](references/frontend/decisions.md) — 로딩·오류 경계 판정표(3절)와 상태 소유권(1절)이 설계 단계 결정이라 `requires` 엣지로 함께 온다
 - exported shared/package API·Props 표면 변경 전 → [`types/api-surface.md`](references/types/api-surface.md)
 - 레포당 1회 — 타입 계약 첫 작성 전, 또는 diff가 tsconfig·TS 버전을 바꿈 → [`type-environment.md`](references/type-environment.md), 결과를 Source Registry에 기록, 카드마다 반복하지 않음
-- Delivery 활성 + FSD 레포(또는 도입 승인) + FSD 채택·폴더 구조를 제안·설계·리뷰하기 전 → [`fsd.md`](references/fsd.md)
+- FSD 레포(또는 도입 승인) + FSD 채택·폴더 구조를 제안·설계·리뷰하기 전 → [`fsd.md`](references/fsd.md)
 - backend·full-stack·DB·data-access 경계를 만들거나 바꾸기 전 → [`backend.md`](references/backend.md)
 - 성능 요구·개선 claim이 있는 카드 작성 또는 production 수정 전 → [`performance.md`](references/performance.md)
 - 구현·테스트 검증 후 → [`subagent-review.md`](references/subagent-review.md); 타입 계약을 만든 변경이면 [`types/review-criteria.md`](references/types/review-criteria.md); Design Intent 있으면 [`visual-design.md`](references/visual-design.md) 재독. 리뷰 기준은 프롬프트에 복붙하지 않고 diff에 해당하는 reference 파일만 `review-packet --review-point`의 파일 링크로 전달한다
@@ -242,7 +248,7 @@ reference는 [`reference-graph.json`](references/reference-graph.json)에 선언
    reporter의 실패 test name을 카드 행에 매핑하고 `oracle-verify.mjs red` 통과 run만
    `VALID_RED`로 전이. network·mock·테스트 배치는 불변 규칙과 승인된 architecture
    source, FSD면 `references/fsd.md` 규칙을 따른다.
-7. production 수정 전 `delivery/implementation-decision.md`·`frontend-implementation.md`로 구현 결정
+7. production 수정 전 `delivery/implementation-decision.md`·`frontend/authoring.md`로 구현 결정
    기록 후 최소 구현→GREEN.
 8. High risk는 sibling `test` skill의 mutation kill·원복·재-GREEN 먼저.
 9. `oracle-run.mjs review-packet`으로 원시 리뷰 입력 생성 → `subagent-review.md`로 독립

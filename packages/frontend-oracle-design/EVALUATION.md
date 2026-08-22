@@ -28,7 +28,7 @@
 - <code>skills/references/bva.md</code> [L3]
 - <code>skills/references/visual-design.md</code> [L4]
 - <code>skills/references/delivery/</code> (분할: ledger·red·implementation-decision·green-review) [L5]
-- <code>skills/references/frontend-implementation.md</code> [L6]
+- <code>skills/references/frontend/</code> (분할: decisions·authoring·quality) [L6]
 - <code>skills/references/architecture-contract.md</code> [L7]
 - <code>skills/references/fsd.md</code>, <code>backend.md</code>,
   <code>subagent-review.md</code> [L8][L9][L10]
@@ -787,7 +787,7 @@ Nielsen/Norman식 사용자 학습, 최신 agent harness의 환경 검증, Arena
 [L3]: ./skills/references/bva.md 'Boundary Value Analysis'
 [L4]: ./skills/references/visual-design.md 'Visual Design Contract'
 [L5]: ./skills/references/delivery/ledger.md 'Implementation Loop (delivery/*)'
-[L6]: ./skills/references/frontend-implementation.md 'Frontend Implementation'
+[L6]: ./skills/references/frontend/decisions.md 'Frontend Implementation (frontend/*)'
 [L7]: ./skills/references/architecture-contract.md 'Architecture Contract'
 [L8]: ./skills/references/fsd.md 'FSD Guidance'
 [L9]: ./skills/references/backend.md 'Backend Guidance'

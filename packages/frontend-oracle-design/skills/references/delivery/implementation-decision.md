@@ -41,5 +41,5 @@ boilerplate 대신 material한 trade-off만 기록한다.
 
 선택이 카드의 관찰 결과를 바꾸거나 승인 기준과 충돌하면 구현하지 말고
 `NEEDS_DECISION` 복귀. 기술적으로 동등한 선택이면
-[`frontend-implementation.md`](../frontend-implementation.md)의 runtime 기준과
+[`frontend/decisions.md`](../frontend/decisions.md)·[`frontend/authoring.md`](../frontend/authoring.md)의 runtime 기준과
 [`changeability.md`](../changeability.md)의 변경 비용 기준으로 결정하고 계속한다.
