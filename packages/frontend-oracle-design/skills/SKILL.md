@@ -18,9 +18,10 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
   미결이면 구현에 맞추지 말고 `NEEDS_DECISION`으로 멈춘다.
 - 일반 architecture나 FSD(Feature-Sliced Design) 폴더 조언만 필요한 요청에는 이 스킬을
   단독으로 자동 호출하지 않는다.
-- 진입 시 risk부터 짧게 판정한다. **Low fast path는 reference를 로드하지 않고**
-  카드·lock·run artifact 없이 기존 레포 검증만 수행한다. 명시적 Oracle 요청 또는
-  Medium/High만 카드 절차로 들어간다.
+- 진입 시 risk부터 짧게 판정해 lane을 라우팅한다. **Low fast path는
+  [`lanes/low-fast-path.md`](references/lanes/low-fast-path.md) 하나만 로드하고 다른
+  reference 노드는 로드하지 않으며**, 카드·lock·run artifact 없이 기존 레포 검증만
+  수행한다. 명시적 Oracle 요청 또는 Medium/High만 카드 절차로 들어간다.
 
 ## 불변 규칙
 
@@ -123,8 +124,10 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
 ## 위험도와 두 개의 Lane
 
 - **Low fast path:** 새 정책·카드·architecture 결정 없는, 기존 승인 계약 안의 되돌리기
-  쉬운 copy·token·고립 CSS·명확한 회귀 수정. 스킬 reference·Oracle artifact 없이 관련
-  테스트와 레포 필수 검증만 수행.
+  쉬운 copy·token·고립 CSS·명확한 회귀 수정. 진입 조건·절차·승격(실격) 규칙은
+  [`lanes/low-fast-path.md`](references/lanes/low-fast-path.md) lane 노드가 소유한다 —
+  Oracle artifact 없이 관련 테스트와 레포 필수 검증만 수행하고, 작업 중 정책 질문이
+  생기면 즉시 실격·승격한다.
 - **Medium:** 새 상태·form·responsive 구조 등 계약이 필요한 변경. Oracle + `VALID_RED` +
   필수 GREEN run + 단일 독립 리뷰.
 - **High:** 결제·권한·파괴적 작업·데이터 손실·복잡한 concurrency. full Oracle + 다중
@@ -142,6 +145,7 @@ reference는 [`reference-graph.json`](references/reference-graph.json)에 선언
 노드 [`common.md`](references/common.md)를 다른 노드보다 먼저 읽는다 — 권위 우선순위·
 정책 출처·피드백 라우팅의 canonical 정의가 거기 있다.
 
+- 진입 risk 판정이 Low → [`lanes/low-fast-path.md`](references/lanes/low-fast-path.md)만 로드 (exclusive lane — 다른 노드 로드 금지, 실격 조건이 나오면 아래 카드 절차로 승격)
 - graph-orchestrated delivery loop를 명시적으로 요청받은 경우에만 → 설치된 `$agent-graph-engineering`을 이름으로 명시적으로 로드·호출하고 [`graph-orchestration.md`](references/graph-orchestration.md)를 전부 읽은 뒤 bundled workflow 실행
 - 명시적 Oracle 요청 또는 Medium/High 판정 뒤 카드 작성 시작 → [`card/policy-sources.md`](references/card/policy-sources.md), [`card/risk-grill.md`](references/card/risk-grill.md)
 - 계약 행(매트릭스) 작성 → [`bva.md`](references/bva.md), [`card/card-format.md`](references/card/card-format.md)

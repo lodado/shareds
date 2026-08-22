@@ -1,8 +1,22 @@
 {
   "id": "frontend-oracle-design-reference-graph",
   "version": 1,
-  "description": "조건 충족 시에만 로드하는 reference 노드 그래프. 노드의 when이 참이면 path를 전부 읽고 requires 엣지의 노드를 함께 로드한다. 무관한 노드는 로드하지 않는다. Low fast path는 어떤 노드도 로드하지 않는다.",
+  "description": "조건 충족 시에만 로드하는 reference 노드 그래프. 진입 시 risk 판정으로 lane을 고른다: Low는 lanes/low-fast-path.md 하나만 로드하는 exclusive lane, 명시적 Oracle 요청 또는 Medium/High는 common을 entry로 하는 oracle lane. 노드의 when이 참이면 path를 전부 읽고 requires 엣지의 노드를 함께 로드하며, 무관한 노드는 로드하지 않는다.",
   "entry": "common",
+  "lanes": [
+    {
+      "id": "low-fast-path",
+      "when": "진입 risk 판정이 Low — 새 정책·카드·architecture 결정 없는 기존 승인 계약 안의 되돌리기 쉬운 수정",
+      "nodes": ["low-fast-path"],
+      "exclusive": true,
+      "escalation": "작업 중 정책 질문·새 계약·architecture 결정이 나타나면 즉시 실격 — oracle lane으로 승격"
+    },
+    {
+      "id": "oracle",
+      "when": "명시적 Oracle 요청 또는 Medium/High 판정",
+      "entry": "common"
+    }
+  ],
   "reviewPoints": [
     { "when": "항상", "nodes": ["changeability"] },
     { "when": "frontend production 변경", "nodes": ["frontend-implementation"] },
@@ -13,6 +27,13 @@
     { "when": "성능 요구·개선 claim", "nodes": ["performance"] }
   ],
   "nodes": [
+    {
+      "id": "low-fast-path",
+      "path": "references/lanes/low-fast-path.md",
+      "phase": "lane",
+      "when": "진입 risk 판정이 Low — 이 lane에서는 이 노드 하나만 로드한다",
+      "requires": []
+    },
     {
       "id": "common",
       "path": "references/common.md",

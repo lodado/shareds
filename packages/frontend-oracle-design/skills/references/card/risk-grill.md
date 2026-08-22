@@ -55,7 +55,8 @@ visual identity 변경이면 카드 작성 전 [`visual-design.md`](../visual-de
 
 가지치기:
 
-- P1에서 Low 판정이면 grill을 끝내고 fast path로 간다.
+- P1에서 Low 판정이면 grill을 끝내고 [`lanes/low-fast-path.md`](../lanes/low-fast-path.md)
+  lane으로 라우팅한다.
 - endpoint가 없으면 P4, mutation·async가 없으면 P5, `behavior-only`면 P7, 성능
   claim이 없으면 P8을 통째로 건너뛴다.
 - 기능이 설치된 `frontend-system-design` reference와 매칭되면 그 문서의 결정

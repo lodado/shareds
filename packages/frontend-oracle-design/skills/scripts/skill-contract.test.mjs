@@ -253,11 +253,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.18.1')
+  assert.equal(version, '0.18.2')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.18.1')
+  assert.equal(marketplace.version, '0.18.2')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -897,4 +897,39 @@ test('passes review criteria to reviewers as file links, not pasted text', async
       assert.ok(ids.has(node), `review point routing references unknown node ${node}`)
     }
   }
+})
+
+test('routes the low fast path as an explicit exclusive lane in the graph', async () => {
+  const [skill, lane, card, delivery, graphSource] = await Promise.all([
+    read('SKILL.md'),
+    read('references/lanes/low-fast-path.md'),
+    readCard(),
+    readDelivery(),
+    read('references/reference-graph.json'),
+  ])
+  const graph = JSON.parse(graphSource)
+  const ids = new Set(graph.nodes.map((node) => node.id))
+
+  // lane 노드가 진입 조건·절차·승격 규칙을 소유한다
+  assert.match(lane, /## 진입 조건/)
+  assert.match(lane, /## 하지 않는 것/)
+  assert.match(lane, /## 승격 — Low 실격 조건/)
+  assert.match(lane, /다른 reference 노드는 로드하지 않는다/)
+  assert.match(lane, /검증을 생략하는 lane이 아니다/)
+  assert.match(lane, /즉시 Low 실격/)
+
+  // 그래프가 lane 분기를 기계 판독 가능하게 선언한다
+  assert.ok(Array.isArray(graph.lanes), 'reference-graph.json must declare lanes')
+  const lowLane = graph.lanes.find((entry) => entry.id === 'low-fast-path')
+  const oracleLane = graph.lanes.find((entry) => entry.id === 'oracle')
+  assert.ok(lowLane, 'low-fast-path lane must exist')
+  assert.equal(lowLane.exclusive, true)
+  for (const node of lowLane.nodes) assert.ok(ids.has(node), `lane references unknown node ${node}`)
+  assert.ok(lowLane.escalation, 'low lane must declare an escalation rule')
+  assert.equal(oracleLane?.entry, 'common')
+
+  // SKILL과 각 단계 문서가 lane 노드로 라우팅한다
+  assert.match(skill, /lanes\/low-fast-path\.md/)
+  assert.match(card, /lanes\/low-fast-path\.md/)
+  assert.match(delivery, /lanes\/low-fast-path\.md/)
 })

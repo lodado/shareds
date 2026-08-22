@@ -13,7 +13,8 @@ frontend production 수정 시
 작성·수정 금지.
 
 - Medium/High risk는 `ORACLE_READY` 카드가 필수다. Low fast path는 새 정책·카드가
-  없고 기존 승인 계약 안의 되돌리기 쉬운 수정에만 쓴다.
+  없고 기존 승인 계약 안의 되돌리기 쉬운 수정에만 쓴다 — lane 계약은
+  [`lanes/low-fast-path.md`](../lanes/low-fast-path.md).
 - 새 카드와 의미가 바뀐 revision은 risk와 무관하게 Draft와 delta를 사용자에게 다시
   확인받은 뒤 lock한다.
 - 대상 레포의 `AGENTS.md`, `CLAUDE.md`, 테스트 스크립트, 인접 테스트, 필수 아키텍처
