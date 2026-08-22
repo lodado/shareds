@@ -51,13 +51,14 @@ discriminated union은 **멤버마다 딸린 데이터가 실제로 다를 때**
 정한다.
 
 ```typescript
-// object union — editing에만 fieldErrors, submitting에만 requestId가 있다.
-// 태그가 그 필드들의 유효 범위를 지킨다.
-type PaymentState =
-  | { status: 'editing'; amount: number; fieldErrors: FieldErrors }
-  | { status: 'submitting'; amount: number; requestId: string }
-  | { status: 'success'; paymentId: string }
-  | { status: 'failure'; amount: number; reason: PaymentFailure }
+// object union — shipping에만 fieldErrors, review에만 quote가 있다.
+// 태그가 그 필드들의 유효 범위를 지킨다. 전부 카드가 정의한 도메인 상태다.
+// submitting·success·failure 같은 요청 lifecycle은 여기 넣지 않는다 —
+// mutation의 framework union(state-ladder 2단)이 이미 소유한다.
+type CheckoutState =
+  | { status: 'cart'; items: CartItem[] }
+  | { status: 'shipping'; address: Address; fieldErrors: FieldErrors }
+  | { status: 'review'; quote: Quote; agreed: boolean }
 
 // literal union — 딸린 데이터가 없다. 배지 문구·비활성 여부는 소비 지점이 정한다.
 // { kind: 'paid' } 같은 wrapper로 감싸도 새로 막히는 잘못된 코드는 없다.
@@ -76,11 +77,11 @@ type PaymentBadge = 'unpaid' | 'paid' | 'refunded'
   파생하는 단일 권위일 때만 record에서 union을 파생한다:
   ```typescript
   type Steps = {
-    editing: { amount: number; fieldErrors: FieldErrors }
-    submitting: { amount: number; requestId: string }
+    shipping: { address: Address; fieldErrors: FieldErrors }
+    review: { quote: Quote; agreed: boolean }
   }
   type State = { [K in keyof Steps]: { status: K } & Steps[K] }[keyof Steps]
-  const stepLabel = { editing: '입력 중', submitting: '처리 중' } satisfies Record<keyof Steps, string>
+  const stepLabel = { shipping: '배송지', review: '최종 확인' } satisfies Record<keyof Steps, string>
   ```
 - **discriminant는 갈라지는 데이터가 있을 때 붙인다.** 원본 상태를 조합해 만드는
   파생 계산(`resolve*`)의 반환은 거의 언제나 literal union이다 — 태그를 씌우면
