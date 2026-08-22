@@ -29,14 +29,9 @@ reviewer를 호출하지 않고 기존 증거를 폐기한다.
 
 ## 리뷰 기준 우선순위
 
-사용자가 제공했거나 승인된 기준으로 지정된 자료의 우선순위:
-
-1. 보안·개인정보·법적·접근성·금융 및 데이터 정합성의 강제 제약
-2. 사용자의 명시적 행동 계약과 공개 호환성
-3. 대상 레포의 필수 아키텍처·API·테스트 계약
-4. 승인된 기획서·PRD·수용 기준·디자인 시스템·Figma 원본의 해당 관할
-5. 위 기준을 실행 가능한 계약으로 옮긴 Oracle Card
-6. production 코드·기존 headless test 관찰은 증거일 뿐 정답 권위가 아님
+리뷰 기준의 우선순위는 [`common.md`](common.md)의 권위 우선순위가 canonical이다 —
+강제 제약부터 Oracle Card까지 같은 순서로 대조하고, production 코드·기존 headless
+test 관찰은 증거일 뿐 정답 권위가 아니다.
 
 Figma가 기준이면 정확한 파일·페이지·프레임·버전을 확인하고, 접근 불가면 추측·
 스크린샷 기억으로 대체하지 말고 미검증으로 보고한다. 외부 기준과 Oracle Card가
@@ -57,6 +52,29 @@ review와 별도로 설치된 `designer` 역할을 명시해 시각 계약을 �
 reviewer도 정책을 새로 정하지 않는다. deterministic comparison이 그대로 통과하고
 `JUDGMENT` 행과 baseline 변경이 모두 없으면 추가 designer 검수는 N/A와 사유를 기록.
 
+## 리뷰 포인트 — 파일 링크로 전달
+
+리뷰 기준은 reviewer 프롬프트에 본문을 복붙하지 않고 **reference 파일 링크로
+전달한다.** primary agent가 diff가 실제로 건드린 영역에 해당하는 기준 파일만 골라
+`--review-point`로 packet에 등록하면, packet에는 경로와 SHA-256 digest만 기록된다 —
+reviewer는 링크된 파일을 직접 **전부** 읽고, digest로 어떤 revision의 기준을 읽었는지
+고정된다. 기준 본문을 요약·발췌해 프롬프트에 넣는 것은 입력 고정 원칙 위반이다.
+
+| 조건 (diff 기준)            | 리뷰 포인트 파일                                                 |
+| --------------------------- | ---------------------------------------------------------------- |
+| 항상                        | [`changeability.md`](changeability.md) — 다섯 축 판정 기준       |
+| frontend production 변경    | [`frontend-implementation.md`](frontend-implementation.md)       |
+| 타입·상태 계약 생성·변경    | [`types/review-criteria.md`](types/review-criteria.md)           |
+| FSD 레포                    | [`fsd.md`](fsd.md) — 「자주 나오는 위반」 표                     |
+| Design Intent 포함          | [`visual-design.md`](visual-design.md) — 증거 계층·Delivery 책임 |
+| backend·DB·data-access 변경 | [`backend.md`](backend.md) — 경계·검증 절                        |
+| 성능 요구·개선 claim        | [`performance.md`](performance.md)                               |
+
+조건에 해당하지 않는 기준 파일은 등록하지 않는다 — reviewer도 그래프 로딩 규칙을
+따르며 무관한 기준으로 finding을 만들지 않는다. 조건→노드 매핑은
+[`reference-graph.json`](reference-graph.json)의 `reviewPoints`에도 기계 판독 가능하게
+선언되어 있다.
+
 ## Reviewer 입력
 
 리뷰 직전 기계 생성한 입력으로 고정한다.
@@ -65,12 +83,15 @@ reviewer도 정책을 새로 정하지 않는다. deterministic comparison이 �
 node <skill-dir>/scripts/oracle-run.mjs review-packet \
   --dir .ai/oracles/<oracle-id> \
   --decision .ai/oracles/<oracle-id>/implementation-decision.md \
+  --review-point <skill-dir>/references/changeability.md \
+  --review-point <skill-dir>/references/types/review-criteria.md \
   --output .ai/oracles/<oracle-id>/review-input.json
 ```
 
 패킷은 마지막 lock verify command·exit, lock manifest, Oracle 전문, 잠긴 local source
 전문, run state, ledger, evidence mapping, init 이후 변경 파일 digest, git diff, visual
-pending과 Implementation Decision의 path·sha256·content를 원시 필드로 담는다.
+pending, Implementation Decision의 path·sha256·content와 등록한 리뷰 포인트의
+path·sha256(본문 없이 링크만)을 원시 필드로 담는다.
 reviewer는 `implementation-decision.md`의 주장과 실제 diff를 대조한다. 결론·의도한
 해결책·유리한 요약을 추가하지 않는다. 패킷을 손으로 고치지 말고 입력이 바뀌면 다시
 생성한다. URL·Figma처럼 lock에 담을 수 없는 외부 기준만 Oracle Registry의 정확한
@@ -199,20 +220,13 @@ reviewer는 아래 질문으로 사용자를 재인터뷰하거나 새 정책을
 - loading, retry, race, out-of-order가 결정론적으로 통제되는가?
 - 구현이 카드 밖의 정책이나 동작을 임의로 추가하지 않았는가?
 - 실제 package version과 레포 계약을 확인하고 외부 best practice보다 우선했는가?
-- material한 입력·성공·실패·상태가 TypeScript로 표현되고 `any`나 광범위한 assertion으로
-  불가능 상태를 숨기지 않았는가? 단순 상태에 불필요한 state machine도 만들지 않았는가?
-- state에 저장된 action(`retry`·`submit`)이나 no-op action이 있는가? 상태는 데이터만
-  담고 action은 hook 반환의 형제여야 하며, 서버 상태면 기존 `refetch`를 재사용해야
-  한다. 위반이면 `FINDING`이다.
-- 기존 query API로 표현되는 서버 상태를 `useState`+`useEffect`로 다시 구현했는가?
-  unmount·route 변경 뒤 늦은 응답이 상태를 덮을 수 있는가?
+- 타입·상태 계약 — state union과 action 배치, 불가능 상태 은폐, 서버 상태 재구현,
+  Suspense/Error Boundary 분기, 늦은 응답 방어 — 는 리뷰 포인트로 받은
+  [`types/review-criteria.md`](types/review-criteria.md)와
+  [`frontend-implementation.md`](frontend-implementation.md) 기준으로만 판정한다.
+  같은 기준을 이 목록에 반복하지 않는다.
 - server state를 query cache와 local/global state가 중복 소유하지 않는가?
 - Server Component로 충분한 일을 Client Component·TanStack Query로 옮기지 않았는가?
-- Suspense/Error Boundary가 필요한 subtree에만 있고 initial load·background refetch·
-  mutation pending을 같은 상태로 취급하지 않았는가?
-- 무조건 실행되는 첫 조회의 loading·error를 경계로 올리지 않고 컴포넌트 안에서
-  분기했는가? 조건부 query·placeholder·취소 제약 같은 실격 사유가 Implementation
-  Decision에 없으면 `FINDING`이다.
 - retry가 실패한 query/boundary 범위만 복구하고 전체 cache를 무차별 reset하지 않는가?
 - micro-hook이 UI와 비즈니스 로직의 책임을 정확히 분리하는가? UI component는 semantic
   JSX·접근성·시각 상태·사용자 intent 연결만 소유하고, domain 판정·DTO 변환·query/cache·

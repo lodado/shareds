@@ -11,6 +11,34 @@ async function read(relativePath) {
   return readFile(join(skillDirectory, relativePath), 'utf8')
 }
 
+const CARD_NODE_FILES = [
+  'references/card/policy-sources.md',
+  'references/card/risk-grill.md',
+  'references/card/card-format.md',
+  'references/card/confirmation-lock.md',
+]
+const DELIVERY_NODE_FILES = [
+  'references/delivery/ledger.md',
+  'references/delivery/red.md',
+  'references/delivery/implementation-decision.md',
+  'references/delivery/green-review.md',
+]
+const TYPES_NODE_FILES = [
+  'references/types/state-ladder.md',
+  'references/types/authoring.md',
+  'references/types/api-surface.md',
+  'references/types/review-criteria.md',
+]
+
+async function readAll(relativePaths) {
+  const parts = await Promise.all(relativePaths.map(read))
+  return parts.join('\n')
+}
+
+const readCard = () => readAll(CARD_NODE_FILES)
+const readDelivery = () => readAll(DELIVERY_NODE_FILES)
+const readTypes = () => readAll(TYPES_NODE_FILES)
+
 test('runs the Oracle contract through the bundled deterministic workflow graph', async () => {
   const [skill, graphOrchestration, graphSource] = await Promise.all([
     read('SKILL.md'),
@@ -54,7 +82,7 @@ test('O26: backs reported verification with a run ledger, machine transitions an
 })
 
 test('O27: lints the card structure and initializes run artifacts around the lock', async () => {
-  const oracleCard = await read('references/oracle-card.md')
+  const oracleCard = await readCard()
 
   assert.match(oracleCard, /oracle-verify\.mjs card/)
   assert.match(oracleCard, /CARD_LINT_FAILED/)
@@ -75,7 +103,7 @@ test('O27: lints the card structure and initializes run artifacts around the loc
 })
 
 test('O28: routes delivery runs through exec and gates GREEN on flakiness and test strength', async () => {
-  const implementationLoop = await read('references/implementation-loop.md')
+  const implementationLoop = await readDelivery()
 
   assert.match(implementationLoop, /oracle-run\.mjs exec/)
   assert.match(implementationLoop, /oracle-run\.mjs transition/)
@@ -141,7 +169,7 @@ test('O30: delegates screenshot and direct-browser execution to a separate skill
 })
 
 test('requires automatic deterministic locking at delivery boundaries', async () => {
-  const [skill, oracleCard] = await Promise.all([read('SKILL.md'), read('references/oracle-card.md')])
+  const [skill, oracleCard] = await Promise.all([read('SKILL.md'), readCard()])
 
   assert.match(skill, /scripts\/oracle-lock\.mjs/)
   assert.match(skill, /각 단계 직전 revision lock을 자동 검증/)
@@ -155,8 +183,8 @@ test('requires automatic deterministic locking at delivery boundaries', async ()
 test('locks all approved Delivery sources once instead of extending an existing lock', async () => {
   const [skill, oracleCard, implementationLoop] = await Promise.all([
     read('SKILL.md'),
-    read('references/oracle-card.md'),
-    read('references/implementation-loop.md'),
+    readCard(),
+    readDelivery(),
   ])
 
   assert.match(skill, /Delivery.*lock.*미룬다/s)
@@ -167,7 +195,7 @@ test('locks all approved Delivery sources once instead of extending an existing 
 })
 
 test('keeps feedback routing and evidence tied to the locked revision', async () => {
-  const [skill, implementationLoop] = await Promise.all([read('SKILL.md'), read('references/implementation-loop.md')])
+  const [skill, implementationLoop] = await Promise.all([read('SKILL.md'), readDelivery()])
 
   for (const classification of [
     'POLICY_GAP',
@@ -188,7 +216,7 @@ test('keeps feedback routing and evidence tied to the locked revision', async ()
 test('carries the locked revision through tests and review without owning visual QA', async () => {
   const [skill, implementationLoop, subagentReview] = await Promise.all([
     read('SKILL.md'),
-    read('references/implementation-loop.md'),
+    readDelivery(),
     read('references/subagent-review.md'),
   ])
 
@@ -225,15 +253,15 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.17.6')
+  assert.equal(version, '0.18.4')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.17.6')
+  assert.equal(marketplace.version, '0.18.4')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
-  const oracleCard = await read('references/oracle-card.md')
+  const oracleCard = await readCard()
 
   assert.match(oracleCard, /Requested mechanism check — 수단과 결과 분리/)
   assert.match(oracleCard, /Intended outcome/)
@@ -269,7 +297,7 @@ test('loads the performance reference only for measured performance claims', asy
 
 test('records new dependency decisions and reviews them against real problems and context', async () => {
   const [implementationLoop, subagentReview] = await Promise.all([
-    read('references/implementation-loop.md'),
+    readDelivery(),
     read('references/subagent-review.md'),
   ])
 
@@ -284,7 +312,7 @@ test('records new dependency decisions and reviews them against real problems an
 test('reuses the repository network boundary and colocates approved MSW handlers', async () => {
   const [skill, implementationLoop, fsd] = await Promise.all([
     read('SKILL.md'),
-    read('references/implementation-loop.md'),
+    readDelivery(),
     read('references/fsd.md'),
   ])
 
@@ -299,7 +327,7 @@ test('reuses the repository network boundary and colocates approved MSW handlers
 })
 
 test('explicitly invokes $test before writing frontend tests', async () => {
-  const [skill, implementationLoop] = await Promise.all([read('SKILL.md'), read('references/implementation-loop.md')])
+  const [skill, implementationLoop] = await Promise.all([read('SKILL.md'), readDelivery()])
 
   assert.match(skill, /테스트 파일을 작성하기 직전에 `\$test` 스킬을 이름으로 명시적으로 로드·호출/)
   assert.match(skill, /테스트 파일 작성 직전에 `\$test` 스킬을 명시적으로 호출/)
@@ -309,7 +337,7 @@ test('explicitly invokes $test before writing frontend tests', async () => {
 
 test('batches delivery decisions without prescribing an implementation topology', async () => {
   const [implementationLoop, graphSource] = await Promise.all([
-    read('references/implementation-loop.md'),
+    readDelivery(),
     read('references/oracle-workflow.graph.json'),
   ])
   const graph = JSON.parse(graphSource)
@@ -408,7 +436,7 @@ test('loads visual design guidance only for UI-shaping work and carries its cont
   const [skill, visualDesign, oracleCard, frontendImplementation, subagentReview] = await Promise.all([
     read('SKILL.md'),
     read('references/visual-design.md'),
-    read('references/oracle-card.md'),
+    readCard(),
     read('references/frontend-implementation.md'),
     read('references/subagent-review.md'),
   ])
@@ -460,7 +488,7 @@ test('O1-O7: loads one detailed changeability reference before implementation de
     read('SKILL.md'),
     read('references/changeability.md'),
     read('references/frontend-implementation.md'),
-    read('references/implementation-loop.md'),
+    readDelivery(),
   ])
 
   for (const term of ['Readability', 'Predictability', 'Cohesion', 'Coupling', 'Simplicity']) {
@@ -488,7 +516,7 @@ test('O1-O7: loads one detailed changeability reference before implementation de
   assert.doesNotMatch(changeability, /^## Implementation Decision 형식$/m)
   assert.doesNotMatch(changeability, /^## Reviewer 판정과 최소 수정$/m)
   assert.match(changeability, /frontend-implementation\.md/)
-  assert.match(changeability, /implementation-loop\.md/)
+  assert.match(changeability, /delivery\/implementation-decision\.md/)
   assert.match(changeability, /subagent-review\.md/)
 
   assert.match(skill, /references\/changeability\.md/)
@@ -547,8 +575,8 @@ test('O8-O10: reviews with the same changeability reference without turning tast
 test('O2: 기존 Oracle Delivery gate를 유지한다', async () => {
   const [skill, oracleCard, implementationLoop] = await Promise.all([
     read('SKILL.md'),
-    read('references/oracle-card.md'),
-    read('references/implementation-loop.md'),
+    readCard(),
+    readDelivery(),
   ])
 
   for (const contract of ['VALID_RED', 'oracle-lock.mjs', 'oracle-run.mjs', 'evidence.json']) {
@@ -557,7 +585,7 @@ test('O2: 기존 Oracle Delivery gate를 유지한다', async () => {
 })
 
 test('pins document-driven stage journal and disk recall', async () => {
-  const [skill, oracleCard] = await Promise.all([read('SKILL.md'), read('references/oracle-card.md')])
+  const [skill, oracleCard] = await Promise.all([read('SKILL.md'), readCard()])
 
   assert.match(skill, /### 문서 기준 진행/)
   assert.match(skill, /대화 기억이 아니라 disk를 재독/)
@@ -574,7 +602,7 @@ test('pins document-driven stage journal and disk recall', async () => {
 test('pins the system-design grill phases and the conditional API contract format', async () => {
   const [skill, oracleCard, architectureContract] = await Promise.all([
     read('SKILL.md'),
-    read('references/oracle-card.md'),
+    readCard(),
     read('references/architecture-contract.md'),
   ])
 
@@ -608,9 +636,9 @@ test('pins the system-design grill phases and the conditional API contract forma
 test('O7: 조건부 품질 계약과 human-first 보고를 안내한다', async () => {
   const [skill, oracleCard, frontendImplementation, implementationLoop, architecture, review] = await Promise.all([
     read('SKILL.md'),
-    read('references/oracle-card.md'),
+    readCard(),
     read('references/frontend-implementation.md'),
-    read('references/implementation-loop.md'),
+    readDelivery(),
     read('references/architecture-contract.md'),
     read('references/subagent-review.md'),
   ])
@@ -630,7 +658,7 @@ test('O7: 조건부 품질 계약과 human-first 보고를 안내한다', async 
 
 test('O8: 카드 schema version 분기와 migration을 추가하지 않는다', async () => {
   const [oracleCard, verifier] = await Promise.all([
-    read('references/oracle-card.md'),
+    readCard(),
     read('scripts/oracle-verify.mjs'),
   ])
 
@@ -641,9 +669,9 @@ test('O8: 카드 schema version 분기와 migration을 추가하지 않는다', 
 test('type-constraints: derives state contracts from card rows and narrows AI choice space', async () => {
   const [skill, oracleCard, frontendImplementation, typeConstraints, verifier] = await Promise.all([
     read('SKILL.md'),
-    read('references/oracle-card.md'),
+    readCard(),
     read('references/frontend-implementation.md'),
-    read('references/type-constraints.md'),
+    readTypes(),
     read('scripts/oracle-verify.mjs'),
   ])
 
@@ -653,7 +681,7 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
   assert.match(verifier, /state-model-row-unlinked/)
   assert.match(verifier, /state-model-row-unknown/)
 
-  assert.match(skill, /references\/type-constraints\.md/)
+  assert.match(skill, /references\/types\/state-ladder\.md/)
   assert.match(skill, /client state·exported Props/)
   assert.match(skill, /shared\/package API·trust boundary/)
   assert.doesNotMatch(skill, /state-modeling\.md/)
@@ -662,7 +690,7 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
   assert.match(oracleCard, /State Model — 선택 사항/)
   assert.match(oracleCard, /섹션이 없다고\s*\n?\s*lint가 막지 않는다/)
   assert.match(oracleCard, /참조 없는 전이는 발명된 정책이다/)
-  assert.match(frontendImplementation, /type-constraints\.md/)
+  assert.match(frontendImplementation, /types\/state-ladder\.md/)
   assert.match(frontendImplementation, /client state·/)
   assert.match(frontendImplementation, /exported Props·shared\/package API·trust boundary/)
   assert.doesNotMatch(frontendImplementation, /state-modeling\.md/)
@@ -693,7 +721,7 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
 test('type-environment: pins compiler environment once per repo and protects contract files', async () => {
   const [skill, typeConstraints, typeEnvironment] = await Promise.all([
     read('SKILL.md'),
-    read('references/type-constraints.md'),
+    readTypes(),
     read('references/type-environment.md'),
   ])
 
@@ -725,7 +753,7 @@ test('type-environment: pins compiler environment once per repo and protects con
 test('prefers Suspense and Error Boundary over in-component loading branches', async () => {
   const [frontendImplementation, typeConstraints, subagentReview] = await Promise.all([
     read('references/frontend-implementation.md'),
-    read('references/type-constraints.md'),
+    readTypes(),
     read('references/subagent-review.md'),
   ])
 
@@ -738,12 +766,12 @@ test('prefers Suspense and Error Boundary over in-component loading branches', a
   assert.match(frontendImplementation, /startTransition/)
   assert.match(frontendImplementation, /throwOnError.*data 부재 조건으로 좁혀/s)
 
-  assert.match(subagentReview, /실격 사유가 Implementation\n {2}Decision에 없으면 `FINDING`이다/)
+  assert.match(subagentReview, /types\/review-criteria\.md/)
 })
 
 test('keeps client state data-only and hands actions back beside it', async () => {
   const [typeConstraints, frontendImplementation, subagentReview] = await Promise.all([
-    read('references/type-constraints.md'),
+    readTypes(),
     read('references/frontend-implementation.md'),
     read('references/subagent-review.md'),
   ])
@@ -773,5 +801,135 @@ test('keeps client state data-only and hands actions back beside it', async () =
   assert.match(frontendImplementation, /state와 action을 형제로 반환한다/)
 
   // 리뷰는 같은 계약으로 판정한다
-  assert.match(subagentReview, /state에 저장된 action/)
+  assert.match(subagentReview, /state union과 action 배치/)
+})
+
+test('declares every reference as a loadable graph node with resolvable edges', async () => {
+  const { readdir } = await import('node:fs/promises')
+  const [skill, graphSource] = await Promise.all([read('SKILL.md'), read('references/reference-graph.json')])
+  const graph = JSON.parse(graphSource)
+  const ids = graph.nodes.map((node) => node.id)
+
+  assert.match(skill, /references\/reference-graph\.json/)
+  assert.equal(graph.entry, 'common')
+  assert.equal(new Set(ids).size, ids.length)
+
+  for (const node of graph.nodes) {
+    assert.ok(node.when, `node ${node.id} must declare a load condition`)
+    assert.ok(Array.isArray(node.requires), `node ${node.id} must declare requires edges`)
+    for (const dependency of node.requires) {
+      assert.ok(ids.includes(dependency), `node ${node.id} requires unknown node ${dependency}`)
+    }
+    await read(node.path.replace(/^references\//, 'references/'))
+  }
+
+  const entries = await readdir(join(skillDirectory, 'references'), { recursive: true, withFileTypes: true })
+  const files = entries
+    .filter((entry) => entry.isFile())
+    .map((entry) => join(entry.parentPath ?? entry.path, entry.name).slice(join(skillDirectory, 'references').length + 1))
+    .map((relative) => `references/${relative}`)
+  const nodePaths = new Set(graph.nodes.map((node) => node.path))
+  for (const file of files) {
+    if (file === 'references/reference-graph.json') continue
+    assert.ok(nodePaths.has(file), `${file} is not declared in reference-graph.json`)
+  }
+})
+
+test('collects shared authority, policy sources, and feedback routing into one common file', async () => {
+  const [skill, common, card, delivery, changeability, subagentReview] = await Promise.all([
+    read('SKILL.md'),
+    read('references/common.md'),
+    readCard(),
+    readDelivery(),
+    read('references/changeability.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  assert.match(common, /## 권위 우선순위/)
+  assert.match(common, /## 정책 출처/)
+  assert.match(common, /## 피드백 라우팅/)
+  assert.match(common, /mandatory-constraint/)
+  for (const classification of [
+    'POLICY_GAP',
+    'EVIDENCE_GAP',
+    'HARNESS_DEFECT',
+    'PRODUCT_DEFECT',
+    'ENVIRONMENT_DEFECT',
+    'NON_ORACLE_OPINION',
+  ]) {
+    assert.match(common, new RegExp(classification))
+  }
+
+  // canonical 정의는 common.md 하나가 소유하고, 나머지는 pointer와 단계 특칙만 남긴다
+  assert.match(skill, /common\.md/)
+  assert.match(card, /common\.md/)
+  assert.match(delivery, /common\.md/)
+  assert.match(changeability, /common\.md/)
+  assert.match(subagentReview, /common\.md/)
+  assert.doesNotMatch(changeability, /권위 순서: 1\)/)
+  assert.doesNotMatch(subagentReview, /^1\. 보안·개인정보·법적·접근성/m)
+})
+
+test('passes review criteria to reviewers as file links, not pasted text', async () => {
+  const [skill, subagentReview, graphSource, runner] = await Promise.all([
+    read('SKILL.md'),
+    read('references/subagent-review.md'),
+    read('references/reference-graph.json'),
+    read('scripts/oracle-run.mjs'),
+  ])
+  const graph = JSON.parse(graphSource)
+  const ids = new Set(graph.nodes.map((node) => node.id))
+
+  assert.match(skill, /--review-point/)
+  assert.match(subagentReview, /## 리뷰 포인트 — 파일 링크로 전달/)
+  assert.match(subagentReview, /--review-point/)
+  assert.match(subagentReview, /본문을 복붙하지 않고/)
+  assert.match(subagentReview, /경로와 SHA-256 digest만 기록/)
+  assert.match(subagentReview, /types\/review-criteria\.md/)
+  assert.match(subagentReview, /무관한 기준으로 finding을 만들지 않는다/)
+  assert.match(runner, /review-point/)
+  assert.match(runner, /REVIEW_POINT_INVALID/)
+
+  assert.ok(Array.isArray(graph.reviewPoints), 'reference-graph.json must declare reviewPoints routing')
+  for (const entry of graph.reviewPoints) {
+    assert.ok(entry.when, 'each review point routing needs a condition')
+    for (const node of entry.nodes) {
+      assert.ok(ids.has(node), `review point routing references unknown node ${node}`)
+    }
+  }
+})
+
+test('routes the low fast path as an explicit exclusive lane in the graph', async () => {
+  const [skill, lane, card, delivery, graphSource] = await Promise.all([
+    read('SKILL.md'),
+    read('references/lanes/low-fast-path.md'),
+    readCard(),
+    readDelivery(),
+    read('references/reference-graph.json'),
+  ])
+  const graph = JSON.parse(graphSource)
+  const ids = new Set(graph.nodes.map((node) => node.id))
+
+  // lane 노드가 진입 조건·절차·승격 규칙을 소유한다
+  assert.match(lane, /## 진입 조건/)
+  assert.match(lane, /## 하지 않는 것/)
+  assert.match(lane, /## 승격 — Low 실격 조건/)
+  assert.match(lane, /다른 reference 노드는 로드하지 않는다/)
+  assert.match(lane, /검증을 생략하는 lane이 아니다/)
+  assert.match(lane, /즉시 Low 실격/)
+
+  // 그래프가 lane 분기를 기계 판독 가능하게 선언한다
+  assert.ok(Array.isArray(graph.lanes), 'reference-graph.json must declare lanes')
+  const lowLane = graph.lanes.find((entry) => entry.id === 'low-fast-path')
+  const oracleLane = graph.lanes.find((entry) => entry.id === 'oracle')
+  assert.ok(lowLane, 'low-fast-path lane must exist')
+  assert.equal(lowLane.exclusive, true)
+  for (const node of lowLane.nodes) assert.ok(ids.has(node), `lane references unknown node ${node}`)
+  assert.ok(lowLane.escalation, 'low lane must declare an escalation rule')
+  assert.equal(oracleLane?.entry, 'common')
+
+  // SKILL과 각 단계 문서가 lane 노드로 라우팅한다
+  assert.match(skill, /lanes\/low-fast-path\.md/)
+  assert.match(card, /lanes\/low-fast-path\.md/)
+  assert.match(delivery, /lanes\/low-fast-path\.md/)
 })

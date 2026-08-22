@@ -179,7 +179,7 @@ owner의 `pending`으로 남긴다. `$frontend-visual-qa`는 다음만 반환한
   있는 `N/A`는 어느 계층에나 가능.
 - 외부 visual QA 결과를 위해 이 스킬의 상태를 추가하지 않는다.
 
-피드백은 기존 라우터를 그대로 사용:
+피드백은 [`common.md`](common.md)의 canonical 라우터를 그대로 사용 — 시각 관할 매핑:
 
 - 승인 Figma·Design Intent와 실제 UI 불일치 → `PRODUCT_DEFECT`
 - source의 시각 요구가 카드에 누락되거나 source끼리 충돌 → `POLICY_GAP`

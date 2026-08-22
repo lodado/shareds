@@ -1,0 +1,183 @@
+{
+  "id": "frontend-oracle-design-reference-graph",
+  "version": 1,
+  "description": "조건 로드 reference 노드 그래프. 진입 risk 판정으로 lane 선택: Low는 low-fast-path 단일 노드 exclusive lane, 명시적 Oracle 요청·Medium/High는 common entry의 oracle lane. 노드 when 충족 시 path 전문과 requires 엣지를 함께 로드, 무관 노드 로드 금지. 로드 조건의 전체 서술은 SKILL.md 「Reference 로딩」이 소유한다.",
+  "entry": "common",
+  "lanes": [
+    {
+      "id": "low-fast-path",
+      "when": "risk=Low",
+      "nodes": ["low-fast-path"],
+      "exclusive": true,
+      "escalation": "정책 질문·새 계약·architecture 결정 발생 시 즉시 실격 — oracle lane으로 승격"
+    },
+    { "id": "oracle", "when": "명시적 Oracle 요청 또는 Medium/High", "entry": "common" }
+  ],
+  "reviewPoints": [
+    { "when": "항상", "nodes": ["changeability"] },
+    { "when": "frontend production 변경", "nodes": ["frontend-implementation"] },
+    { "when": "타입·상태 계약 생성·변경", "nodes": ["types-review-criteria"] },
+    { "when": "FSD 레포", "nodes": ["fsd"] },
+    { "when": "Design Intent 포함", "nodes": ["visual-design"] },
+    { "when": "backend·DB·data-access 변경", "nodes": ["backend"] },
+    { "when": "성능 요구·개선 claim", "nodes": ["performance"] }
+  ],
+  "nodes": [
+    {
+      "id": "low-fast-path",
+      "path": "references/lanes/low-fast-path.md",
+      "when": "risk=Low — 이 노드만 로드",
+      "requires": []
+    },
+    {
+      "id": "common",
+      "path": "references/common.md",
+      "when": "카드 절차 진입 시 최우선",
+      "requires": []
+    },
+    {
+      "id": "bva",
+      "path": "references/bva.md",
+      "when": "계약 행 작성·테스트 번역 ($test와 byte-동일 공유)",
+      "requires": []
+    },
+    {
+      "id": "card-policy-sources",
+      "path": "references/card/policy-sources.md",
+      "when": "카드 작성 시작",
+      "requires": ["common"]
+    },
+    {
+      "id": "card-risk-grill",
+      "path": "references/card/risk-grill.md",
+      "when": "카드 작성 시작",
+      "requires": ["common", "card-policy-sources"]
+    },
+    {
+      "id": "card-format",
+      "path": "references/card/card-format.md",
+      "when": "계약 행·State Model 작성",
+      "requires": ["common", "bva"]
+    },
+    {
+      "id": "card-confirmation-lock",
+      "path": "references/card/confirmation-lock.md",
+      "when": "사용자 확인·lock·init 직전",
+      "requires": ["common"]
+    },
+    {
+      "id": "visual-design",
+      "path": "references/visual-design.md",
+      "when": "보이는 UI 변경 전; Design Intent 있으면 리뷰 재독",
+      "requires": ["common"]
+    },
+    {
+      "id": "delivery-ledger",
+      "path": "references/delivery/ledger.md",
+      "when": "Delivery 진입 직후 ($test 명시 호출 뒤)",
+      "requires": ["common"]
+    },
+    {
+      "id": "delivery-red",
+      "path": "references/delivery/red.md",
+      "when": "테스트 작성·VALID_RED 전이",
+      "requires": ["delivery-ledger", "bva"]
+    },
+    {
+      "id": "delivery-implementation-decision",
+      "path": "references/delivery/implementation-decision.md",
+      "when": "VALID_RED 뒤 production 수정 직전",
+      "requires": ["changeability", "frontend-implementation"]
+    },
+    {
+      "id": "delivery-green-review",
+      "path": "references/delivery/green-review.md",
+      "when": "셀프피드백·GREEN·review 전이",
+      "requires": ["delivery-ledger"]
+    },
+    {
+      "id": "changeability",
+      "path": "references/changeability.md",
+      "when": "production 수정 전·독립 리뷰",
+      "requires": ["common"]
+    },
+    {
+      "id": "frontend-implementation",
+      "path": "references/frontend-implementation.md",
+      "when": "frontend production 수정 전",
+      "requires": ["common"]
+    },
+    {
+      "id": "architecture-contract",
+      "path": "references/architecture-contract.md",
+      "when": "architecture 경계·state ownership·public API 변경",
+      "requires": ["common"]
+    },
+    {
+      "id": "types-state-ladder",
+      "path": "references/types/state-ladder.md",
+      "when": "async·중복 제출 O* 행 또는 client state·boundary 타입 변경 전",
+      "requires": ["common"]
+    },
+    {
+      "id": "types-authoring",
+      "path": "references/types/authoring.md",
+      "when": "state-ladder와 함께",
+      "requires": ["types-state-ladder"]
+    },
+    {
+      "id": "types-api-surface",
+      "path": "references/types/api-surface.md",
+      "when": "exported shared/package API·Props 변경",
+      "requires": ["types-state-ladder", "types-authoring"]
+    },
+    {
+      "id": "types-review-criteria",
+      "path": "references/types/review-criteria.md",
+      "when": "타입·상태 계약 변경의 독립 리뷰",
+      "requires": ["subagent-review"]
+    },
+    {
+      "id": "type-environment",
+      "path": "references/type-environment.md",
+      "when": "레포당 1회 — 첫 타입 계약 또는 tsconfig·TS 버전 변경",
+      "requires": []
+    },
+    {
+      "id": "fsd",
+      "path": "references/fsd.md",
+      "when": "Delivery + FSD 레포(또는 도입 승인)",
+      "requires": []
+    },
+    {
+      "id": "backend",
+      "path": "references/backend.md",
+      "when": "backend·DB·data-access 경계 변경 전",
+      "requires": []
+    },
+    {
+      "id": "performance",
+      "path": "references/performance.md",
+      "when": "성능 요구·개선 claim",
+      "requires": []
+    },
+    {
+      "id": "subagent-review",
+      "path": "references/subagent-review.md",
+      "when": "구현·테스트 검증 후 독립 리뷰",
+      "requires": ["common", "changeability"]
+    },
+    {
+      "id": "graph-orchestration",
+      "path": "references/graph-orchestration.md",
+      "when": "graph-orchestrated delivery loop 명시 요청만",
+      "requires": ["oracle-workflow-graph"]
+    },
+    {
+      "id": "oracle-workflow-graph",
+      "path": "references/oracle-workflow.graph.json",
+      "when": "graph-orchestration과 함께",
+      "requires": []
+    }
+  ]
+}

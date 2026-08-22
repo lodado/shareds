@@ -7,14 +7,13 @@ Oracle Card의 관찰 가능한 계약을 React·Next.js·TanStack Query 코드�
 `NEEDS_DECISION`으로 복귀.
 
 구현 전에 대상 package의 `package.json`, router 구조, framework config, 레포의
-`AGENTS.md`·`CLAUDE.md`·필수 아키텍처 문서를 읽는다. 권위 순서:
+`AGENTS.md`·`CLAUDE.md`·필수 아키텍처 문서를 읽는다. 권위 순서는
+[`common.md`](common.md)의 공통 우선순위가 canonical이며, 이 문서 관할의 하위 출처만
+추가한다:
 
-1. 보안·개인정보·법적·접근성·데이터 정합성의 강제 제약
-2. 승인된 Oracle Card와 기획·디자인·API 계약
-3. 대상 레포의 아키텍처·테스트·호환성 규칙
-4. **실제 설치 버전**의 React·Next.js·TanStack Query 공식 문서
-5. Vercel Engineering 같은 framework maintainer의 적용 가능한 휴리스틱
-6. 커뮤니티 전문가의 반례와 보완 의견
+- **실제 설치 버전**의 React·Next.js·TanStack Query 공식 문서
+- Vercel Engineering 같은 framework maintainer의 적용 가능한 휴리스틱
+- 커뮤니티 전문가의 반례와 보완 의견
 
 하위 출처가 상위 출처를 덮어쓰지 않는다. 예: bundle guide가 barrel import를 피하라
 해도 레포가 FSD slice public API import를 요구하면 레포 규칙을 따른다. 가용한
@@ -41,7 +40,7 @@ React production 변경이면 [`changeability.md`](changeability.md)도 전부 �
   추론되는 타입은 반복하지 않는다.
 - 카드에 async·순서 역전·중복 제출·retry·다단계 상태 행이 있거나 client state·
   exported Props·shared/package API·trust boundary 타입 형태를 만들거나 바꾸면
-  [`type-constraints.md`](type-constraints.md)를 전부 읽는다. 상태·이벤트는 카드 `O*`
+  [`types/state-ladder.md`](types/state-ladder.md)를 전부 읽는다. 상태·이벤트는 카드 `O*`
   행에서 도출, 상태 설계 사다리와 discriminated union 계약을 따르고 카드에 없는 전이는
   발명하지 않는다. 단순 toggle·독립 boolean 하나는 state machine으로 바꾸지 않는다.
 - `any`, 광범위한 assertion, 의미 없는 optional로 카드의 오류·상태 계약을 숨기지 않는다.
@@ -67,7 +66,7 @@ query `select` 또는 render 중 파생으로.
 데이터를 `useState`+`useEffect`+`useRef`로 직접 관리하면 freshness·중복 요청·취소를
 전부 재구현하게 된다 — 기존 경계에 없는 데이터일 때만 직접 관리하고 사유를
 Implementation Decision에 적는다. 직접 관리해도 상태 값에는 데이터만 담고 `retry`
-같은 함수는 넣지 않는다 — [`type-constraints.md`](type-constraints.md)의 「상태는
+같은 함수는 넣지 않는다 — [`types/state-ladder.md`](types/state-ladder.md)의 「상태는
 데이터, action은 형제」를 따른다.
 
 ## 2. 실행 위치를 고른다
@@ -143,7 +142,7 @@ shell을 막지 말고 느린 부분 가까이에 Suspense boundary.
 컴포넌트는 현재 상태의 UI와 사용자 intent를 선언하고 DOM을 명령식으로 조작하지
 않는다. 독립 boolean 여러 개로 불가능한 조합을 만들기보다 실제 UI 상태를 표현하는
 최소 상태를 둔다. async·다단계 흐름의 상태 도출·exhaustiveness는
-[`type-constraints.md`](type-constraints.md)를 따르고, 새 state-machine dependency는
+[`types/state-ladder.md`](types/state-ladder.md)를 따르고, 새 state-machine dependency는
 필요가 입증될 때만.
 
 micro-hook은 **짧은 코드**가 아니라 **작은 소유권 경계**다. UI와 비즈니스 로직 책임:

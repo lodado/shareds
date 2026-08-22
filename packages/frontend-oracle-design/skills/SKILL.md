@@ -18,9 +18,10 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
   미결이면 구현에 맞추지 말고 `NEEDS_DECISION`으로 멈춘다.
 - 일반 architecture나 FSD(Feature-Sliced Design) 폴더 조언만 필요한 요청에는 이 스킬을
   단독으로 자동 호출하지 않는다.
-- 진입 시 risk부터 짧게 판정한다. **Low fast path는 reference를 로드하지 않고**
-  카드·lock·run artifact 없이 기존 레포 검증만 수행한다. 명시적 Oracle 요청 또는
-  Medium/High만 카드 절차로 들어간다.
+- 진입 시 risk부터 짧게 판정해 lane을 라우팅한다. **Low fast path는
+  [`lanes/low-fast-path.md`](references/lanes/low-fast-path.md) 하나만 로드하고 다른
+  reference 노드는 로드하지 않으며**, 카드·lock·run artifact 없이 기존 레포 검증만
+  수행한다. 명시적 Oracle 요청 또는 Medium/High만 카드 절차로 들어간다.
 
 ## 불변 규칙
 
@@ -87,7 +88,7 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
 
 - 카드에 async·순서·중복 제출·다단계 상태 행이 있거나 client state·exported Props·
   shared/package API·trust boundary 타입 형태를 만들거나 바꾸면 구현 전에
-  `references/type-constraints.md`를 읽는다. 상태·이벤트·전이표는 카드 `O*` 행에서
+  `references/types/state-ladder.md`를 읽는다. 상태·이벤트·전이표는 카드 `O*` 행에서
   도출하고 그 문서의 상태 설계 사다리를 따른다.
 - 기존 query·router·form이 상태를 소유하면 새 `status` union을 만들지 않는다.
   discriminated union은 기존 소유자가 표현 못 하는 진짜 client state에만. 카드에 없는
@@ -123,8 +124,10 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
 ## 위험도와 두 개의 Lane
 
 - **Low fast path:** 새 정책·카드·architecture 결정 없는, 기존 승인 계약 안의 되돌리기
-  쉬운 copy·token·고립 CSS·명확한 회귀 수정. 스킬 reference·Oracle artifact 없이 관련
-  테스트와 레포 필수 검증만 수행.
+  쉬운 copy·token·고립 CSS·명확한 회귀 수정. 진입 조건·절차·승격(실격) 규칙은
+  [`lanes/low-fast-path.md`](references/lanes/low-fast-path.md) lane 노드가 소유한다 —
+  Oracle artifact 없이 관련 테스트와 레포 필수 검증만 수행하고, 작업 중 정책 질문이
+  생기면 즉시 실격·승격한다.
 - **Medium:** 새 상태·form·responsive 구조 등 계약이 필요한 변경. Oracle + `VALID_RED` +
   필수 GREEN run + 단일 독립 리뷰.
 - **High:** 결제·권한·파괴적 작업·데이터 손실·복잡한 concurrency. full Oracle + 다중
@@ -133,21 +136,32 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
   정책도 baseline도 아니다.
 - **Delivery Lane:** 사용자가 확인한 한 revision만 lock하고 TDD와 리뷰 수행.
 
-## Reference 로딩
+## Reference 로딩 — 그래프
 
-조건 충족 시에만 지정 파일을 **전부 읽고**, 무관한 reference는 로드하지 않는다.
+reference는 [`reference-graph.json`](references/reference-graph.json)에 선언된
+노드다. 각 노드는 로드 조건(`when`)과 함께 읽어야 하는 의존 노드(`requires` 엣지)를
+선언한다. 조건 충족 시에만 지정 노드 파일을 **전부 읽고** `requires` 엣지로 연결된
+노드를 함께 로드하며, 무관한 reference는 로드하지 않는다. 카드 절차에 진입하면 공통
+노드 [`common.md`](references/common.md)를 다른 노드보다 먼저 읽는다 — 권위 우선순위·
+정책 출처·피드백 라우팅의 canonical 정의가 거기 있다.
 
+- 진입 risk 판정이 Low → [`lanes/low-fast-path.md`](references/lanes/low-fast-path.md)만 로드 (exclusive lane — 다른 노드 로드 금지, 실격 조건이 나오면 아래 카드 절차로 승격)
 - graph-orchestrated delivery loop를 명시적으로 요청받은 경우에만 → 설치된 `$agent-graph-engineering`을 이름으로 명시적으로 로드·호출하고 [`graph-orchestration.md`](references/graph-orchestration.md)를 전부 읽은 뒤 bundled workflow 실행
-- 명시적 Oracle 요청 또는 Medium/High 판정 뒤 카드 작성 시작 → [`bva.md`](references/bva.md), [`oracle-card.md`](references/oracle-card.md)
+- 명시적 Oracle 요청 또는 Medium/High 판정 뒤 카드 작성 시작 → [`card/policy-sources.md`](references/card/policy-sources.md), [`card/risk-grill.md`](references/card/risk-grill.md)
+- 계약 행(매트릭스) 작성 → [`bva.md`](references/bva.md), [`card/card-format.md`](references/card/card-format.md)
+- Draft 사용자 확인·lock·run artifact 초기화 직전 → [`card/confirmation-lock.md`](references/card/confirmation-lock.md)
 - 새 UI·redesign 또는 보이는 layout·palette·type·copy·motion·responsive·identity 변경 전 → [`visual-design.md`](references/visual-design.md)
 - screenshot 비교·직접 브라우저 QA 명시 요청 → 별도 `$frontend-visual-qa` 호출, 이 스킬은 실행을 소유하지 않음
-- Delivery 진입 직후 → 설치된 `$test` 스킬을 이름으로 명시적으로 로드·호출, 못 찾으면 `FAIL`; [`implementation-loop.md`](references/implementation-loop.md), [`changeability.md`](references/changeability.md), [`frontend-implementation.md`](references/frontend-implementation.md), [`architecture-contract.md`](references/architecture-contract.md)
-- 카드에 async·순서·중복 제출·retry·다단계 상태 `O*` 행, 또는 client state·exported Props·shared/package API·trust boundary 타입 변경 전 → [`type-constraints.md`](references/type-constraints.md)
+- Delivery 진입 직후 → 설치된 `$test` 스킬을 이름으로 명시적으로 로드·호출, 못 찾으면 `FAIL`; [`delivery/ledger.md`](references/delivery/ledger.md), [`delivery/red.md`](references/delivery/red.md)
+- `VALID_RED` 뒤 production 수정 직전 → [`delivery/implementation-decision.md`](references/delivery/implementation-decision.md), [`changeability.md`](references/changeability.md), [`frontend-implementation.md`](references/frontend-implementation.md); React architecture 경계·state ownership·public API 변경이면 [`architecture-contract.md`](references/architecture-contract.md)
+- 셀프피드백·GREEN 게이트·review 전이 → [`delivery/green-review.md`](references/delivery/green-review.md)
+- 카드에 async·순서·중복 제출·retry·다단계 상태 `O*` 행, 또는 client state·exported Props·shared/package API·trust boundary 타입 변경 전 → [`types/state-ladder.md`](references/types/state-ladder.md), [`types/authoring.md`](references/types/authoring.md)
+- exported shared/package API·Props 표면 변경 전 → [`types/api-surface.md`](references/types/api-surface.md)
 - 레포당 1회 — 타입 계약 첫 작성 전, 또는 diff가 tsconfig·TS 버전을 바꿈 → [`type-environment.md`](references/type-environment.md), 결과를 Source Registry에 기록, 카드마다 반복하지 않음
 - Delivery 활성 + FSD 레포(또는 도입 승인) + FSD 채택·폴더 구조를 제안·설계·리뷰하기 전 → [`fsd.md`](references/fsd.md)
 - backend·full-stack·DB·data-access 경계를 만들거나 바꾸기 전 → [`backend.md`](references/backend.md)
 - 성능 요구·개선 claim이 있는 카드 작성 또는 production 수정 전 → [`performance.md`](references/performance.md)
-- 구현·테스트 검증 후 → [`subagent-review.md`](references/subagent-review.md); Design Intent 있으면 [`visual-design.md`](references/visual-design.md) 재독
+- 구현·테스트 검증 후 → [`subagent-review.md`](references/subagent-review.md); 타입 계약을 만든 변경이면 [`types/review-criteria.md`](references/types/review-criteria.md); Design Intent 있으면 [`visual-design.md`](references/visual-design.md) 재독. 리뷰 기준은 프롬프트에 복붙하지 않고 diff에 해당하는 reference 파일만 `review-packet --review-point`의 파일 링크로 전달한다
 
 ## 모드 선택
 
@@ -165,7 +179,7 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
    범위 기록. `local`·`identity-shaping`은 Design Change Confirmation을 받고 카드에
    기록. 미확인·미결이면 `NEEDS_DECISION`.
 6. Risk 판정 + 정책 출처 조사.
-7. 필요한 Grill 질문과 BVA로 **Draft Oracle** 작성. Grill은 `oracle-card.md`의 phase
+7. 필요한 Grill 질문과 BVA로 **Draft Oracle** 작성. Grill은 `card/risk-grill.md`의 phase
    순서(결과→위험→데이터·아키텍처→API→경합·비동기→상태→시각→성능·운영)를 따르고,
    사용자가 명시적으로 1문1답 인터뷰를 요청한 경우에만 라운드 상한 없이 진행한다.
 8. 기존 revision은 semantic delta, 새 카드는 전체 정책·미결 질문을 보여주고 명시적으로
@@ -198,7 +212,7 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
    reporter의 실패 test name을 카드 행에 매핑하고 `oracle-verify.mjs red` 통과 run만
    `VALID_RED`로 전이. network·mock·테스트 배치는 불변 규칙과 승인된 architecture
    source, FSD면 `references/fsd.md` 규칙을 따른다.
-7. production 수정 전 `implementation-loop.md`·`frontend-implementation.md`로 구현 결정
+7. production 수정 전 `delivery/implementation-decision.md`·`frontend-implementation.md`로 구현 결정
    기록 후 최소 구현→GREEN.
 8. High risk는 sibling `test` skill의 mutation kill·원복·재-GREEN 먼저.
 9. `oracle-run.mjs review-packet`으로 원시 리뷰 입력 생성 → `subagent-review.md`로 독립
@@ -206,15 +220,9 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
 
 ## 피드백 라우팅
 
-테스트·리뷰의 새 관찰마다 주원인 하나를 기록하고 아래 경로만 사용한다.
-
-- `POLICY_GAP` → 카드 현재본과 질문을 출력하고 `NEEDS_DECISION`
-- `EVIDENCE_GAP` → 잠긴 카드 범위 안에서 누락된 테스트·reviewer 매핑만 추가
-- `HARNESS_DEFECT` → locator·fixture·barrier 등 허용 항목만 공용 2회 예산으로 보정
-- `PRODUCT_DEFECT` → 결정론 테스트의 `VALID_RED` 뒤 production 개선 예산 사용
-- `ENVIRONMENT_DEFECT` → production을 건드리지 않고 실제 원인과 함께 `FAIL`
-- `NON_ORACLE_OPINION` → 근거와 함께 기록하고 완료 차단이나 정책 변경에 사용하지 않음
-
+테스트·리뷰의 새 관찰마다 주원인 하나를 `POLICY_GAP`·`EVIDENCE_GAP`·
+`HARNESS_DEFECT`·`PRODUCT_DEFECT`·`ENVIRONMENT_DEFECT`·`NON_ORACLE_OPINION` 중
+하나로 기록하고, [`common.md`](references/common.md)의 canonical 라우팅 표만 따른다.
 현재 구현·test 관찰·reviewer 선호는 분류 증거일 뿐 정책 출처가 아니다. 승인된 Design
 Intent 불일치는 단순 선호가 아니며 `visual-design.md` 기준으로 분류한다.
 

@@ -8,7 +8,7 @@ reference다. metric·threshold는 승인된 성능 계약이나 사용자 답�
 
 측정 명령·baseline/after run·`performance` 필수 label은
 [`frontend-implementation.md`](frontend-implementation.md) 7절과
-[`implementation-loop.md`](implementation-loop.md)의 GREEN 게이트가 소유한다. 이
+[`delivery/green-review.md`](delivery/green-review.md)의 GREEN 게이트가 소유한다. 이
 문서는 문제 분류·원인 확인·trade-off 판단만 소유한다.
 
 ## 1. 문제를 세 축으로 분류한다
