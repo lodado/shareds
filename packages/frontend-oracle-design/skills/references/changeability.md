@@ -253,15 +253,3 @@ memoization·cache·lazy loading과 단일 request를 위한 global state다.
   않는다. 상태 소유자, 외부 effect 위치, 입력·출력·오류 계약이 기준이다.
 - 100% coverage, zero dependency 또는 특정 React·Next 버전을 보편 규칙으로 만들지 않는다.
 - “Toss가 만들었다”는 이유만으로 build-vs-buy 결정을 하지 않는다.
-
-## Source Registry
-
-외부 자료는 제품 정책 출처가 아니며 대상 레포의 실제 버전과 계약이 우선한다.
-
-- 간결한 네 축 skill 구조: [Frontend Fundamentals plugin skills](https://github.com/toss/frontend-fundamentals/tree/abec04157e2c6eac5be1e59b1a82863a138c6c66/frontend-fundamentals-plugin/skills), commit `abec04157e2c6eac5be1e59b1a82863a138c6c66`.
-- 변경 용이성 정의와 사례: [Frontend Fundamentals](https://github.com/toss/frontend-fundamentals/blob/161d3d6a0d6d372eacd75036de567511643f6265/fundamentals/code-quality/code/index.md), commit `161d3d6a0d6d372eacd75036de567511643f6265`.
-- React lifecycle·SSR·cleanup 보조 근거: [react-simplikit](https://github.com/toss/react-simplikit/blob/85d19c3816afca9a84ffbd5b7ff581962cb5db4c/docs/ko/core/design-principles.md), commit `85d19c3816afca9a84ffbd5b7ff581962cb5db4c`.
-- built-in·단순 API·측정 원칙: [es-toolkit](https://github.com/toss/es-toolkit/blob/5dc4477f838b8cee2b6b09af4f373be2b3aaaa54/AGENTS.md), commit `5dc4477f838b8cee2b6b09af4f373be2b3aaaa54`.
-- 관찰 결과가 다른 close·unmount lifecycle: [overlay-kit event contract](https://github.com/toss/overlay-kit/blob/8f0e59ca653932b44dc19d5002c7dea253682c53/packages/src/event.ts), commit `8f0e59ca653932b44dc19d5002c7dea253682c53`.
-- 처리 가능한 오류만 잡고 나머지를 전파하는 경계: [Suspensive ErrorBoundary](https://github.com/toss/suspensive/blob/c9ada0a088fe6fdb14440935edf01b7a0680d1ae/packages/react/src/ErrorBoundary.tsx), commit `c9ada0a088fe6fdb14440935edf01b7a0680d1ae`.
-- typed transition core와 router adapter 분리: [use-funnel core](https://github.com/toss/use-funnel/blob/26a9aa78723b84178e40eadab38378a052dcaf12/packages/core/src/core.ts), [Next adapter](https://github.com/toss/use-funnel/blob/26a9aa78723b84178e40eadab38378a052dcaf12/packages/next/src/useFunnel.tsx), commit `26a9aa78723b84178e40eadab38378a052dcaf12`.
