@@ -67,6 +67,10 @@ production과 소유권이 갈라지지 않게 하며, slice 삭제·이동 시 
   `<segment>/__test__/*.unit.test.ts(x)`에 둔다. FSD가 아니면 컴포넌트 옆
   `*.scenario.test.tsx`, 순수 helper 옆 `*.unit.test.ts`, 페이지 플로우는 레포의
   Playwright 관례를 따른다.
+- 테스트 이름은 describe `as`, it `to be` 패턴으로 적는다:
+  `describe('<대상> as <상황·역할>')`, `it('to be <관찰 가능한 기대 결과>')`. 예)
+  `describe('CheckoutButton as a form with a submit in flight')` +
+  `it('to be exactly one POST /orders')`.
 - 값 선정은 카드의 BVA 열 근거 — 임의 값 금지, 이유가 자명하지 않으면 주석.
 - assertion은 정확한 값·횟수: `toBe(1)`, `error.code`. `toBeTruthy`·`>0` 금지.
 - 관찰 가능한 것만: 렌더된 UI, 입력값, 공개 콜백, 네트워크 요청(횟수·payload),
