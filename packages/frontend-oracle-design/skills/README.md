@@ -144,6 +144,9 @@ flowchart LR
 로드하고 `types-api-surface`를 선행 조건으로 둡니다. 단순 Props·feature-local 상태·내장
 utility로 끝나는 관계에는 로드하지 않습니다.
 
+0.24.0에서 추가한 compiler witness, 외부 저장소 provenance, TypeScript와 runtime 검증의
+경계는 [`TYPESCRIPT-VERIFICATION.md`](../TYPESCRIPT-VERIFICATION.md)에 정리했습니다.
+
 첫 툴 콜은 lane 진입 노드 **하나**의 Read로 고정되고, 응답은
 `risk=<Low|Medium|High> lane=<low-fast-path|oracle> nodes=[실제로 읽은 노드]` 헤더로
 시작합니다. 구현 요청이든 설명·플랜 전용 요청이든 동일합니다 — 로딩을 건너뛴 사실이
