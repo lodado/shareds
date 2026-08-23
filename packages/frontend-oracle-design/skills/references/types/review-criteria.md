@@ -66,6 +66,8 @@
   `FINDING`이다. 축 목록은 [`../bva.md`](../bva.md)의 타입 경계 절이 소유한다.
 - 한 API의 `@ts-expect-error`가 30개를 넘는데 API 분리를 검토하지 않았으면 `FINDING`이다.
   30은 채워야 할 목표가 아니라 표면이 너무 넓다는 설계 실격선이다.
+- Implementation Decision 3에 오용 목록이 있는데 경계 축을 전부 N/A로 적었으면 `FINDING`이다.
+  막는다고 적은 오용이 곧 닫는 축이다.
 - recursive/distributive type이 project compiler evidence와 필요한 성능 전후값 없이 들어가면
   `FINDING`이다.
 - type error를 `any`, double assertion, `@ts-ignore`, `skipLibCheck`로 숨기면 `FINDING`이다.

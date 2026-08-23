@@ -314,11 +314,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.27.0')
+  assert.equal(version, '0.27.1')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.27.0')
+  assert.equal(marketplace.version, '0.27.1')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -905,6 +905,9 @@ test('scopes negative type witnesses to boundary axes and caps them as a design 
   assert.match(bva, /30은 채워야 할 목표가 아니라 표면이 너무 넓다는 설계 실격선이다/)
   assert.match(typeConstraints, /30개를 넘으면 케이스를\s*\n?\s*더 쓰지 말고 API를 나눈다/)
   assert.match(typeConstraints, /30개를 넘는데 API 분리를 검토하지 않았으면 `FINDING`이다/)
+
+  // 축을 아예 선언하지 않는 우회를 오용 목록과 묶어 닫는다
+  assert.match(typeConstraints, /오용 목록이 있는데 경계 축을 전부 N\/A로 적었으면 `FINDING`이다/)
 })
 
 test('keeps client state data-only and hands actions back beside it', async () => {
