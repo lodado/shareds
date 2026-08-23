@@ -2,17 +2,16 @@
 
 ## 언제 읽나
 
-대상 레포에서 이 스킬로 타입 계약([`types/state-ladder.md`](types/state-ladder.md))을
-처음 만들기 전 **레포당 1회**, 또는 diff가 tsconfig·TypeScript 버전을 바꿀 때만
-읽는다. 매 카드마다 다시 읽지 않는다.
-
-"컴파일되지 않는다"는 컴파일러 설정의 함수다. 환경이 고정되지 않은 타입 계약은
-결정적이지 않다 — 같은 코드가 레포 설정에 따라 통과하기도 실패하기도 한다.
+- 대상 레포에서 이 스킬로 타입 계약([`types/state-ladder.md`](types/state-ladder.md))을
+  처음 만들기 전 **레포당 1회**.
+- 또는 diff가 tsconfig·TypeScript 버전을 바꿀 때. 매 카드마다 다시 읽지 않는다.
+- 근거 — "컴파일되지 않는다"는 컴파일러 설정의 함수다. 환경이 고정되지 않은 타입 계약은
+  결정적이지 않다. 같은 코드가 레포 설정에 따라 통과하기도 실패하기도 한다.
 
 ## 검증 항목
 
-tsconfig는 `extends` 체인을 끝까지 따라가 실효 값으로 판정한다
-(`tsc --showConfig`). 파일에 보이는 값이 아니라 실효 값이 기준이다.
+tsconfig는 `extends` 체인을 끝까지 따라가 실효 값으로 판정한다 (`tsc --showConfig`).
+파일에 보이는 값이 아니라 실효 값이 기준이다.
 
 | 항목                                 | 기준  | 미충족 시 약화되는 계약                                               |
 | ------------------------------------ | ----- | --------------------------------------------------------------------- |
@@ -35,12 +34,13 @@ tsconfig는 `extends` 체인을 끝까지 따라가 실효 값으로 판정한�
   목록을 Implementation Decision에 기록하고 진행한다. 그 계약 위반은 컴파일이
   아니라 리뷰·테스트가 잡아야 한다는 뜻이다.
 
-기록된 환경과 다른 tsconfig·버전 변경이 이후 diff에 나타나면 이 문서를 다시
-읽고 Source Registry 기록을 갱신한다. compiler upgrade는 `strict` 계열 동작도 바꿀 수
-있는 project-constraint 변경이다. Playground나 최신 TypeScript에서만 통과한 결과는
-Source Registry 증거가 아니다. lockfile/package manager가 실제 resolve한 compiler version과
-`tsc --showConfig`의 실효 값을 기록한다.
+## 기록과 재검증
 
-custom recursive·distributive·template-literal type 또는 성능 claim이 있으면
-`tsc --noEmit --extendedDiagnostics`의 baseline/after 값을 Implementation Decision에 남긴다.
-`--generateTrace`는 baseline 악화가 있고 원인 규명이 필요할 때만 사용한다.
+- 기록된 환경과 다른 tsconfig·버전 변경이 이후 diff에 나타나면 이 문서를 다시 읽고 Source
+  Registry 기록을 갱신한다. compiler upgrade는 `strict` 계열 동작도 바꿀 수 있는
+  project-constraint 변경이다.
+- lockfile/package manager가 실제 resolve한 compiler version과 `tsc --showConfig`의 실효 값을
+  기록한다. Playground나 최신 TypeScript에서만 통과한 결과는 Source Registry 증거가 아니다.
+- custom recursive·distributive·template-literal type 또는 성능 claim이 있으면
+  `tsc --noEmit --extendedDiagnostics`의 baseline/after 값을 Implementation Decision에 남긴다.
+  `--generateTrace`는 baseline 악화가 있고 원인 규명이 필요할 때만 사용한다.
