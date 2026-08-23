@@ -34,6 +34,9 @@ trust boundary의 parse는 선택 사항이 아니다. 서로 다른 종류의 �
 `Exclude`·`NonNullable`·`NoInfer`·`Readonly`·`Record`·`Pick`·`Omit`)를 custom
 conditional type으로 재구현하지 않는다. 뒷 단 세 개(overload·mapped/conditional·
 recursive)는 [`api-surface.md`](api-surface.md)의 격리 조건을 만족할 때만 쓴다.
+custom exported generic 또는 mapped·conditional·template-literal·recursive type,
+variance-sensitive callback, deep transform을 실제로 선택하면
+[`advanced-contracts.md`](advanced-contracts.md)까지 읽고 compiler witness를 남긴다.
 
 ## 타입 작성 규칙
 

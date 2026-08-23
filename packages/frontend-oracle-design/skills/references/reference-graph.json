@@ -150,6 +150,12 @@
       "requires": ["types-state-ladder", "types-authoring"]
     },
     {
+      "id": "types-advanced-contracts",
+      "path": "references/types/advanced-contracts.md",
+      "when": "custom exported generic, mapped·conditional·template-literal·recursive type, variance-sensitive callback, deep transform을 설계·변경·리뷰할 때만",
+      "requires": ["types-api-surface"]
+    },
+    {
       "id": "types-review-criteria",
       "path": "references/types/review-criteria.md",
       "when": "타입·상태 계약 변경의 독립 리뷰",

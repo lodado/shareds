@@ -27,7 +27,9 @@
   `FINDING`이다.
 - 앞 단 메커니즘으로 닫히는 문제에 뒷 단 타입을 썼거나, feature 코드에 자작
   mapped·conditional·recursive utility가 있거나, 내장 utility 재구현이나 type
-  test 없는 고급 utility가 있으면 `FINDING`이다.
+  test 없는 고급 utility가 있으면 `FINDING`이다. 고급 type이 막는 실제 오용을
+  적지 못하거나 Type Challenges 같은 puzzle corpus를 product policy로 인용해도
+  `FINDING`이다.
 - 구현이 모든 key를 채우지 않는데 `Record<K, V>`로 total map을 약속했거나, 실행이
   지연·캐시되는 wrapper가 즉시 `ReturnType<F>`를 반환한다고 선언했으면
   `FINDING`이다. sparse lookup 결과의 `Partial<Record<K, V>>`는
@@ -52,6 +54,14 @@
   값을 상태 필드로 발명했으면 `FINDING`이다. 구분이 필요하면 `POLICY_GAP`이다.
 - 시간축 비결정성을 타입만으로 "해결됨" 처리했으면 `FINDING`이다.
 - 생성 후 typecheck를 실행했을 뿐인데 생성 자체를 결정론화했다고 보고하면
+  `FINDING`이다. distributive conditional에 `any`·`unknown`·`never`·union edge test가
+  없거나, mapped type이 readonly·optional modifier를 의도 없이 잃거나, template
+  literal type을 runtime input validator로 보고하거나, method bivariance를 callback
+  safety 증거로 오인하면 `FINDING`이다.
+- `@ts-expect-error` 한 줄이 여러 오용을 담아 unrelated diagnostic으로 통과할 수 있거나,
+  `Equal`류 helper만 있고 public call·assignment witness가 없거나, recursive/distributive
+  type이 project compiler evidence와 필요한 성능 전후값 없이 들어가면 `FINDING`이다.
+  type error를 `any`, double assertion, `@ts-ignore`, `skipLibCheck`로 숨기는 것도
   `FINDING`이다.
 - 구현 diff가 `.test-d.*`의 `@ts-expect-error` 케이스를 삭제·약화했거나, 계약
   타입·스키마를 넓혀(필수 필드→optional, union→`string`) 타입 오류를 없앴는데

@@ -83,6 +83,15 @@ public 위치 사이 관계를 만들고, 일반 제품 호출부에서 자동 �
   tuple 입력 수용, type predicate narrowing, literal의 `string` widening 미발생도
   같이 검증한다. 각 `@ts-expect-error`에는 어떤 오용을 차단하는지 한 줄 이유를
   적는다. 로컬 상태에는 추가하지 않는다.
+- public compiler witness는 실제 call·assignment·`satisfies`를 우선한다.
+  `Equal<A, B>`류 helper만으로 public API를 검증하지 않는다. negative case는
+  `@ts-expect-error` 다음 줄에 한 오용 표현만 둬 unrelated diagnostic이 통과시키지
+  못하게 한다. custom generic은 관련 있는 `any`·`unknown`·`never`, union, readonly
+  tuple, optional property, overload edge만 고르고 모든 타입에 같은 checklist를
+  붙이지 않는다. 계약을 `string`·optional·`any`로 넓혔을 때 unused
+  `@ts-expect-error`나 exhaustive failure로 suite가 RED가 되는 mutation을 한 번
+  확인한다. type-valid는 behavior-correct가 아니므로 runtime behavior test는 별도
+  run label로 기록한다.
 - Implementation Decision에는 (1) 도출한 상태·이벤트 집합과 카드 행 매핑,
   (2) 선택한 사다리 단과 exhaustiveness 계층, (3) **이제 컴파일되지 않는 잘못된
   사용 목록과 실패 증거**, (4) 타입으로 못 잡아 런타임으로 방어한 행동·시간축 항목을

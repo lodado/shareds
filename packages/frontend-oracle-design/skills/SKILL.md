@@ -186,6 +186,7 @@ reference는 [`reference-graph.json`](references/reference-graph.json)에 선언
 - 셀프피드백·GREEN 게이트·review 전이 → [`delivery/green-review.md`](references/delivery/green-review.md), [`frontend/quality.md`](references/frontend/quality.md)
 - 카드에 async·순서·중복 제출·retry·다단계 상태 `O*` 행, 또는 client state·exported Props·shared/package API·trust boundary 타입 변경 전 → [`types/state-ladder.md`](references/types/state-ladder.md), [`types/authoring.md`](references/types/authoring.md), [`frontend/decisions.md`](references/frontend/decisions.md) — 로딩·오류 경계 판정표(3절)와 상태 소유권(1절)이 설계 단계 결정이라 `requires` 엣지로 함께 온다
 - exported shared/package API·Props 표면 변경 전 → [`types/api-surface.md`](references/types/api-surface.md)
+- `custom exported generic, mapped·conditional·template-literal·recursive type, variance-sensitive callback, deep transform을 설계·변경·리뷰할 때만` → [`types/advanced-contracts.md`](references/types/advanced-contracts.md) (`types/api-surface.md` 선행)
 - 레포당 1회 — 타입 계약 첫 작성 전, 또는 diff가 tsconfig·TS 버전을 바꿈 → [`type-environment.md`](references/type-environment.md), 결과를 Source Registry에 기록, 카드마다 반복하지 않음
 - FSD 레포(또는 도입 승인) + FSD 채택·폴더 구조를 제안·설계·리뷰하기 전 → [`fsd.md`](references/fsd.md)
 - backend·full-stack·DB·data-access 경계를 만들거나 바꾸기 전 → [`backend.md`](references/backend.md)

@@ -129,7 +129,7 @@ flowchart LR
   FA --> DID
   COMMON --> SR2["subagent-review"] --> TRC["types-review-criteria"]
   CH --> SR2
-  COMMON --> TSL["types-state-ladder"] --> TA["types-authoring"] --> TAS["types-api-surface"]
+  COMMON --> TSL["types-state-ladder"] --> TA["types-authoring"] --> TAS["types-api-surface"] --> TAC["types-advanced-contracts<br/><i>advanced public type only</i>"]
   COMMON --> AC["architecture-contract"]
   COMMON --> VD["visual-design"]
   IND["fsd · backend · performance · type-environment<br/><i>독립 노드 — 조건 충족 시에만</i>"]
@@ -138,6 +138,11 @@ flowchart LR
 
 화살표는 실행 순서가 아니라 **선행 조건**입니다. `card-format`을 읽으려면 `common`과
 `bva`를 이미 읽었어야 한다는 뜻입니다.
+
+`types-advanced-contracts`는
+`custom exported generic, mapped·conditional·template-literal·recursive type, variance-sensitive callback, deep transform을 설계·변경·리뷰할 때만`
+로드하고 `types-api-surface`를 선행 조건으로 둡니다. 단순 Props·feature-local 상태·내장
+utility로 끝나는 관계에는 로드하지 않습니다.
 
 첫 툴 콜은 lane 진입 노드 **하나**의 Read로 고정되고, 응답은
 `risk=<Low|Medium|High> lane=<low-fast-path|oracle> nodes=[실제로 읽은 노드]` 헤더로

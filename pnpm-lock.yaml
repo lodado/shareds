@@ -101,7 +101,11 @@ importers:
         specifier: ^9.39.5
         version: 9.39.5
 
-  packages/frontend-oracle-design: {}
+  packages/frontend-oracle-design:
+    devDependencies:
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
 
   packages/frontend-system-design: {}
 

@@ -32,8 +32,11 @@ const TYPES_NODE_FILES = [
   'references/types/state-ladder.md',
   'references/types/authoring.md',
   'references/types/api-surface.md',
+  'references/types/advanced-contracts.md',
   'references/types/review-criteria.md',
 ]
+const ADVANCED_TYPES_LOAD_CONDITION =
+  'custom exported generic, mapped·conditional·template-literal·recursive type, variance-sensitive callback, deep transform을 설계·변경·리뷰할 때만'
 
 async function readAll(relativePaths) {
   const parts = await Promise.all(relativePaths.map(read))
@@ -311,11 +314,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.23.1')
+  assert.equal(version, '0.24.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.23.1')
+  assert.equal(marketplace.version, '0.24.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -864,6 +867,29 @@ test('reads load conditions at the decision point, not at the write stage', asyn
   assert.ok(byId.get('types-state-ladder').requires.includes('frontend-decisions'))
   assert.match(skill, /state-ladder\.md\).*frontend\/decisions\.md/)
   assert.match(typeConstraints, /판정표를 읽기 전에 로딩 수단을 고르지\s*\n?\s*않는다/)
+})
+
+test('loads advanced compiler contracts only for advanced public type relationships', async () => {
+  const [skill, readme, advancedContracts, graphSource] = await Promise.all([
+    read('SKILL.md'),
+    read('README.md'),
+    read('references/types/advanced-contracts.md'),
+    read('references/reference-graph.json'),
+  ])
+  const graph = JSON.parse(graphSource)
+  const byId = new Map(graph.nodes.map((node) => [node.id, node]))
+  const advancedNode = byId.get('types-advanced-contracts')
+
+  assert.equal(advancedNode?.path, 'references/types/advanced-contracts.md')
+  assert.equal(advancedNode?.when, ADVANCED_TYPES_LOAD_CONDITION)
+  assert.deepEqual(advancedNode?.requires, ['types-api-surface'])
+  assert.equal(byId.get('types-state-ladder').requires.includes('types-advanced-contracts'), false)
+  assert.ok(skill.includes(ADVANCED_TYPES_LOAD_CONDITION))
+  assert.ok(readme.includes(ADVANCED_TYPES_LOAD_CONDITION))
+
+  assert.match(advancedContracts, /AI가 만든 공개 타입 계약을 컴파일러로 거절 가능하게/)
+  assert.match(advancedContracts, /실제로 막아야 하는 오용 최소 3개.*`@ts-expect-error`/)
+  assert.match(advancedContracts, /runtime complement.*별도 parser·guard·runtime test/)
 })
 
 test('keeps client state data-only and hands actions back beside it', async () => {

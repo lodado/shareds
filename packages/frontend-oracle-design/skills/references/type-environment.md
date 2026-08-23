@@ -14,12 +14,15 @@
 tsconfig는 `extends` 체인을 끝까지 따라가 실효 값으로 판정한다
 (`tsc --showConfig`). 파일에 보이는 값이 아니라 실효 값이 기준이다.
 
-| 항목                         | 기준  | 미충족 시 약화되는 계약                                               |
-| ---------------------------- | ----- | --------------------------------------------------------------------- |
-| TypeScript 버전              | ≥ 5.4 | `NoInfer`(5.4)·`const` type parameter(5.0)·`satisfies`(4.9) 사용 불가 |
-| `strict`                     | 필수  | discriminated union 좁히기·null 안전 — 타입 계약 전제 자체가 없음     |
-| `noUncheckedIndexedAccess`   | 권장  | lookup map·배열 인덱스 접근이 `undefined` 검사 없이 통과              |
-| `exactOptionalPropertyTypes` | 권장  | 연산 union의 "유지 vs 삭제" `undefined` 구분이 컴파일로 보증 안 됨    |
+| 항목                                 | 기준  | 미충족 시 약화되는 계약                                               |
+| ------------------------------------ | ----- | --------------------------------------------------------------------- |
+| TypeScript 버전                      | ≥ 5.4 | `NoInfer`(5.4)·`const` type parameter(5.0)·`satisfies`(4.9) 사용 불가 |
+| `strict`                             | 필수  | discriminated union 좁히기·null 안전 — 타입 계약 전제 자체가 없음     |
+| `strictFunctionTypes`                | 권장  | callback parameter 안전. 단 method·constructor bivariance 예외는 남음 |
+| `useUnknownInCatchVariables`         | 권장  | `catch` 값이 `any`처럼 흘러 boundary parsing 없이 사용될 수 있음      |
+| `noUncheckedIndexedAccess`           | 권장  | lookup map·배열 인덱스 접근이 `undefined` 검사 없이 통과              |
+| `noPropertyAccessFromIndexSignature` | 권장  | 열린 dictionary key를 확정 property처럼 읽는 코드가 통과              |
+| `exactOptionalPropertyTypes`         | 권장  | 연산 union의 "유지 vs 삭제" `undefined` 구분이 컴파일로 보증 안 됨    |
 
 ## 판정
 
@@ -33,4 +36,11 @@ tsconfig는 `extends` 체인을 끝까지 따라가 실효 값으로 판정한�
   아니라 리뷰·테스트가 잡아야 한다는 뜻이다.
 
 기록된 환경과 다른 tsconfig·버전 변경이 이후 diff에 나타나면 이 문서를 다시
-읽고 Source Registry 기록을 갱신한다.
+읽고 Source Registry 기록을 갱신한다. compiler upgrade는 `strict` 계열 동작도 바꿀 수
+있는 project-constraint 변경이다. Playground나 최신 TypeScript에서만 통과한 결과는
+Source Registry 증거가 아니다. lockfile/package manager가 실제 resolve한 compiler version과
+`tsc --showConfig`의 실효 값을 기록한다.
+
+custom recursive·distributive·template-literal type 또는 성능 claim이 있으면
+`tsc --noEmit --extendedDiagnostics`의 baseline/after 값을 Implementation Decision에 남긴다.
+`--generateTrace`는 baseline 악화가 있고 원인 규명이 필요할 때만 사용한다.
