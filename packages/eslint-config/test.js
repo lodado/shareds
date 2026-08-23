@@ -1,14 +1,14 @@
-/* eslint-disable @lodado/local-rules/no-console-log -- test progress output */
+/* eslint-disable @lodado/local-rules/no-console-log, no-console -- test progress output */
 /**
  * Smoke test for the presets. Each one is linted the way it is meant to be used -
  * layered on top of the base preset - so a missing plugin, a bad config entry,
  * or a preset that breaks parsing shows up as a failure instead of a silent message.
  */
-const assert = require('assert')
-const path = require('path')
+const assert = require('node:assert')
+const path = require('node:path')
+const process = require('node:process')
 const { ESLint } = require('eslint')
 
-const BASE = require('./index.js')
 const PRESETS = {
   react: require('./react.js'),
   next: require('./next.js'),
@@ -17,6 +17,7 @@ const PRESETS = {
   'local-rules': require('./local-rules.js'),
   testing: require('./testing.js'),
   query: require('./query.js'),
+  quality: require('./quality.js'),
 }
 
 const SAMPLE = 'export const answer = 42\n'
@@ -38,6 +39,13 @@ const assertNoFatal = (result, label) => {
 }
 
 const main = async () => {
+  const { default: BASE } = await import('./index.mjs')
+
+  assert.ok(
+    BASE.some((config) => config.name === 'antfu/javascript/rules'),
+    'base preset should be powered by Antfu',
+  )
+
   const base = await lint(BASE)
   assertNoFatal(base, 'base')
   assert.strictEqual(base.messages.length, 0, `base: unexpected messages ${JSON.stringify(base.messages)}`)
@@ -105,6 +113,34 @@ const main = async () => {
     'sample-query.tsx',
     '@tanstack/query/exhaustive-deps',
   )
+  await assertReports(
+    [...BASE, ...PRESETS.quality],
+    'export const same = (value) => value < value\n',
+    'sample-quality.ts',
+    'sonarjs/no-identical-expressions',
+  )
+  await assertReports(
+    [...BASE, ...PRESETS.quality],
+    "import value from 'ai-hallucinated-package'\nexport { value }\n",
+    'sample-quality-dependency.ts',
+    'sonarjs/no-implicit-dependencies',
+  )
+  await assertReports(
+    [...BASE, ...PRESETS.quality],
+    'export const answer = undeclaredAnswer\n',
+    'sample-quality-reference.ts',
+    'sonarjs/no-reference-error',
+  )
+
+  const incompleteBranch = await lint(
+    [...BASE, ...PRESETS.quality],
+    'export function classify(value) { if (value === 1) return 1; else if (value === 2) return 2 }\n',
+    'sample-quality-branch.ts',
+  )
+  const missingElse = incompleteBranch.messages.find((message) => message.ruleId === 'sonarjs/elseif-without-else')
+  assert.ok(missingElse, 'quality: elseif-without-else did not report on an incomplete branch chain')
+  assert.strictEqual(missingElse.severity, 1, 'quality: reviewability rules should remain warnings')
+  console.log('ok  quality reviewability rules stay warnings')
 
   // The react preset's effect discipline - deriving state inside an effect must
   // fire both the compiler rule and the you-might-not-need-an-effect rule.
@@ -163,7 +199,7 @@ const main = async () => {
   })
   const [strictResult] = await strictEslint.lintFiles([path.join(strictFixture, 'sample.ts')])
   assert.ok(
-    strictResult.messages.some((message) => message.ruleId === '@typescript-eslint/switch-exhaustiveness-check'),
+    strictResult.messages.some((message) => message.ruleId === 'ts/switch-exhaustiveness-check'),
     `strict-types: switch-exhaustiveness-check did not report: ${JSON.stringify(strictResult.messages)}`,
   )
   console.log('ok  strict-types/switch-exhaustiveness-check reports')

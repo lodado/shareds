@@ -26,22 +26,21 @@ base 프리셋은 항상 깔고 시작하고, 그 위에 프로젝트에 필요�
 돼요.
 
 ```js
-// .eslintrc.js
-module.exports = {
-  root: true,
-  extends: [
-    '@lodado/eslint-config',
-    '@lodado/eslint-config/react',
-    '@lodado/eslint-config/a11y',
-    '@lodado/eslint-config/local-rules',
-  ],
-}
+// eslint.config.mjs
+import base from '@lodado/eslint-config'
+import react from '@lodado/eslint-config/react'
+import a11y from '@lodado/eslint-config/a11y'
+import quality from '@lodado/eslint-config/quality'
+import localRules from '@lodado/eslint-config/local-rules'
+
+export default [...base, ...react, ...a11y, ...quality, ...localRules]
 ```
 
 쓸 수 있는 프리셋은 base(`.`), `react`, `next`, `a11y`, `turbo`, `local-rules`,
-`testing`, `query`가 있어요. 자세한 안내는
+`testing`, `query`, `quality`, `strict-types`가 있어요. 자세한 안내는
 [`eslint-setup` 스킬](packages/vibe-coding-helper/skills/eslint-setup/SKILL.md)에
-정리해 뒀어요.
+정리해 뒀어요. `quality`가 AI 생성 코드에서 어떤 결함을 막는지는
+[`SonarJS AI quality 규칙`](packages/eslint-config/QUALITY.md)에 규칙별로 기록해 뒀어요.
 
 ## 스킬은 이렇게 꽂아요
 

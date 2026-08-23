@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "Composable ESLint presets - enable only the ones you want",
   "license": "MIT",
-  "main": "index.js",
+  "main": "index.mjs",
   "exports": {
-    ".": "./index.js",
+    ".": "./index.mjs",
     "./react": "./react.js",
     "./next": "./next.js",
     "./a11y": "./a11y.js",
@@ -13,11 +13,12 @@
     "./local-rules": "./local-rules.js",
     "./testing": "./testing.js",
     "./query": "./query.js",
+    "./quality": "./quality.js",
     "./fsd": "./fsd.js",
     "./strict-types": "./strict-types.js"
   },
   "files": [
-    "index.js",
+    "index.mjs",
     "react.js",
     "next.js",
     "a11y.js",
@@ -25,6 +26,8 @@
     "local-rules.js",
     "testing.js",
     "query.js",
+    "quality.js",
+    "QUALITY.md",
     "fsd.js",
     "strict-types.js"
   ],
@@ -38,14 +41,14 @@
   },
   "scripts": {
     "test": "node test.js",
-    "lint": "eslint index.js react.js next.js a11y.js turbo.js local-rules.js testing.js query.js fsd.js test.js strict-types.js"
+    "lint": "eslint index.mjs react.js next.js a11y.js turbo.js local-rules.js testing.js query.js quality.js fsd.js test.js strict-types.js"
   },
   "dependencies": {
-    "@eslint/js": "^9.39.0",
+    "@antfu/eslint-config": "^9.3.0",
     "@lodado/eslint-plugin-local-rules": "workspace:*",
-    "@tanstack/eslint-plugin-query": "^5.101.4",
+    "@tanstack/eslint-plugin-query": "^5.102.0",
     "@vitest/eslint-plugin": "^1.6.27",
-    "eslint-config-next": "^16.3.1",
+    "eslint-config-next": "^16.3.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-config-turbo": "^2.10.11",
     "eslint-plugin-import": "^2.32.0",
@@ -54,16 +57,18 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-you-might-not-need-an-effect": "^1.0.2",
-    "eslint-plugin-simple-import-sort": "^12.1.0",
+    "eslint-plugin-sonarjs": "^4.2.0",
     "eslint-plugin-testing-library": "^7.16.2",
-    "globals": "^16.4.0",
     "typescript-eslint": "^8.67.0"
   },
   "peerDependencies": {
     "eslint": "^9.0.0"
   },
+  "engines": {
+    "node": "^22.22.2 || >=24.15.0"
+  },
   "devDependencies": {
     "eslint": "^9.39.5",
-    "next": "^16.3.1"
+    "next": "^16.3.2"
   }
 }

@@ -13,17 +13,18 @@ The config ships composable presets. Enable only what the package actually is.
 pnpm add -D @lodado/eslint-config eslint@^9.39.5
 ```
 
-v1.0.0부터 ESLint 9 flat config 전용이다 — `.eslintrc.*` 레포는 `eslint.config.mjs`로
-이전해야 쓸 수 있다. `next` preset은 `eslint-config-next@16`이 `next` 패키지 자체를
-require하므로 Next 앱(next 설치됨)에서만 동작한다. preset들이 공유 plugin 참조를
-내부에서 하나로 정규화하므로 별도 pnpm override는 필요 없다.
+v2.0.0부터 base는 Antfu 기반 ESM-only ESLint 9 flat config다. Node 22.22.2 또는
+24.15.0 이상이 필요하며 `.eslintrc.*` 레포는 `eslint.config.mjs`로 이전해야 한다.
+`next` preset은 `eslint-config-next@16`이 `next` 패키지 자체를 require하므로 Next
+앱(next 설치됨)에서만 동작한다. preset들이 공유 plugin 참조를 내부에서 하나로
+정규화하므로 별도 pnpm override는 필요 없다.
 
 ## Compose
 
 `eslint.config.mjs` in the consuming package — every preset is a flat-config array, spread it:
 
 ```js
-import base from '@lodado/eslint-config' // always - TS parsing, import sort, prettier conflict removal
+import base from '@lodado/eslint-config' // always - Antfu JS/TS/import defaults, Prettier conflict removal
 import react from '@lodado/eslint-config/react' // React recommended + hooks/effect discipline
 import next from '@lodado/eslint-config/next' // Next.js apps only
 import a11y from '@lodado/eslint-config/a11y' // JSX that renders user-facing markup
@@ -31,6 +32,7 @@ import turbo from '@lodado/eslint-config/turbo' // Turborepo workspaces - catche
 import localRules from '@lodado/eslint-config/local-rules' // lodado custom rules - see the table below
 import testing from '@lodado/eslint-config/testing' // Vitest/Testing Library + Playwright, scoped by file path
 import query from '@lodado/eslint-config/query' // packages using TanStack Query
+import quality from '@lodado/eslint-config/quality' // opt-in SonarJS bugs, code smells, complexity and security checks
 import strictTypes from '@lodado/eslint-config/strict-types' // typed lint - exhaustive discriminated union switches
 
 export default [
@@ -43,32 +45,38 @@ export default [
   ...localRules,
   ...testing,
   ...query,
+  ...quality,
   ...strictTypes,
 ]
 ```
 
-CJS(`eslint.config.js`)면 `require`로 같은 배열을 spread한다.
+Base가 ESM-only이므로 소비자 설정도 `eslint.config.mjs`를 사용한다.
 
 ## Which presets
 
-| Package kind                     | Presets                                            |
-| -------------------------------- | -------------------------------------------------- |
-| Node/TS library, no JSX          | base                                               |
-| React component library          | base + react + a11y + local-rules + testing        |
-| Next.js app                      | base + react + next + a11y + local-rules + testing |
-| Any package inside a turborepo   | add turbo                                          |
-| Any package using TanStack Query | add query                                          |
-| Any package with a tsconfig      | add strict-types                                   |
+| Package kind                                       | Presets                                            |
+| -------------------------------------------------- | -------------------------------------------------- |
+| Node/TS library, no JSX                            | base                                               |
+| React component library                            | base + react + a11y + local-rules + testing        |
+| Next.js app                                        | base + react + next + a11y + local-rules + testing |
+| Any package inside a turborepo                     | add turbo                                          |
+| Any package using TanStack Query                   | add query                                          |
+| Any JS/TS package opting into broad quality checks | add quality                                        |
+| Any package with a tsconfig                        | add strict-types                                   |
 
 `strict-types` needs type information. It ships `parserOptions.project: true` (nearest
 tsconfig.json); override `parserOptions.project` in the consuming config when that guess is
 wrong (for example a monorepo package linting files owned by a different tsconfig). It turns on
-`@typescript-eslint/switch-exhaustiveness-check` as an error with redundant defaults also
+`ts/switch-exhaustiveness-check` as an error with redundant defaults also
 reported, so every switch over a discriminated union must name all states.
 
 `testing` routes by path on its own: `*.test.*` / `*.spec.*` get the Vitest and Testing Library
 rules, `e2e/**`, `*.e2e.*` and `playwright/**` get the Playwright rules. Nothing else is touched,
 so it is safe to enable package-wide.
+
+`quality` enables SonarJS's recommended flat config plus the AI reliability rules documented in
+[`QUALITY.md`](../../../eslint-config/QUALITY.md). It is opt-in because its broad code-smell and
+complexity checks can surface existing debt when first adopted.
 
 Order matters: later entries win. Keep the base preset first.
 

@@ -27,7 +27,7 @@
   "scripts": {
     "prepare": "husky install",
     "lint": "turbo run lint",
-    "test": "turbo run test",
+    "test": "node --test .claude/hooks/*.test.mjs && turbo run test",
     "format": "prettier --write \"**/*.{js,json,md}\"",
     "release": "changeset version",
     "release:publish": "changeset publish",
@@ -37,25 +37,17 @@
     "@changesets/cli": "^2.27.1",
     "@commitlint/cli": "^17.8.1",
     "@commitlint/config-conventional": "^17.8.1",
-    "eslint": "^8.57.0",
+    "eslint": "^9.39.5",
     "husky": "^8.0.3",
     "lint-staged": "^14.0.1",
     "prettier": "^2.8.8",
-    "turbo": "1.10.15"
+    "turbo": "2.10.11"
   },
   "engines": {
-    "node": ">=18.19.0",
+    "node": "^22.22.2 || >=24.15.0",
     "pnpm": ">=9.0.6"
   },
   "lint-staged": {
     "*.{js,json,md}": "prettier --write"
-  },
-  "pnpm": {
-    "overrides": {
-      "eslint-plugin-react-hooks": "^7.1.1",
-      "eslint-plugin-jsx-a11y": "^6.10.2",
-      "eslint-plugin-react": "^7.37.5",
-      "eslint-plugin-import": "^2.32.0"
-    }
   }
 }

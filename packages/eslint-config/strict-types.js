@@ -13,7 +13,7 @@ module.exports = [
       },
     },
     rules: {
-      '@typescript-eslint/switch-exhaustiveness-check': [
+      'ts/switch-exhaustiveness-check': [
         'error',
         {
           allowDefaultCaseForExhaustiveSwitch: false,
