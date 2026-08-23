@@ -78,6 +78,10 @@ production과 소유권이 갈라지지 않게 하며, slice 삭제·이동 시 
   production 조건문·계산식 복제 금지.
 - loading·race는 deferred **pending barrier**로 완료 시점을 테스트가 통제
   (bva.md 패턴). 임의 sleep 금지.
+- exported shared/package API 타입이 이번 변경 대상이면 bva.md 타입 경계 축마다
+  `.test-d.ts(x)` witness를 둔다. 축은 카드가 닫는 관계가 정하고, `@ts-expect-error`
+  다음 줄에는 오용 하나만 둔다. 30개를 넘으면 케이스를 늘리지 말고 API 분리를
+  NEEDS_DECISION으로 올린다 — 표면 분리는 정책 판단이다.
 
 Playwright 규칙 (예외 없음):
 

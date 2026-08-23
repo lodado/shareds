@@ -314,11 +314,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.26.0')
+  assert.equal(version, '0.27.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.26.0')
+  assert.equal(marketplace.version, '0.27.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -888,8 +888,23 @@ test('always loads advanced compiler contracts with type work and keeps adoption
   assert.ok(readme.includes(ADVANCED_TYPES_LOAD_CONDITION))
 
   assert.match(advancedContracts, /AI가 만든 공개 타입 계약을 컴파일러로 거절 가능하게/)
-  assert.match(advancedContracts, /실제로 막아야 하는 오용 최소 3개.*`@ts-expect-error`/)
+  assert.match(advancedContracts, /타입 경계 축 중 이 타입이 닫는 축마다 한 줄 `@ts-expect-error`/)
   assert.match(advancedContracts, /runtime complement.*별도 parser·guard·runtime test/)
+})
+
+test('scopes negative type witnesses to boundary axes and caps them as a design limit', async () => {
+  const [typeConstraints, bva] = await Promise.all([readTypes(), read('references/bva.md')])
+
+  // 축은 bva.md 한 곳이 소유한다 — 타입 문서는 이 API가 닫는 축만 고르라고 요구한다
+  assert.match(bva, /## 5\. 타입 경계/)
+  assert.match(bva, /닫지 않는 축에는 witness를 만들지 않는다/)
+  assert.match(typeConstraints, /이 API가 닫는 경계 축마다 witness를\s*\n?\s*둔다/)
+  assert.match(typeConstraints, /타입 witness의 축과 개수 규칙은 \[`\.\.\/bva\.md`\]/)
+
+  // 30은 채우는 목표가 아니라 분리 신호다
+  assert.match(bva, /30은 채워야 할 목표가 아니라 표면이 너무 넓다는 설계 실격선이다/)
+  assert.match(typeConstraints, /30개를 넘으면 케이스를\s*\n?\s*더 쓰지 말고 API를 나눈다/)
+  assert.match(typeConstraints, /30개를 넘는데 API 분리를 검토하지 않았으면 `FINDING`이다/)
 })
 
 test('keeps client state data-only and hands actions back beside it', async () => {

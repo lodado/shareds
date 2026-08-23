@@ -65,8 +65,8 @@ Type Challenges와 type-fest·zod·TanStack 같은 오픈소스에서 검증된 
 | 증거               | 기준                                                                                                   |
 | ------------------ | ------------------------------------------------------------------------------------------------------ |
 | positive witness   | 대표 제품 호출부 1개가 explicit type argument 없이 컴파일된다.                                         |
-| negative witnesses | 실제로 막아야 하는 오용 최소 3개가 각각 한 줄 `@ts-expect-error`다.                                    |
-| edge witnesses     | 관련 있는 `any`·`unknown`·`never`·union·readonly tuple·optional·overload만 고른다.                     |
+| negative witnesses | [`../bva.md`](../bva.md) 타입 경계 축 중 이 타입이 닫는 축마다 한 줄 `@ts-expect-error`다.             |
+| edge witnesses     | 축 표에 없는 `overload` 같은 구멍은 이 타입이 실제로 노출할 때만 추가한다. 30개를 넘으면 API를 나눈다. |
 | mutation witness   | union을 `string`으로 넓히거나 필수 필드를 optional로 바꾸거나 `NoInfer`를 제거하면 suite가 RED가 된다. |
 | runtime complement | URL·storage·API·시간축·sanitization은 별도 parser·guard·runtime test로 증명한다.                       |
 | soundness gap      | overload 마지막 signature, method bivariance, assertion 격리 같은 남은 구멍을 적는다.                  |

@@ -13,8 +13,9 @@ exported shared/package API를 만들거나 바꿀 때는 구현 타입보다 **
    API가 닫아야 할 항목만 고른다.
 4. schema·config·`as const` 값에서 key와 union을 파생하고 수기 권위를 늘리지 않는다.
 5. controlled surface와 현재 제품이 쓰는 mode만 공개하고 나머지는 API 부재로 둔다.
-6. type test에 generic 명시 없는 대표 정상 호출 1개와 컴파일되지 않아야 할 사용 최소 3개를
-   함께 둔다. JSX를 쓰면 파일은 `.test-d.tsx`로 만든다.
+6. type test에 generic 명시 없는 대표 정상 호출 1개와, 이 API가 닫는 경계 축마다 witness를
+   둔다. 축은 아래 경계 축 표에서 고르고 축 수는 API가 정한다. JSX를 쓰면 파일은
+   `.test-d.tsx`로 만든다.
 
 - 정상 호출도 추론되지 않으면 부정 테스트가 통과해도 좋은 공개 API가 아니다. helper의 추론을
   보존하거나 generic을 단순화하고, 호출부가 같은 type argument를 반복하게 두지 않는다.
@@ -67,6 +68,12 @@ exported shared/package API를 만들거나 바꿀 때는 구현 타입보다 **
   type test를 함께 둔다. feature 컴포넌트 안에 자작 고급 utility를 작성하지 않는다. Props에
   generic이 4개 이상 노출되면 공개 API 분리를 검토한다.
 
+## 경계 축 표
+
+타입 witness의 축과 개수 규칙은 [`../bva.md`](../bva.md)의 타입 경계 절이 소유한다. 이 API가
+닫는 축만 고르고 닫지 않는 축은 만들지 않는다. `@ts-expect-error`가 30개를 넘으면 케이스를
+더 쓰지 말고 API를 나눈다 — 30은 목표가 아니라 설계 실격선이다.
+
 ## 검증 매핑
 
 - 카드 행 → 실패 테스트 매핑은 `$test` 계약대로 유지한다. 별도 "타입 테스트 layer"를 전
@@ -81,8 +88,8 @@ exported shared/package API를 만들거나 바꿀 때는 구현 타입보다 **
   helper만으로 public API를 검증하지 않는다.
 - negative case는 `@ts-expect-error` 다음 줄에 한 오용 표현만 둬 unrelated diagnostic이
   통과시키지 못하게 한다.
-- custom generic은 관련 있는 `any`·`unknown`·`never`, union, readonly tuple, optional property,
-  overload edge만 고르고 모든 타입에 같은 checklist를 붙이지 않는다.
+- custom generic은 `../bva.md` 타입 경계 축 중 이 타입이 실제로 닫는 축만 고르고, 모든
+  타입에 같은 checklist를 붙이지 않는다.
 - 계약을 `string`·optional·`any`로 넓혔을 때 unused `@ts-expect-error`나 exhaustive failure로
   suite가 RED가 되는 mutation을 한 번 확인한다. type-valid는 behavior-correct가 아니므로
   runtime behavior test는 별도 run label로 기록한다.

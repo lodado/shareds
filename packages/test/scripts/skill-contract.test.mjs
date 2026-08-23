@@ -23,6 +23,22 @@ test('ships the frontend test contract with its required BVA reference', async (
   assert.equal(bundledBva, oracleBva)
 })
 
+test('writes type witnesses on the shared boundary axes and treats 30 as a split signal', async () => {
+  const [skill, bva] = await Promise.all([
+    readFile(join(skillDirectory, 'SKILL.md'), 'utf8'),
+    readFile(join(skillDirectory, 'references/bva.md'), 'utf8'),
+  ])
+
+  // 축은 bva.md가 소유하고, 스킬은 카드가 닫는 축만 번역한다
+  assert.match(bva, /## 5\. 타입 경계/)
+  assert.match(bva, /닫지 않는 축에는 witness를 만들지 않는다/)
+  assert.match(skill, /bva\.md 타입 경계 축마다/)
+
+  // 30은 채우는 목표가 아니라 분리 신호다 — 분리 판단은 정책이므로 oracle로 올린다
+  assert.match(bva, /30은 채워야 할 목표가 아니라 표면이 너무 넓다는 설계 실격선이다/)
+  assert.match(skill, /30개를 넘으면 케이스를 늘리지 말고 API 분리를\s*\n?\s*NEEDS_DECISION으로 올린다/)
+})
+
 test('O31: records runs through the oracle ledger and blocks weakened tests', async () => {
   const skill = await readFile(join(skillDirectory, 'SKILL.md'), 'utf8')
 

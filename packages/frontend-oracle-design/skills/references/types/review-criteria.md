@@ -62,6 +62,10 @@
   safety 증거로 오인하면 `FINDING`이다.
 - `@ts-expect-error` 한 줄이 여러 오용을 담아 unrelated diagnostic으로 통과할 수 있거나,
   `Equal`류 helper만 있고 public call·assignment witness가 없으면 `FINDING`이다.
+- 닫는다고 선언한 경계 축에 witness가 없거나, 이 API가 닫지 않는 축까지 witness로 채웠으면
+  `FINDING`이다. 축 목록은 [`../bva.md`](../bva.md)의 타입 경계 절이 소유한다.
+- 한 API의 `@ts-expect-error`가 30개를 넘는데 API 분리를 검토하지 않았으면 `FINDING`이다.
+  30은 채워야 할 목표가 아니라 표면이 너무 넓다는 설계 실격선이다.
 - recursive/distributive type이 project compiler evidence와 필요한 성능 전후값 없이 들어가면
   `FINDING`이다.
 - type error를 `any`, double assertion, `@ts-ignore`, `skipLibCheck`로 숨기면 `FINDING`이다.

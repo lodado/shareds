@@ -1,4 +1,4 @@
-# BVA 4축 & 공용 참조
+# BVA 5축 & 공용 참조
 
 frontend-oracle-design과 test 스킬이 공유하는 참조. 카드 작성 전에 전부 읽는다.
 
@@ -38,6 +38,27 @@ frontend-oracle-design과 test 스킬이 공유하는 참조. 카드 작성 전�
 - 정상 제출 → 정확히 1회 (payload 정확성 포함)
 - 연속 클릭, double click, Enter 연속, 클릭+Enter 조합 → 여전히 총 1회
 - **UI 차단과 횟수는 별도 검증** — disabled여도 요청 2회 가능 (disabled 적용 전 두 이벤트)
+
+## 5. 타입 경계
+
+exported shared/package API 타입에만 적용한다 — 로컬 상태·내부 Props는 대상이 아니다.
+타입의 경계는 값의 min·max가 아니라 타입 lattice의 극단이다. 이번 API가 **실제로 닫는**
+축만 고르고, 축마다 통과 witness 1개와 `@ts-expect-error` 1개를 `.test-d.ts(x)`에 둔다.
+닫지 않는 축에는 witness를 만들지 않는다.
+
+| 축                      | 경계                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------ |
+| union 멤버              | 멤버 하나 통과, 비멤버 하나 거절                                               |
+| `never`·`any`·`unknown` | distributive conditional이 계약일 때만 세 값을 각각 고정                       |
+| optional                | property 생략과 `property: undefined` 구분 (실효 `exactOptionalPropertyTypes`) |
+| readonly                | `readonly T[]`·`as const` tuple 입력 수용, mapped type의 modifier 유실 없음    |
+| literal widening        | 호출부 `as const` 반복 없이 literal이 `string`으로 넓어지지 않음               |
+| tuple arity             | 빈 tuple·1개·n개 중 계약이 실제로 구분하는 길이만                              |
+| 추론 권위               | `NoInfer`·`const` type parameter에서 의도한 인자만 추론에 참여                 |
+
+`@ts-expect-error` 다음 줄에는 오용 표현 하나만 둔다 — 여러 오용을 한 줄에 담으면 unrelated
+diagnostic으로 통과한다. 한 API의 `@ts-expect-error`가 30개를 넘으면 케이스를 더 쓰지 말고
+API를 나눈다. 30은 채워야 할 목표가 아니라 표면이 너무 넓다는 설계 실격선이다.
 
 ## 자동 추가 TC 7종
 
