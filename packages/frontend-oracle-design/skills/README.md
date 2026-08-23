@@ -129,7 +129,7 @@ flowchart LR
   FA --> DID
   COMMON --> SR2["subagent-review"] --> TRC["types-review-criteria"]
   CH --> SR2
-  COMMON --> TSL["types-state-ladder"] --> TA["types-authoring"] --> TAS["types-api-surface"] --> TAC["types-advanced-contracts<br/><i>advanced public type only</i>"]
+  COMMON --> TSL["types-state-ladder"] --> TA["types-authoring"] --> TAS["types-api-surface"] --> TAC["types-advanced-contracts<br/><i>witness-gated adoption</i>"]
   COMMON --> AC["architecture-contract"]
   COMMON --> VD["visual-design"]
   IND["fsd · backend · performance · type-environment<br/><i>독립 노드 — 조건 충족 시에만</i>"]
@@ -140,9 +140,10 @@ flowchart LR
 `bva`를 이미 읽었어야 한다는 뜻입니다.
 
 `types-advanced-contracts`는
-`custom exported generic, mapped·conditional·template-literal·recursive type, variance-sensitive callback, deep transform을 설계·변경·리뷰할 때만`
-로드하고 `types-api-surface`를 선행 조건으로 둡니다. 단순 Props·feature-local 상태·내장
-utility로 끝나는 관계에는 로드하지 않습니다.
+`타입 작업 시 state-ladder와 함께 항상 — 로드는 무조건, 채택은 compiler witness packet gate`
+조건으로 로드하고 `types-api-surface`를 선행 조건으로 둡니다. 읽기는 타입 작업마다
+무조건이지만, 고급 타입의 **채택**은 문서 안의 선택 gate와 compiler witness packet을
+통과할 때만 합니다.
 
 0.24.0에서 추가한 compiler witness, 외부 저장소 provenance, TypeScript와 runtime 검증의
 경계는 [`TYPESCRIPT-VERIFICATION.md`](../TYPESCRIPT-VERIFICATION.md)에 정리했습니다.

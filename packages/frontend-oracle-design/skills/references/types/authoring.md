@@ -36,7 +36,8 @@ conditional type으로 재구현하지 않는다. 뒷 단 세 개(overload·mapp
 recursive)는 [`api-surface.md`](api-surface.md)의 격리 조건을 만족할 때만 쓴다.
 custom exported generic 또는 mapped·conditional·template-literal·recursive type,
 variance-sensitive callback, deep transform을 실제로 선택하면
-[`advanced-contracts.md`](advanced-contracts.md)까지 읽고 compiler witness를 남긴다.
+[`advanced-contracts.md`](advanced-contracts.md)의 카탈로그에서 후보를 고르고
+compiler witness를 남긴다.
 
 ## 타입 작성 규칙
 
@@ -124,17 +125,27 @@ type PaymentBadge = 'unpaid' | 'paid' | 'refunded'
   일부 필드만 검사하고 전체 도메인 타입을 약속하는 predicate를 만들지 않는다.
   boundary의 복잡한 도메인 타입은 predicate 수기 조립 대신 schema parser가
   우선이고, `isNotNil` 수준의 단순·정확한 narrowing만 predicate로 남긴다.
-- **wrapper의 반환 계약은 실행 시점을 따른다.** `Parameters<F>`로 호출 계약은
-  보존하되, `ReturnType<F>`는 wrapper가 같은 호출에서 실제 값을 반환할 때만
-  보존한다. debounce·schedule처럼 실행이 지연되면 즉시 반환형은 `void`, 캐시
-  반환이면 `ReturnType<F> | undefined`, async wrapper면
-  `Promise<Awaited<ReturnType<F>>>`처럼 런타임 의미를 그대로 쓴다.
+- **wrapper의 반환 계약은 실행 시점을 따른다.** 호출 계약은 `Parameters`로 보존하되,
+  `ReturnType` 보존은 wrapper가 같은 호출에서 실제 값을 반환할 때만이다. 실행이
+  지연·캐시·async로 바뀌면 런타임 의미를 그대로 쓴다.
+
+  ```typescript
+  type AnyFn = (...args: never[]) => unknown
+
+  // debounce·schedule — 이번 호출에는 값이 없다
+  type Deferred<F extends AnyFn> = (...args: Parameters<F>) => void
+  // 캐시 — miss면 값이 없다
+  type Cached<F extends AnyFn> = (...args: Parameters<F>) => ReturnType<F> | undefined
+  // async wrapper
+  type Wrapped<F extends AnyFn> = (...args: Parameters<F>) => Promise<Awaited<ReturnType<F>>>
+  ```
+
 - **excess property check는 sanitizer가 아니다.** object literal 대입에만
   적용되며, `const user: PublicUser = source` 같은 annotation은 `source`의 민감
   필드를 런타임에서 제거하지 않는다. 민감 필드 제거·exact object 보장은 runtime
   projection이나 parser가 소유한다.
 - **key remapping 반환형은 런타임과 동형이어야 한다.** 함수가 실제로 key를
-  변환하지 않는데 `ToCamelCaseKeys<T>` 같은 key 변환 반환 타입만 붙이면 거짓
+  변환하지 않는데 `ToCamelCaseKeys` 같은 key 변환 반환 타입만 붙이면 거짓
   계약이다.
 
 ## Exhaustiveness 강제

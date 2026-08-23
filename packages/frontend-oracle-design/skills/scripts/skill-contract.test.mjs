@@ -36,7 +36,7 @@ const TYPES_NODE_FILES = [
   'references/types/review-criteria.md',
 ]
 const ADVANCED_TYPES_LOAD_CONDITION =
-  'custom exported generic, mapped·conditional·template-literal·recursive type, variance-sensitive callback, deep transform을 설계·변경·리뷰할 때만'
+  '타입 작업 시 state-ladder와 함께 항상 — 로드는 무조건, 채택은 compiler witness packet gate'
 
 async function readAll(relativePaths) {
   const parts = await Promise.all(relativePaths.map(read))
@@ -314,11 +314,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.24.1')
+  assert.equal(version, '0.25.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.24.1')
+  assert.equal(marketplace.version, '0.25.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -869,7 +869,7 @@ test('reads load conditions at the decision point, not at the write stage', asyn
   assert.match(typeConstraints, /판정표를 읽기 전에 로딩 수단을 고르지\s*\n?\s*않는다/)
 })
 
-test('loads advanced compiler contracts only for advanced public type relationships', async () => {
+test('always loads advanced compiler contracts with type work and keeps adoption witness-gated', async () => {
   const [skill, readme, advancedContracts, graphSource] = await Promise.all([
     read('SKILL.md'),
     read('README.md'),

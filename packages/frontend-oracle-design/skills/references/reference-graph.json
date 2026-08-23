@@ -146,13 +146,13 @@
     {
       "id": "types-api-surface",
       "path": "references/types/api-surface.md",
-      "when": "exported shared/package API·Props 변경",
+      "when": "state-ladder와 함께",
       "requires": ["types-state-ladder", "types-authoring"]
     },
     {
       "id": "types-advanced-contracts",
       "path": "references/types/advanced-contracts.md",
-      "when": "custom exported generic, mapped·conditional·template-literal·recursive type, variance-sensitive callback, deep transform을 설계·변경·리뷰할 때만",
+      "when": "타입 작업 시 state-ladder와 함께 항상 — 로드는 무조건, 채택은 compiler witness packet gate",
       "requires": ["types-api-surface"]
     },
     {

@@ -31,7 +31,7 @@
   적지 못하거나 Type Challenges 같은 puzzle corpus를 product policy로 인용해도
   `FINDING`이다.
 - 구현이 모든 key를 채우지 않는데 `Record<K, V>`로 total map을 약속했거나, 실행이
-  지연·캐시되는 wrapper가 즉시 `ReturnType<F>`를 반환한다고 선언했으면
+  지연·캐시되는 wrapper가 원본의 `ReturnType`을 즉시 반환한다고 선언했으면
   `FINDING`이다. sparse lookup 결과의 `Partial<Record<K, V>>`는
   `Partial<DomainEntity>` mutation 금지의 대상이 아니다 — 둘을 같은 규칙으로
   금지하면 오적용이다.
