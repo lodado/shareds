@@ -1,6 +1,6 @@
 # TypeScript로 AI 결과를 검수하는 방법
 
-`frontend-oracle-design` 0.24.0에서 추가한 고급 TypeScript 계약과 compiler witness를
+`frontend-oracle-design` 0.24.0에서 추가하고 0.24.1에서 정리한 고급 TypeScript 계약과 compiler witness를
 설명합니다. 대상 독자는 AI가 생성한 TypeScript 코드를 프로젝트에 수용하기 전에, 같은
 컴파일러와 설정으로 반복 가능한 통과·거절 기준을 만들려는 프론트엔드 개발자입니다.
 
@@ -93,9 +93,6 @@ test가 소유합니다. `type-valid`는 `behavior-correct`의 동의어가 아�
 5. 대표 호출부에서 자동 추론되는 최소 generic을 씁니다.
 6. 그래도 관계가 닫히지 않을 때만 고급 계산 타입을 `types/internal`에 격리합니다.
 
-Type Challenges 풀이식 helper를 feature 코드에 복사하거나 내장 utility를 다시 구현하는 것은
-권장하지 않습니다.
-
 ### 3. Compiler witness packet
 
 고급 public type을 채택하려면 다음 증거를 함께 둡니다.
@@ -103,34 +100,12 @@ Type Challenges 풀이식 helper를 feature 코드에 복사하거나 내장 uti
 | 증거               | 판정 기준                                                                          |
 | ------------------ | ---------------------------------------------------------------------------------- |
 | positive           | 대표 제품 호출이 explicit type argument 없이 컴파일됨                              |
-| negative           | 실제로 막아야 하는 오용 최소 3개가 `@ts-expect-error`로 고정됨                     |
 | edge               | 계약과 관련 있는 `any`, `unknown`, `never`, union, readonly tuple, optional만 선택 |
 | mutation           | union widening, optional 변경, `NoInfer` 제거 중 하나가 suite를 RED로 만듦         |
 | runtime complement | 외부 데이터와 시간축을 parser·guard·runtime test가 검증함                          |
 | soundness gap      | overload, bivariance, assertion처럼 남은 구멍을 명시함                             |
 
-`@ts-expect-error`는 오류를 무시하는 용도가 아닙니다. 다음 줄의 오용이 더 이상 오류가 아니면
-TypeScript가 `TS2578: Unused '@ts-expect-error' directive`로 test를 실패시키므로, 계약이
-실수로 넓어진 것을 검출합니다.
-
-### 4. 실제 package-local compiler harness
-
-[`package.json`](package.json)은 `typescript`를 `5.9.3`으로 정확히 고정합니다. `tsd`,
-`expect-type`, `@type-challenges/utils` 같은 추가 test framework는 설치하지 않았습니다.
-
-[`skills/scripts/type-guidance.test.mjs`](skills/scripts/type-guidance.test.mjs)는 다음 순서로
-동작합니다.
-
-1. package manifest의 TypeScript 버전이 정확히 `5.9.3`인지 검사합니다.
-2. Node resolution으로 찾은 `typescript/package.json`도 `5.9.3`인지 검사합니다.
-3. 같은 package에서 `typescript/bin/tsc`를 직접 resolve합니다.
-4. `process.execPath`로 fixture의 `tsconfig.json`과 `--noEmit`을 실행합니다.
-5. compiler exit code가 0이 아니면 stdout과 stderr를 test failure로 출력합니다.
-
-따라서 shell `PATH`의 전역 TypeScript나 Playground 최신 버전이 우연히 통과한 결과를 증거로
-사용하지 않습니다.
-
-### 5. 포함된 compiler witness
+### 4. 포함된 compiler witness
 
 [`test-fixtures/typescript/compiler-witnesses.ts`](test-fixtures/typescript/compiler-witnesses.ts)는
 다음 네 계약을 실행합니다.
@@ -219,7 +194,7 @@ compiler upgrade도 단순 도구 업데이트로 취급하지 않습니다. ass
 
 ## 검증 결과
 
-0.24.0 release에서 다음 결과를 확인했습니다.
+0.24.1 release에서 다음 결과를 확인했습니다.
 
 | 검증                           | 결과                          |
 | ------------------------------ | ----------------------------- |
@@ -278,11 +253,11 @@ Codex marketplace가 이 저장소의 local path를 가리키면 snapshot 복사
 
 | Runtime     | Version | 상태                | Source                                                                        |
 | ----------- | ------- | ------------------- | ----------------------------------------------------------------------------- |
-| Claude Code | 0.24.0  | user scope, enabled | `~/.claude/plugins/cache/my-vibe-coding-helper/frontend-oracle-design/0.24.0` |
-| Codex       | 0.24.0  | installed, enabled  | 이 저장소의 `packages/frontend-oracle-design` local path                      |
+| Claude Code | 0.24.1  | user scope, enabled | `~/.claude/plugins/cache/my-vibe-coding-helper/frontend-oracle-design/0.24.1` |
+| Codex       | 0.24.1  | installed, enabled  | 이 저장소의 `packages/frontend-oracle-design` local path                      |
 
 Claude Code는 update 후 재시작해야 새 plugin cache를 현재 세션에 적용합니다. Codex도 새
-세션에서 skill 목록에 `frontend-oracle-design 0.24.0`이 표시되는지 확인하는 것이 가장
+세션에서 skill 목록에 `frontend-oracle-design 0.24.1`이 표시되는지 확인하는 것이 가장
 확실합니다.
 
 ## 사용할 때의 판정 질문
