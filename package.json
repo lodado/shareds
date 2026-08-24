@@ -1,7 +1,7 @@
 {
   "name": "@lodado/vibe-coding-helper-monorepo",
   "version": "0.0.0",
-  "description": "Monorepo distributing shared ESLint configs and Claude Code / Codex plugins",
+  "description": "Shared frontend engineering skills for Claude Code and Codex, plus composable ESLint presets for modern JavaScript and TypeScript projects",
   "private": true,
   "packageManager": "pnpm@9.0.6",
   "keywords": [
@@ -17,11 +17,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/lodado/my-Vibe-Coding-Helper.git"
+    "url": "https://github.com/lodado/shareds.git"
   },
-  "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper#readme",
+  "homepage": "https://github.com/lodado/shareds#readme",
   "bugs": {
-    "url": "https://github.com/lodado/my-Vibe-Coding-Helper/issues"
+    "url": "https://github.com/lodado/shareds/issues"
   },
   "license": "MIT",
   "scripts": {
