@@ -244,6 +244,7 @@ boundary 규칙 도입을 사용자에게 제안하고, 승인되면 devDependen
 게이트 검증 명령에 포함한다. 도입이 거절되거나 불가하면 승인된 architecture
 문서와 production diff의 일치 여부를 독립 reviewer가 검토한다.
 
-강한 승인 권한이 필요하면 `**/__docs__/architecture.md`와 Oracle lock path를
-CODEOWNERS 및 CI human approval로 보호한다. Oracle source lock은 drift 검출 장치이며
-같은 actor가 문서와 lock을 함께 쓸 수 있는 로컬 환경의 권한 증명은 아니다.
+High risk에서 강한 승인 권한이 필요하면 `**/__docs__/architecture.md`, `.ai/oracles/**`,
+lock SHA, run IDs를 CI artifact와 CODEOWNERS/required human approval로 보호한다.
+Low/Medium에는 기본 강제하지 않는다. Oracle source lock은 drift 검출 장치이며 같은
+actor가 문서와 lock을 함께 쓸 수 있는 로컬 환경의 권한 증명은 아니다.

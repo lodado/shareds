@@ -1,14 +1,26 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
-import { appendFile, lstat, mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
+import { appendFile, lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { devNull } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import {
+  assertSnapshotUnchanged,
+  sha256 as fsSha256,
+  isPathInside,
+  pathsShareIdentity,
+  snapshotRegularFile,
+  stableStringify,
+  ZERO_DIGEST,
+} from './oracle-fs.mjs'
 
-const lockScript = join(dirname(fileURLToPath(import.meta.url)), 'oracle-lock.mjs')
-const verifyScript = join(dirname(fileURLToPath(import.meta.url)), 'oracle-verify.mjs')
+const scriptDirectory = dirname(fileURLToPath(import.meta.url))
+const lockScript = join(scriptDirectory, 'oracle-lock.mjs')
+const verifyScript = join(scriptDirectory, 'oracle-verify.mjs')
+const changeabilityReviewPoint = resolve(scriptDirectory, '../references/changeability.md')
 
 const FLAG_NAMES = [
   'dir',
@@ -34,7 +46,18 @@ const FLAG_NAMES = [
   'output',
   'decision',
   'review-point',
+  'packet',
+  'revision',
+  'runtime',
+  'model',
+  'capability-context',
+  'adapter',
+  'role',
+  'reviewer',
+  'task-id',
 ]
+
+const BOOLEAN_FLAGS = new Set(['json'])
 
 const REQUIRED_CONSECUTIVE_PASSES = { low: 1, medium: 2, high: 3 }
 
@@ -42,7 +65,7 @@ const BUDGET_LIMITS = { policy: 2, harness: 2, product: 3 }
 
 const TRANSITIONS = {
   ORACLE_READY: ['VALID_RED', 'IMPLEMENTED_GREEN', 'NEEDS_DECISION', 'FAIL'],
-  VALID_RED: ['IMPLEMENTED_GREEN', 'NEEDS_DECISION', 'FAIL'],
+  VALID_RED: ['VALID_RED', 'IMPLEMENTED_GREEN', 'NEEDS_DECISION', 'FAIL'],
   IMPLEMENTED_GREEN: ['REVIEW_VERIFIED', 'NEEDS_DECISION', 'FAIL'],
   REVIEW_VERIFIED: ['NEEDS_DECISION', 'FAIL'],
   NEEDS_DECISION: ['ORACLE_READY', 'FAIL'],
@@ -97,6 +120,10 @@ function parseOptions(args) {
     }
 
     const name = flag.startsWith('--') ? flag.slice(2) : ''
+    if (BOOLEAN_FLAGS.has(name)) {
+      options[name] = true
+      continue
+    }
     const value = args[index + 1]
 
     if (!FLAG_NAMES.includes(name) || value === undefined) {
@@ -118,8 +145,19 @@ function portablePath(from, to) {
   return relative(from, to).split(sep).join('/')
 }
 
-function sha256(bytes) {
-  return createHash('sha256').update(bytes).digest('hex')
+function commonAncestor(left, right) {
+  const target = resolve(right)
+  let candidate = resolve(left)
+  while (candidate !== target && !isPathInside(candidate, target)) {
+    const parent = dirname(candidate)
+    if (parent === candidate) return candidate
+    candidate = parent
+  }
+  return candidate
+}
+
+function sha256(value) {
+  return fsSha256(value)
 }
 
 function isTestPath(path) {
@@ -128,7 +166,8 @@ function isTestPath(path) {
 
   return (
     segments.some((segment) => TEST_PATH_SEGMENTS.has(segment)) ||
-    /\.(test|spec)\.[a-z]+$/.test(name) ||
+    /\.(?:test|spec)\.[a-z]+$/.test(name) ||
+    /\.test-d\.tsx?$/.test(name) ||
     name.endsWith('.snap')
   )
 }
@@ -230,7 +269,7 @@ function requiredMilestoneRuns(milestones, ledger) {
     }
 
     const run = ledger[index]
-    if (run.exitCode === 0 || run.grade !== 'reported' || !run.tests?.some((test) => test.status === 'failed')) {
+    if (!isReportedFailingRun(run)) {
       throw new CliError('MILESTONE_RED_INVALID', `${run.runId}: red:${milestone.name} must be a reported failing run`)
     }
     return { ...milestone, index, run }
@@ -300,7 +339,7 @@ async function listFiles(root) {
 
 async function snapshot(root, excludedPrefix) {
   const paths = (await listFiles(root)).filter((path) => !path.startsWith(excludedPrefix)).sort()
-  const entries = new Array(paths.length)
+  const entries = Array.from({ length: paths.length })
   let cursor = 0
   const workers = Array.from({ length: Math.min(SNAPSHOT_CONCURRENCY, paths.length) }, async () => {
     while (cursor < paths.length) {
@@ -309,9 +348,14 @@ async function snapshot(root, excludedPrefix) {
       const path = paths[index]
 
       try {
-        entries[index] = [path, sha256(await readFile(join(root, path)))]
-      } catch {
-        // 읽을 수 없는 항목(심볼릭 링크, 경합 중 삭제)은 비교 대상에서 제외한다.
+        const file = await snapshotRegularFile(join(root, path), {
+          base: root,
+          allowHardlinks: false,
+          label: `worktree file ${path}`,
+        })
+        entries[index] = [path, file.sha256]
+      } catch (error) {
+        throw new CliError('WORKTREE_SNAPSHOT_INVALID', error.message)
       }
     }
   })
@@ -339,6 +383,82 @@ function ledgerPath(directory) {
   return join(directory, 'runs.jsonl')
 }
 
+function isDigest(value) {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)
+}
+
+function assertLedgerSchema(entry) {
+  if (!entry || entry.schemaVersion !== 3 || !isDigest(entry.digest) || !isDigest(entry.previousDigest) || typeof entry.type !== 'string') {
+    throw new Error('invalid schema-v3 ledger record')
+  }
+  const strings = (fields) => fields.every((field) => typeof entry[field] === 'string' && entry[field])
+  if (entry.type === 'init') {
+    if (entry.state !== 'ORACLE_READY' || !entry.stateDelta || !strings(['at'])) throw new Error('invalid init event')
+  } else if (entry.type === 'run') {
+    const validTests =
+      entry.tests === null ||
+      (Array.isArray(entry.tests) &&
+        entry.tests.length > 0 &&
+        entry.tests.every(
+          (test) =>
+            test &&
+            typeof test.name === 'string' &&
+            test.name &&
+            ['passed', 'failed', 'pending', 'skipped', 'todo', 'cancelled', 'flaky', 'expected-failure'].includes(
+              test.status,
+            ),
+        ))
+    const invalid = []
+    if (!strings(['runId', 'label', 'oracleSha256', 'at'])) invalid.push('identity')
+    if (!isDigest(entry.oracleSha256)) invalid.push('oracle')
+    if (!isDigest(entry.lockManifestSha256)) invalid.push('manifest')
+    if (!isDigest(entry.worktreeSha256)) invalid.push('worktree')
+    if (!isDigest(entry.productionSha256)) invalid.push('production')
+    if (
+      !Array.isArray(entry.command) ||
+      entry.command.length === 0 ||
+      typeof entry.command[0] !== 'string' ||
+      !entry.command[0] ||
+      !entry.command.every((part) => typeof part === 'string')
+    ) {
+      invalid.push('command')
+    }
+    if (![null, 'node-test'].includes(entry.adapter)) invalid.push('adapter')
+    if (!['reported', 'exit-only'].includes(entry.grade)) invalid.push('grade')
+    if (entry.exitCode !== null && !Number.isInteger(entry.exitCode)) invalid.push('exitCode')
+    if (entry.signal !== null && typeof entry.signal !== 'string') invalid.push('signal')
+    if (!validTests) invalid.push('tests')
+    if (entry.grade === 'reported' && (entry.adapter !== 'node-test' || !Array.isArray(entry.tests))) {
+      invalid.push('reported')
+    }
+    if (invalid.length > 0) throw new Error(`invalid run event ${entry.runId ?? '<unknown>'}: ${invalid.join(',')}`)
+  } else if (entry.type === 'budget') {
+    if (!strings(['budget', 'reason', 'changeDigest', 'at']) || !isDigest(entry.changeDigest) || !Number.isInteger(entry.spent)) throw new Error('invalid budget event')
+  } else if (entry.type === 'transition') {
+    if (!strings(['state', 'at']) || !entry.stateDelta || typeof entry.stateDelta !== 'object') throw new Error('invalid transition event')
+  } else if (entry.type === 'review-receipt') {
+    if (
+      !strings(['receiptId', 'role', 'reviewerId', 'taskId', 'at']) ||
+      entry.adapter !== 'controller' ||
+      !['packetSha256', 'targetRevision', 'outputSha256', 'findingsSha256', 'oracleSha256'].every((field) =>
+        isDigest(entry[field]),
+      )
+    ) {
+      throw new Error('invalid review receipt event')
+    }
+  } else if (entry.type === 'checkpoint') {
+    if (!isDigest(entry.prefixSha256) || entry.previousDigest !== ZERO_DIGEST || !strings(['at'])) throw new Error('invalid checkpoint event')
+  } else {
+    throw new Error('unknown ledger event type')
+  }
+}
+
+function evidencePathFor(directory, state) {
+  const evidenceEntry = [...(state.history ?? [])].reverse().find((entry) => entry.evidence)
+  if (evidenceEntry?.evidence) return resolve(directory, evidenceEntry.evidence)
+  return join(directory, 'evidence.json')
+}
+
 async function readState(directory) {
   try {
     return JSON.parse(await readFile(statePath(directory), 'utf8'))
@@ -348,21 +468,61 @@ async function readState(directory) {
 }
 
 async function writeState(directory, state) {
-  await writeFile(statePath(directory), `${JSON.stringify(state, null, 2)}\n`)
+  const path = statePath(directory)
+  const temp = `${path}.tmp-${process.pid}-${Date.now()}`
+  await writeFile(temp, `${JSON.stringify(state, null, 2)}\n`)
+  await rename(temp, path)
 }
 
 async function readLedger(directory) {
   try {
-    const raw = await readFile(ledgerPath(directory), 'utf8')
-    const entries = raw
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => JSON.parse(line))
+    const present = await lstat(ledgerPath(directory)).catch((error) => {
+      if (error.code === 'ENOENT') return null
+      throw error
+    })
+    if (!present) return []
+    const ledger = await snapshotRegularFile(ledgerPath(directory), {
+      base: directory,
+      allowHardlinks: false,
+      label: 'run ledger',
+      fail: (message) => new CliError('LEDGER_INVALID', message),
+    })
+    const raw = ledger.bytes.toString('utf8')
+    if (raw !== '' && !raw.endsWith('\n')) throw new Error('truncated JSONL record')
+    const entries = raw === '' ? [] : raw.slice(0, -1).split('\n').map((line) => {
+      if (!line) throw new Error('blank JSONL record')
+      return JSON.parse(line)
+    })
     const runIds = new Set()
-    for (const entry of entries) {
-      if (!entry.runId) continue
-      if (runIds.has(entry.runId)) throw new Error(`duplicate runId: ${entry.runId}`)
-      runIds.add(entry.runId)
+    const receiptIds = new Set()
+    const checkpointIndex = entries.findIndex((entry) => entry?.schemaVersion === 3 && entry.type === 'checkpoint')
+    if (checkpointIndex > 0) {
+      const prefix = `${raw.split('\n').slice(0, checkpointIndex).join('\n')}\n`
+      if (entries.slice(0, checkpointIndex).some((entry) => entry?.schemaVersion === 3)) {
+        throw new Error('legacy prefix contains schema-v3 records')
+      }
+      if (entries[checkpointIndex].prefixSha256 !== sha256(prefix)) throw new Error('legacy checkpoint digest mismatch')
+    } else if (checkpointIndex !== 0 && entries.some((entry) => entry?.schemaVersion !== 3)) {
+      throw new Error('schema-v2 ledger requires migrate-ledger')
+    }
+    let previousDigest = ZERO_DIGEST
+    const chainedEntries = entries.slice(Math.max(checkpointIndex, 0))
+    for (const [index, entry] of chainedEntries.entries()) {
+      assertLedgerSchema(entry)
+      if (entry.previousDigest !== previousDigest) {
+        throw new Error(`schema-v3 digest chain is invalid at ${index}:${entry.type}`)
+      }
+      const { digest, ...unsigned } = entry
+      if (sha256(stableStringify(unsigned)) !== digest) throw new Error(`digest mismatch at ${index}:${entry.type}`)
+      previousDigest = digest
+      if (entry.type === 'run') {
+        if (runIds.has(entry.runId)) throw new Error(`duplicate runId: ${entry.runId}`)
+        runIds.add(entry.runId)
+      }
+      if (entry.type === 'review-receipt') {
+        if (receiptIds.has(entry.receiptId)) throw new Error(`duplicate review receipt: ${entry.receiptId}`)
+        receiptIds.add(entry.receiptId)
+      }
     }
     return entries
   } catch (error) {
@@ -377,10 +537,119 @@ async function readRuns(directory) {
 }
 
 async function appendLedger(directory, record) {
-  await appendFile(ledgerPath(directory), `${JSON.stringify(record)}\n`)
+  return withDirectoryLock(directory, 'ledger', async () => {
+    const entries = await readLedger(directory)
+    const previousDigest = entries.at(-1)?.digest ?? ZERO_DIGEST
+    const chained = { ...record, schemaVersion: 3, previousDigest }
+    chained.digest = sha256(stableStringify(chained))
+    await appendFile(ledgerPath(directory), `${JSON.stringify(chained)}\n`)
+    return chained
+  })
 }
 
-async function reserveRunId(directory) {
+async function migrateLedger(options) {
+  if (!options.dir) throw new CliError('USAGE', 'migrate-ledger requires --dir', 2)
+  const directory = resolve(options.dir)
+  await withDirectoryLock(directory, 'state', async () => {
+    const source = await snapshotRegularFile(ledgerPath(directory), {
+      base: directory,
+      allowHardlinks: false,
+      label: 'legacy run ledger',
+      fail: (message) => new CliError('LEDGER_INVALID', message),
+    })
+    const raw = source.bytes.toString('utf8')
+    if (!raw || !raw.endsWith('\n')) throw new CliError('LEDGER_MIGRATION_INVALID', 'legacy ledger must be complete JSONL')
+    const lines = raw.slice(0, -1).split('\n')
+    if (lines.some((line) => !line)) throw new CliError('LEDGER_MIGRATION_INVALID', 'legacy ledger contains blank records')
+    try {
+      lines.forEach((line) => JSON.parse(line))
+    } catch (error) {
+      throw new CliError('LEDGER_MIGRATION_INVALID', `legacy ledger is malformed: ${error.message}`)
+    }
+    const state = await readState(directory)
+    if (state.schemaVersion !== 2) throw new CliError('LEDGER_MIGRATION_INVALID', 'only active schema-v2 state may migrate')
+    const checkpoint = {
+      schemaVersion: 3,
+      type: 'checkpoint',
+      prefixSha256: source.sha256,
+      previousDigest: ZERO_DIGEST,
+      at: new Date().toISOString(),
+    }
+    checkpoint.digest = sha256(stableStringify(checkpoint))
+    await appendFile(ledgerPath(directory), `${JSON.stringify(checkpoint)}\n`)
+    state.schemaVersion = 3
+    state.ledgerHead = checkpoint.digest
+    await writeState(directory, state)
+  })
+}
+
+function replayState(state, ledger) {
+  for (const entry of ledger) {
+    if (entry.type === 'budget') {
+      const budget = state.budgets?.[entry.budget]
+      if (!budget) continue
+      budget.spent = Math.max(budget.spent ?? 0, entry.spent ?? 0)
+      if (entry.changeDigest && !(budget.digests ?? []).includes(entry.changeDigest)) {
+        budget.digests = [...(budget.digests ?? []), entry.changeDigest]
+      }
+      if (entry.reason && !(budget.reasons ?? []).includes(entry.reason)) {
+        budget.reasons = [...(budget.reasons ?? []), entry.reason]
+      }
+    }
+    if (entry.type === 'transition') {
+      const recorded = (state.history ?? []).some(
+        (history) =>
+          history.ledgerDigest === entry.digest ||
+          (history.state === entry.state &&
+            history.runId === (entry.evidenceRunId ?? null) &&
+            history.at === entry.at),
+      )
+      if (recorded) continue
+      if (!entry.stateDelta || typeof entry.stateDelta !== 'object') {
+        throw new CliError('STATE_LEDGER_DIVERGENCE', 'transition event has no complete state delta')
+      }
+      Object.assign(state, entry.stateDelta)
+      state.state = entry.state
+      state.history ??= []
+      state.history.push({
+        state: entry.state,
+        runId: entry.evidenceRunId ?? null,
+        reason: entry.reason ?? null,
+        row: entry.row ?? null,
+        evidence: entry.evidence ?? null,
+        findings: entry.findings ?? null,
+        packet: entry.packet ?? null,
+        runCount: entry.runCount ?? 0,
+        at: entry.at,
+        ledgerDigest: entry.digest,
+      })
+    }
+  }
+  return state
+}
+
+async function readConsistentState(directory) {
+  const state = await readState(directory)
+  const ledger = await readLedger(directory)
+  const head = ledger.at(-1)?.digest ?? ZERO_DIGEST
+  if (state.ledgerHead) {
+    const anchor = ledger.findIndex((entry) => entry.digest === state.ledgerHead)
+    if (anchor < 0) {
+      throw new CliError('STATE_LEDGER_DIVERGENCE', 'run-state ledger head is not present in the validated ledger')
+    }
+    // Runs and budgets may legitimately follow the last materialized state.
+    // Only unapplied transitions need a complete replay delta.
+    const transitions = ledger.slice(anchor + 1).filter((entry) => entry.type === 'transition')
+    if (transitions.some((entry) => !entry.stateDelta || typeof entry.stateDelta !== 'object')) {
+      throw new CliError('STATE_LEDGER_DIVERGENCE', 'ledger transition has no replayable state delta')
+    }
+  }
+  const replayed = replayState(state, ledger)
+  replayed.ledgerHead = head
+  return replayed
+}
+
+async function reserveRunId(directory, label = null) {
   const reservations = join(directory, '.run-ids')
   await mkdir(reservations, { recursive: true })
   let number = (await readRuns(directory)).length + 1
@@ -388,7 +657,11 @@ async function reserveRunId(directory) {
   for (;;) {
     const runId = `r-${String(number).padStart(3, '0')}`
     try {
-      await writeFile(join(reservations, runId), '', { flag: 'wx' })
+      await writeFile(
+        join(reservations, runId),
+        `${JSON.stringify({ runId, label, state: 'started', at: new Date().toISOString() })}\n`,
+        { flag: 'wx' },
+      )
       return runId
     } catch (error) {
       if (error.code !== 'EEXIST') throw error
@@ -397,8 +670,31 @@ async function reserveRunId(directory) {
   }
 }
 
+async function finishRunId(directory, runId) {
+  const path = join(directory, '.run-ids', runId)
+  const started = await readFile(path, 'utf8')
+    .then(JSON.parse)
+    .catch(() => ({ runId }))
+  await writeFile(
+    path,
+    `${JSON.stringify({ ...started, state: 'finished', finishedAt: new Date().toISOString() })}
+`,
+  )
+}
+
 function verifyLock(directory, state) {
   const lock = resolve(directory, state.lock)
+  let manifestSha256
+  try {
+    manifestSha256 = sha256(readFileSync(lock))
+  } catch (error) {
+    throw new CliError('LOCK_INVALID', `Cannot read lock manifest: ${error.message}`)
+  }
+
+  if (state.lockManifestSha256 && state.lockManifestSha256 !== manifestSha256) {
+    throw new CliError('LOCK_MANIFEST_CHANGED', 'Lock manifest bytes no longer match run state')
+  }
+
   const verified = spawnSync(process.execPath, [lockScript, 'verify', '--lock', lock], { encoding: 'utf8' })
 
   if (verified.status !== 0) {
@@ -406,7 +702,18 @@ function verifyLock(directory, state) {
     throw new CliError(code.trim(), message.join(': ').trim() || 'oracle-lock verify failed')
   }
 
-  return verified.stdout.trim().replace('ORACLE_VERIFIED sha256:', '')
+  const receipt = verified.stdout.trim().match(
+    /^ORACLE_VERIFIED sha256:([a-f0-9]{64}) manifest-sha256:([a-f0-9]{64})$/,
+  )
+  if (!receipt) throw new CliError('LOCK_INVALID', 'oracle-lock verify returned an invalid receipt')
+  if (receipt[2] !== manifestSha256) {
+    throw new CliError('LOCK_MANIFEST_CHANGED', 'Verified manifest bytes do not match the runner snapshot')
+  }
+
+  return {
+    oracleSha256: receipt[1],
+    lockManifestSha256: receipt[2],
+  }
 }
 
 async function lockedOraclePath(directory, state) {
@@ -443,6 +750,99 @@ function fingerprint(options) {
   }
 }
 
+async function skillMetadata() {
+  try {
+    const pkg = JSON.parse(await readFile(join(dirname(lockScript), '..', '..', 'package.json'), 'utf8'))
+    return { version: pkg.version ?? null }
+  } catch {
+    return { version: process.env.npm_package_version ?? null }
+  }
+}
+
+function gitProvenance(root) {
+  const options = { encoding: 'utf8' }
+  const commit = spawnSync('git', ['-C', root, 'rev-parse', 'HEAD'], options)
+  const dirty = spawnSync('git', ['-C', root, 'status', '--porcelain=v1', '--untracked-files=normal'], options)
+  return {
+    commit: commit.status === 0 ? commit.stdout.trim() : null,
+    dirty: dirty.status === 0 ? dirty.stdout.trim() !== '' : null,
+  }
+}
+
+async function findProjectFile(start, names) {
+  let directory = resolve(start)
+  for (;;) {
+    for (const name of names) {
+      const path = join(directory, name)
+      const metadata = await stat(path).catch((error) => (error.code === 'ENOENT' ? null : Promise.reject(error)))
+      if (metadata?.isFile()) return path
+    }
+    const parent = dirname(directory)
+    if (parent === directory) return null
+    directory = parent
+  }
+}
+
+async function provenance(options, state, revision, worktree) {
+  const scanRoot = resolve(options.dir, state.scanRoot)
+  const git = gitProvenance(scanRoot)
+  const lockfilePath = await findProjectFile(scanRoot, ['pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'bun.lockb'])
+  const packagePath = await findProjectFile(scanRoot, ['package.json'])
+  let declaredPackageManager = null
+  if (packagePath) {
+    declaredPackageManager = await readFile(packagePath, 'utf8')
+      .then(JSON.parse)
+      .then((manifest) => manifest.packageManager ?? null)
+      .catch(() => null)
+  }
+  return {
+    skill: await skillMetadata(),
+    runtime: options.runtime ?? null,
+    model: options.model ?? null,
+    targetSnapshot: {
+      lockSha256: revision.oracleSha256,
+      lockManifestSha256: revision.lockManifestSha256,
+      worktreeSha256: sha256(JSON.stringify(worktree)),
+      productionSha256: productionSha256(worktree, state.harnessPaths),
+    },
+    commit: options.revision ?? git.commit,
+    dirty: git.dirty,
+    lockfile: lockfilePath
+      ? { path: portablePath(scanRoot, lockfilePath), sha256: sha256(await readFile(lockfilePath)) }
+      : null,
+    packageManager: {
+      declared: declaredPackageManager,
+      userAgent: process.env.npm_config_user_agent ?? null,
+    },
+    runtimeContextSha256: sha256(
+      stableStringify({
+        runtime: options.runtime ?? null,
+        node: process.version,
+        platform: process.platform,
+        arch: process.arch,
+        capabilityContext: options.capabilityContext ?? null,
+      }),
+    ),
+  }
+}
+
+async function reportSignature(path) {
+  if (!path) return null
+  const metadata = await lstat(path).catch((error) => (error.code === 'ENOENT' ? null : Promise.reject(error)))
+  if (!metadata) return null
+  const snapshot = await snapshotRegularFile(path, {
+    label: 'reporter artifact',
+    fail: (message) => new CliError('REPORT_PATH_PROTECTED', message),
+  })
+  return {
+    dev: snapshot.dev,
+    ino: snapshot.ino,
+    size: snapshot.size,
+    sha256: snapshot.sha256,
+    snapshot,
+  }
+}
+
 function fromJestReport(parsed) {
   return parsed.testResults.flatMap((file) =>
     (file.assertionResults ?? []).map((result) => ({
@@ -452,64 +852,220 @@ function fromJestReport(parsed) {
   )
 }
 
+function playwrightTestStatus(test) {
+  if (test?.status === 'skipped' || test?.expectedStatus === 'skipped') return 'skipped'
+  if (test?.status === 'flaky') return 'flaky'
+  if (test?.status === 'expected' && test?.expectedStatus === 'failed') return 'expected-failure'
+  if (
+    test?.status === 'expected' &&
+    test?.expectedStatus === 'passed' &&
+    test.results?.some((result) => result.status === 'passed')
+  ) {
+    return 'passed'
+  }
+  return 'failed'
+}
+
+function playwrightSpecStatus(tests) {
+  const statuses = tests.map(playwrightTestStatus)
+  if (statuses.length === 0) return 'failed'
+  if (statuses.every((status) => status === 'passed')) return 'passed'
+  return statuses.find((status) => status !== 'passed') ?? 'failed'
+}
+
 function fromPlaywrightReport(suites, ancestors = []) {
   return suites.flatMap((suite) => {
     const titles = [...ancestors, suite.title].filter(Boolean)
 
     return [
-      ...(suite.specs ?? []).map((spec) => ({
-        name: [...titles, spec.title].join(' > '),
-        status: spec.ok ? 'passed' : 'failed',
-      })),
+      ...(suite.specs ?? []).map((spec) => {
+        return {
+          name: [...titles, spec.title].join(' > '),
+          // Playwright's aggregate `ok` hides skipped, expected-failure and
+          // flaky attempts. Evidence accepts only actual clean project passes.
+          status: playwrightSpecStatus(spec.tests ?? []),
+        }
+      }),
       ...fromPlaywrightReport(suite.suites ?? [], titles),
     ]
   })
 }
 
-function fromNodeReport(raw) {
+function fromNodeReport(raw, cleanCommand = false) {
   const tests = []
-
-  for (const line of raw.split('\n').filter(Boolean)) {
+  let complete = false
+  const lines = raw.split('\n')
+  if (lines.at(-1) !== '') return { error: 'Node reporter output is truncated' }
+  for (const line of lines.slice(0, -1)) {
+    if (!line) return { error: 'Node reporter output contains a blank event' }
     let event
     try {
       event = JSON.parse(line)
     } catch {
+      return { error: 'Node reporter output contains malformed JSON' }
+    }
+    if (event?.type === 'test:complete' && event?.data?.summary === true) {
+      complete = true
       continue
     }
-
-    if (event?.type === 'test:pass') tests.push({ name: event.data?.name, status: 'passed' })
-    else if (event?.type === 'test:fail') tests.push({ name: event.data?.name, status: 'failed' })
+    if (!['test:pass', 'test:fail'].includes(event?.type) || event?.data?.test !== true) {
+      return { error: 'Node reporter output contains an unknown event' }
+    }
+    const status = event.data.status
+    if (
+      typeof event.data.name !== 'string' ||
+      !event.data.name ||
+      !['passed', 'failed', 'skipped', 'todo', 'cancelled'].includes(status)
+    ) {
+      return { error: 'Node reporter output has an invalid terminal test event' }
+    }
+    tests.push({ name: event.data.name, status })
   }
-
-  return tests
+  if ((complete || cleanCommand) && tests.length > 0) return { tests }
+  return { error: 'Node reporter output lacks completion or terminal tests' }
 }
 
-function parseReport(raw) {
+function parsedReport(tests) {
+  return tests.length > 0 ? { tests } : { error: 'Reporter contained no tests' }
+}
+
+function parseReport(raw, cleanCommand = false) {
+  if (raw.trim() === '') return { error: 'Reporter contained no tests' }
   try {
     const parsed = JSON.parse(raw)
 
-    if (Array.isArray(parsed?.testResults)) return { tests: fromJestReport(parsed) }
-    if (Array.isArray(parsed?.suites)) return { tests: fromPlaywrightReport(parsed.suites) }
+    if (Array.isArray(parsed?.testResults)) return parsedReport(fromJestReport(parsed))
+    if (Array.isArray(parsed?.suites)) return parsedReport(fromPlaywrightReport(parsed.suites))
+    if (parsed?.type?.startsWith('test:')) {
+      const node = fromNodeReport(raw, cleanCommand)
+      return node.tests ? parsedReport(node.tests) : node
+    }
 
     return { error: 'Unrecognized reporter shape' }
   } catch {
-    const tests = fromNodeReport(raw)
-    return tests.length > 0 ? { tests } : { error: 'Unrecognized reporter shape' }
+    const node = fromNodeReport(raw, cleanCommand)
+    return node.tests ? parsedReport(node.tests) : node
   }
 }
 
-async function readReport(path) {
+function reportNonPassing(tests) {
+  return tests.find((test) => test.status !== 'passed') ?? null
+}
+
+function hasParsedTests(run) {
+  return Array.isArray(run.tests) && run.tests.length > 0
+}
+
+function reportGrade(adapter, report) {
+  if (adapter !== 'node-test') return 'exit-only'
+  if (!hasParsedTests(report)) return 'exit-only'
+  return 'reported'
+}
+
+function hasFailedTests(run) {
+  return run.tests?.some((test) => test.status === 'failed') ?? false
+}
+
+function hasOnlyPassedTests(run) {
+  return hasParsedTests(run) && run.tests.every((test) => test.status === 'passed')
+}
+
+function isCompletedReportedRun(run) {
+  return Number.isInteger(run.exitCode) && !run.signal && run.grade === 'reported' && hasParsedTests(run)
+}
+
+function isReportedFailingRun(run) {
+  return isCompletedReportedRun(run) && run.exitCode !== 0 && hasFailedTests(run)
+}
+
+function isReportedPassingRun(run) {
+  return isCompletedReportedRun(run) && run.exitCode === 0 && hasOnlyPassedTests(run)
+}
+
+function isReviewPacketShape(value) {
+  return Boolean(value?.lockVerification && value?.targetSnapshot && value?.oracle && Array.isArray(value?.ledger))
+}
+
+async function testEvidenceDigest(path) {
+  let document
+  try {
+    document = JSON.parse(await readFile(resolve(path), 'utf8'))
+  } catch (error) {
+    throw new CliError('EVIDENCE_INVALID', `Cannot read test evidence bindings: ${error.message}`)
+  }
+  const bindings = Object.fromEntries(
+    Object.entries(document?.rows ?? {})
+      .filter(([, entry]) => entry?.kind === 'test')
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([row, entry]) => [row, { kind: 'test', name: entry.name }]),
+  )
+  return sha256(stableStringify(bindings))
+}
+
+async function readReport(path, before, cleanCommand = false) {
   if (!path) return { tests: null, error: null }
+
+  const after = await reportSignature(path)
+  if (!after) {
+    return { tests: null, error: `${path}: reporter artifact was not written`, fatalCode: 'REPORT_MISSING' }
+  }
 
   let raw
   try {
-    raw = await readFile(path, 'utf8')
+    await assertSnapshotUnchanged(after.snapshot, {
+      label: 'reporter artifact',
+      fail: (message) => new CliError('REPORT_STALE', message),
+    })
+    raw = after.snapshot.bytes.toString('utf8')
   } catch (error) {
     return { tests: null, error: error.message }
   }
 
-  const parsed = parseReport(raw)
-  return { tests: parsed.tests ?? null, error: parsed.error ?? null }
+  const parsed = parseReport(raw, cleanCommand)
+  if (
+    before &&
+    before.dev === after.dev &&
+    before.ino === after.ino &&
+    before.size === after.size &&
+    before.sha256 === after.sha256
+  ) {
+    return { tests: null, error: `${path}: reporter artifact was not rewritten by this run`, fatalCode: 'REPORT_STALE' }
+  }
+  if (parsed.tests) {
+    const nonPassing = reportNonPassing(parsed.tests)
+    if (nonPassing) {
+      return {
+        tests: parsed.tests,
+        error: `${nonPassing.name ?? 'unnamed test'} is ${nonPassing.status}`,
+        fatalCode: 'REPORT_NONPASSING',
+      }
+    }
+  }
+  return {
+    tests: parsed.tests ?? null,
+    error: parsed.error ?? null,
+    fatalCode: parsed.error === 'Reporter contained no tests' ? 'REPORT_EMPTY' : undefined,
+  }
+}
+
+async function assertReportPathAllowed(directory, state, value) {
+  if (!value) return
+  const report = resolve(value)
+  const lock = resolve(directory, state.lock)
+  const protectedPaths = [statePath(directory), ledgerPath(directory), lock, evidencePathFor(directory, state)]
+  const reserved = join(directory, '.run-ids')
+  if (isPathInside(reserved, report) || protectedPaths.includes(report)) {
+    throw new CliError('REPORT_PATH_PROTECTED', '--report cannot target Oracle state artifacts')
+  }
+  for (const protectedPath of protectedPaths) {
+    if (await pathsShareIdentity(report, protectedPath)) {
+      throw new CliError('REPORT_PATH_PROTECTED', '--report cannot alias an Oracle state artifact')
+    }
+  }
+  const metadata = await lstat(report).catch((error) => (error.code === 'ENOENT' ? null : Promise.reject(error)))
+  if (metadata?.isSymbolicLink()) {
+    throw new CliError('REPORT_PATH_PROTECTED', '--report must not be a symbolic link')
+  }
 }
 
 async function initialize(options) {
@@ -520,6 +1076,28 @@ async function initialize(options) {
   const directory = resolve(options.dir)
   const scanRoot = resolve(options.scanRoot ?? process.cwd())
   const risk = options.risk ?? 'medium'
+
+  const scanRootReal = await realpath(scanRoot).catch((error) => {
+    throw new CliError('ORACLE_DIR_INVALID', `Cannot resolve scan root: ${error.message}`)
+  })
+  const directoryReal = await realpath(directory).catch((error) => {
+    throw new CliError('ORACLE_DIR_INVALID', `Cannot resolve Oracle directory: ${error.message}`)
+  })
+  const repositoryRoot = commonAncestor(dirname(directoryReal), scanRootReal)
+  const oracleParent = join(repositoryRoot, '.ai', 'oracles')
+  const oracleId = relative(oracleParent, directoryReal)
+  if (isPathInside(scanRootReal, directoryReal) || isPathInside(directoryReal, scanRootReal)) {
+    throw new CliError('ORACLE_DIR_OVERLAP', '--dir and --scan-root must be disjoint')
+  }
+  if (
+    !oracleId ||
+    oracleId === '..' ||
+    oracleId.startsWith(`..${sep}`) ||
+    oracleId.includes(sep) ||
+    dirname(directoryReal) !== oracleParent
+  ) {
+    throw new CliError('ORACLE_DIR_INVALID', '--dir must be exactly <repository>/.ai/oracles/<oracle-id>')
+  }
 
   if (!REQUIRED_CONSECUTIVE_PASSES[risk]) {
     throw new CliError('USAGE', `Unknown risk: ${risk}`, 2)
@@ -548,9 +1126,14 @@ async function initialize(options) {
       'init requires at least one --required-label from the repository checks',
     )
   }
+  for (const label of requiredLabels) {
+    if (label.includes(':') && !/^.+:(?:reported|exit)$/.test(label)) {
+      throw new CliError('REQUIRED_LABEL_INVALID', `${label}: expected <label>:reported or <label>:exit`)
+    }
+  }
 
   const state = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     lock: portablePath(directory, resolve(options.lock)),
     scanRoot: portablePath(directory, scanRoot),
     risk,
@@ -568,6 +1151,8 @@ async function initialize(options) {
   }
 
   const revision = verifyLock(directory, state)
+  state.lockSha256 = revision.oracleSha256
+  state.lockManifestSha256 = revision.lockManifestSha256
   const oracle = await readFile(await lockedOraclePath(directory, state), 'utf8')
   state.milestones = parseMilestones(options.milestones, contractRowIds(oracle))
   state.snapshot = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
@@ -579,7 +1164,8 @@ async function initialize(options) {
     )
   }
   // oracle:nondeterminism 상태 이력은 실제 시각을 기록한다
-  state.history.push({ state: 'ORACLE_READY', runId: null, reason: null, runCount: 0, at: new Date().toISOString() })
+  const initializedAt = new Date().toISOString()
+  state.history.push({ state: 'ORACLE_READY', runId: null, reason: null, runCount: 0, at: initializedAt })
 
   try {
     await writeFile(statePath(directory), `${JSON.stringify(state, null, 2)}\n`, { flag: 'wx' })
@@ -590,8 +1176,16 @@ async function initialize(options) {
       'Run state already exists — start a new <oracle-id> directory for a new revision',
     )
   }
+  const initialized = await appendLedger(directory, {
+    type: 'init',
+    state: 'ORACLE_READY',
+    stateDelta: { state: state.state, history: state.history },
+    at: initializedAt,
+  })
+  state.ledgerHead = initialized.digest
+  await writeState(directory, state)
 
-  process.stdout.write(`RUN_STATE_INITIALIZED sha256:${revision} state:ORACLE_READY\n`)
+  process.stdout.write(`RUN_STATE_INITIALIZED sha256:${revision.oracleSha256} state:ORACLE_READY\n`)
 }
 
 async function execute(options) {
@@ -600,37 +1194,102 @@ async function execute(options) {
   }
 
   const directory = resolve(options.dir)
-  const state = await readState(directory)
+  const state = await readConsistentState(directory)
   const revision = verifyLock(directory, state)
-
-  const executed = spawnSync(options.command[0], options.command.slice(1), { stdio: 'inherit' })
+  await assertReportPathAllowed(directory, state, options.report)
+  if (options.adapter && options.adapter !== 'node-test') {
+    throw new CliError('ADAPTER_INVALID', '--adapter must be node-test')
+  }
+  if (options.adapter === 'node-test') {
+    if (!options.report) throw new CliError('REPORT_REQUIRED', 'node-test adapter requires --report')
+    if (options.command[0] !== process.execPath || !options.command.includes('--test')) {
+      throw new CliError('ADAPTER_COMMAND_INVALID', 'node-test adapter requires node --test')
+    }
+    if (
+      options.command.some(
+        (argument) =>
+          argument === '--eval' ||
+          argument === '-e' ||
+          argument.startsWith('--eval=') ||
+          argument.startsWith('--test-reporter') ||
+          argument.startsWith('--test-reporter-destination'),
+      )
+    ) {
+      throw new CliError('ADAPTER_COMMAND_INVALID', 'node-test adapter owns reporter and destination options')
+    }
+  }
+  const reportBefore = await reportSignature(options.report)
+  if (options.adapter && reportBefore) {
+    throw new CliError('REPORT_PATH_EXISTS', 'trusted adapter reports must use a new destination')
+  }
+  const runId = await reserveRunId(directory, options.label)
+  if (options.adapter === 'node-test' && reportBefore) {
+    throw new CliError('REPORT_PATH_PROTECTED', 'node-test adapter requires a new final report path')
+  }
+  const protectedBefore = await Promise.all(
+    [statePath(directory), resolve(directory, state.lock), evidencePathFor(directory, state)].map((path) =>
+      reportSignature(path),
+    ),
+  )
+  let command = options.command
+  let adapterDestination = null
+  if (options.adapter === 'node-test') {
+    const reportDirectory = join(directory, '.runner-reports')
+    await mkdir(reportDirectory, { recursive: true })
+    adapterDestination = join(reportDirectory, `${runId}.ndjson`)
+    await writeFile(adapterDestination, '', { flag: 'wx' })
+    const testIndex = options.command.indexOf('--test')
+    command = [
+      ...options.command.slice(0, testIndex + 1),
+      `--test-reporter=${join(scriptDirectory, 'oracle-node-reporter.mjs')}`,
+      `--test-reporter-destination=${adapterDestination}`,
+      ...options.command.slice(testIndex + 1),
+    ]
+  }
+  const executed = spawnSync(command[0], command.slice(1), { stdio: 'inherit' })
 
   if (executed.error) {
     throw new CliError('COMMAND_UNRUNNABLE', `Cannot run command: ${executed.error.message}`)
   }
 
-  const report = await readReport(options.report)
+  if (adapterDestination && executed.status !== null) await rename(adapterDestination, resolve(options.report))
+  const report = await readReport(options.report, reportBefore, executed.status !== null && !executed.signal)
+  for (let index = 0; index < protectedBefore.length; index += 1) {
+    if (protectedBefore[index]) await assertSnapshotUnchanged(protectedBefore[index].snapshot, { label: 'Oracle artifact' })
+  }
   const scanRoot = resolve(directory, state.scanRoot)
-  const runId = await reserveRunId(directory)
   const worktree = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
   const record = {
     type: 'run',
     runId,
     label: options.label,
     command: options.command,
+    adapter: options.adapter ?? null,
     exitCode: executed.status,
-    grade: report.tests ? 'reported' : 'exit-only',
+    signal: executed.signal ?? null,
+    grade: reportGrade(options.adapter, report),
     tests: report.tests,
     reportError: report.error,
+    reportErrorCode: report.fatalCode ?? null,
     env: fingerprint(options),
-    lockSha256: revision,
+    lockSha256: revision.oracleSha256,
+    oracleSha256: revision.oracleSha256,
+    lockManifestSha256: revision.lockManifestSha256,
     worktreeSha256: sha256(JSON.stringify(worktree)),
     productionSha256: productionSha256(worktree, state.harnessPaths),
     harnessSha256: selectedDigests(worktree, state.harnessPaths ?? []),
+    provenance: await provenance(options, state, revision, worktree),
     at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
   }
 
   await appendLedger(directory, record)
+  await finishRunId(directory, runId)
+  if (executed.status === null || executed.signal) {
+    throw new CliError('COMMAND_TERMINATED', `${runId} terminated by signal ${executed.signal ?? 'unknown'}`)
+  }
+  if (report.fatalCode && (executed.status === 0 || report.fatalCode !== 'REPORT_NONPASSING')) {
+    throw new CliError(report.fatalCode, report.error)
+  }
   process.stdout.write(`RUN_RECORDED ${runId} exit:${record.exitCode} grade:${record.grade}\n`)
 }
 
@@ -664,13 +1323,22 @@ function assertConsecutivePasses(
   ledger,
   run,
   started = lastEntryFor(state, 'VALID_RED')?.runCount ?? lastEntryFor(state, 'ORACLE_READY')?.runCount ?? 0,
+  currentWorktree = null,
+  currentLockManifest = null,
 ) {
   const command = JSON.stringify(run.command)
-  const candidates = ledger.slice(started).filter((entry) => JSON.stringify(entry.command) === command)
+  const candidates = ledger
+    .slice(started)
+    .filter(
+      (entry) =>
+        JSON.stringify(entry.command) === command &&
+        (!currentWorktree || entry.worktreeSha256 === currentWorktree) &&
+        (!currentLockManifest || entry.lockManifestSha256 === currentLockManifest),
+    )
 
   let consecutive = 0
   for (let index = candidates.length - 1; index >= 0; index -= 1) {
-    if (candidates[index].exitCode !== 0) break
+    if (!isReportedPassingRun(candidates[index])) break
     consecutive += 1
   }
 
@@ -693,8 +1361,7 @@ function harnessRedIndex(state, ledger, started, run, current) {
   let redIndex = -1
   for (let index = started; index < ledger.length; index += 1) {
     const entry = ledger[index]
-    const isReportedRed =
-      entry.exitCode !== 0 && entry.grade === 'reported' && entry.tests?.some((test) => test.status === 'failed')
+    const isReportedRed = isReportedFailingRun(entry)
     if (isReportedRed && sameDigests(entry.harnessSha256, current)) redIndex = index
   }
 
@@ -709,19 +1376,55 @@ function harnessRedIndex(state, ledger, started, run, current) {
   return redIndex
 }
 
-function assertRequiredRuns(state, ledger, started) {
+function assertRunFresh(record, currentWorktree, currentProduction, currentHarness, currentLockManifest, code) {
+  if (record.lockManifestSha256 !== currentLockManifest) {
+    throw new CliError(code, `${record.runId} predates the current lock manifest bytes`)
+  }
+  if (record.worktreeSha256 !== currentWorktree) {
+    throw new CliError(code, `${record.runId} predates the current worktree bytes`)
+  }
+  if (record.productionSha256 !== currentProduction) {
+    throw new CliError(code, `${record.runId} predates the current production bytes`)
+  }
+  if (!sameDigests(record.harnessSha256 ?? {}, currentHarness ?? {})) {
+    throw new CliError(code, `${record.runId} predates the current harness bytes`)
+  }
+}
+
+function assertRequiredRuns(
+  state,
+  ledger,
+  started,
+  currentWorktree = null,
+  currentProduction = null,
+  currentHarness = null,
+  currentLockManifest,
+) {
   for (const label of state.requiredLabels ?? []) {
+    const grade = label.endsWith(':exit') ? 'exit-only' : 'reported'
     const latest = ledger
       .slice(started)
       .filter((entry) => entry.label === label)
       .at(-1)
 
-    if (!latest || latest.exitCode !== 0) {
+    if (!latest) {
       throw new CliError(
         'REQUIRED_RUN_MISSING',
+        `required label "${label}" has no run after the previous state transition`,
+      )
+    }
+    const valid =
+      latest.exitCode === 0 &&
+      !latest.signal &&
+      (grade === 'reported' ? latest.grade === 'reported' && hasOnlyPassedTests(latest) : latest.grade === 'exit-only')
+    if (!valid) {
+      throw new CliError(
+        'REQUIRED_LABEL_GRADE',
         `required label "${label}" needs a passing run after the previous state transition`,
       )
     }
+    if (currentWorktree)
+      assertRunFresh(latest, currentWorktree, currentProduction, currentHarness, currentLockManifest, 'SNAPSHOT_STALE')
   }
 }
 
@@ -788,18 +1491,103 @@ async function transition(options) {
   }
 
   const directory = resolve(options.dir)
-  const state = await readState(directory)
+  return await withDirectoryLock(directory, 'state', async () => {
+    return transitionUnderLock(options, directory)
+  })
+}
+
+async function reviewReceipt(options) {
+  const required = ['dir', 'packet', 'revision', 'findings', 'role', 'reviewer', 'taskId']
+  if (required.some((name) => !options[name])) {
+    throw new CliError('USAGE', 'review-receipt requires --dir --packet --revision --findings --role --reviewer --task-id', 2)
+  }
+  const directory = resolve(options.dir)
+  await withDirectoryLock(directory, 'state', async () => {
+    const state = await readConsistentState(directory)
+    if (state.state !== 'IMPLEMENTED_GREEN') {
+      throw new CliError('REVIEW_RECEIPT_STATE', 'review receipts may only be created before REVIEW_VERIFIED')
+    }
+    const packet = await snapshotRegularFile(resolve(options.packet), {
+      base: directory,
+      allowHardlinks: false,
+      label: 'review packet',
+      fail: (message) => new CliError('REVIEW_PACKET_INVALID', message),
+    })
+    const packetDocument = JSON.parse(packet.bytes.toString('utf8'))
+    if (
+      packetDocument?.schemaVersion !== 2 ||
+      packetDocument?.targetSnapshot?.worktreeSha256 !== options.revision
+    ) {
+      throw new CliError('REVIEW_REVISION_MISMATCH', 'review receipt revision must match canonical schema-v2 packet')
+    }
+    const findingsPath = resolve(options.findings)
+    const findings = await snapshotRegularFile(findingsPath, {
+      base: directory,
+      allowHardlinks: false,
+      label: 'review findings',
+      fail: (message) => new CliError('FINDINGS_INVALID', message),
+    })
+    const document = JSON.parse(findings.bytes.toString('utf8'))
+    if (document?.schemaVersion !== 2 || document.reviewerRole !== options.role || document.reviewerId !== options.reviewer) {
+      throw new CliError('FINDINGS_INVALID', 'findings reviewer identity must match the receipt')
+    }
+    if (document.orchestrationReceipt) throw new CliError('REVIEW_RECEIPT_EXISTS', 'findings already has an orchestration receipt')
+    document.packetSha256 = packet.sha256
+    document.targetRevision = options.revision
+    const output = { ...document }
+    const outputSha256 = sha256(stableStringify(output))
+    const receiptId = sha256(stableStringify({ packetSha256: packet.sha256, revision: options.revision, role: options.role, reviewerId: options.reviewer, taskId: options.taskId, outputSha256 }))
+    document.orchestrationReceipt = {
+      receiptId,
+      packetSha256: packet.sha256,
+      targetRevision: options.revision,
+      role: options.role,
+      reviewerId: options.reviewer,
+      taskId: options.taskId,
+      outputSha256,
+    }
+    const finalBytes = `${JSON.stringify(document, null, 2)}\n`
+    const findingsSha256 = sha256(finalBytes)
+    const revision = verifyLock(directory, state)
+    const event = await appendLedger(directory, {
+      type: 'review-receipt',
+      receiptId,
+      packetSha256: packet.sha256,
+      targetRevision: options.revision,
+      role: options.role,
+      reviewerId: options.reviewer,
+      taskId: options.taskId,
+      outputSha256,
+      findingsSha256,
+      oracleSha256: revision.oracleSha256,
+      adapter: 'controller',
+      at: new Date().toISOString(),
+    })
+    const temporary = `${findingsPath}.receipt-${process.pid}-${Date.now()}`
+    await writeFile(temporary, finalBytes, { flag: 'wx' })
+    await rename(temporary, findingsPath)
+    state.ledgerHead = event.digest
+    await writeState(directory, state)
+    process.stdout.write(`REVIEW_RECEIPT ${receiptId} digest:${event.digest}\n`)
+  })
+}
+
+async function transitionUnderLock(options, directory) {
+  const state = await readConsistentState(directory)
   const allowed = TRANSITIONS[state.state] ?? []
 
   if (!allowed.includes(options.to)) {
     throw new CliError('TRANSITION_NOT_ALLOWED', `${state.state} cannot move to ${options.to}`)
   }
 
-  verifyLock(directory, state)
+  const revision = verifyLock(directory, state)
 
-  const ledger = await readRuns(directory)
+  const allLedger = await readLedger(directory)
+  const ledger = allLedger.filter((entry) => entry.type === 'run')
   const scanRoot = resolve(directory, state.scanRoot)
   const notices = []
+  let packetSha256 = null
+  let implementationRevision = null
 
   if (options.to === 'NEEDS_DECISION' || options.to === 'FAIL') {
     if (!options.reason) throw new CliError('MISSING_REASON', `${options.to} requires --reason`)
@@ -811,22 +1599,42 @@ async function transition(options) {
 
   if (options.to === 'VALID_RED') {
     const milestones = state.milestones ?? []
+    const refreshingRed = state.state === 'VALID_RED'
 
-    if (!options.evidence || (milestones.length === 0 && !options.row)) {
-      throw new CliError(
-        'EVIDENCE_REQUIRED',
-        milestones.length > 0 ? 'milestone VALID_RED requires --evidence' : 'VALID_RED requires --evidence and --row',
-      )
+    if (!options.evidence || ((refreshingRed || milestones.length === 0) && !options.row)) {
+      let message = 'VALID_RED requires --evidence and --row'
+      if (!refreshingRed && milestones.length > 0) message = 'milestone VALID_RED requires --evidence'
+      throw new CliError('EVIDENCE_REQUIRED', message)
+    }
+    if (refreshingRed && state.budgets.harness.spent <= (state.harnessBudgetAtValidRed ?? 0)) {
+      throw new CliError('HARNESS_BUDGET_REQUIRED', 'refreshing VALID_RED requires a new harness budget spend')
     }
 
     const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
-    assertNoProductionChange(changedPaths(state.snapshot, current), state.harnessPaths)
     const currentHarness = selectedDigests(current, state.harnessPaths ?? [])
     const oracle = await lockedOraclePath(directory, state)
+    if (refreshingRed) {
+      if (!isReportedFailingRun(run)) {
+        throw new CliError('RUN_NOT_RED', `${run.runId} did not report a clean failing test run`)
+      }
+      assertRunFresh(
+        run,
+        sha256(JSON.stringify(current)),
+        productionSha256(current, state.harnessPaths),
+        currentHarness,
+        revision.lockManifestSha256,
+        'SNAPSHOT_STALE',
+      )
+    } else {
+      assertNoProductionChange(changedPaths(state.snapshot, current), state.harnessPaths)
+    }
 
-    if (milestones.length > 0) {
+    if (!refreshingRed && milestones.length > 0) {
       const milestoneRuns = requiredMilestoneRuns(milestones, ledger)
-      const last = milestoneRuns.reduce((latest, entry) => (entry.index > latest.index ? entry : latest))
+      let last = milestoneRuns[0]
+      for (const entry of milestoneRuns.slice(1)) {
+        if (entry.index > last.index) last = entry
+      }
       if (run.runId !== last.run.runId) {
         throw new CliError('MILESTONE_RUN_INVALID', `--run must cite the last milestone RED: ${last.run.runId}`)
       }
@@ -852,8 +1660,11 @@ async function transition(options) {
         }
       }
     } else {
-      if (run.exitCode === 0) {
-        throw new CliError('RUN_NOT_RED', `${run.runId} exited 0 — a valid RED needs a failing run`)
+      if (!Number.isInteger(run.exitCode) || run.exitCode === 0 || run.signal) {
+        throw new CliError(
+          'RUN_NOT_RED',
+          `${run.runId} did not report a clean failure — a valid RED needs a failing run`,
+        )
       }
       if ((state.harnessPaths ?? []).length > 0 && !sameDigests(run.harnessSha256, currentHarness)) {
         throw new CliError('HARNESS_RED_REQUIRED', 'the selected RED predates the current harness bytes')
@@ -880,11 +1691,15 @@ async function transition(options) {
     }
     state.harnessAtValidRed = currentHarness
     state.harnessBudgetAtValidRed = state.budgets.harness.spent
+    state.testBindings = {
+      evidenceSha256: await testEvidenceDigest(options.evidence),
+      tests: Object.fromEntries(Object.keys(current).filter(isTestPath).map((path) => [path, current[path]])),
+    }
   }
 
   if (options.to === 'IMPLEMENTED_GREEN') {
-    if (run.exitCode !== 0) {
-      throw new CliError('RUN_NOT_GREEN', `${run.runId} exited ${run.exitCode} — GREEN needs a passing run`)
+    if (run.exitCode !== 0 || !hasOnlyPassedTests(run)) {
+      throw new CliError('RUN_NOT_GREEN', `${run.runId} did not report a clean pass — GREEN needs a passing run`)
     }
 
     if (!options.evidence) {
@@ -895,9 +1710,31 @@ async function transition(options) {
       throw new CliError('EVIDENCE_UNVERIFIABLE', `${run.runId} must have a parsed reporter for GREEN`)
     }
 
-    let current = null
-    if (state.state === 'ORACLE_READY' || (state.harnessPaths ?? []).length > 0) {
-      current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+    const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+    const currentWorktree = sha256(JSON.stringify(current))
+    const currentProduction = productionSha256(current, state.harnessPaths)
+    const currentHarness = selectedDigests(current, state.harnessPaths ?? [])
+    assertRunFresh(
+      run,
+      currentWorktree,
+      currentProduction,
+      currentHarness,
+      revision.lockManifestSha256,
+      'SNAPSHOT_STALE',
+    )
+    await assertTestsNotWeakened(state, scanRoot)
+    if (state.testBindings) {
+      const currentEvidenceSha256 = await testEvidenceDigest(options.evidence)
+      const currentTests = Object.fromEntries(Object.keys(current).filter(isTestPath).map((path) => [path, current[path]]))
+      if (
+        currentEvidenceSha256 !== state.testBindings.evidenceSha256 ||
+        !sameDigests(currentTests, state.testBindings.tests)
+      ) {
+        if (state.budgets.harness.spent <= (state.harnessBudgetAtValidRed ?? 0)) {
+          throw new CliError('HARNESS_BUDGET_REQUIRED', 'evidence mapping or test bytes changed after VALID_RED')
+        }
+        throw new CliError('EVIDENCE_STALE', 'evidence mapping or test bytes changed after VALID_RED; record a fresh RED')
+      }
     }
 
     if (state.state === 'ORACLE_READY') {
@@ -911,15 +1748,22 @@ async function transition(options) {
     let started = lastEntryFor(state, 'VALID_RED')?.runCount ?? lastEntryFor(state, 'ORACLE_READY')?.runCount ?? 0
     if (state.state === 'VALID_RED' && (state.harnessPaths ?? []).length > 0) {
       const currentHarness = selectedDigests(current, state.harnessPaths)
-      if (Object.values(currentHarness).some((digest) => digest === null)) {
+      if (Object.values(currentHarness).includes(null)) {
         throw new CliError('HARNESS_PATH_INVALID', 'a registered harness file no longer exists')
       }
       const redIndex = harnessRedIndex(state, ledger, started, run, currentHarness)
       if (redIndex !== null) started = redIndex + 1
     }
-    assertRequiredRuns(state, ledger, started)
-    assertConsecutivePasses(state, ledger, run, started)
-    await assertTestsNotWeakened(state, scanRoot)
+    assertRequiredRuns(
+      state,
+      ledger,
+      started,
+      currentWorktree,
+      currentProduction,
+      currentHarness,
+      revision.lockManifestSha256,
+    )
+    assertConsecutivePasses(state, ledger, run, started, currentWorktree, revision.lockManifestSha256)
     const evidenceResult = runVerifier([
       'evidence',
       '--oracle',
@@ -945,10 +1789,10 @@ async function transition(options) {
   }
 
   if (options.to === 'REVIEW_VERIFIED') {
-    if (run.exitCode !== 0) {
+    if (run.exitCode !== 0 || !hasOnlyPassedTests(run)) {
       throw new CliError(
         'RUN_NOT_GREEN',
-        `${run.runId} exited ${run.exitCode} — review needs a passing re-verification`,
+        `${run.runId} did not report a clean pass — review needs a passing re-verification`,
       )
     }
 
@@ -972,11 +1816,45 @@ async function transition(options) {
     }
 
     const greenEntry = lastEntryFor(state, 'IMPLEMENTED_GREEN')
-    assertRequiredRuns(state, ledger, greenEntry.runCount)
+    const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+    const currentWorktree = sha256(JSON.stringify(current))
+    const currentProduction = productionSha256(current, state.harnessPaths)
+    const currentHarness = selectedDigests(current, state.harnessPaths ?? [])
+    assertRunFresh(
+      run,
+      currentWorktree,
+      currentProduction,
+      currentHarness,
+      revision.lockManifestSha256,
+      'REVIEW_RUN_STALE',
+    )
+    assertRequiredRuns(
+      state,
+      ledger,
+      greenEntry.runCount,
+      currentWorktree,
+      currentProduction,
+      currentHarness,
+      revision.lockManifestSha256,
+    )
     const greenRun = findRun(ledger, greenEntry.runId)
     assertSameCommand(greenRun, run)
+    implementationRevision = greenRun.worktreeSha256
 
     const oracle = await lockedOraclePath(directory, state)
+    runVerifier([
+      'evidence',
+      '--oracle',
+      oracle,
+      '--map',
+      resolve(options.evidence),
+      '--ledger',
+      ledgerPath(directory),
+      '--run',
+      run.runId,
+      '--phase',
+      'review',
+    ])
     if (state.risk === 'high') {
       const mutationRun = findRun(ledger, options.mutationRun)
       const mutationIndex = ledger.findIndex((entry) => entry.runId === mutationRun.runId)
@@ -1009,42 +1887,153 @@ async function transition(options) {
         options.mutationRow,
       ])
     }
-    runVerifier([
-      'evidence',
+
+    if (!options.packet || !options.revision) {
+      throw new CliError('REVIEW_PACKET_REQUIRED', 'REVIEW_VERIFIED requires --packet and --revision')
+    }
+
+    const packetPath = resolve(options.packet)
+    const packetRaw = await readFile(packetPath, 'utf8').catch((error) => {
+      throw new CliError('REVIEW_PACKET_INVALID', `Cannot read review packet: ${error.message}`)
+    })
+    const packet = JSON.parse(packetRaw)
+    packetSha256 = sha256(packetRaw)
+    const packetGreenEntry = [...(packet.state?.history ?? [])]
+      .reverse()
+      .find((entry) => entry.state === 'IMPLEMENTED_GREEN')
+    const packetGreenRun = (packet.ledger ?? []).find((entry) => entry.runId === packetGreenEntry?.runId)
+    const targetSnapshot = packet.targetSnapshot
+    const packetRevision = targetSnapshot?.worktreeSha256 ?? packetGreenRun?.worktreeSha256
+    if (options.revision !== packetRevision) {
+      throw new CliError(
+        'REVIEW_REVISION_MISMATCH',
+        'REVIEW_VERIFIED revision must match the review packet target snapshot',
+      )
+    }
+    if (
+      !targetSnapshot ||
+      targetSnapshot.lockManifestSha256 !== revision.lockManifestSha256 ||
+      packet.state?.lockManifestSha256 !== revision.lockManifestSha256 ||
+      targetSnapshot.worktreeSha256 !== currentWorktree ||
+      targetSnapshot.productionSha256 !== currentProduction ||
+      !sameDigests(targetSnapshot.harnessSha256 ?? {}, currentHarness)
+    ) {
+      throw new CliError('REVIEW_PACKET_STALE', 'review packet does not target the current snapshot')
+    }
+    const findingsSnapshot = await snapshotRegularFile(resolve(options.findings), {
+      base: directory,
+      allowHardlinks: false,
+      label: 'review findings',
+      fail: (message) => new CliError('FINDINGS_INVALID', message),
+    })
+    const findingsDocument = JSON.parse(findingsSnapshot.bytes.toString('utf8'))
+    const receipt = findingsDocument?.orchestrationReceipt
+    const receiptEvent = allLedger.find(
+      (entry) =>
+        entry.type === 'review-receipt' &&
+        entry.receiptId === receipt?.receiptId &&
+        entry.packetSha256 === packetSha256 &&
+        entry.targetRevision === options.revision &&
+        entry.findingsSha256 === findingsSnapshot.sha256,
+    )
+    if (!receiptEvent) {
+      throw new CliError('REVIEWER_EVIDENCE_INVALID', 'review findings require a pre-verification ledger receipt')
+    }
+
+    const reviewArgs = [
+      'review',
       '--oracle',
       oracle,
+      '--file',
+      resolve(options.findings),
+      '--packet',
+      packetPath,
+      '--revision',
+      packetRevision ?? implementationRevision,
       '--map',
       resolve(options.evidence),
       '--ledger',
       ledgerPath(directory),
-      '--run',
-      run.runId,
-      '--phase',
-      'review',
-    ])
-
-    const reviewArgs = ['review', '--oracle', oracle, '--file', resolve(options.findings)]
+    ]
     if (options.intersect) reviewArgs.push('--intersect', resolve(options.intersect))
     runVerifier(reviewArgs)
   }
 
   state.state = options.to
-  state.history.push({
+  const historyEntry = {
     state: options.to,
     runId: run?.runId ?? null,
     reason: options.reason ?? null,
     row: options.row ?? null,
     evidence: options.evidence ? portablePath(directory, resolve(options.evidence)) : null,
     findings: options.findings ? portablePath(directory, resolve(options.findings)) : null,
+    packet: options.packet ? portablePath(directory, resolve(options.packet)) : null,
+    packetSha256,
+    targetRevision: options.revision ?? null,
     intersect: options.intersect ? portablePath(directory, resolve(options.intersect)) : null,
     mutationRunId: options.mutationRun ?? null,
     mutationRow: options.mutationRow ?? null,
     runCount: ledger.length,
     at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
-  })
+  }
+  state.history.push(historyEntry)
 
+  const transitionEvent = await appendLedger(directory, {
+    type: 'transition',
+    state: options.to,
+    evidenceRunId: run?.runId ?? null,
+    reason: options.reason ?? null,
+    row: options.row ?? null,
+    evidence: historyEntry.evidence,
+    findings: historyEntry.findings,
+    packet: historyEntry.packet,
+    packetSha256: historyEntry.packetSha256,
+    targetRevision: historyEntry.targetRevision,
+    stateDelta: {
+      state: options.to,
+      testFiles: state.testFiles,
+      testBindings: state.testBindings,
+      harnessAtValidRed: state.harnessAtValidRed,
+      harnessBudgetAtValidRed: state.harnessBudgetAtValidRed,
+      envDrift: state.envDrift,
+    },
+    runCount: ledger.length,
+    at: historyEntry.at,
+  })
+  historyEntry.ledgerDigest = transitionEvent.digest
+  state.ledgerHead = transitionEvent.digest
   await writeState(directory, state)
   process.stdout.write([`STATE_${options.to} run:${run?.runId ?? 'none'}`, ...notices, ''].join('\n'))
+}
+
+async function withDirectoryLock(directory, name, work) {
+  const lock = join(directory, `.lock-${name}`)
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    try {
+      await mkdir(lock)
+      try {
+        return await work()
+      } finally {
+        await rm(lock, { recursive: true, force: true })
+      }
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error
+      await new Promise((resolveLock) => setImmediate(resolveLock))
+    }
+  }
+  throw new CliError('LOCK_BUSY', `${name} lock remained busy`)
+}
+
+async function budgetDigest(directory, state, name) {
+  const scanRoot = resolve(directory, state.scanRoot)
+  const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+  if (name === 'harness') {
+    let paths = state.harnessPaths ?? []
+    if (paths.length === 0) paths = Object.keys(current).filter(isTestPath)
+    return sha256(JSON.stringify(selectedDigests(current, paths.sort())))
+  }
+  if (name === 'policy') return verifyLock(directory, state).lockManifestSha256
+  return productionSha256(current, state.harnessPaths)
 }
 
 async function spendBudget(options) {
@@ -1053,33 +2042,55 @@ async function spendBudget(options) {
   }
 
   const directory = resolve(options.dir)
-  const state = await readState(directory)
-  const budget = state.budgets[options.spend]
+  await withDirectoryLock(directory, 'state', async () => {
+    const state = await readConsistentState(directory)
+    const budget = state.budgets[options.spend]
 
-  if (!budget) {
-    throw new CliError('USAGE', `Unknown budget: ${options.spend}`, 2)
-  }
+    if (!budget) {
+      throw new CliError('USAGE', `Unknown budget: ${options.spend}`, 2)
+    }
 
-  if (budget.spent >= budget.limit) {
-    throw new CliError(
-      'BUDGET_EXHAUSTED',
-      `${options.spend} budget is spent (${budget.spent}/${budget.limit}) — report FAIL with the last real failure`,
-    )
-  }
+    const digest = await budgetDigest(directory, state, options.spend)
+    if ((budget.digests ?? []).includes(digest)) {
+      budget.reasons = [...(budget.reasons ?? []), options.reason]
+      await appendLedger(directory, {
+        type: 'budget',
+        budget: options.spend,
+        spent: budget.spent,
+        limit: budget.limit,
+        reason: options.reason,
+        changeDigest: digest,
+        duplicate: true,
+        at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
+      })
+      await writeState(directory, state)
+      process.stdout.write(`BUDGET_SPENT ${options.spend} ${budget.spent}/${budget.limit}\n`)
+      return
+    }
 
-  budget.spent += 1
-  budget.reasons = [...(budget.reasons ?? []), options.reason]
-  await writeState(directory, state)
-  await appendLedger(directory, {
-    type: 'budget',
-    budget: options.spend,
-    spent: budget.spent,
-    limit: budget.limit,
-    reason: options.reason,
-    at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
+    if (budget.spent >= budget.limit) {
+      throw new CliError(
+        'BUDGET_EXHAUSTED',
+        `${options.spend} budget is spent (${budget.spent}/${budget.limit}) — report FAIL with the last real failure`,
+      )
+    }
+
+    budget.spent += 1
+    budget.digests = [...(budget.digests ?? []), digest]
+    budget.reasons = [...(budget.reasons ?? []), options.reason]
+    await appendLedger(directory, {
+      type: 'budget',
+      budget: options.spend,
+      spent: budget.spent,
+      limit: budget.limit,
+      reason: options.reason,
+      changeDigest: digest,
+      at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
+    })
+    await writeState(directory, state)
+
+    process.stdout.write(`BUDGET_SPENT ${options.spend} ${budget.spent}/${budget.limit}\n`)
   })
-
-  process.stdout.write(`BUDGET_SPENT ${options.spend} ${budget.spent}/${budget.limit}\n`)
 }
 
 function gitDiff(root, changed, before, current) {
@@ -1117,12 +2128,85 @@ function gitDiff(root, changed, before, current) {
   return parts.join('\n')
 }
 
+async function snapshotPacketFile(path, root, label, snapshots) {
+  try {
+    const snapshot = await snapshotRegularFile(path, {
+      base: root,
+      allowHardlinks: false,
+      label,
+      fail: (message) => new CliError('REVIEW_PACKET_INPUT_INVALID', message),
+    })
+    snapshots.push({ label, snapshot })
+    return snapshot
+  } catch (error) {
+    throw new CliError('REVIEW_PACKET_INPUT_INVALID', `${label}: ${error.message}`)
+  }
+}
+
+async function collectEvidenceArtifacts(directory, evidenceSnapshot, snapshots) {
+  const evidence = JSON.parse(evidenceSnapshot.bytes.toString('utf8'))
+  const artifacts = []
+  const seen = new Set()
+  for (const [row, entry] of Object.entries(evidence.rows ?? {})) {
+    if (typeof entry?.artifact !== 'string') continue
+    const receiptPath = resolve(dirname(evidenceSnapshot.path), entry.artifact)
+    const receiptSnapshot = await snapshotPacketFile(receiptPath, directory, `${row} evidence receipt`, snapshots)
+    if (entry.sha256 && entry.sha256 !== receiptSnapshot.sha256) {
+      throw new CliError('REVIEW_PACKET_INPUT_INVALID', `${row} evidence receipt digest does not match`)
+    }
+    if (!seen.has(receiptSnapshot.path)) {
+      seen.add(receiptSnapshot.path)
+      artifacts.push({
+        path: portablePath(directory, receiptSnapshot.path),
+        sha256: receiptSnapshot.sha256,
+        size: receiptSnapshot.size,
+        mediaType: 'application/json',
+      })
+    }
+    let receipt
+    try {
+      receipt = JSON.parse(receiptSnapshot.bytes.toString('utf8'))
+    } catch (error) {
+      throw new CliError('REVIEW_PACKET_INPUT_INVALID', `${row} evidence receipt is invalid JSON: ${error.message}`)
+    }
+    const rowReceipt = receipt.rows?.[row]
+    const nested = [...(rowReceipt?.journey?.artifacts ?? []), ...(rowReceipt?.artifacts ?? [])]
+    for (const artifact of nested) {
+      if (typeof artifact?.path !== 'string') {
+        throw new CliError('REVIEW_PACKET_INPUT_INVALID', `${row} nested evidence artifact has no path`)
+      }
+      const nestedPath = resolve(dirname(receiptSnapshot.path), artifact.path)
+      const nestedSnapshot = await snapshotPacketFile(nestedPath, directory, `${row} nested evidence artifact`, snapshots)
+      if (artifact.sha256 !== nestedSnapshot.sha256) {
+        throw new CliError('REVIEW_PACKET_INPUT_INVALID', `${row} nested evidence artifact digest does not match`)
+      }
+      if (!seen.has(nestedSnapshot.path)) {
+        seen.add(nestedSnapshot.path)
+        artifacts.push({
+          path: portablePath(directory, nestedSnapshot.path),
+          sha256: nestedSnapshot.sha256,
+          size: nestedSnapshot.size,
+          mediaType: artifact.mediaType,
+        })
+      }
+    }
+  }
+  return artifacts.sort((left, right) => left.path.localeCompare(right.path))
+}
+
 async function reviewPacket(options) {
   if (!options.dir || !options.output) {
     throw new CliError('USAGE', 'review-packet requires --dir and --output', 2)
   }
 
   const directory = resolve(options.dir)
+  const packetState = await readConsistentState(directory)
+  if (packetState.state !== 'IMPLEMENTED_GREEN') {
+    throw new CliError('REVIEW_PACKET_STATE', 'review packets may only be created in IMPLEMENTED_GREEN')
+  }
+  if (!options.decision) {
+    throw new CliError('IMPLEMENTATION_DECISION_REQUIRED', 'review-packet requires --decision')
+  }
   const output = resolve(options.output)
   const outputRelative = relative(directory, output)
   if (
@@ -1133,11 +2217,21 @@ async function reviewPacket(options) {
   ) {
     throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', '--output must be a file inside the Oracle directory')
   }
+  if (outputRelative === '.run-ids' || outputRelative.startsWith(`.run-ids${sep}`)) {
+    throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', '--output cannot be written under .run-ids')
+  }
+
   const [directoryReal, outputParentReal] = await Promise.all([realpath(directory), realpath(dirname(output))]).catch(
     (error) => {
       throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', `Cannot resolve output directory: ${error.message}`)
     },
   )
+  const packetScanRoot = resolve(directory, packetState.scanRoot)
+  const packetScanRootReal = await realpath(packetScanRoot).catch((error) => {
+    throw new CliError('REVIEW_PACKET_INPUT_INVALID', `Cannot resolve scan root: ${error.message}`)
+  })
+  const repositoryRoot = commonAncestor(directoryReal, packetScanRootReal)
+  const inputSnapshots = []
   const outputParentRelative = relative(directoryReal, outputParentReal)
   if (
     outputParentRelative === '..' ||
@@ -1150,8 +2244,19 @@ async function reviewPacket(options) {
     if (error.code === 'ENOENT') return null
     throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', `Cannot inspect output: ${error.message}`)
   })
-  if (outputMetadata?.isSymbolicLink()) {
-    throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', '--output cannot be a symbolic link')
+  if (outputMetadata && (!outputMetadata.isFile() || outputMetadata.isSymbolicLink())) {
+    throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', '--output must be a regular file')
+  }
+
+  if (outputMetadata?.isFile()) {
+    try {
+      if (!isReviewPacketShape(JSON.parse(await readFile(output, 'utf8')))) {
+        throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', '--output can only replace an existing review packet')
+      }
+    } catch (error) {
+      if (error instanceof CliError) throw error
+      throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', '--output can only replace an existing review packet')
+    }
   }
 
   let decisionPath
@@ -1190,7 +2295,13 @@ async function reviewPacket(options) {
       )
     }
 
-    const content = await readFile(decisionPath, 'utf8')
+    const decisionSnapshot = await snapshotPacketFile(
+      decisionPath,
+      directoryReal,
+      'implementation decision',
+      inputSnapshots,
+    )
+    const content = decisionSnapshot.bytes.toString('utf8')
     if (!content.trim()) {
       throw new CliError('IMPLEMENTATION_DECISION_INVALID', '--decision cannot be empty')
     }
@@ -1203,45 +2314,70 @@ async function reviewPacket(options) {
 
   const reviewPoints = []
   const seenReviewPoints = new Set()
+  if (options.reviewPoints.length === 0) {
+    throw new CliError('REVIEW_POINTS_REQUIRED', 'review-packet requires at least one --review-point')
+  }
+  const canonicalChangeability = await realpath(changeabilityReviewPoint).catch((error) => {
+    throw new CliError('REVIEW_POINTS_REQUIRED', `Cannot resolve canonical changeability review point: ${error.message}`)
+  })
   for (const point of options.reviewPoints) {
     const pointPath = resolve(point)
-    if (seenReviewPoints.has(pointPath)) {
-      throw new CliError('REVIEW_POINT_INVALID', `Duplicate review point: ${point}`)
-    }
-    seenReviewPoints.add(pointPath)
-
     let metadata
+    let pointReal
     try {
-      metadata = await lstat(pointPath)
+      ;[metadata, pointReal] = await Promise.all([lstat(pointPath), realpath(pointPath)])
     } catch (error) {
       throw new CliError('REVIEW_POINT_INVALID', `Cannot read review point: ${error.message}`)
     }
+    if (seenReviewPoints.has(pointReal)) {
+      throw new CliError('REVIEW_POINT_INVALID', `Duplicate review point: ${point}`)
+    }
+    seenReviewPoints.add(pointReal)
+
     if (!metadata.isFile() || metadata.isSymbolicLink()) {
       throw new CliError('REVIEW_POINT_INVALID', '--review-point must be a regular file')
     }
 
-    const content = await readFile(pointPath, 'utf8')
+    const pointSnapshot = await snapshotPacketFile(
+      pointPath,
+      null,
+      `review point ${point}`,
+      inputSnapshots,
+    )
+    const content = pointSnapshot.bytes.toString('utf8')
     if (!content.trim()) {
       throw new CliError('REVIEW_POINT_INVALID', '--review-point cannot be empty')
     }
     // 링크만 전달한다 — reviewer가 경로의 파일을 직접 전부 읽고, digest로 어떤
     // revision의 기준을 읽었는지 고정한다. 본문을 packet에 복제하지 않는다.
-    reviewPoints.push({ path: point, sha256: sha256(content) })
+    reviewPoints.push({
+      path: pointReal === canonicalChangeability ? 'changeability.md' : portablePath(directory, pointPath),
+      sha256: sha256(content),
+    })
+  }
+  if (!seenReviewPoints.has(canonicalChangeability)) {
+    throw new CliError('REVIEW_POINTS_REQUIRED', 'review-packet requires the canonical changeability.md review point')
   }
 
-  const state = await readState(directory)
+  const state = packetState
   const revision = verifyLock(directory, state)
   const lock = resolve(directory, state.lock)
   const lockDirectory = dirname(lock)
-  const manifest = JSON.parse(await readFile(lock, 'utf8'))
+  const lockSnapshot = await snapshotPacketFile(lock, directoryReal, 'lock manifest', inputSnapshots)
+  if (lockSnapshot.sha256 !== revision.lockManifestSha256) {
+    throw new CliError('REVIEW_PACKET_INPUT_INVALID', 'lock manifest changed after verification')
+  }
+  const manifest = JSON.parse(lockSnapshot.bytes.toString('utf8'))
   const oraclePath = resolve(lockDirectory, manifest.oracle.path)
-  const evidenceEntry = [...state.history].reverse().find((entry) => entry.evidence)
-  const evidencePath = evidenceEntry?.evidence
-    ? resolve(directory, evidenceEntry.evidence)
-    : join(directory, 'evidence.json')
+  const oracleSnapshot = await snapshotPacketFile(oraclePath, directoryReal, 'Oracle', inputSnapshots)
+  if (oracleSnapshot.sha256 !== revision.oracleSha256) {
+    throw new CliError('REVIEW_PACKET_INPUT_INVALID', 'Oracle bytes do not match the verified lock')
+  }
+  const evidencePath = evidencePathFor(directory, state)
+  const evidenceSnapshot = await snapshotPacketFile(evidencePath, directoryReal, 'evidence map', inputSnapshots)
   let evidence
   try {
-    evidence = JSON.parse(await readFile(evidencePath, 'utf8'))
+    evidence = JSON.parse(evidenceSnapshot.bytes.toString('utf8'))
   } catch (error) {
     throw new CliError('EVIDENCE_INVALID', `Cannot read review evidence: ${error.message}`)
   }
@@ -1259,7 +2395,7 @@ async function reviewPacket(options) {
     throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', '--output cannot overwrite a review input artifact')
   }
 
-  const scanRoot = resolve(directory, state.scanRoot)
+  const scanRoot = packetScanRoot
   const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
   const changed = changedPaths(state.snapshot, current)
   const changedFiles = changed.map((path) => ({
@@ -1268,32 +2404,71 @@ async function reviewPacket(options) {
     afterSha256: current[path] ?? null,
   }))
   const lockedSources = await Promise.all(
-    manifest.sources.map(async (source) => ({
-      ...source,
-      content: await readFile(resolve(lockDirectory, source.path), 'utf8'),
-    })),
+    manifest.sources.map(async (source) => {
+      const sourceSnapshot = await snapshotPacketFile(
+        resolve(lockDirectory, source.path),
+        repositoryRoot,
+        `locked source ${source.path}`,
+        inputSnapshots,
+      )
+      if (sourceSnapshot.sha256 !== source.sha256) {
+        throw new CliError('REVIEW_PACKET_INPUT_INVALID', `locked source ${source.path} digest does not match`)
+      }
+      return { ...source, content: sourceSnapshot.bytes.toString('utf8') }
+    }),
   )
+  const targetSnapshot = {
+    worktreeSha256: sha256(JSON.stringify(current)),
+    productionSha256: productionSha256(current, state.harnessPaths),
+    harnessSha256: selectedDigests(current, state.harnessPaths ?? []),
+    lockManifestSha256: revision.lockManifestSha256,
+  }
+  const fullLedger = await readLedger(directory)
+  const checkpoint = fullLedger.findIndex((entry) => entry.type === 'checkpoint')
+  const ledger = checkpoint >= 0 ? fullLedger.slice(checkpoint) : fullLedger
+  const greenEntry = lastEntryFor(state, 'IMPLEMENTED_GREEN')
+  const greenRun = greenEntry ? findRun(ledger, greenEntry.runId) : null
+  if (!greenRun) throw new CliError('REVIEW_PACKET_STATE', 'IMPLEMENTED_GREEN has no bound run')
+  runVerifier([
+    'evidence',
+    '--oracle',
+    oracleSnapshot.path,
+    '--map',
+    evidenceSnapshot.path,
+    '--ledger',
+    ledgerPath(directory),
+    '--run',
+    greenRun.runId,
+    '--phase',
+    'green',
+  ])
+  const evidenceArtifacts = await collectEvidenceArtifacts(directoryReal, evidenceSnapshot, inputSnapshots)
+  const targetRevision = targetSnapshot.worktreeSha256
   const pending = Object.entries(evidence.rows ?? {})
     .filter(([, entry]) => entry.kind === 'pending')
     .map(([row, entry]) => ({ row, ...entry }))
     .sort((left, right) => left.row.localeCompare(right.row))
 
   const packet = {
-    schemaVersion: implementationDecision ? 2 : 1,
+    schemaVersion: 2,
     lockVerification: {
       command: [process.execPath, lockScript, 'verify', '--lock', lock],
       exitCode: 0,
-      stdout: `ORACLE_VERIFIED sha256:${revision}`,
+      stdout: `ORACLE_VERIFIED sha256:${revision.oracleSha256} manifest-sha256:${revision.lockManifestSha256}`,
+      manifestSha256: revision.lockManifestSha256,
     },
     lock: manifest,
     oracle: {
       ...manifest.oracle,
-      content: await readFile(oraclePath, 'utf8'),
+      content: oracleSnapshot.bytes.toString('utf8'),
     },
     lockedSources,
     state,
-    ledger: await readLedger(directory),
+    ledger,
+    targetRevision,
     evidence,
+    evidenceArtifacts,
+    targetSnapshot,
     ...(implementationDecision ? { implementationDecision } : {}),
     ...(reviewPoints.length ? { reviewPoints } : {}),
     changedFiles,
@@ -1301,8 +2476,178 @@ async function reviewPacket(options) {
     pending,
   }
 
-  await writeFile(output, `${JSON.stringify(packet, null, 2)}\n`)
+  const temp = join(dirname(output), `.review-packet-${process.pid}-${Date.now()}.tmp`)
+  try {
+    for (const { label, snapshot: inputSnapshot } of inputSnapshots) {
+      await assertSnapshotUnchanged(inputSnapshot, {
+        label,
+        fail: (message) => new CliError('REVIEW_PACKET_INPUT_CHANGED', message),
+      })
+    }
+    await writeFile(temp, `${JSON.stringify(packet, null, 2)}\n`)
+    await rename(temp, output)
+  } catch (error) {
+    await rm(temp, { force: true })
+    throw error
+  }
   process.stdout.write(`REVIEW_PACKET_WRITTEN ${portablePath(directory, output)}\n`)
+}
+
+async function orphanedRuns(directory, ledger) {
+  const reservations = join(directory, '.run-ids')
+  const finished = new Set(ledger.filter((entry) => (entry.type ?? 'run') === 'run').map((entry) => entry.runId))
+  let entries
+  try {
+    entries = await readdir(reservations)
+  } catch (error) {
+    if (error.code === 'ENOENT') return []
+    throw error
+  }
+  return entries.filter((runId) => !finished.has(runId)).sort()
+}
+
+async function evidenceStatus(directory, state, ledger) {
+  const evidencePath = evidencePathFor(directory, state)
+  try {
+    const oraclePath = await lockedOraclePath(directory, state)
+    const [oracle, evidence] = await Promise.all([
+      readFile(oraclePath, 'utf8'),
+      readFile(evidencePath, 'utf8').then(JSON.parse),
+    ])
+    const rows = contractRowIds(oracle)
+    const mapped = new Set(Object.keys(evidence.rows ?? {}))
+    const pendingRows = Object.entries(evidence.rows ?? {})
+      .filter(([, entry]) => entry?.kind === 'pending')
+      .map(([row]) => row)
+      .sort()
+    const missingRows = rows.filter((row) => !mapped.has(row))
+    const evidenceEntry = [...(state.history ?? [])]
+      .reverse()
+      .find((entry) => entry.state === 'REVIEW_VERIFIED' || entry.state === 'IMPLEMENTED_GREEN')
+    if (!evidenceEntry?.runId || missingRows.length > 0) {
+      return {
+        status: 'pending',
+        path: portablePath(directory, evidencePath),
+        missingRows,
+        pendingRows,
+      }
+    }
+    const evidenceRun = ledger.find((entry) => (entry.type ?? 'run') === 'run' && entry.runId === evidenceEntry.runId)
+    if (!evidenceRun) {
+      throw new CliError('RUN_NOT_FOUND', `${evidenceEntry.runId} is not recorded in the run ledger`)
+    }
+    runVerifier([
+      'evidence',
+      '--oracle',
+      oraclePath,
+      '--map',
+      evidencePath,
+      '--ledger',
+      ledgerPath(directory),
+      '--run',
+      evidenceRun.runId,
+      '--phase',
+      state.state === 'REVIEW_VERIFIED' ? 'review' : 'green',
+    ])
+    return {
+      status: 'verified',
+      path: portablePath(directory, evidencePath),
+      missingRows,
+      pendingRows,
+    }
+  } catch (error) {
+    return {
+      status: 'invalid',
+      path: portablePath(directory, evidencePath),
+      code: error.code ?? 'EVIDENCE_INVALID',
+      message: error.message,
+    }
+  }
+}
+
+async function reportStatus(options) {
+  if (!options.dir || !options.json) throw new CliError('USAGE', 'status requires --dir and --json', 2)
+
+  const directory = resolve(options.dir)
+  const ledger = await readLedger(directory)
+  const state = replayState(await readState(directory), ledger)
+  const checkpointIndex = ledger.findIndex((entry) => entry.type === 'checkpoint')
+  const legacyPrefix = Math.max(checkpointIndex, 0)
+  const headDigest = ledger.at(-1)?.digest ?? ZERO_DIGEST
+  const verifiedHeadDigest = headDigest
+  const ledgerValid = true
+  const scanRoot = resolve(directory, state.scanRoot)
+  const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+  const currentSnapshot = {
+    worktreeSha256: sha256(JSON.stringify(current)),
+    productionSha256: productionSha256(current, state.harnessPaths),
+    harnessSha256: selectedDigests(current, state.harnessPaths ?? []),
+  }
+  let lockStatus
+  try {
+    const revision = verifyLock(directory, state)
+    lockStatus = { status: 'valid', sha256: revision.oracleSha256, manifestSha256: revision.lockManifestSha256 }
+  } catch (error) {
+    lockStatus = { status: 'invalid', code: error.code ?? 'LOCK_INVALID', message: error.message }
+  }
+  currentSnapshot.lockManifestSha256 = lockStatus.manifestSha256 ?? null
+  const runEntries = ledger.filter((entry) => (entry.type ?? 'run') === 'run')
+  const staleOrMissingRuns = runEntries
+    .filter(
+      (entry) =>
+        entry.lockSha256 !== lockStatus.sha256 ||
+        entry.lockManifestSha256 !== lockStatus.manifestSha256 ||
+        entry.worktreeSha256 !== currentSnapshot.worktreeSha256 ||
+        entry.productionSha256 !== currentSnapshot.productionSha256,
+    )
+    .map((entry) => entry.runId)
+  const runIssues = runEntries
+    .filter((entry) => entry.reportError || (entry.report && entry.grade === 'exit-only'))
+    .map((entry) => ({
+      runId: entry.runId,
+      label: entry.label,
+      reportErrorCode: entry.reportErrorCode ?? null,
+      reportError: entry.reportError ?? null,
+      grade: entry.grade,
+    }))
+  const evidence = await evidenceStatus(directory, state, ledger)
+  const remainingBudgets = Object.fromEntries(
+    Object.entries(state.budgets ?? {}).map(([name, budget]) => [
+      name,
+      { spent: budget.spent, limit: budget.limit, remaining: Math.max(0, budget.limit - budget.spent) },
+    ]),
+  )
+  const blockers = []
+  if (lockStatus.status !== 'valid') blockers.push(lockStatus.code)
+  if (!ledgerValid) blockers.push('LEDGER_CHAIN_INVALID')
+  const needsEvidence = ['ORACLE_READY', 'VALID_RED', 'IMPLEMENTED_GREEN'].includes(state.state)
+  if (needsEvidence && evidence.status === 'invalid') blockers.push(evidence.code)
+  if (needsEvidence && evidence.missingRows?.length > 0) blockers.push('EVIDENCE_MISSING_ROWS')
+
+  process.stdout.write(
+    `${JSON.stringify(
+      {
+        currentState: state.state,
+        currentSnapshot,
+        lockStatus,
+        staleOrMissingRuns,
+        runIssues,
+        evidenceStatus: evidence,
+        orphanedRun: await orphanedRuns(directory, ledger),
+        remainingBudgets,
+        ledgerStatus: {
+          status: ledgerValid ? 'valid' : 'invalid',
+          headDigest,
+          verifiedHeadDigest,
+          legacyPrefix,
+        },
+        blockers,
+        nextLegalActions: TRANSITIONS[state.state] ?? [],
+      },
+      null,
+      2,
+    )}\n`,
+  )
 }
 
 async function main() {
@@ -1310,11 +2655,14 @@ async function main() {
   const options = parseOptions(args)
 
   if (command === 'init') await initialize(options)
+  else if (command === 'migrate-ledger') await migrateLedger(options)
+  else if (command === 'review-receipt') await reviewReceipt(options)
+  else if (command === 'status') await reportStatus(options)
   else if (command === 'exec') await execute(options)
   else if (command === 'transition') await transition(options)
   else if (command === 'budget') await spendBudget(options)
   else if (command === 'review-packet') await reviewPacket(options)
-  else throw new CliError('USAGE', 'Expected init, exec, transition, budget or review-packet', 2)
+  else throw new CliError('USAGE', 'Expected init, migrate-ledger, exec, transition, review-receipt, budget, status or review-packet', 2)
 }
 
 try {

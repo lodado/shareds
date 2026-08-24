@@ -21,6 +21,18 @@ reference는 자기 단계의 특칙만 더하고, 이 문서와 어긋나면 �
 `mandatory-constraint`와 다른 source가 충돌하면 보안·접근성·정합성을 제품·시각 선호로
 낮춰 통과하지 않는다. 충돌과 안전한 대안을 제시하고 `NEEDS_DECISION`.
 
+## 위험도 taxonomy — canonical
+
+Risk 판정은 이 문서가 canonical이다. 다른 문서는 이 표를 가리키고 lane별 절차만 더한다.
+
+| Risk     | 진입 기준                                                                                                                          | Lane            | 기본 증거                                                                          |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------- |
+| `Low`    | 새 정책·카드·architecture 결정이 없고 기존 승인 계약 안의 copy·token·고립 CSS·명확한 회귀 수정                                     | `low-fast-path` | 기존 repo 검증. Oracle card·lock·ledger·독립 review 없음                           |
+| `Medium` | 새 UI 상태·form·responsive 구조·비동기 순서·local/identity visual intent처럼 계약이 필요하지만 결제·권한·데이터 손실급 피해는 아님 | `oracle`        | Oracle Card, `VALID_RED`, required-label GREEN, 단일 독립 review                   |
+| `High`   | 결제·권한·파괴적 작업·데이터 손실·법/보안/개인정보/금융/복잡 concurrency처럼 false GREEN 피해가 큼                                 | `oracle`        | Medium 증거 + 연속 GREEN 강화, mutation kill·원복·재-GREEN, 독립 reviewer 2-sample |
+
+Low 작업 중 정책 질문, visual identity 변경, architecture/public API 결정, 새 상태 전이가 나오면 즉시 Low 실격으로 `common`을 읽고 Oracle lane으로 승격한다.
+
 ## 관할 규칙
 
 - 기준은 자신의 관할 안에서만 우선한다. Figma는 layout·copy·interaction을 정하지만

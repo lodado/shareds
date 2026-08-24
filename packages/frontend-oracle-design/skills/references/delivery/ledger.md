@@ -44,13 +44,17 @@ runId reservation을 원자적으로 만들어 병렬에도 runId 충돌이 없�
 ## 판정 명령은 ledger로 실행한다
 
 모든 판정용 실행은 bundled `oracle-run.mjs exec` 경유. `exec`는 실행 직전 lock을
-검증하고 runId·exit code·reporter 결과·env fingerprint를 append-only ledger에 남긴다.
-ledger에 없는 실행은 증거가 아니다.
+검증하고 runId·exit code·reporter 결과·env fingerprint·provenance를 append-only ledger에
+남긴다. provenance에는 skill version, optional runtime/model, lock/worktree/production
+snapshot, capability context가 들어간다. prompt 원문은 저장하지 말고 필요하면 hash나
+sanitized metadata만 `--capability-context`에 넣는다. ledger에 없는 실행은 증거가 아니다.
 
 ```bash
 node <skill-dir>/scripts/oracle-run.mjs exec \
   --dir .ai/oracles/<oracle-id> --label red-1 \
   --report <reporter-output-path> \
+  --runtime codex --model '<model-or-host>' \
+  --capability-context '<sanitized-json-or-hash>' \
   -- <레포의 실제 테스트 명령>
 ```
 
@@ -72,13 +76,32 @@ node <skill-dir>/scripts/oracle-run.mjs exec \
   빌드 산출물 제외 목록. **gitignore된 경로는 production 변경으로 세지 않는다.** 실제
   production인데 gitignore돼 있으면 `--scan-root`나 ignore 설정을 먼저 정리한다.
 
+## 상태 조회와 resume
+
+재개는 새 명령으로 상태를 발명하지 않고 기존 lock·`run-state.json`·`runs.jsonl`·budget·
+evidence에서 재계산한다. 세션 시작 또는 컨텍스트 요약 뒤 먼저 실행한다.
+
+```bash
+node <skill-dir>/scripts/oracle-run.mjs status \
+  --dir .ai/oracles/<oracle-id> \
+  --json
+```
+
+출력은 `currentState`, `currentSnapshot`, `lockStatus`, `staleOrMissingRuns`,
+`orphanedRun`, `remainingBudgets`, `blockers`, `nextLegalActions`를 담는다. stale run은
+현재 lock/worktree/production snapshot과 다른 과거 증거이며 재사용하지 않는다.
+`orphanedRun`은 `.run-ids` reservation은 있으나 ledger 완료 기록이 없는 실행이다. 같은
+runId를 손으로 재사용하지 말고 새 `exec`를 실행한다. 상태 파일 쓰기는 temp file + atomic
+rename으로만 수행하고 직접 편집하지 않는다.
+
 ### 이 하네스가 판정하지 못하는 것
 
 - `evidence verify`는 인용 테스트 이름이 그 run에서 **실제로 통과했는지**만 본다.
   행↔테스트 대응의 타당성은 독립 reviewer 체크리스트 담당.
 - `run-state.json`·`runs.jsonl`을 지울 수 있는 actor는 기준선·예산을 재시작할 수 있다.
-  `init`의 거부는 drift 검출이지 권한 통제가 아니다. 강한 통제는 `.ai/oracles/**`를
-  CODEOWNERS·CI human approval로 보호.
+  `init`의 거부는 drift 검출이지 권한 통제가 아니다. High risk만 `.ai/oracles/**`, lock
+  SHA, run IDs를 CI artifact와 CODEOWNERS·required review로 보호한다. Low/Medium에는
+  기본 강제하지 않는다.
 - 비결정 소스 scan은 알려진 토큰 목록 기반 — 검출 실패를 무결성 증거로 쓰지 않는다.
 - 예산 사용마다 `oracle-run.mjs budget --spend policy|harness|product --reason ...` 호출.
   `BUDGET_EXHAUSTED`면 다른 예산으로 우회하지 않고 `FAIL`로 보고.

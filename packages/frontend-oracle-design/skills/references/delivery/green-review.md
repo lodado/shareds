@@ -101,8 +101,54 @@ node <skill-dir>/scripts/oracle-verify.mjs evidence \
 ```
 
 `D*` 행 owner: `HARD → test`, `RELATIONAL → visual | pending`, `JUDGMENT → designer
-reviewer`. visual `pending`은 GREEN 증거 검증에서 미검증 항목으로 보고되지만 review
-증거 검증에서는 `EVIDENCE_PENDING`으로 완료를 차단한다.
+reviewer`. visual `pending` 또는 Visual QA `declined`는 GREEN 증거 검증에서 미검증 항목으로
+보고되지만 review 증거 검증에서는 `EVIDENCE_PENDING`으로 완료를 차단한다.
+`REVIEW_VERIFIED`로 가려면 기존 tool browser journey artifact, designer finding, 또는
+source-backed N/A revision 중 하나가 필요하다. N/A는 artifact가 아니라 잠긴 카드 row가
+`N/A (출처: S*)`를 명시하고 manifest가 승인된 Source Registry ID를 인용할 때만 쓴다.
+
+RELATIONAL visual artifact receipt는 Oracle directory 안의 일반 파일이어야 하며, receipt 내부 artifact 경로는 receipt directory 기준이어야 하며, 최소 형식은
+다음과 같다.
+
+```json
+{
+  "schemaVersion": 2,
+  "oracleSha256": "<locked-oracle-sha256>",
+  "rows": {
+    "D1": {
+      "status": "passed",
+      "journey": {
+        "status": "passed",
+        "tool": "playwright",
+        "scenario": "primary purchase card at 320px and desktop",
+        "checks": ["CTA does not overlap price"],
+        "artifacts": ["mobile.png"]
+      }
+    }
+  }
+}
+```
+
+Browser journey만 N/A이면 row 자체는 여전히 `status: "passed"`여야 하며, row-level `checks`/`artifacts`와 row가 인용한 승인 source가 필요하다. whole-row N/A는 artifact가 아니라 위 manifest의 `kind: "na"`만 쓴다.
+
+```json
+{
+  "schemaVersion": 2,
+  "oracleSha256": "<locked-oracle-sha256>",
+  "rows": {
+    "D1": {
+      "status": "passed",
+      "checks": ["Static relation reviewed from approved design source"],
+      "artifacts": ["d1.png"],
+      "journey": {
+        "status": "not-applicable",
+        "reason": "No interactive browser journey for this static relation",
+        "source": "S1"
+      }
+    }
+  }
+}
+```
 
 GREEN 전이는 같은 manifest를 필수 입력으로 받는다.
 
@@ -138,7 +184,10 @@ blocking finding이 없어야 한다.
 ```bash
 node <skill-dir>/scripts/oracle-verify.mjs review \
   --oracle .ai/oracles/<oracle-id>/oracle.md \
-  --file .ai/oracles/<oracle-id>/findings-code-reviewer.json
+  --file .ai/oracles/<oracle-id>/findings-code-reviewer.json \
+  --packet .ai/oracles/<oracle-id>/review-input.json \
+  --revision <targetRevision-from-review-packet> \
+  --map .ai/oracles/<oracle-id>/evidence.json
 
 node <skill-dir>/scripts/oracle-run.mjs transition \
   --dir .ai/oracles/<oracle-id> \

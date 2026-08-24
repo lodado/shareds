@@ -1,12 +1,13 @@
 {
   "name": "@lodado/frontend-oracle-design-plugin",
-  "version": "0.27.1",
-  "description": "Claude Code / Codex plugin for medium/high-risk Oracle-driven frontend delivery.",
+  "version": "0.28.0",
   "private": true,
+  "description": "Claude Code / Codex plugin for medium/high-risk Oracle-driven frontend delivery.",
+  "license": "MIT",
   "scripts": {
+    "lint": "eslint skills",
     "test": "node --test skills/scripts/*.test.mjs"
   },
-  "license": "MIT",
   "devDependencies": {
     "typescript": "5.9.3"
   }

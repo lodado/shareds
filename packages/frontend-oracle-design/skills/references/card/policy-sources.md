@@ -43,12 +43,12 @@ production 코드·기존 테스트·브라우저 관찰은 조사 증거일 뿐
 ```markdown
 ## Source Registry
 
-| ID  | Kind                 | 관할                     | 기준          | 위치·version                        | 승인 상태 |
-| --- | -------------------- | ------------------------ | ------------- | ----------------------------------- | --------- |
-| S1  | product-policy       | 비즈니스 결과            | PRD           | docs/profile.md#save-flow, revision | approved  |
-| S2  | product-policy       | UI·문구·interaction      | Figma         | file/page/frame/version             | approved  |
-| S3  | project-constraint   | payload·오류·idempotency | API 계약      | endpoint/version                    | approved  |
-| S4  | mandatory-constraint | 접근성·토큰              | 디자인 시스템 | 문서 위치/version                   | approved  |
+| ID  | Kind                 | 관할                     | 기준          | 위치·version                      | 승인 상태 |
+| --- | -------------------- | ------------------------ | ------------- | --------------------------------- | --------- |
+| S1  | product-policy       | 비즈니스 결과            | PRD           | repo:docs/profile.md#save-flow-v3 | approved  |
+| S2  | product-policy       | UI·문구·interaction      | Figma         | file/page/frame/version           | approved  |
+| S3  | project-constraint   | payload·오류·idempotency | API 계약      | endpoint/version                  | approved  |
+| S4  | mandatory-constraint | 접근성·토큰              | 디자인 시스템 | 문서 위치/version                 | approved  |
 ```
 
 허용 `Kind` 4종:
@@ -62,6 +62,11 @@ production 코드·기존 테스트·브라우저 관찰은 조사 증거일 뿐
 
 규칙:
 
+- Source ID는 카드 안에서 unique해야 한다. 정책·Outcome Brief·`O*`/`D*` 행이 인용하는
+  `S*`는 반드시 이 표에 존재해야 한다.
+- repo 안의 승인 문서·architecture·API 계약은 `위치·version`을 `repo:<상대경로>#<anchor-or-version>`으로
+  기록한다. `repo:` source는 `oracle-lock.mjs create --source <상대경로>`에도 포함되어야
+  하며, lock manifest에 없으면 lock 금지.
 - Figma는 원본 파일의 정확한 page·frame·variant를 직접 확인. 열 수 없으면 기억·유사
   스크린샷으로 대체하지 않는다.
 - 외부 기준이 없으면 `N/A — 제공되거나 승인된 외부 기준 없음` 기록.
@@ -77,11 +82,12 @@ production 코드·기존 테스트·브라우저 관찰은 조사 증거일 뿐
 
 인정·불인정 목록은 [`common.md`](../common.md)의 정책 출처 절이 canonical이다.
 결정된 정책마다 출처를 붙인다 — 출처 없는 정책이 하나라도 있으면 `ORACLE_READY`가
-아니다.
+아니다. 출처는 등록된 `S*` 또는 `User Confirmation`이어야 하고, 승인되지 않은 source나
+`implementation-reference` 단독 source는 정책 권위가 아니다.
 
 ```markdown
 ### 결정된 정책
 
 - P1: 저장 중 추가 제출은 무시한다. (출처: 유저 Q1=A) (행: O1, O2)
-- P2: 5xx 실패 시 입력을 유지한다. (출처: docs/save.md#failure-policy) (행: O3)
+- P2: 5xx 실패 시 입력을 유지한다. (출처: S1) (행: O3)
 ```

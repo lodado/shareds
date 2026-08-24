@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "name": "frontend-oracle-design-blackbox-smoke-v1",
+  "purpose": "Small held-out prompts for checking Oracle routing and ceremony without hosted evals.",
+  "cases": [
+    {
+      "id": "fod-bb-01",
+      "category": "low-copy-css",
+      "prompt": "Change the approved helper text from 'Save' to '저장' in one existing button; no behavior or layout changes.",
+      "expected": {
+        "risk": "Low",
+        "lane": "low-fast-path",
+        "status": "GREEN",
+        "loadedNodes": ["low-fast-path"],
+        "forbiddenCeremony": ["oracle-card", "revision-lock", "run-ledger", "independent-review"],
+        "requiredLabels": ["repo-validation"]
+      }
+    },
+    {
+      "id": "fod-bb-02",
+      "category": "low-copy-css",
+      "prompt": "Apply an already-approved spacing token to a local CSS rule; do not alter responsive structure or state.",
+      "expected": {
+        "risk": "Low",
+        "lane": "low-fast-path",
+        "status": "GREEN",
+        "loadedNodes": ["low-fast-path"],
+        "forbiddenCeremony": ["oracle-card", "revision-lock", "run-ledger", "independent-review"],
+        "requiredLabels": ["repo-validation"]
+      }
+    },
+    {
+      "id": "fod-bb-03",
+      "category": "submit-order-retry",
+      "prompt": "Make a save form ignore duplicate submit clicks while the first request is pending; prove exactly one POST.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "REVIEW_VERIFIED",
+        "loadedNodes": [
+          "common",
+          "card-policy-sources",
+          "card-risk-grill",
+          "bva",
+          "card-format",
+          "card-confirmation-lock",
+          "delivery-ledger",
+          "delivery-red",
+          "frontend-decisions",
+          "types-state-ladder",
+          "types-authoring",
+          "types-api-surface",
+          "frontend-authoring",
+          "changeability",
+          "delivery-implementation-decision",
+          "frontend-quality",
+          "delivery-green-review",
+          "subagent-review"
+        ],
+        "forbiddenCeremony": ["production-before-valid-red", "unledgered-green", "test-weakening"],
+        "requiredLabels": ["card-lint", "valid-red", "green", "review"]
+      }
+    },
+    {
+      "id": "fod-bb-04",
+      "category": "submit-order-retry",
+      "prompt": "Prevent out-of-order search responses from replacing the latest result when request B resolves before request A.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "REVIEW_VERIFIED",
+        "loadedNodes": [
+          "common",
+          "card-policy-sources",
+          "card-risk-grill",
+          "bva",
+          "card-format",
+          "card-confirmation-lock",
+          "delivery-ledger",
+          "delivery-red",
+          "frontend-decisions",
+          "types-state-ladder",
+          "types-authoring",
+          "types-api-surface",
+          "frontend-authoring",
+          "changeability",
+          "delivery-implementation-decision",
+          "frontend-quality",
+          "delivery-green-review",
+          "subagent-review"
+        ],
+        "forbiddenCeremony": ["production-before-valid-red", "unledgered-green", "sleep-based-race-test"],
+        "requiredLabels": ["card-lint", "valid-red", "green", "review"]
+      }
+    },
+    {
+      "id": "fod-bb-05",
+      "category": "submit-order-retry",
+      "prompt": "After a failed payment-method save, keep the input and allow one retry request; do not silently submit twice.",
+      "expected": {
+        "risk": "High",
+        "lane": "oracle",
+        "status": "REVIEW_VERIFIED",
+        "loadedNodes": [
+          "common",
+          "card-policy-sources",
+          "card-risk-grill",
+          "bva",
+          "card-format",
+          "card-confirmation-lock",
+          "delivery-ledger",
+          "delivery-red",
+          "frontend-decisions",
+          "types-state-ladder",
+          "types-authoring",
+          "types-api-surface",
+          "frontend-authoring",
+          "changeability",
+          "delivery-implementation-decision",
+          "frontend-quality",
+          "delivery-green-review",
+          "subagent-review"
+        ],
+        "forbiddenCeremony": ["production-before-valid-red", "unledgered-green", "mutation-skipped"],
+        "requiredLabels": ["card-lint", "valid-red", "green", "mutation", "review"]
+      }
+    },
+    {
+      "id": "fod-bb-06",
+      "category": "visual-local-identity",
+      "prompt": "Change one card's visual emphasis using the approved brand palette; user confirmation is required before lock.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "loadedNodes": [
+          "common",
+          "card-policy-sources",
+          "card-risk-grill",
+          "bva",
+          "card-format",
+          "visual-design",
+          "card-confirmation-lock"
+        ],
+        "forbiddenCeremony": ["unconfirmed-design-lock", "browser-verified-by-oracle"],
+        "requiredLabels": ["card-lint", "design-confirmation"]
+      }
+    },
+    {
+      "id": "fod-bb-07",
+      "category": "visual-local-identity",
+      "prompt": "Redesign the empty state illustration style to match a new identity direction; no approved design source is provided yet.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "loadedNodes": ["common", "card-policy-sources", "card-risk-grill", "bva", "card-format", "visual-design"],
+        "forbiddenCeremony": ["invented-visual-policy", "revision-lock", "production-edit"],
+        "requiredLabels": ["card-lint", "policy-gap", "design-confirmation"]
+      }
+    },
+    {
+      "id": "fod-bb-08",
+      "category": "policy-source",
+      "prompt": "Implement an age-gated checkout rule, but the PRD and legal note disagree about the minimum age.",
+      "expected": {
+        "risk": "High",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "loadedNodes": ["common", "card-policy-sources", "card-risk-grill", "bva", "card-format"],
+        "forbiddenCeremony": ["conflict-resolution-by-agent", "implementation-reference-as-policy", "revision-lock"],
+        "requiredLabels": ["source-registry-fk", "policy-gap"]
+      }
+    },
+    {
+      "id": "fod-bb-09",
+      "category": "policy-source",
+      "prompt": "A local helper currently blocks admin deletion, but no product source says whether admins may delete records.",
+      "expected": {
+        "risk": "High",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "loadedNodes": ["common", "card-policy-sources", "card-risk-grill", "bva", "card-format"],
+        "forbiddenCeremony": ["production-as-policy", "implementation-reference-as-sole-authority", "revision-lock"],
+        "requiredLabels": ["source-registry-fk", "policy-gap"]
+      }
+    },
+    {
+      "id": "fod-bb-10",
+      "category": "already-satisfied",
+      "prompt": "Verify whether the approved duplicate-submit contract is already satisfied by existing tests and implementation; do not edit production if it is.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "REVIEW_VERIFIED",
+        "loadedNodes": [
+          "common",
+          "card-policy-sources",
+          "card-risk-grill",
+          "bva",
+          "card-format",
+          "card-confirmation-lock",
+          "delivery-ledger",
+          "delivery-red",
+          "frontend-decisions",
+          "types-state-ladder",
+          "types-authoring",
+          "types-api-surface",
+          "changeability",
+          "frontend-quality",
+          "delivery-green-review",
+          "subagent-review"
+        ],
+        "forbiddenCeremony": ["forced-production-edit", "fake-valid-red", "unledgered-green", "false-review-verified"],
+        "requiredLabels": ["card-lint", "existing-evidence", "already-satisfied", "green", "review"],
+        "route": "valid-red:ALREADY_SATISFIED→implement-green"
+      }
+    }
+  ]
+}

@@ -1,44 +1,124 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { link, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { dirname, join, resolve } from 'node:path'
+// eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const script = join(scriptDirectory, 'oracle-run.mjs')
 const lockScript = join(scriptDirectory, 'oracle-lock.mjs')
+const changeabilityReviewPoint = join(scriptDirectory, '../references/changeability.md')
 
 const ORACLE = `# Oracle
 
+## Outcome Brief
+
+- Actor and context: 저장 사용자
+- Observable success: 저장 상태가 계약대로 표시된다.
+- Non-goals: API 재설계
+- Worst regression: 중복 저장
+- Reversibility: revert
+- Sources: S1
+
+## Source Registry
+
+| ID | Kind | 관할 | 기준 | 위치·version | 승인 상태 |
+| --- | --- | --- | --- | --- | --- |
+| S1 | product-policy | 저장 | PRD | user-confirmation | approved |
+
+## User Confirmation
+
+- Status: approved
+- Source: user confirmation
+
+## 결정된 정책
+
+- P1: 저장 중 pending을 표시한다. (출처: S1) (행: O1)
+
 ## Behavior Contract
 
-| ID | Given | When | Then | Never | 부작용(종류×횟수) | BVA |
-| --- | --- | --- | --- | --- | --- | --- |
-| O1 | 입력 | 저장 | pending | 조기 성공 | POST×1 | 상태 |
-`
+| ID | 정책 | Given | When | Then | Never | 부작용(종류×횟수) | BVA |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| O1 | P1 | 입력 | 저장 | pending | 조기 성공 | POST×1 | 상태: loading |
 
+- N/A: 중복, 오류, 재시도, 빈 데이터, out-of-order, 취소는 이 fixture 범위가 아니다. (출처: S1)
+`
 const VISUAL_ORACLE = `# Oracle
+
+## Outcome Brief
+
+- Actor and context: 화면 사용자
+- Observable success: 시각 관계가 유지된다.
+- Non-goals: redesign
+- Worst regression: overlap
+- Reversibility: revert
+- Sources: S1
+
+## Source Registry
+
+| ID | Kind | 관할 | 기준 | 위치·version | 승인 상태 |
+| --- | --- | --- | --- | --- | --- |
+| S1 | product-policy | 디자인 | PRD | user-confirmation | approved |
+
+## User Confirmation
+
+- Status: approved
+- Source: user confirmation
+- Visual QA authorization: declined
+
+## 결정된 정책
+
+- P1: layout relation을 유지한다. (출처: S1) (행: D1)
 
 ## Visual Contract
 
 | ID | 정책 | 축 | 계약 | Never | 출처 | 증거 계층 |
 | --- | --- | --- | --- | --- | --- | --- |
 | D1 | P1 | layout | relation | overlap | S1 | RELATIONAL |
-`
 
+- N/A: 중복, 오류, 재시도, 빈 데이터, 로딩, out-of-order, 취소는 이 fixture 범위가 아니다. (출처: S1)
+`
 const MILESTONE_ORACLE = `# Oracle
+
+## Outcome Brief
+
+- Actor and context: 조회 사용자
+- Observable success: 목록과 상세가 표시된다.
+- Non-goals: API 재설계
+- Worst regression: blank
+- Reversibility: revert
+- Sources: S1
+
+## Source Registry
+
+| ID | Kind | 관할 | 기준 | 위치·version | 승인 상태 |
+| --- | --- | --- | --- | --- | --- |
+| S1 | product-policy | 조회 | PRD | user-confirmation | approved |
+
+## User Confirmation
+
+- Status: approved
+- Source: user confirmation
+
+## 결정된 정책
+
+- P1: 목록과 상세를 각각 표시한다. (출처: S1) (행: O1, O2)
 
 ## Behavior Contract
 
-| ID | Given | When | Then | Never | 부작용(종류×횟수) | BVA |
-| --- | --- | --- | --- | --- | --- | --- |
-| O1 | list input | load | list shown | blank | GET×1 | state |
-| O2 | detail input | open | detail shown | wrong item | GET×1 | state |
-`
+| ID | 정책 | Given | When | Then | Never | 부작용(종류×횟수) | BVA |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| O1 | P1 | list input | load | list shown | blank | GET×1 | state |
+| O2 | P1 | detail input | open | detail shown | wrong item | GET×1 | state |
 
+- N/A: 중복, 오류, 재시도, 빈 데이터, 로딩, out-of-order, 취소는 이 fixture 범위가 아니다. (출처: S1)
+`
 const EVIDENCE = {
   schemaVersion: 1,
   rows: {
@@ -67,6 +147,26 @@ const RED_REPORT = {
 
 const GREEN_REPORT = {
   testResults: [{ assertionResults: [{ fullName: 'save > pending', status: 'passed' }] }],
+}
+const PENDING_REPORT = {
+  testResults: [{ assertionResults: [{ fullName: 'save > pending', status: 'pending' }] }],
+}
+
+const CLEAR_REVIEW = {
+  schemaVersion: 2,
+  reviewer: 'code-reviewer',
+  reviewerRole: 'code-reviewer',
+  reviewerId: 'primary-code-reviewer',
+  packetSha256: 'packet-a',
+  targetRevision: 'revision-a',
+  changeabilityReview: [
+    { axis: 'Readability', status: 'PASS', evidence: 'review packet' },
+    { axis: 'Predictability', status: 'PASS', evidence: 'review packet' },
+    { axis: 'Cohesion', status: 'PASS', evidence: 'review packet' },
+    { axis: 'Coupling', status: 'PASS', evidence: 'review packet' },
+    { axis: 'Simplicity', status: 'PASS', evidence: 'review packet' },
+  ],
+  findings: [],
 }
 
 /**
@@ -106,9 +206,18 @@ function runAsync(args, environment) {
   })
 }
 
+async function allLedgerLines(oracleDirectory) {
+  try {
+    const raw = await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8')
+    return raw.split('\n').filter(Boolean)
+  } catch (error) {
+    if (error.code === 'ENOENT') return []
+    throw error
+  }
+}
+
 async function ledgerLines(oracleDirectory) {
-  const raw = await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8')
-  return raw.split('\n').filter(Boolean)
+  return (await allLedgerLines(oracleDirectory)).filter((line) => JSON.parse(line).type !== 'init')
 }
 
 async function state(oracleDirectory) {
@@ -163,16 +272,18 @@ async function workspace(
     initialize = true,
   } = {},
 ) {
-  const root = await mkdtemp(join(tmpdir(), 'oracle-run-'))
-  t.after(() => rm(root, { recursive: true, force: true }))
+  const repository = await mkdtemp(join(tmpdir(), 'oracle-run-'))
+  const root = join(repository, 'packages')
+  await mkdir(root, { recursive: true })
+  t.after(() => rm(repository, { recursive: true, force: true }))
 
   if (git) {
-    const initialized = spawnSync('git', ['init', '-q', root], { encoding: 'utf8', env: isolatedEnvironment() })
+    const initialized = spawnSync('git', ['init', '-q', repository], { encoding: 'utf8', env: isolatedEnvironment() })
     if (initialized.status !== 0) return null
-    await writeFile(join(root, '.gitignore'), 'node_modules/\n')
+    await writeFile(join(repository, '.gitignore'), 'node_modules/\n')
   }
 
-  const oracleDirectory = join(root, '.ai', 'oracles', 'sample')
+  const oracleDirectory = join(repository, '.ai', 'oracles', 'sample')
   await mkdir(oracleDirectory, { recursive: true })
   await mkdir(join(root, 'src'), { recursive: true })
 
@@ -180,11 +291,11 @@ async function workspace(
   const lock = join(oracleDirectory, 'oracle.lock.json')
   await writeFile(oracle, oracleContent)
   await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify(evidence))
-  await writeFile(join(oracleDirectory, 'red-report.json'), JSON.stringify(RED_REPORT))
-  await writeFile(join(oracleDirectory, 'green-report.json'), JSON.stringify(GREEN_REPORT))
+  await writeFile(join(oracleDirectory, 'findings.json'), JSON.stringify(CLEAR_REVIEW))
+  await writeFile(join(oracleDirectory, 'implementation-decision.md'), 'Implement the approved change.\n')
   await writeFile(
-    join(oracleDirectory, 'findings.json'),
-    JSON.stringify({ schemaVersion: 1, reviewer: 'code-reviewer', findings: [] }),
+    join(root, 'oracle-green-fixture.test.mjs'),
+    "import test from 'node:test'\ntest('save > pending', () => {})\n",
   )
   for (const [path, content] of Object.entries({ ...initialFiles, ...sourceFiles, ...harnessFiles })) {
     await mkdir(dirname(join(root, path)), { recursive: true })
@@ -192,12 +303,19 @@ async function workspace(
   }
 
   const lockArgs = ['create', '--oracle', oracle, '--lock', lock]
-  for (const path of Object.keys(sourceFiles)) lockArgs.push('--source', join(root, path))
+  for (const path of Object.keys(sourceFiles)) lockArgs.push('--source', path)
   const locked = spawnSync(process.execPath, [lockScript, ...lockArgs], {
+    cwd: root,
     encoding: 'utf8',
     env: isolatedEnvironment(),
   })
   assert.equal(locked.status, 0, locked.stderr)
+  const receipt = locked.stdout.trim().match(
+    /^ORACLE_LOCKED sha256:([a-f0-9]{64}) manifest-sha256:([a-f0-9]{64})$/,
+  )
+  assert.ok(receipt, locked.stdout)
+  assert.equal(receipt[1], createHash('sha256').update(oracleContent).digest('hex'))
+  assert.equal(receipt[2], createHash('sha256').update(await readFile(lock)).digest('hex'))
 
   const initArgs = ['init', '--dir', oracleDirectory, '--lock', lock, '--risk', risk, '--scan-root', root]
   for (const label of requiredLabels) initArgs.push('--required-label', label)
@@ -212,6 +330,54 @@ async function workspace(
   return { root, oracleDirectory, oracle, lock, marker: join(root, 'marker.txt') }
 }
 
+function strictReviewPacketArgs(oracleDirectory, output) {
+  return [
+    'review-packet',
+    '--dir',
+    oracleDirectory,
+    '--decision',
+    join(oracleDirectory, 'implementation-decision.md'),
+    '--review-point',
+    changeabilityReviewPoint,
+    '--output',
+    output,
+  ]
+}
+
+function bindReviewDocument(path, packetSha256, targetRevision) {
+  const document = JSON.parse(readFileSync(path, 'utf8'))
+  if (document.schemaVersion !== 2) return
+  document.packetSha256 = packetSha256
+  document.targetRevision = targetRevision
+  document.findings = (document.findings ?? []).map((finding) => ({ ...finding, packetSha256, targetRevision }))
+  delete document.orchestrationReceipt
+  writeFileSync(path, JSON.stringify(document))
+}
+
+let reviewSequence = 0
+
+function issueReviewReceipt(oracleDirectory, packetPath, findingsPath, revision) {
+  const document = JSON.parse(readFileSync(findingsPath, 'utf8'))
+  reviewSequence += 1
+  return run([
+    'review-receipt',
+    '--dir',
+    oracleDirectory,
+    '--packet',
+    packetPath,
+    '--revision',
+    revision,
+    '--findings',
+    findingsPath,
+    '--role',
+    document.reviewerRole,
+    '--reviewer',
+    document.reviewerId,
+    '--task-id',
+    `review-${document.reviewerId}-${reviewSequence}`,
+  ])
+}
+
 function transition(oracleDirectory, to, runId, extra = []) {
   const args = ['transition', '--dir', oracleDirectory, '--to', to, '--run', runId]
 
@@ -221,15 +387,52 @@ function transition(oracleDirectory, to, runId, extra = []) {
     args.push('--evidence', join(oracleDirectory, 'evidence.json'))
   }
 
-  if (to === 'REVIEW_VERIFIED') args.push('--findings', join(oracleDirectory, 'findings.json'))
+  if (to === 'REVIEW_VERIFIED') {
+    const findings = join(oracleDirectory, 'findings.json')
+    args.push('--findings', findings)
+    if (!extra.includes('--packet')) {
+      const packetPath = join(oracleDirectory, `review-${runId}.json`)
+      const packetResult = run(strictReviewPacketArgs(oracleDirectory, packetPath))
+      if (packetResult.status === 0) {
+        const packetRaw = readFileSync(packetPath, 'utf8')
+        const packet = JSON.parse(packetRaw)
+        const revision = packet.targetSnapshot?.worktreeSha256
+        const packetSha256 = createHash('sha256').update(packetRaw).digest('hex')
+        bindReviewDocument(findings, packetSha256, revision)
+        const intersectIndex = extra.indexOf('--intersect')
+        if (intersectIndex >= 0) bindReviewDocument(extra[intersectIndex + 1], packetSha256, revision)
+        for (const path of [
+          findings,
+          ...(intersectIndex >= 0 ? [extra[intersectIndex + 1]] : []),
+        ]) {
+          const receipt = issueReviewReceipt(oracleDirectory, packetPath, path, revision)
+          if (receipt.status !== 0) return receipt
+        }
+        args.push('--packet', packetPath, '--revision', revision)
+      }
+    }
+  }
 
   return run([...args, ...extra])
 }
 
+let reportSequence = 0
+
 function redRun(oracleDirectory, { exitCode = 1, report = true, environment } = {}) {
   const args = ['exec', '--dir', oracleDirectory, '--label', 'red']
-  if (report) args.push('--report', join(oracleDirectory, 'red-report.json'))
-  args.push('--', process.execPath, '-e', `process.exit(${exitCode})`)
+  if (report) {
+    reportSequence += 1
+    const reportPath = join(oracleDirectory, `red-report-${reportSequence}.ndjson`)
+    const testPath = resolve(oracleDirectory, '../../../packages/oracle-red-fixture.test.mjs')
+    const assertion = exitCode === 0 ? '' : "throw new Error('expected RED')"
+    writeFileSync(
+      testPath,
+      `import test from 'node:test'\ntest('save > pending', () => { ${assertion} })\n`,
+    )
+    args.push('--adapter', 'node-test', '--report', reportPath, '--', process.execPath, '--test', testPath)
+  } else {
+    args.push('--', process.execPath, '-e', `process.exit(${exitCode})`)
+  }
   return run(args, environment)
 }
 
@@ -254,6 +457,7 @@ test('O1: exec는 명령을 한 번 실행하고 ledger에 한 줄을 남긴다'
 
   const lines = await ledgerLines(oracleDirectory)
   assert.equal(lines.length, 1)
+  assert.equal(JSON.parse((await allLedgerLines(oracleDirectory))[0]).type, 'init')
 
   const record = JSON.parse(lines[0])
   assert.equal(record.runId, 'r-001')
@@ -262,18 +466,16 @@ test('O1: exec는 명령을 한 번 실행하고 ledger에 한 줄을 남긴다'
   assert.equal(record.grade, 'exit-only')
   assert.equal(record.command[0], process.execPath)
   assert.match(record.lockSha256, /^[a-f0-9]{64}$/)
+  assert.match(record.lockManifestSha256, /^[a-f0-9]{64}$/)
+  assert.equal(record.provenance.targetSnapshot.lockManifestSha256, record.lockManifestSha256)
   assert.match(record.worktreeSha256, /^[a-f0-9]{64}$/)
   assert.match(record.productionSha256, /^[a-f0-9]{64}$/)
   assert.equal(typeof record.env.node, 'string')
   assert.match(record.at, /^\d{4}-\d{2}-\d{2}T/)
 
-  // product write×0 — oracle artifact와 실행 marker 외에는 어떤 파일도 바뀌지 않는다.
+  // product write×0 — scan root에서는 실행 marker 외 파일이 바뀌지 않는다.
   const changed = Object.entries(await snapshotOf(root)).filter(([path, digest]) => before[path] !== digest)
-  assert.deepEqual(changed.map(([path]) => path).sort(), [
-    '.ai/oracles/sample/.run-ids/r-001',
-    '.ai/oracles/sample/runs.jsonl',
-    'marker.txt',
-  ])
+  assert.deepEqual(changed.map(([path]) => path).sort(), ['marker.txt'])
 })
 
 test('O2: lock mismatch면 명령을 실행하지 않고 ORACLE_CHANGED로 멈춘다', async (t) => {
@@ -294,27 +496,13 @@ test('O2: lock mismatch면 명령을 실행하지 않고 ORACLE_CHANGED로 멈�
   assert.equal(executed.status, 1)
   assert.match(executed.stderr, /^ORACLE_CHANGED: /)
   assert.equal(await markerCount(marker), 0)
-  await assert.rejects(ledgerLines(oracleDirectory), { code: 'ENOENT' })
+  assert.deepEqual(await ledgerLines(oracleDirectory), [])
 })
 
-test('O3: reporter JSON이 있으면 테스트 이름과 상태를 기록하고 grade는 reported다', async (t) => {
+test('O3: generic reporter JSON is retained as exit-only and cannot claim trusted reporting', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
 
   const vitestReport = join(root, 'vitest.json')
-  await writeFile(
-    vitestReport,
-    JSON.stringify({
-      testResults: [
-        {
-          assertionResults: [
-            { fullName: 'save > pending 표시', status: 'passed' },
-            { fullName: 'save > POST 1회', status: 'failed' },
-          ],
-        },
-      ],
-    }),
-  )
-
   const vitestRun = run([
     'exec',
     '--dir',
@@ -326,21 +514,23 @@ test('O3: reporter JSON이 있으면 테스트 이름과 상태를 기록하고 
     '--',
     process.execPath,
     '-e',
-    'process.exit(1)',
+    `require('node:fs').writeFileSync(${JSON.stringify(vitestReport)}, ${JSON.stringify(
+      JSON.stringify({
+        testResults: [
+          {
+            assertionResults: [
+              { fullName: 'save > pending 표시', status: 'passed' },
+              { fullName: 'save > POST 1회', status: 'failed' },
+            ],
+          },
+        ],
+      }),
+    )}); process.exit(1)`,
   ])
   assert.equal(vitestRun.status, 0, vitestRun.stderr)
-  assert.match(vitestRun.stdout, /^RUN_RECORDED r-001 exit:1 grade:reported\n$/)
+  assert.match(vitestRun.stdout, /^RUN_RECORDED r-001 exit:1 grade:exit-only\n$/)
 
   const nodeReport = join(root, 'node-report.ndjson')
-  await writeFile(
-    nodeReport,
-    [
-      JSON.stringify({ type: 'test:pass', data: { name: 'ledger는 한 줄을 남긴다' } }),
-      JSON.stringify({ type: 'test:fail', data: { name: 'lock mismatch를 막는다' } }),
-      '',
-    ].join('\n'),
-  )
-
   const nodeRun = run([
     'exec',
     '--dir',
@@ -352,25 +542,24 @@ test('O3: reporter JSON이 있으면 테스트 이름과 상태를 기록하고 
     '--',
     process.execPath,
     '-e',
-    'process.exit(0)',
+    `require('node:fs').writeFileSync(${JSON.stringify(nodeReport)}, ${JSON.stringify(
+      [
+        JSON.stringify({
+          type: 'test:pass',
+          data: { name: 'ledger는 한 줄을 남긴다', status: 'passed', test: true },
+        }),
+        JSON.stringify({
+          type: 'test:fail',
+          data: { name: 'lock mismatch를 막는다', status: 'failed', test: true },
+        }),
+        '',
+      ].join('\n'),
+    )}); process.exit(0)`,
   ])
-  assert.equal(nodeRun.status, 0, nodeRun.stderr)
-  assert.match(nodeRun.stdout, /^RUN_RECORDED r-002 exit:0 grade:reported\n$/)
+  assert.equal(nodeRun.status, 1)
+  assert.match(nodeRun.stderr, /^REPORT_NONPASSING: /)
 
   const playwrightReport = join(root, 'playwright.json')
-  await writeFile(
-    playwrightReport,
-    JSON.stringify({
-      suites: [
-        {
-          title: 'hero.style.spec.ts',
-          specs: [{ title: '320px 스냅샷', ok: true }],
-          suites: [{ title: 'dark', specs: [{ title: 'contrast', ok: false }] }],
-        },
-      ],
-    }),
-  )
-
   const playwrightRun = run([
     'exec',
     '--dir',
@@ -382,10 +571,37 @@ test('O3: reporter JSON이 있으면 테스트 이름과 상태를 기록하고 
     '--',
     process.execPath,
     '-e',
-    'process.exit(0)',
+    `require('node:fs').writeFileSync(${JSON.stringify(playwrightReport)}, ${JSON.stringify(
+      JSON.stringify({
+        suites: [
+          {
+            title: 'hero.style.spec.ts',
+            specs: [
+              {
+                title: '320px 스냅샷',
+                ok: true,
+                tests: [{ status: 'expected', expectedStatus: 'passed', results: [{ status: 'passed' }] }],
+              },
+            ],
+            suites: [
+              {
+                title: 'dark',
+                specs: [
+                  {
+                    title: 'contrast',
+                    ok: false,
+                    tests: [{ status: 'unexpected', expectedStatus: 'passed', results: [{ status: 'failed' }] }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    )}); process.exit(0)`,
   ])
-  assert.equal(playwrightRun.status, 0, playwrightRun.stderr)
-  assert.match(playwrightRun.stdout, /^RUN_RECORDED r-003 exit:0 grade:reported\n$/)
+  assert.equal(playwrightRun.status, 1)
+  assert.match(playwrightRun.stderr, /^REPORT_NONPASSING: /)
 
   const [first, second, third] = (await ledgerLines(oracleDirectory)).map((line) => JSON.parse(line))
   assert.deepEqual(first.tests, [
@@ -402,9 +618,8 @@ test('O3: reporter JSON이 있으면 테스트 이름과 상태를 기록하고 
   ])
 })
 
-test('O3: 번들 node reporter로 실행하면 실제 테스트 이름이 ledger에 기록된다', async (t) => {
+test('O3: node-test adapter owns reporter output and records actual test names', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-  const reporter = join(scriptDirectory, 'oracle-node-reporter.mjs')
   const target = join(root, 'sample.test.mjs')
   const report = join(root, 'report.ndjson')
 
@@ -425,24 +640,270 @@ test('O3: 번들 node reporter로 실행하면 실제 테스트 이름이 ledger
     oracleDirectory,
     '--label',
     'red-1',
+    '--adapter',
+    'node-test',
     '--report',
     report,
     '--',
     process.execPath,
     '--test',
-    `--test-reporter=${reporter}`,
-    `--test-reporter-destination=${report}`,
     target,
   ])
 
   assert.equal(executed.status, 0, executed.stderr)
   assert.match(executed.stdout, /^RUN_RECORDED r-001 exit:1 grade:reported\n$/)
 
-  const [record] = (await ledgerLines(oracleDirectory)).map((line) => JSON.parse(line))
+  const [record] = (await ledgerLines(oracleDirectory))
+    .map((line) => JSON.parse(line))
+    .filter((entry) => entry.type === 'run')
   assert.deepEqual(record.tests, [
     { name: '통과하는 계약', status: 'passed' },
     { name: '실패하는 계약', status: 'failed' },
   ])
+})
+
+test('O2: lock manifest byte changes stop runner operations even when declared hashes are updated', async (t) => {
+  const { oracleDirectory, lock, marker } = await workspace(t)
+  const manifest = JSON.parse(await readFile(lock, 'utf8'))
+  manifest.sources = [...manifest.sources]
+  await writeFile(lock, `${JSON.stringify(manifest)}\n`)
+
+  const executed = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'red-1',
+    '--',
+    process.execPath,
+    ...appendMarker(marker, 0),
+  ])
+
+  assert.equal(executed.status, 1)
+  assert.match(executed.stderr, /^LOCK_MANIFEST_CHANGED: /)
+  assert.equal(await markerCount(marker), 0)
+
+  const status = run(['status', '--dir', oracleDirectory, '--json'])
+  assert.equal(status.status, 0, status.stderr)
+  assert.deepEqual(JSON.parse(status.stdout).blockers, ['LOCK_MANIFEST_CHANGED'])
+})
+
+test('O3: signal-terminated commands leave a receipt but cannot be used as evidence', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  const report = join(oracleDirectory, 'signal-report.json')
+
+  const executed = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'red',
+    '--report',
+    report,
+    '--',
+    process.execPath,
+    '-e',
+    `require('node:fs').writeFileSync(${JSON.stringify(report)}, ${JSON.stringify(
+      JSON.stringify(RED_REPORT),
+    )}); process.kill(process.pid, 'SIGKILL')`,
+  ])
+
+  assert.equal(executed.status, 1)
+  assert.match(executed.stderr, /^COMMAND_TERMINATED: /)
+  const [record] = (await ledgerLines(oracleDirectory)).map(JSON.parse)
+  assert.equal(record.runId, 'r-001')
+  assert.equal(record.exitCode, null)
+  assert.equal(record.signal, 'SIGKILL')
+  assert.equal(record.grade, 'exit-only')
+
+  const transitioned = transition(oracleDirectory, 'VALID_RED', 'r-001')
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^RUN_NOT_RED: /)
+})
+
+test('O3: pre-existing reporter artifact must be rewritten by the command', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  const report = join(oracleDirectory, 'stale-report.json')
+  await writeFile(report, JSON.stringify(GREEN_REPORT))
+
+  const executed = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'behavior',
+    '--report',
+    report,
+    '--',
+    process.execPath,
+    '-e',
+    'process.exit(0)',
+  ])
+
+  assert.equal(executed.status, 1)
+  assert.match(executed.stderr, /^REPORT_STALE: /)
+  const [record] = (await ledgerLines(oracleDirectory)).map(JSON.parse)
+  assert.equal(record.reportError.includes('not rewritten'), true)
+})
+
+test('O3: exec never deletes a caller-owned pre-existing report file', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  const report = join(oracleDirectory, 'caller-owned.json')
+  await writeFile(report, JSON.stringify(GREEN_REPORT))
+
+  const executed = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'behavior',
+    '--report',
+    report,
+    '--',
+    process.execPath,
+    '-e',
+    'process.exit(0)',
+  ])
+
+  assert.equal(executed.status, 1)
+  assert.match(executed.stderr, /^REPORT_STALE: /)
+  assert.equal(await readFile(report, 'utf8'), JSON.stringify(GREEN_REPORT))
+})
+
+test('O3: generic reporter artifact rewritten during the run remains exit-only', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  const report = join(oracleDirectory, 'fresh-report.json')
+  await writeFile(report, JSON.stringify(RED_REPORT))
+
+  const executed = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'behavior',
+    '--report',
+    report,
+    '--',
+    process.execPath,
+    '-e',
+    `require('node:fs').writeFileSync(${JSON.stringify(report)}, ${JSON.stringify(
+      JSON.stringify(GREEN_REPORT),
+    )}); process.exit(0)`,
+  ])
+
+  assert.equal(executed.status, 0, executed.stderr)
+  assert.match(executed.stdout, /^RUN_RECORDED r-001 exit:0 grade:exit-only\n$/)
+})
+
+test('O3: stale failing reporter cannot forge VALID_RED and still leaves an exec receipt', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  await writeFile(join(oracleDirectory, 'red-report.json'), JSON.stringify(RED_REPORT))
+
+  const executed = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'red',
+    '--report',
+    join(oracleDirectory, 'red-report.json'),
+    '--',
+    process.execPath,
+    '-e',
+    'process.exit(1)',
+  ])
+  assert.equal(executed.status, 1)
+  assert.match(executed.stderr, /^REPORT_STALE: /)
+  const [record] = (await ledgerLines(oracleDirectory)).map(JSON.parse)
+  assert.equal(record.exitCode, 1)
+  assert.equal(record.grade, 'exit-only')
+  assert.equal(record.reportError.includes('not rewritten'), true)
+})
+
+test('O3: touching a pre-existing report without changing content is stale', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  const report = join(oracleDirectory, 'touch-report.json')
+  await writeFile(report, JSON.stringify(GREEN_REPORT))
+
+  const executed = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'behavior',
+    '--report',
+    report,
+    '--',
+    process.execPath,
+    '-e',
+    `const fs = require('node:fs'); fs.utimesSync(${JSON.stringify(report)}, new Date(), new Date()); process.exit(0)`,
+  ])
+
+  assert.equal(executed.status, 1)
+  assert.match(executed.stderr, /^REPORT_STALE: /)
+  const [record] = (await ledgerLines(oracleDirectory)).map(JSON.parse)
+  assert.equal(record.grade, 'exit-only')
+  assert.equal(record.reportError.includes('not rewritten'), true)
+})
+
+test('O3: empty structured reporter is exit-only and cannot become RED or GREEN evidence', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  const report = join(oracleDirectory, 'empty-report.json')
+  const emptyReport = { testResults: [] }
+  const red = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'red',
+    '--report',
+    report,
+    '--',
+    process.execPath,
+    '-e',
+    `require('node:fs').writeFileSync(${JSON.stringify(report)}, ${JSON.stringify(
+      JSON.stringify(emptyReport),
+    )}); process.exit(1)`,
+  ])
+  assert.equal(red.status, 1)
+  assert.match(red.stderr, /^REPORT_EMPTY: /)
+  const [redReceipt] = (await ledgerLines(oracleDirectory)).map(JSON.parse)
+  assert.equal(redReceipt.grade, 'exit-only')
+  assert.equal(redReceipt.reportErrorCode, 'REPORT_EMPTY')
+
+  const redTransition = transition(oracleDirectory, 'VALID_RED', 'r-001')
+  assert.equal(redTransition.status, 1)
+  assert.match(redTransition.stderr, /^RED_EVIDENCE_UNVERIFIABLE: /)
+
+  const greenWorkspace = await workspace(t)
+  const greenReport = join(greenWorkspace.oracleDirectory, 'empty-report.json')
+  const green = run([
+    'exec',
+    '--dir',
+    greenWorkspace.oracleDirectory,
+    '--label',
+    'behavior',
+    '--report',
+    greenReport,
+    '--',
+    process.execPath,
+    '-e',
+    `require('node:fs').writeFileSync(${JSON.stringify(greenReport)}, ${JSON.stringify(
+      JSON.stringify(emptyReport),
+    )}); process.exit(0)`,
+  ])
+  assert.equal(green.status, 1)
+  assert.match(green.stderr, /^REPORT_EMPTY: /)
+  const [greenReceipt] = (await ledgerLines(greenWorkspace.oracleDirectory)).map(JSON.parse)
+  assert.equal(greenReceipt.grade, 'exit-only')
+  assert.equal(greenReceipt.reportErrorCode, 'REPORT_EMPTY')
+
+  const greenTransition = transition(greenWorkspace.oracleDirectory, 'IMPLEMENTED_GREEN', 'r-001', [
+    '--reason',
+    'existing implementation already satisfies deterministic rows',
+  ])
+  assert.equal(greenTransition.status, 1)
+  assert.match(greenTransition.stderr, /^RUN_NOT_GREEN: /)
 })
 
 test('O4: reporter를 읽거나 파싱할 수 없으면 exit-only로 격하하고 exit code를 보존한다', async (t) => {
@@ -461,11 +922,10 @@ test('O4: reporter를 읽거나 파싱할 수 없으면 exit-only로 격하하�
     '-e',
     'process.exit(3)',
   ])
-  assert.equal(missingReport.status, 0, missingReport.stderr)
-  assert.match(missingReport.stdout, /^RUN_RECORDED r-001 exit:3 grade:exit-only\n$/)
+  assert.equal(missingReport.status, 1)
+  assert.match(missingReport.stderr, /^REPORT_MISSING: /)
 
   const unknownShape = join(root, 'unknown.json')
-  await writeFile(unknownShape, JSON.stringify({ totals: { passed: 12 } }))
   const unknownReport = run([
     'exec',
     '--dir',
@@ -477,7 +937,9 @@ test('O4: reporter를 읽거나 파싱할 수 없으면 exit-only로 격하하�
     '--',
     process.execPath,
     '-e',
-    'process.exit(4)',
+    `require('node:fs').writeFileSync(${JSON.stringify(unknownShape)}, ${JSON.stringify(
+      JSON.stringify({ totals: { passed: 12 } }),
+    )}); process.exit(4)`,
   ])
   assert.equal(unknownReport.status, 0, unknownReport.stderr)
   assert.match(unknownReport.stdout, /^RUN_RECORDED r-002 exit:4 grade:exit-only\n$/)
@@ -502,7 +964,7 @@ test('O5: 테스트 파일만 바뀐 상태의 non-zero run은 VALID_RED로 전�
   const current = await state(oracleDirectory)
   assert.equal(current.state, 'VALID_RED')
   assert.equal(current.history.length, 2)
-  assert.equal(Object.keys(current.testFiles).length, 1)
+  assert.equal(Object.keys(current.testFiles).length, 3)
   assert.equal(current.testFiles['src/save.test.mjs'].assertions, 1)
 })
 
@@ -603,7 +1065,7 @@ test('O6: milestone은 알려진 행을 중복 없이 한 번씩만 소유한다
   }
 })
 
-test('O6: 모든 milestone의 red:<name> reported RED 후에만 전역 VALID_RED로 간다', async (t) => {
+test('O6: signal-terminated milestone reporter cannot satisfy milestone RED', async (t) => {
   const { root, oracleDirectory } = await workspace(t, {
     oracleContent: MILESTONE_ORACLE,
     evidence: MILESTONE_EVIDENCE,
@@ -612,31 +1074,78 @@ test('O6: 모든 milestone의 red:<name> reported RED 후에만 전역 VALID_RED
   await writeFile(join(root, 'src', 'milestones.test.mjs'), "import 'node:assert'\n")
   const listReport = join(oracleDirectory, 'red-list.json')
   const detailReport = join(oracleDirectory, 'red-detail.json')
-  await writeFile(
-    listReport,
-    JSON.stringify({ testResults: [{ assertionResults: [{ fullName: 'list > shown', status: 'failed' }] }] }),
-  )
-  await writeFile(
-    detailReport,
-    JSON.stringify({ testResults: [{ assertionResults: [{ fullName: 'detail > shown', status: 'failed' }] }] }),
-  )
+  const listContent = { testResults: [{ assertionResults: [{ fullName: 'list > shown', status: 'failed' }] }] }
+  const detailContent = { testResults: [{ assertionResults: [{ fullName: 'detail > shown', status: 'failed' }] }] }
 
-  for (const [label, report] of [
-    ['red:list', listReport],
-    ['red:detail', detailReport],
+  const signaled = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'red:list',
+    '--report',
+    listReport,
+    '--',
+    process.execPath,
+    '-e',
+    `require('node:fs').writeFileSync(${JSON.stringify(listReport)}, ${JSON.stringify(
+      JSON.stringify(listContent),
+    )}); process.kill(process.pid, 'SIGKILL')`,
+  ])
+  assert.equal(signaled.status, 1)
+  assert.match(signaled.stderr, /^COMMAND_TERMINATED: /)
+
+  const detail = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'red:detail',
+    '--report',
+    detailReport,
+    '--',
+    process.execPath,
+    '-e',
+    `require('node:fs').writeFileSync(${JSON.stringify(detailReport)}, ${JSON.stringify(
+      JSON.stringify(detailContent),
+    )}); process.exit(1)`,
+  ])
+  assert.equal(detail.status, 0, detail.stderr)
+
+  const transitioned = transition(oracleDirectory, 'VALID_RED', 'r-002')
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^MILESTONE_RED_INVALID: /)
+})
+
+test('O6: 모든 milestone의 red:<name> reported RED 후에만 전역 VALID_RED로 간다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, {
+    oracleContent: MILESTONE_ORACLE,
+    evidence: MILESTONE_EVIDENCE,
+    milestones: ['list:O1', 'detail:O2'],
+  })
+  await writeFile(join(root, 'src', 'milestones.test.mjs'), "import 'node:assert'\n")
+  for (const [label, name] of [
+    ['red:list', 'list > shown'],
+    ['red:detail', 'detail > shown'],
   ]) {
+    reportSequence += 1
+    const report = join(oracleDirectory, `${label.replace(':', '-')}-${reportSequence}.ndjson`)
+    const target = join(root, `${label.replace(':', '-')}.test.mjs`)
+    await writeFile(target, `import test from 'node:test'\ntest(${JSON.stringify(name)}, () => { throw new Error('RED') })\n`)
     const executed = run([
       'exec',
       '--dir',
       oracleDirectory,
       '--label',
       label,
+      '--adapter',
+      'node-test',
       '--report',
       report,
       '--',
       process.execPath,
-      '-e',
-      'process.exit(1)',
+      '--test',
+      target,
     ])
     assert.equal(executed.status, 0, executed.stderr)
 
@@ -675,7 +1184,7 @@ test('O6: git 레포에서 gitignore된 파일은 production 변경으로 세지
   const transitioned = transition(oracleDirectory, 'VALID_RED', 'r-001')
 
   assert.equal(transitioned.status, 0, transitioned.stderr)
-  assert.equal(Object.keys((await state(oracleDirectory)).testFiles).length, 1)
+  assert.equal(Object.keys((await state(oracleDirectory)).testFiles).length, 3)
 })
 
 test('O6: run-state를 지우고 다시 init해도 기준선과 예산을 되살리지 못한다', async (t) => {
@@ -755,11 +1264,15 @@ test('O7: reporter와 지정 행의 실패 증거가 없는 non-zero run은 VALI
 async function reachValidRed(oracleDirectory, root) {
   await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
   redRun(oracleDirectory)
-  const transitioned = transition(oracleDirectory, 'VALID_RED', 'r-001')
+  const latest = (await ledgerLines(oracleDirectory)).map(JSON.parse).at(-1).runId
+  const transitioned = transition(oracleDirectory, 'VALID_RED', latest)
   assert.equal(transitioned.status, 0, transitioned.stderr)
 }
 
 function greenRun(oracleDirectory, label, environment) {
+  reportSequence += 1
+  const report = join(oracleDirectory, `${label.replaceAll(':', '-')}-report-${reportSequence}.ndjson`)
+  const testPath = resolve(oracleDirectory, '../../../packages/oracle-green-fixture.test.mjs')
   return run(
     [
       'exec',
@@ -767,15 +1280,38 @@ function greenRun(oracleDirectory, label, environment) {
       oracleDirectory,
       '--label',
       'behavior',
+      '--adapter',
+      'node-test',
       '--report',
-      join(oracleDirectory, 'green-report.json'),
+      report,
       '--',
       process.execPath,
-      '-e',
-      'process.exit(0)',
+      '--test',
+      testPath,
     ],
     environment,
   )
+}
+
+function reportedLabelRun(oracleDirectory, label) {
+  reportSequence += 1
+  const report = join(oracleDirectory, `${label}-report-${reportSequence}.ndjson`)
+  const testPath = resolve(oracleDirectory, '../../../packages/oracle-green-fixture.test.mjs')
+  return run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    label,
+    '--adapter',
+    'node-test',
+    '--report',
+    report,
+    '--',
+    process.execPath,
+    '--test',
+    testPath,
+  ])
 }
 
 test('O8: 연속 통과 횟수를 채운 GREEN 전이는 lock을 재검증하고 통과한다', async (t) => {
@@ -818,7 +1354,6 @@ test('O20: review-packet은 lock·source·state·ledger·evidence·diff만 결�
   const created = await workspace(t, {
     git: true,
     initialFiles: { 'src/save.mjs': 'export const save = 1\n' },
-    sourceFiles: { 'src/__docs__/architecture.md': '# Architecture\n\nApproved boundary.\n' },
   })
   if (!created) return t.skip('git 미설치로 review diff를 검증할 수 없다')
   const { root, oracleDirectory } = created
@@ -840,39 +1375,97 @@ test('O20: review-packet은 lock·source·state·ledger·evidence·diff만 결�
   const first = join(oracleDirectory, 'review-input-a.json')
   const second = join(oracleDirectory, 'review-input-b.json')
   for (const output of [first, second]) {
-    const generated = run(['review-packet', '--dir', oracleDirectory, '--output', output])
+    const generated = run(strictReviewPacketArgs(oracleDirectory, output))
     assert.equal(generated.status, 0, generated.stderr)
     assert.match(generated.stdout, /^REVIEW_PACKET_WRITTEN /)
   }
 
+  const regenerated = run(strictReviewPacketArgs(oracleDirectory, first))
+  assert.equal(regenerated.status, 0, regenerated.stderr)
+
   const firstBytes = await readFile(first, 'utf8')
   assert.equal(firstBytes, await readFile(second, 'utf8'))
   const packet = JSON.parse(firstBytes)
-  assert.equal(packet.schemaVersion, 1)
+  assert.equal(packet.schemaVersion, 2)
   assert.equal(packet.lockVerification.exitCode, 0)
   assert.equal(packet.state.state, 'IMPLEMENTED_GREEN')
-  assert.equal(packet.ledger.length, 3)
+  assert.equal(packet.ledger.length, 6)
+  assert.deepEqual(
+    packet.ledger.map((entry) => entry.type ?? 'run'),
+    ['init', 'run', 'transition', 'run', 'run', 'transition'],
+  )
+  assert.equal(packet.targetRevision, packet.targetSnapshot.worktreeSha256)
   assert.deepEqual(packet.evidence, EVIDENCE)
-  assert.equal(packet.lockedSources[0].content, '# Architecture\n\nApproved boundary.\n')
+  assert.deepEqual(packet.lockedSources, [])
+  assert.deepEqual(packet.implementationDecision, {
+    path: 'implementation-decision.md',
+    sha256: createHash('sha256').update('Implement the approved change.\n').digest('hex'),
+    content: 'Implement the approved change.\n',
+  })
+  assert.deepEqual(packet.reviewPoints, [
+    {
+      path: 'changeability.md',
+      sha256: createHash('sha256').update(await readFile(changeabilityReviewPoint)).digest('hex'),
+    },
+  ])
   assert.ok(packet.changedFiles.some((entry) => entry.path === 'src/save.mjs'))
   assert.match(packet.diff, /save\.mjs/)
   assert.deepEqual(packet.pending, [])
   assert.equal('summary' in packet, false)
   assert.equal('conclusion' in packet, false)
 
-  const outside = run(['review-packet', '--dir', oracleDirectory, '--output', join(root, 'src', 'save.mjs')])
+  const protectedReport = join(root, 'protected-review.json')
+  const hardlinkedOutput = join(oracleDirectory, 'review-hardlink.json')
+  await writeFile(protectedReport, 'caller-owned bytes\n')
+  await link(protectedReport, hardlinkedOutput)
+
+  const hardlinkResult = run(strictReviewPacketArgs(oracleDirectory, hardlinkedOutput))
+
+  assert.equal(hardlinkResult.status, 1)
+  assert.match(hardlinkResult.stderr, /^REVIEW_PACKET_OUTPUT_INVALID: /)
+  assert.equal(await readFile(protectedReport, 'utf8'), 'caller-owned bytes\n')
+
+  await writeFile(join(oracleDirectory, 'journal.md'), '# Journal\n')
+  const journal = run(strictReviewPacketArgs(oracleDirectory, join(oracleDirectory, 'journal.md')))
+  assert.equal(journal.status, 1)
+  assert.match(journal.stderr, /^REVIEW_PACKET_OUTPUT_INVALID: /)
+
+  await mkdir(join(oracleDirectory, 'packet-directory'))
+  const directoryOutput = run(strictReviewPacketArgs(oracleDirectory, join(oracleDirectory, 'packet-directory')))
+  assert.equal(directoryOutput.status, 1)
+  assert.match(directoryOutput.stderr, /^REVIEW_PACKET_OUTPUT_INVALID: /)
+
+  const runIdOutput = run(strictReviewPacketArgs(oracleDirectory, join(oracleDirectory, '.run-ids', 'packet.json')))
+  assert.equal(runIdOutput.status, 1)
+  assert.match(runIdOutput.stderr, /^REVIEW_PACKET_OUTPUT_INVALID: /)
+
+  const outside = run(strictReviewPacketArgs(oracleDirectory, join(root, 'src', 'save.mjs')))
   assert.equal(outside.status, 1)
   assert.match(outside.stderr, /^REVIEW_PACKET_OUTPUT_INVALID: /)
 })
 
 test('O7-O8: review-packet은 검증된 implementation decision 원문과 digest를 포함한다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
   const decision = join(oracleDirectory, 'implementation-decision.md')
   const content = '# Implementation Decision\n\n- Changeability: Predictability\n'
   await writeFile(decision, content)
 
   const output = join(oracleDirectory, 'review-input-v2.json')
-  const generated = run(['review-packet', '--dir', oracleDirectory, '--decision', decision, '--output', output])
+  const generated = run([
+    'review-packet',
+    '--dir',
+    oracleDirectory,
+    '--decision',
+    decision,
+    '--review-point',
+    changeabilityReviewPoint,
+    '--output',
+    output,
+  ])
 
   assert.equal(generated.status, 0, generated.stderr)
   const packet = JSON.parse(await readFile(output, 'utf8'))
@@ -953,9 +1546,238 @@ test('O8: evidence manifest나 init에서 선언한 필수 label이 없으면 GR
   assert.match(withoutLint.stderr, /^REQUIRED_RUN_MISSING: /)
   assert.match(withoutLint.stderr, /lint/)
 
-  run(['exec', '--dir', oracleDirectory, '--label', 'lint', '--', process.execPath, '-e', 'process.exit(0)'])
+  const lint = reportedLabelRun(oracleDirectory, 'lint')
+  assert.equal(lint.status, 0, lint.stderr)
+  const lintReceipt = JSON.parse((await ledgerLines(oracleDirectory)).at(-1))
+  assert.equal(lintReceipt.label, 'lint')
+  assert.equal(lintReceipt.grade, 'reported')
   const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
   assert.equal(transitioned.status, 0, transitioned.stderr)
+})
+
+test('O8: GREEN run과 필수 label은 전이 시점 production snapshot과 일치해야 한다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { requiredLabels: ['behavior', 'lint'] })
+  await reachValidRed(oracleDirectory, root)
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  reportedLabelRun(oracleDirectory, 'lint')
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 2\n')
+
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^SNAPSHOT_STALE: /)
+  assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
+})
+
+test('O8: required label run이 current snapshot보다 오래되면 GREEN을 거부한다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { requiredLabels: ['behavior', 'lint'] })
+  await reachValidRed(oracleDirectory, root)
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
+  reportedLabelRun(oracleDirectory, 'lint')
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 2\n')
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-004')
+
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^SNAPSHOT_STALE: /)
+  assert.match(transitioned.stderr, /r-002/)
+})
+
+test('O9: consecutive GREEN passes must be for the same current worktree snapshot', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
+  greenRun(oracleDirectory, 'green-1')
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 2\n')
+  greenRun(oracleDirectory, 'green-2')
+
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^FLAKINESS_GATE: /)
+  assert.match(transitioned.stderr, /consecutive 1/)
+})
+
+test('O9: exit 0 reports with any failed test cannot satisfy GREEN', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  const report = join(oracleDirectory, 'green-report.json')
+  const mixedReport = {
+    testResults: [
+      {
+        assertionResults: [
+          { fullName: 'save > pending', status: 'passed' },
+          { fullName: 'save > duplicate guard', status: 'failed' },
+        ],
+      },
+    ],
+  }
+  const command = [
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'behavior',
+    '--report',
+    report,
+    '--',
+    process.execPath,
+    '-e',
+    `require('node:fs').writeFileSync(${JSON.stringify(report)}, ${JSON.stringify(
+      JSON.stringify(mixedReport),
+    )}); process.exit(0)`,
+  ]
+  const reported = run(command)
+  assert.equal(reported.status, 1)
+  assert.match(reported.stderr, /^REPORT_NONPASSING: /)
+  const [receipt] = (await ledgerLines(oracleDirectory)).map(JSON.parse).slice(-1)
+  assert.deepEqual(receipt.tests, [
+    { name: 'save > pending', status: 'passed' },
+    { name: 'save > duplicate guard', status: 'failed' },
+  ])
+
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002')
+
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^RUN_NOT_GREEN: /)
+  assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
+})
+
+test('O9: exit 0 reports with pending tests cannot satisfy GREEN', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  const report = join(oracleDirectory, 'pending-report.json')
+  const command = [
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'behavior',
+    '--report',
+    report,
+    '--',
+    process.execPath,
+    '-e',
+    `require('node:fs').writeFileSync(${JSON.stringify(report)}, ${JSON.stringify(
+      JSON.stringify(PENDING_REPORT),
+    )}); process.exit(0)`,
+  ]
+
+  const reported = run(command)
+  assert.equal(reported.status, 1)
+  assert.match(reported.stderr, /^REPORT_NONPASSING: /)
+  const [receipt] = (await ledgerLines(oracleDirectory)).map(JSON.parse).slice(-1)
+  assert.deepEqual(receipt.tests, [{ name: 'save > pending', status: 'pending' }])
+
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002')
+
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^RUN_NOT_GREEN: /)
+  assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
+})
+
+test('O9: bundled node reporter marks skip and todo as non-passing evidence', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  const reporter = join(scriptDirectory, 'oracle-node-reporter.mjs')
+  const target = join(root, 'skip-todo.test.mjs')
+  const report = join(root, 'skip-todo.ndjson')
+
+  await writeFile(
+    target,
+    [
+      "import assert from 'node:assert/strict'",
+      "import test from 'node:test'",
+      "test.skip('skipped contract', () => assert.equal(1, 1))",
+      "test.todo('todo contract')",
+      "test('real pass', () => assert.equal(1, 1))",
+      '',
+    ].join('\n'),
+  )
+
+  const command = [
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'behavior',
+    '--report',
+    report,
+    '--',
+    process.execPath,
+    '--test',
+    `--test-reporter=${reporter}`,
+    `--test-reporter-destination=${report}`,
+    target,
+  ]
+  const reported = run(command)
+  assert.equal(reported.status, 1)
+  assert.match(reported.stderr, /^REPORT_NONPASSING: /)
+
+  const [record] = (await ledgerLines(oracleDirectory)).map(JSON.parse).slice(-1)
+  assert.deepEqual(record.tests, [
+    { name: 'skipped contract', status: 'skipped' },
+    { name: 'todo contract', status: 'todo' },
+    { name: 'real pass', status: 'passed' },
+  ])
+
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002')
+
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^RUN_NOT_GREEN: /)
+})
+
+test('O9: exit-only PASS cannot count toward the consecutive GREEN gate', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  const report = join(oracleDirectory, 'green-report.json')
+  await writeFile(report, JSON.stringify(GREEN_REPORT))
+  const command = [
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'behavior',
+    '--report',
+    report,
+    '--',
+    process.execPath,
+    '-e',
+    `if (process.env.WRITE_REPORT === '1') require('node:fs').writeFileSync(${JSON.stringify(
+      report,
+    )}, JSON.stringify({ ...${JSON.stringify(GREEN_REPORT)}, runNonce: process.env.WRITE_REPORT })); process.exit(0)`,
+  ]
+
+  const stale = run(command, { WRITE_REPORT: '0' })
+  assert.equal(stale.status, 1)
+  assert.match(stale.stderr, /^REPORT_STALE: /)
+  const reported = run(command, { WRITE_REPORT: '1' })
+  assert.equal(reported.status, 0, reported.stderr)
+
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^EVIDENCE_UNVERIFIABLE: /)
+})
+
+test('O8: test-only worktree byte changes after GREEN run make selected run stale', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  await writeFile(
+    join(root, 'src', 'save.test.mjs'),
+    "import assert from 'node:assert'\nassert.equal(1, 1)\n// changed after pass\n",
+  )
+
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^SNAPSHOT_STALE: /)
+  assert.match(transitioned.stderr, /worktree/)
 })
 
 test('O8: GREEN 전이 직전 lock mismatch면 ORACLE_CHANGED로 멈춘다', async (t) => {
@@ -999,6 +1821,20 @@ test('O9: High risk는 연속 통과 3회를 요구한다', async (t) => {
   greenRun(oracleDirectory, 'green-3')
   const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-004')
   assert.equal(transitioned.status, 0, transitioned.stderr)
+})
+
+test('O10: .test-d.ts와 .test-d.tsx는 production 변경으로 세지 않는다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await writeFile(join(root, 'src', 'api.test-d.ts'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
+  await writeFile(join(root, 'src', 'view.test-d.tsx'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
+  redRun(oracleDirectory)
+
+  const transitioned = transition(oracleDirectory, 'VALID_RED', 'r-001')
+
+  assert.equal(transitioned.status, 0, transitioned.stderr)
+  const testFiles = Object.keys((await state(oracleDirectory)).testFiles)
+  assert.ok(testFiles.includes('src/api.test-d.ts'))
+  assert.ok(testFiles.includes('src/view.test-d.tsx'))
 })
 
 test('O10: assertion이 줄면 TEST_WEAKENED로 GREEN을 거부한다', async (t) => {
@@ -1104,9 +1940,17 @@ test('O10: 허용치를 낮추거나 유지하면 GREEN을 막지 않는다', as
   greenRun(oracleDirectory, 'green-1')
   greenRun(oracleDirectory, 'green-2')
 
+  const withoutBudget = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(withoutBudget.status, 1)
+  assert.match(withoutBudget.stderr, /^HARNESS_BUDGET_REQUIRED: /)
+
+  const spent = run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'frozen test bytes changed'])
+  assert.equal(spent.status, 0, spent.stderr)
   const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
 
-  assert.equal(transitioned.status, 0, transitioned.stderr)
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^EVIDENCE_STALE: /)
+  assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
 })
 
 test('O10: RED에 기록된 테스트 파일이 사라지면 TEST_WEAKENED로 GREEN을 거부한다', async (t) => {
@@ -1124,21 +1968,115 @@ test('O10: RED에 기록된 테스트 파일이 사라지면 TEST_WEAKENED로 GR
   assert.match(transitioned.stderr, /deleted/)
 })
 
-test('O11: 예산은 한도까지만 사용되고 초과 요청은 BUDGET_EXHAUSTED로 거부한다', async (t) => {
-  const { oracleDirectory } = await workspace(t)
+test('O11: 예산은 distinct 변경 digest 한도까지만 사용되고 초과 요청은 BUDGET_EXHAUSTED로 거부한다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
 
   for (const round of [1, 2, 3]) {
+    await writeFile(join(root, 'src', 'save.mjs'), `export const save = ${round}\n`)
     const spent = run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', `round-${round}`])
     assert.equal(spent.status, 0, spent.stderr)
     assert.equal(spent.stdout, `BUDGET_SPENT product ${round}/3\n`)
   }
 
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 4\n')
   const exhausted = run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'round-4'])
 
   assert.equal(exhausted.status, 1)
   assert.match(exhausted.stderr, /^BUDGET_EXHAUSTED: /)
   assert.equal((await state(oracleDirectory)).budgets.product.spent, 3)
   assert.equal((await state(oracleDirectory)).budgets.harness.spent, 0)
+})
+
+test('status --json reports current state, blockers, budgets, and orphaned reservations', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  await mkdir(join(oracleDirectory, '.run-ids'), { recursive: true })
+  await writeFile(join(oracleDirectory, '.run-ids', 'r-777'), JSON.stringify({ runId: 'r-777', state: 'started' }))
+
+  const checked = run(['status', '--dir', oracleDirectory, '--json'])
+
+  assert.equal(checked.status, 0, checked.stderr)
+  const status = JSON.parse(checked.stdout)
+  assert.equal(status.currentState, 'ORACLE_READY')
+  assert.equal(status.lockStatus.status, 'valid')
+  assert.deepEqual(status.orphanedRun, ['r-777'])
+  assert.deepEqual(status.remainingBudgets.product, { spent: 0, limit: 3, remaining: 3 })
+  assert.ok(status.nextLegalActions.includes('VALID_RED'))
+})
+
+test('O11: budget spend is counted once per distinct current change digest', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
+
+  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'round-1']).status, 0)
+  const repeated = run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'same digest'])
+  assert.equal(repeated.status, 0, repeated.stderr)
+  assert.match(repeated.stdout, /^BUDGET_SPENT product 1\/3\n$/)
+  assert.equal((await state(oracleDirectory)).budgets.product.spent, 1)
+
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 2\n')
+  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'round-2']).status, 0)
+  assert.equal((await state(oracleDirectory)).budgets.product.spent, 2)
+})
+
+test('status --json reports evidence gaps and reporter receipt issues', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify({ schemaVersion: 1, rows: {} }))
+  await writeFile(join(oracleDirectory, 'green-report.json'), JSON.stringify(GREEN_REPORT))
+  run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'behavior',
+    '--report',
+    join(oracleDirectory, 'green-report.json'),
+    '--',
+    process.execPath,
+    '-e',
+    'process.exit(0)',
+  ])
+
+  const checked = run(['status', '--dir', oracleDirectory, '--json'])
+
+  assert.equal(checked.status, 0, checked.stderr)
+  const status = JSON.parse(checked.stdout)
+  assert.deepEqual(status.evidenceStatus.missingRows, ['O1'])
+  assert.ok(status.blockers.includes('EVIDENCE_MISSING_ROWS'))
+  assert.equal(status.runIssues[0].runId, 'r-001')
+  assert.equal(status.runIssues[0].reportErrorCode, 'REPORT_STALE')
+  assert.match(status.runIssues[0].reportError, /not rewritten|not written/)
+})
+
+test('O11: policy와 implicit harness budget은 stable digest별로만 spend된다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+
+  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'policy', '--reason', 'same revision']).status, 0)
+  assert.equal(
+    run(['budget', '--dir', oracleDirectory, '--spend', 'policy', '--reason', 'same revision again']).status,
+    0,
+  )
+  assert.equal((await state(oracleDirectory)).budgets.policy.spent, 1)
+
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
+  assert.equal(
+    run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'test harness changed']).status,
+    0,
+  )
+  assert.equal(
+    run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'same harness again']).status,
+    0,
+  )
+  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 1)
+
+  await writeFile(
+    join(root, 'src', 'save.test.mjs'),
+    "import assert from 'node:assert'\nassert.equal(1, 1)\nassert.equal(2, 2)\n",
+  )
+  assert.equal(
+    run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'next harness digest']).status,
+    0,
+  )
+  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
 })
 
 test('O12: RED와 GREEN의 env fingerprint가 다르면 전이는 통과하되 ENV_DRIFT를 남긴다', async (t) => {
@@ -1243,6 +2181,104 @@ test('O16: production이 바뀐 상태에서는 RED 없이 GREEN으로 갈 수 �
   assert.equal((await state(oracleDirectory)).state, 'ORACLE_READY')
 })
 
+test('O17: REVIEW_VERIFIED rejects a review packet from a different lock manifest identity', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  greenRun(oracleDirectory, 'review')
+
+  const packetPath = join(oracleDirectory, 'cross-oracle-review.json')
+  const packetResult = run(strictReviewPacketArgs(oracleDirectory, packetPath))
+  assert.equal(packetResult.status, 0, packetResult.stderr)
+  const packet = JSON.parse(await readFile(packetPath, 'utf8'))
+  packet.state.lockManifestSha256 = '0'.repeat(64)
+  packet.targetSnapshot.lockManifestSha256 = '0'.repeat(64)
+  await writeFile(packetPath, `${JSON.stringify(packet, null, 2)}\n`)
+  const packetRaw = await readFile(packetPath, 'utf8')
+  const packetSha256 = createHash('sha256').update(packetRaw).digest('hex')
+  bindReviewDocument(join(oracleDirectory, 'findings.json'), packetSha256, packet.targetRevision)
+
+  const reviewed = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-004', [
+    '--packet',
+    packetPath,
+    '--revision',
+    packet.targetRevision,
+  ])
+
+  assert.equal(reviewed.status, 1)
+  assert.match(reviewed.stderr, /^REVIEW_PACKET_STALE: /)
+})
+
+test('O17: REVIEW_VERIFIED rejects a packet that predates the current review snapshot', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+
+  const packet = join(oracleDirectory, 'stale-review.json')
+  const packetResult = run(strictReviewPacketArgs(oracleDirectory, packet))
+  assert.equal(packetResult.status, 0, packetResult.stderr)
+  const packetRaw = readFileSync(packet, 'utf8')
+  const packetSha256 = createHash('sha256').update(packetRaw).digest('hex')
+  const packetJson = JSON.parse(packetRaw)
+  const greenEntry = [...packetJson.state.history].reverse().find((entry) => entry.state === 'IMPLEMENTED_GREEN')
+  const greenRunRecord = packetJson.ledger.find((entry) => entry.runId === greenEntry.runId)
+  const revision = packetJson.targetSnapshot?.worktreeSha256 ?? greenRunRecord.worktreeSha256
+  writeFileSync(
+    join(oracleDirectory, 'findings.json'),
+    JSON.stringify({ ...CLEAR_REVIEW, packetSha256, targetRevision: revision }),
+  )
+
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 2\n')
+  greenRun(oracleDirectory, 'review')
+  const reviewed = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-004', ['--packet', packet, '--revision', revision])
+
+  assert.equal(reviewed.status, 1)
+  assert.match(reviewed.stderr, /^REVIEW_PACKET_STALE: /)
+  assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+})
+
+test('O17: review packet cannot approve a tracked change after the bound GREEN run', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 2\n')
+  greenRun(oracleDirectory, 'review')
+
+  const packetPath = join(oracleDirectory, 'review-current.json')
+  const packetResult = run(strictReviewPacketArgs(oracleDirectory, packetPath))
+  assert.equal(packetResult.status, 0, packetResult.stderr)
+  const packetRaw = readFileSync(packetPath, 'utf8')
+  const packet = JSON.parse(packetRaw)
+  const packetSha256 = createHash('sha256').update(packetRaw).digest('hex')
+  assert.equal(packet.targetRevision, packet.targetSnapshot.worktreeSha256)
+  assert.notEqual(packet.targetRevision, packet.ledger.find((entry) => entry.runId === 'r-003').worktreeSha256)
+  const findings = join(oracleDirectory, 'findings.json')
+  bindReviewDocument(findings, packetSha256, packet.targetRevision)
+  const receipt = issueReviewReceipt(oracleDirectory, packetPath, findings, packet.targetRevision)
+  assert.equal(receipt.status, 0, receipt.stderr)
+
+  const reviewed = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-004', [
+    '--packet',
+    packetPath,
+    '--revision',
+    packet.targetRevision,
+  ])
+
+  assert.equal(reviewed.status, 1)
+  assert.match(reviewed.stderr, /^REVIEW_PACKET_INVALID: /)
+  assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+})
+
 test('O17: REVIEW_VERIFIED는 clear findings와 GREEN 이후 필수 재실행을 요구한다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
   await reachValidRed(oracleDirectory, root)
@@ -1257,8 +2293,7 @@ test('O17: REVIEW_VERIFIED는 clear findings와 GREEN 이후 필수 재실행을
   await writeFile(
     join(oracleDirectory, 'findings.json'),
     JSON.stringify({
-      schemaVersion: 1,
-      reviewer: 'code-reviewer',
+      ...CLEAR_REVIEW,
       findings: [
         {
           id: 'f-1',
@@ -1268,6 +2303,8 @@ test('O17: REVIEW_VERIFIED는 clear findings와 GREEN 이후 필수 재실행을
           finding: 'pending이 표시되지 않는다',
           evidence: 'r-003',
           fix: 'pending UI 추가',
+          packetSha256: CLEAR_REVIEW.packetSha256,
+          targetRevision: CLEAR_REVIEW.targetRevision,
         },
       ],
     }),
@@ -1277,10 +2314,7 @@ test('O17: REVIEW_VERIFIED는 clear findings와 GREEN 이후 필수 재실행을
   assert.equal(blocked.status, 1)
   assert.match(blocked.stderr, /^FINDINGS_BLOCKING: /)
 
-  await writeFile(
-    join(oracleDirectory, 'findings.json'),
-    JSON.stringify({ schemaVersion: 1, reviewer: 'code-reviewer', findings: [] }),
-  )
+  await writeFile(join(oracleDirectory, 'findings.json'), JSON.stringify(CLEAR_REVIEW))
   const verified = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-004')
   assert.equal(verified.status, 0, verified.stderr)
   assert.equal((await state(oracleDirectory)).state, 'REVIEW_VERIFIED')
@@ -1302,7 +2336,15 @@ test('O17: High risk REVIEW_VERIFIED는 GREEN 이후 mutation kill 증거를 요
   redRun(oracleDirectory)
   greenRun(oracleDirectory, 'review')
   const secondFindings = join(oracleDirectory, 'findings-second.json')
-  await writeFile(secondFindings, JSON.stringify({ schemaVersion: 1, reviewer: 'second-code-reviewer', findings: [] }))
+  await writeFile(
+    secondFindings,
+    JSON.stringify({
+      ...CLEAR_REVIEW,
+      reviewer: 'second-code-reviewer',
+      reviewerId: 'second-code-reviewer',
+      packetSha256: 'packet-b',
+    }),
+  )
 
   const missing = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-006', ['--intersect', secondFindings])
   assert.equal(missing.status, 1)
@@ -1339,31 +2381,28 @@ test('O17: High risk REVIEW_VERIFIED는 GREEN 이후 mutation kill 증거를 요
 
 test('review-packet은 리뷰 포인트를 본문 없이 path·digest 링크로만 기록한다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-  const criteria = join(root, 'criteria.md')
-  const content = '# Review criteria\n\n- 다섯 축 판정\n'
-  await writeFile(criteria, content)
+  await reachValidRed(oracleDirectory, root)
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  const criteria = changeabilityReviewPoint
+  const content = await readFile(criteria)
 
   const output = join(oracleDirectory, 'review-input-points.json')
-  const generated = run([
-    'review-packet',
-    '--dir',
-    oracleDirectory,
-    '--review-point',
-    criteria,
-    '--output',
-    output,
-  ])
+  const generated = run(strictReviewPacketArgs(oracleDirectory, output))
 
   assert.equal(generated.status, 0, generated.stderr)
   const packet = JSON.parse(await readFile(output, 'utf8'))
   assert.deepEqual(packet.reviewPoints, [
-    { path: criteria, sha256: createHash('sha256').update(content).digest('hex') },
+    { path: 'changeability.md', sha256: createHash('sha256').update(content).digest('hex') },
   ])
 
   const missing = run([
     'review-packet',
     '--dir',
     oracleDirectory,
+    '--decision',
+    join(oracleDirectory, 'implementation-decision.md'),
     '--review-point',
     join(root, 'absent.md'),
     '--output',
@@ -1372,12 +2411,15 @@ test('review-packet은 리뷰 포인트를 본문 없이 path·digest 링크로�
   assert.equal(missing.status, 1)
   assert.match(missing.stderr, /^REVIEW_POINT_INVALID: /)
 
-  const empty = join(root, 'empty-criteria.md')
+  const empty = join(oracleDirectory, 'references', 'empty-criteria.md')
+  await mkdir(dirname(empty), { recursive: true })
   await writeFile(empty, ' \n')
   const emptyResult = run([
     'review-packet',
     '--dir',
     oracleDirectory,
+    '--decision',
+    join(oracleDirectory, 'implementation-decision.md'),
     '--review-point',
     empty,
     '--output',
@@ -1390,6 +2432,8 @@ test('review-packet은 리뷰 포인트를 본문 없이 path·digest 링크로�
     'review-packet',
     '--dir',
     oracleDirectory,
+    '--decision',
+    join(oracleDirectory, 'implementation-decision.md'),
     '--review-point',
     criteria,
     '--review-point',
@@ -1400,8 +2444,393 @@ test('review-packet은 리뷰 포인트를 본문 없이 path·digest 링크로�
   assert.equal(duplicate.status, 1)
   assert.match(duplicate.stderr, /^REVIEW_POINT_INVALID: /)
 
-  const without = run(['review-packet', '--dir', oracleDirectory, '--output', join(oracleDirectory, 'no-points.json')])
-  assert.equal(without.status, 0, without.stderr)
-  const bare = JSON.parse(await readFile(join(oracleDirectory, 'no-points.json'), 'utf8'))
-  assert.equal('reviewPoints' in bare, false)
+  const without = run([
+    'review-packet',
+    '--dir',
+    oracleDirectory,
+    '--decision',
+    join(oracleDirectory, 'implementation-decision.md'),
+    '--output',
+    join(oracleDirectory, 'no-points.json'),
+  ])
+  assert.equal(without.status, 1)
+  assert.match(without.stderr, /^REVIEW_POINTS_REQUIRED: /)
+})
+
+test('O1: reporters reject Playwright skipped/flaky specs and Node empty suites', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  const report = join(oracleDirectory, 'playwright.json')
+  const playwright = {
+    suites: [
+      {
+        title: 'save',
+        specs: [
+          { title: 'skipped', ok: true, tests: [{ status: 'skipped' }] },
+          { title: 'flaky', ok: true, tests: [{ status: 'flaky' }] },
+        ],
+      },
+    ],
+  }
+
+  const skippedAndFlaky = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'behavior:reported',
+    '--report',
+    report,
+    '--',
+    process.execPath,
+    '-e',
+    `require('node:fs').writeFileSync(${JSON.stringify(report)}, JSON.stringify(${JSON.stringify(playwright)}))`,
+  ])
+  assert.equal(skippedAndFlaky.status, 1)
+  assert.match(skippedAndFlaky.stderr, /^REPORT_NONPASSING: /)
+  const playwrightReceipts = (await ledgerLines(oracleDirectory)).map(JSON.parse)
+  assert.equal(playwrightReceipts.length, 1)
+  const [playwrightReceipt] = playwrightReceipts
+  assert.equal(playwrightReceipt.grade, 'exit-only')
+  assert.equal(playwrightReceipt.exitCode, 0)
+  assert.equal(playwrightReceipt.reportErrorCode, 'REPORT_NONPASSING')
+  assert.match(playwrightReceipt.reportError, /skipped|flaky/i)
+
+  const passingReport = join(oracleDirectory, 'playwright-passing.json')
+  const passingPlaywright = {
+    suites: [
+      {
+        title: 'save',
+        specs: [
+          {
+            title: 'persists pending state',
+            ok: true,
+            tests: [{ status: 'expected', expectedStatus: 'passed', results: [{ status: 'passed' }] }],
+          },
+        ],
+      },
+    ],
+  }
+  const passing = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'behavior:reported',
+    '--report',
+    passingReport,
+    '--',
+    process.execPath,
+    '-e',
+    `require('node:fs').writeFileSync(${JSON.stringify(passingReport)}, JSON.stringify(${JSON.stringify(
+      passingPlaywright,
+    )}))`,
+  ])
+  assert.equal(passing.status, 0, passing.stderr)
+  const passingReceipt = JSON.parse((await ledgerLines(oracleDirectory)).at(-1))
+  assert.deepEqual(passingReceipt.tests, [{ name: 'save > persists pending state', status: 'passed' }])
+
+  const reporter = join(scriptDirectory, 'oracle-node-reporter.mjs')
+  const emptySuiteTarget = join(root, 'empty-suite.test.mjs')
+  const emptyNodeReport = join(root, 'node-empty.ndjson')
+  await writeFile(emptySuiteTarget, ["import { describe } from 'node:test'", "describe('empty suite', () => {})", ''].join('\n'))
+  const emptySuite = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'behavior:reported',
+    '--report',
+    emptyNodeReport,
+    '--',
+    process.execPath,
+    '--test',
+    `--test-reporter=${reporter}`,
+    `--test-reporter-destination=${emptyNodeReport}`,
+    emptySuiteTarget,
+  ])
+  assert.equal(emptySuite.status, 1)
+  assert.match(emptySuite.stderr, /^REPORT_EMPTY: /)
+  const receipts = (await ledgerLines(oracleDirectory)).map(JSON.parse)
+  assert.equal(receipts.length, 3)
+  const [firstReceipt, secondReceipt, emptyReceipt] = receipts
+  assert.equal(firstReceipt.runId, playwrightReceipt.runId)
+  assert.equal(secondReceipt.runId, passingReceipt.runId)
+  assert.equal(emptyReceipt.grade, 'exit-only')
+  assert.equal(emptyReceipt.exitCode, 0)
+  assert.equal(emptyReceipt.reportErrorCode, 'REPORT_EMPTY')
+  assert.match(emptyReceipt.reportError, /no tests/i)
+})
+
+test('O2: required labels distinguish reported tests from exit-code commands', async (t) => {
+  const { oracleDirectory } = await workspace(t, { requiredLabels: ['behavior:reported', 'lint:exit'] })
+  const behavior = reportedLabelRun(oracleDirectory, 'behavior:reported')
+  assert.equal(behavior.status, 0, behavior.stderr)
+  const lint = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'lint:exit',
+    '--',
+    process.execPath,
+    '-e',
+    'process.exit(0)',
+  ])
+  assert.equal(lint.status, 0, lint.stderr)
+  assert.equal(JSON.parse((await ledgerLines(oracleDirectory))[1]).grade, 'exit-only')
+
+  const failedLint = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'lint:exit',
+    '--',
+    process.execPath,
+    '-e',
+    'process.exit(1)',
+  ])
+  assert.equal(failedLint.status, 0, failedLint.stderr)
+  const failed = JSON.parse((await ledgerLines(oracleDirectory)).at(-1))
+  assert.equal(failed.exitCode, 1)
+  assert.equal(failed.grade, 'exit-only')
+  const signaledLint = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'lint:exit',
+    '--',
+    process.execPath,
+    '-e',
+    "process.kill(process.pid, 'SIGTERM')",
+  ])
+  assert.equal(signaledLint.status, 1)
+  assert.match(signaledLint.stderr, /^COMMAND_TERMINATED: /)
+  const signaled = JSON.parse((await ledgerLines(oracleDirectory)).at(-1))
+  assert.equal(signaled.exitCode, null)
+  assert.equal(signaled.signal, 'SIGTERM')
+  const green = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-001', ['--reason', 'existing behavior is green'])
+  assert.equal(green.status, 1)
+  assert.match(green.stderr, /^REQUIRED_LABEL_GRADE: .*lint:exit/)
+})
+
+test('O3: RED evidence mapping and test bytes remain bound through GREEN', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, {
+    harnessFiles: { 'src/save.test.mjs': "import test from 'node:test'\ntest('save', () => {})\n" },
+  })
+  const red = redRun(oracleDirectory)
+  assert.equal(red.status, 0, red.stderr)
+  assert.equal(transition(oracleDirectory, 'VALID_RED', 'r-001').status, 0)
+
+  await writeFile(
+    join(oracleDirectory, 'evidence.json'),
+    JSON.stringify({ schemaVersion: 1, rows: { O1: { kind: 'test', name: 'other test' } } }),
+  )
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import test from 'node:test'\ntest('rewritten', () => {})\n")
+  greenRun(oracleDirectory, 'behavior')
+  const withoutBudget = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002')
+  assert.equal(withoutBudget.status, 1)
+  assert.match(withoutBudget.stderr, /^HARNESS_BUDGET_REQUIRED: /)
+
+  const budget = run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'mapped test bytes changed'])
+  assert.equal(budget.status, 0, budget.stderr)
+  const green = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002')
+
+  assert.equal(green.status, 1)
+  assert.match(green.stderr, /^EVIDENCE_STALE: /)
+  assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
+  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 1)
+})
+
+test('O4: reporter destinations cannot alias protected Oracle artifacts', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  const protectedState = join(oracleDirectory, 'run-state.json')
+  const direct = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'behavior',
+    '--report',
+    protectedState,
+    '--',
+    process.execPath,
+    '-e',
+    'process.exit(0)',
+  ])
+  assert.equal(direct.status, 1)
+  assert.match(direct.stderr, /^REPORT_PATH_PROTECTED: /)
+  assert.deepEqual(await ledgerLines(oracleDirectory), [])
+
+  const alias = join(oracleDirectory, 'state-alias.json')
+  try {
+    await link(protectedState, alias)
+  } catch (error) {
+    if (error.code === 'EPERM' || error.code === 'EOPNOTSUPP') return
+    throw error
+  }
+  const hardlink = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'behavior',
+    '--report',
+    alias,
+    '--',
+    process.execPath,
+    '-e',
+    'process.exit(0)',
+  ])
+  assert.equal(hardlink.status, 1)
+  assert.match(hardlink.stderr, /^REPORT_PATH_PROTECTED: /)
+  assert.deepEqual(await ledgerLines(oracleDirectory), [])
+
+  const symbolicAlias = join(oracleDirectory, 'state-symbolic-alias.json')
+  try {
+    await symlink(protectedState, symbolicAlias)
+  } catch (error) {
+    if (error.code === 'EPERM' || error.code === 'EOPNOTSUPP') return
+    throw error
+  }
+  const symbolic = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'behavior',
+    '--report',
+    symbolicAlias,
+    '--',
+    process.execPath,
+    '-e',
+    'process.exit(0)',
+  ])
+  assert.equal(symbolic.status, 1)
+  assert.match(symbolic.stderr, /^REPORT_PATH_PROTECTED: /)
+  assert.deepEqual(await ledgerLines(oracleDirectory), [])
+})
+
+test('O5: init rejects Oracle directories that overlap the production scan root', async (t) => {
+  const fixture = await workspace(t, { initialize: false })
+  await mkdir(join(fixture.root, 'src', 'production-oracle'), { recursive: true })
+  const result = run([
+    'init',
+    '--dir',
+    join(fixture.root, 'src', 'production-oracle'),
+    '--lock',
+    fixture.lock,
+    '--risk',
+    'medium',
+    '--scan-root',
+    fixture.root,
+    '--required-label',
+    'behavior:reported',
+  ])
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /^ORACLE_DIR_OVERLAP: /)
+  await assert.rejects(readFile(join(fixture.root, 'src', 'production-oracle', 'run-state.json')))
+})
+
+test('O6: concurrent transition and budget writes preserve both state changes', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  const runnerSource = await readFile(script, 'utf8')
+  assert.match(
+    runnerSource,
+    /async function transition\(options\) \{[\s\S]*?await withDirectoryLock\(directory, 'state', async \(\) => \{/,
+  )
+  assert.match(
+    runnerSource,
+    /async function spendBudget\(options\) \{[\s\S]*?await withDirectoryLock\(directory, 'state', async \(\) => \{/,
+  )
+
+  const spent = run(['budget', '--dir', oracleDirectory, '--spend', 'policy', '--reason', 'bounded policy change'])
+  assert.equal(spent.status, 0, spent.stderr)
+  const transitioned = run([
+    'transition',
+    '--dir',
+    oracleDirectory,
+    '--to',
+    'NEEDS_DECISION',
+    '--reason',
+    'bounded decision',
+  ])
+  assert.equal(transitioned.status, 0, transitioned.stderr)
+  const current = await state(oracleDirectory)
+  assert.equal(current.state, 'NEEDS_DECISION')
+  assert.equal(current.budgets.policy.spent, 1)
+  assert.equal(current.history.at(-1).state, 'NEEDS_DECISION')
+  assert.deepEqual(
+    (await ledgerLines(oracleDirectory)).map((line) => JSON.parse(line).type),
+    ['budget', 'transition'],
+  )
+})
+
+test('O11: review packets require post-GREEN state decision and canonical review points', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  const output = join(oracleDirectory, 'packet.json')
+  const preGreen = run(['review-packet', '--dir', oracleDirectory, '--output', output])
+  assert.equal(preGreen.status, 1)
+  assert.match(preGreen.stderr, /^REVIEW_PACKET_STATE: /)
+
+  await reachValidRed(oracleDirectory, root)
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+
+  const decision = join(oracleDirectory, 'implementation-decision.md')
+  await writeFile(decision, 'Implement the approved change.\n')
+  const point = changeabilityReviewPoint
+  const missingDecision = run(['review-packet', '--dir', oracleDirectory, '--review-point', point, '--output', output])
+  assert.equal(missingDecision.status, 1)
+  assert.match(missingDecision.stderr, /^IMPLEMENTATION_DECISION_REQUIRED: /)
+  const missingPoint = run(['review-packet', '--dir', oracleDirectory, '--decision', decision, '--output', output])
+  assert.equal(missingPoint.status, 1)
+  assert.match(missingPoint.stderr, /^REVIEW_POINTS_REQUIRED: /)
+})
+
+test('O16: state events form a replayable digest chain without lost budget history', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  const recorded = run([
+    'exec',
+    '--dir',
+    oracleDirectory,
+    '--label',
+    'lint:exit',
+    '--',
+    process.execPath,
+    '-e',
+    'process.exit(0)',
+  ])
+  assert.equal(recorded.status, 0, recorded.stderr)
+  const spent = run(['budget', '--dir', oracleDirectory, '--spend', 'policy', '--reason', 'recorded policy change'])
+  assert.equal(spent.status, 0, spent.stderr)
+  const transitioned = run([
+    'transition',
+    '--dir',
+    oracleDirectory,
+    '--to',
+    'NEEDS_DECISION',
+    '--reason',
+    'recorded state decision',
+  ])
+  assert.equal(transitioned.status, 0, transitioned.stderr)
+  const events = (await allLedgerLines(oracleDirectory)).map((line) => JSON.parse(line))
+  assert.deepEqual(
+    events.map((event) => event.type),
+    ['init', 'run', 'budget', 'transition'],
+  )
+  assert.equal(events[0].previousDigest, '0'.repeat(64))
+  for (let index = 0; index < events.length; index += 1) {
+    assert.match(events[index].digest, /^[a-f0-9]{64}$/)
+    if (index > 0) assert.equal(events[index].previousDigest, events[index - 1].digest)
+  }
+
+  const resumed = run(['status', '--dir', oracleDirectory, '--json'])
+  assert.equal(resumed.status, 0, resumed.stderr)
+  const report = JSON.parse(resumed.stdout)
+  assert.equal(report.remainingBudgets.policy.spent, 1)
+  assert.equal(report.currentState, 'NEEDS_DECISION')
+  assert.equal(report.ledgerStatus.headDigest, events.at(-1).digest)
 })

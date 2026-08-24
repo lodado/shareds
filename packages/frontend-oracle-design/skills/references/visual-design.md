@@ -133,7 +133,16 @@ screenshot 비교와 사람이 직접 브라우저에 들어가는 실행은 별
 소유한다. 이 스킬이나 `$test`가 암묵적으로 대신 실행하지 않는다. `RELATIONAL` 행이
 있으면 카드 승인 시 `Visual QA authorization: approved | declined`를 같이 받는다.
 `approved`는 명시적 요청으로 간주해 이름으로 호출하고, `declined`는 해당 행을 visual
-owner의 `pending`으로 남긴다. `$frontend-visual-qa`는 다음만 반환한다:
+owner의 `pending`으로 남긴다.
+
+`local`·`identity-shaping` 변경에서 UI-shaping interaction, `RELATIONAL` 행 또는
+`JUDGMENT` 행이 실제 화면 맥락에 의존하면 review 전에 browser journey 1개를 요구한다.
+새 dependency를 추가하지 말고 대상 레포에 이미 있는 Playwright/Storybook/browser MCP/Figma
+handoff 중 하나만 쓴다. 설치된 도구가 없거나 사용자가 declined하면 해당 행은 `pending`
+또는 출처 있는 N/A로만 남긴다. Low fast path는 이 조건이 생기는 순간 Oracle lane으로
+승격한다.
+
+`$frontend-visual-qa`는 다음만 반환한다:
 
 - 인용한 Oracle revision과 승인 baseline
 - 요청받은 D/O 행별 PASS·FAIL·N/A
@@ -172,9 +181,11 @@ owner의 `pending`으로 남긴다. `$frontend-visual-qa`는 다음만 반환한
 
 - `HARD` 행은 가장 좁은 DOM·a11y·component 관찰 계층에서 `Then`·`Never`를 함께 확인.
 - `RELATIONAL` 행은 `$frontend-visual-qa` artifact 또는 같은 owner의 `pending`에 매핑.
-  `pending`은 `IMPLEMENTED_GREEN`에는 남을 수 있지만 `REVIEW_VERIFIED`를 차단한다.
+  `pending`과 사용자 `declined`는 `IMPLEMENTED_GREEN`에는 남을 수 있지만 source-backed N/A
+  revision 없이는 `REVIEW_VERIFIED`를 차단한다.
 - `JUDGMENT` 행은 승인 기준과 Design Intent를 독립 `designer`에게 전달한다. reviewer는
-  정책을 새로 만들지 않는다.
+  정책을 새로 만들지 않는다. designer review가 pending이면 source-backed N/A revision 없이는
+  `REVIEW_VERIFIED`를 차단한다.
 - 행의 주 owner: `HARD → test`, `RELATIONAL → visual`, `JUDGMENT → designer`. 출처
   있는 `N/A`는 어느 계층에나 가능.
 - 외부 visual QA 결과를 위해 이 스킬의 상태를 추가하지 않는다.

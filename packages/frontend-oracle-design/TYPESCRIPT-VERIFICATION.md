@@ -4,6 +4,13 @@
 설명합니다. 대상 독자는 AI가 생성한 TypeScript 코드를 프로젝트에 수용하기 전에, 같은
 컴파일러와 설정으로 반복 가능한 통과·거절 기준을 만들려는 프론트엔드 개발자입니다.
 
+> **현재 routing 메모:** 아래 `추가한 구조` 설명은 0.24.1 당시의 historical
+> design record입니다. 현재는 타입 작업에서 `types-advanced-contracts`를
+> `types-state-ladder`·`types-api-surface`와 함께 **항상 로드**하되, 고급 계약의
+> **채택**만 compiler witness packet gate로 제한합니다. 현재 정답은
+> [`skills/SKILL.md`](skills/SKILL.md)와
+> [`skills/references/reference-graph.json`](skills/references/reference-graph.json)입니다.
+
 ## 한 줄 요약
 
 AI 생성을 결정론적으로 만들지는 않습니다. 대신 AI가 만든 여러 후보를 **프로젝트에 실제로
@@ -57,7 +64,7 @@ test가 소유합니다. `type-valid`는 `behavior-correct`의 동의어가 아�
 
 ## 추가한 구조
 
-### 1. 고급 타입 reference를 조건부로 분리
+### 1. 0.24.1 당시: 고급 타입 reference를 조건부로 분리
 
 [`skills/references/types/advanced-contracts.md`](skills/references/types/advanced-contracts.md)를
 새로 추가했습니다. 다음 작업에만 로드합니다.

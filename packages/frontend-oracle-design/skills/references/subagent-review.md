@@ -89,9 +89,10 @@ node <skill-dir>/scripts/oracle-run.mjs review-packet \
 ```
 
 패킷은 마지막 lock verify command·exit, lock manifest, Oracle 전문, 잠긴 local source
-전문, run state, ledger, evidence mapping, init 이후 변경 파일 digest, git diff, visual
-pending, Implementation Decision의 path·sha256·content와 등록한 리뷰 포인트의
-path·sha256(본문 없이 링크만)을 원시 필드로 담는다.
+전문, run state, ledger, evidence mapping, `targetRevision`, `targetSnapshot`(worktree·
+production·harness digest), init 이후 변경 파일 digest, git diff, visual pending,
+Implementation Decision의 path·sha256·content와 등록한 리뷰 포인트의 path·sha256(본문
+없이 링크만)을 원시 필드로 담는다.
 reviewer는 `implementation-decision.md`의 주장과 실제 diff를 대조한다. 결론·의도한
 해결책·유리한 요약을 추가하지 않는다. 패킷을 손으로 고치지 말고 입력이 바뀌면 다시
 생성한다. URL·Figma처럼 lock에 담을 수 없는 외부 기준만 Oracle Registry의 정확한
@@ -109,7 +110,10 @@ finding은 자유 서술 대신 아래 스키마 파일로 제출해 기계로 �
 ```json
 {
   "schemaVersion": 2,
-  "reviewer": "code-reviewer",
+  "reviewerRole": "code-reviewer",
+  "reviewerId": "code-reviewer:<stable-session-or-agent-id>",
+  "packetSha256": "<sha256(review-input.json)>",
+  "targetRevision": "<review-input.targetRevision>",
   "changeabilityReview": [
     { "axis": "Readability", "status": "PASS", "evidence": "src/form.tsx:10-30" },
     {
@@ -140,7 +144,9 @@ finding은 자유 서술 대신 아래 스키마 파일로 제출해 기계로 �
 `changeabilityReview`는 다섯 축을 정확히 한 번씩 `PASS | FINDING | N/A`로 판정한다.
 모든 판정은 path·line 또는 packet field evidence가 필요하다. `FINDING`은 아래
 `findings`의 실제 ID를 인용하고, `N/A`는 적용되지 않는 이유를 evidence에 쓴다.
-schema v1은 과거 artifact 검증에만 허용, 새 review는 v2.
+schema v1은 과거 artifact 읽기에만 허용된다. 새 review verification은 v2,
+`reviewerRole`, `reviewerId`, `packetSha256`, `targetRevision`을 요구한다. High risk의 두
+artifact는 `reviewerId`가 달라야 한다.
 
 ```bash
 node <skill-dir>/scripts/oracle-verify.mjs findings \
@@ -153,9 +159,19 @@ node <skill-dir>/scripts/oracle-verify.mjs findings \
   --oracle .ai/oracles/<oracle-id>/oracle.md
 
 node <skill-dir>/scripts/oracle-verify.mjs review \
+  --file .ai/oracles/<oracle-id>/findings-code-reviewer.json \
+  --oracle .ai/oracles/<oracle-id>/oracle.md \
+  --packet .ai/oracles/<oracle-id>/review-input.json \
+  --revision <targetRevision-from-review-packet> \
+  --map .ai/oracles/<oracle-id>/evidence.json
+
+node <skill-dir>/scripts/oracle-verify.mjs review \
   --file .ai/oracles/<oracle-id>/findings-a.json \
   --intersect .ai/oracles/<oracle-id>/findings-b.json \
-  --oracle .ai/oracles/<oracle-id>/oracle.md
+  --oracle .ai/oracles/<oracle-id>/oracle.md \
+  --packet .ai/oracles/<oracle-id>/review-input.json \
+  --revision <targetRevision-from-review-packet> \
+  --map .ai/oracles/<oracle-id>/evidence.json
 ```
 
 분류는 상위 피드백 라우터의 `POLICY_GAP`, `EVIDENCE_GAP`, `HARNESS_DEFECT`,
@@ -269,7 +285,8 @@ reviewer는 아래 질문으로 사용자를 재인터뷰하거나 새 정책을
   finding 또는 출처 있는 N/A가 매핑됐으며 같은 fixture·reference를 공유하는 증거를
   독립 증거로 과장하지 않았는가?
 - `$frontend-visual-qa` artifact가 있다면 같은 Oracle revision을 인용하고 사전 합의한
-  시각·브라우저 행을 빠짐없이 판정하는가?
+  시각·브라우저 행을 빠짐없이 판정하는가? `RELATIONAL`·`JUDGMENT` 또는 UI-shaping
+  interaction이면 기존 tool browser journey 1개 또는 source-backed N/A가 있는가?
 - 보안, 접근성, 데이터 유실 방지 같은 레포 필수 계약을 훼손하지 않았는가?
 
 ## Finding 개선

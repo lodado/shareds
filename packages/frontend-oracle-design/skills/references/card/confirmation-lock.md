@@ -35,6 +35,7 @@ Delivery가 요청됐으면 모든 source 승인을 마칠 때까지 lock을 미
 <repo>/.ai/oracles/<oracle-id>/runs.jsonl
 <repo>/.ai/oracles/<oracle-id>/.run-ids/ # 병렬 exec의 원자적 runId reservation
 <repo>/.ai/oracles/<oracle-id>/evidence.json
+<repo>/.ai/oracles/<oracle-id>/review-input.json # 생성 시
 ```
 
 ### 카드 구조 lint
@@ -48,8 +49,10 @@ node <skill-dir>/scripts/oracle-verify.mjs card \
   --oracle .ai/oracles/<oracle-id>/oracle.md
 ```
 
-검사 항목: 완전한 Outcome Brief, `Kind` 있는 Source Registry, 승인된 User Confirmation
-존재, 모든 정책 줄의 stable ID·`(출처: …)`·적용 행, 정책 ID와 행 ID의 양방향 참조,
+검사 항목: 완전한 Outcome Brief, unique ID와 `Kind` 있는 Source Registry, 승인된 User
+Confirmation 존재, 모든 정책 줄의 stable ID·`(출처: …)`·적용 행, 정책 ID와 행 ID의
+양방향 참조, 정책 출처의 등록 source/user-confirmation FK, 승인 상태·관할·위치/version,
+`implementation-reference` 단독 정책 금지, `repo:` local source의 lock manifest 포함,
 중복 없는 행 ID, `O*` 행의 `Then`·`Never`·부작용, `D*` 행의 계약·출처·증거 계층과
 Source Registry 참조, 모호어 부재, 자동 추가 TC 7종의
 실제 계약 행 또는 출처 있는 N/A 표기. `CARD_LINT_FAILED`는 lock 전에 카드를 고치라는
@@ -87,8 +90,9 @@ node <skill-dir>/scripts/oracle-lock.mjs verify \
   Node가 없으면 Design-only와 Delivery 모두 LLM 판정으로 대체하지 않고 `FAIL`.
 
 SHA-256은 drift 검출 장치일 뿐 lockfile을 다시 쓸 수 있는 actor의 승인 권한을
-보장하지 않는다. 강한 통제가 필요하면 CI human approval·CODEOWNERS·외부 서명을
-추가한다. run ledger·상태 파일도 같은 한계.
+보장하지 않는다. High risk에서만 `.ai/oracles/**`, lock SHA, run IDs를 CI artifact로
+보존하고 CODEOWNERS·required human approval로 보호한다. Low/Medium에는 기본 강제하지
+않으며, 필요할 때만 repo 정책으로 승격한다. run ledger·상태 파일도 같은 한계.
 
 ### Run artifact 초기화
 

@@ -1,16 +1,28 @@
 import assert from 'node:assert/strict'
+import { Buffer } from 'node:buffer'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { link, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+// eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+import { stableStringify } from './oracle-fs.mjs'
 
 const script = join(dirname(fileURLToPath(import.meta.url)), 'oracle-verify.mjs')
 
 function run(...args) {
-  return spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' })
+  const command = [...args]
+  if (command[0] === 'review' && !command.includes('--ledger')) {
+    const oracleIndex = command.indexOf('--oracle')
+    if (oracleIndex >= 0) command.push('--ledger', join(dirname(command[oracleIndex + 1]), 'runs.jsonl'))
+  }
+  return spawnSync(process.execPath, [script, ...command], { encoding: 'utf8' })
+}
+
+function runFrom(cwd, ...args) {
+  return spawnSync(process.execPath, [script, ...args], { cwd, encoding: 'utf8' })
 }
 
 async function directory(t) {
@@ -35,7 +47,7 @@ const VALID_CARD = `# Sample Oracle Card
 
 | ID  | Kind           | 관할      | 기준 | 위치·version    | 승인 상태 |
 | --- | -------------- | --------- | ---- | --------------- | --------- |
-| S1  | product-policy | 저장 정책 | PRD  | docs/save.md#v3 | approved  |
+| S1  | product-policy | 저장 정책 | PRD  | repo:docs/save.md#v3 | approved  |
 
 ## User Confirmation
 
@@ -44,9 +56,9 @@ const VALID_CARD = `# Sample Oracle Card
 
 ## 결정된 정책
 
-- P1: 저장 중 추가 제출은 무시한다. (출처: 유저 Q1=A) (행: O1, O2)
-- P2: 5xx 실패 시 입력을 유지하고 재시도할 수 있다. (출처: docs/save.md#failure-policy) (행: O3, O4)
-- P3: 목록 요청의 경계 상태는 최신 화면만 갱신한다. (출처: docs/save.md#list-policy) (행: O5, O6, O7, O8)
+- P1: 저장 중 추가 제출은 무시한다. (출처: S1) (행: O1, O2)
+- P2: 5xx 실패 시 입력을 유지하고 재시도할 수 있다. (출처: S1) (행: O3, O4)
+- P3: 목록 요청의 경계 상태는 최신 화면만 갱신한다. (출처: S1) (행: O5, O6, O7, O8)
 - P4: 저장 action의 문구는 "저장"이다. (출처: S1) (행: D1)
 
 ## Behavior Contract
@@ -156,6 +168,118 @@ test('O5-O6: Source Registry의 Kind 누락과 허용되지 않은 값을 거부
   assert.match(invalid.stderr, /visual-preference/)
 })
 
+test('O5-O6: Source Registry foreign keys, approval, and implementation-only sources are enforced', async (t) => {
+  const duplicateSource = VALID_CARD.replace(
+    '| S1  | product-policy | 저장 정책 | PRD  | repo:docs/save.md#v3 | approved  |',
+    '| S1  | product-policy | 저장 정책 | PRD  | repo:docs/save.md#v3 | approved  |\n| S1  | product-policy | 중복 | PRD | docs/dup.md | approved |',
+  )
+  const unapproved = VALID_CARD.replace(
+    '| S1  | product-policy | 저장 정책 | PRD  | repo:docs/save.md#v3 | approved  |',
+    '| S1  | product-policy | 저장 정책 | PRD  | repo:docs/save.md#v3 | draft |',
+  )
+  const unapprovedVisualSource = VALID_CARD.replace(
+    '| S1  | product-policy | 저장 정책 | PRD  | repo:docs/save.md#v3 | approved  |',
+    '| S1  | product-policy | 저장 정책 | PRD  | repo:docs/save.md#v3 | approved  |\n| S2  | product-policy | 시각 계약 | Figma | file/page/frame/version | draft |',
+  ).replace(
+    '| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1   | HARD      |',
+    '| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S2   | HARD      |',
+  )
+  const unknownPolicySource = VALID_CARD.replace('(출처: S1) (행: O3, O4)', '(출처: S9) (행: O3, O4)')
+  const implementationOnly = VALID_CARD.replace(
+    '| S1  | product-policy | 저장 정책 | PRD  | repo:docs/save.md#v3 | approved  |',
+    '| S1  | implementation-reference | 저장 구현 | 코드 | src/save.ts | approved  |',
+  ).replace('(출처: S1)', '(출처: S1)')
+
+  for (const [card, issue] of [
+    [duplicateSource, 'duplicate-source'],
+    [unapproved, 'policy-source-unapproved'],
+    [unapprovedVisualSource, 'source-unapproved'],
+    [unknownPolicySource, 'policy-source-unknown'],
+    [implementationOnly, 'policy-source-implementation'],
+  ]) {
+    const linted = run('card', '--oracle', await cardFile(t, card))
+    assert.equal(linted.status, 1, issue)
+    assert.match(linted.stderr, new RegExp(issue))
+  }
+})
+
+test('O5-O6: user confirmation policy source must be an exact confirmation FK', async (t) => {
+  const exact = VALID_CARD.replace('(출처: S1)', '(출처: user message Q-confirmation)')
+  const guessed = VALID_CARD.replace('(출처: S1)', '(출처: 사용자 추정)')
+
+  const accepted = run('card', '--oracle', await cardFile(t, exact))
+  assert.equal(accepted.status, 0, accepted.stderr)
+
+  const rejected = run('card', '--oracle', await cardFile(t, guessed))
+  assert.equal(rejected.status, 1)
+  assert.match(rejected.stderr, /policy-source-unregistered/)
+})
+
+test('O5-O6: implementation-reference may support but not solely authorize policy', async (t) => {
+  const withImplementationSource = VALID_CARD.replace(
+    '| S1  | product-policy | 저장 정책 | PRD  | repo:docs/save.md#v3 | approved  |',
+    '| S1  | product-policy | 저장 정책 | PRD  | repo:docs/save.md#v3 | approved  |\n| S2  | implementation-reference | 저장 구현 | Code | src/save.ts | N/A (출처: S1) |',
+  )
+  const paired = withImplementationSource.replace(
+    '- P1: 저장 중 추가 제출은 무시한다. (출처: S1)',
+    '- P1: 저장 중 추가 제출은 무시한다. (출처: S1, S2)',
+  )
+  const sole = withImplementationSource.replace(
+    '- P1: 저장 중 추가 제출은 무시한다. (출처: S1)',
+    '- P1: 저장 중 추가 제출은 무시한다. (출처: S2)',
+  )
+
+  const accepted = run('card', '--oracle', await cardFile(t, paired))
+  assert.equal(accepted.status, 0, accepted.stderr)
+
+  const rejected = run('card', '--oracle', await cardFile(t, sole))
+  assert.equal(rejected.status, 1)
+  assert.match(rejected.stderr, /policy-source-implementation-reference/)
+})
+
+test('O5-O6: local Source Registry paths with anchors must be covered by --source', async (t) => {
+  const base = await directory(t)
+  const oracle = join(base, 'oracle.md')
+  const source = 'package.json'
+  await writeFile(oracle, VALID_CARD.replace('repo:docs/save.md#v3', 'repo:package.json#v3'))
+
+  const covered = run('card', '--oracle', oracle, '--source', source)
+  assert.equal(covered.status, 0, covered.stderr)
+
+  const missing = run('card', '--oracle', oracle, '--source', 'packages/frontend-oracle-design/package.json')
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /source-lock-missing/)
+
+  const extra = run('card', '--oracle', oracle, '--source', source, '--source', 'skills/README.md')
+  assert.equal(extra.status, 1)
+  assert.match(extra.stderr, /source-lock-unregistered/)
+})
+
+test('O5-O6: repo: Source Registry path traversal is rejected even when supplied as --source', async (t) => {
+  const traversal = VALID_CARD.replace('repo:docs/save.md#v3', 'repo:../outside.md#v1')
+  const linted = run('card', '--oracle', await cardFile(t, traversal), '--source', '../outside.md')
+
+  assert.equal(linted.status, 1)
+  assert.match(linted.stderr, /source-repo-path/)
+})
+
+test('O5-O6: repo: Source Registry symlink escaping repository is rejected', async (t) => {
+  const base = await directory(t)
+  const outside = await directory(t)
+  const link = join(base, 'docs', 'oracle-source-link.md')
+  const card = VALID_CARD.replace('repo:docs/save.md#v3', 'repo:docs/oracle-source-link.md#v1')
+  await writeFile(join(outside, 'secret.md'), 'outside')
+  await mkdir(dirname(link), { recursive: true })
+  await symlink(join(outside, 'secret.md'), link)
+
+  const oracle = join(base, 'oracle.md')
+  await writeFile(oracle, card)
+  const linted = runFrom(base, 'card', '--oracle', oracle, '--source', link)
+
+  assert.equal(linted.status, 1)
+  assert.match(linted.stderr, /source-repo-path/)
+})
+
 test('O17: 새 카드의 사용자 확인 근거가 없으면 lock 전 lint를 거부한다', async (t) => {
   const withoutConfirmation = VALID_CARD.replace(
     '## User Confirmation\n\n- Status: approved\n- Source: user message Q-confirmation\n\n',
@@ -173,7 +297,7 @@ test('O17: 새 카드의 사용자 확인 근거가 없으면 lock 전 lint를 �
 })
 
 test('O17: 출처 없는 정책 줄을 위치와 함께 거부한다', async (t) => {
-  const oracle = await cardFile(t, VALID_CARD.replace(' (출처: 유저 Q1=A)', ''))
+  const oracle = await cardFile(t, VALID_CARD.replace(' (출처: S1)', ''))
 
   const linted = run('card', '--oracle', oracle)
 
@@ -429,16 +553,30 @@ test('state-model: async 토큰이 없는 카드는 State Model 없이 통과한
 
 const EVIDENCE_CARD = `# Card
 
+## Source Registry
+
+| ID | Kind | 관할 | 기준 | 위치·version | 승인 상태 |
+| --- | --- | --- | --- | --- | --- |
+| S1 | product-policy | evidence fixture | test | repo:docs/evidence.md#v1 | approved |
+| S2 | implementation-reference | evidence fixture | test | repo:docs/evidence-impl.md#v1 | draft |
+
 ## Behavior Contract
 
 | ID  | Given | When  | Then         | Never       | 부작용(종류×횟수) | BVA       |
 | --- | ----- | ----- | ------------ | ----------- | ----------------- | --------- |
 | O1  | a     | b     | pending 표시 | 성공 UI     | POST×1            | 상태      |
-| O2  | a     | b     | 오류 표시    | 성공 저장   | 저장×0            | 상태      |
-| O3  | a     | b     | 재시도 가능  | 중복 저장   | POST×1            | 횟수      |
+| O2  | a     | b     | N/A (출처: S1) | 성공 저장 | 저장×0            | 상태      |
+| O3  | a     | b     | N/A (출처: S1) | 중복 저장 | POST×1            | 횟수      |
 `
 
 const VISUAL_EVIDENCE_CARD = `# Card
+
+## Source Registry
+
+| ID | Kind | 관할 | 기준 | 위치·version | 승인 상태 |
+| --- | --- | --- | --- | --- | --- |
+| S1 | product-policy | visual | PRD | repo:docs/visual.md#v1 | approved |
+| S2 | implementation-reference | visual fixture | browser note | repo:docs/visual-impl.md#v1 | draft |
 
 ## Visual Contract
 
@@ -446,7 +584,11 @@ const VISUAL_EVIDENCE_CARD = `# Card
 | --- | --- | --- | --- | --- | --- | --- |
 | D1 | P1 | layout | relation | overlap | S1 | RELATIONAL |
 | D2 | P2 | identity | signature | generic | S1 | JUDGMENT |
-| D3 | P3 | copy | exact copy | other copy | S1 | HARD |
+| D3 | P3 | copy | N/A (출처: S1) | other copy | S1 | HARD |
+
+## User Confirmation
+
+- Visual QA authorization: approved
 `
 
 const REPORTED_RUN = JSON.stringify({
@@ -455,7 +597,6 @@ const REPORTED_RUN = JSON.stringify({
   grade: 'reported',
   tests: [
     { name: 'save > pending 표시', status: 'passed' },
-    { name: 'save > 실패 후 재시도', status: 'failed' },
   ],
 })
 
@@ -469,6 +610,34 @@ const REPORTED_RED_RUN = JSON.stringify({
   ],
 })
 
+function chainedLedger(raw, oracleSha256) {
+  let previousDigest = '0'.repeat(64)
+  const records = raw
+    .trim()
+    .split('\n')
+    .map((line, index) => {
+      const parsed = JSON.parse(line)
+      const record = {
+        schemaVersion: 3,
+        type: 'run',
+        label: `fixture-${index}`,
+        command: ['node', '--test'],
+        signal: null,
+        tests: [],
+        oracleSha256,
+        adapter: 'node-test',
+        worktreeSha256: 'a'.repeat(64),
+        ...parsed,
+        previousDigest,
+      }
+      record.digest = createHash('sha256').update(stableStringify(record)).digest('hex')
+      previousDigest = record.digest
+      return JSON.stringify(record)
+    })
+    .join('\n')
+  return `${records}\n`
+}
+
 async function evidenceFixture(t, rows, { ledger = `${REPORTED_RUN}\n` } = {}) {
   const base = await directory(t)
   const oracle = join(base, 'oracle.md')
@@ -477,7 +646,7 @@ async function evidenceFixture(t, rows, { ledger = `${REPORTED_RUN}\n` } = {}) {
 
   await writeFile(oracle, EVIDENCE_CARD)
   await writeFile(map, JSON.stringify({ schemaVersion: 1, rows }))
-  await writeFile(ledgerPath, ledger)
+  await writeFile(ledgerPath, chainedLedger(ledger, createHash('sha256').update(EVIDENCE_CARD).digest('hex')))
 
   return ['evidence', '--oracle', oracle, '--map', map, '--ledger', ledgerPath, '--run', 'r-001']
 }
@@ -497,6 +666,26 @@ test('O18: RED evidence는 지정한 카드 행의 reported test가 실제로 �
   assert.match(wrongRow.stderr, /RED_EVIDENCE_MISSING/)
 })
 
+test('O18: RED evidence rejects signal or null exitCode even with failed reporter test', async (t) => {
+  const args = await evidenceFixture(
+    t,
+    { O1: { kind: 'test', name: 'save > pending 표시' } },
+    {
+      ledger: `${JSON.stringify({
+        runId: 'r-001',
+        exitCode: null,
+        signal: 'SIGTERM',
+        grade: 'reported',
+        tests: [{ name: 'save > pending 표시', status: 'failed' }],
+      })}\n`,
+    },
+  )
+  const red = run('red', ...args.slice(1), '--row', 'O1')
+
+  assert.equal(red.status, 1)
+  assert.match(red.stderr, /^RED_EVIDENCE_UNVERIFIABLE: /)
+})
+
 test('O18: 모든 비-N/A 행이 통과 테스트에 매핑되면 검증을 통과한다', async (t) => {
   const args = await evidenceFixture(t, {
     O1: { kind: 'test', name: 'save > pending 표시' },
@@ -510,6 +699,30 @@ test('O18: 모든 비-N/A 행이 통과 테스트에 매핑되면 검증을 통�
   assert.equal(verified.stdout, 'EVIDENCE_VERIFIED 3 rows\n')
 })
 
+test('O18: N/A evidence requires an explicit row N/A and approved source', async (t) => {
+  const activeRow = await evidenceFixture(t, {
+    O1: { kind: 'na', reason: 'active row bypass', source: 'S1' },
+    O2: { kind: 'na', reason: 'fixture N/A', source: 'S1' },
+    O3: { kind: 'na', reason: 'fixture N/A', source: 'S1' },
+  })
+  const unknownSource = await evidenceFixture(t, {
+    O1: { kind: 'test', name: 'save > pending 표시' },
+    O2: { kind: 'na', reason: 'fixture N/A', source: 'S9' },
+    O3: { kind: 'na', reason: 'fixture N/A', source: 'S1' },
+  })
+  const implementationSource = await evidenceFixture(t, {
+    O1: { kind: 'test', name: 'save > pending 표시' },
+    O2: { kind: 'na', reason: 'implementation reference is not authority', source: 'S2' },
+    O3: { kind: 'na', reason: 'fixture N/A', source: 'S1' },
+  })
+
+  for (const args of [activeRow, unknownSource, implementationSource]) {
+    const rejected = run(...args)
+    assert.equal(rejected.status, 1)
+    assert.match(rejected.stderr, /^EVIDENCE_OWNER_INVALID: /)
+  }
+})
+
 test('O18: visual evidence owner를 tier별로 강제하고 pending은 GREEN에서만 허용한다', async (t) => {
   const base = await directory(t)
   const oracle = join(base, 'oracle.md')
@@ -517,6 +730,7 @@ test('O18: visual evidence owner를 tier별로 강제하고 pending은 GREEN에�
   const ledger = join(base, 'runs.jsonl')
 
   await writeFile(oracle, VISUAL_EVIDENCE_CARD)
+  await mkdir(join(base, 'visual-qa/v-003/screenshots'), { recursive: true })
   await writeFile(
     map,
     JSON.stringify({
@@ -530,12 +744,12 @@ test('O18: visual evidence owner를 tier별로 강제하고 pending은 GREEN에�
   )
   await writeFile(
     ledger,
-    `${JSON.stringify({
+    chainedLedger(`${JSON.stringify({
       runId: 'r-001',
       exitCode: 0,
       grade: 'reported',
       tests: [{ name: 'visual > exact copy', status: 'passed' }],
-    })}\n`,
+    })}\n`, createHash('sha256').update(VISUAL_EVIDENCE_CARD).digest('hex')),
   )
   const args = ['evidence', '--oracle', oracle, '--map', map, '--ledger', ledger, '--run', 'r-001']
 
@@ -553,23 +767,69 @@ test('O18: visual artifact는 같은 Oracle과 행의 PASS를 증명해야 한�
   const oracle = join(base, 'oracle.md')
   const map = join(base, 'evidence.json')
   const ledger = join(base, 'runs.jsonl')
-  const artifact = join(base, 'visual-evidence.json')
+  const artifact = join(base, 'visual-qa/v-001/evidence.json')
   const oracleSha256 = createHash('sha256').update(VISUAL_EVIDENCE_CARD).digest('hex')
+  const worktreeSha256 = 'a'.repeat(64)
+  const media = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==',
+    'base64',
+  )
+  const mediaSha256 = createHash('sha256').update(media).digest('hex')
 
   await writeFile(oracle, VISUAL_EVIDENCE_CARD)
-  await writeFile(artifact, JSON.stringify({ schemaVersion: 1, oracleSha256, rows: { D1: 'passed' } }))
+  await mkdir(join(base, 'visual-qa/v-001'), { recursive: true })
+  await writeFile(join(base, 'visual-qa/v-001/mobile.png'), media)
+  const receipt = {
+    schemaVersion: 3,
+    oracleSha256,
+    producerRun: { runId: 'visual-run-001', tool: 'playwright', status: 'passed', worktreeSha256 },
+    rows: {
+      D1: {
+        status: 'passed',
+        journey: {
+          status: 'passed',
+          tool: 'playwright',
+          scenario: 'layout relation check',
+          checks: ['D1 relation is preserved'],
+          artifacts: [{ path: 'mobile.png', sha256: mediaSha256, mediaType: 'image/png' }],
+        },
+      },
+    },
+  }
+  const receiptRaw = JSON.stringify(receipt)
+  await writeFile(artifact, receiptRaw)
   await writeFile(
     map,
     JSON.stringify({
-      schemaVersion: 2,
+      schemaVersion: 3,
       rows: {
-        D1: { kind: 'visual', artifact: 'visual-evidence.json' },
+        D1: {
+          kind: 'visual',
+          artifact: 'visual-qa/v-001/evidence.json',
+          sha256: createHash('sha256').update(receiptRaw).digest('hex'),
+        },
         D2: { kind: 'reviewer', finding: 'd-1', role: 'designer' },
-        D3: { kind: 'na', reason: 'copy contract is not part of this fixture', source: 'S1' },
+        D3: { kind: 'test', name: 'visual > exact copy' },
       },
     }),
   )
-  await writeFile(ledger, `${JSON.stringify({ runId: 'r-001', exitCode: 0, grade: 'reported', tests: [] })}\n`)
+  await writeFile(
+    ledger,
+    chainedLedger(`${JSON.stringify({
+      runId: 'r-001',
+      exitCode: 0,
+      grade: 'reported',
+      tests: [{ name: 'visual > exact copy', status: 'passed' }],
+    })}\n${JSON.stringify({
+      runId: 'visual-run-001',
+      command: ['npx', 'playwright', 'test'],
+      exitCode: 0,
+      signal: null,
+      grade: 'exit-only',
+      oracleSha256,
+      worktreeSha256,
+    })}\n`, oracleSha256),
+  )
 
   const verified = run(
     'evidence',
@@ -586,7 +846,26 @@ test('O18: visual artifact는 같은 Oracle과 행의 PASS를 증명해야 한�
   )
   assert.equal(verified.status, 0, verified.stderr)
 
-  await writeFile(artifact, JSON.stringify({ schemaVersion: 1, oracleSha256: '0'.repeat(64), rows: { D1: 'passed' } }))
+  await writeFile(
+    artifact,
+    JSON.stringify({
+      schemaVersion: 3,
+      oracleSha256: '0'.repeat(64),
+      producerRun: { runId: 'visual-run-001', tool: 'playwright', status: 'passed', worktreeSha256 },
+      rows: {
+        D1: {
+          status: 'passed',
+          journey: {
+            status: 'passed',
+            tool: 'playwright',
+            scenario: 'layout relation check',
+            checks: ['D1 relation is preserved'],
+            artifacts: [{ path: 'mobile.png', sha256: mediaSha256, mediaType: 'image/png' }],
+          },
+        },
+      },
+    }),
+  )
   const stale = run(
     'evidence',
     '--oracle',
@@ -604,6 +883,438 @@ test('O18: visual artifact는 같은 Oracle과 행의 PASS를 증명해야 한�
   assert.match(stale.stderr, /^VISUAL_EVIDENCE_INVALID: /)
 })
 
+test('O18: visual artifact는 browser journey 없이 screenshot-only로 review를 통과할 수 없다', async (t) => {
+  const base = await directory(t)
+  const oracle = join(base, 'oracle.md')
+  const map = join(base, 'evidence.json')
+  const ledger = join(base, 'runs.jsonl')
+  const artifact = join(base, 'visual-qa/v-002/evidence.json')
+  const oracleSha256 = createHash('sha256').update(VISUAL_EVIDENCE_CARD).digest('hex')
+
+  await writeFile(oracle, VISUAL_EVIDENCE_CARD)
+  await mkdir(join(base, 'visual-qa/v-002'), { recursive: true })
+  await writeFile(artifact, JSON.stringify({ schemaVersion: 2, oracleSha256, rows: { D1: { artifacts: ['d1.png'] } } }))
+  await writeFile(
+    map,
+    JSON.stringify({
+      schemaVersion: 2,
+      rows: {
+        D1: { kind: 'visual', artifact: 'visual-qa/v-002/evidence.json' },
+        D2: { kind: 'reviewer', finding: 'd-1', role: 'designer' },
+        D3: { kind: 'test', name: 'visual > exact copy' },
+      },
+    }),
+  )
+  await writeFile(
+    ledger,
+    chainedLedger(
+      `${JSON.stringify({
+        runId: 'r-001',
+        exitCode: 0,
+        grade: 'reported',
+        tests: [{ name: 'visual > exact copy', status: 'passed' }],
+      })}\n`,
+      oracleSha256,
+    ),
+  )
+
+  const screenshotOnly = run(
+    'evidence',
+    '--oracle',
+    oracle,
+    '--map',
+    map,
+    '--ledger',
+    ledger,
+    '--run',
+    'r-001',
+    '--phase',
+    'review',
+  )
+  assert.equal(screenshotOnly.status, 1)
+  assert.match(screenshotOnly.stderr, /^VISUAL_EVIDENCE_INVALID: /)
+
+  await writeFile(
+    artifact,
+    JSON.stringify({
+      schemaVersion: 2,
+      oracleSha256,
+      rows: {
+        D1: {
+          journey: {
+            status: 'passed',
+            tool: 'playwright',
+            scenario: 'layout relation check',
+            checks: ['D1 relation is preserved'],
+            artifacts: ['screenshots/d1.png'],
+          },
+        },
+      },
+    }),
+  )
+  const missingRowPass = run(
+    'evidence',
+    '--oracle',
+    oracle,
+    '--map',
+    map,
+    '--ledger',
+    ledger,
+    '--run',
+    'r-001',
+    '--phase',
+    'review',
+  )
+  assert.equal(missingRowPass.status, 1)
+  assert.match(missingRowPass.stderr, /^VISUAL_EVIDENCE_INVALID: /)
+
+  await writeFile(
+    artifact,
+    JSON.stringify({
+      schemaVersion: 2,
+      oracleSha256,
+      rows: {
+        D1: {
+          status: 'passed',
+          journey: {
+            status: 'passed',
+            tool: 'playwright',
+            scenario: 'layout relation check',
+            checks: [null],
+            artifacts: ['screenshots/d1.png'],
+          },
+        },
+      },
+    }),
+  )
+  const emptyCheck = run(
+    'evidence',
+    '--oracle',
+    oracle,
+    '--map',
+    map,
+    '--ledger',
+    ledger,
+    '--run',
+    'r-001',
+    '--phase',
+    'review',
+  )
+  assert.equal(emptyCheck.status, 1)
+  assert.match(emptyCheck.stderr, /^VISUAL_EVIDENCE_INVALID: /)
+
+  await writeFile(
+    artifact,
+    JSON.stringify({
+      schemaVersion: 2,
+      oracleSha256,
+      rows: {
+        D1: {
+          status: 'not-applicable',
+          checks: ['D1 relation reviewed outside browser journey'],
+          artifacts: ['d1.png'],
+          journey: { status: 'not-applicable', reason: 'layout relation has no browser journey', source: 'S1' },
+        },
+      },
+    }),
+  )
+  const rowNotApplicable = run(
+    'evidence',
+    '--oracle',
+    oracle,
+    '--map',
+    map,
+    '--ledger',
+    ledger,
+    '--run',
+    'r-001',
+    '--phase',
+    'review',
+  )
+  assert.equal(rowNotApplicable.status, 1)
+  assert.match(rowNotApplicable.stderr, /^VISUAL_EVIDENCE_INVALID: /)
+
+  const media = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==',
+    'base64',
+  )
+  const mediaSha256 = createHash('sha256').update(media).digest('hex')
+  const worktreeSha256 = 'a'.repeat(64)
+  await writeFile(join(base, 'visual-qa/v-002/d1.png'), media)
+  const approvedReceipt = {
+    schemaVersion: 3,
+    oracleSha256,
+    producerRun: { runId: 'visual-run-002', tool: 'playwright', status: 'passed', worktreeSha256 },
+    rows: {
+      D1: {
+        status: 'passed',
+        checks: ['D1 relation reviewed outside browser journey'],
+        artifacts: [{ path: 'd1.png', sha256: mediaSha256, mediaType: 'image/png' }],
+        journey: {
+          status: 'not-applicable',
+          reason: 'no interactive browser journey for static relation',
+          source: 'S1',
+        },
+      },
+    },
+  }
+  const approvedReceiptRaw = JSON.stringify(approvedReceipt)
+  await writeFile(artifact, approvedReceiptRaw)
+  await writeFile(
+    map,
+    JSON.stringify({
+      schemaVersion: 3,
+      rows: {
+        D1: {
+          kind: 'visual',
+          artifact: 'visual-qa/v-002/evidence.json',
+          sha256: createHash('sha256').update(approvedReceiptRaw).digest('hex'),
+        },
+        D2: { kind: 'reviewer', finding: 'd-1', role: 'designer' },
+        D3: { kind: 'test', name: 'visual > exact copy' },
+      },
+    }),
+  )
+  await writeFile(
+    ledger,
+    chainedLedger(
+      `${JSON.stringify({
+        runId: 'r-001',
+        exitCode: 0,
+        grade: 'reported',
+        tests: [{ name: 'visual > exact copy', status: 'passed' }],
+      })}\n${JSON.stringify({
+        runId: 'visual-run-002',
+        command: ['npx', 'playwright', 'test'],
+        exitCode: 0,
+        signal: null,
+        grade: 'exit-only',
+        oracleSha256,
+        worktreeSha256,
+      })}\n`,
+      oracleSha256,
+    ),
+  )
+  const journeyNotApplicable = run(
+    'evidence',
+    '--oracle',
+    oracle,
+    '--map',
+    map,
+    '--ledger',
+    ledger,
+    '--run',
+    'r-001',
+    '--phase',
+    'review',
+  )
+  assert.equal(journeyNotApplicable.status, 0, journeyNotApplicable.stderr)
+
+  await writeFile(
+    artifact,
+    JSON.stringify({
+      schemaVersion: 2,
+      oracleSha256,
+      rows: {
+        D1: {
+          status: 'passed',
+          checks: ['D1 relation reviewed outside browser journey'],
+          artifacts: ['not-applicable.md'],
+          journey: { status: 'not-applicable', reason: 'not approved', source: 'S9' },
+        },
+      },
+    }),
+  )
+
+  const unapprovedSource = run(
+    'evidence',
+    '--oracle',
+    oracle,
+    '--map',
+    map,
+    '--ledger',
+    ledger,
+    '--run',
+    'r-001',
+    '--phase',
+    'review',
+  )
+  assert.equal(unapprovedSource.status, 1)
+  assert.match(unapprovedSource.stderr, /^VISUAL_EVIDENCE_INVALID: /)
+})
+
+test('O18: visual artifact 내부 journey tool과 artifact 경로를 fail-closed로 검증한다', async (t) => {
+  const base = await directory(t)
+  const outside = await directory(t)
+  const oracle = join(base, 'oracle.md')
+  const map = join(base, 'evidence.json')
+  const ledger = join(base, 'runs.jsonl')
+  const artifact = join(base, 'visual-qa/v-003/evidence.json')
+  const oracleSha256 = createHash('sha256').update(VISUAL_EVIDENCE_CARD).digest('hex')
+
+  await writeFile(oracle, VISUAL_EVIDENCE_CARD)
+  await mkdir(join(base, 'visual-qa/v-003/screenshots'), { recursive: true })
+  await writeFile(
+    map,
+    JSON.stringify({
+      schemaVersion: 2,
+      rows: {
+        D1: { kind: 'visual', artifact: 'visual-qa/v-003/evidence.json' },
+        D2: { kind: 'reviewer', finding: 'd-1', role: 'designer' },
+        D3: { kind: 'na', reason: 'copy contract is not part of this fixture', source: 'S1' },
+      },
+    }),
+  )
+  await writeFile(
+    ledger,
+    chainedLedger(
+      `${JSON.stringify({ runId: 'r-001', exitCode: 0, grade: 'reported', tests: [] })}\n`,
+      oracleSha256,
+    ),
+  )
+
+  const verify = () =>
+    run('evidence', '--oracle', oracle, '--map', map, '--ledger', ledger, '--run', 'r-001', '--phase', 'review')
+
+  await writeFile(
+    artifact,
+    JSON.stringify({
+      schemaVersion: 2,
+      oracleSha256,
+      rows: {
+        D1: {
+          status: 'passed',
+          journey: {
+            status: 'passed',
+            tool: 'frontend-visual-qa',
+            scenario: 'layout relation check',
+            checks: ['D1 relation is preserved'],
+            artifacts: ['screenshots/d1.png'],
+          },
+        },
+      },
+    }),
+  )
+  const unsupportedTool = verify()
+  assert.equal(unsupportedTool.status, 1)
+  assert.match(unsupportedTool.stderr, /^VISUAL_EVIDENCE_INVALID: /)
+
+  await writeFile(
+    artifact,
+    JSON.stringify({
+      schemaVersion: 2,
+      oracleSha256,
+      rows: {
+        D1: {
+          status: 'passed',
+          journey: {
+            status: 'passed',
+            tool: 'playwright',
+            scenario: 'layout relation check',
+            checks: ['D1 relation is preserved'],
+            artifacts: ['screenshots/missing.png'],
+          },
+        },
+      },
+    }),
+  )
+  const missingNestedArtifact = verify()
+  assert.equal(missingNestedArtifact.status, 1)
+  assert.match(missingNestedArtifact.stderr, /^VISUAL_EVIDENCE_INVALID: /)
+
+  await writeFile(join(outside, 'outside.png'), 'png')
+  await symlink(join(outside, 'outside.png'), join(base, 'visual-qa/v-003/screenshots/symlink.png'))
+  await writeFile(
+    artifact,
+    JSON.stringify({
+      schemaVersion: 2,
+      oracleSha256,
+      rows: {
+        D1: {
+          status: 'passed',
+          journey: {
+            status: 'passed',
+            tool: 'mcp:browser',
+            scenario: 'layout relation check',
+            checks: ['D1 relation is preserved'],
+            artifacts: ['screenshots/symlink.png'],
+          },
+        },
+      },
+    }),
+  )
+  const symlinkNestedArtifact = verify()
+  assert.equal(symlinkNestedArtifact.status, 1)
+  assert.match(symlinkNestedArtifact.stderr, /^VISUAL_EVIDENCE_INVALID: /)
+})
+
+test('O18: visual artifact symlink은 Oracle directory 안 경로여도 거부한다', async (t) => {
+  const base = await directory(t)
+  const outside = await directory(t)
+  const oracle = join(base, 'oracle.md')
+  const map = join(base, 'evidence.json')
+  const ledger = join(base, 'runs.jsonl')
+  const artifact = join(base, 'visual-evidence.json')
+  const oracleSha256 = createHash('sha256').update(VISUAL_EVIDENCE_CARD).digest('hex')
+
+  await writeFile(oracle, VISUAL_EVIDENCE_CARD)
+  await writeFile(
+    join(outside, 'visual-evidence.json'),
+    JSON.stringify({
+      schemaVersion: 2,
+      oracleSha256,
+      rows: {
+        D1: {
+          status: 'passed',
+          journey: {
+            status: 'passed',
+            tool: 'playwright',
+            scenario: 'layout relation check',
+            checks: ['D1 relation is preserved'],
+            artifacts: ['screenshots/d1.png'],
+          },
+        },
+      },
+    }),
+  )
+  await symlink(join(outside, 'visual-evidence.json'), artifact)
+  await writeFile(
+    map,
+    JSON.stringify({
+      schemaVersion: 2,
+      rows: {
+        D1: { kind: 'visual', artifact: 'visual-evidence.json' },
+        D2: { kind: 'reviewer', finding: 'd-1', role: 'designer' },
+        D3: { kind: 'na', reason: 'copy contract is not part of this fixture', source: 'S1' },
+      },
+    }),
+  )
+  await writeFile(
+    ledger,
+    chainedLedger(
+      `${JSON.stringify({ runId: 'r-001', exitCode: 0, grade: 'reported', tests: [] })}\n`,
+      oracleSha256,
+    ),
+  )
+
+  const rejected = run(
+    'evidence',
+    '--oracle',
+    oracle,
+    '--map',
+    map,
+    '--ledger',
+    ledger,
+    '--run',
+    'r-001',
+    '--phase',
+    'review',
+  )
+
+  assert.equal(rejected.status, 1)
+  assert.match(rejected.stderr, /^VISUAL_EVIDENCE_INVALID: /)
+})
+
 test('O19: run 결과에 없거나 통과하지 않은 테스트 이름을 거부한다', async (t) => {
   const missingName = await evidenceFixture(t, {
     O1: { kind: 'test', name: 'save > 존재하지 않는 이름' },
@@ -611,7 +1322,7 @@ test('O19: run 결과에 없거나 통과하지 않은 테스트 이름을 거�
     O3: { kind: 'na', reason: '사유', source: 'S1' },
   })
   const failedName = await evidenceFixture(t, {
-    O1: { kind: 'test', name: 'save > 실패 후 재시도' },
+    O1: { kind: 'test', name: 'save > 잘못된 테스트 이름' },
     O2: { kind: 'na', reason: '사유', source: 'S1' },
     O3: { kind: 'na', reason: '사유', source: 'S1' },
   })
@@ -625,7 +1336,7 @@ test('O19: run 결과에 없거나 통과하지 않은 테스트 이름을 거�
   const failing = run(...failedName)
   assert.equal(failing.status, 1)
   assert.match(failing.stderr, /^EVIDENCE_NOT_IN_RUN: /)
-  assert.match(failing.stderr, /failed/)
+  assert.match(failing.stderr, /잘못된 테스트 이름/)
 })
 
 test('O20: grade가 exit-only인 run으로는 테스트 증거를 검증하지 않는다', async (t) => {
@@ -687,6 +1398,153 @@ async function findingsDocument(t, document, name = 'findings.json') {
   const path = join(await directory(t), name)
   await writeFile(path, JSON.stringify(document))
   return path
+}
+
+const CHANGEABILITY_REVIEW = [
+  { axis: 'Readability', status: 'PASS', evidence: 'src/form.tsx:10-30' },
+  { axis: 'Predictability', status: 'PASS', evidence: 'deterministic state transitions only' },
+  { axis: 'Cohesion', status: 'N/A', evidence: '변경된 소유 경계가 없다' },
+  { axis: 'Coupling', status: 'PASS', evidence: '새 public API가 없다' },
+  { axis: 'Simplicity', status: 'PASS', evidence: '기존 platform API를 재사용한다' },
+]
+
+function chainedRecord(record, previousDigest = '0'.repeat(64)) {
+  const chained = { schemaVersion: 3, ...record, previousDigest }
+  chained.digest = createHash('sha256').update(stableStringify(chained)).digest('hex')
+  return chained
+}
+
+async function appendReviewReceipt(ledger, findingsPath, oracleSha256) {
+  const raw = await readFile(ledger, 'utf8')
+  const records = raw.trim().split('\n').map(JSON.parse)
+  const documentRaw = await readFile(findingsPath, 'utf8')
+  const document = JSON.parse(documentRaw)
+  const receipt = document.orchestrationReceipt
+  const event = chainedRecord(
+    {
+      type: 'review-receipt',
+      receiptId: receipt.receiptId,
+      packetSha256: receipt.packetSha256,
+      targetRevision: receipt.targetRevision,
+      role: receipt.role,
+      reviewerId: document.reviewerId,
+      taskId: receipt.taskId,
+      outputSha256: receipt.outputSha256,
+      findingsSha256: createHash('sha256').update(documentRaw).digest('hex'),
+      oracleSha256,
+      adapter: 'controller',
+      at: '2025-01-01T00:00:01.000Z',
+    },
+    records.at(-1).digest,
+  )
+  await writeFile(ledger, `${raw}${JSON.stringify(event)}\n`)
+}
+
+async function reviewFixture(t, findings, overrides = {}) {
+  const base = await directory(t)
+  const oracle = join(base, 'oracle.md')
+  const packetPath = join(base, 'review-packet.json')
+  const map = join(base, 'evidence.json')
+  const ledger = join(base, 'runs.jsonl')
+  const revision = overrides.revision ?? 'a'.repeat(64)
+  const productionRevision = overrides.productionRevision ?? 'b'.repeat(64)
+  const evidence = overrides.evidence ?? overrides.map ?? { schemaVersion: 2, rows: {} }
+  const mapDocument = overrides.map ?? evidence
+  const oracleSha256 = createHash('sha256').update(EVIDENCE_CARD).digest('hex')
+  const manifestSha256 = 'c'.repeat(64)
+  const decisionContent = 'Implement the approved change.\n'
+  const decisionSha256 = createHash('sha256').update(decisionContent).digest('hex')
+  const changeability = await readFile(
+    join(dirname(fileURLToPath(import.meta.url)), '../references/changeability.md'),
+  )
+  const greenRun = chainedRecord({
+    type: 'run',
+    runId: 'r-002',
+    label: 'behavior:reported',
+    command: [process.execPath, '--test', 'fixture.test.mjs'],
+    exitCode: 0,
+    signal: null,
+    grade: 'reported',
+    tests: [{ name: 'save > pending 표시', status: 'passed' }],
+    oracleSha256,
+    adapter: 'node-test',
+    worktreeSha256: revision,
+    productionSha256: productionRevision,
+    lockManifestSha256: manifestSha256,
+    at: '2025-01-01T00:00:00.000Z',
+  })
+  const packet = {
+    schemaVersion: 2,
+    oracle: { content: EVIDENCE_CARD, sha256: oracleSha256 },
+    lock: { oracle: { path: 'oracle.md', sha256: oracleSha256 } },
+    lockVerification: {
+      stdout: `ORACLE_VERIFIED sha256:${oracleSha256} manifest-sha256:${manifestSha256}`,
+      manifestSha256,
+    },
+    state: {
+      lockManifestSha256: manifestSha256,
+      history: [{ state: 'IMPLEMENTED_GREEN', runId: 'r-002' }],
+    },
+    ledger: [greenRun],
+    evidence,
+    evidenceArtifacts: [],
+    implementationDecision: {
+      path: 'implementation-decision.md',
+      content: decisionContent,
+      sha256: decisionSha256,
+    },
+    reviewPoints: [
+      {
+        path: 'changeability.md',
+        sha256: createHash('sha256').update(changeability).digest('hex'),
+      },
+    ],
+    targetRevision: revision,
+    targetSnapshot: overrides.targetSnapshot ?? {
+      worktreeSha256: revision,
+      productionSha256: productionRevision,
+      lockManifestSha256: manifestSha256,
+    },
+  }
+  const packetRaw = `${JSON.stringify(packet, null, 2)}\n`
+  const packetSha256 = createHash('sha256').update(packetRaw).digest('hex')
+  const document = {
+    schemaVersion: 2,
+    reviewerRole: 'code-reviewer',
+    reviewerId: overrides.reviewerId ?? 'reviewer-a',
+    packetSha256,
+    targetRevision: revision,
+    changeabilityReview: CHANGEABILITY_REVIEW,
+    findings,
+    ...overrides.document,
+  }
+  if (!Object.hasOwn(document, 'orchestrationReceipt')) {
+    const taskId = `task-${document.reviewerId}-${overrides.name ?? 'findings'}`
+    const output = { ...document }
+    const outputSha256 = createHash('sha256').update(stableStringify(output)).digest('hex')
+    document.orchestrationReceipt = {
+      receiptId: createHash('sha256')
+        .update(stableStringify({ packetSha256, reviewerId: document.reviewerId, taskId, outputSha256 }))
+        .digest('hex'),
+      packetSha256: document.packetSha256,
+      targetRevision: document.targetRevision,
+      role: document.reviewerRole,
+      reviewerId: document.reviewerId,
+      taskId,
+      outputSha256,
+    }
+  }
+  const findingsPath = join(base, overrides.name ?? 'findings.json')
+  const findingsRaw = JSON.stringify(document)
+
+  await writeFile(oracle, EVIDENCE_CARD)
+  await writeFile(packetPath, packetRaw)
+  await writeFile(map, JSON.stringify(mapDocument))
+  await writeFile(findingsPath, findingsRaw)
+  await writeFile(ledger, `${JSON.stringify(greenRun)}\n`)
+  if (document.orchestrationReceipt) await appendReviewReceipt(ledger, findingsPath, oracleSha256)
+
+  return { oracle, packetPath, map, ledger, revision, productionRevision, findingsPath, packetSha256, oracleSha256 }
 }
 
 test('O22: finding 스키마를 검증하고 행 인용이 없으면 NON_ORACLE_OPINION으로 강등한다', async (t) => {
@@ -825,28 +1683,314 @@ test('O23: 서로 다른 high finding과 행 없는 high finding은 단독으로
   assert.doesNotMatch(checked.stdout, /DOWNGRADED f-2/)
 })
 
-test('O23: review 명령은 blocking finding이 있으면 실패하고 해소되면 통과한다', async (t) => {
-  const oracle = await cardFile(t, EVIDENCE_CARD)
-  const blocking = await findingsFile(t, [
-    {
-      id: 'f-1',
-      row: 'O2',
-      classification: 'PRODUCT_DEFECT',
-      severity: 'high',
-      finding: '오류 표시가 없다',
-      evidence: 'r-003',
-      fix: 'error UI 추가',
-    },
-  ])
-  const clear = await findingsFile(t, [], 'clear.json')
+test('O23: review 명령은 v2 findings를 packet·revision·evidence map에 묶고 blocking을 판정한다', async (t) => {
+  const blockingFinding = {
+    id: 'f-1',
+    row: 'O2',
+    classification: 'PRODUCT_DEFECT',
+    severity: 'high',
+    finding: '오류 표시가 없다',
+    evidence: 'r-003',
+    fix: 'error UI 추가',
+  }
+  const blocking = await reviewFixture(t, [blockingFinding], {
+    map: { schemaVersion: 2, rows: { O3: { kind: 'reviewer', finding: 'f-1', role: 'code-reviewer' } } },
+  })
+  const clear = await reviewFixture(t, [], { name: 'clear.json' })
 
-  const rejected = run('review', '--file', blocking, '--oracle', oracle)
+  const rejected = run(
+    'review',
+    '--file',
+    blocking.findingsPath,
+    '--oracle',
+    blocking.oracle,
+    '--packet',
+    blocking.packetPath,
+    '--revision',
+    blocking.revision,
+    '--map',
+    blocking.map,
+  )
   assert.equal(rejected.status, 1)
   assert.match(rejected.stderr, /^FINDINGS_BLOCKING: /)
 
-  const accepted = run('review', '--file', clear, '--oracle', oracle)
+  const accepted = run(
+    'review',
+    '--file',
+    clear.findingsPath,
+    '--oracle',
+    clear.oracle,
+    '--packet',
+    clear.packetPath,
+    '--revision',
+    clear.revision,
+    '--map',
+    clear.map,
+  )
   assert.equal(accepted.status, 0, accepted.stderr)
   assert.equal(accepted.stdout, 'REVIEW_CLEAR advisory:0\n')
+
+  const stale = await reviewFixture(t, [], { document: { targetRevision: 'b'.repeat(64) }, name: 'stale.json' })
+  const rejectedRevision = run(
+    'review',
+    '--file',
+    stale.findingsPath,
+    '--oracle',
+    stale.oracle,
+    '--packet',
+    stale.packetPath,
+    '--revision',
+    stale.revision,
+    '--map',
+    stale.map,
+  )
+  assert.equal(rejectedRevision.status, 1)
+  assert.match(rejectedRevision.stderr, /^REVIEW_REVISION_MISMATCH: /)
+
+  const productionOnly = await reviewFixture(t, [], { name: 'production-only.json' })
+  const rejectedProductionTarget = run(
+    'review',
+    '--file',
+    productionOnly.findingsPath,
+    '--oracle',
+    productionOnly.oracle,
+    '--packet',
+    productionOnly.packetPath,
+    '--revision',
+    productionOnly.productionRevision,
+    '--map',
+    productionOnly.map,
+  )
+  assert.equal(rejectedProductionTarget.status, 1)
+  assert.match(rejectedProductionTarget.stderr, /^REVIEW_PACKET_INVALID: /)
+
+  const tampered = await reviewFixture(t, [], { name: 'tampered.json' })
+  await writeFile(
+    tampered.map,
+    JSON.stringify({ schemaVersion: 2, rows: { O3: { kind: 'na', reason: 'late edit', source: 'S1' } } }),
+  )
+  const rejectedEvidence = run(
+    'review',
+    '--file',
+    tampered.findingsPath,
+    '--oracle',
+    tampered.oracle,
+    '--packet',
+    tampered.packetPath,
+    '--revision',
+    tampered.revision,
+    '--map',
+    tampered.map,
+  )
+  assert.equal(rejectedEvidence.status, 1)
+  assert.match(rejectedEvidence.stderr, /^REVIEW_EVIDENCE_STALE: /)
+
+  const replayed = await reviewFixture(t, [], { name: 'replayed.json' })
+  await writeFile(replayed.oracle, EVIDENCE_CARD.replace('pending 표시', '다른 표시'))
+  const rejectedOracle = run(
+    'review',
+    '--file',
+    replayed.findingsPath,
+    '--oracle',
+    replayed.oracle,
+    '--packet',
+    replayed.packetPath,
+    '--revision',
+    replayed.revision,
+    '--map',
+    replayed.map,
+  )
+  assert.equal(rejectedOracle.status, 1)
+  assert.match(rejectedOracle.stderr, /^REVIEW_ORACLE_STALE: /)
+})
+
+test('O23: review 명령은 fresh v1과 unknown reviewer evidence finding을 거부한다', async (t) => {
+  const legacy = await reviewFixture(t, [], { document: { schemaVersion: 1 }, name: 'legacy.json' })
+  const legacyReview = run(
+    'review',
+    '--file',
+    legacy.findingsPath,
+    '--oracle',
+    legacy.oracle,
+    '--packet',
+    legacy.packetPath,
+    '--revision',
+    legacy.revision,
+    '--map',
+    legacy.map,
+  )
+  assert.equal(legacyReview.status, 1)
+  assert.match(legacyReview.stderr, /schemaVersion 2/)
+
+  const unknown = await reviewFixture(t, [], {
+    map: { schemaVersion: 2, rows: { O3: { kind: 'reviewer', finding: 'f-404', role: 'code-reviewer' } } },
+    name: 'unknown-evidence.json',
+  })
+  const unknownReview = run(
+    'review',
+    '--file',
+    unknown.findingsPath,
+    '--oracle',
+    unknown.oracle,
+    '--packet',
+    unknown.packetPath,
+    '--revision',
+    unknown.revision,
+    '--map',
+    unknown.map,
+  )
+  assert.equal(unknownReview.status, 1)
+  assert.match(unknownReview.stderr, /^REVIEW_FINDING_UNKNOWN: /)
+})
+
+test('O23: intersected review samples require distinct reviewer identities, not distinct roles', async (t) => {
+  const first = await reviewFixture(t, [], { name: 'first.json', reviewerId: 'same-reviewer' })
+  const second = await reviewFixture(t, [], { name: 'second.json', reviewerId: 'same-reviewer' })
+  const intersect = join(dirname(first.findingsPath), 'second.json')
+  const secondDocument = JSON.parse(await readFile(second.findingsPath, 'utf8'))
+  secondDocument.packetSha256 = first.packetSha256
+  secondDocument.targetRevision = first.revision
+  secondDocument.orchestrationReceipt.packetSha256 = first.packetSha256
+  secondDocument.orchestrationReceipt.targetRevision = first.revision
+  const secondOutput = { ...secondDocument }
+  delete secondOutput.orchestrationReceipt
+  secondDocument.orchestrationReceipt.outputSha256 = createHash('sha256').update(stableStringify(secondOutput)).digest('hex')
+  await writeFile(intersect, JSON.stringify(secondDocument))
+  await appendReviewReceipt(first.ledger, intersect, first.oracleSha256)
+  const rejected = run(
+    'review',
+    '--file',
+    first.findingsPath,
+    '--intersect',
+    intersect,
+    '--oracle',
+    first.oracle,
+    '--packet',
+    first.packetPath,
+    '--revision',
+    first.revision,
+    '--map',
+    first.map,
+  )
+  assert.equal(rejected.status, 1)
+  assert.match(rejected.stderr, /^REVIEWER_NOT_INDEPENDENT: /)
+})
+
+test('O23: reviewer evidence role must match the artifact that owns the finding', async (t) => {
+  const first = await reviewFixture(
+    t,
+    [
+      {
+        id: 'f-code',
+        row: 'O1',
+        classification: 'PRODUCT_DEFECT',
+        severity: 'high',
+        finding: 'code issue',
+        evidence: 'x',
+        fix: 'y',
+      },
+    ],
+    {
+      name: 'code.json',
+      reviewerId: 'code-reviewer-1',
+      map: { schemaVersion: 2, rows: { O2: { kind: 'reviewer', finding: 'f-design', role: 'code-reviewer' } } },
+    },
+  )
+  const second = await reviewFixture(
+    t,
+    [
+      {
+        id: 'f-design',
+        row: 'O2',
+        classification: 'PRODUCT_DEFECT',
+        severity: 'high',
+        finding: 'design issue',
+        evidence: 'x',
+        fix: 'y',
+      },
+    ],
+    {
+      name: 'design.json',
+      reviewerId: 'designer-1',
+      document: { reviewerRole: 'designer', packetSha256: first.packetSha256, targetRevision: first.revision },
+    },
+  )
+  const intersect = join(dirname(first.findingsPath), 'design.json')
+  await writeFile(intersect, await readFile(second.findingsPath, 'utf8'))
+  await appendReviewReceipt(first.ledger, intersect, first.oracleSha256)
+  const rejected = run(
+    'review',
+    '--file',
+    first.findingsPath,
+    '--intersect',
+    intersect,
+    '--oracle',
+    first.oracle,
+    '--packet',
+    first.packetPath,
+    '--revision',
+    first.revision,
+    '--map',
+    first.map,
+  )
+  assert.equal(rejected.status, 1)
+  assert.match(rejected.stderr, /^REVIEWER_EVIDENCE_INVALID: /)
+})
+
+test('O23: review rejects duplicate finding ids and reviewer role without matching artifact', async (t) => {
+  const duplicate = await reviewFixture(t, [
+    { id: 'f-1', row: 'O1', classification: 'PRODUCT_DEFECT', severity: 'high', finding: 'a', evidence: 'x', fix: 'y' },
+    { id: 'f-1', row: 'O2', classification: 'PRODUCT_DEFECT', severity: 'high', finding: 'b', evidence: 'x', fix: 'y' },
+  ])
+  const duplicateReview = run(
+    'review',
+    '--file',
+    duplicate.findingsPath,
+    '--oracle',
+    duplicate.oracle,
+    '--packet',
+    duplicate.packetPath,
+    '--revision',
+    duplicate.revision,
+    '--map',
+    duplicate.map,
+  )
+  assert.equal(duplicateReview.status, 1)
+  assert.match(duplicateReview.stderr, /duplicate finding id/)
+
+  const roleMismatch = await reviewFixture(
+    t,
+    [
+      {
+        id: 'f-1',
+        row: 'O1',
+        classification: 'PRODUCT_DEFECT',
+        severity: 'high',
+        finding: 'a',
+        evidence: 'x',
+        fix: 'y',
+      },
+    ],
+    {
+      map: { schemaVersion: 2, rows: { O1: { kind: 'reviewer', finding: 'f-1', role: 'designer' } } },
+      name: 'role-mismatch.json',
+    },
+  )
+  const rejectedRole = run(
+    'review',
+    '--file',
+    roleMismatch.findingsPath,
+    '--oracle',
+    roleMismatch.oracle,
+    '--packet',
+    roleMismatch.packetPath,
+    '--revision',
+    roleMismatch.revision,
+    '--map',
+    roleMismatch.map,
+  )
+  assert.equal(rejectedRole.status, 1)
+  assert.match(rejectedRole.stderr, /^REVIEWER_EVIDENCE_INVALID: /)
 })
 
 test('O8-O10: changeability review v2의 축·상태·근거·finding 연결을 검증하고 v1은 유지한다', async (t) => {
@@ -949,4 +2093,347 @@ test('O25: 같은 줄이나 앞 줄의 면제 주석이 있으면 통과한다',
 
   assert.equal(scanned.status, 0, scanned.stderr)
   assert.equal(scanned.stdout, 'SCAN_OK 1 files\n')
+})
+
+test('O9: visual evidence requires approved producer-bound artifacts', async (t) => {
+  const verifyLegacyAttack = async () => {
+    const base = await directory(t)
+    const oracle = join(base, 'oracle.md')
+    const map = join(base, 'evidence.json')
+    const ledger = join(base, 'runs.jsonl')
+    const artifact = join(base, 'visual/evidence.json')
+    const card = VISUAL_EVIDENCE_CARD.replace(
+      '- Visual QA authorization: approved',
+      '- Visual QA authorization: declined',
+    )
+    const receipt = {
+      schemaVersion: 2,
+      oracleSha256: createHash('sha256').update(card).digest('hex'),
+      rows: {
+        D1: {
+          status: 'passed',
+          journey: {
+            status: 'passed',
+            tool: 'playwright',
+            scenario: 'self-authored legacy journey',
+            checks: ['D1 relation is claimed'],
+            artifacts: ['proof.png'],
+          },
+        },
+      },
+    }
+    await writeFile(oracle, card)
+    await mkdir(dirname(artifact), { recursive: true })
+    await writeFile(join(dirname(artifact), 'proof.png'), 'png')
+    await writeFile(artifact, JSON.stringify(receipt))
+    await writeFile(
+      map,
+      JSON.stringify({
+        schemaVersion: 2,
+        rows: {
+          D1: { kind: 'visual', artifact: 'visual/evidence.json' },
+          D2: { kind: 'reviewer', finding: 'd-1', role: 'designer' },
+          D3: { kind: 'na', reason: 'fixture', source: 'S1' },
+        },
+      }),
+    )
+    await writeFile(
+      ledger,
+      chainedLedger(
+        `${JSON.stringify({ runId: 'r-001', exitCode: 0, grade: 'exit-only' })}\n`,
+        receipt.oracleSha256,
+      ),
+    )
+    return run('evidence', '--oracle', oracle, '--map', map, '--ledger', ledger, '--run', 'r-001', '--phase', 'review')
+  }
+
+  const legacyAttack = await verifyLegacyAttack()
+  assert.equal(legacyAttack.status, 1)
+  assert.match(legacyAttack.stderr, /^VISUAL_EVIDENCE_INVALID: |^EVIDENCE_/)
+
+  const verifyAttack = async (authorization, mutate) => {
+    const base = await directory(t)
+    const oracle = join(base, 'oracle.md')
+    const map = join(base, 'evidence.json')
+    const ledger = join(base, 'runs.jsonl')
+    const artifact = join(base, 'visual/evidence.json')
+    const card = VISUAL_EVIDENCE_CARD.replace(
+      '- Visual QA authorization: approved',
+      `- Visual QA authorization: ${authorization}`,
+    )
+    const media = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==',
+      'base64',
+    )
+    const mediaSha256 = createHash('sha256').update(media).digest('hex')
+    const worktreeSha256 = 'a'.repeat(64)
+    const receipt = {
+      schemaVersion: 3,
+      oracleSha256: createHash('sha256').update(card).digest('hex'),
+      producerRun: {
+        runId: 'visual-run-001',
+        tool: 'playwright',
+        status: 'passed',
+        worktreeSha256,
+      },
+      rows: {
+        D1: {
+          status: 'passed',
+          journey: {
+            status: 'passed',
+            tool: 'playwright',
+            scenario: 'approved producer journey',
+            checks: ['D1 relation is preserved'],
+            artifacts: [{ path: 'proof.png', sha256: mediaSha256, mediaType: 'image/png' }],
+          },
+        },
+      },
+    }
+    await writeFile(oracle, card)
+    await mkdir(dirname(artifact), { recursive: true })
+    await writeFile(join(dirname(artifact), 'proof.png'), media)
+    await mutate(receipt, artifact)
+    const receiptRaw = JSON.stringify(receipt)
+    await writeFile(artifact, receiptRaw)
+    await writeFile(
+      map,
+      JSON.stringify({
+        schemaVersion: 3,
+        rows: {
+          D1: { kind: 'visual', artifact: 'visual/evidence.json', sha256: createHash('sha256').update(receiptRaw).digest('hex') },
+          D2: { kind: 'reviewer', finding: 'd-1', role: 'designer' },
+          D3: { kind: 'na', reason: 'copy is outside this visual producer fixture', source: 'S1' },
+        },
+      }),
+    )
+    await writeFile(
+      ledger,
+      chainedLedger(
+        [
+          JSON.stringify({ runId: 'r-001', exitCode: 0, signal: null, grade: 'exit-only' }),
+          JSON.stringify({
+            runId: 'visual-run-001',
+            label: 'visual-qa',
+            command: ['npx', 'playwright', 'test'],
+            exitCode: 0,
+            signal: null,
+            grade: 'exit-only',
+            oracleSha256: receipt.oracleSha256,
+            worktreeSha256,
+          }),
+          '',
+        ].join('\n'),
+        receipt.oracleSha256,
+      ),
+    )
+    return run('evidence', '--oracle', oracle, '--map', map, '--ledger', ledger, '--run', 'r-001', '--phase', 'review')
+  }
+
+  for (const [authorization, mutate] of [
+    ['declined', async () => {}],
+    ['approved', async (receipt) => { delete receipt.producerRun }],
+    ['approved', async (receipt) => { receipt.producerRun.tool = 'handwritten-browser-tool' }],
+    ['approved', async (receipt, artifact) => { await writeFile(join(dirname(artifact), 'proof.png'), 'dummy png bytes') }],
+    ['approved', async (receipt) => {
+      receipt.rows.D1.journey.artifacts[0].sha256 = '0'.repeat(64)
+      receipt.rows.D1.journey.artifacts[0].mediaType = 'image/jpeg'
+    }],
+  ]) {
+    const rejected = await verifyAttack(authorization, mutate)
+    assert.equal(rejected.status, 1)
+    assert.match(rejected.stderr, /^VISUAL_EVIDENCE_INVALID: |^EVIDENCE_/)
+  }
+})
+
+test('O10: evidence rejects non-clean failed or signaled runs', async (t) => {
+  const rows = {
+    O1: { kind: 'test', name: 'save > pending 표시' },
+    O2: { kind: 'na', reason: 'fixture exception', source: 'S1' },
+    O3: { kind: 'na', reason: 'fixture exception', source: 'S1' },
+  }
+  for (const runRecord of [
+    { ...JSON.parse(REPORTED_RUN), exitCode: 1, tests: [{ name: 'save > pending 표시', status: 'passed' }] },
+    { ...JSON.parse(REPORTED_RUN), exitCode: null, signal: 'SIGTERM', tests: [{ name: 'save > pending 표시', status: 'passed' }] },
+    { ...JSON.parse(REPORTED_RUN), tests: [{ name: 'save > pending 표시', status: 'passed' }, { name: 'other', status: 'failed' }] },
+    { ...JSON.parse(REPORTED_RUN), tests: [{ name: 'save > pending 표시', status: 'passed' }, { name: 'other', status: 'skipped' }] },
+  ]) {
+    const args = await evidenceFixture(t, rows, { ledger: `${JSON.stringify(runRecord)}\n` })
+    const rejected = run(...args)
+    assert.equal(rejected.status, 1)
+    assert.match(rejected.stderr, /^EVIDENCE_/)
+  }
+})
+
+test('O15: review identity is bound to allowed roles and orchestration receipts', async (t) => {
+  const unknownRole = await reviewFixture(t, [], {
+    document: { reviewerRole: 'invented-reviewer', reviewerId: 'self-declared' },
+  })
+  const absentReceipt = await reviewFixture(t, [], {
+    reviewerId: 'self-declared',
+    document: { orchestrationReceipt: undefined },
+  })
+  const verify = (fixture, intersect) =>
+    run(
+      'review',
+      '--file',
+      fixture.findingsPath,
+      ...(intersect ? ['--intersect', intersect] : []),
+      '--oracle',
+      fixture.oracle,
+      '--packet',
+      fixture.packetPath,
+      '--revision',
+      fixture.revision,
+      '--map',
+      fixture.map,
+    )
+
+  for (const fixture of [unknownRole, absentReceipt]) {
+    const rejected = verify(fixture)
+    assert.equal(rejected.status, 1)
+    assert.match(rejected.stderr, /^REVIEWER_|^REVIEW_PACKET_INVALID: |^FINDINGS_INVALID: /)
+  }
+
+  const high = await reviewFixture(t, [], {
+    reviewerId: 'high-sample-a',
+    document: { sampleRisk: 'High' },
+  })
+  const secondPath = join(dirname(high.findingsPath), 'high-sample-b.json')
+  const second = JSON.parse(await readFile(high.findingsPath, 'utf8'))
+  second.reviewerId = 'high-sample-b'
+  const secondOutput = { ...second }
+  delete secondOutput.orchestrationReceipt
+  second.orchestrationReceipt.outputSha256 = createHash('sha256').update(stableStringify(secondOutput)).digest('hex')
+  await writeFile(secondPath, JSON.stringify(second))
+  const duplicateReceipt = verify(high, secondPath)
+  assert.equal(duplicateReceipt.status, 1)
+  assert.match(duplicateReceipt.stderr, /^REVIEWER_/)
+})
+
+test('O17: visual rows require an approved authoritative Source Registry reference', async (t) => {
+  const freeText = VALID_CARD.replace(
+    '| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1   | HARD      |',
+    '| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | handwritten baseline | HARD |',
+  )
+  const implementationOnly = VALID_CARD.replace(
+    '| S1  | product-policy | 저장 정책 | PRD  | repo:docs/save.md#v3 | approved  |',
+    '| S1  | implementation-reference | 저장 구현 | Code | repo:src/save.ts#v1 | draft |\n| S2 | product-policy | 저장 정책 | PRD | repo:docs/save.md#v3 | approved |',
+  )
+    .replaceAll('출처: S1', '출처: S2')
+    .replace('| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S2   | HARD      |', '| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1 | HARD |')
+  const draftAuthority = VALID_CARD.replace(
+    '| S1  | product-policy | 저장 정책 | PRD  | repo:docs/save.md#v3 | approved  |',
+    '| S1  | product-policy | visual draft | PRD | repo:docs/visual.md#v1 | draft |\n| S2 | product-policy | 저장 정책 | PRD | repo:docs/save.md#v3 | approved |',
+  )
+    .replaceAll('출처: S1', '출처: S2')
+    .replace('| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S2   | HARD      |', '| D1  | P4   | copy | 버튼 문구는 "저장"이다 | 다른 문구 | S1 | HARD |')
+
+  for (const card of [freeText, implementationOnly, draftAuthority]) {
+    const rejected = run('card', '--oracle', await cardFile(t, card))
+    assert.equal(rejected.status, 1)
+    assert.match(rejected.stderr, /visual-source|source-unapproved|implementation-reference/)
+  }
+})
+
+test('O18: evidence and review artifacts stay inside the Oracle directory with stable digests', async (t) => {
+  const fixture = await reviewFixture(t, [])
+  const outside = await directory(t)
+  const externalMap = join(outside, 'evidence.json')
+  const externalFindings = join(outside, 'findings.json')
+  const externalPacket = join(outside, 'review-packet.json')
+  await writeFile(externalMap, await readFile(fixture.map, 'utf8'))
+  await writeFile(externalFindings, await readFile(fixture.findingsPath, 'utf8'))
+  await writeFile(externalPacket, await readFile(fixture.packetPath, 'utf8'))
+
+  const review = (file, packet, map) =>
+    run('review', '--file', file, '--oracle', fixture.oracle, '--packet', packet, '--revision', fixture.revision, '--map', map)
+  for (const [file, packet, map] of [
+    [fixture.findingsPath, fixture.packetPath, externalMap],
+    [externalFindings, fixture.packetPath, fixture.map],
+    [fixture.findingsPath, externalPacket, fixture.map],
+  ]) {
+    const rejected = review(file, packet, map)
+    assert.equal(rejected.status, 1)
+    assert.match(rejected.stderr, /^REVIEW_|^EVIDENCE_|^FINDINGS_INVALID: /)
+  }
+
+  const mapAlias = join(dirname(fixture.map), 'map-alias.json')
+  const mapHardlink = join(dirname(fixture.map), 'map-hardlink.json')
+  await symlink(fixture.map, mapAlias)
+  await link(fixture.map, mapHardlink)
+  for (const alias of [mapAlias, mapHardlink]) {
+    const rejected = review(fixture.findingsPath, fixture.packetPath, alias)
+    assert.equal(rejected.status, 1)
+    assert.match(rejected.stderr, /^REVIEW_|^EVIDENCE_|^FINDINGS_INVALID: /)
+  }
+
+  const base = await directory(t)
+  const oracle = join(base, 'oracle.md')
+  const map = join(base, 'evidence.json')
+  const ledger = join(base, 'runs.jsonl')
+  const artifact = join(base, 'receipt/evidence.json')
+  const oracleSha256 = createHash('sha256').update(VISUAL_EVIDENCE_CARD).digest('hex')
+  const media = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==',
+    'base64',
+  )
+  const mediaSha256 = createHash('sha256').update(media).digest('hex')
+  const worktreeSha256 = 'a'.repeat(64)
+  const receipt = JSON.stringify({
+    schemaVersion: 3,
+    oracleSha256,
+    producerRun: {
+      runId: 'visual-run-001',
+      tool: 'playwright',
+      status: 'passed',
+      worktreeSha256,
+    },
+    rows: {
+      D1: {
+        status: 'passed',
+        journey: {
+          status: 'passed',
+          tool: 'playwright',
+          scenario: 'stable receipt',
+          checks: ['D1'],
+          artifacts: [{ path: 'proof.png', sha256: mediaSha256, mediaType: 'image/png' }],
+        },
+      },
+    },
+  })
+  await writeFile(oracle, VISUAL_EVIDENCE_CARD)
+  await mkdir(dirname(artifact), { recursive: true })
+  await writeFile(join(dirname(artifact), 'proof.png'), media)
+  await writeFile(artifact, receipt)
+  await writeFile(map, JSON.stringify({ schemaVersion: 3, rows: { D1: { kind: 'visual', artifact: 'receipt/evidence.json', sha256: createHash('sha256').update(receipt).digest('hex') }, D2: { kind: 'reviewer', finding: 'd-1', role: 'designer' }, D3: { kind: 'na', reason: 'fixture', source: 'S1' } } }))
+  await writeFile(
+    ledger,
+    chainedLedger(
+      [
+        JSON.stringify({ runId: 'r-001', exitCode: 0, signal: null, grade: 'exit-only' }),
+        JSON.stringify({
+          runId: 'visual-run-001',
+          label: 'visual-qa',
+          command: ['npx', 'playwright', 'test'],
+          exitCode: 0,
+          signal: null,
+          grade: 'exit-only',
+          oracleSha256,
+          worktreeSha256,
+        }),
+        '',
+      ].join('\n'),
+      oracleSha256,
+    ),
+  )
+  await writeFile(join(dirname(artifact), 'proof.png'), 'swapped nested artifact bytes')
+  const nestedSwap = run('evidence', '--oracle', oracle, '--map', map, '--ledger', ledger, '--run', 'r-001')
+  assert.equal(nestedSwap.status, 1)
+  assert.match(nestedSwap.stderr, /^VISUAL_EVIDENCE_INVALID: |^EVIDENCE_/)
+
+  await writeFile(join(dirname(artifact), 'proof.png'), media)
+  await writeFile(artifact, receipt.replace('stable receipt', 'swapped receipt'))
+  const receiptSwap = run('evidence', '--oracle', oracle, '--map', map, '--ledger', ledger, '--run', 'r-001')
+  assert.equal(receiptSwap.status, 1)
+  assert.match(receiptSwap.stderr, /^VISUAL_EVIDENCE_INVALID: |^EVIDENCE_/)
 })

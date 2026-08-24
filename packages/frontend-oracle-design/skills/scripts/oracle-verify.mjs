@@ -1,10 +1,33 @@
 #!/usr/bin/env node
 
-import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { Buffer } from 'node:buffer'
+import { lstat, readFile, realpath } from 'node:fs/promises'
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
+import process from 'node:process'
+import { fileURLToPath } from 'node:url'
+import { inflateSync } from 'node:zlib'
+import {
+  assertSnapshotUnchanged,
+  isPathInside,
+  sha256,
+  snapshotRegularFile,
+  stableStringify,
+} from './oracle-fs.mjs'
 
-const FLAG_NAMES = ['oracle', 'map', 'ledger', 'run', 'row', 'file', 'intersect', 'path', 'phase']
+const FLAG_NAMES = [
+  'oracle',
+  'map',
+  'ledger',
+  'run',
+  'row',
+  'file',
+  'intersect',
+  'path',
+  'phase',
+  'source',
+  'packet',
+  'revision',
+]
 
 const CLASSIFICATIONS = [
   'POLICY_GAP',
@@ -16,6 +39,7 @@ const CLASSIFICATIONS = [
 ]
 
 const SEVERITIES = ['critical', 'high', 'medium', 'low']
+const REVIEWER_ROLES = ['code-reviewer', 'designer']
 
 const CHANGEABILITY_AXES = ['Readability', 'Predictability', 'Cohesion', 'Coupling', 'Simplicity']
 const CHANGEABILITY_STATUSES = ['PASS', 'FINDING', 'N/A']
@@ -74,7 +98,7 @@ class CliError extends Error {
 }
 
 function parseOptions(args) {
-  const options = { path: [] }
+  const options = { path: [], source: [] }
 
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index]
@@ -86,6 +110,7 @@ function parseOptions(args) {
     }
 
     if (name === 'path') options.path.push(value)
+    else if (name === 'source') options.source.push(value)
     else options[name] = value
     index += 1
   }
@@ -174,6 +199,10 @@ function isEmptyCell(value) {
   return value === '' || value === '-' || value.toUpperCase() === 'TBD'
 }
 
+function isApproved(value) {
+  return /^(?:approved|승인됨)$/i.test(value.trim())
+}
+
 function sectionLines(lines, title) {
   const section = []
   let active = false
@@ -197,6 +226,64 @@ function policyIds(value) {
 
 function rowIds(value) {
   return [...new Set(value.match(/\b[OD]\d+\b/g) ?? [])]
+}
+
+function betweenMarkers(value, start, end) {
+  const startIndex = value.indexOf(start)
+  if (startIndex === -1) return ''
+
+  const contentStart = startIndex + start.length
+  const endIndex = value.indexOf(end, contentStart)
+  if (endIndex === -1) return ''
+
+  return value.slice(contentStart, endIndex).trim()
+}
+
+function policyIdFromLine(line) {
+  if (!line.startsWith('- P')) return null
+
+  const marker = line.indexOf(':')
+  if (marker === -1) return null
+
+  const id = line.slice(2, marker)
+  return /^P\d+$/.test(id) ? id : null
+}
+
+function stableJson(value) {
+  return stableStringify(value)
+}
+
+async function snapshotOracleFile(path, base, code, label, snapshots) {
+  const snapshot = await snapshotRegularFile(path, {
+    base,
+    allowHardlinks: false,
+    label,
+    fail: (message) => new CliError(code, message),
+  })
+  snapshots?.push(snapshot)
+  return snapshot
+}
+
+async function assertSnapshots(snapshots, base, code) {
+  for (const snapshot of snapshots) {
+    await assertSnapshotUnchanged(snapshot, {
+      base,
+      label: 'verification input',
+      fail: (message) => new CliError(code, message),
+    })
+  }
+}
+
+function parseSnapshotJson(snapshot, code) {
+  try {
+    return JSON.parse(snapshot.bytes.toString('utf8'))
+  } catch (error) {
+    throw new CliError(code, `Cannot parse ${snapshot.path}: ${error.message}`)
+  }
+}
+
+function isDigest(value) {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value)
 }
 
 async function lintCard(options) {
@@ -230,12 +317,75 @@ async function lintCard(options) {
   }
 
   const sourceIds = new Set(sources.map(({ ID }) => ID))
-  if (!sourceHeaders?.includes('Kind')) {
-    issues.push('source-kind: Source Registry must include a `Kind` column')
-  } else {
-    for (const source of sources) {
-      if (!SOURCE_KINDS.includes(source.Kind)) {
-        issues.push(`source-kind: ${source.ID}: ${source.Kind || '(empty)'} must be one of ${SOURCE_KINDS.join(', ')}`)
+  for (const header of ['Kind', '관할', '위치·version', '승인 상태']) {
+    if (!sourceHeaders?.includes(header)) {
+      issues.push(`source-registry-header: Source Registry must include a \`${header}\` column`)
+    }
+  }
+  const sourceById = new Map()
+  for (const source of sources) {
+    if (sourceById.has(source.ID)) issues.push(`duplicate-source: ${source.ID}: Source Registry ID is repeated`)
+    sourceById.set(source.ID, source)
+    if (!SOURCE_KINDS.includes(source.Kind)) {
+      issues.push(`source-kind: ${source.ID}: ${source.Kind || '(empty)'} must be one of ${SOURCE_KINDS.join(', ')}`)
+    }
+    if (source.Kind !== 'implementation-reference' && !isApproved(source['승인 상태'] ?? '')) {
+      issues.push(`source-unapproved: ${source.ID}: authoritative sources must be approved before lock`)
+    }
+    for (const [field, code] of [
+      ['관할', 'source-jurisdiction'],
+      ['위치·version', 'source-location-version'],
+      ['승인 상태', 'source-approval-status'],
+    ]) {
+      if (isEmptyCell(source[field] ?? '')) issues.push(`${code}: ${source.ID}: ${field} must have a concrete value`)
+    }
+  }
+
+  const enforceSourceLock = (options.source ?? []).length > 0
+  const lockedSources = new Set()
+  for (const path of (options.source ?? []).filter(Boolean)) {
+    const sourcePath = resolve(path)
+    lockedSources.add((await realpath(sourcePath).catch(() => null)) ?? sourcePath)
+  }
+  const registeredRepoSources = new Set()
+  const realRoot = await realpath(process.cwd())
+  for (const source of sources) {
+    const location = source['위치·version'] ?? ''
+    const repoSource = location.startsWith('repo:') ? location.slice('repo:'.length).split('#')[0] : null
+    if (repoSource !== null) {
+      const sourcePath = resolve(repoSource)
+      const sourcePortable = relative(process.cwd(), sourcePath)
+      if (
+        isEmptyCell(repoSource) ||
+        isAbsolute(repoSource) ||
+        repoSource.includes('\\') ||
+        sourcePortable.startsWith('..') ||
+        isAbsolute(sourcePortable)
+      ) {
+        issues.push(`source-repo-path: ${source.ID}: repo: source must stay under the repository root`)
+      } else if (enforceSourceLock) {
+        let stat = await lstat(sourcePath).catch(() => null)
+        let realSource = stat ? await realpath(sourcePath).catch(() => null) : null
+        const suffix = `/${repoSource}`
+        const lockedMatch = [...lockedSources].find((lockedSource) => lockedSource.endsWith(suffix))
+        if (!realSource && lockedMatch) {
+          stat = await lstat(lockedMatch).catch(() => null)
+          realSource = stat ? await realpath(lockedMatch).catch(() => null) : null
+        }
+        registeredRepoSources.add(realSource ?? sourcePath)
+        const realPortable = realSource ? relative(realRoot, realSource) : '..'
+        if (stat?.isSymbolicLink() || !stat?.isFile() || realPortable.startsWith('..') || isAbsolute(realPortable)) {
+          issues.push(`source-repo-path: ${source.ID}: repo: source must be a regular file under the repository root`)
+        } else if (!lockedSources.has(realSource ?? sourcePath)) {
+          issues.push(`source-lock-missing: ${source.ID}: local source ${repoSource} must be passed with --source`)
+        }
+      }
+    }
+  }
+  if (enforceSourceLock) {
+    for (const lockedSource of lockedSources) {
+      if (!registeredRepoSources.has(lockedSource)) {
+        issues.push(`source-lock-unregistered: ${lockedSource}: --source is not referenced by Source Registry`)
       }
     }
   }
@@ -284,7 +434,7 @@ async function lintCard(options) {
 
   if (rows.some((row) => cellOf(row, '증거 계층') === 'RELATIONAL')) {
     const authorization = confirmation.find((line) => /^- Visual QA authorization:/i.test(line.trim()))
-    if (!authorization || !/:\s*(approved|declined)\s*$/i.test(authorization.trim())) {
+    if (!authorization || !/:\s*(?:approved|declined)\s*$/i.test(authorization.trim())) {
       issues.push('visual-qa-authorization: RELATIONAL rows require `- Visual QA authorization: approved | declined`')
     }
   }
@@ -295,11 +445,48 @@ async function lintCard(options) {
     if (line.startsWith('## ')) inPolicySection = line.includes('결정된 정책')
     if (!inPolicySection || !line.startsWith('- ')) return
 
-    if (!line.includes('(출처:')) {
+    const sourceText = betweenMarkers(line, '(출처:', ')')
+    if (!sourceText) {
       issues.push(`policy-source: line ${index + 1}: policy has no approved source — ${line.trim()}`)
+    } else {
+      const cited = sourceText
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+      const registered = cited.filter((entry) => /^S\d+$/.test(entry))
+      const confirmationSource = confirmation
+        .find((entry) => /^- Source:/i.test(entry.trim()))
+        ?.split(':')
+        .slice(1)
+        .join(':')
+        .trim()
+      for (const entry of cited) {
+        if (/^S\d+$/.test(entry)) {
+          const source = sourceById.get(entry)
+          if (!source) issues.push(`policy-source-unknown: ${entry}: policy cites a source outside Source Registry`)
+          else if (source.Kind !== 'implementation-reference' && !isApproved(source['승인 상태'] ?? '')) {
+            issues.push(`policy-source-unapproved: ${entry}: policy source is not approved`)
+          }
+        } else if (entry !== confirmationSource) {
+          issues.push(
+            `policy-source-unregistered: ${entry}: policy source must be a Source Registry ID or exact user confirmation source`,
+          )
+        }
+      }
+      const registeredSources = registered.map((entry) => sourceById.get(entry)).filter(Boolean)
+      if (
+        registeredSources.length > 0 &&
+        registeredSources.every((source) => source.Kind === 'implementation-reference')
+      ) {
+        issues.push(
+          `policy-source-implementation-reference: line ${
+            index + 1
+          }: implementation-reference cannot be sole policy authority`,
+        )
+      }
     }
 
-    const id = line.match(/^- (P\d+):/)?.[1]
+    const id = policyIdFromLine(line)
     if (!id) {
       issues.push(`policy-id: line ${index + 1}: policy must start with a unique P* ID`)
       return
@@ -307,7 +494,7 @@ async function lintCard(options) {
 
     if (policies.has(id)) issues.push(`duplicate-policy: ${id}: policy ID is repeated`)
 
-    const linked = line.match(/\(행:\s*([^)]+)\)/)?.[1] ?? ''
+    const linked = betweenMarkers(line, '(행:', ')')
     const linkedRows = rowIds(linked)
     if (linkedRows.length === 0) {
       issues.push(`policy-row-unlinked: ${id}: policy must cite at least one contract row`)
@@ -345,7 +532,15 @@ async function lintCard(options) {
       }
       const source = cellOf(row, '출처')
       if (isEmptyCell(source)) issues.push(`visual-source: ${row.id}: visual contract has no source`)
-      for (const id of source.match(/\bS\d+\b/g) ?? []) {
+      const cited = source.match(/\bS\d+\b/g) ?? []
+      const approvedAuthority = cited.some((id) => {
+        const registered = sourceById.get(id)
+        return registered && registered.Kind !== 'implementation-reference' && isApproved(registered['승인 상태'] ?? '')
+      })
+      if (!approvedAuthority) {
+        issues.push(`visual-source: ${row.id}: visual contract requires an approved non-implementation Source Registry source`)
+      }
+      for (const id of cited) {
         if (!sourceIds.has(id)) issues.push(`unknown-source: ${row.id}: ${id} is not in Source Registry`)
       }
       const tier = cellOf(row, '증거 계층')
@@ -454,6 +649,17 @@ function assertEvidenceShape(id, entry) {
   }
 }
 
+function assertNaEvidence(row, entry, approvedSources) {
+  if (entry.kind !== 'na') return
+
+  if (!approvedSources.has(entry.source)) {
+    throw new CliError('EVIDENCE_OWNER_INVALID', `${row.id}: N/A evidence requires an approved Source Registry source`)
+  }
+  if (!/\bN\/A\b/i.test(rowText(row)) || !rowText(row).includes(entry.source)) {
+    throw new CliError('EVIDENCE_OWNER_INVALID', `${row.id}: N/A evidence requires an explicit source-backed N/A row`)
+  }
+}
+
 function assertEvidenceOwner(row, entry) {
   if (!row.id.startsWith('D') || entry.kind === 'na') return
 
@@ -468,39 +674,297 @@ function assertEvidenceOwner(row, entry) {
   }
 }
 
-async function verifyVisualArtifact(id, entry, mapPath, oracleSha256) {
-  const base = dirname(resolve(mapPath))
-  const artifactPath = resolve(base, entry.artifact)
-  const portable = relative(base, artifactPath)
+function hasNonEmptyStrings(value) {
+  return (
+    Array.isArray(value) && value.length > 0 && value.every((entry) => typeof entry === 'string' && entry.trim() !== '')
+  )
+}
 
-  if (portable.startsWith('..') || isAbsolute(portable)) {
-    throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: visual artifact must stay inside the Oracle directory`)
+function isAllowedJourneyTool(value) {
+  return value === 'playwright' || /^mcp:[\w.-]+$/.test(value)
+}
+
+async function assertRegularFileInside(base, path, id, label, snapshots) {
+  if (typeof path !== 'string' || path.trim() === '') {
+    throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} must be a non-empty relative path`)
   }
 
-  const artifact = await readJson(artifactPath, 'VISUAL_EVIDENCE_INVALID')
-  if (artifact?.schemaVersion !== 1 || artifact.oracleSha256 !== oracleSha256 || artifact.rows?.[id] !== 'passed') {
-    throw new CliError(
-      'VISUAL_EVIDENCE_INVALID',
-      `${id}: visual artifact must cite this Oracle SHA and a passed row result`,
-    )
+  const target = resolve(base, path)
+  if (!isPathInside(base, target)) {
+    throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} must stay inside the Oracle directory`)
+  }
+  return snapshotOracleFile(target, base, 'VISUAL_EVIDENCE_INVALID', `${id}: ${label}`, snapshots)
+}
+
+async function assertArtifactFiles(base, artifacts, id, label, snapshots) {
+  for (const [index, artifact] of artifacts.entries()) {
+    if (
+      !artifact ||
+      typeof artifact.path !== 'string' ||
+      !isDigest(artifact.sha256) ||
+      typeof artifact.mediaType !== 'string' ||
+      !artifact.mediaType.trim()
+    ) {
+      throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label}[${index}] must have path, sha256 and mediaType`)
+    }
+    const snapshot = await assertRegularFileInside(base, artifact.path, id, `${label}[${index}].path`, snapshots)
+    if (snapshot.sha256 !== artifact.sha256) {
+      throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label}[${index}] digest does not match`)
+    }
+    if (artifact.mediaType === 'image/png') assertPng(snapshot.bytes, id, `${label}[${index}]`)
   }
 }
 
-async function ledgerRun(options) {
-  const ledger = await readFile(options.ledger, 'utf8').catch((error) => {
-    throw new CliError('LEDGER_INVALID', `Cannot read ${options.ledger}: ${error.message}`)
-  })
-  const run = ledger
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => JSON.parse(line))
-    .find((entry) => entry.runId === options.run)
+function rowText(row) {
+  return Object.values(row.cells).join(' ')
+}
+
+function approvedSourceIds(lines) {
+  const sourceSection = sectionLines(lines, 'Source Registry')
+  let headers = null
+  const approved = new Set()
+
+  for (const line of sourceSection) {
+    if (!line.trim().startsWith('|')) continue
+
+    const cells = splitRow(line.trim())
+    if (cells[0] === 'ID') {
+      headers = cells
+      continue
+    }
+    if (!headers || !/^S\d+$/.test(cells[0])) continue
+
+    const source = Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? '']))
+    if (source.Kind !== 'implementation-reference' && isApproved(source['승인 상태'] ?? '')) approved.add(source.ID)
+  }
+
+  return approved
+}
+
+function visualAuthorization(card) {
+  return sectionLines(markdownLines(card), 'User Confirmation')
+    .find((line) => /^- Visual QA authorization:/i.test(line.trim()))
+    ?.split(':')
+    .slice(1)
+    .join(':')
+    .trim()
+    .toLowerCase()
+}
+
+function assertPng(bytes, id, label) {
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+  if (!bytes.subarray(0, 8).equals(signature)) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} is not a PNG file`)
+  let offset = 8
+  let ihdr = false
+  let iend = false
+  const idat = []
+  while (offset < bytes.length) {
+    if (offset + 12 > bytes.length) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has a truncated PNG chunk`)
+    const length = bytes.readUInt32BE(offset)
+    const type = bytes.subarray(offset + 4, offset + 8)
+    const end = offset + 12 + length
+    if (end > bytes.length) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has an invalid PNG chunk boundary`)
+    const expected = bytes.readUInt32BE(end - 4)
+    // PNG CRC uses the IEEE polynomial; Node exposes it only indirectly, so validate
+    // through a compact table-less implementation.
+    let crc = 0xffffffff
+    for (const byte of bytes.subarray(offset + 4, end - 4)) {
+      crc ^= byte
+      for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (-(crc & 1) & 0xedb88320)
+    }
+    if (((crc ^ 0xffffffff) >>> 0) !== expected)
+      throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has an invalid PNG CRC`)
+    const name = type.toString('ascii')
+    if (!/^[a-z]{4}$/i.test(name)) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has an invalid PNG chunk type`)
+    if (!ihdr) {
+      if (name !== 'IHDR' || length !== 13) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} lacks a valid PNG IHDR`)
+      const width = bytes.readUInt32BE(offset + 8)
+      const height = bytes.readUInt32BE(offset + 12)
+      if (!width || !height) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has invalid PNG dimensions`)
+      ihdr = true
+    } else if (name === 'IDAT') {
+      if (iend) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has PNG data after IEND`)
+      idat.push(bytes.subarray(offset + 8, end - 4))
+    } else if (name === 'IEND') {
+      if (length !== 0 || iend || idat.length === 0) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has an invalid PNG IEND`)
+      iend = true
+      if (end !== bytes.length) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has trailing PNG bytes`)
+    }
+    offset = end
+  }
+  if (!ihdr || !iend) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} is an incomplete PNG`)
+  try {
+    inflateSync(Buffer.concat(idat))
+  } catch {
+    throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has undecompressible PNG image data`)
+  }
+}
+
+async function verifyVisualArtifact(row, entry, mapPath, oracleSha256, approvedSources, card, ledger, snapshots) {
+  const base = dirname(resolve(mapPath))
+  const id = row.id
+
+  if (!isDigest(entry.sha256)) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: visual evidence requires a sha256`)
+  const artifactSnapshot = await assertRegularFileInside(base, entry.artifact, id, 'visual artifact', snapshots)
+  if (artifactSnapshot.sha256 !== entry.sha256) {
+    throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: visual artifact digest does not match`)
+  }
+  const artifact = parseSnapshotJson(artifactSnapshot, 'VISUAL_EVIDENCE_INVALID')
+  const receipt = artifact?.rows?.[id]
+  const journey = receipt?.journey
+  const rowStatus = receipt?.status ?? receipt?.result
+  const producer = artifact?.producerRun
+  const producerLedger = ledger.find((run) => run.runId === producer?.runId)
+  const validPassed =
+    rowStatus === 'passed' &&
+    journey?.status === 'passed' &&
+    isAllowedJourneyTool(journey.tool) &&
+    typeof journey.scenario === 'string' &&
+    journey.scenario.trim() !== '' &&
+    hasNonEmptyStrings(journey.checks) &&
+    Array.isArray(journey.artifacts) &&
+    journey.artifacts.length > 0
+  const validNotApplicable =
+    rowStatus === 'passed' &&
+    journey?.status === 'not-applicable' &&
+    typeof journey.reason === 'string' &&
+    journey.reason.trim() !== '' &&
+    approvedSources.has(journey.source) &&
+    rowText(row).includes(journey.source) &&
+    hasNonEmptyStrings(receipt.checks) &&
+    Array.isArray(receipt.artifacts) &&
+    receipt.artifacts.length > 0
+  const producerBound =
+    producer &&
+    typeof producer.runId === 'string' &&
+    producer.tool === 'playwright' &&
+    producer.status === 'passed' &&
+    isDigest(producer.worktreeSha256) &&
+    producerLedger?.exitCode === 0 &&
+    producerLedger?.signal == null &&
+    producerLedger?.oracleSha256 === oracleSha256 &&
+    producerLedger?.worktreeSha256 === producer.worktreeSha256 &&
+    producerLedger?.adapter === 'node-test'
+  if (
+    artifact?.schemaVersion !== 3 ||
+    artifact.oracleSha256 !== oracleSha256 ||
+    !producerBound ||
+    (visualAuthorization(card) === 'declined' && !validNotApplicable) ||
+    (visualAuthorization(card) !== 'approved' && visualAuthorization(card) !== 'declined') ||
+    (!validPassed && !validNotApplicable)
+  ) {
+    throw new CliError(
+      'VISUAL_EVIDENCE_INVALID',
+      `${id}: visual artifact must be producer-bound schema v3 with approved authorization and verified artifacts`,
+    )
+  }
+
+  const receiptDirectory = dirname(artifactSnapshot.path)
+  if (validPassed) await assertArtifactFiles(receiptDirectory, journey.artifacts, id, 'journey.artifacts', snapshots)
+  if (validNotApplicable) await assertArtifactFiles(receiptDirectory, receipt.artifacts, id, 'artifacts', snapshots)
+}
+
+function validReviewReceiptField(record, field) {
+  if (field.endsWith('Sha256') || field === 'targetRevision') return isDigest(record[field])
+  return typeof record[field] === 'string' && record[field] !== ''
+}
+
+async function ledgerRun(options, base, snapshots) {
+  const snapshot = await snapshotOracleFile(options.ledger, base, 'LEDGER_INVALID', 'run ledger', snapshots)
+  let records
+  let lines
+  try {
+    const raw = snapshot.bytes.toString('utf8')
+    if (!raw || !raw.endsWith('\n')) throw new Error('ledger must be non-empty newline-terminated JSONL')
+    lines = raw.slice(0, -1).split('\n')
+    if (lines.some((line) => !line.trim())) throw new Error('ledger contains an empty record')
+    records = lines.map((line) => JSON.parse(line))
+  } catch (error) {
+    throw new CliError('LEDGER_INVALID', `Cannot parse run ledger: ${error.message}`)
+  }
+  const runIds = new Set()
+  const receiptIdentities = new Set()
+  let previousDigest = '0'.repeat(64)
+  let checkpointSeen = false
+  let legacyPrefix = Buffer.alloc(0)
+  for (const [index, record] of records.entries()) {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+      throw new CliError('LEDGER_INVALID', `ledger record ${index} must be an object`)
+    }
+    if (record.type === 'checkpoint') {
+      if (checkpointSeen || index === 0 || record.schemaVersion !== 3 || !isDigest(record.prefixSha256) || record.previousDigest !== '0'.repeat(64)) {
+        throw new CliError('LEDGER_INVALID', `ledger checkpoint ${index} is invalid`)
+      }
+      const expectedPrefix = sha256(legacyPrefix)
+      if (record.prefixSha256 !== expectedPrefix || !isDigest(record.digest)) {
+        throw new CliError('LEDGER_INVALID', `ledger checkpoint ${index} does not bind exact legacy prefix bytes`)
+      }
+      checkpointSeen = true
+    } else {
+      if (record.schemaVersion !== 3 || !record.digest) {
+        legacyPrefix = Buffer.concat([legacyPrefix, Buffer.from(`${lines[index]}\n`)])
+        continue
+      }
+      if (record.type !== 'init' && record.type !== 'run' && record.type !== 'review-receipt' && record.type !== 'transition' && record.type !== 'budget') {
+        throw new CliError('LEDGER_INVALID', `ledger record ${index} has an unknown type`)
+      }
+      if (
+        record.type === 'init' &&
+        (record.state !== 'ORACLE_READY' || !record.stateDelta || typeof record.at !== 'string' || !record.at)
+      ) {
+        throw new CliError('LEDGER_INVALID', `ledger init ${index} is malformed`)
+      }
+      if (record.type === 'run') {
+        if (
+          typeof record.runId !== 'string' ||
+          !record.runId ||
+          typeof record.label !== 'string' ||
+          !record.label ||
+          !Array.isArray(record.command) ||
+          typeof record.command[0] !== 'string' ||
+          !record.command[0] ||
+          !record.command.every((part) => typeof part === 'string') ||
+          (record.exitCode !== null && !Number.isInteger(record.exitCode)) ||
+          (record.signal !== null && typeof record.signal !== 'string') ||
+          typeof record.grade !== 'string' ||
+          (record.tests !== null && !Array.isArray(record.tests)) ||
+          runIds.has(record.runId) ||
+          !isDigest(record.oracleSha256) ||
+          (record.adapter !== null && typeof record.adapter !== 'string') ||
+          !isDigest(record.worktreeSha256)
+        ) {
+          throw new CliError('LEDGER_INVALID', `ledger run ${index} has invalid identity, Oracle, or adapter`)
+        }
+        runIds.add(record.runId)
+      }
+      if (record.type === 'review-receipt') {
+        const fields = ['receiptId', 'packetSha256', 'targetRevision', 'role', 'reviewerId', 'taskId', 'outputSha256', 'findingsSha256', 'oracleSha256', 'adapter']
+        if (fields.some((field) => !validReviewReceiptField(record, field))) {
+          throw new CliError('LEDGER_INVALID', `review receipt ${index} has invalid provenance`)
+        }
+        const identity = `${record.taskId}\0${record.reviewerId}`
+        if (receiptIdentities.has(identity)) throw new CliError('LEDGER_INVALID', `duplicate review receipt ${record.taskId}`)
+        receiptIdentities.add(identity)
+      }
+      if (!isDigest(record.digest) || !isDigest(record.previousDigest) || record.previousDigest !== previousDigest) {
+        throw new CliError('LEDGER_INVALID', `ledger record ${index} breaks the digest chain`)
+      }
+    }
+    const { digest, ...unsigned } = record
+    if (sha256(stableStringify(unsigned)) !== digest) throw new CliError('LEDGER_INVALID', `ledger record ${index} digest does not match`)
+    previousDigest = digest
+  }
+  if (legacyPrefix.length > 0 && !checkpointSeen) {
+    throw new CliError('LEDGER_INVALID', 'legacy ledger prefix requires one v3 checkpoint')
+  }
+  if (!options.run) return { run: null, records }
+  const run = records.find((entry) => entry.runId === options.run)
 
   if (!run) {
     throw new CliError('RUN_NOT_FOUND', `${options.run} is not recorded in the run ledger`)
   }
 
-  return run
+  return { run, records }
 }
 
 async function verifyRedEvidence(options) {
@@ -508,11 +972,13 @@ async function verifyRedEvidence(options) {
     throw new CliError('USAGE', 'red requires --oracle, --map, --ledger, --run and --row', 2)
   }
 
-  const card = await readFile(options.oracle, 'utf8').catch((error) => {
-    throw new CliError('CARD_UNREADABLE', `Cannot read ${options.oracle}: ${error.message}`)
-  })
+  const base = dirname(resolve(options.oracle))
+  const snapshots = []
+  const cardSnapshot = await snapshotOracleFile(options.oracle, base, 'RED_EVIDENCE_MISSING', 'Oracle', snapshots)
+  const mapSnapshot = await snapshotOracleFile(options.map, base, 'EVIDENCE_INVALID', 'evidence map', snapshots)
+  const card = cardSnapshot.bytes.toString('utf8')
   const rows = parseRows(card).map((row) => row.id)
-  const map = await readJson(options.map, 'EVIDENCE_INVALID')
+  const map = parseSnapshotJson(mapSnapshot, 'EVIDENCE_INVALID')
   const entry = map?.rows?.[options.row]
 
   if (!rows.includes(options.row) || !entry) {
@@ -524,8 +990,8 @@ async function verifyRedEvidence(options) {
     throw new CliError('RED_EVIDENCE_MISSING', `${options.row} must map to a test for VALID_RED`)
   }
 
-  const run = await ledgerRun(options)
-  if (run.exitCode === 0 || run.grade !== 'reported') {
+  const run = (await ledgerRun(options, base, snapshots)).run
+  if (!Number.isInteger(run.exitCode) || run.exitCode === 0 || run.grade !== 'reported' || run.adapter !== 'node-test' || !Array.isArray(run.tests)) {
     throw new CliError(
       'RED_EVIDENCE_UNVERIFIABLE',
       `${run.runId} must be a non-zero reported run for VALID_RED; got exit ${run.exitCode} grade ${run.grade}`,
@@ -540,6 +1006,7 @@ async function verifyRedEvidence(options) {
     )
   }
 
+  await assertSnapshots(snapshots, base, 'EVIDENCE_INVALID')
   process.stdout.write(`RED_EVIDENCE_VERIFIED ${options.row} ${entry.name}\n`)
 }
 
@@ -548,10 +1015,12 @@ async function verifyEvidence(options) {
     throw new CliError('USAGE', 'evidence requires --oracle, --map, --ledger and --run', 2)
   }
 
-  const card = await readFile(options.oracle, 'utf8').catch((error) => {
-    throw new CliError('CARD_UNREADABLE', `Cannot read ${options.oracle}: ${error.message}`)
-  })
-  const map = await readJson(options.map, 'EVIDENCE_INVALID')
+  const base = dirname(resolve(options.oracle))
+  const snapshots = []
+  const oracleSnapshot = await snapshotOracleFile(options.oracle, base, 'EVIDENCE_INVALID', 'Oracle', snapshots)
+  const mapSnapshot = await snapshotOracleFile(options.map, base, 'EVIDENCE_INVALID', 'evidence map', snapshots)
+  const card = oracleSnapshot.bytes.toString('utf8')
+  const map = parseSnapshotJson(mapSnapshot, 'EVIDENCE_INVALID')
   const contracts = parseRows(card)
   const rows = contracts.map((row) => row.id)
   const mapped = Object.keys(map?.rows ?? {})
@@ -571,8 +1040,10 @@ async function verifyEvidence(options) {
     throw new CliError('EVIDENCE_MISSING_ROW', `card rows have no evidence entry: ${missing.join(', ')}`)
   }
 
+  const approvedSources = approvedSourceIds(markdownLines(card))
   for (const row of contracts) {
     assertEvidenceShape(row.id, map.rows[row.id])
+    assertNaEvidence(row, map.rows[row.id], approvedSources)
     assertEvidenceOwner(row, map.rows[row.id])
   }
 
@@ -581,20 +1052,27 @@ async function verifyEvidence(options) {
     throw new CliError('EVIDENCE_PENDING', `review requires completed visual evidence: ${pending.join(', ')}`)
   }
 
-  const oracleSha256 = createHash('sha256').update(card).digest('hex')
+  const oracleSha256 = oracleSnapshot.sha256
+  const { run, records } = await ledgerRun(options, base, snapshots)
   for (const row of contracts.filter((entry) => map.rows[entry.id].kind === 'visual')) {
-    await verifyVisualArtifact(row.id, map.rows[row.id], options.map, oracleSha256)
+    await verifyVisualArtifact(row, map.rows[row.id], options.map, oracleSha256, approvedSources, card, records, snapshots)
   }
-
-  const run = await ledgerRun(options)
 
   const needsRunEvidence = rows.filter((id) => map.rows[id].kind === 'test')
 
-  if (needsRunEvidence.length > 0 && run.grade !== 'reported') {
+  if (needsRunEvidence.length > 0 && (run.grade !== 'reported' || run.adapter !== 'node-test' || !Array.isArray(run.tests))) {
     throw new CliError(
       'EVIDENCE_UNVERIFIABLE',
       `${run.runId} is graded ${run.grade} — test names cannot be verified without a parsed reporter`,
     )
+  }
+  if (
+    !Number.isInteger(run.exitCode) ||
+    run.exitCode !== 0 ||
+    run.signal != null ||
+    ((run.tests ?? []).length > 0 && (run.tests ?? []).some((test) => test.status !== 'passed'))
+  ) {
+    throw new CliError('EVIDENCE_UNVERIFIABLE', `${run.runId} is not a clean successful evidence run`)
   }
 
   for (const id of needsRunEvidence) {
@@ -611,6 +1089,7 @@ async function verifyEvidence(options) {
   }
 
   const notices = pending.length > 0 ? `VISUAL_EVIDENCE_PENDING ${pending.join(', ')}\n` : ''
+  await assertSnapshots(snapshots, base, 'EVIDENCE_INVALID')
   process.stdout.write(`EVIDENCE_VERIFIED ${rows.length} rows\n${notices}`)
 }
 
@@ -662,6 +1141,15 @@ function normalizeFindings(document, rows, source) {
     }
   }
 
+  const findingIds = new Set()
+  for (const finding of findings) {
+    if (finding?.id) {
+      if (findingIds.has(finding.id))
+        throw new CliError('FINDINGS_INVALID', `${source}: duplicate finding id ${finding.id}`)
+      findingIds.add(finding.id)
+    }
+  }
+
   return findings.map((finding) => {
     for (const field of ['id', 'classification', 'severity', 'finding', 'evidence', 'fix']) {
       if (!finding?.[field]) {
@@ -691,6 +1179,51 @@ function normalizeFindings(document, rows, source) {
       downgraded,
     }
   })
+}
+
+function assertEmbeddedLedger(ledger) {
+  if (!Array.isArray(ledger) || ledger.length === 0) {
+    throw new CliError('REVIEW_PACKET_INVALID', 'review packet requires a non-empty embedded ledger')
+  }
+  const runIds = new Set()
+  const receiptIdentities = new Set()
+  let previousDigest = '0'.repeat(64)
+  for (const [index, record] of ledger.entries()) {
+    if (!record || typeof record !== 'object' || record.type === 'checkpoint' || !isDigest(record.digest) || !isDigest(record.previousDigest)) {
+      throw new CliError('REVIEW_PACKET_INVALID', `embedded ledger record ${index} is malformed`)
+    }
+    const { digest, ...unsigned } = record
+    if (record.previousDigest !== previousDigest || sha256(stableStringify(unsigned)) !== digest) {
+      throw new CliError('REVIEW_PACKET_INVALID', `embedded ledger record ${index} breaks its digest chain`)
+    }
+    if (record.type === 'run') {
+      if (!record.runId || runIds.has(record.runId) || !isDigest(record.oracleSha256) || typeof record.adapter !== 'string' || !record.adapter) {
+        throw new CliError('REVIEW_PACKET_INVALID', `embedded run ${index} lacks a trusted identity`)
+      }
+      runIds.add(record.runId)
+    }
+    if (record.type === 'review-receipt') {
+      const identity = `${record.taskId}\0${record.reviewerId}`
+      if (
+        record.schemaVersion !== 3 ||
+        !isDigest(record.receiptId) ||
+        !isDigest(record.packetSha256) ||
+        !isDigest(record.targetRevision) ||
+        !isDigest(record.outputSha256) ||
+        !isDigest(record.findingsSha256) ||
+        !isDigest(record.oracleSha256) ||
+        typeof record.role !== 'string' ||
+        typeof record.reviewerId !== 'string' ||
+        typeof record.taskId !== 'string' ||
+        record.adapter !== 'controller' ||
+        receiptIdentities.has(identity)
+      ) {
+        throw new CliError('REVIEW_PACKET_INVALID', `embedded review receipt ${index} is malformed`)
+      }
+      receiptIdentities.add(identity)
+    }
+    previousDigest = digest
+  }
 }
 
 function findingKey(finding) {
@@ -763,7 +1296,146 @@ async function verifyFindings(options) {
   process.stdout.write(`${result.lines.join('\n')}\n`)
 }
 
+async function assertReviewBinding(options) {
+  if (!options.packet || !options.revision || !options.map || !options.ledger) {
+    throw new CliError('REVIEW_EVIDENCE_REQUIRED', 'review requires --packet, --revision, --map and --ledger')
+  }
+  const base = dirname(resolve(options.oracle))
+  const snapshots = []
+  const oracleSnapshot = await snapshotOracleFile(options.oracle, base, 'REVIEW_PACKET_INVALID', 'Oracle', snapshots)
+  const packetSnapshot = await snapshotOracleFile(options.packet, base, 'REVIEW_PACKET_INVALID', 'review packet', snapshots)
+  const mapSnapshot = await snapshotOracleFile(options.map, base, 'EVIDENCE_INVALID', 'evidence map', snapshots)
+  const externalLedger = await ledgerRun({ ...options, run: null }, base, snapshots)
+  const packet = parseSnapshotJson(packetSnapshot, 'REVIEW_PACKET_INVALID')
+  const packetSha256 = packetSnapshot.sha256
+  const oracleRaw = oracleSnapshot.bytes.toString('utf8')
+  const oracleSha256 = oracleSnapshot.sha256
+  const canonicalChangeabilitySha256 = sha256(
+    await readFile(resolve(dirname(fileURLToPath(import.meta.url)), '../references/changeability.md')),
+  )
+  if (packet?.oracle?.content !== oracleRaw || packet?.oracle?.sha256 !== oracleSha256) {
+    throw new CliError('REVIEW_ORACLE_STALE', 'review packet Oracle bytes do not match the current locked Oracle')
+  }
+  if (
+    packet?.schemaVersion !== 2 ||
+    packet?.lock?.oracle?.sha256 !== oracleSha256 ||
+    !isDigest(packet?.lockVerification?.manifestSha256) ||
+    packet.lockVerification.manifestSha256 !== packet?.targetSnapshot?.lockManifestSha256 ||
+    !isDigest(packet?.implementationDecision?.sha256) ||
+    typeof packet?.implementationDecision?.content !== 'string' ||
+    sha256(packet.implementationDecision.content) !== packet.implementationDecision.sha256 ||
+    !Array.isArray(packet?.reviewPoints) ||
+    !packet.reviewPoints.some((point) => point?.path === 'changeability.md' && point.sha256 === canonicalChangeabilitySha256) ||
+    !Array.isArray(packet?.evidenceArtifacts)
+  ) {
+    throw new CliError('REVIEW_PACKET_INVALID', 'review packet lacks canonical schema-v2 lock, decision, review-point, or artifact bindings')
+  }
+  assertEmbeddedLedger(packet.ledger)
+  for (const [index, artifact] of packet.evidenceArtifacts.entries()) {
+    if (!artifact || typeof artifact.path !== 'string' || !isDigest(artifact.sha256)) {
+      throw new CliError('REVIEW_PACKET_INVALID', `evidence artifact ${index} lacks path or digest`)
+    }
+    const snapshot = await assertRegularFileInside(base, artifact.path, 'packet', `evidenceArtifacts[${index}]`, snapshots)
+    if (snapshot.sha256 !== artifact.sha256) {
+      throw new CliError('REVIEW_PACKET_INVALID', `evidence artifact ${index} digest does not match`)
+    }
+  }
+  const greenEntry = [...(packet?.state?.history ?? [])]
+    .reverse()
+    .find((history) => history.state === 'IMPLEMENTED_GREEN')
+  const greenRun = packet?.ledger?.find((entry) => entry.runId === greenEntry?.runId)
+  const targetRevision = packet?.targetSnapshot?.worktreeSha256
+  if (!isDigest(targetRevision) || targetRevision !== options.revision || greenRun?.worktreeSha256 !== targetRevision || greenRun?.exitCode !== 0 || greenRun?.grade !== 'reported') {
+    throw new CliError('REVIEW_PACKET_INVALID', 'review packet does not target the implementation worktree')
+  }
+
+  const findingSnapshots = [await snapshotOracleFile(options.file, base, 'FINDINGS_INVALID', 'review findings', snapshots)]
+  if (options.intersect)
+    findingSnapshots.push(await snapshotOracleFile(options.intersect, base, 'FINDINGS_INVALID', 'intersected review findings', snapshots))
+  const documents = findingSnapshots.map((snapshot) => parseSnapshotJson(snapshot, 'FINDINGS_INVALID'))
+  const allFindings = documents.flatMap((document) => document.findings ?? [])
+  const ids = new Set(allFindings.map((finding) => finding.id))
+  if (ids.size !== allFindings.length) throw new CliError('FINDINGS_INVALID', 'duplicate finding id')
+  for (const document of documents) {
+    if (document.schemaVersion !== 2)
+      throw new CliError('FINDINGS_INVALID', 'new review verification requires findings schemaVersion 2')
+    if (!REVIEWER_ROLES.includes(document.reviewerRole) || !document.reviewerId)
+      throw new CliError('FINDINGS_INVALID', 'new review verification requires reviewerRole and reviewerId')
+    if (document.packetSha256 !== packetSha256)
+      throw new CliError('REVIEW_PACKET_INVALID', 'findings must cite the review packet sha256')
+    if (document.targetRevision !== options.revision) {
+      throw new CliError('REVIEW_REVISION_MISMATCH', 'findings must cite the target implementation worktree')
+    }
+    const receipt = document.orchestrationReceipt
+    const output = { ...document }
+    delete output.orchestrationReceipt
+    if (
+      !receipt ||
+      typeof receipt !== 'object' ||
+      receipt.packetSha256 !== packetSha256 ||
+      receipt.targetRevision !== options.revision ||
+      receipt.role !== document.reviewerRole ||
+      typeof receipt.taskId !== 'string' ||
+      !receipt.taskId ||
+      !isDigest(receipt.outputSha256) ||
+      receipt.outputSha256 !== sha256(stableStringify(output))
+    ) {
+      throw new CliError('REVIEWER_EVIDENCE_INVALID', 'review findings require a bound orchestration receipt')
+    }
+    const receiptEvent = externalLedger.records.find(
+      (event) =>
+        event.type === 'review-receipt' &&
+        event.taskId === receipt.taskId &&
+        event.reviewerId === document.reviewerId,
+    )
+    if (
+      !receiptEvent ||
+      receiptEvent.packetSha256 !== packetSha256 ||
+      receiptEvent.targetRevision !== options.revision ||
+      receiptEvent.role !== document.reviewerRole ||
+      receiptEvent.taskId !== receipt.taskId ||
+      receiptEvent.outputSha256 !== receipt.outputSha256 ||
+      receiptEvent.findingsSha256 !== sha256(findingSnapshots[documents.indexOf(document)].bytes) ||
+      receiptEvent.oracleSha256 !== oracleSha256 ||
+      receiptEvent.adapter !== 'controller'
+    ) {
+      throw new CliError('REVIEWER_EVIDENCE_INVALID', 'review findings require an independently ledger-bound review receipt')
+    }
+  }
+  if (documents.length > 1 && documents[0].reviewerId === documents[1].reviewerId)
+    throw new CliError('REVIEWER_NOT_INDEPENDENT', 'intersected review samples require distinct reviewer identities')
+  if (
+    documents.length > 1 &&
+    documents.some((document) => document.sampleRisk === 'High') &&
+    (documents[0].orchestrationReceipt.taskId === documents[1].orchestrationReceipt.taskId ||
+      documents[0].orchestrationReceipt.outputSha256 === documents[1].orchestrationReceipt.outputSha256 ||
+      documents[0].reviewerRole === documents[1].reviewerRole)
+  )
+    throw new CliError('REVIEWER_NOT_INDEPENDENT', 'High-risk intersected reviews require distinct receipt task identities')
+  const byId = new Map(
+    documents.flatMap((document) => (document.findings ?? []).map((finding) => [finding.id, document.reviewerRole])),
+  )
+  const map = parseSnapshotJson(mapSnapshot, 'EVIDENCE_INVALID')
+  if (stableJson(packet.evidence) !== stableJson(map)) {
+    throw new CliError('REVIEW_EVIDENCE_STALE', 'review evidence map must match the review packet evidence')
+  }
+
+  for (const entry of Object.values(map?.rows ?? {})) {
+    if (entry?.kind === 'reviewer') {
+      if (!ids.has(entry.finding))
+        throw new CliError('REVIEW_FINDING_UNKNOWN', `${entry.finding} is not in review findings`)
+      if (byId.get(entry.finding) !== entry.role)
+        throw new CliError(
+          'REVIEWER_EVIDENCE_INVALID',
+          `${entry.finding} belongs to ${byId.get(entry.finding)}, not ${entry.role}`,
+        )
+    }
+  }
+  await assertSnapshots(snapshots, base, 'REVIEW_PACKET_INVALID')
+}
+
 async function verifyReview(options) {
+  await assertReviewBinding(options)
   const result = await findingsResult(options)
 
   if (result.blocking.length > 0) {

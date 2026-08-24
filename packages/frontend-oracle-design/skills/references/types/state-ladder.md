@@ -123,6 +123,7 @@ reducer·전이표·상태 기계는 기본값이 아니다.
 
 ```typescript
 // 금지 — 상태에 action이 들어가 stale closure와 가짜 retry가 동시에 생긴다
+// eslint-disable-next-line @lodado/local-rules/no-action-in-state -- 문서가 금지 패턴 자체를 보여 준다.
 type DetailState = { status: 'loading' } | { status: 'failure'; retry: () => void }
 
 // 허용 — 상태는 데이터, action은 형제

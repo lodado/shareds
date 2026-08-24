@@ -42,7 +42,8 @@ Draft 단계는 `Status: draft` 유지. 사용자가 카드 전문·delta를 확
 
 - `Never`와 부작용 횟수가 빈 행은 미완성이다.
 - 각 결정에 stable 정책 ID(`P*`)와 적용 행, 각 `O*`·`D*` 행의 `정책` 열에 같은 ID.
-  정책 ID와 행 ID의 양방향 참조가 정확히 일치해야 한다.
+  정책 ID와 행 ID의 양방향 참조가 정확히 일치해야 한다. 각 정책 출처는 Source
+  Registry의 승인된 `S*` 또는 `User Confirmation`이어야 하며 source FK가 끊기면 lock 금지.
 - UI 상태와 실제 부작용 횟수를 각각 검증.
 - 전제가 있는 자동 추가 TC는 행으로 만들고, 없으면 N/A와 사유 기록.
 - 존재하지 않는 retry·cancel·race를 테스트 목적으로 발명하지 않는다.

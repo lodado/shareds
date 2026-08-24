@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "hostedEvalDependency": false,
+  "required": [
+    "caseId",
+    "risk",
+    "lane",
+    "status",
+    "loadedNodes",
+    "ceremony",
+    "labels",
+    "policyInvention",
+    "falseReviewVerified",
+    "toolCalls",
+    "tokens",
+    "runtimeMs",
+    "errors"
+  ],
+  "properties": {
+    "caseId": {
+      "type": "string",
+      "description": "Fixture id from blackbox-corpus.json."
+    },
+    "risk": {
+      "type": "string",
+      "description": "Observed Oracle risk classification for this case."
+    },
+    "lane": {
+      "type": "string",
+      "description": "Observed workflow lane selected for this case."
+    },
+    "status": {
+      "type": "string",
+      "description": "Observed terminal status for this case."
+    },
+    "route": {
+      "type": "string",
+      "description": "Optional explicit graph route when the corpus declares one."
+    },
+    "authoritative": {
+      "type": "boolean",
+      "description": "Grader report authority: only a complete corpus report is authoritative; --allow-partial is diagnostic-only."
+    },
+    "loadedNodes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Reference node ids observed during the run."
+    },
+    "ceremony": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Workflow ceremony markers observed during the run."
+    },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Stable evidence labels observed during the run."
+    },
+    "routingAccuracy": {
+      "type": "number",
+      "description": "Aggregate grader output ratio for cases whose risk, lane, status, route and loaded nodes match expected.",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "policyInvention": {
+      "type": "boolean",
+      "description": "True when the run invents product, visual or legal policy not backed by a registered source/user confirmation."
+    },
+    "falseReviewVerified": {
+      "type": "boolean",
+      "description": "True when REVIEW_VERIFIED is reported without required labels, ledger evidence or review binding."
+    },
+    "toolCalls": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "description": "Total tool calls when available from the harness transcript."
+    },
+    "tokens": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "description": "Total token usage when available from the runtime."
+    },
+    "runtimeMs": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "description": "Wall-clock runtime in milliseconds."
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Stable harness or grader error codes observed during the run."
+    }
+  }
+}

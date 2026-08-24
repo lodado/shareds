@@ -105,7 +105,10 @@ write면 재시도·idempotency 정책을 grill 질문으로 올리고, "재시�
 function createDeferred<T>() {
   let resolve!: (v: T) => void
   let reject!: (e: unknown) => void
-  const promise = new Promise<T>((res, rej) => ((resolve = res), (reject = rej)))
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
   return { promise, resolve, reject }
 }
 

@@ -80,7 +80,7 @@ type PaymentBadge = 'unpaid' | 'paid' | 'refunded'
   runtime lookup(config·renderer·메시지·권한) 중 둘 이상을 실제로 파생하는 단일 권위일
   때만 record에서 union을 파생한다:
   ```typescript
-  type Steps = {
+  interface Steps {
     shipping: { address: Address; fieldErrors: FieldErrors }
     review: { quote: Quote; agreed: boolean }
   }

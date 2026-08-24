@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+// eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
 const packageDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
 const repositoryDirectory = dirname(dirname(packageDirectory))
@@ -44,6 +45,11 @@ test('drives the browser through Playwright or a connected browser MCP only', as
   assert.match(skill, /Playwright 또는 이미 연결된 browser MCP/)
   assert.match(skill, /둘 다 없으면 `NEEDS_DECISION`/)
   assert.match(skill, /driver\(playwright\|mcp:<name>\)/)
+  assert.match(skill, /certifiable visual `PASS` producer.*oracle-run --adapter node-test/s)
+  assert.match(skill, /locked test가 Playwright를 호출하고 schema-v3 artifact를 발행/)
+  assert.match(skill, /standalone Playwright adapter는\s*지원하지 않는다/)
+  assert.match(skill, /Browser MCP.*pending.*non-verifying/s)
+  assert.match(skill, /Browser MCP는 observation artifact를 수집할 수 있지만/)
 })
 
 test('keeps Visual QA plugin release metadata versions aligned', async () => {
@@ -63,6 +69,14 @@ test('keeps Visual QA plugin release metadata versions aligned', async () => {
   assert.equal(marketplaceVersion, version)
 })
 
+test('exposes its contract checks through the package lint task', async () => {
+  const packageJson = JSON.parse(await readFile(join(packageDirectory, 'package.json'), 'utf8'))
+
+  assert.equal(typeof packageJson.scripts.lint, 'string')
+  assert.notEqual(packageJson.scripts.lint.trim(), '')
+  assert.match(packageJson.scripts.lint, /(?:eslint|node --test)/)
+})
+
 test('returns append-only artifacts compatible with Oracle evidence', async () => {
   const skill = await read('SKILL.md')
 
@@ -70,7 +84,23 @@ test('returns append-only artifacts compatible with Oracle evidence', async () =
   assert.match(skill, /기존 run을 덮어쓰지 않는다/)
   assert.match(skill, /evidence\.json/)
   assert.match(skill, /"kind": "visual"/)
+  assert.match(skill, /"schemaVersion": 3/)
   assert.match(skill, /oracleSha256/)
+  assert.match(skill, /"producerRun"/)
+  assert.match(skill, /worktreeSha256/)
+  assert.match(skill, /"status": "passed"/)
+  assert.match(skill, /"journey"/)
+  assert.match(skill, /"tool": "playwright"/)
+  assert.match(skill, /"scenario"/)
+  assert.match(skill, /"checks"/)
+  assert.match(skill, /"artifacts"/)
+  assert.match(skill, /"status": "passed"/)
+  assert.match(skill, /"path": "not-applicable\.md"/)
+  assert.match(skill, /"sha256": "<64-hex-digest>"/)
+  assert.match(skill, /"mediaType": "text\/markdown"/)
+  assert.match(skill, /"status": "not-applicable"/)
+  assert.match(skill, /"reason"/)
+  assert.match(skill, /"source": "S1"/)
   assert.match(skill, /VISUAL_VERIFIED/)
   assert.match(skill, /BROWSER_VERIFIED/)
 })

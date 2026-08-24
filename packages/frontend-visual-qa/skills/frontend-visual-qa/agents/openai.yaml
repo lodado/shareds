@@ -1,4 +1,4 @@
 interface:
-  display_name: 'Frontend Visual QA'
-  short_description: 'Verify screenshots and browser journeys'
-  default_prompt: 'Use $frontend-visual-qa to compare approved screenshots and verify a browser journey.'
+  display_name: Frontend Visual QA
+  short_description: Verify screenshots and browser journeys
+  default_prompt: Use $frontend-visual-qa to compare approved screenshots and verify a browser journey.

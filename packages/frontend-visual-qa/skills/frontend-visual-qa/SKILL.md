@@ -22,6 +22,10 @@ Oracle 작성, behavior TDD, production 수정은 소유하지 않는다.
 - 브라우저 조작은 **Playwright 또는 이미 연결된 browser MCP** 중 하나로만 수행한다.
   repo에 이미 설치된 쪽을 먼저 쓰고, 이 스킬만을 위해 dependency나 새 runner를
   추가하지 않는다. 둘 다 없으면 `NEEDS_DECISION`으로 멈추고 어느 쪽을 쓸지 묻는다.
+- certifiable visual `PASS` producer는 trusted `oracle-run --adapter node-test` run뿐이다. 그 run의
+  locked test가 Playwright를 호출하고 schema-v3 artifact를 발행해야 한다. standalone Playwright adapter는
+  지원하지 않는다. Browser MCP는 observation artifact를 수집할 수 있지만 `pending`·non-verifying으로
+  보고하며 `VISUAL_VERIFIED`나 `BROWSER_VERIFIED`를 만들지 않는다.
 - 새 Oracle Delivery 상태를 만들지 않는다. 결과는 보조 artifact이며
   `IMPLEMENTED_GREEN`이나 `REVIEW_VERIFIED`를 대신하지 않는다.
 
@@ -29,11 +33,11 @@ Oracle 작성, behavior TDD, production 수정은 소유하지 않는다.
 
 사용자 요청에서 필요한 모드만 실행한다.
 
-| 모드           | 사용 시점                                                 | 종료 판정                                |
-| -------------- | --------------------------------------------------------- | ---------------------------------------- |
-| Screenshot     | 승인 baseline과 실제 렌더의 drift 비교·baseline 후보 확인 | `VISUAL_VERIFIED` 또는 `VISUAL_FAILED`   |
-| Direct browser | 사람이 쓰는 것처럼 실제 화면에 들어가 핵심 journey 검증   | `BROWSER_VERIFIED` 또는 `BROWSER_FAILED` |
-| Both           | 두 검증을 명시적으로 모두 요청                            | 두 판정을 각각 보고                      |
+| 모드           | 사용 시점                                                 | 종료 판정                                                                                                 |
+| -------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Screenshot     | 승인 baseline과 실제 렌더의 drift 비교·baseline 후보 확인 | trusted node-test run의 locked Playwright test면 `VISUAL_VERIFIED`, 아니면 pending 또는 `VISUAL_FAILED`   |
+| Direct browser | 사람이 쓰는 것처럼 실제 화면에 들어가 핵심 journey 검증   | trusted node-test run의 locked Playwright test면 `BROWSER_VERIFIED`, 아니면 pending 또는 `BROWSER_FAILED` |
+| Both           | 두 검증을 명시적으로 모두 요청                            | 두 판정을 각각 보고                                                                                       |
 
 요청하지 않은 모드를 “더 안전하다”는 이유로 추가하지 않는다.
 
@@ -143,13 +147,51 @@ console: uncaught error·console error 또는 없음
 남은 것: 미검증 항목과 이유
 ```
 
-`evidence.json`은 잠긴 Oracle bytes의 SHA-256과 통과한 행만 기록한다.
+`evidence.json`은 schema v3로 잠긴 Oracle bytes SHA-256, producer ledger binding, 행별
+판정과 browser journey receipt를 기록한다. certifiable PASS producer run은 성공한 trusted
+`oracle-run --adapter node-test` ledger entry와 같은 `runId`, `adapter: "node-test"`, locked test,
+worktree SHA를 써야 하며 그 locked test provenance가 Playwright 사용을 보여야 한다.
+모든 artifact는 이 evidence 파일 기준 상대 경로의 regular non-symlink,
+single-link 파일이어야 하고 실제 bytes SHA-256과 media type을 함께 기록한다. screenshot은
+`image/png`와 PNG magic bytes를 사용한다.
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "oracleSha256": "<64-hex-digest>",
-  "rows": { "D1": "passed" }
+  "producerRun": {
+    "runId": "r-visual-001",
+    "adapter": "node-test",
+    "lockedTest": "visual relation contract",
+    "tool": "playwright",
+    "status": "passed",
+    "worktreeSha256": "<64-hex-digest>"
+  },
+  "rows": {
+    "D1": {
+      "status": "passed",
+      "journey": {
+        "status": "passed",
+        "tool": "playwright",
+        "scenario": "approved visual relation journey",
+        "checks": ["D1 relation is preserved"],
+        "artifacts": [
+          { "path": "actual.png", "sha256": "<64-hex-digest>", "mediaType": "image/png" },
+          { "path": "trace/index.html", "sha256": "<64-hex-digest>", "mediaType": "text/html" }
+        ]
+      }
+    },
+    "D2": {
+      "status": "passed",
+      "checks": ["D2 approved static relation is preserved"],
+      "artifacts": [{ "path": "not-applicable.md", "sha256": "<64-hex-digest>", "mediaType": "text/markdown" }],
+      "journey": {
+        "status": "not-applicable",
+        "reason": "no browser surface for this approved row",
+        "source": "S1"
+      }
+    }
+  }
 }
 ```
 
@@ -159,12 +201,16 @@ Oracle의 전체 evidence manifest에서는 이 artifact를 Oracle 디렉터리 
 ```json
 {
   "kind": "visual",
-  "artifact": "visual-qa/<run-id>/evidence.json"
+  "artifact": "visual-qa/<run-id>/evidence.json",
+  "sha256": "<evidence.json 64-hex-digest>"
 }
 ```
 
 artifact 경로만 쓰지 말고 `report.md`에 Oracle revision, 행, 판정과 실제 관찰을
 함께 남긴다.
+
+Oracle의 `Visual QA authorization: declined`이면 visual PASS를 만들지 않는다. GREEN에서는
+`pending`만 남기거나, 승인 Source Registry 근거를 가진 `not-applicable` receipt만 기록한다.
 
 ## 금지
 

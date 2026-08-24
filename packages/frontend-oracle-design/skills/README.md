@@ -28,14 +28,15 @@ AI가 구현을 시작하기 전에 **무엇이 정답인지 먼저 잠그는** 
 ## 워크플로우 그래프
 
 위 5단계를 기계가 검사할 수 있게 옮긴 것이
-[`oracle-workflow.graph.json`](references/oracle-workflow.graph.json)입니다. 노드 18개,
-엣지 23개, fallback 규칙 5개, terminal 4개. 다음 노드는 Worker가 고르지 않고 컨트롤러가
+[`oracle-workflow.graph.json`](references/oracle-workflow.graph.json)입니다. 노드 19개,
+엣지 25개, fallback 규칙 5개, terminal 5개. 다음 노드는 Worker가 고르지 않고 컨트롤러가
 `graph-verify.mjs next`로 strict-equality 일치한 엣지만 활성화합니다.
 
 ```mermaid
 flowchart TB
   REQ(["요청"]) --> D["draft-oracle<br/><i>agent · planner</i>"]
   D -->|CONFIRMATION_REQUIRED| U{{"user-confirmation<br/><i>gate · 답변 전까지 WAITING_USER</i>"}}
+  D -->|FAIL| PF(["pre-ledger-failed"])
   U -->|REVISE| D
   U -->|CANCEL| CX(["cancelled"])
   U -->|"APPROVE_DESIGN<br/>APPROVE_DELIVERY"| L["lock-oracle<br/><i>tool</i>"]
@@ -49,9 +50,9 @@ Design-only는 여기서 끝납니다. `APPROVE_DELIVERY`로 잠근 카드만 �
 flowchart TB
   IN(["① lock-oracle · DELIVERY_READY"]) --> I["delivery-init<br/><i>agent · planner</i>"]
   I -->|READY| R["valid-red<br/><i>agent · test-engineer</i>"]
-  R -->|VALID_RED| G{{"implement-green<br/><i>gate</i>"}}
+  R -->|VALID_RED| G["implement-green<br/><i>agent</i>"]
+  R -->|ALREADY_SATISFIED| G
   R -->|HARNESS_DEFECT| R
-  R -.->|INVALID_RED| PG(["① draft-oracle 로 회귀"])
 
   G -->|IMPLEMENTED_GREEN_STANDARD| SR["standard-review<br/><i>agent · code-reviewer</i>"]
   G -->|IMPLEMENTED_GREEN_HIGH| FO["high-review-fanout<br/><i>tool · dispatch=all</i>"]
@@ -87,6 +88,10 @@ flowchart TB
 | `PRODUCT_DEFECT` | 제품 코드가 틀림               | `implement-green` | 예산 안에서 구현 재시도                |
 | `EVIDENCE_GAP`   | 증거가 주장을 못 받침          | `evidence-repair` | locator·fixture만 보정, 정책 불변      |
 | `HARNESS_DEFECT` | 테스트 장치가 고장             | `evidence-repair` | 제품 탓으로 넘기지 않음                |
+
+`draft-oracle`의 ledger 생성 전 `FAIL`만 node 전용 edge로 `pre-ledger-failed`에 가며,
+`classification`과 오류 summary를 보존합니다. 그 뒤의 `FAIL`은 `runId`가 있는
+`failed` terminal로 갑니다.
 
 `ENVIRONMENT_DEFECT`와 `NON_ORACLE_OPINION`은 리뷰 finding 분류로만 남고 graph
 label이 아닙니다 — 환경 결함은 사유를 ledger에 남기고 `FAIL`로 보고하며, opinion만
@@ -152,6 +157,39 @@ flowchart LR
 `risk=<Low|Medium|High> lane=<low-fast-path|oracle> nodes=[실제로 읽은 노드]` 헤더로
 시작합니다. 구현 요청이든 설명·플랜 전용 요청이든 동일합니다 — 로딩을 건너뛴 사실이
 헤더에 드러나게 만드는 장치입니다.
+
+## 운영 도구
+
+### 현재 상태와 재개
+
+```bash
+node skills/scripts/oracle-run.mjs status \
+  --dir .ai/oracles/<oracle-id> \
+  --json
+```
+
+`status`는 lock, worktree/production snapshot, stale run, orphaned `.run-ids`, 남은 budget,
+다음 합법 전이를 기존 artifact에서 재계산합니다. resume은 이 출력으로 다음 action을
+고르는 절차이며, `run-state.json`이나 `runs.jsonl`을 직접 편집하지 않습니다.
+
+### Black-box eval corpus
+
+`evals/blackbox-corpus.json`은 hosted eval 제품에 의존하지 않는 10개 smoke prompt입니다.
+결과 JSON/JSONL을 만든 뒤 grader로 routing, policy invention, false review, tool calls,
+tokens, runtime, error count를 확인합니다. 기본 모드는 10개 case를 모두 요구하며, 단일
+case 탐색 실행에만 `--allow-partial`을 사용합니다. partial도 빈 결과는 통과하지 않습니다.
+
+```bash
+node skills/evals/grade-results.mjs <results.json|results.jsonl>
+node skills/evals/grade-results.mjs --allow-partial <results.json|results.jsonl>
+```
+
+### Harness garbage collection
+
+새 상태·agent·dependency를 추가하기 전에 stale reference, never-fired sensor, duplicate
+guidance, 충돌 규칙을 삭제·통합합니다. High risk에만 `.ai/oracles/**`, lock SHA, run IDs를
+CI artifact와 CODEOWNERS/required review로 보호합니다. Low/Medium에는 기본 강제하지
+않습니다.
 
 ## 설치
 

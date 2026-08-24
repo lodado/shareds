@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+// eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
@@ -66,13 +67,22 @@ test('runs the Oracle contract through the bundled deterministic workflow graph'
   assert.doesNotMatch(skill, /\.ai\/agent-graphs\/<oracle-id>\/graph\.json/)
   assert.match(
     graphOrchestration,
-    /명시적으로 요청한 경우에만 설치된\s*\n?`\$agent-graph-engineering`을 이름으로 명시적으로 로드·호출/,
+    /명시적으로 요청한 경우에만 설치된\s*`\$agent-graph-engineering`을 이름으로 명시적으로 로드·호출/,
   )
-  assert.match(graphOrchestration, /subagent 위임을 강제하지 않으며\s*\n?agent 재량 선택만 허용한다/)
+  assert.match(graphOrchestration, /subagent 위임을 강제하지 않으며\s*agent 재량 선택만 허용한다/)
   assert.match(graphOrchestration, /\.ai\/agent-graphs\/<oracle-id>\/graph\.json/)
   assert.match(graphOrchestration, /graph-verify\.mjs next/)
   assert.equal(graph.entry, 'draft-oracle')
-  assert.deepEqual(graph.terminals, ['oracle-ready', 'review-verified', 'cancelled', 'failed'])
+  assert.deepEqual(graph.terminals, [
+    'oracle-ready',
+    'implemented-green',
+    'review-verified',
+    'needs-decision',
+    'pre-ledger-needs-decision',
+    'cancelled',
+    'pre-ledger-failed',
+    'failed',
+  ])
   assert.equal(verified.status, 0, verified.stderr)
   assert.equal(verified.stdout, 'GRAPH_VALID frontend-oracle-design\n')
 })
@@ -84,13 +94,76 @@ test('routes already-satisfied red, blocked standard review and split reviewer s
   const graph = JSON.parse(await read('references/oracle-workflow.graph.json'))
   const node = (id) => graph.nodes.find((candidate) => candidate.id === id)
 
-  assert.deepEqual(selectTransitions(graph, 'valid-red', { classification: 'INVALID_RED' }), ['draft-oracle'])
+  assert.deepEqual(selectTransitions(graph, 'valid-red', { classification: 'ALREADY_SATISFIED' }), ['implement-green'])
+  assert.throws(
+    () => selectTransitions(graph, 'valid-red', { classification: 'INVALID_RED' }),
+    /NO_TRANSITION|matches no edge/,
+  )
   assert.deepEqual(selectTransitions(graph, 'standard-review', { status: 'READY' }), ['review-decision'])
   assert.deepEqual(selectTransitions(graph, 'standard-review', { status: 'BLOCKED' }), ['evidence-repair'])
+  assert.deepEqual(selectTransitions(graph, 'draft-oracle', { classification: 'FAIL' }), ['pre-ledger-failed'])
+  assert.deepEqual(selectTransitions(graph, 'standard-review', { classification: 'FAIL' }), ['failed'])
 
-  assert.deepEqual(node('high-review-a').output, ['status', 'findingsA'])
-  assert.deepEqual(node('high-review-b').output, ['status', 'findingsB'])
-  assert.deepEqual(node('high-review-join').input, ['status', 'findingsA', 'findingsB'])
+  assert.deepEqual(node('implement-green').kind, 'agent')
+  assert.deepEqual(node('implement-green').output, ['classification', 'runId', 'artifacts', 'decision', 'error'])
+  assert.deepEqual(node('standard-review').output, [
+    'status',
+    'classification',
+    'findings',
+    'runId',
+    'decision',
+    'error',
+  ])
+  assert.deepEqual(node('high-review-fanout').output, [
+    'status',
+    'classification',
+    'reviewPacket',
+    'reviewAssignments',
+    'reviewDispatches',
+    'runId',
+    'decision',
+    'error',
+  ])
+  assert.deepEqual(selectTransitions(graph, 'high-review-fanout', { classification: 'FAIL' }), ['failed'])
+  assert.deepEqual(node('high-review-a').output, ['findingsA'])
+  assert.deepEqual(node('high-review-b').output, ['findingsB'])
+  assert.deepEqual(node('high-review-join').input, [
+    'findingsA',
+    'findingsB',
+    'reviewPacket',
+    'reviewAssignments',
+    'reviewDispatches',
+    'runId',
+  ])
+  assert.deepEqual(node('high-review-join').output, [
+    'status',
+    'classification',
+    'findings',
+    'reviewReceiptA',
+    'reviewReceiptB',
+    'runId',
+    'error',
+  ])
+  assert.deepEqual(selectTransitions(graph, 'high-review-join', { status: 'BLOCKED' }), ['evidence-repair'])
+  assert.deepEqual(selectTransitions(graph, 'high-review-join', { classification: 'FAIL' }), ['failed'])
+  assert.match(node('high-review-fanout').task, /controller-issued reviewAssignments.*reviewDispatches/s)
+  assert.match(node('high-review-join').task, /oracle-run\.mjs review-receipt/)
+  assert.match(node('high-review-join').task, /packetSha256.*targetRevision.*previousDigest.*digest.*adapter node-test.*oracleSha256/s)
+  assert.deepEqual(node('review-decision').input.slice(-2), ['reviewReceiptA', 'reviewReceiptB'])
+  assert.match(node('review-decision').task, /standard review finding.*oracle-run\.mjs review-receipt/s)
+  assert.deepEqual(node('final-verify').input.slice(-2), ['reviewReceiptA', 'reviewReceiptB'])
+
+  for (const source of graph.nodes.filter((candidate) => candidate.output?.includes('classification'))) {
+    if (!/\bFAIL\b/.test(source.task)) continue
+    const [targetId] = selectTransitions(graph, source.id, { classification: 'FAIL' })
+    const target = node(targetId)
+    assert.equal(target.kind, 'terminal', `${source.id} FAIL must route to a terminal`)
+    assert.deepEqual(
+      target.input.every((field) => source.output.includes(field)),
+      true,
+      source.id,
+    )
+  }
 })
 
 test('owns repeated failure routes with fallback rules that node edges still override', async () => {
@@ -102,7 +175,7 @@ test('owns repeated failure routes with fallback rules that node edges still ove
   assert.deepEqual(
     graph.fallback.map(({ when, to }) => [when.equals, to]),
     [
-      ['POLICY_GAP', 'draft-oracle'],
+      ['POLICY_GAP', 'needs-decision'],
       ['FAIL', 'failed'],
       ['PRODUCT_DEFECT', 'implement-green'],
       ['EVIDENCE_GAP', 'evidence-repair'],
@@ -117,6 +190,7 @@ test('owns repeated failure routes with fallback rules that node edges still ove
   assert.deepEqual(selectTransitions(graph, 'implement-green', { classification: 'PRODUCT_DEFECT' }), [
     'implement-green',
   ])
+  assert.deepEqual(selectTransitions(graph, 'draft-oracle', { classification: 'FAIL' }), ['pre-ledger-failed'])
   assert.deepEqual(selectTransitions(graph, 'delivery-init', { classification: 'FAIL' }), ['failed'])
 
   // ENVIRONMENT_DEFECT and NON_ORACLE_OPINION stay finding classifications but are not graph labels:
@@ -133,12 +207,106 @@ test('owns repeated failure routes with fallback rules that node edges still ove
   )
 })
 
+test('O12: workflow graph records transitions and preserves decision and failure payloads', async () => {
+  const { selectTransitions } = await import(
+    '../../../agent-graph-engineering/skills/agent-graph-engineering/scripts/graph-verify.mjs'
+  )
+  const graph = JSON.parse(await read('references/oracle-workflow.graph.json'))
+  const node = (id) => graph.nodes.find((candidate) => candidate.id === id)
+  const edge = (from, to, equals) =>
+    graph.edges.find(
+      (candidate) =>
+        candidate.from === from &&
+        candidate.to === to &&
+        candidate.when?.field === 'classification' &&
+        candidate.when.equals === equals,
+    )
+
+  for (const [source, target, classification] of [
+    ['valid-red', 'implement-green', 'VALID_RED'],
+    ['implement-green', 'standard-review', 'IMPLEMENTED_GREEN_STANDARD'],
+    ['implement-green', 'high-review-fanout', 'IMPLEMENTED_GREEN_HIGH'],
+  ]) {
+    assert.match(node(source).task, new RegExp(`oracle-run\\.mjs transition[^.]*${classification}`))
+    assert.ok(edge(source, target, classification))
+  }
+
+  assert.match(node('valid-red').task, /ALREADY_SATISFIED[^.]*production[^.]*수정하지 않는다/)
+  assert.match(node('implement-green').task, /ALREADY_SATISFIED[^.]*production[^.]*수정하지 않는다/)
+  assert.match(node('implement-green').task, /visual[^.]*pending[^.]*IMPLEMENTED_GREEN/)
+  assert.match(node('implement-green').task, /IMPLEMENTED_GREEN[^.]*resume/)
+  assert.match(node('implement-green').task, /IMPLEMENTED_GREEN을 정확히 한 번/)
+  assert.deepEqual(selectTransitions(graph, 'draft-oracle', { classification: 'POLICY_GAP' }), [
+    'pre-ledger-needs-decision',
+  ])
+  assert.deepEqual(selectTransitions(graph, 'lock-oracle', { classification: 'POLICY_GAP' }), [
+    'pre-ledger-needs-decision',
+  ])
+  assert.deepEqual(node('pre-ledger-needs-decision').input, ['classification', 'decision'])
+  assert.deepEqual(selectTransitions(graph, 'draft-oracle', { classification: 'RESUME_IMPLEMENTED_GREEN' }), [
+    'resume-implemented-green',
+  ])
+  assert.deepEqual(selectTransitions(graph, 'resume-implemented-green', { classification: 'RESUME_STANDARD' }), [
+    'standard-review',
+  ])
+  assert.deepEqual(selectTransitions(graph, 'resume-implemented-green', { classification: 'RESUME_HIGH' }), [
+    'high-review-fanout',
+  ])
+  assert.match(node('resume-implemented-green').task, /IMPLEMENTED_GREEN 전이를 다시 기록하지 않는다/)
+  assert.match(node('resume-implemented-green').task, /oracle-run --adapter node-test.*Playwright.*schema-v3/s)
+
+  const policyGapSources = graph.nodes.filter(
+    (candidate) => candidate.output?.includes('classification') && /\bPOLICY_GAP\b/.test(candidate.task),
+  )
+  for (const source of policyGapSources) {
+    assert.ok(source.output.includes('decision'), `${source.id} POLICY_GAP must preserve its decision evidence`)
+    assert.ok(source.output.includes('error'), `${source.id} POLICY_GAP/FAIL must preserve its error evidence`)
+    const expected = ['draft-oracle', 'lock-oracle'].includes(source.id)
+      ? ['pre-ledger-needs-decision']
+      : ['needs-decision']
+    assert.deepEqual(selectTransitions(graph, source.id, { classification: 'POLICY_GAP' }), expected)
+  }
+  assert.deepEqual(node('needs-decision').input, ['classification', 'decision', 'runId'])
+
+  assert.deepEqual(selectTransitions(graph, 'draft-oracle', { classification: 'FAIL' }), ['pre-ledger-failed'])
+  assert.deepEqual(node('draft-oracle').output.includes('error'), true)
+  assert.deepEqual(node('pre-ledger-failed').input, ['classification', 'error'])
+  assert.deepEqual(node('failed').input, ['classification', 'runId', 'error'])
+})
+
+test('O14: harness packages expose lint and provenance captures reproducibility inputs', async () => {
+  const repositoryDirectory = join(skillDirectory, '../../..')
+  const [rootPackageSource, oraclePackageSource, visualPackageSource, turboSource, runnerSource] = await Promise.all([
+    readFile(join(repositoryDirectory, 'package.json'), 'utf8'),
+    readFile(join(repositoryDirectory, 'packages/frontend-oracle-design/package.json'), 'utf8'),
+    readFile(join(repositoryDirectory, 'packages/frontend-visual-qa/package.json'), 'utf8'),
+    readFile(join(repositoryDirectory, 'turbo.json'), 'utf8'),
+    read('scripts/oracle-run.mjs'),
+  ])
+  const rootPackage = JSON.parse(rootPackageSource)
+  const oraclePackage = JSON.parse(oraclePackageSource)
+  const visualPackage = JSON.parse(visualPackageSource)
+  const turbo = JSON.parse(turboSource)
+
+  for (const pkg of [oraclePackage, visualPackage]) {
+    assert.equal(typeof pkg.scripts.lint, 'string')
+    assert.notEqual(pkg.scripts.lint.trim(), '')
+  }
+  assert.equal(rootPackage.scripts.lint, 'turbo run lint')
+  assert.ok(turbo.tasks.lint)
+  assert.match(rootPackage.engines.node, /(?:\^|>=)\d+\.\d+\.\d+/)
+
+  for (const field of ['commit', 'dirty', 'lockfile', 'packageManager', 'runtimeContextSha256']) {
+    assert.match(runnerSource, new RegExp(`\\b${field}\\b`), `runner provenance must record ${field}`)
+  }
+})
+
 test('O26: backs reported verification with a run ledger, machine transitions and counted budgets', async () => {
   const skill = await read('SKILL.md')
 
   assert.match(skill, /scripts\/oracle-run\.mjs exec/)
-  assert.match(skill, /append-only\s*\n?\s*ledger에 기록되고 보고는 자유 서술 대신 runId를 인용한다/)
-  assert.match(skill, /ledger에 없는 실행을\s*\n?\s*통과로 보고하지 않는다/)
+  assert.match(skill, /append-only\s*ledger에 기록되고 보고는 자유 서술 대신 runId를 인용한다/)
+  assert.match(skill, /ledger에 없는 실행을\s*통과로 보고하지 않는다/)
   assert.match(skill, /scripts\/oracle-run\.mjs transition`으로만 기록한다/)
   assert.match(skill, /oracle-run\.mjs budget`이 계수한다/)
   assert.match(skill, /scripts\/oracle-verify\.mjs evidence`로 실제/)
@@ -198,7 +366,7 @@ test('O28: routes delivery runs through exec and gates GREEN on flakiness and te
 
 test('keeps automatic routing narrow and leaves sibling concerns with their owners', async () => {
   const skill = await read('SKILL.md')
-  const description = skill.match(/^description:\s*(.+)$/m)?.[1] ?? ''
+  const description = skill.match(/^description: ([^\n]+)$/m)?.[1] ?? ''
 
   assert.match(description, /medium|high/i)
   assert.match(description, /Do not auto-invoke/i)
@@ -211,7 +379,7 @@ test('keeps automatic routing narrow and leaves sibling concerns with their owne
 test('O29: gives reviewers raw run evidence and a validated finding schema', async () => {
   const subagentReview = await read('references/subagent-review.md')
 
-  assert.match(subagentReview, /ledger\s*\n?\s*runId/)
+  assert.match(subagentReview, /ledger\s*runId/)
   assert.match(subagentReview, /oracle-verify\.mjs findings/)
   assert.match(subagentReview, /--intersect/)
   assert.match(subagentReview, /독립 리뷰를 2회\*\* 실행한다/)
@@ -314,11 +482,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.27.1')
+  assert.equal(version, '0.28.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.27.1')
+  assert.equal(marketplace.version, '0.28.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -328,8 +496,8 @@ test('separates requested mechanism from intended outcome without letting the ag
   assert.match(oracleCard, /Intended outcome/)
   assert.match(oracleCard, /Smallest reversible scope/)
   assert.match(oracleCard, /Deferred scope.*Non-goals/s)
-  assert.match(oracleCard, /scope 축소는 사용자의 명시적\s*\n?\s*승인으로만/)
-  assert.match(oracleCard, /`mandatory-constraint`.*생략\s*\n?\s*근거로 쓰지 않는다/s)
+  assert.match(oracleCard, /scope 축소는 사용자의 명시적\s*승인으로만/)
+  assert.match(oracleCard, /`mandatory-constraint`.*생략\s*근거로 쓰지 않는다/s)
   assert.match(oracleCard, /요청된 수단이 의도한 결과를 얻는 최소 수단인지/)
 })
 
@@ -368,7 +536,7 @@ test('records new dependency decisions and reviews them against real problems an
   assert.match(subagentReview, /왜 새 dependency·framework를 도입했는가\?/)
   assert.match(subagentReview, /기술 이름·인기가 아니라 실제 문제/)
   assert.match(subagentReview, /navigation·persistence·권한·결제·cross-unit/)
-  assert.match(subagentReview, /diff 밖의 실제\s*\n?\s*route/)
+  assert.match(subagentReview, /diff 밖의 실제\s*route/)
 })
 
 test('reuses the repository network boundary and colocates approved MSW handlers', async () => {
@@ -410,11 +578,11 @@ test('batches delivery decisions without prescribing an implementation topology'
   }
 
   assert.match(implementationLoop, /read-only.*병렬/s)
-  assert.match(implementationLoop, /모든.*결정.*뒤.*final lock.*1회/s)
+  assert.match(implementationLoop, /모든 결과 변경 결정이\s*끝난 뒤 final lock을 1회/)
   assert.match(implementationLoop, /`VALID_RED` 전.*production.*수정하지 않는다/s)
   assert.match(implementationLoop, /현재 agent.*직접.*위임.*병렬화.*강제하지 않는다/s)
-  assert.equal(implementationNode.kind, 'gate')
-  assert.equal(implementationNode.owner, undefined)
+  assert.equal(implementationNode.kind, 'agent')
+  assert.equal(implementationNode.owner, 'executor')
   assert.match(implementationNode.task, /단일·위임·병렬 구현 방식을 강제하지 않는다/)
   assert.match(implementationLoop, /targeted GREEN.*1회/s)
   assert.match(implementationLoop, /root test.*lint.*format.*독립 review.*병렬/s)
@@ -572,7 +740,7 @@ test('O1-O7: loads one detailed changeability reference before implementation de
   assert.match(changeability, /내부 상태 전이와 lifecycle을 모호한 자동화로 숨기지 않는다/)
   assert.match(changeability, /복구 가능한 오류만 처리하고 나머지는 상위로 전파한다/)
   assert.match(changeability, /pure transition core와 얇은 adapter/)
-  assert.match(changeability, /미래 가능성만으로\s*\n?\s*단일 runtime에 adapter를 추가하지 않는다/)
+  assert.match(changeability, /미래 가능성만으로\s*단일 runtime에 adapter를 추가하지 않는다/)
   assert.match(changeability, /hook.*반환.*대상 레포.*관례/is)
   assert.doesNotMatch(changeability, /^## React 구현 교차 점검$/m)
   assert.doesNotMatch(changeability, /^## Implementation Decision 형식$/m)
@@ -744,7 +912,7 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
   assert.match(skill, /기존 query·router·form이\s+상태를 소유하면 새 `status` union을 만들지 않는다/)
   assert.match(oracleCard, /## State Model/)
   assert.match(oracleCard, /State Model — 선택 사항/)
-  assert.match(oracleCard, /섹션이 없다고\s*\n?\s*lint가 막지 않는다/)
+  assert.match(oracleCard, /섹션이 없다고\s*lint가 막지 않는다/)
   assert.match(oracleCard, /참조 없는 전이는 발명된 정책이다/)
   assert.match(frontendImplementation, /types\/state-ladder\.md/)
   assert.match(frontendImplementation, /client state·/)
@@ -852,7 +1020,7 @@ test('reads load conditions at the decision point, not at the write stage', asyn
   assert.match(graph.entryContract.loadConditionRule, /애매하면 로드한다/)
   assert.match(graph.entryContract.loadConditionRule, /로드를 건너뛸지는 판정 대상이 아니다/)
   assert.match(skill, /`when`은 산출물 시점이 아니라 결정 시점으로 읽는다/)
-  assert.match(skill, /조건 해당\s*\n?\s*여부가 애매하면 로드한다/)
+  assert.match(skill, /조건 해당\s*여부가 애매하면 로드한다/)
 
   // 설계 단계에 필요한 노드를 쓰기 단계에만 gate하지 않는다 — 이전 실패 모드
   for (const id of ['frontend-decisions', 'frontend-authoring', 'changeability', 'fsd']) {
@@ -866,7 +1034,7 @@ test('reads load conditions at the decision point, not at the write stage', asyn
   // 판정표는 requires 엣지로 딸려온다 — 조건 해석 여지 자체를 없앤다
   assert.ok(byId.get('types-state-ladder').requires.includes('frontend-decisions'))
   assert.match(skill, /state-ladder\.md\).*frontend\/decisions\.md/)
-  assert.match(typeConstraints, /판정표를 읽기 전에 로딩 수단을 고르지\s*\n?\s*않는다/)
+  assert.match(typeConstraints, /판정표를 읽기 전에 로딩 수단을 고르지\s*않는다/)
 })
 
 test('always loads advanced compiler contracts with type work and keeps adoption witness-gated', async () => {
@@ -898,12 +1066,12 @@ test('scopes negative type witnesses to boundary axes and caps them as a design 
   // 축은 bva.md 한 곳이 소유한다 — 타입 문서는 이 API가 닫는 축만 고르라고 요구한다
   assert.match(bva, /## 5\. 타입 경계/)
   assert.match(bva, /닫지 않는 축에는 witness를 만들지 않는다/)
-  assert.match(typeConstraints, /이 API가 닫는 경계 축마다 witness를\s*\n?\s*둔다/)
+  assert.match(typeConstraints, /이 API가 닫는 경계 축마다 witness를\s*둔다/)
   assert.match(typeConstraints, /타입 witness의 축과 개수 규칙은 \[`\.\.\/bva\.md`\]/)
 
   // 30은 채우는 목표가 아니라 분리 신호다
   assert.match(bva, /30은 채워야 할 목표가 아니라 표면이 너무 넓다는 설계 실격선이다/)
-  assert.match(typeConstraints, /30개를 넘으면 케이스를\s*\n?\s*더 쓰지 말고 API를 나눈다/)
+  assert.match(typeConstraints, /30개를 넘으면 케이스를\s*더 쓰지 말고 API를 나눈다/)
   assert.match(typeConstraints, /30개를 넘는데 API 분리를 검토하지 않았으면 `FINDING`이다/)
 
   // 축을 아예 선언하지 않는 우회를 오용 목록과 묶어 닫는다
@@ -929,7 +1097,7 @@ test('keeps client state data-only and hands actions back beside it', async () =
   assert.match(typeConstraints, /no-action-in-state/)
 
   // 5: 잘못된 입력은 UI 동작·문구가 다를 때만 별도 상태다
-  assert.match(typeConstraints, /UI 동작·문구가 실제로 다를 때만\s*\n?\s*별도 상태로 나눈다/)
+  assert.match(typeConstraints, /UI 동작·문구가 실제로 다를 때만\s*별도 상태로 나눈다/)
 
   // 8: 카드의 State Model은 정책 표기이지 런타임 기계 지시가 아니다
   assert.match(typeConstraints, /카드에 `## State Model`이 있다는 사실만으로/)
@@ -938,7 +1106,7 @@ test('keeps client state data-only and hands actions back beside it', async () =
   // 7: unmount·route 변경 뒤 도착한 응답은 타입이 아니라 런타임이 막는다
   assert.match(frontendImplementation, /unmount·route 변경 뒤 도착한 응답/)
   assert.match(frontendImplementation, /AbortController/)
-  assert.match(frontendImplementation, /직접 만든 async 상태에도 같은 방어를\s*\n?\s*적용한다/)
+  assert.match(frontendImplementation, /직접 만든 async 상태에도 같은 방어를\s*적용한다/)
   assert.match(frontendImplementation, /state와 action을 형제로 반환한다/)
 
   // 리뷰는 같은 계약으로 판정한다
@@ -1093,14 +1261,14 @@ test('forces one entry-node read and a lane header before any other work', async
   assert.ok(entryIndex < skill.indexOf('## Reference 로딩'))
 
   assert.match(skill, /첫 tool call은 lane 진입 노드 1개를 Read 하는 것이다/)
-  assert.match(skill, /repo 탐색·답변 작성·다른 도구 호출·다른\s*\n?\s*reference 로드는 전부 그 뒤에 온다/)
+  assert.match(skill, /repo 탐색·답변 작성·다른 도구 호출·다른\s*reference 로드는 전부 그 뒤에 온다/)
   assert.match(skill, /응답 첫 줄에 lane 헤더를 출력한다.*헤더 없이 본문을 쓰면 위반이다/s)
   assert.match(skill, /risk=<Low\|Medium\|High> lane=<low-fast-path\|oracle> nodes=\[/)
   assert.match(skill, /실제로 Read 한\*\* 노드만 적는다/)
 
   // 설명·플랜 전용 요청도 같은 절차 — 이전 실패 모드
   assert.match(skill, /말로 설명만\*\* 하는 요청도 이 절차 안이다/)
-  assert.match(skill, /"이미 아는 내용"·\s*\n?\s*"명세가 충분히 상세함"·"코드를 안 고치니까"는 스킵 사유가 아니다/)
+  assert.match(skill, /"이미 아는 내용"·\s*"명세가 충분히 상세함"·"코드를 안 고치니까"는 스킵 사유가 아니다/)
 
   // Low lane도 같은 헤더를 낸다
   assert.match(lane, /응답 첫 줄에 lane 헤더를 출력한다/)
@@ -1127,8 +1295,8 @@ test('inlines the required reference reads into the mode steps instead of a sepa
   assert.match(designOnly, /\[`card\/card-format\.md`\]/)
   assert.match(designOnly, /10\. \[`card\/confirmation-lock\.md`\]/)
   assert.match(designOnly, /lane 헤더의 `risk`를 여기서 확정한다/)
-  assert.match(delivery, /\[`delivery\/ledger\.md`\][\s\S]*\[`delivery\/red\.md`\][^\n]*를\n?\s*읽는다/)
+  assert.match(delivery, /\[`delivery\/ledger\.md`\][\s\S]*\[`delivery\/red\.md`\][^\n]*를\s*읽는다/)
 
   // 카탈로그 섹션은 실행 순서를 소유하지 않는다
-  assert.match(skill, /「모드 선택」의 각 단계에 인라인된 읽기 지시가 실행\s*\n?순서를 소유하며/)
+  assert.match(skill, /「모드 선택」의 각 단계에 인라인된 읽기 지시가 실행\s*순서를 소유하며/)
 })

@@ -3,24 +3,63 @@
   "outcome": "승인된 Oracle Card를 불변 기준으로 삼아 요청된 frontend 설계 또는 Delivery를 검증 가능한 상태로 완료한다.",
   "stopCondition": "Design-only는 ORACLE_READY, Delivery는 REVIEW_VERIFIED terminal에 도달하며 모든 판정이 Oracle ledger와 lock으로 검증된다.",
   "entry": "draft-oracle",
-  "terminals": ["oracle-ready", "review-verified", "cancelled", "failed"],
-  "maxSteps": 30,
+  "terminals": [
+    "oracle-ready",
+    "implemented-green",
+    "review-verified",
+    "needs-decision",
+    "pre-ledger-needs-decision",
+    "cancelled",
+    "pre-ledger-failed",
+    "failed"
+  ],
+  "maxSteps": 36,
   "context": ["request", "repositoryContext", "previousRevision"],
   "fallback": [
-    { "when": { "field": "classification", "equals": "POLICY_GAP" }, "to": "draft-oracle" },
-    { "when": { "field": "classification", "equals": "FAIL" }, "to": "failed" },
-    { "when": { "field": "classification", "equals": "PRODUCT_DEFECT" }, "to": "implement-green" },
-    { "when": { "field": "classification", "equals": "EVIDENCE_GAP" }, "to": "evidence-repair" },
-    { "when": { "field": "classification", "equals": "HARNESS_DEFECT" }, "to": "evidence-repair" }
+    {
+      "when": {
+        "field": "classification",
+        "equals": "POLICY_GAP"
+      },
+      "to": "needs-decision"
+    },
+    {
+      "when": {
+        "field": "classification",
+        "equals": "FAIL"
+      },
+      "to": "failed"
+    },
+    {
+      "when": {
+        "field": "classification",
+        "equals": "PRODUCT_DEFECT"
+      },
+      "to": "implement-green"
+    },
+    {
+      "when": {
+        "field": "classification",
+        "equals": "EVIDENCE_GAP"
+      },
+      "to": "evidence-repair"
+    },
+    {
+      "when": {
+        "field": "classification",
+        "equals": "HARNESS_DEFECT"
+      },
+      "to": "evidence-repair"
+    }
   ],
   "nodes": [
     {
       "id": "draft-oracle",
       "kind": "agent",
       "owner": "planner",
-      "task": "현재 Frontend Oracle Design 계약으로 risk, Outcome Brief, Source Registry, 필요한 설계·architecture·backend 결정을 조사해 Draft Oracle과 delta 및 미결 질문을 만든다. lock, test, production 수정은 하지 않는다. 완료하면 classification을 CONFIRMATION_REQUIRED 또는 FAIL로만 반환한다.",
+      "task": "현재 Frontend Oracle Design 계약으로 risk, Outcome Brief, Source Registry, 필요한 설계·architecture·backend 결정을 조사해 Draft Oracle과 delta 및 미결 질문을 만든다. 새 graph run이 기존 IMPLEMENTED_GREEN persisted state를 발견하면 RESUME_IMPLEMENTED_GREEN과 실제 runId를 반환한다. lock, test, production 수정은 하지 않는다. 완료하면 CONFIRMATION_REQUIRED, POLICY_GAP과 구조화된 decision, 또는 실제 error를 포함한 FAIL만 반환한다.",
       "input": ["request", "repositoryContext", "previousRevision"],
-      "output": ["classification", "oraclePath", "summary"],
+      "output": ["classification", "oraclePath", "oracleSha256", "summary", "runId", "decision", "error"],
       "writeScope": [".ai/oracles/**"],
       "dispatch": "one"
     },
@@ -36,9 +75,9 @@
     {
       "id": "lock-oracle",
       "kind": "tool",
-      "task": "oracle-verify.mjs card와 oracle-lock.mjs를 실행해 확인된 revision을 잠근다. 승인 모드에 따라 classification을 DESIGN_READY 또는 DELIVERY_READY로 반환하고, 정책 변경은 POLICY_GAP, 도구 실패는 FAIL로 반환한다.",
+      "task": "oracle-verify.mjs card와 oracle-lock.mjs를 실행해 확인된 revision을 잠근다. 승인 모드에 따라 classification을 DESIGN_READY 또는 DELIVERY_READY로 반환하고, 정책 변경은 POLICY_GAP 및 구조화된 decision으로 반환한다. ledger 전 도구 실패는 실제 error와 함께 FAIL로 반환하며 runId를 만들거나 추정하지 않는다.",
       "input": ["oraclePath", "decision", "confirmation"],
-      "output": ["classification", "oracleSha", "runId"],
+      "output": ["classification", "oracleSha256", "runId", "decision", "error"],
       "writeScope": [".ai/oracles/**"],
       "dispatch": "one"
     },
@@ -46,9 +85,9 @@
       "id": "delivery-init",
       "kind": "agent",
       "owner": "planner",
-      "task": "잠긴 Delivery source를 검증하고 조건부 reference를 로드한다. 설치된 $test를 명시적으로 호출한 뒤 oracle-run.mjs init으로 필수 run label, ledger, 상태와 예산을 초기화한다. classification은 READY, POLICY_GAP 또는 FAIL이며, 환경 결함은 사유를 ledger에 남기고 FAIL로 보고한다.",
-      "input": ["oraclePath", "oracleSha", "request"],
-      "output": ["classification", "runState", "runId"],
+      "task": "잠긴 Delivery source를 검증하고 조건부 reference를 로드한다. 설치된 $test를 명시적으로 호출한 뒤 oracle-run.mjs init으로 필수 run label, ledger, 상태와 예산을 초기화한다. classification은 READY, POLICY_GAP 또는 FAIL이다. init 뒤 POLICY_GAP이면 oracle-run.mjs transition --to NEEDS_DECISION을 기록하고 구조화된 decision과 runId를 반환한다. 환경 결함은 사유를 ledger에 남기고 실제 error와 함께 FAIL로 보고한다.",
+      "input": ["oraclePath", "oracleSha256", "request"],
+      "output": ["classification", "runState", "runId", "decision", "error"],
       "writeScope": [".ai/oracles/**"],
       "dispatch": "one"
     },
@@ -56,28 +95,29 @@
       "id": "valid-red",
       "kind": "agent",
       "owner": "test-engineer",
-      "task": "테스트 파일을 쓰기 직전에 $test를 로드해 잠긴 카드의 실패 우선 테스트를 작성·실행한다. oracle-run.mjs ledger와 oracle-verify.mjs red가 인정한 경우에만 VALID_RED를 반환한다. 테스트가 잠긴 카드 행을 이미 만족해 빨갛지 않으면 INVALID_RED를 반환한다. 그 밖에는 POLICY_GAP, HARNESS_DEFECT 또는 FAIL을 반환하고 production은 수정하지 않는다.",
-      "input": ["oraclePath", "oracleSha", "runState"],
-      "output": ["classification", "runId", "evidence"],
+      "task": "테스트 파일을 쓰기 직전에 $test를 로드해 잠긴 카드의 실패 우선 테스트를 작성·실행한다. oracle-run.mjs ledger와 oracle-verify.mjs red가 인정한 경우 oracle-run.mjs transition --to VALID_RED를 먼저 기록한 뒤에만 VALID_RED를 반환한다. 테스트가 잠긴 카드 행을 이미 만족해 빨갛지 않으면 ALREADY_SATISFIED를 반환하고 production은 수정하지 않는다. 그 밖에는 POLICY_GAP 및 구조화된 decision, HARNESS_DEFECT 또는 실제 error를 포함한 FAIL을 반환하고 production은 수정하지 않는다. POLICY_GAP이면 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다. INVALID_RED는 쓰지 않는다.",
+      "input": ["oraclePath", "oracleSha256", "runState"],
+      "output": ["classification", "runId", "evidence", "decision", "error"],
       "writeScope": ["**", "!.ai/agent-graphs/**"],
       "dispatch": "one"
     },
     {
       "id": "implement-green",
-      "kind": "gate",
-      "task": "VALID_RED와 lock을 검증한 뒤 현재 실행 환경이 선택한 방식으로 최소 production 개선을 수행하고 필수 label을 oracle-run.mjs exec로 실행한 결과를 받는다. 이 Node는 단일·위임·병렬 구현 방식을 강제하지 않는다. High risk면 $test가 mutation kill·원복·재-GREEN까지 판정한다. 성공 시 risk에 따라 IMPLEMENTED_GREEN_STANDARD 또는 IMPLEMENTED_GREEN_HIGH를 반환하고, 그 밖에는 PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP 또는 FAIL을 반환한다.",
-      "input": ["oraclePath", "oracleSha", "runState", "evidence"],
-      "output": ["classification", "runId", "artifacts"],
+      "kind": "agent",
+      "task": "VALID_RED와 lock을 검증한 경우에만 최소 production 개선을 수행하고 필수 label을 oracle-run.mjs exec로 실행한다. ALREADY_SATISFIED는 zero-production verification만 수행하며 production을 수정하지 않는다. 이 Node는 단일·위임·병렬 구현 방식을 강제하지 않는다. High risk면 $test가 mutation kill·원복·재-GREEN까지 판정한다. 표준 또는 High 성공은 oracle-run.mjs transition --to IMPLEMENTED_GREEN을 정확히 한 번 기록한 뒤 risk에 따라 IMPLEMENTED_GREEN_STANDARD 또는 IMPLEMENTED_GREEN_HIGH와 runId를 반환한다. visual pending도 그 단일 전이를 기록하고 IMPLEMENTED_GREEN_PENDING_VISUAL을 반환해 resumable IMPLEMENTED_GREEN terminal에서 멈춘다; resume은 pending visual evidence를 완료한 뒤 review로 진행하며 REVIEW_VERIFIED를 주장하지 않는다. 그 밖에는 PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP 및 구조화된 decision 또는 실제 error를 포함한 FAIL과 실패 runId를 반환한다. POLICY_GAP이면 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다.",
+      "input": ["oraclePath", "oracleSha256", "runState", "evidence"],
+      "output": ["classification", "runId", "artifacts", "decision", "error"],
       "writeScope": ["**", "!.ai/agent-graphs/**"],
-      "dispatch": "one"
+      "dispatch": "one",
+      "owner": "executor"
     },
     {
       "id": "evidence-repair",
       "kind": "agent",
       "owner": "test-engineer",
-      "task": "$test 계약과 Oracle budget 안에서 locator, fixture, barrier 또는 evidence mapping만 최소 보정한다. 정책·assertion·production을 바꾸지 않는다. EVIDENCE_READY, HARNESS_DEFECT, PRODUCT_DEFECT, POLICY_GAP 또는 FAIL을 반환한다.",
-      "input": ["oraclePath", "oracleSha", "runState", "findings"],
-      "output": ["classification", "runId", "evidence"],
+      "task": "$test 계약과 Oracle budget 안에서 locator, fixture, barrier 또는 evidence mapping만 최소 보정한다. 정책·assertion·production을 바꾸지 않는다. EVIDENCE_READY, HARNESS_DEFECT, PRODUCT_DEFECT, POLICY_GAP 및 구조화된 decision 또는 실제 error를 포함한 FAIL을 반환한다. POLICY_GAP이면 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다.",
+      "input": ["oraclePath", "oracleSha256", "runState", "findings"],
+      "output": ["classification", "runId", "evidence", "decision", "error"],
       "writeScope": ["**", "!.ai/agent-graphs/**"],
       "dispatch": "one"
     },
@@ -85,18 +125,27 @@
       "id": "standard-review",
       "kind": "agent",
       "owner": "code-reviewer",
-      "task": "oracle-run.mjs review-packet의 원시 증거로 독립 리뷰 1회를 수행하고 검증 가능한 finding artifact를 반환한다. 리뷰를 끝까지 마치면 status를 READY로, 패킷이나 증거가 불완전해 판정할 수 없으면 BLOCKED로 반환한다. 정책을 새로 만들거나 파일을 수정하지 않는다.",
-      "input": ["oraclePath", "oracleSha", "artifacts"],
-      "output": ["status", "findings"],
+      "task": "oracle-run.mjs review-packet의 원시 증거로 독립 리뷰 1회를 수행하고 검증 가능한 finding artifact를 반환한다. 리뷰를 끝까지 마치면 status를 READY로, 패킷이나 증거가 불완전해 판정할 수 없으면 BLOCKED로 반환한다. 정책을 새로 만들거나 파일을 수정하지 않는다. 정책 미결은 POLICY_GAP과 구조화된 decision을 반환하고 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다. 도구 오류는 실제 error를 포함한 classification FAIL과 runId로 반환한다.",
+      "input": ["oraclePath", "oracleSha256", "artifacts"],
+      "output": ["status", "classification", "findings", "runId", "decision", "error"],
       "writeScope": [],
       "dispatch": "one"
     },
     {
       "id": "high-review-fanout",
       "kind": "tool",
-      "task": "High-risk review packet을 고정하고 서로 컨텍스트를 공유하지 않는 두 reviewer Node를 동시에 활성화한다.",
-      "input": ["oraclePath", "oracleSha", "artifacts"],
-      "output": ["status", "reviewPacket"],
+      "task": "Controller가 oracle-run.mjs review-packet으로 High-risk packet을 고정하고 controller-issued reviewAssignments와 reviewDispatches를 만들어 서로 컨텍스트를 공유하지 않는 두 reviewer Node를 동시에 활성화한다. 성공은 status READY와 packet·assignment·dispatch data를 반환한다. 정책 미결은 POLICY_GAP과 구조화된 decision을 반환하고 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다. 패킷 생성 또는 dispatch 실패는 실제 error를 포함한 classification FAIL과 runId로 반환한다.",
+      "input": ["oraclePath", "oracleSha256", "artifacts"],
+      "output": [
+        "status",
+        "classification",
+        "reviewPacket",
+        "reviewAssignments",
+        "reviewDispatches",
+        "runId",
+        "decision",
+        "error"
+      ],
       "writeScope": [".ai/oracles/**"],
       "dispatch": "all"
     },
@@ -104,9 +153,9 @@
       "id": "high-review-a",
       "kind": "agent",
       "owner": "code-reviewer",
-      "task": "High-risk review packet의 첫 번째 독립 표본을 검토하고 검증 가능한 finding artifact를 findingsA로만 반환한다. 다른 reviewer 결과를 읽거나 파일을 수정하지 않는다.",
-      "input": ["reviewPacket"],
-      "output": ["status", "findingsA"],
+      "task": "High-risk review packet과 controller-issued assignment·dispatch의 첫 번째 독립 표본을 검토하고 검증 가능한 finding artifact를 findingsA로만 반환한다. 다른 reviewer 결과를 읽거나 파일을 수정하지 않는다.",
+      "input": ["reviewPacket", "reviewAssignments", "reviewDispatches"],
+      "output": ["findingsA"],
       "writeScope": [],
       "dispatch": "one"
     },
@@ -114,9 +163,9 @@
       "id": "high-review-b",
       "kind": "agent",
       "owner": "code-reviewer",
-      "task": "High-risk review packet의 두 번째 독립 표본을 검토하고 검증 가능한 finding artifact를 findingsB로만 반환한다. 다른 reviewer 결과를 읽거나 파일을 수정하지 않는다.",
-      "input": ["reviewPacket"],
-      "output": ["status", "findingsB"],
+      "task": "High-risk review packet과 controller-issued assignment·dispatch의 두 번째 독립 표본을 검토하고 검증 가능한 finding artifact를 findingsB로만 반환한다. 다른 reviewer 결과를 읽거나 파일을 수정하지 않는다.",
+      "input": ["reviewPacket", "reviewAssignments", "reviewDispatches"],
+      "output": ["findingsB"],
       "writeScope": [],
       "dispatch": "one"
     },
@@ -124,35 +173,68 @@
       "id": "high-review-join",
       "kind": "join",
       "join": "all",
-      "task": "두 High-risk reviewer 표본이 모두 도착할 때까지 기다린 뒤 findingsA와 findingsB를 표본 출처를 유지한 채 findings로 합쳐 status READY와 함께 전달한다.",
-      "input": ["status", "findingsA", "findingsB"],
-      "output": ["status", "findings"],
-      "writeScope": [],
+      "task": "Controller/join은 두 High-risk finding artifact가 모두 도착하면 oracle-run.mjs review-receipt를 호출해 각각의 packetSha256, targetRevision, role, taskId, outputSha256, reviewerId, findingsSha256와 digest-chain previousDigest·digest를 adapter node-test 및 oracleSha256를 포함한 ledger-bound reviewReceiptA와 reviewReceiptB로 기록한다. 두 receipt가 모두 유효하면 findings를 표본 출처와 함께 합쳐 status READY와 receipt identities/digests를 반환한다. finding 또는 receipt가 BLOCKED면 status BLOCKED, controller가 포착한 reviewer dispatch 또는 receipt 명령 실패면 classification FAIL과 실제 error·runId를 반환한다.",
+      "input": ["findingsA", "findingsB", "reviewPacket", "reviewAssignments", "reviewDispatches", "runId"],
+      "output": ["status", "classification", "findings", "reviewReceiptA", "reviewReceiptB", "runId", "error"],
+      "writeScope": [".ai/oracles/**"],
       "dispatch": "one"
     },
     {
       "id": "review-decision",
       "kind": "tool",
-      "task": "oracle-verify.mjs findings와 High-risk 교집합 규칙으로 review artifact를 판정한다. NON_ORACLE_OPINION만 남으면 finding artifact에는 그대로 두고 classification을 REVIEW_ACCEPTED로 정규화한다. classification은 REVIEW_ACCEPTED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP 또는 FAIL이다.",
-      "input": ["oraclePath", "oracleSha", "findings"],
-      "output": ["classification", "runId", "findings"],
+      "task": "Controller는 standard review finding이면 먼저 oracle-run.mjs review-receipt를 호출하고, High-risk면 전달된 두 ledger-bound review-receipt identity/digest를 사용한다. oracle-verify.mjs findings와 High-risk 교집합 규칙 및 receipt를 검증해 review artifact를 판정한다. NON_ORACLE_OPINION만 남으면 finding artifact에는 그대로 두고 classification을 REVIEW_ACCEPTED로 정규화한다. classification은 REVIEW_ACCEPTED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP 및 구조화된 decision 또는 실제 error를 포함한 FAIL이다. POLICY_GAP이면 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다.",
+      "input": ["oraclePath", "oracleSha256", "findings", "reviewReceiptA", "reviewReceiptB"],
+      "output": ["classification", "runId", "findings", "reviewReceiptA", "reviewReceiptB", "decision", "error"],
       "writeScope": [".ai/oracles/**"],
       "dispatch": "one"
     },
     {
       "id": "final-verify",
       "kind": "tool",
-      "task": "lock, evidence, review와 모든 필수 run label을 다시 검증하고 oracle-run.mjs transition으로 REVIEW_VERIFIED를 기록한다. classification은 REVIEW_VERIFIED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP 또는 FAIL이다.",
-      "input": ["oraclePath", "oracleSha", "runState", "findings"],
-      "output": ["classification", "runId", "report"],
+      "task": "lock, evidence, review, 두 ledger-bound review-receipt identity/digest와 모든 필수 run label을 다시 검증하고 oracle-run.mjs transition으로 REVIEW_VERIFIED를 기록한다. classification은 REVIEW_VERIFIED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP 및 구조화된 decision 또는 실제 error를 포함한 FAIL이며 항상 runId 또는 실패 runId를 출력한다. POLICY_GAP이면 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다.",
+      "input": ["oraclePath", "oracleSha256", "runState", "findings", "reviewReceiptA", "reviewReceiptB"],
+      "output": ["classification", "runId", "report", "decision", "error"],
       "writeScope": [".ai/oracles/**"],
       "dispatch": "one"
+    },
+    {
+      "id": "implemented-green",
+      "kind": "terminal",
+      "task": "visual evidence pending Delivery를 resumable IMPLEMENTED_GREEN으로 종료한다. 재개 시 pending visual evidence를 완료한 뒤 review를 수행하며 REVIEW_VERIFIED를 주장하지 않는다.",
+      "input": ["runId", "artifacts"],
+      "output": [],
+      "writeScope": []
+    },
+    {
+      "id": "resume-implemented-green",
+      "kind": "tool",
+      "task": "persisted IMPLEMENTED_GREEN runId와 lock을 확인하고 completed visual evidence를 oracle-verify.mjs로 검증한다. certifiable visual PASS는 trusted oracle-run --adapter node-test run의 잠긴 test가 Playwright를 호출하고 만든 schema-v3 artifact여야 하며 standalone Playwright adapter와 Browser MCP observation은 인정하지 않는다. visual evidence가 아직 pending이면 IMPLEMENTED_GREEN_PENDING_VISUAL을 반환한다. 완료되면 위험도에 따라 RESUME_STANDARD 또는 RESUME_HIGH를 반환해 기존 review로만 진행하며 IMPLEMENTED_GREEN 전이를 다시 기록하지 않는다. 정책 미결은 POLICY_GAP과 구조화된 decision 및 runId를 반환하고 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다. 검증 실패는 실제 error와 runId를 포함한 FAIL이다.",
+      "input": ["oraclePath", "oracleSha256", "runId"],
+      "output": ["classification", "runId", "artifacts", "decision", "error"],
+      "writeScope": [".ai/oracles/**"],
+      "dispatch": "one"
+    },
+    {
+      "id": "pre-ledger-needs-decision",
+      "kind": "terminal",
+      "task": "ledger 생성 전 POLICY_GAP의 policy evidence와 구조화된 decision을 보존하고 runId 없이 종료한다.",
+      "input": ["classification", "decision"],
+      "output": [],
+      "writeScope": []
+    },
+    {
+      "id": "needs-decision",
+      "kind": "terminal",
+      "task": "정책 미결을 종료한다. init 뒤에는 oracle-run.mjs transition --to NEEDS_DECISION으로 기록한 실제 runId를 보존하고, ledger 전에는 pre-ledger 정책 증거와 decision을 보존하며 runId를 만들지 않는다.",
+      "input": ["classification", "decision", "runId"],
+      "output": [],
+      "writeScope": []
     },
     {
       "id": "oracle-ready",
       "kind": "terminal",
       "task": "Design-only 실행을 ORACLE_READY로 종료한다.",
-      "input": ["oracleSha"],
+      "input": ["oracleSha256"],
       "output": [],
       "writeScope": []
     },
@@ -173,10 +255,18 @@
       "writeScope": []
     },
     {
+      "id": "pre-ledger-failed",
+      "kind": "terminal",
+      "input": ["classification", "error"],
+      "output": [],
+      "task": "ledger 생성 전 실제 error를 보존하고 FAIL로 종료한다.",
+      "writeScope": []
+    },
+    {
       "id": "failed",
       "kind": "terminal",
       "task": "마지막 실제 오류와 ledger runId를 보존하고 FAIL로 종료한다.",
-      "input": ["classification", "runId"],
+      "input": ["classification", "runId", "error"],
       "output": [],
       "writeScope": []
     }
@@ -185,49 +275,260 @@
     {
       "from": "draft-oracle",
       "to": "user-confirmation",
-      "when": { "field": "classification", "equals": "CONFIRMATION_REQUIRED" }
+      "when": {
+        "field": "classification",
+        "equals": "CONFIRMATION_REQUIRED"
+      }
     },
-    { "from": "user-confirmation", "to": "lock-oracle", "when": { "field": "decision", "equals": "APPROVE_DESIGN" } },
-    { "from": "user-confirmation", "to": "lock-oracle", "when": { "field": "decision", "equals": "APPROVE_DELIVERY" } },
-    { "from": "user-confirmation", "to": "draft-oracle", "when": { "field": "decision", "equals": "REVISE" } },
-    { "from": "user-confirmation", "to": "cancelled", "when": { "field": "decision", "equals": "CANCEL" } },
-    { "from": "lock-oracle", "to": "oracle-ready", "when": { "field": "classification", "equals": "DESIGN_READY" } },
-    { "from": "lock-oracle", "to": "delivery-init", "when": { "field": "classification", "equals": "DELIVERY_READY" } },
-    { "from": "delivery-init", "to": "valid-red", "when": { "field": "classification", "equals": "READY" } },
-    { "from": "valid-red", "to": "implement-green", "when": { "field": "classification", "equals": "VALID_RED" } },
-    { "from": "valid-red", "to": "valid-red", "when": { "field": "classification", "equals": "HARNESS_DEFECT" } },
-    { "from": "valid-red", "to": "draft-oracle", "when": { "field": "classification", "equals": "INVALID_RED" } },
+    {
+      "from": "draft-oracle",
+      "to": "pre-ledger-failed",
+      "when": {
+        "field": "classification",
+        "equals": "FAIL"
+      }
+    },
+    {
+      "from": "draft-oracle",
+      "to": "pre-ledger-needs-decision",
+      "when": {
+        "field": "classification",
+        "equals": "POLICY_GAP"
+      }
+    },
+    {
+      "from": "draft-oracle",
+      "to": "resume-implemented-green",
+      "when": {
+        "field": "classification",
+        "equals": "RESUME_IMPLEMENTED_GREEN"
+      }
+    },
+    {
+      "from": "user-confirmation",
+      "to": "lock-oracle",
+      "when": {
+        "field": "decision",
+        "equals": "APPROVE_DESIGN"
+      }
+    },
+    {
+      "from": "user-confirmation",
+      "to": "lock-oracle",
+      "when": {
+        "field": "decision",
+        "equals": "APPROVE_DELIVERY"
+      }
+    },
+    {
+      "from": "user-confirmation",
+      "to": "draft-oracle",
+      "when": {
+        "field": "decision",
+        "equals": "REVISE"
+      }
+    },
+    {
+      "from": "user-confirmation",
+      "to": "cancelled",
+      "when": {
+        "field": "decision",
+        "equals": "CANCEL"
+      }
+    },
+    {
+      "from": "lock-oracle",
+      "to": "oracle-ready",
+      "when": {
+        "field": "classification",
+        "equals": "DESIGN_READY"
+      }
+    },
+    {
+      "from": "lock-oracle",
+      "to": "delivery-init",
+      "when": {
+        "field": "classification",
+        "equals": "DELIVERY_READY"
+      }
+    },
+    {
+      "from": "lock-oracle",
+      "to": "pre-ledger-failed",
+      "when": {
+        "field": "classification",
+        "equals": "FAIL"
+      }
+    },
+    {
+      "from": "lock-oracle",
+      "to": "pre-ledger-needs-decision",
+      "when": {
+        "field": "classification",
+        "equals": "POLICY_GAP"
+      }
+    },
+    {
+      "from": "delivery-init",
+      "to": "valid-red",
+      "when": {
+        "field": "classification",
+        "equals": "READY"
+      }
+    },
+    {
+      "from": "valid-red",
+      "to": "implement-green",
+      "when": {
+        "field": "classification",
+        "equals": "VALID_RED"
+      }
+    },
+    {
+      "from": "valid-red",
+      "to": "implement-green",
+      "when": {
+        "field": "classification",
+        "equals": "ALREADY_SATISFIED"
+      }
+    },
+    {
+      "from": "valid-red",
+      "to": "valid-red",
+      "when": {
+        "field": "classification",
+        "equals": "HARNESS_DEFECT"
+      }
+    },
     {
       "from": "implement-green",
       "to": "standard-review",
-      "when": { "field": "classification", "equals": "IMPLEMENTED_GREEN_STANDARD" }
+      "when": {
+        "field": "classification",
+        "equals": "IMPLEMENTED_GREEN_STANDARD"
+      }
+    },
+    {
+      "from": "resume-implemented-green",
+      "to": "standard-review",
+      "when": {
+        "field": "classification",
+        "equals": "RESUME_STANDARD"
+      }
+    },
+    {
+      "from": "resume-implemented-green",
+      "to": "high-review-fanout",
+      "when": {
+        "field": "classification",
+        "equals": "RESUME_HIGH"
+      }
+    },
+    {
+      "from": "resume-implemented-green",
+      "to": "implemented-green",
+      "when": {
+        "field": "classification",
+        "equals": "IMPLEMENTED_GREEN_PENDING_VISUAL"
+      }
     },
     {
       "from": "implement-green",
       "to": "high-review-fanout",
-      "when": { "field": "classification", "equals": "IMPLEMENTED_GREEN_HIGH" }
+      "when": {
+        "field": "classification",
+        "equals": "IMPLEMENTED_GREEN_HIGH"
+      }
+    },
+    {
+      "from": "implement-green",
+      "to": "implemented-green",
+      "when": {
+        "field": "classification",
+        "equals": "IMPLEMENTED_GREEN_PENDING_VISUAL"
+      }
     },
     {
       "from": "evidence-repair",
       "to": "implement-green",
-      "when": { "field": "classification", "equals": "EVIDENCE_READY" }
+      "when": {
+        "field": "classification",
+        "equals": "EVIDENCE_READY"
+      }
     },
-    { "from": "standard-review", "to": "review-decision", "when": { "field": "status", "equals": "READY" } },
-    { "from": "standard-review", "to": "evidence-repair", "when": { "field": "status", "equals": "BLOCKED" } },
-    { "from": "high-review-fanout", "to": "high-review-a", "when": { "field": "status", "equals": "READY" } },
-    { "from": "high-review-fanout", "to": "high-review-b", "when": { "field": "status", "equals": "READY" } },
-    { "from": "high-review-a", "to": "high-review-join", "when": "always" },
-    { "from": "high-review-b", "to": "high-review-join", "when": "always" },
-    { "from": "high-review-join", "to": "review-decision", "when": { "field": "status", "equals": "READY" } },
+    {
+      "from": "standard-review",
+      "to": "review-decision",
+      "when": {
+        "field": "status",
+        "equals": "READY"
+      }
+    },
+    {
+      "from": "standard-review",
+      "to": "evidence-repair",
+      "when": {
+        "field": "status",
+        "equals": "BLOCKED"
+      }
+    },
+    {
+      "from": "high-review-fanout",
+      "to": "high-review-a",
+      "when": {
+        "field": "status",
+        "equals": "READY"
+      }
+    },
+    {
+      "from": "high-review-fanout",
+      "to": "high-review-b",
+      "when": {
+        "field": "status",
+        "equals": "READY"
+      }
+    },
+    {
+      "from": "high-review-a",
+      "to": "high-review-join",
+      "when": "always"
+    },
+    {
+      "from": "high-review-b",
+      "to": "high-review-join",
+      "when": "always"
+    },
+    {
+      "from": "high-review-join",
+      "to": "review-decision",
+      "when": {
+        "field": "status",
+        "equals": "READY"
+      }
+    },
+    {
+      "from": "high-review-join",
+      "to": "evidence-repair",
+      "when": {
+        "field": "status",
+        "equals": "BLOCKED"
+      }
+    },
     {
       "from": "review-decision",
       "to": "final-verify",
-      "when": { "field": "classification", "equals": "REVIEW_ACCEPTED" }
+      "when": {
+        "field": "classification",
+        "equals": "REVIEW_ACCEPTED"
+      }
     },
     {
       "from": "final-verify",
       "to": "review-verified",
-      "when": { "field": "classification", "equals": "REVIEW_VERIFIED" }
+      "when": {
+        "field": "classification",
+        "equals": "REVIEW_VERIFIED"
+      }
     }
   ]
 }
