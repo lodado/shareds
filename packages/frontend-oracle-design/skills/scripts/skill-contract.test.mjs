@@ -77,17 +77,16 @@ test('runs the Oracle contract through the bundled deterministic workflow graph'
     'oracle-ready',
     'implemented-green',
     'review-verified',
-    'needs-decision',
-    'pre-ledger-needs-decision',
+    'run-stopped',
+    'pre-ledger-stop',
     'cancelled',
-    'pre-ledger-failed',
-    'failed',
   ])
+  assert.equal(graph.nodes.length, 19)
   assert.equal(verified.status, 0, verified.stderr)
   assert.equal(verified.stdout, 'GRAPH_VALID frontend-oracle-design\n')
 })
 
-test('routes already-satisfied red, blocked standard review and split reviewer samples to declared edges', async () => {
+test('routes already-satisfied red, standard one-review and high two-review paths to declared edges', async () => {
   const { selectTransitions } = await import(
     '../../../agent-graph-engineering/skills/agent-graph-engineering/scripts/graph-verify.mjs'
   )
@@ -99,22 +98,27 @@ test('routes already-satisfied red, blocked standard review and split reviewer s
     () => selectTransitions(graph, 'valid-red', { classification: 'INVALID_RED' }),
     /NO_TRANSITION|matches no edge/,
   )
-  assert.deepEqual(selectTransitions(graph, 'standard-review', { status: 'READY' }), ['review-decision'])
-  assert.deepEqual(selectTransitions(graph, 'standard-review', { status: 'BLOCKED' }), ['evidence-repair'])
-  assert.deepEqual(selectTransitions(graph, 'draft-oracle', { classification: 'FAIL' }), ['pre-ledger-failed'])
-  assert.deepEqual(selectTransitions(graph, 'standard-review', { classification: 'FAIL' }), ['failed'])
+  assert.deepEqual(selectTransitions(graph, 'review-dispatch', { classification: 'STANDARD' }), ['primary-review'])
+  assert.deepEqual(selectTransitions(graph, 'review-dispatch', { classification: 'HIGH' }), [
+    'primary-review',
+    'secondary-review',
+  ])
+  assert.deepEqual(selectTransitions(graph, 'primary-review', { classification: 'STANDARD_READY' }), [
+    'review-finalize',
+  ])
+  assert.deepEqual(selectTransitions(graph, 'primary-review', { classification: 'STANDARD_BLOCKED' }), [
+    'evidence-repair',
+  ])
+  assert.deepEqual(selectTransitions(graph, 'primary-review', { classification: 'HIGH_BLOCKED' }), ['high-review-join'])
+  assert.deepEqual(selectTransitions(graph, 'secondary-review', { classification: 'HIGH_BLOCKED' }), [
+    'high-review-join',
+  ])
+  assert.deepEqual(selectTransitions(graph, 'draft-oracle', { classification: 'FAIL' }), ['pre-ledger-stop'])
+  assert.deepEqual(selectTransitions(graph, 'primary-review', { classification: 'FAIL' }), ['run-stopped'])
 
   assert.deepEqual(node('implement-green').kind, 'agent')
   assert.deepEqual(node('implement-green').output, ['classification', 'runId', 'artifacts', 'decision', 'error'])
-  assert.deepEqual(node('standard-review').output, [
-    'status',
-    'classification',
-    'findings',
-    'runId',
-    'decision',
-    'error',
-  ])
-  assert.deepEqual(node('high-review-fanout').output, [
+  assert.deepEqual(node('review-dispatch').output, [
     'status',
     'classification',
     'reviewPacket',
@@ -124,9 +128,17 @@ test('routes already-satisfied red, blocked standard review and split reviewer s
     'decision',
     'error',
   ])
-  assert.deepEqual(selectTransitions(graph, 'high-review-fanout', { classification: 'FAIL' }), ['failed'])
-  assert.deepEqual(node('high-review-a').output, ['findingsA'])
-  assert.deepEqual(node('high-review-b').output, ['findingsB'])
+  assert.equal(node('review-dispatch').dispatch, 'all')
+  assert.deepEqual(selectTransitions(graph, 'review-dispatch', { classification: 'FAIL' }), ['run-stopped'])
+  assert.deepEqual(node('primary-review').output, [
+    'classification',
+    'findings',
+    'findingsA',
+    'runId',
+    'decision',
+    'error',
+  ])
+  assert.deepEqual(node('secondary-review').output, ['classification', 'findingsB', 'runId', 'decision', 'error'])
   assert.deepEqual(node('high-review-join').input, [
     'findingsA',
     'findingsB',
@@ -142,16 +154,20 @@ test('routes already-satisfied red, blocked standard review and split reviewer s
     'reviewReceiptA',
     'reviewReceiptB',
     'runId',
+    'decision',
     'error',
   ])
   assert.deepEqual(selectTransitions(graph, 'high-review-join', { status: 'BLOCKED' }), ['evidence-repair'])
-  assert.deepEqual(selectTransitions(graph, 'high-review-join', { classification: 'FAIL' }), ['failed'])
-  assert.match(node('high-review-fanout').task, /controller-issued reviewAssignments.*reviewDispatches/s)
+  assert.deepEqual(selectTransitions(graph, 'high-review-join', { classification: 'FAIL' }), ['run-stopped'])
+  assert.match(node('review-dispatch').task, /STANDARD.*primary assignment.*HIGH.*primary.*secondary/s)
   assert.match(node('high-review-join').task, /oracle-run\.mjs review-receipt/)
-  assert.match(node('high-review-join').task, /packetSha256.*targetRevision.*previousDigest.*digest.*adapter node-test.*oracleSha256/s)
-  assert.deepEqual(node('review-decision').input.slice(-2), ['reviewReceiptA', 'reviewReceiptB'])
-  assert.match(node('review-decision').task, /standard review finding.*oracle-run\.mjs review-receipt/s)
-  assert.deepEqual(node('final-verify').input.slice(-2), ['reviewReceiptA', 'reviewReceiptB'])
+  assert.match(
+    node('high-review-join').task,
+    /packetSha256.*targetRevision.*previousDigest.*digest.*adapter node-test.*oracleSha256/s,
+  )
+  assert.deepEqual(node('review-finalize').input.slice(-2), ['reviewReceiptA', 'reviewReceiptB'])
+  assert.match(node('review-finalize').task, /standard finding.*oracle-run\.mjs review-receipt/s)
+  assert.match(node('review-finalize').task, /REVIEW_ACCEPTED.*REVIEW_VERIFIED/s)
 
   for (const source of graph.nodes.filter((candidate) => candidate.output?.includes('classification'))) {
     if (!/\bFAIL\b/.test(source.task)) continue
@@ -175,8 +191,8 @@ test('owns repeated failure routes with fallback rules that node edges still ove
   assert.deepEqual(
     graph.fallback.map(({ when, to }) => [when.equals, to]),
     [
-      ['POLICY_GAP', 'needs-decision'],
-      ['FAIL', 'failed'],
+      ['POLICY_GAP', 'run-stopped'],
+      ['FAIL', 'run-stopped'],
       ['PRODUCT_DEFECT', 'implement-green'],
       ['EVIDENCE_GAP', 'evidence-repair'],
       ['HARNESS_DEFECT', 'evidence-repair'],
@@ -184,17 +200,17 @@ test('owns repeated failure routes with fallback rules that node edges still ove
   )
   // valid-red keeps its HARNESS_DEFECT self-loop as a node edge that beats the fallback rule.
   assert.deepEqual(selectTransitions(graph, 'valid-red', { classification: 'HARNESS_DEFECT' }), ['valid-red'])
-  assert.deepEqual(selectTransitions(graph, 'review-decision', { classification: 'HARNESS_DEFECT' }), [
+  assert.deepEqual(selectTransitions(graph, 'review-finalize', { classification: 'HARNESS_DEFECT' }), [
     'evidence-repair',
   ])
   assert.deepEqual(selectTransitions(graph, 'implement-green', { classification: 'PRODUCT_DEFECT' }), [
     'implement-green',
   ])
-  assert.deepEqual(selectTransitions(graph, 'draft-oracle', { classification: 'FAIL' }), ['pre-ledger-failed'])
-  assert.deepEqual(selectTransitions(graph, 'delivery-init', { classification: 'FAIL' }), ['failed'])
+  assert.deepEqual(selectTransitions(graph, 'draft-oracle', { classification: 'FAIL' }), ['pre-ledger-stop'])
+  assert.deepEqual(selectTransitions(graph, 'delivery-init', { classification: 'FAIL' }), ['run-stopped'])
 
   // ENVIRONMENT_DEFECT and NON_ORACLE_OPINION stay finding classifications but are not graph labels:
-  // nodes report FAIL with the reason in the ledger, and review-decision normalizes opinion-only
+  // nodes report FAIL with the reason in the ledger, and review-finalize normalizes opinion-only
   // verdicts to REVIEW_ACCEPTED, so an unnormalized output fails loudly instead of routing.
   for (const source of graph.nodes) {
     for (const label of ['ENVIRONMENT_DEFECT', 'NON_ORACLE_OPINION']) {
@@ -224,8 +240,8 @@ test('O12: workflow graph records transitions and preserves decision and failure
 
   for (const [source, target, classification] of [
     ['valid-red', 'implement-green', 'VALID_RED'],
-    ['implement-green', 'standard-review', 'IMPLEMENTED_GREEN_STANDARD'],
-    ['implement-green', 'high-review-fanout', 'IMPLEMENTED_GREEN_HIGH'],
+    ['implement-green', 'review-dispatch', 'IMPLEMENTED_GREEN_STANDARD'],
+    ['implement-green', 'review-dispatch', 'IMPLEMENTED_GREEN_HIGH'],
   ]) {
     assert.match(node(source).task, new RegExp(`oracle-run\\.mjs transition[^.]*${classification}`))
     assert.ok(edge(source, target, classification))
@@ -236,21 +252,17 @@ test('O12: workflow graph records transitions and preserves decision and failure
   assert.match(node('implement-green').task, /visual[^.]*pending[^.]*IMPLEMENTED_GREEN/)
   assert.match(node('implement-green').task, /IMPLEMENTED_GREEN[^.]*resume/)
   assert.match(node('implement-green').task, /IMPLEMENTED_GREEN을 정확히 한 번/)
-  assert.deepEqual(selectTransitions(graph, 'draft-oracle', { classification: 'POLICY_GAP' }), [
-    'pre-ledger-needs-decision',
-  ])
-  assert.deepEqual(selectTransitions(graph, 'lock-oracle', { classification: 'POLICY_GAP' }), [
-    'pre-ledger-needs-decision',
-  ])
-  assert.deepEqual(node('pre-ledger-needs-decision').input, ['classification', 'decision'])
+  assert.deepEqual(selectTransitions(graph, 'draft-oracle', { classification: 'POLICY_GAP' }), ['pre-ledger-stop'])
+  assert.deepEqual(selectTransitions(graph, 'lock-oracle', { classification: 'POLICY_GAP' }), ['pre-ledger-stop'])
+  assert.deepEqual(node('pre-ledger-stop').input, ['classification', 'decision', 'error'])
   assert.deepEqual(selectTransitions(graph, 'draft-oracle', { classification: 'RESUME_IMPLEMENTED_GREEN' }), [
     'resume-implemented-green',
   ])
   assert.deepEqual(selectTransitions(graph, 'resume-implemented-green', { classification: 'RESUME_STANDARD' }), [
-    'standard-review',
+    'review-dispatch',
   ])
   assert.deepEqual(selectTransitions(graph, 'resume-implemented-green', { classification: 'RESUME_HIGH' }), [
-    'high-review-fanout',
+    'review-dispatch',
   ])
   assert.match(node('resume-implemented-green').task, /IMPLEMENTED_GREEN 전이를 다시 기록하지 않는다/)
   assert.match(node('resume-implemented-green').task, /oracle-run --adapter node-test.*Playwright.*schema-v3/s)
@@ -261,17 +273,15 @@ test('O12: workflow graph records transitions and preserves decision and failure
   for (const source of policyGapSources) {
     assert.ok(source.output.includes('decision'), `${source.id} POLICY_GAP must preserve its decision evidence`)
     assert.ok(source.output.includes('error'), `${source.id} POLICY_GAP/FAIL must preserve its error evidence`)
-    const expected = ['draft-oracle', 'lock-oracle'].includes(source.id)
-      ? ['pre-ledger-needs-decision']
-      : ['needs-decision']
+    const expected = ['draft-oracle', 'lock-oracle'].includes(source.id) ? ['pre-ledger-stop'] : ['run-stopped']
     assert.deepEqual(selectTransitions(graph, source.id, { classification: 'POLICY_GAP' }), expected)
   }
-  assert.deepEqual(node('needs-decision').input, ['classification', 'decision', 'runId'])
+  assert.deepEqual(node('run-stopped').input, ['classification', 'runId', 'decision', 'error'])
 
-  assert.deepEqual(selectTransitions(graph, 'draft-oracle', { classification: 'FAIL' }), ['pre-ledger-failed'])
+  assert.deepEqual(selectTransitions(graph, 'draft-oracle', { classification: 'FAIL' }), ['pre-ledger-stop'])
   assert.deepEqual(node('draft-oracle').output.includes('error'), true)
-  assert.deepEqual(node('pre-ledger-failed').input, ['classification', 'error'])
-  assert.deepEqual(node('failed').input, ['classification', 'runId', 'error'])
+  assert.deepEqual(node('pre-ledger-stop').input, ['classification', 'decision', 'error'])
+  assert.deepEqual(node('run-stopped').input, ['classification', 'runId', 'decision', 'error'])
 })
 
 test('O14: harness packages expose lint and provenance captures reproducibility inputs', async () => {

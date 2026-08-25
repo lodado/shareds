@@ -3,16 +3,7 @@
   "outcome": "승인된 Oracle Card를 불변 기준으로 삼아 요청된 frontend 설계 또는 Delivery를 검증 가능한 상태로 완료한다.",
   "stopCondition": "Design-only는 ORACLE_READY, Delivery는 REVIEW_VERIFIED terminal에 도달하며 모든 판정이 Oracle ledger와 lock으로 검증된다.",
   "entry": "draft-oracle",
-  "terminals": [
-    "oracle-ready",
-    "implemented-green",
-    "review-verified",
-    "needs-decision",
-    "pre-ledger-needs-decision",
-    "cancelled",
-    "pre-ledger-failed",
-    "failed"
-  ],
+  "terminals": ["oracle-ready", "implemented-green", "review-verified", "run-stopped", "pre-ledger-stop", "cancelled"],
   "maxSteps": 36,
   "context": ["request", "repositoryContext", "previousRevision"],
   "fallback": [
@@ -21,14 +12,14 @@
         "field": "classification",
         "equals": "POLICY_GAP"
       },
-      "to": "needs-decision"
+      "to": "run-stopped"
     },
     {
       "when": {
         "field": "classification",
         "equals": "FAIL"
       },
-      "to": "failed"
+      "to": "run-stopped"
     },
     {
       "when": {
@@ -122,19 +113,9 @@
       "dispatch": "one"
     },
     {
-      "id": "standard-review",
-      "kind": "agent",
-      "owner": "code-reviewer",
-      "task": "oracle-run.mjs review-packet의 원시 증거로 독립 리뷰 1회를 수행하고 검증 가능한 finding artifact를 반환한다. 리뷰를 끝까지 마치면 status를 READY로, 패킷이나 증거가 불완전해 판정할 수 없으면 BLOCKED로 반환한다. 정책을 새로 만들거나 파일을 수정하지 않는다. 정책 미결은 POLICY_GAP과 구조화된 decision을 반환하고 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다. 도구 오류는 실제 error를 포함한 classification FAIL과 runId로 반환한다.",
-      "input": ["oraclePath", "oracleSha256", "artifacts"],
-      "output": ["status", "classification", "findings", "runId", "decision", "error"],
-      "writeScope": [],
-      "dispatch": "one"
-    },
-    {
-      "id": "high-review-fanout",
+      "id": "review-dispatch",
       "kind": "tool",
-      "task": "Controller가 oracle-run.mjs review-packet으로 High-risk packet을 고정하고 controller-issued reviewAssignments와 reviewDispatches를 만들어 서로 컨텍스트를 공유하지 않는 두 reviewer Node를 동시에 활성화한다. 성공은 status READY와 packet·assignment·dispatch data를 반환한다. 정책 미결은 POLICY_GAP과 구조화된 decision을 반환하고 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다. 패킷 생성 또는 dispatch 실패는 실제 error를 포함한 classification FAIL과 runId로 반환한다.",
+      "task": "Controller가 oracle-run.mjs review-packet으로 review packet과 controller-issued reviewAssignments·reviewDispatches를 정규화한다. STANDARD는 primary assignment 하나만, HIGH는 서로 컨텍스트를 공유하지 않는 primary·secondary independent assignment를 만든다. 성공 classification은 단일 field 값 STANDARD 또는 HIGH만 반환하며 dispatch all은 STANDARD에서 primary-review만, HIGH에서 primary-review와 secondary-review를 활성화한다. 정책 미결은 POLICY_GAP과 구조화된 decision을 반환하고 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다. 패킷 생성 또는 dispatch 실패는 실제 error를 포함한 classification FAIL과 runId로 반환한다.",
       "input": ["oraclePath", "oracleSha256", "artifacts"],
       "output": [
         "status",
@@ -150,22 +131,22 @@
       "dispatch": "all"
     },
     {
-      "id": "high-review-a",
+      "id": "primary-review",
       "kind": "agent",
       "owner": "code-reviewer",
-      "task": "High-risk review packet과 controller-issued assignment·dispatch의 첫 번째 독립 표본을 검토하고 검증 가능한 finding artifact를 findingsA로만 반환한다. 다른 reviewer 결과를 읽거나 파일을 수정하지 않는다.",
+      "task": "review packet과 controller-issued primary assignment·dispatch로 독립 리뷰를 수행한다. STANDARD에서는 검증 가능한 finding artifact를 findings로 반환하고 STANDARD_READY 또는 STANDARD_BLOCKED를, HIGH에서는 findingsA로만 반환하고 HIGH_READY 또는 HIGH_BLOCKED를 분류한다. 다른 reviewer 결과를 읽거나 파일을 수정하지 않는다. HIGH_BLOCKED도 독립 secondary 결과와 함께 high-review-join에서 판정하며 직접 evidence-repair를 활성화하지 않는다. 정책 미결이면 POLICY_GAP과 구조화된 decision 및 NEEDS_DECISION ledger transition, 도구 오류면 실제 error와 runId를 포함한 FAIL을 반환한다.",
       "input": ["reviewPacket", "reviewAssignments", "reviewDispatches"],
-      "output": ["findingsA"],
+      "output": ["classification", "findings", "findingsA", "runId", "decision", "error"],
       "writeScope": [],
       "dispatch": "one"
     },
     {
-      "id": "high-review-b",
+      "id": "secondary-review",
       "kind": "agent",
       "owner": "code-reviewer",
-      "task": "High-risk review packet과 controller-issued assignment·dispatch의 두 번째 독립 표본을 검토하고 검증 가능한 finding artifact를 findingsB로만 반환한다. 다른 reviewer 결과를 읽거나 파일을 수정하지 않는다.",
+      "task": "HIGH review packet과 controller-issued secondary assignment·dispatch로 두 번째 독립 리뷰를 수행하고 검증 가능한 finding artifact를 findingsB로만 반환한다. primary reviewer 결과를 읽거나 파일을 수정하지 않는다. 완료하면 HIGH_READY, packet 또는 evidence가 불완전하면 HIGH_BLOCKED를 반환하며 둘 다 high-review-join으로 간다. 정책 미결이면 POLICY_GAP과 구조화된 decision 및 NEEDS_DECISION ledger transition, 도구 오류면 실제 error와 runId를 포함한 FAIL을 반환한다.",
       "input": ["reviewPacket", "reviewAssignments", "reviewDispatches"],
-      "output": ["findingsB"],
+      "output": ["classification", "findingsB", "runId", "decision", "error"],
       "writeScope": [],
       "dispatch": "one"
     },
@@ -175,25 +156,34 @@
       "join": "all",
       "task": "Controller/join은 두 High-risk finding artifact가 모두 도착하면 oracle-run.mjs review-receipt를 호출해 각각의 packetSha256, targetRevision, role, taskId, outputSha256, reviewerId, findingsSha256와 digest-chain previousDigest·digest를 adapter node-test 및 oracleSha256를 포함한 ledger-bound reviewReceiptA와 reviewReceiptB로 기록한다. 두 receipt가 모두 유효하면 findings를 표본 출처와 함께 합쳐 status READY와 receipt identities/digests를 반환한다. finding 또는 receipt가 BLOCKED면 status BLOCKED, controller가 포착한 reviewer dispatch 또는 receipt 명령 실패면 classification FAIL과 실제 error·runId를 반환한다.",
       "input": ["findingsA", "findingsB", "reviewPacket", "reviewAssignments", "reviewDispatches", "runId"],
-      "output": ["status", "classification", "findings", "reviewReceiptA", "reviewReceiptB", "runId", "error"],
+      "output": [
+        "status",
+        "classification",
+        "findings",
+        "reviewReceiptA",
+        "reviewReceiptB",
+        "runId",
+        "decision",
+        "error"
+      ],
       "writeScope": [".ai/oracles/**"],
       "dispatch": "one"
     },
     {
-      "id": "review-decision",
+      "id": "review-finalize",
       "kind": "tool",
-      "task": "Controller는 standard review finding이면 먼저 oracle-run.mjs review-receipt를 호출하고, High-risk면 전달된 두 ledger-bound review-receipt identity/digest를 사용한다. oracle-verify.mjs findings와 High-risk 교집합 규칙 및 receipt를 검증해 review artifact를 판정한다. NON_ORACLE_OPINION만 남으면 finding artifact에는 그대로 두고 classification을 REVIEW_ACCEPTED로 정규화한다. classification은 REVIEW_ACCEPTED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP 및 구조화된 decision 또는 실제 error를 포함한 FAIL이다. POLICY_GAP이면 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다.",
+      "task": "먼저 Controller는 standard finding이면 oracle-run.mjs review-receipt를 기록하고, High-risk면 전달된 두 ledger-bound review-receipt identity/digest를 검증·기록한다. oracle-verify.mjs findings와 High-risk 교집합 규칙 및 receipt를 검증해 accepted finding만 최종 검증한다. NON_ORACLE_OPINION만 남으면 finding artifact에는 그대로 두고 REVIEW_ACCEPTED로 정규화한다. REVIEW_ACCEPTED일 때만 lock, evidence, review, 두 ledger-bound review receipt와 모든 필수 run label을 다시 검증하고 oracle-run.mjs transition으로 REVIEW_VERIFIED를 기록한다. classification은 REVIEW_VERIFIED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP 및 구조화된 decision 또는 실제 error를 포함한 FAIL이며 항상 실제 또는 실패 runId를 출력한다. POLICY_GAP이면 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다.",
       "input": ["oraclePath", "oracleSha256", "findings", "reviewReceiptA", "reviewReceiptB"],
-      "output": ["classification", "runId", "findings", "reviewReceiptA", "reviewReceiptB", "decision", "error"],
-      "writeScope": [".ai/oracles/**"],
-      "dispatch": "one"
-    },
-    {
-      "id": "final-verify",
-      "kind": "tool",
-      "task": "lock, evidence, review, 두 ledger-bound review-receipt identity/digest와 모든 필수 run label을 다시 검증하고 oracle-run.mjs transition으로 REVIEW_VERIFIED를 기록한다. classification은 REVIEW_VERIFIED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP 및 구조화된 decision 또는 실제 error를 포함한 FAIL이며 항상 runId 또는 실패 runId를 출력한다. POLICY_GAP이면 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다.",
-      "input": ["oraclePath", "oracleSha256", "runState", "findings", "reviewReceiptA", "reviewReceiptB"],
-      "output": ["classification", "runId", "report", "decision", "error"],
+      "output": [
+        "classification",
+        "runId",
+        "findings",
+        "reviewReceiptA",
+        "reviewReceiptB",
+        "report",
+        "decision",
+        "error"
+      ],
       "writeScope": [".ai/oracles/**"],
       "dispatch": "one"
     },
@@ -215,18 +205,18 @@
       "dispatch": "one"
     },
     {
-      "id": "pre-ledger-needs-decision",
+      "id": "pre-ledger-stop",
       "kind": "terminal",
-      "task": "ledger 생성 전 POLICY_GAP의 policy evidence와 구조화된 decision을 보존하고 runId 없이 종료한다.",
-      "input": ["classification", "decision"],
+      "task": "ledger 생성 전 POLICY_GAP 또는 FAIL의 classification, 구조화된 decision, 실제 error를 보존하고 runId를 만들거나 추정하지 않고 종료한다.",
+      "input": ["classification", "decision", "error"],
       "output": [],
       "writeScope": []
     },
     {
-      "id": "needs-decision",
+      "id": "run-stopped",
       "kind": "terminal",
-      "task": "정책 미결을 종료한다. init 뒤에는 oracle-run.mjs transition --to NEEDS_DECISION으로 기록한 실제 runId를 보존하고, ledger 전에는 pre-ledger 정책 증거와 decision을 보존하며 runId를 만들지 않는다.",
-      "input": ["classification", "decision", "runId"],
+      "task": "init 뒤 POLICY_GAP 또는 FAIL의 classification, 실제 runId, 구조화된 decision, 실제 error를 보존하고 종료한다. nullable decision/error는 명시적으로 null로 정규화하며 runId를 발명하지 않는다.",
+      "input": ["classification", "runId", "decision", "error"],
       "output": [],
       "writeScope": []
     },
@@ -253,22 +243,6 @@
       "input": ["decision"],
       "output": [],
       "writeScope": []
-    },
-    {
-      "id": "pre-ledger-failed",
-      "kind": "terminal",
-      "input": ["classification", "error"],
-      "output": [],
-      "task": "ledger 생성 전 실제 error를 보존하고 FAIL로 종료한다.",
-      "writeScope": []
-    },
-    {
-      "id": "failed",
-      "kind": "terminal",
-      "task": "마지막 실제 오류와 ledger runId를 보존하고 FAIL로 종료한다.",
-      "input": ["classification", "runId", "error"],
-      "output": [],
-      "writeScope": []
     }
   ],
   "edges": [
@@ -282,7 +256,7 @@
     },
     {
       "from": "draft-oracle",
-      "to": "pre-ledger-failed",
+      "to": "pre-ledger-stop",
       "when": {
         "field": "classification",
         "equals": "FAIL"
@@ -290,7 +264,7 @@
     },
     {
       "from": "draft-oracle",
-      "to": "pre-ledger-needs-decision",
+      "to": "pre-ledger-stop",
       "when": {
         "field": "classification",
         "equals": "POLICY_GAP"
@@ -354,7 +328,7 @@
     },
     {
       "from": "lock-oracle",
-      "to": "pre-ledger-failed",
+      "to": "pre-ledger-stop",
       "when": {
         "field": "classification",
         "equals": "FAIL"
@@ -362,7 +336,7 @@
     },
     {
       "from": "lock-oracle",
-      "to": "pre-ledger-needs-decision",
+      "to": "pre-ledger-stop",
       "when": {
         "field": "classification",
         "equals": "POLICY_GAP"
@@ -402,7 +376,7 @@
     },
     {
       "from": "implement-green",
-      "to": "standard-review",
+      "to": "review-dispatch",
       "when": {
         "field": "classification",
         "equals": "IMPLEMENTED_GREEN_STANDARD"
@@ -410,7 +384,7 @@
     },
     {
       "from": "resume-implemented-green",
-      "to": "standard-review",
+      "to": "review-dispatch",
       "when": {
         "field": "classification",
         "equals": "RESUME_STANDARD"
@@ -418,7 +392,7 @@
     },
     {
       "from": "resume-implemented-green",
-      "to": "high-review-fanout",
+      "to": "review-dispatch",
       "when": {
         "field": "classification",
         "equals": "RESUME_HIGH"
@@ -434,7 +408,7 @@
     },
     {
       "from": "implement-green",
-      "to": "high-review-fanout",
+      "to": "review-dispatch",
       "when": {
         "field": "classification",
         "equals": "IMPLEMENTED_GREEN_HIGH"
@@ -457,73 +431,95 @@
       }
     },
     {
-      "from": "standard-review",
-      "to": "review-decision",
-      "when": {
-        "field": "status",
-        "equals": "READY"
-      }
-    },
-    {
-      "from": "standard-review",
-      "to": "evidence-repair",
-      "when": {
-        "field": "status",
-        "equals": "BLOCKED"
-      }
-    },
-    {
-      "from": "high-review-fanout",
-      "to": "high-review-a",
-      "when": {
-        "field": "status",
-        "equals": "READY"
-      }
-    },
-    {
-      "from": "high-review-fanout",
-      "to": "high-review-b",
-      "when": {
-        "field": "status",
-        "equals": "READY"
-      }
-    },
-    {
-      "from": "high-review-a",
-      "to": "high-review-join",
-      "when": "always"
-    },
-    {
-      "from": "high-review-b",
-      "to": "high-review-join",
-      "when": "always"
-    },
-    {
-      "from": "high-review-join",
-      "to": "review-decision",
-      "when": {
-        "field": "status",
-        "equals": "READY"
-      }
-    },
-    {
-      "from": "high-review-join",
-      "to": "evidence-repair",
-      "when": {
-        "field": "status",
-        "equals": "BLOCKED"
-      }
-    },
-    {
-      "from": "review-decision",
-      "to": "final-verify",
+      "from": "review-dispatch",
+      "to": "primary-review",
       "when": {
         "field": "classification",
-        "equals": "REVIEW_ACCEPTED"
+        "equals": "STANDARD"
       }
     },
     {
-      "from": "final-verify",
+      "from": "review-dispatch",
+      "to": "primary-review",
+      "when": {
+        "field": "classification",
+        "equals": "HIGH"
+      }
+    },
+    {
+      "from": "review-dispatch",
+      "to": "secondary-review",
+      "when": {
+        "field": "classification",
+        "equals": "HIGH"
+      }
+    },
+    {
+      "from": "primary-review",
+      "to": "review-finalize",
+      "when": {
+        "field": "classification",
+        "equals": "STANDARD_READY"
+      }
+    },
+    {
+      "from": "primary-review",
+      "to": "high-review-join",
+      "when": {
+        "field": "classification",
+        "equals": "HIGH_READY"
+      }
+    },
+    {
+      "from": "primary-review",
+      "to": "evidence-repair",
+      "when": {
+        "field": "classification",
+        "equals": "STANDARD_BLOCKED"
+      }
+    },
+    {
+      "from": "primary-review",
+      "to": "high-review-join",
+      "when": {
+        "field": "classification",
+        "equals": "HIGH_BLOCKED"
+      }
+    },
+    {
+      "from": "secondary-review",
+      "to": "high-review-join",
+      "when": {
+        "field": "classification",
+        "equals": "HIGH_READY"
+      }
+    },
+    {
+      "from": "secondary-review",
+      "to": "high-review-join",
+      "when": {
+        "field": "classification",
+        "equals": "HIGH_BLOCKED"
+      }
+    },
+    {
+      "from": "high-review-join",
+      "to": "review-finalize",
+      "when": {
+        "field": "status",
+        "equals": "READY"
+      }
+    },
+    {
+      "from": "high-review-join",
+      "to": "evidence-repair",
+      "when": {
+        "field": "status",
+        "equals": "BLOCKED"
+      }
+    },
+    {
+      "from": "review-finalize",
       "to": "review-verified",
       "when": {
         "field": "classification",

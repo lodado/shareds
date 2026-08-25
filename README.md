@@ -101,48 +101,42 @@ Oracle은 그걸 막아요. 정하지 않은 정책은 **정하기 전까진 진
 ### 어떻게 도나요
 
 ```text
-                      ┌──────────────┐
-  요청 ──────────────▶│  Risk 판정   │
-                      └──────┬───────┘
-                     Low     │     Medium / High
-              ┌──────────────┴──────────────┐
-              ▼                             ▼
-     ┌─────────────────┐          ┌───────────────────┐
-     │  low-fast-path  │          │   Oracle lane     │
-     │  기존 검증만    │          │   카드부터 시작   │
-     └─────────────────┘          └─────────┬─────────┘
-                                            │
-            ┌───────────────────────────────┘
-            ▼
-   ① Outcome Brief          목표랑 성공 기준을 먼저 적어요
-            │                KPI 없으면 숫자 지어내지 않아요
-            ▼
-   ② Source Registry        PRD·수용 기준·피그마를 위치까지 고정해요
-            │                product-policy / mandatory-constraint 로 분류해요
-            ▼
-   ③ 계약 행 (O*/D*)        Grill 질문이랑 경계값으로 행을 뽑아요
-            │                애매하면 POLICY_GAP ──▶ NEEDS_DECISION
-            ▼
-   ④ 사용자 재확인          Draft 보여주고 승인받아요
-            │                승인 전엔 lint·lock·테스트·구현 전부 금지
-            ▼
-   ⑤ revision lock          oracle-verify card ──▶ oracle-lock create
-            │                이후 단계마다 lock 자동 검증해요
-            ▼
-   ⑥ VALID_RED              $test 로 테스트 먼저 써요
-            │                실패 test 이름을 카드 행에 매핑해요
-            ▼
-   ⑦ GREEN                  그제서야 최소 구현을 해요
-            │
-            ▼
-   ⑧ subagent 리뷰          독립 리뷰 finding 반영하고 전체 재실행
-            │
-            ▼
-   REVIEW_VERIFIED
+  요청
+   │
+   ├─ Low ──▶ low-fast-path: 기존 레포 검증만
+   │
+   └─ Medium / High
+          │
+          ▼
+      ① DEFINE     Outcome Brief·Source Registry·계약 행 작성 + 사용자 확인
+          │
+          ▼
+      ② LOCK       승인한 카드와 정책 출처의 내용 지문 고정
+          │
+          ▼
+      ③ PROVE      VALID_RED로 기능 부족 때문에 실패하는지 증명
+          │
+          ▼
+      ④ BUILD      최소 구현, GREEN, 실행 증거와 ledger 기록
+          │
+          ▼
+      ⑤ REVIEW     표준은 독립 리뷰 1명, High-risk는 독립 리뷰 2명과 join
+          │
+          ▼
+      ⑥ CERTIFY    lock·증거·review receipt를 재검사해 REVIEW_VERIFIED
 
-   모든 실행은 append-only ledger 에 runId 로 남아요
-   ledger 에 없는 실행은 통과로 못 써요
+  옆 출구
+  POLICY_GAP                   ──▶ 사람의 정책 결정 대기
+  PRODUCT_DEFECT               ──▶ BUILD
+  EVIDENCE_GAP/HARNESS_DEFECT  ──▶ 증거만 보정한 뒤 BUILD
+  FAIL                         ──▶ 장부 전/후를 구분해 정지
 ```
+
+이건 사람이 읽는 6단계 운영 화면이에요. 실제 Controller는 사용자 승인, 실패 증명과 구현,
+시각 증거 대기, 표준/High-risk 리뷰, 장부 전후 정지를 별도 Node로 유지해요. 정확한
+Node·Edge·fallback·terminal 수와 전체 그래프는
+[패키지 README](packages/frontend-oracle-design/skills/README.md)가 원본 JSON에서 자동으로
+생성합니다.
 
 ### 핵심 규칙 몇 개
 
@@ -154,13 +148,13 @@ Oracle은 그걸 막아요. 정하지 않은 정책은 **정하기 전까진 진
 
 ### 끝나는 상태
 
-| 상태                | 뜻                                               |
-| ------------------- | ------------------------------------------------ |
-| `ORACLE_READY`      | 카드 잠갔어요. 구현 들어가도 돼요                |
-| `IMPLEMENTED_GREEN` | 카드 테스트랑 레포 필수 검증이 실제로 통과했어요 |
-| `REVIEW_VERIFIED`   | 리뷰 finding까지 반영하고 재통과했어요           |
-| `NEEDS_DECISION`    | 결과를 바꾸는 정책이 미결이에요. 질문을 뱉어요   |
-| `FAIL`              | 환경·하네스 문제나 예산 소진으로 판정 불가예요   |
+| 상태                | 뜻                                                                            |
+| ------------------- | ----------------------------------------------------------------------------- |
+| `ORACLE_READY`      | 카드 잠갔어요. 구현 들어가도 돼요                                             |
+| `IMPLEMENTED_GREEN` | 구현 검증은 통과했지만 시각 증거 대기면 여기서 재개해요. 최종 완료는 아니에요 |
+| `REVIEW_VERIFIED`   | 리뷰 finding까지 반영하고 재통과했어요                                        |
+| `NEEDS_DECISION`    | 결과를 바꾸는 정책이 미결이에요. 질문을 뱉어요                                |
+| `FAIL`              | 환경·하네스 문제나 예산 소진으로 판정 불가예요                                |
 
 ### 무한 루프 방지
 
@@ -183,6 +177,7 @@ Oracle은 그걸 막아요. 정하지 않은 정책은 **정하기 전까진 진
 oracle-verify.mjs   card | red | evidence | findings | review | scan
 oracle-lock.mjs     create | verify
 oracle-run.mjs      init | status | exec | transition | budget | review-packet
+generate-workflow-docs.mjs       README 그래프 요약 생성 | --check
 ```
 
 혼자 다 하지는 않아요. 테스트 작성·판정은 [`test`](packages/test),

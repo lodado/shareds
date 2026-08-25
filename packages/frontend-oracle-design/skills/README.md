@@ -25,87 +25,39 @@ AI가 구현을 시작하기 전에 **무엇이 정답인지 먼저 잠그는** 
 기본값은 카드 설계에서 멈추는 Design-only입니다. 구현까지 필요하면 Delivery를
 명시하세요. 그래프 오케스트레이션도 명시적으로 요청할 때만 로드합니다.
 
+<!-- WORKFLOW_DOCS:START (generated; do not edit) -->
+
 ## 워크플로우 그래프
 
-위 5단계를 기계가 검사할 수 있게 옮긴 것이
-[`oracle-workflow.graph.json`](references/oracle-workflow.graph.json)입니다. 노드 19개,
-엣지 25개, fallback 규칙 5개, terminal 5개. 다음 노드는 Worker가 고르지 않고 컨트롤러가
-`graph-verify.mjs next`로 strict-equality 일치한 엣지만 활성화합니다.
+공개 운영자 화면은 전체 제어 그래프를 여섯 단계로 압축합니다. 현재 canonical graph는 노드
+19개, 엣지 35개, fallback 5개, terminal 6개입니다.
 
 ```mermaid
-flowchart TB
-  REQ(["요청"]) --> D["draft-oracle<br/><i>agent · planner</i>"]
-  D -->|CONFIRMATION_REQUIRED| U{{"user-confirmation<br/><i>gate · 답변 전까지 WAITING_USER</i>"}}
-  D -->|FAIL| PF(["pre-ledger-failed"])
-  U -->|REVISE| D
-  U -->|CANCEL| CX(["cancelled"])
-  U -->|"APPROVE_DESIGN<br/>APPROVE_DELIVERY"| L["lock-oracle<br/><i>tool</i>"]
-  L -->|DESIGN_READY| OK(["oracle-ready<br/><i>Design-only 종료</i>"])
-  L -->|DELIVERY_READY| DEL(["② Delivery 루프로"])
+flowchart LR
+  DEFINE["DEFINE<br/>Oracle Card 초안"] --> LOCK["LOCK<br/>사용자 확인·lock"]
+  LOCK --> PROVE["PROVE<br/>VALID_RED"]
+  PROVE --> BUILD["BUILD<br/>최소 구현·GREEN"]
+  BUILD --> REVIEW["REVIEW<br/>독립 검토"]
+  REVIEW --> CERTIFY["CERTIFY<br/>REVIEW_VERIFIED"]
+
+  DEFINE -. "policy decision wait" .-> POLICY["정책 결정 대기"]
+  POLICY -. "승인된 정책으로 재정의" .-> DEFINE
+  BUILD -. "evidence / harness repair" .-> REPAIR["증거·harness 보정"]
+  REPAIR --> BUILD
+  BUILD -. "failure" .-> STOP(["failure stop"])
+  REVIEW -. "failure" .-> STOP
 ```
 
-Design-only는 여기서 끝납니다. `APPROVE_DELIVERY`로 잠근 카드만 아래 루프에 들어갑니다.
+- 정책 판단이 비면 **policy decision wait**로 나가며, 승인된 정책으로만 DEFINE에 돌아갑니다.
+- evidence/harness 문제는 정책·production을 바꾸지 않고 보정한 뒤 BUILD로 돌아갑니다.
+- 복구 불가능한 실패는 **failure stop**으로 끝납니다.
 
-```mermaid
-flowchart TB
-  IN(["① lock-oracle · DELIVERY_READY"]) --> I["delivery-init<br/><i>agent · planner</i>"]
-  I -->|READY| R["valid-red<br/><i>agent · test-engineer</i>"]
-  R -->|VALID_RED| G["implement-green<br/><i>agent</i>"]
-  R -->|ALREADY_SATISFIED| G
-  R -->|HARNESS_DEFECT| R
+이 도식은 operator projection입니다. dispatch, 병렬 high-risk review, join, ledger receipt,
+visual-pending resume, 그리고 모든 정확한 전이는
+[`oracle-workflow.graph.json`](references/oracle-workflow.graph.json)의 canonical controller
+view가 소유합니다.
 
-  G -->|IMPLEMENTED_GREEN_STANDARD| SR["standard-review<br/><i>agent · code-reviewer</i>"]
-  G -->|IMPLEMENTED_GREEN_HIGH| FO["high-review-fanout<br/><i>tool · dispatch=all</i>"]
-
-  subgraph HIGH["High risk — 컨텍스트 분리된 이중 리뷰"]
-    direction LR
-    FO -->|status=READY| A["high-review-a<br/><i>표본 A</i>"]
-    FO -->|status=READY| B["high-review-b<br/><i>표본 B</i>"]
-    A -->|findingsA| J["high-review-join<br/><i>join=all</i>"]
-    B -->|findingsB| J
-  end
-
-  SR -->|status=READY| RD["review-decision<br/><i>tool · 교집합 판정</i>"]
-  J -->|status=READY| RD
-  RD -->|REVIEW_ACCEPTED| FV["final-verify<br/><i>tool</i>"]
-  FV -->|REVIEW_VERIFIED| RV(["review-verified<br/><i>Delivery 종료</i>"])
-
-  SR -->|status=BLOCKED| E["evidence-repair<br/><i>agent · test-engineer</i>"]
-  E -->|EVIDENCE_READY| G
-```
-
-### 반복 실패 경로는 fallback 규칙 5개가 소유
-
-위 도식에 실패 화살표가 거의 없는 이유입니다. 어느 노드에서 나오든 목적지가 같은
-분류는 노드마다 엣지를 두지 않고 그래프 최상위 `fallback`이 한 번만 선언합니다.
-노드 전용 엣지가 있으면 그쪽이 우선하고(`valid-red`의 `HARNESS_DEFECT` 자기 재시도),
-어느 쪽도 일치하지 않으면 여전히 `NO_TRANSITION`으로 멈춥니다.
-
-| 분류             | 뜻                             | 목적지            | 이유                                   |
-| ---------------- | ------------------------------ | ----------------- | -------------------------------------- |
-| `POLICY_GAP`     | 카드에 없는 정책 판단이 필요함 | `draft-oracle`    | 정책은 카드만 소유 — 구현 중 신설 금지 |
-| `FAIL`           | 복구 불가능한 실패·환경 결함   | `failed`          | 마지막 오류와 runId를 ledger에 보존    |
-| `PRODUCT_DEFECT` | 제품 코드가 틀림               | `implement-green` | 예산 안에서 구현 재시도                |
-| `EVIDENCE_GAP`   | 증거가 주장을 못 받침          | `evidence-repair` | locator·fixture만 보정, 정책 불변      |
-| `HARNESS_DEFECT` | 테스트 장치가 고장             | `evidence-repair` | 제품 탓으로 넘기지 않음                |
-
-`draft-oracle`의 ledger 생성 전 `FAIL`만 node 전용 edge로 `pre-ledger-failed`에 가며,
-`classification`과 오류 summary를 보존합니다. 그 뒤의 `FAIL`은 `runId`가 있는
-`failed` terminal로 갑니다.
-
-`ENVIRONMENT_DEFECT`와 `NON_ORACLE_OPINION`은 리뷰 finding 분류로만 남고 graph
-label이 아닙니다 — 환경 결함은 사유를 ledger에 남기고 `FAIL`로 보고하며, opinion만
-남은 판정은 `review-decision`이 `REVIEW_ACCEPTED`로 정규화합니다.
-
-### 구조에 박아 둔 잠금 장치
-
-- **사용자 확인은 우회 불가** — `user-confirmation`은 gate라 명시적 답변 전까지
-  `WAITING_USER`로 멈춥니다. 에이전트가 대신 승인할 수 없습니다.
-- **High risk는 표본 2개 교집합** — `high-review-a`/`b`는 서로의 결과를 못 읽고 각각
-  `findingsA`/`findingsB`를 냅니다. join이 `input`으로 둘 다 요구하므로 한쪽만 도착한
-  판정은 검증기가 거부합니다.
-- **정책 변경은 항상 카드로 회귀** — `POLICY_GAP`은 어느 단계에서 나오든 fallback 규칙
-  하나를 통해 `draft-oracle` 한 곳으로만 갑니다.
+<!-- WORKFLOW_DOCS:END (generated; do not edit) -->
 
 ## Reference 로딩 그래프
 
