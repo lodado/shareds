@@ -1,72 +1,73 @@
-# UI 시각 디자인 의도 계약
+# UI visual design intent contract
 
-보이는 UI를 새로 만들거나 layout·palette·typography·copy·motion·responsive behavior·
-visual identity를 바꿀 때만 읽는다. 기존 시각 계약을 그대로 쓰는 behavior-only 작업은
-시각 범위와 N/A 사유만 기록하고 이 절차를 확장하지 않는다.
+Read this only when newly creating visible UI or changing layout·palette·typography·copy·motion·
+responsive behavior·visual identity. A behavior-only task that keeps the existing visual contract
+as-is records only the visual scope and the N/A reason and does not expand this procedure.
 
-## 1. 권위와 시각 범위
+## 1. Authority and visual scope
 
-승인된 기획서·브랜드·디자인 시스템·Figma·content guide와 사용자의 명시적 답변만 시각
-정책의 출처다. 각 자료는 자신의 관할 안에서만 — Figma는 layout·copy·interaction을
-정하지만 API idempotency를 정하지 못하고, API 계약은 그 반대다.
+Only approved specs·brand·design system·Figma·content guide and the user's explicit answers are
+sources of visual policy. Each material counts only within its own jurisdiction — Figma decides
+layout·copy·interaction but cannot decide API idempotency, and the API contract is the reverse.
 
-AI 시각 방향과 가용한 `frontend-design` skill의 결과는 **Design Proposal**이지 정책
-출처가 아니다. `frontend-design` skill은 identity-shaping 제안이 실제로 필요할 때만
-로드한다. 제안이 결과를 바꾸면 Design Change Confirmation 전에는 잠그지 않고
-`NEEDS_DECISION`으로 멈춘다.
+An AI visual direction and the output of the available `frontend-design` skill are a **Design
+Proposal**, not a policy source. Load the `frontend-design` skill only when an identity-shaping
+proposal is actually needed. If the proposal changes the outcome, do not lock it before the Design
+Change Confirmation and stop with `NEEDS_DECISION`.
 
-승인된 시각 요구의 불일치는 `PRODUCT_DEFECT`, 카드 누락이면 `POLICY_GAP`. reviewer의
-출처 없는 개인 취향만 `NON_ORACLE_OPINION`.
+A mismatch with an approved visual requirement is `PRODUCT_DEFECT`, and an omission on the card is
+`POLICY_GAP`. Only a reviewer's sourceless personal taste is `NON_ORACLE_OPINION`.
 
-Oracle Card에 시각 범위 하나를 기록한다:
+Record one visual scope on the Oracle Card:
 
-- `behavior-only` — 기존 component·token·시각 결과를 그대로 유지: 전체 디자인 계획 N/A와 사유 기록
-- `local` — 기존 화면의 state·copy·hierarchy·reflow 일부 변경: 기존 디자인 시스템을 재사용하고 영향 축만 계약한 뒤 명시적 사용자 확인
-- `identity-shaping` — 새 page·대규모 redesign·브랜드 인상을 만드는 핵심 화면: 아래 두 pass와 명시적 사용자 확인을 거쳐 전체 Design Intent 잠금
+- `behavior-only` — keeps the existing component·token·visual outcome as-is: record the whole design plan as N/A with a reason
+- `local` — changes part of an existing screen's state·copy·hierarchy·reflow: reuse the existing design system, contract only the affected axes, then explicit user confirmation
+- `identity-shaping` — a new page·large-scale redesign·a key screen that creates the brand impression: lock the whole Design Intent through the two passes below and explicit user confirmation
 
-시각 범위와 기능 Risk는 별개다. 단순 화면도 위험한 mutation이면 High risk일 수 있고,
-identity-shaping이어도 부작용 피해가 작으면 기존 Risk 규칙에 따라 판정한다. 두 판정은
-별도로 기록.
+Visual scope and functional Risk are separate. Even a simple screen can be High risk if it is a
+dangerous mutation, and even identity-shaping work is judged by the existing Risk rules when the
+side-effect damage is small. Record the two judgments separately.
 
-## 2. Design Proposal과 Design Change Confirmation
+## 2. Design Proposal and Design Change Confirmation
 
-승인된 기준이 충분하면 그대로 실행 가능한 계약으로 번역한다. 기준이 부족한
-identity-shaping 작업만 제안한다:
+If the approved criteria are sufficient, translate them as-is into an executable contract. Propose
+only for identity-shaping work whose criteria are insufficient:
 
-1. subject, audience, page의 single job을 구체적으로 정한다.
-2. subject의 실제 재료·언어·도구·구조에서 시각 방향 도출.
-3. color·type·layout·signature·copy·motion을 한 묶음으로 제안.
-4. genericity self-review로 다른 제품에도 그대로 붙을 선택 수정.
-5. 수정한 제안과 버린 대안을 사용자에게 제시.
-6. 승인된 답만 Source Registry에 등록하고 Design Intent에 잠근다.
+1. Decide the subject, the audience, and the page's single job concretely.
+2. Derive the visual direction from the subject's actual material·language·tools·structure.
+3. Propose color·type·layout·signature·copy·motion as one bundle.
+4. Fix, through a genericity self-review, choices that would paste onto another product unchanged.
+5. Present the revised proposal and the discarded alternatives to the user.
+6. Register only the approved answers in the Source Registry and lock them into the Design Intent.
 
-에이전트 추천을 무응답 default로 적용하지 않는다. 승인된 기준끼리 충돌하거나 결과를
-바꾸는 축이 남으면 현재 제안과 질문을 제시하고 `NEEDS_DECISION`.
+Do not apply an agent recommendation as a no-response default. If approved criteria conflict or an
+outcome-changing axis remains, present the current proposal and the questions, then `NEEDS_DECISION`.
 
-### Design Change Confirmation — 필수 게이트
+### Design Change Confirmation — required gate
 
-`local`·`identity-shaping`처럼 보이는 디자인 결과를 바꾸면 Oracle lock·테스트·
-production 수정 전에 반드시 아래를 보여주고 명시적 사용자 확인을 받는다:
+When changing a visible design outcome such as `local`·`identity-shaping`, you must show the
+following and get explicit user confirmation before the Oracle lock·tests·production modification:
 
-1. 현재 결과에서 바뀌는 palette·type·layout·copy·motion·responsive·signature 축
-2. 승인된 source와 새 Design Intent
-3. 유지할 기존 요소와 버린 대안
-4. viewport·theme·reduced-motion에서 달라지는 결과
+1. the palette·type·layout·copy·motion·responsive·signature axes that change from the current outcome
+2. the approved source and the new Design Intent
+3. the existing elements to keep and the discarded alternatives
+4. the outcomes that differ across viewport·theme·reduced-motion
 
-승인된 Figma·PRD·디자인 시스템은 변경 방향의 출처지만 사용자 확인을 대신하지 않는다.
-포괄적 "redesign", "더 예쁘게" 요청도 구체 Design Intent의 승인이 아니다. 이전 사용자
-메시지는 **제시된 전체 Design Intent를 명시적으로 확인한 답변**일 때만 재질문 없이
-사용할 수 있다.
+An approved Figma·PRD·design system is a source for the change direction but does not substitute for user confirmation.
+A blanket "redesign" or "make it prettier" request is also not an approval of a concrete Design
+Intent. A previous user message can be used without re-asking only when it is **an answer that
+explicitly confirmed the entire presented Design Intent**.
 
-확인 답변의 메시지 위치 또는 식별 가능한 인용을 카드에 기록한다. 무응답이거나 일부
-축만 승인되면 카드 현재본과 남은 질문을 출력하고 `NEEDS_DECISION`. `behavior-only`는
-이 게이트를 N/A로 기록.
+Record on the card the message position of the confirming answer or an identifiable quotation. If
+there is no response or only some axes are approved, print the current card and the remaining
+questions, then `NEEDS_DECISION`. `behavior-only` records this gate as N/A.
 
-## 3. Design Intent 형식
+## 3. Design Intent format
 
-Design Intent와 Visual Contract는 별도 임시 파일이 아니라 **같은 Oracle Card bytes**에
-포함한다. 승인된 로컬 디자인 자료는 `oracle-lock.mjs --source`로 함께 잠그고, 원격
-Figma·URL은 정확한 file·page·frame·version을 카드에 기록.
+The Design Intent and the Visual Contract are included in the **same Oracle Card bytes**, not in a
+separate temporary file. Lock approved local design material together with
+`oracle-lock.mjs --source`, and for a remote Figma·URL record the exact
+file·page·frame·version on the card.
 
 ```markdown
 ### Design Intent
@@ -82,131 +83,130 @@ Figma·URL은 정확한 file·page·frame·version을 카드에 기록.
 - Voice and canonical vocabulary:
 - Approved references:
 - Rejected generic direction:
-- Design Change Confirmation: 사용자 답변 위치 또는 behavior-only N/A
+- Design Change Confirmation: user answer position or behavior-only N/A
 
 ### Visual Contract
 
-| ID  | 정책 | 축         | 계약 | Never | 출처      | 증거 계층  |
-| --- | ---- | ---------- | ---- | ----- | --------- | ---------- |
-| D1  | P1   | copy       | ...  | ...   | S1        | HARD       |
-| D2  | P2   | responsive | ...  | ...   | S2        | RELATIONAL |
-| D3  | P3   | identity   | ...  | ...   | 유저 Q1=A | JUDGMENT   |
+| ID  | Policy | Axis       | Contract | Never | Source    | Evidence tier |
+| --- | ------ | ---------- | -------- | ----- | --------- | ------------- |
+| D1  | P1     | copy       | ...      | ...   | S1        | HARD          |
+| D2  | P2     | responsive | ...      | ...   | S2        | RELATIONAL    |
+| D3  | P3     | identity   | ...      | ...   | user Q1=A | JUDGMENT      |
 ```
 
-`behavior-only`면 기존 계약 유지의 출처 있는 N/A만. `local`이면 영향 축만.
-`identity-shaping`이면 아래 항목을 모두 결정하거나 N/A 사유를 남긴다:
+For `behavior-only`, only a sourced N/A that keeps the existing contract. For `local`, only the
+affected axes. For `identity-shaping`, decide all of the items below or leave an N/A reason:
 
-- palette와 semantic token 역할
-- display·body·utility typography 역할과 실제 가용 font
+- the palette and semantic token roles
+- the display·body·utility typography roles and the actually available fonts
 - layout hierarchy, reading order, responsive reflow
-- 정보 구조를 표현하는 label·divider·numbering
-- primary action, loading, error, empty, success의 canonical copy
-- signature element 한 가지와 주변 restraint
-- motion의 목적·trigger와 reduced-motion 대체
-- focus·contrast·keyboard·overflow 등 레포 접근성 계약
+- the label·divider·numbering that expresses the information structure
+- the canonical copy of primary action, loading, error, empty, success
+- one signature element and the restraint around it
+- motion's purpose·trigger and the reduced-motion substitute
+- the repo accessibility contract such as focus·contrast·keyboard·overflow
 
-구현 class·component tree·임의 pixel 값은 정책 결과가 아닌 한 계약에 넣지 않는다.
+Do not put implementation classes·component trees·arbitrary pixel values into the contract unless they are a policy outcome.
 
-## 4. 증거 계층
+## 4. Evidence tiers
 
-각 `D*` 행에 주 증거 계층 하나. 보조 증거는 evidence mapping에 추가하되 독립 증거
-개수로 과장하지 않는다.
+One primary evidence tier per `D*` row. Add secondary evidence to the evidence mapping but do not
+inflate it as a count of independent evidence.
 
-- `HARD` — 정확히 결정 가능한 copy·role·focus·theme·reduced motion·overflow·token 결과: component test, Playwright, DOM/a11y, computed style
-- `RELATIONAL` — hierarchy·reading order·reflow·요소 간 시각 관계: 실제 browser, bounding box, 승인 frame 비교, screenshot
-- `JUDGMENT` — subject 고유성·typography 성격·signature·절제·voice: 승인 brief와 screenshot을 보는 사용자 또는 독립 designer 리뷰
+- `HARD` — exactly determinable copy·role·focus·theme·reduced motion·overflow·token outcomes: component test, Playwright, DOM/a11y, computed style
+- `RELATIONAL` — hierarchy·reading order·reflow·visual relations between elements: a real browser, bounding box, comparison against the approved frame, screenshot
+- `JUDGMENT` — subject distinctiveness·typography character·signature·restraint·voice: a user or an independent designer review that looks at the approved brief and screenshots
 
-- `HARD`를 내부 class name이나 전체 DOM snapshot에 결합하지 않는다.
-- `RELATIONAL`을 모든 pixel의 exact coordinate로 바꾸지 않는다.
-- `JUDGMENT`를 자동화할 수 없다는 이유로 출처 없는 합격 처리하지 않는다.
-- 현재 production screenshot을 승인 없이 golden image로 채택하지 않는다.
-- 같은 fixture·mock·reference를 공유하는 증거를 서로 독립적이라고 보고하지 않는다.
+- Do not couple `HARD` to internal class names or a full DOM snapshot.
+- Do not turn `RELATIONAL` into the exact coordinate of every pixel.
+- Do not pass `JUDGMENT` without a source merely because it cannot be automated.
+- Do not adopt a current production screenshot as a golden image without approval.
+- Do not report evidence that shares the same fixture·mock·reference as independent of each other.
 
-## 5. baseline 권위와 외부 Visual QA handoff
+## 5. Baseline authority and external Visual QA handoff
 
-시각 baseline은 자동 생성 결과가 아니라 사용자에게 승인받은 정책 source다. baseline을
-새로 만들거나 바꾸려면 변경 전후 차이, 대상 viewport·theme·motion과 허용치를
-사용자에게 보여주고 **명시적 승인**을 받은 뒤 새 Oracle revision에 기록한다. 기존
-revision을 덮어쓰지 않는다.
+A visual baseline is not an auto-generated output but a policy source approved by the user. To
+create or change a baseline, show the user the before/after difference, the target
+viewport·theme·motion and the tolerance, get **explicit approval**, and then record it in a new
+Oracle revision. Do not overwrite the existing revision.
 
-screenshot 비교와 사람이 직접 브라우저에 들어가는 실행은 별도 `$frontend-visual-qa`가
-소유한다. 이 스킬이나 `$test`가 암묵적으로 대신 실행하지 않는다. `RELATIONAL` 행이
-있으면 카드 승인 시 `Visual QA authorization: approved | declined`를 같이 받는다.
-`approved`는 명시적 요청으로 간주해 이름으로 호출하고, `declined`는 해당 행을 visual
-owner의 `pending`으로 남긴다.
+Screenshot comparison and runs where a person enters the browser directly are owned by the separate
+`$frontend-visual-qa`. Neither this skill nor `$test` runs them implicitly on its behalf. If there
+is a `RELATIONAL` row, obtain `Visual QA authorization: approved | declined` together at card
+approval. Treat `approved` as an explicit request and invoke it by name, and for `declined` leave
+that row as the visual owner's `pending`.
 
-`local`·`identity-shaping` 변경에서 UI-shaping interaction, `RELATIONAL` 행 또는
-`JUDGMENT` 행이 실제 화면 맥락에 의존하면 review 전에 browser journey 1개를 요구한다.
-새 dependency를 추가하지 말고 대상 레포에 이미 있는 Playwright/Storybook/browser MCP/Figma
-handoff 중 하나만 쓴다. 설치된 도구가 없거나 사용자가 declined하면 해당 행은 `pending`
-또는 출처 있는 N/A로만 남긴다. Low fast path는 이 조건이 생기는 순간 Oracle lane으로
-승격한다.
+In a `local`·`identity-shaping` change, if a UI-shaping interaction, a `RELATIONAL` row, or a
+`JUDGMENT` row depends on real screen context, require one browser journey before review. Do not add
+a new dependency; use only one of the Playwright/Storybook/browser MCP/Figma handoff that already
+exists in the target repo. If no tool is installed or the user declined, leave that row only as
+`pending` or a sourced N/A. The Low fast path escalates to the Oracle lane the moment this condition arises.
 
-`$frontend-visual-qa`는 다음만 반환한다:
+`$frontend-visual-qa` returns only the following:
 
-- 인용한 Oracle revision과 승인 baseline
-- 요청받은 D/O 행별 PASS·FAIL·N/A
-- 환경과 artifact 경로
-- 정책이 필요하면 `NEEDS_DECISION`, 실행 환경이 깨졌으면 `FAIL`
+- the cited Oracle revision and the approved baseline
+- PASS·FAIL·N/A per requested D/O row
+- the environment and the artifact paths
+- `NEEDS_DECISION` if policy is needed, `FAIL` if the execution environment is broken
 
-외부 visual QA artifact는 Oracle의 보조 evidence다. 새 Delivery 상태를 만들거나
-`IMPLEMENTED_GREEN`·`REVIEW_VERIFIED`를 대신하지 않는다. visual QA가 제품 결함을
-발견해도 직접 production을 고치지 않고 이 스킬의 `VALID_RED` 흐름으로 돌려보낸다.
+An external visual QA artifact is the Oracle's secondary evidence. It does not create a new Delivery
+state or substitute for `IMPLEMENTED_GREEN`·`REVIEW_VERIFIED`. Even if visual QA finds a product
+defect, it does not fix production directly but returns it to this skill's `VALID_RED` flow.
 
-## 6. 두 번의 설계 pass
+## 6. Two design passes
 
-### Pass 1 — subject 기반 계획 (`identity-shaping`만)
+### Pass 1 — subject-based plan (`identity-shaping` only)
 
-- **Color:** 기존 디자인 시스템 우선. 새 identity면 4~6개 named color와 semantic 역할.
-- **Type:** display·body·utility 역할, 실제 설치·license·loading·fallback 확인.
-- **Layout:** 정보 위계를 한 문장과 작은 ASCII wireframe으로.
-- **Signature:** 이 화면을 기억하게 할 요소 하나만.
-- **Risk:** 접근성·사용성을 해치지 않는 시각적 위험 하나만 정당화.
-- **Motion:** 이해를 돕는 한 순간을 우선, 산발적 효과 회피.
-- **Copy:** 사용자가 인식하는 명사와 능동형 동사, action→pending→success 어휘 일관.
+- **Color:** the existing design system first. For a new identity, 4~6 named colors and semantic roles.
+- **Type:** display·body·utility roles, and confirmation of the actual installation·license·loading·fallback.
+- **Layout:** the information hierarchy in one sentence and a small ASCII wireframe.
+- **Signature:** only one element that will make this screen memorable.
+- **Risk:** justify only one visual risk that does not harm accessibility·usability.
+- **Motion:** prioritize one moment that aids understanding, and avoid scattered effects.
+- **Copy:** nouns the user recognizes and active verbs, with consistent action→pending→success vocabulary.
 
-### Pass 2 — genericity와 restraint 비평
+### Pass 2 — genericity and restraint critique
 
-잠그기 전 검토하고 수정한 선택과 이유를 기록한다:
+Review before locking and record the choices you revised and why:
 
-1. 전혀 다른 제품에도 palette·type·layout을 그대로 붙일 수 있는가?
-2. hero 또는 첫 화면이 subject의 thesis인가, 템플릿형 큰 제목인가?
-3. numbering·divider·eyebrow가 실제 정보 구조를 표현하는가?
-4. signature 외 장식·motion이 주의를 경쟁하는가?
-5. 카피가 사용자 언어인가, 내부 구현 용어인가?
-6. 한 요소를 제거하면 더 명확해지는가?
-7. 실제 content, 긴 문자열, empty·error 상태에서도 방향이 유지되는가?
+1. Could the palette·type·layout be pasted unchanged onto a completely different product?
+2. Is the hero or the first screen the subject's thesis, or a template-style big headline?
+3. Do the numbering·divider·eyebrow express the real information structure?
+4. Do decorations·motion other than the signature compete for attention?
+5. Is the copy the user's language, or internal implementation jargon?
+6. Would removing one element make it clearer?
+7. Does the direction hold up with real content, long strings, and empty·error states?
 
-## 7. Delivery 증거 책임
+## 7. Delivery evidence responsibility
 
-- `HARD` 행은 가장 좁은 DOM·a11y·component 관찰 계층에서 `Then`·`Never`를 함께 확인.
-- `RELATIONAL` 행은 `$frontend-visual-qa` artifact 또는 같은 owner의 `pending`에 매핑.
-  `pending`과 사용자 `declined`는 `IMPLEMENTED_GREEN`에는 남을 수 있지만 source-backed N/A
-  revision 없이는 `REVIEW_VERIFIED`를 차단한다.
-- `JUDGMENT` 행은 승인 기준과 Design Intent를 독립 `designer`에게 전달한다. reviewer는
-  정책을 새로 만들지 않는다. designer review가 pending이면 source-backed N/A revision 없이는
-  `REVIEW_VERIFIED`를 차단한다.
-- 행의 주 owner: `HARD → test`, `RELATIONAL → visual`, `JUDGMENT → designer`. 출처
-  있는 `N/A`는 어느 계층에나 가능.
-- 외부 visual QA 결과를 위해 이 스킬의 상태를 추가하지 않는다.
+- A `HARD` row confirms `Then`·`Never` together at the narrowest DOM·a11y·component observation tier.
+- A `RELATIONAL` row maps to a `$frontend-visual-qa` artifact or the same owner's `pending`. A
+  `pending` and a user `declined` may remain at `IMPLEMENTED_GREEN` but block `REVIEW_VERIFIED`
+  without a source-backed N/A revision.
+- A `JUDGMENT` row delivers the approval criteria and the Design Intent to an independent `designer`.
+  The reviewer does not create new policy. If the designer review is pending, it blocks
+  `REVIEW_VERIFIED` without a source-backed N/A revision.
+- A row's primary owner: `HARD → test`, `RELATIONAL → visual`, `JUDGMENT → designer`. A sourced
+  `N/A` is possible at any tier.
+- Do not add a state to this skill for an external visual QA result.
 
-피드백은 [`common.md`](common.md)의 canonical 라우터를 그대로 사용 — 시각 관할 매핑:
+Feedback uses the canonical router in [`common.md`](common.md) as-is — visual jurisdiction mapping:
 
-- 승인 Figma·Design Intent와 실제 UI 불일치 → `PRODUCT_DEFECT`
-- source의 시각 요구가 카드에 누락되거나 source끼리 충돌 → `POLICY_GAP`
-- 잘못된 viewport·font fixture·screenshot 조건 → `HARNESS_DEFECT`
-- 도구·font asset·브라우저 기동 문제로 판정 불가 → `ENVIRONMENT_DEFECT`
-- 카드 범위 안 시각 증거 누락 → `EVIDENCE_GAP`
-- 출처 없는 reviewer 취향 → `NON_ORACLE_OPINION`
+- mismatch between the approved Figma·Design Intent and the actual UI → `PRODUCT_DEFECT`
+- a source's visual requirement is missing from the card, or sources conflict → `POLICY_GAP`
+- wrong viewport·font fixture·screenshot conditions → `HARNESS_DEFECT`
+- judgment impossible due to a tool·font asset·browser startup problem → `ENVIRONMENT_DEFECT`
+- missing visual evidence within the card scope → `EVIDENCE_GAP`
+- sourceless reviewer taste → `NON_ORACLE_OPINION`
 
-## 8. 금지
+## 8. Prohibitions
 
-- 모든 UI 변경에 새 palette·font·signature 계획 강제
-- reviewer나 에이전트 제안을 승인 없이 Oracle로 잠금
-- 디자인 품질을 근거 없는 단일 점수로 축약
-- 현재 구현 screenshot을 자동 golden으로 승인
-- 전체 DOM snapshot·class name·모든 pixel coordinate에 계약 결합
-- 고유성을 이유로 새 디자인 시스템·animation dependency·icon library를 기본 추가
-- 여러 signature element와 산발적인 animation 추가
-- 접근성·성능·responsive 기본기를 aesthetic risk로 희생
-- screenshot·직접 브라우저 실행을 이 스킬이나 `$test`에 다시 포함
+- forcing a new palette·font·signature plan on every UI change
+- locking a reviewer's or an agent's proposal into the Oracle without approval
+- reducing design quality to a single unsupported score
+- approving the current implementation screenshot as an automatic golden
+- coupling the contract to a full DOM snapshot·class names·every pixel coordinate
+- adding a new design system·animation dependency·icon library by default in the name of distinctiveness
+- adding multiple signature elements and scattered animation
+- sacrificing accessibility·performance·responsive fundamentals to an aesthetic risk
+- putting screenshots·direct browser runs back into this skill or `$test`

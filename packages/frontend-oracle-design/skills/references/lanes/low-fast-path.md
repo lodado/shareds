@@ -1,44 +1,46 @@
-# Low fast path — lane 계약
+# Low fast path — lane Contract
 
-진입 시 risk 판정이 Low인 작업의 유일한 로드 노드다. 이 lane에서는 이 파일 **하나만**
-읽고 다른 reference 노드는 로드하지 않는다 — 그래프의 Oracle lane(`common` 이하)은
-명시적 Oracle 요청 또는 Medium/High 판정에서만 연다.
+This is the only load node for work whose risk judgment at entry is Low. In this lane read **only**
+this file and do not load any other reference node — the graph's Oracle lane (`common` and below)
+opens only on an explicit Oracle request or a Medium/High judgment.
 
-## 진입 조건 — 전부 만족할 때만
+## Entry Conditions — Only When All Are Satisfied
 
-- 새 정책·카드·architecture 결정이 없다.
-- 기존 승인 계약 안의 변경이다: 되돌리기 쉬운 copy·token·고립 CSS·명확한 회귀 수정.
-- false GREEN의 최악 피해가 작다(정적 표시, 순수 동기 helper 수준). 부작용이 위험하면
-  UI가 단순해도 Low가 아니다.
+- There is no new policy·card·architecture decision.
+- It is a change inside an already approved contract: easily reversible copy·token·isolated CSS·a
+  clear regression fix.
+- The worst-case damage of a false GREEN is small (at the level of static display or a pure
+  synchronous helper). If the side effects are risky, it is not Low even when the UI is simple.
 
-## 절차
+## Procedure
 
-1. risk 판정과 사유를 한 줄 기록하고, 응답 첫 줄에 lane 헤더를 출력한다
-   (`risk=Low lane=low-fast-path nodes=[low-fast-path]`). 사유 예:
-   `risk: low — 승인된 문구 계약 안의 copy 수정`.
-2. 변경을 수행하고 관련 테스트와 레포 필수 검증(lint·typecheck·targeted test)만
-   실행한다.
-3. 결과를 보고한다: 변경 path, 실행한 검증 명령과 실제 결과, risk 사유.
+1. Record the risk judgment and reason in one line, and print the lane header on the first line of
+   the response (`risk=Low lane=low-fast-path nodes=[low-fast-path]`). Reason example:
+   `risk: low — copy fix inside an approved wording contract`.
+2. Make the change and run only the related tests and the repo's required verification
+   (lint·typecheck·targeted test).
+3. Report the result: the changed paths, the verification commands run and their actual results, and
+   the risk reason.
 
-## 하지 않는 것
+## What This Lane Does Not Do
 
-- Oracle Card·revision lock·run ledger·상태 파일·evidence manifest 생성
-- Grill·사용자 카드 확인·독립 subagent 리뷰
-- 다른 reference 노드 로드
+- Creating an Oracle Card·revision lock·run ledger·state file·evidence manifest
+- Grill·user card confirmation·independent subagent review
+- Loading other reference nodes
 
-절차를 생략하는 lane이지 검증을 생략하는 lane이 아니다 — 레포 필수 검증은 그대로
-실행하고, 실행하지 않은 검증을 통과로 보고하지 않는다.
+This is a lane that skips procedure, not a lane that skips verification — run the repo's required
+verification as is, and never report a verification you did not run as passing.
 
-## 승격 — Low 실격 조건
+## Promotion — Low Disqualification Conditions
 
-작업 중 아래 중 하나라도 나타나면 그 즉시 Low 실격이다. fast path를 계속 타지 말고
-지금까지의 변경 내용을 보고한 뒤 Oracle lane으로 승격한다
-(`common.md` → `card/` 노드, Medium 절차).
+If any one of the following appears during the work, it is immediately disqualified from Low. Do not
+stay on the fast path; report the changes made so far and then promote to the Oracle lane
+(`common.md` → `card/` node, Medium procedure).
 
-- 결과를 바꾸는 정책 질문이 생겼다 (`Then`·`Never`·부작용 횟수를 정해야 한다)
-- 새 상태·form·async 흐름·responsive 구조가 필요해졌다
-- architecture 경계·state ownership·public API를 바꾸게 됐다
-- mutation·권한·데이터 정합성 등 부작용 위험이 드러났다
+- A policy question that changes the result has come up (`Then`·`Never`·the number of side effects must be decided)
+- A new state·form·async flow·responsive structure has become necessary
+- You have ended up changing an architecture boundary·state ownership·public API
+- A side-effect risk such as mutation·permissions·data integrity has surfaced
 
-승격 후에는 이미 만든 변경을 기정사실로 두지 않는다 — 카드 절차가 정한 정책과
-어긋나면 되돌린다.
+After promotion, do not treat changes already made as a fait accompli — revert them if they conflict
+with the policy the card procedure sets.

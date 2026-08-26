@@ -1,76 +1,89 @@
-# 변경 용이성 구현·리뷰 기준
+# Changeability implementation·review criteria
 
-## 목적과 권위
+## Purpose and authority
 
-제품 정책이 아니다 — 승인된 동작을 바꾸지 않으면서 변경 비용이 낮은 구현안을 고르는
-휴리스틱이다. 결과·문구·상태·부작용을 새로 정하거나 승인된 Oracle을 고치는 데 쓰지
-않는다.
+This is not product policy — it is a heuristic for picking an implementation with a low change cost
+without altering approved behavior. Do not use it to newly decide outcomes·copy·state·side effects
+or to modify an approved Oracle.
 
-권위 순서는 [`common.md`](common.md)의 공통 우선순위가 canonical이다 — 강제 제약과
-승인된 Oracle, 대상 레포의 `AGENTS.md`·`CLAUDE.md`·architecture·API·테스트 계약,
-실제 설치 버전과 기존 구현 관례, 마지막으로 이 문서의 구현 휴리스틱과 외부 사례.
-충돌하면 상위 기준을 따른다. Toss 자료는 구현 후보를 찾는 근거일 뿐 다른 레포에
-강제하는 권위가 아니다.
+For the authority order, the common priority in [`common.md`](common.md) is canonical — mandatory
+constraints and the approved Oracle, the target repo's `AGENTS.md`·`CLAUDE.md`·architecture·API·test
+contracts, the actually installed versions and existing implementation conventions, and finally this
+document's implementation heuristics and external cases. On conflict, follow the higher criterion.
+Toss material is only evidence for finding implementation candidates, not authority that forces
+anything on another repo.
 
-## 읽는 방법
+## How to read
 
-`VALID_RED` 뒤 production 수정 전 전부 읽는다. 다섯 축을 점수화하거나 모두 채우지
-않고, 이번 선택을 실제로 갈라놓은 축과 감수한 비용만 Implementation Decision에
-남긴다. 독립 reviewer도 같은 기준으로 Decision과 diff를 대조한다. 구체적인 drift,
-숨은 부작용, 변경 전파 위험이 없으면 선호 차이는 `NON_ORACLE_OPINION`이다.
+Read all of it before modifying production after `VALID_RED`. Do not score or fill in all five axes;
+leave in the Implementation Decision only the axes that actually decided this choice and the cost
+accepted. An independent reviewer also compares the Decision and the diff against the same criteria.
+Without concrete drift, a hidden side effect, or change-propagation risk, a difference in preference
+is `NON_ORACLE_OPINION`.
 
-각 축의 **구현 전 질문**: 이 선택이 이해·수정·검증 범위를 실제로 줄이는가? 다른 축의
-비용이나 기존 경계를 불필요하게 해치지 않는가?
+Each axis's **pre-implementation question**: does this choice actually reduce the scope of
+understanding·modification·verification? Does it unnecessarily harm another axis's cost or an
+existing boundary?
 
 ## Readability
 
-처음 읽는 사람이 동시에 기억할 맥락과 조건을 줄인다. 짧은 코드보다 사용자 행동,
-상태 전이와 부작용의 실행 순서가 드러나는 것이 우선이다.
+Reduce the context and conditions a first-time reader has to hold at once. Revealing user actions
+and the execution order of state transitions and side effects takes priority over shorter code.
 
-### 핵심 패턴
+### Core patterns
 
-각 항목은 `위험 신호 → 기본 선택. 제외: 적용하지 않는 경우` 형식이다.
+Each item has the form `risk signal → default choice. Except: when it does not apply`.
 
-- 복잡한 조건이 반복된다 → domain 의미가 드러나는 이름을 붙인다. 제외: 한 번만 쓰이고 이름이 조건보다 모호하다
-- 독립 state·async 흐름이 섞인다 → 상태 소유권·error boundary를 기준으로 분리한다. 제외: LOC만 길고 변경 이유가 같다
-- 핵심 순서가 여러 effect에 흩어진다 → event 또는 이름 붙은 workflow에서 순서를 드러낸다. 제외: 실제 외부 system 동기화다
-- 한 줄마다 helper·wrapper가 생긴다 → 정보를 추가하지 않는 indirection을 제거한다. 제외: 여러 사용처가 동일 정책을 공유한다
+- A complex condition repeats → give it a name that reveals the domain meaning. Except: it is used
+  only once and the name is vaguer than the condition
+- Independent state·async flows are mixed → separate them by state ownership·error boundary. Except:
+  it is only long in LOC and the reason for change is the same
+- The core order is scattered across several effects → reveal the order in an event or a named
+  workflow. Except: it is real external system synchronization
+- A helper·wrapper appears for every line → remove indirection that adds no information. Except:
+  several call sites share the same policy
 
 ```tsx
 const canSubmit = !isLoading && !isLocked && user != null && amount > 0
 ```
 
-같은 정책이 반복될 때만 `canTransfer` 같은 domain 이름을 부여한다.
+Give a domain name such as `canTransfer` only when the same policy repeats.
 
-### React 구현 기준
+### React implementation criteria
 
-- JSX는 semantic structure, 접근성 상태와 사용자 intent 연결을 중심으로 읽힌다.
-- props와 render에서 계산할 수 있는 값은 effect를 거쳐 다른 state로 복사하지 않는다.
-- component는 LOC가 아니라 상태 소유권, async/error boundary, 접근성 책임, 독립 테스트
-  또는 재사용 이유가 달라질 때 분리한다.
-- 명시적 순서가 중요한 workflow를 generic pipeline이나 불필요한 hook으로 숨기지 않는다.
+- JSX reads around semantic structure, accessibility state, and the connection to user intent.
+- A value computable from props and render is not copied into another state through an effect.
+- Split a component not by LOC but when state ownership, async/error boundary, accessibility
+  responsibility, independent test, or reuse reason differs.
+- Do not hide a workflow whose explicit order matters behind a generic pipeline or an unnecessary hook.
 
-### Implementation Decision evidence · Reviewer 판정 기준
+### Implementation Decision evidence · Reviewer judgment criteria
 
-- Decision에는 이름을 붙이거나 분리한 경계와 실제 정보 이득을 기록한다.
-- 불필요한 파일·시점 이동이 실제 변경 오류를 만들 수 있으면 `FINDING`이다.
-- 더 좋아 보이는 이름·함수 문법이나 LOC 선호만 다르면 `NON_ORACLE_OPINION`이다.
+- Record in the Decision the boundary you named or separated and the actual information gain.
+- If an unnecessary file·timing move can create a real change error, it is `FINDING`.
+- If only a nicer-looking name·function syntax or an LOC preference differs, it is `NON_ORACLE_OPINION`.
 
 ## Predictability
 
-호출자가 이름, 입력, 반환값으로 결과와 외부 부작용을 예상할 수 있어야 한다. 내부
-알고리즘은 숨길 수 있지만 request, navigation, storage, analytics, timer 같은 외부
-write의 종류·시점·횟수는 이름 붙은 owner와 경계에서 보여야 한다. 외부 API는 사용자
-intent로 읽히게 만들되 내부 상태 전이와 lifecycle을 모호한 자동화로 숨기지 않는다.
+A caller must be able to predict the result and the external side effects from the name, the inputs,
+and the return value. The internal algorithm may be hidden, but the kind·timing·count of external
+writes such as request, navigation, storage, analytics, and timer must be visible at a named owner
+and boundary. Make the external API read as user intent, but do not hide internal state transitions
+and lifecycle behind vague automation.
 
-### 핵심 패턴
+### Core patterns
 
-- `get*`·`fetch*`에 숨은 부작용이 있다 → caller에서 조합하거나 전체 workflow를 이름에 드러낸다. 제외: 승인 계약이 원자적 workflow를 요구한다
-- render·selector가 외부 상태를 쓴다 → event·mutation·외부 동기화 effect로 옮긴다
-- 성공·실패 handler가 write를 중복한다 → 실행 owner와 정확한 횟수를 한 경계로 모은다. 제외: 서로 다른 승인 부작용이다
-- timer·subscription cleanup이 없다 → 생성한 경계에서 cleanup한다. 제외: runtime이 lifecycle을 명시적으로 소유한다
-- 닫힘·제거·결과 확정이 한 boolean이다 → 관찰 결과가 다른 전이만 이름과 owner를 나눈다. 제외: 같은 시점의 원자적 전이다
-- 국소 경계가 모든 오류를 소비한다 → 복구 가능한 오류만 처리하고 나머지는 상위로 전파한다. 제외: 앱 최상위 격리·관측 경계다
+- `get*`·`fetch*` has a hidden side effect → compose it at the caller or reveal the whole workflow in
+  the name. Except: the approved contract requires an atomic workflow
+- A render·selector writes external state → move it to an event·mutation·external synchronization effect
+- Success·failure handlers duplicate a write → gather the execution owner and the exact count into
+  one boundary. Except: they are different approved side effects
+- A timer·subscription has no cleanup → clean up at the boundary that created it. Except: the runtime
+  explicitly owns the lifecycle
+- Closing·removal·result confirmation is one boolean → split the name and owner only for transitions
+  whose observed result differs. Except: they are atomic transitions at the same moment
+- A local boundary consumes every error → handle only recoverable errors and propagate the rest
+  upward. Except: it is the app top-level isolation·observation boundary
 
 ```ts
 const balance = await fetchBalance()
@@ -78,81 +91,87 @@ trackBalanceViewed(balance)
 saveLastViewedBalance(balance)
 ```
 
-세 동작이 승인된 하나의 workflow라면 무조건 분리하지 않는다. 전체 책임을 드러내는
-이름을 사용하고 실패·재시도·중복 실행 계약을 검증한다.
+If the three actions are one approved workflow, do not separate them unconditionally. Use a name
+that reveals the whole responsibility and verify the failure·retry·duplicate-execution contract.
 
-### React 구현 기준
+### React implementation criteria
 
-- query function은 data 획득과 transport 오류를 소유하고 UI copy·navigation을 숨기지
-  않는다.
-- effect는 observer, subscription, timer, DOM 또는 외부 SDK 동기화에만 쓰며 대상과
-  cleanup을 드러낸다.
-- 요청·overlay·다단계 flow는 시작·취소·성공·실패·시각적 닫힘·resource 제거가 실제로
-  다른 결과나 cleanup을 만들 때만 별도 전이로 모델링한다. 단순 toggle은 늘리지 않는다.
-- 국소 catch·Error Boundary는 자신이 복구할 수 있는 오류만 처리한다. 알 수 없는 오류와
-  fallback 자체 오류는 원인을 보존해 상위 경계로 전파한다.
-- SSR code는 browser global 접근 시점과 server fallback을 경계에서 예측할 수 있게 한다.
-- 기존 logging·telemetry boundary나 캡슐화된 workflow를 개인 선호로 해체하지 않는다.
+- A query function owns data acquisition and transport errors and does not hide UI copy·navigation.
+- Use an effect only for observer, subscription, timer, DOM, or external SDK synchronization, and
+  reveal its target and cleanup.
+- Model a request·overlay·multi-step flow as separate transitions only when start·cancel·success·
+  failure·visual close·resource removal actually produces a different result or cleanup. Do not
+  inflate a simple toggle.
+- A local catch·Error Boundary handles only the errors it can recover from. An unknown error and an
+  error in the fallback itself preserve the cause and propagate to the upper boundary.
+- SSR code makes the timing of browser global access and the server fallback predictable at the boundary.
+- Do not dismantle an existing logging·telemetry boundary or an encapsulated workflow out of personal
+  preference.
 
-### Implementation Decision evidence · Reviewer 판정 기준
+### Implementation Decision evidence · Reviewer judgment criteria
 
-- Decision에는 외부 write의 owner, 실행 시점과 실패·재시도 시 횟수, material한
-  lifecycle 전이와 오류 전파 경계를 기록한다.
-- 호출자가 알 수 없는 write, cleanup 누락이나 중복 부작용은 구체 evidence가 있으면
-  `PRODUCT_DEFECT`, 필요한 검증만 없으면 `EVIDENCE_GAP`이다.
-- 관찰 결과를 새로 정해야 하면 `POLICY_GAP`, explicit handler 선호만 다르면
-  `NON_ORACLE_OPINION`이다.
+- Record in the Decision the owner of external writes, the execution timing and the count on
+  failure·retry, and the material lifecycle transitions and error propagation boundary.
+- A write the caller cannot know about, a missing cleanup, or a duplicated side effect is
+  `PRODUCT_DEFECT` when concrete evidence exists, and `EVIDENCE_GAP` when only the required
+  verification is missing.
+- If the observed result must be newly decided it is `POLICY_GAP`, and if only an explicit handler
+  preference differs it is `NON_ORACLE_OPINION`.
 
 ## Cohesion
 
-같은 정책과 같은 이유로 함께 바뀌는 source, test, mock과 문서를 가장 가까운 owner에
-둔다. 코드가 반복된다는 이유만으로 공통화하지 않고 한쪽만 바뀔 때 실제 drift 결함이
-생기는지를 본다.
+Put the source, tests, mocks, and docs that change together for the same policy and the same reason
+at the nearest owner. Do not factor code out merely because it repeats; look at whether a real drift
+defect appears when only one side changes.
 
-### 핵심 패턴
+### Core patterns
 
-- 같은 business rule이 여러 곳에 복제된다 → 가장 가까운 domain owner로 모은다. 제외: 정책과 release cadence가 서로 다르다
-- feature source·test·mock이 함께 이동하지 않는다 → 같은 architecture unit에 둔다. 제외: 레포가 다른 경계를 강제한다
-- generic util에 consumer별 option이 늘어난다 → 서로 다른 변경 이유를 분리한다. 제외: 안정된 동일 invariant를 공유한다
-- consumer 하나를 미래 재사용 때문에 shared로 올린다 → local에 둔다. 제외: 현재 여러 consumer와 stable contract가 있다
+- The same business rule is duplicated in several places → gather it at the nearest domain owner.
+  Except: the policy and release cadence differ
+- A feature's source·test·mock do not move together → put them in the same architecture unit. Except:
+  the repo enforces a different boundary
+- Per-consumer options keep growing in a generic util → separate the different reasons for change.
+  Except: they share a stable identical invariant
+- A single consumer is promoted to shared for future reuse → keep it local. Except: there are
+  multiple consumers now and a stable contract
 
 ```ts
 const isNicknameValid = nickname.length <= 20
 const isCouponCodeValid = couponCode.length <= 20
 ```
 
-현재 숫자가 같아도 독립 정책이면 하나의 domain API로 합치지 않는다. 반대로 동일한
-송금 한도 규칙이 복제됐다면 drift를 막을 공통 owner가 필요하다.
+Even if the numbers match today, do not merge independent policies into one domain API. Conversely,
+if the same transfer limit rule is duplicated, a common owner is needed to prevent drift.
 
-### React 구현 기준
+### React implementation criteria
 
-- feature 전용 hook, mapper, test와 mock은 가장 가까운 feature 경계에 둔다.
-- query option, DTO mapper와 cache update는 해당 server state owner 가까이에 둔다.
-- UI가 소유할 JSX·token·문구와 domain 판단·transport 변환을 generic hook에 섞지 않는다.
-- 대상 레포의 public API·FSD·module boundary를 넘어 co-location하지 않는다.
+- Put feature-only hooks, mappers, tests, and mocks at the nearest feature boundary.
+- Put query options, DTO mappers, and cache updates near their server state owner.
+- Do not mix the JSX·token·copy the UI should own with domain judgment·transport conversion in a generic hook.
+- Do not co-locate across the target repo's public API·FSD·module boundary.
 
-### Implementation Decision evidence · Reviewer 판정 기준
+### Implementation Decision evidence · Reviewer judgment criteria
 
-- Decision에는 함께 바뀌는 정책과 owner, 중복을 허용하거나 공통화한 drift 근거를 적는다.
-- feature·route를 삭제할 때 함께 제거될 source·test·mock·문서가 같은 경계에
-  모여 있는지 확인한다.
-- 동일 정책이 떨어져 drift를 만들거나 unrelated 책임이 한 abstraction에 묶이면
-  `FINDING` 후보다.
-- 단순 중복 줄 수와 선호하는 폴더 구조는 blocking 근거가 아니다.
+- Write in the Decision the policy and owner that change together, and the drift rationale for allowing duplication or factoring it out.
+- Check that the source·test·mock·docs to be removed together when a feature·route is deleted are
+  gathered at the same boundary.
+- If the same policy sits apart and creates drift, or unrelated responsibilities are bound into one
+  abstraction, it is a `FINDING` candidate.
+- A plain duplicate line count and a preferred folder structure are not grounds for blocking.
 
 ## Coupling
 
-하나의 변경이 알아야 하거나 수정해야 하는 consumer 범위를 줄인다. 공유 invariant는
-결합하되 public API, global store, shared util, transport DTO와 framework API가 책임보다
-넓게 퍼지지 않게 한다.
+Reduce the range of consumers that one change must know about or modify. Couple shared invariants,
+but keep the public API, global store, shared util, transport DTO, and framework API from spreading
+wider than their responsibility.
 
-### 핵심 패턴
+### Core patterns
 
-- consumer 하나뿐인 global/public surface가 생긴다 → local state·module에 둔다. 제외: 승인된 public contract가 필요하다
-- UI가 transport DTO·query key를 안다 → mapper/model owner에서 render-ready 값으로 바꾼다. 제외: UI 자체가 그 contract의 owner다
-- 짧은 props 전달 때문에 store·context를 만든다 → 가장 가까운 common owner에서 전달한다. 제외: 실제로 넓게 공유하는 상태다
-- interface·adapter가 구현 하나를 감싼다 → 구현을 직접 사용한다. 제외: 현재 여러 구현 또는 호환성 계약이 있다
-- 동일 flow가 여러 platform API에 직접 묶인다 → pure transition core와 얇은 adapter로 나눈다. 제외: 현재 runtime 하나만 지원한다
+- A global/public surface with only one consumer appears → keep it in local state·module. Except: an approved public contract is required
+- The UI knows the transport DTO·query key → convert to render-ready values at the mapper/model owner. Except: the UI itself owns that contract
+- A store·context is created just for a short props hand-off → pass it from the nearest common owner. Except: it is state that is genuinely shared widely
+- An interface·adapter wraps a single implementation → use the implementation directly. Except: multiple implementations or a compatibility contract exist now
+- The same flow is tied directly to several platform APIs → split it into a pure transition core and thin adapters. Except: only one runtime is supported now
 
 ```tsx
 function BalanceCard({ balance }: { balance: number }) {
@@ -160,97 +179,99 @@ function BalanceCard({ balance }: { balance: number }) {
 }
 ```
 
-UI가 `BalanceApiResponse` 전체를 받을 필요가 없으면 필요한 값만 전달한다.
+If the UI does not need the whole `BalanceApiResponse`, pass only the values it needs.
 
-### React 구현 기준
+### React implementation criteria
 
-- state는 실제로 공유하는 가장 가까운 common owner에 둔다.
-- FSD는 대상 레포가 이미 사용하거나 도입이 승인됐을 때만 그 public API를 따른다.
-- custom hook은 consumer가 필요한 값과 intent action만 반환한다. tuple/object 형태는
-  대상 레포 관례를 따르며 transport, cache와 UI copy를 동시에 노출하지 않는다.
-- 둘 이상의 승인된 router·runtime이 같은 flow를 공유할 때만 순수 state·transition을
-  core에 두고 URL·navigation·browser API를 adapter가 소유하게 한다. 미래 가능성만으로
-  단일 runtime에 adapter를 추가하지 않는다.
-- 승인된 design system·domain API나 동일한 권한·통화·identity invariant를 local 복제로
-  우회하지 않는다.
+- Put state at the nearest common owner that actually shares it.
+- Follow FSD's public API only when the target repo already uses it or its adoption is approved.
+- A custom hook returns only the values and intent actions the consumer needs. The tuple/object shape
+  follows the target repo's convention and does not expose transport, cache, and UI copy at the same time.
+- Only when two or more approved routers·runtimes share the same flow, put the pure state·transition
+  in the core and let an adapter own the URL·navigation·browser API. Do not add an adapter to a
+  single runtime on future possibility alone.
+- Do not bypass an approved design system·domain API or the same permission·currency·identity
+  invariant with a local copy.
 
-### Implementation Decision evidence · Reviewer 판정 기준
+### Implementation Decision evidence · Reviewer judgment criteria
 
-- Decision에는 public/global/shared surface와 실제 consumer, DTO 변환 owner, platform
-  adapter가 있으면 현재 공유 runtime을 기록한다.
-- 불필요하게 넓은 surface, transport 누수나 승인된 import boundary 위반이 구체 변경
-  전파 위험을 만들면 `FINDING`이다.
-- context·props·barrel에 대한 개인 선호만 다르면 `NON_ORACLE_OPINION`이다.
+- Record in the Decision the public/global/shared surface and its actual consumers, the DTO
+  conversion owner, and, if there is a platform adapter, the currently shared runtimes.
+- If an unnecessarily wide surface, a transport leak, or a violation of an approved import boundary
+  creates a concrete change-propagation risk, it is `FINDING`.
+- If only a personal preference about context·props·barrel differs, it is `NON_ORACLE_OPINION`.
 
 ## Simplicity
 
-현재 승인 계약을 만족하는 가장 작은 책임과 가장 익숙한 수단을 선택한다. 짧거나
-영리한 코드보다 새 개념, dependency, runtime state와 운영 비용을 줄이는 것이 목적이다.
+Choose the smallest responsibility and the most familiar means that satisfy the current approved
+contract. The goal is reducing new concepts, dependencies, runtime state, and operating cost rather
+than short or clever code.
 
-### 핵심 패턴
+### Core patterns
 
-구현 선택은 다음 순서에서 처음 요구를 만족한 단계에 멈춘다.
+Implementation choice stops at the first step in the following order that satisfies the requirement.
 
-1. 코드가 실제로 필요한가?
-2. 기존 레포 구현이나 util이 해결하는가?
-3. JavaScript·TypeScript·DOM·Web·React·framework 기본 기능으로 가능한가?
-4. 이미 설치된 dependency가 해결하는가?
-5. 최소 local code로 가능한가?
-6. 그 뒤에만 새 abstraction이나 dependency를 제안한다.
+1. Is the code actually needed?
+2. Does an existing repo implementation or util solve it?
+3. Is it possible with the built-in features of JavaScript·TypeScript·DOM·Web·React·framework?
+4. Does an already installed dependency solve it?
+5. Is it possible with minimal local code?
+6. Only after that, propose a new abstraction or dependency.
 
-위험 신호는 구현체 하나뿐인 interface·factory·registry, 사용처 없는 option, 측정 없는
-memoization·cache·lazy loading과 단일 request를 위한 global state다.
+The risk signals are an interface·factory·registry with only one implementation, an option with no
+call site, memoization·cache·lazy loading without measurement, and global state for a single request.
 
-### React 구현 기준 · 적용하지 않는 경우
+### React implementation criteria · when it does not apply
 
-- render에서 계산할 수 있는 값에 effect와 state를 추가하지 않는다.
-- 단순 event handler를 이름만 바꾼 custom hook으로 감싸지 않는다.
-- `memo`, `useMemo`, `useCallback`, dynamic import는 측정된 병목이나 identity 계약이
-  있을 때만 사용한다.
-- 입력 검증, 보안, 접근성, cleanup, 데이터 유실 방지나 실제 calibration seam을 코드
-  수 때문에 제거하지 않는다.
+- Do not add an effect and state for a value that can be computed during render.
+- Do not wrap a simple event handler in a custom hook that only renames it.
+- Use `memo`, `useMemo`, `useCallback`, and dynamic import only when there is a measured bottleneck
+  or an identity contract.
+- Do not remove input validation, security, accessibility, cleanup, data-loss prevention, or a real
+  calibration seam because of line count.
 
-### Implementation Decision evidence · Reviewer 판정 기준
+### Implementation Decision evidence · Reviewer judgment criteria
 
-- Decision에는 기존 레포→기본 기능→설치 dependency→최소 local code 중 선택한 첫
-  단계와 추가하지 않은 abstraction을 적는다.
-- 현재 consumer와 요구가 정당화하지 않는 abstraction·dependency·성능 복잡성은
-  `FINDING` 후보다.
-- 더 짧은 문법이 있다는 이유만으로 finding을 만들지 않는다.
+- Write in the Decision the first step chosen among existing repo→built-in feature→installed
+  dependency→minimal local code, and the abstraction you did not add.
+- An abstraction·dependency·performance complexity that the current consumers and requirements do
+  not justify is a `FINDING` candidate.
+- Do not create a finding merely because a shorter syntax exists.
 
-## 축 사이 trade-off
+## Trade-offs between axes
 
-다섯 축은 동시에 최대화할 수 없다. 실제 선택에서 우선한 비용과 감수한 비용만 적는다.
+The five axes cannot be maximized at the same time. Write only the cost you prioritized and the cost you accepted in the actual choice.
 
-- Readability ↔ Cohesion: 독립 변경·테스트 책임이 없으면 가까이 두고, 생기면 이름 붙여 분리한다
-- Predictability ↔ 캡슐화: 알고리즘은 숨기고 외부 write는 이름·계약에서 드러낸다
-- Cohesion ↔ Coupling: 같은 정책과 실제 drift 위험이 있을 때만 공통화한다
-- Coupling ↔ Readability: consumer가 적으면 local flow, 안정된 다수 consumer면 공용 경계를 쓴다
-- Simplicity ↔ Performance: 근거 전에는 단순 구현, 측정 뒤 필요한 범위만 최적화한다
+- Readability ↔ Cohesion: keep them close when there is no independent change·test responsibility, and name and separate them once there is
+- Predictability ↔ encapsulation: hide the algorithm and reveal external writes in the name·contract
+- Cohesion ↔ Coupling: factor out only when the policy is the same and there is a real drift risk
+- Coupling ↔ Readability: with few consumers use a local flow, with stable multiple consumers use a shared boundary
+- Simplicity ↔ Performance: a simple implementation before evidence, and after measurement optimize only the necessary scope
 
 ```markdown
-- Changeability: analytics 실행 순서를 드러내는 Predictability를 우선했다. handler의
-  작은 orchestration 중복은 허용한다.
-- Rejected: consumer가 하나인 generic workflow hook은 만들지 않았다.
+- Changeability: prioritized the Predictability that reveals the analytics execution order. The
+  small orchestration duplication in the handler is allowed.
+- Rejected: did not create a generic workflow hook that has a single consumer.
 ```
 
 ## Workflow owner
 
-이 문서는 변경 비용의 의미와 근거만 소유한다.
+This document owns only the meaning of change cost and its rationale.
 
-- React runtime 기준은 [`frontend/decisions.md`](frontend/decisions.md)와
-  [`frontend/authoring.md`](frontend/authoring.md)가 소유한다.
-- Implementation Decision의 경로·필드·작성 시점은
-  [`delivery/implementation-decision.md`](delivery/implementation-decision.md)가 소유한다.
-- `PASS | FINDING | N/A`, finding router와 최소 수정 절차는
-  [`subagent-review.md`](subagent-review.md)가 소유한다.
+- The React runtime criteria are owned by [`frontend/decisions.md`](frontend/decisions.md) and
+  [`frontend/authoring.md`](frontend/authoring.md).
+- The Implementation Decision's path·fields·writing time are owned by
+  [`delivery/implementation-decision.md`](delivery/implementation-decision.md).
+- `PASS | FINDING | N/A`, the finding router, and the minimal fix procedure are owned by
+  [`subagent-review.md`](subagent-review.md).
 
-## 채택하지 않는 범용 규칙
+## Universal rules not adopted
 
-- Toss의 조직 구조·내부 도구나 숫자 threshold를 blocker로 바꾸지 않는다.
-- FSD, monorepo, 특정 state/query library를 자동 도입하지 않는다.
-- hook 반환, `type`/`interface`, export와 함수 문법을 통일하지 않는다.
-- 함수형·객체지향 같은 패러다임 명칭만으로 component·hook·상태 구조를 판정하지
-  않는다. 상태 소유자, 외부 effect 위치, 입력·출력·오류 계약이 기준이다.
-- 100% coverage, zero dependency 또는 특정 React·Next 버전을 보편 규칙으로 만들지 않는다.
-- “Toss가 만들었다”는 이유만으로 build-vs-buy 결정을 하지 않는다.
+- Do not turn Toss's organizational structure·internal tools or a numeric threshold into a blocker.
+- Do not auto-adopt FSD, a monorepo, or a specific state/query library.
+- Do not unify hook returns, `type`/`interface`, exports, and function syntax.
+- Do not judge component·hook·state structure by a paradigm label alone such as functional·object-
+  oriented. The criteria are the state owner, the location of external effects, and the
+  input·output·error contract.
+- Do not make 100% coverage, zero dependency, or a specific React·Next version a universal rule.
+- Do not make a build-vs-buy decision merely because “Toss made it”.

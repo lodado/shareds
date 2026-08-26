@@ -1,84 +1,87 @@
-# 타입 제약 — 제약 선택 순서와 작성 규칙
+# Type constraints — constraint selection order and authoring rules
 
-## 제약 선택 순서
+## Constraint selection order
 
-- 문제를 축으로 먼저 분류한다. 소유권·상태 공간·API 관계는 서로 다른 축이라 하나의
-  전역 순서로 섞지 않는다 — `keyof`가 discriminated union보다 항상 뒤라는 전역 순서는 없다.
-- 각 사다리 안에서만 **앞 단부터** 검토하고, 앞 단으로 실제 오용이 닫히면 뒷 단을 쓰지 않는다.
-- 목적은 생성 결과를 같게 만드는 것이 아니라, 불필요하게 복잡한 뒷 단 메커니즘을 일관되게
-  탈락시키는 것이다.
+- Classify the problem by axis first. Ownership·state space·API relation are different axes, so do
+  not mix them into one global order — there is no global order that puts `keyof` always after a
+  discriminated union.
+- Review **from the earlier rung** only within each ladder, and if an earlier rung actually closes
+  the misuse, do not use a later rung.
+- The purpose is not to make generation results identical but to consistently eliminate
+  unnecessarily complex later-rung mechanisms.
 
 ```text
-A. 소유권·boundary
-   기존 owner 재사용 → 저장하지 않고 파생 → API 부재로 불가능하게
-   → 외부 값은 unknown에서 runtime parse → schema·config·상수에서 타입 파생
+A. Ownership·boundary
+   reuse existing owner → derive without storing → make impossible via API absence
+   → runtime parse external values from unknown → derive types from schema·config·constants
 
-B. 상태 공간
-   framework union 소비 → capability·API 분리 → union + never
+B. State space
+   consume framework union → capability·API separation → union + never
    → discriminated union → exhaustive lookup·assertNever
-   → 순서 위반 자체가 도메인 오류일 때만 transition machine
+   → transition machine only when the ordering violation itself is a domain error
 
-C. API 관계
+C. API relation
    typeof·as const·satisfies → keyof·indexed access
-   → 내장 utility (Pick·Omit·Extract·Exclude·Parameters·ReturnType·Awaited)
-   → 관계형 generic·lookup map → tagged type → const type parameter·NoInfer
-   → 이산 입출력 관계 2~3개면 overload → 합성 가능한 관계면 mapped·conditional
-   → 중첩 구조 자체가 계약일 때만 recursive
+   → built-in utility (Pick·Omit·Extract·Exclude·Parameters·ReturnType·Awaited)
+   → relational generic·lookup map → tagged type → const type parameter·NoInfer
+   → overload for 2~3 discrete input/output relations → mapped·conditional for a composable relation
+   → recursive only when the nested structure itself is the contract
 ```
 
-- trust boundary의 parse는 선택 사항이 아니다.
-- 사다리끼리는 독립 판정이다. 같은 사다리 안에서 앞 단으로 닫히는 문제에 뒷 단을 쓰면
-  `FINDING`이다.
-- 내장 utility로 표현되는 관계(`Awaited`·`ReturnType`·`Parameters`·`Extract`·`Exclude`·
-  `NonNullable`·`NoInfer`·`Readonly`·`Record`·`Pick`·`Omit`)를 custom conditional type으로
-  재구현하지 않는다.
-- 뒷 단 세 개(overload·mapped/conditional·recursive)는 [`api-surface.md`](api-surface.md)의
-  격리 조건을 만족할 때만 쓴다.
-- custom exported generic, mapped·conditional·template-literal·recursive type,
-  variance-sensitive callback, deep transform을 실제로 선택하면
-  [`advanced-contracts.md`](advanced-contracts.md)의 카탈로그에서 후보를 고르고
-  compiler witness를 남긴다.
+- The parse at a trust boundary is not optional.
+- The ladders are judged independently. Using a later rung for a problem that an earlier rung closes
+  within the same ladder is a `FINDING`.
+- Do not reimplement a relation that a built-in utility expresses
+  (`Awaited`·`ReturnType`·`Parameters`·`Extract`·`Exclude`·`NonNullable`·`NoInfer`·`Readonly`·
+  `Record`·`Pick`·`Omit`) with a custom conditional type.
+- Use the three later rungs (overload·mapped/conditional·recursive) only when they satisfy the
+  isolation condition of [`api-surface.md`](api-surface.md).
+- If you actually choose a custom exported generic, a mapped·conditional·template-literal·recursive
+  type, a variance-sensitive callback, or a deep transform, pick a candidate from the catalog of
+  [`advanced-contracts.md`](advanced-contracts.md) and leave a compiler witness.
 
-## 타입 작성 규칙
+## Type authoring rules
 
-**선언보다 파생.**
+**Derivation over declaration.**
 
-- 수기 선언 대상 — 타입 자체가 정책의 유일한 출처인 닫힌 계약. 상태·이벤트·실패·연산
-  union, tagged/branded type, 공개 API의 capability·상호 배타 Props.
-- 파생 대상 — entity·ID는 `z.output`, 부분집합은 `Extract`·`Exclude`, 유한 문자열 union은
-  `as const` 상수, 객체 key는 `keyof typeof`, 함수 관계는 `Parameters`·`ReturnType`·
-  `Awaited`.
-- 판정 기준은 수기 선언의 개수가 아니라 **동일한 사실을 둘 이상의 위치가 소유하는지**다.
-  하나의 정책 사실을 schema와 interface, 상수와 union이 동시에 소유하면 두 권위가 어긋난다.
+- Targets for hand declaration — a closed contract where the type itself is the single source of
+  policy. State·event·failure·operation unions, tagged/branded types, and a public API's
+  capability·mutually exclusive Props.
+- Targets for derivation — `z.output` for entity·ID, `Extract`·`Exclude` for a subset, an
+  `as const` constant for a finite string union, `keyof typeof` for object keys, and
+  `Parameters`·`ReturnType`·`Awaited` for function relations.
+- The judgment criterion is not the number of hand declarations but **whether two or more places
+  own the same fact**. If one policy fact is owned simultaneously by a schema and an interface, or
+  by a constant and a union, the two authorities drift apart.
 
-discriminated union은 **멤버마다 딸린 데이터가 실제로 다를 때** 쓴다. 아래 두 타입은
-같은 도메인의 서로 다른 사실을 표현하며, 어느 쪽을 고를지는 취향이 아니라 이 조건이
-정한다.
+Use a discriminated union **when the data attached to each member actually differs**. The two types
+below express different facts of the same domain, and which one to choose is decided by this
+condition, not by taste.
 
 ```typescript
-// object union — shipping에만 fieldErrors, review에만 quote가 있다.
-// 태그가 그 필드들의 유효 범위를 지킨다. 전부 카드가 정의한 도메인 상태다.
-// submitting·success·failure 같은 요청 lifecycle은 여기 넣지 않는다 —
-// mutation의 framework union(state-ladder 2단)이 이미 소유한다.
+// object union — only shipping has fieldErrors, only review has quote.
+// The tag guards the valid scope of those fields. All of them are domain states the card defined.
+// Do not put a request lifecycle such as submitting·success·failure here —
+// the mutation's framework union (state-ladder rung 2) already owns it.
 type CheckoutState =
   | { status: 'cart'; items: CartItem[] }
   | { status: 'shipping'; address: Address; fieldErrors: FieldErrors }
   | { status: 'review'; quote: Quote; agreed: boolean }
 
-// literal union — 딸린 데이터가 없다. 배지 문구·비활성 여부는 소비 지점이 정한다.
-// { kind: 'paid' } 같은 wrapper로 감싸도 새로 막히는 잘못된 코드는 없다.
+// literal union — there is no attached data. The badge copy·disabled state is decided by the consumer.
+// Wrapping it in a wrapper such as { kind: 'paid' } blocks no new wrong code.
 type PaymentBadge = 'unpaid' | 'paid' | 'refunded'
 ```
 
-- 위 두 예시 중 무엇을 베낄지 먼저 판정한다. 태그 객체는 멤버 **둘 이상**이 자기만의
-  필드를 가질 때만이고, 그렇지 않으면 literal union이다.
-- 단일 `status` 문자열 literal discriminant를 쓴다. boolean 병렬 flag
-  (`isLoading`·`isError`·`isSuccess`)로 같은 흐름을 표현하지 않는다.
-- 각 상태의 필드는 **그 상태에서만 의미 있는 값**만 담는다. 전 상태 공통 optional
-  필드로 합치지 않는다.
-- variant 수는 variant record 도입 근거가 아니다. 같은 record가 상태 union과 variant별
-  runtime lookup(config·renderer·메시지·권한) 중 둘 이상을 실제로 파생하는 단일 권위일
-  때만 record에서 union을 파생한다:
+- Decide first which of the two examples above to copy. A tagged object is only for when **two or
+  more** members have their own fields, and otherwise it is a literal union.
+- Use a single `status` string literal discriminant. Do not express the same flow with parallel
+  boolean flags (`isLoading`·`isError`·`isSuccess`).
+- Each state's fields hold only **the values that are meaningful in that state**. Do not merge them
+  into optional fields common to all states.
+- The number of variants is not grounds for introducing a variant record. Derive a union from a
+  record only when that same record is the single authority actually deriving two or more of the
+  state union and the per-variant runtime lookups (config·renderer·message·permission):
   ```typescript
   interface Steps {
     shipping: { address: Address; fieldErrors: FieldErrors }
@@ -87,119 +90,132 @@ type PaymentBadge = 'unpaid' | 'paid' | 'refunded'
   type State = { [K in keyof Steps]: { status: K } & Steps[K] }[keyof Steps]
   const stepLabel = { shipping: '배송지', review: '최종 확인' } satisfies Record<keyof Steps, string>
   ```
-- **discriminant는 갈라지는 데이터가 있을 때 붙인다.** 원본 상태를 조합해 만드는
-  파생 계산(`resolve*`)의 반환은 거의 언제나 literal union이다 — 태그를 씌우면
-  호출부마다 `.kind`를 벗기는 비용만 늘고 막히는 잘못된 코드는 없다.
-- **스키마는 경계에만 만든다.** 앱 안에서 사용자 조작으로 생성되는 유한 값은 `as const`
-  상수나 literal union으로 선언하고, zod는 그 값이 storage·URL·응답에서 **돌아오는 읽기
-  지점**에 붙인다. 내부 생성 값에 스키마를 만들어 놓고 읽기 지점이 `JSON.parse` 결과를
-  그대로 신뢰하면 경계를 정반대로 잡은 것이며 `FINDING`이다.
-- 실패는 카드가 subtype을 구분하면(`network`·`validation`·`5xx`) `reason`도 discriminated
-  union으로 만든다. 예상 가능한 실패를 반환값으로 처리해야 하면 `Result<T, ErrorUnion>`
-  형태의 닫힌 union을 쓰고, `throw`는 결함(깨진 invariant) 전용으로 남긴다.
-- trust boundary(API 응답, storage, URL, message)의 값은 `unknown`에서 시작해 **파싱**으로
-  도메인 타입을 획득한다. 레포에 zod가 있으면 `z.discriminatedUnion()`을 쓰고 타입은
-  `z.output`으로 파생한다 — 스키마와 interface를 중복 선언하거나 응답에 `as DomainType`을
-  쓰지 않는다.
-- mutation payload는 entity의 `Partial`이 아니라 실제 연산 union으로 모델링한다
-  (`rename`·`clear-description`처럼). `undefined`가 "유지"인지 "삭제"인지 모호한 patch
-  타입을 만들지 않고, 유지·설정·삭제가 모두 가능하면 연산을 분리한다.
+- **Attach a discriminant when there is diverging data.** The return of a derived computation
+  (`resolve*`) built by combining source states is almost always a literal union — putting a tag on
+  it only adds the cost of stripping `.kind` at every call site and blocks no wrong code.
+- **Create schemas only at boundaries.** Declare a finite value generated inside the app by user
+  action as an `as const` constant or a literal union, and attach zod at the **read point where
+  that value comes back** from storage·URL·a response. Creating a schema for an internally
+  generated value while the read point trusts the `JSON.parse` result as is means the boundary was
+  placed exactly backwards, and it is a `FINDING`.
+- For failure, if the card distinguishes subtypes (`network`·`validation`·`5xx`), make `reason` a
+  discriminated union too. If an expected failure must be handled as a return value, use a closed
+  union of the form `Result<T, ErrorUnion>` and leave `throw` exclusively for defects (broken
+  invariants).
+- A value from a trust boundary (API response, storage, URL, message) starts at `unknown` and
+  acquires its domain type through **parsing**. If the repo has zod, use `z.discriminatedUnion()`
+  and derive the type with `z.output` — do not double-declare a schema and an interface or use
+  `as DomainType` on a response.
+- Model a mutation payload as an actual operation union rather than a `Partial` of the entity (like
+  `rename`·`clear-description`). Do not create a patch type where it is ambiguous whether
+  `undefined` means "keep" or "delete", and if keep·set·delete are all possible, split the
+  operations.
 
-## 런타임보다 강하게 말하지 않는다
+## Do not claim more than the runtime
 
-타입은 구현이 실제로 보장하는 범위까지만 약속한다. 아래는 컴파일은 되지만 런타임보다
-강한 거짓 계약이다.
+A type promises only as far as the implementation actually guarantees. The following are false
+contracts that compile but claim more than the runtime.
 
-- **`Record<K, V>`는 totality 계약이다** — 모든 `K`가 결과에 존재한다는 뜻이다. 전체 key를
-  사전 순회로 초기화하거나 누락 key에 기본값을 채울 때만 쓴다.
-  - 구현이 관찰된 key만 채우는 sparse lookup(`groupBy` 결과 등)이고 key 도메인이 유한
-    union이면 `Partial<Record<K, V>>`.
-  - ID·브랜드 문자열처럼 열린 도메인이면 `Map`. 열린 key에 `Partial<Record<K, V>>`를
-    씌우면 `Map`이 이미 주는 `V | undefined` 조회 계약을 손으로 다시 만들 뿐이다.
-  - `Partial<DomainEntity>` mutation 금지와 다른 문제다. 전자는 연산 의미를 잃는 patch고,
-    후자는 일부 key만 런타임에 존재한다는 결과 표현이다.
-- **type predicate는 검사 의무가 있다.** `value is T`는 본문이 `T`의 필수 invariant를 실제로
-  검사할 때만 쓴다. 항상 `true`를 반환하거나, `as`를 감싸거나, 일부 필드만 검사하고 전체
-  도메인 타입을 약속하는 predicate를 만들지 않는다. boundary의 복잡한 도메인 타입은 schema
-  parser가 우선이고, `isNotNil` 수준의 단순·정확한 narrowing만 predicate로 남긴다.
-- **wrapper의 반환 계약은 실행 시점을 따른다.** 호출 계약은 `Parameters`로 보존하되,
-  `ReturnType` 보존은 wrapper가 같은 호출에서 실제 값을 반환할 때만이다. 실행이
-  지연·캐시·async로 바뀌면 런타임 의미를 그대로 쓴다.
+- **`Record<K, V>` is a totality contract** — it means every `K` exists in the result. Use it only
+  when initializing every key by a prior traversal or filling a default into missing keys.
+  - If the implementation is a sparse lookup that fills only observed keys (a `groupBy` result and
+    such) and the key domain is a finite union, `Partial<Record<K, V>>`.
+  - For an open domain such as an ID·branded string, `Map`. Putting `Partial<Record<K, V>>` on an
+    open key only rebuilds by hand the `V | undefined` lookup contract that `Map` already gives.
+  - It is a different problem from the `Partial<DomainEntity>` mutation ban. The former is a patch
+    that loses operation meaning, and the latter is a result expression that only some keys exist
+    at runtime.
+- **A type predicate has a duty to check.** Use `value is T` only when the body actually checks
+  `T`'s required invariants. Do not create a predicate that always returns `true`, that wraps an
+  `as`, or that checks only some fields while promising the whole domain type. For a complex domain
+  type at a boundary the schema parser comes first, and only simple·exact narrowing at the level of
+  `isNotNil` is left as a predicate.
+- **A wrapper's return contract follows its execution timing.** Preserve the call contract with
+  `Parameters`, but preserve `ReturnType` only when the wrapper returns an actual value on the same
+  call. If execution changes to deferred·cached·async, use the runtime meaning as it is.
 
   ```typescript
   type AnyFn = (...args: never[]) => unknown
 
-  // debounce·schedule — 이번 호출에는 값이 없다
+  // debounce·schedule — there is no value on this call
   type Deferred<F extends AnyFn> = (...args: Parameters<F>) => void
-  // 캐시 — miss면 값이 없다
+  // cache — on a miss there is no value
   type Cached<F extends AnyFn> = (...args: Parameters<F>) => ReturnType<F> | undefined
   // async wrapper
   type Wrapped<F extends AnyFn> = (...args: Parameters<F>) => Promise<Awaited<ReturnType<F>>>
   ```
 
-- **excess property check는 sanitizer가 아니다.** object literal 대입에만 적용되므로
-  `const user: PublicUser = source` 같은 annotation은 `source`의 민감 필드를 런타임에서
-  제거하지 않는다. 민감 필드 제거·exact object 보장은 runtime projection이나 parser가
-  소유한다.
-- **key remapping 반환형은 런타임과 동형이어야 한다.** 함수가 실제로 key를 변환하지 않는데
-  `ToCamelCaseKeys` 같은 key 변환 반환 타입만 붙이면 거짓 계약이다.
+- **excess property check is not a sanitizer.** Because it applies only to object literal
+  assignment, an annotation such as `const user: PublicUser = source` does not remove `source`'s
+  sensitive fields at runtime. Removing sensitive fields·guaranteeing an exact object is owned by a
+  runtime projection or a parser.
+- **A key remapping return type must be isomorphic to the runtime.** Attaching only a key-transform
+  return type such as `ToCamelCaseKeys` when the function does not actually transform keys is a
+  false contract.
 
-## Exhaustiveness 강제
+## Exhaustiveness enforcement
 
-dependency 없는 수단부터 쓰고, 라이브러리는 조건이 맞을 때만 도입한다.
+Use the dependency-free mechanism first, and introduce a library only when the condition is met.
 
-- 기본 (항상, dependency 불필요) — 상태별 early return·guard chain 뒤 공용 `assertNever`.
-- 선언적 매핑 (상태별 결과가 정적 값·render 함수일 때) — lookup 객체 +
-  `satisfies Record<Status, ...>`. key는 **분기하는 union 그 자체**다: 문자열 literal
-  union이면 `Record<DisplayStatus, string>`, discriminated object union일 때만
-  `Record<State['status'], string>`처럼 indexed access로 태그를 꺼낸다.
-- 라이브러리 (**설치돼 있거나 도입이 승인된 경우만**) — `ts-pattern`의 `.exhaustive()`.
+- Baseline (always, no dependency needed) — a shared `assertNever` after per-state early
+  return·guard chains.
+- Declarative mapping (when the per-state result is a static value·render function) — a lookup
+  object + `satisfies Record<Status, ...>`. The key is **the branching union itself**: for a string
+  literal union `Record<DisplayStatus, string>`, and only for a discriminated object union do you
+  pull the tag out with indexed access as in `Record<State['status'], string>`.
+- Library (**only when it is installed or its adoption is approved**) — `ts-pattern`'s
+  `.exhaustive()`.
 
-variant별 설정(라벨·메시지·핸들러·권한)도 `satisfies Record<Union, Config>`로 전체 union
-커버를 강제한다. 새 variant 추가 시 모든 필수 소비 지점이 컴파일 오류로 드러나야 하며,
-catch-all 기본 분기로 누락을 숨기지 않는다.
+Per-variant configuration (label·message·handler·permission) also forces full union coverage with
+`satisfies Record<Union, Config>`. When a new variant is added, every required consumption point
+must surface as a compile error, and do not hide the omission with a catch-all default branch.
 
-**라벨 맵이 필요하다는 사실은 태그 객체를 만들 근거가 아니다.** `satisfies Record`는
-literal union에 그대로 걸린다. 배지 문구·권한 맵을 쓰려고 `{ kind: 'confirmed' }` 같은
-wrapper를 만들면 union 판정을 뒤집는 것이므로 위 discriminant 규칙이 우선한다.
+**The fact that a label map is needed is not grounds for making a tagged object.**
+`satisfies Record` applies to a literal union as is. Making a wrapper such as
+`{ kind: 'confirmed' }` in order to use a badge copy·permission map overturns the union judgment,
+so the discriminant rule above takes precedence.
 
-타입 **형태** 일부는 기계로 잡는다. `@lodado/eslint-config/local-rules`를 쓰는 레포는 다음
-규칙이 이미 켜져 있다.
+Some type **shapes** are caught by machine. A repo using `@lodado/eslint-config/local-rules`
+already has the following rules turned on.
 
-- `no-response-type-assertion` — boundary payload를 파싱 대신 `as`로 단언
-- `require-discriminated-state` — `status` literal union 옆의 optional 형제 필드
-- `no-boolean-state-flags` — 한 흐름을 병렬 boolean flag나 boolean `useState` 2개로 표현
-- `no-action-in-state` — state union·state 값 안에 저장된 `retry` 같은 action
+- `no-response-type-assertion` — asserting a boundary payload with `as` instead of parsing
+- `require-discriminated-state` — an optional sibling field next to a `status` literal union
+- `no-boolean-state-flags` — expressing one flow with parallel boolean flags or two boolean
+  `useState`
+- `no-action-in-state` — an action such as `retry` stored inside a state union·state value
 
-`assertNever`는 레포에 이미 있으면 재사용하고, 없으면 공용 위치 하나에만 만든다.
+Reuse `assertNever` if the repo already has it, and if not, create it in only one shared location.
 
-## 단언과 `any` 정책
+## Assertion and `any` policy
 
-제품 코드에서 `value as DomainType`, `as unknown as`, non-null assertion, `@ts-ignore`,
-`any`로 타입 오류를 숨기지 않는다. 허용은 네 가지뿐이다.
+Do not hide a type error in product code with `value as DomainType`, `as unknown as`, a non-null
+assertion, `@ts-ignore`, or `any`. There are only four allowances.
 
-- literal 보존용 `as const`.
-- 검증 함수 내부에 격리된 브랜드 생성자.
-- 라이브러리 한계를 잇는 adapter 내부 단언.
-- 공용 generic helper 내부 한 지점의 construction assertion. TypeScript가 점진적 객체
-  구성을 증명하지 못하는 `const result = {} as Pick<T, K>` 같은 경우로, 공개 반환 타입이
-  입력 generic에서 기계적으로 도출되고 구현이 그 invariant를 실제로 만들며 소비자 호출부에
-  `as`가 전파되지 않을 때만이다. boundary 값을 도메인 타입으로 바꾸는 데는 쓰지 않는다.
+- `as const` for literal preservation.
+- A brand constructor isolated inside a validation function.
+- An assertion inside an adapter that bridges a library limitation.
+- A construction assertion at a single point inside a shared generic helper. It is a case such as
+  `const result = {} as Pick<T, K>` where TypeScript cannot prove incremental object construction,
+  and only when the public return type is mechanically derived from the input generic, the
+  implementation actually establishes that invariant, and the `as` does not propagate to consumer
+  call sites. Do not use it to turn a boundary value into a domain type.
 
-격리된 단언에는 런타임 invariant 근거를 남긴다. 외부 패키지가 `any`를 반환하면 즉시
-`unknown`으로 받아 좁힌다.
+Leave the runtime invariant grounds on an isolated assertion. If an external package returns `any`,
+receive it immediately as `unknown` and narrow it.
 
-`any` 금지는 application 값 기준이다. `(...args: any[]) => unknown` 같은 callable
-constraint처럼 `any`가 generic 연결에만 쓰이고 값으로 읽히거나 공개 반환형·Props로
-누출되지 않으면 `types/internal`·adapter 안에서만 허용한다. `unknown`으로 되는 자리는
-`unknown`을 쓴다.
+The `any` ban is measured on application values. When `any` is used only for generic wiring, as in
+a callable constraint such as `(...args: any[]) => unknown`, and is neither read as a value nor
+leaked into a public return type·Props, allow it only inside `types/internal`·an adapter. Where
+`unknown` works, use `unknown`.
 
-## 규칙을 코드 주석으로 옮기지 않는다
+## Do not move the rules into code comments
 
-- 이 문서의 규칙과 근거(`Record`는 totality 계약이다, sparse면 `Map`이다)는 왜 그 타입을
-  골랐는지에 대한 설명이지 코드가 담을 내용이 아니다.
-- 선택 사유는 Implementation Decision에 적고, 코드 주석은 타입으로 표현할 수 없는 도메인
-  제약과 그 근거 카드 행 ID(`// P6: 취소는 되돌릴 수 없다`)만 남긴다. 규칙 문장을 그대로
-  붙여 넣은 주석은 리뷰에서 삭제 대상이다.
-- 타입 오류가 나면 구현이 계약을 위반했는지, 계약이 실제 요구사항과 다른지 먼저 판정한다.
-  근거 없이 필수 필드를 optional로 바꾸거나 union을 `string`으로 넓혀서 오류를 없애지 않는다.
+- This document's rules and rationale (`Record` is a totality contract, `Map` when sparse) are an
+  explanation of why that type was chosen, not content for the code to hold.
+- Write the reason for the choice in the Implementation Decision, and leave in code comments only
+  the domain constraint that cannot be expressed by a type and the card row ID backing it
+  (`// P6: cancellation cannot be undone`). A comment that pastes a rule sentence verbatim is a
+  deletion target in review.
+- If a type error occurs, first judge whether the implementation violated the contract or the
+  contract differs from the actual requirement. Do not remove the error by turning a required field
+  optional or widening a union to `string` without grounds.

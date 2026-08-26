@@ -1,50 +1,50 @@
 # Backend and Data-access Contract
 
-Full-stack 작업에서 DB와 persistence 경계를 정할 때만 읽는다. 특정 framework, ORM,
-database 또는 frontend architecture를 강제하지 않는다.
+Read this only when setting DB and persistence boundaries in full-stack work. It does not mandate a
+particular framework, ORM, database, or frontend architecture.
 
 ## Intake
 
-구현과 Oracle lock 전에 실제 repo에서 다음을 확인하고 승인된 architecture source에
-경로와 책임을 기록한다.
+Before implementation and the Oracle lock, confirm the following in the actual repo and record the
+paths and responsibilities in the approved architecture source.
 
-- backend source root와 공개 server entry point
-- DB driver·ORM을 import할 수 있는 data-access 경계
-- repository, service, route/controller의 기존 책임
-- schema·migration·seed와 integration test의 소유 위치
-- local·test·production의 persistence 및 reset 정책
+- The backend source root and public server entry points
+- The data-access boundary that may import the DB driver·ORM
+- The existing responsibilities of repository, service, and route/controller
+- Where schema·migration·seed and integration tests are owned
+- The persistence and reset policies for local·test·production
 
-경계가 미결이면 새 layer를 먼저 만들지 않는다. `NEEDS_DECISION`으로 돌아가 승인된
-architecture가 안정된 뒤 잠근다.
+If a boundary is unresolved, do not create a new layer first. Return to `NEEDS_DECISION` and lock it
+after the approved architecture is stable.
 
-FSD 레포면 server 도메인 코드 배치는 [`fsd.md`](fsd.md)의 「Server 코드 배치」를
-따른다 — layer 밖 `src/server/` 루트를 만들지 않고 소유 slice의 `api` segment에
-`server-only` 경계로 둔다.
+In an FSD repo, follow "Server Code Placement" in [`fsd.md`](fsd.md) for placing server domain code
+— do not create an `src/server/` root outside the layers; put it in the owning slice's `api` segment
+as a `server-only` boundary.
 
-## 최소 data-access 경계
+## Minimum Data-access Boundaries
 
-- DB driver·ORM import와 query 실행은 승인된 repository/data-access module 안에만 둔다.
-- repository는 SQL/query, row mapping, stable ordering, pagination predicate와 다음 페이지
-  판정을 소유한다. route/controller와 UI는 이를 재구현하지 않는다.
-- 단순 read-only 조회는 route/controller가 repository를 직접 호출한다. 여러 repository,
-  transaction 또는 business workflow를 조정하지 않으면 service layer를 추가하지 않는다.
-- service가 필요하면 조정하는 workflow와 transaction boundary를 architecture source에
-  명시한다. repository를 그대로 전달하는 service는 만들지 않는다.
-- DB를 authoritative source로 정했으면 client cache, fixture, draft가 같은 record의 별도
-  source of truth가 되지 않게 한다.
+- Keep DB driver·ORM imports and query execution only inside the approved repository/data-access module.
+- The repository owns SQL/query, row mapping, stable ordering, the pagination predicate, and the
+  next-page decision. route/controller and UI do not reimplement these.
+- For a simple read-only lookup, the route/controller calls the repository directly. Do not add a
+  service layer unless it coordinates multiple repositories, a transaction, or a business workflow.
+- If a service is needed, state the workflow it coordinates and the transaction boundary in the
+  architecture source. Do not create a service that merely forwards to the repository.
+- Once the DB is designated the authoritative source, do not let a client cache, fixture, or draft
+  become a separate source of truth for the same record.
 
-## Persistence와 reset
+## Persistence and reset
 
-- container volume, local file 또는 managed DB의 보존 범위를 architecture contract에
-  기록한다.
-- non-destructive shutdown과 destructive reset 명령을 구분하고, 데이터 삭제 명령은
-  이름과 결과를 명시한다.
-- seed·migration의 반복 실행 가능 여부와 test isolation 방식을 실제 도구 기준으로
-  검증한다. production 데이터를 지우는 fallback은 두지 않는다.
+- Record the retention scope of container volumes, local files, or a managed DB in the architecture
+  contract.
+- Distinguish non-destructive shutdown from destructive reset commands, and state the name and the
+  outcome of any data-deleting command.
+- Verify whether seed·migration can be run repeatedly and how test isolation works, against the
+  actual tools. Do not leave a fallback that deletes production data.
 
-## 검증
+## Verification
 
-repo에 import-boundary lint나 architecture test가 있으면 실행한다. 없으면 검색과 독립
-review로 DB import·query가 승인 경계 밖에 없는지 확인한다. pagination, transaction,
-mapping처럼 query 결과를 바꾸는 로직은 가장 가까운 data-access test로 검증하고,
-가능하면 실제 test database를 사용한다.
+If the repo has import-boundary lint or an architecture test, run it. If not, confirm through search
+and independent review that no DB import·query sits outside the approved boundary. Verify logic that
+changes query results, such as pagination, transaction, and mapping, with the nearest data-access
+test, and use a real test database when possible.

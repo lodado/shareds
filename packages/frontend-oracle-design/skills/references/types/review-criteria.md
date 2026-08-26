@@ -1,89 +1,107 @@
-# 타입 제약 — Reviewer 판정 기준
+# Type constraints — Reviewer judgment criteria
 
-타입·상태 계약을 만든 변경을 리뷰할 때 [`state-ladder.md`](state-ladder.md)·
-[`authoring.md`](authoring.md)·[`api-surface.md`](api-surface.md)와 같은 기준으로 판정한다.
+When reviewing a change that created a type·state contract, judge it by the same criteria as
+[`state-ladder.md`](state-ladder.md)·[`authoring.md`](authoring.md)·[`api-surface.md`](api-surface.md).
 
-## 상태 모델과 소유권
+## State model and ownership
 
-- boolean 조합이 카드 `Never` 행을 타입상 허용하는데 union으로 만들지 않았으면 `FINDING`이다.
-- 카드에 없는 전이가 구현에 있으면 `FINDING`이다.
-- 파생 가능한 값을 별도 상태로 저장했거나, query·mutation 상태를 로컬 기계로 복사했거나,
-  raw setter를 hook 밖으로 노출했으면 `FINDING`이다.
-- 기존 query·router·form 상태를 이름만 바꾼 새 `status` union으로 재포장했거나, 단일
-  capability만 필요한 공통 UI에 전체 lifecycle 타입을 만들었으면 `FINDING`이다.
-- state union이나 state 값에 action을 저장했거나, 쓸 수 없는 상태에 no-op action을 채웠거나,
-  기존 `refetch`가 있는데 같은 일을 하는 action을 새로 만들었으면 `FINDING`이다.
-- 화면·복구 경로가 같은 `O*` 행들을 별도 상태로 쪼갰거나, 카드가 구분하지 않는 값을 상태
-  필드로 발명했으면 `FINDING`이다. 구분이 필요하면 `POLICY_GAP`이다.
-- 카드의 State Model을 근거로 단순 조회에 Event union·전이 함수·transition command를
-  도입했으면 `FINDING`이다. 사다리 단 선택 사유가 Implementation Decision에 있으면 아니다.
-- 무조건 실행되는 첫 조회의 loading·error를 경계로 올리지 않고 컴포넌트 안에서 분기했으면
-  `FINDING`이다. 조건부 query·placeholder·취소 제약 같은 실제 실격 사유를 Implementation
-  Decision에 적었으면 아니다.
+- If a boolean combination allows a card `Never` row at the type level and it was not made a union,
+  it is a `FINDING`.
+- If a transition not in the card exists in the implementation, it is a `FINDING`.
+- If a derivable value was stored as a separate state, query·mutation state was copied into a local
+  machine, or a raw setter was exposed outside the hook, it is a `FINDING`.
+- If existing query·router·form state was repackaged into a new `status` union that only renames
+  it, or a full lifecycle type was created for shared UI that needs only a single capability, it is
+  a `FINDING`.
+- If an action was stored in a state union or a state value, a no-op action was filled into a state
+  where it cannot be used, or a new action doing the same job was created when an existing
+  `refetch` is there, it is a `FINDING`.
+- If `O*` rows sharing a screen·recovery path were split into separate states, or a value the card
+  does not distinguish was invented as a state field, it is a `FINDING`. If the distinction is
+  needed, it is a `POLICY_GAP`.
+- If an Event union·transition function·transition command was introduced for a simple query on the
+  grounds of the card's State Model, it is a `FINDING`. It is not if the reason for the ladder rung
+  choice is in the Implementation Decision.
+- If the loading·error of the first query that runs unconditionally was branched inside the
+  component instead of being lifted to a boundary, it is a `FINDING`. It is not if an actual
+  disqualifying reason such as a conditional query·placeholder·cancellation constraint was written
+  in the Implementation Decision.
 
-## 사다리 단 선택
+## Ladder rung selection
 
-- 사다리 1·2단으로 끝나는 문제에 union·기계를 도입했거나, 상태 분기에 exhaustiveness
-  강제(기본 계층 이상)가 없으면 Decision의 예외 사유 없이는 `FINDING`이다.
-- 앞 단 메커니즘으로 닫히는 문제에 뒷 단 타입을 썼으면 `FINDING`이다.
-- feature 코드에 자작 mapped·conditional·recursive utility가 있거나, 내장 utility를
-  재구현했거나, type test 없는 고급 utility가 있으면 `FINDING`이다.
-- 고급 type이 막는 실제 오용을 적지 못하거나 Type Challenges 같은 puzzle corpus를 product
-  policy로 인용해도 `FINDING`이다.
+- If a union·machine was introduced for a problem that ends at ladder rung 1·2, or a state branch
+  has no exhaustiveness enforcement (at or above the baseline tier), it is a `FINDING` without an
+  exception reason in the Decision.
+- If a later-rung type was used for a problem that an earlier-rung mechanism closes, it is a
+  `FINDING`.
+- If feature code has a homemade mapped·conditional·recursive utility, reimplements a built-in
+  utility, or has an advanced utility without a type test, it is a `FINDING`.
+- Failing to write down the actual misuse the advanced type blocks, or citing a puzzle corpus such
+  as Type Challenges as product policy, is also a `FINDING`.
 
-## 거짓 계약
+## False contracts
 
-- boundary 값을 파싱 없이 단언했거나, `any`가 application 계층으로 새거나,
-  `Partial<DomainEntity>` mutation을 도입했으면 `FINDING`이다.
-- 스키마·연산 union에서 파생 가능한 타입을 수기로 복제 선언했으면 `FINDING`이다.
-- 구현이 모든 key를 채우지 않는데 `Record<K, V>`로 total map을 약속했으면 `FINDING`이다.
-  단 sparse lookup 결과의 `Partial<Record<K, V>>`는 `Partial<DomainEntity>` mutation 금지의
-  대상이 아니다 — 둘을 같은 규칙으로 금지하면 오적용이다.
-- ID·브랜드 문자열처럼 열린 key 도메인에 `Partial<Record<K, V>>`를 썼으면 `FINDING`이다.
-- 실행이 지연·캐시되는 wrapper가 원본의 `ReturnType`을 즉시 반환한다고 선언했으면
-  `FINDING`이다.
-- 필수 invariant를 검사하지 않는 type predicate, runtime key 변환 없는 key-remapping 반환형,
-  `satisfies`·`as const`·annotation·excess property check를 runtime 검증이나 sanitization으로
-  보고한 것은 `FINDING`이다.
-- 자기 필드를 가진 멤버가 하나 이하인데 `{ kind }` 태그 객체 union으로 만들었거나, 단일
-  권위 없이 선언 줄 수만 줄이는 variant record는 `FINDING`이다.
-- 앱 내부에서 생성되는 값에 스키마를 두고 정작 storage·URL·응답 읽기 지점을 파싱 없이
-  신뢰하면 `FINDING`이다.
+- If a boundary value was asserted without parsing, `any` leaked into the application layer, or a
+  `Partial<DomainEntity>` mutation was introduced, it is a `FINDING`.
+- If a type derivable from a schema·operation union was hand-duplicated in a declaration, it is a
+  `FINDING`.
+- If the implementation does not fill every key but a total map was promised with `Record<K, V>`,
+  it is a `FINDING`. However, `Partial<Record<K, V>>` for a sparse lookup result is not subject to
+  the `Partial<DomainEntity>` mutation ban — banning the two under the same rule is a
+  misapplication.
+- If `Partial<Record<K, V>>` was used on an open key domain such as an ID·branded string, it is a
+  `FINDING`.
+- If a wrapper whose execution is deferred·cached declared that it immediately returns the
+  original's `ReturnType`, it is a `FINDING`.
+- A type predicate that does not check the required invariants, a key-remapping return type without
+  a runtime key transform, and reporting `satisfies`·`as const`·annotation·excess property check as
+  runtime validation or sanitization are `FINDING`.
+- Making a `{ kind }` tagged object union when at most one member has its own fields, or a variant
+  record that only reduces declaration lines without a single authority, is a `FINDING`.
+- If a schema is placed on a value generated inside the app while the storage·URL·response read
+  point is trusted without parsing, it is a `FINDING`.
 
-## 공개 API와 고급 타입
+## Public API and advanced types
 
-- 이번 변경에서 새로 설계한 exported shared/package API의 generic이 둘 이상의 public 위치
-  사이 관계를 만들지 않거나 일반 제품 호출부가 type argument를 반복해야 하면 `FINDING`이다.
-  config·schema 정의 경계의 1회 고정과 기존 library generic 사용은
-  대상이 아니다.
-- distributive conditional에 `any`·`unknown`·`never`·union edge test가 없거나, mapped type이
-  readonly·optional modifier를 의도 없이 잃으면 `FINDING`이다.
-- template literal type을 runtime input validator로 보고하거나, method bivariance를 callback
-  safety 증거로 오인하면 `FINDING`이다.
-- `@ts-expect-error` 한 줄이 여러 오용을 담아 unrelated diagnostic으로 통과할 수 있거나,
-  `Equal`류 helper만 있고 public call·assignment witness가 없으면 `FINDING`이다.
-- 닫는다고 선언한 경계 축에 witness가 없거나, 이 API가 닫지 않는 축까지 witness로 채웠으면
-  `FINDING`이다. 축 목록은 [`../bva.md`](../bva.md)의 타입 경계 절이 소유한다.
-- 한 API의 `@ts-expect-error`가 30개를 넘는데 API 분리를 검토하지 않았으면 `FINDING`이다.
-  30은 채워야 할 목표가 아니라 표면이 너무 넓다는 설계 실격선이다.
-- Implementation Decision 3에 오용 목록이 있는데 경계 축을 전부 N/A로 적었으면 `FINDING`이다.
-  막는다고 적은 오용이 곧 닫는 축이다.
-- recursive/distributive type이 project compiler evidence와 필요한 성능 전후값 없이 들어가면
-  `FINDING`이다.
-- type error를 `any`, double assertion, `@ts-ignore`, `skipLibCheck`로 숨기면 `FINDING`이다.
+- If the generic of an exported shared/package API newly designed in this change does not create a
+  relation between two or more public places, or an ordinary product call site has to repeat a type
+  argument, it is a `FINDING`. A one-time pin at a config·schema definition boundary and the use of
+  an existing library generic are not subject to this.
+- If a distributive conditional has no `any`·`unknown`·`never`·union edge test, or a mapped type
+  unintentionally loses readonly·optional modifiers, it is a `FINDING`.
+- Reporting a template literal type as a runtime input validator, or mistaking method bivariance
+  for callback safety evidence, is a `FINDING`.
+- If one `@ts-expect-error` line holds several misuses and could pass on an unrelated diagnostic,
+  or there is only an `Equal`-style helper and no public call·assignment witness, it is a
+  `FINDING`.
+- If a boundary axis declared as closed has no witness, or witnesses were filled in even for axes
+  this API does not close, it is a `FINDING`. The axis list is owned by the type boundary section
+  of [`../bva.md`](../bva.md).
+- If one API's `@ts-expect-error` exceeds 30 and an API split was not considered, it is a `FINDING`.
+  30 is not a target to be filled but a design disqualification line meaning the surface is too
+  wide.
+- If Implementation Decision 3 has a misuse list but every boundary axis was written as N/A, it is
+  a `FINDING`. The misuse written as blocked is exactly the axis being closed.
+- If a recursive/distributive type goes in without project compiler evidence and the required
+  performance before/after values, it is a `FINDING`.
+- If a type error is hidden with `any`, a double assertion, `@ts-ignore`, or `skipLibCheck`, it is
+  a `FINDING`.
 
-## 증거와 계약 파일
+## Evidence and contract files
 
-- 시간축 비결정성을 타입만으로 "해결됨" 처리했으면 `FINDING`이다.
-- 생성 후 typecheck를 실행했을 뿐인데 생성 자체를 결정론화했다고 보고하면 `FINDING`이다.
-- 구현 diff가 `.test-d.*`의 `@ts-expect-error` 케이스를 삭제·약화했거나, 계약 타입·스키마를
-  넓혀(필수 필드→optional, union→`string`) 타입 오류를 없앴는데 카드 행 인용이 없으면
-  `FINDING`이다. 계약 파일은 검수의 신뢰 뿌리다 — 완화는 구현 결정이 아니라 정책 변경이며
-  `POLICY_GAP`으로 `NEEDS_DECISION`이다.
-- 타입 선택 규칙과 그 근거를 코드 주석으로 옮겨 적었으면 `FINDING`이다. 선택 사유는
-  Implementation Decision이 소유하고, 주석은 카드 행 ID를 인용한 도메인 제약만 남긴다.
+- If time-axis non-determinism was treated as "resolved" by types alone, it is a `FINDING`.
+- If merely running a typecheck after generation is reported as having made generation itself
+  deterministic, it is a `FINDING`.
+- If the implementation diff deleted·weakened an `@ts-expect-error` case in `.test-d.*`, or removed
+  a type error by widening the contract type·schema (required field→optional, union→`string`)
+  without a card row citation, it is a `FINDING`. The contract file is the root of trust for
+  inspection — a relaxation is not an implementation decision but a policy change, and it is
+  `NEEDS_DECISION` as a `POLICY_GAP`.
+- If the type selection rules and their rationale were transcribed into code comments, it is a
+  `FINDING`. The reason for the choice is owned by the Implementation Decision, and the comments
+  leave only the domain constraint citing a card row ID.
 
-## 판정 대상이 아닌 것
+## What is not subject to judgment
 
-- 상태 이름 취향, reducer 대 개별 handler 문법 선호, 패턴 매칭 라이브러리 선호만  
-  다르면 `NON_ORACLE_OPINION`이다.
+- If only state-name taste, the reducer versus individual handler syntax preference, or the pattern
+  matching library preference differs, it is a `NON_ORACLE_OPINION`.

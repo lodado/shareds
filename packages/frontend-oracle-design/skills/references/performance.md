@@ -1,64 +1,67 @@
-# 성능 최적화 판단 가이드
+# Performance Optimization Decision Guide
 
-## 목적과 권위
+## Purpose and Authority
 
-제품 정책이 아니다 — 성능 요구나 개선 claim이 있을 때만 읽는 조건부 구현
-reference다. metric·threshold는 승인된 성능 계약이나 사용자 답변이 있어야 정책이
-되며, 없으면 `POLICY_GAP`으로 `NEEDS_DECISION`.
+This is not product policy — it is a conditional implementation reference to read only when there is
+a performance requirement or an improvement claim. A metric·threshold becomes policy only with an
+approved performance contract or a user answer; without one it is a `POLICY_GAP` and
+`NEEDS_DECISION`.
 
-측정 명령·baseline/after run·`performance` 필수 label은
-[`frontend/quality.md`](frontend/quality.md)의 성능·품질 확인 절과
-[`delivery/green-review.md`](delivery/green-review.md)의 GREEN 게이트가 소유한다. 이
-문서는 문제 분류·원인 확인·trade-off 판단만 소유한다.
+Measurement commands·baseline/after runs·the required `performance` label are owned by the
+performance·quality check section of [`frontend/quality.md`](frontend/quality.md) and the GREEN gate
+of [`delivery/green-review.md`](delivery/green-review.md). This document owns only problem
+classification·cause confirmation·trade-off judgment.
 
-## 1. 문제를 세 축으로 분류한다
+## 1. Classify the Problem on Three Axes
 
-| 축             | 뜻                                             | 대표 수단                                                     |
-| -------------- | ---------------------------------------------- | ------------------------------------------------------------- |
-| Initial-load   | 전송량, 네트워크 latency, JavaScript 실행 시간 | bundle 축소, cache, prefetch, code splitting, 리소스 우선순위 |
-| Runtime        | 총 처리 시간, 렌더링, main-thread blocking     | 알고리즘·자료구조, 작업 분할, 렌더 범위 축소                  |
-| Responsiveness | 입력·행동에 대한 화면 반응 지연                | long task 분할, 진행 상태 표시, transition                    |
+| Axis           | Meaning                                                   | Representative Means                                                 |
+| -------------- | --------------------------------------------------------- | -------------------------------------------------------------------- |
+| Initial-load   | Transfer size, network latency, JavaScript execution time | bundle reduction, cache, prefetch, code splitting, resource priority |
+| Runtime        | Total processing time, rendering, main-thread blocking    | algorithm·data structure, work splitting, narrowing render scope     |
+| Responsiveness | Screen response delay to input·action                     | long task splitting, progress indication, transition                 |
 
-- 어느 축의 문제인지 먼저 기록한다. 축이 다르면 수단과 검증도 다르다.
-- 총 처리 시간과 체감 반응성은 별개다. 작업을 나누면 총 시간이 늘어도 반응성이
-  좋아질 수 있다 — 어느 쪽이 제품 요구인지는 정책이며 미결이면 `NEEDS_DECISION`.
+- Record first which axis the problem belongs to. A different axis means different means and
+  different verification.
+- Total processing time and perceived responsiveness are separate. Splitting work can improve
+  responsiveness even when total time grows — which one is the product requirement is policy, and if
+  unresolved it is `NEEDS_DECISION`.
 
-## 2. 측정 전에는 최적화하지 않는다
+## 2. Do Not Optimize Before Measuring
 
-- 개발 장비·네트워크는 실제 사용자보다 빠르다. 동일 route·fixture·viewport·
-  device/network 조건을 고정하고 baseline을 먼저 기록한다.
-- 원인은 profiler로 확인한다: 브라우저 performance profiler, React Profiler,
-  bundle analyzer 등 대상 레포에 이미 있는 도구를 우선한다. 추측한 병목에 먼저
-  손대지 않는다.
-- 잘못된 code splitting은 첫 화면 리소스를 늦춰 오히려 악화시킨다 — 변경 후에도
-  같은 조건으로 재측정한다.
+- Development machines·networks are faster than real users'. Pin identical
+  route·fixture·viewport·device/network conditions and record a baseline first.
+- Confirm the cause with a profiler: prefer tools already present in the target repo, such as the
+  browser performance profiler, React Profiler, and bundle analyzer. Do not touch a guessed
+  bottleneck first.
+- Wrong code splitting delays first-screen resources and makes things worse instead — re-measure
+  under the same conditions after the change too.
 
-## 3. 가장 작은 병목만 바꾼다
+## 3. Change Only the Smallest Bottleneck
 
-- profiler가 가리킨 병목 영역만 변경하고, 예방적 일괄 최적화(`memo`·`useMemo`·
-  prefetch·dynamic import 전면 적용)를 하지 않는다.
-- 모든 개선은 비용이 있다: 메모리, 코드량, bundle, 복잡성, 유지보수. 감수한
-  비용을 Implementation Decision의 Performance 항목에 trade-off로 기록한다.
-- render 파생 값을 effect+setState 연쇄로 만들지 않는다 —
-  [`frontend/decisions.md`](frontend/decisions.md)의 상태 소유권 표를
-  따른다.
+- Change only the bottleneck area the profiler pointed at, and do not do preventive blanket
+  optimization (applying `memo`·`useMemo`·prefetch·dynamic import across the board).
+- Every improvement has a cost: memory, code volume, bundle, complexity, maintenance. Record the
+  cost you accepted as a trade-off in the Performance item of the Implementation Decision.
+- Do not build a render-derived value with an effect+setState chain —
+  follow the state ownership table in [`frontend/decisions.md`](frontend/decisions.md).
 
-## 4. 검증
+## 4. Verification
 
-- baseline/after run은 `oracle-run.mjs exec`와 `performance` 필수 label로
-  기록한다. 비교 가능한 동일 환경이 없으면 "개선됨"을 주장하지 않는다.
-- 원시 측정 artifact(trace·reporter 출력) 경로를 증거에 남긴다.
+- Record baseline/after runs with `oracle-run.mjs exec` and the required `performance` label. If
+  there is no comparable identical environment, do not claim "improved".
+- Leave the path of the raw measurement artifact (trace·reporter output) in the evidence.
 
-## 채택하지 않는 범용 규칙
+## General Rules Not Adopted
 
-- P95/P99 측정을 모든 프로젝트에 강제하지 않는다. 느린 사용자 구간 확인은 승인된
-  성능 계약이나 실제 제품 데이터가 있을 때만.
-- `React.memo`·prefetch·chunking·web worker를 기본값으로 쓰지 않는다.
-- 총 처리 시간보다 반응성이 항상 우선한다고 가정하지 않는다.
+- Do not force P95/P99 measurement on every project. Check the slow-user segment only when there is
+  an approved performance contract or real product data.
+- Do not use `React.memo`·prefetch·chunking·web worker as defaults.
+- Do not assume that responsiveness always takes priority over total processing time.
 
 ## Source Registry
 
-구현 근거일 뿐 제품 정책 출처가 아니다. 실제 설치 버전 문서가 우선한다.
+These are implementation grounds only, not a source of product policy. The actually installed
+version's documentation wins.
 
 - [web.dev: Performance](https://web.dev/performance)
 - [React Profiler](https://react.dev/reference/react/Profiler)

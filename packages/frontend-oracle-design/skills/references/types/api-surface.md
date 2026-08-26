@@ -1,102 +1,112 @@
-# 타입 제약 — Props와 공용 API 표면
+# Type constraints — Props and the shared API surface
 
-## 공용 API 승격 델타
+## Shared API promotion delta
 
-exported shared/package API를 만들거나 바꿀 때는 구현 타입보다 **호출부 먼저** 쓴다. 대표
-제품 호출부에서 컴파일러가 추론할 수 있는 component generic을 명시하지 않는 것을 목표로
-하고, config 정의처럼 값만으로 Row를 추론할 수 없는 경계에서만 generic을 한 번 고정한다.
-이후 아래 델타만 설계한다.
+When creating or changing an exported shared/package API, write **the call site first**, before the
+implementation type. Aim not to specify a component generic that the compiler can infer at a
+representative product call site, and pin the generic once only at a boundary where Row cannot be
+inferred from the value alone, such as a config definition. After that, design only the delta below.
 
-1. 대표 정상 호출부를 명시적 component type argument 없이 작성한다.
-2. 변경 전 허용되던 넓은 값·optional 조합·끊어진 관계 중 실제 오용을 적는다.
-3. 값·조합·관계·경로·결과·확장([`state-ladder.md`](state-ladder.md)의 여섯 지점) 중 이번
-   API가 닫아야 할 항목만 고른다.
-4. schema·config·`as const` 값에서 key와 union을 파생하고 수기 권위를 늘리지 않는다.
-5. controlled surface와 현재 제품이 쓰는 mode만 공개하고 나머지는 API 부재로 둔다.
-6. type test에 generic 명시 없는 대표 정상 호출 1개와, 이 API가 닫는 경계 축마다 witness를
-   둔다. 축은 아래 경계 축 표에서 고르고 축 수는 API가 정한다. JSX를 쓰면 파일은
-   `.test-d.tsx`로 만든다.
+1. Write the representative valid call site without an explicit component type argument.
+2. Write down the actual misuses among the wide values·optional combinations·broken relations that
+   were allowed before the change.
+3. From value·combination·relation·path·result·extension (the six points of
+   [`state-ladder.md`](state-ladder.md)), pick only the items this API must close.
+4. Derive keys and unions from schema·config·`as const` values and do not increase hand authority.
+5. Expose only the controlled surface and the modes the current product uses, and leave the rest as
+   API absence.
+6. Put one representative valid call without an explicit generic in the type test, and a witness
+   for each boundary axis this API closes. Pick the axes from the boundary axis table below and let
+   the API decide the axis count. If it uses JSX, make the file `.test-d.tsx`.
 
-- 정상 호출도 추론되지 않으면 부정 테스트가 통과해도 좋은 공개 API가 아니다. helper의 추론을
-  보존하거나 generic을 단순화하고, 호출부가 같은 type argument를 반복하게 두지 않는다.
-- 새로 설계하는 exported shared/package API에서 generic 자체는 목표가 아니다. 둘 이상의
-  public 위치 사이 관계를 만들고, 일반 제품 호출부에서 자동 추론되며, 추론 권위가 하나이고,
-  구체적 오답을 컴파일 실패시키는 경우에만 쓴다.
-- config·schema 정의 경계의 1회 고정은 허용한다. 하나라도 아니면 concrete type·파생 union·
-  API 분리를 우선한다.
+- If even the valid call is not inferred, it is not a good public API no matter how the negative
+  tests pass. Preserve the helper's inference or simplify the generic, and do not leave the call
+  site repeating the same type argument.
+- In a newly designed exported shared/package API, the generic itself is not the goal. Use it only
+  when it creates a relation between two or more public places, is inferred automatically at an
+  ordinary product call site, has a single inference authority, and makes a concrete wrong answer
+  fail to compile.
+- A one-time pin at a config·schema definition boundary is allowed. If even one of these does not
+  hold, prefer a concrete type·derived union·API split.
 
-## Props와 API 표면 규칙
+## Props and API surface rules
 
-- 상호 배타 Props는 union + `never`로 표현한다 (`href` 있는 link와 `onClick` 있는 action,
-  controlled `value`와 uncontrolled `defaultValue`). 전부 optional인 한 객체로 만들지 않는다.
-- union 상태를 자식에 통째로 내리지 않는다. `Extract<State, { status: 'failure' }>`로 좁힌
-  variant만 전달하고, 자식 안에서 재분기하지 않는다.
-- 유한한 문자열 집합은 `as const` 상수 하나에서 union·schema·registry를 파생한다.
-  route·query key·analytics event 이름은 factory를 경유하고 호출부에서 문자열을 조립하지
-  않는다.
-- 같은 원시 타입인데 혼동 시 실제 장애가 나는 값(서로 다른 ID, 단위, 검증 완료 값)만
-  tagged/branded type을 쓴다. 생성은 검증 함수 한 곳에 격리하고, 모든 문자열을 브랜드화하지
-  않는다.
-- helper는 타입 추론을 보존한다. 반환 타입을 넓게 annotation하거나 호출부에 generic 반복을
-  요구하는 helper는 만들지 않는다 (`queryOptions` 패턴).
-- literal factory는 `const` type parameter로 호출부의 `as const` 반복 없이 key·tuple literal
-  추론을 보존한다. 여러 인자 중 하나만 추론 권위면 나머지 인자에 `NoInfer`를 붙여 추론
-  지점을 하나로 고정한다:
+- Express mutually exclusive Props with union + `never` (a link with `href` and an action with
+  `onClick`, a controlled `value` and an uncontrolled `defaultValue`). Do not make them one object
+  where everything is optional.
+- Do not pass a union state down to a child wholesale. Pass only the variant narrowed with
+  `Extract<State, { status: 'failure' }>`, and do not re-branch inside the child.
+- Derive the union·schema·registry of a finite string set from one `as const` constant. A
+  route·query key·analytics event name goes through a factory and the call site does not assemble
+  strings.
+- Use a tagged/branded type only for values that share a primitive type but cause a real outage
+  when confused (different IDs, units, already-validated values). Isolate construction in one
+  validation function, and do not brand every string.
+- A helper preserves type inference. Do not create a helper that annotates the return type widely
+  or requires the call site to repeat a generic (the `queryOptions` pattern).
+- A literal factory preserves key·tuple literal inference with a `const` type parameter, without
+  repeating `as const` at the call site. If only one of several arguments is the inference
+  authority, attach `NoInfer` to the remaining arguments to pin the inference point to one:
   ```typescript
   function defineRoutes<const T extends readonly string[]>(paths: T): T
   function pick<T>(options: readonly T[], fallback: NoInfer<T>): T
   ```
-- 입력을 변경하지 않는 함수는 `readonly T[]`를 받는다.
-- mode가 값·반환 타입을 기계적으로 결정하면 generic lookup map으로 관계를 보존한다
-  (`{ single: Id | null; multiple: ReadonlySet<Id> }[M]`). mode별 hook·lifecycle·사용 의미가
-  다르면 generic 대신 별도 컴포넌트로 나눈다 (`Calendar.Single`·`Calendar.Range`). 제품이
-  일부 mode만 쓰면 그 mode만 구현하고 mode prop 자체를 만들지 않는다.
-- 제품 컴포넌트는 controlled-first — 한 값의 권위를 하나로 유지한다. uncontrolled 병행
-  지원은 범용 라이브러리를 만들 때만 한다.
-- 닫힌 union(도메인 상태·오류·이벤트)과 소비자가 확장하는 열린 집합(플러그인 key, 앱 query
-  key)을 구분한다. 열린 집합은 넓은 `string`이 아니라 typed registry나 module augmentation으로
-  연다.
-- 타입 오류 메시지도 공개 API 품질이다. 소비자가 볼 오류가 "X is not assignable to
-  CalendarDate | null" 수준으로 읽히지 않으면 generic을 단순화하거나 API를 나눈다.
-- 소비 루프에 단언이 필요하면 API 형태가 틀린 것이다. union·mapped 타입 config를 소비자가
-  `map`으로 펼치는 순간 key↔value 관계가 끊긴다. 관계는 값 생성 시점에 묶고(`accessor(key,
-{ cell })`이 `render(row)`를 반환), 남는 단언은 그 생성 함수 안 한 줄로 격리한다. 정의
-  지점만 닫고 소비 지점에 `as`를 남기는 설계는 공용 API 승격 실격이다.
-- 공개 variant가 2~3개고 입·출력 타입 관계만 다르면 overload를 검토한다. variant마다 동작이
-  다르면 overload 대신 API를 분리한다.
-- mapped·conditional·recursive 타입 계산은 공용 라이브러리의 `types/internal`에 격리하고
-  type test를 함께 둔다. feature 컴포넌트 안에 자작 고급 utility를 작성하지 않는다. Props에
-  generic이 4개 이상 노출되면 공개 API 분리를 검토한다.
+- A function that does not mutate its input takes `readonly T[]`.
+- If mode mechanically determines the value·return type, preserve the relation with a generic
+  lookup map (`{ single: Id | null; multiple: ReadonlySet<Id> }[M]`). If the hook·lifecycle·usage
+  meaning differs per mode, split into separate components instead of a generic
+  (`Calendar.Single`·`Calendar.Range`). If the product uses only some modes, implement only those
+  modes and do not create the mode prop at all.
+- A product component is controlled-first — keep one authority for one value. Support uncontrolled
+  in parallel only when building a general-purpose library.
+- Distinguish a closed union (domain state·error·event) from an open set that consumers extend
+  (plugin key, app query key). Open the open set with a typed registry or module augmentation, not
+  a wide `string`.
+- The type error message is public API quality too. If the error a consumer will see does not read
+  at the level of "X is not assignable to CalendarDate | null", simplify the generic or split the
+  API.
+- If the consumption loop needs an assertion, the API shape is wrong. The moment a consumer spreads
+  a union·mapped type config with `map`, the key↔value relation is severed. Tie the relation at
+  value creation time (`accessor(key, { cell })` returns `render(row)`), and isolate the remaining
+  assertion into one line inside that creation function. A design that closes only the definition
+  point and leaves an `as` at the consumption point is disqualified from shared API promotion.
+- If there are 2~3 public variants and only the input·output type relation differs, consider an
+  overload. If behavior differs per variant, split the API instead of an overload.
+- Isolate mapped·conditional·recursive type computation in the shared library's `types/internal`
+  and keep a type test with it. Do not write a homemade advanced utility inside a feature
+  component. If four or more generics are exposed on Props, consider splitting the public API.
 
-## 경계 축 표
+## Boundary axis table
 
-타입 witness의 축과 개수 규칙은 [`../bva.md`](../bva.md)의 타입 경계 절이 소유한다. 이 API가
-닫는 축만 고르고 닫지 않는 축은 만들지 않는다. `@ts-expect-error`가 30개를 넘으면 케이스를
-더 쓰지 말고 API를 나눈다 — 30은 목표가 아니라 설계 실격선이다.
+The axes and the count rule for type witnesses are owned by the type boundary section of
+[`../bva.md`](../bva.md). Pick only the axes this API closes and do not create axes it does not
+close. If `@ts-expect-error` exceeds 30, do not write more cases but split the API — 30 is not a
+target but a design disqualification line.
 
-## 검증 매핑
+## Verification mapping
 
-- 카드 행 → 실패 테스트 매핑은 `$test` 계약대로 유지한다. 별도 "타입 테스트 layer"를 전
-  상태에 만들지 않는다.
-- exported shared/package API로 상태·Props 타입이 노출될 때만 불가능 사용이 컴파일되지 않음을
-  `@ts-expect-error` type test(`.test-d.ts`, JSX면 `.test-d.tsx`, 또는 vitest `expectTypeOf`)로
-  증명한다. generic API면 명시적 type argument가 없는 대표 정상 호출도 같은 typecheck에서
-  증명한다. 해당되면 readonly·`as const` tuple 입력 수용, type predicate narrowing, literal의
-  `string` widening 미발생도 같이 검증한다. 각 `@ts-expect-error`에는 어떤 오용을 차단하는지
-  한 줄 이유를 적고, 로컬 상태에는 추가하지 않는다.
-- public compiler witness는 실제 call·assignment·`satisfies`를 우선한다. `Equal<A, B>`류
-  helper만으로 public API를 검증하지 않는다.
-- negative case는 `@ts-expect-error` 다음 줄에 한 오용 표현만 둬 unrelated diagnostic이
-  통과시키지 못하게 한다.
-- custom generic은 `../bva.md` 타입 경계 축 중 이 타입이 실제로 닫는 축만 고르고, 모든
-  타입에 같은 checklist를 붙이지 않는다.
-- 계약을 `string`·optional·`any`로 넓혔을 때 unused `@ts-expect-error`나 exhaustive failure로
-  suite가 RED가 되는 mutation을 한 번 확인한다. type-valid는 behavior-correct가 아니므로
-  runtime behavior test는 별도 run label로 기록한다.
+- Keep the card row → failing test mapping per the `$test` contract. Do not create a separate "type
+  test layer" for every state.
+- Only when a state·Props type is exposed as an exported shared/package API, prove that the
+  impossible usage does not compile with an `@ts-expect-error` type test (`.test-d.ts`,
+  `.test-d.tsx` for JSX, or vitest `expectTypeOf`). For a generic API, prove the representative
+  valid call without an explicit type argument in the same typecheck as well. Where applicable,
+  verify readonly·`as const` tuple input acceptance, type predicate narrowing, and that no literal
+  widening to `string` occurs. Write a one-line reason on each `@ts-expect-error` for which misuse
+  it blocks, and do not add them for local state.
+- A public compiler witness prefers an actual call·assignment·`satisfies`. Do not verify a public
+  API with only an `Equal<A, B>`-style helper.
+- A negative case puts only one misuse expression on the line after `@ts-expect-error` so that an
+  unrelated diagnostic cannot let it pass.
+- A custom generic picks only the axes this type actually closes among the `../bva.md` type
+  boundary axes, and does not attach the same checklist to every type.
+- Confirm once a mutation where widening the contract to `string`·optional·`any` turns the suite
+  RED through an unused `@ts-expect-error` or an exhaustive failure. Because type-valid is not
+  behavior-correct, record the runtime behavior test under a separate run label.
 
-Implementation Decision에는 다음 네 가지를 기록한다.
+Record the following four things in the Implementation Decision.
 
-1. 도출한 상태·이벤트 집합과 카드 행 매핑
-2. 선택한 사다리 단과 exhaustiveness 계층
-3. **이제 컴파일되지 않는 잘못된 사용 목록과 실패 증거**
-4. 타입으로 못 잡아 런타임으로 방어한 행동·시간축 항목
+1. The derived state·event set and the card row mapping
+2. The chosen ladder rung and exhaustiveness tier
+3. **The list of wrong usages that now do not compile, and the failure evidence**
+4. The behavior·time-axis items that types could not catch and the runtime defends
