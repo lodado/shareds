@@ -6,13 +6,8 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { inflateSync } from 'node:zlib'
-import {
-  assertSnapshotUnchanged,
-  isPathInside,
-  sha256,
-  snapshotRegularFile,
-  stableStringify,
-} from './oracle-fs.mjs'
+import { isTrustedAdapter } from './oracle-adapters.mjs'
+import { assertSnapshotUnchanged, isPathInside, sha256, snapshotRegularFile, stableStringify } from './oracle-fs.mjs'
 
 const FLAG_NAMES = [
   'oracle',
@@ -75,7 +70,7 @@ const VAGUE_WORDS = [
 
 /** bva.md의 자동 추가 TC 7종. 행이든 N/A 사유든 카드 어딘가에는 나와야 한다. */
 const AUTO_TEST_CASES = [
-  { kind: '중복', tokens: ['중복'] },
+  { kind: '중복', tokens: ['중복', 'duplicate'] },
   { kind: '오류', tokens: ['오류', '에러', 'error'] },
   { kind: '재시도', tokens: ['재시도', 'retry'] },
   { kind: '빈-데이터', tokens: ['빈 ', '0건', 'empty'] },
@@ -83,6 +78,29 @@ const AUTO_TEST_CASES = [
   { kind: 'out-of-order', tokens: ['out-of-order', '역전'] },
   { kind: '취소', tokens: ['취소', '이탈', 'cancel'] },
 ]
+
+// 카드 schema token은 문서 언어와 무관하게 판정한다 — 한국어 카드와 영어 카드가 같은 검사를 통과한다.
+const SOURCE_COLUMNS = {
+  jurisdiction: ['관할', 'Jurisdiction'],
+  location: ['위치·version', 'Location·version'],
+  approval: ['승인 상태', 'Approval status'],
+}
+const POLICY_SECTION_TITLES = ['결정된 정책', 'Decided policies']
+const SOURCE_MARKERS = ['(출처:', '(source:']
+const ROW_MARKERS = ['(행:', '(rows:']
+
+function columnOf(record, names) {
+  const key = names.find((name) => record[name] !== undefined)
+  return key === undefined ? '' : record[key]
+}
+
+function markedText(line, markers) {
+  for (const marker of markers) {
+    const value = betweenMarkers(line, marker, ')')
+    if (value) return value
+  }
+  return ''
+}
 
 // oracle:nondeterminism scan이 찾는 토큰 목록 자체다 — 실행 경로가 아니다
 const NONDETERMINISM_TOKENS = ['Date.now', 'Math.random', 'crypto.randomUUID', 'toLocale', 'new Intl.', 'new Date()']
@@ -317,9 +335,9 @@ async function lintCard(options) {
   }
 
   const sourceIds = new Set(sources.map(({ ID }) => ID))
-  for (const header of ['Kind', '관할', '위치·version', '승인 상태']) {
-    if (!sourceHeaders?.includes(header)) {
-      issues.push(`source-registry-header: Source Registry must include a \`${header}\` column`)
+  for (const names of [['Kind'], SOURCE_COLUMNS.jurisdiction, SOURCE_COLUMNS.location, SOURCE_COLUMNS.approval]) {
+    if (!names.some((header) => sourceHeaders?.includes(header))) {
+      issues.push(`source-registry-header: Source Registry must include a \`${names[0]}\` column`)
     }
   }
   const sourceById = new Map()
@@ -329,15 +347,16 @@ async function lintCard(options) {
     if (!SOURCE_KINDS.includes(source.Kind)) {
       issues.push(`source-kind: ${source.ID}: ${source.Kind || '(empty)'} must be one of ${SOURCE_KINDS.join(', ')}`)
     }
-    if (source.Kind !== 'implementation-reference' && !isApproved(source['승인 상태'] ?? '')) {
+    if (source.Kind !== 'implementation-reference' && !isApproved(columnOf(source, SOURCE_COLUMNS.approval))) {
       issues.push(`source-unapproved: ${source.ID}: authoritative sources must be approved before lock`)
     }
-    for (const [field, code] of [
-      ['관할', 'source-jurisdiction'],
-      ['위치·version', 'source-location-version'],
-      ['승인 상태', 'source-approval-status'],
+    for (const [names, code] of [
+      [SOURCE_COLUMNS.jurisdiction, 'source-jurisdiction'],
+      [SOURCE_COLUMNS.location, 'source-location-version'],
+      [SOURCE_COLUMNS.approval, 'source-approval-status'],
     ]) {
-      if (isEmptyCell(source[field] ?? '')) issues.push(`${code}: ${source.ID}: ${field} must have a concrete value`)
+      if (isEmptyCell(columnOf(source, names)))
+        issues.push(`${code}: ${source.ID}: ${names[0]} must have a concrete value`)
     }
   }
 
@@ -432,7 +451,7 @@ async function lintCard(options) {
     }
   }
 
-  if (rows.some((row) => cellOf(row, '증거 계층') === 'RELATIONAL')) {
+  if (rows.some((row) => cellOf(row, '증거 계층', 'Evidence tier') === 'RELATIONAL')) {
     const authorization = confirmation.find((line) => /^- Visual QA authorization:/i.test(line.trim()))
     if (!authorization || !/:\s*(?:approved|declined)\s*$/i.test(authorization.trim())) {
       issues.push('visual-qa-authorization: RELATIONAL rows require `- Visual QA authorization: approved | declined`')
@@ -442,10 +461,10 @@ async function lintCard(options) {
   const policies = new Map()
   let inPolicySection = false
   lines.forEach((line, index) => {
-    if (line.startsWith('## ')) inPolicySection = line.includes('결정된 정책')
+    if (line.startsWith('## ')) inPolicySection = POLICY_SECTION_TITLES.some((title) => line.includes(title))
     if (!inPolicySection || !line.startsWith('- ')) return
 
-    const sourceText = betweenMarkers(line, '(출처:', ')')
+    const sourceText = markedText(line, SOURCE_MARKERS)
     if (!sourceText) {
       issues.push(`policy-source: line ${index + 1}: policy has no approved source — ${line.trim()}`)
     } else {
@@ -464,7 +483,10 @@ async function lintCard(options) {
         if (/^S\d+$/.test(entry)) {
           const source = sourceById.get(entry)
           if (!source) issues.push(`policy-source-unknown: ${entry}: policy cites a source outside Source Registry`)
-          else if (source.Kind !== 'implementation-reference' && !isApproved(source['승인 상태'] ?? '')) {
+          else if (
+            source.Kind !== 'implementation-reference' &&
+            !isApproved(columnOf(source, SOURCE_COLUMNS.approval))
+          ) {
             issues.push(`policy-source-unapproved: ${entry}: policy source is not approved`)
           }
         } else if (entry !== confirmationSource) {
@@ -494,7 +516,7 @@ async function lintCard(options) {
 
     if (policies.has(id)) issues.push(`duplicate-policy: ${id}: policy ID is repeated`)
 
-    const linked = betweenMarkers(line, '(행:', ')')
+    const linked = markedText(line, ROW_MARKERS)
     const linkedRows = rowIds(linked)
     if (linkedRows.length === 0) {
       issues.push(`policy-row-unlinked: ${id}: policy must cite at least one contract row`)
@@ -525,7 +547,8 @@ async function lintCard(options) {
 
     if (row.id.startsWith('O')) {
       if (isEmptyCell(then)) issues.push(`empty-then: ${row.id}: Then is empty`)
-      if (isEmptyCell(cellOf(row, '부작용'))) issues.push(`empty-side-effect: ${row.id}: side effect count is empty`)
+      if (isEmptyCell(cellOf(row, '부작용', 'Side effects')))
+        issues.push(`empty-side-effect: ${row.id}: side effect count is empty`)
     } else {
       if (isEmptyCell(cellOf(row, '계약'))) {
         issues.push(`empty-visual-contract: ${row.id}: visual contract is empty`)
@@ -535,15 +558,21 @@ async function lintCard(options) {
       const cited = source.match(/\bS\d+\b/g) ?? []
       const approvedAuthority = cited.some((id) => {
         const registered = sourceById.get(id)
-        return registered && registered.Kind !== 'implementation-reference' && isApproved(registered['승인 상태'] ?? '')
+        return (
+          registered &&
+          registered.Kind !== 'implementation-reference' &&
+          isApproved(columnOf(registered, SOURCE_COLUMNS.approval))
+        )
       })
       if (!approvedAuthority) {
-        issues.push(`visual-source: ${row.id}: visual contract requires an approved non-implementation Source Registry source`)
+        issues.push(
+          `visual-source: ${row.id}: visual contract requires an approved non-implementation Source Registry source`,
+        )
       }
       for (const id of cited) {
         if (!sourceIds.has(id)) issues.push(`unknown-source: ${row.id}: ${id} is not in Source Registry`)
       }
-      const tier = cellOf(row, '증거 계층')
+      const tier = cellOf(row, '증거 계층', 'Evidence tier')
       if (!EVIDENCE_TIERS.includes(tier)) {
         issues.push(`visual-evidence-tier: ${row.id}: evidence tier must be one of ${EVIDENCE_TIERS.join(', ')}`)
       }
@@ -616,7 +645,9 @@ async function lintCard(options) {
   }
 
   const contractText = rows.flatMap((row) => Object.values(row.cells)).join(' ')
-  const sourcedNaText = lines.filter((line) => /\bN\/A\b/i.test(line) && line.includes('(출처:')).join(' ')
+  const sourcedNaText = lines
+    .filter((line) => /\bN\/A\b/i.test(line) && SOURCE_MARKERS.some((marker) => line.includes(marker)))
+    .join(' ')
 
   for (const { kind, tokens } of AUTO_TEST_CASES) {
     if (!tokens.some((token) => contractText.includes(token) || sourcedNaText.includes(token))) {
@@ -663,7 +694,7 @@ function assertNaEvidence(row, entry, approvedSources) {
 function assertEvidenceOwner(row, entry) {
   if (!row.id.startsWith('D') || entry.kind === 'na') return
 
-  const tier = cellOf(row, '증거 계층')
+  const tier = cellOf(row, '증거 계층', 'Evidence tier')
   const valid =
     (tier === 'HARD' && entry.kind === 'test') ||
     (tier === 'RELATIONAL' && ['visual', 'pending'].includes(entry.kind)) ||
@@ -735,7 +766,8 @@ function approvedSourceIds(lines) {
     if (!headers || !/^S\d+$/.test(cells[0])) continue
 
     const source = Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? '']))
-    if (source.Kind !== 'implementation-reference' && isApproved(source['승인 상태'] ?? '')) approved.add(source.ID)
+    if (source.Kind !== 'implementation-reference' && isApproved(columnOf(source, SOURCE_COLUMNS.approval)))
+      approved.add(source.ID)
   }
 
   return approved
@@ -753,17 +785,20 @@ function visualAuthorization(card) {
 
 function assertPng(bytes, id, label) {
   const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
-  if (!bytes.subarray(0, 8).equals(signature)) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} is not a PNG file`)
+  if (!bytes.subarray(0, 8).equals(signature))
+    throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} is not a PNG file`)
   let offset = 8
   let ihdr = false
   let iend = false
   const idat = []
   while (offset < bytes.length) {
-    if (offset + 12 > bytes.length) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has a truncated PNG chunk`)
+    if (offset + 12 > bytes.length)
+      throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has a truncated PNG chunk`)
     const length = bytes.readUInt32BE(offset)
     const type = bytes.subarray(offset + 4, offset + 8)
     const end = offset + 12 + length
-    if (end > bytes.length) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has an invalid PNG chunk boundary`)
+    if (end > bytes.length)
+      throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has an invalid PNG chunk boundary`)
     const expected = bytes.readUInt32BE(end - 4)
     // PNG CRC uses the IEEE polynomial; Node exposes it only indirectly, so validate
     // through a compact table-less implementation.
@@ -772,12 +807,14 @@ function assertPng(bytes, id, label) {
       crc ^= byte
       for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (-(crc & 1) & 0xedb88320)
     }
-    if (((crc ^ 0xffffffff) >>> 0) !== expected)
+    if ((crc ^ 0xffffffff) >>> 0 !== expected)
       throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has an invalid PNG CRC`)
     const name = type.toString('ascii')
-    if (!/^[a-z]{4}$/i.test(name)) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has an invalid PNG chunk type`)
+    if (!/^[a-z]{4}$/i.test(name))
+      throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has an invalid PNG chunk type`)
     if (!ihdr) {
-      if (name !== 'IHDR' || length !== 13) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} lacks a valid PNG IHDR`)
+      if (name !== 'IHDR' || length !== 13)
+        throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} lacks a valid PNG IHDR`)
       const width = bytes.readUInt32BE(offset + 8)
       const height = bytes.readUInt32BE(offset + 12)
       if (!width || !height) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has invalid PNG dimensions`)
@@ -786,7 +823,8 @@ function assertPng(bytes, id, label) {
       if (iend) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has PNG data after IEND`)
       idat.push(bytes.subarray(offset + 8, end - 4))
     } else if (name === 'IEND') {
-      if (length !== 0 || iend || idat.length === 0) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has an invalid PNG IEND`)
+      if (length !== 0 || iend || idat.length === 0)
+        throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has an invalid PNG IEND`)
       iend = true
       if (end !== bytes.length) throw new CliError('VISUAL_EVIDENCE_INVALID', `${id}: ${label} has trailing PNG bytes`)
     }
@@ -844,7 +882,7 @@ async function verifyVisualArtifact(row, entry, mapPath, oracleSha256, approvedS
     producerLedger?.signal == null &&
     producerLedger?.oracleSha256 === oracleSha256 &&
     producerLedger?.worktreeSha256 === producer.worktreeSha256 &&
-    producerLedger?.adapter === 'node-test'
+    isTrustedAdapter(producerLedger?.adapter)
   if (
     artifact?.schemaVersion !== 3 ||
     artifact.oracleSha256 !== oracleSha256 ||
@@ -892,7 +930,13 @@ async function ledgerRun(options, base, snapshots) {
       throw new CliError('LEDGER_INVALID', `ledger record ${index} must be an object`)
     }
     if (record.type === 'checkpoint') {
-      if (checkpointSeen || index === 0 || record.schemaVersion !== 3 || !isDigest(record.prefixSha256) || record.previousDigest !== '0'.repeat(64)) {
+      if (
+        checkpointSeen ||
+        index === 0 ||
+        record.schemaVersion !== 3 ||
+        !isDigest(record.prefixSha256) ||
+        record.previousDigest !== '0'.repeat(64)
+      ) {
         throw new CliError('LEDGER_INVALID', `ledger checkpoint ${index} is invalid`)
       }
       const expectedPrefix = sha256(legacyPrefix)
@@ -905,7 +949,13 @@ async function ledgerRun(options, base, snapshots) {
         legacyPrefix = Buffer.concat([legacyPrefix, Buffer.from(`${lines[index]}\n`)])
         continue
       }
-      if (record.type !== 'init' && record.type !== 'run' && record.type !== 'review-receipt' && record.type !== 'transition' && record.type !== 'budget') {
+      if (
+        record.type !== 'init' &&
+        record.type !== 'run' &&
+        record.type !== 'review-receipt' &&
+        record.type !== 'transition' &&
+        record.type !== 'budget'
+      ) {
         throw new CliError('LEDGER_INVALID', `ledger record ${index} has an unknown type`)
       }
       if (
@@ -938,12 +988,24 @@ async function ledgerRun(options, base, snapshots) {
         runIds.add(record.runId)
       }
       if (record.type === 'review-receipt') {
-        const fields = ['receiptId', 'packetSha256', 'targetRevision', 'role', 'reviewerId', 'taskId', 'outputSha256', 'findingsSha256', 'oracleSha256', 'adapter']
+        const fields = [
+          'receiptId',
+          'packetSha256',
+          'targetRevision',
+          'role',
+          'reviewerId',
+          'taskId',
+          'outputSha256',
+          'findingsSha256',
+          'oracleSha256',
+          'adapter',
+        ]
         if (fields.some((field) => !validReviewReceiptField(record, field))) {
           throw new CliError('LEDGER_INVALID', `review receipt ${index} has invalid provenance`)
         }
         const identity = `${record.taskId}\0${record.reviewerId}`
-        if (receiptIdentities.has(identity)) throw new CliError('LEDGER_INVALID', `duplicate review receipt ${record.taskId}`)
+        if (receiptIdentities.has(identity))
+          throw new CliError('LEDGER_INVALID', `duplicate review receipt ${record.taskId}`)
         receiptIdentities.add(identity)
       }
       if (!isDigest(record.digest) || !isDigest(record.previousDigest) || record.previousDigest !== previousDigest) {
@@ -951,7 +1013,8 @@ async function ledgerRun(options, base, snapshots) {
       }
     }
     const { digest, ...unsigned } = record
-    if (sha256(stableStringify(unsigned)) !== digest) throw new CliError('LEDGER_INVALID', `ledger record ${index} digest does not match`)
+    if (sha256(stableStringify(unsigned)) !== digest)
+      throw new CliError('LEDGER_INVALID', `ledger record ${index} digest does not match`)
     previousDigest = digest
   }
   if (legacyPrefix.length > 0 && !checkpointSeen) {
@@ -991,7 +1054,13 @@ async function verifyRedEvidence(options) {
   }
 
   const run = (await ledgerRun(options, base, snapshots)).run
-  if (!Number.isInteger(run.exitCode) || run.exitCode === 0 || run.grade !== 'reported' || run.adapter !== 'node-test' || !Array.isArray(run.tests)) {
+  if (
+    !Number.isInteger(run.exitCode) ||
+    run.exitCode === 0 ||
+    run.grade !== 'reported' ||
+    !isTrustedAdapter(run.adapter) ||
+    !Array.isArray(run.tests)
+  ) {
     throw new CliError(
       'RED_EVIDENCE_UNVERIFIABLE',
       `${run.runId} must be a non-zero reported run for VALID_RED; got exit ${run.exitCode} grade ${run.grade}`,
@@ -1055,12 +1124,24 @@ async function verifyEvidence(options) {
   const oracleSha256 = oracleSnapshot.sha256
   const { run, records } = await ledgerRun(options, base, snapshots)
   for (const row of contracts.filter((entry) => map.rows[entry.id].kind === 'visual')) {
-    await verifyVisualArtifact(row, map.rows[row.id], options.map, oracleSha256, approvedSources, card, records, snapshots)
+    await verifyVisualArtifact(
+      row,
+      map.rows[row.id],
+      options.map,
+      oracleSha256,
+      approvedSources,
+      card,
+      records,
+      snapshots,
+    )
   }
 
   const needsRunEvidence = rows.filter((id) => map.rows[id].kind === 'test')
 
-  if (needsRunEvidence.length > 0 && (run.grade !== 'reported' || run.adapter !== 'node-test' || !Array.isArray(run.tests))) {
+  if (
+    needsRunEvidence.length > 0 &&
+    (run.grade !== 'reported' || !isTrustedAdapter(run.adapter) || !Array.isArray(run.tests))
+  ) {
     throw new CliError(
       'EVIDENCE_UNVERIFIABLE',
       `${run.runId} is graded ${run.grade} — test names cannot be verified without a parsed reporter`,
@@ -1189,7 +1270,13 @@ function assertEmbeddedLedger(ledger) {
   const receiptIdentities = new Set()
   let previousDigest = '0'.repeat(64)
   for (const [index, record] of ledger.entries()) {
-    if (!record || typeof record !== 'object' || record.type === 'checkpoint' || !isDigest(record.digest) || !isDigest(record.previousDigest)) {
+    if (
+      !record ||
+      typeof record !== 'object' ||
+      record.type === 'checkpoint' ||
+      !isDigest(record.digest) ||
+      !isDigest(record.previousDigest)
+    ) {
       throw new CliError('REVIEW_PACKET_INVALID', `embedded ledger record ${index} is malformed`)
     }
     const { digest, ...unsigned } = record
@@ -1197,7 +1284,13 @@ function assertEmbeddedLedger(ledger) {
       throw new CliError('REVIEW_PACKET_INVALID', `embedded ledger record ${index} breaks its digest chain`)
     }
     if (record.type === 'run') {
-      if (!record.runId || runIds.has(record.runId) || !isDigest(record.oracleSha256) || typeof record.adapter !== 'string' || !record.adapter) {
+      if (
+        !record.runId ||
+        runIds.has(record.runId) ||
+        !isDigest(record.oracleSha256) ||
+        typeof record.adapter !== 'string' ||
+        !record.adapter
+      ) {
         throw new CliError('REVIEW_PACKET_INVALID', `embedded run ${index} lacks a trusted identity`)
       }
       runIds.add(record.runId)
@@ -1303,7 +1396,13 @@ async function assertReviewBinding(options) {
   const base = dirname(resolve(options.oracle))
   const snapshots = []
   const oracleSnapshot = await snapshotOracleFile(options.oracle, base, 'REVIEW_PACKET_INVALID', 'Oracle', snapshots)
-  const packetSnapshot = await snapshotOracleFile(options.packet, base, 'REVIEW_PACKET_INVALID', 'review packet', snapshots)
+  const packetSnapshot = await snapshotOracleFile(
+    options.packet,
+    base,
+    'REVIEW_PACKET_INVALID',
+    'review packet',
+    snapshots,
+  )
   const mapSnapshot = await snapshotOracleFile(options.map, base, 'EVIDENCE_INVALID', 'evidence map', snapshots)
   const externalLedger = await ledgerRun({ ...options, run: null }, base, snapshots)
   const packet = parseSnapshotJson(packetSnapshot, 'REVIEW_PACKET_INVALID')
@@ -1325,17 +1424,28 @@ async function assertReviewBinding(options) {
     typeof packet?.implementationDecision?.content !== 'string' ||
     sha256(packet.implementationDecision.content) !== packet.implementationDecision.sha256 ||
     !Array.isArray(packet?.reviewPoints) ||
-    !packet.reviewPoints.some((point) => point?.path === 'changeability.md' && point.sha256 === canonicalChangeabilitySha256) ||
+    !packet.reviewPoints.some(
+      (point) => point?.path === 'changeability.md' && point.sha256 === canonicalChangeabilitySha256,
+    ) ||
     !Array.isArray(packet?.evidenceArtifacts)
   ) {
-    throw new CliError('REVIEW_PACKET_INVALID', 'review packet lacks canonical schema-v2 lock, decision, review-point, or artifact bindings')
+    throw new CliError(
+      'REVIEW_PACKET_INVALID',
+      'review packet lacks canonical schema-v2 lock, decision, review-point, or artifact bindings',
+    )
   }
   assertEmbeddedLedger(packet.ledger)
   for (const [index, artifact] of packet.evidenceArtifacts.entries()) {
     if (!artifact || typeof artifact.path !== 'string' || !isDigest(artifact.sha256)) {
       throw new CliError('REVIEW_PACKET_INVALID', `evidence artifact ${index} lacks path or digest`)
     }
-    const snapshot = await assertRegularFileInside(base, artifact.path, 'packet', `evidenceArtifacts[${index}]`, snapshots)
+    const snapshot = await assertRegularFileInside(
+      base,
+      artifact.path,
+      'packet',
+      `evidenceArtifacts[${index}]`,
+      snapshots,
+    )
     if (snapshot.sha256 !== artifact.sha256) {
       throw new CliError('REVIEW_PACKET_INVALID', `evidence artifact ${index} digest does not match`)
     }
@@ -1345,13 +1455,23 @@ async function assertReviewBinding(options) {
     .find((history) => history.state === 'IMPLEMENTED_GREEN')
   const greenRun = packet?.ledger?.find((entry) => entry.runId === greenEntry?.runId)
   const targetRevision = packet?.targetSnapshot?.worktreeSha256
-  if (!isDigest(targetRevision) || targetRevision !== options.revision || greenRun?.worktreeSha256 !== targetRevision || greenRun?.exitCode !== 0 || greenRun?.grade !== 'reported') {
+  if (
+    !isDigest(targetRevision) ||
+    targetRevision !== options.revision ||
+    greenRun?.worktreeSha256 !== targetRevision ||
+    greenRun?.exitCode !== 0 ||
+    greenRun?.grade !== 'reported'
+  ) {
     throw new CliError('REVIEW_PACKET_INVALID', 'review packet does not target the implementation worktree')
   }
 
-  const findingSnapshots = [await snapshotOracleFile(options.file, base, 'FINDINGS_INVALID', 'review findings', snapshots)]
+  const findingSnapshots = [
+    await snapshotOracleFile(options.file, base, 'FINDINGS_INVALID', 'review findings', snapshots),
+  ]
   if (options.intersect)
-    findingSnapshots.push(await snapshotOracleFile(options.intersect, base, 'FINDINGS_INVALID', 'intersected review findings', snapshots))
+    findingSnapshots.push(
+      await snapshotOracleFile(options.intersect, base, 'FINDINGS_INVALID', 'intersected review findings', snapshots),
+    )
   const documents = findingSnapshots.map((snapshot) => parseSnapshotJson(snapshot, 'FINDINGS_INVALID'))
   const allFindings = documents.flatMap((document) => document.findings ?? [])
   const ids = new Set(allFindings.map((finding) => finding.id))
@@ -1384,9 +1504,7 @@ async function assertReviewBinding(options) {
     }
     const receiptEvent = externalLedger.records.find(
       (event) =>
-        event.type === 'review-receipt' &&
-        event.taskId === receipt.taskId &&
-        event.reviewerId === document.reviewerId,
+        event.type === 'review-receipt' && event.taskId === receipt.taskId && event.reviewerId === document.reviewerId,
     )
     if (
       !receiptEvent ||
@@ -1399,7 +1517,10 @@ async function assertReviewBinding(options) {
       receiptEvent.oracleSha256 !== oracleSha256 ||
       receiptEvent.adapter !== 'controller'
     ) {
-      throw new CliError('REVIEWER_EVIDENCE_INVALID', 'review findings require an independently ledger-bound review receipt')
+      throw new CliError(
+        'REVIEWER_EVIDENCE_INVALID',
+        'review findings require an independently ledger-bound review receipt',
+      )
     }
   }
   if (documents.length > 1 && documents[0].reviewerId === documents[1].reviewerId)
@@ -1411,7 +1532,10 @@ async function assertReviewBinding(options) {
       documents[0].orchestrationReceipt.outputSha256 === documents[1].orchestrationReceipt.outputSha256 ||
       documents[0].reviewerRole === documents[1].reviewerRole)
   )
-    throw new CliError('REVIEWER_NOT_INDEPENDENT', 'High-risk intersected reviews require distinct receipt task identities')
+    throw new CliError(
+      'REVIEWER_NOT_INDEPENDENT',
+      'High-risk intersected reviews require distinct receipt task identities',
+    )
   const byId = new Map(
     documents.flatMap((document) => (document.findings ?? []).map((finding) => [finding.id, document.reviewerRole])),
   )
@@ -1448,6 +1572,35 @@ async function verifyReview(options) {
   }
 
   process.stdout.write(`REVIEW_CLEAR advisory:${result.advisory.length}\n`)
+}
+
+// 잠긴 카드의 행을 그대로 옮긴 빈 manifest를 만든다 — 행 ID를 손으로 옮기다 생기는
+// EVIDENCE_MISSING_ROW·EVIDENCE_UNKNOWN_ROW 왕복을 없앤다. 각 항목의 값은 여전히 작성자가 채운다.
+function scaffoldRow(row) {
+  const tier = cellOf(row, '증거 계층', 'Evidence tier')
+
+  if (/\bN\/A\b/i.test(rowText(row))) {
+    return { kind: 'na', reason: '<카드 행이 밝힌 N/A 사유>', source: '<승인된 S*>' }
+  }
+  if (tier === 'RELATIONAL') return { kind: 'visual', artifact: '<visual-qa/<id>/evidence.json>' }
+  if (tier === 'JUDGMENT') return { kind: 'reviewer', finding: '<finding id>', role: 'designer' }
+  return { kind: 'test', name: '<이 행을 검증하는 테스트 이름>' }
+}
+
+async function scaffoldEvidence(options) {
+  if (!options.oracle) throw new CliError('USAGE', 'evidence-scaffold requires --oracle', 2)
+
+  const card = await readFile(resolve(options.oracle), 'utf8').catch((error) => {
+    throw new CliError('INPUT_UNREADABLE', `Cannot read Oracle: ${error.message}`)
+  })
+  const rows = parseRows(card)
+
+  if (rows.length === 0) {
+    throw new CliError('EVIDENCE_SCAFFOLD_EMPTY', 'card has no O*/D* contract rows to map')
+  }
+
+  const manifest = { schemaVersion: 1, rows: Object.fromEntries(rows.map((row) => [row.id, scaffoldRow(row)])) }
+  process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`)
 }
 
 async function scanNondeterminism(options) {
@@ -1490,10 +1643,11 @@ async function main() {
   if (command === 'card') await lintCard(options)
   else if (command === 'red') await verifyRedEvidence(options)
   else if (command === 'evidence') await verifyEvidence(options)
+  else if (command === 'evidence-scaffold') await scaffoldEvidence(options)
   else if (command === 'findings') await verifyFindings(options)
   else if (command === 'review') await verifyReview(options)
   else if (command === 'scan') await scanNondeterminism(options)
-  else throw new CliError('USAGE', 'Expected card, red, evidence, findings, review or scan', 2)
+  else throw new CliError('USAGE', 'Expected card, red, evidence, evidence-scaffold, findings, review or scan', 2)
 }
 
 try {

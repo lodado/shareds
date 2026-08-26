@@ -1,90 +1,100 @@
-# Delivery — 최소 구현·GREEN 게이트·review 전이
+# Delivery — minimal implementation·GREEN gate·review transition
 
-## 최소 구현·셀프피드백
+## Minimal implementation·self-feedback
 
-최대 3라운드. 한 라운드:
+At most 3 rounds. One round:
 
-1. 실패한 카드 행 하나 또는 같은 root cause의 행 묶음 선택.
-2. 관련 호출 경로를 끝까지 추적해 모든 호출자가 공유하는 원인 파악.
-3. 해당 계약만 만족하는 최소 production 변경 작성.
-4. 실패했던 targeted test 재실행.
-5. 영향 범위 테스트 실행.
-6. 결과를 분류하고 다음 행동 결정.
+1. Select one failing card row or a bundle of rows with the same root cause.
+2. Trace the relevant call path to the end and identify the cause every caller shares.
+3. Write the minimal production change that satisfies only that contract.
+4. Re-run the targeted test that was failing.
+5. Run the impact-scope tests.
+6. Classify the result and decide the next action.
 
-분류·라우팅의 canonical 정의는 [`common.md`](../common.md)의 피드백 라우팅이다.
-이 단계의 특칙:
+The canonical definition of classification·routing is the feedback routing in
+[`common.md`](../common.md). Special rules for this stage:
 
-- `POLICY_GAP` → 카드 현재본과 질문을 출력하고 `NEEDS_DECISION`
-- `EVIDENCE_GAP` → 잠긴 카드 범위 안에서 누락 테스트·증거만 추가
-- `HARNESS_DEFECT` → sibling `test` skill 허용 항목과 공용 2회 예산 안에서만 보정
-- `PRODUCT_DEFECT` → 같은 카드 행을 유지하고 최소 수정 후 재실행
-- `ENVIRONMENT_DEFECT` → production을 건드리지 않고 `FAIL`
-- `NON_ORACLE_OPINION` → 기록하되 정책·assertion·완료 상태를 바꾸지 않음
+- `POLICY_GAP` → print the current card and the question, then `NEEDS_DECISION`
+- `EVIDENCE_GAP` → add only the missing tests·evidence within the locked card scope
+- `HARNESS_DEFECT` → correct only within the sibling `test` skill's allowed items and the shared 2-use budget
+- `PRODUCT_DEFECT` → keep the same card row, make the minimal fix, and re-run
+- `ENVIRONMENT_DEFECT` → `FAIL` without touching production
+- `NON_ORACLE_OPINION` → record it but do not change policy·assertions·completion state
 
-revision mismatch는 피드백 분류 대상이 아니다. 기존 증거를 즉시 폐기하고
-[`card/confirmation-lock.md`](../card/confirmation-lock.md)의 lock 규칙대로
-`NEEDS_DECISION` 또는 `FAIL`로 이동.
+A revision mismatch is not a target of feedback classification. Immediately discard the existing
+evidence and move to `NEEDS_DECISION` or `FAIL` per the lock rules of
+[`card/confirmation-lock.md`](../card/confirmation-lock.md).
 
-매 라운드 기록:
+Record every round:
 
-| 라운드 | 카드 행 | 실패 가설 | 최소 변경 | 실제 실행 결과 | 다음 판단 |
-| ------ | ------- | --------- | --------- | -------------- | --------- |
+| Round | Card row | Failure hypothesis | Minimal change | Actual run result | Next judgment |
+| ----- | -------- | ------------------ | -------------- | ----------------- | ------------- |
 
-## GREEN 게이트
+## GREEN gate
 
-카드 테스트 통과 후 init에서 `--required-label`로 고정한 레포 검증을 각 label의
-`exec`로 실제 실행한다.
+After the card tests pass, actually run the repo verifications pinned with `--required-label` at init
+through the `exec` of each label.
 
 1. targeted test
-2. 영향 범위 test
-3. typecheck와 lint
-4. Oracle source lock verify 및 레포에 존재하는 구조 검증 명령
-5. 루트 또는 패키지 필수 test/build
+2. impact-scope test
+3. typecheck and lint
+4. Oracle source lock verify and any structure verification command that exists in the repo
+5. required root or package test/build
 
-성능 요구·개선 claim이 있으면 동일 조건 baseline/after를 검사하는 기존 repo 명령을
-`performance` 필수 label로 추가. exported shared/package API가 바뀌면 레포가 이미
-제공하는 type test, runtime test, pack/export·changeset 검증만 필수 label로 추가.
-해당 없는 작업에 이 명령이나 새 dependency를 만들지 않는다.
+If there is a performance requirement·improvement claim, add the existing repo command that checks a
+same-condition baseline/after as a required `performance` label. If the exported shared/package API
+changes, add only the type test, runtime test, and pack/export·changeset verification the repo already
+provides as required labels. Do not create these commands or a new dependency for work where they do not apply.
 
-레포 규칙에 정의된 명령이 우선이다. 실행하지 않은 검증을 통과로 보고하지 않는다.
-문서화된 명령이 없으면 package scripts를 읽어 targeted + 가장 가까운 package 검증을
-실행한다. 필수 root 명령이 없거나 무관한 기존 실패가 있으면 원문과 영향을 분리해
-보고하고 GREEN으로 숨기지 않는다.
+Commands defined in the repo rules take precedence. Do not report a verification that was not run as
+passing. If there is no documented command, read the package scripts and run the targeted verification
+plus the closest package verification. If a required root command is missing or there is an unrelated
+pre-existing failure, report the raw text and the impact separately and do not hide it behind GREEN.
 
-그다음 `--to IMPLEMENTED_GREEN` 전이를 시도한다. 기계 검사:
+Then attempt the `--to IMPLEMENTED_GREEN` transition. Machine checks:
 
-- `ORACLE_CHANGED` — 카드·source bytes가 잠긴 값과 다름 → 증거를 폐기하고 `NEEDS_DECISION`
-- `RUN_NOT_GREEN` — 인용한 run이 통과하지 않음 → 실제 통과 run을 만들고 인용
-- `EVIDENCE_REQUIRED` — evidence manifest 없이 상태 전이를 시도함 → 잠긴 카드 전 행을 매핑하고 `--evidence`로 인용
-- `REQUIRED_RUN_MISSING` — 선언한 필수 label의 최신 통과가 없음 → 해당 repo 명령을 `exec --label`로 다시 실행
-- `FLAKINESS_GATE` — 같은 명령의 연속 통과가 risk 필요 횟수에 못 미침 → 같은 명령을 그대로 다시 실행해 연속 통과를 확보
-- `TEST_WEAKENED` — RED 기준선 대비 assertion 감소·금지 토큰·삭제 → 테스트를 원래 강도로 되돌린다
-- `ENV_DRIFT`(경고) — RED와 GREEN의 실행 환경이 다름 → 환경 차이가 결과를 바꿨는지 확인하고 보고에 남긴다
+- `ORACLE_CHANGED` — the card·source bytes differ from the locked values → discard the evidence and `NEEDS_DECISION`
+- `RUN_NOT_GREEN` — the quoted run did not pass → produce an actually passing run and quote it
+- `EVIDENCE_REQUIRED` — a state transition was attempted without an evidence manifest → map every row of the locked card and quote it with `--evidence`
+- `REQUIRED_RUN_MISSING` — there is no latest pass for a declared required label → re-run that repo command with `exec --label`
+- `FLAKINESS_GATE` — consecutive passes of the same command fall short of the count the risk requires → re-run the same command as-is to secure consecutive passes
+- `TEST_WEAKENED` — assertions decreased, forbidden tokens, or deletions relative to the RED baseline → restore the tests to their original strength
+- `ENV_DRIFT`(warning) — the RED and GREEN execution environments differ → confirm whether the environment difference changed the result and leave it in the report
 
-flakiness 필요 횟수는 Low 1회, Medium 2회, High 3회. 재실행으로 통과를 뽑는 게 아니라
-**같은 명령이 반복해도 결정론적으로 통과함**을 보이는 절차다. 실패가 섞이면
-`HARNESS_DEFECT`로 분류하고 조용히 다시 굴리지 않는다.
+The required flakiness count is Low 1, Medium 2, High 3. It is not about extracting a pass by
+re-running but a procedure for showing that **the same command passes deterministically even when
+repeated**. If a failure is mixed in, classify it as `HARNESS_DEFECT` and do not quietly roll it again.
 
-`TEST_WEAKENED` 금지 토큰: `test.skip`·`it.skip`·`describe.skip`·`.only(`·
-`waitForTimeout(`·`toBeTruthy(`·`toBeFalsy(`·`.first()`·`.nth(`·`setTimeout(`과
-screenshot 허용치(`maxDiffPixels`·`maxDiffPixelRatio`·`threshold`) 상향.
+`TEST_WEAKENED` forbidden tokens: `test.skip`·`it.skip`·`describe.skip`·`.only(`·
+`waitForTimeout(`·`toBeTruthy(`·`toBeFalsy(`·`.first()`·`.nth(`·`setTimeout(` and raising the
+screenshot tolerance (`maxDiffPixels`·`maxDiffPixelRatio`·`threshold`).
 
-선택한 GREEN run은 parsed reporter가 있는 카드 test run이어야 한다. 별도 lint·
-typecheck·build는 각각 선언한 label로 기록. 전이는 모든 필수 label과 evidence
-manifest를 직접 검사하며, 전이가 통과해야 `IMPLEMENTED_GREEN`이다.
+The chosen GREEN run must be a card test run that has a parsed reporter. Separate lint·
+typecheck·build are each recorded under their declared label. The transition directly inspects every
+required label and the evidence manifest, and only when the transition passes is it `IMPLEMENTED_GREEN`.
 
 ### Evidence manifest
 
-증거 매핑은 산문이 아니라 `.ai/oracles/<oracle-id>/evidence.json`으로 관리하고 기계로
-검증한다.
+Evidence mapping is managed as `.ai/oracles/<oracle-id>/evidence.json` rather than prose and is
+verified by machine. Do not move row IDs by hand; generate the skeleton from the locked card and then
+fill in only the values — this removes the round trip where the row set diverges from the card and
+comes back as `EVIDENCE_MISSING_ROW`·`EVIDENCE_UNKNOWN_ROW`.
+
+```bash
+node <skill-dir>/scripts/oracle-verify.mjs evidence-scaffold \
+  --oracle .ai/oracles/<oracle-id>/oracle.md > .ai/oracles/<oracle-id>/evidence.json
+```
+
+Replace the `<...>` slots in the generated output with the actual test name·artifact·finding·source.
+An unfilled placeholder fails `evidence` verification as-is.
 
 ```json
 {
   "schemaVersion": 1,
   "rows": {
-    "O1": { "kind": "test", "name": "저장 > pending 표시와 POST 1회" },
+    "O1": { "kind": "test", "name": "save > shows pending and POSTs once" },
     "O2": { "kind": "reviewer", "finding": "f-3", "role": "code-reviewer" },
-    "O3": { "kind": "na", "reason": "이 기능에 취소 경로가 없다", "source": "S1" },
+    "O3": { "kind": "na", "reason": "this feature has no cancel path", "source": "S1" },
     "D1": { "kind": "visual", "artifact": "visual-qa/v-001/evidence.json" },
     "D2": { "kind": "reviewer", "finding": "d-1", "role": "designer" }
   }
@@ -100,15 +110,15 @@ node <skill-dir>/scripts/oracle-verify.mjs evidence \
   --phase green
 ```
 
-`D*` 행 owner: `HARD → test`, `RELATIONAL → visual | pending`, `JUDGMENT → designer
-reviewer`. visual `pending` 또는 Visual QA `declined`는 GREEN 증거 검증에서 미검증 항목으로
-보고되지만 review 증거 검증에서는 `EVIDENCE_PENDING`으로 완료를 차단한다.
-`REVIEW_VERIFIED`로 가려면 기존 tool browser journey artifact, designer finding, 또는
-source-backed N/A revision 중 하나가 필요하다. N/A는 artifact가 아니라 잠긴 카드 row가
-`N/A (출처: S*)`를 명시하고 manifest가 승인된 Source Registry ID를 인용할 때만 쓴다.
+`D*` row owners: `HARD → test`, `RELATIONAL → visual | pending`, `JUDGMENT → designer
+reviewer`. A visual `pending` or a Visual QA `declined` is reported as an unverified item in GREEN
+evidence verification but blocks completion with `EVIDENCE_PENDING` in review evidence verification.
+To reach `REVIEW_VERIFIED`, one of an existing tool browser journey artifact, a designer finding, or a
+source-backed N/A revision is required. N/A is used not as an artifact but only when the locked card row
+states `N/A (출처: S*)` and the manifest quotes an approved Source Registry ID.
 
-RELATIONAL visual artifact receipt는 Oracle directory 안의 일반 파일이어야 하며, receipt 내부 artifact 경로는 receipt directory 기준이어야 하며, 최소 형식은
-다음과 같다.
+A RELATIONAL visual artifact receipt must be a regular file inside the Oracle directory, artifact paths inside the receipt must be relative to the receipt directory, and the minimum format is
+as follows.
 
 ```json
 {
@@ -129,7 +139,7 @@ RELATIONAL visual artifact receipt는 Oracle directory 안의 일반 파일이�
 }
 ```
 
-Browser journey만 N/A이면 row 자체는 여전히 `status: "passed"`여야 하며, row-level `checks`/`artifacts`와 row가 인용한 승인 source가 필요하다. whole-row N/A는 artifact가 아니라 위 manifest의 `kind: "na"`만 쓴다.
+If only the browser journey is N/A, the row itself must still be `status: "passed"`, and row-level `checks`/`artifacts` and the approved source the row quotes are required. A whole-row N/A uses not an artifact but only `kind: "na"` in the manifest above.
 
 ```json
 {
@@ -150,7 +160,7 @@ Browser journey만 N/A이면 row 자체는 여전히 `status: "passed"`여야 �
 }
 ```
 
-GREEN 전이는 같은 manifest를 필수 입력으로 받는다.
+The GREEN transition takes the same manifest as a required input.
 
 ```bash
 node <skill-dir>/scripts/oracle-run.mjs transition \
@@ -160,26 +170,29 @@ node <skill-dir>/scripts/oracle-run.mjs transition \
   --evidence .ai/oracles/<oracle-id>/evidence.json
 ```
 
-`kind: test`는 인용한 run의 reporter 결과에 같은 이름이 통과로 존재해야 한다.
-`EVIDENCE_NOT_IN_RUN` = 매핑이 실제 실행과 어긋남, `EVIDENCE_UNVERIFIABLE` = run이
-`exit-only`라 이름 확인 불가. 둘 다 이름을 지어내지 말고 reporter를 붙여 재실행.
+`kind: test` requires that the same name exists as a pass in the reporter result of the quoted run.
+`EVIDENCE_NOT_IN_RUN` = the mapping diverges from the actual run, `EVIDENCE_UNVERIFIABLE` = the run is
+`exit-only` so the name cannot be confirmed. For both, do not invent a name; attach a reporter and re-run.
 
-최종 보고는 Outcome Brief의 사용자·성공 결과·비목표, 선택한 최소 경계, path별 변화,
-검증, 남은 위험과 가역성을 먼저 쓴다. 증거 부록에 Oracle SHA-256·source hashes·마지막
-verify command/exit, 인용 runId와 실제 검증 command/PASS·FAIL 수,
-`oracle-verify.mjs evidence` 출력 기록. 결과에 영향을 주는 commit·runtime/browser
-version·locale/timezone·viewport/theme·role·clock/seed·데이터 초기화만 함께 기록.
-비-N/A 행 미매핑 또는 revision 불일치면 GREEN을 발급하지 않는다.
+The final report first writes the Outcome Brief's user·success outcome·non-goals, the minimal boundary
+chosen, the change per path, the verification, and the remaining risk and reversibility. In the
+evidence appendix, record the Oracle SHA-256·source hashes·last verify command/exit, the quoted runId
+and the actual verification command/PASS·FAIL counts, and the `oracle-verify.mjs evidence` output.
+Record alongside them only the commit·runtime/browser version·locale/timezone·viewport/theme·role·clock/seed·data
+initialization that affect the result. If a non-N/A row is unmapped or the revision does not match, do not issue GREEN.
 
-production diff의 비결정 소스는 `oracle-verify.mjs scan`을 변경 파일에 실행해 확인.
-검출된 `Date.now`·`Math.random`·`crypto.randomUUID`·`toLocale`·`new Intl.`은 주입
-seam으로 바꾸거나 `oracle:nondeterminism <사유>` 주석으로 면제를 기록.
+Confirm the nondeterministic sources in the production diff by running `oracle-verify.mjs scan` on the
+changed files. Replace a detected `Date.now`·`Math.random`·`crypto.randomUUID`·`toLocale`·`new Intl.`
+with an injection seam, or record an exemption with an `oracle:nondeterminism <reason>` comment.
 
-### 최종 review 전이
+### Final review transition
 
-`IMPLEMENTED_GREEN` 뒤 reviewer finding을 반영하면 init에서 선언한 필수 label을 전부
-다시 실행한다. 선택한 test run은 GREEN 때와 같은 command여야 하며, review artifact에
-blocking finding이 없어야 한다.
+After `IMPLEMENTED_GREEN`, if reviewer findings are reflected, re-run the test run to be quoted with
+the same command used at GREEN. Quoting a pre-GREEN run as-is is `REVIEW_RERUN_REQUIRED`.
+For the remaining required labels, reuse the existing passing run if the lock·worktree·production·harness
+digests are the same as at GREEN, and if bytes changed from reflecting findings, `SNAPSHOT_STALE`
+demands a re-run — re-running the same bytes does not add evidence. The review artifact must have no
+blocking finding.
 
 ```bash
 node <skill-dir>/scripts/oracle-verify.mjs review \
@@ -197,13 +210,13 @@ node <skill-dir>/scripts/oracle-run.mjs transition \
   --findings .ai/oracles/<oracle-id>/findings-code-reviewer.json
 ```
 
-High risk는 GREEN 뒤 guard를 제거한 reported failing run과 영향받은 카드 행을
-`--mutation-run`·`--mutation-row`로 넘기고, guard 복구 뒤 같은 GREEN command를 review
-run으로 다시 통과시킨다. runner는 GREEN 대비 production digest가 mutation에서 바뀌고
-review 전에 정확히 돌아왔는지도 검사한다. 둘 중 하나가 없으면
-`MUTATION_EVIDENCE_REQUIRED`, 순서·실패·reporter·digest 조건이 어긋나면
-`MUTATION_EVIDENCE_INVALID`. 두 번째 reviewer 파일도 `--intersect`로 함께 넘긴다.
-critical/high finding은 한쪽에만 있어도 review를 막는다.
+High risk passes the reported failing run with the guard removed after GREEN and the affected card row
+via `--mutation-run`·`--mutation-row`, and after restoring the guard makes the same GREEN command pass
+again as the review run. The runner also inspects whether the production digest changed at the mutation
+relative to GREEN and returned exactly before the review. If either of the two is missing it is
+`MUTATION_EVIDENCE_REQUIRED`, and if the order·failure·reporter·digest conditions do not hold it is
+`MUTATION_EVIDENCE_INVALID`. Pass the second reviewer file together with `--intersect`.
+A critical/high finding blocks the review even if it exists on only one side.
 
 ```bash
 node <skill-dir>/scripts/oracle-run.mjs transition \
@@ -217,22 +230,22 @@ node <skill-dir>/scripts/oracle-run.mjs transition \
   --mutation-row O3
 ```
 
-## 금지
+## Forbidden
 
-[`common.md`](../common.md)의 공통 금지에 더해:
+In addition to the common prohibitions in [`common.md`](../common.md):
 
-- 카드의 정책·`Then`·`Never`·부작용 횟수 변경
-- ledger를 거치지 않은 실행을 증거로 보고
-- 거부된 전이를 우회하거나 `run-state.json`·`runs.jsonl`을 직접 편집
-- 예산을 계수하지 않고 보정·개선 라운드를 반복
-- assertion 약화, `test.skip`, `first()`/`nth()`로 오류 은폐
-- fixture에 기대 결과 인코딩
-- 임의 sleep 또는 단정 대상을 기다려 race 직렬화
-- 브라우저의 현재 동작을 기대값으로 채택
-- 유효하지 않은 RED를 근거로 production 수정
-- revision mismatch를 자동 재잠금해 기존 증거 재사용
-- 승인 없이 architecture 문서 생성·수정 또는 lock 갱신
-- 승인된 architecture 문서가 아닌 구현에 맞춰 문서·경계를 사후 변경
+- Changing the card's policy·`Then`·`Never`·side-effect count
+- Reporting a run that did not go through the ledger as evidence
+- Routing around a rejected transition or editing `run-state.json`·`runs.jsonl` directly
+- Repeating correction·improvement rounds without counting the budget
+- Hiding errors with assertion weakening, `test.skip`, or `first()`/`nth()`
+- Encoding the expected result into a fixture
+- Serializing a race with an arbitrary sleep or by waiting on the assertion target
+- Adopting the browser's current behavior as the expected value
+- Modifying production on the basis of an invalid RED
+- Auto-relocking a revision mismatch to reuse existing evidence
+- Creating·modifying an architecture document or refreshing the lock without approval
+- Retroactively changing the document·boundary to match the implementation rather than the approved architecture document
 
-3라운드 후에도 GREEN이 아니면 남은 카드 위반과 실제 출력을 포함해 `FAIL`로 보고한다.
-무한 자가개선은 하지 않는다.
+If it is still not GREEN after 3 rounds, report `FAIL` including the remaining card violations and the
+actual output. Do not do unbounded self-improvement.

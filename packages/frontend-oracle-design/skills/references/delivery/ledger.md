@@ -1,53 +1,55 @@
-# Delivery — 권위·스케줄·판정 명령 ledger
+# Delivery — authority·schedule·adjudication command ledger
 
-## 권위와 진입 조건
+## Authority and entry conditions
 
-테스트 파일을 작성하기 직전에 설치된 `$test` 스킬을 이름으로 명시적으로 로드·호출해
-SKILL.md 전문과 판정 계약을 활성화한다. 파일을 참고만 하는 것으로 대체하지 않으며,
-못 찾으면 `FAIL`. `$test`의 Oracle 게이트·테스트 작성·실행·`VALID_RED` 판정·보정
-예산을 그대로 따른다. Delivery 노드들은 production 구현과 자가피드백만 추가한다.
-frontend production 수정 시
-[`frontend/decisions.md`](../frontend/decisions.md)·[`frontend/authoring.md`](../frontend/authoring.md)도 전부 읽는다.
+Immediately before writing a test file, explicitly load and invoke the installed `$test` skill by
+name to activate the full SKILL.md text and the adjudication contract. Do not substitute merely
+referring to the file, and if it cannot be found, `FAIL`. Follow `$test`'s Oracle gate·test
+authoring·execution·`VALID_RED` verdict·correction budget exactly as they are. Delivery nodes only
+add production implementation and self-feedback. When modifying frontend production, also read all of
+[`frontend/decisions.md`](../frontend/decisions.md)·[`frontend/authoring.md`](../frontend/authoring.md).
 
-**TDD 우선.** `ORACLE_READY` 뒤 테스트 먼저 작성·실행, `VALID_RED` 확보 전 production
-작성·수정 금지.
+**TDD first.** After `ORACLE_READY`, write and run tests first; writing or modifying production
+before securing `VALID_RED` is forbidden.
 
-- Medium/High risk는 `ORACLE_READY` 카드가 필수다. Low fast path는 새 정책·카드가
-  없고 기존 승인 계약 안의 되돌리기 쉬운 수정에만 쓴다 — lane 계약은
-  [`lanes/low-fast-path.md`](../lanes/low-fast-path.md).
-- 새 카드와 의미가 바뀐 revision은 risk와 무관하게 Draft와 delta를 사용자에게 다시
-  확인받은 뒤 lock한다.
-- 대상 레포의 `AGENTS.md`, `CLAUDE.md`, 테스트 스크립트, 인접 테스트, 필수 아키텍처
-  문서를 production 수정 전에 읽는다.
-- React architecture 경계·state ownership·public API가 바뀔 때만
-  [`architecture-contract.md`](../architecture-contract.md)의 명시적 문서 승인과 Oracle
-  local-source lock을 완료한다. 기존 승인 문서가 변경을 정확히 허용하면 경로와 source
-  hash만 기록.
-- 기존 worktree 변경을 보존하고 관련 없는 파일을 수정하지 않는다.
+- Medium/High risk requires an `ORACLE_READY` card. The Low fast path is used only for easily
+  reversible changes inside an already approved contract with no new policy·card — the lane contract
+  is [`lanes/low-fast-path.md`](../lanes/low-fast-path.md).
+- A new card and a revision whose meaning changed are locked only after the Draft and delta are
+  re-confirmed with the user, regardless of risk.
+- Read the target repo's `AGENTS.md`, `CLAUDE.md`, test scripts, adjacent tests, and required
+  architecture documents before modifying production.
+- Only when the React architecture boundary·state ownership·public API changes, complete the explicit
+  document approval and the Oracle local-source lock of
+  [`architecture-contract.md`](../architecture-contract.md). If an existing approved document permits
+  the change exactly, record only the path and the source hash.
+- Preserve existing worktree changes and do not modify unrelated files.
 
-## 압축 스케줄
+## Compressed schedule
 
-`policy`, `architecture`, `evidence`, `naming`, `review` 질문을 한 intake에 묶는다.
-lock 전에는 독립적인 read-only 조사를 병렬 실행할 수 있지만, 모든 결과 변경 결정이
-끝난 뒤 final lock을 1회 만든다. Draft Oracle 사용자 승인은 직렬 gate다. screenshot·
-direct-browser 실행은 사용자가 명시적으로 요청한 별도 `$frontend-visual-qa` 소유.
+Bundle the `policy`, `architecture`, `evidence`, `naming`, `review` questions into one intake.
+Before the lock, independent read-only investigations may run in parallel, but create the final lock
+once after every outcome-changing decision is finished. Draft Oracle user approval is a serial gate.
+screenshot·direct-browser execution is owned by the separate `$frontend-visual-qa` that the user
+explicitly requested.
 
-`VALID_RED` 전에는 production을 수정하지 않는다. 이후 구현을 현재 agent가 직접
-수행할지, 위임할지, 병렬화할지는 이 계약이 강제하지 않는다. 선택한 실행 방식과
-무관하게 합친 production 기준으로 targeted GREEN을 1회 실행한다.
+Production is not modified before `VALID_RED`. This contract does not force whether the subsequent
+implementation is performed directly by the current agent, delegated, or parallelized. Regardless of
+the execution method chosen, run targeted GREEN once against the combined production.
 
-targeted GREEN 뒤에는 root test·lint·format과 독립 review를 병렬 실행한다. 각 `exec`가
-runId reservation을 원자적으로 만들어 병렬에도 runId 충돌이 없다. 모든 결과가
-합류하고 유효 finding이 반영된 뒤 final verify를 직렬 1회 실행한다. 어느 한 결과만으로
-완료 처리 금지.
+After targeted GREEN, run root test·lint·format and the independent review in parallel. Each `exec`
+creates its runId reservation atomically, so there is no runId collision even in parallel. Do not
+split these independent runs into separate turns; throw them together as parallel tool calls in one
+message. After all results have joined and valid findings are reflected, run the final verify once
+serially. Treating any single result as completion is forbidden.
 
-## 판정 명령은 ledger로 실행한다
+## Adjudication commands run through the ledger
 
-모든 판정용 실행은 bundled `oracle-run.mjs exec` 경유. `exec`는 실행 직전 lock을
-검증하고 runId·exit code·reporter 결과·env fingerprint·provenance를 append-only ledger에
-남긴다. provenance에는 skill version, optional runtime/model, lock/worktree/production
-snapshot, capability context가 들어간다. prompt 원문은 저장하지 말고 필요하면 hash나
-sanitized metadata만 `--capability-context`에 넣는다. ledger에 없는 실행은 증거가 아니다.
+Every adjudication run goes through the bundled `oracle-run.mjs exec`. `exec` verifies the lock
+immediately before running and leaves runId·exit code·reporter result·env fingerprint·provenance in an
+append-only ledger. provenance holds the skill version, optional runtime/model, lock/worktree/production
+snapshot, and capability context. Do not store the raw prompt; if needed, put only a hash or
+sanitized metadata into `--capability-context`. A run that is not in the ledger is not evidence.
 
 ```bash
 node <skill-dir>/scripts/oracle-run.mjs exec \
@@ -55,31 +57,52 @@ node <skill-dir>/scripts/oracle-run.mjs exec \
   --report <reporter-output-path> \
   --runtime codex --model '<model-or-host>' \
   --capability-context '<sanitized-json-or-hash>' \
-  -- <레포의 실제 테스트 명령>
+  -- <actual test command of the repo>
 ```
 
-- reporter 경로를 넘기면 테스트 이름·상태까지 기록되어 grade가 `reported`가 된다.
-  vitest·jest `--reporter=json --outputFile`, Playwright `--reporter=json`,
-  `node --test --test-reporter=json` 지원.
-- reporter 없거나 형식 미상이면 `exit-only`로 격하 — 카드 행의 테스트 이름을 증거로
-  확정할 수 없으므로 가능하면 reporter를 붙인다.
-- node:test 레포는 번들 `scripts/oracle-node-reporter.mjs` 사용. `--test-reporter`는
-  module specifier라 `./` 또는 절대 경로로 넘긴다.
-- 상태 전이는 `oracle-run.mjs transition`으로만 기록. 스크립트가 TDD 순서, 행별
-  RED/GREEN evidence, `--required-label` 실행, 연속 통과 횟수, 테스트 약화, review
-  artifact와 lock을 검사하고 거부 사유를 코드로 출력한다.
-- TDD 순서 판정 기준선 = `init` 시점 worktree. 에디터 캐시·agent runtime 파일이 계속
-  바뀌는 레포는 `init` 전에 worktree를 정리하거나 `--scan-root`로 범위를 대상 package로
-  좁힌다. 무관한 변경이 `PRODUCTION_TOUCHED_BEFORE_RED`를 만들면 범위를 좁히고 다시
-  시작하며, 검사를 끄지 않는다.
-- 판정 범위: git 레포는 `git ls-files -c -o --exclude-standard`, 아니면 `node_modules`·
-  빌드 산출물 제외 목록. **gitignore된 경로는 production 변경으로 세지 않는다.** 실제
-  production인데 gitignore돼 있으면 `--scan-root`나 ignore 설정을 먼저 정리한다.
+For a run that a transition immediately follows, the `red`·`green` subcommands record the exec and the
+transition in one call — the verification is identical to the two-step path. Add only `--evidence`
+(and `--row` for RED) to the `exec` flags.
 
-## 상태 조회와 resume
+```bash
+node <skill-dir>/scripts/oracle-run.mjs red \
+  --dir .ai/oracles/<oracle-id> --label red-1 \
+  --adapter node-test --report <reporter-output-path> \
+  --evidence .ai/oracles/<oracle-id>/evidence.json --row O1 \
+  -- <actual test command of the repo>
+```
 
-재개는 새 명령으로 상태를 발명하지 않고 기존 lock·`run-state.json`·`runs.jsonl`·budget·
-evidence에서 재계산한다. 세션 시작 또는 컨텍스트 요약 뒤 먼저 실행한다.
+- Only a run that passes `--adapter node-test` together with `--report` becomes `grade: reported`.
+  This is because the Oracle directly owns and injects the reporter module and the output
+  destination, so the command being run cannot forge the result. If the user passes `--test-reporter`
+  family arguments directly, it is rejected with `ADAPTER_COMMAND_INVALID`.
+- Every other run is `exit-only`. If the vitest·jest `--reporter=json --outputFile` or
+  Playwright `--reporter=json` result is passed via `--report`, it is parsed and used for `reportError`
+  diagnostics but is not given the `reported` grade — the executed command itself can write
+  that file, so the Oracle cannot vouch for its origin.
+- An `exit-only` run passes neither the `VALID_RED` transition nor test-name-based evidence
+  verification. If a repo that has only non-node:test runners is blocked by this gate, it is
+  `ENVIRONMENT_DEFECT` rather than `HARNESS_DEFECT`, and you `FAIL` with the actual cause without
+  touching production.
+- A node:test repo uses the bundled `scripts/oracle-node-reporter.mjs`. `--test-reporter` is a
+  module specifier, so pass it as `./` or an absolute path.
+- Record state transitions only with `oracle-run.mjs transition`. The script inspects TDD ordering,
+  per-row RED/GREEN evidence, `--required-label` runs, consecutive pass counts, test weakening, the
+  review artifact, and the lock, and prints the rejection reason as a code.
+- The baseline for adjudicating TDD ordering = the worktree at `init` time. A repo where editor
+  cache·agent runtime files keep changing should clean the worktree before `init` or narrow the scope
+  to the target package with `--scan-root`. If an unrelated change produces
+  `PRODUCTION_TOUCHED_BEFORE_RED`, narrow the scope and start again; do not turn the check off.
+- Adjudication scope: a git repo uses `git ls-files -c -o --exclude-standard`, otherwise a
+  `node_modules`·build-output exclusion list. **A gitignored path is not counted as a production
+  change.** If something is real production but gitignored, clean up `--scan-root` or the ignore
+  settings first.
+
+## Status query and resume
+
+Resuming does not invent state with a new command; it recomputes from the existing
+lock·`run-state.json`·`runs.jsonl`·budget·evidence. Run it first after a session start or a context
+summary.
 
 ```bash
 node <skill-dir>/scripts/oracle-run.mjs status \
@@ -87,21 +110,22 @@ node <skill-dir>/scripts/oracle-run.mjs status \
   --json
 ```
 
-출력은 `currentState`, `currentSnapshot`, `lockStatus`, `staleOrMissingRuns`,
-`orphanedRun`, `remainingBudgets`, `blockers`, `nextLegalActions`를 담는다. stale run은
-현재 lock/worktree/production snapshot과 다른 과거 증거이며 재사용하지 않는다.
-`orphanedRun`은 `.run-ids` reservation은 있으나 ledger 완료 기록이 없는 실행이다. 같은
-runId를 손으로 재사용하지 말고 새 `exec`를 실행한다. 상태 파일 쓰기는 temp file + atomic
-rename으로만 수행하고 직접 편집하지 않는다.
+The output holds `currentState`, `currentSnapshot`, `lockStatus`, `staleOrMissingRuns`,
+`orphanedRun`, `remainingBudgets`, `blockers`, `nextLegalActions`. A stale run is past evidence that
+differs from the current lock/worktree/production snapshot and is not reused. `orphanedRun` is a run
+that has a `.run-ids` reservation but no ledger completion record. Do not reuse the same runId by
+hand; run a new `exec`. State file writes are performed only with temp file + atomic rename and are
+never edited directly.
 
-### 이 하네스가 판정하지 못하는 것
+### What this harness cannot adjudicate
 
-- `evidence verify`는 인용 테스트 이름이 그 run에서 **실제로 통과했는지**만 본다.
-  행↔테스트 대응의 타당성은 독립 reviewer 체크리스트 담당.
-- `run-state.json`·`runs.jsonl`을 지울 수 있는 actor는 기준선·예산을 재시작할 수 있다.
-  `init`의 거부는 drift 검출이지 권한 통제가 아니다. High risk만 `.ai/oracles/**`, lock
-  SHA, run IDs를 CI artifact와 CODEOWNERS·required review로 보호한다. Low/Medium에는
-  기본 강제하지 않는다.
-- 비결정 소스 scan은 알려진 토큰 목록 기반 — 검출 실패를 무결성 증거로 쓰지 않는다.
-- 예산 사용마다 `oracle-run.mjs budget --spend policy|harness|product --reason ...` 호출.
-  `BUDGET_EXHAUSTED`면 다른 예산으로 우회하지 않고 `FAIL`로 보고.
+- `evidence verify` only looks at whether the quoted test name **actually passed** in that run.
+  The validity of the row↔test correspondence is the independent reviewer checklist's responsibility.
+- An actor that can delete `run-state.json`·`runs.jsonl` can restart the baseline·budget.
+  `init`'s rejection is drift detection, not permission control. Only High risk protects
+  `.ai/oracles/**`, the lock SHA, and run IDs with CI artifacts and CODEOWNERS·required review. This
+  is not enforced by default for Low/Medium.
+- The nondeterministic source scan is based on a known token list — do not use a detection failure as
+  evidence of integrity.
+- Call `oracle-run.mjs budget --spend policy|harness|product --reason ...` on every budget use.
+  If `BUDGET_EXHAUSTED`, do not route around it with another budget; report `FAIL`.

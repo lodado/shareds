@@ -59,45 +59,84 @@ view가 소유합니다.
 
 <!-- WORKFLOW_DOCS:END (generated; do not edit) -->
 
+<!-- REFERENCE_DOCS:START (generated; do not edit) -->
+
 ## Reference 로딩 그래프
 
 계약 문서는 한 번에 다 읽지 않습니다.
 [`reference-graph.json`](references/reference-graph.json)이 진입 risk로 lane을 고르고,
-`when` 조건이 충족된 노드의 전문과 그 `requires` 엣지만 로드합니다.
+`when` 조건이 충족된 노드의 전문과 그 `requires` 엣지만 로드합니다. 아래 도식은 그
+파일에서 생성되므로 노드나 `requires`가 바뀌면 함께 갱신됩니다.
 
 ```mermaid
 flowchart LR
   START(["요청"]) --> RISK{"risk 판정"}
-  RISK -->|"Low"| LFP["low-fast-path<br/><i>exclusive · 이 노드만</i>"]
-  LFP -.->|"정책 질문 · 새 계약 · architecture 결정 발생"| COMMON
-  RISK -->|"Medium · High · 명시적 Oracle 요청"| COMMON["common"]
+  RISK -->|"risk=Low"| low_fast_path["low-fast-path<br/><i>exclusive · 이 노드만</i>"]
+  low_fast_path -.->|"정책 질문·새 계약·architecture 결정 발생 시 즉시 실격 — oracle lane으로 승격"| common
+  RISK -->|"그 외"| common["common"]
 
-  COMMON --> CPS["card-policy-sources"] --> CRG["card-risk-grill"]
-  COMMON --> BVA["bva"] --> CF["card-format"]
-  COMMON --> CCL["card-confirmation-lock"]
-  COMMON --> DL["delivery-ledger"]
-  DL --> DR["delivery-red"]
-  BVA --> DR
-  DL --> DGR["delivery-green-review"]
-  COMMON --> CH["changeability"]
-  COMMON --> FD["frontend-decisions"] --> FA["frontend-authoring"]
-  FQ["frontend-quality"] --> DGR
-  CH --> DID["delivery-implementation-decision"]
-  FA --> DID
-  COMMON --> SR2["subagent-review"] --> TRC["types-review-criteria"]
-  CH --> SR2
-  COMMON --> TSL["types-state-ladder"] --> TA["types-authoring"] --> TAS["types-api-surface"] --> TAC["types-advanced-contracts<br/><i>witness-gated adoption</i>"]
-  COMMON --> AC["architecture-contract"]
-  COMMON --> VD["visual-design"]
-  IND["fsd · backend · performance · type-environment<br/><i>독립 노드 — 조건 충족 시에만</i>"]
-  GO["graph-orchestration"] --> OWG["oracle-workflow.graph.json"]
+  card_policy_sources["card-policy-sources"]
+  card_risk_grill["card-risk-grill"]
+  card_format["card-format"]
+  card_confirmation_lock["card-confirmation-lock"]
+  visual_design["visual-design"]
+  delivery_ledger["delivery-ledger"]
+  delivery_red["delivery-red"]
+  delivery_implementation_decision["delivery-implementation-decision"]
+  delivery_green_review["delivery-green-review"]
+  frontend_decisions["frontend-decisions"]
+  frontend_authoring["frontend-authoring"]
+  frontend_quality["frontend-quality"]
+  architecture_contract["architecture-contract"]
+  types_state_ladder["types-state-ladder"]
+  types_authoring["types-authoring"]
+  types_api_surface["types-api-surface"]
+  types_advanced_contracts["types-advanced-contracts"]
+  types_review_criteria["types-review-criteria"]
+  subagent_review["subagent-review"]
+  review_checklist["review-checklist"]
+  graph_orchestration["graph-orchestration"]
+  oracle_workflow_graph["oracle-workflow-graph"]
+
+  common --> card_policy_sources
+  common --> card_risk_grill
+  card_policy_sources --> card_risk_grill
+  common --> card_format
+  bva --> card_format
+  common --> card_confirmation_lock
+  common --> visual_design
+  common --> delivery_ledger
+  delivery_ledger --> delivery_red
+  bva --> delivery_red
+  changeability --> delivery_implementation_decision
+  frontend_authoring --> delivery_implementation_decision
+  delivery_ledger --> delivery_green_review
+  frontend_quality --> delivery_green_review
+  common --> changeability
+  common --> frontend_decisions
+  frontend_decisions --> frontend_authoring
+  common --> architecture_contract
+  common --> types_state_ladder
+  frontend_decisions --> types_state_ladder
+  types_state_ladder --> types_authoring
+  types_state_ladder --> types_api_surface
+  types_authoring --> types_api_surface
+  types_api_surface --> types_advanced_contracts
+  subagent_review --> types_review_criteria
+  common --> subagent_review
+  changeability --> subagent_review
+  subagent_review --> review_checklist
+  oracle_workflow_graph --> graph_orchestration
+  IND["type-environment · fsd · backend · performance<br/><i>독립 노드 — 조건 충족 시에만</i>"]
 ```
 
 화살표는 실행 순서가 아니라 **선행 조건**입니다. `card-format`을 읽으려면 `common`과
 `bva`를 이미 읽었어야 한다는 뜻입니다.
 
+<!-- REFERENCE_DOCS:END (generated; do not edit) -->
+
 `types-advanced-contracts`는
-`타입 작업 시 state-ladder와 함께 항상 — 로드는 무조건, 채택은 compiler witness packet gate`
+`always with state-ladder during type work — loading unconditional, adoption via compiler witness packet gate`
 조건으로 로드하고 `types-api-surface`를 선행 조건으로 둡니다. 읽기는 타입 작업마다
 무조건이지만, 고급 타입의 **채택**은 문서 안의 선택 gate와 compiler witness packet을
 통과할 때만 합니다.

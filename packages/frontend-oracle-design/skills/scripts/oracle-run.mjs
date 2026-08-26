@@ -7,6 +7,7 @@ import { devNull } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { forbiddenArgument, isTrustedAdapter, TRUSTED_ADAPTER_NAMES, trustedAdapter } from './oracle-adapters.mjs'
 import {
   assertSnapshotUnchanged,
   sha256 as fsSha256,
@@ -20,7 +21,11 @@ import {
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const lockScript = join(scriptDirectory, 'oracle-lock.mjs')
 const verifyScript = join(scriptDirectory, 'oracle-verify.mjs')
-const changeabilityReviewPoint = resolve(scriptDirectory, '../references/changeability.md')
+// reference-graph.json이 `항상`으로 선언한 리뷰 포인트 — packet에 빠지면 reviewer가 판정 기준 없이 읽는다.
+const canonicalReviewPoints = [
+  { name: 'review-checklist.md', path: resolve(scriptDirectory, '../references/review-checklist.md') },
+  { name: 'changeability.md', path: resolve(scriptDirectory, '../references/changeability.md') },
+]
 
 const FLAG_NAMES = [
   'dir',
@@ -388,7 +393,13 @@ function isDigest(value) {
 }
 
 function assertLedgerSchema(entry) {
-  if (!entry || entry.schemaVersion !== 3 || !isDigest(entry.digest) || !isDigest(entry.previousDigest) || typeof entry.type !== 'string') {
+  if (
+    !entry ||
+    entry.schemaVersion !== 3 ||
+    !isDigest(entry.digest) ||
+    !isDigest(entry.previousDigest) ||
+    typeof entry.type !== 'string'
+  ) {
     throw new Error('invalid schema-v3 ledger record')
   }
   const strings = (fields) => fields.every((field) => typeof entry[field] === 'string' && entry[field])
@@ -423,19 +434,25 @@ function assertLedgerSchema(entry) {
     ) {
       invalid.push('command')
     }
-    if (![null, 'node-test'].includes(entry.adapter)) invalid.push('adapter')
+    if (entry.adapter !== null && !isTrustedAdapter(entry.adapter)) invalid.push('adapter')
     if (!['reported', 'exit-only'].includes(entry.grade)) invalid.push('grade')
     if (entry.exitCode !== null && !Number.isInteger(entry.exitCode)) invalid.push('exitCode')
     if (entry.signal !== null && typeof entry.signal !== 'string') invalid.push('signal')
     if (!validTests) invalid.push('tests')
-    if (entry.grade === 'reported' && (entry.adapter !== 'node-test' || !Array.isArray(entry.tests))) {
+    if (entry.grade === 'reported' && (!isTrustedAdapter(entry.adapter) || !Array.isArray(entry.tests))) {
       invalid.push('reported')
     }
     if (invalid.length > 0) throw new Error(`invalid run event ${entry.runId ?? '<unknown>'}: ${invalid.join(',')}`)
   } else if (entry.type === 'budget') {
-    if (!strings(['budget', 'reason', 'changeDigest', 'at']) || !isDigest(entry.changeDigest) || !Number.isInteger(entry.spent)) throw new Error('invalid budget event')
+    if (
+      !strings(['budget', 'reason', 'changeDigest', 'at']) ||
+      !isDigest(entry.changeDigest) ||
+      !Number.isInteger(entry.spent)
+    )
+      throw new Error('invalid budget event')
   } else if (entry.type === 'transition') {
-    if (!strings(['state', 'at']) || !entry.stateDelta || typeof entry.stateDelta !== 'object') throw new Error('invalid transition event')
+    if (!strings(['state', 'at']) || !entry.stateDelta || typeof entry.stateDelta !== 'object')
+      throw new Error('invalid transition event')
   } else if (entry.type === 'review-receipt') {
     if (
       !strings(['receiptId', 'role', 'reviewerId', 'taskId', 'at']) ||
@@ -447,7 +464,8 @@ function assertLedgerSchema(entry) {
       throw new Error('invalid review receipt event')
     }
   } else if (entry.type === 'checkpoint') {
-    if (!isDigest(entry.prefixSha256) || entry.previousDigest !== ZERO_DIGEST || !strings(['at'])) throw new Error('invalid checkpoint event')
+    if (!isDigest(entry.prefixSha256) || entry.previousDigest !== ZERO_DIGEST || !strings(['at']))
+      throw new Error('invalid checkpoint event')
   } else {
     throw new Error('unknown ledger event type')
   }
@@ -489,10 +507,16 @@ async function readLedger(directory) {
     })
     const raw = ledger.bytes.toString('utf8')
     if (raw !== '' && !raw.endsWith('\n')) throw new Error('truncated JSONL record')
-    const entries = raw === '' ? [] : raw.slice(0, -1).split('\n').map((line) => {
-      if (!line) throw new Error('blank JSONL record')
-      return JSON.parse(line)
-    })
+    const entries =
+      raw === ''
+        ? []
+        : raw
+            .slice(0, -1)
+            .split('\n')
+            .map((line) => {
+              if (!line) throw new Error('blank JSONL record')
+              return JSON.parse(line)
+            })
     const runIds = new Set()
     const receiptIds = new Set()
     const checkpointIndex = entries.findIndex((entry) => entry?.schemaVersion === 3 && entry.type === 'checkpoint')
@@ -558,16 +582,19 @@ async function migrateLedger(options) {
       fail: (message) => new CliError('LEDGER_INVALID', message),
     })
     const raw = source.bytes.toString('utf8')
-    if (!raw || !raw.endsWith('\n')) throw new CliError('LEDGER_MIGRATION_INVALID', 'legacy ledger must be complete JSONL')
+    if (!raw || !raw.endsWith('\n'))
+      throw new CliError('LEDGER_MIGRATION_INVALID', 'legacy ledger must be complete JSONL')
     const lines = raw.slice(0, -1).split('\n')
-    if (lines.some((line) => !line)) throw new CliError('LEDGER_MIGRATION_INVALID', 'legacy ledger contains blank records')
+    if (lines.some((line) => !line))
+      throw new CliError('LEDGER_MIGRATION_INVALID', 'legacy ledger contains blank records')
     try {
       lines.forEach((line) => JSON.parse(line))
     } catch (error) {
       throw new CliError('LEDGER_MIGRATION_INVALID', `legacy ledger is malformed: ${error.message}`)
     }
     const state = await readState(directory)
-    if (state.schemaVersion !== 2) throw new CliError('LEDGER_MIGRATION_INVALID', 'only active schema-v2 state may migrate')
+    if (state.schemaVersion !== 2)
+      throw new CliError('LEDGER_MIGRATION_INVALID', 'only active schema-v2 state may migrate')
     const checkpoint = {
       schemaVersion: 3,
       type: 'checkpoint',
@@ -600,9 +627,7 @@ function replayState(state, ledger) {
       const recorded = (state.history ?? []).some(
         (history) =>
           history.ledgerDigest === entry.digest ||
-          (history.state === entry.state &&
-            history.runId === (entry.evidenceRunId ?? null) &&
-            history.at === entry.at),
+          (history.state === entry.state && history.runId === (entry.evidenceRunId ?? null) && history.at === entry.at),
       )
       if (recorded) continue
       if (!entry.stateDelta || typeof entry.stateDelta !== 'object') {
@@ -702,9 +727,7 @@ function verifyLock(directory, state) {
     throw new CliError(code.trim(), message.join(': ').trim() || 'oracle-lock verify failed')
   }
 
-  const receipt = verified.stdout.trim().match(
-    /^ORACLE_VERIFIED sha256:([a-f0-9]{64}) manifest-sha256:([a-f0-9]{64})$/,
-  )
+  const receipt = verified.stdout.trim().match(/^ORACLE_VERIFIED sha256:([a-f0-9]{64}) manifest-sha256:([a-f0-9]{64})$/)
   if (!receipt) throw new CliError('LOCK_INVALID', 'oracle-lock verify returned an invalid receipt')
   if (receipt[2] !== manifestSha256) {
     throw new CliError('LOCK_MANIFEST_CHANGED', 'Verified manifest bytes do not match the runner snapshot')
@@ -786,7 +809,12 @@ async function findProjectFile(start, names) {
 async function provenance(options, state, revision, worktree) {
   const scanRoot = resolve(options.dir, state.scanRoot)
   const git = gitProvenance(scanRoot)
-  const lockfilePath = await findProjectFile(scanRoot, ['pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'bun.lockb'])
+  const lockfilePath = await findProjectFile(scanRoot, [
+    'pnpm-lock.yaml',
+    'package-lock.json',
+    'yarn.lock',
+    'bun.lockb',
+  ])
   const packagePath = await findProjectFile(scanRoot, ['package.json'])
   let declaredPackageManager = null
   if (packagePath) {
@@ -957,7 +985,9 @@ function hasParsedTests(run) {
 }
 
 function reportGrade(adapter, report) {
-  if (adapter !== 'node-test') return 'exit-only'
+  // 신뢰 등급은 오라클이 리포터와 목적지를 소유한 실행에만 준다. 파싱된 JSON은
+  // 진단 재료일 뿐 출처 보증이 아니다 — 실행된 명령 자신이 그 파일을 쓸 수 있다.
+  if (!isTrustedAdapter(adapter)) return 'exit-only'
   if (!hasParsedTests(report)) return 'exit-only'
   return 'reported'
 }
@@ -1192,30 +1222,23 @@ async function execute(options) {
   if (!options.dir || !options.label || !options.command?.length) {
     throw new CliError('USAGE', 'exec requires --dir, --label and -- <command>', 2)
   }
+  const wrapperStartedAt = Date.now() // oracle:nondeterminism wrapper 소요 시간 계측
 
   const directory = resolve(options.dir)
   const state = await readConsistentState(directory)
   const revision = verifyLock(directory, state)
   await assertReportPathAllowed(directory, state, options.report)
-  if (options.adapter && options.adapter !== 'node-test') {
-    throw new CliError('ADAPTER_INVALID', '--adapter must be node-test')
+  if (options.adapter && !isTrustedAdapter(options.adapter)) {
+    throw new CliError('ADAPTER_INVALID', `--adapter must be one of ${TRUSTED_ADAPTER_NAMES.join(', ')}`)
   }
-  if (options.adapter === 'node-test') {
-    if (!options.report) throw new CliError('REPORT_REQUIRED', 'node-test adapter requires --report')
-    if (options.command[0] !== process.execPath || !options.command.includes('--test')) {
-      throw new CliError('ADAPTER_COMMAND_INVALID', 'node-test adapter requires node --test')
+  const adapter = trustedAdapter(options.adapter)
+  if (adapter) {
+    if (!options.report) throw new CliError('REPORT_REQUIRED', `${options.adapter} adapter requires --report`)
+    if (!adapter.matches(options.command, { execPath: process.execPath })) {
+      throw new CliError('ADAPTER_COMMAND_INVALID', adapter.expectation)
     }
-    if (
-      options.command.some(
-        (argument) =>
-          argument === '--eval' ||
-          argument === '-e' ||
-          argument.startsWith('--eval=') ||
-          argument.startsWith('--test-reporter') ||
-          argument.startsWith('--test-reporter-destination'),
-      )
-    ) {
-      throw new CliError('ADAPTER_COMMAND_INVALID', 'node-test adapter owns reporter and destination options')
+    if (forbiddenArgument(adapter, options.command)) {
+      throw new CliError('ADAPTER_COMMAND_INVALID', `${options.adapter} adapter owns reporter and destination options`)
     }
   }
   const reportBefore = await reportSignature(options.report)
@@ -1223,8 +1246,8 @@ async function execute(options) {
     throw new CliError('REPORT_PATH_EXISTS', 'trusted adapter reports must use a new destination')
   }
   const runId = await reserveRunId(directory, options.label)
-  if (options.adapter === 'node-test' && reportBefore) {
-    throw new CliError('REPORT_PATH_PROTECTED', 'node-test adapter requires a new final report path')
+  if (adapter && reportBefore) {
+    throw new CliError('REPORT_PATH_PROTECTED', `${options.adapter} adapter requires a new final report path`)
   }
   const protectedBefore = await Promise.all(
     [statePath(directory), resolve(directory, state.lock), evidencePathFor(directory, state)].map((path) =>
@@ -1233,20 +1256,26 @@ async function execute(options) {
   )
   let command = options.command
   let adapterDestination = null
-  if (options.adapter === 'node-test') {
+  let adapterEnv = null
+  if (adapter) {
     const reportDirectory = join(directory, '.runner-reports')
     await mkdir(reportDirectory, { recursive: true })
-    adapterDestination = join(reportDirectory, `${runId}.ndjson`)
+    adapterDestination = join(reportDirectory, `${runId}.${adapter.extension}`)
+    // 배타 생성. 이미 있으면 실패한다 — 목적지는 오라클만 만든다.
     await writeFile(adapterDestination, '', { flag: 'wx' })
-    const testIndex = options.command.indexOf('--test')
-    command = [
-      ...options.command.slice(0, testIndex + 1),
-      `--test-reporter=${join(scriptDirectory, 'oracle-node-reporter.mjs')}`,
-      `--test-reporter-destination=${adapterDestination}`,
-      ...options.command.slice(testIndex + 1),
-    ]
+    const built = adapter.build(options.command, {
+      reporter: join(scriptDirectory, adapter.reporter),
+      destination: adapterDestination,
+    })
+    command = built.command
+    adapterEnv = built.env
   }
-  const executed = spawnSync(command[0], command.slice(1), { stdio: 'inherit' })
+  const commandStartedAt = Date.now() // oracle:nondeterminism 명령 소요 시간 계측
+  const executed = spawnSync(command[0], command.slice(1), {
+    stdio: 'inherit',
+    ...(adapterEnv ? { env: { ...process.env, ...adapterEnv } } : {}),
+  })
+  const commandMs = Date.now() - commandStartedAt // oracle:nondeterminism 명령 소요 시간 계측
 
   if (executed.error) {
     throw new CliError('COMMAND_UNRUNNABLE', `Cannot run command: ${executed.error.message}`)
@@ -1255,7 +1284,8 @@ async function execute(options) {
   if (adapterDestination && executed.status !== null) await rename(adapterDestination, resolve(options.report))
   const report = await readReport(options.report, reportBefore, executed.status !== null && !executed.signal)
   for (let index = 0; index < protectedBefore.length; index += 1) {
-    if (protectedBefore[index]) await assertSnapshotUnchanged(protectedBefore[index].snapshot, { label: 'Oracle artifact' })
+    if (protectedBefore[index])
+      await assertSnapshotUnchanged(protectedBefore[index].snapshot, { label: 'Oracle artifact' })
   }
   const scanRoot = resolve(directory, state.scanRoot)
   const worktree = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
@@ -1279,6 +1309,8 @@ async function execute(options) {
     productionSha256: productionSha256(worktree, state.harnessPaths),
     harnessSha256: selectedDigests(worktree, state.harnessPaths ?? []),
     provenance: await provenance(options, state, revision, worktree),
+    commandMs,
+    wrapperMs: Date.now() - wrapperStartedAt - commandMs, // oracle:nondeterminism wrapper 소요 시간 계측
     at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
   }
 
@@ -1290,7 +1322,16 @@ async function execute(options) {
   if (report.fatalCode && (executed.status === 0 || report.fatalCode !== 'REPORT_NONPASSING')) {
     throw new CliError(report.fatalCode, report.error)
   }
-  process.stdout.write(`RUN_RECORDED ${runId} exit:${record.exitCode} grade:${record.grade}\n`)
+  process.stdout.write(
+    `RUN_RECORDED ${runId} exit:${record.exitCode} grade:${record.grade} commandMs:${record.commandMs} wrapperMs:${record.wrapperMs}\n`,
+  )
+  return runId
+}
+
+// red/green은 exec와 상태 전이를 한 CLI 호출로 묶는다 — 게이트·검증은 그대로다.
+async function executeThenTransition(options, to) {
+  const runId = await execute(options)
+  await transition({ ...options, to, run: runId })
 }
 
 function findRun(ledger, runId) {
@@ -1391,27 +1432,16 @@ function assertRunFresh(record, currentWorktree, currentProduction, currentHarne
   }
 }
 
-function assertRequiredRuns(
-  state,
-  ledger,
-  started,
-  currentWorktree = null,
-  currentProduction = null,
-  currentHarness = null,
-  currentLockManifest,
-) {
+// 재사용 판정은 시간이 아니라 bytes다 — lock/worktree/production/harness digest가 모두 현재와 같으면
+// 그 label을 다시 돌려도 같은 결과다. 전이 이후 재실행 요구는 변경된 bytes에 대해서만 의미가 있고,
+// 그 경우는 아래 assertRunFresh가 SNAPSHOT_STALE로 잡는다.
+function assertRequiredRuns(state, ledger, currentWorktree, currentProduction, currentHarness, currentLockManifest) {
   for (const label of state.requiredLabels ?? []) {
     const grade = label.endsWith(':exit') ? 'exit-only' : 'reported'
-    const latest = ledger
-      .slice(started)
-      .filter((entry) => entry.label === label)
-      .at(-1)
+    const latest = ledger.filter((entry) => entry.label === label).at(-1)
 
     if (!latest) {
-      throw new CliError(
-        'REQUIRED_RUN_MISSING',
-        `required label "${label}" has no run after the previous state transition`,
-      )
+      throw new CliError('REQUIRED_RUN_MISSING', `required label "${label}" has no recorded run`)
     }
     const valid =
       latest.exitCode === 0 &&
@@ -1420,11 +1450,10 @@ function assertRequiredRuns(
     if (!valid) {
       throw new CliError(
         'REQUIRED_LABEL_GRADE',
-        `required label "${label}" needs a passing run after the previous state transition`,
+        `required label "${label}" needs a passing run for the current snapshot`,
       )
     }
-    if (currentWorktree)
-      assertRunFresh(latest, currentWorktree, currentProduction, currentHarness, currentLockManifest, 'SNAPSHOT_STALE')
+    assertRunFresh(latest, currentWorktree, currentProduction, currentHarness, currentLockManifest, 'SNAPSHOT_STALE')
   }
 }
 
@@ -1499,7 +1528,11 @@ async function transition(options) {
 async function reviewReceipt(options) {
   const required = ['dir', 'packet', 'revision', 'findings', 'role', 'reviewer', 'taskId']
   if (required.some((name) => !options[name])) {
-    throw new CliError('USAGE', 'review-receipt requires --dir --packet --revision --findings --role --reviewer --task-id', 2)
+    throw new CliError(
+      'USAGE',
+      'review-receipt requires --dir --packet --revision --findings --role --reviewer --task-id',
+      2,
+    )
   }
   const directory = resolve(options.dir)
   await withDirectoryLock(directory, 'state', async () => {
@@ -1514,10 +1547,7 @@ async function reviewReceipt(options) {
       fail: (message) => new CliError('REVIEW_PACKET_INVALID', message),
     })
     const packetDocument = JSON.parse(packet.bytes.toString('utf8'))
-    if (
-      packetDocument?.schemaVersion !== 2 ||
-      packetDocument?.targetSnapshot?.worktreeSha256 !== options.revision
-    ) {
+    if (packetDocument?.schemaVersion !== 2 || packetDocument?.targetSnapshot?.worktreeSha256 !== options.revision) {
       throw new CliError('REVIEW_REVISION_MISMATCH', 'review receipt revision must match canonical schema-v2 packet')
     }
     const findingsPath = resolve(options.findings)
@@ -1528,15 +1558,29 @@ async function reviewReceipt(options) {
       fail: (message) => new CliError('FINDINGS_INVALID', message),
     })
     const document = JSON.parse(findings.bytes.toString('utf8'))
-    if (document?.schemaVersion !== 2 || document.reviewerRole !== options.role || document.reviewerId !== options.reviewer) {
+    if (
+      document?.schemaVersion !== 2 ||
+      document.reviewerRole !== options.role ||
+      document.reviewerId !== options.reviewer
+    ) {
       throw new CliError('FINDINGS_INVALID', 'findings reviewer identity must match the receipt')
     }
-    if (document.orchestrationReceipt) throw new CliError('REVIEW_RECEIPT_EXISTS', 'findings already has an orchestration receipt')
+    if (document.orchestrationReceipt)
+      throw new CliError('REVIEW_RECEIPT_EXISTS', 'findings already has an orchestration receipt')
     document.packetSha256 = packet.sha256
     document.targetRevision = options.revision
     const output = { ...document }
     const outputSha256 = sha256(stableStringify(output))
-    const receiptId = sha256(stableStringify({ packetSha256: packet.sha256, revision: options.revision, role: options.role, reviewerId: options.reviewer, taskId: options.taskId, outputSha256 }))
+    const receiptId = sha256(
+      stableStringify({
+        packetSha256: packet.sha256,
+        revision: options.revision,
+        role: options.role,
+        reviewerId: options.reviewer,
+        taskId: options.taskId,
+        outputSha256,
+      }),
+    )
     document.orchestrationReceipt = {
       receiptId,
       packetSha256: packet.sha256,
@@ -1693,7 +1737,11 @@ async function transitionUnderLock(options, directory) {
     state.harnessBudgetAtValidRed = state.budgets.harness.spent
     state.testBindings = {
       evidenceSha256: await testEvidenceDigest(options.evidence),
-      tests: Object.fromEntries(Object.keys(current).filter(isTestPath).map((path) => [path, current[path]])),
+      tests: Object.fromEntries(
+        Object.keys(current)
+          .filter(isTestPath)
+          .map((path) => [path, current[path]]),
+      ),
     }
   }
 
@@ -1725,7 +1773,11 @@ async function transitionUnderLock(options, directory) {
     await assertTestsNotWeakened(state, scanRoot)
     if (state.testBindings) {
       const currentEvidenceSha256 = await testEvidenceDigest(options.evidence)
-      const currentTests = Object.fromEntries(Object.keys(current).filter(isTestPath).map((path) => [path, current[path]]))
+      const currentTests = Object.fromEntries(
+        Object.keys(current)
+          .filter(isTestPath)
+          .map((path) => [path, current[path]]),
+      )
       if (
         currentEvidenceSha256 !== state.testBindings.evidenceSha256 ||
         !sameDigests(currentTests, state.testBindings.tests)
@@ -1733,7 +1785,10 @@ async function transitionUnderLock(options, directory) {
         if (state.budgets.harness.spent <= (state.harnessBudgetAtValidRed ?? 0)) {
           throw new CliError('HARNESS_BUDGET_REQUIRED', 'evidence mapping or test bytes changed after VALID_RED')
         }
-        throw new CliError('EVIDENCE_STALE', 'evidence mapping or test bytes changed after VALID_RED; record a fresh RED')
+        throw new CliError(
+          'EVIDENCE_STALE',
+          'evidence mapping or test bytes changed after VALID_RED; record a fresh RED',
+        )
       }
     }
 
@@ -1754,15 +1809,7 @@ async function transitionUnderLock(options, directory) {
       const redIndex = harnessRedIndex(state, ledger, started, run, currentHarness)
       if (redIndex !== null) started = redIndex + 1
     }
-    assertRequiredRuns(
-      state,
-      ledger,
-      started,
-      currentWorktree,
-      currentProduction,
-      currentHarness,
-      revision.lockManifestSha256,
-    )
+    assertRequiredRuns(state, ledger, currentWorktree, currentProduction, currentHarness, revision.lockManifestSha256)
     assertConsecutivePasses(state, ledger, run, started, currentWorktree, revision.lockManifestSha256)
     const evidenceResult = runVerifier([
       'evidence',
@@ -1828,15 +1875,15 @@ async function transitionUnderLock(options, directory) {
       revision.lockManifestSha256,
       'REVIEW_RUN_STALE',
     )
-    assertRequiredRuns(
-      state,
-      ledger,
-      greenEntry.runCount,
-      currentWorktree,
-      currentProduction,
-      currentHarness,
-      revision.lockManifestSha256,
-    )
+    // 리뷰가 코드를 바꿨으면 digest가 갈려 나머지 label도 재실행된다. 바꾸지 않았어도 인용 run만은
+    // GREEN 이후 실제 재실행이어야 REVIEW_VERIFIED가 리뷰한 상태를 한 번은 직접 검증한다.
+    if (ledger.findIndex((entry) => entry.runId === run.runId) < greenEntry.runCount) {
+      throw new CliError(
+        'REVIEW_RERUN_REQUIRED',
+        `${run.runId} predates IMPLEMENTED_GREEN — rerun the card test command after review`,
+      )
+    }
+    assertRequiredRuns(state, ledger, currentWorktree, currentProduction, currentHarness, revision.lockManifestSha256)
     const greenRun = findRun(ledger, greenEntry.runId)
     assertSameCommand(greenRun, run)
     implementationRevision = greenRun.worktreeSha256
@@ -2176,7 +2223,12 @@ async function collectEvidenceArtifacts(directory, evidenceSnapshot, snapshots) 
         throw new CliError('REVIEW_PACKET_INPUT_INVALID', `${row} nested evidence artifact has no path`)
       }
       const nestedPath = resolve(dirname(receiptSnapshot.path), artifact.path)
-      const nestedSnapshot = await snapshotPacketFile(nestedPath, directory, `${row} nested evidence artifact`, snapshots)
+      const nestedSnapshot = await snapshotPacketFile(
+        nestedPath,
+        directory,
+        `${row} nested evidence artifact`,
+        snapshots,
+      )
       if (artifact.sha256 !== nestedSnapshot.sha256) {
         throw new CliError('REVIEW_PACKET_INPUT_INVALID', `${row} nested evidence artifact digest does not match`)
       }
@@ -2317,9 +2369,13 @@ async function reviewPacket(options) {
   if (options.reviewPoints.length === 0) {
     throw new CliError('REVIEW_POINTS_REQUIRED', 'review-packet requires at least one --review-point')
   }
-  const canonicalChangeability = await realpath(changeabilityReviewPoint).catch((error) => {
-    throw new CliError('REVIEW_POINTS_REQUIRED', `Cannot resolve canonical changeability review point: ${error.message}`)
-  })
+  const canonical = new Map()
+  for (const { name, path } of canonicalReviewPoints) {
+    const real = await realpath(path).catch((error) => {
+      throw new CliError('REVIEW_POINTS_REQUIRED', `Cannot resolve canonical ${name} review point: ${error.message}`)
+    })
+    canonical.set(real, name)
+  }
   for (const point of options.reviewPoints) {
     const pointPath = resolve(point)
     let metadata
@@ -2338,12 +2394,7 @@ async function reviewPacket(options) {
       throw new CliError('REVIEW_POINT_INVALID', '--review-point must be a regular file')
     }
 
-    const pointSnapshot = await snapshotPacketFile(
-      pointPath,
-      null,
-      `review point ${point}`,
-      inputSnapshots,
-    )
+    const pointSnapshot = await snapshotPacketFile(pointPath, null, `review point ${point}`, inputSnapshots)
     const content = pointSnapshot.bytes.toString('utf8')
     if (!content.trim()) {
       throw new CliError('REVIEW_POINT_INVALID', '--review-point cannot be empty')
@@ -2351,12 +2402,14 @@ async function reviewPacket(options) {
     // 링크만 전달한다 — reviewer가 경로의 파일을 직접 전부 읽고, digest로 어떤
     // revision의 기준을 읽었는지 고정한다. 본문을 packet에 복제하지 않는다.
     reviewPoints.push({
-      path: pointReal === canonicalChangeability ? 'changeability.md' : portablePath(directory, pointPath),
+      path: canonical.get(pointReal) ?? portablePath(directory, pointPath),
       sha256: sha256(content),
     })
   }
-  if (!seenReviewPoints.has(canonicalChangeability)) {
-    throw new CliError('REVIEW_POINTS_REQUIRED', 'review-packet requires the canonical changeability.md review point')
+  for (const [real, name] of canonical) {
+    if (!seenReviewPoints.has(real)) {
+      throw new CliError('REVIEW_POINTS_REQUIRED', `review-packet requires the canonical ${name} review point`)
+    }
   }
 
   const state = packetState
@@ -2659,10 +2712,17 @@ async function main() {
   else if (command === 'review-receipt') await reviewReceipt(options)
   else if (command === 'status') await reportStatus(options)
   else if (command === 'exec') await execute(options)
+  else if (command === 'red') await executeThenTransition(options, 'VALID_RED')
+  else if (command === 'green') await executeThenTransition(options, 'IMPLEMENTED_GREEN')
   else if (command === 'transition') await transition(options)
   else if (command === 'budget') await spendBudget(options)
   else if (command === 'review-packet') await reviewPacket(options)
-  else throw new CliError('USAGE', 'Expected init, migrate-ledger, exec, transition, review-receipt, budget, status or review-packet', 2)
+  else
+    throw new CliError(
+      'USAGE',
+      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, budget, status or review-packet',
+      2,
+    )
 }
 
 try {

@@ -1,93 +1,99 @@
-# Oracle Card — 외부 기준과 정책 출처
+# Oracle Card — external standards and policy sources
 
-## 외부 기준 게이트
+## External standard gate
 
-Risk·Grill 전에 사용자가 제공했거나 레포가 승인된 기준으로 지정한 자료를 찾아 전부
-읽는다. 우선순위와 관할 규칙은 [`common.md`](../common.md)의 권위 우선순위를 따른다 —
-production 코드·기존 테스트·브라우저 관찰은 조사 증거일 뿐 정책 출처가 아니다.
+Before Risk·Grill, find and read in full every material the user provided or the repo designated as
+an approved standard. Priority and jurisdiction rules follow the authority priority in
+[`common.md`](../common.md) — production code·existing tests·browser observation are investigation
+evidence only, not policy sources.
 
-카드 상단에 이번 변경의 제품 결과와 범위를 기록한다. KPI가 없으면 수치를 발명하지
-않고 사용자가 관찰할 수 있는 성공 결과를 쓴다.
+Record this change's product outcome and scope at the top of the card. If there is no KPI, write a
+success outcome the user can observe instead of inventing numbers.
 
 ```markdown
 ## Outcome Brief
 
-- Actor and context: 누가 어떤 상황에서 사용하는가
-- Observable success: 관찰 가능한 성공 결과
-- Non-goals: 이번 변경에서 하지 않을 일
-- Worst regression: false GREEN의 가장 큰 피해
-- Reversibility: 되돌리는 방법 또는 N/A 사유
+- Actor and context: who uses it in what situation
+- Observable success: the observable success outcome
+- Non-goals: what this change will not do
+- Worst regression: the worst damage from a false GREEN
+- Reversibility: how to revert, or the N/A reason
 - Sources: S1, S2
 ```
 
-### Requested mechanism check — 수단과 결과 분리
+### Requested mechanism check — separating mechanism from outcome
 
-사용자가 구체적 수단(화면·필드·버튼·자동화·조건)을 요청했지만 의도한 결과나
-사용자가 불명확하면 Outcome Brief에 다음을 함께 기록한다. 수단과 결과가 이미
-일치하면 이 소절 없이 그대로 진행한다.
+When the user requested a concrete mechanism (screen·field·button·automation·condition) but the
+intended outcome or the user is unclear, record the following in the Outcome Brief as well. When
+mechanism and outcome already match, proceed without this subsection.
 
-- Requested mechanism: 사용자가 요청한 구체적 수단
-- Intended outcome: 실제로 해결하려는 사용자·비즈니스 문제
-- Smallest reversible scope: 그 결과를 확인할 수 있는 최소 가역 범위
-- Deferred scope: 검증 전에는 만들지 않을 범위 — Non-goals에 사유와 함께 기록
+- Requested mechanism: the concrete mechanism the user requested
+- Intended outcome: the user·business problem actually being solved
+- Smallest reversible scope: the smallest reversible scope that can confirm that outcome
+- Deferred scope: scope that will not be built before verification — record it in Non-goals with the
+  reason
 
-규칙:
+Rules:
 
-- 더 작은 대안은 Draft Oracle에 제시만 한다. scope 축소는 사용자의 명시적
-  승인으로만 확정하며 에이전트가 임의로 줄이지 않는다.
-- 이 검토를 `mandatory-constraint`(보안·개인정보·법·접근성·데이터 정합성) 생략
-  근거로 쓰지 않는다.
+- Smaller alternatives are only presented in the Draft Oracle. Scope reduction is finalized only by
+  the user's explicit approval, and the agent never shrinks it at will.
+- Do not use this review as grounds for skipping a `mandatory-constraint`
+  (security·privacy·legal·accessibility·data integrity).
 
 ## Source Registry
 
 ```markdown
 ## Source Registry
 
-| ID  | Kind                 | 관할                     | 기준          | 위치·version                      | 승인 상태 |
-| --- | -------------------- | ------------------------ | ------------- | --------------------------------- | --------- |
-| S1  | product-policy       | 비즈니스 결과            | PRD           | repo:docs/profile.md#save-flow-v3 | approved  |
-| S2  | product-policy       | UI·문구·interaction      | Figma         | file/page/frame/version           | approved  |
-| S3  | project-constraint   | payload·오류·idempotency | API 계약      | endpoint/version                  | approved  |
-| S4  | mandatory-constraint | 접근성·토큰              | 디자인 시스템 | 문서 위치/version                 | approved  |
+| ID  | Kind                 | Jurisdiction              | Standard      | Location·version                  | Approval status |
+| --- | -------------------- | ------------------------- | ------------- | --------------------------------- | --------------- |
+| S1  | product-policy       | Business outcome          | PRD           | repo:docs/profile.md#save-flow-v3 | approved        |
+| S2  | product-policy       | UI·copy·interaction       | Figma         | file/page/frame/version           | approved        |
+| S3  | project-constraint   | payload·error·idempotency | API contract  | endpoint/version                  | approved        |
+| S4  | mandatory-constraint | accessibility·tokens      | Design system | doc location/version              | approved        |
 ```
 
-허용 `Kind` 4종:
+The four allowed `Kind` values:
 
-- `product-policy`: 사용자 답변과 승인된 PRD·Figma처럼 제품 결과를 정하는 자료
-- `mandatory-constraint`: 보안·개인정보·법·접근성·데이터 정합성처럼 제품 선호로 낮출
-  수 없는 제약
-- `project-constraint`: 저장소의 공개 API·architecture·테스트·호환성 계약
-- `implementation-reference`: 실제 설치 버전의 공식 문서·구현 휴리스틱. 제품 결과를
-  정하지 못한다.
+- `product-policy`: material that decides product outcomes, such as user answers and approved
+  PRD·Figma
+- `mandatory-constraint`: constraints that a product preference cannot lower, such as
+  security·privacy·legal·accessibility·data integrity
+- `project-constraint`: the repository's public API·architecture·test·compatibility contracts
+- `implementation-reference`: official docs·implementation heuristics for the actually installed
+  version. It cannot decide product outcomes.
 
-규칙:
+Rules:
 
-- Source ID는 카드 안에서 unique해야 한다. 정책·Outcome Brief·`O*`/`D*` 행이 인용하는
-  `S*`는 반드시 이 표에 존재해야 한다.
-- repo 안의 승인 문서·architecture·API 계약은 `위치·version`을 `repo:<상대경로>#<anchor-or-version>`으로
-  기록한다. `repo:` source는 `oracle-lock.mjs create --source <상대경로>`에도 포함되어야
-  하며, lock manifest에 없으면 lock 금지.
-- Figma는 원본 파일의 정확한 page·frame·variant를 직접 확인. 열 수 없으면 기억·유사
-  스크린샷으로 대체하지 않는다.
-- 외부 기준이 없으면 `N/A — 제공되거나 승인된 외부 기준 없음` 기록.
-- 외부 기준끼리 또는 사용자 답변과 충돌, 필수 기준 접근 불가 → 충돌 위치·영향 정책
-  제시 후 `NEEDS_DECISION`.
-- 카드는 외부 기준의 실행 가능한 번역이다. 작성 후 외부 기준의 상태·문구·interaction·
-  부작용 요구가 누락·왜곡되지 않았는지 대조한다.
-- 기준은 자신의 관할 안에서만 우선한다([`common.md`](../common.md) 관할 규칙).
-  `mandatory-constraint` 충돌 처리도 같은 문서를 따른다.
-- 기준의 revision/version이 바뀌면 기존 `ORACLE_READY`를 무효화하고 다시 대조.
+- A Source ID must be unique within the card. Every `S*` cited by a policy·Outcome Brief·`O*`/`D*`
+  row must exist in this table.
+- For approved documents·architecture·API contracts inside the repo, record `Location·version` as
+  `repo:<relative-path>#<anchor-or-version>`. A `repo:` source must also be included in
+  `oracle-lock.mjs create --source <relative-path>`, and locking is forbidden when it is missing
+  from the lock manifest.
+- For Figma, directly confirm the exact page·frame·variant in the original file. When it cannot be
+  opened, do not substitute memory·similar screenshots.
+- When there is no external standard, record `N/A — no provided or approved external standard`.
+- A conflict between external standards or with a user answer, or an inaccessible required standard
+  → present the conflict location·affected policy, then `NEEDS_DECISION`.
+- The card is an executable translation of the external standard. After writing it, cross-check that
+  the external standard's state·copy·interaction·side-effect requirements were not
+  omitted·distorted.
+- A standard takes precedence only within its own jurisdiction ([`common.md`](../common.md)
+  jurisdiction rules). `mandatory-constraint` conflict handling also follows the same document.
+- When a standard's revision/version changes, invalidate the existing `ORACLE_READY` and cross-check
+  again.
 
-## 정책 출처
+## Policy sources
 
-인정·불인정 목록은 [`common.md`](../common.md)의 정책 출처 절이 canonical이다.
-결정된 정책마다 출처를 붙인다 — 출처 없는 정책이 하나라도 있으면 `ORACLE_READY`가
-아니다. 출처는 등록된 `S*` 또는 `User Confirmation`이어야 하고, 승인되지 않은 source나
-`implementation-reference` 단독 source는 정책 권위가 아니다.
+The accepted·not-accepted list is canonical in the policy sources section of
+[`common.md`](../common.md). Attach a source to every decided policy — if even one policy lacks a
+source, it is not `ORACLE_READY`. The source must be a registered `S*` or `User Confirmation`, and
+an unapproved source or an `implementation-reference` alone is not policy authority.
 
 ```markdown
-### 결정된 정책
+### Decided policies
 
-- P1: 저장 중 추가 제출은 무시한다. (출처: 유저 Q1=A) (행: O1, O2)
-- P2: 5xx 실패 시 입력을 유지한다. (출처: S1) (행: O3)
+- P1: Additional submits during save are ignored. (source: user Q1=A) (rows: O1, O2)
+- P2: On a 5xx failure the input is preserved. (source: S1) (rows: O3)
 ```

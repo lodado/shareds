@@ -20,7 +20,7 @@
     { "id": "oracle", "when": "명시적 Oracle 요청 또는 Medium/High", "entry": "common" }
   ],
   "reviewPoints": [
-    { "when": "항상", "nodes": ["changeability"] },
+    { "when": "항상", "nodes": ["review-checklist", "changeability"] },
     { "when": "frontend production 변경", "nodes": ["frontend-decisions", "frontend-authoring"] },
     { "when": "타입·상태 계약 생성·변경", "nodes": ["types-review-criteria"] },
     { "when": "FSD 레포", "nodes": ["fsd"] },
@@ -152,7 +152,7 @@
     {
       "id": "types-advanced-contracts",
       "path": "references/types/advanced-contracts.md",
-      "when": "타입 작업 시 state-ladder와 함께 항상 — 로드는 무조건, 채택은 compiler witness packet gate",
+      "when": "always with state-ladder during type work — loading unconditional, adoption via compiler witness packet gate",
       "requires": ["types-api-surface"]
     },
     {
@@ -190,6 +190,12 @@
       "path": "references/subagent-review.md",
       "when": "구현·테스트 검증 후 독립 리뷰",
       "requires": ["common", "changeability"]
+    },
+    {
+      "id": "review-checklist",
+      "path": "references/review-checklist.md",
+      "when": "reviewer가 판정할 때 — primary agent는 로드하지 않고 --review-point로 등록만 한다",
+      "requires": ["subagent-review"]
     },
     {
       "id": "graph-orchestration",

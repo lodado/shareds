@@ -4,9 +4,12 @@ import { fileURLToPath } from 'node:url'
 
 export const generatedBlockStart = '<!-- WORKFLOW_DOCS:START (generated; do not edit) -->'
 export const generatedBlockEnd = '<!-- WORKFLOW_DOCS:END (generated; do not edit) -->'
+export const referenceBlockStart = '<!-- REFERENCE_DOCS:START (generated; do not edit) -->'
+export const referenceBlockEnd = '<!-- REFERENCE_DOCS:END (generated; do not edit) -->'
 
 const scriptDirectory = new URL('.', import.meta.url)
 const defaultGraphPath = fileURLToPath(new URL('../references/oracle-workflow.graph.json', scriptDirectory))
+const defaultReferenceGraphPath = fileURLToPath(new URL('../references/reference-graph.json', scriptDirectory))
 const defaultReadmePath = fileURLToPath(new URL('../README.md', scriptDirectory))
 
 function graphCounts(graph) {
@@ -65,18 +68,90 @@ view가 소유합니다.
 ${generatedBlockEnd}`
 }
 
-export function replaceGeneratedBlock(readme, generatedBlock) {
-  const start = readme.indexOf(generatedBlockStart)
-  const end = readme.indexOf(generatedBlockEnd)
+function mermaidId(nodeId) {
+  return nodeId.replaceAll('-', '_')
+}
+
+export function renderReferenceBlock(referenceGraph) {
+  if (!Array.isArray(referenceGraph.nodes) || !Array.isArray(referenceGraph.lanes)) {
+    throw new TypeError('Reference graph must define nodes and lanes arrays.')
+  }
+
+  const lowLane = referenceGraph.lanes.find((lane) => lane.exclusive)
+  if (!lowLane) {
+    throw new TypeError('Reference graph must declare an exclusive low-risk lane.')
+  }
+
+  const entry = referenceGraph.entry
+  const laneNodes = new Set(lowLane.nodes)
+  const routed = new Set([...laneNodes, entry])
+  const edges = []
+
+  for (const node of referenceGraph.nodes) {
+    for (const dependency of node.requires) {
+      edges.push(`  ${mermaidId(dependency)} --> ${mermaidId(node.id)}`)
+      routed.add(node.id)
+      routed.add(dependency)
+    }
+  }
+
+  const independent = referenceGraph.nodes.filter((node) => !routed.has(node.id)).map((node) => node.id)
+  const independentLine =
+    independent.length > 0 ? `\n  IND["${independent.join(' · ')}<br/><i>독립 노드 — 조건 충족 시에만</i>"]` : ''
+
+  // 라벨은 mermaid id와 파일 id가 다른 노드에만 필요하다 — lane·entry 노드는 위에서 이미 선언했다.
+  const labels = referenceGraph.nodes
+    .filter((node) => routed.has(node.id) && node.id !== entry && !laneNodes.has(node.id))
+    .filter((node) => mermaidId(node.id) !== node.id)
+    .map((node) => `  ${mermaidId(node.id)}["${node.id}"]`)
+
+  return `${referenceBlockStart}
+
+## Reference 로딩 그래프
+
+계약 문서는 한 번에 다 읽지 않습니다.
+[\`reference-graph.json\`](references/reference-graph.json)이 진입 risk로 lane을 고르고,
+\`when\` 조건이 충족된 노드의 전문과 그 \`requires\` 엣지만 로드합니다. 아래 도식은 그
+파일에서 생성되므로 노드나 \`requires\`가 바뀌면 함께 갱신됩니다.
+
+\`\`\`mermaid
+flowchart LR
+  START(["요청"]) --> RISK{"risk 판정"}
+  RISK -->|"${lowLane.when}"| ${mermaidId(lowLane.nodes[0])}["${lowLane.nodes[0]}<br/><i>exclusive · 이 노드만</i>"]
+  ${mermaidId(lowLane.nodes[0])} -.->|"${lowLane.escalation}"| ${mermaidId(entry)}
+  RISK -->|"그 외"| ${mermaidId(entry)}["${entry}"]
+
+${labels.join('\n')}
+
+${edges.join('\n')}${independentLine}
+\`\`\`
+
+화살표는 실행 순서가 아니라 **선행 조건**입니다. \`card-format\`을 읽으려면 \`common\`과
+\`bva\`를 이미 읽었어야 한다는 뜻입니다.
+
+${referenceBlockEnd}`
+}
+
+function replaceBlock(readme, block, startMarker, endMarker, label) {
+  const start = readme.indexOf(startMarker)
+  const end = readme.indexOf(endMarker)
 
   if (start === -1 && end === -1) {
-    throw new Error('README is missing the workflow docs generated block markers.')
+    throw new Error(`README is missing the ${label} generated block markers.`)
   }
   if (start === -1 || end === -1 || end < start) {
-    throw new Error('README has malformed workflow docs generated block markers.')
+    throw new Error(`README has malformed ${label} generated block markers.`)
   }
 
-  return `${readme.slice(0, start)}${generatedBlock}${readme.slice(end + generatedBlockEnd.length)}`
+  return `${readme.slice(0, start)}${block}${readme.slice(end + endMarker.length)}`
+}
+
+export function replaceGeneratedBlock(readme, generatedBlock) {
+  return replaceBlock(readme, generatedBlock, generatedBlockStart, generatedBlockEnd, 'workflow docs')
+}
+
+export function replaceReferenceBlock(readme, referenceBlock) {
+  return replaceBlock(readme, referenceBlock, referenceBlockStart, referenceBlockEnd, 'reference docs')
 }
 
 export function isGeneratedBlockCurrent(readme, graph) {
@@ -86,12 +161,17 @@ export function isGeneratedBlockCurrent(readme, graph) {
 
 export async function updateWorkflowDocs({
   graphPath = defaultGraphPath,
+  referenceGraphPath = defaultReferenceGraphPath,
   readmePath = defaultReadmePath,
   check = false,
 } = {}) {
-  const [graphSource, readme] = await Promise.all([readFile(graphPath, 'utf8'), readFile(readmePath, 'utf8')])
-  const generatedBlock = renderGeneratedBlock(JSON.parse(graphSource))
-  const updatedReadme = replaceGeneratedBlock(readme, generatedBlock)
+  const [graphSource, referenceGraphSource, readme] = await Promise.all([
+    readFile(graphPath, 'utf8'),
+    readFile(referenceGraphPath, 'utf8'),
+    readFile(readmePath, 'utf8'),
+  ])
+  const withWorkflow = replaceGeneratedBlock(readme, renderGeneratedBlock(JSON.parse(graphSource)))
+  const updatedReadme = replaceReferenceBlock(withWorkflow, renderReferenceBlock(JSON.parse(referenceGraphSource)))
 
   if (check) {
     return updatedReadme === readme

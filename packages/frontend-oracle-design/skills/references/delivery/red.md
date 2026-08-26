@@ -1,25 +1,25 @@
-# Delivery — 테스트로 계약 상태 확인 (`VALID_RED`)
+# Delivery — confirm the contract state with tests (`VALID_RED`)
 
-1. bundled `oracle-lock.mjs verify` 실행, revision·exit code 기록. `exec`·`transition`은
-   매 호출 같은 검증 자동 수행.
-2. 카드의 모든 비-N/A 행을 관찰 가능한 테스트로 번역하고 test name을 `evidence.json`
-   해당 행에 먼저 매핑.
-3. network 경계는 레포가 이미 쓰는 test boundary를 우선한다. MSW가 설치됐거나 도입이
-   승인됐으면 MSW handler, 아니면 기존 transport seam. 테스트만 위해
-   dependency를 조용히 추가하지 않는다. handler·예시 데이터는 경계를 소유한 가장
-   가까운 곳, FSD 배치는 [`fsd.md`](../fsd.md)의 `__mocks__/` 규칙.
-4. 각 행의 `Then`, `Never`, 부작용 종류·횟수를 함께 assert. 요청 횟수·순서는 handler에서
-   관찰.
-5. 테스트를 `exec`로 실제 실행.
-6. 실패가 `$test`의 `VALID_RED` 술어를 만족하면 `oracle-verify.mjs red`로 지정 행의
-   reported test 실패를 확인. 그 runId·행으로 전이를 기록하고, 전이 통과 뒤에만
-   production 수정.
+1. Run the bundled `oracle-lock.mjs verify` and record the revision·exit code. `exec`·`transition`
+   automatically perform the same verification on every call.
+2. Translate every non-N/A row of the card into an observable test and first map the test name onto
+   the corresponding row of `evidence.json`.
+3. For the network boundary, prefer the test boundary the repo already uses. If MSW is installed or
+   its adoption is approved, use an MSW handler; otherwise use the existing transport seam. Do not
+   quietly add a dependency just for tests. Handlers·example data belong in the closest place that
+   owns the boundary, and FSD placement follows the `__mocks__/` rule of [`fsd.md`](../fsd.md).
+4. Assert each row's `Then`, `Never`, and side-effect kind·count together. Observe request
+   count·order in the handler.
+5. Actually run the tests with `exec`.
+6. If the failure satisfies `$test`'s `VALID_RED` predicate, confirm the reported test failure of the
+   designated row with `oracle-verify.mjs red`. Record the transition with that runId·row, and modify
+   production only after the transition passes.
 
-카드가 커서 init에 milestone을 선언했다면 각 묶음 작성 즉시 `red:<name>` label로
-reported RED를 실행한다. 모든 묶음이 실제로 실패한 후 마지막 milestone run을 `--run`으로
-인용해 전역 `VALID_RED`로 전이한다. 하나라도 없으면 `MILESTONE_RED_MISSING`이며 독립
-lock·상태를 만들지 않는다. milestone은 초기 RED 피드백만 앞당기고 GREEN·review는 기존
-전역 gate 그대로.
+If the card is large and milestones were declared at init, run a reported RED with the `red:<name>`
+label immediately after writing each bundle. After every bundle has actually failed, quote the last
+milestone run with `--run` and transition to the global `VALID_RED`. If even one is missing it is
+`MILESTONE_RED_MISSING`, and no independent lock·state is created. A milestone only pulls initial RED
+feedback earlier; GREEN·review stay on the existing global gates.
 
 ```bash
 node <skill-dir>/scripts/oracle-run.mjs exec \
@@ -47,18 +47,22 @@ node <skill-dir>/scripts/oracle-run.mjs transition \
   --row O1
 ```
 
-`RED_EVIDENCE_UNVERIFIABLE`·`RED_EVIDENCE_MISSING`은 무관한 compile/setup 실패나
-exit-only run을 RED로 쓰지 못하게 한다. `PRODUCTION_TOUCHED_BEFORE_RED`는 테스트보다
-production을 먼저 건드렸다는 기계 증거 — 변경 파일을 되돌려 순서를 지키고 우회하지
-않는다. 전이는 이 시점의 테스트 파일 digest·assertion 수를 GREEN 게이트 기준선으로
-저장한다.
+If there is no other work between the run and the transition, `oracle-run.mjs red` records the exec·verify·transition
+above in one call with the same verification — see [`ledger.md`](ledger.md) for the flag format.
 
-`--harness-path` 등록 파일은 해당 bytes로 reported RED를 기록하기 전까지 변경 가능.
-`VALID_RED` 후 다시 바꾸면 harness 예산 미사용 시 `HARNESS_BUDGET_REQUIRED`, 변경된
-bytes로 새 reported RED→GREEN 미실행 시 `HARNESS_RED_REQUIRED`로 완료 차단. production
-파일을 harness로 등록해 순서 게이트를 우회하지 않는다.
+`RED_EVIDENCE_UNVERIFIABLE`·`RED_EVIDENCE_MISSING` prevent an unrelated compile/setup failure or an
+exit-only run from being used as RED. `PRODUCTION_TOUCHED_BEFORE_RED` is machine evidence that
+production was touched before the tests — revert the changed files to keep the order and do not route
+around it. The transition stores the test file digest·assertion count at this point as the GREEN gate
+baseline.
 
-요청된 동작이 이미 GREEN이면 production을 억지로 바꾸거나 RED를 만들지 않는다. 기존
-구현이 카드를 충족한다는 증거를 기록하고 `--to IMPLEMENTED_GREEN --reason ...`으로
-전이한다. 이 경로는 `ORACLE_READY` 이후 production 변경이 없을 때만 통과. High risk는
-`$test`의 mutation 단계로 테스트 민감도를 별도 확인.
+A file registered with `--harness-path` can be changed until a reported RED is recorded with those
+bytes. If it is changed again after `VALID_RED`, completion is blocked with `HARNESS_BUDGET_REQUIRED`
+when the harness budget is unused, and with `HARNESS_RED_REQUIRED` when a new reported RED→GREEN with
+the changed bytes has not been run. Do not register a production file as a harness to route around the
+ordering gate.
+
+If the requested behavior is already GREEN, do not force a production change or manufacture a RED.
+Record the evidence that the existing implementation satisfies the card and transition with
+`--to IMPLEMENTED_GREEN --reason ...`. This path passes only when there has been no production change
+since `ORACLE_READY`. High risk separately confirms test sensitivity with `$test`'s mutation stage.
