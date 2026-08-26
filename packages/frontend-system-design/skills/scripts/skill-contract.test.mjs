@@ -223,8 +223,8 @@ test('the Oracle remains the orchestrator when it loads system-design references
   )
 
   assert.match(oracleSkill, /frontend-system-design/)
-  assert.match(oracleSkill, /정책 후보/)
-  assert.match(oracleSkill, /제어권|오케스트레이션/)
+  assert.match(oracleSkill, /policy candidate/)
+  assert.match(oracleSkill, /Oracle\s+intake and control|Oracle's orchestration/)
   assert.doesNotMatch(oracleSkill, /기본 추천과 다를 항목만/)
 })
 
