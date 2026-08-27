@@ -7,10 +7,12 @@ by the user.
 
 1. Investigate the external standards and the existing revision without modifying production.
 2. Write the **Draft Oracle**, the semantic delta, and the open questions.
-3. Show the full card and the delta to the user and re-confirm.
-4. On approval, change `User Confirmation` to `approved` and record the actual response location.
-5. On a modification request, fix the Draft and re-confirm.
-6. On no response·policy conflict, `NEEDS_DECISION`.
+3. Run the cold-read gate in [`card-format.md`](card-format.md) — a context-free read, the four
+   questions, the single root and its first nail — and repair the Draft before showing it.
+4. Show the full card and the delta to the user and re-confirm.
+5. On approval, change `User Confirmation` to `approved` and record the actual response location.
+6. On a modification request, fix the Draft and re-confirm.
+7. On no response·policy conflict, `NEEDS_DECISION`.
 
 Do not create a new card for implementation·test corrections inside the scope of an existing locked
 Oracle. However, when the meaning of any one of `Then`·`Never`·side effects·BVA·Design
@@ -20,8 +22,8 @@ user confirmation.
 
 ## Deterministic revision lock
 
-After self-review, save the exact bytes of the user-confirmed card to a file and lock it with the
-bundled script. Work with no new policy·card, such as the Low fast path, does not enter this
+After the cold-read gate, save the exact bytes of the user-confirmed card to a file and lock it with
+the bundled script. Work with no new policy·card, such as the Low fast path, does not enter this
 procedure.
 
 When a revision locked as Design-only is later extended to Delivery and a new local source such as
@@ -45,7 +47,7 @@ When the target repo has not decided the agent artifact location:
 
 Before the lock, machine-check the structural minimum with `oracle-verify.mjs card`. The lint is
 only a token·table structure check, not a semantic approval — semantic review is owned by the
-adversarial self-review in [`card-format.md`](card-format.md).
+cold-read gate in [`card-format.md`](card-format.md).
 
 ```bash
 node <skill-dir>/scripts/oracle-verify.mjs card \
@@ -91,7 +93,7 @@ node <skill-dir>/scripts/oracle-lock.mjs verify \
   change diff and the current card, and return to `NEEDS_DECISION`.
 - `LOCK_INVALID`·a missing tool·an unrunnable command is a determinism judgment failure → `FAIL`.
 - Automatic regeneration to clear a mismatch is forbidden. Re-locking happens only after going
-  through the source gate, the Draft delta, user re-confirmation, and self-review again.
+  through the source gate, the Draft delta, user re-confirmation, and the cold-read gate again.
 - When the card was skipped as Low risk, leave the lock N/A reason. At Medium/High, when the
   filesystem·Node is unavailable, both Design-only and Delivery report `FAIL` instead of
   substituting LLM judgment.
@@ -153,7 +155,8 @@ node <skill-dir>/scripts/oracle-run.mjs init \
 - For `identity-shaping`, confirmation was obtained with a proposal that completed two design passes
 - The `Never` and side-effect counts of every row are complete
 - The seven auto-added TCs are added, or an N/A reason is given
-- The adversarial self-review passed
+- The cold-read gate passed — the context-free read, the four questions, and a first nail that was
+  actually driven
 - The `oracle-verify.mjs card` lint and the revision lock verification pass
 
 ### `NEEDS_DECISION`

@@ -38,7 +38,9 @@ lane procedure.
 
 During Low work, a policy question, a visual identity change, an architecture/public API decision,
 or a new state transition disqualifies Low immediately: read `common` and escalate to the Oracle
-lane.
+lane. When only part of the request disqualifies, escalate that part alone under the carve-out
+conditions in [`lanes/low-fast-path.md`](lanes/low-fast-path.md) and record the descope; a
+remainder that shares state, a side effect, or a type with the carved scope is never split.
 
 ## Jurisdiction rules
 

@@ -25,6 +25,37 @@ AI가 구현을 시작하기 전에 **무엇이 정답인지 먼저 잠그는** 
 기본값은 카드 설계에서 멈추는 Design-only입니다. 구현까지 필요하면 Delivery를
 명시하세요. 그래프 오케스트레이션도 명시적으로 요청할 때만 로드합니다.
 
+## 증거
+
+이 스킬은 "장부에 없는 실행은 증거가 아니다"를 사용자에게 요구합니다. 같은 기준을
+스킬 자신에게 적용한 결과입니다.
+
+**Setup.** 번들된 grader에 여섯 가지 결과 아티팩트를 넣고 실제로 돌립니다. 재현
+명령은 아래 그대로입니다.
+
+```bash
+npm test                                            # 문서 규범과 실제 파일의 결합 검사
+node skills/evals/grade-results.mjs <results.json>  # 10-case 코퍼스 전량 채점
+```
+
+**Result.** 2026-08-27 로컬 실행.
+
+| 입력                               | authority                   | 판정                           | exit |
+| ---------------------------------- | --------------------------- | ------------------------------ | ---- |
+| 10개 케이스 전량·기대와 일치       | `AUTHORITATIVE_FULL_CORPUS` | 10/10 pass, routingAccuracy 1  | 0    |
+| 1개 케이스만, 플래그 없음          | 동일                        | 나머지 9개 `MISSING_CASE`      | 1    |
+| 1개 케이스만, `--allow-partial`    | `NON_AUTHORITATIVE_PARTIAL` | `authoritative: false`         | 1    |
+| 빈 배열                            | 동일                        | `EMPTY_RESULTS`                | 1    |
+| 빈 파일                            | 없음                        | `BLANK_JSONL`                  | 2    |
+| 10개 중 1개가 REVIEW_VERIFIED 자칭 | `AUTHORITATIVE_FULL_CORPUS` | 9/10, `falseReviewVerified: 1` | 1    |
+
+**So.** 부분 실행은 스스로를 authoritative라고 부를 수 없고, 빈 결과는 통과가 아니라
+실패이며, 자칭 REVIEW_VERIFIED는 집계에 그대로 드러납니다.
+
+**증명하지 않은 것.** 위 여섯 줄은 grader 게이트를 검증한 것이지 **실제 모델 실행
+결과가 아닙니다.** 라이브 10-case 실행 기록은 아직 이 저장소에 없으므로,
+routingAccuracy를 스킬의 성능 수치로 인용하지 마세요.
+
 <!-- WORKFLOW_DOCS:START (generated; do not edit) -->
 
 ## 워크플로우 그래프
@@ -181,6 +212,26 @@ node skills/evals/grade-results.mjs --allow-partial <results.json|results.jsonl>
 guidance, 충돌 규칙을 삭제·통합합니다. High risk에만 `.ai/oracles/**`, lock SHA, run IDs를
 CI artifact와 CODEOWNERS/required review로 보호합니다. Low/Medium에는 기본 강제하지
 않습니다.
+
+## 이웃 스킬과의 결합
+
+Oracle은 테스트·스크린샷·구현 옵션을 직접 소유하지 않고 이웃 스킬에 위임합니다. 위임
+강도는 셋으로 나뉘며 **의도적으로 다릅니다** — 아래 표가 그 지도입니다. 한쪽을 고치면
+반대쪽도 함께 확인하세요.
+
+| 이웃 스킬                  | 결합 강도              | 규칙                                                                           |
+| -------------------------- | ---------------------- | ------------------------------------------------------------------------------ |
+| `$test`                    | hard — 없으면 `FAIL`   | 테스트 파일 작성 직전 이름으로 호출. 호출 불가면 Oracle이 판정을 포기합니다.   |
+| `$frontend-visual-qa`      | explicit-only          | 사용자가 명시 요청할 때만. Oracle은 별도 브라우저 완료 상태를 만들지 않습니다. |
+| `$agent-graph-engineering` | explicit-only          | 그래프 오케스트레이션을 명시 요청할 때만 로드합니다.                           |
+| `$frontend-system-design`  | graceful — 없으면 진행 | 설치되어 있으면 reference만 읽고, intake와 통제는 Oracle이 유지합니다.         |
+
+`$test`만 hard인 이유는 테스트 판정 소유권이 의도된 신뢰 경계이기 때문입니다. Oracle이
+자기 테스트를 스스로 쓰고 스스로 통과 판정하면 증거가 순환합니다.
+
+`references/bva.md`는 `packages/test`와 **바이트 단위로 동일한 사본**입니다. 두 스킬이
+같은 경계값 축을 쓰지 않으면 계약과 테스트가 조용히 갈라지므로 사본을 없애지 말고
+동기화 상태로 두며, `skill-contract.test.mjs`가 동일성을 검사합니다.
 
 ## 설치
 

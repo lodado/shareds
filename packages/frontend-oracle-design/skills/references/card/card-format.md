@@ -1,4 +1,4 @@
-# Oracle Card — card format and self-review
+# Oracle Card — card format and the cold-read gate
 
 ## Card format
 
@@ -92,7 +92,28 @@ cites a real `O*` row, the lock is blocked with `CARD_LINT_FAILED`.
 - This section is included in the card bytes and locked along with them. Translation into a
   discriminated union is owned by [`types/state-ladder.md`](../types/state-ladder.md).
 
-## Adversarial self-review
+## Cold-read gate — adversarial self-review
+
+The Draft passes three checks before it is shown to the user: a context-free read, four questions
+per row, and one synthesis. All three run on the Draft. After the lock, a repair is a new revision,
+not a re-review, so this gate is the last cheap place to find a defect.
+
+### 1. Cold read — a reader who was not in the conversation
+
+The author cannot un-see the conversation and is therefore the worst judge of whether the card
+stands on its own. Hand the card to an independent reviewer surface that has no session context.
+
+- Pass **the card bytes only.** No repo path, no conversation, no rationale, no intended reading,
+  no statement of what the card is supposed to mean. The Draft text is the entire input.
+- Ask for three things: what this card contracts, in the reviewer's own words; every place the
+  reviewer had to guess in order to answer; every `Then`·`Never`·side-effect count it could satisfy
+  in a way the author plainly did not intend.
+- A forced guess is a card defect, not a reader failure — repair the row instead of explaining it.
+- Role routing follows [`subagent-review.md`](../subagent-review.md). When no independent surface is
+  available, record that in `journal.md` and run the four questions alone. A same-context read is
+  the fallback, never the target.
+
+### 2. Four questions — per row
 
 Apply four questions to each row and reinforce the row when a counterexample appears.
 
@@ -103,6 +124,18 @@ Apply four questions to each row and reinforce the row when a counterexample app
 
 Example: "button disabled while saving" alone does not catch two POSTs before disabled is applied.
 Write both `POST×1 (total)` and "no second POST" on the same row.
+
+### 3. Single root — synthesis, not a list
+
+A finding list postpones the decision. Collapse the cold read and the four questions into one
+answer, and record it in `journal.md`.
+
+- **Root**: the one assumption this card carries that, if false, makes the remaining rows moot.
+- **First nail**: the cheapest observation that would falsify the root — an existing test, one repo
+  read, one question to the user — chosen because it costs less than the delivery it pre-empts.
+
+Drive the first nail before confirmation. If it lands, the root is a `POLICY_GAP`: the card goes to
+`NEEDS_DECISION` with that question, not to the lock.
 
 When there is a Design Intent, also perform the genericity·restraint critique from
 [`visual-design.md`](../visual-design.md). Do not downgrade a sourced aesthetic requirement to

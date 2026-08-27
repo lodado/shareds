@@ -332,8 +332,11 @@ test('O26: backs reported verification with a run ledger, machine transitions an
   assert.match(skill, /recorded only via `scripts\/oracle-run\.mjs transition`/)
   assert.match(skill, /counted by `oracle-run\.mjs budget`/)
   assert.match(skill, /checked against actual run results with `scripts\/oracle-verify\.mjs evidence`/)
-  assert.match(skill, /runs: cited ledger runIds/)
-  assert.match(skill, /State machine: recorded transitions and last state/)
+  // 인용은 Verification 그룹이 단독 소유한다 — 별도 runs 필드는 같은 runId를 두 번 적게 만들었다
+  assert.match(skill, /- <label> <runId> exit <n> <grade>/)
+  assert.match(skill, /Cite each runId once/)
+  assert.match(skill, /- Transitions <\.\.\.> — last state <\.\.\.>/)
+  assert.match(skill, /- Budgets policy <n>\/2 · harness <n>\/2 · product <n>\/3 · ENV_DRIFT <presence>/)
 })
 
 test('O27: lints the card structure and initializes run artifacts around the lock', async () => {
@@ -505,11 +508,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.30.0')
+  assert.equal(version, '0.32.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.30.0')
+  assert.equal(marketplace.version, '0.32.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -897,8 +900,33 @@ test('O7: 조건부 품질 계약과 human-first 보고를 안내한다', async 
   assert.match(implementationLoop, /Performance: claim/)
   assert.match(architecture, /## Exported Public API contract — conditional/)
   assert.match(review, /mandatory constraint/)
-  assert.match(skill, /Outcome: Actor\/context/)
-  assert.match(skill, /Evidence appendix:/)
+  assert.match(skill, /\*\*Outcome\*\* actor\/context/)
+  assert.match(skill, /\*\*Evidence appendix\*\*/)
+})
+
+test('reports the state and its blocker first, and drops groups instead of padding them with N/A', async () => {
+  const skill = await read('SKILL.md')
+  const report = skill.slice(skill.indexOf('## Final report'))
+
+  // 읽는 사람이 행동할 근거가 첫 두 줄에 온다
+  assert.match(report, /\*\*Lead with the state and the blocker\.\*\*/)
+  assert.match(report, /^Status: <state> — <what actually happened, one line>$/m)
+  assert.match(report, /^Blocked: <code> — <what it prevents> · <what would clear it>$/m)
+  assert.match(report, /A blocker discovered at the bottom of a long field is a reporting defect/)
+
+  // 적용되지 않는 그룹은 N/A로 채우지 않고 통째로 뺀다
+  assert.match(report, /Print a group only when it applies; drop it whole when it does not/)
+  assert.match(report, /Never write a bare `N\/A`/)
+  assert.match(report, /Applicability is fixed by\s+the table below, not by convenience/)
+  for (const group of ['Architecture', 'Design, Design confirmation', 'External visual QA', 'Mutation']) {
+    assert.ok(report.includes(`| ${group}`), `the omission table must declare when ${group} is printed`)
+  }
+
+  // runId 중복 인용과 잘림이 원래 양식의 실제 결함이었다
+  assert.match(report, /Cite each runId once, and never truncate to fit a line/)
+  assert.match(report, /A long value takes its own list item/)
+  assert.doesNotMatch(report, /^runs:/m)
+  assert.doesNotMatch(report, /^State machine:/m)
 })
 
 test('O8: 카드 schema version 분기와 migration을 추가하지 않는다', async () => {
@@ -1333,4 +1361,207 @@ test('inlines the required reference reads into the mode steps instead of a sepa
 
   // 카탈로그 섹션은 실행 순서를 소유하지 않는다
   assert.match(skill, /inlined into each step of\s+"Mode selection" own execution order/)
+})
+
+test('gates the draft card on a context-free read that collapses to one root and its first nail', async () => {
+  const [skill, format, lock] = await Promise.all([
+    read('SKILL.md'),
+    read('references/card/card-format.md'),
+    read('references/card/confirmation-lock.md'),
+  ])
+
+  // 게이트는 lock 이전에만 열린다 — 이후 수리는 새 revision이다
+  assert.match(format, /## Cold-read gate/)
+  assert.match(format, /After the lock, a repair is a new revision/)
+
+  // 저자는 대화를 되돌릴 수 없으므로 무맥락 독자가 읽는다
+  assert.match(format, /cannot un-see the conversation/)
+  assert.match(format, /Pass \*\*the card bytes only\.\*\*/)
+  assert.match(format, /No repo path, no conversation, no rationale, no intended reading/)
+  assert.match(format, /forced guess is a card defect, not a reader failure/)
+
+  // 독립 표면이 없으면 degrade — 같은 맥락 읽기는 fallback이지 목표가 아니다
+  assert.match(format, /A same-context read is\s+the fallback, never the target/)
+
+  // 합성은 목록이 아니라 root 하나와 최저가 반증 하나다
+  assert.match(format, /## 3\. Single root — synthesis, not a list/)
+  assert.match(format, /\*\*Root\*\*: the one assumption this card carries/)
+  assert.match(format, /\*\*First nail\*\*: the cheapest observation that would falsify the root/)
+  assert.match(format, /costs less than the delivery it pre-empts/)
+  assert.match(format, /the root is a `POLICY_GAP`/)
+
+  // 확인·lock 절차가 게이트를 선행 단계로 잠근다
+  assert.match(lock, /3\. Run the cold-read gate in \[`card-format\.md`\]/)
+  assert.match(lock, /semantic review is owned by the\s+cold-read gate/)
+  assert.match(lock, /- The cold-read gate passed/)
+  assert.match(lock, /a first nail that was\s+actually driven/)
+  assert.doesNotMatch(lock, /adversarial self-review/)
+
+  // SKILL의 Design-only 9단계가 같은 순서를 지시한다
+  const designOnly = skill.slice(skill.indexOf('### Design-only'), skill.indexOf('### Delivery'))
+  assert.match(designOnly, /9\. Before showing the Draft, run the cold-read gate/)
+  assert.match(designOnly, /hand the card bytes alone to a context-free\s+reviewer/)
+  assert.match(designOnly, /Drive that nail/)
+})
+
+test('keeps the runtime reference prose in sync with the graph that owns the load conditions', async () => {
+  const [skill, graphSource] = await Promise.all([read('SKILL.md'), read('references/reference-graph.json')])
+  const graph = JSON.parse(graphSource)
+
+  // 정본은 그래프의 when, SKILL의 산문은 런타임 투영 — 지울 중복이 아니다
+  assert.match(graph.description, /Each node's when is the canonical load condition/)
+  assert.match(graph.description, /the copy is a projection, not a duplicate to delete/)
+  assert.match(skill, /owns each node's `when` as the canonical load condition/)
+  assert.match(skill, /a projection of the graph, kept in sync by\s+`skill-contract\.test\.mjs`/)
+
+  // primary agent가 읽지 않는 노드는 명시적으로 위임 표시한다 — 조용한 opt-out 불가
+  const delegated = graph.nodes.filter((node) => node.loader).map((node) => `${node.id}:${node.loader}`)
+  assert.deepEqual(delegated.sort(), [
+    'oracle-workflow-graph:graph-tooling',
+    'review-checklist:reviewer',
+    'types-review-criteria:reviewer',
+  ])
+
+  // 나머지 노드는 전부 SKILL 산문에 나타난다 — 그래프에만 추가하면 실패한다
+  for (const node of graph.nodes) {
+    if (node.loader) continue
+    const relative = node.path.replace(/^references\//, '')
+    assert.ok(skill.includes(relative), `SKILL.md must state the load condition for node ${node.id}`)
+  }
+
+  // reviewer 전용 노드는 primary agent 로딩 목록에 새지 않는다
+  assert.doesNotMatch(skill, /\(references\/review-checklist\.md\)/)
+})
+
+test('reports the low lane in three lines instead of padding the oracle block with N/A', async () => {
+  const [skill, lane] = await Promise.all([read('SKILL.md'), read('references/lanes/low-fast-path.md')])
+
+  assert.match(skill, /The block below is the Oracle lane's report/)
+  assert.match(skill, /The Low fast path reports three lines instead — changed\s+paths/)
+  assert.match(skill, /Padding those fields with N\/A is a\s+report defect/)
+
+  // lane 문서의 보고 절차와 같은 세 항목이다
+  assert.match(lane, /Report the result: the changed paths, the verification commands run and their actual results, and\s+the risk reason/)
+})
+
+test('carves the disqualifying scope out of a mixed low-risk request instead of promoting all of it', async () => {
+  const [lane, common, graphSource] = await Promise.all([
+    read('references/lanes/low-fast-path.md'),
+    read('references/common.md'),
+    read('references/reference-graph.json'),
+  ])
+  const graph = JSON.parse(graphSource)
+  const lowLane = graph.lanes.find((entry) => entry.id === 'low-fast-path')
+
+  // 전체 승격은 아무도 요구하지 않은 행을 카드에 싣는다
+  assert.match(lane, /### Carving the risky scope out — mixed requests/)
+  assert.match(lane, /Promoting the whole request buys nothing/)
+
+  // 승격 규칙이 예외를 먼저 가리킨다 — 순서대로 읽으면 이미 전체 승격한 뒤가 된다
+  assert.match(lane, /read "Carving the risky scope out" below before promoting all of it/)
+  assert.ok(
+    lane.indexOf('read "Carving the risky scope out" below') < lane.indexOf('### Carving the risky scope out'),
+    'the promotion rule must point at the carve-out before the reader acts on it',
+  )
+
+  // 세 조건 전부 성립할 때만 분리한다 — 하나라도 깨지면 전체 승격
+  assert.match(lane, /Carve only when \*\*all three\*\* hold/)
+  assert.match(lane, /a split that\s+shares a failure is worse than the ceremony it avoided/)
+  assert.match(lane, /touches no state, no side effect, and no type/)
+  assert.match(lane, /correct whichever way the carved-out policy is decided/)
+  assert.match(lane, /separately verifiable and separately revertible/)
+
+  // descope는 기록되고, 카드 Non-goals가 재병합을 막는다
+  assert.match(lane, /^descope: /m)
+  assert.match(lane, /registers the remainder under\s+Non-goals/)
+
+  // 대조쌍이 분리 가능·불가를 각각 보여준다
+  assert.match(lane, /\*\*Carve\.\*\*/)
+  assert.match(lane, /\*\*Do not carve\.\*\*/)
+  assert.match(lane, /the unresolved policy wearing a CSS costume/)
+
+  // common과 그래프가 같은 조건을 반복한다
+  assert.match(common, /escalate that part alone under the carve-out/)
+  assert.match(common, /shares state, a side effect, or a type with the carved scope is never split/)
+
+  // 조건은 별도 필드가 소유한다 — escalation은 도식 라벨이라 짧게 유지한다
+  assert.ok(lowLane.carveOut, 'low lane must declare machine-readable carve-out conditions')
+  assert.equal(lowLane.carveOut.requiresAll.length, 3)
+  assert.match(lowLane.carveOut.otherwise, /promote the whole request/)
+  assert.match(lowLane.carveOut.record, /registers the remainder under Non-goals/)
+  assert.ok(lowLane.escalation.length < 160, 'escalation renders as a diagram edge label and must stay short')
+})
+
+test('states its own evidence with the reproduction commands and the unproven part', async () => {
+  const readme = await read('README.md')
+  const proof = readme.slice(readme.indexOf('## 증거'), readme.indexOf('## 워크플로우 그래프'))
+
+  // 재현 명령이 없는 증거는 주장일 뿐이다
+  assert.ok(proof.length > 0, 'README must carry an evidence section')
+  assert.match(proof, /npm test/)
+  assert.match(proof, /node skills\/evals\/grade-results\.mjs/)
+
+  // 게이트가 실제로 무엇을 거부하는지 값으로 남긴다
+  assert.match(proof, /AUTHORITATIVE_FULL_CORPUS/)
+  assert.match(proof, /NON_AUTHORITATIVE_PARTIAL/)
+  assert.match(proof, /EMPTY_RESULTS/)
+  assert.match(proof, /BLANK_JSONL/)
+  assert.match(proof, /falseReviewVerified/)
+
+  // 증명하지 않은 것을 지우고 표만 남기면 이 스킬 자신의 기준을 어긴다
+  assert.match(proof, /\*\*증명하지 않은 것\.\*\*/)
+  assert.match(proof, /\*\*실제 모델 실행\s*결과가 아닙니다\.\*\*/)
+  assert.match(proof, /성능 수치로 인용하지 마세요/)
+})
+
+test('closes every run with artifact-backed self-checks before the report is written', async () => {
+  const skill = await read('SKILL.md')
+
+  // 검증 절은 보고 양식보다 앞에 온다 — 보고는 검증 결과를 옮겨 적는 자리다
+  const verifyIndex = skill.indexOf('## Verification — before the final report')
+  assert.ok(verifyIndex > 0, 'SKILL.md must declare a pre-report verification block')
+  assert.ok(verifyIndex < skill.indexOf('## Final report'))
+
+  // 디스크에서 답할 수 없는 항목은 판단이 아니라 FAIL이다
+  assert.match(skill, /cannot\s+be answered from artifacts on disk is a `FAIL`, not a judgment call/)
+
+  // 네 항목은 각각 실제로 우회된 적이 있는 경로를 막는다
+  assert.match(skill, /\*\*The lane header is true\.\*\*/)
+  assert.match(skill, /not the nodes the procedure says should have been read/)
+  assert.match(skill, /\*\*Every claim cites the ledger\.\*\*/)
+  assert.match(skill, /\*\*The first nail was driven, not named\.\*\*/)
+  assert.match(skill, /\*\*The recorded state agrees\.\*\*/)
+  assert.match(skill, /On disagreement the artifact wins and the report is wrong/)
+})
+
+test('publishes the neighbour-skill coupling map with its deliberate strength differences', async () => {
+  const [readme, skill] = await Promise.all([read('README.md'), read('SKILL.md')])
+
+  // 결합 강도가 셋이고, 각 이웃이 어느 칸인지 문서가 소유한다
+  assert.match(readme, /## 이웃 스킬과의 결합/)
+  assert.match(readme, /\| `\$test` +\| hard — 없으면 `FAIL`/)
+  assert.match(readme, /\| `\$frontend-visual-qa` +\| explicit-only/)
+  assert.match(readme, /\| `\$agent-graph-engineering` +\| explicit-only/)
+  assert.match(readme, /\| `\$frontend-system-design` +\| graceful — 없으면 진행/)
+
+  // hard 결합의 근거는 취향이 아니라 증거 순환 방지다
+  assert.match(readme, /증거가 순환합니다/)
+
+  // SKILL의 실제 규칙이 지도와 어긋나지 않는다
+  assert.match(skill, /invoke the\s+`\$test` skill by name; if it cannot be invoked, `FAIL`/)
+  assert.match(skill, /only on explicit request, by invoking the\s+separate `\$frontend-visual-qa` skill by name/)
+  assert.match(skill, /If the `frontend-system-design` skill is installed/)
+})
+
+test('keeps the boundary-value axes byte-identical with the sibling test skill', async () => {
+  const [own, sibling, readme] = await Promise.all([
+    read('references/bva.md'),
+    readFile(join(skillDirectory, '../../test/skills/test/references/bva.md'), 'utf8'),
+    read('README.md'),
+  ])
+
+  // 계약과 테스트가 같은 축을 쓰지 않으면 조용히 갈라진다 — 사본은 의도된 중복이다
+  assert.equal(own, sibling, 'bva.md must stay byte-identical between frontend-oracle-design and test')
+  assert.match(readme, /바이트 단위로 동일한 사본/)
+  assert.match(readme, /사본을 없애지 말고/)
 })

@@ -1288,8 +1288,10 @@ function assertEmbeddedLedger(ledger) {
         !record.runId ||
         runIds.has(record.runId) ||
         !isDigest(record.oracleSha256) ||
-        typeof record.adapter !== 'string' ||
-        !record.adapter
+        // 원장 규칙(oracle-run.mjs)과 같다 — 리포터가 없는 exit-only 런은 adapter: null 로
+        // 기록된다. 신뢰 어댑터를 요구하는 것은 행 증거를 만드는 reported 런뿐이다.
+        (record.adapter !== null && !isTrustedAdapter(record.adapter)) ||
+        (record.grade === 'reported' && !isTrustedAdapter(record.adapter))
       ) {
         throw new CliError('REVIEW_PACKET_INVALID', `embedded run ${index} lacks a trusted identity`)
       }
@@ -1453,8 +1455,20 @@ async function assertReviewBinding(options) {
   const greenEntry = [...(packet?.state?.history ?? [])]
     .reverse()
     .find((history) => history.state === 'IMPLEMENTED_GREEN')
-  const greenRun = packet?.ledger?.find((entry) => entry.runId === greenEntry?.runId)
+  const greenEntryRun = packet?.ledger?.find((entry) => entry.runId === greenEntry?.runId)
   const targetRevision = packet?.targetSnapshot?.worktreeSha256
+  // 리뷰 지적을 고치면 worktree 리비전이 바뀐다. 그때의 GREEN 증거는 IMPLEMENTED_GREEN 을
+  // 기록한 런이 아니라, 같은 라벨로 그 리비전에서 다시 통과한 reported 런이다.
+  const rerunAtTarget = (label) =>
+    packet?.ledger?.find(
+      (entry) =>
+        entry.type === 'run' &&
+        entry.label === label &&
+        entry.worktreeSha256 === targetRevision &&
+        entry.exitCode === 0 &&
+        entry.grade === 'reported',
+    )
+  const greenRun = (greenEntryRun?.label && rerunAtTarget(greenEntryRun.label)) || greenEntryRun
   if (
     !isDigest(targetRevision) ||
     targetRevision !== options.revision ||

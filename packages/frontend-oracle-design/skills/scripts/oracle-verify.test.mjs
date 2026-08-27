@@ -1525,6 +1525,22 @@ async function reviewFixture(t, findings, overrides = {}) {
     lockManifestSha256: manifestSha256,
     at: '2025-01-01T00:00:00.000Z',
   })
+  const extraRuns = []
+  for (const record of overrides.extraRuns ?? []) {
+    const previous = extraRuns.at(-1) ?? greenRun
+    extraRuns.push(
+      chainedRecord(
+        {
+          oracleSha256,
+          worktreeSha256: revision,
+          productionSha256: productionRevision,
+          lockManifestSha256: manifestSha256,
+          ...record,
+        },
+        previous.digest,
+      ),
+    )
+  }
   const packet = {
     schemaVersion: 2,
     oracle: { content: EVIDENCE_CARD, sha256: oracleSha256 },
@@ -1537,7 +1553,7 @@ async function reviewFixture(t, findings, overrides = {}) {
       lockManifestSha256: manifestSha256,
       history: [{ state: 'IMPLEMENTED_GREEN', runId: 'r-002' }],
     },
-    ledger: [greenRun],
+    ledger: [greenRun, ...extraRuns],
     evidence,
     evidenceArtifacts: [],
     implementationDecision: {
@@ -1593,7 +1609,7 @@ async function reviewFixture(t, findings, overrides = {}) {
   await writeFile(packetPath, packetRaw)
   await writeFile(map, JSON.stringify(mapDocument))
   await writeFile(findingsPath, findingsRaw)
-  await writeFile(ledger, `${JSON.stringify(greenRun)}\n`)
+  await writeFile(ledger, [greenRun, ...extraRuns].map((record) => `${JSON.stringify(record)}\n`).join(''))
   if (document.orchestrationReceipt) await appendReviewReceipt(ledger, findingsPath, oracleSha256)
 
   return { oracle, packetPath, map, ledger, revision, productionRevision, findingsPath, packetSha256, oracleSha256 }
@@ -1781,6 +1797,84 @@ test('O23: review 명령은 v2 findings를 packet·revision·evidence map에 묶
   )
   assert.equal(accepted.status, 0, accepted.stderr)
   assert.equal(accepted.stdout, 'REVIEW_CLEAR advisory:0\n')
+
+  // typecheck·lint 처럼 리포터가 없는 required label 은 원장에 adapter: null·grade: 'exit-only'
+  // 로 기록된다(oracle-run.mjs). 그 런이 섞였다는 이유로 리뷰 검증이 막히면 안 된다.
+  const exitOnly = await reviewFixture(t, [], {
+    name: 'exit-only.json',
+    extraRuns: [
+      {
+        type: 'run',
+        runId: 'r-003',
+        label: 'typecheck:exit',
+        command: ['npx', 'tsc', '--noEmit'],
+        adapter: null,
+        exitCode: 0,
+        signal: null,
+        grade: 'exit-only',
+        tests: null,
+        at: '2025-01-01T00:00:00.500Z',
+      },
+    ],
+  })
+  const acceptedExitOnly = run(
+    'review',
+    '--file',
+    exitOnly.findingsPath,
+    '--oracle',
+    exitOnly.oracle,
+    '--packet',
+    exitOnly.packetPath,
+    '--revision',
+    exitOnly.revision,
+    '--map',
+    exitOnly.map,
+  )
+  assert.equal(acceptedExitOnly.status, 0, acceptedExitOnly.stderr)
+  assert.equal(acceptedExitOnly.stdout, 'REVIEW_CLEAR advisory:0\n')
+
+  // 리뷰 지적(blocking finding)을 고치면 worktree 리비전이 바뀐다. 그때는 IMPLEMENTED_GREEN 을
+  // 기록한 런이 아니라, 같은 라벨로 새 리비전에서 다시 통과한 reported 런이 GREEN 증거다.
+  const fixedRevision = 'd'.repeat(64)
+  const afterFix = await reviewFixture(t, [], {
+    name: 'after-fix.json',
+    document: { targetRevision: fixedRevision },
+    targetSnapshot: {
+      worktreeSha256: fixedRevision,
+      productionSha256: 'b'.repeat(64),
+      lockManifestSha256: 'c'.repeat(64),
+    },
+    extraRuns: [
+      {
+        type: 'run',
+        runId: 'r-004',
+        label: 'behavior:reported',
+        command: [process.execPath, '--test', 'fixture.test.mjs'],
+        adapter: 'node-test',
+        exitCode: 0,
+        signal: null,
+        grade: 'reported',
+        tests: [{ name: 'save > pending 표시', status: 'passed' }],
+        worktreeSha256: fixedRevision,
+        at: '2025-01-01T00:00:00.700Z',
+      },
+    ],
+  })
+  const acceptedAfterFix = run(
+    'review',
+    '--file',
+    afterFix.findingsPath,
+    '--oracle',
+    afterFix.oracle,
+    '--packet',
+    afterFix.packetPath,
+    '--revision',
+    fixedRevision,
+    '--map',
+    afterFix.map,
+  )
+  assert.equal(acceptedAfterFix.status, 0, acceptedAfterFix.stderr)
+  assert.equal(acceptedAfterFix.stdout, 'REVIEW_CLEAR advisory:0\n')
 
   const stale = await reviewFixture(t, [], { document: { targetRevision: 'b'.repeat(64) }, name: 'stale.json' })
   const rejectedRevision = run(

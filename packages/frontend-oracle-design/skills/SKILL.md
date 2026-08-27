@@ -78,8 +78,12 @@ Lane routing:
 
 ## Reference loading — graph
 
-References are nodes declared in [`reference-graph.json`](references/reference-graph.json). Read
-`when` as the decision point, not the deliverable stage. If applicability is ambiguous, load.
+References are nodes declared in [`reference-graph.json`](references/reference-graph.json), which
+owns each node's `when` as the canonical load condition. The bullets below restate those conditions
+because this file is what gets read at runtime — they are a projection of the graph, kept in sync by
+`skill-contract.test.mjs`, not a duplicate to collapse.
+
+Read `when` as the decision point, not the deliverable stage. If applicability is ambiguous, load.
 Whether to skip a load is not a judgment call. The read instructions inlined into each step of
 "Mode selection" own execution order; do not defer to this section to proceed through a step.
 
@@ -169,8 +173,11 @@ When only cards, requirements, policy decisions, or test contracts are requested
    one-question-at-a-time interview, run it without a round cap.
 8. Show existing revisions as a semantic delta and new cards in full with open questions, then
    explicitly re-confirm.
-9. Record the approval's location in `User Confirmation` and run the adversarial self-review. On a
-   change request, fix the Draft and re-confirm; on no answer, `NEEDS_DECISION`.
+9. Before showing the Draft, run the cold-read gate: hand the card bytes alone to a context-free
+   reviewer, apply the four questions per row, and collapse both into one root plus the first nail
+   that falsifies it cheapest. Drive that nail. Then record the approval's location in
+   `User Confirmation`. On a change request, fix the Draft and re-confirm; on no answer,
+   `NEEDS_DECISION`.
 10. Read [`card/confirmation-lock.md`](references/card/confirmation-lock.md) → after
     `oracle-verify.mjs card` lint passes, create the deterministic revision lock.
 11. End at `ORACLE_READY` | `NEEDS_DECISION` | tool failure `FAIL`.
@@ -242,23 +249,72 @@ evidence is `pending`, or Visual QA was `declined` with no source-backed N/A rev
 stops at the resumable `IMPLEMENTED_GREEN` terminal. On resume, complete the pending visual
 evidence and then proceed to review; never claim this intermediate state means `REVIEW_VERIFIED`.
 
+## Verification — before the final report
+
+Four self-checks. Each one names a way this skill has actually been bypassed, so a check that cannot
+be answered from artifacts on disk is a `FAIL`, not a judgment call.
+
+1. **The lane header is true.** `nodes` lists the nodes this run actually Read, reconciled against
+   the tool calls made — not the nodes the procedure says should have been read.
+2. **Every claim cites the ledger.** No execution appears in the report that is absent from
+   `runs.jsonl`, and each status word traces to a runId with its label and exit code.
+3. **The first nail was driven, not named.** The cold-read gate's root and its falsifying
+   observation are both in `journal.md`, with the observation's result.
+4. **The recorded state agrees.** `oracle-run.mjs status --json` reports the same terminal state the
+   report claims. On disagreement the artifact wins and the report is wrong.
+
 ## Final report
 
+The block below is the Oracle lane's report. The Low fast path reports three lines instead — changed
+paths, the verification commands with their actual results, and the risk reason — because a card,
+lock, ledger, and review it never created cannot be reported on. Padding those fields with N/A is a
+report defect.
+
+Three rules decide what reaches the reader:
+
+1. **Lead with the state and the blocker.** The first line is the state and what actually happened.
+   When the run did not reach its mode's normal terminal, the second line names the blocking code and
+   what would clear it. A blocker discovered at the bottom of a long field is a reporting defect.
+2. **Print a group only when it applies; drop it whole when it does not.** Applicability is fixed by
+   the table below, not by convenience. Never write a bare `N/A` — when a group that applies has
+   nothing to show, give the reason in its place.
+3. **Cite each runId once, and never truncate to fit a line.** A long value takes its own list item.
+
+| Group                       | Printed only when                                                    |
+| --------------------------- | -------------------------------------------------------------------- |
+| Architecture                | an architecture boundary·state ownership·public API actually changed |
+| Design, Design confirmation | the visual scope is `local` or `identity-shaping`                    |
+| External visual QA          | `$frontend-visual-qa` actually ran                                   |
+| Mutation                    | risk is High                                                         |
+
 ```text
-Status: ORACLE_READY | IMPLEMENTED_GREEN | REVIEW_VERIFIED | NEEDS_DECISION | FAIL
-Outcome: Actor/context, Observable success, actually achieved result, Non-goals
-Decisions: chosen minimal boundary, State ownership, Server/Client, Async, Type contract, Sources, Rejected
-Changes: observable behavior change per path
-Verification: targeted tests·impact tests·typecheck·lint·build, accessibility, performance claim or N/A
-Risk and recovery: Worst regression, remaining risk, Reversibility·rollback or N/A
-Architecture: per-unit architecture.md, approval answers, Oracle source hash, repo structure verification or reviewer evidence; for FSD, layer·segment·public API·test placement compliance evidence
-Design: Visual scope, Subject, Audience, Single job, Thesis, Signature, Risk, Rejected
-Design confirmation: location of the user's Design Change Confirmation answer
-External visual QA: artifact path and verdict if `$frontend-visual-qa` was explicitly run, else N/A
-Implementation: card rows per round, hypothesis, minimal change, result
-mutation: High-risk kill·revert·re-pass evidence or N/A
-subagent: role, findings, applied or not
-Evidence appendix: full O*/D* row mapping, Oracle SHA-256, source hashes, last verify command and exit code
-runs: cited ledger runIds with label·exit·grade, evidence verify output
-State machine: recorded transitions and last state, budgets used n/limit, ENV_DRIFT presence, `oracle-run.mjs status --json` summary
+Status: <state> — <what actually happened, one line>
+Blocked: <code> — <what it prevents> · <what would clear it>
+
+**Outcome** actor/context · observable success · achieved result · non-goals
+
+**Decisions**
+- Chose <minimal boundary · state ownership · server/client · async · type contract> — sources <S*>
+- Rejected <option> — <why>
+
+**Changes**
+- <path> — <observable behavior change>
+
+**Verification**
+- <label> <runId> exit <n> <grade>
+- evidence verify <output> · findings verify <output>
+- accessibility · performance — <claim, or the reason it does not apply>
+
+**Risk and recovery** worst regression · what blocks it · reversibility·rollback
+
+**Implementation**
+- Round <n> <card rows> — hypothesis, minimal change, result
+- Review <role> — findings, applied or not
+
+**Evidence appendix**
+- Oracle SHA-256 <digest> · source hashes <...>
+- Row mapping <O*/D* → test name>
+- Transitions <...> — last state <...>
+- Budgets policy <n>/2 · harness <n>/2 · product <n>/3 · ENV_DRIFT <presence>
+- Last verify <command> exit <n>
 ```

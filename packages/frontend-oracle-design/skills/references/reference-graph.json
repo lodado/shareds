@@ -1,7 +1,7 @@
 {
   "id": "frontend-oracle-design-reference-graph",
   "version": 1,
-  "description": "Conditionally loaded reference node graph. The entry risk judgment selects the lane: Low takes the low-fast-path single-node exclusive lane, and an explicit Oracle request or Medium/High takes the oracle lane with the common entry. When a node when is satisfied, load its full path together with its requires edges, and do not load unrelated nodes. The full description of the load conditions is owned by the Reference loading section in SKILL.md.",
+  "description": "Conditionally loaded reference node graph. The entry risk judgment selects the lane: Low takes the low-fast-path single-node exclusive lane, and an explicit Oracle request or Medium/High takes the oracle lane with the common entry. When a node when is satisfied, load its full path together with its requires edges, and do not load unrelated nodes. Each node's when is the canonical load condition. SKILL.md restates them as prose on purpose, because the agent reads SKILL.md at runtime and may never open this file — the copy is a projection, not a duplicate to delete, and skill-contract.test.mjs fails when a loader:agent node is missing from that section.",
   "entry": "common",
   "entryContract": {
     "firstToolCall": "Read exactly one lane entry node — low-fast-path when risk=Low, otherwise common",
@@ -15,7 +15,17 @@
       "when": "risk=Low",
       "nodes": ["low-fast-path"],
       "exclusive": true,
-      "escalation": "immediately disqualified when a policy question·new contract·architecture decision appears — promote to the oracle lane"
+      "escalation": "immediately disqualified when a policy question·new contract·architecture decision appears — promote to the oracle lane",
+      "carveOut": {
+        "when": "only part of the request disqualifies — escalate that part alone and finish the remainder in this lane",
+        "requiresAll": [
+          "the remainder touches no state, no side effect, and no type the carved-out scope reads or writes",
+          "the remainder is correct whichever way the carved-out policy is decided",
+          "the remainder is separately verifiable and separately revertible"
+        ],
+        "otherwise": "promote the whole request — a split that shares a failure is worse than the ceremony it avoided",
+        "record": "one descope line naming what was carved out, its trigger, and where it went; the Oracle card registers the remainder under Non-goals"
+      }
     },
     {
       "id": "oracle",
@@ -184,6 +194,7 @@
       "id": "types-review-criteria",
       "path": "references/types/review-criteria.md",
       "when": "independent review of a type·state contract change",
+      "loader": "reviewer",
       "requires": ["subagent-review"]
     },
     {
@@ -220,6 +231,7 @@
       "id": "review-checklist",
       "path": "references/review-checklist.md",
       "when": "when the reviewer adjudicates — the primary agent does not load it and only registers it with --review-point",
+      "loader": "reviewer",
       "requires": ["subagent-review"]
     },
     {
@@ -232,6 +244,7 @@
       "id": "oracle-workflow-graph",
       "path": "references/oracle-workflow.graph.json",
       "when": "together with graph-orchestration",
+      "loader": "graph-tooling",
       "requires": []
     }
   ]

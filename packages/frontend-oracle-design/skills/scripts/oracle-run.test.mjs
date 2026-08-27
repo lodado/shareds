@@ -2351,7 +2351,9 @@ test('O17: REVIEW_VERIFIED rejects a packet that predates the current review sna
   assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
 })
 
-test('O17: review packet cannot approve a tracked change after the bound GREEN run', async (t) => {
+// blocking finding을 고치면 worktree가 바뀐다. 그때 인증을 영구히 막으면 리뷰 반영 자체가 불가능해지므로,
+// 게이트는 "GREEN 이후 변경 금지"가 아니라 "변경된 리비전에서 필수 라벨이 실제로 다시 통과했는가"다.
+test('O17: a tracked change after GREEN certifies only once the required label re-passes at that revision', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
   await reachValidRed(oracleDirectory, root)
   await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
@@ -2382,8 +2384,41 @@ test('O17: review packet cannot approve a tracked change after the bound GREEN r
     packet.targetRevision,
   ])
 
+  assert.equal(reviewed.status, 0, reviewed.stderr)
+  assert.equal((await state(oracleDirectory)).state, 'REVIEW_VERIFIED')
+})
+
+test('O17: a tracked change after GREEN cannot certify on the pre-change run alone', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+
+  // GREEN 이후 재실행까지 마쳐 REVIEW_RERUN_REQUIRED 를 만족시킨 뒤, 스냅샷 게이트만 남긴다
+  greenRun(oracleDirectory, 'review')
+  const packetPath = join(oracleDirectory, 'review-prechange.json')
+  const packetResult = run(strictReviewPacketArgs(oracleDirectory, packetPath))
+  assert.equal(packetResult.status, 0, packetResult.stderr)
+  const packetRaw = readFileSync(packetPath, 'utf8')
+  const packet = JSON.parse(packetRaw)
+  const packetSha256 = createHash('sha256').update(packetRaw).digest('hex')
+  const findings = join(oracleDirectory, 'findings.json')
+  bindReviewDocument(findings, packetSha256, packet.targetRevision)
+  assert.equal(issueReviewReceipt(oracleDirectory, packetPath, findings, packet.targetRevision).status, 0)
+
+  // 패킷·영수증을 다 만든 뒤 production을 바꾸면, 인용 run 은 그 리비전의 증거가 아니다
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 2\n')
+  const reviewed = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-004', [
+    '--packet',
+    packetPath,
+    '--revision',
+    packet.targetRevision,
+  ])
+
   assert.equal(reviewed.status, 1)
-  assert.match(reviewed.stderr, /^REVIEW_PACKET_INVALID: /)
+  assert.match(reviewed.stderr, /^(SNAPSHOT_STALE|REVIEW_RUN_STALE|REVIEW_PACKET_STALE|REVIEW_RERUN_REQUIRED): /)
   assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
 })
 
