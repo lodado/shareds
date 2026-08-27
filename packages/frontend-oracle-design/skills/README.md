@@ -72,7 +72,7 @@ view가 소유합니다.
 flowchart LR
   START(["요청"]) --> RISK{"risk 판정"}
   RISK -->|"risk=Low"| low_fast_path["low-fast-path<br/><i>exclusive · 이 노드만</i>"]
-  low_fast_path -.->|"정책 질문·새 계약·architecture 결정 발생 시 즉시 실격 — oracle lane으로 승격"| common
+  low_fast_path -.->|"immediately disqualified when a policy question·new contract·architecture decision appears — promote to the oracle lane"| common
   RISK -->|"그 외"| common["common"]
 
   card_policy_sources["card-policy-sources"]

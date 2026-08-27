@@ -1,7 +1,7 @@
 {
   "id": "frontend-oracle-design",
-  "outcome": "승인된 Oracle Card를 불변 기준으로 삼아 요청된 frontend 설계 또는 Delivery를 검증 가능한 상태로 완료한다.",
-  "stopCondition": "Design-only는 ORACLE_READY, Delivery는 REVIEW_VERIFIED terminal에 도달하며 모든 판정이 Oracle ledger와 lock으로 검증된다.",
+  "outcome": "Complete the requested frontend design or Delivery in a verifiable state, using the approved Oracle Card as the immutable criterion.",
+  "stopCondition": "Design-only reaches the ORACLE_READY terminal and Delivery reaches the REVIEW_VERIFIED terminal, with every verdict verified by the Oracle ledger and lock.",
   "entry": "draft-oracle",
   "terminals": ["oracle-ready", "implemented-green", "review-verified", "run-stopped", "pre-ledger-stop", "cancelled"],
   "maxSteps": 36,
@@ -48,7 +48,7 @@
       "id": "draft-oracle",
       "kind": "agent",
       "owner": "planner",
-      "task": "현재 Frontend Oracle Design 계약으로 risk, Outcome Brief, Source Registry, 필요한 설계·architecture·backend 결정을 조사해 Draft Oracle과 delta 및 미결 질문을 만든다. 새 graph run이 기존 IMPLEMENTED_GREEN persisted state를 발견하면 RESUME_IMPLEMENTED_GREEN과 실제 runId를 반환한다. lock, test, production 수정은 하지 않는다. 완료하면 CONFIRMATION_REQUIRED, POLICY_GAP과 구조화된 decision, 또는 실제 error를 포함한 FAIL만 반환한다.",
+      "task": "Under the current Frontend Oracle Design contract, investigate risk, the Outcome Brief, the Source Registry, and the required design·architecture·backend decisions to produce the Draft Oracle, its delta, and the open questions. When a new graph run finds an existing persisted IMPLEMENTED_GREEN state, return RESUME_IMPLEMENTED_GREEN and the actual runId. Do not lock, test, or modify production. On completion return only CONFIRMATION_REQUIRED, POLICY_GAP with a structured decision, or FAIL with the actual error.",
       "input": ["request", "repositoryContext", "previousRevision"],
       "output": ["classification", "oraclePath", "oracleSha256", "summary", "runId", "decision", "error"],
       "writeScope": [".ai/oracles/**"],
@@ -57,7 +57,7 @@
     {
       "id": "user-confirmation",
       "kind": "gate",
-      "task": "Draft Oracle 전문, revision delta, 미결 질문, 필요한 Design Change Confirmation과 architecture 확인을 사용자에게 한 번에 보여준다. 명시적 답변만 기록하고 요청 모드에 따라 APPROVE_DESIGN 또는 APPROVE_DELIVERY를 반환한다. 답이 없으면 이 Node에서 기다린다.",
+      "task": "Show the user the full Draft Oracle text, the revision delta, the open questions, and any required Design Change Confirmation and architecture confirmation at once. Record only an explicit answer and return APPROVE_DESIGN or APPROVE_DELIVERY according to the requested mode. If there is no answer, wait at this Node.",
       "input": ["oraclePath", "summary", "request"],
       "output": ["decision", "confirmation"],
       "writeScope": [".ai/oracles/**"],
@@ -66,7 +66,7 @@
     {
       "id": "lock-oracle",
       "kind": "tool",
-      "task": "oracle-verify.mjs card와 oracle-lock.mjs를 실행해 확인된 revision을 잠근다. 승인 모드에 따라 classification을 DESIGN_READY 또는 DELIVERY_READY로 반환하고, 정책 변경은 POLICY_GAP 및 구조화된 decision으로 반환한다. ledger 전 도구 실패는 실제 error와 함께 FAIL로 반환하며 runId를 만들거나 추정하지 않는다.",
+      "task": "Run oracle-verify.mjs card and oracle-lock.mjs to lock the confirmed revision. Return the classification as DESIGN_READY or DELIVERY_READY according to the approval mode, and return a policy change as POLICY_GAP with a structured decision. A tool failure before the ledger returns FAIL with the actual error, and does not create or guess a runId.",
       "input": ["oraclePath", "decision", "confirmation"],
       "output": ["classification", "oracleSha256", "runId", "decision", "error"],
       "writeScope": [".ai/oracles/**"],
@@ -76,7 +76,7 @@
       "id": "delivery-init",
       "kind": "agent",
       "owner": "planner",
-      "task": "잠긴 Delivery source를 검증하고 조건부 reference를 로드한다. 설치된 $test를 명시적으로 호출한 뒤 oracle-run.mjs init으로 필수 run label, ledger, 상태와 예산을 초기화한다. classification은 READY, POLICY_GAP 또는 FAIL이다. init 뒤 POLICY_GAP이면 oracle-run.mjs transition --to NEEDS_DECISION을 기록하고 구조화된 decision과 runId를 반환한다. 환경 결함은 사유를 ledger에 남기고 실제 error와 함께 FAIL로 보고한다.",
+      "task": "Verify the locked Delivery sources and load the conditional references. After explicitly invoking the installed $test, initialize the required run labels, ledger, state, and budgets with oracle-run.mjs init. The classification is READY, POLICY_GAP, or FAIL. On POLICY_GAP after init, record oracle-run.mjs transition --to NEEDS_DECISION and return the structured decision and the runId. An environment defect leaves the reason in the ledger and is reported as FAIL with the actual error.",
       "input": ["oraclePath", "oracleSha256", "request"],
       "output": ["classification", "runState", "runId", "decision", "error"],
       "writeScope": [".ai/oracles/**"],
@@ -86,7 +86,7 @@
       "id": "valid-red",
       "kind": "agent",
       "owner": "test-engineer",
-      "task": "테스트 파일을 쓰기 직전에 $test를 로드해 잠긴 카드의 실패 우선 테스트를 작성·실행한다. oracle-run.mjs ledger와 oracle-verify.mjs red가 인정한 경우 oracle-run.mjs transition --to VALID_RED를 먼저 기록한 뒤에만 VALID_RED를 반환한다. 테스트가 잠긴 카드 행을 이미 만족해 빨갛지 않으면 ALREADY_SATISFIED를 반환하고 production은 수정하지 않는다. 그 밖에는 POLICY_GAP 및 구조화된 decision, HARNESS_DEFECT 또는 실제 error를 포함한 FAIL을 반환하고 production은 수정하지 않는다. POLICY_GAP이면 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다. INVALID_RED는 쓰지 않는다.",
+      "task": "Load $test immediately before writing test files, then write and run the failure-first tests of the locked card. Only when the oracle-run.mjs ledger and oracle-verify.mjs red accept it, first record oracle-run.mjs transition --to VALID_RED and only then return VALID_RED. If the tests are not red because the locked card rows are already satisfied, return ALREADY_SATISFIED and do not modify production. Otherwise return POLICY_GAP with a structured decision, HARNESS_DEFECT, or FAIL with the actual error, and do not modify production. On POLICY_GAP, record oracle-run.mjs transition --to NEEDS_DECISION. Do not use INVALID_RED.",
       "input": ["oraclePath", "oracleSha256", "runState"],
       "output": ["classification", "runId", "evidence", "decision", "error"],
       "writeScope": ["**", "!.ai/agent-graphs/**"],
@@ -95,7 +95,7 @@
     {
       "id": "implement-green",
       "kind": "agent",
-      "task": "VALID_RED와 lock을 검증한 경우에만 최소 production 개선을 수행하고 필수 label을 oracle-run.mjs exec로 실행한다. ALREADY_SATISFIED는 zero-production verification만 수행하며 production을 수정하지 않는다. 이 Node는 단일·위임·병렬 구현 방식을 강제하지 않는다. High risk면 $test가 mutation kill·원복·재-GREEN까지 판정한다. 표준 또는 High 성공은 oracle-run.mjs transition --to IMPLEMENTED_GREEN을 정확히 한 번 기록한 뒤 risk에 따라 IMPLEMENTED_GREEN_STANDARD 또는 IMPLEMENTED_GREEN_HIGH와 runId를 반환한다. visual pending도 그 단일 전이를 기록하고 IMPLEMENTED_GREEN_PENDING_VISUAL을 반환해 resumable IMPLEMENTED_GREEN terminal에서 멈춘다; resume은 pending visual evidence를 완료한 뒤 review로 진행하며 REVIEW_VERIFIED를 주장하지 않는다. 그 밖에는 PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP 및 구조화된 decision 또는 실제 error를 포함한 FAIL과 실패 runId를 반환한다. POLICY_GAP이면 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다.",
+      "task": "Only when VALID_RED and the lock are verified, perform the minimal production improvement and run the required labels with oracle-run.mjs exec. ALREADY_SATISFIED performs zero-production verification only and does not modify production. This Node does not force a single·delegated·parallel implementation method. At High risk, $test also adjudicates the mutation kill·revert·re-GREEN. A standard or High success records oracle-run.mjs transition --to IMPLEMENTED_GREEN exactly once, then returns IMPLEMENTED_GREEN_STANDARD or IMPLEMENTED_GREEN_HIGH with the runId according to risk. A visual pending also records that single transition and returns IMPLEMENTED_GREEN_PENDING_VISUAL to stop at the resumable IMPLEMENTED_GREEN terminal; the resume completes the pending visual evidence and then proceeds to review, and does not claim REVIEW_VERIFIED. Otherwise return PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP with a structured decision, or FAIL with the actual error, together with the failing runId. On POLICY_GAP, record oracle-run.mjs transition --to NEEDS_DECISION.",
       "input": ["oraclePath", "oracleSha256", "runState", "evidence"],
       "output": ["classification", "runId", "artifacts", "decision", "error"],
       "writeScope": ["**", "!.ai/agent-graphs/**"],
@@ -106,7 +106,7 @@
       "id": "evidence-repair",
       "kind": "agent",
       "owner": "test-engineer",
-      "task": "$test 계약과 Oracle budget 안에서 locator, fixture, barrier 또는 evidence mapping만 최소 보정한다. 정책·assertion·production을 바꾸지 않는다. EVIDENCE_READY, HARNESS_DEFECT, PRODUCT_DEFECT, POLICY_GAP 및 구조화된 decision 또는 실제 error를 포함한 FAIL을 반환한다. POLICY_GAP이면 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다.",
+      "task": "Within the $test contract and the Oracle budget, minimally correct only the locator, fixture, barrier, or evidence mapping. Do not change policy·assertions·production. Return EVIDENCE_READY, HARNESS_DEFECT, PRODUCT_DEFECT, POLICY_GAP with a structured decision, or FAIL with the actual error. On POLICY_GAP, record oracle-run.mjs transition --to NEEDS_DECISION.",
       "input": ["oraclePath", "oracleSha256", "runState", "findings"],
       "output": ["classification", "runId", "evidence", "decision", "error"],
       "writeScope": ["**", "!.ai/agent-graphs/**"],
@@ -115,7 +115,7 @@
     {
       "id": "review-dispatch",
       "kind": "tool",
-      "task": "Controller가 oracle-run.mjs review-packet으로 review packet과 controller-issued reviewAssignments·reviewDispatches를 정규화한다. STANDARD는 primary assignment 하나만, HIGH는 서로 컨텍스트를 공유하지 않는 primary·secondary independent assignment를 만든다. 성공 classification은 단일 field 값 STANDARD 또는 HIGH만 반환하며 dispatch all은 STANDARD에서 primary-review만, HIGH에서 primary-review와 secondary-review를 활성화한다. 정책 미결은 POLICY_GAP과 구조화된 decision을 반환하고 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다. 패킷 생성 또는 dispatch 실패는 실제 error를 포함한 classification FAIL과 runId로 반환한다.",
+      "task": "The Controller normalizes the review packet and the controller-issued reviewAssignments·reviewDispatches with oracle-run.mjs review-packet. STANDARD creates only one primary assignment, and HIGH creates independent primary·secondary assignments that share no context with each other. A successful classification returns only the single field value STANDARD or HIGH, and dispatch all activates only primary-review under STANDARD, and both primary-review and secondary-review under HIGH. Unresolved policy returns POLICY_GAP with a structured decision and records oracle-run.mjs transition --to NEEDS_DECISION. A packet creation or dispatch failure returns classification FAIL with the actual error and the runId.",
       "input": ["oraclePath", "oracleSha256", "artifacts"],
       "output": [
         "status",
@@ -134,7 +134,7 @@
       "id": "primary-review",
       "kind": "agent",
       "owner": "code-reviewer",
-      "task": "review packet과 controller-issued primary assignment·dispatch로 독립 리뷰를 수행한다. STANDARD에서는 검증 가능한 finding artifact를 findings로 반환하고 STANDARD_READY 또는 STANDARD_BLOCKED를, HIGH에서는 findingsA로만 반환하고 HIGH_READY 또는 HIGH_BLOCKED를 분류한다. 다른 reviewer 결과를 읽거나 파일을 수정하지 않는다. HIGH_BLOCKED도 독립 secondary 결과와 함께 high-review-join에서 판정하며 직접 evidence-repair를 활성화하지 않는다. 정책 미결이면 POLICY_GAP과 구조화된 decision 및 NEEDS_DECISION ledger transition, 도구 오류면 실제 error와 runId를 포함한 FAIL을 반환한다.",
+      "task": "Perform an independent review with the review packet and the controller-issued primary assignment·dispatch. Under STANDARD return the verifiable finding artifact as findings and classify STANDARD_READY or STANDARD_BLOCKED; under HIGH return it only as findingsA and classify HIGH_READY or HIGH_BLOCKED. Do not read the result of another reviewer or modify files. HIGH_BLOCKED is also adjudicated at high-review-join together with the independent secondary result and does not activate evidence-repair directly. On unresolved policy return POLICY_GAP with a structured decision and the NEEDS_DECISION ledger transition; on a tool error return FAIL with the actual error and the runId.",
       "input": ["reviewPacket", "reviewAssignments", "reviewDispatches"],
       "output": ["classification", "findings", "findingsA", "runId", "decision", "error"],
       "writeScope": [],
@@ -144,7 +144,7 @@
       "id": "secondary-review",
       "kind": "agent",
       "owner": "code-reviewer",
-      "task": "HIGH review packet과 controller-issued secondary assignment·dispatch로 두 번째 독립 리뷰를 수행하고 검증 가능한 finding artifact를 findingsB로만 반환한다. primary reviewer 결과를 읽거나 파일을 수정하지 않는다. 완료하면 HIGH_READY, packet 또는 evidence가 불완전하면 HIGH_BLOCKED를 반환하며 둘 다 high-review-join으로 간다. 정책 미결이면 POLICY_GAP과 구조화된 decision 및 NEEDS_DECISION ledger transition, 도구 오류면 실제 error와 runId를 포함한 FAIL을 반환한다.",
+      "task": "Perform the second independent review with the HIGH review packet and the controller-issued secondary assignment·dispatch, and return the verifiable finding artifact only as findingsB. Do not read the result of the primary reviewer or modify files. On completion return HIGH_READY, and if the packet or evidence is incomplete return HIGH_BLOCKED; both go to high-review-join. On unresolved policy return POLICY_GAP with a structured decision and the NEEDS_DECISION ledger transition; on a tool error return FAIL with the actual error and the runId.",
       "input": ["reviewPacket", "reviewAssignments", "reviewDispatches"],
       "output": ["classification", "findingsB", "runId", "decision", "error"],
       "writeScope": [],
@@ -154,7 +154,7 @@
       "id": "high-review-join",
       "kind": "join",
       "join": "all",
-      "task": "Controller/join은 두 High-risk finding artifact가 모두 도착하면 oracle-run.mjs review-receipt를 호출해 각각의 packetSha256, targetRevision, role, taskId, outputSha256, reviewerId, findingsSha256와 digest-chain previousDigest·digest를 adapter node-test 및 oracleSha256를 포함한 ledger-bound reviewReceiptA와 reviewReceiptB로 기록한다. 두 receipt가 모두 유효하면 findings를 표본 출처와 함께 합쳐 status READY와 receipt identities/digests를 반환한다. finding 또는 receipt가 BLOCKED면 status BLOCKED, controller가 포착한 reviewer dispatch 또는 receipt 명령 실패면 classification FAIL과 실제 error·runId를 반환한다.",
+      "task": "When both High-risk finding artifacts arrive, the Controller/join calls oracle-run.mjs review-receipt to record the packetSha256 of each, targetRevision, role, taskId, outputSha256, reviewerId, findingsSha256, and the digest-chain previousDigest·digest as the ledger-bound reviewReceiptA and reviewReceiptB, including adapter node-test and oracleSha256. When both receipts are valid, merge the findings with their sample provenance and return status READY with the receipt identities/digests. If a finding or a receipt is BLOCKED, return status BLOCKED; if the controller caught a reviewer dispatch or receipt command failure, return classification FAIL with the actual error·runId.",
       "input": ["findingsA", "findingsB", "reviewPacket", "reviewAssignments", "reviewDispatches", "runId"],
       "output": [
         "status",
@@ -172,7 +172,7 @@
     {
       "id": "review-finalize",
       "kind": "tool",
-      "task": "먼저 Controller는 standard finding이면 oracle-run.mjs review-receipt를 기록하고, High-risk면 전달된 두 ledger-bound review-receipt identity/digest를 검증·기록한다. oracle-verify.mjs findings와 High-risk 교집합 규칙 및 receipt를 검증해 accepted finding만 최종 검증한다. NON_ORACLE_OPINION만 남으면 finding artifact에는 그대로 두고 REVIEW_ACCEPTED로 정규화한다. REVIEW_ACCEPTED일 때만 lock, evidence, review, 두 ledger-bound review receipt와 모든 필수 run label을 다시 검증하고 oracle-run.mjs transition으로 REVIEW_VERIFIED를 기록한다. classification은 REVIEW_VERIFIED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP 및 구조화된 decision 또는 실제 error를 포함한 FAIL이며 항상 실제 또는 실패 runId를 출력한다. POLICY_GAP이면 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다.",
+      "task": "First, for a standard finding the Controller records oracle-run.mjs review-receipt, and for High risk it verifies and records the two ledger-bound review-receipt identities/digests that were passed in. Verify oracle-verify.mjs findings, the High-risk intersection rule, and the receipts, and finally verify only the accepted findings. When only NON_ORACLE_OPINION remains, leave it in the finding artifact as-is and normalize to REVIEW_ACCEPTED. Only when REVIEW_ACCEPTED, re-verify the lock, evidence, review, the two ledger-bound review receipts, and every required run label, then record REVIEW_VERIFIED with oracle-run.mjs transition. The classification is REVIEW_VERIFIED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP with a structured decision, or FAIL with the actual error, and it always outputs the actual or failing runId. On POLICY_GAP, record oracle-run.mjs transition --to NEEDS_DECISION.",
       "input": ["oraclePath", "oracleSha256", "findings", "reviewReceiptA", "reviewReceiptB"],
       "output": [
         "classification",
@@ -190,7 +190,7 @@
     {
       "id": "implemented-green",
       "kind": "terminal",
-      "task": "visual evidence pending Delivery를 resumable IMPLEMENTED_GREEN으로 종료한다. 재개 시 pending visual evidence를 완료한 뒤 review를 수행하며 REVIEW_VERIFIED를 주장하지 않는다.",
+      "task": "End a Delivery with pending visual evidence as a resumable IMPLEMENTED_GREEN. On resume, complete the pending visual evidence and then perform the review, and do not claim REVIEW_VERIFIED.",
       "input": ["runId", "artifacts"],
       "output": [],
       "writeScope": []
@@ -198,7 +198,7 @@
     {
       "id": "resume-implemented-green",
       "kind": "tool",
-      "task": "persisted IMPLEMENTED_GREEN runId와 lock을 확인하고 completed visual evidence를 oracle-verify.mjs로 검증한다. certifiable visual PASS는 trusted oracle-run --adapter node-test run의 잠긴 test가 Playwright를 호출하고 만든 schema-v3 artifact여야 하며 standalone Playwright adapter와 Browser MCP observation은 인정하지 않는다. visual evidence가 아직 pending이면 IMPLEMENTED_GREEN_PENDING_VISUAL을 반환한다. 완료되면 위험도에 따라 RESUME_STANDARD 또는 RESUME_HIGH를 반환해 기존 review로만 진행하며 IMPLEMENTED_GREEN 전이를 다시 기록하지 않는다. 정책 미결은 POLICY_GAP과 구조화된 decision 및 runId를 반환하고 oracle-run.mjs transition --to NEEDS_DECISION을 기록한다. 검증 실패는 실제 error와 runId를 포함한 FAIL이다.",
+      "task": "Confirm the persisted IMPLEMENTED_GREEN runId and the lock, and verify the completed visual evidence with oracle-verify.mjs. A certifiable visual PASS must be a schema-v3 artifact produced by a locked test of a trusted oracle-run --adapter node-test run driving Playwright; a standalone Playwright adapter and a Browser MCP observation are not accepted. If the visual evidence is still pending, return IMPLEMENTED_GREEN_PENDING_VISUAL. When it is complete, return RESUME_STANDARD or RESUME_HIGH according to risk to proceed only to the existing review, and do not record the IMPLEMENTED_GREEN transition again. Unresolved policy returns POLICY_GAP with a structured decision and the runId, and records oracle-run.mjs transition --to NEEDS_DECISION. A verification failure is FAIL with the actual error and the runId.",
       "input": ["oraclePath", "oracleSha256", "runId"],
       "output": ["classification", "runId", "artifacts", "decision", "error"],
       "writeScope": [".ai/oracles/**"],
@@ -207,7 +207,7 @@
     {
       "id": "pre-ledger-stop",
       "kind": "terminal",
-      "task": "ledger 생성 전 POLICY_GAP 또는 FAIL의 classification, 구조화된 decision, 실제 error를 보존하고 runId를 만들거나 추정하지 않고 종료한다.",
+      "task": "Before the ledger is created, preserve the POLICY_GAP or FAIL classification, the structured decision, and the actual error, and end without creating or guessing a runId.",
       "input": ["classification", "decision", "error"],
       "output": [],
       "writeScope": []
@@ -215,7 +215,7 @@
     {
       "id": "run-stopped",
       "kind": "terminal",
-      "task": "init 뒤 POLICY_GAP 또는 FAIL의 classification, 실제 runId, 구조화된 decision, 실제 error를 보존하고 종료한다. nullable decision/error는 명시적으로 null로 정규화하며 runId를 발명하지 않는다.",
+      "task": "After init, preserve the POLICY_GAP or FAIL classification, the actual runId, the structured decision, and the actual error, and end. Normalize a nullable decision/error explicitly to null and do not invent a runId.",
       "input": ["classification", "runId", "decision", "error"],
       "output": [],
       "writeScope": []
@@ -223,7 +223,7 @@
     {
       "id": "oracle-ready",
       "kind": "terminal",
-      "task": "Design-only 실행을 ORACLE_READY로 종료한다.",
+      "task": "End a Design-only run as ORACLE_READY.",
       "input": ["oracleSha256"],
       "output": [],
       "writeScope": []
@@ -231,7 +231,7 @@
     {
       "id": "review-verified",
       "kind": "terminal",
-      "task": "Delivery 실행을 REVIEW_VERIFIED로 종료한다.",
+      "task": "End a Delivery run as REVIEW_VERIFIED.",
       "input": ["report"],
       "output": [],
       "writeScope": []
@@ -239,7 +239,7 @@
     {
       "id": "cancelled",
       "kind": "terminal",
-      "task": "사용자가 취소한 실행을 추가 변경 없이 종료한다.",
+      "task": "End a run the user cancelled without further changes.",
       "input": ["decision"],
       "output": [],
       "writeScope": []

@@ -70,9 +70,12 @@ test('runs the Oracle contract through the bundled deterministic workflow graph'
   assert.doesNotMatch(skill, /\.ai\/agent-graphs\/<oracle-id>\/graph\.json/)
   assert.match(
     graphOrchestration,
-    /명시적으로 요청한 경우에만 설치된\s*`\$agent-graph-engineering`을 이름으로 명시적으로 로드·호출/,
+    /explicitly requests a graph-orchestrated delivery loop[\s\S]{0,60}`\$agent-graph-engineering`/,
   )
-  assert.match(graphOrchestration, /subagent 위임을 강제하지 않으며\s*agent 재량 선택만 허용한다/)
+  assert.match(
+    graphOrchestration,
+    /subagent delegation is not\s*forced and only the agent.s discretionary choice is allowed/,
+  )
   assert.match(graphOrchestration, /\.ai\/agent-graphs\/<oracle-id>\/graph\.json/)
   assert.match(graphOrchestration, /graph-verify\.mjs next/)
   assert.equal(graph.entry, 'draft-oracle')
@@ -217,7 +220,10 @@ test('owns repeated failure routes with fallback rules that node edges still ove
   // verdicts to REVIEW_ACCEPTED, so an unnormalized output fails loudly instead of routing.
   for (const source of graph.nodes) {
     for (const label of ['ENVIRONMENT_DEFECT', 'NON_ORACLE_OPINION']) {
-      assert.doesNotMatch(source.task, new RegExp(`${label}(?!만)`))
+      // review-finalize is the only node allowed to name one, and only to say it normalizes an
+      // opinion-only verdict away instead of routing on it.
+      if (source.id === 'review-finalize' && label === 'NON_ORACLE_OPINION') continue
+      assert.doesNotMatch(source.task, new RegExp(label))
     }
   }
   assert.throws(
@@ -250,11 +256,11 @@ test('O12: workflow graph records transitions and preserves decision and failure
     assert.ok(edge(source, target, classification))
   }
 
-  assert.match(node('valid-red').task, /ALREADY_SATISFIED[^.]*production[^.]*수정하지 않는다/)
-  assert.match(node('implement-green').task, /ALREADY_SATISFIED[^.]*production[^.]*수정하지 않는다/)
+  assert.match(node('valid-red').task, /ALREADY_SATISFIED[^.]*modify production/)
+  assert.match(node('implement-green').task, /ALREADY_SATISFIED[^.]*modify production/)
   assert.match(node('implement-green').task, /visual[^.]*pending[^.]*IMPLEMENTED_GREEN/)
   assert.match(node('implement-green').task, /IMPLEMENTED_GREEN[^.]*resume/)
-  assert.match(node('implement-green').task, /IMPLEMENTED_GREEN을 정확히 한 번/)
+  assert.match(node('implement-green').task, /IMPLEMENTED_GREEN exactly once/)
   assert.deepEqual(selectTransitions(graph, 'draft-oracle', { classification: 'POLICY_GAP' }), ['pre-ledger-stop'])
   assert.deepEqual(selectTransitions(graph, 'lock-oracle', { classification: 'POLICY_GAP' }), ['pre-ledger-stop'])
   assert.deepEqual(node('pre-ledger-stop').input, ['classification', 'decision', 'error'])
@@ -267,8 +273,11 @@ test('O12: workflow graph records transitions and preserves decision and failure
   assert.deepEqual(selectTransitions(graph, 'resume-implemented-green', { classification: 'RESUME_HIGH' }), [
     'review-dispatch',
   ])
-  assert.match(node('resume-implemented-green').task, /IMPLEMENTED_GREEN 전이를 다시 기록하지 않는다/)
-  assert.match(node('resume-implemented-green').task, /oracle-run --adapter node-test.*Playwright.*schema-v3/s)
+  assert.match(node('resume-implemented-green').task, /not record the IMPLEMENTED_GREEN transition again/)
+  // The three together are the contract; the sentence may order them however it reads best.
+  for (const token of ['oracle-run --adapter node-test', 'Playwright', 'schema-v3']) {
+    assert.match(node('resume-implemented-green').task, new RegExp(token))
+  }
 
   const policyGapSources = graph.nodes.filter(
     (candidate) => candidate.output?.includes('classification') && /\bPOLICY_GAP\b/.test(candidate.task),
@@ -597,7 +606,7 @@ test('batches delivery decisions without prescribing an implementation topology'
   assert.match(implementationLoop, /does not force whether the subsequent.*current agent, delegated, or parallelized/s)
   assert.equal(implementationNode.kind, 'agent')
   assert.equal(implementationNode.owner, 'executor')
-  assert.match(implementationNode.task, /단일·위임·병렬 구현 방식을 강제하지 않는다/)
+  assert.match(implementationNode.task, /does not force a single·delegated·parallel implementation method/)
   assert.match(implementationLoop, /targeted GREEN once/)
   assert.match(implementationLoop, /root test.*lint.*format.*independent review.*parallel/s)
   assert.match(implementationLoop, /all results.*join.*final verify/s)
@@ -1028,9 +1037,9 @@ test('reads load conditions at the decision point, not at the write stage', asyn
   const byId = new Map(graph.nodes.map((node) => [node.id, node]))
 
   // 범용 규칙 하나가 모든 노드의 when 해석을 소유한다
-  assert.match(graph.entryContract.loadConditionRule, /산출물 시점이 아니라 결정 시점/)
-  assert.match(graph.entryContract.loadConditionRule, /애매하면 로드한다/)
-  assert.match(graph.entryContract.loadConditionRule, /로드를 건너뛸지는 판정 대상이 아니다/)
+  assert.match(graph.entryContract.loadConditionRule, /decision point, not the deliverable stage/)
+  assert.match(graph.entryContract.loadConditionRule, /If applicability is ambiguous, load/)
+  assert.match(graph.entryContract.loadConditionRule, /Whether to skip a load is not a judgment call/)
   assert.match(skill, /Read\s+`when` as the decision point, not the deliverable stage/)
   assert.match(skill, /If applicability is ambiguous, load\./)
 
@@ -1076,13 +1085,13 @@ test('scopes negative type witnesses to boundary axes and caps them as a design 
   const [typeConstraints, bva] = await Promise.all([readTypes(), read('references/bva.md')])
 
   // 축은 bva.md 한 곳이 소유한다 — 타입 문서는 이 API가 닫는 축만 고르라고 요구한다
-  assert.match(bva, /## 5\. 타입 경계/)
-  assert.match(bva, /닫지 않는 축에는 witness를 만들지 않는다/)
+  assert.match(bva, /## 5\. Type boundaries/)
+  assert.match(bva, /Do not create a witness on an axis it does not close/)
   assert.match(typeConstraints, /for each boundary axis this API closes/)
   assert.match(typeConstraints, /axes and the count rule for type witnesses are owned by/)
 
   // 30은 채우는 목표가 아니라 분리 신호다
-  assert.match(bva, /30은 채워야 할 목표가 아니라 표면이 너무 넓다는 설계 실격선이다/)
+  assert.match(bva, /30 is not a target to fill but a design disqualification line/)
   assert.match(typeConstraints, /exceeds 30, do not write more cases but split the API/)
   assert.match(typeConstraints, /exceeds 30.*API split.*`FINDING`/is)
 
@@ -1222,7 +1231,7 @@ test('passes review criteria to reviewers as file links, not pasted text', async
   assert.doesNotMatch(process_, /Decision Falsification Questions/)
   assert.match(checklist, /Decision Falsification Questions — Applicable Items Only/)
   assert.match(checklist, /--review-point/)
-  const always = graph.reviewPoints.find((entry) => entry.when === '항상')
+  const always = graph.reviewPoints.find((entry) => entry.when === 'always')
   assert.ok(always.nodes.includes('review-checklist'), 'the checklist must always reach the reviewer')
   assert.match(subagentReview, /--review-point <skill-dir>\/references\/review-checklist\.md/)
 
@@ -1301,9 +1310,9 @@ test('forces one entry-node read and a lane header before any other work', async
 
   // 그래프가 진입 계약을 기계 판독 가능하게 선언한다
   assert.ok(graph.entryContract, 'reference-graph.json must declare entryContract')
-  assert.match(graph.entryContract.firstToolCall, /lane 진입 노드 1개 Read/)
+  assert.match(graph.entryContract.firstToolCall, /Read exactly one lane entry node/)
   assert.match(graph.entryContract.responseHeader, /^risk=<Low\|Medium\|High> lane=/)
-  assert.match(graph.entryContract.appliesTo, /설명·플랜 전용 요청/)
+  assert.match(graph.entryContract.appliesTo, /explanation·plan-only requests/)
 })
 
 test('inlines the required reference reads into the mode steps instead of a separate section', async () => {

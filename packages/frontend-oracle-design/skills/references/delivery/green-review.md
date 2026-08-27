@@ -115,7 +115,7 @@ reviewer`. A visual `pending` or a Visual QA `declined` is reported as an unveri
 evidence verification but blocks completion with `EVIDENCE_PENDING` in review evidence verification.
 To reach `REVIEW_VERIFIED`, one of an existing tool browser journey artifact, a designer finding, or a
 source-backed N/A revision is required. N/A is used not as an artifact but only when the locked card row
-states `N/A (출처: S*)` and the manifest quotes an approved Source Registry ID.
+states `N/A (source: S*)` and the manifest quotes an approved Source Registry ID.
 
 A RELATIONAL visual artifact receipt must be a regular file inside the Oracle directory, artifact paths inside the receipt must be relative to the receipt directory, and the minimum format is
 as follows.

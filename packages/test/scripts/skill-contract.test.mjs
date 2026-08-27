@@ -17,9 +17,9 @@ test('ships the frontend test contract with its required BVA reference', async (
 
   assert.match(skill, /name: test/)
   assert.match(skill, /references\/bva\.md/)
-  assert.match(skill, /VALID_RED 술어/)
-  assert.match(skill, /가능한 기존 테스트가 있다면 재활용한다/)
-  assert.match(skill, /describe `as`, it `to be` 패턴/)
+  assert.match(skill, /VALID_RED predicates/)
+  assert.match(skill, /If a usable existing test exists, reuse it/)
+  assert.match(skill, /describe `as`, it `to be` pattern/)
   assert.equal(bundledBva, oracleBva)
 })
 
@@ -30,13 +30,13 @@ test('writes type witnesses on the shared boundary axes and treats 30 as a split
   ])
 
   // 축은 bva.md가 소유하고, 스킬은 카드가 닫는 축만 번역한다
-  assert.match(bva, /## 5\. 타입 경계/)
-  assert.match(bva, /닫지 않는 축에는 witness를 만들지 않는다/)
-  assert.match(skill, /bva\.md 타입 경계 축마다/)
+  assert.match(bva, /## 5\. Type boundaries/)
+  assert.match(bva, /Do not create a witness on an axis it does not close/)
+  assert.match(skill, /each bva\.md type boundary axis/)
 
   // 30은 채우는 목표가 아니라 분리 신호다 — 분리 판단은 정책이므로 oracle로 올린다
-  assert.match(bva, /30은 채워야 할 목표가 아니라 표면이 너무 넓다는 설계 실격선이다/)
-  assert.match(skill, /30개를 넘으면 케이스를 늘리지 말고 API 분리를\s*\n?\s*NEEDS_DECISION으로 올린다/)
+  assert.match(bva, /30 is not a target to fill but a design disqualification line/)
+  assert.match(skill, /it exceeds 30, do not add more cases; raise the API split/)
 })
 
 test('O31: records runs through the oracle ledger and blocks weakened tests', async () => {
@@ -54,7 +54,7 @@ test('keeps behavior tests here and delegates screenshot or direct-browser QA', 
   const skill = await readFile(join(skillDirectory, 'SKILL.md'), 'utf8')
 
   assert.match(skill, /\$frontend-visual-qa/)
-  assert.match(skill, /screenshot.*직접 브라우저.*위임/s)
+  assert.match(skill, /Screenshot comparison[\s\S]{0,80}delegated to/i)
   assert.doesNotMatch(skill, /headless.*`\*\.style\.(?:test|spec)/s)
-  assert.match(skill, /BROWSER_VERIFIED.*발급하지 않는다/s)
+  assert.match(skill, /does not create a visual baseline or issue `BROWSER_VERIFIED`/)
 })
