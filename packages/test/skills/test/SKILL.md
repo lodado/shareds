@@ -91,6 +91,16 @@ Playwright rules (no exceptions):
    visible after scroll into view or `naturalWidth > 0`
 5. `test.skip` + a reason only for what cannot be judged at any layer — first consider moving layers
    (unit/API)
+6. In a repo that uses `playwright-spec-for-ai-agent` (the dependency in `package.json`, a
+   `playwright-spec-for-ai-agent.config.*` file, or `@qa-scenario` in neighboring specs), every new or
+   edited spec file carries the `@qa-*` annotations: a file-level `// @qa-scenario:` plus
+   `// @qa-live-policy:` on each test or an enclosing `test.describe`. Read the vocabulary and parsing
+   rules before writing them — they are not restated here:
+   [docs/reference/annotations.md](https://github.com/lodado/playwright-spec-for-AI-Agent/blob/main/docs/reference/annotations.md),
+   worked example [examples/sample-spec.ts](https://github.com/lodado/playwright-spec-for-AI-Agent/blob/main/examples/sample-spec.ts).
+   Derive the live policy from the card's side-effect rows: observation only → `readonly`,
+   non-destructive interaction → `safe-interaction`, mutation·payment·deletion → the matching
+   `blocked-*` policy. A missing annotation in such a repo blocks `GREEN` the same as a skipped row.
 
 When a non-N/A Oracle row is skipped, do not issue `GREEN`.
 Verify it at another layer, return to Oracle with a sourced N/A, or report `FAIL`.
