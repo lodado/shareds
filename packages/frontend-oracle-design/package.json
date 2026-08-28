@@ -8,7 +8,9 @@
     "lint": "eslint skills",
     "test": "node --test skills/scripts/*.test.mjs",
     "workflow-docs:generate": "node skills/scripts/generate-workflow-docs.mjs",
-    "workflow-docs:check": "node skills/scripts/generate-workflow-docs.mjs --check"
+    "workflow-docs:check": "node skills/scripts/generate-workflow-docs.mjs --check",
+    "bundles:generate": "node skills/scripts/generate-reference-bundles.mjs",
+    "bundles:check": "node skills/scripts/generate-reference-bundles.mjs --check"
   },
   "devDependencies": {
     "typescript": "5.9.3"

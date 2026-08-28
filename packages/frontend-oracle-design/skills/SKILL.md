@@ -83,6 +83,15 @@ owns each node's `when` as the canonical load condition. The bullets below resta
 because this file is what gets read at runtime — they are a projection of the graph, kept in sync by
 `skill-contract.test.mjs`, not a duplicate to collapse.
 
+A lane reads the same node set in the same order every run, and reading them as separate calls
+changes the prompt prefix each time and loses the cache. `bundles/` holds those node sets pre-joined
+in dependency-first order — `card-lane`, `delivery-lane`, `types-lane`, `frontend-lane` — generated
+from the graph by `scripts/generate-reference-bundles.mjs`. Reading a bundle is optional and equals
+reading its nodes: same bytes, one call, stable prefix. It is a delivery mechanism, never an
+authority, so **the lane header still reports the node ids, not the bundle id**, and a node outside
+any bundle is still read directly. Never hand-edit `bundles/` — edit the reference and regenerate;
+`--check` fails the build on drift.
+
 Read `when` as the decision point, not the deliverable stage. If applicability is ambiguous, load.
 Whether to skip a load is not a judgment call. The read instructions inlined into each step of
 "Mode selection" own execution order; do not defer to this section to proceed through a step.

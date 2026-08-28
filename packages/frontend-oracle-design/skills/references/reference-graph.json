@@ -247,5 +247,56 @@
       "loader": "graph-tooling",
       "requires": []
     }
-  ]
+  ],
+  "bundles": [
+    {
+      "id": "card-lane",
+      "when": "oracle lane, writing an Oracle Card — replaces the common·card·bva node reads",
+      "nodes": ["common", "card-policy-sources", "card-risk-grill", "bva", "card-format", "card-confirmation-lock"]
+    },
+    {
+      "id": "delivery-lane",
+      "when": "entering Delivery after ORACLE_READY",
+      "nodes": [
+        "delivery-ledger",
+        "delivery-red",
+        "delivery-implementation-decision",
+        "delivery-green-review",
+        "subagent-review"
+      ]
+    },
+    {
+      "id": "types-lane",
+      "when": "async·ordering·duplicate-submit rows, or client state·exported Props·shared API·trust boundary type changes",
+      "nodes": [
+        "types-state-ladder",
+        "types-authoring",
+        "types-api-surface",
+        "types-advanced-contracts",
+        "frontend-decisions"
+      ]
+    },
+    {
+      "id": "frontend-lane",
+      "when": "a React production change — implementation decisions and authoring boundaries",
+      "nodes": [
+        "changeability",
+        "frontend-decisions",
+        "frontend-authoring",
+        "frontend-quality",
+        "architecture-contract"
+      ]
+    }
+  ],
+  "bundleContract": {
+    "purpose": "Deterministic pre-joined reads of the same reference bytes. A bundle exists to stabilize the prompt prefix so a repeat session hits the cache, and never to summarize or replace node content.",
+    "generator": "scripts/generate-reference-bundles.mjs",
+    "check": "scripts/generate-reference-bundles.mjs --check",
+    "rules": [
+      "A bundle is optional. Reading its nodes individually is always valid and produces the same bytes.",
+      "Report the node ids in the lane header, never the bundle id.",
+      "Never hand-edit bundles/ — edit the reference node and regenerate.",
+      "A bundle contains every requires edge of its declared nodes, in dependency-first order."
+    ]
+  }
 }
