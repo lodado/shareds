@@ -179,7 +179,9 @@ Review before locking and record the choices you revised and why:
 
 ## 7. Delivery evidence responsibility
 
-- A `HARD` row confirms `Then`·`Never` together at the narrowest DOM·a11y·component observation tier.
+- A `HARD` row confirms `Then`·`Never` together at the narrowest **user-observable** DOM·a11y·
+  component tier. Narrowest means the smallest rendered outcome, never a new exported map·helper
+  added so the row has something to assert on.
 - A `RELATIONAL` row maps to a `$frontend-visual-qa` artifact or the same owner's `pending`. A
   `pending` and a user `declined` may remain at `IMPLEMENTED_GREEN` but block `REVIEW_VERIFIED`
   without a source-backed N/A revision.

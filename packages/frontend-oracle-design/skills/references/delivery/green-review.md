@@ -93,13 +93,18 @@ An unfilled placeholder fails `evidence` verification as-is.
   "schemaVersion": 1,
   "rows": {
     "O1": { "kind": "test", "name": "save > shows pending and POSTs once" },
-    "O2": { "kind": "reviewer", "finding": "f-3", "role": "code-reviewer" },
+    "O2": { "kind": "test", "name": "save > shows pending and POSTs once" },
     "O3": { "kind": "na", "reason": "this feature has no cancel path", "source": "S1" },
+    "O4": { "kind": "reviewer", "finding": "f-3", "role": "code-reviewer" },
     "D1": { "kind": "visual", "artifact": "visual-qa/v-001/evidence.json" },
     "D2": { "kind": "reviewer", "finding": "d-1", "role": "designer" }
   }
 }
 ```
+
+`O1`·`O2` above quote one test on purpose: one observation covers both rows, and splitting it would
+buy a second export rather than a second observation. Give a row its own test name only when it needs
+its own observation.
 
 ```bash
 node <skill-dir>/scripts/oracle-verify.mjs evidence \

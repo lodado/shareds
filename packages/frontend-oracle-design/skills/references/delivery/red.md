@@ -3,7 +3,11 @@
 1. Run the bundled `oracle-lock.mjs verify` and record the revision·exit code. `exec`·`transition`
    automatically perform the same verification on every call.
 2. Translate every non-N/A row of the card into an observable test and first map the test name onto
-   the corresponding row of `evidence.json`.
+   the corresponding row of `evidence.json`. A row maps to an observation, not to a symbol: several
+   rows may quote the same test name when one observation covers them, and a test asserts what the
+   user can observe. Do not create a production export whose only reason to exist is to give a row
+   something to import — if the row is only observable through a module invented for the test, the
+   observation tier is wrong, not the code.
 3. For the network boundary, prefer the test boundary the repo already uses. If MSW is installed or
    its adoption is approved, use an MSW handler; otherwise use the existing transport seam. Do not
    quietly add a dependency just for tests. Handlers·example data belong in the closest place that
