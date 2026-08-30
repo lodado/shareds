@@ -2725,3 +2725,105 @@ test('O18: evidence and review artifacts stay inside the Oracle directory with s
   assert.equal(receiptSwap.status, 1)
   assert.match(receiptSwap.stderr, /^VISUAL_EVIDENCE_INVALID: |^EVIDENCE_/)
 })
+
+/** Deviations·Dependency landmines 선택 섹션 — VALID_CARD의 P1~P4를 4유형 전부로 커버한다. */
+const DEVIATIONS_SECTION = `
+## Deviations
+
+| Policy | Type                       | Disposition                              |
+| ------ | -------------------------- | ---------------------------------------- |
+| P1     | not-provided               | covered(O2)                              |
+| P1     | unsafe-provided            | impossible: 무시는 부작용이 없다         |
+| P1     | wrong-timing-order         | covered(O2)                              |
+| P1     | stopped-early-applied-long | needs-decision: 응답 후에도 무시가 지속되면? |
+| P2     | not-provided               | covered(O3)                              |
+| P2     | unsafe-provided            | impossible: 입력 유지에 위해 문맥 없음   |
+| P2     | wrong-timing-order         | covered(O4)                              |
+| P2     | stopped-early-applied-long | impossible: 지속 시간 없음               |
+| P3     | not-provided               | covered(O7)                              |
+| P3     | unsafe-provided            | impossible: 최신만 갱신은 항상 안전      |
+| P3     | wrong-timing-order         | covered(O7)                              |
+| P3     | stopped-early-applied-long | covered(O8)                              |
+| P4     | not-provided               | covered(D1)                              |
+| P4     | unsafe-provided            | impossible: 정적 문구                    |
+| P4     | wrong-timing-order         | impossible: 시간 표면 없음               |
+| P4     | stopped-early-applied-long | impossible: 지속 시간 없음               |
+`
+
+const LANDMINES_SECTION = `
+## Dependency landmines — example-lib
+
+| Landmine                                   | Citation               | Disposition                    |
+| ------------------------------------------ | ---------------------- | ------------------------------ |
+| initialOffset 옵션 = 마운트 스크롤 리셋 화석 | docs/api#initialoffset | needs-decision: 리마운트 시 유지? |
+| 동적 높이 재측정 주의                       | issues/123             | N/A: 행 높이 고정 (S1)          |
+`
+
+test('deviations·landmines: 유효한 선택 섹션은 lint를 통과한다', async (t) => {
+  const linted = run('card', '--oracle', await cardFile(t, VALID_CARD + DEVIATIONS_SECTION + LANDMINES_SECTION))
+
+  assert.equal(linted.status, 0, linted.stderr)
+})
+
+test('deviations: 유형 누락·enum 밖 유형·없는 정책은 실패한다', async (t) => {
+  const missingType = VALID_CARD + DEVIATIONS_SECTION.replace(/\| P4     \| stopped-early-applied-long[^\n]*\n/, '')
+  const badType = VALID_CARD + DEVIATIONS_SECTION.replace('| P1     | not-provided ', '| P1     | maybe-provided ')
+  const unknownPolicy = VALID_CARD + DEVIATIONS_SECTION.replace('| P4     | not-provided ', '| P99    | not-provided ')
+
+  const missing = run('card', '--oracle', await cardFile(t, missingType))
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /deviation-type-missing: P4: stopped-early-applied-long/)
+
+  const type = run('card', '--oracle', await cardFile(t, badType))
+  assert.equal(type.status, 1)
+  assert.match(type.stderr, /deviation-disposition: P1: "maybe-provided"/)
+
+  const policy = run('card', '--oracle', await cardFile(t, unknownPolicy))
+  assert.equal(policy.status, 1)
+  assert.match(policy.stderr, /deviation-policy-unknown: "P99"/)
+})
+
+test('landmines: 인용 없는 항목과 빈 disposition은 실패한다', async (t) => {
+  const noCitation = VALID_CARD + LANDMINES_SECTION.replace('docs/api#initialoffset', '-')
+  const noDisposition = VALID_CARD + LANDMINES_SECTION.replace('needs-decision: 리마운트 시 유지?', '-')
+
+  const citation = run('card', '--oracle', await cardFile(t, noCitation))
+  assert.equal(citation.status, 1)
+  assert.match(citation.stderr, /landmine-citation-missing/)
+
+  const disposition = run('card', '--oracle', await cardFile(t, noDisposition))
+  assert.equal(disposition.status, 1)
+  assert.match(disposition.stderr, /landmine-undispositioned/)
+})
+
+test('sources: 잠긴 dep 버전과 설치 버전을 대조해 드리프트를 보고한다', async (t) => {
+  const root = await directory(t)
+  const lockDir = join(root, '.ai', 'oracles', 'sample')
+  await mkdir(lockDir, { recursive: true })
+  await mkdir(join(root, 'node_modules', 'pkg-a'), { recursive: true })
+  await writeFile(join(root, 'node_modules', 'pkg-a', 'package.json'), JSON.stringify({ name: 'pkg-a', version: '1.2.3' }))
+  const lockPath = join(lockDir, 'oracle.lock.json')
+  const manifest = {
+    algorithm: 'sha256',
+    oracle: { path: 'oracle.md', sha256: 'a'.repeat(64) },
+    schemaVersion: 1,
+    sources: [],
+    dependencies: [{ name: 'pkg-a', version: '1.2.3' }],
+  }
+  await writeFile(lockPath, JSON.stringify(manifest))
+
+  const current = run('sources', '--lock', lockPath)
+  assert.equal(current.status, 0, current.stderr)
+  assert.equal(current.stdout, 'SOURCES_CURRENT 1 dependencies\n')
+
+  await writeFile(join(root, 'node_modules', 'pkg-a', 'package.json'), JSON.stringify({ name: 'pkg-a', version: '2.0.0' }))
+  const drifted = run('sources', '--lock', lockPath)
+  assert.equal(drifted.status, 1)
+  assert.match(drifted.stderr, /ASSUMPTION_DRIFT pkg-a locked 1\.2\.3 installed 2\.0\.0/)
+  assert.match(drifted.stderr, /re-run the landmine sweep/)
+
+  await writeFile(lockPath, JSON.stringify({ ...manifest, dependencies: undefined }))
+  const none = run('sources', '--lock', lockPath)
+  assert.equal(none.status, 0, none.stderr)
+  assert.equal(none.stdout, 'SOURCES_CURRENT 0 dependencies\n')
+})

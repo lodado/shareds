@@ -22,6 +22,7 @@ const FLAG_NAMES = [
   'source',
   'packet',
   'revision',
+  'lock',
 ]
 
 const CLASSIFICATIONS = [
@@ -676,6 +677,100 @@ async function lintCard(options) {
           }
         }
       }
+    }
+  }
+
+  // Deviations 섹션도 선택이다 — 있으면 P*×4 STPA 유형 커버리지와 disposition을 검증한다.
+  const DEVIATION_TYPES = ['not-provided', 'unsafe-provided', 'wrong-timing-order', 'stopped-early-applied-long']
+  const deviations = sectionLines(lines, 'Deviations')
+
+  if (deviations.length > 0) {
+    const deviationRows = deviations
+      .filter((line) => line.trim().startsWith('|'))
+      .map((line) => splitRow(line.trim()))
+      .filter((cells) => cells[0] !== 'Policy' && !/^:?-+:?$/.test(cells[0]))
+
+    if (deviationRows.length === 0) {
+      issues.push('deviation-rows: Deviations must include a Policy/Type/Disposition table')
+    }
+
+    const typesByPolicy = new Map()
+    for (const cells of deviationRows) {
+      const [policy = '', type = '', disposition = ''] = cells
+      if (!policies.has(policy)) {
+        issues.push(`deviation-policy-unknown: "${policy}" is not a decided policy`)
+        continue
+      }
+      if (!DEVIATION_TYPES.includes(type)) {
+        issues.push(`deviation-disposition: ${policy}: "${type}" is not a deviation type (${DEVIATION_TYPES.join(' | ')})`)
+        continue
+      }
+      if (!typesByPolicy.has(policy)) typesByPolicy.set(policy, new Set())
+      typesByPolicy.get(policy).add(type)
+
+      const value = disposition.trim()
+      if (isEmptyCell(value)) {
+        issues.push(`deviation-disposition: ${policy} × ${type}: disposition is empty`)
+        continue
+      }
+      const covered = value.match(/^covered\(([^)]+)\)$/)
+      if (covered) {
+        const cited = rowIds(covered[1])
+        if (cited.length === 0) issues.push(`deviation-disposition: ${policy} × ${type}: covered() must cite O*/D* rows`)
+        for (const id of cited) {
+          if (!seenRows.has(id)) issues.push(`deviation-row-unknown: ${policy} × ${type}: ${id} is not a contract row`)
+        }
+      } else if (!/^impossible:\s*\S/.test(value) && !/^needs-decision:\s*\S/.test(value)) {
+        issues.push(
+          `deviation-disposition: ${policy} × ${type}: disposition must be covered(O*) | impossible: reason | needs-decision: question`,
+        )
+      }
+    }
+
+    for (const policyId of policies.keys()) {
+      for (const type of DEVIATION_TYPES) {
+        if (!typesByPolicy.get(policyId)?.has(type)) {
+          issues.push(`deviation-type-missing: ${policyId}: ${type} has no disposition`)
+        }
+      }
+    }
+  }
+
+  // Dependency landmines 섹션도 선택이다 — 있으면 인용·disposition을 검증한다. 패키지별 다중 섹션 허용.
+  const landmineRows = []
+  {
+    let inLandmines = false
+    for (const line of lines) {
+      if (line.startsWith('## ')) {
+        inLandmines = line.startsWith('## Dependency landmines')
+        continue
+      }
+      if (!inLandmines || !line.trim().startsWith('|')) continue
+      const cells = splitRow(line.trim())
+      if (cells[0] === 'Landmine' || /^:?-+:?$/.test(cells[0])) continue
+      landmineRows.push(cells)
+    }
+  }
+
+  for (const cells of landmineRows) {
+    const [landmine = '', citation = '', disposition = ''] = cells
+    if (isEmptyCell(citation.trim())) {
+      issues.push(`landmine-citation-missing: "${landmine}": a docs anchor, issue URL, or changelog entry is required`)
+    }
+    const value = disposition.trim()
+    if (isEmptyCell(value)) {
+      issues.push(`landmine-undispositioned: "${landmine}": disposition is empty`)
+      continue
+    }
+    const covered = value.match(/^covered\(([^)]+)\)$/)
+    if (covered) {
+      for (const id of rowIds(covered[1])) {
+        if (!seenRows.has(id)) issues.push(`landmine-row-unknown: "${landmine}": ${id} is not a contract row`)
+      }
+    } else if (!/^impossible:\s*\S/.test(value) && !/^needs-decision:\s*\S/.test(value) && !/^N\/A/i.test(value)) {
+      issues.push(
+        `landmine-undispositioned: "${landmine}": disposition must be covered(O*) | impossible: reason | needs-decision: question | N/A reason`,
+      )
     }
   }
 
@@ -1732,6 +1827,50 @@ async function scanNondeterminism(options) {
   process.stdout.write(`SCAN_OK ${options.path.length} files\n`)
 }
 
+/** 잠긴 dep 버전과 현재 설치 버전을 대조한다 — 가정 드리프트의 선행 신호. 게이트가 아니라 재스윕 지시다. */
+async function verifySources(options) {
+  if (!options.lock) throw new CliError('USAGE', 'sources requires --lock', 2)
+  const lockPath = resolve(options.lock)
+  const lockDirectory = dirname(lockPath)
+  const manifest = await readJson(lockPath, 'LOCK_INVALID')
+  const dependencies = manifest?.dependencies
+  if (dependencies !== undefined && !Array.isArray(dependencies)) {
+    throw new CliError('LOCK_INVALID', 'dependencies must be an array of { name, version }')
+  }
+
+  if (!dependencies || dependencies.length === 0) {
+    process.stdout.write('SOURCES_CURRENT 0 dependencies\n')
+    return
+  }
+
+  const segments = lockDirectory.split(/[\\/]/)
+  const markerIndex = segments.lastIndexOf('.ai')
+  const rootDirectory = markerIndex === -1 ? lockDirectory : segments.slice(0, markerIndex).join('/')
+
+  const drifted = []
+  for (const entry of dependencies) {
+    if (!entry || typeof entry.name !== 'string' || typeof entry.version !== 'string') {
+      throw new CliError('LOCK_INVALID', 'dependencies must be an array of { name, version }')
+    }
+    const installedPath = resolve(rootDirectory, 'node_modules', entry.name, 'package.json')
+    let installed
+    try {
+      installed = JSON.parse(await readFile(installedPath, 'utf8')).version
+    } catch {
+      installed = null
+    }
+    if (installed !== entry.version) {
+      drifted.push({ name: entry.name, locked: entry.version, installed: installed ?? 'not installed' })
+    }
+  }
+
+  if (drifted.length > 0) {
+    const lines = drifted.map((entry) => `ASSUMPTION_DRIFT ${entry.name} locked ${entry.locked} installed ${entry.installed}`)
+    throw new CliError('ASSUMPTION_DRIFT', `${lines.join('\n')}\nre-run the landmine sweep for the drifted packages in a new revision`)
+  }
+  process.stdout.write(`SOURCES_CURRENT ${dependencies.length} dependencies\n`)
+}
+
 async function main() {
   const [command, ...args] = process.argv.slice(2)
   const options = parseOptions(args)
@@ -1743,7 +1882,8 @@ async function main() {
   else if (command === 'findings') await verifyFindings(options)
   else if (command === 'review') await verifyReview(options)
   else if (command === 'scan') await scanNondeterminism(options)
-  else throw new CliError('USAGE', 'Expected card, red, evidence, evidence-scaffold, findings, review or scan', 2)
+  else if (command === 'sources') await verifySources(options)
+  else throw new CliError('USAGE', 'Expected card, red, evidence, evidence-scaffold, findings, review, scan or sources', 2)
 }
 
 try {

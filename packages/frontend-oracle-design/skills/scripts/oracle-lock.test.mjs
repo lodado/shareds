@@ -403,3 +403,39 @@ test('rejects an invalid lock manifest', async (t) => {
   assert.equal(verified.status, 1)
   assert.match(verified.stderr, /LOCK_INVALID/)
 })
+
+test('dep: --dep은 설치 버전을 manifest.dependencies에 고정하고 verify는 드리프트와 무관하게 통과한다', async (t) => {
+  const { lock, oracle, source, sourcePath } = await fixture(t)
+  const packageJson = join(dirname(sourcePath), '..', 'node_modules', 'pkg-a', 'package.json')
+  await mkdir(dirname(packageJson), { recursive: true })
+  await writeFile(packageJson, JSON.stringify({ name: 'pkg-a', version: '1.2.3' }))
+
+  const created = run('create', '--oracle', oracle, '--lock', lock, '--source', source, '--dep', 'pkg-a')
+  assert.equal(created.status, 0, created.stderr)
+
+  const manifest = JSON.parse(await readFile(lock, 'utf8'))
+  assert.deepEqual(manifest.dependencies, [{ name: 'pkg-a', version: '1.2.3' }])
+
+  // dep 버전 드리프트는 verify(바이트 안정성)의 실패 사유가 아니다 — 감지는 oracle-verify sources 소관.
+  await writeFile(packageJson, JSON.stringify({ name: 'pkg-a', version: '2.0.0' }))
+  const verified = run('verify', '--lock', lock)
+  assert.equal(verified.status, 0, verified.stderr)
+})
+
+test('dep: 미설치 패키지는 DEP_UNRESOLVED, 다른 dep 집합의 재생성은 SOURCE_CHANGED다', async (t) => {
+  const { lock, oracle, source, sourcePath } = await fixture(t)
+
+  const missing = run('create', '--oracle', oracle, '--lock', lock, '--source', source, '--dep', 'pkg-none')
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /DEP_UNRESOLVED/)
+
+  const packageJson = join(dirname(sourcePath), '..', 'node_modules', 'pkg-a', 'package.json')
+  await mkdir(dirname(packageJson), { recursive: true })
+  await writeFile(packageJson, JSON.stringify({ name: 'pkg-a', version: '1.2.3' }))
+  const created = run('create', '--oracle', oracle, '--lock', lock, '--source', source, '--dep', 'pkg-a')
+  assert.equal(created.status, 0, created.stderr)
+
+  const recreated = run('create', '--oracle', oracle, '--lock', lock, '--source', source)
+  assert.equal(recreated.status, 1)
+  assert.match(recreated.stderr, /SOURCE_CHANGED/)
+})

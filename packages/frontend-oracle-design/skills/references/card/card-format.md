@@ -135,7 +135,11 @@ stands on its own. Hand the card to an independent reviewer surface that has no 
 
 - Pass **the card bytes only.** No repo path, no conversation, no rationale, no intended reading,
   no statement of what the card is supposed to mean. The Draft text is the entire input.
-- Ask for three things: what this card contracts, in the reviewer's own words; every place the
+- Frame the read as a premortem stated as fact, not a possibility: **"this card was locked and
+  shipped, and one defect escaped it — name that defect, pointing at the row, cell, or missing
+  dimension that let it through."** Certainty framing measurably widens the reasons a reviewer
+  generates; a worry that cannot point at a location is discarded rather than recorded.
+- Then ask for three things: what this card contracts, in the reviewer's own words; every place the
   reviewer had to guess in order to answer; every `Then`·`Never`·side-effect count it could satisfy
   in a way the author plainly did not intend.
 - A forced guess is a card defect, not a reader failure — repair the row instead of explaining it.

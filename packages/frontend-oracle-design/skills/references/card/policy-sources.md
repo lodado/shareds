@@ -84,6 +84,44 @@ Rules:
 - When a standard's revision/version changes, invalidate the existing `ORACLE_READY` and cross-check
   again.
 
+## Dependency landmines — importing upstream escapes
+
+A library's caveat docs, its issue tracker, and above all its **problem-avoidance options are
+fossils of escapes upstream already paid for** — an option like `initialOffset` exists because
+someone shipped the scroll-reset defect it prevents. Read the fossils before the lock instead of
+rediscovering the defect in production.
+
+When the Source Registry registers an `implementation-reference` dependency that this change newly
+adopts or whose usage surface it changes, collect — for the actually installed version — ① the
+official docs' caveat·gotcha·pitfall sections, ② the option list, flagging options that exist to
+avoid a known problem, ③ top open·closed defects in the issue tracker that touch the used surface.
+Record them as a card section per package:
+
+```markdown
+## Dependency landmines — example-virtual-list
+
+| Landmine                                            | Citation                | Disposition                             |
+| --------------------------------------------------- | ----------------------- | --------------------------------------- |
+| initialOffset option = fossil of mount scroll reset | docs/api#initialoffset  | needs-decision: keep scroll on remount? |
+| measureElement remeasures on dynamic row height     | docs/api#measureelement | N/A: fixed row height (S2)              |
+```
+
+Rules:
+
+- **Every landmine needs a citation** — a docs anchor, issue URL, or changelog entry.
+  LLM-recalled pitfalls without a citation are rejected by lint (`landmine-citation-missing`):
+  unconstrained recall produces majority false positives, and a citation is the constraint.
+- Every row carries one of the three dispositions (`covered(O*/D*)` / `impossible: reason` /
+  `needs-decision: question`); an empty one fails lint (`landmine-undispositioned`). Promotion
+  follows the sweep rule — only `needs-decision` becomes a grill question.
+- A card that adopts no dependency and changes no dependency surface has no landmine section —
+  do not manufacture one.
+- At lock time, pass each landmine-swept package to `oracle-lock.mjs create --dep <name>`; the
+  lock records the installed version. After the lock, `oracle-verify.mjs sources --lock <path>`
+  compares locked versions against the currently installed ones and reports `ASSUMPTION_DRIFT`
+  per changed package — a drifted card re-runs the landmine sweep in a new revision instead of
+  trusting stale fossils.
+
 ## Policy sources
 
 The accepted·not-accepted list is canonical in the policy sources section of

@@ -49,6 +49,11 @@ lane procedure.
 | `Medium` | needs a contract — new UI states·forms·responsive structure·async ordering·local/identity visual intent — but not payment·permission·data-loss-scale damage | `oracle`        | Oracle Card, `VALID_RED`, required-label GREEN, one independent review                                    |
 | `High`   | payment·permissions·destructive actions·data loss·legal/security/privacy/financial/complex concurrency, where a false GREEN is costly                       | `oracle`        | Medium evidence + consecutive-GREEN hardening, mutation kill·revert·re-GREEN, 2-sample independent review |
 
+Risk judgment may take one optional evidence input: `scripts/oracle-twr.mjs` scores the target
+files' time-weighted bug-fix history from git. A high score is grounds to raise the lane or spend
+more sweep·exploration budget; it is never a gate, never grounds to lower a judgment, and its
+absence blocks nothing.
+
 During Low work, a policy question, a visual identity change, an architecture/public API decision,
 or a new state transition disqualifies Low immediately: read `common` and escalate to the Oracle
 lane. When only part of the request disqualifies, escalate that part alone under the carve-out
@@ -200,6 +205,44 @@ Rules:
   jurisdiction rules). `mandatory-constraint` conflict handling also follows the same document.
 - When a standard's revision/version changes, invalidate the existing `ORACLE_READY` and cross-check
   again.
+
+## Dependency landmines — importing upstream escapes
+
+A library's caveat docs, its issue tracker, and above all its **problem-avoidance options are
+fossils of escapes upstream already paid for** — an option like `initialOffset` exists because
+someone shipped the scroll-reset defect it prevents. Read the fossils before the lock instead of
+rediscovering the defect in production.
+
+When the Source Registry registers an `implementation-reference` dependency that this change newly
+adopts or whose usage surface it changes, collect — for the actually installed version — ① the
+official docs' caveat·gotcha·pitfall sections, ② the option list, flagging options that exist to
+avoid a known problem, ③ top open·closed defects in the issue tracker that touch the used surface.
+Record them as a card section per package:
+
+```markdown
+## Dependency landmines — example-virtual-list
+
+| Landmine                                            | Citation                | Disposition                             |
+| --------------------------------------------------- | ----------------------- | --------------------------------------- |
+| initialOffset option = fossil of mount scroll reset | docs/api#initialoffset  | needs-decision: keep scroll on remount? |
+| measureElement remeasures on dynamic row height     | docs/api#measureelement | N/A: fixed row height (S2)              |
+```
+
+Rules:
+
+- **Every landmine needs a citation** — a docs anchor, issue URL, or changelog entry.
+  LLM-recalled pitfalls without a citation are rejected by lint (`landmine-citation-missing`):
+  unconstrained recall produces majority false positives, and a citation is the constraint.
+- Every row carries one of the three dispositions (`covered(O*/D*)` / `impossible: reason` /
+  `needs-decision: question`); an empty one fails lint (`landmine-undispositioned`). Promotion
+  follows the sweep rule — only `needs-decision` becomes a grill question.
+- A card that adopts no dependency and changes no dependency surface has no landmine section —
+  do not manufacture one.
+- At lock time, pass each landmine-swept package to `oracle-lock.mjs create --dep <name>`; the
+  lock records the installed version. After the lock, `oracle-verify.mjs sources --lock <path>`
+  compares locked versions against the currently installed ones and reports `ASSUMPTION_DRIFT`
+  per changed package — a drifted card re-runs the landmine sweep in a new revision instead of
+  trusting stale fossils.
 
 ## Policy sources
 
@@ -606,7 +649,11 @@ stands on its own. Hand the card to an independent reviewer surface that has no 
 
 - Pass **the card bytes only.** No repo path, no conversation, no rationale, no intended reading,
   no statement of what the card is supposed to mean. The Draft text is the entire input.
-- Ask for three things: what this card contracts, in the reviewer's own words; every place the
+- Frame the read as a premortem stated as fact, not a possibility: **"this card was locked and
+  shipped, and one defect escaped it — name that defect, pointing at the row, cell, or missing
+  dimension that let it through."** Certainty framing measurably widens the reasons a reviewer
+  generates; a worry that cannot point at a location is discarded rather than recorded.
+- Then ask for three things: what this card contracts, in the reviewer's own words; every place the
   reviewer had to guess in order to answer; every `Then`·`Never`·side-effect count it could satisfy
   in a way the author plainly did not intend.
 - A forced guess is a card defect, not a reader failure — repair the row instead of explaining it.
@@ -714,6 +761,46 @@ Rules:
   defects hide.
 - When several cells resolve to the same tangled transition policy, that is the trigger to add the
   `## State Model` section instead of more prose rows.
+
+## Deviation sweep — STPA unsafe-action types
+
+The pair sweep asks how two known policies interact. The deviation sweep asks how **each single
+policy fails to hold** — the four unsafe-control-action types of STPA, applied mechanically to
+every decided `P*`. The judgment space is `P* × 4 types`, derived from the card bytes alone, so
+completeness is lintable the same way as pairs.
+
+| Type token                   | The question it generates for a policy                           |
+| ---------------------------- | ---------------------------------------------------------------- |
+| `not-provided`               | the behavior the policy mandates does not happen — what results? |
+| `unsafe-provided`            | the behavior happens in a context where it causes harm — which?  |
+| `wrong-timing-order`         | it happens too early, too late, or out of order — what breaks?   |
+| `stopped-early-applied-long` | it stops before finishing, or keeps running after it should stop |
+
+```markdown
+## Deviations
+
+| Policy | Type                       | Disposition                                                 |
+| ------ | -------------------------- | ----------------------------------------------------------- |
+| P1     | not-provided               | covered(O3)                                                 |
+| P1     | unsafe-provided            | needs-decision: applying it during teardown touches scroll? |
+| P1     | wrong-timing-order         | covered(O7)                                                 |
+| P1     | stopped-early-applied-long | needs-decision: does cleanup restore the paired state?      |
+| P4     | not-provided               | covered(D1)                                                 |
+| P4     | unsafe-provided            | impossible: static copy, no context sensitivity             |
+| P4     | wrong-timing-order         | impossible: no timing surface                               |
+| P4     | stopped-early-applied-long | impossible: no duration                                     |
+```
+
+Rules:
+
+- Every decided `P*` carries **all four** type rows; a missing type and an empty·non-enum
+  disposition are lint failures (`oracle-verify.mjs card`: `deviation-type-missing`,
+  `deviation-disposition`, `deviation-policy-unknown`). Static policies resolve most types with a
+  one-line `impossible:` naming the absent surface — that line is the auditable record.
+- The dispositions are the same three as pairs, with the same promotion rule: only
+  `needs-decision` becomes a grill question, and one surviving to lock means `NEEDS_DECISION`.
+- Timer·subscription·pending policies almost never close `stopped-early-applied-long` as
+  impossible — StrictMode re-invocation and unmount are standing counterexamples.
 
 ## Runtime dimensions — question bank
 

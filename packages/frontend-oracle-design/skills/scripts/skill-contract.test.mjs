@@ -509,11 +509,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.34.1')
+  assert.equal(version, '0.35.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.34.1')
+  assert.equal(marketplace.version, '0.35.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -1468,6 +1468,48 @@ test('locks machine-observable invariants and the bounded exploration authorizat
   assert.match(visualSkill, /exploration\.md/)
   assert.match(visualSkill, /`PRODUCT_DEFECT` 후보/)
   assert.match(visualSkill, /`POLICY_GAP` 후보/)
+})
+
+test('anticipates escapes: deviation types, landmine fossils, premortem framing, drift signal, TWR evidence', async () => {
+  const [sweep, sources, format, common, verifier, lock, twr] = await Promise.all([
+    read('references/card/interaction-sweep.md'),
+    read('references/card/policy-sources.md'),
+    read('references/card/card-format.md'),
+    read('references/common.md'),
+    read('scripts/oracle-verify.mjs'),
+    read('scripts/oracle-lock.mjs'),
+    read('scripts/oracle-twr.mjs'),
+  ])
+
+  // 예지-1: STPA 4유형이 P*마다 강제되고 완전성은 카드 바이트만으로 lint된다
+  assert.match(sweep, /## Deviation sweep — STPA unsafe-action types/)
+  assert.match(sweep, /`P\* × 4 types`, derived from the card bytes alone/)
+  assert.match(sweep, /stopped-early-applied-long/)
+  assert.match(sweep, /StrictMode re-invocation and unmount are standing counterexamples/)
+  assert.match(verifier, /deviation-type-missing/)
+  assert.match(verifier, /deviation-policy-unknown/)
+
+  // 예지-2: 회피용 옵션 = 업스트림 escape 화석, 인용 없는 회상은 기각
+  assert.match(sources, /fossils of escapes upstream already paid for/)
+  assert.match(sources, /Every landmine needs a citation/)
+  assert.match(verifier, /landmine-citation-missing/)
+  assert.match(verifier, /landmine-undispositioned/)
+
+  // 예지-0: cold-read는 가능성이 아니라 확정 premortem으로 읽는다
+  assert.match(format, /this card was locked and\s+shipped, and one defect escaped it/)
+  assert.match(format, /a worry that cannot point at a location is discarded/i)
+
+  // 예지-4: dep 버전은 lock에 고정되고 드리프트는 재스윕 지시로 보고된다
+  assert.match(lock, /--dep/)
+  assert.match(lock, /DEP_UNRESOLVED/)
+  assert.match(verifier, /ASSUMPTION_DRIFT/)
+  assert.match(verifier, /SOURCES_CURRENT/)
+  assert.match(sources, /oracle-verify\.mjs sources --lock/)
+
+  // 예지-3: TWR은 증거 입력이지 게이트가 아니다
+  assert.match(common, /oracle-twr\.mjs/)
+  assert.match(common, /never a gate/)
+  assert.match(twr, /bug-fix 커밋만 시간 정규화 가중/)
 })
 
 test('keeps the runtime reference prose in sync with the graph that owns the load conditions', async () => {

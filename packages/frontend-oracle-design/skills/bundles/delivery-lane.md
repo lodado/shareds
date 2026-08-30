@@ -49,6 +49,11 @@ lane procedure.
 | `Medium` | needs a contract — new UI states·forms·responsive structure·async ordering·local/identity visual intent — but not payment·permission·data-loss-scale damage | `oracle`        | Oracle Card, `VALID_RED`, required-label GREEN, one independent review                                    |
 | `High`   | payment·permissions·destructive actions·data loss·legal/security/privacy/financial/complex concurrency, where a false GREEN is costly                       | `oracle`        | Medium evidence + consecutive-GREEN hardening, mutation kill·revert·re-GREEN, 2-sample independent review |
 
+Risk judgment may take one optional evidence input: `scripts/oracle-twr.mjs` scores the target
+files' time-weighted bug-fix history from git. A high score is grounds to raise the lane or spend
+more sweep·exploration budget; it is never a gate, never grounds to lower a judgment, and its
+absence blocks nothing.
+
 During Low work, a policy question, a visual identity change, an architecture/public API decision,
 or a new state transition disqualifies Low immediately: read `common` and escalate to the Oracle
 lane. When only part of the request disqualifies, escalate that part alone under the carve-out

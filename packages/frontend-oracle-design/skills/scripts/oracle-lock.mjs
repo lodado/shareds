@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process'
-import { lstat, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
@@ -27,18 +27,46 @@ function fail(code) {
 }
 
 function parseOptions(args) {
-  const options = { sources: [] }
+  const options = { sources: [], deps: [] }
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index]
     const value = args[index + 1]
-    if (!['--oracle', '--lock', '--source'].includes(flag) || !value) {
+    if (!['--oracle', '--lock', '--source', '--dep'].includes(flag) || !value) {
       throw new CliError('USAGE', `Unknown or incomplete option: ${flag}`, 2)
     }
     if (flag === '--source') options.sources.push(value)
+    else if (flag === '--dep') options.deps.push(value)
     else options[flag.slice(2)] = value
     index += 1
   }
   return options
+}
+
+/** landmine 스윕 대상 패키지의 설치 버전을 lock에 고정한다 — 드리프트는 verify sources가 감지한다. */
+async function installedDependencies(rootDirectory, names) {
+  const dependencies = []
+  for (const name of [...new Set(names)].sort()) {
+    const packagePath = resolve(rootDirectory, 'node_modules', name, 'package.json')
+    let version
+    try {
+      version = JSON.parse(await readFile(packagePath, 'utf8')).version
+    } catch (error) {
+      throw new CliError('DEP_UNRESOLVED', `Cannot resolve installed version of ${name}: ${error.message}`)
+    }
+    if (typeof version !== 'string' || version === '') {
+      throw new CliError('DEP_UNRESOLVED', `${name} has no version in its package.json`)
+    }
+    dependencies.push({ name, version })
+  }
+  return dependencies
+}
+
+function sameDependencies(left = [], right = []) {
+  if (left.length !== right.length) return false
+  const byName = (first, second) => (first.name < second.name ? -1 : first.name > second.name ? 1 : 0)
+  const sortedLeft = [...left].sort(byName)
+  const sortedRight = [...right].sort(byName)
+  return sortedLeft.every((entry, index) => entry.name === sortedRight[index].name && entry.version === sortedRight[index].version)
 }
 
 function repositoryRoot(lockDirectory) {
@@ -74,6 +102,13 @@ function assertManifest(manifest, lockDirectory) {
     !manifest.sources.every(validEntry)
   ) {
     throw new CliError('LOCK_INVALID', 'Lock manifest does not match schema version 1')
+  }
+  if (manifest.dependencies !== undefined) {
+    const validDependency = (entry) =>
+      entry && typeof entry.name === 'string' && entry.name !== '' && typeof entry.version === 'string' && entry.version !== ''
+    if (!Array.isArray(manifest.dependencies) || !manifest.dependencies.every(validDependency)) {
+      throw new CliError('LOCK_INVALID', 'Lock manifest does not match schema version 1')
+    }
   }
   if (manifest.oracle.path !== 'oracle.md' || isAbsolute(manifest.oracle.path) || resolve(lockDirectory, manifest.oracle.path) !== join(lockDirectory, 'oracle.md')) {
     throw new CliError(
@@ -190,6 +225,7 @@ export async function createLock(options) {
   )
   await assertCardLintSnapshot(oracleSnapshot, sourceSnapshots, rootDirectory)
 
+  const dependencies = await installedDependencies(rootDirectory, options.deps ?? [])
   const manifest = {
     algorithm: 'sha256',
     oracle: { path: 'oracle.md', sha256: oracleSnapshot.sha256 },
@@ -197,6 +233,7 @@ export async function createLock(options) {
     sources: sourceSnapshots
       .map((source) => ({ path: portablePath(canonicalLockDirectory, source.realPath), sha256: source.sha256 }))
       .sort(comparePath),
+    ...(dependencies.length > 0 ? { dependencies } : {}),
   }
   await assertUnchanged(oracleSnapshot, 'INPUT_UNREADABLE', { allowHardlinks: false, base: rootDirectory })
   for (const source of sourceSnapshots) {
@@ -207,6 +244,7 @@ export async function createLock(options) {
   if (presentLock) {
     if (presentLock.manifest.oracle.sha256 !== manifest.oracle.sha256) throw new CliError('ORACLE_CHANGED', 'Existing lock belongs to different Oracle bytes')
     if (!sameEntries(presentLock.manifest.sources, manifest.sources)) throw new CliError('SOURCE_CHANGED', 'Existing lock belongs to different source bytes')
+    if (!sameDependencies(presentLock.manifest.dependencies, manifest.dependencies)) throw new CliError('SOURCE_CHANGED', 'Existing lock belongs to a different dependency set')
     finalLock = await assertUnchanged(presentLock.lockSnapshot, 'LOCK_INVALID', {
       allowHardlinks: false,
       base: rootDirectory,
@@ -218,7 +256,11 @@ export async function createLock(options) {
     } catch (error) {
       if (error.code !== 'EEXIST') throw error
       const racedLock = await readManifest(lockPath, lockDirectory, 'LOCK_INVALID', rootDirectory)
-      if (racedLock.manifest.oracle.sha256 !== manifest.oracle.sha256 || !sameEntries(racedLock.manifest.sources, manifest.sources)) {
+      if (
+        racedLock.manifest.oracle.sha256 !== manifest.oracle.sha256 ||
+        !sameEntries(racedLock.manifest.sources, manifest.sources) ||
+        !sameDependencies(racedLock.manifest.dependencies, manifest.dependencies)
+      ) {
         throw new CliError('LOCK_INVALID', 'Lock manifest appeared with different contents')
       }
       finalLock = await assertUnchanged(racedLock.lockSnapshot, 'LOCK_INVALID', {
@@ -240,7 +282,7 @@ async function verifyEntry(lockDirectory, rootDirectory, entry, changedCode) {
 }
 
 export async function verifyLock(options, hooks = {}) {
-  if (!options.lock || options.oracle || options.sources.length > 0) throw new CliError('USAGE', 'verify requires only --lock', 2)
+  if (!options.lock || options.oracle || options.sources.length > 0 || (options.deps?.length ?? 0) > 0) throw new CliError('USAGE', 'verify requires only --lock', 2)
   const lockPath = resolve(options.lock)
   const lockDirectory = dirname(lockPath)
   const canonicalLockDirectory = await realpath(lockDirectory).catch((error) => {

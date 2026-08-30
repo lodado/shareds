@@ -66,6 +66,46 @@ Rules:
 - When several cells resolve to the same tangled transition policy, that is the trigger to add the
   `## State Model` section instead of more prose rows.
 
+## Deviation sweep — STPA unsafe-action types
+
+The pair sweep asks how two known policies interact. The deviation sweep asks how **each single
+policy fails to hold** — the four unsafe-control-action types of STPA, applied mechanically to
+every decided `P*`. The judgment space is `P* × 4 types`, derived from the card bytes alone, so
+completeness is lintable the same way as pairs.
+
+| Type token                   | The question it generates for a policy                           |
+| ---------------------------- | ---------------------------------------------------------------- |
+| `not-provided`               | the behavior the policy mandates does not happen — what results? |
+| `unsafe-provided`            | the behavior happens in a context where it causes harm — which?  |
+| `wrong-timing-order`         | it happens too early, too late, or out of order — what breaks?   |
+| `stopped-early-applied-long` | it stops before finishing, or keeps running after it should stop |
+
+```markdown
+## Deviations
+
+| Policy | Type                       | Disposition                                                 |
+| ------ | -------------------------- | ----------------------------------------------------------- |
+| P1     | not-provided               | covered(O3)                                                 |
+| P1     | unsafe-provided            | needs-decision: applying it during teardown touches scroll? |
+| P1     | wrong-timing-order         | covered(O7)                                                 |
+| P1     | stopped-early-applied-long | needs-decision: does cleanup restore the paired state?      |
+| P4     | not-provided               | covered(D1)                                                 |
+| P4     | unsafe-provided            | impossible: static copy, no context sensitivity             |
+| P4     | wrong-timing-order         | impossible: no timing surface                               |
+| P4     | stopped-early-applied-long | impossible: no duration                                     |
+```
+
+Rules:
+
+- Every decided `P*` carries **all four** type rows; a missing type and an empty·non-enum
+  disposition are lint failures (`oracle-verify.mjs card`: `deviation-type-missing`,
+  `deviation-disposition`, `deviation-policy-unknown`). Static policies resolve most types with a
+  one-line `impossible:` naming the absent surface — that line is the auditable record.
+- The dispositions are the same three as pairs, with the same promotion rule: only
+  `needs-decision` becomes a grill question, and one surviving to lock means `NEEDS_DECISION`.
+- Timer·subscription·pending policies almost never close `stopped-early-applied-long` as
+  impossible — StrictMode re-invocation and unmount are standing counterexamples.
+
 ## Runtime dimensions — question bank
 
 Add the dimension as a counterpart **when its premise exists in the card**; otherwise it generates
