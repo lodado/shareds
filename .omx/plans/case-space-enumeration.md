@@ -1,4 +1,4 @@
-# Case-space 전수 열거 플랜 — 스킬의 궁극 목표
+# Case-space 전수 열거 플랜 — 스킬의 궁극 목표 (2026-08-30 구현 완료, 0.36.0)
 
 작성: 2026-08-30. 선행: `.omx/plans/oracle-discovery-gap.md` (interaction sweep, 0.34.x로 출시됨).
 목표 선언: **모든 경우의 수를 카드 시점에 예지하고, BVA 기반으로 테스트 플랜과 구현을 도출한다.**
@@ -171,3 +171,17 @@ engine이라 의존 추가 없음).
 - 문자 그대로의 무한 전수 주장 — §1 정의 밖의 완전성은 주장하지 않고, 모델 밖은
   I\*·탐색·escaped-bug 루프가 소관한다는 문장을 case-space.md에 명기.
 - @xstate/graph 의존 — v5 마이그레이션 미완(beta), 전이표 자체 열거가 더 작고 결정적.
+
+## 9. 구현 기록 (2026-08-30)
+
+- P0~P3 구현 완료. `card/case-space.md`(8계열 분류표+출처, browserslist 파생 규칙, 조건부
+  완전성 명시), `oracle-frames.mjs`(t-way greedy covering + [error] 단독 + State Model maximal
+  simple path + 빈 셀; 순수 함수 export로 verify가 동일 로직 재생성), verify lint 4종
+  (`frame-undispositioned`·`frame-unknown`·`family-undispositioned`·`case-space-too-wide`),
+  test SKILL(PATH 프레임=경로 테스트 열거, Order 차원 fast-check 필수), visual-qa(webkit
+  매트릭스 L4). 릴리스: oracle-design 0.36.0 · test 0.8.0 · visual-qa 0.4.0.
+- 검증: 265/265. dry-run: 서버 테이블 공간에서 pairwise 전 곱 120→프레임 십수 개,
+  모든 2-tuple 커버 단언 + back-forward×inverted 교차 생성 확인. 경로 열거기의
+  사이클-닫는 전이 누락 버그를 테스트가 잡음(성공 복귀 경로 소실) — 수정.
+- 이월/보류: `single` 주석(pairwise가 이미 폭발 억제, v1 불필요), guide-word 파라미터
+  편차(Value 축 중복), sweep의 case-space 흡수(§4대로 경계 밖).
