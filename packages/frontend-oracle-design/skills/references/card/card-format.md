@@ -112,7 +112,7 @@ replaces the `O*`·`D*` row that owns a specific scenario outcome.
 
 | ID  | Policy | Invariant                                      | Observable basis   |
 | --- | ------ | ---------------------------------------------- | ------------------ |
-| I1  | P23    | document scrollWidth === clientWidth at ≥320px | layout measurement |
+| I1  | P1     | document scrollWidth === clientWidth at ≥320px | layout measurement |
 | I2  | —      | zero console errors·uncaught exceptions        | implicit oracle    |
 ```
 

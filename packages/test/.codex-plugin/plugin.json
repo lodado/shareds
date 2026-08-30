@@ -1,6 +1,6 @@
 {
   "name": "test",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Oracle-driven deterministic frontend behavior testing.",
   "author": {
     "name": "lodado",

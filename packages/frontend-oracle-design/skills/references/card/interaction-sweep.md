@@ -36,12 +36,12 @@ a one-line N/A with the reason in `journal.md` — silence is not a valid skip.
 ```markdown
 ## Interaction sweep
 
-| Pair                          | Disposition                                                   |
-| ----------------------------- | ------------------------------------------------------------- |
-| P19 × P13 (inherited remount) | needs-decision: does virtualizer init move scroll on remount? |
-| P22 × P19                     | covered(O20)                                                  |
-| P20 × P23                     | impossible: both derived reads, no mutual write               |
-| P4                            | impossible: static copy, no shared surface                    |
+| Pair                                                 | Disposition                                                                      |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------- |
+| P3 (new list window) × P1 (inherited filter remount) | needs-decision: does a fresh list mount move scroll on remount?                  |
+| P3 × P2 (inherited list semantics)                   | covered(O5)                                                                      |
+| P3 × StrictMode                                      | needs-decision: does the append timer's cleanup survive a double-invoked effect? |
+| P4                                                   | impossible: static copy, no shared surface                                       |
 ```
 
 Exactly three dispositions:
@@ -85,11 +85,11 @@ time. A retro that cannot name one is naming a new dimension; add the dimension.
 
 ## Worked counterexample
 
-A revision replaced list rendering with row virtualization and declared "P13 (filter remount)
-inherited without semantic change" — no sweep. The virtualizer's mount-time `scrollTo(0)` fired on
-every filter remount; the defect shipped and was found by the user. The sweep line
-`P19(virtualization) × P13(inherited remount)` forces the question at card time, before the library
-is even installed. Same revision, same mechanism: three later fix attempts each broke a different
-locked contract (checkbox responsiveness, GET accounting) — interactions that pairs
-`scheduling × request-count` and `P19 × filter debounce` would have surfaced as questions instead
-of implement-and-revert round trips.
+A revision replaced list rendering with a windowed list and declared the inherited filter-remount
+policy "inherited without semantic change" — no sweep. The list library's mount-time `scrollTo(0)`
+fired on every filter remount; the defect shipped and was found by the user. The sweep line
+`new list window × inherited filter remount` forces that question at card time, before the library
+is even installed. Same revision, same mechanism: later fix attempts each broke a different locked
+contract — interactions the pairs `scheduling × request-count contract` and
+`new list window × inherited input debounce` would have surfaced as questions instead of
+implement-and-revert round trips.
