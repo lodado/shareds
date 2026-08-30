@@ -509,11 +509,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.35.0')
+  assert.equal(version, '0.36.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.35.0')
+  assert.equal(marketplace.version, '0.36.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -1510,6 +1510,44 @@ test('anticipates escapes: deviation types, landmine fossils, premortem framing,
   assert.match(common, /oracle-twr\.mjs/)
   assert.match(common, /never a gate/)
   assert.match(twr, /bug-fix 커밋만 시간 정규화 가중/)
+})
+
+test('enumerates the declared case space by machine and dispositions every generated frame', async () => {
+  const repositoryDirectory = join(skillDirectory, '../../..')
+  const [caseSpace, skill, verifier, frames, testSkill, visualSkill] = await Promise.all([
+    read('references/card/case-space.md'),
+    read('SKILL.md'),
+    read('scripts/oracle-verify.mjs'),
+    read('scripts/oracle-frames.mjs'),
+    readFile(join(repositoryDirectory, 'packages/test/skills/test/SKILL.md'), 'utf8'),
+    readFile(join(repositoryDirectory, 'packages/frontend-visual-qa/skills/frontend-visual-qa/SKILL.md'), 'utf8'),
+  ])
+
+  // 열거는 기계, LLM은 판정만 — 같은 카드 바이트는 같은 프레임 집합이다
+  assert.match(frames, /같은 카드 바이트는 같은 ID 집합을 낸다/)
+  assert.match(frames, /export const TAXONOMY_FAMILIES/)
+  assert.match(caseSpace, /## Family taxonomy — imported, not invented/)
+  assert.match(caseSpace, /derive choices from the repo's `browserslist`/)
+  assert.match(verifier, /frame-undispositioned/)
+  assert.match(verifier, /frame-unknown/)
+  assert.match(verifier, /family-undispositioned/)
+  assert.match(verifier, /case-space-too-wide/)
+
+  // 조건부 완전성 명시 — 선언 공간 밖 커버리지 주장 금지
+  assert.match(caseSpace, /Declared space ⊂ reality is not checkable/)
+
+  // 카드 절차가 생성기 실행과 판정을 소유한다
+  assert.match(skill, /card\/case-space\.md/)
+  assert.match(skill, /oracle-frames\.mjs --oracle/)
+
+  // $test: PATH 프레임 = 경로 테스트 열거, Order 차원은 fast-check 필수
+  assert.match(testSkill, /`PATH\*` frames of `oracle-frames\.mjs` are the test\s+enumeration/)
+  assert.match(testSkill, /sequence test is \*\*required\*\*, not optional/)
+  assert.match(testSkill, /fc\.scheduler/)
+
+  // visual-qa: webkit 매트릭스 — 축을 몰라도 관측면이 받는다 (L4)
+  assert.match(visualSkill, /chromium과 \*\*webkit\*\* 두 engine/)
+  assert.match(visualSkill, /축을 몰라도 불변식 위반은 관측면에 뜬다/)
 })
 
 test('keeps the runtime reference prose in sync with the graph that owns the load conditions', async () => {

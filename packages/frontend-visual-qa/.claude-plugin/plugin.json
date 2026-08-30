@@ -1,6 +1,6 @@
 {
   "name": "frontend-visual-qa",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Screenshot comparison and direct-browser frontend QA against approved visual sources.",
   "author": {
     "name": "lodado",

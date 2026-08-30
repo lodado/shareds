@@ -7,6 +7,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { inflateSync } from 'node:zlib'
 import { isTrustedAdapter } from './oracle-adapters.mjs'
+import { generateFromDocument, TAXONOMY_FAMILIES } from './oracle-frames.mjs'
 import { assertSnapshotUnchanged, isPathInside, sha256, snapshotRegularFile, stableStringify } from './oracle-fs.mjs'
 
 const FLAG_NAMES = [
@@ -818,6 +819,71 @@ async function lintCard(options) {
       if (!sweptPolicies.has(policyId)) {
         issues.push(`sweep-policy-missing: ${policyId} does not appear in any sweep pair`)
       }
+    }
+  }
+
+  // Case space 섹션 — 있으면 프레임을 결정적으로 재생성해 disposition 완전성을 대조한다. 열거는 기계, 판정만 사람.
+  const generated = generateFromDocument(lines.join('\n'))
+
+  if (generated) {
+    const declaredFamilies = new Set(generated.caseSpace.families.map((entry) => entry.family))
+    for (const family of TAXONOMY_FAMILIES) {
+      if (!declaredFamilies.has(family)) {
+        issues.push(`family-undispositioned: ${family}: declare dimensions or exclude it with a reason`)
+      }
+    }
+    for (const family of declaredFamilies) {
+      if (!TAXONOMY_FAMILIES.includes(family)) issues.push(`family-unknown: ${family} is not a taxonomy family`)
+    }
+
+    if (generated.frames.length > 50) {
+      issues.push(
+        `case-space-too-wide: ${generated.frames.length} combinable frames — split the dimension or narrow the scope`,
+      )
+    }
+
+    const generatedIds = new Set([
+      ...generated.frames.map((frame) => frame.id),
+      ...generated.errorFrames.map((frame) => frame.id),
+      ...generated.paths.map((path) => path.id),
+      ...generated.emptyCells.map((cell) => cell.id),
+    ])
+
+    const dispositionRows = sectionLines(lines, 'Frame dispositions')
+      .filter((line) => line.trim().startsWith('|'))
+      .map((line) => splitRow(line.trim()))
+      .filter((cells) => cells[0] !== 'Frame' && !/^:?-+:?$/.test(cells[0]))
+
+    const dispositioned = new Set()
+    for (const cells of dispositionRows) {
+      const [frameId = '', disposition = ''] = cells
+      if (!generatedIds.has(frameId)) {
+        issues.push(`frame-unknown: ${frameId} is not in the generated frame set`)
+        continue
+      }
+      dispositioned.add(frameId)
+
+      const value = disposition.trim()
+      if (isEmptyCell(value)) {
+        issues.push(`frame-undispositioned: ${frameId}: disposition is empty`)
+        continue
+      }
+      const covered = value.match(/^covered\(([^)]+)\)$/)
+      if (covered) {
+        const cited = rowIds(covered[1])
+        if (cited.length === 0) issues.push(`frame-disposition: ${frameId}: covered() must cite O*/D* rows`)
+        for (const id of cited) {
+          if (!seenRows.has(id)) issues.push(`frame-row-unknown: ${frameId}: ${id} is not a contract row`)
+        }
+      } else if (!/^impossible:\s*\S/.test(value) && !/^needs-decision:\s*\S/.test(value)) {
+        issues.push(
+          `frame-disposition: ${frameId}: disposition must be covered(O*) | impossible: reason | needs-decision: question`,
+        )
+      }
+    }
+
+    for (const id of generatedIds) {
+      if (!dispositioned.has(id)) issues.push(`frame-undispositioned: ${id}`)
     }
   }
 

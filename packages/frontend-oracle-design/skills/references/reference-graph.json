@@ -107,6 +107,12 @@
       "requires": ["common", "card-format"]
     },
     {
+      "id": "card-case-space",
+      "path": "references/card/case-space.md",
+      "when": "after drafting contract rows and before showing the Draft — declare the dimension space and disposition the machine-generated frames",
+      "requires": ["common", "bva", "card-format"]
+    },
+    {
       "id": "card-confirmation-lock",
       "path": "references/card/confirmation-lock.md",
       "when": "just before user confirmation·lock·init",
@@ -265,6 +271,7 @@
         "bva",
         "card-format",
         "card-interaction-sweep",
+        "card-case-space",
         "card-confirmation-lock"
       ]
     },

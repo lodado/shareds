@@ -110,6 +110,7 @@ flowchart LR
   card_risk_grill["card-risk-grill"]
   card_format["card-format"]
   card_interaction_sweep["card-interaction-sweep"]
+  card_case_space["card-case-space"]
   card_confirmation_lock["card-confirmation-lock"]
   visual_design["visual-design"]
   delivery_ledger["delivery-ledger"]
@@ -137,6 +138,9 @@ flowchart LR
   bva --> card_format
   common --> card_interaction_sweep
   card_format --> card_interaction_sweep
+  common --> card_case_space
+  bva --> card_case_space
+  card_format --> card_case_space
   common --> card_confirmation_lock
   common --> visual_design
   common --> delivery_ledger

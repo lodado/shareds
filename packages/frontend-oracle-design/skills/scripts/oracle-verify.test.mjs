@@ -2827,3 +2827,81 @@ test('sources: 잠긴 dep 버전과 설치 버전을 대조해 드리프트를 �
   assert.equal(none.status, 0, none.stderr)
   assert.equal(none.stdout, 'SOURCES_CURRENT 0 dependencies\n')
 })
+
+/** Case space fixture — VALID_CARD의 State Model 경로·빈 셀까지 전부 판정한다. */
+const CASE_SPACE_SECTION = `
+## Case space
+
+- Strength: 2
+
+| Family      | Dimension | Choices                    |
+| ----------- | --------- | -------------------------- |
+| Data        | rows      | 0, max                     |
+| Value       | keyword   | empty, unicode [error]     |
+| Async       | request   | success, http-5xx          |
+| Order       | —         | excluded: single operation |
+| Entry       | —         | excluded: fixture scope    |
+| Environment | —         | excluded: fixture scope    |
+| Platform    | —         | excluded: fixture scope    |
+| Inherited   | —         | excluded: first revision   |
+`
+
+async function caseSpaceCard(mutate = (rows) => rows) {
+  const { generateFromDocument } = await import('./oracle-frames.mjs')
+  const base = VALID_CARD + CASE_SPACE_SECTION
+  const generated = generateFromDocument(base)
+  const ids = [
+    ...generated.frames.map((frame) => frame.id),
+    ...generated.errorFrames.map((frame) => frame.id),
+    ...generated.paths.map((path) => path.id),
+    ...generated.emptyCells.map((cell) => cell.id),
+  ]
+  const rows = ids.map((id) => `| ${id} | ${id.startsWith('EMPTY') ? 'impossible: fixture' : 'covered(O1)'} |`)
+  return `${base}\n## Frame dispositions\n\n| Frame | Disposition |\n| ----- | ----------- |\n${mutate(rows).join('\n')}\n`
+}
+
+test('case-space: 기계 생성 프레임 전부가 판정되면 lint를 통과한다', async (t) => {
+  const linted = run('card', '--oracle', await cardFile(t, await caseSpaceCard()))
+
+  assert.equal(linted.status, 0, linted.stderr)
+})
+
+test('case-space: 판정 누락·미생성 ID 인용·계열 누락은 실패한다', async (t) => {
+  const missing = run('card', '--oracle', await cardFile(t, await caseSpaceCard((rows) => rows.slice(1))))
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /frame-undispositioned: F1/)
+
+  const unknown = run('card', '--oracle', await cardFile(t, await caseSpaceCard((rows) => [...rows, '| F99 | covered(O1) |'])))
+  assert.equal(unknown.status, 1)
+  assert.match(unknown.stderr, /frame-unknown: F99/)
+
+  const noPlatform = (await caseSpaceCard()).replace(/\| Platform[^\n]*\n/, '')
+  const family = run('card', '--oracle', await cardFile(t, noPlatform))
+  assert.equal(family.status, 1)
+  assert.match(family.stderr, /family-undispositioned: Platform/)
+})
+
+test('case-space: 조합 프레임 50개 초과는 설계 실격선이다', async (t) => {
+  const wideChoices = Array.from({ length: 8 }, (_, index) => `c${index}`).join(', ')
+  const wide = `${VALID_CARD}
+## Case space
+
+- Strength: 2
+
+| Family      | Dimension | Choices                  |
+| ----------- | --------- | ------------------------ |
+| Data        | first     | ${wideChoices}           |
+| Value       | second    | ${wideChoices}           |
+| Async       | —         | excluded: fixture        |
+| Order       | —         | excluded: fixture        |
+| Entry       | —         | excluded: fixture        |
+| Environment | —         | excluded: fixture        |
+| Platform    | —         | excluded: fixture        |
+| Inherited   | —         | excluded: fixture        |
+`
+
+  const linted = run('card', '--oracle', await cardFile(t, wide))
+
+  assert.equal(linted.status, 1)
+  assert.match(linted.stderr, /case-space-too-wide: 64 combinable frames/)
+})

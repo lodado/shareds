@@ -117,10 +117,14 @@ locator나 fixture 문제가 있으면 최대 2회만 보정한다. assertion �
 3. 판정 기준은 카드 `I*` 불변식과 implicit oracle **만**: console error·uncaught
    exception, 실패한 network 응답, dead click, 가로 오버플로, 포커스 소실, 요청 횟수.
    정책 판단·미적 판단은 하지 않는다.
-4. 도구 유발 현상을 구분해 기록한다 — Playwright는 클릭 전에 대상으로 스크롤하므로,
+4. driver가 Playwright면 탐색을 chromium과 **webkit** 두 engine에서 실행한다(동봉
+   engine이라 의존 추가 없음). 카드가 Platform 차원을 선언하지 않았어도 실행한다 —
+   축을 몰라도 불변식 위반은 관측면에 뜬다. browser MCP driver면 해당 브라우저
+   하나만으로 실행하고 그 사실을 기록한다.
+5. 도구 유발 현상을 구분해 기록한다 — Playwright는 클릭 전에 대상으로 스크롤하므로,
    화면 밖 요소 조작 시의 스크롤 이동은 사용자 등가 행동이 아니다. 재현 경로에 도구
    개입 여부를 명시한다.
-5. 산출물은 run 디렉터리의 `exploration.md`. 발견은 verdict가 아니라 **후보**다:
+6. 산출물은 run 디렉터리의 `exploration.md`. 발견은 verdict가 아니라 **후보**다:
    - `I*`·implicit oracle 위반 → `PRODUCT_DEFECT` 후보 + 재현 증거 →
      `frontend-oracle-design`의 `VALID_RED` 흐름으로 회송
    - 카드가 침묵하는 동작 관찰 → `POLICY_GAP` 후보(질문+증거+추천) → `NEEDS_DECISION`

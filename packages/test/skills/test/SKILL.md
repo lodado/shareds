@@ -77,11 +77,17 @@ ownership splits from production, and make the test follow along when a slice is
   Copying production conditionals·formulas is forbidden.
 - For loading·race, the test controls the completion moment with a deferred **pending barrier**
   (the bva.md pattern). Arbitrary sleep is forbidden.
-- When the card has a `## State Model`, enumerate its transition paths as tests and assert that
-  empty state×event cells stay unreachable. When it has `## Invariants`, prefer relation
-  assertions derived from the card's policies (filter then clear returns the original list, loaded
-  count is monotonic, a repeated identical query issues no new request) over one-off expected
-  values — the same pending barrier controls the sequences.
+- When the card has a `## State Model`, the `PATH*` frames of `oracle-frames.mjs` are the test
+  enumeration: one test per path (the path label is the describe name), and `EMPTY` cells the card
+  dispositioned `impossible` get an unreachability assertion. A skipped path blocks `GREEN` the
+  same as a skipped row. When it has `## Invariants`, prefer relation assertions derived from the
+  card's policies (filter then clear returns the original list, loaded count is monotonic, a
+  repeated identical query issues no new request) over one-off expected values.
+- When the card's Case space has an Order dimension with two or more choices, a fast-check
+  sequence test is **required**, not optional: `fc.commands` against a model, or `fc.scheduler`
+  shuffling promise resolution order — combined with the deferred pending barrier. If fast-check
+  is neither installed nor approved, verify the Order frames with hand-enumerated deferred
+  orderings and record why.
 - When an exported shared/package API type is the target of this change, put a `.test-d.ts(x)` witness on
   each bva.md type boundary axis. The axes are set by the relations the card closes, and only one misuse
   goes on the line after `@ts-expect-error`. When it exceeds 30, do not add more cases; raise the API split
