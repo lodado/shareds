@@ -564,6 +564,78 @@ test('state-model: States·Events가 비어 있거나 전이표가 없으면 실
   assert.match(table.stderr, /state-model-transitions/)
 })
 
+/** Invariants·Interaction sweep 선택 섹션 — VALID_CARD의 P1~P4·O4를 인용한다. */
+const INVARIANTS_SECTION = `
+## Invariants
+
+| ID  | Policy | Invariant                              | Observable basis |
+| --- | ------ | -------------------------------------- | ---------------- |
+| I1  | P1     | 성공 저장은 세션에서 요청 1회 이하다   | network 로그     |
+| I2  | —      | console error·uncaught exception 0건   | implicit oracle  |
+`
+
+const SWEEP_SECTION = `
+## Interaction sweep
+
+| Pair    | Disposition                                                           |
+| ------- | --------------------------------------------------------------------- |
+| P1 × P2 | covered(O4)                                                           |
+| P3 × P1 | needs-decision: 저장 pending 중 목록 갱신이 도착하면 어느 쪽이 이기나? |
+| P4      | impossible: 정적 문구, 공유 표면 없음                                  |
+`
+
+test('invariants·sweep: 구조가 유효한 선택 섹션은 lint를 통과한다', async (t) => {
+  const linted = run('card', '--oracle', await cardFile(t, VALID_CARD + INVARIANTS_SECTION + SWEEP_SECTION))
+
+  assert.equal(linted.status, 0, linted.stderr)
+  assert.equal(linted.stdout, 'CARD_LINT_OK 9 rows\n')
+})
+
+test('invariants: 없는 정책 인용·빈 관측 근거·I* 아닌 ID는 실패한다', async (t) => {
+  const unknownPolicy = VALID_CARD + INVARIANTS_SECTION.replace('| I1  | P1     |', '| I1  | P99    |') + SWEEP_SECTION
+  const emptyBasis = VALID_CARD + INVARIANTS_SECTION.replace('| network 로그     |', '| -                |') + SWEEP_SECTION
+  const badId = VALID_CARD + INVARIANTS_SECTION.replace('| I1  |', '| X1  |') + SWEEP_SECTION
+
+  const policy = run('card', '--oracle', await cardFile(t, unknownPolicy))
+  assert.equal(policy.status, 1)
+  assert.match(policy.stderr, /invariant-policy-unknown: I1: P99/)
+
+  const basis = run('card', '--oracle', await cardFile(t, emptyBasis))
+  assert.equal(basis.status, 1)
+  assert.match(basis.stderr, /invariant-basis: I1/)
+
+  const id = run('card', '--oracle', await cardFile(t, badId))
+  assert.equal(id.status, 1)
+  assert.match(id.stderr, /invariant-id/)
+})
+
+test('sweep: 빈 disposition·enum 밖 값·없는 행 인용은 실패한다', async (t) => {
+  const emptyCell = VALID_CARD + SWEEP_SECTION.replace('covered(O4)', '-')
+  const badEnum = VALID_CARD + SWEEP_SECTION.replace('covered(O4)', 'probably fine')
+  const unknownRow = VALID_CARD + SWEEP_SECTION.replace('covered(O4)', 'covered(O99)')
+
+  const empty = run('card', '--oracle', await cardFile(t, emptyCell))
+  assert.equal(empty.status, 1)
+  assert.match(empty.stderr, /sweep-cell-empty: "P1 × P2"/)
+
+  const disposition = run('card', '--oracle', await cardFile(t, badEnum))
+  assert.equal(disposition.status, 1)
+  assert.match(disposition.stderr, /sweep-disposition: "P1 × P2"/)
+
+  const row = run('card', '--oracle', await cardFile(t, unknownRow))
+  assert.equal(row.status, 1)
+  assert.match(row.stderr, /sweep-row-unknown: "P1 × P2": O99/)
+})
+
+test('sweep: 어떤 pair에도 나타나지 않는 결정 정책은 실패한다 — 침묵은 셀로만 가능하다', async (t) => {
+  const missingPolicy = VALID_CARD + SWEEP_SECTION.replace(/\| P4[^\n]*\n/, '')
+
+  const linted = run('card', '--oracle', await cardFile(t, missingPolicy))
+
+  assert.equal(linted.status, 1)
+  assert.match(linted.stderr, /sweep-policy-missing: P4/)
+})
+
 test('state-model: async 토큰이 없는 카드는 State Model 없이 통과한다', async (t) => {
   const syncCard = `# Static Card
 

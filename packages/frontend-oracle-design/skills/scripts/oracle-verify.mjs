@@ -644,6 +644,88 @@ async function lintCard(options) {
     }
   }
 
+  // Invariants 섹션도 선택이다 — 없어도 lint를 막지 않고, 있으면 구조를 검증한다.
+  const invariants = sectionLines(lines, 'Invariants')
+
+  if (invariants.length > 0) {
+    const invariantRows = invariants
+      .filter((line) => line.trim().startsWith('|'))
+      .map((line) => splitRow(line.trim()))
+      .filter((cells) => cells[0] !== 'ID' && !/^:?-+:?$/.test(cells[0]))
+
+    if (invariantRows.length === 0) {
+      issues.push('invariant-rows: Invariants must include an ID/Policy/Invariant/Observable-basis table')
+    }
+
+    for (const cells of invariantRows) {
+      const [id, policy = '', invariant = '', basis = ''] = cells
+      if (!/^I\d+$/.test(id ?? '')) {
+        issues.push(`invariant-id: "${id}": invariant must have an I* ID`)
+        continue
+      }
+      if (isEmptyCell(invariant)) issues.push(`invariant-empty: ${id}: invariant text is empty`)
+      if (isEmptyCell(basis)) issues.push(`invariant-basis: ${id}: observable basis is empty`)
+      if (!isEmptyCell(policy) && policy !== '—') {
+        const cited = policyIds(policy)
+        if (cited.length === 0) {
+          issues.push(`invariant-policy-unknown: ${id}: "${policy}" is neither a P* ID nor —`)
+        }
+        for (const policyId of cited) {
+          if (!policies.has(policyId)) {
+            issues.push(`invariant-policy-unknown: ${id}: ${policyId} is not a decided policy`)
+          }
+        }
+      }
+    }
+  }
+
+  // Interaction sweep 섹션도 선택이다 — 있으면 disposition enum·행 인용·정책 커버리지를 검증한다.
+  const sweep = sectionLines(lines, 'Interaction sweep')
+
+  if (sweep.length > 0) {
+    const sweepRows = sweep
+      .filter((line) => line.trim().startsWith('|'))
+      .map((line) => splitRow(line.trim()))
+      .filter((cells) => cells[0] !== 'Pair' && !/^:?-+:?$/.test(cells[0]))
+
+    if (sweepRows.length === 0) {
+      issues.push('sweep-rows: Interaction sweep must include a Pair/Disposition table')
+    }
+
+    const sweptPolicies = new Set()
+    for (const cells of sweepRows) {
+      const [pair = '', disposition = ''] = cells
+      for (const policyId of policyIds(pair)) sweptPolicies.add(policyId)
+
+      const value = disposition.trim()
+      if (isEmptyCell(value)) {
+        issues.push(`sweep-cell-empty: "${pair}": disposition is empty`)
+        continue
+      }
+
+      const covered = value.match(/^covered\(([^)]+)\)$/)
+      if (covered) {
+        const cited = rowIds(covered[1])
+        if (cited.length === 0) {
+          issues.push(`sweep-disposition: "${pair}": covered() must cite at least one O*/D* row`)
+        }
+        for (const id of cited) {
+          if (!seenRows.has(id)) issues.push(`sweep-row-unknown: "${pair}": ${id} is not a contract row`)
+        }
+      } else if (!/^impossible:\s*\S/.test(value) && !/^needs-decision:\s*\S/.test(value)) {
+        issues.push(
+          `sweep-disposition: "${pair}": disposition must be covered(O*) | impossible: reason | needs-decision: question`,
+        )
+      }
+    }
+
+    for (const policyId of policies.keys()) {
+      if (!sweptPolicies.has(policyId)) {
+        issues.push(`sweep-policy-missing: ${policyId} does not appear in any sweep pair`)
+      }
+    }
+  }
+
   const contractText = rows.flatMap((row) => Object.values(row.cells)).join(' ')
   const sourcedNaText = lines
     .filter((line) => /\bN\/A\b/i.test(line) && SOURCE_MARKERS.some((marker) => line.includes(marker)))

@@ -103,6 +103,8 @@ Whether to skip a load is not a judgment call. The read instructions inlined int
 - Card writing: [`card/policy-sources.md`](references/card/policy-sources.md),
   [`card/risk-grill.md`](references/card/risk-grill.md), [`bva.md`](references/bva.md),
   [`card/card-format.md`](references/card/card-format.md),
+  [`card/interaction-sweep.md`](references/card/interaction-sweep.md) — after drafting contract
+  rows and before showing the Draft, the disposition sweep of new×inherited×runtime interactions,
   [`card/confirmation-lock.md`](references/card/confirmation-lock.md).
 - Delivery: right after entering Delivery, explicitly load and invoke the installed `$test` skill
   by name; [`delivery/ledger.md`](references/delivery/ledger.md),
@@ -176,14 +178,16 @@ When only cards, requirements, policy decisions, or test contracts are requested
    the card.
 6. Judge risk and investigate policy sources. The lane header's `risk` is finalized here.
 7. Read [`card/risk-grill.md`](references/card/risk-grill.md)·[`bva.md`](references/bva.md)·
-   [`card/card-format.md`](references/card/card-format.md) → write the **Draft Oracle** with the
-   needed Grill questions and BVA. Follow the phase order (outcome → risk → data·architecture →
-   API → concurrency·async → state → visual → performance·ops); if the user asks for a
-   one-question-at-a-time interview, run it without a round cap.
+   [`card/card-format.md`](references/card/card-format.md)·
+   [`card/interaction-sweep.md`](references/card/interaction-sweep.md) → write the **Draft Oracle**
+   with the needed Grill questions and BVA, then fill the interaction sweep — every
+   `needs-decision` cell becomes a grill question. Follow the phase order (outcome → risk →
+   data·architecture → API → concurrency·async → state → visual → performance·ops); if the user
+   asks for a one-question-at-a-time interview, run it without a round cap.
 8. Show existing revisions as a semantic delta and new cards in full with open questions, then
    explicitly re-confirm.
 9. Before showing the Draft, run the cold-read gate: hand the card bytes alone to a context-free
-   reviewer, apply the four questions per row, and collapse both into one root plus the first nail
+   reviewer, apply the five questions per row, and collapse both into one root plus the first nail
    that falsifies it cheapest. Drive that nail. Then record the approval's location in
    `User Confirmation`. On a change request, fix the Draft and re-confirm; on no answer,
    `NEEDS_DECISION`.

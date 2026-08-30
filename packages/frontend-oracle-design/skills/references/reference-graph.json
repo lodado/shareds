@@ -101,6 +101,12 @@
       "requires": ["common", "bva"]
     },
     {
+      "id": "card-interaction-sweep",
+      "path": "references/card/interaction-sweep.md",
+      "when": "after drafting contract rows and before showing the Draft — disposition sweep of new×inherited×runtime interactions",
+      "requires": ["common", "card-format"]
+    },
+    {
       "id": "card-confirmation-lock",
       "path": "references/card/confirmation-lock.md",
       "when": "just before user confirmation·lock·init",
@@ -252,7 +258,15 @@
     {
       "id": "card-lane",
       "when": "oracle lane, writing an Oracle Card — replaces the common·card·bva node reads",
-      "nodes": ["common", "card-policy-sources", "card-risk-grill", "bva", "card-format", "card-confirmation-lock"]
+      "nodes": [
+        "common",
+        "card-policy-sources",
+        "card-risk-grill",
+        "bva",
+        "card-format",
+        "card-interaction-sweep",
+        "card-confirmation-lock"
+      ]
     },
     {
       "id": "delivery-lane",

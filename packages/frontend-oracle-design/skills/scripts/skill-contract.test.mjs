@@ -16,6 +16,7 @@ const CARD_NODE_FILES = [
   'references/card/policy-sources.md',
   'references/card/risk-grill.md',
   'references/card/card-format.md',
+  'references/card/interaction-sweep.md',
   'references/card/confirmation-lock.md',
 ]
 const DELIVERY_NODE_FILES = [
@@ -508,11 +509,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.33.0')
+  assert.equal(version, '0.34.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.33.0')
+  assert.equal(marketplace.version, '0.34.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -1402,6 +1403,71 @@ test('gates the draft card on a context-free read that collapses to one root and
   assert.match(designOnly, /9\. Before showing the Draft, run the cold-read gate/)
   assert.match(designOnly, /hand the card bytes alone to a context-free\s+reviewer/)
   assert.match(designOnly, /Drive that nail/)
+})
+
+test('sweeps new×inherited×runtime interactions into lintable dispositions instead of free recall', async () => {
+  const [skill, sweep, format, verifier] = await Promise.all([
+    read('SKILL.md'),
+    read('references/card/interaction-sweep.md'),
+    read('references/card/card-format.md'),
+    read('scripts/oracle-verify.mjs'),
+  ])
+
+  // 스윕은 판정의 곱집합이지 테스트의 곱집합이 아니다 — 발견의 출력은 질문이다
+  assert.match(sweep, /dispositions, never tests/)
+  assert.match(sweep, /`POLICY_GAP` candidate routed through\s+`NEEDS_DECISION`/)
+  assert.match(sweep, /covered\(O\*\/D\*\)/)
+  assert.match(sweep, /impossible: <reason>/)
+  assert.match(sweep, /needs-decision: <question>/)
+
+  // 침묵은 셀로만 가능하다 — 빈 셀과 누락 정책은 기계가 잡는다
+  assert.match(sweep, /An unasked question is invisible; an empty\s+cell fails lint/)
+  assert.match(verifier, /sweep-cell-empty/)
+  assert.match(verifier, /sweep-policy-missing/)
+  assert.match(verifier, /sweep-disposition/)
+  assert.match(verifier, /sweep-row-unknown/)
+
+  // 승계 선언은 스윕을 통과해야 한다 — 리마운트×가상화류 결함의 규칙화
+  assert.match(sweep, /"inherited without semantic change" is valid only when each inherited policy/)
+
+  // 질문 은행은 escaped-bug 회고로 자란다
+  assert.match(sweep, /StrictMode double-invoke/)
+  assert.match(sweep, /mount-time side effects/)
+  assert.match(sweep, /Growth rule: every defect found after lock/)
+
+  // 카드 절차와 cold-read가 스윕을 소유한다
+  assert.match(skill, /card\/interaction-sweep\.md/)
+  assert.match(format, /interaction-sweep\.md/)
+  assert.match(format, /### 2\. Five questions — per row/)
+  assert.match(format, /share state, DOM, scroll, cache, or timing/)
+})
+
+test('locks machine-observable invariants and the bounded exploration authorization on the card', async () => {
+  const repositoryDirectory = join(skillDirectory, '../../..')
+  const [format, verifier, visualSkill] = await Promise.all([
+    read('references/card/card-format.md'),
+    read('scripts/oracle-verify.mjs'),
+    readFile(join(repositoryDirectory, 'packages/frontend-visual-qa/skills/frontend-visual-qa/SKILL.md'), 'utf8'),
+  ])
+
+  // I* 행은 시나리오 없이 모든 journey에서 판정 가능한 것만 — 기계 관측만 자격이 있다
+  assert.match(format, /## Invariants — optional/)
+  assert.match(format, /only machine-observable\s+facts qualify/)
+  assert.match(verifier, /invariant-policy-unknown/)
+  assert.match(verifier, /invariant-basis/)
+  assert.match(verifier, /invariant-id/)
+
+  // 탐색 승인은 카드 필드로만 — 추측 실행 금지 원칙 유지
+  assert.match(format, /Exploration authorization: approved \| declined/)
+  assert.match(visualSkill, /## 6\. 탐색 phase/)
+  assert.match(visualSkill, /`Exploration authorization: approved`가 있을 때만/)
+
+  // 탐색의 판정 기준은 I*·implicit oracle뿐이고 출력은 verdict가 아니라 후보다
+  assert.match(visualSkill, /`I\*` 불변식과 implicit oracle \*\*만\*\*/)
+  assert.match(visualSkill, /`VERIFIED` 판정에 영향을 주지 않는다/)
+  assert.match(visualSkill, /exploration\.md/)
+  assert.match(visualSkill, /`PRODUCT_DEFECT` 후보/)
+  assert.match(visualSkill, /`POLICY_GAP` 후보/)
 })
 
 test('keeps the runtime reference prose in sync with the graph that owns the load conditions', async () => {

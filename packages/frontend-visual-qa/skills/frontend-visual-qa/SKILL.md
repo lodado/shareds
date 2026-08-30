@@ -13,7 +13,8 @@ Oracle 작성, behavior TDD, production 수정은 소유하지 않는다.
 - 사용자가 screenshot 비교 또는 직접 브라우저 QA를 명시적으로 요청했을 때만
   실행한다. 승인된 Oracle의 `Visual QA authorization: approved`도 명시적 요청으로 인정한다.
   둘 다 없으면 `frontend-oracle-design`이 필요성을 추측해
-  자동 실행하지 않는다.
+  자동 실행하지 않는다. 탐색 phase는 같은 방식으로 승인된 Oracle의
+  `Exploration authorization: approved`가 있을 때만 실행한다.
 - 승인된 Oracle Card, Figma, 디자인 시스템, baseline과 사용자의 명시적 답변만
   기대 결과의 출처다. 현재 production 화면은 관찰 자료일 뿐 자동 baseline이 아니다.
 - 새 정책·baseline 선택·허용치 변경이 필요하면 `NEEDS_DECISION`으로 돌아간다.
@@ -104,7 +105,29 @@ font readiness 같은 관찰 가능한 barrier를 기다린다.
 locator나 fixture 문제가 있으면 최대 2회만 보정한다. assertion 약화, `first()`,
 `nth()`, 임의 wait, baseline update로 통과시키지 않는다.
 
-## 6. 판정과 라우팅
+## 6. 탐색 phase — bounded exploration
+
+카드 `User Confirmation`의 `Exploration authorization: approved`가 있을 때만, 요청 행
+검증을 **모두 마친 뒤** 실행한다. 필드가 없거나 `declined`면 건너뛴다 — "더 안전하다"는
+이유로 추가하지 않는다는 원칙 그대로다.
+
+1. time-box: 상호작용 30회 또는 10분 중 먼저 도달하는 쪽. 초과 탐색 금지.
+2. 투어는 승인된 journey 표면 안에서만: 새로고침 mid-flow, back/forward, 빠른 연타·연속
+   Enter, pending 중 리사이즈·필터 변경, 스크롤 중 조작, 빈/최대 데이터.
+3. 판정 기준은 카드 `I*` 불변식과 implicit oracle **만**: console error·uncaught
+   exception, 실패한 network 응답, dead click, 가로 오버플로, 포커스 소실, 요청 횟수.
+   정책 판단·미적 판단은 하지 않는다.
+4. 도구 유발 현상을 구분해 기록한다 — Playwright는 클릭 전에 대상으로 스크롤하므로,
+   화면 밖 요소 조작 시의 스크롤 이동은 사용자 등가 행동이 아니다. 재현 경로에 도구
+   개입 여부를 명시한다.
+5. 산출물은 run 디렉터리의 `exploration.md`. 발견은 verdict가 아니라 **후보**다:
+   - `I*`·implicit oracle 위반 → `PRODUCT_DEFECT` 후보 + 재현 증거 →
+     `frontend-oracle-design`의 `VALID_RED` 흐름으로 회송
+   - 카드가 침묵하는 동작 관찰 → `POLICY_GAP` 후보(질문+증거+추천) → `NEEDS_DECISION`
+   - 탐색 결과는 `VERIFIED` 판정에 영향을 주지 않는다. 후보가 있어도 요청 행이 전부
+     일치하면 해당 모드는 `VERIFIED`고, 후보는 별도 항목으로 보고한다.
+
+## 7. 판정과 라우팅
 
 | 관찰                                    | 판정·라우팅                                              |
 | --------------------------------------- | -------------------------------------------------------- |
@@ -118,7 +141,7 @@ locator나 fixture 문제가 있으면 최대 2회만 보정한다. assertion �
 
 결함을 발견해도 이 스킬 안에서 product를 고치고 재승인하지 않는다.
 
-## 7. Artifact
+## 8. Artifact
 
 레포가 위치를 정하지 않았다면 기존 Oracle 아래에 새 run 디렉터리를 만든다.
 
@@ -129,6 +152,7 @@ locator나 fixture 문제가 있으면 최대 2회만 보정한다. assertion �
   actual.png        # Screenshot 모드일 때
   diff.png          # mismatch가 있을 때
   trace/            # Direct browser 도구가 제공할 때
+  exploration.md    # 탐색 phase를 실행했을 때 — 후보 분류와 재현 경로
 ```
 
 기존 run을 덮어쓰지 않는다. `report.md`에는 다음을 기록한다.
@@ -215,6 +239,8 @@ Oracle의 `Visual QA authorization: declined`이면 visual PASS를 만들지 않
 ## 금지
 
 - 사용자 요청 없이 screenshot이나 직접 브라우저 실행
+- `Exploration authorization: approved` 없이 탐색 phase 실행, time-box 초과 탐색
+- 탐색 관찰로 `VERIFIED` 발급·정책 판단·baseline 변경 — 탐색의 출력은 후보뿐이다
 - 현재 화면을 자동 golden baseline으로 승인
 - mismatch를 없애려고 tolerance 또는 baseline 자동 갱신
 - production/live에서 파괴적 journey 실행

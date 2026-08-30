@@ -77,6 +77,11 @@ ownership splits from production, and make the test follow along when a slice is
   Copying production conditionals·formulas is forbidden.
 - For loading·race, the test controls the completion moment with a deferred **pending barrier**
   (the bva.md pattern). Arbitrary sleep is forbidden.
+- When the card has a `## State Model`, enumerate its transition paths as tests and assert that
+  empty state×event cells stay unreachable. When it has `## Invariants`, prefer relation
+  assertions derived from the card's policies (filter then clear returns the original list, loaded
+  count is monotonic, one GET per unique querystring) over one-off expected values — the same
+  pending barrier controls the sequences.
 - When an exported shared/package API type is the target of this change, put a `.test-d.ts(x)` witness on
   each bva.md type boundary axis. The axes are set by the relations the card closes, and only one misuse
   goes on the line after `@ts-expect-error`. When it exceeds 30, do not add more cases; raise the API split

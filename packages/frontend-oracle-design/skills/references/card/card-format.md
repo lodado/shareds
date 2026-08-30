@@ -2,7 +2,9 @@
 
 ## Card format
 
-Apply the four axes and the seven auto-added TCs from [`bva.md`](../bva.md). Every new card follows
+Apply the four axes and the seven auto-added TCs from [`bva.md`](../bva.md), then run the
+interaction sweep from [`interaction-sweep.md`](interaction-sweep.md) before showing the Draft.
+Every new card follows
 the order `Outcome Brief → Source Registry → User Confirmation → Decided policies → contract rows`.
 `oracle-verify.mjs card` checks the Outcome Brief required values and the Source Registry `Kind`
 before the lock.
@@ -20,6 +22,7 @@ record the location of the user's Design Change Confirmation answer in the same 
 - Source: message·issue·document location of the user's approval response
 - Delta: new card, or a summary of semantic changes against the previous revision
 - Visual QA authorization: approved | declined # when there is a RELATIONAL row
+- Exploration authorization: approved | declined # opt-in: authorizes the bounded exploration phase of $frontend-visual-qa
 ```
 
 The Draft stage keeps `Status: draft`. Only after the user has reviewed the full card·delta and
@@ -65,8 +68,11 @@ Abbreviated example:
 
 The default is to omit it. Even when there are async rows, the `O*` rows themselves are the
 contract, and lint does not block on a missing section. Add `## State Model` after the contract rows
-only for cards where the transition policy is too tangled to read from the row list alone
-(multi-step submits·optimistic rollback·payment-like). Once added, `oracle-verify.mjs card` verifies
+for cards where the transition policy is too tangled to read from the row list alone
+(multi-step submits·optimistic rollback·payment-like), and whenever the delta introduces
+remount·timer·scroll-ownership·mount-side-effect rows — several sweep cells resolving to the same
+tangled transition is the concrete trigger. Lint still does not block absence; the cold-read gate
+checks the omission. Once added, `oracle-verify.mjs card` verifies
 the structure: without non-empty `States`·`Events` and a transition table in which every transition
 cites a real `O*` row, the lock is blocked with `CARD_LINT_FAILED`.
 
@@ -92,10 +98,34 @@ cites a real `O*` row, the lock is blocked with `CARD_LINT_FAILED`.
 - This section is included in the card bytes and locked along with them. Translation into a
   discriminated union is owned by [`types/state-ladder.md`](../types/state-ladder.md).
 
+## Invariants — optional
+
+Cross-cutting `I*` rows that must hold in **every** state, with no Given·When. They are the
+judgment basis for any browser journey — including the exploration phase of
+`$frontend-visual-qa`, which runs outside the enumerated scenarios — so only machine-observable
+facts qualify: console·uncaught errors, network request counts, layout measurements (overflow,
+scroll-height jumps), URL, focus presence. "Feels stable" is not an invariant. An `I*` row never
+replaces the `O*`·`D*` row that owns a specific scenario outcome.
+
+```markdown
+## Invariants
+
+| ID  | Policy | Invariant                                      | Observable basis   |
+| --- | ------ | ---------------------------------------------- | ------------------ |
+| I1  | P23    | document scrollWidth === clientWidth at ≥320px | layout measurement |
+| I2  | —      | zero console errors·uncaught exceptions        | implicit oracle    |
+```
+
+- `Policy` cites a decided `P*`, or `—` for implicit oracles that are wrong regardless of policy.
+- Once the section exists, `oracle-verify.mjs card` validates its structure; absence does not block
+  lint — same contract as State Model.
+- `I*` rows are checked during every journey rather than mapped one-to-one to a scenario test.
+
 ## Cold-read gate — adversarial self-review
 
-The Draft passes three checks before it is shown to the user: a context-free read, four questions
-per row, and one synthesis. All three run on the Draft. After the lock, a repair is a new revision,
+The Draft passes three checks before it is shown to the user: a context-free read, five questions
+per row, and one synthesis. All three run on the Draft, and the Draft includes the interaction
+sweep and any Invariants — the reviewer attacks the sweep's `impossible` reasons too. After the lock, a repair is a new revision,
 not a re-review, so this gate is the last cheap place to find a defect.
 
 ### 1. Cold read — a reader who was not in the conversation
@@ -110,24 +140,27 @@ stands on its own. Hand the card to an independent reviewer surface that has no 
   in a way the author plainly did not intend.
 - A forced guess is a card defect, not a reader failure — repair the row instead of explaining it.
 - Role routing follows [`subagent-review.md`](../subagent-review.md). When no independent surface is
-  available, record that in `journal.md` and run the four questions alone. A same-context read is
+  available, record that in `journal.md` and run the five questions alone. A same-context read is
   the fallback, never the target.
 
-### 2. Four questions — per row
+### 2. Five questions — per row
 
-Apply four questions to each row and reinforce the row when a counterexample appears.
+Apply five questions to each row and reinforce the row when a counterexample appears.
 
 1. What is the simplest implementation that passes this row while violating the requirement?
 2. Is there a different but normal implementation that could fail because of this row?
 3. Can it pass by only mimicking the UI, without the actual side effect?
 4. Among loading, error, retry, consecutive input, and order reversal, what is relevant but missing?
+5. Which other rows share state, DOM, scroll, cache, or timing with this row, and which row owns
+   the expected outcome of that interaction? An unowned interaction goes back to the sweep as a
+   `needs-decision` cell, never into a guessed row.
 
 Example: "button disabled while saving" alone does not catch two POSTs before disabled is applied.
 Write both `POST×1 (total)` and "no second POST" on the same row.
 
 ### 3. Single root — synthesis, not a list
 
-A finding list postpones the decision. Collapse the cold read and the four questions into one
+A finding list postpones the decision. Collapse the cold read and the five questions into one
 answer, and record it in `journal.md`.
 
 - **Root**: the one assumption this card carries that, if false, makes the remaining rows moot.

@@ -155,7 +155,7 @@ node <skill-dir>/scripts/oracle-run.mjs init \
 - For `identity-shaping`, confirmation was obtained with a proposal that completed two design passes
 - The `Never` and side-effect counts of every row are complete
 - The seven auto-added TCs are added, or an N/A reason is given
-- The cold-read gate passed — the context-free read, the four questions, and a first nail that was
+- The cold-read gate passed — the context-free read, the five questions, and a first nail that was
   actually driven
 - The `oracle-verify.mjs card` lint and the revision lock verification pass
 
