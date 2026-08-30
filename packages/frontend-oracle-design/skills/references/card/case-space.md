@@ -99,9 +99,10 @@ Lint (`oracle-verify.mjs card`, active when `## Case space` exists):
   `@ts-expect-error` rule
 
 A frame does not create a test. `F*`·`E*` dispositions map to existing rows or promote questions;
-`PATH*` frames become the Delivery path-test enumeration ($test maps each path to one test);
-`EMPTY` cells resolve to impossible or a policy question, per the State Model rule that already
-owns them.
+`PATH*` frames become the Delivery path-test enumeration ($test maps each path to one test, and
+that path test doubles as the evidence for every row it traverses — assertion ownership stays
+single, so a row covered by a path gets no standalone test); `EMPTY` cells resolve to impossible
+or a policy question, per the State Model rule that already owns them.
 
 ## What this section does not claim
 

@@ -509,11 +509,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.36.0')
+  assert.equal(version, '0.36.1')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.36.0')
+  assert.equal(marketplace.version, '0.36.1')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -1544,6 +1544,14 @@ test('enumerates the declared case space by machine and dispositions every gener
   assert.match(testSkill, /`PATH\*` frames of `oracle-frames\.mjs` are the test\s+enumeration/)
   assert.match(testSkill, /sequence test is \*\*required\*\*, not optional/)
   assert.match(testSkill, /fc\.scheduler/)
+
+  // assertion 소유는 단일 — 실행 중복은 허용, 소유 중복은 결함
+  assert.match(testSkill, /exactly one owning test/)
+  assert.match(testSkill, /is that row's evidence/)
+  assert.match(testSkill, /evidence mapping is N:1/)
+  assert.match(testSkill, /never re-owns a row's expected values/)
+  assert.match(testSkill, /one shared place per harness/)
+  assert.match(caseSpace, /assertion ownership stays\s+single/)
 
   // visual-qa: webkit 매트릭스 — 축을 몰라도 관측면이 받는다 (L4)
   assert.match(visualSkill, /chromium과 \*\*webkit\*\* 두 engine/)

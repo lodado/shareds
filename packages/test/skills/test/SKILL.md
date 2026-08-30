@@ -80,14 +80,27 @@ ownership splits from production, and make the test follow along when a slice is
 - When the card has a `## State Model`, the `PATH*` frames of `oracle-frames.mjs` are the test
   enumeration: one test per path (the path label is the describe name), and `EMPTY` cells the card
   dispositioned `impossible` get an unreachability assertion. A skipped path blocks `GREEN` the
-  same as a skipped row. When it has `## Invariants`, prefer relation assertions derived from the
-  card's policies (filter then clear returns the original list, loaded count is monotonic, a
-  repeated identical query issues no new request) over one-off expected values.
+  same as a skipped row.
+- **Every assertion has exactly one owning test — re-executing a behavior is fine, re-owning its
+  assertion is not.** A path test asserts each traversed row's Then·Never·side-effect count at the
+  step where it fires, and **is that row's evidence**: map several rows to the one path test
+  (evidence mapping is N:1) instead of writing standalone row tests. A standalone row test exists
+  only for rows no path traverses — static `D*` rows, error subtypes outside the model.
+  Duplicating a row's expected values into a second test is a defect, not extra safety: when the
+  policy changes, two owners drift apart.
 - When the card's Case space has an Order dimension with two or more choices, a fast-check
   sequence test is **required**, not optional: `fc.commands` against a model, or `fc.scheduler`
-  shuffling promise resolution order — combined with the deferred pending barrier. If fast-check
-  is neither installed nor approved, verify the Order frames with hand-enumerated deferred
-  orderings and record why.
+  shuffling promise resolution order — combined with the deferred pending barrier. The sequence
+  test judges only against the model and the card's `I*` invariants — it explores sequences the
+  paths did not enumerate and never re-owns a row's expected values. If fast-check is neither
+  installed nor approved, verify the Order frames with hand-enumerated deferred orderings and
+  record why.
+- `## Invariants` rows are judged in one shared place per harness (a common post-step check of the
+  journey runner), not copied into each scenario test. When an `I*` restates an `O*` row's
+  property, both cite the same `P*` — execution may overlap, assertion ownership may not. Prefer
+  relation assertions derived from the card's policies (filter then clear returns the original
+  list, loaded count is monotonic, a repeated identical query issues no new request) over one-off
+  expected values.
 - When an exported shared/package API type is the target of this change, put a `.test-d.ts(x)` witness on
   each bva.md type boundary axis. The axes are set by the relations the card closes, and only one misuse
   goes on the line after `@ts-expect-error`. When it exceeds 30, do not add more cases; raise the API split
