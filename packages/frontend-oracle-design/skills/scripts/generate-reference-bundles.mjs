@@ -41,10 +41,37 @@ function resolveNodes(graph, bundle) {
   return resolved
 }
 
-export async function renderBundle(graph, bundle) {
+// A continuation bundle declares `after: [bundleId, ...]` — the nodes those bundles already
+// delivered (or themselves assumed) are in context, so this bundle lists them as assumed instead
+// of re-emitting their bytes. Reading base + continuation equals reading each lane's full node set
+// once, without paying for the overlap (e.g. common·bva) twice.
+export function resolveAssumed(graph, bundle, trail = []) {
+  const assumed = new Set()
+  for (const afterId of bundle.after ?? []) {
+    if (trail.includes(afterId)) throw new Error(`bundle ${bundle.id} has an after cycle at ${afterId}`)
+    const parent = (graph.bundles ?? []).find((candidate) => candidate.id === afterId)
+    if (!parent) throw new Error(`bundle ${bundle.id} declares unknown after bundle ${afterId}`)
+    for (const node of resolveNodes(graph, parent)) assumed.add(node.id)
+    for (const id of resolveAssumed(graph, parent, [...trail, afterId])) assumed.add(id)
+  }
+  return assumed
+}
+
+export function splitDelivery(graph, bundle) {
+  const assumed = resolveAssumed(graph, bundle)
   const nodes = resolveNodes(graph, bundle)
+  return {
+    delivered: nodes.filter((node) => !assumed.has(node.id)),
+    assumed: nodes.filter((node) => assumed.has(node.id)),
+  }
+}
+
+export async function renderBundle(graph, bundle) {
+  const { delivered, assumed } = splitDelivery(graph, bundle)
+  if (delivered.length === 0)
+    throw new Error(`bundle ${bundle.id} delivers no nodes — its after bundles already cover it`)
   const sections = await Promise.all(
-    nodes.map(async (node) => {
+    delivered.map(async (node) => {
       const body = await readFile(join(skillDirectory, node.path), 'utf8')
       return `<!-- node:${node.id} path:${node.path} -->\n\n${body.trimEnd()}\n`
     }),
@@ -56,11 +83,22 @@ export async function renderBundle(graph, bundle) {
     `> ${GENERATED_NOTICE}`,
     '',
     `- When: ${bundle.when}`,
-    `- Nodes: ${nodes.map((node) => node.id).join(', ')}`,
+    `- Nodes: ${delivered.map((node) => node.id).join(', ')}`,
+    ...(assumed.length > 0
+      ? [`- Assumes already read (via ${bundle.after.join(', ')}): ${assumed.map((node) => node.id).join(', ')}`]
+      : []),
     '',
     'Reading this bundle counts as reading every node listed above. Report those node ids in the',
     'lane header, not the bundle id — the header states what was actually read, and a bundle is a',
     'delivery mechanism for the same bytes, not a node of its own.',
+    ...(assumed.length > 0
+      ? [
+          '',
+          'This is a continuation bundle: the assumed nodes are not repeated here. Read it only when',
+          'the listed base bundle (or those exact nodes) is already in this context; otherwise read',
+          'the full lane bundle instead.',
+        ]
+      : []),
     '',
   ].join('\n')
 
@@ -92,7 +130,8 @@ async function main() {
       if (actual === null) problems.push(`${name} is missing`)
       else if (actual !== content) problems.push(`${name} is stale`)
     }
-    for (const name of present) if (!expected.has(name)) problems.push(`${name} is not declared in reference-graph.json`)
+    for (const name of present)
+      if (!expected.has(name)) problems.push(`${name} is not declared in reference-graph.json`)
 
     if (problems.length > 0) {
       console.error(`BUNDLE_DRIFT\n${problems.map((problem) => `- ${problem}`).join('\n')}`)

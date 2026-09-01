@@ -307,6 +307,30 @@
         "frontend-quality",
         "architecture-contract"
       ]
+    },
+    {
+      "id": "delivery-lane-continued",
+      "when": "entering Delivery after ORACLE_READY when the card-lane bundle (or its exact nodes) is already in this context — same node set as delivery-lane without re-reading the overlap",
+      "after": ["card-lane"],
+      "nodes": [
+        "delivery-ledger",
+        "delivery-red",
+        "delivery-implementation-decision",
+        "delivery-green-review",
+        "subagent-review"
+      ]
+    },
+    {
+      "id": "types-lane-continued",
+      "when": "types-lane condition met when the card-lane and delivery-lane bundles are already in this context — same node set as types-lane without re-reading the overlap",
+      "after": ["card-lane", "delivery-lane"],
+      "nodes": [
+        "types-state-ladder",
+        "types-authoring",
+        "types-api-surface",
+        "types-advanced-contracts",
+        "frontend-decisions"
+      ]
     }
   ],
   "bundleContract": {
@@ -317,7 +341,8 @@
       "A bundle is optional. Reading its nodes individually is always valid and produces the same bytes.",
       "Report the node ids in the lane header, never the bundle id.",
       "Never hand-edit bundles/ — edit the reference node and regenerate.",
-      "A bundle contains every requires edge of its declared nodes, in dependency-first order."
+      "A bundle contains every requires edge of its declared nodes, in dependency-first order.",
+      "A continuation bundle (`after`) delivers only the nodes its base bundles did not; the header lists the assumed nodes. Read it only when the base bundle's nodes are already in context — reading base + continuation equals reading the full lane node set once."
     ]
   }
 }
