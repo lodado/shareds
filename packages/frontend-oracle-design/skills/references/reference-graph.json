@@ -331,6 +331,18 @@
         "types-advanced-contracts",
         "frontend-decisions"
       ]
+    },
+    {
+      "id": "frontend-lane-continued",
+      "when": "frontend-lane condition met when the delivery-lane bundle (or its exact nodes) is already in this context — same node set as frontend-lane without re-reading the overlap; typically the architecture-contract read reached during Delivery",
+      "after": ["delivery-lane"],
+      "nodes": [
+        "changeability",
+        "frontend-decisions",
+        "frontend-authoring",
+        "frontend-quality",
+        "architecture-contract"
+      ]
     }
   ],
   "bundleContract": {

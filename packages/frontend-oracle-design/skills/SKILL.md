@@ -89,7 +89,8 @@ in dependency-first order — `card-lane`, `delivery-lane`, `types-lane`, `front
 from the graph by `scripts/generate-reference-bundles.mjs`. Reading a bundle is optional and equals
 reading its nodes: same bytes, one call, stable prefix. When a base bundle's nodes are already in
 this context, prefer the matching `-continued` continuation bundle (`delivery-lane-continued`,
-`types-lane-continued`): it delivers the same lane node set minus the overlap already read, and its
+`types-lane-continued`, `frontend-lane-continued`): it delivers the same lane node set minus the
+overlap already read, and its
 header names the assumed nodes. Base plus continuation equals the full lane read once; without the
 base in context, read the full lane bundle instead. It is a delivery mechanism, never an
 authority, so **the lane header still reports the node ids, not the bundle id**, and a node outside
