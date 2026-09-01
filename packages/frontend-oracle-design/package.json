@@ -5,7 +5,7 @@
   "description": "Claude Code / Codex plugin for medium/high-risk Oracle-driven frontend delivery.",
   "license": "MIT",
   "scripts": {
-    "lint": "eslint skills",
+    "lint": "eslint skills --ignore-pattern 'skills/bundles/**' && node skills/scripts/generate-reference-bundles.mjs --check",
     "test": "node --test skills/scripts/*.test.mjs",
     "workflow-docs:generate": "node skills/scripts/generate-workflow-docs.mjs",
     "workflow-docs:check": "node skills/scripts/generate-workflow-docs.mjs --check",

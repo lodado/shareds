@@ -4,8 +4,8 @@
 // 같은 카드 바이트는 같은 ID 집합을 낸다 — verify가 재생성해 완전성을 대조한다.
 
 import { readFile } from 'node:fs/promises'
-import process from 'node:process'
 import { resolve } from 'node:path'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 export const TAXONOMY_FAMILIES = [
@@ -67,7 +67,7 @@ export function parseCaseSpace(document) {
 
   const families = tableRows(section, 'Family').map((cells) => {
     const [family = '', dimension = '', choicesCell = ''] = cells
-    if (/^excluded:/.test(choicesCell.trim())) {
+    if (choicesCell.trim().startsWith('excluded:')) {
       return { family, dimension: null, choices: [], excluded: choicesCell.trim().slice('excluded:'.length).trim() }
     }
     const choices = choicesCell
@@ -138,7 +138,7 @@ export function generateCaseFrames(caseSpace) {
     const covers = (frame, tuple) => tuple.every(([index, choice]) => frame[index] === choice)
     while (uncovered.length > 0) {
       const seed = uncovered[0]
-      const frame = new Array(dimensions.length).fill(null)
+      const frame = Array.from({length: dimensions.length}).fill(null)
       for (const [index, choice] of seed) frame[index] = choice
       for (const [index, dimension] of dimensions.entries()) {
         if (frame[index] !== null) continue

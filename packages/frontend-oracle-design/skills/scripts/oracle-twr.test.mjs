@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parseLog, scoreCommits } from './oracle-twr.mjs'
 
-const RS = '\u001e'
+const RS = '\u001E'
 
 test('parseLog: RS 구분 레코드에서 hash·timestamp·subject·files를 읽는다', () => {
   const raw = `${RS}${'a'.repeat(40)} 1000 fix: null guard\nsrc/a.ts\nsrc/b.ts\n${RS}${'b'.repeat(40)} 2000 feat: add page\nsrc/c.ts\n`

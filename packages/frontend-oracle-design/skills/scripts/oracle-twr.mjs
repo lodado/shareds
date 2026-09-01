@@ -4,11 +4,11 @@
 // risk 판정의 선택적 증거 입력이다 — 게이트가 아니고, 점수가 낮다는 이유로 판정을 낮추지 않는다.
 
 import { spawnSync } from 'node:child_process'
+import { resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { resolve } from 'node:path'
 
-const BUG_FIX_SUBJECT = /\b(fix(es|ed)?|bug|hotfix|regression|defect)\b/i
+const BUG_FIX_SUBJECT = /\b(?:fix(?:es|ed)?|bug|hotfix|regression|defect)\b/i
 
 class CliError extends Error {
   constructor(code, message, exitCode = 1) {
@@ -67,7 +67,7 @@ export function scoreCommits(commits, prefixes = []) {
 
 export function parseLog(raw) {
   return raw
-    .split('\u001e')
+    .split('\u001E')
     .map((record) => record.trim())
     .filter(Boolean)
     .map((record) => {

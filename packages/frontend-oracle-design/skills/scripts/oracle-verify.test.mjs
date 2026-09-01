@@ -2766,7 +2766,7 @@ test('deviations·landmines: 유효한 선택 섹션은 lint를 통과한다', a
 })
 
 test('deviations: 유형 누락·enum 밖 유형·없는 정책은 실패한다', async (t) => {
-  const missingType = VALID_CARD + DEVIATIONS_SECTION.replace(/\| P4     \| stopped-early-applied-long[^\n]*\n/, '')
+  const missingType = VALID_CARD + DEVIATIONS_SECTION.replace(/\| P4 {5}\| stopped-early-applied-long[^\n]*\n/, '')
   const badType = VALID_CARD + DEVIATIONS_SECTION.replace('| P1     | not-provided ', '| P1     | maybe-provided ')
   const unknownPolicy = VALID_CARD + DEVIATIONS_SECTION.replace('| P4     | not-provided ', '| P99    | not-provided ')
 

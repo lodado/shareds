@@ -7,8 +7,9 @@
 // file and hits the cache. It never adds, edits, or summarizes reference content — a bundle that
 // drifts from its nodes is a generation defect, and `--check` fails on it.
 
-import { readFile, writeFile, mkdir, readdir, rm } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 const skillDirectory = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -139,14 +140,14 @@ async function main() {
       process.exitCode = 1
       return
     }
-    console.log(`bundles ok — ${expected.size} bundles match their nodes`)
+    process.stdout.write(`bundles ok — ${expected.size} bundles match their nodes\n`)
     return
   }
 
   await rm(bundleDirectory, { recursive: true, force: true })
   await mkdir(bundleDirectory, { recursive: true })
   for (const [name, content] of expected) await writeFile(join(bundleDirectory, name), content, 'utf8')
-  console.log(`generated ${expected.size} bundles in bundles/`)
+  process.stdout.write(`generated ${expected.size} bundles in bundles/\n`)
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
