@@ -58,3 +58,22 @@ test('keeps behavior tests here and delegates screenshot or direct-browser QA', 
   assert.doesNotMatch(skill, /headless.*`\*\.style\.(?:test|spec)/s)
   assert.match(skill, /does not create a visual baseline or issue `BROWSER_VERIFIED`/)
 })
+
+test('scopes qa-agent annotations to API and user scenarios and exempts pure rendering explicitly', async () => {
+  const skill = await readFile(join(skillDirectory, 'SKILL.md'), 'utf8')
+
+  // In scope: API-linked network behavior and multi-step user scenarios are annotated.
+  assert.match(skill, /\*\*Annotate \(in scope\):\*\*/)
+  assert.match(skill, /touches the network[\s\S]{0,120}multi-step user scenario/)
+
+  // Out of scope: pure rendering is skipped with an explicit, auditable marker — not left unannotated.
+  assert.match(skill, /\*\*Skip explicitly \(out of scope\):\*\*/)
+  assert.match(skill, /pure rendering only/)
+  assert.match(skill, /@qa-live-skip: true/)
+  assert.match(skill, /explicit and auditable; never leave\s+it silently unannotated/)
+
+  // Boundary guard: a side-effect row is never render-only, and doubt resolves toward annotating.
+  assert.match(skill, /\*\*Boundary guard:\*\*/)
+  assert.match(skill, /never render-only/)
+  assert.match(skill, /When in doubt whether a spec is pure rendering, annotate it in scope/)
+})

@@ -116,15 +116,28 @@ Playwright rules (no exceptions):
 5. `test.skip` + a reason only for what cannot be judged at any layer — first consider moving layers
    (unit/API)
 6. In a repo that uses `playwright-spec-for-ai-agent` (the dependency in `package.json`, a
-   `playwright-spec-for-ai-agent.config.*` file, or `@qa-scenario` in neighboring specs), every new or
-   edited spec file carries the `@qa-*` annotations: a file-level `// @qa-scenario:` plus
-   `// @qa-live-policy:` on each test or an enclosing `test.describe`. Read the vocabulary and parsing
-   rules before writing them — they are not restated here:
+   `playwright-spec-for-ai-agent.config.*` file, or `@qa-scenario` in neighboring specs), annotate the
+   specs the QA agent should judge and explicitly mark the ones it should skip — do not spend QA
+   judgment on pure rendering. Read the vocabulary and parsing rules before writing them — they are
+   not restated here:
    [docs/reference/annotations.md](https://github.com/lodado/playwright-spec-for-AI-Agent/blob/main/docs/reference/annotations.md),
    worked example [examples/sample-spec.ts](https://github.com/lodado/playwright-spec-for-AI-Agent/blob/main/examples/sample-spec.ts).
-   Derive the live policy from the card's side-effect rows: observation only → `readonly`,
-   non-destructive interaction → `safe-interaction`, mutation·payment·deletion → the matching
-   `blocked-*` policy. A missing annotation in such a repo blocks `GREEN` the same as a skipped row.
+   - **Annotate (in scope):** a spec whose behavior touches the network (an API-linked request whose
+     count·payload the card asserts) or a multi-step user scenario (form submit, auth, payment,
+     routing/navigation flow). It carries the `@qa-*` annotations: a file-level `// @qa-scenario:`
+     plus `// @qa-live-policy:` on each test or an enclosing `test.describe`. Derive the live policy
+     from the card's side-effect rows: observation only → `readonly`, non-destructive interaction →
+     `safe-interaction`, mutation·payment·deletion → the matching `blocked-*` policy.
+   - **Skip explicitly (out of scope):** a spec that verifies pure rendering only — static display,
+     prop→DOM mapping, or snapshot-style checks with **zero network requests, zero state change, and
+     no side-effect Oracle row mapped to it**. Mark it with a file-level `// @qa-live-skip: true` (or
+     a test-level `// @qa-live-policy: skip`) so the exemption is explicit and auditable; never leave
+     it silently unannotated.
+   - **Boundary guard:** if an Oracle row carries a side effect (mutation·payment·deletion·request
+     count·permission·data integrity), it is never render-only — annotate it in scope even when it
+     looks like a plain render. When in doubt whether a spec is pure rendering, annotate it in scope.
+     In such a repo, an in-scope spec that is neither annotated nor explicitly `@qa-live-skip` marked
+     blocks `GREEN` the same as a skipped row.
 
 When a non-N/A Oracle row is skipped, do not issue `GREEN`.
 Verify it at another layer, return to Oracle with a sourced N/A, or report `FAIL`.
