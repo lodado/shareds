@@ -33,6 +33,7 @@ test('ships every reference the workflow links to', async () => {
     'review',
     'fidelity',
     'interface-rules',
+    'visual-system',
   ]
 
   for (const name of references) {
@@ -89,6 +90,33 @@ test('follows an owned source verbatim and only creates when no source exists, d
   assert.match(fidelity, /소스에 없는 것을 더하지 않는다/)
   assert.match(fidelity, /이 표에 없는 이탈은 사용자에게 묻는다/)
   assert.match(ui, /`kill-ai-slop`이 설치돼 있으면 이 절 대신/)
+})
+
+test('derives the creation-mode visual system from linked well-known sources, tokens before code', async () => {
+  const [skill, system] = await Promise.all([read('SKILL.md'), read('references/visual-system.md')])
+
+  assert.match(skill, /visual-system\.md.*공식으로 도출/)
+  assert.match(skill, /토큰 블록과 anchor hue 도출/)
+  assert.match(skill, /토큰 블록[^.]*컴포넌트보다 먼저 방출/)
+  assert.match(system, /링크가\s+이긴다/)
+  assert.match(system, /이식 테스트[\s\S]*어색하지 않으면/)
+  assert.match(system, /solid의 L이 70% 이상이면/)
+  assert.match(system, /3:1 이상/)
+  assert.match(system, /1–2 앱\/섹션 배경[\s\S]*11–12 텍스트/)
+  assert.match(system, /컴포넌트 코드보다\s+먼저/)
+  assert.match(system, /### 랜딩[\s\S]*### 앱/)
+  assert.match(system, /aesthetic-usability/)
+  assert.match(system, /Fidelity에서는\s+쓰지 않는다/)
+})
+
+test('prefers the deterministic detector for anti-slop but keeps the ladder as judge', async () => {
+  const skill = await read('SKILL.md')
+
+  assert.match(skill, /npx --yes impeccable detect[\s\S]*결정론적 규칙 61개/)
+  assert.match(skill, /대비 계산과 선택자 매칭이 꺼진다/)
+  assert.match(skill, /impeccable critique/)
+  assert.match(skill, /DESIGN.md[\s\S]*교체하려 하면 멈추고[\s\S]*NEEDS_DECISION/)
+  assert.match(skill, /1–4단을\s+해치는 시각 제안은 반려/)
 })
 
 test('vendors Vercel interface rules with a pinned upstream sha and folds cognitive load into the UX review', async () => {

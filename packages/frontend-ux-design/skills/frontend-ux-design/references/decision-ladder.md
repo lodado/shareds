@@ -40,6 +40,10 @@
 
 ### 5. Visual treatment — 각 항목은 1–4단 중 무엇을 돕는지 적는다
 
+- anchor hue(Creation): <주제의 사물 3개와 각 함의 hue> → 고른 것 <hue 값과 이유>
+- 이식 테스트(Creation): 무관한 브리프 <예: 치과 · 주물 공장>에 같은 팔레트를 놓으면
+  <어색하다 = 통과 / 자연스럽다 = 주제에서 안 나옴, 재도출>
+- 토큰(Creation): <신규 방출 / 기존 토큰 재사용 + 출처 파일>
 - typography: <scale 단계 수, display/body 역할> → 돕는 단: hierarchy
 - spacing: <기본 단위, 섹션 간격 규칙> → 돕는 단: hierarchy
 - color: accent <하나>, 쓰이는 곳 <primary action · 현재 위치> → 돕는 단: interaction

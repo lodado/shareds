@@ -42,10 +42,10 @@ accent color 하나하나가 1–4단 중 어느 것을 돕는지 한 줄로 말
 
 Frame 직후 한 번 정하고 Rationale 첫 줄에 적는다. 창작은 소스가 없을 때의 마지막 수단이다.
 
-| 모드         | 조건                                                                                                                                                     | 원칙                                                                                                                                             |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Fidelity** | 사용자 소유 디자인 소스가 있다(루트 `DESIGN.md` · Figma · 스크린샷 · 토큰 · 기존 화면). `DESIGN.md`가 있으면 그것이 잠긴 시스템이며 다른 소스보다 앞선다 | 소스를 값 단위로 추출해 그대로 구현한다. 소스에 없는 treatment를 추가하지 않는다. 벗어나는 건 a11y · responsive · 빠진 state뿐이며 전부 기록한다 |
-| **Creation** | 소스가 없다                                                                                                                                              | 사다리 순서대로 결정하고 anti-slop 규칙(아래 위임 표) 안에서만 만든다. 빼는 게 먼저, signature 하나                                              |
+| 모드         | 조건                                                                                                                                                     | 원칙                                                                                                                                                                                              |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fidelity** | 사용자 소유 디자인 소스가 있다(루트 `DESIGN.md` · Figma · 스크린샷 · 토큰 · 기존 화면). `DESIGN.md`가 있으면 그것이 잠긴 시스템이며 다른 소스보다 앞선다 | 소스를 값 단위로 추출해 그대로 구현한다. 소스에 없는 treatment를 추가하지 않는다. 벗어나는 건 a11y · responsive · 빠진 state뿐이며 전부 기록한다                                                  |
+| **Creation** | 소스가 없다                                                                                                                                              | 사다리 순서대로 결정하고 anti-slop 규칙(아래 위임 표) 안에서만 만든다. 시각 시스템은 [`references/visual-system.md`](references/visual-system.md) 공식으로 도출한다. 빼는 게 먼저, signature 하나 |
 
 혼합(일부 화면만 소스 있음)이면 소스 있는 부분은 Fidelity, 없는 부분은 소스의 토큰 ·
 컴포넌트 · 밀도를 그대로 이어받는 Creation이다. 두 모드 모두 slop gate를 통과해야 한다.
@@ -55,20 +55,36 @@ Fidelity 절차는 [`references/fidelity.md`](references/fidelity.md).
 
 이 skill은 순서와 판정 기준만 소유한다. 아래 관심사는 설치된 스킬에 위임하고, 없을 때만
 괄호 안 fallback을 쓴다. 위임한 스킬의 출력은 decision record와 Rationale에 인용한다.
+시각 시스템 도출(`references/visual-system.md`)은 위임 대상이 아니다 — 설치된 스킬이
+있어도 Creation이면 항상 이 skill이 돌린다. 위임 스킬의 시각 제안은 그 위에 얹는다.
 
-| 관심사                       | 위임 대상                                              | 없을 때 fallback                                              |
-| ---------------------------- | ------------------------------------------------------ | ------------------------------------------------------------- |
-| Creation build 제약          | `baseline-ui` (요청 없으면 animation · gradient 없음)  | ui-checklist + interface-rules.md                             |
-| Creation anti-slop 검사      | `kill-ai-slop` (scan → triage → report → fix)          | `hallmark` slop-test; 둘 다 없으면 ui-checklist § Slop gates  |
-| Fidelity 기존 화면 감사      | `improve-ui` (read-only, 자기 디자인 근거 대조)        | fidelity.md § Self-review                                     |
-| 기존 코드에서 DESIGN.md 생성 | `create-design-md`                                     | pre-flight 결과를 소스로 사용                                 |
-| Creation 시각 방향·카피      | `frontend-design` (plan → critique → build, 카피 규칙) | ui-checklist § Copy                                           |
-| Figma 소스 추출              | `figma:figma-design-to-code`                           | fidelity.md § 스크린샷 스냅 규칙으로 격하하고 사용자에게 알림 |
-| 자기 사이트 URL 추출         | `clone-website` workflow가 레포에 있으면 그 Phase 1    | fidelity.md § 최소 추출                                       |
-| 제3자 사이트 구조 학습       | `hallmark study` (DNA만, 픽셀 금지)                    | reference-study.md                                            |
-| motion 검토                  | `design-motion-principles`                             | ui-checklist § Motion                                         |
-| 위험 동작 정책               | `frontend-oracle-design`                               | 없으면 `NEEDS_DECISION`으로 사용자에게                        |
-| 스크린샷·브라우저 QA         | `frontend-visual-qa` (명시 요청 시)                    | 눈으로 섹션별 비교                                            |
+`impeccable`은 설치돼 있으면 anti-slop · 비평 · 마감의 1순위다. 이유는 취향이 아니라
+결정론이다 — 규칙 61개가 모델 없이 돌아서 결과가 재현된다. 다만 경계 두 개를 지킨다.
+`DESIGN.md`는 이 skill의 Fidelity 모드에서 잠긴 시스템이므로, `impeccable`이 redesign
+경로에서 그것을 교체하려 하면 멈추고 사용자에게 묻는다(`NEEDS_DECISION`). 그리고
+`impeccable`의 지적은 증거로 인용하되, 채택 여부는 사다리 순서로 판정한다 — 1–4단을
+해치는 시각 제안은 반려하고 그 근거를 Rationale에 남긴다.
+
+anti-slop 검사는 **CLI(`npx --yes impeccable detect`)로 돌린다.** 편집 후 자동으로 도는
+플러그인 훅은 `htmlparser2` · `css-select` · `css-tree` · `domutils`를 프로젝트에서
+resolve 하지 못하면 정규식 폴백으로 내려가고, 그때 **대비 계산과 선택자 매칭이 꺼진다**
+(도구가 "findings are an undercount" 경고를 함께 낸다). CLI는 자기 의존성을 들고 오므로
+대비까지 계산한다. 훅 결과만 보고 통과로 판정하지 않는다.
+
+| 관심사                       | 위임 대상                                                                            | 없을 때 fallback                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| Creation build 제약          | `baseline-ui` (요청 없으면 animation · gradient 없음)                                | ui-checklist + interface-rules.md                             |
+| Creation anti-slop 검사      | `npx --yes impeccable detect <target>` (결정론적 규칙 61개) → 남은 건 `kill-ai-slop` | `hallmark` slop-test; 둘 다 없으면 ui-checklist § Slop gates  |
+| 화면 비평 · 마감 패스        | `impeccable critique <target>` / `polish <target>`                                   | review.md 6축 + ui-checklist                                  |
+| Fidelity 기존 화면 감사      | `impeccable critique` (없으면 `improve-ui`, read-only)                               | fidelity.md § Self-review                                     |
+| 기존 코드에서 DESIGN.md 생성 | `impeccable document` 또는 `create-design-md`                                        | pre-flight 결과를 소스로 사용                                 |
+| Creation 카피·비평 패스      | `frontend-design` (plan → critique → build, 카피 규칙)                               | ui-checklist § Copy                                           |
+| Figma 소스 추출              | `figma:figma-design-to-code`                                                         | fidelity.md § 스크린샷 스냅 규칙으로 격하하고 사용자에게 알림 |
+| 자기 사이트 URL 추출         | `clone-website` workflow가 레포에 있으면 그 Phase 1                                  | fidelity.md § 최소 추출                                       |
+| 제3자 사이트 구조 학습       | `hallmark study` (DNA만, 픽셀 금지)                                                  | reference-study.md                                            |
+| motion 검토                  | `design-motion-principles`                                                           | ui-checklist § Motion                                         |
+| 위험 동작 정책               | `frontend-oracle-design`                                                             | 없으면 `NEEDS_DECISION`으로 사용자에게                        |
+| 스크린샷·브라우저 QA         | `frontend-visual-qa` (명시 요청 시)                                                  | 눈으로 섹션별 비교                                            |
 
 위임 스킬이 이 skill의 사다리 순서와 충돌하면 사다리가 이긴다. 예: `frontend-design`이
 "hero는 thesis"라 해도 primary task가 폼 완료면 폼이 첫 화면이다.
@@ -116,14 +132,17 @@ brief에서 읽히는 것은 추정으로 먼저 말하고, 결과를 가장 크
 responsive 계획(320 / 768 / 1280), a11y 계획(keyboard path, focus order, 이름 붙은 landmark),
 그리고 **버린 대안**. Fidelity에서는 5단이 extraction 표 참조로 대체되고, gate는 "소스에
 없는 treatment 추가 금지"로 바뀐다. 결정이 실제로 갈리는 지점(조작 모델, 정보 노출 범위, destructive
-처리)이 있으면 그 한 가지만 사용자에게 묻는다. 나머지는 진행한다.
+처리)이 있으면 그 한 가지만 사용자에게 묻는다. 나머지는 진행한다. Creation이면 5단을
+채우기 전에 [`references/visual-system.md`](references/visual-system.md)로 팔레트 · 토큰 ·
+타이포 · 레이아웃 패턴을 도출하고, Build에서 토큰 블록을 컴포넌트보다 먼저 방출한다.
 
 ### 4. Build — 작은 컴포넌트, 잠긴 토큰, 모든 상태
 
 - 시맨틱 HTML과 landmark 먼저. div로 버튼을 만들지 않는다.
 - 모든 interactive 요소는 default / hover / focus-visible / active / disabled / loading /
   error / success 상태를 가진다. 빠진 상태는 미완성이다.
-- 색과 폰트는 토큰만 참조한다. 새 값이 필요하면 토큰 블록에 이름 붙여 추가한다.
+- 토큰 블록(`:root` / `.dark`)을 컴포넌트보다 먼저 방출한다. 이후 색과 폰트는 토큰만
+  참조한다. 새 값이 필요하면 토큰 블록에 이름 붙여 추가한다.
 - motion은 `transform` · `opacity`만, UI 상태 변화는 200ms 이하, `prefers-reduced-motion`
   존중. 자주 쓰거나 키보드로 트리거되는 동작에는 animation을 넣지 않는다.
 - 320px에서 가로 스크롤 없음, 두 theme(지원 시) 모두 확인.
@@ -177,6 +196,8 @@ task walkthrough 질문 3개, 출시 후 측정 지표(완료율 · 소요 시�
 
 - 모드가 명시됐다. Fidelity면 extraction 표와 이탈 기록이, Creation이면 anti-slop gate
   결과가 있다.
+- Creation이면 토큰 블록과 anchor hue 도출 1줄(주제의 사물 → hue)이 decision record에
+  있다. 기존 토큰을 쓴 경우 그 사실과 출처 파일을 적는다.
 - Decision record와 Rationale이 모두 있고 서로 모순이 없다.
 - UI checklist에 남은 `fail`이 없고, UX checklist에서 나온 개선 포인트가 목록으로 전달됐다.
 - 6축 점수가 모두 3 이상이다.
