@@ -2085,6 +2085,36 @@ test('O10: 허용치를 낮추거나 유지하면 GREEN을 막지 않는다', as
   assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
 })
 
+test('O10: PATH·시퀀스 증거 매핑도 VALID_RED 시점에 얼린다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, {
+    evidence: {
+      ...EVIDENCE,
+      paths: { PATH1: { kind: 'test', name: 'save > path' } },
+      sequence: { kind: 'test', name: 'save > sequence' },
+    },
+  })
+  await reachValidRed(oracleDirectory, root)
+
+  const evidencePath = join(oracleDirectory, 'evidence.json')
+  const frozen = JSON.parse(await readFile(evidencePath, 'utf8'))
+  await writeFile(
+    evidencePath,
+    JSON.stringify({ ...frozen, paths: { PATH1: { kind: 'test', name: 'save > swapped' } } }),
+  )
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+
+  const swappedPath = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(swappedPath.status, 1)
+  assert.match(swappedPath.stderr, /^HARNESS_BUDGET_REQUIRED: /)
+
+  await writeFile(evidencePath, JSON.stringify({ ...frozen, sequence: { kind: 'test', name: 'save > other' } }))
+  const swappedSequence = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(swappedSequence.status, 1)
+  assert.match(swappedSequence.stderr, /^HARNESS_BUDGET_REQUIRED: /)
+  assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
+})
+
 test('O10: RED에 기록된 테스트 파일이 사라지면 TEST_WEAKENED로 GREEN을 거부한다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
   await reachValidRed(oracleDirectory, root)

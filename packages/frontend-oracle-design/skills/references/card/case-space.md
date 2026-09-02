@@ -117,7 +117,9 @@ every generated `PATH*` needs an `evidence.json` `paths.<id>` entry of `{ kind: 
 whose name is in the run (`EVIDENCE_MISSING_PATH`·`EVIDENCE_UNKNOWN_PATH`), and an `Order`
 dimension with two or more combinable choices needs `evidence.json` `sequence` naming the
 sequence test (`SEQUENCE_EVIDENCE_MISSING`). `oracle-verify.mjs evidence-scaffold` emits both
-keys when the card declares them.
+keys when the card declares them, and the `VALID_RED` transition freezes them alongside the row
+mapping — swapping a `PATH*` or `sequence` name for another passing test after RED is
+`HARNESS_BUDGET_REQUIRED`·`EVIDENCE_STALE`, the same gate the row mapping already had.
 
 ## What this section does not claim
 

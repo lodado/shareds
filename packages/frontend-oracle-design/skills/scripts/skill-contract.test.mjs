@@ -509,11 +509,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.38.0')
+  assert.equal(version, '0.38.1')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.38.0')
+  assert.equal(marketplace.version, '0.38.1')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -1448,6 +1448,7 @@ test('locks machine-observable invariants and the bounded exploration authorizat
     read('references/card/card-format.md'),
     read('scripts/oracle-verify.mjs'),
     readFile(join(repositoryDirectory, 'packages/frontend-visual-qa/skills/frontend-visual-qa/SKILL.md'), 'utf8'),
+    read('scripts/oracle-run.mjs'),
   ])
 
   // I* 행은 시나리오 없이 모든 journey에서 판정 가능한 것만 — 기계 관측만 자격이 있다
@@ -1514,13 +1515,14 @@ test('anticipates escapes: deviation types, landmine fossils, premortem framing,
 
 test('enumerates the declared case space by machine and dispositions every generated frame', async () => {
   const repositoryDirectory = join(skillDirectory, '../../..')
-  const [caseSpace, skill, verifier, frames, testSkill, visualSkill] = await Promise.all([
+  const [caseSpace, skill, verifier, frames, testSkill, visualSkill, runner] = await Promise.all([
     read('references/card/case-space.md'),
     read('SKILL.md'),
     read('scripts/oracle-verify.mjs'),
     read('scripts/oracle-frames.mjs'),
     readFile(join(repositoryDirectory, 'packages/test/skills/test/SKILL.md'), 'utf8'),
     readFile(join(repositoryDirectory, 'packages/frontend-visual-qa/skills/frontend-visual-qa/SKILL.md'), 'utf8'),
+    read('scripts/oracle-run.mjs'),
   ])
 
   // 열거는 기계, LLM은 판정만 — 같은 카드 바이트는 같은 프레임 집합이다
@@ -1557,6 +1559,8 @@ test('enumerates the declared case space by machine and dispositions every gener
   assert.match(testSkill, /Unreachability has exactly two forms/)
   assert.match(testSkill, /as `it\.each` rows of the owning row's test/)
   assert.match(testSkill, /SEQUENCE_EVIDENCE_MISSING/)
+  assert.match(caseSpace, /the `VALID_RED` transition freezes them alongside the row\s+mapping/)
+  assert.match(runner, /PATH\*·Order 시퀀스 매핑도 RED 시점에 얼린다/)
 
   // assertion 소유는 단일 — 실행 중복은 허용, 소유 중복은 결함
   assert.match(testSkill, /exactly one owning test/)
