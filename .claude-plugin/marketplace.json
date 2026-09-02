@@ -79,6 +79,18 @@
       "category": "development",
       "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
       "tags": ["frontend", "visual-regression", "browser", "qa", "oracle"]
+    },
+    {
+      "name": "frontend-ux-design",
+      "description": "Explainable UI/UX design and implementation: decision ladder, state matrix, funnel review, rationale.",
+      "version": "0.1.0",
+      "author": {
+        "name": "lodado"
+      },
+      "source": "./packages/frontend-ux-design",
+      "category": "development",
+      "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+      "tags": ["frontend", "ui", "ux", "design", "accessibility"]
     }
   ]
 }
