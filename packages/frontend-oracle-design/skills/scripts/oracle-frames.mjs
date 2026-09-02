@@ -66,9 +66,15 @@ export function parseCaseSpace(document) {
   const strength = strengthLine ? Number.parseInt(strengthLine.split(':')[1], 10) : 2
 
   const families = tableRows(section, 'Family').map((cells) => {
-    const [family = '', dimension = '', choicesCell = ''] = cells
+    const [family = '', dimension = '', choicesCell = '', touchesCell = ''] = cells
     if (choicesCell.trim().startsWith('excluded:')) {
-      return { family, dimension: null, choices: [], excluded: choicesCell.trim().slice('excluded:'.length).trim() }
+      return {
+        family,
+        dimension: null,
+        choices: [],
+        excluded: choicesCell.trim().slice('excluded:'.length).trim(),
+        touches: null,
+      }
     }
     const choices = choicesCell
       .split(',')
@@ -78,10 +84,20 @@ export function parseCaseSpace(document) {
         const error = /\[error\]$/.test(choice)
         return { value: choice.replace(/\s*\[error\]$/, ''), error }
       })
-    return { family, dimension, choices, excluded: null }
+    return { family, dimension, choices, excluded: null, touches: parseTouches(touchesCell) }
   })
 
   return { strength, families }
+}
+
+/** 선택 열 `Touches` — 차원이 닿을 수 있는 P·I id 인용, 또는 `independent: <reason>`. 열이 없으면 null. */
+function parseTouches(cell) {
+  const value = (cell ?? '').trim()
+  if (value.startsWith('independent:')) {
+    return { independent: value.slice('independent:'.length).trim(), ids: [] }
+  }
+  const ids = [...new Set(value.match(/\b[PI]\d+\b/g) ?? [])]
+  return ids.length > 0 ? { independent: null, ids } : null
 }
 
 function* tupleIndexes(count, size) {
@@ -96,13 +112,16 @@ function* tupleIndexes(count, size) {
   }
 }
 
-/** t-way covering frames + [error] 단독 프레임. 결정적 — 순서는 표 선언 순서만 따른다. */
+/** t-way covering frames + [error] 단독 프레임. 결정적 — 순서는 표 선언 순서만 따른다.
+ * Touches가 채택된 카드는 인용 P·I id가 직접 겹치는 차원 조합만 의무로 삼고(강도 3은 상호 공유
+ * clique), 파트너 없는 차원·independent 차원은 choice당 1-way 프레임이 된다. 열이 없으면 전 쌍. */
 export function generateCaseFrames(caseSpace) {
   const dimensions = caseSpace.families
     .filter((entry) => !entry.excluded && entry.dimension)
     .map((entry) => ({
       dimension: entry.dimension,
       choices: entry.choices.filter((choice) => !choice.error).map((choice) => choice.value),
+      touches: entry.touches,
     }))
     .filter((entry) => entry.choices.length > 0)
 
@@ -114,33 +133,17 @@ export function generateCaseFrames(caseSpace) {
     }
   }
 
-  const strength = Math.min(Math.max(caseSpace.strength, 1), dimensions.length)
   const frames = []
-  if (dimensions.length > 0) {
-    const uncovered = []
-    for (const combo of dimensions.length >= strength ? tupleIndexes(dimensions.length, strength) : []) {
-      const build = (position, chosen) => {
-        if (position === combo.length) {
-          uncovered.push(chosen)
-          return
-        }
-        for (const choice of dimensions[combo[position]].choices) build(position + 1, [...chosen, [combo[position], choice]])
-      }
-      build(0, [])
-    }
-    if (uncovered.length === 0 && dimensions.length > 0) {
-      // 차원이 strength보다 적으면 1-way: 모든 choice가 한 번씩 나타난다.
-      for (const [index, dimension] of dimensions.entries()) {
-        for (const choice of dimension.choices) uncovered.push([[index, choice]])
-      }
-    }
+  const pushFrame = (label) => frames.push({ id: `F${frames.length + 1}`, label })
 
-    const covers = (frame, tuple) => tuple.every(([index, choice]) => frame[index] === choice)
+  // 공용 greedy — dims 지역 인덱스의 tuple 집합을 덮는 최소 근사 프레임을 순서대로 뽑는다.
+  const covers = (frame, tuple) => tuple.every(([index, choice]) => frame[index] === choice)
+  const addGreedyFrames = (dims, uncovered) => {
     while (uncovered.length > 0) {
       const seed = uncovered[0]
-      const frame = Array.from({length: dimensions.length}).fill(null)
+      const frame = Array.from({ length: dims.length }).fill(null)
       for (const [index, choice] of seed) frame[index] = choice
-      for (const [index, dimension] of dimensions.entries()) {
+      for (const [index, dimension] of dims.entries()) {
         if (frame[index] !== null) continue
         let best = dimension.choices[0]
         let bestScore = -1
@@ -157,10 +160,93 @@ export function generateCaseFrames(caseSpace) {
       for (let cursor = uncovered.length - 1; cursor >= 0; cursor -= 1) {
         if (covers(frame, uncovered[cursor])) uncovered.splice(cursor, 1)
       }
-      frames.push({
-        id: `F${frames.length + 1}`,
-        label: frame.map((choice, index) => `${dimensions[index].dimension}=${choice}`).join(' × '),
-      })
+      pushFrame(frame.map((choice, index) => `${dims[index].dimension}=${choice}`).join(' × '))
+    }
+  }
+
+  const valueTuples = (dims, combo) => {
+    const tuples = []
+    const build = (position, chosen) => {
+      if (position === combo.length) {
+        tuples.push(chosen)
+        return
+      }
+      for (const choice of dims[combo[position]].choices) build(position + 1, [...chosen, [combo[position], choice]])
+    }
+    build(0, [])
+    return tuples
+  }
+
+  const touchesAdopted = dimensions.some(
+    (entry) => entry.touches && (entry.touches.independent || entry.touches.ids.length > 0),
+  )
+
+  if (dimensions.length > 0 && !touchesAdopted) {
+    const strength = Math.min(Math.max(caseSpace.strength, 1), dimensions.length)
+    const uncovered = []
+    for (const combo of dimensions.length >= strength ? tupleIndexes(dimensions.length, strength) : []) {
+      uncovered.push(...valueTuples(dimensions, combo))
+    }
+    if (uncovered.length === 0 && dimensions.length > 0) {
+      // 차원이 strength보다 적으면 1-way: 모든 choice가 한 번씩 나타난다.
+      for (const [index, dimension] of dimensions.entries()) {
+        for (const choice of dimension.choices) uncovered.push([[index, choice]])
+      }
+    }
+    addGreedyFrames(dimensions, uncovered)
+  }
+
+  if (dimensions.length > 0 && touchesAdopted) {
+    const shares = (left, right) =>
+      (left.touches?.ids ?? []).some((id) => (right.touches?.ids ?? []).includes(id))
+
+    // 직접 공유 그래프의 연결 성분 — 프레임은 성분을 넘지 않고, 라벨도 성분 차원만 싣는다.
+    const assigned = new Set()
+    const components = []
+    for (const [index, entry] of dimensions.entries()) {
+      if (assigned.has(index) || !(entry.touches?.ids?.length > 0)) continue
+      const queue = [index]
+      const component = []
+      assigned.add(index)
+      while (queue.length > 0) {
+        const current = queue.shift()
+        component.push(current)
+        for (const [candidate, other] of dimensions.entries()) {
+          if (assigned.has(candidate) || !(other.touches?.ids?.length > 0)) continue
+          if (shares(dimensions[current], other)) {
+            assigned.add(candidate)
+            queue.push(candidate)
+          }
+        }
+      }
+      components.push(component)
+    }
+
+    const strength = Math.max(caseSpace.strength, 2)
+    for (const component of components) {
+      if (component.length < 2) continue
+      const dims = component.map((index) => dimensions[index])
+      const uncovered = []
+      for (const combo of tupleIndexes(dims.length, 2)) {
+        if (!shares(dims[combo[0]], dims[combo[1]])) continue
+        uncovered.push(...valueTuples(dims, combo))
+      }
+      if (strength >= 3 && dims.length >= 3) {
+        for (const combo of tupleIndexes(dims.length, 3)) {
+          const clique = combo.every((left, position) =>
+            combo.slice(position + 1).every((right) => shares(dims[left], dims[right])),
+          )
+          if (clique) uncovered.push(...valueTuples(dims, combo))
+        }
+      }
+      addGreedyFrames(dims, uncovered)
+    }
+
+    // 파트너 없는 인용 차원·Touches 미기재 차원·independent 차원 — choice당 1-way.
+    for (const [index, entry] of dimensions.entries()) {
+      const inCombination = components.some((component) => component.length >= 2 && component.includes(index))
+      if (inCombination) continue
+      for (const choice of entry.choices) pushFrame(`${entry.dimension}=${choice}`)
     }
   }
 

@@ -60,8 +60,8 @@ production was touched before the tests — revert the changed files to keep the
 around it. The transition stores the test file digest·assertion count·expected-value literal multiset
 at this point as the GREEN gate baseline: `toBe(1)` → `toBe(2)` keeps the assertion count and still
 fails `TEST_WEAKENED`, because the expected values are the card's, not the implementation's. The
-frozen evidence mapping covers `rows`, `paths`, and `sequence` together, so every name the verifier
-will check is fixed before production is touched.
+frozen evidence mapping covers `rows`, `paths`, `frames`, and `sequence` together, so every name
+the verifier will check is fixed before production is touched.
 
 A file registered with `--harness-path` can be changed until a reported RED is recorded with those
 bytes. If it is changed again after `VALID_RED`, completion is blocked with `HARNESS_BUDGET_REQUIRED`

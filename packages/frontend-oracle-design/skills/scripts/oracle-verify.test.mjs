@@ -2981,6 +2981,154 @@ test('evidence: State Model PATH*와 Order 시퀀스는 evidence 키가 없으�
   assert.match(notInRun.stderr, /^EVIDENCE_NOT_IN_RUN: sequence/)
 })
 
+test('deviations: static 축약 한 줄이 timing·context·duration 세 유형을 닫는다', async (t) => {
+  const shorthand = VALID_CARD + DEVIATIONS_SECTION
+    .replace('| P4     | unsafe-provided            | impossible: 정적 문구                    |\n', '')
+    .replace('| P4     | wrong-timing-order         | impossible: 시간 표면 없음               |\n', '')
+    .replace(
+      '| P4     | stopped-early-applied-long | impossible: 지속 시간 없음               |',
+      '| P4     | static                     | impossible: 정적 문구 — 시간·문맥·지속 면 없음 |',
+    )
+  assert.equal(run('card', '--oracle', await cardFile(t, shorthand)).status, 0)
+
+  const wrongDisposition = shorthand.replace(
+    'impossible: 정적 문구 — 시간·문맥·지속 면 없음',
+    'needs-decision: 정적인가?',
+  )
+  const rejected = run('card', '--oracle', await cardFile(t, wrongDisposition))
+  assert.equal(rejected.status, 1)
+  assert.match(rejected.stderr, /deviation-disposition: P4 × static: shorthand requires impossible:/)
+
+  // static은 not-provided를 닫지 않는다.
+  const missingNotProvided = shorthand.replace('| P4     | not-provided               | covered(D1)                              |\n', '')
+  const missing = run('card', '--oracle', await cardFile(t, missingNotProvided))
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /deviation-type-missing: P4: not-provided/)
+})
+
+/** Touches 열 채택 카드 — 인용 id 실재·미기재 차원을 lint가 잡는다. */
+async function touchesCard(touchesRows) {
+  const { generateFromDocument } = await import('./oracle-frames.mjs')
+  const base = `${VALID_CARD}${INVARIANTS_SECTION}
+## Case space
+
+- Strength: 2
+
+| Family      | Dimension | Choices          | Touches                  |
+| ----------- | --------- | ---------------- | ------------------------ |
+${touchesRows}
+| Async       | —         | excluded: fixture | —                       |
+| Order       | —         | excluded: fixture | —                       |
+| Entry       | —         | excluded: fixture | —                       |
+| Environment | —         | excluded: fixture | —                       |
+| Platform    | —         | excluded: fixture | —                       |
+| Inherited   | —         | excluded: fixture | —                       |
+`
+  const generated = generateFromDocument(base)
+  const ids = [
+    ...generated.frames.map((frame) => frame.id),
+    ...generated.errorFrames.map((frame) => frame.id),
+    ...generated.paths.map((path) => path.id),
+    ...generated.emptyCells.map((cell) => cell.id),
+  ]
+  const rows = ids.map((id) => `| ${id} | ${id.startsWith('EMPTY') ? 'impossible: fixture' : 'covered(O1)'} |`)
+  return `${base}\n## Frame dispositions\n\n| Frame | Disposition |\n| ----- | ----------- |\n${rows.join('\n')}\n`
+}
+
+test('touches: 실재하는 P·I 인용은 통과, 미상 id·미기재 차원은 실패한다', async (t) => {
+  const valid = await touchesCard(
+    '| Data        | rows      | 0, max           | P1, I1                   |\n| Value       | keyword   | empty, min       | P1                       |',
+  )
+  const linted = run('card', '--oracle', await cardFile(t, valid))
+  assert.equal(linted.status, 0, linted.stderr)
+
+  const unknown = await touchesCard(
+    '| Data        | rows      | 0, max           | P9, I3                   |\n| Value       | keyword   | empty, min       | P1                       |',
+  )
+  const unknownRun = run('card', '--oracle', await cardFile(t, unknown))
+  assert.equal(unknownRun.status, 1)
+  assert.match(unknownRun.stderr, /touches-unknown: rows: P9 is not a decided policy or invariant/)
+  assert.match(unknownRun.stderr, /touches-unknown: rows: I3 is not a decided policy or invariant/)
+
+  const missing = await touchesCard(
+    '| Data        | rows      | 0, max           | P1                       |\n| Value       | keyword   | empty, min       |                          |',
+  )
+  const missingRun = run('card', '--oracle', await cardFile(t, missing))
+  assert.equal(missingRun.status, 1)
+  assert.match(missingRun.stderr, /touches-missing: keyword: cite the P\*\/I\* it can affect or write independent:/)
+})
+
+test('evidence: covered() F* 프레임은 실행 evidence가 없으면 검증을 막는다', async (t) => {
+  const caseSpace = `
+## Case space
+
+- Strength: 2
+
+| Family      | Dimension | Choices           |
+| ----------- | --------- | ----------------- |
+| Data        | rows      | 0, max            |
+| Value       | keyword   | empty, min        |
+| Async       | —         | excluded: fixture |
+| Order       | —         | excluded: fixture |
+| Entry       | —         | excluded: fixture |
+| Environment | —         | excluded: fixture |
+| Platform    | —         | excluded: fixture |
+| Inherited   | —         | excluded: fixture |
+
+## Frame dispositions
+
+| Frame | Disposition                        |
+| ----- | ---------------------------------- |
+| F1    | covered(O1)                        |
+| F2    | independent(O1): fixture 사유      |
+| F3    | independent(O1): fixture 사유      |
+| F4    | independent(O1): fixture 사유      |
+`
+  const card = EVIDENCE_CARD + caseSpace
+  const rows = {
+    O1: { kind: 'test', name: 'save > pending 표시' },
+    O2: { kind: 'na', reason: '사유', source: 'S1' },
+    O3: { kind: 'na', reason: '사유', source: 'S1' },
+  }
+  const reported = JSON.stringify({
+    runId: 'r-001',
+    exitCode: 0,
+    grade: 'reported',
+    adapter: 'node-test',
+    tests: [
+      { name: 'save > pending 표시', status: 'passed' },
+      { name: 'save > pending 표시 [F1]', status: 'passed' },
+    ],
+  })
+  const fixture = async (manifest) => {
+    const base = await directory(t)
+    const oracle = join(base, 'oracle.md')
+    const map = join(base, 'evidence.json')
+    const ledgerPath = join(base, 'runs.jsonl')
+    await writeFile(oracle, card)
+    await writeFile(map, JSON.stringify(manifest))
+    await writeFile(ledgerPath, chainedLedger(`${reported}\n`, createHash('sha256').update(card).digest('hex')))
+    return ['evidence', '--oracle', oracle, '--map', map, '--ledger', ledgerPath, '--run', 'r-001']
+  }
+
+  const missingFrame = run(...(await fixture({ schemaVersion: 1, rows })))
+  assert.equal(missingFrame.status, 1)
+  assert.match(missingFrame.stderr, /^EVIDENCE_MISSING_FRAME: .*F1/)
+
+  const unknownFrame = run(
+    ...(await fixture({ schemaVersion: 1, rows, frames: { F1: { kind: 'test', name: 'save > pending 표시 [F1]' }, F2: { kind: 'test', name: 'x' } } })),
+  )
+  assert.equal(unknownFrame.status, 1)
+  assert.match(unknownFrame.stderr, /^EVIDENCE_UNKNOWN_FRAME: .*F2/)
+
+  const complete = run(...(await fixture({ schemaVersion: 1, rows, frames: { F1: { kind: 'test', name: 'save > pending 표시 [F1]' } } })))
+  assert.equal(complete.status, 0, complete.stderr)
+
+  const notInRun = run(...(await fixture({ schemaVersion: 1, rows, frames: { F1: { kind: 'test', name: 'absent [F1]' } } })))
+  assert.equal(notInRun.status, 1)
+  assert.match(notInRun.stderr, /^EVIDENCE_NOT_IN_RUN: F1/)
+})
+
 test('case-space: 조합 프레임 50개 초과는 설계 실격선이다', async (t) => {
   const wideChoices = Array.from({ length: 8 }, (_, index) => `c${index}`).join(', ')
   const wide = `${VALID_CARD}

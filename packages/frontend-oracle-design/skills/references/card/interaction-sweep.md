@@ -101,6 +101,11 @@ Rules:
   disposition are lint failures (`oracle-verify.mjs card`: `deviation-type-missing`,
   `deviation-disposition`, `deviation-policy-unknown`). Static policies resolve most types with a
   one-line `impossible:` naming the absent surface — that line is the auditable record.
+- A fully static policy may compress the three surface types into one shorthand row
+  `| P4 | static | impossible: <reason naming the absent timing·context·duration surface> |` —
+  it closes `unsafe-provided`·`wrong-timing-order`·`stopped-early-applied-long` together.
+  `not-provided` is never closed by the shorthand: even a static copy row answers what happens
+  when the copy is missing.
 - The dispositions are the same three as pairs, with the same promotion rule: only
   `needs-decision` becomes a grill question, and one surviving to lock means `NEEDS_DECISION`.
 - Timer·subscription·pending policies almost never close `stopped-early-applied-long` as
@@ -121,7 +126,9 @@ no pairs. Same premise discipline as the seven auto-added TCs.
 
 Growth rule: every defect found after lock — user report, exploration phase, review — appends one
 entry here via the escaped-bug retro: name the cell or question that would have caught it at card
-time. A retro that cannot name one is naming a new dimension; add the dimension.
+time. A retro that cannot name one is naming a new dimension; add the dimension. The same retro
+writes the `escapes.jsonl` line defined in [`case-space.md`](case-space.md), so the
+mis-disposition versus undeclared-dimension ratio stays greppable across oracles.
 
 ## Worked counterexample
 

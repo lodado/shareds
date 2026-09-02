@@ -91,7 +91,9 @@ ownership splits from production, and make the test follow along when a slice is
 - A `covered(O*)` disposition on an `F*` combination frame is an execution claim: the row's test
   runs under that frame's choices. Feed the fixture-controllable frames (Data volume, Value class,
   Entry, viewport) as `it.each` rows of the owning row's test, named `<row test> [F7]`, instead of
-  writing a new owner. Frames the card marked `independent(O*)` get no case.
+  writing a new owner. Frames the card marked `independent(O*)` get no case. Each covered frame's
+  case name goes into `evidence.json` `frames.<F id>` — the verifier refuses GREEN with
+  `EVIDENCE_MISSING_FRAME` when a covered frame has no named execution.
 - **Every assertion has exactly one owning test — re-executing a behavior is fine, re-owning its
   assertion is not.** A path test asserts each traversed row's Then·Never·side-effect count at the
   step where it fires, and **is that row's evidence**: map several rows to the one path test

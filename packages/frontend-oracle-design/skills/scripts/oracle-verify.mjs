@@ -648,6 +648,7 @@ async function lintCard(options) {
 
   // Invariants 섹션도 선택이다 — 없어도 lint를 막지 않고, 있으면 구조를 검증한다.
   const invariants = sectionLines(lines, 'Invariants')
+  const invariantIds = new Set()
 
   if (invariants.length > 0) {
     const invariantRows = invariants
@@ -665,6 +666,7 @@ async function lintCard(options) {
         issues.push(`invariant-id: "${id}": invariant must have an I* ID`)
         continue
       }
+      invariantIds.add(id)
       if (isEmptyCell(invariant)) issues.push(`invariant-empty: ${id}: invariant text is empty`)
       if (isEmptyCell(basis)) issues.push(`invariant-basis: ${id}: observable basis is empty`)
       if (!isEmptyCell(policy) && policy !== '—') {
@@ -700,6 +702,18 @@ async function lintCard(options) {
       const [policy = '', type = '', disposition = ''] = cells
       if (!policies.has(policy)) {
         issues.push(`deviation-policy-unknown: "${policy}" is not a decided policy`)
+        continue
+      }
+      if (type === 'static') {
+        // 정적 정책 축약 — 한 줄이 timing·context·duration 세 유형을 impossible로 닫는다. not-provided는 별도.
+        if (!/^impossible:\s*\S/.test(disposition.trim())) {
+          issues.push(`deviation-disposition: ${policy} × static: shorthand requires impossible: <reason>`)
+          continue
+        }
+        if (!typesByPolicy.has(policy)) typesByPolicy.set(policy, new Set())
+        for (const closed of ['unsafe-provided', 'wrong-timing-order', 'stopped-early-applied-long']) {
+          typesByPolicy.get(policy).add(closed)
+        }
         continue
       }
       if (!DEVIATION_TYPES.includes(type)) {
@@ -834,6 +848,25 @@ async function lintCard(options) {
     }
     for (const family of declaredFamilies) {
       if (!TAXONOMY_FAMILIES.includes(family)) issues.push(`family-unknown: ${family} is not a taxonomy family`)
+    }
+
+    // Touches 열 채택 시 — 인용 id는 실재해야 하고, 조합 가능한 차원은 인용하거나 independent 사유를 쓴다.
+    const combinableFamilies = generated.caseSpace.families.filter((entry) => !entry.excluded && entry.dimension)
+    const touchesAdopted = combinableFamilies.some(
+      (entry) => entry.touches && (entry.touches.independent || entry.touches.ids.length > 0),
+    )
+    if (touchesAdopted) {
+      for (const entry of combinableFamilies) {
+        if (entry.touches?.independent) continue
+        if (entry.touches?.ids?.length > 0) {
+          for (const id of entry.touches.ids) {
+            const known = id.startsWith('P') ? policies.has(id) : invariantIds.has(id)
+            if (!known) issues.push(`touches-unknown: ${entry.dimension}: ${id} is not a decided policy or invariant`)
+          }
+        } else if (entry.choices.filter((choice) => !choice.error).length >= 2) {
+          issues.push(`touches-missing: ${entry.dimension}: cite the P*/I* it can affect or write independent: <reason>`)
+        }
+      }
     }
 
     if (generated.frames.length > 50) {
@@ -1334,7 +1367,19 @@ async function verifyRedEvidence(options) {
   process.stdout.write(`RED_EVIDENCE_VERIFIED ${options.row} ${entry.name}\n`)
 }
 
-/** PATH* 하나당 테스트 하나, Order choice 2개 이상이면 시퀀스 테스트 하나 — 문서만의 약속을 evidence 키로 옮긴다. */
+/** 카드의 Frame dispositions에서 covered()로 처분된 F* id — 실행 주장이라 evidence 게이트 대상이다. */
+function coveredFrameIds(card, generated) {
+  const generatedFrameIds = new Set(generated.frames.map((frame) => frame.id))
+  return sectionLines(markdownLines(card), 'Frame dispositions')
+    .filter((line) => line.trim().startsWith('|'))
+    .map((line) => splitRow(line.trim()))
+    .filter((cells) => cells[0] !== 'Frame' && !/^:?-+:?$/.test(cells[0] ?? ''))
+    .filter(([frameId = '', disposition = '']) => generatedFrameIds.has(frameId) && /^covered\(/.test(disposition.trim()))
+    .map(([frameId]) => frameId)
+}
+
+/** PATH* 하나당 테스트 하나, Order choice 2개 이상이면 시퀀스 테스트 하나, covered F*는 프레임 실행
+ * 테스트 하나 — 문서만의 약속을 evidence 키로 옮긴다. */
 function collectFrameEvidence(card, map) {
   const generated = generateFromDocument(card)
   if (!generated) return []
@@ -1355,6 +1400,23 @@ function collectFrameEvidence(card, map) {
       throw new CliError('EVIDENCE_INVALID', `${id}: path evidence must be { kind: "test", name }`)
     }
     entries.push([id, paths[id].name])
+  }
+
+  const covered = coveredFrameIds(card, generated)
+  const frameEntries = map?.frames ?? {}
+  const unknownFrames = Object.keys(frameEntries).filter((id) => !covered.includes(id))
+  if (unknownFrames.length > 0) {
+    throw new CliError('EVIDENCE_UNKNOWN_FRAME', `evidence maps frames that are not covered() F* frames: ${unknownFrames.join(', ')}`)
+  }
+  const missingFrames = covered.filter((id) => !frameEntries[id])
+  if (missingFrames.length > 0) {
+    throw new CliError('EVIDENCE_MISSING_FRAME', `covered() frames have no execution evidence: ${missingFrames.join(', ')}`)
+  }
+  for (const id of covered) {
+    if (frameEntries[id].kind !== 'test' || !frameEntries[id].name) {
+      throw new CliError('EVIDENCE_INVALID', `${id}: frame evidence must be { kind: "test", name }`)
+    }
+    entries.push([id, frameEntries[id].name])
   }
 
   const order = generated.caseSpace.families.find((entry) => entry.family === 'Order' && !entry.excluded)
@@ -1921,6 +1983,12 @@ async function scaffoldEvidence(options) {
   const order = generated?.caseSpace.families.find((entry) => entry.family === 'Order' && !entry.excluded)
   if (order && order.choices.filter((choice) => !choice.error).length >= 2) {
     manifest.sequence = { kind: 'test', name: '<fast-check sequence test over the Order dimension>' }
+  }
+  const covered = generated ? coveredFrameIds(card, generated) : []
+  if (covered.length > 0) {
+    manifest.frames = Object.fromEntries(
+      covered.map((id) => [id, { kind: 'test', name: `<the it.each case that runs [${id}]>` }]),
+    )
   }
   process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`)
 }

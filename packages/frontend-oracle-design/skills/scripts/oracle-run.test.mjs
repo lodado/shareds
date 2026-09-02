@@ -2090,6 +2090,7 @@ test('O10: PATH·시퀀스 증거 매핑도 VALID_RED 시점에 얼린다', asyn
     evidence: {
       ...EVIDENCE,
       paths: { PATH1: { kind: 'test', name: 'save > path' } },
+      frames: { F1: { kind: 'test', name: 'save > frame' } },
       sequence: { kind: 'test', name: 'save > sequence' },
     },
   })
@@ -2112,6 +2113,11 @@ test('O10: PATH·시퀀스 증거 매핑도 VALID_RED 시점에 얼린다', asyn
   const swappedSequence = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
   assert.equal(swappedSequence.status, 1)
   assert.match(swappedSequence.stderr, /^HARNESS_BUDGET_REQUIRED: /)
+
+  await writeFile(evidencePath, JSON.stringify({ ...frozen, frames: { F1: { kind: 'test', name: 'save > swapped frame' } } }))
+  const swappedFrame = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(swappedFrame.status, 1)
+  assert.match(swappedFrame.stderr, /^HARNESS_BUDGET_REQUIRED: /)
   assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
 })
 

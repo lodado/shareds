@@ -1049,10 +1049,16 @@ async function testEvidenceDigest(path) {
         .map(([key, entry]) => [key, { kind: 'test', name: entry.name }]),
     )
 
+  const sequenceBinding = (entry) => {
+    if (entry?.kind !== 'test') return null
+    return { kind: 'test', name: entry.name }
+  }
+
   const bindings = {
     rows: testNames(document?.rows),
     paths: testNames(document?.paths),
-    sequence: document?.sequence?.kind === 'test' ? { kind: 'test', name: document.sequence.name } : null,
+    frames: testNames(document?.frames),
+    sequence: sequenceBinding(document?.sequence),
   }
   return sha256(stableStringify(bindings))
 }

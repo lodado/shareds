@@ -305,6 +305,7 @@ test('O14: harness packages expose lint and provenance captures reproducibility 
     readFile(join(repositoryDirectory, 'packages/frontend-visual-qa/package.json'), 'utf8'),
     readFile(join(repositoryDirectory, 'turbo.json'), 'utf8'),
     read('scripts/oracle-run.mjs'),
+    read('references/card/interaction-sweep.md'),
   ])
   const rootPackage = JSON.parse(rootPackageSource)
   const oraclePackage = JSON.parse(oraclePackageSource)
@@ -509,11 +510,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.38.1')
+  assert.equal(version, '0.39.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.38.1')
+  assert.equal(marketplace.version, '0.39.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -1237,6 +1238,7 @@ test('passes review criteria to reviewers as file links, not pasted text', async
     readReview(),
     read('references/reference-graph.json'),
     read('scripts/oracle-run.mjs'),
+    read('references/card/interaction-sweep.md'),
   ])
   const graph = JSON.parse(graphSource)
   const ids = new Set(graph.nodes.map((node) => node.id))
@@ -1449,6 +1451,7 @@ test('locks machine-observable invariants and the bounded exploration authorizat
     read('scripts/oracle-verify.mjs'),
     readFile(join(repositoryDirectory, 'packages/frontend-visual-qa/skills/frontend-visual-qa/SKILL.md'), 'utf8'),
     read('scripts/oracle-run.mjs'),
+    read('references/card/interaction-sweep.md'),
   ])
 
   // I* 행은 시나리오 없이 모든 journey에서 판정 가능한 것만 — 기계 관측만 자격이 있다
@@ -1515,7 +1518,7 @@ test('anticipates escapes: deviation types, landmine fossils, premortem framing,
 
 test('enumerates the declared case space by machine and dispositions every generated frame', async () => {
   const repositoryDirectory = join(skillDirectory, '../../..')
-  const [caseSpace, skill, verifier, frames, testSkill, visualSkill, runner] = await Promise.all([
+  const [caseSpace, skill, verifier, frames, testSkill, visualSkill, runner, sweep] = await Promise.all([
     read('references/card/case-space.md'),
     read('SKILL.md'),
     read('scripts/oracle-verify.mjs'),
@@ -1523,6 +1526,7 @@ test('enumerates the declared case space by machine and dispositions every gener
     readFile(join(repositoryDirectory, 'packages/test/skills/test/SKILL.md'), 'utf8'),
     readFile(join(repositoryDirectory, 'packages/frontend-visual-qa/skills/frontend-visual-qa/SKILL.md'), 'utf8'),
     read('scripts/oracle-run.mjs'),
+    read('references/card/interaction-sweep.md'),
   ])
 
   // 열거는 기계, LLM은 판정만 — 같은 카드 바이트는 같은 프레임 집합이다
@@ -1561,6 +1565,25 @@ test('enumerates the declared case space by machine and dispositions every gener
   assert.match(testSkill, /SEQUENCE_EVIDENCE_MISSING/)
   assert.match(caseSpace, /the `VALID_RED` transition freezes them alongside the row\s+mapping/)
   assert.match(runner, /PATH\*·Order 시퀀스 매핑도 RED 시점에 얼린다/)
+
+  // Touches: 조합 의무는 인용이 직접 겹치는 차원 쌍만, 1-way는 하네스 설정, 주장 단위 감사
+  assert.match(caseSpace, /### Touches — optional fourth column that scopes the combination/)
+  assert.match(caseSpace, /only between dimensions whose citations\s+directly intersect/)
+  assert.match(caseSpace, /A 1-way dimension maps to\s+harness configuration/)
+  assert.match(verifier, /touches-unknown/)
+  assert.match(verifier, /touches-missing/)
+
+  // covered F*는 실행 evidence 게이트, RED 동결 대상
+  assert.match(caseSpace, /EVIDENCE_MISSING_FRAME/)
+  assert.match(verifier, /EVIDENCE_MISSING_FRAME/)
+  assert.match(testSkill, /EVIDENCE_MISSING_FRAME/)
+
+  // deviation static 축약과 탈출 장부
+  assert.match(sweep, /\| P4 \| static \| impossible:/)
+  assert.match(sweep, /`not-provided` is never closed by the shorthand/)
+  assert.match(caseSpace, /escapes\.jsonl/)
+  assert.match(caseSpace, /mis-disposition/)
+  assert.match(sweep, /escapes\.jsonl/)
 
   // assertion 소유는 단일 — 실행 중복은 허용, 소유 중복은 결함
   assert.match(testSkill, /exactly one owning test/)

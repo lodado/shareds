@@ -120,3 +120,56 @@ test('strength가 차원 수보다 크면 1-way로 강등된다', () => {
     ['rows=0', 'rows=max'],
   )
 })
+
+/** Touches 채택 카드 — 직접 공유 쌍만 조합, 파트너 없음·independent는 1-way. */
+const TOUCHES_CARD = `## Case space
+
+- Strength: 2
+
+| Family      | Dimension | Choices                      | Touches                        |
+| ----------- | --------- | ---------------------------- | ------------------------------ |
+| Data        | rows      | 0, 1, max                    | P1, I1                         |
+| Value       | keyword   | empty, min                   | P1                             |
+| Entry       | entry     | fresh, refresh               | P5                             |
+| Environment | viewport  | 320, desktop                 | I1                             |
+| Platform    | browser   | chromium, webkit             | independent: engine cannot alter request policy |
+`
+
+test('touches: 직접 공유 쌍만 조합 의무가 되고 라벨은 성분 차원만 싣는다', () => {
+  const caseSpace = parseCaseSpace(TOUCHES_CARD)
+  const { frames } = generateCaseFrames(caseSpace)
+  const labels = frames.map((frame) => frame.label)
+
+  // rows×keyword(P1)·rows×viewport(I1)만 쌍 의무 — keyword×viewport 쌍은 요구되지 않는다.
+  const assignments = frames
+    .filter((frame) => frame.label.includes(' × '))
+    .map((frame) => new Map(frame.label.split(' × ').map((part) => part.split('=')).map(([key, value]) => [key, value])))
+  for (const rows of ['0', '1', 'max']) {
+    for (const keyword of ['empty', 'min']) {
+      assert.ok(assignments.some((frame) => frame.get('rows') === rows && frame.get('keyword') === keyword), `rows=${rows} × keyword=${keyword}`)
+    }
+    for (const viewport of ['320', 'desktop']) {
+      assert.ok(assignments.some((frame) => frame.get('rows') === rows && frame.get('viewport') === viewport), `rows=${rows} × viewport=${viewport}`)
+    }
+  }
+
+  // 조합 프레임은 성분(rows·keyword·viewport) 차원만 싣는다 — entry·browser는 라벨에 없다.
+  for (const frame of assignments) {
+    assert.ok(!frame.has('entry') && !frame.has('browser'))
+  }
+
+  // 파트너 없는 entry(P5 단독)와 independent browser는 choice당 1-way.
+  assert.ok(labels.includes('entry=fresh') && labels.includes('entry=refresh'))
+  assert.ok(labels.includes('browser=chromium') && labels.includes('browser=webkit'))
+
+  // 전 쌍 pairwise(3×2×2×2×2 공간의 커버링 ≥ 12프레임 상당)보다 작다 — 6 조합 + 4 1-way.
+  assert.ok(frames.length <= 10, `frames=${frames.length}`)
+})
+
+test('touches: 결정적이고, 열이 없으면 기존 전-쌍 동작 그대로다', () => {
+  const withTouches = parseCaseSpace(TOUCHES_CARD)
+  assert.deepEqual(generateCaseFrames(withTouches), generateCaseFrames(parseCaseSpace(TOUCHES_CARD)))
+
+  const legacy = parseCaseSpace(TOUCHES_CARD.replace(/\|[^|\n]*\|$/gm, '|').replace(' Touches                        |', '').replace(' independent: engine cannot alter request policy |', ''))
+  assert.equal(legacy.families.every((entry) => entry.touches === null), true)
+})

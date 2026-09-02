@@ -797,6 +797,11 @@ Rules:
   disposition are lint failures (`oracle-verify.mjs card`: `deviation-type-missing`,
   `deviation-disposition`, `deviation-policy-unknown`). Static policies resolve most types with a
   one-line `impossible:` naming the absent surface — that line is the auditable record.
+- A fully static policy may compress the three surface types into one shorthand row
+  `| P4 | static | impossible: <reason naming the absent timing·context·duration surface> |` —
+  it closes `unsafe-provided`·`wrong-timing-order`·`stopped-early-applied-long` together.
+  `not-provided` is never closed by the shorthand: even a static copy row answers what happens
+  when the copy is missing.
 - The dispositions are the same three as pairs, with the same promotion rule: only
   `needs-decision` becomes a grill question, and one surviving to lock means `NEEDS_DECISION`.
 - Timer·subscription·pending policies almost never close `stopped-early-applied-long` as
@@ -817,7 +822,9 @@ no pairs. Same premise discipline as the seven auto-added TCs.
 
 Growth rule: every defect found after lock — user report, exploration phase, review — appends one
 entry here via the escaped-bug retro: name the cell or question that would have caught it at card
-time. A retro that cannot name one is naming a new dimension; add the dimension.
+time. A retro that cannot name one is naming a new dimension; add the dimension. The same retro
+writes the `escapes.jsonl` line defined in [`case-space.md`](case-space.md), so the
+mis-disposition versus undeclared-dimension ratio stays greppable across oracles.
 
 ## Worked counterexample
 
@@ -893,6 +900,36 @@ applies unchanged.
   the category-partition error annotation. Everything else joins t-way combination.
 - An excluded family writes `—` as the dimension and `excluded: <reason>` as its choices.
 
+### Touches — optional fourth column that scopes the combination
+
+Without it, every combinable dimension pair is an obligation and the residue frames force
+copy-pasted independence claims. With it, the author states the interaction claim **once per
+dimension** and the machine expands it:
+
+```markdown
+| Family      | Dimension | Choices          | Touches                                          |
+| ----------- | --------- | ---------------- | ------------------------------------------------ |
+| Data        | rows      | 0, 1, max        | P1, I1                                           |
+| Value       | keyword   | empty, min       | P1                                               |
+| Environment | viewport  | 320, desktop     | I1                                               |
+| Platform    | browser   | chromium, webkit | independent: engine cannot alter the policy (S2) |
+```
+
+- `Touches` cites the decided `P*`/`I*` the dimension can affect. Combination obligations exist
+  only between dimensions whose citations directly intersect (`rows × keyword` via P1,
+  `rows × viewport` via I1 — `keyword × viewport` produces no frames; that doubt belongs to the
+  sweep as a question, not to twenty residue frames). Strength 3 combines only mutually sharing
+  cliques.
+- `independent: <reason>` excludes the dimension from combination; each choice still emits a
+  1-way frame. A cited dimension with no partner is 1-way too. **A 1-way dimension maps to
+  harness configuration** — Playwright projects, the journey matrix — not to per-row test cases.
+- A cited id that is not a decided policy or invariant fails `touches-unknown`; a combinable
+  dimension (two or more non-error choices) with neither citations nor `independent:` fails
+  `touches-missing` once any dimension adopts the column. A card without the column keeps the
+  all-pairs behavior unchanged.
+- The claim is the audit unit: an escaped webkit-only defect falsifies the one recorded
+  `independent:` line, not a guess about twenty dispositions.
+
 ## Generated frames — run, then disposition
 
 ```bash
@@ -913,14 +950,14 @@ a grill question, and one surviving to lock means `NEEDS_DECISION`:
 ```markdown
 ## Frame dispositions
 
-| Frame                | Disposition                                                |
-| -------------------- | ---------------------------------------------------------- |
-| F1                   | covered(O5)                                                |
-| F2                   | needs-decision: back-forward while the request is pending? |
+| Frame                | Disposition                                                 |
+| -------------------- | ----------------------------------------------------------- |
+| F1                   | covered(O5)                                                 |
+| F2                   | needs-decision: back-forward while the request is pending?  |
 | F3                   | independent(O5): row count never reaches the pending policy |
-| E1                   | covered(O9)                                                |
-| PATH1                | covered(O1, O5)                                            |
-| EMPTY pending × SORT | needs-decision: sort while fetching — cancel or queue?     |
+| E1                   | covered(O9)                                                 |
+| PATH1                | covered(O1, O5)                                             |
+| EMPTY pending × SORT | needs-decision: sort while fetching — cancel or queue?      |
 ```
 
 Lint (`oracle-verify.mjs card`, active when `## Case space` exists):
@@ -946,11 +983,14 @@ and that path test doubles as the evidence for every row it traverses — assert
 single, so a row covered by a path gets no standalone test); `EMPTY` cells resolve to impossible
 or a policy question, per the State Model rule that already owns them.
 
-Two of these are machine-checked at `oracle-verify.mjs evidence`, not only promised in prose:
+Three of these are machine-checked at `oracle-verify.mjs evidence`, not only promised in prose:
 every generated `PATH*` needs an `evidence.json` `paths.<id>` entry of `{ kind: "test", name }`
-whose name is in the run (`EVIDENCE_MISSING_PATH`·`EVIDENCE_UNKNOWN_PATH`), and an `Order`
+whose name is in the run (`EVIDENCE_MISSING_PATH`·`EVIDENCE_UNKNOWN_PATH`), an `Order`
 dimension with two or more combinable choices needs `evidence.json` `sequence` naming the
-sequence test (`SEQUENCE_EVIDENCE_MISSING`). `oracle-verify.mjs evidence-scaffold` emits both
+sequence test (`SEQUENCE_EVIDENCE_MISSING`), and every `covered()` `F*` frame needs an
+`evidence.json` `frames.<id>` entry naming the case that actually runs that combination
+(`EVIDENCE_MISSING_FRAME`·`EVIDENCE_UNKNOWN_FRAME`) — `independent()`·`impossible`·
+`needs-decision` frames are exempt. `oracle-verify.mjs evidence-scaffold` emits both
 keys when the card declares them, and the `VALID_RED` transition freezes them alongside the row
 mapping — swapping a `PATH*` or `sequence` name for another passing test after RED is
 `HARNESS_BUDGET_REQUIRED`·`EVIDENCE_STALE`, the same gate the row mapping already had.
@@ -960,7 +1000,13 @@ mapping — swapping a `PATH*` or `sequence` name for another passing test after
 Frames ⊂ declared space is machine-checked. Declared space ⊂ reality is not checkable — do not
 report Case space coverage as evidence against defect classes outside the declared dimensions.
 The exploration phase and `I*` invariants judge those, and every escape feeds the family taxonomy
-or the runtime question bank via the escaped-bug retro.
+or the runtime question bank via the escaped-bug retro. Record each escape as one line of
+`.ai/oracles/<id>/escapes.jsonl` with `kind` either `mis-disposition` (an existing cell, frame,
+or `Touches` claim was judged wrong — name it) or `undeclared-dimension` (name the family,
+dimension, and choices to add). The ratio between the two kinds is the standing verdict on this
+section: `undeclared-dimension` escapes grow the taxonomy, while a run of `mis-disposition`
+escapes means dispositions have gone mechanical — narrow the `Touches` citations before adding
+process.
 
 <!-- node:card-confirmation-lock path:references/card/confirmation-lock.md -->
 
