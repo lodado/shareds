@@ -2881,6 +2881,106 @@ test('case-space: 판정 누락·미생성 ID 인용·계열 누락은 실패한
   assert.match(family.stderr, /family-undispositioned: Platform/)
 })
 
+test('case-space: independent(O*)는 이유가 있어야 하고 F* 프레임에만 붙는다', async (t) => {
+  const independent = await caseSpaceCard((rows) =>
+    rows.map((row) => (row.startsWith('| F1 ') ? '| F1 | independent(O1): rows count does not touch the pending policy |' : row)),
+  )
+  assert.equal(run('card', '--oracle', await cardFile(t, independent)).status, 0)
+
+  const noReason = await caseSpaceCard((rows) => rows.map((row) => (row.startsWith('| F1 ') ? '| F1 | independent(O1) |' : row)))
+  const missingReason = run('card', '--oracle', await cardFile(t, noReason))
+  assert.equal(missingReason.status, 1)
+  assert.match(missingReason.stderr, /frame-disposition: F1: independent\(\) must name why/)
+
+  const onPath = await caseSpaceCard((rows) =>
+    rows.map((row) => (row.startsWith('| PATH1 ') ? '| PATH1 | independent(O1): reason |' : row)),
+  )
+  const pathIndependent = run('card', '--oracle', await cardFile(t, onPath))
+  assert.equal(pathIndependent.status, 1)
+  assert.match(pathIndependent.stderr, /frame-disposition: PATH1: independent\(\) applies to F\* combination frames only/)
+
+  const coveredReason = await caseSpaceCard((rows) => rows.map((row) => (row.startsWith('| F1 ') ? '| F1 | covered(O1): reason |' : row)))
+  const reasoned = run('card', '--oracle', await cardFile(t, coveredReason))
+  assert.equal(reasoned.status, 1)
+  assert.match(reasoned.stderr, /frame-disposition: F1: covered\(\) takes no reason/)
+})
+
+test('evidence: State Model PATH*와 Order 시퀀스는 evidence 키가 없으면 검증을 막는다', async (t) => {
+  const stateModel = `
+## State Model
+
+- States: editing, submitting
+- Events: SUBMIT
+
+| From    | Event  | To         | Row |
+| ------- | ------ | ---------- | --- |
+| editing | SUBMIT | submitting | O1  |
+
+## Case space
+
+- Strength: 2
+
+| Family      | Dimension | Choices                  |
+| ----------- | --------- | ------------------------ |
+| Data        | —         | excluded: fixture        |
+| Value       | —         | excluded: fixture        |
+| Async       | —         | excluded: fixture        |
+| Order       | submit/ok | sequential, inverted     |
+| Entry       | —         | excluded: fixture        |
+| Environment | —         | excluded: fixture        |
+| Platform    | —         | excluded: fixture        |
+| Inherited   | —         | excluded: fixture        |
+`
+  const card = EVIDENCE_CARD + stateModel
+  const rows = {
+    O1: { kind: 'test', name: 'save > pending 표시' },
+    O2: { kind: 'na', reason: '사유', source: 'S1' },
+    O3: { kind: 'na', reason: '사유', source: 'S1' },
+  }
+  const reported = JSON.stringify({
+    runId: 'r-001',
+    exitCode: 0,
+    grade: 'reported',
+    adapter: 'node-test',
+    tests: [
+      { name: 'save > pending 표시', status: 'passed' },
+      { name: '[PATH1] editing -SUBMIT-> submitting', status: 'passed' },
+      { name: 'submit/ok sequence', status: 'passed' },
+    ],
+  })
+  const fixture = async (manifest) => {
+    const base = await directory(t)
+    const oracle = join(base, 'oracle.md')
+    const map = join(base, 'evidence.json')
+    const ledgerPath = join(base, 'runs.jsonl')
+    await writeFile(oracle, card)
+    await writeFile(map, JSON.stringify(manifest))
+    await writeFile(ledgerPath, chainedLedger(`${reported}\n`, createHash('sha256').update(card).digest('hex')))
+    return ['evidence', '--oracle', oracle, '--map', map, '--ledger', ledgerPath, '--run', 'r-001']
+  }
+
+  const missingPath = run(...(await fixture({ schemaVersion: 1, rows })))
+  assert.equal(missingPath.status, 1)
+  assert.match(missingPath.stderr, /^EVIDENCE_MISSING_PATH: .*PATH1/)
+
+  const paths = { PATH1: { kind: 'test', name: '[PATH1] editing -SUBMIT-> submitting' } }
+  const missingSequence = run(...(await fixture({ schemaVersion: 1, rows, paths })))
+  assert.equal(missingSequence.status, 1)
+  assert.match(missingSequence.stderr, /^SEQUENCE_EVIDENCE_MISSING: .*submit\/ok/)
+
+  const unknownPath = run(...(await fixture({ schemaVersion: 1, rows, paths: { ...paths, PATH9: paths.PATH1 } })))
+  assert.equal(unknownPath.status, 1)
+  assert.match(unknownPath.stderr, /^EVIDENCE_UNKNOWN_PATH: .*PATH9/)
+
+  const sequence = { kind: 'test', name: 'submit/ok sequence' }
+  const complete = run(...(await fixture({ schemaVersion: 1, rows, paths, sequence })))
+  assert.equal(complete.status, 0, complete.stderr)
+
+  const notInRun = run(...(await fixture({ schemaVersion: 1, rows, paths, sequence: { kind: 'test', name: 'absent' } })))
+  assert.equal(notInRun.status, 1)
+  assert.match(notInRun.stderr, /^EVIDENCE_NOT_IN_RUN: sequence/)
+})
+
 test('case-space: 조합 프레임 50개 초과는 설계 실격선이다', async (t) => {
   const wideChoices = Array.from({ length: 8 }, (_, index) => `c${index}`).join(', ')
   const wide = `${VALID_CARD}

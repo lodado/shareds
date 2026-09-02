@@ -293,6 +293,21 @@ function highestTolerance(content, token) {
   return values.length > 0 ? Math.max(...values) : null
 }
 
+/** 기대값 리터럴의 multiset. toBe(1)→toBe(2)처럼 개수는 같고 값만 바꾼 약화를 잡는다. */
+const EXPECTED_LITERAL = String.raw`(-?\d+(?:\.\d+)?|'[^'\n]*'|"[^"\n]*"|true|false|null|undefined)`
+const EXPECTED_LITERAL_PATTERNS = [
+  new RegExp(String.raw`\.(?:toBe|toEqual|toStrictEqual|toHaveBeenCalledTimes|toHaveLength|toHaveTextContent|toHaveValue)\(\s*${EXPECTED_LITERAL}\s*\)`, 'g'),
+  new RegExp(String.raw`assert\.(?:equal|strictEqual|deepEqual|deepStrictEqual)\([^,\n]+,\s*${EXPECTED_LITERAL}\s*\)`, 'g'),
+]
+
+function expectedLiterals(content) {
+  const literals = {}
+  for (const pattern of EXPECTED_LITERAL_PATTERNS) {
+    for (const match of content.matchAll(pattern)) literals[match[1]] = (literals[match[1]] ?? 0) + 1
+  }
+  return literals
+}
+
 function measureTestFile(content) {
   const banned = {}
   for (const token of WEAKENING_TOKENS) {
@@ -309,6 +324,7 @@ function measureTestFile(content) {
   return {
     sha256: sha256(content),
     assertions: ASSERTION_TOKENS.reduce((total, token) => total + countOccurrences(content, token), 0),
+    literals: expectedLiterals(content),
     banned,
     tolerances,
   }
@@ -1484,6 +1500,11 @@ async function assertTestsNotWeakened(state, scanRoot) {
 
     if (current.assertions < recorded.assertions) {
       weakened.push(`${path}: assertions ${recorded.assertions} → ${current.assertions}`)
+    }
+
+    for (const [literal, count] of Object.entries(recorded.literals ?? {})) {
+      const now = current.literals[literal] ?? 0
+      if (now < count) weakened.push(`${path}: expected literal ${literal} ${count} → ${now}`)
     }
 
     for (const [token, count] of Object.entries(current.banned)) {

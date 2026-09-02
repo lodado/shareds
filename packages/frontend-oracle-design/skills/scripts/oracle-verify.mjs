@@ -868,16 +868,28 @@ async function lintCard(options) {
         issues.push(`frame-undispositioned: ${frameId}: disposition is empty`)
         continue
       }
-      const covered = value.match(/^covered\(([^)]+)\)$/)
-      if (covered) {
-        const cited = rowIds(covered[1])
-        if (cited.length === 0) issues.push(`frame-disposition: ${frameId}: covered() must cite O*/D* rows`)
-        for (const id of cited) {
+      // covered(O*)는 그 행의 테스트가 이 프레임의 choice 조합으로 실제 실행될 때만. 조합과 무관하게
+      // 정책이 성립한다는 주장은 independent(O*): 이유 — 실행 커버리지가 아니라 독립성 주장으로 감사된다.
+      const cited = value.match(/^(covered|independent)\(([^)]+)\)(?::\s*(\S.*))?$/)
+      if (cited) {
+        const [, verb, ids, reason] = cited
+        const rows = rowIds(ids)
+        if (rows.length === 0) issues.push(`frame-disposition: ${frameId}: ${verb}() must cite O*/D* rows`)
+        for (const id of rows) {
           if (!seenRows.has(id)) issues.push(`frame-row-unknown: ${frameId}: ${id} is not a contract row`)
+        }
+        if (verb === 'independent' && !reason) {
+          issues.push(`frame-disposition: ${frameId}: independent() must name why the choices cannot change the outcome`)
+        }
+        if (verb === 'independent' && !frameId.startsWith('F')) {
+          issues.push(`frame-disposition: ${frameId}: independent() applies to F* combination frames only`)
+        }
+        if (verb === 'covered' && reason) {
+          issues.push(`frame-disposition: ${frameId}: covered() takes no reason — use independent() for a claim of independence`)
         }
       } else if (!/^impossible:\s*\S/.test(value) && !/^needs-decision:\s*\S/.test(value)) {
         issues.push(
-          `frame-disposition: ${frameId}: disposition must be covered(O*) | impossible: reason | needs-decision: question`,
+          `frame-disposition: ${frameId}: disposition must be covered(O*) | independent(O*): reason | impossible: reason | needs-decision: question`,
         )
       }
     }
@@ -1322,6 +1334,44 @@ async function verifyRedEvidence(options) {
   process.stdout.write(`RED_EVIDENCE_VERIFIED ${options.row} ${entry.name}\n`)
 }
 
+/** PATH* 하나당 테스트 하나, Order choice 2개 이상이면 시퀀스 테스트 하나 — 문서만의 약속을 evidence 키로 옮긴다. */
+function collectFrameEvidence(card, map) {
+  const generated = generateFromDocument(card)
+  if (!generated) return []
+
+  const entries = []
+  const paths = map?.paths ?? {}
+  const pathIds = generated.paths.map((path) => path.id)
+  const unknownPaths = Object.keys(paths).filter((id) => !pathIds.includes(id))
+  if (unknownPaths.length > 0) {
+    throw new CliError('EVIDENCE_UNKNOWN_PATH', `evidence maps paths the State Model does not generate: ${unknownPaths.join(', ')}`)
+  }
+  const missingPaths = pathIds.filter((id) => !paths[id])
+  if (missingPaths.length > 0) {
+    throw new CliError('EVIDENCE_MISSING_PATH', `State Model paths have no test evidence: ${missingPaths.join(', ')}`)
+  }
+  for (const id of pathIds) {
+    if (paths[id].kind !== 'test' || !paths[id].name) {
+      throw new CliError('EVIDENCE_INVALID', `${id}: path evidence must be { kind: "test", name }`)
+    }
+    entries.push([id, paths[id].name])
+  }
+
+  const order = generated.caseSpace.families.find((entry) => entry.family === 'Order' && !entry.excluded)
+  const orderChoices = order ? order.choices.filter((choice) => !choice.error).length : 0
+  if (orderChoices >= 2) {
+    if (map?.sequence?.kind !== 'test' || !map.sequence.name) {
+      throw new CliError(
+        'SEQUENCE_EVIDENCE_MISSING',
+        `Order dimension "${order.dimension}" has ${orderChoices} choices — evidence.sequence must name the fast-check (or hand-enumerated) sequence test`,
+      )
+    }
+    entries.push(['sequence', map.sequence.name])
+  }
+
+  return entries
+}
+
 async function verifyEvidence(options) {
   if (!options.oracle || !options.map || !options.ledger || !options.run) {
     throw new CliError('USAGE', 'evidence requires --oracle, --map, --ledger and --run', 2)
@@ -1379,7 +1429,13 @@ async function verifyEvidence(options) {
     )
   }
 
-  const needsRunEvidence = rows.filter((id) => map.rows[id].kind === 'test')
+  // PATH*·Order 시퀀스 증거 — 카드가 State Model·Order 차원을 선언했으면 행 증거와 같은 게이트를 지난다.
+  const frameEvidence = collectFrameEvidence(card, map)
+
+  const needsRunEvidence = [
+    ...rows.filter((id) => map.rows[id].kind === 'test').map((id) => [id, map.rows[id].name]),
+    ...frameEvidence,
+  ]
 
   if (
     needsRunEvidence.length > 0 &&
@@ -1399,8 +1455,7 @@ async function verifyEvidence(options) {
     throw new CliError('EVIDENCE_UNVERIFIABLE', `${run.runId} is not a clean successful evidence run`)
   }
 
-  for (const id of needsRunEvidence) {
-    const name = map.rows[id].name
+  for (const [id, name] of needsRunEvidence) {
     const observed = (run.tests ?? []).find((entry) => entry.name === name)
 
     if (!observed) {
@@ -1857,6 +1912,16 @@ async function scaffoldEvidence(options) {
   }
 
   const manifest = { schemaVersion: 1, rows: Object.fromEntries(rows.map((row) => [row.id, scaffoldRow(row)])) }
+  const generated = generateFromDocument(card)
+  if (generated?.paths.length) {
+    manifest.paths = Object.fromEntries(
+      generated.paths.map((path) => [path.id, { kind: 'test', name: `<[${path.id}] ${path.label}>` }]),
+    )
+  }
+  const order = generated?.caseSpace.families.find((entry) => entry.family === 'Order' && !entry.excluded)
+  if (order && order.choices.filter((choice) => !choice.error).length >= 2) {
+    manifest.sequence = { kind: 'test', name: '<fast-check sequence test over the Order dimension>' }
+  }
   process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`)
 }
 

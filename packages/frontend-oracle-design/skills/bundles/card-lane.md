@@ -906,9 +906,9 @@ The generator emits, deterministically for the same card bytes:
 - `PATH*` — every simple path of the `## State Model` transition table from its initial state
 - `EMPTY <state> × <event>` — every undefined state×event cell
 
-Every emitted ID gets a row in `## Frame dispositions`, with the same three dispositions and the
-same promotion rule as the sweep — only `needs-decision` becomes a grill question, and one
-surviving to lock means `NEEDS_DECISION`:
+Every emitted ID gets a row in `## Frame dispositions`, with the sweep's three dispositions plus
+one that only `F*` frames may carry, under the same promotion rule — only `needs-decision` becomes
+a grill question, and one surviving to lock means `NEEDS_DECISION`:
 
 ```markdown
 ## Frame dispositions
@@ -917,6 +917,7 @@ surviving to lock means `NEEDS_DECISION`:
 | -------------------- | ---------------------------------------------------------- |
 | F1                   | covered(O5)                                                |
 | F2                   | needs-decision: back-forward while the request is pending? |
+| F3                   | independent(O5): row count never reaches the pending policy |
 | E1                   | covered(O9)                                                |
 | PATH1                | covered(O1, O5)                                            |
 | EMPTY pending × SORT | needs-decision: sort while fetching — cancel or queue?     |
@@ -926,17 +927,31 @@ Lint (`oracle-verify.mjs card`, active when `## Case space` exists):
 
 - every generated ID has a disposition — `frame-undispositioned`
 - no disposition cites an ID the generator did not emit — `frame-unknown`
-- disposition enum and `covered()` row citations are checked like the sweep
+- disposition enum and `covered()`·`independent()` row citations are checked like the sweep.
+  `covered(O5)` on an `F*` frame is an execution claim: O5's test actually runs under that
+  frame's choice combination — as an `it.each` row over the frames the fixture can control, or a
+  dedicated case. When the choices cannot change the row's outcome, write
+  `independent(O5): <mechanism>` instead; it is a claim of independence, audited as such, never
+  counted as coverage. `independent()` without a reason, on a non-`F*` frame, or `covered()` with
+  a reason fails `frame-disposition`.
 - every taxonomy family appears — `family-undispositioned`
 - more than 50 combinable frames — `case-space-too-wide`: not a budget to fill but a design
   disqualification line; split the dimension or narrow the scope, mirroring bva's 30
   `@ts-expect-error` rule
 
-A frame does not create a test. `F*`·`E*` dispositions map to existing rows or promote questions;
-`PATH*` frames become the Delivery path-test enumeration ($test maps each path to one test, and
-that path test doubles as the evidence for every row it traverses — assertion ownership stays
+A frame does not create a test by itself. `F*`·`E*` dispositions map to existing rows or promote
+questions — a `covered()` `F*` frame parameterizes the row's existing test, it does not add an
+owner; `PATH*` frames become the Delivery path-test enumeration ($test maps each path to one test,
+and that path test doubles as the evidence for every row it traverses — assertion ownership stays
 single, so a row covered by a path gets no standalone test); `EMPTY` cells resolve to impossible
 or a policy question, per the State Model rule that already owns them.
+
+Two of these are machine-checked at `oracle-verify.mjs evidence`, not only promised in prose:
+every generated `PATH*` needs an `evidence.json` `paths.<id>` entry of `{ kind: "test", name }`
+whose name is in the run (`EVIDENCE_MISSING_PATH`·`EVIDENCE_UNKNOWN_PATH`), and an `Order`
+dimension with two or more combinable choices needs `evidence.json` `sequence` naming the
+sequence test (`SEQUENCE_EVIDENCE_MISSING`). `oracle-verify.mjs evidence-scaffold` emits both
+keys when the card declares them.
 
 ## What this section does not claim
 

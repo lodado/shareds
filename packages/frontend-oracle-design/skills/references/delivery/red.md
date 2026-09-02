@@ -57,8 +57,9 @@ above in one call with the same verification — see [`ledger.md`](ledger.md) fo
 `RED_EVIDENCE_UNVERIFIABLE`·`RED_EVIDENCE_MISSING` prevent an unrelated compile/setup failure or an
 exit-only run from being used as RED. `PRODUCTION_TOUCHED_BEFORE_RED` is machine evidence that
 production was touched before the tests — revert the changed files to keep the order and do not route
-around it. The transition stores the test file digest·assertion count at this point as the GREEN gate
-baseline.
+around it. The transition stores the test file digest·assertion count·expected-value literal multiset
+at this point as the GREEN gate baseline: `toBe(1)` → `toBe(2)` keeps the assertion count and still
+fails `TEST_WEAKENED`, because the expected values are the card's, not the implementation's.
 
 A file registered with `--harness-path` can be changed until a reported RED is recorded with those
 bytes. If it is changed again after `VALID_RED`, completion is blocked with `HARNESS_BUDGET_REQUIRED`

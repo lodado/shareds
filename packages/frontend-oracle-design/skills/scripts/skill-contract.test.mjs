@@ -509,11 +509,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.37.0')
+  assert.equal(version, '0.38.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.37.0')
+  assert.equal(marketplace.version, '0.38.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -1544,6 +1544,19 @@ test('enumerates the declared case space by machine and dispositions every gener
   assert.match(testSkill, /`PATH\*` frames of `oracle-frames\.mjs` are the test\s+enumeration/)
   assert.match(testSkill, /sequence test is \*\*required\*\*, not optional/)
   assert.match(testSkill, /fc\.scheduler/)
+
+  // 곱 → 테스트 다리: independent()는 커버리지가 아닌 독립성 주장, PATH·sequence는 evidence 키로 기계 검사
+  assert.match(caseSpace, /`independent\(O5\):\s+<mechanism>`/)
+  assert.match(caseSpace, /never\s+counted as coverage/)
+  assert.match(caseSpace, /EVIDENCE_MISSING_PATH/)
+  assert.match(caseSpace, /SEQUENCE_EVIDENCE_MISSING/)
+  assert.match(verifier, /EVIDENCE_MISSING_PATH/)
+  assert.match(verifier, /SEQUENCE_EVIDENCE_MISSING/)
+  assert.match(verifier, /independent\(\) applies to F\* combination frames only/)
+  assert.match(testSkill, /`\[PATH3\] <path label>`/)
+  assert.match(testSkill, /Unreachability has exactly two forms/)
+  assert.match(testSkill, /as `it\.each` rows of the owning row's test/)
+  assert.match(testSkill, /SEQUENCE_EVIDENCE_MISSING/)
 
   // assertion 소유는 단일 — 실행 중복은 허용, 소유 중복은 결함
   assert.match(testSkill, /exactly one owning test/)

@@ -78,9 +78,20 @@ ownership splits from production, and make the test follow along when a slice is
 - For loading·race, the test controls the completion moment with a deferred **pending barrier**
   (the bva.md pattern). Arbitrary sleep is forbidden.
 - When the card has a `## State Model`, the `PATH*` frames of `oracle-frames.mjs` are the test
-  enumeration: one test per path (the path label is the describe name), and `EMPTY` cells the card
-  dispositioned `impossible` get an unreachability assertion. A skipped path blocks `GREEN` the
-  same as a skipped row.
+  enumeration: one test per path, and `EMPTY` cells the card dispositioned `impossible` get an
+  unreachability assertion. A skipped path blocks `GREEN` the same as a skipped row — the gate is
+  `evidence.json` `paths.<PATH id>` (`EVIDENCE_MISSING_PATH`), so the test name starts with the
+  frame id token, `[PATH3] <path label>`, and the reporter matches on that token rather than on
+  the arrow-laden label alone.
+  - Unreachability has exactly two forms. When the state ladder expresses the cell in the type,
+    it is a `.test-d.ts(x)` witness: the event handler's parameter type rejects that state with
+    one `@ts-expect-error`. Otherwise it is a runtime test that enters the state, fires the event,
+    and asserts the observable surface unchanged plus side-effect count 0. Do not assert a
+    console warning or an internal guard — those are implementation, not the card.
+- A `covered(O*)` disposition on an `F*` combination frame is an execution claim: the row's test
+  runs under that frame's choices. Feed the fixture-controllable frames (Data volume, Value class,
+  Entry, viewport) as `it.each` rows of the owning row's test, named `<row test> [F7]`, instead of
+  writing a new owner. Frames the card marked `independent(O*)` get no case.
 - **Every assertion has exactly one owning test — re-executing a behavior is fine, re-owning its
   assertion is not.** A path test asserts each traversed row's Then·Never·side-effect count at the
   step where it fires, and **is that row's evidence**: map several rows to the one path test
@@ -94,7 +105,9 @@ ownership splits from production, and make the test follow along when a slice is
   test judges only against the model and the card's `I*` invariants — it explores sequences the
   paths did not enumerate and never re-owns a row's expected values. If fast-check is neither
   installed nor approved, verify the Order frames with hand-enumerated deferred orderings and
-  record why.
+  record why. Either way the test is named in `evidence.json` `sequence` — the verifier refuses
+  the evidence with `SEQUENCE_EVIDENCE_MISSING` when the Order dimension has two or more choices
+  and no sequence test is mapped.
 - `## Invariants` rows are judged in one shared place per harness (a common post-step check of the
   journey runner), not copied into each scenario test. When an `I*` restates an `O*` row's
   property, both cite the same `P*` — execution may overlap, assertion ownership may not. Prefer
@@ -162,8 +175,9 @@ On FAIL, classify the cause. **Only machinery problems can be corrected** — 2 
   cardinality error with `first()`/`nth()`
 
 The forbidden items are checked by machine at the GREEN transition. When the assertion count drops
-compared with the `VALID_RED` moment or the tokens above newly appear, it is rejected as `TEST_WEAKENED`,
-so corrections stay inside the allowed items.
+compared with the `VALID_RED` moment, an expected-value literal recorded at RED disappears
+(`toBe(1)` → `toBe(2)` is a swap, not a fix), or the tokens above newly appear, it is rejected as
+`TEST_WEAKENED`, so corrections stay inside the allowed items.
 
 ### VALID_RED predicates — issued only when all are satisfied
 

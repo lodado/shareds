@@ -1967,6 +1967,30 @@ test('O10: assertion이 줄면 TEST_WEAKENED로 GREEN을 거부한다', async (t
   assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
 })
 
+test('O10: assertion 수는 같아도 기대값 리터럴을 바꾸면 TEST_WEAKENED로 GREEN을 거부한다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await writeFile(
+    join(root, 'src', 'save.test.mjs'),
+    "import assert from 'node:assert'\nassert.equal(posts, 1)\nassert.equal(status, 'pending')\n",
+  )
+  redRun(oracleDirectory)
+  assert.equal(transition(oracleDirectory, 'VALID_RED', 'r-001').status, 0)
+
+  await writeFile(
+    join(root, 'src', 'save.test.mjs'),
+    "import assert from 'node:assert'\nassert.equal(posts, 2)\nassert.equal(status, 'pending')\n",
+  )
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^TEST_WEAKENED: /)
+  assert.match(transitioned.stderr, /expected literal 1 1 → 0/)
+  assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
+})
+
 test('O10: 금지 토큰이 새로 들어오면 TEST_WEAKENED로 GREEN을 거부한다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
   await reachValidRed(oracleDirectory, root)
