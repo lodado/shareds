@@ -1,9 +1,9 @@
 ---
-name: frontend-ux-design
+name: frontend-interface-design
 description: Use when the user asks to design or implement a web UI, screen, flow, or component and wants it usable, not just pretty. Covers requirement framing, reference study, a decision ladder (primary task → hierarchy → interaction → feedback → visual), implementation with loading/empty/error states, funnel-based UX review, and a written rationale for every visual choice. Do not use for risky behavior policy (frontend-oracle-design), screenshot verification (frontend-visual-qa), or behavior tests (test).
 ---
 
-# Frontend UX Design
+# Frontend Interface Design
 
 요구사항을 받아 **설명 가능한** 웹 UI를 설계하고 구현하는 skill이다. 목표는 예쁜 화면이
 아니라 사용자가 primary task를 빨리, 실수 없이, 다시 찾아와서 끝내는 화면이다.
@@ -97,6 +97,9 @@ resolve 하지 못하면 정규식 폴백으로 내려가고, 그때 **대비 �
 기존 공용 컴포넌트(`components/ui`, `shared/ui`), motion 라이브러리, 폰트 로딩을 확인한다.
 결과를 `file:line`과 함께 한 블록으로 적고 "보존 / 새로 도입"을 나눈다. 재사용 가능한
 컴포넌트가 있으면 그것을 쓴다. 신호가 없으면 한 줄만 남기고 넘어간다.
+컴포넌트가 없어 레지스트리(21st.dev · shadcn)를 볼 때는
+[`references/reference-study.md`](references/reference-study.md) § 컴포넌트 소스의 설치
+게이트를 따른다 — 기본은 참고, 설치는 역할이 비어 있는 프리미티브만이다.
 
 ### 1. Frame — 문제를 한 문장으로 고정한다
 

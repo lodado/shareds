@@ -1,6 +1,6 @@
 {
-  "name": "frontend-ux-design",
-  "version": "0.2.3",
+  "name": "frontend-interface-design",
+  "version": "0.3.0",
   "description": "Explainable UI/UX design and implementation: decision ladder, state matrix, funnel review, rationale.",
   "author": {
     "name": "lodado",

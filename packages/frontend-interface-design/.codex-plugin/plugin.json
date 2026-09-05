@@ -1,6 +1,6 @@
 {
-  "name": "frontend-ux-design",
-  "version": "0.2.3",
+  "name": "frontend-interface-design",
+  "version": "0.3.0",
   "description": "Explainable UI/UX design and implementation: decision ladder, state matrix, funnel review, rationale.",
   "author": {
     "name": "lodado",
@@ -11,10 +11,10 @@
   "license": "MIT",
   "skills": "./skills/",
   "interface": {
-    "displayName": "Frontend UX Design",
+    "displayName": "Frontend Interface Design",
     "shortDescription": "Design and build explainable, usable web UI",
     "category": "development",
-    "defaultPrompt": "Use $frontend-ux-design to design and implement this screen with a decision record and rationale.",
+    "defaultPrompt": "Use $frontend-interface-design to design and implement this screen with a decision record and rationale.",
     "websiteURL": "https://github.com/lodado/my-Vibe-Coding-Helper"
   }
 }

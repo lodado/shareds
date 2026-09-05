@@ -54,7 +54,7 @@ agent-graph-engineering
 frontend-system-design
 test
 frontend-visual-qa
-frontend-ux-design
+frontend-interface-design
 ```
 
 패키지 안에 `.claude-plugin/plugin.json`이랑 `.codex-plugin/plugin.json`이 같이 들어 있어요.
@@ -206,7 +206,7 @@ npm으로 나갈 것들이에요.
 | [`frontend-system-design`](packages/frontend-system-design)   | 잘 알려진 프론트엔드 문제의 설계 패턴    |
 | [`test`](packages/test)                                       | Oracle 기반 결정론적 행동 테스트         |
 | [`frontend-visual-qa`](packages/frontend-visual-qa)           | 스크린샷 비교랑 직접 브라우저 QA         |
-| [`frontend-ux-design`](packages/frontend-ux-design)           | 설명 가능한 UI/UX 설계랑 구현            |
+| [`frontend-interface-design`](packages/frontend-interface-design)           | 설명 가능한 UI/UX 설계랑 구현            |
 
 ## 개발
 

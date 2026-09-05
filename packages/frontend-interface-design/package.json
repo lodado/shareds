@@ -1,6 +1,6 @@
 {
-  "name": "@lodado/frontend-ux-design-plugin",
-  "version": "0.2.3",
+  "name": "@lodado/frontend-interface-design-plugin",
+  "version": "0.3.0",
   "private": true,
   "description": "Claude Code / Codex plugin for explainable UI/UX design and implementation.",
   "license": "MIT",

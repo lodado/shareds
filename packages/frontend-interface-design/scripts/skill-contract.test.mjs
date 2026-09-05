@@ -6,14 +6,14 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const packageDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
-const skillDirectory = join(packageDirectory, 'skills/frontend-ux-design')
+const skillDirectory = join(packageDirectory, 'skills/frontend-interface-design')
 
 const read = (relativePath) => readFile(join(skillDirectory, relativePath), 'utf8')
 
 test('decides top-down: primary task before visual treatment, and gates every treatment on a rung', async () => {
   const skill = await read('SKILL.md')
 
-  assert.match(skill, /name: frontend-ux-design/)
+  assert.match(skill, /name: frontend-interface-design/)
   assert.match(
     skill,
     /1\.\s+primary task[\s\S]*2\.\s+information hierarchy[\s\S]*3\.\s+interaction[\s\S]*4\.\s+feedback[\s\S]*5\.\s+visual treatment/,
@@ -59,6 +59,17 @@ test('separates shared patterns from single-brand choices in reference study', a
   assert.match(study, /2개 이상에서 반복 → \*\*패턴\*\*/)
   assert.match(study, /1개에만 있음 → \*\*브랜드 선택\*\*/)
   assert.match(study, /픽셀 · 카피 · 에셋 · 폰트 이름을 복제하지 않는다/)
+})
+
+test('treats component registries as a gated source, not a per-screen catalog', async () => {
+  const [skill, study] = await Promise.all([read('SKILL.md'), read('references/reference-study.md')])
+
+  assert.match(skill, /설치\s+게이트/)
+  assert.match(study, /## 컴포넌트 소스/)
+  assert.match(study, /기본은\s+\*\*참고\*\*/)
+  assert.match(study, /\*\*역할 부재\*\*/)
+  assert.match(study, /조합 블록은 항상 참고 모드다/)
+  assert.match(study, /화면마다 레지스트리에서 새 컴포넌트를 설치하지 않는다/)
 })
 
 test('defers risky behavior policy and verification to sibling skills', async () => {
