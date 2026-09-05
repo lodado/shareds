@@ -79,6 +79,9 @@ function readPathOf(block) {
  */
 export function loadedNodesFrom(events, graph) {
   const byPath = graph.nodes.map((node) => [node.path, node.id])
+  // A bundle is a deterministic pre-joined read of its nodes' bytes, so a successful bundle read
+  // counts as reading every node it contains (bundleContract: same bytes, never a summary).
+  for (const bundle of graph.bundles ?? []) byPath.push([`bundles/${bundle.id}.md`, bundle])
   const pendingReads = new Map()
   const confirmed = new Set()
   for (const event of events) {
@@ -91,7 +94,8 @@ export function loadedNodesFrom(events, graph) {
         }
         if (block?.type === 'tool_result' && block.tool_use_id && block.is_error !== true) {
           const id = pendingReads.get(block.tool_use_id)
-          if (id) confirmed.add(id)
+          if (typeof id === 'string') confirmed.add(id)
+          else if (id) for (const node of id.nodes) confirmed.add(node)
         }
       }
     }
@@ -99,7 +103,8 @@ export function loadedNodesFrom(events, graph) {
     const item = event.item
     if (item && READ_TOOL_NAMES.has(String(item.item_type ?? '').toLowerCase()) && item.status !== 'failed') {
       const id = nodeIdForPath(item.path ?? item.file_path ?? null, byPath)
-      if (id) confirmed.add(id)
+      if (typeof id === 'string') confirmed.add(id)
+      else if (id) for (const node of id.nodes) confirmed.add(node)
     }
   }
   return [...confirmed]
@@ -132,12 +137,43 @@ export function usageFrom(events) {
   return { toolCalls, tokens }
 }
 
-/** The last fenced json block of the final text, which is where the footer asks the run to report. */
+/**
+ * The last fenced json block of the run's own output, which is where the footer asks the run to
+ * report. Only assistant/agent text blocks count: a tool result or user message that happens to
+ * contain a fenced json block is environment content, not the run's report.
+ */
+function roleOf(event) {
+  if (typeof event?.message?.role === 'string') return event.message.role
+  if (typeof event?.role === 'string') return event.role
+  if (event?.type === 'assistant') return 'assistant'
+  return null
+}
+
+function isRunOutputEvent(event, role) {
+  if (role === 'user') return false
+  return role === 'assistant' || event?.type === 'assistant' || event?.type === 'result'
+}
+
 export function selfReportFrom(events) {
   const texts = []
-  walkStrings(events, (text) => {
-    if (text.includes('```json')) texts.push(text)
-  })
+  for (const event of events) {
+    const role = roleOf(event)
+    const content = event?.message?.content
+    if (isRunOutputEvent(event, role) && Array.isArray(content)) {
+      for (const block of content) {
+        if (block?.type === 'text' && typeof block.text === 'string' && block.text.includes('```json')) texts.push(block.text)
+      }
+    }
+    if (event?.type === 'result' && typeof event.result === 'string' && event.result.includes('```json')) {
+      texts.push(event.result)
+    }
+    // Codex stream: the final agent message arrives as item.completed with item_type agent_message.
+    if (event?.type !== 'item.completed') continue
+    const item = event.item
+    if (item?.item_type === 'agent_message' && typeof item.text === 'string' && item.text.includes('```json')) {
+      texts.push(item.text)
+    }
+  }
   const block = [...(texts.at(-1) ?? '').matchAll(/```json\n([\s\S]*?)```/g)].at(-1)?.[1]
   if (!block) return null
   try {
@@ -227,7 +263,7 @@ async function main() {
   const out = option(args, '--out')
   if (!HOSTS[host] || !out) {
     process.stderr.write(
-      `USAGE: run-live.mjs --host <${Object.keys(HOSTS).join('|')}> --out <results.jsonl> [--corpus <file>] [--case <id>] [--repo <dir>] [--replicates <n>]\n`,
+      `USAGE: run-live.mjs --host <${Object.keys(HOSTS).join('|')}> --out <results.jsonl> [--corpus <file>] [--case <id>] [--repo <dir>] [--replicates <n>] [--variant <name>]\n`,
     )
     process.exitCode = 2
     return
@@ -238,6 +274,8 @@ async function main() {
   // scores the fixture on every replicate instead of treating the repeats as a duplicate case.
   const replicates = Number.parseInt(option(args, '--replicates') ?? '1', 10)
   if (!Number.isSafeInteger(replicates) || replicates < 1) throw new Error('INVALID_REPLICATES')
+  // A/B arm marker: results from different skill versions carry their arm so the grader never pools them.
+  const variant = option(args, '--variant')
   // held-out.json runs through the same runner and the same artifact shape, but its escapes are
   // judged by reading the Draft against each assertion — the grader never scores it.
   const corpusFile = option(args, '--corpus') ?? 'blackbox-corpus.json'
@@ -260,10 +298,12 @@ async function main() {
       const runtimeMs = Date.now() - startedAt
       const events = parseTranscript(stdout)
       const { result, selfReported } = buildResult({ fixture, events, graph, runtimeMs, replicateId })
+      if (variant) result.variant = variant
       if (code !== 0) result.errors.push(`HOST_EXIT_${code}`)
       lines.push(JSON.stringify(result))
       runs.push({
         caseId: fixture.id,
+        ...(variant ? { variant } : {}),
         ...(replicateId === null ? {} : { replicateId }),
         host,
         exitCode: code,

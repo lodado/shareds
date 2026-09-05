@@ -1,9 +1,14 @@
 #!/usr/bin/env node
-// Grades a results artifact against blackbox-corpus.json. A fixture may appear once, or k times with
-// distinct `replicateId`s (run-live.mjs --replicates k). Replicates are graded independently: the case
+// Grades a results artifact against blackbox-corpus.json. The unit of grading is (caseId, variant):
+// each variant of a fixture (an A/B arm such as baseline/compressed, default variant when absent) is
+// graded as its own line. Within one variant a fixture may appear once, or k times with distinct
+// `replicateId`s (run-live.mjs --replicates k). Replicates are graded independently: the variant
 // passes only when every replicate passes (pass^k, the reliability view) and `passAtK` records
 // whether any replicate passed (pass@k, the capability view). Repeats without distinct replicateIds
-// are still DUPLICATE_CASE — an artifact must say that it meant to repeat.
+// are still DUPLICATE_CASE — an artifact must say that it meant to repeat. When replicate counts
+// differ across variants/cases the aggregate carries replicateCounts so unequal k is visible, and
+// metrics.variants reports each non-default variant separately — cross-variant numbers are never
+// silently pooled.
 import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
@@ -40,6 +45,12 @@ function replicateIdOf(result) {
   return result.replicateId
 }
 
+function variantOf(result) {
+  if (!isRecord(result)) return null
+  if (typeof result.variant !== 'string' || !result.variant) return null
+  return result.variant
+}
+
 /** Every entry carries its own replicateId and no two share one — otherwise the repeats are duplicates. */
 function distinctReplicates(entries) {
   const ids = entries.map(replicateIdOf)
@@ -67,6 +78,7 @@ function gradeFixture(matching, fixture, metricsSchema) {
   const passedCount = replicates.filter((entry) => entry.pass).length
   return {
     caseId: fixture.id,
+    variant: variantOf(matching[0]),
     pass: passedCount === replicates.length,
     passAtK: passedCount > 0,
     routingPass: replicates.every((entry) => entry.routingPass),
@@ -249,6 +261,7 @@ async function main() {
             passAllK: null,
             passAtK: null,
             replicatedCases: 0,
+            replicateCounts: [],
             policyInvention: 0,
             falseReviewVerified: 0,
             toolCalls: 0,
@@ -267,23 +280,32 @@ async function main() {
 
   const fixtures = new Map(corpus.cases.map((fixture) => [fixture.id, fixture]))
   if (fixtures.size !== corpus.cases.length) throw new EvalInputError('DUPLICATE_FIXTURE_ID')
-  const byCase = new Map()
+  // Grading unit is (caseId, variant): variants are independent arms and never share a replicate pool.
+  const byGroup = new Map()
   for (const result of results) {
-    const caseId = caseIdOf(result)
-    const entries = byCase.get(caseId) ?? []
+    const key = `${caseIdOf(result)}\u0000${variantOf(result) ?? ''}`
+    const entries = byGroup.get(key) ?? []
     entries.push(result)
-    byCase.set(caseId, entries)
+    byGroup.set(key, entries)
   }
+  const groupKeys = [...byGroup.keys()]
+  const variantsOfCase = (caseId) =>
+    groupKeys.filter((key) => key.startsWith(`${caseId}\u0000`)).map((key) => key.slice(caseId.length + 1))
 
   const selectedFixtures = allowPartial
     ? [...new Set(results.map((result) => caseIdOf(result)))].map((caseId) => fixtures.get(caseId)).filter(Boolean)
     : corpus.cases
-  const cases = selectedFixtures.map((fixture) => {
-    const matching = byCase.get(fixture.id) ?? []
-    if (matching.length === 0) {
-      return { caseId: fixture.id, pass: false, routingPass: false, failures: [{ code: 'MISSING_CASE' }] }
+  const cases = selectedFixtures.flatMap((fixture) => {
+    const variants = variantsOfCase(fixture.id)
+    if (variants.length === 0) {
+      return [{ caseId: fixture.id, pass: false, routingPass: false, failures: [{ code: 'MISSING_CASE' }] }]
     }
-    return gradeFixture(matching, fixture, metricsSchema)
+    return variants.map((variant) => {
+      const matching = byGroup.get(`${fixture.id}\u0000${variant}`) ?? []
+      const graded = gradeFixture(matching, fixture, metricsSchema)
+      if (variant) graded.variant = variant
+      return graded
+    })
   })
   for (const result of results) {
     const fixture = fixtures.get(caseIdOf(result))
@@ -299,6 +321,16 @@ async function main() {
   }
   const passed = cases.filter((entry) => entry.pass).length
   const replicated = cases.filter((entry) => Number.isInteger(entry.k) && entry.k > 1)
+  // Unequal k across replicated lines is legal but must be visible, not silently pooled.
+  const replicateCounts = [...new Set(replicated.map((entry) => entry.k))].sort((left, right) => left - right)
+  const variantMetrics = {}
+  for (const entry of cases) {
+    if (!entry.variant) continue
+    const bucket = (variantMetrics[entry.variant] ??= { total: 0, passed: 0, routingPassed: 0 })
+    bucket.total += 1
+    if (entry.pass) bucket.passed += 1
+    if (entry.routingPass) bucket.routingPassed += 1
+  }
   const checkedAdd = (left, right) => {
     if (!Number.isSafeInteger(left + right)) throw new EvalInputError('AGGREGATE_OVERFLOW')
     return left + right
@@ -327,6 +359,8 @@ async function main() {
       passAllK: replicated.length ? replicated.filter((entry) => entry.pass).length / replicated.length : null,
       passAtK: replicated.length ? replicated.filter((entry) => entry.passAtK).length / replicated.length : null,
       replicatedCases: replicated.length,
+      replicateCounts,
+      ...(Object.keys(variantMetrics).length ? { variants: variantMetrics } : {}),
       policyInvention: totals.policyInvention,
       falseReviewVerified: totals.falseReviewVerified,
       toolCalls: totals.toolCalls,

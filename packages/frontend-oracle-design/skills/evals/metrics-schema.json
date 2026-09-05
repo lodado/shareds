@@ -25,6 +25,10 @@
       "type": "string",
       "description": "Optional replicate marker (r1, r2, ...) when the same fixture is run k times for pass@k / pass^k. Repeats without distinct replicateIds are DUPLICATE_CASE."
     },
+    "variant": {
+      "type": "string",
+      "description": "Optional A/B arm marker (e.g. baseline, compressed). Grading unit is (caseId, variant); variants are never pooled into one number."
+    },
     "risk": {
       "type": "string",
       "description": "Observed Oracle risk classification for this case."

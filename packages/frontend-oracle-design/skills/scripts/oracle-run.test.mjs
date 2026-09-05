@@ -2211,6 +2211,62 @@ test('status --json nextActions is an execution packet: per transition, what is 
   assert.ok(refresh.blockers.includes('HARNESS_BUDGET_REQUIRED'))
 })
 
+test('nextActions mirrors what transition actually accepts: escape stays open, resume needs --run, review needs the packet', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { risk: 'high' })
+
+  // 증거가 비어 있어도 NEEDS_DECISION·FAIL은 잠기지 않는다 — 증거가 없을 때 쓰는 탈출 전이다.
+  await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify({ schemaVersion: 1, rows: {} }))
+  const empty = JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout)
+  assert.ok(empty.blockers.includes('EVIDENCE_MISSING_ROWS'))
+  for (const escape of ['NEEDS_DECISION', 'FAIL']) {
+    const action = empty.nextActions.find((entry) => entry.to === escape)
+    assert.equal(action.ready, true, escape)
+    assert.deepEqual(action.requires, ['--reason'], escape)
+  }
+  // ORACLE_READY에서 GREEN으로 곧장 가는 것은 VALID_RED 생략이므로 --reason이 함께 필요하다.
+  const skipGreen = empty.nextActions.find((entry) => entry.to === 'IMPLEMENTED_GREEN')
+  assert.deepEqual(skipGreen.requires, ['--run', '--evidence', '--reason'])
+
+  // 실제로 탈출한 뒤의 재개 패킷: transition은 --reason이 아니라 --run을 요구한다.
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
+  assert.equal(redRun(oracleDirectory).status, 0)
+  assert.equal(
+    run(['transition', '--dir', oracleDirectory, '--to', 'NEEDS_DECISION', '--reason', 'policy gap']).status,
+    0,
+  )
+  const paused = JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout)
+  const resume = paused.nextActions.find((entry) => entry.to === 'ORACLE_READY')
+  assert.deepEqual(resume.requires, ['--run'])
+  assert.deepEqual(resume.candidateRuns, ['r-001'])
+  assert.match(resume.example, /--run r-001$/)
+
+  // 패킷이 안내한 그대로가 실제 transition에서도 통한다.
+  assert.equal(run(['transition', '--dir', oracleDirectory, '--to', 'ORACLE_READY', '--run', 'r-001']).status, 0)
+})
+
+test('nextActions review candidates only cite runs recorded after IMPLEMENTED_GREEN, newest first', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { risk: 'low' })
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
+  assert.equal(redRun(oracleDirectory).status, 0)
+  assert.equal(transition(oracleDirectory, 'VALID_RED', 'r-001').status, 0)
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = () => true\n')
+  assert.equal(greenRun(oracleDirectory, 'behavior').status, 0, 'green run')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002').status, 0)
+
+  const before = JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout)
+  const reviewBefore = before.nextActions.find((entry) => entry.to === 'REVIEW_VERIFIED')
+  // r-002는 GREEN 이전의 run이므로 리뷰 인용 후보가 아니다 (REVIEW_RERUN_REQUIRED와 같은 규칙).
+  assert.deepEqual(reviewBefore.candidateRuns, [])
+  assert.ok(reviewBefore.blockers.includes('NO_FRESH_GREEN_RUN'))
+  assert.deepEqual(reviewBefore.requires, ['--run', '--evidence', '--findings', '--packet', '--revision'])
+
+  assert.equal(greenRun(oracleDirectory, 'behavior').status, 0)
+  const after = JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout)
+  const reviewAfter = after.nextActions.find((entry) => entry.to === 'REVIEW_VERIFIED')
+  assert.deepEqual(reviewAfter.candidateRuns, ['r-003'])
+  assert.match(reviewAfter.example, /--run r-003 /)
+})
+
 test('O11: budget spend is counted once per distinct current change digest', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
   await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')

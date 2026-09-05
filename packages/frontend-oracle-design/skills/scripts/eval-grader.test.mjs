@@ -545,3 +545,55 @@ test('repeats that share or omit a replicateId remain DUPLICATE_CASE', async (t)
   )
   assert.deepEqual(JSON.parse(run(mixed, '--allow-partial').stdout).cases[0].failures, [{ code: 'DUPLICATE_CASE', count: 2 }])
 })
+
+test('variants are graded as separate arms and never pooled into one number', async (t) => {
+  const path = await tempFile(
+    t,
+    'variants.jsonl',
+    [
+      JSON.stringify({ ...passingRecord, variant: 'baseline', replicateId: 'r1' }),
+      JSON.stringify({ ...passingRecord, variant: 'baseline', replicateId: 'r2' }),
+      JSON.stringify({ ...passingRecord, variant: 'compressed', replicateId: 'r1', status: 'NEEDS_DECISION' }),
+      JSON.stringify({ ...passingRecord, variant: 'compressed', replicateId: 'r2' }),
+    ].join('\n'),
+  )
+
+  const report = JSON.parse(run(path, '--allow-partial').stdout)
+  assert.equal(report.total, 2)
+  const baseline = report.cases.find((entry) => entry.variant === 'baseline')
+  const compressed = report.cases.find((entry) => entry.variant === 'compressed')
+  assert.equal(baseline.pass, true)
+  assert.equal(compressed.pass, false)
+  assert.equal(compressed.passAtK, true)
+  assert.deepEqual(report.metrics.variants, {
+    baseline: { total: 1, passed: 1, routingPassed: 1 },
+    compressed: { total: 1, passed: 0, routingPassed: 0 },
+  })
+})
+
+test('unequal replicate counts stay visible in metrics.replicateCounts', async (t) => {
+  const second = {
+    ...passingRecord,
+    caseId: 'fod-bb-07',
+    risk: 'Medium',
+    lane: 'oracle',
+    status: 'NEEDS_DECISION',
+    loadedNodes: ['common', 'card-policy-sources', 'card-risk-grill', 'bva', 'card-format'],
+    labels: ['policy-gap', 'source-registry-fk'],
+  }
+  const path = await tempFile(
+    t,
+    'unequal.jsonl',
+    [
+      JSON.stringify({ ...passingRecord, replicateId: 'r1' }),
+      JSON.stringify({ ...passingRecord, replicateId: 'r2' }),
+      JSON.stringify({ ...second, replicateId: 'r1' }),
+      JSON.stringify({ ...second, replicateId: 'r2' }),
+      JSON.stringify({ ...second, replicateId: 'r3' }),
+    ].join('\n'),
+  )
+
+  const report = JSON.parse(run(path, '--allow-partial').stdout)
+  assert.deepEqual(report.metrics.replicateCounts, [2, 3])
+  assert.equal(report.metrics.replicatedCases, 2)
+})

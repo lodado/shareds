@@ -2681,60 +2681,101 @@ async function evidenceStatus(directory, state, ledger) {
 
 
 // 실행 패킷 — 다음 전이마다 "무엇이 이미 충족됐고, 무엇이 아직 없고, 어떤 run을 인용할 수 있는가"를 기계가
-// 계산한다. 모델이 Delivery 절차 전체를 다시 읽고 추론하는 대신 이 목록만 보고 한 걸음을 고른다. 판정은 여전히
-// transition이 한다: 여기서 ready=true여도 transition은 같은 검사를 다시 수행하고 실패할 수 있다.
-const TRANSITION_PACKETS = {
-  VALID_RED: {
-    requires: ['--run', '--evidence', '--row'],
-    runPredicate: isReportedFailingRun,
-    runKind: 'reported failing run',
-    readNodes: ['delivery-ledger', 'delivery-red'],
-  },
-  IMPLEMENTED_GREEN: {
-    requires: ['--run', '--evidence'],
-    runPredicate: isReportedPassingRun,
-    runKind: 'reported passing run',
-    readNodes: ['delivery-ledger', 'delivery-implementation-decision', 'delivery-green-review'],
-  },
-  REVIEW_VERIFIED: {
-    requires: ['--run', '--evidence', '--findings'],
-    runPredicate: isReportedPassingRun,
-    runKind: 'reported passing run',
-    readNodes: ['delivery-green-review', 'subagent-review', 'review-checklist'],
-  },
-  NEEDS_DECISION: { requires: ['--reason'], readNodes: [] },
-  ORACLE_READY: { requires: ['--reason'], readNodes: ['card-confirmation-lock'] },
-  FAIL: { requires: ['--reason'], readNodes: [] },
+// 계산한다. 모델이 Delivery 절차 전체를 다시 읽고 추론하는 대신 이 목록만 보고 한 걸음을 고른다. 안내는
+// transitionUnderLock이 실제로 요구하는 인자·게이트에서 파생해야 하며, 서로 다른 규칙 사본을 유지하지 않는다.
+// 판정은 여전히 transition이 한다: 여기서 ready=true여도 transition은 같은 검사를 다시 수행하고 실패할 수 있다.
+const PACKET_READ_NODES = {
+  VALID_RED: ['delivery-ledger', 'delivery-red'],
+  IMPLEMENTED_GREEN: ['delivery-ledger', 'delivery-implementation-decision', 'delivery-green-review'],
+  REVIEW_VERIFIED: ['delivery-green-review', 'subagent-review', 'review-checklist'],
+  NEEDS_DECISION: [],
+  ORACLE_READY: ['card-confirmation-lock'],
+  FAIL: [],
 }
 
-function transitionPackets({ state, directory, runEntries, staleRunIds, blockers, evidence }) {
-  const dir = portablePath(process.cwd(), directory)
+/** transitionUnderLock 1697–2000행이 실제로 검사하는 인자·전제와 같은 규칙으로 패킷 하나를 만든다. */
+function transitionPacket(to, { state, runEntries, staleRunIds, blockers, evidence }) {
+  const requires = []
+  const packetBlockers = []
+  let candidateRuns = []
   const stale = new Set(staleRunIds)
-  return (TRANSITIONS[state.state] ?? []).map((to) => {
-    const spec = TRANSITION_PACKETS[to]
-    const requires = [...spec.requires]
-    const packetBlockers = [...blockers]
-    let candidateRuns = []
-    if (spec.runPredicate) {
-      candidateRuns = runEntries
-        .filter((entry) => !stale.has(entry.runId) && spec.runPredicate(entry))
-        .map((entry) => entry.runId)
-      if (candidateRuns.length === 0) packetBlockers.push(`NO_FRESH_${spec.runKind === 'reported failing run' ? 'RED' : 'GREEN'}_RUN`)
-      if (evidence.status === 'pending' && evidence.missingRows?.length > 0 && !packetBlockers.includes('EVIDENCE_MISSING_ROWS')) {
-        packetBlockers.push('EVIDENCE_MISSING_ROWS')
+  // NEEDS_DECISION·FAIL은 유효한 state·lock과 --reason만 요구하는 탈출 전이다. 전역 evidence blocker를
+  // 상속하면 증거가 없을 때 쓰라고 있는 바로 그 전이를 잘못 잠근다. lock·ledger 손상만 물려받는다.
+  const escape = to === 'NEEDS_DECISION' || to === 'FAIL'
+  for (const code of blockers) {
+    if (escape && (code === 'EVIDENCE_MISSING_ROWS' || code.startsWith('EVIDENCE_'))) continue
+    packetBlockers.push(code)
+  }
+
+  if (escape) {
+    requires.push('--reason')
+  } else if (to === 'ORACLE_READY') {
+    // NEEDS_DECISION → ORACLE_READY 재개는 transitionUnderLock에서 non-escape라 --run이 필수고 --reason은 받지 않는다.
+    requires.push('--run')
+    const fresh = runEntries.filter((entry) => !stale.has(entry.runId) && isCompletedReportedRun(entry))
+    candidateRuns = fresh.map((entry) => entry.runId).reverse()
+  } else {
+    requires.push('--run', '--evidence')
+    const wantsFailing = to === 'VALID_RED'
+    const predicate = wantsFailing ? isReportedFailingRun : isReportedPassingRun
+    // 인용 가능한 run: 신선하고 보고서가 파싱된 run을 최신순으로 — 오래된 run을 예시로 권하지 않는다.
+    let entries = runEntries.filter((entry) => !stale.has(entry.runId) && predicate(entry))
+    if (to === 'REVIEW_VERIFIED') {
+      // GREEN 이후의 실제 재실행만 리뷰 인용이 가능하다 (REVIEW_RERUN_REQUIRED와 같은 규칙).
+      const greenEntry = lastEntryFor(state, 'IMPLEMENTED_GREEN')
+      if (greenEntry) {
+        entries = entries.filter((entry, index) => {
+          const position = runEntries.findIndex((candidate) => candidate.runId === entry.runId)
+          return index >= 0 && position >= greenEntry.runCount
+        })
       }
+    }
+    candidateRuns = entries.map((entry) => entry.runId).reverse()
+    if (candidateRuns.length === 0) packetBlockers.push(wantsFailing ? 'NO_FRESH_RED_RUN' : 'NO_FRESH_GREEN_RUN')
+    if (evidence.status === 'pending' && evidence.missingRows?.length > 0 && !packetBlockers.includes('EVIDENCE_MISSING_ROWS')) {
+      packetBlockers.push('EVIDENCE_MISSING_ROWS')
     }
     if (to === 'VALID_RED') {
       const refreshing = state.state === 'VALID_RED'
       const milestones = state.milestones ?? []
-      if (!refreshing && milestones.length > 0) requires.splice(requires.indexOf('--row'), 1)
+      if (refreshing || milestones.length === 0) requires.push('--row')
       if (refreshing && (state.budgets?.harness?.spent ?? 0) <= (state.harnessBudgetAtValidRed ?? 0)) {
         packetBlockers.push('HARNESS_BUDGET_REQUIRED')
       }
     }
-    if (to === 'REVIEW_VERIFIED' && state.risk === 'high') {
-      requires.push('--intersect', '--mutation-run', '--mutation-row')
+    if (to === 'IMPLEMENTED_GREEN') {
+      // ORACLE_READY에서 곧장 GREEN으로 가는 것은 VALID_RED 생략이므로 --reason이 함께 필수다.
+      if (state.state === 'ORACLE_READY') requires.push('--reason')
+      // 연속 통과 게이트: 같은 명령의 신선한 연속 통과가 부족하면 지금 인용해도 FLAKINESS_GATE다.
+      const required = REQUIRED_CONSECUTIVE_PASSES[state.risk] ?? 1
+      const satisfied = candidateRuns.some((runId) => {
+        try {
+          assertConsecutivePasses(state, runEntries, findRun(runEntries, runId))
+          return true
+        } catch {
+          return false
+        }
+      })
+      if (candidateRuns.length > 0 && !satisfied) packetBlockers.push(`FLAKINESS_GATE_${required}_CONSECUTIVE`)
     }
+    if (to === 'REVIEW_VERIFIED') {
+      requires.push('--findings', '--packet', '--revision')
+      if (state.risk === 'high') requires.push('--intersect', '--mutation-run', '--mutation-row')
+    }
+  }
+  return { requires, packetBlockers, candidateRuns }
+}
+
+function transitionPackets({ state, directory, runEntries, staleRunIds, blockers, evidence }) {
+  const dir = portablePath(process.cwd(), directory)
+  return (TRANSITIONS[state.state] ?? []).map((to) => {
+    const { requires, packetBlockers, candidateRuns } = transitionPacket(to, {
+      state,
+      runEntries,
+      staleRunIds,
+      blockers,
+      evidence,
+    })
     const example = [`oracle-run.mjs transition --dir ${dir} --to ${to}`]
     for (const flag of requires) {
       if (flag === '--run') example.push(`--run ${candidateRuns[0] ?? '<runId>'}`)
@@ -2746,7 +2787,7 @@ function transitionPackets({ state, directory, runEntries, staleRunIds, blockers
       blockers: [...new Set(packetBlockers)],
       requires,
       candidateRuns,
-      readNodes: spec.readNodes,
+      readNodes: PACKET_READ_NODES[to],
       example: example.join(' '),
     }
   })

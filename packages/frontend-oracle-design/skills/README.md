@@ -226,9 +226,13 @@ node skills/evals/grade-results.mjs --allow-partial <results.json|results.jsonl>
 됩니다. 블록이 없으면`NO_MACHINE_REPORT`오류로 실패합니다. sidecar`<out>.meta.json`에 model,
 prompt SHA-256, session id, exit code, 원본 자기보고가 남습니다.
 
-`--replicates <k>`는 같은 fixture를 k번 독립 실행해 `replicateId`(r1..rk)를 붙입니다. grader는
-replicate를 각각 채점해 모두 통과해야 case 통과(pass^k, `metrics.passAllK`)로 보고, 하나라도 통과한
-비율은 `metrics.passAtK`로 따로 냅니다. replicateId 없이 반복된 case는 여전히 `DUPLICATE_CASE`입니다.
+`--replicates <k>`는 같은 fixture를 k번 독립 실행해 `replicateId`(r1..rk)를 붙입니다. `--variant
+<name>`은 A/B 팔(예: baseline·compressed)을 표시합니다. grader의 채점 단위는 `(caseId, variant)`이며
+팔끼리는 절대 합산하지 않습니다(`metrics.variants`). 한 팔 안에서 replicate를 각각 채점해 모두
+통과해야 통과(pass^k, `metrics.passAllK`)로 보고, 하나라도 통과한 비율은 `metrics.passAtK`로 따로
+냅니다. 서로 다른 k는 `metrics.replicateCounts`로 드러나고, replicateId 없이 반복된 case는 여전히
+`DUPLICATE_CASE`입니다. 같은 `--repo` 작업 폴더를 반복 사용하므로 실행 간 오염 격리는 호출자
+책임입니다.
 
 ```bash
 node skills/evals/run-live.mjs --host claude --out results.jsonl --repo <대상 레포>
