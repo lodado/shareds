@@ -64,6 +64,43 @@ Abbreviated example:
 | O3  | P2     | pending     | server 5xx  | error+input kept | success UI, input lost     | successful save×0 | state: error   |
 ```
 
+## Open questions — Draft only
+
+A question that survives investigation does not wait in the conversation for an answer. It travels
+inside the Draft as a numbered Open question, and the Draft already carries the recommended answer
+as real rows. The user answers by choosing, not by composing: `yes` adopts every recommendation,
+`Q2=B` swaps one. Every disposition cell that depends on a question cites it first
+(`needs-decision: Q1 — <question>`).
+
+```markdown
+## Open questions
+
+### Q1 (P5) — duplicate click while pending — recommended A
+
+| Option | Given   | When        | Then         | Never       | Side effects   |
+| ------ | ------- | ----------- | ------------ | ----------- | -------------- |
+| A      | pending | click again | pending kept | second POST | POST×1 (total) |
+| B      | pending | click again | error toast  | second POST | POST×1 (total) |
+```
+
+Rules:
+
+- The recommended option is already a contract row under a provisional policy line —
+  `- P5: … (source: Q1 — recommended) (rows: O2)`. The alternatives live only in the question. The
+  sweep·deviations·frames are dispositioned as if the recommendation held, so `yes` changes no
+  disposition.
+- `Q*` is not a policy source. `oracle-verify.mjs card` rejects it as `policy-source-unregistered`,
+  which is exactly what keeps a Draft with an unanswered question from locking.
+- Resolution is mechanical. `yes`: replace each provisional source with the user's confirmation
+  source and delete the section. `Q2=B`: rewrite the row's cells from option B, re-disposition only
+  the cells that cited Q2, and re-confirm only if a new `needs-decision` appears. Any other edit is
+  a change request and re-confirms the whole card.
+- No answer, or an answer outside the listed options, is `NEEDS_DECISION` — never a default.
+- A question whose answer would change the lane, the actor, or the side-effect class of most rows
+  is not an Open question; ask it in a pre-Draft round per [`risk-grill.md`](risk-grill.md).
+- The section is empty at lock: `ORACLE_READY` requires that no `## Open questions` content remains
+  and no policy cites a `Q*` source.
+
 ## State Model — optional
 
 The default is to omit it. Even when there are async rows, the `O*` rows themselves are the
@@ -125,7 +162,8 @@ replaces the `O*`·`D*` row that owns a specific scenario outcome.
 
 The Draft passes three checks before it is shown to the user: a context-free read, five questions
 per row, and one synthesis. All three run on the Draft, and the Draft includes the interaction
-sweep and any Invariants — the reviewer attacks the sweep's `impossible` reasons too. After the lock, a repair is a new revision,
+sweep, any Invariants, and the Open questions with their candidate rows — the reviewer attacks the
+sweep's `impossible` reasons and the recommended options too. After the lock, a repair is a new revision,
 not a re-review, so this gate is the last cheap place to find a defect.
 
 ### 1. Cold read — a reader who was not in the conversation

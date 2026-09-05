@@ -17,6 +17,7 @@ const CARD_NODE_FILES = [
   'references/card/risk-grill.md',
   'references/card/card-format.md',
   'references/card/interaction-sweep.md',
+  'references/card/retro-metrics.md',
   'references/card/confirmation-lock.md',
 ]
 const DELIVERY_NODE_FILES = [
@@ -510,11 +511,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.39.0')
+  assert.equal(version, '0.40.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.39.0')
+  assert.equal(marketplace.version, '0.40.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -858,7 +859,7 @@ test('pins the system-design grill phases and the conditional API contract forma
   assert.match(skill, /phase order.*one-question-at-a-time/s)
   assert.match(oracleCard, /an earlier answer kills a later branch/)
   assert.match(oracleCard, /3~5 per round, at most 2 rounds/)
-  assert.match(oracleCard, /5 or fewer surviving questions remain after pruning, bundle the two rounds/)
+  assert.match(oracleCard, /5 or fewer\s+surviving questions remain after pruning, bundle the two rounds into the Draft itself/)
   assert.match(oracleCard, /RADIO framework/)
   assert.match(oracleCard, /Example Mapping/)
   assert.match(oracleCard, /frontend-system-design.*into P4·P5 questions/s)
@@ -1758,4 +1759,82 @@ test('keeps the boundary-value axes byte-identical with the sibling test skill',
   assert.equal(own, sibling, 'bva.md must stay byte-identical between frontend-oracle-design and test')
   assert.match(readme, /바이트 단위로 동일한 사본/)
   assert.match(readme, /사본을 없애지 말고/)
+})
+
+/** prettier가 산문을 다시 줄바꿈해도 살아남는 pin — 공백은 전부 `\s+`. */
+function loose(text) {
+  return new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'))
+}
+
+test('answers ride the Draft as Open questions so one confirmation resolves and approves the card', async () => {
+  const [skill, grill, format, sweep, lock] = await Promise.all([
+    read('SKILL.md'),
+    read('references/card/risk-grill.md'),
+    read('references/card/card-format.md'),
+    read('references/card/interaction-sweep.md'),
+    read('references/card/confirmation-lock.md'),
+  ])
+
+  // 질문은 초안 앞이 아니라 초안 안에 — 추천 옵션은 실제 행, 대안은 질문에만
+  assert.match(grill, loose('Round composition — Draft-first by default'))
+  assert.match(grill, loose('A pre-Draft round exists only when an earlier answer kills a later branch'))
+  assert.match(format, loose('## Open questions — Draft only'))
+  assert.match(format, loose('`yes` adopts every recommendation, `Q2=B` swaps one'))
+  assert.match(format, loose('(source: Q1 — recommended)'))
+  assert.match(format, loose('rejects it as `policy-source-unregistered`'))
+
+  // 해소는 기계적 — 새 needs-decision이 생길 때만 재확인, 무응답은 기본값이 아니라 NEEDS_DECISION
+  assert.match(format, loose('Resolution is mechanical'))
+  assert.match(format, loose('re-confirm only if a new `needs-decision` appears'))
+  assert.match(format, loose('is `NEEDS_DECISION` — never a default'))
+  assert.match(lock, loose('`yes` adopts every recommended option and approves the card'))
+  assert.match(lock, loose('No `## Open questions` content remains and no policy cites a `Q*` source'))
+  assert.match(sweep, loose('`needs-decision: Q1 — <question>`'))
+
+  // SKILL의 절차·불변식·보고가 같은 계약을 말한다
+  assert.match(skill, loose('a single `yes` both answers and confirms'))
+  assert.match(skill, loose('`Q<n>=<option>` swaps one option and re-confirms only if a new `needs-decision` appears'))
+  assert.match(skill, loose('- Turns <n> — user turns from the request to this state'))
+})
+
+test('records escapes as classes and run metrics as direction signals, never gates', async () => {
+  const [skill, retro, caseSpace, graphSource, review] = await Promise.all([
+    read('SKILL.md'),
+    read('references/card/retro-metrics.md'),
+    read('references/card/case-space.md'),
+    read('references/reference-graph.json'),
+    read('references/delivery/green-review.md'),
+  ])
+  const graph = JSON.parse(graphSource)
+  const node = graph.nodes.find((entry) => entry.id === 'card-retro-metrics')
+  const cardLane = graph.bundles.find((bundle) => bundle.id === 'card-lane')
+
+  // 스키마의 집은 하나 — escapes.jsonl 레코드, 교훈은 사례가 아니라 클래스
+  assert.match(retro, loose('## Escape record — `escapes.jsonl`'))
+  assert.match(
+    retro,
+    loose('`JUDGMENT_ERROR` · `DIMENSION_MISSING` · `INVARIANT_MISSING` · `POLICY_GAP` · `EVIDENCE_GAP` · `HARNESS_DEFECT`'),
+  )
+  assert.match(retro, loose('The class is the lesson; the symptom is evidence'))
+  assert.match(retro, loose('Re-classify by appending a new line, never by editing'))
+  assert.match(caseSpace, loose('is defined once in [`retro-metrics.md`](retro-metrics.md)'))
+
+  // 지표 다섯 — 게이트 아님, 소표본 경고
+  assert.match(retro, loose('## Metrics — direction signals, never gates'))
+  for (const metric of ['Escape Rate', 'Question Precision', 'Oracle Cost', 'Test Duplication', 'Turns to terminal']) {
+    assert.match(retro, new RegExp(`\\| ${metric} +\\|`), `retro-metrics.md must define ${metric}`)
+  }
+  assert.match(retro, loose('No metric moves a gate'))
+  assert.match(retro, loose('The first tens of cards cannot rank devices'))
+
+  // 그래프·번들·SKILL 산문이 같은 노드를 안다
+  assert.equal(node?.path, 'references/card/retro-metrics.md')
+  assert.deepEqual(node?.requires, ['common', 'card-case-space'])
+  assert.ok(cardLane?.nodes.includes('card-retro-metrics'), 'card-lane bundle must carry the retro node')
+  assert.match(skill, loose('card/retro-metrics.md'))
+
+  // 막힌 3라운드는 같은 문맥의 4번째 시도가 아니라 fresh 재파견이다
+  assert.match(review, loose('Round 3 never resumes the context that failed rounds 1 and 2'))
+  assert.match(review, loose("record `fresh-dispatch` in the round table's Next judgment"))
+  assert.match(review, loose('The product budget stays 3'))
 })

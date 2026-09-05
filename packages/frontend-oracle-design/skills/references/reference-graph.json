@@ -113,6 +113,12 @@
       "requires": ["common", "bva", "card-format"]
     },
     {
+      "id": "card-retro-metrics",
+      "path": "references/card/retro-metrics.md",
+      "when": "recording any defect found after the lock, and the run metrics at REVIEW_VERIFIED — read with the card lane so the escape classes are known before the sweep",
+      "requires": ["common", "card-case-space"]
+    },
+    {
       "id": "card-confirmation-lock",
       "path": "references/card/confirmation-lock.md",
       "when": "just before user confirmation·lock·init",
@@ -272,6 +278,7 @@
         "card-format",
         "card-interaction-sweep",
         "card-case-space",
+        "card-retro-metrics",
         "card-confirmation-lock"
       ]
     },

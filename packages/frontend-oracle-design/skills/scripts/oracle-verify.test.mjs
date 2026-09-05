@@ -3153,3 +3153,42 @@ test('case-space: 조합 프레임 50개 초과는 설계 실격선이다', asyn
   assert.equal(linted.status, 1)
   assert.match(linted.stderr, /case-space-too-wide: 64 combinable frames/)
 })
+
+test('a Draft with an Open question fails the lock on the provisional Q* source alone', async (t) => {
+  // 추천 옵션은 실제 행(O2)이고 정책은 Q1을 임시 출처로 인용한다 — 대안은 질문 절에만 산다
+  const draft = `${VALID_CARD.replace(
+    '- P1: 저장 중 추가 제출은 무시한다. (출처: S1) (행: O1, O2)',
+    '- P1: 저장 중 추가 제출은 무시한다. (출처: Q1 — recommended) (행: O1, O2)',
+  )}
+## Open questions
+
+### Q1 (P1) — duplicate click while pending — recommended A
+
+| Option | Given   | When      | Then         | Never        | Side effects |
+| ------ | ------- | --------- | ------------ | ------------ | ------------ |
+| A      | pending | 중복 클릭 | pending 유지 | 두 번째 POST | POST×1(총)   |
+| B      | pending | 중복 클릭 | 오류 토스트  | 두 번째 POST | POST×1(총)   |
+`
+
+  const linted = run('card', '--oracle', await cardFile(t, draft))
+
+  assert.equal(linted.status, 1)
+  assert.match(linted.stderr, /^CARD_LINT_FAILED: /)
+  assert.match(linted.stderr, /policy-source-unregistered: Q1 — recommended/)
+  // 질문 절 자체는 구조 결함이 아니다 — 출처 FK 하나만 막는다
+  const issues = linted.stderr.split('\n').filter((line) => /^\s+[a-z-]+:/.test(line))
+  assert.deepEqual(
+    issues.map((line) => line.trim().split(':')[0]),
+    ['policy-source-unregistered'],
+    linted.stderr,
+  )
+  // 거절은 다음 행동을 동봉한다
+  assert.match(linted.stderr, /\nnext: fix the card structure the issues name before the lock/)
+
+  // 해소 = 임시 출처를 확인 출처로 바꾸고 절을 지운다 — 그러면 통과
+  const resolved = draft
+    .replace('(출처: Q1 — recommended)', '(출처: user message Q-confirmation)')
+    .replace(/\n## Open questions[\s\S]*$/, '\n')
+  const relinted = run('card', '--oracle', await cardFile(t, resolved))
+  assert.equal(relinted.status, 0, relinted.stderr)
+})

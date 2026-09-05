@@ -117,6 +117,45 @@ class CliError extends Error {
   }
 }
 
+/** 거절 코드마다 다음 합법 행동 한 줄 — confirmation-lock.md·green-review.md의 처방과 같은 내용이다. */
+const NEXT_ACTIONS = {
+  CARD_LINT_FAILED: 'fix the card structure the issues name before the lock — never reword to bypass a check',
+  CARD_UNREADABLE: 'pass the locked oracle.md path with --oracle',
+  EVIDENCE_INVALID: 'regenerate with `evidence-scaffold` from the locked card and fill only the values',
+  EVIDENCE_MISSING_ROW: 'regenerate with `evidence-scaffold` — the row set diverged from the locked card',
+  EVIDENCE_UNKNOWN_ROW: 'regenerate with `evidence-scaffold` — the row set diverged from the locked card',
+  EVIDENCE_MISSING_PATH: 'name the [PATH*] test in evidence.json paths — a skipped path blocks GREEN like a skipped row',
+  EVIDENCE_MISSING_FRAME: 'name the covered frame case in evidence.json frames, or disposition the frame as independent()',
+  SEQUENCE_EVIDENCE_MISSING: 'map the fast-check sequence test in evidence.json sequence, or record why fast-check is unavailable',
+  EVIDENCE_OWNER_INVALID: 'match the evidence kind to the row tier — HARD→test, RELATIONAL→visual|pending, JUDGMENT→designer',
+  EVIDENCE_NOT_IN_RUN: 'attach the reporter (`--adapter node-test --report <path>`) and re-run; never invent a test name',
+  EVIDENCE_UNVERIFIABLE: 'the run is exit-only — re-run with `--adapter node-test --report <path>`',
+  EVIDENCE_PENDING: 'complete the pending visual evidence before REVIEW_VERIFIED — IMPLEMENTED_GREEN is the honest stop',
+  EVIDENCE_STALE: 'a frozen name changed after VALID_RED — spend the harness budget and record a new reported RED',
+  RED_EVIDENCE_MISSING: 'run the mapped test with the reporter so the failing name is recorded',
+  RED_EVIDENCE_UNVERIFIABLE: 'an exit-only or setup failure is not RED — re-run with the reporter and a failing mapped row',
+  RUN_NOT_FOUND: 'cite a runId that exists in runs.jsonl — run `exec` again if needed',
+  RUN_NOT_RED: 'the cited run must fail on the mapped row — write the test, run `red --row <row>`',
+  FINDINGS_INVALID: 'findings must use the six classifications and cite real card rows — regenerate the findings file',
+  FINDINGS_BLOCKING: 'fix the PRODUCT_DEFECT findings and re-verify, or route a POLICY_GAP to NEEDS_DECISION',
+  REVIEW_PACKET_STALE: 'regenerate `review-packet` — the input changed since the packet was built',
+  REVIEW_REVISION_MISMATCH: 'pass the targetRevision printed in review-input.json',
+  REVIEWER_NOT_INDEPENDENT: 'High risk needs two artifacts from different reviewerIds',
+  VISUAL_EVIDENCE_INVALID: 'the artifact must be a schema-v3 receipt inside the Oracle directory with matching digests',
+  NONDETERMINISM_FOUND: 'inject the source through a seam, or record `oracle:nondeterminism <reason>` next to the token',
+  ASSUMPTION_DRIFT: 're-run the landmine sweep for the drifted packages in a new revision — this is not a lock failure',
+  LOCK_INVALID: 'FAIL — the determinism judgment is impossible; do not substitute LLM judgment',
+  LEDGER_INVALID: 'do not edit runs.jsonl — recover from `oracle-run.mjs status --json`',
+}
+
+/** 인수 오류에는 처방이 없다. */
+const NO_NEXT_ACTION = new Set(['USAGE', 'INPUT_UNREADABLE'])
+
+function nextActionLine(code) {
+  if (NO_NEXT_ACTION.has(code) || !NEXT_ACTIONS[code]) return ''
+  return `next: ${NEXT_ACTIONS[code]}\n`
+}
+
 function parseOptions(args) {
   const options = { path: [], source: [] }
 
@@ -2089,6 +2128,6 @@ try {
   await main()
 } catch (error) {
   const cliError = error instanceof CliError ? error : new CliError('INPUT_UNREADABLE', error.message ?? String(error))
-  process.stderr.write(`${cliError.code}: ${cliError.message}\n`)
+  process.stderr.write(`${cliError.code}: ${cliError.message}\n${nextActionLine(cliError.code)}`)
   process.exitCode = cliError.exitCode
 }

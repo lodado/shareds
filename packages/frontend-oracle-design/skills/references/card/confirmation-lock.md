@@ -6,11 +6,16 @@ A new card or a revision whose meaning changed must pass the following serial ga
 by the user.
 
 1. Investigate the external standards and the existing revision without modifying production.
-2. Write the **Draft Oracle**, the semantic delta, and the open questions.
-3. Run the cold-read gate in [`card-format.md`](card-format.md) — a context-free read, the four
+2. Write the **Draft Oracle**, the semantic delta, and the Open questions — each with its candidate
+   rows and a recommendation, the Draft dispositioned under the recommended options
+   ([`card-format.md`](card-format.md)).
+3. Run the cold-read gate in [`card-format.md`](card-format.md) — a context-free read, the five
    questions, the single root and its first nail — and repair the Draft before showing it.
-4. Show the full card and the delta to the user and re-confirm.
-5. On approval, change `User Confirmation` to `approved` and record the actual response location.
+4. Show the full card and the delta to the user and ask for one confirmation: `yes` adopts every
+   recommended option and approves the card; `Q<n>=<option>` swaps one option. Resolution is
+   mechanical and needs no second confirmation unless it creates a new `needs-decision`.
+5. On approval, resolve the Open questions, change `User Confirmation` to `approved`, and record the
+   actual response location.
 6. On a modification request, fix the Draft and re-confirm.
 7. On no response·policy conflict, `NEEDS_DECISION`.
 
@@ -148,6 +153,7 @@ node <skill-dir>/scripts/oracle-run.mjs init \
 - Every policy has an accepted source
 - `User Confirmation` is `approved` and has the actual user response location that approved the new
   card or the semantic delta
+- No `## Open questions` content remains and no policy cites a `Q*` source
 - The UI visual scope is recorded, and for `local`·`identity-shaping` the approved Design Intent and
   the `Never`·source·evidence tier of every `D*` row are complete
 - For `local`·`identity-shaping`, the explicit user answer location of the Design Change

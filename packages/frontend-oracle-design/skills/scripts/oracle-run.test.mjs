@@ -3109,3 +3109,20 @@ test('O16: state events form a replayable digest chain without lost budget histo
   assert.equal(report.currentState, 'NEEDS_DECISION')
   assert.equal(report.ledgerStatus.headDigest, events.at(-1).digest)
 })
+
+test('a rejection prints the next legal action after the code line', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-next-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+
+  // 코드 줄은 그대로 첫 줄 — 기존 `^CODE: ` 단언이 깨지지 않는다
+  const rejected = run(['status', '--dir', join(root, 'not-an-oracle'), '--json'])
+  assert.equal(rejected.status, 1)
+  assert.match(rejected.stderr, /^STATE_INVALID: /)
+  assert.match(rejected.stderr, /\nnext: run `init` if this oracle never entered Delivery/)
+
+  // 인수 오류에는 처방이 없다 — 상태 조회 안내가 오해를 낳는다
+  const usage = run(['no-such-command'])
+  assert.equal(usage.status, 2)
+  assert.match(usage.stderr, /^USAGE: /)
+  assert.doesNotMatch(usage.stderr, /\nnext: /)
+})

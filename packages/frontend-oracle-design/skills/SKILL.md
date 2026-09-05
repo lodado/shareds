@@ -56,8 +56,10 @@ Lane routing:
 - Production code, existing tests, and browser observation are investigation evidence, not policy
   sources. Unresolved policy is `POLICY_GAP` → `NEEDS_DECISION`.
 - New cards and semantically changed revisions are re-confirmed with the user via the Draft Oracle
-  and its delta. Before that confirmation: no lint, lock, tests, or production edits. A policy
-  change is a new revision, never an in-place edit of a locked file.
+  and its delta. The Draft carries every surviving question as an Open question with candidate rows
+  and a recommendation, so a single `yes` both answers and confirms; a question never goes out ahead
+  of the card unless its answer kills a branch. Before that confirmation: no lint, lock, tests, or
+  production edits. A policy change is a new revision, never an in-place edit of a locked file.
 - Lint the card with `scripts/oracle-verify.mjs card`, then lock it with `scripts/oracle-lock.mjs`.
   The revision lock is auto-verified immediately before each stage. No relocking to pass a
   mismatch.
@@ -112,6 +114,8 @@ Whether to skip a load is not a judgment call. The read instructions inlined int
   rows and before showing the Draft, the disposition sweep of new×inherited×runtime interactions,
   [`card/case-space.md`](references/card/case-space.md) — declaring the dimension space and
   dispositioning the machine-generated frames of `scripts/oracle-frames.mjs`,
+  [`card/retro-metrics.md`](references/card/retro-metrics.md) — the escape record written for any
+  defect found after the lock and the run metrics recorded at `REVIEW_VERIFIED`, neither a gate,
   [`card/confirmation-lock.md`](references/card/confirmation-lock.md).
 - Delivery: right after entering Delivery, explicitly load and invoke the installed `$test` skill
   by name; [`delivery/ledger.md`](references/delivery/ledger.md),
@@ -188,13 +192,16 @@ When only cards, requirements, policy decisions, or test contracts are requested
    [`card/card-format.md`](references/card/card-format.md)·
    [`card/interaction-sweep.md`](references/card/interaction-sweep.md)·
    [`card/case-space.md`](references/card/case-space.md) → write the **Draft Oracle**
-   with the needed Grill questions and BVA, then fill the interaction sweep, declare the Case
-   space, run `scripts/oracle-frames.mjs --oracle` and disposition every emitted frame — every
-   `needs-decision` cell or frame becomes a grill question. Follow the phase order (outcome →
-   risk → data·architecture → API → concurrency·async → state → visual → performance·ops); if the
-   user asks for a one-question-at-a-time interview, run it without a round cap.
-8. Show existing revisions as a semantic delta and new cards in full with open questions, then
-   explicitly re-confirm.
+   with every surviving Grill question as an Open question — candidate rows plus a
+   recommendation — and BVA, then fill the interaction sweep, declare the Case space, run
+   `scripts/oracle-frames.mjs --oracle` and disposition every emitted frame under the recommended
+   options — every `needs-decision` cell or frame cites an Open question. Follow the phase order
+   (outcome → risk → data·architecture → API → concurrency·async → state → visual →
+   performance·ops); a question goes out ahead of the Draft only when its answer kills a branch,
+   and if the user asks for a one-question-at-a-time interview, run it without a round cap.
+8. Show existing revisions as a semantic delta and new cards in full with their Open questions,
+   then ask for one confirmation: `yes` adopts every recommendation and approves the card;
+   `Q<n>=<option>` swaps one option and re-confirms only if a new `needs-decision` appears.
 9. Before showing the Draft, run the cold-read gate: hand the card bytes alone to a context-free
    reviewer, apply the five questions per row, and collapse both into one root plus the first nail
    that falsifies it cheapest. Drive that nail. Then record the approval's location in
@@ -338,5 +345,6 @@ Blocked: <code> — <what it prevents> · <what would clear it>
 - Row mapping <O*/D* → test name>
 - Transitions <...> — last state <...>
 - Budgets policy <n>/2 · harness <n>/2 · product <n>/3 · ENV_DRIFT <presence>
+- Turns <n> — user turns from the request to this state
 - Last verify <command> exit <n>
 ```

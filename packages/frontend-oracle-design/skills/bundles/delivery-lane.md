@@ -1136,6 +1136,14 @@ At most 3 rounds. One round:
 5. Run the impact-scope tests.
 6. Classify the result and decide the next action.
 
+Round 3 never resumes the context that failed rounds 1 and 2. Dispatch a fresh implementer — a
+subagent that receives only the locked card, the failing run output, the current diff, and the
+Implementation Decision, on a more capable tier when the surface offers one — and record
+`fresh-dispatch` in the round table's Next judgment. A loop that survives two same-context rounds
+usually means the implementer cannot see its own problem; the third round buys fresh eyes, not a
+third attempt at the same reading. The product budget stays 3: the dispatch is round 3, not an
+extra round.
+
 The canonical definition of classification·routing is the feedback routing in
 [`common.md`](../common.md). Special rules for this stage:
 

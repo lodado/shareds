@@ -60,13 +60,18 @@ Pruning:
   the card rows and present it together with the Draft Oracle; on explicit approval, register it as
   a `project-constraint` source and lock it together. Without approval, `NEEDS_DECISION`.
 
-Round composition: Round 1 = surviving P1~P3 questions, Round 2 = surviving P4~P7 questions. **When
-5 or fewer surviving questions remain after pruning, bundle the two rounds and throw them at once**
-— the only reason to split rounds is that an earlier answer kills a later branch, and with no branch
-to kill it only adds round trips. However, do not bundle when the content of a later phase question
-itself depends on an earlier answer. When the user explicitly requests a one-question-at-a-time
-interview (e.g. "grill me"), proceed in phase order without a round cap, for Design-only
-investigation only. Policy questions during Delivery still follow the 2 rounds of
+Round composition — Draft-first by default. A surviving question does not go out ahead of the card:
+it rides the Draft Oracle as an **Open question** ([`card-format.md`](card-format.md)) carrying its
+candidate rows and the recommendation, and the Draft is fully dispositioned under the recommended
+options, so one user turn resolves every question and confirms the card at once. The recommendation
+carried by the Draft is still not a decision until the user's reply adopts it. **A pre-Draft round
+exists only when an earlier answer kills a later branch** — a P1·P2 answer that changes the risk
+lane, the actor, or the side-effect class so much that drafting both branches is wasted work. Then
+Round 1 = those surviving P1~P3 questions and Round 2 = surviving P4~P7 questions; when 5 or fewer
+surviving questions remain after pruning, bundle the two rounds into the Draft itself. Splitting
+rounds with no branch to kill only adds round trips. When the user explicitly requests a
+one-question-at-a-time interview (e.g. "grill me"), proceed in phase order without a round cap, for
+Design-only investigation only. Policy questions during Delivery still follow the 2 rounds of
 `oracle-run.mjs budget`.
 
 At the end of each round, append the questions·answers·whether the recommendation was adopted and

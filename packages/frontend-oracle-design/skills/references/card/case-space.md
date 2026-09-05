@@ -162,7 +162,9 @@ The exploration phase and `I*` invariants judge those, and every escape feeds th
 or the runtime question bank via the escaped-bug retro. Record each escape as one line of
 `.ai/oracles/<id>/escapes.jsonl` with `kind` either `mis-disposition` (an existing cell, frame,
 or `Touches` claim was judged wrong — name it) or `undeclared-dimension` (name the family,
-dimension, and choices to add). The ratio between the two kinds is the standing verdict on this
+dimension, and choices to add). The full record — `class`, `detected_after`,
+`should_have_been_caught_by`, `correction` — is defined once in
+[`retro-metrics.md`](retro-metrics.md). The ratio between the two kinds is the standing verdict on this
 section: `undeclared-dimension` escapes grow the taxonomy, while a run of `mis-disposition`
 escapes means dispositions have gone mechanical — narrow the `Touches` citations before adding
 process.

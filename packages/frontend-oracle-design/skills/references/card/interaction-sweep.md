@@ -51,7 +51,9 @@ Exactly three dispositions:
 - `impossible: <reason>` — the pair cannot interact. The reason names the mechanism (no shared
   state·DOM·scroll·cache·timing), never a likelihood guess.
 - `needs-decision: <question>` — the interaction changes the outcome and no row owns it. Promote to
-  a grill question or red card; never resolve it with a default. A `needs-decision` cell that
+  a grill question or red card; never resolve it with a default. When the question rides the Draft
+  as an Open question ([`card-format.md`](card-format.md)), cite its id first:
+  `needs-decision: Q1 — <question>`. A `needs-decision` cell that
   survives to lock time means the card ends `NEEDS_DECISION`, not `ORACLE_READY` — resolve it to
   `covered` or `impossible` via the user's answer first.
 

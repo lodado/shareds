@@ -113,6 +113,60 @@ class CliError extends Error {
   }
 }
 
+/** 거절 코드마다 다음 합법 행동 한 줄 — green-review.md·red.md·ledger.md의 처방 표와 같은 내용이다. */
+const NEXT_ACTIONS = {
+  ORACLE_CHANGED: 'discard the RED·GREEN·review evidence, show the card diff, and return to NEEDS_DECISION — never relock',
+  SOURCE_CHANGED: 'discard the evidence, show the source diff, and confirm a new revision — never relock',
+  LOCK_MANIFEST_CHANGED: 'discard the evidence and confirm a new revision with the changed source set — never relock',
+  LOCK_INVALID: 'FAIL — the determinism judgment is impossible; do not substitute LLM judgment',
+  RUN_NOT_GREEN: 'produce an actually passing run with `exec --label <label>` and cite that runId',
+  RUN_NOT_RED: 'the cited run must fail on the mapped row — write the test, run `red --row <row>`',
+  EVIDENCE_REQUIRED: 'generate `oracle-verify.mjs evidence-scaffold --oracle <card> > evidence.json`, fill the slots, pass --evidence',
+  EVIDENCE_MISSING_ROWS: 'regenerate the scaffold from the locked card and fill only the values',
+  EVIDENCE_NOT_IN_RUN: 'attach the reporter (`--adapter node-test --report <path>`) and re-run; never invent a test name',
+  EVIDENCE_UNVERIFIABLE: 'the run is exit-only — re-run with `--adapter node-test --report <path>`',
+  RED_EVIDENCE_MISSING: 'run the mapped test with `--adapter node-test --report <path>` so the failing name is recorded',
+  RED_EVIDENCE_UNVERIFIABLE: 'an exit-only or setup failure is not RED — re-run with the reporter and a failing mapped row',
+  REQUIRED_RUN_MISSING: 're-run every declared required label with `exec --label <label>` and cite the latest pass',
+  FLAKINESS_GATE: 're-run the same command unchanged until consecutive passes reach the risk count; a failure is HARNESS_DEFECT',
+  TEST_WEAKENED: 'restore the tests to the RED baseline — assertion count, expected-value literals, no forbidden tokens',
+  PRODUCTION_TOUCHED_BEFORE_RED: 'revert the production files, write the tests first, record VALID_RED with `red`',
+  HARNESS_BUDGET_REQUIRED: '`budget --spend harness --reason ...`, then a new reported RED→GREEN with the changed harness bytes',
+  HARNESS_RED_REQUIRED: 'run a new reported RED→GREEN with the changed harness bytes',
+  MILESTONE_RED_MISSING: 'run a reported `red:<name>` for every milestone before the global VALID_RED',
+  MUTATION_EVIDENCE_REQUIRED: 'after GREEN, run the guard-removed failing run, restore, re-GREEN, and pass --mutation-run/--mutation-row',
+  MUTATION_EVIDENCE_INVALID: 'the mutation must fail on the mapped row and the production digest must return exactly before review',
+  REVIEW_PACKET_REQUIRED: 'generate `review-packet` and hand the reviewer its path',
+  REVIEW_PACKET_STALE: 'the input changed since the packet — regenerate `review-packet`, never edit it',
+  REVIEW_RERUN_REQUIRED: 're-run the GREEN command after applying findings and cite the new run',
+  SNAPSHOT_STALE: 'bytes changed since GREEN — re-run the required labels and cite the new runs',
+  REVIEW_RUN_STALE: 're-run the cited command against the current bytes',
+  FINDINGS_BLOCKING: 'fix the PRODUCT_DEFECT findings and re-verify, or route a POLICY_GAP to NEEDS_DECISION',
+  FINDINGS_INVALID: 'findings must use the six classifications and cite real card rows — regenerate the findings file',
+  REVIEWER_NOT_INDEPENDENT: 'High risk needs two artifacts from different reviewerIds',
+  BUDGET_EXHAUSTED: 'report FAIL with the last actual failure — never route around via another budget',
+  TRANSITION_NOT_ALLOWED: 'run `status --json` and take one of nextLegalActions',
+  STATE_INVALID: 'run `init` if this oracle never entered Delivery; otherwise do not edit state files — recover from the ledger with `status --json`',
+  STATE_LEDGER_DIVERGENCE: 'do not edit state files — run `status --json` and recover from the ledger',
+  ADAPTER_COMMAND_INVALID: 'drop the --test-reporter arguments — `--adapter node-test` injects the reporter itself',
+  REPORT_MISSING: 'pass `--report <path>` and let the adapter write it',
+  REPORT_STALE: 'the report predates the run — re-run with a fresh --report path',
+  REPORT_PATH_EXISTS: 'choose a new --report path; an existing file cannot vouch for this run',
+  RUN_ARTIFACTS_EXIST: 'a new revision gets a new <oracle-id> directory — never re-init to reset the baseline',
+  ORACLE_DIR_INVALID: 'pass --dir as <repository>/.ai/oracles/<oracle-id> — an existing directory inside the scan root',
+}
+
+/** 인수 오류에는 처방이 없다 — 상태 조회 안내도 오해를 낳는다. */
+const NO_NEXT_ACTION = new Set(['USAGE', 'INPUT_UNREADABLE'])
+
+function nextActionLine(code, options) {
+  if (NO_NEXT_ACTION.has(code)) return ''
+  if (NEXT_ACTIONS[code]) return `next: ${NEXT_ACTIONS[code]}\n`
+  let directory = ''
+  if (options?.dir) directory = ` --dir ${options.dir}`
+  return `next: run \`oracle-run.mjs status${directory} --json\` and take one of nextLegalActions\n`
+}
+
 function parseOptions(args) {
   const options = { command: null, requiredLabels: [], harnessPaths: [], milestones: [], reviewPoints: [] }
 
@@ -2765,6 +2819,12 @@ try {
   await main()
 } catch (error) {
   const cliError = error instanceof CliError ? error : new CliError('INPUT_UNREADABLE', error.message ?? String(error))
-  process.stderr.write(`${cliError.code}: ${cliError.message}\n`)
+  let dirOption
+  try {
+    dirOption = parseOptions(process.argv.slice(3)).dir
+  } catch {
+    dirOption = undefined
+  }
+  process.stderr.write(`${cliError.code}: ${cliError.message}\n${nextActionLine(cliError.code, { dir: dirOption })}`)
   process.exitCode = cliError.exitCode
 }
