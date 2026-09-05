@@ -138,6 +138,9 @@ test('grader compares expected route when the corpus declares one', async (t) =>
         'card-risk-grill',
         'bva',
         'card-format',
+        'card-interaction-sweep',
+        'card-case-space',
+        'card-retro-metrics',
         'card-confirmation-lock',
         'delivery-ledger',
         'delivery-red',
@@ -145,6 +148,7 @@ test('grader compares expected route when the corpus declares one', async (t) =>
         'types-state-ladder',
         'types-authoring',
         'types-api-surface',
+        'types-advanced-contracts',
         'changeability',
         'frontend-quality',
         'delivery-green-review',
@@ -415,4 +419,41 @@ test('full corpus mode rejects missing and duplicate case results', async (t) =>
   assert.equal(duplicate.status, 1)
   const duplicateReport = JSON.parse(duplicate.stdout)
   assert.deepEqual(duplicateReport.cases[0].failures, [{ code: 'DUPLICATE_CASE', count: 2 }])
+})
+
+const noDecisionResult = {
+  caseId: 'fod-bb-07',
+  risk: 'Medium',
+  lane: 'oracle',
+  status: 'NEEDS_DECISION',
+  loadedNodes: ['common', 'card-policy-sources', 'card-risk-grill', 'bva', 'card-format', 'visual-design'],
+  ceremony: [],
+  labels: ['card-lint', 'policy-gap', 'design-confirmation'],
+  policyInvention: false,
+  falseReviewVerified: false,
+  toolCalls: 1,
+  tokens: 10,
+  runtimeMs: 20,
+  errors: [],
+}
+
+test('a declared node exception is tolerated in the result but any other extra node still fails', async (t) => {
+  const tolerated = await tempFile(
+    t,
+    'tolerated.json',
+    JSON.stringify({ ...noDecisionResult, loadedNodes: [...noDecisionResult.loadedNodes, 'card-interaction-sweep'] }),
+  )
+  const toleratedRun = run(tolerated, '--allow-partial')
+  assert.deepEqual(JSON.parse(toleratedRun.stdout).cases[0].failures, [])
+
+  const extra = await tempFile(
+    t,
+    'extra.json',
+    JSON.stringify({ ...noDecisionResult, loadedNodes: [...noDecisionResult.loadedNodes, 'fsd'] }),
+  )
+  const extraRun = run(extra, '--allow-partial')
+  assert.deepEqual(
+    JSON.parse(extraRun.stdout).cases[0].failures.map((failure) => failure.code),
+    ['LOADED_NODES_MISMATCH'],
+  )
 })

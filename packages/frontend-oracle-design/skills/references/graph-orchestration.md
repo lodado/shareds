@@ -26,8 +26,8 @@ graph verifier cannot be found, `FAIL` instead of falling back to sequential exe
   the decision, and the error, normalizing a nullable decision/error explicitly.
 - `ENVIRONMENT_DEFECT` and `NON_ORACLE_OPINION` remain finding classifications only and are not
   graph labels. An environment defect leaves the reason in the ledger and is reported as `FAIL`, and
-  a review verdict that leaves only opinions is normalized by `review-finalize` to
-  `REVIEW_ACCEPTED`.
+  a review verdict that leaves only opinions is normalized by `review-finalize-standard` or
+  `review-finalize-high` to `REVIEW_ACCEPTED`.
 - `valid-red` classifies `VALID_RED` only after recording
   `oracle-run.mjs transition --to VALID_RED`. `ALREADY_SATISFIED` does not go back to draft but
   performs only the zero-production verification of the existing implementation evidence at
@@ -54,9 +54,11 @@ graph verifier cannot be found, `FAIL` instead of falling back to sequential exe
   `oracle-run.mjs review-receipt` for both High-risk findings to create two ledger-bound receipts
   containing `packetSha256`, `targetRevision`, `role`, `taskId`, `outputSha256`, `reviewerId`,
   `findingsSha256`, `previousDigest`, and `digest`. The new run record and the receipts state the
-  locked `oracleSha256` and `adapter: node-test`. `review-finalize` verifies and records the
-  receipts and the findings first, and performs the final verification and the `REVIEW_VERIFIED`
-  transition only on accepted findings. An actual error from a receipt command propagates as `FAIL`,
+  locked `oracleSha256` and `adapter: node-test`. Finalization is split by route so the receipt
+  contract is executable on each: `review-finalize-standard` records and verifies the one primary
+  receipt it was given, `review-finalize-high` verifies and records the two ledger-bound receipts
+  the join produced plus the intersection rule, and neither substitutes for the other. Each performs
+  the final verification and the `REVIEW_VERIFIED` transition only on accepted findings. An actual error from a receipt command propagates as `FAIL`,
   and BLOCKED goes to `evidence-repair`.
 - The graph `maxSteps` is only a runaway ceiling and does not replace the `oracle-run.mjs budget`
   adjudication.

@@ -309,6 +309,54 @@ export function validateGraph(graph) {
     }
   }
 
+  // Reaching an ancestor is not enough: one run takes one route, and a repair loop makes almost
+  // every node an ancestor of every other. A field counts as available only when EVERY incoming
+  // route carries it — the must-available fixpoint below — so a sibling branch's producer can no
+  // longer stand in for a field this route never carries. A join waits for all of its predecessors,
+  // so it unions them instead, and a fallback target is reachable from anywhere and keeps the
+  // looser ancestor rule above.
+  const outputsOf = (id) => (isStringArray(nodeById.get(id)?.output) ? nodeById.get(id).output : [])
+  const universe = new Set(contextFields)
+  for (const id of nodeById.keys()) for (const field of outputsOf(id)) universe.add(field)
+  const routeAvailable = new Map(
+    [...nodeById.keys()].map((id) => [id, id === graph.entry ? new Set(contextFields) : new Set(universe)]),
+  )
+  const exiting = (id) => new Set([...routeAvailable.get(id), ...outputsOf(id)])
+  for (let pass = 0; pass < nodeById.size + 2; pass += 1) {
+    let changed = false
+    for (const [id, node] of nodeById) {
+      if (id === graph.entry) continue
+      const sources = reverseAdjacency.get(id) ?? []
+      const next = new Set(contextFields)
+      if (node.kind === 'join' || fallbackTargets.includes(id)) {
+        for (const source of sources) for (const field of exiting(source)) next.add(field)
+      } else if (sources.length > 0) {
+        const [first, ...rest] = sources.map(exiting)
+        for (const field of first) {
+          if (rest.every((fields) => fields.has(field))) next.add(field)
+        }
+      }
+      const current = routeAvailable.get(id)
+      if (next.size !== current.size || [...next].some((field) => !current.has(field))) {
+        routeAvailable.set(id, next)
+        changed = true
+      }
+    }
+    if (!changed) break
+  }
+
+  for (const node of nodeById.values()) {
+    if (!isStringArray(node.input) || fallbackTargets.includes(node.id)) continue
+    for (const field of node.input) {
+      if (!routeAvailable.get(node.id).has(field)) {
+        addIssue(
+          'NODE_INPUT_UNSATISFIED_ON_ROUTE',
+          `${node.id}: input ${field} is not produced on every incoming route`,
+        )
+      }
+    }
+  }
+
   for (const source of nodes.filter((node) => isRecord(node) && node.dispatch === 'all')) {
     const targets = (outgoing.get(source.id) ?? [])
       .map(({ to }) => nodeById.get(to))

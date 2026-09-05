@@ -365,3 +365,46 @@ test('CLI verifies a graph and deterministically selects the next node', async (
   assert.equal(next.status, 0, next.stderr)
   assert.deepEqual(JSON.parse(next.stdout), { node: 'plan', next: ['implement'] })
 })
+
+function branchedGraph() {
+  const base = graph()
+  base.nodes.push({
+    id: 'audit',
+    kind: 'agent',
+    owner: 'auditor',
+    task: 'Audit the plan and issue a receipt.',
+    input: ['plan'],
+    output: ['status', 'artifacts', 'receipt'],
+    writeScope: [],
+    dispatch: 'one',
+  })
+  base.edges.push(
+    { from: 'plan', to: 'audit', when: { field: 'status', equals: 'audit' } },
+    { from: 'audit', to: 'review', when: { field: 'status', equals: 'success' } },
+    { from: 'audit', to: 'failed', when: { field: 'status', equals: 'failure' } },
+  )
+  base.nodes.find((node) => node.id === 'review').input = ['artifacts', 'receipt']
+  return base
+}
+
+test('rejects an input that only a sibling branch produces, per incoming route', () => {
+  assert.throws(
+    () => validateGraph(branchedGraph()),
+    (error) =>
+      error instanceof GraphValidationError &&
+      error.issues.some(
+        ({ code, message }) =>
+          code === 'NODE_INPUT_UNSATISFIED_ON_ROUTE' && message.includes('receipt'),
+      ),
+  )
+})
+
+test('a join may still collect its inputs from separate branches', () => {
+  const base = branchedGraph()
+  const review = base.nodes.find((node) => node.id === 'review')
+  review.kind = 'join'
+  review.join = 'all'
+  delete review.owner
+
+  assert.equal(validateGraph(base).id, 'sample')
+})

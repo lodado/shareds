@@ -89,7 +89,7 @@ test('runs the Oracle contract through the bundled deterministic workflow graph'
     'pre-ledger-stop',
     'cancelled',
   ])
-  assert.equal(graph.nodes.length, 19)
+  assert.equal(graph.nodes.length, 20)
   assert.equal(verified.status, 0, verified.stderr)
   assert.equal(verified.stdout, 'GRAPH_VALID frontend-oracle-design\n')
 })
@@ -112,8 +112,9 @@ test('routes already-satisfied red, standard one-review and high two-review path
     'secondary-review',
   ])
   assert.deepEqual(selectTransitions(graph, 'primary-review', { classification: 'STANDARD_READY' }), [
-    'review-finalize',
+    'review-finalize-standard',
   ])
+  assert.deepEqual(selectTransitions(graph, 'high-review-join', { status: 'READY' }), ['review-finalize-high'])
   assert.deepEqual(selectTransitions(graph, 'primary-review', { classification: 'STANDARD_BLOCKED' }), [
     'evidence-repair',
   ])
@@ -173,9 +174,17 @@ test('routes already-satisfied red, standard one-review and high two-review path
     node('high-review-join').task,
     /packetSha256.*targetRevision.*previousDigest.*digest.*adapter node-test.*oracleSha256/s,
   )
-  assert.deepEqual(node('review-finalize').input.slice(-2), ['reviewReceiptA', 'reviewReceiptB'])
-  assert.match(node('review-finalize').task, /standard finding.*oracle-run\.mjs review-receipt/s)
-  assert.match(node('review-finalize').task, /REVIEW_ACCEPTED.*REVIEW_VERIFIED/s)
+  // Standard finalization records one controller-issued receipt; only High takes the two
+  // ledger-bound receipts the join produced, so the Standard route cannot borrow them.
+  assert.deepEqual(node('review-finalize-standard').input, ['oraclePath', 'oracleSha256', 'findings'])
+  assert.equal(node('review-finalize-standard').input.includes('reviewReceiptA'), false)
+  assert.match(node('review-finalize-standard').task, /single primary finding.*oracle-run\.mjs review-receipt/s)
+  assert.deepEqual(node('review-finalize-high').input.slice(-2), ['reviewReceiptA', 'reviewReceiptB'])
+  assert.match(node('review-finalize-high').task, /intersection rule/)
+  for (const id of ['review-finalize-standard', 'review-finalize-high']) {
+    assert.match(node(id).task, /REVIEW_ACCEPTED.*REVIEW_VERIFIED/s)
+    assert.deepEqual(selectTransitions(graph, id, { classification: 'REVIEW_VERIFIED' }), ['review-verified'])
+  }
 
   for (const source of graph.nodes.filter((candidate) => candidate.output?.includes('classification'))) {
     if (!/\bFAIL\b/.test(source.task)) continue
@@ -208,7 +217,10 @@ test('owns repeated failure routes with fallback rules that node edges still ove
   )
   // valid-red keeps its HARNESS_DEFECT self-loop as a node edge that beats the fallback rule.
   assert.deepEqual(selectTransitions(graph, 'valid-red', { classification: 'HARNESS_DEFECT' }), ['valid-red'])
-  assert.deepEqual(selectTransitions(graph, 'review-finalize', { classification: 'HARNESS_DEFECT' }), [
+  assert.deepEqual(selectTransitions(graph, 'review-finalize-standard', { classification: 'HARNESS_DEFECT' }), [
+    'evidence-repair',
+  ])
+  assert.deepEqual(selectTransitions(graph, 'review-finalize-high', { classification: 'HARNESS_DEFECT' }), [
     'evidence-repair',
   ])
   assert.deepEqual(selectTransitions(graph, 'implement-green', { classification: 'PRODUCT_DEFECT' }), [
@@ -224,7 +236,7 @@ test('owns repeated failure routes with fallback rules that node edges still ove
     for (const label of ['ENVIRONMENT_DEFECT', 'NON_ORACLE_OPINION']) {
       // review-finalize is the only node allowed to name one, and only to say it normalizes an
       // opinion-only verdict away instead of routing on it.
-      if (source.id === 'review-finalize' && label === 'NON_ORACLE_OPINION') continue
+      if (source.id.startsWith('review-finalize') && label === 'NON_ORACLE_OPINION') continue
       assert.doesNotMatch(source.task, new RegExp(label))
     }
   }
@@ -511,11 +523,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.42.0')
+  assert.equal(version, '0.43.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.42.0')
+  assert.equal(marketplace.version, '0.43.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -1899,7 +1911,12 @@ test('extends machine derivation past the card bytes: witnesses, evidence lookup
 
   // hook은 가속기, 게이트가 권위
   const hookConfig = JSON.parse(hooks)
-  assert.equal(hookConfig.hooks.PreToolUse[0].matcher, 'Write|Edit|MultiEdit')
+  assert.equal(hookConfig.hooks.PreToolUse[0].matcher, 'Write|Edit|MultiEdit|NotebookEdit')
+  assert.match(readme, loose('### Hook이 사전 차단하는 것과 게이트만 보는 것'))
+  assert.match(readme, loose('`evals/run-live.mjs`가 그 결과 artifact를 실제 CLI 실행으로 만듭니다'))
+  assert.match(readme, loose('held-out은 grader가 점수 매기지 않습니다'))
+  assert.match(readme, loose('| Bash `rm`·`mv`·`sed -i`·heredoc 쓰기 | 게이트 | 게이트 |'))
+  assert.match(readme, /"oracleGuard":"unjudged"/)
   assert.match(hookConfig.hooks.PreToolUse[0].hooks[0].args[0], /oracle-guard-hook\.mjs$/)
   assert.match(red, loose('the transition gate stays the authority'))
   assert.match(skill, loose('hosts without hooks rely on it alone'))

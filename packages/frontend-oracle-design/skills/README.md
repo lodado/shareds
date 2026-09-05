@@ -61,7 +61,7 @@ routingAccuracy를 스킬의 성능 수치로 인용하지 마세요.
 ## 워크플로우 그래프
 
 공개 운영자 화면은 전체 제어 그래프를 여섯 단계로 압축합니다. 현재 canonical graph는 노드
-19개, 엣지 35개, fallback 5개, terminal 6개입니다.
+20개, 엣지 36개, fallback 5개, terminal 6개입니다.
 
 ```mermaid
 flowchart LR
@@ -216,6 +216,21 @@ node skills/evals/grade-results.mjs <results.json|results.jsonl>
 node skills/evals/grade-results.mjs --allow-partial <results.json|results.jsonl>
 ```
 
+`evals/run-live.mjs`가 그 결과 artifact를 실제 CLI 실행으로 만듭니다. fixture 통과와 모델 성능을
+섞지 않기 위해 권위를 나눕니다 — `loadedNodes`·`toolCalls`·`tokens`·`runtimeMs`는 host transcript에서
+기계로 유도하고(모델이 읽었다고 말한 게 아니라 실제로 연 경로), routing 판정
+(`risk`·`lane`·`status`·`labels`·`ceremony`)만 실행이 마지막 ```json 블록으로 자기보고합니다. 블록이
+없으면 `NO_MACHINE_REPORT`오류로 실패합니다. sidecar`<out>.meta.json`에 model, prompt SHA-256,
+session id, exit code, 원본 자기보고가 남습니다.
+
+```bash
+node skills/evals/run-live.mjs --host claude --out results.jsonl --repo <대상 레포>
+node skills/evals/run-live.mjs --host codex --out held-out.jsonl --corpus held-out.json
+```
+
+held-out은 grader가 점수 매기지 않습니다. `escapes[].assertion`을 Draft와 대조해 판정하며, corpus
+기대값을 고치는 사람이 홀드아웃 정답을 만질 수 없도록 분리된 채로 둡니다.
+
 ### 기계 유도 — 코드와 형제 카드에서 빈칸을 만든다
 
 카드 안의 열거(스윕·deviation·frame)는 카드 바이트에서 기계가 만든다. 0.41.0부터 그 원칙이 카드 밖으로
@@ -243,6 +258,22 @@ node skills/evals/grade-results.mjs --allow-partial <results.json|results.jsonl>
   `evals/evals.json`으로 투영한다. `--check`가 드리프트를 잡는다. held-out은 저자가 아니라 다른 레포에서
   실제로 새어나간 결함이 정답을 준 케이스다(r11b: StrictMode 타이머·리마운트 scrollTo·ResizeObserver
   초기 측정·필터 전환 중 Suspense 폴백). "나아졌나"는 이 케이스의 버전 간 A/B로만 답한다.
+
+### Hook이 사전 차단하는 것과 게이트만 보는 것
+
+hook은 가속기이고 `oracle-run.mjs transition`이 최종 권위입니다. 아래 표의 "게이트"는 쓰기가 이미
+일어난 뒤 `status --changed-files`와 transition 검증이 잡는다는 뜻입니다.
+
+| 경로                                      | Claude Code      | Codex·jcode | 판정                                            |
+| ----------------------------------------- | ---------------- | ----------- | ----------------------------------------------- |
+| `Write`·`Edit`·`MultiEdit`·`NotebookEdit` | hook이 사전 거절 | 게이트      | `PRODUCTION_TOUCHED_BEFORE_RED`·`TEST_WEAKENED` |
+| Bash `rm`·`mv`·`sed -i`·heredoc 쓰기      | 게이트           | 게이트      | hook은 도구 이름과 경로로만 보므로 판정 불가    |
+| MCP·에디터 확장 쓰기                      | 게이트           | 게이트      | 같은 이유                                       |
+| `.ai/oracles/**` 자체                     | 통과             | 통과        | 오라클 아티팩트는 production이 아님             |
+
+판정 불가는 fail-open이지만 조용히 사라지지 않습니다. hook은 stderr에 한 줄 JSON을 남깁니다 —
+`{"oracleGuard":"unjudged","reason":"STATE_UNPARSEABLE"|"SCAN_ROOT_MISSING"|"PAYLOAD_UNREADABLE",...}`.
+stdout과 종료 코드는 그대로이므로 쓰기는 계속 진행되고, 흔적만 남습니다.
 
 ### Harness garbage collection
 

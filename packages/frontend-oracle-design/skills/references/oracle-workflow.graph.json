@@ -170,9 +170,18 @@
       "dispatch": "one"
     },
     {
-      "id": "review-finalize",
+      "id": "review-finalize-standard",
       "kind": "tool",
-      "task": "First, for a standard finding the Controller records oracle-run.mjs review-receipt, and for High risk it verifies and records the two ledger-bound review-receipt identities/digests that were passed in. Verify oracle-verify.mjs findings, the High-risk intersection rule, and the receipts, and finally verify only the accepted findings. When only NON_ORACLE_OPINION remains, leave it in the finding artifact as-is and normalize to REVIEW_ACCEPTED. Only when REVIEW_ACCEPTED, re-verify the lock, evidence, review, the two ledger-bound review receipts, and every required run label, then record REVIEW_VERIFIED with oracle-run.mjs transition. The classification is REVIEW_VERIFIED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP with a structured decision, or FAIL with the actual error, and it always outputs the actual or failing runId. On POLICY_GAP, record oracle-run.mjs transition --to NEEDS_DECISION.",
+      "task": "The Controller records the single primary finding as the ledger-bound review receipt with oracle-run.mjs review-receipt, then verifies oracle-verify.mjs findings and that receipt, and finally verifies only the accepted findings. When only NON_ORACLE_OPINION remains, leave it in the finding artifact as-is and normalize to REVIEW_ACCEPTED. Only when REVIEW_ACCEPTED, re-verify the lock, evidence, review, the ledger-bound review receipt, and every required run label, then record REVIEW_VERIFIED with oracle-run.mjs transition. This Node never receives a High-risk receipt pair; two independent reviews finalize at review-finalize-high instead. The classification is REVIEW_VERIFIED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP with a structured decision, or FAIL with the actual error, and it always outputs the actual or failing runId. On POLICY_GAP, record oracle-run.mjs transition --to NEEDS_DECISION.",
+      "input": ["oraclePath", "oracleSha256", "findings"],
+      "output": ["classification", "runId", "findings", "reviewReceipt", "report", "decision", "error"],
+      "writeScope": [".ai/oracles/**"],
+      "dispatch": "one"
+    },
+    {
+      "id": "review-finalize-high",
+      "kind": "tool",
+      "task": "The Controller verifies and records the two ledger-bound review-receipt identities/digests that high-review-join passed in. Verify oracle-verify.mjs findings, the High-risk intersection rule, and the receipts, and finally verify only the accepted findings. When only NON_ORACLE_OPINION remains, leave it in the finding artifact as-is and normalize to REVIEW_ACCEPTED. Only when REVIEW_ACCEPTED, re-verify the lock, evidence, review, the two ledger-bound review receipts, and every required run label, then record REVIEW_VERIFIED with oracle-run.mjs transition. A missing or unverifiable receipt is never substituted by the single standard receipt. The classification is REVIEW_VERIFIED, PRODUCT_DEFECT, EVIDENCE_GAP, HARNESS_DEFECT, POLICY_GAP with a structured decision, or FAIL with the actual error, and it always outputs the actual or failing runId. On POLICY_GAP, record oracle-run.mjs transition --to NEEDS_DECISION.",
       "input": ["oraclePath", "oracleSha256", "findings", "reviewReceiptA", "reviewReceiptB"],
       "output": [
         "classification",
@@ -456,7 +465,7 @@
     },
     {
       "from": "primary-review",
-      "to": "review-finalize",
+      "to": "review-finalize-standard",
       "when": {
         "field": "classification",
         "equals": "STANDARD_READY"
@@ -504,7 +513,7 @@
     },
     {
       "from": "high-review-join",
-      "to": "review-finalize",
+      "to": "review-finalize-high",
       "when": {
         "field": "status",
         "equals": "READY"
@@ -519,7 +528,15 @@
       }
     },
     {
-      "from": "review-finalize",
+      "from": "review-finalize-standard",
+      "to": "review-verified",
+      "when": {
+        "field": "classification",
+        "equals": "REVIEW_VERIFIED"
+      }
+    },
+    {
+      "from": "review-finalize-high",
       "to": "review-verified",
       "when": {
         "field": "classification",

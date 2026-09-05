@@ -43,6 +43,9 @@
           "card-risk-grill",
           "bva",
           "card-format",
+          "card-interaction-sweep",
+          "card-case-space",
+          "card-retro-metrics",
           "card-confirmation-lock",
           "delivery-ledger",
           "delivery-red",
@@ -50,6 +53,7 @@
           "types-state-ladder",
           "types-authoring",
           "types-api-surface",
+          "types-advanced-contracts",
           "frontend-authoring",
           "changeability",
           "delivery-implementation-decision",
@@ -75,6 +79,9 @@
           "card-risk-grill",
           "bva",
           "card-format",
+          "card-interaction-sweep",
+          "card-case-space",
+          "card-retro-metrics",
           "card-confirmation-lock",
           "delivery-ledger",
           "delivery-red",
@@ -82,6 +89,7 @@
           "types-state-ladder",
           "types-authoring",
           "types-api-surface",
+          "types-advanced-contracts",
           "frontend-authoring",
           "changeability",
           "delivery-implementation-decision",
@@ -107,6 +115,9 @@
           "card-risk-grill",
           "bva",
           "card-format",
+          "card-interaction-sweep",
+          "card-case-space",
+          "card-retro-metrics",
           "card-confirmation-lock",
           "delivery-ledger",
           "delivery-red",
@@ -114,6 +125,7 @@
           "types-state-ladder",
           "types-authoring",
           "types-api-surface",
+          "types-advanced-contracts",
           "frontend-authoring",
           "changeability",
           "delivery-implementation-decision",
@@ -139,6 +151,9 @@
           "card-risk-grill",
           "bva",
           "card-format",
+          "card-interaction-sweep",
+          "card-case-space",
+          "card-retro-metrics",
           "visual-design",
           "card-confirmation-lock"
         ],
@@ -156,7 +171,25 @@
         "status": "NEEDS_DECISION",
         "loadedNodes": ["common", "card-policy-sources", "card-risk-grill", "bva", "card-format", "visual-design"],
         "forbiddenCeremony": ["invented-visual-policy", "revision-lock", "production-edit"],
-        "requiredLabels": ["card-lint", "policy-gap", "design-confirmation"]
+        "requiredLabels": ["card-lint", "policy-gap", "design-confirmation"],
+        "nodeExceptions": [
+          {
+            "node": "card-interaction-sweep",
+            "reason": "Stops at NEEDS_DECISION for a missing approved design source before the Draft sweep and the lock."
+          },
+          {
+            "node": "card-case-space",
+            "reason": "Stops at NEEDS_DECISION for a missing approved design source before the Draft sweep and the lock."
+          },
+          {
+            "node": "card-retro-metrics",
+            "reason": "Stops at NEEDS_DECISION for a missing approved design source before the Draft sweep and the lock."
+          },
+          {
+            "node": "card-confirmation-lock",
+            "reason": "Stops at NEEDS_DECISION for a missing approved design source before the Draft sweep and the lock."
+          }
+        ]
       }
     },
     {
@@ -169,7 +202,25 @@
         "status": "NEEDS_DECISION",
         "loadedNodes": ["common", "card-policy-sources", "card-risk-grill", "bva", "card-format"],
         "forbiddenCeremony": ["conflict-resolution-by-agent", "implementation-reference-as-policy", "revision-lock"],
-        "requiredLabels": ["source-registry-fk", "policy-gap"]
+        "requiredLabels": ["source-registry-fk", "policy-gap"],
+        "nodeExceptions": [
+          {
+            "node": "card-interaction-sweep",
+            "reason": "Source conflict resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          },
+          {
+            "node": "card-case-space",
+            "reason": "Source conflict resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          },
+          {
+            "node": "card-retro-metrics",
+            "reason": "Source conflict resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          },
+          {
+            "node": "card-confirmation-lock",
+            "reason": "Source conflict resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          }
+        ]
       }
     },
     {
@@ -182,7 +233,25 @@
         "status": "NEEDS_DECISION",
         "loadedNodes": ["common", "card-policy-sources", "card-risk-grill", "bva", "card-format"],
         "forbiddenCeremony": ["production-as-policy", "implementation-reference-as-sole-authority", "revision-lock"],
-        "requiredLabels": ["source-registry-fk", "policy-gap"]
+        "requiredLabels": ["source-registry-fk", "policy-gap"],
+        "nodeExceptions": [
+          {
+            "node": "card-interaction-sweep",
+            "reason": "Missing product source resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          },
+          {
+            "node": "card-case-space",
+            "reason": "Missing product source resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          },
+          {
+            "node": "card-retro-metrics",
+            "reason": "Missing product source resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          },
+          {
+            "node": "card-confirmation-lock",
+            "reason": "Missing product source resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          }
+        ]
       }
     },
     {
@@ -199,6 +268,9 @@
           "card-risk-grill",
           "bva",
           "card-format",
+          "card-interaction-sweep",
+          "card-case-space",
+          "card-retro-metrics",
           "card-confirmation-lock",
           "delivery-ledger",
           "delivery-red",
@@ -206,6 +278,7 @@
           "types-state-ladder",
           "types-authoring",
           "types-api-surface",
+          "types-advanced-contracts",
           "changeability",
           "frontend-quality",
           "delivery-green-review",
@@ -213,7 +286,13 @@
         ],
         "forbiddenCeremony": ["forced-production-edit", "fake-valid-red", "unledgered-green", "false-review-verified"],
         "requiredLabels": ["card-lint", "existing-evidence", "already-satisfied", "green", "review"],
-        "route": "valid-red:ALREADY_SATISFIED→implement-green"
+        "route": "valid-red:ALREADY_SATISFIED→implement-green",
+        "nodeExceptions": [
+          {
+            "node": "delivery-implementation-decision",
+            "reason": "ALREADY_SATISFIED verifies the existing implementation without a production change, so no implementation-method decision is read."
+          }
+        ]
       }
     }
   ]

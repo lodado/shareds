@@ -47,11 +47,13 @@ function booleanMetric(result, field) {
   return result[field] ? 1 : 0
 }
 
-function compareSet(actual, expected, missingCode, unexpectedCode) {
+function compareSet(actual, expected, missingCode, unexpectedCode, tolerated = []) {
   const actualSet = asSet(actual)
   const expectedSet = asSet(expected)
+  const toleratedSet = asSet(tolerated)
   const missing = [...expectedSet].filter((value) => !actualSet.has(value))
-  const unexpected = [...actualSet].filter((value) => !expectedSet.has(value))
+  // A declared node exception is optional, never forbidden: the case may stop before that read.
+  const unexpected = [...actualSet].filter((value) => !expectedSet.has(value) && !toleratedSet.has(value))
   const failures = []
   if (missing.length || unexpected.length) {
     failures.push({ code: missing.length ? missingCode : unexpectedCode, missing, unexpected })
@@ -139,7 +141,13 @@ function gradeCase(result, fixture, metricsSchema) {
     failures.push({ code: 'ROUTE_MISMATCH', expected: expected.route, actual: actual.route })
   }
   failures.push(
-    ...compareSet(actual.loadedNodes, expected.loadedNodes, 'LOADED_NODES_MISMATCH', 'LOADED_NODES_MISMATCH'),
+    ...compareSet(
+      actual.loadedNodes,
+      expected.loadedNodes,
+      'LOADED_NODES_MISMATCH',
+      'LOADED_NODES_MISMATCH',
+      (expected.nodeExceptions ?? []).map((entry) => entry.node),
+    ),
   )
 
   const ceremony = asSet(actual.ceremony)

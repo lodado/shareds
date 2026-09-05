@@ -112,3 +112,53 @@ test('stays silent with no oracle, a foreign tool, or an unreadable payload — 
   assert.equal(broken.status, 0)
   assert.equal(broken.decision, null)
 })
+
+test('guards a notebook write and a renamed production file, and still lets a new test through', async (t) => {
+  const root = await repository(t, 'ORACLE_READY')
+
+  const notebook = hook({
+    cwd: root,
+    hook_event_name: 'PreToolUse',
+    tool_name: 'NotebookEdit',
+    tool_input: { notebook_path: 'packages/src/analysis.ipynb', new_source: 'x = 1' },
+  })
+  assert.match(notebook.decision?.permissionDecisionReason ?? '', /^PRODUCTION_TOUCHED_BEFORE_RED: src\/analysis\.ipynb/)
+
+  // A rename lands as a write to a path the init snapshot never saw — production all the same.
+  const renamed = hook(write(root, 'packages/src/save-form.ts'))
+  assert.match(renamed.decision?.permissionDecisionReason ?? '', /^PRODUCTION_TOUCHED_BEFORE_RED: src\/save-form\.ts/)
+  assert.equal(hook(write(root, 'packages/src/__test__/save-form.test.ts')).decision, null)
+})
+
+test('an unjudgeable write is fail-open but leaves one structured diagnostic on stderr', async (t) => {
+  const root = await repository(t, 'ORACLE_READY')
+  await writeFile(join(root, '.ai', 'oracles', 'sample', 'run-state.json'), '{ not json')
+
+  const unreadable = hook(write(root, 'packages/src/save.ts'))
+  assert.equal(unreadable.status, 0)
+  assert.equal(unreadable.decision, null)
+  assert.deepEqual(JSON.parse(unreadable.stderr.trim()), {
+    oracleGuard: 'unjudged',
+    reason: 'STATE_UNPARSEABLE',
+    oracle: join(root, '.ai', 'oracles', 'sample'),
+  })
+
+  const broken = hook('{not json')
+  assert.equal(broken.status, 0)
+  assert.equal(JSON.parse(broken.stderr.trim()).reason, 'PAYLOAD_UNREADABLE')
+})
+
+test('a delete or a shell write is out of scope for the hook and only the transition gate sees it', async (t) => {
+  const root = await repository(t, 'ORACLE_READY')
+
+  // Documented gap: the hook matches write tools by file path, so `rm`/`mv` through Bash reaches
+  // the working tree unjudged. oracle-run.mjs status --changed-files is what catches it afterwards.
+  const shell = hook({
+    cwd: root,
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Bash',
+    tool_input: { command: 'rm packages/src/save.ts' },
+  })
+  assert.equal(shell.decision, null)
+  assert.equal(shell.stderr.trim(), '')
+})

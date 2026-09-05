@@ -195,3 +195,55 @@ test('O13: eval fails on errors duplicates malformed JSONL and missing graph clo
   assert.equal(visualConfirmation.expected.status, 'NEEDS_DECISION')
   assert.equal(Object.hasOwn(visualConfirmation.expected, 'statuses'), false)
 })
+
+// A lane bundle is the canonical node closure the workflow reads together, so a corpus case that
+// enters a lane must expect every node of that lane. frontend-lane has no such trigger node — it is
+// gated on an architecture boundary the prompt may not touch — so it stays out of this table.
+const laneTriggers = [
+  { trigger: 'card-format', bundle: 'card-lane' },
+  { trigger: 'types-state-ladder', bundle: 'types-lane' },
+  { trigger: 'delivery-ledger', bundle: 'delivery-lane' },
+]
+
+test('corpus expectations carry the whole lane bundle unless the case declares an exception', async () => {
+  const [corpus, graph] = await Promise.all([readJson(corpusPath), readJson(referenceGraphPath)])
+  const bundleNodes = new Map(graph.bundles.map((bundle) => [bundle.id, bundle.nodes]))
+
+  for (const fixture of corpus.cases) {
+    const loaded = new Set(fixture.expected.loadedNodes)
+    const exceptions = fixture.expected.nodeExceptions ?? []
+    const excepted = new Set(exceptions.map((entry) => entry.node))
+
+    for (const entry of exceptions) {
+      assert.equal(typeof entry.node, 'string', `${fixture.id} exception node`)
+      assert.ok(entry.reason?.trim(), `${fixture.id} exception for ${entry.node} needs a reason`)
+      assert.ok(!loaded.has(entry.node), `${fixture.id} excepts ${entry.node} while also loading it`)
+    }
+
+    for (const { trigger, bundle } of laneTriggers) {
+      if (!loaded.has(trigger)) continue
+      for (const nodeId of bundleNodes.get(bundle)) {
+        assert.ok(
+          loaded.has(nodeId) || excepted.has(nodeId),
+          `${fixture.id} enters ${bundle} via ${trigger} but omits ${nodeId} without an exception`,
+        )
+      }
+    }
+  }
+})
+
+test('an exception may not cover a node the current workflow reads unconditionally in every lane', async () => {
+  const corpus = await readJson(corpusPath)
+  const reachesTheDraft = corpus.cases.filter((fixture) => fixture.expected.loadedNodes.includes('card-format'))
+
+  assert.ok(reachesTheDraft.length > 0)
+  for (const fixture of reachesTheDraft) {
+    const excepted = new Set((fixture.expected.nodeExceptions ?? []).map((entry) => entry.node))
+    if (excepted.has('card-interaction-sweep')) {
+      assert.equal(fixture.expected.status, 'NEEDS_DECISION', `${fixture.id} may skip the sweep only when it stops`)
+    } else {
+      assert.ok(fixture.expected.loadedNodes.includes('card-case-space'), `${fixture.id} case space`)
+      assert.ok(fixture.expected.loadedNodes.includes('card-retro-metrics'), `${fixture.id} retro metrics`)
+    }
+  }
+})

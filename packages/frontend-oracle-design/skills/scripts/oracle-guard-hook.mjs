@@ -41,7 +41,8 @@ async function findStates(cwd, filePath) {
       try {
         states.push({ directory, state: JSON.parse(raw) })
       } catch {
-        // 손상된 상태 파일은 이 hook의 판정 대상이 아니다 — 게이트가 STATE_INVALID로 잡는다
+        // 손상된 상태 파일은 이 hook이 판정할 수 없다 — 게이트가 STATE_INVALID로 잡는다
+        unjudged('STATE_UNPARSEABLE', { oracle: directory })
       }
     }
   }
@@ -69,6 +70,11 @@ async function addsWeakening(toolName, input, absolutePath) {
   return false
 }
 
+/** fail-open은 유지하되 판정 불능을 조용히 삼키지 않는다 — stderr 한 줄, stdout·종료코드는 그대로. */
+function unjudged(reason, fields = {}) {
+  process.stderr.write(`${JSON.stringify({ oracleGuard: 'unjudged', reason, ...fields })}\n`)
+}
+
 function deny(reason) {
   process.stdout.write(
     `${JSON.stringify({
@@ -81,13 +87,19 @@ async function main() {
   const payload = JSON.parse(await readStdin())
   const toolName = payload.tool_name
   const input = payload.tool_input ?? {}
-  if (!['Write', 'Edit', 'MultiEdit'].includes(toolName) || typeof input.file_path !== 'string') return
+  // NotebookEdit writes a source file under another key; every other write path (shell rm·mv, an
+  // MCP writer) is invisible here and stays the transition gate's job — README records the split.
+  const targetPath = typeof input.file_path === 'string' ? input.file_path : input.notebook_path
+  if (!['Write', 'Edit', 'MultiEdit', 'NotebookEdit'].includes(toolName) || typeof targetPath !== 'string') return
 
   const cwd = typeof payload.cwd === 'string' ? payload.cwd : process.cwd()
-  const absolutePath = resolve(cwd, input.file_path)
+  const absolutePath = resolve(cwd, targetPath)
 
   for (const { directory, state } of await findStates(cwd, absolutePath)) {
-    if (typeof state.scanRoot !== 'string') continue
+    if (typeof state.scanRoot !== 'string') {
+      unjudged('SCAN_ROOT_MISSING', { oracle: directory })
+      continue
+    }
     const scanRoot = resolve(directory, state.scanRoot)
     if (!isPathInside(scanRoot, absolutePath) || isPathInside(directory, absolutePath)) continue
     const portable = relative(scanRoot, absolutePath).split(sep).join('/')
@@ -119,7 +131,8 @@ async function main() {
 
 try {
   await main()
-} catch {
-  // fail-open: 판정 불가는 허용이다 — 사후 게이트가 권위다
+} catch (error) {
+  // fail-open: 판정 불가는 허용이다 — 사후 게이트가 권위다. 다만 흔적은 남긴다.
+  unjudged('PAYLOAD_UNREADABLE', { message: error instanceof Error ? error.message : String(error) })
 }
 process.exitCode = 0
