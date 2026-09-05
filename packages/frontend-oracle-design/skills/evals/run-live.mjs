@@ -2,8 +2,13 @@
 // Runs the black-box corpus against a real CLI host and writes a grader-ready JSONL artifact.
 // Split of authority: loadedNodes, toolCalls, tokens and runtimeMs are derived from the host's own
 // transcript, and only the routing verdict (risk·lane·status·labels·ceremony) is self-reported by
-// the run. The sidecar keeps the raw self-report next to the machine-derived record, so a later
-// read can tell which number came from where.
+// the run. `loadedNodes` counts a node only when a read tool call on its path has a non-error
+// tool result — a path that is merely mentioned (grep output, prose) lands in `mentionedNodes`.
+// Every result carries an `attestation` map that says, per field, whether the value was observed
+// from the transcript, self-reported by the run, or left unreported. An unreported safety flag is
+// never coerced to a silent `false`: it stays `false` for the schema and adds a FLAG_UNREPORTED error.
+// The sidecar keeps the raw self-report next to the machine-derived record, so a later read can
+// tell which number came from where.
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -21,6 +26,9 @@ const REPORT_FOOTER = [
   'array), policyInvention (boolean), falseReviewVerified (boolean), errors (string array).',
   'Report what actually happened, never what the corpus wants.',
 ].join('\n')
+
+const READ_TOOL_NAMES = new Set(['read', 'read_file', 'readfile', 'view', 'cat', 'file_read'])
+const SELF_REPORTED_FLAGS = ['policyInvention', 'falseReviewVerified']
 
 const HOSTS = {
   claude: { command: 'claude', args: (prompt) => ['-p', prompt, '--output-format', 'stream-json', '--verbose'] },
@@ -50,15 +58,60 @@ export function parseTranscript(stdout) {
   return events
 }
 
-/** Node ids the run actually read, taken from every path string the transcript mentions. */
+function nodeIdForPath(text, byPath) {
+  if (typeof text !== 'string') return null
+  const portable = text.replaceAll('\\', '/')
+  for (const [path, id] of byPath) {
+    if (portable === path || portable.endsWith(`/${path}`)) return id
+  }
+  return null
+}
+
+function readPathOf(block) {
+  const input = block?.input ?? block?.arguments ?? {}
+  return input.file_path ?? input.path ?? input.filePath ?? input.file ?? null
+}
+
+/**
+ * Node ids whose file was opened by a read tool call that came back without an error. A Claude
+ * stream-json transcript pairs `tool_use` blocks with `tool_result` blocks by id; a Codex transcript
+ * completes `file_read`-style items with a `status`. Anything else is a mention, not a read.
+ */
 export function loadedNodesFrom(events, graph) {
+  const byPath = graph.nodes.map((node) => [node.path, node.id])
+  const pendingReads = new Map()
+  const confirmed = new Set()
+  for (const event of events) {
+    const content = event?.message?.content
+    if (Array.isArray(content)) {
+      for (const block of content) {
+        if (block?.type === 'tool_use' && READ_TOOL_NAMES.has(String(block.name ?? '').toLowerCase())) {
+          const id = nodeIdForPath(readPathOf(block), byPath)
+          if (id && block.id) pendingReads.set(block.id, id)
+        }
+        if (block?.type === 'tool_result' && block.tool_use_id && block.is_error !== true) {
+          const id = pendingReads.get(block.tool_use_id)
+          if (id) confirmed.add(id)
+        }
+      }
+    }
+    if (event?.type !== 'item.completed') continue
+    const item = event.item
+    if (item && READ_TOOL_NAMES.has(String(item.item_type ?? '').toLowerCase()) && item.status !== 'failed') {
+      const id = nodeIdForPath(item.path ?? item.file_path ?? null, byPath)
+      if (id) confirmed.add(id)
+    }
+  }
+  return [...confirmed]
+}
+
+/** Node ids whose path appears anywhere in the transcript — evidence of exposure, not of a read. */
+export function mentionedNodesFrom(events, graph) {
   const byPath = graph.nodes.map((node) => [node.path, node.id])
   const found = new Set()
   walkStrings(events, (text) => {
-    const portable = text.replaceAll('\\', '/')
-    for (const [path, id] of byPath) {
-      if (portable === path || portable.endsWith(`/${path}`)) found.add(id)
-    }
+    const id = nodeIdForPath(text, byPath)
+    if (id) found.add(id)
   })
   return [...found]
 }
@@ -94,20 +147,42 @@ export function selfReportFrom(events) {
   }
 }
 
-export function buildResult({ fixture, events, graph, runtimeMs }) {
+export function buildResult({ fixture, events, graph, runtimeMs, replicateId = null }) {
   const report = selfReportFrom(events)
   const { toolCalls, tokens } = usageFrom(events)
   const reported = report ?? {}
   const errors = Array.isArray(reported.errors) ? [...reported.errors] : []
   if (!report) errors.push('NO_MACHINE_REPORT')
+  const attestation = {
+    risk: 'self-reported',
+    lane: 'self-reported',
+    status: 'self-reported',
+    labels: 'self-reported',
+    ceremony: 'self-reported',
+    loadedNodes: 'observed',
+    mentionedNodes: 'observed',
+    toolCalls: 'observed',
+    tokens: 'observed',
+    runtimeMs: 'observed',
+  }
+  for (const flag of SELF_REPORTED_FLAGS) {
+    if (typeof reported[flag] === 'boolean') {
+      attestation[flag] = 'self-reported'
+    } else {
+      attestation[flag] = 'unreported'
+      if (report) errors.push(`FLAG_UNREPORTED:${flag}`)
+    }
+  }
   return {
     result: {
       caseId: fixture.id,
+      ...(replicateId === null ? {} : { replicateId }),
       risk: reported.risk ?? null,
       lane: reported.lane ?? null,
       status: reported.status ?? null,
       ...(fixture.expected.route ? { route: reported.route ?? null } : {}),
       loadedNodes: loadedNodesFrom(events, graph),
+      mentionedNodes: mentionedNodesFrom(events, graph),
       ceremony: Array.isArray(reported.ceremony) ? reported.ceremony : [],
       labels: Array.isArray(reported.labels) ? reported.labels : [],
       policyInvention: reported.policyInvention === true,
@@ -116,6 +191,7 @@ export function buildResult({ fixture, events, graph, runtimeMs }) {
       tokens,
       runtimeMs,
       errors,
+      attestation,
     },
     selfReported: reported,
   }
@@ -151,13 +227,17 @@ async function main() {
   const out = option(args, '--out')
   if (!HOSTS[host] || !out) {
     process.stderr.write(
-      `USAGE: run-live.mjs --host <${Object.keys(HOSTS).join('|')}> --out <results.jsonl> [--corpus <file>] [--case <id>] [--repo <dir>]\n`,
+      `USAGE: run-live.mjs --host <${Object.keys(HOSTS).join('|')}> --out <results.jsonl> [--corpus <file>] [--case <id>] [--repo <dir>] [--replicates <n>]\n`,
     )
     process.exitCode = 2
     return
   }
   const only = option(args, '--case')
   const repo = option(args, '--repo') ?? process.cwd()
+  // pass^k needs k independent runs of the same fixture; each gets its own replicateId so the grader
+  // scores the fixture on every replicate instead of treating the repeats as a duplicate case.
+  const replicates = Number.parseInt(option(args, '--replicates') ?? '1', 10)
+  if (!Number.isSafeInteger(replicates) || replicates < 1) throw new Error('INVALID_REPLICATES')
   // held-out.json runs through the same runner and the same artifact shape, but its escapes are
   // judged by reading the Draft against each assertion — the grader never scores it.
   const corpusFile = option(args, '--corpus') ?? 'blackbox-corpus.json'
@@ -172,26 +252,31 @@ async function main() {
   const lines = []
   const runs = []
   for (const fixture of cases) {
-    const prompt = `${fixture.prompt}\n${REPORT_FOOTER}`
-    const startedAt = Date.now()
-    const { code, stdout, stderr } = await runHost(host, prompt, repo)
-    const runtimeMs = Date.now() - startedAt
-    const events = parseTranscript(stdout)
-    const { result, selfReported } = buildResult({ fixture, events, graph, runtimeMs })
-    if (code !== 0) result.errors.push(`HOST_EXIT_${code}`)
-    lines.push(JSON.stringify(result))
-    runs.push({
-      caseId: fixture.id,
-      host,
-      exitCode: code,
-      promptSha256: createHash('sha256').update(prompt).digest('hex'),
-      model: events.find((event) => event?.message?.model)?.message?.model ?? events.find((event) => event.model)?.model ?? null,
-      sessionId: events.find((event) => event.session_id)?.session_id ?? null,
-      runtimeMs,
-      selfReported,
-      stderr: stderr.slice(-2000),
-    })
-    process.stderr.write(`ran ${fixture.id} in ${runtimeMs}ms (exit ${code})\n`)
+    for (let replicate = 1; replicate <= replicates; replicate += 1) {
+      const replicateId = replicates === 1 ? null : `r${replicate}`
+      const prompt = `${fixture.prompt}\n${REPORT_FOOTER}`
+      const startedAt = Date.now()
+      const { code, stdout, stderr } = await runHost(host, prompt, repo)
+      const runtimeMs = Date.now() - startedAt
+      const events = parseTranscript(stdout)
+      const { result, selfReported } = buildResult({ fixture, events, graph, runtimeMs, replicateId })
+      if (code !== 0) result.errors.push(`HOST_EXIT_${code}`)
+      lines.push(JSON.stringify(result))
+      runs.push({
+        caseId: fixture.id,
+        ...(replicateId === null ? {} : { replicateId }),
+        host,
+        exitCode: code,
+        promptSha256: createHash('sha256').update(prompt).digest('hex'),
+        model: events.find((event) => event?.message?.model)?.message?.model ?? events.find((event) => event.model)?.model ?? null,
+        sessionId: events.find((event) => event.session_id)?.session_id ?? null,
+        runtimeMs,
+        selfReported,
+        attestation: result.attestation,
+        stderr: stderr.slice(-2000),
+      })
+      process.stderr.write(`ran ${fixture.id}${replicateId ? ` ${replicateId}` : ''} in ${runtimeMs}ms (exit ${code})\n`)
+    }
   }
 
   await writeFile(out, `${lines.join('\n')}\n`)

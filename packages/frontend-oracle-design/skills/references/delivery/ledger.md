@@ -111,7 +111,11 @@ node <skill-dir>/scripts/oracle-run.mjs status \
 ```
 
 The output holds `currentState`, `currentSnapshot`, `lockStatus`, `staleOrMissingRuns`,
-`orphanedRun`, `remainingBudgets`, `blockers`, `nextLegalActions`. A stale run is past evidence that
+`orphanedRun`, `remainingBudgets`, `blockers`, `nextLegalActions`, `nextActions`. `nextActions` is
+the execution packet: one entry per legal transition with `ready`, its `blockers`, the `requires`
+flags, the fresh `candidateRuns` that satisfy the run predicate, the `readNodes` worth opening for
+that step, and an `example` command. Pick one step from the packet instead of re-reading the whole
+procedure; the packet is not a verdict, `transition` repeats every check. A stale run is past evidence that
 differs from the current lock/worktree/production snapshot and is not reused. `orphanedRun` is a run
 that has a `.run-ids` reservation but no ledger completion record. Do not reuse the same runId by
 hand; run a new `exec`. State file writes are performed only with temp file + atomic rename and are

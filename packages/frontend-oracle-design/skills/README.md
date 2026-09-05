@@ -218,13 +218,21 @@ node skills/evals/grade-results.mjs --allow-partial <results.json|results.jsonl>
 
 `evals/run-live.mjs`가 그 결과 artifact를 실제 CLI 실행으로 만듭니다. fixture 통과와 모델 성능을
 섞지 않기 위해 권위를 나눕니다 — `loadedNodes`·`toolCalls`·`tokens`·`runtimeMs`는 host transcript에서
-기계로 유도하고(모델이 읽었다고 말한 게 아니라 실제로 연 경로), routing 판정
-(`risk`·`lane`·`status`·`labels`·`ceremony`)만 실행이 마지막 ```json 블록으로 자기보고합니다. 블록이
-없으면 `NO_MACHINE_REPORT`오류로 실패합니다. sidecar`<out>.meta.json`에 model, prompt SHA-256,
-session id, exit code, 원본 자기보고가 남습니다.
+기계로 유도하고, routing 판정(`risk`·`lane`·`status`·`labels`·`ceremony`)만 실행이 마지막 ```json
+블록으로 자기보고합니다. `loadedNodes`는 read 도구 호출이 오류 없는 tool result로 돌아온 노드만
+세고, 경로가 문자열로만 등장한 노드는 `mentionedNodes`에 따로 둡니다. 각 결과의 `attestation`은
+필드별로 `observed`·`self-reported`·`unreported`를 기록하며, 자기보고에서 빠진
+`policyInvention`·`falseReviewVerified`는 조용한 `false`가 아니라 `FLAG_UNREPORTED:<flag>`오류가
+됩니다. 블록이 없으면`NO_MACHINE_REPORT`오류로 실패합니다. sidecar`<out>.meta.json`에 model,
+prompt SHA-256, session id, exit code, 원본 자기보고가 남습니다.
+
+`--replicates <k>`는 같은 fixture를 k번 독립 실행해 `replicateId`(r1..rk)를 붙입니다. grader는
+replicate를 각각 채점해 모두 통과해야 case 통과(pass^k, `metrics.passAllK`)로 보고, 하나라도 통과한
+비율은 `metrics.passAtK`로 따로 냅니다. replicateId 없이 반복된 case는 여전히 `DUPLICATE_CASE`입니다.
 
 ```bash
 node skills/evals/run-live.mjs --host claude --out results.jsonl --repo <대상 레포>
+node skills/evals/run-live.mjs --host claude --out results-k3.jsonl --repo <대상 레포> --replicates 3
 node skills/evals/run-live.mjs --host codex --out held-out.jsonl --corpus held-out.json
 ```
 

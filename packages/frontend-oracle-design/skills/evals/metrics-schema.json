@@ -21,6 +21,10 @@
       "type": "string",
       "description": "Fixture id from blackbox-corpus.json."
     },
+    "replicateId": {
+      "type": "string",
+      "description": "Optional replicate marker (r1, r2, ...) when the same fixture is run k times for pass@k / pass^k. Repeats without distinct replicateIds are DUPLICATE_CASE."
+    },
     "risk": {
       "type": "string",
       "description": "Observed Oracle risk classification for this case."
@@ -48,6 +52,13 @@
       },
       "description": "Reference node ids observed during the run."
     },
+    "mentionedNodes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Reference node ids whose path appears anywhere in the transcript. Exposure only; loadedNodes requires a successful read tool result."
+    },
     "ceremony": {
       "type": "array",
       "items": {
@@ -67,6 +78,18 @@
       "description": "Aggregate grader output ratio for cases whose risk, lane, status, route and loaded nodes match expected.",
       "minimum": 0,
       "maximum": 1
+    },
+    "passAllK": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Aggregate grader output: share of replicated cases where every replicate passed (pass^k). null when no case was replicated."
+    },
+    "passAtK": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Aggregate grader output: share of replicated cases where at least one replicate passed (pass@k). null when no case was replicated."
     },
     "policyInvention": {
       "type": "boolean",
@@ -100,6 +123,10 @@
         "type": "string"
       },
       "description": "Stable harness or grader error codes observed during the run."
+    },
+    "attestation": {
+      "type": "object",
+      "description": "Per-field provenance written by run-live.mjs: observed (derived from the host transcript), self-reported (from the run's final json block) or unreported (the run omitted a flag; the schema value stays false and FLAG_UNREPORTED:<flag> is added to errors)."
     }
   }
 }

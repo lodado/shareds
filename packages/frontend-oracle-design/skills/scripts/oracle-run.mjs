@@ -2679,6 +2679,79 @@ async function evidenceStatus(directory, state, ledger) {
   }
 }
 
+
+// 실행 패킷 — 다음 전이마다 "무엇이 이미 충족됐고, 무엇이 아직 없고, 어떤 run을 인용할 수 있는가"를 기계가
+// 계산한다. 모델이 Delivery 절차 전체를 다시 읽고 추론하는 대신 이 목록만 보고 한 걸음을 고른다. 판정은 여전히
+// transition이 한다: 여기서 ready=true여도 transition은 같은 검사를 다시 수행하고 실패할 수 있다.
+const TRANSITION_PACKETS = {
+  VALID_RED: {
+    requires: ['--run', '--evidence', '--row'],
+    runPredicate: isReportedFailingRun,
+    runKind: 'reported failing run',
+    readNodes: ['delivery-ledger', 'delivery-red'],
+  },
+  IMPLEMENTED_GREEN: {
+    requires: ['--run', '--evidence'],
+    runPredicate: isReportedPassingRun,
+    runKind: 'reported passing run',
+    readNodes: ['delivery-ledger', 'delivery-implementation-decision', 'delivery-green-review'],
+  },
+  REVIEW_VERIFIED: {
+    requires: ['--run', '--evidence', '--findings'],
+    runPredicate: isReportedPassingRun,
+    runKind: 'reported passing run',
+    readNodes: ['delivery-green-review', 'subagent-review', 'review-checklist'],
+  },
+  NEEDS_DECISION: { requires: ['--reason'], readNodes: [] },
+  ORACLE_READY: { requires: ['--reason'], readNodes: ['card-confirmation-lock'] },
+  FAIL: { requires: ['--reason'], readNodes: [] },
+}
+
+function transitionPackets({ state, directory, runEntries, staleRunIds, blockers, evidence }) {
+  const dir = portablePath(process.cwd(), directory)
+  const stale = new Set(staleRunIds)
+  return (TRANSITIONS[state.state] ?? []).map((to) => {
+    const spec = TRANSITION_PACKETS[to]
+    const requires = [...spec.requires]
+    const packetBlockers = [...blockers]
+    let candidateRuns = []
+    if (spec.runPredicate) {
+      candidateRuns = runEntries
+        .filter((entry) => !stale.has(entry.runId) && spec.runPredicate(entry))
+        .map((entry) => entry.runId)
+      if (candidateRuns.length === 0) packetBlockers.push(`NO_FRESH_${spec.runKind === 'reported failing run' ? 'RED' : 'GREEN'}_RUN`)
+      if (evidence.status === 'pending' && evidence.missingRows?.length > 0 && !packetBlockers.includes('EVIDENCE_MISSING_ROWS')) {
+        packetBlockers.push('EVIDENCE_MISSING_ROWS')
+      }
+    }
+    if (to === 'VALID_RED') {
+      const refreshing = state.state === 'VALID_RED'
+      const milestones = state.milestones ?? []
+      if (!refreshing && milestones.length > 0) requires.splice(requires.indexOf('--row'), 1)
+      if (refreshing && (state.budgets?.harness?.spent ?? 0) <= (state.harnessBudgetAtValidRed ?? 0)) {
+        packetBlockers.push('HARNESS_BUDGET_REQUIRED')
+      }
+    }
+    if (to === 'REVIEW_VERIFIED' && state.risk === 'high') {
+      requires.push('--intersect', '--mutation-run', '--mutation-row')
+    }
+    const example = [`oracle-run.mjs transition --dir ${dir} --to ${to}`]
+    for (const flag of requires) {
+      if (flag === '--run') example.push(`--run ${candidateRuns[0] ?? '<runId>'}`)
+      else example.push(`${flag} <${flag.slice(2)}>`)
+    }
+    return {
+      to,
+      ready: packetBlockers.length === 0,
+      blockers: [...new Set(packetBlockers)],
+      requires,
+      candidateRuns,
+      readNodes: spec.readNodes,
+      example: example.join(' '),
+    }
+  })
+}
+
 async function reportStatus(options) {
   if (!options.dir || (!options.json && !options['changed-files'])) {
     throw new CliError('USAGE', 'status requires --dir and --json (or --changed-files)', 2)
@@ -2767,6 +2840,14 @@ async function reportStatus(options) {
         },
         blockers,
         nextLegalActions: TRANSITIONS[state.state] ?? [],
+        nextActions: transitionPackets({
+          state,
+          directory,
+          runEntries,
+          staleRunIds: staleOrMissingRuns,
+          blockers,
+          evidence,
+        }),
       },
       null,
       2,

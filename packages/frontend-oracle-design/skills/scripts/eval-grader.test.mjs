@@ -457,3 +457,91 @@ test('a declared node exception is tolerated in the result but any other extra n
     ['LOADED_NODES_MISMATCH'],
   )
 })
+
+const passingRecord = {
+  caseId: 'fod-bb-01',
+  risk: 'Low',
+  lane: 'low-fast-path',
+  status: 'GREEN',
+  loadedNodes: ['low-fast-path'],
+  ceremony: [],
+  labels: ['repo-validation'],
+  policyInvention: false,
+  falseReviewVerified: false,
+  toolCalls: 1,
+  tokens: 10,
+  runtimeMs: 20,
+  errors: [],
+}
+
+test('distinct replicateIds grade a fixture as pass^k and record pass@k separately', async (t) => {
+  const path = await tempFile(
+    t,
+    'replicates.jsonl',
+    [
+      JSON.stringify({ ...passingRecord, replicateId: 'r1' }),
+      JSON.stringify({ ...passingRecord, replicateId: 'r2', status: 'NEEDS_DECISION' }),
+      JSON.stringify({ ...passingRecord, replicateId: 'r3' }),
+    ].join('\n'),
+  )
+
+  const result = run(path, '--allow-partial')
+  assert.equal(result.status, 1)
+  const report = JSON.parse(result.stdout)
+  assert.deepEqual([report.total, report.passed, report.failed], [1, 0, 1])
+  const graded = report.cases[0]
+  assert.equal(graded.pass, false)
+  assert.equal(graded.passAtK, true)
+  assert.equal(graded.k, 3)
+  assert.equal(graded.passedReplicates, 2)
+  assert.deepEqual(
+    graded.failures.map((failure) => [failure.code, failure.replicateId]),
+    [['STATUS_MISMATCH', 'r2']],
+  )
+  assert.deepEqual(
+    graded.replicates.map((entry) => [entry.replicateId, entry.pass]),
+    [
+      ['r1', true],
+      ['r2', false],
+      ['r3', true],
+    ],
+  )
+  assert.equal(report.metrics.passAllK, 0)
+  assert.equal(report.metrics.passAtK, 1)
+  assert.equal(report.metrics.replicatedCases, 1)
+  assert.equal(report.metrics.toolCalls, 3)
+})
+
+test('all replicates passing yields pass^k = 1 and a single-record artifact reports no replicate metrics', async (t) => {
+  const allPass = await tempFile(
+    t,
+    'all-pass.jsonl',
+    [JSON.stringify({ ...passingRecord, replicateId: 'r1' }), JSON.stringify({ ...passingRecord, replicateId: 'r2' })].join('\n'),
+  )
+  const report = JSON.parse(run(allPass, '--allow-partial').stdout)
+  assert.equal(report.passed, 1)
+  assert.equal(report.cases[0].pass, true)
+  assert.equal(report.metrics.passAllK, 1)
+
+  const single = await tempFile(t, 'single.jsonl', `${JSON.stringify(passingRecord)}\n`)
+  const singleReport = JSON.parse(run(single, '--allow-partial').stdout)
+  assert.equal(singleReport.metrics.passAllK, null)
+  assert.equal(singleReport.metrics.passAtK, null)
+  assert.equal(singleReport.metrics.replicatedCases, 0)
+})
+
+test('repeats that share or omit a replicateId remain DUPLICATE_CASE', async (t) => {
+  const shared = await tempFile(
+    t,
+    'shared.jsonl',
+    [JSON.stringify({ ...passingRecord, replicateId: 'r1' }), JSON.stringify({ ...passingRecord, replicateId: 'r1' })].join('\n'),
+  )
+  assert.deepEqual(JSON.parse(run(shared, '--allow-partial').stdout).cases[0].failures, [{ code: 'DUPLICATE_CASE', count: 2 }])
+
+  const mixed = await tempFile(
+    t,
+    'mixed.jsonl',
+    [JSON.stringify({ ...passingRecord, replicateId: 'r1' }), JSON.stringify(passingRecord)].join('\n'),
+  )
+  assert.deepEqual(JSON.parse(run(mixed, '--allow-partial').stdout).cases[0].failures, [{ code: 'DUPLICATE_CASE', count: 2 }])
+})

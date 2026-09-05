@@ -2171,6 +2171,46 @@ test('status --json reports current state, blockers, budgets, and orphaned reser
   assert.ok(status.nextLegalActions.includes('VALID_RED'))
 })
 
+test('status --json nextActions is an execution packet: per transition, what is satisfied, what is missing, which run to cite', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { risk: 'high' })
+
+  const before = JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout)
+  assert.deepEqual(
+    before.nextActions.map((action) => action.to),
+    before.nextLegalActions,
+  )
+  const redBefore = before.nextActions.find((action) => action.to === 'VALID_RED')
+  assert.equal(redBefore.ready, false)
+  assert.deepEqual(redBefore.blockers, ['NO_FRESH_RED_RUN'])
+  assert.deepEqual(redBefore.requires, ['--run', '--evidence', '--row'])
+  assert.deepEqual(redBefore.candidateRuns, [])
+  assert.deepEqual(redBefore.readNodes, ['delivery-ledger', 'delivery-red'])
+  assert.match(redBefore.example, /transition --dir .* --to VALID_RED --run <runId> --evidence <evidence> --row <row>/)
+  const decision = before.nextActions.find((action) => action.to === 'NEEDS_DECISION')
+  assert.equal(decision.ready, true)
+  assert.deepEqual(decision.requires, ['--reason'])
+
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
+  assert.equal(redRun(oracleDirectory).status, 0)
+
+  const after = JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout)
+  const redAfter = after.nextActions.find((action) => action.to === 'VALID_RED')
+  assert.equal(redAfter.ready, true)
+  assert.deepEqual(redAfter.candidateRuns, ['r-001'])
+  assert.match(redAfter.example, /--run r-001 /)
+  const greenAfter = after.nextActions.find((action) => action.to === 'IMPLEMENTED_GREEN')
+  assert.equal(greenAfter.ready, false)
+  assert.deepEqual(greenAfter.blockers, ['NO_FRESH_GREEN_RUN'])
+
+  // 패킷은 판정이 아니다: ready=true여도 transition은 같은 검사를 다시 한다.
+  assert.equal(transition(oracleDirectory, 'VALID_RED', 'r-001').status, 0)
+  const red = JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout)
+  const review = red.nextActions.find((action) => action.to === 'IMPLEMENTED_GREEN')
+  assert.deepEqual(review.readNodes, ['delivery-ledger', 'delivery-implementation-decision', 'delivery-green-review'])
+  const refresh = red.nextActions.find((action) => action.to === 'VALID_RED')
+  assert.ok(refresh.blockers.includes('HARNESS_BUDGET_REQUIRED'))
+})
+
 test('O11: budget spend is counted once per distinct current change digest', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
   await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')

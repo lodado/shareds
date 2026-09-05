@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// Grades a results artifact against blackbox-corpus.json. A fixture may appear once, or k times with
+// distinct `replicateId`s (run-live.mjs --replicates k). Replicates are graded independently: the case
+// passes only when every replicate passes (pass^k, the reliability view) and `passAtK` records
+// whether any replicate passed (pass@k, the capability view). Repeats without distinct replicateIds
+// are still DUPLICATE_CASE — an artifact must say that it meant to repeat.
 import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
@@ -27,6 +32,51 @@ function isRecord(value) {
 
 function caseIdOf(result) {
   return isRecord(result) ? result.caseId : null
+}
+
+function replicateIdOf(result) {
+  if (!isRecord(result)) return null
+  if (typeof result.replicateId !== 'string' || !result.replicateId) return null
+  return result.replicateId
+}
+
+/** Every entry carries its own replicateId and no two share one — otherwise the repeats are duplicates. */
+function distinctReplicates(entries) {
+  const ids = entries.map(replicateIdOf)
+  return ids.every(Boolean) && new Set(ids).size === ids.length
+}
+
+function gradeFixture(matching, fixture, metricsSchema) {
+  if (matching.length === 1) {
+    const graded = gradeCase(matching[0], fixture, metricsSchema)
+    const replicateId = replicateIdOf(matching[0])
+    if (replicateId) graded.replicates = [{ replicateId, pass: graded.pass, failures: graded.failures }]
+    return graded
+  }
+  if (!distinctReplicates(matching)) {
+    const graded = gradeCase(matching[0], fixture, metricsSchema)
+    graded.failures.push({ code: 'DUPLICATE_CASE', count: matching.length })
+    graded.routingPass = false
+    graded.pass = false
+    return graded
+  }
+  const replicates = matching.map((result) => {
+    const graded = gradeCase(result, fixture, metricsSchema)
+    return { replicateId: replicateIdOf(result), pass: graded.pass, routingPass: graded.routingPass, failures: graded.failures }
+  })
+  const passedCount = replicates.filter((entry) => entry.pass).length
+  return {
+    caseId: fixture.id,
+    pass: passedCount === replicates.length,
+    passAtK: passedCount > 0,
+    routingPass: replicates.every((entry) => entry.routingPass),
+    k: replicates.length,
+    passedReplicates: passedCount,
+    failures: replicates.flatMap((entry) =>
+      entry.failures.map((failure) => ({ ...failure, replicateId: entry.replicateId })),
+    ),
+    replicates: replicates.map(({ replicateId, pass, failures }) => ({ replicateId, pass, failures })),
+  }
 }
 
 function numericMetric(result, field) {
@@ -196,6 +246,9 @@ async function main() {
           cases: [{ caseId: null, pass: false, routingPass: false, failures: [{ code: 'EMPTY_RESULTS' }] }],
           metrics: {
             routingAccuracy: 0,
+            passAllK: null,
+            passAtK: null,
+            replicatedCases: 0,
             policyInvention: 0,
             falseReviewVerified: 0,
             toolCalls: 0,
@@ -230,13 +283,7 @@ async function main() {
     if (matching.length === 0) {
       return { caseId: fixture.id, pass: false, routingPass: false, failures: [{ code: 'MISSING_CASE' }] }
     }
-    const graded = gradeCase(matching[0], fixture, metricsSchema)
-    if (matching.length > 1) {
-      graded.failures.push({ code: 'DUPLICATE_CASE', count: matching.length })
-      graded.routingPass = false
-    }
-    graded.pass = graded.failures.length === 0
-    return graded
+    return gradeFixture(matching, fixture, metricsSchema)
   })
   for (const result of results) {
     const fixture = fixtures.get(caseIdOf(result))
@@ -251,6 +298,7 @@ async function main() {
       })
   }
   const passed = cases.filter((entry) => entry.pass).length
+  const replicated = cases.filter((entry) => Number.isInteger(entry.k) && entry.k > 1)
   const checkedAdd = (left, right) => {
     if (!Number.isSafeInteger(left + right)) throw new EvalInputError('AGGREGATE_OVERFLOW')
     return left + right
@@ -275,6 +323,10 @@ async function main() {
     cases,
     metrics: {
       routingAccuracy: cases.length ? cases.filter((entry) => entry.routingPass).length / cases.length : 0,
+      // pass^k over the cases that were actually replicated; 1 when nothing was replicated is not claimed.
+      passAllK: replicated.length ? replicated.filter((entry) => entry.pass).length / replicated.length : null,
+      passAtK: replicated.length ? replicated.filter((entry) => entry.passAtK).length / replicated.length : null,
+      replicatedCases: replicated.length,
       policyInvention: totals.policyInvention,
       falseReviewVerified: totals.falseReviewVerified,
       toolCalls: totals.toolCalls,
