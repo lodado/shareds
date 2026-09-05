@@ -209,7 +209,10 @@ above in one call with the same verification — see [`ledger.md`](ledger.md) fo
 `RED_EVIDENCE_UNVERIFIABLE`·`RED_EVIDENCE_MISSING` prevent an unrelated compile/setup failure or an
 exit-only run from being used as RED. `PRODUCTION_TOUCHED_BEFORE_RED` is machine evidence that
 production was touched before the tests — revert the changed files to keep the order and do not route
-around it. The transition stores the test file digest·assertion count·expected-value literal multiset
+around it. On Claude Code the plugin's PreToolUse hook (`hooks/hooks.json` →
+`scripts/oracle-guard-hook.mjs`) denies such a write before it lands with the same code, and after
+`VALID_RED` denies a write that adds a `TEST_WEAKENED` token to a test; the transition gate stays
+the authority, and a host without hooks relies on it alone. The transition stores the test file digest·assertion count·expected-value literal multiset
 at this point as the GREEN gate baseline: `toBe(1)` → `toBe(2)` keeps the assertion count and still
 fails `TEST_WEAKENED`, because the expected values are the card's, not the implementation's. The
 frozen evidence mapping covers `rows`, `paths`, `frames`, and `sequence` together, so every name
@@ -928,10 +931,24 @@ After the card tests pass, actually run the repo verifications pinned with `--re
 through the `exec` of each label.
 
 1. targeted test
-2. impact-scope test
+2. impact-scope test — the required label `impact`. The file list is machine-fed, never judged:
+   `oracle-run.mjs status --dir <dir> --changed-files` prints every path changed since the init
+   baseline, one per line, and the repo's own related-tests command consumes it (`vitest related`,
+   `jest --findRelatedTests`, `nx affected`). Other locked cards whose evidence tests fall in that
+   set are reported as preserved in the final report.
 3. typecheck and lint
 4. Oracle source lock verify and any structure verification command that exists in the repo
 5. required root or package test/build
+6. side-effect ownership — `oracle-verify.mjs scan --side-effects --oracle <card> --path <changed
+production files>`. Every known side-effect token in the diff (network·storage·navigation·
+   messaging·analytics·timer·subscription·console·notification) must fall in a category some card
+   row's side-effect column owns, or carry an `oracle:side-effect <row|reason>` comment on the
+   same or the previous line. The exemption needs a real row (`oracle:side-effect O3`) or a reason
+   in words; a bare marker, or a row the card does not have, is `SIDE_EFFECT_EXEMPTION_INVALID` —
+   the exemption is audited like an `impossible` witness, never a free pass. `SIDE_EFFECT_UNOWNED` routes like the reviewer's finding would: the
+   card lacks the row → `POLICY_GAP`; the card has the row and the implementation added an effect
+   it never asked for → `PRODUCT_DEFECT`. The token list is known and finite — a clean scan is
+   not evidence of no side effects.
 
 If there is a performance requirement·improvement claim, add the existing repo command that checks a
 same-condition baseline/after as a required `performance` label. If the exported shared/package API
@@ -1353,6 +1370,25 @@ verification is missing it is `EVIDENCE_GAP`, and if an observation result or AP
 decided it is `POLICY_GAP`. A more preferred naming·folder·abstraction style is `NON_ORACLE_OPINION`
 and is not grounds for blocking. Also check whether a mandatory constraint was lowered into a
 product·visual preference.
+
+## Blind row mapping — the row↔test relevance check
+
+`oracle-verify.mjs evidence` proves only that the quoted test name passed in the quoted run. Whether
+that test enforces the row it is mapped to was, until now, one checklist item — an unmeasured
+judgment by a reviewer who had already seen `evidence.json`. The blind mapping makes it a
+two-sample check: a context-free reviewer receives **only the card's contract rows and the test
+source files** — never `evidence.json`, the review packet, or the implementation decision — and
+returns, for every test name, the row or rows it enforces:
+
+```json
+{ "save > shows pending and POSTs once": ["O1", "O2"], "save > keeps input on 5xx": "O3" }
+```
+
+`oracle-verify.mjs review --blind-map <file>` compares it with the evidence mapping before the
+binding checks. A row whose test the blind reader mapped elsewhere, or to nothing, is
+`EVIDENCE_MAPPING_DISPUTED`. The remedy is never a mapping edit: re-read the disputed row — a test
+that enforces a different row is an `EVIDENCE_GAP` for the row it left unowned. High risk runs the
+blind mapping always; Medium runs it when a row is mapped N:1 onto a path test.
 
 ## Reviewer Checklist
 

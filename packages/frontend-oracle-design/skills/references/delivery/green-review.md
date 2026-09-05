@@ -44,10 +44,24 @@ After the card tests pass, actually run the repo verifications pinned with `--re
 through the `exec` of each label.
 
 1. targeted test
-2. impact-scope test
+2. impact-scope test — the required label `impact`. The file list is machine-fed, never judged:
+   `oracle-run.mjs status --dir <dir> --changed-files` prints every path changed since the init
+   baseline, one per line, and the repo's own related-tests command consumes it (`vitest related`,
+   `jest --findRelatedTests`, `nx affected`). Other locked cards whose evidence tests fall in that
+   set are reported as preserved in the final report.
 3. typecheck and lint
 4. Oracle source lock verify and any structure verification command that exists in the repo
 5. required root or package test/build
+6. side-effect ownership — `oracle-verify.mjs scan --side-effects --oracle <card> --path <changed
+production files>`. Every known side-effect token in the diff (network·storage·navigation·
+   messaging·analytics·timer·subscription·console·notification) must fall in a category some card
+   row's side-effect column owns, or carry an `oracle:side-effect <row|reason>` comment on the
+   same or the previous line. The exemption needs a real row (`oracle:side-effect O3`) or a reason
+   in words; a bare marker, or a row the card does not have, is `SIDE_EFFECT_EXEMPTION_INVALID` —
+   the exemption is audited like an `impossible` witness, never a free pass. `SIDE_EFFECT_UNOWNED` routes like the reviewer's finding would: the
+   card lacks the row → `POLICY_GAP`; the card has the row and the implementation added an effect
+   it never asked for → `PRODUCT_DEFECT`. The token list is known and finite — a clean scan is
+   not evidence of no side effects.
 
 If there is a performance requirement·improvement claim, add the existing repo command that checks a
 same-condition baseline/after as a required `performance` label. If the exported shared/package API

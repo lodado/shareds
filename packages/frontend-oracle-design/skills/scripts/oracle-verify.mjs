@@ -1,14 +1,23 @@
 #!/usr/bin/env node
 
 import { Buffer } from 'node:buffer'
-import { lstat, readFile, realpath } from 'node:fs/promises'
-import { dirname, isAbsolute, relative, resolve } from 'node:path'
+import { lstat, readdir, readFile, realpath } from 'node:fs/promises'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { inflateSync } from 'node:zlib'
 import { isTrustedAdapter } from './oracle-adapters.mjs'
 import { generateFromDocument, TAXONOMY_FAMILIES } from './oracle-frames.mjs'
-import { assertSnapshotUnchanged, isPathInside, sha256, snapshotRegularFile, stableStringify } from './oracle-fs.mjs'
+import {
+  assertSnapshotUnchanged,
+  isPathInside,
+  scanSideEffects,
+  sha256,
+  SIDE_EFFECT_CATEGORIES,
+  SIDE_EFFECT_EXEMPTION_MARKER,
+  snapshotRegularFile,
+  stableStringify,
+} from './oracle-fs.mjs'
 
 const FLAG_NAMES = [
   'oracle',
@@ -24,7 +33,11 @@ const FLAG_NAMES = [
   'packet',
   'revision',
   'lock',
+  'blind-map',
 ]
+
+/** 값 없는 플래그 — `card --ir`, `card --repo-policies`, `scan --side-effects`. */
+const BOOLEAN_FLAGS = new Set(['ir', 'repo-policies', 'side-effects'])
 
 const CLASSIFICATIONS = [
   'POLICY_GAP',
@@ -146,6 +159,12 @@ const NEXT_ACTIONS = {
   ASSUMPTION_DRIFT: 're-run the landmine sweep for the drifted packages in a new revision — this is not a lock failure',
   LOCK_INVALID: 'FAIL — the determinism judgment is impossible; do not substitute LLM judgment',
   LEDGER_INVALID: 'do not edit runs.jsonl — recover from `oracle-run.mjs status --json`',
+  EVIDENCE_MAPPING_DISPUTED:
+    'the blind read and evidence.json disagree — re-read the disputed rows; a test that enforces a different row is EVIDENCE_GAP, never a mapping edit',
+  BLIND_MAP_INVALID: 'the blind map must be JSON of { "<test name>": "O1" | ["O1", "O2"] } written by a reviewer who never saw evidence.json',
+  SIDE_EFFECT_UNOWNED:
+    'add the row whose side-effect column owns that category, or exempt the line with `oracle:side-effect <row|reason>` — an unrequested effect is PRODUCT_DEFECT, a missing row is POLICY_GAP',
+  SIDE_EFFECT_EXEMPTION_INVALID: 'write `oracle:side-effect O3` (a real row) or `oracle:side-effect <reason>` — a bare marker exempts nothing',
 }
 
 /** 인수 오류에는 처방이 없다. */
@@ -162,6 +181,10 @@ function parseOptions(args) {
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index]
     const name = flag.startsWith('--') ? flag.slice(2) : ''
+    if (BOOLEAN_FLAGS.has(name)) {
+      options[name] = true
+      continue
+    }
     const value = args[index + 1]
 
     if (!FLAG_NAMES.includes(name) || value === undefined) {
@@ -279,12 +302,265 @@ function sectionLines(lines, title) {
   return section
 }
 
+// `<oracle-id>.P7`처럼 점이 앞선 id는 다른 오라클의 정책이다 — 이 카드의 P*로 세지 않는다
 function policyIds(value) {
-  return [...new Set(value.match(/\bP\d+\b/g) ?? [])]
+  return [...new Set(value.match(/(?<![\w.])P\d+\b/g) ?? [])]
 }
 
 function rowIds(value) {
   return [...new Set(value.match(/\b[OD]\d+\b/g) ?? [])]
+}
+
+const WITNESS_PATTERN = /\b(code|constraint|type|docs)\(([^)]+)\)/
+const LOOKUP_PATTERN = /\b(docs|code|issue|changelog)\(([^)]+)\)/
+
+const DISPOSITION_ENUM = {
+  sweep: 'disposition must be covered(O*) | impossible: mechanism — witness | needs-decision: question | needs-evidence: fact — lookup',
+  deviation:
+    'disposition must be covered(O*) | impossible: mechanism — witness | needs-decision: question | needs-evidence: fact — lookup',
+  frame:
+    'disposition must be covered(O*) | independent(O*): reason | impossible: mechanism — witness | needs-decision: question | needs-evidence: fact — lookup',
+  landmine:
+    'disposition must be covered(O*) | impossible: mechanism — witness | needs-decision: question | needs-evidence: fact — lookup | N/A reason',
+}
+
+/** disposition 셀 하나를 구조로 — sweep·deviation·frame·landmine 4계열이 같은 파서를 쓴다. IR의 disposition 필드다. */
+function parseDisposition(value) {
+  const text = value.trim()
+  if (isEmptyCell(text)) return { type: 'empty', text }
+  const cited = text.match(/^(covered|independent)\(([^)]+)\)(?::\s*(\S.*))?$/)
+  if (cited) {
+    const [, verb, ids, reason] = cited
+    const subrefs = [...new Set(ids.match(/\b[OD]\d+\.(?:Then|Never)\b/g) ?? [])]
+    return { type: verb, rows: rowIds(ids), subrefs, reason: reason ?? null, text }
+  }
+  if (/^impossible:\s*\S/.test(text)) {
+    const witness = text.match(WITNESS_PATTERN)
+    return { type: 'impossible', witness: witness ? { kind: witness[1], ref: witness[2].trim() } : null, text }
+  }
+  if (/^needs-decision:\s*\S/.test(text)) return { type: 'needs-decision', text }
+  if (/^needs-evidence:\s*\S/.test(text)) {
+    const lookup = text.match(LOOKUP_PATTERN)
+    return { type: 'needs-evidence', lookup: lookup ? { kind: lookup[1], ref: lookup[2].trim() } : null, text }
+  }
+  if (/^N\/A/i.test(text)) return { type: 'na', text }
+  return { type: 'unknown', text }
+}
+
+/** code()·constraint() witness는 실재를 검사한다. type()·docs()는 존재만 — 관련성은 역-2-sample 소관. */
+async function checkWitness(witness, context, label) {
+  if (witness.kind === 'constraint') {
+    if (context.sourceIds.has(witness.ref)) return []
+    return [`impossible-witness-invalid: ${label}: constraint(${witness.ref}) is not a registered Source Registry ID`]
+  }
+  if (witness.kind === 'code') {
+    const match = witness.ref.match(/^([^#]+)#L(\d+)(?:-L?(\d+))?$/)
+    if (!match) return [`impossible-witness-invalid: ${label}: code() must be code(<repo-path>#L<a>-L<b>)`]
+    const [, path, from, to] = match
+    const content = await readFile(resolve(context.rootDirectory, path), 'utf8').catch(() => null)
+    if (content === null) {
+      return [`impossible-witness-invalid: ${label}: code(${path}) does not exist under ${context.rootDirectory}`]
+    }
+    const total = content.split('\n').length
+    const first = Number(from)
+    const last = Number(to ?? from)
+    if (first < 1 || last > total || first > last) {
+      return [`impossible-witness-invalid: ${label}: code(${witness.ref}) line range exceeds the file (${total} lines)`]
+    }
+  }
+  return []
+}
+
+/**
+ * 4계열 공통 판정 검사 — 발행 코드는 계열별로 유지하고(`sweep-disposition` 등), witness·lookup 코드는 전역이다.
+ * context: { code, rowCode, label, enumText, seenRows, sourceIds, rootDirectory, allowIndependent, allowNa, frameId }
+ */
+async function checkDisposition(parsed, context) {
+  const issues = []
+  const { code, rowCode, label, enumText } = context
+
+  if (parsed.type === 'covered' || parsed.type === 'independent') {
+    if (parsed.type === 'independent' && !context.allowIndependent) return [`${code}: ${label}: ${enumText}`]
+    if (parsed.rows.length === 0) issues.push(`${code}: ${label}: ${parsed.type}() must cite O*/D* rows`)
+    for (const id of parsed.rows) {
+      if (!context.seenRows.has(id)) issues.push(`${rowCode}: ${label}: ${id} is not a contract row`)
+    }
+    if (parsed.type === 'independent' && !parsed.reason) {
+      issues.push(`${code}: ${label}: independent() must name why the choices cannot change the outcome`)
+    }
+    if (parsed.type === 'independent' && context.frameId && !context.frameId.startsWith('F')) {
+      issues.push(`${code}: ${label}: independent() applies to F* combination frames only`)
+    }
+    if (parsed.type === 'covered' && parsed.reason) {
+      issues.push(`${code}: ${label}: covered() takes no reason — use independent() for a claim of independence`)
+    }
+    return issues
+  }
+  if (parsed.type === 'impossible') {
+    if (!parsed.witness) {
+      return [
+        `impossible-witness-missing: ${label}: impossible needs a witness — code(<path>#La-Lb) | constraint(S*) | type(<expr>) | docs(<anchor>)`,
+      ]
+    }
+    return checkWitness(parsed.witness, context, label)
+  }
+  if (parsed.type === 'needs-decision') return []
+  if (parsed.type === 'needs-evidence') {
+    if (parsed.lookup) return []
+    return [
+      `needs-evidence-lookup-missing: ${label}: needs-evidence needs a lookup — docs(<anchor>) | code(<path>) | issue(<url>) | changelog(<ref>)`,
+    ]
+  }
+  if (parsed.type === 'na' && context.allowNa) return []
+  return [`${code}: ${label}: ${enumText}`]
+}
+
+/** 카드가 `.ai/oracles/<id>/` 아래에 있으면 레포 루트, 아니면 카드 디렉터리 — code() witness의 기준. */
+function oracleRootDirectory(cardPath) {
+  const cardDirectory = dirname(resolve(cardPath))
+  const segments = cardDirectory.split(/[\\/]/)
+  const markerIndex = segments.lastIndexOf('.ai')
+  return markerIndex === -1 ? cardDirectory : segments.slice(0, markerIndex).join('/')
+}
+
+function tableCells(lines, section, header) {
+  return sectionLines(lines, section)
+    .filter((line) => line.trim().startsWith('|'))
+    .map((line) => splitRow(line.trim()))
+    .filter((cells) => cells[0] !== header && !/^:?-+:?$/.test(cells[0]))
+}
+
+/** 랜드마인은 패키지별 다중 섹션 — 헤딩에서 패키지 이름을 함께 거둔다. */
+function landmineTable(lines) {
+  const rows = []
+  let pkg = null
+  for (const line of lines) {
+    if (line.startsWith('## ')) {
+      pkg = line.startsWith('## Dependency landmines') ? line.replace(/^## Dependency landmines\s*[—-]?\s*/, '').trim() : null
+      continue
+    }
+    if (pkg === null || !line.trim().startsWith('|')) continue
+    const cells = splitRow(line.trim())
+    if (cells[0] === 'Landmine' || /^:?-+:?$/.test(cells[0])) continue
+    rows.push({ pkg, cells })
+  }
+  return rows
+}
+
+/**
+ * Judgment Space IR — 카드 바이트에서 파생하는 정규화 레코드. 저작 표면은 markdown뿐이고 이 함수는 언제나 같은 입력에
+ * 같은 출력을 낸다. id는 삽입에 안정한 파생 id: sweep:P3×P1 · deviation:P1:wrong-timing-order · frame:F18 · landmine:<셀>.
+ */
+export function buildJudgmentSpace(cardText) {
+  const lines = markdownLines(cardText)
+  const records = []
+
+  for (const [pair = '', disposition = ''] of tableCells(lines, 'Interaction sweep', 'Pair')) {
+    const parts = pair
+      .split('×')
+      .map((part) => part.trim())
+      .filter(Boolean)
+    const tokens = parts.map((part) => policyIds(part)[0] ?? part.replace(/\s*\(.*\)\s*$/, ''))
+    records.push({
+      id: `sweep:${tokens.join('×')}`,
+      origin: { kind: 'interaction', pair, policies: policyIds(pair) },
+      disposition: parseDisposition(disposition),
+    })
+  }
+
+  for (const [policy = '', type = '', disposition = ''] of tableCells(lines, 'Deviations', 'Policy')) {
+    const types = type === 'static' ? ['unsafe-provided', 'wrong-timing-order', 'stopped-early-applied-long'] : [type]
+    for (const deviationType of types) {
+      records.push({
+        id: `deviation:${policy}:${deviationType}`,
+        origin: { kind: 'deviation', policy, type: deviationType, shorthand: type === 'static' },
+        disposition: parseDisposition(disposition),
+      })
+    }
+  }
+
+  for (const [frameId = '', disposition = ''] of tableCells(lines, 'Frame dispositions', 'Frame')) {
+    records.push({ id: `frame:${frameId}`, origin: { kind: 'frame', frame: frameId }, disposition: parseDisposition(disposition) })
+  }
+
+  for (const { pkg, cells } of landmineTable(lines)) {
+    const [landmine = '', citation = '', disposition = ''] = cells
+    records.push({
+      id: `landmine:${landmine}`,
+      origin: { kind: 'landmine', package: pkg, citation },
+      disposition: parseDisposition(disposition),
+    })
+  }
+
+  return records
+}
+
+/**
+ * surface 토큰 = 백틱 span, camelCase·PascalCase 식별자, snake_case, 경로꼴(`a/b`). 하이픈 산문(out-of-order)은
+ * 영어 단어지 표면이 아니라서 제외한다 — 모든 카드가 공유하는 낱말은 counterpart를 말해주지 않는다.
+ */
+function surfaceTokens(text) {
+  const tokens = new Set()
+  for (const span of text.match(/`[^`]+`/g) ?? []) tokens.add(span.slice(1, -1).trim().toLowerCase())
+  for (const word of text.match(/[a-z][\w/.]{3,}/gi) ?? []) {
+    const camel = /^[a-z]+[A-Z]\w*$/.test(word) || /^[A-Z][a-z]+[A-Z]\w*$/.test(word)
+    const snake = /^\w+$/.test(word) && word.includes('_')
+    const pathLike = /^[\w.]+\/[\w./]+$/.test(word)
+    if (camel || snake || pathLike) tokens.add(word.toLowerCase())
+  }
+  return tokens
+}
+
+function policyLines(lines) {
+  const entries = []
+  let inPolicySection = false
+  for (const line of lines) {
+    if (line.startsWith('## ')) inPolicySection = POLICY_SECTION_TITLES.some((title) => line.includes(title))
+    if (!inPolicySection || !line.startsWith('- ')) continue
+    const id = policyIdFromLine(line)
+    if (id) entries.push({ id, line, rows: rowIds(markedText(line, ROW_MARKERS)) })
+  }
+  return entries
+}
+
+/** 정책마다 surface 토큰 = 정책 문장 + 인용 행의 Given·When·Then·Never 셀. */
+function policySurfaces(cardText) {
+  const lines = markdownLines(cardText)
+  const rowText = new Map(parseRows(lines).map((row) => [row.id, Object.values(row.cells).join(' ')]))
+  return policyLines(lines).map((policy) => ({
+    id: policy.id,
+    tokens: surfaceTokens([policy.line, ...policy.rows.map((rowId) => rowText.get(rowId) ?? '')].join(' ')),
+  }))
+}
+
+/**
+ * 같은 레포의 다른 잠긴 카드가 결정한 정책 중 이 카드와 surface를 공유하는 것 — 스윕 counterpart 후보.
+ * 판정은 여전히 사람·LLM의 disposition이고, 이 함수는 우주를 넓힐 뿐이다.
+ */
+async function repoPolicyCandidates(cardPath, cardText) {
+  const oracleDirectory = dirname(resolve(cardPath))
+  const oraclesRoot = dirname(oracleDirectory)
+  const own = policySurfaces(cardText)
+  const candidates = []
+
+  const entries = await readdir(oraclesRoot, { withFileTypes: true }).catch(() => [])
+  for (const entry of entries) {
+    if (!entry.isDirectory() || join(oraclesRoot, entry.name) === oracleDirectory) continue
+    const siblingDirectory = join(oraclesRoot, entry.name)
+    const bytes = await readFile(join(siblingDirectory, 'oracle.md')).catch(() => null)
+    const lock = await readJson(join(siblingDirectory, 'oracle.lock.json'), 'LOCK_INVALID').catch(() => null)
+    if (!bytes || lock?.oracle?.sha256 !== sha256(bytes)) continue
+
+    for (const theirs of policySurfaces(bytes.toString('utf8'))) {
+      for (const mine of own) {
+        const shared = [...mine.tokens].filter((token) => theirs.tokens.has(token))
+        if (shared.length === 0) continue
+        candidates.push({ policy: mine.id, oracle: entry.name, counterpart: theirs.id, shared: shared.sort() })
+      }
+    }
+  }
+
+  return candidates.sort((left, right) => `${left.policy}${left.oracle}${left.counterpart}`.localeCompare(`${right.policy}${right.oracle}${right.counterpart}`))
 }
 
 function betweenMarkers(value, start, end) {
@@ -351,9 +627,34 @@ async function lintCard(options) {
   const card = await readFile(options.oracle, 'utf8').catch((error) => {
     throw new CliError('CARD_UNREADABLE', `Cannot read ${options.oracle}: ${error.message}`)
   })
+
+  // 데이터 뷰 — lint 없이 파생 IR을 덤프한다. 같은 바이트면 같은 출력.
+  if (options.ir) {
+    process.stdout.write(`${stableStringify(buildJudgmentSpace(card))}\n`)
+    return
+  }
+
+  // 오라클 간 기억 — 형제 카드의 잠긴 정책 중 surface를 공유하는 counterpart 후보. 정보일 뿐 게이트가 아니다.
+  if (options['repo-policies']) {
+    const candidates = await repoPolicyCandidates(options.oracle, card)
+    process.stdout.write(`REPO_POLICY_CANDIDATES ${candidates.length}\n`)
+    if (candidates.length > 0) {
+      process.stdout.write('# candidates — disposition each as a sweep counterpart; never paste them as rows\n')
+    }
+    for (const candidate of candidates) {
+      process.stdout.write(
+        `| ${candidate.policy} × ${candidate.oracle}.${candidate.counterpart} | needs-evidence: shared surface \`${candidate.shared.join(
+          '`, `',
+        )}\` — docs(.ai/oracles/${candidate.oracle}/oracle.md#${candidate.counterpart}) |\n`,
+      )
+    }
+    return
+  }
+
   const lines = markdownLines(card)
   const rows = parseRows(lines)
   const issues = []
+  const rootDirectory = oracleRootDirectory(options.oracle)
 
   const sourceSection = sectionLines(lines, 'Source Registry')
   if (sourceSection.length === 0) {
@@ -724,6 +1025,18 @@ async function lintCard(options) {
 
   // Deviations 섹션도 선택이다 — 있으면 P*×4 STPA 유형 커버리지와 disposition을 검증한다.
   const DEVIATION_TYPES = ['not-provided', 'unsafe-provided', 'wrong-timing-order', 'stopped-early-applied-long']
+  // 4계열 disposition 공통 컨텍스트 — 행 실재, 등록 출처(constraint witness), code() witness의 기준 디렉터리
+  const dispositionContext = { seenRows, sourceIds: new Set(sourceById.keys()), rootDirectory }
+  // lint는 승인된 최종 카드에만 돈다 — 살아남은 needs-decision·needs-evidence는 lock 차단(disposition-open)
+  const openCells = []
+  const checkCell = async (value, context) => {
+    const parsed = parseDisposition(value)
+    if (parsed.type === 'needs-decision' || parsed.type === 'needs-evidence') {
+      openCells.push(`${context.label}: ${parsed.type}`)
+    }
+    return checkDisposition(parsed, context)
+  }
+
   const deviations = sectionLines(lines, 'Deviations')
 
   if (deviations.length > 0) {
@@ -749,6 +1062,15 @@ async function lintCard(options) {
           issues.push(`deviation-disposition: ${policy} × static: shorthand requires impossible: <reason>`)
           continue
         }
+        issues.push(
+          ...(await checkCell(disposition, {
+            ...dispositionContext,
+            code: 'deviation-disposition',
+            rowCode: 'deviation-row-unknown',
+            label: `${policy} × static`,
+            enumText: DISPOSITION_ENUM.deviation,
+          })),
+        )
         if (!typesByPolicy.has(policy)) typesByPolicy.set(policy, new Set())
         for (const closed of ['unsafe-provided', 'wrong-timing-order', 'stopped-early-applied-long']) {
           typesByPolicy.get(policy).add(closed)
@@ -767,18 +1089,15 @@ async function lintCard(options) {
         issues.push(`deviation-disposition: ${policy} × ${type}: disposition is empty`)
         continue
       }
-      const covered = value.match(/^covered\(([^)]+)\)$/)
-      if (covered) {
-        const cited = rowIds(covered[1])
-        if (cited.length === 0) issues.push(`deviation-disposition: ${policy} × ${type}: covered() must cite O*/D* rows`)
-        for (const id of cited) {
-          if (!seenRows.has(id)) issues.push(`deviation-row-unknown: ${policy} × ${type}: ${id} is not a contract row`)
-        }
-      } else if (!/^impossible:\s*\S/.test(value) && !/^needs-decision:\s*\S/.test(value)) {
-        issues.push(
-          `deviation-disposition: ${policy} × ${type}: disposition must be covered(O*) | impossible: reason | needs-decision: question`,
-        )
-      }
+      issues.push(
+        ...(await checkCell(value, {
+          ...dispositionContext,
+          code: 'deviation-disposition',
+          rowCode: 'deviation-row-unknown',
+          label: `${policy} × ${type}`,
+          enumText: DISPOSITION_ENUM.deviation,
+        })),
+      )
     }
 
     for (const policyId of policies.keys()) {
@@ -816,16 +1135,16 @@ async function lintCard(options) {
       issues.push(`landmine-undispositioned: "${landmine}": disposition is empty`)
       continue
     }
-    const covered = value.match(/^covered\(([^)]+)\)$/)
-    if (covered) {
-      for (const id of rowIds(covered[1])) {
-        if (!seenRows.has(id)) issues.push(`landmine-row-unknown: "${landmine}": ${id} is not a contract row`)
-      }
-    } else if (!/^impossible:\s*\S/.test(value) && !/^needs-decision:\s*\S/.test(value) && !/^N\/A/i.test(value)) {
-      issues.push(
-        `landmine-undispositioned: "${landmine}": disposition must be covered(O*) | impossible: reason | needs-decision: question | N/A reason`,
-      )
-    }
+    issues.push(
+      ...(await checkCell(value, {
+        ...dispositionContext,
+        code: 'landmine-undispositioned',
+        rowCode: 'landmine-row-unknown',
+        label: `"${landmine}"`,
+        enumText: DISPOSITION_ENUM.landmine,
+        allowNa: true,
+      })),
+    )
   }
 
   // Interaction sweep 섹션도 선택이다 — 있으면 disposition enum·행 인용·정책 커버리지를 검증한다.
@@ -852,20 +1171,15 @@ async function lintCard(options) {
         continue
       }
 
-      const covered = value.match(/^covered\(([^)]+)\)$/)
-      if (covered) {
-        const cited = rowIds(covered[1])
-        if (cited.length === 0) {
-          issues.push(`sweep-disposition: "${pair}": covered() must cite at least one O*/D* row`)
-        }
-        for (const id of cited) {
-          if (!seenRows.has(id)) issues.push(`sweep-row-unknown: "${pair}": ${id} is not a contract row`)
-        }
-      } else if (!/^impossible:\s*\S/.test(value) && !/^needs-decision:\s*\S/.test(value)) {
-        issues.push(
-          `sweep-disposition: "${pair}": disposition must be covered(O*) | impossible: reason | needs-decision: question`,
-        )
-      }
+      issues.push(
+        ...(await checkCell(value, {
+          ...dispositionContext,
+          code: 'sweep-disposition',
+          rowCode: 'sweep-row-unknown',
+          label: `"${pair}"`,
+          enumText: DISPOSITION_ENUM.sweep,
+        })),
+      )
     }
 
     for (const policyId of policies.keys()) {
@@ -942,33 +1256,28 @@ async function lintCard(options) {
       }
       // covered(O*)는 그 행의 테스트가 이 프레임의 choice 조합으로 실제 실행될 때만. 조합과 무관하게
       // 정책이 성립한다는 주장은 independent(O*): 이유 — 실행 커버리지가 아니라 독립성 주장으로 감사된다.
-      const cited = value.match(/^(covered|independent)\(([^)]+)\)(?::\s*(\S.*))?$/)
-      if (cited) {
-        const [, verb, ids, reason] = cited
-        const rows = rowIds(ids)
-        if (rows.length === 0) issues.push(`frame-disposition: ${frameId}: ${verb}() must cite O*/D* rows`)
-        for (const id of rows) {
-          if (!seenRows.has(id)) issues.push(`frame-row-unknown: ${frameId}: ${id} is not a contract row`)
-        }
-        if (verb === 'independent' && !reason) {
-          issues.push(`frame-disposition: ${frameId}: independent() must name why the choices cannot change the outcome`)
-        }
-        if (verb === 'independent' && !frameId.startsWith('F')) {
-          issues.push(`frame-disposition: ${frameId}: independent() applies to F* combination frames only`)
-        }
-        if (verb === 'covered' && reason) {
-          issues.push(`frame-disposition: ${frameId}: covered() takes no reason — use independent() for a claim of independence`)
-        }
-      } else if (!/^impossible:\s*\S/.test(value) && !/^needs-decision:\s*\S/.test(value)) {
-        issues.push(
-          `frame-disposition: ${frameId}: disposition must be covered(O*) | independent(O*): reason | impossible: reason | needs-decision: question`,
-        )
-      }
+      issues.push(
+        ...(await checkCell(value, {
+          ...dispositionContext,
+          code: 'frame-disposition',
+          rowCode: 'frame-row-unknown',
+          label: frameId,
+          enumText: DISPOSITION_ENUM.frame,
+          allowIndependent: true,
+          frameId,
+        })),
+      )
     }
 
     for (const id of generatedIds) {
       if (!dispositioned.has(id)) issues.push(`frame-undispositioned: ${id}`)
     }
+  }
+
+  for (const cell of openCells) {
+    issues.push(
+      `disposition-open: ${cell} survives on an approved card — resolve it to covered/impossible, or the card ends NEEDS_DECISION`,
+    )
   }
 
   const contractText = rows.flatMap((row) => Object.values(row.cells)).join(' ')
@@ -1971,7 +2280,34 @@ async function assertReviewBinding(options) {
   await assertSnapshots(snapshots, base, 'REVIEW_PACKET_INVALID')
 }
 
+/**
+ * 블라인드 행↔테스트 매핑 대조 — evidence.json을 보지 않은 리뷰어가 카드 행과 테스트 소스만으로 적은
+ * `{ "<test name>": "O1" | ["O1", "O2"] }`를 매핑과 비교한다. 이름 통과만 보던 evidence verify의 빈칸을 2-sample로 메운다.
+ */
+async function assertBlindMapping(options) {
+  if (!options.map) throw new CliError('USAGE', 'review --blind-map requires --map', 2)
+  const blind = await readJson(resolve(options['blind-map']), 'BLIND_MAP_INVALID')
+  if (!blind || typeof blind !== 'object' || Array.isArray(blind)) {
+    throw new CliError('BLIND_MAP_INVALID', 'blind map must be a JSON object keyed by test name')
+  }
+  const map = await readJson(resolve(options.map), 'EVIDENCE_INVALID')
+  const disputes = []
+
+  for (const [rowId, entry] of Object.entries(map?.rows ?? {})) {
+    if (entry?.kind !== 'test') continue
+    const claimed = blind[entry.name]
+    const rows = Array.isArray(claimed) ? claimed : claimed ? [claimed] : []
+    if (rows.length === 0) disputes.push(`${rowId}: "${entry.name}" — the blind reviewer mapped it to no row`)
+    else if (!rows.includes(rowId)) disputes.push(`${rowId}: "${entry.name}" — the blind reviewer mapped it to ${rows.join(', ')}`)
+  }
+
+  if (disputes.length > 0) {
+    throw new CliError('EVIDENCE_MAPPING_DISPUTED', `row↔test mapping disputed by the blind read:\n  ${disputes.join('\n  ')}`)
+  }
+}
+
 async function verifyReview(options) {
+  if (options['blind-map']) await assertBlindMapping(options)
   await assertReviewBinding(options)
   const result = await findingsResult(options)
 
@@ -2032,8 +2368,94 @@ async function scaffoldEvidence(options) {
   process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`)
 }
 
+/** 카드 행의 side-effect 열 — 한국어·영어 헤더 모두 `부작용`·`Side effect`로 시작한다. */
+function sideEffectText(rows) {
+  return rows
+    .flatMap((row) => Object.entries(row.cells).filter(([key]) => /부작용|side effect/i.test(key)).map(([, value]) => value))
+    .join(' ')
+}
+
+/**
+ * 정적 side-effect 인벤토리. --oracle이 있으면 범주 소유를 대조한다: 카드의 어떤 행도 그 범주의 side effect를
+ * 소유하지 않으면 SIDE_EFFECT_UNOWNED. 알려진 토큰 목록일 뿐이라 검출 0은 효과 없음의 증거가 아니다.
+ */
+async function scanSideEffectInventory(options) {
+  const hits = []
+  const exemptions = []
+  const invalid = []
+  for (const path of options.path) {
+    const content = await readFile(path, 'utf8').catch((error) => {
+      throw new CliError('SCAN_UNREADABLE', `Cannot read ${path}: ${error.message}`)
+    })
+    const scanned = scanSideEffects(path, content)
+    hits.push(...scanned.hits)
+    exemptions.push(...scanned.exemptions)
+    invalid.push(...scanned.invalid)
+  }
+
+  for (const hit of hits) process.stdout.write(`SIDE_EFFECT ${hit.category} ${hit.path}:${hit.line} ${hit.token}\n`)
+
+  // 맨 마커는 면제가 아니다 — `impossible`이 witness를 요구하듯 면제도 행 또는 사유를 요구한다
+  if (invalid.length > 0) {
+    throw new CliError(
+      'SIDE_EFFECT_EXEMPTION_INVALID',
+      `exemptions need a row or a reason — \`${SIDE_EFFECT_EXEMPTION_MARKER} <O*|D*|reason>\`:\n  ${invalid
+        .map((entry) => `${entry.path}:${entry.line}: ${entry.reason}`)
+        .join('\n  ')}`,
+    )
+  }
+
+  if (!options.oracle) {
+    process.stdout.write(`SCAN_OK ${options.path.length} files side-effects:${hits.length}\n`)
+    return
+  }
+
+  const card = await readFile(options.oracle, 'utf8').catch((error) => {
+    throw new CliError('CARD_UNREADABLE', `Cannot read ${options.oracle}: ${error.message}`)
+  })
+  const rows = parseRows(markdownLines(card))
+  const rowSet = new Set(rows.map((row) => row.id))
+  const unknownRows = exemptions.filter((entry) => {
+    const cited = entry.reason.match(/^([OD]\d+)\b/)
+    return cited && !rowSet.has(cited[1])
+  })
+  if (unknownRows.length > 0) {
+    throw new CliError(
+      'SIDE_EFFECT_EXEMPTION_INVALID',
+      `exemptions cite rows that are not on the card:\n  ${unknownRows
+        .map((entry) => `${entry.path}:${entry.line}: ${entry.reason}`)
+        .join('\n  ')}`,
+    )
+  }
+
+  const owned = sideEffectText(rows)
+  if (hits.length > 0 && owned.trim() === '') {
+    throw new CliError(
+      'SIDE_EFFECT_UNOWNED',
+      `the card has no side-effect column, so no row can own these effects — run \`card\` lint first:\n  ${hits
+        .map((hit) => `${hit.path}:${hit.line}: ${hit.token} (${hit.category})`)
+        .join('\n  ')}`,
+    )
+  }
+  const unowned = hits.filter((hit) => {
+    const category = SIDE_EFFECT_CATEGORIES.find((entry) => entry.category === hit.category)
+    return !category.owned.test(owned)
+  })
+
+  if (unowned.length > 0) {
+    throw new CliError(
+      'SIDE_EFFECT_UNOWNED',
+      `no card row owns these side effects — add the row or exempt with \`${SIDE_EFFECT_EXEMPTION_MARKER} <row|reason>\`:\n  ${unowned
+        .map((hit) => `${hit.path}:${hit.line}: ${hit.token} (${hit.category})`)
+        .join('\n  ')}`,
+    )
+  }
+  process.stdout.write(`SCAN_OK ${options.path.length} files side-effects:${hits.length} owned\n`)
+}
+
 async function scanNondeterminism(options) {
   if (options.path.length === 0) throw new CliError('USAGE', 'scan requires at least one --path', 2)
+  if (options['side-effects']) return scanSideEffectInventory(options)
 
   const hits = []
 

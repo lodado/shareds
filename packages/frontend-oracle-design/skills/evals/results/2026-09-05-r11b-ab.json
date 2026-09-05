@@ -1,0 +1,72 @@
+{
+  "eval": "fod-ho-r11b",
+  "date": "2026-09-05",
+  "method": "one fresh Claude subagent per version, Design-only, same prompt, target repo read-only, .ai/ and docs/ai-work-log/ forbidden (independence). Graded by grep + read of the produced Draft against held-out.json assertions. n=1 per version — direction only.",
+  "confound": "the target repo HEAD (6b25669) already implements the requested virtualization after the escapes were fixed, so three of the four escapes are visible in code; both versions read the same code.",
+  "runs": {
+    "0.39.0": {
+      "draft_bytes": 39680,
+      "user_turns_before_draft": 0,
+      "open_questions": 5,
+      "assertions": {
+        "lane header risk=Medium lane=oracle": { "passed": true, "evidence": "response.md line 1" },
+        "StrictMode double-invoke of the append timer": {
+          "passed": true,
+          "evidence": "O15 row; sweep P4 × StrictMode covered(O15)"
+        },
+        "inherited filterKey remount × virtualizer mount scroll reset": {
+          "passed": true,
+          "evidence": "landmine initialOffset needs-decision Q2; sweep P1 × P5 needs-decision Q2"
+        },
+        "initial default column count → first measurement transition": {
+          "passed": true,
+          "evidence": "sweep P1 × P2 needs-decision Q2b; deviation P2 wrong-timing-order Q2b"
+        },
+        "what the user sees during a filter switch (Suspense fallback vs previous list)": {
+          "passed": false,
+          "evidence": "auto-TC loading: 'initial loading is the Suspense fallback owned outside this card, N/A here' — the r11b blind spot verbatim"
+        },
+        "Draft after 1 turn with questions inside": {
+          "passed": true,
+          "evidence": "user-turns-before-draft: 0, 5 questions bundled"
+        }
+      },
+      "pass_rate": 0.83
+    },
+    "0.41.0": {
+      "draft_bytes": 69059,
+      "user_turns_before_draft": 0,
+      "open_questions": 3,
+      "assertions": {
+        "lane header risk=Medium lane=oracle": { "passed": true, "evidence": "response.md line 1" },
+        "StrictMode double-invoke of the append timer": {
+          "passed": true,
+          "evidence": "O17·O18 rows; sweep P8 × StrictMode (timer owner) covered(O18)"
+        },
+        "inherited filterKey remount × virtualizer mount scroll reset": {
+          "passed": true,
+          "evidence": "O7 row 'list scroll call×0'; landmine initialOffset covered(O7); sweep P7 × key remount covered(O7)"
+        },
+        "initial default column count → first measurement transition": {
+          "passed": true,
+          "evidence": "sweep P8 × measured layout (fallback 4 → real columns) covered(O5)"
+        },
+        "what the user sees during a filter switch (Suspense fallback vs previous list)": {
+          "passed": false,
+          "evidence": "auto-TC loading: 'initial loading is the untouched Suspense fallback — N/A here' — same blind spot"
+        },
+        "Draft after 1 turn with questions inside": {
+          "passed": true,
+          "evidence": "user-turns-before-draft: 0, Open questions Q1–Q3 with A/B rows and recommendations"
+        }
+      },
+      "pass_rate": 0.83
+    }
+  },
+  "delta": {
+    "pass_rate": 0.0,
+    "draft_bytes": 29379,
+    "user_turns_before_draft": 0,
+    "reading": "no escape-detection gain on this case; 0.41.0 costs ~74% more card bytes (Oracle Cost up) for the same catch rate. The one escape both miss is a POLICY_GAP the runtime-dimension bank did not carry — added as a bank entry ('query key change inside a Suspense boundary') under the growth rule, escape evidence r11b defect 4."
+  }
+}

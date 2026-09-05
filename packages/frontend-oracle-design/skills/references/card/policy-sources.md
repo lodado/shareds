@@ -100,10 +100,11 @@ Record them as a card section per package:
 ```markdown
 ## Dependency landmines — example-virtual-list
 
-| Landmine                                            | Citation                | Disposition                             |
-| --------------------------------------------------- | ----------------------- | --------------------------------------- |
-| initialOffset option = fossil of mount scroll reset | docs/api#initialoffset  | needs-decision: keep scroll on remount? |
-| measureElement remeasures on dynamic row height     | docs/api#measureelement | N/A: fixed row height (S2)              |
+| Landmine                                            | Citation                | Disposition                                                                       |
+| --------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------- |
+| initialOffset option = fossil of mount scroll reset | docs/api#initialoffset  | needs-decision: keep scroll on remount?                                           |
+| measureElement remeasures on dynamic row height     | docs/api#measureelement | N/A: fixed row height (S2)                                                        |
+| scrollMargin ignored before first measure           | issues/812              | needs-evidence: is the list inside a scrolling ancestor — code(src/list/Grid.tsx) |
 ```
 
 Rules:
@@ -111,9 +112,11 @@ Rules:
 - **Every landmine needs a citation** — a docs anchor, issue URL, or changelog entry.
   LLM-recalled pitfalls without a citation are rejected by lint (`landmine-citation-missing`):
   unconstrained recall produces majority false positives, and a citation is the constraint.
-- Every row carries one of the three dispositions (`covered(O*/D*)` / `impossible: reason` /
-  `needs-decision: question`); an empty one fails lint (`landmine-undispositioned`). Promotion
-  follows the sweep rule — only `needs-decision` becomes a grill question.
+- Every row carries one of the four dispositions (`covered(O*/D*)` / `impossible: mechanism —
+witness` / `needs-decision: question` / `needs-evidence: fact — lookup`) or a sourced `N/A`;
+  an empty one fails lint (`landmine-undispositioned`). Grammar and witness rules are the sweep's
+  ([`interaction-sweep.md`](interaction-sweep.md)). Promotion follows the sweep rule — only
+  `needs-decision` becomes a grill question; `needs-evidence` is investigated in the same pass.
 - A card that adopts no dependency and changes no dependency surface has no landmine section —
   do not manufacture one.
 - At lock time, pass each landmine-swept package to `oracle-lock.mjs create --dep <name>`; the

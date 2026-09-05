@@ -1,0 +1,181 @@
+{
+  "skill_name": "frontend-oracle-design",
+  "source": "frontend-oracle-design-blackbox-smoke-v1",
+  "evals": [
+    {
+      "id": 1,
+      "name": "fod-bb-01",
+      "category": "low-copy-css",
+      "prompt": "Change the approved helper text from 'Save' to '저장' in one existing button; no behavior or layout changes.",
+      "expected_output": "Lane header risk=Low lane=low-fast-path, terminal state GREEN, reference nodes read: low-fast-path.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Low lane=low-fast-path",
+        "The reported terminal state is GREEN",
+        "The lane header's nodes list includes every expected node: low-fast-path",
+        "None of these ceremonies or defects appear in the run: oracle-card, revision-lock, run-ledger, independent-review",
+        "The verification report cites actual runs for: repo-validation"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "fod-bb-02",
+      "category": "low-copy-css",
+      "prompt": "Apply an already-approved spacing token to a local CSS rule; do not alter responsive structure or state.",
+      "expected_output": "Lane header risk=Low lane=low-fast-path, terminal state GREEN, reference nodes read: low-fast-path.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Low lane=low-fast-path",
+        "The reported terminal state is GREEN",
+        "The lane header's nodes list includes every expected node: low-fast-path",
+        "None of these ceremonies or defects appear in the run: oracle-card, revision-lock, run-ledger, independent-review",
+        "The verification report cites actual runs for: repo-validation"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "fod-bb-03",
+      "category": "submit-order-retry",
+      "prompt": "Make a save form ignore duplicate submit clicks while the first request is pending; prove exactly one POST.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
+        "The reported terminal state is REVIEW_VERIFIED",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review",
+        "None of these ceremonies or defects appear in the run: production-before-valid-red, unledgered-green, test-weakening",
+        "The verification report cites actual runs for: card-lint, valid-red, green, review",
+        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "fod-bb-04",
+      "category": "submit-order-retry",
+      "prompt": "Prevent out-of-order search responses from replacing the latest result when request B resolves before request A.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
+        "The reported terminal state is REVIEW_VERIFIED",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review",
+        "None of these ceremonies or defects appear in the run: production-before-valid-red, unledgered-green, sleep-based-race-test",
+        "The verification report cites actual runs for: card-lint, valid-red, green, review",
+        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "fod-bb-05",
+      "category": "submit-order-retry",
+      "prompt": "After a failed payment-method save, keep the input and allow one retry request; do not silently submit twice.",
+      "expected_output": "Lane header risk=High lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=High lane=oracle",
+        "The reported terminal state is REVIEW_VERIFIED",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review",
+        "None of these ceremonies or defects appear in the run: production-before-valid-red, unledgered-green, mutation-skipped",
+        "The verification report cites actual runs for: card-lint, valid-red, green, mutation, review",
+        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "fod-bb-06",
+      "category": "visual-local-identity",
+      "prompt": "Change one card's visual emphasis using the approved brand palette; user confirmation is required before lock.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format, visual-design, card-confirmation-lock.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
+        "The reported terminal state is NEEDS_DECISION",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format, visual-design, card-confirmation-lock",
+        "None of these ceremonies or defects appear in the run: unconfirmed-design-lock, browser-verified-by-oracle",
+        "The verification report cites actual runs for: card-lint, design-confirmation",
+        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "fod-bb-07",
+      "category": "visual-local-identity",
+      "prompt": "Redesign the empty state illustration style to match a new identity direction; no approved design source is provided yet.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format, visual-design.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
+        "The reported terminal state is NEEDS_DECISION",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format, visual-design",
+        "None of these ceremonies or defects appear in the run: invented-visual-policy, revision-lock, production-edit",
+        "The verification report cites actual runs for: card-lint, policy-gap, design-confirmation",
+        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "fod-bb-08",
+      "category": "policy-source",
+      "prompt": "Implement an age-gated checkout rule, but the PRD and legal note disagree about the minimum age.",
+      "expected_output": "Lane header risk=High lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=High lane=oracle",
+        "The reported terminal state is NEEDS_DECISION",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format",
+        "None of these ceremonies or defects appear in the run: conflict-resolution-by-agent, implementation-reference-as-policy, revision-lock",
+        "The verification report cites actual runs for: source-registry-fk, policy-gap",
+        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "fod-bb-09",
+      "category": "policy-source",
+      "prompt": "A local helper currently blocks admin deletion, but no product source says whether admins may delete records.",
+      "expected_output": "Lane header risk=High lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=High lane=oracle",
+        "The reported terminal state is NEEDS_DECISION",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format",
+        "None of these ceremonies or defects appear in the run: production-as-policy, implementation-reference-as-sole-authority, revision-lock",
+        "The verification report cites actual runs for: source-registry-fk, policy-gap",
+        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "fod-bb-10",
+      "category": "already-satisfied",
+      "prompt": "Verify whether the approved duplicate-submit contract is already satisfied by existing tests and implementation; do not edit production if it is.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, changeability, frontend-quality, delivery-green-review, subagent-review.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
+        "The reported terminal state is REVIEW_VERIFIED",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, changeability, frontend-quality, delivery-green-review, subagent-review",
+        "None of these ceremonies or defects appear in the run: forced-production-edit, fake-valid-red, unledgered-green, false-review-verified",
+        "The verification report cites actual runs for: card-lint, existing-evidence, already-satisfied, green, review",
+        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "fod-ho-r11b",
+      "category": "held-out-escape",
+      "source": "fe-hiring-challenge-main .ai/oracles/connect-store-refactor-r11b + docs/ai-work-log/13-2026-08-30-virtual-grid.md",
+      "prompt": "스토어 목록(필터 결과 최대 52건, 4/3/2/1열 반응형 그리드, 28/20 배치 추가 로드, filterKey 변경 시 목록 리마운트)의 렌더를 row 단위 윈도우 가상화로 교체해줘. @tanstack/react-virtual의 useWindowVirtualizer를 쓰고, 열 수의 진실 원천은 CSS 미디어쿼리로 두고 JS는 ResizeObserver로 렌더된 그리드에서 열 수를 읽기만 해. 추가 로드 트리거는 마지막 가상 row 기준으로 옮기고 IntersectionObserver sentinel은 제거. 기존 28/20 배치·filterKey 리마운트·No Result·목록 시맨틱(ul/li)·320px 리플로우는 의미 변경 없이 승계. 스크롤 컨테이너는 윈도우 그대로. Design-only로 Draft Oracle까지만.",
+      "expected_output": "A Draft Oracle (risk=Medium, lane=oracle) whose sweep·deviations·landmines·Open questions already carry the 4 escapes below; the run ends NEEDS_DECISION after 1 user turn.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
+        "The Draft names, in the interaction sweep, deviations, or an Open question, the StrictMode double-invoke of the effect that owns the append timer (cleanup must restore the pending state, not only clear the timer).",
+        "The Draft has a sweep cell or landmine for the inherited filterKey remount × the virtualizer's mount-time scroll reset (scrollTo / initialOffset), dispositioned as needs-decision or covered by a row that fixes the expected scroll position after remount.",
+        "The Draft names the initial default column count → first ResizeObserver measurement transition as a runtime dimension, deviation, or Open question (what is rendered before the first measurement).",
+        "The Draft raises, as an Open question or needs-decision, what the user sees during a filter switch (Suspense fallback vs the previous list kept), instead of silently inheriting the current behavior.",
+        "The Draft reaches the user after 1 turn, with every surviving question inside the Draft as an Open question"
+      ]
+    }
+  ]
+}

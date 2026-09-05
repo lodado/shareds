@@ -36,26 +36,43 @@ a one-line N/A with the reason in `journal.md` — silence is not a valid skip.
 ```markdown
 ## Interaction sweep
 
-| Pair                                                 | Disposition                                                                      |
-| ---------------------------------------------------- | -------------------------------------------------------------------------------- |
-| P3 (new list window) × P1 (inherited filter remount) | needs-decision: does a fresh list mount move scroll on remount?                  |
-| P3 × P2 (inherited list semantics)                   | covered(O5)                                                                      |
-| P3 × StrictMode                                      | needs-decision: does the append timer's cleanup survive a double-invoked effect? |
-| P4                                                   | impossible: static copy, no shared surface                                       |
+| Pair                                                 | Disposition                                                                         |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| P3 (new list window) × P1 (inherited filter remount) | needs-decision: does a fresh list mount move scroll on remount?                     |
+| P3 × P2 (inherited list semantics)                   | covered(O5)                                                                         |
+| P3 × StrictMode                                      | needs-decision: does the append timer's cleanup survive a double-invoked effect?    |
+| P4                                                   | impossible: static copy, no shared surface — code(src/Banner.tsx#L1-L20)            |
+| P3 × P5 (inherited debounce)                         | needs-evidence: does the debounce share the request queue — code(src/list/query.ts) |
 ```
 
-Exactly three dispositions:
+Exactly four dispositions:
 
 - `covered(O*/D*)` — an existing row owns the interaction's expected outcome. The cited row must
-  exist on the card.
-- `impossible: <reason>` — the pair cannot interact. The reason names the mechanism (no shared
-  state·DOM·scroll·cache·timing), never a likelihood guess.
+  exist on the card. A sub-reference such as `covered(O12.Then)` is allowed, never required — the
+  row citation is already a machine-verified witness.
+- `impossible: <mechanism> — <witness>` — the pair cannot interact. The mechanism names what is
+  absent (no shared state·DOM·scroll·cache·timing), never a likelihood guess, and the witness is
+  where a reader can see the absence: `code(<repo-path>#L<a>-L<b>)`, `constraint(S*)`,
+  `type(<expression>)`, or `docs(<anchor>)`. Lint rejects an `impossible` without one
+  (`impossible-witness-missing`) and checks that `code()` names a real file and line range and
+  that `constraint()` names a registered source (`impossible-witness-invalid`). "Absent because I
+  say so" is the cell this system was most often wrong in.
 - `needs-decision: <question>` — the interaction changes the outcome and no row owns it. Promote to
   a grill question or red card; never resolve it with a default. When the question rides the Draft
   as an Open question ([`card-format.md`](card-format.md)), cite its id first:
   `needs-decision: Q1 — <question>`. A `needs-decision` cell that
   survives to lock time means the card ends `NEEDS_DECISION`, not `ORACLE_READY` — resolve it to
   `covered` or `impossible` via the user's answer first.
+- `needs-evidence: <missing fact> — <lookup>` — a policy may exist, but the facts in hand cannot
+  settle the cell; investigation settles it. The lookup names where to look: `docs(<anchor>)`,
+  `code(<path>)`, `issue(<url>)`, or `changelog(<ref>)` — a cell without one fails
+  `needs-evidence-lookup-missing`. The agent investigates in the same design pass and rewrites the
+  cell to `covered` or `impossible` with the citation as its witness, or promotes it to
+  `needs-decision` when the facts show no policy exists. **Only `needs-decision` reaches the
+  user.** A `needs-evidence` cell surviving to lock blocks the lock exactly like `needs-decision`;
+  the instruction differs — investigate, do not ask. Both are machine-checked: `oracle-verify.mjs
+card` runs on the approved card only, and any surviving `needs-decision` or `needs-evidence` in
+  the sweep, deviations, frames, or landmines fails as `disposition-open`.
 
 Rules:
 
@@ -85,16 +102,16 @@ completeness is lintable the same way as pairs.
 ```markdown
 ## Deviations
 
-| Policy | Type                       | Disposition                                                 |
-| ------ | -------------------------- | ----------------------------------------------------------- |
-| P1     | not-provided               | covered(O3)                                                 |
-| P1     | unsafe-provided            | needs-decision: applying it during teardown touches scroll? |
-| P1     | wrong-timing-order         | covered(O7)                                                 |
-| P1     | stopped-early-applied-long | needs-decision: does cleanup restore the paired state?      |
-| P4     | not-provided               | covered(D1)                                                 |
-| P4     | unsafe-provided            | impossible: static copy, no context sensitivity             |
-| P4     | wrong-timing-order         | impossible: no timing surface                               |
-| P4     | stopped-early-applied-long | impossible: no duration                                     |
+| Policy | Type                       | Disposition                                                                         |
+| ------ | -------------------------- | ----------------------------------------------------------------------------------- |
+| P1     | not-provided               | covered(O3)                                                                         |
+| P1     | unsafe-provided            | needs-decision: applying it during teardown touches scroll?                         |
+| P1     | wrong-timing-order         | covered(O7)                                                                         |
+| P1     | stopped-early-applied-long | needs-evidence: does cleanup restore the paired state — code(src/list/useAppend.ts) |
+| P4     | not-provided               | covered(D1)                                                                         |
+| P4     | unsafe-provided            | impossible: static copy, no context sensitivity — constraint(S2)                    |
+| P4     | wrong-timing-order         | impossible: no timing surface — code(src/Banner.tsx#L1-L20)                         |
+| P4     | stopped-early-applied-long | impossible: no duration — code(src/Banner.tsx#L1-L20)                               |
 ```
 
 Rules:
@@ -108,23 +125,42 @@ Rules:
   it closes `unsafe-provided`·`wrong-timing-order`·`stopped-early-applied-long` together.
   `not-provided` is never closed by the shorthand: even a static copy row answers what happens
   when the copy is missing.
-- The dispositions are the same three as pairs, with the same promotion rule: only
+- The dispositions are the same four as pairs, with the same promotion rule: only
   `needs-decision` becomes a grill question, and one surviving to lock means `NEEDS_DECISION`.
 - Timer·subscription·pending policies almost never close `stopped-early-applied-long` as
   impossible — StrictMode re-invocation and unmount are standing counterexamples.
+
+## Witness kinds and falsifiers
+
+A witness is checked for existence by lint and for relevance by people. Known weakness, on purpose:
+`type()` and `docs()` are checked for shape only, so they are the cheapest witness to fake — the
+reverse two-sample read exists for exactly that cell, and a `type()`·`docs()` witness the reviewer
+cannot open is a `needs-decision`, never a pass. The standard way to attack
+each kind is defined once here — a cell never carries its own falsifier text. The reverse
+two-sample read (SKILL.md, Design-only) hands every `impossible` of the Draft to a context-free
+reviewer with this table and the premortem framing "one of these is wrong — build the
+counterexample"; a disagreement is promoted to `needs-decision`, once per card.
+
+| Witness              | What it claims                               | How to falsify it                                                                                  |
+| -------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `code(path#La-Lb)`   | the cited lines contain no shared surface    | find the shared mutable state·DOM node·scroll owner·cache key·timer the lines reach through a call |
+| `constraint(S*)`     | an approved source rules the interaction out | find a path the source's jurisdiction does not cover, or a version where the constraint changed    |
+| `type(<expression>)` | the type makes the state unrepresentable     | construct a value the type admits that the mechanism forbids, or a cast·`any` on the way in        |
+| `docs(<anchor>)`     | the maintainer documents the absence         | find the caveat, option, or issue on the same page that reintroduces the surface                   |
 
 ## Runtime dimensions — question bank
 
 Add the dimension as a counterpart **when its premise exists in the card**; otherwise it generates
 no pairs. Same premise discipline as the seven auto-added TCs.
 
-| Premise on the card                                  | Dimension — the question a pair must answer                                                                                                   |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| effect·timer·subscription                            | StrictMode double-invoke: does cleanup restore every paired state, and does an effect watching state — not the event handler — own the timer? |
-| Suspense boundary·key remount                        | mount-time side effects of libraries (virtualizer scroll reset, observers, focus): what does a fresh init do to scroll·focus·selection?       |
-| measured layout (ResizeObserver·getComputedStyle)    | the initial default → first measured value transition fires as a "change": is any anchoring·scroll·animation keyed on that event?             |
-| render scheduling (transition·deferred) near request | intermediate render values can each spawn a query: does the request-count contract still hold under the new scheduling?                       |
-| list + refresh·navigation                            | browser scroll restoration·bfcache versus the card's reset policy: who wins on reload and on back/forward?                                    |
+| Premise on the card                                  | Dimension — the question a pair must answer                                                                                                                                                                                                                                                    |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| effect·timer·subscription                            | StrictMode double-invoke: does cleanup restore every paired state, and does an effect watching state — not the event handler — own the timer?                                                                                                                                                  |
+| Suspense boundary·key remount                        | mount-time side effects of libraries (virtualizer scroll reset, observers, focus): what does a fresh init do to scroll·focus·selection?                                                                                                                                                        |
+| measured layout (ResizeObserver·getComputedStyle)    | the initial default → first measured value transition fires as a "change": is any anchoring·scroll·animation keyed on that event?                                                                                                                                                              |
+| render scheduling (transition·deferred) near request | intermediate render values can each spawn a query: does the request-count contract still hold under the new scheduling?                                                                                                                                                                        |
+| list + refresh·navigation                            | browser scroll restoration·bfcache versus the card's reset policy: who wins on reload and on back/forward?                                                                                                                                                                                     |
+| query key change inside a Suspense boundary          | what the user sees during the switch — the boundary's fallback, or the previous data kept until the new data lands? "The fallback is outside this card" is the answer that let this escape; the display during the switch is this card's policy whenever this card changes what the key covers |
 
 Growth rule: every defect found after lock — user report, exploration phase, review — appends one
 entry here via the escaped-bug retro: name the cell or question that would have caught it at card

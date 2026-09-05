@@ -65,7 +65,9 @@ Lane routing:
   mismatch.
 - TDD default: `ORACLE_READY` → write and run tests → record
   `oracle-run.mjs transition --to VALID_RED` → classify `VALID_RED`; no production writing or
-  editing before that. Immediately before writing test files, explicitly load and invoke the
+  editing before that. On Claude Code the plugin's PreToolUse hook (`hooks/hooks.json`) denies
+  such a write before it lands and denies a weakening token entering a test after `VALID_RED`;
+  the transition gate stays the authority and hosts without hooks rely on it alone. Immediately before writing test files, explicitly load and invoke the
   `$test` skill by name; if it cannot be invoked, `FAIL`.
 - Judgment commands run through `scripts/oracle-run.mjs exec`. Results are recorded in the
   append-only ledger and reports cite runIds instead of free-form claims. Never report an execution
@@ -195,7 +197,12 @@ When only cards, requirements, policy decisions, or test contracts are requested
    with every surviving Grill question as an Open question — candidate rows plus a
    recommendation — and BVA, then fill the interaction sweep, declare the Case space, run
    `scripts/oracle-frames.mjs --oracle` and disposition every emitted frame under the recommended
-   options — every `needs-decision` cell or frame cites an Open question. Follow the phase order
+   options — every `needs-decision` cell or frame cites an Open question. Resolve every
+   `needs-evidence` cell by investigation in the same pass; only `needs-decision` reaches the
+   user. Before drafting, run `scripts/oracle-dimensions.mjs --path <touched files>` and
+   `scripts/oracle-verify.mjs card --repo-policies` — the dimension candidates, side-effect
+   inventory, and the sibling cards' policies that share a surface are counterparts to
+   disposition, never rows to copy. Follow the phase order
    (outcome → risk → data·architecture → API → concurrency·async → state → visual →
    performance·ops); a question goes out ahead of the Draft only when its answer kills a branch,
    and if the user asks for a one-question-at-a-time interview, run it without a round cap.
@@ -204,7 +211,11 @@ When only cards, requirements, policy decisions, or test contracts are requested
    `Q<n>=<option>` swaps one option and re-confirms only if a new `needs-decision` appears.
 9. Before showing the Draft, run the cold-read gate: hand the card bytes alone to a context-free
    reviewer, apply the five questions per row, and collapse both into one root plus the first nail
-   that falsifies it cheapest. Drive that nail. Then record the approval's location in
+   that falsifies it cheapest. Drive that nail. In the same gate run the reverse two-sample read
+   once per card: extract the `impossible` dispositions with `scripts/oracle-verify.mjs card --ir`,
+   hand them with the witness falsifier table of `card/interaction-sweep.md` to a second
+   context-free reviewer under the framing "one of these is wrong — build the counterexample", and
+   promote every disagreement to `needs-decision`. Then record the approval's location in
    `User Confirmation`. On a change request, fix the Draft and re-confirm; on no answer,
    `NEEDS_DECISION`.
 10. Read [`card/confirmation-lock.md`](references/card/confirmation-lock.md) → after
@@ -236,7 +247,10 @@ When implementation, test-based self-verification, and subagent review are expli
    `delivery/implementation-decision.md`·`frontend/authoring.md`, then minimal implementation →
    GREEN. `ALREADY_SATISFIED` performs zero-production verification only and approves no production
    edits. Either GREEN path records `oracle-run.mjs transition --to IMPLEMENTED_GREEN` exactly once
-   first.
+   first. The impact scope is machine-fed, not judged: the required label `impact` runs the repo's
+   related-tests command over `oracle-run.mjs status --changed-files`, and
+   `oracle-verify.mjs scan --side-effects --oracle <card> --path <changed production files>` must
+   report every code side effect owned by a card row or exempted with `oracle:side-effect`.
 7. High risk: the sibling `test` skill's mutation kill·revert·re-GREEN first.
 8. The Controller generates raw review input and assignment/dispatch with `oracle-run.mjs review-packet`.
    Reviewers return findings only; the Controller/join creates the `oracle-run.mjs review-receipt`

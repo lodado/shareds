@@ -12,9 +12,11 @@ import {
   assertSnapshotUnchanged,
   sha256 as fsSha256,
   isPathInside,
+  isTestPath,
   pathsShareIdentity,
   snapshotRegularFile,
   stableStringify,
+  WEAKENING_TOKENS,
   ZERO_DIGEST,
 } from './oracle-fs.mjs'
 
@@ -62,7 +64,7 @@ const FLAG_NAMES = [
   'task-id',
 ]
 
-const BOOLEAN_FLAGS = new Set(['json'])
+const BOOLEAN_FLAGS = new Set(['json', 'changed-files'])
 
 const REQUIRED_CONSECUTIVE_PASSES = { low: 1, medium: 2, high: 3 }
 
@@ -77,26 +79,7 @@ const TRANSITIONS = {
   FAIL: [],
 }
 
-const TEST_PATH_SEGMENTS = new Set(['__test__', '__tests__', '__mocks__', '__snapshots__'])
-
 const ASSERTION_TOKENS = ['expect(', 'assert.', 'assert(']
-
-/** 기존 테스트에서 새로 늘어나면 약화로 보는 토큰. 감소·유지는 통과한다. */
-const WEAKENING_TOKENS = [
-  'test.skip',
-  'it.skip',
-  'describe.skip',
-  '.only(',
-  'waitForTimeout(',
-  'toBeTruthy(',
-  'toBeFalsy(',
-  '.first()',
-  '.nth(',
-  'setTimeout(',
-  'maxDiffPixels',
-  'maxDiffPixelRatio',
-  'threshold',
-]
 
 /** 값이 커지면 약화인 허용치. 토큰 수가 그대로여도 상향을 잡는다. */
 const TOLERANCE_TOKENS = ['maxDiffPixels', 'maxDiffPixelRatio', 'threshold']
@@ -217,18 +200,6 @@ function commonAncestor(left, right) {
 
 function sha256(value) {
   return fsSha256(value)
-}
-
-function isTestPath(path) {
-  const segments = path.split('/')
-  const name = segments.at(-1)
-
-  return (
-    segments.some((segment) => TEST_PATH_SEGMENTS.has(segment)) ||
-    /\.(?:test|spec)\.[a-z]+$/.test(name) ||
-    /\.test-d\.tsx?$/.test(name) ||
-    name.endsWith('.snap')
-  )
 }
 
 async function validateHarnessPaths(root, values) {
@@ -2709,11 +2680,21 @@ async function evidenceStatus(directory, state, ledger) {
 }
 
 async function reportStatus(options) {
-  if (!options.dir || !options.json) throw new CliError('USAGE', 'status requires --dir and --json', 2)
+  if (!options.dir || (!options.json && !options['changed-files'])) {
+    throw new CliError('USAGE', 'status requires --dir and --json (or --changed-files)', 2)
+  }
 
   const directory = resolve(options.dir)
   const ledger = await readLedger(directory)
   const state = replayState(await readState(directory), ledger)
+
+  // --changed-files: init 기준선 이후 바뀐 경로만 한 줄씩 — 레포의 related-tests 도구에 그대로 먹인다 (impact 라벨)
+  if (options['changed-files']) {
+    const root = resolve(directory, state.scanRoot)
+    const now = await snapshot(root, `${portablePath(root, directory)}/`)
+    process.stdout.write(changedPaths(state.snapshot, now).map((path) => `${path}\n`).join(''))
+    return
+  }
   const checkpointIndex = ledger.findIndex((entry) => entry.type === 'checkpoint')
   const legacyPrefix = Math.max(checkpointIndex, 0)
   const headDigest = ledger.at(-1)?.digest ?? ZERO_DIGEST

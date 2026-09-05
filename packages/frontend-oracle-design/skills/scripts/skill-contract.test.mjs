@@ -511,11 +511,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.40.0')
+  assert.equal(version, '0.42.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.40.0')
+  assert.equal(marketplace.version, '0.42.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -1420,7 +1420,8 @@ test('sweeps new×inherited×runtime interactions into lintable dispositions ins
   assert.match(sweep, /dispositions, never tests/)
   assert.match(sweep, /`POLICY_GAP` candidate routed through\s+`NEEDS_DECISION`/)
   assert.match(sweep, /covered\(O\*\/D\*\)/)
-  assert.match(sweep, /impossible: <reason>/)
+  assert.match(sweep, /impossible: <mechanism> — <witness>/)
+  assert.match(sweep, /needs-evidence: <missing fact> — <lookup>/)
   assert.match(sweep, /needs-decision: <question>/)
 
   // 침묵은 셀로만 가능하다 — 빈 셀과 누락 정책은 기계가 잡는다
@@ -1837,4 +1838,70 @@ test('records escapes as classes and run metrics as direction signals, never gat
   assert.match(review, loose('Round 3 never resumes the context that failed rounds 1 and 2'))
   assert.match(review, loose("record `fresh-dispatch` in the round table's Next judgment"))
   assert.match(review, loose('The product budget stays 3'))
+})
+
+test('extends machine derivation past the card bytes: witnesses, evidence lookups, code inventory, sibling policies, the guard hook', async () => {
+  const [skill, sweep, caseSpace, sources, lock, red, green, subagent, verifier, runner, hooks, readme] =
+    await Promise.all([
+      read('SKILL.md'),
+      read('references/card/interaction-sweep.md'),
+      read('references/card/case-space.md'),
+      read('references/card/policy-sources.md'),
+      read('references/card/confirmation-lock.md'),
+      read('references/delivery/red.md'),
+      read('references/delivery/green-review.md'),
+      read('references/subagent-review.md'),
+      read('scripts/oracle-verify.mjs'),
+      read('scripts/oracle-run.mjs'),
+      readFile(join(dirname(skillDirectory), 'hooks/hooks.json'), 'utf8'),
+      read('README.md'),
+    ])
+
+  // R1: 4 disposition, impossible은 witness, needs-evidence는 조회처 — 사용자에게 가는 건 needs-decision뿐
+  assert.match(sweep, loose('Exactly four dispositions:'))
+  assert.match(sweep, loose('Only `needs-decision` reaches the user.'))
+  assert.match(sweep, loose('## Witness kinds and falsifiers'))
+  assert.match(sweep, loose('a cell never carries its own falsifier text'))
+  assert.match(caseSpace, loose('The four dispositions and their grammar'))
+  assert.match(sources, loose('one of the four dispositions'))
+  assert.match(lock, loose('every `impossible` carries a witness the lint could resolve'))
+  assert.match(skill, loose('Resolve every `needs-evidence` cell by investigation in the same pass'))
+  assert.match(skill, loose('run the reverse two-sample read once per card'))
+  assert.match(skill, loose('`scripts/oracle-verify.mjs card --ir`'))
+  assert.match(sweep, loose('fails as `disposition-open`'))
+  assert.match(sweep, loose('Known weakness, on purpose'))
+  assert.match(green, loose('is `SIDE_EFFECT_EXEMPTION_INVALID`'))
+  assert.match(verifier, /SIDE_EFFECT_EXEMPTION_INVALID/)
+  for (const code of [
+    'impossible-witness-missing',
+    'impossible-witness-invalid',
+    'needs-evidence-lookup-missing',
+    'disposition-open',
+  ]) {
+    assert.match(verifier, new RegExp(code), `oracle-verify.mjs must issue ${code}`)
+  }
+  assert.match(verifier, /export function buildJudgmentSpace/)
+
+  // R3: 코드·형제 카드에서 빈칸을 — 카드에 자동 기입 금지
+  assert.match(skill, loose('`scripts/oracle-dimensions.mjs --path <touched files>`'))
+  assert.match(skill, loose('`scripts/oracle-verify.mjs card --repo-policies`'))
+  assert.match(skill, loose('counterparts to disposition, never rows to copy'))
+  assert.match(green, loose('the required label `impact`'))
+  assert.match(green, loose('`oracle-run.mjs status --dir <dir> --changed-files`'))
+  assert.match(green, loose('a clean scan is not evidence of no side effects'))
+  assert.match(verifier, /SIDE_EFFECT_UNOWNED/)
+  assert.match(runner, /'changed-files'/)
+
+  // 블라인드 매핑은 행↔테스트 관련성의 2-sample
+  assert.match(subagent, loose('## Blind row mapping — the row↔test relevance check'))
+  assert.match(subagent, loose('The remedy is never a mapping edit'))
+  assert.match(verifier, /EVIDENCE_MAPPING_DISPUTED/)
+
+  // hook은 가속기, 게이트가 권위
+  const hookConfig = JSON.parse(hooks)
+  assert.equal(hookConfig.hooks.PreToolUse[0].matcher, 'Write|Edit|MultiEdit')
+  assert.match(hookConfig.hooks.PreToolUse[0].hooks[0].args[0], /oracle-guard-hook\.mjs$/)
+  assert.match(red, loose('the transition gate stays the authority'))
+  assert.match(skill, loose('hosts without hooks rely on it alone'))
+  assert.match(readme, loose('### 기계 유도 — 코드와 형제 카드에서 빈칸을 만든다'))
 })

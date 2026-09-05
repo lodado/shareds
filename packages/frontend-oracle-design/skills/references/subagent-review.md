@@ -203,6 +203,25 @@ decided it is `POLICY_GAP`. A more preferred naming·folder·abstraction style i
 and is not grounds for blocking. Also check whether a mandatory constraint was lowered into a
 product·visual preference.
 
+## Blind row mapping — the row↔test relevance check
+
+`oracle-verify.mjs evidence` proves only that the quoted test name passed in the quoted run. Whether
+that test enforces the row it is mapped to was, until now, one checklist item — an unmeasured
+judgment by a reviewer who had already seen `evidence.json`. The blind mapping makes it a
+two-sample check: a context-free reviewer receives **only the card's contract rows and the test
+source files** — never `evidence.json`, the review packet, or the implementation decision — and
+returns, for every test name, the row or rows it enforces:
+
+```json
+{ "save > shows pending and POSTs once": ["O1", "O2"], "save > keeps input on 5xx": "O3" }
+```
+
+`oracle-verify.mjs review --blind-map <file>` compares it with the evidence mapping before the
+binding checks. A row whose test the blind reader mapped elsewhere, or to nothing, is
+`EVIDENCE_MAPPING_DISPUTED`. The remedy is never a mapping edit: re-read the disputed row — a test
+that enforces a different row is an `EVIDENCE_GAP` for the row it left unowned. High risk runs the
+blind mapping always; Medium runs it when a row is mapped N:1 onto a path test.
+
 ## Reviewer Checklist
 
 The judgment items are owned by [`review-checklist.md`](review-checklist.md). When this file is

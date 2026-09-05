@@ -109,15 +109,21 @@ a grill question, and one surviving to lock means `NEEDS_DECISION`:
 ```markdown
 ## Frame dispositions
 
-| Frame                | Disposition                                                 |
-| -------------------- | ----------------------------------------------------------- |
-| F1                   | covered(O5)                                                 |
-| F2                   | needs-decision: back-forward while the request is pending?  |
-| F3                   | independent(O5): row count never reaches the pending policy |
-| E1                   | covered(O9)                                                 |
-| PATH1                | covered(O1, O5)                                             |
-| EMPTY pending × SORT | needs-decision: sort while fetching — cancel or queue?      |
+| Frame                | Disposition                                                                  |
+| -------------------- | ---------------------------------------------------------------------------- |
+| F1                   | covered(O5)                                                                  |
+| F2                   | needs-decision: back-forward while the request is pending?                   |
+| F3                   | independent(O5): row count never reaches the pending policy                  |
+| E1                   | covered(O9)                                                                  |
+| E2                   | impossible: a cached read has no 5xx path — constraint(S3)                   |
+| F4                   | needs-evidence: can the fixture reach 1000 rows — code(src/list/fixtures.ts) |
+| PATH1                | covered(O1, O5)                                                              |
+| EMPTY pending × SORT | needs-decision: sort while fetching — cancel or queue?                       |
 ```
+
+The four dispositions and their grammar — `impossible: <mechanism> — <witness>`,
+`needs-evidence: <fact> — <lookup>` — are the sweep's ([`interaction-sweep.md`](interaction-sweep.md));
+`independent(O*): reason` is the one addition, for `F*` frames only.
 
 Lint (`oracle-verify.mjs card`, active when `## Case space` exists):
 

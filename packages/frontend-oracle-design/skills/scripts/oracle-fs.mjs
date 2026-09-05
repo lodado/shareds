@@ -24,6 +24,95 @@ export function stableStringify(value) {
   return JSON.stringify(value)
 }
 
+/** 테스트·mock 경로 판정 — oracle-run의 TDD 순서 게이트와 PreToolUse hook이 같은 판정을 쓴다. */
+export const TEST_PATH_SEGMENTS = new Set(['__test__', '__tests__', '__mocks__', '__snapshots__'])
+
+export function isTestPath(path) {
+  const segments = path.split('/')
+  const name = segments.at(-1)
+
+  return (
+    segments.some((segment) => TEST_PATH_SEGMENTS.has(segment)) ||
+    /\.(?:test|spec)\.[a-z]+$/.test(name) ||
+    /\.test-d\.tsx?$/.test(name) ||
+    name.endsWith('.snap')
+  )
+}
+
+/** 기존 테스트에서 새로 늘어나면 약화로 보는 토큰. 감소·유지는 통과한다. */
+export const WEAKENING_TOKENS = [
+  'test.skip',
+  'it.skip',
+  'describe.skip',
+  '.only(',
+  'waitForTimeout(',
+  'toBeTruthy(',
+  'toBeFalsy(',
+  '.first()',
+  '.nth(',
+  'setTimeout(',
+  'maxDiffPixels',
+  'maxDiffPixelRatio',
+  'threshold',
+]
+
+/**
+ * 코드에서 기계적으로 뽑는 side-effect 토큰 표 — 알려진 목록일 뿐이며 검출 0은 효과 없음의 증거가 아니다.
+ * `owned`는 카드 side-effect 열에서 그 범주를 소유한다고 볼 키워드다.
+ */
+export const SIDE_EFFECT_CATEGORIES = [
+  { category: 'network', tokens: ['fetch(', 'axios.', 'axios(', 'ky.', 'ky(', 'XMLHttpRequest', 'graphql(', '.mutate(', 'useMutation('], owned: /GET|POST|PUT|PATCH|DELETE|request|fetch|요청|호출|save|저장|mutation/i },
+  { category: 'storage', tokens: ['localStorage', 'sessionStorage', 'indexedDB', 'document.cookie', 'caches.'], owned: /storage|persist|cookie|cache|캐시|보존|저장소/i },
+  { category: 'navigation', tokens: ['location.assign', 'location.replace', 'location.href', 'history.push', 'history.replace', 'router.push', 'router.replace', 'navigate(', 'window.open('], owned: /navigat|route|URL|redirect|이동|라우트|history|open/i },
+  { category: 'messaging', tokens: ['postMessage(', 'BroadcastChannel', 'dispatchEvent(', 'new CustomEvent'], owned: /message|event|메시지|이벤트|broadcast|dispatch/i },
+  { category: 'analytics', tokens: ['track(', 'gtag(', 'analytics.', 'dataLayer', 'sendBeacon('], owned: /analytics|track|telemetry|이벤트|분석|로그|log/i },
+  { category: 'timer', tokens: ['setTimeout(', 'setInterval(', 'requestAnimationFrame(', 'requestIdleCallback('], owned: /timer|타이머|debounce|throttle|delay|interval|지연/i },
+  { category: 'subscription', tokens: ['addEventListener(', '.observe(', '.subscribe(', 'new ResizeObserver', 'new IntersectionObserver', 'new MutationObserver'], owned: /listener|subscri|observ|구독|관측/i },
+  { category: 'console', tokens: ['console.log(', 'console.warn(', 'console.error(', 'console.info('], owned: /console|log|로그/i },
+  { category: 'notification', tokens: ['new Notification(', 'navigator.clipboard', 'navigator.share(', 'navigator.vibrate('], owned: /notification|clipboard|share|알림|클립보드|공유/i },
+]
+
+export const SIDE_EFFECT_EXEMPTION_MARKER = 'oracle:side-effect'
+
+const EXEMPTION_PATTERN = new RegExp(`${SIDE_EFFECT_EXEMPTION_MARKER}[ \\t]+(\\S[^\\n]*)`)
+
+/**
+ * 주어진 파일 내용에서 side-effect 토큰을 줄 단위로 찾는다. 면제 주석 `oracle:side-effect <row|reason>`은 같은 줄이나
+ * 바로 윗줄이며 **사유가 있어야** 면제다 — 맨 마커는 면제하지 않고 `invalid`로 돌려준다.
+ */
+export function scanSideEffects(path, content) {
+  const lines = content.split('\n')
+  const hits = []
+  const exemptions = []
+  const invalid = []
+
+  const exemptionOf = (line, lineNumber) => {
+    if (!line.includes(SIDE_EFFECT_EXEMPTION_MARKER)) return null
+    const match = line.match(EXEMPTION_PATTERN)
+    if (!match) {
+      invalid.push({ path, line: lineNumber, reason: 'marker without a row or reason' })
+      return null
+    }
+    return { path, line: lineNumber, reason: match[1].replace(/\*\/\s*$/, '').trim() }
+  }
+
+  lines.forEach((line, index) => {
+    const exemption = exemptionOf(line, index + 1) ?? exemptionOf(lines[index - 1] ?? '', index)
+    if (exemption) {
+      if (!exemptions.some((entry) => entry.line === exemption.line)) exemptions.push(exemption)
+      return
+    }
+
+    for (const { category, tokens } of SIDE_EFFECT_CATEGORIES) {
+      for (const token of tokens) {
+        if (line.includes(token)) hits.push({ path, line: index + 1, token, category })
+      }
+    }
+  })
+
+  return { hits, exemptions, invalid }
+}
+
 export function isPathInside(base, target) {
   const path = relative(resolve(base), resolve(target))
   return path === '' || (!path.startsWith('..') && !isAbsolute(path))

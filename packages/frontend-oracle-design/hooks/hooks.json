@@ -1,0 +1,18 @@
+{
+  "description": "Oracle guard — denies a production write before VALID_RED and a test-weakening write after it, with the same codes the transition gate would raise later. The gate stays the authority; this only moves the refusal before the write.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/skills/scripts/oracle-guard-hook.mjs"],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

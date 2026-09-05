@@ -57,7 +57,10 @@ above in one call with the same verification — see [`ledger.md`](ledger.md) fo
 `RED_EVIDENCE_UNVERIFIABLE`·`RED_EVIDENCE_MISSING` prevent an unrelated compile/setup failure or an
 exit-only run from being used as RED. `PRODUCTION_TOUCHED_BEFORE_RED` is machine evidence that
 production was touched before the tests — revert the changed files to keep the order and do not route
-around it. The transition stores the test file digest·assertion count·expected-value literal multiset
+around it. On Claude Code the plugin's PreToolUse hook (`hooks/hooks.json` →
+`scripts/oracle-guard-hook.mjs`) denies such a write before it lands with the same code, and after
+`VALID_RED` denies a write that adds a `TEST_WEAKENED` token to a test; the transition gate stays
+the authority, and a host without hooks relies on it alone. The transition stores the test file digest·assertion count·expected-value literal multiset
 at this point as the GREEN gate baseline: `toBe(1)` → `toBe(2)` keeps the assertion count and still
 fails `TEST_WEAKENED`, because the expected values are the card's, not the implementation's. The
 frozen evidence mapping covers `rows`, `paths`, `frames`, and `sequence` together, so every name

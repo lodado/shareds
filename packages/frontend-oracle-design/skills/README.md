@@ -216,6 +216,34 @@ node skills/evals/grade-results.mjs <results.json|results.jsonl>
 node skills/evals/grade-results.mjs --allow-partial <results.json|results.jsonl>
 ```
 
+### 기계 유도 — 코드와 형제 카드에서 빈칸을 만든다
+
+카드 안의 열거(스윕·deviation·frame)는 카드 바이트에서 기계가 만든다. 0.41.0부터 그 원칙이 카드 밖으로
+넓어진다 — 판정은 여전히 사람과 LLM의 disposition이고, 기계는 빈칸의 범위만 넓힌다.
+
+- `scripts/oracle-dimensions.mjs --path <file>...` — 고정 패턴 표로 코드에서 Case space 차원 후보
+  (`code(path#L)` 인용 포함)와 side-effect 인벤토리를 뽑는다. 카드에 자동 기입하지 않는다.
+- `scripts/oracle-verify.mjs card --repo-policies` — 같은 레포의 잠긴 형제 카드 중 surface 토큰을
+  공유하는 정책을 스윕 counterpart 후보(`P3 × <oracle-id>.P7`)로 낸다. 정보이지 게이트가 아니다.
+- `scripts/oracle-verify.mjs scan --side-effects --oracle <card> --path <changed files>` — diff의
+  알려진 side-effect 토큰마다 카드의 어떤 행이 그 범주를 소유하는지 대조한다. 미소유는
+  `SIDE_EFFECT_UNOWNED`, 면제는 `oracle:side-effect <row|reason>` 주석.
+- `scripts/oracle-run.mjs status --dir <dir> --changed-files` — init 기준선 이후 바뀐 경로만 한 줄씩.
+  레포의 related-tests 명령에 그대로 넘겨 필수 라벨 `impact`를 만든다.
+- `scripts/oracle-verify.mjs card --ir` — 카드 바이트에서 파생한 Judgment Space IR(JSON) 덤프.
+  `impossible`은 witness가 필수이고(`code()`·`constraint()`는 실재 검사), `needs-evidence`는 조회처가
+  필수다. 역-2-sample 리뷰와 지표 집계가 이 IR을 읽는다.
+- `scripts/oracle-verify.mjs review --blind-map <file>` — evidence.json을 보지 않은 리뷰어의 테스트→행
+  매핑과 대조한다. 불일치는 `EVIDENCE_MAPPING_DISPUTED`.
+- `hooks/hooks.json` — Claude Code PreToolUse hook. 플러그인 루트의 이 파일을 Claude Code가 자동으로
+  읽으므로 `plugin.json`에 등록하지 않는다. `ORACLE_READY`에서 production 쓰기, `VALID_RED` 이후
+  **기존** 테스트에 약화 토큰 추가를 쓰기 전에 거절한다(스냅샷에 없는 새 테스트 파일은 순서 게이트가
+  본다). 판정 불가는 허용(fail-open)이고 사후 게이트가 계속 권위다. Codex·jcode에는 hook이 없다.
+- `evals/to-skill-creator-evals.mjs` — 블랙박스 코퍼스와 `evals/held-out.json`을 skill-creator
+  `evals/evals.json`으로 투영한다. `--check`가 드리프트를 잡는다. held-out은 저자가 아니라 다른 레포에서
+  실제로 새어나간 결함이 정답을 준 케이스다(r11b: StrictMode 타이머·리마운트 scrollTo·ResizeObserver
+  초기 측정·필터 전환 중 Suspense 폴백). "나아졌나"는 이 케이스의 버전 간 A/B로만 답한다.
+
 ### Harness garbage collection
 
 새 상태·agent·dependency를 추가하기 전에 stale reference, never-fired sensor, duplicate

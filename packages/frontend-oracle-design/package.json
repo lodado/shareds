@@ -1,11 +1,11 @@
 {
   "name": "@lodado/frontend-oracle-design-plugin",
-  "version": "0.40.0",
+  "version": "0.42.0",
   "private": true,
   "description": "Claude Code / Codex plugin for medium/high-risk Oracle-driven frontend delivery.",
   "license": "MIT",
   "scripts": {
-    "lint": "eslint skills --ignore-pattern 'skills/bundles/**' && node skills/scripts/generate-reference-bundles.mjs --check",
+    "lint": "eslint skills --ignore-pattern 'skills/bundles/**' && node skills/scripts/generate-reference-bundles.mjs --check && node skills/evals/to-skill-creator-evals.mjs --check",
     "test": "node --test skills/scripts/*.test.mjs",
     "workflow-docs:generate": "node skills/scripts/generate-workflow-docs.mjs",
     "workflow-docs:check": "node skills/scripts/generate-workflow-docs.mjs --check",

@@ -3126,3 +3126,19 @@ test('a rejection prints the next legal action after the code line', async (t) =
   assert.match(usage.stderr, /^USAGE: /)
   assert.doesNotMatch(usage.stderr, /\nnext: /)
 })
+
+test('status --changed-files lists only the paths changed since the init baseline, one per line', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { initialFiles: { 'src/list.ts': 'export const a = 1\n' } })
+
+  const before = run(['status', '--dir', oracleDirectory, '--changed-files'])
+  assert.equal(before.status, 0, before.stderr)
+  assert.equal(before.stdout, '')
+
+  await writeFile(join(root, 'src/list.ts'), 'export const a = 2\n')
+  await writeFile(join(root, 'src/new.test.ts'), "import test from 'node:test'\ntest('x', () => {})\n")
+
+  const after = run(['status', '--dir', oracleDirectory, '--changed-files'])
+  assert.equal(after.status, 0, after.stderr)
+  // 레포의 related-tests 도구에 그대로 넘길 수 있는 순수 경로 목록 — 정렬, 스캔 루트 기준 상대 경로
+  assert.equal(after.stdout, 'src/list.ts\nsrc/new.test.ts\n')
+})

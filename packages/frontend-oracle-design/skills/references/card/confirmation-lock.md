@@ -154,6 +154,8 @@ node <skill-dir>/scripts/oracle-run.mjs init \
 - `User Confirmation` is `approved` and has the actual user response location that approved the new
   card or the semantic delta
 - No `## Open questions` content remains and no policy cites a `Q*` source
+- No sweep·deviation·frame·landmine cell remains `needs-decision` or `needs-evidence`, and every
+  `impossible` carries a witness the lint could resolve
 - The UI visual scope is recorded, and for `local`·`identity-shaping` the approved Design Intent and
   the `Never`·source·evidence tier of every `D*` row are complete
 - For `local`·`identity-shaping`, the explicit user answer location of the Design Change

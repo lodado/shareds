@@ -580,8 +580,8 @@ const SWEEP_SECTION = `
 | Pair    | Disposition                                                           |
 | ------- | --------------------------------------------------------------------- |
 | P1 × P2 | covered(O4)                                                           |
-| P3 × P1 | needs-decision: 저장 pending 중 목록 갱신이 도착하면 어느 쪽이 이기나? |
-| P4      | impossible: 정적 문구, 공유 표면 없음                                  |
+| P3 × P1 | covered(O7)                                                           |
+| P4      | impossible: 정적 문구, 공유 표면 없음 — constraint(S1)                                  |
 `
 
 test('invariants·sweep: 구조가 유효한 선택 섹션은 lint를 통과한다', async (t) => {
@@ -2733,21 +2733,21 @@ const DEVIATIONS_SECTION = `
 | Policy | Type                       | Disposition                              |
 | ------ | -------------------------- | ---------------------------------------- |
 | P1     | not-provided               | covered(O2)                              |
-| P1     | unsafe-provided            | impossible: 무시는 부작용이 없다         |
+| P1     | unsafe-provided            | impossible: 무시는 부작용이 없다 — constraint(S1)         |
 | P1     | wrong-timing-order         | covered(O2)                              |
-| P1     | stopped-early-applied-long | needs-decision: 응답 후에도 무시가 지속되면? |
+| P1     | stopped-early-applied-long | covered(O8)                              |
 | P2     | not-provided               | covered(O3)                              |
-| P2     | unsafe-provided            | impossible: 입력 유지에 위해 문맥 없음   |
+| P2     | unsafe-provided            | impossible: 입력 유지에 위해 문맥 없음 — constraint(S1)   |
 | P2     | wrong-timing-order         | covered(O4)                              |
-| P2     | stopped-early-applied-long | impossible: 지속 시간 없음               |
+| P2     | stopped-early-applied-long | impossible: 지속 시간 없음 — constraint(S1)               |
 | P3     | not-provided               | covered(O7)                              |
-| P3     | unsafe-provided            | impossible: 최신만 갱신은 항상 안전      |
+| P3     | unsafe-provided            | impossible: 최신만 갱신은 항상 안전 — constraint(S1)      |
 | P3     | wrong-timing-order         | covered(O7)                              |
 | P3     | stopped-early-applied-long | covered(O8)                              |
 | P4     | not-provided               | covered(D1)                              |
-| P4     | unsafe-provided            | impossible: 정적 문구                    |
-| P4     | wrong-timing-order         | impossible: 시간 표면 없음               |
-| P4     | stopped-early-applied-long | impossible: 지속 시간 없음               |
+| P4     | unsafe-provided            | impossible: 정적 문구 — constraint(S1)   |
+| P4     | wrong-timing-order         | impossible: 시간 표면 없음 — constraint(S1)               |
+| P4     | stopped-early-applied-long | impossible: 지속 시간 없음 — constraint(S1)               |
 `
 
 const LANDMINES_SECTION = `
@@ -2755,7 +2755,7 @@ const LANDMINES_SECTION = `
 
 | Landmine                                   | Citation               | Disposition                    |
 | ------------------------------------------ | ---------------------- | ------------------------------ |
-| initialOffset 옵션 = 마운트 스크롤 리셋 화석 | docs/api#initialoffset | needs-decision: 리마운트 시 유지? |
+| initialOffset 옵션 = 마운트 스크롤 리셋 화석 | docs/api#initialoffset | covered(O5)                    |
 | 동적 높이 재측정 주의                       | issues/123             | N/A: 행 높이 고정 (S1)          |
 `
 
@@ -2785,7 +2785,7 @@ test('deviations: 유형 누락·enum 밖 유형·없는 정책은 실패한다'
 
 test('landmines: 인용 없는 항목과 빈 disposition은 실패한다', async (t) => {
   const noCitation = VALID_CARD + LANDMINES_SECTION.replace('docs/api#initialoffset', '-')
-  const noDisposition = VALID_CARD + LANDMINES_SECTION.replace('needs-decision: 리마운트 시 유지?', '-')
+  const noDisposition = VALID_CARD + LANDMINES_SECTION.replace('covered(O5)                    |', '-                              |')
 
   const citation = run('card', '--oracle', await cardFile(t, noCitation))
   assert.equal(citation.status, 1)
@@ -2856,7 +2856,7 @@ async function caseSpaceCard(mutate = (rows) => rows) {
     ...generated.paths.map((path) => path.id),
     ...generated.emptyCells.map((cell) => cell.id),
   ]
-  const rows = ids.map((id) => `| ${id} | ${id.startsWith('EMPTY') ? 'impossible: fixture' : 'covered(O1)'} |`)
+  const rows = ids.map((id) => `| ${id} | ${id.startsWith('EMPTY') ? 'impossible: fixture — constraint(S1)' : 'covered(O1)'} |`)
   return `${base}\n## Frame dispositions\n\n| Frame | Disposition |\n| ----- | ----------- |\n${mutate(rows).join('\n')}\n`
 }
 
@@ -2983,16 +2983,16 @@ test('evidence: State Model PATH*와 Order 시퀀스는 evidence 키가 없으�
 
 test('deviations: static 축약 한 줄이 timing·context·duration 세 유형을 닫는다', async (t) => {
   const shorthand = VALID_CARD + DEVIATIONS_SECTION
-    .replace('| P4     | unsafe-provided            | impossible: 정적 문구                    |\n', '')
-    .replace('| P4     | wrong-timing-order         | impossible: 시간 표면 없음               |\n', '')
+    .replace('| P4     | unsafe-provided            | impossible: 정적 문구 — constraint(S1)   |\n', '')
+    .replace('| P4     | wrong-timing-order         | impossible: 시간 표면 없음 — constraint(S1)               |\n', '')
     .replace(
-      '| P4     | stopped-early-applied-long | impossible: 지속 시간 없음               |',
-      '| P4     | static                     | impossible: 정적 문구 — 시간·문맥·지속 면 없음 |',
+      '| P4     | stopped-early-applied-long | impossible: 지속 시간 없음 — constraint(S1)               |',
+      '| P4     | static                     | impossible: 정적 문구 — 시간·문맥·지속 면 없음 — constraint(S1) |',
     )
   assert.equal(run('card', '--oracle', await cardFile(t, shorthand)).status, 0)
 
   const wrongDisposition = shorthand.replace(
-    'impossible: 정적 문구 — 시간·문맥·지속 면 없음',
+    'impossible: 정적 문구 — 시간·문맥·지속 면 없음 — constraint(S1)',
     'needs-decision: 정적인가?',
   )
   const rejected = run('card', '--oracle', await cardFile(t, wrongDisposition))
@@ -3031,7 +3031,7 @@ ${touchesRows}
     ...generated.paths.map((path) => path.id),
     ...generated.emptyCells.map((cell) => cell.id),
   ]
-  const rows = ids.map((id) => `| ${id} | ${id.startsWith('EMPTY') ? 'impossible: fixture' : 'covered(O1)'} |`)
+  const rows = ids.map((id) => `| ${id} | ${id.startsWith('EMPTY') ? 'impossible: fixture — constraint(S1)' : 'covered(O1)'} |`)
   return `${base}\n## Frame dispositions\n\n| Frame | Disposition |\n| ----- | ----------- |\n${rows.join('\n')}\n`
 }
 
@@ -3191,4 +3191,280 @@ test('a Draft with an Open question fails the lock on the provisional Q* source 
     .replace(/\n## Open questions[\s\S]*$/, '\n')
   const relinted = run('card', '--oracle', await cardFile(t, resolved))
   assert.equal(relinted.status, 0, relinted.stderr)
+})
+
+/** R1: 4계열 disposition 검사 — needs-evidence 수용, impossible witness 강제, covered 서브 인용. */
+const R1_SWEEP = `
+## Interaction sweep
+
+| Pair    | Disposition                                                                 |
+| ------- | --------------------------------------------------------------------------- |
+| P1 × P2 | covered(O4.Then)                                                            |
+| P3 × P1 | needs-evidence: 목록 갱신이 저장 pending과 상태를 공유하나 — code(src/list.ts) |
+| P4      | impossible: 정적 문구, 공유 표면 없음 — constraint(S1)                       |
+`
+
+const R1_FRAMES = `
+## Case space
+
+| Family      | Dimension | Choices                  |
+| ----------- | --------- | ------------------------ |
+| Data        | volume    | 0, 1, many               |
+| Value       | —         | excluded: fixture        |
+| Async       | —         | excluded: fixture        |
+| Order       | —         | excluded: fixture        |
+| Entry       | —         | excluded: fixture        |
+| Environment | —         | excluded: fixture        |
+| Platform    | —         | excluded: fixture        |
+| Inherited   | —         | excluded: fixture        |
+`
+
+test('a needs-decision cell that survives on an approved card fails the lock as disposition-open', async (t) => {
+  const open = SWEEP_SECTION.replace('covered(O7)', 'needs-decision: 저장 pending 중 목록 갱신이 도착하면 어느 쪽이 이기나?')
+  const linted = run('card', '--oracle', await cardFile(t, VALID_CARD + open))
+
+  assert.equal(linted.status, 1)
+  assert.match(linted.stderr, /disposition-open: "P3 × P1": needs-decision survives on an approved card/)
+  // 다른 구조 결함은 없다 — 열린 셀 하나만 lock을 막는다
+  const issues = linted.stderr.split('\n').filter((line) => /^\s+[a-z-]+:/.test(line))
+  assert.deepEqual(issues.map((line) => line.trim().split(':')[0]), ['disposition-open'], linted.stderr)
+})
+
+test('R1: needs-evidence is grammatically accepted in every family, blocks the lock as open, and is rejected without a lookup token', async (t) => {
+  const accepted = run(
+    'card',
+    '--oracle',
+    await cardFile(
+      t,
+      `${VALID_CARD}${R1_SWEEP}
+## Deviations
+
+| Policy | Type   | Disposition                                                                   |
+| ------ | ------ | ----------------------------------------------------------------------------- |
+| P1     | not-provided | needs-evidence: 무시가 빠지면 두 번째 POST가 나가나 — issue(https://x/1)  |
+| P1     | static | impossible: 무시는 표면이 없다 — constraint(S1)                                |
+| P2     | not-provided | covered(O3)                                                              |
+| P2     | static | impossible: 지속 시간 없음 — constraint(S1)                                    |
+| P3     | not-provided | covered(O7)                                                              |
+| P3     | static | impossible: 최신만 갱신 — constraint(S1)                                       |
+| P4     | not-provided | covered(D1)                                                              |
+| P4     | static | impossible: 정적 문구 — constraint(S1)                                         |
+
+## Dependency landmines — example-lib
+
+| Landmine   | Citation | Disposition                                                        |
+| ---------- | -------- | ------------------------------------------------------------------ |
+| initialOffset | docs/api#initialoffset | needs-evidence: 리마운트 시 적용되나 — docs(example-lib#initialoffset) |
+`,
+    ),
+  )
+  // 문법은 통과(enum·lookup 오류 없음) — 살아남은 셀 셋만 disposition-open으로 lock을 막는다
+  assert.equal(accepted.status, 1)
+  const acceptedIssues = accepted.stderr
+    .split('\n')
+    .filter((line) => /^\s+[a-z-]+:/.test(line))
+    .map((line) => line.trim().split(':')[0])
+  assert.deepEqual(acceptedIssues, ['disposition-open', 'disposition-open', 'disposition-open'], accepted.stderr)
+
+  const lookupMissing = run(
+    'card',
+    '--oracle',
+    await cardFile(t, VALID_CARD + R1_SWEEP.replace(' — code(src/list.ts)', '')),
+  )
+  assert.equal(lookupMissing.status, 1)
+  assert.match(lookupMissing.stderr, /needs-evidence-lookup-missing: "P3 × P1"/)
+
+  // 조사로 해소한 카드는 통과한다 — 조사 결과 인용이 witness가 된다
+  const resolved = VALID_CARD + R1_SWEEP.replace(
+    'needs-evidence: 목록 갱신이 저장 pending과 상태를 공유하나 — code(src/list.ts)',
+    'impossible: 목록 갱신은 저장 상태를 읽지 않는다 — constraint(S1)',
+  )
+  const relinted = run('card', '--oracle', await cardFile(t, resolved))
+  assert.equal(relinted.status, 0, relinted.stderr)
+})
+
+test('R1: impossible without a witness fails in every family, and code()·constraint() witnesses are checked for real', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'oracle-witness-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  await mkdir(join(directory, 'src'), { recursive: true })
+  await writeFile(join(directory, 'src', 'save.ts'), 'a\nb\nc\nd\ne\n')
+  const oracle = join(directory, 'oracle.md')
+
+  // needs-evidence 셀은 disposition-open으로 따로 막힌다 — 여기서는 witness 검사만 보도록 닫아 둔다
+  const lint = async (sweep) => {
+    await writeFile(oracle, VALID_CARD + sweep.replace(/\| P3 × P1 \|[^\n]*\n/, '| P3 × P1 | covered(O7) |\n'))
+    return run('card', '--oracle', oracle)
+  }
+
+  const bare = await lint(R1_SWEEP.replace(' — constraint(S1)', ''))
+  assert.equal(bare.status, 1)
+  assert.match(bare.stderr, /impossible-witness-missing: "P4"/)
+
+  const framesBare = run(
+    'card',
+    '--oracle',
+    await cardFile(
+      t,
+      `${VALID_CARD}${R1_FRAMES}
+## Frame dispositions
+
+| Frame | Disposition        |
+| ----- | ------------------ |
+| F1    | impossible: no rows |
+| F2    | covered(O5)        |
+| F3    | covered(O5)        |
+`,
+    ),
+  )
+  assert.equal(framesBare.status, 1)
+  assert.match(framesBare.stderr, /impossible-witness-missing: F1/)
+
+  const codeOk = await lint(R1_SWEEP.replace('constraint(S1)', 'code(src/save.ts#L1-L5)'))
+  assert.equal(codeOk.status, 0, codeOk.stderr)
+
+  const codeRange = await lint(R1_SWEEP.replace('constraint(S1)', 'code(src/save.ts#L1-L50)'))
+  assert.equal(codeRange.status, 1)
+  assert.match(codeRange.stderr, /impossible-witness-invalid: "P4": code\(src\/save\.ts#L1-L50\) line range exceeds the file \(6 lines\)/)
+
+  const codeMissing = await lint(R1_SWEEP.replace('constraint(S1)', 'code(src/missing.ts#L1-L2)'))
+  assert.equal(codeMissing.status, 1)
+  assert.match(codeMissing.stderr, /impossible-witness-invalid: "P4": code\(src\/missing\.ts\) does not exist/)
+
+  const constraintUnknown = await lint(R1_SWEEP.replace('constraint(S1)', 'constraint(S9)'))
+  assert.equal(constraintUnknown.status, 1)
+  assert.match(constraintUnknown.stderr, /impossible-witness-invalid: "P4": constraint\(S9\) is not a registered Source Registry ID/)
+
+  // type()·docs()는 존재만 — 관련성은 역-2-sample 소관
+  const docsOk = await lint(R1_SWEEP.replace('constraint(S1)', 'docs(design-system#static-copy)'))
+  assert.equal(docsOk.status, 0, docsOk.stderr)
+})
+
+test('R1: card --ir derives stable judgment ids from the card bytes, deterministically and without lint', async (t) => {
+  const card = VALID_CARD + SWEEP_SECTION + DEVIATIONS_SECTION + LANDMINES_SECTION
+  const oracle = await cardFile(t, card)
+
+  const first = run('card', '--oracle', oracle, '--ir')
+  const second = run('card', '--oracle', oracle, '--ir')
+  assert.equal(first.status, 0, first.stderr)
+  assert.equal(first.stdout, second.stdout)
+
+  const records = JSON.parse(first.stdout)
+  const ids = records.map((record) => record.id)
+  assert.ok(ids.includes('sweep:P1×P2'), ids.join(', '))
+  assert.ok(ids.includes('sweep:P4'))
+  assert.ok(ids.includes('deviation:P1:stopped-early-applied-long'))
+  assert.ok(ids.includes('landmine:initialOffset 옵션 = 마운트 스크롤 리셋 화석'))
+
+  const impossible = records.find((record) => record.id === 'sweep:P4')
+  assert.equal(impossible.disposition.type, 'impossible')
+  assert.deepEqual(impossible.disposition.witness, { kind: 'constraint', ref: 'S1' })
+  const covered = records.find((record) => record.id === 'sweep:P1×P2')
+  assert.deepEqual(covered.disposition.rows, ['O4'])
+
+  // 판정 실패 카드도 IR은 덤프된다 — 데이터 뷰지 게이트가 아니다
+  const broken = run('card', '--oracle', await cardFile(t, card.replace(' — constraint(S1)', '')), '--ir')
+  assert.equal(broken.status, 0, broken.stderr)
+})
+
+test('review --blind-map disputes a row whose test the blind reader mapped elsewhere', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'oracle-blind-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const map = join(directory, 'evidence.json')
+  const blind = join(directory, 'blind.json')
+  const oracle = join(directory, 'oracle.md')
+  await writeFile(oracle, VALID_CARD)
+  await writeFile(
+    map,
+    JSON.stringify({
+      schemaVersion: 1,
+      rows: { O1: { kind: 'test', name: 'save > posts once' }, O2: { kind: 'test', name: 'save > posts once' } },
+    }),
+  )
+
+  await writeFile(blind, JSON.stringify({ 'save > posts once': ['O1'] }))
+  const disputed = run('review', '--oracle', oracle, '--file', map, '--map', map, '--blind-map', blind)
+  assert.equal(disputed.status, 1)
+  assert.match(disputed.stderr, /^EVIDENCE_MAPPING_DISPUTED: /)
+  assert.match(disputed.stderr, /O2: "save > posts once" — the blind reviewer mapped it to O1/)
+  assert.match(disputed.stderr, /\nnext: the blind read and evidence\.json disagree/)
+
+  await writeFile(blind, JSON.stringify({ 'save > posts once': ['O1', 'O2'] }))
+  const agreed = run('review', '--oracle', oracle, '--file', map, '--map', map, '--blind-map', blind)
+  assert.doesNotMatch(agreed.stderr, /EVIDENCE_MAPPING_DISPUTED/)
+})
+
+test('scan --side-effects inventories code effects and refuses one no card row owns', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'oracle-side-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const source = join(directory, 'save.ts')
+  const oracle = join(directory, 'oracle.md')
+  await writeFile(oracle, VALID_CARD)
+  await writeFile(source, "await fetch('/api/save')\nlocalStorage.setItem('draft', body)\n")
+
+  const inventory = run('scan', '--side-effects', '--path', source)
+  assert.equal(inventory.status, 0, inventory.stderr)
+  assert.match(inventory.stdout, /SIDE_EFFECT network .*save\.ts:1 fetch\(/)
+  assert.match(inventory.stdout, /SIDE_EFFECT storage .*save\.ts:2 localStorage/)
+  assert.match(inventory.stdout, /SCAN_OK 1 files side-effects:2\n$/)
+
+  // 카드는 POST·GET(network)만 소유한다 — storage는 미소유
+  const unowned = run('scan', '--side-effects', '--oracle', oracle, '--path', source)
+  assert.equal(unowned.status, 1)
+  assert.match(unowned.stderr, /^SIDE_EFFECT_UNOWNED: /)
+  assert.match(unowned.stderr, /save\.ts:2: localStorage \(storage\)/)
+  assert.doesNotMatch(unowned.stderr, /fetch\(/)
+  assert.match(unowned.stderr, /\nnext: add the row whose side-effect column owns that category/)
+
+  await writeFile(source, "await fetch('/api/save')\n// oracle:side-effect O1 draft persistence is inside the save contract\nlocalStorage.setItem('draft', body)\n")
+  const exempt = run('scan', '--side-effects', '--oracle', oracle, '--path', source)
+  assert.equal(exempt.status, 0, exempt.stderr)
+  assert.match(exempt.stdout, /SCAN_OK 1 files side-effects:1 owned\n$/)
+
+  // 맨 마커는 면제가 아니다 — 행이나 사유가 있어야 한다
+  await writeFile(source, "await fetch('/api/save')\n// oracle:side-effect\nlocalStorage.setItem('draft', body)\n")
+  const bare = run('scan', '--side-effects', '--oracle', oracle, '--path', source)
+  assert.equal(bare.status, 1)
+  assert.match(bare.stderr, /^SIDE_EFFECT_EXEMPTION_INVALID: /)
+  assert.match(bare.stderr, /save\.ts:2: marker without a row or reason/)
+
+  // 카드에 없는 행을 인용한 면제도 무효
+  await writeFile(source, "await fetch('/api/save')\n// oracle:side-effect O99 nobody owns this\nlocalStorage.setItem('draft', body)\n")
+  const unknownRow = run('scan', '--side-effects', '--oracle', oracle, '--path', source)
+  assert.equal(unknownRow.status, 1)
+  assert.match(unknownRow.stderr, /^SIDE_EFFECT_EXEMPTION_INVALID: /)
+  assert.match(unknownRow.stderr, /save\.ts:2: O99 nobody owns this/)
+})
+
+test('card --repo-policies lists locked sibling policies that share a surface token as sweep counterparts', async (t) => {
+  const repository = await mkdtemp(join(tmpdir(), 'oracle-repo-'))
+  t.after(() => rm(repository, { recursive: true, force: true }))
+  const oracles = join(repository, '.ai', 'oracles')
+  const shared = VALID_CARD.replace(
+    '- P1: 저장 중 추가 제출은 무시한다. (출처: S1) (행: O1, O2)',
+    '- P1: `SaveButton` 저장 중 추가 제출은 무시한다. (출처: S1) (행: O1, O2)',
+  )
+  const unrelated = VALID_CARD.replace(
+    '- P1: 저장 중 추가 제출은 무시한다. (출처: S1) (행: O1, O2)',
+    '- P1: `ProfileAvatar` 업로드 중 추가 제출은 무시한다. (출처: S1) (행: O1, O2)',
+  )
+  for (const [id, content, locked] of [
+    ['locked-sibling', shared, true],
+    ['unlocked-sibling', shared, false],
+    ['other-surface', unrelated, true],
+    ['mine', shared, false],
+  ]) {
+    await mkdir(join(oracles, id), { recursive: true })
+    await writeFile(join(oracles, id, 'oracle.md'), content)
+    if (locked) {
+      const digest = createHash('sha256').update(content).digest('hex')
+      await writeFile(join(oracles, id, 'oracle.lock.json'), JSON.stringify({ schemaVersion: 1, oracle: { path: 'oracle.md', sha256: digest } }))
+    }
+  }
+
+  const candidates = run('card', '--oracle', join(oracles, 'mine', 'oracle.md'), '--repo-policies')
+  assert.equal(candidates.status, 0, candidates.stderr)
+  const lines = candidates.stdout.trim().split('\n')
+  assert.equal(lines[0], 'REPO_POLICY_CANDIDATES 1')
+  assert.match(lines[1], /^# candidates — disposition each as a sweep counterpart; never paste them as rows$/)
+  assert.match(lines[2], /^\| P1 × locked-sibling\.P1 \| needs-evidence: shared surface `savebutton` — docs\(\.ai\/oracles\/locked-sibling\/oracle\.md#P1\) \|$/)
 })
