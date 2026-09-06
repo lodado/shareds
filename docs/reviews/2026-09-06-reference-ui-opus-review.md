@@ -59,6 +59,22 @@ A unit-test count or one successful smoke is not evidence that reference-grade U
 - Evidence root: `$JCODE_SCRATCH_DIR/reference-ui-review/`. Delivered `acceptance-candidate/index.html`, worker report `acceptance-candidate/acceptance-report.md`, initial/final images `acceptance-candidate/design-loop/r1/` and `r3/`, independent render `coordinator-ui-final/`, independent interaction results `coordinator-ui-checks.json`.
 - Acceptance limits: one model and one brief, no paired baseline, no human reference-acceptance calibration, no production framework integration, no dark theme or assistive-technology acceptance. Global installed skill remains unchanged.
 
+## Installed-path integration follow-through
+
+**Latest package validation supersedes earlier counts: 75/75 tests passed, zero skipped; ESLint passed.**
+
+An isolated copy of the final skill was exposed through the actual `.claude/skills/frontend-interface-design` discovery symlink, outside the repository working directory. This found a real integration defect missed by direct-path tests: `pack.mjs`, `observe.mjs`, `render.mjs` and `evals/run-live.mjs` compared Node's resolved module URL to the unresolved symlink argument. Invoking them via the installed path silently exited zero without running the CLI. The first integration attempt failed parsing the absent route JSON; this was a product defect, not a harness formatting issue.
+
+- Added `scripts/installed-cli.test.mjs`: all four installed CLI parity tests failed before the fix (`actual exit0`, expected exit2 for invalid input).
+- Fixed only the entry-point comparison in those four scripts using `realpathSync(process.argv[1])`.
+- Re-ran the full suite: **75/75 passed**, including all four installed-path regression tests and the real-browser test. ESLint passed.
+- Repeated the isolated installation workflow: Claude discovery link and prompt/internal-artifact contract passed; shipped pack validation emitted actual output; installed route returned parsed JSON with dashboard `tokens-only` and no fidelity claim.
+- Invoked the copied renderer through the installed symlink, rendering the actual shipped composition at375/1280 × light/dark: **4/4 cells**, no browser errors and zero contrast/document overflow failures. Sibling metrics modules, token CSS and assets resolved without relying on repository cwd.
+- Invoked the copied evaluation runner through the installed path: Codex dry-run created both `.agents/skills` and `.codex/skills` links correctly. No paid host generation was executed and no live run was fabricated.
+- Reproduction script: `$JCODE_SCRATCH_DIR/reference-ui-review/check-installed.py`. Observed result: `final-install-smoke/integration-result.json` under the same root. Global installed skills remain untouched.
+
+This closes the actual skill discovery → CLI routing → browser renderer integration boundary. It does not change the documented limits on production-app adaptation, live evaluator host execution or reference-grade model performance.
+
 ## Requirement and changed-output evidence map
 
 This inventory maps every changed deliverable to a concrete check or an explicit unverified boundary. A row marked static, assisted, blocked or unmeasured is not promoted to an end-to-end pass. Test paths are relative to `packages/frontend-interface-design/`. Skill asset paths are relative to its `skills/frontend-interface-design/` directory. The two repository reports use repository-relative paths.

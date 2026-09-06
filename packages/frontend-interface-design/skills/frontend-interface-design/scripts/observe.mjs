@@ -6,6 +6,7 @@
 // of the site. Playwright is resolved the same way render.mjs resolves it, so no new dependency.
 // Exit 2 when Playwright is missing or the page could not be observed (403, bot wall, timeout):
 // a failed observation must degrade to `unverified`, never to an invented value.
+import { realpathSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
@@ -285,7 +286,7 @@ async function main() {
   }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
   main().catch((error) => {
     process.stderr.write(`OBSERVE_FAILED: ${error.message}\n`)
     process.exitCode = 2

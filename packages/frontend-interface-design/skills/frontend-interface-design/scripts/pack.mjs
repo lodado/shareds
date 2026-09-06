@@ -6,6 +6,7 @@
 //   --route "<utterance>"         the routing decision as JSON on stdout
 //   --list                        id, brand, task and evidence status of every pack
 // No dependencies: packs are plain JSON next to references/.
+import { realpathSync } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import process from 'node:process'
@@ -470,7 +471,7 @@ async function main() {
   if (invalid > 0) process.exitCode = 1
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
   main().catch((error) => {
     process.stderr.write(`PACK_FAILED: ${error.message}\n`)
     process.exitCode = 2

@@ -6,6 +6,7 @@
 // directory or this file's directory, in that order. The exit code is 0 even when every gate
 // fails — grading is a separate step (evals/grade-results.mjs) — and 2 when Playwright is missing.
 import { spawn } from 'node:child_process'
+import { realpathSync } from 'node:fs'
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { basename, dirname, extname, join, resolve } from 'node:path'
@@ -487,7 +488,7 @@ async function main() {
   if (aggregate.renderedCells === 0) process.exitCode = 1
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
   main().catch((error) => {
     process.stderr.write(`RENDER_FAILED: ${error.message}\n`)
     process.exitCode = 2

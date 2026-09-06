@@ -9,6 +9,7 @@
 // next to the transcript as self-report.json so a later read can tell where a number came from.
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { realpathSync } from 'node:fs'
 import { access, appendFile, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
@@ -454,7 +455,7 @@ async function main() {
   process.stdout.write(nextCommands({ root, host, variant, fixtures, dryRun }))
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
   main().catch((error) => {
     process.stderr.write(`EVAL_LIVE_FAILED: ${error.message}\n`)
     process.exitCode = 2
