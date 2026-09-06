@@ -82,7 +82,17 @@ URL 모드에서는 DOM(`nav` · `main` · `section`)과 CSS(토큰, transition)
   (조작 모델 · state 처리 · 키보드 경로)만 뽑는다. 색 · 폰트 · motion 값은 가져오지 않는다.
 - 구현은 pre-flight에서 찾은 기존 컴포넌트와 우리 토큰으로 한다. 레지스트리 코드를
   붙여 넣지 않는다.
-- hero · pricing · feature grid 같은 조합 블록은 항상 참고 모드다. 설치하지 않는다.
+- Fidelity 모드에서 hero · pricing · feature grid 같은 조합 블록은 항상 참고 모드다. 설치하지
+  않는다. Adaptation 모드는 아래 § 조합 블록을 따른다.
+
+### 조합 블록 — Adaptation 모드의 시작점
+
+슬롭은 hero · pricing · feature 섹션을 매번 빈 div에서 그릴 때 가장 많이 나온다. Adaptation
+모드에서는 **검증된 조합 블록**을 시작점으로 허용한다 — 우선순위: ① 이 skill의
+[`../exemplars/compositions/`](../exemplars/README.md) ② 계보 파일의 매크로구조 ③ shadcn blocks ·
+자체 registry. 조건 둘은 그대로다: 설치 직후 원본 색 · 폰트 · 그림자를 우리 토큰으로 전부
+치환한다(원본 스타일이 남으면 slop), 같은 역할의 두 번째 파일을 만들지 않는다. 21st.dev류의
+개별 컴포넌트 검색은 여전히 참고 모드다.
 
 ### 설치 게이트(프리미티브만)
 

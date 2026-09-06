@@ -1,7 +1,10 @@
-# Visual system — Creation 모드 시각 시스템 도출 공식
+# Visual system — 토큰 파생 공식 (계보의 뒤에서 쓴다)
 
-Creation 모드에서 decision record 5단(visual treatment)을 채우기 **전에** 실행한다.
-Fidelity에서는 쓰지 않는다 — 소스가 곧 시스템이다.
+Adaptation 모드의 시각 시스템은 [`adaptation.md`](adaptation.md)의 **계보 + 노브 3개**가 정한다.
+이 파일은 그 뒤에서만 쓴다: (a) 노브 ① hue를 주제의 사물에서 뽑는 절차(§0), (b) 계보 토큰을
+새 hue로 재도출할 때의 팔레트 · 12-step · solid 전경 계산(§1–§2), (c) 계보가 다루지 않는
+레이아웃 패턴의 조건표(§5). 계보 파일과 이 파일이 다르면 계보가 이긴다. Fidelity에서는 쓰지
+않는다 — 소스가 곧 시스템이다.
 
 링크가 원천(source of truth)이고, 본문에는 실행에 필요한 최소 수치만 담는다.
 링크 내용과 본문 수치가 다르면 링크가 이긴다. 원문 vendoring 금지 — 이 파일은

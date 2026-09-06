@@ -40,10 +40,11 @@
 
 ### 5. Visual treatment — 각 항목은 1–4단 중 무엇을 돕는지 적는다
 
-- anchor hue(Creation): <주제의 사물 3개와 각 함의 hue> → 고른 것 <hue 값과 이유>
-- 이식 테스트(Creation): 무관한 브리프 <예: 치과 · 주물 공장>에 같은 팔레트를 놓으면
-  <어색하다 = 통과 / 자연스럽다 = 주제에서 안 나옴, 재도출>
-- 토큰(Creation): <신규 방출 / 기존 토큰 재사용 + 출처 파일>
+- 계보(Adaptation): <id> — 표의 행 <유형>. 노브 ① hue <사물 3개 → hue, 이식 테스트 결과> ·
+  ② 페어링 <번호> · ③ radius/밀도 <프리셋>
+- DESIGN.md(Adaptation): <경로, lint 오류 0 · 경고 n> / (Fidelity) 소스 <종류 · 위치>
+- 흔한 답 vs 갈림(Adaptation): <한 줄> / <구조 · 타입 · 색 중 둘 이상>
+- 토큰: <exemplars/tokens.css 복사 + 노브 반영 / 기존 토큰 재사용 + 출처 파일>
 - typography: <scale 단계 수, display/body 역할> → 돕는 단: hierarchy
 - spacing: <기본 단위, 섹션 간격 규칙> → 돕는 단: hierarchy
 - color: accent <하나>, 쓰이는 곳 <primary action · 현재 위치> → 돕는 단: interaction
@@ -74,7 +75,9 @@
 - **2단 목록은 3개 이하.** 4개째부터는 progressive disclosure 대상이다.
 - **3단 조작 수는 세어서 적는다.** "간단함"은 수치가 아니다.
 - **4단 표의 빈 행은 없다.** 그 state가 실제로 불가능하면 "불가 — 이유"를 적는다.
-- **5단의 "돕는 단" 칸이 비면 그 treatment는 삭제.** 이것이 visual treatment gate다.
+- **5단의 "돕는 단" 칸이 비면 그 treatment는 삭제.** 단, [`craft.md`](craft.md) 12개 기본값과
+  계보 `DESIGN.md`에 있는 treatment는 면제다 — 마감은 정당화 대상이 아니다. 이것이 visual
+  treatment gate다.
 - **버린 대안은 최소 1개.** 대안이 없었다면 탐색을 안 한 것이다.
 
 ## 사용자에게 묻는 기준
@@ -84,3 +87,22 @@
 - 조작 모델이 갈리고(탭 vs 스크롤, 모달 vs 페이지) 되돌리려면 재작성이 필요할 때
 - 기본 노출 정보 범위가 비즈니스 판단일 때(가격, 재고, 개인정보)
 - destructive 동작의 undo / confirm 정책이 없을 때 — 이 경우 `frontend-oracle-design`으로 보낸다
+
+## Decision rules — 자주 갈리는 지점의 기본값
+
+3단 · 4단을 채울 때 아래 기본값에서 시작한다. 뒤집으려면 조건이 있어야 한다.
+
+| 상황                           | 기본값                                                                  | 뒤집는 조건                            |
+| ------------------------------ | ----------------------------------------------------------------------- | -------------------------------------- |
+| 정보 노출                      | primary task에 필요한 것만 기본 노출, 나머지는 progressive disclosure   | 전문가용 고빈도 도구면 밀도를 올린다   |
+| 조작 모델                      | 가장 적은 단계로 task를 끝내는 모델, click 기본                         | 순차 서사·비교 탐색이면 scroll-driven  |
+| Loading                        | 레이아웃을 아는 콘텐츠는 skeleton, 모르면 spinner, 1초 넘으면 진행 표시 | 되돌릴 수 있는 동작은 optimistic       |
+| Empty                          | 다음 행동 CTA 하나 + 한 줄 설명, 분위기 문구 금지                       | 첫 방문 온보딩이면 예시 데이터 제안    |
+| Error                          | 무엇이 · 왜 · 어떻게, 필드 옆 inline, 사과 금지                         | 전역 오류만 배너                       |
+| Success                        | 결과가 화면에 보이면 조용히, 안 보이면 toast                            | 되돌리기 가능하면 undo 포함 toast      |
+| Destructive                    | undo 우선, 없으면 확인 dialog, 확인 버튼에 동작 이름                    | 되돌릴 수 없는 결제·삭제는 Oracle 정책 |
+| Form                           | label 위, blur 시 검증, idle 상태에서 submit 비활성화 금지              | 한 필드 form은 inline 검증             |
+| Motion                         | 피드백 120–200ms ease-out만. 등장/퇴장은 필요할 때 ≤200ms               | 브랜드 순간 한 곳(signature)만 허용    |
+| Accent                         | 하나. primary action과 현재 위치에만                                    | 데이터 시각화 범주 색은 별도 팔레트    |
+| Density                        | 사용 빈도로 결정. 온보딩 sparse, 운영 도구 dense                        | —                                      |
+| Radius · shadow · blur · glass | craft.md · 계보 기본값 그대로. 그 밖은 계층 · 레이어를 표현할 때만      | 근거 한 줄을 못 쓰면 제거              |

@@ -1,0 +1,152 @@
+# Adaptation — 계보를 고르고 변이해 DESIGN.md를 만든다
+
+사용자 소유 디자인 소스가 없을 때의 모드다(구 Creation). "무에서 도출"하지 않는다 —
+**계보(lineage) 하나를 고르고, 노브 3개로 변이하고, 프로젝트 루트 `DESIGN.md`로 잠근다.**
+그 뒤의 화면은 전부 Fidelity다.
+
+근거 한 줄: 형용사는 영역을 가리키고 레퍼런스는 점을 찍는다("Adjectives describe a region. A
+specific reference describes a point." — Google DESIGN.md PHILOSOPHY). 점이 정해지면 금지 규칙은
+공짜로 따라온다.
+
+## 1. 브리프 — 질문은 고정 템플릿, 추정을 먼저
+
+Frame 결과 위에 아래 6칸을 채운다. 브리프에서 읽히는 건 **추정으로 먼저 적고**, 결과를 가장
+크게 바꾸는 것만 최대 3개 묻는다. 즉석에서 만든 질문은 결과를 나쁘게 한다(Sketch2Code) —
+질문은 아래 문구를 그대로 쓴다.
+
+```md
+## Brief — <화면>
+
+- 청중: <누가 · 어떤 상황 · 빈도> (질문: "이 화면을 하루 몇 번, 어떤 기기로 쓰나요?")
+- 무드 3단어: <예: 정확한 · 조용한 · 빠른> (질문: "이 화면이 주면 안 되는 인상 하나는요?")
+- 기억할 요소 1개: <예: 잔액 숫자> (질문: "사용자가 나중에 떠올릴 한 가지는요?")
+- 레퍼런스 ≤3: <말로: "Linear의 밀도", "토스의 목록">
+- 밀도: sparse / comfortable / dense
+- 언어: ko / en / 혼합
+```
+
+브리프에서 **체크리스트 10문항**을 만든다. 아래 템플릿의 `<>`만 브리프로 채운다. 이 문항이
+`look.md` 2단계 A와 `evals/judge.mjs`의 심판 문항이 된다.
+
+1. 첫 시선이 `<primary action 또는 기억할 요소>`에 가는가
+2. `<청중>`이 `<빈도>`로 쓰기에 밀도가 맞는가
+3. 무드 `<3단어>` 중 둘 이상이 화면에서 읽히는가
+4. `<주면 안 되는 인상>`이 없는가
+5. `<기억할 요소>`가 화면에서 유일하게 대담한가
+6. 같은 유형의 흔한 답(§6)과 구조 · 타입 · 색 중 둘 이상에서 갈리는가
+7. `<레퍼런스 1>`의 패턴(브랜드 선택이 아닌)이 채택됐는가
+8. 상태(loading · empty · error)가 브리프의 실제 데이터 길이로 설계됐는가
+9. (ko) 한글 줄바꿈이 어절 단위이고 행간이 1.5 이상인가 / (en) 본문 measure가 45–75ch인가
+10. 지어낸 수치 · 로고 · 후기가 없는가
+
+## 2. 계보 선택 — 표로 결정한다
+
+| 유형(brief.type)                               | 기본 계보                                                | 밀도 · 청중이 바꾸는 경우                                                |
+| ---------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 운영 도구 · 관리자 · 설정 · 프로젝트/이슈      | [`precision-tool`](lineages/precision-tool.md)           | 표 · 로그 · 모니터링이 화면의 주인이면 `dense-data-ops`                  |
+| 마케팅 랜딩 · 제품 소개 · 가격                 | [`editorial-marketing`](lineages/editorial-marketing.md) | 커머스(장바구니 · 상품)면 `playful-commerce`                             |
+| 소비자 금융 · 결제 · 계좌 · 모바일 첫 화면(ko) | [`consumer-fintech-ko`](lineages/consumer-fintech-ko.md) | 데스크톱 전용 B2B면 `precision-tool`                                     |
+| 대시보드 · 표 · 모니터링 · 분석                | [`dense-data-ops`](lineages/dense-data-ops.md)           | 지표 1개가 지배하는 소비자 화면이면 `consumer-fintech-ko`                |
+| 블로그 · 문서 · 뉴스레터 · 긴 글               | [`warm-content`](lineages/warm-content.md)               | 기술 문서 + 코드가 중심이면 `precision-tool`의 타입으로                  |
+| 커머스 PDP · PLP · 장바구니 · 프로모션         | [`playful-commerce`](lineages/playful-commerce.md)       | 럭셔리 · 편집샵이면 `editorial-marketing`                                |
+| 온보딩 · 폼 위저드                             | 부모 제품의 계보                                         | 제품이 없으면 `consumer-fintech-ko`(모바일) / `precision-tool`(데스크톱) |
+
+표에 없는 유형은 가장 가까운 행을 고르고 decision record에 "가까운 이유" 한 줄을 적는다.
+계보를 두 개 섞지 않는다 — 섞으면 평균이 되고 평균이 슬롭이다.
+
+## 3. 노브 3개 — 변이는 여기서만
+
+계보 파일 끝의 `## Adaptation` 섹션이 노브의 허용 범위를 정한다.
+
+### ① anchor hue (필수 교체)
+
+계보의 기본 hue는 자리표시자다. **반드시** 브리프에서 다시 정한다:
+
+1. 주제의 **사물 3개**(재료 · 도구 · 환경 · 빛)를 적고 각각이 함의하는 hue를 적는다. "금융이라서
+   파랑"은 사물이 아니라 범주 반사다 — 무효.
+2. 하나를 anchor로 고른다. 계보의 허용 범위(예: precision-tool은 chroma 0.12–0.18) 안에서
+   L · C는 계보 값을 유지하고 **hue 숫자만** 바꾼다.
+3. **이식 테스트**: 같은 팔레트를 무관한 브리프(치과 · 주물 공장 · 장례 안내 중 하나)에 놓아
+   본다. 어색하지 않으면 주제에서 나온 게 아니다 — 1번으로 돌아간다.
+4. 계보 파일의 모든 `oklch(L% C <기본 hue>)`에서 기본 hue를 anchor로 치환한다. `destructive`
+   (h 27) · `success`(h 145) · `warning`(h 85)은 고정이다.
+
+### ② 타입 페어링 (계보의 3개 중 1개)
+
+계보마다 페어링 3개가 있다 — 라틴 2개, 한국어 호환 1개. `언어: ko`면 한국어 호환 행이
+기본이고 [`typography-ko.md`](typography-ko.md)가 우선한다. 페어링 표의 폰트 이름은 버전
+관리 대상이다: 어떤 이름이 "AI 폰트"로 읽히기 시작하면 이름을 바꾸되 **성격 설명**은 유지한다.
+성격이 스펙이고 이름은 구현이다.
+
+### ③ radius + 밀도 프리셋 (계보의 2–3개 중 1개)
+
+`--radius`와 `--row-h` · 간격 기본 단위를 함께 바꾼다. 하나만 바꾸면 어긋난다.
+
+노브 밖의 값(그림자 체계 · 매크로구조 · 상태색)은 계보 그대로다. 바꾸고 싶으면 그건 변이가
+아니라 다른 계보다 — 표로 돌아간다.
+
+## 4. DESIGN.md 방출
+
+1. 계보 파일을 복사한다.
+2. 노브 ①②③을 적용한다. frontmatter와 본문 둘 다.
+3. `name` · `description`을 브리프로 채운다. description은 계보의 문장을 고쳐 쓰되 브리프의
+   사물 · 무드가 들어가야 한다.
+4. `## Adaptation` 섹션(스킬 확장)은 **제거**하고 그 내용은 decision record로 옮긴다.
+5. 프로젝트 루트에 `DESIGN.md`로 쓴다. 이미 있으면 덮어쓰지 않고 사용자에게 묻는다
+   (`NEEDS_DECISION`).
+6. lint: `npx --yes @google/design.md lint DESIGN.md`. `contrast-ratio` · `missing-primary` ·
+   `broken-ref` 오류는 전부 고친다. 경고는 기록한다.
+7. 토큰 블록: [`../exemplars/tokens.css`](../exemplars/tokens.css)를 복사해 DESIGN.md 값으로
+   채운 뒤 프로젝트의 토큰 파일(`globals.css` · `tokens.css`)에 넣는다. 이후 컴포넌트는 토큰만
+   참조한다. 기존 토큰 파일이 있으면 그 이름에 매핑하고 새 이름을 만들지 않는다.
+
+## 5. 일반적 답 시뮬레이션 — 갈라서기 확인
+
+같은 유형의 브리프에 흔히 나오는 답을 **한 줄**로 적는다(계보 파일 `## Adaptation`의 "흔한
+답"을 그대로 써도 된다). 우리 결정이 그와 **구조 · 타입 · 색 중 둘 이상**에서 갈리는지 적는다.
+하나 이하면 노브나 매크로구조를 바꾼다.
+
+```md
+흔한 답: 가운데 정렬 hero + 아이콘 카드 3열 + 후기 + 가격 카드 3열
+갈림: 구조(hero를 제품 숫자 하나로, 카드 열 없음) · 타입(display 800 −0.02em vs 600) · 색(anchor 205 vs 보라)
+```
+
+## 6. 다양성 로그와 accept/reject
+
+`.design/log.json`을 프로젝트에 둔다. 같은 프로젝트의 다음 화면은 마지막 화면과 **매크로구조가
+같으면 안 된다**(hallmark). 사용자의 채택 · 반려도 여기 남겨 다음 심판 문항에 반영한다.
+
+```json
+{
+  "screens": [
+    {
+      "date": "2026-09-06",
+      "screen": "home",
+      "lineage": "consumer-fintech-ko",
+      "macro": "amount-hero-list",
+      "pairing": "ko-1",
+      "hue": 205
+    }
+  ],
+  "decisions": [{ "date": "2026-09-06", "screen": "home", "verdict": "accept", "note": "잔액 숫자 크기 유지" }]
+}
+```
+
+## 7. 잠금
+
+DESIGN.md가 생기면 이후 모든 화면은 **Fidelity**다([`fidelity.md`](fidelity.md)). 계보를 바꾸는 건
+새 revision이고 사용자 승인이 필요하다.
+
+## Decision record에 남기는 블록
+
+```md
+### Adaptation
+
+- 계보: <id> — 표의 행 <유형> (가까운 이유: <없음/한 줄>)
+- ① hue: 사물 <a · b · c> → <hue>; 이식 테스트 <어색함 = 통과>
+- ② 페어링: <계보 페어링 번호> (ko 우선: 예/아니오)
+- ③ radius · 밀도: <프리셋 이름>
+- DESIGN.md: <경로>, lint <오류 0 · 경고 n>
+- 흔한 답 vs 갈림: <한 줄> / <구조 · 타입 · 색 중 둘 이상>
+- log: <.design/log.json에 기록한 매크로구조>
+```

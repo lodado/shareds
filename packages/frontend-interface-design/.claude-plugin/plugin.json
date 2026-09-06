@@ -1,7 +1,7 @@
 {
   "name": "frontend-interface-design",
-  "version": "0.3.0",
-  "description": "Explainable UI/UX design and implementation: decision ladder, state matrix, funnel review, rationale.",
+  "version": "0.4.0",
+  "description": "Explainable, well-crafted UI/UX design and implementation: decision ladder, lineage-based DESIGN.md adaptation, exemplar-first token-only build, scored screenshot loop, Korean typography, funnel review, rationale.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"

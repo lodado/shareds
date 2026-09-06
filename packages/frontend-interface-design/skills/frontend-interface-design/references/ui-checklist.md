@@ -69,15 +69,10 @@ vendoring한 Vercel 규칙을 따른다. MUST 위반은 `fail`, SHOULD 위반은
 - [ ] 지어낸 수치 · 로고 · 후기 없음. 없으면 placeholder와 "확인 필요" 표시.
 - [ ] 오류 문구에 사과 · 모호함 없음.
 
-## Slop gates — 하나라도 `yes`면 지운다
+## Craft · Slop — 이 절은 Look 루프가 맡는다
 
-`kill-ai-slop`이 설치돼 있으면 이 절 대신 그 스킬의 scan · triage · report를 돌린다(32 tells).
-없을 때만 아래 fallback을 쓴다.
-
-- [ ] 보라→파랑 gradient, gradient text
-- [ ] glassmorphism · 큰 drop shadow · 과한 radius가 계층 표현 없이 쓰였다
-- [ ] 모든 heading 위 eyebrow, 모든 카드에 badge
-- [ ] 지어낸 stat row(10k+ / 99.9% / 24/7)
-- [ ] 이모지 아이콘
-- [ ] "단순한 X가 아니라 Y입니다" 류 카피
-- [ ] 세 장의 동일 카드 + CTA + footer 구조가 이유 없이 기본값
+마감 결함(틴트 없는 회색 · 같은 gap 반복 · 브라우저 기본 표면 · 400×600 타이포)과 클리셰
+(gradient text · glass · eyebrow · 지어낸 stat row · 이모지 아이콘 · 동일 카드 3열)는
+[`look.md`](look.md)의 게이트(`evals/gates.json`, 선택적으로 `impeccable detect` browser 엔진)와
+craft 체크 10문항이 잡는다. 여기서 다시 세지 않는다. 클리셰가 브리프의 요구로 정당화되면
+decision record 5단에 "돕는 단"을 적는다 — 적지 못하면 지운다.

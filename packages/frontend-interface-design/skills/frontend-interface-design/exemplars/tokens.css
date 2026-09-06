@@ -1,0 +1,176 @@
+/*
+  exemplars/tokens.css — 토큰 블록 정답지
+  - 복사한 뒤 DESIGN.md(계보 + 노브)의 값으로 --h · chroma · radius · 폰트만 바꾼다.
+  - 이름은 shadcn 어휘를 따른다. 새 이름을 발명하지 않는다.
+  - 컴포넌트 코드는 이 파일의 변수만 참조한다. 리터럴 색 · 폰트 · radius는 결함이다.
+  - 한국어 화면은 typography-ko.md의 폰트 스택과 keep-all 규칙이 아래 값에 우선한다.
+*/
+
+/* 폰트: 한글 + 라틴이 한 가족인 것 하나. 라틴 전용 프로젝트는 계보 페어링으로 교체 */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+
+:root {
+  /* ── 노브 ─────────────────────────────────────────── */
+  --h: 230; /* anchor hue — DESIGN.md가 정한다. 자리표시자 그대로 쓰지 않는다 */
+  --c-accent: 0.16; /* primary chroma — 계보 허용 범위 안 */
+  --c-tint: 0.008; /* 중립색 틴트 — 0.005 이상 */
+  --radius: 0.5rem; /* 밀도가 정한다: 도구 0.25–0.375 · 콘텐츠 0.5–0.75 · 각진 브랜드 0 */
+  --row-h: 48px; /* dense 40 · comfortable 48 · spacious 56 */
+
+  /* ── 색: 4층 + 상태 ───────────────────────────────── */
+  --background: oklch(98.5% calc(var(--c-tint) * 0.6) var(--h));
+  --foreground: oklch(19% calc(var(--c-tint) * 1.8) var(--h));
+  --card: oklch(100% 0 0);
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --muted: oklch(95.5% var(--c-tint) var(--h));
+  --muted-foreground: oklch(47% calc(var(--c-tint) * 3) var(--h)); /* 4.5:1 이상 — render.mjs로 확인 */
+  --primary: oklch(50% var(--c-accent) var(--h));
+  --primary-hover: oklch(45% calc(var(--c-accent) + 0.01) var(--h));
+  --primary-foreground: oklch(99% 0.004 var(--h));
+  --secondary: var(--muted);
+  --secondary-foreground: var(--foreground);
+  --accent: oklch(93% calc(var(--c-accent) * 0.3) var(--h)); /* 선택 · 현재 위치 배경 */
+  --accent-foreground: var(--foreground);
+  --border: oklch(89% calc(var(--c-tint) * 1.5) var(--h));
+  --input: var(--border);
+  --ring: oklch(60% var(--c-accent) var(--h));
+  --destructive: oklch(52% 0.19 27);
+  --destructive-foreground: oklch(99% 0.004 27);
+  --success: oklch(52% 0.14 145);
+  --warning: oklch(70% 0.15 85);
+  --chart-1: oklch(55% 0.15 var(--h));
+  --chart-2: oklch(55% 0.15 calc(var(--h) + 72));
+  --chart-3: oklch(55% 0.15 calc(var(--h) + 144));
+  --chart-4: oklch(55% 0.15 calc(var(--h) + 216));
+  --chart-5: oklch(55% 0.15 calc(var(--h) + 288));
+
+  /* ── 그림자: 층 · 광원 하나 · hue 틴트 ─────────────── */
+  --shadow-color: oklch(30% 0.03 var(--h) / 0.08);
+  --shadow-raised: 0 1px 2px var(--shadow-color), 0 2px 4px var(--shadow-color);
+  --shadow-overlay: 0 2px 4px var(--shadow-color), 0 8px 16px var(--shadow-color);
+  --shadow-modal:
+    0 4px 8px var(--shadow-color), 0 16px 32px var(--shadow-color), 0 32px 64px var(--shadow-color);
+
+  /* ── 간격: 4 기반 스케일 하나 ──────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+
+  /* ── 타이포 ────────────────────────────────────────── */
+  --font-sans:
+    'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue',
+    'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'Apple Color Emoji', 'Segoe UI Emoji',
+    sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --leading-tight: 1.25;
+  --leading-normal: 1.6;
+  --tracking-display: -0.02em;
+
+  /* ── 모션 ──────────────────────────────────────────── */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --duration-fast: 140ms;
+  --duration-base: 200ms;
+
+  color-scheme: light;
+}
+
+.dark {
+  --background: oklch(15% calc(var(--c-tint) * 1.5) var(--h));
+  --foreground: oklch(93% calc(var(--c-tint) * 0.8) var(--h));
+  --card: oklch(19% calc(var(--c-tint) * 1.8) var(--h));
+  --muted: oklch(23% calc(var(--c-tint) * 1.8) var(--h));
+  --muted-foreground: oklch(70% calc(var(--c-tint) * 2.5) var(--h));
+  --primary: oklch(70% calc(var(--c-accent) - 0.02) var(--h)); /* 밝은 solid 위 전경은 어둡게 */
+  --primary-hover: oklch(75% calc(var(--c-accent) - 0.02) var(--h));
+  --primary-foreground: oklch(16% 0.02 var(--h));
+  --accent: oklch(28% calc(var(--c-accent) * 0.35) var(--h));
+  --border: oklch(28% calc(var(--c-tint) * 1.8) var(--h));
+  --ring: oklch(72% var(--c-accent) var(--h));
+  --shadow-color: oklch(5% 0.02 var(--h) / 0.5);
+  color-scheme: dark;
+}
+
+/* ── 기본 표면: 브라우저가 그리는 것도 디자인이다 ───────── */
+html {
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  background: var(--background);
+  color: var(--foreground);
+  caret-color: var(--ring);
+  accent-color: var(--ring);
+  scrollbar-color: color-mix(in oklch, var(--foreground) 25%, transparent) transparent;
+}
+
+body {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  letter-spacing: -0.01em;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: oklch(from var(--ring) l c h / 0.25);
+}
+
+a {
+  color: var(--primary);
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+
+h1,
+h2,
+h3 {
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-display);
+  font-weight: 700;
+  word-break: keep-all; /* 어절 단위 줄바꿈. 375px에서도 유지한다 — normal로 풀면 "정산\n을"처럼 음절이 끊긴다 */
+  overflow-wrap: anywhere; /* 한 어절이 폭을 넘을 때만 어절 안에서 끊는다 */
+  text-wrap: balance;
+  margin: 0;
+}
+
+p,
+li {
+  text-wrap: pretty;
+}
+
+:lang(en) {
+  letter-spacing: 0;
+}
+
+.num,
+td,
+time {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+  }
+}
