@@ -6,6 +6,8 @@ Use PROFILE blocks only. Read one complete profile document at a time so opening
 
 Document genre manually, with uncertainty: tutorial, technical_explanation, opinion, retrospective, review, essay. Mixed/unknown documents are not evidence for every genre. Avoid forcing a common outline. Count independent documents, not repeated paragraphs or duplicate versions. Mark corpus selection/window bias.
 
+Audit authorship before using examples or numeric targets. A personal blog may embed guest replies, coauthored articles, translated passages, bibliographies, or quotations inside ordinary paragraph tags. Record excluded document/block IDs and attribution reasons in a sidecar manifest without changing the original snapshot. Do not use those blocks as evidence of the individual's voice. If computing curated metrics, retain the original metrics, record the exact selected IDs and exclusions, and label unresolved inline quotations. Mixed-source metrics are corpus diagnostics, not author-specific drafting targets. This attribution audit is a host review step, not an automatic guarantee of the parser.
+
 ## Ten dimensions
 
 | Key                    | Observe and operationalize                                                                                                                                    |
