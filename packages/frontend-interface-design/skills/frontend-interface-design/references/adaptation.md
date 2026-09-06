@@ -95,7 +95,7 @@ Frame 결과 위에 아래 6칸을 채운다. 브리프에서 읽히는 건 **�
 5. 프로젝트 루트에 `DESIGN.md`로 쓴다. 이미 있으면 덮어쓰지 않고 사용자에게 묻는다
    (`NEEDS_DECISION`).
 6. lint: `npx --yes @google/design.md lint DESIGN.md`. `contrast-ratio` · `missing-primary` ·
-   `broken-ref` 오류는 전부 고친다. 경고는 기록한다.
+   `broken-ref` 오류는 전부 고친다. 경고는 기록한다(`orphaned-tokens`는 산문에서만 쓰는 다크 · 상태 토큰이라 허용). `clamp()`는 Dimension이 아니므로 토큰에는 최대값을 두고 유동값은 산문과 CSS에 둔다.
 7. 토큰 블록: [`../exemplars/tokens.css`](../exemplars/tokens.css)를 복사해 DESIGN.md 값으로
    채운 뒤 프로젝트의 토큰 파일(`globals.css` · `tokens.css`)에 넣는다. 이후 컴포넌트는 토큰만
    참조한다. 기존 토큰 파일이 있으면 그 이름에 매핑하고 새 이름을 만들지 않는다.

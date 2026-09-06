@@ -25,7 +25,8 @@ const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g
 // A token block is the :root / .dark / [data-theme] rule that *defines* tokens; its literals are the tokens themselves.
 const TOKEN_BLOCK_SELECTOR = /(?:^|[\s;{}>"'`])((?::root|\.dark|html\.dark|\[data-theme[^\]]*\])[^{}]*)\{/
 const COLOR_LITERAL = /(?:^|[\s:(,'"[=])(?:#[\da-f]{3,8}\b|(?:rgba?|hsla?|oklch|oklab)\()/gi
-const FONT_FAMILY_LITERAL = /font-?family\s*:\s*(?!var\()/gi
+// The whitespace sits inside the lookahead: `\s*(?!var\()` would backtrack past a space and count `font-family: var(--x)` as a literal.
+const FONT_FAMILY_LITERAL = /font-?family\s*:(?!\s*var\()/gi
 const RADIUS_DECLARATION = /border-?radius\s*:\s*([^;{}\n]*)/gi
 const PX_VALUE = /\b\d+(?:\.\d+)?px\b/
 const TAILWIND_RADIUS = /rounded-\[\d+(?:\.\d+)?px\]/g
@@ -298,7 +299,8 @@ export async function scanSource(root) {
     }
     const counts = scanSourceText(await readFile(file, 'utf8'))
     totals.files += 1
-    for (const key of ['colors', 'fontFamilies', 'radii', 'literalValues', 'tokenReferences']) totals[key] += counts[key]
+    for (const key of ['colors', 'fontFamilies', 'radii', 'literalValues', 'tokenReferences'])
+      totals[key] += counts[key]
   }
   const total = totals.literalValues + totals.tokenReferences
   totals.literalRatio = total ? round(totals.literalValues / total) : 0
@@ -434,7 +436,9 @@ async function main() {
   const playwright = await resolvePlaywright({ playwrightDir: options.playwright })
   if (!playwright.chromium) {
     process.stderr.write(
-      `PLAYWRIGHT_NOT_FOUND: run \`npm i playwright-core\` in any directory and pass --playwright <that dir> (or set FID_PLAYWRIGHT_DIR); for the browser run \`npx playwright install chromium\` there or pass --executable-path <chromium binary>. Tried: ${playwright.tried.join(', ')}\n`,
+      `PLAYWRIGHT_NOT_FOUND: run \`npm i playwright-core\` in any directory and pass --playwright <that dir> (or set FID_PLAYWRIGHT_DIR); for the browser run \`npx playwright install chromium\` there or pass --executable-path <chromium binary>. Tried: ${playwright.tried.join(
+        ', ',
+      )}\n`,
     )
     process.exitCode = 2
     return
@@ -459,7 +463,12 @@ async function main() {
     generatedAt: new Date().toISOString(),
     input: isUrl(options.in) ? options.in : resolve(options.in),
     lang: options.lang,
-    renderer: { playwright: playwright.source, playwrightVersion: playwright.version, chromium: browserVersion, executablePath },
+    renderer: {
+      playwright: playwright.source,
+      playwrightVersion: playwright.version,
+      chromium: browserVersion,
+      executablePath,
+    },
     errors: Object.entries(cells)
       .filter(([, cell]) => cell.error)
       .map(([key, cell]) => `${key}: ${cell.error}`),

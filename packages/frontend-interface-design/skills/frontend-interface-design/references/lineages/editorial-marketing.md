@@ -21,13 +21,13 @@ colors:
 typography:
   display:
     fontFamily: 'Bricolage Grotesque, system-ui, sans-serif'
-    fontSize: 'clamp(2.5rem, 1.5rem + 4.5vw, 5rem)'
+    fontSize: 80px
     fontWeight: 700
     lineHeight: 1.02
     letterSpacing: -0.03em
   headline:
     fontFamily: 'Bricolage Grotesque, system-ui, sans-serif'
-    fontSize: 'clamp(1.75rem, 1.2rem + 2vw, 2.5rem)'
+    fontSize: 40px
     fontWeight: 600
     lineHeight: 1.1
     letterSpacing: -0.02em
@@ -115,8 +115,8 @@ hairline이 페이지를 나눈다.
 **Character:** display는 크고 무겁고 좁게(700, −0.03em), 본문은 18px로 넉넉하게. 대문자
 eyebrow · 이탤릭 강조 단어 · 한 단어만 세리프는 쓰지 않는다. 제목이 스스로 무게를 갖는다.
 
-- **Display** (700, clamp 40–80px, 1.02, −0.03em): hero 헤드라인 하나.
-- **Headline** (600, 28–40px, 1.1): 섹션 제목.
+- **Display** (700, 80px — 유동값 `clamp(2.5rem, 1.5rem + 4.5vw, 5rem)`, 1.02, −0.03em): hero 헤드라인 하나. 토큰은 최대값이고 CSS에서는 clamp을 쓴다.
+- **Headline** (600, 40px — 유동값 `clamp(1.75rem, 1.2rem + 2vw, 2.5rem)`, 1.1): 섹션 제목.
 - **Title** (600, 20px): 카드 · 기능 제목.
 - **Body** (400, 18px, 1.6, 60–70ch): 설명.
 - **Label** (500, 14px): 버튼 · 메타.

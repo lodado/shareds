@@ -22,7 +22,7 @@ colors:
 typography:
   display:
     fontFamily: 'Literata, Georgia, serif'
-    fontSize: 'clamp(2rem, 1.4rem + 2.5vw, 3.25rem)'
+    fontSize: 52px
     fontWeight: 600
     lineHeight: 1.1
     letterSpacing: -0.015em
@@ -122,7 +122,7 @@ sans 또는 본문용 세리프. **Mono:** 코드.
 **Character:** 본문이 주인. 제목은 본문보다 겨우 두 단계 크고, 무게로 구분한다. 이탤릭은
 인용 · 강조 구문에만, 단어 하나에 세리프 이탤릭 액센트는 없다.
 
-- **Display** (600, 32–52px, 1.1): 글 제목 하나.
+- **Display** (600, 52px — 유동값 `clamp(2rem, 1.4rem + 2.5vw, 3.25rem)`, 1.1): 글 제목 하나. 토큰은 최대값이고 CSS에서는 clamp을 쓴다.
 - **Headline / Title** (600, 26 / 20px): 절 · 소절.
 - **Body** (400, 18px, 1.7, 66ch): 본문. 문단 간격 1em, 들여쓰기 없음.
 - **Label** (500, 14px): 메타 · 목차 · 캡션.

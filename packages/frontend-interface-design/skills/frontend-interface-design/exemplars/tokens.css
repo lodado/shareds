@@ -1,7 +1,7 @@
 /*
   exemplars/tokens.css — 토큰 블록 정답지
   - 복사한 뒤 DESIGN.md(계보 + 노브)의 값으로 --h · chroma · radius · 폰트만 바꾼다.
-  - 이름은 shadcn 어휘를 따른다. 새 이름을 발명하지 않는다.
+  - 이름은 shadcn 어휘를 따르고, 계보가 요구하는 것(표면 사다리 · hairline · soft 상태색)만 더한다.
   - 컴포넌트 코드는 이 파일의 변수만 참조한다. 리터럴 색 · 폰트 · radius는 결함이다.
   - 한국어 화면은 typography-ko.md의 폰트 스택과 keep-all 규칙이 아래 값에 우선한다.
 */
@@ -11,40 +11,61 @@
 
 :root {
   /* ── 노브 ─────────────────────────────────────────── */
-  --h: 230; /* anchor hue — DESIGN.md가 정한다. 자리표시자 그대로 쓰지 않는다 */
-  --c-accent: 0.16; /* primary chroma — 계보 허용 범위 안 */
+  --h: 215; /* anchor hue — DESIGN.md가 정한다. 자리표시자 그대로 쓰지 않는다 */
+  --c-accent: 0.14; /* primary chroma — 계보 허용 범위 안 */
   --c-tint: 0.008; /* 중립색 틴트 — 0.005 이상 */
   --radius: 0.5rem; /* 밀도가 정한다: 도구 0.25–0.375 · 콘텐츠 0.5–0.75 · 각진 브랜드 0 */
   --row-h: 48px; /* dense 40 · comfortable 48 · spacious 56 */
 
-  /* ── 색: 4층 + 상태 ───────────────────────────────── */
-  --background: oklch(98.5% calc(var(--c-tint) * 0.6) var(--h));
-  --foreground: oklch(19% calc(var(--c-tint) * 1.8) var(--h));
+  /* ── 표면 사다리: canvas → surface-1 → card (Linear식, 그림자 대신 단차) ─── */
+  --background: oklch(98.6% calc(var(--c-tint) * 0.6) var(--h));
+  --surface-1: oklch(97.2% calc(var(--c-tint) * 0.9) var(--h)); /* 사이드바 · 섹션 띠 */
+  --surface-2: oklch(95.6% var(--c-tint) var(--h)); /* hover · 그룹 헤더 */
   --card: oklch(100% 0 0);
   --card-foreground: var(--foreground);
   --popover: var(--card);
   --popover-foreground: var(--foreground);
-  --muted: oklch(95.5% var(--c-tint) var(--h));
+
+  /* ── 잉크 3단 ─────────────────────────────────────── */
+  --foreground: oklch(20% calc(var(--c-tint) * 1.8) var(--h));
+  --muted: var(--surface-2);
   --muted-foreground: oklch(47% calc(var(--c-tint) * 3) var(--h)); /* 4.5:1 이상 — render.mjs로 확인 */
+  --subtle-foreground: oklch(62% calc(var(--c-tint) * 2.5) var(--h)); /* 캡션 · 비활성 · 아이콘 */
+
+  /* ── accent ───────────────────────────────────────── */
   --primary: oklch(50% var(--c-accent) var(--h));
   --primary-hover: oklch(45% calc(var(--c-accent) + 0.01) var(--h));
   --primary-foreground: oklch(99% 0.004 var(--h));
-  --secondary: var(--muted);
+  --primary-soft: oklch(94.5% calc(var(--c-accent) * 0.28) var(--h)); /* 선택 · soft 버튼 · 아이콘 타일 */
+  --secondary: var(--surface-2);
   --secondary-foreground: var(--foreground);
-  --accent: oklch(93% calc(var(--c-accent) * 0.3) var(--h)); /* 선택 · 현재 위치 배경 */
+  --accent: oklch(93% calc(var(--c-accent) * 0.3) var(--h)); /* 선택 행 · 현재 위치 배경 */
   --accent-foreground: var(--foreground);
-  --border: oklch(89% calc(var(--c-tint) * 1.5) var(--h));
+
+  /* ── 경계: hairline은 알파, border는 불투명 ─────────── */
+  --hairline: oklch(from var(--foreground) l c h / 0.08);
+  --hairline-strong: oklch(from var(--foreground) l c h / 0.16);
+  --border: oklch(89.5% calc(var(--c-tint) * 1.5) var(--h));
   --input: var(--border);
   --ring: oklch(60% var(--c-accent) var(--h));
+
+  /* ── 상태색: 고정 hue + soft 배경 ──────────────────── */
   --destructive: oklch(52% 0.19 27);
   --destructive-foreground: oklch(99% 0.004 27);
+  --destructive-soft: oklch(95% 0.03 27);
   --success: oklch(52% 0.14 145);
+  --success-soft: oklch(95% 0.035 145);
   --warning: oklch(70% 0.15 85);
-  --chart-1: oklch(55% 0.15 var(--h));
-  --chart-2: oklch(55% 0.15 calc(var(--h) + 72));
-  --chart-3: oklch(55% 0.15 calc(var(--h) + 144));
-  --chart-4: oklch(55% 0.15 calc(var(--h) + 216));
-  --chart-5: oklch(55% 0.15 calc(var(--h) + 288));
+  --warning-soft: oklch(96% 0.05 85);
+  --info: oklch(55% 0.12 250);
+  --info-soft: oklch(95% 0.03 250);
+
+  /* ── 차트 · 아바타 팔레트: anchor에서 72° 등간격 ────── */
+  --chart-1: oklch(58% 0.14 var(--h));
+  --chart-2: oklch(58% 0.14 calc(var(--h) + 72));
+  --chart-3: oklch(58% 0.14 calc(var(--h) + 144));
+  --chart-4: oklch(58% 0.14 calc(var(--h) + 216));
+  --chart-5: oklch(58% 0.14 calc(var(--h) + 288));
 
   /* ── 그림자: 층 · 광원 하나 · hue 틴트 ─────────────── */
   --shadow-color: oklch(30% 0.03 var(--h) / 0.08);
@@ -52,12 +73,14 @@
   --shadow-overlay: 0 2px 4px var(--shadow-color), 0 8px 16px var(--shadow-color);
   --shadow-modal:
     0 4px 8px var(--shadow-color), 0 16px 32px var(--shadow-color), 0 32px 64px var(--shadow-color);
+  --edge-highlight: inset 0 1px 0 oklch(100% 0 0 / 0.6); /* 들린 패널 상단의 픽셀 하이라이트 */
 
   /* ── 간격: 4 기반 스케일 하나 ──────────────────────── */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+  --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
   --space-12: 48px;
@@ -70,8 +93,10 @@
     'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'Apple Color Emoji', 'Segoe UI Emoji',
     sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --text-2xs: 12px; /* 게이트: 12px 미만 텍스트 없음 */
   --text-xs: 12px;
-  --text-sm: 14px;
+  --text-sm: 13px;
+  --text-md: 14px;
   --text-base: 16px;
   --text-lg: 18px;
   --text-xl: 20px;
@@ -91,17 +116,27 @@
 
 .dark {
   --background: oklch(15% calc(var(--c-tint) * 1.5) var(--h));
-  --foreground: oklch(93% calc(var(--c-tint) * 0.8) var(--h));
+  --surface-1: oklch(17.5% calc(var(--c-tint) * 1.6) var(--h));
+  --surface-2: oklch(21% calc(var(--c-tint) * 1.8) var(--h));
   --card: oklch(19% calc(var(--c-tint) * 1.8) var(--h));
-  --muted: oklch(23% calc(var(--c-tint) * 1.8) var(--h));
+  --foreground: oklch(93% calc(var(--c-tint) * 0.8) var(--h));
   --muted-foreground: oklch(70% calc(var(--c-tint) * 2.5) var(--h));
+  --subtle-foreground: oklch(55% calc(var(--c-tint) * 2) var(--h));
   --primary: oklch(70% calc(var(--c-accent) - 0.02) var(--h)); /* 밝은 solid 위 전경은 어둡게 */
   --primary-hover: oklch(75% calc(var(--c-accent) - 0.02) var(--h));
   --primary-foreground: oklch(16% 0.02 var(--h));
+  --primary-soft: oklch(26% calc(var(--c-accent) * 0.35) var(--h));
   --accent: oklch(28% calc(var(--c-accent) * 0.35) var(--h));
+  --hairline: oklch(from var(--foreground) l c h / 0.1);
+  --hairline-strong: oklch(from var(--foreground) l c h / 0.2);
   --border: oklch(28% calc(var(--c-tint) * 1.8) var(--h));
   --ring: oklch(72% var(--c-accent) var(--h));
+  --destructive-soft: oklch(24% 0.05 27);
+  --success-soft: oklch(24% 0.05 145);
+  --warning-soft: oklch(26% 0.06 85);
+  --info-soft: oklch(24% 0.05 250);
   --shadow-color: oklch(5% 0.02 var(--h) / 0.5);
+  --edge-highlight: inset 0 1px 0 oklch(100% 0 0 / 0.06);
   color-scheme: dark;
 }
 
@@ -166,6 +201,46 @@ li {
 td,
 time {
   font-variant-numeric: tabular-nums;
+}
+
+/* 아이콘: 한 세트, 1.5px, currentColor, 광학 보정 */
+.icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  vertical-align: -3px;
+}
+
+/* 아바타: 이니셜 + 차트 팔레트 */
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--chart-1);
+  color: oklch(99% 0 0);
+  font-size: 12px; /* 게이트: 12px 미만 텍스트 없음 */
+  font-weight: 600;
+  letter-spacing: 0;
+  flex: none;
+}
+.avatar[data-c='2'] {
+  background: var(--chart-2);
+}
+.avatar[data-c='3'] {
+  background: var(--chart-3);
+}
+.avatar[data-c='4'] {
+  background: var(--chart-4);
+}
+.avatar[data-c='5'] {
+  background: var(--chart-5);
 }
 
 @media (prefers-reduced-motion: reduce) {

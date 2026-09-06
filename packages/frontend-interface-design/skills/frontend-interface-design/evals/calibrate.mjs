@@ -29,8 +29,10 @@ function sideMatches(side, reference, baseDirectory) {
 export function matchJudgment(judgments, vote, baseDirectory = process.cwd()) {
   for (const judgment of judgments) {
     if (judgment.briefId !== vote.briefId) continue
-    if (sideMatches(judgment.a, vote.a, baseDirectory) && sideMatches(judgment.b, vote.b, baseDirectory)) return { judgment, swapped: false }
-    if (sideMatches(judgment.a, vote.b, baseDirectory) && sideMatches(judgment.b, vote.a, baseDirectory)) return { judgment, swapped: true }
+    if (sideMatches(judgment.a, vote.a, baseDirectory) && sideMatches(judgment.b, vote.b, baseDirectory))
+      return { judgment, swapped: false }
+    if (sideMatches(judgment.a, vote.b, baseDirectory) && sideMatches(judgment.b, vote.a, baseDirectory))
+      return { judgment, swapped: true }
   }
   return null
 }
@@ -87,7 +89,8 @@ async function readJudgments(directory) {
     if (!name.endsWith('.json')) continue
     try {
       const judgment = JSON.parse(await readFile(join(directory, name), 'utf8'))
-      if (isRecord(judgment) && typeof judgment.briefId === 'string' && typeof judgment.winner === 'string') judgments.push(judgment)
+      if (isRecord(judgment) && typeof judgment.briefId === 'string' && typeof judgment.winner === 'string')
+        judgments.push(judgment)
     } catch {
       // Not a judgment file; the directory may hold notes.
     }
@@ -105,13 +108,25 @@ async function main() {
     process.exitCode = 2
     return
   }
-  const [judgments, votes] = await Promise.all([readJudgments(resolve(judgmentsDirectory)), readFile(resolve(votesFile), 'utf8').then(JSON.parse)])
+  const [judgments, votes] = await Promise.all([
+    readJudgments(resolve(judgmentsDirectory)),
+    readFile(resolve(votesFile), 'utf8').then(JSON.parse),
+  ])
   if (!Array.isArray(votes)) throw new Error('INVALID_VOTES: expected an array')
-  const report = { generatedAt: new Date().toISOString(), judgments: judgments.length, votes: votes.length, ...calibrate(judgments, votes, { baseDirectory: dirname(resolve(votesFile)) }) }
+  const report = {
+    generatedAt: new Date().toISOString(),
+    judgments: judgments.length,
+    votes: votes.length,
+    ...calibrate(judgments, votes, { baseDirectory: dirname(resolve(votesFile)) }),
+  }
   await writeFile(resolve(out), `${JSON.stringify(report, null, 2)}\n`)
   const rate = report.agreementRate === null ? 'n/a' : `${Math.round(report.agreementRate * 100)}%`
   process.stdout.write(
-    `agreement ${rate} (${report.agreements}/${report.decisive} decisive votes, ${report.unmatched.length} unmatched) — ${report.flagged ? `BELOW ${Math.round(AGREEMENT_THRESHOLD * 100)}%: fix the checklist and re-measure` : 'OK'} → ${resolve(out)}\n`,
+    `agreement ${rate} (${report.agreements}/${report.decisive} decisive votes, ${
+      report.unmatched.length
+    } unmatched) — ${
+      report.flagged ? `BELOW ${Math.round(AGREEMENT_THRESHOLD * 100)}%: fix the checklist and re-measure` : 'OK'
+    } → ${resolve(out)}\n`,
   )
   if (report.flagged) process.exitCode = 1
 }

@@ -29,6 +29,7 @@ const EXEMPLARS = [
   'primitives/dialog.html',
   'compositions/app-shell.html',
   'compositions/marketing-hero.html',
+  'compositions/fintech-home.html',
 ]
 
 function sectionOf(markdown, heading) {
@@ -142,6 +143,9 @@ test('every lineage follows the DESIGN.md spec order and carries the adaptation 
       assert.ok(file.includes(key), `${lineage}: missing ${key}`)
     }
     assert.match(file, /자리표시자/, `${lineage}: placeholder hue warning`)
+    // The DESIGN.md linter rejects clamp() as a Dimension; fluid sizes live in prose, tokens carry the max.
+    const frontmatter = file.split('\n---\n')[0]
+    assert.doesNotMatch(frontmatter, /clamp\(/, `${lineage}: clamp() in frontmatter tokens`)
 
     let cursor = -1
     for (const heading of order) {

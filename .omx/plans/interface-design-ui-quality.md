@@ -539,3 +539,52 @@ comp-led), 새 delivery 상태, visual-qa · oracle 경계 변경, Fidelity 모�
   https://uxdev.org/blog/99-css-letter-spacing/ · https://parksb.github.io/article/37.html ·
   https://sun.fo/suit/ · https://spoqa.github.io/spoqa-han-sans/ ·
   https://github.com/wanteddev/wanted-sans · https://tilnote.io/en/pages/6a9355cface8bd2da70ebf6a
+
+## 13. 구현 기록 (2026-09-06)
+
+브랜치 `claude/ui-design-quality-m9zu73`, 패키지 `frontend-interface-design` 0.3.0 → 0.4.0. Phase 0–4를
+한 릴리스로 구현했다 — 플랜의 0.4/0.5/0.6 분할은 "측정 게이트 통과 후 다음 phase"를 전제했는데,
+live 하네스는 host(`claude` · `codex`) 실행이 필요해 이 세션에서 돌리지 않았다. 승률 게이트는
+사용자가 §5 절차로 실행한 뒤 적용한다.
+
+### 구현된 것
+
+| Phase | 산출물                                                                                                                                                                                                                                                                                                                                                |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | `skills/frontend-interface-design/scripts/{metrics-core.js, metrics-browser.js, render.mjs}` — Look 루프와 eval이 같은 렌더러 · 지표를 쓴다. `evals/{briefs.json(8: ko 4 · en 4, 문항 10), gates.json, run-live.mjs(--dry-run 픽스처), judge.mjs(pairwise · 위치 교대 · 절대점수 없음), calibrate.mjs, grade-results.mjs, README.md}` + 패키지 테스트 |
+| 1     | `references/look.md` — 렌더 → 게이트 → 섹션별 yes/no 비평(브리프 10 + craft 10) → 통과 수가 늘 때만 채택 → ≤3라운드 · 2라운드 무개선 정지. `VERIFIED` 미발급                                                                                                                                                                                          |
+| 2     | `references/craft.md`(12 기본값, CSS 스니펫 12) · `references/typography-ko.md` · `exemplars/`(tokens.css + 프리미티브 5 + 조합 2 + README) · reference-study의 조합 블록 허용                                                                                                                                                                        |
+| 3     | `references/adaptation.md`(브리프 6칸 · 고정 질문 · 체크리스트 10 템플릿 · 계보 표 · 노브 3 · DESIGN.md 방출 · lint · 흔한 답 시뮬레이션 · `.design/log.json`) · `references/lineages/*.md` 6개(Google DESIGN.md alpha 스키마 + `## Adaptation` 확장 섹션, 자리표시자 hue)                                                                            |
+| 4     | SKILL.md 208줄 · 18,916자 → 125줄 · 11,975자(63%), 상시 규칙 12, 참조 on-demand 표, Impeccable 재배치(init → browser detect → critique 2순위 → polish finisher), review 7축 yes/no + `loop:` 줄, decision-ladder gate 면제 조항 · Decision rules 이관, ui-checklist Slop gates → 루프로 흡수, 계약 테스트 13건 재작성                                 |
+
+### 플랜과의 차이
+
+- SKILL.md 상시 로드는 63%로, 목표 50%에 미달이다. 남은 비용은 frontmatter description(트리거
+  정확도 때문에 유지)과 위임 표다. 다음 라운드에서 하네스 승률과 함께 재측정한다.
+- 계보 토큰의 `fontSize`에 `clamp()`를 썼다가 실제 `@google/design.md lint`(0.4.0)가 Dimension이
+  아니라고 거부해 최대값으로 바꾸고 유동값은 산문 · CSS로 옮겼다. 6개 전부 errors 0(warnings는
+  `orphaned-tokens`뿐 — 산문에서만 쓰는 다크 · 상태 토큰). 계약 테스트에 `clamp(` 금지 pin 추가.
+- 한국어 제목 줄바꿈: 처음엔 ryelle의 조언대로 ≤480px에서 `word-break: normal`로 풀었는데, 375px
+  렌더에서 "정산\n을"처럼 음절이 끊겼다. `keep-all` 유지 + `overflow-wrap: anywhere`로 바꾸고
+  typography-ko.md 규칙을 수정했다 — Look 루프가 규칙 자체의 결함을 잡은 첫 사례다.
+
+### Look 루프를 exemplar에 적용한 기록
+
+r1(1280 · 375, chromium 1194): 발견 3건 — app-shell에 primary 버튼 2개(목록 헤더 + 상세 패널) ·
+marketing-hero의 feature 프레임이 `min-height`로 빈 공간을 채움 · 375 제목 음절 끊김. 수정 후
+r2: 세 항목 모두 통과, 가로 overflow 0/14 스크린샷. 스크린샷은 세션 스크래치에만 있고 레포에는
+넣지 않았다.
+
+### 검증
+
+- 계약 테스트 13/13 (`node --test scripts/skill-contract.test.mjs`).
+- pre-commit 전체 `pnpm test` 8/8 패키지 GREEN (커밋 `bf1b65f`, `86fee93`).
+- 하네스 단위 테스트 · lint · 브라우저 스모크: (하네스 리포트 후 갱신)
+
+### 남은 것 — 사용자 실행
+
+1. live 하네스: `evals/README.md` 절차로 baseline(0.3.0, `git worktree`) vs candidate(0.4.0) ×
+   host × k=3 실행 → `grade-results.mjs` 승률. 55% 미만이면 되돌린다(§10 정지 규칙).
+2. 사람 보정 20쌍(`calibrate.mjs`), 심판-사람 일치율 ≥75% 확인.
+3. Impeccable on/off variant 측정 후 위임 표 유지 여부 결정.
+4. exemplar 검수 1회(정답지 확정) · `.design/log.json` 첫 프로젝트 적용.

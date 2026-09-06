@@ -109,11 +109,16 @@ export function parseJudgeOutput(text) {
   const checks = parsed?.checks
   for (const side of SIDES) {
     const list = checks?.[side]
-    if (!Array.isArray(list) || list.length !== CHECKLIST_LENGTH || !list.every((value) => typeof value === 'boolean')) {
+    if (
+      !Array.isArray(list) ||
+      list.length !== CHECKLIST_LENGTH ||
+      !list.every((value) => typeof value === 'boolean')
+    ) {
       throw new Error(`JUDGE_INVALID_CHECKS:${side}`)
     }
   }
-  if (typeof parsed.belongs !== 'string' || !Object.hasOwn(SWAP, parsed.belongs)) throw new Error('JUDGE_INVALID_BELONGS')
+  if (typeof parsed.belongs !== 'string' || !Object.hasOwn(SWAP, parsed.belongs))
+    throw new Error('JUDGE_INVALID_BELONGS')
   let notes = []
   if (Array.isArray(parsed.notes)) notes = parsed.notes.map(String).slice(0, 3)
   else if (typeof parsed.notes === 'string') notes = [parsed.notes]
@@ -292,9 +297,22 @@ async function main() {
   const cwd = commonAncestor(a.dir, b.dir)
   const imagesAB = [...a.screenshots, ...b.screenshots].map((shot) => shot.path)
   const first = await judgeOrdering({ host, prompt: promptAB, images: imagesAB, cwd, extra, order: 'AB' })
-  const second = await judgeOrdering({ host, prompt: promptBA, images: [...imagesAB].reverse(), cwd, extra, order: 'BA' })
+  const second = await judgeOrdering({
+    host,
+    prompt: promptBA,
+    images: [...imagesAB].reverse(),
+    cwd,
+    extra,
+    order: 'BA',
+  })
   const combined = combineOrderings(first.parsed, second.parsed)
-  const strip = ({ dir, variant, host: generatorHost, replicateId, caseId }) => ({ dir, variant, host: generatorHost, replicateId, caseId })
+  const strip = ({ dir, variant, host: generatorHost, replicateId, caseId }) => ({
+    dir,
+    variant,
+    host: generatorHost,
+    replicateId,
+    caseId,
+  })
   const judgment = {
     briefId,
     a: strip(a),
@@ -313,7 +331,11 @@ async function main() {
   await mkdir(dirname(resolve(out)), { recursive: true })
   await writeFile(resolve(out), `${JSON.stringify(judgment, null, 2)}\n`)
   process.stdout.write(
-    `${briefId}: winner ${judgment.winner} (A ${a.variant ?? '?'} vs B ${b.variant ?? '?'}), checks A ${combined.checkPass.A ?? 'n/a'} / B ${combined.checkPass.B ?? 'n/a'}, positionBias ${judgment.positionBias}${judgment.errors.length ? `, errors ${judgment.errors.join('; ')}` : ''} → ${resolve(out)}\n`,
+    `${briefId}: winner ${judgment.winner} (A ${a.variant ?? '?'} vs B ${b.variant ?? '?'}), checks A ${
+      combined.checkPass.A ?? 'n/a'
+    } / B ${combined.checkPass.B ?? 'n/a'}, positionBias ${judgment.positionBias}${
+      judgment.errors.length ? `, errors ${judgment.errors.join('; ')}` : ''
+    } → ${resolve(out)}\n`,
   )
 }
 

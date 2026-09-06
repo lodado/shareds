@@ -20,6 +20,8 @@
   // emoji presentation: ©, ®, ™. A footer "© 2026" is not an emoji icon.
   const TEXT_SYMBOLS = /^[©®™]$/
   const KEYCAP = /[#*\d]️?⃣/u
+  // Flags (🇰🇷) are pairs of regional indicators, which carry no Extended_Pictographic property.
+  const FLAG = /\p{Regional_Indicator}{2}/u
   const VARIATION_SELECTOR_16 = '️'
   const WEIGHT_NAMES = { normal: 400, bold: 700, bolder: 700, lighter: 300 }
   // Average glyph advance as a share of the font size, the usual "measure" approximation.
@@ -313,12 +315,12 @@
 
   /**
    * True when the text contains an emoji glyph: any Extended_Pictographic character except the
-   * typographic ©/®/™ (unless VS16 forces emoji presentation), plus keycap sequences. Bare digits,
-   * '#' and '*' (keycap bases) never count.
+   * typographic ©/®/™ (unless VS16 forces emoji presentation), plus keycap sequences and flags.
+   * Bare digits, '#' and '*' (keycap bases) never count.
    */
   function hasEmoji(text) {
     if (typeof text !== 'string' || !text) return false
-    if (KEYCAP.test(text)) return true
+    if (KEYCAP.test(text) || FLAG.test(text)) return true
     const characters = [...text]
     for (let index = 0; index < characters.length; index += 1) {
       const character = characters[index]

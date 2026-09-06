@@ -18,7 +18,16 @@ const evalDirectory = dirname(fileURLToPath(import.meta.url))
 const skillDirectory = dirname(evalDirectory)
 const USAGE =
   'USAGE: run-live.mjs --host <claude|codex> --variant <name> --skill-dir <skill directory> --out <dir> [--replicates <k>] [--briefs id,id] [--briefs-file <briefs.json>] [--extra-args "<host args>"] [--dry-run]'
-const WRITE_TOOL_NAMES = new Set(['write', 'write_file', 'writefile', 'edit', 'multiedit', 'create_file', 'file_write', 'save_file'])
+const WRITE_TOOL_NAMES = new Set([
+  'write',
+  'write_file',
+  'writefile',
+  'edit',
+  'multiedit',
+  'create_file',
+  'file_write',
+  'save_file',
+])
 const CODEX_CHANGE_ITEMS = new Set(['file_change', 'file_write', 'patch'])
 const FENCED_JSON = /```json\b([\s\S]*?)```/g
 
@@ -45,7 +54,15 @@ export const HOSTS = {
     command: 'codex',
     exposure: ['.agents/skills', '.codex/skills'],
     // codex exec --json streams item.* events; workspace-write lets it write index.html in cwd.
-    args: (prompt, extra) => ['exec', '--json', '--sandbox', 'workspace-write', '--skip-git-repo-check', ...extra, prompt],
+    args: (prompt, extra) => [
+      'exec',
+      '--json',
+      '--sandbox',
+      'workspace-write',
+      '--skip-git-repo-check',
+      ...extra,
+      prompt,
+    ],
   },
 }
 
@@ -195,7 +212,8 @@ export function writtenPathsFrom(events) {
     }
     if (event?.type !== 'item.completed') continue
     const item = event.item
-    if (!item || !CODEX_CHANGE_ITEMS.has(String(item.item_type ?? '').toLowerCase()) || item.status === 'failed') continue
+    if (!item || !CODEX_CHANGE_ITEMS.has(String(item.item_type ?? '').toLowerCase()) || item.status === 'failed')
+      continue
     for (const change of Array.isArray(item.changes) ? item.changes : [item]) {
       if (typeof change?.path === 'string') confirmed.add(change.path)
     }
@@ -225,7 +243,8 @@ export function buildRunRecord({ brief, variant, host, replicateId, dir, events,
     loopRounds: Number.isSafeInteger(reported.loopRounds) ? 'self-reported' : 'unreported',
   }
   if (report) {
-    for (const field of ['mode', 'loopRounds']) if (attestation[field] === 'unreported') errors.push(`FLAG_UNREPORTED:${field}`)
+    for (const field of ['mode', 'loopRounds'])
+      if (attestation[field] === 'unreported') errors.push(`FLAG_UNREPORTED:${field}`)
   }
   return {
     record: {
@@ -245,7 +264,10 @@ export function buildRunRecord({ brief, variant, host, replicateId, dir, events,
       tokens,
       runtimeMs,
       exitCode,
-      model: events.find((event) => event?.message?.model)?.message?.model ?? events.find((event) => event?.model)?.model ?? null,
+      model:
+        events.find((event) => event?.message?.model)?.message?.model ??
+        events.find((event) => event?.model)?.model ??
+        null,
       sessionId: events.find((event) => event?.session_id)?.session_id ?? null,
       errors,
       attestation,
@@ -316,15 +338,34 @@ export function nextCommands({ root, host, variant, fixtures, dryRun }) {
     'next:',
     '  # 1. render every run: screenshots + deterministic metrics next to its index.html',
     ...fixtures.map(
-      ({ brief, dir }) => `  node ${render} --in ${join(dir, 'index.html')} --out ${dir} --lang ${brief.lang} --source ${dir} --impeccable`,
+      ({ brief, dir }) =>
+        `  node ${render} --in ${join(dir, 'index.html')} --out ${dir} --lang ${
+          brief.lang
+        } --source ${dir} --impeccable`,
     ),
     `  # 2. judge ${variant} against ${other} per brief × host × replicate (both orderings, no scores)`,
     ...fixtures.map(
       ({ brief, replicateId }) =>
-        `  node ${join(evalDirectory, 'judge.mjs')} --brief ${brief.id} --a ${join(root, brief.id, 'candidate', host, replicateId)} --b ${join(root, brief.id, 'baseline', host, replicateId)} --host ${host} --out ${join(root, 'judgments', `${brief.id}-${host}-${replicateId}.json`)}`,
+        `  node ${join(evalDirectory, 'judge.mjs')} --brief ${brief.id} --a ${join(
+          root,
+          brief.id,
+          'candidate',
+          host,
+          replicateId,
+        )} --b ${join(root, brief.id, 'baseline', host, replicateId)} --host ${host} --out ${join(
+          root,
+          'judgments',
+          `${brief.id}-${host}-${replicateId}.json`,
+        )}`,
     ),
     '  # 3. grade: gates per unit, pass^k / pass@k per (brief, host, variant), win rates per host',
-    `  node ${join(evalDirectory, 'grade-results.mjs')} --runs ${join(root, 'runs.jsonl')} --metrics ${root} --judgments ${join(root, 'judgments')} --gates ${join(evalDirectory, 'gates.json')} --briefs ${join(evalDirectory, 'briefs.json')} --out ${join(root, 'summary')}`,
+    `  node ${join(evalDirectory, 'grade-results.mjs')} --runs ${join(
+      root,
+      'runs.jsonl',
+    )} --metrics ${root} --judgments ${join(root, 'judgments')} --gates ${join(
+      evalDirectory,
+      'gates.json',
+    )} --briefs ${join(evalDirectory, 'briefs.json')} --out ${join(root, 'summary')}`,
     '',
   ]
   return lines.join('\n')
@@ -392,7 +433,9 @@ async function main() {
       await writeFile(join(dir, 'self-report.json'), `${JSON.stringify(selfReported, null, 2)}\n`)
       await writeFile(join(dir, 'run.json'), `${JSON.stringify(record, null, 2)}\n`)
       await appendFile(join(root, 'runs.jsonl'), `${JSON.stringify(record)}\n`)
-      process.stderr.write(`ran ${brief.id} ${replicateId} in ${runtimeMs}ms (exit ${code}, output ${outputExists ? 'yes' : 'NO'})\n`)
+      process.stderr.write(
+        `ran ${brief.id} ${replicateId} in ${runtimeMs}ms (exit ${code}, output ${outputExists ? 'yes' : 'NO'})\n`,
+      )
     }
   }
   process.stdout.write(nextCommands({ root, host, variant, fixtures, dryRun }))

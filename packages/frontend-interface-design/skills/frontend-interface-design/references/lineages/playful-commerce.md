@@ -25,7 +25,7 @@ colors:
 typography:
   display:
     fontFamily: 'Gabarito, system-ui, sans-serif'
-    fontSize: 'clamp(2rem, 1.4rem + 3vw, 3.5rem)'
+    fontSize: 56px
     fontWeight: 800
     lineHeight: 1.05
     letterSpacing: -0.02em
@@ -137,7 +137,7 @@ accent 하나 + sale hue 하나 · sticky 구매 박스 · 옵션 칩 · 모션�
 **Character:** 무게 대비가 크고(800 vs 400) 자간은 살짝 좁다. 가격은 display 가족 800 tnum이며
 화면에서 가장 무겁다. 상품명은 title 600 두 줄 `line-clamp`.
 
-- **Display** (800, 32–56px): 프로모션 · 카테고리 제목. PDP에는 없다.
+- **Display** (800, 56px — 유동값 `clamp(2rem, 1.4rem + 3vw, 3.5rem)`): 프로모션 · 카테고리 제목. PDP에는 없다. 토큰은 최대값이고 CSS에서는 clamp을 쓴다.
 - **Headline** (700, 24px): PDP 상품명.
 - **Title** (600, 16px): 카드 상품명 · 버튼.
 - **Body** (400, 15px): 설명 · 리뷰.
