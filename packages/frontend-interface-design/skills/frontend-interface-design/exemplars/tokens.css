@@ -30,7 +30,7 @@
   --foreground: oklch(20% calc(var(--c-tint) * 1.8) var(--h));
   --muted: var(--surface-2);
   --muted-foreground: oklch(47% calc(var(--c-tint) * 3) var(--h)); /* 4.5:1 이상 — render.mjs로 확인 */
-  --subtle-foreground: oklch(62% calc(var(--c-tint) * 2.5) var(--h)); /* 캡션 · 비활성 · 아이콘 */
+  --subtle-foreground: oklch(50% calc(var(--c-tint) * 2.5) var(--h)); /* 캡션 · 비활성 · 아이콘 — 흰 배경 4.5:1 */
 
   /* ── accent ───────────────────────────────────────── */
   --primary: oklch(50% var(--c-accent) var(--h));
@@ -55,7 +55,8 @@
   --destructive-soft: oklch(95% 0.03 27);
   --success: oklch(52% 0.14 145);
   --success-soft: oklch(95% 0.035 145);
-  --warning: oklch(70% 0.15 85);
+  --warning: oklch(70% 0.15 85); /* 채움 · 점용. 흰 배경 위 텍스트는 2.7:1이라 쓰지 않는다 */
+  --warning-text: oklch(50% 0.11 85); /* 텍스트용 warning ink (≥ 4.5:1) */
   --warning-soft: oklch(96% 0.05 85);
   --info: oklch(55% 0.12 250);
   --info-soft: oklch(95% 0.03 250);
@@ -121,7 +122,7 @@
   --card: oklch(19% calc(var(--c-tint) * 1.8) var(--h));
   --foreground: oklch(93% calc(var(--c-tint) * 0.8) var(--h));
   --muted-foreground: oklch(70% calc(var(--c-tint) * 2.5) var(--h));
-  --subtle-foreground: oklch(55% calc(var(--c-tint) * 2) var(--h));
+  --subtle-foreground: oklch(62% calc(var(--c-tint) * 2) var(--h));
   --primary: oklch(70% calc(var(--c-accent) - 0.02) var(--h)); /* 밝은 solid 위 전경은 어둡게 */
   --primary-hover: oklch(75% calc(var(--c-accent) - 0.02) var(--h));
   --primary-foreground: oklch(16% 0.02 var(--h));
@@ -133,6 +134,7 @@
   --ring: oklch(72% var(--c-accent) var(--h));
   --destructive-soft: oklch(24% 0.05 27);
   --success-soft: oklch(24% 0.05 145);
+  --warning-text: oklch(82% 0.13 85);
   --warning-soft: oklch(26% 0.06 85);
   --info-soft: oklch(24% 0.05 250);
   --shadow-color: oklch(5% 0.02 var(--h) / 0.5);
@@ -216,31 +218,36 @@ time {
   vertical-align: -3px;
 }
 
-/* 아바타: 이니셜 + 차트 팔레트 */
+/* 아바타: 이니셜 · 차트 hue에서 soft 배경 + 진한 잉크를 파생한다 (흰 글자 on 58% 채움은 4.5:1 미달) */
 .avatar {
+  --avatar-c: var(--chart-1);
   display: inline-grid;
   place-items: center;
   width: 20px;
   height: 20px;
   border-radius: 999px;
-  background: var(--chart-1);
-  color: oklch(99% 0 0);
+  background: oklch(from var(--avatar-c) 92% 0.05 h);
+  color: oklch(from var(--avatar-c) 40% 0.12 h);
   font-size: 12px; /* 게이트: 12px 미만 텍스트 없음 */
   font-weight: 600;
   letter-spacing: 0;
   flex: none;
 }
 .avatar[data-c='2'] {
-  background: var(--chart-2);
+  --avatar-c: var(--chart-2);
 }
 .avatar[data-c='3'] {
-  background: var(--chart-3);
+  --avatar-c: var(--chart-3);
 }
 .avatar[data-c='4'] {
-  background: var(--chart-4);
+  --avatar-c: var(--chart-4);
 }
 .avatar[data-c='5'] {
-  background: var(--chart-5);
+  --avatar-c: var(--chart-5);
+}
+.dark .avatar {
+  background: oklch(from var(--avatar-c) 32% 0.07 h);
+  color: oklch(from var(--avatar-c) 86% 0.09 h);
 }
 
 @media (prefers-reduced-motion: reduce) {

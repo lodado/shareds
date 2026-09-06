@@ -174,6 +174,9 @@
         letter-spacing: -0.01em;
       }
       .block h2 a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px; /* 탭 타깃 ≥24px */
         font-size: 13px;
         font-weight: 500;
         color: var(--muted-foreground);
@@ -196,24 +199,25 @@
         background: var(--surface-1);
       }
       .row .glyph {
+        --glyph-c: var(--chart-1);
         display: grid;
         place-items: center;
         width: 40px;
         height: 40px;
         border-radius: 999px;
-        background: var(--chart-1);
-        color: oklch(99% 0 0);
+        background: oklch(from var(--glyph-c) 93% 0.05 h); /* 기관 마크 자리 — soft 배경 + 진한 잉크 */
+        color: oklch(from var(--glyph-c) 38% 0.13 h);
         font-size: 14px;
         font-weight: 700;
       }
       .row .glyph[data-c='2'] {
-        background: var(--chart-2);
+        --glyph-c: var(--chart-2);
       }
       .row .glyph[data-c='3'] {
-        background: var(--chart-3);
+        --glyph-c: var(--chart-3);
       }
       .row .glyph[data-c='4'] {
-        background: var(--chart-4);
+        --glyph-c: var(--chart-4);
       }
       .row .name {
         font-weight: 500;
@@ -224,6 +228,9 @@
       .row .sub {
         font-size: 13px;
         color: var(--muted-foreground);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .row .right {
         display: flex;
@@ -231,7 +238,7 @@
         gap: var(--space-2);
       }
       .row .amt {
-        font-size: 16px;
+        font-size: 15px;
         font-weight: 600;
         font-variant-numeric: tabular-nums;
         letter-spacing: -0.01em;
@@ -367,7 +374,7 @@
 
       /* ── 탭 바 ──────────────────────────────────────── */
       .tabbar {
-        position: sticky;
+        position: sticky; /* 흐름 안에서 뷰포트 하단에 붙는다 — fixed는 전체 페이지 캡처에서 중간에 뜬다 */
         bottom: 0;
         margin-top: auto;
         display: grid;
@@ -392,9 +399,6 @@
       .tabbar .icon {
         width: 24px;
         height: 24px;
-      }
-      .spacer-bottom {
-        height: var(--space-6);
       }
     </style>
   </head>
@@ -492,7 +496,6 @@
           <a class="linkrow" href="#"><svg class="icon"><use href="#i-shield" /></svg>내 신용점수 확인하기<svg class="icon chev"><use href="#i-chev" /></svg></a>
           <a class="linkrow" href="#"><svg class="icon"><use href="#i-zap" /></svg>자동이체 4건 · 다음 결제 9월 10일<svg class="icon chev"><use href="#i-chev" /></svg></a>
         </section>
-        <div class="spacer-bottom"></div>
       </main>
 
       <nav class="tabbar" aria-label="하단 탭">

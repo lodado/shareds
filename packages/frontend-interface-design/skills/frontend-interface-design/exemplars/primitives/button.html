@@ -93,10 +93,14 @@
         margin-left: var(--space-1);
         padding: 1px 5px;
         border-radius: calc(var(--radius) - 4px);
-        background: color-mix(in oklch, currentColor 12%, transparent);
+        background: oklch(0% 0 0 / 0.2); /* solid(primary) 위: 어두운 오버레이 — 흰 12%는 전경 대비를 깎는다 */
         font-family: var(--font-mono);
         font-size: 12px;
         font-weight: 500;
+      }
+      .btn--secondary kbd,
+      .btn--ghost kbd {
+        background: color-mix(in oklch, currentColor 12%, transparent);
       }
       .spinner {
         display: none;

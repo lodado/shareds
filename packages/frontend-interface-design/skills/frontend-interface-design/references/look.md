@@ -31,6 +31,9 @@ node <skill>/scripts/render.mjs --in design-loop/harness.html --out design-loop/
   결과는 undercount라서 게이트 근거로 쓰지 않는다.
 - Playwright가 없으면 프로젝트의 Playwright 또는 browser MCP로 같은 뷰포트를 찍고,
   metrics는 "미측정"으로 기록한다. 스크린샷 없이 다음 단계로 가지 않는다.
+- 전체 페이지 캡처에서 `fixed` · `sticky` 하단 바(탭 바 · 토스트 · 하단 CTA)는 첫 뷰포트의
+  바닥, 즉 페이지 중간에 찍힌다. 캡처 아티팩트지 결함이 아니다 — 겹침으로 세지 않고, 확인이
+  필요하면 뷰포트 높이를 문서 높이로 늘려 한 번 더 찍는다.
 
 ## 2. 섹션별 비평 (체크리스트, yes/no만)
 

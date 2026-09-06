@@ -553,7 +553,7 @@ live 하네스는 host(`claude` · `codex`) 실행이 필요해 이 세션에서
 | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0     | `skills/frontend-interface-design/scripts/{metrics-core.js, metrics-browser.js, render.mjs}` — Look 루프와 eval이 같은 렌더러 · 지표를 쓴다. `evals/{briefs.json(8: ko 4 · en 4, 문항 10), gates.json, run-live.mjs(--dry-run 픽스처), judge.mjs(pairwise · 위치 교대 · 절대점수 없음), calibrate.mjs, grade-results.mjs, README.md}` + 패키지 테스트 |
 | 1     | `references/look.md` — 렌더 → 게이트 → 섹션별 yes/no 비평(브리프 10 + craft 10) → 통과 수가 늘 때만 채택 → ≤3라운드 · 2라운드 무개선 정지. `VERIFIED` 미발급                                                                                                                                                                                          |
-| 2     | `references/craft.md`(12 기본값, CSS 스니펫 12) · `references/typography-ko.md` · `exemplars/`(tokens.css + 프리미티브 5 + 조합 2 + README) · reference-study의 조합 블록 허용                                                                                                                                                                        |
+| 2     | `references/craft.md`(12 기본값, CSS 스니펫 12) · `references/typography-ko.md` · `exemplars/`(tokens.css + 프리미티브 5 + 조합 3 + README) · reference-study의 조합 블록 허용                                                                                                                                                                        |
 | 3     | `references/adaptation.md`(브리프 6칸 · 고정 질문 · 체크리스트 10 템플릿 · 계보 표 · 노브 3 · DESIGN.md 방출 · lint · 흔한 답 시뮬레이션 · `.design/log.json`) · `references/lineages/*.md` 6개(Google DESIGN.md alpha 스키마 + `## Adaptation` 확장 섹션, 자리표시자 hue)                                                                            |
 | 4     | SKILL.md 208줄 · 18,916자 → 125줄 · 11,975자(63%), 상시 규칙 12, 참조 on-demand 표, Impeccable 재배치(init → browser detect → critique 2순위 → polish finisher), review 7축 yes/no + `loop:` 줄, decision-ladder gate 면제 조항 · Decision rules 이관, ui-checklist Slop gates → 루프로 흡수, 계약 테스트 13건 재작성                                 |
 
@@ -568,18 +568,46 @@ live 하네스는 host(`claude` · `codex`) 실행이 필요해 이 세션에서
   렌더에서 "정산\n을"처럼 음절이 끊겼다. `keep-all` 유지 + `overflow-wrap: anywhere`로 바꾸고
   typography-ko.md 규칙을 수정했다 — Look 루프가 규칙 자체의 결함을 잡은 첫 사례다.
 
+- §7.3의 조합 2개(app shell · marketing hero)는 첫 판이 사용자 판정에서 탈락했다 — 규칙은 다
+  지켰지만 레퍼런스 옆에 두면 "빈 프레임 + 카드 나열"이었다. §1.2가 말한 평균 회귀를 우리 정답지가
+  재현한 것이다. 레퍼런스 밀도로 다시 만들고 소비자 금융(Toss류 375 홈) 조합을 하나 더 추가했다
+  (아래 기록).
+
 ### Look 루프를 exemplar에 적용한 기록
 
-r1(1280 · 375, chromium 1194): 발견 3건 — app-shell에 primary 버튼 2개(목록 헤더 + 상세 패널) ·
-marketing-hero의 feature 프레임이 `min-height`로 빈 공간을 채움 · 375 제목 음절 끊김. 수정 후
-r2: 세 항목 모두 통과, 가로 overflow 0/14 스크린샷. 스크린샷은 세션 스크래치에만 있고 레포에는
-넣지 않았다.
+첫 판(조합 2): r1 발견 3건 — app-shell에 primary 버튼 2개 · marketing-hero의 feature 프레임이
+`min-height`로 빈 공간을 채움 · 375 제목 음절 끊김. r2에서 통과했지만 위의 이유로 폐기했다.
+
+다시 만든 판(조합 3)은 계보의 실제 레퍼런스에서 구조 · 밀도만 가져왔다(브랜드 자산 · 카피 · 폰트명
+제외): `tokens.css` v2(노브 5 · 표면 사다리 · hairline · soft 상태색 · 차트 5 · 아이콘 · 아바타),
+`app-shell.html`(Linear류 — 13px · 28px nav 행 · 36px 목록 행 · 그룹 헤더 · 우선순위 글리프 · 라벨
+pill · 속성 패널 · 활동 · 댓글), `marketing-hero.html`(Stripe류 — 제품 mock이 주인공 · 사실 띠 ·
+기능 3 · 단계 · 가격 2 · CTA · footer), `fintech-home.html`(Toss류 375 홈 — 금액 hero · 액션 타일 ·
+8px 띠 · 60px 행 · 소비 막대 · 탭 바, `:root` 노브만 바꿔 hue 250). 여기에 `look.md` 루프를 그대로
+돌렸다(chromium 141 · 375 + 1280 · light):
+
+| 라운드 | 게이트 (app-shell · marketing · fintech)               | 발견 → 수정                                                                                                                                           |
+| ------ | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| r1     | tiny 11px 다수 · contrast 57 · 18 · 8 · tap 0 · 19 · 2 | 11px 전부 12px로 · `--subtle-foreground` L62 → 50 · 링크 최소 높이 · 트러스트 띠 selector 버그(`.trust div` → `> div`) · 토스트가 표를 가림           |
+| r2     | contrast 16 · 1 · 4 · tap 0 · 1 · 0                    | 아바타 · 기관 마크: 흰 글자 on 58% 채움(3.8–4.5:1) → hue에서 soft 배경 + 진한 잉크 파생 · `--warning-text` 추가(70% 노랑은 2.7:1) · footer 링크 block |
+| r3     | contrast 1 · 0 · 0 · 나머지 0                          | primary 버튼 안 kbd의 흰 12% 오버레이가 전경 대비를 4.2:1로 → 어두운 오버레이                                                                         |
+| r4     | 전 게이트 0 · keep-all 1.00 · overflow 0/16 스크린샷   | 통과. 탭 바 fixed + 스페이서 → 흐름 안 sticky. 전체 페이지 캡처에서 하단 바가 중간에 찍히는 건 캡처 아티팩트라 look.md에 명시                         |
+
+정답지라서 게이트 0까지 갔고, 그 때문에 `look.md`의 3라운드 상한을 한 라운드 넘겼다(매 라운드
+통과 수가 늘었으므로 정지 조건에는 걸리지 않았다). 생성 화면에서는 상한을 지킨다. 스크린샷은
+세션 스크래치에만 있고 레포에는 넣지 않았다.
+
+루프가 잡아낸 것 중 셋은 규칙 · 토큰 자체의 결함이었다 — 한국어 줄바꿈 규칙, `--subtle-foreground`
+밝기, warning 색의 텍스트 사용. 규칙만 읽고 만들었다면 셋 다 통과했다고 믿었을 것이다.
 
 ### 검증
 
 - 계약 테스트 13/13 (`node --test scripts/skill-contract.test.mjs`).
-- pre-commit 전체 `pnpm test` 8/8 패키지 GREEN (커밋 `bf1b65f`, `86fee93`).
-- 하네스 단위 테스트 · lint · 브라우저 스모크: (하네스 리포트 후 갱신)
+- 패키지 테스트 55(54 pass · 1 skip — `FID_PLAYWRIGHT_DIR` 없는 브라우저 스모크) · `eslint skills scripts` 0.
+- 브라우저 스모크 `render.test.mjs` 10/10 (playwright-core 1.56.1 · chromium 141.0.7390.37).
+- exemplar 게이트: 조합 3 × (375 · 1280) 전부 0 — contrast · overflow · tiny · tap · long. 프리미티브 5
+  가로 overflow 0. `--source` 리터럴 비율 0.07–0.08(색 리터럴 0 · radius 소수는 데모 레이아웃).
+- pre-commit 전체 `pnpm test` 8/8 패키지 GREEN (커밋 `bf1b65f` · `86fee93` · `004bf85`).
 
 ### 남은 것 — 사용자 실행
 
@@ -587,4 +615,4 @@ r2: 세 항목 모두 통과, 가로 overflow 0/14 스크린샷. 스크린샷은
    host × k=3 실행 → `grade-results.mjs` 승률. 55% 미만이면 되돌린다(§10 정지 규칙).
 2. 사람 보정 20쌍(`calibrate.mjs`), 심판-사람 일치율 ≥75% 확인.
 3. Impeccable on/off variant 측정 후 위임 표 유지 여부 결정.
-4. exemplar 검수 1회(정답지 확정) · `.design/log.json` 첫 프로젝트 적용.
+4. exemplar를 레퍼런스와 나란히 놓고 사람 검수 1회(정답지 확정) · `.design/log.json` 첫 프로젝트 적용.

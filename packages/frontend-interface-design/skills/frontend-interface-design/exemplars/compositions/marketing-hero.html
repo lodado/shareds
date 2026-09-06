@@ -61,6 +61,9 @@
         font-weight: 500;
       }
       .nav ul a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px; /* 탭 타깃 ≥24px */
         color: var(--muted-foreground);
         text-decoration: none;
       }
@@ -399,8 +402,8 @@
       }
       .toast {
         position: absolute;
-        right: -20px;
-        bottom: 28px;
+        right: -24px;
+        bottom: -18px; /* 프레임 모서리에 걸친다 — 내용을 가리지 않는다 */
         display: flex;
         align-items: center;
         gap: 10px;
@@ -437,7 +440,7 @@
         gap: var(--space-8);
         padding: var(--space-8) 0;
       }
-      .trust div {
+      .trust > div {
         display: flex;
         gap: var(--space-3);
         align-items: flex-start;
@@ -790,6 +793,8 @@
         gap: 8px;
       }
       .cols a {
+        display: block;
+        padding: 4px 0; /* 탭 타깃 ≥24px — 열 너비 전체가 타깃 */
         color: var(--muted-foreground);
         text-decoration: none;
       }
@@ -905,7 +910,7 @@
                 <div class="app__head"><strong>정산 · 9월 1주차</strong><span class="pill">대사 완료</span><span class="fake-btn">정산 실행</span></div>
                 <div class="kpis">
                   <div class="kpi"><span>이번 주 정산액</span><b>₩5,868,500</b><em>+8.2%</em></div>
-                  <div class="kpi"><span>미처리</span><b>6건</b><em style="color: var(--warning)">확인 필요</em></div>
+                  <div class="kpi"><span>미처리</span><b>6건</b><em style="color: var(--warning-text)">확인 필요</em></div>
                   <div class="kpi"><span>정산 예정일</span><b>9월 15일</b><em style="color: var(--muted-foreground)">화요일 09:00</em></div>
                 </div>
                 <div class="chart">
