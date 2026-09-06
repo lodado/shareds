@@ -1,0 +1,19 @@
+{
+  "status": "local_workflow_passed",
+  "snapshot": "v-20260906T154231-62d1ffb8b9c141d2ac3b1277068bbc7b",
+  "documents": 3,
+  "split_status": "insufficient_independent_groups",
+  "profile_rules": 1,
+  "profile_mode": "exploratory",
+  "active_pointer_verified": true,
+  "profile_evidence_findings": [],
+  "human_preference": "not_run",
+  "editing_effort": "not_run",
+  "live_collection": "not_run",
+  "fresh_model_generation": false,
+  "limitations": [
+    "Synthetic fixtures only.",
+    "Saved demo draft generated once by coordinator using the extracted weak ending rule.",
+    "No real-author style generalization or legal safety conclusion."
+  ]
+}

@@ -91,6 +91,18 @@
       "category": "development",
       "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
       "tags": ["frontend", "ui", "ux", "design", "accessibility"]
+    },
+    {
+      "name": "blog-voice-cloner",
+      "description": "Evidence-backed Korean/English blog voice profiles, content-isolated drafting, and local author history.",
+      "version": "0.1.0",
+      "author": {
+        "name": "lodado"
+      },
+      "source": "./packages/blog-voice-cloner",
+      "category": "productivity",
+      "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+      "tags": ["writing", "blog", "stylometry"]
     }
   ]
 }

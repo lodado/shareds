@@ -1,0 +1,54 @@
+{
+  "anti_patterns": [],
+  "evaluation": {
+    "status": "not_evaluated"
+  },
+  "genre_rules": {
+    "technical_explanation": [
+      {
+        "id": "ENDING-01",
+        "dimension": "endings",
+        "instruction": "조건을 설명한 뒤 그 조건에 주의를 돌리는 짧은 문장으로 마무리한다.",
+        "scope": {
+          "genres": ["technical_explanation"],
+          "roles": ["ending"]
+        },
+        "evidence": ["87f11936ba42:paragraph-04", "f079c4a965fa:paragraph-03", "d8d625f5743c:paragraph-03"],
+        "confidence": "weak",
+        "exceptions": [
+          "원문에 없는 조건이나 권고를 추가하지 않는다.",
+          "세 합성 문서의 관찰이며 일반화 검증은 불충분하다."
+        ]
+      }
+    ]
+  },
+  "global_rules": [],
+  "metrics_reference": "style-metrics.json",
+  "schema_version": 1,
+  "source_metadata": [
+    {
+      "genre": "technical_explanation",
+      "id": "87f11936ba42",
+      "published_at": "2026-08-22T00:00:00Z",
+      "title": "80caf4c0f18afaedf9e571f7bc5dee9483bf4cdbe3181ce29e8f98246fce509b",
+      "url": "https://example.invalid/synthetic/2"
+    },
+    {
+      "genre": "technical_explanation",
+      "id": "f079c4a965fa",
+      "published_at": "2026-08-23T00:00:00Z",
+      "title": "대기열의 순서",
+      "url": "https://example.invalid/synthetic/3"
+    },
+    {
+      "genre": "technical_explanation",
+      "id": "d8d625f5743c",
+      "published_at": "2026-08-21T00:00:00Z",
+      "title": "캐시의 시간",
+      "url": "https://example.invalid/synthetic/1"
+    }
+  ],
+  "status": "reviewed",
+  "weak_observations": [],
+  "mode": "exploratory"
+}

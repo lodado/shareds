@@ -1,0 +1,228 @@
+{
+  "schema_version": 1,
+  "document_ids": ["87f11936ba42", "d8d625f5743c", "f079c4a965fa"],
+  "counts": {
+    "documents": 3,
+    "blocks": 12,
+    "prose_paragraphs": 10,
+    "prose_characters": 320,
+    "whitespace_units": 85,
+    "sentences": 16,
+    "headings": 2,
+    "list_items": 0,
+    "quotes": 0,
+    "code_blocks": 0
+  },
+  "distributions": {
+    "paragraph_characters": {
+      "count": 10,
+      "min": 7,
+      "p10": 9.7,
+      "median": 30.5,
+      "p90": 64.3,
+      "max": 67
+    },
+    "paragraph_whitespace_units": {
+      "count": 10,
+      "min": 2,
+      "p10": 2.0,
+      "median": 8.0,
+      "p90": 17.0,
+      "max": 17
+    },
+    "sentence_characters": {
+      "count": 16,
+      "min": 7,
+      "p10": 10.0,
+      "median": 16.5,
+      "p90": 33.0,
+      "max": 37
+    },
+    "sentence_whitespace_units": {
+      "count": 16,
+      "min": 2,
+      "p10": 2.5,
+      "median": 4.5,
+      "p90": 9.0,
+      "max": 10
+    },
+    "sentences_per_paragraph": {
+      "count": 10,
+      "min": 1,
+      "p10": 1.0,
+      "median": 2.0,
+      "p90": 2.0,
+      "max": 2
+    },
+    "paragraphs_per_document": {
+      "count": 3,
+      "min": 3,
+      "p10": 3.0,
+      "median": 3.0,
+      "p90": 3.8,
+      "max": 4
+    }
+  },
+  "punctuation": {
+    "?": {
+      "count": 0,
+      "denominator": 320,
+      "rate": 0.0
+    },
+    "!": {
+      "count": 0,
+      "denominator": 320,
+      "rate": 0.0
+    },
+    "(": {
+      "count": 0,
+      "denominator": 320,
+      "rate": 0.0
+    },
+    ")": {
+      "count": 0,
+      "denominator": 320,
+      "rate": 0.0
+    },
+    ",": {
+      "count": 0,
+      "denominator": 320,
+      "rate": 0.0
+    },
+    ".": {
+      "count": 15,
+      "denominator": 320,
+      "rate": 0.046875
+    },
+    ":": {
+      "count": 0,
+      "denominator": 320,
+      "rate": 0.0
+    },
+    ";": {
+      "count": 0,
+      "denominator": 320,
+      "rate": 0.0
+    },
+    "…": {
+      "count": 0,
+      "denominator": 320,
+      "rate": 0.0
+    },
+    "“": {
+      "count": 0,
+      "denominator": 320,
+      "rate": 0.0
+    },
+    "”": {
+      "count": 0,
+      "denominator": 320,
+      "rate": 0.0
+    },
+    "？": {
+      "count": 0,
+      "denominator": 320,
+      "rate": 0.0
+    },
+    "！": {
+      "count": 0,
+      "denominator": 320,
+      "rate": 0.0
+    }
+  },
+  "short_sentences": {
+    "count": 16,
+    "denominator": 16,
+    "rate": 1.0,
+    "threshold_characters": 40
+  },
+  "single_sentence_paragraphs": {
+    "count": 4,
+    "denominator": 10,
+    "rate": 0.4
+  },
+  "questions": {
+    "count": 0,
+    "denominator": 16,
+    "rate": 0.0
+  },
+  "exclamations": {
+    "count": 0,
+    "denominator": 16,
+    "rate": 0.0
+  },
+  "parentheses": {
+    "count": 0,
+    "denominator": 320,
+    "rate": 0.0
+  },
+  "first_person": {
+    "count": 0,
+    "denominator": 85,
+    "rate": 0.0
+  },
+  "connectives": {
+    "count": 3,
+    "denominator": 85,
+    "rate": 0.03529411764705882
+  },
+  "korean_endings": {
+    "denominator": 16,
+    "unmatched": 3,
+    "counts": {
+      "다": 13
+    },
+    "heuristic": true
+  },
+  "formatting": {
+    "headings": {
+      "count": 2,
+      "denominator": 12,
+      "rate": 0.16666666666666666
+    },
+    "list_items": {
+      "count": 0,
+      "denominator": 12,
+      "rate": 0.0
+    },
+    "bold_spans": {
+      "count": 0,
+      "denominator": 10,
+      "rate": 0.0
+    },
+    "italic_spans": {
+      "count": 0,
+      "denominator": 10,
+      "rate": 0.0
+    },
+    "blank_lines": {
+      "count": 6,
+      "denominator": 15,
+      "rate": 0.4,
+      "documents_with_metadata": 3,
+      "scope": "raw source lines, including non-prose and HTML markup, not rendered spacing"
+    },
+    "markdown_links": {
+      "count": 0,
+      "denominator": 10,
+      "rate": 0.0
+    }
+  },
+  "definitions": {
+    "characters": "Unicode code points, including intra-block whitespace, excluding inter-block separators",
+    "whitespace_units": "str.split() units, not linguistic tokens",
+    "quantiles": "Linear interpolation at (count - 1) * p",
+    "short_sentence": "At most 40 Unicode code points including terminal punctuation, descriptive fixed threshold",
+    "prose": "paragraph blocks only"
+  },
+  "limitations": [
+    "HTML is parsed without executing scripts, fetching resources, or interpreting CSS.",
+    "HTML/Markdown structure is best effort. Nested lists are flattened; malformed markup may lose structure.",
+    "Prose means paragraph blocks only. Code, quotes, headings and lists are excluded from prose denominators.",
+    "Whitespace units are not linguistic words. Sentence boundaries and Korean endings are heuristics.",
+    "Inline Markdown is retained. Character counts include punctuation and formatting markers.",
+    "Duplicate detection uses normalized 5-character shingles and pairwise Jaccard >= 0.8, with transitive union.",
+    "Duplicate detection compares only supplied documents. Historical different-path duplicates require historical content or signatures from the storage layer.",
+    "Numeric conformity is not evidence of meaning, voice fidelity, or reliable evaluation."
+  ]
+}

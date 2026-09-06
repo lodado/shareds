@@ -1,0 +1,102 @@
+{
+  "run_path": ".blog-voice/synthetic-manual/runs/20260907T003401-CDE",
+  "variants": {
+    "C": {
+      "profile_version": "synthetic-manual-v1",
+      "rule_ids": ["R1", "R2", "R3", "R4"],
+      "override_ids": [],
+      "example_ids": [],
+      "sections": [
+        {
+          "section": "P1",
+          "role": "concrete operation then mechanism",
+          "ledger_ids": ["CLAIM-01", "FACT-01"],
+          "rule_ids": ["R1", "R2"],
+          "example_ids": [],
+          "intended_relation": "conditional possibility, not guaranteed improvement"
+        },
+        {
+          "section": "P2",
+          "role": "constraint on interpretation",
+          "ledger_ids": ["FACT-01", "FACT-02"],
+          "rule_ids": ["R2", "R4"],
+          "example_ids": [],
+          "intended_relation": "TTL value is not a latency measurement"
+        },
+        {
+          "section": "P3",
+          "role": "expiry constraint and qualified implication",
+          "ledger_ids": ["FACT-03", "CLAIM-01"],
+          "rule_ids": ["R2", "R3", "R4"],
+          "example_ids": [],
+          "intended_relation": "expiry requires refetch; conclusion retains may and before-expiry scope"
+        }
+      ]
+    },
+    "D": {
+      "profile_version": "synthetic-manual-v1",
+      "rule_ids": ["R1", "R2", "R3", "R4"],
+      "override_ids": [],
+      "example_ids": ["EX-01"],
+      "sections": [
+        {
+          "section": "P1",
+          "role": "concrete operation then mechanism",
+          "ledger_ids": ["CLAIM-01", "FACT-01"],
+          "rule_ids": ["R1", "R2"],
+          "example_ids": [],
+          "intended_relation": "conditional possibility, not guaranteed improvement"
+        },
+        {
+          "section": "P2",
+          "role": "constraint on interpretation",
+          "ledger_ids": ["FACT-01", "FACT-02"],
+          "rule_ids": ["R2", "R4"],
+          "example_ids": ["EX-01"],
+          "intended_relation": "TTL value is not a latency measurement"
+        },
+        {
+          "section": "P3",
+          "role": "expiry constraint and qualified implication",
+          "ledger_ids": ["FACT-03", "CLAIM-01"],
+          "rule_ids": ["R2", "R3", "R4"],
+          "example_ids": [],
+          "intended_relation": "expiry requires refetch; conclusion retains may and before-expiry scope"
+        }
+      ]
+    },
+    "E": {
+      "profile_version": "synthetic-manual-v1",
+      "rule_ids": ["R1", "R2", "R3", "R4"],
+      "override_ids": ["UO-01"],
+      "example_ids": ["EX-01"],
+      "sections": [
+        {
+          "section": "P1",
+          "role": "concrete operation then mechanism",
+          "ledger_ids": ["CLAIM-01", "FACT-01"],
+          "rule_ids": ["R1", "R2"],
+          "example_ids": [],
+          "intended_relation": "conditional possibility, not guaranteed improvement"
+        },
+        {
+          "section": "P2",
+          "role": "constraint on interpretation",
+          "ledger_ids": ["FACT-01", "FACT-02"],
+          "rule_ids": ["R2", "R4"],
+          "example_ids": ["EX-01"],
+          "intended_relation": "TTL value is not a latency measurement"
+        },
+        {
+          "section": "P3",
+          "role": "expiry constraint and qualified implication",
+          "ledger_ids": ["FACT-03", "CLAIM-01"],
+          "rule_ids": ["R2", "R3", "R4"],
+          "example_ids": [],
+          "intended_relation": "expiry requires refetch; conclusion retains may and before-expiry scope"
+        }
+      ]
+    }
+  },
+  "design": "single-agent synthetic C/D/E smoke, not independent fresh-context A-E benchmark"
+}

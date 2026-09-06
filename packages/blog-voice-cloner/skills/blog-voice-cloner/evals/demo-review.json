@@ -1,0 +1,14 @@
+{
+  "reviewer": "coordinator, same-context qualitative review",
+  "profile_rule": "ENDING-01",
+  "findings": [],
+  "checks": {
+    "content_preservation": "All four ledger entries retained with may/condition and no added benchmark or experience.",
+    "style_match": "Last paragraph redirects attention to supplied conditions using a short sentence.",
+    "over_imitation": "No fixture ending copied verbatim, no rhetorical question or analogy added.",
+    "source_leakage": "Claims supported by independent demo brief only.",
+    "generic_ai_signals": "No abstract generic preamble or section symmetry added."
+  },
+  "human_preference": "not_run",
+  "independent_semantic_review": "not_run"
+}

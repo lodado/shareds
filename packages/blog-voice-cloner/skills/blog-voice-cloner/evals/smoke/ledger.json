@@ -1,0 +1,72 @@
+{
+  "protected_literals": ["60", "TTL"],
+  "entries": [
+    {
+      "id": "CLAIM-01",
+      "type": "claim",
+      "statement": "Local cache may reduce repeated reads for the same key before TTL expiry.",
+      "source": "CONTENT_SOURCE user brief (verbatim in profile-prompt.md)",
+      "protected_literals": [],
+      "qualifiers": ["may", "same key", "before TTL expires"],
+      "relations": {
+        "condition": ["same key", "before expiry"],
+        "certainty": "may"
+      },
+      "used_by": ["C:P1", "C:P3", "D:P1", "D:P3", "E:P1", "E:P3"]
+    },
+    {
+      "id": "FACT-01",
+      "type": "fact",
+      "statement": "TTL is 60 seconds in this example.",
+      "source": "CONTENT_SOURCE user brief (verbatim in profile-prompt.md)",
+      "protected_literals": ["60", "TTL"],
+      "qualifiers": ["this example"],
+      "relations": {
+        "value": "60 seconds",
+        "not": "latency benchmark"
+      },
+      "used_by": ["C:P1", "C:P2", "D:P1", "D:P2", "E:P1", "E:P2"]
+    },
+    {
+      "id": "FACT-02",
+      "type": "fact",
+      "statement": "No latency benchmark is supplied.",
+      "source": "CONTENT_SOURCE user brief (verbatim in profile-prompt.md)",
+      "protected_literals": [],
+      "qualifiers": ["supplied content only"],
+      "relations": {
+        "negation": "no benchmark",
+        "does_not_establish": "latency improvement magnitude"
+      },
+      "used_by": ["C:P2", "D:P2", "E:P2"]
+    },
+    {
+      "id": "FACT-03",
+      "type": "fact",
+      "statement": "After TTL expires data must be fetched again.",
+      "source": "CONTENT_SOURCE user brief (verbatim in profile-prompt.md)",
+      "protected_literals": [],
+      "qualifiers": ["after expiry"],
+      "relations": {
+        "condition": "TTL expired",
+        "modality": "must"
+      },
+      "used_by": ["C:P3", "D:P3", "E:P3"]
+    },
+    {
+      "id": "FACT-04",
+      "type": "fact",
+      "statement": "No personal experience is supplied.",
+      "source": "CONTENT_SOURCE user brief (verbatim in profile-prompt.md)",
+      "protected_literals": [],
+      "qualifiers": ["content boundary"],
+      "relations": {
+        "negation": "no authorized personal experience"
+      },
+      "used_by": []
+    }
+  ],
+  "absence_checks": {
+    "FACT-04": "C/D/E P1-P3 contain no personal experience"
+  }
+}

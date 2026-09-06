@@ -1,0 +1,12 @@
+{
+  "status": "no_overlap_flags",
+  "findings": [],
+  "reviews": {
+    "content_preservation": "not_run",
+    "style_match": "not_run",
+    "over_imitation": "not_run",
+    "source_leakage": "not_run",
+    "generic_ai_signals": "not_run"
+  },
+  "caveat": "These deterministic checks identify literal overlap and missing protected literals only. No overlap flags is not a guarantee of originality, attribution, factual accuracy, semantic fidelity, or stylistic quality. Human review remains necessary."
+}

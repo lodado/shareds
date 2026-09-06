@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0",
+  "status": "uninitialized",
+  "document_count": 0,
+  "distributions": {},
+  "limitations": ["No measurements. Run analyze_style.py on a corpus."]
+}

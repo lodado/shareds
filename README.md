@@ -225,3 +225,7 @@ npm 릴리스는 조건이 두 개예요. 레포 변수 `ENABLE_NPM_RELEASE`가 
 ## 라이선스
 
 [MIT](LICENCE) © [lodado](https://github.com/lodado)
+
+## Blog Voice Cloner
+
+[blog-voice-cloner](packages/blog-voice-cloner/skills/blog-voice-cloner/README.md)는 한국어·영어 블로그 문체를 근거와 함께 분석하고, 작성자별 기간 프로필을 저장하며, 새 내용에 문체를 적용하는 스킬입니다. 원문 내용과 작성 내용을 분리하고 의미·중복·과잉 모방을 검토합니다. Python 3.10+ 표준 라이브러리 기반이며 웹 수집은 호스트 도구로 수행합니다.

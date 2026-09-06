@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "status": "uninitialized",
+  "author_id": null,
+  "snapshot": null,
+  "global_rules": [],
+  "genre_rules": {},
+  "weak_observations": [],
+  "anti_patterns": [],
+  "metrics_reference": "style-metrics.json",
+  "evidence_reference": "evidence.md",
+  "evaluation": {
+    "validation": "not_run",
+    "held_out": "not_run"
+  },
+  "limitations": ["No corpus analyzed."]
+}

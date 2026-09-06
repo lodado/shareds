@@ -1,0 +1,30 @@
+{
+  "protected_literals": ["TTL", "60"],
+  "entries": [
+    {
+      "id": "CLAIM-01",
+      "statement": "Same-key request before TTL expiry may reduce repeated reads.",
+      "source": "demo-brief.md",
+      "qualifiers": ["may", "same key", "before expiry"],
+      "used_by": ["paragraph-01", "paragraph-03"]
+    },
+    {
+      "id": "FACT-01",
+      "statement": "Example TTL is 60 seconds.",
+      "source": "demo-brief.md",
+      "used_by": ["paragraph-01"]
+    },
+    {
+      "id": "FACT-02",
+      "statement": "After expiry data must be fetched again.",
+      "source": "demo-brief.md",
+      "used_by": ["paragraph-02"]
+    },
+    {
+      "id": "FACT-03",
+      "statement": "No latency benchmark supplied.",
+      "source": "demo-brief.md",
+      "used_by": ["paragraph-02"]
+    }
+  ]
+}

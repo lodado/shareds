@@ -1,0 +1,113 @@
+[
+  {
+    "id": "87f11936ba42",
+    "title": "80caf4c0f18afaedf9e571f7bc5dee9483bf4cdbe3181ce29e8f98246fce509b",
+    "path": "80caf4c0f18afaedf9e571f7bc5dee9483bf4cdbe3181ce29e8f98246fce509b.txt",
+    "version": "10f1261cc58cd032a86f2f638c63bdadedbd88f7f3f7467c1176a544055d5208",
+    "blocks": [
+      {
+        "id": "paragraph-01",
+        "type": "paragraph",
+        "text": "재시도의 범위"
+      },
+      {
+        "id": "paragraph-02",
+        "type": "paragraph",
+        "text": "요청 하나가 실패했다. 바로 다시 보낼지 결정해야 한다."
+      },
+      {
+        "id": "paragraph-03",
+        "type": "paragraph",
+        "text": "일시적인 실패라면 재시도가 도움이 될 수 있다. 하지만 같은 작업을 두 번 실행해도 되는지는 별도로 확인해야 한다."
+      },
+      {
+        "id": "paragraph-04",
+        "type": "paragraph",
+        "text": "횟수보다 조건이 먼저다."
+      }
+    ],
+    "formatting": {
+      "blank_lines": 3,
+      "source_lines": 7
+    },
+    "url": "https://example.invalid/synthetic/2",
+    "genre": "technical_explanation",
+    "published_at": "2026-08-22T00:00:00Z",
+    "collected_at": "2026-09-06T15:00:00Z",
+    "original_sha256": "10f1261cc58cd032a86f2f638c63bdadedbd88f7f3f7467c1176a544055d5208"
+  },
+  {
+    "id": "f079c4a965fa",
+    "title": "대기열의 순서",
+    "path": "ba39502b46c41c5a73e2118cd67add292810b7886e673226eb235cc39c1a1a4c.html",
+    "version": "5605d36720d31f62ac99a3660c372bcd3968ed8014eeedf0633e637313bde18b",
+    "blocks": [
+      {
+        "id": "heading-01",
+        "type": "heading",
+        "text": "대기열의 순서"
+      },
+      {
+        "id": "paragraph-01",
+        "type": "paragraph",
+        "text": "작업이 줄을 섰다. 다음 작업을 고르려면 순서가 필요하다."
+      },
+      {
+        "id": "paragraph-02",
+        "type": "paragraph",
+        "text": "먼저 들어온 작업을 먼저 처리하면 순서를 설명하기 쉽다. 하지만 우선순위가 필요한 작업에는 다른 기준이 필요할 수 있다."
+      },
+      {
+        "id": "paragraph-03",
+        "type": "paragraph",
+        "text": "기준을 먼저 정하자."
+      }
+    ],
+    "formatting": {
+      "blank_lines": 0,
+      "source_lines": 1
+    },
+    "url": "https://example.invalid/synthetic/3",
+    "genre": "technical_explanation",
+    "published_at": "2026-08-23T00:00:00Z",
+    "collected_at": "2026-09-06T15:00:00Z",
+    "original_sha256": "5605d36720d31f62ac99a3660c372bcd3968ed8014eeedf0633e637313bde18b"
+  },
+  {
+    "id": "d8d625f5743c",
+    "title": "캐시의 시간",
+    "path": "be4c0bfb88c5bce804133a531f4d99fcaefef7ddd0499fe3aa8e03cecb855015.md",
+    "version": "d75ba955b8c4ace9568e79953cfe39329cf25d0543e16dea29924f875e04e660",
+    "blocks": [
+      {
+        "id": "heading-01",
+        "type": "heading",
+        "text": "캐시의 시간"
+      },
+      {
+        "id": "paragraph-01",
+        "type": "paragraph",
+        "text": "같은 키가 다시 들어왔다. 저장된 값을 먼저 확인한다."
+      },
+      {
+        "id": "paragraph-02",
+        "type": "paragraph",
+        "text": "값이 남아 있다면 다시 읽는 일을 줄일 수 있다. 하지만 만료된 값에는 이 설명을 적용할 수 없다."
+      },
+      {
+        "id": "paragraph-03",
+        "type": "paragraph",
+        "text": "조건부터 확인하자."
+      }
+    ],
+    "formatting": {
+      "blank_lines": 3,
+      "source_lines": 7
+    },
+    "url": "https://example.invalid/synthetic/1",
+    "genre": "technical_explanation",
+    "published_at": "2026-08-21T00:00:00Z",
+    "collected_at": "2026-09-06T15:00:00Z",
+    "original_sha256": "d75ba955b8c4ace9568e79953cfe39329cf25d0543e16dea29924f875e04e660"
+  }
+]

@@ -43,3 +43,8 @@ yarn-error.log*
 
 # Oracle run artifacts (ledger, run state, reporter output)
 .ai/
+
+# Local author corpora and Python tool caches
+.blog-voice/
+__pycache__/
+*.pyc

@@ -1,0 +1,6 @@
+[2026-09-06T15:28:30.599Z] Evaluation baseline. Do not inspect repository or other agents. Produce short Korean blog draft 120-180 words equivalent for ONLY this brief: A local cache may reduce repeated reads when the same key is requested again before TTL expires. TTL is 60 seconds in this example. There is no latency benchmark. After TTL expires data must be fetched again. No personal experience supplied. Style sample (fictional): '지난 겨울, 나는 서버 열두 대를 갈아엎었다. 문제는 여기서부터다. 빠르다고 다 좋은 건 아니다. 왜 그럴까? 조건이 빠졌기 때문이다.' Task B raw few-shot: write using sample style. Task A generic: same content brief without sample style. Return both explicitly labelled and note no real human preference evaluation. No tools needed, no files.
+
+<system-reminder>
+SWARM COMPLETION REPORT REQUIRED
+Before finishing, call the swarm tool with action="report" to submit your completion report. Include a concise message, validation/tests performed, and blockers or follow-ups. After the report tool succeeds, also write a brief final assistant response. Do not finish with only tool output, a lifecycle status change, or no final response. Do not send a separate DM for the final report unless you need interactive coordination before finishing.
+</system-reminder>

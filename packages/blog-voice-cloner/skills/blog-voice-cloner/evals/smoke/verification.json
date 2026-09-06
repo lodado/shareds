@@ -1,0 +1,49 @@
+{
+  "status": "passed",
+  "variants": [
+    {
+      "variant": "C",
+      "three_blocks": true,
+      "draft_final_smoke_identical": true,
+      "protected_literals_present": true,
+      "question_and_catchphrase_absent": true,
+      "whitespace_units": 102,
+      "validator_exit_code": 0,
+      "note": "String checks are proxies; semantics reviewed separately."
+    },
+    {
+      "variant": "D",
+      "three_blocks": true,
+      "draft_final_smoke_identical": true,
+      "protected_literals_present": true,
+      "question_and_catchphrase_absent": true,
+      "whitespace_units": 94,
+      "validator_exit_code": 0,
+      "note": "String checks are proxies; semantics reviewed separately."
+    },
+    {
+      "variant": "E",
+      "three_blocks": true,
+      "draft_final_smoke_identical": true,
+      "protected_literals_present": true,
+      "question_and_catchphrase_absent": true,
+      "whitespace_units": 99,
+      "validator_exit_code": 0,
+      "note": "String checks are proxies; semantics reviewed separately."
+    }
+  ],
+  "exact_prompt_records_match": true,
+  "variant_input_selection_correct": true,
+  "json_parse": "passed",
+  "microcase_markers": "passed",
+  "A_B_bodies_read": false,
+  "commit_performed": false,
+  "human_preference": "not_run",
+  "human_edit_effort": "not_run",
+  "independent_fresh_context_A_E_benchmark": "not_run",
+  "limitations": [
+    "No fresh contexts or independent reviewers. C had no designated example input, but the coordinating session saw the full user request including EX-01.",
+    "No baseline A/B read or compared. No statistical, human preference or human edit-effort result.",
+    "All variants safely omit rhetorical questions and analogies; E adds no observed reduction from D (zero to zero)."
+  ]
+}

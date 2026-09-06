@@ -1,0 +1,11 @@
+{
+  "profile": ["87f11936ba42", "d8d625f5743c", "f079c4a965fa"],
+  "validation": [],
+  "held_out": [],
+  "seed": 42,
+  "status": "insufficient_independent_groups",
+  "warnings": ["Fewer than 10 independent groups. Evaluation is not reliable; all documents are profile-only."],
+  "independent_groups": 3,
+  "duplicate_groups": [],
+  "quarantine": []
+}

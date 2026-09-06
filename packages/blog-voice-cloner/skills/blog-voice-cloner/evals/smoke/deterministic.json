@@ -1,0 +1,86 @@
+{
+  "C": {
+    "command": [
+      "python3",
+      "packages/blog-voice-cloner/skills/blog-voice-cloner/scripts/validate_style.py",
+      ".blog-voice/synthetic-manual/runs/20260907T003401-CDE/C/final.md",
+      "--corpus",
+      ".blog-voice/synthetic-manual/runs/20260907T003401-CDE/C/style-reference",
+      "--ledger",
+      ".blog-voice/synthetic-manual/runs/20260907T003401-CDE/C/ledger.json",
+      "--output",
+      ".blog-voice/synthetic-manual/runs/20260907T003401-CDE/C/deterministic.json"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "report": {
+      "status": "no_overlap_flags",
+      "findings": [],
+      "reviews": {
+        "content_preservation": "not_run",
+        "style_match": "not_run",
+        "over_imitation": "not_run",
+        "source_leakage": "not_run",
+        "generic_ai_signals": "not_run"
+      },
+      "caveat": "These deterministic checks identify literal overlap and missing protected literals only. No overlap flags is not a guarantee of originality, attribution, factual accuracy, semantic fidelity, or stylistic quality. Human review remains necessary."
+    }
+  },
+  "D": {
+    "command": [
+      "python3",
+      "packages/blog-voice-cloner/skills/blog-voice-cloner/scripts/validate_style.py",
+      ".blog-voice/synthetic-manual/runs/20260907T003401-CDE/D/final.md",
+      "--corpus",
+      ".blog-voice/synthetic-manual/runs/20260907T003401-CDE/D/style-reference",
+      "--ledger",
+      ".blog-voice/synthetic-manual/runs/20260907T003401-CDE/D/ledger.json",
+      "--output",
+      ".blog-voice/synthetic-manual/runs/20260907T003401-CDE/D/deterministic.json"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "report": {
+      "status": "no_overlap_flags",
+      "findings": [],
+      "reviews": {
+        "content_preservation": "not_run",
+        "style_match": "not_run",
+        "over_imitation": "not_run",
+        "source_leakage": "not_run",
+        "generic_ai_signals": "not_run"
+      },
+      "caveat": "These deterministic checks identify literal overlap and missing protected literals only. No overlap flags is not a guarantee of originality, attribution, factual accuracy, semantic fidelity, or stylistic quality. Human review remains necessary."
+    }
+  },
+  "E": {
+    "command": [
+      "python3",
+      "packages/blog-voice-cloner/skills/blog-voice-cloner/scripts/validate_style.py",
+      ".blog-voice/synthetic-manual/runs/20260907T003401-CDE/E/final.md",
+      "--corpus",
+      ".blog-voice/synthetic-manual/runs/20260907T003401-CDE/E/style-reference",
+      "--ledger",
+      ".blog-voice/synthetic-manual/runs/20260907T003401-CDE/E/ledger.json",
+      "--output",
+      ".blog-voice/synthetic-manual/runs/20260907T003401-CDE/E/deterministic.json"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "report": {
+      "status": "no_overlap_flags",
+      "findings": [],
+      "reviews": {
+        "content_preservation": "not_run",
+        "style_match": "not_run",
+        "over_imitation": "not_run",
+        "source_leakage": "not_run",
+        "generic_ai_signals": "not_run"
+      },
+      "caveat": "These deterministic checks identify literal overlap and missing protected literals only. No overlap flags is not a guarantee of originality, attribution, factual accuracy, semantic fidelity, or stylistic quality. Human review remains necessary."
+    }
+  }
+}
