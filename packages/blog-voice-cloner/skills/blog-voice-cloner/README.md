@@ -108,3 +108,29 @@ python3 scripts/manage_voice.py correction --root .blog-voice --author author-a 
 - 파일 분리는 모델의 강제 샌드박스가 아닙니다. 평가 자료를 이미 본 컨텍스트를 독립 추출자로 쓰지 마세요.
 - 실존 작성자의 사실·경험·의견을 가져오지 않습니다. 사칭·보증 표현 없이 독창적인 글을 작성하고, 공개 사용 시 권리와 플랫폼 조건을 확인하세요.
 - 자동 검사 통과는 사람의 문체 선호·수정 비용·법적 안전을 입증하지 않습니다. 실제 평가가 없으면 `not_run`입니다.
+
+## 배포 디렉터리 트리
+
+```text
+blog-voice-cloner/
+├── SKILL.md
+├── README.md
+├── scripts/
+│   ├── analyze_style.py
+│   ├── validate_style.py
+│   └── manage_voice.py
+├── references/
+│   ├── style-profile.md
+│   ├── style-profile.json
+│   ├── style-metrics.json
+│   ├── examples.md
+│   ├── negative-examples.md
+│   ├── evidence.md
+│   └── analysis-guide.md / writing-workflow.md / collection.md / evaluation.md / research.md
+├── tests/
+│   ├── test_analysis.py
+│   ├── test_validation.py
+│   ├── test_storage.py
+│   └── test_skill_contract.py
+└── evals/                    # 실행 가능한 데모, A–E 출력, 요구사항별 관찰
+```
