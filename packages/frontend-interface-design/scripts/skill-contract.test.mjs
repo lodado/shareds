@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFile, readdir } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
@@ -212,7 +212,7 @@ test('exemplars reference tokens only — no literal colors in component markup'
   for (const exemplar of EXEMPLARS.filter((file) => file.endsWith('.html'))) {
     const html = await read(`exemplars/${exemplar}`)
     assert.match(html, /tokens\.css/, `${exemplar}: must link tokens.css`)
-    assert.doesNotMatch(html, /#[0-9a-fA-F]{6}\b/, `${exemplar}: hex color literal`)
+    assert.doesNotMatch(html, /#[0-9a-f]{6}\b/i, `${exemplar}: hex color literal`)
     assert.doesNotMatch(html, /\b(rgb|hsl)a?\(/, `${exemplar}: rgb/hsl literal`)
     assert.match(html, /var\(--/, `${exemplar}: must use tokens`)
     assert.match(html, /lang="ko"/, `${exemplar}: Korean exemplar`)

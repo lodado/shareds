@@ -1,0 +1,223 @@
+{
+  "version": 1,
+  "name": "frontend-interface-design-briefs-v1",
+  "purpose": "Eight design briefs (four Korean, four English) that the Phase 0 harness runs through a real host with the skill installed. Each brief carries its own ten yes/no checklist questions for the pairwise judge and optional gate overrides.",
+  "briefs": [
+    {
+      "id": "b01-fintech-home-ko",
+      "lang": "ko",
+      "type": "fintech-mobile-home",
+      "title": "핀테크 앱 첫 화면",
+      "prompt": "핀테크 앱을 열면 가장 먼저 보이는 홈 화면을 정적 index.html 하나로 만든다. 사용자는 월급을 관리하는 사회초년생이며, 앱을 열자마자 총자산과 이번 달 지출을 확인하고 송금을 시작한다. 무드는 차분함·정확함·따뜻함이고, 기억할 요소는 화면 상단을 지배하는 잔액 카드 하나다. 참고는 숫자가 주인공인 잔액 화면, 은행 앱보다 덜 빽빽한 하단 탭, 영수증처럼 읽히는 거래 내역 목록이며, 금액과 이름은 그럴듯한 placeholder로 쓰고 실제 통계·로고·후기는 넣지 않는다.",
+      "audience": "월급을 관리하는 사회초년생, 모바일 세로 화면, 하루 여러 번 짧게 사용",
+      "mood": ["차분함", "정확함", "따뜻함"],
+      "memorable": "화면 상단을 지배하는 잔액 카드 하나",
+      "references": ["숫자가 주인공인 잔액 화면", "은행 앱보다 덜 빽빽한 하단 탭", "영수증처럼 읽히는 거래 내역 목록"],
+      "checklist": [
+        "첫 시선이 송금 버튼(primary action)에 가는가?",
+        "제목·금액·보조 설명의 위계가 세 단계 이상 눈에 구분되는가?",
+        "간격이 화면 전체에 균일하게 반복되지 않고 섹션 > 그룹 > 요소 순으로 달라지며, 요소가 한 그리드에 정렬되는가?",
+        "한글 줄바꿈이 어절 단위인가(단어 중간에서 끊기지 않는가)?",
+        "잔액 숫자(디스플레이)와 본문 타이포의 크기·굵기 대비가 분명한가?",
+        "accent 색이 화면의 5% 이하이고 송금 버튼과 현재 탭에만 쓰였는가?",
+        "중립색이 anchor hue 쪽으로 틴트되어 순수 회색 덩어리로 보이지 않는가?",
+        "카드의 테두리·그림자 처리가 화면 전체에서 한 가지 방식으로 일관적인가?",
+        "밀도가 하루 여러 번 짧게 보는 모바일 사용자에게 맞는가(빽빽하지도 비어 있지도 않은가)?",
+        "이 화면이 일반 대시보드 템플릿이 아니라 이 브리프(사회초년생 자산 홈)에 속해 보이는가?"
+      ],
+      "gates": { "hangulKeepAllCoverage": 0.95, "smallTapTargets": 0 }
+    },
+    {
+      "id": "b02-saas-dashboard-en",
+      "lang": "en",
+      "type": "saas-dashboard",
+      "title": "Team analytics dashboard",
+      "prompt": "Build the overview screen of a SaaS analytics dashboard as one static index.html. The audience is a product manager who opens it every morning to check whether last week's release moved the key metric and then drills into one chart. The mood is focused, quiet and precise, and the memorable element is a single hero metric that owns the top of the page while everything else stays secondary. References, in words: a monitoring tool whose charts are mostly whitespace, a spreadsheet-like table with tabular numerals, and a calm status bar instead of alert badges; use placeholder numbers and names and do not invent real statistics, customer logos or testimonials.",
+      "audience": "Product manager on a desktop, every morning, one question per visit",
+      "mood": ["focused", "quiet", "precise"],
+      "memorable": "One hero metric that owns the top of the page",
+      "references": [
+        "A monitoring tool whose charts are mostly whitespace",
+        "A spreadsheet-like table with tabular numerals",
+        "A calm status bar instead of alert badges"
+      ],
+      "checklist": [
+        "Does the first glance land on the primary action (drilling into the hero metric)?",
+        "Are at least three hierarchy levels (page title, hero metric, supporting labels) visibly distinct?",
+        "Does the spacing rhythm vary by level (section > group > element) instead of repeating one gap everywhere?",
+        "Do cards, table columns and labels sit on one shared grid or baseline?",
+        "Is the display type of the hero metric clearly different in size and weight from body text?",
+        "Is the accent color used on at most about five percent of the screen and only for actions or the current state?",
+        "Are the neutrals tinted toward one hue rather than a soup of pure greys?",
+        "Are surfaces treated consistently (one border or shadow language for every card)?",
+        "Does the density suit a daily desktop user (dense enough to scan, not a wall)?",
+        "Does the screen belong to this brief (a morning check-in dashboard) rather than a generic admin template?"
+      ],
+      "gates": { "fontFamilyCount": { "max": 3 } }
+    },
+    {
+      "id": "b03-marketing-landing-ko",
+      "lang": "ko",
+      "type": "marketing-landing",
+      "title": "독립 서점 구독 서비스 랜딩",
+      "prompt": "매달 책 한 권을 골라 보내 주는 독립 서점 구독 서비스의 랜딩 페이지를 index.html 하나로 만든다. 방문자는 선물을 찾는 삼십대이며, 첫 화면에서 서비스가 무엇인지 이해하고 구독 신청으로 넘어간다. 무드는 종이·느긋함·확신이고, 기억할 요소는 헤드라인 옆에 책등처럼 세로로 쌓인 타이포 한 덩어리다. 참고는 잡지 표지 같은 히어로, 카드 격자 대신 한 열로 흐르는 서사, 표가 아닌 문장으로 말하는 가격이며, 후기·수치·언론 로고는 넣지 말고 문구는 placeholder로 둔다.",
+      "audience": "선물을 찾는 삼십대 방문자, 모바일과 데스크톱 반반, 첫 방문",
+      "mood": ["종이", "느긋함", "확신"],
+      "memorable": "헤드라인 옆에 책등처럼 세로로 쌓인 타이포 한 덩어리",
+      "references": ["잡지 표지 같은 히어로", "카드 격자 대신 한 열로 흐르는 서사", "표가 아닌 문장으로 말하는 가격"],
+      "checklist": [
+        "첫 시선이 구독 신청 버튼(primary action)에 가는가?",
+        "헤드라인·본문·캡션의 위계가 세 단계 이상 구분되는가?",
+        "섹션 사이 여백이 요소 사이 여백보다 분명히 크고 같은 간격이 화면 전체에 반복되지 않으며, 요소가 한 그리드에 정렬되는가?",
+        "한글 헤드라인과 본문의 줄바꿈이 어절 단위인가?",
+        "디스플레이 타이포와 본문 타이포의 대비가 분명한가?",
+        "accent 색이 화면의 5% 이하이고 신청 버튼과 링크 같은 action에만 쓰였는가?",
+        "배경과 중립색이 종이처럼 틴트되어 있고 순수 회색이 아닌가?",
+        "구분선·테두리·그림자가 한 가지 방식으로 일관되게 쓰였는가?",
+        "밀도가 첫 방문자에게 맞게 느긋한가(카드 격자로 빽빽하지 않은가)?",
+        "이 페이지가 일반 SaaS 랜딩 템플릿이 아니라 독립 서점 구독 브리프에 속해 보이는가?"
+      ],
+      "gates": { "hangulKeepAllCoverage": 0.95 }
+    },
+    {
+      "id": "b04-commerce-pdp-en",
+      "lang": "en",
+      "type": "commerce-pdp",
+      "title": "Ceramic mug product page",
+      "prompt": "Create the product detail page for a hand-thrown ceramic mug sold by a small studio, as one static index.html. The shopper is a repeat customer on a phone who wants to pick a glaze and a size and add the mug to the cart without hunting. The mood is tactile, unhurried and honest, and the memorable element is the glaze picker rendered as real color swatches that sit right under the price. References, in words: a gallery-first layout where the image takes most of the first screen, an options block that reads like a short form, and shipping details folded into a plain accordion; use placeholder copy and prices, with no invented reviews, ratings or badges.",
+      "audience": "Repeat customer on a phone who wants to pick glaze and size and add to cart quickly",
+      "mood": ["tactile", "unhurried", "honest"],
+      "memorable": "The glaze picker as real color swatches directly under the price",
+      "references": [
+        "A gallery-first layout where the image takes most of the first screen",
+        "An options block that reads like a short form",
+        "Shipping details folded into a plain accordion"
+      ],
+      "checklist": [
+        "Does the first glance land on the add-to-cart action?",
+        "Are product name, price and supporting details visibly separated into at least three hierarchy levels?",
+        "Does spacing vary by level (gallery, options block, details) rather than one uniform gap?",
+        "Do image, price, swatches and button align to one shared edge or grid?",
+        "Is the product title set in display type that contrasts clearly with the body copy?",
+        "Is the accent color limited to roughly five percent of the screen and used only on the add-to-cart action and the selected option?",
+        "Are the neutrals tinted (warm or cool) instead of pure grey?",
+        "Is one surface language (border or shadow, not both at random) used throughout?",
+        "Is the density right for a phone shopper (one decision per block, no cramped option rows)?",
+        "Does the page feel like this studio's mug rather than a generic e-commerce template?"
+      ],
+      "gates": { "smallTapTargets": 0 }
+    },
+    {
+      "id": "b05-admin-form-ko",
+      "lang": "ko",
+      "type": "admin-form",
+      "title": "사내 비품 신청 관리 폼",
+      "prompt": "사내 총무팀이 비품 신청을 검토하고 승인 또는 반려하는 관리자 화면을 index.html 하나로 만든다. 사용자는 하루에 수십 건을 처리하는 숙련된 담당자이며, 신청 내용을 읽고 필드 몇 개를 수정한 뒤 승인 버튼을 누른다. 무드는 사무적·명료·신뢰이고, 기억할 요소는 폼 오른쪽에 고정되어 함께 스크롤되는 요약·결정 패널이다. 참고는 라벨이 필드 위에 놓인 두 열 폼, 필드 옆 inline 오류 문구, 표가 아닌 정의 목록으로 보여 주는 신청 요약이며, 이름·품목·금액은 placeholder로 쓰고 실제 데이터는 넣지 않는다.",
+      "audience": "하루 수십 건을 처리하는 숙련된 총무팀 담당자, 데스크톱, 키보드 위주",
+      "mood": ["사무적", "명료", "신뢰"],
+      "memorable": "폼 오른쪽에 고정되어 함께 스크롤되는 요약·결정 패널",
+      "references": [
+        "라벨이 필드 위에 놓인 두 열 폼",
+        "필드 옆 inline 오류 문구",
+        "표가 아닌 정의 목록으로 보여 주는 신청 요약"
+      ],
+      "checklist": [
+        "첫 시선이 승인 버튼(primary action)에 가는가?",
+        "화면 제목·섹션 제목·필드 라벨·도움말의 위계가 세 단계 이상 구분되는가?",
+        "필드 사이·그룹 사이·섹션 사이 간격이 서로 다르고 라벨·필드·버튼이 한 그리드에 정렬되는가?",
+        "한글 라벨과 도움말의 줄바꿈이 어절 단위인가?",
+        "제목 타이포와 폼 본문 타이포의 대비가 분명한가?",
+        "accent 색이 5% 이하이고 승인 버튼과 포커스 상태에만 쓰였으며 반려 버튼은 accent가 아닌가?",
+        "중립색이 틴트되어 있고 필드·패널이 순수 회색 덩어리가 아닌가?",
+        "입력 필드·패널의 테두리 처리가 화면 전체에서 일관적인가?",
+        "밀도가 숙련된 고빈도 사용자에게 맞게 충분히 높은가(빈 여백으로 스크롤을 늘리지 않는가)?",
+        "이 화면이 일반 관리자 템플릿이 아니라 비품 승인 브리프에 속해 보이는가?"
+      ],
+      "gates": { "hangulKeepAllCoverage": 0.95, "longLines": 0 }
+    },
+    {
+      "id": "b06-content-reading-en",
+      "lang": "en",
+      "type": "content-reading",
+      "title": "Long-form essay reader",
+      "prompt": "Design the reading page for a long-form essay on a small independent publication, as one static index.html. The reader arrives from a link on a phone or a laptop and wants to read for fifteen minutes without distraction. The mood is literary, warm and unhurried, and the memorable element is a generous drop cap paired with a measure that never exceeds a comfortable line length. References, in words: a magazine essay page with one column and wide margins, a quiet progress indicator instead of a sticky share bar, and pull quotes set in the display face; use placeholder essay text and a placeholder author, with no invented publication logos or reader counts.",
+      "audience": "Reader arriving from a link, phone or laptop, fifteen uninterrupted minutes",
+      "mood": ["literary", "warm", "unhurried"],
+      "memorable": "A generous drop cap paired with a measure that never exceeds a comfortable line length",
+      "references": [
+        "A magazine essay page with one column and wide margins",
+        "A quiet progress indicator instead of a sticky share bar",
+        "Pull quotes set in the display face"
+      ],
+      "checklist": [
+        "Does the first glance land on the start of the essay (the primary task is reading, not sharing)?",
+        "Are title, byline, body and pull quotes visibly separated into at least three hierarchy levels?",
+        "Does the vertical rhythm vary (paragraph, section, quote) instead of one uniform gap?",
+        "Do the text column, headings and pull quotes align to one measure?",
+        "Is the display face for the title and pull quotes clearly distinct from the body face?",
+        "Is the accent color limited to about five percent of the screen and used only for links and the progress indicator?",
+        "Are background and text neutrals tinted (paper-like) rather than pure grey on pure white?",
+        "Are rules, borders and any shadows used in one consistent way?",
+        "Is the density right for uninterrupted reading (no sidebar clutter, a comfortable line length)?",
+        "Does the page belong to this small literary publication rather than a generic blog template?"
+      ],
+      "gates": { "longLines": 0, "fontFamilyCount": { "max": 2 } }
+    },
+    {
+      "id": "b07-data-table-ko",
+      "lang": "ko",
+      "type": "data-table-tool",
+      "title": "물류 재고 관리 테이블",
+      "prompt": "물류 창고의 재고를 관리하는 내부 도구의 재고 목록 화면을 index.html 하나로 만든다. 사용자는 하루 종일 이 화면을 켜 두고 검색·필터·정렬로 품목을 찾아 수량을 고치는 운영 담당자다. 무드는 고밀도·정돈·무표정이고, 기억할 요소는 표 위에 얇게 떠 있는 필터 바와 선택한 행에 나타나는 일괄 작업 툴바다. 참고는 스프레드시트처럼 촘촘하지만 행 구분이 분명한 표, 오른쪽 정렬과 tabular 숫자를 쓰는 숫자 열, 색 점 하나와 텍스트로만 표시하는 상태이며, 품목명·수량은 placeholder로 쓰고 실제 통계는 넣지 않는다.",
+      "audience": "하루 종일 화면을 켜 두는 창고 운영 담당자, 데스크톱, 고빈도",
+      "mood": ["고밀도", "정돈", "무표정"],
+      "memorable": "표 위에 얇게 떠 있는 필터 바와 선택한 행에 나타나는 일괄 작업 툴바",
+      "references": [
+        "스프레드시트처럼 촘촘하지만 행 구분이 분명한 표",
+        "오른쪽 정렬과 tabular 숫자를 쓰는 숫자 열",
+        "색 점 하나와 텍스트로만 표시하는 상태"
+      ],
+      "checklist": [
+        "첫 시선이 검색·필터(primary action)에 가는가?",
+        "화면 제목·표 헤더·셀 본문·보조 텍스트의 위계가 세 단계 이상 구분되는가?",
+        "행 안 간격과 툴바·표 사이 간격이 서로 다르며 헤더·셀·툴바가 한 그리드에 정렬되는가?",
+        "한글 셀 텍스트와 필터 라벨의 줄바꿈이 어절 단위인가?",
+        "제목 타이포와 표 본문 타이포의 대비가 분명하고 숫자 열이 tabular 숫자로 정렬되는가?",
+        "accent 색이 5% 이하이고 선택한 행과 기본 동작에만 쓰였는가?",
+        "행 배경과 구분선의 중립색이 틴트되어 있고 순수 회색 덩어리가 아닌가?",
+        "표·툴바·필터 바의 테두리·그림자 처리가 한 방식으로 일관적인가?",
+        "밀도가 고빈도 운영 담당자에게 맞게 높으면서도 행 구분이 분명한가?",
+        "이 화면이 일반 관리자 표 템플릿이 아니라 창고 재고 브리프에 속해 보이는가?"
+      ],
+      "gates": { "hangulKeepAllCoverage": 0.95, "fontFamilyCount": { "max": 3 }, "tinyText": 0 }
+    },
+    {
+      "id": "b08-onboarding-en",
+      "lang": "en",
+      "type": "onboarding",
+      "title": "Habit tracker first-run onboarding",
+      "prompt": "Build the first-run onboarding screen of a habit-tracking app as one static index.html. The user has just installed the app on a phone and needs to pick the one habit to start with and choose a reminder time, then land on an empty but inviting home. The mood is encouraging, light and clear, and the memorable element is a single oversized habit card that the user builds step by step on the same screen. References, in words: a one-question-per-step flow with a slim progress rail, a picker that feels like tapping chips rather than filling a form, and an empty state that shows the first day rather than a mascot; use placeholder habit names, with no invented user counts, ratings or store badges.",
+      "audience": "New user on a phone right after install, one decision at a time",
+      "mood": ["encouraging", "light", "clear"],
+      "memorable": "A single oversized habit card that the user builds step by step on the same screen",
+      "references": [
+        "A one-question-per-step flow with a slim progress rail",
+        "A picker that feels like tapping chips rather than filling a form",
+        "An empty state that shows the first day rather than a mascot"
+      ],
+      "checklist": [
+        "Does the first glance land on the continue action or on the first choice the user must make?",
+        "Are step title, choice labels and helper text visibly separated into at least three hierarchy levels?",
+        "Does spacing vary between the card, the choices and the footer instead of one uniform gap?",
+        "Do the progress rail, the card and the button align to one shared grid?",
+        "Is the step title set in display type that contrasts clearly with choice and helper text?",
+        "Is the accent color limited to about five percent of the screen and used only on the primary action and the selected chip?",
+        "Are the neutrals tinted rather than pure grey, so the light mood reads as warm or cool instead of flat?",
+        "Are chips, card and button surfaces treated in one consistent way (the same border or shadow language)?",
+        "Is the density sparse enough for a first-time user (one decision per screen, generous targets)?",
+        "Does the screen feel like this habit tracker rather than a generic onboarding template?"
+      ],
+      "gates": { "smallTapTargets": 0 }
+    }
+  ]
+}
