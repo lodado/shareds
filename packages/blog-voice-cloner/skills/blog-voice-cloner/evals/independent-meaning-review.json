@@ -1,0 +1,303 @@
+{
+  "schema_version": 1,
+  "review_type": "independent_meaning_review",
+  "reviewer": {
+    "identity": "Jcode independent AI agent",
+    "independent_agent": true,
+    "human": false,
+    "draft_author": false,
+    "independence_basis": "This reviewer independently compared only the authorized brief and draft. The reviewer did not generate or modify the draft and did not consult the style corpus, profile, demo-review, or other agents. This is not human review."
+  },
+  "inputs": {
+    "brief": "packages/blog-voice-cloner/skills/blog-voice-cloner/evals/demo-brief.md",
+    "draft": "packages/blog-voice-cloner/skills/blog-voice-cloner/evals/demo-draft.md"
+  },
+  "scope": {
+    "claim_authority": "The supplied brief only, not stylistic evidence or external caching knowledge.",
+    "excluded_material_consulted": false,
+    "not_assessed": ["stylistic preference", "real-author fidelity", "human editing effort"],
+    "prose_modified": false,
+    "commit_created": false,
+    "limitation": "This review checks semantic support against the synthetic brief. It does not verify an implementation or measure real-world performance."
+  },
+  "source_brief_clauses": [
+    {
+      "id": "B1",
+      "line": 3,
+      "quote": "A local cache may reduce repeated reads when the same key is requested again before TTL expires."
+    },
+    {
+      "id": "B2",
+      "line": 3,
+      "quote": "TTL is 60 seconds in this example."
+    },
+    {
+      "id": "B3",
+      "line": 3,
+      "quote": "There is no latency benchmark."
+    },
+    {
+      "id": "B4",
+      "line": 3,
+      "quote": "After TTL expires data must be fetched again."
+    },
+    {
+      "id": "B5",
+      "line": 3,
+      "quote": "No personal experience supplied."
+    },
+    {
+      "id": "B6",
+      "line": 5,
+      "quote": "This brief, not the style corpus, authorizes the demo claims."
+    }
+  ],
+  "output_unit_coverage": [
+    {
+      "line": 1,
+      "quote": "캐시를 다시 읽을 수 있는 시간",
+      "claim_ids": ["C01"]
+    },
+    {
+      "line": 3,
+      "quote": "같은 키가 다시 요청되면 로컬 캐시가 반복 읽기를 줄일 수 있다.",
+      "claim_ids": ["C02"]
+    },
+    {
+      "line": 3,
+      "quote": "이 예제의 TTL은 60초다.",
+      "claim_ids": ["C03"]
+    },
+    {
+      "line": 3,
+      "quote": "같은 키를 요청했고 아직 TTL이 만료되지 않았다는 조건에서 이야기하는 효과다.",
+      "claim_ids": ["C04", "C05"]
+    },
+    {
+      "line": 5,
+      "quote": "TTL이 만료됐다면 데이터를 다시 가져와야 한다.",
+      "claim_ids": ["C06"]
+    },
+    {
+      "line": 5,
+      "quote": "지연 시간 벤치마크는 제공되지 않았으므로, 이 설명만으로 얼마나 빨라지는지는 말할 수 없다.",
+      "claim_ids": ["C07", "C08"]
+    },
+    {
+      "line": 7,
+      "quote": "재사용의 조건은 같은 키와 만료 전 요청이다.",
+      "claim_ids": ["C09", "C10"]
+    }
+  ],
+  "claims": [
+    {
+      "id": "C01",
+      "draft_line": 1,
+      "draft_quote": "캐시를 다시 읽을 수 있는 시간",
+      "claim": "Cached-data reuse has a relevant time window.",
+      "source_brief_clause_ids": ["B1", "B2", "B4"],
+      "outcome": "supported_framing",
+      "observed_outcome": "The heading frames the before-expiry window discussed in the brief. It supplies no new duration, benchmark, or promise that cache reuse always succeeds.",
+      "actionable_findings": []
+    },
+    {
+      "id": "C02",
+      "draft_line": 3,
+      "draft_quote": "같은 키가 다시 요청되면 로컬 캐시가 반복 읽기를 줄일 수 있다.",
+      "claim": "A local cache may reduce repeated reads when the same key is requested again.",
+      "source_brief_clause_ids": ["B1"],
+      "outcome": "supported_with_explicit_context",
+      "observed_outcome": "The local cache, repeated request, same key, repeated-read effect, and possibility rather than certainty are preserved. This sentence does not itself mention expiry, but the third sentence in the same paragraph explicitly limits this effect to an unexpired TTL. The final sentence repeats that limitation. Read in its supplied context, the claim is not unconditional.",
+      "actionable_findings": []
+    },
+    {
+      "id": "C03",
+      "draft_line": 3,
+      "draft_quote": "이 예제의 TTL은 60초다.",
+      "claim": "The TTL in this example is exactly 60 seconds.",
+      "source_brief_clause_ids": ["B2"],
+      "outcome": "supported",
+      "observed_outcome": "60초 preserves both the numeric value 60 and the unit seconds. 이 예제의 retains the example-specific scope rather than asserting a universal or default TTL.",
+      "actionable_findings": []
+    },
+    {
+      "id": "C04",
+      "draft_line": 3,
+      "draft_quote": "같은 키를 요청했고",
+      "claim": "The possible repeated-read reduction is conditional on requesting the same key.",
+      "source_brief_clause_ids": ["B1"],
+      "outcome": "supported",
+      "observed_outcome": "The third sentence explicitly attaches the same-key condition to the previously described effect. The repeated-request meaning is established by 다시 요청되면 in the first sentence. No different-key benefit is asserted.",
+      "actionable_findings": []
+    },
+    {
+      "id": "C05",
+      "draft_line": 3,
+      "draft_quote": "아직 TTL이 만료되지 않았다는 조건에서 이야기하는 효과다.",
+      "claim": "The possible effect applies while the TTL has not yet expired.",
+      "source_brief_clause_ids": ["B1", "B4"],
+      "outcome": "supported",
+      "observed_outcome": "아직 TTL이 만료되지 않았다는 preserves the before-expiry boundary, including its negation of already-expired status. 조건에서 이야기하는 효과다 makes this a restriction on the effect, not an optional aside or a post-expiry allowance.",
+      "actionable_findings": []
+    },
+    {
+      "id": "C06",
+      "draft_line": 5,
+      "draft_quote": "TTL이 만료됐다면 데이터를 다시 가져와야 한다.",
+      "claim": "After TTL expiry, the data must be fetched again.",
+      "source_brief_clause_ids": ["B4"],
+      "outcome": "supported",
+      "observed_outcome": "만료됐다면 preserves the expiry trigger. 다시 가져와야 한다 preserves mandatory refetching rather than changing must to may, allowing stale reuse, or adding a particular refresh mechanism.",
+      "actionable_findings": []
+    },
+    {
+      "id": "C07",
+      "draft_line": 5,
+      "draft_quote": "지연 시간 벤치마크는 제공되지 않았으므로",
+      "claim": "No latency benchmark has been provided.",
+      "source_brief_clause_ids": ["B3"],
+      "outcome": "supported",
+      "observed_outcome": "The absence of a benchmark is retained. The draft does not invent measured latency, a percentage, a comparison result, or a benchmark methodology.",
+      "actionable_findings": []
+    },
+    {
+      "id": "C08",
+      "draft_line": 5,
+      "draft_quote": "이 설명만으로 얼마나 빨라지는지는 말할 수 없다.",
+      "claim": "This explanation alone does not establish a quantified speed improvement.",
+      "source_brief_clause_ids": ["B1", "B3"],
+      "outcome": "supported_inference",
+      "observed_outcome": "This is an evidence-limit inference, not a verbatim brief claim. B1 supplies only a possible reduction in repeated reads and B3 supplies no latency benchmark, so neither quantifies speed. 이 설명만으로 limits the inability to quantify to the supplied explanation. In context, the sentence neither guarantees any speed improvement nor says improvement is impossible.",
+      "actionable_findings": []
+    },
+    {
+      "id": "C09",
+      "draft_line": 7,
+      "draft_quote": "재사용의 조건은 같은 키와",
+      "claim": "The recap retains same-key requesting as a reuse condition.",
+      "source_brief_clause_ids": ["B1"],
+      "outcome": "supported",
+      "observed_outcome": "The closing recap repeats the same-key restriction from the earlier conditional explanation. It does not replace same key with any key or explicitly claim these conditions guarantee a cache hit or improvement.",
+      "actionable_findings": []
+    },
+    {
+      "id": "C10",
+      "draft_line": 7,
+      "draft_quote": "만료 전 요청이다.",
+      "claim": "The recap retains requesting before expiry as a reuse condition.",
+      "source_brief_clause_ids": ["B1", "B4"],
+      "outcome": "supported",
+      "observed_outcome": "만료 전 요청 explicitly retains the before-expiry request boundary. This agrees with mandatory refetching after expiry and does not extend the reuse window.",
+      "actionable_findings": []
+    }
+  ],
+  "semantic_checks": [
+    {
+      "id": "exact_duration_and_scope",
+      "source_brief_clause_ids": ["B2"],
+      "claim_ids": ["C03"],
+      "outcome": "pass",
+      "observed_outcome": "Exactly 60 seconds is preserved, with the duration scoped to this example.",
+      "actionable_findings": []
+    },
+    {
+      "id": "same_key_and_repeat_request",
+      "source_brief_clause_ids": ["B1"],
+      "claim_ids": ["C02", "C04", "C09"],
+      "outcome": "pass",
+      "observed_outcome": "Both same key and requested again are explicit. The recap does not broaden the key condition.",
+      "actionable_findings": []
+    },
+    {
+      "id": "conditions_and_temporal_boundary",
+      "source_brief_clause_ids": ["B1", "B4"],
+      "claim_ids": ["C02", "C04", "C05", "C06", "C09", "C10"],
+      "outcome": "pass",
+      "observed_outcome": "Same key and an unexpired TTL are conjunctive conditions. The expiry condition appears in the same paragraph and explicitly qualifies the initial effect. Expired reuse is not authorized. No additional sufficient-condition guarantee is stated.",
+      "actionable_findings": []
+    },
+    {
+      "id": "uncertainty_and_modal_strength",
+      "source_brief_clause_ids": ["B1", "B4"],
+      "claim_ids": ["C02", "C06", "C08"],
+      "outcome": "pass",
+      "observed_outcome": "줄일 수 있다 preserves may for the benefit. 다시 가져와야 한다 preserves must for refetching. A possible reduction in repeated reads is not promoted to a certain latency improvement.",
+      "actionable_findings": []
+    },
+    {
+      "id": "mandatory_refetch_after_expiry",
+      "source_brief_clause_ids": ["B4"],
+      "claim_ids": ["C06"],
+      "outcome": "pass",
+      "observed_outcome": "After expiry, refetching is explicitly required. It is neither omitted nor weakened to a recommendation or possibility.",
+      "actionable_findings": []
+    },
+    {
+      "id": "negation_and_its_scope",
+      "source_brief_clause_ids": ["B1", "B3", "B4"],
+      "claim_ids": ["C05", "C06", "C07", "C08"],
+      "outcome": "pass",
+      "observed_outcome": "Not yet expired remains the pre-expiry condition. No benchmark remains an absence of evidence, not evidence of no benefit. Cannot quantify from this explanation remains a limited knowledge claim, not a claim that caching never improves speed. The refetch obligation is not negated.",
+      "actionable_findings": []
+    },
+    {
+      "id": "causality_and_inference",
+      "source_brief_clause_ids": ["B1", "B3"],
+      "claim_ids": ["C02", "C04", "C05", "C07", "C08"],
+      "outcome": "pass",
+      "observed_outcome": "The potential effect is still local cache reducing repeated reads under the stated conditions. The no-benchmark-to-no-quantification inference is warranted within this explanation. The draft does not infer measured speed, certainty, or a numerical effect from the 60-second TTL.",
+      "actionable_findings": []
+    },
+    {
+      "id": "no_benchmark_or_quantified_performance_invention",
+      "source_brief_clause_ids": ["B1", "B2", "B3"],
+      "claim_ids": ["C02", "C03", "C07", "C08"],
+      "outcome": "pass",
+      "observed_outcome": "No latency benchmark, measured comparison, percentage improvement, or latency figure is asserted. The only numeric claim is the authorized example TTL of 60 seconds, which is not presented as a performance measurement.",
+      "actionable_findings": []
+    },
+    {
+      "id": "no_invented_personal_experience",
+      "source_brief_clause_ids": ["B5"],
+      "claim_ids": ["C01", "C02", "C03", "C04", "C05", "C06", "C07", "C08", "C09", "C10"],
+      "outcome": "pass",
+      "observed_outcome": "Across the entire heading and body, no personal anecdote, first-person test, observation attributed to the author, or invented use experience appears. The draft need not repeat the brief's absence-of-experience notice to satisfy this boundary.",
+      "actionable_findings": []
+    }
+  ],
+  "unsupported_claims": {
+    "outcome": "none_found",
+    "items": [],
+    "observed_outcome": "All seven output units, including the heading and repeated closing conditions, were checked. Each claim is supported by a brief clause, its explicit draft context, or the limited inference that no speed magnitude is established. No new benchmark, personal experience, cache implementation detail, guaranteed benefit, or post-expiry reuse claim was found.",
+    "actionable_findings": []
+  },
+  "summary": {
+    "verdict": "pass",
+    "output_units_reviewed": 7,
+    "atomic_claims_reviewed": 10,
+    "unsupported_claim_count": 0,
+    "actionable_finding_count": 0,
+    "conclusion": "No actionable meaning-preservation finding identified. This conclusion is an independent AI-agent review, not a human assessment."
+  },
+  "validation": {
+    "semantic_method": "Independent manual comparison of every draft output unit to the authorized brief, including contextual conditions, negation, modal strength, and inference.",
+    "structural_method": "Python standard-library assertions on the in-memory review before writing the output.",
+    "checks_passed": [
+      "Unique source and claim identifiers",
+      "All six source quotations match their cited brief lines",
+      "All ten claim quotations match their cited draft lines",
+      "All source and claim references resolve",
+      "Every heading and sentence is covered in order: seven output units",
+      "Every atomic claim is mapped exactly once to an output unit",
+      "All nine required semantic and unsupported-content checks have observed outcomes",
+      "Every claim and semantic check includes actionable findings, empty when none were identified",
+      "Summary counts agree with review records",
+      "Reviewer explicitly identified as an independent AI agent and not human",
+      "JSON serialization and parse round trip"
+    ],
+    "file_read_boundary": "Only demo-brief.md and demo-draft.md were read. The output was validated in memory and was not read back.",
+    "other_files_read": false,
+    "prose_modified": false,
+    "commit_created": false
+  }
+}

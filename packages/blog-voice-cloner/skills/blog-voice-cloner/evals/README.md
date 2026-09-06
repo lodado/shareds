@@ -16,3 +16,7 @@ All C/D/E examples omit questions and analogies, so E demonstrates no additional
 Human style preference: **not_run**. Actual human editing effort: **not_run**. Independent fresh-context A–E benchmark: **not_run**. Live website coverage: **not_run**. Real-author held-out generalization: **not_run**.
 
 For an actual blinded study, follow `references/evaluation.md`, use independent generation contexts and a separate identity key, counterbalance pair order, collect human decisions and edits, and retain disagreements. Do not turn these smoke artifacts into a percentage style-similarity claim.
+
+## Follow-up traceability and outcome check
+
+`requirement-map.md` enumerates all 20 requirements plus approved storage behavior, with specific tests, observed results and unverified parts. `verify_requirements.py` executes each referenced test and records `requirement-observations.json`, including bounded saved-variant measurements. A separate brief-only AI reviewer checked the actual demo: 7 output units, 10 atomic claims, no unsupported claims or actionable semantic findings. See `independent-meaning-review.json`. This is not a human preference result.

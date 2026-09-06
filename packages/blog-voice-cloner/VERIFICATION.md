@@ -2,6 +2,8 @@
 
 Date: 2026-09-07, Asia/Seoul. Implementation includes host instructions plus deterministic Python tools. It is not model fine-tuning.
 
+See [REQUIREMENTS.md](REQUIREMENTS.md) for all 20 numbered requirements, specific test names, public artifact checks, observed outcomes and explicit evidence gaps. Reproduce the per-test and bounded A–E observations with `python3 evals/verify_requirements.py` from the skill directory.
+
 ## Observed acceptance checks
 
 | Requirement                                    | Check and actual result                                                                                                                                                                                                              |
@@ -44,6 +46,12 @@ An early full-repository run overlapped the newly added failing regression tests
 
 ## What is not established
 
-No live influencer URL/corpus was supplied. Actual web collection completeness, real-author generalization, independent semantic review, human style preference and measured human editing effort remain untested. The three-document sample is explicitly insufficient for independent validation/held-out evaluation. The A–E smoke uses two agent contexts, not one isolated context per variant. No copyright/plagiarism safety or numerical style-similarity claim is made.
+No live influencer URL/corpus was supplied. Actual web collection completeness, real-author generalization, semantic accuracy beyond the synthetic demo, human style preference and measured human editing effort remain untested. The three-document sample is explicitly insufficient for independent validation/held-out evaluation. The A–E smoke uses two agent contexts, not one isolated context per variant. No copyright/plagiarism safety or numerical style-similarity claim is made.
 
 Host instructions, not a Python sandbox, enforce content/style context isolation and qualitative writing decisions. A future host must obey the skill and load references progressively. Source corpora stay local by default, but host-model processing is not inherently offline. Large historical duplicate clustering has quadratic cost. Trust the local data root and use explicit retention/security policies.
+
+## Outcome follow-up
+
+`evals/verify_requirements.py` reran all 63 tests, resolved every referenced test name in the 20-section requirement map, and recorded each observed result. The same runner passed from an isolated copied skill directory. Saved B copied the distinctive transition once and the source question once; D copied neither. Question counts were 3 versus 0, which is descriptive and not itself proof of improved voice fidelity.
+
+A separate AI reviewer, given only demo-brief.md and demo-draft.md, checked all 7 output units and 10 atomic claims. It found 0 unsupported claims and 0 actionable semantic findings, including explicit checks of 60 seconds, same key, before expiry, may, refetch obligation and absent benchmark. This is independent agent evidence for the synthetic example only, not human judgment. Full evidence: [independent meaning review](skills/blog-voice-cloner/evals/independent-meaning-review.json).

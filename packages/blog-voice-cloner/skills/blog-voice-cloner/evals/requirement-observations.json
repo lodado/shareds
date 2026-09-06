@@ -1,0 +1,356 @@
+{
+  "mapped_requirement_ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+  "mapped_tests_executed": [
+    "test_aggregate_comparison_budget_is_reported",
+    "test_analysis_failure_leaves_no_snapshot_or_lock",
+    "test_cli_help_outside_repository",
+    "test_cli_local_import_snapshot_correction_and_default_root",
+    "test_cli_profile_only_and_refusal",
+    "test_collection_at_cutoff_is_included",
+    "test_copied_english_and_korean",
+    "test_correction_versions_and_separate_reason_do_not_change_reference",
+    "test_draft_file_corpus_output_and_options",
+    "test_duplicate_evidence_is_one_independent_source",
+    "test_duplicate_groups_determinism",
+    "test_empty_and_small",
+    "test_empty_reviewed_profile_and_symlink_active_pointer_rejected",
+    "test_entry_and_progressive_references",
+    "test_expired_article_near_duplicate_new_url_keeps_heldout_role",
+    "test_frequency_and_formatting_signals",
+    "test_heldout_and_missing_evidence_rejected",
+    "test_html_injection_and_structures",
+    "test_html_inline_code_preserves_sentence",
+    "test_ids_versions_and_recursive_order",
+    "test_import_idempotence_and_collection_history",
+    "test_init_creates_persistent_slots_without_overwriting_user_overrides",
+    "test_korean_quantiles_and_zero_denominators",
+    "test_ledger_missing_literal_is_warning_and_reviews_not_run",
+    "test_markdown_fences_quotes_and_denominators",
+    "test_metadata_only_republication_and_unknown_publication",
+    "test_ngram_overlap_without_long_contiguous_match",
+    "test_novel_and_short_common_text_do_not_flag",
+    "test_present_literal_does_not_claim_semantic_success",
+    "test_quarantine_excluded_from_references",
+    "test_quote_and_code_are_informational",
+    "test_real_snapshot_engine_outputs_and_stable_ids_across_formats",
+    "test_reconcile_preserves_history_and_quarantines_joined_groups",
+    "test_reconcile_uses_duplicates_from_nonoverlapping_history",
+    "test_republished_version_uses_latest_eligible_collection",
+    "test_required_fields_whitelists_and_collections",
+    "test_reviewed_exploratory_activation_checks_real_evidence",
+    "test_selection_hides_future_history_and_unknown_publication",
+    "test_singleton_medium_only_in_scoped_genre",
+    "test_snapshot_preserves_native_text_and_html_block_parsing",
+    "test_snapshot_unique_immutable_stable_names_and_no_activation",
+    "test_templates_do_not_invent_profiles",
+    "test_temporal_window_timezone_and_future_collection",
+    "test_transitive_duplicates"
+  ],
+  "mapping_limit": "All sections enumerated, but behavioral evidence remains partial where human or real-author evaluation is absent.",
+  "tests_run": 63,
+  "successful": true,
+  "tests": [
+    {
+      "test": "test_analysis.AnalysisTests.test_cli_profile_only_and_refusal",
+      "observed": "passed"
+    },
+    {
+      "test": "test_analysis.AnalysisTests.test_duplicate_groups_determinism",
+      "observed": "passed"
+    },
+    {
+      "test": "test_analysis.AnalysisTests.test_empty_and_small",
+      "observed": "passed"
+    },
+    {
+      "test": "test_analysis.AnalysisTests.test_fence_length_and_unclosed_fence",
+      "observed": "passed"
+    },
+    {
+      "test": "test_analysis.AnalysisTests.test_frequency_and_formatting_signals",
+      "observed": "passed"
+    },
+    {
+      "test": "test_analysis.AnalysisTests.test_html_injection_and_structures",
+      "observed": "passed"
+    },
+    {
+      "test": "test_analysis.AnalysisTests.test_html_inline_code_preserves_sentence",
+      "observed": "passed"
+    },
+    {
+      "test": "test_analysis.AnalysisTests.test_html_nested_list_prose_is_excluded",
+      "observed": "passed"
+    },
+    {
+      "test": "test_analysis.AnalysisTests.test_ids_versions_and_recursive_order",
+      "observed": "passed"
+    },
+    {
+      "test": "test_analysis.AnalysisTests.test_invalid_assignment_rejected_before_writes",
+      "observed": "passed"
+    },
+    {
+      "test": "test_analysis.AnalysisTests.test_korean_quantiles_and_zero_denominators",
+      "observed": "passed"
+    },
+    {
+      "test": "test_analysis.AnalysisTests.test_markdown_fences_quotes_and_denominators",
+      "observed": "passed"
+    },
+    {
+      "test": "test_analysis.AnalysisTests.test_quarantine_excluded_from_references",
+      "observed": "passed"
+    },
+    {
+      "test": "test_analysis.AnalysisTests.test_transitive_duplicates",
+      "observed": "passed"
+    },
+    {
+      "test": "test_skill_contract.SkillContractTests.test_cli_help_outside_repository",
+      "observed": "passed"
+    },
+    {
+      "test": "test_skill_contract.SkillContractTests.test_entry_and_progressive_references",
+      "observed": "passed"
+    },
+    {
+      "test": "test_skill_contract.SkillContractTests.test_semantic_and_correction_boundaries_present",
+      "observed": "passed"
+    },
+    {
+      "test": "test_skill_contract.SkillContractTests.test_templates_do_not_invent_profiles",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_analysis_failure_leaves_no_snapshot_or_lock",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_bad_slug_naive_dates_and_symlinks_rejected",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_cli_init_and_validation",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_cli_local_import_snapshot_correction_and_default_root",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_collection_at_cutoff_is_included",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_correction_versions_and_separate_reason_do_not_change_reference",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_empty_reviewed_profile_and_symlink_active_pointer_rejected",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_expired_article_near_duplicate_new_url_keeps_heldout_role",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_import_idempotence_and_collection_history",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_init_creates_persistent_slots_without_overwriting_user_overrides",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_metadata_only_republication_and_unknown_publication",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_raw_symlink_and_correction_symlink_rejected",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_real_snapshot_engine_outputs_and_stable_ids_across_formats",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_reconcile_preserves_history_and_quarantines_joined_groups",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_reconcile_uses_duplicates_from_nonoverlapping_history",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_republished_version_uses_latest_eligible_collection",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_reviewed_exploratory_activation_checks_real_evidence",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_selection_hides_future_history_and_unknown_publication",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_snapshot_preserves_native_text_and_html_block_parsing",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_snapshot_rejects_tampered_absolute_staging_id",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_snapshot_unique_immutable_stable_names_and_no_activation",
+      "observed": "passed"
+    },
+    {
+      "test": "test_storage.StorageTests.test_temporal_window_timezone_and_future_collection",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.CLITests.test_draft_file_corpus_output_and_options",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.CLITests.test_profile_api_imported_by_path_resolves_sibling",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.CLITests.test_profile_cli_embedded_and_file_splits",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.CLITests.test_snapshot_documents_preserve_evidence_ids",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.OverlapTests.test_aggregate_comparison_budget_is_reported",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.OverlapTests.test_copied_english_and_korean",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.OverlapTests.test_invalid_thresholds_rejected",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.OverlapTests.test_ledger_missing_literal_is_warning_and_reviews_not_run",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.OverlapTests.test_nfc_whitespace_normalization",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.OverlapTests.test_ngram_overlap_without_long_contiguous_match",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.OverlapTests.test_novel_and_short_common_text_do_not_flag",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.OverlapTests.test_present_literal_does_not_claim_semantic_success",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.OverlapTests.test_quote_and_code_are_informational",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.OverlapTests.test_size_limits_are_explicit_review_warnings",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.ProfileTests.test_duplicate_evidence_is_one_independent_source",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.ProfileTests.test_duplicate_of_held_out_evidence_is_contamination",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.ProfileTests.test_heldout_and_missing_evidence_rejected",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.ProfileTests.test_malformed_shapes_fail_closed",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.ProfileTests.test_multi_document_high_confidence_and_split_overlap",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.ProfileTests.test_one_document_high_confidence_and_universal_scope_rejected",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.ProfileTests.test_required_fields_whitelists_and_collections",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.ProfileTests.test_singleton_medium_only_in_scoped_genre",
+      "observed": "passed"
+    },
+    {
+      "test": "test_validation.ProfileTests.test_valid_weak_rule",
+      "observed": "passed"
+    }
+  ],
+  "saved_variant_observations": {
+    "A": {
+      "copied_distinctive_transition": 0,
+      "copied_rhetorical_question": 0,
+      "question_marks": 0,
+      "ttl_60_literal_present": true,
+      "fictional_biography_marker": false
+    },
+    "B": {
+      "copied_distinctive_transition": 1,
+      "copied_rhetorical_question": 1,
+      "question_marks": 3,
+      "ttl_60_literal_present": true,
+      "fictional_biography_marker": false
+    },
+    "C": {
+      "copied_distinctive_transition": 0,
+      "copied_rhetorical_question": 0,
+      "question_marks": 0,
+      "ttl_60_literal_present": true,
+      "fictional_biography_marker": false
+    },
+    "D": {
+      "copied_distinctive_transition": 0,
+      "copied_rhetorical_question": 0,
+      "question_marks": 0,
+      "ttl_60_literal_present": true,
+      "fictional_biography_marker": false
+    },
+    "E": {
+      "copied_distinctive_transition": 0,
+      "copied_rhetorical_question": 0,
+      "question_marks": 0,
+      "ttl_60_literal_present": true,
+      "fictional_biography_marker": false
+    }
+  },
+  "bounded_improvement": {
+    "comparison": "B raw few-shot versus D structured profile plus role example",
+    "observed": "Source catchphrase copying decreased in this saved sample. Question frequency also decreased, which is not itself evidence of a better style match. Facts require separate semantic review.",
+    "catchphrase_reduction": 1,
+    "questions_reduction": 3,
+    "style_preference": "not_run",
+    "human_editing_effort": "not_run",
+    "limitations": "Non-randomized saved smoke samples, two generation contexts, no causal or real-author efficacy conclusion."
+  },
+  "required_followups": [
+    "Real author corpus and independent held-out evaluation",
+    "Human blinded pairwise preference and actual edit effort"
+  ]
+}
