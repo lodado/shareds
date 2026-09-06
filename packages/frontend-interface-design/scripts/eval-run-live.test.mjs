@@ -13,6 +13,7 @@ import {
   buildPrompt,
   buildRunRecord,
   HOSTS,
+  INTERNAL_ARTIFACTS,
   nextCommands,
   parseTranscript,
   REPORT_FOOTER_MARKER,
@@ -115,7 +116,13 @@ test('the prompt names the installed skill, the brief, the single-file contract 
   )
   assert.ok(prompt.includes(brief.prompt))
   assert.match(prompt, /## Brief — 사내 비품 신청 관리 폼 \(lang: ko, type: admin-form\)/)
-  assert.match(prompt, /Write exactly one file, `index\.html`/)
+  // One *deliverable*, not one file: the skill's own workflow must write screenshots, metrics and
+  // a DESIGN.md, so an "exactly one file" contract would forbid the artifacts it mandates.
+  assert.match(prompt, /The deliverable is exactly one page: `index\.html`/)
+  assert.match(prompt, /Do not write a second HTML page, a variant or an alternative version/)
+  for (const artifact of INTERNAL_ARTIFACTS) assert.ok(prompt.includes(artifact), `prompt must permit ${artifact}`)
+  assert.match(prompt, /are not counted against the deliverable/)
+  assert.doesNotMatch(prompt, /no other files/)
   assert.match(prompt, /no invented statistics, logos, testimonials or press mentions/)
   assert.ok(prompt.includes(REPORT_FOOTER_MARKER))
   assert.ok(

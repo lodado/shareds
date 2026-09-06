@@ -44,6 +44,10 @@
 
   /* ── 경계: hairline은 알파, border는 불투명 ─────────── */
   --hairline: oklch(from var(--foreground) l c h / 0.08);
+  /* scrim: the neutral wash under a kbd cap or an inline chip, dark in both themes. */
+  --scrim: oklch(0% 0 0 / 0.2);
+  /* backdrop: the modal wash, tinted toward the anchor hue so it is not a grey sheet. */
+  --backdrop: oklch(10% 0.02 var(--h) / 0.4);
   --hairline-strong: oklch(from var(--foreground) l c h / 0.16);
   --border: oklch(89.5% calc(var(--c-tint) * 1.5) var(--h));
   --input: var(--border);
@@ -129,6 +133,8 @@
   --primary-soft: oklch(26% calc(var(--c-accent) * 0.35) var(--h));
   --accent: oklch(28% calc(var(--c-accent) * 0.35) var(--h));
   --hairline: oklch(from var(--foreground) l c h / 0.1);
+  --scrim: oklch(0% 0 0 / 0.32);
+  --backdrop: oklch(6% 0.02 var(--h) / 0.6);
   --hairline-strong: oklch(from var(--foreground) l c h / 0.2);
   --border: oklch(28% calc(var(--c-tint) * 1.8) var(--h));
   --ring: oklch(72% var(--c-accent) var(--h));

@@ -5,6 +5,8 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
+import { scanSourceText } from '../skills/frontend-interface-design/scripts/render.mjs'
+
 const packageDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
 const skillDirectory = join(packageDirectory, 'skills/frontend-interface-design')
 
@@ -30,6 +32,7 @@ const EXEMPLARS = [
   'compositions/app-shell.html',
   'compositions/marketing-hero.html',
   'compositions/fintech-home.html',
+  'compositions/pack-developer-platform.html',
 ]
 
 function sectionOf(markdown, heading) {
@@ -86,6 +89,8 @@ test('ships every reference, lineage and exemplar the workflow links to', async 
     'fidelity',
     'interface-rules',
     'look',
+    'one-shot',
+    'reference-pack',
     'reference-study',
     'review',
     'typography-ko',
@@ -109,7 +114,7 @@ test('replaces Creation with lineage-based Adaptation that locks a DESIGN.md', a
   const [skill, adaptation] = await Promise.all([read('SKILL.md'), read('references/adaptation.md')])
 
   assert.match(skill, /\*\*Fidelity\*\*[\s\S]*\*\*Adaptation\*\*/)
-  assert.match(skill, /계보를 두 개 섞지 않는다/)
+  assert.match(skill, /계보를 두 개 섞지 않고 팩도 하나만 쓴다/)
   assert.doesNotMatch(skill, /\*\*Creation\*\*/)
 
   for (const lineage of LINEAGES) assert.match(adaptation, new RegExp(`lineages/${lineage}\\.md`))
@@ -174,11 +179,37 @@ test('makes the screenshot loop mandatory, scored, accept-only-if-better and bou
   assert.match(look, /scripts\/render\.mjs --in/)
   assert.match(look, /gates\.json/)
   assert.match(look, /yes\/no로만/)
-  assert.match(look, /통과 수가 늘었을 때만 r2를 채택/)
-  assert.match(look, /최대 \*\*3라운드\*\*/)
+  // Adoption is a three-condition rule, not a count comparison: a genuine fix that costs one
+  // unrelated check must still be adoptable, and a critical regression hidden inside a higher
+  // total must still be rejected.
+  assert.match(look, /하드 게이트/)
+  assert.match(look, /하드 게이트[^\n]*모든 항목[^\n]*통과/)
+  assert.doesNotMatch(look, /실패 수가 늘지 않는다/)
+  assert.match(look, /치명적 무퇴행/)
+  assert.match(look, /겨눈 결함이 실제로 고쳐졌거나/)
+  assert.match(look, /총점에 숨은 치명적 회귀는 개선이 아니다/)
+  assert.doesNotMatch(look, /통과 수가 늘었을 때만 r2를 채택/)
+  // The loop finishes inside one user request instead of asking to continue.
+  assert.match(look, /첫 렌더 1회 \+ 보수 최대 2회/)
   assert.match(look, /2라운드 연속[^\n]*정지/)
+  // A static harness and a running app are not the same evidence.
+  assert.match(look, /validated: actual-app/)
+  assert.match(look, /validated: surrogate/)
   assert.match(look, /`VERIFIED`를 발급하지 않고/)
   assert.match(look, /impeccable critique[\s\S]*두 번째 의견/)
+})
+
+test('source ownership and route scope bound reference reuse without banning licensed materials', async () => {
+  const [skill, oneShot, reference] = await Promise.all([
+    read('SKILL.md'),
+    read('references/one-shot.md'),
+    read('references/reference-pack.md'),
+  ])
+  const firstRule = sectionOf(skill, '## 상시 규칙 12').split(/\n2\. /)[0]
+  assert.match(firstRule, /사용자 소유 소스[\s\S]*Fidelity/)
+  assert.match(oneShot, /scope=full/)
+  assert.match(oneShot, /라이선스가 허용/)
+  assert.match(reference, /라이선스가 허용/)
 })
 
 test('ships craft defaults as code, not adjectives, and Korean typography as a deterministic floor', async () => {
@@ -210,6 +241,9 @@ test('ships craft defaults as code, not adjectives, and Korean typography as a d
   assert.match(tokens, /--shadow-raised:/)
   assert.match(tokens, /word-break: keep-all/)
   assert.match(tokens, /--ease-out: cubic-bezier/)
+  // Values a component would otherwise hardcode (the kbd scrim, the modal backdrop) live here.
+  assert.match(tokens, /--scrim:/)
+  assert.match(tokens, /--backdrop:/)
 })
 
 test('exemplars reference tokens only — no literal colors in component markup', async () => {
@@ -219,8 +253,32 @@ test('exemplars reference tokens only — no literal colors in component markup'
     assert.doesNotMatch(html, /#[0-9a-f]{6}\b/i, `${exemplar}: hex color literal`)
     assert.doesNotMatch(html, /\b(rgb|hsl)a?\(/, `${exemplar}: rgb/hsl literal`)
     assert.match(html, /var\(--/, `${exemplar}: must use tokens`)
-    assert.match(html, /lang="ko"/, `${exemplar}: Korean exemplar`)
+    assert.match(html, /<html lang="(ko|en)"/, `${exemplar}: must declare its language`)
+    // The contract the render actually enforces: colour and font literals may live in a
+    // :root/.dark token block and nowhere else. `oklch(from var(--token) …)` is derivation, not a
+    // literal, so it does not count.
+    const scan = scanSourceText(html)
+    assert.equal(scan.colors, 0, `${exemplar}: ${scan.colors} colour literal(s) outside the token block`)
+    assert.equal(scan.fontFamilies, 0, `${exemplar}: font-family literal outside the token block`)
+    assert.ok(scan.tokenReferences > 0, `${exemplar}: must reference tokens`)
   }
+
+  // Literal px radii are a known, measured defect in the older compositions: the render's
+  // literalRatio gate reads 0.107 / 0.055 / 0.087 for them today. The pack-built composition shows
+  // the target state at 0.000. This pin fails if a composition regresses, and fails equally if one
+  // is fixed without updating the number, so the debt cannot drift quietly.
+  const ratios = {}
+  for (const exemplar of EXEMPLARS.filter((file) => file.startsWith('compositions/'))) {
+    const scan = scanSourceText(await read(`exemplars/${exemplar}`))
+    ratios[exemplar] = Number((scan.literalValues / (scan.literalValues + scan.tokenReferences || 1)).toFixed(3))
+  }
+  assert.deepEqual(ratios, {
+    'compositions/app-shell.html': 0.044,
+    'compositions/fintech-home.html': 0.107,
+    'compositions/marketing-hero.html': 0.087,
+    // Built entirely from a Reference Pack: every value is a token, so nothing is left over.
+    'compositions/pack-developer-platform.html': 0,
+  })
   const readme = await read('exemplars/README.md')
   for (const exemplar of EXEMPLARS.filter((file) => file !== 'README.md')) {
     assert.ok(readme.includes(exemplar.split('/').at(-1)), `README does not list ${exemplar}`)
@@ -294,4 +352,57 @@ test('keeps the vendored Vercel rules pinned and moves slop gates into the loop'
   assert.match(ladder, /## Decision rules/)
   assert.match(visual, /계보가 이긴다/)
   assert.match(fidelity, /Adaptation 모드가 방출/)
+})
+
+test('routes a named brand through an evidence-graded pack and never through the name alone', async () => {
+  const [skill, pack] = await Promise.all([read('SKILL.md'), read('references/reference-pack.md')])
+
+  assert.match(skill, /\*\*Reference-informed\*\*/)
+  assert.match(skill, /pack\.mjs --route/)
+  assert.match(skill, /\*\*브랜드 이름은 증거가 아니다\*\*/)
+  for (const grade of ['`observed`', '`estimated`', '`unverified`']) assert.ok(pack.includes(grade), grade)
+  assert.match(pack, /이름은 증거가 아니다/)
+  assert.match(pack, /브랜드 충실도를 주장하지 않는다/)
+  assert.match(pack, /우회하지 않는다/)
+  assert.match(pack, /scripts\/observe\.mjs/)
+  assert.match(pack, /한 화면에 팩 두 개를 섞지 않는다/)
+  assert.match(pack, /라이선스\(SPDX\) · 버전/)
+})
+
+test('diversity applies only to unlocked screens, so a locked system may repeat its macro structure', async () => {
+  const [adaptation, oneShot] = await Promise.all([read('references/adaptation.md'), read('references/one-shot.md')])
+
+  // The old text forbade repeating a macro structure while also locking the system that produces
+  // it. The rule now keys on `locked`, and the knob list no longer claims to own macro structure.
+  assert.match(adaptation, /`locked: true`면 \*\*매크로구조를 반복해도 된다/)
+  assert.match(adaptation, /`locked: false`[\s\S]{0,240}매크로구조가 같으면 안 된다/)
+  assert.match(adaptation, /노브 밖의 값\(그림자 체계 · 상태색\)/)
+  assert.doesNotMatch(adaptation, /노브 밖의 값\(그림자 체계 · 매크로구조/)
+  assert.match(adaptation, /"locked"/)
+  assert.match(oneShot, /## 4\. 잠금과 다양성의 관계 — 충돌 아님/)
+})
+
+test('one-shot fixes a precedence order, answers without asking, and scopes states per component', async () => {
+  const [skill, oneShot] = await Promise.all([read('SKILL.md'), read('references/one-shot.md')])
+
+  assert.match(skill, /one-shot\.md/)
+  // Safety and accessibility outrank the reference; the reference outranks the lineage; craft
+  // defaults are last, so an observed value is not overruled by a taste rule.
+  const order = ['안전 · 권한 · 법', '접근성 하한', '사용자 소유 소스', 'Reference Pack의 observed', '계보(lineage)의 기본값', 'craft 기본값']
+  let cursor = oneShot.indexOf('## 1.')
+  for (const step of order) {
+    const index = oneShot.indexOf(step, cursor)
+    assert.ok(index > cursor, `precedence out of order at ${step}`)
+    cursor = index
+  }
+  assert.match(oneShot, /5–7단은 법이 아니라 기본값이다/)
+  assert.match(oneShot, /\*\*묻지 않는다\.\*\*/)
+  assert.match(oneShot, /NEEDS_DECISION/)
+  // States belong to component roles, not to every element.
+  assert.match(oneShot, /## 5\. 상태\(state\)는 컴포넌트마다 다르다/)
+  assert.match(oneShot, /정적 텍스트 · 이미지 · 배지 \| 없음/)
+  assert.doesNotMatch(skill, /상태 8종/)
+  // Palette and font limits count families and roles, not raw token counts.
+  assert.match(oneShot, /## 6\. 색 · 폰트 수 — 개수가 아니라 가족과 역할/)
+  assert.match(skill, /hue 가족 3–5/)
 })

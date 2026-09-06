@@ -33,6 +33,12 @@ const FENCED_JSON = /```json\b([\s\S]*?)```/g
 
 export const SKILL_NAME = 'frontend-interface-design'
 export const REPORT_FOOTER_MARKER = 'When you finish, emit one fenced ```json block as the last thing you write'
+/**
+ * Paths the skill's own workflow produces. They are working artifacts, not deliverables: the Look
+ * loop writes screenshots and metrics, Adaptation writes DESIGN.md and the diversity log. Naming
+ * them keeps "one deliverable page" from contradicting the workflow the run is being graded on.
+ */
+export const INTERNAL_ARTIFACTS = ['DESIGN.md', 'design-loop/', '.design/']
 export const HOSTS = {
   claude: {
     command: 'claude',
@@ -99,7 +105,14 @@ export function buildPrompt({ brief, variant, host, replicateId }) {
     '',
     '## Output contract',
     '',
-    '- Write exactly one file, `index.html`, in the current working directory. It must be self-contained: all CSS inline in a <style> block, no JavaScript frameworks or external scripts, no build step, no other files.',
+    // The skill's own workflow requires screenshots, metrics and a written rationale. An
+    // "exactly one file" rule would forbid the artifacts the skill mandates, so the contract
+    // constrains the *delivery*: one deliverable page, and the working artifacts the skill asks
+    // for beside it. The grader reads index.html and ignores the rest.
+    '- The deliverable is exactly one page: `index.html` in the current working directory. It must be self-contained: all CSS inline in a <style> block, no JavaScript frameworks or external scripts, no build step. Do not write a second HTML page, a variant or an alternative version.',
+    `- The skill's own working artifacts are expected and are not counted against the deliverable: \`${INTERNAL_ARTIFACTS.join(
+      '`, `',
+    )}\`. Write them where the skill says to. Everything outside that list and index.html is an extra file, so do not create one.`,
     '- The only external requests allowed are Google Fonts (fonts.googleapis.com, fonts.gstatic.com) and the Pretendard CDN (cdn.jsdelivr.net/gh/orioncactus/pretendard). Images, icons and scripts must be inline or omitted.',
     '- Do not ask questions. Make reasonable assumptions and state them in your final message.',
     '- Use placeholder content only: no invented statistics, logos, testimonials or press mentions.',

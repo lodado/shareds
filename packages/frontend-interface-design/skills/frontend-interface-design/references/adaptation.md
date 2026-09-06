@@ -82,8 +82,9 @@ Frame 결과 위에 아래 6칸을 채운다. 브리프에서 읽히는 건 **�
 
 `--radius`와 `--row-h` · 간격 기본 단위를 함께 바꾼다. 하나만 바꾸면 어긋난다.
 
-노브 밖의 값(그림자 체계 · 매크로구조 · 상태색)은 계보 그대로다. 바꾸고 싶으면 그건 변이가
-아니라 다른 계보다 — 표로 돌아간다.
+노브 밖의 값(그림자 체계 · 상태색)은 계보 그대로다. 바꾸고 싶으면 그건 변이가 아니라 다른
+계보다 — 표로 돌아간다. **매크로구조는 예외다**: 노브가 아니라 §5의 갈라서기와 §6의 다양성
+규칙이 다룬다. 계보의 매크로구조를 그대로 쓰는 것이 기본이고, 흔한 답과 갈리지 않을 때만 바꾼다.
 
 ## 4. DESIGN.md 방출
 
@@ -113,8 +114,16 @@ Frame 결과 위에 아래 6칸을 채운다. 브리프에서 읽히는 건 **�
 
 ## 6. 다양성 로그와 accept/reject
 
-`.design/log.json`을 프로젝트에 둔다. 같은 프로젝트의 다음 화면은 마지막 화면과 **매크로구조가
-같으면 안 된다**(hallmark). 사용자의 채택 · 반려도 여기 남겨 다음 심판 문항에 반영한다.
+`.design/log.json`을 프로젝트에 둔다. 항목마다 `locked`를 적는다: 채택된 Reference Pack이나
+사용자가 받아들인 `DESIGN.md`가 시각 권위면 `true`다.
+
+- `locked: true`면 **매크로구조를 반복해도 된다.** 잠긴 시스템의 두 화면이 닮는 것은 일관성이지
+  결함이 아니다. 다양성 규칙을 건너뛴다.
+- `locked: false`(소스도 팩도 없이 계보만으로 만드는 화면)면 마지막 `locked: false` 화면과
+  **매크로구조가 같으면 안 된다**. 같으면 그건 템플릿 반사다.
+
+우선순위 전체는 [`one-shot.md`](one-shot.md) §1과 §4에 있다. 사용자의 채택 · 반려도 여기 남겨
+다음 심판 문항에 반영한다.
 
 ```json
 {
@@ -125,7 +134,9 @@ Frame 결과 위에 아래 6칸을 채운다. 브리프에서 읽히는 건 **�
       "lineage": "consumer-fintech-ko",
       "macro": "amount-hero-list",
       "pairing": "ko-1",
-      "hue": 205
+      "hue": 205,
+      "locked": false,
+      "pack": null
     }
   ],
   "decisions": [{ "date": "2026-09-06", "screen": "home", "verdict": "accept", "note": "잔액 숫자 크기 유지" }]
@@ -135,7 +146,15 @@ Frame 결과 위에 아래 6칸을 채운다. 브리프에서 읽히는 건 **�
 ## 7. 잠금
 
 DESIGN.md가 생기면 이후 모든 화면은 **Fidelity**다([`fidelity.md`](fidelity.md)). 계보를 바꾸는 건
-새 revision이고 사용자 승인이 필요하다.
+새 revision이고 사용자 승인이 필요하다. 이 시점부터 `.design/log.json`의 `locked`는 `true`이고
+§6의 다양성 규칙은 적용되지 않는다.
+
+## 8. 레퍼런스가 있는 Adaptation
+
+사용자가 브랜드를 지목했으면([`reference-pack.md`](reference-pack.md)) 계보 선택보다 팩 라우팅이
+먼저다. 팩이 `observed`면 계보는 구조의 뼈대로 남고 토큰 · 타입 · 리듬은 팩의 관측값이 이긴다
+([`one-shot.md`](one-shot.md) §1). 팩이 `unverified`면 이 파일의 절차를 그대로 돌리고, 팩은
+패턴 힌트로만 읽으며, 사용자에게 "브랜드 재현이 아니다"를 먼저 말한다.
 
 ## Decision record에 남기는 블록
 
@@ -143,10 +162,11 @@ DESIGN.md가 생기면 이후 모든 화면은 **Fidelity**다([`fidelity.md`](f
 ### Adaptation
 
 - 계보: <id> — 표의 행 <유형> (가까운 이유: <없음/한 줄>)
+- 팩: <packId · evidenceStatus · 관측일> 또는 없음 (route: <mode>)
 - ① hue: 사물 <a · b · c> → <hue>; 이식 테스트 <어색함 = 통과>
 - ② 페어링: <계보 페어링 번호> (ko 우선: 예/아니오)
 - ③ radius · 밀도: <프리셋 이름>
 - DESIGN.md: <경로>, lint <오류 0 · 경고 n>
 - 흔한 답 vs 갈림: <한 줄> / <구조 · 타입 · 색 중 둘 이상>
-- log: <.design/log.json에 기록한 매크로구조>
+- log: <.design/log.json에 기록한 매크로구조 · locked>
 ```

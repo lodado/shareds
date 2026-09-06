@@ -24,7 +24,11 @@ const SKIPPED_DIRECTORIES = new Set(['node_modules', 'dist', '.git'])
 const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g
 // A token block is the :root / .dark / [data-theme] rule that *defines* tokens; its literals are the tokens themselves.
 const TOKEN_BLOCK_SELECTOR = /(?:^|[\s;{}>"'`])((?::root|\.dark|html\.dark|\[data-theme[^\]]*\])[^{}]*)\{/
-const COLOR_LITERAL = /(?:^|[\s:(,'"[=])(?:#[\da-f]{3,8}\b|(?:rgba?|hsla?|oklch|oklab)\()/gi
+// `oklch(from var(--token) …)` and `oklch(from currentColor …)` are relative colour syntax: the
+// value is derived from a token or the inherited colour, so it is token discipline, not a literal.
+// Only a colour function that opens with its own numbers counts.
+const COLOR_LITERAL =
+  /(?:^|[\s:(,'"[=])(?:#[\da-f]{3,8}\b|(?:rgba?|hsla?|oklch|oklab)\((?!\s*from\s+(?:var\(\s*--|currentColor)))/gi
 // The whitespace sits inside the lookahead: `\s*(?!var\()` would backtrack past a space and count `font-family: var(--x)` as a literal.
 const FONT_FAMILY_LITERAL = /font-?family\s*:(?!\s*var\()/gi
 const RADIUS_DECLARATION = /border-?radius\s*:\s*([^;{}\n]*)/gi
