@@ -33,7 +33,7 @@
 
 Files: `SKILL.md`, `references/analysis-guide.md`, `references/writing-workflow.md`, `references/evaluation.md`, `references/research.md`, new `references/language-ko.md`, `references/voice-brief.md`, and `tests/test_skill_contract.py` in the existing skill.
 
-- [ ] Inspect baseline sample failures without reading held-out text. Write contract tests for required Korean/brief references, target-voice versus generic cleanup distinction, provenance of contrastive examples, bounded revision and pending human evaluation.
+- [x] Inspect baseline sample failures without reading held-out text (sequence deviation recorded below). Write contract tests for required Korean/brief references, target-voice versus generic cleanup distinction, provenance of contrastive examples, bounded revision and pending human evaluation.
 - [x] Run the new tests and record the expected missing-contract failures.
 - [x] Add Korean contextual observation guidance and a per-run voice brief: observed rule → trigger → action → example → semantic boundary. Do not hard-code the particular author's quirks.
 - [x] Add derived negative-example isolation and style revision with at most two local revisions, preserving the ledger. Human preference is not inferred from revision count.
@@ -46,18 +46,20 @@ Files: new `scripts/build_blind_review.py` and `tests/test_blind_review.py` in t
 - [x] Write failing tests for randomized opaque output IDs, a separate evaluator key, preserved text, escaped HTML, no method labels in user-facing output, no overwrite and invalid inputs.
 - [x] Implement a standard-library CLI accepting a manifest with cases and output paths. Emit `review.html`, `ratings.json`, and a separate key under `private/`. No external assets/network or embedded automatic preference score.
 - [x] Use synthetic fixture text in committed tests. Keep real author results ignored.
-- [ ] Run tests and inspect generated HTML through the browser or file read.
+- [x] Run tests and inspect generated HTML through the browser or file read.
 
 ## Task 4: Generation and handoff
 
-- [ ] Generate raw-example, frozen-baseline and improved-skill variants in fresh sessions with the same brief and budget. Record exact supplied prompts, profiles and model/host identifiers. Do not fabricate seeds or elapsed evaluation times.
-- [ ] Use a separate semantic reviewer with content briefs and outputs only, not source examples or method labels. Preserve raw generations even if a correction is needed, and disclose corrections in a separate record.
-- [ ] Build anonymous reviewer package and an unfilled rating form with voice preference, meaning errors, excessive imitation and free-text edits.
-- [ ] Run package and repository tests, review diff, commit only task changes and open the local review HTML for the user.
-- [ ] Report actual sample counts, collection/independence limitations and human review pending. Do not declare the improved skill a winner before user review.
+- [x] Generate raw-example, frozen-baseline and improved-skill variants in fresh sessions with the same brief and budget. Record exact supplied prompts, profiles and model/host identifiers. Do not fabricate seeds or elapsed evaluation times.
+- [x] Use a separate semantic reviewer with content briefs and outputs only, not source examples or method labels. Preserve raw generations even if a correction is needed, and disclose corrections in a separate record.
+- [x] Build anonymous reviewer package and an unfilled rating form with voice preference, meaning errors, excessive imitation and free-text edits.
+- [x] Run package and repository tests, review diff, commit only task changes and attempt opening the local review HTML. The environment suppressed live opening, so provide the file link instead.
+- [x] Report actual sample counts, collection/independence limitations and human review pending. Do not declare the improved skill a winner before user review.
 
 ## Execution notes
 
 - The general instruction changes followed repository/reference inspection and failing contract tests, while the separate baseline development draft was still running. Do not report a model-output RED before those changes. The subsequent umbrella draft supplied an observed repetition failure, which motivated one additional sparse-content rule.
 - Shared content, language, length and host model route are controlled. End-to-end workflows have different planning/revision costs, not equal token budgets. Profiles differ as part of the methods. This is not a single-feature ablation.
 - The first full repository test run completed successfully on 2026-09-07. Final package tests must be rerun after review-tool changes.
+
+- Delivered nine anonymous samples, a browser-fillable form and optional model meaning notes. One 352-character output misses the requested length and remains disclosed, not corrected after evaluation. The real packet passed 31 isolated Chrome checks, while live opening was suppressed. Human preference remains pending.
