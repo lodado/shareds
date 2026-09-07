@@ -13,6 +13,15 @@ async function read(path) {
   return readFile(join(skillDirectory, path), 'utf8')
 }
 
+test('reference handoff does not grant QA or baseline authority', async () => {
+  const skill = await read('SKILL.md')
+  assert.match(skill, /## 레퍼런스 재현 인계/)
+  assert.match(skill, /증거 패킷은 QA 실행 승인이나 baseline 승인이 아니다/)
+  assert.match(skill, /중간 진행/)
+  assert.match(skill, /역방향/)
+  assert.match(skill, /unsupported/)
+})
+
 test('owns explicit screenshot and direct-browser QA without product authority', async () => {
   const skill = await read('SKILL.md')
 
