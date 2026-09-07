@@ -1,0 +1,13 @@
+✔ loading and amounts preserve rendering and one audit per success event (0.835291ms)
+✔ approved error distinctions are preserved without success telemetry (0.066833ms)
+✔ unexpected failure preserves cause rather than inventing a recovery policy (0.142792ms)
+✔ dispose is idempotent and late events cannot write or throw (0.052792ms)
+✔ toggle changes only open and its label, without mutation (0.069584ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 35.44425

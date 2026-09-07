@@ -1,0 +1,44 @@
+--- seed/status-view.mjs
++++ stage-1/src/status-view.mjs
+@@ -1,23 +1,21 @@
+ export function mountBalance(sdk, render, audit) {
+   let disposed = false
+-  const stop = sdk.watch(([phase, amount, error]) => {
++  const subscription = sdk.watch((event) => {
+     if (disposed) return
+-    if (phase === 'pending') {
++    if (event.type === 'waiting') {
+       render({ kind: 'loading' })
+-    } else if (phase === 'ok') {
+-      render({ kind: 'ready', text: `$${(amount / 100).toFixed(2)}` })
++    } else if (event.type === 'settled') {
++      render({ kind: 'ready', text: `$${(event.payload.minorUnits / 100).toFixed(2)}` })
+       audit('balance.ready')
+-    } else if (phase === 'denied') {
+-      render({ kind: 'error', text: 'Not allowed' })
+-    } else if (phase === 'offline') {
+-      render({ kind: 'error', text: 'Try again' })
++    } else if (event.type === 'rejected') {
++      render({ kind: 'error', text: event.code === 'DENIED' ? 'Not allowed' : 'Try again' })
+     } else {
+-      throw error
++      throw event.error
+     }
+   })
+   return () => {
+     if (disposed) return
+     disposed = true
+-    stop()
++    subscription.cancel()
+   }
+ }
+--- seed/toggle.mjs
++++ stage-1/src/toggle.mjs
+@@ -2,6 +2,6 @@
+   return {
+     ...state,
+     open: !state.open,
+-    label: state.open ? 'Show details' : 'Hide details',
++    label: state.open ? 'Details' : 'Hide details',
+   }
+ }

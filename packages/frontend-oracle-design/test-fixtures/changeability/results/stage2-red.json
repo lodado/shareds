@@ -1,0 +1,12 @@
+[
+  {
+    "run": "run-a",
+    "exitCode": 1,
+    "reason": "v2 snapshot must fail v3 amount contract"
+  },
+  {
+    "run": "run-b",
+    "exitCode": 1,
+    "reason": "v2 snapshot must fail v3 amount contract"
+  }
+]

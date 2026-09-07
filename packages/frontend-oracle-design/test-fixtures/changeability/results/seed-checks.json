@@ -1,0 +1,10 @@
+[
+  {
+    "sdkVersion": "v1",
+    "exitCode": 0
+  },
+  {
+    "sdkVersion": "v2",
+    "exitCode": 1
+  }
+]

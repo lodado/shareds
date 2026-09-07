@@ -1,0 +1,109 @@
+✖ loading and amounts preserve rendering and one audit per success event (0.408959ms)
+✖ approved error distinctions are preserved without success telemetry (0.107791ms)
+✖ unexpected failure preserves cause rather than inventing a recovery policy (0.419459ms)
+✖ dispose is idempotent and late events cannot write or throw (0.06025ms)
+✖ toggle changes only open and its label, without mutation (0.606625ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 0
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 35.598958
+
+✖ failing tests:
+
+test at packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:49:1
+✖ loading and amounts preserve rendering and one audit per success event (0.408959ms)
+  TypeError: object is not iterable (cannot read property Symbol(Symbol.iterator))
+      at file:///Users/chungheon/orca/my-Vibe-Coding-Helper/packages/frontend-oracle-design/test-fixtures/changeability/seed/status-view.mjs:3:26
+      at Object.emit (file:///Users/chungheon/orca/my-Vibe-Coding-Helper/packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:40:39)
+      at TestContext.<anonymous> (file:///Users/chungheon/orca/my-Vibe-Coding-Helper/packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:51:7)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+
+test at packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:65:1
+✖ approved error distinctions are preserved without success telemetry (0.107791ms)
+  TypeError: object is not iterable (cannot read property Symbol(Symbol.iterator))
+      at file:///Users/chungheon/orca/my-Vibe-Coding-Helper/packages/frontend-oracle-design/test-fixtures/changeability/seed/status-view.mjs:3:26
+      at Object.emit (file:///Users/chungheon/orca/my-Vibe-Coding-Helper/packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:42:38)
+      at TestContext.<anonymous> (file:///Users/chungheon/orca/my-Vibe-Coding-Helper/packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:67:7)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:76:1
+✖ unexpected failure preserves cause rather than inventing a recovery policy (0.419459ms)
+  AssertionError [ERR_ASSERTION]: The validation function is expected to return "true". Received false
+
+  Caught error:
+
+  TypeError: object is not iterable (cannot read property Symbol(Symbol.iterator))
+      at TestContext.<anonymous> (file:///Users/chungheon/orca/my-Vibe-Coding-Helper/packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:79:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: TypeError: object is not iterable (cannot read property Symbol(Symbol.iterator))
+        at file:///Users/chungheon/orca/my-Vibe-Coding-Helper/packages/frontend-oracle-design/test-fixtures/changeability/seed/status-view.mjs:3:26
+        at Object.emit (file:///Users/chungheon/orca/my-Vibe-Coding-Helper/packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:44:14)
+        at file:///Users/chungheon/orca/my-Vibe-Coding-Helper/packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:80:15
+        at getActual (node:assert:580:5)
+        at strict.throws (node:assert:728:24)
+        at TestContext.<anonymous> (file:///Users/chungheon/orca/my-Vibe-Coding-Helper/packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:79:10)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1397:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+        at Test.postRun (node:internal/test_runner/test:1537:19),
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:87:1
+✖ dispose is idempotent and late events cannot write or throw (0.06025ms)
+  TypeError: stop is not a function
+      at Object.dispose (file:///Users/chungheon/orca/my-Vibe-Coding-Helper/packages/frontend-oracle-design/test-fixtures/changeability/seed/status-view.mjs:21:5)
+      at TestContext.<anonymous> (file:///Users/chungheon/orca/my-Vibe-Coding-Helper/packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:89:7)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:98:1
+✖ toggle changes only open and its label, without mutation (0.606625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+    {
+      id: 'balance',
+  +   label: 'Show details',
+  -   label: 'Details',
+      open: false
+    }
+
+      at TestContext.<anonymous> (file:///Users/chungheon/orca/my-Vibe-Coding-Helper/packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:102:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { open: false, label: 'Show details', id: 'balance' },
+    expected: { open: false, label: 'Details', id: 'balance' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

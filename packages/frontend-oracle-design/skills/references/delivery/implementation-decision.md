@@ -40,6 +40,25 @@ boilerplate that ceremonially fills every axis, record only material trade-offs.
 - Rejected: alternatives actually considered but not applied, the related quality axis and the concrete reason
 ```
 
+## Material change sketch
+
+When a boundary choice materially affects change cost, use the existing Changeability and Rejected
+entries for `change + evidence → preserved contract → owner/impact path → choice + verification +
+accepted cost`. This is not a separate artifact or an additional required field. Do not repeat
+unrelated axes or invent a future change merely to fill it in.
+
+```markdown
+- Changeability: the approved SDK callback-format update changes the feature's transport mapping,
+  not its success/error outcomes, request count, or cancellation/cleanup contract. Existing mapper
+  remains the owner; its contract tests and the consumer behavior tests cover the change. Prioritized
+  Coupling at the cost of keeping a local conversion rather than exposing the SDK DTO to the UI.
+- Rejected: a new adapter/interface adds no information beyond the existing mapper.
+```
+
+Replace the example with actual paths, change evidence, and verification commands for the target
+repo. Mark predicted impact as a walkthrough, not a measured improvement. A new outcome or error
+meaning still needs the approval flow below, even if a mapper could conceal the difference.
+
 If a choice changes the card's observed outcome or conflicts with the approval criteria, do not
 implement it and return to `NEEDS_DECISION`. If the choices are technically equivalent, decide by the
 runtime criteria of [`frontend/decisions.md`](../frontend/decisions.md)·[`frontend/authoring.md`](../frontend/authoring.md) and

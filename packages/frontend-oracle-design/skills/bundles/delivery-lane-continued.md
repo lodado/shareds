@@ -265,10 +265,56 @@ Each axis's **pre-implementation question**: does this choice actually reduce th
 understanding·modification·verification? Does it unnecessarily harm another axis's cost or an
 existing boundary?
 
+## Start with a concrete change
+
+For a material boundary choice, start with the current requirement, an approved upcoming change,
+actual change history, or an observed dependency leak — not an imagined future platform. Trace the
+preserved contract, the owning responsibility, and the understanding·modification·verification
+path. Compare the simplest existing solution with the proposed boundary and name the cost accepted.
+Keep this reasoning in the existing Decision; its short example is owned by
+[`delivery/implementation-decision.md`](delivery/implementation-decision.md#material-change-sketch).
+
+Use only relevant scenarios: an API representation change, a policy change, a presentation-only
+change, or feature removal. Tests and docs changing with their owner can be healthy cohesion;
+unrelated consumers needing edits can signal coupling. Changed file count is not a quality score.
+If the scenario requires a new observed outcome or error policy, return to the existing approval
+flow rather than silently hiding that change in a mapper.
+
+An independent reviewer should be able to follow user intent to the state·policy·effect owner,
+identify what must remain unchanged, and locate applicable error·retry·cancel·cleanup responsibilities.
+Name a concrete dependency path or hidden contract when that fails, not a preferred folder style.
+Material-only Decision writing does not remove the five-axis review output owned by
+[`subagent-review.md`](subagent-review.md).
+
+### Bounded change rehearsal
+
+Use a static walkthrough to compare candidate impact paths; it is not evidence of measured
+change-cost improvement. When evaluating a change to these heuristics, start with one currently
+needed boundary and one unnecessary wrapper, not a new universal scoring system:
+
+1. Pin the same requirement/input, fixture revision, preserved behavior tests, and model/tool
+   settings for the existing and proposed criteria. Identify the fixture location and existing test
+   command before running either variant in isolated workspaces.
+2. Keep the raw diff, Decision, commands, exit codes, and test results. Have an independent reviewer
+   compare preserved behavior, responsibility leaks, and unnecessary abstractions with the expected
+   choices. Check that the changeability and frontend criteria give consistent guidance together.
+3. Stop when the existing seam satisfies the contract; do not add an adapter to complete a template.
+   On a preserved contract failure, a new leak, or an unjustified abstraction, stop and fix or revert
+   that small change before adding cases. Passing requires preserved contract tests and an explained,
+   consistent boundary choice; unresolved judgment stays unverified.
+
+Prose regex and review schema checks are not semantic evaluation. Record a walkthrough-only result
+as such; do not claim a live-model improvement or a general cost reduction from it. This rehearsal
+is a bounded evaluation method, not an additional gate on every product change.
+
 ## Readability
 
 Reduce the context and conditions a first-time reader has to hold at once. Revealing user actions
 and the execution order of state transitions and side effects takes priority over shorter code.
+Compare the caller's required concepts, preconditions, order, and errors, not just the number of
+public functions. A single `runTransfer(options)` with interacting flags and hidden ordering can be
+harder to use than several explicit actions. Hide implementation knowledge, not the caller's contract;
+a deep module is neither a large class nor a hook that merges independent state owners.
 
 ### Core patterns
 
@@ -410,8 +456,8 @@ wider than their responsibility.
 - A global/public surface with only one consumer appears → keep it in local state·module. Except: an approved public contract is required
 - The UI knows the transport DTO·query key → convert to render-ready values at the mapper/model owner. Except: the UI itself owns that contract
 - A store·context is created just for a short props hand-off → pass it from the nearest common owner. Except: it is state that is genuinely shared widely
-- An interface·adapter wraps a single implementation → use the implementation directly. Except: multiple implementations or a compatibility contract exist now
-- The same flow is tied directly to several platform APIs → split it into a pure transition core and thin adapters. Except: only one runtime is supported now
+- An interface·adapter wraps a single implementation → use the implementation directly. Except: a current compatibility contract, shared implementations, or the present-boundary exception below justifies a seam
+- External APIs obscure a complex current policy or transition → compare a pure transition core and thin adapters. Except: an existing seam or local derivation already makes the contract clear and testable
 
 ```tsx
 function BalanceCard({ balance }: { balance: number }) {
@@ -421,22 +467,43 @@ function BalanceCard({ balance }: { balance: number }) {
 
 If the UI does not need the whole `BalanceApiResponse`, pass only the values it needs.
 
+### Present-boundary exception
+
+This section owns the exception, including for a single implementation; it is not an automatic
+instruction to add an adapter. Consider a boundary when actual change history or an approved change
+shows independent volatility causing current understanding·modification·verification cost, even
+within one responsibility; when external knowledge leaks into unrelated consumers; or when external
+dependencies obstruct deterministic verification of a current policy or transition.
+
+Try the existing client·query·test seam first, then a local mapper or parameter, and only then a
+minimal adapter. Name what the existing owner cannot absorb and what knowledge the candidate hides.
+Keep error distinctions, request count, cancellation, and cleanup under the approved contract. Do not
+duplicate retry logic or mirror state already owned by query, router, or form infrastructure.
+
+- Candidate: a current SDK has an independent callback-format change while product policy remains
+  stable. A feature-local conversion may contain that knowledge even for one consumer. If an existing
+  mapper suffices, stop there; no interface·factory·registry is implied.
+- Reject: a pass-through wrapper for a hypothetical future SDK, a seam created only for mock taste,
+  or a pure core for a simple toggle. A small function or one implementation is not itself a defect;
+  the question is whether the new boundary hides real complexity at lower total cost.
+
 ### React implementation criteria
 
 - Put state at the nearest common owner that actually shares it.
 - Follow FSD's public API only when the target repo already uses it or its adoption is approved.
 - A custom hook returns only the values and intent actions the consumer needs. The tuple/object shape
   follows the target repo's convention and does not expose transport, cache, and UI copy at the same time.
-- Only when two or more approved routers·runtimes share the same flow, put the pure state·transition
-  in the core and let an adapter own the URL·navigation·browser API. Do not add an adapter to a
-  single runtime on future possibility alone.
+- Shared approved runtimes or the present-boundary exception can justify pure state·transition
+  separate from URL·navigation·browser APIs. Reuse the existing owners first and do not inflate a
+  simple toggle. Do not add an adapter to a single runtime on future possibility alone.
 - Do not bypass an approved design system·domain API or the same permission·currency·identity
   invariant with a local copy.
 
 ### Implementation Decision evidence · Reviewer judgment criteria
 
 - Record in the Decision the public/global/shared surface and its actual consumers, the DTO
-  conversion owner, and, if there is a platform adapter, the currently shared runtimes.
+  conversion owner, and any seam's current volatility, compatibility, or shared-runtime evidence,
+  why the existing seam was insufficient, and the preserved contract.
 - If an unnecessarily wide surface, a transport leak, or a violation of an approved import boundary
   creates a concrete change-propagation risk, it is `FINDING`.
 - If only a personal preference about context·props·barrel differs, it is `NON_ORACLE_OPINION`.
@@ -488,11 +555,8 @@ The five axes cannot be maximized at the same time. Write only the cost you prio
 - Coupling ↔ Readability: with few consumers use a local flow, with stable multiple consumers use a shared boundary
 - Simplicity ↔ Performance: a simple implementation before evidence, and after measurement optimize only the necessary scope
 
-```markdown
-- Changeability: prioritized the Predictability that reveals the analytics execution order. The
-  small orchestration duplication in the handler is allowed.
-- Rejected: did not create a generic workflow hook that has a single consumer.
-```
+Write only the trade-off that decided the choice; use the existing Decision rather than a separate
+five-axis checklist. Its example lives in the delivery document linked above.
 
 ## Workflow owner
 
@@ -504,6 +568,17 @@ This document owns only the meaning of change cost and its rationale.
   [`delivery/implementation-decision.md`](delivery/implementation-decision.md).
 - `PASS | FINDING | N/A`, the finding router, and the minimal fix procedure are owned by
   [`subagent-review.md`](subagent-review.md).
+
+## Further reading — evidence, not authority
+
+- [Fowler: YAGNI](https://martinfowler.com/bliki/Yagni.html) and
+  [preparatory refactoring](https://martinfowler.com/articles/preparatory-refactoring-example.html):
+  reject speculative capability without rejecting small changes that make the current task easier.
+- [Cockburn: Hexagonal Architecture](https://alistair.cockburn.us/hexagonal-architecture): protect the
+  application boundary from external technology, not a mandate for a port/factory around every call.
+- [React: Choosing the State Structure](https://react.dev/learn/choosing-the-state-structure) and
+  [You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect): preserve state
+  ownership and distinguish user events from external synchronization.
 
 ## Universal rules not adopted
 
@@ -574,7 +649,10 @@ and the Source Registry are owned by [`frontend/quality.md`](quality.md).
 - Do not hide the card's error·state contract behind `any`, broad assertions, or meaningless
   optionals.
 - Only when an exported shared/package API changes, verify consumer inference·error shapes with a
-  type test. Do not add an interface·factory·adapter for a single local implementation.
+  type test. Reject speculative interface·factory·adapter layers. For a currently justified local
+  seam, including one implementation, use the
+  [present-boundary exception](../changeability.md#present-boundary-exception); do not duplicate its
+  criteria here or bypass the approved architecture boundary.
 
 ## 1. Decide State Ownership First
 
@@ -819,6 +897,25 @@ boilerplate that ceremonially fills every axis, record only material trade-offs.
 - Sources: the repo contracts·official docs·heuristics applied
 - Rejected: alternatives actually considered but not applied, the related quality axis and the concrete reason
 ```
+
+## Material change sketch
+
+When a boundary choice materially affects change cost, use the existing Changeability and Rejected
+entries for `change + evidence → preserved contract → owner/impact path → choice + verification +
+accepted cost`. This is not a separate artifact or an additional required field. Do not repeat
+unrelated axes or invent a future change merely to fill it in.
+
+```markdown
+- Changeability: the approved SDK callback-format update changes the feature's transport mapping,
+  not its success/error outcomes, request count, or cancellation/cleanup contract. Existing mapper
+  remains the owner; its contract tests and the consumer behavior tests cover the change. Prioritized
+  Coupling at the cost of keeping a local conversion rather than exposing the SDK DTO to the UI.
+- Rejected: a new adapter/interface adds no information beyond the existing mapper.
+```
+
+Replace the example with actual paths, change evidence, and verification commands for the target
+repo. Mark predicted impact as a walkthrough, not a measured improvement. A new outcome or error
+meaning still needs the approval flow below, even if a mapper could conceal the difference.
 
 If a choice changes the card's observed outcome or conflicts with the approval criteria, do not
 implement it and return to `NEEDS_DECISION`. If the choices are technically equivalent, decide by the

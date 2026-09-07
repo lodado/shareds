@@ -54,7 +54,10 @@ and the Source Registry are owned by [`frontend/quality.md`](quality.md).
 - Do not hide the card's error·state contract behind `any`, broad assertions, or meaningless
   optionals.
 - Only when an exported shared/package API changes, verify consumer inference·error shapes with a
-  type test. Do not add an interface·factory·adapter for a single local implementation.
+  type test. Reject speculative interface·factory·adapter layers. For a currently justified local
+  seam, including one implementation, use the
+  [present-boundary exception](../changeability.md#present-boundary-exception); do not duplicate its
+  criteria here or bypass the approved architecture boundary.
 
 ## 1. Decide State Ownership First
 

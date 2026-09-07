@@ -1,0 +1,68 @@
+{
+  "baselineRevision": "484d71255e9ad7f6107e57937f83465e23e781aa",
+  "assignment": {
+    "run-a": "baseline",
+    "run-b": "candidate"
+  },
+  "agentType": "executor",
+  "modelOverride": null,
+  "reasoningOverride": null,
+  "replicatesPerCondition": 1,
+  "nodeVersion": "v26.7.0",
+  "policyHashes": {
+    "run-a": {
+      "changeability.md": "07736431643cf2f6bd49cbc8cde76f95aed9c1d30426344c7a3466d71764c474",
+      "frontend/decisions.md": "d0d4062c75add37cd22322e2c4b910c06bb60dc77adcd011e987a0fea794c4eb",
+      "delivery/implementation-decision.md": "7d1c182d7793462701d4e8cd69a7ba8d19e4faa54f94d18a4bb8ae11978db7c7"
+    },
+    "run-b": {
+      "changeability.md": "fe3c4a225ea08ea6e7585f971eb4a314fb6d3b398288d707ec8743c30097f81a",
+      "frontend/decisions.md": "89db87cee95ec653e5b06fbc75e158a144b78bc6f859c42018e73defd1df0a72",
+      "delivery/implementation-decision.md": "a395a62311165a39e5f0c99e86884bd9149bf845647640e2dda4efdcae9f27e9"
+    }
+  },
+  "stage1TestSha256": "a4f99fcbad20854ee9ccde3401147461526b3a028cdc10b13e773add02c23540",
+  "stage1": [
+    {
+      "run": "run-a",
+      "exitCode": 0,
+      "tests": 5,
+      "immutableInputsVerified": true
+    },
+    {
+      "run": "run-b",
+      "exitCode": 0,
+      "tests": 5,
+      "immutableInputsVerified": true
+    }
+  ],
+  "stage2TestSha256": "a6956f87226075d32fc2012c370d8d0b0c7d1875cdea2cf658022c7bb6199c4e",
+  "stage2": [
+    {
+      "run": "run-a",
+      "exitCode": 0,
+      "tests": 5,
+      "immutableInputsVerified": true,
+      "changedSourceFiles": ["status-view.mjs"]
+    },
+    {
+      "run": "run-b",
+      "exitCode": 0,
+      "tests": 5,
+      "immutableInputsVerified": true,
+      "changedSourceFiles": ["status-view.mjs"]
+    }
+  ],
+  "inputHashes": {
+    "task.md": "a57dac4a5c024bbd7638239be334e540904ce74fdad230122e3f0f8134812002",
+    "stage-2.md": "24a81fde1dd14a2c5ebc307a8deb43b6cf0eb416d1f00d6181fc1c440bc3a469",
+    "rubric.md": "636b55cb7dcaf165bbac74f9f3ef323d0bd73c536b957a8ea32846f5da7f3604",
+    "seed/status-view.mjs": "11d172399b8d1fdbdaf7f89e46dcbe768ccee8d078cb35876c24583f7921e9f6",
+    "seed/toggle.mjs": "c3e2db804ae91e82fec9ead94d252edc10f21253623d711357d29ec3482323d2"
+  },
+  "outcome": "tie",
+  "blindReviewerAssignmentWithheld": true,
+  "modelIdentityIndependentlyAttested": false,
+  "readScopeIsolation": "procedural, not OS-enforced",
+  "logNormalization": "Whitespace-only blank lines emptied for git; all other stdout/stderr retained."
+}

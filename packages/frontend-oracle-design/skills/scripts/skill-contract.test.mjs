@@ -801,6 +801,62 @@ test('O1-O7: loads one detailed changeability reference before implementation de
   assert.match(implementationLoop, /boilerplate/)
 })
 
+test('changeability: grounds material choices in change evidence without adding a scoring gate', async () => {
+  const [criteria, decision, review] = await Promise.all([
+    read('references/changeability.md'),
+    read('references/delivery/implementation-decision.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  assert.match(criteria, /## Start with a concrete change/)
+  assert.match(criteria, /actual change history/)
+  assert.match(criteria, /preserved contract/)
+  assert.match(criteria, /understanding.*modification.*verification/s)
+  assert.match(criteria, /file count.*not a quality score/s)
+  assert.match(criteria, /static walkthrough.*not.*measured.*improvement/s)
+  assert.match(decision, /## Material change sketch/)
+  assert.match(decision, /not a separate artifact or an additional required field/)
+  assert.match(decision, /Existing mapper.*new adapter/s)
+  assert.match(criteria, /five-axis review output.*subagent-review\.md/s)
+  assert.match(review, /judges the five axes exactly once each/)
+})
+
+test('changeability: owns the present-boundary exception without retaining a conflicting frontend ban', async () => {
+  const [criteria, frontend] = await Promise.all([
+    read('references/changeability.md'),
+    read('references/frontend/decisions.md'),
+  ])
+
+  assert.match(criteria, /### Present-boundary exception/)
+  assert.match(criteria, /even\s+within one responsibility/)
+  assert.match(criteria, /existing client.*query.*test seam/s)
+  assert.match(criteria, /local mapper.*parameter.*adapter/s)
+  assert.match(criteria, /single implementation.*not.*automatic.*adapter/s)
+  assert.match(criteria, /error distinctions.*request count.*cancel.*cleanup/s)
+  assert.match(criteria, /current SDK.*independent.*change/s)
+  assert.match(criteria, /pass-through wrapper/)
+  assert.match(criteria, /simple toggle/)
+  assert.match(frontend, /changeability\.md#present-boundary-exception/)
+  assert.doesNotMatch(frontend, /Do not add an interface·factory·adapter for a single local implementation/)
+  assert.doesNotMatch(criteria, /Only when two or more approved routers/)
+  assert.match(criteria, /single runtime on future possibility alone/)
+})
+
+test('changeability: compares caller knowledge and defines bounded rehearsal evidence', async () => {
+  const criteria = await read('references/changeability.md')
+
+  assert.match(criteria, /caller.*concepts.*preconditions.*order.*errors/s)
+  assert.match(criteria, /runTransfer\(options\)/)
+  assert.match(criteria, /### Bounded change rehearsal/)
+  assert.match(criteria, /same.*input.*revision.*settings/s)
+  assert.match(criteria, /raw diff.*test.*results/s)
+  assert.match(criteria, /independent reviewer/)
+  assert.match(criteria, /Stop.*existing seam.*satisfies/s)
+  assert.match(criteria, /stop.*revert.*preserved contract/s)
+  assert.match(criteria, /regex.*schema.*not.*semantic/s)
+  assert.match(criteria, /martinfowler\.com\/bliki\/Yagni/)
+})
+
 test('O8-O10: reviews with the same changeability reference without turning taste into a blocker', async () => {
   const [changeability, subagentReview] = await Promise.all([read('references/changeability.md'), readReview()])
 

@@ -1,0 +1,54 @@
+✖ loading and amounts preserve rendering and one audit per success event (1.342834ms)
+✔ approved error distinctions are preserved without success telemetry (0.092458ms)
+✔ unexpected failure preserves cause rather than inventing a recovery policy (0.148291ms)
+✔ dispose is idempotent and late events cannot write or throw (0.06875ms)
+✔ toggle changes only open and its label, without mutation (0.064ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 34.853958
+
+✖ failing tests:
+
+test at packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:52:1
+✖ loading and amounts preserve rendering and one audit per success event (1.342834ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+    [
+      {
+        kind: 'loading'
+      },
+      {
+        kind: 'ready',
+  +     text: '$NaN'
+  -     text: '$12.34'
+      },
+      {
+        kind: 'ready',
+  +     text: '$NaN'
+  -     text: '$0.00'
+      },
+      {
+        kind: 'ready',
+  +     text: '$NaN'
+  -     text: '$-1.25'
+      }
+    ]
+
+      at TestContext.<anonymous> (file:///Users/chungheon/orca/my-Vibe-Coding-Helper/packages/frontend-oracle-design/test-fixtures/changeability/verify.test.mjs:58:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { kind: 'loading' }, { kind: 'ready', text: '$NaN' }, { kind: 'ready', text: '$NaN' }, { kind: 'ready', text: '$NaN' } ],
+    expected: [ { kind: 'loading' }, { kind: 'ready', text: '$12.34' }, { kind: 'ready', text: '$0.00' }, { kind: 'ready', text: '$-1.25' } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

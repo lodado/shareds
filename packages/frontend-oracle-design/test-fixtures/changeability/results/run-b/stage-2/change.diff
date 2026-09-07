@@ -1,0 +1,11 @@
+--- stage-1/src/status-view.mjs
++++ stage-2/src/status-view.mjs
+@@ -5,7 +5,7 @@
+     if (event.type === "waiting") {
+       render({ kind: "loading" })
+     } else if (event.type === "settled") {
+-      render({ kind: "ready", text: `$${(event.payload.minorUnits / 100).toFixed(2)}` })
++      render({ kind: "ready", text: `$${(Number(event.payload.amount.minor) / 100).toFixed(2)}` })
+       audit("balance.ready")
+     } else if (event.type === "rejected" && event.code === "DENIED") {
+       render({ kind: "error", text: "Not allowed" })

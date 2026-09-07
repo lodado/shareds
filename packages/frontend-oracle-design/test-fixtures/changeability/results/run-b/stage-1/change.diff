@@ -1,0 +1,48 @@
+--- seed/status-view.mjs
++++ stage-1/src/status-view.mjs
+@@ -1,23 +1,23 @@
+ export function mountBalance(sdk, render, audit) {
+   let disposed = false
+-  const stop = sdk.watch(([phase, amount, error]) => {
++  const { cancel } = sdk.watch((event) => {
+     if (disposed) return
+-    if (phase === 'pending') {
+-      render({ kind: 'loading' })
+-    } else if (phase === 'ok') {
+-      render({ kind: 'ready', text: `$${(amount / 100).toFixed(2)}` })
+-      audit('balance.ready')
+-    } else if (phase === 'denied') {
+-      render({ kind: 'error', text: 'Not allowed' })
+-    } else if (phase === 'offline') {
+-      render({ kind: 'error', text: 'Try again' })
++    if (event.type === "waiting") {
++      render({ kind: "loading" })
++    } else if (event.type === "settled") {
++      render({ kind: "ready", text: `$${(event.payload.minorUnits / 100).toFixed(2)}` })
++      audit("balance.ready")
++    } else if (event.type === "rejected" && event.code === "DENIED") {
++      render({ kind: "error", text: "Not allowed" })
++    } else if (event.type === "rejected" && event.code === "OFFLINE") {
++      render({ kind: "error", text: "Try again" })
+     } else {
+-      throw error
++      throw event.error
+     }
+   })
+   return () => {
+     if (disposed) return
+     disposed = true
+-    stop()
++    cancel()
+   }
+ }
+--- seed/toggle.mjs
++++ stage-1/src/toggle.mjs
+@@ -2,6 +2,6 @@
+   return {
+     ...state,
+     open: !state.open,
+-    label: state.open ? 'Show details' : 'Hide details',
++    label: state.open ? 'Details' : 'Hide details',
+   }
+ }
