@@ -42,6 +42,18 @@ Lane routing:
 
 ## Invariants
 
+### User-facing progress
+
+- After the required lane header, summarize the goal, scope, and expected artifacts in the user's
+  language. Follow the five message shapes in `common.md`; progress is informational, not approval.
+- In the Oracle lane, after source investigation and before writing the plan or Draft, print the test-space briefing
+  in `card/case-space.md`: dimensions, provenance, candidate product, constraints, selection, and unknowns.
+  Read that node with its dependencies at this point, not only after contract rows are drafted.
+- Report meaningful changes only. Keep facts, assumptions, recommendations, and ledger-backed results
+  distinct; the existing Final report remains authoritative for completion evidence and state.
+- The Low fast path stays single-node: use its existing report, without loading Oracle references or
+  creating a test-space briefing, card, lock, or ledger.
+
 ### Document-driven progress
 
 - At the start of each stage, re-read disk, not conversation memory. `journal.md` is append-only
@@ -114,7 +126,8 @@ Whether to skip a load is not a judgment call. The read instructions inlined int
   [`card/card-format.md`](references/card/card-format.md),
   [`card/interaction-sweep.md`](references/card/interaction-sweep.md) — after drafting contract
   rows and before showing the Draft, the disposition sweep of new×inherited×runtime interactions,
-  [`card/case-space.md`](references/card/case-space.md) — declaring the dimension space and
+  [`card/case-space.md`](references/card/case-space.md) — before planning, explain the candidate space;
+  after drafting rows, declare the dimension space and
   dispositioning the machine-generated frames of `scripts/oracle-frames.mjs`,
   [`card/retro-metrics.md`](references/card/retro-metrics.md) — the escape record written for any
   defect found after the lock and the run metrics recorded at `REVIEW_VERIFIED`, neither a gate,

@@ -109,7 +109,7 @@
     {
       "id": "card-case-space",
       "path": "references/card/case-space.md",
-      "when": "after drafting contract rows and before showing the Draft — declare the dimension space and disposition the machine-generated frames",
+      "when": "after source investigation and before writing the plan or Draft — explain the candidate test space; after drafting contract rows and before showing the Draft — declare the dimension space and disposition the machine-generated frames",
       "requires": ["common", "bva", "card-format"]
     },
     {

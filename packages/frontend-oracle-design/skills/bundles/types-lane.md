@@ -18,6 +18,53 @@ request or a Medium/High judgment). Definitions that used to be duplicated acros
 canonical here — each reference adds only its own stage-specific rules, and on any conflict this
 document wins.
 
+## User communication contract
+
+After the mandatory lane header, speak in the user's language. Keep internal codes as supporting
+labels, not the whole explanation. Distinguish facts, assumptions, and recommendations. This is
+not an extra approval gate: continue ordinary investigation and planning; preserve existing policy
+questions, Draft confirmation, lock, and delivery gates. The Low fast path keeps its own single-node
+procedure and report; this contract adds no reference load or Oracle artifacts to that lane.
+
+| Message    | Required content                                                                                                                       |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Start      | Goal, scope/non-goals, expected artifacts, first action.                                                                               |
+| Progress   | Current stage, newly established fact or result, next action.                                                                          |
+| Decision   | Unresolved question, recommendation and reason, alternatives/tradeoffs, what remains blocked. A recommendation is not approved policy. |
+| Failure    | Observed cause (or unknown cause), impact, recovery action and outcome; retain the canonical classification.                           |
+| Completion | Actual state, result, changed paths, verification evidence, unverified scope and artifact paths.                                       |
+
+Emit progress only when the stage, evidence, scope, or blocker changes. Do not invent percentages or ETAs.
+Put the short result first; link actual artifact paths for detail instead of dumping raw tool logs.
+Never claim a linked file exists without checking it. No new progress artifact is required.
+
+Example shapes (placeholders, not execution claims; translate to the user's language):
+
+```text
+[시작] 목표: <사용자 결과> · 범위: <포함 / 제외>
+산출물: <예정 파일> · 먼저: <조사>
+
+[진행 · <단계>] 확인: <새 근거> · 다음: <행동>
+가정: <있을 때만 명시; 확정 사실과 분리>
+
+[결정 필요 · NEEDS_DECISION] <질문>
+추천: <안> — <이유> · 대안: <차이>
+미결정 영향: <확정할 수 없는 동작>
+
+[문제 · <분류>] 원인: <관측 사실 또는 미확인>
+영향: <검증/작업 범위> · 복구: <다음 조치 또는 실제 결과>
+
+Status: <실제 상태> — <실제로 완료된 결과>
+Blocked: <있을 때만: 원인과 해제 조건>
+변경: <경로와 결과> · 검증: <label / runId / exit / grade>
+미검증: <남은 범위와 이유> · 상세: <실제 보고서 경로>
+```
+
+Completion uses SKILL.md's existing Final report applicability and evidence rules, not a second
+report. Cite each runId once. Design-only work reports the card/approval state without implying
+test execution; unavailable evidence is unverified, never PASS. File creation is not execution,
+and `IMPLEMENTED_GREEN` is not `REVIEW_VERIFIED`. Progress summaries cannot create ledger states.
+
 ## Authority priority
 
 Priority of material the user provided or the repo designated as an approved standard. A lower

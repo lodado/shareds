@@ -89,6 +89,61 @@ dimension** and the machine expands it:
 - The claim is the audit unit: an escaped webkit-only defect falsifies the one recorded
   `independent:` line, not a guess about twenty dispositions.
 
+## Pre-plan test-space briefing
+
+After source investigation and before writing the plan or Draft, show the user the proposed space.
+This is an informational preview: it does not replace Draft confirmation or authorize a lock,
+test edits, or production work. Unknown policies stay Open questions under the existing grill rules.
+The first Draft still reconciles this preview against declared dimensions and generated frames.
+
+Include, in the user's language:
+
+- **Goal and axes:** each applicable family, dimension and choice set, with the source ID and exact location
+  (approved requirement/API version, or investigation `file:line`). Code/test/browser observations are investigation evidence, not approved policy.
+  Label inferred axes `Assumption` and missing facts `Unknown`; retain all eight family dispositions.
+- **Candidate product:** show each cardinality and the multiplication, explicitly before constraints.
+  For example, entry (2) × response (3) × submit order (2): `2 × 3 × 2 = 12` raw candidates.
+  This is illustrative, not a prescribed scenario list or a claim about generated or executed tests.
+  State: **candidate combinations ≠ generated frames ≠ executable tests**.
+- **Constraints:** name impossible combinations with witnesses, inapplicable scope with reasons,
+  and unresolved policy separately. Unknown is not excluded. Count the union of excluded combinations
+  once, not the sum of overlapping exclusions. Give a valid-combination count only when computed
+  from those constraints; otherwise say `uncomputed` (미산정), never guess a reduced number.
+- **Selection and risk:** explain the actual generator, not an invented full-product runner:
+  `Strength: 2` is t-way/pairwise by default, High uses `3`; `Touches` scopes obligations,
+  `[error]` choices produce standalone `E*` frames outside the combinable product, and state paths
+  and undefined cells produce `PATH*` / `EMPTY`. Label whether the displayed product includes error
+  choices; show the generator's non-error product separately if different. Full-product review or
+  representative harness configurations do not replace mandatory generated-frame dispositions.
+  Never silently reduce required high-risk combinations; identify how their rows/frames will be
+  retained, or mark the unresolved mapping. Name residual risk outside the declared space.
+- **Counts and limits:** before generation, frame/test counts are `uncomputed`. After generation,
+  report actual counts by kind, not fabricated IDs. Executable test counts wait for `$test`'s realization;
+  an independent harness dimension or several frames mapping to one row is not one new test per cell.
+  With zero dimensions, state `no applicable dimensions` and the reason, not “1 test” from the empty
+  product. A dimension with zero choices is incomplete input, not zero-risk coverage.
+  Do not multiply assertion criteria (accessibility, visual quality, success invariants) as though they
+  were independent input dimensions. Separate relevant harness/configuration checks instead.
+
+Keep rationale next to the existing parsed table, not in new schema columns. Use this compact shape:
+
+```text
+[플랜 전 · 테스트 범위]
+목표: <검증할 사용자 결과>
+축 | 값 | 근거 위치·종류 | 확정/가정/미확인
+<해당 축들; 제외된 family는 이유 표시>
+후보: <개수 × 개수 = 전체 곱; 오류값 포함 여부>
+제약: <불가능/해당 없음과 근거> · 유효 조합: <계산값 또는 미산정>
+선정: <strength / Touches / 별도 오류·경로> · 필수 위험 조합: <보존 방법>
+생성 프레임: <종류별 실제 개수 또는 미산정> · 실행 테스트: <미산정 또는 실제 매핑 근거>
+미확정·잔여 위험: <정책 질문 / 선언 범위 밖>
+다음: <계획 작성; 기존 승인 절차 유지>
+```
+
+If investigation or planning changes the scope, print only added/removed dimensions, the reason,
+count delta (or `uncomputed` if either count is unknown), and changed residual risk. Reconcile the
+first Draft rather than maintaining a second source of truth or silently changing the denominator.
+
 ## Explain the selected space in the first Draft
 
 Show applicable dimensions, choices, reasons tied to contracts, and cross-dimension constraints;
