@@ -727,7 +727,9 @@ cites a real `O*` row, the lock is blocked with `CARD_LINT_FAILED`.
   the type) or an unresolved policy. When unresolved it is `NEEDS_DECISION`, and do not fill in
   "ignore" as the default.
 - This section is included in the card bytes and locked along with them. Translation into a
-  discriminated union is owned by [`types/state-ladder.md`](../types/state-ladder.md).
+  discriminated union is owned by [`types/state-ladder.md`](../types/state-ladder.md). It keeps
+  only the states no owner already holds and derives the rest, so a state named after what the
+  user sees (`paging`, `empty`) is not thereby a union member.
 
 ## Invariants — optional
 

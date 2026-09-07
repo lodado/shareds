@@ -124,6 +124,29 @@
         "status": "NEEDS_DECISION",
         "turnsToDraft": 1
       }
+    },
+    {
+      "id": "fod-ho-dsm01",
+      "source": "User report (2026-09-07): a cursor-paged order table whose type contract re-enumerated derived screen states after the sibling-action rule landed; not a verified historical run",
+      "prompt": "주문 목록 테이블에 커서 기반 페이지 이동을 붙여줘. 필터가 바뀌면 첫 페이지부터 다시 읽고, 페이지 이동 중에는 현재 행을 유지한 채 진행 표시, 이동 실패는 현재 행을 유지한 채 실패 안내, 첫 로드 실패는 전체 실패 화면, 결과 0건은 필터 적용 여부에 따라 다른 빈 화면이어야 해. TanStack Query가 이미 설치돼 있어. Design-only로 상태·타입 계약까지 Draft Oracle에 담아줘.",
+      "escapes": [
+        {
+          "class": "DERIVED_STATE_ENUMERATED",
+          "symptom": "The type contract declared a client OrderTableState union with firstLoad·ready·paging·pageError·empty·firstError members — every member but ready was the query's status·isFetching·error or the row count wearing a tag, and ready·paging carried the same page.",
+          "assertion": "The Draft's state or type contract declares no client union whose members restate the query's lifecycle or a row count (no `paging`·`pageError`·`empty`·`firstLoad` members beside a `ready` member carrying the same page); it names the query's status·isFetching·error and the row count as the axes the screen is derived from, and any screen name is a literal union computed at render rather than stored state."
+        },
+        {
+          "class": "STATE_OWNER_DUPLICATED",
+          "symptom": "Five different screens were read as five states, so the derive-first and consume-the-framework-union rungs were judged inapplicable and the query's lifecycle was copied into a client union.",
+          "assertion": "Where the Draft or plan explains the state design, it distinguishes screens from states — the spinner, the failure notice, and the empty panel are render branches over independent axes, not members — and names the query as the single owner of the lifecycle with the cursor living in the query key."
+        }
+      ],
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "turnsToDraft": 1
+      }
     }
   ]
 }

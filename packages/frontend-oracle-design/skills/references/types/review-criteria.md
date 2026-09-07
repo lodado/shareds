@@ -19,6 +19,14 @@ When reviewing a change that created a type·state contract, judge it by the sam
 - If `O*` rows sharing a screen·recovery path were split into separate states, or a value the card
   does not distinguish was invented as a state field, it is a `FINDING`. If the distinction is
   needed, it is a `POLICY_GAP`.
+- If a union member's tag is computable from a sibling's fields plus a value an owner already holds
+  (`paging` = `ready` + `isFetching`, `empty` = `ready` + `rows.length === 0`), or two members
+  carry the same payload under different tags, a derived state was stored as a member and it is a
+  `FINDING`. It is not if the Implementation Decision names the fact that member alone carries.
+- If a client union enumerates the reachable combinations of independent axes (data present × in
+  flight × failed × row count) instead of reading each axis at its owner and branching at render,
+  it is a `FINDING`. A screen name the render needs belongs in the literal union of a `resolve*`
+  function, not in stored state.
 - If an Event union·transition function·transition command was introduced for a simple query on the
   grounds of the card's State Model, it is a `FINDING`. It is not if the reason for the ladder rung
   choice is in the Implementation Decision.

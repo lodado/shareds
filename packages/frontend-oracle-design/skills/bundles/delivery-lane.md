@@ -951,7 +951,7 @@ Each item is `kind → default owner. Forbidden: duplication shape`.
 - Filters that need sharing·bookmarking·back navigation → URL `searchParams`·router. Forbidden: two-way effect sync between URL and local state
 - A form draft being typed → the nearest form/feature. Forbidden: treating an unsaved draft as the server cache source of record
 - Transient UI such as modal·selection·hover → the nearest component/hook. Forbidden: promoting to a global store without a reason
-- Values computable from current props/state → derive during render (useMemo etc.). Forbidden: storing a computed value back into state via effect
+- Values computable from current props/state → derive during render (useMemo etc.). Forbidden: storing a computed value back into state via effect, or enumerating it as a member of a state union (`empty`·`paging` beside `ready`)
 - Client state actually shared by distant subtrees → the nearest common provider/store. Forbidden: using an app-wide provider as the default
 
 To copy a server source of record into an editable draft, the Oracle must have policies for

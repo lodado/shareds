@@ -151,7 +151,9 @@ Whether to skip a load is not a judgment call. The read instructions inlined int
   [`types/authoring.md`](references/types/authoring.md),
   [`types/api-surface.md`](references/types/api-surface.md),
   [`frontend/decisions.md`](references/frontend/decisions.md). Read [`state-ladder.md`](references/types/state-ladder.md) together with [`frontend/decisions.md`](references/frontend/decisions.md).
-  If an existing query·router·form owns the state, do not create a new `status` union.
+  If an existing query·router·form owns the state, do not create a new `status` union, and never
+  a member per screen — a member computable from a neighbour plus an owned flag (`paging`,
+  `empty`) is derived state, not state.
 - always with state-ladder during type work — loading unconditional, adoption via compiler witness packet gate →
   [`types/advanced-contracts.md`](references/types/advanced-contracts.md). Once per
   repo, or when tsconfig·TS version·witness inclusion·checker path changes:

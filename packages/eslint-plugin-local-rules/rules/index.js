@@ -9,6 +9,7 @@ module.exports = {
   'no-console-log': require('./no-console-log'),
   'no-css-locator-without-reason': require('./no-css-locator-without-reason'),
   'no-derived-state-effect': require('./no-derived-state-effect'),
+  'no-derived-state-member': require('./no-derived-state-member'),
   'no-fetch-in-component': require('./no-fetch-in-component'),
   'no-refetch-in-effect': require('./no-refetch-in-effect'),
   'no-response-type-assertion': require('./no-response-type-assertion'),

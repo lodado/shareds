@@ -76,6 +76,10 @@ type PaymentBadge = 'unpaid' | 'paid' | 'refunded'
 - Decide from the domain relation, not a minimum member count. A tagged object is justified when
   state changes which fields exist, what they mean, or which combinations are valid — even when
   only one member carries a payload. If no state has attached data, prefer a literal union.
+- The condition holds **per pair of members**, not for the union as a whole. Two members with the
+  same fields under different tags (`ready`·`paging`) are one member plus a flag an owner already
+  holds, and a member that only adds a screen name to a neighbour's data is not diverging data —
+  the derived-state rule of [`state-ladder.md`](state-ladder.md) owns that judgment.
 - Use a single `status` string literal discriminant. Do not express the same flow with parallel
   boolean flags (`isLoading`·`isError`·`isSuccess`).
 - Each state's fields hold only **the values that are meaningful in that state**. Do not merge them
@@ -184,6 +188,8 @@ already has the following rules turned on.
 - `no-boolean-state-flags` — expressing one flow with parallel boolean flags or two boolean
   `useState`
 - `no-action-in-state` — an action such as `retry` stored inside a state union·state value
+- `no-derived-state-member` — two members of a `status` union carrying the same fields under
+  different tags
 
 Reuse `assertNever` if the repo already has it, and if not, create it in only one shared location.
 

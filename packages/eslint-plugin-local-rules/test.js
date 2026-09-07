@@ -461,4 +461,34 @@ typedRuleTester.run('no-action-in-state', rules['no-action-in-state'], {
   ],
 })
 
+typedRuleTester.run('no-derived-state-member', rules['no-derived-state-member'], {
+  valid: [
+    // Members with no fields differ by tag alone, and there the tag is the whole fact.
+    "type S = { status: 'idle' } | { status: 'loading' } | { status: 'success'; data: Payload }",
+    // Different data per member is what a discriminated union is for.
+    "type S = { status: 'ready'; page: Page } | { status: 'failure'; failure: ListFailure }",
+    "type S = { status: 'shipping'; address: Address; fieldErrors: FieldErrors } | { status: 'review'; quote: Quote; agreed: boolean }",
+    // `type` / `kind` variant unions (actions, events, nodes) legitimately repeat a payload per variant.
+    "type Action = { type: 'increment'; by: number } | { type: 'decrement'; by: number }",
+    "type Failure = { kind: 'network'; retryable: boolean } | { kind: 'server'; retryable: boolean }",
+    // A union of references is not inspected.
+    'type S = Ready | Paging',
+  ],
+  invalid: [
+    {
+      code: "type OrderTableState = { status: 'ready'; page: Page<OrderRow> } | { status: 'paging'; page: Page<OrderRow> }",
+      errors: [{ messageId: 'sameDataDifferentTag', data: { tag: 'paging', sibling: 'ready', fields: 'page' } }],
+    },
+    {
+      // readonly and field order do not change the data a member carries.
+      code: "type S = { readonly status: 'open'; readonly id: Id; readonly draft: Draft } | { status: 'saving'; draft: Draft; id: Id }",
+      errors: [{ messageId: 'sameDataDifferentTag', data: { tag: 'saving', sibling: 'open', fields: 'draft, id' } }],
+    },
+    {
+      code: "type S = { phase: 'idle'; attempt: number } | { phase: 'retrying'; attempt: number } | { phase: 'loading'; attempt: number }",
+      errors: [{ messageId: 'sameDataDifferentTag' }, { messageId: 'sameDataDifferentTag' }],
+    },
+  ],
+})
+
 console.log(`ok  ${Object.keys(rules).length} rules pass RuleTester`)

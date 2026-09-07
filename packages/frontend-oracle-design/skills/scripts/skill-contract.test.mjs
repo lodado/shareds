@@ -523,11 +523,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.44.1')
+  assert.equal(version, '0.45.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.44.1')
+  assert.equal(marketplace.version, '0.45.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -1234,6 +1234,40 @@ test('keeps client state data-only and hands actions back beside it', async () =
 
   // 리뷰는 같은 계약으로 판정한다
   assert.match(subagentReview, /state union and action placement/)
+})
+
+test('does not enumerate derived states as union members', async () => {
+  const [typeConstraints, frontendImplementation, oracleCard, skill] = await Promise.all([
+    readTypes(),
+    readFrontend(),
+    readCard(),
+    read('SKILL.md'),
+  ])
+
+  // rung 1은 스칼라만이 아니라 union 멤버에도 적용된다 — 태그 하나가 flag 하나를 인코딩하면 상태가 아니다
+  assert.match(typeConstraints, /## A derived state is not a state/)
+  assert.match(typeConstraints, /Same payload under different tags/)
+  assert.match(typeConstraints, /neighbour plus one field/)
+  assert.match(typeConstraints, /Different screens do not imply different states/)
+  assert.match(typeConstraints, /status: 'paging'; page: Page<OrderRow>/)
+  assert.match(typeConstraints, /literal union returned by a `resolve\*`/)
+  assert.match(typeConstraints, /no-derived-state-member/)
+  assert.match(typeConstraints, /holds \*\*per pair of members\*\*/)
+
+  // 허용 예시가 fetch lifecycle을 손으로 복제한 union을 기본값으로 가르치지 않는다
+  assert.match(typeConstraints, /there is no `DetailState` at all/)
+
+  // 카드→타입 표는 화면이 아니라 상태를 읽는다
+  assert.match(typeConstraints, /a `Given` that reads as a screen/)
+
+  // 리뷰는 같은 기준으로 판정한다
+  assert.match(typeConstraints, /derived state was stored as a member/)
+  assert.match(typeConstraints, /reachable combinations of independent axes/)
+
+  // 카드 State Model의 화면 이름은 멤버 선언이 아니고, 소유권 표는 union 멤버 열거도 금지한다
+  assert.match(oracleCard, /not thereby a union member/)
+  assert.match(frontendImplementation, /enumerating it as a member of a state union/)
+  assert.match(skill, /never\s+a member per screen/)
 })
 
 test('declares every reference as a loadable graph node with resolvable edges', async () => {

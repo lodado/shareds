@@ -181,6 +181,12 @@ const main = async () => {
     'sample-action-state.tsx',
     '@lodado/local-rules/no-action-in-state',
   )
+  await assertReports(
+    [...BASE, ...PRESETS['local-rules']],
+    "export type Table = { status: 'ready'; rows: Row[] } | { status: 'paging'; rows: Row[] }\n",
+    'sample-derived-state.tsx',
+    '@lodado/local-rules/no-derived-state-member',
+  )
 
   // strict-types needs type information, so it lints a real on-disk fixture file.
   const strictFixture = path.join(__dirname, 'strict-types-fixture')
