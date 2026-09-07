@@ -56,6 +56,19 @@ Oracle 작성, behavior TDD, production 수정은 소유하지 않는다.
 Oracle이 없으면 exploratory observation은 가능하지만 `VERIFIED`를 발급하지 않는다.
 관찰 결과와 “정책 기준 없음”을 명시하고 `NEEDS_DECISION`으로 끝낸다.
 
+## 레퍼런스 재현 인계
+
+명시적으로 승인된 QA에 재현 작업의 증거 패킷이 주어지면 evidence log·state matrix·
+asset provenance·unsupported items·host contract를 요청 행과 연결한다.
+증거 패킷은 QA 실행 승인이나 baseline 승인이 아니다. 진입 게이트와 기존 판정 조건을
+그대로 적용하고, 관측·추론·adapted 상태를 승인된 기대 결과와 구분한다.
+
+요청된 motion·interaction 행은 시작·의미 있는 중간 진행·끝·역방향·취소/닫기와
+reduced-motion을 동일 조건에서 확인한다. 정적 자료만 있거나 상태를 재현할 수 없으면
+unsupported 항목과 미검증 이유를 보고하며 통과로 바꾸지 않는다. 자산 권리 미확인은
+별도 release blocker로 보고하고, evidence-only 자산이 배포 입력에 포함됐는지 확인한다.
+인계 문서의 pass나 자기 리뷰는 `VISUAL_VERIFIED`·`BROWSER_VERIFIED`를 대신하지 않는다.
+
 ## 3. 공통 환경 고정
 
 재현에 영향을 주는 값만 기록한다.

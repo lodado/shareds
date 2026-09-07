@@ -12,6 +12,46 @@ const skillDirectory = join(packageDirectory, 'skills/frontend-interface-design'
 
 const read = (relativePath) => readFile(join(skillDirectory, relativePath), 'utf8')
 
+test('reference reconstruction has a conditional entry and a traceable handoff', async () => {
+  const [skill, fidelity, rebuild] = await Promise.all([
+    read('SKILL.md'),
+    read('references/fidelity.md'),
+    read('references/reference-rebuild.md'),
+  ])
+  assert.match(skill, /references\/reference-rebuild\.md/)
+  assert.match(fidelity, /reference-rebuild\.md/)
+  for (const field of [
+    'surface/state',
+    'trigger',
+    'observation',
+    'confidence',
+    'provenance',
+    'classification',
+    'open question',
+  ]) {
+    assert.ok(rebuild.includes(field), `missing evidence field: ${field}`)
+  }
+  for (const boundary of [
+    'observed',
+    'adapted',
+    'unsupported',
+    'evidence-only',
+    'pending',
+    'frontend-visual-qa',
+    'frontend-oracle-design',
+  ]) {
+    assert.ok(rebuild.includes(boundary), `missing boundary: ${boundary}`)
+  }
+  assert.match(rebuild, /브랜드 이름만/)
+  assert.match(rebuild, /스크린샷만/)
+  assert.match(rebuild, /역방향/)
+  assert.match(rebuild, /중간/)
+  assert.match(fidelity, /관측한 state를 옮긴다/)
+  assert.doesNotMatch(fidelity, /ui-checklist 기본값으로 채운다/)
+  assert.match(fidelity, /자기 사이트의 `clone-website` 경로를 사용하지 않는다/)
+  assert.match(skill, /motion 기본값/)
+})
+
 const LINEAGES = [
   'precision-tool',
   'editorial-marketing',
@@ -91,6 +131,7 @@ test('ships every reference, lineage and exemplar the workflow links to', async 
     'look',
     'one-shot',
     'reference-pack',
+    'reference-rebuild',
     'reference-study',
     'review',
     'typography-ko',
@@ -388,7 +429,14 @@ test('one-shot fixes a precedence order, answers without asking, and scopes stat
   assert.match(skill, /one-shot\.md/)
   // Safety and accessibility outrank the reference; the reference outranks the lineage; craft
   // defaults are last, so an observed value is not overruled by a taste rule.
-  const order = ['안전 · 권한 · 법', '접근성 하한', '사용자 소유 소스', 'Reference Pack의 observed', '계보(lineage)의 기본값', 'craft 기본값']
+  const order = [
+    '안전 · 권한 · 법',
+    '접근성 하한',
+    '사용자 소유 소스',
+    'Reference Pack의 observed',
+    '계보(lineage)의 기본값',
+    'craft 기본값',
+  ]
   let cursor = oneShot.indexOf('## 1.')
   for (const step of order) {
     const index = oneShot.indexOf(step, cursor)

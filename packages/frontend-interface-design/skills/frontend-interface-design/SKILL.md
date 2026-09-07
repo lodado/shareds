@@ -44,8 +44,8 @@ discoverability < accessibility < responsiveness이며 취향보다 앞선다. �
    렌더 → 게이트 → 섹션 비평 → 하드 게이트 · 치명적 무퇴행 · 진전일 때 채택,
    첫 렌더 1회 + 보수 최대 2회.
 9. 텍스트 대비 4.5:1 · UI 3:1, 320px 가로 overflow 0, 탭 타깃 24px(모바일 44px) 이상.
-10. motion은 `transform` · `opacity`만, ≤200ms ease-out. 키보드 · 고빈도 동작은 무모션,
-    `prefers-reduced-motion` 존중.
+10. motion 기본값은 `transform` · `opacity`, ≤200ms ease-out. 키보드 · 고빈도 동작은 무모션,
+    `prefers-reduced-motion` 존중. 재현에서는 reference-rebuild.md의 관측값·접근성 우선순위를 따른다.
 11. 지어낸 수치 · 로고 · 후기 없음. 없으면 placeholder와 "확인 필요"로 표시한다.
     **브랜드 이름은 증거가 아니다** — 관측한 팩이 없으면 "재현이 아니다"고 먼저 말한다.
 12. 한 화면에 primary action 하나. 첫 시선이 그것 또는 기억할 요소에 간다.
@@ -72,6 +72,10 @@ discoverability < accessibility < responsiveness이며 취향보다 앞선다. �
 전체 우선순위와 "묻지 않고 가정을 적는" 규칙은 [`references/one-shot.md`](references/one-shot.md).
 
 ## Workflow
+
+실제 URL·기존 화면·스크린샷을 충실히 재현하는 요청은 Fidelity에서
+[`references/reference-rebuild.md`](references/reference-rebuild.md)를 함께 읽는다.
+제3자 URL도 이 경로를 쓰되 소유 소스·계약과 자산 권리를 보존한다. 브랜드 이름만이면 기존 팩 경로다.
 
 0. **Pre-flight.** `package.json` · 토큰 파일 · 공용 컴포넌트 · 폰트 로딩 · 루트 `DESIGN.md` ·
    `.design/log.json`을 읽고 "보존 / 새로 도입"을 `file:line`으로 적는다. 있는 컴포넌트를 쓴다.
