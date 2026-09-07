@@ -1,73 +1,123 @@
-export {}
+import {
+  chooseAllowed,
+  defineRoutes,
+  parseOrderId,
+  parseUserId,
+  renderLink,
+  setField,
+  type Callback,
+  type Dist,
+  type DistributiveOmit,
+  type Entry,
+  type FieldArgs,
+  type Fields,
+  type IsNever,
+  type LinkProps,
+  type MethodCallback,
+  type PreserveModifiers,
+  type RequestState,
+  type RouteRegistry,
+  type UserId,
+  type Whole,
+} from './contracts.js'
 
-type Equal<Actual, Expected> = (<T>() => T extends Actual ? 1 : 2) extends <T>() => T extends Expected ? 1 : 2
-  ? true
-  : false
-type Expect<T extends true> = T
+// Markers identify harness expectations; tsc does NOT verify their descriptions.
+const success: RequestState<number> = { status: 'success', data: 1 }
+const idle: RequestState<number> = { status: 'idle' }
+// @ts-expect-error witness:payload
+const missingData: RequestState<number> = { status: 'success' }
 
-function chooseAllowed<T extends string>(allowed: readonly T[], value: NoInfer<T>): T {
-  if (!allowed.includes(value)) throw new Error(`Unexpected value: ${value}`)
-  return value
+const button = { onClick: () => {} } satisfies LinkProps
+renderLink({ ...button })
+const href = '/home'
+renderLink({ href })
+// @ts-expect-error witness:xor-literal
+renderLink({ href, onClick: () => {} })
+const invalidLink = { href, onClick: () => {} }
+// @ts-expect-error witness:xor-variable
+renderLink(invalidLink)
+// @ts-expect-error witness:xor-spread
+renderLink({ ...invalidLink })
+// @ts-expect-error witness:xor-undefined
+renderLink({ href, onClick: undefined })
+
+setField<Fields>('title', 'ok')
+setField<Fields>('count', 1)
+// @ts-expect-error witness:tuple-arity
+setField<Fields>('title')
+const correlated: FieldArgs<Fields> = Math.random() ? ['title', 'ok'] : ['count', 1]
+setField<Fields>(...correlated)
+const fieldKey: keyof Fields = Math.random() ? 'title' : 'count'
+const fieldValue: Fields[keyof Fields] = Math.random() ? 'ok' : 1
+// @ts-expect-error witness:correlation
+setField<Fields>(fieldKey, fieldValue)
+
+const allowed = ['draft', 'published'] as const
+const chosen: 'draft' | 'published' = chooseAllowed(allowed, 'draft')
+// @ts-expect-error witness:inference-authority
+chooseAllowed(allowed, 'archived')
+const inferredRoutes = defineRoutes(['/home', '/settings'])
+const routes: readonly ['/home', '/settings'] = inferredRoutes
+
+function assertNever(value: never): never {
+  throw new Error(String(value))
+}
+function exhaust(state: RequestState<number>): string {
+  switch (state.status) {
+    case 'idle':
+      return 'idle'
+    case 'loading':
+      return 'loading'
+    case 'success':
+      return String(state.data)
+    // mutation:exhaustiveness
+    default:
+      return assertNever(state)
+  }
 }
 
-const allowedStatuses = ['draft', 'published'] as const
-const chosenStatus = chooseAllowed(allowedStatuses, 'draft')
-type noinferPreservesTupleAuthority = Expect<Equal<typeof chosenStatus, 'draft' | 'published'>>
+const distributed: Dist<'a' | 1> = ['a']
+// @ts-expect-error witness:distribution
+const wrongDistributed: Dist<'a' | 1> = [1]
+// @ts-expect-error witness:non-distribution
+const wrongWhole: Whole<'a' | 1> = ['a']
+// @ts-expect-error witness:distributed-never
+const wrongNever: Dist<never> = []
+const neverDetected: IsNever<never> = true
+// @ts-expect-error witness:never-boxing
+const wrongNeverDetected: IsNever<never> = false
+const omitted: DistributiveOmit<Entry, 'id'> = { kind: 'text', value: 'ok' }
+// @ts-expect-error witness:distributive-omit
+const wrongOmitted: DistributiveOmit<Entry, 'id'> = { kind: 'text', value: 1 }
 
-// @ts-expect-error NoInfer keeps the second argument from widening the allowed tuple authority.
-chooseAllowed(allowedStatuses, 'archived')
+const patch: PreserveModifiers<{ readonly name?: string; count: number }> = { count: 1 }
+// @ts-expect-error witness:readonly
+patch.name = 'changed'
 
-type Route = 'home' | 'settings' | 'billing'
+const parsed: UserId = parseUserId('u-1')
+// @ts-expect-error witness:raw-brand
+const rawId: UserId = 'u-1'
+// @ts-expect-error witness:brand-mixing
+const wrongId: UserId = parseOrderId('o-1')
+const external: unknown = 'u-1'
+// @ts-expect-error witness:unknown-before-parser
+const unparsedId: UserId = external
+const validated: UserId = parseUserId(external)
 
-const routeTitles = {
-  home: 'Home',
-  settings: 'Settings',
-  billing: 'Billing',
-} satisfies Record<Route, string>
-type satisfiesKeepsLiteralKeys = Expect<Equal<keyof typeof routeTitles, Route>>
+const callback: Callback = { handle: (value: string) => void value }
+// @ts-expect-error witness:callback-variance
+const narrowCallback: Callback = { handle: (value: 'narrow') => void value }
+const method: MethodCallback = { handle: (value: 'narrow') => void value }
 
-const missingRouteTitles = {
-  home: 'Home',
-  settings: 'Settings',
-  // @ts-expect-error satisfies Record<Route, ...> rejects missing union members.
-} satisfies Record<Route, string>
-void missingRouteTitles
+// Variables can carry extra keys: satisfies is not a universal exact-key guard.
+const wider = { home: '/', settings: '/', extra: '/' }
+const registry = wider satisfies RouteRegistry
+const literalRegistry = { home: '/', settings: '/' } satisfies RouteRegistry
+// @ts-expect-error witness:registry-missing
+const missingRegistry = { home: '/' } satisfies RouteRegistry
+// @ts-expect-error witness:registry-extra
+const extraRegistry = { home: '/', settings: '/', extra: '/' } satisfies RouteRegistry
 
-const extraRouteTitles = {
-  home: 'Home',
-  settings: 'Settings',
-  billing: 'Billing',
-  // @ts-expect-error satisfies Record<Route, ...> rejects keys outside the closed union.
-  admin: 'Admin',
-} satisfies Record<Route, string>
-void extraRouteTitles
-
-type DistElement<T> = T extends readonly (infer Item)[] ? Item : T
-type BoxedElement<T> = [T] extends [readonly (infer Item)[]] ? Item : T
-type BadNeverCheck<T> = T extends never ? true : false
-type GoodNeverCheck<T> = [T] extends [never] ? true : false
-
-type distributiveConditionalMapsUnionMembers = Expect<Equal<DistElement<string | readonly number[]>, string | number>>
-type boxedConditionalTreatsUnionAsWhole = Expect<
-  Equal<BoxedElement<string | readonly number[]>, string | readonly number[]>
->
-type distributiveNeverStaysNever = Expect<Equal<BadNeverCheck<never>, never>>
-type boxedNeverCheckReturnsBoolean = Expect<Equal<GoodNeverCheck<never>, true>>
-
-type ThemePatch = {
-  keep?: 'dark'
-  clear: 'dark' | undefined
-}
-
-const omitOptional: ThemePatch = { clear: undefined }
-const setBoth: ThemePatch = { keep: 'dark', clear: 'dark' }
-void omitOptional
-void setBoth
-
-// @ts-expect-error exactOptionalPropertyTypes distinguishes omission from explicit undefined.
-const explicitUndefinedOptional: ThemePatch = { keep: undefined, clear: 'dark' }
-void explicitUndefinedOptional
-
-// @ts-expect-error required properties that include undefined still must be present.
-const missingRequiredUndefined: ThemePatch = {}
-void missingRequiredUndefined
+const undefinedPayload: RequestState<undefined> = { status: 'success', data: undefined }
+// @ts-expect-error witness:required-undefined
+const missingUndefined: RequestState<undefined> = { status: 'success' }

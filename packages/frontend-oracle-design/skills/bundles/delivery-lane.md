@@ -305,7 +305,8 @@ The moment right after each transition is the boundary: idle→pending, pending�
 
 ## 5. Type boundaries
 
-Apply this only to exported shared/package API types — local state·internal Props are not targets.
+Choose witnesses by risk and the static guarantee being claimed, not export visibility. High-risk
+local contracts are eligible; routine local state need not have a separate type-test layer.
 A type's boundary is not a value's min·max but the extremes of the type lattice. Pick only the axes
 this API **actually closes**, and per axis put one passing witness and one `@ts-expect-error` in `.test-d.ts(x)`.
 Do not create a witness on an axis it does not close.
@@ -321,8 +322,8 @@ Do not create a witness on an axis it does not close.
 | inference authority     | Only the intended arguments join inference under `NoInfer`·`const` type parameter                   |
 
 Put only one misuse expression on the line after `@ts-expect-error` — packing several misuses into one
-line makes it pass on an unrelated diagnostic. When one API's `@ts-expect-error` count exceeds 30, stop
-writing more cases and split the API. 30 is not a target to fill but a design disqualification line meaning the surface is too wide.
+line makes it pass on an unrelated diagnostic. Keep cases non-overlapping and split an API when the
+surface becomes hard to review; case count is a complexity signal, not a fixed quota.
 
 ## 7 auto-added TC types
 

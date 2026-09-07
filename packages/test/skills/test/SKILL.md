@@ -118,8 +118,8 @@ ownership splits from production, and make the test follow along when a slice is
   expected values.
 - When an exported shared/package API type is the target of this change, put a `.test-d.ts(x)` witness on
   each bva.md type boundary axis. The axes are set by the relations the card closes, and only one misuse
-  goes on the line after `@ts-expect-error`. When it exceeds 30, do not add more cases; raise the API split
-  as NEEDS_DECISION — splitting the surface is a policy judgment.
+  goes on the line after `@ts-expect-error`. Keep witnesses non-overlapping and split a surface when it
+  becomes hard to review; case count is a complexity signal, not a fixed quota.
 
 Playwright rules (no exceptions):
 

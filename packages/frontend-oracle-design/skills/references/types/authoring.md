@@ -73,8 +73,9 @@ type CheckoutState =
 type PaymentBadge = 'unpaid' | 'paid' | 'refunded'
 ```
 
-- Decide first which of the two examples above to copy. A tagged object is only for when **two or
-  more** members have their own fields, and otherwise it is a literal union.
+- Decide from the domain relation, not a minimum member count. A tagged object is justified when
+  state changes which fields exist, what they mean, or which combinations are valid — even when
+  only one member carries a payload. If no state has attached data, prefer a literal union.
 - Use a single `status` string literal discriminant. Do not express the same flow with parallel
   boolean flags (`isLoading`·`isError`·`isSuccess`).
 - Each state's fields hold only **the values that are meaningful in that state**. Do not merge them

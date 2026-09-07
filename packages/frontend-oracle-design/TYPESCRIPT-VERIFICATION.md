@@ -11,6 +11,14 @@
 > [`skills/SKILL.md`](skills/SKILL.md)와
 > [`skills/references/reference-graph.json`](skills/references/reference-graph.json)입니다.
 
+## Current 0.44 verification boundary
+
+The historical release results below are not current-run evidence. Current verification separates
+static compiler witnesses from runtime behavior: `test-fixtures/typescript` and the pinned compiler
+cover type acceptance, while `skills/scripts/type-runtime.test.mjs` covers unknown-input parsing and
+unknown-input parser behavior. A passing runtime test does not prove the static contract, and a passing
+compiler witness does not prove runtime behavior.
+
 ## 한 줄 요약
 
 AI 생성을 결정론적으로 만들지는 않습니다. 대신 AI가 만든 여러 후보를 **프로젝트에 실제로
@@ -40,6 +48,67 @@ AI 구현 후보
 
 이번 변경은 이런 결과를 설명이나 리뷰어의 감각만으로 판단하지 않고, 실제 compiler가 실패할
 수 있는 witness로 바꾸는 데 목적이 있습니다.
+
+## 계약 의무와 검증 하네스 경계
+
+중요한 타입 주장은 Implementation Decision의 승인된 근거 행과 연결합니다. 기록할 값은 보호할
+관계, 실제 제품 symbol과 import/소비 경로, 정상 호출 또는 대입, 실제로 거절할 오용 표현,
+`static`·`runtime`·`mixed`·`policy-gap` 분류, 필요한 compiler flag, witness와 실행 증거,
+그리고 남은 런타임 보완입니다. local/public 여부만으로 witness 의무를 결정하지 않으며, 위험도와
+주장하는 정적 보장으로 결정합니다. 사례 수에는 고정 quota가 없고 비중복 coverage를 기준으로
+합니다.
+
+witness는 같은 이름의 `declare` 함수나 복제 interface가 아니라 실제 제품 symbol을 import해야
+합니다. 검사기는 실제 compiler 경로·버전, `tsc --showConfig`의 effective config, 검사 파일
+목록과 필수 witness inclusion을 확인하고, 격리 canary로 진단 경로가 살아 있는지 확인해야 합니다.
+`@ts-expect-error` 설명문은 compiler가 검증하는 계약이 아니며, 지시문이 가린 오류를 제품의
+`VALID_RED`로 보고하지 않습니다. 하네스 누락·`noCheck`·transpile-only·오타·문법/모듈 오류는
+계약 거절이 아니라 각각 harness 또는 infrastructure 결과로 분류합니다. 계약을 약화한 mutation이
+의도한 witness를 더 이상 거절하지 못할 때만 killed로 셉니다. baseline GREEN → 한 축 mutation
+실패 → 원복 GREEN 순서를 유지합니다.
+
+`satisfies`는 런타임 검증이나 모든 alias의 exact-key 검사도 아니고, `unique symbol` brand는
+assertion·`any` 우회나 런타임 검증을 대신하지 않습니다. `readonly`는 runtime freeze가 아니며,
+key remapping이 modifier를 반드시 제거하는 것도 아닙니다. `NoInfer`는 추론 원천만 제한하고
+union key와 독립 payload의 상관관계를 만들지 않으므로, 그 관계가 계약이면 mapped union of
+objects/tuples를 사용하고 positive·negative witness를 둡니다.
+
+## 0.44.0 실행 범위와 제한
+
+현재 corpus는 `test-fixtures/typescript/contracts.ts`를 실제로 import하는 **스킬 회귀**입니다.
+소비 프로젝트의 승인 행을 대신하는 제품 검증이라고 보고하지 않습니다. 실제 소비 프로젝트에는
+해당 obligation의 제품 symbol과 필요한 JSX/프로젝트 설정을 연결해야 합니다.
+
+- 한 variant만 payload가 있는 상태, 변수/spread/명시적 undefined를 통한 XOR, correlated tuple과
+  독립 union, NoInfer 추론 권위, const literal 추론, exhaustive consumer, 분배/never,
+  DistributiveOmit, remap modifier, ID 혼용/unknown, callback property와 method 차이를 검사합니다.
+- `skills/scripts/type-guidance.test.mjs`는 pinned Compiler API로 config의 extends를 해석하고,
+  실제 포함 파일과 symbol을 확인합니다. 동일 compiler host에서 canary와 지시문 제거 사본을
+  검사해 diagnostic code와 오용 표현의 span을 대조합니다.
+- 계약 mutation은 실제 `contracts.ts`를 한 축씩 바꿉니다. 동일 verifier가 의도한 진단으로
+  실패하고 원복 후 GREEN인지 확인합니다. 변경 대상이 없는 치환을 성공으로 인정하지 않습니다.
+- witness 제외/삭제, 직접·상속 noCheck, 진단을 하지 않는 checker, nocheck 지시문은 거부합니다.
+  negative의 symbol 오타는 invalid이며 계약 mutation의 killed로 세지 않습니다.
+- node-test diagnostic 출력에는 매 실행의 runId, compiler/runner, 실효 설정, 실제 검사 파일,
+  계약/witness revision, 진단과 mutation·원복 runId가 남습니다. 별도의 TS evidence adapter나
+  자동 제품 승인 연결은 추가하지 않았습니다. 기존 node-test trusted producer가 실행 결과를
+  다루며, 출력 JSON이나 hash 자체가 승인·실행 진실성의 증명은 아닙니다.
+- `skills/scripts/type-runtime.test.mjs`는 실제 fixture parser의 unknown 입력을 행동 검증합니다.
+  이 파일의 transpilation은 실행 준비일 뿐 typecheck가 아닙니다. zod 변환, 실제 JSX, 중복 요청,
+  stale response, abort/retry/멱등성은 이 corpus가 검증하지 않으며 소비 프로젝트의 기존 테스트가
+  맡습니다. 브랜드와 readonly도 런타임 보안·freeze를 보장하지 않습니다.
+
+같은 TS 5.9.3 / Node v26.7.0 / 현재 fixture config로 기준 SHA의 witness와 변경 후 corpus를
+각각 `--extendedDiagnostics` 실행한 관측값입니다. 두 실행 모두 GREEN이며, 과거 release의
+다른 config 결과를 재사용하지 않았습니다. 작은 corpus의 비용 관측이지 성능 개선이나 안전 한계의
+증명은 아닙니다.
+
+| 관측값         | 기준 witness | 변경 후 corpus |
+| -------------- | ------------ | -------------- |
+| Types          | 3494         | 3811           |
+| Instantiations | 1485         | 1584           |
+| Memory used    | 38384K       | 31967K         |
+| Check time     | 0.19s        | 0.16s          |
 
 ## 타입이 소유하는 범위
 

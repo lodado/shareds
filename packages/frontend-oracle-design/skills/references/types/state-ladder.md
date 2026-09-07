@@ -39,9 +39,9 @@ Judge every design by the following question.
 - The remaining time-axis non-determinism and its runtime defense must be recorded in the
   Implementation Decision. Reporting type-valid as behavior-correct is also a `FINDING`.
 
-Before designing, find the six points below in the change target and **write down at least three
-wrong usages that must not compile first** — for an exported API they become the
-`@ts-expect-error` cases of `.test-d.ts` as they are.
+Before designing, identify the applicable relations below and the concrete wrong usages that must
+not compile. Select witnesses by the risk and the static guarantee being claimed, not a minimum
+case count or export visibility.
 
 - Value — wide `string`·`number`·`Date` → brand·semantic type
 - Combination — several related booleans, mutually exclusive optional Props → discriminated union,
@@ -52,6 +52,18 @@ wrong usages that must not compile first** — for an exported API they become t
 - Result — success·failure·absence·keep·delete all in one `undefined` → `Result`·operation union
 - Extension — the key consumers will extend is open as `string` → typed registry·module
   augmentation
+
+## Contract obligations
+
+For each important or explicitly claimed static guarantee, attach a small obligation to the existing
+Implementation Decision: approved source row; protected relation; actual file, symbol, and consumer
+path; valid usage; rejected misuse; classification (`static`, `runtime`, `mixed`, or `policy-gap`);
+required compiler flags; witness and run evidence; and remaining runtime complement.
+
+Choose non-overlapping coverage, not a fixed minimum or maximum count. Do not exempt a high-risk
+contract merely because it is local or require a witness merely because it is exported. Do not
+promote private types to public API solely for tests; use colocated checks or the real consumption
+boundary. Missing approved policy is a policy gap, not permission to invent a type restriction.
 
 ## State design ladder
 

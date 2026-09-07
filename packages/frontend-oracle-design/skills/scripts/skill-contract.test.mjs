@@ -523,11 +523,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.43.0')
+  assert.equal(version, '0.44.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.43.0')
+  assert.equal(marketplace.version, '0.44.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -871,7 +871,10 @@ test('pins the system-design grill phases and the conditional API contract forma
   assert.match(skill, /phase order.*one-question-at-a-time/s)
   assert.match(oracleCard, /an earlier answer kills a later branch/)
   assert.match(oracleCard, /3~5 per round, at most 2 rounds/)
-  assert.match(oracleCard, /5 or fewer\s+surviving questions remain after pruning, bundle the two rounds into the Draft itself/)
+  assert.match(
+    oracleCard,
+    /5 or fewer\s+surviving questions remain after pruning, bundle the two rounds into the Draft itself/,
+  )
   assert.match(oracleCard, /RADIO framework/)
   assert.match(oracleCard, /Example Mapping/)
   assert.match(oracleCard, /frontend-system-design.*into P4·P5 questions/s)
@@ -982,7 +985,7 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
   assert.match(typeConstraints, /what no longer compiles/)
   assert.match(typeConstraints, /acceptance decision determinism/)
   assert.match(typeConstraints, /newly designed exported shared\/package API, the generic itself is not the goal/)
-  assert.match(typeConstraints, /existing library generic.*not (?:a )?target/is)
+  assert.match(typeConstraints, /existing library generic are not subject to this/i)
   assert.match(typeConstraints, /generation itself remains non-deterministic/i)
   assert.doesNotMatch(typeConstraints, /같은\s+카드에서 같은 설계가 나온다/)
   assert.match(typeConstraints, /[Ss]hared API promotion delta/)
@@ -1007,7 +1010,7 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
   assert.match(typeConstraints, /Attach (?:a )?discriminant[\s\S]{0,20}diverging data/i)
   // 예시 하나만 있으면 그 모양이 기본값이 된다 — object union 옆에 literal union 대조쌍 유지
   assert.match(typeConstraints, /type PaymentBadge = 'unpaid' \| 'paid' \| 'refunded'/)
-  assert.match(typeConstraints, /Decide first[\s\S]{0,30}two examples above[\s\S]{0,10}copy/i)
+  assert.match(typeConstraints, /Decide from the domain relation, not a minimum member count/i)
   assert.match(typeConstraints, /Create schemas only at boundaries/i)
   assert.match(typeConstraints, /Do not move the rules into code comments/i)
   assert.match(typeConstraints, /key is \*\*the branching union itself\*\*/)
@@ -1124,7 +1127,7 @@ test('always loads advanced compiler contracts with type work and keeps adoption
   assert.match(advancedContracts, /runtime complement.*parser·guard·runtime test/)
 })
 
-test('scopes negative type witnesses to boundary axes and caps them as a design limit', async () => {
+test('scopes type witnesses to claimed relations without fixed quotas', async () => {
   const [typeConstraints, bva] = await Promise.all([readTypes(), read('references/bva.md')])
 
   // 축은 bva.md 한 곳이 소유한다 — 타입 문서는 이 API가 닫는 축만 고르라고 요구한다
@@ -1133,10 +1136,10 @@ test('scopes negative type witnesses to boundary axes and caps them as a design 
   assert.match(typeConstraints, /for each boundary axis this API closes/)
   assert.match(typeConstraints, /axes and the count rule for type witnesses are owned by/)
 
-  // 30은 채우는 목표가 아니라 분리 신호다
-  assert.match(bva, /30 is not a target to fill but a design disqualification line/)
-  assert.match(typeConstraints, /exceeds 30, do not write more cases but split the API/)
-  assert.match(typeConstraints, /exceeds 30.*API split.*`FINDING`/is)
+  // 사례 수는 고정 quota가 아니라 비중복 coverage와 복잡도 신호다
+  assert.match(bva, /case count is a complexity signal, not a fixed quota/)
+  assert.match(typeConstraints, /risk and the (?:static )?guarantee being claimed/)
+  assert.match(typeConstraints, /not a fixed minimum or maximum count/)
 
   // 축을 아예 선언하지 않는 우회를 오용 목록과 묶어 닫는다
   assert.match(typeConstraints, /misuse list[\s\S]*boundary axis[\s\S]*N\/A/i)
@@ -1649,7 +1652,10 @@ test('reports the low lane in three lines instead of padding the oracle block wi
   assert.match(skill, /Padding those fields with N\/A is a\s+report defect/)
 
   // lane 문서의 보고 절차와 같은 세 항목이다
-  assert.match(lane, /Report the result: the changed paths, the verification commands run and their actual results, and\s+the risk reason/)
+  assert.match(
+    lane,
+    /Report the result: the changed paths, the verification commands run and their actual results, and\s+the risk reason/,
+  )
 })
 
 test('carves the disqualifying scope out of a mixed low-risk request instead of promoting all of it', async () => {
@@ -1826,7 +1832,9 @@ test('records escapes as classes and run metrics as direction signals, never gat
   assert.match(retro, loose('## Escape record — `escapes.jsonl`'))
   assert.match(
     retro,
-    loose('`JUDGMENT_ERROR` · `DIMENSION_MISSING` · `INVARIANT_MISSING` · `POLICY_GAP` · `EVIDENCE_GAP` · `HARNESS_DEFECT`'),
+    loose(
+      '`JUDGMENT_ERROR` · `DIMENSION_MISSING` · `INVARIANT_MISSING` · `POLICY_GAP` · `EVIDENCE_GAP` · `HARNESS_DEFECT`',
+    ),
   )
   assert.match(retro, loose('The class is the lesson; the symptom is evidence'))
   assert.match(retro, loose('Re-classify by appending a new line, never by editing'))

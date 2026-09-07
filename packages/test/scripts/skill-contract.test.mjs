@@ -23,7 +23,7 @@ test('ships the frontend test contract with its required BVA reference', async (
   assert.equal(bundledBva, oracleBva)
 })
 
-test('writes type witnesses on the shared boundary axes and treats 30 as a split signal', async () => {
+test('writes type witnesses on the shared boundary axes without a fixed quota', async () => {
   const [skill, bva] = await Promise.all([
     readFile(join(skillDirectory, 'SKILL.md'), 'utf8'),
     readFile(join(skillDirectory, 'references/bva.md'), 'utf8'),
@@ -34,9 +34,8 @@ test('writes type witnesses on the shared boundary axes and treats 30 as a split
   assert.match(bva, /Do not create a witness on an axis it does not close/)
   assert.match(skill, /each bva\.md type boundary axis/)
 
-  // 30은 채우는 목표가 아니라 분리 신호다 — 분리 판단은 정책이므로 oracle로 올린다
-  assert.match(bva, /30 is not a target to fill but a design disqualification line/)
-  assert.match(skill, /it exceeds 30, do not add more cases; raise the API split/)
+  assert.match(bva, /case count is a complexity signal, not a fixed quota/)
+  assert.match(skill, /case count is a complexity signal, not a fixed quota/)
 })
 
 test('O31: records runs through the oracle ledger and blocks weakened tests', async () => {

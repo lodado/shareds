@@ -218,7 +218,7 @@
     {
       "id": "type-environment",
       "path": "references/type-environment.md",
-      "when": "once per repo — the first type contract or a tsconfig·TS version change",
+      "when": "once per repo — the first type contract or a tsconfig·TS version·witness inclusion·checker path change",
       "requires": []
     },
     {

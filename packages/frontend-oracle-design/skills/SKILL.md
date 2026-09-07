@@ -141,7 +141,7 @@ Whether to skip a load is not a judgment call. The read instructions inlined int
   If an existing query·router·form owns the state, do not create a new `status` union.
 - always with state-ladder during type work — loading unconditional, adoption via compiler witness packet gate →
   [`types/advanced-contracts.md`](references/types/advanced-contracts.md). Once per
-  repo, or when tsconfig·TS version changes:
+  repo, or when tsconfig·TS version·witness inclusion·checker path changes:
   [`references/type-environment.md`](references/type-environment.md).
 - UI-shaping: before new UI, redesigns, or visible layout/palette/type/copy/motion/responsive/
   identity changes, read [`references/visual-design.md`](references/visual-design.md). Record the

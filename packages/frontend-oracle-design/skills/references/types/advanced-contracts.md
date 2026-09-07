@@ -55,12 +55,12 @@ Read each item together with **the relation it closes** and **the trap**. When y
   to delay the instantiation depth limit (`TS2589`). On adoption, the before/after values of
   `--extendedDiagnostics` from [`../type-environment.md`](../type-environment.md) are
   mandatory.
-- **homomorphic vs non-homomorphic mapped type** — only the `{ [K in keyof T]: … }` form preserves
-  `readonly`·optional modifiers. If the key source is not `keyof T` the preservation rule differs,
-  so apply the modifier test of the semantics rules below.
-- **the two implementations of a branded type** — a string tag (`{ __brand: 'UserId' }`) is
-  structurally forgeable, while a `unique symbol` brand cannot be forged outside the declaring
-  module. For a contract that crosses a package boundary, prefer the symbol brand. The criteria for
+- **mapped-type modifiers** — homomorphic forms preserve `readonly` and optional modifiers, and
+  some key-remapping forms preserve them too. Test the actual form rather than treating `as`
+  remapping or a different key source as automatic modifier loss.
+- **the two implementations of a branded type** — a string tag (`{ __brand: 'UserId' }`) is structurally forgeable, while a `unique symbol` brand resists ordinary structural construction outside its declaring module. Neither brand validates runtime values; assertions and `any` can bypass it. Prefer an isolated symbol-brand constructor across package boundaries.
+  (The brand rule is a choice about structural mixing, not parser evidence.)
+  The criteria for choosing targets follow the brand rule of [`api-surface.md`](api-surface.md).
   choosing targets follow the brand rule of [`api-surface.md`](api-surface.md).
 - **Forbidden: union-order-dependent types** — the `UnionToTuple` family is non-deterministic
   because union member order is a compiler-internal matter. Do not put it in product code. The ban
@@ -72,14 +72,14 @@ Read each item together with **the relation it closes** and **the trap**. When y
 To adopt an advanced type, leave the evidence below in `.test-d.ts(x)` or in the type assertion
 test the repo uses.
 
-| Evidence           | Criterion                                                                                                                           |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| positive witness   | One representative product call site compiles without an explicit type argument.                                                    |
-| negative witnesses | One `@ts-expect-error` line per axis this type closes among the [`../bva.md`](../bva.md) type boundary axes.                        |
-| edge witnesses     | A hole not in the axis table, such as `overload`, is added only when this type actually exposes it. Split the API if it exceeds 30. |
-| mutation witness   | Widening the union to `string`, changing a required field to optional, or removing `NoInfer` turns the suite RED.                   |
-| runtime complement | URL·storage·API·time axis·sanitization are proven by a separate parser·guard·runtime test.                                          |
-| soundness gap      | Write down the remaining holes such as the last overload signature, method bivariance, and assertion isolation.                     |
+| Evidence           | Criterion                                                                                                                                                                                                                                            |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| positive witness   | One representative product call site compiles without an explicit type argument.                                                                                                                                                                     |
+| negative witnesses | One `@ts-expect-error` line per axis this type closes among the [`../bva.md`](../bva.md) type boundary axes.                                                                                                                                         |
+| edge witnesses     | A hole not in the axis table, such as `overload`, is added only when this type actually exposes it. Keep cases non-overlapping; split the API when the witness surface is too broad to review. Case count is a complexity signal, not a fixed quota. |
+| mutation witness   | A risk-selected weakening of the claimed relation (union widening, required→optional, `never` removal, or correlation removal) turns the suite RED.                                                                                                  |
+| runtime complement | URL·storage·API·time axis·sanitization are proven by a separate parser·guard·runtime test.                                                                                                                                                           |
+| soundness gap      | Write down the remaining holes such as the last overload signature, method bivariance, and assertion isolation.                                                                                                                                      |
 
 ## Advanced semantics rules
 
@@ -97,8 +97,17 @@ test the repo uses.
   cross-product grows, hand it over to ahead-of-time generation or runtime validation.
 - A `const` type parameter only preserves call-site literal inference; it cannot recover the
   literal of a variable that has already widened to `string`.
-- `NoInfer` only restricts the inference source and does not change assignability. Pin which
-  argument is the inference authority with positive/negative witnesses.
+- `NoInfer` only restricts the inference source and does not change assignability. It does not
+  correlate a union key with an independently unioned payload: `T[K]` is still a union when `K` is
+  a union. Use a mapped union of tuples/objects when key↔value correlation is the contract, and pin
+  the inference authority with positive/negative witnesses.
+- `satisfies` checks an expression against a target while preserving its inferred type; it is not a
+  runtime validator and does not provide exact-key checking for every variable or alias.
+- A `unique symbol` brand blocks ordinary structural mixing only when construction is isolated; it
+  does not validate runtime values and can still be bypassed by assertions or `any`.
+- `readonly` constrains the typed operation, not runtime freezing or every alias to the same object.
+- Key remapping does not inherently discard `readonly` or optional modifiers. Verify the effective
+  mapped-type form and compiler behavior instead of treating remapping as an automatic loss.
 - Even under `strictFunctionTypes`, a method·constructor declaration has a bivariance exception.
   Take a callback that needs safety as a function property rather than a method, and keep a
   negative witness.

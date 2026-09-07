@@ -56,8 +56,9 @@ When reviewing a change that created a type·state contract, judge it by the sam
 - A type predicate that does not check the required invariants, a key-remapping return type without
   a runtime key transform, and reporting `satisfies`·`as const`·annotation·excess property check as
   runtime validation or sanitization are `FINDING`.
-- Making a `{ kind }` tagged object union when at most one member has its own fields, or a variant
-  record that only reduces declaration lines without a single authority, is a `FINDING`.
+- Making a `{ kind }` tagged object union when state does not change data presence, meaning, or
+  valid combinations, or a variant record that only reduces declaration lines without a single
+  authority, is a `FINDING`. One payload-bearing member can still justify a discriminated union.
 - If a schema is placed on a value generated inside the app while the storage·URL·response read
   point is trusted without parsing, it is a `FINDING`.
 
@@ -77,8 +78,8 @@ When reviewing a change that created a type·state contract, judge it by the sam
 - If a boundary axis declared as closed has no witness, or witnesses were filled in even for axes
   this API does not close, it is a `FINDING`. The axis list is owned by the type boundary section
   of [`../bva.md`](../bva.md).
-- If one API's `@ts-expect-error` exceeds 30 and an API split was not considered, it is a `FINDING`.
-  30 is not a target to be filled but a design disqualification line meaning the surface is too
+- If witness cases are redundant or the surface is too broad to review, consider an API split. There
+  is there is no fixed `@ts-expect-error` quota; coverage follows the non-overlapping relations actually claimed.
   wide.
 - If Implementation Decision 3 has a misuse list but every boundary axis was written as N/A, it is
   a `FINDING`. The misuse written as blocked is exactly the axis being closed.

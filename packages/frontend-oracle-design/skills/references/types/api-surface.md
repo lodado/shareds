@@ -80,22 +80,23 @@ inferred from the value alone, such as a config definition. After that, design o
 
 The axes and the count rule for type witnesses are owned by the type boundary section of
 [`../bva.md`](../bva.md). Pick only the axes this API closes and do not create axes it does not
-close. If `@ts-expect-error` exceeds 30, do not write more cases but split the API — 30 is not a
-target but a design disqualification line.
+close. Keep witnesses non-overlapping and split an API when the surface becomes hard to review;
+case count is a complexity signal, not a fixed quota.
 
 ## Verification mapping
 
 - Keep the card row → failing test mapping per the `$test` contract. Do not create a separate "type
   test layer" for every state.
-- Only when a state·Props type is exposed as an exported shared/package API, prove that the
-  impossible usage does not compile with an `@ts-expect-error` type test (`.test-d.ts`,
-  `.test-d.tsx` for JSX, or vitest `expectTypeOf`). For a generic API, prove the representative
-  valid call without an explicit type argument in the same typecheck as well. Where applicable,
-  verify readonly·`as const` tuple input acceptance, type predicate narrowing, and that no literal
-  widening to `string` occurs. Write a one-line reason on each `@ts-expect-error` for which misuse
-  it blocks, and do not add them for local state.
-- A public compiler witness prefers an actual call·assignment·`satisfies`. Do not verify a public
-  API with only an `Equal<A, B>`-style helper.
+- For a contract that claims a static guarantee, prove the smallest representative valid call and
+  the actual misuse that the contract closes with an `@ts-expect-error` type test (`.test-d.ts`,
+  `.test-d.tsx` for actual JSX, or the repo's explicitly executed typecheck path). Public/shared APIs and high-risk local contracts
+  are both eligible; routine local state may rely on ordinary tsc and behavior tests. For a generic
+  API, prove the representative valid call without an explicit type argument in the same typecheck.
+  Where applicable, verify readonly·`as const` tuple input acceptance, type predicate narrowing, and
+  that no literal widening to `string` occurs. Write a one-line reason on each `@ts-expect-error` for
+  which misuse it blocks.
+
+- A public compiler witness imports the actual product symbol and uses an actual call, assignment, JSX expression, or `satisfies`; a same-named `declare` or copied interface is not evidence. An `Equal<A, B>` helper may supplement this but cannot be the sole public API verification.
 - A negative case puts only one misuse expression on the line after `@ts-expect-error` so that an
   unrelated diagnostic cannot let it pass.
 - A custom generic picks only the axes this type actually closes among the `../bva.md` type
