@@ -2037,6 +2037,11 @@ function findingKey(finding) {
   return `${finding.row}|${finding.classification}|${normalized}`
 }
 
+/** SEVERITIES는 심각도 내림차순이다 — 낮은 인덱스가 더 높은 심각도다. */
+function severityRank(finding) {
+  return SEVERITIES.indexOf(finding.severity)
+}
+
 async function findingsResult(options) {
   if (!options.file || !options.oracle) {
     throw new CliError('USAGE', 'findings requires --file and --oracle', 2)
@@ -2061,15 +2066,20 @@ async function findingsResult(options) {
   if (secondary) {
     const secondaryKeys = new Set(claims(secondary).map(findingKey))
     const primaryKeys = new Set(claims(primary).map(findingKey))
-    const seen = new Set()
+    // 같은 key의 중복은 가장 높은 severity를 쓴 원래 지적 하나로 접는다. 먼저 나온 사본을 남기면
+    // 같은 문서 안의 medium 사본이 high를 가려, mandatory 판정이 문서 순서에 좌우된다.
+    const retained = new Map()
+    for (const finding of [...claims(primary), ...claims(secondary)]) {
+      const key = findingKey(finding)
+      const kept = retained.get(key)
+      if (!kept || severityRank(finding) < severityRank(kept)) retained.set(key, finding)
+    }
 
     blocking = []
     advisory = [...opinions(primary), ...opinions(secondary)]
 
-    for (const finding of [...claims(primary), ...claims(secondary)]) {
-      const key = findingKey(finding)
-      if (seen.has(key)) continue
-      seen.add(key)
+    // Map은 첫 등장 순서를 유지한다 — 유지된 항목의 출력 순서는 severity 선택과 무관하게 같다.
+    for (const [key, finding] of retained) {
       if (mandatory(finding) || (secondaryKeys.has(key) && primaryKeys.has(key))) blocking.push(finding)
       else advisory.push(finding)
     }

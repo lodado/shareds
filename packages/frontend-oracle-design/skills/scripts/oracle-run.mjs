@@ -62,6 +62,8 @@ const FLAG_NAMES = [
   'role',
   'reviewer',
   'task-id',
+  'blind-map',
+  'blind-input',
 ]
 
 const BOOLEAN_FLAGS = new Set(['json', 'changed-files'])
@@ -120,6 +122,12 @@ const NEXT_ACTIONS = {
   MUTATION_EVIDENCE_REQUIRED: 'after GREEN, run the guard-removed failing run, restore, re-GREEN, and pass --mutation-run/--mutation-row',
   MUTATION_EVIDENCE_INVALID: 'the mutation must fail on the mapped row and the production digest must return exactly before review',
   REVIEW_PACKET_REQUIRED: 'generate `review-packet` and hand the reviewer its path',
+  BLIND_MAP_REQUIRED:
+    'derive `blind-input`, have a reviewer who never saw evidence.json return the test→row mapping, record it with `review-receipt --role blind-mapper`, and pass --blind-input/--blind-map',
+  BLIND_INPUT_STALE: 'the revision or the test bytes moved after the blind read — derive `blind-input` again and re-run the blind mapping',
+  BLIND_MAP_STALE: 'the evidence mapping changed after the blind read — a stale blind read cannot disprove the new mapping; re-run it',
+  BLIND_MAP_RECEIPT_INVALID: 'record the blind mapping with `review-receipt --role blind-mapper` against this input and revision',
+  BLIND_INPUT_INVALID: 'generate the blind input with `blind-input` — it carries only the contract rows and the test sources',
   REVIEW_PACKET_STALE: 'the input changed since the packet — regenerate `review-packet`, never edit it',
   REVIEW_RERUN_REQUIRED: 're-run the GREEN command after applying findings and cite the new run',
   SNAPSHOT_STALE: 'bytes changed since GREEN — re-run the required labels and cite the new runs',
@@ -685,6 +693,9 @@ function replayState(state, ledger) {
         evidence: entry.evidence ?? null,
         findings: entry.findings ?? null,
         packet: entry.packet ?? null,
+        // 멈춤 원인은 원장이 가진 사실이다 — state 쓰기가 끊겨 재생될 때도 잃지 않는다
+        ...(entry.lockStop ? { lockStop: entry.lockStop } : {}),
+        ...(entry.blindMapping ? { blindMapping: entry.blindMapping } : {}),
         runCount: entry.runCount ?? 0,
         at: entry.at,
         ledgerDigest: entry.digest,
@@ -1055,6 +1066,25 @@ function isReportedPassingRun(run) {
 
 function isReviewPacketShape(value) {
   return Boolean(value?.lockVerification && value?.targetSnapshot && value?.oracle && Array.isArray(value?.ledger))
+}
+
+/**
+ * 블라인드 행↔테스트 매핑이 필요한가 — subagent-review.md의 규칙 그대로다.
+ * High은 언제나, Medium은 한 테스트가 여러 행을 지는 N:1 매핑이 있을 때. Low는 해당 없다.
+ * 판정 입력은 검증된 런의 risk와 증거 매핑뿐이다 — 호출자가 넘긴 옵션은 판정에 쓰지 않는다.
+ */
+function blindMappingApplicability(risk, evidence) {
+  const tests = Object.entries(evidence?.rows ?? {}).filter(([, entry]) => entry?.kind === 'test')
+  const byName = new Map()
+  for (const [row, entry] of tests) byName.set(entry.name, [...(byName.get(entry.name) ?? []), row])
+  const shared = [...byName.entries()].filter(([, rows]) => rows.length > 1).map(([name]) => name)
+  // High은 조건 없이 언제나 요구된다. 테스트 증거가 하나도 없으면 면제가 아니라 증거가 잘못된 것이다 —
+  // 그 판정은 호출부가 EVIDENCE_INVALID로 막는다.
+  if (risk === 'high') return { required: true, reason: 'high-risk review always runs the blind mapping', shared }
+  if (risk === 'medium' && shared.length > 0) {
+    return { required: true, reason: `medium risk with rows sharing one test: ${shared.sort().join(', ')}`, shared }
+  }
+  return { required: false, reason: null, shared }
 }
 
 async function testEvidenceDigest(path) {
@@ -1586,6 +1616,67 @@ async function transition(options) {
   })
 }
 
+/**
+ * 블라인드 매핑 영수증 — `--packet`에는 blind-input을, `--findings`에는 매핑 파일을 준다. 두 바이트를 원장에
+ * 직접 묶어, REVIEW_VERIFIED가 "이 입력을 읽고 이 매핑을 낸 작업"을 확인할 수 있게 한다.
+ */
+async function blindMapReceipt(options, directory, state) {
+  const inputSnapshot = await snapshotRegularFile(resolve(options.packet), {
+    base: directory,
+    allowHardlinks: false,
+    label: 'blind mapping input',
+    fail: (message) => new CliError('BLIND_INPUT_INVALID', message),
+  })
+  const input = JSON.parse(inputSnapshot.bytes.toString('utf8'))
+  if (input?.schemaVersion !== 1 || input?.targetRevision !== options.revision) {
+    throw new CliError('BLIND_INPUT_INVALID', 'blind mapping receipt must cite a `blind-input` for this revision')
+  }
+  const mapSnapshot = await snapshotRegularFile(resolve(options.findings), {
+    base: directory,
+    allowHardlinks: false,
+    label: 'blind mapping',
+    fail: (message) => new CliError('BLIND_MAP_INVALID', message),
+  })
+  let map
+  try {
+    map = JSON.parse(mapSnapshot.bytes.toString('utf8'))
+  } catch (error) {
+    throw new CliError('BLIND_MAP_INVALID', `Cannot read the blind mapping: ${error.message}`)
+  }
+  if (!map || typeof map !== 'object' || Array.isArray(map) || Object.keys(map).length === 0) {
+    throw new CliError('BLIND_MAP_INVALID', 'the blind mapping must be a non-empty JSON object keyed by test name')
+  }
+  const revision = verifyLock(directory, state)
+  const receiptId = sha256(
+    stableStringify({
+      inputSha256: inputSnapshot.sha256,
+      mapSha256: mapSnapshot.sha256,
+      revision: options.revision,
+      role: 'blind-mapper',
+      reviewerId: options.reviewer,
+      taskId: options.taskId,
+    }),
+  )
+  const event = await appendLedger(directory, {
+    type: 'review-receipt',
+    receiptId,
+    // 블라인드 리뷰어는 리뷰 패킷을 읽지 않는다 — packetSha256 자리에는 그가 실제로 읽은 입력을 적는다.
+    packetSha256: inputSnapshot.sha256,
+    targetRevision: options.revision,
+    role: 'blind-mapper',
+    reviewerId: options.reviewer,
+    taskId: options.taskId,
+    outputSha256: inputSnapshot.sha256,
+    findingsSha256: mapSnapshot.sha256,
+    oracleSha256: revision.oracleSha256,
+    adapter: 'controller',
+    at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
+  })
+  state.ledgerHead = event.digest
+  await writeState(directory, state)
+  process.stdout.write(`BLIND_MAP_RECEIPT ${receiptId} digest:${event.digest}\n`)
+}
+
 async function reviewReceipt(options) {
   const required = ['dir', 'packet', 'revision', 'findings', 'role', 'reviewer', 'taskId']
   if (required.some((name) => !options[name])) {
@@ -1601,6 +1692,9 @@ async function reviewReceipt(options) {
     if (state.state !== 'IMPLEMENTED_GREEN') {
       throw new CliError('REVIEW_RECEIPT_STATE', 'review receipts may only be created before REVIEW_VERIFIED')
     }
+    // 블라인드 매핑 영수증은 같은 원장 장치를 쓰되 입력이 다르다: 리뷰 패킷이 아니라 blind-input이고,
+    // 산출물은 findings가 아니라 `{ "<test name>": "O1" }` 매핑이다. 그래서 판정 findings 스키마를 요구하지 않는다.
+    if (options.role === 'blind-mapper') return blindMapReceipt(options, directory, state)
     const packet = await snapshotRegularFile(resolve(options.packet), {
       base: directory,
       allowHardlinks: false,
@@ -1677,6 +1771,203 @@ async function reviewReceipt(options) {
   })
 }
 
+/**
+ * 드리프트 상태에서 멈춤을 기록할 때 남기는 원인. 기대값은 마지막으로 신뢰된 run-state·manifest의 값이고,
+ * 관측값은 지금 실제로 읽히는 바이트다. 관측은 사실 기록일 뿐 검증이 아니다 — 읽을 수 없으면
+ * 지어내지 않고 null로 남긴다.
+ *
+ * 관측도 읽기다. 그래서 나머지 읽기와 **같은** 경로 규칙을 쓴다: snapshotRegularFile로 심볼릭 링크·
+ * 하드링크·TOCTOU를 막고 base 밖으로 나가지 않는다. 그리고 드리프트한 manifest가 가리키는 임의 경로를
+ * 따라가지 않는다 — 포인터는 신뢰된 digest와 일치하는 manifest에서만 따른다.
+ */
+async function lockStopCause(directory, state, error) {
+  const lockPath = resolve(directory, state.lock)
+  const lockDirectory = dirname(lockPath)
+  const scanRoot = resolve(directory, state.scanRoot)
+  // 잠긴 출처는 저장소 루트 아래에 있다 — oracle-lock·review-packet이 쓰는 것과 같은 경계다.
+  const observationRoot = commonAncestor(lockDirectory, scanRoot)
+
+  /** 확립된 스냅샷 규칙으로만 관측한다. 규칙을 못 지키면 사실이 아니라 unavailable이다. */
+  const observe = async (path, base) => {
+    try {
+      const target = resolve(path)
+      if (!isPathInside(base, target)) return null
+      const snapshot = await snapshotRegularFile(target, { base, allowHardlinks: false, label: 'observed file' })
+      // 읽는 도중 바뀐 바이트는 사실로 기록하지 않는다
+      await assertSnapshotUnchanged(snapshot, { base, label: 'observed file' })
+      return snapshot
+    } catch {
+      return null
+    }
+  }
+
+  const lockSnapshot = await observe(lockPath, observationRoot)
+  const observedManifestSha256 = lockSnapshot?.sha256 ?? null
+  // manifest가 신뢰된 digest와 다르면 그것이 가리키는 경로는 더 이상 신뢰 입력이 아니다.
+  // 드리프트한 포인터를 따라가면 공격자가 고른 파일의 digest를 사실로 적게 된다.
+  const manifestTrusted = Boolean(
+    observedManifestSha256 && state.lockManifestSha256 && observedManifestSha256 === state.lockManifestSha256,
+  )
+  let manifest = null
+  if (manifestTrusted) {
+    try {
+      manifest = JSON.parse(lockSnapshot.bytes.toString('utf8'))
+    } catch {
+      manifest = null
+    }
+  }
+
+  let observedOracleSha256 = null
+  if (manifest?.oracle?.path) {
+    observedOracleSha256 = (await observe(resolve(lockDirectory, manifest.oracle.path), observationRoot))?.sha256 ?? null
+  }
+  // 잠긴 출처도 같은 규칙으로 관측한다 — SOURCE_CHANGED의 어떤 출처가 어떻게 어긋났는지 남긴다.
+  const observedSources = []
+  for (const source of manifest?.sources ?? []) {
+    if (typeof source?.path !== 'string' || !isDigest(source.sha256)) continue
+    observedSources.push({
+      path: source.path,
+      expectedSha256: source.sha256,
+      observedSha256: (await observe(resolve(lockDirectory, source.path), observationRoot))?.sha256 ?? null,
+    })
+  }
+
+  return {
+    code: error.code ?? 'LOCK_INVALID',
+    message: error.message,
+    priorState: state.state,
+    expectedOracleSha256: state.lockSha256 ?? null,
+    expectedManifestSha256: state.lockManifestSha256 ?? null,
+    observedManifestSha256,
+    // manifest 자체가 드리프트했으면 그 포인터로 얻은 관측은 존재하지 않는다 — 지어내지 않는다
+    observedOracleSha256,
+    observedSources,
+    manifestTrusted,
+  }
+}
+
+/**
+ * 블라인드 매핑 증거 결속. 리뷰어가 읽은 입력이 (a) 승인된 리비전, (b) 그 리비전의 테스트 소스 바이트,
+ * (c) 지금 검증 중인 매핑의 digest, (d) 원장에 있는 리뷰어·작업 영수증에 묶여 있는지 확인한다.
+ * 입력 결속은 같은 사용자 권한을 가진 악의적 행위자에 대한 증명이 아니다 — 잘못된 리비전·낡은 테스트·
+ * 바뀐 매핑·다른 영수증을 거절하는 것까지가 이 검사의 범위다.
+ */
+/** 정본 파생과 제출된 입력의 키 집합·값이 정확히 같아야 한다 — 여분 문맥은 블라인드성을 깬다. */
+const BLIND_INPUT_KEYS = [
+  'schemaVersion',
+  'targetRevision',
+  'oracleSha256',
+  'lockManifestSha256',
+  'evidenceMappingSha256',
+  'testBindingsSha256',
+  'blindMappingRequired',
+  'contractRows',
+  'testSources',
+]
+
+async function assertBlindMappingEvidence(directory, state, options, expected) {
+  const inputSnapshot = await snapshotRegularFile(resolve(options.blindInput), {
+    base: directory,
+    allowHardlinks: false,
+    label: 'blind mapping input',
+    fail: (message) => new CliError('BLIND_INPUT_INVALID', message),
+  })
+  const mapSnapshot = await snapshotRegularFile(resolve(options.blindMap), {
+    base: directory,
+    allowHardlinks: false,
+    label: 'blind mapping',
+    fail: (message) => new CliError('BLIND_MAP_INVALID', message),
+  })
+  let input
+  try {
+    input = JSON.parse(inputSnapshot.bytes.toString('utf8'))
+  } catch (error) {
+    throw new CliError('BLIND_INPUT_INVALID', `Cannot read blind mapping input: ${error.message}`)
+  }
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new CliError('BLIND_INPUT_INVALID', 'blind mapping input must be a JSON object from `blind-input`')
+  }
+
+  const currentEvidenceMappingSha256 = sha256(await readFile(expected.evidencePath))
+  if (input.evidenceMappingSha256 !== currentEvidenceMappingSha256) {
+    throw new CliError('BLIND_MAP_STALE', 'the evidence mapping changed after the blind input was derived')
+  }
+
+  // 제출된 입력을 "검사"하지 않는다 — 지금 신뢰된 값에서 정본을 **다시 파생**해 통째로 대조한다.
+  // 그래서 관련 테스트를 빼거나, 계약 행을 고치거나, production 문맥을 끼워 넣은 입력은 통과할 수 없다.
+  const canonical = (await deriveBlindInput(directory, state)).document
+  const extra = Object.keys(input).filter((key) => !BLIND_INPUT_KEYS.includes(key))
+  if (extra.length > 0) {
+    throw new CliError('BLIND_INPUT_INVALID', `blind mapping input carries context it must not have: ${extra.join(', ')}`)
+  }
+  if (stableStringify(input) !== stableStringify(canonical)) {
+    const reason = BLIND_INPUT_KEYS.filter((key) => stableStringify(input[key]) !== stableStringify(canonical[key]))
+    throw new CliError(
+      'BLIND_INPUT_STALE',
+      `blind mapping input is not the canonical derivation for this revision (${reason.join(', ') || 'shape'})`,
+    )
+  }
+  // 정본은 지금 검증 중인 리비전·카드·매핑을 가리켜야 한다.
+  if (canonical.targetRevision !== expected.targetRevision || canonical.oracleSha256 !== expected.oracleSha256) {
+    throw new CliError('BLIND_INPUT_STALE', 'blind mapping input does not target the approved revision')
+  }
+  if (canonical.lockManifestSha256 !== expected.lockManifestSha256) {
+    throw new CliError('BLIND_INPUT_STALE', 'blind mapping input does not match the verified lock manifest')
+  }
+
+  // 원장에 있는 리뷰어·작업 영수증 — 식별자를 입력 파일에서 읽지 않는다. 원장 사건이 이 입력 바이트와
+  // 이 매핑 바이트를 직접 가리켜야 한다. 그래서 다른 작업의 영수증을 이 매핑에 붙일 수 없다.
+  const receiptEvent = expected.ledger.find(
+    (entry) =>
+      entry.type === 'review-receipt' &&
+      entry.role === 'blind-mapper' &&
+      entry.outputSha256 === inputSnapshot.sha256 &&
+      entry.findingsSha256 === mapSnapshot.sha256,
+  )
+  if (
+    !receiptEvent ||
+    receiptEvent.targetRevision !== expected.targetRevision ||
+    receiptEvent.oracleSha256 !== expected.oracleSha256 ||
+    receiptEvent.adapter !== 'controller'
+  ) {
+    throw new CliError(
+      'BLIND_MAP_RECEIPT_INVALID',
+      'the blind mapping requires a ledger receipt bound to this input, this mapping and this revision',
+    )
+  }
+  // 블라인드 리뷰어는 판정 리뷰어와 같을 수 없다 — 리뷰 패킷을 읽은 사람은 이미 evidence.json을 봤다.
+  // 작업 식별자도 재사용할 수 없다: 패킷을 읽은 그 작업이 블라인드 읽기까지 겸했다고 주장할 수 없다.
+  if (expected.reviewerIds.includes(receiptEvent.reviewerId)) {
+    throw new CliError(
+      'BLIND_MAP_RECEIPT_INVALID',
+      `${receiptEvent.reviewerId} already reviewed with the packet — the blind read needs a reviewer who never saw evidence.json`,
+    )
+  }
+  if ((expected.taskIds ?? []).includes(receiptEvent.taskId)) {
+    throw new CliError(
+      'BLIND_MAP_RECEIPT_INVALID',
+      `${receiptEvent.taskId} is already bound to a packet review — the blind read needs its own task`,
+    )
+  }
+  // 판정에 쓴 두 파일이 그 사이 바뀌지 않았음을 확립된 규칙대로 확인한다.
+  for (const [label, snapshotToCheck] of [
+    ['blind mapping input', inputSnapshot],
+    ['blind mapping', mapSnapshot],
+  ]) {
+    await assertSnapshotUnchanged(snapshotToCheck, {
+      base: directory,
+      label,
+      fail: (message) => new CliError('BLIND_INPUT_STALE', message),
+    })
+  }
+  return {
+    inputSha256: inputSnapshot.sha256,
+    mapSha256: mapSnapshot.sha256,
+    reviewerId: receiptEvent.reviewerId,
+    taskId: receiptEvent.taskId,
+  }
+}
+
 async function transitionUnderLock(options, directory) {
   const state = await readConsistentState(directory)
   const allowed = TRANSITIONS[state.state] ?? []
@@ -1685,7 +1976,20 @@ async function transitionUnderLock(options, directory) {
     throw new CliError('TRANSITION_NOT_ALLOWED', `${state.state} cannot move to ${options.to}`)
   }
 
-  const revision = verifyLock(directory, state)
+  // NEEDS_DECISION·FAIL은 증거가 아니라 멈춤을 기록하는 탈출 전이다. 카드·출처·manifest가 드리프트하면
+  // 성공 진행은 계속 거부하지만, 멈춤까지 막으면 드리프트 처방("NEEDS_DECISION으로 돌아가라") 자체가
+  // 도달 불가능해진다. state·ledger 정체성은 이미 readConsistentState가 검증했으므로 여기서는
+  // 원인을 기록만 하고, 어떤 relock·재개 권한도 주지 않는다. ledger 손상은 위에서 이미 fail closed다.
+  const escaping = options.to === 'NEEDS_DECISION' || options.to === 'FAIL'
+  let revision
+  let lockStop = null
+  try {
+    revision = verifyLock(directory, state)
+  } catch (error) {
+    if (!escaping) throw error
+    lockStop = await lockStopCause(directory, state, error)
+    revision = { oracleSha256: state.lockSha256 ?? null, lockManifestSha256: state.lockManifestSha256 ?? null }
+  }
 
   const allLedger = await readLedger(directory)
   const ledger = allLedger.filter((entry) => entry.type === 'run')
@@ -1693,6 +1997,7 @@ async function transitionUnderLock(options, directory) {
   const notices = []
   let packetSha256 = null
   let implementationRevision = null
+  let blindMapping = null
 
   if (options.to === 'NEEDS_DECISION' || options.to === 'FAIL') {
     if (!options.reason) throw new CliError('MISSING_REASON', `${options.to} requires --reason`)
@@ -2048,6 +2353,44 @@ async function transitionUnderLock(options, directory) {
       throw new CliError('REVIEWER_EVIDENCE_INVALID', 'review findings require a pre-verification ledger receipt')
     }
 
+    // 블라인드 행↔테스트 매핑 — 필요 여부는 검증된 런의 risk와 증거 매핑에서 파생한다. 호출자가 옵션을
+    // 빼는 것으로는 우회할 수 없다. 판정은 마지막 게이트인 여기서만 하고, 앞선 단계는 조기에 잠그지 않는다.
+    const evidenceDocument = JSON.parse(await readFile(resolve(options.evidence), 'utf8'))
+    const intersectDocument = options.intersect
+      ? JSON.parse(await readFile(resolve(options.intersect), 'utf8'))
+      : null
+    const intersectReviewerId = intersectDocument?.reviewerId ?? null
+    const intersectTaskId = intersectDocument?.orchestrationReceipt?.taskId ?? null
+    blindMapping = blindMappingApplicability(state.risk, evidenceDocument)
+    if (blindMapping.required) {
+      // High은 무조건 요구된다. 테스트 증거가 하나도 없다면 면제가 아니라 증거가 잘못된 것이다.
+      const testRows = Object.values(evidenceDocument?.rows ?? {}).filter((entry) => entry?.kind === 'test')
+      if (testRows.length === 0) {
+        throw new CliError(
+          'EVIDENCE_INVALID',
+          'the blind mapping applies but no row maps to a test — an unmapped contract is not an exemption',
+        )
+      }
+      if (!options.blindMap || !options.blindInput) {
+        throw new CliError(
+          'BLIND_MAP_REQUIRED',
+          `${blindMapping.reason} — derive the input with \`blind-input\` and pass --blind-input and --blind-map`,
+        )
+      }
+      blindMapping = {
+        ...blindMapping,
+        ...(await assertBlindMappingEvidence(directory, state, options, {
+          evidencePath: resolve(options.evidence),
+          targetRevision: options.revision,
+          oracleSha256: revision.oracleSha256,
+          lockManifestSha256: revision.lockManifestSha256,
+          ledger: allLedger,
+          reviewerIds: [findingsDocument?.reviewerId, intersectReviewerId].filter(Boolean),
+          taskIds: [findingsDocument?.orchestrationReceipt?.taskId, intersectTaskId].filter(Boolean),
+        })),
+      }
+    }
+
     const reviewArgs = [
       'review',
       '--oracle',
@@ -2064,6 +2407,8 @@ async function transitionUnderLock(options, directory) {
       ledgerPath(directory),
     ]
     if (options.intersect) reviewArgs.push('--intersect', resolve(options.intersect))
+    // 블라인드 매핑 대조는 같은 review 호출에 붙인다 — 같은 패킷 검증을 두 번 하지 않는다.
+    if (blindMapping?.required) reviewArgs.push('--blind-map', resolve(options.blindMap))
     runVerifier(reviewArgs)
   }
 
@@ -2081,6 +2426,8 @@ async function transitionUnderLock(options, directory) {
     intersect: options.intersect ? portablePath(directory, resolve(options.intersect)) : null,
     mutationRunId: options.mutationRun ?? null,
     mutationRow: options.mutationRow ?? null,
+    ...(lockStop ? { lockStop } : {}),
+    ...(blindMapping ? { blindMapping } : {}),
     runCount: ledger.length,
     at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
   }
@@ -2097,6 +2444,8 @@ async function transitionUnderLock(options, directory) {
     packet: historyEntry.packet,
     packetSha256: historyEntry.packetSha256,
     targetRevision: historyEntry.targetRevision,
+    ...(lockStop ? { lockStop } : {}),
+    ...(blindMapping ? { blindMapping } : {}),
     stateDelta: {
       state: options.to,
       testFiles: state.testFiles,
@@ -2111,6 +2460,8 @@ async function transitionUnderLock(options, directory) {
   historyEntry.ledgerDigest = transitionEvent.digest
   state.ledgerHead = transitionEvent.digest
   await writeState(directory, state)
+  // 드리프트 위에서 멈춤을 기록했다는 사실은 조용히 넘어가지 않는다 — 다음 사람이 잠금 상태를 오해하면 안 된다.
+  if (lockStop) notices.push(`LOCK_UNVERIFIED ${lockStop.code}`)
   process.stdout.write([`STATE_${options.to} run:${run?.runId ?? 'none'}`, ...notices, ''].join('\n'))
 }
 
@@ -2305,6 +2656,160 @@ async function collectEvidenceArtifacts(directory, evidenceSnapshot, snapshots) 
     }
   }
   return artifacts.sort((left, right) => left.path.localeCompare(right.path))
+}
+
+/**
+ * 블라인드 리뷰어 입력 — 리뷰 패킷은 evidence·구현 결정·다른 리뷰 판정을 모두 담으므로 블라인드 입력이 될 수
+ * 없다. 그래서 같은 기계장치(잠금 검증·스냅샷·원장)로 **최소 전용 입력**만 파생한다: 카드의 계약 행 본문과
+ * 테스트 소스 바이트뿐이다. 어떤 행이 어떤 테스트에 매핑됐는지는 들어가지 않는다.
+ *
+ * 새 workflow 엔진을 만들지 않는다 — VALID_RED가 이미 얼려 둔 test 바인딩과 GREEN이 검증한 스냅샷을 쓴다.
+ */
+/**
+ * 블라인드 리뷰어 입력의 **정본 파생**. 생산자(`blind-input`)와 검증자(REVIEW_VERIFIED)가 이 함수 하나를
+ * 함께 쓴다. 그래서 "리뷰어가 읽었어야 할 것"이 두 곳에서 갈라지지 않는다.
+ *
+ * 입력은 신뢰된 값에서만 나온다: 잠금이 검증한 카드 바이트, VALID_RED가 얼린 테스트 경로, 등록된 harness
+ * 경로. 호출자가 고른 파일 목록은 쓰지 않는다 — 그래서 테스트를 빼거나 production 파일을 끼워 넣을 수 없다.
+ */
+async function deriveBlindInput(directory, state, { protect } = {}) {
+  const revision = verifyLock(directory, state)
+  const scanRoot = resolve(directory, state.scanRoot)
+  const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+  const snapshots = []
+  const oraclePath = await lockedOraclePath(directory, state)
+  const oracleSnapshot = await snapshotPacketFile(oraclePath, directory, 'Oracle', snapshots)
+  if (oracleSnapshot.sha256 !== revision.oracleSha256) {
+    throw new CliError('BLIND_INPUT_INVALID', 'Oracle bytes do not match the verified lock')
+  }
+  const evidencePath = evidencePathFor(directory, state)
+  const evidenceSnapshot = await snapshotPacketFile(evidencePath, directory, 'evidence map', snapshots)
+  const evidence = JSON.parse(evidenceSnapshot.bytes.toString('utf8'))
+  // 카드·lock·state·ledger·evidence는 판정의 입력이다 — 산출물이 이들을 덮어써서는 안 된다.
+  protect?.(
+    new Set([resolve(directory, state.lock), statePath(directory), ledgerPath(directory), oraclePath, evidencePath]),
+  )
+  const applicability = blindMappingApplicability(state.risk, evidence)
+
+  // 리뷰어가 읽을 것: 잠긴 카드의 계약 행 줄과 얼린 테스트 원문. 두 가지뿐이다.
+  const contractRows = oracleSnapshot.bytes
+    .toString('utf8')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /^\|\s*[OD]\d+\s*\|/.test(line))
+  // 테스트 소스는 VALID_RED가 얼린 그 파일들이다 — 여기서 새로 고르지 않는다.
+  const testPaths = Object.keys(state.testBindings?.tests ?? {})
+    .filter((path) => path in current)
+    .sort()
+  if (testPaths.length === 0) {
+    throw new CliError('BLIND_INPUT_INVALID', 'blind mapping needs at least one frozen test source')
+  }
+  // 최소 의존 파일 — **등록된 harness 경로만**. 임의의 상대 import를 따라가면 production 모듈이 섞여
+  // 블라인드성이 깨진다. 완전한 의존성 해석을 주장하지 않는다: 담기는 것은 등록된 harness helper뿐이다.
+  const helperPaths = [
+    ...new Set((state.harnessPaths ?? []).filter((path) => path in current && !testPaths.includes(path))),
+  ].sort()
+
+  const testSources = []
+  for (const [path, dependency] of [
+    ...testPaths.map((path) => [path, false]),
+    ...helperPaths.map((path) => [path, true]),
+  ]) {
+    const label = dependency ? `test dependency ${path}` : `test source ${path}`
+    const fileSnapshot = await snapshotPacketFile(join(scanRoot, path), scanRoot, label, snapshots)
+    if (fileSnapshot.sha256 !== current[path]) {
+      throw new CliError('BLIND_INPUT_STALE', `${path} changed while the blind input was derived`)
+    }
+    testSources.push({
+      path,
+      sha256: fileSnapshot.sha256,
+      content: fileSnapshot.bytes.toString('utf8'),
+      ...(dependency ? { dependency: true } : {}),
+    })
+  }
+
+  // 확립된 규칙대로, 파생에 쓴 모든 입력이 그 사이 바뀌지 않았음을 확인한다.
+  for (const { label, snapshot: inputSnapshot } of snapshots) {
+    await assertSnapshotUnchanged(inputSnapshot, {
+      label,
+      fail: (message) => new CliError('BLIND_INPUT_STALE', message),
+    })
+  }
+
+  return {
+    revision,
+    applicability,
+    evidencePath,
+    document: {
+      schemaVersion: 1,
+      targetRevision: sha256(JSON.stringify(current)),
+      oracleSha256: revision.oracleSha256,
+      lockManifestSha256: revision.lockManifestSha256,
+      // 매핑 본문은 넣지 않는다 — 리뷰어가 본 적 없어야 2-sample이 성립한다. digest만 묶는다.
+      evidenceMappingSha256: evidenceSnapshot.sha256,
+      testBindingsSha256: await testEvidenceDigest(evidencePath),
+      // applicability의 사유는 공유 테스트 이름 같은 매핑 힌트를 담으므로 리뷰어 입력에 넣지 않는다.
+      blindMappingRequired: applicability.required,
+      contractRows,
+      testSources,
+    },
+  }
+}
+
+async function blindInput(options) {
+  if (!options.dir || !options.output) {
+    throw new CliError('USAGE', 'blind-input requires --dir and --output', 2)
+  }
+  const directory = resolve(options.dir)
+  const state = await readConsistentState(directory)
+  if (state.state !== 'IMPLEMENTED_GREEN') {
+    throw new CliError('BLIND_INPUT_STATE', 'blind mapping input is derived in IMPLEMENTED_GREEN, before review')
+  }
+  const output = resolve(options.output)
+  const outputRelative = relative(directory, output)
+  if (!outputRelative || outputRelative.startsWith('..') || isAbsolute(outputRelative)) {
+    throw new CliError('BLIND_INPUT_INVALID', '--output must be a file inside the Oracle directory')
+  }
+  if (outputRelative === '.run-ids' || outputRelative.startsWith(`.run-ids${sep}`)) {
+    throw new CliError('BLIND_INPUT_INVALID', '--output cannot be written under .run-ids')
+  }
+  // 출력이 심볼릭 링크나 그 부모를 통해 디렉터리 밖으로 새지 않게 한다 — review-packet과 같은 규칙이다.
+  const [directoryReal, outputParentReal] = await Promise.all([realpath(directory), realpath(dirname(output))]).catch(
+    (error) => {
+      throw new CliError('BLIND_INPUT_INVALID', `Cannot resolve output directory: ${error.message}`)
+    },
+  )
+  if (!isPathInside(directoryReal, outputParentReal)) {
+    throw new CliError('BLIND_INPUT_INVALID', '--output parent must stay inside the Oracle directory')
+  }
+  const outputMetadata = await lstat(output).catch((error) => {
+    if (error.code === 'ENOENT') return null
+    throw new CliError('BLIND_INPUT_INVALID', `Cannot inspect output: ${error.message}`)
+  })
+  if (outputMetadata && (!outputMetadata.isFile() || outputMetadata.isSymbolicLink())) {
+    throw new CliError('BLIND_INPUT_INVALID', '--output must be a regular file')
+  }
+
+  const derived = await deriveBlindInput(directory, state, {
+    fail: (code, message) => new CliError(code, message),
+    protect: (paths) => {
+      if (paths.has(output)) {
+        throw new CliError('BLIND_INPUT_INVALID', '--output cannot overwrite a verification input artifact')
+      }
+    },
+  })
+  const document = derived.document
+  const temp = join(dirname(output), `.blind-input-${process.pid}-${Date.now()}.tmp`)
+  try {
+    await writeFile(temp, `${JSON.stringify(document, null, 2)}\n`)
+    await rename(temp, output)
+  } catch (error) {
+    await rm(temp, { force: true })
+    throw error
+  }
+  process.stdout.write(
+    `BLIND_INPUT_WRITTEN ${portablePath(directory, output)} required:${document.blindMappingRequired} revision:${document.targetRevision}\n`,
+  )
 }
 
 async function reviewPacket(options) {
@@ -2694,7 +3199,7 @@ const PACKET_READ_NODES = {
 }
 
 /** transitionUnderLock 1697–2000행이 실제로 검사하는 인자·전제와 같은 규칙으로 패킷 하나를 만든다. */
-function transitionPacket(to, { state, runEntries, staleRunIds, blockers, evidence }) {
+function transitionPacket(to, { state, runEntries, staleRunIds, blockers, evidence, blindMapping }) {
   const requires = []
   const packetBlockers = []
   let candidateRuns = []
@@ -2761,12 +3266,26 @@ function transitionPacket(to, { state, runEntries, staleRunIds, blockers, eviden
     if (to === 'REVIEW_VERIFIED') {
       requires.push('--findings', '--packet', '--revision')
       if (state.risk === 'high') requires.push('--intersect', '--mutation-run', '--mutation-row')
+      // transitionUnderLock이 실제로 쓰는 것과 같은 규칙에서 파생한다 — 규칙 사본을 유지하지 않는다.
+      if (blindMapping?.required) {
+        requires.push('--blind-input', '--blind-map')
+        // 영수증이 아예 없으면 증거가 없는 것이 확실하다. 있더라도 transition은 결속을 다시 판정한다 —
+        // 여기서 blocker가 사라지는 것은 "통과 보장"이 아니라 "이 단계에서 관측 가능한 결손이 없음"이다.
+        if (!blindMapping.receiptPresent) packetBlockers.push('BLIND_MAP_REQUIRED')
+      }
     }
   }
   return { requires, packetBlockers, candidateRuns }
 }
 
-function transitionPackets({ state, directory, runEntries, staleRunIds, blockers, evidence }) {
+/** REVIEW_VERIFIED 패킷에만 블라인드 매핑 상태를 붙인다 — 다른 전이에는 해당 개념이 없다. */
+function blindMappingReport(to, blindMapping) {
+  if (to !== 'REVIEW_VERIFIED') return {}
+  if (!blindMapping) return {}
+  return { blindMapping }
+}
+
+function transitionPackets({ state, directory, runEntries, staleRunIds, blockers, evidence, blindMapping }) {
   const dir = portablePath(process.cwd(), directory)
   return (TRANSITIONS[state.state] ?? []).map((to) => {
     const { requires, packetBlockers, candidateRuns } = transitionPacket(to, {
@@ -2775,6 +3294,7 @@ function transitionPackets({ state, directory, runEntries, staleRunIds, blockers
       staleRunIds,
       blockers,
       evidence,
+      blindMapping,
     })
     const example = [`oracle-run.mjs transition --dir ${dir} --to ${to}`]
     for (const flag of requires) {
@@ -2788,9 +3308,33 @@ function transitionPackets({ state, directory, runEntries, staleRunIds, blockers
       requires,
       candidateRuns,
       readNodes: PACKET_READ_NODES[to],
+      ...blindMappingReport(to, blindMapping),
       example: example.join(' '),
     }
   })
+}
+
+/** status가 보고하는 블라인드 매핑 상태 — 게이트와 같은 applicability 규칙에서 파생한다. */
+async function blindMappingStatus(directory, state, ledger) {
+  if (state.state !== 'IMPLEMENTED_GREEN') return null
+  let evidence
+  try {
+    evidence = JSON.parse(await readFile(evidencePathFor(directory, state), 'utf8'))
+  } catch {
+    return null
+  }
+  const applicability = blindMappingApplicability(state.risk, evidence)
+  if (!applicability.required) return applicability
+  // status는 관측만 한다. 여기서 보이는 것은 "이 리비전을 가리키는 blind-mapper 영수증이 원장에 있는가"뿐이다.
+  // 그 영수증이 실제로 제출될 입력·매핑 바이트를 가리키는지, 리뷰어·작업이 독립인지는 transition만 판정한다.
+  // 그래서 satisfied라고 말하지 않는다 — 있으면 receiptPresent, 판정은 unknown이다.
+  const scanRoot = resolve(directory, state.scanRoot)
+  const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+  const targetRevision = sha256(JSON.stringify(current))
+  const receiptPresent = ledger.some(
+    (entry) => entry.type === 'review-receipt' && entry.role === 'blind-mapper' && entry.targetRevision === targetRevision,
+  )
+  return { ...applicability, receiptPresent, verified: 'unknown' }
 }
 
 async function reportStatus(options) {
@@ -2855,6 +3399,8 @@ async function reportStatus(options) {
       { spent: budget.spent, limit: budget.limit, remaining: Math.max(0, budget.limit - budget.spent) },
     ]),
   )
+  // 마지막 게이트와 같은 규칙으로 블라인드 매핑 필요 여부를 설명한다. 판정은 여전히 transition이 한다.
+  const blindMapping = await blindMappingStatus(directory, state, ledger)
   const blockers = []
   if (lockStatus.status !== 'valid') blockers.push(lockStatus.code)
   if (!ledgerValid) blockers.push('LEDGER_CHAIN_INVALID')
@@ -2888,6 +3434,7 @@ async function reportStatus(options) {
           staleRunIds: staleOrMissingRuns,
           blockers,
           evidence,
+          blindMapping,
         }),
       },
       null,
@@ -2910,10 +3457,11 @@ async function main() {
   else if (command === 'transition') await transition(options)
   else if (command === 'budget') await spendBudget(options)
   else if (command === 'review-packet') await reviewPacket(options)
+  else if (command === 'blind-input') await blindInput(options)
   else
     throw new CliError(
       'USAGE',
-      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, budget, status or review-packet',
+      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, budget, status, review-packet or blind-input',
       2,
     )
 }

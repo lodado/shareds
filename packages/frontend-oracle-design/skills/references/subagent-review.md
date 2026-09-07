@@ -216,11 +216,41 @@ returns, for every test name, the row or rows it enforces:
 { "save > shows pending and POSTs once": ["O1", "O2"], "save > keeps input on 5xx": "O3" }
 ```
 
-`oracle-verify.mjs review --blind-map <file>` compares it with the evidence mapping before the
-binding checks. A row whose test the blind reader mapped elsewhere, or to nothing, is
-`EVIDENCE_MAPPING_DISPUTED`. The remedy is never a mapping edit: re-read the disputed row — a test
-that enforces a different row is an `EVIDENCE_GAP` for the row it left unowned. High risk runs the
-blind mapping always; Medium runs it when a row is mapped N:1 onto a path test.
+`oracle-verify.mjs review --blind-map <file>` compares it with the evidence mapping. A row whose test
+the blind reader mapped elsewhere, or to nothing, is `EVIDENCE_MAPPING_DISPUTED`. The remedy is never
+a mapping edit: re-read the disputed row — a test that enforces a different row is an `EVIDENCE_GAP`
+for the row it left unowned.
+
+The reviewer's input is not the review packet: the packet carries `evidence.json`, the implementation
+decision, and the other review judgments, so reading it is not a blind read. `oracle-run.mjs
+blind-input` derives the minimal dedicated input instead — the card's contract row lines and the
+frozen test sources (plus the registered harness helpers), with the mapping bound only as a digest.
+It does not claim complete dependency resolution: only registered harness paths travel with the
+tests, never arbitrary relative imports, so production modules stay out of the blind read.
+
+```bash
+node <skill-dir>/scripts/oracle-run.mjs blind-input --dir .ai/oracles/<oracle-id> \
+  --output .ai/oracles/<oracle-id>/blind-input.json
+
+# the blind reviewer reads only that file and writes the mapping, then the controller records it
+node <skill-dir>/scripts/oracle-run.mjs review-receipt --dir .ai/oracles/<oracle-id> \
+  --role blind-mapper --reviewer <blind reviewer id> --task-id <task id> \
+  --packet .ai/oracles/<oracle-id>/blind-input.json \
+  --findings .ai/oracles/<oracle-id>/blind-map.json \
+  --revision <targetRevision from blind-input.json>
+```
+
+**The blind mapping is a gate, not an option.** High risk always requires it; Medium requires it when
+two or more rows share one test. Applicability is derived at the final `REVIEW_VERIFIED` transition
+from the verified run's risk and the evidence mapping itself, so omitting `--blind-input`·`--blind-map`
+cannot bypass it — that is `BLIND_MAP_REQUIRED`, and `status --json` reports the same gate before you
+attempt the transition. When the mapping applies but no row maps to a test, that is `EVIDENCE_INVALID`
+rather than an exemption. Earlier phases are not locked: the requirement lands only at the final
+transition. The transition rejects a blind read bound to the wrong revision or stale test bytes
+(`BLIND_INPUT_STALE`), one taken before the mapping changed (`BLIND_MAP_STALE`), and one without a
+ledger receipt tied to that exact input and mapping, or signed by a reviewer who already read the
+packet (`BLIND_MAP_RECEIPT_INVALID`). Input binding proves provenance against mistakes and stale
+artifacts; it is not a proof against a malicious actor holding the same user's write permissions.
 
 ## Reviewer Checklist
 

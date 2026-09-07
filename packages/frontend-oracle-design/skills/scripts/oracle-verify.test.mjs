@@ -1823,6 +1823,107 @@ test('O23: 서로 다른 high finding과 행 없는 high finding은 단독으로
   assert.doesNotMatch(checked.stdout, /DOWNGRADED f-2/)
 })
 
+test('O23: 같은 key의 중복 지적은 가장 높은 severity와 그 출처를 유지한다 — 순서에 의존하지 않는다', async (t) => {
+  const oracle = await cardFile(t, EVIDENCE_CARD)
+  const base = {
+    row: 'O2',
+    classification: 'PRODUCT_DEFECT',
+    evidence: 'r-003',
+    fix: 'error UI 추가',
+  }
+  // findingKey는 대소문자·구두점을 지우므로 아래 네 본문은 모두 같은 key다. 구두점만 다르게 두면
+  // 어느 원본이 유지됐는지 stdout 한 줄로 구분된다 — CLI 스키마를 넓히지 않고 출처를 관측한다.
+  const text = {
+    critical: '오류 표시가 없다!!!',
+    high: '오류 표시가 없다!!',
+    medium: '오류 표시가 없다!',
+    low: '오류 표시가 없다',
+  }
+  const copy = (severity) => ({ ...base, id: `f-${severity}`, severity, finding: text[severity] })
+  const lines = (result) => result.stdout.trim().split('\n')
+  const unrelatedFinding = {
+    id: 'f-other',
+    row: 'O3',
+    classification: 'EVIDENCE_GAP',
+    severity: 'medium',
+    finding: '재시도 증거 없음',
+    evidence: 'r-003',
+    fix: '테스트 추가',
+  }
+  const unrelated = await findingsFile(
+    t,
+    [unrelatedFinding],
+    'unrelated.json',
+  )
+
+  // 같은 문서 안의 중복 — findingKey는 severity를 담지 않으므로 medium이 먼저 나오면 `seen` 단락 때문에
+  // high가 통째로 사라지고, 상대 리뷰어에게 그 key가 없으면 mandatory 판정이 문서 순서에 좌우된다.
+  for (const [label, order, winner] of [
+    ['medium first', ['medium', 'high'], 'high'],
+    ['high first', ['high', 'medium'], 'high'],
+    ['high before critical', ['high', 'critical'], 'critical'],
+    ['critical before high', ['critical', 'high'], 'critical'],
+    ['low medium high', ['low', 'medium', 'high'], 'high'],
+  ]) {
+    const file = await findingsFile(t, order.map(copy), `${order.join('-')}.json`)
+    const checked = run('findings', '--file', file, '--intersect', unrelated, '--oracle', oracle)
+    assert.equal(checked.status, 0, checked.stderr)
+    // 유지된 항목은 가장 높은 severity를 쓴 원래 지적 그 자체다 — 본문이 그 출처를 가리킨다
+    assert.deepEqual(
+      lines(checked),
+      [
+        'FINDINGS_OK blocking:1 advisory:1',
+        `BLOCKING O2 PRODUCT_DEFECT ${text[winner]}`,
+        'ADVISORY O3 EVIDENCE_GAP 재시도 증거 없음',
+      ],
+      label,
+    )
+  }
+
+  // 리뷰어를 가로질러도 같다: 한쪽이 medium, 다른 쪽이 high면 high 원본이 남고 교집합이므로 blocking이다
+  const acrossMedium = await findingsFile(t, [copy('medium')], 'across-medium.json')
+  const acrossHigh = await findingsFile(t, [copy('high')], 'across-high.json')
+  for (const [label, first, second] of [
+    ['medium ∩ high', acrossMedium, acrossHigh],
+    ['high ∩ medium', acrossHigh, acrossMedium],
+  ]) {
+    const checked = run('findings', '--file', first, '--intersect', second, '--oracle', oracle)
+    assert.equal(checked.status, 0, checked.stderr)
+    assert.deepEqual(
+      lines(checked),
+      ['FINDINGS_OK blocking:1 advisory:0', `BLOCKING O2 PRODUCT_DEFECT ${text.high}`],
+      label,
+    )
+  }
+
+  // 한쪽에만 있는 high·critical은 교집합이 아니어도 단독으로 blocking을 유지한다
+  const unilateral = run('findings', '--file', acrossHigh, '--intersect', unrelated, '--oracle', oracle)
+  assert.equal(unilateral.status, 0, unilateral.stderr)
+  assert.deepEqual(lines(unilateral), [
+    'FINDINGS_OK blocking:1 advisory:1',
+    `BLOCKING O2 PRODUCT_DEFECT ${text.high}`,
+    'ADVISORY O3 EVIDENCE_GAP 재시도 증거 없음',
+  ])
+
+  // 진짜로 다른 결함은 병합하지 않는다 — 서로 다른 key는 그대로 각각 남는다
+  const distinct = await findingsFile(
+    t,
+    [
+      copy('high'),
+      { ...base, id: 'd-2', severity: 'high', finding: '입력이 사라진다' },
+    ],
+    'distinct.json',
+  )
+  const distinctChecked = run('findings', '--file', distinct, '--intersect', unrelated, '--oracle', oracle)
+  assert.equal(distinctChecked.status, 0, distinctChecked.stderr)
+  assert.deepEqual(lines(distinctChecked), [
+    'FINDINGS_OK blocking:2 advisory:1',
+    `BLOCKING O2 PRODUCT_DEFECT ${text.high}`,
+    'BLOCKING O2 PRODUCT_DEFECT 입력이 사라진다',
+    'ADVISORY O3 EVIDENCE_GAP 재시도 증거 없음',
+  ])
+})
+
 test('O23: review 명령은 v2 findings를 packet·revision·evidence map에 묶고 blocking을 판정한다', async (t) => {
   const blockingFinding = {
     id: 'f-1',
