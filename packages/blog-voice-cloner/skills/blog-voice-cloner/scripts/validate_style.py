@@ -19,11 +19,11 @@ import re
 import tempfile
 import unicodedata
 
-DIMENSIONS = frozenset(('opening', 'argument_structure', 'sentence_architecture',
+DIMENSIONS = frozenset(('title_craft', 'opening', 'argument_structure', 'sentence_architecture',
     'paragraph_architecture', 'lexical_behavior', 'stance', 'rhetoric',
     'explanation_strategy', 'endings', 'formatting'))
 GENRES = frozenset(('tutorial', 'technical_explanation', 'opinion', 'retrospective', 'review', 'essay'))
-ROLES = frozenset(('opening', 'problem-framing', 'explanation', 'example', 'transition',
+ROLES = frozenset(('title', 'opening', 'problem-framing', 'explanation', 'example', 'transition',
     'counterargument', 'qualification', 'emphasis', 'ending'))
 EXCLUDED_TYPES = frozenset(('code', 'quote', 'blockquote', 'fenced_code', 'indented_code'))
 MAX_BLOCK_CHARS = 20_000
@@ -167,7 +167,7 @@ def validate_documents(drafts, documents, *, min_shared_chars=80, ngram_size=5,
                     evidence=[value], measurement={'present': False}))
     return {'status': 'review_required' if any(f['severity'] != 'info' for f in findings) else 'no_overlap_flags',
             'findings': findings, 'reviews': {name: 'not_run' for name in
-                ('content_preservation', 'style_match', 'over_imitation', 'source_leakage', 'generic_ai_signals')},
+                ('content_preservation', 'style_match', 'over_imitation', 'source_leakage', 'generic_ai_signals', 'target_voice_match')},
             'caveat': CAVEAT}
 
 
@@ -186,7 +186,8 @@ def validate_profile(profile, documents, splits):
     if not isinstance(profile, dict):
         error('profile', 'Profile must be a JSON object.')
         return findings
-    refs = {ref: ref.rsplit(':', 1)[0] for ref, _ in _blocks(documents)}
+    blocks = dict(_blocks(documents))
+    refs = {ref: ref.rsplit(':', 1)[0] for ref in blocks}
     # Recompute actual duplicate components so stale/omitted metadata cannot
     # inflate confidence. Also honor declared groups conservatively.
     parents = {document['id']: document['id'] for document in documents}
@@ -284,6 +285,9 @@ def validate_profile(profile, documents, splits):
             if genre is not None and genre not in scoped_genres:
                 error(location, 'Genre rule scope must include its enclosing genre.')
         evidence = rule.get('evidence')
+        roles = scope.get('roles') if isinstance(scope, dict) else None
+        title_rule = rule.get('dimension') == 'title_craft' or (
+            isinstance(roles, list) and 'title' in roles)
         evidence_docs = set()
         if not isinstance(evidence, list) or not evidence:
             error(location, 'Evidence must be a nonempty list of docid:blockid references.')
@@ -293,6 +297,8 @@ def validate_profile(profile, documents, splits):
                     error(location, 'Evidence reference does not exist.', [reference])
                 elif refs[reference] not in allowed:
                     error(location, 'Evidence must belong exclusively to the profile set, never validation or held-out documents.', [reference])
+                elif title_rule and blocks[reference].get('type') != 'heading':
+                    error(location, 'Title evidence must reference a verified title heading block, not body prose.', [reference])
                 else:
                     evidence_docs.add(root(refs[reference]))
         if len(evidence_docs) <= 1:

@@ -32,7 +32,37 @@ def profile(r=None):
             'weak_observations': [], 'anti_patterns': []}
 
 
+class TitleRuleTests(unittest.TestCase):
+    def test_title_evidence_requires_heading_block(self):
+        for dimension, roles in [('title_craft', ['title']), ('formatting', ['title'])]:
+            with self.subTest(dimension=dimension):
+                title = rule()
+                title['dimension'] = dimension
+                title['scope']['roles'] = roles
+                findings = validator.validate_profile(
+                    profile(title), [doc('This is a body paragraph.')], {'profile': ['source']})
+                self.assertTrue(any('heading' in finding['problem'] for finding in findings))
+
+    def test_title_rule_with_real_heading_evidence(self):
+        title = rule()
+        title.update(dimension='title_craft', instruction='Name the topic in a short title.')
+        title['scope']['roles'] = ['title']
+        self.assertEqual(validator.validate_profile(
+            profile(title), [doc('A small notebook', kind='heading')], {'profile': ['source']}), [])
+
+    def test_title_rule_cannot_use_held_out_heading(self):
+        title = rule()
+        title.update(dimension='title_craft')
+        title['scope']['roles'] = ['title']
+        findings = validator.validate_profile(profile(title), [doc('A small notebook', kind='heading')],
+            {'profile': ['source'], 'held_out': ['source']})
+        self.assertTrue(any('exclusively' in finding['problem'] for finding in findings))
+
+
 class OverlapTests(unittest.TestCase):
+    def test_target_voice_review_is_explicitly_not_run(self):
+        self.assertEqual(validator.validate_documents([], [])['reviews'].get('target_voice_match'), 'not_run')
+
     def test_copied_english_and_korean(self):
         for text in ['A distinctive long paragraph about saffron sunsets and ancient observatories. ' * 3,
                      '나는 오늘 오래된 골목에서 반짝이는 빛을 발견했다. 그 빛은 잊었던 기억을 조용히 불러왔다. ' * 3]:
@@ -76,7 +106,7 @@ class OverlapTests(unittest.TestCase):
         self.assertEqual(len(report['findings']), 2)
         self.assertTrue(all(f['severity'] == 'warning' for f in report['findings']))
         self.assertEqual(set(report['reviews']), {'content_preservation', 'style_match',
-                         'over_imitation', 'source_leakage', 'generic_ai_signals'})
+                         'over_imitation', 'source_leakage', 'generic_ai_signals', 'target_voice_match'})
         self.assertEqual(set(report['reviews'].values()), {'not_run'})
         self.assertNotIn('originality_score', report)
         self.assertIn('not proof', report['findings'][0]['problem'])
@@ -106,7 +136,7 @@ class OverlapTests(unittest.TestCase):
         report = validator.validate_documents([doc('42% of something.', 'draft')], [], ledger={'protected_literals': ['42%']})
         self.assertFalse(report['findings'])
         self.assertEqual(set(report['reviews']), {'content_preservation', 'style_match',
-                         'over_imitation', 'source_leakage', 'generic_ai_signals'})
+                         'over_imitation', 'source_leakage', 'generic_ai_signals', 'target_voice_match'})
         self.assertEqual(set(report['reviews'].values()), {'not_run'})
         for invalid in ({}, {'protected_literals': [42]}, {'protected_literals': ['']}):
             with self.assertRaises(ValueError):

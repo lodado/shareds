@@ -8,26 +8,31 @@ Document genre manually, with uncertainty: tutorial, technical_explanation, opin
 
 Audit authorship before using examples or numeric targets. A personal blog may embed guest replies, coauthored articles, translated passages, bibliographies, or quotations inside ordinary paragraph tags. Record excluded document/block IDs and attribution reasons in a sidecar manifest without changing the original snapshot. Do not use those blocks as evidence of the individual's voice. If computing curated metrics, retain the original metrics, record the exact selected IDs and exclusions, and label unresolved inline quotations. Mixed-source metrics are corpus diagnostics, not author-specific drafting targets. This attribution audit is a host review step, not an automatic guarantee of the parser.
 
-## Ten dimensions
+## Eleven dimensions
 
-| Key                    | Observe and operationalize                                                                                                                                    |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| opening                | anecdote, problem, assertion, question, observation, contradiction, scene, definition. What information becomes available first?                              |
-| argument_structure     | recurring problem → observation → explanation → implication or belief → counterexample → reinterpretation. Record alternatives and counterevidence.           |
-| sentence_architecture  | short/long alternation, chained clauses, fragments, parentheticals, questions, punch lines, ending patterns. Identify the contextual trigger.                 |
-| paragraph_architecture | length, one-line emphasis, topic sentences, transitions, paragraph-ending function. A source newline is not necessarily a rhetorical paragraph.               |
-| lexical_behavior       | technical/colloquial, abstract/concrete, connectives, jargon, metaphors. Explain why and when, not favorite-word lists.                                       |
-| stance                 | certainty, hedging, qualification, self-reference, reader address, criticism, praise, epistemic humility. Preserve the NEW claim's epistemic strength.        |
-| rhetoric               | contrast, reversal, analogy, rhetorical question, understatement, humor, irony, repetition, callbacks. Frequency is not an obligation.                        |
-| explanation_strategy   | example-first, abstraction-first, counterexample, comparison, steps, failure story, historical context. Only use examples/history supplied as CONTENT_SOURCE. |
-| endings                | summary, open question, qualification, recommendation, callback, short punch, implication. Separate section endings from article endings.                     |
-| formatting             | headings, bold, italics, lists, quotes, code, blank lines, one-line paragraphs. Record prose vs code-heavy genre differences.                                 |
+| Key                    | Observe and operationalize                                                                                                                                       |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| title_craft            | sentence vs noun phrase, topic naming, information withheld, punctuation and emotional framing. Use actual article-title metadata, not filenames or site titles. |
+| opening                | anecdote, problem, assertion, question, observation, contradiction, scene, definition. What information becomes available first?                                 |
+| argument_structure     | recurring problem → observation → explanation → implication or belief → counterexample → reinterpretation. Record alternatives and counterevidence.              |
+| sentence_architecture  | short/long alternation, chained clauses, fragments, parentheticals, questions, punch lines, ending patterns. Identify the contextual trigger.                    |
+| paragraph_architecture | length, one-line emphasis, topic sentences, transitions, paragraph-ending function. A source newline is not necessarily a rhetorical paragraph.                  |
+| lexical_behavior       | technical/colloquial, abstract/concrete, connectives, jargon, metaphors. Explain why and when, not favorite-word lists.                                          |
+| stance                 | certainty, hedging, qualification, self-reference, reader address, criticism, praise, epistemic humility. Preserve the NEW claim's epistemic strength.           |
+| rhetoric               | contrast, reversal, analogy, rhetorical question, understatement, humor, irony, repetition, callbacks. Frequency is not an obligation.                           |
+| explanation_strategy   | example-first, abstraction-first, counterexample, comparison, steps, failure story, historical context. Only use examples/history supplied as CONTENT_SOURCE.    |
+| endings                | summary, open question, qualification, recommendation, callback, short punch, implication. Separate section endings from article endings.                        |
+| formatting             | headings, bold, italics, lists, quotes, code, blank lines, one-line paragraphs. Record prose vs code-heavy genre differences.                                    |
 
 For each dimension record supported rules OR `insufficient_evidence`. Do not invent a rule to fill every category.
+
+For Korean, load `language-ko.md` and map contextual observations into these dimensions. Distinguish article-level voice from changing local register: where does factual explanation become a reader aside or reaction? Record transitions and their supporting blocks, not only global frequencies. Document sentence fragments and manual display line breaks separately; a line ending midway through a clause does not establish a rhetorical paragraph boundary.
 
 ## Rule contract
 
 Required: id, dimension, instruction, scope {genres:[], roles:[]}, evidence:[], confidence, exceptions:[]. Use the JSON template. A rule describes an action, trigger, frequency constraint, and applicability. Put universal candidates in global_rules, genre-limited rules in genre_rules, weak candidates in weak_observations. anti_patterns are explicit things not to do, never permission to alter claims.
+
+Title evidence must resolve to an actual heading block containing the verified article title. If it exists only in source metadata, create a NEW curated input with that title as a heading, preserving original files, metadata provenance and the transformation record before analyzing it. Never silently alter an existing snapshot or cite an invented `doc:title` pointer. If title metadata is unavailable, record insufficient evidence. A trait absent from a small sample is `not_observed`, not a universal prohibition. Foreground a few distinguishing decisions without inflating confidence.
 
 Confidence is ordinal, not a probability. High requires repeated independent documents, no material contradictions, and validation support where available. Medium needs repeated support or an explicitly narrow, context-specific observation. One example can only establish a weak global candidate. Small corpora cannot establish high generalization confidence. Record contrary observations and validation decisions in evidence.md. Never promote based just on document count.
 
@@ -38,3 +43,5 @@ Use actual script outputs, including units/denominators/method limits. Whitespac
 ## Profile lifecycle
 
 Generated JSON/Markdown starts empty and awaiting qualitative analysis. Fill both consistently, validate evidence, evaluate validation in a separate context, record any revisions. Freeze before held-out use. Log held-out exposures in the profile's evaluation record. Reusing exposed held-out text later is not independent evaluation. Never add those examples to a writer's reference pool. Snapshot split history persists across moving windows, conflicting duplicate groups are quarantined. Inspect per-genre coverage even when total group count is sufficient.
+
+Title validation rejects non-heading evidence, but cannot establish that a heading is the verified article title rather than a section heading. The host must separately check title provenance against the collected source and record that check.

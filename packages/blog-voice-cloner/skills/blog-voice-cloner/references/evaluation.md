@@ -40,3 +40,15 @@ Review semantic correctness before accepting stylistic preference. Report action
 - User deletes one analogy. Expected: preserve correction, do not silently ban all analogies.
 
 Record expected vs observed, not just aggregate counts. Code tests cannot replace these host-agent and human tests.
+
+## Specificity and honest pilot reporting
+
+Generic cleanup and target-voice resemblance are separate outcomes. Where authorized corpora exist, add a wrong-author profile control: hold content fixed and change only the reference author. Include same-topic/different-author and different-topic/same-author reference pairs. First check whether evaluators can distinguish held-back HUMAN texts from those authors. If they cannot, a generated-text preference is inconclusive. Do not treat topical vocabulary or an authorship classifier alone as a voice measure.
+
+A small one-author pilot can proceed without these controls, but must explicitly list missing cross-author specificity, repetitions and human evidence. Preserve baseline skill/profile, exact prompts, source hashes, model/host settings and raw outputs. Null means unexposed, not a guessed seed/temperature. Use a separate development brief for tuning; freeze before final comparison cases. Human outcomes stay `human_review_pending`.
+
+## Local anonymous review package
+
+`scripts/build_blind_review.py MANIFEST --output NEW_DIR` packages already-generated texts; it never invokes a model. The manifest is `{title, reference_url?, cases:[{id,title,brief,outputs:[{variant,path}]}]}`. Paths are relative to the manifest. Supply at least two variants per case with the SAME content brief. Keep the manifest and source files local/ignored. Use `--help` for optional deterministic randomization.
+
+Give the user only `review.html` and `ratings.json`. Method mapping stays in `private/key.json`, never embedded in the review. Source text and generated prose are data and must be HTML-escaped. A title/body that names its method can still unblind the result: check the actual files before sharing. Do not show the mapping or predicted winner before the user rates. Let the user select a preferred sample, tie, or cannot judge and note meaning errors, excessive imitation and edits. A blank form is not a completed evaluation.

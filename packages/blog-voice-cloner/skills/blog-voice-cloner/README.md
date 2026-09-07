@@ -66,16 +66,34 @@ python3 scripts/manage_voice.py correction --root .blog-voice --author author-a 
 
 수정 저장과 선호 학습은 다릅니다. 위 명령은 원본 문체나 사용자 선호를 자동 변경하지 않습니다. “앞으로도 이렇게”라고 명시한 선호만 별도 `user-overrides.json`에 근거와 함께 저장합니다. 내용·사실 수정은 글의 장부에 반영합니다.
 
+## 문체 재현과 익명 검수
+
+한국어는 종결어미 개수만 세지 않고, 정보 설명에서 독자에게 말을 거는 순간의 어체 전환과 거리감 등을 분석합니다. 제목은 `title_craft` 차원으로 실제 제목 블록을 근거로 삼습니다. 작성할 때는 장르와 문단 역할에 맞는 규칙을 작은 `voice-brief.json`으로 정리한 뒤 계획에 반영합니다. 내용이 적으면 같은 주의사항을 반복해 분량을 채우지 않습니다.
+
+동일한 내용으로 작성한 결과를 방법 이름 없이 검수하려면 다음 명령을 사용합니다.
+
+```bash
+python3 scripts/build_blind_review.py ./manifest.json --output ./review-new --seed 123
+```
+
+매니페스트는 `title`, 선택적 `reference_url`, `cases`를 포함합니다. 각 사례는 `id`, `title`, `brief`, `outputs: [{variant, path}]`를 가집니다. 경로는 매니페스트 기준이며 한 사례에 두 개 이상의 결과가 필요합니다. 자세한 예시는 [evaluation.md](references/evaluation.md)를 참고하세요.
+
+`review-new/review.html`과 미작성 `ratings.json`이 검수용입니다. 방법 대응표인 `private/key.json`은 검수자에게 보여주지 않습니다. 기존 출력 폴더는 덮어쓰지 않습니다. 작성 방식은 숨겨도 글 자체의 표현으로 추측할 수 있으므로 완전한 맹검을 보증하지 않습니다. 자동 검사와 모델 검토는 사람의 문체 선호가 아니며, 실제 검수 전 상태는 `human_review_pending`입니다.
+
+HTML에서 글별 점수·의견과 주제별 선호를 입력한 뒤 JSON을 내려받아 전달하세요. 브라우저 임시 저장은 파일 위치와 브라우저에 따라 달라질 수 있습니다. 원래의 `ratings.json`이 자동 수정되는 것은 아닙니다. 내려받은 평가를 다시 가져올 수도 있습니다. 도구는 Python 표준 라이브러리로 실행하며, 테스트 중 JavaScript 동작 검증은 Node.js가 없으면 건너뜁니다.
+
 ## 구성 요소
 
 - `SKILL.md`: 요청 라우팅, 데이터 경계, 필수 실행 순서.
 - `scripts/analyze_style.py`: 파일 파싱·분할·결정론적 문체 지표.
 - `scripts/validate_style.py`: 원문 겹침·근거 연결·보호 문자열 검토.
 - `scripts/manage_voice.py`: 작성자별 가져오기·버전·기간 스냅샷·수정 기록.
+- `scripts/build_blind_review.py`: 익명 검수 HTML·빈 평가지·분리된 대응표 생성.
 - `references/style-profile.{json,md}`: 빈 초기 템플릿. 실제 추론 결과가 아닙니다.
 - `references/style-metrics.json`: 빈 측정 템플릿. 실제 결과는 분석 출력 폴더에 생성합니다.
 - `references/examples.md`, `evidence.md`, `negative-examples.md`: 역할별 사례, 근거 형식, 피해야 할 모방.
-- `references/analysis-guide.md`: 10개 분석 차원과 근거·신뢰도 기준.
+- `references/analysis-guide.md`: 제목을 포함한 11개 분석 차원과 근거·신뢰도 기준.
+- `references/language-ko.md`, `voice-brief.md`: 한국어 맥락별 어투와 작성용 문체 결정.
 - `references/writing-workflow.md`: 사실 장부, 문체 기반 계획, 독립 검토, 수정 학습.
 - `references/evaluation.md`: A~E 비교와 블라인드 사람 평가 절차.
 - `tests/`: 파싱·지표·중복·데이터 저장·CLI 회귀 테스트.
@@ -118,7 +136,8 @@ blog-voice-cloner/
 ├── scripts/
 │   ├── analyze_style.py
 │   ├── validate_style.py
-│   └── manage_voice.py
+│   ├── manage_voice.py
+│   └── build_blind_review.py
 ├── references/
 │   ├── style-profile.md
 │   ├── style-profile.json
@@ -126,11 +145,13 @@ blog-voice-cloner/
 │   ├── examples.md
 │   ├── negative-examples.md
 │   ├── evidence.md
+│   ├── language-ko.md / voice-brief.md
 │   └── analysis-guide.md / writing-workflow.md / collection.md / evaluation.md / research.md
 ├── tests/
 │   ├── test_analysis.py
 │   ├── test_validation.py
 │   ├── test_storage.py
-│   └── test_skill_contract.py
+│   ├── test_skill_contract.py
+│   └── test_blind_review.py
 └── evals/                    # 실행 가능한 데모, A–E 출력, 요구사항별 관찰
 ```
