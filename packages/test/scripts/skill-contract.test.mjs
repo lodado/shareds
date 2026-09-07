@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+// eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
 const packageDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
 const skillDirectory = join(packageDirectory, 'skills/test')
@@ -75,4 +76,15 @@ test('scopes qa-agent annotations to API and user scenarios and exempts pure ren
   assert.match(skill, /\*\*Boundary guard:\*\*/)
   assert.match(skill, /never render-only/)
   assert.match(skill, /When in doubt whether a spec is pure rendering, annotate it in scope/)
+})
+
+test('loads async harness guidance only for async tests, outside the generic handoff', async () => {
+  const skill = await readFile(join(skillDirectory, 'SKILL.md'), 'utf8')
+  const asyncGuide = await readFile(join(skillDirectory, 'references/async-testing.md'), 'utf8')
+  assert.match(skill, /For async tests, read.*references\/async-testing\.md/)
+  const handoff = skill.split('### Design-to-test handoff')[1].split('## Step 1:')[0]
+  assert.doesNotMatch(handoff, /late.response|stale.response|cancellation/i)
+  assert.match(asyncGuide, /late response has crossed the controlled boundary/)
+  assert.match(asyncGuide, /Test cancellation separately/)
+  assert.match(asyncGuide, /Disabling retry.*does not test retry policy/)
 })

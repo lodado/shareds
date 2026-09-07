@@ -44,9 +44,6 @@ evidence requirement below. Missing tool choices, locators, fixtures, and equiva
 are implementation decisions; changing policy, Then, Never, side-effect counts, or which conditions
 are excluded requires Oracle's existing decision/revision procedure. A harness limitation is FAIL,
 not permission to change the expectation. A planned or illustrative helper is not a verified utility.
-For late-response tests, process the released stale response and relevant updates before checking the
-current result; an already-visible current result alone cannot establish stale-response completion.
-Do not infer race safety from cancellation, or execution evidence from a design example.
 
 ## Step 1: Investigate target·conventions
 
@@ -73,6 +70,8 @@ Choose the narrowest common architecture unit that the test verifies. Do not mov
 ownership splits from production, and make the test follow along when a slice is deleted·moved.
 
 ## Step 2: Write the tests
+
+For async tests, read [`references/async-testing.md`](references/async-testing.md) for conditional harness guidance.
 
 - **Every row** of the card matrix is the standard. Per row, assert Then + Never + the side-effect count.
 - Location: apply the locality rules above first. In FSD, put a slice-crossing scenario in

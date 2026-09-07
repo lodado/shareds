@@ -98,19 +98,16 @@ in adjacent prose, referring to the declared dimensions and existing policy/row 
 does not change generation or disposition grammar and does not promise exhaustive execution.
 
 Distinguish impossible combinations with witnesses, inapplicable scope with reasons, and unresolved
-policy with an Open question; uncertainty is not an exclusion. For async data, distinguish current-key
-cache from previous-key placeholder and state which owner combinations are reachable. Explain relevant
-scope × placeholder, filter × page reset, and response-order interactions when those contracts exist;
-these are examples, not a new global axis list. Do not turn these dimensions into production unions
-or reducers duplicating query/router/form state.
+policy with an Open question; uncertainty is not an exclusion. Explain outcome-changing interactions
+for this product rather than importing a fixed scenario list. Declared dimensions describe verification
+conditions, not instructions to duplicate state already owned by a library or framework.
 
 Connect risk combinations and temporal paths to the verification realization plan in
 [`card-format.md`](card-format.md). Do not invent `F*` or `PATH*` identifiers before generation; afterwards
 reference the emitted dispositions rather than creating a second mapping. An Order dimension with
-at least two choices carries the existing `$test` sequence obligation: plan invariant-based sequence
-exploration (fast-check if installed or approved; otherwise hand-enumerated deferred orderings with
-reason) and `evidence.json` `sequence`, in addition to the representative path. Neither a few example
-orderings nor a dimension list claims coverage of all possible sequences.
+at least two choices carries the existing `$test` sequence obligation and `evidence.json` `sequence`
+mapping, in addition to representative paths. Concrete test construction belongs to `$test`.
+A dimension list or representative path does not claim coverage of all possible sequences.
 
 ## Generated frames — run, then disposition
 

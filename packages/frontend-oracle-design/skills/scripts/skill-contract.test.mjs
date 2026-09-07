@@ -523,11 +523,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.44.0')
+  assert.equal(version, '0.44.1')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.44.0')
+  assert.equal(marketplace.version, '0.44.1')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -2007,7 +2007,8 @@ test('first substantive Draft exposes verification design without duplicating po
     assert.ok(card.includes(field), `Missing realization field: ${field}`)
   }
   assert.match(card, /not a second source of Then/)
-  assert.match(card, /late response has crossed the controlled boundary/)
+  assert.doesNotMatch(card, /StrictMode|focus-refetch|wait for A start|tarball/)
+  assert.doesNotMatch(space, /scope × placeholder|filter × page reset/)
   assert.match(card, /without deciding expected values/)
   assert.match(space, /separate dimensions do not imply unrestricted independence/)
   assert.match(space, /Do not invent `F\*` or `PATH\*` identifiers/)

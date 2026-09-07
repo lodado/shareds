@@ -79,22 +79,11 @@ This is not a second source of Then, Never, or side-effect expectations. Referen
 use generated frame IDs only after generation. A policy change returns to Open questions and the
 existing confirmation/revision procedure. No new plan file, ledger, or state model is required.
 
-- For shared type APIs, plan valid inference and a single-misuse `@ts-expect-error` compiler witness;
-  separate compile-time rejection from runtime time/order behavior. For pure rules, identify concrete
-  boundary inputs and reference their expected results. For distributed packages, name the consuming
-  tarball type/runtime boundary when relevant.
-- For async integration, retain the actual query/router/form owner and minimal consumer; control the
-  external boundary rather than mocking the whole owner. Identify fresh per-test owner setup and
-  teardown, request-count meaning (starts, logical queries, or successful responses), and retry,
-  focus-refetch and StrictMode settings. Disabling retry in a baseline does not test retry policy.
-- For an inverted response path, wait for A start, change input, wait for B start, release B and
-  observe B, then release A. Before final assertions, establish that the late response has crossed the controlled boundary
-  and relevant updates have been processed. B already being visible is not that completion barrier.
-  Use controlled completion and observable waits, never arbitrary sleep. Test cancellation separately:
-  preventing A's delivery does not prove safety when A actually arrives late.
-- Carry the existing Case space Order/sequence requirement into the plan, including the approved-tool
-  or hand-enumerated deferred fallback and eventual `sequence` evidence mapping. Do not duplicate row
-  assertion owners to implement it.
+- Choose verification means for the guarantee being claimed; distinguish compile-time guarantees
+  from runtime behavior where both apply. Explain the boundary and observations, not a prescribed
+  library or harness recipe. `$test` owns implementation-specific test construction.
+- When Case space requires Order/sequence evidence, include that obligation in the plan without
+  duplicating row assertion owners. Concrete tooling and execution follow the existing `$test` contract.
 - Label nonexistent harness helpers as proposals, and tools as candidates or unresolved when needed.
   Illustrative code, written tests, and actual executed results are distinct evidence states; no PASS
   without a run. Unknown expected results are Open questions, not fixture decisions.
