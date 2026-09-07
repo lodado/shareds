@@ -200,7 +200,16 @@ class BlindReviewTests(unittest.TestCase):
         page = (self.root / "review/review.html").read_text(encoding="utf-8")
         self.assertEqual(set(ReviewHTML(page).scripts), {"initial-ratings", "review-app"})
         self.assertNotIn('<img src=x', page)
-        self.assertGreaterEqual(page.count(html.escape(payload)), 5)
+        self.assertGreaterEqual(page.count(html.escape(payload)), 4)
+
+    def test_reference_text_renders_in_reference_panel(self):
+        self.manifest["reference_text"] = "<script>원본 텍스트</script>\n줄 바꿈"
+        result = self.run_cli(output="with-reference-text")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        page = (self.root / "with-reference-text/review.html").read_text(encoding="utf-8")
+        self.assertIn("<h2>원본 비교</h2>", page)
+        self.assertIn("<h3>원문 텍스트</h3>", page)
+        self.assertIn(html.escape(self.manifest["reference_text"]), page)
 
     @unittest.skipUnless(shutil.which("node"), "Node.js is needed to exercise the offline ratings script")
     def test_ratings_script_autosave_restore_export_import_and_storage_failure(self):

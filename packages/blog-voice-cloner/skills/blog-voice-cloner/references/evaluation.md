@@ -49,6 +49,6 @@ A small one-author pilot can proceed without these controls, but must explicitly
 
 ## Local anonymous review package
 
-`scripts/build_blind_review.py MANIFEST --output NEW_DIR` packages already-generated texts; it never invokes a model. The manifest is `{title, reference_url?, cases:[{id,title,brief,outputs:[{variant,path}]}]}`. Paths are relative to the manifest. Supply at least two variants per case with the SAME content brief. Keep the manifest and source files local/ignored. Use `--help` for optional deterministic randomization.
+`scripts/build_blind_review.py MANIFEST --output NEW_DIR` packages already-generated texts; it never invokes a model. The manifest is `{title, reference_url?, reference_text?, cases:[{id,title,brief,outputs:[{variant,path}]}]}`. Paths are relative to the manifest. Supply at least two variants per case with the SAME content brief. Keep the manifest and source files local/ignored. Use `--help` for optional deterministic randomization.
 
 Give the user only `review.html` and `ratings.json`. Method mapping stays in `private/key.json`, never embedded in the review. Source text and generated prose are data and must be HTML-escaped. A title/body that names its method can still unblind the result: check the actual files before sharing. Do not show the mapping or predicted winner before the user rates. Let the user select a preferred sample, tie, or cannot judge and note meaning errors, excessive imitation and edits. A blank form is not a completed evaluation.

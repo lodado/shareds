@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Build a local human-review packet using Python 3.10+ and the stdlib.
 
-Manifest schema: {"title": str, "reference_url": str (optional), "cases": [
+Manifest schema: {"title": str, "reference_url": str (optional), "reference_text": str (optional),
+  "cases": [
   {"id": str, "title": str, "brief": str,
    "outputs": [{"variant": str, "path": str}, ...]}, ...]}.
 Case IDs are unique safe identifiers. Variants are unique within each case.
@@ -200,6 +201,8 @@ def load_manifest(path):
     nonblank(manifest.get("title"), "title")
     if "reference_url" in manifest:
         nonblank(manifest["reference_url"], "reference_url")
+    if "reference_text" in manifest:
+        nonblank(manifest["reference_text"], "reference_text")
     cases = manifest.get("cases")
     if not isinstance(cases, list) or not cases:
         raise ValueError("cases must be a nonempty array")
@@ -256,10 +259,37 @@ def reference_link(url):
     return '<p><a href="' + html.escape(url, quote=True) + '" target="_blank" rel="noopener noreferrer">참고 자료 열기</a></p>'
 
 
+def build_reference_panel(manifest):
+    if "reference_url" not in manifest and "reference_text" not in manifest:
+        return []
+    panel = [
+        '<section class="comparison-layout">',
+        '<aside class="reference-column"><h2>원본 비교</h2>'
+        '<p>원본 블로그 글을 참고해 익명 글을 평가하세요. 새 창으로 원문을 열어 오른쪽 검수 항목과 함께 보면 비교가 빠릅니다.</p>'
+    ]
+    if "reference_url" in manifest:
+        ref_link = reference_link(manifest["reference_url"])
+        if ref_link:
+            panel.append(ref_link + pre(manifest["reference_url"]))
+            panel.append(
+                '<iframe class="reference-preview" loading="lazy" title="원본 블로그 본문 미리보기" '
+                + 'src="' + html.escape(manifest["reference_url"], quote=True) + '" referrerpolicy="no-referrer">'
+                + '</iframe>'
+                + '<p class="reference-note">브라우저 정책으로 미리보기가 막히면 위 링크를 새 창에서 열어 주세요.</p>'
+            )
+        else:
+            panel.append('<p>원본 링크가 유효하지 않습니다. 새 창에서 열어 주세요.</p>')
+    if "reference_text" in manifest:
+        panel.append('<h3>원문 텍스트</h3>' + pre(manifest["reference_text"]))
+    panel.append('</aside><section class="comparison-main">')
+    return panel
+
+
 def build_packet(manifest, seed):
     rng = random.Random(seed)
     ratings = {"human_preference": "pending", "cases": []}
     key = {"seed": seed, "cases": []}
+    reference_panel = build_reference_panel(manifest)
     page = ['<!doctype html><html lang="ko"><meta charset="utf-8">',
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
             "<title>익명 글 검토</title><style>",
@@ -270,6 +300,13 @@ def build_packet(manifest, seed):
             "select,textarea{box-sizing:border-box;width:100%;padding:.5rem}textarea{min-height:5rem}",
             "button{padding:.6rem 1rem}fieldset{border:0;padding:0;min-width:0}nav a{display:inline-block;margin:.4rem}",
             "small{display:block;overflow-wrap:anywhere;color:#555}section{margin:2rem 0}",
+            ".comparison-layout{display:grid;grid-template-columns:minmax(340px,1.2fr) minmax(460px,2.8fr);gap:1rem;align-items:start}",
+            ".reference-column{border:1px solid #aaa;padding:1rem;position:sticky;top:1rem;max-height:calc(100vh - 2rem);overflow:auto}",
+            ".reference-column h2,.reference-column h3{margin-top:0}",
+            ".reference-preview{width:100%;min-height:420px;height:420px;border:1px solid #ddd}",
+            ".reference-note{font-size:.92rem;color:#666;margin-top:.4rem}",
+            ".comparison-main{min-width:0}",
+            "@media (max-width: 1050px){.comparison-layout{grid-template-columns:1fr}.reference-column{position:static;max-height:none}}",
             "</style><body><h1>" + html.escape(manifest["title"]) + "</h1>",
             "<p>같은 요청에 대한 글을 비교해 주세요. 아래 글은 원문 그대로 표시됩니다.</p>",
             "<p>표시 정보만 익명화됩니다. 본문이나 요청에 포함된 작성자·모델 단서는 제거되지 않습니다.</p>",
@@ -290,8 +327,8 @@ def build_packet(manifest, seed):
             '<p id="review-progress"></p>',
             '<nav aria-label="사례 바로가기">' + ' '.join(
                 f'<a href="#review-case-{i}">사례 {i + 1}</a>' for i in range(len(manifest["cases"]))) + '</nav>']
-    if "reference_url" in manifest:
-        page.append("<h2>참고 자료</h2>" + reference_link(manifest["reference_url"]) + pre(manifest["reference_url"]))
+    if reference_panel:
+        page.extend(reference_panel)
     page.append('<form id="ratings-form" autocomplete="off"><fieldset id="rating-fields" disabled><legend>익명 글 평가</legend>')
     used_ids = set()
     for case_index, case in enumerate(manifest["cases"]):
@@ -331,6 +368,9 @@ def build_packet(manifest, seed):
         key["cases"].append(private_case)
     page.append('<label for="review-complete"><input type="checkbox" id="review-complete" disabled> '
                 '평가 완료 (모든 사례의 선호 선택 후 체크)</label></fieldset></form>')
+    if reference_panel:
+        page.append("</section>")
+        page.append("</section>")
     # Include visible content, not just seeded IDs, to isolate autosaves when a
     # packet is rebuilt with the same seed but different texts or instructions.
     ratings["packet_id"] = hashlib.sha256("\n".join(page).encode("utf-8")).hexdigest()

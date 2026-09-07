@@ -76,7 +76,7 @@ python3 scripts/manage_voice.py correction --root .blog-voice --author author-a 
 python3 scripts/build_blind_review.py ./manifest.json --output ./review-new --seed 123
 ```
 
-매니페스트는 `title`, 선택적 `reference_url`, `cases`를 포함합니다. 각 사례는 `id`, `title`, `brief`, `outputs: [{variant, path}]`를 가집니다. 경로는 매니페스트 기준이며 한 사례에 두 개 이상의 결과가 필요합니다. 자세한 예시는 [evaluation.md](references/evaluation.md)를 참고하세요.
+매니페스트는 `title`, 선택적 `reference_url`, 선택적 `reference_text`, `cases`를 포함합니다. 각 사례는 `id`, `title`, `brief`, `outputs: [{variant, path}]`를 가집니다. 경로는 매니페스트 기준이며 한 사례에 두 개 이상의 결과가 필요합니다. 자세한 예시는 [evaluation.md](references/evaluation.md)를 참고하세요.
 
 `review-new/review.html`과 미작성 `ratings.json`이 검수용입니다. 방법 대응표인 `private/key.json`은 검수자에게 보여주지 않습니다. 기존 출력 폴더는 덮어쓰지 않습니다. 작성 방식은 숨겨도 글 자체의 표현으로 추측할 수 있으므로 완전한 맹검을 보증하지 않습니다. 자동 검사와 모델 검토는 사람의 문체 선호가 아니며, 실제 검수 전 상태는 `human_review_pending`입니다.
 
