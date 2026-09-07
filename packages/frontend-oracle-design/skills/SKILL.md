@@ -177,6 +177,17 @@ Whether to skip a load is not a judgment call. The read instructions inlined int
 
 When only cards, requirements, policy decisions, or test contracts are requested:
 
+The first substantive Draft or detailed design response includes verification design, not merely
+"unit/integration/e2e" or tool names. Show applicable Case space choices and constraints, connect
+outcome-changing interactions and temporal paths to contract rows, and explain the real target,
+controlled boundary, completion barrier, observations, and method for each core failure mechanism.
+Use the verification realization plan and cold-read criteria in
+[`card/card-format.md`](references/card/card-format.md) and the existing
+[`card/case-space.md`](references/card/case-space.md) contract. Plans and examples are not execution
+evidence; unresolved expectations remain Open questions. "First" means the user-reviewable Draft,
+not a short progress preamble. This does not expand the Low fast path, authorize test or production
+edits or dependency installation for design-only requests, or replace Draft generation and approval.
+
 1. Read [`common.md`](references/common.md) and
    [`card/policy-sources.md`](references/card/policy-sources.md) → write the `Outcome Brief`.
    Without a KPI, invent no numbers.

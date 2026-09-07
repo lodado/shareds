@@ -35,6 +35,19 @@ NEEDS_DECISION — finish with a FAIL report that states the cause.
 - The card's policy·Then·Never·side-effect count is **immutable**. What this skill can decide is only
   the locator·fixture·waiting method·observation layer.
 
+### Design-to-test handoff
+
+Reuse the approved verification realization plan on the card: its real target, controllable premises,
+boundary, completion barrier, and observation references guide the harness. Keep the card's rows and
+emitted frames as the sole expectation/evidence owners, including the existing Order `sequence`
+evidence requirement below. Missing tool choices, locators, fixtures, and equivalent waiting methods
+are implementation decisions; changing policy, Then, Never, side-effect counts, or which conditions
+are excluded requires Oracle's existing decision/revision procedure. A harness limitation is FAIL,
+not permission to change the expectation. A planned or illustrative helper is not a verified utility.
+For late-response tests, process the released stale response and relevant updates before checking the
+current result; an already-visible current result alone cannot establish stale-response completion.
+Do not infer race safety from cancellation, or execution evidence from a design example.
+
 ## Step 1: Investigate target·conventions
 
 Read the target file and the neighboring tests. **The target repo's AGENTS.md/CLAUDE.md, test

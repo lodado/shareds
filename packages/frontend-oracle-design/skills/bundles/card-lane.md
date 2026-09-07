@@ -587,6 +587,41 @@ Abbreviated example:
 | O3  | P2     | pending     | server 5xx  | error+input kept | success UI, input lost     | successful save×0 | state: error   |
 ```
 
+## Verification realization plan
+
+Include this small section in the first user-reviewable Draft, reusing Case space and contract rows.
+The information is required where applicable; the table layout and code examples are not mandatory.
+Scale detail to distinct failure mechanisms, not a fixed example count. A list of test levels, axes,
+or "race/type safety will be tested" without construction and observation details is insufficient.
+
+| Contract reference                                       | Real target                         | Controlled boundary                  | Input and order                       | Completion barrier                         | Observation reference                          | Method and evidence status                                                                     |
+| -------------------------------------------------------- | ----------------------------------- | ------------------------------------ | ------------------------------------- | ------------------------------------------ | ---------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Existing O\* / type contract; emitted frame if available | Public API, real owner and consumer | Fetcher, input, clock, or type input | Premises and actions / response order | Observable start and controlled completion | Refer to the row's Then / Never / side effects | Compiler witness / runtime test; planned, illustrative, written, or executed with run evidence |
+
+This is not a second source of Then, Never, or side-effect expectations. Reference their owning rows;
+use generated frame IDs only after generation. A policy change returns to Open questions and the
+existing confirmation/revision procedure. No new plan file, ledger, or state model is required.
+
+- For shared type APIs, plan valid inference and a single-misuse `@ts-expect-error` compiler witness;
+  separate compile-time rejection from runtime time/order behavior. For pure rules, identify concrete
+  boundary inputs and reference their expected results. For distributed packages, name the consuming
+  tarball type/runtime boundary when relevant.
+- For async integration, retain the actual query/router/form owner and minimal consumer; control the
+  external boundary rather than mocking the whole owner. Identify fresh per-test owner setup and
+  teardown, request-count meaning (starts, logical queries, or successful responses), and retry,
+  focus-refetch and StrictMode settings. Disabling retry in a baseline does not test retry policy.
+- For an inverted response path, wait for A start, change input, wait for B start, release B and
+  observe B, then release A. Before final assertions, establish that the late response has crossed the controlled boundary
+  and relevant updates have been processed. B already being visible is not that completion barrier.
+  Use controlled completion and observable waits, never arbitrary sleep. Test cancellation separately:
+  preventing A's delivery does not prove safety when A actually arrives late.
+- Carry the existing Case space Order/sequence requirement into the plan, including the approved-tool
+  or hand-enumerated deferred fallback and eventual `sequence` evidence mapping. Do not duplicate row
+  assertion owners to implement it.
+- Label nonexistent harness helpers as proposals, and tools as candidates or unresolved when needed.
+  Illustrative code, written tests, and actual executed results are distinct evidence states; no PASS
+  without a run. Unknown expected results are Open questions, not fixture decisions.
+
 ## Open questions — Draft only
 
 A question that survives investigation does not wait in the conversation for an answer. It travels
@@ -707,6 +742,11 @@ stands on its own. Hand the card to an independent reviewer surface that has no 
 - Role routing follows [`subagent-review.md`](../subagent-review.md). When no independent surface is
   available, record that in `journal.md` and run the five questions alone. A same-context read is
   the fallback, never the target.
+
+Verification cold-read question: can an implementer build the tests from this card alone without deciding expected values?
+Point out every guess about axis choices, premises, controls, completion barriers, or observations.
+Tool selection may remain open in greenfield work; the boundary and action order may not be replaced
+by a tool-name list. Repair the plan by reference to existing rows, not by duplicating their policy.
 
 ### 2. Five questions — per row
 
@@ -1014,6 +1054,29 @@ dimension** and the machine expands it:
   all-pairs behavior unchanged.
 - The claim is the audit unit: an escaped webkit-only defect falsifies the one recorded
   `independent:` line, not a guess about twenty dispositions.
+
+## Explain the selected space in the first Draft
+
+Show applicable dimensions, choices, reasons tied to contracts, and cross-dimension constraints;
+separate dimensions do not imply unrestricted independence. Keep the existing eight families and
+exclusion reasons. Do not add explanatory columns to the parsed table: put rationale and constraints
+in adjacent prose, referring to the declared dimensions and existing policy/row IDs. This explanation
+does not change generation or disposition grammar and does not promise exhaustive execution.
+
+Distinguish impossible combinations with witnesses, inapplicable scope with reasons, and unresolved
+policy with an Open question; uncertainty is not an exclusion. For async data, distinguish current-key
+cache from previous-key placeholder and state which owner combinations are reachable. Explain relevant
+scope × placeholder, filter × page reset, and response-order interactions when those contracts exist;
+these are examples, not a new global axis list. Do not turn these dimensions into production unions
+or reducers duplicating query/router/form state.
+
+Connect risk combinations and temporal paths to the verification realization plan in
+[`card-format.md`](card-format.md). Do not invent `F*` or `PATH*` identifiers before generation; afterwards
+reference the emitted dispositions rather than creating a second mapping. An Order dimension with
+at least two choices carries the existing `$test` sequence obligation: plan invariant-based sequence
+exploration (fast-check if installed or approved; otherwise hand-enumerated deferred orderings with
+reason) and `evidence.json` `sequence`, in addition to the representative path. Neither a few example
+orderings nor a dimension list claims coverage of all possible sequences.
 
 ## Generated frames — run, then disposition
 

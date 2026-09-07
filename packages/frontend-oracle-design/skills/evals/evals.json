@@ -176,6 +176,55 @@
         "The Draft raises, as an Open question or needs-decision, what the user sees during a filter switch (Suspense fallback vs the previous list kept), instead of silently inheriting the current behavior.",
         "The Draft reaches the user after 1 turn, with every surviving question inside the Draft as an Open question"
       ]
+    },
+    {
+      "id": 12,
+      "name": "fod-ho-vd01",
+      "category": "held-out-escape",
+      "source": "Current user proposal (2026-09-07); not a verified historical run — frontend Oracle first-Draft verification-design review",
+      "prompt": "Explain a type- and architecture-first plan for a server-paginated shared table library. Design only: do not implement code, add tests, install dependencies, or claim anything ran.",
+      "expected_output": "A Draft Oracle (risk=Medium, lane=oracle) whose sweep·deviations·landmines·Open questions already carry the 3 escapes below; the run ends NEEDS_DECISION after 1 user turn.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
+        "The first substantive Draft explicitly declares the applicable Case-space dimensions and choices (for example page mode, cache or placeholder availability, request state, and completion order), gives the constraint or applicability reason for each, and connects the risky interactions to contract rows.",
+        "For each key failure mechanism, the Draft identifies the actual hook or compound UI under test, the fetcher or deferred response boundary it controls, the observable completion barrier, the user-visible or request observation, and whether this is planned or executed evidence.",
+        "The response distinguishes protocol obligations (Draft/card/frame generation/approval and later $test handoff) from design output: it may produce a Draft and generated/dispositioned frames when the procedure calls for them, but it does not fabricate frame IDs or claim card approval, lock, or executed test evidence.",
+        "The Draft reaches the user after 1 turn, with every surviving question inside the Draft as an Open question"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "fod-ho-vd02",
+      "category": "held-out-escape",
+      "source": "Current user proposal (2026-09-07); not a verified historical run — type-only design-only boundary review",
+      "prompt": "Describe only the public TypeScript API and architecture for a reusable table column builder. Do not implement production code or tests. Explain how the design would verify type safety and runtime behavior.",
+      "expected_output": "A Draft Oracle (risk=Medium, lane=oracle) whose sweep·deviations·landmines·Open questions already carry the 3 escapes below; the run ends NEEDS_DECISION after 1 user turn.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
+        "The first Draft separates compile-time and runtime verification: it names at least one valid inference witness and one single misuse rejected by the compiler, then identifies the runtime contract, target, controllable input, and observable result without duplicating production logic.",
+        "The response preserves the design-only scope: proposed compiler witnesses and runtime harness boundaries are clearly labeled as planned examples, with no production or test-file changes, dependency installation, test execution, or fabricated PASS evidence.",
+        "The response distinguishes a legitimately produced Draft from the approval/lock protocol: it may produce the Draft and planned witnesses, but does not claim user approval, ORACLE_READY, lock, or executed test evidence, and routes unresolved policy or API decisions to Open questions.",
+        "The Draft reaches the user after 1 turn, with every surviving question inside the Draft as an Open question"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "fod-ho-vd03",
+      "category": "held-out-escape",
+      "source": "Current user proposal (2026-09-07); not a verified historical run — tenant/cache async race review",
+      "prompt": "Design a multi-tenant async data view with query caching and placeholder data. Give the first detailed architecture plan, without implementing it.",
+      "expected_output": "A Draft Oracle (risk=High, lane=oracle) whose sweep·deviations·landmines·Open questions already carry the 4 escapes below; the run ends NEEDS_DECISION after 1 user turn.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=High lane=oracle",
+        "The first Draft names tenant or scope, data availability (no current key, current-key cache, previous-key placeholder), request state, and completion order as applicable dimensions; it explains non-combinable or policy-unknown cells instead of treating all unions as reachable.",
+        "The Draft connects the request-reversal and tenant/placeholder paths to a real query consumer, a fetcher/deferred completion boundary, an observable barrier after the late response is processed, and exact visible data/request assertions; cancellation is planned separately from response-order safety.",
+        "When Order has two or more choices, the Draft explicitly plans the existing $test sequence evidence (fast-check or justified hand-enumerated deferred orderings) and distinguishes that future execution evidence from the current first-Draft plan.",
+        "The response distinguishes protocol artifacts and gates (Draft, frame/card approval, $test handoff) from proposed verification content and reports no execution result, approval, or generated evidence that has not occurred.",
+        "The Draft reaches the user after 1 turn, with every surviving question inside the Draft as an Open question"
+      ]
     }
   ]
 }

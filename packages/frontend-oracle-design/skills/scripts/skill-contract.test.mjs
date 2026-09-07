@@ -1986,3 +1986,31 @@ test('extends machine derivation past the card bytes: witnesses, evidence lookup
   assert.match(skill, loose('hosts without hooks rely on it alone'))
   assert.match(readme, loose('### 기계 유도 — 코드와 형제 카드에서 빈칸을 만든다'))
 })
+
+test('first substantive Draft exposes verification design without duplicating policy or expanding Low', async () => {
+  const skill = await read('SKILL.md')
+  const card = await read('references/card/card-format.md')
+  const space = await read('references/card/case-space.md')
+  const testSkill = await readFile(join(skillDirectory, '../../test/skills/test/SKILL.md'), 'utf8')
+  assert.match(skill, /first substantive Draft or detailed design response/)
+  assert.match(skill, /does not expand the Low fast path/)
+  assert.match(card, /## Verification realization plan/)
+  for (const field of [
+    'Contract reference',
+    'Real target',
+    'Controlled boundary',
+    'Input and order',
+    'Completion barrier',
+    'Observation reference',
+    'Method and evidence status',
+  ]) {
+    assert.ok(card.includes(field), `Missing realization field: ${field}`)
+  }
+  assert.match(card, /not a second source of Then/)
+  assert.match(card, /late response has crossed the controlled boundary/)
+  assert.match(card, /without deciding expected values/)
+  assert.match(space, /separate dimensions do not imply unrestricted independence/)
+  assert.match(space, /Do not invent `F\*` or `PATH\*` identifiers/)
+  assert.match(testSkill, /Reuse the approved verification realization plan/)
+  assert.match(testSkill, /sequence.*evidence/s)
+})

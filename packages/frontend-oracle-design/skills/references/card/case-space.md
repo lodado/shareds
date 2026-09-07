@@ -89,6 +89,29 @@ dimension** and the machine expands it:
 - The claim is the audit unit: an escaped webkit-only defect falsifies the one recorded
   `independent:` line, not a guess about twenty dispositions.
 
+## Explain the selected space in the first Draft
+
+Show applicable dimensions, choices, reasons tied to contracts, and cross-dimension constraints;
+separate dimensions do not imply unrestricted independence. Keep the existing eight families and
+exclusion reasons. Do not add explanatory columns to the parsed table: put rationale and constraints
+in adjacent prose, referring to the declared dimensions and existing policy/row IDs. This explanation
+does not change generation or disposition grammar and does not promise exhaustive execution.
+
+Distinguish impossible combinations with witnesses, inapplicable scope with reasons, and unresolved
+policy with an Open question; uncertainty is not an exclusion. For async data, distinguish current-key
+cache from previous-key placeholder and state which owner combinations are reachable. Explain relevant
+scope × placeholder, filter × page reset, and response-order interactions when those contracts exist;
+these are examples, not a new global axis list. Do not turn these dimensions into production unions
+or reducers duplicating query/router/form state.
+
+Connect risk combinations and temporal paths to the verification realization plan in
+[`card-format.md`](card-format.md). Do not invent `F*` or `PATH*` identifiers before generation; afterwards
+reference the emitted dispositions rather than creating a second mapping. An Order dimension with
+at least two choices carries the existing `$test` sequence obligation: plan invariant-based sequence
+exploration (fast-check if installed or approved; otherwise hand-enumerated deferred orderings with
+reason) and `evidence.json` `sequence`, in addition to the representative path. Neither a few example
+orderings nor a dimension list claims coverage of all possible sequences.
+
 ## Generated frames — run, then disposition
 
 ```bash
