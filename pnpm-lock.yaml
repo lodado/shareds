@@ -34,6 +34,8 @@ importers:
 
   packages/agent-graph-engineering: {}
 
+  packages/agent-memory: {}
+
   packages/blog-voice-cloner: {}
 
   packages/eslint-config:

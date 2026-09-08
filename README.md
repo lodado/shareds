@@ -55,6 +55,7 @@ frontend-system-design
 test
 frontend-visual-qa
 frontend-interface-design
+agent-memory
 ```
 
 패키지 안에 `.claude-plugin/plugin.json`이랑 `.codex-plugin/plugin.json`이 같이 들어 있어요.
@@ -229,3 +230,7 @@ npm 릴리스는 조건이 두 개예요. 레포 변수 `ENABLE_NPM_RELEASE`가 
 ## Blog Voice Cloner
 
 [blog-voice-cloner](packages/blog-voice-cloner/skills/blog-voice-cloner/README.md)는 한국어·영어 블로그 문체를 근거와 함께 분석하고, 작성자별 기간 프로필을 저장하며, 새 내용에 문체를 적용하는 스킬입니다. 원문 내용과 작성 내용을 분리하고 의미·중복·과잉 모방을 검토합니다. Python 3.10+ 표준 라이브러리 기반이며 웹 수집은 호스트 도구로 수행합니다.
+
+## Agent Memory
+
+[Agent Memory 패키지](packages/agent-memory/README.md)는 recall → 작업 → log → 선택적 TIL/generalize → 검토된 규칙 승격 루프를 제공합니다. 6개 스킬을 Claude, Codex, jcode, Cursor, 공용 `.agents` 경로에 설치할 수 있습니다. 기존 Vault를 재배치하거나 규칙을 자동 승격하지 않습니다.

@@ -103,6 +103,18 @@
       "category": "productivity",
       "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
       "tags": ["writing", "blog", "stylometry"]
+    },
+    {
+      "name": "agent-memory",
+      "description": "Evidence-backed Obsidian agent memory: recall, session logs, conditional concepts, TIL, rule review, and maintenance.",
+      "version": "0.1.0",
+      "author": {
+        "name": "lodado"
+      },
+      "source": "./packages/agent-memory",
+      "category": "productivity",
+      "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+      "tags": ["obsidian", "memory", "learning"]
     }
   ]
 }
