@@ -153,6 +153,149 @@
         "facts": ["pricing card spacing is the only reported issue", "brand and section structure are approved"],
         "artifacts": ["review.md: pricing card spacing note"]
       }
+    },
+    {
+      "id": "content-without-images",
+      "prompt": "이미지 없이 기술 블로그 홈을 완성해줘. 글 발견이 목적이고 한국어 제목·요약·날짜·주제를 빠짐없이 보여줘.",
+      "reply": "이미지는 없고 생성 이미지도 원하지 않는다. 구성과 세부 디자인은 맡긴다.",
+      "expected": "Use a text-led editorial composition that fits actual article lengths; do not reserve a large product-image panel or pad cards for an effect. Inspect static desktop/mobile hierarchy before motion.",
+      "setup": {
+        "workspace": "isolated local evaluation fixture",
+        "facts": [
+          "No images or image generation allowed",
+          "Full visual output, not a wireframe",
+          "Direction and execution delegated"
+        ],
+        "artifacts": [
+          "articles.json: [{\"title\":\"서버 컴포넌트 도입 후 다시 정리한 데이터 경계와 캐시 무효화 전략\",\"summary\":\"라우트별 데이터 수명과 갱신 시점을 실제 장애 사례로 비교합니다.\",\"date\":\"2026-09-09\",\"topic\":\"React\"},{\"title\":\"로그를 읽는 순서\",\"summary\":\"배포 실패 원인을 좁히는 세 가지 질문.\",\"date\":\"2026-09-08\",\"topic\":\"운영\"}]"
+        ]
+      }
+    },
+    {
+      "id": "essential-image-unavailable",
+      "prompt": "제품 이미지를 크게 보여주는 레퍼런스로 제품 소개를 만들어줘.",
+      "reply": "제품 이미지는 제공할 수 없다. 이미지를 지어내지 말고 이미지 없이 성립하는 구성으로 조정해줘.",
+      "expected": "Record the missing essential asset and choose a composition that works without it. Do not substitute an arbitrary diagram and claim the source composition is preserved.",
+      "setup": {
+        "workspace": "isolated local evaluation fixture",
+        "facts": ["Essential source asset unavailable", "Image-free redesign authorized"],
+        "artifacts": ["content.md: 제품명 Orbit; 작업 기록 검색과 태그 필터 제공"]
+      }
+    },
+    {
+      "id": "approved-whitespace",
+      "prompt": "승인된 흰 배경·넓은 여백·중앙 정렬의 작가 소개를 유지해서 완성해줘.",
+      "reply": "이미지 없는 타이포 중심이 승인 방향이다. 본문과 글 탐색 링크만 넣어줘.",
+      "expected": "Preserve intentional whitespace and centered alignment where compatible with the approved task; do not reject them merely as sparse or add unrequested cards/images.",
+      "setup": {
+        "workspace": "isolated local evaluation fixture",
+        "facts": ["Author introduction, not dense feed", "Approved visual source must be provided by evaluator"],
+        "artifacts": ["copy.md: 기록하며 생각하는 사람; 개발 과정의 선택과 시행착오를 씁니다; 글 읽기"]
+      }
+    },
+    {
+      "id": "demo-consent-only",
+      "prompt": "RELAY 주제와 데모 데이터 사용은 괜찮아. 또 물어볼 게 없어?",
+      "reply": "주제와 데모 사용만 동의했고 시각 방향은 실제 견본을 보고 정하고 싶다.",
+      "expected": "Do not promote topic/demo consent into direction approval. Present an actual viewed content-bearing visual sample before requesting the unresolved direction decision; no invented prior approval.",
+      "setup": {
+        "workspace": "isolated local evaluation fixture",
+        "facts": [
+          "Topic and demo usage approved",
+          "Visual direction not approved",
+          "User wants to select after seeing sample"
+        ],
+        "artifacts": ["brief.md: 개발팀 배포 관제 소개; 한국어 랜딩; local index.html; demo release list permitted"]
+      }
+    },
+    {
+      "id": "structure-rejected",
+      "prompt": "카드가 너무 크고 글 찾기가 어려워. 겹침 효과는 빼고 구조를 고쳐줘.",
+      "reply": "색상·브랜드는 그대로 두고 글 목록의 밀도를 먼저 고쳐줘.",
+      "expected": "Revisit content-driven card sizing and article discovery within the existing brand; do not merely add animation, recolor, or restart unrelated brand approval.",
+      "setup": {
+        "workspace": "isolated local evaluation fixture",
+        "facts": [
+          "Existing cards oversized for scroll effect",
+          "Brand unchanged",
+          "Structure repair explicitly requested"
+        ],
+        "artifacts": ["index.html: evaluator supplies oversized stacked article-card fixture with actual text"]
+      }
+    },
+    {
+      "id": "budget-exhausted-structure",
+      "prompt": "검토 예산은 다 썼어. 현재 결과 상태를 보고해줘.",
+      "reply": "추가 수정은 하지 말고 기능 검사와 디자인 상태를 구분해줘.",
+      "expected": "Report technical pass separately from incomplete design when article hierarchy or essential asset fit still fails. Do not claim completion from an accepted incremental revision or exhausted budget; user acceptance remains not obtained.",
+      "setup": {
+        "workspace": "isolated local evaluation fixture",
+        "facts": [
+          "Technical checks passed",
+          "Content hierarchy defect still present",
+          "No further repair budget",
+          "No user acceptance"
+        ],
+        "artifacts": [
+          "critique.md: long actual titles clipped; focal image missing; r3 spacing improved but core composition unresolved"
+        ]
+      }
+    },
+    {
+      "id": "multi-site-study-proposal",
+      "prompt": "블로그 홈을 구성해줘. 참고할 사이트는 직접 찾아서 여러 개 클론해 비교하는 방법도 제안해줘.",
+      "reply": "글 발견이 목적이다. 먼저 후보 URL과 비교 구간, 비용 범위를 제안해줘. 아직 클론 실행은 승인하지 않았다.",
+      "expected": "Select a small set of relevant exact pages and propose what each comparison tests, isolated output roots, prerequisites and bounded budget; do not clone sites or overwrite the product merely from proposal consent.",
+      "setup": {
+        "workspace": "isolated evaluation workspace",
+        "facts": [
+          "Article discovery, not service signup",
+          "Agent selects candidates",
+          "Proposal only, no clone execution permission"
+        ],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "approved-clone-study",
+      "prompt": "앞서 승인한 A/B 사이트의 글 목록 클론 비교를 진행하고 결과를 디자인에 반영해줘.",
+      "reply": "URL·상태·격리 위치·비교 범위·예산과 실행이 승인됐다. 브랜드는 유지해줘.",
+      "expected": "Check tool and workspace prerequisites, execute the bounded study without repeated approval, preserve source clones separately from content-substituted variants and final output, compare fidelity and task fit independently, then apply selected patterns.",
+      "setup": {
+        "workspace": "isolated evaluation workspace",
+        "facts": [
+          "Approved study and execution",
+          "Evaluator provides exact accessible URLs and isolated prepared roots",
+          "Shared product routes must stay unchanged during study"
+        ],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "clone-tool-unavailable",
+      "prompt": "clone-template으로 후보 사이트를 분석해줘.",
+      "reply": "새 설치는 하지 마. 비교할 URL은 있지만 해당 스킬은 없다.",
+      "expected": "Do not invent clone-template commands or install a tool. Inspect available clone tools and report their names and prerequisites; if permitted equivalent execution is unavailable, provide an explicitly observation-only alternative rather than claiming clones exist.",
+      "setup": {
+        "workspace": "isolated evaluation workspace",
+        "facts": ["Requested tool absent", "No new installation permitted", "Tools and output scope must be checked"],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "clone-fit-mismatch",
+      "prompt": "잘 복제된 제품 랜딩을 우리 글 목록에 적용해줘.",
+      "reply": "큰 제품 이미지는 없고 긴 한국어 글 제목과 요약만 있다. 최우선은 글 탐색이다.",
+      "expected": "Do not promote successful source reproduction into content suitability. Retain the original comparison separately, test actual article data in a distinct variant, and reject the image-dependent layout if it fails; do not fill with invented imagery.",
+      "setup": {
+        "workspace": "isolated evaluation workspace",
+        "facts": [
+          "Source fidelity high",
+          "Source asset unavailable",
+          "Final output must support actual article discovery"
+        ],
+        "artifacts": []
+      }
     }
   ]
 }

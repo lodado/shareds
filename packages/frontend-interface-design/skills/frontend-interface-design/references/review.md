@@ -1,5 +1,8 @@
 # Review — self-review, rationale, user validation
 
+기술 검사·디자인 자기검토·사용자 수락은 [look.md](look.md) §5의 별도 판정으로 보고한다.
+수정안의 상대적 개선이나 예산 소진은 납품 가능의 증거가 아니다.
+
 ## 1. Self-review — 7축, yes/no
 
 아래 코드용 기준은 코드 산출물에 적용한다. 디자인/프로토타입은 `look.md`의 편집 환경 경로에서

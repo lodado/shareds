@@ -1,6 +1,6 @@
 {
   "name": "frontend-interface-design",
-  "version": "0.5.0",
+  "version": "0.5.2",
   "description": "Brand-aligned web UI design: clarify goals, assets/tokens, references and editable output scope, then autonomously compose and visually review section-level designs in the agreed environment.",
   "author": {
     "name": "lodado",

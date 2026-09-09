@@ -546,3 +546,58 @@ test('composition workflow treats brand, output permissions, and feedback as exp
     assert.ok(ids.has(id), `missing behavioral case ${id}`)
   }
 })
+
+// These checks cover the published contract and fixture coverage, not live visual quality.
+test('content-fit review separates delivery readiness from revision improvement', async () => {
+  const [look, composition, sources, rawCases] = await Promise.all([
+    read('references/look.md'),
+    read('references/section-composition.md'),
+    read('references/reference-sources.md'),
+    readFile(join(skillDirectory, 'evals/interaction-cases.json'), 'utf8'),
+  ])
+  for (const status of ['technical:', 'design-self-review:', 'user-acceptance:']) {
+    assert.ok(look.includes(status), `missing independent result field ${status}`)
+  }
+  assert.ok(composition.includes('reference-sources.md'))
+  assert.ok(sources.includes('document-only'))
+  const cases = JSON.parse(rawCases).cases
+  assert.equal(new Set(cases.map(({ id }) => id)).size, cases.length)
+  for (const id of [
+    'content-without-images',
+    'essential-image-unavailable',
+    'approved-whitespace',
+    'demo-consent-only',
+    'structure-rejected',
+    'budget-exhausted-structure',
+  ]) {
+    assert.ok(
+      cases.some((entry) => entry.id === id),
+      `missing regression scenario ${id}`,
+    )
+  }
+})
+
+// Document/fixture coverage only; live clone execution is evaluated separately.
+test('multi-site clone study has a routed, bounded proposal and distinct evidence outputs', async () => {
+  const [sources, study, rawCases] = await Promise.all([
+    read('references/reference-sources.md'),
+    read('references/clone-study.md'),
+    readFile(join(skillDirectory, 'evals/interaction-cases.json'), 'utf8'),
+  ])
+  assert.ok(sources.includes('clone-study.md'))
+  for (const field of ['source-observation', 'reference-clone', 'content-variant', 'final-composition']) {
+    assert.ok(study.includes(field), `missing distinct artifact role ${field}`)
+  }
+  const cases = JSON.parse(rawCases).cases
+  for (const id of [
+    'multi-site-study-proposal',
+    'approved-clone-study',
+    'clone-tool-unavailable',
+    'clone-fit-mismatch',
+  ]) {
+    assert.ok(
+      cases.some((entry) => entry.id === id),
+      `missing behavioral case ${id}`,
+    )
+  }
+})

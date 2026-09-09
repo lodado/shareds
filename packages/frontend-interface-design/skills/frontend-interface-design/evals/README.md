@@ -88,3 +88,23 @@ The existing `run-live.mjs` → render → judge → grade pipeline remains a fi
 2. Record one vote per pair in `human-votes.json`: `[{ "briefId", "a": "<dir or variant>", "b": "<dir or variant>", "winner": "A" | "B" | "tie" }]`.
 3. `calibrate.mjs` computes agreement over the human's decisive votes only; a judge tie against a decisive human vote is a disagreement.
 4. Target: agreement ≥ 75% (MLLM-as-judge 77% and human–human 68.7% are the reference points). Below the target the checklist questions are the suspect: rewrite the ambiguous ones, re-judge, re-measure. A skill change is adopted only on a calibrated judge.
+
+## Content-fit regression batch
+
+`interaction-cases.json` also covers image-free article discovery, missing essential imagery, intentional
+whitespace, demo-only consent, structural rejection, and an exhausted repair budget. Materialize each setup
+with actual copy and permitted assets in an isolated workspace; incomplete setup is not a passed run.
+Run baseline and candidate on the same inputs and collect tool actions, reference evidence, static
+desktop/mobile output, and separate technical/design/user-acceptance records. A text-only forward test
+can check decision boundaries but cannot prove visual quality. Use pairwise screenshots with swapped
+ordering for visual review; record human feedback separately from model judgment. Passing document or
+scenario-schema tests does not mean this batch has run or that one-shot design quality is guaranteed.
+
+## Multi-site clone study cases
+
+The manual corpus also covers proposal-only multi-site research, an approved clone study with final
+application, an unavailable clone tool with no installation permission, and accurate clones that fail
+actual-content fit. Supply exact permitted URLs, browser access, prepared isolated roots and actual
+content for live execution. Record proposal, execution authorization, source observations, clone
+locations, content variants and selected final patterns separately. A next-action simulation can check
+boundaries, but is not proof that websites were cloned, rendered or visually compared.
