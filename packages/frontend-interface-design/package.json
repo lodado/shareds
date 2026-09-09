@@ -1,8 +1,8 @@
 {
   "name": "@lodado/frontend-interface-design-plugin",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
-  "description": "Claude Code / Codex plugin for explainable, well-crafted UI/UX design: decision ladder, lineage DESIGN.md adaptation, scored screenshot loop, Korean typography.",
+  "description": "Brand-aligned web UI design: clarify goals, assets/tokens, references and editable output scope, then autonomously compose and visually review section-level designs in the agreed environment.",
   "license": "MIT",
   "scripts": {
     "lint": "eslint skills scripts",

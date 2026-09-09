@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "purpose": "Behavioral scenarios for adaptive discovery and reference-driven section composition.",
+  "cases": [
+    {
+      "id": "reply-changes-direction",
+      "prompt": "대시보드의 첫 화면을 만들어줘. 세련되고 고급스럽게.",
+      "reply": "숫자 밀도보다 큰 잔액과 다음 행동이 먼저 보여야 하고, 장식적인 그래디언트는 피한다.",
+      "expected": "The brief records the reply and the chosen direction prioritizes a clear primary action over decorative treatment.",
+      "setup": {
+        "workspace": "isolated static page",
+        "facts": ["dashboard for salary management", "primary action is unknown until reply"],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "delegated-direction",
+      "prompt": "목적과 콘텐츠는 확정됐다. 나머지 디자인 선택은 맡겨.",
+      "reply": "섹션 구성과 시각적 세부는 위임한다.",
+      "expected": "No per-component approval loop is opened; the skill chooses, builds, renders, and critiques the UI autonomously.",
+      "setup": {
+        "workspace": "isolated static page",
+        "facts": ["audience: first-time users", "content: balance, activity, one primary CTA"],
+        "artifacts": ["content.md: Balance 1,250,000원; 최근 활동 3건"]
+      }
+    },
+    {
+      "id": "unresolved-fact",
+      "prompt": "회원가입 화면을 만들어줘.",
+      "reply": "소셜 로그인 제공 여부와 필수 입력 필드는 아직 결정되지 않았다.",
+      "expected": "The skill asks for the material product facts or marks the work blocked; it never invents policy or required fields.",
+      "setup": {
+        "workspace": "isolated static page",
+        "facts": ["signup page requested", "social login availability unknown", "required fields unknown"],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "exact-fidelity",
+      "prompt": "첨부한 화면을 픽셀 수준으로 재현해줘.",
+      "reply": "구조와 상태를 그대로 옮기고 새 무드보드나 재디자인은 원하지 않는다.",
+      "expected": "Fidelity remains the active mode and skips forced interview or moodboard detours.",
+      "setup": {
+        "workspace": "isolated static page",
+        "facts": ["owned reference must be supplied by evaluator", "scope: structure and states only"],
+        "artifacts": [
+          "reference/index.html: <main data-owned-reference>로그인</main>",
+          "reference/tokens.css: :root { --color-bg: #fff; }"
+        ],
+        "requires": "Evaluator must provide the supplied owned HTML/tokens artifact before running this case."
+      }
+    },
+    {
+      "id": "mixed-sections",
+      "prompt": "제품 소개 페이지를 여러 섹션으로 만들어줘.",
+      "reply": "히어로는 이미지 중심, 기능은 비교가 쉽고, 가격은 선택이 명확해야 한다.",
+      "expected": "Sections may use different suitable structures while sharing the resolved typography, color, spacing, surface, and icon tokens.",
+      "setup": {
+        "workspace": "isolated static page",
+        "facts": ["hero image-led", "features compare options", "pricing requires clear selection"],
+        "artifacts": ["content.md: 제품명 Orbit; 기능 A/B/C; Basic/Pro pricing"]
+      }
+    },
+    {
+      "id": "mcp-code-only",
+      "prompt": "Magic UI 컴포넌트를 참고해서 만들어줘.",
+      "reply": "MCP는 코드만 반환하고 미리보기는 제공하지 않는다.",
+      "expected": "The skill distinguishes code evidence from visual inspection, uses the component only when safe, and does not claim to have seen a render.",
+      "setup": {
+        "workspace": "isolated static page",
+        "facts": ["Magic UI MCP returns source only", "no preview URL or screenshot is available"],
+        "artifacts": ["mcp-response.tsx: export function Card(){ return <div>Plan</div> }"]
+      }
+    },
+    {
+      "id": "korean-mobile",
+      "prompt": "한국어 모바일 화면으로 구현해줘.",
+      "reply": "실제 한국어 문구를 넣고 375px에서 핵심 행동과 줄바꿈이 유지되어야 한다.",
+      "expected": "Rendered mobile review checks Korean typography, keep-all behavior, readable hierarchy, and adequate tap targets.",
+      "setup": {
+        "workspace": "isolated static page",
+        "facts": ["viewport target: 375px", "actual Korean copy must remain intact"],
+        "artifacts": ["content.ko.md: 이번 달 지출; 예산 확인하기; 최근 거래 내역"]
+      }
+    },
+    {
+      "id": "brand-conflict",
+      "prompt": "우리 브랜드 가이드와 레퍼런스를 반영해 결제 화면을 만들어줘.",
+      "reply": "현재 화면은 보라색이지만 최신 공식 토큰은 녹색이며, 어떤 원본을 우선할지 아직 정하지 않았다.",
+      "expected": "The skill records the authoritative original and version, asks which source wins, and does not silently promote observed code or screenshot values to approved brand policy.",
+      "setup": {
+        "workspace": "isolated static page",
+        "facts": [
+          "current implementation uses purple",
+          "official token file uses green",
+          "authority and version precedence are unresolved"
+        ],
+        "artifacts": ["current/index.html: observed purple button", "brand/tokens-v2.css: --color-primary: green"]
+      }
+    },
+    {
+      "id": "no-token-system",
+      "prompt": "토큰 파일이 없는 신규 제품 랜딩 페이지를 디자인해줘.",
+      "reply": "공식 디자인 시스템은 없지만 새 시각 방향 제안과 승인된 예시 자산은 사용할 수 있다.",
+      "expected": "The skill continues without inventing an existing token system, labels proposed values as requiring approval, and applies only the agreed direction.",
+      "setup": {
+        "workspace": "isolated static page",
+        "facts": [
+          "no token file or brand guide exists",
+          "new visual direction may be proposed",
+          "approval is required for brand identity decisions"
+        ],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "editable-target-unavailable",
+      "prompt": "Figma에서 편집 가능한 최종 시안을 만들어줘.",
+      "reply": "현재 Figma 쓰기 권한과 대상 파일을 제공할 수 없다. HTML이나 PNG로 대체해도 되는지는 정하지 않았다.",
+      "expected": "The skill reports the missing editable target and read/write permission instead of silently substituting HTML or PNG and claiming the agreed output is complete.",
+      "setup": {
+        "workspace": "isolated static page",
+        "facts": [
+          "requested output: editable Figma design",
+          "Figma write access unavailable",
+          "substitution permission unknown"
+        ],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "prior-approval-execution",
+      "prompt": "앞서 합의한 브리프와 실행 요청대로 전체 UI를 완성해줘.",
+      "reply": "목적·필수 콘텐츠·브랜드 기준·방향·출력 위치는 이미 승인했고 섹션별 구성과 세부 조정은 맡긴다.",
+      "expected": "The skill does not reopen a redundant approval loop; it proceeds through section selection, implementation, rendering, and bounded critique under the approved brief.",
+      "setup": {
+        "workspace": "isolated static page",
+        "facts": [
+          "approved brief is available",
+          "execution request is explicit",
+          "section layout and detail decisions are delegated"
+        ],
+        "artifacts": ["approved-brief.md: purpose, content, brand, direction, output location"]
+      }
+    },
+    {
+      "id": "scoped-feedback",
+      "prompt": "완성된 제품 페이지를 검토해줘.",
+      "reply": "가격 카드의 간격만 좁혀줘. 나머지 브랜드와 섹션 구성은 유지하고, 새로운 요구사항은 아니다.",
+      "expected": "The skill makes a local spacing repair without expanding the feedback into a whole-brand redesign or reopening unrelated section choices.",
+      "setup": {
+        "workspace": "existing rendered page",
+        "facts": ["pricing card spacing is the only reported issue", "brand and section structure are approved"],
+        "artifacts": ["review.md: pricing card spacing note"]
+      }
+    }
+  ]
+}

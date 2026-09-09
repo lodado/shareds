@@ -1,7 +1,7 @@
 {
   "name": "frontend-interface-design",
-  "version": "0.4.0",
-  "description": "Explainable, well-crafted UI/UX design and implementation: decision ladder, lineage-based DESIGN.md adaptation, exemplar-first token-only build, scored screenshot loop, Korean typography, funnel review, rationale.",
+  "version": "0.5.0",
+  "description": "Brand-aligned web UI design: clarify goals, assets/tokens, references and editable output scope, then autonomously compose and visually review section-level designs in the agreed environment.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
@@ -12,9 +12,9 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Frontend Interface Design",
-    "shortDescription": "Design and build explainable, usable web UI",
+    "shortDescription": "Align brand, compose UI, deliver the agreed design",
     "category": "development",
-    "defaultPrompt": "Use $frontend-interface-design to design and implement this screen with a decision record and rationale.",
+    "defaultPrompt": "Use $frontend-interface-design to clarify missing goals, brand assets/tokens, reference interpretation and output format. Once agreed, select and apply suitable section designs autonomously in the agreed editing environment, then visually review the result.",
     "websiteURL": "https://github.com/lodado/my-Vibe-Coding-Helper"
   }
 }

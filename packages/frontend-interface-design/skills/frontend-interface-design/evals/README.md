@@ -76,6 +76,12 @@ node <skill>/scripts/render.mjs --in design-loop/harness.html --out design-loop/
 
 `design-loop/r1/375-light.png` … and `design-loop/r1/metrics.json` come out; gate failures are fixed before any critique so the deterministic numbers anchor the LLM's judgement instead of the other way round.
 
+## Multi-turn interaction cases (manual)
+
+`interaction-cases.json` is a small, human-readable forward-test corpus (currently including brand-source conflicts, absent token systems, unavailable editable targets, prior approval, and scoped feedback); it is **not** loaded by `evals/run-live.mjs`. For each case, create an isolated workspace and give the evaluated agent only `prompt` plus `setup` (never `reply` or `expected`). Answer the agent's material questions with `reply`, then collect the actual questions, brief/readiness decisions, moodboard directions, section choices, and rendered screens. Judge those observations against `expected` separately. This is the only supported way to evaluate the multi-turn behavior today; schema validation does not mean these cases passed.
+
+The existing `run-live.mjs` → render → judge → grade pipeline remains a fixed-brief visual evaluation. It does not automatically perform the multi-turn interaction protocol above.
+
 ## Human calibration
 
 1. Pick 20 judged pairs across briefs and hosts (both winners and ties). Show each pair's screenshots blind — hide variant names and swap sides at random.

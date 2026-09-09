@@ -82,8 +82,8 @@
     },
     {
       "name": "frontend-interface-design",
-      "description": "Explainable, well-crafted UI/UX design and implementation: decision ladder, lineage-based DESIGN.md adaptation, exemplar-first token-only build, scored screenshot loop, Korean typography, funnel review, rationale.",
-      "version": "0.4.0",
+      "description": "Brand-aligned web UI design: clarify goals, assets/tokens, references and editable output scope, then autonomously compose and visually review section-level designs in the agreed environment.",
+      "version": "0.5.0",
       "author": {
         "name": "lodado"
       },
