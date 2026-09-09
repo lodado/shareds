@@ -1,0 +1,159 @@
+{
+  "version": 1,
+  "name": "frontend-oracle-design-lifecycle-forward-v1",
+  "purpose": "Forward scenarios for adaptive lifecycle planning. Assertions are semantic reviewer prompts, not an executable runtime grader.",
+  "cases": [
+    {
+      "id": "fod-lc-01",
+      "category": "low-no-extra-ceremony",
+      "prompt": "Change an already-approved label in one existing button. Do not alter behavior, layout, state, or API.",
+      "expected": {
+        "risk": "Low",
+        "lane": "low-fast-path",
+        "status": "GREEN",
+        "loadedNodes": [
+          "low-fast-path"
+        ]
+      },
+      "expectedConstraints": [
+        "Keep the Low single-node fast path",
+        "Use ordinary repository validation only"
+      ],
+      "forbiddenConstraints": [
+        "Do not invent an Oracle card, lifecycle plan, milestone, or review ceremony"
+      ],
+      "semanticAssertions": [
+        "The response preserves the Low path and explains why lifecycle-adaptation is not loaded"
+      ]
+    },
+    {
+      "id": "fod-lc-02",
+      "category": "medium-greenfield-policy",
+      "prompt": "Design a new medium-risk filter panel for a greenfield screen. The product has not decided whether filter changes apply immediately or only after pressing Apply. Produce the first Draft Oracle, without implementing it.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "loadedNodes": [
+          "common",
+          "card-policy-sources"
+        ]
+      },
+      "expectedConstraints": [
+        "Keep the unresolved apply-policy as an Open question"
+      ],
+      "forbiddenConstraints": [
+        "Do not invent lifecycle ceremony or reverse-engineer an existing system",
+        "Do not claim implementation, approval, lock, or executed evidence",
+        "Do not load lifecycle-adaptation solely because product policy is unresolved"
+      ],
+      "semanticAssertions": [
+        "The reviewer can distinguish a product-policy decision from a technical implementation choice"
+      ]
+    },
+    {
+      "id": "fod-lc-03",
+      "category": "brownfield-conflicting-sources",
+      "prompt": "In an existing checkout, the current code allows retry after a failed address save, while the approved legal note says the form must require re-validation. Map the change impact and prepare a Draft Oracle; do not resolve the conflict by copying the code.",
+      "expected": {
+        "risk": "High",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "loadedNodes": [
+          "common",
+          "card-policy-sources",
+          "lifecycle-adaptation"
+        ]
+      },
+      "expectedConstraints": [
+        "Separate observed-as-is, approved-to-be, and unknown",
+        "Record the affected ownership and validation boundary"
+      ],
+      "forbiddenConstraints": [
+        "Do not treat current implementation as policy",
+        "Do not lock or implement while sources conflict"
+      ],
+      "semanticAssertions": [
+        "The reviewer verifies that brownfield impact mapping does not silently promote code behavior to product policy"
+      ]
+    },
+    {
+      "id": "fod-lc-04",
+      "category": "high-review-red",
+      "prompt": "Fix a small high-risk permission check in an existing admin form. The requested patch is only three lines. Deliver it through the Oracle workflow and prove the denied request; do not skip VALID_RED or independent review because the diff is small.",
+      "expected": {
+        "risk": "High",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "loadedNodes": [
+          "common",
+          "card-policy-sources"
+        ]
+      },
+      "expectedConstraints": [
+        "Retain VALID_RED before production writes",
+        "Retain the required independent review",
+        "Await the existing approval/confirmation gate before claiming delivery"
+      ],
+      "forbiddenConstraints": [
+        "Do not waive RED or review based on line count",
+        "Do not claim executed evidence or REVIEW_VERIFIED without approval and delivery",
+        "Do not load lifecycle-adaptation solely because risk is High or the patch is small"
+      ],
+      "semanticAssertions": [
+        "The reviewer checks risk-driven minimum guarantees separately from investigation depth"
+      ]
+    },
+    {
+      "id": "fod-lc-05",
+      "category": "milestone-shared-effects",
+      "prompt": "Plan a medium-risk order editor with two milestones: optimistic row updates and background save retry. Both touch the same cache and can reorder notifications. Decide whether they form one independently verifiable result or must remain grouped.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "loadedNodes": [
+          "common",
+          "card-policy-sources",
+          "lifecycle-adaptation"
+        ]
+      },
+      "expectedConstraints": [
+        "Evaluate milestone boundaries by independently verifiable outcomes",
+        "Treat shared cache and notification side effects as a grouping concern"
+      ],
+      "forbiddenConstraints": [
+        "Do not split units merely by component or folder",
+        "Do not claim independent parallel completion without an integration contract"
+      ],
+      "semanticAssertions": [
+        "The reviewer can see why shared side effects constrain unit boundaries"
+      ]
+    },
+    {
+      "id": "fod-lc-06",
+      "category": "multi-card-unsupported",
+      "prompt": "Implement three unrelated dashboard widgets as three separate Oracle cards and automatically report one aggregate completion when all cards are green. Propose the safest lifecycle handling, noting any unsupported coordination.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "loadedNodes": [
+          "common",
+          "card-policy-sources",
+          "lifecycle-adaptation"
+        ]
+      },
+      "expectedConstraints": [
+        "State that multi-card aggregate coordination is not supported by this update",
+        "Keep each card's existing approval and verification contract"
+      ],
+      "forbiddenConstraints": [
+        "Do not invent a scheduler, aggregate ledger, or cross-card completion state"
+      ],
+      "semanticAssertions": [
+        "The reviewer distinguishes a bounded unsupported feature from a silently invented orchestration layer"
+      ]
+    }
+  ]
+}

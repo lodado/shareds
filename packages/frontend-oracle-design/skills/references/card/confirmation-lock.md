@@ -140,6 +140,9 @@ node <skill-dir>/scripts/oracle-run.mjs init \
 - For a large card, repeat `--milestone <name>:O1,O2` to group non-overlapping test-owned rows. The
   rows must exist in the Oracle and two milestones never own the same row. Do not declare it for a
   small card.
+- When choosing a milestone grouping, read [lifecycle-adaptation.md](../lifecycle-adaptation.md).
+  Milestones remain inside one card and share its lock, budgets and delivery gates. Keep the
+  cross-boundary verification owner in the existing card; this is not a multi-card scheduler.
 - `init` fails when the state file already exists. Re-running it to reset the budget·baseline is
   forbidden. A new revision gets a new `<oracle-id>` directory.
 

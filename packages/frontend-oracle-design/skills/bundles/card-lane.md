@@ -209,6 +209,11 @@ Rules:
 - Do not use this review as grounds for skipping a `mandatory-constraint`
   (security·privacy·legal·accessibility·data integrity).
 
+When unclear existing-system ownership, cross-boundary scope or milestone grouping requires
+adaptive investigation, apply [lifecycle-adaptation.md](../lifecycle-adaptation.md). Reuse this
+Outcome Brief and the Source Registry; keep observed as-is, approved to-be and unknowns distinct
+in the investigation rationale rather than making a parallel requirements document.
+
 ## Source Registry
 
 ```markdown
@@ -657,6 +662,11 @@ existing confirmation/revision procedure. No new plan file, ledger, or state mod
 - Label nonexistent harness helpers as proposals, and tools as candidates or unresolved when needed.
   Illustrative code, written tests, and actual executed results are distinct evidence states; no PASS
   without a run. Unknown expected results are Open questions, not fixture decisions.
+
+For conditional lifecycle planning, reuse this section to name the owning row and real target of
+cross-boundary verification. Single-card milestones do not prove integration by themselves; see
+[lifecycle-adaptation.md](../lifecycle-adaptation.md) when selecting that grouping. Keep stage
+selection rationale in the journal and expected outcomes in their existing rows.
 
 ## Open questions — Draft only
 
@@ -1460,6 +1470,9 @@ node <skill-dir>/scripts/oracle-run.mjs init \
 - For a large card, repeat `--milestone <name>:O1,O2` to group non-overlapping test-owned rows. The
   rows must exist in the Oracle and two milestones never own the same row. Do not declare it for a
   small card.
+- When choosing a milestone grouping, read [lifecycle-adaptation.md](../lifecycle-adaptation.md).
+  Milestones remain inside one card and share its lock, budgets and delivery gates. Keep the
+  cross-boundary verification owner in the existing card; this is not a multi-card scheduler.
 - `init` fails when the state file already exists. Re-running it to reset the budget·baseline is
   forbidden. A new revision gets a new `<oracle-id>` directory.
 

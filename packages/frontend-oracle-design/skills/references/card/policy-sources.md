@@ -40,6 +40,11 @@ Rules:
 - Do not use this review as grounds for skipping a `mandatory-constraint`
   (security·privacy·legal·accessibility·data integrity).
 
+When unclear existing-system ownership, cross-boundary scope or milestone grouping requires
+adaptive investigation, apply [lifecycle-adaptation.md](../lifecycle-adaptation.md). Reuse this
+Outcome Brief and the Source Registry; keep observed as-is, approved to-be and unknowns distinct
+in the investigation rationale rather than making a parallel requirements document.
+
 ## Source Registry
 
 ```markdown

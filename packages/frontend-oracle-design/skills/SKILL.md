@@ -121,6 +121,11 @@ Whether to skip a load is not a judgment call. The read instructions inlined int
   installed `$agent-graph-engineering` skill by name, read
   [`graph-orchestration.md`](references/graph-orchestration.md) in full, then execute the bundled
   workflow.
+- Oracle-lane inception: before selecting investigation breadth/depth for unclear existing-system
+  ownership, cross-boundary scope, or single-card milestone grouping, read
+  [`lifecycle-adaptation.md`](references/lifecycle-adaptation.md) with its dependencies. A small
+  change with known owners and sufficient approved sources does not load it. Keep it out of the
+  generic bundles and the Low fast path; it adjusts investigation, not required gates.
 - Card writing: [`card/policy-sources.md`](references/card/policy-sources.md),
   [`card/risk-grill.md`](references/card/risk-grill.md), [`bva.md`](references/bva.md),
   [`card/card-format.md`](references/card/card-format.md),
@@ -215,7 +220,11 @@ edits or dependency installation for design-only requests, or replace Draft gene
 5. For visible UI changes, record the `behavior-only`·`local`·`identity-shaping` scope via
    `visual-design.md`. `local`·`identity-shaping` require a Design Change Confirmation recorded on
    the card.
-6. Judge risk and investigate policy sources. The lane header's `risk` is finalized here.
+6. Judge risk and investigate policy sources. When existing-system ownership is unclear,
+   scope crosses boundaries, or single-card milestones need grouping, read
+   [`lifecycle-adaptation.md`](references/lifecycle-adaptation.md) before choosing investigation
+   breadth/depth. Reuse existing artifacts; emit the Case space briefing before presenting a plan.
+   This does not move implementation decisions ahead of VALID_RED or waive source/confirmation gates. The lane header's `risk` is finalized here.
 7. Read [`card/risk-grill.md`](references/card/risk-grill.md)·[`bva.md`](references/bva.md)·
    [`card/card-format.md`](references/card/card-format.md)·
    [`card/interaction-sweep.md`](references/card/interaction-sweep.md)·

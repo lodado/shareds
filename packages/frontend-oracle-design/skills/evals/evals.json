@@ -240,6 +240,102 @@
         "Where the Draft or plan explains the state design, it distinguishes screens from states — the spinner, the failure notice, and the empty panel are render branches over independent axes, not members — and names the query as the single owner of the lifecycle with the cursor living in the query key.",
         "The Draft reaches the user after 1 turn, with every surviving question inside the Draft as an Open question"
       ]
+    },
+    {
+      "id": 16,
+      "name": "fod-lc-01",
+      "category": "lifecycle-forward",
+      "prompt": "Change an already-approved label in one existing button. Do not alter behavior, layout, state, or API.",
+      "expected_output": "Forward lifecycle scenario: risk=Low lane=low-fast-path, terminal state GREEN, reference nodes read: low-fast-path.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Low lane=low-fast-path",
+        "The reported terminal state is GREEN",
+        "The lane header's nodes list includes every expected node: low-fast-path",
+        "Expected constraints: Keep the Low single-node fast path; Use ordinary repository validation only",
+        "Forbidden constraints: Do not invent an Oracle card, lifecycle plan, milestone, or review ceremony",
+        "A semantic reviewer confirms: The response preserves the Low path and explains why lifecycle-adaptation is not loaded"
+      ]
+    },
+    {
+      "id": 17,
+      "name": "fod-lc-02",
+      "category": "lifecycle-forward",
+      "prompt": "Design a new medium-risk filter panel for a greenfield screen. The product has not decided whether filter changes apply immediately or only after pressing Apply. Produce the first Draft Oracle, without implementing it.",
+      "expected_output": "Forward lifecycle scenario: risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
+        "The reported terminal state is NEEDS_DECISION",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources",
+        "Expected constraints: Keep the unresolved apply-policy as an Open question",
+        "Forbidden constraints: Do not invent lifecycle ceremony or reverse-engineer an existing system; Do not claim implementation, approval, lock, or executed evidence; Do not load lifecycle-adaptation solely because product policy is unresolved",
+        "A semantic reviewer confirms: The reviewer can distinguish a product-policy decision from a technical implementation choice"
+      ]
+    },
+    {
+      "id": 18,
+      "name": "fod-lc-03",
+      "category": "lifecycle-forward",
+      "prompt": "In an existing checkout, the current code allows retry after a failed address save, while the approved legal note says the form must require re-validation. Map the change impact and prepare a Draft Oracle; do not resolve the conflict by copying the code.",
+      "expected_output": "Forward lifecycle scenario: risk=High lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, lifecycle-adaptation.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=High lane=oracle",
+        "The reported terminal state is NEEDS_DECISION",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources, lifecycle-adaptation",
+        "Expected constraints: Separate observed-as-is, approved-to-be, and unknown; Record the affected ownership and validation boundary",
+        "Forbidden constraints: Do not treat current implementation as policy; Do not lock or implement while sources conflict",
+        "A semantic reviewer confirms: The reviewer verifies that brownfield impact mapping does not silently promote code behavior to product policy"
+      ]
+    },
+    {
+      "id": 19,
+      "name": "fod-lc-04",
+      "category": "lifecycle-forward",
+      "prompt": "Fix a small high-risk permission check in an existing admin form. The requested patch is only three lines. Deliver it through the Oracle workflow and prove the denied request; do not skip VALID_RED or independent review because the diff is small.",
+      "expected_output": "Forward lifecycle scenario: risk=High lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=High lane=oracle",
+        "The reported terminal state is NEEDS_DECISION",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources",
+        "Expected constraints: Retain VALID_RED before production writes; Retain the required independent review; Await the existing approval/confirmation gate before claiming delivery",
+        "Forbidden constraints: Do not waive RED or review based on line count; Do not claim executed evidence or REVIEW_VERIFIED without approval and delivery; Do not load lifecycle-adaptation solely because risk is High or the patch is small",
+        "A semantic reviewer confirms: The reviewer checks risk-driven minimum guarantees separately from investigation depth"
+      ]
+    },
+    {
+      "id": 20,
+      "name": "fod-lc-05",
+      "category": "lifecycle-forward",
+      "prompt": "Plan a medium-risk order editor with two milestones: optimistic row updates and background save retry. Both touch the same cache and can reorder notifications. Decide whether they form one independently verifiable result or must remain grouped.",
+      "expected_output": "Forward lifecycle scenario: risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, lifecycle-adaptation.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
+        "The reported terminal state is NEEDS_DECISION",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources, lifecycle-adaptation",
+        "Expected constraints: Evaluate milestone boundaries by independently verifiable outcomes; Treat shared cache and notification side effects as a grouping concern",
+        "Forbidden constraints: Do not split units merely by component or folder; Do not claim independent parallel completion without an integration contract",
+        "A semantic reviewer confirms: The reviewer can see why shared side effects constrain unit boundaries"
+      ]
+    },
+    {
+      "id": 21,
+      "name": "fod-lc-06",
+      "category": "lifecycle-forward",
+      "prompt": "Implement three unrelated dashboard widgets as three separate Oracle cards and automatically report one aggregate completion when all cards are green. Propose the safest lifecycle handling, noting any unsupported coordination.",
+      "expected_output": "Forward lifecycle scenario: risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, lifecycle-adaptation.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
+        "The reported terminal state is NEEDS_DECISION",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources, lifecycle-adaptation",
+        "Expected constraints: State that multi-card aggregate coordination is not supported by this update; Keep each card's existing approval and verification contract",
+        "Forbidden constraints: Do not invent a scheduler, aggregate ledger, or cross-card completion state",
+        "A semantic reviewer confirms: The reviewer distinguishes a bounded unsupported feature from a silently invented orchestration layer"
+      ]
     }
   ]
 }

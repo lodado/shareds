@@ -88,6 +88,11 @@ existing confirmation/revision procedure. No new plan file, ledger, or state mod
   Illustrative code, written tests, and actual executed results are distinct evidence states; no PASS
   without a run. Unknown expected results are Open questions, not fixture decisions.
 
+For conditional lifecycle planning, reuse this section to name the owning row and real target of
+cross-boundary verification. Single-card milestones do not prove integration by themselves; see
+[lifecycle-adaptation.md](../lifecycle-adaptation.md) when selecting that grouping. Keep stage
+selection rationale in the journal and expected outcomes in their existing rows.
+
 ## Open questions — Draft only
 
 A question that survives investigation does not wait in the conversation for an answer. It travels

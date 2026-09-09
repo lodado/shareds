@@ -89,6 +89,12 @@
       "requires": ["common"]
     },
     {
+      "id": "lifecycle-adaptation",
+      "path": "references/lifecycle-adaptation.md",
+      "when": "Oracle lane only — before selecting investigation breadth/depth for unclear existing-system ownership, cross-boundary scope, or single-card milestone grouping",
+      "requires": ["common", "card-policy-sources"]
+    },
+    {
       "id": "card-risk-grill",
       "path": "references/card/risk-grill.md",
       "when": "start of card writing",

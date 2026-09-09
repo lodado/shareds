@@ -46,7 +46,29 @@ export function heldOutEvals(heldOut, offset) {
   }))
 }
 
-export function toEvals(corpus, heldOut = { cases: [] }) {
+/** Forward scenarios exercise lifecycle guidance through semantic review assertions.
+ * They intentionally carry no executable grader: skill-creator evaluates the response. */
+export function lifecycleEvals(lifecycle, offset) {
+  return (lifecycle?.cases ?? []).map((entry, index) => ({
+    id: offset + index + 1,
+    name: entry.id,
+    category: 'lifecycle-forward',
+    source: entry.source,
+    prompt: entry.prompt,
+    expected_output: `Forward lifecycle scenario: risk=${entry.expected.risk} lane=${entry.expected.lane}, terminal state ${entry.expected.status}, reference nodes read: ${entry.expected.loadedNodes.join(', ')}.`,
+    files: [],
+    assertions: [
+      `The first line of the response is the lane header and it reports risk=${entry.expected.risk} lane=${entry.expected.lane}`,
+      `The reported terminal state is ${entry.expected.status}`,
+      `The lane header's nodes list includes every expected node: ${entry.expected.loadedNodes.join(', ')}`,
+      `Expected constraints: ${(entry.expectedConstraints ?? []).join('; ')}`,
+      `Forbidden constraints: ${(entry.forbiddenConstraints ?? []).join('; ')}`,
+      ...(entry.semanticAssertions ?? []).map((assertion) => `A semantic reviewer confirms: ${assertion}`),
+    ],
+  }))
+}
+
+export function toEvals(corpus, heldOut = { cases: [] }, lifecycle = { cases: [] }) {
   const evals = corpus.cases.map((entry, index) => ({
     id: index + 1,
     name: entry.id,
@@ -59,7 +81,11 @@ export function toEvals(corpus, heldOut = { cases: [] }) {
   return {
     skill_name: 'frontend-oracle-design',
     source: corpus.name,
-    evals: [...evals, ...heldOutEvals(heldOut, evals.length)],
+    evals: [
+      ...evals,
+      ...heldOutEvals(heldOut, evals.length),
+      ...lifecycleEvals(lifecycle, evals.length + heldOut.cases.length),
+    ],
   }
 }
 
@@ -68,7 +94,8 @@ const heldOutPath = join(evalDirectory, 'held-out.json')
 async function main() {
   const corpus = JSON.parse(await readFile(corpusPath, 'utf8'))
   const heldOut = JSON.parse(await readFile(heldOutPath, 'utf8').catch(() => '{"cases":[]}'))
-  const rendered = `${JSON.stringify(toEvals(corpus, heldOut), null, 2)}\n`
+  const lifecycle = JSON.parse(await readFile(join(evalDirectory, 'lifecycle-cases.json'), 'utf8'))
+  const rendered = `${JSON.stringify(toEvals(corpus, heldOut, lifecycle), null, 2)}\n`
 
   if (process.argv.includes('--check')) {
     const current = await readFile(evalsPath, 'utf8').catch(() => null)
@@ -76,13 +103,13 @@ async function main() {
       process.stderr.write('EVALS_STALE: evals/evals.json does not match blackbox-corpus.json — run to-skill-creator-evals.mjs\n')
       process.exitCode = 1
     } else {
-      process.stdout.write(`evals ok — ${corpus.cases.length} corpus + ${heldOut.cases.length} held-out cases\n`)
+      process.stdout.write(`evals ok — ${corpus.cases.length} corpus + ${heldOut.cases.length} held-out + ${lifecycle.cases.length} lifecycle cases\n`)
     }
     return
   }
 
   await writeFile(evalsPath, rendered)
-  process.stdout.write(`generated evals.json — ${corpus.cases.length} corpus + ${heldOut.cases.length} held-out cases\n`)
+  process.stdout.write(`generated evals.json — ${corpus.cases.length} corpus + ${heldOut.cases.length} held-out + ${lifecycle.cases.length} lifecycle cases\n`)
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split(/[\\/]/).pop())) {

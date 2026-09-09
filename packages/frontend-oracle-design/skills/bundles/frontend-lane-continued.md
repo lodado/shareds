@@ -42,6 +42,11 @@ the priority with `NEEDS_DECISION` and record the approved decision in the docum
 result is unresolved or changes during the conversation, do not lock the document and return it to
 `NEEDS_DECISION`.
 
+For unclear brownfield ownership or cross-boundary planning, use the scoped investigation in
+[lifecycle-adaptation.md](lifecycle-adaptation.md): distinguish observed as-is from approved to-be
+and unknowns. Reuse this document when it already covers the change; observations alone do not
+approve changes to it or require a repository-wide reverse-engineering document.
+
 ## Architecture unit
 
 Place the document not at every leaf component but at the responsibility boundary that changes together.

@@ -107,6 +107,7 @@ flowchart LR
   RISK -->|"그 외"| common["common"]
 
   card_policy_sources["card-policy-sources"]
+  lifecycle_adaptation["lifecycle-adaptation"]
   card_risk_grill["card-risk-grill"]
   card_format["card-format"]
   card_interaction_sweep["card-interaction-sweep"]
@@ -133,6 +134,8 @@ flowchart LR
   oracle_workflow_graph["oracle-workflow-graph"]
 
   common --> card_policy_sources
+  common --> lifecycle_adaptation
+  card_policy_sources --> lifecycle_adaptation
   common --> card_risk_grill
   card_policy_sources --> card_risk_grill
   common --> card_format
