@@ -1,5 +1,9 @@
 # Review — self-review, rationale, user validation
 
+## UI·UX·모션의 공동 완료 조건
+
+[experience-design.md](experience-design.md) §4의 journey-review · reference-translation · motion-review 근거를 기존 보고에 연결한다. 기본/축소 설정을 구분하며 테스트 삭제는 원래 역할과 변경/대체 계약에 연결한다. 기술 통과·자기검토·사용자 수락·실제 성과를 서로 대체하지 않는다.
+
 기술 검사·디자인 자기검토·사용자 수락은 [look.md](look.md) §5의 별도 판정으로 보고한다.
 수정안의 상대적 개선이나 예산 소진은 납품 가능의 증거가 아니다.
 

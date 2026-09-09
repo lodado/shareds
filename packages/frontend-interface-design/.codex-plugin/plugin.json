@@ -1,7 +1,7 @@
 {
   "name": "frontend-interface-design",
-  "version": "0.5.2",
-  "description": "Brand-aligned web UI design: clarify goals, assets/tokens, references and editable output scope, then autonomously compose and visually review section-level designs in the agreed environment.",
+  "version": "0.6.0",
+  "description": "Reference-driven UI/UX and motion: align journeys, funnel goals and brand experience, compose sections, and review static, interactive and reduced-motion outcomes.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
@@ -12,9 +12,9 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Frontend Interface Design",
-    "shortDescription": "Align brand, compose UI, deliver the agreed design",
+    "shortDescription": "Compose UI, UX journeys and meaningful motion",
     "category": "development",
-    "defaultPrompt": "Use $frontend-interface-design to clarify missing goals, brand assets/tokens, reference interpretation and output format. Once agreed, select and apply suitable section designs autonomously in the agreed editing environment, then visually review the result.",
+    "defaultPrompt": "Use frontend-interface-design to align goals, user journeys and brand references, then compose and apply coherent UI and meaningful motion in the agreed format. Review real content, core tasks and normal/reduced-motion behavior; disclose unobserved scope.",
     "websiteURL": "https://github.com/lodado/my-Vibe-Coding-Helper"
   }
 }

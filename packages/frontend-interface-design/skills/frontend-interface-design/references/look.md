@@ -1,5 +1,9 @@
 # Look — 채점형 시각 루프
 
+## 정적 렌더가 검사하지 못하는 경험
+
+[experience-design.md](experience-design.md) §4의 여정·일반 모션·축소 모션 검토를 별도로 수행한다. 정적 render.mjs 결과만으로 시간적 경험이 검증됐다고 하지 않는다. 요구된 핵심 특징 누락은 기술 게이트 통과와 무관하게 미완성이다. 계측 오탐과 큰 방향 실패도 해당 절의 분류를 따른다.
+
 Build 직후 **반드시** 돈다. 보지 않은 화면은 완료가 아니다. 이 루프는 자기비평이지 검증이
 아니다 — `frontend-visual-qa`의 `VERIFIED`를 발급하지 않고 Oracle artifact도 만들지 않는다.
 
@@ -190,3 +194,7 @@ surrogate로 돌았으면 Rationale에 그대로 적는다. 하네스가 통과�
   critique의 지적은 `fixes`에 증거로 인용한다. 채택 여부는 3단계 규칙으로 판정한다.
 - `impeccable polish <target>`은 루프가 끝난 뒤 finisher로 **1회**. polish 뒤에도 3단계의 세 조건으로
   한 번 더 비교하고, 조건을 하나라도 어기면 되돌린다.
+
+### 보정 예산의 경계
+
+선택적 finisher/polish와 그 뒤 재렌더도 기존 최대 두 번의 보수 예산에 포함한다. 예산을 모두 썼으면 추가 polish를 자동 실행하지 않는다. 핵심 경험 해석 실패는 이 미세 보정 루프가 아니라 [experience-design.md](experience-design.md) §4의 실패 기록·영향 결정 재검토로 처리한다.

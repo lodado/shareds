@@ -91,9 +91,9 @@ test('decides top-down: primary task before visual treatment, and exempts craft 
     skill,
     /1\.\s+primary task[\s\S]*2\.\s+information hierarchy[\s\S]*3\.\s+interaction[\s\S]*4\.\s+feedback[\s\S]*5\.\s+visual treatment/,
   )
-  assert.match(skill, /visual treatment gate/)
-  assert.match(skill, /craft\.md[\s\S]*기본값[\s\S]*근거 없이 쓴다/)
-  assert.match(skill, /말할 수 없으면 지운다/)
+  assert.match(skill, /정보 이해·조작·합의된 브랜드 표현/)
+  assert.match(skill, /craft\.md[\s\S]*기본값/)
+  assert.match(skill, /핵심 작업·접근성·읽기를 해치지/)
 })
 
 test('keeps exactly twelve always-on rules, hardest first, and stays inside the rule budget', async () => {

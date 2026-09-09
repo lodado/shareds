@@ -143,7 +143,9 @@ time {
 
 출처: Vercel WIG "Nested radii" · kill-ai-slop "corners that don't nest".
 
-## 8. 피드백 모션 — 120–200ms ease-out, 키보드 · 고빈도 동작은 무모션
+## 8. 일반 조작 피드백 — 120–200ms ease-out, 고빈도 조작은 지연 없이
+
+이 절의 짧은 시간 기본값은 일반 조작 피드백용이다. 브랜드·영상·스크롤 시간축과 일반/축소 설정 검토는 [experience-design.md](experience-design.md) §3–4를 따른다. 고빈도 조작도 필요한 상태 피드백은 유지하며 조작을 기다리게 하지 않는다.
 
 hover · pressed는 즉시성이 핵심이다. `transform` · `opacity`만, `transition: all` 금지,
 `ease-in` 금지, 등장 애니메이션은 0.9 이상에서 시작. 하루 100번 쓰는 동작(단축키 · 팔레트
@@ -212,7 +214,7 @@ hover · pressed는 즉시성이 핵심이다. `transform` · `opacity`만, `tra
 
 ## 11. empty · table · form 레시피
 
-- **empty**: 한 줄 설명 + 다음 행동 CTA 하나. 회색 일러스트 + "데이터 없음"만 두지 않는다.
+- **empty**: 상태를 설명하고 가능한 복구·다음 행동이 있으면 제공한다. 회색 일러스트와 "데이터 없음"만으로 설명을 대신하지 않는다.
 - **table**: 텍스트 좌정렬 · 숫자 우정렬 + tabular · 행 높이 `--row-h` · 구분선 hairline ·
   헤더는 `--muted-foreground` 500 · 정렬 기본값 명시 · sticky 헤더.
 - **form**: label 위 · 필수 표시 · 형식 요구는 에러 전에 · blur 검증 · 에러는 필드 옆 `aria-describedby` ·
@@ -233,3 +235,5 @@ hover · pressed는 즉시성이 핵심이다. `transform` · `opacity`만, `tra
 - 방향(어떤 계보 · 어떤 hue · 어떤 페어링)을 고르지 않는다 — [`adaptation.md`](adaptation.md).
 - 금지 목록을 두지 않는다 — 클리셰 탐지는 `evals/gates.json`과 `impeccable detect`가 맡는다.
 - 사다리 1–4단(task · hierarchy · interaction · feedback)을 바꾸지 않는다.
+
+빈 상태의 CTA는 실제로 가능한 다음 행동이 있을 때 제공한다. 완료 결과에서는 명확한 결과·다운로드·종료가 충분하면 추가 CTA를 강제하지 않는다.

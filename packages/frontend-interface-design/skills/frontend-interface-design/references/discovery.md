@@ -1,5 +1,9 @@
 # Discovery — 준비에서 기준을 합의하고 실행에서 자율 완성한다
 
+## 여정·변경 범위 연결
+
+[experience-design.md](experience-design.md) §1–2를 준비 단계에서 적용한다. 퍼널별 목표·핵심 여정·리텐션의 실제 가치를 합의하고 콘텐츠와 상호작용 변경 축을 구분한다.
+
 준비 단계에서는 결과를 바꾸는 사용자 결정을 확인한다. 실행 단계에서는 그 기준 안의 섹션 구성과
 시각 세부를 직접 끝낸다. 두 단계는 Fidelity / Reference-informed / Adaptation 소스 모드와 별개다.
 

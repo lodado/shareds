@@ -108,3 +108,9 @@ actual-content fit. Supply exact permitted URLs, browser access, prepared isolat
 content for live execution. Record proposal, execution authorization, source observations, clone
 locations, content variants and selected final patterns separately. A next-action simulation can check
 boundaries, but is not proof that websites were cloned, rendered or visually compared.
+
+## Experience regression cases (0.6.0)
+
+`interaction-cases.json`의 `experience-*` 15건은 원본 관측·변경 권한·모션·여정·리텐션의 행동 평가다. 각 case의 `expected`, `failure`, `evidence`를 사용한다. 격리 환경에 원본/기존 화면 등 필요한 fixture를 준비한 뒤 실행하며, `artifacts: []`는 자료가 이미 준비됐다는 뜻이 아니다. 접근 불가 사례 외에는 실제 관측 가능한 fixture가 있어야 실행 평가가 된다.
+
+문서 계약 테스트는 연결과 시나리오 필드만 확인한다. 모델 판단 dry-run과 브라우저에서 구현·동작을 관측한 end-to-end 결과를 별도로 기록한다. 15건이 등록됐다는 사실을 15건 실동작 통과로 보고하지 않는다.

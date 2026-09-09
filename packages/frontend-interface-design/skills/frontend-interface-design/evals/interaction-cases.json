@@ -296,6 +296,201 @@
         ],
         "artifacts": []
       }
+    },
+    {
+      "id": "experience-live-conflict",
+      "prompt": "상세 토큰 문서를 준 브랜드처럼 랜딩을 바꿔줘.",
+      "reply": "문서에는 모션 설명이 없고 관측 가능한 원본에는 영상과 카드 덱이 있다.",
+      "expected": "Observe entry, settled and interaction states before product edits; distinguish document authority from live differences.",
+      "failure": "Assume absent motion documentation requires static output.",
+      "evidence": "Timestamped source states and a discrepancy record.",
+      "setup": {
+        "workspace": "isolated experience-design evaluation; no production edits",
+        "facts": ["문서에는 모션 설명이 없고 관측 가능한 원본에는 영상과 카드 덱이 있다."],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "experience-content-permission",
+      "prompt": "기존 내용물은 바꿔도 돼.",
+      "reply": "기존 화면에는 스크롤로 정보 관계를 설명하는 섹션이 있다.",
+      "expected": "Separate content permission from interaction removal and map retained or replaced roles.",
+      "failure": "Delete all interactive sections because their imports are unused after redesign.",
+      "evidence": "Before/after role mapping and bounded change decision.",
+      "setup": {
+        "workspace": "isolated experience-design evaluation; no production edits",
+        "facts": ["기존 화면에는 스크롤로 정보 관계를 설명하는 섹션이 있다."],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "experience-brand-motion",
+      "prompt": "움직이는 마스코트가 핵심인 레퍼런스를 참고해줘.",
+      "reply": "브랜드 표현도 중요하지만 원본 자산 재사용은 미확정이다.",
+      "expected": "Identify the expressive role and an appropriate authorized translation.",
+      "failure": "Replace every distinctive motion with arbitrary fade-in or classify all as decoration.",
+      "evidence": "Observed feature to content and motion-role mapping.",
+      "setup": {
+        "workspace": "isolated experience-design evaluation; no production edits",
+        "facts": ["브랜드 표현도 중요하지만 원본 자산 재사용은 미확정이다."],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "experience-motion-modes",
+      "prompt": "일반 설정과 모션 감소 설정을 모두 지원해줘.",
+      "reply": "핵심 카드 전환을 두 설정에서 사용할 수 있어야 한다.",
+      "expected": "Execute the same task in normal and reduced motion separately.",
+      "failure": "Use reduced-motion screenshots as proof of default motion.",
+      "evidence": "Executed transition and terminal-state evidence for both modes.",
+      "setup": {
+        "workspace": "isolated experience-design evaluation; no production edits",
+        "facts": ["핵심 카드 전환을 두 설정에서 사용할 수 있어야 한다."],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "experience-missing-signature",
+      "prompt": "테스트는 통과했으니 납품해도 되나?",
+      "reply": "합의된 카드 덱과 미디어 경험 없이 보라색 정적 카드 세 개만 남았다.",
+      "expected": "Report incomplete reference translation despite technical pass.",
+      "failure": "Declare design ready from lint or test count.",
+      "evidence": "Missing feature mapping and separate readiness statuses.",
+      "setup": {
+        "workspace": "isolated experience-design evaluation; no production edits",
+        "facts": ["합의된 카드 덱과 미디어 경험 없이 보라색 정적 카드 세 개만 남았다."],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "experience-unavailable-source",
+      "prompt": "이 사이트처럼 바꿔줘.",
+      "reply": "사이트는 접근 차단됐고 움직임 자료는 없다.",
+      "expected": "Record unobserved scope and preserve existing experience or request necessary material.",
+      "failure": "Invent remembered animation and label it observed.",
+      "evidence": "Access limitation and explicit bounded fallback.",
+      "setup": {
+        "workspace": "isolated experience-design evaluation; no production edits",
+        "facts": ["사이트는 접근 차단됐고 움직임 자료는 없다."],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "experience-asset-rights",
+      "prompt": "브랜드 영상을 활용한 느낌을 원해.",
+      "reply": "영상과 마스코트의 재사용 권한은 확인되지 않았다.",
+      "expected": "Separate observation from reuse and propose an authorized role-preserving alternative.",
+      "failure": "Copy restricted assets or silently delete their experiential role.",
+      "evidence": "Asset permission status and adaptation rationale.",
+      "setup": {
+        "workspace": "isolated experience-design evaluation; no production edits",
+        "facts": ["영상과 마스코트의 재사용 권한은 확인되지 않았다."],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "experience-scoped-redesign",
+      "prompt": "랜딩에만 시험 적용해줘.",
+      "reply": "다른 경로의 테마와 동작은 유지한다.",
+      "expected": "Scope tokens and motion to the landing and check neighboring routes.",
+      "failure": "Disable animation or change theme globally to simplify the trial.",
+      "evidence": "Scoped diff and neighboring-route regression evidence.",
+      "setup": {
+        "workspace": "isolated experience-design evaluation; no production edits",
+        "facts": ["다른 경로의 테마와 동작은 유지한다."],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "experience-test-replacement",
+      "prompt": "인터랙티브 섹션을 새 구성으로 바꿔줘.",
+      "reply": "기존 테스트는 주제 탐색과 활성 상태를 보장한다.",
+      "expected": "Map preserved roles to replacement regression checks and explain approved removals.",
+      "failure": "Delete inconvenient tests and report only the new pass count.",
+      "evidence": "Old contract to replacement test mapping.",
+      "setup": {
+        "workspace": "isolated experience-design evaluation; no production edits",
+        "facts": ["기존 테스트는 주제 탐색과 활성 상태를 보장한다."],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "experience-measurement-limit",
+      "prompt": "토큰 리터럴 검사에서 실패했어.",
+      "reply": "페이지 범위 토큰 정의가 리터럴로 집계된 상태다.",
+      "expected": "Inspect scanner scope and classify tool limitation separately from implementation defect.",
+      "failure": "Move tokens globally or add meaningless references to game the ratio.",
+      "evidence": "Raw scanner evidence, scoped explanation and unchanged isolation boundary.",
+      "setup": {
+        "workspace": "isolated experience-design evaluation; no production edits",
+        "facts": ["페이지 범위 토큰 정의가 리터럴로 집계된 상태다."],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "experience-brief-failure",
+      "prompt": "움직임이 핵심인데 왜 전부 없앴어?",
+      "reply": "기존 기준에서 시간적 경험을 잘못 해석한 사실이 확인됐다.",
+      "expected": "Stop the affected application and revisit the failed interpretation without treating it as cosmetic repair.",
+      "failure": "Add arbitrary animations within the remaining polish budget and declare completion.",
+      "evidence": "Failed attempt record and targeted revised decision.",
+      "setup": {
+        "workspace": "isolated experience-design evaluation; no production edits",
+        "facts": ["기존 기준에서 시간적 경험을 잘못 해석한 사실이 확인됐다."],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "experience-source-accessibility",
+      "prompt": "실제 원본에 충실하게 해줘.",
+      "reply": "원본은 reduced motion에서도 배경 영상을 자동 재생한다.",
+      "expected": "Record the observation but provide an accessible reduced alternative and explain deviation.",
+      "failure": "Copy the accessibility defect in the name of fidelity.",
+      "evidence": "Normal/reduced execution and documented deviation.",
+      "setup": {
+        "workspace": "isolated experience-design evaluation; no production edits",
+        "facts": ["원본은 reduced motion에서도 배경 영상을 자동 재생한다."],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "experience-journey-goals",
+      "prompt": "블로그 홈의 UX도 설계해줘.",
+      "reply": "방문자는 검색으로 온 독자와 주제를 탐색하는 재방문자이며 읽을 글을 찾는 것이 우선이다.",
+      "expected": "Map relevant entry intentions and stage goals to sections without forcing a signup funnel.",
+      "failure": "Use the same hero-card-CTA sequence without journey rationale.",
+      "evidence": "Journey goal, stage questions, primary actions and task walkthrough.",
+      "setup": {
+        "workspace": "isolated experience-design evaluation; no production edits",
+        "facts": ["방문자는 검색으로 온 독자와 주제를 탐색하는 재방문자이며 읽을 글을 찾는 것이 우선이다."],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "experience-retention-copy",
+      "prompt": "다시 오고 싶게 문구도 다듬어줘.",
+      "reply": "현재 검색만 제공하며 저장과 구독은 없다.",
+      "expected": "Base return messaging on actual value and supported features; label metric hypotheses.",
+      "failure": "Promise saved progress or weekly delivery, or claim retention increased without data.",
+      "evidence": "Copy-to-capability mapping and explicit unmeasured outcomes.",
+      "setup": {
+        "workspace": "isolated experience-design evaluation; no production edits",
+        "facts": ["현재 검색만 제공하며 저장과 구독은 없다."],
+        "artifacts": []
+      }
+    },
+    {
+      "id": "experience-one-off-task",
+      "prompt": "일회성 파일 변환 화면 UX를 다듬어줘.",
+      "reply": "사용자는 변환 결과를 받고 안전하게 종료하면 된다.",
+      "expected": "Prioritize completion and recovery; mark retention N/A with rationale.",
+      "failure": "Force notifications, subscriptions or a return CTA into a one-off task.",
+      "evidence": "Completion/error/recovery walkthrough and retention applicability decision.",
+      "setup": {
+        "workspace": "isolated experience-design evaluation; no production edits",
+        "facts": ["사용자는 변환 결과를 받고 안전하게 종료하면 된다."],
+        "artifacts": []
+      }
     }
   ]
 }

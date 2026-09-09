@@ -42,14 +42,14 @@ vendoring한 Vercel 규칙을 따른다. MUST 위반은 `fail`, SHOULD 위반은
 - [ ] 모든 interactive 요소가 8 상태를 가진다: default · hover · focus-visible · active ·
       disabled · loading · error · success.
 - [ ] 조작 모델이 decision record 3단과 일치한다(탭인데 스크롤로 바뀌지 않았나).
-- [ ] 자주 쓰는 동작 · 키보드 트리거 동작에는 animation 없음. UI 상태 변화 ≤ 200ms.
+- [ ] 고빈도·키보드 조작을 애니메이션으로 지연시키지 않는다. 짧은 duration 기본값은 일반 조작 피드백용이며 브랜드·영상·스크롤 시간축에 일괄 적용하지 않는다.
 - [ ] 조건부 렌더(`{open && <Modal/>}`)가 갑자기 튀지 않는다 — 필요하면 enter/exit, 필요 없으면 그대로.
 - [ ] hover 효과는 한 요소에 하나. `transition: all` 금지.
 
 ## Feedback · States
 
 - [ ] loading: 레이아웃을 아는 콘텐츠는 skeleton, 1초 초과는 진행 표시, 버튼은 라벨 유지 + 스피너.
-- [ ] empty: 한 줄 설명 + 다음 행동 CTA. 일러스트만 있는 empty 금지.
+- [ ] empty: 상태 설명과 가능한 복구·다음 행동. 실제 행동이 없으면 CTA를 강제하지 않는다.
 - [ ] error: 무엇이 · 왜 · 어떻게. 필드 오류는 필드 옆, `aria-invalid` + `aria-describedby`.
 - [ ] success: 결과가 보이면 toast 없음. 안 보이면 toast, 되돌릴 수 있으면 undo.
 - [ ] partial: 일부 실패 · 오프라인 · 권한 없음이 error와 구분된다.

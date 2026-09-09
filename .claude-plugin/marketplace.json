@@ -82,8 +82,8 @@
     },
     {
       "name": "frontend-interface-design",
-      "description": "Brand-aligned web UI design: clarify goals, assets/tokens, references and editable output scope, then autonomously compose and visually review section-level designs in the agreed environment.",
-      "version": "0.5.2",
+      "description": "Reference-driven UI/UX and motion: align journeys, funnel goals and brand experience, compose sections, and review static, interactive and reduced-motion outcomes.",
+      "version": "0.6.0",
       "author": {
         "name": "lodado"
       },
