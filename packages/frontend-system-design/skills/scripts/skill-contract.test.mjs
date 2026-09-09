@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import { readdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+// This package runs its contract suite with Node's built-in runner (see package.json).
+// eslint-disable-next-line test/no-import-node-test -- keep the package's documented test runner
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
 const skillDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
 const referenceDirectory = join(skillDirectory, 'references')
@@ -192,8 +194,8 @@ test('SKILL.md is an Oracle-dependent companion and defers to the target repo', 
 
   assert.match(skill, /검증된 구현 방법/)
   assert.match(skill, /레포가 우선이다/)
-  assert.match(skill, /설치된\n?\s*버전의 문서로 확인/)
-  assert.match(skill, /그대로 붙여 넣는 스니펫이\n?\s*아니라/)
+  assert.match(skill, /설치된\s*버전의 문서로 확인/)
+  assert.match(skill, /그대로 붙여 넣는 스니펫이\s*아니라/)
   assert.match(skill, /frontend-oracle-design/)
   assert.match(skill, /frontend-oracle-design.*먼저/s)
   assert.match(skill, /ORACLE_READY/)
@@ -202,10 +204,43 @@ test('SKILL.md is an Oracle-dependent companion and defers to the target repo', 
   assert.match(skill, /단독으로 실행하지 않는다/)
   assert.doesNotMatch(skill, /단독으로 써도 된다/)
   assert.doesNotMatch(skill, /나머지는 기본값대로 진행/)
+  assert.match(skill, /Oracle이 정책을 소유한다/)
+  assert.match(skill, /레포가 우선이다/)
+  assert.match(skill, /reference.*앞설 수 없다/)
 
   for (const section of REQUIRED_SECTIONS) {
     assert.match(skill, new RegExp(section.replace('## ', '').replace(/\./g, '\\.')))
   }
+})
+
+test('references state the boundaries of query keys and cancellation', async () => {
+  const references = Object.fromEntries((await readReferences()).map(({ name, body }) => [name, body]))
+
+  for (const name of ['map-location.md', 'search-typeahead.md']) {
+    assert.match(references[name], /query key[^\n]*(?:화면 정합성|현재 키)/)
+    assert.match(references[name], /(?:서버|네트워크)[\s\S]{0,100}(?:별개|보장하지|취소)/)
+    assert.doesNotMatch(references[name], /query key[^\n]*(?:요청을 취소|서버.*막|구조적으로 없앤다)/)
+  }
+})
+
+test('map and upload references keep nullable and validated boundaries explicit', async () => {
+  const references = Object.fromEntries((await readReferences()).map(({ name, body }) => [name, body]))
+
+  assert.doesNotMatch(references['map-location.md'], /view!\./)
+  assert.match(references['map-location.md'], /skipToken|조건부 child|조건부 컴포넌트/)
+  assert.match(references['media-upload.md'], /unknown/)
+  assert.match(references['media-upload.md'], /parseUploadedAsset|검증.*파서|런타임.*검증/)
+  const uploadImplementation = sectionOf(references['media-upload.md'], '## 3. 구현', 'media-upload.md')
+  assert.match(uploadImplementation, /try\s*\{[\s\S]*JSON\.parse[\s\S]*\}\s*catch\s*\(error\)[\s\S]*reject\(error\)/)
+  const uploadCode = uploadImplementation.match(/```(?:ts|tsx)\n[\s\S]*?```/g)?.join('\n') ?? ''
+  assert.doesNotMatch(uploadCode, /`done` 상태에는/)
+  const doneProse = references['media-upload.md'].indexOf('`done` 상태에는')
+  const firstUploadFence = references['media-upload.md'].indexOf('```ts', doneProse)
+  assert.ok(doneProse !== -1 && doneProse < firstUploadFence, 'done 설명이 TypeScript fence 밖에 있어야 한다')
+  assert.match(
+    references['media-upload.md'],
+    /done[^\n]*asset[^\n]*(?:필수|required)|asset[^\n]*done[^\n]*(?:필수|required)/i,
+  )
 })
 
 test('SKILL.md defines the compact result returned after a reference is loaded', async () => {
@@ -306,6 +341,8 @@ test('pins the load-bearing techniques that must never drift out', async () => {
 
   assert.match(reference['notification-realtime'], /visibilityState/)
   assert.match(reference['notification-realtime'], /BroadcastChannel/)
+  assert.match(reference['notification-realtime'], /일반 `useQuery` 변형은 polling 자체 때문이 아니다/)
+  assert.match(reference['notification-realtime'], /취소 제약이 없다면 `useSuspenseQuery`와/)
 
   assert.match(reference['map-location'], /normalizeBounds/)
   assert.match(reference['map-location'], /주소에 남기지 않는다/)

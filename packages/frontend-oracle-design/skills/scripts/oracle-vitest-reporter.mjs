@@ -62,12 +62,29 @@ async function emit(files) {
  */
 function flattenModules(modules) {
   return (modules ?? []).flatMap((module) => {
-    const tests = typeof module.children?.allTests === 'function' ? [...module.children.allTests()] : []
+    // 수집 단계에서 죽은 모듈(미구현 import 등)은 allTests()가 던진다. 조용히 넘기면
+    // 리포터가 통째로 실패해 리포트 파일이 아예 생기지 않고, 판정이 불가능해진다.
+    // 그 모듈 자체를 실패 한 건으로 내보내 RED 가 등급을 받을 수 있게 한다.
+    let tests = []
+    try {
+      tests = typeof module.children?.allTests === 'function' ? [...module.children.allTests()] : []
+    } catch {
+      return [{ name: `${module.moduleId ?? 'unknown module'} (collection failed)`, status: 'failed' }]
+    }
 
-    return tests.map((test) => ({
-      name: test.fullName ?? test.name,
-      status: test.result?.().state === 'passed' ? 'passed' : test.result?.().state ?? 'failed',
-    }))
+    if (tests.length === 0 && module.errors?.().length > 0) {
+      return [{ name: `${module.moduleId ?? 'unknown module'} (collection failed)`, status: 'failed' }]
+    }
+
+    return tests.map((test) => {
+      let state = 'failed'
+      try {
+        state = test.result?.().state ?? 'failed'
+      } catch {
+        state = 'failed'
+      }
+      return { name: test.fullName ?? test.name, status: state === 'passed' ? 'passed' : state }
+    })
   })
 }
 

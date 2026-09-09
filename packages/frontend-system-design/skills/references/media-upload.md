@@ -55,9 +55,17 @@ export function uploadWithProgress(
     request.upload.addEventListener('progress', (event) => {
       if (event.lengthComputable) onProgress(event.loaded / event.total)
     })
-    request.addEventListener('load', () =>
-      request.status < 400 ? resolve(JSON.parse(request.responseText)) : reject(new UploadError(request.status)),
-    )
+    request.addEventListener('load', () => {
+      if (request.status < 400) {
+        // JSON shape은 신뢰하지 않는다. 실제 앱에서는 런타임 검증 파서를 주입한다.
+        try {
+          const payload: unknown = JSON.parse(request.responseText)
+          resolve(parseUploadedAsset(payload))
+        } catch (error) {
+          reject(error)
+        }
+      } else reject(new UploadError(request.status))
+    })
     request.addEventListener('error', () => reject(new UploadError()))
     request.addEventListener('abort', () => reject(new DOMException('Upload canceled', 'AbortError')))
     if (signal?.aborted) {
@@ -75,15 +83,19 @@ export function uploadWithProgress(
 
 파일별 상태. 취소 컨트롤러를 항목과 함께 보관한다.
 
+`done` 상태에는 업로드 결과인 `asset`이 필수다. 아직 결과가 없는 상태에는 asset을
+둘 수 없도록 하여, 완료를 표시하고도 제출할 파일이 없는 조합을 타입에서 막는다.
+
 ```ts
 // <slice>/model/useUploadQueue.ts
 type UploadItem = {
   id: string
   file: File
-  status: 'queued' | 'uploading' | 'done' | 'failed' | 'canceled'
   progress: number
-  asset?: UploadedAsset
-}
+} & (
+  | { status: 'queued' | 'uploading' | 'failed' | 'canceled'; asset?: never }
+  | { status: 'done'; asset: UploadedAsset }
+)
 
 const controllers = useRef(new Map<string, AbortController>())
 

@@ -23,8 +23,10 @@
 
 **정규화한 경계를 query key에 넣는다.** 좌표 원값을 키로 쓰면 소수점 아래가 매번 달라져
 사실상 캐시가 없는 것과 같다. 확대 수준과 반올림한 경계를 키로 만들면 같은 화면으로
-돌아왔을 때 캐시가 맞는다. 쿼리 캐시가 키를 소유하므로 늦게 온 이전 경계의 응답이
-현재 화면에 들어올 수 없다.
+돌아왔을 때 캐시가 맞는다. query key는 화면 정합성을 위해 결과를 현재 경계와 연결해 관찰자가 이전 경계의
+응답을 현재 키의 결과로 잘못 커밋하지 않게 하지만, 요청 취소나 서버 작업의 중단까지
+보장하지는 않는다. 불필요한 네트워크 사용은 `AbortSignal`을 transport까지 전달해 별도로
+줄인다.
 
 **선택 상태의 주인을 한 곳으로 정한다.** 지도 선택과 목록 선택을 effect로 양방향
 동기화하면 서로를 계속 되돌린다. 상위에서 선택 id 하나를 소유하고 지도와 목록이 그것을
@@ -61,6 +63,8 @@ export function normalizeBounds(bounds: Bounds, zoom: number) {
 
 ```ts
 // <slice>/model/usePlacesInView.ts
+import { skipToken, useQuery } from '@tanstack/react-query'
+
 export function usePlacesInView(map: MapInstance | null) {
   const [view, setView] = useState<NormalizedBounds | null>(null)
 
@@ -74,9 +78,8 @@ export function usePlacesInView(map: MapInstance | null) {
 
   return useQuery({
     queryKey: ['places', view],
-    queryFn: ({ signal }) => fetchPlacesInBounds(view!, { signal }),
-    enabled: view !== null,
-    // 새 영역을 기다리는 동안 이전 마커를 남긴다. 빈 지도가 깜빡이는 것보다 낫다.
+    queryFn: view === null ? skipToken : ({ signal }) => fetchPlacesInBounds(view, { signal }),
+    // 이전 마커를 남길지는 제품 정책에 맞춘다. 이 예시는 유지 정책을 가정한다.
     placeholderData: keepPreviousData,
   })
 }
@@ -111,10 +114,16 @@ export function requestUserLocation(fallback: Coords, timeoutMs = 5_000): Promis
 
 ```tsx
 // <slice>/ui/PlaceExplorer.tsx
-const [selectedId, setSelectedId] = useState<string | null>(null)
+export function PlaceExplorer({ places }: { places: Place[] }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
-<PlaceMap places={places} selectedId={selectedId} onSelect={setSelectedId} />
-<PlaceList places={places} selectedId={selectedId} onSelect={setSelectedId} />
+  return (
+    <>
+      <PlaceMap places={places} selectedId={selectedId} onSelect={setSelectedId} />
+      <PlaceList places={places} selectedId={selectedId} onSelect={setSelectedId} />
+    </>
+  )
+}
 ```
 
 ## 4. 판단이 갈리는 지점
@@ -131,16 +140,16 @@ const [selectedId, setSelectedId] = useState<string | null>(null)
 
 ## 5. 함정
 
-| 증상                             | 원인                           | 교정                              |
-| -------------------------------- | ------------------------------ | --------------------------------- |
-| 지도를 움직이면 요청이 폭증      | 이동 중 프레임마다 조회        | 이동 종료 이벤트에만 반응         |
-| 캐시가 전혀 안 맞음              | 좌표 원값을 query key로 사용   | 정규화한 경계 + 확대 수준을 키로  |
-| 이전 지역 결과가 남아 있음       | 늦게 온 응답을 그대로 반영     | 쿼리 키로 결과를 영역에 묶음      |
-| 선택이 계속 되돌아감             | 지도·목록 양방향 effect 동기화 | 선택 주인을 하나로                |
-| 위치 로딩에서 멈춤               | 권한 무응답 경로 없음          | 시간초과 + fallback 좌표          |
-| 마커 수천 개로 지도가 멈춤       | 상한 없이 렌더                 | 결과 상한 + 묶음 표현             |
-| 공유 링크에 사용자 위치가 노출됨 | 정확한 좌표를 주소에 기록      | 정밀도를 낮추거나 주소에서 제거   |
-| 축소하면 서버가 죽음             | 전국 범위 조회 허용            | 축소 한계에서 조회 차단 또는 요약 |
+| 증상                             | 원인                            | 교정                                                           |
+| -------------------------------- | ------------------------------- | -------------------------------------------------------------- |
+| 지도를 움직이면 요청이 폭증      | 이동 중 프레임마다 조회         | 이동 종료 이벤트에만 반응                                      |
+| 캐시가 전혀 안 맞음              | 좌표 원값을 query key로 사용    | 정규화한 경계 + 확대 수준을 키로                               |
+| 이전 지역 결과가 잘못 커밋됨     | 늦게 온 응답을 현재 상태에 반영 | 쿼리 키로 화면 정합성을 묶고, 취소는 `AbortSignal`로 별도 처리 |
+| 선택이 계속 되돌아감             | 지도·목록 양방향 effect 동기화  | 선택 주인을 하나로                                             |
+| 위치 로딩에서 멈춤               | 권한 무응답 경로 없음           | 시간초과 + fallback 좌표                                       |
+| 마커 수천 개로 지도가 멈춤       | 상한 없이 렌더                  | 결과 상한 + 묶음 표현                                          |
+| 공유 링크에 사용자 위치가 노출됨 | 정확한 좌표를 주소에 기록       | 정밀도를 낮추거나 주소에서 제거                                |
+| 축소하면 서버가 죽음             | 전국 범위 조회 허용             | 축소 한계에서 조회 차단 또는 요약                              |
 
 ## 6. 남길 검증
 

@@ -37,6 +37,45 @@ const cases = [
   ['callback-variance', 2322, 'Callback'],
 ].map(([id, code, symbol]) => ({ id, code, symbol }))
 
+test('state-ladder documented retry capability rejects unavailable actions', async () => {
+  const ladder = await readFile(join(packageDirectory, 'skills/references/types/state-ladder.md'), 'utf8')
+  const contract = ladder.match(/type DetailState =\n[\s\S]*?declare function useDetail[^\n]+/)[0]
+  const root = await mkdtemp(join(tmpdir(), 'state-ladder-types-'))
+  try {
+    const path = join(root, 'retry.ts')
+    const source = `
+type Detail = { title: string }
+type LoadFailure = { message: string }
+type DetailId = string
+${contract}
+const loading: DetailResult = { state: { status: 'loading' }, retry: undefined }
+const ready: DetailResult = { state: { status: 'ready', detail: { title: 'ok' } }, retry: undefined }
+const failed: DetailResult = { state: { status: 'failure', reason: { message: 'offline' } }, retry: () => {} }
+const result = useDetail('detail-id')
+if (result.retry !== undefined) result.retry()
+// @ts-expect-error loading has no retry capability
+loading.retry()
+// @ts-expect-error ready has no retry capability
+ready.retry()
+// @ts-expect-error failure must expose a real retry capability
+const missing: DetailResult = { state: { status: 'failure', reason: { message: 'offline' } }, retry: undefined }
+`
+    const options = { strict: true, noEmit: true, types: [], target: ts.ScriptTarget.ES2022 }
+    await writeFile(path, source)
+    const diagnostics = ts.getPreEmitDiagnostics(ts.createProgram([path], options))
+    assert.deepEqual(
+      diagnostics.map((item) => item.code),
+      [],
+    )
+
+    await writeFile(path, source.replaceAll('// @ts-expect-error', '// rejected misuse:'))
+    const rejected = ts.getPreEmitDiagnostics(ts.createProgram([path], options))
+    assert.deepEqual(rejected.map((item) => item.code).sort(), [2322, 2722, 2722])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 function fail(reason, detail, diagnostics = []) {
   throw Object.assign(new Error(`${reason}: ${detail}`), { reason, diagnostics })
 }

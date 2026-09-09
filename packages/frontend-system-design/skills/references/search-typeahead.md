@@ -18,11 +18,12 @@
 
 combobox의 키보드·focus 계약과 query 취소 전달은 [S1][S2]의 실제 버전·브라우저 동작을 따른다.
 
-**정규화한 쿼리를 query key에 넣는다. 이게 순서 역전 문제를 구조적으로 없앤다.**
+**정규화한 쿼리를 query key에 넣는다. 이게 화면의 순서 역전 커밋을 방지한다.**
 직접 `fetch` + `setState`로 만들면 늦게 온 `사과` 응답이 최신 `사과나무` 결과를
 덮어쓰므로 순번 가드를 손으로 만들어야 한다. 쿼리 캐시는 결과를 입력에 묶어 두기
-때문에 오래된 키의 응답이 현재 키의 화면에 들어올 수 없다. 순서 역전 방어를 직접
-만들지 말고 이 성질을 쓴다.
+때문에 관찰자는 오래된 키의 응답을 현재 키의 결과로 커밋하지 않는다. 다만 query key만으로
+진행 중인 요청의 취소나 서버의 작업 중단까지 보장하지는 않는다. 순서 정합성은 query key로,
+네트워크 절약은 `AbortSignal` 전달로 각각 다룬다.
 
 **정규화는 key에 넣기 전에 한다.** `사과 `와 `사과`가 다른 키가 되면 캐시 적중률이
 떨어지고 같은 결과를 두 번 받는다.
@@ -56,7 +57,7 @@ export function useDebouncedValue<T>(value: T, delay: number) {
   const [debounced, setDebounced] = useState(value)
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay)
+    const timer = setTimeout(setDebounced, delay, value)
     return () => clearTimeout(timer)
   }, [value, delay])
 
@@ -86,28 +87,32 @@ IME 게이트. 조합이 끝난 뒤에만 조회하는 정책일 때 쓴다.
 
 ```tsx
 // <slice>/ui/SearchInput.tsx
-const [raw, setRaw] = useState('')
-const composingRef = useRef(false)
+export function SearchInput() {
+  const [raw, setRaw] = useState('')
+  const composingRef = useRef(false)
 
-<input
-  role="combobox"
-  value={raw}
-  aria-expanded={isOpen}
-  aria-controls="product-search-options"
-  aria-activedescendant={activeOptionId}
-  onCompositionStart={() => {
-    composingRef.current = true
-  }}
-  onCompositionEnd={(event) => {
-    composingRef.current = false
-    // 조합이 확정된 최종 값은 여기서 한 번만 반영한다.
-    setRaw(event.currentTarget.value)
-  }}
-  onChange={(event) => {
-    if (composingRef.current) return
-    setRaw(event.currentTarget.value)
-  }}
-/>
+  return (
+    <input
+      role="combobox"
+      value={raw}
+      aria-expanded={isOpen}
+      aria-controls="product-search-options"
+      aria-activedescendant={activeOptionId}
+      onCompositionStart={() => {
+        composingRef.current = true
+      }}
+      onCompositionEnd={(event) => {
+        composingRef.current = false
+        // 조합이 확정된 최종 값은 여기서 한 번만 반영한다.
+        setRaw(event.currentTarget.value)
+      }}
+      onChange={(event) => {
+        if (composingRef.current) return
+        setRaw(event.currentTarget.value)
+      }}
+    />
+  )
+}
 ```
 
 `aria-expanded`·`aria-controls`·`aria-activedescendant`와 화살표·Escape·Enter의 세부
@@ -133,16 +138,16 @@ const composingRef = useRef(false)
 
 ## 5. 함정
 
-| 증상                                | 원인                                     | 교정                                      |
-| ----------------------------------- | ---------------------------------------- | ----------------------------------------- |
-| 한 글자 칠 때마다 요청이 나감       | 조합 이벤트 미처리                       | composition 게이트 또는 조회 정책 확정    |
-| 결과가 이전 검색어의 것으로 보임    | 응답 순서 역전에 순번 가드 없음          | 쿼리를 query key에 넣어 캐시가 묶게       |
-| 붙여넣기에도 debounce가 걸려 답답함 | 모든 입력에 같은 대기 적용               | 붙여넣기는 즉시 조회로 분기               |
-| 검색창 두 개가 서로 방해            | debounce 타이머가 모듈 스코프            | 타이머를 훅 인스턴스로 이동               |
-| 같은 검색어인데 캐시가 안 맞음      | 정규화 전 원문을 key로 사용              | 정규화 후 값을 key로                      |
-| 화살표 키가 목록을 못 움직임        | `div` 나열, 활성 항목 연결 없음          | Combobox 패턴 + `aria-activedescendant`   |
-| `결과 없음`이 첫 진입에도 보임      | `조회 전`과 `결과 없음`을 한 상태로 처리 | 두 상태를 분리해서 렌더                   |
-| 취소해도 서버 요청이 계속 감        | `signal`을 요청에 넘기지 않음            | `queryFn`의 `signal`을 transport까지 전달 |
+| 증상                                | 원인                                     | 교정                                                            |
+| ----------------------------------- | ---------------------------------------- | --------------------------------------------------------------- |
+| 한 글자 칠 때마다 요청이 나감       | 조합 이벤트 미처리                       | composition 게이트 또는 조회 정책 확정                          |
+| 결과가 이전 검색어로 잘못 커밋됨    | 응답 순서 역전을 현재 상태에 반영        | query key로 화면 정합성을 묶고 취소는 `AbortSignal`로 별도 처리 |
+| 붙여넣기에도 debounce가 걸려 답답함 | 모든 입력에 같은 대기 적용               | 붙여넣기는 즉시 조회로 분기                                     |
+| 검색창 두 개가 서로 방해            | debounce 타이머가 모듈 스코프            | 타이머를 훅 인스턴스로 이동                                     |
+| 같은 검색어인데 캐시가 안 맞음      | 정규화 전 원문을 key로 사용              | 정규화 후 값을 key로                                            |
+| 화살표 키가 목록을 못 움직임        | `div` 나열, 활성 항목 연결 없음          | Combobox 패턴 + `aria-activedescendant`                         |
+| `결과 없음`이 첫 진입에도 보임      | `조회 전`과 `결과 없음`을 한 상태로 처리 | 두 상태를 분리해서 렌더                                         |
+| 취소해도 서버 요청이 계속 감        | `signal`을 요청에 넘기지 않음            | `queryFn`의 `signal`을 transport까지 전달                       |
 
 ## 6. 남길 검증
 

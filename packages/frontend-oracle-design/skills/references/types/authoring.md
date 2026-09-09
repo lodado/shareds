@@ -54,9 +54,10 @@ C. API relation
   own the same fact**. If one policy fact is owned simultaneously by a schema and an interface, or
   by a constant and a union, the two authorities drift apart.
 
-Use a discriminated union **when the data attached to each member actually differs**. The two types
-below express different facts of the same domain, and which one to choose is decided by this
-condition, not by taste.
+Use a discriminated union **when the data attached to each member actually differs** in presence,
+meaning, or valid combinations. A card-approved domain phase can change payload permissions even
+when field shapes match. The two types below express different facts of the same domain; choose
+by that relation, not by taste.
 
 ```typescript
 // object union — only shipping has fieldErrors, only review has quote.
@@ -76,10 +77,11 @@ type PaymentBadge = 'unpaid' | 'paid' | 'refunded'
 - Decide from the domain relation, not a minimum member count. A tagged object is justified when
   state changes which fields exist, what they mean, or which combinations are valid — even when
   only one member carries a payload. If no state has attached data, prefer a literal union.
-- The condition holds **per pair of members**, not for the union as a whole. Two members with the
-  same fields under different tags (`ready`·`paging`) are one member plus a flag an owner already
-  holds, and a member that only adds a screen name to a neighbour's data is not diverging data —
-  the derived-state rule of [`state-ladder.md`](state-ladder.md) owns that judgment.
+- The condition holds **per pair of members**, not for the union as a whole. The same payload alone
+  is not proof of duplication: `draft`·`submitted` can encode distinct card-approved permissions or
+  transitions. In contrast, `ready`·`paging` duplicate a flag the query already holds. A member that
+  only adds a derived screen name is not a new domain fact — the ownership test in
+  [`state-ladder.md`](state-ladder.md) owns that judgment.
 - Use a single `status` string literal discriminant. Do not express the same flow with parallel
   boolean flags (`isLoading`·`isError`·`isSuccess`).
 - Each state's fields hold only **the values that are meaningful in that state**. Do not merge them
@@ -159,6 +161,13 @@ contracts that compile but claim more than the runtime.
   false contract.
 
 ## Exhaustiveness enforcement
+
+For a derived screen name, a pure `resolve*` function returns a literal union such as
+`resolveOrderTableView(query, rowCount): 'firstLoad' | 'table' | 'empty' | 'failure'`.
+Read the current owners on every render; do not store that result or attach copied query payloads.
+The card decides branch precedence and simultaneous notices. This resolver is only needed when
+the render needs a name; direct branches remain sufficient otherwise. Under Suspense the initial
+loading/error branches belong to boundaries, so omit them from the child resolver's return union.
 
 Use the dependency-free mechanism first, and introduce a library only when the condition is met.
 

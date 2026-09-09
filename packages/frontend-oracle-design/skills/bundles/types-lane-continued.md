@@ -87,15 +87,21 @@ boundary. Missing approved policy is a policy gap, not permission to invent a ty
 
 Writing a union is a three-rung ladder. Do not use rung 3 for a problem that ends at rung 1·2.
 
+Quick check: **derive → reuse the owner → own only the remainder**. Choose the loading mechanism
+with [`frontend/decisions.md` section 3](../frontend/decisions.md#3-decide-loadingerror-boundaries-per-state),
+then check the examples below. The default example uses Suspense; plain Query is a separate exception.
+
 1. **If it can be derived, do not store it.** Compute it from the source
    (`itemCount = items.length`). Even with strong types, duplicated stored state gets only one side
    updated. A union member whose tag can be computed is stored derived state too — the section
    "A derived state is not a state" below owns that judgment.
 2. **If a library already owns the union, consume it as is.** TanStack Query's
    `status`·`fetchStatus` and a mutation's `isPending`/`isSuccess`/`isError` are already a
-   discriminated contract and even include time-axis handling based on the latest call. Do not copy
-   the same state into a `useState` machine. If a required parameter is missing, express it with
-   `skipToken` or API absence instead of a non-null assertion.
+   discriminated contract. Do not copy the same state into a `useState` machine. Their observer
+   lifecycle does not prove cancellation, server write ordering, or duplicate-submit safety; verify
+   those runtime contracts separately. If a required parameter is missing, use `skipToken` with
+   plain `useQuery`, or do not render the querying child until the parameter exists; do not use a
+   non-null assertion or pass `skipToken` to `useSuspenseQuery`.
 3. **Make only the real client state that still remains with `useState<Union>` + an intent-function
    hook.** Do not expose raw `setState`·setters outside the hook, and return only functions that
    express domain intent (`pick`, `submit`, `reset`). Handle a call that came from a wrong state by
@@ -114,8 +120,8 @@ Loading·error handling at rung 2 follows the rules below.
   familiar API first, that API's constraints harden as if they were the requirements and you
   disqualify the remaining candidates yourself.
 - Leave a branch only for the remainder that cannot be lifted to a boundary, such as conditional
-  query·placeholder·cancellation constraints. Even then, attach ts-pattern directly to the library
-  union without a homemade union
+  query·placeholder·cancellation constraints. Even then, narrow the library union directly without
+  a homemade union; use dependency-free guards or, when already installed or approved, ts-pattern
   (`match(mutation).with({ status: 'error', error: { code: 'CONFLICT' } }, …)`).
 - For the same reason, **reuse existing query·framework state first.** Do not rebuild server state
   that is expressed by an existing query API·router state·form state into a hook that manages it
@@ -149,10 +155,10 @@ Reducers·transition tables·state machines are not the default.
 ## A derived state is not a state
 
 Rung 1 applies to union members, not only to scalars. A member earns its tag only when it carries a
-fact that **no existing owner holds and no other member's fields can compute**. A member that is "a
-neighbour plus one flag" is a derived state, and enumerating derived states — one tag per screen the
-user can see — is the most common way a union grows past the policy. Before adding a member, name
-the single axis that separates it from its nearest neighbour and ask who already owns that axis.
+fact that **no existing owner holds and no other member's fields can compute**. Before adding a
+member, name what separates it from its nearest neighbour: a derived display condition, or a
+card-approved domain fact that changes allowed actions or transitions? Only the latter needs a new
+stored tag when no existing owner holds it.
 
 | Member                   | What it actually is                        | Who already owns the axis                            |
 | ------------------------ | ------------------------------------------ | ---------------------------------------------------- |
@@ -162,13 +168,15 @@ the single axis that separates it from its nearest neighbour and ask who already
 | `filteredEmpty`          | `empty` while a filter is active           | the filter input the hook already holds              |
 | `firstLoad`·`firstError` | the query's `pending`·`error` with no data | the query's `status`, or the Suspense·Error Boundary |
 
-- **Same payload under different tags** is the mechanical smell. When two members carry the same
-  fields (`ready` and `paging` both hold `page`), the tag encodes one boolean that belongs beside
-  the state, not a state of its own. Merge the members and read the boolean from its owner. In a
-  repo using `@lodado/eslint-config/local-rules`, `no-derived-state-member` reports this shape.
+- **Same payload under different tags** is a review signal; same payload alone is not proof of
+  derived state. `ready` and `paging` duplicate the query's request axis, so read it from the query.
+  In contrast, `draft` and `submitted` may carry identical fields but have different card-approved
+  permissions or transitions; preserve that distinction if no existing owner holds it. The
+  `no-derived-state-member` lint rule detects shapes, not domain intent; review its diagnostic
+  against the ownership evidence rather than merging legitimate states to silence it.
 - **A member that is a neighbour plus one field** (`pageError` = `ready` + `failure`) is the same
-  smell one step later. The extra field _is_ the axis the tag stood in for, so it becomes a value
-  beside the state, not a member.
+  smell when an existing owner already holds the extra axis. Read the query's failure beside its
+  data instead of storing a new member; a genuinely new domain fact is not prohibited by this shape.
 - **Different screens do not imply different states.** Skeleton, table, table with a spinner, table
   under a failure notice, and an empty panel are five renders of three or four independent axes —
   data present, in flight, failed, row count. A union that enumerates their reachable combinations
@@ -197,18 +205,51 @@ type OrderTableState =
   | { status: 'empty'; filtered: boolean } // ready + rows.length === 0
   | { status: 'firstError'; failure: ListFailure } // the query's own error, with no data
 
-// Allowed — no client union. The query owns the lifecycle, the data owns emptiness, and the screen
-// is a render-time read of independent axes. Plain useQuery only because the card keeps the previous
-// page during a cursor move (a placeholder constraint — decisions.md section 3); which axes stay
-// visible together, such as stale rows under a failure notice, is the card's policy, not a member.
+// Default — the parent owns local Suspense and Error Boundary fallbacks.
 function OrderTable({ filters }: { filters: OrderFilters }) {
-  const query = useQuery({ ...orderListOptions(filters), placeholderData: keepPreviousData })
-  if (query.data === undefined) return query.error ? <LoadFailure failure={query.error} /> : <TableSkeleton />
+  const query = useSuspenseQuery(orderListOptions(filters))
   const { rows } = query.data
   if (rows.length === 0) return <EmptyOrders filtered={hasActiveFilter(filters)} />
   return <OrderRows rows={rows} busy={query.isFetching} failure={query.error} />
 }
 ```
+
+The parent places `<OrderTable />` inside a local `<Suspense fallback={<TableSkeleton />}>` and
+the repo's Error Boundary. Query retry coordinates that boundary with `QueryErrorResetBoundary`
+as specified in the decision table. This example assumes the card keeps cached rows with a
+background-error notice; the empty branch assumes the card needs no progress/error notice there.
+Neither branch stores a new state. Different card policies require different render branches.
+
+### Exception: observer-level placeholder data
+
+Keeping existing content alone does not justify `useQuery`: first consider a transition of the
+query input under Suspense. Use the following alternative only when the approved contract requires
+the observer to switch to the new key immediately while temporarily exposing the previous page as
+placeholder data, including `isPlaceholderData` to disable next-page navigation. Record why the
+transition alternative does not satisfy that contract; do not invent this requirement for a card.
+
+```tsx
+function PlaceholderOrderTable({ filters }: { filters: OrderFilters }) {
+  const query = useQuery({ ...orderListOptions(filters), placeholderData: keepPreviousData })
+  if (query.data === undefined) {
+    if (query.isError) return <LoadFailure failure={query.error} />
+    return <TableSkeleton />
+  }
+  return (
+    <OrderPage
+      page={query.data}
+      busy={query.isFetching}
+      failure={query.error}
+      nextPageDisabled={query.isPlaceholderData || !query.data.hasMore}
+    />
+  )
+}
+```
+
+`OrderPage` owns the card's empty/content branches and pagination UI. Placeholder data is not a
+promise to retain the previous page after the new key fails; this example then renders
+`LoadFailure` when no data remains. A stale-page-on-failure policy needs separate implementation
+and runtime evidence, not an assumption about `keepPreviousData`.
 
 ## State is data, actions are siblings
 
@@ -216,9 +257,10 @@ function OrderTable({ filters }: { filters: OrderFilters }) {
 an action is what can be done next with those values. The two have different lifetimes, so do not
 mix them into one value.
 
-- Do not store functions such as `retry`·`submit`·`reset` in a state value. A stored function is
-  pinned to the closure of the render that created it, so it keeps capturing stale values even
-  after props·params change. In a repo using `@lodado/eslint-config/local-rules`,
+- Do not store functions such as `retry`·`submit`·`reset` in a state value. A persisted function can
+  retain the closure of an earlier render after props·params change. A capability object derived
+  on each render is not persisted state; keeping actions beside state makes that boundary explicit.
+  In a repo using `@lodado/eslint-config/local-rules`,
   `no-action-in-state` catches this shape on both the type and the value side.
 - Hand actions back as a **sibling of the hook's return object** (`{ state, retry }`). For server
   state, do not make a new action but re-expose the query's `refetch` as is.
@@ -232,15 +274,31 @@ mix them into one value.
   fields and actions for each. If the card makes no distinction, do not invent one — it is
   `NEEDS_DECISION` as a `POLICY_GAP`.
 
-```typescript
-// Forbidden — an action inside state creates a stale closure and a fake retry at the same time
+```tsx
+// Forbidden — persisting an action inside state can retain an old render's closure
 // eslint-disable-next-line @lodado/local-rules/no-action-in-state -- the document shows the forbidden pattern itself.
 type DetailState = { status: 'loading' } | { status: 'failure'; retry: () => void }
 
-// Allowed — state is data, actions are siblings
-type DetailState = { status: 'loading' } | { status: 'failure'; reason: LoadFailure }
-function useDetail(id: DetailId): { state: DetailState; retry: () => void }
+// Allowed — stored state is data; action availability is derived on each render
+type DetailState =
+  | { status: 'loading' }
+  | { status: 'ready'; detail: Detail }
+  | { status: 'failure'; reason: LoadFailure }
+type DetailResult =
+  | { state: Exclude<DetailState, { status: 'failure' }>; retry: undefined }
+  | { state: Extract<DetailState, { status: 'failure' }>; retry: () => void }
+declare function useDetail(id: DetailId): DetailResult
+
+function DetailRetry({ result }: { result: DetailResult }) {
+  if (result.retry === undefined) return null
+  return <button onClick={result.retry}>Retry</button>
+}
 ```
+
+`DetailResult` is a render-time return contract, never another stored state. The hook implementation
+derives retry availability from its current state; its runtime guard also prevents a second request
+if the same callback is invoked twice before a rerender. That guard and late-response handling
+require tests against the card's policy; the return type alone does not make invocation timing safe.
 
 The `DetailState` above is the rung-3 remainder for data that has no query boundary. When a query
 owns the detail there is no `DetailState` at all — `query.data`·`query.error` are the state and
@@ -254,13 +312,13 @@ The section is optional so most cards do not have one — without it, derive dir
 `Given`·`When`·`Then` of the `O*` rows, and the absence of the section is a reason not to build a
 transition table·state machine, not a reason to build one.
 
-| Card column    | Type correspondence                                                           |
-| -------------- | ----------------------------------------------------------------------------- |
-| `Given`        | The starting state and the fields valid only in that state                    |
-| `When`         | The event (user action, response, time·order change)                          |
-| `Then`         | The arriving state and the observed result                                    |
-| `Never`        | A forbidden state or forbidden transition — make it inexpressible in the type |
-| `Side effects` | The kind and count of external writes coupled to the transition               |
+| Card column    | Type correspondence                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------- |
+| `Given`        | The starting state and the fields valid only in that state                                                    |
+| `When`         | The event (user action, response, time·order change)                                                          |
+| `Then`         | The arriving state and the observed result                                                                    |
+| `Never`        | Reject invalid value combinations statically; forbidden temporal transitions require runtime guards and tests |
+| `Side effects` | The kind and count of external writes coupled to the transition                                               |
 
 - **One row is not one state.** The table is a reading aid, not a generator that converts rows into
   states. It is normal for several `O*` rows to converge into one same state, and splitting rows
@@ -338,9 +396,10 @@ C. API relation
   own the same fact**. If one policy fact is owned simultaneously by a schema and an interface, or
   by a constant and a union, the two authorities drift apart.
 
-Use a discriminated union **when the data attached to each member actually differs**. The two types
-below express different facts of the same domain, and which one to choose is decided by this
-condition, not by taste.
+Use a discriminated union **when the data attached to each member actually differs** in presence,
+meaning, or valid combinations. A card-approved domain phase can change payload permissions even
+when field shapes match. The two types below express different facts of the same domain; choose
+by that relation, not by taste.
 
 ```typescript
 // object union — only shipping has fieldErrors, only review has quote.
@@ -360,10 +419,11 @@ type PaymentBadge = 'unpaid' | 'paid' | 'refunded'
 - Decide from the domain relation, not a minimum member count. A tagged object is justified when
   state changes which fields exist, what they mean, or which combinations are valid — even when
   only one member carries a payload. If no state has attached data, prefer a literal union.
-- The condition holds **per pair of members**, not for the union as a whole. Two members with the
-  same fields under different tags (`ready`·`paging`) are one member plus a flag an owner already
-  holds, and a member that only adds a screen name to a neighbour's data is not diverging data —
-  the derived-state rule of [`state-ladder.md`](state-ladder.md) owns that judgment.
+- The condition holds **per pair of members**, not for the union as a whole. The same payload alone
+  is not proof of duplication: `draft`·`submitted` can encode distinct card-approved permissions or
+  transitions. In contrast, `ready`·`paging` duplicate a flag the query already holds. A member that
+  only adds a derived screen name is not a new domain fact — the ownership test in
+  [`state-ladder.md`](state-ladder.md) owns that judgment.
 - Use a single `status` string literal discriminant. Do not express the same flow with parallel
   boolean flags (`isLoading`·`isError`·`isSuccess`).
 - Each state's fields hold only **the values that are meaningful in that state**. Do not merge them
@@ -443,6 +503,13 @@ contracts that compile but claim more than the runtime.
   false contract.
 
 ## Exhaustiveness enforcement
+
+For a derived screen name, a pure `resolve*` function returns a literal union such as
+`resolveOrderTableView(query, rowCount): 'firstLoad' | 'table' | 'empty' | 'failure'`.
+Read the current owners on every render; do not store that result or attach copied query payloads.
+The card decides branch precedence and simultaneous notices. This resolver is only needed when
+the render needs a name; direct branches remain sufficient otherwise. Under Suspense the initial
+loading/error branches belong to boundaries, so omit them from the child resolver's return union.
 
 Use the dependency-free mechanism first, and introduce a library only when the condition is met.
 

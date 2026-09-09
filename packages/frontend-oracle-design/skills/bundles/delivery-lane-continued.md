@@ -648,8 +648,10 @@ and the Source Registry are owned by [`frontend/quality.md`](quality.md).
   into a state machine.
 - Do not hide the card's error·state contract behind `any`, broad assertions, or meaningless
   optionals.
-- Only when an exported shared/package API changes, verify consumer inference·error shapes with a
-  type test. Reject speculative interface·factory·adapter layers. For a currently justified local
+- For each important or explicitly claimed static guarantee, verify the relevant consumer
+  inference·error shapes with a type witness, including local contracts when risk warrants it.
+  Follow the contract obligations in `types/state-ladder.md`; export visibility alone is not the
+  criterion. Reject speculative interface·factory·adapter layers. For a currently justified local
   seam, including one implementation, use the
   [present-boundary exception](../changeability.md#present-boundary-exception); do not duplicate its
   criteria here or bypass the approved architecture boundary.
@@ -715,12 +717,18 @@ dependency. Do not block the whole shell; put a Suspense boundary near the slow 
 - When a query input under Suspense changes, it becomes a first read with no data again and the
   fallback comes up. If the card requires keeping the existing content, wrap the input change in
   `startTransition` and show pending with a means that does not shake the layout.
+- Keeping existing content alone does not justify `useQuery`. A placeholder exception needs an
+  actual observer-level requirement (new key with previous data and `isPlaceholderData`), not just
+  a preference for `keepPreviousData`. Record why a Suspense input transition is insufficient.
 - For query retry, reset `QueryErrorResetBoundary` and the Error Boundary together, but limit it to
   the failed query/boundary scope. An indiscriminate reset of the whole cache is forbidden.
 - Do not assume that a refetch error with cached data always throws to the boundary. Check the
   policy for keeping stale content·exposing errors in the card. If the card requires keeping the
-  existing content, narrow `throwOnError` to the no-data condition so the boundary does not erase an
-  already loaded screen.
+  existing content, `useSuspenseQuery` already throws only when no data is available;
+  `useSuspenseQuery` does not expose a configurable `throwOnError`. For plain `useQuery` with
+  boundary errors enabled, narrow `throwOnError` to the no-data condition. If a Suspense query must
+  send cached-data errors to the boundary, explicitly throw the returned error according to the
+  card's fetching/error policy instead of trying to configure that option.
 - Do not assume `useSuspenseQuery` has `enabled`·`placeholderData`. If cancellation is a product
   contract, check the target version's limits and choose a better-fitting means such as a plain
   query.
@@ -729,13 +737,21 @@ dependency. Do not block the whole shell; put a Suspense boundary near the slow 
 - If cancellation is a contract, confirm that `queryFn` passes the provided `AbortSignal` to the
   actual request, and verify deterministically that only the latest input's result survives even
   under response order inversion.
-- **Do not update state with a response that arrives after unmount·route change.** For queries the
-  library handles this against the latest call, but apply the same defense to hand-built async
-  state: abort the request with `AbortController` in effect cleanup, or discard late responses with
-  an invalidation token. This is a runtime defense rather than a type one, so record it in the
-  Implementation Decision.
+- **Do not update obsolete component state with a response that arrives after unmount·route change.**
+  A query becoming unused does not by itself cancel its request; an eventual cache write can be
+  legitimate. Distinguish cache lifetime from the active screen's input, and apply the same defense
+  to hand-built async state: abort with `AbortController` in effect cleanup, or discard late
+  responses with an invalidation token. Query observers and mutation callback ordering do not
+  guarantee server write ordering or exactly-once effects. These are runtime contracts rather than
+  type proofs, so record and test the required defenses in the Implementation Decision.
 - For mutation pending, verify duplicate submit blocking and the total number of actual requests
   separately.
+
+API references: TanStack Query [Suspense](https://tanstack.com/query/latest/docs/framework/react/guides/suspense),
+[useSuspenseQuery](https://tanstack.com/query/latest/docs/framework/react/reference/useSuspenseQuery),
+and [query cancellation](https://tanstack.com/query/latest/docs/framework/react/guides/query-cancellation).
+Recheck these against the target repo's installed version; this table is not a version-independent
+guarantee about library behavior.
 
 <!-- node:frontend-authoring path:references/frontend/authoring.md -->
 

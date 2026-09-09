@@ -40,6 +40,11 @@
 
 가시성에 묶인 주기 조회.
 
+아래의 일반 `useQuery` 변형은 polling 자체 때문이 아니다. 읽음 처리의 낙관적 업데이트가
+진행 중인 unread-count 조회를 실제로 취소한 뒤 snapshot을 잡아야 한다는 정책이 Oracle
+Card에서 승인된 경우에만 선택한다. 그런 취소 제약이 없다면 `useSuspenseQuery`와
+경계 조합을 기본으로 하고, 이 예시를 그대로 복사하지 않는다.
+
 ```ts
 // <slice>/model/useUnreadCount.ts
 export function useUnreadCount({ intervalMs = 30_000 } = {}) {

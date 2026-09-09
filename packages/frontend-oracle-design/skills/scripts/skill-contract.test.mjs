@@ -1229,11 +1229,48 @@ test('keeps client state data-only and hands actions back beside it', async () =
   // 7: unmount·route 변경 뒤 도착한 응답은 타입이 아니라 런타임이 막는다
   assert.match(frontendImplementation, /response that arrives after unmount·route change/)
   assert.match(frontendImplementation, /AbortController/)
-  assert.match(frontendImplementation, /apply the same defense to hand-built async/)
+  assert.match(frontendImplementation, /apply the same defense\s+to hand-built async/)
   assert.match(frontendImplementation, /returns state and actions as siblings/)
 
   // 리뷰는 같은 계약으로 판정한다
   assert.match(subagentReview, /state union and action placement/)
+})
+
+test('teaches the Suspense default before a justified placeholder exception', async () => {
+  const ladder = await read('references/types/state-ladder.md')
+  const decisions = await read('references/frontend/decisions.md')
+  const firstExample = ladder.match(/```tsx\n([\s\S]*?)```/)[1]
+
+  assert.match(firstExample, /useSuspenseQuery\(orderListOptions\(filters\)\)/)
+  assert.doesNotMatch(firstExample, /useQuery\(|query\.data === undefined/)
+  assert.match(ladder, /### Exception: observer-level placeholder data/)
+  const exception = ladder.split('### Exception: observer-level placeholder data')[1].split('\n## ')[0]
+  assert.match(exception, /useQuery\(/)
+  assert.match(exception, /placeholderData: keepPreviousData/)
+  assert.match(exception, /nextPageDisabled=\{query\.isPlaceholderData/)
+  assert.ok(ladder.indexOf(firstExample) < ladder.indexOf('### Exception:'))
+  assert.match(ladder, /Keeping existing content alone does not justify/)
+  assert.match(decisions, /Keeping existing content alone does not justify/)
+  assert.match(decisions, /`useSuspenseQuery` does not expose a configurable `throwOnError`/)
+})
+
+test('distinguishes owned domain facts, action availability, and runtime guarantees', async () => {
+  const [ladder, authoring, review, decisions] = await Promise.all([
+    read('references/types/state-ladder.md'),
+    read('references/types/authoring.md'),
+    read('references/types/review-criteria.md'),
+    read('references/frontend/decisions.md'),
+  ])
+
+  for (const document of [ladder, authoring, review]) {
+    assert.match(document, /same payload alone\s+is not proof/i)
+  }
+  assert.match(ladder, /retry: undefined/)
+  assert.match(ladder, /retry: \(\) => void/)
+  assert.match(ladder, /runtime guard/)
+  assert.match(ladder, /forbidden temporal transitions require runtime guards and tests/)
+  assert.doesNotMatch(ladder + decisions, /based on the latest call|handles this against the latest call/)
+  assert.doesNotMatch(decisions, /Only when an exported shared\/package API changes/)
 })
 
 test('does not enumerate derived states as union members', async () => {
@@ -1261,7 +1298,7 @@ test('does not enumerate derived states as union members', async () => {
   assert.match(typeConstraints, /a `Given` that reads as a screen/)
 
   // 리뷰는 같은 기준으로 판정한다
-  assert.match(typeConstraints, /derived state was stored as a member/)
+  assert.match(typeConstraints, /derived state\s+was stored as a member/)
   assert.match(typeConstraints, /reachable combinations of independent axes/)
 
   // 카드 State Model의 화면 이름은 멤버 선언이 아니고, 소유권 표는 union 멤버 열거도 금지한다
