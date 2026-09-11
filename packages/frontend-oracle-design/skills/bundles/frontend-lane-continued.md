@@ -29,15 +29,17 @@ Before creating an approval document or an Oracle lock, confirm the following in
 - the applicable `AGENTS.md`, `CLAUDE.md`, and repo-local instructions
 - the source root (including `src/`) and the exact paths of the affected architecture unit
 - the public API and the client/server entry points that external callers use
-- the existing per-segment responsibilities, state, and async ownership
+- the domain capability, terms, invariant owners, and existing per-segment responsibilities,
+  state, and async ownership; distinguish observed coupling from approved boundaries
 - the test ownership location and run command per unit·segment
 - the existing architecture documents and the import-boundary verification means
 
 Record the confirmed paths and responsibilities concretely in the approval document. Introduce an
 architecture such as FSD only when there is no existing structure or the user has approved a new
-structure. If FSD is adopted, read all of [`fsd.md`](fsd.md) and apply the layer·segment·public API
-contract. If the folder convention of the user's global rules or the repo instructions (for example
-a `components/`·`hooks/` organization) conflicts with FSD, do not compromise arbitrarily but confirm
+structure. If FSD is adopted, read all of [`fsd.md`](fsd.md) and apply its domain-boundary method
+before the layer·segment·public API mapping, even when no folder moves. If the folder convention of
+the user's global rules or the repo instructions (for example a `components/`·`hooks/` organization)
+conflicts with FSD, do not compromise arbitrarily but confirm
 the priority with `NEEDS_DECISION` and record the approved decision in the document. If the intake
 result is unresolved or changes during the conversation, do not lock the document and return it to
 `NEEDS_DECISION`.
@@ -122,6 +124,11 @@ For an FSD unit, the following must be included: the layer·segment mapping and 
 of the slice public API (`index.ts`) in `Responsibilities and public entry points`, the
 allowed·forbidden import boundaries (including the deep import ban) in `Component boundaries`, and
 the `__test__/`·`__mocks__/` placement in `Test boundaries`. The criteria are [`fsd.md`](fsd.md).
+For a material domain-boundary choice, also use its compact boundary record inside the applicable
+sections above: capability/non-goals and domain terms; invariant/state/effect owners; consumer-facing
+contract and hidden knowledge; directed dependencies; one evidenced change/removal walkthrough and
+its planned behavioral verification. Compare the simplest existing boundary with the rejected
+alternative. Do not add a second architecture artifact or copy policy definitions out of the card.
 
 ## API contract — conditional
 

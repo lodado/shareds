@@ -8,8 +8,9 @@ gates are owned by [`frontend/quality.md`](quality.md).
 ## 1. Respect Architecture Units and Code Boundaries
 
 - If the existing repo architecture is consistent, preserve it and do not slip in an FSD migration.
-- In greenfield or approved FSD, read all of [`fsd.md`](../fsd.md) and respect the layer
-  direction·segment rules·slice public API contract. Do not create layers·segments that are not
+- In greenfield or approved FSD, read all of [`fsd.md`](../fsd.md): choose the domain/invariant owner
+  and public seam before layer direction·segment rules·slice public API mapping. Apply this to
+  ownership/dependency changes without folder moves too. Do not create layers·segments that are not
   used.
 - If it is not FSD, apply the existing repo architecture documents·import conventions as they are.
   Inventing a new profile·migration during implementation is forbidden.

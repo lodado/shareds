@@ -230,7 +230,7 @@
     {
       "id": "fsd",
       "path": "references/fsd.md",
-      "when": "FSD repo (or approved adoption) + before proposing·designing·reviewing FSD adoption·folder structure",
+      "when": "FSD repo (or approved adoption) + before proposing·designing·reviewing FSD adoption·domain boundaries·slice ownership·public APIs·dependencies·folder structure, including boundary changes with no folder moves",
       "requires": []
     },
     {

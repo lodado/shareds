@@ -99,6 +99,11 @@ reason. Do not create a finding out of explanation taste or writing quality alon
 - Was an unnecessary FSD migration or an empty layer·segment not created on the existing structure?
 - If it is FSD, was all of [`fsd.md`](fsd.md) read and is there no item that falls under the
   "Common violations" table?
+- For an FSD boundary change, including one without folder moves, can the reviewer trace the
+  capability to one invariant/state/effect owner and the public seam's hidden knowledge? Challenge
+  the recorded change/removal path: do unrelated domains need internal DTO/store/query knowledge,
+  or are different policies unified merely because their data shapes match? Judge concrete leaks
+  and approved contracts, not folder count; inspect behavioral and import-boundary evidence separately.
 - Are components split by state·async/error·accessibility responsibility, without cramming
   independent components into one file or, conversely, multiplying trivial wrappers?
 - Does the interactive UI satisfy the semantic element·accessible name·keyboard·focus·state delivery

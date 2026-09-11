@@ -286,6 +286,11 @@ Name a concrete dependency path or hidden contract when that fails, not a prefer
 Material-only Decision writing does not remove the five-axis review output owned by
 [`subagent-review.md`](subagent-review.md).
 
+For an existing or approved FSD repo, apply the domain-boundary method in
+[`fsd.md`](fsd.md#domain-boundary-before-folder-structure) to material slice ownership, public API,
+or dependency decisions, even without a folder move. It grounds these axes in domain language,
+invariant owners, and a public behavioral seam; it does not authorize adopting FSD elsewhere.
+
 ### Bounded change rehearsal
 
 Use a static walkthrough to compare candidate impact paths; it is not evidence of measured
@@ -765,8 +770,9 @@ gates are owned by [`frontend/quality.md`](quality.md).
 ## 1. Respect Architecture Units and Code Boundaries
 
 - If the existing repo architecture is consistent, preserve it and do not slip in an FSD migration.
-- In greenfield or approved FSD, read all of [`fsd.md`](../fsd.md) and respect the layer
-  direction·segment rules·slice public API contract. Do not create layers·segments that are not
+- In greenfield or approved FSD, read all of [`fsd.md`](../fsd.md): choose the domain/invariant owner
+  and public seam before layer direction·segment rules·slice public API mapping. Apply this to
+  ownership/dependency changes without folder moves too. Do not create layers·segments that are not
   used.
 - If it is not FSD, apply the existing repo architecture documents·import conventions as they are.
   Inventing a new profile·migration during implementation is forbidden.

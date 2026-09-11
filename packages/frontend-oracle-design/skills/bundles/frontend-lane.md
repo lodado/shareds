@@ -215,6 +215,11 @@ Name a concrete dependency path or hidden contract when that fails, not a prefer
 Material-only Decision writing does not remove the five-axis review output owned by
 [`subagent-review.md`](subagent-review.md).
 
+For an existing or approved FSD repo, apply the domain-boundary method in
+[`fsd.md`](fsd.md#domain-boundary-before-folder-structure) to material slice ownership, public API,
+or dependency decisions, even without a folder move. It grounds these axes in domain language,
+invariant owners, and a public behavioral seam; it does not authorize adopting FSD elsewhere.
+
 ### Bounded change rehearsal
 
 Use a static walkthrough to compare candidate impact paths; it is not evidence of measured
@@ -694,8 +699,9 @@ gates are owned by [`frontend/quality.md`](quality.md).
 ## 1. Respect Architecture Units and Code Boundaries
 
 - If the existing repo architecture is consistent, preserve it and do not slip in an FSD migration.
-- In greenfield or approved FSD, read all of [`fsd.md`](../fsd.md) and respect the layer
-  direction·segment rules·slice public API contract. Do not create layers·segments that are not
+- In greenfield or approved FSD, read all of [`fsd.md`](../fsd.md): choose the domain/invariant owner
+  and public seam before layer direction·segment rules·slice public API mapping. Apply this to
+  ownership/dependency changes without folder moves too. Do not create layers·segments that are not
   used.
 - If it is not FSD, apply the existing repo architecture documents·import conventions as they are.
   Inventing a new profile·migration during implementation is forbidden.
@@ -879,15 +885,17 @@ Before creating an approval document or an Oracle lock, confirm the following in
 - the applicable `AGENTS.md`, `CLAUDE.md`, and repo-local instructions
 - the source root (including `src/`) and the exact paths of the affected architecture unit
 - the public API and the client/server entry points that external callers use
-- the existing per-segment responsibilities, state, and async ownership
+- the domain capability, terms, invariant owners, and existing per-segment responsibilities,
+  state, and async ownership; distinguish observed coupling from approved boundaries
 - the test ownership location and run command per unit·segment
 - the existing architecture documents and the import-boundary verification means
 
 Record the confirmed paths and responsibilities concretely in the approval document. Introduce an
 architecture such as FSD only when there is no existing structure or the user has approved a new
-structure. If FSD is adopted, read all of [`fsd.md`](fsd.md) and apply the layer·segment·public API
-contract. If the folder convention of the user's global rules or the repo instructions (for example
-a `components/`·`hooks/` organization) conflicts with FSD, do not compromise arbitrarily but confirm
+structure. If FSD is adopted, read all of [`fsd.md`](fsd.md) and apply its domain-boundary method
+before the layer·segment·public API mapping, even when no folder moves. If the folder convention of
+the user's global rules or the repo instructions (for example a `components/`·`hooks/` organization)
+conflicts with FSD, do not compromise arbitrarily but confirm
 the priority with `NEEDS_DECISION` and record the approved decision in the document. If the intake
 result is unresolved or changes during the conversation, do not lock the document and return it to
 `NEEDS_DECISION`.
@@ -972,6 +980,11 @@ For an FSD unit, the following must be included: the layer·segment mapping and 
 of the slice public API (`index.ts`) in `Responsibilities and public entry points`, the
 allowed·forbidden import boundaries (including the deep import ban) in `Component boundaries`, and
 the `__test__/`·`__mocks__/` placement in `Test boundaries`. The criteria are [`fsd.md`](fsd.md).
+For a material domain-boundary choice, also use its compact boundary record inside the applicable
+sections above: capability/non-goals and domain terms; invariant/state/effect owners; consumer-facing
+contract and hidden knowledge; directed dependencies; one evidenced change/removal walkthrough and
+its planned behavioral verification. Compare the simplest existing boundary with the rejected
+alternative. Do not add a second architecture artifact or copy policy definitions out of the card.
 
 ## API contract — conditional
 

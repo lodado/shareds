@@ -46,6 +46,11 @@ Name a concrete dependency path or hidden contract when that fails, not a prefer
 Material-only Decision writing does not remove the five-axis review output owned by
 [`subagent-review.md`](subagent-review.md).
 
+For an existing or approved FSD repo, apply the domain-boundary method in
+[`fsd.md`](fsd.md#domain-boundary-before-folder-structure) to material slice ownership, public API,
+or dependency decisions, even without a folder move. It grounds these axes in domain language,
+invariant owners, and a public behavioral seam; it does not authorize adopting FSD elsewhere.
+
 ### Bounded change rehearsal
 
 Use a static walkthrough to compare candidate impact paths; it is not evidence of measured

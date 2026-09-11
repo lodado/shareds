@@ -170,7 +170,10 @@ Whether to skip a load is not a judgment call. The read instructions inlined int
   existing repo/installed tool. With no tool available or the user declined, and no locked
   source-backed N/A, the run can reach `IMPLEMENTED_GREEN` only and `REVIEW_VERIFIED` is blocked.
 - Feature-Sliced Design repos (or approved adoption) + before proposing, designing, or reviewing
-  FSD adoption or folder structure: [`references/fsd.md`](references/fsd.md). Before
+  FSD adoption, domain boundaries, slice ownership, public APIs, dependencies, or folder structure:
+  [`references/fsd.md`](references/fsd.md). Start with domain responsibility and invariants, then
+  map layers/slices/segments; record the public seam and change walkthrough in the existing
+  architecture document. This includes boundary changes with no folder moves. Before
   backend·full-stack·DB·data-access changes: [`backend.md`](references/backend.md). With a
   performance requirement or improvement claim:
   [`references/performance.md`](references/performance.md).
