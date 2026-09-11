@@ -308,10 +308,10 @@ export function observedCoverage(pack) {
  *  - `lineage`: no pack matched. The brand name, if any, contributes nothing — adaptation.md decides.
  *
  * Scope fails closed. A pack is evidence about the task it observed, so `brandFidelityClaim` is
- * true only when the pack's task is the task at hand. When the task is unknown or different, the
- * route degrades to `tokens-only`: tokens, radius, spacing and the small type roles transfer, the
- * layout slots and the display scale do not. A marketing landing page is not evidence for a
- * deployment dashboard, and "no --task given" is not the same as "the tasks match".
+ * true only when the pack's task is the task at hand. A known different task with complete device
+ * and theme coverage gets `relationship-study`: concrete relationships may be translated through
+ * reference-study.md and a real-content slice, but the pack is not a layout recipe. Unknown tasks
+ * or coverage gaps remain `tokens-only`, and never widen into fidelity.
  */
 export function routeUtterance(utterance, packs, { task = null } = {}) {
   const haystack = normalize(utterance)
@@ -349,7 +349,7 @@ export function routeUtterance(utterance, packs, { task = null } = {}) {
       visualAuthority: 'lineage',
       brandFidelityClaim: false,
       candidates: [],
-      note: 'No pack matched. A brand name alone is not evidence: pick a lineage with adaptation.md and tell the user the reference was not reproduced.',
+      note: 'No pack matched. A brand name alone is not evidence: preserve lineage and no fidelity claim. If the user supplies an accessible URL or screenshot, record the observed region and relationships in reference-study.md; the lineage fallback is not a substitute for observation.',
     }
   }
 
@@ -369,13 +369,20 @@ export function routeUtterance(utterance, packs, { task = null } = {}) {
     coverageGaps.push(`pair:${requested.device}/${requested.theme}`)
   const fullScope = observedPack && taskMatch === true && coverageGaps.length === 0
   let scope = 'pattern-hint'
-  if (observedPack) scope = fullScope ? 'full' : 'tokens-only'
+  const relationshipStudy = observedPack && taskMatch === false && inferred !== null && coverageGaps.length === 0
+  if (observedPack) {
+    if (fullScope) scope = 'full'
+    else if (relationshipStudy) scope = 'relationship-study'
+    else scope = 'tokens-only'
+  }
   const reasons = []
   if (taskMatch === false) reasons.push(`task ${inferred} ≠ pack task ${pack.task}`)
   else if (taskMatch === null) reasons.push('task unknown')
   reasons.push(...coverageGaps.map((gap) => `not observed: ${gap}`))
   const scopeNote = {
     full: 'Use the whole pack: tokens, type scale and layout slots in order.',
+    'relationship-study':
+      'Inspect reference-study.md: observed region -> concrete relationships/asset conditions -> real-content slice -> side-by-side validation. Do NOT adopt the page order or product policy, and do not merely reskin tokens.',
     'tokens-only': `Scope reduced (${reasons.join('; ')}). Transfer tokens, radius, spacing rhythm and the ui/caption/eyebrow type roles. Do NOT transfer the layout slots, the display scale or the section order — see the pack's taskTransfer, and say which combination was never observed.`,
     'pattern-hint': 'Nothing in this pack was observed. Read it as a pattern hint only.',
   }[scope]

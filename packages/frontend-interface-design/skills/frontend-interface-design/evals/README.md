@@ -82,7 +82,29 @@ node <skill>/scripts/render.mjs --in design-loop/harness.html --out design-loop/
 
 The existing `run-live.mjs` → render → judge → grade pipeline remains a fixed-brief visual evaluation. It does not automatically perform the multi-turn interaction protocol above.
 
+## Section implementation cases (manual)
+
+`section-spec-*` covers a document-only instruction artifact, implementation through delivery, and a scoped Fidelity fix.
+Follow the multi-turn protocol above; prepare each stated fixture before running implementation cases.
+Judge whether section names become concrete layout/state/mobile/implementation/check decisions, not whether the answer repeats taxonomy labels.
+The document-only case can validate instruction specificity and scope without a browser; it cannot prove visual quality.
+Package tests check linked resources and corpus integrity, not that these behavioral cases passed.
+
+`dictionary-source-to-implementation` additionally checks original-source reading versus packaged-summary fallback,
+specific layout/motion decisions, and separation of source recommendations from agent-authored values.
+
 ## Human calibration
+
+For the `visual-adoption-*` manual cases, pin the pre-change skill and candidate and give both the same
+content, assets, tools and time budget. Hide version names, implementation narratives and test counts;
+randomize screenshot order. A user/design evaluator records brief fit, composition, preference reasons,
+whether early rejection was appropriate, and any later large rework. Keep functional/accessibility results
+separate and retain existing regression gates. Include image-free lists, image-led galleries, long Korean
+titles and expressive heroes; use the existing content-fit/clone cases as controls, not only the blog failure.
+The original blog case requires the four named source artifacts from its setup. If absent, record it as
+unreviewed; do not fabricate a reproduction or treat the user's reported failure as a fresh visual observation.
+Fixture/contract tests do not execute these cases. Do not claim aesthetic improvement from their passing,
+one evaluator's preference, or an invented aesthetic score/target preference rate.
 
 1. Pick 20 judged pairs across briefs and hosts (both winners and ties). Show each pair's screenshots blind — hide variant names and swap sides at random.
 2. Record one vote per pair in `human-votes.json`: `[{ "briefId", "a": "<dir or variant>", "b": "<dir or variant>", "winner": "A" | "B" | "tie" }]`.

@@ -12,6 +12,39 @@ const skillDirectory = join(packageDirectory, 'skills/frontend-interface-design'
 
 const read = (relativePath) => readFile(join(skillDirectory, relativePath), 'utf8')
 
+// These are document-contract checks, not evidence of visual quality or actual image viewing.
+test('visual-adoption cases carry observable success, counterexamples and bounded evidence requirements', async () => {
+  const { cases } = JSON.parse(await read('evals/interaction-cases.json'))
+  const selected = cases.filter(({ id }) => id.startsWith('visual-adoption-'))
+  assert.equal(selected.length, 6)
+  assert.equal(new Set(cases.map(({ id }) => id)).size, cases.length)
+  for (const entry of selected) {
+    for (const field of ['prompt', 'reply', 'expected', 'failure', 'evidence']) {
+      assert.ok(entry[field]?.trim(), `${entry.id}: missing ${field}`)
+    }
+    assert.ok(entry.setup.workspace && entry.setup.facts.length, `${entry.id}: missing bounded setup`)
+  }
+})
+
+test('visual adoption reuses comparison evidence without promoting tools or counts to approval', async () => {
+  const [skill, look, review, study, form] = await Promise.all([
+    read('SKILL.md'),
+    read('references/look.md'),
+    read('references/review.md'),
+    read('references/reference-study.md'),
+    read('references/form-quality.md'),
+  ])
+  assert.doesNotMatch(skill, /통과 수가 늘 때만/)
+  assert.doesNotMatch(look, /고쳐졌거나[\s\S]{0,60}통과 수가 늘었다/)
+  assert.doesNotMatch(look, /Rationale[^\n]*critical \d+\/\d+/)
+  assert.doesNotMatch(skill, /Rationale[^\n]*checks/)
+  assert.doesNotMatch(review, /craft.md 12개 기본값이 적용됐다|지워도 task에 영향 없는 장식이 없다/)
+  for (const doc of [look, review, study, form]) assert.ok(doc.includes('unreviewed'))
+  assert.match(study, /comparison[\s\S]*남은 차이/)
+  assert.match(form, /시그니처 미달/)
+  assert.match(review, /브랜드 표현/)
+})
+
 test('reference reconstruction has a conditional entry and a traceable handoff', async () => {
   const [skill, fidelity, rebuild] = await Promise.all([
     read('SKILL.md'),
@@ -117,7 +150,8 @@ test('keeps exactly twelve always-on rules, hardest first, and stays inside the 
   // 0.3.0 was 208 lines / 18,916 chars always-on. The budget keeps the always-on load near half of that.
   assert.ok(lines <= 180, `SKILL.md has ${lines} lines; budget is 180`)
   assert.ok(skill.length <= 12500, `SKILL.md has ${skill.length} chars; budget is 12500`)
-  assert.doesNotMatch(skill, /kill-ai-slop|hallmark|baseline-ui|clone-website|design-motion-principles/)
+  // Specialist names may be routed from workflow stages, but do not expand the always-on rules.
+  assert.doesNotMatch(rules, /kill-ai-slop|hallmark|baseline-ui|clone-website|design-motion-principles/)
 })
 
 test('ships every reference, lineage and exemplar the workflow links to', async () => {
@@ -127,12 +161,14 @@ test('ships every reference, lineage and exemplar the workflow links to', async 
     'craft',
     'decision-ladder',
     'fidelity',
+    'form-quality',
     'interface-rules',
     'look',
     'one-shot',
     'reference-pack',
     'reference-rebuild',
     'reference-study',
+    'section-implementation',
     'review',
     'typography-ko',
     'ui-checklist',
@@ -228,7 +264,7 @@ test('makes the screenshot loop mandatory, scored, accept-only-if-better and bou
   assert.match(look, /\*\*반드시\*\* 돈다/)
   assert.match(look, /scripts\/render\.mjs --in/)
   assert.match(look, /gates\.json/)
-  assert.match(look, /yes\/no로만/)
+  assert.match(look, /unreviewed/)
   // Adoption is a three-condition rule, not a count comparison: a genuine fix that costs one
   // unrelated check must still be adoptable, and a critical regression hidden inside a higher
   // total must still be rejected.
@@ -236,7 +272,7 @@ test('makes the screenshot loop mandatory, scored, accept-only-if-better and bou
   assert.match(look, /하드 게이트[^\n]*모든 항목[^\n]*통과/)
   assert.doesNotMatch(look, /실패 수가 늘지 않는다/)
   assert.match(look, /치명적 무퇴행/)
-  assert.match(look, /겨눈 결함이 실제로 고쳐졌거나/)
+  assert.match(look, /겨눈 결함[\s\S]*비교 근거/)
   assert.match(look, /총점에 숨은 치명적 회귀는 개선이 아니다/)
   assert.doesNotMatch(look, /통과 수가 늘었을 때만 r2를 채택/)
   // The loop finishes inside one user request instead of asking to continue.
@@ -335,13 +371,16 @@ test('exemplars reference tokens only — no literal colors in component markup'
   }
 })
 
-test('reviews with seven yes/no axes including Craft and requires a loop line, not absolute scores', async () => {
+test('reviews seven evidence-linked axes and separate outcomes, not aggregate approval scores', async () => {
   const [review, ux] = await Promise.all([read('references/review.md'), read('references/ux-checklist.md')])
 
   for (const axis of ['Task fit', 'Hierarchy', 'States', 'Execution', 'Restraint', 'Craft', 'Explainability']) {
     assert.ok(review.includes(`| ${axis}`), `missing axis ${axis}`)
   }
-  assert.match(review, /axes: 7\/7/)
+  assert.doesNotMatch(review, /axes: [0-7]\/7/)
+  for (const status of ['technical:', 'design-self-review:', 'user-acceptance:']) {
+    assert.ok(review.includes(status), `missing separate review status ${status}`)
+  }
   assert.match(review, /loop: r2 gates/)
   // The measurable loop-line requirement is code-only; design/prototype output records observed
   // frame/preview evidence instead of invented metrics.

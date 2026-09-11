@@ -62,7 +62,7 @@ test('a brand name alone never becomes evidence: an unmatched utterance routes t
   assert.match(decision.note, /brand name alone is not evidence/i)
 })
 
-test('an observed pack leads only when the task matches; otherwise the scope drops to tokens-only', () => {
+test('an observed pack leads only when the task matches; otherwise it enters a bounded relationship study', () => {
   const matched = routeUtterance('Vercel 랜딩페이지처럼 만들어줘', shipped)
   assert.equal(matched.mode, 'reference-informed-adaptation')
   assert.equal(matched.packId, 'vercel-developer-platform')
@@ -75,9 +75,11 @@ test('an observed pack leads only when the task matches; otherwise the scope dro
   const mismatched = routeUtterance('Vercel UI처럼 배포 현황 대시보드를 만들어줘', shipped)
   assert.equal(mismatched.packId, 'vercel-developer-platform')
   assert.equal(mismatched.taskMatch, false)
-  assert.equal(mismatched.scope, 'tokens-only')
+  assert.equal(mismatched.scope, 'relationship-study')
   assert.equal(mismatched.brandFidelityClaim, false)
-  assert.match(mismatched.note, /Do NOT transfer the layout slots/)
+  assert.match(mismatched.note, /reference-study\.md/)
+  assert.match(mismatched.note, /side-by-side validation/)
+  assert.doesNotMatch(mismatched.note, /tokens-only/)
 
   // And an unknown task is not the same as a matching one.
   const unknown = routeUtterance('Vercel처럼 만들어줘', shipped)
@@ -85,6 +87,26 @@ test('an observed pack leads only when the task matches; otherwise the scope dro
   assert.equal(unknown.taskMatch, null)
   assert.equal(unknown.scope, 'tokens-only')
   assert.equal(unknown.brandFidelityClaim, false)
+})
+
+test('a valid partial pack with a different known task gets relationship-study only when coverage is complete', () => {
+  const partial = packOf('vercel-developer-platform')
+  partial.evidenceStatus = 'partial'
+  const firstEvidence = evidenceEntries(partial).find((entry) => entry.evidence === 'observed')
+  const path = firstEvidence.path.split('.')
+  let target = partial
+  for (const segment of path) target = target[segment]
+  target.evidence = 'unverified'
+  assert.deepEqual(check(partial), [], 'the partial fixture must remain a valid pack')
+
+  const adapted = routeUtterance('Vercel UI처럼 배포 현황 대시보드를 만들어줘', [{ pack: partial }])
+  assert.equal(adapted.scope, 'relationship-study')
+  assert.equal(adapted.brandFidelityClaim, false)
+  assert.match(adapted.note, /observed region.*concrete relationships.*real-content slice.*side-by-side validation/i)
+
+  const uncovered = routeUtterance('Vercel UI처럼 모바일 라이트 배포 현황 대시보드를 만들어줘', [{ pack: partial }])
+  assert.equal(uncovered.scope, 'tokens-only')
+  assert.equal(uncovered.brandFidelityClaim, false)
 })
 
 test('asking for a device or theme the pack never loaded is a coverage gap, not a reproduction', () => {

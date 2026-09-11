@@ -7,57 +7,51 @@
 기술 검사·디자인 자기검토·사용자 수락은 [look.md](look.md) §5의 별도 판정으로 보고한다.
 수정안의 상대적 개선이나 예산 소진은 납품 가능의 증거가 아니다.
 
-## 1. Self-review — 7축, yes/no
+## 1. Self-review — 7축, 근거와 미검토 범위
 
-아래 코드용 기준은 코드 산출물에 적용한다. 디자인/프로토타입은 `look.md`의 편집 환경 경로에서
-합의된 화면·상태·크기·브랜드 자산/토큰·편집 가능 범위를 실제 확인한다. 미측정 DOM/실행 검사를
-통과했다고 기록하지 않는다. 결과 형식·위치까지 충족해야 완료다.
+코드 기준은 코드 산출물에만 적용한다. 디자인/프로토타입은 합의된 프레임·상태·크기·편집 가능
+범위를 실제 확인하며 DOM/실행 검사를 했다고 하지 않는다. 각 축은 yes/no 또는 `unreviewed`와
+근거를 남긴다. 수치 점수나 `7/7` 집계를 납품 배지로 쓰지 않는다. 미열람·근거 부족은 통과가 아니다.
+시각 축은 [reference-study.md](reference-study.md)의 기존 comparison을 함께 참조한다:
+원본/승인 보드와 대응 렌더 → 보존한 관계 → 남은 차이와 허용/반려 이유. 같은 근거를 축마다 복제하지 않는다.
 
-체크리스트와 Look 루프를 돌린 뒤 각 축에 **yes/no**로 답하고 근거를 한 줄 적는다. 점수(1–5)는
-매기지 않는다 — 자기 채점 절대점수는 근거가 약하다. `no`가 하나라도 있으면 고치고 다시 본다.
-남은 `no`의 원인을 브리프 · 섹션 구성 · 전체 위계 · 세부 마감으로 구분하고 Look 보정 예산 안에서
-해당 부분만 수정한다. 무조건 Frame부터 재시작하지 않는다. 예산 뒤 미해결은 결함으로 보고한다.
+| 축             | 판단 기준                                                                                                     | 근거 출처                             |
+| -------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Task fit       | 핵심 작업을 끝낼 수 있고 첫 시선이 진입점 또는 합의된 기억할 요소에 가는가                                    | 브리프·실제 여정·비교 화면            |
+| Hierarchy      | 주인공의 비중·읽기 순서·정보 간 강약이 실제 제목과 모바일에서도 유지되는가                                    | comparison의 전체 축소/읽기 크기      |
+| States         | 필요한 loading·empty·error·success·partial 상태와 해당하지 않는 이유가 있는가                                 | state matrix·one-shot.md §5·실행 근거 |
+| Execution      | 적용 가능한 기술 게이트 전부 통과했고 검사 범위와 미측정을 구분했는가                                         | design-loop/r<n>/metrics.json         |
+| Restraint      | 장식이 정보·조작 피드백·합의된 브랜드 표현의 역할을 하며 다른 주인공과 경쟁하지 않는가                        | 브리프·comparison·시간 근거           |
+| Craft          | 실제 화면의 비례·타입·정렬·표면·밀도가 콘텐츠와 승인 방향에 맞는가. 틴트·그림자·hairline의 존재 여부가 아니다 | form-quality.md·comparison            |
+| Explainability | treatment의 선택과 손실을 정보·조작·피드백·브랜드 역할 및 관측 근거로 설명할 수 있는가                        | decision record·comparison            |
 
-| 축             | `yes`의 기준                                                                                                                                                 | 근거 출처                       |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- |
-| Task fit       | primary task가 최소 조작으로 끝나고, 첫 시선이 그 진입점 또는 기억할 요소에 간다                                                                             | 브리프 체크리스트 1             |
-| Hierarchy      | 2초 안에 primary / secondary / tertiary가 크기 · 무게 · 색 중 둘 이상으로 구분된다                                                                           | craft 체크 2                    |
-| States         | 역할별 필요한 loading · empty · error · success · partial 등이 설계·구현됐고 해당하지 않는 상태는 이유가 있다                                                | state matrix · one-shot.md §5   |
-| Execution      | 게이트 전부 통과(대비 · overflow · 폰트 수 · 탭 타깃 · 리터럴 비율 · keep-all)                                                                               | `design-loop/r<n>/metrics.json` |
-| Restraint      | 지워도 task에 영향 없는 장식이 없다. accent 하나, signature 하나                                                                                             | craft 체크 6 · 12               |
-| Craft          | craft.md 12개 기본값이 적용됐다: 틴트 중립색 · 층 그림자 · hairline · 브라우저 표면 · 타이포 대비 · tabular · radius 중첩 · 피드백 모션 · 밀도 · 아이콘 세트 | craft 체크 3–5 · 7–10           |
-| Explainability | craft · DESIGN.md 밖의 모든 treatment가 사다리 1–4단 중 하나를 근거로 댄다                                                                                   | decision record 5단             |
+`no`는 브리프·구성·전체 위계·세부 마감 중 원인을 구분해 영향받은 선택으로 돌아간다.
+핵심 실패 또는 필수 비교의 `unreviewed`는 확장 불가다. 보정 예산 뒤 미해결은 결함으로 보고한다.
 
-결과는 Rationale 첫 줄에 적는다: `axes: 7/7` 또는 `axes: 6/7 (Craft no → r3에서 수정)`.
-
-## 2. Rationale — 왜 이렇게 만들었나 (10줄 이내)
+## 2. Rationale — 기존 기록에 연결한다 (10줄 이내)
 
 ```md
 ## Rationale — <화면>
 
-mode: adaptation lineage: <id 또는 fidelity 소스> loop: r2 gates 9/9 checks 14/20→18/20 axes: 7/7
+mode: adaptation lineage: <id 또는 fidelity 소스> loop: r2 gates <실측 결과와 범위>
+technical: <pass/fail/unmeasured/N/A> · design-self-review: <ready/incomplete/unreviewed> · user-acceptance: <accepted/rejected/not-obtained>
 
-1. task: <primary task 한 줄>. 완료까지 <n>회 조작.
-2. hierarchy: <1순위>를 첫 화면 좌상단에, <3순위>는 접음. 이유: <빈도 · 결정 순서>.
-3. interaction: <조작 모델>. <대안>을 버린 이유: <한 줄>.
-4. feedback: loading은 <skeleton>, error는 <inline>, success는 <조용히/undo toast>. 이유: <한 줄>.
-5. visual: 계보 <id> + 노브 <hue · 페어링 · radius/밀도>. signature <무엇> — <돕는 단>.
-   craft 밖 treatment <없음 / 있음 — 돕는 단>.
-6. trade-off: <얻은 것> 대신 <포기한 것>.
-7. 남은 결함 · 미확인 범위: <Look 미통과/미측정, 자산 부족, 사용자 조사 미수행 등 실제 한계>.
+1. task / hierarchy: <핵심 작업과 실제 콘텐츠의 우선순위>.
+2. interaction / feedback: <조작 모델·상태·실행 근거, 일반/축소 모션>.
+3. visual comparison: <기존 comparison 링크: 원본/승인 보드 ↔ 대응 렌더, 보존한 관계>.
+4. decision / trade-off: <남은 차이·개선/손실과 채택 또는 반려 이유>.
+5. 남은 결함 · 미확인 범위: <구성/조형 실패, 미열람, 자산 부족, 사용자 평가 미수행>.
 ```
 
-규칙:
-
-- 5번에서 craft · DESIGN.md 밖인데 "돕는 단"을 못 쓰는 treatment는 코드에서도 지운다.
-- 6번 trade-off가 "없음"이면 대안을 탐색하지 않은 것이다.
-- 7번에 실제 한계를 적는다. 미확정 제품 사실을 허용하는 가정란으로 쓰지 않는다.
 - 코드 결과는 `loop:` 줄과 실제 측정 기록이 필요하다. 디자인 결과는 실제 프레임/미리보기·
-  확인한 상태/크기·보정 기록을 쓴다. 없는 metrics를 만들어 채우지 않는다.
+  확인 상태/크기·보정 기록을 쓴다. 없는 metrics를 만들어 채우지 않는다.
+- 미확정 사실이나 관측하지 않은 레퍼런스를 근거로 채우지 않는다. 기술 통과·렌더 횟수·설명의
+  완결성은 조형 통과가 아니다. 기술 결과가 같아도 시각적 개선을 채택할 수 있다(`look.md` §3).
+- 실제 사용자 반려는 자기검토 ready나 자동 검증 통과로 뒤집지 않는다. 후속 수정안의 사용자
+  수락은 새 응답 전까지 not-obtained이며 이전 반려 기록은 보존한다.
 
-사용자에게는 완성 UI와 실제 확인한 화면을 먼저 보여주고 이 설명을 붙인다. 선택한 방향/보드,
-섹션별 출처와 유지·조정 내용은 기록 경로로 연결한다. 렌더 자기비평은 독립적인 QA나 사용자
-만족·전환율 검증이 아니며, 실제 수행하지 않은 검증을 Rationale에 채워 넣지 않는다.
+완성 UI와 실제 확인한 화면을 먼저 보여주고 설명을 붙인다. 자체 렌더 비평은 독립 QA나 사용자
+만족·전환율 검증이 아니며, 보정 예산 소진은 납품 가능의 증거가 아니다.
 
 ## 3. User validation — 사용자에게 넘기는 검증 방법
 

@@ -2,7 +2,7 @@
 
 사용자가 **브랜드 이름 하나**로 UI를 요구할 때("오늘의집 UI처럼", "Vercel UI처럼") 쓰는 모드다.
 이 모드의 규칙은 하나로 줄어든다: **이름은 증거가 아니다.** 팩이 있으면 팩의 관측값을 따르고,
-없으면 없다고 말하고 계보로 내려간다. 이름만 보고 값을 지어내는 것은 이 skill의 가장 큰 결함이다.
+없으면 제공 URL·스크린샷 등 접근 가능한 소스를 관측하고, 근거가 없는 부분에 계보를 쓴다. 이름만으로 값을 지어내거나 팩 부재를 레퍼런스 부재로 취급하지 않는다.
 
 산출물은 브리프와 방향 합의 뒤 **한 번의 자율 제작 흐름**으로 끝낸다. 중요한 미확정 정보는
 질문으로 확정한다([`one-shot.md`](one-shot.md)). 위임받은 시각 선택만 직접 결정한다.
@@ -78,20 +78,29 @@
 - `layout.slots[]`는 관측한 **밴드 순서**다. 픽셀 높이가 아니라 역할과 순서가 계약이다.
 - `components.<role>.pattern`은 한 줄 문장이다. 코드가 아니다.
 
+팩은 검색·라우팅용 요약이다. 실제 응용은 [reference-study.md](reference-study.md)의 원본 구간·
+관계·성립 조건·적용 위치·비교 증거로 구체화한다. 집계된 색/간격과 한 줄 패턴만으로 구도를 생성하지 않는다.
+
 ## 3. 라우팅 — 이름에서 팩까지
 
 ```
 사용자 발화 → normalize(브랜드 이름) → packs/*.json의 brand · aliases와 매칭
   ├ 매칭 O + evidenceStatus observed|partial → Reference-informed Adaptation
-  │    task가 사용자 task와 다르면 layout은 버리고 tokens · typeScale만 채택(팩의 task 표기 필수)
+  │    task 일치 + 관측 범위 충족 → full; 알려진 다른 task + 관측 범위 충족 → relationship-study
+  │    task 미확정 또는 기기/테마 관측 누락 → tokens-only (브랜드 충실도 주장 금지)
   ├ 매칭 O + evidenceStatus unverified      → Unverified route: 계보 + 팩의 패턴 힌트,
   │    "브랜드 재현 아님"을 먼저 말한다
   └ 매칭 X                                   → 팩 없음. adaptation.md 계보 표로 간다.
-                                              브랜드 이름을 근거로 값을 만들지 않는다
+                                              제공 URL·스크린샷은 별도 관측; 이름만으로 값을 만들지 않는다
 ```
 
 `scripts/pack.mjs --route "<발화>"`가 이 결정을 결정론적으로 돌려준다. 라우팅 결과의
 `mode` · `packId` · `evidenceStatus`를 decision record에 그대로 적는다.
+
+`relationship-study`는 전체 레이아웃 채택 권한이 아니다. 목적이 달라도 보존 가능한 관계를 원본에서
+확인하고 실제 콘텐츠 대표 구간으로 검증한다. 정책·섹션 순서·display 크기를 그대로 옮기지 않으며
+`brandFidelityClaim`은 false다. 관계가 맞지 않으면 제외하고 이유를 남긴다. `tokens-only`에서도
+추가 자료를 관측할 수 있지만, 관측 전 미확정 범위의 적합성·충실도를 주장하지 않는다.
 
 ## 4. 새 레퍼런스를 관측할 때 (팩이 없고 URL · 스크린샷이 있을 때)
 
@@ -104,7 +113,9 @@ node <skill>/scripts/observe.mjs --url https://<public page> --device desktop --
 - 403 · 봇 차단 · 빈 SPA 껍데기면 스크립트가 exit 2로 멈춘다. **우회하지 않는다.** 그 레퍼런스는
   `unverified`이고, 사용자에게 스크린샷을 요청하거나 계보로 내려간다.
 - 관측 JSON은 **집계값과 구조**만 담는다(폰트 가족 · 타입 스케일 · 색 역할 · radius · 간격 ·
-  슬롯). 카피 · 이미지 URL · 로고 · CSS 원문은 담지 않는다. 그것을 가져오면 복제다.
+  슬롯). 카피 · 이미지 URL · 로고 · CSS 원문은 담지 않는다. 이 요약만으로 특정 요소의 관계나
+  시간적 경험을 확인했다고 하지 않는다. 허용된 캡처/상태 관측을 reference-study.md의 근거로
+  연결하고, 증거 수집과 자산·코드의 런타임 재사용 권한은 별도로 판단한다.
 - 스크린샷만 있으면 `estimated`가 상한이다. 스냅 규칙은 [`fidelity.md`](fidelity.md)와 같다.
 
 ## 5. 하나의 시각 시스템 — 섹션 출처는 여러 개
