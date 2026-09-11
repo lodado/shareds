@@ -106,6 +106,9 @@ components:
 **Key characteristics:** 밝은 바탕 · 저채도 틴트 중립색 · 한 가족 grotesk · tabular 숫자 · 4px
 스케일 · 40px 행 · hairline 구분 · 그림자는 팝오버에만.
 
+사조: Command Palette(2011) · Minimalism (Digital/UI)(1995). Visual Cues 중 키보드 우선 · 낮은 채도 · 밀도 높은 목록을 잇고, Dark-SaaS / Linear Look(2023)의 glow · glass 카드는 반동 대상으로 두어 잇지 않는다.
+출처 `design-movement-converted.md`(로컬 스냅샷, `dictionary-recipes.md` §0). 이름 · 연도 · 신호만 옮겼고 대표작 · 이미지는 URL로만 인용한다.
+
 ## Colors
 
 - **Primary** (`oklch(50% 0.16 H)`): primary action · 현재 위치 · 선택 강조에만. 한 화면 점유 ≤5%.

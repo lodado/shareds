@@ -1,9 +1,48 @@
 # Dictionary recipes — 원문 패턴을 섹션 구현 지시로 번역한 예시
 
-`section-implementation.md`의 명세를 작성할 때 관련 레시피만 읽는다. 아래 원문 요지는 사용자가
-제공한 Vibe Dictionary Markdown에서 발췌·요약했다. 그 뒤의 구조·수치·동작 결정은 **구현 지시 예시**이지
+`section-implementation.md`의 명세를 작성할 때 §0으로 원문을 찾고 관련 레시피만 읽는다. A–C의 원문 요지는
+Vibe Dictionary Markdown에서 발췌·요약했다. 그 뒤의 구조·수치·동작 결정은 **구현 지시 예시**이지
 사전의 규범이나 라이브 사이트 관측값이 아니다. 실제 콘텐츠·계약·토큰에 맞게 선택하고 조정 이유를 적는다.
 출처 표기는 `파일 → 섹션 제목/패턴 ID`로 남긴다. 줄 번호만 의존하지 않는다.
+
+## 0. 사전 루트와 읽는 순서
+
+사전 루트는 `references/dictionary/`다. 사이트 원본 8개 · 페이지 변환본 3개 · `README.md` · `TOC.md` ·
+`SHA256SUMS.txt`를 바이트 그대로 둔 **로컬 스냅샷**(수집 2026-09-11)이며 git에 올리지 않는다. 배포된 플러그인에는
+없을 수 있다. 무결성은 `cd references/dictionary && shasum -a 256 -c SHA256SUMS.txt`로 확인하고, 바뀌어 있으면 다시 복사한다.
+출처 · 라이선스 · 알려진 불일치는 [reference-sources.md](reference-sources.md)의 스냅샷 절에 있다.
+
+소스는 이 순서로 고르고 어느 것을 썼는지 적는다.
+
+1. 로컬 스냅샷이 있으면 원문을 읽고 `snapshot: 2026-09-11`을 적는다. 라이브 사이트 관측이 아니다.
+2. 사용자가 파일/경로를 주면 그것을 쓴다. 스냅샷보다 새 판이면 사용자 판이 우선이다.
+3. 둘 다 없으면 이 파일의 A–C 발췌만 쓰고 `패키지 내 요약 참조`로 표시한다. 요약을 원문 읽기로 보고하지 않는다.
+
+파일은 통째로 읽지 않는다(133 KB짜리도 있다). 카테고리 범위나 ID 한 행만 읽는다.
+
+```sh
+grep -n '^### ' references/dictionary/layout-taxonomy.md                        # 카테고리 목차
+sed -n '/^### 17\./,/^### 18\./p' references/dictionary/layout-taxonomy.md      # 한 카테고리
+grep -n '^| sticky-scroll-reveal ' references/dictionary/layout-taxonomy.md    # ID 한 행
+grep -n '^| Purple-Blue Gradient ' references/dictionary/ai-slop-taxonomy.md   # Pattern 이름 한 행
+grep -n '^## ' references/dictionary/design-movement-converted.md              # 사조 목차 `## 이름 (연도)`
+```
+
+| 단계             | 사전 파일                                                                                                  | 읽는 곳                                                                      | 쓰는 곳                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| 1 Discovery      | `ux-taxonomy.md`                                                                                           | Part 4 페이지 유형 · Part 5 플로우 Sequence                                  | `discovery.md` · `experience-design.md` §1                   |
+| 1·2 Adaptation   | `design-movement-converted.md`                                                                             | `## 이름 (연도)` → Visual Cues · 반동 대상 · Lenses                          | `adaptation.md` §2 · `lineages/*.md` · `art-direction.md` §1 |
+| 2 Art direction  | `visual-asset-taxonomy.md`; 제작 시 `generative-image-taxonomy.md` · `commercial-photographic-taxonomy.md` | Part 1 기법 · Part 2 구조 · Part 3 표면; Spec · Prompt Fragment · Part 10    | `art-direction.md` 이미지 제작 브리프                        |
+| 2 소스 탐색      | `design-references-converted.md`                                                                           | 9 카테고리의 "언제 쓰나"                                                     | `reference-sources.md`                                       |
+| 3 Compose        | `layout-taxonomy.md`                                                                                       | 대표 조합 · Part 3 아키타입 Best For/Avoid For · Part 4 블록 · Part 6 페어링 | `section-composition.md` §2                                  |
+| 3 Implementation | `layout-taxonomy.md` · `design-taxonomy.md`                                                                | Part 5 스크롤/스티키 Avoid For · Part 2 모션 이름과 의존 라이브러리          | `section-implementation.md` §2 · `experience-design.md` §3   |
+| 4 Build (ko)     | `typography-taxonomy.md`                                                                                   | Part 4 §9 한글 조판 · Part 6 §15 한영 페어링                                 | `typography-ko.md`                                           |
+| 4·6 상태         | `ux-taxonomy.md`                                                                                           | 25. 상태 유형 · 27. AI UX 패턴                                               | `one-shot.md` §5                                             |
+| 5 Look           | `ai-slop-taxonomy.md`                                                                                      | Pattern · Tell · Escape · Part 8 Root Causes                                 | `look.md` §2 비평                                            |
+| —                | `dev-wiki-converted.md`                                                                                    | 읽지 않는다(스킬 무관)                                                       | —                                                            |
+
+사전 항목은 `document-only` 참고다. 관측값 · 사용자 소유 소스 · 접근성 하한 · 프로젝트 토큰보다 앞서지 않는다
+(`one-shot.md` §1). `Prompt Example` · `Build` 열은 후보이지 결정값이 아니다. 원문의 오탈자 · 수치 불일치는 고치지 않는다.
 
 ## A. 요금제 화면 — 조건 → 같은 기준의 비교 → 선택
 

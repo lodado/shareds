@@ -26,11 +26,11 @@
 `용어 → 이 콘텐츠에 맞는 이유 → 구체적인 배치/동작 → 좁은 화면의 변화`까지 쓴다.
 필요한 항목만 선택한다. 모든 사전·기법을 읽거나 화면에 적용할 필요는 없다.
 
-사용자가 사전 파일/경로를 제공하면 선택한 패턴 ID 또는 제목으로 원문을 찾아 `Description`,
-`Build`, `Best For`, `Avoid For`, 반응형 조건을 확인한다. 파일을 열지 않고 원문을 확인했다고 쓰지 않는다.
-원문이 없는 배포 환경에서는 [dictionary-recipes.md](dictionary-recipes.md)의 발췌·해석을 사용하되
-`패키지 내 요약 참조`로 표시한다. 매번 전체 사전이나 작성자의 Downloads 경로를 요구하지 않는다.
-이 레시피에는 요금제 비교·롱리드·스크롤 설명 섹션의 구체적인 지시 예시가 있다.
+원문은 [dictionary-recipes.md](dictionary-recipes.md) §0의 순서로 연다: 로컬 스냅샷 `references/dictionary/`
+(있으면 `snapshot: 2026-09-11` 표기) → 사용자가 제공한 파일/경로 → 둘 다 없으면 레시피 발췌를
+`패키지 내 요약 참조`로 표시. 선택한 패턴 ID 또는 제목으로 `Description`, `Build`, `Best For`, `Avoid For`,
+반응형 조건을 확인한다. 파일을 열지 않고 원문을 확인했다고 쓰지 않으며, 매번 전체 사전이나 작성자의
+Downloads 경로를 요구하지 않는다. 레시피에는 요금제 비교·롱리드·스크롤 설명 섹션의 구체적인 지시 예시가 있다.
 
 | 참고 개념                                                   | 구현 지시에 포함할 결정                                                                                                                 |
 | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -121,13 +121,21 @@ S1 탐색 헤더 → S2 검색/필터 → S3 결과 목록으로 나눈다. 검�
 
 ## 참고 자료와 적용 범위
 
-사용자가 제공한 Vibe Dictionary Markdown 묶음의 아래 항목을 선택·재구성했다. 사전 전체를 복제하지 않는다.
-이 파일은 필요한 번역 규칙을 포함하므로 배포 후 원래 Downloads 경로나 외부 열람에 의존하지 않는다.
+Vibe Dictionary Markdown 묶음(로컬 스냅샷 `references/dictionary/`, 수집 2026-09-11, git 미추적이라 배포본에는 없다)의
+아래 항목을 선택·재구성했다. 사전 전체를 복제하지 않는다. 이 파일과 레시피는 필요한 번역 규칙을 포함하므로
+배포 후 원래 Downloads 경로나 외부 열람에 의존하지 않는다.
 
-- `layout-taxonomy.md` — 대표 조합 구성, 구조·레이아웃, 반응형: [Layout Taxonomy](https://vibedesignlab.net/dictionary/layout-taxonomy)
-- `ux-taxonomy.md` — 검색/필터, 흐름, 동작·상태: [UX Taxonomy](https://vibedesignlab.net/dictionary/ux-taxonomy)
-- `typography-taxonomy.md` — 역할·행 길이·줄바꿈·반응형: [Typography Taxonomy](https://vibedesignlab.net/dictionary/typography-taxonomy)
+- `layout-taxonomy.md`(구성 버전 3.0) — 대표 조합 구성, 구조·레이아웃, 반응형: [Layout Taxonomy](https://vibedesignlab.net/dictionary/layout-taxonomy)
+- `ux-taxonomy.md` — 검색/필터, 흐름, 동작·상태, AI UX: [UX Taxonomy](https://vibedesignlab.net/dictionary/ux-taxonomy)
+- `typography-taxonomy.md` — 역할·행 길이·줄바꿈·반응형·한글 조판: [Typography Taxonomy](https://vibedesignlab.net/dictionary/typography-taxonomy)
 - `visual-asset-taxonomy.md` — 구도·프레이밍·구현 매핑: [Visual Asset Taxonomy](https://vibedesignlab.net/dictionary/visual-asset-taxonomy)
+- `design-taxonomy.md` — 컴포넌트 명명, 인터랙티브 패턴의 이름·의존 라이브러리: [Design Taxonomy](https://vibedesignlab.net/dictionary/design-taxonomy)
+- `ai-slop-taxonomy.md` — 클리셰 Tell · Escape · 근본 원인: [AI Slop Taxonomy](https://vibedesignlab.net/dictionary/ai-slop-taxonomy)
+- `generative-image-taxonomy.md` — 생성 이미지의 촬영·조명·구도 어휘: [Generative Image Taxonomy](https://vibedesignlab.net/dictionary/generative-image-taxonomy)
+- `commercial-photographic-taxonomy.md` — 상업 사진 스펙 · 물리 정합성: [Commercial Photographic Taxonomy](https://vibedesignlab.net/dictionary/commercial-photographic-taxonomy)
+- `design-movement-converted.md` — 사조 33 · Visual Cues · 반동 대상(페이지 변환본): [Design Movement](https://vibedesignlab.net/dictionary/design-movement)
+- `design-references-converted.md` — 레퍼런스 사이트 77 · "언제 쓰나"(페이지 변환본): [Design References](https://vibedesignlab.net/dictionary/design-references)
+- `dev-wiki-converted.md` — 스킬에서 쓰지 않는다: [Dev Wiki](https://vibedesignlab.net/dictionary/dev-wiki)
 
 링크는 제공된 자료의 출처 표기이며 이번 작업에서 라이브 사이트를 관측했다는 뜻이 아니다.
 분류 체계의 추천은 사용자 소스·프로젝트 토큰·접근성·실제 콘텐츠보다 우선하지 않는다.

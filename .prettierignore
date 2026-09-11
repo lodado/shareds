@@ -5,3 +5,5 @@ playwright.config.ts
 
 # Ignore all HTML files:
 *.html
+# Local-only third-party dictionary snapshot: keep byte-identical to SHA256SUMS.txt
+packages/frontend-interface-design/skills/frontend-interface-design/references/dictionary/

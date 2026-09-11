@@ -96,6 +96,9 @@ hairline이 페이지를 나눈다.
 **Key characteristics:** 논지 하나의 hero · 큰 display(700, −0.03em) · 12열 비대칭(7/5 · 5/7) ·
 섹션 간 128px · accent 하나 · 제품 화면은 hairline 프레임 · 모션은 한 순간.
 
+사조: Swiss Revival 2.0(2018) · Editorial Utilitarian(2020) · Bento Grid(2023, 기능 격자에만). Visual Cues 중 큰 display 타입 · 비대칭 그리드 · 괘선 위계를 잇고, 장식 그라디언트는 반동 대상이다.
+출처 `design-movement-converted.md`(로컬 스냅샷, `dictionary-recipes.md` §0). 이름 · 연도 · 신호만 옮겼고 대표작 · 이미지는 URL로만 인용한다.
+
 ## Colors
 
 - **Primary** (`oklch(48% 0.19 H)`): CTA · 링크 · 강조 숫자 하나. 배경으로 칠하지 않는다.

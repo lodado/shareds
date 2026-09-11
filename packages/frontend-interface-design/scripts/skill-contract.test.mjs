@@ -169,6 +169,7 @@ test('ships every reference, lineage and exemplar the workflow links to', async 
     'reference-rebuild',
     'reference-study',
     'section-implementation',
+    'dictionary-recipes',
     'review',
     'typography-ko',
     'ui-checklist',
@@ -639,4 +640,140 @@ test('multi-site clone study has a routed, bounded proposal and distinct evidenc
       `missing behavioral case ${id}`,
     )
   }
+})
+
+const DICTIONARY_FILES = [
+  'layout-taxonomy.md',
+  'ux-taxonomy.md',
+  'typography-taxonomy.md',
+  'ai-slop-taxonomy.md',
+  'design-taxonomy.md',
+  'visual-asset-taxonomy.md',
+  'generative-image-taxonomy.md',
+  'commercial-photographic-taxonomy.md',
+  'design-movement-converted.md',
+  'design-references-converted.md',
+  'dev-wiki-converted.md',
+]
+
+// The snapshot itself is git-ignored (no redistribution license) and absent on CI, so this pins the
+// routing prose and the ignore rules — never the dictionary files.
+test('routes dictionary reads through the local snapshot, a user copy, then the packaged summary', async () => {
+  const [recipes, implementation, composition, sources, skill, readme, gitignore, prettierignore] = await Promise.all([
+    read('references/dictionary-recipes.md'),
+    read('references/section-implementation.md'),
+    read('references/section-composition.md'),
+    read('references/reference-sources.md'),
+    read('SKILL.md'),
+    read('evals/README.md'),
+    readFile(join(packageDirectory, '../../.gitignore'), 'utf8'),
+    readFile(join(packageDirectory, '../../.prettierignore'), 'utf8'),
+  ])
+  const snapshotPath = 'skills/frontend-interface-design/references/dictionary/'
+  assert.ok(gitignore.includes(snapshotPath), 'snapshot must stay out of git')
+  assert.ok(prettierignore.includes(snapshotPath), 'pnpm format would pad the tables and break SHA256SUMS')
+
+  const routing = sectionOf(recipes, '## 0.')
+  for (const file of DICTIONARY_FILES) assert.ok(routing.includes(file), `§0 does not route ${file}`)
+  assert.match(routing, /shasum -a 256 -c SHA256SUMS\.txt/)
+  assert.match(routing, /통째로 읽지 않는다/)
+  let cursor = -1
+  for (const step of [
+    '로컬 스냅샷이 있으면',
+    'snapshot: 2026-09-11',
+    '사용자가 파일/경로를 주면',
+    '패키지 내 요약 참조',
+  ]) {
+    const index = routing.indexOf(step, cursor)
+    assert.ok(index > cursor, `source order broken at ${step}`)
+    cursor = index
+  }
+
+  assert.match(implementation, /references\/dictionary\//)
+  assert.match(implementation, /패키지 내 요약 참조/)
+  assert.doesNotMatch(implementation, /사용자가 사전 파일\/경로를 제공하면 선택한/)
+  for (const file of DICTIONARY_FILES) assert.ok(implementation.includes(file), `참고 자료 omits ${file}`)
+  assert.match(composition, /dictionary-recipes\.md[\s\S]*Avoid For/)
+  assert.match(sources, /## Vibe Dictionary[\s\S]*SHA256SUMS[\s\S]*document-only/)
+  assert.match(sources, /라이선스[\s\S]*git에 올리지 않고/)
+  assert.match(skill, /dictionary-recipes\.md/)
+  assert.match(readme, /references\/dictionary\//)
+
+  const { cases } = JSON.parse(await read('evals/interaction-cases.json'))
+  const dictionaryCase = cases.find(({ id }) => id === 'dictionary-source-to-implementation')
+  assert.ok(dictionaryCase.setup.facts.some((fact) => fact.includes('snapshot: 2026-09-11')))
+})
+
+// Names, one-line cues and source pointers only — the taxonomy tables stay in the git-ignored snapshot.
+const MOVEMENTS = [
+  'Command Palette(2011)',
+  'Minimalism (Digital/UI)(1995)',
+  'K-Fintech Friendly Minimal(2018)',
+  'Swiss Revival 2.0(2018)',
+  'Editorial Utilitarian(2020)',
+  'Bento Grid(2023',
+  'Swiss Style(1950)',
+  'Flat Design(2013)',
+  'Serif / Heritage Revival(2023)',
+  'Anti-AI Crafting(2025)',
+  'Material You(2021)',
+  'Claymorphism(2021)',
+]
+
+test('injects dictionary vocabulary by name: slop escapes, movements, Korean pairing, states and motion patterns', async () => {
+  const [look, ui, adaptation, artDirection, ko, oneShot, experience] = await Promise.all([
+    read('references/look.md'),
+    read('references/ui-checklist.md'),
+    read('references/adaptation.md'),
+    read('references/art-direction.md'),
+    read('references/typography-ko.md'),
+    read('references/one-shot.md'),
+    read('references/experience-design.md'),
+  ])
+  // a. A slop finding names the pattern and its escape; severities are never summed into a score.
+  assert.match(look, /ai-slop-taxonomy\.md/)
+  assert.match(look, /slop:[^\n]*Escape/)
+  assert.match(look, /Severity를 합산하지 않는다/)
+  assert.match(ui, /ai-slop-taxonomy\.md/)
+  // b. Every lineage says which movement it descends from and what that movement reacted against.
+  assert.match(sectionOf(adaptation, '## 2.'), /\| 사조\(/)
+  for (const lineage of LINEAGES) {
+    const overview = sectionOf(await read(`references/lineages/${lineage}.md`), '## Overview')
+    assert.ok(
+      MOVEMENTS.some((name) => overview.includes(name)),
+      `${lineage}: Overview names no movement`,
+    )
+    assert.match(overview, /반동 대상/, `${lineage}: Overview lacks the movement's counter-target`)
+  }
+  assert.match(artDirection, /design-movement-converted\.md[\s\S]*Visual Cues/)
+  // c. Mixed-script corrections apply only when a second Latin family is in play.
+  assert.match(ko, /hangul-latin-pairing/)
+  assert.match(ko, /KLREQ §7\.3\.1/)
+  assert.match(ko, /Pretendard 단일 가족 본문은 보정 없음/)
+  // d. Extended states come from the contract, not from the taxonomy's full list.
+  const states = sectionOf(oneShot, '## 5.')
+  assert.match(states, /25\. 상태 유형/)
+  assert.match(states, /27\. AI UX 패턴/)
+  assert.match(states, /계약에 없는\s+상태를 화면에 발명하지 않는다/)
+  // e. Motion rows name the pattern from the dictionary but own their timing decisions.
+  assert.match(experience, /\| 패턴\(사전\)/)
+  assert.match(experience, /design-taxonomy\.md → Part 2/)
+  assert.match(experience, /두 출처를 섞지 않는다/)
+  assert.match(experience, /Avoid For/)
+})
+
+test('reference sites are candidates to observe and image production needs missing assets plus approval', async () => {
+  const [sources, artDirection] = await Promise.all([
+    read('references/reference-sources.md'),
+    read('references/art-direction.md'),
+  ])
+  assert.match(sources, /design-references-converted\.md[\s\S]*Mood & Style/)
+  assert.match(sources, /실제 화면을 연 뒤에만 `observed`/)
+  const brief = sectionOf(artDirection, '## 4. 이미지 제작 브리프')
+  assert.match(brief, /제공된 자산으로 성립하는 화면에는 쓰지 않는다/)
+  assert.match(
+    brief,
+    /visual-asset-taxonomy\.md[\s\S]*generative-image-taxonomy\.md[\s\S]*commercial-photographic-taxonomy\.md/,
+  )
+  assert.match(brief, /사용자 승인 전까지/)
 })

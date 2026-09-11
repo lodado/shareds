@@ -103,6 +103,9 @@ components:
 **Key characteristics:** 18px 본문 · 1.7 행간 · 66ch measure · 제목 세리프(노브) · 미세 종이
 틴트 · 목차 사이드 · 인용 · 각주 · 코드 블록 · 진행 표시.
 
+사조: Serif / Heritage Revival(2023) · Anti-AI Crafting(2025). Visual Cues 중 세리프 제목 · 아날로그 표면 · 의도적 불완전성을 노브 범위에서 잇고, 매끈한 flattened AI look은 반동 대상이다.
+출처 `design-movement-converted.md`(로컬 스냅샷, `dictionary-recipes.md` §0). 이름 · 연도 · 신호만 옮겼고 대표작 · 이미지는 URL로만 인용한다.
+
 ## Colors
 
 - **Primary**: 링크 · 강조 하나. 배경으로 쓰지 않는다. 링크는 underline offset 0.18em.

@@ -80,6 +80,11 @@ ko 브리프면 11번을 더한다: 한글 줄바꿈이 어절 단위이고 행�
 `no`마다 **수정 1줄**을 적는다 — 어느 관계/구도 또는 값을 왜 바꾸는가. "더 세련되게"나
 형용사를 곧바로 gradient·카드 추가로 번역하는 것은 진단이 아니다(`form-quality.md` §3).
 
+클리셰가 원인이면 `slop:` 줄에 `ai-slop-taxonomy.md`의 패턴 이름과 그 행의 `Escape`(대신 쓸 양화 패턴)를 적는다
+(경로 · 읽는 법은 `dictionary-recipes.md` §0, 로컬 스냅샷이 없으면 이름만). "지운다"가 아니라 "무엇으로 바꾼다"가
+수정이다. 예: `slop: Purple-Blue Gradient → Escape: Monochromatic · 60% Dominant`. 원인 어휘가 필요하면 같은 파일
+Part 8 Root Causes(Mean-Best Aesthetic · Vague Taste-Word Prompting · No Brand Constraint)를 쓰되 Severity를 합산하지 않는다.
+
 ```md
 ## design-loop/r1/critique.md
 
@@ -88,6 +93,7 @@ A. brief: 7/10 (no: 3, 6, 9)
 B. craft: 6/10 (no: 3, 5, 7, 10)
 critical (A1 · A8 · B1 · B2): 3/4 (no: B2)
 target: B2 — 이번 라운드가 고치려는 결함
+slop: Everywhere Glow → Escape: Figure-Ground · Z-axis Layering (또는 none)
 fixes:
 
 - A3 hero CTA가 fold 아래 → hero 높이 100svh→auto, CTA를 h1 직후로

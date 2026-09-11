@@ -48,3 +48,6 @@ yarn-error.log*
 .blog-voice/
 __pycache__/
 *.pyc
+
+# Third-party design dictionary snapshot (vibedesignlab.net) — no redistribution license, local use only
+packages/frontend-interface-design/skills/frontend-interface-design/references/dictionary/

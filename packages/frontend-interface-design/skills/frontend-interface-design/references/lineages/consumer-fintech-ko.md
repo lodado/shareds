@@ -127,6 +127,9 @@ components:
 **Key characteristics:** 375px 기준 · Pretendard 한 가족 · TDS형 스케일 t1–t7 · 금액 32px
 700 tnum · 하단 고정 CTA 56px · 목록 행 56px + chevron · 섹션 구분은 8px 두께 `muted` 띠.
 
+사조: K-Fintech Friendly Minimal(2018). Visual Cues 중 한 화면 한 태스크 · 큰 금액 숫자 · 문장형 카피 · 단일 포인트 컬러 · 둥근 큰 버튼을 잇는다. 반동 대상은 메뉴 트리 · 메트릭스형 은행 앱이다.
+출처 `design-movement-converted.md`(로컬 스냅샷, `dictionary-recipes.md` §0). 이름 · 연도 · 신호만 옮겼고 대표작 · 이미지는 URL로만 인용한다.
+
 ## Colors
 
 - **Primary** (`oklch(55% 0.19 H)`): CTA · 링크 · 진행 표시. 파랑이 기본이 아니다 — hue는

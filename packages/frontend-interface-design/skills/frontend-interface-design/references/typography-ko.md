@@ -67,17 +67,19 @@ time {
 
 ## 규칙 표
 
-| 항목          | 값                                                                                                      | 출처                                                          |
-| ------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| 가족          | 한글 완비 가족 1개가 본문. 라틴 display는 `unicode-range`로만                                           | Pretendard README · Interop · Toss TPS                        |
-| 크기          | 본문 16–17px, 캡션 13px 이상                                                                            | KRDS 17/15/13 · TDS t5 17px                                   |
-| 행간          | 본문 1.5–1.7(기본 1.6), 제목 1.25–1.35                                                                  | KRDS ≥150% · toss.im `line-height:1.6` 19회 · Remain 1.5–1.75 |
-| 자간          | 본문 −0.01em, display −0.02em, 라틴 전용 0                                                              | toss.im `-.02em` 11회 · naver.com −0.3px · uxdev              |
-| 굵기          | 400 · 500 · 600 · 700만. 300 이하 금지                                                                  | KRDS 400/700 · Toss(한글은 굵게 보인다)                       |
-| 줄바꿈        | `keep-all` + `overflow-wrap: break-word`(본문) · `anywhere`(제목). 좁은 폭에서도 `normal`로 풀지 않는다 | MDN · toss.im keep-all 10회 · ryelle                          |
-| 합성          | `font-synthesis: none`                                                                                  | MDN                                                           |
-| 숫자          | 금액 · 표 · 시간은 `tabular-nums`                                                                       | toss.im `tnum` · Pretendard `tnum` 지원                       |
-| 스케일(TDS형) | 30/40 · 26/35 · 22/31 · 20/29 · **17/25.5** · 15/22.5 · 13/19.5                                         | TDS typography 문서                                           |
+| 항목          | 값                                                                                                                             | 출처                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| 가족          | 한글 완비 가족 1개가 본문. 라틴 display는 `unicode-range`로만                                                                  | Pretendard README · Interop · Toss TPS                                                        |
+| 크기          | 본문 16–17px, 캡션 13px 이상                                                                                                   | KRDS 17/15/13 · TDS t5 17px                                                                   |
+| 행간          | 본문 1.5–1.7(기본 1.6), 제목 1.25–1.35                                                                                         | KRDS ≥150% · toss.im `line-height:1.6` 19회 · Remain 1.5–1.75                                 |
+| 자간          | 본문 −0.01em, display −0.02em, 라틴 전용 0. 표준(KLREQ §7.3.1)은 본문 0 — 공공 · KRDS 준수 브리프면 0                          | toss.im `-.02em` 11회 · naver.com −0.3px · uxdev · `typography-taxonomy.md → tracking`        |
+| 한영 페어링   | 라틴 전용 두 번째 가족을 섞을 때만: 라틴 span 105% · `top: -0.05em` · 획 굵기 시각 맞춤. Pretendard 단일 가족 본문은 보정 없음 | `typography-taxonomy.md → hangul-latin-pairing` · latin-scale-adjust · baseline-shift-pairing |
+| 장평          | 본문 `font-stretch`/`scaleX` 변형 금지. 제목 인상 조절에만 variable `wdth`                                                     | `typography-taxonomy.md → jangpyeong`                                                         |
+| 굵기          | 400 · 500 · 600 · 700만. 300 이하 금지                                                                                         | KRDS 400/700 · Toss(한글은 굵게 보인다)                                                       |
+| 줄바꿈        | `keep-all` + `overflow-wrap: break-word`(본문) · `anywhere`(제목). 좁은 폭에서도 `normal`로 풀지 않는다                        | MDN · toss.im keep-all 10회 · ryelle                                                          |
+| 합성          | `font-synthesis: none`                                                                                                         | MDN                                                                                           |
+| 숫자          | 금액 · 표 · 시간은 `tabular-nums`                                                                                              | toss.im `tnum` · Pretendard `tnum` 지원                                                       |
+| 스케일(TDS형) | 30/40 · 26/35 · 22/31 · 20/29 · **17/25.5** · 15/22.5 · 13/19.5                                                                | TDS typography 문서                                                                           |
 
 ## 라틴 display 폰트가 꼭 필요할 때
 

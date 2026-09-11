@@ -46,17 +46,21 @@ specific reference describes a point." — Google DESIGN.md PHILOSOPHY). 점이 
 
 ## 2. 계보 선택 — 표로 결정한다
 
-| 유형(brief.type)                               | 기본 계보                                                | 밀도 · 청중이 바꾸는 경우                                                |
-| ---------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 운영 도구 · 관리자 · 설정 · 프로젝트/이슈      | [`precision-tool`](lineages/precision-tool.md)           | 표 · 로그 · 모니터링이 화면의 주인이면 `dense-data-ops`                  |
-| 마케팅 랜딩 · 제품 소개 · 가격                 | [`editorial-marketing`](lineages/editorial-marketing.md) | 커머스(장바구니 · 상품)면 `playful-commerce`                             |
-| 소비자 금융 · 결제 · 계좌 · 모바일 첫 화면(ko) | [`consumer-fintech-ko`](lineages/consumer-fintech-ko.md) | 데스크톱 전용 B2B면 `precision-tool`                                     |
-| 대시보드 · 표 · 모니터링 · 분석                | [`dense-data-ops`](lineages/dense-data-ops.md)           | 지표 1개가 지배하는 소비자 화면이면 `consumer-fintech-ko`                |
-| 블로그 · 문서 · 뉴스레터 · 긴 글               | [`warm-content`](lineages/warm-content.md)               | 기술 문서 + 코드가 중심이면 `precision-tool`의 타입으로                  |
-| 커머스 PDP · PLP · 장바구니 · 프로모션         | [`playful-commerce`](lineages/playful-commerce.md)       | 럭셔리 · 편집샵이면 `editorial-marketing`                                |
-| 온보딩 · 폼 위저드                             | 부모 제품의 계보                                         | 제품이 없으면 `consumer-fintech-ko`(모바일) / `precision-tool`(데스크톱) |
+| 유형(brief.type)                               | 기본 계보                                                | 사조(`design-movement-converted.md`)                    | 밀도 · 청중이 바꾸는 경우                                                |
+| ---------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 운영 도구 · 관리자 · 설정 · 프로젝트/이슈      | [`precision-tool`](lineages/precision-tool.md)           | Command Palette(2011) · Minimalism (Digital/UI)(1995)   | 표 · 로그 · 모니터링이 화면의 주인이면 `dense-data-ops`                  |
+| 마케팅 랜딩 · 제품 소개 · 가격                 | [`editorial-marketing`](lineages/editorial-marketing.md) | Swiss Revival 2.0(2018) · Editorial Utilitarian(2020)   | 커머스(장바구니 · 상품)면 `playful-commerce`                             |
+| 소비자 금융 · 결제 · 계좌 · 모바일 첫 화면(ko) | [`consumer-fintech-ko`](lineages/consumer-fintech-ko.md) | K-Fintech Friendly Minimal(2018)                        | 데스크톱 전용 B2B면 `precision-tool`                                     |
+| 대시보드 · 표 · 모니터링 · 분석                | [`dense-data-ops`](lineages/dense-data-ops.md)           | Swiss Style(1950) · Flat Design(2013)                   | 지표 1개가 지배하는 소비자 화면이면 `consumer-fintech-ko`                |
+| 블로그 · 문서 · 뉴스레터 · 긴 글               | [`warm-content`](lineages/warm-content.md)               | Serif / Heritage Revival(2023) · Anti-AI Crafting(2025) | 기술 문서 + 코드가 중심이면 `precision-tool`의 타입으로                  |
+| 커머스 PDP · PLP · 장바구니 · 프로모션         | [`playful-commerce`](lineages/playful-commerce.md)       | Material You(2021) · Claymorphism(2021)                 | 럭셔리 · 편집샵이면 `editorial-marketing`                                |
+| 온보딩 · 폼 위저드                             | 부모 제품의 계보                                         | 부모 제품의 사조                                        | 제품이 없으면 `consumer-fintech-ko`(모바일) / `precision-tool`(데스크톱) |
 
 표에 없는 유형은 가장 가까운 행을 고르고 decision record에 "가까운 이유" 한 줄을 적는다.
+사조 열은 계보가 어느 관습에서 왔는지 이름으로만 가리킨다. 사용자가 사조 이름으로 방향을 말하면
+(“네오브루탈리즘 느낌”) 로컬 스냅샷의 `## 이름 (연도)` 절에서 Visual Cues · 반동 대상 · Lenses(DS Fit · Cost)를
+읽어 계보 위에 노브 조정과 시그니처 후보로 옮기고, 그 사조의 부적합 조건(예: 금융 · 헬스케어에 Neobrutalism)을
+같이 적는다. 계보 밖 사조는 `art-direction.md` 방향 후보로만 쓴다.
 계보 하나를 전역 기본값의 출발점으로 삼되 섹션 구성의 출처까지 제한하지 않는다. 서로 다른
 스타일을 그대로 겹치지 않고 선택한 무드보드의 하나의 시각 시스템으로 조정한다.
 

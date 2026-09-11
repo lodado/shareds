@@ -119,6 +119,9 @@ components:
 **Key characteristics:** 잠긴 비율(4/5) 이미지 그리드 · radius 16–24 · 가격 800 tnum · 브랜드
 accent 하나 + sale hue 하나 · sticky 구매 박스 · 옵션 칩 · 모션은 이미지 hover 한 번.
 
+사조: Material You(2021) · Claymorphism(2021). Visual Cues 중 콘텐츠 색에서 파생한 톤 · 둥근 볼륨감 · 친근한 촉각을 잇는다. 반동 대상은 엔터프라이즈형 진지한 톤이며 럭셔리 편집샵에는 맞지 않는다.
+출처 `design-movement-converted.md`(로컬 스냅샷, `dictionary-recipes.md` §0). 이름 · 연도 · 신호만 옮겼고 대표작 · 이미지는 URL로만 인용한다.
+
 ## Colors
 
 - **Primary**: 담기 · 구매 · 선택 상태. 상품 이미지 위에 칠하지 않는다.

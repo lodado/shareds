@@ -112,6 +112,9 @@ components:
 **Key characteristics:** 13px 본문 · 4px 스케일 · 32px 행 · sticky 헤더 · 필터 바 40px · 상태
 글리프 세트 · 차트 5색 등간격 · mono는 ID · 시간 · 코드 열에만.
 
+사조: Swiss Style(1950) · Flat Design(2013). Visual Cues 중 모듈형 그리드 · 단일 산세리프 · 장식 없는 기호를 잇는다. 반동 대상은 장식적 세리프와 감정 중심 일러스트다.
+출처 `design-movement-converted.md`(로컬 스냅샷, `dictionary-recipes.md` §0). 이름 · 연도 · 신호만 옮겼고 대표작 · 이미지는 URL로만 인용한다.
+
 ## Colors
 
 - **Primary**: 선택 · 필터 활성 · primary action. 표 안에서는 선택 행 배경(`selection`)으로만

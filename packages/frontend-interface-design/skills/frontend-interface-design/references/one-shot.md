@@ -101,6 +101,11 @@ placeholder는 그 사실을 표시하고 실제 콘텐츠 완료와 구분한�
 
 "버튼에 success 상태가 없다"는 결함이 아니다. "폼 제출 버튼에 loading이 없다"는 결함이다.
 
+역할별 확장 상태는 `ux-taxonomy.md → 25. 상태 유형`(경로 · 읽는 법은 `dictionary-recipes.md` §0)에서 그 화면의 계약에
+있는 것만 고른다: offline · stale data · partial load · conflict · rate limited · permission denied · expired. 계약에 없는
+상태를 화면에 발명하지 않는다. AI 기능이 있으면 `27. AI UX 패턴`의 streaming response · AI loading/thinking ·
+regenerate/retry · source citation · human-in-the-loop · AI guardrail을 해당 컴포넌트의 필수 상태 행에 넣는다.
+
 ## 6. 색 · 폰트 수 — 개수가 아니라 가족과 역할
 
 - 색: **중립 계열 1개 + 액션 accent 1개 + 상태색(성공 · 경고 · 위험)**이 기본이다. 중립 계열이

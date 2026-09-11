@@ -83,7 +83,7 @@
     {
       "name": "frontend-interface-design",
       "description": "Reference-driven UI/UX and motion: align journeys, funnel goals and brand experience, compose sections, and review static, interactive and reduced-motion outcomes.",
-      "version": "0.7.0",
+      "version": "0.8.0",
       "author": {
         "name": "lodado"
       },

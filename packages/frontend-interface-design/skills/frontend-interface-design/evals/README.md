@@ -92,6 +92,14 @@ Package tests check linked resources and corpus integrity, not that these behavi
 
 `dictionary-source-to-implementation` additionally checks original-source reading versus packaged-summary fallback,
 specific layout/motion decisions, and separation of source recommendations from agent-authored values.
+A local snapshot under `references/dictionary/` (git-ignored, absent from distributed installs) counts as an
+original-source read when the agent records the snapshot date; without it the agent must fall back to user-supplied
+files or the packaged summary and say so.
+
+`slop-named-escape`, `movement-to-lineage` and `ai-ux-states` cover the dictionary vocabulary injected into the Look
+critique, lineage selection and the state table. Run each twice where the setup says so — with the local snapshot and
+without it — and judge whether names came with their source and whether the agent stayed inside the contract, not
+whether it repeated taxonomy labels.
 
 ## Human calibration
 

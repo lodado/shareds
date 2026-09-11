@@ -141,7 +141,7 @@ description: 'Design and apply coherent web UI/UX and motion in the agreed forma
 | 1     | `discovery.md` · `brand-intake.md`; `design-input-template.md`는 선택형 자료 전달                                                                                                |
 | 2     | `art-direction.md` — 새 디자인 방향을 정할 때                                                                                                                                    |
 | 1 · 2 | 브랜드를 지목했으면 `reference-pack.md`; 아니면 `adaptation.md` + `lineages/<id>.md` 또는 `fidelity.md`; 필요 시 `reference-study.md`                                            |
-| 3     | `section-composition.md` · `reference-study.md`(레퍼런스 응용) · `decision-ladder.md`                                                                                            |
+| 3     | `section-composition.md` · `reference-study.md`(레퍼런스 응용) · `decision-ladder.md` · `dictionary-recipes.md`                                                                  |
 | 4     | `exemplars/README.md` · `form-quality.md`(새 UI·시각 반려) · `craft.md` · `typography-ko.md`(ko) · [visual-system.md](references/visual-system.md)(토큰 파생 공식이 필요할 때만) |
 | 5     | `look.md` · `evals/gates.json`                                                                                                                                                   |
 | 6     | `ui-checklist.md` · `interface-rules.md` · `ux-checklist.md` · `review.md`                                                                                                       |

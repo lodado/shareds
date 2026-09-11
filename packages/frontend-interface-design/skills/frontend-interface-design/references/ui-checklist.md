@@ -74,5 +74,6 @@ vendoring한 Vercel 규칙을 따른다. MUST 위반은 `fail`, SHOULD 위반은
 마감 결함(틴트 없는 회색 · 같은 gap 반복 · 브라우저 기본 표면 · 400×600 타이포)과 클리셰
 (gradient text · glass · eyebrow · 지어낸 stat row · 이모지 아이콘 · 동일 카드 3열)는
 [`look.md`](look.md)의 게이트(`evals/gates.json`, 선택적으로 `impeccable detect` browser 엔진)와
-craft 체크 10문항이 잡는다. 여기서 다시 세지 않는다. 클리셰가 브리프의 요구로 정당화되면
+craft 체크 10문항이 잡는다. 클리셰의 이름과 대체 패턴은 `ai-slop-taxonomy.md`(Pattern · Escape)에서 가져와
+critique의 `slop:` 줄에 적는다. 여기서 다시 세지 않는다. 클리셰가 브리프의 요구로 정당화되면
 decision record 5단에 "돕는 단"을 적는다 — 적지 못하면 지운다.

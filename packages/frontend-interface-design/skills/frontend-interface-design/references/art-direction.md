@@ -29,6 +29,8 @@ Discovery가 `BRIEF_READY`이면 [brand-intake.md](brand-intake.md)의 원본·�
 운영 휴리스틱이지 최적값이 아니다. 색만 바꾼 변형은 후보가 아니다. 각 후보는 다음 차이 중
 적어도 하나를 가져야 한다: 주인공과 시선 흐름, 텍스트/이미지 비중, 정보 밀도, 대칭/비대칭,
 섹션 연결 방식, 주요 인터랙션의 노출 위치. 하나를 추천하되 사용자가 방향을 고를 수 있게 한다.
+후보가 사조에 기대면 `design-movement-converted.md`(경로는 `dictionary-recipes.md` §0)의 해당 사조에서 Visual Cues 중
+채택 · 기각을 이름으로 적고, 반동 대상과 Lenses의 Cost를 후보 비용으로 옮긴다. 사조 이름만으로 방향을 설명하지 않는다.
 
 각 후보에 반드시 포함한다. 보드는 실제로 materialize한 HTML/design frame/image 또는 동등한
 artifact여야 하며, 생성 후 직접 열어 확인한다.
@@ -87,6 +89,16 @@ moodboard는 다음을 결정하지만 모든 섹션을 같은 레이아웃으�
 - board: <artifact path> · board-viewed: yes | no · responsive evidence: <path/범위>
 - asset gaps: <none 또는 구체적 항목>
 ```
+
+## 4. 이미지 제작 브리프 — 자산이 없고 제작이 승인된 경우에만
+
+제공된 자산으로 성립하는 화면에는 쓰지 않는다. 필수 이미지가 없고 사용자가 제작(생성 · 촬영 · 일러스트)을 승인했을 때만
+`visual-asset-taxonomy.md` → 기법(Part 1) · 구조(Part 2) · 표면(Part 3) 이름으로 브리프를 쓰고, `Build` 열(SVG / Image(gen) /
+Hybrid)로 제작 수단을 정한다. 사진풍이면 `generative-image-taxonomy.md`의 Spec · Prompt Fragment, 상업 사진 수준이면
+`commercial-photographic-taxonomy.md`의 장르 → 스펙 순서와 Part 10 물리 정합성(피부 · 그림자 · 반사 · 원근)을 검수 항목으로
+옮긴다(경로 · 읽는 법은 `dictionary-recipes.md` §0. 로컬 스냅샷이 없으면 3축 이름만으로 쓰고 그 사실을 적는다).
+설치된 이미지 생성 스킬이 있으면 브리프를 넘기고, 결과 이미지는 직접 열어 물리 정합성을 확인한 뒤에도 사용자 승인 전까지
+"확인 필요"다. 브랜드 로고 · 실제 인물 · 제3자 제품을 생성해 채우지 않는다.
 
 ## 근거
 

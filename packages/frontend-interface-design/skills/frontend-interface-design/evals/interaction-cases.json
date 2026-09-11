@@ -13,6 +13,7 @@
         "workspace": "isolated document-only evaluation",
         "facts": [
           "Evaluator supplies the actual Vibe Dictionary layout-taxonomy.md entries sticky-scroll-reveal and sticky-stacking-cards, three ordered step descriptions and three permitted product images.",
+          "If the git-ignored local snapshot references/dictionary/ exists, reading it counts as an original-source read: the agent records snapshot: 2026-09-11 and does not call it a live-site observation.",
           "Repeat without source files: the agent may use packaged dictionary-recipes.md but must identify it as a packaged summary, not a fresh original-source read."
         ],
         "artifacts": [
@@ -829,6 +830,52 @@
           "Evaluator supplies installed clone-website contract, accessible URL and prepared isolated root; hallmark is absent. Repeat with browser unavailable; retain no-install boundary."
         ],
         "artifacts": []
+      }
+    },
+    {
+      "id": "slop-named-escape",
+      "prompt": "이 랜딩 hero가 AI 티가 난다는 피드백을 받았어. Look 루프로 비평하고 고쳐줘.",
+      "reply": "브랜드 색은 기존 토큰 그대로, 문구는 못 바꿔. 그라디언트는 꼭 필요한 게 아니면 빼도 돼.",
+      "expected": "The critique names each cliché with its ai-slop-taxonomy pattern name and that row's Escape pattern on a slop: line (for example Purple-Blue Gradient → Monochromatic · 60% Dominant), each fix replaces the cliché with the named positive pattern using existing tokens, and severities are never summed into a score. Without the local snapshot the agent names the pattern from memory and states that the Escape column was not read.",
+      "failure": "Deletes decoration without naming what replaces it, invents a slop score, changes copy, adds a new accent colour, or claims to have read the taxonomy row without the snapshot or a user-supplied file.",
+      "evidence": "design-loop/r1/critique.md with slop: lines, the source used (snapshot date, user file or packaged summary), before/after renders and gate results.",
+      "setup": {
+        "workspace": "isolated copy of a marketing hero built from exemplars with a violet-to-blue hero gradient and a blurred orb behind the headline",
+        "facts": [
+          "Existing tokens.css with an approved single accent hue",
+          "Copy is final and may not change",
+          "Run twice: local snapshot present, then absent; both runs are recorded"
+        ],
+        "artifacts": ["hero.html and tokens.css", "screenshots at 375 and 1280 before the loop"]
+      }
+    },
+    {
+      "id": "movement-to-lineage",
+      "prompt": "우리 핀테크 앱 첫 화면을 네오브루탈리즘 느낌으로 다시 잡아줘.",
+      "reply": "금융이라 신뢰가 먼저야. 느낌만 살리고 방향은 네가 골라도 돼.",
+      "expected": "Keeps consumer-fintech-ko as the lineage, reads the Neobrutalism entry from the local snapshot when present, lists by name which Visual Cues are adopted or rejected, records the movement's unsuitability for finance as a risk, translates the surviving cues into the three adaptation knobs and one signature candidate, and offers 2–3 materialised directions instead of renaming the whole system.",
+      "failure": "Switches to a raw Neobrutalism treatment, copies exemplar imagery or brand assets from the movement entry, describes the direction only by the movement name, or ignores the finance unsuitability without recording it.",
+      "evidence": "Decision record with lineage, movement source (snapshot date or absence), adopted and rejected cues, knob values, moodboard artifacts and board-viewed status.",
+      "setup": {
+        "workspace": "isolated workspace with an approved brief for a Korean consumer finance home screen and an existing DESIGN.md that is not locked",
+        "facts": ["Brand hue is fixed", "Run twice: local snapshot present, then absent"],
+        "artifacts": ["brief.md and DESIGN.md", "moodboard directories per candidate"]
+      }
+    },
+    {
+      "id": "ai-ux-states",
+      "prompt": "AI 답변 화면을 설계해줘. 질문 입력하고 답이 스트리밍으로 와.",
+      "reply": "재생성이랑 출처 표시는 API에 있어. 신뢰도 점수는 없어.",
+      "expected": "The state table for the answer component includes streaming response, AI loading/thinking, regenerate/retry and source citation because the contract has them, marks confidence indicator as not in the contract and leaves it out, and keeps the ordinary role-based states for the input and buttons. Each added state carries a trigger, presentation and recovery decision.",
+      "failure": "Adds confidence indicators or human-in-the-loop approval that the contract does not have, lists every AI UX pattern as required, or ships the answer component without streaming and retry states.",
+      "evidence": "One-shot state table per component with the contract fact behind each AI state, plus rendered loading, streaming, complete and error screens.",
+      "setup": {
+        "workspace": "isolated document-and-prototype workspace",
+        "facts": [
+          "API contract: streaming tokens, regenerate endpoint, citations array; no confidence score",
+          "Local snapshot present"
+        ],
+        "artifacts": ["api-contract.md", "state table and rendered screens"]
       }
     }
   ]
