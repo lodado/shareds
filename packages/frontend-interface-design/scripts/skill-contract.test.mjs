@@ -1,742 +1,157 @@
 import assert from 'node:assert/strict'
-import { Buffer } from 'node:buffer'
-import { readdir, readFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
-// eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
+import { access, readdir, readFile } from 'node:fs/promises'
+import { dirname, extname, join, resolve } from 'node:path'
+// eslint-disable-next-line test/no-import-node-test -- package contract tests run with node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { scanSourceText } from '../skills/frontend-interface-design/scripts/render.mjs'
-
 const packageDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
-const skillDirectory = join(packageDirectory, 'skills/frontend-interface-design')
+const skillDirectory = join(packageDirectory, 'skills/reference-driven-figma-design')
+const readSkillFile = (path) => readFile(join(skillDirectory, path), 'utf8')
 
-const read = (relativePath) => readFile(join(skillDirectory, relativePath), 'utf8')
-
-// These are document-contract checks, not evidence of visual quality or actual image viewing.
-test('visual-adoption cases carry observable success, counterexamples and bounded evidence requirements', async () => {
-  const { cases } = JSON.parse(await read('evals/interaction-cases.json'))
-  const selected = cases.filter(({ id }) => id.startsWith('visual-adoption-'))
-  assert.equal(selected.length, 6)
-  assert.equal(new Set(cases.map(({ id }) => id)).size, cases.length)
-  for (const entry of selected) {
-    for (const field of ['prompt', 'reply', 'expected', 'failure', 'evidence']) {
-      assert.ok(entry[field]?.trim(), `${entry.id}: missing ${field}`)
-    }
-    assert.ok(entry.setup.workspace && entry.setup.facts.length, `${entry.id}: missing bounded setup`)
-  }
-})
-
-test('visual adoption reuses comparison evidence without promoting tools or counts to approval', async () => {
-  const [skill, look, review, study, form] = await Promise.all([
-    read('SKILL.md'),
-    read('references/look.md'),
-    read('references/review.md'),
-    read('references/reference-study.md'),
-    read('references/form-quality.md'),
-  ])
-  assert.doesNotMatch(skill, /통과 수가 늘 때만/)
-  assert.doesNotMatch(look, /고쳐졌거나[\s\S]{0,60}통과 수가 늘었다/)
-  assert.doesNotMatch(look, /Rationale[^\n]*critical \d+\/\d+/)
-  assert.doesNotMatch(skill, /Rationale[^\n]*checks/)
-  assert.doesNotMatch(review, /craft.md 12개 기본값이 적용됐다|지워도 task에 영향 없는 장식이 없다/)
-  for (const doc of [look, review, study, form]) assert.ok(doc.includes('unreviewed'))
-  assert.match(study, /comparison[\s\S]*남은 차이/)
-  assert.match(form, /시그니처 미달/)
-  assert.match(review, /브랜드 표현/)
-})
-
-test('reference reconstruction has a conditional entry and a traceable handoff', async () => {
-  const [skill, fidelity, rebuild] = await Promise.all([
-    read('SKILL.md'),
-    read('references/fidelity.md'),
-    read('references/reference-rebuild.md'),
-  ])
-  assert.match(skill, /references\/reference-rebuild\.md/)
-  assert.match(fidelity, /reference-rebuild\.md/)
-  for (const field of [
-    'surface/state',
-    'trigger',
-    'observation',
-    'confidence',
-    'provenance',
-    'classification',
-    'open question',
-  ]) {
-    assert.ok(rebuild.includes(field), `missing evidence field: ${field}`)
-  }
-  for (const boundary of [
-    'observed',
-    'adapted',
-    'unsupported',
-    'evidence-only',
-    'pending',
-    'frontend-visual-qa',
-    'frontend-oracle-design',
-  ]) {
-    assert.ok(rebuild.includes(boundary), `missing boundary: ${boundary}`)
-  }
-  assert.match(rebuild, /브랜드 이름만/)
-  assert.match(rebuild, /스크린샷만/)
-  assert.match(rebuild, /역방향/)
-  assert.match(rebuild, /중간/)
-  assert.match(fidelity, /관측한 state를 옮긴다/)
-  assert.doesNotMatch(fidelity, /ui-checklist 기본값으로 채운다/)
-  assert.match(fidelity, /자기 사이트의 `clone-website` 경로를 사용하지 않는다/)
-  assert.match(skill, /motion 기본값/)
-})
-
-const LINEAGES = [
-  'precision-tool',
-  'editorial-marketing',
-  'consumer-fintech-ko',
-  'dense-data-ops',
-  'warm-content',
-  'playful-commerce',
-]
-
-const EXEMPLARS = [
-  'tokens.css',
-  'README.md',
-  'primitives/button.html',
-  'primitives/input.html',
-  'primitives/card.html',
-  'primitives/table-row.html',
-  'primitives/dialog.html',
-  'compositions/app-shell.html',
-  'compositions/marketing-hero.html',
-  'compositions/fintech-home.html',
-  'compositions/pack-developer-platform.html',
-]
-
-function sectionOf(markdown, heading) {
-  const start = markdown.indexOf(heading)
-  assert.notEqual(start, -1, `missing section ${heading}`)
-  const rest = markdown.slice(start + heading.length)
-  const next = rest.search(/\n## /)
-  return next === -1 ? rest : rest.slice(0, next)
+async function walk(directory) {
+  const entries = await readdir(directory, { withFileTypes: true })
+  const nested = await Promise.all(
+    entries.map(async (entry) => {
+      const path = join(directory, entry.name)
+      return entry.isDirectory() ? walk(path) : [path]
+    }),
+  )
+  return nested.flat()
 }
 
-test('decides top-down: primary task before visual treatment, and exempts craft defaults from the gate', async () => {
-  const skill = await read('SKILL.md')
+test('routes only Figma-first design requests and forbids silent code or image substitution', async () => {
+  const skill = await readSkillFile('SKILL.md')
 
-  assert.match(skill, /name: frontend-interface-design/)
-  assert.match(
-    skill,
-    /primary task\s+→\s+information hierarchy\s+→\s+interaction\s+→\s+feedback\s+→\s+visual treatment/,
-  )
-  assert.match(skill, /정보 이해·조작·합의된 브랜드 표현/)
-  assert.match(skill, /craft\.md[\s\S]*기본값/)
-  assert.match(skill, /핵심 작업·접근성·읽기를 해치지/)
+  assert.match(skill, /name: reference-driven-figma-design/)
+  assert.match(skill, /editable Figma product or landing designs/)
+  assert.match(skill, /React, HTML\/CSS, Tailwind, Next\.js/)
+  assert.match(skill, /PNG, 설명 문서, 코드, 이미지 생성물은 편집 가능한 Figma를 대신하지 못한다/)
+  assert.match(skill, /Figma read\/write가 필수/)
+  assert.match(skill, /Figma write가 없으면 상태를 BLOCKED/)
+  assert.doesNotMatch(skill, /\[TODO:/)
 })
 
-test('keeps at most six always-on core contracts and stays inside the generation-first budget', async () => {
-  const skill = await read('SKILL.md')
-  const rules = sectionOf(skill, '## 핵심')
-  // A rule may wrap onto indented continuation lines; join them so pins can see the whole rule.
-  const numbered = rules
-    .split(/\n(?=\d{1,2}\. )/)
-    .map((chunk) => chunk.trim().replace(/\n\s+/g, ' '))
-    .filter((chunk) => /^\d{1,2}\. /.test(chunk))
-
-  assert.ok(numbered.length > 0)
-  assert.ok(numbered.length <= 6)
-
-  const lines = skill.split('\n').length
-  assert.ok(lines <= 60, `SKILL.md has ${lines} lines; budget is 60`)
-  assert.ok(Buffer.byteLength(skill, 'utf8') <= 9000, 'SKILL.md exceeds the 9KB UTF-8 budget')
-  // Specialist names may be routed from workflow stages, but do not expand the always-on rules.
-  assert.doesNotMatch(rules, /kill-ai-slop|hallmark|baseline-ui|clone-website|design-motion-principles/)
-})
-
-test('ships core references, lineage and exemplar resources', async () => {
-  const skill = await read('SKILL.md')
-  const references = ['art-direction', 'experience-design', 'fidelity', 'look', 'review']
-
-  for (const name of references) {
-    assert.match(skill, new RegExp(`${name}\\.md`), `SKILL.md does not mention ${name}.md`)
-    await read(`references/${name}.md`)
-  }
-  for (const lineage of LINEAGES) await read(`references/lineages/${lineage}.md`)
-  for (const exemplar of EXEMPLARS) await read(`exemplars/${exemplar}`)
-
-  const lineageFiles = await readdir(join(skillDirectory, 'references/lineages'))
-  assert.equal(lineageFiles.filter((file) => file.endsWith('.md')).length, LINEAGES.length)
-})
-
-test('replaces Creation with lineage-based Adaptation that locks a DESIGN.md', async () => {
-  const [skill, adaptation] = await Promise.all([read('SKILL.md'), read('references/adaptation.md')])
-
-  assert.match(skill, /\*\*Fidelity\*\*[\s\S]*\*\*Adaptation\*\*/)
-  assert.match(skill, /최종 시각 시스템은 하나, 섹션 구성의 출처는 여러 개/)
-  assert.doesNotMatch(skill, /\*\*Creation\*\*/)
-
-  for (const lineage of LINEAGES) assert.match(adaptation, new RegExp(`lineages/${lineage}\\.md`))
-  assert.match(adaptation, /노브 3개/)
-  assert.match(adaptation, /anchor hue|노브 3개|시각 방향/)
-  assert.match(adaptation, /이식 테스트/)
-  assert.match(adaptation, /npx --yes @google\/design\.md lint DESIGN\.md/)
-  assert.match(adaptation, /흔한 답/)
-  assert.match(adaptation, /\.design\/log\.json/)
-  assert.match(adaptation, /체크리스트 10문항/)
-  assert.match(adaptation, /확정된 스타일|섹션 구성|Fidelity|Adaptation/)
-})
-
-test('every lineage follows the DESIGN.md spec order and carries the adaptation knobs', async () => {
-  const order = [
-    '## Overview',
-    '## Colors',
-    '## Typography',
-    '## Layout',
-    '## Elevation & Depth',
-    '## Shapes',
-    '## Components',
-    "## Do's and Don'ts",
-    '## Adaptation',
+test('preserves the source hierarchy and separates visual system from composition', async () => {
+  const skill = await readSkillFile('SKILL.md')
+  const authority = [
+    'PRD / Product Requirements',
+    '승인된 Brand Direction',
+    '기존 내부 Design Assets',
+    '선택된 Figma Base Template',
+    '기존 Figma Variables / Components',
+    '승인된 이전 디자인 패턴',
+    'Refero References',
+    'Aside/Browser로 조사한 외부 References',
+    '새로운 디자인 결정',
   ]
 
-  for (const lineage of LINEAGES) {
-    const file = await read(`references/lineages/${lineage}.md`)
-    assert.match(file, /^---\nversion: alpha\nname: /, `${lineage}: frontmatter`)
-    for (const key of ['colors:', '  primary:', 'typography:', 'rounded:', 'spacing:', 'components:']) {
-      assert.ok(file.includes(key), `${lineage}: missing ${key}`)
-    }
-    assert.match(file, /자리표시자/, `${lineage}: placeholder hue warning`)
-    // The DESIGN.md linter rejects clamp() as a Dimension; fluid sizes live in prose, tokens carry the max.
-    const frontmatter = file.split('\n---\n')[0]
-    assert.doesNotMatch(frontmatter, /clamp\(/, `${lineage}: clamp() in frontmatter tokens`)
-
-    let cursor = -1
-    for (const heading of order) {
-      const index = file.indexOf(heading)
-      assert.ok(index > cursor, `${lineage}: ${heading} missing or out of order`)
-      cursor = index
-    }
-    const adaptation = sectionOf(file, '## Adaptation')
-    assert.match(adaptation, /① hue/)
-    assert.match(adaptation, /② 페어링/)
-    assert.match(adaptation, /③ radius/)
-    assert.match(adaptation, /매크로구조/)
-    assert.match(adaptation, /signature 후보/)
-    assert.match(adaptation, /흔한 답/)
-    assert.match(adaptation, /typography-ko\.md/)
-  }
-})
-
-test('makes the screenshot loop mandatory, scored, accept-only-if-better and bounded', async () => {
-  const [skill, look, review] = await Promise.all([
-    read('SKILL.md'),
-    read('references/look.md'),
-    read('references/review.md'),
-  ])
-
-  assert.match(skill, /Look|렌더|실제 적용 결과/)
-  assert.match(skill, /scripts\/render\.mjs/)
-  // Code output keeps the renderer gate; design/prototype output is reviewed in its agreed
-  // editing environment and must not fabricate code metrics.
-  assert.match(skill, /Look \(필수\)/)
-  assert.match(look, /코드.*정적 하네스|정적 하네스.*코드/)
-  assert.match(look, /디자인\/프로토타입.*편집 환경/)
-  assert.match(review, /없는 metrics를 만들어 채우지 않는다/)
-  assert.match(look, /\*\*반드시\*\* 돈다/)
-  assert.match(look, /scripts\/render\.mjs --in/)
-  assert.match(look, /gates\.json/)
-  assert.match(look, /unreviewed/)
-  // Adoption is a three-condition rule, not a count comparison: a genuine fix that costs one
-  // unrelated check must still be adoptable, and a critical regression hidden inside a higher
-  // total must still be rejected.
-  assert.match(look, /하드 게이트/)
-  assert.match(look, /하드 게이트[^\n]*모든 항목[^\n]*통과/)
-  assert.doesNotMatch(look, /실패 수가 늘지 않는다/)
-  assert.match(look, /치명적 무퇴행/)
-  assert.match(look, /겨눈 결함[\s\S]*비교 근거/)
-  assert.match(look, /총점에 숨은 치명적 회귀는 개선이 아니다/)
-  assert.doesNotMatch(look, /통과 수가 늘었을 때만 r2를 채택/)
-  // The loop finishes inside one user request instead of asking to continue.
-  assert.match(look, /첫 렌더 1회 \+ 보수 최대 2회/)
-  assert.match(look, /2라운드 연속[^\n]*정지/)
-  // A static harness and a running app are not the same evidence.
-  assert.match(look, /validated: actual-app/)
-  assert.match(look, /validated: surrogate/)
-  assert.match(look, /`VERIFIED`를 발급하지 않고/)
-  assert.match(look, /impeccable critique[\s\S]*두 번째 의견/)
-})
-
-test('source ownership and route scope bound reference reuse without banning licensed materials', async () => {
-  const [skill, oneShot, reference] = await Promise.all([
-    read('SKILL.md'),
-    read('references/one-shot.md'),
-    read('references/reference-pack.md'),
-  ])
-  const firstRule = sectionOf(skill, '## 핵심 계약').split(/\n2\. /)[0]
-  assert.match(firstRule, /사용자 소유 소스[\s\S]*Fidelity/)
-  assert.match(oneShot, /scope=full/)
-  assert.match(oneShot, /라이선스가 허용/)
-  assert.match(reference, /라이선스가 허용/)
-})
-
-test('ships craft defaults as code, not adjectives, and Korean typography as a deterministic floor', async () => {
-  const [craft, ko, tokens] = await Promise.all([
-    read('references/craft.md'),
-    read('references/typography-ko.md'),
-    read('exemplars/tokens.css'),
-  ])
-
-  const craftSections = craft.match(/^## \d{1,2}\. /gm) ?? []
-  assert.ok(craftSections.length > 0)
-  assert.ok((craft.match(/```css/g) ?? []).length >= 8, 'craft.md needs CSS snippets')
-  assert.match(craft, /Lucide/)
-  assert.match(craft, /광원은 하나/)
-
-  assert.match(ko, /Pretendard Variable/)
-  assert.match(ko, /word-break: keep-all/)
-  assert.match(ko, /font-synthesis: none/)
-  assert.match(ko, /line-height: 1\.6/)
-  assert.match(ko, /letter-spacing: -0\.02em/)
-  assert.match(ko, /unicode-range/)
-  assert.match(ko, /Toss Product Sans는 배포 불가/)
-  assert.match(ko, /hangulKeepAllCoverage/)
-
-  assert.match(tokens, /--h: /)
-  assert.match(tokens, /\.dark \{/)
-  assert.match(tokens, /--shadow-raised:/)
-  assert.match(tokens, /word-break: keep-all/)
-  assert.match(tokens, /--ease-out: cubic-bezier/)
-  // Values a component would otherwise hardcode (the kbd scrim, the modal backdrop) live here.
-  assert.match(tokens, /--scrim:/)
-  assert.match(tokens, /--backdrop:/)
-})
-
-test('exemplars reference tokens only — no literal colors in component markup', async () => {
-  for (const exemplar of EXEMPLARS.filter((file) => file.endsWith('.html'))) {
-    const html = await read(`exemplars/${exemplar}`)
-    assert.match(html, /tokens\.css/, `${exemplar}: must link tokens.css`)
-    assert.doesNotMatch(html, /#[0-9a-f]{6}\b/i, `${exemplar}: hex color literal`)
-    assert.doesNotMatch(html, /\b(rgb|hsl)a?\(/, `${exemplar}: rgb/hsl literal`)
-    assert.match(html, /var\(--/, `${exemplar}: must use tokens`)
-    assert.match(html, /<html lang="(ko|en)"/, `${exemplar}: must declare its language`)
-    // The contract the render actually enforces: colour and font literals may live in a
-    // :root/.dark token block and nowhere else. `oklch(from var(--token) …)` is derivation, not a
-    // literal, so it does not count.
-    const scan = scanSourceText(html)
-    assert.equal(scan.colors, 0, `${exemplar}: ${scan.colors} colour literal(s) outside the token block`)
-    assert.equal(scan.fontFamilies, 0, `${exemplar}: font-family literal outside the token block`)
-    assert.ok(scan.tokenReferences > 0, `${exemplar}: must reference tokens`)
-  }
-
-  // Literal px radii are a known, measured defect in the older compositions: the render's
-  // literalRatio gate reads 0.107 / 0.055 / 0.087 for them today. The pack-built composition shows
-  // the target state at 0.000. This pin fails if a composition regresses, and fails equally if one
-  // is fixed without updating the number, so the debt cannot drift quietly.
-  const ratios = {}
-  for (const exemplar of EXEMPLARS.filter((file) => file.startsWith('compositions/'))) {
-    const scan = scanSourceText(await read(`exemplars/${exemplar}`))
-    ratios[exemplar] = Number((scan.literalValues / (scan.literalValues + scan.tokenReferences || 1)).toFixed(3))
-  }
-  assert.deepEqual(ratios, {
-    'compositions/app-shell.html': 0.044,
-    'compositions/fintech-home.html': 0.107,
-    'compositions/marketing-hero.html': 0.087,
-    // Built entirely from a Reference Pack: every value is a token, so nothing is left over.
-    'compositions/pack-developer-platform.html': 0,
-  })
-  const readme = await read('exemplars/README.md')
-  for (const exemplar of EXEMPLARS.filter((file) => file !== 'README.md')) {
-    assert.ok(readme.includes(exemplar.split('/').at(-1)), `README does not list ${exemplar}`)
-  }
-})
-
-test('reviews evidence-linked outcomes separately, not aggregate approval scores', async () => {
-  const [review, ux] = await Promise.all([read('references/review.md'), read('references/ux-checklist.md')])
-
-  assert.match(review, /Task fit|핵심 작업|구성|브랜드 표현/)
-  assert.doesNotMatch(review, /axes: [0-7]\/7/)
-  for (const status of ['technical:', 'design-self-review:', 'user-acceptance:']) {
-    assert.ok(review.includes(status), `missing separate review status ${status}`)
-  }
-  // The measurable loop-line requirement is code-only; design/prototype output records observed
-  // frame/preview evidence instead of invented metrics.
-  assert.match(review, /코드 결과는[\s\S]*loop:[\s\S]*디자인 결과는[\s\S]*프레임\/미리보기/)
-  assert.match(review, /검증 필요 가정|remaining uncertainty|미확정/)
-  assert.doesNotMatch(review, /review: T\d H\d/)
-  for (const stage of ['## Funnel', '## Impression', '## Interaction', '## Conversion', '## Retention']) {
-    assert.ok(ux.includes(stage), `missing stage ${stage}`)
-  }
-})
-
-test('starts builds from exemplars and composite blocks instead of a blank div', async () => {
-  const [skill, study] = await Promise.all([read('SKILL.md'), read('references/reference-study.md')])
-
-  assert.match(skill, /실제 콘텐츠|복수 섹션|섹션 구성/)
-  assert.match(skill, /실제 콘텐츠|복수 섹션|섹션 구성/)
-  assert.match(study, /실제 콘텐츠|복수 섹션|섹션 구성/)
-  assert.match(study, /원본|스타일|slop|유지할|조정할/)
-  assert.match(study, /반복|패턴|공통/)
-  assert.match(study, /한 개|브랜드|선택|출처/)
-})
-
-test('repositions Impeccable as a workflow add-on and never as the quality gate', async () => {
-  const skill = await read('SKILL.md')
-
-  assert.doesNotMatch(skill, /npx --yes impeccable detect/)
-})
-
-test('defers risky behavior policy and verification to sibling skills', async () => {
-  const skill = await read('SKILL.md')
-
-  assert.match(skill, /`frontend-oracle-design`이\s+소유한다/)
-  assert.match(skill, /`frontend-visual-qa`/)
-  assert.match(skill, /`test`가 맡는다/)
-  assert.match(skill, /`VERIFIED`를 발급하지 않는다/)
-})
-
-test('keeps the vendored Vercel rules pinned and moves slop gates into the loop', async () => {
-  const [rules, ui, ladder, visual, fidelity] = await Promise.all([
-    read('references/interface-rules.md'),
-    read('references/ui-checklist.md'),
-    read('references/decision-ladder.md'),
-    read('references/visual-system.md'),
-    read('references/fidelity.md'),
-  ])
-
-  assert.match(rules, /Upstream commit: [0-9a-f]{40}/)
-  assert.match(rules, /NEVER: `outline: none` without visible focus replacement/)
-  assert.match(ui, /## Craft · Slop — 이 절은 Look 루프가 맡는다/)
-  assert.doesNotMatch(ui, /kill-ai-slop/)
-  assert.match(ladder, /계보\(Adaptation\)/)
-  assert.match(ladder, /면제/)
-  assert.match(ladder, /## Decision rules/)
-  assert.match(visual, /계보가 이긴다/)
-  assert.match(fidelity, /Adaptation 모드가 방출/)
-})
-
-test('routes a named brand through an evidence-graded pack and never through the name alone', async () => {
-  const [skill, pack] = await Promise.all([read('SKILL.md'), read('references/reference-pack.md')])
-
-  assert.match(skill, /\*\*Reference-informed\*\*/)
-  assert.match(skill, /pack\.mjs --route/)
-  assert.match(skill, /\*\*브랜드 이름은 증거가 아니다\*\*/)
-  for (const grade of ['`observed`', '`estimated`', '`unverified`']) assert.ok(pack.includes(grade), grade)
-  assert.match(pack, /이름은 증거가 아니다/)
-  assert.match(pack, /브랜드 충실도를 주장하지 않는다/)
-  assert.match(pack, /우회하지 않는다/)
-  assert.match(pack, /scripts\/observe\.mjs/)
-  assert.match(pack, /하나의 시각 시스템|섹션 출처는 여러 개|여러 팩/)
-  assert.match(pack, /라이선스\(SPDX\) · 버전/)
-})
-
-test('diversity applies only to unlocked screens, so a locked system may repeat its macro structure', async () => {
-  const [adaptation, oneShot] = await Promise.all([read('references/adaptation.md'), read('references/one-shot.md')])
-
-  // The old text forbade repeating a macro structure while also locking the system that produces
-  // it. The rule now keys on `locked`, and the knob list no longer claims to own macro structure.
-  assert.match(adaptation, /`locked: true`면 \*\*매크로구조를 반복해도 된다/)
-  assert.match(adaptation, /`locked: false`[\s\S]{0,300}매크로구조가 같은 이유를 확인/)
-  assert.match(adaptation, /노브 밖|상태색|시각 방향/)
-  assert.doesNotMatch(adaptation, /모든 섹션에 부적합한 구도를 강제/)
-  assert.match(adaptation, /"locked"/)
-  assert.match(oneShot, /잠금과 다양성|하나의 스타일|여러 출처/)
-})
-
-test('one-shot fixes a precedence order, answers without asking, and scopes states per component', async () => {
-  const [skill, oneShot] = await Promise.all([read('SKILL.md'), read('references/one-shot.md')])
-
-  assert.match(skill, /one-shot\.md/)
-  // Safety and accessibility outrank the reference; the reference outranks the lineage; craft
-  // defaults are last, so an observed value is not overruled by a taste rule.
-  const order = [
-    '안전 · 권한 · 법',
-    '접근성 하한',
-    '사용자 소유 소스',
-    'Reference Pack의 observed',
-    '계보(lineage)의 기본값',
-    'craft 기본값',
-  ]
-  let cursor = oneShot.indexOf('## 1.')
-  for (const step of order) {
-    const index = oneShot.indexOf(step, cursor)
-    assert.ok(index > cursor, `precedence out of order at ${step}`)
-    cursor = index
-  }
-  assert.match(oneShot, /5–7단은 법이 아니라 기본값이다/)
-  assert.match(oneShot, /필수 정보와 시각 방향을 확정|중요한 미확정 정보는 질문/)
-  assert.match(oneShot, /NEEDS_DECISION/)
-  // States belong to component roles, not to every element.
-  assert.match(oneShot, /## 5\. 상태\(state\)는 컴포넌트마다 다르다/)
-  assert.match(oneShot, /정적 텍스트 · 이미지 · 배지 \| 없음/)
-  assert.doesNotMatch(skill, /상태 8종/)
-  // Palette and font limits count families and roles, not raw token counts.
-  assert.match(oneShot, /## 6\. 색 · 폰트 수 — 개수가 아니라 가족과 역할/)
-})
-
-test('composition workflow exposes adaptive discovery and an autonomous handoff', async () => {
-  const [skill, discovery, artDirection, composition, cases] = await Promise.all([
-    read('SKILL.md'),
-    read('references/discovery.md'),
-    read('references/art-direction.md'),
-    read('references/section-composition.md'),
-    readFile(join(skillDirectory, 'evals/interaction-cases.json'), 'utf8'),
-  ])
-  for (const reference of ['discovery.md', 'art-direction.md', 'section-composition.md']) {
-    assert.match(skill, new RegExp(reference.replace('.', '\\.')))
-  }
-  assert.match(discovery, /grill|adaptive|적응형/i)
-  assert.match(discovery, /질문|question/i)
-  assert.match(discovery, /미확정|unknown|unresolved/i)
-  assert.match(artDirection, /무드보드|moodboard/i)
-  assert.match(artDirection, /실제 콘텐츠|대표 구간|후보|방향/)
-  assert.match(composition, /섹션|section/i)
-  assert.match(composition, /MCP|컴포넌트|component/i)
-  assert.match(composition, /공통|shared|token/i)
-
-  const scenarios = JSON.parse(cases)
-  assert.equal(scenarios.version, 1)
-  assert.ok(scenarios.cases.length >= 6)
-  for (const scenario of scenarios.cases) {
-    assert.match(scenario.id, /^[a-z0-9-]+$/)
-    assert.ok(scenario.reply, `${scenario.id}: user reply is required`)
-    assert.ok(scenario.expected, `${scenario.id}: observable outcome is required`)
-    assert.ok(scenario.setup?.workspace, `${scenario.id}: isolated setup is required`)
-    assert.ok(Array.isArray(scenario.setup?.facts), `${scenario.id}: setup facts are required`)
-    assert.ok(Array.isArray(scenario.setup?.artifacts), `${scenario.id}: setup artifacts are required`)
-  }
-  const ids = new Set(scenarios.cases.map(({ id }) => id))
-  for (const id of [
-    'reply-changes-direction',
-    'delegated-direction',
-    'unresolved-fact',
-    'exact-fidelity',
-    'mixed-sections',
-    'mcp-code-only',
-    'korean-mobile',
-  ]) {
-    assert.ok(ids.has(id), `missing behavioral case ${id}`)
-  }
-})
-
-test('composition workflow treats brand, output permissions, and feedback as explicit contracts', async () => {
-  const [skill, discovery, brand, inputTemplate, oneShot, cases] = await Promise.all([
-    read('SKILL.md'),
-    read('references/discovery.md'),
-    read('references/brand-intake.md'),
-    read('references/design-input-template.md'),
-    read('references/one-shot.md'),
-    readFile(join(skillDirectory, 'evals/interaction-cases.json'), 'utf8'),
-  ])
-
-  for (const reference of ['brand-intake.md', 'design-input-template.md']) {
-    assert.match(skill, new RegExp(reference.replace('.', '\\.')), `${reference} is not wired into SKILL.md`)
-  }
-  assert.match(brand, /원본.*버전|버전.*원본/)
-  assert.match(brand, /provided|extracted|none|proposal-needs-approval|N\/A/)
-  assert.match(brand, /관찰된 사실|승인된 정책|approved|authoritative/i)
-  assert.match(brand, /충돌.*사용자|사용자.*충돌/)
-  assert.match(discovery, /읽기|쓰기|read|write/i)
-  assert.match(discovery, /편집 가능|editable|결과물.*위치|location/i)
-  assert.match(discovery, /대체하지|몰래.*대체|silently substitute/i)
-  assert.match(oneShot, /이미.*승인|승인.*실행|반복.*묻지|permission loop/i)
-  assert.match(inputTemplate, /토큰|자산|결과물|편집/)
-
-  const scenarios = JSON.parse(cases)
-  const ids = new Set(scenarios.cases.map(({ id }) => id))
-  for (const id of [
-    'brand-conflict',
-    'no-token-system',
-    'editable-target-unavailable',
-    'prior-approval-execution',
-    'scoped-feedback',
-  ]) {
-    assert.ok(ids.has(id), `missing behavioral case ${id}`)
-  }
-})
-
-// These checks cover the published contract and fixture coverage, not live visual quality.
-test('content-fit review separates delivery readiness from revision improvement', async () => {
-  const [look, composition, sources, rawCases] = await Promise.all([
-    read('references/look.md'),
-    read('references/section-composition.md'),
-    read('references/reference-sources.md'),
-    readFile(join(skillDirectory, 'evals/interaction-cases.json'), 'utf8'),
-  ])
-  for (const status of ['technical:', 'design-self-review:', 'user-acceptance:']) {
-    assert.ok(look.includes(status), `missing independent result field ${status}`)
-  }
-  assert.ok(composition.includes('reference-sources.md'))
-  assert.ok(sources.includes('document-only'))
-  const cases = JSON.parse(rawCases).cases
-  assert.equal(new Set(cases.map(({ id }) => id)).size, cases.length)
-  for (const id of [
-    'content-without-images',
-    'essential-image-unavailable',
-    'approved-whitespace',
-    'demo-consent-only',
-    'structure-rejected',
-    'budget-exhausted-structure',
-  ]) {
-    assert.ok(
-      cases.some((entry) => entry.id === id),
-      `missing regression scenario ${id}`,
-    )
-  }
-})
-
-// Document/fixture coverage only; live clone execution is evaluated separately.
-test('multi-site clone study has a routed, bounded proposal and distinct evidence outputs', async () => {
-  const [sources, study, rawCases] = await Promise.all([
-    read('references/reference-sources.md'),
-    read('references/clone-study.md'),
-    readFile(join(skillDirectory, 'evals/interaction-cases.json'), 'utf8'),
-  ])
-  assert.ok(sources.includes('clone-study.md'))
-  for (const field of ['source-observation', 'reference-clone', 'content-variant', 'final-composition']) {
-    assert.ok(study.includes(field), `missing distinct artifact role ${field}`)
-  }
-  const cases = JSON.parse(rawCases).cases
-  for (const id of [
-    'multi-site-study-proposal',
-    'approved-clone-study',
-    'clone-tool-unavailable',
-    'clone-fit-mismatch',
-  ]) {
-    assert.ok(
-      cases.some((entry) => entry.id === id),
-      `missing behavioral case ${id}`,
-    )
-  }
-})
-
-const DICTIONARY_FILES = [
-  'layout-taxonomy.md',
-  'ux-taxonomy.md',
-  'typography-taxonomy.md',
-  'ai-slop-taxonomy.md',
-  'design-taxonomy.md',
-  'visual-asset-taxonomy.md',
-  'generative-image-taxonomy.md',
-  'commercial-photographic-taxonomy.md',
-  'design-movement-converted.md',
-  'design-references-converted.md',
-  'dev-wiki-converted.md',
-]
-
-// The snapshot itself is git-ignored (no redistribution license) and absent on CI, so this pins the
-// routing prose and the ignore rules — never the dictionary files.
-test('routes dictionary reads through the local snapshot, a user copy, then the packaged summary', async () => {
-  const [recipes, implementation, composition, sources, skill, readme, gitignore, prettierignore] = await Promise.all([
-    read('references/dictionary-recipes.md'),
-    read('references/section-implementation.md'),
-    read('references/section-composition.md'),
-    read('references/reference-sources.md'),
-    read('SKILL.md'),
-    read('evals/README.md'),
-    readFile(join(packageDirectory, '../../.gitignore'), 'utf8'),
-    readFile(join(packageDirectory, '../../.prettierignore'), 'utf8'),
-  ])
-  const snapshotPath = 'skills/frontend-interface-design/references/dictionary/'
-  assert.ok(gitignore.includes(snapshotPath), 'snapshot must stay out of git')
-  assert.ok(prettierignore.includes(snapshotPath), 'pnpm format would pad the tables and break SHA256SUMS')
-
-  const routing = sectionOf(recipes, '## 0.')
-  for (const file of DICTIONARY_FILES) assert.ok(routing.includes(file), `§0 does not route ${file}`)
-  assert.match(routing, /shasum -a 256 -c SHA256SUMS\.txt/)
-  assert.match(routing, /통째로 읽지 않는다/)
   let cursor = -1
-  for (const step of [
-    '로컬 스냅샷이 있으면',
-    'snapshot: 2026-09-11',
-    '사용자가 파일/경로를 주면',
-    '패키지 내 요약 참조',
-  ]) {
-    const index = routing.indexOf(step, cursor)
-    assert.ok(index > cursor, `source order broken at ${step}`)
+  for (const item of authority) {
+    const index = skill.indexOf(item)
+    assert.ok(index > cursor, `missing or out-of-order authority: ${item}`)
     cursor = index
   }
 
-  assert.match(implementation, /references\/dictionary\//)
-  assert.match(implementation, /패키지 내 요약 참조/)
-  assert.doesNotMatch(implementation, /사용자가 사전 파일\/경로를 제공하면 선택한/)
-  for (const file of DICTIONARY_FILES) assert.ok(implementation.includes(file), `참고 자료 omits ${file}`)
-  assert.match(composition, /dictionary-recipes\.md[\s\S]*Avoid For/)
-  assert.match(sources, /## Vibe Dictionary[\s\S]*SHA256SUMS[\s\S]*document-only/)
-  assert.match(sources, /라이선스[\s\S]*git에 올리지 않고/)
-  assert.match(skill, /dictionary-recipes\.md/)
-  assert.match(readme, /references\/dictionary\//)
-
-  const { cases } = JSON.parse(await read('evals/interaction-cases.json'))
-  const dictionaryCase = cases.find(({ id }) => id === 'dictionary-source-to-implementation')
-  assert.ok(dictionaryCase.setup.facts.some((fact) => fact.includes('snapshot: 2026-09-11')))
+  assert.match(skill, /Visual System.*내부 시스템.*Figma Base Template/s)
+  assert.match(skill, /Composition.*Refero.*외부 사례/s)
+  assert.match(skill, /외부의 색·폰트·radius·shadow를 함께 복사하지 않는다/)
 })
 
-// Names, one-line cues and source pointers only — the taxonomy tables stay in the git-ignored snapshot.
-const MOVEMENTS = [
-  'Command Palette(2011)',
-  'Minimalism (Digital/UI)(1995)',
-  'K-Fintech Friendly Minimal(2018)',
-  'Swiss Revival 2.0(2018)',
-  'Editorial Utilitarian(2020)',
-  'Bento Grid(2023',
-  'Swiss Style(1950)',
-  'Flat Design(2013)',
-  'Serif / Heritage Revival(2023)',
-  'Anti-AI Crafting(2025)',
-  'Material You(2021)',
-  'Claymorphism(2021)',
-]
-
-test('injects dictionary vocabulary by name: slop escapes, movements, Korean pairing, states and motion patterns', async () => {
-  const [look, ui, adaptation, artDirection, ko, oneShot, experience] = await Promise.all([
-    read('references/look.md'),
-    read('references/ui-checklist.md'),
-    read('references/adaptation.md'),
-    read('references/art-direction.md'),
-    read('references/typography-ko.md'),
-    read('references/one-shot.md'),
-    read('references/experience-design.md'),
+test('runs internal-first research, a three-section pilot, bounded critique, and asset promotion', async () => {
+  const [skill, research, composition, critique, learning] = await Promise.all([
+    readSkillFile('SKILL.md'),
+    readSkillFile('references/research-selection.md'),
+    readSkillFile('references/figma-composition.md'),
+    readSkillFile('references/critique-refinement.md'),
+    readSkillFile('references/asset-learning.md'),
   ])
-  // a. A slop finding names the pattern and its escape; severities are never summed into a score.
-  assert.match(look, /ai-slop-taxonomy\.md/)
-  assert.match(look, /slop:[^\n]*Escape/)
-  assert.match(look, /Severity를 합산하지 않는다/)
-  assert.match(ui, /ai-slop-taxonomy\.md/)
-  // b. Every lineage says which movement it descends from and what that movement reacted against.
-  assert.match(sectionOf(adaptation, '## 2.'), /\| 사조\(/)
-  for (const lineage of LINEAGES) {
-    const overview = sectionOf(await read(`references/lineages/${lineage}.md`), '## Overview')
-    assert.ok(
-      MOVEMENTS.some((name) => overview.includes(name)),
-      `${lineage}: Overview names no movement`,
-    )
-    assert.match(overview, /반동 대상/, `${lineage}: Overview lacks the movement's counter-target`)
+
+  assert.match(research, /Existing Component Catalog[\s\S]*Existing Figma Library[\s\S]*Refero/)
+  assert.match(research, /preview-only[\s\S]*structure-inspected[\s\S]*editable-verified/)
+  assert.match(composition, /합의 범위의 1–3개 section/)
+  assert.match(skill, /가장 영향이 큰 문제 3개/)
+  assert.match(critique, /2–4회의 의미 있는 반복/)
+  assert.match(critique, /전체 page를 다시 생성하지 않는다/)
+  assert.match(learning, /Experiment → Real Page Usage → Visual Critique → Reuse Evaluation → Approved Pattern/)
+  assert.match(learning, /Component Name/)
+  assert.match(learning, /Avoid When/)
+})
+
+test('ships valid input and output JSON schemas with an editable-Figma completion gate', async () => {
+  const request = JSON.parse(await readSkillFile('references/schemas/design-request.schema.json'))
+  const delivery = JSON.parse(await readSkillFile('references/schemas/design-delivery.schema.json'))
+
+  assert.equal(request.$schema, 'https://json-schema.org/draft/2020-12/schema')
+  assert.equal(request.properties.deliverable.properties.format.const, 'editable-figma')
+  assert.equal(request.properties.deliverable.properties.code_generation_allowed.const, false)
+  assert.deepEqual(request.properties.scope.properties.pilot_sections, {
+    type: 'array',
+    items: { type: 'string', minLength: 1 },
+    minItems: 1,
+    maxItems: 3,
+    uniqueItems: true,
+  })
+
+  assert.ok(delivery.properties.status.enum.includes('FIGMA_READY'))
+  assert.equal(delivery.properties.figma.properties.code_generated.const, false)
+  const readyGate = delivery.allOf[0].then.properties
+  assert.equal(readyGate.figma.properties.editable.const, true)
+  assert.equal(readyGate.critique.properties.iteration_count.minimum, 1)
+  assert.equal(readyGate.critique.properties.iteration_count.maximum, undefined)
+  assert.equal(readyGate.verification.properties.preview_inspected.const, true)
+})
+
+test('all local references resolve and code-oriented exemplar assets are gone', async () => {
+  const skill = await readSkillFile('SKILL.md')
+  const links = [...skill.matchAll(/\]\(([^)]+)\)/g)].map((match) => match[1])
+
+  for (const link of links) {
+    if (/^[a-z]+:/i.test(link)) continue
+    await access(resolve(skillDirectory, link))
   }
-  assert.match(artDirection, /design-movement-converted\.md[\s\S]*Visual Cues/)
-  // c. Mixed-script corrections apply only when a second Latin family is in play.
-  assert.match(ko, /hangul-latin-pairing/)
-  assert.match(ko, /KLREQ §7\.3\.1/)
-  assert.match(ko, /Pretendard 단일 가족 본문은 보정 없음/)
-  // d. Extended states come from the contract, not from the taxonomy's full list.
-  const states = sectionOf(oneShot, '## 5.')
-  assert.match(states, /25\. 상태 유형/)
-  assert.match(states, /27\. AI UX 패턴/)
-  assert.match(states, /계약에 없는\s+상태를 화면에 발명하지 않는다/)
-  // e. Motion rows name the pattern from the dictionary but own their timing decisions.
-  assert.match(experience, /\| 패턴\(사전\)/)
-  assert.match(experience, /design-taxonomy\.md → Part 2/)
-  assert.match(experience, /두 출처를 섞지 않는다/)
-  assert.match(experience, /Avoid For/)
+
+  const files = await walk(skillDirectory)
+  const prohibited = files.filter((file) => ['.html', '.css', '.jsx', '.tsx'].includes(extname(file)))
+  assert.deepEqual(prohibited, [])
 })
 
-test('reference sites are candidates to observe and image production needs missing assets plus approval', async () => {
-  const [sources, artDirection] = await Promise.all([
-    read('references/reference-sources.md'),
-    read('references/art-direction.md'),
+test('plugin identity stays upgrade-compatible while UI and skill routing become Figma-specific', async () => {
+  const [codexManifest, claudeManifest, packageManifest, openai] = await Promise.all([
+    readFile(join(packageDirectory, '.codex-plugin/plugin.json'), 'utf8').then(JSON.parse),
+    readFile(join(packageDirectory, '.claude-plugin/plugin.json'), 'utf8').then(JSON.parse),
+    readFile(join(packageDirectory, 'package.json'), 'utf8').then(JSON.parse),
+    readSkillFile('agents/openai.yaml'),
   ])
-  assert.match(sources, /design-references-converted\.md[\s\S]*Mood & Style/)
-  assert.match(sources, /실제 화면을 연 뒤에만 `observed`/)
-  const brief = sectionOf(artDirection, '## 4. 이미지 제작 브리프')
-  assert.match(brief, /제공된 자산으로 성립하는 화면에는 쓰지 않는다/)
-  assert.match(
-    brief,
-    /visual-asset-taxonomy\.md[\s\S]*generative-image-taxonomy\.md[\s\S]*commercial-photographic-taxonomy\.md/,
-  )
-  assert.match(brief, /사용자 승인 전까지/)
+
+  assert.equal(codexManifest.name, 'frontend-interface-design')
+  assert.equal(codexManifest.version, '1.0.0')
+  assert.equal(codexManifest.interface.displayName, 'Reference-Driven Figma Design')
+  assert.match(codexManifest.description, /editable Figma/)
+  assert.equal(claudeManifest.name, 'frontend-interface-design')
+  assert.equal(packageManifest.name, '@lodado/frontend-interface-design-plugin')
+  assert.match(openai, /value: figma/)
+  assert.match(openai, /\$reference-driven-figma-design/)
+
+  const legacyDirectory = join(packageDirectory, 'skills/frontend-interface-design')
+  const legacy = await readFile(join(legacyDirectory, 'SKILL.md'), 'utf8')
+  assert.match(legacy, /name: frontend-interface-design/)
+  const target = legacy.match(/\]\(([^)]+)\)/)?.[1]
+  assert.ok(target, 'Legacy invocation must resolve to the canonical skill')
+  assert.equal(resolve(legacyDirectory, target), join(skillDirectory, 'SKILL.md'))
+  await access(resolve(legacyDirectory, target))
+})
+
+test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and promotion boundaries', async () => {
+  const { cases, schema_version: schemaVersion } = JSON.parse(await readSkillFile('evals/behavior-cases.json'))
+  const ids = cases.map(({ id }) => id)
+
+  assert.equal(schemaVersion, '1.0')
+  assert.equal(cases.length, 9)
+  assert.equal(new Set(ids).size, cases.length)
+  for (const entry of cases) {
+    assert.ok(entry.prompt.trim(), `${entry.id}: missing prompt`)
+    assert.ok(entry.expected_invariants.length >= 3, `${entry.id}: weak expected contract`)
+    assert.ok(entry.forbidden.length >= 2, `${entry.id}: weak forbidden contract`)
+  }
 })

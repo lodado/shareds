@@ -1,13 +1,13 @@
 {
   "name": "frontend-interface-design",
-  "version": "0.8.0",
-  "description": "Reference-driven UI/UX and motion: align journeys, funnel goals and brand experience, compose sections, and review static, interactive and reduced-motion outcomes.",
+  "version": "1.0.0",
+  "description": "Research and compose production-quality editable Figma product and landing designs from internal assets, templates, and verified references.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
   },
-  "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
-  "repository": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "homepage": "https://github.com/lodado/shareds",
+  "repository": "https://github.com/lodado/shareds",
   "license": "MIT",
-  "keywords": ["frontend", "ui", "ux", "design", "accessibility"]
+  "keywords": ["figma", "product-design", "landing-page", "reference-design", "design-system"]
 }

@@ -1,0 +1,11 @@
+interface:
+  display_name: Reference-Driven Figma Design
+  short_description: Compose editable Figma designs from verified references
+  default_prompt: Use $reference-driven-figma-design to turn this PRD into an editable Figma product or landing design.
+dependencies:
+  tools:
+    - type: mcp
+      value: figma
+      description: Read and edit Figma files, variables, components, and canvas nodes
+policy:
+  allow_implicit_invocation: true

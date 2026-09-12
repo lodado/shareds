@@ -1,0 +1,104 @@
+{
+  "schema_version": "1.0",
+  "cases": [
+    {
+      "id": "figma-write-required",
+      "prompt": "Figma 편집 권한은 없지만 랜딩 페이지를 완성해줘.",
+      "expected_invariants": [
+        "Return BLOCKED for the requested final format",
+        "State the exact missing Figma write capability",
+        "Treat any research notes as a limited artifact"
+      ],
+      "forbidden": [
+        "Generate React, HTML, CSS, Tailwind, or Next.js",
+        "Claim that PNG or prose is the editable Figma result"
+      ]
+    },
+    {
+      "id": "internal-pattern-first",
+      "prompt": "새 product screenshot hero를 만들어줘. 내부 catalog에 적합한 Approved pattern이 있다.",
+      "expected_invariants": [
+        "Inspect the existing catalog and Figma component before external research",
+        "Reuse or adapt the Approved pattern when it fits",
+        "Preserve the current visual system"
+      ],
+      "forbidden": ["Search Refero first", "Redraw an existing component from rectangles and text"]
+    },
+    {
+      "id": "template-auto-selection",
+      "prompt": "Base Template은 알아서 골라서 B2B SaaS 랜딩 시안을 만들어줘.",
+      "expected_invariants": [
+        "Compare accessible candidates using content fit and structural quality",
+        "Inspect Variables, Components, Variants, Properties, and Auto Layout in a strong candidate",
+        "Select an editable template rather than the prettiest preview"
+      ],
+      "forbidden": ["Ask the user to choose every candidate", "Claim preview-only structure is verified"]
+    },
+    {
+      "id": "composition-not-visual-system",
+      "prompt": "Linear hero의 구도를 참고하되 우리 Figma template과 브랜드는 유지해줘.",
+      "expected_invariants": [
+        "Reuse the hierarchy and composition relationship",
+        "Map elements to existing Figma components and variables",
+        "Keep the approved typography, color, radius, shadow, and component language"
+      ],
+      "forbidden": ["Copy Linear visual tokens", "Replace the approved visual system"]
+    },
+    {
+      "id": "refero-browser-expansion",
+      "prompt": "Refero에서 적합한 version history 사례를 못 찾았다.",
+      "expected_invariants": [
+        "Continue research with an available browser or Aside",
+        "Inspect a real service state when interaction or responsive behavior matters",
+        "Record observation limits"
+      ],
+      "forbidden": ["Stop only because Refero was insufficient", "Invent an unobserved interaction"]
+    },
+    {
+      "id": "three-section-pilot",
+      "prompt": "PRD를 바탕으로 전체 랜딩 페이지를 만들어줘.",
+      "expected_invariants": [
+        "Create the three highest-value pilot sections first",
+        "Use real copy and product assets when available",
+        "Critique the actual Figma pilot before expanding the full page"
+      ],
+      "forbidden": ["Fill every section before inspecting the pilot", "Use fake metrics or testimonials"]
+    },
+    {
+      "id": "incremental-critique",
+      "prompt": "첫 시안이 평범해 보여. 더 좋게 만들어줘.",
+      "expected_invariants": [
+        "Inspect hierarchy, composition, rhythm, product emphasis, consistency, and authenticity",
+        "Select the three highest-impact problems",
+        "Preserve successful parts and make targeted changes over two to four meaningful rounds"
+      ],
+      "forbidden": ["Regenerate the whole page without diagnosis", "Add generic glow, pills, or bento cards"]
+    },
+    {
+      "id": "experiment-promotion-gate",
+      "prompt": "새 hero component를 만들었으니 바로 shared library에 올려줘.",
+      "expected_invariants": [
+        "Keep the component as Experiment until real page usage and critique",
+        "Evaluate reuse, properties, variants, duplication, and responsiveness",
+        "Require separate library publish authority"
+      ],
+      "forbidden": [
+        "Promote solely because the component was created",
+        "Claim Shared or Approved without a designated library"
+      ]
+    },
+    {
+      "id": "scoped-internal-state",
+      "prompt": "기존 승인된 사내 Figma 설정 다이얼로그의 오류 상태만 개선해줘. desktop-only이고 내부 Error variant가 적합하다. 실제 수정 후 재검토에서 남은 문제가 없다.",
+      "expected_invariants": [
+        "Reuse the verified internal variant with internal-default; skip unnecessary external template research",
+        "Limit the pilot to the requested state and desktop viewport",
+        "Record actual critique and post-fix preview; allow completion after one meaningful round if all scoped gates pass"
+      ],
+      "forbidden": [
+        "Invent additional sections or a mobile deliverable to fill a quota",
+        "Fabricate issues or repeat edits just to reach two rounds"
+      ]
+    }
+  ]
+}

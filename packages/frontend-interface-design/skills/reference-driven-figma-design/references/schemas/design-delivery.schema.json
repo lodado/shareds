@@ -1,0 +1,555 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lodado/shareds/reference-driven-figma-design/design-delivery.schema.json",
+  "title": "Reference-Driven Figma Design Delivery",
+  "description": "Structured progress or final handoff for an editable Figma design.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "status",
+    "figma",
+    "scope",
+    "source_trace",
+    "critique",
+    "asset_library",
+    "verification",
+    "handoff"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": ["DISCOVERED", "BRIEF_READY", "NEEDS_INPUT", "BLOCKED", "PILOT_READY", "FIGMA_READY", "INCOMPLETE"]
+    },
+    "figma": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "file_key", "page_ids", "frame_ids", "editable", "code_generated"],
+      "properties": {
+        "url": {
+          "type": ["string", "null"],
+          "format": "uri"
+        },
+        "file_key": {
+          "type": ["string", "null"]
+        },
+        "page_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "frame_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "editable": {
+          "type": "boolean"
+        },
+        "code_generated": {
+          "const": false
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pilot_sections", "completed_sections", "responsive_frames", "states"],
+      "properties": {
+        "pilot_sections": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 3,
+          "uniqueItems": true
+        },
+        "completed_sections": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "responsive_frames": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "source_trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_template", "internal_assets_used", "references"],
+      "properties": {
+        "base_template": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/templateSelection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "internal_assets_used": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/referenceLogEntry"
+          }
+        }
+      }
+    },
+    "critique": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["iteration_count", "rounds", "ai_slop_findings", "unresolved"],
+      "properties": {
+        "iteration_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rounds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/critiqueRound"
+          }
+        },
+        "ai_slop_findings": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "asset_library": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalog_location", "entries"],
+      "properties": {
+        "catalog_location": {
+          "type": ["string", "null"]
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/componentCatalogEntry"
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "figma_read",
+        "figma_write",
+        "structure_inspected",
+        "preview_inspected",
+        "design_self_review",
+        "user_acceptance",
+        "unreviewed"
+      ],
+      "properties": {
+        "figma_read": {
+          "type": "boolean"
+        },
+        "figma_write": {
+          "type": "boolean"
+        },
+        "structure_inspected": {
+          "type": "boolean"
+        },
+        "preview_inspected": {
+          "type": "boolean"
+        },
+        "design_self_review": {
+          "enum": ["ready", "incomplete", "unreviewed"]
+        },
+        "user_acceptance": {
+          "enum": ["accepted", "rejected", "not-obtained"]
+        },
+        "unreviewed": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "next_action"],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "next_action": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "templateSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "inspection_status", "selection_reason"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inspection_status": {
+          "enum": ["preview-only", "structure-inspected", "editable-verified"]
+        },
+        "selection_reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "referenceLogEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "section",
+        "selected_reference",
+        "source",
+        "observation_status",
+        "problem_solved",
+        "structural_principle_reused",
+        "not_copied",
+        "figma_components_used",
+        "selection_reason"
+      ],
+      "properties": {
+        "section": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selected_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation_status": {
+          "enum": ["preview-only", "visually-inspected", "interaction-inspected"]
+        },
+        "problem_solved": {
+          "type": "string",
+          "minLength": 1
+        },
+        "structural_principle_reused": {
+          "type": "string",
+          "minLength": 1
+        },
+        "not_copied": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "figma_components_used": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "selection_reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "critiqueRound": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "inspected_frames", "top_issues", "fixes", "preserved", "result"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^V[1-9][0-9]*$"
+        },
+        "inspected_frames": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "top_issues": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 3
+        },
+        "fixes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 3
+        },
+        "preserved": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "result": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "componentCatalogEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_name",
+        "status",
+        "purpose",
+        "best_for",
+        "avoid_when",
+        "supported_content",
+        "variants",
+        "editable_properties",
+        "figma_component_reference",
+        "originating_reference",
+        "used_in",
+        "notes"
+      ],
+      "properties": {
+        "component_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": ["Experiment", "Approved", "Deprecated"]
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "best_for": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "avoid_when": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "supported_content": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "editable_properties": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "figma_component_reference": {
+          "type": ["string", "null"]
+        },
+        "originating_reference": {
+          "type": ["string", "null"]
+        },
+        "used_in": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": ["PILOT_READY", "FIGMA_READY"]
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "figma": {
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://(www\\.)?figma\\.com/(design|file)/[A-Za-z0-9]+(?:[/?#]|$)"
+              },
+              "file_key": {
+                "type": "string",
+                "minLength": 1
+              },
+              "page_ids": {
+                "minItems": 1
+              },
+              "frame_ids": {
+                "minItems": 1
+              },
+              "editable": {
+                "const": true
+              }
+            }
+          },
+          "critique": {
+            "properties": {
+              "iteration_count": {
+                "minimum": 1
+              },
+              "rounds": {
+                "minItems": 1
+              }
+            }
+          },
+          "verification": {
+            "properties": {
+              "figma_read": {
+                "const": true
+              },
+              "figma_write": {
+                "const": true
+              },
+              "structure_inspected": {
+                "const": true
+              },
+              "preview_inspected": {
+                "const": true
+              }
+            }
+          },
+          "scope": {
+            "properties": {
+              "pilot_sections": {
+                "minItems": 1
+              },
+              "completed_sections": {
+                "minItems": 1
+              },
+              "responsive_frames": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "FIGMA_READY"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "verification": {
+            "properties": {
+              "design_self_review": {
+                "const": "ready"
+              },
+              "unreviewed": {
+                "maxItems": 0
+              }
+            }
+          },
+          "critique": {
+            "properties": {
+              "unresolved": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
