@@ -19,6 +19,10 @@
 
 ## 2. Source trace
 
+라이브러리 연결, 실제 재사용, 시각 품질은 별개의 주장이다. 연결 성공만으로 화면 전체에 적용됐다고 하지 않는다.
+공식 라이브러리와 팀/로컬 파생 자산을 구분한다. 이름에 ADS 같은 시스템명이 있어도 공식임을 입증하지 못하면 파생/미확인으로 표시하고, 자체 토큰을 공식 토큰으로 부르지 않는다.
+주요 조립 단위별로 원본 URL/node 또는 component key → 적용 node, `linked instance / copied frame / local derivative`, 유지된 연결·변경한 override를 기존 source trace에 남긴다. 복사한 frame을 linked instance로 보고하지 않는다.
+
 컴포넌트 변경은 [필수 출처 게이트](component-source-gate.md)의 증거 행 위치를 기존
 `source_trace.references`의 `source`/`selection_reason`에 연결한다. HOLD인 부분이 있으면
 전체 FIGMA_READY 또는 “완료/정상 확인”으로 보고하지 않는다. 필요한 자료가 없는 부분과 이미 검토한

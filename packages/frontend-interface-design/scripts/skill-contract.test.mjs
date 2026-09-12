@@ -10,6 +10,29 @@ const packageDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
 const skillDirectory = join(packageDirectory, 'skills/reference-driven-figma-design')
 const readSkillFile = (path) => readFile(join(skillDirectory, path), 'utf8')
 
+// Static instruction regression only; scenario behavior and live Figma quality require separate evaluation.
+test('locks editable-reference assembly, source inspection, and composability before expansion', async () => {
+  const [skill, composition, gate, critique, delivery] = await Promise.all([
+    readSkillFile('SKILL.md'),
+    readSkillFile('references/figma-composition.md'),
+    readSkillFile('references/component-source-gate.md'),
+    readSkillFile('references/critique-refinement.md'),
+    readSkillFile('references/delivery-contract.md'),
+  ])
+
+  assert.match(skill, /레퍼런스 조립[\s\S]*스크린샷[\s\S]*재그리기/)
+  assert.match(skill, /제품 스크린샷 등 실제 콘텐츠 에셋은 유지할 수 있다/)
+  assert.match(skill, /한방에[\s\S]*검증 생략/)
+  assert.match(composition, /화면·섹션 → 복합 컴포넌트 → primitive/)
+  assert.match(composition, /큰 단위[\s\S]*탐색[\s\S]*적용 node/)
+  assert.match(gate, /Figma Make[\s\S]*image fill[\s\S]*편집 가능한/)
+  assert.match(gate, /Hug→Fill[\s\S]*정렬[\s\S]*rotation[\s\S]*색상 override/)
+  assert.match(gate, /원본 레이어[\s\S]*로컬 파생 Variant/)
+  assert.match(critique, /구조[\s\S]*거절[\s\S]*즉시[\s\S]*mapping/)
+  assert.match(delivery, /라이브러리 연결[\s\S]*실제 재사용[\s\S]*시각 품질/)
+  assert.match(delivery, /공식[\s\S]*파생[\s\S]*linked instance \/ copied frame \/ local derivative/)
+})
+
 async function walk(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
   const nested = await Promise.all(
@@ -155,8 +178,17 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
   const ids = cases.map(({ id }) => id)
 
   assert.equal(schemaVersion, '1.0')
-  assert.equal(cases.length, 27)
+  assert.equal(cases.length, 32)
   assert.equal(new Set(ids).size, cases.length)
+  for (const id of [
+    'editable-reference-assembly-not-redraw',
+    'inventory-largest-reusable-units',
+    'asset-title-is-not-editability-proof',
+    'source-pilot-reflow-and-overrides',
+    'structural-rejection-reopens-mapping',
+  ]) {
+    assert.ok(ids.includes(id), `Missing assembly regression case: ${id}`)
+  }
   for (const entry of cases) {
     assert.ok(entry.prompt.trim(), `${entry.id}: missing prompt`)
     assert.ok(entry.expected_invariants.length >= 3, `${entry.id}: weak expected contract`)
@@ -184,7 +216,12 @@ test('requires taxonomy interpretation, separate screen evidence, adaptation and
   assert.match(workflow, /작은 수정은 기존 근거를 재사용/)
   assert.match(workflow, /프롬프트 실행 계약/)
   assert.match(workflow, /실제 Figma 실행·시각 품질이 검증됐다는 뜻이 아니다/)
-  for (const file of ['research-selection.md', 'figma-composition.md', 'critique-refinement.md', 'delivery-contract.md']) {
+  for (const file of [
+    'research-selection.md',
+    'figma-composition.md',
+    'critique-refinement.md',
+    'delivery-contract.md',
+  ]) {
     const content = await readSkillFile(`references/${file}`)
     assert.ok(content.includes('taxonomy-reference-workflow.md'), file)
   }
@@ -222,6 +259,11 @@ test('ships source fingerprints and local resolution without redistributing dict
     const options = { cwd: repositoryDirectory, encoding: 'utf8' }
     assert.equal(execFileSync('git', ['ls-files', '--', ...dictionaryPaths], options).trim(), '')
     const probes = dictionaryPaths.map((path) => `${path}taxonomy.md`)
-    assert.deepEqual(execFileSync('git', ['check-ignore', '--no-index', '--', ...probes], options).trim().split('\n'), probes)
+    assert.deepEqual(
+      execFileSync('git', ['check-ignore', '--no-index', '--', ...probes], options)
+        .trim()
+        .split('\n'),
+      probes,
+    )
   }
 })

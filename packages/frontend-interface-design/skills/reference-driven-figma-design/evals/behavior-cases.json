@@ -2,6 +2,71 @@
   "schema_version": "1.0",
   "cases": [
     {
+      "id": "editable-reference-assembly-not-redraw",
+      "prompt": "피그마에서 편집 가능한 원본을 조립해줘. 스크린샷 기반 재현이나 개발이 아니라 레퍼런스 조립임. 한방에 알아서 해줘.",
+      "expected_invariants": [
+        "Keep the editable-reference assembly contract and already supplied decisions without repeated questions",
+        "Use native source frames, components or instances; use UI reference screenshots for observation and comparison QA, not as editable UI substitutes; preserve legitimate product screenshot content assets",
+        "Complete source selection, assembly and verification internally; HOLD missing source units rather than silently changing the production method"
+      ],
+      "forbidden": [
+        "Substitute code, image placement or screenshot-guided redraw for editable-reference assembly",
+        "Treat one-shot or proceed as permission to skip verification or source gates"
+      ]
+    },
+    {
+      "id": "inventory-largest-reusable-units",
+      "prompt": "연결된 디자인 라이브러리에 Navigation과 Page header가 있다. 기본 레이아웃과 To do만 기존 자산으로 조립해줘.",
+      "expected_invariants": [
+        "Inventory suitable screen or section assets before composite components and primitives within the existing source hierarchy",
+        "Map source file and node, reuse unit, allowed changes and gaps before target composition; record applied nodes afterward",
+        "Reuse suitable navigation and page header units, preserve originals and keep the requested partial scope"
+      ],
+      "forbidden": [
+        "Import one button and manually redraw the available navigation and header",
+        "Expand to an unrequested full board or require external replacement of a verified exact-source internal edit"
+      ]
+    },
+    {
+      "id": "asset-title-is-not-editability-proof",
+      "prompt": "Jira UI Kit 검색 결과가 있다. 첫 후보는 Figma Make, 둘째 Design 파일은 보드 전체가 image fill, 셋째는 위젯만 native이고 보드 배경은 이미지다.",
+      "expected_invariants": [
+        "Inspect artifact type and actual target descendants rather than trusting title, thumbnail or outer frame type",
+        "Count only verified editable target units as assembly candidates; retain raster references as screen evidence only",
+        "Apply the bounded shortage rule and HOLD an unavailable native board without claiming candidate coverage"
+      ],
+      "forbidden": [
+        "Count a Make preview or an image-filled Design frame as an editable board asset",
+        "Infer that an entire board is editable because one widget contains native layers"
+      ]
+    },
+    {
+      "id": "source-pilot-reflow-and-overrides",
+      "prompt": "원본 카드를 가져왔다. 제목을 Hug에서 Fill로 바꾸니 가운데 정렬이고, 우선순위 아이콘 swap 뒤 회전과 색이 남는다. 중첩 override도 안 먹는데 복제해도 되나?",
+      "expected_invariants": [
+        "Validate one source-based pilot with long text, target width, inherited alignment, parent height and footer layout before repetition",
+        "Inspect icon rotation and color overrides after swaps; prefer a suitable source variant or a local derivative preserving source layers when nested overrides fail",
+        "Reinspect the corrected pilot and report linked instance, copied frame or local derivative honestly without labeling custom tokens official"
+      ],
+      "forbidden": [
+        "Duplicate broken layouts or detach and redraw icons just to bypass failed nested overrides",
+        "Treat library connection or import success as proof of actual reuse or visual quality"
+      ]
+    },
+    {
+      "id": "structural-rejection-reopens-mapping",
+      "prompt": "레퍼런스 레이아웃과 패턴을 따르라 했는데 또 다른 구조네. 폰트랑 높이만 바꿔놓고 뭐가 달라진겨?",
+      "expected_invariants": [
+        "Immediately reopen source selection and mapping for rejected reference structure rather than waiting for two failed rounds",
+        "Preserve successful parts and repair the mismatched reusable units instead of regenerating the whole page",
+        "Compare before and after at the same viewport and state; report observed structural changes and applied nodes only"
+      ],
+      "forbidden": [
+        "Use font-size or card-height tweaks as the sole fix for the wrong reference structure",
+        "Claim improvement based only on saving, tool success or an uninspected change"
+      ]
+    },
+    {
       "id": "figma-write-required",
       "prompt": "Figma 편집 권한은 없지만 랜딩 페이지를 완성해줘.",
       "expected_invariants": [

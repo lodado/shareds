@@ -5,6 +5,9 @@
 
 ## 1. 적용 여부를 실제 구조로 판정
 
+후보 이름·표지·검색 썸네일은 편집 가능성의 증거가 아니다. Figma Make 산출물과 native Design을 구분하고, Design 파일도 목표 UI의 자식 레이어와 image fill을 확인한다.
+편집 가능한 외곽 frame 안에 보드 전체 이미지가 든 경우 그 보드는 편집 가능한 조립 후보가 아니다. 일부 위젯만 native라면 그 단위만 인정한다. 스크린샷 자료는 화면 근거로 남길 수 있지만 유효한 조립 후보 수에는 넣지 않는다.
+
 변경하려는 역할마다 사용자 작업, 실제 콘텐츠/에셋, 필요한 상태, 합의된 기기/폭을 적고
 후보의 file/page/node ID, type, parent, 조상까지의 visible, Auto Layout, font, property를 읽는다.
 `FRAME`, `COMPONENT`, `COMPONENT_SET`, `INSTANCE`를 구분하고 instance의 main component를 확인한다.
@@ -73,6 +76,9 @@ Reference Log에 역할별 아래 정보를 남긴다. 기존 delivery의 `sourc
 | applied    | 실제 적용 위치와 남은 미검증 범위; 아직 적용 전이면 그 상태를 명시                     |
 
 ## 4. 파일럿 검토 없이는 확장 금지
+
+원본 기반 대표 조합 하나에 실제 변경을 먼저 시험한다. 긴 제목·좁은 대상 폭에서 Hug→Fill 전환 뒤 상속된 정렬과 줄바꿈, 부모 높이·footer 겹침을 검사한다. 아이콘 swap 뒤 rotation과 색상 override가 남는지도 실제 레이어에서 확인한다.
+중첩 override가 의도대로 적용되지 않으면 반복 복제로 퍼뜨리지 않는다. 적합한 원본 Variant를 우선하고, 없으면 원본 레이어를 보존한 로컬 파생 Variant로 필요한 차이만 만든 뒤 다시 검증한다. 무분별한 detach·재그리기로 우회하지 않는다.
 
 출처 게이트 통과는 시각 품질 통과가 아니다. 합의된 기기/상태의 대표 구간을 먼저 적용·검토한다.
 
