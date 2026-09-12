@@ -6,7 +6,7 @@
     "name": "lodado",
     "url": "https://github.com/lodado"
   },
-  "version": "0.47.0",
+  "version": "0.48.0",
   "plugins": [
     {
       "name": "vibe-coding-helper",
@@ -82,15 +82,15 @@
     },
     {
       "name": "frontend-interface-design",
-      "description": "Reference-driven UI/UX and motion: align journeys, funnel goals and brand experience, compose sections, and review static, interactive and reduced-motion outcomes.",
-      "version": "0.8.0",
+      "description": "Figma-first product and landing design from internal assets, structured templates, and verified references.",
+      "version": "1.0.0",
       "author": {
         "name": "lodado"
       },
       "source": "./packages/frontend-interface-design",
       "category": "development",
-      "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
-      "tags": ["frontend", "ui", "ux", "design", "accessibility"]
+      "homepage": "https://github.com/lodado/shareds",
+      "tags": ["figma", "product-design", "landing-page", "reference-design"]
     },
     {
       "name": "blog-voice-cloner",

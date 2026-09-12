@@ -1,20 +1,27 @@
 {
   "name": "frontend-interface-design",
-  "version": "0.8.0",
-  "description": "Reference-driven UI/UX and motion: align journeys, funnel goals and brand experience, compose sections, and review static, interactive and reduced-motion outcomes.",
+  "version": "1.0.0",
+  "description": "Research and compose production-quality editable Figma product and landing designs from internal assets, templates, and verified references.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
   },
-  "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
-  "repository": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "homepage": "https://github.com/lodado/shareds",
+  "repository": "https://github.com/lodado/shareds",
   "license": "MIT",
   "skills": "./skills/",
   "interface": {
-    "displayName": "Frontend Interface Design",
-    "shortDescription": "Compose UI, UX journeys and meaningful motion",
-    "category": "development",
-    "defaultPrompt": "Use frontend-interface-design to align goals, user journeys and brand references, then compose and apply coherent UI and meaningful motion in the agreed format. Review real content, core tasks and normal/reduced-motion behavior; disclose unobserved scope.",
-    "websiteURL": "https://github.com/lodado/my-Vibe-Coding-Helper"
+    "displayName": "Reference-Driven Figma Design",
+    "shortDescription": "Compose editable Figma designs from verified references",
+    "longDescription": "Turns PRDs, internal Figma assets, structured templates, Refero examples, and live product references into editable product or landing designs with a bounded visual critique loop and reusable component catalog.",
+    "developerName": "lodado",
+    "category": "Productivity",
+    "capabilities": ["Research", "Figma", "Write"],
+    "defaultPrompt": [
+      "Turn this PRD into an editable reference-driven Figma design.",
+      "Select a Figma template and build a three-section landing-page pilot.",
+      "Critique this Figma page and refine its three biggest visual problems."
+    ],
+    "websiteURL": "https://github.com/lodado/shareds"
   }
 }

@@ -1,0 +1,342 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lodado/shareds/reference-driven-figma-design/design-request.schema.json",
+  "title": "Reference-Driven Figma Design Request",
+  "description": "Normalized ready-to-design input. Users may provide natural language; the skill extracts this structure before mutating Figma.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "project",
+    "brief",
+    "target",
+    "source_authority",
+    "base_template",
+    "content",
+    "scope",
+    "autonomy",
+    "deliverable"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "design_kind"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "design_kind": {
+          "enum": ["landing-page", "product-surface", "hybrid"]
+        },
+        "locale": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 2
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "brief": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prd_summary", "audience", "primary_outcome"],
+      "properties": {
+        "prd_summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prd_sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source"
+          }
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1
+        },
+        "primary_outcome": {
+          "type": "string",
+          "minLength": 1
+        },
+        "success_signals": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "figma_file_url", "working_area"],
+      "properties": {
+        "mode": {
+          "enum": ["existing-file", "duplicate-template", "new-file"]
+        },
+        "figma_file_url": {
+          "type": ["string", "null"],
+          "format": "uri"
+        },
+        "working_area": {
+          "type": "string",
+          "minLength": 1
+        },
+        "read_access": {
+          "type": "boolean"
+        },
+        "write_access": {
+          "type": "boolean"
+        }
+      }
+    },
+    "source_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["brand_direction", "internal_assets", "locked_constraints"],
+      "properties": {
+        "brand_direction": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source"
+          }
+        },
+        "internal_assets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source"
+          }
+        },
+        "approved_patterns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source"
+          }
+        },
+        "locked_constraints": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "base_template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selection", "source", "purchase_approved"],
+      "properties": {
+        "selection": {
+          "enum": ["user-specified", "auto-select", "internal-default"]
+        },
+        "source": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/source"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "purchase_approved": {
+          "type": "boolean"
+        }
+      }
+    },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["copy_status", "assets", "missing_asset_policy"],
+      "properties": {
+        "copy_status": {
+          "enum": ["final", "editable-draft", "approved-placeholder"]
+        },
+        "assets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/asset"
+          }
+        },
+        "missing_asset_policy": {
+          "enum": ["block", "asset-free-composition", "labeled-placeholder"]
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pilot_sections", "full_sections", "responsive_frames", "states"],
+      "properties": {
+        "pilot_sections": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "uniqueItems": true
+        },
+        "full_sections": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "responsive_frames": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "width"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 240
+              }
+            }
+          },
+          "minItems": 1
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "autonomy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["delegated_decisions", "approval_required_for"],
+      "properties": {
+        "delegated_decisions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "approval_required_for": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "positioning-change",
+              "new-brand-direction",
+              "paid-purchase",
+              "license-acceptance",
+              "external-sharing",
+              "destructive-change",
+              "library-publish"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "deliverable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "code_generation_allowed", "prototype_required", "reference_log", "catalog_updates"],
+      "properties": {
+        "format": {
+          "const": "editable-figma"
+        },
+        "code_generation_allowed": {
+          "const": false
+        },
+        "prototype_required": {
+          "type": "boolean"
+        },
+        "reference_log": {
+          "type": "boolean"
+        },
+        "catalog_updates": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "locator", "status"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "prd",
+            "brand-guide",
+            "figma-file",
+            "figma-library",
+            "component-catalog",
+            "approved-pattern",
+            "template",
+            "refero",
+            "website",
+            "other"
+          ]
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": ["string", "null"]
+        },
+        "status": {
+          "enum": ["provided", "extracted", "unknown", "none"]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "locator", "status"],
+      "properties": {
+        "kind": {
+          "enum": ["copy", "logo", "product-screenshot", "photo", "illustration", "icon", "proof", "data"]
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": ["provided", "extracted", "missing", "placeholder-approved"]
+        },
+        "rights": {
+          "enum": ["confirmed", "unknown", "not-applicable"]
+        }
+      }
+    }
+  }
+}
