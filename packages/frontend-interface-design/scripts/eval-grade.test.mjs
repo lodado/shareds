@@ -98,12 +98,12 @@ test('gates resolve from defaults, brief overrides keep the default kind, and wh
   assert.deepEqual(koGates.gates.contrastFailures, { max: 0 })
   assert.deepEqual(koGates.gates.hangulKeepAllCoverage, { min: 0.95, whenLang: 'ko' })
   assert.deepEqual(koGates.gates.hangulTextNodes, { min: 1, whenLang: 'ko' })
-  assert.deepEqual(koGates.gates.fontFamilyCount, { max: 2 })
+  assert.equal(koGates.gates.fontFamilyCount, undefined)
 
   const enGates = resolveGates(gates, en)
   assert.equal(Object.hasOwn(enGates.gates, 'hangulKeepAllCoverage'), false)
   assert.equal(Object.hasOwn(enGates.gates, 'hangulTextNodes'), false)
-  assert.deepEqual(enGates.gates.fontFamilyCount, { max: 3 })
+  assert.equal(enGates.gates.fontFamilyCount, undefined)
   assert.deepEqual(enGates.gates.literalRatio, { max: 0.1 })
 
   const custom = resolveGates(
@@ -150,18 +150,28 @@ test('a unit passes only when every gate holds; each failure names its gate and 
     failing.failures.map((failure) => [failure.gate, failure.code, failure.expected, failure.actual]),
     [
       ['contrastFailures', 'ABOVE_MAX', 0, 2],
-      ['fontFamilyCount', 'ABOVE_MAX', 2, 3],
       ['hangulKeepAllCoverage', 'BELOW_MIN', 0.95, 0.9],
     ],
   )
 
-  // b02 lifts fontFamilyCount to 3 and, being english, has no hangul gates at all.
+  // Font count is diagnostic; English has no Hangul gates.
   const overridden = gradeUnit({
     metrics: passingMetrics({ aggregate: { fontFamilyCount: 3, hangulTextNodes: 0, hangulKeepAllCoverage: null } }),
     brief: en,
     gates,
   })
   assert.equal(overridden.pass, true)
+
+  // An explicit product font contract still gates; only the universal quota was removed.
+  const productFonts = gradeUnit({
+    metrics: passingMetrics({ aggregate: { fontFamilyCount: 3 } }),
+    brief: { ...en, gates: { ...en.gates, fontFamilyCount: { max: 2 } } },
+    gates,
+  })
+  assert.deepEqual(
+    productFonts.failures.map(({ gate, code }) => [gate, code]),
+    [['fontFamilyCount', 'ABOVE_MAX']],
+  )
 
   const noSource = gradeUnit({ metrics: passingMetrics({ source: null }), brief: en, gates })
   assert.deepEqual(noSource.failures, [{ gate: 'literalRatio', code: 'MISSING_METRIC' }])

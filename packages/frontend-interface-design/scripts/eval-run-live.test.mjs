@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
-import { access, lstat, mkdtemp, readFile, readlink, rm } from 'node:fs/promises'
+import { spawn, spawnSync } from 'node:child_process'
+import { access, chmod, lstat, mkdir, mkdtemp, readFile, readlink, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
@@ -45,6 +45,33 @@ async function exists(path) {
   } catch {
     return false
   }
+}
+
+async function runWithTimeout(command, args, options, timeoutMs = 5000) {
+  const child = spawn(command, args, { ...options, detached: true })
+  let stdout = ''
+  let stderr = ''
+  child.stdout?.on('data', (chunk) => {
+    stdout += chunk
+  })
+  child.stderr?.on('data', (chunk) => {
+    stderr += chunk
+  })
+  return new Promise((resolveResult) => {
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      // Kill only this detached process group; never enumerate unrelated PIDs.
+      try {
+        if (process.platform === 'win32') child.kill('SIGKILL')
+        else process.kill(-child.pid, 'SIGKILL')
+      } catch {}
+    }, timeoutMs)
+    child.on('close', (code) => {
+      clearTimeout(timer)
+      resolveResult({ timedOut, code, stdout, stderr })
+    })
+  })
 }
 
 const report = {
@@ -189,7 +216,7 @@ test("written paths need a write tool call with a non-error result; the self-rep
   )
   assert.deepEqual(writtenPathsFrom(codex), ['index.html'])
   assert.equal(selfReportFrom(codex).mode, 'Fidelity')
-  assert.equal(usageFrom(codex).toolCalls, 3)
+  assert.equal(usageFrom(codex).toolCalls, 2) // Agent messages are not tool calls.
 })
 
 test('the run record keeps observed telemetry apart from the self-report and flags what is missing', async () => {
@@ -407,4 +434,59 @@ test('nextCommands lists render, judge and grade steps for every fixture', () =>
     /judge\.mjs --brief b02-saas-dashboard-en --a \/runs\/b02-saas-dashboard-en\/candidate\/codex\/r1 --b \/runs\/b02-saas-dashboard-en\/baseline\/codex\/r1 --host codex --out \/runs\/judgments\/b02-saas-dashboard-en-codex-r1\.json/,
   )
   assert.match(text, /grade-results\.mjs --runs \/runs\/runs\.jsonl --metrics \/runs --judgments \/runs\/judgments/)
+})
+
+test('run-live closes fake host stdin so EOF-dependent CLIs do not hang', async (t) => {
+  if (process.platform === 'win32') {
+    t.skip('Fake executable and process-group cleanup require POSIX')
+    return
+  }
+  const root = await tempDirectory(t)
+  const bin = join(root, 'bin')
+  const fakeHost = join(bin, 'codex')
+  await mkdir(bin, { recursive: true })
+  await writeFile(
+    fakeHost,
+    `#!/usr/bin/env node
+let input = ''
+process.stdin.setEncoding('utf8')
+process.stdin.on('data', (chunk) => { input += chunk })
+process.stdin.on('end', () => {
+  require('node:fs').writeFileSync('index.html', '<main>fixture</main>')
+  process.stdout.write(JSON.stringify({ type: 'item.completed', item: { type: 'file_change', status: 'completed', changes: [{ path: 'index.html', kind: 'add' }] } }) + '\\n')
+  const fence = String.fromCharCode(96).repeat(3)
+  process.stdout.write(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: fence + 'json\\n' + JSON.stringify({ caseId: 'b01-fintech-home-ko', variant: 'candidate', replicateId: 'r1', host: 'codex', outputPath: 'index.html', mode: 'Adaptation', loopRounds: 0, errors: [] }) + '\\n' + fence } }) + '\\n')
+})
+process.stdin.resume()
+`,
+  )
+  await chmod(fakeHost, 0o755)
+  const result = await runWithTimeout(
+    process.execPath,
+    [
+      runner,
+      '--host',
+      'codex',
+      '--variant',
+      'candidate',
+      '--skill-dir',
+      skillDirectory,
+      '--out',
+      root,
+      '--briefs',
+      'b01-fintech-home-ko',
+    ],
+    {
+      cwd: root,
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  )
+  assert.equal(result.timedOut, false, `fake host waited for stdin EOF: ${result.stderr}`)
+  assert.equal(result.code, 0)
+  const run = JSON.parse(await readFile(join(root, 'runs.jsonl'), 'utf8'))
+  assert.equal(run.outputExists, true)
+  assert.equal(run.exitCode, 0)
+  assert.equal(run.attestation.mode, 'self-reported')
+  assert.deepEqual(run.writtenPaths, ['index.html'])
 })

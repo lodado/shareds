@@ -14,18 +14,21 @@
       "memorable": "화면 상단을 지배하는 잔액 카드 하나",
       "references": ["숫자가 주인공인 잔액 화면", "은행 앱보다 덜 빽빽한 하단 탭", "영수증처럼 읽히는 거래 내역 목록"],
       "checklist": [
-        "첫 시선이 송금 버튼(primary action)에 가는가?",
+        "잔액·거래 맥락을 이해하고 송금 행동을 찾을 수 있는가?",
         "제목·금액·보조 설명의 위계가 세 단계 이상 눈에 구분되는가?",
         "간격이 화면 전체에 균일하게 반복되지 않고 섹션 > 그룹 > 요소 순으로 달라지며, 요소가 한 그리드에 정렬되는가?",
         "한글 줄바꿈이 어절 단위인가(단어 중간에서 끊기지 않는가)?",
         "잔액 숫자(디스플레이)와 본문 타이포의 크기·굵기 대비가 분명한가?",
-        "accent 색이 화면의 5% 이하이고 송금 버튼과 현재 탭에만 쓰였는가?",
+        "브랜드 색면·정보·행동·상태를 구분하는 색의 역할이 명료하고 가독성이 유지되는가?",
         "중립색이 anchor hue 쪽으로 틴트되어 순수 회색 덩어리로 보이지 않는가?",
         "카드의 테두리·그림자 처리가 화면 전체에서 한 가지 방식으로 일관적인가?",
         "밀도가 하루 여러 번 짧게 보는 모바일 사용자에게 맞는가(빽빽하지도 비어 있지도 않은가)?",
         "이 화면이 일반 대시보드 템플릿이 아니라 이 브리프(사회초년생 자산 홈)에 속해 보이는가?"
       ],
-      "gates": { "hangulKeepAllCoverage": 0.95, "smallTapTargets": 0 }
+      "gates": {
+        "hangulKeepAllCoverage": 0.95,
+        "smallTapTargets": 0
+      }
     },
     {
       "id": "b02-saas-dashboard-en",
@@ -42,18 +45,18 @@
         "A calm status bar instead of alert badges"
       ],
       "checklist": [
-        "Does the first glance land on the primary action (drilling into the hero metric)?",
+        "Can the user understand the key metric and find the relevant drill-down action?",
         "Are at least three hierarchy levels (page title, hero metric, supporting labels) visibly distinct?",
         "Does the spacing rhythm vary by level (section > group > element) instead of repeating one gap everywhere?",
         "Do cards, table columns and labels sit on one shared grid or baseline?",
         "Is the display type of the hero metric clearly different in size and weight from body text?",
-        "Is the accent color used on at most about five percent of the screen and only for actions or the current state?",
+        "Are color roles for brand, information, action and state clear while preserving readability?",
         "Are the neutrals tinted toward one hue rather than a soup of pure greys?",
         "Are surfaces treated consistently (one border or shadow language for every card)?",
         "Does the density suit a daily desktop user (dense enough to scan, not a wall)?",
         "Does the screen belong to this brief (a morning check-in dashboard) rather than a generic admin template?"
       ],
-      "gates": { "fontFamilyCount": { "max": 3 } }
+      "gates": {}
     },
     {
       "id": "b03-marketing-landing-ko",
@@ -66,18 +69,20 @@
       "memorable": "헤드라인 옆에 책등처럼 세로로 쌓인 타이포 한 덩어리",
       "references": ["잡지 표지 같은 히어로", "카드 격자 대신 한 열로 흐르는 서사", "표가 아닌 문장으로 말하는 가격"],
       "checklist": [
-        "첫 시선이 구독 신청 버튼(primary action)에 가는가?",
+        "책 구독 서비스의 의미·기억할 타이포와 구독 신청 행동을 찾을 수 있는가?",
         "헤드라인·본문·캡션의 위계가 세 단계 이상 구분되는가?",
         "섹션 사이 여백이 요소 사이 여백보다 분명히 크고 같은 간격이 화면 전체에 반복되지 않으며, 요소가 한 그리드에 정렬되는가?",
         "한글 헤드라인과 본문의 줄바꿈이 어절 단위인가?",
         "디스플레이 타이포와 본문 타이포의 대비가 분명한가?",
-        "accent 색이 화면의 5% 이하이고 신청 버튼과 링크 같은 action에만 쓰였는가?",
+        "브랜드 색면·정보·행동·상태를 구분하는 색의 역할이 명료하고 가독성이 유지되는가?",
         "배경과 중립색이 종이처럼 틴트되어 있고 순수 회색이 아닌가?",
         "구분선·테두리·그림자가 한 가지 방식으로 일관되게 쓰였는가?",
         "밀도가 첫 방문자에게 맞게 느긋한가(카드 격자로 빽빽하지 않은가)?",
         "이 페이지가 일반 SaaS 랜딩 템플릿이 아니라 독립 서점 구독 브리프에 속해 보이는가?"
       ],
-      "gates": { "hangulKeepAllCoverage": 0.95 }
+      "gates": {
+        "hangulKeepAllCoverage": 0.95
+      }
     },
     {
       "id": "b04-commerce-pdp-en",
@@ -94,18 +99,20 @@
         "Shipping details folded into a plain accordion"
       ],
       "checklist": [
-        "Does the first glance land on the add-to-cart action?",
+        "Can the user understand the product, compare options and find the add-to-cart action?",
         "Are product name, price and supporting details visibly separated into at least three hierarchy levels?",
         "Does spacing vary by level (gallery, options block, details) rather than one uniform gap?",
         "Do image, price, swatches and button align to one shared edge or grid?",
         "Is the product title set in display type that contrasts clearly with the body copy?",
-        "Is the accent color limited to roughly five percent of the screen and used only on the add-to-cart action and the selected option?",
+        "Are color roles for brand, information, action and state clear while preserving readability?",
         "Are the neutrals tinted (warm or cool) instead of pure grey?",
         "Is one surface language (border or shadow, not both at random) used throughout?",
         "Is the density right for a phone shopper (one decision per block, no cramped option rows)?",
         "Does the page feel like this studio's mug rather than a generic e-commerce template?"
       ],
-      "gates": { "smallTapTargets": 0 }
+      "gates": {
+        "smallTapTargets": 0
+      }
     },
     {
       "id": "b05-admin-form-ko",
@@ -122,18 +129,21 @@
         "표가 아닌 정의 목록으로 보여 주는 신청 요약"
       ],
       "checklist": [
-        "첫 시선이 승인 버튼(primary action)에 가는가?",
+        "요청 내용·판단 근거를 읽고 승인 또는 반려 행동을 구분할 수 있는가?",
         "화면 제목·섹션 제목·필드 라벨·도움말의 위계가 세 단계 이상 구분되는가?",
         "필드 사이·그룹 사이·섹션 사이 간격이 서로 다르고 라벨·필드·버튼이 한 그리드에 정렬되는가?",
         "한글 라벨과 도움말의 줄바꿈이 어절 단위인가?",
         "제목 타이포와 폼 본문 타이포의 대비가 분명한가?",
-        "accent 색이 5% 이하이고 승인 버튼과 포커스 상태에만 쓰였으며 반려 버튼은 accent가 아닌가?",
+        "브랜드 색면·정보·행동·상태를 구분하는 색의 역할이 명료하고 가독성이 유지되는가?",
         "중립색이 틴트되어 있고 필드·패널이 순수 회색 덩어리가 아닌가?",
         "입력 필드·패널의 테두리 처리가 화면 전체에서 일관적인가?",
         "밀도가 숙련된 고빈도 사용자에게 맞게 충분히 높은가(빈 여백으로 스크롤을 늘리지 않는가)?",
         "이 화면이 일반 관리자 템플릿이 아니라 비품 승인 브리프에 속해 보이는가?"
       ],
-      "gates": { "hangulKeepAllCoverage": 0.95, "longLines": 0 }
+      "gates": {
+        "hangulKeepAllCoverage": 0.95,
+        "longLines": 0
+      }
     },
     {
       "id": "b06-content-reading-en",
@@ -150,18 +160,20 @@
         "Pull quotes set in the display face"
       ],
       "checklist": [
-        "Does the first glance land on the start of the essay (the primary task is reading, not sharing)?",
+        "Can the reader find the essay opening and follow the reading hierarchy without competing controls?",
         "Are title, byline, body and pull quotes visibly separated into at least three hierarchy levels?",
         "Does the vertical rhythm vary (paragraph, section, quote) instead of one uniform gap?",
         "Do the text column, headings and pull quotes align to one measure?",
         "Is the display face for the title and pull quotes clearly distinct from the body face?",
-        "Is the accent color limited to about five percent of the screen and used only for links and the progress indicator?",
+        "Are color roles for brand, information, action and state clear while preserving readability?",
         "Are background and text neutrals tinted (paper-like) rather than pure grey on pure white?",
         "Are rules, borders and any shadows used in one consistent way?",
         "Is the density right for uninterrupted reading (no sidebar clutter, a comfortable line length)?",
         "Does the page belong to this small literary publication rather than a generic blog template?"
       ],
-      "gates": { "longLines": 0, "fontFamilyCount": { "max": 2 } }
+      "gates": {
+        "longLines": 0
+      }
     },
     {
       "id": "b07-data-table-ko",
@@ -178,18 +190,21 @@
         "색 점 하나와 텍스트로만 표시하는 상태"
       ],
       "checklist": [
-        "첫 시선이 검색·필터(primary action)에 가는가?",
+        "표의 정보·행 관계를 이해하고 검색·필터로 원하는 결과를 찾을 수 있는가?",
         "화면 제목·표 헤더·셀 본문·보조 텍스트의 위계가 세 단계 이상 구분되는가?",
         "행 안 간격과 툴바·표 사이 간격이 서로 다르며 헤더·셀·툴바가 한 그리드에 정렬되는가?",
         "한글 셀 텍스트와 필터 라벨의 줄바꿈이 어절 단위인가?",
         "제목 타이포와 표 본문 타이포의 대비가 분명하고 숫자 열이 tabular 숫자로 정렬되는가?",
-        "accent 색이 5% 이하이고 선택한 행과 기본 동작에만 쓰였는가?",
+        "브랜드 색면·정보·행동·상태를 구분하는 색의 역할이 명료하고 가독성이 유지되는가?",
         "행 배경과 구분선의 중립색이 틴트되어 있고 순수 회색 덩어리가 아닌가?",
         "표·툴바·필터 바의 테두리·그림자 처리가 한 방식으로 일관적인가?",
         "밀도가 고빈도 운영 담당자에게 맞게 높으면서도 행 구분이 분명한가?",
         "이 화면이 일반 관리자 표 템플릿이 아니라 창고 재고 브리프에 속해 보이는가?"
       ],
-      "gates": { "hangulKeepAllCoverage": 0.95, "fontFamilyCount": { "max": 3 }, "tinyText": 0 }
+      "gates": {
+        "hangulKeepAllCoverage": 0.95,
+        "tinyText": 0
+      }
     },
     {
       "id": "b08-onboarding-en",
@@ -206,18 +221,20 @@
         "An empty state that shows the first day rather than a mascot"
       ],
       "checklist": [
-        "Does the first glance land on the continue action or on the first choice the user must make?",
+        "Can the user understand the first choice and find how to continue?",
         "Are step title, choice labels and helper text visibly separated into at least three hierarchy levels?",
         "Does spacing vary between the card, the choices and the footer instead of one uniform gap?",
         "Do the progress rail, the card and the button align to one shared grid?",
         "Is the step title set in display type that contrasts clearly with choice and helper text?",
-        "Is the accent color limited to about five percent of the screen and used only on the primary action and the selected chip?",
+        "Are color roles for brand, information, action and state clear while preserving readability?",
         "Are the neutrals tinted rather than pure grey, so the light mood reads as warm or cool instead of flat?",
         "Are chips, card and button surfaces treated in one consistent way (the same border or shadow language)?",
         "Is the density sparse enough for a first-time user (one decision per screen, generous targets)?",
         "Does the screen feel like this habit tracker rather than a generic onboarding template?"
       ],
-      "gates": { "smallTapTargets": 0 }
+      "gates": {
+        "smallTapTargets": 0
+      }
     }
   ]
 }

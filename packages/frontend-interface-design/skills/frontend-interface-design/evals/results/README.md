@@ -1,5 +1,7 @@
 # results
 
+[2026-09-12 generation-first](2026-09-12-generation-first/README.md): local implementation checks and a partial live baseline, not a candidate win or human-calibrated result. Three Codex generations completed; remaining attempts and the alternate Claude smoke hit provider limits.
+
 Graded harness runs, one directory per run: `<date>-<host>-<variant>/` (for example
 `2026-09-06-claude-candidate/`), holding the `summary.json` and `summary.md` that
 `grade-results.mjs --out` wrote, plus `calibration.json` when human votes were collected.

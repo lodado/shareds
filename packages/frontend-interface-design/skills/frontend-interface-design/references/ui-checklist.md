@@ -27,7 +27,7 @@
 
 ## Color
 
-- [ ] accent 하나. primary action · 현재 위치 · 링크 이외에 쓰이지 않는다.
+- [ ] 브랜드 색면·정보·행동·상태색의 역할이 명료하고 강조가 서로 경쟁하지 않는다.
 - [ ] 텍스트 대비 4.5:1, 큰 텍스트·UI 요소 3:1. 두 theme 모두 확인.
 - [ ] 정보를 색으로만 전달하지 않는다(상태 = 색 + 텍스트 또는 아이콘).
 - [ ] 상태색(success / warning / error)이 브랜드 accent와 구분된다.
@@ -39,8 +39,7 @@ keyboard · hit target · forms · state/URL · feedback · touch · animation �
 vendoring한 Vercel 규칙을 따른다. MUST 위반은 `fail`, SHOULD 위반은 `fail` 또는 이유 있는 `n/a`.
 아래는 그 문서에 없는 것만.
 
-- [ ] 모든 interactive 요소가 8 상태를 가진다: default · hover · focus-visible · active ·
-      disabled · loading · error · success.
+- [ ] 각 interactive 역할에 필요한 상태만 구현한다(default · hover · focus-visible · active, 해당 시 disabled · loading · error · success · current). 지원하지 않는 상태를 발명하지 않는다.
 - [ ] 조작 모델이 decision record 3단과 일치한다(탭인데 스크롤로 바뀌지 않았나).
 - [ ] 고빈도·키보드 조작을 애니메이션으로 지연시키지 않는다. 짧은 duration 기본값은 일반 조작 피드백용이며 브랜드·영상·스크롤 시간축에 일괄 적용하지 않는다.
 - [ ] 조건부 렌더(`{open && <Modal/>}`)가 갑자기 튀지 않는다 — 필요하면 enter/exit, 필요 없으면 그대로.

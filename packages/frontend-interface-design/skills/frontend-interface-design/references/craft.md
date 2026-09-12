@@ -1,7 +1,7 @@
-# Craft — plain을 refined로 만드는 12개 기본값
+# Craft — 필요한 마감에 쓰는 11개 레시피
 
 절제(restraint)는 노이즈를 없애고, craft는 마감을 더한다. 둘은 다른 일이다. 이 파일의 항목은
-**기본값**이다 — 사다리 근거를 대지 않아도 쓴다. 계보 `DESIGN.md`가 다른 값을 정했으면 그것이
+**선택한 방향을 구현하는 기본값**이다. 시그니처 결정은 [art-direction.md](art-direction.md)에 한 번 모은다. 계보 `DESIGN.md`가 다른 값을 정했으면 그것이
 이긴다. 수치는 출처에서 왔고 어휘가 아니라 코드다: "tinted neutral"을 아는 것과 쓰는 것은
 다르다.
 
@@ -11,8 +11,8 @@
 
 ## 1. 중립색은 anchor hue로 틴트한다
 
-순수 `#000` · `#fff` · 무채색 회색(`#6b7280`류)은 쓰지 않는다. 배경 · 본문 · 회색 단계 · border
-전부 anchor hue를 조금 담는다. chroma 최소 0.005, 중간 단계에서 최대(양 끝의 2–3배).
+따뜻하거나 차가운 종이·표면을 표현할 때 배경·본문·회색 단계·border에 anchor hue를 조금 담을 수 있다.
+아래 예시는 chroma 0.005 이상에서 시작한다. 승인된 무채색·흑백 방향을 틴트로 덮지 않는다.
 
 ```css
 :root {
@@ -149,7 +149,7 @@ time {
 
 hover · pressed는 즉시성이 핵심이다. `transform` · `opacity`만, `transition: all` 금지,
 `ease-in` 금지, 등장 애니메이션은 0.9 이상에서 시작. 하루 100번 쓰는 동작(단축키 · 팔레트
-토글)은 애니메이션이 없다. reduced-motion은 "적고 부드럽게"이지 0이 아니다.
+토글)은 애니메이션이 없다. reduced-motion은 역할에 따라 직접 전환 또는 축소 움직임을 선택하고 정보·조작을 보존한다.
 
 ```css
 :root {
@@ -222,13 +222,6 @@ hover · pressed는 즉시성이 핵심이다. `transform` · `opacity`만, `tra
 
 구조와 상태 8종이 들어간 실물은 [`../exemplars/`](../exemplars/README.md)에 있다. 복사한 뒤
 `DESIGN.md`로 재스킨한다.
-
-## 12. 브랜드 순간은 하나
-
-기억에 남을 요소를 **하나** 고르고 그 하나에만 대담함을 쓴다 — 나머지는 조용히. 두 개면 둘 다
-잡음이다. 무엇인지 · 사다리 어느 단을 돕는지 · 왜 기억에 남는지 3줄을 decision record에 적는다.
-
-출처: Anthropic frontend-design v3 "Spend your boldness in one place" · 현행 signature 규칙.
 
 ## 이 파일이 하지 않는 것
 

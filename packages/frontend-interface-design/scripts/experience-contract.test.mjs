@@ -8,7 +8,9 @@ const read = (path) => readFile(new URL(path, root), 'utf8')
 
 test('experience planning is reachable before build and verified at delivery', async () => {
   const skill = await read('SKILL.md')
-  assert.ok(skill.indexOf('references/experience-design.md') < skill.indexOf('4. **Apply / Build.**'))
+  const planning = skill.indexOf('references/experience-design.md')
+  const build = skill.indexOf('2. **대표 구간을 만든다.**')
+  assert.ok(planning >= 0 && build > planning, 'scope transitions before building the representative slice')
   const experience = await read('references/experience-design.md')
   for (const field of ['journey-review', 'reference-translation', 'motion-review', 'unobserved', 'reduced-motion']) {
     assert.ok(experience.includes(field), `missing evidence dimension: ${field}`)

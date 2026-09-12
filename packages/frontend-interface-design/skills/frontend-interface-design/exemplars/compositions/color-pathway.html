@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Small Rituals — color pathway</title>
+    <style>
+      :root {
+        --ink: #282624;
+        --yellow: #ffd11a;
+        --orange: #c44800;
+        --blue: #005dcc;
+        --lilac: #b892df;
+        --pink: #ff9cc9;
+        --paper: #fffdfa;
+        --warm: #f7f0ee;
+        --line: #d9d3cc;
+        --sans: Inter, ui-sans-serif, system-ui, sans-serif;
+        --focus: #005fcc;
+        --white: #fff;
+        --shadow: #28262414;
+        --muted: #716b65;
+        --muted-ink: #59544f;
+        --panel-yellow-a: #fff1d0;
+        --panel-yellow-b: #ffd82e;
+        --panel-yellow-c: #ffad22;
+        --panel-pink: #f5e6f2;
+        --shape-radius: 42% 58% 50% 45%;
+        --detail-ink: #e7e1dc;
+        --icon-yellow: #f4c400;
+        --icon-lilac: #a77bd4;
+        --icon-blue: #087af2;
+        --icon-pink: #ff9cc9;
+        --icon-orange: #ff7418;
+        --radius-circle: 50%;
+        --radius-pill: 999px;
+        --radius-panel: 1.5rem;
+        --radius-choice: 0.7rem;
+        --radius-detail: 1rem;
+        color-scheme: light;
+        background: var(--paper);
+        color: var(--ink);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        font-family: var(--sans);
+        line-height: 1.45;
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: 4px;
+      }
+      .notice {
+        background: var(--yellow);
+        padding: 0.6rem 1rem;
+        text-align: center;
+        font-size: 0.85rem;
+        min-height: 44px;
+      }
+      .notice a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        text-decoration: underline;
+      }
+      .nav {
+        height: 74px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 max(1.25rem, 4vw);
+        background: var(--white);
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        box-shadow: 0 2px 12px var(--shadow);
+      }
+      .mark {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-weight: 750;
+        letter-spacing: -0.05em;
+      }
+      .mark:before {
+        content: '';
+        width: 28px;
+        height: 28px;
+        border-radius: var(--radius-circle);
+        background: var(--orange);
+      }
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 1.7rem;
+        font-size: 0.85rem;
+      }
+      .nav-links a {
+        color: inherit;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+      }
+      .cta {
+        border: 0;
+        border-radius: var(--radius-pill);
+        background: var(--blue);
+        color: var(--white);
+        font-weight: 700;
+        padding: 0.7rem 1.4rem;
+      }
+      .wrap {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: clamp(3rem, 7vw, 7rem) max(1rem, 4vw);
+      }
+      .hero {
+        text-align: center;
+      }
+      .eyebrow {
+        font-size: 0.75rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .hero h1 {
+        font-size: clamp(3rem, 7.5vw, 7rem);
+        line-height: 0.92;
+        letter-spacing: -0.045em;
+        max-width: 10ch;
+        margin: 1rem auto 1.2rem;
+      }
+      .hero h1 em {
+        font-style: normal;
+        color: var(--orange);
+      }
+      .hero p {
+        font-size: clamp(1rem, 1.5vw, 1.25rem);
+        max-width: 38rem;
+        margin: 0 auto 2.5rem;
+        color: var(--muted-ink);
+      }
+      .panels {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 1.2rem;
+        text-align: center;
+      }
+      .panel {
+        min-height: 300px;
+        border-radius: var(--radius-panel);
+        background: var(--warm);
+        padding: clamp(1.5rem, 3vw, 3rem);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
+        overflow: hidden;
+      }
+      .panel h2 {
+        font-size: clamp(1.45rem, 2.5vw, 2.4rem);
+        line-height: 1.03;
+        max-width: 17ch;
+        margin: 0;
+      }
+      .panel-main {
+        background: linear-gradient(160deg, var(--panel-yellow-a), var(--panel-yellow-b) 65%, var(--panel-yellow-c));
+      }
+      .panel-side {
+        background: var(--panel-pink);
+      }
+      .shape {
+        width: 150px;
+        height: 115px;
+        border-radius: var(--shape-radius);
+        background: var(--orange);
+        position: relative;
+        transform: rotate(-7deg);
+      }
+      .shape:after {
+        content: '';
+        position: absolute;
+        width: 42px;
+        height: 42px;
+        right: -24px;
+        top: -18px;
+        border-radius: var(--radius-circle);
+        background: var(--blue);
+        box-shadow: -73px 73px 0 var(--yellow);
+      }
+      .path {
+        margin-top: clamp(4rem, 9vw, 9rem);
+      }
+      .path h2 {
+        text-align: center;
+        font-size: clamp(1.8rem, 4vw, 3.3rem);
+        line-height: 1;
+        letter-spacing: -0.06em;
+        margin: 0 auto 2rem;
+        max-width: 17ch;
+      }
+      .choices {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+      }
+      .choice {
+        min-height: 76px;
+        padding: 1rem 1.25rem;
+        border: 2px solid var(--line);
+        border-radius: var(--radius-choice);
+        background: var(--white);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        text-align: left;
+        color: var(--ink);
+        transition: border-color 0.2s, transform 0.2s;
+      }
+      .choice:hover {
+        transform: translateY(-2px);
+      }
+      .choice[aria-pressed='true'] {
+        border-color: var(--ink);
+        box-shadow: inset 0 -5px var(--choice-color);
+      }
+      .choice-name {
+        font-size: 1.05rem;
+      }
+      .choice svg {
+        width: 34px;
+        height: 34px;
+      }
+      .reset {
+        display: block;
+        margin: 1rem auto 0;
+        min-height: 44px;
+        padding: 0.65rem 1.2rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-pill);
+        background: transparent;
+        color: var(--ink);
+        font-weight: 700;
+      }
+      .reset:hover {
+        background: var(--warm);
+      }
+      .detail {
+        margin: 1.5rem auto 0;
+        max-width: 44rem;
+        padding: 1.25rem 1.5rem;
+        border-radius: var(--radius-detail);
+        background: var(--ink);
+        color: var(--white);
+        text-align: center;
+        min-height: 76px;
+      }
+      .detail strong {
+        display: block;
+        font-size: 1.15rem;
+      }
+      .detail span {
+        font-size: 0.9rem;
+        color: var(--detail-ink);
+      }
+      .sr {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+      }
+      @media (max-width: 700px) {
+        .nav {
+          height: 62px;
+        }
+        .nav-links a {
+          display: none;
+        }
+        .panels {
+          grid-template-columns: 1fr;
+        }
+        .panel {
+          min-height: 280px;
+        }
+        .choices {
+          grid-template-columns: 1fr;
+          gap: 0.75rem;
+        }
+        .choice {
+          min-height: 64px;
+        }
+        .wrap {
+          padding-top: 3rem;
+        }
+        .hero h1 {
+          font-size: clamp(3.5rem, 16vw, 5rem);
+          letter-spacing: -0.025em;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .choice {
+          transition: none;
+        }
+        .choice:hover {
+          transform: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="notice"><a href="#path">New: plan a calmer week</a></div>
+    <header class="nav">
+      <a class="mark" href="#top">small rituals</a>
+      <nav class="nav-links" aria-label="site">
+        <a href="#path">Explore</a><a href="#about">About</a><button class="cta" type="button">Start free</button>
+      </nav>
+    </header>
+    <main class="wrap" id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <p class="eyebrow">a gentler everyday service</p>
+        <h1 id="hero-title">Make room for one good <em>habit.</em></h1>
+        <p>Simple prompts for meals, movement, and rest—built for the moments between everything else.</p>
+      </section>
+      <section class="panels" aria-label="service overview">
+        <article class="panel panel-main">
+          <h2>Build a rhythm that fits between everything else.</h2>
+          <div class="shape" aria-hidden="true"></div>
+        </article>
+        <article class="panel panel-side">
+          <h2>Small steps, clearly yours.</h2>
+          <div
+            class="shape"
+            style="background: var(--lilac); transform: rotate(8deg) scale(0.8)"
+            aria-hidden="true"
+          ></div>
+        </article>
+      </section>
+      <section class="path" id="path" aria-labelledby="path-title">
+        <h2 id="path-title">What would make today feel lighter?</h2>
+        <div class="choices" role="group" aria-label="Choose a ritual">
+          <button
+            class="choice"
+            type="button"
+            style="--choice-color: var(--yellow)"
+            aria-pressed="true"
+            data-title="Plan meals"
+            data-detail="A five-minute starting point for the next good meal."
+          >
+            <span class="choice-name">Plan meals</span
+            ><svg aria-hidden="true" viewBox="0 0 40 40">
+              <path
+                fill="none"
+                stroke="var(--icon-yellow)"
+                stroke-width="6"
+                stroke-linecap="round"
+                d="M7 25c7-15 10 10 17-8 2-5 4 6 9-1"
+              />
+            </svg></button
+          ><button
+            class="choice"
+            type="button"
+            style="--choice-color: var(--lilac)"
+            aria-pressed="false"
+            data-title="Move gently"
+            data-detail="A low-pressure reset you can do wherever you are."
+          >
+            <span class="choice-name">Move gently</span
+            ><svg aria-hidden="true" viewBox="0 0 40 40">
+              <path
+                fill="none"
+                stroke="var(--icon-lilac)"
+                stroke-width="5"
+                stroke-linecap="round"
+                d="M29 28A13 13 0 1 1 17 5a10 10 0 1 0 12 23Z"
+              />
+            </svg></button
+          ><button
+            class="choice"
+            type="button"
+            style="--choice-color: var(--blue)"
+            aria-pressed="false"
+            data-title="Reset your desk"
+            data-detail="Clear one surface; keep the momentum small."
+          >
+            <span class="choice-name">Reset your desk</span
+            ><svg aria-hidden="true" viewBox="0 0 40 40">
+              <circle cx="20" cy="20" r="13" fill="none" stroke="var(--icon-blue)" stroke-width="5" />
+              <circle cx="20" cy="20" r="3" fill="var(--icon-blue)" />
+            </svg></button
+          ><button
+            class="choice"
+            type="button"
+            style="--choice-color: var(--pink)"
+            aria-pressed="false"
+            data-title="Sleep on time"
+            data-detail="A softer landing for the end of the day."
+          >
+            <span class="choice-name">Sleep on time</span
+            ><svg aria-hidden="true" viewBox="0 0 40 40">
+              <path fill="var(--icon-pink)" d="M20 4a16 16 0 1 0 14 22A15 15 0 0 1 20 4Z" />
+            </svg></button
+          ><button
+            class="choice"
+            type="button"
+            style="--choice-color: var(--orange)"
+            aria-pressed="false"
+            data-title="Call a friend"
+            data-detail="One honest check-in counts as a plan."
+          >
+            <span class="choice-name">Call a friend</span
+            ><svg aria-hidden="true" viewBox="0 0 40 40">
+              <path
+                fill="var(--icon-orange)"
+                d="M9 8h22a4 4 0 0 1 4 4v13a4 4 0 0 1-4 4H20l-7 6v-6H9a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4Z"
+              />
+            </svg></button
+          ><button
+            class="choice"
+            type="button"
+            style="--choice-color: var(--yellow)"
+            aria-pressed="false"
+            data-title="Start small"
+            data-detail="Choose the version that takes less than two minutes."
+          >
+            <span class="choice-name">Start small</span
+            ><svg aria-hidden="true" viewBox="0 0 40 40">
+              <path
+                fill="none"
+                stroke="var(--icon-yellow)"
+                stroke-width="5"
+                stroke-linecap="round"
+                d="M20 5v30M5 20h30"
+              />
+            </svg>
+          </button>
+        </div>
+        <button class="reset" id="reset" type="button" aria-controls="detail">Reset selection</button>
+        <div class="detail" id="detail" aria-live="polite">
+          <strong>Plan meals</strong><span>A five-minute starting point for the next good meal.</span>
+        </div>
+      </section>
+    </main>
+    <script>
+      const detail = document.querySelector('#detail'),
+        choices = [...document.querySelectorAll('.choice')]
+      function select(button) {
+        choices.forEach((b) => b.setAttribute('aria-pressed', String(b === button)))
+        detail.innerHTML = `<strong>${button.dataset.title}</strong><span>${button.dataset.detail}</span>`
+      }
+      document.querySelectorAll('.choice').forEach((button) => button.addEventListener('click', () => select(button)))
+      document.querySelector('#reset').addEventListener('click', () => select(choices[0]))
+    </script>
+  </body>
+</html>

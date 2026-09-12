@@ -213,7 +213,7 @@ async function loadSide({ dir, viewports, theme, withCode, variant, dryRun }) {
 function runHost(host, prompt, images, cwd, extra) {
   const { command, args } = HOSTS[host]
   return new Promise((done, reject) => {
-    const child = spawn(command, args(prompt, images, extra), { cwd })
+    const child = spawn(command, args(prompt, images, extra), { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
     let stdout = ''
     let stderr = ''
     child.stdout.setEncoding('utf8')

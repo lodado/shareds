@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { spawn } from 'node:child_process'
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import process from 'node:process'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -28,6 +31,33 @@ function side(directory, html = null) {
     screenshots: [375, 1280].map((viewport) => ({ viewport, path: `${directory}/${viewport}-light.png` })),
     html,
   }
+}
+
+async function runWithTimeout(command, args, options, timeoutMs = 5000) {
+  const child = spawn(command, args, { ...options, detached: true })
+  let stdout = ''
+  let stderr = ''
+  child.stdout?.on('data', (chunk) => {
+    stdout += chunk
+  })
+  child.stderr?.on('data', (chunk) => {
+    stderr += chunk
+  })
+  return new Promise((resolveResult) => {
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      // Kill only this detached process group; never enumerate unrelated PIDs.
+      try {
+        if (process.platform === 'win32') child.kill('SIGKILL')
+        else process.kill(-child.pid, 'SIGKILL')
+      } catch {}
+    }, timeoutMs)
+    child.on('close', (code) => {
+      clearTimeout(timer)
+      resolveResult({ timedOut, code, stdout, stderr })
+    })
+  })
 }
 
 const checks = (trueCount) => Array.from({ length: 10 }, (_, index) => index < trueCount)
@@ -168,4 +198,67 @@ test('commonAncestor is the deepest shared directory of both run directories', (
   assert.equal(commonAncestor('/runs/b01/candidate/claude/r1', '/runs/b01/baseline/claude/r1'), '/runs/b01')
   assert.equal(commonAncestor('/runs/x', '/runs/x'), '/runs/x')
   assert.equal(commonAncestor('/a/b', '/c/d'), '/')
+})
+
+test('judge closes fake host stdin so EOF-dependent CLIs do not hang', async (t) => {
+  if (process.platform === 'win32') {
+    t.skip('Fake executable and process-group cleanup require POSIX')
+    return
+  }
+  const root = await mkdtemp(join(tmpdir(), 'fid-judge-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const bin = join(root, 'bin')
+  const fakeHost = join(bin, 'codex')
+  const aDir = join(root, 'a')
+  const bDir = join(root, 'b')
+  await mkdir(bin, { recursive: true })
+  await mkdir(aDir, { recursive: true })
+  await mkdir(bDir, { recursive: true })
+  for (const directory of [aDir, bDir]) {
+    for (const viewport of [375, 1280]) await writeFile(join(directory, `${viewport}-light.png`), 'fixture')
+  }
+  await writeFile(
+    fakeHost,
+    [
+      '#!/usr/bin/env node',
+      "let input = ''",
+      "process.stdin.setEncoding('utf8')",
+      "process.stdin.on('data', (chunk) => { input += chunk })",
+      "process.stdin.on('end', () => {",
+      '  const checks = { A: Array(10).fill(true), B: Array(10).fill(false) }',
+      '  const fence = String.fromCharCode(96).repeat(3)',
+      "  const text = fence + 'json\\n' + JSON.stringify({ checks, belongs: 'A', notes: [] }) + '\\n' + fence",
+      "  process.stdout.write(JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text }] } }) + '\\n')",
+      '})',
+      'process.stdin.resume()',
+      '',
+    ].join('\n'),
+  )
+  await chmod(fakeHost, 0o755)
+  const result = await runWithTimeout(
+    process.execPath,
+    [
+      join(packageDirectory, 'skills/frontend-interface-design/evals/judge.mjs'),
+      '--brief',
+      'b03-marketing-landing-ko',
+      '--a',
+      aDir,
+      '--b',
+      bDir,
+      '--host',
+      'codex',
+      '--out',
+      join(root, 'judgment.json'),
+    ],
+    {
+      cwd: root,
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  )
+  assert.equal(result.timedOut, false, `fake host waited for stdin EOF: ${result.stderr}`)
+  assert.equal(result.code, 0, `judge failed: ${result.stderr}`)
+  const judgment = JSON.parse(await readFile(join(root, 'judgment.json'), 'utf8'))
+  assert.deepEqual(judgment.errors, [])
+  assert.equal(judgment.orderings.length, 2)
 })

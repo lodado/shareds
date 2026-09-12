@@ -116,4 +116,4 @@ Toss Product Sans는 배포 불가 자산이다 — 쓰지 않는다. Noto Sans 
 ## 게이트
 
 `scripts/render.mjs --lang ko`가 `hangulKeepAllCoverage`를 계산한다. 0.95 미만이면 결함이다.
-폰트 가족 수는 ko에서도 2 이하 — Pretendard + (선택) 라틴 display.
+폰트 가족 수는 진단값이다. 한글 본문·display·코드 역할과 실제 글리프 지원을 확인하고 명시된 제품/호스트 제한만 적용한다.

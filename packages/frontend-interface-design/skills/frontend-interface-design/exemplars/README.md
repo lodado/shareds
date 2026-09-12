@@ -1,71 +1,35 @@
-# Exemplars — 선택한 재료를 DESIGN.md로 재스킨한다
+# Exemplars — 서로 다른 표현의 중심을 배운다
 
-기존 프로젝트 요소가 부족할 때 선택할 수 있는 기본 재료다. 모든 화면을 여기의 단일 조합에서
-시작할 필요는 없다. 파일은 전부 정적 HTML + `tokens.css`라 브라우저에서 바로
-열리고 `scripts/render.mjs`로 렌더 · 측정된다. 프레임워크로 옮길 때는 **구조 · 상태 · 토큰
-참조**를 옮기고 클래스 이름은 프로젝트 관례를 따른다.
+새 방향이 필요하면 실제 콘텐츠에 맞는 **예시 하나**만 연다. 전부 읽거나 같은 조합에서 시작하지 않는다.
+이 예시들은 관측한 정보 관계를 자체 HTML/CSS/SVG와 다른 콘텐츠로 옮긴 연구다. 원본 사이트의 픽셀 복제나 브랜드 자산이 아니다.
 
-조합(compositions)은 계보의 실제 레퍼런스 **밀도와 마감**을 기준으로 만들었다. 구조와 밀도만
-배웠고 브랜드 자산 · 카피 · 폰트명은 가져오지 않았다. 각 파일의 상단 주석이 어떤 원칙을 따르는지
-적는다.
+## 기본 선택: 세 가지 시그니처
 
-| 파일                                        | 계보 · 레퍼런스 밀도                                            | 보여주는 craft                                                                                                       |
-| ------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `tokens.css`                                | 공통                                                            | 노브 3개(`--h` · chroma · radius)로 전체가 바뀐다 · 표면 사다리 · hairline · soft 상태색 · 아이콘 · 아바타(hue 파생) |
-| `primitives/button.html`                    | 공통                                                            | 변형 4 · 크기 3 · 상태 8종 · 광학 정렬 · scale(0.97) · 로딩 중 라벨 유지                                             |
-| `primitives/input.html`                     | 공통                                                            | 라벨 위 · 힌트 · 오류 inline · border-width 고정(강조는 shadow) · 16px · tabular                                     |
-| `primitives/card.html`                      | 공통                                                            | 그림자 또는 border 하나 · radius 중첩 · 상태 형태                                                                    |
-| `primitives/table-row.html`                 | 공통                                                            | sticky 헤더 · 좌/우 정렬 · hairline · 형태+색+텍스트 상태 · 밀도 토글                                                |
-| `primitives/dialog.html`                    | 공통                                                            | 네이티브 `<dialog>` · modal 그림자 단 · 0.98에서 등장 · 동작 이름 버튼                                               |
-| `compositions/app-shell.html`               | precision-tool · Linear류 이슈 목록 + 상세                      | 13px · 28px nav 행 · 36px 목록 행 · 그룹 헤더 · 우선순위 글리프 · 라벨 pill · 아바타 · 속성 패널 · 활동 · 댓글       |
-| `compositions/marketing-hero.html`          | editorial-marketing · Stripe/Linear류 마케팅                    | 제품 mock이 주인공(KPI · 차트 · 표 · 토스트) · 6/6 hero · 사실 띠 · 번갈아 기능 3 · 단계 · 가격 2 · CTA · footer     |
-| `compositions/fintech-home.html`            | consumer-fintech-ko · Toss류 모바일 홈(hue 250 노브)            | 금액 hero · 액션 타일 4 · 8px 띠 · 60px 행 + 송금 버튼 · 소비 막대 · 프로모 · 하단 탭                                |
-| `compositions/pack-developer-platform.html` | Reference Pack `vercel-developer-platform`(observed 2026-09-06) | 팩의 관측값만으로 만든 조합 · 슬롯 순서 · 무채색 반전 primary · 6px radius · 14px UI · 이탈 2건 주석                 |
+| 예시                                                                      | 입력 → 제작 조작 → 보이는 결과                                                                     | 바꿀 것                                                                                 |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| [editorial-signal-ledger.html](compositions/editorial-signal-ledger.html) | 긴 한글 제목·짧은 메타 → 서체 대비와 비대칭 정렬 → 글이 주인공인 편집 화면, 실제 주제 필터         | 실제 제목 길이·기사 수·주제 분류. 이미지 없는 작업은 그래픽 칸까지 가져오지 않는다.     |
+| [image-orbit-rail.html](compositions/image-orbit-rail.html)               | 자체 제작 제품 도형·라인업 → 큰 이미지 무대와 별도 선택 레일 → 제품/옵션 관계와 인접한 선택 피드백 | 허용된 실제 이미지·제품 비례·긴 옵션명. 필수 실제 자산을 도형으로 대체하는 예가 아니다. |
+| [color-pathway.html](compositions/color-pathway.html)                     | 소비자 서비스의 선택 항목 → 넓은 브랜드 색면과 행동/상태색 분리 → 선택·결과·reset이 연결된 화면    | 브랜드 색 역할·문구·조작 계약. 색만으로 선택을 구분하지 않는다.                         |
 
-## 사용 절차
+주인공·정보 관계·작동하는 상태를 배우고 우리 콘텐츠·토큰·반응형 구도로 치환한다. 과감한 글자나 색면만 복사하면 새 템플릿이 된다.
+토큰은 각 예시의 `:root`에 있다. 기존 프로젝트에서는 그 역할을 기존 토큰에 매핑한다. 새 토큰 체계를 겹쳐 넣지 않는다.
 
-1. 브리프와 방향이 정해졌으면 기존 토큰에 매핑한다. 토큰이 없을 때 `tokens.css`를 기본 재료로
-   복사하고 선택한 DESIGN.md 값으로 조정한다. `fintech-home.html`은 노브를 적용한 예다.
-2. 섹션 역할에 맞는 프리미티브 · 조합만 선택한다. 유용한 정보 관계와 상태는 보존하되 실제
-   콘텐츠 · 밀도 · 반응형 구도에 맞춰 조정한다. 다른 출처의 구성도 같은 토큰으로 재스킨한다.
-   아이콘은 파일 상단의 `<symbol>` 스프라이트처럼 한 세트로 둔다.
-3. 컴포넌트 안에 남은 리터럴 값이 없는지 `scripts/render.mjs --source`로 확인한다.
-4. `references/look.md` 루프를 돈다. 이 파일들도 그 루프로 만들었다(r1 → 발견 → r2).
+## 관측 출처와 한계
 
-## Reference Pack에서 만든 조합
+2026-09-12 관측: [The Guardian](https://www.theguardian.com/international)의 편집 위계·비대칭 관계, [Apple iPhone](https://www.apple.com/iphone/)의 제품 무대·라인업 레일, [Headspace](https://www.headspace.com/)의 넓은 색면·선택 구조.
+관측 화면과 자체 재구성·다른 콘텐츠 치환·최종 예시를 구분한다. 로고·기사·제품 사진·원본 CSS/폰트 파일을 복사하지 않았다.
+정지 화면의 재구성과 직접 실행한 필터/선택/reset만 근거다. 원본 사이트 전체 동작이나 픽셀 Fidelity를 보장하지 않는다.
+실제 캡처·소스 hash·콘텐츠 치환·동작 관측 범위는 [평가 기록](../evals/results/2026-09-12-generation-first/README.md)에 연결한다.
 
-`compositions/pack-developer-platform.html`은 [`references/packs/vercel-developer-platform.json`](../references/packs/vercel-developer-platform.json)의
-`observed` 값만으로 만들었다. 계보 파일이 아니라 **팩이 시각 권위**인 경우의 예다.
+## 기존 기능 재료와 회귀 fixture — 기본 시각 방향이 아님
 
-- 토큰 블록의 값은 전부 팩의 값이고 이름은 `tokens.css`의 이름이다. 리터럴 비율 0.00.
-- 이탈 2건을 파일 주석에 남겼다: 11px eyebrow → 12px(접근성 하한이 레퍼런스를 이긴다),
-  본문 measure 무제한 → 68ch(1232px 폭에서 187자 줄이 나왔다). 둘 다
-  [`one-shot.md`](../references/one-shot.md) §1의 2단이 4단을 이긴 경우다.
-- 브랜드 자산 · 카피 · 로고는 없다. 수치는 전부 placeholder다.
-- Look 루프 실측: r1 `tiny 1 · long 1` → r2 `게이트 전부 통과`(375 · 1280 × light · dark 4셀).
+| 파일                                                                                                                                                        | 쓰는 경우                                                                  |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| [tokens.css](tokens.css)                                                                                                                                    | 기존 시스템이 없을 때만 출발할 공통 토큰. 선택한 방향으로 조정             |
+| [button.html](primitives/button.html), [input.html](primitives/input.html)                                                                                  | 역할별 상태·포커스·오류의 구현 참고                                        |
+| [card.html](primitives/card.html), [table-row.html](primitives/table-row.html), [dialog.html](primitives/dialog.html)                                       | 구조·상태·토큰 참조를 기존 컴포넌트에 이식                                 |
+| [app-shell.html](compositions/app-shell.html), [marketing-hero.html](compositions/marketing-hero.html), [fintech-home.html](compositions/fintech-home.html) | 이전 조합의 기능/토큰 회귀 비교; 새 작업의 기본 템플릿으로 선택하지 않음   |
+| [pack-developer-platform.html](compositions/pack-developer-platform.html)                                                                                   | 관측된 Vercel pack 라우팅·토큰 매핑 fixture. 2026-09-06 관측의 제한된 표본 |
 
-## 레퍼런스에서 배운 것 (구조 · 밀도만)
-
-- **Linear류 도구**: 깊이는 그림자가 아니라 표면 사다리(canvas → surface-1 → card)와 hairline로.
-  13px 본문, 4px 스케일, 아이콘 16px 1.5px, 아바타 20px, 라벨은 점 + pill, 우선순위는 막대 글리프.
-  제품 화면이 마케팅의 주인공이다. 이니셜 아바타 · 기관 마크는 흰 글자 on 채움(4.5:1 미달)이 아니라
-  hue에서 soft 배경 + 진한 잉크를 파생한다(`oklch(from … 92% 0.05 h)` / `40% 0.12 h`).
-- **Stripe류 마케팅**: 단일 CTA 색, 큰 display에 좁은 자간, 숫자는 tabular, 제품 mock은 12–16px
-  radius 프레임 + 은은한 틴트 그림자, 섹션 96–128px, 카드 대신 hairline 띠.
-- **Toss류 소비자 금융**: 375px 기준 한 화면 한 메시지, 금액이 주인공(32–34px 700 tnum), 섹션은
-  8px 띠, 행 56–64px에 행 단위 액션, accent는 기능(송금 · 선택 · 진행)에만, pill은 작은 컨트롤만.
-
-## 프레임워크로 옮길 때
-
-- React + Tailwind: `tokens.css`의 변수를 `@theme` 또는 `tailwind.config` `extend`에 매핑한다
-  (shadcn 이름이라 그대로 붙는다). 클래스는 `bg-primary text-primary-foreground`처럼 토큰만.
-- CSS-in-JS: 변수 참조(`var(--primary)`)를 그대로 쓴다. 값을 JS 상수로 복제하지 않는다.
-- 상태 8종(default · hover · focus-visible · active · disabled · loading · error · success)은
-  상태 어휘다. 프레임워크에서도 [`one-shot.md`](../references/one-shot.md) §5의 역할별 필수 상태를
-  구현한다. 정적 콘텐츠에 동작 상태를 추가하지 않으며 해당 역할에 필요한 상태 누락만 결함이다.
-
-## 이 파일들이 아닌 것
-
-- 완성 디자인이 아니다. 계보 · 노브 없이 그대로 쓰면 자리표시자 hue의 화면이 나온다.
-- 컴포넌트 라이브러리가 아니다. 프로젝트에 이미 `components/ui`가 있으면 그것을 쓴다.
-- 데모 데이터다. 실제 프로젝트에서는 사용자의 실제 수치 · 로고 · 후기만 쓴다.
+새 예시는 `scripts/render.mjs --source <실제 HTML>`로 토큰 사용까지 검사하고 [Look](../references/look.md)으로 실제 화면·동작을 본다.
+패키지의 `signature-exemplars.test.mjs`는 키보드 조작·선택/복귀·일반/축소 모션을 검사한다. 테스트 통과는 미감 또는 사용자 선호의 증명이 아니다.

@@ -2,8 +2,9 @@
 
 Measures whether a change to this skill makes screens better, not just different: eight briefs run
 through a real host with the skill installed, rendered and measured deterministically, then judged
-pairwise against a baseline. Nothing here runs in the package test suite except `--dry-run` and the
-pure functions; a live run costs host tokens (see below).
+pairwise against a baseline. Package tests cover fixtures, parsers and graders with fake hosts; configured browser checks also render local pages. They do not call live models. A live run costs host tokens (see below).
+
+The [2026-09-12 generation-first record](results/2026-09-12-generation-first/README.md) preserves the first live baseline, provider failures and local exemplar checks. Candidate comparison and human calibration remain unperformed.
 
 ## Pipeline
 

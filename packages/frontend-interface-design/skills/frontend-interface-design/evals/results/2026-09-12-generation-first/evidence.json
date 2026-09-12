@@ -1,0 +1,227 @@
+{
+  "evidenceRoot": ".omx/fid-eval-47bghsk4",
+  "status": "implementation verified locally; comparative effectiveness not measured",
+  "snapshots": {
+    "baseline-hashes.json": {
+      "sha256": "e5077b2e0d7ca9941b8df9b1f8abe2d6728b5eb924ccd66c4c9e40981f00fa57"
+    },
+    "candidate-hashes.json": {
+      "sha256": "8442b0e6291c050c9e64a34ce93c3d7bf305c22a33c8893badc105e21942ce3d"
+    },
+    "briefs-v0.json": {
+      "sha256": "3d12bfdad5209981208ee53d48d57e983e52beeca4e1dba195eece1978abf1ee"
+    },
+    "briefs-v1.json": {
+      "sha256": "e978e0dc9d90d29594ba5830203a6bda5a948cff38820c5b08352ff0ae51ee0e"
+    },
+    "gates-v1.json": {
+      "sha256": "dfd683558769a8afa7aaf212eefe68deaed6bb4823e1577b84ca0c6796483398"
+    },
+    "rubric-freeze.json": {
+      "sha256": "ad3e1f934eb640ca9a241aa1816d29e5124706e48e1f712da33e912be9d7b7f8"
+    },
+    "candidate-freeze.json": {
+      "sha256": "5cba272d3d66032f3ba9599c3d7a38914cc8567a67fe3aa8a09d0568f58871cf"
+    },
+    "environment.json": {
+      "sha256": "d8b56ffb66f24e6219484f42a7f44ea8dcbfb1d02fa1f82c02dbba900a408142"
+    },
+    "evidence-audit.json": {
+      "sha256": "4c3d7decff1a1168710dc6ed07cb6ef102e0f05d2772c2c8dc4352448fdd07f4"
+    },
+    "final-tests.log": {
+      "sha256": "efc9bdd64f500a92d05c28d93a8df73d963d14c8e8d3c65356ba32ef01e10689"
+    },
+    "final-lint.log": {
+      "sha256": "a8a7185ec63c70f8821487c0127047bb8644e68e26b5be300cfa43fb178490a1"
+    },
+    "final-format.log": {
+      "sha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+    }
+  },
+  "generationRuns": [
+    {
+      "path": "run/b03-marketing-landing-ko/baseline/codex/r1",
+      "caseId": "b03-marketing-landing-ko",
+      "host": "codex",
+      "replicateId": "r1",
+      "exitCode": 0,
+      "runtimeMs": 893065,
+      "outputExists": true,
+      "errors": [
+        "Chromium launch failed: sandbox MachPortRendezvous permission denied; no screenshots produced.",
+        "WebKit fallback aborted with exit code 134.",
+        "Browser MCP required approval while approval policy was never.",
+        "DESIGN.md lint could not run: package unavailable in offline npm cache."
+      ],
+      "artifacts": {
+        "run.json": "9d8bede2b306a4482f65b4fba159a50c6a333e3ec1c4c2ea4cb8bbb89cfde174",
+        "meta.json": "d0fcdc371fdf5ed4d497bc2f30eef132025653d011d93aa1000fb2ace9cde5da",
+        "index.html": "446720069fd7d1ed3e4ee6bbd5b2fd5ca41eb14631a306245e2039358d366c3f",
+        "metrics.json": "e4df1156341a6821ba64be01856987eec1df6946de47722942f6d171fff659b0",
+        "transcript.jsonl": "cdbc7c3d5db3d2d16dea1edfc56e049275e63a289a6a4a62637eb3da4c7d7a60",
+        "stderr.txt": "f8d9652674b1ef062f4c350242484d94b7bce4a0877d862545c44572bc57c778",
+        "375-light.png": "114eee950fbec81e082b5fe36602f15388d865d4c4f9861687651302b41aa957",
+        "1280-light.png": "5f891e94ef5c12fe07dd1f38fe8394549778c1b8671130de88b231f806416836",
+        "375-dark.png": "114eee950fbec81e082b5fe36602f15388d865d4c4f9861687651302b41aa957",
+        "1280-dark.png": "5f891e94ef5c12fe07dd1f38fe8394549778c1b8671130de88b231f806416836"
+      }
+    },
+    {
+      "path": "run/b03-marketing-landing-ko/baseline/codex/r2",
+      "caseId": "b03-marketing-landing-ko",
+      "host": "codex",
+      "replicateId": "r2",
+      "exitCode": 1,
+      "runtimeMs": 582895,
+      "outputExists": true,
+      "errors": ["NO_MACHINE_REPORT", "HOST_EXIT_1"],
+      "artifacts": {
+        "run.json": "b78058bb19837f6a4149ae2c6d1ed0a4272e2a86af576e5f7b1a960d50b01e58",
+        "meta.json": "7e4788c5f991bb1f6d0942dc20040b0de74a32101ae5e696369d15e74a8020ca",
+        "index.html": "05e8fd44cfdc74668cb659a2bdcaabb4739ce7b58a2d93d2cbeae54dc7ec72eb",
+        "metrics.json": "5011058ad6b9c774c2de486258d51510caef1e523ef98885863712217c99e829",
+        "transcript.jsonl": "a697c5dabb5db2119a3b20bc620974b1110860978a2322d2a7f10cedcbfbdf7f",
+        "stderr.txt": "1c9f23b9d63ec95714c17f8d6dd219f34695e795aeff15451a7d81de992c84f3",
+        "375-light.png": "a2e44bddba98ba9a5535671ae20a94b3b2645d9c7446eb5d28e77b7f0566e25e",
+        "1280-light.png": "d3af68741f109fe6fca37bb34fb08d3ec3a11ce6c1b8a08dda5957c7d156fe32",
+        "375-dark.png": "a2e44bddba98ba9a5535671ae20a94b3b2645d9c7446eb5d28e77b7f0566e25e",
+        "1280-dark.png": "d3af68741f109fe6fca37bb34fb08d3ec3a11ce6c1b8a08dda5957c7d156fe32"
+      }
+    },
+    {
+      "path": "run/b06-content-reading-en/baseline/codex/r1",
+      "caseId": "b06-content-reading-en",
+      "host": "codex",
+      "replicateId": "r1",
+      "exitCode": 0,
+      "runtimeMs": 781436,
+      "outputExists": true,
+      "errors": [
+        "Browser rendering failed under sandbox restrictions; no screenshots or responsive measurements obtained.",
+        "Browser MCP required unavailable approval.",
+        "Official design linter unavailable offline; local YAML, token-reference and source checks passed."
+      ],
+      "artifacts": {
+        "run.json": "cebd60cea85caf21839ba14cd06793b8c84d0bd52c8f00d361404317b2cf5978",
+        "meta.json": "6ba34cbc6e8ab0ce1b99d4f4cdee594c43349d06bc2c8ca402873a858ab27518",
+        "index.html": "9020939598e1398ef9009ec1083d22df9805fa87b64f44172f6277db7ca74b2e",
+        "metrics.json": "10ce0a8a89f78256bbf7bd5e9bbf853b5f02022746aa3d270a836c16536d0175",
+        "transcript.jsonl": "59894d33af4a09a6b1ae0c48ec8230355e6b6b9c8b4124c391fdaf7fe1b7ec60",
+        "stderr.txt": "d9f9e166dd178872df486a8f3d9702302878c3b80392e6ef1982905db169188a",
+        "375-light.png": "af8356ac019d97cd94d889c214e2ed60de45b711a35a1ebc0cd77ce1cfff6e30",
+        "1280-light.png": "b12a77c183e025c8904ce9313cb4dba56b80715c76ff6c36e806931b613e7e64",
+        "375-dark.png": "af8356ac019d97cd94d889c214e2ed60de45b711a35a1ebc0cd77ce1cfff6e30",
+        "1280-dark.png": "b12a77c183e025c8904ce9313cb4dba56b80715c76ff6c36e806931b613e7e64"
+      }
+    },
+    {
+      "path": "run/b06-content-reading-en/baseline/codex/r2",
+      "caseId": "b06-content-reading-en",
+      "host": "codex",
+      "replicateId": "r2",
+      "exitCode": 1,
+      "runtimeMs": 751243,
+      "outputExists": true,
+      "errors": ["NO_MACHINE_REPORT", "HOST_EXIT_1"],
+      "artifacts": {
+        "run.json": "799ee663192eb87fd94305a522d14b0e4e870523dfba7677706e7a8bd544fc71",
+        "meta.json": "471b0df4941a1344c13346ab0c9dafc7dd07b2d32cd5fc8935aff652a7965067",
+        "index.html": "d09ec66792a8089ad04766134abc347f10cc5888282ca5a0f81c8d5242651d79",
+        "metrics.json": "589e3a50f18f378d72d9e7009545b3c69351c10bd8ee5b69cf2404d9780cf8ec",
+        "transcript.jsonl": "10dfcb8b1e38b0f9442ef1f7afef34184a66c0d479841fbc1470f0138129bf34",
+        "stderr.txt": "e1f5e1650d911da24a67656fafe0d680a58ea687ec5002809ed1a653cf7b0443",
+        "375-light.png": "6cd18ff97af30ac17f4f76823759ed02c5cd1d07a2ed35b7a424d06c2de1834d",
+        "1280-light.png": "2bedf5d58e39b09fffc4bf040842b5bc0fc2341a48f5beb37872697e760a4830",
+        "375-dark.png": "6cd18ff97af30ac17f4f76823759ed02c5cd1d07a2ed35b7a424d06c2de1834d",
+        "1280-dark.png": "2bedf5d58e39b09fffc4bf040842b5bc0fc2341a48f5beb37872697e760a4830"
+      }
+    },
+    {
+      "path": "run/b07-data-table-ko/baseline/codex/r1",
+      "caseId": "b07-data-table-ko",
+      "host": "codex",
+      "replicateId": "r1",
+      "exitCode": 0,
+      "runtimeMs": 1191740,
+      "outputExists": true,
+      "errors": [
+        "브라우저 실행 권한 거부 및 연결 가능한 브라우저 부재로 렌더링·시각 검증 미수행.",
+        "@google/design.md 오프라인 캐시 부재(ENOTCACHED)로 DESIGN.md 린트 미수행."
+      ],
+      "artifacts": {
+        "run.json": "720e83011c0c0ccf75fa8f2a61cde943acc423de0ba7d196a59dbae53b01e99d",
+        "meta.json": "1b519daf9a8d001169c6ba9cf9ed3e6150656b4a62574444804d71e26b98861b",
+        "index.html": "755c5797d467deb05c183a754171341205c2f6ad975ec31a9da22825140e4b8c",
+        "metrics.json": "b234552f38f9cee8a0ece438759cf264ef7479b3b997399bee17ed89a3abe7b8",
+        "transcript.jsonl": "da1858988768b8c8fb9fc6b17a0a76869da881a14d39237ed2f586571a495210",
+        "stderr.txt": "a40b05454cf792d91334addad78f39bc46e91413745ae546378ff2296762911a",
+        "375-light.png": "05659d5771af7badb049d23e5913c42e4f1b5002d8bc88e4c752206368a4c89d",
+        "1280-light.png": "f96bc99b9120b25f974bd780a94e036bee8163a744181dd42f24948e19a8ed08",
+        "375-dark.png": "05659d5771af7badb049d23e5913c42e4f1b5002d8bc88e4c752206368a4c89d",
+        "1280-dark.png": "f96bc99b9120b25f974bd780a94e036bee8163a744181dd42f24948e19a8ed08"
+      }
+    },
+    {
+      "path": "run/b07-data-table-ko/baseline/codex/r2",
+      "caseId": "b07-data-table-ko",
+      "host": "codex",
+      "replicateId": "r2",
+      "exitCode": 1,
+      "runtimeMs": 276949,
+      "outputExists": false,
+      "errors": ["NO_MACHINE_REPORT", "NO_OUTPUT", "HOST_EXIT_1"],
+      "artifacts": {
+        "run.json": "c49111b24b3f45ead362dd7cd5868e9f38658b1346786fef1cb31129c2f3b390",
+        "meta.json": "e4f57371919aac7fa29e8367986fd59a451e9650695d79e6907501f4d25ebbf7",
+        "transcript.jsonl": "6e9fb74c46c98303d821741360740f7c20276ef65609a1f4059ac64ec9e483fd",
+        "stderr.txt": "866e5b0579b1624a7f4ccbe563fa8ff1556fa0fa1a263b70f1d00c812cfef68c"
+      }
+    },
+    {
+      "path": "claude-run/b03-marketing-landing-ko/baseline/claude/r1",
+      "caseId": "b03-marketing-landing-ko",
+      "host": "claude",
+      "replicateId": "r1",
+      "exitCode": 1,
+      "runtimeMs": 146386,
+      "outputExists": false,
+      "errors": ["NO_MACHINE_REPORT", "NO_OUTPUT", "HOST_EXIT_1"],
+      "artifacts": {
+        "run.json": "9e100d7e66351d6a22235e5ed92cabc8662cf69b2d5b760e9c913dcf66a2493f",
+        "meta.json": "40bf49c0cefd1ae15e82d641780a312a6f45841b55ec0ad3f02476a31d2458ea",
+        "transcript.jsonl": "a8188117fdf674fc2e66a373d0c0c04ea9e385f09857e5a52e0576e12e6e5673",
+        "stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "exemplars": [
+    {
+      "source": "exemplars/compositions/editorial-signal-ledger.html",
+      "sha256": "2fb78879915f2b47c0c7c19e87edbae9d81bb95009c0a052d29b82871f6a9a43",
+      "localEvidence": "candidate-examples/rendered/editorial-signal-ledger"
+    },
+    {
+      "source": "exemplars/compositions/image-orbit-rail.html",
+      "sha256": "7682ecaf226249c68b5b15e98a8f7228c7c17c51fd4ff9caae940abad7241d7f",
+      "localEvidence": "candidate-examples/rendered/image-orbit-rail"
+    },
+    {
+      "source": "exemplars/compositions/color-pathway.html",
+      "sha256": "1eaad6fb77cc420016c639e92470c45b129a9c6a2eaab622629f844a548f619f",
+      "localEvidence": "candidate-examples/rendered/color-pathway"
+    }
+  ],
+  "verification": {
+    "tests": 96,
+    "passed": 96,
+    "failed": 0,
+    "skipped": 0,
+    "lintExitCode": 0,
+    "formatExitCode": 0,
+    "diffCheckExitCode": 0,
+    "typecheckBuild": "No separate package scripts",
+    "candidateComparison": "not run: both hosts quota exhausted",
+    "humanCalibration": "not obtained"
+  }
+}

@@ -15,8 +15,7 @@ specific reference describes a point." — Google DESIGN.md PHILOSOPHY). 점이 
 
 ## 1. 브리프 — 사실과 의도를 먼저 확정한다
 
-[`discovery.md`](discovery.md)에서 조사한 사실과 사용자 답변으로 Frame을 작성한다. 목표 · 실제
-콘텐츠 · 범위 · 제약이 미확정이면 먼저 질문한다. 아래 항목은 고정 설문지가 아니라 시각 브리프의
+[`discovery.md`](discovery.md)에서 조사한 사실과 사용자 답변으로 Frame을 작성한다. 이미 정해진 목표·실제 콘텐츠·범위·제약은 재사용하고 중요한 빈칸만 질문한다. 아래 항목은 고정 설문지가 아니라 시각 브리프의
 요약이다. 위임된 밀도와 표현은 [`art-direction.md`](art-direction.md)의 대안에서 결정한다.
 
 ```md
@@ -30,17 +29,16 @@ specific reference describes a point." — Google DESIGN.md PHILOSOPHY). 점이 
 - 언어: ko / en / 혼합
 ```
 
-브리프에서 **체크리스트 10문항**을 만든다. 아래 템플릿의 `<>`만 브리프로 채운다. 이 문항이
-`look.md` 2단계 A와 `evals/judge.mjs`의 심판 문항이 된다.
+기존 브리프를 재사용한다. 아래 **체크리스트 10문항**은 필요한 질문을 고르는 보조 자료이며 새 고정 보고 의무가 아니다. 고정 eval에서는 `evals/briefs.json`의 10문항을 그대로 쓴다.
 
-1. 첫 시선이 `<primary action 또는 기억할 요소>`에 가는가
+1. 핵심 정보·행동 또는 `<기억할 요소>`를 찾을 수 있는가
 2. `<청중>`이 `<빈도>`로 쓰기에 밀도가 맞는가
-3. 무드 `<3단어>` 중 둘 이상이 화면에서 읽히는가
+3. 색의 브랜드·정보·행동 역할과 무드가 실제 콘텐츠에 맞는가
 4. `<주면 안 되는 인상>`이 없는가
-5. `<기억할 요소>`가 화면에서 유일하게 대담한가
+5. `<기억할 요소>`를 만드는 시그니처와 다른 요소의 관계가 명료한가
 6. 선택한 방향의 위계 · 밀도 · 구도가 실제 콘텐츠에서도 성립하는가
 7. 섹션별 선택 구성의 장점이 공통 스타일 안에서 유지되는가
-8. 상태(loading · empty · error)가 브리프의 실제 데이터 길이로 설계됐는가
+8. 브리프가 실제로 지원하는 상태가 실제 데이터 길이에서 작동하는가
 9. (ko) 한글 줄바꿈이 어절 단위이고 행간이 1.5 이상인가 / (en) 본문 measure가 45–75ch인가
 10. 지어낸 수치 · 로고 · 후기가 없는가
 
@@ -74,14 +72,8 @@ specific reference describes a point." — Google DESIGN.md PHILOSOPHY). 점이 
 계보의 기본 hue는 자리표시자다. 브랜드/무드보드 값이 있으면 보존한다. 없고 색 선택이 위임됐으면
 다음 방식으로 후보를 만들 수 있다. 실제 브랜드색이나 제품 사실이라고 주장하지 않는다:
 
-1. 주제의 **사물 3개**(재료 · 도구 · 환경 · 빛)를 적고 각각이 함의하는 hue를 적는다. "금융이라서
-   파랑"은 사물이 아니라 범주 반사다 — 무효.
-2. 하나를 anchor로 고른다. 계보의 허용 범위(예: precision-tool은 chroma 0.12–0.18) 안에서
-   L · C는 계보 값을 유지하고 **hue 숫자만** 바꾼다.
-3. **이식 테스트**: 같은 팔레트를 무관한 브리프(치과 · 주물 공장 · 장례 안내 중 하나)에 놓아
-   본다. 어색하지 않으면 주제에서 나온 게 아니다 — 1번으로 돌아간다.
-4. 계보 파일의 모든 `oklch(L% C <기본 hue>)`에서 기본 hue를 anchor로 치환한다. `destructive`
-   (h 27) · `success`(h 145) · `warning`(h 85)은 고정이다.
+주제의 재료·환경·빛에서 anchor 후보를 찾고 실제 화면의 색 역할로 시험한다. "금융이라서 파랑" 같은 범주 반사 대신 선택한 시그니처와 콘텐츠에 맞춘다.
+이식 테스트나 사물 목록은 막힐 때만 쓰는 보조 질문이다. hue 숫자만 바꾸는 것이 유일한 변형은 아니며 상태색의 의미·대비를 보존한다.
 
 ### ② 타입 페어링 (계보의 3개 중 1개)
 
@@ -109,16 +101,16 @@ specific reference describes a point." — Google DESIGN.md PHILOSOPHY). 점이 
    사물 · 무드가 들어가야 한다.
 4. `## Adaptation` 섹션(스킬 확장)은 **제거**하고 그 내용은 decision record로 옮긴다.
 5. 프로젝트 루트에 `DESIGN.md`로 쓴다. 이미 있으면 덮어쓰지 않고 사용자에게 묻는다
-   (`NEEDS_DECISION`).
+   (`NEEDS_DECISION`). 기존 파일의 존재만으로 승인 범위를 추정하지 않는다.
 6. lint: `npx --yes @google/design.md lint DESIGN.md`. `contrast-ratio` · `missing-primary` ·
    `broken-ref` 오류는 전부 고친다. 경고는 기록한다(`orphaned-tokens`는 산문에서만 쓰는 다크 · 상태 토큰이라 허용). `clamp()`는 Dimension이 아니므로 토큰에는 최대값을 두고 유동값은 산문과 CSS에 둔다.
 7. 토큰 블록: [`../exemplars/tokens.css`](../exemplars/tokens.css)를 복사해 DESIGN.md 값으로
    채운 뒤 프로젝트의 토큰 파일(`globals.css` · `tokens.css`)에 넣는다. 이후 컴포넌트는 토큰만
    참조한다. 기존 토큰 파일이 있으면 그 이름에 매핑하고 새 이름을 만들지 않는다.
 
-## 5. 일반적 답 시뮬레이션 — 갈라서기 확인
+## 5. 후보가 막힐 때만: 흔한 답과 비교
 
-같은 유형의 브리프에 흔히 나오는 답을 **한 줄**로 적는다(계보 파일 `## Adaptation`의 "흔한
+이유 없는 템플릿 반복이 보일 때 같은 유형의 브리프에 흔히 나오는 답을 **한 줄**로 비교할 수 있다(계보 파일 `## Adaptation`의 "흔한
 답"을 그대로 써도 된다). 우리 결정이 그와 **구조 · 타입 · 색 중 둘 이상**에서 갈리는지 적는다.
 이는 차이를 점검하는 진단이지 통과 개수 의무가 아니다. 선택한 방향과 콘텐츠에 적합하면
 닮은 구성을 유지한다. 이유 없는 템플릿 반복일 때만 대안을 비교한다.
@@ -130,7 +122,7 @@ specific reference describes a point." — Google DESIGN.md PHILOSOPHY). 점이 
 
 ## 6. 다양성 로그와 accept/reject
 
-`.design/log.json`을 프로젝트에 둔다. 항목마다 `locked`를 적는다: 채택된 Reference Pack이나
+실제 채택/반려 이력이나 여러 화면의 일관성 관리가 필요할 때 기존 `.design/log.json`을 사용한다. 기록하는 항목마다 `locked`를 적는다: 채택된 Reference Pack이나
 사용자가 받아들인 `DESIGN.md`가 시각 권위면 `true`다.
 
 - `locked: true`면 **매크로구조를 반복해도 된다.** 잠긴 시스템의 두 화면이 닮는 것은 일관성이지
@@ -173,18 +165,7 @@ specific reference describes a point." — Google DESIGN.md PHILOSOPHY). 점이 
 ([`one-shot.md`](one-shot.md) §1). 팩이 `unverified`면 이 파일의 절차를 그대로 돌리고, 팩은
 패턴 힌트로만 읽으며, 사용자에게 "브랜드 재현이 아니다"를 먼저 말한다.
 
-## Decision record에 남기는 블록
+## 기록은 기존 기준에 한 번
 
-```md
-### Adaptation
-
-- 계보: <id> — 표의 행 <유형> (가까운 이유: <없음/한 줄>)
-- 팩: <packId · evidenceStatus · 관측일> 또는 없음 (route: <mode>)
-- ① hue: 사물 <a · b · c> → <hue>; 이식 테스트 <어색함 = 통과>
-- ② 페어링: <계보 페어링 번호> (ko 우선: 예/아니오)
-- ③ radius · 밀도: <프리셋 이름>
-- DESIGN.md: <경로>, lint <오류 0 · 경고 n>
-- 방향/보드: <선택 · 위임 근거와 실제 확인한 산출물 경로>
-- 흔한 답 vs 갈림: <구조 · 타입 · 색의 차이 또는 적합해서 유지한 이유>
-- log: <.design/log.json에 기록한 매크로구조 · locked>
-```
+선택한 방향·토큰·이탈·실제 확인한 대표 구간을 기존 `DESIGN.md` 또는 편집 환경의 기준에 연결한다.
+별도 보드·decision record·로그에 동일한 노브/체크리스트를 반복하지 않는다. `decision-ladder.md`와 `visual-system.md`는 구체적인 결정·토큰 파생이 막힐 때만 참고한다.

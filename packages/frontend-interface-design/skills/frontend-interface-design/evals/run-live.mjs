@@ -144,7 +144,8 @@ export function usageFrom(events) {
   for (const event of events) {
     const content = event?.message?.content
     if (Array.isArray(content)) toolCalls += content.filter((block) => block?.type === 'tool_use').length
-    if (event?.type === 'item.completed' && event?.item?.item_type) toolCalls += 1
+    const itemType = event?.item?.type ?? event?.item?.item_type
+    if (event?.type === 'item.completed' && ['command_execution', 'mcp_tool_call', 'web_search', 'file_change', 'file_write', 'patch'].includes(itemType)) toolCalls += 1
     for (const usage of [event?.message?.usage, event?.usage, event?.info?.total_token_usage]) {
       if (!usage) continue
       tokens = Math.max(tokens, (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0))
@@ -178,10 +179,10 @@ export function assistantTextsFrom(events) {
       for (const block of content) if (block?.type === 'text' && typeof block.text === 'string') texts.push(block.text)
     }
     if (event?.type === 'result' && typeof event.result === 'string') texts.push(event.result)
-    // Codex stream: the final agent message arrives as item.completed with item_type agent_message.
+    // Current Codex uses item.type; keep compatibility with older item_type transcripts.
     if (event?.type !== 'item.completed') continue
     const item = event.item
-    if (item?.item_type === 'agent_message' && typeof item.text === 'string') texts.push(item.text)
+    if ((item?.type ?? item?.item_type) === 'agent_message' && typeof item.text === 'string') texts.push(item.text)
   }
   return texts
 }
@@ -226,7 +227,7 @@ export function writtenPathsFrom(events) {
     }
     if (event?.type !== 'item.completed') continue
     const item = event.item
-    if (!item || !CODEX_CHANGE_ITEMS.has(String(item.item_type ?? '').toLowerCase()) || item.status === 'failed')
+    if (!item || !CODEX_CHANGE_ITEMS.has(String(item.type ?? item.item_type ?? '').toLowerCase()) || item.status === 'failed')
       continue
     for (const change of Array.isArray(item.changes) ? item.changes : [item]) {
       if (typeof change?.path === 'string') confirmed.add(change.path)
@@ -282,7 +283,7 @@ export function buildRunRecord({ brief, variant, host, replicateId, dir, events,
         events.find((event) => event?.message?.model)?.message?.model ??
         events.find((event) => event?.model)?.model ??
         null,
-      sessionId: events.find((event) => event?.session_id)?.session_id ?? null,
+      sessionId: events.find((event) => event?.session_id)?.session_id ?? events.find((event) => event?.type === 'thread.started')?.thread_id ?? null,
       errors,
       attestation,
     },
@@ -320,7 +321,7 @@ export async function createFixture({ root, brief, variant, host, replicateId, s
 function runHost(host, prompt, cwd, extra) {
   const { command, args } = HOSTS[host]
   return new Promise((done, reject) => {
-    const child = spawn(command, args(prompt, extra), { cwd })
+    const child = spawn(command, args(prompt, extra), { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
     let stdout = ''
     let stderr = ''
     child.stdout.setEncoding('utf8')
