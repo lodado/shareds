@@ -33,7 +33,8 @@ property, variant, auto layout, variable binding을 실제로 확인한다.
 
 ## 3. Base Figma Template 자동 선정
 
-사용자가 지정하지 않았으면 내부 후보 다음에 Figma Community, 공식 UI Kit, 신뢰할 수 있는
+내부 자산이 요구 범위를 충족하면 그것을 `internal-default` Visual Source of Truth로 선택하고
+외부 template 검색을 생략한다. 내부 자산이 부족하고 사용자가 지정하지 않았으면 Figma Community, 공식 UI Kit, 신뢰할 수 있는
 template library, SaaS landing/product kit를 찾는다. “가장 예쁜 것”이 아니라 아래 기준을 0–5로
 평가한다.
 

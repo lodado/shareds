@@ -6,7 +6,7 @@
     "name": "lodado",
     "url": "https://github.com/lodado"
   },
-  "version": "0.48.0",
+  "version": "0.47.0",
   "plugins": [
     {
       "name": "vibe-coding-helper",

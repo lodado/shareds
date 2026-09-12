@@ -95,13 +95,14 @@ Experiment로 만들고 API/property를 실제 콘텐츠에 맞춰 제한한다.
 2. Strongest Product/Evidence Section
 3. Workflow/Explanation Section
 
-PRD의 설득 구조가 다르면 더 중요한 정확히 3개 section으로 바꾼다. 예를 들어 comparison이 핵심인
+PRD의 설득 구조가 다르면 더 중요한 약 3개 section으로 바꾼다.
+단일 화면이나 부분 수정은 합의 범위의 1–3개 section/state만 선택하며 범위를 부풀리지 않는다. 예를 들어 comparison이 핵심인
 제품은 workflow 대신 comparison을 선택할 수 있다.
 
 pilot은 실제 길이의 copy, 실제 screenshot, 실제 brand asset을 사용한다. 허용된 placeholder는
 표시한다. screenshot이 제품 증거라면 장식처럼 축소하지 않는다.
 
-Desktop에서 먼저 위계와 rhythm을 확인하되 mobile frame도 같은 pilot에서 만든다. 좁은 화면에서는
+합의된 기기에서 위계와 rhythm을 확인하고, mobile이 범위에 있으면 같은 pilot에서 만든다. 좁은 화면에서는
 단순 scale-down이 아니라 읽기 순서, crop, grouping, CTA 우선순위를 재결정한다.
 
 pilot을 실제 Figma preview로 본 뒤에만 PILOT_READY를 쓴다. 이 시점의 목적은 방향을 검증하는

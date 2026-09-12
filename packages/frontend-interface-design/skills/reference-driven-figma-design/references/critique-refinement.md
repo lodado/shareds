@@ -55,7 +55,7 @@ AI slop 검사는 특정 스타일 금지가 아니다. 목적과 source가 없�
 
 ## 3. 반복 방법
 
-각 round에서 가장 영향이 큰 문제 3개만 고른다.
+각 round에서 가장 영향이 큰 문제를 최대 3개 고른다. 문제가 적으면 채워 넣지 않는다.
 
 예:
 
@@ -74,7 +74,9 @@ AI slop 검사는 특정 스타일 금지가 아니다. 목적과 source가 없�
 4. 필요한 경우에만 V4
 
 일반적으로 2–4회의 의미 있는 반복을 우선한다. 색 하나를 바꾸거나 관찰 없이 다시 저장한 것은
-iteration으로 세지 않는다. 같은 문제가 두 round 연속 개선되지 않으면 미세 조정 대신 source
+iteration으로 세지 않는다. 2–4회는 권장치이지 최소·최대 게이트가 아니다. 작은 변경은
+1회 실제 비평과 필요한 수정 후 재검토로 충분할 수 있고, 추가 반복이 필요하면 이유를 기록한다.
+횟수를 채우기 위한 수정이나 관찰하지 않은 round를 만들지 않는다. 같은 문제가 두 round 연속 개선되지 않으면 미세 조정 대신 source
 selection, mapping 또는 asset 조건으로 돌아간다.
 
 ## 4. Round record
@@ -97,10 +99,10 @@ V1, V2, V3를 모두 복제해 canvas를 어지럽히지 않는다. 사용자가
 다음이면 FIGMA_READY가 아니다.
 
 - Figma 결과를 다시 열어 보지 못했다.
-- desktop 또는 합의한 mobile/state가 unreviewed다.
+- 합의한 desktop/mobile/state가 unreviewed다.
 - 핵심 product asset이 placeholder인데 실제처럼 보인다.
 - hierarchy나 content fit의 큰 실패를 polish로 덮었다.
-- 2회 미만의 의미 있는 critique/refinement다.
+- 실제 critique와 필요한 수정 후 재검토 기록이 없다.
 - 다른 reference의 visual system이 섞여 있다.
 
 자기 비평은 `design-self-review: ready | incomplete | unreviewed`로 기록한다. 사용자 수락은 실제

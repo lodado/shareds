@@ -29,12 +29,18 @@
 - AI slop 제거·유지 판단
 - unresolved와 unreviewed
 
+`iteration_count`는 실제 `rounds` 길이와 일치해야 한다. 각 round는 고유한 version과 관찰 기록을 가진다.
+문제가 없으면 `top_issues`와 `fixes`는 빈 배열로 두고 `result`에 실제 검토한 기준과 수정 불필요 이유를
+기록한다. 검토 횟수를 채우려고 문제나 수정을 발명하지 않는다.
+요청의 전체 section, viewport, state와 전달한 완료 목록을 대조한다. JSON Schema만으로 범위 간
+일치나 실제 Figma 관찰을 증명할 수 없으므로 도구 결과와 함께 확인한다.
 반복 횟수만으로 품질을 주장하지 않는다. 실제 frame을 보고 어떤 문제가 개선됐는지 연결한다.
 
 ## 4. 결과 상태
 
-- **FIGMA_READY**: editable Figma, 전체 합의 범위, 2–4회 critique, log/catalog, 미확인 공개.
-- **PILOT_READY**: 핵심 3 section까지만 검증됨. 전체 page 완료가 아니다.
+- **FIGMA_READY**: editable Figma, 전체 합의 범위, 실제 critique와 수정 후 재검토, 합의된 log/catalog 기록.
+  2–4회는 권장치이며 적거나 더 많은 경우 이유를 남긴다. 범위 안의 unresolved/unreviewed는 없어야 한다.
+- **PILOT_READY**: 합의한 pilot(보통 3개, 작은 범위는 1–3개)만 검증됨. 전체 page 완료가 아니다.
 - **INCOMPLETE**: 일부 frame은 있으나 asset, state, responsive, critique gate가 남음.
 - **NEEDS_INPUT**: 제품 방향을 바꾸는 사용자 결정이 필요함.
 - **BLOCKED**: Figma write, 필수 원본, 권한 또는 유료/라이선스 승인 때문에 진행 불가.

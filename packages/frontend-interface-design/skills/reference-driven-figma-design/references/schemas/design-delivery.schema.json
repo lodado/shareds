@@ -26,7 +26,7 @@
       "minLength": 1
     },
     "status": {
-      "enum": ["NEEDS_INPUT", "BLOCKED", "PILOT_READY", "FIGMA_READY", "INCOMPLETE"]
+      "enum": ["DISCOVERED", "BRIEF_READY", "NEEDS_INPUT", "BLOCKED", "PILOT_READY", "FIGMA_READY", "INCOMPLETE"]
     },
     "figma": {
       "type": "object",
@@ -142,15 +142,13 @@
       "properties": {
         "iteration_count": {
           "type": "integer",
-          "minimum": 0,
-          "maximum": 4
+          "minimum": 0
         },
         "rounds": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/critiqueRound"
-          },
-          "maxItems": 4
+          }
         },
         "ai_slop_findings": {
           "type": "array",
@@ -324,7 +322,7 @@
       "properties": {
         "version": {
           "type": "string",
-          "pattern": "^V[1-4]$"
+          "pattern": "^V[1-9][0-9]*$"
         },
         "inspected_frames": {
           "type": "array",
@@ -451,7 +449,7 @@
       "if": {
         "properties": {
           "status": {
-            "const": "FIGMA_READY"
+            "enum": ["PILOT_READY", "FIGMA_READY"]
           }
         },
         "required": ["status"]
@@ -462,7 +460,8 @@
             "properties": {
               "url": {
                 "type": "string",
-                "format": "uri"
+                "format": "uri",
+                "pattern": "^https://(www\\.)?figma\\.com/(design|file)/[A-Za-z0-9]+(?:[/?#]|$)"
               },
               "file_key": {
                 "type": "string",
@@ -482,12 +481,10 @@
           "critique": {
             "properties": {
               "iteration_count": {
-                "minimum": 2,
-                "maximum": 4
+                "minimum": 1
               },
               "rounds": {
-                "minItems": 2,
-                "maxItems": 4
+                "minItems": 1
               }
             }
           },
@@ -504,9 +501,50 @@
               },
               "preview_inspected": {
                 "const": true
+              }
+            }
+          },
+          "scope": {
+            "properties": {
+              "pilot_sections": {
+                "minItems": 1
               },
+              "completed_sections": {
+                "minItems": 1
+              },
+              "responsive_frames": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "FIGMA_READY"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "verification": {
+            "properties": {
               "design_self_review": {
                 "const": "ready"
+              },
+              "unreviewed": {
+                "maxItems": 0
+              }
+            }
+          },
+          "critique": {
+            "properties": {
+              "unresolved": {
+                "maxItems": 0
               }
             }
           }

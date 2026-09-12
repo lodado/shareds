@@ -69,7 +69,7 @@ test('runs internal-first research, a three-section pilot, bounded critique, and
 
   assert.match(research, /Existing Component Catalog[\s\S]*Existing Figma Library[\s\S]*Refero/)
   assert.match(research, /preview-only[\s\S]*structure-inspected[\s\S]*editable-verified/)
-  assert.match(composition, /정확히 3개 section/)
+  assert.match(composition, /합의 범위의 1–3개 section/)
   assert.match(skill, /가장 영향이 큰 문제 3개/)
   assert.match(critique, /2–4회의 의미 있는 반복/)
   assert.match(critique, /전체 page를 다시 생성하지 않는다/)
@@ -88,7 +88,7 @@ test('ships valid input and output JSON schemas with an editable-Figma completio
   assert.deepEqual(request.properties.scope.properties.pilot_sections, {
     type: 'array',
     items: { type: 'string', minLength: 1 },
-    minItems: 3,
+    minItems: 1,
     maxItems: 3,
     uniqueItems: true,
   })
@@ -97,8 +97,8 @@ test('ships valid input and output JSON schemas with an editable-Figma completio
   assert.equal(delivery.properties.figma.properties.code_generated.const, false)
   const readyGate = delivery.allOf[0].then.properties
   assert.equal(readyGate.figma.properties.editable.const, true)
-  assert.equal(readyGate.critique.properties.iteration_count.minimum, 2)
-  assert.equal(readyGate.critique.properties.iteration_count.maximum, 4)
+  assert.equal(readyGate.critique.properties.iteration_count.minimum, 1)
+  assert.equal(readyGate.critique.properties.iteration_count.maximum, undefined)
   assert.equal(readyGate.verification.properties.preview_inspected.const, true)
 })
 
@@ -132,6 +132,14 @@ test('plugin identity stays upgrade-compatible while UI and skill routing become
   assert.equal(packageManifest.name, '@lodado/frontend-interface-design-plugin')
   assert.match(openai, /value: figma/)
   assert.match(openai, /\$reference-driven-figma-design/)
+
+  const legacyDirectory = join(packageDirectory, 'skills/frontend-interface-design')
+  const legacy = await readFile(join(legacyDirectory, 'SKILL.md'), 'utf8')
+  assert.match(legacy, /name: frontend-interface-design/)
+  const target = legacy.match(/\]\(([^)]+)\)/)?.[1]
+  assert.ok(target, 'Legacy invocation must resolve to the canonical skill')
+  assert.equal(resolve(legacyDirectory, target), join(skillDirectory, 'SKILL.md'))
+  await access(resolve(legacyDirectory, target))
 })
 
 test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and promotion boundaries', async () => {
@@ -139,7 +147,7 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
   const ids = cases.map(({ id }) => id)
 
   assert.equal(schemaVersion, '1.0')
-  assert.equal(cases.length, 8)
+  assert.equal(cases.length, 9)
   assert.equal(new Set(ids).size, cases.length)
   for (const entry of cases) {
     assert.ok(entry.prompt.trim(), `${entry.id}: missing prompt`)

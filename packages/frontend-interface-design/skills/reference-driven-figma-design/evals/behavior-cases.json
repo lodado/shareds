@@ -86,6 +86,19 @@
         "Promote solely because the component was created",
         "Claim Shared or Approved without a designated library"
       ]
+    },
+    {
+      "id": "scoped-internal-state",
+      "prompt": "기존 승인된 사내 Figma 설정 다이얼로그의 오류 상태만 개선해줘. desktop-only이고 내부 Error variant가 적합하다. 실제 수정 후 재검토에서 남은 문제가 없다.",
+      "expected_invariants": [
+        "Reuse the verified internal variant with internal-default; skip unnecessary external template research",
+        "Limit the pilot to the requested state and desktop viewport",
+        "Record actual critique and post-fix preview; allow completion after one meaningful round if all scoped gates pass"
+      ],
+      "forbidden": [
+        "Invent additional sections or a mobile deliverable to fill a quota",
+        "Fabricate issues or repeat edits just to reach two rounds"
+      ]
     }
   ]
 }

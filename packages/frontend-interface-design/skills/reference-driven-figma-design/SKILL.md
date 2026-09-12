@@ -34,6 +34,10 @@ Accumulate**가 기본이다.
 
 작업 전 실제 도구와 권한을 확인한다. 제품명만 보고 기능을 추측하지 않는다.
 
+사용 가능한 Figma provider의 도구 설명과 필수 companion skill을 먼저 읽고 그 실행 규칙을 따른다.
+예를 들어 공식 provider가 요구하면 `figma-use`, 페이지 작업의 `figma-generate-design`, component
+작업의 `figma-generate-library`를 해당 작업 전에 읽는다. 설치되지 않은 skill이나 API를 가정하지 않는다.
+
 - **Figma read/write가 필수다.** 파일·page·frame·Variables·Components·Variants·Auto Layout을
   실제로 읽고, 별도 working 영역을 쓰며, 결과를 다시 열어 볼 수 있어야 한다. 존재하지 않는
   node ID, component ID, variable, version을 만들지 않는다.
@@ -81,7 +85,7 @@ Accumulate**가 기본이다.
 | DISCOVERED  | 소스·권한·자산·미결정이 구분됨                  |
 | NEEDS_INPUT | 제품 방향을 바꾸는 필수 결정이 남음             |
 | BRIEF_READY | 작업 계약과 source hierarchy가 준비됨           |
-| PILOT_READY | 핵심 3개 섹션이 Figma에서 작성·비평됨           |
+| PILOT_READY | 합의된 핵심 pilot이 Figma에서 작성·비평됨           |
 | FIGMA_READY | 전체 범위가 편집 가능하고 검토·기록까지 완료됨  |
 | INCOMPLETE  | 일부 시안은 있으나 완료 게이트를 충족하지 못함  |
 | BLOCKED     | 필수 Figma 권한·자산·정책 때문에 진행할 수 없음 |
@@ -96,6 +100,7 @@ Accumulate**가 기본이다.
    variables/components/variants, 실제 copy와 product assets를 먼저 조사한다.
 3. **Select a base.** 지정 template이 없으면
    [research and selection](references/research-selection.md) 기준으로 접근 가능한 후보를 비교한다.
+   내부 시스템이 범위를 충분히 해결하면 `internal-default`로 선택하고 외부 template 검색을 생략한다.
    preview만 본 후보의 내부 구조를 검증됐다고 하지 않는다.
 4. **Translate the PRD.** 각 섹션을 User Question, Communication Goal, Required Content,
    Available Evidence, Desired Action, Available Visual Assets로 바꾼다.
@@ -108,7 +113,8 @@ Accumulate**가 기본이다.
    Working Page, duplicated frame 또는 Experiment Area에서 instance, property, variable,
    auto layout으로 만든다. 불필요한 detach를 피한다.
 8. **Pilot first.** 전체 페이지보다 Hero, strongest product/evidence, workflow/explanation 또는
-   PRD에 더 적합한 핵심 3개 섹션을 실제 copy·screenshot·brand asset으로 먼저 만든다.
+   PRD에 더 적합한 약 3개 섹션을 실제 copy·screenshot·brand asset으로 먼저 만든다.
+   단일 화면·부분 수정은 합의 범위 안의 1–3개로 제한하며 섹션이나 기기를 추가하지 않는다.
 9. **Critique and refine.** [critique loop](references/critique-refinement.md)로 실제 Figma 결과를
    다시 보고 가장 영향이 큰 문제 3개를 수정한다. 일반적으로 2–4회의 의미 있는 반복을 하며,
    잘된 부분은 유지하고 전면 재생성하지 않는다.
@@ -140,8 +146,10 @@ FIGMA_READY는 다음이 모두 사실일 때만 쓴다.
 - 결과가 editable이고 component/variable/auto-layout 사용 여부를 실제 확인했다.
 - 합의된 desktop/mobile과 필요한 핵심 상태를 직접 열어 보았다.
 - visual hierarchy, composition, rhythm, product emphasis, consistency, authenticity를 비평했다.
-- AI slop 검사를 통과했고 top fixes를 반영한 2–4회 반복 기록이 있다.
-- Reference Log와 Component Catalog 변경이 Figma 또는 지정된 내부 자산 위치에 남아 있다.
+- AI slop 검사를 통과했고 실제 재검토와 필요한 top fixes 기록이 있다. 2–4회는 권장치이며,
+  작은 수정은 1회로 충분할 수 있다. 회수보다 합의 범위와 품질 게이트 충족을 확인한다.
+- 합의된 Reference Log와 Component Catalog 변경이 Figma 또는 지정된 내부 자산 위치에 남아 있다.
+  기존 자산만 재사용해 변경이 없으면 그 이유를 기록하며 불필요한 새 자산을 만들지 않는다.
 - 가짜 metric, testimonial, product UI, 접근하지 않은 정보가 없다.
 
 완료 보고는 [delivery contract](references/delivery-contract.md)를 따른다. 자기 비평은 사용자 승인이나
