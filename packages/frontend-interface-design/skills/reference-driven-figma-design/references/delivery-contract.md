@@ -3,6 +3,11 @@
 모든 handoff는 `schemas/design-delivery.schema.json`의 의미를 따른다. 대화에서는 읽기 쉽게
 요약해도 내부 기록은 같은 필드를 유지한다.
 
+[taxonomy·화면 근거·응용 계약](taxonomy-reference-workflow.md)의 Reference Log를 기존
+`source_trace.references`의 `source`/`selection_reason`에서 연결한다. 사전 파일/용어, 번역한 검색 의도,
+관찰한 화면, 편집 자산, 응용 내용, 적용 node와 실제 비교 캡처를 구분해 남긴다.
+정적 검사나 모의 행동 평가를 실제 Figma 실행·시각 품질 검증으로 보고하지 않는다.
+
 ## 1. 가장 먼저 전달할 것
 
 1. 실제 Figma URL
@@ -13,6 +18,11 @@
 정적 preview는 보조 증거다. Figma 원본 링크보다 먼저 대체 산출물처럼 제시하지 않는다.
 
 ## 2. Source trace
+
+컴포넌트 변경은 [필수 출처 게이트](component-source-gate.md)의 증거 행 위치를 기존
+`source_trace.references`의 `source`/`selection_reason`에 연결한다. HOLD인 부분이 있으면
+전체 FIGMA_READY 또는 “완료/정상 확인”으로 보고하지 않는다. 필요한 자료가 없는 부분과 이미 검토한
+부분을 분리하며, 단순 import/저장 성공을 출처 비교·시각 검토의 통과로 대신하지 않는다.
 
 - 선택된 base template과 실제 구조 확인 수준
 - 사용한 내부 components/variables/patterns

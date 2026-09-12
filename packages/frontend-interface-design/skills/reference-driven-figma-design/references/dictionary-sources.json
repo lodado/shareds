@@ -1,0 +1,71 @@
+{
+  "schema_version": "1.0",
+  "source_index": "https://vibedesignlab.net/dictionary",
+  "collected_at": "2026-09-11T09:17:40.395Z",
+  "usage": "Third-party reference text has no established redistribution license. Local use only; do not commit or bundle original documents.",
+  "files": [
+    {
+      "name": "README.md",
+      "sha256": "8dcafb8579cd45217236566c5456c8a0d748e485d40910291803d3a64f8ae818"
+    },
+    {
+      "name": "TOC.md",
+      "sha256": "cf0a8670ef32a70166a367fd7cf01302b4a31ad60b55a4db362c770600482f18"
+    },
+    {
+      "name": "ai-slop-taxonomy.md",
+      "sha256": "7d0317f117f3989d544e095f9eac94959e232603dc4091c723b5e3b726c0bdfe",
+      "source_url": "https://vibedesignlab.net/dictionary/ai-slop-taxonomy"
+    },
+    {
+      "name": "commercial-photographic-taxonomy.md",
+      "sha256": "e01cea4ba688a259c9c7956598525c4530f0edaac4d3a77a56d10095edbbc053",
+      "source_url": "https://vibedesignlab.net/dictionary/commercial-photographic-taxonomy"
+    },
+    {
+      "name": "design-movement-converted.md",
+      "sha256": "76b1c45b22ced7f48187e983eb3455ca1720381bf2905280e7d99f837fd3fcca",
+      "source_url": "https://vibedesignlab.net/dictionary/design-movement"
+    },
+    {
+      "name": "design-references-converted.md",
+      "sha256": "354a1766fc4de4f5fb7e3aad3a6e80d2cdb6dd6fe04021659e893f192eadf394",
+      "source_url": "https://vibedesignlab.net/dictionary/design-references"
+    },
+    {
+      "name": "design-taxonomy.md",
+      "sha256": "97918dffa0a687af863631f0e9afc15ad2e2af493c58a92d928918594a84002d",
+      "source_url": "https://vibedesignlab.net/dictionary/design-taxonomy"
+    },
+    {
+      "name": "dev-wiki-converted.md",
+      "sha256": "9d347579d3ab4ad9c6d9f1ef12c4bc257a7d4207d812a230b3b7a7e70704bb52",
+      "source_url": "https://vibedesignlab.net/dictionary/dev-wiki"
+    },
+    {
+      "name": "generative-image-taxonomy.md",
+      "sha256": "2eaf03d52ca5c90175b21e9559798073c48300176b280d111cd7d3dc823abc77",
+      "source_url": "https://vibedesignlab.net/dictionary/generative-image-taxonomy"
+    },
+    {
+      "name": "layout-taxonomy.md",
+      "sha256": "f12e9171e15dea799014dc89dcebe5d824de91716db80b93fc841310ddfb1fbe",
+      "source_url": "https://vibedesignlab.net/dictionary/layout-taxonomy"
+    },
+    {
+      "name": "typography-taxonomy.md",
+      "sha256": "fe919b1ef252defd9ffc4a54cd502795c5559e6ad6b314121b29b8240c364167",
+      "source_url": "https://vibedesignlab.net/dictionary/typography-taxonomy"
+    },
+    {
+      "name": "ux-taxonomy.md",
+      "sha256": "e5e8d84f73f8958984dcf1cc72084cd6a8f744f10efbc603ee1e3a8f86feeab6",
+      "source_url": "https://vibedesignlab.net/dictionary/ux-taxonomy"
+    },
+    {
+      "name": "visual-asset-taxonomy.md",
+      "sha256": "e6e8f0bb3994ca92c0a6dab1f023920258288e186ce33a34ad0ea5479f5445f3",
+      "source_url": "https://vibedesignlab.net/dictionary/visual-asset-taxonomy"
+    }
+  ]
+}

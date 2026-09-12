@@ -11,6 +11,19 @@ metadata:
 만든다. AI의 무제약 창작이 아니라 **Research → Select → Map → Compose → Critique → Refine →
 Accumulate**가 기본이다.
 
+## 필수 taxonomy·화면 근거·응용 계약
+
+새 화면·주요 구성 변경·컴포넌트 대안 탐색은 검색 전에
+[Taxonomy → reference → adaptation](references/taxonomy-reference-workflow.md)을 읽는다.
+내부 적합성 확인 후 필요한 사전 항목의 정의·fit/avoid를 검색 의도로 번역하고,
+**taxonomy 판단 근거 / 관찰한 화면 구성 / 실제 편집 자산**을 따로 확인한다.
+키워드만 보고 임의로 그리거나 컴포넌트 import를 좋은 화면 구성의 증거로 대신하지 않는다.
+
+템플릿은 출발점이지 부품의 한계가 아니다. 콘텐츠·밀도·상태·모바일 불일치가 있으면 승인 범위 안에서
+다른 출처를 능동적으로 찾아 변형·재조합하고, 원본·연결 상태·변경 이유를 기록한다.
+전체 확장 전 실제 레퍼런스와 파일럿을 나란히 비교해 위계·비율·밀도·여백·읽기 순서를 검증한다.
+기존 컴포넌트 출처 게이트와 작은 내부 수정의 예외는 유지한다. 이 계약은 프롬프트 규칙이며 런타임 차단 훅은 아니다.
+
 ## 결과와 역할 경계
 
 - 최종 산출물은 실제 Figma 파일의 편집 가능한 frame, component instance, variable, auto layout이다.
@@ -30,7 +43,25 @@ Accumulate**가 기본이다.
 5. Composition references are not visual systems.
 6. Critique before completion.
 
+## 필수 컴포넌트 출처 게이트 — 본 시안 변경 전에
+
+**템플릿은 시각 기준이지 선택지의 상한이 아니다.** 필요한 역할·콘텐츠·상태·기기 변형이 없거나,
+사용자가 외부 레퍼런스/컴포넌트 비교를 요청하면 [component-source-gate.md](references/component-source-gate.md)를
+먼저 읽고 통과한다. 기존 컴포넌트가 있다는 이유로 이 게이트를 건너뛰지 않는다.
+
+- 부족한 부분은 외부의 **서로 다른 출처 2곳 이상**을 실제 조사하고 편집 가능한 후보를 같은 콘텐츠로 비교한다.
+  검색 결과·스크린샷·한 라이브러리의 여러 Variant는 서로 다른 출처의 실제 컴포넌트 비교를 대체하지 못한다.
+- 기존 구조의 적합성이 확인됐고 외부 비교 요청도 없는 오타·간격·상태 수정은 그 근거를 남기고 재사용한다.
+  승인된 정확한 원본 보존/외부 반입 금지 범위를 검색 할당량으로 깨지 않는다.
+- 증거가 부족하면 해당 부분의 채택·확장·완료 선언을 중단한다. 검색 실패를 임의 창작·역할 바꾸기·무단
+  detach 허가로 해석하지 않는다. `ㄱㄱ`, `빨리`, `한방에`는 게이트 생략 승인이 아니다.
+- `PILOT_READY`/`FIGMA_READY`와 “완료/정상 확인” 표현은 출처 게이트 및 실제 가독 크기의 시각 검토 통과 후에만 쓴다.
+  도구 성공 응답과 전체 페이지 축소판은 검토 증거가 아니다. 도구·권한·라이선스 제약은 그대로 보존한다.
+
 ## Capability gate
+
+컴포넌트 출처 탐색은 편집 가능한 Figma Library/Community/UI Kit를 우선하고,
+구도 리서치는 사용 가능한 Refero를 우선한다. 두 경로는 서로의 실제 자산/관측 증거를 대체하지 않는다.
 
 작업 전 실제 도구와 권한을 확인한다. 제품명만 보고 기능을 추측하지 않는다.
 
@@ -77,6 +108,8 @@ Accumulate**가 기본이다.
   workflow representation.
 - 외부의 색·폰트·radius·shadow를 함께 복사하지 않는다. 구조를 현재 시스템의 component와
   variable로 번역한다.
+- 이 규칙은 외부의 편집 가능한 component/kit 반입을 금지하지 않는다. 출처 게이트에서 채택한
+  instance/프레임은 실제로 재사용하고, 승인된 토큰으로 조정한 override와 연결 상태를 기록한다.
 
 ## 실행 상태
 
@@ -85,7 +118,7 @@ Accumulate**가 기본이다.
 | DISCOVERED  | 소스·권한·자산·미결정이 구분됨                  |
 | NEEDS_INPUT | 제품 방향을 바꾸는 필수 결정이 남음             |
 | BRIEF_READY | 작업 계약과 source hierarchy가 준비됨           |
-| PILOT_READY | 합의된 핵심 pilot이 Figma에서 작성·비평됨           |
+| PILOT_READY | 합의된 핵심 pilot이 Figma에서 작성·비평됨       |
 | FIGMA_READY | 전체 범위가 편집 가능하고 검토·기록까지 완료됨  |
 | INCOMPLETE  | 일부 시안은 있으나 완료 게이트를 충족하지 못함  |
 | BLOCKED     | 필수 Figma 권한·자산·정책 때문에 진행할 수 없음 |
@@ -104,11 +137,11 @@ Accumulate**가 기본이다.
    preview만 본 후보의 내부 구조를 검증됐다고 하지 않는다.
 4. **Translate the PRD.** 각 섹션을 User Question, Communication Goal, Required Content,
    Available Evidence, Desired Action, Available Visual Assets로 바꾼다.
-5. **Research only the gaps.** 내부 자산으로 해결되지 않는 중요한 섹션에 여러 composition 후보를
-   찾고 역할 적합성·위계·반응형·전환 비용을 비교한다. 첫 결과나 가장 화려한 결과를 고르지 않는다.
+5. **Research the gaps and requested alternatives.** 부족한 컴포넌트와 사용자가 요청한 외부 대안은
+   필수 출처 게이트로 실제 반입·비교한다. 구도 참고만으로 컴포넌트 탐색을 대신하지 않는다.
 6. **Map before drawing.** Reference element를 기존 Figma component/variant/primitive에 매핑한다.
-   우선순위는 Existing Component → Existing Variant → Existing Primitives의 조합 →
-   New Reusable Component → One-off Element다.
+   우선순위는 적합성이 검증된 내부 자산 → 출처 게이트에서 채택한 외부 자산 →
+   게이트가 허용한 내부 primitive 조합/새 Experiment다. 비교가 요청됐다면 내부 자산도 비교 후 선택한다.
 7. **Compose safely.** [Figma composition](references/figma-composition.md)에 따라 원본을 보존하고
    Working Page, duplicated frame 또는 Experiment Area에서 instance, property, variable,
    auto layout으로 만든다. 불필요한 detach를 피한다.
@@ -142,6 +175,8 @@ Accumulate**가 기본이다.
 
 FIGMA_READY는 다음이 모두 사실일 때만 쓴다.
 
+- 변경한 각 역할의 출처 게이트 통과 또는 정당한 내부 재사용 근거가 Reference Log에 있다.
+  후보·권리·실제 복제/연결·override·적용 위치·가독 크기 비교 증거 중 필요한 항목이 없으면 완료가 아니다.
 - 실제 Figma URL과 정확한 file/page/frame 식별자를 전달할 수 있다.
 - 결과가 editable이고 component/variable/auto-layout 사용 여부를 실제 확인했다.
 - 합의된 desktop/mobile과 필요한 핵심 상태를 직접 열어 보았다.

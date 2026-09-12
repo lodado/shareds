@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { access, readdir, readFile } from 'node:fs/promises'
 import { dirname, extname, join, resolve } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package contract tests run with node --test.
@@ -125,7 +126,14 @@ test('plugin identity stays upgrade-compatible while UI and skill routing become
   ])
 
   assert.equal(codexManifest.name, 'frontend-interface-design')
-  assert.equal(codexManifest.version, '1.0.0')
+  assert.equal(codexManifest.version, packageManifest.version)
+  assert.equal(claudeManifest.version, packageManifest.version)
+  // Marketplace metadata belongs to the monorepo, not an individual installed plugin.
+  const repositoryDirectory = dirname(dirname(packageDirectory))
+  if (packageDirectory === join(repositoryDirectory, 'packages/frontend-interface-design')) {
+    const marketplace = JSON.parse(await readFile(join(repositoryDirectory, '.claude-plugin/marketplace.json'), 'utf8'))
+    assert.equal(marketplace.plugins.find(({ name }) => name === codexManifest.name)?.version, packageManifest.version)
+  }
   assert.equal(codexManifest.interface.displayName, 'Reference-Driven Figma Design')
   assert.match(codexManifest.description, /editable Figma/)
   assert.equal(claudeManifest.name, 'frontend-interface-design')
@@ -147,11 +155,73 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
   const ids = cases.map(({ id }) => id)
 
   assert.equal(schemaVersion, '1.0')
-  assert.equal(cases.length, 9)
+  assert.equal(cases.length, 27)
   assert.equal(new Set(ids).size, cases.length)
   for (const entry of cases) {
     assert.ok(entry.prompt.trim(), `${entry.id}: missing prompt`)
     assert.ok(entry.expected_invariants.length >= 3, `${entry.id}: weak expected contract`)
     assert.ok(entry.forbidden.length >= 2, `${entry.id}: weak forbidden contract`)
+  }
+})
+
+test('requires taxonomy interpretation, separate screen evidence, adaptation and pilot comparison', async () => {
+  const main = await readSkillFile('SKILL.md')
+  const workflow = await readSkillFile('references/taxonomy-reference-workflow.md')
+  assert.match(main, /references\/taxonomy-reference-workflow\.md/)
+  for (const heading of [
+    '## 1. 사전 해석과 무결성',
+    '## 2. 키워드를 검색 의도로 변환',
+    '## 3. 화면 근거와 컴포넌트 출처를 분리',
+    '## 4. 능동적인 응용의 범위',
+    '## 5. 비교 파일럿과 완료 게이트',
+  ]) {
+    assert.ok(workflow.includes(heading), heading)
+  }
+  assert.match(workflow, /taxonomy는 시각 증거가 아니고, UI Kit import는 화면 구성의 근거가 아니다/)
+  assert.match(workflow, /로컬 파생 컴포넌트/)
+  assert.match(workflow, /HOLD/)
+  assert.match(workflow, /INCOMPLETE/)
+  assert.match(workflow, /작은 수정은 기존 근거를 재사용/)
+  assert.match(workflow, /프롬프트 실행 계약/)
+  assert.match(workflow, /실제 Figma 실행·시각 품질이 검증됐다는 뜻이 아니다/)
+  for (const file of ['research-selection.md', 'figma-composition.md', 'critique-refinement.md', 'delivery-contract.md']) {
+    const content = await readSkillFile(`references/${file}`)
+    assert.ok(content.includes('taxonomy-reference-workflow.md'), file)
+  }
+  for (const match of workflow.matchAll(/\]\(([^)]+)\)/g)) {
+    const destination = match[1].split('#')[0]
+    if (destination && !/^[a-z]+:/i.test(destination)) {
+      await access(resolve(skillDirectory, 'references', destination))
+    }
+  }
+})
+
+test('ships source fingerprints and local resolution without redistributing dictionary text', async () => {
+  const legacy = await readFile(join(packageDirectory, 'skills/frontend-interface-design/SKILL.md'), 'utf8')
+  assert.match(legacy, /\.\.\/reference-driven-figma-design\/references\/taxonomy-reference-workflow\.md/)
+  const manifest = JSON.parse(await readSkillFile('references/dictionary-sources.json'))
+  assert.equal(manifest.source_index, 'https://vibedesignlab.net/dictionary')
+  assert.match(manifest.usage, /Local use only/)
+  const names = manifest.files.map(({ name, sha256 }) => {
+    assert.match(name, /^[\w.-]+\.md$/)
+    assert.match(sha256, /^[\da-f]{64}$/)
+    return name
+  })
+  assert.equal(names.length, 13)
+  assert.equal(new Set(names).size, 13)
+  assert.equal(names.filter((name) => name.endsWith('taxonomy.md')).length, 8)
+  await access(join(skillDirectory, 'scripts/resolve_dictionary.py'))
+  const workflow = await readSkillFile('references/taxonomy-reference-workflow.md')
+  assert.match(workflow, /Git이나 플러그인 패키지에 원문을 넣지 않는다/)
+  assert.match(workflow, /FIGMA_DESIGN_DICTIONARY/)
+  const repositoryDirectory = dirname(dirname(packageDirectory))
+  if (packageDirectory === join(repositoryDirectory, 'packages/frontend-interface-design')) {
+    const dictionaryPaths = ['frontend-interface-design', 'reference-driven-figma-design'].map(
+      (skill) => `packages/frontend-interface-design/skills/${skill}/references/dictionary/`,
+    )
+    const options = { cwd: repositoryDirectory, encoding: 'utf8' }
+    assert.equal(execFileSync('git', ['ls-files', '--', ...dictionaryPaths], options).trim(), '')
+    const probes = dictionaryPaths.map((path) => `${path}taxonomy.md`)
+    assert.deepEqual(execFileSync('git', ['check-ignore', '--no-index', '--', ...probes], options).trim().split('\n'), probes)
   }
 })

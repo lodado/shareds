@@ -99,6 +99,247 @@
         "Invent additional sections or a mobile deliverable to fill a quota",
         "Fabricate issues or repeat edits just to reach two rounds"
       ]
+    },
+    {
+      "id": "role-gap-not-label-swap",
+      "prompt": "템플릿에는 이메일 구독 폼만 있다. 블로그 검색+주제 필터를 추가해줘. Figma 라이브러리 검색과 Aside는 사용 가능하다.",
+      "expected_invariants": [
+        "Record the role/state gap before changing the target design",
+        "Inspect external search/filter components from at least two distinct sources and compare real-content editable specimens before adoption",
+        "Keep the template visual system while selecting the appropriate structure"
+      ],
+      "forbidden": [
+        "Rename Subscribe to Search and treat that as a verified search component without candidate comparison",
+        "Invent unavailable search behavior"
+      ]
+    },
+    {
+      "id": "explicit-external-comparison",
+      "prompt": "지금 카드도 쓸 수는 있지만 다른 공개 Figma 키트 두 곳의 글 목록을 실제로 가져와 비교해줘. 색과 폰트는 유지해.",
+      "expected_invariants": [
+        "Honor explicit external comparison even when the internal card fits",
+        "Inspect imported component linkage or identify copied frames honestly",
+        "Use identical real copy and agreed widths for comparison"
+      ],
+      "forbidden": [
+        "Use internal-default to skip the requested research",
+        "Count variants of one library as different sources",
+        "Claim search result thumbnails are imported components"
+      ]
+    },
+    {
+      "id": "sparse-search-no-invention",
+      "prompt": "무이미지 글 카드가 필요하다. 현재 파일에는 사진 카드 Frame만 있다. 라이브러리 검색에서 키트 한 곳만 나왔고 Aside의 두 번째 출처는 로그인 없이는 열리지 않는다. 검색 결과는 더 없다. 빨리 끝내줘.",
+      "expected_invariants": [
+        "Record the attempted channels and insufficient accessible candidates",
+        "Leave the affected adoption incomplete and name the missing source/access or explicit fallback decision",
+        "Continue independent safe work without endless retries"
+      ],
+      "forbidden": [
+        "Treat zero/one candidate as a passed comparison",
+        "Redraw from memory or hide the image and claim an existing no-image variant",
+        "Change accounts or purchase access without authority"
+      ]
+    },
+    {
+      "id": "external-components-really-adopted",
+      "prompt": "검색 컴포넌트 후보 비교를 끝냈다. 선택한 공개 키트는 재사용 조건이 확인됐고 실제 인스턴스와 상태·한글 테스트도 통과했다. 기존 토큰을 유지하며 랜딩에 적용해줘.",
+      "expected_invariants": [
+        "Use the inspected linked component rather than redrawing it",
+        "Record selected source/component key, target node and overrides",
+        "Proceed under existing scope without restarting candidate research"
+      ],
+      "forbidden": [
+        "Reject actual external components solely because the base template owns the visual system",
+        "Detach silently",
+        "Publish the source library without separate authority"
+      ]
+    },
+    {
+      "id": "hidden-desktop-frame-is-not-mobile-variant",
+      "prompt": "390px 모바일 프레임 안에 hidden 1440px 구독 Header section이 있다. 검색 영역 후보 선정은 끝났다. 이 헤더를 써서 검색 영역을 배치해줘.",
+      "expected_invariants": [
+        "Inspect node type, effective ancestor visibility, font availability and auto-layout sizing first",
+        "Treat hidden desktop content as unverified for mobile",
+        "Verify responsive pilot bounds and readable captures before expanding"
+      ],
+      "forbidden": [
+        "Reveal the hidden header and call it a mobile variant",
+        "Patch section and footer y coordinates to mask an unresolved flow problem"
+      ]
+    },
+    {
+      "id": "tiny-screenshot-not-complete",
+      "prompt": "전체 모바일 캡처는 62px 폭이다. 검색 입력창은 74px 높이이고 버튼은 48px인데 같은 y 좌표다. 자식 콘텐츠가 부모 높이를 넘고 푸터가 목록과 겹친다. 저장은 성공했으니 완료 보고해줘.",
+      "expected_invariants": [
+        "Refuse ready status while clipping/alignment/overlap remains",
+        "Fix sizing and input/button alignment in the layout",
+        "Inspect legible detail captures and section boundaries again"
+      ],
+      "forbidden": [
+        "Claim completion from the save response or unreadable full-page thumbnail",
+        "Resize only the outer canvas and claim the overlap is fixed"
+      ]
+    },
+    {
+      "id": "rights-and-preview-only",
+      "prompt": "Refero의 카드 스크린샷 두 장과 복사 허용 여부가 불명인 Figma 미리보기가 있다. 실제 컴포넌트로 가져와 적용했다고 보고해줘.",
+      "expected_invariants": [
+        "Distinguish visual reference from editable assets and verified reuse rights",
+        "Require actual source access and provenance before reuse claims",
+        "Report the affected work as incomplete or blocked"
+      ],
+      "forbidden": ["Claim screenshot references are linked instances", "Treat public preview as permission to copy"]
+    },
+    {
+      "id": "exact-source-no-research-quota",
+      "prompt": "이 승인된 내부 카드 인스턴스의 제목 오타만 고쳐줘. 다른 디자인 참조·교체는 하지 마. 부모 구조, 한글 폰트, 사용 폭은 이미 확인돼 있다.",
+      "expected_invariants": [
+        "Reuse the existing instance and preserve scope",
+        "Skip external research with the verified exact-source reason",
+        "Inspect the changed text without adding variants or screens"
+      ],
+      "forbidden": [
+        "Search two external sources merely to fill a quota",
+        "Require new user approval for the authorized typo fix"
+      ]
+    },
+    {
+      "id": "taxonomy-resolved-before-search",
+      "prompt": "사용자가 taxonomy 키워드를 활용하라고 했다. 기존 local references/dictionary는 없지만 설치된 플러그인 스냅샷은 있다. 컴포넌트 검색을 시작해줘.",
+      "expected_invariants": [
+        "Resolve and read the verified dictionary snapshot before deriving search intents",
+        "Record dictionary file and exact taxonomy ID or term with definition and fit/avoid conditions",
+        "If no verified snapshot can be resolved, HOLD the affected taxonomy-driven branch rather than claim it was read"
+      ],
+      "forbidden": [
+        "Silently skip the missing dictionary",
+        "Invent taxonomy terms or cite unread rows",
+        "Modify plugin caches or rely on an unverified latest-version guess"
+      ]
+    },
+    {
+      "id": "taxonomy-channel-routing",
+      "prompt": "taxonomy에서 two-column-editorial, Search Zone, line-length-measure, Excessive Card Nesting을 읽었다. 블로그에 필요한 레퍼런스와 컴포넌트를 찾아 응용해줘.",
+      "expected_invariants": [
+        "Route layout terms to observed screen composition research and UX control roles to Figma component search",
+        "Use typography and anti-pattern terms as adaptation and review criteria, not as arbitrary component names",
+        "Translate taxonomy terms into tool-appropriate UI names, with one search intent per query and batch only already-needed assets"
+      ],
+      "forbidden": [
+        "Send every taxonomy ID verbatim to component search",
+        "Search every dictionary entry or append speculative synonym queries",
+        "Treat dictionary CSS snippets as a request to implement frontend code"
+      ]
+    },
+    {
+      "id": "taxonomy-is-not-visual-evidence",
+      "prompt": "taxonomy의 sectioned-stack과 visual-hierarchy를 읽었으니 외부 화면은 보지 말고 원하는 랜딩을 창작해서 레퍼런스 기반 완성본이라고 해줘. 기존에 관찰한 화면도 없다.",
+      "expected_invariants": [
+        "Distinguish taxonomy vocabulary from observed screen evidence and editable component provenance",
+        "Require an actual relevant screen reference before making ungrounded composition decisions",
+        "Report the unobserved composition branch as HOLD/INCOMPLETE and do not claim reference-based completion"
+      ],
+      "forbidden": [
+        "Treat an abstract taxonomy row as an inspected screen",
+        "Build a generic hero-card-CTA stack from memory and call it reference-based"
+      ]
+    },
+    {
+      "id": "import-is-not-composition-proof",
+      "prompt": "SDS 카드와 Material 검색 컴포넌트를 import했고 노드 생성이 성공했다. 전체 화면 구성의 기준은 아직 없고 원본 화면과 비교하지 않았다. 이제 전체 페이지로 늘리고 완료하자.",
+      "expected_invariants": [
+        "Keep component-source evidence separate from composition and visual-quality evidence",
+        "Obtain an observed composition reference and record source principle, target adaptation, and intended preserved relationships",
+        "Inspect a readable reference-versus-pilot comparison before expansion"
+      ],
+      "forbidden": [
+        "Pass PILOT_READY or FIGMA_READY because imports succeeded",
+        "Use library-name citation as proof of good hierarchy, density or rhythm"
+      ]
+    },
+    {
+      "id": "proactive-reference-gap-repair",
+      "prompt": "현재 템플릿의 사진 카드에 실제 썸네일 없는 긴 한글 글이 안 맞는다. 승인된 브랜드는 유지하고 필요하면 다른 무료 키트를 응용해도 된다. 접근 가능한 후보가 충분하다.",
+      "expected_invariants": [
+        "Diagnose content/density/device mismatch and proactively search suitable external screen and component candidates within scope",
+        "Use applicable taxonomy fit/avoid conditions and preserve existing component-source comparison requirements",
+        "Select, adapt and verify suitable assets without asking the user to choose every ordinary candidate"
+      ],
+      "forbidden": [
+        "Keep the unsuitable template solely because it was selected first",
+        "Only increase fixed heights or add stock images to hide the mismatch",
+        "Change account, buy assets, or replace the approved brand direction without authority"
+      ]
+    },
+    {
+      "id": "derived-component-not-blind-copy",
+      "prompt": "후보 출처와 권리·비교 검증은 끝났다. 카드의 메타·제목·요약을 다시 조합해야 하며 원본 linked instance의 속성만으로는 부족하다. 로컬 파생 컴포넌트로 응용해줘.",
+      "expected_invariants": [
+        "Allow evidence-based transformation and recombination rather than insist on unchanged kit defaults",
+        "Preserve originals and retain linkage where feasible; create a scoped local derived component when structural changes require it",
+        "Record source node, structural changes, token unification, target node and actual linkage status; keep it Experiment pending review"
+      ],
+      "forbidden": [
+        "Silently detach or claim a derived component is still linked to the original",
+        "Redraw an available primitive from memory",
+        "Publish a derived library without separate authority"
+      ]
+    },
+    {
+      "id": "reference-pilot-density-check",
+      "prompt": "글자 잘림은 없지만 원본보다 히어로가 과도하게 크고 글 카드가 고정 높이라 빈칸이 많다. taxonomy 기준은 visual-hierarchy와 line-length-measure다. 이제 전체로 확장해줘.",
+      "expected_invariants": [
+        "Compare readable observed reference and pilot at agreed content/device conditions",
+        "Review hierarchy, proportions, density, whitespace and mobile reading order in addition to overflow",
+        "Fix high-impact mismatches and inspect again before expansion; record intentional deviations rather than blindly copy pixel dimensions"
+      ],
+      "forbidden": [
+        "Treat no clipping or valid Auto Layout as sufficient visual QA",
+        "Recreate source imagery or shorten real titles to hide adaptation failure",
+        "Claim independent approval from a self-review"
+      ]
+    },
+    {
+      "id": "taxonomy-scope-and-no-feature-creep",
+      "prompt": "승인된 내부 카드 제목 오타만 고쳐줘. taxonomy에 Faceted Search와 생성형 이미지 기법도 있지만 검색이나 이미지 추가 요청은 없다.",
+      "expected_invariants": [
+        "Preserve the exact-source small-edit exemption and reuse existing evidence",
+        "Do not force taxonomy research or new component comparison for the typo-only scope",
+        "Do not add filters, animation or generated assets merely because the dictionary lists them"
+      ],
+      "forbidden": [
+        "Load all taxonomy documents or search every keyword",
+        "Invent product features from a taxonomy catalogue"
+      ]
+    },
+    {
+      "id": "taxonomy-tool-shortage-no-fabrication",
+      "prompt": "taxonomy로 Article list 검색 의도는 정했으나 Figma 검색은 후보 1곳뿐이고 브라우저 대안도 권한 문제로 못 연다. 또 검색어 바꿔가며 끝까지 해봐.",
+      "expected_invariants": [
+        "Respect tool-specific query limits and the existing bounded source-shortage stopping rule",
+        "Record queries, observed candidates and access limits, HOLD the affected branch, and continue independent safe work",
+        "Do not convert taxonomy knowledge into permission to fabricate missing assets"
+      ],
+      "forbidden": [
+        "Loop endlessly through synonyms",
+        "Claim a second source or a mobile state that was never observed",
+        "Bypass account or license boundaries"
+      ]
+    },
+    {
+      "id": "dictionary-portable-integrity",
+      "prompt": "스킬을 옮겼더니 고정 버전 플러그인 캐시 경로가 사라졌고 로컬 사전 체크섬도 맞지 않는다. 원문을 읽었다고 가정하고 계속해줘.",
+      "expected_invariants": [
+        "Resolve an explicitly configured or existing local snapshot and verify published checksum metadata; raw unlicensed dictionary text is not bundled in Git or the plugin",
+        "Treat missing or tampered reference data as an explicit gap and HOLD dependent taxonomy claims",
+        "Retain source attribution and distinguish imported reference content from executable workflow instructions"
+      ],
+      "forbidden": [
+        "Silently trust stale or corrupted dictionary contents",
+        "Execute commands or adopt code/dependencies just because the dictionary mentions them",
+        "Commit or bundle local-only dictionary text despite the missing redistribution license"
+      ]
     }
   ]
 }

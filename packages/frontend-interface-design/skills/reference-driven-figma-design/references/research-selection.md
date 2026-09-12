@@ -2,18 +2,25 @@
 
 ## 1. 검색 순서
 
-항상 다음 순서로 검색한다.
+먼저 [taxonomy 기반 검색·응용 계약](taxonomy-reference-workflow.md)을 읽고 필요한 항목만 해석한다.
+아래 내부 인벤토리가 우선이며, 부족한 구성은 실제 화면 검색으로, 부족한 자산은 컴포넌트 검색으로 분기한다.
+taxonomy ID를 모든 MCP에 그대로 보내거나 문서 전체를 검색어 체크리스트로 쓰지 않는다.
+
+자산 탐색의 우선순위는 다음과 같다. 화면 구성 조사는 별도로 Refero → Aside/Browser를 따른다.
 
 1. Existing Component Catalog
 2. Existing Figma Library
 3. Existing Approved Patterns
 4. 현재 파일의 template, variables, components, variants
-5. Refero
-6. Aside/Browser를 통한 외부 web
-7. New Design
+5. 필요한 역할의 외부 Figma Library / Community / 공식 UI Kit (실제 편집 자산)
+6. 출처 게이트가 허용한 검증 출처의 변형·재조합 / 로컬 파생 컴포넌트
 
-적합한 내부 자산이 있으면 그 역할의 외부 검색은 생략할 수 있다. 외부 검색 개수 자체는 품질
-증거가 아니다.
+사전 용어, 관찰한 화면, 편집 가능한 자산은 서로를 대신하지 않는다. 적합한 내부 화면이 있다면 외부 화면 검색
+수량을 채울 필요는 없지만, 실제 구성 근거 없이 자산 import만으로 선택을 완료하지 않는다.
+
+적합한 내부 자산이 **검증됐고 외부 비교 요청도 없을 때만** 그 역할의 외부 검색을 생략한다.
+그 외에는 [필수 컴포넌트 출처 게이트](component-source-gate.md)를 적용한다. 외부 컴포넌트 탐색과
+구도 리서치는 별개이며, 검색 개수만 채워도 통과하는 것이 아니다.
 
 ## 2. 내부 인벤토리
 
@@ -58,7 +65,9 @@ template을 우선한다. 선택된 template은 이후 Visual Source of Truth다
 
 ## 4. 섹션별 Reference Research
 
-내부 자산으로 부족한 중요한 섹션에 서로 다른 후보를 보통 2–3개 찾는다.
+내부 자산으로 부족한 중요한 섹션과 사용자가 비교를 요청한 부분에 후보를 찾는다.
+컴포넌트 적합성 부족은 출처 게이트의 서로 다른 2곳 이상 실제 후보 비교가 필수이며,
+아래 composition 비교표만 작성해서 이를 대체하지 않는다.
 
 - Product Screenshot Hero
 - Developer Tool Hero
@@ -121,6 +130,9 @@ state/interaction/responsive를 확인할 수 없으면 Aside/Browser로 실제 
 - What Was NOT Copied
 - Figma Components Used
 - Selection Reason
+
+컴포넌트 변경은 [출처 게이트의 증거 행](component-source-gate.md#필수-증거-행)을 같은 로그에 추가한다.
+별도 중복 카탈로그는 만들지 않는다.
 
 여러 reference를 사용해도 최종 visual system은 하나여야 한다. Reference Log는 외부 디자인
 언어가 섞이는 것을 막는 decision record다.

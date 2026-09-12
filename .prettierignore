@@ -7,3 +7,4 @@ playwright.config.ts
 *.html
 # Local-only third-party dictionary snapshot: keep byte-identical to SHA256SUMS.txt
 packages/frontend-interface-design/skills/frontend-interface-design/references/dictionary/
+packages/frontend-interface-design/skills/reference-driven-figma-design/references/dictionary/

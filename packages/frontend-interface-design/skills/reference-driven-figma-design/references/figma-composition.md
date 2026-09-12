@@ -1,5 +1,10 @@
 # Figma composition — 구조를 기존 시스템의 언어로 번역한다
 
+구성을 만들기 전에 [taxonomy → reference → adaptation](taxonomy-reference-workflow.md)의 화면 근거와
+자산 근거를 확인한다. 검증된 출처의 구조를 바꾸어 로컬 파생 컴포넌트로 응용할 수 있지만,
+원본 보존·실제 연결 상태·토큰 정합성·변경 근거를 기록한다. 기본 키트 모양의 무조건적 유지도 목표가 아니다.
+전체 확장은 같은 계약의 레퍼런스 대비 파일럿 검토를 통과한 뒤에 한다.
+
 ## 1. Canvas safety
 
 Figma를 열면 대상 file, page, frame, component set, variable collection과 version을 먼저 확인한다.
@@ -40,6 +45,7 @@ section은 `사용자가 <질문>에 답을 얻도록 <주인공>을 <관계>로
 ## 3. Reference → Figma mapping
 
 외부 pattern을 복사하기 전에 element 단위로 매핑한다.
+[필수 컴포넌트 출처 게이트](component-source-gate.md)를 먼저 통과하고 실제 외부 자산도 후보에 포함한다.
 
 | Reference role     | Existing Figma candidate |
 | ------------------ | ------------------------ |
@@ -55,11 +61,10 @@ section은 `사용자가 <질문>에 답을 얻도록 <주인공>을 <관계>로
 
 사용 우선순위:
 
-1. Existing Component
-2. Existing Variant
-3. Composition of Existing Primitives
-4. New Reusable Component
-5. One-off Element
+1. 적합성이 검증된 Existing Component / Existing Variant
+2. 출처 게이트에서 채택한 External Component Instance / Editable Frame
+3. 게이트에서 비교·탈락 이유가 기록된 경우의 Composition of Existing Primitives
+4. 같은 게이트와 승인 범위 안의 New Reusable Component / One-off Experiment
 
 기존 component가 있는데 rectangle과 text로 다시 그리지 않는다. 새 component가 필요하면 먼저
 Experiment로 만들고 API/property를 실제 콘텐츠에 맞춰 제한한다.
@@ -75,7 +80,8 @@ Experiment로 만들고 API/property를 실제 콘텐츠에 맞춰 제한한다.
 - button, card, navigation, form, icon language
 - product frame과 screenshot treatment의 기본 규칙
 
-외부 reference에서 가져오는 것은 정보 관계다.
+외부 reference에서 가져오는 정보 관계는 다음과 같다. 실제 component/Frame도 출처 게이트를 거쳐
+재사용할 수 있다. 시각 언어를 유지하라는 규칙으로 외부 자산 반입을 금지하거나 재그리기를 강요하지 않는다.
 
 - section structure와 reading order
 - text/image proportion
@@ -105,7 +111,8 @@ pilot은 실제 길이의 copy, 실제 screenshot, 실제 brand asset을 사용�
 합의된 기기에서 위계와 rhythm을 확인하고, mobile이 범위에 있으면 같은 pilot에서 만든다. 좁은 화면에서는
 단순 scale-down이 아니라 읽기 순서, crop, grouping, CTA 우선순위를 재결정한다.
 
-pilot을 실제 Figma preview로 본 뒤에만 PILOT_READY를 쓴다. 이 시점의 목적은 방향을 검증하는
+pilot을 실제 Figma preview로 보고 [출처 게이트 §4](component-source-gate.md)의 구조·가독 크기 검토를
+통과한 뒤에만 PILOT_READY를 쓴다. 이 시점의 목적은 방향을 검증하는
 것이지 미완성 전체 page를 빠르게 채우는 것이 아니다.
 
 ## 6. 전체 확장
