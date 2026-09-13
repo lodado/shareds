@@ -1,5 +1,7 @@
 # Figma composition — 구조를 기존 시스템의 언어로 번역한다
 
+[Edit contract](edit-contract.md)의 원본/브랜드 역할과 변경 허용표를 먼저 적용한다. FIDELITY의 지정 템플릿은 구조 참고가 아니라 시각 기준이며, ASSEMBLE의 내부 디자인은 변경하지 않는다. 전송·override 실패는 read-back으로 확인하고 재제작 허가로 해석하지 않는다.
+
 구성을 만들기 전에 [taxonomy → reference → adaptation](taxonomy-reference-workflow.md)의 화면 근거와
 자산 근거를 확인한다. 검증된 출처의 구조를 바꾸어 로컬 파생 컴포넌트로 응용할 수 있지만,
 원본 보존·실제 연결 상태·토큰 정합성·변경 근거를 기록한다. 기본 키트 모양의 무조건적 유지도 목표가 아니다.

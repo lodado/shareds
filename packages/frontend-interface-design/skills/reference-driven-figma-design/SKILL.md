@@ -7,6 +7,8 @@ metadata:
 
 # Reference-Driven Figma Design
 
+편집 전 [Edit contract](references/edit-contract.md)로 ASSEMBLE / LOCALIZE / FIDELITY / RESKIN / REDESIGN과 섹션별 보존·변경 범위를 고정한다. 컴포넌트 연결, 시각 충실도, 콘텐츠, 레이아웃을 독립 검증한다.
+
 좋은 구조를 조사하고 기존 시각 시스템의 언어로 번역해, 사람이 계속 편집할 수 있는 Figma 시안을
 만든다. AI의 무제약 창작이 아니라 **Research → Select → Map → Compose → Critique → Refine →
 Accumulate**가 기본이다.

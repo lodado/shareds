@@ -1,5 +1,7 @@
 # Request contract — 준비에서 기준을 합의하고 실행에서 자율 완성한다
 
+[Edit contract](edit-contract.md)의 모드·기준·preserve/allowed changes 표를 기존 locked_constraints와 scope에 연결한다. 통합 요청을 재디자인으로 확대하지 않는다.
+
 이 문서는 자연어 요청을 내부 작업 계약으로 정리할 때 읽는다. 사용자가 JSON을 직접 작성하게
 만들기 위한 설문지가 아니다. 제공된 PRD·링크·Figma·자산에서 값을 먼저 추출하고, 결과를
 `schemas/design-request.schema.json` 구조로 정규화한다.

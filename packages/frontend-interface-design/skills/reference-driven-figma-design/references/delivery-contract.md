@@ -1,5 +1,7 @@
 # Delivery contract — 편집 가능한 Figma와 검증 범위를 전달한다
 
+[Edit contract](edit-contract.md)의 Source/Fidelity/Content/Layout 게이트를 분리해 기록한다. 데스크톱·모바일·프로토타입·제품 연동 검증과 범위 밖을 구분하고, 현재 전달 frame과 보존/보관 버전을 명시한다.
+
 모든 handoff는 `schemas/design-delivery.schema.json`의 의미를 따른다. 대화에서는 읽기 쉽게
 요약해도 내부 기록은 같은 필드를 유지한다.
 

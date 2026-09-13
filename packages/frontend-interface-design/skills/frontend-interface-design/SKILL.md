@@ -17,3 +17,5 @@ description: 'Compatibility entry for existing frontend-interface-design invocat
 역할·상태·기기 변형 부족 또는 외부 비교 요청에는 canonical 컴포넌트 출처 게이트를 적용한다.
 후보 부족·검색 실패·단순 진행 승인은 창작 허가가 아니며, 해당 부분은 INCOMPLETE로 남긴다.
 적합성이 검증된 내부안의 작은 수정이고 외부 비교 요청도 없으면 불필요한 탐색을 생략한다.
+
+편집 모드·보존 범위·원본 충실도 및 전송 복구는 [Edit contract](../reference-driven-figma-design/references/edit-contract.md)를 따른다.

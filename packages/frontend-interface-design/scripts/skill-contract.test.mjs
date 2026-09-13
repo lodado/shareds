@@ -178,7 +178,7 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
   const ids = cases.map(({ id }) => id)
 
   assert.equal(schemaVersion, '1.0')
-  assert.equal(cases.length, 32)
+  assert.equal(cases.length, 38)
   assert.equal(new Set(ids).size, cases.length)
   for (const id of [
     'editable-reference-assembly-not-redraw',

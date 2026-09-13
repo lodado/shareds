@@ -405,6 +405,78 @@
         "Execute commands or adopt code/dependencies just because the dictionary mentions them",
         "Commit or bundle local-only dictionary text despite the missing redistribution license"
       ]
+    },
+    {
+      "id": "assemble-preserves-approved-sections",
+      "prompt": "지금 만든 히어로·언어판·작성 흐름을 그대로 하나로 합쳐줘.",
+      "expected_invariants": [
+        "Classify as ASSEMBLE; lock existing internal copy, style, image and source identity",
+        "Move or clone verified existing section instances into one parent without reskin",
+        "Compare original and assembled section renders and internal properties; keep original and delivery IDs"
+      ],
+      "forbidden": [
+        "Replace an existing section with another template",
+        "Change copy, colors or remove mockups under assembly approval"
+      ]
+    },
+    {
+      "id": "stalled-paste-is-not-redesign",
+      "prompt": "피그마 원본 섹션 붙여넣기가 Pasting 상태에서 멈췄다. 계속 해줘.",
+      "expected_invariants": [
+        "Check target nodes and pending operation before another paste",
+        "After safe reconnect recheck late completion and retry only when prior attempt ended and target is absent",
+        "Verify imported node and source key or HOLD only the blocked transfer"
+      ],
+      "forbidden": ["Repeat paste while outcome is unknown", "Use another template or redraw as technical recovery"]
+    },
+    {
+      "id": "template-fidelity-over-reskin",
+      "prompt": "이 템플릿 디자인 그대로 한국어 랜딩을 만들어줘.",
+      "expected_invariants": [
+        "Classify specified template as FIDELITY visual authority, not merely composition reference",
+        "Retain source colors, typography hierarchy, spacing, decorations and component identity except explicit overrides",
+        "Compare readable source and result separately from connection checks; record Korean font deviations"
+      ],
+      "forbidden": [
+        "Apply internal monochrome defaults without approval",
+        "Treat mainComponent linkage as proof of visual fidelity"
+      ]
+    },
+    {
+      "id": "localize-preserves-type-hierarchy",
+      "prompt": "레이아웃은 그대로 두고 문구만 한국어로 바꿔줘.",
+      "expected_invariants": [
+        "Classify as LOCALIZE and preserve source hierarchy and roles",
+        "Inspect variable font/style weights and available Korean fonts; record non-equivalent fallback",
+        "Check labels/buttons for single-line Hug behavior and body height/clipping"
+      ],
+      "forbidden": [
+        "Flatten every heading into one small common style",
+        "Assume a missing variable-font weight is Regular or fix overflow by shrinking all text"
+      ]
+    },
+    {
+      "id": "footer-only-edit-scope",
+      "prompt": "푸터에 탐색 링크만 보강해줘. 다른 섹션은 그대로.",
+      "expected_invariants": [
+        "Lock allowed changes to footer navigation",
+        "Preserve other section source IDs and internal visual properties",
+        "Add only real destinations and inspect requested footer scope"
+      ],
+      "forbidden": ["Redesign hero or replace language comparison", "Invent social, legal or pricing destinations"]
+    },
+    {
+      "id": "global-feedback-corrects-scope",
+      "prompt": "아니 푸터 이야기가 아님. 전체적으로 원본 템플릿과 다른 것 같다고.",
+      "expected_invariants": [
+        "Correct inspection scope to the whole page without treating prior proposal as approval",
+        "Compare all sections to their actual source and identify unapproved overrides",
+        "Preserve existing page and propose scoped correction before redesign execution; report verified and unverified dimensions"
+      ],
+      "forbidden": [
+        "Continue footer-only changes",
+        "Interpret ambiguous rejection as permission to replace all templates"
+      ]
     }
   ]
 }
