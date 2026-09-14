@@ -27,6 +27,26 @@ before securing `VALID_RED` is forbidden.
 
 ## Compressed schedule
 
+## Delivery capability discovery — before expensive artifacts
+
+When Delivery is explicit at intake, after risk and source investigation and before writing the
+Draft, lock, init, or tests, inspect the target repository's package scripts, actual runner configuration, required
+verification boundary, and the trusted reporter path available to the Oracle. Record a short journal
+entry with the checked paths/commands, `supported | unsupported | unknown`, evidence, and remaining
+investigation or the existing `ENVIRONMENT_DEFECT` reason. A package name alone is not evidence that a
+runner is supported; a configured dependency is not enough without an executable reporter path.
+
+This discovery is not runtime readiness, a reported run, `VALID_RED`, a lock, or permission to skip
+the existing RED/GREEN/evidence gates. Resolve `unknown` by reading more; do not turn it into
+`unsupported`. If the actual path is structurally unsupported, report the concrete incompatibility
+early as `ENVIRONMENT_DEFECT` → `FAIL`. Never promote `exit-only` to reported evidence; a separately
+approved runner change still has to satisfy the trusted adapter contract. Design-only and Low
+skip this discovery entirely; visual tool availability remains a separate explicit-visual-QA concern.
+
+When entering Delivery after Design-only, perform the same investigation alongside the `$test`
+availability check before any new lock, init, or test writing. Do not recreate an already approved
+Draft merely to claim the check happened earlier, and do not extend an existing revision lock.
+
 Bundle the `policy`, `architecture`, `evidence`, `naming`, `review` questions into one intake.
 Before the lock, independent read-only investigations may run in parallel, but create the final lock
 once after every outcome-changing decision is finished. Draft Oracle user approval is a serial gate.

@@ -25,6 +25,17 @@ simple, it is High if the side effects are dangerous.
 
 ## Policy Grill — system design interview
 
+### Conditional source-aware review
+
+When the source-aware trigger in [`policy-sources.md`](policy-sources.md) applies, dispatch one fresh
+analyst context after the Draft is assembled and before approval. Pass only the relevant verbatim
+user messages, approved source excerpts and locations, affected P/O/D/Q mapping, and Draft bytes.
+Return `source/message location`, `card P/O/D/Q or missing`, evidence, and one of
+`POLICY_GAP`, `EVIDENCE_GAP`, or `NON_ORACLE_OPINION`. A finding becomes an existing Open question or
+evidence investigation; the analyst never invents a product decision. If fresh independent dispatch
+is unavailable, record the same-context fallback. Keep the existing card-only and reverse review
+unchanged.
+
 Ask **only questions whose answer changes the expected outcome or the test**.
 
 - 3~5 per round, at most 2 rounds

@@ -523,11 +523,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.47.0')
+  assert.equal(version, '0.48.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.47.0')
+  assert.equal(marketplace.version, '0.48.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -2085,4 +2085,42 @@ test('first substantive Draft exposes verification design without duplicating po
   assert.match(space, /Do not invent `F\*` or `PATH\*` identifiers/)
   assert.match(testSkill, /Reuse the approved verification realization plan/)
   assert.match(testSkill, /sequence.*evidence/s)
+})
+
+test('P0-A adds a conditional source-aware intent audit without weakening the card-only review', async () => {
+  const [skill, sources, grill, card, review] = await Promise.all([
+    read('SKILL.md'),
+    read('references/card/policy-sources.md'),
+    read('references/card/risk-grill.md'),
+    read('references/card/card-format.md'),
+    read('references/subagent-review.md'),
+  ])
+
+  assert.match(skill, /source-aware fresh review/)
+  assert.match(skill, /card-only cold-read/)
+  assert.match(sources, /verbatim.*source|source.*verbatim/is)
+  assert.match(sources, /P\/O\/D|Open questions|missing/i)
+  assert.match(grill, /source-aware|original message|verbatim/i)
+  assert.match(card, /source-aware fresh review/)
+  assert.match(card, /policy gap|POLICY_GAP/i)
+  assert.match(review, /source-aware/)
+  assert.match(review, /same-context fallback/)
+})
+
+test('P0-B checks Delivery capability early while preserving Low and Design-only paths', async () => {
+  const [skill, ledger, readme] = await Promise.all([
+    read('SKILL.md'),
+    read('references/delivery/ledger.md'),
+    read('README.md'),
+  ])
+
+  for (const text of [skill, ledger]) {
+    assert.match(text, /capability (?:discovery|check|preflight)/i)
+    assert.match(text, /supported \| unsupported \| unknown/)
+    assert.match(text, /package name|package.*alone|runner.*package/i)
+    assert.match(text, /before.*(?:Draft|lock|init|test)/i)
+    assert.match(text, /Design-only.*Low|Low.*Design-only/is)
+    assert.match(text, /runtime readiness|reported evidence|VALID_RED/i)
+  }
+  assert.match(readme, /Card.*journal.*implementation-decision.*lock.*ledger/is)
 })

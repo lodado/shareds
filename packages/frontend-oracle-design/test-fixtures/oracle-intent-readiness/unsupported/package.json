@@ -1,0 +1,10 @@
+{
+  "name": "oracle-unsupported-runner-fixture",
+  "private": true,
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "fixture-only"
+  }
+}

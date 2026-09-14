@@ -1,13 +1,27 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { access, chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { buildResult, loadedNodesFrom, mentionedNodesFrom, parseTranscript, selfReportFrom, usageFrom } from '../evals/run-live.mjs'
+import {
+  buildResult,
+  createTranscriptRun,
+  loadedNodesFrom,
+  mentionedNodesFrom,
+  parseTranscript,
+  selfReportFrom,
+  usageFrom,
+  writeTranscript,
+} from '../evals/run-live.mjs'
 
 const skillDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
+
+function runNode(args, options) {
+  return new Promise((resolve) => execFile(process.execPath, args, options, (error, stdout, stderr) => resolve({ error, stdout, stderr })))
+}
 
 async function readJson(path) {
   return JSON.parse(await readFile(join(skillDirectory, path), 'utf8'))
@@ -190,4 +204,76 @@ test('the runner variant lands on each result so the grader can keep A/B arms ap
   // main() attaches variant after buildResult; the schema accepts it as an optional string.
   const schema = await readJson('evals/metrics-schema.json')
   assert.equal(schema.properties.variant.type, 'string')
+})
+
+test('transcripts are opt-in, unique per invocation, and linked by case metadata', async () => {
+  const root = await mkdtemp(join(process.env.TMPDIR ?? '/tmp', 'oracle-eval-'))
+  try {
+    assert.equal(await createTranscriptRun(null), null)
+    assert.deepEqual(await writeTranscript({ runDir: null, caseId: 'case', stdout: 'x', stderr: 'y' }), null)
+
+    const first = await createTranscriptRun(join(root, 'transcripts'))
+    const second = await createTranscriptRun(join(root, 'transcripts'))
+    assert.notEqual(first, second)
+    const link = await writeTranscript({ runDir: first, caseId: 'case/with spaces', replicateId: 'r1', stdout: 'raw out', stderr: 'raw err' })
+    assert.deepEqual(link, {
+      caseId: 'case/with spaces',
+      replicateId: 'r1',
+      stdout: 'Y2FzZS93aXRoIHNwYWNlcw/cjE/stdout.raw',
+      stderr: 'Y2FzZS93aXRoIHNwYWNlcw/cjE/stderr.raw',
+    })
+    assert.equal(await readFile(join(first, link.stdout), 'utf8'), 'raw out')
+    assert.equal(await readFile(join(first, link.stderr), 'utf8'), 'raw err')
+    await assert.rejects(
+      writeTranscript({ runDir: first, caseId: 'case/with spaces', replicateId: 'r1', stdout: 'changed', stderr: 'changed' }),
+      { code: 'EEXIST' },
+    )
+    const traversal = await writeTranscript({ runDir: first, caseId: '..', replicateId: '..', stdout: 'safe', stderr: 'safe' })
+    assert.ok(traversal.stdout.includes('Li4'))
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('main links fake-host transcripts, leaves opt-out untouched, and rejects a missing value', async () => {
+  const root = await mkdtemp(join(process.env.TMPDIR ?? '/tmp', 'oracle-cli-'))
+  try {
+    const bin = join(root, 'bin')
+    await mkdir(bin)
+    const fake = join(bin, 'claude')
+    await writeFile(fake, '#!/bin/sh\nprintf \'%s\\n\' \'{"type":"result","message":{"content":[{"type":"text","text":"```json\\n{\\"risk\\":\\"Low\\",\\"lane\\":\\"low-fast-path\\",\\"status\\":\\"GREEN\\",\\"labels":[],\\"ceremony":[],\\"policyInvention":false,\\"falseReviewVerified\\":false,\\"errors":[]}\\n```json"}]}}\'')
+    await chmod(fake, 0o755)
+    const runner = join(skillDirectory, 'evals/run-live.mjs')
+    const base = ['--host', 'claude', '--case', 'fod-bb-01', '--corpus', 'blackbox-corpus.json']
+    const plainOut = join(root, 'plain.jsonl')
+    const plain = await runNode([runner, '--out', plainOut, ...base], { env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } })
+    assert.equal(plain.error, null)
+    assert.equal(await access(join(root, 'transcripts')).then(() => true, () => false), false)
+
+    const out = join(root, 'with.jsonl')
+    const transcriptDir = join(root, 'transcripts')
+    const recorded = await runNode([runner, '--out', out, '--transcript-dir', transcriptDir, ...base], { env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } })
+    assert.equal(recorded.error, null)
+    const meta = JSON.parse(await readFile(`${out}.meta.json`, 'utf8'))
+    assert.equal(meta.runs.length, 1)
+    assert.match(meta.runs[0].transcript.runDir, /^transcripts\/run-/)
+    assert.equal(await readFile(join(dirname(out), meta.runs[0].transcript.runDir, meta.runs[0].transcript.stdout), 'utf8').then((value) => value.includes('type')), true)
+
+    const missing = await runNode([runner, '--host', 'claude', '--out', join(root, 'missing.jsonl'), '--transcript-dir', '--variant', 'candidate'], { env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } })
+    assert.equal(missing.error?.code, 2)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('manual adversarial fixtures stay ungraded and design-only', async () => {
+  const corpus = await readJson('evals/adversarial-corpus.json')
+  assert.equal(corpus.cases.every((fixture) => fixture.manualReviewOnly === true), true)
+  const complete = await readJson('../test-fixtures/oracle-intent-readiness/complete/input.json')
+  const completeCase = corpus.cases.find((fixture) => fixture.id === 'fod-adv-02')
+  assert.deepEqual(completeCase.expected.requiredLabels, [])
+  assert.match(complete.approvedSource, /exactly one POST/)
+  assert.match(complete.approvedSource, /preserves the entered value/)
+  assert.match(complete.draft, /one POST/)
+  assert.match(complete.draft, /preserve the value on failure/)
 })

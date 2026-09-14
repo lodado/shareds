@@ -84,6 +84,17 @@ also declared machine-readably in `reviewPoints` of
 
 ## Reviewer Input
 
+### Conditional source-aware analyst review
+
+The source-aware review is a separate, pre-approval input contract, not a replacement for the
+Delivery review or card-only cold read. When triggered by [`card/policy-sources.md`](card/policy-sources.md),
+dispatch a fresh `analyst` context with only relevant verbatim user messages and message locations,
+approved source excerpts and exact locations/versions, affected P/O/D/Q dispositions, and Draft
+bytes. It returns locations, the linked or missing row, evidence, classification, and the existing
+Open question or investigation action. It must not set policy or add a product choice. If fresh
+independence is unavailable, record the same-context fallback and limitation. Do not claim this
+review as evidence of implementation readiness, and keep the card-only cold-read and reverse review.
+
 Pin it with machine-generated input right before the review.
 
 ```bash

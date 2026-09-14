@@ -225,6 +225,20 @@ node skills/scripts/oracle-run.mjs status \
 
 ### Black-box eval corpus
 
+### Artifact roles and early Delivery checks
+
+Keep the existing artifacts single-purpose: **Card** is the approved contract, **journal** is
+non-authoritative investigation and decision rationale, **implementation-decision** records how the
+approved contract was implemented, **lock** fixes the revision, and **ledger/evidence** records
+execution proof. The source-aware intent audit and Delivery capability discovery only add findings to
+these existing artifacts; they do not create a handoff/spec/plan file or a new workflow state.
+
+Capability discovery is Delivery-only and an investigation, not runtime readiness or `VALID_RED`
+evidence. It checks actual scripts and reporter configuration rather than rejecting a runner by
+package name. Low and Design-only remain on their existing paths.
+
+### Black-box evaluation
+
 `evals/blackbox-corpus.json`은 hosted eval 제품에 의존하지 않는 10개 smoke prompt입니다.
 결과 JSON/JSONL을 만든 뒤 grader로 routing, policy invention, false review, tool calls,
 tokens, runtime, error count를 확인합니다. 기본 모드는 10개 case를 모두 요구하며, 단일
@@ -252,6 +266,17 @@ prompt SHA-256, session id, exit code, 원본 자기보고가 남습니다.
 냅니다. 서로 다른 k는 `metrics.replicateCounts`로 드러나고, replicateId 없이 반복된 case는 여전히
 `DUPLICATE_CASE`입니다. 같은 `--repo` 작업 폴더를 반복 사용하므로 실행 간 오염 격리는 호출자
 책임입니다.
+
+For non-sensitive fixtures only, `--transcript-dir <dir>` retains raw host stdout/stderr in a fresh
+run directory and links the files from `<out>.meta.json`. Capture is opt-in; it does not promote
+self-reported ceremony or routing to observed evidence. Review these records and pre/post file
+inventories manually to assess source-review input isolation or failure before Draft/lock/init.
+Missing records mean unverified, not PASS. The separate `adversarial-corpus.json` contains manual
+source-intent diagnostics, not additional authoritative black-box grades.
+
+For A/B comparisons, pin each skill revision and use a pristine fixture workspace and independent
+host session for every case/replicate. Verify the actual loaded skill paths; repeating `--repo`
+does not isolate filesystem changes. Static fixture tests do not establish model quality gains.
 
 ```bash
 node skills/evals/run-live.mjs --host claude --out results.jsonl --repo <대상 레포>

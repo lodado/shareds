@@ -9,10 +9,11 @@
 // never coerced to a silent `false`: it stays `false` for the schema and adds a FLAG_UNREPORTED error.
 // The sidecar keeps the raw self-report next to the machine-derived record, so a later read can
 // tell which number came from where.
+import { Buffer } from 'node:buffer'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFile, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
@@ -252,19 +253,56 @@ function runHost(host, prompt, cwd) {
   })
 }
 
+/**
+ * Preserve host output only when explicitly requested. The unique invocation directory means a
+ * repeated run never overwrites an earlier transcript, while case/replicate ids remain metadata.
+ */
+export async function createTranscriptRun(transcriptDir) {
+  if (!transcriptDir) return null
+  const root = resolve(transcriptDir)
+  await mkdir(root, { recursive: true })
+  return mkdtemp(join(root, 'run-'))
+}
+
+export async function writeTranscript({ runDir, caseId, replicateId, stdout, stderr }) {
+  if (!runDir) return null
+  const segment = (value) => Buffer.from(String(value)).toString('base64url')
+  const caseDir = join(runDir, segment(caseId), segment(replicateId ?? 'r1'))
+  await mkdir(caseDir, { recursive: true })
+  await Promise.all([
+    writeFile(join(caseDir, 'stdout.raw'), stdout, { flag: 'wx', mode: 0o600 }),
+    writeFile(join(caseDir, 'stderr.raw'), stderr, { flag: 'wx', mode: 0o600 }),
+  ])
+  return {
+    caseId,
+    replicateId,
+    stdout: relative(runDir, join(caseDir, 'stdout.raw')),
+    stderr: relative(runDir, join(caseDir, 'stderr.raw')),
+  }
+}
+
 function option(args, name) {
   const index = args.indexOf(name)
-  return index === -1 ? null : args[index + 1]
+  if (index === -1) return null
+  const value = args[index + 1]
+  if (!value || value.startsWith('--')) return null
+  return value
 }
 
 async function main() {
   const args = process.argv.slice(2)
   const host = option(args, '--host')
   const out = option(args, '--out')
+  const transcriptDir = option(args, '--transcript-dir')
   if (!HOSTS[host] || !out) {
     process.stderr.write(
-      `USAGE: run-live.mjs --host <${Object.keys(HOSTS).join('|')}> --out <results.jsonl> [--corpus <file>] [--case <id>] [--repo <dir>] [--replicates <n>] [--variant <name>]\n`,
+      `USAGE: run-live.mjs --host <${Object.keys(HOSTS).join('|')}> --out <results.jsonl> [--corpus <file>] [--case <id>] [--repo <dir>] [--replicates <n>] [--variant <name>] [--transcript-dir <dir>]\n`,
     )
+    process.exitCode = 2
+    return
+  }
+  if (args.includes('--transcript-dir') && !transcriptDir) {
+    process.stderr.write('USAGE: --transcript-dir requires a directory value\n')
     process.exitCode = 2
     return
   }
@@ -289,6 +327,7 @@ async function main() {
 
   const lines = []
   const runs = []
+  const transcriptRunDir = await createTranscriptRun(transcriptDir)
   for (const fixture of cases) {
     for (let replicate = 1; replicate <= replicates; replicate += 1) {
       const replicateId = replicates === 1 ? null : `r${replicate}`
@@ -298,6 +337,7 @@ async function main() {
       const runtimeMs = Date.now() - startedAt
       const events = parseTranscript(stdout)
       const { result, selfReported } = buildResult({ fixture, events, graph, runtimeMs, replicateId })
+      const transcript = await writeTranscript({ runDir: transcriptRunDir, caseId: fixture.id, replicateId, stdout, stderr })
       if (variant) result.variant = variant
       if (code !== 0) result.errors.push(`HOST_EXIT_${code}`)
       lines.push(JSON.stringify(result))
@@ -314,6 +354,14 @@ async function main() {
         selfReported,
         attestation: result.attestation,
         stderr: stderr.slice(-2000),
+        ...(transcript
+          ? {
+              transcript: {
+                ...transcript,
+                runDir: relative(dirname(resolve(out)), transcriptRunDir),
+              },
+            }
+          : {}),
       })
       process.stderr.write(`ran ${fixture.id}${replicateId ? ` ${replicateId}` : ''} in ${runtimeMs}ms (exit ${code})\n`)
     }

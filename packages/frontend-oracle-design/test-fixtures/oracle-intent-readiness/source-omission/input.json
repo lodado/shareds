@@ -1,0 +1,6 @@
+{
+  "userRequest": "After a failed payment save, keep the entered value so the user can retry.",
+  "approvedSource": "A failed save must preserve the entered value.",
+  "draft": "Show an error and clear the form.",
+  "expected": "source-aware review reports the omitted requirement with source location; card-only review receives no source text"
+}

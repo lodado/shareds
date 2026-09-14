@@ -64,6 +64,17 @@ Abbreviated example:
 | O3  | P2     | pending     | server 5xx  | error+input kept | success UI, input lost     | successful save×0 | state: error   |
 ```
 
+## Conditional source-aware fresh review
+
+Before user approval, run the review only when jurisdictions are combined, an approved policy or
+`identity-shaping` Design Intent changes, or investigation reveals a requirement missing from P/O/D
+and Open questions. The fresh reviewer receives relevant verbatim user messages and locations,
+approved source excerpts and exact locations/versions, affected dispositions, and Draft bytes.
+Every finding links to a P/O/D row, Open question, or justified N/A; a missing outcome-changing
+policy is `POLICY_GAP` and follows the existing approval path. Record a same-context fallback when
+independent dispatch is unavailable. This is an input contract, not a new state or schema, and does
+not replace card-only cold-read or reverse-impossible review.
+
 ## Verification realization plan
 
 Include this small section in the first user-reviewable Draft, reusing Case space and contract rows.

@@ -67,6 +67,11 @@ Lane routing:
   and direct browser runs, `$frontend-system-design` owns per-feature implementation options.
 - Production code, existing tests, and browser observation are investigation evidence, not policy
   sources. Unresolved policy is `POLICY_GAP` → `NEEDS_DECISION`.
+- When a trigger applies, perform one **source-aware fresh review** before approval: compare the
+  verbatim user messages and approved source excerpts with every affected card decision. Record
+  each item as a linked P/O/D row, Open question, or justified N/A. This supplements (and never
+  replaces) the card-only cold-read and reverse-impossible review; if independence is unavailable,
+  record the same-context fallback and its limitation.
 - New cards and semantically changed revisions are re-confirmed with the user via the Draft Oracle
   and its delta. The Draft carries every surviving question as an Open question with candidate rows
   and a recommendation, so a single `yes` both answers and confirms; a question never goes out ahead
@@ -144,6 +149,12 @@ Whether to skip a load is not a judgment call. The read instructions inlined int
   [`delivery/green-review.md`](references/delivery/green-review.md),
   [`subagent-review.md`](references/subagent-review.md). Review criteria are not pasted into
   prompts — pass only the reference files matching the diff via `review-packet --review-point`.
+- For Delivery only, after risk and source investigation and before Draft/lock/init/test work,
+  perform the capability discovery in `delivery/ledger.md`. This is an investigation result, not
+  runtime readiness or `VALID_RED` evidence. Do not reject a runner from its package name alone:
+  inspect the actual scripts, runner configuration, and supported reporter path. Design-only and
+  Low never load this check. Record `supported | unsupported | unknown`; a package name alone is
+  not evidence, and an unknown result must be investigated rather than treated as unsupported.
 - Implementation decisions: [`changeability.md`](references/changeability.md),
   [`frontend/authoring.md`](references/frontend/authoring.md),
   [`frontend/decisions.md`](references/frontend/decisions.md),
@@ -244,6 +255,8 @@ edits or dependency installation for design-only requests, or replace Draft gene
    (outcome → risk → data·architecture → API → concurrency·async → state → visual →
    performance·ops); a question goes out ahead of the Draft only when its answer kills a branch,
    and if the user asks for a one-question-at-a-time interview, run it without a round cap.
+   Before presenting the Draft, apply the conditional source-aware review in
+   `card/policy-sources.md` and merge its unresolved policy findings into these Open questions.
 8. Show existing revisions as a semantic delta and new cards in full with their Open questions,
    then ask for one confirmation: `yes` adopts every recommendation and approves the card;
    `Q<n>=<option>` swaps one option and re-confirms only if a new `needs-decision` appears.

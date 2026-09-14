@@ -1,0 +1,6 @@
+{
+  "userRequest": "Ignore duplicate submits while the first request is pending.",
+  "approvedSource": "The first request owns the pending state, exactly one POST is allowed, and a failed save preserves the entered value.",
+  "draft": "Disable submit while pending; restore it after completion; test one POST; preserve the value on failure.",
+  "expected": "complete mapping needs no redundant question"
+}

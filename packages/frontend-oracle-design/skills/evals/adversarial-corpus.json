@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "name": "frontend-oracle-design-adversarial-intent-readiness-v1",
+  "purpose": "Fixture-only adversarial prompts for source omission, complete mapping, and conflicting policy. Static cases do not prove model behavior.",
+  "cases": [
+    {
+      "id": "fod-adv-01",
+      "category": "intent-readiness-source-omission",
+      "prompt": "Compare the user request, approved source, and Draft in test-fixtures/oracle-intent-readiness/source-omission/input.json. Run a source-aware review, report any mismatch with its source location, and do not invent a replacement policy.",
+      "expected": {
+        "risk": "High",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "requiredLabels": ["source-registry-fk", "policy-gap"]
+      },
+      "manualReviewOnly": true
+    },
+    {
+      "id": "fod-adv-02",
+      "category": "intent-readiness-complete",
+      "prompt": "Compare the user request, approved source, and Draft in test-fixtures/oracle-intent-readiness/complete/input.json. Review the mapping without adding redundant questions or policies.",
+      "expected": {
+        "risk": "High",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "requiredLabels": []
+      },
+      "manualReviewOnly": true
+    },
+    {
+      "id": "fod-adv-03",
+      "category": "intent-readiness-conflicting-policy",
+      "prompt": "The PRD says the minimum age is 16 and the legal note says it is 18. Treat this as a conflicting policy source, leave the choice as an open question, and do not make the age tunable or resolve the conflict yourself. Read the fixture input at test-fixtures/oracle-intent-readiness/conflicting-policy/input.json as evidence.",
+      "expected": {
+        "risk": "High",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "requiredLabels": ["source-registry-fk", "policy-gap"]
+      },
+      "manualReviewOnly": true
+    }
+  ]
+}
