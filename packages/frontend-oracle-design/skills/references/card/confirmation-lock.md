@@ -1,5 +1,14 @@
 # Oracle Card — user confirmation·revision lock·run artifact
 
+## Full-product lock additions
+
+`Coverage: full-product` is an opt-in contract, not permission to bypass confirmation or lock.
+The lock records dimension and constraint revisions. Any dimension/value, constraint, tuple, or
+metadata revision change makes prior frame mappings and execution evidence stale; do not reuse them.
+Draft may display unresolved applicability questions, but unresolved, missing, duplicate, malformed,
+or stale mappings block ready, lock, and completion. Design-only verifies frame↔GWT only; Delivery
+also requires reporter-case and ledger evidence through the existing `$test` and run gates.
+
 ## Draft Oracle and user confirmation
 
 A new card or a revision whose meaning changed must pass the following serial gate and be confirmed

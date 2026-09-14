@@ -7,6 +7,7 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { sha256, stableStringify } from './oracle-fs.mjs'
 
 export const TAXONOMY_FAMILIES = [
   'Data',
@@ -56,7 +57,23 @@ function tableRows(lines, headerFirstCell) {
     .filter((cells) => cells[0] !== headerFirstCell && !/^:?-+:?$/.test(cells[0]))
 }
 
-/** `## Case space`를 {strength, families:[{family, dimension, choices, excluded}]}로 읽는다. */
+const STABLE_ID = /^[A-Z0-9][\w-]*$/i
+const MAX_FULL_PRODUCT = 100_000
+
+function parseCaseSpaceMetadata(section) {
+  const matches = [...section.join('\n').matchAll(/^```json[^\S\n]*\n([\s\S]*?)^```[^\S\n]*$/gm)]
+  if (matches.length === 0) return null
+  if (matches.length !== 1) throw Object.assign(new Error('Case space metadata must contain one JSON fence'), { code: 'CASE_SPACE_METADATA' })
+  try {
+    const metadata = JSON.parse(matches[0][1])
+    if (!metadata || Array.isArray(metadata) || typeof metadata !== 'object') throw new Error('metadata must be an object')
+    return metadata
+  } catch (error) {
+    throw Object.assign(new Error(`Malformed Case space metadata: ${error.message}`), { code: 'CASE_SPACE_METADATA', cause: error })
+  }
+}
+
+/** `## Case space`를 {strength, coverage, metadata, families:[{family, dimension, choices, excluded}]}로 읽는다. */
 export function parseCaseSpace(document) {
   const lines = document.split('\n')
   const section = sectionLines(lines, 'Case space')
@@ -64,6 +81,15 @@ export function parseCaseSpace(document) {
 
   const strengthLine = section.find((line) => line.trim().startsWith('- Strength:'))
   const strength = strengthLine ? Number.parseInt(strengthLine.split(':')[1], 10) : 2
+  const coverageLine = section.find((line) => line.trim().startsWith('- Coverage:'))
+  const coverage = coverageLine ? coverageLine.split(':').slice(1).join(':').trim() : null
+  if (coverage && coverage !== 'full-product') {
+    throw Object.assign(new Error(`Unknown Case space coverage: ${coverage}`), { code: 'CASE_SPACE_COVERAGE' })
+  }
+  const metadata = coverage === 'full-product' ? parseCaseSpaceMetadata(section) : null
+  if (coverage === 'full-product' && !metadata) {
+    throw Object.assign(new Error('full-product requires fenced JSON metadata'), { code: 'CASE_SPACE_METADATA' })
+  }
 
   const families = tableRows(section, 'Family').map((cells) => {
     const [family = '', dimension = '', choicesCell = '', touchesCell = ''] = cells
@@ -84,10 +110,29 @@ export function parseCaseSpace(document) {
         const error = /\[error\]$/.test(choice)
         return { value: choice.replace(/\s*\[error\]$/, ''), error }
       })
+    if (coverage === 'full-product' && choicesCell.split(',').some((choice) => !choice.trim())) {
+      throw Object.assign(new Error(`Empty choice ID: ${dimension}`), { code: 'CASE_SPACE_ID' })
+    }
     return { family, dimension, choices, excluded: null, touches: parseTouches(touchesCell) }
   })
 
-  return { strength, families }
+  if (coverage === 'full-product') {
+    const seenDimensions = new Set()
+    for (const entry of families) {
+      if (entry.excluded) continue
+      if (!STABLE_ID.test(entry.dimension)) throw Object.assign(new Error(`Dimension is not an ASCII stable ID: ${entry.dimension}`), { code: 'CASE_SPACE_ID' })
+      if (seenDimensions.has(entry.dimension)) throw Object.assign(new Error(`Duplicate dimension ID: ${entry.dimension}`), { code: 'CASE_SPACE_ID' })
+      seenDimensions.add(entry.dimension)
+      const seenChoices = new Set()
+      for (const choice of entry.choices) {
+        if (!STABLE_ID.test(choice.value)) throw Object.assign(new Error(`Choice is not an ASCII stable ID: ${choice.value}`), { code: 'CASE_SPACE_ID' })
+        if (seenChoices.has(choice.value)) throw Object.assign(new Error(`Duplicate choice ID: ${entry.dimension}=${choice.value}`), { code: 'CASE_SPACE_ID' })
+        seenChoices.add(choice.value)
+      }
+    }
+  }
+
+  return { strength, coverage, metadata, model: metadata, families }
 }
 
 /** 선택 열 `Touches` — 차원이 닿을 수 있는 P·I id 인용, 또는 `independent: <reason>`. 열이 없으면 null. */
@@ -112,10 +157,58 @@ function* tupleIndexes(count, size) {
   }
 }
 
+export function canonicalTuple(tuple) {
+  return stableStringify(tuple)
+}
+
+export function frameId(tuple, dimensionRevision, constraintRevision) {
+  return `F${sha256(`${canonicalTuple(tuple)}${dimensionRevision}${constraintRevision}`)}`
+}
+
+function fullProductFrames(caseSpace) {
+  const dimensions = caseSpace.families
+    .filter((entry) => !entry.excluded && entry.dimension)
+    .map((entry) => ({ dimension: entry.dimension, choices: entry.choices.map((choice) => choice.value) }))
+  if (dimensions.length === 0 || dimensions.some((dimension) => dimension.choices.length === 0)) {
+    throw Object.assign(new Error('full-product dimensions and values must not be empty'), { code: 'CASE_SPACE_ID' })
+  }
+
+  const dimensionModel = dimensions
+    .map((dimension) => ({
+      id: dimension.dimension,
+      values: [...dimension.choices].sort(),
+      source: caseSpace.metadata?.dimensionSources?.[dimension.dimension] ?? null,
+    }))
+    .sort((left, right) => left.id.localeCompare(right.id))
+  if (!Array.isArray(caseSpace.metadata?.constraints)) throw Object.assign(new Error('constraints must be an explicit array'), { code: 'CASE_SPACE_METADATA' })
+  const { constraints: declaredConstraints, ...metadata } = caseSpace.metadata
+  const constraints = [...declaredConstraints].sort((left, right) => stableStringify(left).localeCompare(stableStringify(right)))
+  const dimensionRevision = sha256(stableStringify({ dimensions: dimensionModel, metadata }))
+  const constraintRevision = sha256(stableStringify(constraints))
+  const rawCount = dimensions.reduce((count, dimension) => count * dimension.choices.length, 1)
+  if (rawCount > MAX_FULL_PRODUCT) {
+    throw Object.assign(new Error(`full-product requires ${rawCount} tuples; limit is ${MAX_FULL_PRODUCT}`), { code: 'CASE_SPACE_INCOMPLETE' })
+  }
+
+  const frames = []
+  const visit = (index, tuple) => {
+    if (index === dimensions.length) {
+      const label = dimensions.map((dimension) => `${dimension.dimension}=${tuple[dimension.dimension]}`).join(' × ')
+      frames.push({ id: frameId(tuple, dimensionRevision, constraintRevision), label, tuple })
+      return
+    }
+    const dimension = dimensions[index]
+    for (const value of dimension.choices) visit(index + 1, { ...tuple, [dimension.dimension]: value })
+  }
+  visit(0, {})
+  return { frames, errorFrames: [], dimensionRevision, constraintRevision, rawCount }
+}
+
 /** t-way covering frames + [error] 단독 프레임. 결정적 — 순서는 표 선언 순서만 따른다.
  * Touches가 채택된 카드는 인용 P·I id가 직접 겹치는 차원 조합만 의무로 삼고(강도 3은 상호 공유
  * clique), 파트너 없는 차원·independent 차원은 choice당 1-way 프레임이 된다. 열이 없으면 전 쌍. */
 export function generateCaseFrames(caseSpace) {
+  if (caseSpace.coverage === 'full-product') return fullProductFrames(caseSpace)
   const dimensions = caseSpace.families
     .filter((entry) => !entry.excluded && entry.dimension)
     .map((entry) => ({
@@ -314,9 +407,9 @@ export function enumerateStateModel(document) {
 export function generateFromDocument(document) {
   const caseSpace = parseCaseSpace(document)
   if (!caseSpace) return null
-  const { frames, errorFrames } = generateCaseFrames(caseSpace)
+  const { frames, errorFrames, dimensionRevision, constraintRevision, rawCount } = generateCaseFrames(caseSpace)
   const { paths, emptyCells } = enumerateStateModel(document)
-  return { caseSpace, frames, errorFrames, paths, emptyCells }
+  return { caseSpace, frames, errorFrames, paths, emptyCells, ...(caseSpace.coverage === 'full-product' ? { dimensionRevision, constraintRevision, rawCount } : {}) }
 }
 
 async function main() {
@@ -330,7 +423,16 @@ async function main() {
   const generated = generateFromDocument(document)
   if (!generated) throw new CliError('NO_CASE_SPACE', 'Card has no ## Case space section')
 
-  for (const frame of generated.frames) process.stdout.write(`${frame.id} ${frame.label}\n`)
+  if (args.includes('--json')) {
+    process.stdout.write(`${JSON.stringify(generated)}\n`)
+    return
+  }
+
+  if (generated.caseSpace.coverage === 'full-product') {
+    process.stdout.write(`dimension-revision ${generated.dimensionRevision} · constraint-revision ${generated.constraintRevision} · raw ${generated.rawCount}\n`)
+  }
+
+  for (const frame of generated.frames) process.stdout.write(`${frame.id} ${frame.label}${frame.tuple ? ` ${JSON.stringify(frame.tuple)}` : ''}\n`)
   for (const frame of generated.errorFrames) process.stdout.write(`${frame.id} ${frame.label}\n`)
   for (const path of generated.paths) process.stdout.write(`${path.id} ${path.label}\n`)
   for (const cell of generated.emptyCells) process.stdout.write(`${cell.id}\n`)
@@ -343,7 +445,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     await main()
   } catch (error) {
-    const cliError = error instanceof CliError ? error : new CliError('INPUT_UNREADABLE', error.message ?? String(error))
+    let code = 'INPUT_UNREADABLE'
+    if (error.code?.startsWith('CASE_SPACE_')) code = error.code
+    const cliError = error instanceof CliError ? error : new CliError(code, error.message ?? String(error))
     process.stderr.write(`${cliError.code}: ${cliError.message}\n`)
     process.exitCode = cliError.exitCode
   }

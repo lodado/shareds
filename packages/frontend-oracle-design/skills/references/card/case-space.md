@@ -37,6 +37,55 @@ applies unchanged.
 
 ## Card section — declaring the space
 
+### Full-product opt-in
+
+For a request that explicitly requires every Cartesian tuple, add `- Coverage: full-product`.
+The existing table remains the source of dimension and choice IDs; full-product IDs must be ASCII
+stable tokens. Put exactly one fenced JSON metadata object in the section. This is an incomplete
+shape sketch, not a ready card; populate every boundary and its six candidate dispositions:
+
+```json
+{
+  "dimensionSources": { "rows": "S1" },
+  "dimensionKinds": { "rows": "input" },
+  "observationAxes": {},
+  "boundaries": [],
+  "applicability": [],
+  "constraints": []
+}
+```
+
+`dimensionKinds` is required for each declared dimension and is either `input` or `observation`.
+An observation dimension also requires `observationAxes.<id>.at` and `.constraints`; it is an
+expected observation at an explicit sample time, not an input axis. `boundaries` use `action`,
+`external-event`, or `async`; each boundary retains a non-empty source, and `applicability` records
+every candidate for every boundary with exactly one of a `dimensionId`, a non-empty reason, or a real
+Open-question ID. Predicates name their referenced constraints. `constraints` retain an ID, source,
+mechanism, and falsifier. A missing
+contract does not justify inventing cursor expiry, retry, or navigation policy: retain a question.
+
+The full generator emits every raw tuple, including `[error]` values, with deterministic tuple IDs;
+it does not apply `Touches`, `independent`, pairwise reduction, or the legacy 50-frame cap. A raw
+tuple receives exactly one disposition record. Counts are reported separately as raw tuples,
+valid/scenario/excluded/unresolved cases, and executed unique cases; no count is evidence of an
+assertion. The product remains complete only relative to the declared model, not all real behavior.
+
+The repository's `test-fixtures/full-product/fixture.mjs` and generated `oracle.md` provide the
+complete 2×3×2 example. Run `oracle-frames.mjs --oracle <card> --json`, then
+`oracle-verify.mjs card --case-space --oracle <card>` before reporting counts. The second command
+is a preapproval structural audit, not card approval or an execution claim. Normal `card` and lock
+still require approval and reject unresolved policy/evidence. Full-product currently refuses more
+than 100,000 tuples with `CASE_SPACE_INCOMPLETE`; it never silently samples.
+
+The audit reports dimension/constraint revisions, source-linked values, `N_raw`, `N_valid`,
+`N_excluded`, `N_unresolved`, `N_scenarios`, `N_executed_unique`, `N_passed_unique`, missing/extra/
+duplicate/malformed/stale-mapping, exclusions and questions. Execution counts are null in design.
+`N_raw = N_scenarios + N_excluded + N_unresolved` is an audit identity, not a replacement for the
+ID/tuple set comparison. Test function/file counts are never substituted for reporter case counts.
+Resource failure is incomplete; without an actual command result report “검수 미실행”. A reduction
+to pairwise/representatives requires explicit approval of a new coverage contract and revision;
+it must not retain the full-product execution claim.
+
 ```markdown
 ## Case space
 
@@ -163,6 +212,11 @@ reference the emitted dispositions rather than creating a second mapping. An Ord
 at least two choices carries the existing `$test` sequence obligation and `evidence.json` `sequence`
 mapping, in addition to representative paths. Concrete test construction belongs to `$test`.
 A dimension list or representative path does not claim coverage of all possible sequences.
+Sequence witnesses use the action/request identity, not a bare state token: a duplicate is
+`start:<action>:<request>` followed by `repeat:<action>:pending` before `complete`, `fail`, or
+`cancel`; an inversion is `start:A`, `start:B`, `complete:B`, `complete:A`; an owner-lifetime
+witness places `owner:<change>` before the late completion. Other sequence steps may use arbitrary
+strings, but these witnesses must remain identifiable for the applicable candidate.
 
 ## Generated frames — run, then disposition
 

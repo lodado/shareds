@@ -1096,12 +1096,16 @@ async function testEvidenceDigest(path) {
   }
   // 행뿐 아니라 PATH*·Order 시퀀스 매핑도 RED 시점에 얼린다 — 얼리지 않으면 GREEN 직전에
   // 통과하는 아무 테스트 이름으로 갈아끼울 수 있고, 그건 행 매핑에 이미 막아둔 바로 그 이동이다.
-  const testNames = (entries) =>
+  const testNames = (entries, frameMetadata = false) =>
     Object.fromEntries(
       Object.entries(entries ?? {})
         .filter(([, entry]) => entry?.kind === 'test')
         .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, entry]) => [key, { kind: 'test', name: entry.name }]),
+        .map(([key, entry]) => [key, {
+          kind: 'test', name: entry.name,
+          ...(frameMetadata ? Object.fromEntries(['tuple', 'scenario', 'dimensionRevision', 'constraintRevision']
+            .filter((field) => Object.hasOwn(entry, field)).map((field) => [field, entry[field]])) : {}),
+        }]),
     )
 
   const sequenceBinding = (entry) => {
@@ -1112,7 +1116,7 @@ async function testEvidenceDigest(path) {
   const bindings = {
     rows: testNames(document?.rows),
     paths: testNames(document?.paths),
-    frames: testNames(document?.frames),
+    frames: testNames(document?.frames, true),
     sequence: sequenceBinding(document?.sequence),
   }
   return sha256(stableStringify(bindings))

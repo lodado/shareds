@@ -3,7 +3,16 @@
 // 카드에 자동 기입하지 않는다: 정적 분석 → 후보 → 사람·LLM의 disposition. 검출 0은 차원 없음의 증거가 아니다.
 import { readFile } from 'node:fs/promises'
 import process from 'node:process'
-import { scanSideEffects } from './oracle-fs.mjs'
+import { scanSideEffects, sha256 } from './oracle-fs.mjs'
+
+export const APPLICABILITY_CANDIDATES = [
+  'action-repeat',
+  'request-lifecycle',
+  'response-order',
+  'owner-lifetime',
+  'server-boundary',
+  'data-value',
+]
 
 /** family는 case-space.md의 8계열 중 하나. `and`는 같은 파일에 함께 있어야 성립하는 짝, `minimum`은 최소 hit 수. */
 export const DIMENSION_PATTERNS = [
@@ -97,10 +106,51 @@ export function mineDimensions(path, content) {
   return candidates
 }
 
+function boundaryId(path, kind, line, index) {
+  const digest = sha256(path)
+  return `${kind}-${digest}-L${line}-${index + 1}`
+}
+
+/** Mine every applicability candidate for every detected action/async boundary. */
+export function mineApplicability(path, content) {
+  const lines = content.split('\n')
+  const lineCitation = (line) => `code(${path}#L${line})`
+  const fetchHits = matchingLines(lines, /\bfetch\(|\baxios[.(]|\bky[.(]|useQuery\(|useMutation\(/)
+  const actionHits = matchingLines(lines, /onClick|onSubmit|handle(?:Next|Previous|Page|Filter|Sort)|\b(?:next|previous|retry)\b/i)
+  const externalHits = matchingLines(lines, /addEventListener\(|\.subscribe\(|set(?:Timeout|Interval)\(|new (?:Resize|Intersection)Observer\(/)
+  const boundaries = [
+    ...fetchHits.map((line, index) => ({ id: boundaryId(path, 'async', line, index), kind: 'async', source: lineCitation(line) })),
+    ...actionHits.map((line, index) => ({ id: boundaryId(path, 'action', line, index), kind: 'action', source: lineCitation(line) })),
+    ...externalHits.map((line, index) => ({ id: boundaryId(path, 'external-event', line, index), kind: 'external-event', source: lineCitation(line) })),
+  ]
+  const questions = {
+    'action-repeat': 'Can the action repeat while its request is pending?',
+    'request-lifecycle': 'Which start, progress, success, failure, and cancel transitions are contractual?',
+    'response-order': 'Does A→B→B complete→A complete have a defined result?',
+    'owner-lifetime': 'Can the owner change or unmount before the response arrives?',
+    'server-boundary': 'What page-end, empty, invalid/expired cursor, limit, and retry boundaries does the contract define?',
+    'data-value': 'What approved identifier, ordering, and size boundaries apply?',
+  }
+  const applicability = boundaries.flatMap((boundary) => APPLICABILITY_CANDIDATES.map((candidate) => ({
+    boundary: boundary.id,
+    candidate,
+    source: boundary.source,
+    prompt: questions[candidate],
+  })))
+  return { boundaries, applicability }
+}
+
 export function renderReport(files) {
-  const candidates = files.flatMap((file) => file.candidates)
-  const effects = files.flatMap((file) => file.effects)
-  const out = [`## Dimension candidates — ${files.length} files`, '']
+  const candidates = files.flatMap((file) => file.candidates ?? [])
+  const effects = files.flatMap((file) => file.effects ?? [])
+  const applicability = files.flatMap((file) => file.applicability ?? [])
+  const out = [`## Dimension candidates — ${files.length} files`, '', '## Applicability checklist', '', '| Candidate | Boundary | Decision | Source |', '| --- | --- | --- | --- |']
+  for (const candidate of APPLICABILITY_CANDIDATES) {
+    const entries = applicability.filter((entry) => entry.candidate === candidate)
+    if (entries.length === 0) out.push(`| ${candidate} | — | not observed; record evidence before excluding | — |`)
+    else for (const entry of entries) out.push(`| ${candidate} | ${entry.boundary} | assign dimension / reason / registered Q ID: ${entry.prompt} | ${entry.source} |`)
+  }
+  out.push('', 'Candidate checklist coverage is not proof that all real interactions were discovered.', '')
   if (candidates.length === 0) out.push('No pattern matched. This is not evidence that the dimension space is complete.', '')
   else {
     out.push('| Family | Dimension | Citation | Note |', '| --- | --- | --- | --- |')
@@ -146,7 +196,9 @@ async function main() {
       process.exitCode = 1
       return
     }
-    files.push({ path, candidates: mineDimensions(path, content), effects: scanSideEffects(path, content).hits })
+    const candidates = mineDimensions(path, content)
+    const applicability = mineApplicability(path, content)
+    files.push({ path, candidates, ...applicability, effects: scanSideEffects(path, content).hits })
   }
 
   process.stdout.write(renderReport(files))

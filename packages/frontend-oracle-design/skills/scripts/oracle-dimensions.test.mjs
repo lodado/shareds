@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { mineDimensions } from './oracle-dimensions.mjs'
+import { APPLICABILITY_CANDIDATES, mineApplicability, mineDimensions, renderReport } from './oracle-dimensions.mjs'
 
 const script = join(dirname(fileURLToPath(import.meta.url)), 'oracle-dimensions.mjs')
 
@@ -57,6 +57,7 @@ test('a file with no pattern yields no candidates — and says so instead of cla
   assert.equal(empty.status, 0, empty.stderr)
   assert.match(empty.stdout, /No pattern matched\. This is not evidence that the dimension space is complete\./)
   assert.match(empty.stdout, /No known side-effect token found\./)
+  assert.deepEqual(mineDimensions(plain, "export const label = 'Save'\n"), [])
 
   const report = spawnSync(process.execPath, [script, '--path', grid], { encoding: 'utf8' })
   assert.equal(report.status, 0, report.stderr)
@@ -68,4 +69,34 @@ test('a file with no pattern yields no candidates — and says so instead of cla
 
   const usage = spawnSync(process.execPath, [script], { encoding: 'utf8' })
   assert.equal(usage.status, 2)
+})
+
+test('applicability gate records async-action candidates without inventing cursor policy', () => {
+  const found = mineDimensions('src/Pager.tsx', `function Pager({ next }) {\n  async function load(page) { return fetch('/rows?page=' + page) }\n  return <button onClick={() => load(next)}>next</button>\n}`)
+  const applicability = mineApplicability('src/Pager.tsx', `function Pager({ next }) {\n  async function load(page) { return fetch('/rows?page=' + page) }\n  return <button onClick={() => load(next)}>next</button>\n}`)
+  assert.deepEqual(APPLICABILITY_CANDIDATES, ['action-repeat', 'request-lifecycle', 'response-order', 'owner-lifetime', 'server-boundary', 'data-value'])
+  assert.ok(applicability.boundaries.some((boundary) => boundary.kind === 'async'))
+  assert.equal(applicability.applicability.length, applicability.boundaries.length * APPLICABILITY_CANDIDATES.length)
+  assert.ok(applicability.applicability.some((entry) => entry.candidate === 'action-repeat'))
+  const server = applicability.applicability.find((entry) => entry.candidate === 'server-boundary')
+  assert.equal(server.dimensionId, undefined)
+  assert.equal(server.question, undefined)
+  assert.match(server.prompt, /cursor|contract|boundary/i)
+  const report = renderReport([{ path: 'src/Pager.tsx', candidates: found, effects: [], ...applicability }])
+  for (const candidate of APPLICABILITY_CANDIDATES) assert.match(report, new RegExp(`\\| ${candidate} \\|`))
+})
+
+test('applicability boundary ids stay unique across files and each boundary gets all six questions', () => {
+  const a = mineApplicability('src/a.ts', 'fetch("/a")\nfetch("/a2")')
+  const b = mineApplicability('src/b.ts', 'fetch("/a")\nfetch("/a2")')
+  const ids = [...a.boundaries, ...b.boundaries].map(({ id }) => id)
+  assert.equal(new Set(ids).size, ids.length)
+  for (const boundary of [...a.boundaries, ...b.boundaries]) {
+    const rows = [...a.applicability, ...b.applicability].filter((entry) => entry.boundary === boundary.id)
+    assert.deepEqual(rows.map(({ candidate }) => candidate), APPLICABILITY_CANDIDATES)
+    assert.equal(rows.every(({ source, prompt }) => source && typeof prompt === 'string'), true)
+  }
+  const external = mineApplicability('src/stream.ts', 'stream.subscribe(onRows)')
+  assert.equal(external.boundaries[0].kind, 'external-event')
+  assert.equal(external.applicability.length, 6)
 })

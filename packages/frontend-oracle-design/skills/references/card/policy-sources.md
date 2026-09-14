@@ -1,5 +1,13 @@
 # Oracle Card — external standards and policy sources
 
+## Case-space policy boundary
+
+The full-product generator may enumerate declared values, but it cannot approve behavior. Cursor
+expiry, retry, pending-repeat handling, prior-page retention, and response ordering remain policy
+questions unless an approved source or user decision establishes them. Recommendations are not
+expected values. Record a source, an explicit non-application reason, or a question ID; unresolved
+expectations remain `NEEDS_DECISION` and block ready/lock.
+
 ## External standard gate
 
 Before Risk·Grill, find and read in full every material the user provided or the repo designated as

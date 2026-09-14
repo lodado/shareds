@@ -5,6 +5,22 @@ description: Use when the user explicitly requests an Oracle contract or graph-o
 
 # Frontend Oracle Design
 
+## Case-space completeness gates
+
+Before planning, run `scripts/oracle-dimensions.mjs --path <touched files>` and disposition the
+applicability checklist for `action-repeat`, `request-lifecycle`, `response-order`,
+`owner-lifetime`, `server-boundary`, and `data-value`. Each candidate needs a source plus a mapped
+dimension, a non-application reason, or an Open-question ID. This checklist catches declared-model
+omissions but is not proof of all real interactions; cursor expiry and retry policy must not be
+invented when the contract is silent.
+
+When the card opts into `Coverage: full-product`, `oracle-frames.mjs` emits every raw Cartesian
+tuple, including error values, and records deterministic dimension/constraint revisions. It does
+not use pairwise, `Touches`, `independent`, or the legacy frame cap. Every tuple needs exactly one
+existing disposition and an identifiable GWT scenario; Delivery additionally requires reporter and
+ledger evidence through the existing approval, lock, and `$test` boundaries. Raw, valid, excluded,
+unresolved, scenario, and executed counts are separate; no count alone proves assertions.
+
 Frontend Oracle is not an implementation generator. It is a delivery/evidence harness that preserves
 approved frontend behavior and visual intent as `Outcome Brief → Source Registry → contract rows →
 revision lock → ledger state transitions`. References own the detailed rules; this file is the
@@ -77,7 +93,8 @@ Lane routing:
   and a recommendation, so a single `yes` both answers and confirms; a question never goes out ahead
   of the card unless its answer kills a branch. Before that confirmation: no lint, lock, tests, or
   production edits. A policy change is a new revision, never an in-place edit of a locked file.
-- Lint the card with `scripts/oracle-verify.mjs card`, then lock it with `scripts/oracle-lock.mjs`.
+- Lint the card with `scripts/oracle-verify.mjs card`; `--case-space` is a structural preapproval
+  check only and never records user approval. Then lock it with `scripts/oracle-lock.mjs`.
   The revision lock is auto-verified immediately before each stage. No relocking to pass a
   mismatch.
 - TDD default: `ORACLE_READY` → write and run tests → record

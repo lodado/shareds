@@ -178,3 +178,32 @@ is even installed. Same revision, same mechanism: later fix attempts each broke 
 contract — interactions the pairs `scheduling × request-count contract` and
 `new list window × inherited input debounce` would have surfaced as questions instead of
 implement-and-revert round trips.
+
+## Full-product applicability gate
+
+Before generating a full product, inspect each action, external event, and async boundary for:
+`action-repeat`, `request-lifecycle`, `response-order`, `owner-lifetime`, `server-boundary`, and
+`data-value`. Record the source and either a mapped dimension, a reason for non-application, or an
+Open-question ID. This candidate list catches omissions in the declared model; it is not proof of
+all real interactions. Pending duplicate actions are event sequences, not a static `pending` value.
+
+For full-product frames, each resolved tuple maps to one identifiable scenario:
+
+```json
+{
+  "id": "S-F...",
+  "sources": ["S1"],
+  "rows": ["O1"],
+  "given": { "query": "", "page": "first", "history": [], "data": [], "pending": [] },
+  "when": ["start:next:A", "repeat:next:pending"],
+  "then": { "requests": [], "display": [], "effects": [], "never": [] },
+  "target": "request boundary",
+  "control": "mock server",
+  "barrier": "response settled",
+  "observe": "reporter assertion"
+}
+```
+
+Use controlled completion order for late responses and owner changes. A scenario is a mapping
+record, not execution evidence; delivery additionally requires the existing reporter and ledger
+authority.

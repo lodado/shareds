@@ -1,7 +1,23 @@
 import assert from 'node:assert/strict'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
-import { enumerateStateModel, generateCaseFrames, generateFromDocument, parseCaseSpace } from './oracle-frames.mjs'
+import { canonicalTuple, enumerateStateModel, frameId, generateCaseFrames, generateFromDocument, parseCaseSpace } from './oracle-frames.mjs'
+
+const FULL_PRODUCT_CARD = `## Case space
+
+- Coverage: full-product
+
+\`\`\`json
+{"dimensionSources":{"rows":"C-rows","mode":"C-mode"},"boundaries":[{"id":"next","kind":"async","source":"C-next"}],"applicability":[{"boundary":"next","candidate":"repeat","source":"C-next","dimensionId":"mode"}],"constraints":[]}
+\`\`\`
+
+| Family | Dimension | Choices |
+| ------ | --------- | ------- |
+| Data | rows | first, last |
+| Async | mode | idle, pending, done |
+`
+
+const fullProduct = () => generateFromDocument(FULL_PRODUCT_CARD)
 
 /** 플랜 §5 서버 페이지네이션 dry-run 공간 — 일반 도메인. */
 const SERVER_TABLE_CARD = `# Card
@@ -172,4 +188,43 @@ test('touches: 결정적이고, 열이 없으면 기존 전-쌍 동작 그대로
 
   const legacy = parseCaseSpace(TOUCHES_CARD.replace(/\|[^|\n]*\|$/gm, '|').replace(' Touches                        |', '').replace(' independent: engine cannot alter request policy |', ''))
   assert.equal(legacy.families.every((entry) => entry.touches === null), true)
+})
+
+test('full-product: parses metadata and emits every raw tuple with deterministic IDs', () => {
+  const generated = fullProduct()
+  assert.equal(generated.caseSpace.coverage, 'full-product')
+  assert.equal(generated.caseSpace.metadata.dimensionSources.rows, 'C-rows')
+  assert.equal(generated.rawCount, 6)
+  assert.equal(generated.frames.length, 6)
+  assert.deepEqual(generated.errorFrames, [])
+  assert.ok(generated.frames.every((frame) => frame.tuple && frame.id.startsWith('F')))
+  assert.equal(new Set(generated.frames.map((frame) => frame.id)).size, 6)
+  assert.equal(generated.frames[0].id, frameId(generated.frames[0].tuple, generated.dimensionRevision, generated.constraintRevision))
+  assert.equal(canonicalTuple(generated.frames[0].tuple), canonicalTuple(generated.frames[0].tuple))
+})
+
+test('full-product: rejects duplicate or empty stable IDs and malformed metadata', () => {
+  assert.throws(() => generateFromDocument(FULL_PRODUCT_CARD.replace('| Data | rows |', '| Data | rows |').replace('first, last', 'first, first')), /duplicate/i)
+  assert.throws(() => generateFromDocument(FULL_PRODUCT_CARD.replace('"C-rows"', '"C-rows"}')), /CASE_SPACE_METADATA|metadata/i)
+  assert.throws(() => generateFromDocument(FULL_PRODUCT_CARD.replace('rows | first', 'rows with space | first')), /stable|ASCII|ID/i)
+  assert.throws(() => generateFromDocument(FULL_PRODUCT_CARD.replace('first, last', 'first,,last')), /Empty choice/)
+  assert.throws(() => generateFromDocument(FULL_PRODUCT_CARD.replace('| Data | rows |', '| Data | |')), /stable ID/)
+})
+
+test('full-product: canonical IDs ignore tuple key order, revisions bind values, constraints and event metadata', () => {
+  assert.equal(canonicalTuple({ a: '1', b: '2' }), canonicalTuple({ b: '2', a: '1' }))
+  const before = fullProduct()
+  const changedValue = generateFromDocument(FULL_PRODUCT_CARD.replace('first, last', 'first, other'))
+  assert.notEqual(before.dimensionRevision, changedValue.dimensionRevision)
+  const changedConstraint = generateFromDocument(FULL_PRODUCT_CARD.replace('"constraints":[]', '"constraints":[{"id":"C1","when":{"rows":"first"}}]'))
+  assert.notEqual(before.constraintRevision, changedConstraint.constraintRevision)
+  const changedMetadata = generateFromDocument(FULL_PRODUCT_CARD.replace('"constraints":[]', '"constraints":[],"sequences":{"mode":{"idle":["start:next:A","complete:A"]}}'))
+  assert.notEqual(before.dimensionRevision, changedMetadata.dimensionRevision)
+  assert.notEqual(before.frames[0].id, changedMetadata.frames[0].id)
+})
+
+test('full-product: refuses oversized products instead of sampling', () => {
+  const values = Array.from({ length: 317 }, (_, index) => `v${index}`).join(', ')
+  const huge = FULL_PRODUCT_CARD.replace('first, last', values).replace('idle, pending, done', values)
+  assert.throws(() => generateFromDocument(huge), (error) => error.code === 'CASE_SPACE_INCOMPLETE')
 })

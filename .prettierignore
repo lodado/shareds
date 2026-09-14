@@ -2,6 +2,9 @@
 build
 coverage
 playwright.config.ts
+# Generated from references / the full-product fixture; edit their sources instead.
+packages/frontend-oracle-design/skills/bundles/
+packages/frontend-oracle-design/test-fixtures/full-product/oracle.md
 
 # Ignore all HTML files:
 *.html

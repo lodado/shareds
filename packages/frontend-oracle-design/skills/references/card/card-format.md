@@ -1,5 +1,24 @@
 # Oracle Card — card format and the cold-read gate
 
+## Full-product disposition and scenario mapping
+
+For `Coverage: full-product`, use the existing disposition grammar with this auditable table:
+
+```markdown
+## Frame dispositions
+
+| Frame | Disposition | Tuple (JSON)     | Scenario (JSON)                                |
+| ----- | ----------- | ---------------- | ---------------------------------------------- |
+| F...  | covered(O1) | {"rows":"first"} | {"id":"S-F...","sources":["S1"],"rows":["O1"]} |
+```
+
+The card records `- Dimension revision: <hash>` and `- Constraint revision: <hash>` from the
+generator. A scenario contains `id`, `sources`, `rows`, `given` (`query`, `page`, `history`,
+`data`, `pending`), ordered `when` events, `then` (`requests`, `display`, `effects`, `never`),
+`target`, `control`, `barrier`, and `observe`. Parameterization is allowed, but each valid tuple
+must retain a distinct scenario/case identity. Counts distinguish raw, scenario, and executed
+cases; function/file counts are not execution evidence.
+
 ## Card format
 
 Apply the four axes and the seven auto-added TCs from [`bva.md`](../bva.md), then run the

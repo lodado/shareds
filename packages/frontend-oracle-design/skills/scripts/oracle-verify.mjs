@@ -7,7 +7,8 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { inflateSync } from 'node:zlib'
 import { isTrustedAdapter } from './oracle-adapters.mjs'
-import { generateFromDocument, TAXONOMY_FAMILIES } from './oracle-frames.mjs'
+import { APPLICABILITY_CANDIDATES } from './oracle-dimensions.mjs'
+import { canonicalTuple, frameId, generateFromDocument, TAXONOMY_FAMILIES } from './oracle-frames.mjs'
 import {
   assertSnapshotUnchanged,
   isPathInside,
@@ -37,7 +38,7 @@ const FLAG_NAMES = [
 ]
 
 /** 값 없는 플래그 — `card --ir`, `card --repo-policies`, `scan --side-effects`. */
-const BOOLEAN_FLAGS = new Set(['ir', 'repo-policies', 'side-effects'])
+const BOOLEAN_FLAGS = new Set(['ir', 'repo-policies', 'side-effects', 'case-space'])
 
 const CLASSIFICATIONS = [
   'POLICY_GAP',
@@ -621,12 +622,192 @@ function isDigest(value) {
   return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value)
 }
 
+function fullProductRecords(card) {
+  return tableCells(markdownLines(card), 'Frame dispositions', 'Frame').map(([id, disposition, tuple, scenario]) => {
+    const parse = (value) => { try { return JSON.parse(value) } catch { return null } }
+    return { id, disposition: parseDisposition(disposition ?? ''), tuple: parse(tuple), scenario: parse(scenario) }
+  })
+}
+
+function sequenceFor(events, tuple) {
+  return events.map((event) => event.replace(/\{([^}]+)\}/g, (_, id) => tuple[id] ?? `{${id}}`))
+}
+
+function sequenceWitness(events, candidate, boundary) {
+  const starts = events.flatMap((event, index) => {
+    const match = event.match(/^start:([^:]+):([^:]+)$/)
+    if (!match) return []
+    const end = events.findIndex((value, position) => position > index && ['complete', 'fail', 'cancel'].some((kind) => value === `${kind}:${match[2]}`))
+    return [{ action: match[1], request: match[2], index, end }]
+  })
+  if (candidate === 'action-repeat') return starts.some(({ action, index, end }) => action === boundary && events.some((event, position) => event === `repeat:${boundary}:pending` && position > index && (end === -1 || position < end)))
+  if (candidate === 'response-order') return starts.some((a) => starts.some((b) => a.request !== b.request && a.index < b.index && b.index < b.end && b.end < a.end && events[a.end] === `complete:${a.request}` && events[b.end] === `complete:${b.request}`))
+  if (candidate === 'owner-lifetime') return starts.some(({ index, end, request }) => events[end] === `complete:${request}` && events.some((event, position) => event.startsWith('owner:') && position > index && position < end))
+  return starts.some(({ index, end }) => end > index)
+}
+
+/** Structural full-product audit. Source relevance and assertion sufficiency remain review-owned. */
+function auditFullProduct(card, generated) {
+  const { caseSpace, frames, dimensionRevision, constraintRevision, rawCount } = generated
+  const model = caseSpace.model
+  const lines = markdownLines(card)
+  const records = fullProductRecords(card)
+  const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
+  const text = (value) => typeof value === 'string' && !isEmptyCell(value)
+  const strings = (value) => Array.isArray(value) && value.length > 0 && value.every(text)
+  const dimensions = caseSpace.families.filter((entry) => !entry.excluded && entry.dimension)
+  const domains = new Map(dimensions.map((entry) => [entry.dimension, new Set(entry.choices.map((choice) => choice.value))]))
+  const sourceIds = new Set(tableCells(lines, 'Source Registry', 'ID').map(([id]) => id))
+  const approved = approvedSourceIds(lines)
+  const rowSet = new Set(parseRows(card).map(({ id }) => id))
+  const questions = new Set()
+  const questionText = sectionLines(lines, 'Open questions').join('\n')
+  const issues = []
+  const malformed = []
+  const stale = []
+  const ids = new Set(frames.map(({ id }) => id))
+  const auxiliaryIds = new Set([...generated.paths, ...generated.emptyCells].map(({ id }) => id))
+  const seen = new Set()
+  const duplicate = []
+  const extra = []
+  const constraints = Array.isArray(model.constraints) ? model.constraints.filter(object) : []
+  const constraintIds = new Set()
+  const validPartial = (tuple) => object(tuple) && Object.keys(tuple).length > 0 && Object.entries(tuple).every(([id, value]) => domains.get(id)?.has(value))
+  const validTuple = (tuple) => validPartial(tuple) && Object.keys(tuple).length === domains.size
+  const matches = (tuple, constraint) => object(constraint.when) && Object.entries(constraint.when).every(([id, value]) => tuple?.[id] === value)
+  const ask = (id, label) => {
+    if (!/^Q\d+$/.test(id ?? '') || !new RegExp(`\\b${id}\\b`).test(questionText)) issues.push(`question: ${label} requires a registered Open question ID`)
+    else questions.add(id)
+  }
+
+  if (!Array.isArray(model.constraints) || constraints.length !== model.constraints.length) malformed.push('constraints must be an array of objects (empty is explicit)')
+  for (const constraint of constraints) {
+    if (!object(constraint) || !/^C\d+$/.test(constraint.id ?? '') || constraintIds.has(constraint.id) || !validPartial(constraint.when) || !approved.has(constraint.source) || !text(constraint.mechanism) || !text(constraint.falsifier)) {
+      malformed.push(`exclusion constraint: ${constraint?.id ?? '(missing)'}`)
+    }
+    constraintIds.add(constraint?.id)
+  }
+  for (const dimension of dimensions) {
+    const id = dimension.dimension
+    if (!sourceIds.has(model.dimensionSources?.[id])) malformed.push(`dimension source: ${id}`)
+    if (!['input', 'observation'].includes(model.dimensionKinds?.[id])) malformed.push(`dimension kind: ${id}`)
+    if (model.dimensionKinds?.[id] === 'observation') {
+      const observation = model.observationAxes?.[id]
+      if (!text(observation?.at) || !strings(observation?.constraints) || !observation.constraints.every((c) => constraintIds.has(c))) malformed.push(`observation sample point/constraints: ${id}`)
+    }
+  }
+  for (const family of TAXONOMY_FAMILIES) if (!caseSpace.families.some((x) => x.family === family)) malformed.push(`family-undispositioned: ${family}`)
+  const boundaries = Array.isArray(model.boundaries) ? model.boundaries.filter(object) : []
+  const applicability = Array.isArray(model.applicability) ? model.applicability.filter(object) : []
+  if (!boundaries.length || boundaries.length !== model.boundaries.length || !Array.isArray(model.applicability) || applicability.length !== model.applicability.length) malformed.push('boundary/applicability inventory required')
+  const boundaryIds = new Set()
+  for (const boundary of boundaries) {
+    if (!object(boundary) || !/^[\w-]+$/.test(boundary.id ?? '') || boundaryIds.has(boundary.id) || !['action', 'external-event', 'async'].includes(boundary.kind) || !sourceIds.has(boundary.source)) malformed.push(`boundary: ${boundary?.id}`)
+    boundaryIds.add(boundary?.id)
+    for (const candidate of APPLICABILITY_CANDIDATES) {
+      const entries = applicability.filter((entry) => entry?.boundary === boundary?.id && entry.candidate === candidate)
+      if (entries.length !== 1) issues.push(`applicability: ${boundary?.id}/${candidate} requires exactly one disposition`)
+    }
+  }
+  for (const entry of applicability) {
+    if (!object(entry) || !boundaryIds.has(entry.boundary) || !APPLICABILITY_CANDIDATES.includes(entry.candidate) || !sourceIds.has(entry.source) || ['dimensionId', 'reason', 'question'].filter((key) => text(entry[key])).length !== 1) {
+      malformed.push(`applicability: ${entry?.boundary}/${entry?.candidate}`)
+      continue
+    }
+    if (entry.question) ask(entry.question, `applicability ${entry.boundary}/${entry.candidate}`)
+    if (entry.dimensionId && !domains.has(entry.dimensionId)) malformed.push(`applicability dimension: ${entry.dimensionId}`)
+    if (entry.dimensionId && ['action-repeat', 'request-lifecycle', 'response-order', 'owner-lifetime'].includes(entry.candidate)) {
+      const choices = model.sequences?.[entry.dimensionId]
+      if (!object(choices) || ![...domains.get(entry.dimensionId) ?? []].every((value) => strings(choices[value]) && choices[value].length >= 2)) issues.push(`applicability sequence: ${entry.boundary}/${entry.candidate}`)
+      const witnessed = frames.some(({ tuple }) => {
+          const events = choices?.[tuple[entry.dimensionId]]
+          if (!strings(events)) return false
+          const expanded = sequenceFor(events, tuple)
+          return sequenceWitness(expanded, entry.candidate, entry.boundary)
+        })
+      if (!witnessed) issues.push(`applicability ${entry.candidate} sequence: ${entry.boundary} lacks its temporal witness`)
+    }
+  }
+  for (const [id, choices] of Object.entries(model.sequences ?? {})) {
+    if (!domains.has(id) || !object(choices) || Object.entries(choices).some(([value, events]) => !domains.get(id).has(value) || !strings(events) || events.some((event) => [...event.matchAll(/\{([^}]+)\}/g)].some(([, placeholder]) => !domains.has(placeholder))))) malformed.push(`sequence domain: ${id}`)
+  }
+  const section = sectionLines(lines, 'Frame dispositions')
+  for (const [label, revision] of [['Dimension revision', dimensionRevision], ['Constraint revision', constraintRevision]]) {
+    const values = section.filter((line) => line.startsWith(`- ${label}:`)).map((line) => line.slice(label.length + 3).trim())
+    if (values.length !== 1 || values[0] !== revision) stale.push(label)
+  }
+
+  const excluded = []
+  const unresolvedRecords = []
+  const scenarios = new Set()
+  let unresolved = 0
+  for (const record of records) {
+    if (seen.has(record.id)) { duplicate.push(record.id); continue }
+    seen.add(record.id)
+    if (!ids.has(record.id)) {
+      if (!auxiliaryIds.has(record.id)) extra.push(record.id)
+      continue
+    }
+    if (!validTuple(record.tuple)) { malformed.push(`tuple domain: ${record.id}`); continue }
+    if (frameId(record.tuple, dimensionRevision, constraintRevision) !== record.id) malformed.push(`ID/tuple mismatch: ${record.id}`)
+    const applicable = constraints.filter((constraint) => matches(record.tuple, constraint))
+    const disposition = record.disposition
+    if (disposition.type === 'impossible') {
+      const cited = applicable.find((constraint) => new RegExp(`\\b${constraint.id}\\b`).test(disposition.text) && disposition.witness?.kind === 'constraint' && disposition.witness.ref === constraint.source)
+      if (!cited) issues.push(`exclusion: ${record.id} needs an applicable approved constraint, mechanism and falsifier`)
+      else excluded.push({ id: record.id, tuple: record.tuple, constraints: applicable.map((c) => c.id), source: cited.source, mechanism: cited.mechanism, falsifier: cited.falsifier })
+      if (record.scenario) issues.push(`scenario: excluded frame ${record.id} cannot assert an expectation`)
+    } else if (disposition.type === 'needs-decision' || disposition.type === 'needs-evidence') {
+      unresolved += 1
+      unresolvedRecords.push({ id: record.id, tuple: record.tuple, disposition: disposition.text })
+      if (disposition.type === 'needs-decision') ask(disposition.text.match(/^needs-decision:\s*(Q\d+)\b/)?.[1], record.id)
+      if (disposition.type === 'needs-evidence' && !disposition.lookup) issues.push(`needs-evidence-lookup-missing: ${record.id}`)
+      if (record.scenario) issues.push(`scenario: unresolved frame ${record.id} cannot assert an expectation`)
+    } else if (disposition.type === 'covered' && !disposition.reason && disposition.rows.length > 0 && disposition.rows.every((id) => rowSet.has(id))) {
+      if (applicable.length) issues.push(`exclusion: ${record.id} contradicts applicable constraint ${applicable.map((c) => c.id).join(',')}`)
+      const gwt = record.scenario
+      if (!object(gwt) || !text(gwt.id) || scenarios.has(gwt.id) || !strings(gwt.sources) || !gwt.sources.every((id) => approved.has(id)) || !strings(gwt.rows) || stableStringify([...new Set(gwt.rows)].sort()) !== stableStringify([...disposition.rows].sort()) || !object(gwt.given) || !['query', 'page', 'history', 'data', 'pending'].every((key) => Object.hasOwn(gwt.given, key) && gwt.given[key] !== null) || !strings(gwt.when) || !object(gwt.then) || !['requests', 'display', 'effects', 'never'].every((key) => text(gwt.then[key])) || !['target', 'control', 'barrier', 'observe'].every((key) => text(gwt[key]))) {
+        issues.push(`scenario: ${record.id} requires unique sourced GWT, contract rows and realization`)
+        continue
+      }
+      scenarios.add(gwt.id)
+      for (const [dimension, value] of Object.entries(record.tuple)) {
+        const events = model.sequences?.[dimension]?.[value]
+        if (!strings(events)) continue
+        let cursor = -1
+        const expanded = sequenceFor(events, record.tuple)
+        if (expanded.some((event) => { cursor = gwt.when.indexOf(event, cursor + 1); return cursor === -1 })) issues.push(`sequence: ${record.id} must contain ${expanded.join(' -> ')}`)
+      }
+    } else issues.push(`disposition: ${record.id} must use covered, impossible, needs-decision or needs-evidence`)
+  }
+  const missing = frames.filter(({ id }) => !seen.has(id)).map(({ id }) => id)
+  for (const [kind, values] of [['missing', missing], ['extra', extra], ['duplicate', duplicate], ['malformed', malformed], ['stale-mapping', stale]]) if (values.length) issues.push(`${kind}: ${values.join(', ')}`)
+  return {
+    coverage: 'full-product', dimensionRevision, constraintRevision,
+    dimensions: dimensions.map((entry) => ({ id: entry.dimension, values: entry.choices.map((choice) => choice.value), source: model.dimensionSources?.[entry.dimension] })),
+    N_raw: rawCount, N_valid: rawCount - excluded.length - unresolved, N_excluded: excluded.length, N_unresolved: unresolved,
+    N_scenarios: scenarios.size, N_executed_unique: null, N_passed_unique: null,
+    missing, extra, duplicate, malformed, 'stale-mapping': stale, excluded, unresolved: unresolvedRecords, questions: [...questions].sort(), issues,
+    ready: issues.length === 0 && unresolved === 0 && questions.size === 0,
+    execution: 'not-run', limitation: 'Declared-model completeness only; source relevance and assertion semantics require review.',
+  }
+}
+
 async function lintCard(options) {
   if (!options.oracle) throw new CliError('USAGE', 'card requires --oracle', 2)
 
   const card = await readFile(options.oracle, 'utf8').catch((error) => {
     throw new CliError('CARD_UNREADABLE', `Cannot read ${options.oracle}: ${error.message}`)
   })
+
+  if (options['case-space']) {
+    const generated = generateFromDocument(card)
+    if (generated?.caseSpace.coverage !== 'full-product') throw new CliError('CASE_SPACE_REQUIRED', 'Expected Coverage: full-product')
+    const report = auditFullProduct(card, generated)
+    process.stdout.write(`${JSON.stringify(report)}\n`)
+    if (report.issues.length) throw new CliError('CASE_SPACE_FAILED', report.issues.join('\n'))
+    return
+  }
 
   // 데이터 뷰 — lint 없이 파생 IR을 덤프한다. 같은 바이트면 같은 출력.
   if (options.ir) {
@@ -1190,7 +1371,12 @@ async function lintCard(options) {
   }
 
   // Case space 섹션 — 있으면 프레임을 결정적으로 재생성해 disposition 완전성을 대조한다. 열거는 기계, 판정만 사람.
-  const generated = generateFromDocument(lines.join('\n'))
+  const generated = generateFromDocument(card)
+  if (generated?.caseSpace.coverage === 'full-product') {
+    const report = auditFullProduct(card, generated)
+    issues.push(...report.issues)
+    if (report.N_unresolved || report.questions.length) issues.push('disposition-open: full-product has unresolved expectations')
+  }
 
   if (generated) {
     const declaredFamilies = new Set(generated.caseSpace.families.map((entry) => entry.family))
@@ -1222,7 +1408,7 @@ async function lintCard(options) {
       }
     }
 
-    if (generated.frames.length > 50) {
+    if (generated.caseSpace.coverage !== 'full-product' && generated.frames.length > 50) {
       issues.push(
         `case-space-too-wide: ${generated.frames.length} combinable frames — split the dimension or narrow the scope`,
       )
@@ -1247,6 +1433,7 @@ async function lintCard(options) {
         issues.push(`frame-unknown: ${frameId} is not in the generated frame set`)
         continue
       }
+      if (dispositioned.has(frameId)) issues.push(`frame-duplicate: ${frameId}`)
       dispositioned.add(frameId)
 
       const value = disposition.trim()
@@ -1752,6 +1939,24 @@ function collectFrameEvidence(card, map) {
 
   const covered = coveredFrameIds(card, generated)
   const frameEntries = map?.frames ?? {}
+  if (generated.caseSpace.coverage === 'full-product') {
+    const audit = auditFullProduct(card, generated)
+    if (!audit.ready) throw new CliError('CASE_SPACE_FAILED', [...audit.issues, ...audit.questions].join('\n') || 'Unresolved full-product expectations')
+    const records = new Map(fullProductRecords(card).map((record) => [record.id, record]))
+    const names = new Set()
+    for (const id of covered) {
+      const entry = frameEntries[id]
+      const record = records.get(id)
+      if (!entry) throw new CliError('EVIDENCE_MISSING_FRAME', `${id} has no reporter case`)
+      if (entry.dimensionRevision !== generated.dimensionRevision || entry.constraintRevision !== generated.constraintRevision || canonicalTuple(entry.tuple ?? {}) !== canonicalTuple(record.tuple) || entry.scenario !== record.scenario.id) {
+        throw new CliError('EVIDENCE_STALE', `${id}: stale-mapping of tuple, scenario or model revision`)
+      }
+      if (typeof entry.name !== 'string' || !entry.name.includes(`[${id}]`) || names.has(entry.name)) {
+        throw new CliError('EVIDENCE_CASE_COLLISION', `${id}: require a distinct reporter case containing [${id}]`)
+      }
+      names.add(entry.name)
+    }
+  }
   const unknownFrames = Object.keys(frameEntries).filter((id) => !covered.includes(id))
   if (unknownFrames.length > 0) {
     throw new CliError('EVIDENCE_UNKNOWN_FRAME', `evidence maps frames that are not covered() F* frames: ${unknownFrames.join(', ')}`)
@@ -1826,6 +2031,9 @@ async function verifyEvidence(options) {
 
   const oracleSha256 = oracleSnapshot.sha256
   const { run, records } = await ledgerRun(options, base, snapshots)
+  const generated = generateFromDocument(card)
+  const fullProduct = generated?.caseSpace.coverage === 'full-product'
+  if (fullProduct && run.oracleSha256 !== oracleSha256) throw new CliError('EVIDENCE_STALE', 'full-product run belongs to another Oracle revision')
   for (const row of contracts.filter((entry) => map.rows[entry.id].kind === 'visual')) {
     await verifyVisualArtifact(
       row,
@@ -1841,6 +2049,13 @@ async function verifyEvidence(options) {
 
   // PATH*·Order 시퀀스 증거 — 카드가 State Model·Order 차원을 선언했으면 행 증거와 같은 게이트를 지난다.
   const frameEvidence = collectFrameEvidence(card, map)
+  if (fullProduct) {
+    const names = new Set()
+    for (const entry of run.tests ?? []) {
+      if (names.has(entry.name)) throw new CliError('EVIDENCE_CASE_COLLISION', `Reporter case name is not unique: ${entry.name}`)
+      names.add(entry.name)
+    }
+  }
 
   const needsRunEvidence = [
     ...rows.filter((id) => map.rows[id].kind === 'test').map((id) => [id, map.rows[id].name]),
@@ -1880,6 +2095,14 @@ async function verifyEvidence(options) {
   const notices = pending.length > 0 ? `VISUAL_EVIDENCE_PENDING ${pending.join(', ')}\n` : ''
   await assertSnapshots(snapshots, base, 'EVIDENCE_INVALID')
   process.stdout.write(`EVIDENCE_VERIFIED ${rows.length} rows\n${notices}`)
+  if (fullProduct) {
+    const report = auditFullProduct(card, generated)
+    const covered = coveredFrameIds(card, generated)
+    report.N_executed_unique = covered.length
+    report.N_passed_unique = covered.length
+    report.execution = { runId: run.runId, ledger: options.ledger, oracle: options.oracle, map: options.map }
+    process.stdout.write(`${JSON.stringify(report)}\n`)
+  }
 }
 
 function normalizeFindings(document, rows, source) {
@@ -2374,6 +2597,15 @@ async function scaffoldEvidence(options) {
     manifest.frames = Object.fromEntries(
       covered.map((id) => [id, { kind: 'test', name: `<the it.each case that runs [${id}]>` }]),
     )
+    if (generated.caseSpace.coverage === 'full-product') {
+      const records = new Map(fullProductRecords(card).map((record) => [record.id, record]))
+      for (const id of covered) Object.assign(manifest.frames[id], {
+        tuple: records.get(id)?.tuple,
+        scenario: records.get(id)?.scenario?.id,
+        dimensionRevision: generated.dimensionRevision,
+        constraintRevision: generated.constraintRevision,
+      })
+    }
   }
   process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`)
 }
@@ -2559,7 +2791,9 @@ async function main() {
 try {
   await main()
 } catch (error) {
-  const cliError = error instanceof CliError ? error : new CliError('INPUT_UNREADABLE', error.message ?? String(error))
+  let code = 'INPUT_UNREADABLE'
+  if (error.code?.startsWith('CASE_SPACE_')) code = error.code
+  const cliError = error instanceof CliError ? error : new CliError(code, error.message ?? String(error))
   process.stderr.write(`${cliError.code}: ${cliError.message}\n${nextActionLine(cliError.code)}`)
   process.exitCode = cliError.exitCode
 }

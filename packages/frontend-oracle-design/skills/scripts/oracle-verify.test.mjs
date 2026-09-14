@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { fullProductFixture as buildFullProductFixture } from '../../test-fixtures/full-product/fixture.mjs'
 import { stableStringify } from './oracle-fs.mjs'
 
 const script = join(dirname(fileURLToPath(import.meta.url)), 'oracle-verify.mjs')
@@ -2960,6 +2961,141 @@ async function caseSpaceCard(mutate = (rows) => rows) {
   const rows = ids.map((id) => `| ${id} | ${id.startsWith('EMPTY') ? 'impossible: fixture — constraint(S1)' : 'covered(O1)'} |`)
   return `${base}\n## Frame dispositions\n\n| Frame | Disposition |\n| ----- | ----------- |\n${mutate(rows).join('\n')}\n`
 }
+
+function fullProductFixture(mutateModel) {
+  return buildFullProductFixture(VALID_CARD, mutateModel)
+}
+
+test('full-product: twelve exact records pass and every structural mutation fails', async (t) => {
+  const fixture = await fullProductFixture()
+  assert.equal(fixture.records.length, 12)
+  const good = run('card', '--case-space', '--oracle', await cardFile(t, fixture.render()))
+  assert.equal(good.status, 0, good.stderr)
+  const report = JSON.parse(good.stdout)
+  assert.equal(report.N_raw, 12)
+  assert.equal(report.N_valid, 12)
+  assert.equal(report.N_scenarios, 12)
+  assert.equal(report.N_executed_unique, null)
+  const mutations = [
+    ['missing', (r) => r.shift(), /missing/],
+    ['missing plus duplicate with unchanged count', (r) => { r.shift(); r.push(structuredClone(r[0])) }, /missing[\s\S]*duplicate/],
+    ['extra', (r) => r.push({ ...r[0], frame: 'Funknown' }), /extra/],
+    ['fake auxiliary frame', (r) => r.push({ ...r[0], frame: 'PATHbogus' }), /extra/],
+    ['unknown value', (r) => { r[0].tuple.navigation = 'loading' }, /malformed/],
+    ['ID tuple mismatch', (r) => { r[0].tuple.navigation = r[0].tuple.navigation === 'next' ? 'previous' : 'next' }, /tuple/],
+    ['unsupported exclusion', (r) => { r[0].disposition = 'impossible: too many tests — constraint(S1)'; r[0].scenario = null }, /exclusion/],
+    ['GWT missing', (r) => { r[0].scenario = null }, /scenario/],
+    ['duplicate scenario', (r) => { r[1].scenario.id = r[0].scenario.id }, /scenario/],
+    ['late or repeated action order missing', (r) => { r.find((x) => x.tuple.ordering === 'late').scenario.when.reverse() }, /sequence/],
+    ['pairwise subset', (r) => { r.splice(6) }, /missing/],
+    ['independent is not full coverage', (r) => { r[0].disposition = 'independent(O1): representative enough' }, /disposition/],
+  ]
+  for (const [name, mutate, message] of mutations) await t.test(name, async (st) => {
+    const records = structuredClone(fixture.records)
+    mutate(records)
+    const result = run('card', '--case-space', '--oracle', await cardFile(st, fixture.render(records)))
+    assert.equal(result.status, 1, result.stdout)
+    assert.match(result.stdout + result.stderr, message)
+  })
+})
+
+test('full-product: committed example is generated from the runnable fixture', async () => {
+  const example = await readFile(join(dirname(script), '../../test-fixtures/full-product/oracle.md'), 'utf8')
+  assert.equal(example, buildFullProductFixture().render())
+})
+
+test('full-product: applicability, exclusions and unresolved expectations retain their gate semantics', async (t) => {
+  const absent = await fullProductFixture((model) => { model.applicability.shift() })
+  const missing = run('card', '--case-space', '--oracle', await cardFile(t, absent.render()))
+  assert.equal(missing.status, 1)
+  assert.match(missing.stdout + missing.stderr, /applicability.*action-repeat/)
+  for (const weaken of [
+    (model) => { model.sequences.ordering.late = ['start:{navigation}:A', 'complete:A'] },
+    (model) => { model.sequences.ordering.duplicate = ['start:{navigation}:A', 'complete:A', 'repeat:{navigation}:pending'] },
+  ]) {
+    const weak = await fullProductFixture(weaken)
+    const result = run('card', '--case-space', '--oracle', await cardFile(t, weak.render()))
+    assert.equal(result.status, 1, result.stdout)
+    assert.match(result.stdout + result.stderr, /applicability.*sequence/)
+  }
+
+  const unanswered = await fullProductFixture()
+  unanswered.records[0].disposition = 'needs-decision: Q1 — cursor or offset API?'
+  unanswered.records[0].scenario = null
+  const openCard = `${unanswered.render()  }\n## Open questions\n\n- Q1: API contract? offset or cursor; no recommendation adopted.\n`
+  const draft = run('card', '--case-space', '--oracle', await cardFile(t, openCard))
+  assert.equal(draft.status, 0, draft.stderr)
+  assert.equal(JSON.parse(draft.stdout).N_unresolved, 1)
+  assert.equal(JSON.parse(draft.stdout).ready, false)
+  const ready = run('card', '--oracle', await cardFile(t, openCard))
+  assert.equal(ready.status, 1)
+  assert.match(ready.stderr, /disposition-open/)
+  const lockPath = await cardFile(t, openCard)
+  const locked = spawnSync(process.execPath, [join(dirname(script), 'oracle-lock.mjs'), 'create', '--oracle', lockPath, '--lock', join(dirname(lockPath), 'oracle.lock.json')], { encoding: 'utf8' })
+  assert.equal(locked.status, 1)
+
+  const excluded = await fullProductFixture((model) => { model.constraints.push({ id: 'C1', when: { history: 'fresh', navigation: 'previous' }, source: 'S1', mechanism: 'fixture API forbids previous without a prior page', falsifier: 'a prior page is reachable while history is fresh' }) })
+  for (const r of excluded.records.filter((r) => r.tuple.history === 'fresh' && r.tuple.navigation === 'previous')) {
+    r.disposition = 'impossible: C1 fixture has no previous page — constraint(S1)'
+    r.scenario = null
+  }
+  const result = run('card', '--case-space', '--oracle', await cardFile(t, excluded.render()))
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(JSON.parse(result.stdout).N_excluded, 3)
+  assert.equal(JSON.parse(result.stdout).N_valid, 9)
+})
+
+test('full-product: one parameterized function produces twelve unique current-revision reporter cases', async (t) => {
+  const fixture = await fullProductFixture()
+  const card = fixture.render()
+  const scaffold = run('evidence-scaffold', '--oracle', await cardFile(t, card))
+  assert.equal(scaffold.status, 0, scaffold.stderr)
+  const manifest = JSON.parse(scaffold.stdout)
+  for (const [id, entry] of Object.entries(manifest.frames)) entry.name = `parameterized [${id}]`
+  const firstName = Object.values(manifest.frames)[0].name
+  for (const id of Object.keys(manifest.rows)) manifest.rows[id] = { kind: 'test', name: firstName }
+  manifest.sequence = { kind: 'test', name: firstName }
+  const tests = Object.values(manifest.frames).map(({ name }) => ({ name, status: 'passed' }))
+  const verify = async (map, reported = tests, cardText = card, digest = createHash('sha256').update(cardText).digest('hex')) => {
+    const base = await directory(t)
+    const oracle = join(base, 'oracle.md')
+    const mapPath = join(base, 'evidence.json')
+    const ledger = join(base, 'runs.jsonl')
+    await writeFile(oracle, cardText)
+    await writeFile(mapPath, JSON.stringify(map))
+    await writeFile(ledger, chainedLedger(`${JSON.stringify({ runId: 'full-run', exitCode: 0, grade: 'reported', adapter: 'node-test', tests: reported })  }\n`, digest))
+    return run('evidence', '--oracle', oracle, '--map', mapPath, '--ledger', ledger, '--run', 'full-run', '--phase', 'green')
+  }
+  const good = await verify(manifest)
+  assert.equal(good.status, 0, good.stderr)
+  assert.match(good.stdout, /"N_executed_unique":12/)
+  assert.match(good.stdout, /"N_passed_unique":12/)
+  for (const [name, mutate] of [
+    ['missing', (map) => { delete map.frames[fixture.records[0].frame] }],
+    ['shared reporter', (map) => { Object.values(map.frames)[1].name = firstName }],
+    ['stale tuple', (map) => { Object.values(map.frames)[0].tuple.navigation = 'loading' }],
+    ['stale revision', (map) => { Object.values(map.frames)[0].constraintRevision = '0'.repeat(64) }],
+  ]) await t.test(name, async () => {
+    const map = structuredClone(manifest)
+    mutate(map)
+    const result = await verify(map)
+    assert.equal(result.status, 1, result.stdout)
+  })
+  assert.equal((await verify(manifest, [...tests, tests[0]])).status, 1, 'same-name cases must not collapse')
+  assert.equal((await verify(manifest, tests.map((x, i) => i ? x : { ...x, status: 'skipped' }))).status, 1)
+  assert.equal((await verify(manifest, tests, card, '0'.repeat(64))).status, 1, 'old ledger revision')
+  const changed = card.replace('fresh, prior', 'fresh, prior, restored')
+  assert.equal((await verify(manifest, tests, changed)).status, 1, 'axis revision invalidates old mappings')
+  const changedConstraint = card.replace('"constraints":[]', '"constraints":[{"id":"C1","when":{"history":"fresh"},"source":"S1","mechanism":"contract changed","falsifier":"prior page reachable"}]')
+  assert.equal((await verify(manifest, tests, changedConstraint)).status, 1, 'constraint revision invalidates old mappings')
+})
+
+test('case-space: duplicate dispositions are rejected rather than collapsed by Set', async (t) => {
+  const card = await caseSpaceCard((rows) => [...rows, rows[0]])
+  const result = run('card', '--oracle', await cardFile(t, card))
+  assert.equal(result.status, 1, result.stdout)
+  assert.match(result.stderr, /frame-duplicate/)
+})
 
 test('case-space: 기계 생성 프레임 전부가 판정되면 lint를 통과한다', async (t) => {
   const linted = run('card', '--oracle', await cardFile(t, await caseSpaceCard()))
