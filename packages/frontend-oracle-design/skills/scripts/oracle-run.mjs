@@ -3203,6 +3203,14 @@ const PACKET_READ_NODES = {
 }
 
 /** transitionUnderLock 1697–2000행이 실제로 검사하는 인자·전제와 같은 규칙으로 패킷 하나를 만든다. */
+
+function reviewRequiredFlags(risk, blindMapping) {
+  const flags = ['--findings', '--packet', '--revision']
+  if (risk === 'high') flags.push('--intersect', '--mutation-run', '--mutation-row')
+  if (blindMapping?.required) flags.push('--blind-input', '--blind-map')
+  return flags
+}
+
 function transitionPacket(to, { state, runEntries, staleRunIds, blockers, evidence, blindMapping }) {
   const requires = []
   const packetBlockers = []
@@ -3268,11 +3276,9 @@ function transitionPacket(to, { state, runEntries, staleRunIds, blockers, eviden
       if (candidateRuns.length > 0 && !satisfied) packetBlockers.push(`FLAKINESS_GATE_${required}_CONSECUTIVE`)
     }
     if (to === 'REVIEW_VERIFIED') {
-      requires.push('--findings', '--packet', '--revision')
-      if (state.risk === 'high') requires.push('--intersect', '--mutation-run', '--mutation-row')
+      requires.push(...reviewRequiredFlags(state.risk, blindMapping))
       // transitionUnderLock이 실제로 쓰는 것과 같은 규칙에서 파생한다 — 규칙 사본을 유지하지 않는다.
       if (blindMapping?.required) {
-        requires.push('--blind-input', '--blind-map')
         // 영수증이 아예 없으면 증거가 없는 것이 확실하다. 있더라도 transition은 결속을 다시 판정한다 —
         // 여기서 blocker가 사라지는 것은 "통과 보장"이 아니라 "이 단계에서 관측 가능한 결손이 없음"이다.
         if (!blindMapping.receiptPresent) packetBlockers.push('BLIND_MAP_REQUIRED')
@@ -3447,6 +3453,201 @@ async function reportStatus(options) {
   )
 }
 
+async function reviewBrief(options) {
+  if (!options.dir || !options.packet || !options.findings || options.output || options.command) {
+    throw new CliError(
+      'USAGE',
+      'review-brief requires --dir --packet --findings [--intersect] [--json]; stdout only',
+      2,
+    )
+  }
+  const directory = await realpath(resolve(options.dir))
+  const inputs = []
+  for (const path of [statePath(directory), ledgerPath(directory)]) {
+    await snapshotPacketFile(path, directory, path, inputs)
+  }
+  const state = await readConsistentState(directory)
+  if (state.state !== 'IMPLEMENTED_GREEN') {
+    throw new CliError('REVIEW_PACKET_STATE', 'review-brief requires IMPLEMENTED_GREEN; it never advances delivery')
+  }
+  const revision = verifyLock(directory, state)
+  const packetSnapshot = await snapshotPacketFile(resolve(options.packet), directory, 'review packet', inputs)
+  const packet = JSON.parse(packetSnapshot.bytes.toString('utf8'))
+  if (!isReviewPacketShape(packet) || packet.schemaVersion !== 2) {
+    throw new CliError('REVIEW_PACKET_INVALID', 'review-brief requires a schema-v2 review packet')
+  }
+  const scanRoot = resolve(directory, state.scanRoot)
+  const excluded = `${portablePath(scanRoot, directory)}/`
+  const assertCurrent = async () => {
+    const current = await snapshot(scanRoot, excluded)
+    if (
+      packet.targetRevision !== sha256(JSON.stringify(current)) ||
+      packet.targetSnapshot.worktreeSha256 !== packet.targetRevision ||
+      packet.targetSnapshot.productionSha256 !== productionSha256(current, state.harnessPaths) ||
+      stableStringify(packet.targetSnapshot.harnessSha256) !==
+        stableStringify(selectedDigests(current, state.harnessPaths ?? [])) ||
+      packet.targetSnapshot.lockManifestSha256 !== revision.lockManifestSha256
+    ) {
+      throw new CliError(
+        'REVIEW_PACKET_STALE',
+        'regenerate the review packet and reviewer findings for the current revision',
+      )
+    }
+  }
+  await assertCurrent()
+  const oraclePath = await lockedOraclePath(directory, state)
+  const evidencePath = evidencePathFor(directory, state)
+  const evidenceSnapshot = await snapshotPacketFile(evidencePath, directory, 'evidence map', inputs)
+  const evidenceArtifacts = await collectEvidenceArtifacts(directory, evidenceSnapshot, inputs)
+  const reviewerFiles = [options.findings, ...(options.intersect ? [options.intersect] : [])]
+  const reviewers = []
+  for (const path of reviewerFiles) {
+    const input = await snapshotPacketFile(resolve(path), directory, 'reviewer findings', inputs)
+    reviewers.push({ path: portablePath(directory, input.path), document: JSON.parse(input.bytes.toString('utf8')) })
+  }
+  const findingArgs = ['--oracle', oraclePath, '--file', resolve(options.findings)]
+  if (options.intersect) findingArgs.push('--intersect', resolve(options.intersect))
+  try {
+    runVerifier([
+      'review',
+      ...findingArgs,
+      '--packet',
+      packetSnapshot.path,
+      '--revision',
+      packet.targetRevision,
+      '--map',
+      evidencePath,
+      '--ledger',
+      ledgerPath(directory),
+    ])
+  } catch (error) {
+    // A blocked review is useful navigation, not permission to weaken its gate.
+    if (error.code !== 'FINDINGS_BLOCKING') throw error
+  }
+  const findings = JSON.parse(runVerifier(['findings', ...findingArgs, '--ir']))
+  const withSource = (entries) =>
+    entries.map((entry) => ({
+      ...entry,
+      source: reviewers.find(({ document }) => document.findings.some((finding) => finding.id === entry.id)).path,
+    }))
+  const evidence = JSON.parse(evidenceSnapshot.bytes.toString('utf8'))
+  const blindMapping = await blindMappingStatus(directory, state, await readLedger(directory))
+  const requiredFlags = reviewRequiredFlags(state.risk, blindMapping)
+  const remainingReviewWork = ['Final transition checks and post-GREEN rerun are not evaluated by this view.']
+  if (requiredFlags.includes('--intersect')) {
+    if (!options.intersect) remainingReviewWork.push('Missing second independent review (--intersect).')
+    remainingReviewWork.push('High-risk mutation evidence (--mutation-run, --mutation-row) is not evaluated here.')
+  }
+  if (blindMapping.required) {
+    remainingReviewWork.push(blindMapping.receiptPresent
+      ? 'Blind-mapper receipt observed; --blind-input and --blind-map binding/independence remain unverified.'
+      : 'Missing blind-mapper receipt; --blind-input and --blind-map remain required.')
+  }
+  const sections = packet.oracle.content.split(/^##\s+/m)
+  const section = (title) =>
+    sections
+      .find((text) => text.startsWith(`${title}\n`) || text.startsWith(`${title}\r\n`))
+      ?.split('\n')
+      .slice(1)
+      .join('\n')
+      .trim() ?? 'Not present; consult the original Oracle.'
+  const brief = {
+    authority: 'navigation-only',
+    packet: {
+      path: portablePath(directory, packetSnapshot.path),
+      sha256: packetSnapshot.sha256,
+      targetRevision: packet.targetRevision,
+    },
+    outcome: section('Outcome Brief'),
+    confirmation: section('User Confirmation'),
+    openQuestions: section('Open questions'),
+    sources: `${packet.oracle.path}#source-registry`,
+    reviewRequirements: {
+      risk: state.risk,
+      requiredFlags,
+      minimumReviewerDocuments: requiredFlags.includes('--intersect') ? 2 : 1,
+      suppliedReviewers: reviewers.map(({ path, document }) => ({ path, role: document.reviewerRole, id: document.reviewerId })),
+      blindMapping,
+      remainingReviewWork,
+    },
+    blocking: withSource(findings.blocking),
+    pending: Object.entries(evidence.rows ?? {})
+      .filter(([, entry]) => entry.kind === 'pending')
+      .map(([row, entry]) => ({ row, ...entry })),
+    advisory: withSource(findings.advisory),
+    evidence: { path: portablePath(directory, evidencePath), rows: evidence.rows, artifacts: evidenceArtifacts },
+    raw: { oracle: packet.oracle.path, findings: reviewers.map(({ path }) => path), reviewPoints: packet.reviewPoints },
+    limitations: [
+      'Navigation only: no policy approval, usability proof, or delivery transition.',
+      'Pending evidence remains unresolved even when there are no blocking findings.',
+      'Existing full-card approval and required independent reviews still apply; exit 0 only means the brief was generated.',
+    ],
+  }
+  await assertCurrent()
+  verifyLock(directory, state)
+  for (const { label, snapshot: input } of inputs) {
+    await assertSnapshotUnchanged(input, {
+      label,
+      fail: (message) => new CliError('REVIEW_PACKET_INPUT_CHANGED', message),
+    })
+  }
+  if (options.json) {
+    process.stdout.write(`${JSON.stringify(brief, null, 2)}\n`)
+    return
+  }
+  const findingsLines = (entries) =>
+    entries.length
+      ? entries.map(
+          (entry) =>
+            `- [${entry.severity}] ${entry.row} ${entry.id} ${entry.classification}: ${entry.finding}\n  Evidence: ${entry.evidence}\n  Proposed action: ${entry.fix}\n  Source: ${entry.source}`,
+        )
+      : ['- None reported; this is not approval.']
+  process.stdout.write(
+    [
+      '# Human review brief',
+      '',
+      'Authority: navigation-only',
+      ...brief.limitations.map((line) => `- ${line}`),
+      '',
+      '## User outcome (verbatim)',
+      brief.outcome,
+      '',
+      '## Recorded confirmation / delta (verbatim)',
+      brief.confirmation,
+      '',
+      '## Open questions (verbatim)',
+      brief.openQuestions,
+      '',
+      '## Required review work (not a gate verdict)',
+      `- Risk: ${brief.reviewRequirements.risk}; reviewer documents supplied: ${reviewers.length}/${brief.reviewRequirements.minimumReviewerDocuments} minimum`,
+      ...brief.reviewRequirements.suppliedReviewers.map((entry) => `- Reviewer: ${entry.role} ${entry.id} (${entry.path})`),
+      ...brief.reviewRequirements.remainingReviewWork.map((entry) => `- ${entry}`),
+      '',
+      '## Blocking findings',
+      ...findingsLines(brief.blocking),
+      '',
+      '## Pending evidence',
+      ...brief.pending.map((entry) => `- ${entry.row}: ${JSON.stringify(entry)}`),
+      '',
+      '## Advisory / heuristic signals',
+      ...findingsLines(brief.advisory),
+      '',
+      '## Evidence references (not usability proof)',
+      ...Object.entries(brief.evidence.rows).map(([row, entry]) => `- ${row}: ${JSON.stringify(entry)}`),
+      ...brief.evidence.artifacts.map((entry) => `- ${entry.path} sha256:${entry.sha256}`),
+      '',
+      '## Original inputs',
+      `- Packet: ${brief.packet.path} sha256:${brief.packet.sha256}`,
+      `- Revision: ${brief.packet.targetRevision}`,
+      `- Oracle: ${brief.raw.oracle}`,
+      `- Sources: ${brief.sources}`,
+      ...brief.raw.findings.map((path) => `- Findings: ${path}`),
+      ...brief.raw.reviewPoints.map((entry) => `- Review criteria: ${entry.path} sha256:${entry.sha256}`),
+      '',
+    ].join('\n'),
+  )
+}
+
 async function main() {
   const [command, ...args] = process.argv.slice(2)
   const options = parseOptions(args)
@@ -3461,11 +3662,12 @@ async function main() {
   else if (command === 'transition') await transition(options)
   else if (command === 'budget') await spendBudget(options)
   else if (command === 'review-packet') await reviewPacket(options)
+  else if (command === 'review-brief') await reviewBrief(options)
   else if (command === 'blind-input') await blindInput(options)
   else
     throw new CliError(
       'USAGE',
-      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, budget, status, review-packet or blind-input',
+      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, budget, status, review-packet, review-brief or blind-input',
       2,
     )
 }

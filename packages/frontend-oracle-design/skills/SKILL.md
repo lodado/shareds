@@ -67,6 +67,11 @@ Lane routing:
   Read that node with its dependencies at this point, not only after contract rows are drafted.
 - Report meaningful changes only. Keep facts, assumptions, recommendations, and ledger-backed results
   distinct; the existing Final report remains authoritative for completion evidence and state.
+- Human attention briefs lead with the changed user outcome, linked evidence, and unresolved
+  decisions; keep the full Draft/delta and independent reviewers' raw inputs intact. After GREEN,
+  `oracle-run.mjs review-brief` derives a read-only evidence index from the current packet and
+  ledger-bound findings. It never approves policy, proves usability, or advances delivery; see
+  `delivery/green-review.md` for the command and its limitations.
 - The Low fast path stays single-node: use its existing report, without loading Oracle references or
   creating a test-space briefing, card, lock, or ledger.
 

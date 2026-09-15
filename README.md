@@ -178,9 +178,12 @@ Node·Edge·fallback·terminal 수와 전체 그래프는
 ```bash
 oracle-verify.mjs   card | red | evidence | findings | review | scan
 oracle-lock.mjs     create | verify
-oracle-run.mjs      init | status | exec | transition | budget | review-packet
+oracle-run.mjs      init | status | exec | transition | budget | review-packet | review-brief
 generate-workflow-docs.mjs       README 그래프 요약 생성 | --check
 ```
+
+`review-brief`는 현재 리뷰 근거에서 사용자 목표·차단 항목·미완료 증거·비차단 의견을 모은
+읽기 전용 요약입니다. 원본 카드·리뷰 입력이나 승인 절차를 대체하지 않습니다.
 
 혼자 다 하지는 않아요. 테스트 작성·판정은 [`test`](packages/test),
 스크린샷이랑 브라우저는 [`frontend-visual-qa`](packages/frontend-visual-qa),

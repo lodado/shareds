@@ -1,5 +1,7 @@
 # Oracle Card — card format and the cold-read gate
 
+**Last Updated:** 2026-09-15
+
 ## Full-product disposition and scenario mapping
 
 For `Coverage: full-product`, use the existing disposition grammar with this auditable table:
@@ -82,6 +84,25 @@ Abbreviated example:
 | O2  | P1     | pending     | click+Enter | pending kept     | second POST                | POST×1 (total)    | count: 1/2     |
 | O3  | P2     | pending     | server 5xx  | error+input kept | success UI, input lost     | successful save×0 | state: error   |
 ```
+
+## Human review brief — before approval
+
+Lead the user-facing Draft presentation with a short, derived attention guide, not another contract.
+Build it from the Draft, Source Registry, and semantic delta; do not require an implementation
+review packet before approval. Group by changed user journey/outcome rather than file or test count:
+
+- User·context·observable success from the Outcome Brief, and what changes from the prior revision.
+- Approved `S*` sources and exact locations → affected `P*` → `O*`/`D*` rows; label proposed policy
+  and unresolved source links instead of presenting them as approved.
+- Known facts versus planned verification and unverified UX/product assumptions.
+- All high-risk changes, all blockers and Open questions, with options and their owning rows.
+- Links to the full Draft, semantic delta, and original source evidence.
+
+The brief does not replace full card·delta approval, card-only cold read, or source-aware review.
+Keep it outside the card-only review input so it cannot prime that reviewer. Show every unresolved
+question even when several rows are grouped; do not cap critical/high risks to a top-N list.
+An unanswered question stays unanswered. This presentation adds no new gate, state, authority, or
+schema; confirmation and locking still follow the existing rules below and above.
 
 ## Conditional source-aware fresh review
 

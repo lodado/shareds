@@ -1,5 +1,7 @@
 # Delivery — minimal implementation·GREEN gate·review transition
 
+**Last Updated:** 2026-09-15
+
 ## Minimal implementation·self-feedback
 
 At most 3 rounds. One round:
@@ -201,9 +203,51 @@ node <skill-dir>/scripts/oracle-run.mjs transition \
 `EVIDENCE_NOT_IN_RUN` = the mapping diverges from the actual run, `EVIDENCE_UNVERIFIABLE` = the run is
 `exit-only` so the name cannot be confirmed. For both, do not invent a name; attach a reporter and re-run.
 
-The final report first writes the Outcome Brief's user·success outcome·non-goals, the minimal boundary
-chosen, the change per path, the verification, and the remaining risk and reversibility. In the
-evidence appendix, record the Oracle SHA-256·source hashes·last verify command/exit, the quoted runId
+### Human review brief — after implementation
+
+The final report starts with the Outcome Brief's user·success outcome·non-goals, then groups the
+journey/outcome delta rather than asking the reader to reconstruct it from files or test counts.
+Use the raw `review-packet` available only after `IMPLEMENTED_GREEN`, current findings, and original
+evidence. Before approval use the [Draft brief](../card/card-format.md#human-review-brief--before-approval),
+not a fabricated packet. For each changed journey show:
+
+| Item            | Content                                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------------------- |
+| Outcome delta   | What the user can now do, versus the prior revision; retain cross-boundary effects                    |
+| Approved basis  | Exact source locations and `S*` → `P*` → `O*`/`D*` links                                              |
+| Proven facts    | Observations with row, runId, revision, and raw test/browser/reviewer evidence links                  |
+| Unverified      | Heuristic concerns and unknown UX/product outcomes, explicitly separate from contract defects         |
+| Human attention | All high-risk changes, all blockers and decision questions, disagreements, and original finding links |
+
+Missing, unexecuted, pending, or stale evidence is unverified, never PASS. Preserve all critical/high
+flags without a top-N cutoff; grouping may remove repeated prose, never individual row/evidence
+links or uncertainty. New policy and unresolved source conflicts use the existing decision route.
+On changed input, regenerate the packet and brief rather than reusing a favorable conclusion.
+The brief is a derived index, not proof, full-card approval, or the independent reviewer's raw input;
+it adds no new gate, state, authority, or schema. An agent/browser observation does not prove actual
+users understand the UI or need the feature; keep those claims tied to separate user evidence.
+
+Generate the machine evidence index after `IMPLEMENTED_GREEN`, with a current source lock and packet
+and ledger-bound reviewer receipts for the supplied findings:
+
+```bash
+node <skill-dir>/scripts/oracle-run.mjs review-brief \
+  --dir .ai/oracles/<oracle-id> \
+  --packet .ai/oracles/<oracle-id>/review-input.json \
+  --findings .ai/oracles/<oracle-id>/findings-code-reviewer.json
+```
+
+Add `--intersect <second-findings-file>` for the second review. Output is stdout-only Markdown by
+default; `--json` selects JSON. There are no implicit file writes and the raw packet is unchanged.
+Exit 0 means the view was generated, not approval or `REVIEW_VERIFIED`; blockers and pending evidence
+remain visible. The view reuses canonical findings normalization, not a new severity or policy rule.
+It also shows risk, supplied reviewer identities, and outstanding mandatory review work using the
+existing requirements. A blind-mapper receipt is only observed; its binding remains unverified here.
+It does not invent a journey narrative or prove user outcomes; use its evidence links for the brief
+above, never as a substitute for raw independent reviewer input.
+
+After the brief, keep the minimal boundary chosen, change per path, verification, remaining risk,
+and reversibility. In the evidence appendix, record the Oracle SHA-256·source hashes·last verify command/exit, the quoted runId
 and the actual verification command/PASS·FAIL counts, and the `oracle-verify.mjs evidence` output.
 Record alongside them only the commit·runtime/browser version·locale/timezone·viewport/theme·role·clock/seed·data
 initialization that affect the result. If a non-N/A row is unmapped or the revision does not match, do not issue GREEN.

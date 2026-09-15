@@ -1,5 +1,7 @@
 # Oracle Card — escape record and run metrics
 
+**Last Updated:** 2026-09-15
+
 Every device on the card is a bet about where defects hide. The escape record settles the bet: a
 defect found after the lock names the cell, frame, landmine, or question that should have caught it,
 and the metrics say whether the procedure as a whole is buying anything. Neither is a gate.
@@ -46,13 +48,26 @@ Rules:
 Compute from the artifacts on disk. The first tens of cards cannot rank devices; read the values for
 direction only and say so wherever they are quoted.
 
-| Metric             | Definition                                                                                                  | Source                                                                                                                                |
-| ------------------ | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Escape Rate        | escapes with `detected_after` of `REVIEW_VERIFIED` or later ÷ cards that reached `REVIEW_VERIFIED`, rolling | `escapes.jsonl`, `run-state.json`                                                                                                     |
-| Question Precision | Open questions and `needs-decision` cells whose answer changed the card bytes ÷ all raised                  | the diff between the Draft and the locked bytes — a new `P*`, a `Then`·`Never` change, a new row counts; a restated answer does not   |
-| Oracle Cost        | dispositioned cells + questions raised to the user                                                          | sweep·deviation·frame·landmine tables and Open questions. Self-reported minutes are not a proxy; record wall-clock only when measured |
-| Test Duplication   | assertions with two or more owning tests                                                                    | `evidence.json` against the test files; expected 0 under the single-owner rule of `$test`                                             |
-| Turns to terminal  | user turns between the request and the reported terminal state                                              | `journal.md`; the final report prints `Turns <n>`                                                                                     |
+| Metric                | Definition                                                                                                  | Source                                                                                                                                |
+| --------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Escape Rate           | escapes with `detected_after` of `REVIEW_VERIFIED` or later ÷ cards that reached `REVIEW_VERIFIED`, rolling | `escapes.jsonl`, `run-state.json`                                                                                                     |
+| Question Precision    | Open questions and `needs-decision` cells whose answer changed the card bytes ÷ all raised                  | the diff between the Draft and the locked bytes — a new `P*`, a `Then`·`Never` change, a new row counts; a restated answer does not   |
+| Oracle Cost           | dispositioned cells + questions raised to the user                                                          | sweep·deviation·frame·landmine tables and Open questions. Self-reported minutes are not a proxy; record wall-clock only when measured |
+| Test Duplication      | assertions with two or more owning tests                                                                    | `evidence.json` against the test files; expected 0 under the single-owner rule of `$test`                                             |
+| Turns to terminal     | user turns between the request and the reported terminal state                                              | `journal.md`; the final report prints `Turns <n>`                                                                                     |
+| Human Review Effort   | measured active human review time per change/journey bundle; report waiting time separately                 | observed start/stop and pause records in `journal.md`, linked to revision and review scope                                            |
+| Escalation Usefulness | escalated items that required human action or a decision ÷ all human-reviewed escalations                   | human disposition and original finding/question links in `journal.md`; an advisory preference is not automatically actionable         |
+| Semantic Escapes      | distinct confirmed UX/product-meaning defects found after review, by severity and detection stage           | `escapes.jsonl` plus linked human classification/evidence in `journal.md`; state reviewed-card denominator and observation window     |
+| Normal-sample Misses  | confirmed missed issues, by severity, among audited normal-classified bundles                               | risk-stratified sample selection, audited denominator, AI/human disagreements and raw evidence in `journal.md`                        |
+
+No automatic collection is provided. Record missing measurements as unmeasured, not zero; preserve
+the existing escape schema and link any severity, review timing, or audit notes from the journal.
+Report sample size, risk mix, revision, and observation window alongside comparisons. Audit normal
+classifications as well as escalations: reviewing only raised warnings cannot reveal false negatives.
+Read effort and usefulness alongside severity-specific escapes and misses; faster review alone is
+not evidence of better review. Separate actual user task completion/failure observations from
+agent/browser checks. Product metrics should follow the approved goal, not a generic UX score; see
+[goal-linked UX measurement](https://research.google/pubs/measuring-the-user-experience-on-a-large-scale-user-centered-metrics-for-web-applications/).
 
 - No metric moves a gate. A rising Escape Rate raises the sweep·exploration budget; it never lowers
   a lint or skips a review.

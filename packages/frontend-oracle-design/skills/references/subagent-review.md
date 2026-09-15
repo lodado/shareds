@@ -1,5 +1,7 @@
 # Independent Subagent Card Review·Improvement
 
+**Last Updated:** 2026-09-15
+
 ## Purpose and Independence
 
 So that implementers do not give final approval to their own GREEN, an independent reviewer examines
@@ -213,6 +215,36 @@ verification is missing it is `EVIDENCE_GAP`, and if an observation result or AP
 decided it is `POLICY_GAP`. A more preferred naming·folder·abstraction style is `NON_ORACLE_OPINION`
 and is not grounds for blocking. Also check whether a mandatory constraint was lowered into a
 product·visual preference.
+
+## Semantic review and calibration
+
+Review one changed user journey/outcome at a time, keeping its cross-screen and side-effect links.
+Trace approved `S*` → `P*` → `O*`/`D*` and the actual evidence; distinguish verified facts, unverified
+heuristics, and unresolved questions. Ask whether status is perceivable, recovery is discoverable,
+and wording matches actual effects. These are advisory questions, not new product policy or a UX
+score that can authorize completion.
+
+- An approved requirement violated by implementation is `PRODUCT_DEFECT`; an omitted requirement
+  is `POLICY_GAP`; missing proof is `EVIDENCE_GAP`. Keep the existing findings schema and router.
+- A heuristic concern without a violated criterion is advisory `NON_ORACLE_OPINION`, with the
+  observed scene, uncertainty, and question for validation. Do not downgrade sourced design,
+  accessibility, security, or data-integrity requirements into preferences. Actual user failures
+  are evidence to investigate, not mere taste or automatic authority to choose a new policy.
+- The human-facing brief is an evidence index produced after independent findings. It does not
+  replace the raw reviewer packet or enter the independent reviewer's pinned input. Preserve all
+  critical/high findings, reviewer disagreements, missing evidence, and decision questions; grouped
+  observations retain every row and original evidence link. Existing mandatory/High-risk reviews
+  and their blocking rules remain unchanged.
+- Calibrate AI rubric judgments in shadow mode against human judgments, including risk-stratified
+  samples classified as normal, not only escalations. Record misses, false alarms, and ambiguous
+  criteria in the existing journal; self-reported model confidence is not an approval threshold.
+- An agent/browser pass is not evidence of actual user usability or product value. Where those
+  claims matter, separately observe users' task completion and failure reasons, and relate product
+  outcomes to the approved goal. Do not defer security or data-loss checks to post-release learning.
+
+Basis: [mixed evaluators and human calibration](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents),
+[usability heuristics, not product specifications](https://www.nngroup.com/articles/ten-usability-heuristics/),
+and [task success with failure observation](https://www.nngroup.com/articles/success-rate-the-simplest-usability-metric/).
 
 ## Blind row mapping — the row↔test relevance check
 

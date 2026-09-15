@@ -2329,7 +2329,11 @@ async function findingsResult(options) {
 
 async function verifyFindings(options) {
   const result = await findingsResult(options)
-  process.stdout.write(`${result.lines.join('\n')}\n`)
+  process.stdout.write(
+    options.ir
+      ? `${JSON.stringify({ blocking: result.blocking, advisory: result.advisory })}\n`
+      : `${result.lines.join('\n')}\n`,
+  )
 }
 
 async function assertReviewBinding(options) {

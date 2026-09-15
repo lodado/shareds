@@ -345,6 +345,172 @@ async function workspace(
   return { root, oracleDirectory, oracle, lock, marker: join(root, 'marker.txt') }
 }
 
+test('review-brief preserves blockers and advisory provenance without changing evidence or granting approval', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { risk: 'low' })
+  greenRun(oracleDirectory, 'green')
+  const green = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-001', ['--reason', 'existing behavior'])
+  assert.equal(green.status, 0, green.stderr)
+  const packetPath = join(oracleDirectory, 'review-input.json')
+  const generated = run(strictReviewPacketArgs(oracleDirectory, packetPath))
+  assert.equal(generated.status, 0, generated.stderr)
+  const packetBytes = await readFile(packetPath, 'utf8')
+  const packet = JSON.parse(packetBytes)
+  const findingsPath = join(oracleDirectory, 'findings.json')
+  await writeFile(
+    findingsPath,
+    JSON.stringify({
+      ...CLEAR_REVIEW,
+      findings: [
+        {
+          id: 'critical',
+          row: 'O1',
+          classification: 'POLICY_GAP',
+          severity: 'critical',
+          finding: 'Approved recovery requirement is missing',
+          evidence: 'S1 recovery paragraph',
+          fix: 'Ask Q1',
+        },
+        {
+          id: 'taste',
+          classification: 'PRODUCT_DEFECT',
+          severity: 'medium',
+          finding: 'Prefer a different layout',
+          evidence: 'reviewer preference',
+          fix: 'Consider an alternative',
+        },
+      ],
+    }),
+  )
+  bindReviewDocument(findingsPath, createHash('sha256').update(packetBytes).digest('hex'), packet.targetRevision)
+  const receipt = issueReviewReceipt(oracleDirectory, packetPath, findingsPath, packet.targetRevision)
+  assert.equal(receipt.status, 0, receipt.stderr)
+  const args = ['review-brief', '--dir', oracleDirectory, '--packet', packetPath, '--findings', findingsPath]
+  const protectedPaths = [
+    packetPath,
+    findingsPath,
+    join(oracleDirectory, 'runs.jsonl'),
+    join(oracleDirectory, 'run-state.json'),
+  ]
+  const before = await Promise.all(protectedPaths.map((path) => readFile(path, 'utf8')))
+  const result = run([...args, '--json'])
+  assert.equal(result.status, 0, result.stderr)
+  const brief = JSON.parse(result.stdout)
+  assert.equal(brief.authority, 'navigation-only')
+  assert.equal(brief.packet.sha256, createHash('sha256').update(packetBytes).digest('hex'))
+  assert.equal(brief.packet.targetRevision, packet.targetRevision)
+  assert.match(brief.outcome, /저장 사용자/)
+  assert.match(brief.confirmation, /Status: approved/)
+  assert.equal(brief.openQuestions, 'Not present; consult the original Oracle.')
+  assert.deepEqual(
+    brief.blocking.map((entry) => entry.id),
+    ['critical'],
+  )
+  assert.equal(brief.advisory[0].id, 'taste')
+  assert.equal(brief.advisory[0].classification, 'NON_ORACLE_OPINION')
+  assert.equal(brief.advisory[0].downgraded, true)
+  assert.deepEqual(brief.pending, [])
+  assert.deepEqual(brief.evidence.rows, EVIDENCE.rows)
+  assert.deepEqual(await Promise.all(protectedPaths.map((path) => readFile(path, 'utf8'))), before)
+  const human = run(args)
+  assert.equal(human.status, 0, human.stderr)
+  assert.match(human.stdout, /# Human review brief/)
+  assert.match(human.stdout, /navigation-only/)
+  assert.match(human.stdout, /critical/)
+  assert.match(human.stdout, /NON_ORACLE_OPINION/)
+  assert.doesNotMatch(human.stdout, /REVIEW_CLEAR|REVIEW_VERIFIED/)
+
+  await writeFile(join(root, 'src', 'later.mjs'), 'export const later = 1\n')
+  const stale = run([...args, '--json'])
+  assert.equal(stale.status, 1)
+  assert.match(stale.stderr, /^REVIEW_PACKET_STALE:/)
+  assert.equal(stale.stdout, '')
+  await rm(join(root, 'src', 'later.mjs'))
+
+  const evidencePath = join(oracleDirectory, 'evidence.json')
+  const evidenceBytes = await readFile(evidencePath, 'utf8')
+  await writeFile(evidencePath, JSON.stringify({ ...EVIDENCE, rows: {} }))
+  const missing = run([...args, '--json'])
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /^REVIEW_EVIDENCE_STALE:/)
+  assert.equal(missing.stdout, '')
+  await writeFile(evidencePath, evidenceBytes)
+
+  await writeFile(packetPath, '{')
+  const malformed = run([...args, '--json'])
+  assert.equal(malformed.status, 1)
+  assert.equal(malformed.stdout, '')
+  await writeFile(packetPath, packetBytes)
+  const output = run([...args, '--output', packetPath])
+  assert.equal(output.status, 2)
+  assert.match(output.stderr, /^USAGE:/)
+  assert.equal(await readFile(packetPath, 'utf8'), packetBytes)
+})
+
+test('review-brief keeps pending visual evidence visible and rejects unbound reviewer output', async (t) => {
+  const { oracleDirectory } = await workspace(t, {
+    risk: 'low',
+    oracleContent: VISUAL_ORACLE,
+    evidence: VISUAL_EVIDENCE,
+  })
+  greenRun(oracleDirectory, 'green')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-001', ['--reason', 'existing behavior']).status, 0)
+  const packetPath = join(oracleDirectory, 'review-input.json')
+  assert.equal(run(strictReviewPacketArgs(oracleDirectory, packetPath)).status, 0)
+  const packetBytes = await readFile(packetPath, 'utf8')
+  const packet = JSON.parse(packetBytes)
+  const findingsPath = join(oracleDirectory, 'findings.json')
+  bindReviewDocument(findingsPath, createHash('sha256').update(packetBytes).digest('hex'), packet.targetRevision)
+  const args = ['review-brief', '--dir', oracleDirectory, '--packet', packetPath, '--findings', findingsPath, '--json']
+  const unbound = run(args)
+  assert.equal(unbound.status, 1)
+  assert.equal(unbound.stdout, '')
+  const receipt = issueReviewReceipt(oracleDirectory, packetPath, findingsPath, packet.targetRevision)
+  assert.equal(receipt.status, 0, receipt.stderr)
+  const result = run(args)
+  assert.equal(result.status, 0, result.stderr)
+  const brief = JSON.parse(result.stdout)
+  assert.deepEqual(brief.pending, [{ row: 'D1', ...VISUAL_EVIDENCE.rows.D1 }])
+  assert.deepEqual(brief.blocking, [])
+  assert.match(brief.limitations.join(' '), /Pending/)
+  assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+})
+
+
+test('review-brief exposes mandatory High-risk review work even when supplied findings are clear', async (t) => {
+  const { oracleDirectory } = await workspace(t, { risk: 'high' })
+  for (const label of ['green-1', 'green-2', 'green-3']) greenRun(oracleDirectory, label)
+  const green = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003', ['--reason', 'existing behavior'])
+  assert.equal(green.status, 0, green.stderr)
+  const packetPath = join(oracleDirectory, 'review-input.json')
+  assert.equal(run(strictReviewPacketArgs(oracleDirectory, packetPath)).status, 0)
+  const packetBytes = await readFile(packetPath, 'utf8')
+  const packet = JSON.parse(packetBytes)
+  const findingsPath = join(oracleDirectory, 'findings.json')
+  bindReviewDocument(findingsPath, createHash('sha256').update(packetBytes).digest('hex'), packet.targetRevision)
+  assert.equal(issueReviewReceipt(oracleDirectory, packetPath, findingsPath, packet.targetRevision).status, 0)
+  const args = ['review-brief', '--dir', oracleDirectory, '--packet', packetPath, '--findings', findingsPath]
+  const result = run([...args, '--json'])
+  assert.equal(result.status, 0, result.stderr)
+  const brief = JSON.parse(result.stdout)
+  assert.deepEqual(brief.blocking, [])
+  assert.deepEqual(brief.pending, [])
+  assert.equal(brief.reviewRequirements.risk, 'high')
+  assert.equal(brief.reviewRequirements.minimumReviewerDocuments, 2)
+  assert.equal(brief.reviewRequirements.suppliedReviewers.length, 1)
+  assert.equal(brief.reviewRequirements.blindMapping.required, true)
+  assert.equal(brief.reviewRequirements.blindMapping.receiptPresent, false)
+  assert.equal(brief.reviewRequirements.blindMapping.verified, 'unknown')
+  assert.match(brief.reviewRequirements.remainingReviewWork.join(' '), /--intersect/)
+  assert.match(brief.reviewRequirements.remainingReviewWork.join(' '), /--blind-input.*--blind-map/)
+  assert.match(brief.reviewRequirements.remainingReviewWork.join(' '), /--mutation-run.*--mutation-row/)
+  const human = run(args)
+  assert.equal(human.status, 0, human.stderr)
+  assert.match(human.stdout, /Required review work/)
+  assert.match(human.stdout, /--intersect/)
+  assert.match(human.stdout, /--blind-input/)
+  assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+})
+
 function strictReviewPacketArgs(oracleDirectory, output) {
   return [
     'review-packet',
