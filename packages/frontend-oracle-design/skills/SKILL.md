@@ -225,6 +225,12 @@ Whether to skip a load is not a judgment call. The read instructions inlined int
   rule and the reviewer's widget check, so the contract reaches review as a shared checklist, not
   as a fresh opinion. A contract is guidance, never policy: a key or state it names that the card
   does not cover is `POLICY_GAP`.
+- After `implement-green` touches UI, before review-dispatch, run the two design scanners the
+  repo does not have to install and record their output as observation artifacts, pending and
+  non-verifying: `npx react-doctor@latest design --scope <changed files>` for the deterministic
+  interaction·motion·affordance rules, and the `web-design-guidelines` skill on the changed files if
+  it is installed. Fix what the card already covers; anything else is a candidate, never a new
+  policy. Skip a scanner that cannot run (offline, sandbox) and say so in the report.
 - Hook Encapsulation only when the approved architecture chose `orchestration-only`. Existing
   equivalent rules first; no dependency installs or lint config changes.
 - Screenshot comparison and direct browser QA run only on explicit request, by invoking the

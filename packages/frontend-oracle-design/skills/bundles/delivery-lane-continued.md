@@ -1416,12 +1416,16 @@ conflict location and the affected card rows as a finding and return to `NEEDS_D
 - If role routing is not supported, do not impersonate the role with a prompt; use a supported
   independent review surface or report `FAIL`.
 
-For `identity-shaping`, a `JUDGMENT` row, or an intentional visual baseline change, specify the
-installed `designer` role separately from the code review above and review the visual contract. For
-mixed work, `code-reviewer` takes the technical·behavioral contract and `designer` takes the Design
-Intent·`D*` rows. Neither reviewer sets new policy. If the deterministic comparison passes as-is and
-both a `JUDGMENT` row and a baseline change are absent, record the additional designer inspection as
-N/A with a reason.
+For `identity-shaping`, a `JUDGMENT` row, an intentional visual baseline change, or a diff that adds
+an interactive widget or a click target with no native element, specify the installed `designer`
+role separately from the code review above. For mixed work, `code-reviewer` takes the
+technical·behavioral contract and `designer` takes the Design Intent·`D*` rows plus the interaction
+surface: it names the pattern each new interactive element behaves like, checks it against the
+matching `contracts/<pattern>.json`, and reads the react-doctor design and web-design-guidelines
+observation artifacts as raw input — cite their file:line, but re-derive every finding from the diff,
+because those artifacts are pending and never verify anything. Neither reviewer sets new policy. If
+the deterministic comparison passes as-is and no `JUDGMENT` row, baseline change, or new interactive
+element is present, record the additional designer inspection as N/A with a reason.
 
 ## Review Points — Delivered as File Links
 

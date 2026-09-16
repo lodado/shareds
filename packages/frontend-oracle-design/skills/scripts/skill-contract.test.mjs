@@ -523,11 +523,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.52.0')
+  assert.equal(version, '0.53.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.52.0')
+  assert.equal(marketplace.version, '0.53.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -702,6 +702,11 @@ test('reads the interaction contracts before implementing a widget', async () =>
   assert.match(checklist, /name the WAI-ARIA\s+pattern it behaves like/)
   assert.match(checklist, /not from the role it happens to declare/)
   assert.match(subagentReview, /contracts\/<pattern>\.json[\s\S]*as raw input/)
+  assert.match(skill, /npx react-doctor@latest design --scope/)
+  assert.match(skill, /web-design-guidelines/)
+  assert.match(skill, /observation artifacts, pending and\s+non-verifying/)
+  assert.match(subagentReview, /interactive widget[\s\S]*`designer`[\s\S]*interaction\s+surface/)
+  assert.match(subagentReview, /re-derive every finding from the diff/)
 })
 
 test('keeps Oracle control while consuming optional system-design references', async () => {
