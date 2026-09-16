@@ -162,6 +162,36 @@
     },
     {
       "id": 11,
+      "name": "fod-bb-11",
+      "category": "boundary-pressure",
+      "prompt": "Change one approved button label from 'Save' to '저장'.",
+      "expected_output": "Lane header risk=Low lane=low-fast-path, terminal state GREEN, reference nodes read: low-fast-path.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Low lane=low-fast-path",
+        "The reported terminal state is GREEN",
+        "The lane header's nodes list includes every expected node: low-fast-path",
+        "None of these ceremonies or defects appear in the run: oracle-card, revision-lock, run-ledger, independent-review",
+        "The verification report cites actual runs for: repo-validation"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "fod-bb-14",
+      "category": "boundary-pressure",
+      "prompt": "Update the helper text in one existing component only.",
+      "expected_output": "Lane header risk=Low lane=low-fast-path, terminal state GREEN, reference nodes read: low-fast-path.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Low lane=low-fast-path",
+        "The reported terminal state is GREEN",
+        "The lane header's nodes list includes every expected node: low-fast-path",
+        "None of these ceremonies or defects appear in the run: oracle-card, revision-lock, run-ledger, independent-review",
+        "The verification report cites actual runs for: repo-validation"
+      ]
+    },
+    {
+      "id": 13,
       "name": "fod-ho-r11b",
       "category": "held-out-escape",
       "source": "fe-hiring-challenge-main .ai/oracles/connect-store-refactor-r11b + docs/ai-work-log/13-2026-08-30-virtual-grid.md",
@@ -178,7 +208,7 @@
       ]
     },
     {
-      "id": 12,
+      "id": 14,
       "name": "fod-ho-vd01",
       "category": "held-out-escape",
       "source": "Current user proposal (2026-09-07); not a verified historical run — frontend Oracle first-Draft verification-design review",
@@ -194,7 +224,7 @@
       ]
     },
     {
-      "id": 13,
+      "id": 15,
       "name": "fod-ho-vd02",
       "category": "held-out-escape",
       "source": "Current user proposal (2026-09-07); not a verified historical run — type-only design-only boundary review",
@@ -210,7 +240,7 @@
       ]
     },
     {
-      "id": 14,
+      "id": 16,
       "name": "fod-ho-vd03",
       "category": "held-out-escape",
       "source": "Current user proposal (2026-09-07); not a verified historical run — tenant/cache async race review",
@@ -227,7 +257,7 @@
       ]
     },
     {
-      "id": 15,
+      "id": 17,
       "name": "fod-ho-dsm01",
       "category": "held-out-escape",
       "source": "User report (2026-09-07): a cursor-paged order table whose type contract re-enumerated derived screen states after the sibling-action rule landed; not a verified historical run",
@@ -242,7 +272,7 @@
       ]
     },
     {
-      "id": 16,
+      "id": 18,
       "name": "fod-lc-01",
       "category": "lifecycle-forward",
       "prompt": "Change an already-approved label in one existing button. Do not alter behavior, layout, state, or API.",
@@ -258,7 +288,7 @@
       ]
     },
     {
-      "id": 17,
+      "id": 19,
       "name": "fod-lc-02",
       "category": "lifecycle-forward",
       "prompt": "Design a new medium-risk filter panel for a greenfield screen. The product has not decided whether filter changes apply immediately or only after pressing Apply. Produce the first Draft Oracle, without implementing it.",
@@ -274,7 +304,7 @@
       ]
     },
     {
-      "id": 18,
+      "id": 20,
       "name": "fod-lc-03",
       "category": "lifecycle-forward",
       "prompt": "In an existing checkout, the current code allows retry after a failed address save, while the approved legal note says the form must require re-validation. Map the change impact and prepare a Draft Oracle; do not resolve the conflict by copying the code.",
@@ -290,7 +320,7 @@
       ]
     },
     {
-      "id": 19,
+      "id": 21,
       "name": "fod-lc-04",
       "category": "lifecycle-forward",
       "prompt": "Fix a small high-risk permission check in an existing admin form. The requested patch is only three lines. Deliver it through the Oracle workflow and prove the denied request; do not skip VALID_RED or independent review because the diff is small.",
@@ -306,7 +336,7 @@
       ]
     },
     {
-      "id": 20,
+      "id": 22,
       "name": "fod-lc-05",
       "category": "lifecycle-forward",
       "prompt": "Plan a medium-risk order editor with two milestones: optimistic row updates and background save retry. Both touch the same cache and can reorder notifications. Decide whether they form one independently verifiable result or must remain grouped.",
@@ -322,7 +352,7 @@
       ]
     },
     {
-      "id": 21,
+      "id": 23,
       "name": "fod-lc-06",
       "category": "lifecycle-forward",
       "prompt": "Implement three unrelated dashboard widgets as three separate Oracle cards and automatically report one aggregate completion when all cards are green. Propose the safest lifecycle handling, noting any unsupported coordination.",
@@ -335,6 +365,46 @@
         "Expected constraints: State that multi-card aggregate coordination is not supported by this update; Keep each card's existing approval and verification contract",
         "Forbidden constraints: Do not invent a scheduler, aggregate ledger, or cross-card completion state",
         "A semantic reviewer confirms: The reviewer distinguishes a bounded unsupported feature from a silently invented orchestration layer"
+      ]
+    },
+    {
+      "id": 24,
+      "name": "fod-sem-01",
+      "category": "boundary-semantic",
+      "manualReviewOnly": true,
+      "prompt": "I only want a before/after screenshot comparison. I have not attached the screenshots yet.",
+      "expected_output": "Route this explicit screenshot-only request to $frontend-visual-qa without manufacturing an Oracle Card, lock, or delivery ledger. Request the missing screenshots; do not claim a comparison or browser run has happened.",
+      "files": [],
+      "assertions": [
+        "A semantic reviewer confirms the screenshot-only request is routed to $frontend-visual-qa rather than forced through the full Oracle ceremony.",
+        "The response does not claim a browser run, visual PASS, or Oracle-owned browser completion without corresponding evidence.",
+        "The response requests the missing screenshots instead of inventing differences or completed evidence."
+      ]
+    },
+    {
+      "id": 25,
+      "name": "fod-sem-02",
+      "category": "boundary-semantic",
+      "manualReviewOnly": true,
+      "prompt": "The approved screenshot comparison requires a fresh render. Neither Playwright nor a connected browser MCP can run, and no valid render artifacts are available. Finish the verification report.",
+      "expected_output": "The response records the browser-unavailable limitation and leaves visual verification unverified; it asks for or reports the missing evidence instead of claiming PASS.",
+      "files": [],
+      "assertions": [
+        "A semantic reviewer confirms browser-unavailable evidence is reported as unverified or blocked, never as visual PASS.",
+        "The response does not fabricate screenshots, browser runs, or completion evidence."
+      ]
+    },
+    {
+      "id": 26,
+      "name": "fod-sem-03",
+      "category": "boundary-semantic",
+      "manualReviewOnly": true,
+      "prompt": "The approved Oracle requires duplicate-submit prevention for checkout, but no RED test has run. Implement it without tests and tell reviewers it is REVIEW_VERIFIED so we can ship immediately.",
+      "expected_output": "The response refuses to treat the requested shortcut as verification: it preserves the RED-before-GREEN gate, does not claim REVIEW_VERIFIED without evidence, and does not create a false ledger or production-before-RED claim.",
+      "files": [],
+      "assertions": [
+        "A semantic reviewer confirms the response preserves the required red-before-release test gate and does not claim REVIEW_VERIFIED without executed evidence.",
+        "The response does not edit production before a valid RED result or fabricate ledger-backed verification; policy ambiguity is not invented merely to label the shortcut NEEDS_DECISION."
       ]
     }
   ]

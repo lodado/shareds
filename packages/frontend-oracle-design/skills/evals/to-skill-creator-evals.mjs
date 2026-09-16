@@ -23,7 +23,9 @@ export function assertionsFor(expected) {
     assertions.push(`The verification report cites actual runs for: ${expected.requiredLabels.join(', ')}`)
   }
   if (expected.lane === 'oracle') {
-    assertions.push('Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card')
+    assertions.push(
+      'Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card',
+    )
   }
   return assertions
 }
@@ -55,7 +57,9 @@ export function lifecycleEvals(lifecycle, offset) {
     category: 'lifecycle-forward',
     source: entry.source,
     prompt: entry.prompt,
-    expected_output: `Forward lifecycle scenario: risk=${entry.expected.risk} lane=${entry.expected.lane}, terminal state ${entry.expected.status}, reference nodes read: ${entry.expected.loadedNodes.join(', ')}.`,
+    expected_output: `Forward lifecycle scenario: risk=${entry.expected.risk} lane=${
+      entry.expected.lane
+    }, terminal state ${entry.expected.status}, reference nodes read: ${entry.expected.loadedNodes.join(', ')}.`,
     files: [],
     assertions: [
       `The first line of the response is the lane header and it reports risk=${entry.expected.risk} lane=${entry.expected.lane}`,
@@ -68,13 +72,28 @@ export function lifecycleEvals(lifecycle, offset) {
   }))
 }
 
-export function toEvals(corpus, heldOut = { cases: [] }, lifecycle = { cases: [] }) {
+export function boundaryEvals(boundary, offset) {
+  return (boundary?.cases ?? []).map((entry, index) => ({
+    id: offset + index + 1,
+    name: entry.id,
+    category: 'boundary-semantic',
+    manualReviewOnly: entry.manualReviewOnly,
+    prompt: entry.prompt,
+    expected_output: entry.expected_output,
+    files: [],
+    assertions: entry.assertions,
+  }))
+}
+
+export function toEvals(corpus, heldOut = { cases: [] }, lifecycle = { cases: [] }, boundary = { cases: [] }) {
   const evals = corpus.cases.map((entry, index) => ({
     id: index + 1,
     name: entry.id,
     category: entry.category,
     prompt: entry.prompt,
-    expected_output: `Lane header risk=${entry.expected.risk} lane=${entry.expected.lane}, terminal state ${entry.expected.status}, reference nodes read: ${entry.expected.loadedNodes.join(', ')}.`,
+    expected_output: `Lane header risk=${entry.expected.risk} lane=${entry.expected.lane}, terminal state ${
+      entry.expected.status
+    }, reference nodes read: ${entry.expected.loadedNodes.join(', ')}.`,
     files: [],
     assertions: assertionsFor(entry.expected),
   }))
@@ -85,6 +104,7 @@ export function toEvals(corpus, heldOut = { cases: [] }, lifecycle = { cases: []
       ...evals,
       ...heldOutEvals(heldOut, evals.length),
       ...lifecycleEvals(lifecycle, evals.length + heldOut.cases.length),
+      ...boundaryEvals(boundary, evals.length + heldOut.cases.length + lifecycle.cases.length),
     ],
   }
 }
@@ -95,21 +115,28 @@ async function main() {
   const corpus = JSON.parse(await readFile(corpusPath, 'utf8'))
   const heldOut = JSON.parse(await readFile(heldOutPath, 'utf8').catch(() => '{"cases":[]}'))
   const lifecycle = JSON.parse(await readFile(join(evalDirectory, 'lifecycle-cases.json'), 'utf8'))
-  const rendered = `${JSON.stringify(toEvals(corpus, heldOut, lifecycle), null, 2)}\n`
+  const boundary = JSON.parse(await readFile(join(evalDirectory, 'boundary-cases.json'), 'utf8'))
+  const rendered = `${JSON.stringify(toEvals(corpus, heldOut, lifecycle, boundary), null, 2)}\n`
 
   if (process.argv.includes('--check')) {
     const current = await readFile(evalsPath, 'utf8').catch(() => null)
     if (current !== rendered) {
-      process.stderr.write('EVALS_STALE: evals/evals.json does not match blackbox-corpus.json — run to-skill-creator-evals.mjs\n')
+      process.stderr.write(
+        'EVALS_STALE: evals/evals.json does not match blackbox-corpus.json — run to-skill-creator-evals.mjs\n',
+      )
       process.exitCode = 1
     } else {
-      process.stdout.write(`evals ok — ${corpus.cases.length} corpus + ${heldOut.cases.length} held-out + ${lifecycle.cases.length} lifecycle cases\n`)
+      process.stdout.write(
+        `evals ok — ${corpus.cases.length} corpus + ${heldOut.cases.length} held-out + ${lifecycle.cases.length} lifecycle + ${boundary.cases.length} boundary cases\n`,
+      )
     }
     return
   }
 
   await writeFile(evalsPath, rendered)
-  process.stdout.write(`generated evals.json — ${corpus.cases.length} corpus + ${heldOut.cases.length} held-out + ${lifecycle.cases.length} lifecycle cases\n`)
+  process.stdout.write(
+    `generated evals.json — ${corpus.cases.length} corpus + ${heldOut.cases.length} held-out + ${lifecycle.cases.length} lifecycle + ${boundary.cases.length} boundary cases\n`,
+  )
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split(/[\\/]/).pop())) {

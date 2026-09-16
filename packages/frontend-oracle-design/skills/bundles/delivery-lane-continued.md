@@ -1016,11 +1016,42 @@ and pin those commands with `oracle-run.mjs init --required-label performance` a
 there is no comparable environment, do not claim "improved". For a change with no performance
 requirement, give only an N/A reason, without a benchmark or a new measurement dependency.
 
+### Changed UI Boundaries
+
+For changed layouts or controls, verify 200% text resize through a supported browser
+scaling mechanism without losing content or functionality (except captions and images of text).
+Zoom may change the responsive breakpoint; do not require it to stay within one breakpoint.
+Check pointer target size and spacing against the repo's adopted accessibility standard and
+applicable exceptions; do not invent thresholds or apply pointer sizing to noninteractive elements.
+Choose relevant widths from the affected layout and breakpoint, immediately below and above
+the breakpoint where reflow changes; this is not a fixed four-viewport matrix for every task.
+Map these checks to existing Oracle rows and evidence rather than creating a separate checklist.
+Record resize scale, tested widths, and CSS-pixel target size/spacing observations or the
+applicable exception in that evidence.
+Browser execution stays with `$frontend-visual-qa` under existing Visual QA authorization.
+When authorization is declined or browser tools are unavailable, leave browser checks unverified;
+static inspection alone cannot establish browser PASS.
+
+### Noise-Aware Performance Claims
+
+Only for a performance requirement or improvement claim, repeat baseline and after measurements
+under the same pinned conditions when the metric varies. Record sample count, median and spread,
+and retain raw samples in ledger-linked evidence; deterministic measures such as bundle bytes
+do not need artificial repetition. Use the approved budget and the harness's measurement
+resolution: no universal minimum improvement percentage. A difference within measurement noise
+means "improvement not established", not an improvement or proof that the budget passed.
+Revert only complexity introduced solely for performance when repeated evidence shows no benefit;
+preserve required behavior and mandatory constraints, then rerun affected checks. If the evidence
+is inconclusive, report that limitation rather than claiming success or reverting unrelated work.
+
 ## Source Registry
 
 Below are implementation grounds. Product policy must come from the Oracle's approved sources. If
 the link content differs from the actually installed version, the installed version's documentation
 wins.
+
+- Accessibility boundaries: [WCAG 2.2 Resize Text](https://www.w3.org/WAI/WCAG22/Understanding/resize-text.html), [WCAG 2.2 Target Size (Minimum)](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html)
+- Noise-aware measurement and neutral-change reversion: [Agent Skills performance guidance](https://github.com/addyosmani/agent-skills/blob/be4e44a9fbc5e8df0beaefadbb28bd22ee61cc39/skills/performance-optimization/SKILL.md#L368-L389) (implementation reference, not product policy).
 
 - React state/effect/hook/Suspense: [Choosing the State Structure](https://react.dev/learn/choosing-the-state-structure), [You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect), [Reusing Logic with Custom Hooks](https://react.dev/learn/reusing-logic-with-custom-hooks), [Suspense](https://react.dev/reference/react/Suspense)
 - Next server/client/stream/error: [Server and Client Components](https://nextjs.org/docs/app/getting-started/server-and-client-components), [loading.js](https://nextjs.org/docs/app/api-reference/file-conventions/loading), [error.js](https://nextjs.org/docs/app/api-reference/file-conventions/error)

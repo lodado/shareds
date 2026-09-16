@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
@@ -9,6 +9,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const skillDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
+const evalDirectory = join(skillDirectory, 'evals')
 const grader = join(skillDirectory, 'evals/grade-results.mjs')
 
 async function tempFile(t, name, content) {
@@ -331,7 +332,11 @@ test('rejects result errors and duplicate routing without counting either as a p
     runtimeMs: 20,
     errors: ['runner failed after emitting a partial result'],
   }
-  const path = await tempFile(t, 'duplicate-errors.jsonl', `${JSON.stringify(resultRecord)}\n${JSON.stringify(resultRecord)}\n`)
+  const path = await tempFile(
+    t,
+    'duplicate-errors.jsonl',
+    `${JSON.stringify(resultRecord)}\n${JSON.stringify(resultRecord)}\n`,
+  )
 
   const result = run(path, '--allow-partial')
   assert.equal(result.status, 1)
@@ -411,8 +416,9 @@ test('full corpus mode rejects missing and duplicate case results', async (t) =>
   const missingReport = JSON.parse(missing.stdout)
   assert.equal(missingReport.authority, 'AUTHORITATIVE_FULL_CORPUS')
   assert.equal(missingReport.authoritative, true)
-  assert.equal(missingReport.total, 10)
-  assert.equal(missingReport.cases.filter((entry) => entry.failures[0]?.code === 'MISSING_CASE').length, 9)
+  const corpusSize = JSON.parse(await readFile(join(evalDirectory, 'blackbox-corpus.json'), 'utf8')).cases.length
+  assert.equal(missingReport.total, corpusSize)
+  assert.equal(missingReport.cases.filter((entry) => entry.failures[0]?.code === 'MISSING_CASE').length, corpusSize - 1)
 
   const duplicatePath = await tempFile(t, 'duplicate.json', JSON.stringify([result, result]))
   const duplicate = run(duplicatePath, '--allow-partial')
@@ -516,7 +522,10 @@ test('all replicates passing yields pass^k = 1 and a single-record artifact repo
   const allPass = await tempFile(
     t,
     'all-pass.jsonl',
-    [JSON.stringify({ ...passingRecord, replicateId: 'r1' }), JSON.stringify({ ...passingRecord, replicateId: 'r2' })].join('\n'),
+    [
+      JSON.stringify({ ...passingRecord, replicateId: 'r1' }),
+      JSON.stringify({ ...passingRecord, replicateId: 'r2' }),
+    ].join('\n'),
   )
   const report = JSON.parse(run(allPass, '--allow-partial').stdout)
   assert.equal(report.passed, 1)
@@ -534,16 +543,23 @@ test('repeats that share or omit a replicateId remain DUPLICATE_CASE', async (t)
   const shared = await tempFile(
     t,
     'shared.jsonl',
-    [JSON.stringify({ ...passingRecord, replicateId: 'r1' }), JSON.stringify({ ...passingRecord, replicateId: 'r1' })].join('\n'),
+    [
+      JSON.stringify({ ...passingRecord, replicateId: 'r1' }),
+      JSON.stringify({ ...passingRecord, replicateId: 'r1' }),
+    ].join('\n'),
   )
-  assert.deepEqual(JSON.parse(run(shared, '--allow-partial').stdout).cases[0].failures, [{ code: 'DUPLICATE_CASE', count: 2 }])
+  assert.deepEqual(JSON.parse(run(shared, '--allow-partial').stdout).cases[0].failures, [
+    { code: 'DUPLICATE_CASE', count: 2 },
+  ])
 
   const mixed = await tempFile(
     t,
     'mixed.jsonl',
     [JSON.stringify({ ...passingRecord, replicateId: 'r1' }), JSON.stringify(passingRecord)].join('\n'),
   )
-  assert.deepEqual(JSON.parse(run(mixed, '--allow-partial').stdout).cases[0].failures, [{ code: 'DUPLICATE_CASE', count: 2 }])
+  assert.deepEqual(JSON.parse(run(mixed, '--allow-partial').stdout).cases[0].failures, [
+    { code: 'DUPLICATE_CASE', count: 2 },
+  ])
 })
 
 test('variants are graded as separate arms and never pooled into one number', async (t) => {

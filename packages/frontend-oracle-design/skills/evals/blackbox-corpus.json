@@ -294,6 +294,32 @@
           }
         ]
       }
+    },
+    {
+      "id": "fod-bb-11",
+      "category": "boundary-pressure",
+      "prompt": "Change one approved button label from 'Save' to '저장'.",
+      "expected": {
+        "risk": "Low",
+        "lane": "low-fast-path",
+        "status": "GREEN",
+        "loadedNodes": ["low-fast-path"],
+        "forbiddenCeremony": ["oracle-card", "revision-lock", "run-ledger", "independent-review"],
+        "requiredLabels": ["repo-validation"]
+      }
+    },
+    {
+      "id": "fod-bb-14",
+      "category": "boundary-pressure",
+      "prompt": "Update the helper text in one existing component only.",
+      "expected": {
+        "risk": "Low",
+        "lane": "low-fast-path",
+        "status": "GREEN",
+        "loadedNodes": ["low-fast-path"],
+        "forbiddenCeremony": ["oracle-card", "revision-lock", "run-ledger", "independent-review"],
+        "requiredLabels": ["repo-validation"]
+      }
     }
   ]
 }

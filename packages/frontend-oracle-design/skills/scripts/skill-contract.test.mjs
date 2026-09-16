@@ -523,11 +523,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.53.0')
+  assert.equal(version, '0.53.1')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.53.0')
+  assert.equal(marketplace.version, '0.53.1')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -564,6 +564,33 @@ test('loads the performance reference only for measured performance claims', asy
   assert.match(performance, /frontend\/quality\.md/)
   assert.match(performance, /frontend\/decisions\.md/)
   assert.match(frontendImplementation, /performance\.md/)
+})
+
+test('checks changed UI boundaries without expanding visual QA authority', async () => {
+  const quality = await read('references/frontend/quality.md')
+  assert.match(quality, /200% text resize/)
+  assert.match(quality, /target size.*spacing/)
+  assert.match(quality, /applicable exceptions/)
+  assert.match(quality, /breakpoint.*below.*above/)
+  assert.match(quality, /not a fixed four-viewport matrix/)
+  assert.match(quality, /existing Oracle rows.*evidence/)
+  assert.match(quality, /Record resize scale, tested widths, and CSS-pixel target size\/spacing/)
+  assert.match(quality, /Visual QA authorization/)
+  assert.match(quality, /unavailable.*unverified/)
+  assert.match(quality, /w3\.org\/WAI\/WCAG22\/Understanding\/resize-text\.html/)
+  assert.match(quality, /w3\.org\/WAI\/WCAG22\/Understanding\/target-size-minimum\.html/)
+})
+
+test('requires noise-aware evidence before keeping performance-only complexity', async () => {
+  const quality = await read('references/frontend/quality.md')
+  assert.match(quality, /repeat baseline and after measurements/)
+  assert.match(quality, /sample count.*median.*spread/)
+  assert.match(quality, /within measurement noise\s+means "improvement not established"/)
+  assert.match(quality, /no universal minimum improvement percentage/)
+  assert.match(quality, /Revert only complexity introduced solely for performance/)
+  assert.match(quality, /preserve required behavior.*mandatory constraints/)
+  assert.match(quality, /deterministic.*bundle bytes/)
+  assert.match(quality, /without a benchmark or a new measurement dependency/)
 })
 
 test('records new dependency decisions and reviews them against real problems and context', async () => {

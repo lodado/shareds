@@ -20,6 +20,7 @@ const expectedCategoryCounts = {
   'visual-local-identity': 2,
   'policy-source': 2,
   'already-satisfied': 1,
+  'boundary-pressure': 2,
 }
 
 function countBy(items, key) {
@@ -28,11 +29,11 @@ function countBy(items, key) {
   return counts
 }
 
-test('black-box corpus contains the agreed ten smoke cases by category', async () => {
+test('black-box corpus contains the smoke cases by category', async () => {
   const corpus = await readJson(corpusPath)
 
   assert.equal(corpus.version, 1)
-  assert.equal(corpus.cases.length, 10)
+  assert.equal(corpus.cases.length, 12)
   assert.deepEqual(countBy(corpus.cases, 'category'), expectedCategoryCounts)
 })
 
@@ -56,7 +57,7 @@ test('low fast-path cases forbid Oracle ceremony and load only the lane node', a
   const corpus = await readJson(corpusPath)
   const lowCases = corpus.cases.filter((fixture) => fixture.expected.lane === 'low-fast-path')
 
-  assert.equal(lowCases.length, 2)
+  assert.equal(lowCases.length, 4)
   for (const fixture of lowCases) {
     assert.deepEqual(fixture.expected.loadedNodes, ['low-fast-path'])
     assert.ok(fixture.expected.forbiddenCeremony.includes('oracle-card'))
@@ -182,8 +183,7 @@ test('O13: eval fails on errors duplicates malformed JSONL and missing graph clo
 
   const asyncCases = corpus.cases.filter(
     (fixture) =>
-      fixture.category === 'submit-order-retry' ||
-      /duplicate submit|out-of-order|retry request/i.test(fixture.prompt),
+      fixture.category === 'submit-order-retry' || /duplicate submit|out-of-order|retry request/i.test(fixture.prompt),
   )
   assert.ok(asyncCases.length > 0)
   for (const fixture of asyncCases) {
