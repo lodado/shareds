@@ -12,7 +12,6 @@ module.exports = [
     plugins: { '@lodado/local-rules': localRulesPlugin },
     rules: {
       '@lodado/local-rules/interaction-pattern-contract': 'error',
-      '@lodado/local-rules/interaction-pattern-guess': 'warn',
     },
   },
 ]

@@ -4,7 +4,6 @@ module.exports = {
   'fsd-no-driver-outside-repository': require('./fsd-no-driver-outside-repository'),
   'interaction-hover-needs-focus': require('./interaction-hover-needs-focus'),
   'interaction-pattern-contract': require('./interaction-pattern-contract'),
-  'interaction-pattern-guess': require('./interaction-pattern-guess'),
   'no-action-in-state': require('./no-action-in-state'),
   'no-arbitrary-sleep-in-tests': require('./no-arbitrary-sleep-in-tests'),
   'no-boolean-state-flags': require('./no-boolean-state-flags'),

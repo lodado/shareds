@@ -523,11 +523,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.51.0')
+  assert.equal(version, '0.52.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.51.0')
+  assert.equal(marketplace.version, '0.52.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -697,6 +697,11 @@ test('reads the interaction contracts before implementing a widget', async () =>
   assert.match(skill, /eslint-plugin-local-rules\/contracts\/<pattern>\.json/)
   assert.match(skill, /interaction-pattern-contract/)
   assert.match(skill, /A contract is guidance, never policy/)
+  const checklist = await readFile(join(skillDirectory, 'references/review-checklist.md'), 'utf8')
+  const subagentReview = await readFile(join(skillDirectory, 'references/subagent-review.md'), 'utf8')
+  assert.match(checklist, /name the WAI-ARIA\s+pattern it behaves like/)
+  assert.match(checklist, /not from the role it happens to declare/)
+  assert.match(subagentReview, /contracts\/<pattern>\.json[\s\S]*as raw input/)
 })
 
 test('keeps Oracle control while consuming optional system-design references', async () => {

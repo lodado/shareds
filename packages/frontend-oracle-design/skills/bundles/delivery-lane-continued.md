@@ -1376,6 +1376,12 @@ If the card contains an `identity-shaping` Design Intent, re-read all of
 jurisdiction as well. Add the `$frontend-visual-qa` artifact of `RELATIONAL` rows as raw input, but
 the reviewer does not take over ownership of screenshots or direct browser runs.
 
+When the diff adds a widget — a dialog, menu, combobox, tabs, disclosure, listbox, or switch, declared
+or not — add the matching `contracts/<pattern>.json` shipped by the `@lodado/local-rules` package
+(the `contracts/` directory next to its rules) as raw input so the reviewer checks
+keys·roles·focus against the contract instead of recalling them. The contract is a checklist, not
+policy: the card decides which keys the product needs.
+
 The primary agent runs the bundled `oracle-lock.mjs verify` right before the review. On a mismatch,
 do not call the reviewer and discard the existing evidence.
 

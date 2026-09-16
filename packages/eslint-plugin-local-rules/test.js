@@ -506,13 +506,18 @@ ruleTester.run('interaction-pattern-contract', rules['interaction-pattern-contra
     // menu button bound to state with ArrowDown handling
     `function Menu() {
       const [open, setOpen] = useState(false)
-      const onKey = (e) => { if (e.key === 'ArrowDown') setOpen(true) }
+      const onKey = (e) => { if (e.key === 'ArrowDown') setOpen(true); if (e.key === 'Escape') setOpen(false) }
       return <button aria-haspopup="menu" aria-expanded={open} onKeyDown={onKey}>작업</button>
     }`,
     // combobox bound + ArrowDown
     `function Combo() {
       const [open, setOpen] = useState(false)
-      return <input role="combobox" aria-expanded={open} aria-controls="l" onKeyDown={(e) => e.key === "ArrowDown" && setOpen(true)} />
+      return <input role="combobox" aria-expanded={open} aria-controls="l" onKeyDown={(e) => { switch (e.key) { case "ArrowDown": setOpen(true); break; case "Escape": setOpen(false); break } }} />
+    }`,
+    // includes() over an array of keys counts too
+    `function List() {
+      const onKey = (e) => { if (['ArrowDown', 'ArrowUp'].includes(e.key)) move(e.key) }
+      return <ul role="listbox" onKeyDown={onKey}><li role="option" aria-selected={sel === 0}>S</li></ul>
     }`,
     // tabs with arrow handling, tab bound
     `function Tabs() {
@@ -528,7 +533,7 @@ ruleTester.run('interaction-pattern-contract', rules['interaction-pattern-contra
   invalid: [
     {
       // menu-button.static-expanded fixture: literal never changes
-      code: `function Menu() { const [open, setOpen] = useState(false); return <button aria-haspopup="menu" aria-expanded="false" onKeyDown={(e) => e.key === 'ArrowDown' && setOpen(true)}>작업</button> }`,
+      code: `function Menu() { const [open, setOpen] = useState(false); return <button aria-haspopup="menu" aria-expanded="false" onKeyDown={(e) => { if (e.key === 'ArrowDown') setOpen(true); if (e.key === 'Escape') setOpen(false) }}>작업</button> }`,
       errors: [
         {
           messageId: 'literalState',
@@ -554,7 +559,7 @@ ruleTester.run('interaction-pattern-contract', rules['interaction-pattern-contra
           messageId: 'missingKeyHandler',
           data: {
             pattern: 'combobox',
-            keys: 'ArrowDown',
+            keys: 'ArrowDown/Escape',
             keyHint:
               'ArrowDown / ArrowUp: 닫힘: 열기. 열림: option 이동 · Enter: 활성 option 선택 후 닫기 · Escape: 닫기(열림) / 값 지우기(닫힘, 선택) · Home / End: 입력 커서 처음/끝',
           },
@@ -565,6 +570,26 @@ ruleTester.run('interaction-pattern-contract', rules['interaction-pattern-contra
       // tabs.no-arrow
       code: `function Tabs() { const [i, setI] = useState(0); return <div role="tablist"><button role="tab" aria-selected={i === 0} aria-controls="p0" onClick={() => setI(0)}>A</button></div> }`,
       errors: [{ messageId: 'missingKeyHandler' }],
+    },
+    {
+      // an unrelated string holding the key name is not a handler
+      code: `function Tabs() { const analyticsEvent = 'ArrowRight'; const [i, setI] = useState(0); return <div role="tablist"><button role="tab" aria-selected={i === 0} aria-controls="p0" onClick={() => setI(0)}>A</button></div> }`,
+      errors: [{ messageId: 'missingKeyHandler' }],
+    },
+    {
+      // one arrow direction is not enough
+      code: `function Tabs() { const [i, setI] = useState(0); const onKey = (e) => { if (e.key === 'ArrowRight') setI(i + 1) }; return <div role="tablist"><button role="tab" aria-selected={i === 0} aria-controls="p0" onKeyDown={onKey}>A</button></div> }`,
+      errors: [
+        {
+          messageId: 'missingKeyHandler',
+          data: {
+            pattern: 'tabs',
+            keys: 'ArrowLeft',
+            keyHint:
+              'Tab: tablist 진입 시 활성 tab 하나만, 다음 Tab은 tabpanel · ArrowRight / ArrowLeft: tab 이동, 순환. 자동 활성화면 즉시 패널 교체 · Home / End: 첫/마지막 tab · Enter / Space: 수동 활성화 모드에서만 패널 교체',
+          },
+        },
+      ],
     },
     {
       code: `const Tab = () => <button role="tab" aria-selected="true">A</button>`,
@@ -581,43 +606,6 @@ ruleTester.run('interaction-pattern-contract', rules['interaction-pattern-contra
     {
       code: `const L = () => <ul role="listbox"><li role="option">S</li></ul>`,
       errors: [{ messageId: 'missingKeyHandler' }, { messageId: 'missingAttribute' }],
-    },
-  ],
-})
-
-// ---------- interaction: pattern guess ----------
-ruleTester.run('interaction-pattern-guess', rules['interaction-pattern-guess'], {
-  valid: [
-    // dialog.ok fixture shape: overlay declares its role
-    `const D = ({ open }) => open && <div className="fixed inset-0"><div role="dialog" aria-modal="true">x</div></div>`,
-    `const M = ({ open }) => open && <ul role="menu"><li role="menuitem">a</li></ul>`,
-    // conditional plain content, not a widget
-    `const T = ({ ok }) => ok && <p>Saved</p>`,
-    `const P = ({ open }) => open && <div className="panel">detail</div>`,
-    // presentation-only decorated overlay
-    `const B = ({ busy }) => busy && <div className="fixed inset-0" role="presentation" />`,
-  ],
-  invalid: [
-    {
-      // div-soup.card-click fixture
-      code: `function Card() { const [open, setOpen] = useState(false); return <div><div className="bare" onClick={() => setOpen(true)}>Plan</div>{open && <div className="overlay"><div className="panel"><h2>Plan</h2></div></div>}</div> }`,
-      errors: [{ messageId: 'overlayWithoutRole' }],
-    },
-    {
-      code: 'const D = ({ open }) => open && <div className="fixed inset-0 bg-black/40"><div>x</div></div>',
-      errors: [{ messageId: 'overlayWithoutRole' }],
-    },
-    {
-      code: 'const D = ({ open }) => open && <div className={cn("fixed inset-0", open && "block")}>x</div>',
-      errors: [{ messageId: 'overlayWithoutRole' }],
-    },
-    {
-      code: "const D = ({ open }) => open && <div style={{ position: 'fixed', inset: 0 }}>x</div>",
-      errors: [{ messageId: 'overlayWithoutRole' }],
-    },
-    {
-      code: 'const M = ({ open }) => open && <ul className="popup"><li onClick={a}>복제</li></ul>',
-      errors: [{ messageId: 'listWithoutRole' }],
     },
   ],
 })

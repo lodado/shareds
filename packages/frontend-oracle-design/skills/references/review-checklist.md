@@ -46,6 +46,13 @@ reason. Do not create a finding out of explanation taste or writing quality alon
 
 - Does the implementation match the layout, states, copy, and interaction of the approved
   spec·Figma?
+- For every interactive element the diff adds that is not a native control, name the WAI-ARIA
+  pattern it behaves like — dialog, menu-button, combobox, tabs, disclosure, listbox, switch, or
+  `none` — from what it renders and how its state changes, not from the role it happens to declare.
+  Then check it against `contracts/<pattern>.json` of `@lodado/local-rules`: the role and state
+  attributes, the keys under `guidance.keys`, and where focus goes. Cite the path·line for each key
+  found or missing. A key the card covers but the code lacks is `EVIDENCE_GAP`; a key the card never
+  decided is `POLICY_GAP`. A boolean-gated overlay or list with no role is a finding, not `none`.
 - Are the Outcome Brief's user·situation and observable success achieved by the actual diff without
   invading the Non-goals?
 - Is each requirement of the external criteria translated exactly into the Oracle Card without

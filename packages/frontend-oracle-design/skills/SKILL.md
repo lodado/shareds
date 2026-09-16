@@ -221,10 +221,10 @@ Whether to skip a load is not a judgment call. The read instructions inlined int
   listbox, switch, disclosure, or a click target with no native element, read the matching
   interaction contract from `@lodado/eslint-plugin-local-rules/contracts/<pattern>.json` (this
   repo: `packages/eslint-plugin-local-rules/contracts/`) and carry its `guidance.keys`·`roles`·`css`
-  into the implementation decision. The same JSON feeds the `interaction-pattern-contract` and
-  `interaction-pattern-guess` lint rules, so the reviewer sees the contract as lint output, not as
-  a fresh opinion. A contract is guidance, never policy: a key or state it names that the card does
-  not cover is `POLICY_GAP`.
+  into the implementation decision. The same JSON feeds the `interaction-pattern-contract` lint
+  rule and the reviewer's widget check, so the contract reaches review as a shared checklist, not
+  as a fresh opinion. A contract is guidance, never policy: a key or state it names that the card
+  does not cover is `POLICY_GAP`.
 - Hook Encapsulation only when the approved architecture chose `orchestration-only`. Existing
   equivalent rules first; no dependency installs or lint config changes.
 - Screenshot comparison and direct browser QA run only on explicit request, by invoking the

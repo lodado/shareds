@@ -2,8 +2,10 @@
  * A `role` or `aria-haspopup` names a WAI-ARIA widget pattern, and every pattern has a keyboard
  * and state contract (contracts/<pattern>.json). This rule checks the parts of that contract that
  * are visible in source: state attributes bound to an expression rather than a literal, the
- * required naming/relationship attributes, and a key handler for the pattern's primary keys
- * somewhere in the enclosing component. Whether the handler actually works is a browser test's job.
+ * required naming/relationship attributes, and — for every key the pattern needs — a comparison
+ * against `event.key` somewhere in the enclosing component (`key === 'Escape'`, `switch (e.key)`,
+ * `['ArrowUp', 'ArrowDown'].includes(e.key)`). A string that merely appears in the file does not
+ * count. Whether the handler actually works is a browser test's job.
  */
 const { keyHint, stepGuidance } = require('./lib/interaction-contracts')
 
@@ -24,14 +26,14 @@ const PATTERNS = {
     haspopup: ['menu', 'true'],
     bound: ['aria-expanded'],
     attrStep: 'expanded-binding',
-    keys: ['ArrowDown', 'Enter', ' '],
+    keys: ['ArrowDown', 'Escape'],
   },
   combobox: {
     roles: ['combobox'],
     bound: ['aria-expanded'],
     requiredAny: [['aria-controls']],
     attrStep: 'arrowdown-opens',
-    keys: ['ArrowDown'],
+    keys: ['ArrowDown', 'Escape'],
   },
   tabs: { roles: ['tablist'], keys: ['ArrowRight', 'ArrowLeft'] },
   tab: {
@@ -76,6 +78,51 @@ const outermostFunction = (node) => {
   return found
 }
 
+const KEY_PROPERTIES = new Set(['key', 'code'])
+
+const isKeyAccess = (node) =>
+  node.type === 'MemberExpression' && !node.computed && KEY_PROPERTIES.has(node.property.name)
+
+const stringOf = (node) => (node.type === 'Literal' && typeof node.value === 'string' ? node.value : null)
+
+const walk = (node, visit) => {
+  if (!node || typeof node.type !== 'string') return
+  visit(node)
+  for (const key of Object.keys(node)) {
+    if (key === 'parent') continue
+    const value = node[key]
+    if (Array.isArray(value)) value.forEach((child) => walk(child, visit))
+    else if (value && typeof value === 'object') walk(value, visit)
+  }
+}
+
+/** Every string a key is compared against inside `scope`: `e.key === 'X'`, `switch (e.key) { case 'X' }`, `[...].includes(e.key)`. */
+const comparedKeys = (scope) => {
+  const keys = new Set()
+  walk(scope, (node) => {
+    if (node.type === 'BinaryExpression' && /^[!=]==?$/.test(node.operator)) {
+      if (isKeyAccess(node.left) && stringOf(node.right) !== null) keys.add(stringOf(node.right))
+      if (isKeyAccess(node.right) && stringOf(node.left) !== null) keys.add(stringOf(node.left))
+    } else if (node.type === 'SwitchStatement' && isKeyAccess(node.discriminant)) {
+      node.cases.forEach(
+        (switchCase) => switchCase.test && stringOf(switchCase.test) !== null && keys.add(stringOf(switchCase.test)),
+      )
+    } else if (
+      node.type === 'CallExpression' &&
+      node.callee.type === 'MemberExpression' &&
+      node.callee.property.name === 'includes' &&
+      node.callee.object.type === 'ArrayExpression' &&
+      node.arguments[0] &&
+      isKeyAccess(node.arguments[0])
+    ) {
+      node.callee.object.elements.forEach(
+        (element) => element && stringOf(element) !== null && keys.add(stringOf(element)),
+      )
+    }
+  })
+  return keys
+}
+
 const detectPattern = (node) => {
   const role = literalValue(findAttribute(node, 'role'))
   const haspopup = literalValue(findAttribute(node, 'aria-haspopup'))
@@ -109,7 +156,7 @@ module.exports = {
         '{{ pattern }}: `{{ attribute }}` is a literal, so it never changes. Bind it to state: {{ attribute }}={ {{ stateName }} }. {{ guidance }}',
       missingAttribute: '{{ pattern }}: add {{ attributes }}. {{ guidance }}',
       missingKeyHandler:
-        '{{ pattern }}: no handler for {{ keys }} in this component. Add onKeyDown for them or use a library primitive. Keys: {{ keyHint }}',
+        '{{ pattern }}: nothing in this component compares event.key against {{ keys }}. Handle them in onKeyDown or use a library primitive. Keys: {{ keyHint }}',
     },
   },
   create(context) {
@@ -145,18 +192,14 @@ module.exports = {
 
         if (spec.keys) {
           const component = outermostFunction(node)
-          const text = component ? sourceCode.getText(component) : sourceCode.getText()
-          if (LIBRARY_HANDLED.test(text)) return
-          const handled = spec.keys.some((key) => text.includes(`'${key}'`) || text.includes(`"${key}"`))
-          if (!handled) {
+          if (LIBRARY_HANDLED.test(sourceCode.getText(component ?? node))) return
+          const handled = comparedKeys(component ?? node)
+          const missing = spec.keys.filter((key) => !handled.has(key))
+          if (missing.length) {
             context.report({
               node,
               messageId: 'missingKeyHandler',
-              data: {
-                pattern,
-                keys: spec.keys.map((key) => (key === ' ' ? 'Space' : key)).join('/'),
-                keyHint: keyHint(guidancePattern),
-              },
+              data: { pattern, keys: missing.join('/'), keyHint: keyHint(guidancePattern) },
             })
           }
         }

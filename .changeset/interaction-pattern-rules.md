@@ -2,10 +2,12 @@
 '@lodado/eslint-plugin-local-rules': minor
 ---
 
-Add `interaction-pattern-contract` and `interaction-pattern-guess`, plus `contracts/*.json` exported as
-`contracts`: WAI-ARIA pattern contracts (keys, roles, focus, CSS states) for button, dialog,
-menu-button, combobox, tabs, disclosure, listbox and switch. The contract rule checks what source can
-show — state attributes bound to expressions, required naming/relationship attributes, and a key
-handler for the pattern's primary keys in the enclosing component. The guess rule flags a boolean-gated
-overlay or list that renders a widget without declaring its role. Both ship as warnings through the
-`local-rules` preset.
+Add `interaction-pattern-contract` plus `contracts/*.json` exported as `contracts`: WAI-ARIA pattern
+contracts (keys, roles, focus, CSS states) for button, dialog, menu-button, combobox, tabs,
+disclosure, listbox and switch. The rule finds a widget by its declared `role` or `aria-haspopup`
+and checks what source can show: state attributes bound to expressions rather than literals, the
+required naming and relationship attributes, and — for every key the pattern needs — a comparison
+against `event.key` in the enclosing component (`key === 'Escape'`, `switch (e.key)`,
+`[...].includes(e.key)`). A string that merely appears in the file does not count, and one arrow
+direction does not satisfy a pattern that needs both. It ships `recommended: false`; extend
+`@lodado/eslint-config/interaction` to turn it on.
