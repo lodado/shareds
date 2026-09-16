@@ -1,0 +1,250 @@
+/*
+ * Shared tokens and the state styles every contracts/<pattern>.json guidance.css asks for.
+ * One class per widget part; the example files only add layout.
+ */
+:root {
+  --ring: #2563eb;
+  --fg: #111827;
+  --bg: #ffffff;
+  --muted: #f3f4f6;
+  --muted-2: #e5e7eb;
+  --accent: #2563eb;
+  --accent-fg: #ffffff;
+  --motion: 150ms;
+}
+
+/* interactive.json: focus-visible ring, hover feedback, disabled, reduced motion */
+.control {
+  cursor: pointer;
+  padding: 8px 14px;
+  border: 1px solid var(--muted-2);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  transition: background-color var(--motion) ease, transform var(--motion) ease;
+}
+.control:hover {
+  background: var(--muted);
+}
+.control:active {
+  transform: scale(0.98);
+}
+.control:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.control:disabled,
+.control[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* button.json: pending keeps its size, marks aria-busy */
+.control[aria-busy='true'] {
+  opacity: 0.7;
+  cursor: progress;
+}
+.control[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-fg);
+  text-decoration: underline;
+}
+
+/* dialog.json: overlay, enter/exit motion, reduced motion */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.4);
+  animation: fade-in var(--motion) ease-out;
+}
+.dialog {
+  min-width: 320px;
+  padding: 20px;
+  border-radius: 8px;
+  background: var(--bg);
+  animation: rise-in var(--motion) ease-out;
+}
+.dialog h2 {
+  margin: 0 0 12px;
+}
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+/* menu-button.json / combobox.json / listbox.json: popup and item states */
+.popup {
+  position: absolute;
+  margin-top: 4px;
+  min-width: 180px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid var(--muted-2);
+  border-radius: 6px;
+  background: var(--bg);
+  list-style: none;
+  transform-origin: top left;
+  animation: pop-in 120ms ease-out;
+}
+.item {
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 4px;
+  transition: background-color var(--motion) ease;
+}
+.item:hover,
+.item[data-active='true'] {
+  background: var(--muted);
+}
+.item:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.item[aria-selected='true'] {
+  background: var(--muted-2);
+  font-weight: 600;
+}
+.item[aria-selected='true']::before {
+  content: '✓ ';
+}
+.listbox {
+  position: static;
+  animation: none;
+}
+.listbox:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* tabs.json: selected needs a non-colour signal, indicator moves by transform */
+.tablist {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--muted-2);
+}
+.tab {
+  cursor: pointer;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font: inherit;
+  transition: background-color var(--motion) ease;
+}
+.tab:hover {
+  background: var(--muted);
+}
+.tab[aria-selected='true'] {
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.tab:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.tabpanel {
+  padding: 12px 0;
+}
+
+/* disclosure.json: chevron rotates, content opens without max-height hacks */
+.disclosure-trigger .chevron {
+  display: inline-block;
+  margin-left: 6px;
+  transition: transform var(--motion) ease;
+}
+.disclosure-trigger[aria-expanded='true'] .chevron {
+  transform: rotate(180deg);
+}
+.disclosure-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--motion) ease;
+}
+.disclosure-content[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+.disclosure-content > div {
+  overflow: hidden;
+}
+
+/* switch.json: thumb moves by transform, both states pass 3:1, focus ring outside the track */
+.switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: #6b7280;
+  cursor: pointer;
+  transition: background-color var(--motion) ease;
+}
+.switch[aria-checked='true'] {
+  background: var(--accent);
+}
+.switch .thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--bg);
+  transition: transform var(--motion) ease;
+}
+.switch[aria-checked='true'] .thumb {
+  transform: translateX(20px);
+}
+.switch:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.switch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control,
+  .item,
+  .tab,
+  .switch,
+  .switch .thumb,
+  .disclosure-trigger .chevron,
+  .disclosure-content {
+    transition: none;
+  }
+  .overlay,
+  .dialog,
+  .popup {
+    animation: none;
+  }
+}

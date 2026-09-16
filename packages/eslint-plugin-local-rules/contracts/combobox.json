@@ -1,7 +1,12 @@
 {
   "pattern": "combobox",
   "sources": ["https://www.w3.org/WAI/ARIA/apg/patterns/combobox/"],
-  "identify": { "self": { "role": "combobox" } },
+  "example": "examples/combobox",
+  "identify": {
+    "self": {
+      "role": "combobox"
+    }
+  },
   "states": ["closed", "open"],
   "steps": [
     {
@@ -9,8 +14,15 @@
       "when": "closed",
       "key": "ArrowDown",
       "expect": {
-        "attr": { "target": "self", "name": "aria-expanded", "equals": "true" },
-        "role": { "name": "listbox", "visible": true }
+        "attr": {
+          "target": "self",
+          "name": "aria-expanded",
+          "equals": "true"
+        },
+        "role": {
+          "name": "listbox",
+          "visible": true
+        }
       },
       "guidance": "닫힌 상태에서 ArrowDown이면 listbox를 열고 aria-expanded=true."
     },
@@ -18,23 +30,44 @@
       "id": "arrow-moves",
       "when": "open",
       "key": "ArrowDown",
-      "expect": { "activeItemMoved": true },
+      "expect": {
+        "activeItemMoved": true
+      },
       "guidance": "열린 상태 ArrowDown/Up으로 option 이동. aria-activedescendant 또는 포커스 이동."
     },
     {
       "id": "escape-closes",
       "when": "open",
       "key": "Escape",
-      "expect": { "attr": { "target": "self", "name": "aria-expanded", "equals": "false" }, "focus": "self" },
+      "expect": {
+        "attr": {
+          "target": "self",
+          "name": "aria-expanded",
+          "equals": "false"
+        },
+        "focus": "self"
+      },
       "guidance": "Escape면 listbox 닫고 포커스는 입력에 남긴다."
     }
   ],
   "guidance": {
     "keys": [
-      { "key": "ArrowDown / ArrowUp", "do": "닫힘: 열기. 열림: option 이동" },
-      { "key": "Enter", "do": "활성 option 선택 후 닫기" },
-      { "key": "Escape", "do": "닫기(열림) / 값 지우기(닫힘, 선택)" },
-      { "key": "Home / End", "do": "입력 커서 처음/끝" }
+      {
+        "key": "ArrowDown / ArrowUp",
+        "do": "닫힘: 열기. 열림: option 이동"
+      },
+      {
+        "key": "Enter",
+        "do": "활성 option 선택 후 닫기"
+      },
+      {
+        "key": "Escape",
+        "do": "닫기(열림) / 값 지우기(닫힘, 선택)"
+      },
+      {
+        "key": "Home / End",
+        "do": "입력 커서 처음/끝"
+      }
     ],
     "roles": {
       "self": "combobox + aria-expanded + aria-controls + aria-autocomplete",

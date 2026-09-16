@@ -1,9 +1,17 @@
 {
   "pattern": "menu-button",
   "sources": ["https://www.w3.org/WAI/ARIA/apg/patterns/menu-button/"],
+  "example": "examples/menu-button",
   "identify": {
-    "trigger": { "role": "button", "attrs": { "aria-haspopup": "menu|true" } },
-    "self": { "role": "menu" }
+    "trigger": {
+      "role": "button",
+      "attrs": {
+        "aria-haspopup": "menu|true"
+      }
+    },
+    "self": {
+      "role": "menu"
+    }
   },
   "states": ["closed", "open"],
   "steps": [
@@ -11,37 +19,67 @@
       "id": "arrowdown-opens",
       "when": "closed",
       "key": "ArrowDown",
-      "expect": { "self": { "visible": true }, "focus": "role:menuitem" },
+      "expect": {
+        "self": {
+          "visible": true
+        },
+        "focus": "role:menuitem"
+      },
       "guidance": "트리거에서 ArrowDown/Enter/Space면 열고 첫 menuitem에 포커스."
     },
     {
       "id": "expanded-binding",
       "when": "open",
       "action": "none",
-      "expect": { "attr": { "target": "trigger", "name": "aria-expanded", "equals": "true" } },
+      "expect": {
+        "attr": {
+          "target": "trigger",
+          "name": "aria-expanded",
+          "equals": "true"
+        }
+      },
       "guidance": "aria-expanded={open}으로 상태에 바인딩. 리터럴 문자열 금지."
     },
     {
       "id": "escape-closes",
       "when": "open",
       "key": "Escape",
-      "expect": { "self": { "visible": false }, "focus": "trigger" },
+      "expect": {
+        "self": {
+          "visible": false
+        },
+        "focus": "trigger"
+      },
       "guidance": "Escape면 닫고 포커스를 트리거로."
     },
     {
       "id": "arrow-moves",
       "when": "open",
       "key": "ArrowDown",
-      "expect": { "activeItemMoved": true },
+      "expect": {
+        "activeItemMoved": true
+      },
       "guidance": "menu 안 ArrowDown/Up으로 menuitem 이동, 끝에서 순환."
     }
   ],
   "guidance": {
     "keys": [
-      { "key": "Enter / Space / ArrowDown", "do": "열고 첫 항목 포커스" },
-      { "key": "ArrowUp", "do": "열고 마지막 항목 포커스" },
-      { "key": "ArrowDown / ArrowUp (열림)", "do": "항목 이동, 순환" },
-      { "key": "Escape", "do": "닫고 트리거로 포커스" }
+      {
+        "key": "Enter / Space / ArrowDown",
+        "do": "열고 첫 항목 포커스"
+      },
+      {
+        "key": "ArrowUp",
+        "do": "열고 마지막 항목 포커스"
+      },
+      {
+        "key": "ArrowDown / ArrowUp (열림)",
+        "do": "항목 이동, 순환"
+      },
+      {
+        "key": "Escape",
+        "do": "닫고 트리거로 포커스"
+      }
     ],
     "roles": {
       "trigger": "button + aria-haspopup=menu + aria-expanded + aria-controls",
