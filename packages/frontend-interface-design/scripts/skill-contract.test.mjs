@@ -178,7 +178,7 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
   const ids = cases.map(({ id }) => id)
 
   assert.equal(schemaVersion, '1.0')
-  assert.equal(cases.length, 38)
+  assert.equal(cases.length, 47)
   assert.equal(new Set(ids).size, cases.length)
   for (const id of [
     'editable-reference-assembly-not-redraw',
@@ -186,6 +186,15 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
     'asset-title-is-not-editability-proof',
     'source-pilot-reflow-and-overrides',
     'structural-rejection-reopens-mapping',
+    'hci-wireframe-before-figma-write',
+    'hci-screenshot-is-not-interaction-proof',
+    'hci-conflicting-reference-models',
+    'hci-wireframe-without-write-access',
+    'hci-small-edit-reuses-existing-flow',
+    'hci-explicit-review-checkpoint',
+    'visual-directions-when-unresolved',
+    'visual-direction-preserves-locked-design',
+    'visual-feedback-targeted-before-after',
   ]) {
     assert.ok(ids.includes(id), `Missing assembly regression case: ${id}`)
   }

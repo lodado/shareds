@@ -8,6 +8,10 @@ description: 'Compatibility entry for existing frontend-interface-design invocat
 이전 이름으로 호출한 요청은 [Reference-Driven Figma Design](../reference-driven-figma-design/SKILL.md)을
 읽고 그 계약을 따른다. 최종 결과는 편집 가능한 Figma이며, Figma write 권한 부족을 코드·정적 이미지로 우회하지 않는다.
 
+새 화면·주요 구성/행동 변경·와이어프레임 요청은 canonical 스킬의
+[HCI → reference → wireframe](../reference-driven-figma-design/references/hci-wireframe-workflow.md)으로
+사용자 과업·레퍼런스 비교·러프 스케치와 설명을 첫 대상 Figma 쓰기 전에 보여준다.
+
 새 화면·구성 변경·대안 탐색은 canonical 스킬의
 [taxonomy → reference → adaptation](../reference-driven-figma-design/references/taxonomy-reference-workflow.md)을 따른다.
 사전 용어를 화면/컴포넌트 검색 의도로 번역하고, 관찰한 화면 구성과 편집 자산을 별도 확인한다.

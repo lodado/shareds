@@ -12,6 +12,10 @@
 
 ## 1. 가장 먼저 전달할 것
 
+아래 순서는 Figma 결과의 handoff다. 대상 편집 전에는 [HCI 사전 설명](hci-wireframe-workflow.md)의
+와이어프레임·비교 근거·동선을 먼저 보여준다. Figma 제작이 막혔다면 준비 결과와 BLOCKED를 분리하고
+없는 Figma URL을 만들거나 스케치를 Figma 결과로 대체하지 않는다.
+
 1. 실제 Figma URL
 2. file/page/frame 식별자와 최종 frame 이름
 3. 현재 상태: PILOT_READY / FIGMA_READY / INCOMPLETE / BLOCKED
@@ -36,6 +40,10 @@
 - 가져온 structural principle
 - 복사하지 않은 visual traits
 - 새로 만든 Experiment 또는 Approved 변경
+
+HCI 사전 설계 대상은 같은 로그에 `과업 → 레퍼런스 채택/기각 → 와이어프레임 번호 → 실제 frame/state`를
+연결한다. 편집 전 설명 위치와 이후 변경 이유, 작은 수정의 생략 근거를 남긴다.
+관련 상태의 실제 검증과 제안/미검증을 구분하며, 자체 walkthrough는 사용자 테스트나 승인으로 기록하지 않는다.
 
 ## 3. Critique trace
 

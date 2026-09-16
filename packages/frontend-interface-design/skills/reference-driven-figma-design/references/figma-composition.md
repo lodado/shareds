@@ -9,6 +9,11 @@
 
 ## 1. Canvas safety
 
+새 화면·주요 구성/행동 변경·와이어프레임 요청은 [HCI → reference → wireframe](hci-wireframe-workflow.md)의
+사전 설명을 먼저 전달한다. 첫 대상 쓰기 전에 과업·스케치·핵심 상태·채택 근거가 사용자에게 보였는지 확인한다.
+스케치 번호를 아래 source→target 매핑에 연결하며, 스케치의 박스를 실제 원본 재사용 대신 재그리지 않는다.
+구조·행동을 보존하는 작은 수정의 예외와 명시된 사용자 검토 대기 조건도 같은 계약을 따른다.
+
 Figma를 열면 대상 file, page, frame, component set, variable collection과 version을 먼저 확인한다.
 이름이나 과거 기록만으로 ID를 재사용하지 않는다.
 

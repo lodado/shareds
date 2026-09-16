@@ -35,6 +35,12 @@ Canvas를 변경하기 전 다음을 알 수 있어야 한다.
 모든 필드가 완벽할 필요는 없다. 미정 항목이 pilot의 방향을 실질적으로 바꾸지 않으면 합리적인
 가정을 `agent proposal`로 표시하고 진행한다.
 
+새 화면·주요 구성/행동 변경·와이어프레임 요청은 [HCI 사전 설계](hci-wireframe-workflow.md)를 적용한다.
+기존 brief의 audience/primary_outcome/success_signals와 scope.states에 과업·성공·필요 상태를 연결하고,
+첫 대상 Figma 쓰기 전에 레퍼런스 비교·러프 스케치·동선 설명을 보여준다.
+권한이 없어도 읽을 수 있는 자료의 사전 설명은 준비하되, 최종 Figma 제작의 BLOCKED를 해제하지 않는다.
+사용자가 검토 후 진행을 요청했다면 설명 후 기다리고, 그렇지 않으면 위임 범위에서 진행한다.
+
 ## 3. Grill-me intake
 
 결과를 크게 바꾸는 사용자 결정만 질문한다. 설치된 grill-me 또는 host의 structured question

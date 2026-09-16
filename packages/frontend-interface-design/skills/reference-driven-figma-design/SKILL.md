@@ -1,6 +1,6 @@
 ---
 name: reference-driven-figma-design
-description: 'Research, compose, critique, and maintain production-quality editable Figma product or landing designs from PRDs, internal assets, templates, and verified UI references. Use for Figma-first design work; not frontend implementation, design-to-code, or static-image-only delivery.'
+description: 'Plan task flows with HCI, compare verified references, explain rough wireframes before Figma editing, then compose and critique editable Figma product or landing designs. Use for Figma-first design work; not frontend implementation, design-to-code, or static-image-only delivery.'
 metadata:
   short-description: Build editable Figma designs from verified references
 ---
@@ -10,7 +10,7 @@ metadata:
 편집 전 [Edit contract](references/edit-contract.md)로 ASSEMBLE / LOCALIZE / FIDELITY / RESKIN / REDESIGN과 섹션별 보존·변경 범위를 고정한다. 컴포넌트 연결, 시각 충실도, 콘텐츠, 레이아웃을 독립 검증한다.
 
 좋은 구조를 조사하고 기존 시각 시스템의 언어로 번역해, 사람이 계속 편집할 수 있는 Figma 시안을
-만든다. AI의 무제약 창작이 아니라 **Research → Select → Map → Compose → Critique → Refine →
+만든다. AI의 무제약 창작이 아니라 **Understand → Research → Sketch & Explain → Map → Compose → Critique → Refine →
 Accumulate**가 기본이다.
 
 ## 제작 방식부터 고정한다
@@ -20,6 +20,23 @@ Accumulate**가 기본이다.
 이미 정해진 산출물·원본·허용 변형·제외 범위는 brief에 유지하고 다시 묻지 않는다. 필요한 원본을 확보하지 못하면 해당 부분을 HOLD로 남기며, 대체 제작 방식은 사용자 결정 없이는 바꾸지 않는다.
 [조립 매핑](references/figma-composition.md)으로 큰 단위 자산부터 확인하고 [출처·파일럿 게이트](references/component-source-gate.md)를 통과한다.
 “한방에/알아서”는 자산 선택·조립·수정·검토를 내부에서 완수하라는 뜻이지 검증 생략이나 근거 없는 완료 선언을 허용하지 않는다.
+
+## Figma 편집 전에 HCI와 러프 와이어프레임을 설명한다
+
+새 화면·주요 구성/행동 변경 또는 사용자의 와이어프레임 요청에는
+[HCI → reference → wireframe](references/hci-wireframe-workflow.md)을 먼저 읽는다.
+사용자·과업·사용 맥락·성공 신호와 행동→피드백→오류/복구를 정의하고, 같은 과업의 레퍼런스를 비교한다.
+**첫 대상 Figma 쓰기 전에** 번호가 붙은 텍스트 와이어프레임과 핵심 상태, 채택/기각 근거,
+사용자 동선과 Figma 구현 매핑을 대화에 보여준다. 내부 메모만 쓰거나 완성 시안 뒤에 설명하지 않는다.
+Figma 읽기·자산 조사는 선행할 수 있다. 러프 스케치는 설계 가설이지 편집 가능한 원본이나 최종 납품물이 아니다.
+검토를 기다리라는 명시 요청이 있으면 멈추고, 그렇지 않으면 설명 후 위임 범위에서 계속한다. 설명을 사용자 승인으로 기록하지 않는다.
+구조·행동이 그대로인 작은 내부 수정은 기존 근거를 재사용하며 새 조사·와이어프레임을 강제하지 않는다.
+이 단계도 프롬프트 실행 계약이며 MCP 호출을 물리적으로 차단하는 런타임 훅은 아니다.
+
+시각 방향이 미정이거나 대안 요청이 있으면 [Visual direction](references/visual-direction.md)을 읽는다.
+사전 설명 뒤 출처 게이트를 통과한 원본으로 대표 구간의 시각 대안을 비교·선정하고 확장한다.
+방향이 고정된 수정에는 대안을 강제하지 않는다. 피드백은 대상 영역과 관찰 가능한 문제로 좁히고,
+같은 콘텐츠·viewport·상태에서 변경 전후를 확인한다. 와이어프레임 설명은 시각 품질 검증이 아니다.
 
 ## 필수 taxonomy·화면 근거·응용 계약
 
@@ -79,11 +96,13 @@ Accumulate**가 기본이다.
 예를 들어 공식 provider가 요구하면 `figma-use`, 페이지 작업의 `figma-generate-design`, component
 작업의 `figma-generate-library`를 해당 작업 전에 읽는다. 설치되지 않은 skill이나 API를 가정하지 않는다.
 
-- **Figma read/write가 필수다.** 파일·page·frame·Variables·Components·Variants·Auto Layout을
+- 최종 Figma 제작에는 **Figma read/write가 필수다.** 파일·page·frame·Variables·Components·Variants·Auto Layout을
   실제로 읽고, 별도 working 영역을 쓰며, 결과를 다시 열어 볼 수 있어야 한다. 존재하지 않는
   node ID, component ID, variable, version을 만들지 않는다.
 - Figma write가 없으면 상태를 BLOCKED로 내고 필요한 연결 또는 권한을 요청한다. 리서치 메모나
   후보 비교는 제한 산출물일 뿐 Figma 완료로 보고하지 않는다.
+  읽을 수 있는 자료의 HCI·레퍼런스 비교·텍스트 와이어프레임 설명은 독립적으로 준비할 수 있다.
+  준비 산출물과 막힌 Figma 제작을 분리하고, 권한·출처 게이트를 통과한 것으로 취급하지 않는다.
 - Refero가 실제 사용 가능하면 composition, hierarchy, section structure, product presentation,
   interaction pattern 조사에 우선 사용한다.
 - Refero가 없거나 결과가 부족하면 사용 가능한 Aside/Browser로 Figma Community, 공식 UI Kit,
@@ -141,15 +160,20 @@ Accumulate**가 기본이다.
    이미 주어진 답을 다시 묻지 않는다.
 2. **Inspect internal first.** 대상 Figma, 기존 Component Catalog, library, approved patterns,
    variables/components/variants, 실제 copy와 product assets를 먼저 조사한다.
-3. **Select a base.** 지정 template이 없으면
+3. **Model the task and translate the PRD.** HCI 브리프로 사용자·과업·맥락·성공 신호와
+   핵심 행동/상태/복구를 정리한다. 각 섹션은 User Question, Communication Goal, Required Content,
+   Available Evidence, Desired Action, Available Visual Assets로 바꾼다. 랜딩에는 설득·다음 행동의 흐름을,
+   제품 UI에는 과업·상태 전이를 우선하며 불필요한 폼이나 화면을 추가하지 않는다.
+4. **Select a base candidate.** 지정 template이 없으면
    [research and selection](references/research-selection.md) 기준으로 접근 가능한 후보를 비교한다.
    내부 시스템이 범위를 충분히 해결하면 `internal-default`로 선택하고 외부 template 검색을 생략한다.
-   preview만 본 후보의 내부 구조를 검증됐다고 하지 않는다.
-4. **Translate the PRD.** 각 섹션을 User Question, Communication Goal, Required Content,
-   Available Evidence, Desired Action, Available Visual Assets로 바꾼다.
-5. **Research the gaps and requested alternatives.** 부족한 컴포넌트와 사용자가 요청한 외부 대안은
-   필수 출처 게이트로 실제 반입·비교한다. 구도 참고만으로 컴포넌트 탐색을 대신하지 않는다.
-6. **Map before drawing.** Reference element를 기존 Figma component/variant/primitive에 매핑한다.
+   이 단계는 읽기 전용 후보 선정이다. preview만 본 내부 구조나 아직 복제하지 않은 자산을 검증됐다고 하지 않는다.
+5. **Research references and inspect candidates.** 부족한 컴포넌트와 사용자가 요청한 외부 대안의
+   화면·동작·편집 원본·권리를 읽기 전용으로 조사한다. 구도 참고만으로 컴포넌트 탐색을 대신하지 않는다.
+6. **Sketch, explain, then compare and map.** HCI 계약의 러프 와이어프레임과 설명을 먼저 보여준다.
+   실제 반입·비교판 작성도 Figma 쓰기이므로 설명 및 명시된 검토 대기 뒤에 한다.
+   필수 출처 게이트의 실콘텐츠 비교를 마친 후 후보를 확정하고 Reference element를
+   기존 Figma component/variant/primitive에 매핑한다. 비교 결과로 스케치가 바뀌면 이유를 설명한다.
    우선순위는 적합성이 검증된 내부 자산 → 출처 게이트에서 채택한 외부 자산 →
    게이트가 허용한 내부 primitive 조합/새 Experiment다. 비교가 요청됐다면 내부 자산도 비교 후 선택한다.
 7. **Compose safely.** [Figma composition](references/figma-composition.md)에 따라 원본을 보존하고
@@ -185,6 +209,8 @@ Accumulate**가 기본이다.
 
 FIGMA_READY는 다음이 모두 사실일 때만 쓴다.
 
+- HCI 사전 설명 대상이면 와이어프레임·핵심 상태·결정 근거를 대상 편집 전에 보여준 기록이 있다.
+  Figma 결과를 그 과업/상태와 대조하고 변경 이유·미검증 동작을 남긴다. 작은 수정의 생략 근거도 기록한다.
 - 변경한 각 역할의 출처 게이트 통과 또는 정당한 내부 재사용 근거가 Reference Log에 있다.
   후보·권리·실제 복제/연결·override·적용 위치·가독 크기 비교 증거 중 필요한 항목이 없으면 완료가 아니다.
 - 실제 Figma URL과 정확한 file/page/frame 식별자를 전달할 수 있다.
