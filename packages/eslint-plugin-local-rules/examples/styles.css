@@ -161,15 +161,7 @@
   transform: rotate(180deg);
 }
 .disclosure-content {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows var(--motion) ease;
-}
-.disclosure-content[data-open='true'] {
-  grid-template-rows: 1fr;
-}
-.disclosure-content > div {
-  overflow: hidden;
+  padding: 8px 0 0;
 }
 
 /* switch.json: thumb moves by transform, both states pass 3:1, focus ring outside the track */
@@ -238,8 +230,7 @@
   .tab,
   .switch,
   .switch .thumb,
-  .disclosure-trigger .chevron,
-  .disclosure-content {
+  .disclosure-trigger .chevron {
     transition: none;
   }
   .overlay,

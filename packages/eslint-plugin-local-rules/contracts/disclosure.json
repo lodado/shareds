@@ -63,7 +63,7 @@
     "focus": "트리거에 유지, 이동 없음",
     "css": {
       "chevron": "rotate(0→180deg) 150–200ms",
-      "content": "height auto 전환은 grid-template-rows 0fr→1fr 또는 즉시. max-height 해킹 금지",
+      "content": "collapsed content carries the `hidden` attribute so it leaves the accessibility tree; a height transition then needs transition-behavior: allow-discrete. max-height guesses are not a substitute.",
       "focus-visible": "outline 2px",
       "reduced-motion": "즉시"
     }

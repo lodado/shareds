@@ -1,0 +1,6 @@
+{
+  "name": "@lodado/interaction-examples",
+  "type": "module",
+  "private": true,
+  "description": "Reference implementations of the interaction contracts. Not code the plugin loads - the rules only read contracts/."
+}

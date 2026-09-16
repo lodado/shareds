@@ -3,7 +3,8 @@
  * roles: button + aria-expanded + aria-controls; the content has the id and no role.
  * focus: stays on the trigger.
  * keys: Enter/Space toggle — free from <button>.
- * css: chevron rotates; content animates grid-template-rows 0fr→1fr, no max-height guess.
+ * css: the chevron rotates. The content uses `hidden` so collapsed text leaves the accessibility tree,
+ *      which also means it cannot transition — animating height needs transition-behavior: allow-discrete.
  */
 import { useId, useState } from 'react'
 
@@ -25,8 +26,8 @@ export default function ShippingFaq() {
           ▾
         </span>
       </button>
-      <div id={contentId} className="disclosure-content" data-open={open} hidden={!open}>
-        <div>영업일 기준 2–3일입니다. 도서 지역은 하루 더 걸릴 수 있습니다.</div>
+      <div id={contentId} className="disclosure-content" hidden={!open}>
+        영업일 기준 2–3일입니다. 도서 지역은 하루 더 걸릴 수 있습니다.
       </div>
     </div>
   )

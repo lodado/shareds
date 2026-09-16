@@ -3,7 +3,8 @@
  * roles: ul role="listbox" tabIndex=0 aria-activedescendant; li role="option" tabIndex={-1} aria-selected.
  * focus: the list holds focus; the active option is announced by aria-activedescendant.
  * keys: ArrowDown/ArrowUp move (and select — single-select follows focus), Home/End jump,
- *       typing a character jumps to the next match.
+ *       typing a character jumps to the next match. Typeahead only sees keys that arrive as keydown:
+ *       text composed through an IME reports key === 'Process', so it is skipped by the length check.
  * css: selected shows a check glyph and weight; active shows a background.
  */
 import { useId, useState } from 'react'
