@@ -48,17 +48,34 @@ test('requires approved baselines and reproducible browser evidence', async () =
   assert.match(skill, /임의 sleep을 사용하지 않는다/)
 })
 
-test('drives the browser through Playwright or a connected browser MCP only', async () => {
+test('allows agent-browser observations without changing trusted PASS producers', async () => {
   const skill = await read('SKILL.md')
 
-  assert.match(skill, /Playwright 또는 이미 연결된 browser MCP/)
-  assert.match(skill, /둘 다 없으면 `NEEDS_DECISION`/)
-  assert.match(skill, /driver\(playwright\|mcp:<name>\)/)
+  assert.match(skill, /Playwright, agent-browser 또는 이미 연결된 browser MCP/)
+  assert.match(skill, /모두 없으면 `NEEDS_DECISION`/)
+  assert.match(skill, /driver\(playwright\|agent-browser\|mcp:<name>\)/)
   assert.match(skill, /certifiable visual `PASS` producer.*oracle-run --adapter node-test/s)
   assert.match(skill, /locked test가 Playwright를 호출하고 schema-v3 artifact를 발행/)
   assert.match(skill, /standalone Playwright adapter는\s*지원하지 않는다/)
-  assert.match(skill, /Browser MCP.*pending.*non-verifying/s)
-  assert.match(skill, /Browser MCP는 observation artifact를 수집할 수 있지만/)
+  assert.match(skill, /agent-browser와 Browser MCP.*pending.*non-verifying/s)
+  assert.match(skill, /agent-browser.*Playwright.*provenance로 바꾸지 않는다/s)
+  assert.match(skill, /snapshot -i/)
+  assert.match(skill, /ref.*다시.*snapshot/s)
+})
+
+test('reuses bounded exploration for dogfood with reproducible, non-verifying findings', async () => {
+  const skill = await read('SKILL.md')
+
+  assert.match(skill, /## 6\. 탐색 phase — bounded exploration \(dogfood\)/)
+  assert.match(skill, /`Exploration authorization: approved`가 있을 때만/)
+  assert.match(skill, /상호작용 30회 또는 10분/)
+  assert.match(skill, /핵심 journey 1~3개/)
+  assert.match(skill, /재현 단계.*expected\/actual.*스크린샷/s)
+  assert.match(skill, /`NON_ORACLE_OPINION`/)
+  assert.match(skill, /`VERIFIED` 판정에 영향을 주지 않는다/)
+  assert.match(skill, /토큰.*개인정보.*마스킹/s)
+  assert.match(skill, /dogfood.*자동 설치하지 않는다/s)
+  assert.match(skill, /production\/live.*submit·삭제·결제.*부작용을 만들지 않는다/s)
 })
 
 test('keeps Visual QA plugin release metadata versions aligned', async () => {
