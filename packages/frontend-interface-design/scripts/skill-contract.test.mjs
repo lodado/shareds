@@ -178,7 +178,7 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
   const ids = cases.map(({ id }) => id)
 
   assert.equal(schemaVersion, '1.0')
-  assert.equal(cases.length, 47)
+  assert.equal(cases.length, 54)
   assert.equal(new Set(ids).size, cases.length)
   for (const id of [
     'editable-reference-assembly-not-redraw',
@@ -195,6 +195,13 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
     'visual-directions-when-unresolved',
     'visual-direction-preserves-locked-design',
     'visual-feedback-targeted-before-after',
+    'five-planes-strategy-before-dependent-questions',
+    'five-planes-scope-preserves-exclusions',
+    'five-planes-structure-policy-grill-fallback',
+    'five-planes-skeleton-not-flow-rewrite',
+    'five-planes-surface-evidence-and-delegation',
+    'five-planes-small-fidelity-skips-interview',
+    'five-planes-late-finding-reopens-only-dependencies',
   ]) {
     assert.ok(ids.includes(id), `Missing assembly regression case: ${id}`)
   }

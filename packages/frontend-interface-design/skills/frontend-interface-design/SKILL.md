@@ -8,6 +8,10 @@ description: 'Compatibility entry for existing frontend-interface-design invocat
 이전 이름으로 호출한 요청은 [Reference-Driven Figma Design](../reference-driven-figma-design/SKILL.md)을
 읽고 그 계약을 따른다. 최종 결과는 편집 가능한 Figma이며, Figma write 권한 부족을 코드·정적 이미지로 우회하지 않는다.
 
+Strategy → Scope → Structure → Skeleton → Surface는 순차 승인 단계가 아니라 결정의 의존관계다.
+canonical의 [5개 계층과 단계별 Grill 질문](../reference-driven-figma-design/references/request-contract.md) §3을
+따라 이미 확인한 답과 위임된 세부는 재질문하지 않고, 결과를 바꾸는 미결정만 해당 계층에서 묻는다.
+
 새 화면·주요 구성/행동 변경·와이어프레임 요청은 canonical 스킬의
 [HCI → reference → wireframe](../reference-driven-figma-design/references/hci-wireframe-workflow.md)으로
 사용자 과업·레퍼런스 비교·러프 스케치와 설명을 첫 대상 Figma 쓰기 전에 보여준다.

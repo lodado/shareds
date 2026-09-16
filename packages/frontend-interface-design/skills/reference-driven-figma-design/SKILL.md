@@ -13,6 +13,26 @@ metadata:
 만든다. AI의 무제약 창작이 아니라 **Understand → Research → Sketch & Explain → Map → Compose → Critique → Refine →
 Accumulate**가 기본이다.
 
+## 5개 계층 — 작업 단계가 아니라 결정의 의존관계
+
+Garrett의 **Strategy → Scope → Structure → Skeleton → Surface**는 아래의 추상적 목적을 위의
+구체적 표현으로 연결한다. 아래 계층을 전부 끝내야 다음 작업을 시작하는 waterfall이나 단계별
+승인 절차가 아니다. 조사·스케치·시각 실험은 겹칠 수 있지만, 영향을 주는 하위 결정이 미정이면
+상위 결과는 가설로 남긴다. 위쪽에서 발견한 문제는 원인이 있는 계층과 영향받는 결정만 다시 연다.
+
+| 계층      | 결정                                                 | 기존 실행 루프에서 다루는 곳                   |
+| --------- | ---------------------------------------------------- | ---------------------------------------------- |
+| Strategy  | 사용자 요구·제품 목적·핵심 과업·성공 신호            | Normalize / Model the task의 brief             |
+| Scope     | 기능·콘텐츠·상태·기기와 포함/제외·보존 범위          | Normalize / Inspect의 scope·locked constraints |
+| Structure | 정보 분류·화면 관계·행동/상태/복구 흐름              | Model the task / Research의 HCI 흐름           |
+| Skeleton  | 화면 내 위계·배치·탐색·키보드/반응형 의도            | Sketch & explain의 러프 와이어프레임           |
+| Surface   | 시각 시스템·실제 콘텐츠 표현·지각 가능한 모션/피드백 | Compose / Pilot / Critique의 실제 Figma 시안   |
+
+각 지점에서 [단계별 Grill 질문](references/request-contract.md) §3으로
+중요한 빈칸만 확인한다. 자료에 있는 답은 추출하고 위임된 세부는 직접 결정한다. 작은 Fidelity/RESKIN
+수정에 목적 인터뷰나 새 와이어프레임을 강제하지 않는다. 기존 HCI 설명·출처·권한 게이트는 유지한다.
+기존 화면을 Surface부터 분석할 수 있지만 관찰만으로 제품 전략이나 정책이 확인됐다고 하지 않는다.
+
 ## 제작 방식부터 고정한다
 
 “레퍼런스 조립” 요청은 **편집 가능한 원본 frame/component/instance를 가져와 조합**하는 작업이다.
@@ -160,7 +180,8 @@ Figma 읽기·자산 조사는 선행할 수 있다. 러프 스케치는 설계 
    이미 주어진 답을 다시 묻지 않는다.
 2. **Inspect internal first.** 대상 Figma, 기존 Component Catalog, library, approved patterns,
    variables/components/variants, 실제 copy와 product assets를 먼저 조사한다.
-3. **Model the task and translate the PRD.** HCI 브리프로 사용자·과업·맥락·성공 신호와
+3. **Model the task and translate the PRD.** Strategy·Scope의 근거를 기존 brief와 범위에서 확인하고,
+   Structure의 HCI 브리프로 사용자·과업·맥락·성공 신호와
    핵심 행동/상태/복구를 정리한다. 각 섹션은 User Question, Communication Goal, Required Content,
    Available Evidence, Desired Action, Available Visual Assets로 바꾼다. 랜딩에는 설득·다음 행동의 흐름을,
    제품 UI에는 과업·상태 전이를 우선하며 불필요한 폼이나 화면을 추가하지 않는다.
@@ -170,7 +191,8 @@ Figma 읽기·자산 조사는 선행할 수 있다. 러프 스케치는 설계 
    이 단계는 읽기 전용 후보 선정이다. preview만 본 내부 구조나 아직 복제하지 않은 자산을 검증됐다고 하지 않는다.
 5. **Research references and inspect candidates.** 부족한 컴포넌트와 사용자가 요청한 외부 대안의
    화면·동작·편집 원본·권리를 읽기 전용으로 조사한다. 구도 참고만으로 컴포넌트 탐색을 대신하지 않는다.
-6. **Sketch, explain, then compare and map.** HCI 계약의 러프 와이어프레임과 설명을 먼저 보여준다.
+6. **Sketch, explain, then compare and map.** Structure의 연결과 Skeleton의 화면 배치를 구분하고,
+   HCI 계약의 러프 와이어프레임과 설명을 먼저 보여준다.
    실제 반입·비교판 작성도 Figma 쓰기이므로 설명 및 명시된 검토 대기 뒤에 한다.
    필수 출처 게이트의 실콘텐츠 비교를 마친 후 후보를 확정하고 Reference element를
    기존 Figma component/variant/primitive에 매핑한다. 비교 결과로 스케치가 바뀌면 이유를 설명한다.
@@ -179,10 +201,13 @@ Figma 읽기·자산 조사는 선행할 수 있다. 러프 스케치는 설계 
 7. **Compose safely.** [Figma composition](references/figma-composition.md)에 따라 원본을 보존하고
    Working Page, duplicated frame 또는 Experiment Area에서 instance, property, variable,
    auto layout으로 만든다. 불필요한 detach를 피한다.
-8. **Pilot first.** 전체 페이지보다 Hero, strongest product/evidence, workflow/explanation 또는
+8. **Pilot first.** Surface는 위 계층의 의도를 승인된 시각 시스템으로 표현한다. 방향이 미정이면
+   [시각 대안](references/visual-direction.md)으로 비교하고, 위임된 선택은 직접 끝낸다.
+   전체 페이지보다 Hero, strongest product/evidence, workflow/explanation 또는
    PRD에 더 적합한 약 3개 섹션을 실제 copy·screenshot·brand asset으로 먼저 만든다.
    단일 화면·부분 수정은 합의 범위 안의 1–3개로 제한하며 섹션이나 기기를 추가하지 않는다.
-9. **Critique and refine.** [critique loop](references/critique-refinement.md)로 실제 Figma 결과를
+9. **Critique and refine.** 문제의 원인이 있는 계층을 먼저 찾고, 범위·흐름 문제를 장식으로 덮지 않는다.
+   [critique loop](references/critique-refinement.md)로 실제 Figma 결과를
    다시 보고 가장 영향이 큰 문제 3개를 수정한다. 일반적으로 2–4회의 의미 있는 반복을 하며,
    잘된 부분은 유지하고 전면 재생성하지 않는다.
 10. **Expand.** pilot이 기준을 넘으면 같은 visual system으로 전체 범위, desktop/mobile,
@@ -202,12 +227,16 @@ Figma 읽기·자산 조사는 선행할 수 있다. 러프 스케치는 설계 
 - 외부 서비스 인증·편집 권한이 필요하다.
 - 원본 파괴, 외부 공유, 유료 구매 또는 라이선스 의무 수락이 필요하다.
 
-질문은 선행관계를 따라 한 번에 최대 1–3개만 묻고 추천안과 디자인 영향을 함께 제시한다.
+질문은 [단계별 Grill 규칙](references/request-contract.md) §3에 따라
+선행관계를 지키며 한 번에 최대 1–3개만 묻고 추천안과 디자인 영향을 함께 제시한다.
 사소한 spacing·variant·section 순서는 승인 범위 안에서 직접 결정한다.
 
 ## 완료 게이트
 
 FIGMA_READY는 다음이 모두 사실일 때만 쓴다.
+
+- 현재 범위에 영향을 주는 5개 계층의 결정 근거가 기존 brief·scope·Reference Log에 연결돼 있고,
+  결과를 바꾸는 미결정을 임의 가정이나 시각 마감으로 덮지 않았다. 계층별 별도 문서·승인은 요구하지 않는다.
 
 - HCI 사전 설명 대상이면 와이어프레임·핵심 상태·결정 근거를 대상 편집 전에 보여준 기록이 있다.
   Figma 결과를 그 과업/상태와 대조하고 변경 이유·미검증 동작을 남긴다. 작은 수정의 생략 근거도 기록한다.
