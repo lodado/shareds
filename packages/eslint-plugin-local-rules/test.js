@@ -492,3 +492,132 @@ typedRuleTester.run('no-derived-state-member', rules['no-derived-state-member'],
 })
 
 console.log(`ok  ${Object.keys(rules).length} rules pass RuleTester`)
+
+// ---------- interaction: pattern contract ----------
+ruleTester.run('interaction-pattern-contract', rules['interaction-pattern-contract'], {
+  valid: [
+    // dialog with name and an Escape handler in the component
+    `function Dialog({ onClose }) {
+      useEffect(() => { const onKey = (e) => { if (e.key === 'Escape') onClose() }; document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey) }, [])
+      return <div role="dialog" aria-modal="true" aria-labelledby="t"><h2 id="t">Title</h2></div>
+    }`,
+    // library primitive owns the contract
+    `function Wrapper() { return <Dialog.Content role="dialog" aria-label="x" onEscapeKeyDown={close} /> }`,
+    // menu button bound to state with ArrowDown handling
+    `function Menu() {
+      const [open, setOpen] = useState(false)
+      const onKey = (e) => { if (e.key === 'ArrowDown') setOpen(true) }
+      return <button aria-haspopup="menu" aria-expanded={open} onKeyDown={onKey}>작업</button>
+    }`,
+    // combobox bound + ArrowDown
+    `function Combo() {
+      const [open, setOpen] = useState(false)
+      return <input role="combobox" aria-expanded={open} aria-controls="l" onKeyDown={(e) => e.key === "ArrowDown" && setOpen(true)} />
+    }`,
+    // tabs with arrow handling, tab bound
+    `function Tabs() {
+      const [i, setI] = useState(0)
+      const onKey = (e) => { if (e.key === 'ArrowRight') setI(i + 1); if (e.key === 'ArrowLeft') setI(i - 1) }
+      return <div role="tablist"><button role="tab" aria-selected={i === 0} aria-controls="p0" onKeyDown={onKey}>A</button></div>
+    }`,
+    `function Switch() { const [on, setOn] = useState(false); return <button role="switch" aria-checked={on} onClick={() => setOn(!on)} /> }`,
+    `function Faq() { const [open, setOpen] = useState(false); return <button aria-expanded={open} aria-controls="faq" onClick={() => setOpen(!open)}>Q</button> }`,
+    // plain button: no pattern
+    'const Plain = () => <button onClick={go}>Go</button>',
+  ],
+  invalid: [
+    {
+      // menu-button.static-expanded fixture: literal never changes
+      code: `function Menu() { const [open, setOpen] = useState(false); return <button aria-haspopup="menu" aria-expanded="false" onKeyDown={(e) => e.key === 'ArrowDown' && setOpen(true)}>작업</button> }`,
+      errors: [
+        {
+          messageId: 'literalState',
+          data: {
+            pattern: 'menu-button',
+            attribute: 'aria-expanded',
+            stateName: 'expanded',
+            guidance: 'aria-expanded={open}으로 상태에 바인딩. 리터럴 문자열 금지.',
+          },
+        },
+      ],
+    },
+    {
+      // dialog without a name and without Escape
+      code: `function Dialog() { return <div role="dialog" aria-modal="true"><h2>Title</h2></div> }`,
+      errors: [{ messageId: 'missingAttribute' }, { messageId: 'missingKeyHandler' }],
+    },
+    {
+      // combobox.no-arrow: no ArrowDown anywhere in the component
+      code: `function Combo() { const [open, setOpen] = useState(false); return <input role="combobox" aria-expanded={open} aria-controls="l" onChange={() => setOpen(true)} /> }`,
+      errors: [
+        {
+          messageId: 'missingKeyHandler',
+          data: {
+            pattern: 'combobox',
+            keys: 'ArrowDown',
+            keyHint:
+              'ArrowDown / ArrowUp: 닫힘: 열기. 열림: option 이동 · Enter: 활성 option 선택 후 닫기 · Escape: 닫기(열림) / 값 지우기(닫힘, 선택) · Home / End: 입력 커서 처음/끝',
+          },
+        },
+      ],
+    },
+    {
+      // tabs.no-arrow
+      code: `function Tabs() { const [i, setI] = useState(0); return <div role="tablist"><button role="tab" aria-selected={i === 0} aria-controls="p0" onClick={() => setI(0)}>A</button></div> }`,
+      errors: [{ messageId: 'missingKeyHandler' }],
+    },
+    {
+      code: `const Tab = () => <button role="tab" aria-selected="true">A</button>`,
+      errors: [{ messageId: 'literalState' }, { messageId: 'missingAttribute' }],
+    },
+    {
+      code: `const S = () => <div role="switch" aria-checked={true} onClick={toggle} />`,
+      errors: [{ messageId: 'literalState' }],
+    },
+    {
+      code: `const S = () => <button role="switch" onClick={toggle} />`,
+      errors: [{ messageId: 'missingAttribute' }],
+    },
+    {
+      code: `const L = () => <ul role="listbox"><li role="option">S</li></ul>`,
+      errors: [{ messageId: 'missingKeyHandler' }, { messageId: 'missingAttribute' }],
+    },
+  ],
+})
+
+// ---------- interaction: pattern guess ----------
+ruleTester.run('interaction-pattern-guess', rules['interaction-pattern-guess'], {
+  valid: [
+    // dialog.ok fixture shape: overlay declares its role
+    `const D = ({ open }) => open && <div className="fixed inset-0"><div role="dialog" aria-modal="true">x</div></div>`,
+    `const M = ({ open }) => open && <ul role="menu"><li role="menuitem">a</li></ul>`,
+    // conditional plain content, not a widget
+    `const T = ({ ok }) => ok && <p>Saved</p>`,
+    `const P = ({ open }) => open && <div className="panel">detail</div>`,
+    // presentation-only decorated overlay
+    `const B = ({ busy }) => busy && <div className="fixed inset-0" role="presentation" />`,
+  ],
+  invalid: [
+    {
+      // div-soup.card-click fixture
+      code: `function Card() { const [open, setOpen] = useState(false); return <div><div className="bare" onClick={() => setOpen(true)}>Plan</div>{open && <div className="overlay"><div className="panel"><h2>Plan</h2></div></div>}</div> }`,
+      errors: [{ messageId: 'overlayWithoutRole' }],
+    },
+    {
+      code: 'const D = ({ open }) => open && <div className="fixed inset-0 bg-black/40"><div>x</div></div>',
+      errors: [{ messageId: 'overlayWithoutRole' }],
+    },
+    {
+      code: 'const D = ({ open }) => open && <div className={cn("fixed inset-0", open && "block")}>x</div>',
+      errors: [{ messageId: 'overlayWithoutRole' }],
+    },
+    {
+      code: "const D = ({ open }) => open && <div style={{ position: 'fixed', inset: 0 }}>x</div>",
+      errors: [{ messageId: 'overlayWithoutRole' }],
+    },
+    {
+      code: 'const M = ({ open }) => open && <ul className="popup"><li onClick={a}>복제</li></ul>',
+      errors: [{ messageId: 'listWithoutRole' }],
+    },
+  ],
+})

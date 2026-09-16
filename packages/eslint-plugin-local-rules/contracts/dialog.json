@@ -1,0 +1,59 @@
+{
+  "pattern": "dialog",
+  "sources": ["https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/"],
+  "identify": { "trigger": { "role": "button", "attrs": { "aria-haspopup": "dialog" } }, "self": { "role": "dialog" } },
+  "states": ["closed", "open"],
+  "steps": [
+    {
+      "id": "opens-focus-inside",
+      "when": "closed",
+      "action": "click-trigger",
+      "expect": { "self": { "visible": true }, "focus": "within-self" },
+      "guidance": "열리면 포커스를 dialog 안 첫 포커스 가능 요소(또는 dialog 자체 tabIndex=-1)로 옮긴다."
+    },
+    {
+      "id": "escape-closes",
+      "when": "open",
+      "key": "Escape",
+      "expect": { "self": { "visible": false } },
+      "guidance": "document keydown에서 Escape면 onClose. onEscapeKeyDown에서 preventDefault 하지 않는다."
+    },
+    {
+      "id": "focus-returns",
+      "when": "open",
+      "key": "Escape",
+      "expect": { "self": { "visible": false }, "focus": "trigger" },
+      "guidance": "닫힌 뒤 포커스를 연 트리거로 되돌린다. 열 때 document.activeElement를 ref에 저장."
+    },
+    {
+      "id": "tab-trapped",
+      "when": "open",
+      "key": "Tab",
+      "repeat": 12,
+      "expect": { "focus": "within-self" },
+      "guidance": "Tab 순환을 dialog 안에 가둔다. 첫/마지막 요소에서 반대편으로 순환."
+    },
+    {
+      "id": "has-name",
+      "when": "open",
+      "action": "none",
+      "expect": { "attr": { "target": "self", "name": "aria-labelledby|aria-label", "present": true } },
+      "guidance": "제목 요소 id를 aria-labelledby로 연결한다."
+    }
+  ],
+  "guidance": {
+    "keys": [
+      { "key": "Tab / Shift+Tab", "do": "dialog 안에서만 순환" },
+      { "key": "Escape", "do": "닫기, 포커스는 트리거로" }
+    ],
+    "roles": { "trigger": "button + aria-haspopup=dialog", "self": "dialog + aria-modal=true + aria-labelledby" },
+    "focus": "열 때 안으로, 닫을 때 트리거로. 바깥은 inert 또는 aria-hidden",
+    "css": {
+      "overlay": "position fixed inset 0, 반투명 배경, 스크롤 잠금",
+      "enter": "opacity 0→1 + translateY(8px)→0, 150–200ms ease-out",
+      "exit": "역방향 100–150ms",
+      "reduced-motion": "opacity만 또는 즉시",
+      "focus-visible": "dialog 안 컨트롤에 outline 2px"
+    }
+  }
+}

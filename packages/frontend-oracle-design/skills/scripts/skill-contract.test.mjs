@@ -523,11 +523,11 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.50.0')
+  assert.equal(version, '0.51.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
-  assert.equal(marketplace.version, '0.50.0')
+  assert.equal(marketplace.version, '0.51.0')
 })
 
 test('separates requested mechanism from intended outcome without letting the agent shrink scope', async () => {
@@ -690,6 +690,13 @@ test('gates approved hook encapsulation and reviews UI/business responsibility b
   assert.match(subagentReview, /micro-hook.*UI.*business logic/s)
   assert.match(subagentReview, /trivial wrapper.*giant hook/s)
   assert.doesNotMatch(subagentReview, /lint|hook-encapsulation|eslint-disable/)
+})
+
+test('reads the interaction contracts before implementing a widget', async () => {
+  const skill = await readFile(join(skillDirectory, 'SKILL.md'), 'utf8')
+  assert.match(skill, /eslint-plugin-local-rules\/contracts\/<pattern>\.json/)
+  assert.match(skill, /interaction-pattern-contract/)
+  assert.match(skill, /A contract is guidance, never policy/)
 })
 
 test('keeps Oracle control while consuming optional system-design references', async () => {

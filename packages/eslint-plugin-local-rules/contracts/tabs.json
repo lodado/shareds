@@ -1,0 +1,51 @@
+{
+  "pattern": "tabs",
+  "sources": ["https://www.w3.org/WAI/ARIA/apg/patterns/tabs/"],
+  "identify": { "self": { "role": "tablist" } },
+  "states": ["idle"],
+  "steps": [
+    {
+      "id": "arrow-moves",
+      "when": "idle",
+      "key": "ArrowRight",
+      "focusFirst": "role:tab",
+      "expect": { "activeItemMoved": true },
+      "guidance": "tab에 포커스 두고 ArrowRight/Left면 다음/이전 tab으로 포커스 이동, 끝에서 순환. roving tabindex."
+    },
+    {
+      "id": "selected-binding",
+      "when": "idle",
+      "action": "none",
+      "expect": { "role": { "name": "tab", "attrs": { "aria-selected": "true" }, "count": 1 } },
+      "guidance": "정확히 하나의 tab만 aria-selected=true. 상태에 바인딩."
+    },
+    {
+      "id": "panel-linked",
+      "when": "idle",
+      "action": "none",
+      "expect": { "role": { "name": "tabpanel", "visible": true } },
+      "guidance": "선택 tab의 aria-controls가 가리키는 tabpanel만 보인다. tabpanel에 aria-labelledby."
+    }
+  ],
+  "guidance": {
+    "keys": [
+      { "key": "Tab", "do": "tablist 진입 시 활성 tab 하나만, 다음 Tab은 tabpanel" },
+      { "key": "ArrowRight / ArrowLeft", "do": "tab 이동, 순환. 자동 활성화면 즉시 패널 교체" },
+      { "key": "Home / End", "do": "첫/마지막 tab" },
+      { "key": "Enter / Space", "do": "수동 활성화 모드에서만 패널 교체" }
+    ],
+    "roles": {
+      "self": "tablist",
+      "item": "tab + aria-selected + aria-controls",
+      "panel": "tabpanel + aria-labelledby"
+    },
+    "focus": "roving tabindex: 활성 0, 나머지 -1",
+    "css": {
+      "selected": "색 외 신호 1개 이상(밑줄·배경). 색만으로 구분 금지",
+      "hover": "selected와 다른 강도",
+      "indicator": "밑줄 이동은 transform translateX 150–200ms",
+      "focus-visible": "outline 2px + offset",
+      "reduced-motion": "indicator 즉시 이동"
+    }
+  }
+}

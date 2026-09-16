@@ -1,0 +1,38 @@
+{
+  "pattern": "switch",
+  "sources": ["https://www.w3.org/WAI/ARIA/apg/patterns/switch/"],
+  "identify": { "self": { "role": "switch" } },
+  "states": ["idle"],
+  "steps": [
+    {
+      "id": "space-toggles",
+      "when": "idle",
+      "key": " ",
+      "focusFirst": "self",
+      "expect": { "attr": { "target": "self", "name": "aria-checked", "toggled": true } },
+      "guidance": "Space로 aria-checked 토글. 네이티브면 <button role=switch> 또는 <input type=checkbox role=switch>."
+    },
+    {
+      "id": "click-toggles",
+      "when": "idle",
+      "action": "click",
+      "expect": { "attr": { "target": "self", "name": "aria-checked", "toggled": true } },
+      "guidance": "click도 같은 토글."
+    }
+  ],
+  "guidance": {
+    "keys": [
+      { "key": "Space", "do": "토글" },
+      { "key": "Enter", "do": "토글(권장, 선택)" }
+    ],
+    "roles": { "self": "switch + aria-checked + 라벨(aria-label 또는 label for)" },
+    "focus": "self",
+    "css": {
+      "thumb": "translateX 이동 150–200ms, 색은 on/off 둘 다 대비 3:1 이상",
+      "on-off": "색 외 신호(위치·아이콘)",
+      "focus-visible": "outline 2px + offset, 트랙 바깥으로",
+      "disabled": "opacity 0.5",
+      "reduced-motion": "thumb 즉시 이동"
+    }
+  }
+}

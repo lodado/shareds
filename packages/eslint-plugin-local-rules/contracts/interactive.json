@@ -1,0 +1,42 @@
+{
+  "pattern": "interactive",
+  "description": "Applies to every element with interactive intent (cursor:pointer, click handler, tabindex, or a native control) regardless of which widget pattern it turns out to be.",
+  "sources": [
+    "https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html",
+    "https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html",
+    "https://web.dev/articles/rail"
+  ],
+  "checks": [
+    {
+      "id": "focus-reachable",
+      "skipNative": true,
+      "guidance": "Tab 순회로 도달 가능해야 한다. 네이티브 button/a로 바꾸거나 tabIndex={0}을 준다."
+    },
+    {
+      "id": "key-activates",
+      "skipNative": true,
+      "guidance": "click과 같은 변화가 Enter와 Space에서도 나야 한다. onKeyDown에서 key === 'Enter' || key === ' '일 때 같은 핸들러를 호출한다. 네이티브 button은 자동."
+    },
+    {
+      "id": "focus-visible",
+      "guidance": ":focus-visible에서 outline 2px 이상 + outline-offset, 또는 box-shadow ring. outline: none 단독 금지. Tailwind: focus-visible:outline-2 focus-visible:outline-offset-2."
+    },
+    {
+      "id": "hover-feedback",
+      "guidance": "hover에서 background·color·transform·opacity·box-shadow·border 중 하나 이상이 바뀌어야 한다. 120–200ms transition."
+    },
+    {
+      "id": "role-name",
+      "guidance": "role(또는 네이티브 요소)과 accessible name이 있어야 한다. 텍스트가 없으면 aria-label."
+    },
+    {
+      "id": "latency",
+      "budgetMs": 100,
+      "guidance": "click 후 100ms 안에 보이는 변화(DOM 변경)가 있어야 한다. 비동기면 즉시 pending 상태(aria-busy 또는 disabled)를 켠다."
+    },
+    {
+      "id": "reduced-motion",
+      "guidance": "prefers-reduced-motion: reduce에서 transition-duration 0 또는 opacity만 남긴다."
+    }
+  ]
+}

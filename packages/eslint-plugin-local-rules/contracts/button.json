@@ -1,0 +1,33 @@
+{
+  "pattern": "button",
+  "sources": ["https://www.w3.org/WAI/ARIA/apg/patterns/button/"],
+  "identify": { "self": { "role": "button" } },
+  "states": ["idle"],
+  "steps": [
+    {
+      "id": "click-feedback",
+      "when": "idle",
+      "action": "click",
+      "expect": { "changed": true },
+      "guidance": "click 후 100ms 안에 DOM 변화 또는 aria-busy/disabled. 비동기 핸들러는 useTransition이나 pending state로 즉시 표시한다."
+    },
+    {
+      "id": "enter-activates",
+      "when": "idle",
+      "key": "Enter",
+      "expect": { "changed": true },
+      "guidance": "네이티브 button이면 자동. div라면 onKeyDown Enter/Space."
+    }
+  ],
+  "guidance": {
+    "keys": [{ "key": "Enter / Space", "do": "활성화. 네이티브 <button>이면 자동" }],
+    "roles": { "self": "button, 토글이면 aria-pressed" },
+    "css": {
+      "hover": "배경 또는 색 변화, 120–200ms",
+      "active": "scale(0.98) 또는 더 짙은 배경",
+      "focus-visible": "outline 2px + offset 2px",
+      "disabled": "opacity 0.5, cursor not-allowed, pointer-events 유지(툴팁 가능)",
+      "pending": "aria-busy=true + 스피너 또는 라벨 교체, 크기 고정"
+    }
+  }
+}

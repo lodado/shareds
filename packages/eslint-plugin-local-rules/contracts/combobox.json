@@ -1,0 +1,51 @@
+{
+  "pattern": "combobox",
+  "sources": ["https://www.w3.org/WAI/ARIA/apg/patterns/combobox/"],
+  "identify": { "self": { "role": "combobox" } },
+  "states": ["closed", "open"],
+  "steps": [
+    {
+      "id": "arrowdown-opens",
+      "when": "closed",
+      "key": "ArrowDown",
+      "expect": {
+        "attr": { "target": "self", "name": "aria-expanded", "equals": "true" },
+        "role": { "name": "listbox", "visible": true }
+      },
+      "guidance": "닫힌 상태에서 ArrowDown이면 listbox를 열고 aria-expanded=true."
+    },
+    {
+      "id": "arrow-moves",
+      "when": "open",
+      "key": "ArrowDown",
+      "expect": { "activeItemMoved": true },
+      "guidance": "열린 상태 ArrowDown/Up으로 option 이동. aria-activedescendant 또는 포커스 이동."
+    },
+    {
+      "id": "escape-closes",
+      "when": "open",
+      "key": "Escape",
+      "expect": { "attr": { "target": "self", "name": "aria-expanded", "equals": "false" }, "focus": "self" },
+      "guidance": "Escape면 listbox 닫고 포커스는 입력에 남긴다."
+    }
+  ],
+  "guidance": {
+    "keys": [
+      { "key": "ArrowDown / ArrowUp", "do": "닫힘: 열기. 열림: option 이동" },
+      { "key": "Enter", "do": "활성 option 선택 후 닫기" },
+      { "key": "Escape", "do": "닫기(열림) / 값 지우기(닫힘, 선택)" },
+      { "key": "Home / End", "do": "입력 커서 처음/끝" }
+    ],
+    "roles": {
+      "self": "combobox + aria-expanded + aria-controls + aria-autocomplete",
+      "list": "listbox, 항목 option + aria-selected"
+    },
+    "focus": "포커스는 입력에 고정, aria-activedescendant로 활성 option 표시",
+    "css": {
+      "active-option": "배경 변화(hover와 동일), 스크롤 따라가기(scrollIntoView block nearest)",
+      "open": "listbox는 입력과 같은 폭, 최대 높이 + overflow auto",
+      "enter": "opacity 100–150ms",
+      "focus-visible": "입력 ring 2px"
+    }
+  }
+}

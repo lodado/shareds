@@ -1,0 +1,41 @@
+{
+  "pattern": "disclosure",
+  "sources": ["https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/"],
+  "identify": {
+    "trigger": { "role": "button", "attrs": { "aria-expanded": "true|false" }, "notAttrs": ["aria-haspopup"] },
+    "self": { "role": "region|group|*", "byControls": true }
+  },
+  "states": ["closed", "open"],
+  "steps": [
+    {
+      "id": "toggle-opens",
+      "when": "closed",
+      "key": "Enter",
+      "focusFirst": "trigger",
+      "expect": {
+        "attr": { "target": "trigger", "name": "aria-expanded", "equals": "true" },
+        "self": { "visible": true }
+      },
+      "guidance": "Enter/Space로 aria-expanded 토글, aria-controls 대상이 보인다."
+    },
+    {
+      "id": "toggle-closes",
+      "when": "open",
+      "key": "Enter",
+      "focusFirst": "trigger",
+      "expect": { "attr": { "target": "trigger", "name": "aria-expanded", "equals": "false" } },
+      "guidance": "한 번 더 누르면 닫힌다. 포커스는 트리거에 유지."
+    }
+  ],
+  "guidance": {
+    "keys": [{ "key": "Enter / Space", "do": "토글" }],
+    "roles": { "trigger": "button + aria-expanded + aria-controls", "self": "id를 가진 콘텐츠, 필요하면 region" },
+    "focus": "트리거에 유지, 이동 없음",
+    "css": {
+      "chevron": "rotate(0→180deg) 150–200ms",
+      "content": "height auto 전환은 grid-template-rows 0fr→1fr 또는 즉시. max-height 해킹 금지",
+      "focus-visible": "outline 2px",
+      "reduced-motion": "즉시"
+    }
+  }
+}

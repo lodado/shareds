@@ -1,0 +1,39 @@
+{
+  "pattern": "listbox",
+  "sources": ["https://www.w3.org/WAI/ARIA/apg/patterns/listbox/"],
+  "identify": { "self": { "role": "listbox", "notInside": "combobox" } },
+  "states": ["idle"],
+  "steps": [
+    {
+      "id": "arrow-moves",
+      "when": "idle",
+      "key": "ArrowDown",
+      "focusFirst": "self",
+      "expect": { "activeItemMoved": true },
+      "guidance": "ArrowDown/Up으로 option 이동. 포커스 이동(roving) 또는 aria-activedescendant."
+    },
+    {
+      "id": "selected-binding",
+      "when": "idle",
+      "action": "none",
+      "expect": { "role": { "name": "option", "attrs": { "aria-selected": "true|false" }, "min": 1 } },
+      "guidance": "모든 option에 aria-selected를 상태로 바인딩."
+    }
+  ],
+  "guidance": {
+    "keys": [
+      { "key": "ArrowDown / ArrowUp", "do": "option 이동" },
+      { "key": "Home / End", "do": "첫/마지막" },
+      { "key": "Space / Enter", "do": "선택(단일은 이동 즉시 선택 가능)" },
+      { "key": "문자 입력", "do": "타입어헤드" }
+    ],
+    "roles": { "self": "listbox + aria-multiselectable(다중)", "item": "option + aria-selected" },
+    "focus": "listbox tabIndex=0 + aria-activedescendant, 또는 option roving",
+    "css": {
+      "selected": "배경 + 체크 아이콘, 색만 금지",
+      "active": "테두리 또는 outline (selected와 구분)",
+      "hover": "배경 약하게",
+      "scroll": "활성 option scrollIntoView nearest"
+    }
+  }
+}
