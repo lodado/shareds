@@ -92,7 +92,7 @@ module.exports = {
     docs: {
       description: 'flag a boolean-gated overlay or list that renders a widget without declaring its pattern role',
       category: 'Accessibility',
-      recommended: 'warn',
+      recommended: false,
     },
     schema: [],
     messages: {

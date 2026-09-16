@@ -15,7 +15,8 @@
     "./query": "./query.js",
     "./quality": "./quality.js",
     "./fsd": "./fsd.js",
-    "./strict-types": "./strict-types.js"
+    "./strict-types": "./strict-types.js",
+    "./interaction": "./interaction.js"
   },
   "files": [
     "index.mjs",
@@ -29,7 +30,8 @@
     "quality.js",
     "QUALITY.md",
     "fsd.js",
-    "strict-types.js"
+    "strict-types.js",
+    "interaction.js"
   ],
   "repository": {
     "type": "git",
@@ -41,7 +43,7 @@
   },
   "scripts": {
     "test": "node test.js",
-    "lint": "eslint index.mjs react.js next.js a11y.js turbo.js local-rules.js testing.js query.js quality.js fsd.js test.js strict-types.js"
+    "lint": "eslint index.mjs react.js next.js a11y.js turbo.js local-rules.js testing.js query.js quality.js fsd.js interaction.js test.js strict-types.js"
   },
   "dependencies": {
     "@antfu/eslint-config": "^9.3.0",

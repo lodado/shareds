@@ -2,6 +2,7 @@ module.exports = {
   'fsd-no-banned-segments': require('./fsd-no-banned-segments'),
   'fsd-no-deep-import': require('./fsd-no-deep-import'),
   'fsd-no-driver-outside-repository': require('./fsd-no-driver-outside-repository'),
+  'interaction-hover-needs-focus': require('./interaction-hover-needs-focus'),
   'interaction-pattern-contract': require('./interaction-pattern-contract'),
   'interaction-pattern-guess': require('./interaction-pattern-guess'),
   'no-action-in-state': require('./no-action-in-state'),

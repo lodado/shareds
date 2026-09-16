@@ -29,6 +29,7 @@ const main = async () => {
           'jsx-a11y/control-has-associated-label': 'off',
           '@lodado/local-rules/interaction-pattern-contract': 'error',
           '@lodado/local-rules/interaction-pattern-guess': 'error',
+          '@lodado/local-rules/interaction-hover-needs-focus': 'error',
         },
       },
     ],

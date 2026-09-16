@@ -621,3 +621,41 @@ ruleTester.run('interaction-pattern-guess', rules['interaction-pattern-guess'], 
     },
   ],
 })
+
+// ---------- interaction: hover needs focus ----------
+ruleTester.run('interaction-hover-needs-focus', rules['interaction-hover-needs-focus'], {
+  valid: [
+    'const A = () => <button className="hover:bg-gray-100 focus-visible:outline-2">x</button>',
+    'const A = () => <a href="/x" className="hover:underline focus:underline">x</a>',
+    'const A = () => <div role="button" tabIndex={0} className={cn("hover:bg-muted", "focus-visible:ring-2")}>x</div>',
+    'const A = ({ on }) => <button className={cn("base", on && "hover:bg-muted", "focus-visible:ring")}>x</button>',
+    // hover on a decorative element is fine - nothing focuses it
+    'const A = () => <span className="group-hover:opacity-100">x</span>',
+    // no hover styling at all
+    'const A = () => <button className="rounded px-3">x</button>',
+    // focus handled through a shared class the tokens still mention
+    'const A = () => <button className="control hover:bg-muted focus-within:ring">x</button>',
+  ],
+  invalid: [
+    {
+      code: 'const A = () => <button className="hover:bg-gray-100">x</button>',
+      errors: [{ messageId: 'hoverWithoutFocus', data: { token: 'hover:bg-gray-100' } }],
+    },
+    {
+      code: 'const A = () => <a href="/x" className="underline hover:text-blue-600">x</a>',
+      errors: [{ messageId: 'hoverWithoutFocus' }],
+    },
+    {
+      code: 'const A = () => <div role="button" tabIndex={0} className="hover:bg-muted">x</div>',
+      errors: [{ messageId: 'hoverWithoutFocus' }],
+    },
+    {
+      code: 'const A = () => <div onClick={go} className={cn("p-2", "md:hover:bg-muted")}>x</div>',
+      errors: [{ messageId: 'hoverWithoutFocus' }],
+    },
+    {
+      code: 'const A = ({ active }) => <button className={`base ${active ? "hover:bg-muted" : "hover:bg-gray-50"}`}>x</button>',
+      errors: [{ messageId: 'hoverWithoutFocus' }],
+    },
+  ],
+})

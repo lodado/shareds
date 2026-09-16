@@ -101,7 +101,7 @@ module.exports = {
       description:
         'require the source-visible parts of the WAI-ARIA pattern contract that a role or aria-haspopup declares',
       category: 'Accessibility',
-      recommended: 'warn',
+      recommended: false,
     },
     schema: [],
     messages: {
