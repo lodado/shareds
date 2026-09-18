@@ -20,17 +20,17 @@ test('locks editable-reference assembly, source inspection, and composability be
     readSkillFile('references/delivery-contract.md'),
   ])
 
-  assert.match(skill, /레퍼런스 조립[\s\S]*스크린샷[\s\S]*재그리기/)
-  assert.match(skill, /제품 스크린샷 등 실제 콘텐츠 에셋은 유지할 수 있다/)
-  assert.match(skill, /한방에[\s\S]*검증 생략/)
-  assert.match(composition, /화면·섹션 → 복합 컴포넌트 → primitive/)
-  assert.match(composition, /큰 단위[\s\S]*탐색[\s\S]*적용 node/)
-  assert.match(gate, /Figma Make[\s\S]*image fill[\s\S]*편집 가능한/)
-  assert.match(gate, /Hug→Fill[\s\S]*정렬[\s\S]*rotation[\s\S]*색상 override/)
-  assert.match(gate, /원본 레이어[\s\S]*로컬 파생 Variant/)
-  assert.match(critique, /구조[\s\S]*거절[\s\S]*즉시[\s\S]*mapping/)
-  assert.match(delivery, /라이브러리 연결[\s\S]*실제 재사용[\s\S]*시각 품질/)
-  assert.match(delivery, /공식[\s\S]*파생[\s\S]*linked instance \/ copied frame \/ local derivative/)
+  assert.match(skill, /Reference assembly[\s\S]*Never redraw[\s\S]*screenshot/i)
+  assert.match(skill, /product screenshots[\s\S]*content assets[\s\S]*may stay/i)
+  assert.match(skill, /one-shot[\s\S]*never waives verification/i)
+  assert.match(composition, /screen\/section → composite component → primitive/)
+  assert.match(composition, /Search[\s\S]*large unit[\s\S]*applied node/i)
+  assert.match(gate, /Figma Make[\s\S]*image fill[\s\S]*editable/i)
+  assert.match(gate, /Hug→Fill[\s\S]*alignment[\s\S]*rotation[\s\S]*color override/i)
+  assert.match(gate, /local derivative Variant[\s\S]*original layers/i)
+  assert.match(critique, /Rejected[\s\S]*structure[\s\S]*mapping immediately/i)
+  assert.match(delivery, /Library linkage[\s\S]*actual reuse[\s\S]*visual quality/i)
+  assert.match(delivery, /official librar[\s\S]*derivative[\s\S]*linked instance \/ copied frame \/ local derivative/i)
 })
 
 async function walk(directory) {
@@ -49,10 +49,10 @@ test('routes only Figma-first design requests and forbids silent code or image s
 
   assert.match(skill, /name: reference-driven-figma-design/)
   assert.match(skill, /editable Figma product or landing designs/)
-  assert.match(skill, /React, HTML\/CSS, Tailwind, Next\.js/)
-  assert.match(skill, /PNG, 설명 문서, 코드, 이미지 생성물은 편집 가능한 Figma를 대신하지 못한다/)
-  assert.match(skill, /Figma read\/write가 필수/)
-  assert.match(skill, /Figma write가 없으면 상태를 BLOCKED/)
+  assert.match(skill, /React[\s\S]*HTML\/CSS[\s\S]*Next\.js[\s\S]*Tailwind/)
+  assert.match(skill, /PNG, docs, code, generated images never replace editable Figma/i)
+  assert.match(skill, /requires Figma read\/write/i)
+  assert.match(skill, /No write → BLOCKED/)
   assert.doesNotMatch(skill, /\[TODO:/)
 })
 
@@ -60,14 +60,14 @@ test('preserves the source hierarchy and separates visual system from compositio
   const skill = await readSkillFile('SKILL.md')
   const authority = [
     'PRD / Product Requirements',
-    '승인된 Brand Direction',
-    '기존 내부 Design Assets',
-    '선택된 Figma Base Template',
-    '기존 Figma Variables / Components',
-    '승인된 이전 디자인 패턴',
+    'approved Brand Direction',
+    'existing internal Design Assets',
+    'selected Figma Base Template',
+    'existing Figma Variables / Components',
+    'approved previous design patterns',
     'Refero References',
-    'Aside/Browser로 조사한 외부 References',
-    '새로운 디자인 결정',
+    'external References via Aside/Browser',
+    'new design decisions',
   ]
 
   let cursor = -1
@@ -77,9 +77,9 @@ test('preserves the source hierarchy and separates visual system from compositio
     cursor = index
   }
 
-  assert.match(skill, /Visual System.*내부 시스템.*Figma Base Template/s)
-  assert.match(skill, /Composition.*Refero.*외부 사례/s)
-  assert.match(skill, /외부의 색·폰트·radius·shadow를 함께 복사하지 않는다/)
+  assert.match(skill, /Visual System.*internal system.*Figma Template/s)
+  assert.match(skill, /Composition.*Refero.*external examples/s)
+  assert.match(skill, /Never copy external color, font, radius, shadow/i)
 })
 
 test('runs internal-first research, a three-section pilot, bounded critique, and asset promotion', async () => {
@@ -93,10 +93,10 @@ test('runs internal-first research, a three-section pilot, bounded critique, and
 
   assert.match(research, /Existing Component Catalog[\s\S]*Existing Figma Library[\s\S]*Refero/)
   assert.match(research, /preview-only[\s\S]*structure-inspected[\s\S]*editable-verified/)
-  assert.match(composition, /합의 범위의 1–3개 section/)
-  assert.match(skill, /가장 영향이 큰 문제 3개/)
-  assert.match(critique, /2–4회의 의미 있는 반복/)
-  assert.match(critique, /전체 page를 다시 생성하지 않는다/)
+  assert.match(composition, /1–3 sections\/states within agreed scope/)
+  assert.match(skill, /3 highest-impact problems/)
+  assert.match(critique, /2–4 meaningful iterations/)
+  assert.match(critique, /don't regenerate the whole page/i)
   assert.match(learning, /Experiment → Real Page Usage → Visual Critique → Reuse Evaluation → Approved Pattern/)
   assert.match(learning, /Component Name/)
   assert.match(learning, /Avoid When/)
@@ -217,21 +217,24 @@ test('requires taxonomy interpretation, separate screen evidence, adaptation and
   const workflow = await readSkillFile('references/taxonomy-reference-workflow.md')
   assert.match(main, /references\/taxonomy-reference-workflow\.md/)
   for (const heading of [
-    '## 1. 사전 해석과 무결성',
-    '## 2. 키워드를 검색 의도로 변환',
-    '## 3. 화면 근거와 컴포넌트 출처를 분리',
-    '## 4. 능동적인 응용의 범위',
-    '## 5. 비교 파일럿과 완료 게이트',
+    '## 1. Dictionary interpretation integrity',
+    '## 2. Translate keywords into search intent',
+    '## 3. Separate screen evidence from component sources',
+    '## 4. Scope active adaptation',
+    '## 5. Comparison pilot completion gate',
   ]) {
     assert.ok(workflow.includes(heading), heading)
   }
-  assert.match(workflow, /taxonomy는 시각 증거가 아니고, UI Kit import는 화면 구성의 근거가 아니다/)
-  assert.match(workflow, /로컬 파생 컴포넌트/)
+  assert.match(
+    workflow,
+    /Taxonomy entries aren't visual evidence[\s\S]*UI-kit import isn't screen-construction evidence/,
+  )
+  assert.match(workflow, /local derivative component/i)
   assert.match(workflow, /HOLD/)
   assert.match(workflow, /INCOMPLETE/)
-  assert.match(workflow, /작은 수정은 기존 근거를 재사용/)
-  assert.match(workflow, /프롬프트 실행 계약/)
-  assert.match(workflow, /실제 Figma 실행·시각 품질이 검증됐다는 뜻이 아니다/)
+  assert.match(workflow, /Small[\s\S]*non-structural fixes[\s\S]*reuse existing rationale/i)
+  assert.match(workflow, /prompt execution contract/i)
+  assert.match(workflow, /real Figma execution or visual quality was[\s\S]*verified/i)
   for (const file of [
     'research-selection.md',
     'figma-composition.md',
@@ -265,7 +268,7 @@ test('ships source fingerprints and local resolution without redistributing dict
   assert.equal(names.filter((name) => name.endsWith('taxonomy.md')).length, 8)
   await access(join(skillDirectory, 'scripts/resolve_dictionary.py'))
   const workflow = await readSkillFile('references/taxonomy-reference-workflow.md')
-  assert.match(workflow, /Git이나 플러그인 패키지에 원문을 넣지 않는다/)
+  assert.match(workflow, /local-only[\s\S]*never committed to Git or shipped/i)
   assert.match(workflow, /FIGMA_DESIGN_DICTIONARY/)
   const repositoryDirectory = dirname(dirname(packageDirectory))
   if (packageDirectory === join(repositoryDirectory, 'packages/frontend-interface-design')) {

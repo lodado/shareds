@@ -21,11 +21,11 @@ def check():
     assert "references/taxonomy-reference-workflow.md" in main, "unreachable mandatory workflow"
     contract = guide.read_text()
     for heading in (
-        "## 1. 사전 해석과 무결성",
-        "## 2. 키워드를 검색 의도로 변환",
-        "## 3. 화면 근거와 컴포넌트 출처를 분리",
-        "## 4. 능동적인 응용의 범위",
-        "## 5. 비교 파일럿과 완료 게이트",
+        "## 1. Dictionary interpretation integrity",
+        "## 2. Translate keywords into search intent",
+        "## 3. Separate screen evidence from component sources",
+        "## 4. Scope active adaptation",
+        "## 5. Comparison pilot completion gate",
     ):
         assert heading in contract, heading
     for filename in ("research-selection.md", "figma-composition.md", "critique-refinement.md", "delivery-contract.md"):

@@ -1,55 +1,23 @@
-# Visual direction — 작은 대안을 비교하고 선택한 영역만 고친다
+# Visual direction — compare small alternatives, fix only the chosen area
 
-HCI는 과업·행동·복구를, 시각 방향은 위계·비율·밀도·타이포그래피·이미지 구성을 결정한다.
-텍스트 와이어프레임만으로 미감이나 시각 품질이 검증됐다고 하지 않는다.
+## 1. Are alternatives needed?
 
-## 1. 시각 대안이 필요한가?
+- Direction undecided or alternatives requested → 2–3 options in one section. Count is guidance; short on valid alternatives → say so. Color-swapped copies, arbitrary placement variants, mixed external styles: not strategies.
+- FIDELITY/ASSEMBLE and small fixes inside an approved direction or named template keep the existing option. "Make it prettier" releases no preserve condition.
+- Brand-locked exploration keeps color, type, tokens; varies proportion, placement, density only. [Edit contract](edit-contract.md) allowances win.
 
-- 시각 방향이 미정이거나 사용자가 대안을 요청했다면 대표 구간에서 보통 2–3안을 비교한다.
-  개수는 권장치다. 유효한 대안이나 자산이 부족하면 부족하다고 기록하고 같은 안을 복제해 수량을 채우지 않는다.
-- 승인된 방향·지정 템플릿을 유지하는 FIDELITY/ASSEMBLE/작은 수정은 기존안을 따른다.
-  “더 예쁘게” 같은 피드백을 보존 조건 해제나 전체 재디자인 허가로 해석하지 않는다.
-- 브랜드가 고정된 탐색은 색·서체·토큰을 유지하고 허용된 비율·배치·밀도 안에서만 비교한다.
-  [Edit contract](edit-contract.md)의 허용 범위가 우선이며, 불명확한 핵심 변경만 확인한다.
+## 2. Explain → compare sources → alternatives → select → expand
 
-## 2. 설명 → 원본 비교 → 시각 대안 → 선정 → 확장
+1. Wireframes from [HCI pre-design](hci-wireframe-workflow.md), the visual question, fixed conditions, per-option hypothesis — in conversation, before any write. Stated wait-for-review: research yes, writes no.
+2. Compare sources per [component source gate](component-source-gate.md); alternatives come from the editable source. Alternative comparison never replaces it.
+3. One representative section + key states in a Figma Working/Experiment area, not whole pages. Same content, images, viewport, state every option; unavoidable differences logged as confounders.
+4. Readable captures side by side; per option gain, loss, task fit, basis. Select within delegated scope; user choice required → wait. Agent selection is not approval or a usability test.
+5. Verify the pilot, then expand. Update wireframes when structure changes; no unrequested features.
 
-1. [HCI 사전 설명](hci-wireframe-workflow.md)의 와이어프레임과 함께
-   **비교할 시각적 질문, 고정 조건, 각 안의 가설**을 먼저 대화에 보여준다.
-   명시된 검토 대기 조건은 이 시점부터 지킨다. 조사·원본 읽기는 가능하지만 대상 쓰기는 먼저 하지 않는다.
-2. 설명 뒤 [출처 게이트](component-source-gate.md)의 실제 반입·동일 콘텐츠 비교를 수행한다.
-   편집 가능한 원본과 허용 변형으로 대안을 만든다. 출처 비교를 시각 대안 비교로 대체하지 않는다.
-3. 전체 페이지 대신 같은 대표 구간/핵심 상태를 Figma Working/Experiment 영역에서 비교한다.
-   같은 콘텐츠·이미지·viewport·상태를 쓰고 고정된 조건을 유지한다. 비교를 유리하게 만들려고
-   한 안에서만 문구를 줄이거나 가짜 수치·이미지를 넣지 않는다. 필요한 차이는 교란 요인으로 기록한다.
-4. 읽을 수 있는 실제 캡처를 나란히 보고 각 안의 장점·손실·과업 적합성·근거를 설명한다.
-   위임받은 범위에서는 추천안을 선정해 계속하고, 사용자 선택 대기가 명시되어 있으면 기다린다.
-   에이전트 선정은 사용자 승인이나 사용성 테스트가 아니다.
-5. 선정한 방향으로 pilot을 검증한 뒤 전체 범위로 확장한다.
-   주요 구조가 바뀌면 와이어프레임과 변경 이유를 갱신하며, 원래 요구에 없던 기능은 추가하지 않는다.
+Reference Log per option, real frame/capture locations: option, task hypothesis, adopted source/principle, fixed vs changed conditions, gain/loss, decision (selected/rejected/unverified). Delivery frame separate from exploration; no rejected option promoted to approved asset. Without Figma write: hypotheses and comparison plan only, review incomplete. HTML or images never substitute for editable Figma.
 
-비교 질문 예시: “실제 제품 증거를 더 크게 보여줄 것인가, 설명의 읽기 순서를 더 강조할 것인가?”
-이는 현재 과업에 둘 다 적합할 때의 예시다. 색만 바꾼 세 장, 의미 없는 카드 배치 차이,
-외부 사이트들의 스타일 혼합을 서로 다른 디자인 전략으로 포장하지 않는다.
+## 3. Targeted feedback
 
-| 안  | 과업에 대한 가설       | 채택한 출처·원리                 | 고정/변경 조건            | 관찰한 장점·손실             | 결정             |
-| --- | ---------------------- | -------------------------------- | ------------------------- | ---------------------------- | ---------------- |
-| A/B | 먼저 인식시키려는 정보 | 실제 URL/frame 및 채택·기각 이유 | 콘텐츠·브랜드·viewport 등 | 위계·가독성·밀도·행동 발견성 | 선정/제외/미검증 |
+Max-three top issues and partial-fix rule from [critique loop](critique-refinement.md). Phrase as `target frame/node or capture number → observed problem → task impact → what changes → what is preserved`.
 
-같은 Reference Log에 위 표와 실제 후보 frame/capture 위치를 남긴다. 최종 전달 frame과 탐색안을 구분하고
-탈락안을 승인된 자산으로 승격하지 않는다. 새 카탈로그·스키마·대안 생성 앱은 만들지 않는다.
-Figma write가 없으면 텍스트 가설·비교 계획만 준비하고 시각 대안 검토는 미완료로 남긴다.
-HTML·이미지 생성물로 편집 가능한 Figma 결과를 대체하지 않는다.
-
-## 3. 추상적 취향 대신 선택 영역과 관찰 가능한 차이를 수정한다
-
-[기존 비평 루프](critique-refinement.md)의 최대 3개 주요 문제와 부분 수정 규칙을 재사용한다.
-피드백은 `대상 frame/node 또는 캡처 번호 → 관찰한 문제 → 과업 영향 → 변경할 것 → 보존할 것`으로 바꾼다.
-주석·선택 영역 도구가 실제 있으면 활용하고, 없으면 번호와 node 위치를 명시한다. 없는 도구를 가정하지 않는다.
-
-예: “캡처 2의 카드가 제목보다 먼저 보여 핵심 메시지가 약하다. 카드의 강조를 줄이고
-CTA를 설명과 가까이 배치한다. 브랜드 색·서체·문구와 나머지 섹션은 유지한다.”
-
-변경 전후를 **같은 콘텐츠·viewport·상태**로 확인한다. 개선 근거가 없으면 성공이라고 보고하지 않는다.
-한 프레임의 수정을 위해 전체 페이지를 재생성하지 않는다. 구조적 부적합이면 기존 규칙대로 mapping을 다시 연다.
-실제 prototype의 동작 검증, 시각 자체 비평, 사용자 테스트, 제품 코드 QA는 별개다.
+Before and after on the **same content, viewport, and state**. No evidence of improvement → no success report. Never regenerate a page to fix one frame; structural misfit reopens mapping.

@@ -11,10 +11,10 @@ test('edit contract is reachable and separates preservation from redesign', asyn
   for (const mode of ['ASSEMBLE', 'LOCALIZE', 'FIDELITY', 'RESKIN', 'REDESIGN']) {
     assert.ok(contract.includes(mode), mode)
   }
-  assert.match(contract, /통합 요청 자체는 그 근거가 아니다/)
-  assert.match(contract, /미완료·완료를 구분하지 못하는 동안 다시 붙여넣지 않는다/)
-  assert.match(contract, /전송 실패를 다른 템플릿 재제작으로 우회하지 않는다/)
-  assert.match(contract, /컴포넌트 연결 성공은 원본 디자인 충실도나 제품 완성도의 증거가 아니다/)
+  assert.match(contract, /integration request is not grounds/i)
+  assert.match(contract, /incomplete vs complete[\s\S]*no re-paste/i)
+  assert.match(contract, /No rebuilding another template around a failure/i)
+  assert.match(contract, /Component linkage success is no evidence of design fidelity or completeness/i)
   for (const term of [
     'Source gate',
     'Fidelity gate',
@@ -23,7 +23,7 @@ test('edit contract is reachable and separates preservation from redesign', asyn
     'Pasting',
     'read-back',
     'Noto',
-    '미검증',
+    'unverified',
   ]) {
     assert.ok(contract.includes(term), term)
   }

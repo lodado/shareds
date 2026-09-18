@@ -1,138 +1,48 @@
-# Research and selection — 내부 자산부터 검증 가능한 후보를 고른다
+# Research and selection — pick verifiable candidates, internal assets first
 
-## 1. 검색 순서
+Read first: [taxonomy → reference → adaptation](taxonomy-reference-workflow.md).
 
-먼저 [taxonomy 기반 검색·응용 계약](taxonomy-reference-workflow.md)을 읽고 필요한 항목만 해석한다.
-아래 내부 인벤토리가 우선이며, 부족한 구성은 실제 화면 검색으로, 부족한 자산은 컴포넌트 검색으로 분기한다.
-taxonomy ID를 모든 MCP에 그대로 보내거나 문서 전체를 검색어 체크리스트로 쓰지 않는다.
+## 1. Search order
 
-자산 탐색의 우선순위는 다음과 같다. 화면 구성 조사는 별도로 Refero → Aside/Browser를 따른다.
+Internal inventory first; missing composition → real-screen search, missing assets → component search. Don't send taxonomy IDs to every MCP or treat the doc as a search-term checklist.
 
 1. Existing Component Catalog
 2. Existing Figma Library
 3. Existing Approved Patterns
-4. 현재 파일의 template, variables, components, variants
-5. 필요한 역할의 외부 Figma Library / Community / 공식 UI Kit (실제 편집 자산)
-6. 출처 게이트가 허용한 검증 출처의 변형·재조합 / 로컬 파생 컴포넌트
+4. Current file's templates/variables/components/variants
+5. External Figma Library / Community / official UI Kit (real editable assets)
+6. Gate-approved variation/recombination / local derivative of a verified source
 
-사전 용어, 관찰한 화면, 편집 가능한 자산은 서로를 대신하지 않는다. 적합한 내부 화면이 있다면 외부 화면 검색
-수량을 채울 필요는 없지만, 실제 구성 근거 없이 자산 import만으로 선택을 완료하지 않는다.
+Terminology, observed screens, and editable assets don't substitute for each other; asset import alone doesn't finish selection. Skip external search for a role only when the internal asset is **verified and no comparison was requested**; otherwise apply the [component source gate](component-source-gate.md). A filled search count isn't a pass.
 
-적합한 내부 자산이 **검증됐고 외부 비교 요청도 없을 때만** 그 역할의 외부 검색을 생략한다.
-그 외에는 [필수 컴포넌트 출처 게이트](component-source-gate.md)를 적용한다. 외부 컴포넌트 탐색과
-구도 리서치는 별개이며, 검색 개수만 채워도 통과하는 것이 아니다.
+## 2. Internal inventory
 
-## 2. 내부 인벤토리
+Read real structure with Figma tools. Same name isn't same role — verify the instance's component, property, variant, auto layout, variable binding.
 
-Figma 도구로 실제 구조를 읽고 다음을 기록한다.
+## 3. Base Figma template selection
 
-| 자산               | 확인할 내용                                                  |
-| ------------------ | ------------------------------------------------------------ |
-| Foundations        | colors, typography, spacing, radius, grid, elevation과 mode  |
-| Primitives         | button, badge, icon, input, avatar, product frame            |
-| Components         | navigation, card, feature, integration, screenshot container |
-| Marketing Patterns | hero, feature, product demo, workflow, comparison, CTA       |
-| Approved Pages     | 실제 승인된 page/frame와 적용 범위                           |
-| Experiments        | 아직 승격되지 않은 pattern과 사용 이력                       |
+Internal assets cover the range → select `internal-default` as Visual Source of Truth, skip external search. Otherwise search Figma Community, official UI Kits, trusted template libraries, SaaS kits. Score 0–5 weighted: Content/Product fit (20), Visual/Brand fit (15), Structural quality — real Auto Layout/Variables/Components/Variants (20), Coverage (10), Responsive readiness (10), Editability (10), Adaptation cost (10), Access/Rights (5).
 
-이름이 비슷하다는 이유만으로 역할이 같다고 단정하지 않는다. instance가 가리키는 component,
-property, variant, auto layout, variable binding을 실제로 확인한다.
+Compare the top 2–3; candidate count isn't a target. Inspect strong candidates' internal structure. Mark web-preview-only `preview-only`, internally inspected `structure-inspected`, duplicated/edited `editable-verified`. Prefer simple + well-structured over flashy + badly structured. The selected template becomes the Visual Source of Truth.
 
-## 3. Base Figma Template 자동 선정
+## 4. Section reference research
 
-내부 자산이 요구 범위를 충족하면 그것을 `internal-default` Visual Source of Truth로 선택하고
-외부 template 검색을 생략한다. 내부 자산이 부족하고 사용자가 지정하지 않았으면 Figma Community, 공식 UI Kit, 신뢰할 수 있는
-template library, SaaS landing/product kit를 찾는다. “가장 예쁜 것”이 아니라 아래 기준을 0–5로
-평가한다.
+Find candidates for sections internal assets can't cover, plus any section the user asked to compare. Component-fit gaps need real comparison of 2+ candidates at the [source gate](component-source-gate.md); a composition table doesn't substitute.
 
-| 기준                 | 비중 | 판정 질문                                                              |
-| -------------------- | ---: | ---------------------------------------------------------------------- |
-| Content/Product fit  |   20 | PRD의 콘텐츠 유형과 screenshot을 자연스럽게 담는가                     |
-| Visual/Brand fit     |   15 | 승인 방향으로 낮은 비용에 조정 가능한가                                |
-| Structural quality   |   20 | Auto Layout, Variables, Components, Variants, Properties가 실제 있는가 |
-| Coverage             |   10 | 필요한 section/state를 충분히 제공하는가                               |
-| Responsive readiness |   10 | desktop/mobile 구조와 adaptation 가능성이 있는가                       |
-| Editability          |   10 | detach나 one-off 재작업 없이 agent와 사람이 편집 가능한가              |
-| Adaptation cost      |   10 | 실제 copy/assets 적용과 customisation 비용이 합리적인가                |
-| Access/Rights        |    5 | 실제 접근·복제·편집·사용 권한을 확인했는가                             |
+Sections: Product Screenshot Hero, Developer Tool Hero, Workflow/Product Demo, Before/After/Comparison, Version History/Diff, Integrations/Technical Explanation, Evidence/CTA.
 
-상위 2–3개를 비교하되 후보 수를 최적값으로 취급하지 않는다. 강한 후보는 Figma 도구로 내부
-구조를 검사한다. 웹 preview만 본 후보는 `preview-only`, 내부를 읽은 후보는
-`structure-inspected`, 실제 복제·편집까지 확인한 후보는 `editable-verified`로 표시한다.
+Per candidate: problem solved, focal point, hierarchy, density, product treatment (crop/frame/annotation/scale), CTA placement, responsive behavior, fit, adaptation cost, adopt/reject, evidence (real URL/file/page/frame + observed state).
 
-화려하지만 구조가 나쁜 template보다 단순해도 variables/components/auto layout이 잘 구축된
-template을 우선한다. 선택된 template은 이후 Visual Source of Truth다.
+Refero is the primary composition/hierarchy researcher — only a real connected Refero MCP or authenticated `styles.refero.design` session, access result recorded. No fit case, or state/interaction/responsive unverifiable → open the real service and library in Aside/Browser. A search snippet or static screenshot doesn't confirm interaction.
 
-## 4. 섹션별 Reference Research
+## 5. Reference selection
 
-내부 자산으로 부족한 중요한 섹션과 사용자가 비교를 요청한 부분에 후보를 찾는다.
-컴포넌트 적합성 부족은 출처 게이트의 서로 다른 2곳 이상 실제 후보 비교가 필수이며,
-아래 composition 비교표만 작성해서 이를 대체하지 않는다.
+Compare on the same 0–5 scale: Content Fit, Information Hierarchy, Visual Hierarchy, Product Screenshot Compatibility, Responsive Behavior, Communication Effectiveness, Current Design System Compatibility, Existing Component Reusability, Adaptation Cost.
 
-- Product Screenshot Hero
-- Developer Tool Hero
-- Workflow / Product Demo
-- Before/After / Comparison
-- Version History / Diff Visualization
-- Integrations / Technical Explanation
-- Evidence / CTA
-
-각 후보에 다음을 기록한다.
-
-| 항목              | 분석                                         |
-| ----------------- | -------------------------------------------- |
-| problem           | 어떤 communication/user problem을 해결하는가 |
-| focal point       | 첫 시선과 가장 큰 시각 면적은 무엇인가       |
-| hierarchy         | 어떤 크기·정렬·그룹 관계 때문에 읽히는가     |
-| density           | copy, control, image의 밀도와 리듬           |
-| product treatment | screenshot crop, frame, annotation, scale    |
-| CTA               | 위치, 우선순위, product evidence와의 관계    |
-| responsive        | 좁은 화면의 순서·축소·생략·재배치            |
-| fit               | 현재 PRD와 실제 assets에 맞는가              |
-| adaptation        | 현재 Figma system으로 번역하기 쉬운가        |
-| adopt             | 가져올 구조적 원리                           |
-| reject            | 복사하지 않을 visual/brand 요소              |
-| evidence          | 실제 URL/file/page/frame와 관측 상태         |
-
-Refero는 composition과 hierarchy의 우선 조사원이다. 실제로 연결된 Refero MCP 또는 인증된
-`styles.refero.design` session만 사용하고 접근 결과를 기록한다. 적절한 사례가 없거나
-state/interaction/responsive를 확인할 수 없으면 Aside/Browser로 실제 서비스와 관련 library를 연다.
-검색 snippet이나 정적 screenshot만으로 interaction을 확인했다고 하지 않는다.
-
-## 5. Reference Selection
-
-다음 항목을 같은 0–5 척도로 비교한다.
-
-- Content Fit
-- Information Hierarchy
-- Visual Hierarchy
-- Product Screenshot Compatibility
-- Responsive Behavior
-- Communication Effectiveness
-- Current Design System Compatibility
-- Existing Component Reusability
-- Adaptation Cost
-
-점수는 판단 보조다. hard constraint를 위반한 후보는 합계가 높아도 제외한다. 선택 이유는
-“예뻐서”가 아니라 어떤 사용자 질문을 어떤 구조로 해결하며 기존 component로 어떻게 옮길 수
-있는지로 쓴다.
+Scores aid judgment; a hard-constraint violation excludes a candidate regardless of total. Give the reason as which question which structure solves and how it maps to existing components, not "prettier."
 
 ## 6. Reference Log
 
-각 주요 섹션에 다음을 Figma의 지정된 Reference Log page/section 또는 승인된 catalog 위치에
-남긴다.
+Record per major section — column list in [taxonomy-reference-workflow.md](taxonomy-reference-workflow.md). Component changes add the [source gate's evidence row](component-source-gate.md#required-evidence-row) to the same log; no separate catalog.
 
-- Section
-- Selected Reference
-- Source와 관측 상태
-- Problem Solved
-- Structural Principle Reused
-- What Was NOT Copied
-- Figma Components Used
-- Selection Reason
-
-컴포넌트 변경은 [출처 게이트의 증거 행](component-source-gate.md#필수-증거-행)을 같은 로그에 추가한다.
-별도 중복 카탈로그는 만들지 않는다.
-
-여러 reference를 사용해도 최종 visual system은 하나여야 한다. Reference Log는 외부 디자인
-언어가 섞이는 것을 막는 decision record다.
+Multiple references, one final visual system — the Reference Log keeps external design languages from mixing.

@@ -55,3 +55,8 @@ packages/frontend-interface-design/skills/reference-driven-figma-design/referenc
 
 # Scratch Next app used to render and drive the interaction examples locally.
 clone-lab/
+
+# oh-my-codex runtime state (plans stay tracked)
+.omx/state/
+.omx/logs/
+.omx/metrics.json

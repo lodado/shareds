@@ -1,101 +1,56 @@
-# Component source gate — 부족하면 외부 실제 자산부터
+# Component source gate — go external first when thin
 
-이 게이트는 컴포넌트 채택/변경의 선행조건이다. 템플릿 보존은 그 템플릿의 형태만 쓰라는 뜻이 아니다.
-보존할 시각 언어와 교체 가능한 구조를 구분한다. 본 시안 적용 전에 별도 비교 영역에서 판정한다.
+Precondition for component adoption/change. Separate visual language to preserve from swappable structure; judge in a separate comparison area before applying to the comp.
 
-## 1. 적용 여부를 실제 구조로 판정
+## 1. Judge fit by real structure
 
-후보 이름·표지·검색 썸네일은 편집 가능성의 증거가 아니다. Figma Make 산출물과 native Design을 구분하고, Design 파일도 목표 UI의 자식 레이어와 image fill을 확인한다.
-편집 가능한 외곽 frame 안에 보드 전체 이미지가 든 경우 그 보드는 편집 가능한 조립 후보가 아니다. 일부 위젯만 native라면 그 단위만 인정한다. 스크린샷 자료는 화면 근거로 남길 수 있지만 유효한 조립 후보 수에는 넣지 않는다.
+Name/cover/thumbnail aren't editable candidates. Distinguish `Figma Make` output from native Design; check child layers/`image fill` against target UI. Whole-board image in an editable outer frame isn't editable. Screenshot is screen evidence only, never an assembly candidate.
 
-변경하려는 역할마다 사용자 작업, 실제 콘텐츠/에셋, 필요한 상태, 합의된 기기/폭을 적고
-후보의 file/page/node ID, type, parent, 조상까지의 visible, Auto Layout, font, property를 읽는다.
-`FRAME`, `COMPONENT`, `COMPONENT_SET`, `INSTANCE`를 구분하고 instance의 main component를 확인한다.
-Variant 속성은 component set 또는 독립 component에서 읽는다. 이름·과거 ID로 구조를 추측하지 않는다.
+Per role record user task, real content, needed states, device/width. Read candidate file/page/node ID, type, parent, ancestor visibility, Auto Layout, font, properties — valid IDs only, never guessed from a name. Distinguish `FRAME`, `COMPONENT`, `COMPONENT_SET`, `INSTANCE`; check instance main component; read Variant properties from the set.
 
-다음 중 하나면 **외부 후보 비교가 필수**다:
+External comparison **required** when internal structure fails role/content/state/device fit, fit is unverified (unverified ≠ fit), or the user asked for it. Verified internal fit + no request → reuse as `internal-fit`. Prohibited-import or exact-original instructions win — report conflict, hold what can't be met. No research for a trivial typo/spacing fix.
 
-- 내부 구조가 역할, 콘텐츠 길이/이미지 유무, 필요한 상태 또는 대상 기기를 충족하지 못한다.
-- 충족 여부가 미확인이다. 먼저 내부를 검사하고, 미확인을 적합으로 간주하지 않는다.
-- 사용자가 외부 템플릿/컴포넌트/다른 시안 비교를 요청했다. 내부가 적합해도 요청을 생략하지 않는다.
+## 2. Explore → import → compare
 
-역할/상태/기기가 맞는 내부 구조가 검증됐고 외부 비교 요청도 없으면 `internal-fit` 근거로 재사용한다.
-외부 반입 금지나 정확한 원본 보존 지시가 있으면 그 범위를 우선한다. 그 안에서 요구를 못 채우면
-모순을 보고하고 해당 부분을 보류한다. 작은 오타/간격 수정에 후보 수를 채우기 위한 리서치를 강제하지 않는다.
+[hci-wireframe-workflow](hci-wireframe-workflow.md) targets do steps 1–2 plus a read-only rights/original check first. **Steps 3–4 write to the target Figma** — only after wireframe/candidate evidence and any stated review-wait. Pre-check candidates are provisional, not PASS/`editable-verified`.
 
-## 2. 탐색 → 실제 반입 → 나란히 비교
+1. Confirm tools — Figma search covers accessible libraries only; use Aside/Browser for Community/official kits. Refero is visual reference only. Don't claim an unconnected MCP was called.
+2. Find candidates from **two or more distinct sources** — same-library Variants/duplicates/recolors count as one. Record source/URL, result, limits.
+3. Import/copy verified-rights accessible candidates. Linkable published component stays an instance; note a generic Community Frame as a copy. Unclear rights → refer only.
+4. Compare baseline + external candidates at same real content/width/states. Preserve original, distinguish adjusted copy. Don't drop required conditions to fake fit.
+5. Evaluate role/content/state/responsive/rights first, visual harmony/cost second. Fit approved font/color/spacing on the real imported instance/copy. Record main-component link, text/visibility override, local variant separately. Hidden image ≠ confirmed no-image Variant.
 
-[HCI 사전 설계](hci-wireframe-workflow.md) 대상 작업은 아래 1–2와 권리·원본의 읽기 전용 조사를 먼저 한다.
-**3의 import/복제와 4의 비교 영역 생성도 대상 Figma 쓰기다.** 그 전에 러프 와이어프레임·후보 근거를
-사용자에게 보여주고 명시된 검토 대기 조건을 따른다. 사전 스케치의 후보는 잠정안이며, 실제 반입·비교 전에는
-게이트 PASS나 editable-verified로 기록하지 않는다. 설명 이후에도 아래 비교 요건은 그대로 적용한다.
+Stop once 2+ valid candidates support a decision under real-content comparison. One purposeful pass per source type; still thin → stop rules.
 
-1. 사용 가능한 도구를 확인한다. Figma 검색은 접근 가능한 라이브러리 탐색이며 Community 전체 검색으로
-   가정하지 않는다. Aside/Browser로 Community/공식 UI Kit를 보완한다. Refero는 시각 구성 참고이며
-   실제 편집 자산 제공·복사 권한·동작 확인을 뜻하지 않는다. 미연결 MCP를 호출했다고 쓰지 않는다.
-2. 필요한 역할에 대해 서로 다른 출처 2곳 이상의 후보를 찾는다. 동일 library/template의 여러 Variant,
-   복제본, 색만 바꾼 시안은 출처 하나다. 출처 이름/URL, 조회 결과와 관측 한계를 남긴다.
-3. 재사용 조건과 접근 가능성을 확인한 후보를 실제 import/복제한다. 연결 가능한 published component는
-   instance로 유지한다. Community의 일반 Frame은 편집 가능한 복제본이라고 기록한다. 권리가 불명확하면
-   참고만 하고 복사·채택하지 않는다. 실제 구조 없는 screenshot을 component라고 부르지 않는다.
-4. 비교 영역에 기존 기준안과 외부 후보를 놓고 같은 실제 콘텐츠·합의된 폭·필수 상태로 확인한다.
-   원본 견본을 보존하고 조정본을 구별한다. 긴 한글, 이미지 없음 등 요구된 조건을 빼서 적합성을 만들지 않는다.
-   서로 다른 기기를 같은 크기라고 가장하지 말고 대상별 원본/조정본을 비교한다.
-5. 역할/콘텐츠/상태/반응형/권리를 먼저, 시각 조화와 변경 비용을 다음으로 평가한다. 적합한 구조를
-   승인된 폰트·색·간격에 맞추되 실제 imported instance 또는 복제한 Frame을 사용한다.
-   조정본의 main component 연결, text override, visibility override, local variant를 각각 구분해 기록한다.
-   이미지 숨김은 새로 조정한 상태이지 확인된 무이미지 Variant가 아니다.
+## 3. Pass and stop
 
-2개 이상 유효 후보의 실콘텐츠 비교로 결정을 내릴 수 있으면 추가 검색은 멈춘다. 한 역할에 대해
-라이브러리 탐색과 별도 Community/공식 출처 탐색을 각각 한 번의 목적 있는 검색 묶음으로 시도했는데도
-후보가 부족하면 같은 검색/동의어 재시도를 반복하지 말고 아래 중단 규칙으로 간다.
-도구가 특정 검색 방식을 제한하면 그 계약을 따르고 접근 제약을 기록한다.
+- **PASS** — real comparison + evidence rows complete; internal can still win. New primitive combos need documented unfit reasons, not a redraw substituting for import.
+- **INTERNAL_FIT** — §1 fit confirmed, no external request.
+- **HOLD** — candidates/access/rights/comparison insufficient or a required state unmet. Stop applying/expanding that part, report `INCOMPLETE`. No Figma access → `BLOCKED`; user decision needed → `NEEDS_INPUT`.
 
-## 3. 통과와 중단
+Under HOLD continue independently safe work; ask once for access/exception. User **explicitly** picks a specific original under thin candidates → record decision + unverified scope, proceed in scope. "진행해/빨리/한방에" (go ahead/hurry/one-shot) are not exceptions and don't waive license, access, or quality review. Paid purchase, account change, library publish aren't executed on ordinary design-work approval.
 
-- **PASS**: 위 실제 비교와 증거 행이 완성됐다. 내부안이 이겨도 된다. 새 primitive 조합/Experiment는
-  비교한 후보의 부적합 이유와 조합 근거가 있을 때만 진행하며, 실제 반입 요청을 재그리기로 대체하지 않는다.
-- **INTERNAL_FIT**: §1의 적합성 근거와 외부 비교 요청 없음이 확인됐다. 불필요한 외부 검색을 하지 않는다.
-- **HOLD**: 후보 수/편집 접근/권리/실콘텐츠 비교가 부족하거나 필수 상태를 충족하지 못한다.
-  해당 부분의 본 시안 적용·전체 확장·완료 선언을 중단하고 `INCOMPLETE`로 보고한다.
-  필수 Figma 접근 자체가 없으면 `BLOCKED`, 사용자의 결정이 꼭 필요하면 `NEEDS_INPUT`으로 구분한다.
+## Required evidence row
 
-HOLD에서는 독립적으로 가능한 안전한 작업은 계속한다. 필요한 소스/접근 또는 정확한 예외를 한 번만
-명확히 요청한다. 사용자가 특정 원본만 사용하거나 후보 부족 상태의 직접 설계를 **명시적으로** 택하면
-그 결정과 미검증 범위를 기록하고 해당 범위에서 진행할 수 있다. `진행해`, `빨리`, `한방에`는 예외가 아니다.
-이 예외도 라이선스/접근 권한이나 품질 검토를 면제하지 않는다. 유료 구매·계정 변경·라이브러리 publish는
-통상 디자인 작업의 승인으로 실행하지 않는다.
+Per role in the Reference Log, linked from `source_trace.references` `source`/`selection_reason`.
 
-## 필수 증거 행
+- role/gap — task, real content/state/width, internal fit/unfit reason
+- candidates — distinct sources, URL/key/node ID, rights state, search attempts
+- reuse type — linked instance / copied frame / local derivative + target ID
+- comparison — original vs. adjusted copy's Figma location, readable captures, states/widths
+- decision — PASS / INTERNAL_FIT / HOLD, reason, overrides, explicit exception if any
+- applied — real location + remaining unverified scope; state if not yet applied
 
-Reference Log에 역할별 아래 정보를 남긴다. 기존 delivery의 `source_trace.references`에서
-`source`/`selection_reason`에 이 증거 행 위치를 연결한다. 긴 보고서를 사용자에게 매번 강제하지 않는다.
+## 4. No expansion without pilot review
 
-| 필드       | 필요한 증거                                                                            |
-| ---------- | -------------------------------------------------------------------------------------- |
-| role / gap | 사용자 작업, 실제 콘텐츠·상태·폭, 내부안의 적합/부적합 근거                            |
-| candidates | 서로 다른 출처, URL/file/component key/node ID, 관측·권리 상태, 탐색 시도              |
-| reuse type | linked instance / copied frame / local experiment와 실제 target ID                     |
-| comparison | 원본·동일 콘텐츠 조정본의 Figma 위치, 읽을 수 있는 캡처, 확인한 상태/폭                |
-| decision   | PASS / INTERNAL_FIT / HOLD, 선택·탈락 이유, override, 명시적 예외가 있으면 사용자 결정 |
-| applied    | 실제 적용 위치와 남은 미검증 범위; 아직 적용 전이면 그 상태를 명시                     |
+Test one representative original-based combo first: long titles/narrow width after `Hug→Fill` (alignment, wrap, parent height, footer overlap); icon swap leaves no stray `rotation` or `color override`. Nested overrides misbehaving → don't spread by duplication; prefer a fitting original Variant, or a `local derivative Variant` preserving `original layers` for the needed difference only, then re-verify. No indiscriminate detach/redraw.
 
-## 4. 파일럿 검토 없이는 확장 금지
+Gate pass isn't a visual-quality pass.
 
-원본 기반 대표 조합 하나에 실제 변경을 먼저 시험한다. 긴 제목·좁은 대상 폭에서 Hug→Fill 전환 뒤 상속된 정렬과 줄바꿈, 부모 높이·footer 겹침을 검사한다. 아이콘 swap 뒤 rotation과 색상 override가 남는지도 실제 레이어에서 확인한다.
-중첩 override가 의도대로 적용되지 않으면 반복 복제로 퍼뜨리지 않는다. 적합한 원본 Variant를 우선하고, 없으면 원본 레이어를 보존한 로컬 파생 Variant로 필요한 차이만 만든 뒤 다시 검증한다. 무분별한 detach·재그리기로 우회하지 않는다.
+- Don't treat a hidden desktop frame as a mobile Variant; re-verify links after reparent.
+- Fix Auto Layout flow/Hug/Fill/Fixed and text reflow first; don't hide overflow via fixed parent height or manual `y` moves. Intentional absolute decoration is fine unless it blocks reading or interaction.
+- Check the real input area/button baseline, not the outer label box.
+- View full + readable partial captures directly; check transparent backgrounds against the real parent.
+- Check overlap/clipping/overflow at boundaries, search rows, list end, footer; re-measure after fixing. No PILOT_READY/FIGMA_READY/done while any remains.
 
-출처 게이트 통과는 시각 품질 통과가 아니다. 합의된 기기/상태의 대표 구간을 먼저 적용·검토한다.
-
-- hidden desktop 프레임을 mobile Variant로 간주하지 않는다. 부모/자식 크기와 실제 콘텐츠를 확인하고
-  파일럿에서 대상 폭으로 검증한다. 이미 확인한 ID도 변경/재부모화 뒤에는 구조와 연결을 다시 확인한다.
-- Auto Layout의 흐름/Hug/Fill/Fixed와 텍스트 reflow를 먼저 고친다. 부모 고정 높이, 직접 `y` 이동,
-  캔버스만 늘리기로 넘친 자식·겹침을 가리지 않는다. 절대 좌표가 의도된 장식은 예외지만 읽기/조작을 가리면 실패다.
-- 한 행의 입력창과 버튼은 label을 포함한 바깥 박스가 아닌 **실제 입력 영역과 버튼**의 기준선을 확인한다.
-- 전체 캡처와 가독 가능한 부분 캡처를 직접 본다. 수천 px 페이지를 수십 px 폭으로 줄인 이미지는
-  글자 잘림·정렬 검증이 아니다. 투명 배경은 실제 부모 배경에서도 확인한다.
-- 부모 밖 텍스트/제어, 섹션 경계, 검색행, 마지막 목록과 푸터의 겹침·잘림·의도하지 않은 overflow를
-  검사하고 수정 뒤 다시 측정·캡처한다. 하나라도 남으면 PILOT_READY/FIGMA_READY/완료라고 보고하지 않는다.
-
-이 문서는 에이전트의 필수 실행 계약이다. 자체로 MCP 호출을 기술적으로 차단하는 runtime hook은 아니며,
-로그나 자가 판정을 호스트 권한·독립 QA·사용자 승인 증거로 취급하지 않는다.
+Execution contract, not a runtime hook blocking MCP calls; logs and self-judgment aren't independent QA or user approval.
