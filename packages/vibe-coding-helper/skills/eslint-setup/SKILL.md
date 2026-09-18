@@ -5,6 +5,8 @@ description: Use when adding or changing ESLint config in a project that uses @l
 
 # ESLint setup with @lodado/eslint-config
 
+**Last updated:** 2026-09-18
+
 The config ships composable presets. Enable only what the package actually is.
 
 ## Install
@@ -21,64 +23,135 @@ v2.0.0부터 base는 Antfu 기반 ESM-only ESLint 9 flat config다. Node 22.22.2
 
 ## Compose
 
-`eslint.config.mjs` in the consuming package — every preset is a flat-config array, spread it:
+Use `eslint.config.mjs`; each preset is a flat-config array. Start with the presets
+needed by the package, for example a React library:
 
 ```js
-import base from '@lodado/eslint-config' // always - Antfu JS/TS/import defaults, Prettier conflict removal
-import react from '@lodado/eslint-config/react' // React recommended + hooks/effect discipline
-import next from '@lodado/eslint-config/next' // Next.js apps only
-import a11y from '@lodado/eslint-config/a11y' // JSX that renders user-facing markup
-import turbo from '@lodado/eslint-config/turbo' // Turborepo workspaces - catches undeclared env vars
-import localRules from '@lodado/eslint-config/local-rules' // lodado custom rules - see the table below
-import testing from '@lodado/eslint-config/testing' // Vitest/Testing Library + Playwright, scoped by file path
-import query from '@lodado/eslint-config/query' // packages using TanStack Query
-import quality from '@lodado/eslint-config/quality' // opt-in SonarJS bugs, code smells, complexity and security checks
-import strictTypes from '@lodado/eslint-config/strict-types' // typed lint - exhaustive discriminated union switches
+import base from '@lodado/eslint-config'
+import react from '@lodado/eslint-config/react'
+import a11y from '@lodado/eslint-config/a11y'
+import localRules from '@lodado/eslint-config/local-rules'
+import testing from '@lodado/eslint-config/testing'
 
 export default [
   { ignores: ['dist/**', '.next/**', 'coverage/**'] },
   ...base,
   ...react,
-  ...next,
   ...a11y,
-  ...turbo,
   ...localRules,
   ...testing,
-  ...query,
-  ...quality,
-  ...strictTypes,
 ]
 ```
 
-Base가 ESM-only이므로 소비자 설정도 `eslint.config.mjs`를 사용한다.
+Plugins, including `eslint-plugin-functional` and `eslint-plugin-react-web-api`,
+install as package dependencies. **Installing a plugin does not activate a preset**:
+import and spread each required preset. No Jest preset is added.
 
 ## Which presets
 
-| Package kind                                       | Presets                                            |
-| -------------------------------------------------- | -------------------------------------------------- |
-| Node/TS library, no JSX                            | base                                               |
-| React component library                            | base + react + a11y + local-rules + testing        |
-| Next.js app                                        | base + react + next + a11y + local-rules + testing |
-| Any package inside a turborepo                     | add turbo                                          |
-| Any package using TanStack Query                   | add query                                          |
-| Any JS/TS package opting into broad quality checks | add quality                                        |
-| Any package with a tsconfig                        | add strict-types                                   |
+| Package kind                                              | Presets                                            |
+| --------------------------------------------------------- | -------------------------------------------------- |
+| Node/TS library, no JSX                                   | base                                               |
+| React component library                                   | base + react + a11y + local-rules + testing        |
+| Next.js app                                               | base + next + react + a11y + local-rules + testing |
+| Any package inside Turborepo                              | add turbo                                          |
+| Any package using TanStack Query                          | add query                                          |
+| Any JS/TS package opting into broad quality checks        | add quality                                        |
+| TypeScript package with a tsconfig                        | add strict-types                                   |
+| TypeScript package with designated pure calculation files | add functional                                     |
 
-`strict-types` needs type information. It ships `parserOptions.project: true` (nearest
-tsconfig.json); override `parserOptions.project` in the consuming config when that guess is
-wrong (for example a monorepo package linting files owned by a different tsconfig). It turns on
-`ts/switch-exhaustiveness-check` as an error with redundant defaults also
-reported, so every switch over a discriminated union must name all states.
+Order matters: later entries win. Keep `base` first and, for Next.js apps, put
+`react` **after** `next` so the React discipline rules retain their severity.
+The public import stays `@lodado/eslint-config/react` even though its source is ESM.
 
-`testing` routes by path on its own: `*.test.*` / `*.spec.*` get the Vitest and Testing Library
-rules, `e2e/**`, `*.e2e.*` and `playwright/**` get the Playwright rules. Nothing else is touched,
-so it is safe to enable package-wide.
+### Base: keep lint feedback actionable
 
-`quality` enables SonarJS's recommended flat config plus the AI reliability rules documented in
-[`QUALITY.md`](../../../eslint-config/QUALITY.md). It is opt-in because its broad code-smell and
-complexity checks can surface existing debt when first adopted.
+`base` enables `eslint-comments/require-description` and
+`eslint-comments/no-unlimited-disable` as errors, and sets
+`linterOptions.reportUnusedDisableDirectives: 'error'`. Exceptions must name the
+rule and explain why it is needed, rather than disabling all feedback:
 
-Order matters: later entries win. Keep the base preset first.
+```js
+// eslint-disable-next-line no-console -- CLI output is the command's public interface.
+console.log('Ready')
+```
+
+### Type-aware checks
+
+Add these presets after the base and framework presets when the project has a tsconfig:
+
+```js
+import base from '@lodado/eslint-config'
+import strictTypes from '@lodado/eslint-config/strict-types'
+import functional from '@lodado/eslint-config/functional'
+
+export default [...base, ...strictTypes, ...functional]
+```
+
+Both use `parserOptions.project: true` (nearest `tsconfig.json`). Ensure matched files
+belong to that tsconfig; for a different project, append a file-scoped override such as:
+
+```js
+{
+  files: ['**/*.{ts,tsx,mts,cts}'],
+  languageOptions: {
+    parserOptions: { project: './tsconfig.eslint.json' },
+  },
+}
+```
+
+Use TypeScript's `strict`/`strictNullChecks` for meaningful unnecessary-condition
+checks. Type-aware lint builds a TypeScript program, so check lint duration on the
+consumer project; JavaScript files are not enrolled by `strict-types`.
+
+`strict-types` enables these errors:
+
+| Rule                                                                                                                         | Feedback                                                                             |
+| ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `ts/no-floating-promises`                                                                                                    | Handle completion or rejection; `void` alone is not an escape (`ignoreVoid: false`). |
+| `ts/no-misused-promises`                                                                                                     | Do not pass Promises to synchronous conditions or callbacks.                         |
+| `ts/no-unsafe-assignment`, `ts/no-unsafe-argument`, `ts/no-unsafe-call`, `ts/no-unsafe-member-access`, `ts/no-unsafe-return` | Stop `any` from bypassing the type contract.                                         |
+| `ts/no-unnecessary-condition`                                                                                                | Remove conditions that types prove unnecessary.                                      |
+| `ts/switch-exhaustiveness-check`                                                                                             | Name every discriminated-union state; redundant defaults are also reported.          |
+
+### Functional: a scoped pure core
+
+`functional` applies only to `domain/`, `selectors/`, and `reducers/` directories and
+`*.pure.ts` files (also `.mts`/`.cts`); `*.test.*` and `*.spec.*` files are excluded.
+It does not impose these restrictions on every UI component, event handler or adapter.
+
+- `functional/immutable-data`: **error** for mutation.
+- `functional/prefer-immutable-types` and `functional/no-let`: **warn**, so readonly
+  contracts and avoiding reassignment give feedback without banning every local algorithm.
+- Core restriction rules reject direct I/O imports/globals and nondeterministic
+  operations such as `Date.now()`, zero-argument `new Date()` and `Math.random()`.
+  Keep I/O in adapters; pass data, time and random values into calculations.
+
+For example, use `expiresAt(now, ttl)` rather than reading the clock inside it.
+Readonly types and syntax restrictions are guardrails, **not proof of full purity**:
+ESLint cannot establish the behavior of every indirect call or injected dependency.
+
+### React: effects only for external synchronization
+
+`react` keeps the strict `react-you-might-not-need-an-effect` preset and enables
+`react-hooks/purity`, `react-hooks/immutability`, `react-hooks/refs`,
+`react-hooks/static-components`, and `react-hooks/exhaustive-deps` as **errors**.
+Do not suppress a dependency error to hide an effect loop; move derived values into
+render-time calculations and user actions into event handlers.
+
+The `react-web-api` rules warn about missing cleanup for event listeners, fetches,
+intersection observers, intervals, resize observers and timeouts. Legitimate effects
+remain allowed; these checks look for resource leaks rather than counting effects.
+
+### Other presets
+
+`testing` routes by path: `*.test.*` / `*.spec.*` receive Vitest and Testing Library
+rules; `e2e/**`, `*.e2e.*` and `playwright/**` receive Playwright rules.
+
+`a11y` uses jsx-a11y's strict preset. `quality` enables SonarJS's recommended flat
+config plus AI reliability rules documented in
+[`QUALITY.md`](../../../eslint-config/QUALITY.md). It is opt-in because its broad
+code-smell and complexity checks can surface existing debt when first adopted.
 
 ## Local rules
 

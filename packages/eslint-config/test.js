@@ -10,7 +10,7 @@ const process = require('node:process')
 const { ESLint } = require('eslint')
 
 const PRESETS = {
-  react: require('./react.js'),
+  react: require('./react.mjs').default,
   next: require('./next.js'),
   a11y: require('./a11y.js'),
   turbo: require('./turbo.js'),

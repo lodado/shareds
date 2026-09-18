@@ -33,6 +33,7 @@ module.exports = [
     name: 'lodado/next',
     rules: {
       '@next/next/no-html-link-for-pages': 'off',
+      'react-hooks/exhaustive-deps': 'error',
     },
   },
 ]

@@ -6,20 +6,26 @@
  * preset's normalized eslint-config-next) shares one instance per plugin name -
  * flat config rejects two different objects under the same plugin key.
  */
-const react = require('eslint-plugin-react')
-const reactHooks = require('eslint-plugin-react-hooks')
-const youMightNotNeedAnEffect = require('eslint-plugin-react-you-might-not-need-an-effect')
+import react from 'eslint-plugin-react'
+import reactHooks from 'eslint-plugin-react-hooks'
+import webApi from 'eslint-plugin-react-web-api'
+import youMightNotNeedAnEffect from 'eslint-plugin-react-you-might-not-need-an-effect'
 
-module.exports = [
+export default [
   { ...react.configs.flat.recommended, plugins: { react } },
   youMightNotNeedAnEffect.configs.strict,
+  webApi.configs.recommended,
   {
     name: 'lodado/react',
     plugins: { 'react-hooks': reactHooks },
     settings: { react: { version: 'detect' } },
     rules: {
       'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/exhaustive-deps': 'error',
+      'react-hooks/purity': 'error',
+      'react-hooks/immutability': 'error',
+      'react-hooks/refs': 'error',
+      'react-hooks/static-components': 'error',
       'react-hooks/set-state-in-effect': 'error',
       'react-hooks/set-state-in-render': 'error',
 

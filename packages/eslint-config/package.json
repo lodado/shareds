@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "description": "Composable ESLint presets - enable only the ones you want",
   "license": "MIT",
-  "main": "index.mjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lodado/my-Vibe-Coding-Helper.git",
+    "directory": "packages/eslint-config"
+  },
   "exports": {
     ".": "./index.mjs",
-    "./react": "./react.js",
+    "./react": "./react.mjs",
     "./next": "./next.js",
     "./a11y": "./a11y.js",
     "./turbo": "./turbo.js",
@@ -16,34 +20,38 @@
     "./quality": "./quality.js",
     "./fsd": "./fsd.js",
     "./strict-types": "./strict-types.js",
-    "./interaction": "./interaction.js"
+    "./interaction": "./interaction.js",
+    "./functional": "./functional.mjs"
   },
+  "main": "index.mjs",
   "files": [
-    "index.mjs",
-    "react.js",
-    "next.js",
-    "a11y.js",
-    "turbo.js",
-    "local-rules.js",
-    "testing.js",
-    "query.js",
-    "quality.js",
     "QUALITY.md",
+    "a11y.js",
     "fsd.js",
+    "functional.mjs",
+    "index.mjs",
+    "interaction.js",
+    "local-rules.js",
+    "next.js",
+    "quality.js",
+    "query.js",
+    "react.mjs",
     "strict-types.js",
-    "interaction.js"
+    "testing.js",
+    "turbo.js"
   ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/lodado/my-Vibe-Coding-Helper.git",
-    "directory": "packages/eslint-config"
-  },
   "publishConfig": {
     "access": "public"
   },
+  "engines": {
+    "node": "^22.22.2 || >=24.15.0"
+  },
   "scripts": {
-    "test": "node test.js",
-    "lint": "eslint index.mjs react.js next.js a11y.js turbo.js local-rules.js testing.js query.js quality.js fsd.js interaction.js test.js strict-types.js"
+    "test": "node test.js && node --test feedback.test.mjs functional.test.mjs",
+    "lint": "eslint index.mjs react.mjs next.js a11y.js turbo.js local-rules.js testing.js query.js quality.js fsd.js interaction.js test.js strict-types.js functional.mjs feedback.test.mjs functional.test.mjs package.json"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0"
   },
   "dependencies": {
     "@antfu/eslint-config": "^9.3.0",
@@ -53,21 +61,17 @@
     "eslint-config-next": "^16.3.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-config-turbo": "^2.10.11",
+    "eslint-plugin-functional": "^10.0.1",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-playwright": "^2.11.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-web-api": "^5.19.1",
     "eslint-plugin-react-you-might-not-need-an-effect": "^1.0.2",
     "eslint-plugin-sonarjs": "^4.2.0",
     "eslint-plugin-testing-library": "^7.16.2",
     "typescript-eslint": "^8.67.0"
-  },
-  "peerDependencies": {
-    "eslint": "^9.0.0"
-  },
-  "engines": {
-    "node": "^22.22.2 || >=24.15.0"
   },
   "devDependencies": {
     "eslint": "^9.39.5",

@@ -12,4 +12,12 @@ export default await antfu(
     typescript: true,
   },
   prettier,
+  {
+    name: 'lodado/feedback',
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
+    rules: {
+      'eslint-comments/require-description': 'error',
+      'eslint-comments/no-unlimited-disable': 'error',
+    },
+  },
 ).renamePlugins({ import: 'import-lite' })
