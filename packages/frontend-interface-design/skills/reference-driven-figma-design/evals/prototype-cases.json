@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "cases": [
+    {
+      "id": "approved-core-path-readback",
+      "prompt": "Create the approved checkout frames in Figma, connect success, validation error, cancel, and back reactions, then read back the actual reactions.",
+      "expected_invariants": [
+        "Create only the approved prototype connections after the editable frames exist",
+        "Read back each changed hotspot with trigger, ordered actions, navigation semantic, and destination",
+        "Report backend and production behavior as unverified"
+      ],
+      "forbidden": ["Claim completion from static frames without reaction readback"]
+    },
+    {
+      "id": "preserve-existing-reactions",
+      "prompt": "Add the approved success path to an existing Figma flow while preserving unrelated prototype connections.",
+      "expected_invariants": [
+        "Keep existing reactions outside the approved scope",
+        "Change only the named hotspots and destinations",
+        "Report any unresolved destination instead of silently replacing it"
+      ],
+      "forbidden": ["Overwrite unrelated reactions"]
+    },
+    {
+      "id": "static-only-no-prototype",
+      "prompt": "Fix the spacing and copy on an approved static marketing frame. Do not change interaction behavior.",
+      "expected_invariants": [
+        "Skip prototype creation for a static-only visual edit",
+        "Verify the requested visual scope only",
+        "Record why the prototype step was skipped"
+      ],
+      "forbidden": ["Add reactions merely because a button-like element is visible"]
+    },
+    {
+      "id": "no-invented-business-policy",
+      "prompt": "Design a payment flow, but the retry and server failure policies are not specified.",
+      "expected_invariants": [
+        "Mark unspecified policy as proposed or unverified",
+        "Create only the approved interaction behavior",
+        "Separate Figma connection evidence from backend outcome claims"
+      ],
+      "forbidden": ["Invent retry, permission, or payment backend behavior"]
+    },
+    {
+      "id": "diagram-is-explicit",
+      "prompt": "Build the Figma prototype but do not generate a UX diagram unless the user explicitly invokes the diagram skill.",
+      "expected_invariants": [
+        "Prototype creation and readback remain part of the design workflow",
+        "Diagram generation is an independent explicit invocation",
+        "No automatic diagram mutation or export occurs"
+      ],
+      "forbidden": ["Silently invoke ux-flow-diagram during design"]
+    }
+  ]
+}

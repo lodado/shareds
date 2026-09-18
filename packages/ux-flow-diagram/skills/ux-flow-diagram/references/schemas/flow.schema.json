@@ -1,0 +1,548 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lodado/shareds/ux-flow-diagram/flow.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source",
+    "view",
+    "mode",
+    "coverage",
+    "nodes",
+    "interactions",
+    "edges",
+    "flows",
+    "evidence",
+    "issues",
+    "statistics",
+    "verification"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "view": {
+      "enum": ["current", "proposed"]
+    },
+    "mode": {
+      "enum": ["exact", "hybrid", "inferred"]
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "limitations"],
+      "properties": {
+        "status": {
+          "enum": ["complete", "partial", "unavailable"]
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "interactions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/interaction"
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/edge"
+      }
+    },
+    "flows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/flow"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "verification": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/verification"
+      }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": ["figma", "codebase", "requirements", "ir"]
+        },
+        "file": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "pageId": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "evidenceLevel": {
+      "enum": ["exact", "structural", "inferred"]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "level", "sourceKind", "locator"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "level": {
+          "$ref": "#/$defs/evidenceLevel"
+        },
+        "sourceKind": {
+          "enum": ["figma", "codebase", "requirements", "ir", "test", "browser"]
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation": {},
+        "revision": {
+          "type": "string"
+        }
+      }
+    },
+    "semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence", "evidenceRefs"],
+      "properties": {
+        "purpose": {
+          "type": "string"
+        },
+        "terminal": {
+          "type": "boolean"
+        },
+        "role": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "primaryValue": {
+          "type": "boolean"
+        },
+        "requiredStates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence": {
+          "const": "inferred"
+        },
+        "evidenceRefs": {
+          "$ref": "#/$defs/refs"
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "name", "type", "evidence", "evidenceRefs"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "enum": ["screen", "overlay", "section", "state", "external", "unknown"]
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidenceLevel"
+        },
+        "evidenceRefs": {
+          "$ref": "#/$defs/refs"
+        },
+        "semantics": {
+          "$ref": "#/$defs/semantics"
+        }
+      }
+    },
+    "condition": {},
+    "action": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type", "evidence", "evidenceRefs"],
+      "properties": {
+        "type": {
+          "enum": [
+            "navigate",
+            "overlay",
+            "swap",
+            "scroll",
+            "component-state",
+            "back",
+            "close",
+            "external",
+            "set-variable",
+            "set-variable-mode",
+            "conditional",
+            "unsupported"
+          ]
+        },
+        "to": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "resolution": {
+          "enum": ["resolved", "missing", "out-of-scope", "unavailable"]
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidenceLevel"
+        },
+        "evidenceRefs": {
+          "$ref": "#/$defs/refs"
+        },
+        "payload": {}
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["type"],
+            "properties": {
+              "type": {
+                "const": "conditional"
+              }
+            }
+          },
+          "then": {
+            "required": ["branches"],
+            "properties": {
+              "branches": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/branch"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "branch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["condition", "actions"],
+      "properties": {
+        "condition": {
+          "$ref": "#/$defs/condition"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "trigger", "actions", "evidence", "evidenceRefs"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "trigger": {
+          "$ref": "#/$defs/trigger"
+        },
+        "hotspot": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidenceLevel"
+        },
+        "evidenceRefs": {
+          "$ref": "#/$defs/refs"
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "from",
+        "interactionId",
+        "actionPath",
+        "branchPath",
+        "category",
+        "action",
+        "evidence",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "interactionId": {
+          "type": "string"
+        },
+        "actionPath": {
+          "type": "string"
+        },
+        "branchPath": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "category": {
+          "enum": [
+            "product-navigation",
+            "overlay",
+            "scroll",
+            "component-state",
+            "variable-state",
+            "external",
+            "unknown"
+          ]
+        },
+        "action": {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "enum": [
+                "navigate",
+                "overlay",
+                "swap",
+                "scroll",
+                "component-state",
+                "back",
+                "close",
+                "external",
+                "set-variable",
+                "set-variable-mode",
+                "conditional",
+                "unsupported"
+              ]
+            },
+            "navigation": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "condition": {},
+        "historyDependent": {
+          "type": "boolean"
+        },
+        "brokenDestination": {
+          "type": "boolean"
+        },
+        "resolution": {
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidenceLevel"
+        },
+        "evidenceRefs": {
+          "$ref": "#/$defs/refs"
+        }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "name", "nodeIds", "edgeIds", "evidence", "evidenceRefs"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "startingPoint": {
+          "type": "string"
+        },
+        "nodeIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "edgeIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidenceLevel"
+        },
+        "evidenceRefs": {
+          "$ref": "#/$defs/refs"
+        },
+        "statistics": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "type",
+        "title",
+        "severity",
+        "confidence",
+        "affectedNodes",
+        "observation",
+        "interpretation",
+        "recommendation",
+        "evidenceRefs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "severity": {
+          "enum": ["low", "medium", "high"]
+        },
+        "confidence": {
+          "enum": ["low", "medium", "high"]
+        },
+        "affectedNodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "observation": {
+          "type": "string"
+        },
+        "interpretation": {
+          "type": "string"
+        },
+        "recommendation": {
+          "type": "string"
+        },
+        "evidenceRefs": {
+          "$ref": "#/$defs/refs"
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["kind", "status", "path", "evidenceRefs"],
+      "properties": {
+        "kind": {
+          "enum": ["test", "browser"]
+        },
+        "status": {
+          "enum": ["verified", "failed", "stale", "unverified"]
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidenceRefs": {
+          "$ref": "#/$defs/refs"
+        }
+      }
+    }
+  }
+}

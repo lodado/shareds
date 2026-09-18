@@ -1,0 +1,12 @@
+{
+  "name": "@lodado/ux-flow-diagram-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Explicitly invoked, evidence-aware UX flow diagrams from Figma, codebases, requirements, or Flow IR.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test scripts/*.test.mjs skills/ux-flow-diagram/scripts/*.test.mjs",
+    "lint": "eslint skills scripts",
+    "typecheck": "find scripts skills/ux-flow-diagram/scripts -name '*.mjs' -print0 | xargs -0 -n1 node --check"
+  }
+}

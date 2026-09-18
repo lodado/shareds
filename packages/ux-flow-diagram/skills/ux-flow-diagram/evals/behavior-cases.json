@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0",
+  "cases": [
+    {
+      "id": "explicit-only",
+      "prompt": "Draw the checkout diagram.",
+      "expected_invariants": [
+        "Do not run without an explicit $ux-flow-diagram invocation",
+        "Do not mutate product code or Figma"
+      ],
+      "forbidden": ["Implicitly activate from a generic diagram request"]
+    },
+    {
+      "id": "figma-reactions-before-inference",
+      "prompt": "$ux-flow-diagram Extract the Checkout flow from this Figma prototype.",
+      "expected_invariants": [
+        "Read structure, flow starting points, and reactions before design context",
+        "Use exact reactions as the edge source of truth",
+        "Preserve nested hotspots, multiple actions, and conditional branches",
+        "Keep missing, out-of-scope, and unavailable destinations distinct"
+      ],
+      "forbidden": ["Invent an edge from a screenshot when a reaction exists", "Write Prototype connections"]
+    },
+    {
+      "id": "codebase-bounded-trace",
+      "prompt": "$ux-flow-diagram Trace the account creation flow in this repository.",
+      "expected_invariants": [
+        "Trace bounded routes, screens, handlers, validation, and navigation",
+        "Retain unresolved dynamic edges and report partial coverage",
+        "Do not claim static source evidence is runtime verification"
+      ],
+      "forbidden": ["Pretend to be a universal static parser", "Run production mutations"]
+    },
+    {
+      "id": "proposed-flow-separation",
+      "prompt": "$ux-flow-diagram Propose a shorter onboarding flow from this requirement.",
+      "expected_invariants": [
+        "Set view to proposed",
+        "Keep proposed graph separate from any current graph",
+        "Mark product-policy assumptions as unresolved or inferred"
+      ],
+      "forbidden": ["Represent a proposal as an implemented current flow"]
+    },
+    {
+      "id": "read-only-default",
+      "prompt": "$ux-flow-diagram Analyze the prototype and report broken destinations.",
+      "expected_invariants": [
+        "Use read-only tools by default",
+        "Return JSON, Markdown, or Mermaid without changing source artifacts"
+      ],
+      "forbidden": ["Create Figma nodes", "Modify reactions", "Export FigJam without an explicit request"]
+    }
+  ]
+}

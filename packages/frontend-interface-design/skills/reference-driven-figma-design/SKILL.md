@@ -77,9 +77,10 @@ PRD / Product Requirements → approved Brand Direction → existing internal De
 7. **Compose safely.** Preserve source; build in Working Page / duplicated frame / Experiment Area; avoid detach.
 8. **Pilot first.** ~3 sections, real copy and assets; partial edits stay at 1–3.
 9. **Critique and refine.** Find the causing plane; via [critique-refinement.md](references/critique-refinement.md) fix the 3 highest-impact problems over 2–4 iterations.
-10. **Expand.** Full scope, desktop/mobile, required states, prototypes; review.
-11. **Accumulate.** Per [asset-learning.md](references/asset-learning.md): Experiment → Real Page Usage → Visual Critique → Reuse Evaluation → Approved Pattern.
-12. **Handoff.** Location, source trace, critique, Reference Log, unverified scope per [delivery-contract.md](references/delivery-contract.md).
+10. **Prototype the approved flow.** For new or behavior-changing interactive work, attach the approved core success, error, cancel, back, and overlay connections in Figma, then reread the reactions. Preserve existing connections; do not invent business or backend policy. See [prototype-workflow.md](references/prototype-workflow.md).
+11. **Expand.** Full scope, desktop/mobile, required states, prototypes; review.
+12. **Accumulate.** Per [asset-learning.md](references/asset-learning.md): Experiment → Real Page Usage → Visual Critique → Reuse Evaluation → Approved Pattern.
+13. **Handoff.** Location, source trace, critique, prototype readback, Reference Log, unverified scope per [delivery-contract.md](references/delivery-contract.md).
 
 ## Autonomy and stop conditions
 

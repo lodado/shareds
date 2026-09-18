@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0",
+  "source": { "type": "codebase", "file": "src/features/projects", "revision": "abc123" },
+  "view": "current",
+  "mode": "exact",
+  "coverage": { "status": "complete", "limitations": [] },
+  "nodes": [
+    {
+      "id": "create-project",
+      "name": "Create project",
+      "type": "screen",
+      "evidence": "structural",
+      "evidenceRefs": ["ev-create"]
+    },
+    {
+      "id": "project",
+      "name": "Project",
+      "type": "screen",
+      "evidence": "structural",
+      "evidenceRefs": ["ev-project"],
+      "semantics": { "terminal": true, "evidence": "inferred", "evidenceRefs": ["ev-project"] }
+    }
+  ],
+  "interactions": [
+    {
+      "id": "submit-project",
+      "from": "create-project",
+      "trigger": { "type": "submit", "label": "Create project" },
+      "actions": [
+        {
+          "type": "navigate",
+          "to": "project",
+          "resolution": "resolved",
+          "evidence": "structural",
+          "evidenceRefs": ["ev-submit"],
+          "payload": { "source": "src/features/projects/create.tsx:42" }
+        }
+      ],
+      "evidence": "structural",
+      "evidenceRefs": ["ev-submit"]
+    }
+  ],
+  "edges": [
+    {
+      "id": "submit-project:actions.0",
+      "from": "create-project",
+      "to": "project",
+      "interactionId": "submit-project",
+      "actionPath": "actions.0",
+      "branchPath": [],
+      "category": "product-navigation",
+      "action": { "type": "navigate" },
+      "resolution": "resolved",
+      "evidence": "structural",
+      "evidenceRefs": ["ev-submit"]
+    }
+  ],
+  "flows": [
+    {
+      "id": "flow:create-project",
+      "name": "Project creation",
+      "startingPoint": "create-project",
+      "nodeIds": ["create-project", "project"],
+      "edgeIds": ["submit-project:actions.0"],
+      "evidence": "structural",
+      "evidenceRefs": ["ev-create"]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev-create",
+      "level": "structural",
+      "sourceKind": "codebase",
+      "locator": "src/features/projects/create.tsx:1-60",
+      "observation": "Create project screen route"
+    },
+    {
+      "id": "ev-project",
+      "level": "structural",
+      "sourceKind": "codebase",
+      "locator": "src/features/projects/[id]/page.tsx:1-40",
+      "observation": "Project result screen"
+    },
+    {
+      "id": "ev-submit",
+      "level": "structural",
+      "sourceKind": "codebase",
+      "locator": "src/features/projects/create.tsx:42",
+      "observation": "Submit handler navigates after create"
+    }
+  ],
+  "issues": [],
+  "statistics": {},
+  "verification": []
+}

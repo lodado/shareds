@@ -91,3 +91,9 @@ feedback/completion visible after each action? Can they recover from/cancel the 
 keyboard read/focus order designed? Verify against agreed screens/states and the real
 prototype path — not static-mock verification, can't cover network/backend behavior. See
 [delivery-contract](delivery-contract.md) for QA.
+
+## 6. Prototype behavior is part of the approved interaction
+
+For a new or behavior-changing flow, the editable Figma deliverable includes the approved core prototype path, not just static frames. Attach only behavior supported by the brief: success, validation/error recovery, cancel/back, and required overlay open/close paths. Preserve existing reactions outside the approved change.
+
+After writing, reread the actual reactions and report the source hotspot, trigger, action, destination, and any unresolved or unverified branch. A prototype reaction is evidence of the Figma connection, not proof of backend success, production navigation, or usability. Static-only and small visual edits skip this step and record why.

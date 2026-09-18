@@ -83,7 +83,7 @@
     {
       "name": "frontend-interface-design",
       "description": "Figma-first product and landing design from internal assets, structured templates, and verified references.",
-      "version": "1.5.0",
+      "version": "1.6.0",
       "author": {
         "name": "lodado"
       },
@@ -91,6 +91,18 @@
       "category": "development",
       "homepage": "https://github.com/lodado/shareds",
       "tags": ["figma", "product-design", "landing-page", "reference-design"]
+    },
+    {
+      "name": "ux-flow-diagram",
+      "description": "Explicitly invoked, evidence-aware UX flow extraction and Mermaid diagramming from Figma, codebases, requirements, or Flow IR.",
+      "version": "0.1.0",
+      "author": {
+        "name": "lodado"
+      },
+      "source": "./packages/ux-flow-diagram",
+      "category": "development",
+      "homepage": "https://github.com/lodado/shareds",
+      "tags": ["ux", "flow", "diagram", "figma", "mermaid"]
     },
     {
       "name": "blog-voice-cloner",

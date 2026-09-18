@@ -1,0 +1,16 @@
+{
+  "name": "ux-flow-diagram",
+  "version": "0.1.0",
+  "description": "Explicitly invoked UX flow extraction, evidence-aware graph analysis, and Mermaid rendering.",
+  "author": { "name": "lodado", "url": "https://github.com/lodado" },
+  "homepage": "https://github.com/lodado/shareds",
+  "repository": "https://github.com/lodado/shareds",
+  "license": "MIT",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "UX Flow Diagram",
+    "shortDescription": "Extract and analyze user flows from real prototype and code evidence",
+    "category": "Productivity",
+    "websiteURL": "https://github.com/lodado/shareds"
+  }
+}

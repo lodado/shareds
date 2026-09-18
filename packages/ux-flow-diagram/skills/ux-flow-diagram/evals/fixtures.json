@@ -1,0 +1,1131 @@
+[
+  {
+    "name": "linear",
+    "snapshot": {
+      "source": {
+        "type": "figma",
+        "file": "fixture",
+        "page": "Page"
+      },
+      "coverage": {
+        "status": "complete",
+        "limitations": []
+      },
+      "nodes": [
+        {
+          "id": "A",
+          "name": "A",
+          "type": "FRAME",
+          "screenId": "A",
+          "page": "Page"
+        },
+        {
+          "id": "B",
+          "name": "B",
+          "type": "FRAME",
+          "screenId": "B",
+          "page": "Page"
+        },
+        {
+          "id": "C",
+          "name": "C",
+          "type": "FRAME",
+          "screenId": "C",
+          "page": "Page"
+        },
+        {
+          "id": "h0",
+          "name": "Action 0",
+          "type": "RECTANGLE",
+          "parentId": "A",
+          "screenId": "A",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "NODE",
+                  "navigation": "NAVIGATE",
+                  "destinationId": "B",
+                  "transition": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "h1",
+          "name": "Action 1",
+          "type": "RECTANGLE",
+          "parentId": "B",
+          "screenId": "B",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "NODE",
+                  "navigation": "NAVIGATE",
+                  "destinationId": "C",
+                  "transition": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingPoints": [
+        {
+          "nodeId": "A",
+          "name": "Flow A"
+        }
+      ],
+      "resolutions": {}
+    },
+    "statistics": {
+      "screens": 3,
+      "interactions": 2,
+      "exactEdges": 2,
+      "unreachableNodes": 0,
+      "deadEnds": 1
+    },
+    "issues": [],
+    "absentIssues": []
+  },
+  {
+    "name": "branch",
+    "snapshot": {
+      "source": {
+        "type": "figma",
+        "file": "fixture",
+        "page": "Page"
+      },
+      "coverage": {
+        "status": "complete",
+        "limitations": []
+      },
+      "nodes": [
+        {
+          "id": "A",
+          "name": "A",
+          "type": "FRAME",
+          "screenId": "A",
+          "page": "Page"
+        },
+        {
+          "id": "B",
+          "name": "B",
+          "type": "FRAME",
+          "screenId": "B",
+          "page": "Page"
+        },
+        {
+          "id": "C",
+          "name": "C",
+          "type": "FRAME",
+          "screenId": "C",
+          "page": "Page"
+        },
+        {
+          "id": "h0",
+          "name": "Action 0",
+          "type": "RECTANGLE",
+          "parentId": "A",
+          "screenId": "A",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "CONDITIONAL",
+                  "conditionalBlocks": [
+                    {
+                      "condition": {
+                        "value": "valid"
+                      },
+                      "actions": [
+                        {
+                          "type": "NODE",
+                          "navigation": "NAVIGATE",
+                          "destinationId": "B",
+                          "transition": null
+                        }
+                      ]
+                    },
+                    {
+                      "actions": [
+                        {
+                          "type": "NODE",
+                          "navigation": "NAVIGATE",
+                          "destinationId": "C",
+                          "transition": null
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingPoints": [
+        {
+          "nodeId": "A",
+          "name": "Flow A"
+        }
+      ],
+      "resolutions": {}
+    },
+    "statistics": {
+      "conditionals": 1
+    },
+    "issues": [],
+    "absentIssues": ["branch-completeness"]
+  },
+  {
+    "name": "overlay",
+    "snapshot": {
+      "source": {
+        "type": "figma",
+        "file": "fixture",
+        "page": "Page"
+      },
+      "coverage": {
+        "status": "complete",
+        "limitations": []
+      },
+      "nodes": [
+        {
+          "id": "A",
+          "name": "A",
+          "type": "FRAME",
+          "screenId": "A",
+          "page": "Page"
+        },
+        {
+          "id": "B",
+          "name": "B",
+          "type": "FRAME",
+          "screenId": "B",
+          "page": "Page"
+        },
+        {
+          "id": "h0",
+          "name": "Action 0",
+          "type": "RECTANGLE",
+          "parentId": "A",
+          "screenId": "A",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "NODE",
+                  "navigation": "OVERLAY",
+                  "destinationId": "B",
+                  "transition": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "h1",
+          "name": "Action 1",
+          "type": "RECTANGLE",
+          "parentId": "B",
+          "screenId": "B",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "CLOSE"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingPoints": [
+        {
+          "nodeId": "A",
+          "name": "Flow A"
+        }
+      ],
+      "resolutions": {}
+    },
+    "statistics": {
+      "overlays": 1
+    },
+    "issues": [],
+    "absentIssues": ["overlay-trap"]
+  },
+  {
+    "name": "back",
+    "snapshot": {
+      "source": {
+        "type": "figma",
+        "file": "fixture",
+        "page": "Page"
+      },
+      "coverage": {
+        "status": "complete",
+        "limitations": []
+      },
+      "nodes": [
+        {
+          "id": "A",
+          "name": "A",
+          "type": "FRAME",
+          "screenId": "A",
+          "page": "Page"
+        },
+        {
+          "id": "B",
+          "name": "B",
+          "type": "FRAME",
+          "screenId": "B",
+          "page": "Page"
+        },
+        {
+          "id": "h0",
+          "name": "Action 0",
+          "type": "RECTANGLE",
+          "parentId": "A",
+          "screenId": "A",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "NODE",
+                  "navigation": "NAVIGATE",
+                  "destinationId": "B",
+                  "transition": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "h1",
+          "name": "Action 1",
+          "type": "RECTANGLE",
+          "parentId": "B",
+          "screenId": "B",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "BACK"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingPoints": [
+        {
+          "nodeId": "A",
+          "name": "Flow A"
+        }
+      ],
+      "resolutions": {}
+    },
+    "statistics": {},
+    "issues": [],
+    "absentIssues": ["structural-dead-end"]
+  },
+  {
+    "name": "dead-end",
+    "snapshot": {
+      "source": {
+        "type": "figma",
+        "file": "fixture",
+        "page": "Page"
+      },
+      "coverage": {
+        "status": "complete",
+        "limitations": []
+      },
+      "nodes": [
+        {
+          "id": "A",
+          "name": "A",
+          "type": "FRAME",
+          "screenId": "A",
+          "page": "Page"
+        },
+        {
+          "id": "B",
+          "name": "B",
+          "type": "FRAME",
+          "screenId": "B",
+          "page": "Page"
+        },
+        {
+          "id": "C",
+          "name": "C",
+          "type": "FRAME",
+          "screenId": "C",
+          "page": "Page"
+        },
+        {
+          "id": "h0",
+          "name": "Action 0",
+          "type": "RECTANGLE",
+          "parentId": "A",
+          "screenId": "A",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "NODE",
+                  "navigation": "NAVIGATE",
+                  "destinationId": "B",
+                  "transition": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "h1",
+          "name": "Action 1",
+          "type": "RECTANGLE",
+          "parentId": "B",
+          "screenId": "B",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "NODE",
+                  "navigation": "NAVIGATE",
+                  "destinationId": "C",
+                  "transition": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingPoints": [
+        {
+          "nodeId": "A",
+          "name": "Flow A"
+        }
+      ],
+      "resolutions": {}
+    },
+    "statistics": {},
+    "issues": ["structural-dead-end"],
+    "absentIssues": []
+  },
+  {
+    "name": "unreachable",
+    "snapshot": {
+      "source": {
+        "type": "figma",
+        "file": "fixture",
+        "page": "Page"
+      },
+      "coverage": {
+        "status": "complete",
+        "limitations": []
+      },
+      "nodes": [
+        {
+          "id": "A",
+          "name": "A",
+          "type": "FRAME",
+          "screenId": "A",
+          "page": "Page"
+        },
+        {
+          "id": "B",
+          "name": "B",
+          "type": "FRAME",
+          "screenId": "B",
+          "page": "Page"
+        },
+        {
+          "id": "C",
+          "name": "C",
+          "type": "FRAME",
+          "screenId": "C",
+          "page": "Page"
+        },
+        {
+          "id": "h0",
+          "name": "Action 0",
+          "type": "RECTANGLE",
+          "parentId": "A",
+          "screenId": "A",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "NODE",
+                  "navigation": "NAVIGATE",
+                  "destinationId": "B",
+                  "transition": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingPoints": [
+        {
+          "nodeId": "A",
+          "name": "Flow A"
+        }
+      ],
+      "resolutions": {}
+    },
+    "statistics": {
+      "unreachableNodes": 1
+    },
+    "issues": ["unreachable"],
+    "absentIssues": []
+  },
+  {
+    "name": "broken",
+    "snapshot": {
+      "source": {
+        "type": "figma",
+        "file": "fixture",
+        "page": "Page"
+      },
+      "coverage": {
+        "status": "complete",
+        "limitations": []
+      },
+      "nodes": [
+        {
+          "id": "A",
+          "name": "A",
+          "type": "FRAME",
+          "screenId": "A",
+          "page": "Page"
+        },
+        {
+          "id": "h0",
+          "name": "Action 0",
+          "type": "RECTANGLE",
+          "parentId": "A",
+          "screenId": "A",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "NODE",
+                  "navigation": "NAVIGATE",
+                  "destinationId": "deleted",
+                  "transition": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingPoints": [
+        {
+          "nodeId": "A",
+          "name": "Flow A"
+        }
+      ],
+      "resolutions": {
+        "deleted": "missing"
+      }
+    },
+    "statistics": {
+      "brokenDestinations": 1
+    },
+    "issues": ["broken-destination"],
+    "absentIssues": []
+  },
+  {
+    "name": "component",
+    "snapshot": {
+      "source": {
+        "type": "figma",
+        "file": "fixture",
+        "page": "Page"
+      },
+      "coverage": {
+        "status": "complete",
+        "limitations": []
+      },
+      "nodes": [
+        {
+          "id": "A",
+          "name": "A",
+          "type": "FRAME",
+          "screenId": "A",
+          "page": "Page"
+        },
+        {
+          "id": "B",
+          "name": "B",
+          "type": "FRAME",
+          "screenId": "B",
+          "page": "Page"
+        },
+        {
+          "id": "h0",
+          "name": "Action 0",
+          "type": "RECTANGLE",
+          "parentId": "A",
+          "screenId": "A",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "NODE",
+                  "navigation": "CHANGE_TO",
+                  "destinationId": "B",
+                  "transition": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingPoints": [
+        {
+          "nodeId": "A",
+          "name": "Flow A"
+        }
+      ],
+      "resolutions": {}
+    },
+    "statistics": {
+      "interactions": 1
+    },
+    "issues": [],
+    "absentIssues": []
+  },
+  {
+    "name": "multiple-starts",
+    "snapshot": {
+      "source": {
+        "type": "figma",
+        "file": "fixture",
+        "page": "Page"
+      },
+      "coverage": {
+        "status": "complete",
+        "limitations": []
+      },
+      "nodes": [
+        {
+          "id": "A",
+          "name": "A",
+          "type": "FRAME",
+          "screenId": "A",
+          "page": "Page"
+        },
+        {
+          "id": "B",
+          "name": "B",
+          "type": "FRAME",
+          "screenId": "B",
+          "page": "Page"
+        },
+        {
+          "id": "C",
+          "name": "C",
+          "type": "FRAME",
+          "screenId": "C",
+          "page": "Page"
+        }
+      ],
+      "startingPoints": [
+        {
+          "nodeId": "A",
+          "name": "Flow A"
+        },
+        {
+          "nodeId": "B",
+          "name": "Flow B"
+        },
+        {
+          "nodeId": "C",
+          "name": "Flow C"
+        }
+      ],
+      "resolutions": {}
+    },
+    "statistics": {
+      "flows": 3
+    },
+    "issues": [],
+    "absentIssues": []
+  },
+  {
+    "name": "no-prototype",
+    "snapshot": {
+      "source": {
+        "type": "figma",
+        "file": "fixture",
+        "page": "Page"
+      },
+      "coverage": {
+        "status": "complete",
+        "limitations": []
+      },
+      "nodes": [
+        {
+          "id": "A",
+          "name": "A",
+          "type": "FRAME",
+          "screenId": "A",
+          "page": "Page"
+        },
+        {
+          "id": "B",
+          "name": "B",
+          "type": "FRAME",
+          "screenId": "B",
+          "page": "Page"
+        }
+      ],
+      "startingPoints": [],
+      "resolutions": {}
+    },
+    "statistics": {},
+    "issues": [],
+    "absentIssues": []
+  },
+  {
+    "name": "nested-actions",
+    "snapshot": {
+      "source": {
+        "type": "figma",
+        "file": "fixture",
+        "page": "Page"
+      },
+      "coverage": {
+        "status": "complete",
+        "limitations": []
+      },
+      "nodes": [
+        {
+          "id": "A",
+          "name": "A",
+          "type": "FRAME",
+          "screenId": "A",
+          "page": "Page"
+        },
+        {
+          "id": "B",
+          "name": "B",
+          "type": "FRAME",
+          "screenId": "B",
+          "page": "Page"
+        },
+        {
+          "id": "C",
+          "name": "C",
+          "type": "FRAME",
+          "screenId": "C",
+          "page": "Page"
+        },
+        {
+          "id": "h0",
+          "name": "Action 0",
+          "type": "RECTANGLE",
+          "parentId": "A",
+          "screenId": "A",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "SET_VARIABLE",
+                  "variableId": "logged-in",
+                  "variableValue": {
+                    "type": "BOOLEAN",
+                    "value": true
+                  }
+                },
+                {
+                  "type": "CONDITIONAL",
+                  "conditionalBlocks": [
+                    {
+                      "condition": {
+                        "value": "valid"
+                      },
+                      "actions": [
+                        {
+                          "type": "CONDITIONAL",
+                          "conditionalBlocks": [
+                            {
+                              "condition": {
+                                "value": "paid"
+                              },
+                              "actions": [
+                                {
+                                  "type": "NODE",
+                                  "navigation": "NAVIGATE",
+                                  "destinationId": "B",
+                                  "transition": null
+                                }
+                              ]
+                            },
+                            {
+                              "actions": [
+                                {
+                                  "type": "NODE",
+                                  "navigation": "NAVIGATE",
+                                  "destinationId": "C",
+                                  "transition": null
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "SET_VARIABLE_MODE",
+                  "variableCollectionId": "theme",
+                  "variableModeId": "dark"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingPoints": [
+        {
+          "nodeId": "A",
+          "name": "Flow A"
+        }
+      ],
+      "resolutions": {}
+    },
+    "statistics": {
+      "conditionals": 2
+    },
+    "issues": ["branch-completeness"],
+    "absentIssues": []
+  },
+  {
+    "name": "normal-cycle",
+    "snapshot": {
+      "source": {
+        "type": "figma",
+        "file": "fixture",
+        "page": "Page"
+      },
+      "coverage": {
+        "status": "complete",
+        "limitations": []
+      },
+      "nodes": [
+        {
+          "id": "A",
+          "name": "A",
+          "type": "FRAME",
+          "screenId": "A",
+          "page": "Page"
+        },
+        {
+          "id": "B",
+          "name": "B",
+          "type": "FRAME",
+          "screenId": "B",
+          "page": "Page"
+        },
+        {
+          "id": "h0",
+          "name": "Action 0",
+          "type": "RECTANGLE",
+          "parentId": "A",
+          "screenId": "A",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "NODE",
+                  "navigation": "NAVIGATE",
+                  "destinationId": "B",
+                  "transition": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "h1",
+          "name": "Action 1",
+          "type": "RECTANGLE",
+          "parentId": "B",
+          "screenId": "B",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "NODE",
+                  "navigation": "NAVIGATE",
+                  "destinationId": "A",
+                  "transition": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingPoints": [
+        {
+          "nodeId": "A",
+          "name": "Flow A"
+        }
+      ],
+      "resolutions": {}
+    },
+    "statistics": {},
+    "issues": [],
+    "absentIssues": ["accidental-loop", "structural-dead-end"]
+  },
+  {
+    "name": "trap",
+    "snapshot": {
+      "source": {
+        "type": "figma",
+        "file": "fixture",
+        "page": "Page"
+      },
+      "coverage": {
+        "status": "complete",
+        "limitations": []
+      },
+      "nodes": [
+        {
+          "id": "A",
+          "name": "A",
+          "type": "FRAME",
+          "screenId": "A",
+          "page": "Page"
+        },
+        {
+          "id": "B",
+          "name": "B",
+          "type": "FRAME",
+          "screenId": "B",
+          "page": "Page"
+        },
+        {
+          "id": "h0",
+          "name": "Action 0",
+          "type": "RECTANGLE",
+          "parentId": "A",
+          "screenId": "A",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "NODE",
+                  "navigation": "OVERLAY",
+                  "destinationId": "B",
+                  "transition": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingPoints": [
+        {
+          "nodeId": "A",
+          "name": "Flow A"
+        }
+      ],
+      "resolutions": {}
+    },
+    "statistics": {},
+    "issues": ["overlay-trap"],
+    "absentIssues": []
+  },
+  {
+    "name": "unavailable-target",
+    "snapshot": {
+      "source": {
+        "type": "figma",
+        "file": "fixture",
+        "page": "Page"
+      },
+      "coverage": {
+        "status": "complete",
+        "limitations": []
+      },
+      "nodes": [
+        {
+          "id": "A",
+          "name": "A",
+          "type": "FRAME",
+          "screenId": "A",
+          "page": "Page"
+        },
+        {
+          "id": "h0",
+          "name": "Action 0",
+          "type": "RECTANGLE",
+          "parentId": "A",
+          "screenId": "A",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "NODE",
+                  "navigation": "NAVIGATE",
+                  "destinationId": "hidden",
+                  "transition": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingPoints": [
+        {
+          "nodeId": "A",
+          "name": "Flow A"
+        }
+      ],
+      "resolutions": {
+        "hidden": "unavailable"
+      }
+    },
+    "statistics": {
+      "brokenDestinations": 0
+    },
+    "issues": [],
+    "absentIssues": ["broken-destination"]
+  },
+  {
+    "name": "null-destination",
+    "snapshot": {
+      "source": {
+        "type": "figma",
+        "file": "fixture",
+        "page": "Page"
+      },
+      "coverage": {
+        "status": "complete",
+        "limitations": []
+      },
+      "nodes": [
+        {
+          "id": "A",
+          "name": "A",
+          "type": "FRAME",
+          "screenId": "A",
+          "page": "Page"
+        },
+        {
+          "id": "h0",
+          "name": "Action 0",
+          "type": "RECTANGLE",
+          "parentId": "A",
+          "screenId": "A",
+          "page": "Page",
+          "reactions": [
+            {
+              "trigger": {
+                "type": "ON_CLICK"
+              },
+              "actions": [
+                {
+                  "type": "NODE",
+                  "navigation": "NAVIGATE",
+                  "destinationId": null,
+                  "transition": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingPoints": [
+        {
+          "nodeId": "A",
+          "name": "Flow A"
+        }
+      ],
+      "resolutions": {}
+    },
+    "statistics": {
+      "brokenDestinations": 1
+    },
+    "issues": ["broken-destination"],
+    "absentIssues": []
+  }
+]

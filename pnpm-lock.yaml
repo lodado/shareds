@@ -129,6 +129,8 @@ importers:
 
   packages/test: {}
 
+  packages/ux-flow-diagram: {}
+
   packages/vibe-coding-helper: {}
 
 packages:

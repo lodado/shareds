@@ -55,11 +55,23 @@ frontend-system-design
 test
 frontend-visual-qa
 frontend-interface-design
+ux-flow-diagram
 agent-memory
 ```
 
 패키지 안에 `.claude-plugin/plugin.json`이랑 `.codex-plugin/plugin.json`이 같이 들어 있어요.
 둘 다 같은 `skills/` 디렉터리를 읽어요. 스킬 하나 만들면 두 에이전트가 같이 써요.
+
+### UX Flow Diagram
+
+[`ux-flow-diagram`](packages/ux-flow-diagram) runs only when explicitly invoked as
+`$ux-flow-diagram`. It reads Figma Prototype reactions, bounded codebase traces,
+requirements, or an existing Flow IR and produces evidence-aware JSON, Markdown,
+and Mermaid. Ordinary design or coding requests do not activate it. It never
+modifies Prototype connections; FigJam export requires a separate explicit request.
+
+The Figma design skill separately creates approved Prototype connections while
+building interactive designs and verifies them by reading the reactions back.
 
 ## ESLint 쓰기
 

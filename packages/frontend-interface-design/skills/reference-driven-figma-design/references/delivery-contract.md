@@ -14,6 +14,8 @@ Per assembly unit: source URL/node or component key → applied node, `linked in
 
 Also: base template and structure-check depth, components/variables used, reference per section, principle taken, traits not copied, Experiment/Approved changes.
 
+For interactive scope, record prototype readback separately from visual inspection: the changed hotspot, trigger, action/navigation type, destination, and branches that were not specified or could not be verified. Preserve existing reactions and do not claim backend or production behavior from a Figma prototype alone.
+
 ## 3. Critique trace
 
 Per round: top issues and fixes, viewports/states checked, AI slop removed vs kept, unresolved and unreviewed.
