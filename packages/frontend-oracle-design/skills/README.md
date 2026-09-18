@@ -41,6 +41,30 @@ DTO·store·query key·실행 순서를 알지 않고 사용할 수 있는 계�
 [`rubric.md`](../test-fixtures/fsd-domain-design/rubric.md)에 있습니다. 문서/그래프 검사는
 의미적 설계 품질을 증명하지 않으므로 시나리오 결과는 별도로 평가합니다.
 
+## Contextualized review
+
+The existing independent reviewer can receive selected original callers, consumers, state/error owners,
+approved source files and observations through `review-packet --context <manifest.json>`. Their bytes
+are pinned alongside the existing card, ledger, diff and review-point criteria. Changing a selected
+nonchanged caller also invalidates the review; the same commit is not enough.
+
+For example, a search-hook change is reviewed with its unchanged page consumer, query key/state owner,
+error boundary and approved error/empty and response-order rows. The reviewer can distinguish a real
+late-response overwrite from protection already provided by the actual query owner. A graph service,
+new reviewer team or memoization mandate is not required.
+
+The four perspectives supplement the existing five changeability axes. Medium/High independence,
+approval, lock, RED/GREEN and final evidence gates are unchanged. Context-free v2 artifacts retain
+legacy behavior; supplied context is validated. Low fast path and Design-only add no mandatory context artifacts or implementation review.
+See [the input contract](references/subagent-review.md#contextualized-review--collect-evidence-not-more-agents)
+and [paired questions](references/review-checklist.md#contextual-pattern-index).
+
+The [Ericsson paper](https://arxiv.org/abs/2609.15877) supplies design inspiration, not product policy
+or performance guarantees. Our packet schema, frontend mapping and regression fixtures are local design
+choices. Runtime checks prove structure and input integrity, not model understanding or improved recall.
+Live model comparison is **NOT_RUN** without an approved isolated runtime/account/budget; cost, time and
+tokens are **unmeasured**. Development fixtures are synthetic, not observed incidents or held-out answers. The runnable O16 corpus is `evals/contextual-review-fixtures.json`; `scripts/contextual-review-evals.test.mjs` materializes each case in a temporary directory, executes its `.mjs` entry, and removes the directory. The existing converter projects original file contents inline in reviewer prompts, with separate expected output/assertions; no external model call is made. Model evaluation is **NOT_RUN (0/12 cases attempted and 0/12 completed)**, with tokens/time/cost **unmeasured**; this is readiness evidence, not a baseline/candidate comparison or quality claim.
+
 ## 증거
 
 이 스킬은 "장부에 없는 실행은 증거가 아니다"를 사용자에게 요구합니다. 같은 기준을
@@ -314,6 +338,66 @@ held-out은 grader가 점수 매기지 않습니다. `escapes[].assertion`을 Dr
   `evals/evals.json`으로 투영한다. `--check`가 드리프트를 잡는다. held-out은 저자가 아니라 다른 레포에서
   실제로 새어나간 결함이 정답을 준 케이스다(r11b: StrictMode 타이머·리마운트 scrollTo·ResizeObserver
   초기 측정·필터 전환 중 Suspense 폴백). "나아졌나"는 이 케이스의 버전 간 A/B로만 답한다.
+
+### 조건부 실행 가드레일 — 기존 계약의 작은 보강
+
+조사 기준은 HEAD `8f988fe851d1131a9763983609cdf9ced56c5f4a`입니다. 기존 조건부 graph,
+escape 회고, 승인/lock, ledger, 쓰기 hook을 재구현하지 않습니다.
+
+| 이미 있는 기능                  | 실제 부족한 부분                         | 재사용할 위치                                        | 최소 변경안                         |
+| ------------------------------- | ---------------------------------------- | ---------------------------------------------------- | ----------------------------------- |
+| `when`/`requires`와 생성 bundle | 실패 대응 시점과 규칙의 연결             | 기존 graph 소유 노드                                 | 적용 시점 투영; 새 노드/라우터 없음 |
+| escape 회고와 feedback routing  | 실행 실패와 잘못된 행동의 구별·후보 검토 | `card/retro-metrics.md`, journal/ledger/diff/finding | 선택적 후보화; escape 스키마 불변   |
+| lock·RED/GREEN·review·hook      | 금지와 정상 예외의 대응 검증             | confirmation-lock, Delivery 노드                     | 기존 계약 seed와 prevent/allow 쌍   |
+| Low carve-out                   | 과잉 중단을 막는 명시적 회귀 사례        | Low 단일 노드                                        | 기존 세 조건만 적용, 새 산출물 없음 |
+
+**논문에서 가져온 아이디어.** [AgentGuard: Learning Execution Guardrails from Anomalous
+Coding-Agent Trajectories](https://arxiv.org/abs/2609.16287) (v1)의 Evidence Extraction / Rule
+Induction / Rule Organization: 관찰 가능한 context·action·outcome·support·stage에서 후보를
+만들고, `When`·`DoNot`·`Unless`·`Instead`·`ApplyAt`으로 표현하며, 병합 시 정상 예외를
+보존하고 필요한 작업 시점에만 읽습니다. 논문도 지침 로딩을 권한 변경이나 도구 가로채기로
+보지 않으며, 과잉 거절과 정상 작업 손실을 별도 문제로 다룹니다.
+
+**저장소에 맞춘 설계.** 별도 학습 시스템 대신 기존 reference 소유 노드에 여섯 개의
+`origin: existing-contract`, `status: proposed` seed를 구조화했습니다. 실제 사고에서 도출한
+규칙이라고 주장하지 않습니다. 원본 실행 증거는 기존 산출물을 인용하고, 후보 검토는
+`card/retro-metrics.md` 한 곳이 소유합니다. 관찰 → 직접 증거/기존 원인 분류 → 후보 →
+중복·충돌·예외와 prevent/allow 검토 → 기존 저장소 검토·승인 → 후속 실행의 해당 graph
+노드에서 조건부 적용 → **기존 Oracle 판정**입니다. 현재 문제의 feedback routing은 후보
+검토를 기다리지 않습니다. 후보가 proposed여도 기존 계약은 이미 유효합니다. 저장소의 스킬
+변경 승인은 개별 Card 확인, revision lock, 유효 RED, `$test` 판정 또는 독립 리뷰를 대신하지
+않습니다. Low/Design-only의 범위, 예외 경로, 예산, CLI와 과거 산출물은 그대로입니다.
+
+**검증 구분.**
+
+- **A — 구조:** `scripts/execution-guardrails.test.mjs`는 필드·참조·소유 노드·prevent/allow
+  연결을 검사합니다. 기존 graph/skill-contract/bundle 및 eval projection 검사도 유지합니다.
+  `evals/boundary-cases.json`의 `fod-sem-guard-*` 12개는 `synthetic-fixture`인 수동 의미 검토
+  사례입니다. 기대 출력과 문자열 검사는 실제 모델 행동의 증거가 아닙니다.
+- **B — 결정론적 동작:** 이번 변경은 helper/router/hook/runner를 수정하지 않습니다. 기존
+  lock·run·verify·hook 테스트가 실제 거절/허용·상태·부작용을 계속 검증합니다. A의 성공을
+  새로운 런타임 차단 기능으로 해석하지 않습니다.
+- **C — 에이전트 행동:** 승인된 격리 환경에서는 기존 `evals/run-live.mjs`에
+  `--corpus boundary-cases.json --case fod-sem-guard-<rule-id>-<prevent|allow>`와
+  `--variant baseline|candidate`, `--transcript-dir <dir>`를 사용합니다. semantic 사례는
+  blackbox grader의 자동 점수가 아니라 실제 trajectory/diff와 `assertions`의 수동 검토
+  대상입니다. 정답 fixture를 실행 에이전트에게 읽히지 않습니다. 각 case/replicate에 초기화된
+  작업 공간·독립 세션과 고정 skill revision/실제 로딩 경로를 사용하고, 같은 작업·모델·환경·
+  도구 권한·예산으로 비교합니다. 현재 runner가 이 격리나 예산을 대신 보장하지 않습니다.
+
+행동 비교에서는 비정상 행동, 정상 작업 완료, 불필요한 거절, 필수 증거 없는 완료를 **함께**
+확인합니다. 각 조건의 planned/attempted/completed 표본 수와 분모, NOT_RUN, host 실행 실패를
+따로 공개하고, 누락/실패를 정상 실행으로 세지 않습니다. 비용·시간·토큰은 실제 측정한 것만
+기록하며 나머지는 `unmeasured`입니다. 구조/fixture 테스트를 행동 성능으로 환산하거나,
+논문의 성능 수치가 이 스킬에서 재현됐다고 주장하거나, 지표로 기존 gate를 완화하지 않습니다.
+held-out 정답은 규칙 구성/수정에 사용하지 않습니다.
+
+이번 업데이트의 C 평가는 **NOT_RUN**: CLI 실행 파일은 확인했지만 계정 사용·격리된 fixture
+작업 공간·모델/도구 권한/예산이 고정된 승인된 live 평가 환경은 확보하지 않았습니다.
+계획은 조건당 12개 합성 사례 × 1회, baseline/candidate 각각 attempted=0, completed=0,
+NOT_RUN=12, host 실행 실패=0/0 attempted(시도 없음; 실패율 아님)입니다. 행동 지표는 분모가
+없어 산출하지 않았고, 비용·시간·토큰은 `unmeasured`입니다. 새로운 실제 사고·성공 기록이나
+개선 성과는 만들지 않았습니다. 실행환경을 갖춘 뒤의 실제 A/B 평가는 남아 있습니다.
 
 ### Hook이 사전 차단하는 것과 게이트만 보는 것
 

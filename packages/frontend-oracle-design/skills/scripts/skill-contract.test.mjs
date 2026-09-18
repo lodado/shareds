@@ -48,6 +48,40 @@ async function readAll(relativePaths) {
 
 const REVIEW_NODE_FILES = ['references/subagent-review.md', 'references/review-checklist.md']
 
+test('O1 Low and Design-only do not acquire contextual review requirements', async () => {
+  const { splitDelivery } = await import('./generate-reference-bundles.mjs')
+  const { selectTransitions } = await import(
+    '../../../agent-graph-engineering/skills/agent-graph-engineering/scripts/graph-verify.mjs'
+  )
+  const graph = JSON.parse(await read('references/reference-graph.json'))
+  const lane = graph.lanes.find(({ id }) => id === 'low-fast-path')
+  const { delivered, assumed } = splitDelivery(graph, { id: 'low-contract', nodes: lane.nodes })
+  assert.equal(lane.exclusive, true)
+  assert.deepEqual(delivered.map(({ id }) => id), ['low-fast-path'])
+  assert.deepEqual(assumed, [])
+  const workflow = JSON.parse(await read('references/oracle-workflow.graph.json'))
+  assert.deepEqual(selectTransitions(workflow, 'lock-oracle', { classification: 'DESIGN_READY' }), ['oracle-ready'])
+  assert.deepEqual(workflow.edges.filter(({ from }) => from === 'oracle-ready'), [])
+})
+
+test('O15 contextual review graph and generated artifacts remain synchronized', async () => {
+  const { loadGraph, renderBundle, bundlePath } = await import('./generate-reference-bundles.mjs')
+  const graph = await loadGraph()
+  const node = graph.nodes.find(({ id }) => id === 'subagent-review')
+  assert.equal(node.when,
+    'Delivery only — before contextual packet collection and independent review after implementation/test verification')
+  assert.deepEqual(node.requires, ['common', 'changeability'])
+  for (const bundle of graph.bundles) {
+    assert.equal(await readFile(bundlePath(bundle), 'utf8'), await renderBundle(graph, bundle), bundle.id)
+  }
+  for (const script of ['scripts/generate-workflow-docs.mjs', 'evals/to-skill-creator-evals.mjs']) {
+    const result = spawnSync(process.execPath, [join(skillDirectory, script), '--check'], { encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr || result.stdout)
+  }
+  const skill = await read('SKILL.md')
+  assert.match(skill, /before contextual packet collection and independent review after implementation\/test\s+verification/)
+})
+
 const readCard = () => readAll(CARD_NODE_FILES)
 const readReview = () => readAll(REVIEW_NODE_FILES)
 const readDelivery = () => readAll(DELIVERY_NODE_FILES)
@@ -523,7 +557,7 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.53.1')
+  assert.equal(version, '0.54.0')
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
@@ -2167,4 +2201,35 @@ test('P0-B checks Delivery capability early while preserving Low and Design-only
     assert.match(text, /runtime readiness|reported evidence|VALID_RED/i)
   }
   assert.match(readme, /Card.*journal.*implementation-decision.*lock.*ledger/is)
+})
+
+test('conditional guardrail loading projects existing owners without adding a delivery gate', async () => {
+  const graph = JSON.parse(await read('references/reference-graph.json'))
+  const skill = await read('SKILL.md')
+  const conditions = [
+    ['low-fast-path', /scope carve-out/, /scope carve-out at disqualification/],
+    ['card-retro-metrics', /execution observation/, /candidate review from execution observations/],
+    ['card-confirmation-lock', /revision mismatch/, /confirmation-lock on a\s+revision mismatch/],
+    ['delivery-ledger', /uncertain command/, /delivery\/ledger before an uncertain command/],
+    ['delivery-red', /test\/harness correction/, /delivery\/red before a test\/harness correction/],
+    [
+      'delivery-green-review',
+      /missing or failed evidence/,
+      /before reporting completion with missing or failed evidence/,
+    ],
+  ]
+  for (const [id, graphCondition, skillProjection] of conditions) {
+    const node = graph.nodes.find((entry) => entry.id === id)
+    assert.ok(node, id)
+    assert.match(node.when, graphCondition, id)
+    if (id.startsWith('delivery-')) assert.match(node.when, /Delivery/, id)
+    assert.match(skill, skillProjection, id)
+  }
+  assert.match(skill, /In Delivery only, check delivery\/ledger/)
+  assert.match(skill, /not an extra approval or delivery state/)
+  assert.match(skill, /after immediate existing feedback routing/)
+  const retro = await read('references/card/retro-metrics.md')
+  assert.match(retro, /author cannot approve\/activate their own candidate\s+in the same run/)
+  assert.match(retro, /No sidecar,\s+new log or normal-run artifact is required/)
+  assert.match(retro, /Design-only notes authorize neither\s+tests nor production edits/)
 })

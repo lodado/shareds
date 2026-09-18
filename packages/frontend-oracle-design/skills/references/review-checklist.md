@@ -44,6 +44,29 @@ reason. Do not create a finding out of explanation taste or writing quality alon
 
 ## Contract Check
 
+### Contextual pattern index
+
+Use these questions only when the stated premise applies. This is an index into existing criteria,
+not authority to invent product behavior. Perspective selection and input integrity are owned by
+`subagent-review.md`; five-axis judgments above remain mandatory. Each row specifies its
+`id / dimension / appliesWhen / requiredContext / checks / counterexamples / evidenceRequired /
+existingCriteriaRefs / classificationNotes` without duplicating a separate rule catalog.
+
+| ID / dimension                              | Applies when; required context                                                                              | Check / counterexamples                                                                                                                                                       | Evidence and existing criteria                                                                                                                                                                       |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `error-to-empty` / reliability              | Error handling changes; approved error/empty O/P rows, request and upper error owners                       | Does a failed request become normal empty UI? Counterexamples: explicitly approved silent fallback, or a real upper boundary that preserves the error                         | Original catch/return, actual propagation and UI path, source row and reproduction status; Contract Check, Behavior / Side Effects, `frontend/decisions.md` error boundary                           |
+| `stale-response` / reliability              | Responses may overlap; selection, request key and state-update owners                                       | Can an old response replace the latest selection? Counterexamples: verified query-key isolation, cancellation or version guard at the actual owner, not merely a library name | Request/response ordering and update path, approved ordering row; Behavior / Side Effects, `types/review-criteria.md` when applicable                                                                |
+| `duplicate-mutation` / reliability          | Action triggers a mutation; handler, pending state, business-effect owner and approved idempotency contract | Is effect count correct independently of disabled UI? Counterexamples: transport retries that still produce one approved idempotent business effect                           | Actual effect count/payload and triggering path; Contract Check and Behavior / Side Effects. A disabled screenshot alone proves neither request nor business-effect count                            |
+| `shared-api-consumer` / maintainability     | Public/shared API changes; export/re-export, actual unchanged consumers and approved compatibility scope    | Does the changed seam break an unmodified consumer? Counterexamples: verified versioned compatibility, app-internal-only API outside the claimed public scope                 | Original API plus consumer import/use and approved scope; Architecture / Structure, `changeability.md` Coupling, conditional `fsd.md`                                                                |
+| `repeated-work` / performance               | Repeated work is present; execution path, invocation count, data size, cache/subscription owner             | Is redundant work real? Counterexamples: intentional separated requests, proven deduplication, a small simple workload with no breached requirement                           | Distinguish static work count from measured delay; Architecture / Structure and conditional `performance.md`. No memoization, virtualization, benchmark dependency or arbitrary threshold by default |
+| `premature-commonization` / maintainability | Similar states/policies are unified; policy owners, independent change directions and consumer invariants   | Does one policy's change leak into another? Counterexample: a demonstrated shared invariant with preserved independent ownership                                              | Both policy sources and actual consumers; Decision Falsification Questions, `changeability.md` Cohesion/Coupling/Simplicity; shape similarity alone is not a defect or reason to abstract            |
+
+Classification for every row uses `common.md`: a proven approved-contract violation is
+`PRODUCT_DEFECT`; missing policy is `POLICY_GAP`; missing required proof is `EVIDENCE_GAP`.
+Apply existing `HARNESS_DEFECT`/`ENVIRONMENT_DEFECT` routing when machinery prevents judgment;
+unsupported style preferences are `NON_ORACLE_OPINION`. A question or inferred edge alone is not a
+finding. Do not suppress mandatory or global critical/high issues because no pattern ID fits.
+
 - Does the implementation match the layout, states, copy, and interaction of the approved
   spec·Figma?
 - For every interactive element the diff adds that is not a native control, name the WAI-ARIA

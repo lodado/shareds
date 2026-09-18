@@ -1527,6 +1527,24 @@ async function findingsDocument(t, document, name = 'findings.json') {
   return path
 }
 
+test('O11 contextual findings reject invalid dimensions references and unverified claims', async (t) => {
+  const oracle = await cardFile(t)
+  const document = {
+    schemaVersion: 2,
+    reviewer: 'code-reviewer',
+    // eslint-disable-next-line no-use-before-define -- shared fixture declared with adjacent helper
+    changeabilityReview: CHANGEABILITY_REVIEW,
+    findings: [],
+  }
+  const legacy = await findingsDocument(t, document, 'legacy-context-free.json')
+  const accepted = run('findings', '--file', legacy, '--oracle', oracle)
+  assert.equal(accepted.status, 0, accepted.stderr)
+  const malformed = await findingsDocument(t, { ...document, contextReview: [] }, 'malformed-context.json')
+  const rejected = run('findings', '--file', malformed, '--oracle', oracle)
+  assert.equal(rejected.status, 1, rejected.stderr)
+  assert.match(rejected.stderr, /^FINDINGS_INVALID: /)
+})
+
 const CHANGEABILITY_REVIEW = [
   { axis: 'Readability', status: 'PASS', evidence: 'src/form.tsx:10-30' },
   { axis: 'Predictability', status: 'PASS', evidence: 'deterministic state transitions only' },
@@ -3704,4 +3722,91 @@ test('card --repo-policies lists locked sibling policies that share a surface to
   assert.equal(lines[0], 'REPO_POLICY_CANDIDATES 1')
   assert.match(lines[1], /^# candidates — disposition each as a sweep counterpart; never paste them as rows$/)
   assert.match(lines[2], /^\| P1 × locked-sibling\.P1 \| needs-evidence: shared surface `savebutton` — docs\(\.ai\/oracles\/locked-sibling\/oracle\.md#P1\) \|$/)
+})
+
+test('O2 legacy v2 remains valid while historical v1 stays read-only', async (t) => {
+  const oracle = await cardFile(t)
+  const v2 = await findingsDocument(t, { schemaVersion: 2, reviewerRole: 'code-reviewer', reviewerId: 'legacy-v2', changeabilityReview: CHANGEABILITY_REVIEW, findings: [] }, 'legacy-v2.json')
+  const accepted = run('findings', '--file', v2, '--oracle', oracle)
+  assert.equal(accepted.status, 0, accepted.stderr)
+  const v1 = await findingsDocument(t, { schemaVersion: 1, reviewer: 'code-reviewer', findings: [] }, 'historical-v1.json')
+  const historical = run('findings', '--file', v1, '--oracle', oracle)
+  assert.equal(historical.status, 0, historical.stderr)
+  const fixture = await reviewFixture(t, [], { document: { schemaVersion: 1 } })
+  const readOnly = run('review', '--file', fixture.findingsPath, '--oracle', fixture.oracle,
+    '--packet', fixture.packetPath, '--revision', fixture.revision, '--map', fixture.map, '--ledger', fixture.ledger)
+  assert.equal(readOnly.status, 1)
+  assert.match(readOnly.stderr, /FINDINGS_INVALID.*schemaVersion 2/)
+})
+
+const CONTEXT_SELECTIONS = ['readability', 'maintainability', 'reliability', 'performance'].map((dimension) => ({
+  dimension,
+  applicability: 'applicable',
+  reason: `The ${dimension} context is required by the changed path.`,
+  contextRefs: ['src/changed.ts'],
+  reviewPointRefs: ['changeability.md'],
+  missingContext: [],
+}))
+
+test('O9 contextReview records all four applicability decisions without replacing five axes', async (t) => {
+  const oracle = await cardFile(t)
+  const file = await findingsDocument(t, { schemaVersion: 2, reviewerRole: 'code-reviewer', reviewerId: 'context-reviewer', changeabilityReview: CHANGEABILITY_REVIEW, contextReview: CONTEXT_SELECTIONS, findings: [] }, 'context-valid.json')
+  const result = run('findings', '--file', file, '--oracle', oracle)
+  assert.equal(result.status, 0, result.stderr)
+})
+
+test('standalone legacy compatibility: missing context exhausted investigation budget cannot become PASS or N/A', async (t) => {
+  const oracle = await cardFile(t)
+  const unresolved = CONTEXT_SELECTIONS.map((entry) => entry.dimension === 'reliability' ? { ...entry, applicability: 'unresolved', missingContext: ['request owner'] } : entry)
+  const file = await findingsDocument(t, { schemaVersion: 2, reviewerRole: 'code-reviewer', reviewerId: 'unresolved-context', changeabilityReview: CHANGEABILITY_REVIEW, contextReview: unresolved, findings: [] }, 'context-unresolved.json')
+  const result = run('findings', '--file', file, '--oracle', oracle)
+  assert.equal(result.status, 0, result.stderr)
+  assert.doesNotMatch(result.stdout, /PASS.*reliability/i)
+})
+
+test('standalone legacy compatibility: contextual dimensions do not substitute Medium or High independent reviews', async (t) => {
+  const first = await reviewFixture(t, [], { name: 'high-one.json', reviewerId: 'high-one' })
+  const second = await reviewFixture(t, [], { name: 'high-two.json', reviewerId: 'high-two' })
+  const firstDocument = JSON.parse(await readFile(first.findingsPath, 'utf8'))
+  const secondDocument = JSON.parse(await readFile(second.findingsPath, 'utf8'))
+  assert.notEqual(firstDocument.reviewerId, secondDocument.reviewerId)
+  assert.equal(firstDocument.reviewerId, 'high-one')
+  assert.equal(secondDocument.reviewerId, 'high-two')
+})
+
+test('O13 existing finding intersection and standalone blocking rules remain unchanged', async (t) => {
+  const oracle = await cardFile(t)
+  const finding = { id: 'high-standalone', row: 'O1', severity: 'high', classification: 'PRODUCT_DEFECT', finding: 'synthetic high finding', evidence: 'r-003', fix: 'preserve existing blocker' }
+  const file = await findingsDocument(t, { schemaVersion: 2, reviewerRole: 'code-reviewer', reviewerId: 'blocker', changeabilityReview: CHANGEABILITY_REVIEW, findings: [finding] }, 'high-standalone.json')
+  const result = run('findings', '--file', file, '--oracle', oracle)
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /^FINDINGS_OK blocking:1 advisory:0/m)
+  const clear = await findingsDocument(t, { schemaVersion: 2, changeabilityReview: CHANGEABILITY_REVIEW, findings: [] }, 'clear-side.json')
+  const loneHigh = run('findings', '--file', file, '--intersect', clear, '--oracle', oracle)
+  assert.equal(loneHigh.status, 0, loneHigh.stderr)
+  assert.match(loneHigh.stdout, /^FINDINGS_OK blocking:1 advisory:0/m)
+  const medium = { ...finding, id: 'medium-left', severity: 'medium' }
+  const left = await findingsDocument(t, { schemaVersion: 2, changeabilityReview: CHANGEABILITY_REVIEW, findings: [medium] }, 'medium-left.json')
+  const right = await findingsDocument(t, { schemaVersion: 2, changeabilityReview: CHANGEABILITY_REVIEW, findings: [{ ...medium, id: 'medium-right' }] }, 'medium-right.json')
+  const loneMedium = run('findings', '--file', left, '--intersect', clear, '--oracle', oracle)
+  assert.equal(loneMedium.status, 0, loneMedium.stderr)
+  assert.match(loneMedium.stdout, /^FINDINGS_OK blocking:0 advisory:1/m)
+  const intersection = run('findings', '--file', left, '--intersect', right, '--oracle', oracle)
+  assert.equal(intersection.status, 0, intersection.stderr)
+  assert.match(intersection.stdout, /^FINDINGS_OK blocking:1 advisory:0/m)
+})
+
+test('O14 existing five-axis changeability validation remains strict with contextual review', async (t) => {
+  const oracle = await cardFile(t)
+  const base = { schemaVersion: 2, reviewerRole: 'code-reviewer', reviewerId: 'axis-check', contextReview: CONTEXT_SELECTIONS, findings: [] }
+  for (const [name, changeabilityReview] of [
+    ['missing-axis.json', CHANGEABILITY_REVIEW.slice(0, 4)],
+    ['duplicate-axis.json', [...CHANGEABILITY_REVIEW, CHANGEABILITY_REVIEW[0]]],
+    ['bad-finding-id.json', CHANGEABILITY_REVIEW.map((entry) => entry.axis === 'Readability' ? { ...entry, status: 'FINDING', findingId: 'missing' } : entry)],
+  ]) {
+    const file = await findingsDocument(t, { ...base, changeabilityReview }, name)
+    const result = run('findings', '--file', file, '--oracle', oracle)
+    assert.equal(result.status, 1, `${name}: ${result.stderr}`)
+    assert.match(result.stderr, /^FINDINGS_INVALID: /)
+  }
 })

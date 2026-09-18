@@ -19,6 +19,7 @@ import {
   snapshotRegularFile,
   stableStringify,
 } from './oracle-fs.mjs'
+import { contextGaps, snapshotContext, validateContextReview } from './oracle-review-context.mjs'
 
 const FLAG_NAMES = [
   'oracle',
@@ -2151,6 +2152,10 @@ function normalizeFindings(document, rows, source) {
     if (missing.length > 0) {
       throw new CliError('FINDINGS_INVALID', `${source}: missing changeability axes ${missing.join(', ')}`)
     }
+    if (Object.hasOwn(document, 'contextReview')) {
+      const contextErrors = validateContextReview(document.contextReview)
+      if (contextErrors.length) throw new CliError('FINDINGS_INVALID', `${source}: ${contextErrors.join('; ')}`)
+    }
   }
 
   const findingIds = new Set()
@@ -2382,6 +2387,29 @@ async function assertReviewBinding(options) {
     )
   }
   assertEmbeddedLedger(packet.ledger)
+  const contextSnapshots = []
+  let contextRoot
+  if (Object.hasOwn(packet, 'reviewContext')) {
+    const context = packet.reviewContext
+    contextRoot = resolve(base, '../../..')
+    if (!context || typeof context.repositoryRoot !== 'string' || resolve(base, context.repositoryRoot) !== contextRoot || !context.manifest || typeof context.manifest.path !== 'string' || !isDigest(context.manifest.sha256)) {
+      throw new CliError('REVIEW_PACKET_INVALID', 'context needs a bound repository root and manifest')
+    }
+    const manifestSnapshot = await snapshotOracleFile(resolve(contextRoot, context.manifest.path), contextRoot, 'REVIEW_PACKET_STALE', 'context manifest', contextSnapshots)
+    if (manifestSnapshot.sha256 !== context.manifest.sha256) throw new CliError('REVIEW_PACKET_STALE', 'context manifest changed')
+    try {
+      const selected = await snapshotContext(parseSnapshotJson(manifestSnapshot, 'REVIEW_PACKET_INVALID'), {
+        root: contextRoot, oracle: oracleRaw, lock: packet.lock,
+        lockDirectory: dirname(resolve(base, packet.state.lock)), reviewPoints: packet.reviewPoints,
+      })
+      contextSnapshots.push(...selected.snapshots)
+      const { repositoryRoot: _root, manifest: _manifest, ...embedded } = context
+      if (stableJson(embedded) !== stableJson(selected.context)) throw new Error('selected context bytes or metadata changed')
+    } catch (error) {
+      throw new CliError('REVIEW_PACKET_STALE', error.message)
+    }
+    if (contextGaps(context)) throw new CliError('REVIEW_CONTEXT_INCOMPLETE', 'Required context/applicability unresolved or investigation budget exhausted; route the actual evidence, policy or environment gap')
+  }
   for (const [index, artifact] of packet.evidenceArtifacts.entries()) {
     if (!artifact || typeof artifact.path !== 'string' || !isDigest(artifact.sha256)) {
       throw new CliError('REVIEW_PACKET_INVALID', `evidence artifact ${index} lacks path or digest`)
@@ -2432,6 +2460,20 @@ async function assertReviewBinding(options) {
       await snapshotOracleFile(options.intersect, base, 'FINDINGS_INVALID', 'intersected review findings', snapshots),
     )
   const documents = findingSnapshots.map((snapshot) => parseSnapshotJson(snapshot, 'FINDINGS_INVALID'))
+  if (!packet.reviewContext && documents.some((document) => Object.hasOwn(document, 'contextReview'))) {
+    throw new CliError('FINDINGS_INVALID', 'contextReview requires a contextualized review packet')
+  }
+  if (packet.reviewContext) {
+    const contextRefs = new Set((packet.reviewContext.files ?? []).map((file) => file.path))
+    for (const document of documents) {
+      if (document.reviewerRole !== 'code-reviewer' && !Object.hasOwn(document, 'contextReview')) continue
+      const errors = validateContextReview(document.contextReview, {
+        contextRefs, reviewPointRefs: new Set(packet.reviewPoints.map((point) => point.path)),
+        selections: packet.reviewContext.selections,
+      })
+      if (errors.length) throw new CliError('FINDINGS_INVALID', `contextReview: ${errors.join('; ')}`)
+    }
+  }
   const allFindings = documents.flatMap((document) => document.findings ?? [])
   const ids = new Set(allFindings.map((finding) => finding.id))
   if (ids.size !== allFindings.length) throw new CliError('FINDINGS_INVALID', 'duplicate finding id')
@@ -2515,6 +2557,7 @@ async function assertReviewBinding(options) {
     }
   }
   await assertSnapshots(snapshots, base, 'REVIEW_PACKET_INVALID')
+  if (contextRoot) await assertSnapshots(contextSnapshots, contextRoot, 'REVIEW_PACKET_STALE')
 }
 
 /**

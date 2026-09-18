@@ -156,3 +156,67 @@ never edited directly.
   evidence of integrity.
 - Call `oracle-run.mjs budget --spend policy|harness|product --reason ...` on every budget use.
   If `BUDGET_EXHAUSTED`, do not route around it with another budget; report `FAIL`.
+  After RED, harness identity includes the frozen test-binding semantics (`rows`, `paths`, `frames`,
+  `sequence`) from the selected evidence map as well as the existing test/harness file digest.
+  A mapping-only correction counts once; formatting and non-binding notes do not count again.
+  Pre-RED file-only identities and unchanged legacy spends remain compatible. An unreadable bound
+  map is an error, not a reason to omit it from identity. Spending still requires fresh RED→GREEN
+  for changed bindings; it neither increases the two-round limit nor reopens terminal `FAIL`.
+
+## Conditional seed — verified commands
+
+Proposed existing-contract projection, not an incident, approval or extra gate. The linked contracts
+already apply; candidate management belongs to `card/retro-metrics.md`, not this stage.
+
+```json
+{
+  "id": "verified-command",
+  "revision": 1,
+  "status": "proposed",
+  "origin": "existing-contract",
+  "When": "A required command, path or option is missing, unknown, or failed to start.",
+  "DoNot": "Repeat guessed command names, paths or flags, or describe those attempts as passing verification.",
+  "Unless": "A retry has support from inspected scripts/configuration or documented tool help and is allowed by scope and remaining applicable budget. Rerunning the unchanged GREEN command for the required consecutive-pass gate is not guessing.",
+  "Instead": "Inspect actual package scripts, runner configuration, installed command help and paths. Run the verified supported command through exec when judging Delivery. Investigate unknown capability; if required judgment remains impossible, report the actual cause as ENVIRONMENT_DEFECT -> FAIL without production changes. Keep successful independent evidence and unverified scope distinct; do not reset or borrow budgets.",
+  "ApplyAt": ["Delivery capability discovery", "adjudication commands", "status query and resume"],
+  "authorityRefs": [
+    "references/delivery/ledger.md#delivery-capability-discovery--before-expensive-artifacts",
+    "references/delivery/green-review.md#green-gate",
+    "references/common.md#feedback-routing--canonical-classification"
+  ],
+  "evidenceRefs": [],
+  "regressionCases": {
+    "mustPrevent": ["fod-sem-guard-verified-command-prevent"],
+    "mustAllow": ["fod-sem-guard-verified-command-allow"]
+  }
+}
+```
+
+## Conditional seed — authorized scope
+
+Proposed existing-contract projection, not an incident, approval or extra gate. The linked contracts
+already apply; candidate management belongs to `card/retro-metrics.md`, not this stage.
+
+```json
+{
+  "id": "authorized-scope",
+  "revision": 1,
+  "status": "proposed",
+  "origin": "existing-contract",
+  "When": "A recovery or implementation would change files, dependencies, configuration or external state.",
+  "DoNot": "Expand beyond the approved request/contract or overwrite unrelated user changes to make the task pass.",
+  "Unless": "The necessary change is already within approved scope and the applicable state, source and evidence gates permit it. Existing approval suffices; genuinely new scope needs the existing decision/approval route, and contract meaning changes need a new confirmed revision.",
+  "Instead": "Check the current diff, ownership and real scripts/config first; prefer the existing test boundary without adding a dependency. Perform only authorized reversible recovery within budget. Preserve pre-RED production protection and declared harness paths. Stop the affected action for a missing decision, rather than silently installing or reconfiguring; continue only other work the existing state and scope permit.",
+  "ApplyAt": ["Delivery capability discovery", "writing tests", "production implementation", "self-feedback"],
+  "authorityRefs": [
+    "references/delivery/ledger.md#authority-and-entry-conditions",
+    "references/delivery/red.md",
+    "references/card/confirmation-lock.md#run-artifact-initialization"
+  ],
+  "evidenceRefs": [],
+  "regressionCases": {
+    "mustPrevent": ["fod-sem-guard-authorized-scope-prevent"],
+    "mustAllow": ["fod-sem-guard-authorized-scope-allow"]
+  }
+}
+```

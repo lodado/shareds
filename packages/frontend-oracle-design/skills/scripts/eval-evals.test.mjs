@@ -19,7 +19,7 @@ test('evals.json is the skill-creator projection of the blackbox corpus and stay
   assert.equal(evals.evals.length, corpus.cases.length + heldOut.cases.length + boundary.cases.length)
 
   const semantic = evals.evals.filter((entry) => entry.category === 'boundary-semantic')
-  assert.equal(semantic.length, 3)
+  assert.equal(semantic.length, 15)
   assert.ok(semantic.every((entry) => entry.assertions.length >= 2))
   for (const entry of semantic) {
     const fixture = boundary.cases.find(({ id }) => id === entry.name)

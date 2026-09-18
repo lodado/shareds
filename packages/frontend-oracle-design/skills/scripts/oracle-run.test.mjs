@@ -2611,6 +2611,125 @@ test('O11: policy와 implicit harness budget은 stable digest별로만 spend된�
   assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
 })
 
+test('harness budget: evidence-only repair spends once and still needs fresh RED before GREEN', async (t) => {
+  for (const mode of ['implicit', 'registered', 'legacy']) {
+    await t.test(mode, async (t) => {
+      const harnessFiles = mode === 'registered' ? { 'src/harness.mjs': 'export const marker = 1\n' } : {}
+      const { root, oracleDirectory } = await workspace(t, { harnessFiles })
+      const spend = () => run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'fixture binding repair'])
+      if (mode === 'legacy') {
+        // Pre-RED spends retain the historical file-only identity; no fabricated ledger migration.
+        await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
+        redRun(oracleDirectory)
+        assert.equal(spend().status, 0)
+        const red = transition(oracleDirectory, 'VALID_RED', 'r-001')
+        assert.equal(red.status, 0, red.stderr)
+      } else {
+        await reachValidRed(oracleDirectory, root)
+      }
+      assert.equal(spend().status, 0)
+      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 1)
+      const evidence = { ...EVIDENCE, sequence: { kind: 'test', name: 'save > pending' } }
+      await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify(evidence))
+
+      const cachedState = await readFile(join(oracleDirectory, 'run-state.json'), 'utf8')
+      const repaired = spend()
+      assert.equal(repaired.status, 0, repaired.stderr)
+      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
+      // Simulate an interrupted cache write, retaining the seed state required for ledger replay.
+      await writeFile(join(oracleDirectory, 'run-state.json'), cachedState)
+      const replayed = run(['status', '--dir', oracleDirectory, '--json'])
+      assert.equal(replayed.status, 0, replayed.stderr)
+      assert.equal(JSON.parse(replayed.stdout).remainingBudgets.harness.spent, 2)
+      assert.equal(spend().status, 0)
+      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
+
+      greenRun(oracleDirectory, 'before-refresh-1')
+      greenRun(oracleDirectory, 'before-refresh-2')
+      const stale = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+      assert.equal(stale.status, 1)
+      assert.match(stale.stderr, /^EVIDENCE_STALE: /)
+
+      redRun(oracleDirectory)
+      const refreshed = transition(oracleDirectory, 'VALID_RED', 'r-004')
+      assert.equal(refreshed.status, 0, refreshed.stderr)
+      assert.equal(spend().status, 0)
+      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
+      greenRun(oracleDirectory, 'after-refresh-1')
+      greenRun(oracleDirectory, 'after-refresh-2')
+      const green = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-006')
+      assert.equal(green.status, 0, green.stderr)
+
+      await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify({
+        ...evidence, sequence: { kind: 'test', name: 'another binding' },
+      }))
+      const exhausted = spend()
+      assert.equal(exhausted.status, 1)
+      assert.match(exhausted.stderr, /^BUDGET_EXHAUSTED: /)
+      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
+      await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify(evidence))
+      greenRun(oracleDirectory, 'review-green')
+      const reviewed = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-007')
+      assert.equal(reviewed.status, 0, reviewed.stderr)
+      const stopped = transition(oracleDirectory, 'FAIL', 'r-007', ['--reason', 'synthetic terminal-state regression'])
+      assert.equal(stopped.status, 0, stopped.stderr)
+      assert.equal(transition(oracleDirectory, 'ORACLE_READY', 'r-007').status, 1)
+      assert.equal((await state(oracleDirectory)).state, 'FAIL')
+    })
+  }
+})
+
+test('harness budget: semantic row path frame and sequence bindings participate in identity', async (t) => {
+  const changes = {
+    rows: { rows: { O1: { kind: 'test', name: 'another row binding' } } },
+    paths: { paths: { PATH1: { kind: 'test', name: 'path binding' } } },
+    frames: { frames: { F1: { kind: 'test', name: 'frame binding', tuple: { action: 'next' }, scenario: 'G1' } } },
+    sequence: { sequence: { kind: 'test', name: 'sequence binding' } },
+  }
+  for (const [name, change] of Object.entries(changes)) {
+    await t.test(name, async (t) => {
+      const { root, oracleDirectory } = await workspace(t)
+      await reachValidRed(oracleDirectory, root)
+      const spend = () => run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'binding identity'])
+      assert.equal(spend().status, 0)
+      const mapping = { ...EVIDENCE, ...change }
+      await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify(mapping))
+      assert.equal(spend().status, 0)
+      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
+      await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify({ note: 'not a test binding', ...mapping }, null, 2))
+      assert.equal(spend().status, 0)
+      assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
+    })
+  }
+})
+
+test('harness budget: bound evidence path is authoritative and unreadable bindings fail without spending', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  const customMap = join(oracleDirectory, 'selected-evidence.json')
+  await writeFile(customMap, JSON.stringify(EVIDENCE))
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
+  redRun(oracleDirectory)
+  const red = run(['transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', 'r-001', '--row', 'O1', '--evidence', customMap])
+  assert.equal(red.status, 0, red.stderr)
+  await writeFile(join(oracleDirectory, 'evidence.json'), 'not the selected map')
+  const spend = () => run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'selected binding'])
+  assert.equal(spend().status, 0)
+  const ledgerBefore = await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8')
+  await writeFile(customMap, '{')
+  const malformed = spend()
+  assert.equal(malformed.status, 1)
+  assert.match(malformed.stderr, /^EVIDENCE_INVALID: /)
+  await rm(customMap)
+  const missing = spend()
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /^EVIDENCE_INVALID: /)
+  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 1)
+  assert.equal(await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8'), ledgerBefore)
+  await writeFile(customMap, JSON.stringify({ ...EVIDENCE, sequence: { kind: 'test', name: 'save > pending' } }))
+  assert.equal(spend().status, 0)
+  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 2)
+})
+
 test('O12: RED와 GREEN의 env fingerprint가 다르면 전이는 통과하되 ENV_DRIFT를 남긴다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
   await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
@@ -3823,12 +3942,13 @@ test('a stop observation never follows a drifted manifest pointer out of the rep
  * High 런의 모든 게이트를 실제로 통과시킨 뒤 REVIEW_VERIFIED 직전에 세우는 fixture.
  * 블라인드 매핑 하나만 남겨 두고 나머지는 전부 유효하다.
  */
-async function highRiskReviewReady(t) {
+async function highRiskReviewReady(t, options = {}) {
   const source = 'src/save.mjs'
   const original = 'export const guarded = true\n'
   const { root, oracleDirectory, oracle, lock } = await workspace(t, {
+    ...options,
     risk: 'high',
-    initialFiles: { [source]: original },
+    initialFiles: { ...options.initialFiles, [source]: original },
   })
   await reachValidRed(oracleDirectory, root)
   greenRun(oracleDirectory, 'green-1')
@@ -4194,4 +4314,204 @@ test('legacy runs without blind-mapping evidence are still readable but cannot b
   assert.equal(attempted.status, 1)
   assert.match(attempted.stderr, /^BLIND_MAP_REQUIRED: /)
   assert.equal((await state(fixture.oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+})
+function contextManifestFor(selected, sourceKind = 'implementation-reference') {
+  return {
+    schemaVersion: 1,
+    files: [{ path: selected, sourceKind, ...(sourceKind === 'approved-policy' ? { sourceId: 'S2' } : {}), reason: 'selected original owner/consumer evidence', dimensions: ['readability', 'maintainability', 'reliability'] }],
+    edges: [],
+    selections: ['readability', 'maintainability', 'reliability', 'performance'].map((dimension) => ({
+      dimension, applicability: dimension === 'performance' ? 'not-applicable' : 'applicable',
+      reason: dimension === 'performance' ? 'No performance claim or changed workload' : 'Original consumer/owner context',
+      contextRefs: dimension === 'performance' ? [] : [selected],
+      reviewPointRefs: dimension === 'performance' ? [] : ['review-checklist.md'], missingContext: [],
+    })),
+    budget: { maxFiles: 10, maxEdges: 10, exhausted: false },
+  }
+}
+
+const CONTEXT_FRAMES = [
+  ['F1', 'inside', 'changed-target', 'stable', 'medium'],
+  ['F2', 'inside', 'caller-consumer', 'after-packet', 'high'],
+  ['F3', 'inside', 'state-error-owner', 'after-review', 'medium'],
+  ['F4', 'inside', 'approved-policy', 'stable', 'high'],
+  ['F5', 'inside', 'observation', 'after-packet', 'medium'],
+  ['F6', 'outside', 'changed-target', 'after-review', 'high'],
+  ['F7', 'outside', 'caller-consumer', 'stable', 'medium'],
+  ['F8', 'outside', 'state-error-owner', 'after-packet', 'high'],
+  ['F9', 'outside', 'approved-policy', 'after-packet', 'medium'],
+  ['F10', 'outside', 'observation', 'stable', 'high'],
+  ['F11', 'inside', 'changed-target', 'after-packet', 'medium'],
+  ['F12', 'inside', 'caller-consumer', 'after-review', 'medium'],
+  ['F13', 'inside', 'state-error-owner', 'stable', 'medium'],
+  ['F14', 'inside', 'approved-policy', 'after-review', 'medium'],
+  ['F15', 'inside', 'observation', 'after-review', 'medium'],
+]
+
+async function contextualReviewFixture(t, frame = CONTEXT_FRAMES[6], updateManifest = (manifest) => manifest) {
+  const [, location, role, , risk] = frame
+  const extension = ['approved-policy', 'observation'].includes(role) ? 'md' : 'mjs'
+  const selected = `${location === 'inside' ? 'packages/context' : 'outside'}/${role}.${extension}`
+  const relativeSelected = relative('packages', selected)
+  const contents = {
+    'approved-policy': 'Approved synthetic save pending policy.\n',
+    observation: 'Synthetic local observation; not policy.\n',
+  }[role] ?? 'export const owner = (value) => value\n'
+  const options = {
+    risk,
+    initialFiles: { [relativeSelected]: contents },
+    ...(role === 'approved-policy' ? {
+      oracleContent: SOURCED_ORACLE.replace('packages/docs/policy.md', selected),
+      sourceFiles: { [relativeSelected]: contents },
+    } : {}),
+  }
+  const fixture = risk === 'high' ? await highRiskReviewReady(t, options) : await workspace(t, options)
+  if (risk !== 'high') {
+    assert.equal(greenRun(fixture.oracleDirectory, 'green-1').status, 0)
+    assert.equal(greenRun(fixture.oracleDirectory, 'green-2').status, 0)
+    const promoted = transition(fixture.oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002', ['--reason', 'existing behavior'])
+    assert.equal(promoted.status, 0, promoted.stderr)
+    assert.equal(greenRun(fixture.oracleDirectory, 'review').status, 0)
+    fixture.reviewRunId = 'r-003'
+    fixture.extra = []
+  }
+  const manifestPath = join(dirname(fixture.root), 'context.json')
+  await writeFile(manifestPath, JSON.stringify(updateManifest(contextManifestFor(selected, ['approved-policy', 'observation'].includes(role) ? role : 'implementation-reference'))))
+  const packetPath = join(fixture.oracleDirectory, 'context-packet.json')
+  const generated = run([...strictReviewPacketArgs(fixture.oracleDirectory, packetPath), '--context', manifestPath])
+  assert.equal(generated.status, 0, generated.stderr)
+  const raw = await readFile(packetPath, 'utf8')
+  const packet = JSON.parse(raw)
+  const findingsPaths = [join(fixture.oracleDirectory, 'findings.json')]
+  if (risk === 'high') findingsPaths.push(join(fixture.oracleDirectory, 'findings-second.json'))
+  for (const [index, path] of findingsPaths.entries()) {
+    await writeFile(path, JSON.stringify({
+      ...CLEAR_REVIEW, reviewerId: `context-reviewer-${index}`,
+      packetSha256: createHash('sha256').update(raw).digest('hex'), targetRevision: packet.targetRevision,
+      contextReview: structuredClone(packet.reviewContext.selections),
+    }))
+    const receipt = issueReviewReceipt(fixture.oracleDirectory, packetPath, path, packet.targetRevision)
+    assert.equal(receipt.status, 0, receipt.stderr)
+  }
+  const extra = [...fixture.extra, '--packet', packetPath, '--revision', packet.targetRevision]
+  if (risk === 'high') {
+    const blind = blindMappingEvidence(fixture.oracleDirectory, () => ({ 'save > pending': ['O1'] }))
+    assert.equal(blind.derived.status, 0, blind.derived.stderr)
+    assert.equal(blind.receipt.status, 0, blind.receipt.stderr)
+    extra.push(...blind.args)
+  }
+  return { ...fixture, extra, selected, selectedPath: join(dirname(fixture.root), selected), manifestPath, packet, packetPath, findingsPaths, contents }
+}
+
+function verifyContextFixture(fixture) {
+  const args = [
+    verifyScript, 'review', '--file', fixture.findingsPaths[0], '--oracle', fixture.oracle,
+    '--packet', fixture.packetPath, '--revision', fixture.packet.targetRevision,
+    '--map', join(fixture.oracleDirectory, 'evidence.json'), '--ledger', join(fixture.oracleDirectory, 'runs.jsonl'),
+  ]
+  if (fixture.findingsPaths.length === 2) args.push('--intersect', fixture.findingsPaths[1])
+  return spawnSync(process.execPath, args, { encoding: 'utf8' })
+}
+
+test('O4 context manifest preserves selected file bytes and outside-scanRoot callers', async (t) => {
+  for (const frame of CONTEXT_FRAMES.filter(([, , , timing]) => timing === 'stable')) {
+    await t.test(frame.join(' '), async (t) => {
+      const fixture = await contextualReviewFixture(t, frame)
+      assert.equal(fixture.packet.reviewContext.files[0].path, fixture.selected)
+      assert.equal(fixture.packet.reviewContext.files[0].sha256, createHash('sha256').update(fixture.contents).digest('hex'))
+      const reviewed = transition(fixture.oracleDirectory, 'REVIEW_VERIFIED', fixture.reviewRunId, fixture.extra)
+      assert.equal(reviewed.status, 0, reviewed.stderr)
+      assert.equal((await state(fixture.oracleDirectory)).state, 'REVIEW_VERIFIED')
+    })
+  }
+})
+
+test('O7 changing or deleting a selected context file invalidates packet verification', async (t) => {
+  for (const frame of CONTEXT_FRAMES.filter(([, , , timing]) => timing === 'after-packet')) {
+    await t.test(frame.join(' '), async (t) => {
+      const fixture = await contextualReviewFixture(t, frame)
+      const valid = verifyContextFixture(fixture)
+      assert.equal(valid.status, 0, valid.stderr)
+      await writeFile(fixture.selectedPath, `${fixture.contents}\nchanged selected bytes\n`)
+      const stale = verifyContextFixture(fixture)
+      assert.equal(stale.status, 1)
+      assert.match(stale.stderr, /REVIEW_PACKET_STALE|SOURCE_CHANGED/)
+      await rm(fixture.selectedPath)
+      const deleted = verifyContextFixture(fixture)
+      assert.equal(deleted.status, 1)
+      assert.match(deleted.stderr, /REVIEW_PACKET_STALE|SOURCE_CHANGED/)
+      assert.equal((await state(fixture.oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+    })
+  }
+})
+
+test('O8 changing selected context after receipt blocks REVIEW_VERIFIED transition', async (t) => {
+  for (const frame of CONTEXT_FRAMES.filter(([, , , timing]) => timing === 'after-review')) {
+    await t.test(frame.join(' '), async (t) => {
+      const fixture = await contextualReviewFixture(t, frame)
+      const valid = verifyContextFixture(fixture)
+      assert.equal(valid.status, 0, valid.stderr)
+      await writeFile(fixture.selectedPath, `${fixture.contents}\nchanged after receipt\n`)
+      const stale = transition(fixture.oracleDirectory, 'REVIEW_VERIFIED', fixture.reviewRunId, fixture.extra)
+      assert.equal(stale.status, 1)
+      assert.match(stale.stderr, /^(?:REVIEW_PACKET_STALE|REVIEW_RUN_STALE|SOURCE_CHANGED):/)
+      assert.equal((await state(fixture.oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+    })
+  }
+})
+
+test('O3 contextual packet cannot bypass approval lock or VALID_RED gates', async (t) => {
+  const fixture = await workspace(t, { risk: 'medium' })
+  const packetPath = join(fixture.oracleDirectory, 'context-packet.json')
+  const contextPath = join(fixture.oracleDirectory, 'context.json')
+  await writeFile(contextPath, '{}')
+  const result = run([...strictReviewPacketArgs(fixture.oracleDirectory, packetPath), '--context', contextPath])
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /REVIEW_PACKET_STATE|VALID_RED|IMPLEMENTED_GREEN/)
+  assert.equal((await state(fixture.oracleDirectory)).state, 'ORACLE_READY')
+})
+
+test('context output alias cannot overwrite a selected observation or manifest', async (t) => {
+  const fixture = await contextualReviewFixture(t)
+  const repository = dirname(fixture.root)
+  const alias = join(fixture.oracleDirectory, 'same-directory')
+  await symlink(fixture.oracleDirectory, alias)
+  const context = contextManifestFor(relative(repository, fixture.packetPath), 'observation')
+  await writeFile(fixture.manifestPath, JSON.stringify(context))
+  const before = await readFile(fixture.packetPath, 'utf8')
+  const result = run([...strictReviewPacketArgs(fixture.oracleDirectory, join(alias, 'context-packet.json')), '--context', fixture.manifestPath])
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /REVIEW_PACKET_OUTPUT_INVALID/)
+  assert.equal(await readFile(fixture.packetPath, 'utf8'), before)
+})
+
+test('O10 missing context and exhausted investigation budget cannot become PASS or N/A', async (t) => {
+  for (const kind of ['unresolved', 'missing', 'budget']) {
+    const fixture = await contextualReviewFixture(t, undefined, (manifest) => {
+      if (kind === 'budget') manifest.budget.exhausted = true
+      else {
+        manifest.selections[0].applicability = kind === 'unresolved' ? 'unresolved' : 'not-applicable'
+        manifest.selections[0].missingContext = ['unread required owner']
+      }
+      return manifest
+    })
+    const rejected = verifyContextFixture(fixture)
+    assert.equal(rejected.status, 1)
+    assert.match(rejected.stderr, /REVIEW_CONTEXT_INCOMPLETE/)
+    assert.equal((await state(fixture.oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+  }
+})
+
+test('O12 contextual dimensions do not substitute for Medium or High independent reviews', async (t) => {
+  const fixture = await contextualReviewFixture(t, CONTEXT_FRAMES[3])
+  const valid = verifyContextFixture(fixture)
+  assert.equal(valid.status, 0, valid.stderr)
+  const document = JSON.parse(await readFile(fixture.findingsPaths[1], 'utf8'))
+  document.contextReview = document.contextReview.map((selection, index) => index < 2 ? { ...selection, applicability: 'not-applicable', reason: 'Other reviewer covers this perspective' } : selection)
+  delete document.orchestrationReceipt
+  await writeFile(fixture.findingsPaths[1], JSON.stringify(document))
+  assert.equal(issueReviewReceipt(fixture.oracleDirectory, fixture.packetPath, fixture.findingsPaths[1], fixture.packet.targetRevision).status, 0)
+  const partitioned = verifyContextFixture(fixture)
+  assert.equal(partitioned.status, 1)
+  assert.match(partitioned.stderr, /FINDINGS_INVALID/)
 })

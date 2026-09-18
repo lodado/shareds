@@ -67,7 +67,7 @@
     {
       "id": "low-fast-path",
       "path": "references/lanes/low-fast-path.md",
-      "when": "risk=Low — load only this node",
+      "when": "risk=Low — load only this node, including its existing scope carve-out at Low disqualification",
       "requires": []
     },
     {
@@ -121,13 +121,13 @@
     {
       "id": "card-retro-metrics",
       "path": "references/card/retro-metrics.md",
-      "when": "recording any defect found after the lock, and the run metrics at REVIEW_VERIFIED — read with the card lane so the escape classes are known before the sweep",
+      "when": "recording any defect found after the lock, the run metrics at REVIEW_VERIFIED, or reviewing an execution observation as a conditional guardrail candidate — read with the card lane so the escape classes are known before the sweep; candidate review is not a delivery gate and Low never loads this node",
       "requires": ["common", "card-case-space"]
     },
     {
       "id": "card-confirmation-lock",
       "path": "references/card/confirmation-lock.md",
-      "when": "just before user confirmation·lock·init",
+      "when": "just before user confirmation·lock·init, or when a stage detects a revision mismatch",
       "requires": ["common"]
     },
     {
@@ -139,13 +139,13 @@
     {
       "id": "delivery-ledger",
       "path": "references/delivery/ledger.md",
-      "when": "right after entering Delivery (after the explicit $test call)",
+      "when": "right after entering Delivery (after the explicit $test call), and within Delivery before an uncertain command or scope-changing recovery",
       "requires": ["common"]
     },
     {
       "id": "delivery-red",
       "path": "references/delivery/red.md",
-      "when": "writing tests·the VALID_RED transition",
+      "when": "Delivery only — writing tests·the VALID_RED transition, and before a test/harness correction on the RED-to-GREEN path",
       "requires": ["delivery-ledger", "bva"]
     },
     {
@@ -157,7 +157,7 @@
     {
       "id": "delivery-green-review",
       "path": "references/delivery/green-review.md",
-      "when": "self-feedback·GREEN·the review transition",
+      "when": "Delivery only — self-feedback·GREEN·the review transition, and before reporting completion with missing or failed evidence",
       "requires": ["delivery-ledger", "frontend-quality"]
     },
     {
@@ -248,7 +248,7 @@
     {
       "id": "subagent-review",
       "path": "references/subagent-review.md",
-      "when": "independent review after implementation·test verification",
+      "when": "Delivery only — before contextual packet collection and independent review after implementation/test verification",
       "requires": ["common", "changeability"]
     },
     {

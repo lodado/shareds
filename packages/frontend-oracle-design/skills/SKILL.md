@@ -144,6 +144,14 @@ Read `when` as the decision point, not the deliverable stage. If applicability i
 Whether to skip a load is not a judgment call. The read instructions inlined into each step of
 "Mode selection" own execution order; do not defer to this section to proceed through a step.
 
+Conditional execution guidance stays at the existing owner nodes: check confirmation-lock on a
+revision mismatch. In Delivery only, check delivery/ledger before an uncertain command or scope-changing recovery;
+delivery/red before a test/harness correction on the RED-to-GREEN path; delivery/green-review
+before reporting completion with missing or failed evidence. Within the loaded node, match `When`
+and `ApplyAt`; this is not an extra approval or delivery state. For a reusable execution observation,
+use card/retro-metrics' candidate review after immediate existing feedback routing. Low checks only
+its own scope carve-out at disqualification, with no additional node or artifact.
+
 - Only when a graph-orchestrated delivery loop is explicitly requested: load and invoke the
   installed `$agent-graph-engineering` skill by name, read
   [`graph-orchestration.md`](references/graph-orchestration.md) in full, then execute the bundled
@@ -162,7 +170,8 @@ Whether to skip a load is not a judgment call. The read instructions inlined int
   after drafting rows, declare the dimension space and
   dispositioning the machine-generated frames of `scripts/oracle-frames.mjs`,
   [`card/retro-metrics.md`](references/card/retro-metrics.md) — the escape record written for any
-  defect found after the lock and the run metrics recorded at `REVIEW_VERIFIED`, neither a gate,
+  defect found after the lock, the run metrics recorded at `REVIEW_VERIFIED`, and conditional
+  guardrail candidate review from execution observations, none a gate; Low never loads this node,
   [`card/confirmation-lock.md`](references/card/confirmation-lock.md).
 - Delivery: right after entering Delivery, explicitly load and invoke the installed `$test` skill
   by name; [`delivery/ledger.md`](references/delivery/ledger.md),
@@ -171,6 +180,10 @@ Whether to skip a load is not a judgment call. The read instructions inlined int
   [`delivery/green-review.md`](references/delivery/green-review.md),
   [`subagent-review.md`](references/subagent-review.md). Review criteria are not pasted into
   prompts — pass only the reference files matching the diff via `review-packet --review-point`.
+  Delivery only: before contextual packet collection and independent review after implementation/test
+  verification, use the existing `subagent-review` node for `--context` file selection and snapshot
+  binding. Supporting context does not replace common inputs, five-axis judgments or independent
+  reviews. Low and Design-only acquire no context artifacts or review steps.
 - For Delivery only, after risk and source investigation and before Draft/lock/init/test work,
   perform the capability discovery in `delivery/ledger.md`. This is an investigation result, not
   runtime readiness or `VALID_RED` evidence. Do not reject a runner from its package name alone:

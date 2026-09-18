@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { appendFile, lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { devNull } from 'node:os'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { forbiddenArgument, isTrustedAdapter, TRUSTED_ADAPTER_NAMES, trustedAdapter } from './oracle-adapters.mjs'
@@ -19,6 +19,7 @@ import {
   WEAKENING_TOKENS,
   ZERO_DIGEST,
 } from './oracle-fs.mjs'
+import { snapshotContext } from './oracle-review-context.mjs'
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const lockScript = join(scriptDirectory, 'oracle-lock.mjs')
@@ -64,6 +65,7 @@ const FLAG_NAMES = [
   'task-id',
   'blind-map',
   'blind-input',
+  'context',
 ]
 
 const BOOLEAN_FLAGS = new Set(['json', 'changed-files'])
@@ -2493,7 +2495,15 @@ async function budgetDigest(directory, state, name) {
   if (name === 'harness') {
     let paths = state.harnessPaths ?? []
     if (paths.length === 0) paths = Object.keys(current).filter(isTestPath)
-    return sha256(JSON.stringify(selectedDigests(current, paths.sort())))
+    const filesDigest = sha256(JSON.stringify(selectedDigests(current, paths.sort())))
+    // Before RED there is no frozen evidence binding; keep the existing file-only identity.
+    if (!state.testBindings?.evidenceSha256) return filesDigest
+    const evidenceDigest = await testEvidenceDigest(evidencePathFor(directory, state))
+    // Legacy spends have file-only digests. Preserve their deduplication only while the binding is unchanged.
+    if (evidenceDigest === state.testBindings.evidenceSha256 && state.budgets.harness.digests?.includes(filesDigest)) {
+      return filesDigest
+    }
+    return sha256(stableStringify({ filesDigest, evidenceDigest }))
   }
   if (name === 'policy') return verifyLock(directory, state).lockManifestSha256
   return productionSha256(current, state.harnessPaths)
@@ -2996,6 +3006,31 @@ async function reviewPacket(options) {
   if (oracleSnapshot.sha256 !== revision.oracleSha256) {
     throw new CliError('REVIEW_PACKET_INPUT_INVALID', 'Oracle bytes do not match the verified lock')
   }
+  let reviewContext
+  if (options.context) {
+    const contextSnapshot = await snapshotPacketFile(resolve(options.context), repositoryRoot, 'review context manifest', inputSnapshots)
+    const contextPath = contextSnapshot.realPath
+    let contextManifest
+    try {
+      contextManifest = JSON.parse(contextSnapshot.bytes.toString('utf8'))
+    } catch (error) {
+      throw new CliError('REVIEW_CONTEXT_INVALID', `Cannot read context manifest: ${error.message}`)
+    }
+    try {
+      const selected = await snapshotContext(contextManifest, {
+        root: repositoryRoot, oracle: oracleSnapshot.bytes.toString('utf8'),
+        lock: manifest, lockDirectory, reviewPoints,
+      })
+      inputSnapshots.push(...selected.snapshots.map((snapshot) => ({ label: 'context file', snapshot })))
+      reviewContext = {
+        ...selected.context,
+        repositoryRoot: portablePath(directoryReal, repositoryRoot),
+        manifest: { path: portablePath(repositoryRoot, contextPath), sha256: contextSnapshot.sha256 },
+      }
+    } catch (error) {
+      throw new CliError('REVIEW_CONTEXT_INVALID', error.message)
+    }
+  }
   const evidencePath = evidencePathFor(directory, state)
   const evidenceSnapshot = await snapshotPacketFile(evidencePath, directoryReal, 'evidence map', inputSnapshots)
   let evidence
@@ -3013,8 +3048,10 @@ async function reviewPacket(options) {
     evidencePath,
     ...(decisionPath ? [decisionPath] : []),
     ...manifest.sources.map((source) => resolve(lockDirectory, source.path)),
+    ...inputSnapshots.map((input) => input.snapshot.path),
   ])
-  if (protectedPaths.has(output)) {
+  const outputReal = join(outputParentReal, basename(output))
+  if (protectedPaths.has(output) || inputSnapshots.some(({ snapshot }) => snapshot.realPath === outputReal)) {
     throw new CliError('REVIEW_PACKET_OUTPUT_INVALID', '--output cannot overwrite a review input artifact')
   }
 
@@ -3094,6 +3131,7 @@ async function reviewPacket(options) {
     targetSnapshot,
     ...(implementationDecision ? { implementationDecision } : {}),
     ...(reviewPoints.length ? { reviewPoints } : {}),
+    ...(reviewContext ? { reviewContext } : {}),
     changedFiles,
     diff: gitDiff(scanRoot, changed, state.snapshot, current),
     pending,

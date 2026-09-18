@@ -320,3 +320,32 @@ In addition to the common prohibitions in [`common.md`](../common.md):
 
 If it is still not GREEN after 3 rounds, report `FAIL` including the remaining card violations and the
 actual output. Do not do unbounded self-improvement.
+
+## Conditional seed — truthful evidence
+
+Proposed existing-contract projection, not an incident, approval or extra gate. The linked contracts
+already apply; candidate management belongs to `card/retro-metrics.md`, not this stage.
+
+```json
+{
+  "id": "truthful-evidence",
+  "revision": 1,
+  "status": "proposed",
+  "origin": "existing-contract",
+  "When": "A progress or completion report includes failed, unexecuted, stale, exit-only or missing required evidence.",
+  "DoNot": "Present those checks as PASS, fabricate runIds/artifacts, or claim REVIEW_VERIFIED without its required evidence and transition.",
+  "Unless": "No exception makes absent evidence a pass. Actually passing local checks may be reported with their real scope/runId even when required browser evidence is unavailable. A source-backed N/A uses the existing approved revision and manifest procedure.",
+  "Instead": "Separate actual run results from unverified scope and name the blocking evidence. Repair EVIDENCE_GAP only inside the locked contract. POLICY_GAP stays NEEDS_DECISION; impossible required environment judgment stays ENVIRONMENT_DEFECT -> FAIL. Visual pending may retain IMPLEMENTED_GREEN only as existing manifest rules permit, never REVIEW_VERIFIED. Do not erase real local passes or relax gates.",
+  "ApplyAt": ["self-feedback", "IMPLEMENTED_GREEN", "REVIEW_VERIFIED", "completion report"],
+  "authorityRefs": [
+    "references/delivery/ledger.md#adjudication-commands-run-through-the-ledger",
+    "references/delivery/green-review.md#evidence-manifest",
+    "references/common.md#feedback-routing--canonical-classification"
+  ],
+  "evidenceRefs": [],
+  "regressionCases": {
+    "mustPrevent": ["fod-sem-guard-truthful-evidence-prevent"],
+    "mustAllow": ["fod-sem-guard-truthful-evidence-allow"]
+  }
+}
+```
