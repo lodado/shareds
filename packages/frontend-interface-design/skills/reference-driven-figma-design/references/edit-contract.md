@@ -42,3 +42,11 @@ Menus/buttons: single-line fit, width, Hug→Fill, touch target. Body: content w
 ## 6. Delivery, versions
 
 Link source / previous review / improvement / rejected / delivery; desktop, mobile, prototype, integration each verified / unverified / out of scope. In-scope unresolved is INCOMPLETE.
+
+## Refactor boundary
+
+Refactor describes a preservation constraint, not a new mode or redesign permission. Record
+which existing mode fits each section; preserve appearance, behavior, content, and source ownership
+while normalizing tokens, aliases, bindings, and component reuse. Changes to those preserved
+properties require separately resolved scope. Missing source never authorizes a replacement design.
+Use [foundations-brand-workflow.md](foundations-brand-workflow.md) for source feasibility and binding verification.

@@ -82,6 +82,69 @@ test('preserves the source hierarchy and separates visual system from compositio
   assert.match(skill, /Never copy external color, font, radius, shadow/i)
 })
 
+test('locks the journey-first dependency order and material-decision interview contract', async () => {
+  const [skill, request, wireframes, foundations] = await Promise.all([
+    readSkillFile('SKILL.md'),
+    readSkillFile('references/request-contract.md'),
+    readSkillFile('references/hci-wireframe-workflow.md'),
+    readSkillFile('references/foundations-brand-workflow.md'),
+  ])
+
+  assert.match(skill, /\]\(references\/foundations-brand-workflow\.md\)/)
+  const stages = [
+    /Stage 1\s*[—-]\s*Core journey/i,
+    /Stage 2\s*[—-]\s*Requirements and wireframes/i,
+    /Stage 3\s*[—-]\s*Brand, foundations, and semantic tokens/i,
+    /Stage 4\s*[—-]\s*UI composition and verification/i,
+  ]
+  const executionMatch = skill.match(/## Execution loop[\s\S]*?(?=\n## |$)/i)
+  assert.ok(executionMatch, 'missing canonical ## Execution loop section')
+  const executionLoop = executionMatch[0]
+  let cursor = -1
+  for (const stage of stages) {
+    const match = executionLoop.match(stage)
+    assert.ok(match, `missing canonical stage: ${stage}`)
+    const index = match.index ?? -1
+    assert.ok(index > cursor, `canonical stages are out of order: ${stage}`)
+    cursor = index
+  }
+  assert.doesNotMatch(executionLoop, /Select base[\s\S]*Research[\s\S]*Sketch/i)
+  assert.match(request, /one question per round|normally one question/i)
+  assert.match(request, /2[–-]3 independent questions per round/i)
+  assert.match(request, /no (?:total|global).*question.*(?:cap|quota)/i)
+  assert.match(request, /external grill-me.*optional|grill-me.*unavailable/i)
+  assert.match(request, /directly.*user.*question|user-facing.*interview/i)
+  assert.doesNotMatch(
+    `${skill}\n${request}`,
+    /1[–-]3 questions? (?:max|total)|question yourself|self-(?:only|questioning) fallback/i,
+  )
+  assert.match(wireframes, /screen.*purpose|requirements.*wireframe/i)
+  assert.match(wireframes, /loading|empty|error|recovery/i)
+  assert.match(foundations, /semantic.*token/i)
+  assert.match(foundations, /Variables|Text Styles|editable component/i)
+  assert.match(foundations, /read.*access.*not.*import|import.*preflight/i)
+})
+
+test('locks refactor preservation, targeted reopening, and explicit output boundaries', async () => {
+  const [skill, foundations, delivery] = await Promise.all([
+    readSkillFile('SKILL.md'),
+    readSkillFile('references/foundations-brand-workflow.md'),
+    readSkillFile('references/delivery-contract.md'),
+  ])
+
+  assert.match(skill, /refactor|reuse.*approved|preserve.*existing/i)
+  assert.match(foundations, /refactor.*preserv|reuse.*existing.*(?:ID|asset|component)/i)
+  assert.match(foundations, /concrete.*(?:Figma|artifact)|Variables.*(?:Styles|component)/i)
+  assert.match(delivery, /partial|upstream|not.*complete|blocked/i)
+  assert.match(delivery, /reopen.*(?:earliest|affected)|dependent.*stale/i)
+  assert.match(foundations, /Read back\s+bindings/i)
+  assert.match(foundations, /mutation(?: is)? authorized[\s\S]*verify propagation/i)
+  assert.match(foundations, /Markdown token table[\s\S]*not.*design system/i)
+  assert.match(skill, /Never redraw[\s\S]*screenshot/i)
+  assert.match(skill, /ux-flow-diagram.*explicit|explicit.*ux-flow-diagram/i)
+  assert.match(skill, /requires Figma read\/write|No write.*BLOCKED/i)
+})
+
 test('runs internal-first research, a three-section pilot, bounded critique, and asset promotion', async () => {
   const [skill, research, composition, critique, learning] = await Promise.all([
     readSkillFile('SKILL.md'),
@@ -178,7 +241,7 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
   const ids = cases.map(({ id }) => id)
 
   assert.equal(schemaVersion, '1.0')
-  assert.equal(cases.length, 54)
+  assert.equal(cases.length, 62)
   assert.equal(new Set(ids).size, cases.length)
   for (const id of [
     'editable-reference-assembly-not-redraw',
@@ -202,6 +265,14 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
     'five-planes-surface-evidence-and-delegation',
     'five-planes-small-fidelity-skips-interview',
     'five-planes-late-finding-reopens-only-dependencies',
+    'journey-first-canonical-order',
+    'journey-material-completion-grill',
+    'wireframe-requirements-recovery',
+    'foundation-semantic-token-artifacts',
+    'source-import-preflight-read-not-import',
+    'refactor-preserves-approved-system',
+    'targeted-reopen-upstream-dependency',
+    'boundaries-preserve-no-redraw-and-explicit-diagram',
   ]) {
     assert.ok(ids.includes(id), `Missing assembly regression case: ${id}`)
   }

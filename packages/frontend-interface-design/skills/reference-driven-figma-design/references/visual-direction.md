@@ -21,3 +21,10 @@ Reference Log per option, real frame/capture locations: option, task hypothesis,
 Max-three top issues and partial-fix rule from [critique loop](critique-refinement.md). Phrase as `target frame/node or capture number → observed problem → task impact → what changes → what is preserved`.
 
 Before and after on the **same content, viewport, and state**. No evidence of improvement → no success report. Never regenerate a page to fix one frame; structural misfit reopens mapping.
+
+## Stage 3 dependency
+
+Apply [foundations-brand-workflow.md](foundations-brand-workflow.md) after journey and wireframe
+readiness. Early visual research is provisional, not permission to finalize a template first.
+For a refactor, preserve the approved visual system; do not offer a reskin as routine cleanup.
+New evidence reopens only the affected decision and marks its dependent artifacts stale.

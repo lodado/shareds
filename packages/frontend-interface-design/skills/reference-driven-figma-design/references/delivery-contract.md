@@ -37,3 +37,13 @@ Report separately: `technical` (read/write and structure checks), `design-self-r
 ## 6. Forbidden handoffs
 
 Invented Figma URL, node ID, component, or variable; PNG or HTML output called a "Figma mock"; static preview ahead of the link; unfinished pilot called full-page completion; code generation counted as delivery; fake metrics, testimonials, or logos.
+
+## Stage readiness and reopening
+
+Distinguish upstream preparation, verified system assets, and verified product screens. A journey,
+wireframe, branding guide, or token table is not a complete design-system or screen-refactor delivery.
+Use [foundations-brand-workflow.md](foundations-brand-workflow.md) for concrete assets, ownership,
+bindings, and propagation evidence; report unverified checks explicitly. Reopen only the earliest
+affected stage when evidence changes; mark dependent artifacts stale until reverified.
+Keep the existing result statuses and schema. FIGMA_READY requires every in-scope deliverable,
+not merely the current stage's documents. Do not invent user acceptance or IDs.

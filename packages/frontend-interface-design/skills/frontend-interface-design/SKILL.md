@@ -10,3 +10,5 @@ Read [Reference-Driven Figma Design](../reference-driven-figma-design/SKILL.md) 
 Output is editable Figma; never fall back to code or static images when Figma write is missing — report BLOCKED.
 
 Contracts: [request-contract.md](../reference-driven-figma-design/references/request-contract.md), [hci-wireframe-workflow.md](../reference-driven-figma-design/references/hci-wireframe-workflow.md), [taxonomy-reference-workflow.md](../reference-driven-figma-design/references/taxonomy-reference-workflow.md), [edit-contract.md](../reference-driven-figma-design/references/edit-contract.md).
+
+Follow the canonical journey → requirements/wireframes → brand/foundations/semantic tokens → UI verification flow, reusing verified decisions for existing-design refactors.

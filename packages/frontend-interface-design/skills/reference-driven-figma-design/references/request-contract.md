@@ -14,27 +14,48 @@ Known before touching canvas: product; outcome (key action); scope (screens, sec
 
 New screens, major composition/behavior changes, and wireframe requests apply [HCI pre-design](hci-wireframe-workflow.md) before the first Figma write, tied to the brief's audience/primary_outcome/success_signals and scope.states. Asked to review first → explain and wait.
 
-## 3. Five planes and grill-me questions
+## 3. Embedded grill protocol — evidence first, user-facing decisions
 
-Strategy → Scope → Structure → Skeleton → Surface (abstract → concrete); a mock problem may reopen a lower plane. Dependent mocks are hypotheses; nothing upper is finalized over an open dependency; a stated wait-for-review holds.
+Use this user-facing interview at every execution stage, not only intake. Strategy → Scope →
+Structure → Skeleton → Surface helps locate the earliest unresolved dependency. A downstream
+mock is a hypothesis until that dependency is resolved; explicit wait-for-review remains binding.
 
-Ask only when the answer changes the outcome; never push Skeleton pixel values or approved-direction Surface details onto the user:
+1. Read available PRD, sources, earlier answers, and existing decisions before asking.
+2. Classify the gap: retrievable fact (inspect it), delegated reversible detail (decide and log),
+   material user decision (ask), or technical/permission blocker (diagnose and report).
+3. Ask the earliest material decision, normally one question per round. At most **2–3 independent questions per round**;
+   there is **no total question cap or quota**. Explain the affected choice, recommendation, and
+   tradeoffs; offer exclusive alternatives when useful and always allow a free-text answer.
+4. Follow the answer's consequences and contradictions until usable. Do not rephrase settled
+   questions unless new evidence changes their basis. Never substitute an agent proposal for a user answer.
+5. No answer is not approval: leave dependent artifacts provisional and continue only independent
+   safe work. Respect requests to stop questions; summarize the unresolved decision and its impact
+   rather than inventing agreement. Stop when material decisions are resolved, not at a fixed count.
+   Record harmless residual assumptions; do not promise zero ambiguity.
 
-**Strategy** user, context, purpose, core task, success signals → brief. **Scope** features, content, states, devices, exclude/preserve → scope, locked constraints. **Structure** grouping, entry/exit, screen relations, recovery → HCI flow. **Skeleton** hierarchy, placement, navigation, keyboard, responsive → numbered sketches. **Surface** brand, type, color, imagery, motion → [visual alternatives](visual-direction.md), as real differences, not adjectives.
+Question targets by stage:
 
-### When to ask vs continue
+- **Core journey:** Who is acting, why now, and what makes the task complete? Which authentication,
+  payment, permission, privacy, or recovery policy changes the path? What is explicitly excluded?
+- **Requirements and wireframes:** What happens on each action, back/cancel, loading, empty,
+  error/retry, and success? What persists? Is the behavior real, proposed, or prototype-only?
+- **Brand and foundations:** What must remain unchanged? Which source wins when code, Figma,
+  and an approved image disagree? Is the image layout guidance or exact visual authority?
+  Who owns future updates: a live library or an explicitly agreed local snapshot?
+- **UI verification:** Does new evidence invalidate the journey, interaction, or visual contract?
+  Reopen the earliest affected stage only; keep unrelated decisions settled and dependent artifacts stale.
 
-1. Answerable from PRD, approved source, or earlier answers → extract it, do not ask.
-2. Delegated judgment inside agreed scope → decide it, record the basis.
-3. A decision materially changing purpose, scope, flow, preserved items, or brand → ask that item only, wait as `NEEDS_INPUT`.
+External grill-me is optional. If available, read its real instructions and honor invocation
+restrictions, including explicit-only rules. If grill-me is unavailable, perform this embedded
+user-facing interview directly; do not claim to have invoked it or install another skill.
+Use the host's supported question surface: attached OMX/tmux uses `omx question` and waits for
+its returned answer; other hosts use native structured questions or one concise plain-text question.
+Missing tmux is not missing design capability.
 
-`grill-me`/`grilling` installed → follow its real instructions and invocation scope, never bypassing explicit-invocation-only; absent → question yourself, never claiming you called it. Add no new skills, helpers, or JSON fields.
-
-Earliest open decision first, one at a time; settled decisions stay settled. Present 1–3 independent questions (a limit, not a quota): the design choice each changes, your recommendation, 2–3 exclusive alternatives or a direct answer.
-
-"Make it sleek" is not brand delegation; delegation inside a direction is no authority over positioning or the visual system. Never invent payment, deletion, permission, or privacy policy as a delegation.
-
-Confirm the cause plane rather than the symptom and reopen only it. Log `decision → basis (source / user answer / delegated choice) → applied location` in the existing brief, scope, sketches, and Reference Log; no extra documents, and never relax critique-budget, source, permission, or completion gates.
+"Make it sleek" does not delegate brand positioning. Never invent payment, deletion, permission,
+or privacy policy. Log `decision → basis (source / user answer / delegated choice) → provisional
+or resolved → affected artifact → reopening condition` in the existing brief/Reference Log.
+No new schema fields or workflow statuses; never relax source, permission, critique, or completion gates.
 
 ## 4. No base template given
 

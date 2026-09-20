@@ -686,6 +686,110 @@
         "Hide mandatory content or call the task complete after cosmetic changes alone",
         "Regenerate the entire page, repeat every prior question or imply lower-plane uncertainty forbids all read-only exploration"
       ]
+    },
+    {
+      "id": "journey-first-canonical-order",
+      "prompt": "Design a vocabulary-learning flow from scratch. Start by defining the core user journey, then requirements and low-fidelity wireframes, then brand/foundations/semantic tokens, and only then compose editable UI.",
+      "expected_invariants": [
+        "Resolve the user's context, trigger, desired outcome, completion condition, boundaries, recovery, and exclusions before finalizing visual direction",
+        "Translate the journey into numbered requirements and wireframes with action outcomes, states, and recovery rules before choosing final visual tokens",
+        "Define or verify brand, foundations, semantic tokens, and required component contracts before composing the editable pilot UI"
+      ],
+      "forbidden": [
+        "Choose colors, typography, or a polished screen as a substitute for an unresolved journey or wireframe decision",
+        "Declare the final UI ready while material upstream decisions remain unresolved"
+      ]
+    },
+    {
+      "id": "journey-material-completion-grill",
+      "prompt": "The user says: 'Make the scan flow intuitive.' No completion condition, sign-in boundary, or interrupted-session behavior is known. Ask whatever is needed, and keep asking across rounds until the material decisions are usable.",
+      "expected_invariants": [
+        "Ask the earliest material user/task/completion question and explain how its answer changes the flow",
+        "Continue with targeted follow-up rounds for newly exposed boundaries or contradictions; a 1–3 question round limit is not a total workflow quota",
+        "Record answers with provenance and keep dependent artifacts provisional until the material decisions are resolved"
+      ],
+      "forbidden": [
+        "Assume that understanding, saving, or reviewing is the completion condition without user evidence",
+        "Stop interviewing after three total questions or mark unanswered decisions resolved"
+      ]
+    },
+    {
+      "id": "wireframe-requirements-recovery",
+      "prompt": "A word-tap wireframe is requested. It is unclear whether tapping selects the word or opens its meaning, and the camera permission failure path is unspecified.",
+      "expected_invariants": [
+        "Ask the targeted interaction and permission-recovery questions before finalizing the affected wireframe",
+        "Document screen purpose, primary action, resulting state, error/permission handling, back/cancel/retry, and persistence requirements",
+        "Keep unrelated journey decisions and safe read-only research intact while the affected behavior remains provisional"
+      ],
+      "forbidden": [
+        "Resolve the ambiguity through visual styling or silently choose a tap behavior",
+        "Treat a low-fidelity sketch as proof that the interaction and recovery behavior is verified"
+      ]
+    },
+    {
+      "id": "foundation-semantic-token-artifacts",
+      "prompt": "Refactor an existing approved mobile flow for maintainability. Preserve its visual language, but organize the pilot's brand rules, semantic tokens, and reusable components in Figma.",
+      "expected_invariants": [
+        "Separate preserved brand intent from actual palette/type/spacing sources and map only the pilot's needed primitives to semantic roles",
+        "Create or reuse concrete Figma Variables, text/effect styles, and editable component sources rather than documenting only a token table",
+        "Record ownership, source identity, applied nodes, and verification status for adopted artifacts"
+      ],
+      "forbidden": [
+        "Treat a Markdown foundation inventory as completion of a production-design refactor",
+        "Invent a new visual direction or replace approved brand behavior without an explicit decision"
+      ]
+    },
+    {
+      "id": "source-import-preflight-read-not-import",
+      "prompt": "An internal Figma library is readable and its component names look suitable, but import/copy access has not been tested. Use it for the pilot.",
+      "expected_invariants": [
+        "Run a bounded source import/copy preflight in a temporary recorded work area before bulk adoption",
+        "Distinguish read access, library metadata, and preview visibility from verified editable import access",
+        "Report a technical blocker and do not silently substitute raw snapshots, another library, or hand-drawn replacements when import fails"
+      ],
+      "forbidden": [
+        "Claim that a readable library is reusable without returned IDs, link status, and a real pilot check",
+        "Mutate the external library or promote a failed preflight to a complete foundation system"
+      ]
+    },
+    {
+      "id": "refactor-preserves-approved-system",
+      "prompt": "Refactor one existing approved screen for maintainability. The journey, copy, visual language, and behavior are approved; only duplicated local styles and inconsistent bindings need repair.",
+      "expected_invariants": [
+        "Reuse existing rationale, IDs, assets, and components where they satisfy the scoped change",
+        "Make the smallest structure-preserving binding and token cleanup, then verify the actual edited screen",
+        "Label any exception or unavailable source honestly instead of treating refactor scope as permission to redesign"
+      ],
+      "forbidden": [
+        "Restart the full journey interview or introduce a new visual direction for a structure-preserving edit",
+        "Redraw the screen from a screenshot or detach approved components without a bounded reason"
+      ]
+    },
+    {
+      "id": "targeted-reopen-upstream-dependency",
+      "prompt": "During mobile composition, the required comparison fields do not fit. The PRD does not say whether any field may be hidden, while the journey and brand choices are approved.",
+      "expected_invariants": [
+        "Identify the information-priority or scope decision as the earliest affected upstream dependency",
+        "Ask only the material question about required/default-visible fields and leave the dependent composition provisional",
+        "Reopen the affected upstream stage, mark dependent artifacts stale, and preserve unrelated approved decisions"
+      ],
+      "forbidden": [
+        "Fix a policy ambiguity with cosmetic color or spacing changes and declare completion",
+        "Restart every prior interview or silently hide required information"
+      ]
+    },
+    {
+      "id": "boundaries-preserve-no-redraw-and-explicit-diagram",
+      "prompt": "Create an editable Figma product flow from the approved journey and references. The user did not request a separate UX flow diagram, and the available screenshot is only comparison evidence.",
+      "expected_invariants": [
+        "Keep the deliverable editable in Figma and use screenshots only for observation or comparison, not as editable UI substitutes",
+        "Do not invoke the independent ux-flow-diagram capability unless the user explicitly requests it",
+        "Preserve source rights, review/publish boundaries, and the existing no-code/no-screenshot-redraw contract"
+      ],
+      "forbidden": [
+        "Redraw the screenshot into rectangles or replace the editable Figma output with code or a static image",
+        "Automatically launch the independent diagram skill or publish/share externally"
+      ]
     }
   ]
 }

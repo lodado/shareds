@@ -9,13 +9,35 @@ doesn't prove usability — outputs below are a hypothesis to verify.
 Read first: [request-contract](request-contract.md) §3 (five planes + Grill questions).
 
 Derive flow from Strategy/Scope into Skeleton layout. Overlap research/sketching; ask only
-on a new contradiction, no per-plane gate. Extract the brief from PRD/internal screens; don't
+on a new contradiction, no ceremonial per-plane approval; the four execution stages still require artifact readiness. Extract the brief from PRD/internal screens; don't
 re-ask given answers, don't invent fake personas/research/metrics. Mark unclear non-blocking
 items `proposed/unverified`; ask only about conflicts changing product direction.
 
 Brief fields: users/context (skill, frequency, device, constraints) · core task (one
 sentence, user language) · entry/info needs · action → feedback → error/recovery,
 CTA/next-CTA · states: empty, loading, success, error, permission.
+
+### Stage 1 output and readiness
+
+Record primary user/context, trigger, entry, desired outcome/completion, main path, policy boundaries,
+recovery, and in/out scope in the existing brief/Reference Log. Give journey steps stable identifiers
+and separate observed behavior from proposed behavior. Ready when no material user, purpose,
+completion, or policy decision would change the core flow. Inspect existing flows instead of
+inventing personas or re-interviewing decisions already supported by evidence.
+
+### Stage 2 output and readiness
+
+Link `journey step → screen/state → requirement → numbered wireframe → acceptance check` in the
+Reference Log. Each screen needs a purpose, entry/exit, primary/secondary actions, required content,
+and next state. Cover relevant loading, empty, error, permission, and success states; specify what
+back/cancel preserves and how retry recovers. Distinguish product/backend policy from prototype-only
+behavior. A low-fidelity sketch must explain task order, information hierarchy, and focus intent;
+color and typography cannot substitute for unresolved structural decisions.
+
+Ready when important actions have a supported next state and recovery rule, and requirements do
+not contradict Stage 1. Ask unresolved product decisions via the request contract, without a global
+question quota. Use 1–3 key wireframes to test the decision; expand only as scope requires.
+Read-only research can overlap, but template adoption and final UI cannot bypass these checkpoints.
 
 ## 2. Compare 2–3 similar-task references
 
