@@ -120,6 +120,12 @@ test('locks the journey-first dependency order and material-decision interview c
   )
   assert.match(wireframes, /screen.*purpose|requirements.*wireframe/i)
   assert.match(wireframes, /loading|empty|error|recovery/i)
+  assert.match(executionLoop, /first-value\s+moment\s+\(activation\)/i)
+  assert.match(wireframes, /activation.*first-value moment|first-value moment.*activation/is)
+  assert.match(wireframes, /true prerequisite.*deferrable guidance/is)
+  assert.match(wireframes, /empty state.*activation CTA/is)
+  assert.match(wireframes, /Tour dismissed.*not\s+a success state/is)
+  assert.match(request, /single action first delivers the core value/i)
   assert.match(foundations, /semantic.*token/i)
   assert.match(foundations, /Variables|Text Styles|editable component/i)
   assert.match(foundations, /read.*access.*not.*import|import.*preflight/i)
@@ -241,7 +247,7 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
   const ids = cases.map(({ id }) => id)
 
   assert.equal(schemaVersion, '1.0')
-  assert.equal(cases.length, 62)
+  assert.equal(cases.length, 63)
   assert.equal(new Set(ids).size, cases.length)
   for (const id of [
     'editable-reference-assembly-not-redraw',
@@ -273,6 +279,7 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
     'refactor-preserves-approved-system',
     'targeted-reopen-upstream-dependency',
     'boundaries-preserve-no-redraw-and-explicit-diagram',
+    'activation-before-onboarding-ceremony',
   ]) {
     assert.ok(ids.includes(id), `Missing assembly regression case: ${id}`)
   }

@@ -790,6 +790,19 @@
         "Redraw the screenshot into rectangles or replace the editable Figma output with code or a static image",
         "Automatically launch the independent diagram skill or publish/share externally"
       ]
+    },
+    {
+      "id": "activation-before-onboarding-ceremony",
+      "prompt": "신규 사용자 온보딩 디자인해줘. 가입, 환영 메시지, 제품 투어, 초기 설정, 툴팁 다 넣어줘.",
+      "expected_invariants": [
+        "Name the single activation action, the first-value moment, before designing any onboarding step",
+        "Classify each onboarding step as a true prerequisite or deferrable guidance; keep deferrable steps skippable and off the main path",
+        "Wireframe the shortest entry-to-activation path and put the activation CTA in the empty state"
+      ],
+      "forbidden": [
+        "Treat tour dismissal, settings saved or profile completion as journey completion or a success state",
+        "Add a welcome modal, tour or tooltips without a named activation action they lead to"
+      ]
     }
   ]
 }

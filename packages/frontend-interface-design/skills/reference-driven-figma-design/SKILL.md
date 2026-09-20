@@ -83,8 +83,8 @@ decision remains unresolved. Verified existing evidence can satisfy a checkpoint
 
 ### Stage 1 — Core journey
 
-Define the primary user/context, trigger, entry, core task, completion condition, main path,
-recovery, policy boundaries, and exclusions. Link stable journey-step identifiers to the brief.
+Define the primary user/context, trigger, entry, core task, completion condition, first-value
+moment (activation) for first-time users, main path, recovery, policy boundaries, and exclusions. Link stable journey-step identifiers to the brief.
 Ask about unresolved purpose or completion before dependent visual preferences.
 Ready when no unresolved user, outcome, or policy decision would change the core flow.
 See [hci-wireframe-workflow.md](references/hci-wireframe-workflow.md).

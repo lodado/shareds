@@ -35,7 +35,9 @@ mock is a hypothesis until that dependency is resolved; explicit wait-for-review
 
 Question targets by stage:
 
-- **Core journey:** Who is acting, why now, and what makes the task complete? Which authentication,
+- **Core journey:** Who is acting, why now, and what makes the task complete? For a first-time
+  user, which single action first delivers the core value, and which onboarding steps are true
+  prerequisites of that action versus deferrable guidance? Which authentication,
   payment, permission, privacy, or recovery policy changes the path? What is explicitly excluded?
 - **Requirements and wireframes:** What happens on each action, back/cancel, loading, empty,
   error/retry, and success? What persists? Is the behavior real, proposed, or prototype-only?

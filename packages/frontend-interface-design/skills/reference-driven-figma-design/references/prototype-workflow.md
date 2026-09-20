@@ -7,7 +7,7 @@ checks approved Figma reactions while the diagram skill reads a prototype on dem
 ## Before the first write
 
 1. Derive the flow from the brief and HCI wireframe.
-2. Identify only approved behavior: entry, primary success, validation/error recovery,
+2. Identify only approved behavior: entry to the activation action, primary success, validation/error recovery,
    cancel/back, and required overlay open/close paths.
 3. Mark unresolved business rules (permissions, payment outcomes, server retries,
    destructive retention) as `proposed` or `unverified`; never invent them.

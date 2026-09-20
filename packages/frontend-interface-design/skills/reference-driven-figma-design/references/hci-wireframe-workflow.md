@@ -21,8 +21,17 @@ CTA/next-CTA · states: empty, loading, success, error, permission.
 
 Record primary user/context, trigger, entry, desired outcome/completion, main path, policy boundaries,
 recovery, and in/out scope in the existing brief/Reference Log. Give journey steps stable identifiers
-and separate observed behavior from proposed behavior. Ready when no material user, purpose,
-completion, or policy decision would change the core flow. Inspect existing flows instead of
+and separate observed behavior from proposed behavior.
+
+When the journey includes a first-time user, name the **activation** step: the single action where
+the user first solves their own problem with the product (the first-value moment). Onboarding
+(signup, welcome, tour, settings, tooltips) is the process leading there, not the completion.
+Classify each onboarding step as a _true prerequisite_ (the activation action is impossible without
+it) or _deferrable guidance_ (tour, tooltip, profile completion); deferrable steps leave the main
+path or become skippable. Returning-user tasks record `activation = completion` and skip this.
+
+Ready when no material user, purpose, completion, or policy decision would change the core flow,
+and the activation action is reachable from entry on the main path with no deferrable step before it. Inspect existing flows instead of
 inventing personas or re-interviewing decisions already supported by evidence.
 
 ### Stage 2 output and readiness
@@ -31,7 +40,10 @@ Link `journey step → screen/state → requirement → numbered wireframe → a
 Reference Log. Each screen needs a purpose, entry/exit, primary/secondary actions, required content,
 and next state. Cover relevant loading, empty, error, permission, and success states; specify what
 back/cancel preserves and how retry recovers. Distinguish product/backend policy from prototype-only
-behavior. A low-fidelity sketch must explain task order, information hierarchy, and focus intent;
+behavior. For a first-time journey, record the observed count of screens and actions between entry
+and the activation action as an acceptance check; the empty state is the main onboarding surface and
+must carry the activation CTA, not only a "no data" message. Tour dismissed or settings saved is not
+a success state — success is feedback on the activation action itself. A low-fidelity sketch must explain task order, information hierarchy, and focus intent;
 color and typography cannot substitute for unresolved structural decisions.
 
 Ready when important actions have a supported next state and recovery rule, and requirements do
@@ -108,7 +120,8 @@ sourced asset/component → applied frame/state`. Preserve originals, links, edi
 the pilot with real content. Log changed flow/state when upgrading a sketch; confirm
 decisions that change product policy or approved scope.
 
-Self task-walkthrough at sketch stage: does the user know where to act? Is
+Self task-walkthrough at sketch stage: does the user know where to act? Does a first-time user
+reach the core-value action before any deferrable setup? Is
 feedback/completion visible after each action? Can they recover from/cancel the key error? Is
 keyboard read/focus order designed? Verify against agreed screens/states and the real
 prototype path — not static-mock verification, can't cover network/backend behavior. See
