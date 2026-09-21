@@ -22,12 +22,14 @@
     "./strict-types": "./strict-types.js",
     "./interaction": "./interaction.js",
     "./functional": "./functional.mjs",
-    "./tailwind": "./tailwind.js"
+    "./tailwind": "./tailwind.js",
+    "./ai": "./ai.js"
   },
   "main": "index.mjs",
   "files": [
     "QUALITY.md",
     "a11y.js",
+    "ai.js",
     "fsd.js",
     "functional.mjs",
     "index.mjs",
@@ -50,14 +52,18 @@
   },
   "scripts": {
     "test": "node test.js && node --test feedback.test.mjs functional.test.mjs",
-    "lint": "eslint index.mjs react.mjs next.js a11y.js turbo.js local-rules.js testing.js query.js quality.js fsd.js interaction.js test.js strict-types.js tailwind.js functional.mjs feedback.test.mjs functional.test.mjs package.json"
+    "lint": "eslint index.mjs ai.js react.mjs next.js a11y.js turbo.js local-rules.js testing.js query.js quality.js fsd.js interaction.js test.js strict-types.js tailwind.js functional.mjs feedback.test.mjs functional.test.mjs package.json"
   },
   "peerDependencies": {
     "eslint": "^10.0.0",
+    "eslint-plugin-ai-guard": "^1.3.0",
     "eslint-plugin-better-tailwindcss": "^4.7.0",
     "tailwindcss": "^4.1.17"
   },
   "peerDependenciesMeta": {
+    "eslint-plugin-ai-guard": {
+      "optional": true
+    },
     "eslint-plugin-better-tailwindcss": {
       "optional": true
     },
@@ -85,6 +91,7 @@
   },
   "devDependencies": {
     "eslint": "^10.11.0",
+    "eslint-plugin-ai-guard": "^1.3.0",
     "eslint-plugin-better-tailwindcss": "^4.7.0",
     "tailwindcss": "^4.1.17"
   }

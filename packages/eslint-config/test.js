@@ -19,6 +19,7 @@ const PRESETS = {
   query: require('./query.js'),
   quality: require('./quality.js'),
   tailwind: require('./tailwind.js'),
+  ai: require('./ai.js'),
 }
 
 const SAMPLE = 'export const answer = 42\n'

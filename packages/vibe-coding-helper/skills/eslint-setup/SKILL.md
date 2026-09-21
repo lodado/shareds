@@ -62,6 +62,7 @@ import and spread each required preset. No Jest preset is added.
 | TypeScript package with a tsconfig                        | add strict-types                                   |
 | TypeScript package with designated pure calculation files | add functional                                     |
 | Package styling with Tailwind CSS v4                      | add tailwind                                       |
+| Repo where coding agents write most of the code           | add ai                                             |
 
 Order matters: later entries win. Keep `base` first; `next` only carries the
 `@next/next/*` rules, so it composes with `react` and `a11y` in any order.
@@ -194,6 +195,43 @@ export default [...base, ...tailwind, { settings: { 'better-tailwindcss': { entr
 
 Unknown, conflicting, concatenated and duplicate classes are errors; deprecated
 classes warn. Class order and line wrapping stay off - that is the formatter's job.
+
+### AI: the defects that still type-check
+
+`ai` is opt-in and needs one peer the preset does not install:
+
+```bash
+pnpm add -D eslint-plugin-ai-guard
+```
+
+Most of `eslint-plugin-ai-guard`'s 18 rules restate a judgement another preset
+already makes, usually with type information the plugin does not have, so the preset
+turns those off and keeps the eight with no owner elsewhere:
+
+| Rule                               | Severity | What it catches                                                                  |
+| ---------------------------------- | -------- | -------------------------------------------------------------------------------- |
+| `ai-guard/no-async-array-callback` | error    | `.map(async ...)` yielding `Promise[]` instead of values                         |
+| `ai-guard/no-catch-log-rethrow`    | warn     | a catch that logs and rethrows, so one failure is reported twice                 |
+| `ai-guard/no-unsafe-deserialize`   | warn     | `JSON.parse` on a request body or query with no visible validation               |
+| `ai-guard/no-async-without-await`  | warn     | `async` added by habit to a function that never awaits                           |
+| `ai-guard/no-await-in-loop`        | warn     | independent awaits serialized in a loop; retry and sequential shapes are allowed |
+| `ai-guard/no-broad-exception`      | warn     | `catch (error: any)` widening a typed failure back to `any`                      |
+| `ai-guard/require-auth-middleware` | warn     | an Express/Fastify route defined with no authentication middleware               |
+| `ai-guard/require-authz-check`     | warn     | a handler reading a resource id with no ownership check                          |
+
+The off rules defer to `ts/no-floating-promises`, `ts/no-unnecessary-condition`
+(`strict-types`), `sonarjs/no-ignored-exceptions`, `no-hardcoded-passwords`,
+`sql-queries`, `no-identical-functions` (`quality`), `no-eval` and
+`unicorn/no-unnecessary-await` (`base`), and `@lodado/local-rules/no-console-log`.
+**A repo that does not enable `quality` or `strict-types` loses those checks
+entirely** - turn the matching `ai-guard` rules back on instead:
+
+```js
+rules: {
+  'ai-guard/no-empty-catch': 'error',
+  'ai-guard/no-hardcoded-secret': 'error',
+}
+```
 
 ### Other presets
 

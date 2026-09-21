@@ -139,3 +139,36 @@ test('tailwind preset reports conflicting and unknown classes against the CSS en
   const config = await eslint.calculateConfigForFile(path.join(cwd, 'sample.tsx'))
   assert.equal(config.rules['better-tailwindcss/enforce-consistent-class-order'], undefined)
 })
+
+test('ai preset adds the AI defects no other preset catches and defers on the rest', async () => {
+  const { default: ai } = await import('./ai.js')
+  const eslint = createLinter([...base, ...ai])
+  const file = path.join(cwd, 'sample-ai.ts')
+  const cases = [
+    ['no-async-array-callback', 'declare const ids: string[]\nexport const load = (fetchOne: (id: string) => Promise<string>): Promise<string>[] => ids.map(async (id) => fetchOne(id))'],
+    ['no-catch-log-rethrow', 'export function run(work: () => void): void { try { work() } catch (error) { console.error(error); throw error } }'],
+    ['no-unsafe-deserialize', 'export const parse = (body: string): unknown => JSON.parse(body)'],
+    ['no-async-without-await', 'export async function label(): Promise<string> { return "ready" }'],
+  ]
+  for (const [rule, code] of cases) {
+    await reports(eslint, code, `ai-guard/${rule}`, file)
+  }
+
+  // Rules another preset already owns, more precisely, stay off - one defect reports once.
+  const config = await eslint.calculateConfigForFile(file)
+  const deferred = {
+    'no-floating-promise': 'ts/no-floating-promises',
+    'no-redundant-await': 'unicorn/no-unnecessary-await',
+    'no-catch-without-use': 'unicorn/prefer-optional-catch-binding',
+    'no-empty-catch': 'sonarjs/no-ignored-exceptions',
+    'no-hardcoded-secret': 'sonarjs/no-hardcoded-passwords',
+    'no-sql-string-concat': 'sonarjs/sql-queries',
+    'no-eval-dynamic': 'no-eval',
+    'no-dead-branch': 'ts/no-unnecessary-condition',
+    'no-duplicate-logic-block': 'sonarjs/no-identical-functions',
+    'no-console-in-handler': '@lodado/local-rules/no-console-log',
+  }
+  for (const [rule, owner] of Object.entries(deferred)) {
+    assert.equal(config.rules[`ai-guard/${rule}`]?.[0], 0, `${rule} is owned by ${owner}`)
+  }
+})
