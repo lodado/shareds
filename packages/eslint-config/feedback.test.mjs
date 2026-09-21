@@ -172,3 +172,42 @@ test('ai preset adds the AI defects no other preset catches and defers on the re
     assert.equal(config.rules[`ai-guard/${rule}`]?.[0], 0, `${rule} is owned by ${owner}`)
   }
 })
+
+test('design preset reports token drift and server/client leaks, and defers a11y and security', async () => {
+  const { default: design } = await import('./design.mjs')
+  const eslint = createLinter([...base, ...react, ...design])
+  const file = path.join(cwd, 'sample-design.tsx')
+  const cases = [
+    ['no-arbitrary-colors', 'export const Box = () => <div className="bg-[#1A5276]" />'],
+    ['no-arbitrary-spacing', 'export const Box = () => <div className="p-[13px]" />'],
+    ['no-arbitrary-typography', 'export const Box = () => <div className="text-[13px]" />'],
+    ['no-arbitrary-border-radius', 'export const Box = () => <div className="rounded-[7px]" />'],
+    ['no-arbitrary-zindex', 'export const Box = () => <div className="z-[100]" />'],
+    ['no-placeholder-code', 'export const send = (): void => { throw new Error("Not implemented") }'],
+    ['no-leaked-env-on-client', '"use client"\nexport const key = process.env.STRIPE_SECRET_KEY'],
+    ['no-server-only-in-client', '"use client"\nimport fs from "node:fs"\nexport const read = (): string => fs.readFileSync("a", "utf8")'],
+  ]
+  for (const [rule, code] of cases) {
+    await reports(eslint, code, `deslint/${rule}`, file)
+  }
+
+  // Accessibility, security and Tailwind correctness already have owners.
+  const config = await eslint.calculateConfigForFile(file)
+  const deferred = {
+    'image-alt-text': 'jsx-a11y-x/alt-text',
+    'form-labels': 'jsx-a11y-x/label-has-associated-control',
+    'aria-validation': 'jsx-a11y-x/role-supports-aria-props',
+    'focus-visible-style': '@lodado/local-rules/interaction-hover-needs-focus',
+    'no-conflicting-classes': 'better-tailwindcss/no-conflicting-classes',
+    'no-hardcoded-secrets': 'sonarjs/no-hardcoded-passwords',
+    'no-sql-injection': 'sonarjs/sql-queries',
+    'no-eval': 'no-eval',
+    'no-empty-catch': 'sonarjs/no-ignored-exceptions',
+    'no-async-useeffect': 'react-hooks/set-state-in-effect',
+    'no-floating-promise-handler': 'ts/no-floating-promises',
+    'no-prod-console': '@lodado/local-rules/no-console-log',
+  }
+  for (const [rule, owner] of Object.entries(deferred)) {
+    assert.equal(config.rules[`deslint/${rule}`]?.[0], 0, `${rule} is owned by ${owner}`)
+  }
+})

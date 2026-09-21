@@ -93,7 +93,7 @@ export default [...base, ...react, ...a11y, ...quality, ...localRules]
 쓸 수 있는 프리셋이에요.
 
 ```text
-.(base) react next a11y turbo local-rules testing query quality fsd strict-types functional interaction tailwind ai
+.(base) react next a11y turbo local-rules testing query quality fsd strict-types functional interaction tailwind ai design
 ```
 
 플러그인은 패키지 의존성으로 함께 설치되지만, **규칙은 해당 프리셋을 import해야 켜져요.**
@@ -109,6 +109,9 @@ export default [...base, ...react, ...a11y, ...quality, ...localRules]
 - `ai`: 타입 검사를 통과하는 AI 코드 결함을 잡아요. `.map(async)`, 로그 후 재throw,
   검증 없는 `JSON.parse`, auth 없는 라우트 같은 것들이에요. `eslint-plugin-ai-guard`를
   따로 설치해야 하고, 다른 프리셋이 더 정확히 잡는 룰은 꺼둬요.
+- `design`: 디자인 시스템을 벗어난 값(`bg-[#1A5276]`, `p-[13px]`)이랑 dark mode·반응형
+  누락, `'use client'`로 새어 나간 서버 코드·env를 잡아요. `@deslint/eslint-plugin`을
+  따로 설치해야 하고, Tailwind 테마가 실제로 스케일을 정의한 레포에서만 의미 있어요.
 - `strict-types`: 처리하지 않은 Promise, Promise 오용, `any`의 전파, 불필요한 조건,
   누락된 union 분기를 타입 정보로 검사해요.
 - `functional`: `domain/`, `selectors/`, `reducers/` 아래 TypeScript와 `*.pure.ts`

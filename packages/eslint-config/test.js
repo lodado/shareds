@@ -20,6 +20,7 @@ const PRESETS = {
   quality: require('./quality.js'),
   tailwind: require('./tailwind.js'),
   ai: require('./ai.js'),
+  design: require('./design.mjs').default,
 }
 
 const SAMPLE = 'export const answer = 42\n'

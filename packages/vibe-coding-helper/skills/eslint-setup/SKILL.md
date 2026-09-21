@@ -63,6 +63,7 @@ import and spread each required preset. No Jest preset is added.
 | TypeScript package with designated pure calculation files | add functional                                     |
 | Package styling with Tailwind CSS v4                      | add tailwind                                       |
 | Repo where coding agents write most of the code           | add ai                                             |
+| Repo with a Tailwind design system to hold the line on    | add design                                         |
 
 Order matters: later entries win. Keep `base` first; `next` only carries the
 `@next/next/*` rules, so it composes with `react` and `a11y` in any order.
@@ -232,6 +233,33 @@ rules: {
   'ai-guard/no-hardcoded-secret': 'error',
 }
 ```
+
+### Design: token drift, coverage and server/client leaks
+
+`design` is opt-in and needs one peer the preset does not install:
+
+```bash
+pnpm add -D @deslint/eslint-plugin
+```
+
+`@deslint/eslint-plugin` judges the axis the other presets leave alone: whether
+generated markup escapes the design system instead of using it.
+
+| Rule                                                                                                                                                                                              | Severity | What it catches                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------- |
+| `deslint/no-arbitrary-colors`, `-spacing`, `-typography`, `-border-radius`, `-zindex`, `deslint/no-magic-numbers-layout`                                                                          | error    | `bg-[#1A5276]`, `p-[13px]`, `z-[100]` - a value escaping the theme scale  |
+| `deslint/no-leaked-env-on-client`, `deslint/no-server-only-in-client`, `deslint/no-hydration-mismatch`                                                                                            | error    | a secret env var or a server module reaching a `'use client'` file        |
+| `deslint/no-placeholder-code`, `deslint/no-mock-data-in-prod`, `deslint/no-leaked-stack-trace`                                                                                                    | error    | `throw new Error('Not implemented')` and fixtures shipped as product code |
+| `deslint/dark-mode-coverage`, `deslint/responsive-required`, `deslint/spacing-rhythm-consistency`, `deslint/consistent-color-palette`, `deslint/no-inline-styles`, `deslint/max-tailwind-classes` | warn     | coverage and rhythm the theme cannot decide on its own                    |
+
+The token rules judge Tailwind classes, so enable this preset only where the theme
+really defines the scale the arbitrary value is escaping - otherwise every one-off
+becomes noise.
+
+Its accessibility, security and Tailwind-correctness rules ship off: `a11y`,
+`quality`, `tailwind` and `local-rules` already decide those, and `design.mjs` names
+the owner beside each one. `@deslint/eslint-plugin` is ESM-only, which is why the
+preset is `design.mjs`; the public import stays `@lodado/eslint-config/design`.
 
 ### Other presets
 
