@@ -75,9 +75,9 @@ building interactive designs and verifies them by reading the reactions back.
 
 ## ESLint 쓰기
 
-**설정 기준:** 2026-09-18
+**설정 기준:** 2026-09-21
 
-base 프리셋을 깔고, 그 위에 필요한 것만 얹으면 돼요.
+ESLint 10 전용이에요. base 프리셋을 깔고, 그 위에 필요한 것만 얹으면 돼요.
 
 ```js
 // eslint.config.mjs
@@ -93,21 +93,26 @@ export default [...base, ...react, ...a11y, ...quality, ...localRules]
 쓸 수 있는 프리셋이에요.
 
 ```text
-.(base) react next a11y turbo local-rules testing query quality fsd strict-types functional interaction
+.(base) react next a11y turbo local-rules testing query quality fsd strict-types functional interaction tailwind
 ```
 
 플러그인은 패키지 의존성으로 함께 설치되지만, **규칙은 해당 프리셋을 import해야 켜져요.**
 
 - `base`: disable 사유·규칙명을 요구하고, 사용하지 않는 disable을 오류로 잡아요.
-- `react`: effect 오용 검사에 더해 purity·immutability·refs·static-components와
-  exhaustive-deps를 오류로 검사해요. 리스너·fetch·observer·타이머 누수는 경고해요.
+  타입은 통과하지만 결함을 숨기는 async·mutation 습관(`return Promise.resolve()`,
+  불필요한 `await`, thenable 객체, 즉시 mutation)도 잡아요.
+- `react`: ESLint React strict 위에 React Compiler 진단(purity·immutability·refs·
+  static-components·error-boundaries·use-memo)과 exhaustive-deps를 오류로 검사해요.
+  리스너·fetch·observer·타이머 누수는 경고해요.
+- `tailwind`: Tailwind v4 클래스의 오타·충돌·중복을 잡아요. `eslint-plugin-better-tailwindcss`와
+  `tailwindcss`를 따로 설치하고 CSS 진입 파일을 알려줘야 해요.
 - `strict-types`: 처리하지 않은 Promise, Promise 오용, `any`의 전파, 불필요한 조건,
   누락된 union 분기를 타입 정보로 검사해요.
 - `functional`: `domain/`, `selectors/`, `reducers/` 아래 TypeScript와 `*.pure.ts`
   계산 코드의 변경·I/O·시간/난수 접근을 제한해요. 테스트는 제외하며 `.mts`·`.cts`도 지원해요.
 
 `strict-types`와 `functional`은 tsconfig가 필요하고 선택해서 추가해요.
-Next.js에서는 `base → next → react` 순서로 합쳐 React의 엄격한 규칙을 유지해요.
+`next`는 `@next/eslint-plugin-next`만 담고 있어서 `react`·`a11y`와 순서 상관없이 합쳐요.
 순수 영역 밖의 I/O·React 코드까지 금지하지 않으며, ESLint가 완전한 순수성을 증명하지는 않아요.
 
 더 자세한 건 여기 있어요.

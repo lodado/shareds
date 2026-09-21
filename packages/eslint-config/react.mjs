@@ -1,48 +1,38 @@
 /**
- * React preset (flat): plugin-react recommended plus effect discipline - effects
- * only synchronize external systems, derived state and effect chains fail lint.
+ * React preset (flat): ESLint React strict-typescript, the official React Compiler
+ * diagnostics, and effect discipline - effects only synchronize external systems,
+ * derived state and effect chains fail lint.
  *
- * Plugin references are the raw module objects so every preset (and the next
- * preset's normalized eslint-config-next) shares one instance per plugin name -
- * flat config rejects two different objects under the same plugin key.
+ * eslint-plugin-react-hooks owns the compiler rules (rules-of-hooks, purity,
+ * set-state-in-effect ...). ESLint React ships its own ports of the same rules, so
+ * those are switched off - one defect reports once, under the `react-hooks/` id.
  */
-import react from 'eslint-plugin-react'
+import eslintReact from '@eslint-react/eslint-plugin'
 import reactHooks from 'eslint-plugin-react-hooks'
-import webApi from 'eslint-plugin-react-web-api'
 import youMightNotNeedAnEffect from 'eslint-plugin-react-you-might-not-need-an-effect'
 
 export default [
-  { ...react.configs.flat.recommended, plugins: { react } },
+  eslintReact.configs['strict-typescript'],
   youMightNotNeedAnEffect.configs.strict,
-  webApi.configs.recommended,
   {
     name: 'lodado/react',
     plugins: { 'react-hooks': reactHooks },
-    settings: { react: { version: 'detect' } },
     rules: {
-      'react-hooks/rules-of-hooks': 'error',
+      ...reactHooks.configs.recommended.rules,
       'react-hooks/exhaustive-deps': 'error',
-      'react-hooks/purity': 'error',
-      'react-hooks/immutability': 'error',
-      'react-hooks/refs': 'error',
-      'react-hooks/static-components': 'error',
-      'react-hooks/set-state-in-effect': 'error',
-      'react-hooks/set-state-in-render': 'error',
 
-      'react/prop-types': 'off', // TypeScript covers this
-      'react/require-default-props': 'off',
-      'react/button-has-type': 'off',
-      'react/jsx-no-useless-fragment': 'off',
-      'react/react-in-jsx-scope': 'off',
-      'react/jsx-props-no-spreading': 'warn',
-      'react/jsx-filename-extension': ['error', { extensions: ['.js', '.jsx', '.ts', '.tsx'] }],
-      'react/function-component-definition': [
-        'error',
-        {
-          namedComponents: 'arrow-function',
-          unnamedComponents: 'arrow-function',
-        },
-      ],
+      '@eslint-react/error-boundaries': 'off',
+      '@eslint-react/exhaustive-deps': 'off',
+      '@eslint-react/purity': 'off',
+      '@eslint-react/rules-of-hooks': 'off',
+      '@eslint-react/set-state-in-effect': 'off',
+      '@eslint-react/set-state-in-render': 'off',
+      '@eslint-react/static-components': 'off',
+      '@eslint-react/unsupported-syntax': 'off',
+      '@eslint-react/use-memo': 'off',
+
+      '@eslint-react/dom-no-missing-button-type': 'off', // buttons default to submit only inside forms; TS props cover the rest
+      '@eslint-react/jsx-no-useless-fragment': 'off',
     },
   },
 ]

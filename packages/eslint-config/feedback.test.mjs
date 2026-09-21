@@ -73,12 +73,18 @@ test('suppression comments must name rules and explain a necessary exception', a
 test('React compiler diagnostics and exhaustive dependencies remain errors after Next composition', async () => {
   const eslint = createLinter([...base, ...react, ...next])
   const config = await eslint.calculateConfigForFile(path.join(cwd, 'sample.tsx'))
-  for (const rule of ['purity', 'immutability', 'refs', 'static-components', 'exhaustive-deps']) {
+  for (const rule of ['purity', 'immutability', 'refs', 'static-components', 'exhaustive-deps', 'error-boundaries', 'globals', 'use-memo']) {
     assert.equal(config.rules[`react-hooks/${rule}`]?.[0], 2, rule)
   }
   for (const resource of ['event-listener', 'fetch', 'intersection-observer', 'interval', 'resize-observer', 'timeout']) {
-    assert.equal(config.rules[`react-web-api/no-leaked-${resource}`]?.[0], 1, resource)
+    assert.equal(config.rules[`@eslint-react/web-api-no-leaked-${resource}`]?.[0], 1, resource)
   }
+  // ESLint React ports of the compiler rules stay off so one defect reports once.
+  for (const rule of ['rules-of-hooks', 'purity', 'set-state-in-effect', 'exhaustive-deps']) {
+    assert.equal(config.rules[`@eslint-react/${rule}`]?.[0], 0, rule)
+  }
+  assert.equal(config.rules['@eslint-react/no-class-component']?.[0], 2)
+  assert.equal(config.rules['@next/next/no-img-element']?.[0], 1)
 })
 
 test('React purity and immutability report real render defects', async () => {
@@ -100,7 +106,36 @@ export const Listener = () => {
   return null
 }
 `
-  await reports(reactLinter, effect(''), 'react-web-api/no-leaked-event-listener')
+  await reports(reactLinter, effect(''), '@eslint-react/web-api-no-leaked-event-listener')
   const messages = await messagesFor(reactLinter, effect("return () => window.removeEventListener('resize', onResize)"))
-  assert.deepEqual(messages.filter((message) => message.ruleId?.startsWith('react-web-api/')), [])
+  assert.deepEqual(messages.filter((message) => message.ruleId?.startsWith('@eslint-react/web-api-')), [])
+})
+
+test('base flags async and dependency habits that pass the type checker', async () => {
+  const cases = [
+    ['unicorn/no-useless-promise-resolve-reject', 'export async function load() { return Promise.resolve(1) }'],
+    ['unicorn/no-unnecessary-await', 'export async function load() { return await 1 }'],
+    ['unicorn/no-thenable', 'export const box = { then() { return 1 } }'],
+    ['unicorn/no-useless-spread', 'export const copy = [...[1, 2]]'],
+    ['unicorn/no-immediate-mutation', 'const items = []\nitems.push(1)\nexport { items }'],
+    ['unicorn/prefer-optional-catch-binding', 'try { JSON.parse("{") } catch (error) { console.error("bad") }'],
+    ['e18e/ban-dependencies', "import isOdd from 'is-odd'\nexport { isOdd }"],
+  ]
+  for (const [rule, code] of cases) {
+    await reports(untyped, code, rule, path.join(cwd, 'sample-habits.ts'))
+  }
+})
+
+test('tailwind preset reports conflicting and unknown classes against the CSS entry point', async () => {
+  const { default: tailwind } = await import('./tailwind.js')
+  const eslint = createLinter([
+    ...base,
+    ...react,
+    ...tailwind,
+    { settings: { 'better-tailwindcss': { entryPoint: path.join(cwd, 'tailwind-fixture/app.css') } } },
+  ])
+  await reports(eslint, 'export const Box = () => <div className="p-2 p-4" />', 'better-tailwindcss/no-conflicting-classes')
+  await reports(eslint, 'export const Box = () => <div className="text-brandish" />', 'better-tailwindcss/no-unknown-classes')
+  const config = await eslint.calculateConfigForFile(path.join(cwd, 'sample.tsx'))
+  assert.equal(config.rules['better-tailwindcss/enforce-consistent-class-order'], undefined)
 })

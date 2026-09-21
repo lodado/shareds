@@ -5,21 +5,23 @@ description: Use when adding or changing ESLint config in a project that uses @l
 
 # ESLint setup with @lodado/eslint-config
 
-**Last updated:** 2026-09-18
+**Last updated:** 2026-09-21
 
 The config ships composable presets. Enable only what the package actually is.
 
 ## Install
 
 ```bash
-pnpm add -D @lodado/eslint-config eslint@^9.39.5
+pnpm add -D @lodado/eslint-config eslint@^10.11.0
 ```
 
-v2.0.0부터 base는 Antfu 기반 ESM-only ESLint 9 flat config다. Node 22.22.2 또는
-24.15.0 이상이 필요하며 `.eslintrc.*` 레포는 `eslint.config.mjs`로 이전해야 한다.
-`next` preset은 `eslint-config-next@16`이 `next` 패키지 자체를 require하므로 Next
-앱(next 설치됨)에서만 동작한다. preset들이 공유 plugin 참조를 내부에서 하나로
-정규화하므로 별도 pnpm override는 필요 없다.
+v3.0.0부터 ESLint 10 전용이다(ESLint 9는 2026-08-06 EOL). base는 Antfu 기반
+ESM-only flat config이며 Node 22.22.2 또는 24.15.0 이상이 필요하다. ESLint 9 레포는
+`npx @eslint/migrate-config`가 아니라 `npx codemod @eslint/v9-to-v10`으로 올린다.
+React 규칙은 `eslint-plugin-react` 대신 `@eslint-react/eslint-plugin`, a11y는
+`eslint-plugin-jsx-a11y-x`에서 온다 - 둘 다 ESLint 10을 지원하고 규칙 id 접두사만
+`@eslint-react/`·`jsx-a11y-x/`로 바뀐다. `next` preset은 `@next/eslint-plugin-next`만
+담으므로 `next` 패키지 없이도 로드된다.
 
 ## Compose
 
@@ -59,9 +61,10 @@ import and spread each required preset. No Jest preset is added.
 | Any JS/TS package opting into broad quality checks        | add quality                                        |
 | TypeScript package with a tsconfig                        | add strict-types                                   |
 | TypeScript package with designated pure calculation files | add functional                                     |
+| Package styling with Tailwind CSS v4                      | add tailwind                                       |
 
-Order matters: later entries win. Keep `base` first and, for Next.js apps, put
-`react` **after** `next` so the React discipline rules retain their severity.
+Order matters: later entries win. Keep `base` first; `next` only carries the
+`@next/next/*` rules, so it composes with `react` and `a11y` in any order.
 The public import stays `@lodado/eslint-config/react` even though its source is ESM.
 
 ### Base: keep lint feedback actionable
@@ -75,6 +78,27 @@ rule and explain why it is needed, rather than disabling all feedback:
 // eslint-disable-next-line no-console -- CLI output is the command's public interface.
 console.log('Ready')
 ```
+
+`base` also flags habits that type-check but hide a defect: `return Promise.resolve()`
+inside `async`, `return await` of a non-promise, thenable objects, useless spreads,
+unreadable IIFEs (errors); mutating a value right after creating it, repeated
+`push` calls, unused `catch (error)` bindings and banned dependencies such as
+`lodash`/`is-odd` (warnings, via `unicorn` and `e18e/ban-dependencies`).
+
+### Adopting a stricter preset on an existing repo
+
+Do not downgrade a preset to warnings to get CI green. Record the existing
+violations once and fail only on new ones:
+
+```bash
+npx eslint . --suppress-all          # writes eslint-suppressions.json - commit it
+npx eslint .                         # passes; new violations still fail
+npx eslint . --prune-suppressions    # after fixing, drop entries that no longer fire
+```
+
+The file stores a count per (file, rule), so a fix and a regression of the same rule
+in the same file cancel out - prune regularly. IDEs apply the file automatically on
+ESLint 10.1+.
 
 ### Type-aware checks
 
@@ -133,22 +157,50 @@ ESLint cannot establish the behavior of every indirect call or injected dependen
 
 ### React: effects only for external synchronization
 
-`react` keeps the strict `react-you-might-not-need-an-effect` preset and enables
-`react-hooks/purity`, `react-hooks/immutability`, `react-hooks/refs`,
-`react-hooks/static-components`, and `react-hooks/exhaustive-deps` as **errors**.
+`react` layers ESLint React's `strict-typescript` preset (`@eslint-react/*`: no class
+components, no nested component definitions, no leaked JSX, no unsafe `target="_blank"`),
+the strict `react-you-might-not-need-an-effect` preset, and the full
+`eslint-plugin-react-hooks` recommended set - React Compiler diagnostics such as
+`purity`, `immutability`, `refs`, `static-components`, `error-boundaries`, `globals`,
+`use-memo` and `exhaustive-deps` are **errors**. ESLint React's own ports of the
+compiler rules are switched off so one defect reports once under `react-hooks/`.
 Do not suppress a dependency error to hide an effect loop; move derived values into
 render-time calculations and user actions into event handlers.
 
-The `react-web-api` rules warn about missing cleanup for event listeners, fetches,
-intersection observers, intervals, resize observers and timeouts. Legitimate effects
-remain allowed; these checks look for resource leaks rather than counting effects.
+The `@eslint-react/web-api-*` rules warn about missing cleanup for event listeners,
+fetches, intersection observers, intervals, resize observers and timeouts. Legitimate
+effects remain allowed; these checks look for resource leaks rather than counting effects.
+
+`eslint-plugin-react` conventions with no ESLint React equivalent are gone:
+`react/function-component-definition` (arrow components) and
+`react/jsx-props-no-spreading`. Add a project override if a repo still wants them.
+
+### Tailwind: classes resolve against the real theme
+
+`tailwind` is opt-in and needs two peers the preset does not install:
+
+```bash
+pnpm add -D eslint-plugin-better-tailwindcss tailwindcss
+```
+
+Then tell the plugin which CSS file imports Tailwind so unknown and conflicting
+classes are judged against the project's theme, not a generic list:
+
+```js
+import tailwind from '@lodado/eslint-config/tailwind'
+
+export default [...base, ...tailwind, { settings: { 'better-tailwindcss': { entryPoint: 'app/globals.css' } } }]
+```
+
+Unknown, conflicting, concatenated and duplicate classes are errors; deprecated
+classes warn. Class order and line wrapping stay off - that is the formatter's job.
 
 ### Other presets
 
 `testing` routes by path: `*.test.*` / `*.spec.*` receive Vitest and Testing Library
 rules; `e2e/**`, `*.e2e.*` and `playwright/**` receive Playwright rules.
 
-`a11y` uses jsx-a11y's strict preset. `quality` enables SonarJS's recommended flat
+`a11y` uses the jsx-a11y-x strict preset (rule ids `jsx-a11y-x/*`). `quality` enables SonarJS's recommended flat
 config plus AI reliability rules documented in
 [`QUALITY.md`](../../../eslint-config/QUALITY.md). It is opt-in because its broad
 code-smell and complexity checks can surface existing debt when first adopted.

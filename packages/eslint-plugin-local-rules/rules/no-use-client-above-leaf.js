@@ -19,7 +19,7 @@ module.exports = {
     },
   },
   create(context) {
-    const filename = context.getFilename().replace(/\\/g, '/')
+    const filename = context.filename.replace(/\\/g, '/')
 
     if (!ROUTE_FILE.test(filename)) {
       return {}

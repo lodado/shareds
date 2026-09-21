@@ -18,6 +18,7 @@ const PRESETS = {
   testing: require('./testing.js'),
   query: require('./query.js'),
   quality: require('./quality.js'),
+  tailwind: require('./tailwind.js'),
 }
 
 const SAMPLE = 'export const answer = 42\n'
@@ -97,6 +98,19 @@ const main = async () => {
     )
     console.log(`ok  ${ruleId} reports on ${fileName}`)
   }
+
+  await assertReports(
+    [...BASE, ...PRESETS.a11y],
+    'export const Banner = () => <img src="/hero.png" />\n',
+    'sample-a11y.tsx',
+    'jsx-a11y-x/alt-text',
+  )
+  await assertReports(
+    [...BASE, ...PRESETS.next],
+    'export const Hero = () => <img src="/hero.png" alt="" />\n',
+    'sample-next.tsx',
+    '@next/next/no-img-element',
+  )
 
   const TESTING = [...BASE, ...PRESETS.testing]
   await assertReports(TESTING, 'test.only("submits", () => {})\n', 'sample.test.tsx', 'vitest/no-focused-tests')

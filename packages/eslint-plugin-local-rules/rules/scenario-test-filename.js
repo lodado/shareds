@@ -22,7 +22,7 @@ module.exports = {
     },
   },
   create(context) {
-    const filename = normalize(context.getFilename())
+    const filename = normalize(context.filename)
 
     if (!UNIT_TEST_FILE.test(filename) || CONVENTIONAL.test(filename) || isE2EFile(filename)) {
       return {}

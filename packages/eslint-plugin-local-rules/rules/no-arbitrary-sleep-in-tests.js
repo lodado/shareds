@@ -45,7 +45,7 @@ module.exports = {
     },
   },
   create(context) {
-    if (!isTestFile(context.getFilename())) {
+    if (!isTestFile(context.filename)) {
       return {}
     }
 

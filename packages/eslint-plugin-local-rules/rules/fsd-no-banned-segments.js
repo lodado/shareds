@@ -22,7 +22,7 @@ module.exports = {
     },
   },
   create(context) {
-    const match = BANNED_SEGMENT.exec(normalize(context.getFilename()))
+    const match = BANNED_SEGMENT.exec(normalize(context.filename))
 
     if (!match) {
       return {}

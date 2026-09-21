@@ -1,14 +1,14 @@
 /* eslint-disable @lodado/local-rules/no-console-log -- test progress output */
 /**
  * The reference implementations under examples/ must satisfy the contracts they demonstrate:
- * jsx-a11y strict plus this plugin's interaction rules report nothing. Run with `node examples.test.js`.
+ * jsx-a11y-x strict plus this plugin's interaction rules report nothing. Run with `node examples.test.js`.
  */
 const assert = require('node:assert/strict')
 const { readdirSync } = require('node:fs')
 const { join } = require('node:path')
 
 const { ESLint } = require('eslint')
-const jsxA11y = require('eslint-plugin-jsx-a11y')
+const jsxA11y = require('eslint-plugin-jsx-a11y-x').default
 const tsParser = require('@typescript-eslint/parser')
 
 const plugin = require('./index.js')
@@ -20,13 +20,12 @@ const main = async () => {
     cwd: __dirname,
     overrideConfigFile: true,
     overrideConfig: [
-      { ...jsxA11y.flatConfigs.strict, plugins: { 'jsx-a11y': jsxA11y } },
+      jsxA11y.configs.strict,
       {
         files: ['examples/**/*.tsx'],
         languageOptions: { parser: tsParser, parserOptions: { ecmaFeatures: { jsx: true } } },
         plugins: { '@lodado/local-rules': plugin },
         rules: {
-          'jsx-a11y/control-has-associated-label': 'off',
           '@lodado/local-rules/interaction-pattern-contract': 'error',
           '@lodado/local-rules/interaction-hover-needs-focus': 'error',
         },

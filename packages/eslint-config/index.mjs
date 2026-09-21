@@ -20,4 +20,21 @@ export default await antfu(
       'eslint-comments/no-unlimited-disable': 'error',
     },
   },
+  {
+    name: 'lodado/habits',
+    files: ['**/*.?([cm])[jt]s?(x)'],
+    // Async and mutation habits that type-check but hide a defect; Antfu registers
+    // the unicorn and e18e plugins, this only turns the extra rules on.
+    rules: {
+      'unicorn/no-thenable': 'error',
+      'unicorn/no-unnecessary-await': 'error',
+      'unicorn/no-useless-promise-resolve-reject': 'error',
+      'unicorn/no-useless-spread': 'error',
+      'unicorn/no-unreadable-iife': 'error',
+      'unicorn/no-immediate-mutation': 'warn',
+      'unicorn/prefer-single-call': 'warn',
+      'unicorn/prefer-optional-catch-binding': 'warn',
+      'e18e/ban-dependencies': 'warn',
+    },
+  },
 ).renamePlugins({ import: 'import-lite' })

@@ -55,7 +55,7 @@ module.exports = {
       context.report({
         node,
         messageId: 'assertedPayload',
-        data: { target: context.getSourceCode().getText(node.typeAnnotation) },
+        data: { target: context.sourceCode.getText(node.typeAnnotation) },
       })
     }
 

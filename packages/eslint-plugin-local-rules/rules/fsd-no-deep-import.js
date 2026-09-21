@@ -42,7 +42,7 @@ module.exports = {
     },
   },
   create(context) {
-    const filename = normalize(context.getFilename())
+    const filename = normalize(context.filename)
     const importer = parseSlicedPath(filename)
 
     const check = (node, source) => {

@@ -24,11 +24,11 @@ module.exports = {
     },
   },
   create(context) {
-    if (!isE2EFile(context.getFilename())) {
+    if (!isE2EFile(context.filename)) {
       return {}
     }
 
-    const sourceCode = context.getSourceCode()
+    const sourceCode = context.sourceCode
 
     return {
       CallExpression(node) {

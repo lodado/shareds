@@ -2319,8 +2319,10 @@ async function findingsResult(options) {
   const lines = [`FINDINGS_OK blocking:${blocking.length} advisory:${advisory.length}`]
 
   if (secondary) {
-    lines.push(...blocking.map((finding) => `BLOCKING ${finding.row} ${finding.classification} ${finding.finding}`))
-    lines.push(...advisory.map((finding) => `ADVISORY ${finding.row} ${finding.classification} ${finding.finding}`))
+    lines.push(
+      ...blocking.map((finding) => `BLOCKING ${finding.row} ${finding.classification} ${finding.finding}`),
+      ...advisory.map((finding) => `ADVISORY ${finding.row} ${finding.classification} ${finding.finding}`),
+    )
   }
 
   lines.push(

@@ -21,7 +21,8 @@
     "./fsd": "./fsd.js",
     "./strict-types": "./strict-types.js",
     "./interaction": "./interaction.js",
-    "./functional": "./functional.mjs"
+    "./functional": "./functional.mjs",
+    "./tailwind": "./tailwind.js"
   },
   "main": "index.mjs",
   "files": [
@@ -37,6 +38,7 @@
     "query.js",
     "react.mjs",
     "strict-types.js",
+    "tailwind.js",
     "testing.js",
     "turbo.js"
   ],
@@ -48,33 +50,42 @@
   },
   "scripts": {
     "test": "node test.js && node --test feedback.test.mjs functional.test.mjs",
-    "lint": "eslint index.mjs react.mjs next.js a11y.js turbo.js local-rules.js testing.js query.js quality.js fsd.js interaction.js test.js strict-types.js functional.mjs feedback.test.mjs functional.test.mjs package.json"
+    "lint": "eslint index.mjs react.mjs next.js a11y.js turbo.js local-rules.js testing.js query.js quality.js fsd.js interaction.js test.js strict-types.js tailwind.js functional.mjs feedback.test.mjs functional.test.mjs package.json"
   },
   "peerDependencies": {
-    "eslint": "^9.0.0"
+    "eslint": "^10.0.0",
+    "eslint-plugin-better-tailwindcss": "^4.7.0",
+    "tailwindcss": "^4.1.17"
+  },
+  "peerDependenciesMeta": {
+    "eslint-plugin-better-tailwindcss": {
+      "optional": true
+    },
+    "tailwindcss": {
+      "optional": true
+    }
   },
   "dependencies": {
-    "@antfu/eslint-config": "^9.3.0",
+    "@antfu/eslint-config": "^9.5.1",
+    "@eslint-react/eslint-plugin": "^5.20.3",
     "@lodado/eslint-plugin-local-rules": "workspace:*",
-    "@tanstack/eslint-plugin-query": "^5.102.0",
+    "@next/eslint-plugin-next": "^16.3.5",
+    "@tanstack/eslint-plugin-query": "^5.103.1",
     "@vitest/eslint-plugin": "^1.6.27",
-    "eslint-config-next": "^16.3.2",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-config-turbo": "^2.10.11",
+    "eslint-config-turbo": "^2.11.2",
     "eslint-plugin-functional": "^10.0.1",
-    "eslint-plugin-import": "^2.32.0",
-    "eslint-plugin-jsx-a11y": "^6.10.2",
-    "eslint-plugin-playwright": "^2.11.0",
-    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-jsx-a11y-x": "^0.2.0",
+    "eslint-plugin-playwright": "^2.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-web-api": "^5.19.1",
     "eslint-plugin-react-you-might-not-need-an-effect": "^1.0.2",
-    "eslint-plugin-sonarjs": "^4.2.0",
+    "eslint-plugin-sonarjs": "^4.2.1",
     "eslint-plugin-testing-library": "^7.16.2",
-    "typescript-eslint": "^8.67.0"
+    "typescript-eslint": "^8.70.0"
   },
   "devDependencies": {
-    "eslint": "^9.39.5",
-    "next": "^16.3.2"
+    "eslint": "^10.11.0",
+    "eslint-plugin-better-tailwindcss": "^4.7.0",
+    "tailwindcss": "^4.1.17"
   }
 }

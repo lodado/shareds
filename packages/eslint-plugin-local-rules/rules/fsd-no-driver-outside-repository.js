@@ -49,7 +49,7 @@ module.exports = {
     const options = context.options[0] || {}
     const drivers = options.drivers || DEFAULT_DRIVERS
     const allow = options.allow || DEFAULT_ALLOW
-    const filename = normalize(context.getFilename())
+    const filename = normalize(context.filename)
 
     if (allow.some((fragment) => filename.includes(fragment))) {
       return {}
