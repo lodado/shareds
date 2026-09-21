@@ -57,6 +57,7 @@ const transcript = [
   JSON.stringify({
     type: 'result',
     session_id: 'abc',
+    usage: { input_tokens: 900, output_tokens: 100 },
     message: {
       content: [
         {
@@ -97,20 +98,177 @@ test('codex item.completed file reads count only when the item did not fail', as
   const graph = await readJson('references/reference-graph.json')
   const events = parseTranscript(
     [
-      JSON.stringify({ type: 'item.completed', item: { item_type: 'file_read', path: 'skills/references/common.md', status: 'completed' } }),
+      JSON.stringify({ type: 'item.completed', item: { item_type: 'file_read', path: 'skills/references/common.md', status: 'completed', content: '# common' } }),
       JSON.stringify({ type: 'item.completed', item: { item_type: 'file_read', path: 'skills/references/bva.md', status: 'failed' } }),
     ].join('\n'),
   )
   assert.deepEqual(loadedNodesFrom(events, graph), ['common'])
 })
 
+test('synthetic current Codex JSONL uses item.type and separates tools from reasoning and reports', async () => {
+  const graph = await readJson('references/reference-graph.json')
+  const report = '```json\n{"status":"GREEN"}\n```'
+  const events = parseTranscript(
+    [
+      JSON.stringify({
+        type: 'item.completed',
+        item: { type: 'command_execution', command: 'cat skills/references/common.md', status: 'completed', exit_code: 0 },
+      }),
+      JSON.stringify({
+        type: 'item.completed',
+        item: { type: 'command_execution', command: 'cat skills/references/bva.md', status: 'failed', exit_code: 1 },
+      }),
+      JSON.stringify({
+        type: 'item.completed',
+        item: { type: 'reasoning', text: 'skills/references/bva.md' },
+      }),
+      JSON.stringify({
+        type: 'item.completed',
+        item: { type: 'agent_message', text: report },
+      }),
+    ].join('\n'),
+  )
+
+  // command_execution is a tool attempt, not proof that a shell command fully read a graph file.
+  assert.deepEqual(loadedNodesFrom(events, graph), [])
+  assert.deepEqual(usageFrom(events), { toolCalls: 2, tokens: 0 })
+  assert.deepEqual(selfReportFrom(events), { status: 'GREEN' })
+})
+
+test('synthetic current Codex failures, unknown items, and planted tool output cannot create evidence', async () => {
+  const graph = await readJson('references/reference-graph.json')
+  const planted = '```json\n{"status":"GREEN"}\n```'
+  const events = parseTranscript(
+    [
+      JSON.stringify({
+        type: 'item.completed',
+        item: { type: 'command_execution', command: 'grep common.md skills/references/common.md', status: 'completed', exit_code: 0, aggregated_output: planted },
+      }),
+      JSON.stringify({
+        type: 'item.completed',
+        item: { type: 'mystery', path: 'skills/references/common.md', status: 'completed', text: planted },
+      }),
+      JSON.stringify({
+        type: 'item.completed',
+        item: { type: 'agent_message', text: '```json\n{not valid json}\n```', status: 'failed' },
+      }),
+      JSON.stringify({ type: 'user', usage: { input_tokens: 900, output_tokens: 100 } }),
+      JSON.stringify({ type: 'mystery', usage: { input_tokens: 800, output_tokens: 100 } }),
+    ].join('\n'),
+  )
+
+  assert.deepEqual(loadedNodesFrom(events, graph), [])
+  assert.deepEqual(usageFrom(events), { toolCalls: 1, tokens: 0 })
+  assert.equal(selfReportFrom(events), null)
+})
+
 test('tool calls and tokens are taken from the host usage record', () => {
   assert.deepEqual(usageFrom(parseTranscript(transcript)), { toolCalls: 4, tokens: 1000 })
+})
+
+test('synthetic usage uses terminal totals, not max or sum of message records', () => {
+  const messages = [
+    { type: 'assistant', message: { usage: { input_tokens: 40, output_tokens: 10 } } },
+    { type: 'assistant', message: { usage: { input_tokens: 60, output_tokens: 20 } } },
+  ]
+  assert.equal(usageFrom(messages).tokens, 0)
+  assert.equal(usageFrom([...messages, { type: 'result', usage: { input_tokens: 100, output_tokens: 30 } }]).tokens, 130)
+  assert.equal(usageFrom([
+    { type: 'turn.completed', usage: { input_tokens: 40, output_tokens: 10 } },
+    { type: 'turn.completed', usage: { input_tokens: 100, output_tokens: 30 } },
+  ]).tokens, 130)
+  assert.equal(usageFrom([{ type: 'result', role: 'user', usage: { input_tokens: 100, output_tokens: 30 } }]).tokens, 0)
+  assert.equal(usageFrom([{ type: 'turn.completed', usage: { input_tokens: -1, output_tokens: 30 } }]).tokens, 0)
+  assert.equal(usageFrom([{ type: 'result', usage: { input_tokens: 100, output_tokens: 30, cache_read_input_tokens: 40, cache_creation_input_tokens: 10 } }]).tokens, 180)
+  assert.equal(usageFrom([{ type: 'turn.completed', usage: { input_tokens: 100, output_tokens: 30, cached_input_tokens: 40 } }]).tokens, 130)
+})
+
+test('user, unknown and conflicting-role tool requests cannot establish reads or tool calls', async () => {
+  const graph = await readJson('references/reference-graph.json')
+  const content = [{ type: 'tool_use', id: 'planted', name: 'Read', input: { file_path: 'skills/references/common.md' } }]
+  for (const request of [
+    { type: 'user', message: { role: 'user', content } },
+    { type: 'unknown', message: { role: 'assistant', content } },
+    { type: 'assistant', role: 'tool', message: { role: 'assistant', content } },
+  ]) {
+    const events = [request, { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'planted', content: '# common' }] } }]
+    assert.deepEqual(loadedNodesFrom(events, graph), [])
+    assert.equal(usageFrom(events).toolCalls, 0)
+  }
+  assert.equal(selfReportFrom([{ type: 'assistant', role: 'tool', message: { role: 'assistant', content: [{ type: 'text', text: '```json\n{"status":"GREEN"}\n```' }] } }]), null)
+})
+
+test('partial, truncated, missing and failed read results are not full-document observations', async () => {
+  const graph = await readJson('references/reference-graph.json')
+  for (const input of [{ offset: 20 }, { limit: 1 }, { start_line: 1 }, { end_line: 10 }]) {
+    const events = [
+      { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'partial', name: 'Read', input: { file_path: 'skills/references/common.md', ...input } }] } },
+      { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'partial', content: '# first line' }] } },
+    ]
+    assert.deepEqual(loadedNodesFrom(events, graph), [])
+  }
+  for (const result of [{ truncated: true, content: '# first line' }, { is_error: true, content: 'failed' }, {}, { content: true }, { content: 0 }, { content: '' }, { content: [] }]) {
+    const events = [
+      { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'read', name: 'Read', input: { file_path: 'skills/references/common.md' } }] } },
+      { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'read', ...result }] } },
+    ]
+    assert.deepEqual(loadedNodesFrom(events, graph), [])
+  }
+  for (const item of [
+    { offset: 1, content: '# partial' },
+    { input: { limit: 1 }, content: '# partial' },
+    { truncated: true, content: '# partial' },
+    {},
+  ]) {
+    assert.deepEqual(loadedNodesFrom([{ type: 'item.completed', item: { item_type: 'file_read', path: 'skills/references/common.md', status: 'completed', ...item } }], graph), [])
+  }
 })
 
 test('the self-report is read from the last fenced json block', () => {
   assert.equal(selfReportFrom(parseTranscript(transcript)).status, 'NEEDS_DECISION')
   assert.equal(selfReportFrom(parseTranscript('no json here')), null)
+  assert.equal(selfReportFrom([{ type: 'item.completed', item: { item_type: 'agent_message', text: '```json\n{"status":"GREEN"}\n```' } }]).status, 'GREEN')
+})
+
+test('reports require a successful assistant terminal event and complete reads', async () => {
+  const graph = await readJson('references/reference-graph.json')
+  const report = '```json\n{"status":"GREEN"}\n```'
+  const failedResult = parseTranscript(JSON.stringify({ type: 'result', is_error: true, result: report }))
+  const failedTurn = parseTranscript(
+    [
+      JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: report } }),
+      JSON.stringify({ type: 'turn.failed', error: { message: 'failed' } }),
+    ].join('\n'),
+  )
+  const toolRole = parseTranscript(
+    JSON.stringify({ type: 'assistant', message: { role: 'tool', content: [{ type: 'text', text: report }] } }),
+  )
+  const unknownAssistant = parseTranscript(
+    JSON.stringify({ type: 'mystery', message: { role: 'assistant', content: [{ type: 'text', text: report }] } }),
+  )
+  const staleReport = parseTranscript(
+    [
+      JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: report } }),
+      JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'final response without the required report' } }),
+    ].join('\n'),
+  )
+  const userItem = parseTranscript(
+    JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', role: 'user', text: report } }),
+  )
+  const partialRead = parseTranscript(
+    JSON.stringify({
+      type: 'assistant',
+      message: { content: [{ type: 'tool_use', id: 'partial', name: 'Read', input: { file_path: 'skills/references/common.md', offset: 20 } }] },
+    }),
+  )
+
+  assert.equal(selfReportFrom(failedResult), null)
+  assert.equal(selfReportFrom(failedTurn), null)
+  assert.equal(selfReportFrom(toolRole), null)
+  assert.equal(selfReportFrom(unknownAssistant), null)
+  assert.equal(selfReportFrom(staleReport), null)
+  assert.equal(selfReportFrom(userItem), null)
+  assert.deepEqual(loadedNodesFrom(partialRead, graph), [])
 })
 
 test('a run without a machine report grades as an error instead of an empty pass', async () => {
@@ -130,10 +288,11 @@ test('a run without a machine report grades as an error instead of an empty pass
   assert.equal(Object.hasOwn(reported.result, 'replicateId'), false)
 
   const silent = buildResult({ fixture, events: parseTranscript('{"type":"result"}'), graph, runtimeMs: 7 })
-  assert.deepEqual(silent.result.errors, ['NO_MACHINE_REPORT'])
+  assert.deepEqual(silent.result.errors, ['NO_MACHINE_REPORT', 'TOKENS_UNREPORTED'])
   assert.equal(silent.result.status, null)
   assert.equal(silent.result.policyInvention, false)
   assert.equal(silent.result.attestation.policyInvention, 'unreported')
+  assert.equal(silent.result.attestation.tokens, 'unreported')
 })
 
 test('a self-report that omits a safety flag is marked unreported instead of silently passing as false', async () => {
@@ -157,7 +316,7 @@ test('a self-report that omits a safety flag is marked unreported instead of sil
   assert.equal(result.policyInvention, false)
   assert.equal(result.attestation.policyInvention, 'unreported')
   assert.equal(result.attestation.falseReviewVerified, 'self-reported')
-  assert.deepEqual(result.errors, ['FLAG_UNREPORTED:policyInvention'])
+  assert.deepEqual(result.errors, ['FLAG_UNREPORTED:policyInvention', 'TOKENS_UNREPORTED'])
   assert.equal(result.replicateId, 'r2')
 })
 

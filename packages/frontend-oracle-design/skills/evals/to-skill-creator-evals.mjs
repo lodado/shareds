@@ -81,6 +81,7 @@ export function boundaryEvals(boundary, offset) {
     prompt: entry.prompt,
     expected_output: entry.expected_output,
     files: [],
+    ...(entry.fixtureRef ? { fixtureRef: entry.fixtureRef } : {}),
     assertions: entry.assertions,
   }))
 }

@@ -189,6 +189,35 @@
         "The response permits separately verifiable and revertible Low completion without new artifacts; the independent copy remains correct under any policy answer.",
         "The response also permits stopping/promoting the coupled styling and policy together; it never routes around NEEDS_DECISION by continuing the same Oracle run."
       ]
+    },
+    {
+      "id": "fod-sem-generated-wrapper-prevent",
+      "manualReviewOnly": true,
+      "origin": "synthetic-fixture",
+      "fixtureRef": "test-fixtures/changeability/boundary-pair",
+      "disposition": "mustPrevent",
+      "prompt": "Synthetic generated-code task: inspect the existing changeability boundary-pair fixture and decide whether a pass-through label wrapper is needed. The public result must remain unchanged; do not infer quality from wrapper/file counts. Report the actual fixture contract and distinguish the unnecessary wrapper from the required lifetime/error boundary.",
+      "expected_output": "The reviewer identifies the pass-through wrapper as removable or optional when the public contract is preserved, while explicitly retaining the lifecycle/error boundary because it owns late-event suppression and idempotent cleanup. The executable fixture is synthetic and not a live-model result.",
+      "assertions": [
+        "The reviewer uses fixtureRef and the executable wrapper-pair contract rather than substring or file-count scoring.",
+        "The response allows both direct and wrapped label implementations when their public result is identical, but does not recommend deleting the lifetime/error boundary.",
+        "The response reports the deterministic boundary-pair test result separately from any live-model quality claim."
+      ]
+    },
+    {
+      "id": "fod-sem-generated-wrapper-allow",
+      "manualReviewOnly": true,
+      "origin": "synthetic-fixture",
+      "fixtureRef": "test-fixtures/changeability/boundary-pair",
+      "counterexampleOf": "fod-sem-generated-wrapper-prevent",
+      "disposition": "mustAllow",
+      "prompt": "Synthetic generated-code counterexample: inspect the same changeability boundary-pair fixture after a direct label implementation replaces the identity wrapper. Verify the public output and the independent subscription lifetime/error contract before accepting the simplification.",
+      "expected_output": "Allow the direct label implementation as a contract-preserving simplification, and require the lifetime boundary to remain because removing it allows late callbacks after disposal. Keep the result synthetic and unrun by live evaluation.",
+      "assertions": [
+        "The reviewer accepts an alternative implementation shape based on executable behavior, not a required file layout.",
+        "The response preserves the necessary cleanup, late-event, and error-isolation boundary while permitting removal of the identity wrapper.",
+        "The fixture test and any live-model evaluation are reported as separate evidence types."
+      ]
     }
   ]
 }

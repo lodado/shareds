@@ -19,7 +19,7 @@ test('evals.json is the skill-creator projection of the blackbox corpus and stay
   assert.equal(evals.evals.length, corpus.cases.length + heldOut.cases.length + boundary.cases.length)
 
   const semantic = evals.evals.filter((entry) => entry.category === 'boundary-semantic')
-  assert.equal(semantic.length, 15)
+  assert.equal(semantic.length, 17)
   assert.ok(semantic.every((entry) => entry.assertions.length >= 2))
   for (const entry of semantic) {
     const fixture = boundary.cases.find(({ id }) => id === entry.name)
@@ -27,6 +27,7 @@ test('evals.json is the skill-creator projection of the blackbox corpus and stay
     assert.equal(entry.manualReviewOnly, true)
     assert.deepEqual(entry.assertions, fixture.assertions)
     assert.equal(entry.expected_output, fixture.expected_output)
+    if (fixture.fixtureRef) assert.equal(entry.fixtureRef, fixture.fixtureRef)
     assert.doesNotMatch(
       entry.assertions.join('\n'),
       /The first line of the response is the lane header|The reported terminal state is GREEN|The verification report cites actual runs/,

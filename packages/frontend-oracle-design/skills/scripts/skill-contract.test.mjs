@@ -879,6 +879,78 @@ test('O1-O7: loads one detailed changeability reference before implementation de
   assert.match(implementationLoop, /boilerplate/)
 })
 
+test('material boundary choices cite real reuse and state evidence without mandatory ceremony', async () => {
+  const decision = await read('references/delivery/implementation-decision.md')
+  assert.match(decision, /file.*symbol.*call.*site/is)
+  assert.match(decision, /fits.*does not fit/s)
+  assert.match(decision, /source.*update.*derivation.*lifetime/s)
+  assert.match(decision, /one-line change.*no.*alternatives/s)
+  assert.match(decision, /not.*approved policy/s)
+})
+
+test('material responsibility assignment is consumed before editing and checked in the existing loop', async () => {
+  const [decision, green, checklist, skill, graph] = await Promise.all([
+    read('references/delivery/implementation-decision.md'),
+    read('references/delivery/green-review.md'),
+    read('references/review-checklist.md'),
+    read('SKILL.md'),
+    read('references/oracle-workflow.graph.json'),
+  ])
+  // These assertions test entry-point wiring, not whether a model follows the assignment.
+  assert.match(decision, /## Responsibility assignment/)
+  assert.match(decision, /State ownership.*Hook boundary.*Architecture.*Side effects/s)
+  assert.match(decision, /file.*symbol.*owns.*must not/s)
+  assert.match(decision, /technically equivalent.*update.*Decision/s)
+  assert.match(decision, /not.*policy.*approval/s)
+  for (const entry of [green, checklist, skill, graph]) {
+    assert.match(entry, /implementation-decision\.md#responsibility-assignment/)
+  }
+  assert.match(green, /actual.*caller.*owner.*Decision/s)
+  assert.match(checklist, /Cohesion.*Coupling.*evidence/s)
+  assert.match(checklist, /passing.*behavior.*not.*responsibility/s)
+})
+
+test('hook extraction follows responsibility rather than branch or side-effect counts', async () => {
+  const [authoring, checklist, decisions] = await Promise.all([
+    read('references/frontend/authoring.md'),
+    read('references/review-checklist.md'),
+    read('references/frontend/decisions.md'),
+  ])
+  assert.doesNotMatch(authoring, /When an\s+event handler grows a domain branch|ordering of two or more side effects|If it owns one interaction workflow.*split it into a hook/s)
+  assert.match(authoring, /state ownership.*lifetime.*error.*independent test.*reuse/s)
+  assert.match(authoring, /without.*orchestration-only.*event handler/s)
+  assert.match(authoring, /React-independent.*not.*hook/s)
+  assert.match(checklist, /frontend\/authoring\.md/)
+  assert.match(decisions, /initialization timing.*save.*cancel.*conflict with remote updates/s)
+  assert.match(decisions, /independent lifetime/)
+})
+
+test('self-feedback includes one bounded simplification pass before final evidence', async () => {
+  const [green, skill, graph] = await Promise.all([
+    read('references/delivery/green-review.md'),
+    read('SKILL.md'),
+    read('references/oracle-workflow.graph.json'),
+  ])
+  assert.match(green, /### Bounded simplification/)
+  assert.match(green, /first pass.*before.*final GREEN.*review packet/s)
+  assert.match(green, /existing.*3-round.*budget/s)
+  assert.match(green, /No deletion.*required/)
+  assert.match(green, /current bytes.*snapshot.*packet/s)
+  assert.match(green, /fake RED.*weaken/s)
+  assert.match(green, /security.*input validation.*accessibility.*cleanup.*data-loss/s)
+  assert.match(skill, /green-review\.md#bounded-simplification/)
+  assert.match(graph, /green-review\.md#bounded-simplification/)
+})
+
+test('review routing distinguishes contract gaps and advisory cost without schema escalation', async () => {
+  const review = await read('references/subagent-review.md')
+  assert.match(review, /### Structural concerns and authority/)
+  assert.match(review, /Source Registry.*jurisdiction/s)
+  assert.match(review, /unrelated O\* row or raise severity/)
+  assert.match(review, /missing.*PASS.*N\/A/s)
+  assert.match(review, /maintenance cost.*advisory/s)
+})
+
 test('changeability: grounds material choices in change evidence without adding a scoring gate', async () => {
   const [criteria, decision, review] = await Promise.all([
     read('references/changeability.md'),

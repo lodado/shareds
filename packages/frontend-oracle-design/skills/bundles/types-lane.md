@@ -244,6 +244,10 @@ Each item is `kind → default owner. Forbidden: duplication shape`.
 To copy a server source of record into an editable draft, the Oracle must have policies for
 `initialization timing`, `save`, `cancel`, and `conflict with remote updates`. Keep a single source
 of truth, and do query transformation with query `select` or render-time derivation when possible.
+The query remains the remote source of record; a draft owns only the unsaved edit and its approved
+lifecycle. A value with an independent lifetime (for example the snapshot at edit start) is not
+the same as a value derived from the current render. Record why that lifetime is needed rather than
+adding synchronization to keep two copies of the same current value.
 
 For server state, first use the query API·router state·form state that already exist in the repo.
 Managing the same data by hand with `useState`+`useEffect`+`useRef` means reimplementing

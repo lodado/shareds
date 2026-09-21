@@ -8,6 +8,24 @@ import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../test-fixtures/changeability')
 
+function verifyBoundaryPair(labelModule, lifetimeModule) {
+  const { NODE_TEST_CONTEXT, ...env } = process.env
+  return spawnSync(process.execPath, ['--test', join(root, 'boundary-pair/verify.test.mjs')], {
+    encoding: 'utf8',
+    timeout: 30000,
+    env: { ...env, SUBJECT_ROOT: join(root, 'boundary-pair'), LABEL_MODULE: labelModule, LIFETIME_MODULE: lifetimeModule },
+  })
+}
+
+test('changeability pilot: wrapper removal and lifetime boundary are judged by executable contracts', () => {
+  const result = verifyBoundaryPair('wrapper.mjs', 'lifetime-good.mjs')
+  assert.equal(result.status, 0, result.error?.message ?? result.stdout + result.stderr)
+  const direct = verifyBoundaryPair('direct.mjs', 'lifetime-good.mjs')
+  assert.equal(direct.status, 0, direct.error?.message ?? direct.stdout + direct.stderr)
+  const deletion = verifyBoundaryPair('direct.mjs', 'lifetime-deleted.mjs')
+  assert.equal(deletion.status, 1, 'deleting the lifetime boundary must remain a reproducible contract failure')
+})
+
 function verify(subject, sdkVersion, testFile = 'verify.test.mjs') {
   // A nested node --test must not inherit the outer runner's recursive-test marker.
   const { NODE_TEST_CONTEXT, ...env } = process.env

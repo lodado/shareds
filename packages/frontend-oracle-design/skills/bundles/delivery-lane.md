@@ -1077,6 +1077,10 @@ Each item is `kind → default owner. Forbidden: duplication shape`.
 To copy a server source of record into an editable draft, the Oracle must have policies for
 `initialization timing`, `save`, `cancel`, and `conflict with remote updates`. Keep a single source
 of truth, and do query transformation with query `select` or render-time derivation when possible.
+The query remains the remote source of record; a draft owns only the unsaved edit and its approved
+lifecycle. A value with an independent lifetime (for example the snapshot at edit start) is not
+the same as a value derived from the current render. Record why that lifetime is needed rather than
+adding synchronization to keep two copies of the same current value.
 
 For server state, first use the query API·router state·form state that already exist in the repo.
 Managing the same data by hand with `useState`+`useEffect`+`useRef` means reimplementing
@@ -1195,23 +1199,33 @@ keep the minimal state that expresses the actual UI state. For state derivation�
 async·multi-step flows follow [`types/state-ladder.md`](../types/state-ladder.md), and add a new
 state-machine dependency only when the need is proven.
 
-A micro-hook is not **short code** but a **small ownership boundary**. UI and business logic
-responsibilities:
+A micro-hook is a small ownership boundary for UI and business logic, not a code-length target.
+Choose extraction by state ownership, lifetime management, error isolation, independent test
+responsibility, or actual reuse. A domain branch, a function's existence, LOC, or the number of
+side-effect calls does not establish a separate responsibility.
 
-- A UI component owns only semantic JSX, accessibility, visual state expression, view-local interaction, and conveying user intent. It does not own domain judgment, DTO conversion, query/cache, or navigation·storage·observer coordination.
-- A micro-hook owns only one interaction workflow or the connection between one external system and the React lifecycle. It does not own JSX·class·token·copy, or a bundle of unrelated workflows.
-- A pure model function owns only React-independent business rules such as filter·group·sort·validation·state transition. It does not own hook lifecycle or screen presentation.
+Within an approved `orchestration-only` target, preserve its exact allow/block boundary and compose
+the required hooks. In a project without that `orchestration-only` policy, an existing event handler
+may own a local workflow when the current contract and ownership remain clear. Moving the same
+responsibility to another file is not automatically an improvement.
 
-A Page composes micro-hooks and draws the UI from render-ready values and intent actions. When an
-event handler grows a domain branch or an ordering of two or more side effects, a hook owns the
-workflow, and computation that does not need React goes into a pure model function.
-
-- If it owns one interaction workflow or an external system synchronization, split it into a hook.
+- A UI component owns semantic JSX, accessibility, visual expression and user intent. Reuse the
+  approved domain/transport/query owners; do not duplicate their policy, state or retry logic.
+- Extract a micro-hook when a React-connected responsibility above needs its own owner. Keep its
+  workflow cohesive; it does not own JSX·class·token·copy or unrelated workflows.
+- React-independent calculation belongs in an existing function or render derivation, not a hook.
+  Do not create a model file solely because a calculation exists.
+- Stop at an existing function, render derivation, event handler, or query/router/form API when it
+  satisfies the contract. Remove pass-through renames and options with no current consumer; preserve
+  needed lifecycle management, error isolation, testable external seams, and approved public API or
+  design-system boundaries. The [present-boundary exception](../changeability.md#present-boundary-exception)
+  owns the rationale for a new seam.
 - A hook **returns state and actions as siblings** (`{ state, retry }`). Do not put actions into the
   state value, and for server state re-expose the query's `refetch` instead of a new action. Do not
   fill in no-op actions for things it cannot do.
 - query key/options·remote operations belong to the corresponding server-state boundary.
-- A view focuses on rendering·expressing accessible interaction and receives data/actions.
+- A view follows the repo's approved data/action ownership; this is not a rule to pass all data
+  through props or call every hook only at a leaf.
 - Express pure computation as a function or during render. Use `useMemo` only when it is an
   optimization with real cost.
 - Creating a hook/file for a one-line `useState` used once, a simple rename, or a JSX fragment is
@@ -1322,12 +1336,63 @@ boilerplate that ceremonially fills every axis, record only material trade-offs.
 - Rejected: alternatives actually considered but not applied, the related quality axis and the concrete reason
 ```
 
+## Responsibility assignment
+
+For a material UI/business boundary change, use the existing State ownership, Hook boundary,
+Architecture and Side effects entries to settle where the implementation belongs before editing.
+Name the file and symbol that owns each changed responsibility, what its caller may use and must not
+duplicate, the applicable approved source, and the existing check. Mark a new symbol as planned;
+do not claim it already exists. Reuse actual query, mutation, form and domain owners before choosing
+a new hook. This is not a new field, artifact, policy approval or a requirement for one-line changes.
+
+For example, only if the consuming repo has approved this separation:
+
+```markdown
+- Architecture: <approved source location + locked hash> applies to
+  src/profile/ProfileView.tsx#ProfileView: render and view-local interaction are allowed;
+  saving policy and direct profile transport calls belong to the owners below.
+- Hook boundary: src/profile/useProfileEditor.ts#useProfileEditor owns the edit/save/cancel
+  workflow. ProfileView calls its intent actions; it does not repeat the save decision.
+- State ownership: existing query owns remote data; useProfileEditor owns the editable draft
+  under <approved initialization/save/cancel/conflict contract>. Display-only values are derived.
+- Side effects: useProfileEditor calls src/profile/api.ts#profileMutation, which keeps its
+  existing retry/error policy. <existing behavior command> checks save/cancel outcomes;
+  <existing approved boundary command> checks the View import restriction separately.
+```
+
+Replace the example with investigated owners and approved constraints. It does not prescribe this
+file layout, props-only data flow, leaf-only hook calls, or a new hook for every action. Implement the
+changed responsibility at its assigned owner, then connect the caller; do not finish the workflow
+inside the UI and merely add a forwarding hook beside it. The conditional structural-check contract
+stays in [`architecture-contract.md`](../architecture-contract.md#hook-encapsulation-contract--conditional).
+
+If the actual implementation takes a technically equivalent path within the approved boundaries,
+update the existing Decision with the actual owner and reason, then rerun affected checks. A
+disagreement with this implementation prediction is not itself a policy violation. Repair an actual
+violation of a known contract through the existing feedback path. If the proposed allocation requires
+changing approved behavior or architecture, stop at the existing `NEEDS_DECISION` route; rewriting
+the Decision cannot approve that change.
+
 ## Material change sketch
 
 When a boundary choice materially affects change cost, use the existing Changeability and Rejected
 entries for `change + evidence → preserved contract → owner/impact path → choice + verification +
 accepted cost`. This is not a separate artifact or an additional required field. Do not repeat
 unrelated axes or invent a future change merely to fill it in.
+
+For a material choice, make the existing entries traceable to the code:
+
+- Architecture / Simplicity: cite the reuse candidate's actual file, symbol, and call sites. Explain
+  what fits the current requirement and what does not fit; existing code and tests are evidence,
+  not approved policy. Compare the simplest existing implementation with the proposed change.
+- State ownership: name the data source, update owner, derivation, and lifetime. Apply the query
+  result versus editable-draft distinction in [`frontend/decisions.md`](../frontend/decisions.md#1-decide-state-ownership-first).
+- Changeability / Rejected: name the current complexity the boundary hides, the accepted cost,
+  and the existing check or concrete change scenario that could disprove the choice. “More cohesive”
+  or “for extensibility” alone is not evidence.
+
+These are prompts for a significant boundary decision, not extra mandatory fields. An obvious
+one-line change needs no list of alternatives or expanded design document.
 
 ```markdown
 - Changeability: the approved SDK callback-format update changes the feature's transport mapping,
@@ -1454,7 +1519,8 @@ At most 3 rounds. One round:
 
 1. Select one failing card row or a bundle of rows with the same root cause.
 2. Trace the relevant call path to the end and identify the cause every caller shares.
-3. Write the minimal production change that satisfies only that contract.
+3. Write the minimal production change that satisfies only that contract, using the assigned
+   owners for a material boundary change ([Responsibility assignment](implementation-decision.md#responsibility-assignment)).
 4. Re-run the targeted test that was failing.
 5. Run the impact-scope tests.
 6. Classify the result and decide the next action.
@@ -1485,6 +1551,38 @@ Record every round:
 
 | Round | Card row | Failure hypothesis | Minimal change | Actual run result | Next judgment |
 | ----- | -------- | ------------------ | -------------- | ----------------- | ------------- |
+
+### Bounded simplification
+
+After the relevant tests first pass, before final GREEN evidence and the review packet are frozen,
+inspect only the changed scope once within the existing 3-round product budget. This is part of
+self-feedback, not a new state, gate, review role or refactoring loop. `ALREADY_SATISFIED` remains
+zero-production verification; this pass grants no edit permission.
+
+For a material responsibility assignment, trace the actual caller → state/policy owner → external
+effect path in the changed code and compare it with the existing Decision. Check where the state
+is updated and the business decision is made, not whether a hook file exists. Use the existing
+round record for a material mismatch and its resolution; apply the assignment's equivalent-change
+versus approved-contract-conflict distinction. Behavior tests and the applicable existing structural
+checks prove different things; a passing behavior test alone does not settle responsibility placement.
+
+Use [`changeability.md`](../changeability.md) to ask:
+
+- Did we add derivable state and synchronization, or duplicate a policy/effect owner?
+- Does a public API, option, wrapper or adapter have no current responsibility or consumer?
+- Do defaults, type assertions or swallowed exceptions hide an error or contract mismatch?
+- Would deletion make behavior and ownership easier to follow?
+
+No deletion is required. If keeping the code is correct, record the material reason in the existing
+Decision or round record and stop. File count, LOC and abstraction count are not quality scores.
+Preserve security, input validation, accessibility, cleanup and data-loss prevention, along with
+the necessary boundaries described by the existing criteria. A change to cancellation, retry or
+error meaning is not a simple refactor; use the existing contract/approval route.
+
+For any allowed edit, rerun affected checks and required labels before finalizing evidence. Use
+current bytes for evidence, snapshot and packet; invalidate reviews of changed input. Do not reuse
+pre-edit GREEN/review results, manufacture a fake RED or weaken expectations to justify cleanup.
+Do not spend another budget or start another loop when the existing budget is exhausted.
 
 ## GREEN gate
 
@@ -2185,6 +2283,26 @@ verification is missing it is `EVIDENCE_GAP`, and if an observation result or AP
 decided it is `POLICY_GAP`. A more preferred naming·folder·abstraction style is `NON_ORACLE_OPINION`
 and is not grounds for blocking. Also check whether a mandatory constraint was lowered into a
 product·visual preference.
+
+### Structural concerns and authority
+
+Before routing a structural concern, verify the source's approval, jurisdiction, applicability to
+this change, and actual violation evidence. Source Registry membership alone does not authorize a
+structural judgment. Compare the Decision with the diff, callers, owners and executed checks.
+
+| Concern                                                                        | Existing route                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Approved product behavior is violated                                          | `PRODUCT_DEFECT` with the affected row and reproduction; use the existing VALID_RED/fix path                                                                                                          |
+| Applicable approved architecture, public API or project constraint is violated | Cite the exact source/scope and violated boundary; use the existing row-based route and required repository verification. If a required contract is absent from the card, `POLICY_GAP` and reapproval |
+| Concrete maintenance cost without a contract violation                         | Advisory `NON_ORACLE_OPINION`; consider the evidence during implementation choice or the bounded self-feedback pass, not as a new policy or completion blocker                                        |
+| Naming, folder or code-length preference                                       | Advisory `NON_ORACLE_OPINION`                                                                                                                                                                         |
+| Policy or required evidence is missing                                         | Investigate or use `POLICY_GAP` / `EVIDENCE_GAP`; never turn missing information into PASS or N/A                                                                                                     |
+
+The rowless medium/low normalization above is unchanged. It is not proof that a missing contract
+was resolved: the Controller must still use the existing decision/required-verification path.
+Do not attach an unrelated O* row or raise severity to bypass normalization. A mandatory global
+critical/high concern retains its existing treatment; concrete cost alone does not make one.
+Do not require a finding count, a deletion, or a fix when the evidence supports keeping the code.
 
 ## Semantic review and calibration
 

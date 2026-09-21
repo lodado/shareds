@@ -386,6 +386,26 @@ decided it is `POLICY_GAP`. A more preferred naming·folder·abstraction style i
 and is not grounds for blocking. Also check whether a mandatory constraint was lowered into a
 product·visual preference.
 
+### Structural concerns and authority
+
+Before routing a structural concern, verify the source's approval, jurisdiction, applicability to
+this change, and actual violation evidence. Source Registry membership alone does not authorize a
+structural judgment. Compare the Decision with the diff, callers, owners and executed checks.
+
+| Concern                                                                        | Existing route                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Approved product behavior is violated                                          | `PRODUCT_DEFECT` with the affected row and reproduction; use the existing VALID_RED/fix path                                                                                                          |
+| Applicable approved architecture, public API or project constraint is violated | Cite the exact source/scope and violated boundary; use the existing row-based route and required repository verification. If a required contract is absent from the card, `POLICY_GAP` and reapproval |
+| Concrete maintenance cost without a contract violation                         | Advisory `NON_ORACLE_OPINION`; consider the evidence during implementation choice or the bounded self-feedback pass, not as a new policy or completion blocker                                        |
+| Naming, folder or code-length preference                                       | Advisory `NON_ORACLE_OPINION`                                                                                                                                                                         |
+| Policy or required evidence is missing                                         | Investigate or use `POLICY_GAP` / `EVIDENCE_GAP`; never turn missing information into PASS or N/A                                                                                                     |
+
+The rowless medium/low normalization above is unchanged. It is not proof that a missing contract
+was resolved: the Controller must still use the existing decision/required-verification path.
+Do not attach an unrelated O* row or raise severity to bypass normalization. A mandatory global
+critical/high concern retains its existing treatment; concrete cost alone does not make one.
+Do not require a finding count, a deletion, or a fix when the evidence supports keeping the code.
+
 ## Semantic review and calibration
 
 Review one changed user journey/outcome at a time, keeping its cross-screen and side-effect links.

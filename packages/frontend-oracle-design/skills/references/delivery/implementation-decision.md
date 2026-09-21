@@ -40,12 +40,63 @@ boilerplate that ceremonially fills every axis, record only material trade-offs.
 - Rejected: alternatives actually considered but not applied, the related quality axis and the concrete reason
 ```
 
+## Responsibility assignment
+
+For a material UI/business boundary change, use the existing State ownership, Hook boundary,
+Architecture and Side effects entries to settle where the implementation belongs before editing.
+Name the file and symbol that owns each changed responsibility, what its caller may use and must not
+duplicate, the applicable approved source, and the existing check. Mark a new symbol as planned;
+do not claim it already exists. Reuse actual query, mutation, form and domain owners before choosing
+a new hook. This is not a new field, artifact, policy approval or a requirement for one-line changes.
+
+For example, only if the consuming repo has approved this separation:
+
+```markdown
+- Architecture: <approved source location + locked hash> applies to
+  src/profile/ProfileView.tsx#ProfileView: render and view-local interaction are allowed;
+  saving policy and direct profile transport calls belong to the owners below.
+- Hook boundary: src/profile/useProfileEditor.ts#useProfileEditor owns the edit/save/cancel
+  workflow. ProfileView calls its intent actions; it does not repeat the save decision.
+- State ownership: existing query owns remote data; useProfileEditor owns the editable draft
+  under <approved initialization/save/cancel/conflict contract>. Display-only values are derived.
+- Side effects: useProfileEditor calls src/profile/api.ts#profileMutation, which keeps its
+  existing retry/error policy. <existing behavior command> checks save/cancel outcomes;
+  <existing approved boundary command> checks the View import restriction separately.
+```
+
+Replace the example with investigated owners and approved constraints. It does not prescribe this
+file layout, props-only data flow, leaf-only hook calls, or a new hook for every action. Implement the
+changed responsibility at its assigned owner, then connect the caller; do not finish the workflow
+inside the UI and merely add a forwarding hook beside it. The conditional structural-check contract
+stays in [`architecture-contract.md`](../architecture-contract.md#hook-encapsulation-contract--conditional).
+
+If the actual implementation takes a technically equivalent path within the approved boundaries,
+update the existing Decision with the actual owner and reason, then rerun affected checks. A
+disagreement with this implementation prediction is not itself a policy violation. Repair an actual
+violation of a known contract through the existing feedback path. If the proposed allocation requires
+changing approved behavior or architecture, stop at the existing `NEEDS_DECISION` route; rewriting
+the Decision cannot approve that change.
+
 ## Material change sketch
 
 When a boundary choice materially affects change cost, use the existing Changeability and Rejected
 entries for `change + evidence → preserved contract → owner/impact path → choice + verification +
 accepted cost`. This is not a separate artifact or an additional required field. Do not repeat
 unrelated axes or invent a future change merely to fill it in.
+
+For a material choice, make the existing entries traceable to the code:
+
+- Architecture / Simplicity: cite the reuse candidate's actual file, symbol, and call sites. Explain
+  what fits the current requirement and what does not fit; existing code and tests are evidence,
+  not approved policy. Compare the simplest existing implementation with the proposed change.
+- State ownership: name the data source, update owner, derivation, and lifetime. Apply the query
+  result versus editable-draft distinction in [`frontend/decisions.md`](../frontend/decisions.md#1-decide-state-ownership-first).
+- Changeability / Rejected: name the current complexity the boundary hides, the accepted cost,
+  and the existing check or concrete change scenario that could disprove the choice. “More cohesive”
+  or “for extensibility” alone is not evidence.
+
+These are prompts for a significant boundary decision, not extra mandatory fields. An obvious
+one-line change needs no list of alternatives or expanded design document.
 
 ```markdown
 - Changeability: the approved SDK callback-format update changes the feature's transport mapping,

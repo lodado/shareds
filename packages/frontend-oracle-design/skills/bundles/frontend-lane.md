@@ -604,6 +604,10 @@ Each item is `kind → default owner. Forbidden: duplication shape`.
 To copy a server source of record into an editable draft, the Oracle must have policies for
 `initialization timing`, `save`, `cancel`, and `conflict with remote updates`. Keep a single source
 of truth, and do query transformation with query `select` or render-time derivation when possible.
+The query remains the remote source of record; a draft owns only the unsaved edit and its approved
+lifecycle. A value with an independent lifetime (for example the snapshot at edit start) is not
+the same as a value derived from the current render. Record why that lifetime is needed rather than
+adding synchronization to keep two copies of the same current value.
 
 For server state, first use the query API·router state·form state that already exist in the repo.
 Managing the same data by hand with `useState`+`useEffect`+`useRef` means reimplementing
@@ -722,23 +726,33 @@ keep the minimal state that expresses the actual UI state. For state derivation�
 async·multi-step flows follow [`types/state-ladder.md`](../types/state-ladder.md), and add a new
 state-machine dependency only when the need is proven.
 
-A micro-hook is not **short code** but a **small ownership boundary**. UI and business logic
-responsibilities:
+A micro-hook is a small ownership boundary for UI and business logic, not a code-length target.
+Choose extraction by state ownership, lifetime management, error isolation, independent test
+responsibility, or actual reuse. A domain branch, a function's existence, LOC, or the number of
+side-effect calls does not establish a separate responsibility.
 
-- A UI component owns only semantic JSX, accessibility, visual state expression, view-local interaction, and conveying user intent. It does not own domain judgment, DTO conversion, query/cache, or navigation·storage·observer coordination.
-- A micro-hook owns only one interaction workflow or the connection between one external system and the React lifecycle. It does not own JSX·class·token·copy, or a bundle of unrelated workflows.
-- A pure model function owns only React-independent business rules such as filter·group·sort·validation·state transition. It does not own hook lifecycle or screen presentation.
+Within an approved `orchestration-only` target, preserve its exact allow/block boundary and compose
+the required hooks. In a project without that `orchestration-only` policy, an existing event handler
+may own a local workflow when the current contract and ownership remain clear. Moving the same
+responsibility to another file is not automatically an improvement.
 
-A Page composes micro-hooks and draws the UI from render-ready values and intent actions. When an
-event handler grows a domain branch or an ordering of two or more side effects, a hook owns the
-workflow, and computation that does not need React goes into a pure model function.
-
-- If it owns one interaction workflow or an external system synchronization, split it into a hook.
+- A UI component owns semantic JSX, accessibility, visual expression and user intent. Reuse the
+  approved domain/transport/query owners; do not duplicate their policy, state or retry logic.
+- Extract a micro-hook when a React-connected responsibility above needs its own owner. Keep its
+  workflow cohesive; it does not own JSX·class·token·copy or unrelated workflows.
+- React-independent calculation belongs in an existing function or render derivation, not a hook.
+  Do not create a model file solely because a calculation exists.
+- Stop at an existing function, render derivation, event handler, or query/router/form API when it
+  satisfies the contract. Remove pass-through renames and options with no current consumer; preserve
+  needed lifecycle management, error isolation, testable external seams, and approved public API or
+  design-system boundaries. The [present-boundary exception](../changeability.md#present-boundary-exception)
+  owns the rationale for a new seam.
 - A hook **returns state and actions as siblings** (`{ state, retry }`). Do not put actions into the
   state value, and for server state re-expose the query's `refetch` instead of a new action. Do not
   fill in no-op actions for things it cannot do.
 - query key/options·remote operations belong to the corresponding server-state boundary.
-- A view focuses on rendering·expressing accessible interaction and receives data/actions.
+- A view follows the repo's approved data/action ownership; this is not a rule to pass all data
+  through props or call every hook only at a leaf.
 - Express pure computation as a function or during render. Use `useMemo` only when it is an
   optimization with real cost.
 - Creating a hook/file for a one-line `useState` used once, a simple rename, or a JSX fragment is

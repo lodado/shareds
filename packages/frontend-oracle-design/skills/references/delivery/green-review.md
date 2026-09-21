@@ -8,7 +8,8 @@ At most 3 rounds. One round:
 
 1. Select one failing card row or a bundle of rows with the same root cause.
 2. Trace the relevant call path to the end and identify the cause every caller shares.
-3. Write the minimal production change that satisfies only that contract.
+3. Write the minimal production change that satisfies only that contract, using the assigned
+   owners for a material boundary change ([Responsibility assignment](implementation-decision.md#responsibility-assignment)).
 4. Re-run the targeted test that was failing.
 5. Run the impact-scope tests.
 6. Classify the result and decide the next action.
@@ -39,6 +40,38 @@ Record every round:
 
 | Round | Card row | Failure hypothesis | Minimal change | Actual run result | Next judgment |
 | ----- | -------- | ------------------ | -------------- | ----------------- | ------------- |
+
+### Bounded simplification
+
+After the relevant tests first pass, before final GREEN evidence and the review packet are frozen,
+inspect only the changed scope once within the existing 3-round product budget. This is part of
+self-feedback, not a new state, gate, review role or refactoring loop. `ALREADY_SATISFIED` remains
+zero-production verification; this pass grants no edit permission.
+
+For a material responsibility assignment, trace the actual caller → state/policy owner → external
+effect path in the changed code and compare it with the existing Decision. Check where the state
+is updated and the business decision is made, not whether a hook file exists. Use the existing
+round record for a material mismatch and its resolution; apply the assignment's equivalent-change
+versus approved-contract-conflict distinction. Behavior tests and the applicable existing structural
+checks prove different things; a passing behavior test alone does not settle responsibility placement.
+
+Use [`changeability.md`](../changeability.md) to ask:
+
+- Did we add derivable state and synchronization, or duplicate a policy/effect owner?
+- Does a public API, option, wrapper or adapter have no current responsibility or consumer?
+- Do defaults, type assertions or swallowed exceptions hide an error or contract mismatch?
+- Would deletion make behavior and ownership easier to follow?
+
+No deletion is required. If keeping the code is correct, record the material reason in the existing
+Decision or round record and stop. File count, LOC and abstraction count are not quality scores.
+Preserve security, input validation, accessibility, cleanup and data-loss prevention, along with
+the necessary boundaries described by the existing criteria. A change to cancellation, retry or
+error meaning is not a simple refactor; use the existing contract/approval route.
+
+For any allowed edit, rerun affected checks and required labels before finalizing evidence. Use
+current bytes for evidence, snapshot and packet; invalidate reviews of changed input. Do not reuse
+pre-edit GREEN/review results, manufacture a fake RED or weaken expectations to justify cleanup.
+Do not spend another budget or start another loop when the existing budget is exhausted.
 
 ## GREEN gate
 

@@ -104,14 +104,18 @@ finding. Do not suppress mandatory or global critical/high issues because no pat
 - Was work for which a Server Component is sufficient not moved to a Client Component·TanStack Query?
 - Does retry recover only the scope of the failed query/boundary without indiscriminately resetting
   the whole cache?
-- Does the micro-hook separate the responsibilities of UI and business logic exactly? Does the UI
-  component own only semantic JSX·accessibility·visual state·user intent wiring, and not directly
-  own domain judgment·DTO conversion·query/cache·navigation·storage·observer coordination?
-- Does each micro-hook own only one interaction workflow or external system connection, return only
-  render-ready values and intent actions, and not hide JSX·class·token·copy?
-- Are the filtering·grouping·sorting·validation·state transitions that do not need React in pure
-  model functions, without creating a trivial wrapper that is a mere rename or a giant hook that
-  merges unrelated responsibilities?
+- Does the micro-hook separate UI and business logic for a responsibility identified in
+  [`frontend/authoring.md`](frontend/authoring.md#2-set-declarative-ui-and-micro-hook-boundaries)?
+  Compare the actual callers, state/effect owners and checks with the Implementation Decision;
+  do not accept its self-assessment. Preserve an approved orchestration-only scope without
+  imposing it elsewhere. A trivial wrapper or giant hook is not justified by extracting a file.
+- For a material [responsibility assignment](delivery/implementation-decision.md#responsibility-assignment),
+  derive the caller → state/policy owner → external effect path from code, then compare it with
+  the Decision and the applicable approved boundary. Cite the actual decision/update sites in the
+  existing Cohesion/Coupling evidence, including a View that still owns the workflow behind a
+  forwarding hook. A passing behavior test is not proof of responsibility placement. An equivalent
+  implementation under the same approved constraints is allowed; disagreement with a predicted
+  file layout alone is not a contract violation. Missing owner/consumer code remains missing evidence.
 - Is the final justification for introducing a new dependency·framework the actual problem and the
   features to be used, rather than the technology name·popularity? Do the Dependency item of the
   Implementation Decision and the diff match?

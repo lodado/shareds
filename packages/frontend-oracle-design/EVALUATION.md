@@ -3,6 +3,138 @@
 > **Historical evaluation** — 0.1.9 시점 기록이다. 이후 버전에서 상태 전이·증거
 > 게이트 등 일부 지적이 보완되었으므로 현재 상태 감사 결과로 읽지 않는다.
 
+## 2026-09-21 유지보수 평가의 범위
+
+이번 감사의 시작점은 `5275313a9691d8251ce9bc902d3fd885c7efd6d1`, 패키지는 `0.54.0`이다.
+참고 커밋 `cc07b507765187693e8401defd3a60d94bbce864`로 되돌리지 않고 현재 구현을 확인했다.
+실제 문제가 된 애플리케이션 diff와 실행 기록이 없으므로 특정 코드 생성 원인은 확정하지 않았다.
+아래 결과를 과거 평가의 점수나 이전 스킬의 live 결과와 합산하지 않는다.
+
+| 검증 종류       | 확인하는 것                                                                                                 | 확인하지 못하는 것                                      |
+| --------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| 구조 검증       | reference 링크·bundle·workflow 동기화, findings 분류와 packet 무결성, Low/Design-only 및 기존 Delivery 경계 | 구현 선택의 적절성, 모델의 코드 품질                    |
+| 결정적 회귀     | Codex/Claude 이벤트 fixture 처리, 실행 가능한 코드 fixture의 계약·오류·수명·대안 구현                       | 모델이 같은 선택을 할 확률, 일반적인 유지보수 비용 감소 |
+| live-model 평가 | 같은 초기 코드·요구사항에서 얻은 실제 diff, 검증 결과, 독립 리뷰와 사람의 표본 확인                         | 이번 변경에서는 미실행이므로 개선 효과 미확인           |
+
+상태 소유권, 편집 초안 예외, 현재 필요한 단일 구현 경계, 독립 리뷰, revision lock과 ledger는
+기존 기능이다. 이번 변경은 중요한 구현 선택의 근거를 실제 파일·심볼·호출부에 연결하고,
+훅 분리를 부수효과 개수 대신 책임으로 판단하도록 충돌 문구를 정리한다. 간소화 검토는 기존
+self-feedback 예산 안에서 첫 관련 테스트 통과 후, 최종 GREEN 증거와 packet 확정 전에 한다.
+새 상태·품질 점수·리뷰 수·finding 스키마는 추가하지 않는다.
+
+`test-fixtures/changeability/`의 이전 pilot은 동률이었다. 이전 snapshot 재실행과 이번 synthetic
+fixture 검증은 새 스킬의 live-model 결과가 아니다. 문구·JSON 일치 검사도 의미적 설계 평가로
+보고하지 않는다. 실제 생성 결과를 평가할 때는 불필요한 전달 wrapper와 필요한 오류·수명 경계를
+함께 검토하고, 계약을 만족하는 다른 함수·파일 구조도 허용한다.
+새 pair의 요구사항·초기 코드·독립 실행 명령은
+[`boundary-pair/task.md`](test-fixtures/changeability/boundary-pair/task.md)에 있다. 같은 verifier가
+두 label 구현을 허용하고, 수명 경계 삭제 variant는 거부한다. `boundary-cases.json`과 생성된
+`evals.json`은 이 fixture를 경로로 참조한다. wrapper 필요성의 최종 판단은 실제 diff와 책임을
+대조하는 독립 리뷰에 남기며, 문자열 검사나 테스트 통과만으로 자동 판정하지 않는다.
+
+### 책임 배치와 구현 대조
+
+후속 변경은 기존 Decision의 State ownership·Hook boundary·Architecture·Side effects에
+변경 책임을 실제 파일·심볼로 배치하도록 연결했다. 새 심볼은 예정임을 표시하고, 중요한 경계
+변경에만 적용한다. 구현 루프는 해당 소유자에 구현한 뒤 호출부를 연결하며, 첫 관련 테스트
+통과 후 실제 caller → owner → effect 경로를 Decision과 대조한다. 독립 리뷰는 기존
+Cohesion/Coupling 근거에 실제 판단·갱신 위치를 남긴다. Decision은 승인 정책이 아니므로
+승인 범위 안의 동등한 배치 변경은 허용하고, 실제 계약 위반은 기존 피드백 경로로 처리한다.
+
+`contextual-review-fixtures.json`에는 `ownership-boundary` 한 쌍을 추가했다. 성공·실패 동작과
+승인 계약, Decision 문구는 같지만 한 구현은 UI가 도메인 모듈을 직접 import하고 다른 구현은
+interaction owner를 통한다. 기존 6쌍의 정확한 동작 검사는 유지한다. 새 쌍은 동작 결과가 같음을
+확인한 뒤, 설치된 ESLint의 `no-restricted-imports`로 fixture가 명시적으로 승인한 직접 import
+금지를 검사한다. 정답은 기존 eval 변환기의 모델 입력에서 계속 분리한다.
+
+```sh
+node --test packages/frontend-oracle-design/skills/scripts/contextual-review-evals.test.mjs \
+  packages/frontend-oracle-design/skills/scripts/skill-contract.test.mjs
+```
+
+후속 변경의 패키지 전체 테스트는 463/463, targeted 검증은 contextual fixture·Decision 연결·
+eval 변환·workflow 문서 테스트 93/93 통과다. 독립 리뷰에서도 위 두 테스트 87/87과 변경한 두
+테스트 파일의 ESLint 오류 0을 확인했다. `skill-contract.test.mjs`에는 경고 42개가 남아 있다.
+저장소의 나머지 테스트 10개 작업은 캐시 없이 성공했고 hook 테스트 8/8도 통과했다.
+`pnpm quality`의 knip·jscpd 검사는 통과했으며, 기존 중복은 baseline과 비교한 결과다.
+
+이후 저장소의 ESLint 설정이 병행 변경된 상태에서 canonical 패키지 lint는 133 errors,
+434 warnings로 실패했다. 같은 설정을 한 프로세스에서 적용한 86개 파일 비교에서는 HEAD가
+134 errors, 현재 코드가 133 errors였고, 유일한 오류 차이는 기존 contextual fixture 테스트의
+`sonarjs/no-unenclosed-multiline-block` 한 건이 없어졌다는 점이다. 이 비교는 전체 lint 통과를
+뜻하지 않는다. 저장소 lint도 다른 패키지 오류로 실패했다. 관련 없는 설정·패키지는 수정하지
+않았으며, 아래 이전 단계의 lint 성공 기록을 이번 실행의 결과로 재사용하지 않는다.
+
+이 fixture는 framework-neutral 모듈이다. React 렌더링·수명, inline 업무 분기, 재수출·동적 import를
+통한 우회, 모델의 실제 검수 성능까지 검증하지 않는다. import 규칙을 통과했다는 이유로 훅의
+응집도가 증명되었다고 보지 않는다. 실제 모델 비교는 여전히 `NOT_RUN`이다.
+
+### 이벤트 계측의 근거와 한계
+
+설치된 CLI는 Codex `0.155.1`, Claude Code `2.1.278`이다. `eval-live.test.mjs`의 JSONL은
+공식 형식에 맞춘 **합성 fixture**이며 실사용 로그가 아니다. Codex의 `item.type`을 기존
+`item.item_type` 검사에서 놓치는 결함을 재현했다. `item_type`은 기존 fixture 호환 alias로만
+유지한다. 그 과거 형식을 출력한 실제 CLI 버전이나 로그는 확보하지 못했다.
+
+Codex `rust-v0.155.1`의
+[`exec_events.rs`](https://github.com/openai/codex/blob/be2951ea34f0d295ed0becf97079f92fa5f6950e/codex-rs/exec/src/exec_events.rs)와
+[`event_processor_with_jsonl_output.rs`](https://github.com/openai/codex/blob/be2951ea34f0d295ed0becf97079f92fa5f6950e/codex-rs/exec/src/event_processor_with_jsonl_output.rs)를
+확인했다. `turn.completed.usage`는 `ThreadTokenUsage.total`의 snapshot이므로 마지막 값을
+사용하며 여러 snapshot을 합산하지 않는다. `cached_input_tokens`는 input의 부분집합이므로
+다시 더하지 않는다. Claude의
+[공식 usage 설명](https://platform.claude.com/docs/en/agent-sdk/cost-tracking)에 따라 이 실행기의
+단일 `-p` 요청은 마지막 `result.usage`를 사용한다. Claude cache read/create input은 별도
+항목이므로 더한다. assistant 메시지별 usage는 output placeholder나 중복을 포함할 수 있어
+총합으로 사용하지 않는다. streaming-input 여러 요청이나 subagent 전체 비용을 계산하는
+실행기는 아니다. terminal usage가 없으면 `TOKENS_UNREPORTED`와 `unreported`를 남기며,
+스키마 호환용 숫자 0을 실제 무사용으로 해석하지 않는다.
+
+도구 수는 호스트가 노출한 알려진 도구 실행 시도 수다. 실패한 실행도 시도에는 포함하지만 성공한 읽기로
+간주하지 않는다. user/tool JSON은 최종 보고가 아니며, 잘못된 role·실패한 terminal 보고는
+거부한다. Claude 파일 읽기는 정상 assistant 요청과 비어 있지 않은 성공 결과를 연결한다. 명시된
+부분 범위·truncation·오류·누락은 완독으로 세지 않는다. shell `cat`·grep·파일명 언급도
+완독 증거가 아니다. 호스트가 알리지 않은 truncation이나 원본 bytes와의 일치는 이 계측만으로
+증명할 수 없다. 이 값은 코드 품질 점수가 아니다.
+
+재현에 사용할 현재 패키지 명령은 다음과 같다.
+
+```sh
+pnpm --filter @lodado/frontend-oracle-design-plugin test
+pnpm --filter @lodado/frontend-oracle-design-plugin lint
+pnpm --filter @lodado/frontend-oracle-design-plugin bundles:check
+pnpm --filter @lodado/frontend-oracle-design-plugin workflow-docs:check
+```
+
+이전 유지보수 단계에서 패키지 전체 테스트는 456/456 통과했다. 그 실행 뒤 보완한 파서의 role·usage·
+부분 읽기 처리는 아래 최종 변경 구간 재실행 142/142로 확인했다. 두 숫자를 합친 전체 테스트
+결과로 표시하지 않는다. fixture의 수명 경계 삭제 대조군은 verifier가 거부해야 회귀 테스트가
+통과한다. 별도 typecheck script는 없으며 기존 compiler/type witness는 패키지 테스트에 포함된다.
+
+```sh
+node --test packages/frontend-oracle-design/skills/scripts/eval-*.test.mjs \
+  packages/frontend-oracle-design/skills/scripts/changeability-pilot.test.mjs \
+  packages/frontend-oracle-design/skills/scripts/skill-contract.test.mjs \
+  packages/frontend-oracle-design/skills/scripts/workflow-docs.test.mjs
+pnpm exec turbo run lint --force
+node --test .claude/hooks/*.test.mjs
+pnpm exec turbo run test --force --filter='!@lodado/frontend-oracle-design-plugin'
+git diff --check
+```
+
+이전 단계의 저장소 lint는 7개 작업, 나머지 패키지 테스트는 10개 작업이 성공했으며 캐시 적중은 각각 0이었다.
+hook 테스트는 8/8 통과했다. lint의 오류는 없고 수정하지 않은 파일의 기존 경고 3개가 남았다.
+bundle·workflow·eval 변환물을 생성한 뒤 각 check와 diff 공백 검사를 통과했다.
+
+Live A/B는 실행 환경과 비용이 승인된 범위에서만 실행한다. 각 case/replicate/variant마다
+fixture만 복사한 독립 임시 디렉터리와 새 세션을 쓰고, 모델·reasoning·CLI 버전·권한·도구·검증
+명령을 동일하게 고정한다. 사용자 작업 트리, 실제 자격 증명, 네트워크 서비스는 입력으로 쓰지
+않는다. 원본 diff, 명령·종료 코드, 테스트 출력, 모델 설정, fixture/skill revision, 독립 리뷰를
+보관하고 사람의 표본 판단을 별도로 기록한다. 이전 실행의 ledger·캐시를 다음 실행에 복사하지
+않는다. `skills/evals/run-live.mjs --repo`는 같은 디렉터리를 반복 사용하는 routing 관찰용이므로
+코드 생성 격리 실행기로 간주하지 않는다. 이번 작업은 새 live 플랫폼을 만들지 않는다.
+
+아래 본문은 계속 0.1.9 당시의 기록이다.
+
 > 평가 기준일: 2026-08-16  
 > 평가 대상: <code>@lodado/frontend-oracle-design-plugin</code> 0.1.9  
 > 기준 커밋: <code>b8f675b8801056cd21390eafcef2b5b144d32fbb</code>  

@@ -343,10 +343,13 @@ When implementation, test-based self-verification, and subagent review are expli
    Map the reporter's failing test names to card rows; only a run that passes
    `oracle-verify.mjs red` and then records `oracle-run.mjs transition --to VALID_RED` is
    `VALID_RED`.
-6. Only `VALID_RED` may edit production: record the implementation decision via
-   `delivery/implementation-decision.md`·`frontend/authoring.md`, then minimal implementation →
+6. Only `VALID_RED` may edit production: record the implementation decision and any material
+   [responsibility assignment](references/delivery/implementation-decision.md#responsibility-assignment)
+   with `frontend/authoring.md`, then minimal implementation →
    GREEN. `ALREADY_SATISFIED` performs zero-production verification only and approves no production
-   edits. Either GREEN path records `oracle-run.mjs transition --to IMPLEMENTED_GREEN` exactly once
+   edits. After the first relevant test pass, before final evidence, apply the bounded simplification
+   in [`delivery/green-review.md`](references/delivery/green-review.md#bounded-simplification).
+   Either GREEN path records `oracle-run.mjs transition --to IMPLEMENTED_GREEN` exactly once
    first. The impact scope is machine-fed, not judged: the required label `impact` runs the repo's
    related-tests command over `oracle-run.mjs status --changed-files`, and
    `oracle-verify.mjs scan --side-effects --oracle <card> --path <changed production files>` must
