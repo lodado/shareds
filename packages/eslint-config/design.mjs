@@ -45,7 +45,7 @@ const DEFERRED = {
   'no-ssrf': 'sonarjs/no-ssrf',
   'no-weak-crypto': 'sonarjs/weak-ssl',
   'secure-cookies': 'sonarjs/insecure-cookie',
-  'no-prod-console': '@lodado/local-rules/no-console-log',
+  'no-prod-console': 'no-console',
 }
 
 const deferred = Object.fromEntries(Object.keys(DEFERRED).map((rule) => [`deslint/${rule}`, 'off']))

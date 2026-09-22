@@ -159,7 +159,8 @@ function reachesContract(program, sourceFile, span, contractFile) {
     seen.add(node)
     if (ts.isIdentifier(node)) {
       let symbol = checker.getSymbolAtLocation(node)
-      if (symbol?.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol)
+        const hasAliasFlag = (symbol?.flags & ts.SymbolFlags.Alias) !== 0
+      if (hasAliasFlag) symbol = checker.getAliasedSymbol(symbol)
       if (
         symbol?.getName() === span.symbol &&
         symbol.declarations?.some((declaration) => declaration.getSourceFile().fileName === contractFile)
@@ -340,7 +341,10 @@ test('uses the exact-pinned compiler, not another installed TypeScript', async (
 })
 
 test('checks positive consumers, imported symbols, canary and exact negative source spans', async (t) => {
-  t.diagnostic(JSON.stringify(await verifyFixture()))
+  const result = await verifyFixture()
+  assert.equal(result.canary.code, 2322)
+  assert.ok(result.obligations.length > 0)
+  t.diagnostic(JSON.stringify(result))
 })
 
 test('contract mutations fail for the intended relationship and restore GREEN', async (t) => {

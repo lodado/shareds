@@ -8,6 +8,7 @@ module.exports = [
   {
     name: 'lodado/strict-types',
     files: ['**/*.{ts,tsx,mts,cts}'],
+    ignores: ['**/*.md/**', '**/*.mdx/**'],
 
     languageOptions: {
       parserOptions: {

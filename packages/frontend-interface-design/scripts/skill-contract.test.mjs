@@ -5,6 +5,7 @@ import { dirname, extname, join, resolve } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package contract tests run with node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { resolveExecutable } from '../../frontend-oracle-design/skills/scripts/resolve-executable.mjs'
 
 const packageDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
 const skillDirectory = join(packageDirectory, 'skills/reference-driven-figma-design')
@@ -354,10 +355,11 @@ test('ships source fingerprints and local resolution without redistributing dict
       (skill) => `packages/frontend-interface-design/skills/${skill}/references/dictionary/`,
     )
     const options = { cwd: repositoryDirectory, encoding: 'utf8' }
-    assert.equal(execFileSync('git', ['ls-files', '--', ...dictionaryPaths], options).trim(), '')
+    const gitExecutable = resolveExecutable('git')
+    assert.equal(execFileSync(gitExecutable, ['ls-files', '--', ...dictionaryPaths], options).trim(), '')
     const probes = dictionaryPaths.map((path) => `${path}taxonomy.md`)
     assert.deepEqual(
-      execFileSync('git', ['check-ignore', '--no-index', '--', ...probes], options)
+      execFileSync(gitExecutable, ['check-ignore', '--no-index', '--', ...probes], options)
         .trim()
         .split('\n'),
       probes,

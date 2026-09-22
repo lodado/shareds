@@ -46,7 +46,10 @@ const HOSTS = {
 }
 
 function walkStrings(value, visit) {
-  if (typeof value === 'string') return visit(value)
+  if (typeof value === 'string') {
+    visit(value)
+    return
+  }
   if (Array.isArray(value)) {
     for (const entry of value) walkStrings(entry, visit)
     return
@@ -441,7 +444,8 @@ async function main() {
             }
           : {}),
       })
-      process.stderr.write(`ran ${fixture.id}${replicateId ? ` ${replicateId}` : ''} in ${runtimeMs}ms (exit ${code})\n`)
+      const replicateSuffix = replicateId ? ` ${replicateId}` : ''
+      process.stderr.write(`ran ${fixture.id}${replicateSuffix} in ${runtimeMs}ms (exit ${code})\n`)
     }
   }
 

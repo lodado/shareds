@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { access, chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
@@ -366,7 +367,7 @@ test('the runner variant lands on each result so the grader can keep A/B arms ap
 })
 
 test('transcripts are opt-in, unique per invocation, and linked by case metadata', async () => {
-  const root = await mkdtemp(join(process.env.TMPDIR ?? '/tmp', 'oracle-eval-'))
+  const root = await mkdtemp(join(tmpdir(), 'oracle-eval-'))
   try {
     assert.equal(await createTranscriptRun(null), null)
     assert.deepEqual(await writeTranscript({ runDir: null, caseId: 'case', stdout: 'x', stderr: 'y' }), null)
@@ -395,7 +396,7 @@ test('transcripts are opt-in, unique per invocation, and linked by case metadata
 })
 
 test('main links fake-host transcripts, leaves opt-out untouched, and rejects a missing value', async () => {
-  const root = await mkdtemp(join(process.env.TMPDIR ?? '/tmp', 'oracle-cli-'))
+  const root = await mkdtemp(join(tmpdir(), 'oracle-cli-'))
   try {
     const bin = join(root, 'bin')
     await mkdir(bin)

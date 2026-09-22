@@ -19,4 +19,4 @@ const parseSlicedPath = (rawPath) => {
   }
 }
 
-module.exports = { SLICED_LAYERS, normalize, parseSlicedPath }
+module.exports = { normalize, parseSlicedPath }

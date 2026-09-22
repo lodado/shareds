@@ -135,7 +135,8 @@ async function main() {
       if (!expected.has(name)) problems.push(`${name} is not declared in reference-graph.json`)
 
     if (problems.length > 0) {
-      console.error(`BUNDLE_DRIFT\n${problems.map((problem) => `- ${problem}`).join('\n')}`)
+      const details = problems.map((problem) => `- ${problem}`).join('\n')
+      console.error(`BUNDLE_DRIFT\n${details}`)
       console.error('Run: pnpm --filter @lodado/frontend-oracle-design-plugin bundles:generate')
       process.exitCode = 1
       return

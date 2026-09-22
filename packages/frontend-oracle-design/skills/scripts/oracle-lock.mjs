@@ -63,7 +63,11 @@ async function installedDependencies(rootDirectory, names) {
 
 function sameDependencies(left = [], right = []) {
   if (left.length !== right.length) return false
-  const byName = (first, second) => (first.name < second.name ? -1 : first.name > second.name ? 1 : 0)
+  const byName = (first, second) => {
+    if (first.name < second.name) return -1
+    if (first.name > second.name) return 1
+    return 0
+  }
   const sortedLeft = [...left].sort(byName)
   const sortedRight = [...right].sort(byName)
   return sortedLeft.every((entry, index) => entry.name === sortedRight[index].name && entry.version === sortedRight[index].version)

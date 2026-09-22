@@ -26,6 +26,7 @@ export default await antfu(
     // Async and mutation habits that type-check but hide a defect; Antfu registers
     // the unicorn and e18e plugins, this only turns the extra rules on.
     rules: {
+      'no-nested-ternary': 'error',
       'unicorn/no-thenable': 'error',
       'unicorn/no-unnecessary-await': 'error',
       'unicorn/no-useless-promise-resolve-reject': 'error',
@@ -34,6 +35,7 @@ export default await antfu(
       'unicorn/no-immediate-mutation': 'warn',
       'unicorn/prefer-single-call': 'warn',
       'unicorn/prefer-optional-catch-binding': 'warn',
+      'e18e/prefer-includes': 'off', // unicorn/prefer-includes owns this diagnostic
       'e18e/ban-dependencies': 'warn',
     },
   },

@@ -1,4 +1,6 @@
 module.exports = {
+  'strict-ui-boundary': require('./strict-ui-boundary'),
+  'fsd-strict-boundaries': require('./fsd-strict-boundaries'),
   'fsd-no-banned-segments': require('./fsd-no-banned-segments'),
   'fsd-no-deep-import': require('./fsd-no-deep-import'),
   'fsd-no-driver-outside-repository': require('./fsd-no-driver-outside-repository'),

@@ -17,7 +17,7 @@ jobs:
           scope: '@lodado'
 
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g pnpm@9.0.6
 
       - name: Cache pnpm modules
         uses: actions/cache@v4
@@ -28,10 +28,16 @@ jobs:
             ${{ runner.os }}-pnpm-
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
+
+      - name: Strict architecture contract
+        run: pnpm check:architecture
 
       - name: Lint
         run: pnpm lint
+
+      - name: Static quality checks
+        run: pnpm quality
 
       - name: Run tests
         run: pnpm test

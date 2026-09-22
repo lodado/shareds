@@ -10,6 +10,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { fullProductFixture as buildFullProductFixture } from '../../test-fixtures/full-product/fixture.mjs'
 import { stableStringify } from './oracle-fs.mjs'
+import { bracedValues, replacePlaceholders, stripTrailingParenthesized } from './oracle-verify-helpers.mjs'
 
 const script = join(dirname(fileURLToPath(import.meta.url)), 'oracle-verify.mjs')
 
@@ -101,6 +102,37 @@ async function cardFile(t, content = VALID_CARD) {
   await writeFile(path, content)
   return path
 }
+
+async function writeEvidenceFixture(t, card, reported, manifest) {
+  const base = await directory(t)
+  const oracle = join(base, 'oracle.md')
+  const map = join(base, 'evidence.json')
+  const ledgerPath = join(base, 'runs.jsonl')
+  await writeFile(oracle, card)
+  await writeFile(map, JSON.stringify(manifest))
+  await writeFile(ledgerPath, chainedLedger(`${reported}\n`, createHash('sha256').update(card).digest('hex')))
+  return ['evidence', '--oracle', oracle, '--map', map, '--ledger', ledgerPath, '--run', 'r-001']
+}
+
+test('placeholder scanners preserve regex edge cases', () => {
+  assert.equal(stripTrailingParenthesized('foo(x)(bar)'), 'foo')
+  assert.equal(stripTrailingParenthesized('foo(x\u2028)(bar)'), 'foo(x\u2028)')
+  assert.equal(stripTrailingParenthesized('foo(x)(bar)\u2029  '), 'foo')
+  assert.equal(stripTrailingParenthesized('foo(unclosed'), 'foo(unclosed')
+  assert.deepEqual(bracedValues('{a}{b}{missing'), ['a', 'b'])
+  assert.deepEqual(bracedValues('{a{b}'), ['a{b'])
+  assert.equal(replacePlaceholders('x{a}{b}{missing}', { a: 0, b: '' }), 'x0{missing}')
+  assert.equal(replacePlaceholders('x{}y{a}', { a: 'z' }), 'x{}yz')
+})
+
+test('oracle-verify CLI keeps dispatching through a symlink', async (t) => {
+  const oracle = await cardFile(t)
+  const alias = join(await directory(t), 'oracle-verify-link.mjs')
+  await symlink(script, alias)
+  const result = spawnSync(process.execPath, [alias, 'card', '--oracle', oracle], { encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stdout, 'CARD_LINT_OK 9 rows\n')
+})
 
 /** 지정한 행 ID의 표 행 하나만 통째로 바꾼 카드 변형. */
 function withRow(rowId, replacement) {
@@ -2646,7 +2678,8 @@ test('O15: review identity is bound to allowed roles and orchestration receipts'
   })
   const absentReceipt = await reviewFixture(t, [], {
     reviewerId: 'self-declared',
-    document: { orchestrationReceipt: undefined },
+    // Own-property undefined is intentional: review must reject a present-but-invalid receipt.
+    document: { orchestrationReceipt: void 0 },
   })
   const verify = (fixture, intersect) =>
     run(
@@ -2942,7 +2975,9 @@ test('sources: 잠긴 dep 버전과 설치 버전을 대조해 드리프트를 �
   assert.match(drifted.stderr, /ASSUMPTION_DRIFT pkg-a locked 1\.2\.3 installed 2\.0\.0/)
   assert.match(drifted.stderr, /re-run the landmine sweep/)
 
-  await writeFile(lockPath, JSON.stringify({ ...manifest, dependencies: undefined }))
+  const withoutDependencies = { ...manifest }
+  delete withoutDependencies.dependencies
+  await writeFile(lockPath, JSON.stringify(withoutDependencies))
   const none = run('sources', '--lock', lockPath)
   assert.equal(none.status, 0, none.stderr)
   assert.equal(none.stdout, 'SOURCES_CURRENT 0 dependencies\n')
@@ -3203,16 +3238,7 @@ test('evidence: State Model PATH*와 Order 시퀀스는 evidence 키가 없으�
       { name: 'submit/ok sequence', status: 'passed' },
     ],
   })
-  const fixture = async (manifest) => {
-    const base = await directory(t)
-    const oracle = join(base, 'oracle.md')
-    const map = join(base, 'evidence.json')
-    const ledgerPath = join(base, 'runs.jsonl')
-    await writeFile(oracle, card)
-    await writeFile(map, JSON.stringify(manifest))
-    await writeFile(ledgerPath, chainedLedger(`${reported}\n`, createHash('sha256').update(card).digest('hex')))
-    return ['evidence', '--oracle', oracle, '--map', map, '--ledger', ledgerPath, '--run', 'r-001']
-  }
+  const fixture = (manifest) => writeEvidenceFixture(t, card, reported, manifest)
 
   const missingPath = run(...(await fixture({ schemaVersion: 1, rows })))
   assert.equal(missingPath.status, 1)
@@ -3355,16 +3381,7 @@ test('evidence: covered() F* 프레임은 실행 evidence가 없으면 검증을
       { name: 'save > pending 표시 [F1]', status: 'passed' },
     ],
   })
-  const fixture = async (manifest) => {
-    const base = await directory(t)
-    const oracle = join(base, 'oracle.md')
-    const map = join(base, 'evidence.json')
-    const ledgerPath = join(base, 'runs.jsonl')
-    await writeFile(oracle, card)
-    await writeFile(map, JSON.stringify(manifest))
-    await writeFile(ledgerPath, chainedLedger(`${reported}\n`, createHash('sha256').update(card).digest('hex')))
-    return ['evidence', '--oracle', oracle, '--map', map, '--ledger', ledgerPath, '--run', 'r-001']
-  }
+  const fixture = (manifest) => writeEvidenceFixture(t, card, reported, manifest)
 
   const missingFrame = run(...(await fixture({ schemaVersion: 1, rows })))
   assert.equal(missingFrame.status, 1)

@@ -1,0 +1,20 @@
+{
+  "threshold": 100,
+  "minTokens": 50,
+  "minLines": 5,
+  "formats": ["javascript", "typescript", "jsx", "tsx"],
+  "pattern": "packages/**/*.{js,mjs,cjs,ts,tsx,jsx}",
+  "ignore": [
+    "**/node_modules/**",
+    "**/test-fixtures/**",
+    "**/examples/**",
+    "**/skills/bundles/**",
+    "**/dist/**",
+    "**/*.test.*",
+    "**/tests/**"
+  ],
+  "reporters": ["console"],
+  "mode": "weak",
+  "baseline": ".jscpd-baseline.json",
+  "failOnNewClones": 0
+}

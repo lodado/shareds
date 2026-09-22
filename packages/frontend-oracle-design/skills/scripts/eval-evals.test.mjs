@@ -41,7 +41,7 @@ test('evals.json is the skill-creator projection of the blackbox corpus and stay
   assert.ok(r11b.assertions.some((line) => /StrictMode/.test(line)))
   assert.ok(r11b.assertions.some((line) => /initialOffset/.test(line)))
   assert.ok(
-    heldOut.cases.every((entry) => entry.source && entry.escapes.every((escape) => escape.class && escape.assertion)),
+    heldOut.cases.every((entry) => entry.source && entry.escapes.every((scenario) => scenario.class && scenario.assertion)),
   )
   for (const entry of evals.evals) {
     assert.ok(entry.prompt.length > 0, `${entry.name} prompt`)

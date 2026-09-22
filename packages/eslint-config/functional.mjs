@@ -1,9 +1,17 @@
 import functionalPlugin from 'eslint-plugin-functional'
+import base from './index.mjs'
+
+const baseRules = base.find(({ name }) => name === 'antfu/javascript/rules')?.rules ?? {}
+
+const withBaseRestrictions = (ruleId, additions) => [
+  baseRules[ruleId]?.[0] ?? 'error',
+  ...(baseRules[ruleId]?.slice(1) ?? []),
+  ...additions,
+]
 
 const pureFiles = [
   '**/domain/**/*.{ts,mts,cts}',
   '**/selectors/**/*.{ts,mts,cts}',
-  '**/reducers/**/*.{ts,mts,cts}',
   '**/*.pure.{ts,mts,cts}',
 ]
 
@@ -21,8 +29,7 @@ export default [
       'functional/immutable-data': 'error',
       'functional/prefer-immutable-types': 'warn',
       'functional/no-let': 'warn',
-      'no-restricted-globals': [
-        'error',
+      'no-restricted-globals': withBaseRestrictions('no-restricted-globals', [
         { name: 'fetch', message: 'Move I/O to an adapter and pass data; pure functions must not call fetch.' },
         { name: 'window', message: 'Move browser I/O to an adapter and pass data; pure functions must not access window.' },
         { name: 'document', message: 'Move browser I/O to an adapter and pass data; pure functions must not access document.' },
@@ -34,22 +41,19 @@ export default [
         { name: 'setInterval', message: 'Move timers to an adapter and pass data; pure functions must not schedule work.' },
         { name: 'clearTimeout', message: 'Move timers to an adapter and pass data; pure functions must not manage timers.' },
         { name: 'clearInterval', message: 'Move timers to an adapter and pass data; pure functions must not manage timers.' },
-      ],
-      'no-restricted-properties': [
-        'error',
+      ]),
+      'no-restricted-properties': withBaseRestrictions('no-restricted-properties', [
         { object: 'Math', property: 'random', message: 'Pass a sampled value; pure functions must not call Math.random().' },
         { object: 'Date', property: 'now', message: 'Pass the current time; pure functions must not call Date.now().' },
         { object: 'globalThis', property: 'fetch', message: 'Move I/O to an adapter and pass data; pure functions must not call globalThis.fetch().' },
-      ],
-      'no-restricted-syntax': [
-        'error',
+      ]),
+      'no-restricted-syntax': withBaseRestrictions('no-restricted-syntax', [
         { selector: "NewExpression[callee.name='Date'][arguments.length=0]", message: 'Pass the current time; pure functions must not construct the current Date.' },
         { selector: "CallExpression[callee.name='Date'][arguments.length=0]", message: 'Pass the current time; pure functions must not call Date().' },
-      ],
-      'no-restricted-imports': [
-        'error',
+      ]),
+      'no-restricted-imports': withBaseRestrictions('no-restricted-imports', [
         { patterns: [{ group: ['fs', 'fs/*', 'net', 'net/*', 'http', 'http/*', 'https', 'https/*', 'node:fs', 'node:fs/*', 'node:net', 'node:net/*', 'node:http', 'node:http/*', 'node:https', 'node:https/*'], message: 'Move server I/O to an adapter and pass data; pure functions must not import I/O modules.' }] },
-      ],
+      ]),
     },
   },
 ]

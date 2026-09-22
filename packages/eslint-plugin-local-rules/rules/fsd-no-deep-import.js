@@ -50,9 +50,16 @@ module.exports = {
         return
       }
 
-      const resolved = source.startsWith('.')
-        ? path.posix.join(path.posix.dirname(filename), source)
-        : source.replace(/^[@~]\//, '')
+      let resolved
+      if (source.startsWith('.')) {
+        resolved = path.posix.join(path.posix.dirname(filename), source)
+      } else if (source.startsWith('@/') || source.startsWith('~/')) {
+        resolved = source.slice(2)
+      }
+
+      if (!resolved) {
+        return
+      }
       const target = parseSlicedPath(resolved)
 
       if (!target || isPublicSurface(target.rest)) {

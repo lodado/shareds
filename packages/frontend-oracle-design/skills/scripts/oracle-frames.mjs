@@ -108,7 +108,9 @@ export function parseCaseSpace(document) {
       .filter(Boolean)
       .map((choice) => {
         const error = /\[error\]$/.test(choice)
-        return { value: choice.replace(/\s*\[error\]$/, ''), error }
+        let value = choice
+        if (error) value = choice.slice(0, -'[error]'.length).trimEnd()
+        return { value, error }
       })
     if (coverage === 'full-product' && choicesCell.split(',').some((choice) => !choice.trim())) {
       throw Object.assign(new Error(`Empty choice ID: ${dimension}`), { code: 'CASE_SPACE_ID' })
@@ -162,7 +164,8 @@ export function canonicalTuple(tuple) {
 }
 
 export function frameId(tuple, dimensionRevision, constraintRevision) {
-  return `F${sha256(`${canonicalTuple(tuple)}${dimensionRevision}${constraintRevision}`)}`
+  const digest = sha256(`${canonicalTuple(tuple)}${dimensionRevision}${constraintRevision}`)
+  return `F${digest}`
 }
 
 function fullProductFrames(caseSpace) {
@@ -297,7 +300,7 @@ export function generateCaseFrames(caseSpace) {
     const assigned = new Set()
     const components = []
     for (const [index, entry] of dimensions.entries()) {
-      if (assigned.has(index) || !(entry.touches?.ids?.length > 0)) continue
+      if (assigned.has(index) || (entry.touches?.ids?.length ?? 0) <= 0) continue
       const queue = [index]
       const component = []
       assigned.add(index)
@@ -305,7 +308,7 @@ export function generateCaseFrames(caseSpace) {
         const current = queue.shift()
         component.push(current)
         for (const [candidate, other] of dimensions.entries()) {
-          if (assigned.has(candidate) || !(other.touches?.ids?.length > 0)) continue
+          if (assigned.has(candidate) || (other.touches?.ids?.length ?? 0) <= 0) continue
           if (shares(dimensions[current], other)) {
             assigned.add(candidate)
             queue.push(candidate)
@@ -432,7 +435,10 @@ async function main() {
     process.stdout.write(`dimension-revision ${generated.dimensionRevision} · constraint-revision ${generated.constraintRevision} · raw ${generated.rawCount}\n`)
   }
 
-  for (const frame of generated.frames) process.stdout.write(`${frame.id} ${frame.label}${frame.tuple ? ` ${JSON.stringify(frame.tuple)}` : ''}\n`)
+  for (const frame of generated.frames) {
+    const tuple = frame.tuple ? ` ${JSON.stringify(frame.tuple)}` : ''
+    process.stdout.write(`${frame.id} ${frame.label}${tuple}\n`)
+  }
   for (const frame of generated.errorFrames) process.stdout.write(`${frame.id} ${frame.label}\n`)
   for (const path of generated.paths) process.stdout.write(`${path.id} ${path.label}\n`)
   for (const cell of generated.emptyCells) process.stdout.write(`${cell.id}\n`)

@@ -3,7 +3,7 @@
  * shape the server actually sent. Parse the boundary into a union instead. Asserting to
  * `unknown` is allowed because it forces narrowing afterwards.
  */
-const BOUNDARY_METHODS = new Set(['json', 'getItem', 'get'])
+const BOUNDARY_METHODS = new Set(['json', 'getItem'])
 
 const SAFE_TARGETS = new Set(['TSUnknownKeyword', 'TSAnyKeyword'])
 

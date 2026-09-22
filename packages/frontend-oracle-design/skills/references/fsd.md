@@ -303,6 +303,22 @@ src/
 | `index.ts` re-exports a store/DTO/cache recipe to every consumer  | expose domain intent and results; contain internal knowledge |
 | Same-layer import treated as legal because it uses a public API   | repair ownership/composition or obtain a scoped exception    |
 
+## Optional strict lint profile
+
+An approved repository that uses `@lodado/eslint-config` can select its strict profile after the
+base config. The profile does not change FSD itself. It adds a project policy for named rendering
+files: state and workflow belong in `model`, rendering and presentation hooks in `ui`, and request
+transport in `api`. The consumer declares its source roots, aliases, rendering targets, runtime
+modules, allowed React exports, public entries, and the reason for every exception in a separate
+policy module. See [`STRICT.md`](../../../eslint-config/STRICT.md) for the complete flat-config
+and script form.
+
+The profile's FSD checks still require normal layer direction, same-slice isolation, and a narrow
+public entry. It does not declare that FSD bans `useState` in all UI, settle whether a slice is a
+good domain boundary, prove transitive client/server safety, or replace a repository's build and
+server-boundary checks. Keep `hook-encapsulation` as the approval and `oracle-run.mjs` label; the
+approved config source and `lodado-check-architecture ./strict-policy.mjs` are the recorded gate.
+
 ## Sources — rules versus adapted heuristics
 
 Consulted 2026-09-11; pinned commits are source snapshots, not release versions.

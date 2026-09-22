@@ -819,6 +819,14 @@ does not prove the responsibility cohesion or behavioral correctness of the extr
 trivial wrappers, hooks that hide UI presentation, and giant hooks that merge unrelated
 responsibilities are judged separately by tests and an independent reviewer.
 
+When the approved repository uses `@lodado/eslint-config/strict`, prefer its local strict rule to
+`use-encapsulation/prefer-custom-hooks`. The former checks configured import origins and lexical
+bindings for supported static forms, while the latter is identifier based and cannot safely carry
+the stricter ownership contract. Keep the same `hook-encapsulation` approval label and record the
+separate policy module plus `lodado-check-architecture ./strict-policy.mjs` command. The profile
+does not replace a review of external-system synchronization or a build check for client/server
+reachability. See [`STRICT.md`](../../../../eslint-config/STRICT.md).
+
 <!-- node:frontend-quality path:references/frontend/quality.md -->
 
 # Frontend Quality Gates — Design Intent·Performance·Accessibility
@@ -1149,6 +1157,14 @@ reviewer taste. Leave the following values in the approval document as exact val
   labels of `oracle-run.mjs init`. Run the lint command pinned after GREEN and review under the same label.
 - This contract is a structural gate that blocks forbidden direct calls. The cohesion and the
   behavior contract of a custom hook are handled by tests and independent review.
+
+For a repository that has approved `@lodado/eslint-config/strict`, record the same
+`hook-encapsulation` label with the policy module, `@lodado/eslint-config/strict` export, and
+`lodado-check-architecture ./strict-policy.mjs` command. The policy records source roots,
+rendering targets, module contracts, exact React exceptions, and public-entry/cross-slice reasons.
+It is an opt-in repository policy, not an assertion that FSD or React universally forbids local
+UI state. [`STRICT.md`](../../../eslint-config/STRICT.md) is the canonical package reference; do
+not copy its policy table into an Oracle card.
 
 ## Implementation judgment
 

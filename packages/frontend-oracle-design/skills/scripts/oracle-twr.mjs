@@ -3,10 +3,10 @@
 // Time-Weighted Risk (Google bug-prediction TWR): bug-fix 커밋만 시간 정규화 가중으로 파일별 합산한다.
 // risk 판정의 선택적 증거 입력이다 — 게이트가 아니고, 점수가 낮다는 이유로 판정을 낮추지 않는다.
 
-import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { spawnGit } from './resolve-executable.mjs'
 
 const BUG_FIX_SUBJECT = /\b(?:fix(?:es|ed)?|bug|hotfix|regression|defect)\b/i
 
@@ -87,7 +87,7 @@ export function parseLog(raw) {
 async function main() {
   const options = parseOptions(process.argv.slice(2))
   const repo = resolve(options.repo)
-  const log = spawnSync('git', ['-C', repo, 'log', '--no-merges', '--format=%x1e%H %ct %s', '--name-only'], {
+  const log = spawnGit( ['-C', repo, 'log', '--no-merges', '--format=%x1e%H %ct %s', '--name-only'], {
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
   })

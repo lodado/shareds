@@ -132,7 +132,7 @@ async function pathState(path, options) {
   try {
     return await lstat(path)
   } catch (error) {
-    reject(options, `${options.label}: cannot stat ${path}: ${error.message}`, error)
+    return reject(options, `${options.label}: cannot stat ${path}: ${error.message}`, error)
   }
 }
 

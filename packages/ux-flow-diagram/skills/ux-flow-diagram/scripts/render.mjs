@@ -106,7 +106,8 @@ export function renderMarkdown(input) {
       if (action.type === 'set-variable') lines.push(`${indent}  - Mutation: ${markdown(action.variable)} → ${markdown(action.value)}`)
       if (action.type === 'set-variable-mode') lines.push(`${indent}  - Mode: ${markdown(action.collection)} → ${markdown(action.mode)}`)
       if (action.type === 'conditional') for (const branch of action.branches) {
-        lines.push(`${indent}  - **${branch.condition === null ? 'Else' : `If ${markdown(branch.condition)}`}**`)
+        const condition = branch.condition === null ? 'Else' : `If ${markdown(branch.condition)}`
+        lines.push(`${indent}  - **${condition}**`)
         if (branch.actions.length) actions(branch.actions, `${indent}    `)
         else lines.push(`${indent}    - No-op; intent requires review.`)
       }
@@ -132,7 +133,10 @@ export function renderMarkdown(input) {
   if (!ir.verification.length) lines.push('No test/browser verification evidence supplied. Static code and prototype links are not runtime verification.')
   else for (const record of ir.verification) lines.push(`- ${markdown(record)}`)
   lines.push('', '## Evidence provenance', '')
-  for (const entry of ir.evidence) lines.push(`- ${markdown(entry.id)} [${entry.level}; ${entry.sourceKind}]: ${markdown(entry.locator)}${entry.observation === undefined ? '' : ` — ${markdown(entry.observation)}`}`)
+  for (const entry of ir.evidence) {
+    const observation = entry.observation === undefined ? '' : ` — ${markdown(entry.observation)}`
+    lines.push(`- ${markdown(entry.id)} [${entry.level}; ${entry.sourceKind}]: ${markdown(entry.locator)}${observation}`)
+  }
   return `${lines.join('\n')}\n`
 }
 

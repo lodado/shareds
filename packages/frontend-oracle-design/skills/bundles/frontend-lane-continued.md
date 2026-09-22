@@ -249,6 +249,14 @@ reviewer taste. Leave the following values in the approval document as exact val
 - This contract is a structural gate that blocks forbidden direct calls. The cohesion and the
   behavior contract of a custom hook are handled by tests and independent review.
 
+For a repository that has approved `@lodado/eslint-config/strict`, record the same
+`hook-encapsulation` label with the policy module, `@lodado/eslint-config/strict` export, and
+`lodado-check-architecture ./strict-policy.mjs` command. The policy records source roots,
+rendering targets, module contracts, exact React exceptions, and public-entry/cross-slice reasons.
+It is an opt-in repository policy, not an assertion that FSD or React universally forbids local
+UI state. [`STRICT.md`](../../../eslint-config/STRICT.md) is the canonical package reference; do
+not copy its policy table into an Oracle card.
+
 ## Implementation judgment
 
 - Split a component only when state ownership, async/error boundary, accessibility responsibility,

@@ -7,6 +7,7 @@ import { devNull } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+
 import { forbiddenArgument, isTrustedAdapter, TRUSTED_ADAPTER_NAMES, trustedAdapter } from './oracle-adapters.mjs'
 import {
   assertSnapshotUnchanged,
@@ -20,6 +21,7 @@ import {
   ZERO_DIGEST,
 } from './oracle-fs.mjs'
 import { snapshotContext } from './oracle-review-context.mjs'
+import { spawnGit } from './resolve-executable.mjs'
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const lockScript = join(scriptDirectory, 'oracle-lock.mjs')
@@ -384,7 +386,7 @@ async function walkFiles(root, prefix = '') {
 }
 
 async function listFiles(root) {
-  const git = spawnSync('git', ['-C', root, 'ls-files', '-c', '-o', '--exclude-standard', '-z'])
+  const git = spawnGit( ['-C', root, 'ls-files', '-c', '-o', '--exclude-standard', '-z'])
 
   if (git.status === 0) {
     return git.stdout.toString('utf8').split('\0').filter(Boolean)
@@ -838,8 +840,8 @@ async function skillMetadata() {
 
 function gitProvenance(root) {
   const options = { encoding: 'utf8' }
-  const commit = spawnSync('git', ['-C', root, 'rev-parse', 'HEAD'], options)
-  const dirty = spawnSync('git', ['-C', root, 'status', '--porcelain=v1', '--untracked-files=normal'], options)
+  const commit = spawnGit( ['-C', root, 'rev-parse', 'HEAD'], options)
+  const dirty = spawnGit( ['-C', root, 'status', '--porcelain=v1', '--untracked-files=normal'], options)
   return {
     commit: commit.status === 0 ? commit.stdout.trim() : null,
     dirty: dirty.status === 0 ? dirty.stdout.trim() !== '' : null,
@@ -1700,7 +1702,7 @@ async function reviewReceipt(options) {
     }
     // 블라인드 매핑 영수증은 같은 원장 장치를 쓰되 입력이 다르다: 리뷰 패킷이 아니라 blind-input이고,
     // 산출물은 findings가 아니라 `{ "<test name>": "O1" }` 매핑이다. 그래서 판정 findings 스키마를 요구하지 않는다.
-    if (options.role === 'blind-mapper') return blindMapReceipt(options, directory, state)
+    if (options.role === 'blind-mapper') return await blindMapReceipt(options, directory, state)
     const packet = await snapshotRegularFile(resolve(options.packet), {
       base: directory,
       allowHardlinks: false,
@@ -1774,6 +1776,7 @@ async function reviewReceipt(options) {
     state.ledgerHead = event.digest
     await writeState(directory, state)
     process.stdout.write(`REVIEW_RECEIPT ${receiptId} digest:${event.digest}\n`)
+    return undefined
   })
 }
 
@@ -2570,11 +2573,11 @@ function gitDiff(root, changed, before, current) {
   if (changed.length === 0) return ''
 
   const gitOptions = { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 }
-  const listed = spawnSync('git', ['-C', root, 'ls-files', '-z'], gitOptions)
+  const listed = spawnGit( ['-C', root, 'ls-files', '-z'], gitOptions)
   if (listed.status !== 0) return `GIT_DIFF_UNAVAILABLE: ${listed.stderr.trim() || 'not a git worktree'}`
 
   const tracked = new Set(listed.stdout.split('\0').filter(Boolean))
-  const head = spawnSync('git', ['-C', root, 'diff', '--no-ext-diff', '--binary', 'HEAD', '--', ...changed], gitOptions)
+  const head = spawnGit( ['-C', root, 'diff', '--no-ext-diff', '--binary', 'HEAD', '--', ...changed], gitOptions)
   const parts = []
 
   if (head.status === 0) {
@@ -2584,14 +2587,14 @@ function gitDiff(root, changed, before, current) {
       ['diff', '--no-ext-diff', '--binary', '--', ...changed],
       ['diff', '--cached', '--no-ext-diff', '--binary', '--', ...changed],
     ]) {
-      const fallback = spawnSync('git', ['-C', root, ...args], gitOptions)
+      const fallback = spawnGit( ['-C', root, ...args], gitOptions)
       if (fallback.status === 0 && fallback.stdout.trim()) parts.push(fallback.stdout.trimEnd())
     }
   }
 
   for (const path of changed.filter((entry) => !tracked.has(entry))) {
     if (before[path] === undefined && current[path] !== undefined) {
-      const addition = spawnSync('git', ['-C', root, 'diff', '--no-index', '--binary', '--', devNull, path], gitOptions)
+      const addition = spawnGit( ['-C', root, 'diff', '--no-index', '--binary', '--', devNull, path], gitOptions)
       if ([0, 1].includes(addition.status) && addition.stdout.trim()) parts.push(addition.stdout.trimEnd())
     } else {
       parts.push(`GIT_DIFF_UNAVAILABLE_FOR_UNTRACKED_BASELINE: ${path}`)
@@ -3256,13 +3259,13 @@ function transitionPacket(to, { state, runEntries, staleRunIds, blockers, eviden
   const stale = new Set(staleRunIds)
   // NEEDS_DECISION·FAIL은 유효한 state·lock과 --reason만 요구하는 탈출 전이다. 전역 evidence blocker를
   // 상속하면 증거가 없을 때 쓰라고 있는 바로 그 전이를 잘못 잠근다. lock·ledger 손상만 물려받는다.
-  const escape = to === 'NEEDS_DECISION' || to === 'FAIL'
+  const isEscapeTransition = to === 'NEEDS_DECISION' || to === 'FAIL'
   for (const code of blockers) {
-    if (escape && (code === 'EVIDENCE_MISSING_ROWS' || code.startsWith('EVIDENCE_'))) continue
+    if (isEscapeTransition && (code === 'EVIDENCE_MISSING_ROWS' || code.startsWith('EVIDENCE_'))) continue
     packetBlockers.push(code)
   }
 
-  if (escape) {
+  if (isEscapeTransition) {
     requires.push('--reason')
   } else if (to === 'ORACLE_READY') {
     // NEEDS_DECISION → ORACLE_READY 재개는 transitionUnderLock에서 non-escape라 --run이 필수고 --reason은 받지 않는다.
@@ -3718,7 +3721,7 @@ try {
   try {
     dirOption = parseOptions(process.argv.slice(3)).dir
   } catch {
-    dirOption = undefined
+    dirOption = null
   }
   process.stderr.write(`${cliError.code}: ${cliError.message}\n${nextActionLine(cliError.code, { dir: dirOption })}`)
   process.exitCode = cliError.exitCode

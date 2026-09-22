@@ -20,6 +20,8 @@ export default [
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-hooks/exhaustive-deps': 'error',
+      'react-you-might-not-need-an-effect/no-derived-state': 'off', // react-hooks/set-state-in-effect
+
 
       '@eslint-react/error-boundaries': 'off',
       '@eslint-react/exhaustive-deps': 'off',
@@ -31,7 +33,7 @@ export default [
       '@eslint-react/unsupported-syntax': 'off',
       '@eslint-react/use-memo': 'off',
 
-      '@eslint-react/dom-no-missing-button-type': 'off', // buttons default to submit only inside forms; TS props cover the rest
+      '@eslint-react/dom-no-missing-button-type': 'error',
       '@eslint-react/jsx-no-useless-fragment': 'off',
     },
   },

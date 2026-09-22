@@ -8,6 +8,16 @@ import { dirname, join, relative, resolve } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { resolveExecutable, spawnGit } from './resolve-executable.mjs'
+
+function gitCommand() {
+  try {
+    return resolveExecutable('git')
+  } catch (error) {
+    if (error.code === 'ENOENT') return null
+    throw error
+  }
+}
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const script = join(scriptDirectory, 'oracle-run.mjs')
@@ -280,6 +290,7 @@ async function workspace(
     initialFiles = {},
     sourceFiles = {},
     initialize = true,
+    runEnvironment = {},
   } = {},
 ) {
   const repository = await mkdtemp(join(tmpdir(), 'oracle-run-'))
@@ -288,7 +299,7 @@ async function workspace(
   t.after(() => rm(repository, { recursive: true, force: true }))
 
   if (git) {
-    const initialized = spawnSync('git', ['init', '-q', repository], { encoding: 'utf8', env: isolatedEnvironment() })
+    const initialized = spawnGit(['init', '-q', repository], { encoding: 'utf8', env: isolatedEnvironment() })
     if (initialized.status !== 0) return null
     await writeFile(join(repository, '.gitignore'), 'node_modules/\n')
   }
@@ -338,12 +349,19 @@ async function workspace(
   for (const milestone of milestones) initArgs.push('--milestone', milestone)
 
   if (initialize) {
-    const initialized = run(initArgs)
+    const initialized = run(initArgs, runEnvironment)
     assert.equal(initialized.status, 0, initialized.stderr)
   }
 
   return { root, oracleDirectory, oracle, lock, marker: join(root, 'marker.txt') }
 }
+
+test('init falls back to filesystem scanning when git is unavailable', async (t) => {
+  const created = await workspace(t, { runEnvironment: { PATH: '' } })
+  assert.ok(created)
+  const status = run(['status', '--dir', created.oracleDirectory, '--json'], { PATH: '' })
+  assert.equal(status.status, 0, status.stderr)
+})
 
 test('review-brief preserves blockers and advisory provenance without changing evidence or granting approval', async (t) => {
   const { root, oracleDirectory } = await workspace(t, { risk: 'low' })
@@ -1439,7 +1457,10 @@ test('O6: 모든 milestone의 red:<name> reported RED 후에만 전역 VALID_RED
 
 test('O6: git 레포에서 gitignore된 파일은 production 변경으로 세지 않는다', async (t) => {
   const created = await workspace(t, { git: true })
-  if (!created) return t.skip('git 미설치 — git 경로를 판정할 수 없다')
+  if (!created) {
+    t.skip('git 미설치 — git 경로를 판정할 수 없다')
+    return undefined
+  }
   const { root, oracleDirectory } = created
 
   await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
@@ -1451,6 +1472,7 @@ test('O6: git 레포에서 gitignore된 파일은 production 변경으로 세지
 
   assert.equal(transitioned.status, 0, transitioned.stderr)
   assert.equal(Object.keys((await state(oracleDirectory)).testFiles).length, 3)
+  return undefined
 })
 
 test('O6: run-state를 지우고 다시 init해도 기준선과 예산을 되살리지 못한다', async (t) => {
@@ -1715,12 +1737,15 @@ test('O20: review-packet은 lock·source·state·ledger·evidence·diff만 결�
     git: true,
     initialFiles: { 'src/save.mjs': 'export const save = 1\n' },
   })
-  if (!created) return t.skip('git 미설치로 review diff를 검증할 수 없다')
+  if (!created) {
+    t.skip('git 미설치로 review diff를 검증할 수 없다')
+    return undefined
+  }
   const { root, oracleDirectory } = created
-  const added = spawnSync('git', ['-C', root, 'add', '.'], { encoding: 'utf8', env: isolatedEnvironment() })
+  const added = spawnSync(gitCommand(), ['-C', root, 'add', '.'], { encoding: 'utf8', env: isolatedEnvironment() })
   assert.equal(added.status, 0, added.stderr)
   const committed = spawnSync(
-    'git',
+    gitCommand(),
     ['-C', root, '-c', 'user.name=Oracle Test', '-c', 'user.email=oracle@example.test', 'commit', '-qm', 'baseline'],
     { encoding: 'utf8', env: isolatedEnvironment() },
   )
@@ -1810,6 +1835,7 @@ test('O20: review-packet은 lock·source·state·ledger·evidence·diff만 결�
   const outside = run(strictReviewPacketArgs(oracleDirectory, join(root, 'src', 'save.mjs')))
   assert.equal(outside.status, 1)
   assert.match(outside.stderr, /^REVIEW_PACKET_OUTPUT_INVALID: /)
+  return undefined
 })
 
 test('O7-O8: review-packet은 검증된 implementation decision 원문과 digest를 포함한다', async (t) => {
@@ -2486,10 +2512,10 @@ test('nextActions mirrors what transition actually accepts: escape stays open, r
   await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify({ schemaVersion: 1, rows: {} }))
   const empty = JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout)
   assert.ok(empty.blockers.includes('EVIDENCE_MISSING_ROWS'))
-  for (const escape of ['NEEDS_DECISION', 'FAIL']) {
-    const action = empty.nextActions.find((entry) => entry.to === escape)
-    assert.equal(action.ready, true, escape)
-    assert.deepEqual(action.requires, ['--reason'], escape)
+  for (const transitionName of ['NEEDS_DECISION', 'FAIL']) {
+    const action = empty.nextActions.find((entry) => entry.to === transitionName)
+    assert.equal(action.ready, true, transitionName)
+    assert.deepEqual(action.requires, ['--reason'], transitionName)
   }
   // ORACLE_READY에서 GREEN으로 곧장 가는 것은 VALID_RED 생략이므로 --reason이 함께 필요하다.
   const skipGreen = empty.nextActions.find((entry) => entry.to === 'IMPLEMENTED_GREEN')

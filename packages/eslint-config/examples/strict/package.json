@@ -1,0 +1,11 @@
+{
+  "name": "strict-consumer-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint:code": "eslint src",
+    "check:architecture": "lodado-check-architecture strict-policy.mjs",
+    "typecheck": "tsc --noEmit",
+    "check": "pnpm lint:code && pnpm check:architecture && pnpm typecheck"
+  }
+}

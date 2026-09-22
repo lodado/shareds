@@ -232,7 +232,7 @@ test('rejects an atomic source rename before final verify success', async (t) =>
 
   await assert.rejects(
     verifyLock(
-      { lock, oracle: undefined, sources: [] },
+      { lock, sources: [] },
       { beforeFinalUnchangedAssertions: () => rename(replacement, sourcePath) },
     ),
     (error) => error.code === 'SOURCE_CHANGED',
@@ -388,7 +388,7 @@ test('O8: lock rejects out-of-root, symlinked, and hardlinked evidence', async (
 
   await assert.rejects(
     verifyLock(
-      { lock, oracle: undefined, sources: [] },
+      { lock, sources: [] },
       { beforeFinalUnchangedAssertions: () => rename(replacement, lock) },
     ),
     (error) => error.code === 'LOCK_MANIFEST_CHANGED',

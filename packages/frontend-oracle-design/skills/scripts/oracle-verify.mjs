@@ -20,6 +20,7 @@ import {
   stableStringify,
 } from './oracle-fs.mjs'
 import { contextGaps, snapshotContext, validateContextReview } from './oracle-review-context.mjs'
+import { bracedValues, replacePlaceholders, stripTrailingParenthesized } from './oracle-verify-helpers.mjs'
 
 const FLAG_NAMES = [
   'oracle',
@@ -462,7 +463,7 @@ export function buildJudgmentSpace(cardText) {
       .split('×')
       .map((part) => part.trim())
       .filter(Boolean)
-    const tokens = parts.map((part) => policyIds(part)[0] ?? part.replace(/\s*\(.*\)\s*$/, ''))
+    const tokens = parts.map((part) => policyIds(part)[0] ?? stripTrailingParenthesized(part))
     records.push({
       id: `sweep:${tokens.join('×')}`,
       origin: { kind: 'interaction', pair, policies: policyIds(pair) },
@@ -631,7 +632,7 @@ function fullProductRecords(card) {
 }
 
 function sequenceFor(events, tuple) {
-  return events.map((event) => event.replace(/\{([^}]+)\}/g, (_, id) => tuple[id] ?? `{${id}}`))
+  return events.map((event) => replacePlaceholders(event, tuple))
 }
 
 function sequenceWitness(events, candidate, boundary) {
@@ -730,7 +731,7 @@ function auditFullProduct(card, generated) {
     }
   }
   for (const [id, choices] of Object.entries(model.sequences ?? {})) {
-    if (!domains.has(id) || !object(choices) || Object.entries(choices).some(([value, events]) => !domains.get(id).has(value) || !strings(events) || events.some((event) => [...event.matchAll(/\{([^}]+)\}/g)].some(([, placeholder]) => !domains.has(placeholder))))) malformed.push(`sequence domain: ${id}`)
+    if (!domains.has(id) || !object(choices) || Object.entries(choices).some(([value, events]) => !domains.get(id).has(value) || !strings(events) || events.some((event) => bracedValues(event).some((placeholder) => !domains.has(placeholder))))) malformed.push(`sequence domain: ${id}`)
   }
   const section = sectionLines(lines, 'Frame dispositions')
   for (const [label, revision] of [['Dimension revision', dimensionRevision], ['Constraint revision', constraintRevision]]) {
@@ -2578,7 +2579,9 @@ async function assertBlindMapping(options) {
   for (const [rowId, entry] of Object.entries(map?.rows ?? {})) {
     if (entry?.kind !== 'test') continue
     const claimed = blind[entry.name]
-    const rows = Array.isArray(claimed) ? claimed : claimed ? [claimed] : []
+    let rows = []
+    if (Array.isArray(claimed)) rows = claimed
+    else if (claimed) rows = [claimed]
     if (rows.length === 0) disputes.push(`${rowId}: "${entry.name}" — the blind reviewer mapped it to no row`)
     else if (!rows.includes(rowId)) disputes.push(`${rowId}: "${entry.name}" — the blind reviewer mapped it to ${rows.join(', ')}`)
   }
@@ -2746,7 +2749,10 @@ async function scanSideEffectInventory(options) {
 
 async function scanNondeterminism(options) {
   if (options.path.length === 0) throw new CliError('USAGE', 'scan requires at least one --path', 2)
-  if (options['side-effects']) return scanSideEffectInventory(options)
+  if (options['side-effects']) {
+    await scanSideEffectInventory(options)
+    return undefined
+  }
 
   const hits = []
 
@@ -2776,6 +2782,7 @@ async function scanNondeterminism(options) {
   }
 
   process.stdout.write(`SCAN_OK ${options.path.length} files\n`)
+  return undefined
 }
 
 /** 잠긴 dep 버전과 현재 설치 버전을 대조한다 — 가정 드리프트의 선행 신호. 게이트가 아니라 재스윕 지시다. */

@@ -6,12 +6,16 @@ const vitest = require('@vitest/eslint-plugin')
 const playwright = require('eslint-plugin-playwright')
 const testingLibrary = require('eslint-plugin-testing-library')
 
-const E2E_TESTS = ['**/e2e/**/*.{js,ts}', '**/*.e2e.{js,ts}', '**/playwright/**/*.{js,ts}']
+const E2E_TESTS = [
+  '**/e2e/**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}',
+  '**/*.e2e.{js,jsx,ts,tsx,mjs,cjs,mts,cts}',
+  '**/playwright/**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}',
+]
 
 module.exports = [
   {
     name: 'lodado/testing-unit',
-    files: ['**/*.{test,spec}.{js,jsx,ts,tsx}'],
+    files: ['**/*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs,mts,cts}'],
     ignores: E2E_TESTS,
     plugins: {
       vitest,

@@ -123,3 +123,11 @@ This gate proves only the structural fact that there is **no direct call** to a 
 does not prove the responsibility cohesion or behavioral correctness of the extracted hook, so
 trivial wrappers, hooks that hide UI presentation, and giant hooks that merge unrelated
 responsibilities are judged separately by tests and an independent reviewer.
+
+When the approved repository uses `@lodado/eslint-config/strict`, prefer its local strict rule to
+`use-encapsulation/prefer-custom-hooks`. The former checks configured import origins and lexical
+bindings for supported static forms, while the latter is identifier based and cannot safely carry
+the stricter ownership contract. Keep the same `hook-encapsulation` approval label and record the
+separate policy module plus `lodado-check-architecture ./strict-policy.mjs` command. The profile
+does not replace a review of external-system synchronization or a build check for client/server
+reachability. See [`STRICT.md`](../../../../eslint-config/STRICT.md).

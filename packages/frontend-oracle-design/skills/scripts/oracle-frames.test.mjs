@@ -61,6 +61,20 @@ test('parseCaseSpace: strength·excluded·[error] 주석을 읽는다', () => {
   assert.deepEqual(keyword.choices.at(-1), { value: 'unicode', error: true })
 })
 
+test('parseCaseSpace preserves literal marker text and trims whitespace only before terminal error markers', () => {
+  const longChoice = `${'x'.repeat(4096)}${' '.repeat(4096)}suffix`
+  const choices = `unicode\u00A0\t[error], literal[error]suffix, plain, ${longChoice}`
+  const card = SERVER_TABLE_CARD.replace('empty, min, unicode [error]', choices)
+  const values = parseCaseSpace(card).families.find((entry) => entry.family === 'Value').choices
+  assert.deepEqual(values.slice(0, 3), [
+    { value: 'unicode', error: true },
+    { value: 'literal[error]suffix', error: false },
+    { value: 'plain', error: false },
+  ])
+  assert.equal(values[3].value, longChoice)
+  assert.equal(values[3].error, false)
+})
+
 test('generateCaseFrames: pairwise가 전 곱을 대폭 줄이면서 모든 2-tuple을 덮는다', () => {
   const caseSpace = parseCaseSpace(SERVER_TABLE_CARD)
 

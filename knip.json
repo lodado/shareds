@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignore": [
+    "**/test-fixtures/**",
+    "**/examples/**",
+    "**/*-fixture/**",
+    "**/strict-types-fixture/**",
+    "**/tailwind-fixture/**"
+  ],
+  "ignoreDependencies": ["@eslint/css", "typescript-eslint"],
+  "ignoreBinaries": ["rtk"],
+  "workspaces": {
+    "packages/*": {
+      "entry": ["**/scripts/*.{js,mjs}", "**/evals/*.{js,mjs}", "**/*.test.{js,mjs}"]
+    },
+    ".": {
+      "entry": [".claude/hooks/*.mjs"]
+    }
+  }
+}

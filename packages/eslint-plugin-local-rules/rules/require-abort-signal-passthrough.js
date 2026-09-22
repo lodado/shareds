@@ -4,30 +4,38 @@
  */
 const FUNCTION_TYPES = new Set(['FunctionExpression', 'ArrowFunctionExpression'])
 
-const destructuresSignal = (fn) => {
+const signalBindingName = (fn) => {
   const [firstParam] = fn.params
-
-  return Boolean(
-    firstParam &&
-      firstParam.type === 'ObjectPattern' &&
-      firstParam.properties.some(
-        (property) => property.type === 'Property' && !property.computed && property.key.name === 'signal',
-      ),
+  if (firstParam?.type !== 'ObjectPattern') {
+    return undefined
+  }
+  const property = firstParam.properties.find(
+    (entry) => entry.type === 'Property' && !entry.computed && entry.key.name === 'signal',
   )
+  if (!property) {
+    return undefined
+  }
+  let binding = property.value
+  if (binding.type === 'AssignmentPattern') {
+    binding = binding.left
+  }
+  return binding.name
 }
 
-const hasSignalOption = (call) => {
+const hasSignalOption = (call, signalName) => {
   const options = call.arguments[1]
 
   if (!options || options.type !== 'ObjectExpression') {
     return false
   }
 
-  return options.properties.some(
-    (property) =>
-      (property.type === 'Property' && !property.computed && property.key.name === 'signal') ||
-      property.type === 'SpreadElement',
-  )
+  return options.properties.some((property) => {
+    if (property.type !== 'Property' || property.computed || property.key.name !== 'signal') {
+      return false
+    }
+
+    return property.value.type === 'Identifier' && property.value.name === signalName
+  })
 }
 
 /** Every `fetch(...)` lexically inside the queryFn, nested callbacks included. */
@@ -81,12 +89,13 @@ module.exports = {
           return
         }
 
-        if (!destructuresSignal(node.value)) {
+        const signalName = signalBindingName(node.value)
+        if (!signalName) {
           return
         }
 
         collectFetchCalls(node.value.body).forEach((call) => {
-          if (!hasSignalOption(call)) {
+          if (!hasSignalOption(call, signalName)) {
             context.report({ node: call, messageId: 'missingSignalPassthrough' })
           }
         })

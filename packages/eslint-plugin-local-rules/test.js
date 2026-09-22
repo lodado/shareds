@@ -199,6 +199,9 @@ ruleTester.run('no-fetch-in-component', rules['no-fetch-in-component'], {
 ruleTester.run('require-abort-signal-passthrough', rules['require-abort-signal-passthrough'], {
   valid: [
     'useQuery({ queryKey: key, queryFn: ({ signal }) => fetch(url, { signal }) })',
+    'useQuery({ queryKey: key, queryFn: ({ signal }) => fetch(url, { signal: signal }) })',
+    'useQuery({ queryKey: key, queryFn: ({ signal: abortSignal }) => fetch(url, { signal: abortSignal }) })',
+    'useQuery({ queryKey: key, queryFn: ({ signal: abortSignal = fallback }) => fetch(url, { signal: abortSignal }) })',
     'useQuery({ queryKey: key, queryFn: () => fetch(url) })',
     'useQuery({ queryKey: key, queryFn: ({ signal }) => client.get(url, { signal }) })',
     'useQuery({ queryKey: key, queryFn: async ({ signal }) => { const res = await fetch(url, { method: "POST", signal }); return res.json() } })',
@@ -212,6 +215,18 @@ ruleTester.run('require-abort-signal-passthrough', rules['require-abort-signal-p
       code: 'useQuery({ queryKey: key, queryFn: async ({ signal }) => { const res = await fetch(url, { method: "POST" }); return res.json() } })',
       errors: [{ messageId: 'missingSignalPassthrough' }],
     },
+    {
+      code: 'useQuery({ queryKey: key, queryFn: ({ signal: abortSignal }) => fetch(url, { signal }) })',
+      errors: [{ messageId: 'missingSignalPassthrough' }],
+    },
+    {
+      code: 'useQuery({ queryKey: key, queryFn: ({ signal }) => fetch(url, { signal: otherSignal }) })',
+      errors: [{ messageId: 'missingSignalPassthrough' }],
+    },
+    {
+      code: 'useQuery({ queryKey: key, queryFn: ({ signal }) => fetch(url, { ...requestOptions }) })',
+      errors: [{ messageId: 'missingSignalPassthrough' }],
+    },
   ],
 })
 
@@ -220,6 +235,11 @@ ruleTester.run('scenario-test-filename', rules['scenario-test-filename'], {
     { code: 'export const x = 1', filename: 'Button.scenario.test.tsx' },
     { code: 'export const x = 1', filename: 'format.unit.test.ts' },
     { code: 'export const x = 1', filename: 'e2e/checkout.spec.ts' },
+    { code: 'export const x = 1', filename: 'e2e/checkout.spec.tsx' },
+    { code: 'export const x = 1', filename: 'playwright/checkout.e2e.mjs' },
+    { code: 'export const x = 1', filename: 'e2e/checkout.e2e.cjs' },
+    { code: 'export const x = 1', filename: 'e2e/checkout.e2e.mts' },
+    { code: 'export const x = 1', filename: 'e2e/checkout.e2e.cts' },
     { code: 'export const x = 1', filename: 'src/index.ts' },
   ],
   invalid: [
@@ -278,6 +298,7 @@ ruleTester.run('fsd-no-deep-import', rules['fsd-no-deep-import'], {
     { code: "import { repo } from '@/features/auth/index.server'", filename: '/repo/src/app/api/login/route.ts' },
     { code: "import { repo } from '@/features/auth/api/server'", filename: '/repo/src/app/api/login/route.ts' },
     { code: "import { UserRef } from '@/entities/user/@x/order'", filename: '/repo/src/entities/order/model/order.ts' },
+    { code: "import { Auth } from '@company/features/auth/ui'", filename: '/repo/src/views/login/ui/Page.tsx' },
     // internal imports within the same slice stay free
     {
       code: "import { store } from '@/features/auth/model/store'",
@@ -340,6 +361,11 @@ ruleTester.run('fsd-no-driver-outside-repository', rules['fsd-no-driver-outside-
     {
       code: "const pg = require('pg')",
       filename: '/repo/src/views/products/ui/Page.tsx',
+      errors: [{ messageId: 'driverOutsideBoundary' }],
+    },
+    {
+      code: "import pg from 'pg'",
+      filename: '/repo/src/features/seedling/model/seedling.ts',
       errors: [{ messageId: 'driverOutsideBoundary' }],
     },
   ],
@@ -415,6 +441,8 @@ typedRuleTester.run('no-response-type-assertion', rules['no-response-type-assert
     // Asserting to unknown still forces narrowing afterwards.
     'const payload = (await response.json()) as unknown',
     'const count = value as number',
+    'const cached = cache.get(key) as CartState',
+    'const cached = map.get(key) as CartState',
   ],
   invalid: [
     {

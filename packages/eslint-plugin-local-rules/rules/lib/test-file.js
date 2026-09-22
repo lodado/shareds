@@ -1,7 +1,8 @@
 /** Path predicates shared by the rules that only apply to test code. */
-const UNIT_TEST_FILE = /\.(test|spec)\.[jt]sx?$/
+const SOURCE_EXTENSION = '[cm]?[jt]sx?'
+const UNIT_TEST_FILE = new RegExp(`\\.(test|spec)\\.${SOURCE_EXTENSION}$`)
 const TEST_DIRECTORY = /(^|\/)(e2e|playwright|__tests__)\//
-const E2E_FILE = /(^|\/)(e2e|playwright)\/|\.e2e\.[jt]s$/
+const E2E_FILE = new RegExp(`(^|\\/)(e2e|playwright)\\/|\\.e2e\\.${SOURCE_EXTENSION}$`)
 
 const normalize = (filename) => filename.replace(/\\/g, '/')
 

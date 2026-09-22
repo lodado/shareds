@@ -20,7 +20,18 @@ const DEFAULT_DRIVERS = [
   'typeorm',
 ]
 
-const DEFAULT_ALLOW = ['/shared/api/', '.repository.', '/migrations/', '/db/', 'seed']
+const isDefaultAllowedPath = (filename) => {
+  const segments = filename.split('/').filter(Boolean)
+  const basename = segments.at(-1) || ''
+  return (
+    (segments.includes('shared') && segments[segments.indexOf('shared') + 1] === 'api') ||
+    segments.includes('migrations') ||
+    segments.includes('db') ||
+    segments.includes('seed') ||
+    /^seed\.[^.]+$/.test(basename) ||
+    basename.includes('.repository.')
+  )
+}
 
 module.exports = {
   meta: {
@@ -48,10 +59,10 @@ module.exports = {
   create(context) {
     const options = context.options[0] || {}
     const drivers = options.drivers || DEFAULT_DRIVERS
-    const allow = options.allow || DEFAULT_ALLOW
+    const allow = options.allow
     const filename = normalize(context.filename)
 
-    if (allow.some((fragment) => filename.includes(fragment))) {
+    if (allow ? allow.some((fragment) => filename.includes(fragment)) : isDefaultAllowedPath(filename)) {
       return {}
     }
 

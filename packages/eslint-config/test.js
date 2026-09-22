@@ -1,4 +1,4 @@
-/* eslint-disable @lodado/local-rules/no-console-log, no-console -- test progress output */
+/* eslint-disable no-console -- test progress output */
 /**
  * Smoke test for the presets. Each one is linted the way it is meant to be used -
  * layered on top of the base preset - so a missing plugin, a bad config entry,
@@ -18,6 +18,8 @@ const PRESETS = {
   testing: require('./testing.js'),
   query: require('./query.js'),
   quality: require('./quality.js'),
+  fsd: require('./fsd.js'),
+  interaction: require('./interaction.js'),
   tailwind: require('./tailwind.js'),
   ai: require('./ai.js'),
   design: require('./design.mjs').default,
@@ -66,22 +68,22 @@ const main = async () => {
   assert.strictEqual(combined.messages.length, 0, `combined: unexpected messages ${JSON.stringify(combined.messages)}`)
   console.log('ok  every preset combined')
 
-  // no-console-log is the one rule we ship ourselves - assert it actually fires.
+  // Base owns console diagnostics; the local preset must not add a second report.
   const reported = await lint([...BASE, ...PRESETS['local-rules']], 'console.log("hi")\n', 'sample-console.tsx')
   assert.ok(
-    reported.messages.some((message) => message.ruleId === '@lodado/local-rules/no-console-log'),
-    'local-rules: no-console-log did not report on console.log',
+    reported.messages.some((message) => message.ruleId === 'no-console'),
+    'base: no-console did not report on console.log',
   )
-  console.log('ok  local-rules/no-console-log reports')
+  console.log('ok  base/no-console reports')
 
-  // Severity comes from each rule's meta.docs.recommended - judgement calls stay warnings.
+  // Judgement calls remain warnings under the explicit preset policy.
   const effect = await lint([...BASE, ...PRESETS['local-rules']], 'useEffect(() => {}, [])\n', 'sample-effect.tsx')
   const annotation = effect.messages.find(
     (message) => message.ruleId === '@lodado/local-rules/require-effect-annotation',
   )
   assert.ok(annotation, 'local-rules: require-effect-annotation did not report on an undocumented effect')
   assert.strictEqual(annotation.severity, 1, 'local-rules: require-effect-annotation should be a warning')
-  console.log('ok  local-rules severity follows meta.docs.recommended')
+  console.log('ok  local-rules severity follows explicit severity policy')
 
   // Opt-in rules ship off, so a repo with its own test-file convention is not flooded.
   const optIn = await lint([...BASE, ...PRESETS['local-rules']], 'export const x = 1\n', 'sample-optin.test.tsx')
@@ -159,7 +161,7 @@ const main = async () => {
   console.log('ok  quality reviewability rules stay warnings')
 
   // The react preset's effect discipline - deriving state inside an effect must
-  // fire both the compiler rule and the you-might-not-need-an-effect rule.
+  // fire both the compiler rule without a duplicate derived-state report.
   const REACT = [...BASE, ...PRESETS.react]
   const derivedEffect = [
     "import { useEffect, useState } from 'react'",
@@ -171,12 +173,6 @@ const main = async () => {
     '',
   ].join('\n')
   await assertReports(REACT, derivedEffect, 'sample-derived-effect.tsx', 'react-hooks/set-state-in-effect')
-  await assertReports(
-    REACT,
-    derivedEffect,
-    'sample-derived-effect.tsx',
-    'react-you-might-not-need-an-effect/no-derived-state',
-  )
 
   // The state-modeling rules read TS type nodes through the base preset's parser.
   await assertReports(

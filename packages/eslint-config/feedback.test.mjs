@@ -5,9 +5,12 @@ import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { ESLint } from 'eslint'
 import base from './index.mjs'
+import localRules from './local-rules.js'
 import next from './next.js'
+import quality from './quality.js'
 import react from './react.mjs'
 import strictTypes from './strict-types.js'
+import testing from './testing.js'
 
 const cwd = path.dirname(fileURLToPath(import.meta.url))
 const typedFile = path.join(cwd, 'strict-types-fixture/sample.ts')
@@ -26,6 +29,33 @@ const reports = async (eslint, code, ruleId, filePath) => {
   const messages = await messagesFor(eslint, code, filePath)
   assert.ok(messages.some((message) => message.ruleId === ruleId), `${ruleId}: ${JSON.stringify(messages)}`)
 }
+
+test('base rejects nested ternaries in JS, TS and JSX but permits a single conditional', async () => {
+  for (const extension of ['js', 'ts', 'jsx', 'tsx']) {
+    const file = path.join(cwd, `sample-conditional.${extension}`)
+    await reports(untyped, 'export const label = (a, b) => a ? "a" : b ? "b" : "c"', 'no-nested-ternary', file)
+    await reports(untyped, 'export const label = (a, b) => a ? b ? "a" : "b" : "c"', 'no-nested-ternary', file)
+    const messages = await messagesFor(untyped, 'export const label = (a) => a ? "a" : "b"', file)
+    assert.deepEqual(messages.filter((message) => message.ruleId?.includes('ternary')), [])
+  }
+  await reports(untyped, 'export const Label = ({ a, b }) => <div>{a ? "a" : b ? "b" : "c"}</div>', 'no-nested-ternary')
+})
+
+test('quality composition keeps one owner for nested conditionals and detects duplicate branches', async () => {
+  const eslint = createLinter([...base, ...quality])
+  const messages = await messagesFor(eslint, 'export const label = (a, b) => a ? "a" : b ? "b" : "c"')
+  assert.equal(messages.filter((message) => message.ruleId === 'no-nested-ternary').length, 1)
+  assert.equal(messages.filter((message) => message.ruleId === 'sonarjs/no-nested-conditional').length, 0)
+  await reports(eslint, 'export function label(a) { if (a) { return "same" } else { return "same" } }', 'sonarjs/no-all-duplicated-branches')
+})
+
+test('quality rules do not run against non-JavaScript languages', async () => {
+  const eslint = createLinter([...base, ...quality])
+  for (const extension of ['md', 'json', 'yaml']) {
+    const config = await eslint.calculateConfigForFile(path.join(cwd, `sample.${extension}`))
+    assert.equal(config.rules['sonarjs/max-lines'], undefined)
+  }
+})
 
 test('typed feedback rejects unhandled promises and any propagation', async () => {
   const cases = [
@@ -59,6 +89,14 @@ test('typed rules do not force JavaScript config files into a TS project', async
   assert.equal(config.languageOptions.parserOptions.project, undefined)
   assert.equal(config.rules['ts/switch-exhaustiveness-check'], undefined)
   await messagesFor(typed, 'export default []', path.join(cwd, 'eslint.config.mjs'))
+})
+
+test('typed rules do not require a TS project for Markdown code blocks', async () => {
+  for (const file of ['guide.md/0_0.ts', 'guide.mdx/0_0.tsx']) {
+    const config = await typed.calculateConfigForFile(path.join(cwd, file))
+    assert.equal(config.rules['ts/no-floating-promises'], undefined)
+    assert.notEqual(config.languageOptions.parserOptions.project, true)
+  }
 })
 
 test('suppression comments must name rules and explain a necessary exception', async () => {
@@ -166,7 +204,7 @@ test('ai preset adds the AI defects no other preset catches and defers on the re
     'no-eval-dynamic': 'no-eval',
     'no-dead-branch': 'ts/no-unnecessary-condition',
     'no-duplicate-logic-block': 'sonarjs/no-identical-functions',
-    'no-console-in-handler': '@lodado/local-rules/no-console-log',
+    'no-console-in-handler': 'no-console',
   }
   for (const [rule, owner] of Object.entries(deferred)) {
     assert.equal(config.rules[`ai-guard/${rule}`]?.[0], 0, `${rule} is owned by ${owner}`)
@@ -205,9 +243,59 @@ test('design preset reports token drift and server/client leaks, and defers a11y
     'no-empty-catch': 'sonarjs/no-ignored-exceptions',
     'no-async-useeffect': 'react-hooks/set-state-in-effect',
     'no-floating-promise-handler': 'ts/no-floating-promises',
-    'no-prod-console': '@lodado/local-rules/no-console-log',
+    'no-prod-console': 'no-console',
   }
   for (const [rule, owner] of Object.entries(deferred)) {
     assert.equal(config.rules[`deslint/${rule}`]?.[0], 0, `${rule} is owned by ${owner}`)
+  }
+})
+
+test('composed presets report console, redundant catch and includes only once', async () => {
+  const eslint = createLinter([...base, ...quality, ...localRules])
+  const cases = [
+    ['console.log("debug")', 'no-console', '@lodado/local-rules/no-console-log'],
+    ['export function run(work) { try { return work() } catch (error) { throw error } }', 'no-useless-catch', 'sonarjs/no-useless-catch'],
+    ['export const has = (items, item) => items.indexOf(item) !== -1', 'unicorn/prefer-includes', 'e18e/prefer-includes'],
+  ]
+  for (const [code, owner, duplicate] of cases) {
+    const messages = await messagesFor(eslint, code)
+    assert.equal(messages.filter((message) => message.ruleId === owner).length, 1, owner)
+    assert.equal(messages.filter((message) => message.ruleId === duplicate).length, 0, duplicate)
+  }
+})
+
+test('quality warns on complexity, skips style metrics and Markdown snippets', async () => {
+  const eslint = createLinter([...base, ...quality])
+  const config = await eslint.calculateConfigForFile(path.join(cwd, 'sample.ts'))
+  assert.equal(config.rules['sonarjs/cognitive-complexity'][0], 1)
+  for (const rule of ['max-lines', 'max-lines-per-function', 'no-duplicate-string', 'no-unused-vars', 'block-scoped-var']) {
+    assert.equal(config.rules[`sonarjs/${rule}`][0], 0, rule)
+  }
+  for (const file of ['guide.md/0_0.ts', 'guide.mdx/0_0.tsx']) {
+    const snippet = await eslint.calculateConfigForFile(path.join(cwd, file))
+    assert.equal(snippet.rules['sonarjs/no-reference-error'], undefined)
+  }
+})
+
+test('React keeps button safety and a single derived-effect owner', async () => {
+  await reports(reactLinter, 'export const Submit = () => <button>Save</button>', '@eslint-react/dom-no-missing-button-type')
+  const eslint = createLinter([...base, ...react, ...localRules])
+  const config = await eslint.calculateConfigForFile(path.join(cwd, 'sample.tsx'))
+  assert.equal(config.rules['react-hooks/set-state-in-effect'][0], 2)
+  assert.equal(config.rules['react-you-might-not-need-an-effect/no-derived-state'][0], 0)
+  assert.equal(config.rules['@lodado/local-rules/no-derived-state-effect'][0], 0)
+})
+
+test('testing routes every supported extension without mixing unit and E2E rules', async () => {
+  const eslint = createLinter([...base, ...testing])
+  for (const extension of ['js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs', 'mts', 'cts']) {
+    const unit = await eslint.calculateConfigForFile(path.join(cwd, `sample.test.${extension}`))
+    assert.equal(unit.rules['vitest/no-focused-tests'][0], 2, extension)
+    assert.equal(unit.rules['playwright/no-wait-for-timeout'], undefined, extension)
+    for (const file of [`e2e/sample.spec.${extension}`, `playwright/sample.spec.${extension}`, `sample.e2e.${extension}`]) {
+      const e2e = await eslint.calculateConfigForFile(path.join(cwd, file))
+      assert.equal(e2e.rules['playwright/no-wait-for-timeout'][0], 2, file)
+      assert.equal(e2e.rules['vitest/no-focused-tests'], undefined, file)
+    }
   }
 })

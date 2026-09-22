@@ -20,8 +20,9 @@
     "access": "public"
   },
   "scripts": {
-    "test": "node test.js && node examples.test.js && tsc -p examples/tsconfig.json",
-    "lint": "eslint index.js rules test.js examples.test.js"
+    "test": "node test.js && node examples.test.js && tsc -p examples/tsconfig.json && pnpm test:strict",
+    "lint": "eslint index.js rules test.js examples.test.js strict-ui.test.js fsd-strict.test.js",
+    "test:strict": "node strict-ui.test.js && node fsd-strict.test.js"
   },
   "peerDependencies": {
     "eslint": "^8.57.0 || ^9.0.0 || ^10.0.0"
@@ -33,7 +34,9 @@
     "@typescript-eslint/parser": "^8.67.0",
     "eslint": "^10.11.0",
     "eslint-plugin-jsx-a11y-x": "^0.2.0",
-    "globals": "^17.12.0",
+    "globals": "^17.12.0"
+  },
+  "dependencies": {
     "typescript": "5.9.3"
   }
 }

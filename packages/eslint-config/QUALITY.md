@@ -1,7 +1,7 @@
 # SonarJS AI quality 규칙
 
-`@lodado/eslint-config/quality`는 사람이 매번 다르게 판단할 수 있는 AI 생성 코드를
-결정적인 정적 검문소에 통과시키기 위한 opt-in 프리셋이다. Antfu base 뒤에 펼쳐 쓴다.
+`@lodado/eslint-config/quality`는 SonarJS로 코드 결함을 검사하는 opt-in 프리셋이다.
+Antfu base 뒤에 펼쳐 쓴다. AI 생성 여부를 판별하는 도구는 아니다.
 
 ```js
 import base from '@lodado/eslint-config'
@@ -12,10 +12,55 @@ export default [...base, ...quality]
 
 ## 켜진 범위
 
-작성 시점의 `eslint-plugin-sonarjs@4.2.0`에는 279개 규칙이 있다. 이 프리셋은 공식
-`recommended`의 활성 규칙 217개를 전부 `error`로 받고, 기본값이 `off`인 규칙 중
-AI 출력의 정확성과 검토 가능성에 직접 도움이 되는 32개를 더 켠다. 따라서 총 249개
-SonarJS 규칙이 활성화된다.
+공식 `recommended`를 바탕으로 결함 검사를 추가하되, base와 겹치는 진단은 끈다.
+JS/TS 파일에만 적용하며 Markdown 코드 블록과 JSON·YAML은 제외한다.
+인지 복잡도는 error 대신 warn으로 보고한다. 파일·함수 줄 수와 반복 문자열은 검사하지 않는다.
+중첩 삼항연산자는 base의 `no-nested-ternary: error`가 담당하고,
+중복 보고를 피하기 위해 `sonarjs/no-nested-conditional`은 끈다. 단일 삼항연산자는 허용한다.
+
+## 다른 프리셋의 중복·과잉 검사
+
+- `console`은 base의 `no-console`, `includes` 권고는 Unicorn이 담당한다.
+- effect 안의 동기적인 상태 갱신은 React Hooks가 담당한다. 중복된 derived-state 검사는 끈다.
+- 버튼의 `type` 누락 검사는 유지한다. 타입 검사가 버튼의 기본 submit 동작을 막아주지는 않는다.
+- 루트 설정에서 `react-perf`를 제거했다. 인라인 함수·객체라는 이유만으로 메모이제이션을 강제하지 않는다.
+- functional의 기본 범위는 domain·selectors·`*.pure.*`다. 일반 reducer는 제외하고, 명시적인 pure reducer는 계속 검사한다.
+- local 규칙의 활성화 목록은 명시적으로 관리한다. 플러그인에 규칙을 추가해도 자동으로 켜지지 않는다.
+
+## 타입 검사와 저장소 검사
+
+TypeScript 프로젝트에서는 기존 `strict-types` 프리셋도 함께 쓴다.
+검사할 파일이 `tsconfig.json`에 포함되어 있어야 한다.
+
+```js
+import base from '@lodado/eslint-config'
+import quality from '@lodado/eslint-config/quality'
+import strictTypes from '@lodado/eslint-config/strict-types'
+
+export default [...base, ...quality, ...strictTypes]
+```
+
+`strict-types`는 처리하지 않은 Promise, 안전하지 않은 `any` 사용,
+타입상 불필요한 조건과 빠진 union 분기를 검사한다.
+
+이 저장소의 별도 정적 분석은 다음 명령으로 실행한다. CI에서도 `pnpm quality`를 실행한다.
+
+```sh
+pnpm quality:knip  # 미사용 파일·export·의존성, 누락 의존성
+pnpm quality:jscpd # 새로 생긴 코드 복제
+pnpm quality      # 위 두 검사
+```
+
+Knip의 workspace entry에는 패키지 스크립트와 테스트를 포함한다.
+예제와 검사 fixture는 제외하며, 언어 플러그인으로 쓰는 `@eslint/css`와
+`typescript-eslint`는 미사용 의존성 검사에서 제외한다.
+
+jscpd는 `packages/`의 JS/TS 코드에서 50토큰·5줄 이상인 복제를 검사한다.
+테스트·예제·생성된 bundle은 제외한다. 기존 복제 12건은 `.jscpd-baseline.json`에 기록했고,
+새 복제가 하나라도 생기면 실패한다. `threshold: 100`은 비율 검사를 비활성화하기 위한 값이며,
+실제 차단은 `--fail-on-new-clones`가 담당한다. 기준선 갱신은 기존 복제를 검토한 뒤에만 한다.
+
+## 주요 검사 영역
 
 공식 recommended에서 특히 AI 결과 검수에 중요한 영역은 다음과 같다.
 
@@ -29,11 +74,11 @@ SonarJS 규칙이 활성화된다.
 | 보안               | `code-eval`, `sql-queries`, `no-hardcoded-passwords`, `hardcoded-secret-signatures`, `pseudo-random`, `csrf`, `cors`, `insecure-cookie`, `weak-ssl` | 사용자 입력 실행, SQL injection, 비밀 유출, 보안 문맥의 PRNG, 완화책 비활성화                |
 
 전체 공식 규칙 정의는 각 lint 메시지의 SonarSource RSPEC 링크가 권위다. 아래 목록은
-공식 recommended에 **추가로** 켠 32개다.
+이 프리셋에서 추가하거나 경고 수준으로 조정한 규칙이다.
 
 ## 추가 error 16개
 
-확실한 런타임 결함, 의존성 환각 또는 분석 우회이므로 Claude Stop 훅과 CI를 실패시킨다.
+`error`는 lint를 실패시킨다. Stop 훅에서 차단하려면 훅을 별도로 등록해야 한다.
 
 | 규칙                                   | 검수 목적                                                                               |
 | -------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -54,22 +99,20 @@ SonarJS 규칙이 활성화된다.
 | `unicode-aware-regex`                  | Unicode property/class를 쓰면서 `u` 플래그를 빼 문자 판정이 달라지는 일을 막는다.       |
 | `values-not-convertible-to-numbers`    | 숫자로 바꿀 수 없는 값을 수치 비교해 잘못된 분기로 가는 일을 막는다.                    |
 
-## 추가 warn 16개
+## 경고로 검사하는 규칙
 
 문맥에 따라 정당할 수 있지만, AI 출력은 사람이 한 번 확인해야 하는 지점이다. 경고는
 기본적으로 lint를 실패시키지 않으며 팀이 `--max-warnings=0`을 선택하면 차단할 수 있다.
 
 | 규칙                                 | 검토 신호                                                                     |
 | ------------------------------------ | ----------------------------------------------------------------------------- |
+| `cognitive-complexity`               | 제어 흐름이 복잡해 사람이 검토할 필요가 있는 함수다.                          |
 | `cyclomatic-complexity`              | 독립 실행 경로가 많아 누락된 테스트 조합이 생기기 쉬운 함수다.                |
 | `elseif-without-else`                | 분기 체인에 나머지 입력 정책이 명시되지 않았다. 의도적 no-op인지 확인한다.    |
 | `expression-complexity`              | 한 식에 조건 연산자가 너무 많아 진리표 검토가 어렵다.                         |
-| `max-lines`                          | 생성된 대형 파일이 책임을 과도하게 합쳤을 가능성이 있다.                      |
-| `max-lines-per-function`             | 한 함수의 입력·출력·실패 경계를 한 번에 검토하기 어렵다.                      |
 | `max-union-size`                     | 거대한 union이 상태 모델의 누락/중복을 숨길 수 있다.                          |
 | `nested-control-flow`                | 깊은 중첩 때문에 early return, cleanup, 오류 경로가 가려진다.                 |
 | `no-commented-code`                  | 과거 구현을 주석으로 남겨 실제 권위 코드가 무엇인지 흐리는 일을 찾는다.       |
-| `no-duplicate-string`                | 생성 코드에 반복된 protocol key/상태 문자열이 서로 drift할 위험을 알린다.     |
 | `no-nested-incdec`                   | 증가·감소의 평가 순서를 한 식 안에서 추론해야 하는 코드를 찾는다.             |
 | `no-nested-switch`                   | 상태 전이 표가 여러 switch로 흩어져 조합 누락이 생길 가능성을 알린다.         |
 | `no-return-type-any`                 | AI가 타입 오류를 `any` 반환으로 덮어 계약 검증을 약화한 지점을 찾는다.        |

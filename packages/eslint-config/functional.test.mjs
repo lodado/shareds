@@ -68,3 +68,27 @@ test('functional preset excludes test files', async (t) => {
   const result = await lint(root, 'domain/value.test.ts', 'export const value = { count: 0 }; value.count++\n')
   assert.equal(result.messages.some((message) => message.ruleId === 'functional/immutable-data'), false)
 })
+
+test('functional scopes retain base syntax restrictions', async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'lodado-functional-base-rules-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  await writeFile(path.join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { strict: true }, include: ['**/*.ts'] }))
+
+  const constEnum = await lint(root, 'domain/const-enum.ts', 'const enum Kind { A }\nexport const value = Kind.A\n')
+  assert.ok(constEnum.messages.some((message) => message.ruleId === 'no-restricted-syntax' && message.message.includes('const=true')))
+
+  const exportAssignment = await lint(root, 'domain/export-assignment.ts', 'const value = 1\nexport = value\n')
+  assert.ok(exportAssignment.messages.some((message) => message.ruleId === 'no-restricted-syntax' && message.message.includes('TSExportAssignment')))
+})
+
+test('reducers are not immutable by default, but .pure files remain protected', async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'lodado-functional-reducers-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  await writeFile(path.join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { strict: true }, include: ['**/*.ts'] }))
+
+  const reducer = await lint(root, 'reducers/value.ts', 'export function reducer(state: { count: number }) { state.count++\n  return state\n}\n')
+  assert.equal(reducer.messages.some((message) => message.ruleId === 'functional/immutable-data'), false)
+
+  const pureReducer = await lint(root, 'reducers/value.pure.ts', 'export function reducer(state: { count: number }) { state.count++\n  return state\n}\n')
+  assert.ok(pureReducer.messages.some((message) => message.ruleId === 'functional/immutable-data'))
+})

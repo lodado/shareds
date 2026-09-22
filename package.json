@@ -1,9 +1,22 @@
 {
   "name": "@lodado/vibe-coding-helper-monorepo",
   "version": "0.0.0",
-  "description": "Shared frontend engineering skills for Claude Code and Codex, plus composable ESLint presets for modern JavaScript and TypeScript projects",
   "private": true,
   "packageManager": "pnpm@9.0.6",
+  "description": "Shared frontend engineering skills for Claude Code and Codex, plus composable ESLint presets for modern JavaScript and TypeScript projects",
+  "author": {
+    "name": "lodado",
+    "url": "https://github.com/lodado"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/lodado/shareds#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lodado/shareds.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lodado/shareds/issues"
+  },
   "keywords": [
     "eslint-config",
     "claude-code",
@@ -11,19 +24,10 @@
     "codex",
     "monorepo"
   ],
-  "author": {
-    "name": "lodado",
-    "url": "https://github.com/lodado"
+  "engines": {
+    "node": "^22.22.2 || >=24.15.0",
+    "pnpm": ">=9.0.6"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/lodado/shareds.git"
-  },
-  "homepage": "https://github.com/lodado/shareds#readme",
-  "bugs": {
-    "url": "https://github.com/lodado/shareds/issues"
-  },
-  "license": "MIT",
   "scripts": {
     "prepare": "husky install",
     "lint": "turbo run lint",
@@ -31,7 +35,11 @@
     "format": "prettier --write \"**/*.{js,json,md}\"",
     "release": "changeset version",
     "release:publish": "changeset publish",
-    "changeset": "changeset"
+    "changeset": "changeset",
+    "quality:knip": "knip --no-progress --no-config-hints",
+    "quality:jscpd": "jscpd --config .jscpd.json --fail-on-new-clones --no-colors",
+    "quality": "pnpm quality:knip && pnpm quality:jscpd",
+    "check:architecture": "pnpm --filter @lodado/eslint-plugin-local-rules test:strict && pnpm --filter @lodado/eslint-config test:strict"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",
@@ -39,13 +47,11 @@
     "@commitlint/config-conventional": "^17.8.1",
     "eslint": "^10.11.0",
     "husky": "^8.0.3",
+    "jscpd": "5.3.0",
+    "knip": "6.37.0",
     "lint-staged": "^14.0.1",
     "prettier": "^2.8.8",
     "turbo": "2.10.11"
-  },
-  "engines": {
-    "node": "^22.22.2 || >=24.15.0",
-    "pnpm": ">=9.0.6"
   },
   "lint-staged": {
     "*.{js,json,md}": "prettier --write"
