@@ -40,6 +40,12 @@ $reference-driven-3d-character
 
 충분한 기존 도면과 해당 버전의 승인은 재사용한다. 작은 수정에 전신 설계안을 다시 요구하지 않는다. 사용자가 시각적 결정을 명시적으로 위임하면 확인 대기를 생략할 수 있지만, 에이전트의 판단을 사용자 승인으로 기록하지 않는다.
 
+## Adversarial visual review
+
+Before generating an image, the agent records a compact visual contract and uses the same requirement IDs for prompting and inspection. A separate image-capable reviewer opens the original references and candidate, checks each required observation, and returns panel-specific findings. The lead delivers the reviewed image with that assessment. Reviewer PASS does not replace user acceptance.
+
+A failed, inaccessible, omitted, or stale required check keeps the result incomplete. Corrections need a review of the new image; prior visual passes do not transfer. If separate review is unavailable, the agent may show a labeled draft but cannot claim independent verification or silently continue into dependent production. These are skill instructions, not a host-enforced tool barrier. Automatic image display can occur before review.
+
 ## 문서
 
 - [실행 절차](skills/reference-driven-3d-character/SKILL.md)

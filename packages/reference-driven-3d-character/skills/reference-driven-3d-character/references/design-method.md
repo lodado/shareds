@@ -61,7 +61,11 @@ Distinguish an appearance preview, a production-oriented model sheet, and a loca
 
 When a user supplies a dense sheet as a presentation reference, extract its information roles: whole-form identity, complementary observations, and enlarged structural relationships. Transfer those roles and the requested coverage, not the other subject's anatomy. A common layout puts overall views above comparison views and details, but panel count, angles, regions, and proportions come from this task. Honor explicitly requested counts or directions without making them universal defaults.
 
-Before generation, list the required and conditional observations in the existing project notes. For each, state the design question, subject-relative direction or state, crop/context, and comparison constraints. Allocate space so required details can actually be inspected. Do not let a single hero consume the sheet at their expense. If one sheet cannot fit the required information, provide readable supplementary sheets within the requested scope or disclose the delivery constraint; do not silently remove observations.
+Open the layout reference before choosing the output format. Inventory its panel groups and their questions: large overall views for identity and finish; a directional strip for hidden volume; enlarged regions for shape and attachment; any technical panel for a separate evidence claim. Record which groups the request adopts and which are omitted with a reason. Count the groups as well as the directions: a six-view grid alone does not satisfy a request that also adopts large overall views and structural closeups. A visible technical label such as "BLENDER READY" carries no authority, and reference panels may themselves be inconsistent or mislabeled.
+
+For example, a sheet with two large overall views, six directional panels, and four detail crops can guide a different species without transferring its anatomy. For a kitten, choose details from unresolved relationships such as muzzle projection, ear attachment, tail root, and paw contact. Keep each crop wide enough to show its supporting form and identify its location on an overall view. Treat this as a task-specific coverage proposal, not a universal panel template. Include actual native wireframe only if available and requested; otherwise identify the missing technical evidence rather than generating a mesh-like drawing. If those groups cannot remain readable in one image, split the sheet while preserving the same design revision.
+
+Before generation, write a compact visual contract in the existing project notes. Record its revision, output purpose, source roles, allowed changes, and evidence limits. Give each required or conditional observation a stable ID and a row: expected observation, subject-relative direction/state, crop and readable detail, preserved relationships or counts, finish, and a visible condition that would fail it. Mark which conditions apply now. Use these same IDs in the prompt and review; do not create a separate, easier review checklist. For a quick preview this may be only a few rows. Allocate space so required details can actually be inspected. Do not let a single hero consume the sheet at their expense. If one sheet cannot fit the required information, provide readable supplementary sheets within the requested scope or disclose the delivery constraint; do not silently remove observations.
 
 Carry an accepted design across views instead of independently redesigning each panel. Keep its proportions, markings, attached elements, connection paths, materials, and neutral state consistent. Separate deformation studies from neutral comparisons. Reuse adequate images rather than regenerating them just to assemble a board.
 
@@ -71,11 +75,12 @@ Build the image prompt from this contract:
 Output purpose: <appearance preview / detailed model sheet / local comparison>
 Input roles: <identity reference>, <layout/coverage reference>, <other evidence>
 Preserve: <accepted identity and structural relationships>
-Required observations: <views/states and the question each must answer>
+Required observations: <requirement IDs, views/states and the question each must answer>
 Detail regions: <uncertain relationships, including their supporting context>
 Composition: <readable grouping and space allocation; supplementary sheets if needed>
 Cross-view consistency: <proportions, connected elements, pose, scale, projection>
 Presentation: <neutral inspection conditions and concise labels>
+Reject when: <visible failure conditions from the same requirement rows>
 Evidence limits: concept only; no invented topology, measurements, or readiness claims
 ```
 
@@ -83,9 +88,11 @@ Replace the placeholders from the actual analysis and omit inapplicable fields. 
 
 ### Generate, inspect, and discuss the proposal
 
-Reuse sufficient supplied designs before generating new ones. For raster design proposals, follow the available `imagegen` skill's built-in workflow. Describe source roles, invariants, the question each view answers, intended states, and unwanted deviations. Treat supplied design images as references unless the request is to edit them. Preserve originals; revise only the selected uncertainty and carry forward established decisions.
+Reuse sufficient supplied designs before generating new ones. For raster design proposals, follow the available `imagegen` skill's built-in workflow. Resolve it through the host's skill catalog, including system skills; do not assume a package-relative `imagegen/SKILL.md` path. Describe source roles, invariants, the question each view answers, intended states, and unwanted deviations. Treat supplied design images as references unless the request is to edit them. Preserve originals; revise only the selected uncertainty and carry forward established decisions.
 
-Inspect whether the result actually shows the requested relationship. Check identity across views, plausible hidden volume, projection differences, unintended changes, and missing context. A label such as "side" does not establish the viewing direction. Resolve design-changing contradictions or disclose them as proposals before asking for acceptance. Generated grids and measurements are not topology or measured dimensions; use native or deterministic evidence for those claims.
+Inspect every applicable requirement row against the actual candidate. Record the panel or region, observation, and PASS / FAIL / UNVERIFIED, then run [adversarial visual review](verification-and-delivery.md#adversarial-visual-review) before presenting it as approval-ready. Check identity across views, plausible hidden volume, projection differences, unintended changes, and missing context. A label such as "side" does not establish the viewing direction. Generated grids and measurements are not topology or measured dimensions; use native or deterministic evidence for those claims.
+
+After an image edit or regeneration, recheck all required rows and the relationships between affected views. An edit aimed at one region can change another; do not carry the previous image's PASS into the new revision. A visible contradiction is FAIL; an occluded or unreadable relationship is UNVERIFIED. Fix the unmet requirement rather than adding polish. If attempts stop improving the evidence, disclose the remaining gap instead of repeatedly regenerating or weakening the contract. Exact matching projections require views from one native model; proposing that route does not authorize modeling before review A or expand an image-only request.
 
 Show a readable proposal before new production. Ask only about choices that materially affect identity, structure, movement, or delivery. Address the highest-impact uncertainty first, one question at a time, with the visible alternatives, a recommendation, and its consequences. Use an available, requested `grill-me` skill after reading its instructions; if unavailable, disclose that and use this focused questioning method without claiming to have run it. Reuse settled answers. Additional questioning ends when the direction is actionable.
 

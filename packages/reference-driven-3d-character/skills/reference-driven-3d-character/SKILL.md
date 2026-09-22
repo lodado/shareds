@@ -27,7 +27,7 @@ Static characters skip rigging and motion. Animation work does not imply game in
 - Rigging, skinning, contact, locomotion, or transitions: read [motion-design.md](references/motion-design.md).
 - Before judging a stage or delivering files: read [verification-and-delivery.md](references/verification-and-delivery.md).
 
-Read only the relevant branches. The image-generation branch uses the available `imagegen` skill/tool; focused interviewing may use `grill-me` when installed. Neither is required for reusing an adequate design or a scoped repair. No orchestration framework or specialist agent is required. Consult current official tool documentation when implementation depends on unfamiliar or version-sensitive behavior.
+Read only the relevant branches. The image-generation branch uses the available `imagegen` skill/tool; focused interviewing may use `grill-me` when installed. Neither is required for reusing an adequate design or a scoped repair. Visual proposals and changed visual deliverables use the [adversarial visual review](references/verification-and-delivery.md#adversarial-visual-review) procedure. It requires a separate image-capable reviewer, not an orchestration framework; unavailable review remains UNVERIFIED. Consult current official tool documentation when implementation depends on unfamiliar or version-sensitive behavior.
 
 ## 0. Establish capability and a safe work area
 
@@ -60,13 +60,13 @@ For a new design or substantial redesign, choose the images from identity, hidde
 
 Distinguish an appearance preview from a detailed production-oriented model sheet. Honor requested information coverage and layout-reference density: plan readable whole-form, complementary-view, and structural-detail evidence before prompting. Minimalism removes redundancy, not requested views. Separate character-identity references from sheet-layout references; greater texture detail or image resolution cannot replace missing structural information.
 
-Reuse adequate supplied images and their recorded acceptance. Where a raster proposal is needed, load the installed `imagegen` instructions and use its default built-in tool. Label source roles and preservation constraints, inspect the result for contradictions, and actually show it before modeling. Exact structural diagrams and mesh evidence belong to deterministic tools or the native scene. Missing image capability is a disclosed gap, not permission to invent a preview, silently skip review, or switch to a paid API.
+Before generation, write the compact visual contract in existing notes and derive both the prompt and review checks from its requirement IDs. Reuse adequate supplied images and their recorded acceptance. Where a raster proposal is needed, load the installed `imagegen` instructions and use its default built-in tool. Inspect the result, then dispatch the original inputs and candidate to a separate reviewer using the linked procedure before calling it approval-ready. A required FAIL or UNVERIFIED permits a clearly labeled draft or correction, not a verified handoff or dependent production. Exact structural diagrams and mesh evidence belong to deterministic tools or the native scene. Missing image capability is a disclosed gap, not permission to invent a preview, silently skip review, or switch to a paid API.
 
 Resolve remaining direction-changing choices one at a time against the displayed proposal. Use `grill-me` when available and requested; otherwise disclose its absence and ask a focused question with a recommendation and its consequences. Do not ask again for facts or preferences already settled.
 
 Review A: record the displayed version, adopted decisions, remaining assumptions, and the user's acceptance before production modeling. Review B follows the native form pilot. These are the defaults for new or substantially changed design; explicit delegation of visual decisions can waive waiting, but is recorded as delegation, not user acceptance. A general request to build is not acceptance of an unseen design. Local repairs reuse valid decisions and review only affected relationships.
 
-Ready: the visual direction is supported by inspected images and the applicable review is resolved. Keep adopted generated images and their prompt/source roles in the project; a tool-managed path alone is not the design record.
+Ready: the visual contract's required checks and separate review pass for the displayed revision, and review A is resolved. Keep adopted generated images, contract, prompt/source roles, and review findings in the project; a tool-managed path alone is not the design record. Every regenerated candidate needs new visual checks; a prior image's PASS does not transfer.
 
 ## 2. Explain structural and motion design before production
 
@@ -132,7 +132,7 @@ Ready: required files and observed evidence describe the same revision. Report r
 
 ## Handoff and stop conditions
 
-Provide the actual editable project location first, followed by how to open/replay it, relevant controls/settings, observed checks, and remaining issues. Link previews and exports only if produced. Distinguish technical checks, visual self-review, and user acceptance; silence is not acceptance.
+Before calling a visual deliverable verified, apply the same adversarial review procedure to its final revision. Provide the actual editable project location first, followed by how to open/replay it, relevant controls/settings, observed checks, and remaining issues. For an image-only request, show the requested image with its review status and stop without modeling. Link previews and exports only if produced. Distinguish technical checks, visual self-review, separate review, and user acceptance; silence is not acceptance.
 
 Use PASS / FAIL / UNVERIFIED per applicable check. Mark out-of-scope work with a skip reason, not PASS. These are evidence labels, not a runtime authority system. The skill does not physically prevent tool calls or certify artistic quality.
 

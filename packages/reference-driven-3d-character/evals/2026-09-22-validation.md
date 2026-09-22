@@ -108,3 +108,48 @@
 - PASS: 기존 `js-yaml`로 실제 frontmatter 파싱. 패키지 계약 검사로 단일 스킬 경로, manifest·카탈로그 버전 일치, 로컬 문서 링크 확인.
 - UNVERIFIED: 공식 `validate_plugin.py`는 `ModuleNotFoundError: No module named 'yaml'`로 실행되지 않았다. 의존성을 추가하지 않았고 대체 검사를 공식 검증기 통과로 보고하지 않는다.
 - UNVERIFIED: 보강한 프롬프트로 새 상세 시트를 생성한 결과와 실제 Codex 설치 후 활성화. 추가한 정보 범위 시나리오는 아직 실행 결과가 아니다.
+
+## Adversarial review trial and supplied layout reference
+
+This follow-up changes the visual contract and review instructions, not a host execution barrier. The initial worktree was clean at `3f7b45c1e683dbb4459c24f5506c2fd97463472e`. Existing design, verification, and evaluation files remain the owners; no new runner, image generator, or policy ledger was added.
+
+### Actual review observations
+
+One separate native `vision` agent, invocation `01a0c7c5-a864-7240-a424-e458670ca5cc`, reviewed three existing kitten images. It received task-specific requests, explicit requirement rows, image paths, and the skill references, without the producer's initial verdict or the evaluation answer table. Later turns reused that reviewer; they are not independent samples or fresh contexts. The model version and complete history-isolation telemetry were not independently established.
+
+| Candidate                    | SHA-256                                                            | Observed reviewer behavior                                                                                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A: single appearance preview | `af7bcc2aca17e15de50b91171d56cf67be0184aa56dfdf1197cbf1102229f940` | Accepted the appearance-preview contract without demanding a turnaround or native model.                                                                                          |
+| B: first six-view sheet      | `4ddc40abc38e5c1dc089bc410c885754ed3b8b8364e9e0afb0eab743d1a8ae3b` | Missed two unpadded paw-like shapes in the underside panel and passed the four-paw check. It also treated missing exact camera metadata as a blocker beyond the concept contract. |
+| C: revised six-view sheet    | `0cbcf4cbe58f0963d15401b63f8b4c8117a3646041903479ba40148c528ee29f` | Returned a review, but its direction and consistency judgments were not independently validated. This is not a passing geometric control.                                         |
+
+The files remain under the local generated-image directory `~/.codex/generated_images/01a0c75e-f391-77e0-bff3-803581b14b87/`, with filenames `exec-483ce9a7-8e25-4ecb-bb2b-703175631c2f.png`, `exec-e76399d4-b596-4287-b0e2-fe0699073710.png`, and `exec-344b779a-4121-40c3-a461-fc59da65d7d9.png`. They are not bundled fixtures.
+
+A focused path-based re-review of B still missed the extra shapes. The leader then supplied B as a direct image attachment and identified the disputed region. The reviewer inventoried two upper unpadded curled shapes plus four padded soles and corrected V2 to FAIL. This was an assisted correction, not first-pass detection success. The reviewer reported that earlier visual tool calls had also returned pixels; the attachment change alone cannot be credited with the correction because the prompt also became more specific.
+
+The trial exposed a real false-pass risk. The revised instructions require panel-level inventories, image-bearing input, contract-scoped evidence, and preservation of disagreements. Neither party's PASS may override a visible contradiction. The new procedure has not established a reliable defect-detection rate, and no automated image understanding is claimed.
+
+### Layout-reference inspection
+
+The user then supplied `~/Downloads/KakaoTalk_Photo_2026-09-22-13-10-27.png`, SHA-256 `463c150c0120a380c303659fa421cbfc2ba8d7f249d9f5df6dcb687fa77a1390`. The leader opened the actual image. Its two large presentations, six-direction strip, four enlarged regions, and wireframe-style panel informed the coverage instructions and the local trial in [scenarios.md](scenarios.md). The image is layout evidence, not proof of correct camera axes or a Blender-ready mesh. No new kitten sheet, native model, or wireframe was produced in this follow-up.
+
+The same visual reviewer received this reference as a direct attachment and independently identified those panel groups, the anatomy-transfer boundary, and the unsupported native-mesh claim. This was layout analysis in a reused context, not validation of a newly generated kitten. A separate native `critic` invocation, `01a0c7c2-a37a-7e02-83fb-5197e73bb53b`, reviewed the instruction changes and returned OKAY with no concrete blockers; that review does not establish visual detection accuracy.
+
+### Checks and limits
+
+- The new static routing test failed before the review-owner links and procedure existed, then passed with the other three package tests. It checks packaging and instruction routing, not visual behavior or forced execution.
+- Targeted package tests: 4/4 PASS. Targeted ESLint, `node --check`, Prettier, and `git diff --check`: PASS. There is no package typecheck script or TypeScript source in this change.
+- Root `pnpm run test`: exit 0, 12/12 Turbo tasks successful, 11 cached. Log: `/tmp/character-adversarial-root-test.log`. This is not a claim that all repository tests ran without cache.
+- The final instruction revision still needs broader visual trials, including valid multi-view controls. Host-enforced dispatch, Claude/jcode reviewer integration, and end-to-end production handoff remain UNVERIFIED. Static tests do not close those gaps.
+
+## 0.3.0: separate-context generation and review
+
+At the user's request, a new native `designer` invocation (`01a0c7d0-3e7d-75d0-8fde-729ae389f8a9`) received the skill as a native skill input, the cute smooth kitten request, and the chicken layout-reference path. The host call used `fork_context: false`; the parent transcript and prior kitten verdicts were not supplied. Shared system instructions and environment still applied, and complete context-isolation telemetry was unavailable.
+
+The designer reported loading the installed entry with SHA-256 `4d2269c6bf80c64b9872353b28b34a07a69cad059279402c4ce4ab90f856105d`, matching the leader's file check. It inspected the supplied reference and generated a 1536×1024 candidate at `~/.codex/generated_images/01a0c7d0-3e7d-75d0-8fde-729ae389f8a9/exec-d6912d86-60dc-4c93-acc6-401baaeee4f4.png`, SHA-256 `5d3f515e3e1c6d4a19c255c27d8853ee4ac653c86bfd629c055d661f844f5546`. The leader opened that actual image and verified its hash.
+
+A new `vision` invocation (`01a0c7d7-110b-7d11-9fdc-28fc32de508e`) also used `fork_context: false`. It received the skill, scoped request, requirement rows, original reference, and candidate as direct image attachments, without the designer's self-review. It returned PASS for identity/finish, adopted layout groups, directional coverage, cross-view consistency/counts, detail evidence, and technical-claim limits. Its verdict was eligible for user review, not native-geometry verification. The lead displayed the image again when the user reported that the initial presentation was not visible.
+
+The candidate has two large overall views, six directional panels, four detail crops, and a silhouette/color panel instead of invented wireframe evidence. No Blender model was built. This is one generated example and one separate visual judgment, not a measured reliability improvement or an infallible geometric control.
+
+The designer reported failing to locate an auxiliary `imagegen/SKILL.md` path while successfully using the built-in image generator. The design reference now directs catalog lookup, including system skills, instead of assuming a package-relative path. That instruction clarification was not part of the earlier generation trial; its behavioral effect remains unmeasured. The entry, review procedure, and the independent trial do not establish host-enforced execution.

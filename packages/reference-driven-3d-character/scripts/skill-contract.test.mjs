@@ -55,3 +55,18 @@ it('resolves package documentation links without an installed sibling skill', ()
     }
   }
 })
+
+// Static routing checks only; visual judgment and real reviewer invocation need the behavioral evaluations.
+it('routes proposal and delivery review to one adversarial review owner', () => {
+  const skillRoot = join(root, 'skills', name)
+  const entry = readFileSync(join(skillRoot, 'SKILL.md'), 'utf8')
+  const design = readFileSync(join(skillRoot, 'references/design-method.md'), 'utf8')
+  const verification = readFileSync(join(skillRoot, 'references/verification-and-delivery.md'), 'utf8')
+  assert.match(entry, /verification-and-delivery\.md#adversarial-visual-review/)
+  assert.match(design, /verification-and-delivery\.md#adversarial-visual-review/)
+  assert.match(verification, /^## Adversarial visual review$/m)
+  assert.match(verification, /Requirement ID \| Expected observation \| Observed panel\/region \| Result/)
+  assert.match(verification, /Reviewer invocation/)
+  assert.match(verification, /UNVERIFIED/)
+  assert.match(verification, /inventory the visible parts by panel and location/)
+})
