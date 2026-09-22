@@ -36,6 +36,30 @@
 | 설계      | 프론트엔드 시스템 패턴, Figma 제품·랜딩 디자인   | 에이전트 플러그인 |
 | 에이전트  | 워크플로 그래프 설계랑 실행                      | 에이전트 플러그인 |
 
+## 스킬 한눈에 보기
+
+스킬 이름을 누르면 사용 조건과 실행 절차를 볼 수 있어요. 플러그인 하나에 여러 스킬이 들어 있기도 해요.
+
+| 스킬                                                                                                                    | 하는 일                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| [`eslint-setup`](packages/vibe-coding-helper/skills/eslint-setup/SKILL.md)                                              | 프로젝트에 맞는 ESLint 프리셋을 선택하고 설정해요.                               |
+| [`frontend-oracle-design`](packages/frontend-oracle-design/skills/SKILL.md)                                             | 중·고위험 프론트엔드 작업의 동작 계약을 정하고 테스트·구현·리뷰를 진행해요.      |
+| [`frontend-system-design`](packages/frontend-system-design/skills/SKILL.md)                                             | Oracle 설계에 검색·채팅·결제 같은 기능의 구현 선택지와 실패 대응을 보태요.       |
+| [`test`](packages/test/skills/test/SKILL.md)                                                                            | 프론트엔드 동작과 회귀 오류를 확인하는 자동화 테스트를 작성·실행해요.            |
+| [`frontend-visual-qa`](packages/frontend-visual-qa/skills/frontend-visual-qa/SKILL.md)                                  | 승인된 화면 기준과 실제 브라우저 동작을 비교해 시각적 오류를 찾아요.             |
+| [`frontend-interface-design`](packages/frontend-interface-design/skills/frontend-interface-design/SKILL.md)             | 기존 이름으로 들어온 디자인 요청을 `reference-driven-figma-design`으로 연결해요. |
+| [`reference-driven-figma-design`](packages/frontend-interface-design/skills/reference-driven-figma-design/SKILL.md)     | 레퍼런스와 디자인 시스템을 바탕으로 편집 가능한 Figma 화면을 만들어요.           |
+| [`reference-driven-3d-character`](packages/reference-driven-3d-character/skills/reference-driven-3d-character/SKILL.md) | 레퍼런스 기반 3D 캐릭터의 도안·모델·요청한 동작을 만들고 단계별로 검수해요.      |
+| [`ux-flow-diagram`](packages/ux-flow-diagram/skills/ux-flow-diagram/SKILL.md)                                           | 명시적으로 호출하면 Figma·코드·요구사항에서 근거 있는 사용자 흐름도를 추출해요.  |
+| [`agent-graph-engineering`](packages/agent-graph-engineering/skills/agent-graph-engineering/SKILL.md)                   | 여러 에이전트와 도구의 분기·병렬 작업·재시도를 그래프로 설계하고 실행해요.       |
+| [`blog-voice-cloner`](packages/blog-voice-cloner/skills/blog-voice-cloner/SKILL.md)                                     | 블로그 문체를 분석하고 원래 의미를 유지하며 새 글에 적용해요.                    |
+| [`agent-memory-recall`](packages/agent-memory/skills/agent-memory-recall/SKILL.md)                                      | 현재 작업에 필요한 과거 기록을 Agent Memory에서 읽기 전용으로 찾아요.            |
+| [`agent-memory-log`](packages/agent-memory/skills/agent-memory-log/SKILL.md)                                            | 요청한 작업 기록을 Obsidian Agent Memory에 저장해요.                             |
+| [`agent-memory-todayilearned`](packages/agent-memory/skills/agent-memory-todayilearned/SKILL.md)                        | 요청한 배움을 날짜별 TIL 노트로 정리해요.                                        |
+| [`agent-memory-generalize`](packages/agent-memory/skills/agent-memory-generalize/SKILL.md)                              | 작업 기록에서 다른 작업에도 쓸 수 있는 개념을 근거와 함께 추출해요.              |
+| [`agent-memory-p0-rules`](packages/agent-memory/skills/agent-memory-p0-rules/SKILL.md)                                  | 규칙 후보의 근거와 범위를 검토해 수동 승격 여부를 판단해요.                      |
+| [`agent-memory-maintenance`](packages/agent-memory/skills/agent-memory-maintenance/SKILL.md)                            | Agent Memory의 중복·오래된 기록·끊어진 링크를 점검하고 정비해요.                 |
+
 ## 스킬 꽂기
 
 Claude Code는 두 줄이면 끝나요.
@@ -57,6 +81,7 @@ frontend-visual-qa
 frontend-interface-design
 reference-driven-3d-character
 ux-flow-diagram
+blog-voice-cloner
 agent-memory
 ```
 
