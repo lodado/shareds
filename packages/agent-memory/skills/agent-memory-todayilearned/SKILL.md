@@ -1,6 +1,8 @@
 ---
 name: agent-memory-todayilearned
 description: Write a date-scoped Today I Learned note for explicitly requested Agent Memory learning capture.
+allowed-tools:
+  - Bash
 ---
 
 # Agent Memory Today I Learned

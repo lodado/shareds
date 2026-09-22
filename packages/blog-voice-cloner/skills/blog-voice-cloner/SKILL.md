@@ -1,6 +1,8 @@
 ---
 name: blog-voice-cloner
 description: Use when analyzing an author's blog corpus, maintaining a recent-period voice profile, drafting new articles in a reference voice, applying style without changing meaning, or explaining evidence-backed style differences. 블로그 문체 분석, 최근 30일 글 등록, 문체 적용, 수정 기록 요청에 사용한다.
+allowed-tools:
+  - Bash
 ---
 
 # Blog Voice Cloner

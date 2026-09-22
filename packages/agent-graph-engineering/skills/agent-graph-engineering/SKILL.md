@@ -1,6 +1,8 @@
 ---
 name: agent-graph-engineering
 description: Use when the user explicitly requests graph-based AI orchestration, or when a task needs multiple agents or tools with branching, parallel work, joins, bounded retries, evaluation loops, or human decisions. Do not invoke for work one agent can complete safely in a short sequential flow.
+allowed-tools:
+  - Bash
 ---
 
 # Agent Graph Engineering

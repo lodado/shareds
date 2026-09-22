@@ -1,6 +1,8 @@
 ---
 name: agent-memory-recall
 description: Read-only retrieval of relevant Agent Memory before current work.
+allowed-tools:
+  - Bash
 ---
 
 # Agent Memory Recall

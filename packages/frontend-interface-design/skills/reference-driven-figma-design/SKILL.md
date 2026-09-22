@@ -1,6 +1,8 @@
 ---
 name: reference-driven-figma-design
 description: 'Define core journeys, requirements and wireframes, brand foundations and semantic tokens, then compose and verify editable Figma product or landing designs. Use for Figma-first design and appearance-preserving design-system refactors; not frontend implementation, design-to-code, or static-image-only delivery.'
+allowed-tools:
+  - Bash
 metadata:
   short-description: Build editable Figma designs from verified references
 ---

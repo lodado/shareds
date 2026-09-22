@@ -1,6 +1,8 @@
 ---
 name: agent-memory-maintenance
 description: Review and maintain Agent Memory health without destructive automatic cleanup.
+allowed-tools:
+  - Bash
 ---
 
 # Agent Memory Maintenance

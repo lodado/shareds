@@ -1,6 +1,8 @@
 ---
 name: agent-memory-p0-rules
 description: Review explicit Agent Memory rule candidates without automatic promotion.
+allowed-tools:
+  - Bash
 ---
 
 # Agent Memory P0 Rules

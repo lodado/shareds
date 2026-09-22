@@ -1,6 +1,8 @@
 ---
 name: test
 description: Use when writing, executing, or auditing deterministic frontend behavior tests — new or changed behavior, regression reproduction, async flows with loading, errors, retry, duplicate submits or out-of-order responses. Screenshot comparison and direct-browser QA belong to the separate frontend-visual-qa skill.
+allowed-tools:
+  - Bash
 ---
 
 # $test — Oracle-based test creation·execution·verification

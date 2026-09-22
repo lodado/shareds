@@ -1,6 +1,8 @@
 ---
 name: frontend-system-design
 description: Use with frontend-oracle-design when building or reviewing a well-known frontend feature — infinite scroll, search, feeds, chat, uploads, payments, notifications, maps, carts, or multi-step funnels. frontend-oracle-design must run first and remains the sole orchestrator; this companion supplies policy candidates, implementation options, production failure modes, and verification duties after Oracle intake.
+allowed-tools:
+  - Bash
 ---
 
 # Frontend System Design

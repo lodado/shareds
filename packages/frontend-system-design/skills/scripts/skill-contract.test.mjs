@@ -270,10 +270,10 @@ test('plugin metadata publishes the Oracle-first contract under a new cache iden
   const marketplace = JSON.parse(await readFile(join(repositoryDirectory, '.claude-plugin/marketplace.json'), 'utf8'))
   const listing = marketplace.plugins.find((plugin) => plugin.name === 'frontend-system-design')
 
-  assert.equal(packageJson.version, '0.2.1')
-  assert.equal(codexPlugin.version, '0.2.1')
-  assert.equal(claudePlugin.version, '0.2.1')
-  assert.equal(listing?.version, '0.2.1')
+  assert.match(packageJson.version, /^\d+\.\d+\.\d+$/)
+  assert.equal(codexPlugin.version, packageJson.version)
+  assert.equal(claudePlugin.version, packageJson.version)
+  assert.equal(listing?.version, packageJson.version)
 
   for (const description of [
     packageJson.description,

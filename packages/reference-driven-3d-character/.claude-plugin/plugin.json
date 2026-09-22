@@ -1,8 +1,11 @@
 {
   "name": "reference-driven-3d-character",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Design and refine editable 3D characters from references, verifying form, deformation, motion, and requested delivery targets.",
-  "author": { "name": "lodado", "url": "https://github.com/lodado" },
+  "author": {
+    "name": "lodado",
+    "url": "https://github.com/lodado"
+  },
   "homepage": "https://github.com/lodado/shareds",
   "repository": "https://github.com/lodado/shareds",
   "license": "MIT",

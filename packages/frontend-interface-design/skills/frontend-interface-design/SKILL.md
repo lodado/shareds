@@ -1,6 +1,8 @@
 ---
 name: frontend-interface-design
 description: 'Compatibility entry for existing frontend-interface-design invocations. Routes to reference-driven-figma-design for editable Figma product and landing design, not frontend implementation.'
+allowed-tools:
+  - Bash
 ---
 
 # Frontend Interface Design

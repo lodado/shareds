@@ -1,6 +1,8 @@
 ---
 name: agent-memory-generalize
 description: Extract a cautiously scoped, portable concept from Agent Memory evidence.
+allowed-tools:
+  - Bash
 ---
 
 # Agent Memory Generalize

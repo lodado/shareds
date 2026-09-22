@@ -1,6 +1,8 @@
 ---
 name: agent-memory-log
 description: Save an explicitly requested session log to an Obsidian Agent Memory vault.
+allowed-tools:
+  - Bash
 ---
 
 # Agent Memory Log

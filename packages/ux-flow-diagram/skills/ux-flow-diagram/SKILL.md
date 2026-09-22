@@ -1,6 +1,8 @@
 ---
 name: ux-flow-diagram
 description: Explicitly invoked only. Extract a user-flow graph from Figma Prototype reactions, bounded codebase tracing, requirements, or an existing Flow IR, then render evidence-aware JSON, Markdown, Mermaid, findings, and optional proposals.
+allowed-tools:
+  - Bash
 disable-model-invocation: true
 ---
 

@@ -1,6 +1,8 @@
 ---
 name: reference-driven-3d-character
 description: Design, build, or refine editable 3D characters from reference images or existing assets, including requested rigging, motion, and export verification. Use for reference fidelity and structural character repairs; not image-only generation, general CAD, or game-system implementation.
+allowed-tools:
+  - Bash
 ---
 
 # Reference-driven 3D character

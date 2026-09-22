@@ -1,6 +1,8 @@
 ---
 name: eslint-setup
 description: Use when adding or changing ESLint config in a project that uses @lodado/eslint-config - picks the right preset combination instead of copying a full config in.
+allowed-tools:
+  - Bash
 ---
 
 # ESLint setup with @lodado/eslint-config

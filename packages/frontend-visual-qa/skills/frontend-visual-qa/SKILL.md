@@ -1,6 +1,8 @@
 ---
 name: frontend-visual-qa
 description: Use when the user explicitly requests frontend screenshot comparison, visual regression, approved baseline creation or update, or direct interactive browser QA. Verifies rendered UI and browser journeys against an approved Oracle Card or user-approved visual source, records reproducible artifacts, and reports findings without changing product policy or production code. Do not use for ordinary behavior TDD; use the separate test skill for deterministic unit, component, integration, or Playwright behavior tests.
+allowed-tools:
+  - Bash
 ---
 
 # Frontend Visual QA

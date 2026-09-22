@@ -57,19 +57,27 @@ test('O1 Low and Design-only do not acquire contextual review requirements', asy
   const lane = graph.lanes.find(({ id }) => id === 'low-fast-path')
   const { delivered, assumed } = splitDelivery(graph, { id: 'low-contract', nodes: lane.nodes })
   assert.equal(lane.exclusive, true)
-  assert.deepEqual(delivered.map(({ id }) => id), ['low-fast-path'])
+  assert.deepEqual(
+    delivered.map(({ id }) => id),
+    ['low-fast-path'],
+  )
   assert.deepEqual(assumed, [])
   const workflow = JSON.parse(await read('references/oracle-workflow.graph.json'))
   assert.deepEqual(selectTransitions(workflow, 'lock-oracle', { classification: 'DESIGN_READY' }), ['oracle-ready'])
-  assert.deepEqual(workflow.edges.filter(({ from }) => from === 'oracle-ready'), [])
+  assert.deepEqual(
+    workflow.edges.filter(({ from }) => from === 'oracle-ready'),
+    [],
+  )
 })
 
 test('O15 contextual review graph and generated artifacts remain synchronized', async () => {
   const { loadGraph, renderBundle, bundlePath } = await import('./generate-reference-bundles.mjs')
   const graph = await loadGraph()
   const node = graph.nodes.find(({ id }) => id === 'subagent-review')
-  assert.equal(node.when,
-    'Delivery only — before contextual packet collection and independent review after implementation/test verification')
+  assert.equal(
+    node.when,
+    'Delivery only — before contextual packet collection and independent review after implementation/test verification',
+  )
   assert.deepEqual(node.requires, ['common', 'changeability'])
   for (const bundle of graph.bundles) {
     assert.equal(await readFile(bundlePath(bundle), 'utf8'), await renderBundle(graph, bundle), bundle.id)
@@ -79,7 +87,10 @@ test('O15 contextual review graph and generated artifacts remain synchronized', 
     assert.equal(result.status, 0, result.stderr || result.stdout)
   }
   const skill = await read('SKILL.md')
-  assert.match(skill, /before contextual packet collection and independent review after implementation\/test\s+verification/)
+  assert.match(
+    skill,
+    /before contextual packet collection and independent review after implementation\/test\s+verification/,
+  )
 })
 
 const readCard = () => readAll(CARD_NODE_FILES)
@@ -557,7 +568,7 @@ test('keeps Oracle plugin release metadata versions aligned', async () => {
   const marketplace = JSON.parse(marketplaceJson)
   const marketplaceVersion = marketplace.plugins.find(({ name }) => name === 'frontend-oracle-design')?.version
 
-  assert.equal(version, '0.55.0')
+  assert.match(version, /^\d+\.\d+\.\d+$/)
   assert.equal(JSON.parse(claudePluginJson).version, version)
   assert.equal(JSON.parse(codexPluginJson).version, version)
   assert.equal(marketplaceVersion, version)
@@ -916,7 +927,10 @@ test('hook extraction follows responsibility rather than branch or side-effect c
     read('references/review-checklist.md'),
     read('references/frontend/decisions.md'),
   ])
-  assert.doesNotMatch(authoring, /When an\s+event handler grows a domain branch|ordering of two or more side effects|If it owns one interaction workflow.*split it into a hook/s)
+  assert.doesNotMatch(
+    authoring,
+    /When an\s+event handler grows a domain branch|ordering of two or more side effects|If it owns one interaction workflow.*split it into a hook/s,
+  )
   assert.match(authoring, /state ownership.*lifetime.*error.*independent test.*reuse/s)
   assert.match(authoring, /without.*orchestration-only.*event handler/s)
   assert.match(authoring, /React-independent.*not.*hook/s)
