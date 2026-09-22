@@ -60,6 +60,10 @@ graph verifier cannot be found, `FAIL` instead of falling back to sequential exe
   the join produced plus the intersection rule, and neither substitutes for the other. Each performs
   the final verification and the `REVIEW_VERIFIED` transition only on accepted findings. An actual error from a receipt command propagates as `FAIL`,
   and BLOCKED goes to `evidence-repair`.
+- At `implement-green`, an explicitly selected task-scoped worker may use the existing
+  [worker commands](delivery/ledger.md#optional-task-scoped-implementation-worker). Read back the
+  accepted state/run instead of recording GREEN twice. Worker transport does not select graph edges,
+  authorize graph mode, or replace High mutation checks and independent review.
 - The graph `maxSteps` is only a runaway ceiling and does not replace the `oracle-run.mjs budget`
   adjudication.
 - Do not call `$frontend-oracle-design` recursively inside a graph Node. Apply only the currently

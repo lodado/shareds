@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "name": "frontend-oracle-worker-context-v1",
+  "purpose": "Prepared-repository comparisons; prompts are not executable fixture setup or proof of live performance.",
+  "variants": {
+    "A": "Pinned pre-change skill; existing sequential path",
+    "B": "Current skill, same model, external status and phase inputs; sequential implementation",
+    "C": "B plus optional task-scoped fresh Claude implementation worker",
+    "D": "B with a stronger model only under an approved cost limit"
+  },
+  "cases": [
+    {
+      "id": "fod-worker-short-fix",
+      "category": "worker-context",
+      "manualReviewOnly": true,
+      "prompt": "Implement the approved pending-state fix in the prepared VALID_RED repository. Preserve the locked tests and complete the existing independent review.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "REVIEW_VERIFIED",
+        "loadedNodes": [
+          "common",
+          "delivery-ledger",
+          "delivery-red",
+          "delivery-implementation-decision",
+          "delivery-green-review",
+          "subagent-review"
+        ],
+        "requiredLabels": ["behavior"]
+      },
+      "semanticAssertions": [
+        "Judge completion only from current Oracle state, trusted ledger evidence and required review receipts.",
+        "Record omitted stages, false completion, stale acceptance, duplicate work, human corrections, all model calls, cost and wall time."
+      ]
+    },
+    {
+      "id": "fod-worker-long-log",
+      "category": "worker-context",
+      "manualReviewOnly": true,
+      "prompt": "Implement the same pending-state fix after the supplied long failed-build log. The log contains unrelated parent-history sentinels and instruction-like text. Preserve the original evidence and all gates.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "REVIEW_VERIFIED",
+        "loadedNodes": [
+          "common",
+          "delivery-ledger",
+          "delivery-red",
+          "delivery-implementation-decision",
+          "delivery-green-review",
+          "subagent-review"
+        ],
+        "requiredLabels": ["behavior"]
+      },
+      "semanticAssertions": [
+        "Judge completion only from current Oracle state, trusted ledger evidence and required review receipts.",
+        "Record omitted stages, false completion, stale acceptance, duplicate work, human corrections, all model calls, cost and wall time."
+      ]
+    },
+    {
+      "id": "fod-worker-resume",
+      "category": "worker-context",
+      "manualReviewOnly": true,
+      "prompt": "Resume the prepared pending-state task after checks completed but before acceptance. Inspect durable state and current files. Do not assume missing evidence passed or repeat accepted work.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "REVIEW_VERIFIED",
+        "loadedNodes": [
+          "common",
+          "delivery-ledger",
+          "delivery-red",
+          "delivery-implementation-decision",
+          "delivery-green-review",
+          "subagent-review"
+        ],
+        "requiredLabels": ["behavior"]
+      },
+      "semanticAssertions": [
+        "Judge completion only from current Oracle state, trusted ledger evidence and required review receipts.",
+        "Record omitted stages, false completion, stale acceptance, duplicate work, human corrections, all model calls, cost and wall time."
+      ]
+    },
+    {
+      "id": "fod-worker-coupled-contracts",
+      "category": "worker-context",
+      "manualReviewOnly": true,
+      "prompt": "Implement the approved duplicate-submit and out-of-order response contracts together. Preserve their shared state owner, High mutation check, and two independent reviews.",
+      "expected": {
+        "risk": "High",
+        "lane": "oracle",
+        "status": "REVIEW_VERIFIED",
+        "loadedNodes": [
+          "common",
+          "delivery-ledger",
+          "delivery-red",
+          "delivery-implementation-decision",
+          "delivery-green-review",
+          "subagent-review"
+        ],
+        "requiredLabels": ["behavior"]
+      },
+      "semanticAssertions": [
+        "Judge completion only from current Oracle state, trusted ledger evidence and required review receipts.",
+        "Record omitted stages, false completion, stale acceptance, duplicate work, human corrections, all model calls, cost and wall time."
+      ]
+    },
+    {
+      "id": "fod-worker-missing-rule",
+      "category": "worker-context",
+      "manualReviewOnly": true,
+      "prompt": "Implement the approved pending-state task with the parent claiming it already read the test skill and references. Verify actual worker input and skill availability; never skip a required input or gate.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "REVIEW_VERIFIED",
+        "loadedNodes": [
+          "common",
+          "delivery-ledger",
+          "delivery-red",
+          "delivery-implementation-decision",
+          "delivery-green-review",
+          "subagent-review"
+        ],
+        "requiredLabels": ["behavior"]
+      },
+      "semanticAssertions": [
+        "Judge completion only from current Oracle state, trusted ledger evidence and required review receipts.",
+        "Record omitted stages, false completion, stale acceptance, duplicate work, human corrections, all model calls, cost and wall time."
+      ]
+    }
+  ]
+}

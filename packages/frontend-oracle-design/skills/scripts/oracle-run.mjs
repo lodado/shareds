@@ -8,6 +8,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
+import { splitDelivery } from './generate-reference-bundles.mjs'
 import { forbiddenArgument, isTrustedAdapter, TRUSTED_ADAPTER_NAMES, trustedAdapter } from './oracle-adapters.mjs'
 import {
   assertSnapshotUnchanged,
@@ -21,6 +22,7 @@ import {
   ZERO_DIGEST,
 } from './oracle-fs.mjs'
 import { snapshotContext } from './oracle-review-context.mjs'
+import { claudeWorkerInvocation, parseWorkerSubmission } from './oracle-worker.mjs'
 import { spawnGit } from './resolve-executable.mjs'
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
@@ -68,6 +70,9 @@ const FLAG_NAMES = [
   'blind-map',
   'blind-input',
   'context',
+  'task',
+  'max-budget-usd',
+  'timeout-ms',
 ]
 
 const BOOLEAN_FLAGS = new Set(['json', 'changed-files'])
@@ -691,6 +696,7 @@ function replayState(state, ledger) {
       state.history ??= []
       state.history.push({
         state: entry.state,
+        ...(entry.workerAttemptId ? { workerAttemptId: entry.workerAttemptId } : {}),
         runId: entry.evidenceRunId ?? null,
         reason: entry.reason ?? null,
         row: entry.row ?? null,
@@ -1339,7 +1345,7 @@ async function execute(options) {
   if (options.adapter && reportBefore) {
     throw new CliError('REPORT_PATH_EXISTS', 'trusted adapter reports must use a new destination')
   }
-  const runId = await reserveRunId(directory, options.label)
+  const runId = options.reservedRunId ?? await reserveRunId(directory, options.label)
   if (adapter && reportBefore) {
     throw new CliError('REPORT_PATH_PROTECTED', `${options.adapter} adapter requires a new final report path`)
   }
@@ -1364,9 +1370,12 @@ async function execute(options) {
     command = built.command
     adapterEnv = built.env
   }
+  const controls = options.capture ? await workerControls(directory) : null
   const commandStartedAt = Date.now() // oracle:nondeterminism 명령 소요 시간 계측
   const executed = spawnSync(command[0], command.slice(1), {
-    stdio: 'inherit',
+    stdio: options.capture ? 'pipe' : 'inherit',
+    ...(options.cwd ? { cwd: options.cwd } : {}),
+    ...(options.capture ? { input: options.capture.input, encoding: 'utf8', timeout: options.capture.timeout, maxBuffer: 16 * 1024 * 1024 } : {}),
     ...(adapterEnv ? { env: { ...process.env, ...adapterEnv } } : {}),
   })
   const commandMs = Date.now() - commandStartedAt // oracle:nondeterminism 명령 소요 시간 계측
@@ -1375,6 +1384,8 @@ async function execute(options) {
     throw new CliError('COMMAND_UNRUNNABLE', `Cannot run command: ${executed.error.message}`)
   }
 
+  if (controls && !sameDigests(controls, await workerControls(directory))) throw new CliError('WORKER_PROTECTED_CHANGE', 'worker changed Oracle artifacts')
+  if (options.capture) await writeFile(options.capture.outputPath, executed.stdout ?? '', { flag: 'wx', mode: 0o600 })
   if (adapterDestination && executed.status !== null) await rename(adapterDestination, resolve(options.report))
   const report = await readReport(options.report, reportBefore, executed.status !== null && !executed.signal)
   for (let index = 0; index < protectedBefore.length; index += 1) {
@@ -1388,6 +1399,8 @@ async function execute(options) {
     runId,
     label: options.label,
     command: options.command,
+    cwd: options.cwd ?? process.cwd(),
+    ...(options.worker ? { worker: { ...options.worker, ...(options.capture ? { outputSha256: sha256(executed.stdout ?? '') } : {}) } } : {}),
     adapter: options.adapter ?? null,
     exitCode: executed.status,
     signal: executed.signal ?? null,
@@ -2424,6 +2437,7 @@ async function transitionUnderLock(options, directory) {
   state.state = options.to
   const historyEntry = {
     state: options.to,
+    ...(options.workerAttemptId ? { workerAttemptId: options.workerAttemptId } : {}),
     runId: run?.runId ?? null,
     reason: options.reason ?? null,
     row: options.row ?? null,
@@ -2445,6 +2459,7 @@ async function transitionUnderLock(options, directory) {
   const transitionEvent = await appendLedger(directory, {
     type: 'transition',
     state: options.to,
+    ...(options.workerAttemptId ? { workerAttemptId: options.workerAttemptId } : {}),
     evidenceRunId: run?.runId ?? null,
     reason: options.reason ?? null,
     row: options.row ?? null,
@@ -2526,7 +2541,8 @@ async function spendBudget(options) {
       throw new CliError('USAGE', `Unknown budget: ${options.spend}`, 2)
     }
 
-    const digest = await budgetDigest(directory, state, options.spend)
+    const sourceDigest = await budgetDigest(directory, state, options.spend)
+    const digest = options.workerAttemptId ? sha256(stableStringify({ sourceDigest, workerAttemptId: options.workerAttemptId })) : sourceDigest
     if ((budget.digests ?? []).includes(digest)) {
       budget.reasons = [...(budget.reasons ?? []), options.reason]
       await appendLedger(directory, {
@@ -3689,6 +3705,231 @@ async function reviewBrief(options) {
   )
 }
 
+
+function workerTaskPath(directory, taskId, attemptId) {
+  return join(directory, '.worker-tasks', taskId, `${attemptId}.json`)
+}
+
+async function workerFile(path, base) {
+  const file = await snapshotRegularFile(await realpath(path), { base, allowHardlinks: false, label: 'worker input' })
+  return { path: file.path ?? await realpath(path), sha256: file.sha256, content: file.bytes.toString('utf8') }
+}
+
+async function workerControls(directory) {
+  const paths = (await walkFiles(directory)).sort()
+  return Object.fromEntries(await Promise.all(paths.map(async (path) => {
+    const file = await snapshotRegularFile(join(directory, path), { base: directory, allowHardlinks: false })
+    return [path, file.sha256]
+  })))
+}
+
+async function assertWorkerInputs(packet) {
+  if (stableStringify(await skillMetadata()) !== stableStringify(packet.skillRevision)) throw new CliError('WORKER_INPUT_STALE', 'skill version changed')
+  for (const input of packet.inputs) {
+    const current = await workerFile(input.path)
+    if (current.sha256 !== input.sha256) throw new CliError('WORKER_INPUT_STALE', input.path)
+  }
+}
+
+async function workerPacket(options) {
+  if (!options.dir || !options.task) throw new CliError('USAGE', 'worker-packet requires --dir and --task', 2)
+  const directory = resolve(options.dir)
+  await withDirectoryLock(directory, 'worker', async () => {
+    const state = await readConsistentState(directory)
+    if (state.state !== 'VALID_RED' || state.risk === 'low') {
+      throw new CliError('WORKER_STATE_INVALID', 'the optional implementation worker requires Medium/High VALID_RED')
+    }
+    if (state.budgets.product.spent >= state.budgets.product.limit) throw new CliError('BUDGET_EXHAUSTED', 'no product attempts remain')
+    const revision = verifyLock(directory, state)
+    const spec = JSON.parse((await workerFile(resolve(options.task))).content)
+    const root = resolve(directory, state.scanRoot)
+    const oracle = await workerFile(await lockedOraclePath(directory, state))
+    const rows = contractRowIds(oracle.content)
+    if (!/^[a-z0-9][\w-]{0,79}$/i.test(spec.taskId ?? '') ||
+        typeof spec.goal !== 'string' || !spec.goal.trim() ||
+        !Array.isArray(spec.rows) || !spec.rows.length || spec.rows.some((row) => !rows.includes(row)) ||
+        !Array.isArray(spec.writablePaths) || !spec.writablePaths.length ||
+        !Array.isArray(spec.referenceNodes) || typeof spec.testSkill !== 'string') {
+      throw new CliError('WORKER_TASK_INVALID', 'taskId, goal, Oracle rows, exact writablePaths, referenceNodes and testSkill are required')
+    }
+    for (const path of spec.writablePaths) {
+      if (typeof path !== 'string' || isAbsolute(path) || path.includes('\\') || path.split('/').some((part) => !part || part === '.' || part === '..') ||
+          path.includes('*') || !isPathInside(root, resolve(root, path)) || isPathInside(directory, resolve(root, path)) ||
+          isTestPath(path) || state.harnessPaths?.includes(path) ||
+          path.split('/').some((part) => ['.ai', '.git', 'package.json', 'pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'bun.lock', 'bun.lockb'].includes(part) || part.startsWith('.env') || /\.(?:pem|key)$/i.test(part) || /config/i.test(part))) {
+        throw new CliError('WORKER_SCOPE_INVALID', String(path))
+      }
+    }
+    const testSkill = await workerFile(spec.testSkill).catch(() => {
+      throw new CliError('WORKER_SKILL_MISSING', 'the installed test SKILL.md must be readable')
+    })
+    if (!/^name:\s*test\s*$/m.test(testSkill.content)) throw new CliError('WORKER_SKILL_MISSING', 'testSkill must name the test skill')
+    const graphFile = await workerFile(join(scriptDirectory, '../references/reference-graph.json'))
+    const graph = JSON.parse(graphFile.content)
+    const conditional = graph.nodes.filter((node) => node.implementationInput === 'conditional')
+    const omitted = spec.notApplicable ?? {}
+    if (!omitted || typeof omitted !== 'object' || Array.isArray(omitted) ||
+        Object.entries(omitted).some(([id, reason]) => !conditional.some((node) => node.id === id) || typeof reason !== 'string' || !reason.trim())) {
+      throw new CliError('WORKER_TASK_INVALID', 'notApplicable needs a reason for each conditional reference excluded')
+    }
+    const required = [...new Set([...PACKET_READ_NODES.IMPLEMENTED_GREEN, 'delivery-red',
+      ...conditional.filter((node) => !omitted[node.id]).map((node) => node.id), ...spec.referenceNodes])]
+    const { delivered } = splitDelivery(graph, { id: 'implementation-task', nodes: required })
+    if (delivered.some((node) => node.loader === 'reviewer' || node.loader === 'graph-tooling' || node.id === 'low-fast-path')) {
+      throw new CliError('WORKER_TASK_INVALID', 'implementation input cannot switch lanes or replace review')
+    }
+    const references = await Promise.all(delivered.map(async (node) => ({ id: node.id, ...await workerFile(join(scriptDirectory, '..', node.path)) })))
+    const testBva = await workerFile(join(dirname(testSkill.path), 'references/bva.md'))
+    const lock = await workerFile(resolve(directory, state.lock))
+    const manifest = JSON.parse(lock.content)
+    const lockedSources = await Promise.all(manifest.sources.map(async (source) => {
+      const file = await workerFile(resolve(dirname(lock.path), source.path))
+      if (file.sha256 !== source.sha256) throw new CliError('WORKER_INPUT_STALE', source.path)
+      return file
+    }))
+    const evidence = await workerFile(evidencePathFor(directory, state))
+    if (spec.decision && (typeof spec.decision !== 'string' || !isPathInside(directory, resolve(directory, spec.decision)))) throw new CliError('WORKER_SCOPE_INVALID', 'decision must stay inside Oracle artifacts')
+    const decisions = spec.decision ? [await workerFile(resolve(directory, spec.decision), directory)] : []
+    const ruleNames = (await readdir(scriptDirectory)).filter((name) => name.startsWith('oracle-') && name.endsWith('.mjs') && !name.endsWith('.test.mjs'))
+    const rules = await Promise.all([...ruleNames, 'generate-reference-bundles.mjs', 'resolve-executable.mjs'].map((name) => workerFile(join(scriptDirectory, name))))
+    const entry = await workerFile(join(scriptDirectory, '../SKILL.md'))
+    const ledger = await readLedger(directory)
+    const runs = ledger.filter((event) => event.type === 'run')
+    const red = findRun(runs, lastEntryFor(state, 'VALID_RED').runId)
+    const checks = [red, ...state.requiredLabels.filter((label) => label !== red.label).map((label) => runs.findLast((run) => run.label === label))]
+    if (!red.cwd || !isReportedFailingRun(red) || checks.some((check) => !check?.cwd)) {
+      throw new CliError('WORKER_CHECKS_MISSING', 'record the trusted RED and every required label through current exec before issuing a task')
+    }
+    if (!Array.isArray(spec.replaySafeLabels) || checks.some((check) => !spec.replaySafeLabels.includes(check.label))) {
+      throw new CliError('WORKER_REPLAY_UNAPPROVED', 'explicitly list every approved replay-safe check label; use sequential delivery for unsafe commands')
+    }
+    const baseline = await snapshot(root, `${portablePath(root, directory)}/`)
+    if (!sameDigests(state.testBindings.tests, Object.fromEntries(Object.entries(baseline).filter(([path]) => isTestPath(path))))) {
+      throw new CliError('WORKER_INPUT_STALE', 'test sources changed after VALID_RED')
+    }
+    const attemptId = await reserveRunId(directory, `worker:${spec.taskId}`)
+    const packet = {
+      schemaVersion: 1, taskId: spec.taskId, attemptId, phase: 'implement-green', role: 'oracle-implementation',
+      goal: spec.goal, rows: spec.rows, root,
+      baseline: { oracleSha256: revision.oracleSha256, lockManifestSha256: revision.lockManifestSha256,
+        ledgerHead: ledger.at(-1).digest, files: baseline },
+      scope: { writablePaths: spec.writablePaths, readablePaths: [...new Set([...spec.writablePaths, ...Object.keys(state.testBindings.tests), ...(state.harnessPaths ?? [])])],
+        protection: 'post-execution diff and input checks; not a filesystem sandbox' },
+      referenceSelection: { notApplicable: omitted, rule: 'unclassified conditional nodes load conservatively; dependency closure always wins' },
+      oracle, lockedSources, decisions, references, requiredSkills: [{ name: 'test', ...testSkill }, { name: 'test:bva', ...testBva }],
+      inputs: [oracle, lock, ...lockedSources, evidence, ...decisions, graphFile, entry, ...references, testSkill, testBva, ...rules].map(({ path, sha256 }) => ({ path, sha256 })),
+      skillRevision: await skillMetadata(), remainingBudgets: Object.fromEntries(Object.entries(state.budgets).map(([key, value]) => [key, value.limit - value.spent])),
+      evidence: { redRun: red, ...evidence },
+      checks: checks.map(({ label, command, adapter, cwd }) => ({ label, command, adapter, cwd })),
+      previousAttempts: runs.filter((run) => run.worker?.taskId === spec.taskId && run.worker.kind === 'implementation')
+        .map((run) => ({ runId: run.runId, exitCode: run.exitCode, grade: run.grade, worktreeSha256: run.worktreeSha256 })),
+      execution: { contextMode: 'fresh', host: 'claude', model: 'host default; no automatic model escalation', completed: false },
+    }
+    const path = workerTaskPath(directory, spec.taskId, attemptId)
+    await mkdir(dirname(path), { recursive: true })
+    if (!isPathInside(await realpath(directory), await realpath(dirname(path)))) throw new CliError('WORKER_SCOPE_INVALID', 'task directory escapes Oracle artifacts')
+    const bytes = `${JSON.stringify(packet, null, 2)}\n`
+    await writeFile(path, bytes, { flag: 'wx', mode: 0o600 })
+    const reservationPath = join(directory, '.run-ids', attemptId)
+    const reservation = JSON.parse(await readFile(reservationPath, 'utf8'))
+    await writeFile(reservationPath, JSON.stringify({ ...reservation, taskId: spec.taskId, packetSha256: sha256(bytes) }))
+    process.stdout.write(`WORKER_PACKET ${path}\n`)
+  })
+}
+
+async function workerRun(options) {
+  if (!options.dir || !options.packet) throw new CliError('USAGE', 'worker-run requires --dir --packet --max-budget-usd', 2)
+  const directory = resolve(options.dir)
+  await withDirectoryLock(directory, 'worker', async () => {
+    const input = await snapshotRegularFile(resolve(options.packet), { base: directory, allowHardlinks: false })
+    const packet = JSON.parse(input.bytes.toString('utf8'))
+    if (packet.schemaVersion !== 1 || !/^r-\d+$/.test(packet.attemptId ?? '') ||
+        !/^[a-z0-9][\w-]{0,79}$/i.test(packet.taskId ?? '') ||
+        resolve(options.packet) !== workerTaskPath(directory, packet.taskId, packet.attemptId)) {
+      throw new CliError('WORKER_TASK_INVALID', 'use a generated task packet')
+    }
+    const reservationPath = join(directory, '.run-ids', packet.attemptId)
+    const reservation = JSON.parse(await readFile(reservationPath, 'utf8'))
+    if (reservation.packetSha256 !== input.sha256 || reservation.taskId !== packet.taskId) throw new CliError('WORKER_INPUT_STALE', 'packet does not match its run reservation')
+    await assertWorkerInputs(packet)
+    let state = await readConsistentState(directory)
+    const revision = verifyLock(directory, state)
+    if (revision.oracleSha256 !== packet.baseline.oracleSha256 || revision.lockManifestSha256 !== packet.baseline.lockManifestSha256) {
+      throw new CliError('WORKER_INPUT_STALE', 'Oracle revision changed')
+    }
+    const root = resolve(directory, state.scanRoot)
+    if (root !== packet.root) throw new CliError('WORKER_INPUT_STALE', 'scan root changed')
+    const current = await snapshot(root, `${portablePath(root, directory)}/`)
+    let ledger = await readLedger(directory)
+    const completed = state.history.find((entry) => entry.workerAttemptId === packet.attemptId)
+    if (completed) {
+      const accepted = findRun(ledger.filter((entry) => entry.type === 'run'), completed.runId)
+      if (accepted.worktreeSha256 !== sha256(JSON.stringify(current))) throw new CliError('WORKER_INPUT_STALE', 'accepted candidate changed')
+      process.stdout.write(`WORKER_ALREADY_ACCEPTED ${packet.attemptId} state:${state.state}\n`)
+      return
+    }
+    if (state.state !== 'VALID_RED') throw new CliError('WORKER_STATE_INVALID', 'implementation needs VALID_RED')
+    const siblings = (await readdir(dirname(resolve(options.packet)))).filter((name) => /^r-\d+\.json$/.test(name))
+    if (siblings.some((name) => Number(name.slice(2, -5)) > Number(packet.attemptId.slice(2)))) throw new CliError('WORKER_ATTEMPT_STALE', 'a newer attempt supersedes this packet')
+    const outputPath = resolve(options.packet).replace(/\.json$/, '.ndjson')
+    let worker = ledger.find((event) => event.type === 'run' && event.runId === packet.attemptId)
+    if (!worker) {
+      if (reservation.workerDispatched) throw new CliError('WORKER_INTERRUPTED', 'no durable completion; do not repeat external work automatically')
+      if (packet.baseline.ledgerHead !== ledger.at(-1).digest || !sameDigests(packet.baseline.files, current)) throw new CliError('WORKER_INPUT_STALE', 'baseline changed before dispatch')
+      const invocation = claudeWorkerInvocation(packet, Number(options.maxBudgetUsd))
+      const timeout = Number(options.timeoutMs ?? 600000)
+      if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 3600000) throw new CliError('USAGE', '--timeout-ms must be 1..3600000', 2)
+      await spendBudget({ dir: directory, spend: 'product', reason: `implementation worker ${packet.taskId}/${packet.attemptId}`, workerAttemptId: packet.attemptId })
+      await writeFile(reservationPath, JSON.stringify({ ...reservation, workerDispatched: true }))
+      await execute({ dir: directory, label: `worker:${packet.taskId}`, command: invocation.command,
+        runtime: 'claude', cwd: root, reservedRunId: packet.attemptId,
+        capture: { input: invocation.input, outputPath, timeout },
+        worker: { kind: 'implementation', taskId: packet.taskId, attemptId: packet.attemptId, packetSha256: input.sha256,
+          capability: invocation.capability, inputSha256: sha256(invocation.input) } })
+      ledger = await readLedger(directory)
+      worker = ledger.find((event) => event.type === 'run' && event.runId === packet.attemptId)
+    }
+    const candidate = await snapshot(root, `${portablePath(root, directory)}/`)
+    if (worker.exitCode !== 0 || worker.worktreeSha256 !== sha256(JSON.stringify(candidate)) ||
+        worker.worker?.packetSha256 !== input.sha256) throw new CliError('WORKER_RESULT_STALE', 'worker did not finish on this candidate')
+    const changed = changedPaths(packet.baseline.files, candidate)
+    if (changed.some((path) => !packet.scope.writablePaths.includes(path))) throw new CliError('WORKER_SCOPE_VIOLATION', changed.join(', '))
+    await assertWorkerInputs(packet)
+    const output = await snapshotRegularFile(outputPath, { base: directory, allowHardlinks: false })
+    if (output.sha256 !== worker.worker.outputSha256) throw new CliError('WORKER_RESULT_STALE', 'host transcript changed')
+    const submission = parseWorkerSubmission(output.bytes.toString('utf8'), packet)
+    const candidateSha256 = worker.worktreeSha256
+    let greenRun
+    for (const [index, check] of packet.checks.entries()) {
+      const count = index === 0 ? REQUIRED_CONSECUTIVE_PASSES[state.risk] : 1
+      ledger = await readLedger(directory)
+      const reusable = ledger.filter((entry) => entry.type === 'run' && entry.worker?.kind === 'check' &&
+        entry.worker.attemptId === packet.attemptId && entry.worker.checkIndex === index &&
+        entry.worker.packetSha256 === input.sha256 && entry.cwd === check.cwd &&
+        stableStringify(entry.command) === stableStringify(check.command) && entry.adapter === check.adapter &&
+        entry.worktreeSha256 === candidateSha256 && entry.exitCode === 0 && !entry.signal &&
+        (index !== 0 || isReportedPassingRun(entry)))
+      for (let pass = reusable.length; pass < count; pass += 1) {
+        const id = await execute({ ...check, dir: directory, report: check.adapter ? `${outputPath}.${index}.${pass}.report` : undefined,
+          worker: { kind: 'check', taskId: packet.taskId, attemptId: packet.attemptId, packetSha256: input.sha256, checkIndex: index } })
+        const run = findRun(await readRuns(directory), id)
+        if (run.worktreeSha256 !== candidateSha256) throw new CliError('WORKER_RESULT_STALE', 'candidate changed during verification')
+        if (run.exitCode !== 0 || (index === 0 && !isReportedPassingRun(run))) throw new CliError('RUN_NOT_GREEN', id)
+        reusable.push(run)
+      }
+      if (index === 0) greenRun = reusable.at(-1).runId
+    }
+    await assertWorkerInputs(packet)
+    await writeFile(`${outputPath}.submission.json`, JSON.stringify({
+      ...submission, candidateSha256, changedPaths: changed, evidenceRunId: greenRun,
+      note: 'Worker handoff is unverified narrative. Only ledger runs and the transition establish acceptance.',
+    }, null, 2), { mode: 0o600 })
+    await transition({ dir: directory, to: 'IMPLEMENTED_GREEN', run: greenRun, evidence: packet.evidence.path, workerAttemptId: packet.attemptId })
+    state = await readConsistentState(directory)
+    process.stdout.write(`WORKER_ACCEPTED ${packet.attemptId} state:${state.state}; independent review remains required\n`)
+  })
+}
+
 async function main() {
   const [command, ...args] = process.argv.slice(2)
   const options = parseOptions(args)
@@ -3705,10 +3946,12 @@ async function main() {
   else if (command === 'review-packet') await reviewPacket(options)
   else if (command === 'review-brief') await reviewBrief(options)
   else if (command === 'blind-input') await blindInput(options)
+  else if (command === 'worker-packet') await workerPacket(options)
+  else if (command === 'worker-run') await workerRun(options)
   else
     throw new CliError(
       'USAGE',
-      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, budget, status, review-packet, review-brief or blind-input',
+      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, budget, status, review-packet, review-brief, blind-input, worker-packet or worker-run',
       2,
     )
 }
@@ -3716,7 +3959,8 @@ async function main() {
 try {
   await main()
 } catch (error) {
-  const cliError = error instanceof CliError ? error : new CliError('INPUT_UNREADABLE', error.message ?? String(error))
+  const workerCode = /^WORKER_[A-Z_]+:/.exec(error.message ?? '')?.[0].slice(0, -1)
+  const cliError = error instanceof CliError ? error : new CliError(workerCode ?? 'INPUT_UNREADABLE', error.message ?? String(error))
   let dirOption
   try {
     dirOption = parseOptions(process.argv.slice(3)).dir

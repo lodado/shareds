@@ -354,6 +354,9 @@ When implementation, test-based self-verification, and subagent review are expli
    related-tests command over `oracle-run.mjs status --changed-files`, and
    `oracle-verify.mjs scan --side-effects --oracle <card> --path <changed production files>` must
    report every code side effect owned by a card row or exempted with `oracle:side-effect`.
+   For an optional fresh implementation context after `VALID_RED`, use the existing runner's
+   [task-scoped worker path](references/delivery/ledger.md#optional-task-scoped-implementation-worker).
+   It is independent of graph opt-in and does not replace review or expand Low/Design-only.
 7. High risk: the sibling `test` skill's mutation kill·revert·re-GREEN first.
 8. The Controller generates raw review input and assignment/dispatch with `oracle-run.mjs review-packet`.
    Reviewers return findings only; the Controller/join creates the `oracle-run.mjs review-receipt`

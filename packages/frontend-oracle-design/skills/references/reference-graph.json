@@ -132,6 +132,7 @@
     },
     {
       "id": "visual-design",
+      "implementationInput": "conditional",
       "path": "references/visual-design.md",
       "when": "before a visible UI change; re-read at review when a Design Intent exists",
       "requires": ["common"]
@@ -186,30 +187,35 @@
     },
     {
       "id": "architecture-contract",
+      "implementationInput": "conditional",
       "path": "references/architecture-contract.md",
       "when": "architecture boundary·state ownership·public API change",
       "requires": ["common"]
     },
     {
       "id": "types-state-ladder",
+      "implementationInput": "conditional",
       "path": "references/types/state-ladder.md",
       "when": "before async·duplicate-submit O* rows or a client state·boundary type change",
       "requires": ["common", "frontend-decisions"]
     },
     {
       "id": "types-authoring",
+      "implementationInput": "conditional",
       "path": "references/types/authoring.md",
       "when": "together with state-ladder",
       "requires": ["types-state-ladder"]
     },
     {
       "id": "types-api-surface",
+      "implementationInput": "conditional",
       "path": "references/types/api-surface.md",
       "when": "together with state-ladder",
       "requires": ["types-state-ladder", "types-authoring"]
     },
     {
       "id": "types-advanced-contracts",
+      "implementationInput": "conditional",
       "path": "references/types/advanced-contracts.md",
       "when": "always with state-ladder during type work — loading unconditional, adoption via compiler witness packet gate",
       "requires": ["types-api-surface"]
@@ -223,24 +229,28 @@
     },
     {
       "id": "type-environment",
+      "implementationInput": "conditional",
       "path": "references/type-environment.md",
       "when": "once per repo — the first type contract or a tsconfig·TS version·witness inclusion·checker path change",
       "requires": []
     },
     {
       "id": "fsd",
+      "implementationInput": "conditional",
       "path": "references/fsd.md",
       "when": "FSD repo (or approved adoption) + before proposing·designing·reviewing FSD adoption·domain boundaries·slice ownership·public APIs·dependencies·folder structure, including boundary changes with no folder moves",
       "requires": []
     },
     {
       "id": "backend",
+      "implementationInput": "conditional",
       "path": "references/backend.md",
       "when": "before a backend·DB·data-access boundary change",
       "requires": []
     },
     {
       "id": "performance",
+      "implementationInput": "conditional",
       "path": "references/performance.md",
       "when": "performance requirement·improvement claim",
       "requires": []

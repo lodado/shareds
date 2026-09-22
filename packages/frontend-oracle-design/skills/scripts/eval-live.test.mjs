@@ -355,6 +355,23 @@ test('a successful bundle read counts as reading every node the bundle contains'
   assert.deepEqual(loadedNodesFrom(events, graph).sort(), [...bundle.nodes].sort())
 })
 
+test('bundle observations count delivered dependency closures without inventing continuation history', async () => {
+  const graph = await readJson('references/reference-graph.json')
+  const observedRead = (id) => [
+    { type: 'assistant', message: { content: [{ type: 'tool_use', id, name: 'Read', input: { file_path: `/repo/skills/bundles/${id}.md` } }] } },
+    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'complete bundle bytes' }] } },
+  ]
+  const delivery = loadedNodesFrom(observedRead('delivery-lane'), graph)
+  assert.equal(delivery.length, 11)
+  assert.ok(delivery.includes('common'))
+  assert.ok(delivery.includes('frontend-authoring'))
+  const continuation = loadedNodesFrom(observedRead('delivery-lane-continued'), graph)
+  assert.equal(continuation.includes('common'), false)
+  assert.ok(continuation.includes('frontend-authoring'))
+  const combined = loadedNodesFrom([...observedRead('card-lane'), ...observedRead('delivery-lane-continued')], graph)
+  for (const id of delivery) assert.ok(combined.includes(id), id)
+})
+
 test('the runner variant lands on each result so the grader can keep A/B arms apart', async () => {
   const [corpus, graph] = await Promise.all([readJson('evals/blackbox-corpus.json'), readJson('references/reference-graph.json')])
   const fixture = corpus.cases.find((candidate) => candidate.id === 'fod-bb-08')

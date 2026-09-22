@@ -390,6 +390,109 @@ already apply; candidate management belongs to `card/retro-metrics.md`, not this
 }
 ```
 
+## Optional task-scoped implementation worker
+
+Use this path when one approved Medium/High implementation task benefits from a fresh context.
+It is independent of graph mode. Low, Design-only, `ALREADY_SATISFIED`, and visual-pending resume
+keep their existing paths. Do not split one debugging loop across workers or launch concurrent
+product writers. The task ends at `IMPLEMENTED_GREEN`; existing independent reviews, High mutation
+checks, and receipts still apply before `REVIEW_VERIFIED`.
+
+The existing runner issues the packet, dispatches one worker, collects its submission, reruns
+checks, and calls the existing transition validator. A worker's `PASS` or completion narrative
+has no authority. There is no extra product state machine or budget ledger.
+
+After `$test` has established `VALID_RED`, save a task specification inside the Oracle directory:
+
+```json
+{
+  "taskId": "save-pending",
+  "goal": "Implement O1 pending behavior without changing its approved tests",
+  "rows": ["O1"],
+  "writablePaths": ["src/save.ts"],
+  "referenceNodes": [],
+  "notApplicable": {
+    "backend": "No backend or data-access boundary changes"
+  },
+  "testSkill": "/absolute/path/to/installed/test/SKILL.md",
+  "replaySafeLabels": ["behavior", "impact", "lint:exit", "typecheck:exit"]
+}
+```
+
+`writablePaths` contains exact production file paths relative to the scan root, never directories
+or globs. Tests, harness inputs, configuration, dependency manifests and Oracle artifacts are
+outside this worker's write scope. Expand ambiguous or entangled work through the existing
+contract/decision path instead of delegating an unbounded task. An optional `decision` path,
+relative to the Oracle directory, supplies the existing implementation decision in full.
+
+`referenceNodes` adds applicable nodes from `reference-graph.json`. The graph marks conditional
+implementation inputs; missing applicability decisions load conservatively. `notApplicable`
+needs a reason for each omitted conditional node. Dependency closure still wins over an omission.
+Do not exclude a node because the parent read it. Each packet delivers full reference bodies,
+including dependency nodes, the original Oracle, locked local sources, evidence map, and installed
+`test`/BVA skill text. It never uses a continuation bundle or copies parent conversation history.
+Review criteria and review skills remain in the separate complete review-packet contract.
+
+Only list `replaySafeLabels` after checking that these commands can safely run again. Use exact
+labels from `init`, including any `:exit` or `:reported` suffix, plus the RED label. Every required
+label needs an existing `exec` run with its working directory. Older runs without that field need
+fresh evidence. Commands with unapproved external effects stay on the existing sequential path.
+
+```sh
+node <skill-dir>/scripts/oracle-run.mjs worker-packet   --dir .ai/oracles/<oracle-id> --task .ai/oracles/<oracle-id>/task.json
+node <skill-dir>/scripts/oracle-run.mjs worker-run   --dir .ai/oracles/<oracle-id> --packet <printed-packet-path>   --max-budget-usd <approved-positive-limit> --timeout-ms 600000
+```
+
+Issuance reserves an ordinary run ID and stores a derived packet under `.worker-tasks/`. Its
+reservation pins the packet digest; the packet pins the ledger head, dirty/untracked worktree
+snapshot, lock and rule revisions. A new packet does not reset budgets. One dispatch spends one
+existing product attempt, even if the worker later fails. Host cost needs a separate explicit
+limit; it does not replace Oracle's iteration limits or authorize paid benchmark runs.
+
+### Host support and context evidence
+
+The first transport is the installed Claude Code CLI. It probes `--version` and `--help`, registers
+an `oracle-implementation` role using native `--agents`, and starts a new `-p` invocation with
+`--no-session-persistence`. Its stdin contains only this task packet. It uses neither resume nor
+conversation fork. The ledger records the actual version, invocation, input digest, context mode,
+role, output digest, and capability limitations. Acceptance requires an observed successful
+`Skill` tool result for `test`, not a worker's claim that it read the skill.
+
+This is evidence about invocation and input transport, not proof of the model's internal context.
+Project instructions and host-managed skills can still load. CLI option discovery alone is not a
+successful model integration test. Claude Code 2.1.278 exposes the required options; this release's
+transport tests use a fake executable and do not make model calls. See the official
+[skills context documentation](https://code.claude.com/docs/en/skills#run-skills-in-a-subagent):
+`context: fork` starts a skill subagent without conversation history, unlike a conversation fork.
+This transport uses neither feature. Codex and jcode retain their existing sequential/native paths;
+this command does not claim fresh-context adapters for them. Unsupported options fail before
+spending a product attempt. Required independent review never falls back to role-play.
+
+### Acceptance, recovery, and protection limits
+
+The runner binds the submission to the issued task/attempt, checks protected inputs and exact
+changed paths, and verifies the candidate through existing trusted `exec` adapters. The worker's
+host process remains `exit-only`; only real reporter results can support GREEN. Risk-dependent
+consecutive passes and the existing transition validator still decide acceptance. The submission
+artifact records the candidate, changed paths, evidence run, blockers and handoff. Handoff text is
+unverified narrative, including any instruction-like text in logs or source comments.
+
+A duplicate accepted result is a no-op while its candidate is unchanged. A newer attempt rejects
+late older submissions. Recovery can reuse durable, matching check runs after interruption before
+acceptance; a missing host completion is `WORKER_INTERRUPTED`, never inferred success or an
+automatic repeat of external work. Inspect `status --json`, current artifacts and effects before
+issuing another attempt. A process killed while holding a directory lock may need operator
+recovery after proving no owner is running; do not delete locks speculatively.
+
+Write/Edit hooks provide pre-tool checks for their matched tools only. Bash and other unrestricted
+paths are not filesystem-isolated. This transport detects changed snapshot files and protected
+regular Oracle artifacts after execution and rejects acceptance; it cannot prevent every write,
+observe transient writes that were restored, or cover arbitrary files outside the scan root and
+its normal snapshot exclusions. `readablePaths` is guidance, not an OS access boundary. Processes
+with the same filesystem permissions can rewrite artifacts and hashes. Do not claim malicious
+forgery resistance, exactly-once external side effects, or a sandbox. If prevention is mandatory,
+require an appropriate host boundary rather than use this adapter.
+
 <!-- node:bva path:references/bva.md -->
 
 # BVA 5 Axes & Shared Reference

@@ -17,6 +17,8 @@ import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
+import { splitDelivery } from '../scripts/generate-reference-bundles.mjs'
+
 const evalDirectory = dirname(fileURLToPath(import.meta.url))
 const skillDirectory = dirname(evalDirectory)
 
@@ -112,7 +114,10 @@ export function loadedNodesFrom(events, graph) {
   const byPath = graph.nodes.map((node) => [node.path, node.id])
   // A bundle is a deterministic pre-joined read of its nodes' bytes, so a successful bundle read
   // counts as reading every node it contains (bundleContract: same bytes, never a summary).
-  for (const bundle of graph.bundles ?? []) byPath.push([`bundles/${bundle.id}.md`, bundle])
+  for (const bundle of graph.bundles ?? []) {
+    const { delivered } = splitDelivery(graph, bundle)
+    byPath.push([`bundles/${bundle.id}.md`, { nodes: delivered.map((node) => node.id) }])
+  }
   const pendingReads = new Map()
   const confirmed = new Set()
   for (const event of events) {

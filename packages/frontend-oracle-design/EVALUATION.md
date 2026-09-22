@@ -1,3 +1,92 @@
+## 0.55.0 task-scoped worker evaluation
+
+Implementation began at `87e9f0f13e2f4d2788261aaf019f2608b91852dd`. Existing uncommitted
+work outside this change was preserved. New runtime text and documentation are in English.
+
+| Responsibility              | Existing owner and call path                                                  | Enforcement before this change                                       | Change                                                                                     |
+| --------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| State, transitions, budgets | `oracle-run.mjs`: `readConsistentState`, `transitionUnderLock`, `spendBudget` | Executable gates and CLI tests                                       | Reused; worker attempt metadata stays in existing run/transition events                    |
+| Task inputs and references  | `reviewPacket`, `snapshot`, `splitDelivery`, reference graph                  | Review packets and bundle closure enforced; no implementation packet | Add `workerPacket` in the same runner, pin inputs, deliver full dependency closure         |
+| Worker context              | Workflow graph executor node; host invocation chosen by caller                | Graph contract; no task implementation CLI transport                 | One optional Claude print-mode transport; sequential product writes                        |
+| Evidence and acceptance     | `execute`, trusted adapters, transition validator, review receipts            | Executable gates                                                     | `workerRun` collects submissions and invokes these same gates                              |
+| Resume and duplicates       | Run reservations, hash-chain ledger, state replay, directory locks            | Executable state recovery; no worker attempt identity                | Bind attempts, reject late results, reuse matching durable checks, no duplicate acceptance |
+
+`oracle-worker.mjs` is the only new runtime module. It holds Claude-specific option discovery,
+invocation, and stream parsing; policy stays in `oracle-run.mjs`. The runner calls it from
+`workerRun`. Keeping host flags out of the already large state owner is its reason to exist.
+The new `skills/evals/worker-context-cases.json` is a corpus for the existing `run-live.mjs`, not
+another runner. It covers a short fix, long logs, crash recovery, coupled contracts, and a missing
+mandatory input. Each case requires a prepared repository; the corpus does not create one.
+
+### Comparison protocol
+
+Use the same initial repository, Oracle risk, locked contract, checks and independent-review
+requirements for every arm. Prepare separate clean worktrees and retain their source revisions.
+The deterministic worker fixture in `oracle-run.test.mjs` demonstrates the minimum approved
+RED setup; live coupled-contract tasks need their own real application fixture and approvals.
+
+| Arm | Configuration                                                                                |
+| --- | -------------------------------------------------------------------------------------------- |
+| A   | Pinned pre-change skill, existing sequential implementation                                  |
+| B   | Current skill, same model, external state checks and phase inputs, sequential implementation |
+| C   | B plus a fresh task-scoped implementation worker                                             |
+| D   | B with a stronger model, only when access and cost are approved                              |
+
+`--variant` is a result label, not a mode or model switch. Configure the host and skill installation
+separately. For C, add an explicit request to use the worker commands to a temporary corpus copy;
+for B/D request sequential implementation. Keep the original task text and approval requirements
+unchanged and record these extra instruction bytes. The runner does not select that policy for
+you. Then use the existing runner, for example:
+
+```sh
+node packages/frontend-oracle-design/skills/evals/run-live.mjs \
+  --host claude --repo <prepared-repository> \
+  --corpus packages/frontend-oracle-design/skills/evals/worker-context-cases.json \
+  --case fod-worker-short-fix --variant C --replicates 1 \
+  --out <results.jsonl> --transcript-dir <transcripts>
+```
+
+Before paid runs, fix the sample count, repetitions, model/version and cost ceiling. Record every
+failure, missing stage, false completion, stale acceptance, duplicate action after resume and
+human correction. Report time and total cost per verified completion, including the controller,
+implementation workers and required reviewers. The existing transcript/usage output and nested
+worker submission cost are inputs to that accounting, not a complete automatic cost rollup.
+Manual review of real state, receipts and diffs remains necessary. More calls must not be counted
+as evidence that context separation itself helped.
+
+### Deterministic evidence and limits
+
+The fake Claude executable receives the actual generated packet through stdin. It checks the
+full common/test inputs and rejects parent-history sentinel text or resume/fork flags. Real CLI
+subprocesses in temporary repositories exercise RED/GREEN, source and untracked-file drift,
+protected writes, missing/failed skill activation, incorrect attempt IDs, capability failures,
+replay consent, budget exhaustion and recovery before/after the transition append. Worker claims
+and instruction-like handoff text cannot make a failing test pass. The existing tests continue to
+cover High receipts, zero-production delivery, pending visual resume, Low, and graph opt-in.
+
+Bundle observation now counts delivered dependency nodes rather than only the bundle's declared
+roots. A full delivery bundle previously appeared to load five nodes; it delivers eleven. A
+continuation bundle still does not count omitted assumptions as reads. This fixes measurement;
+it does not prove that the model understood the material.
+
+Before this change, `SKILL.md` was 33,837 bytes and the four main bundle closures contained
+331,586 bytes of deduplicated reference text. After this change the entry is 34,126 bytes.
+The conservative test packet, excluding only the backend reference, is about 270 KB including
+its Oracle, locked source, evidence and full skill/reference text. This is an actual serialized
+input measurement, not tokens or a measured attention limit. It includes no parent conversation.
+A task with more justified exclusions can be smaller; required contracts must not be removed
+merely to improve a size figure. The two packet forms are not equivalent workload measurements.
+
+The installed Claude CLI 2.1.278 was probed without a model call. Its official
+[skill context documentation](https://code.claude.com/docs/en/skills#run-skills-in-a-subagent)
+distinguishes `context: fork` from conversation forks. The transport uses a new print invocation
+with an explicitly registered role. Codex/jcode automatic fresh-worker integration is not
+implemented; existing native/sequential workflows remain available. Fake transport tests do not
+establish real-host success, isolation, malicious tamper resistance, or long-run model quality.
+
+Evaluation path and deterministic tests are implemented. Live-model evaluation and long-run
+performance are **NOT_RUN**; no improvement percentage or benchmark cost is claimed.
+
 # frontend-oracle-design 0.1.9 상세 평가
 
 > **Historical evaluation** — 0.1.9 시점 기록이다. 이후 버전에서 상태 전이·증거
