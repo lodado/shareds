@@ -1,0 +1,11 @@
+{
+  "name": "@lodado/reference-driven-3d-character-plugin",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Reference-driven 3D character design, scoped production, and evidence-based delivery.",
+  "license": "MIT",
+  "scripts": {
+    "lint": "eslint scripts",
+    "test": "node --test scripts/*.test.mjs"
+  }
+}

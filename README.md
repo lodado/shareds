@@ -55,6 +55,7 @@ frontend-system-design
 test
 frontend-visual-qa
 frontend-interface-design
+reference-driven-3d-character
 ux-flow-diagram
 agent-memory
 ```
@@ -241,15 +242,16 @@ npm으로 나갈 것들이에요.
 
 에이전트에 꽂는 플러그인이에요.
 
-| 플러그인                                                          | 설명                                                                                                  |
-| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| [`vibe-coding-helper`](packages/vibe-coding-helper)               | ESLint 도입이랑 레포 컨벤션                                                                           |
-| [`frontend-oracle-design`](packages/frontend-oracle-design)       | 위험도 기반 Oracle 계약, TDD, 근거, 리뷰                                                              |
-| [`agent-graph-engineering`](packages/agent-graph-engineering)     | 에이전트 워크플로 그래프 설계랑 실행                                                                  |
-| [`frontend-system-design`](packages/frontend-system-design)       | 잘 알려진 프론트엔드 문제의 설계 패턴                                                                 |
-| [`test`](packages/test)                                           | Oracle 기반 결정론적 행동 테스트                                                                      |
-| [`frontend-visual-qa`](packages/frontend-visual-qa)               | 스크린샷 비교랑 직접 브라우저 QA                                                                      |
-| [`frontend-interface-design`](packages/frontend-interface-design) | `$reference-driven-figma-design`: HCI·레퍼런스 비교 → 러프 와이어프레임 설명 → 편집 가능 Figma 디자인 |
+| 플러그인                                                                  | 설명                                                                                                  |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| [`vibe-coding-helper`](packages/vibe-coding-helper)                       | ESLint 도입이랑 레포 컨벤션                                                                           |
+| [`frontend-oracle-design`](packages/frontend-oracle-design)               | 위험도 기반 Oracle 계약, TDD, 근거, 리뷰                                                              |
+| [`agent-graph-engineering`](packages/agent-graph-engineering)             | 에이전트 워크플로 그래프 설계랑 실행                                                                  |
+| [`frontend-system-design`](packages/frontend-system-design)               | 잘 알려진 프론트엔드 문제의 설계 패턴                                                                 |
+| [`test`](packages/test)                                                   | Oracle 기반 결정론적 행동 테스트                                                                      |
+| [`frontend-visual-qa`](packages/frontend-visual-qa)                       | 스크린샷 비교랑 직접 브라우저 QA                                                                      |
+| [`frontend-interface-design`](packages/frontend-interface-design)         | `$reference-driven-figma-design`: HCI·레퍼런스 비교 → 러프 와이어프레임 설명 → 편집 가능 Figma 디자인 |
+| [`reference-driven-3d-character`](packages/reference-driven-3d-character) | 레퍼런스 해석, 형태·변형·동작 설계, 편집 가능한 3D 캐릭터의 단계별 제작·검증                          |
 
 ## 개발
 

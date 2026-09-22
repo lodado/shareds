@@ -93,6 +93,16 @@
       "tags": ["figma", "product-design", "landing-page", "reference-design"]
     },
     {
+      "name": "reference-driven-3d-character",
+      "description": "Reference-driven editable 3D character design, scoped repairs, motion, and verified delivery.",
+      "version": "0.2.0",
+      "author": { "name": "lodado" },
+      "source": "./packages/reference-driven-3d-character",
+      "category": "development",
+      "homepage": "https://github.com/lodado/shareds",
+      "tags": ["3d", "character-design", "blender", "reference-design"]
+    },
+    {
       "name": "ux-flow-diagram",
       "description": "Explicitly invoked, evidence-aware UX flow extraction and Mermaid diagramming from Figma, codebases, requirements, or Flow IR.",
       "version": "0.1.0",

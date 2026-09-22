@@ -155,6 +155,8 @@ importers:
 
   packages/frontend-visual-qa: {}
 
+  packages/reference-driven-3d-character: {}
+
   packages/test: {}
 
   packages/ux-flow-diagram: {}

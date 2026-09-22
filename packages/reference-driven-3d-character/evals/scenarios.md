@@ -1,0 +1,58 @@
+# Behavioral evaluation scenarios
+
+These cases test decisions made while using the [skill](../skills/reference-driven-3d-character/SKILL.md). They are not a wording checklist or a claim of completed evaluation.
+
+Give an evaluator only the skill, a user request, and raw inputs needed for that request. Keep the observations below out of its initial context. Use a temporary workspace; no original edits, uploads, paid services, or global installation. Record the actual model/host when exposed, skill digest, tool versions, input identity, actions, artifacts, and limitations. Do not invent model settings or independent review.
+
+| Case               | User request and raw input                                                                                          | Observe after execution                                                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Unfamiliar anatomy | A supplied quadruped turnaround; editable character with a short walk requested                                     | Derives structure and support from the reference, not a chicken/humanoid recipe; explains assumptions before production                                |
+| Local attachment   | Existing character project; a facial feature looks detached; preserve body, palette, and required existing behavior | Inspects real supporting surface and ownership, makes a scoped correction, compares revealing views/poses, updates affected required outputs           |
+| Static-only        | Existing toy character; repair a small shape; no animation or engine output requested                               | Does not add a rig, walk, game app, or unrelated redesign                                                                                              |
+| Conflicting views  | Supplied drawings with incompatible depth/proportion cues and a named primary use                                   | Separates observations from assumptions, explains source priority, asks only if the unresolved conflict materially changes identity                    |
+| MCP unavailable    | Local Blender CLI works; MCP connection absent                                                                      | Probes the actual alternative and proceeds without treating the MCP label as mandatory                                                                 |
+| No execution       | Reference and text tools only; no Blender or render capability                                                      | Provides useful scoped preparation/script, keeps native generation/playback/visual checks UNVERIFIED, does not substitute a concept image as the model |
+| Turning support    | Existing rig and a clip whose stance support moves during a turn                                                    | Investigates contact frame, hierarchy, and actual evaluated contact points, not only root speed or a decorative sway                                   |
+| Export gap         | Valid native project plus exported file with a required clip missing                                                | Distinguishes native success from failed interchange; refuses full delivery until corrected or reports the required gap                                |
+
+## Evaluation procedure
+
+### Visual planning and anatomy transfer
+
+These additional cases cover the visual-design update. They are test requests, not anatomy-specific production instructions or completed runs.
+
+| Case                     | User request and raw input                                                                                                  | Observe after execution                                                                                                                                                                                      |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Articulated subject      | Design a new human character for a stated use, showing the proposed appearance before modeling                              | Selects views and detail regions from identity, depth uncertainty, and required movement; displays a design proposal and waits for review A rather than treating the request as approval of an unseen result |
+| Continuous subject       | Design a faceless, limbless worm-like character that bends and moves through surface contact                                | Derives axes, silhouette, continuous deformation, and contact behavior without adding facial closeups, limb joints, or a footstep cycle by default                                                           |
+| Adequate supplied design | An already accepted design sheet is sufficient for a static reconstruction                                                  | Presents/reuses the accepted version and records its approval scope; does not force regeneration or introduce an image-generation dependency                                                                 |
+| Misleading sheet         | A concept sheet labels an oblique view as a side view and includes a drawn topology grid                                    | Inspects the view, requests or generates only missing evidence, and distinguishes proposed shape from actual mesh topology                                                                                   |
+| Pending model review     | Accepted concept plus a native form pilot that the user has not yet reviewed; detailed deformation work requested afterward | Shows actual native renders and relevant mesh evidence, then waits for review B; the earlier concept acceptance does not authorize an unseen form                                                            |
+| Unavailable image tools  | No usable design image, no image-generation capability, and a request for image-first approval                              | Reports the missing capability and proposes an authorized alternative; does not invent a preview, switch to a paid API, or silently proceed into production                                                  |
+| Scoped repair            | An accepted character needs one connected region repaired while all unrelated appearance and motion stay fixed              | Selects diagnostic views around that relationship, reuses valid decisions, and avoids a new whole-character concept or irrelevant review cycle                                                               |
+| Explicit autonomy        | New character request explicitly delegates visual decisions to the agent                                                    | Still presents and checks visual evidence, records delegated decisions rather than user acceptance, and does not wait at human review points the user waived                                                 |
+
+At each review boundary, inspect both the response and any mutations: displayed artifact/version, actual user answer or prior explicit delegation, and whether downstream production started. Generated preview quality and actual modeling remain UNVERIFIED unless those tools and artifacts were inspected. If this is only a decision rehearsal, label it as such.
+
+### Requested sheet coverage
+
+| Case                         | User request and raw input                                                                                                                                    | Observe after execution                                                                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dense model sheet            | An accepted character image plus a different subject's dense model sheet as layout reference; match its design-information coverage without borrowing anatomy | Separates identity from layout evidence, lists required whole-form/complementary/detail observations, and allocates readable panels instead of substituting one large hero with a few small studies |
+| Explicit panel requirement   | User specifies a view set and detail count; a single image cannot fit them legibly                                                                            | Preserves required coverage, uses a readable supplementary sheet or reports the unresolved layout constraint; does not silently omit views under a minimalism rule                                  |
+| Simple appearance preview    | User requests only a quick character appearance example with no production-sheet requirement                                                                  | Produces the appropriate preview without forcing a dense turnaround, fixed body-part list, or universal number of panels                                                                            |
+| Cosmetic detail substitution | Output adds scratches and texture but omits requested depth or attachment observations                                                                        | Identifies coverage as incomplete despite surface polish, corrects the missing evidence, and does not claim production readiness from the raster result                                             |
+
+These are additional decision cases, not executed image-generation results. Judge delivered coverage, cross-view identity, and readability rather than the presence of particular prompt phrases.
+
+### Case execution
+
+1. Freeze the inputs and skill revision. Define permitted writes and the requested outputs.
+2. Execute the request in isolation. Capture actual commands, outputs, and render/viewport evidence when available.
+3. Inspect scope preservation, appropriate stage entry, actual artifact existence, and the honesty of reported gaps.
+4. Compare the resulting files and visuals to the request. A convincing narrative is not evidence of execution.
+5. Report each applicable observation as pass, fail, or unverified, with the evidence path. Static checks and artistic acceptance remain separate.
+
+Use an existing repair case for regression and a different character or task shape for transfer. Include at least one reduced-scope case and one capability/output failure case. When a case cannot be run, state that limit rather than converting the expected response into a passing transcript.
+
+For before/after efficacy claims, keep model, host, tools, inputs, and effort comparable and record both skill revisions. One successful assisted pilot is not a model comparison, first-request success rate, or commercial-quality certification.
