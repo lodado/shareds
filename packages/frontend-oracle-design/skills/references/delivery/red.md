@@ -25,34 +25,9 @@ milestone run with `--run` and transition to the global `VALID_RED`. If even one
 `MILESTONE_RED_MISSING`, and no independent lock·state is created. A milestone only pulls initial RED
 feedback earlier; GREEN·review stay on the existing global gates.
 
-```bash
-node <skill-dir>/scripts/oracle-run.mjs exec \
-  --dir .ai/oracles/<oracle-id> \
-  --label red:list \
-  --report .ai/oracles/<oracle-id>/red-list.json \
-  -- <targeted-test-command>
-```
-
-```bash
-node <skill-dir>/scripts/oracle-verify.mjs red \
-  --oracle .ai/oracles/<oracle-id>/oracle.md \
-  --map .ai/oracles/<oracle-id>/evidence.json \
-  --ledger .ai/oracles/<oracle-id>/runs.jsonl \
-  --run r-001 \
-  --row O1
-```
-
-```bash
-node <skill-dir>/scripts/oracle-run.mjs transition \
-  --dir .ai/oracles/<oracle-id> \
-  --to VALID_RED \
-  --run r-001 \
-  --evidence .ai/oracles/<oracle-id>/evidence.json \
-  --row O1
-```
-
-If there is no other work between the run and the transition, `oracle-run.mjs red` records the exec·verify·transition
-above in one call with the same verification — see [`ledger.md`](ledger.md) for the flag format.
+Use the current `status --dir <dir>` action's command. When no work separates execution and
+transition, `oracle-run.mjs red` combines exec·verify·transition with identical checks; see
+[`ledger.md`](ledger.md).
 
 `RED_EVIDENCE_UNVERIFIABLE`·`RED_EVIDENCE_MISSING` prevent an unrelated compile/setup failure or an
 exit-only run from being used as RED. `PRODUCTION_TOUCHED_BEFORE_RED` is machine evidence that
@@ -76,32 +51,3 @@ If the requested behavior is already GREEN, do not force a production change or 
 Record the evidence that the existing implementation satisfies the card and transition with
 `--to IMPLEMENTED_GREEN --reason ...`. This path passes only when there has been no production change
 since `ORACLE_READY`. High risk separately confirms test sensitivity with `$test`'s mutation stage.
-
-## Conditional seed — assertion integrity
-
-Proposed existing-contract projection, not an incident, approval or extra gate. The linked contracts
-already apply; candidate management belongs to `card/retro-metrics.md`, not this stage.
-
-```json
-{
-  "id": "assertion-integrity",
-  "revision": 1,
-  "status": "proposed",
-  "origin": "existing-contract",
-  "When": "A failing test is being changed during test writing or RED-to-GREEN correction.",
-  "DoNot": "Weaken assertions or swap expected values to hide the contract violation or manufacture GREEN.",
-  "Unless": "No exception permits weakening for GREEN. A contract-preserving HARNESS_DEFECT correction may fix a missing fixture premise, equivalent locator or barrier under $test's shared 2-round budget. Changed expectations require the confirmation-lock new-revision procedure, not merely permission to edit tests.",
-  "Instead": "Compare approved contract, implementation and raw failure; let $test judge RED. Repair only allowed machinery and count the harness budget. Changed registered harness bytes after VALID_RED require fresh reported RED then GREEN. Policy changes require a new Draft, confirmation, lock and regenerated evidence; do not overwrite locked expectations.",
-  "ApplyAt": ["writing tests", "VALID_RED", "IMPLEMENTED_GREEN"],
-  "authorityRefs": [
-    "references/common.md#feedback-routing--canonical-classification",
-    "references/delivery/red.md",
-    "references/card/confirmation-lock.md#draft-oracle-and-user-confirmation"
-  ],
-  "evidenceRefs": [],
-  "regressionCases": {
-    "mustPrevent": ["fod-sem-guard-assertion-integrity-prevent"],
-    "mustAllow": ["fod-sem-guard-assertion-integrity-allow"]
-  }
-}
-```

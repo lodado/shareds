@@ -111,6 +111,20 @@ test('a continuation bundle omits exactly its after bundles\u2019 nodes and decl
   }
 })
 
+test('entry bundles defer later phases and conditional architecture without dropping dependencies', async () => {
+  const graph = await loadGraph()
+  const delivered = (id) => splitDelivery(graph, graph.bundles.find((bundle) => bundle.id === id)).delivered.map((node) => node.id)
+  assert.deepEqual(delivered('delivery-lane'), ['common', 'delivery-ledger'])
+  assert.deepEqual(delivered('delivery-lane-continued'), ['delivery-ledger'])
+  for (const id of ['frontend-lane', 'frontend-lane-continued']) {
+    assert.ok(!delivered(id).includes('architecture-contract'))
+    assert.ok(delivered(id).includes('frontend-authoring'))
+  }
+  const skill = await read('SKILL.md')
+  assert.match(skill, /status --dir/)
+  assert.match(skill, /transition.*rechecks|transition.*repeats/s)
+})
+
 test('SKILL.md documents bundles as an optional cache-stable read, not a new authority', async () => {
   const skill = await read('SKILL.md')
   assert.match(skill, /bundles\//)

@@ -362,12 +362,10 @@ test('bundle observations count delivered dependency closures without inventing 
     { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'complete bundle bytes' }] } },
   ]
   const delivery = loadedNodesFrom(observedRead('delivery-lane'), graph)
-  assert.equal(delivery.length, 11)
-  assert.ok(delivery.includes('common'))
-  assert.ok(delivery.includes('frontend-authoring'))
+  assert.deepEqual(delivery, ['common', 'delivery-ledger'])
+  assert.ok(!delivery.includes('frontend-authoring'), 'Delivery entry defers production guidance')
   const continuation = loadedNodesFrom(observedRead('delivery-lane-continued'), graph)
-  assert.equal(continuation.includes('common'), false)
-  assert.ok(continuation.includes('frontend-authoring'))
+  assert.deepEqual(continuation, ['delivery-ledger'])
   const combined = loadedNodesFrom([...observedRead('card-lane'), ...observedRead('delivery-lane-continued')], graph)
   for (const id of delivery) assert.ok(combined.includes(id), id)
 })

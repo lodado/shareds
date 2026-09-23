@@ -2689,6 +2689,59 @@ test('status --json reports current state, blockers, budgets, and orphaned reser
   assert.ok(status.nextLegalActions.includes('VALID_RED'))
 })
 
+test('status without --json prints compact advisory state and every next action', async (t) => {
+  const { oracleDirectory } = await workspace(t, { risk: 'high' })
+  const beforeState = await readFile(join(oracleDirectory, 'run-state.json'), 'utf8')
+  const beforeLedger = await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8')
+
+  const checked = run(['status', '--dir', oracleDirectory])
+
+  assert.equal(checked.status, 0, checked.stderr)
+  assert.match(checked.stdout, /^state: ORACLE_READY\n/)
+  assert.match(checked.stdout, /blockers: none\n/)
+  for (const action of ['VALID_RED', 'IMPLEMENTED_GREEN', 'NEEDS_DECISION', 'FAIL']) {
+    assert.match(checked.stdout, new RegExp(`^action: ${action}\\n`, 'm'))
+  }
+  assert.match(checked.stdout, /ready: false/)
+  assert.match(checked.stdout, /blockers: NO_FRESH_RED_RUN/)
+  assert.match(checked.stdout, /read: common \(references\/common\.md\).*bva \(references\/bva\.md\).*delivery-red \(references\/delivery\/red\.md\)/)
+  assert.match(checked.stdout, /example: oracle-run\.mjs transition --dir .* --to VALID_RED/)
+  assert.equal(await readFile(join(oracleDirectory, 'run-state.json'), 'utf8'), beforeState)
+  assert.equal(await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8'), beforeLedger)
+})
+
+test('status source errors remain read-only without changing rejection codes', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  const stateFile = join(oracleDirectory, 'run-state.json')
+  const beforeState = await readFile(stateFile, 'utf8')
+  const beforeLedger = await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8').catch(() => '')
+  const brokenState = JSON.parse(beforeState)
+  brokenState.scanRoot = 'missing-source-root'
+  await writeFile(stateFile, JSON.stringify(brokenState))
+
+  const checked = run(['status', '--dir', oracleDirectory])
+
+  assert.equal(checked.status, 1)
+  assert.match(checked.stderr, /^INPUT_UNREADABLE: /)
+  assert.doesNotMatch(checked.stderr, /status --dir/)
+  assert.equal(await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8').catch(() => ''), beforeLedger)
+  assert.deepEqual(JSON.parse(await readFile(stateFile, 'utf8')), brokenState)
+})
+
+test('compact status is advisory; unmet transitions are still rejected by the gate', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  const checked = run(['status', '--dir', oracleDirectory])
+  assert.equal(checked.status, 0)
+  const beforeState = await readFile(join(oracleDirectory, 'run-state.json'), 'utf8')
+  const beforeLedger = await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8')
+
+  const transitioned = run(['transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', 'missing'])
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^RUN_NOT_FOUND: /)
+  assert.equal(await readFile(join(oracleDirectory, 'run-state.json'), 'utf8'), beforeState)
+  assert.equal(await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8'), beforeLedger)
+})
+
 test('status --json nextActions is an execution packet: per transition, what is satisfied, what is missing, which run to cite', async (t) => {
   const { root, oracleDirectory } = await workspace(t, { risk: 'high' })
 
@@ -2777,6 +2830,11 @@ test('nextActions review candidates only cite runs recorded after IMPLEMENTED_GR
   assert.deepEqual(reviewBefore.candidateRuns, [])
   assert.ok(reviewBefore.blockers.includes('NO_FRESH_GREEN_RUN'))
   assert.deepEqual(reviewBefore.requires, ['--run', '--evidence', '--findings', '--packet', '--revision'])
+
+  const compact = run(['status', '--dir', oracleDirectory])
+  assert.equal(compact.status, 0, compact.stderr)
+  assert.match(compact.stdout, /^reviewerReads: review-checklist \(references\/review-checklist\.md\)$/m)
+  assert.doesNotMatch(compact.stdout, /^read: .*review-checklist/m)
 
   assert.equal(greenRun(oracleDirectory, 'behavior').status, 0)
   const after = JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout)

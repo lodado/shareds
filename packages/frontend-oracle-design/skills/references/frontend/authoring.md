@@ -8,7 +8,7 @@ gates are owned by [`frontend/quality.md`](quality.md).
 ## 1. Respect Architecture Units and Code Boundaries
 
 - If the existing repo architecture is consistent, preserve it and do not slip in an FSD migration.
-- In greenfield or approved FSD, read all of [`fsd.md`](../fsd.md): choose the domain/invariant owner
+- In existing or approved FSD, read all of [`fsd.md`](../fsd.md): choose the domain/invariant owner
   and public seam before layer direction·segment rules·slice public API mapping. Apply this to
   ownership/dependency changes without folder moves too. Do not create layers·segments that are not
   used.
@@ -18,8 +18,10 @@ gates are owned by [`frontend/quality.md`](quality.md).
   reason for independent testing·reuse differs. By default one exported component per file, with
   small private JSX helpers allowed. Splitting by LOC alone or a prop-forwarding wrapper is
   forbidden.
-- Direct network calls from a component are forbidden. transport·DTO adapters belong to the approved
-  api/network boundary, and query key/options·domain selectors are owned by the model boundary.
+- Direct network calls from a component are forbidden. Transport·DTO adapters belong to the approved
+  external-connection owner; query key/options and domain selectors stay with their existing state
+  or policy owner. These are responsibilities, not required directory names; only the applicable
+  approved architecture profile supplies their placement.
 - Separate the client·server public APIs so that server-only code does not leak into the client
   graph.
 
@@ -41,6 +43,12 @@ the required hooks. In a project without that `orchestration-only` policy, an ex
 may own a local workflow when the current contract and ownership remain clear. Moving the same
 responsibility to another file is not automatically an improvement.
 
+Apply the [calculation, coordination, connection, and presentation responsibilities](../changeability.md#separate-decisions-coordination-and-connections)
+without adding a layer for each. A React hook connects the existing operation to subscriptions and
+lifetime; it need not become the owner of every calculation or external adapter it calls. Reuse the
+current query/mutation/form APIs for their owned state and retries, and use an existing explicit
+dependency import when no additional seam is needed.
+
 - A UI component owns semantic JSX, accessibility, visual expression and user intent. Reuse the
   approved domain/transport/query owners; do not duplicate their policy, state or retry logic.
 - Extract a micro-hook when a React-connected responsibility above needs its own owner. Keep its
@@ -56,6 +64,11 @@ responsibility to another file is not automatically an improvement.
   state value, and for server state re-expose the query's `refetch` instead of a new action. Do not
   fill in no-op actions for things it cannot do.
 - query key/options·remote operations belong to the corresponding server-state boundary.
+- When repeated internal-data interpretation calls for a
+  [purpose-specific read](../changeability.md#provide-purpose-specific-reads), consume the owner's
+  selector or read contract and keep display formatting, translation, and style with the current
+  UI/presenter owner. Do not copy the derived representation into another state store. An already
+  suitable value needs no mapper or hook wrapper.
 - A view follows the repo's approved data/action ownership; this is not a rule to pass all data
   through props or call every hook only at a leaf.
 - Express pure computation as a function or during render. Use `useMemo` only when it is an

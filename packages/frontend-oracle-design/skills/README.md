@@ -358,8 +358,9 @@ Induction / Rule Organization: 관찰 가능한 context·action·outcome·suppor
 보존하고 필요한 작업 시점에만 읽습니다. 논문도 지침 로딩을 권한 변경이나 도구 가로채기로
 보지 않으며, 과잉 거절과 정상 작업 손실을 별도 문제로 다룹니다.
 
-**저장소에 맞춘 설계.** 별도 학습 시스템 대신 기존 reference 소유 노드에 여섯 개의
-`origin: existing-contract`, `status: proposed` seed를 구조화했습니다. 실제 사고에서 도출한
+**저장소에 맞춘 설계.** 여섯 개의 `origin: existing-contract`, `status: proposed` seed는
+`evals/boundary-cases.json`의 검사 전용 메타데이터에 두고 기존 reference 소유 노드를 연결합니다.
+런타임 문서에서 seed JSON을 읽지 않습니다. 실제 사고에서 도출한
 규칙이라고 주장하지 않습니다. 원본 실행 증거는 기존 산출물을 인용하고, 후보 검토는
 `card/retro-metrics.md` 한 곳이 소유합니다. 관찰 → 직접 증거/기존 원인 분류 → 후보 →
 중복·충돌·예외와 prevent/allow 검토 → 기존 저장소 검토·승인 → 후속 실행의 해당 graph

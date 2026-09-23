@@ -184,28 +184,3 @@ node <skill-dir>/scripts/oracle-run.mjs init \
 Print the open questions, a recommendation with rationale per question, and the current card. In
 this state, do not proceed to tests·implementation. If it was ever locked, print the last SHA-256
 and the mismatch as well. The current card is the resumption material for the next session.
-
-## Conditional seed — revision integrity
-
-Proposed existing-contract projection, not an incident, approval or extra gate. The linked contracts
-already apply; candidate management belongs to `card/retro-metrics.md`, not this stage.
-
-```json
-{
-  "id": "revision-integrity",
-  "revision": 1,
-  "status": "proposed",
-  "origin": "existing-contract",
-  "When": "Verification reports ORACLE_CHANGED, SOURCE_CHANGED or an invalid lock before a stage.",
-  "DoNot": "Automatically regenerate or overwrite the lock to clear the mismatch and reuse old evidence.",
-  "Unless": "No exception allows mismatch bypass. An approved new revision uses a new path after the source gate, full Draft/delta, cold-read and actual user re-confirmation. Identical-byte idempotent create remains allowed, not a mismatch repair.",
-  "Instead": "Discard prior RED/GREEN/review evidence; show the diff and current card. ORACLE_CHANGED or SOURCE_CHANGED routes to NEEDS_DECISION; LOCK_INVALID or an unrunnable lock command routes to FAIL. Preserve prior artifacts and generate fresh evidence only after locking the approved new revision.",
-  "ApplyAt": ["user confirmation", "lock", "writing tests", "independent review", "completion report"],
-  "authorityRefs": ["references/card/confirmation-lock.md#deterministic-revision-lock"],
-  "evidenceRefs": [],
-  "regressionCases": {
-    "mustPrevent": ["fod-sem-guard-revision-integrity-prevent"],
-    "mustAllow": ["fod-sem-guard-revision-integrity-allow"]
-  }
-}
-```

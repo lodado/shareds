@@ -1,6 +1,6 @@
 # Independent Subagent Card Review·Improvement
 
-**Last Updated:** 2026-09-15
+**Last Updated:** 2026-09-23
 
 ## Purpose and Independence
 
@@ -158,60 +158,11 @@ whether that source's stated jurisdiction applies to the finding. A hash cannot 
 The manifest is JSON schema version 1. Paths are repository-relative; `reviewPointRefs` use the
 registered packet criterion paths (for example `review-checklist.md`). All four selections occur once.
 The generator adds file `sha256` values; an optional supplied digest is checked, never trusted.
-Example shape for an isolated consumer change (replace every reason and path with investigated facts):
+The caller supplies `files`, `edges`, `selections`, and optional exploration `budget`
+(`maxFiles`, `maxEdges`, `exhausted`). Each file has `path`, `sourceKind`, `reason`, and `dimensions`;
+each selection has `dimension`, `applicability`, `reason`, `contextRefs`, `reviewPointRefs`, and
+`missingContext`. Budget values are exploration limits, not product thresholds.
 
-```json
-{
-  "schemaVersion": 1,
-  "files": [
-    {
-      "path": "src/search/Page.tsx",
-      "sourceKind": "implementation-reference",
-      "reason": "unchanged direct consumer of the changed search hook",
-      "dimensions": ["readability", "maintainability", "reliability"]
-    }
-  ],
-  "edges": [],
-  "selections": [
-    {
-      "dimension": "readability",
-      "applicability": "applicable",
-      "reason": "changed returned value meaning",
-      "contextRefs": ["src/search/Page.tsx"],
-      "reviewPointRefs": ["review-checklist.md"],
-      "missingContext": []
-    },
-    {
-      "dimension": "maintainability",
-      "applicability": "applicable",
-      "reason": "existing consumer compatibility",
-      "contextRefs": ["src/search/Page.tsx"],
-      "reviewPointRefs": ["review-checklist.md"],
-      "missingContext": []
-    },
-    {
-      "dimension": "reliability",
-      "applicability": "unresolved",
-      "reason": "request/error owner not yet inspected",
-      "contextRefs": ["src/search/Page.tsx"],
-      "reviewPointRefs": ["review-checklist.md"],
-      "missingContext": ["request and error owner"]
-    },
-    {
-      "dimension": "performance",
-      "applicability": "not-applicable",
-      "reason": "no changed execution workload or performance claim",
-      "contextRefs": [],
-      "reviewPointRefs": [],
-      "missingContext": []
-    }
-  ],
-  "budget": { "maxFiles": 20, "maxEdges": 40, "exhausted": false }
-}
-```
-
-This intentionally incomplete example cannot finalize a review: inspect the missing owner and
-regenerate the manifest/packet. Budget values are exploration limits, not product thresholds.
 Optional `ranges` are `{startLine,endLine}`. An `approved-policy` file additionally names its `sourceId`.
 An edge has `from`/`to` `{path,symbol?}`, `relation` (`imports`, `calls`, `consumes`, `owns-state`,
 `renders`, `handles-error`), `basis` (`observed`, `inferred`), original `path:line` evidence refs,
@@ -267,17 +218,11 @@ Open question or investigation action. It must not set policy or add a product c
 independence is unavailable, record the same-context fallback and limitation. Do not claim this
 review as evidence of implementation readiness, and keep the card-only cold-read and reverse review.
 
-Pin it with machine-generated input right before the review.
-
-```bash
-node <skill-dir>/scripts/oracle-run.mjs review-packet \
-  --dir .ai/oracles/<oracle-id> \
-  --decision .ai/oracles/<oracle-id>/implementation-decision.md \
-  --review-point <skill-dir>/references/review-checklist.md \
-  --review-point <skill-dir>/references/changeability.md \
-  --review-point <skill-dir>/references/types/review-criteria.md \
-  --output .ai/oracles/<oracle-id>/review-input.json
-```
+For Delivery review after GREEN, generate `review-input.json` with `oracle-run.mjs review-packet
+--dir <dir> --decision <decision> --review-point <criterion> --output <packet>`. Always pass the
+canonical `review-checklist.md` and `changeability.md` points; add conditional criteria only when
+applicable, and `--context <manifest>` when selected. This is
+not the pre-approval analyst input above.
 
 The packet holds as raw fields the last lock verify command·exit, the lock manifest, the full Oracle
 text, the full locked local source text, run state, ledger, evidence mapping, `targetRevision`,
@@ -296,42 +241,11 @@ packet's approval criteria·Design Intent together with the designer findings.
 The reviewer does not modify code and returns findings only. Modifying·approving policy·baseline is
 forbidden, and final baseline approval is left to the user.
 
-Findings are submitted through the schema file below instead of free-form prose and verified by
-machine.
-
-```json
-{
-  "schemaVersion": 2,
-  "reviewerRole": "code-reviewer",
-  "reviewerId": "code-reviewer:<stable-session-or-agent-id>",
-  "packetSha256": "<sha256(review-input.json)>",
-  "targetRevision": "<review-input.targetRevision>",
-  "changeabilityReview": [
-    { "axis": "Readability", "status": "PASS", "evidence": "src/form.tsx:10-30" },
-    {
-      "axis": "Predictability",
-      "status": "FINDING",
-      "evidence": "src/fetch-balance.ts:8",
-      "findingId": "f-1"
-    },
-    { "axis": "Cohesion", "status": "N/A", "evidence": "there is no changed ownership boundary" },
-    { "axis": "Coupling", "status": "PASS", "evidence": "there is no new public API" },
-    { "axis": "Simplicity", "status": "PASS", "evidence": "it reuses the existing platform API" }
-  ],
-  "findings": [
-    {
-      "id": "f-1",
-      "row": "O3",
-      "classification": "PRODUCT_DEFECT",
-      "severity": "high",
-      "source": "S1",
-      "finding": "fetchBalance performs analytics logging that is not evident in its name and return value",
-      "evidence": "review-input.json diff:src/fetch-balance.ts:8",
-      "fix": "move the analytics logging to a named event boundary"
-    }
-  ]
-}
-```
+Submit reviewer-produced findings JSON, not a free-form PASS. New artifacts use `schemaVersion: 2`,
+`reviewerRole`, stable `reviewerId`, `packetSha256`, `targetRevision`, `changeabilityReview`, and
+`findings`. Each finding records `id`, `row`, `classification`, `severity`, `source`, `finding`,
+`evidence`, and minimal `fix`. Each axis judgment records `axis`, `status`, `evidence`, and a
+`findingId` when it reports a finding.
 
 `changeabilityReview` judges the five axes exactly once each as `PASS | FINDING | N/A`. Every
 judgment needs path·line or packet field evidence. `FINDING` cites a real ID from the `findings`
@@ -340,31 +254,10 @@ reading past artifacts. New review verification requires v2, `reviewerRole`, `re
 `packetSha256`, and `targetRevision`. The two artifacts of High risk must have different
 `reviewerId`.
 
-```bash
-node <skill-dir>/scripts/oracle-verify.mjs findings \
-  --file .ai/oracles/<oracle-id>/findings-code-reviewer.json \
-  --oracle .ai/oracles/<oracle-id>/oracle.md
-
-node <skill-dir>/scripts/oracle-verify.mjs findings \
-  --file .ai/oracles/<oracle-id>/findings-a.json \
-  --intersect .ai/oracles/<oracle-id>/findings-b.json \
-  --oracle .ai/oracles/<oracle-id>/oracle.md
-
-node <skill-dir>/scripts/oracle-verify.mjs review \
-  --file .ai/oracles/<oracle-id>/findings-code-reviewer.json \
-  --oracle .ai/oracles/<oracle-id>/oracle.md \
-  --packet .ai/oracles/<oracle-id>/review-input.json \
-  --revision <targetRevision-from-review-packet> \
-  --map .ai/oracles/<oracle-id>/evidence.json
-
-node <skill-dir>/scripts/oracle-verify.mjs review \
-  --file .ai/oracles/<oracle-id>/findings-a.json \
-  --intersect .ai/oracles/<oracle-id>/findings-b.json \
-  --oracle .ai/oracles/<oracle-id>/oracle.md \
-  --packet .ai/oracles/<oracle-id>/review-input.json \
-  --revision <targetRevision-from-review-packet> \
-  --map .ai/oracles/<oracle-id>/evidence.json
-```
+Use `oracle-verify.mjs findings --file <findings> --oracle <card>` for shape/classification, then
+`oracle-verify.mjs review` with the current packet, revision and evidence map for binding and
+blocking checks. High risk supplies the second raw findings file through `--intersect`. The
+Controller records `oracle-run.mjs review-receipt`; final `transition` rechecks receipt and inputs.
 
 The classification is one of the upstream feedback router's `POLICY_GAP`, `EVIDENCE_GAP`,
 `HARNESS_DEFECT`, `PRODUCT_DEFECT`, `ENVIRONMENT_DEFECT`, `NON_ORACLE_OPINION`. Any other
@@ -402,7 +295,7 @@ structural judgment. Compare the Decision with the diff, callers, owners and exe
 
 The rowless medium/low normalization above is unchanged. It is not proof that a missing contract
 was resolved: the Controller must still use the existing decision/required-verification path.
-Do not attach an unrelated O* row or raise severity to bypass normalization. A mandatory global
+Do not attach an unrelated O\* row or raise severity to bypass normalization. A mandatory global
 critical/high concern retains its existing treatment; concrete cost alone does not make one.
 Do not require a finding count, a deletion, or a fix when the evidence supports keeping the code.
 
@@ -443,11 +336,7 @@ that test enforces the row it is mapped to was, until now, one checklist item �
 judgment by a reviewer who had already seen `evidence.json`. The blind mapping makes it a
 two-sample check: a context-free reviewer receives **only the card's contract rows and the test
 source files** — never `evidence.json`, the review packet, or the implementation decision — and
-returns, for every test name, the row or rows it enforces:
-
-```json
-{ "save > shows pending and POSTs once": ["O1", "O2"], "save > keeps input on 5xx": "O3" }
-```
+returns a JSON object mapping each test name to the row ID or array of row IDs it enforces.
 
 `oracle-verify.mjs review --blind-map <file>` compares it with the evidence mapping. A row whose test
 the blind reader mapped elsewhere, or to nothing, is `EVIDENCE_MAPPING_DISPUTED`. The remedy is never
@@ -461,17 +350,10 @@ frozen test sources (plus the registered harness helpers), with the mapping boun
 It does not claim complete dependency resolution: only registered harness paths travel with the
 tests, never arbitrary relative imports, so production modules stay out of the blind read.
 
-```bash
-node <skill-dir>/scripts/oracle-run.mjs blind-input --dir .ai/oracles/<oracle-id> \
-  --output .ai/oracles/<oracle-id>/blind-input.json
-
-# the blind reviewer reads only that file and writes the mapping, then the controller records it
-node <skill-dir>/scripts/oracle-run.mjs review-receipt --dir .ai/oracles/<oracle-id> \
-  --role blind-mapper --reviewer <blind reviewer id> --task-id <task id> \
-  --packet .ai/oracles/<oracle-id>/blind-input.json \
-  --findings .ai/oracles/<oracle-id>/blind-map.json \
-  --revision <targetRevision from blind-input.json>
-```
+Generate with `oracle-run.mjs blind-input --dir <dir> --output <input>`. The blind reviewer reads
+only that file and writes the mapping. The Controller then records `review-receipt` with
+`--role blind-mapper`, the actual `--reviewer` and `--task-id`, that input as `--packet`, the mapping
+as `--findings`, and the input's `--revision`.
 
 **The blind mapping is a gate, not an option.** High risk always requires it; Medium requires it when
 two or more rows share one test. Applicability is derived at the final `REVIEW_VERIFIED` transition

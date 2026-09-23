@@ -13,6 +13,25 @@ document's implementation heuristics and external cases. On conflict, follow the
 Toss material is only evidence for finding implementation candidates, not authority that forces
 anything on another repo.
 
+## Architecture-independent ownership
+
+A module is the smallest useful ownership scope with a clear responsibility and external contract:
+an existing function, object, file, directory, or package can be enough. It does not imply a new
+class, folder, or layer. A public contract includes inputs, results, failures, visible effects,
+and calling conditions, including relevant lifetime constraints; function signatures, hook returns,
+component props, methods, and package exports all participate.
+
+Choose ownership from approved business knowledge, invariants, reasons for change, dependencies,
+and lifetime before choosing paths. Placement translates that decision into the current repo's
+file and import rules; moving files alone does not repair ownership. Reuse a sufficient existing
+owner before introducing another boundary.
+
+In a small app, an existing feature function may suffice; in feature-first, MVC/MVVM, or layered
+code, use the actual policy, coordination, read, and external-system owners rather than deciding
+from their names. For packages, start from current consumers and exports. Only an existing or
+approved FSD project needs the [FSD mapping](fsd.md#domain-boundary-before-folder-structure).
+These principles do not activate an Oracle workflow or change its approval, lock, or evidence gates.
+
 ## How to read
 
 Read all of it before modifying production after `VALID_RED`. Do not score or fill in all five axes;
@@ -122,6 +141,34 @@ writes such as request, navigation, storage, analytics, and timer must be visibl
 and boundary. Make the external API read as user intent, but do not hide internal state transitions
 and lifecycle behind vague automation.
 
+### Meaningful operations
+
+When callers must coordinate setters, dependent fields, persistence, and cache updates to preserve
+one business invariant, offer the meaningful operation at its owner. This keeps the invariant's
+execution recipe from spreading across consumers. Ask: can the caller request the outcome, or must
+it reconstruct the internal update procedure? Keep failure, cancellation, retry, and external-effect
+semantics explicit; encapsulation is not a promise of server authorization, concurrency safety, or
+idempotency. Several entry points needing shared state must reach the same owning instance, not
+merely call hooks with the same name.
+
+A simple input setter or generic transport PATCH remains appropriate when it is the actual
+contract. A named function can be enough; neither a command object, generic executor, nor global
+command bus is required. See [consumer-facing contracts](types/api-surface.md#consumer-facing-contracts).
+
+### Separate decisions, coordination, and connections
+
+Distinguish domain calculation and judgment, operation ordering, communication/storage/SDK access,
+React subscription and lifetime management, and presentation. When these change for different
+reasons, separating their responsibilities limits the knowledge each consumer needs. Ask: what does
+this code decide, coordinate, connect to, and present?
+
+This is not a five-file design. Small operations can keep functions together; existing framework
+and module boundaries may already suffice. A React-independent calculation needs no hook, and a
+pure business rule still belongs to its business owner, not a global utility bucket. A current
+explicit import may express an external dependency adequately; do not create a port or DI layer
+for every call. [React application](frontend/authoring.md#2-set-declarative-ui-and-micro-hook-boundaries)
+adds lifecycle and presentation guidance without changing these owners.
+
 ### Core patterns
 
 - `get*`·`fetch*` has a hidden side effect → compose it at the caller or reveal the whole workflow in
@@ -175,6 +222,32 @@ Put the source, tests, mocks, and docs that change together for the same policy 
 at the nearest owner. Do not factor code out merely because it repeats; look at whether a real drift
 defect appears when only one side changes.
 
+### Own the business judgment
+
+When several consumers interpret the same approved rule, the policy definition belongs to one
+clear owner that supplies the judgment or operation. Co-locating copies of the condition is not
+cohesion. Distinguish assembling the required facts from applying the rule to them, so UI, hooks,
+and services do not each reinterpret it. Ask: would a policy change require several consumers to
+edit the same condition? Reuse a lower-level owner when one already exists. Similar nouns, JSX,
+or equal constants do not make independent policies one responsibility; neither a class nor a
+shared module is required.
+
+### Follow the actual direction of change
+
+Owning one rule differs from organizing implementations that change together. When adding kinds
+repeatedly changes each kind's defaults, validation, and presentation connection, keep that kind's
+responsibilities near its feature owner while preserving the calculation/presentation boundary.
+When kinds are few and closed but common operations change more often, a discriminated union and
+explicit switch may be simpler. Use current requirements, change history, or observed knowledge
+dispersion, not the mere presence of a branch, to choose an extension point.
+
+Ask: is the knowledge needed for the recurring change together, or has reuse coupled unrelated
+changes? One central selection or assembly point changing on registration is not automatically an
+Open/Closed violation. Distinguish label/order configuration from new validation or behavior;
+do not bury different policies in interacting boolean options. Preserve kind/value/validation
+relations rather than erasing them with `any`. No global registry or plugin platform follows from
+one local definition, and an existing owner must not be duplicated just to colocate a kind.
+
 ### Core patterns
 
 - The same business rule is duplicated in several places → gather it at the nearest domain owner.
@@ -216,10 +289,36 @@ Reduce the range of consumers that one change must know about or modify. Couple 
 but keep the public API, global store, shared util, transport DTO, and framework API from spreading
 wider than their responsibility.
 
+Coupling includes knowledge of another owner's data structure, calling order, update procedure,
+lifetime, and environment, not only imports.
+
+### Require a narrow, sufficient role
+
+When a collaborator needs only selected facts or capabilities, derive its contract from the actual
+collaboration instead of copying the supplier's entire public surface. This reduces dependence on
+unrelated store, Context, or SDK details. Ask: does the consumer need the whole object, or only this
+role? A single value is preferable when sufficient; handling a whole domain object is legitimate
+when that is the responsibility. Keep supplier assembly at the existing composition owner, not in
+every consumer. See [consumer-facing contracts](types/api-surface.md#consumer-facing-contracts) for
+type relationships; a new interface is not mandatory.
+
+### Provide purpose-specific reads
+
+When consumers repeatedly decode nested DTOs, provider codes, or relationships across stores,
+provide the read representation needed for that purpose at the appropriate owner. Ask: does the
+consumer read meaningful facts, or reconstruct internal knowledge? Separate response conversion,
+derived business meaning, and display/translation responsibilities. A UI presenter may own display
+formatting without becoming a generic hook that mixes business policy and JSX.
+
+Derive the representation from owned data rather than duplicating it in global state. If the
+existing shape already serves the consumer, keep it: a rename-only mapper or ViewModel layer adds
+no protection. Preserve loading, failure, and permission information the consumer needs. Expose a
+read contract only to its actual consumers; internal use alone does not require a public export.
+
 ### Core patterns
 
 - A global/public surface with only one consumer appears → keep it in local state·module. Except: an approved public contract is required
-- The UI knows the transport DTO·query key → convert to render-ready values at the mapper/model owner. Except: the UI itself owns that contract
+- The UI interprets transport or cache internals → use the purpose-specific read contract above. Except: the consumer legitimately owns that contract or needs an explicit query/prefetch collaboration
 - A store·context is created just for a short props hand-off → pass it from the nearest common owner. Except: it is state that is genuinely shared widely
 - An interface·adapter wraps a single implementation → use the implementation directly. Except: a current compatibility contract, shared implementations, or the present-boundary exception below justifies a seam
 - External APIs obscure a complex current policy or transition → compare a pure transition core and thin adapters. Except: an existing seam or local derivation already makes the contract clear and testable

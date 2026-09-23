@@ -76,29 +76,3 @@ Worked pair — same request, opposite verdicts:
 - **Do not carve.** "Fix the disabled-button styling and make the save button ignore duplicate
   clicks." The styling renders the very state the undecided policy defines, so the safe-looking half
   is not safe — it is the unresolved policy wearing a CSS costume.
-
-## Conditional seed — independent progress
-
-Proposed existing-contract projection, not an incident or a new gate. Low still reads this node
-alone: no candidate review, card, lock, ledger or extra artifact. The existing carve-out applies
-without waiting for approval of this seed.
-
-```json
-{
-  "id": "independent-progress",
-  "revision": 1,
-  "status": "proposed",
-  "origin": "existing-contract",
-  "When": "Only part of a mixed Low request is disqualified and the remainder may be independent.",
-  "DoNot": "Abandon the whole request solely because one part is blocked, or split work that shares the failure.",
-  "Unless": "If any of the three existing carve-out conditions fails or is unproven, promote the whole request; safety and approval boundaries still apply.",
-  "Instead": "Prove no shared state/side effects/types, correctness under every answer to the unresolved policy, and separate verification/revertibility. Record the existing descope line, route the risky part to Oracle and verify/finish only the eligible Low remainder. This is not permission to continue implementation in a NEEDS_DECISION Oracle run.",
-  "ApplyAt": ["Low disqualification", "scope carve-out"],
-  "authorityRefs": ["references/lanes/low-fast-path.md#carving-the-risky-scope-out--mixed-requests"],
-  "evidenceRefs": [],
-  "regressionCases": {
-    "mustPrevent": ["fod-sem-guard-independent-progress-prevent"],
-    "mustAllow": ["fod-sem-guard-independent-progress-allow"]
-  }
-}
-```

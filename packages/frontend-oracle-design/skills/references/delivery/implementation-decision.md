@@ -40,6 +40,31 @@ boilerplate that ceremonially fills every axis, record only material trade-offs.
 - Rejected: alternatives actually considered but not applied, the related quality axis and the concrete reason
 ```
 
+## Explain material choices
+
+When presenting an implementation plan or decision to the user, connect each material choice about
+responsibility, state/lifetime, public contracts, dependencies or external effects to its current-code
+rationale and the applied skill section. Cite its path with a heading anchor or verified current lines;
+explain why the rule fits the inspected owner, caller or approved contract, rather than quoting a slogan.
+Cite only material actually inspected, and label proposed owners and predicted benefits as proposals.
+
+In the user-facing explanation, show a minimal type shape and call-site or operation example when
+they clarify the changed contract or responsibility; omit either if it adds no information. Show only
+the relevant boundary, not a full implementation, and distinguish existing symbols from proposed ones.
+Illustrative snippets are not evidence of compilation or execution and do not authorize production edits before VALID_RED.
+
+Approved product/repository contracts govern. Existing code is evidence of the current structure;
+skill guidance and external implementations are not product-policy authority. If an external product
+implementation materially informed the choice, optionally cite its original file, symbol and commit
+permalink. Separate structural facts from our interpretation, stating what responsibility relationship
+is adopted and what does not transfer. Commercial use alone is not evidence of correctness, performance
+or suitability; do not infer author intent or measured gains from source structure.
+
+Keep this in the existing explanation and Decision/Sources entries, without duplicating the rationale.
+No mandatory external research, new fields, approval gate or loading stage is introduced; the Decision
+still follows VALID_RED. Trivial changes need no citation checklist or expanded plan. This rule does
+not activate Oracle for ordinary explanations or expand Low/Design-only into Delivery.
+
 ## Responsibility assignment
 
 For a material UI/business boundary change, use the existing State ownership, Hook boundary,

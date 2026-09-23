@@ -300,14 +300,8 @@
     },
     {
       "id": "delivery-lane",
-      "when": "entering Delivery after ORACLE_READY",
-      "nodes": [
-        "delivery-ledger",
-        "delivery-red",
-        "delivery-implementation-decision",
-        "delivery-green-review",
-        "subagent-review"
-      ]
+      "when": "Delivery entry only after ORACLE_READY; later phases follow oracle-run status action reads",
+      "nodes": ["delivery-ledger"]
     },
     {
       "id": "types-lane",
@@ -322,26 +316,14 @@
     },
     {
       "id": "frontend-lane",
-      "when": "a React production change — implementation decisions and authoring boundaries",
-      "nodes": [
-        "changeability",
-        "frontend-decisions",
-        "frontend-authoring",
-        "frontend-quality",
-        "architecture-contract"
-      ]
+      "when": "React implementation criteria when applicable; architecture-contract remains conditional",
+      "nodes": ["changeability", "frontend-decisions", "frontend-authoring", "frontend-quality"]
     },
     {
       "id": "delivery-lane-continued",
-      "when": "entering Delivery after ORACLE_READY when the card-lane bundle (or its exact nodes) is already in this context — same node set as delivery-lane without re-reading the overlap",
+      "when": "Delivery entry only after ORACLE_READY; later phases follow oracle-run status action reads when card-lane is already in context",
       "after": ["card-lane"],
-      "nodes": [
-        "delivery-ledger",
-        "delivery-red",
-        "delivery-implementation-decision",
-        "delivery-green-review",
-        "subagent-review"
-      ]
+      "nodes": ["delivery-ledger"]
     },
     {
       "id": "types-lane-continued",
@@ -357,15 +339,9 @@
     },
     {
       "id": "frontend-lane-continued",
-      "when": "frontend-lane condition met when the delivery-lane bundle (or its exact nodes) is already in this context — same node set as frontend-lane without re-reading the overlap; typically the architecture-contract read reached during Delivery",
+      "when": "React implementation criteria when applicable; architecture-contract remains conditional after the delivery entry bundle, omitting only already delivered nodes",
       "after": ["delivery-lane"],
-      "nodes": [
-        "changeability",
-        "frontend-decisions",
-        "frontend-authoring",
-        "frontend-quality",
-        "architecture-contract"
-      ]
+      "nodes": ["changeability", "frontend-decisions", "frontend-authoring", "frontend-quality"]
     }
   ],
   "bundleContract": {
@@ -377,7 +353,8 @@
       "Report the node ids in the lane header, never the bundle id.",
       "Never hand-edit bundles/ — edit the reference node and regenerate.",
       "A bundle contains every requires edge of its declared nodes, in dependency-first order.",
-      "A continuation bundle (`after`) delivers only the nodes its base bundles did not; the header lists the assumed nodes. Read it only when the base bundle's nodes are already in context — reading base + continuation equals reading the full lane node set once."
+      "A continuation bundle (`after`) delivers only the nodes its base bundles did not; the header lists the assumed nodes. Read it only when the base bundle's nodes are already in context — reading base + continuation equals reading the full lane node set once.",
+      "delivery-lane is entry-only. Later phase reads come from oracle-run status; resolve their reference-graph dependencies, reading only missing applicable nodes."
     ]
   }
 }

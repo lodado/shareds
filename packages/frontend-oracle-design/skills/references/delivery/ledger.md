@@ -25,8 +25,6 @@ before securing `VALID_RED` is forbidden.
   the change exactly, record only the path and the source hash.
 - Preserve existing worktree changes and do not modify unrelated files.
 
-## Compressed schedule
-
 ## Delivery capability discovery — before expensive artifacts
 
 When Delivery is explicit at intake, after risk and source investigation and before writing the
@@ -71,26 +69,10 @@ append-only ledger. provenance holds the skill version, optional runtime/model, 
 snapshot, and capability context. Do not store the raw prompt; if needed, put only a hash or
 sanitized metadata into `--capability-context`. A run that is not in the ledger is not evidence.
 
-```bash
-node <skill-dir>/scripts/oracle-run.mjs exec \
-  --dir .ai/oracles/<oracle-id> --label red-1 \
-  --report <reporter-output-path> \
-  --runtime codex --model '<model-or-host>' \
-  --capability-context '<sanitized-json-or-hash>' \
-  -- <actual test command of the repo>
-```
-
-For a run that a transition immediately follows, the `red`·`green` subcommands record the exec and the
-transition in one call — the verification is identical to the two-step path. Add only `--evidence`
-(and `--row` for RED) to the `exec` flags.
-
-```bash
-node <skill-dir>/scripts/oracle-run.mjs red \
-  --dir .ai/oracles/<oracle-id> --label red-1 \
-  --adapter node-test --report <reporter-output-path> \
-  --evidence .ai/oracles/<oracle-id>/evidence.json --row O1 \
-  -- <actual test command of the repo>
-```
+Use `exec --dir <dir> --label <label> --adapter node-test --report <path> -- <repo command>`
+for reported tests. For an immediate execution/transition pair, `red` or `green` performs the same
+checks in one call; add `--evidence <map>` and RED's `--row <row>`. Discover flags through the
+runner's usage; `status --dir <dir>` supplies state-specific transition commands.
 
 - Only a run that passes `--adapter node-test` together with `--report` becomes `grade: reported`.
   This is because the Oracle directly owns and injects the reporter module and the output
@@ -120,29 +102,20 @@ node <skill-dir>/scripts/oracle-run.mjs red \
 
 ## Status query and resume
 
-Resuming does not invent state with a new command; it recomputes from the existing
-lock·`run-state.json`·`runs.jsonl`·budget·evidence. Run it first after a session start or a context
-summary.
+Run `node <skill-dir>/scripts/oracle-run.mjs status --dir <dir>` after init, on resume, or after
+rejection. It recomputes from the lock, state, ledger, budget and evidence; it creates no new state.
+The default output lists the current state, blockers, and each legal action's command and
+dependency-closed reference paths. Read only the chosen action's missing references; conditional
+loads still apply. Do not pre-read all later phases.
 
-```bash
-node <skill-dir>/scripts/oracle-run.mjs status \
-  --dir .ai/oracles/<oracle-id> \
-  --json
-```
+`status --json` retains the machine packet (`nextLegalActions`, `nextActions`, `requires`,
+`candidateRuns`, primary `readNodes`, `example`); JSON consumers resolve reference dependencies.
+Neither view is a verdict: `transition` repeats every check. Escape actions `NEEDS_DECISION` and
+`FAIL` remain available; their presence is not a recommendation to abandon recoverable work.
 
-The output holds `currentState`, `currentSnapshot`, `lockStatus`, `staleOrMissingRuns`,
-`orphanedRun`, `remainingBudgets`, `blockers`, `nextLegalActions`, `nextActions`. `nextActions` is
-the execution packet: one entry per legal transition with `ready`, its `blockers`, the `requires`
-flags, the fresh `candidateRuns` that satisfy the run predicate, the `readNodes` worth opening for
-that step, and an `example` command. The advertised flags mirror what `transition` actually
-requires — resume needs `--run`, skipping RED adds `--reason`, review adds `--packet`/`--revision`,
-and escape transitions (`NEEDS_DECISION`/`FAIL`) stay open even when evidence is missing. Pick one
-step from the packet instead of re-reading the whole procedure; the packet is not a verdict,
-`transition` repeats every check. A stale run is past evidence that
-differs from the current lock/worktree/production snapshot and is not reused. `orphanedRun` is a run
-that has a `.run-ids` reservation but no ledger completion record. Do not reuse the same runId by
-hand; run a new `exec`. State file writes are performed only with temp file + atomic rename and are
-never edited directly.
+A stale run no longer matches the current lock/worktree/production snapshot. An `orphanedRun` has
+an ID reservation but no completion record. Neither is reusable: run a fresh `exec`, never edit a
+runId. State writes use temp file + atomic rename; never hand-edit `run-state.json` or `runs.jsonl`.
 
 ### What this harness cannot adjudicate
 
@@ -163,64 +136,6 @@ never edited directly.
   map is an error, not a reason to omit it from identity. Spending still requires fresh RED→GREEN
   for changed bindings; it neither increases the two-round limit nor reopens terminal `FAIL`.
 
-## Conditional seed — verified commands
-
-Proposed existing-contract projection, not an incident, approval or extra gate. The linked contracts
-already apply; candidate management belongs to `card/retro-metrics.md`, not this stage.
-
-```json
-{
-  "id": "verified-command",
-  "revision": 1,
-  "status": "proposed",
-  "origin": "existing-contract",
-  "When": "A required command, path or option is missing, unknown, or failed to start.",
-  "DoNot": "Repeat guessed command names, paths or flags, or describe those attempts as passing verification.",
-  "Unless": "A retry has support from inspected scripts/configuration or documented tool help and is allowed by scope and remaining applicable budget. Rerunning the unchanged GREEN command for the required consecutive-pass gate is not guessing.",
-  "Instead": "Inspect actual package scripts, runner configuration, installed command help and paths. Run the verified supported command through exec when judging Delivery. Investigate unknown capability; if required judgment remains impossible, report the actual cause as ENVIRONMENT_DEFECT -> FAIL without production changes. Keep successful independent evidence and unverified scope distinct; do not reset or borrow budgets.",
-  "ApplyAt": ["Delivery capability discovery", "adjudication commands", "status query and resume"],
-  "authorityRefs": [
-    "references/delivery/ledger.md#delivery-capability-discovery--before-expensive-artifacts",
-    "references/delivery/green-review.md#green-gate",
-    "references/common.md#feedback-routing--canonical-classification"
-  ],
-  "evidenceRefs": [],
-  "regressionCases": {
-    "mustPrevent": ["fod-sem-guard-verified-command-prevent"],
-    "mustAllow": ["fod-sem-guard-verified-command-allow"]
-  }
-}
-```
-
-## Conditional seed — authorized scope
-
-Proposed existing-contract projection, not an incident, approval or extra gate. The linked contracts
-already apply; candidate management belongs to `card/retro-metrics.md`, not this stage.
-
-```json
-{
-  "id": "authorized-scope",
-  "revision": 1,
-  "status": "proposed",
-  "origin": "existing-contract",
-  "When": "A recovery or implementation would change files, dependencies, configuration or external state.",
-  "DoNot": "Expand beyond the approved request/contract or overwrite unrelated user changes to make the task pass.",
-  "Unless": "The necessary change is already within approved scope and the applicable state, source and evidence gates permit it. Existing approval suffices; genuinely new scope needs the existing decision/approval route, and contract meaning changes need a new confirmed revision.",
-  "Instead": "Check the current diff, ownership and real scripts/config first; prefer the existing test boundary without adding a dependency. Perform only authorized reversible recovery within budget. Preserve pre-RED production protection and declared harness paths. Stop the affected action for a missing decision, rather than silently installing or reconfiguring; continue only other work the existing state and scope permit.",
-  "ApplyAt": ["Delivery capability discovery", "writing tests", "production implementation", "self-feedback"],
-  "authorityRefs": [
-    "references/delivery/ledger.md#authority-and-entry-conditions",
-    "references/delivery/red.md",
-    "references/card/confirmation-lock.md#run-artifact-initialization"
-  ],
-  "evidenceRefs": [],
-  "regressionCases": {
-    "mustPrevent": ["fod-sem-guard-authorized-scope-prevent"],
-    "mustAllow": ["fod-sem-guard-authorized-scope-allow"]
-  }
-}
-```
-
 ## Optional task-scoped implementation worker
 
 Use this path when one approved Medium/High implementation task benefits from a fresh context.
@@ -233,22 +148,9 @@ The existing runner issues the packet, dispatches one worker, collects its submi
 checks, and calls the existing transition validator. A worker's `PASS` or completion narrative
 has no authority. There is no extra product state machine or budget ledger.
 
-After `$test` has established `VALID_RED`, save a task specification inside the Oracle directory:
-
-```json
-{
-  "taskId": "save-pending",
-  "goal": "Implement O1 pending behavior without changing its approved tests",
-  "rows": ["O1"],
-  "writablePaths": ["src/save.ts"],
-  "referenceNodes": [],
-  "notApplicable": {
-    "backend": "No backend or data-access boundary changes"
-  },
-  "testSkill": "/absolute/path/to/installed/test/SKILL.md",
-  "replaySafeLabels": ["behavior", "impact", "lint:exit", "typecheck:exit"]
-}
-```
+After `$test` has established `VALID_RED`, supply a task JSON inside the Oracle directory. It is
+caller input, not generated state: `taskId`, `goal`, card `rows`, `writablePaths`, `referenceNodes`,
+`notApplicable` reasons, absolute installed `testSkill` path, and `replaySafeLabels`.
 
 `writablePaths` contains exact production file paths relative to the scan root, never directories
 or globs. Tests, harness inputs, configuration, dependency manifests and Oracle artifacts are

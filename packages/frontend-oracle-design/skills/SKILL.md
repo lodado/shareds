@@ -69,6 +69,10 @@ Lane routing:
   Read that node with its dependencies at this point, not only after contract rows are drafted.
 - Report meaningful changes only. Keep facts, assumptions, recommendations, and ledger-backed results
   distinct; the existing Final report remains authoritative for completion evidence and state.
+- When explaining material implementation choices, state the choice, current-code rationale, and
+  applied skill section actually read, with short illustrative type or code examples where useful.
+  Follow the [explanation guidance](references/delivery/implementation-decision.md#explain-material-choices)
+  at its normal load point; this adds no earlier load or approval.
 - Human attention briefs lead with the changed user outcome, linked evidence, and unresolved
   decisions; keep the full Draft/delta and independent reviewers' raw inputs intact. After GREEN,
   `oracle-run.mjs review-brief` derives a read-only evidence index from the current packet and
@@ -128,19 +132,19 @@ owns each node's `when` as the canonical load condition. The bullets below resta
 because this file is what gets read at runtime — they are a projection of the graph, kept in sync by
 `skill-contract.test.mjs`, not a duplicate to collapse.
 
-A lane reads the same node set in the same order every run, and reading them as separate calls
-changes the prompt prefix each time and loses the cache. `bundles/` holds those node sets pre-joined
-in dependency-first order — `card-lane`, `delivery-lane`, `types-lane`, `frontend-lane` — generated
-from the graph by `scripts/generate-reference-bundles.mjs`. Reading a bundle is optional and equals
-reading its nodes: same bytes, one call, stable prefix. When a base bundle's nodes are already in
-this context, prefer the matching `-continued` continuation bundle (`delivery-lane-continued`,
-`types-lane-continued`, `frontend-lane-continued`): it delivers the same lane node set minus the
-overlap already read, and its
-header names the assumed nodes. Base plus continuation equals the full lane read once; without the
-base in context, read the full lane bundle instead. It is a delivery mechanism, never an
-authority, so **the lane header still reports the node ids, not the bundle id**, and a node outside
-any bundle is still read directly. Never hand-edit `bundles/` — edit the reference and regenerate;
-`--check` fails the build on drift.
+`bundles/` optionally joins reference nodes in dependency-first order with the same bytes and a
+stable prefix. Use a `-continued` bundle only when its header's assumed nodes are already loaded;
+otherwise read the full bundle or individual nodes. **Report node ids, not the bundle id.**
+Bundles are a delivery mechanism, never an authority. Never hand-edit `bundles/` — edit references
+and regenerate with `scripts/generate-reference-bundles.mjs`; `--check` detects drift.
+
+Delivery bundles are **entry only**: common rules and `delivery/ledger.md`, not all later phases.
+After init, run `oracle-run.mjs status --dir <dir>` at entry, resume, and after a rejection. Select
+the current action, read its listed references with dependencies if not already loaded, and run
+the printed command with actual inputs. Do not load every future action's references. Conditional
+architecture, backend, type, and visual guidance below still applies. Status is advisory;
+`transition` rechecks the gates and only success advances the state. Follow the rejection code and
+recovery hint, never bypass it by editing state or evidence.
 
 Read `when` as the decision point, not the deliverable stage. If applicability is ambiguous, load.
 Whether to skip a load is not a judgment call. The read instructions inlined into each step of
@@ -149,8 +153,9 @@ Whether to skip a load is not a judgment call. The read instructions inlined int
 Conditional execution guidance stays at the existing owner nodes: check confirmation-lock on a
 revision mismatch. In Delivery only, check delivery/ledger before an uncertain command or scope-changing recovery;
 delivery/red before a test/harness correction on the RED-to-GREEN path; delivery/green-review
-before reporting completion with missing or failed evidence. Within the loaded node, match `When`
-and `ApplyAt`; this is not an extra approval or delivery state. For a reusable execution observation,
+before reporting completion with missing or failed evidence. These are existing load conditions,
+not an extra approval or delivery state; proposed guardrail seeds live in eval metadata, not runtime
+instructions. For a reusable execution observation,
 use card/retro-metrics' candidate review after immediate existing feedback routing. Low checks only
 its own scope carve-out at disqualification, with no additional node or artifact.
 
@@ -176,11 +181,12 @@ its own scope carve-out at disqualification, with no additional node or artifact
   guardrail candidate review from execution observations, none a gate; Low never loads this node,
   [`card/confirmation-lock.md`](references/card/confirmation-lock.md).
 - Delivery: right after entering Delivery, explicitly load and invoke the installed `$test` skill
-  by name; [`delivery/ledger.md`](references/delivery/ledger.md),
-  [`delivery/red.md`](references/delivery/red.md),
-  [`delivery/implementation-decision.md`](references/delivery/implementation-decision.md),
-  [`delivery/green-review.md`](references/delivery/green-review.md),
-  [`subagent-review.md`](references/subagent-review.md). Review criteria are not pasted into
+  by name and read [`delivery/ledger.md`](references/delivery/ledger.md). Load later nodes with
+  their dependencies when needed: [`delivery/red.md`](references/delivery/red.md) before tests/RED;
+  [`delivery/implementation-decision.md`](references/delivery/implementation-decision.md) before
+  production edits after VALID_RED; [`delivery/green-review.md`](references/delivery/green-review.md)
+  for self-feedback/GREEN; [`subagent-review.md`](references/subagent-review.md) for review dispatch.
+  Review criteria are not pasted into
   prompts — pass only the reference files matching the diff via `review-packet --review-point`.
   Delivery only: before contextual packet collection and independent review after implementation/test
   verification, use the existing `subagent-review` node for `--context` file selection and snapshot
@@ -329,8 +335,8 @@ edits or dependency installation for design-only requests, or replace Draft gene
 
 When implementation, test-based self-verification, and subagent review are explicitly requested:
 
-1. After the Design-only procedure, read [`delivery/ledger.md`](references/delivery/ledger.md) and
-   [`delivery/red.md`](references/delivery/red.md). If Delivery was known from the start, defer the
+1. After the Design-only procedure, read [`delivery/ledger.md`](references/delivery/ledger.md).
+   If Delivery was known from the start, defer the
    lock until architecture·backend source decisions are made. Design Intent never proceeds without
    a recorded Design Change Confirmation.
 2. For React architecture boundary·state ownership·public API changes check
@@ -339,9 +345,11 @@ When implementation, test-based self-verification, and subagent review are expli
    finalization: card lint → create the final lock once with the same source set. Never extend an
    existing lock — confirm and lock a new revision.
 4. Pin the repo's real required command labels with `oracle-run.mjs init --required-label`,
-   creating the run ledger and state files. The revision lock is auto-verified immediately before
-   each stage.
-5. Invoke the `$test` skill explicitly right before writing test files; write and run tests first.
+   creating the run ledger and state files. Run `oracle-run.mjs status --dir <dir>` for the current
+   action's reads and command; call `transition` (or the combined `red`/`green` command) at every
+   state change. The revision lock is auto-verified immediately before each stage.
+5. Read [`delivery/red.md`](references/delivery/red.md) with its dependencies.
+   Invoke the `$test` skill explicitly right before writing test files; write and run tests first.
    Map the reporter's failing test names to card rows; only a run that passes
    `oracle-verify.mjs red` and then records `oracle-run.mjs transition --to VALID_RED` is
    `VALID_RED`.

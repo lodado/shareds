@@ -11,10 +11,11 @@ Neither source approves product policy or a migration. See the pinned sources at
 ## Domain boundary before folder structure
 
 Treat a slice as a product/domain responsibility boundary, not a bucket for a technical file type.
-High cohesion means the rules, state, effects, UI, tests, and mappings serving that responsibility
-have a clear owner and can change together. Low coupling means other responsibilities need its
-public contract, not its internal store, query keys, DTOs, or execution recipe. A legal import graph
-is necessary structural evidence, not proof that the domains are well designed.
+Apply the [architecture-independent ownership criteria](changeability.md#architecture-independent-ownership),
+[cohesion](changeability.md#cohesion), and [coupling](changeability.md#coupling) before mapping paths.
+Map a responsibility to the appropriate existing slice, preserving any entity or lower-layer owner
+instead of copying its rules into each feature. A legal import graph is necessary structural
+evidence, not proof that the domains are well designed.
 
 A business domain can involve several slices on different layers; one slice is not automatically
 a DDD bounded context, backend service, database table, or aggregate. Layer chooses responsibility
@@ -54,10 +55,13 @@ fill every cell. Keep policy definitions in their existing approved source and c
 
 ### Deep public seam, not a barrel over internals
 
-Adapt the deep-module idea to the slice's public API: offer useful domain behavior behind a contract
-that needs less caller knowledge than the implementation it hides. Count concepts and required
-ordering, not exports or lines of code. A single generic hook with mode flags and independent state
-owners can be more coupled than several explicit actions.
+Map [meaningful operations](changeability.md#meaningful-operations),
+[collaborator roles](changeability.md#require-a-narrow-sufficient-role), and
+[purpose-specific reads](changeability.md#provide-purpose-specific-reads) to the slice's public API.
+Keep their implementation in the owning internal responsibility; the public entry re-exports only
+what current outside consumers need. It is not a file for implementing every operation. Internal
+UI-only reads need no public export. An explicit SSR/prefetch collaboration may legitimately expose
+query options; this does not permit exposing all cache internals or same-layer sibling imports.
 
 - A payment consumer should express intent and observe approved outcomes, not decode provider DTOs,
   reconstruct query keys, or repeat cache invalidation steps. Keep mapping and workflow policy at
@@ -136,13 +140,20 @@ automated enforcement. Report a walkthrough as predicted impact, not measured lo
 
 ## Slices and segments
 
+The following is this profile's responsibility mapping, not the only valid React or FSD layout.
+If the target repo has another approved hook/query placement, follow that convention. Apply the
+[responsibility separation](changeability.md#separate-decisions-coordination-and-connections) and
+[change-direction criterion](changeability.md#follow-the-actual-direction-of-change) within the
+chosen owner; neither a new slice nor a segment per responsibility is required.
+
 - A slice is a business domain unit and is the folder directly under a layer.
 - The standard segments are only `ui`, `model`, `api`, `lib`, `config`.
   **`components`, `hooks`, and `utils` are not FSD segments.**
   - Put components and view-logic hooks in `ui`.
-  - Put state·business-logic hooks, stores, and query keys/options in `model`.
-  - Put transport, DTO conversion, and request functions in `api`.
-  - Put pure computations·helpers in `lib`.
+  - Put business calculations, state·business-logic hooks, stores, and query keys/options in `model`.
+  - Put transport, parsing, DTO conversion, and request functions in `api`.
+  - Put non-policy computations·helpers in `lib`; purity alone does not move a business rule out of
+    its `model` owner or justify promotion to `shared`.
 - A hook that owns an interaction workflow (for example a mutation hook) belongs to `model`.
   Do not create a `hooks/` folder and mix model and ui responsibilities.
 - Name files inside a segment on a domain basis (`model/user.ts`,

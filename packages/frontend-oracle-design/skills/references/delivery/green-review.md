@@ -1,6 +1,6 @@
 # Delivery — minimal implementation·GREEN gate·review transition
 
-**Last Updated:** 2026-09-15
+**Last Updated:** 2026-09-23
 
 ## Minimal implementation·self-feedback
 
@@ -108,15 +108,11 @@ passing. If there is no documented command, read the package scripts and run the
 plus the closest package verification. If a required root command is missing or there is an unrelated
 pre-existing failure, report the raw text and the impact separately and do not hide it behind GREEN.
 
-Then attempt the `--to IMPLEMENTED_GREEN` transition. Machine checks:
-
-- `ORACLE_CHANGED` — the card·source bytes differ from the locked values → discard the evidence and `NEEDS_DECISION`
-- `RUN_NOT_GREEN` — the quoted run did not pass → produce an actually passing run and quote it
-- `EVIDENCE_REQUIRED` — a state transition was attempted without an evidence manifest → map every row of the locked card and quote it with `--evidence`
-- `REQUIRED_RUN_MISSING` — there is no latest pass for a declared required label → re-run that repo command with `exec --label`
-- `FLAKINESS_GATE` — consecutive passes of the same command fall short of the count the risk requires → re-run the same command as-is to secure consecutive passes
-- `TEST_WEAKENED` — assertions decreased, forbidden tokens, or deletions relative to the RED baseline → restore the tests to their original strength
-- `ENV_DRIFT`(warning) — the RED and GREEN execution environments differ → confirm whether the environment difference changed the result and leave it in the report
+Attempt the `--to IMPLEMENTED_GREEN` command from `status`; a rejected command does not advance
+state. Follow its code and recovery hint: `ORACLE_CHANGED` invalidates evidence;
+`RUN_NOT_GREEN`, `EVIDENCE_REQUIRED` and `REQUIRED_RUN_MISSING` require real runs/mappings;
+`FLAKINESS_GATE` requires the existing consecutive-pass count; `TEST_WEAKENED` requires restoring
+test strength. Report `ENV_DRIFT` and investigate whether it affected the result.
 
 The required flakiness count is Low 1, Medium 2, High 3. It is not about extracting a pass by
 re-running but a procedure for showing that **the same command passes deterministically even when
@@ -137,40 +133,12 @@ verified by machine. Do not move row IDs by hand; generate the skeleton from the
 fill in only the values — this removes the round trip where the row set diverges from the card and
 comes back as `EVIDENCE_MISSING_ROW`·`EVIDENCE_UNKNOWN_ROW`.
 
-```bash
-node <skill-dir>/scripts/oracle-verify.mjs evidence-scaffold \
-  --oracle .ai/oracles/<oracle-id>/oracle.md > .ai/oracles/<oracle-id>/evidence.json
-```
-
-Replace the `<...>` slots in the generated output with the actual test name·artifact·finding·source.
-An unfilled placeholder fails `evidence` verification as-is.
-
-```json
-{
-  "schemaVersion": 1,
-  "rows": {
-    "O1": { "kind": "test", "name": "save > shows pending and POSTs once" },
-    "O2": { "kind": "test", "name": "save > shows pending and POSTs once" },
-    "O3": { "kind": "na", "reason": "this feature has no cancel path", "source": "S1" },
-    "O4": { "kind": "reviewer", "finding": "f-3", "role": "code-reviewer" },
-    "D1": { "kind": "visual", "artifact": "visual-qa/v-001/evidence.json" },
-    "D2": { "kind": "reviewer", "finding": "d-1", "role": "designer" }
-  }
-}
-```
-
-`O1`·`O2` above quote one test on purpose: one observation covers both rows, and splitting it would
-buy a second export rather than a second observation. Give a row its own test name only when it needs
-its own observation.
-
-```bash
-node <skill-dir>/scripts/oracle-verify.mjs evidence \
-  --oracle .ai/oracles/<oracle-id>/oracle.md \
-  --map .ai/oracles/<oracle-id>/evidence.json \
-  --ledger .ai/oracles/<oracle-id>/runs.jsonl \
-  --run r-007 \
-  --phase green
-```
+Run `oracle-verify.mjs evidence-scaffold --oracle <card> > <new-map>` once, then fill the generated
+slots with actual test names, artifacts, findings or sources. Do not overwrite populated evidence
+on resume. An unfilled placeholder fails verification. One observation may cover multiple rows;
+give a row a separate test only when it needs its own observation, not an invented production export.
+Validate with `oracle-verify.mjs evidence --oracle <card> --map <map> --ledger <ledger> --run <id>
+--phase green`; the GREEN transition requires and rechecks the same manifest.
 
 `D*` row owners: `HARD → test`, `RELATIONAL → visual | pending`, `JUDGMENT → designer
 reviewer`. A visual `pending` or a Visual QA `declined` is reported as an unverified item in GREEN
@@ -179,58 +147,13 @@ To reach `REVIEW_VERIFIED`, one of an existing tool browser journey artifact, a 
 source-backed N/A revision is required. N/A is used not as an artifact but only when the locked card row
 states `N/A (source: S*)` and the manifest quotes an approved Source Registry ID.
 
-A RELATIONAL visual artifact receipt must be a regular file inside the Oracle directory, artifact paths inside the receipt must be relative to the receipt directory, and the minimum format is
-as follows.
-
-```json
-{
-  "schemaVersion": 2,
-  "oracleSha256": "<locked-oracle-sha256>",
-  "rows": {
-    "D1": {
-      "status": "passed",
-      "journey": {
-        "status": "passed",
-        "tool": "playwright",
-        "scenario": "primary purchase card at 320px and desktop",
-        "checks": ["CTA does not overlap price"],
-        "artifacts": ["mobile.png"]
-      }
-    }
-  }
-}
-```
-
-If only the browser journey is N/A, the row itself must still be `status: "passed"`, and row-level `checks`/`artifacts` and the approved source the row quotes are required. A whole-row N/A uses not an artifact but only `kind: "na"` in the manifest above.
-
-```json
-{
-  "schemaVersion": 2,
-  "oracleSha256": "<locked-oracle-sha256>",
-  "rows": {
-    "D1": {
-      "status": "passed",
-      "checks": ["Static relation reviewed from approved design source"],
-      "artifacts": ["d1.png"],
-      "journey": {
-        "status": "not-applicable",
-        "reason": "No interactive browser journey for this static relation",
-        "source": "S1"
-      }
-    }
-  }
-}
-```
-
-The GREEN transition takes the same manifest as a required input.
-
-```bash
-node <skill-dir>/scripts/oracle-run.mjs transition \
-  --dir .ai/oracles/<oracle-id> \
-  --to IMPLEMENTED_GREEN \
-  --run r-007 \
-  --evidence .ai/oracles/<oracle-id>/evidence.json
-```
+A RELATIONAL receipt is a regular file inside the Oracle directory; artifact paths are relative
+to that receipt. Use the existing trusted `node-test` producer's schema-v3 artifact, not hand-written
+PASS JSON. The manifest's `sha256` pins the receipt; its producer binds `runId`, `tool`, `status`
+and `worktreeSha256` to a matching reported `node-test` Playwright ledger run, with digest-bound
+nested artifacts. Bind the locked `oracleSha256`, row status and passing journey's tool, scenario,
+checks and artifacts. A journey-only N/A still needs a passed row, row-level checks/artifacts and the
+approved source; whole-row N/A belongs in the evidence manifest, not a visual receipt.
 
 `kind: test` requires that the same name exists as a pass in the reporter result of the quoted run.
 `EVIDENCE_NOT_IN_RUN` = the mapping diverges from the actual run, `EVIDENCE_UNVERIFIABLE` = the run is
@@ -263,12 +186,7 @@ users understand the UI or need the feature; keep those claims tied to separate 
 Generate the machine evidence index after `IMPLEMENTED_GREEN`, with a current source lock and packet
 and ledger-bound reviewer receipts for the supplied findings:
 
-```bash
-node <skill-dir>/scripts/oracle-run.mjs review-brief \
-  --dir .ai/oracles/<oracle-id> \
-  --packet .ai/oracles/<oracle-id>/review-input.json \
-  --findings .ai/oracles/<oracle-id>/findings-code-reviewer.json
-```
+Run `oracle-run.mjs review-brief --dir <dir> --packet <packet> --findings <findings>`.
 
 Add `--intersect <second-findings-file>` for the second review. Output is stdout-only Markdown by
 default; `--json` selects JSON. There are no implicit file writes and the raw packet is unchanged.
@@ -298,21 +216,9 @@ digests are the same as at GREEN, and if bytes changed from reflecting findings,
 demands a re-run — re-running the same bytes does not add evidence. The review artifact must have no
 blocking finding.
 
-```bash
-node <skill-dir>/scripts/oracle-verify.mjs review \
-  --oracle .ai/oracles/<oracle-id>/oracle.md \
-  --file .ai/oracles/<oracle-id>/findings-code-reviewer.json \
-  --packet .ai/oracles/<oracle-id>/review-input.json \
-  --revision <targetRevision-from-review-packet> \
-  --map .ai/oracles/<oracle-id>/evidence.json
-
-node <skill-dir>/scripts/oracle-run.mjs transition \
-  --dir .ai/oracles/<oracle-id> \
-  --to REVIEW_VERIFIED \
-  --run r-010 \
-  --evidence .ai/oracles/<oracle-id>/evidence.json \
-  --findings .ai/oracles/<oracle-id>/findings-code-reviewer.json
-```
+Validate findings with `oracle-verify.mjs review`, then use the `REVIEW_VERIFIED` action printed
+by `status`. Supply the current evidence, packet, target revision, findings and ledger-bound review
+receipt; [`subagent-review.md`](../subagent-review.md) owns reviewer and blind-mapping requirements.
 
 High risk passes the reported failing run with the guard removed after GREEN and the affected card row
 via `--mutation-run`·`--mutation-row`, and after restoring the guard makes the same GREEN command pass
@@ -353,32 +259,3 @@ In addition to the common prohibitions in [`common.md`](../common.md):
 
 If it is still not GREEN after 3 rounds, report `FAIL` including the remaining card violations and the
 actual output. Do not do unbounded self-improvement.
-
-## Conditional seed — truthful evidence
-
-Proposed existing-contract projection, not an incident, approval or extra gate. The linked contracts
-already apply; candidate management belongs to `card/retro-metrics.md`, not this stage.
-
-```json
-{
-  "id": "truthful-evidence",
-  "revision": 1,
-  "status": "proposed",
-  "origin": "existing-contract",
-  "When": "A progress or completion report includes failed, unexecuted, stale, exit-only or missing required evidence.",
-  "DoNot": "Present those checks as PASS, fabricate runIds/artifacts, or claim REVIEW_VERIFIED without its required evidence and transition.",
-  "Unless": "No exception makes absent evidence a pass. Actually passing local checks may be reported with their real scope/runId even when required browser evidence is unavailable. A source-backed N/A uses the existing approved revision and manifest procedure.",
-  "Instead": "Separate actual run results from unverified scope and name the blocking evidence. Repair EVIDENCE_GAP only inside the locked contract. POLICY_GAP stays NEEDS_DECISION; impossible required environment judgment stays ENVIRONMENT_DEFECT -> FAIL. Visual pending may retain IMPLEMENTED_GREEN only as existing manifest rules permit, never REVIEW_VERIFIED. Do not erase real local passes or relax gates.",
-  "ApplyAt": ["self-feedback", "IMPLEMENTED_GREEN", "REVIEW_VERIFIED", "completion report"],
-  "authorityRefs": [
-    "references/delivery/ledger.md#adjudication-commands-run-through-the-ledger",
-    "references/delivery/green-review.md#evidence-manifest",
-    "references/common.md#feedback-routing--canonical-classification"
-  ],
-  "evidenceRefs": [],
-  "regressionCases": {
-    "mustPrevent": ["fod-sem-guard-truthful-evidence-prevent"],
-    "mustAllow": ["fod-sem-guard-truthful-evidence-allow"]
-  }
-}
-```

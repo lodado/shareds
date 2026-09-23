@@ -51,45 +51,10 @@ function markdownAnchorExists(source, anchor) {
   return headings.includes(anchor) || explicitAnchors.includes(anchor)
 }
 
-function fencedJson(source) {
-  const blocks = []
-  const lines = source.split('\n')
-  for (let index = 0; index < lines.length; index += 1) {
-    if (lines[index].trim() !== '```json') continue
-    const jsonLines = []
-    index += 1
-    while (index < lines.length && lines[index].trim() !== '```') {
-      jsonLines.push(lines[index])
-      index += 1
-    }
-    try {
-      blocks.push(JSON.parse(jsonLines.join('\n')))
-    } catch {
-      /* unrelated example */
-    }
-  }
-  return blocks
-}
-
-function isRuleObject(candidate) {
-  return (
-    candidate &&
-    typeof candidate.id === 'string' &&
-    'revision' in candidate &&
-    'status' in candidate &&
-    'origin' in candidate &&
-    'When' in candidate
-  )
-}
-
 async function readRuleBlocks() {
-  const blocks = []
-  for (const owner of new Set(Object.values(owners))) {
-    for (const candidate of fencedJson(await read(owner))) {
-      if (isRuleObject(candidate)) blocks.push({ ...candidate, owner })
-    }
-  }
-  return blocks
+  const fixtures = JSON.parse(await read('evals/boundary-cases.json'))
+  assert.ok(Array.isArray(fixtures.guardrails), 'guardrails are test-only metadata, not runtime Markdown payloads')
+  return fixtures.guardrails
 }
 
 function assertRuleInventory(blocks) {
@@ -149,7 +114,11 @@ test('rule inventory rejects duplicate, unknown, and misplaced rule objects', as
     assertRuleInventory(rules.map((rule, index) => (index === 0 ? { ...rule, id: 'unknown-rule' } : rule))),
   )
   assert.throws(() =>
-    assertRuleInventory(rules.map((rule, index) => (index === 0 ? { ...rule, owner: rules[1].owner } : rule))),
+    assertRuleInventory(
+      rules.map((rule, index) =>
+        index === 0 ? { ...rule, owner: rules.find((candidate) => candidate.owner !== rule.owner).owner } : rule,
+      ),
+    ),
   )
   assert.equal(markdownAnchorExists('```json\n{"authorityRefs":["missing-anchor"]}\n```', 'missing-anchor'), false)
   assert.equal(markdownAnchorExists('# Green Gate', 'green-gate'), true)

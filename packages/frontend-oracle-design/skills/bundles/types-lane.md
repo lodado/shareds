@@ -899,6 +899,29 @@ leaked into a public return type·Props, allow it only inside `types/internal`·
 
 # Type constraints — Props and the shared API surface
 
+## Consumer-facing contracts
+
+The [public-contract definition](../changeability.md#architecture-independent-ownership) applies to
+local functions, hook returns, component props, and methods as well as package exports. Describe
+the input/result relationship, failure meaning, visible effects, and calling conditions that the
+consumer must understand. A type alone does not guarantee runtime authorization, concurrency, or
+idempotency.
+
+Apply [meaningful operations](../changeability.md#meaningful-operations) when correctness otherwise
+depends on callers sequencing internal updates. For inputs and collaborators, apply the
+[narrow-role criterion](../changeability.md#require-a-narrow-sufficient-role): select the sufficient
+facts and capabilities, not an entire store, Context, or SDK for convenience. Ask what a valid
+consumer actually needs to know or supply. Keep an existing concrete type or a single value when
+enough; retain a whole domain object when the operation genuinely needs it. Preserve actual
+input/result relationships without widening them or adding unrelated generic parameters.
+
+Choose the [read contract](../changeability.md#provide-purpose-specific-reads) for the consumer's
+purpose rather than re-exporting every internal DTO or cache type. Keep the contract with its
+owner; being a type does not justify promotion to a global shared module. These local design
+criteria do not trigger shared/package promotion, packaging, or changesets. The promotion delta
+below and the [exported API gate](../architecture-contract.md#exported-public-api-contract--conditional)
+retain their existing scope.
+
 ## Shared API promotion delta
 
 When creating or changing an exported shared/package API, write **the call site first**, before the

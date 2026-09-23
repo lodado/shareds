@@ -63,3 +63,26 @@ test('keeps progress informational and makes scope changes visible', async () =>
   assert.match(space, /count delta/)
   assert.match(space, /residual risk/)
 })
+
+test('material implementation explanations cite applied guidance without adding ceremony', async () => {
+  const [skill, decision] = await Promise.all([
+    read('SKILL.md'),
+    read('references/delivery/implementation-decision.md'),
+  ])
+  assert.match(skill, /implementation-decision\.md#explain-material-choices/)
+  assert.match(skill, /no earlier load or approval/)
+  assert.match(decision, /choice.*current-code\s+rationale.*applied skill section/s)
+  assert.match(decision, /heading anchor.*verified current lines/s)
+  assert.match(decision, /actually inspected/)
+  assert.match(decision, /file.*symbol.*commit\s+permalink/s)
+  assert.match(decision, /structural facts.*interpretation/s)
+  assert.match(decision, /Commercial use alone is not evidence/)
+  assert.match(decision, /not product-policy authority/)
+  assert.match(decision, /No mandatory external research/)
+  assert.match(decision, /Trivial changes need no citation checklist/)
+  assert.match(skill, /short illustrative type or code examples/)
+  assert.match(decision, /type shape and call-site or operation example/)
+  assert.match(decision, /existing symbols from proposed ones/)
+  assert.match(decision, /not evidence of compilation or execution/)
+  assert.match(decision, /do not authorize production edits before VALID_RED/)
+})

@@ -960,7 +960,7 @@ test('review routing distinguishes contract gaps and advisory cost without schem
   const review = await read('references/subagent-review.md')
   assert.match(review, /### Structural concerns and authority/)
   assert.match(review, /Source Registry.*jurisdiction/s)
-  assert.match(review, /unrelated O\* row or raise severity/)
+  assert.match(review, /unrelated O\\?\* row or raise severity/)
   assert.match(review, /missing.*PASS.*N\/A/s)
   assert.match(review, /maintenance cost.*advisory/s)
 })
@@ -1571,7 +1571,9 @@ test('passes review criteria to reviewers as file links, not pasted text', async
   assert.match(checklist, /--review-point/)
   const always = graph.reviewPoints.find((entry) => entry.when === 'always')
   assert.ok(always.nodes.includes('review-checklist'), 'the checklist must always reach the reviewer')
-  assert.match(subagentReview, /--review-point <skill-dir>\/references\/review-checklist\.md/)
+  // The command is generic now; the applicability table still owns the mandatory criteria.
+  assert.match(subagentReview, /--review-point <criterion>/)
+  assert.match(subagentReview, /Always\s*\|\s*\[`review-checklist\.md`\]/)
 
   assert.ok(Array.isArray(graph.reviewPoints), 'reference-graph.json must declare reviewPoints routing')
   for (const entry of graph.reviewPoints) {

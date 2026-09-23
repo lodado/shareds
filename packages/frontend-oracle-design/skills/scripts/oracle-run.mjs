@@ -8,7 +8,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
-import { splitDelivery } from './generate-reference-bundles.mjs'
+import { loadGraph, splitDelivery } from './generate-reference-bundles.mjs'
 import { forbiddenArgument, isTrustedAdapter, TRUSTED_ADAPTER_NAMES, trustedAdapter } from './oracle-adapters.mjs'
 import {
   assertSnapshotUnchanged,
@@ -164,7 +164,7 @@ function nextActionLine(code, options) {
   if (NEXT_ACTIONS[code]) return `next: ${NEXT_ACTIONS[code]}\n`
   let directory = ''
   if (options?.dir) directory = ` --dir ${options.dir}`
-  return `next: run \`oracle-run.mjs status${directory} --json\` and take one of nextLegalActions\n`
+  return `next: run \`oracle-run.mjs status${directory}\` and choose one of the actions shown\n`
 }
 
 function parseOptions(args) {
@@ -3404,9 +3404,13 @@ async function blindMappingStatus(directory, state, ledger) {
   return { ...applicability, receiptPresent, verified: 'unknown' }
 }
 
+function formatReadNode(node) {
+  return `${node.id} (${node.path})`
+}
+
 async function reportStatus(options) {
-  if (!options.dir || (!options.json && !options['changed-files'])) {
-    throw new CliError('USAGE', 'status requires --dir and --json (or --changed-files)', 2)
+  if (!options.dir) {
+    throw new CliError('USAGE', 'status requires --dir', 2)
   }
 
   const directory = resolve(options.dir)
@@ -3475,39 +3479,51 @@ async function reportStatus(options) {
   if (needsEvidence && evidence.status === 'invalid') blockers.push(evidence.code)
   if (needsEvidence && evidence.missingRows?.length > 0) blockers.push('EVIDENCE_MISSING_ROWS')
 
-  process.stdout.write(
-    `${JSON.stringify(
-      {
-        currentState: state.state,
-        currentSnapshot,
-        lockStatus,
-        staleOrMissingRuns,
-        runIssues,
-        evidenceStatus: evidence,
-        orphanedRun: await orphanedRuns(directory, ledger),
-        remainingBudgets,
-        ledgerStatus: {
-          status: ledgerValid ? 'valid' : 'invalid',
-          headDigest,
-          verifiedHeadDigest,
-          legacyPrefix,
-        },
-        blockers,
-        nextLegalActions: TRANSITIONS[state.state] ?? [],
-        nextActions: transitionPackets({
-          state,
-          directory,
-          runEntries,
-          staleRunIds: staleOrMissingRuns,
-          blockers,
-          evidence,
-          blindMapping,
-        }),
-      },
-      null,
-      2,
-    )}\n`,
-  )
+  const statusResult = {
+    currentState: state.state,
+    currentSnapshot,
+    lockStatus,
+    staleOrMissingRuns,
+    runIssues,
+    evidenceStatus: evidence,
+    orphanedRun: await orphanedRuns(directory, ledger),
+    remainingBudgets,
+    ledgerStatus: {
+      status: ledgerValid ? 'valid' : 'invalid',
+      headDigest,
+      verifiedHeadDigest,
+      legacyPrefix,
+    },
+    blockers,
+    nextLegalActions: TRANSITIONS[state.state] ?? [],
+    nextActions: transitionPackets({
+      state,
+      directory,
+      runEntries,
+      staleRunIds: staleOrMissingRuns,
+      blockers,
+      evidence,
+      blindMapping,
+    }),
+  }
+  if (options.json) {
+    process.stdout.write(`${JSON.stringify(statusResult, null, 2)}\n`)
+    return
+  }
+  const graph = await loadGraph()
+  const lines = [`state: ${statusResult.currentState}`, `blockers: ${statusResult.blockers.join(', ') || 'none'}`]
+  for (const action of statusResult.nextActions) {
+    const { delivered } = splitDelivery(graph, { id: `status-${action.to}`, nodes: action.readNodes ?? [] })
+    const agentNodes = delivered.filter((node) => node.loader !== 'reviewer')
+    const reviewerNodes = delivered.filter((node) => node.loader === 'reviewer')
+    lines.push(`action: ${action.to}`)
+    lines.push(`ready: ${action.ready}`)
+    lines.push(`blockers: ${action.blockers.join(', ') || 'none'}`)
+    lines.push(`read: ${agentNodes.map(formatReadNode).join(', ') || 'none'}`)
+    if (reviewerNodes.length > 0) lines.push(`reviewerReads: ${reviewerNodes.map(formatReadNode).join(', ')}`)
+    lines.push(`example: ${action.example}`)
+  }
+  process.stdout.write(`${lines.join('\n')}\n`)
 }
 
 async function reviewBrief(options) {

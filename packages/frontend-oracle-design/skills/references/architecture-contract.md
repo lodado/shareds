@@ -11,7 +11,7 @@ Before creating an approval document or an Oracle lock, confirm the following in
 - the applicable `AGENTS.md`, `CLAUDE.md`, and repo-local instructions
 - the source root (including `src/`) and the exact paths of the affected architecture unit
 - the public API and the client/server entry points that external callers use
-- the domain capability, terms, invariant owners, and existing per-segment responsibilities,
+- the domain capability, terms, invariant owners, and existing internal responsibilities,
   state, and async ownership; distinguish observed coupling from approved boundaries
 - the test ownership location and run command per unit·segment
 - the existing architecture documents and the import-boundary verification means
@@ -106,7 +106,8 @@ For an FSD unit, the following must be included: the layer·segment mapping and 
 of the slice public API (`index.ts`) in `Responsibilities and public entry points`, the
 allowed·forbidden import boundaries (including the deep import ban) in `Component boundaries`, and
 the `__test__/`·`__mocks__/` placement in `Test boundaries`. The criteria are [`fsd.md`](fsd.md).
-For a material domain-boundary choice, also use its compact boundary record inside the applicable
+For a material domain-boundary choice in any architecture, apply the
+[ownership criteria](changeability.md#architecture-independent-ownership) inside the applicable
 sections above: capability/non-goals and domain terms; invariant/state/effect owners; consumer-facing
 contract and hidden knowledge; directed dependencies; one evidenced change/removal walkthrough and
 its planned behavioral verification. Compare the simplest existing boundary with the rejected
