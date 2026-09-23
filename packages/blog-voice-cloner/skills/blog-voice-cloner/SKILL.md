@@ -25,6 +25,7 @@ Python 3.10+ standard library. Resolve scripts relative to this skill, data rela
 | AI 티 나는지 봐줘 / why does this read as AI  | `references/ai-tells.md` + `scripts/check_draft.py`              |
 | Turn one post into a thread/PR/blog           | `references/formats.md` one-source section, one ledger           |
 | SEO/GEO 평가받고 반영 / claude-seo review     | `references/seo-review.md` loop                                  |
+| 상위노출 분석 / what ranks for this keyword   | `references/top-posts.md` scan before planning                   |
 
 ## Non-negotiable boundaries
 
@@ -44,7 +45,7 @@ Python 3.10+ standard library. Resolve scripts relative to this skill, data rela
 
 ## Draft and review
 
-Follow `writing-workflow.md`: intent → content ledger → `references/voice-brief.md` → style-aware plan → draft → separate reviews → bounded revision → final. Run `validate_style.py` for overlap warnings. Before delivery run `scripts/check_draft.py DRAFT --format pr|thread|blog|general`, adding `--genre experience|opinion|reference` for posts: fix strong and co-occurring tells unless the active profile supports them, answer a thin human signal with more interview questions, and never present its output as AI detection or a score. For a blog post meant for search, finish with the claude-seo review loop in `references/seo-review.md`: at most two rounds, apply findings that keep meaning, ask the user for missing experience, reject myths with reasons. Rule compliance, target-voice resemblance, content preservation and generic-AI cleanup are different checks. Unperformed reviews are `not_run`, never passed. Human preference stays pending until collected.
+Follow `writing-workflow.md`: intent → content ledger → `references/voice-brief.md` → style-aware plan → draft → separate reviews → bounded revision → final. Run `validate_style.py` for overlap warnings. Before delivery run `scripts/check_draft.py DRAFT --format pr|thread|blog|general`, adding `--genre experience|opinion|reference` for posts: fix strong and co-occurring tells unless the active profile supports them, answer a thin human signal with more interview questions, and never present its output as AI detection or a score. For a blog post meant for search, offer the top-post scan in `references/top-posts.md` before planning, and finish with the claude-seo review loop in `references/seo-review.md`: at most two rounds, apply findings that keep meaning, ask the user for missing experience, reject myths with reasons. Rule compliance, target-voice resemblance, content preservation and generic-AI cleanup are different checks. Unperformed reviews are `not_run`, never passed. Human preference stays pending until collected.
 
 Save generated/edited text, diff and optional reason with `manage_voice.py correction`. Classify STYLE_CORRECTION, CONTENT_CORRECTION, PERSONAL_PREFERENCE or FACT_CORRECTION. Ask when ambiguous. Explicit future style preferences go separately into `user-overrides.json`. Never automatically retrain REFERENCE_STYLE or add generated drafts to the corpus.
 

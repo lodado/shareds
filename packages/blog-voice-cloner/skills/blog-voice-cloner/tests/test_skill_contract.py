@@ -28,7 +28,7 @@ class SkillContractTests(unittest.TestCase):
     def test_cli_help_outside_repository(self):
         import tempfile
         with tempfile.TemporaryDirectory() as directory:
-            for name in ["analyze_style.py", "validate_style.py", "manage_voice.py", "check_draft.py"]:
+            for name in ["analyze_style.py", "validate_style.py", "manage_voice.py", "check_draft.py", "find_top_posts.py", "scan_top_posts.py"]:
                 result = subprocess.run([sys.executable, str(ROOT / "scripts" / name), "--help"], cwd=directory, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("usage:", result.stdout)
@@ -87,6 +87,15 @@ class SkillContractTests(unittest.TestCase):
         tells = (ROOT / "references/ai-tells.md").read_text()
         for field in ["## When to act", "## Not tells", "active author profile"]:
             self.assertIn(field, tells)
+
+    def test_top_post_scan_is_routed_with_its_limits(self):
+        # Instruction coverage only, not proof that a scan improves a post.
+        self.assertIn("references/top-posts.md", (ROOT / "SKILL.md").read_text())
+        text = (ROOT / "references/top-posts.md").read_text()
+        for field in ["scripts/find_top_posts.py", "scripts/scan_top_posts.py", "never targets", "CONTENT_SOURCE", "grill-me.md"]:
+            self.assertIn(field, text)
+        self.assertRegex(text, r"Never fetch Naver pages with any tool")
+        self.assertIn("top-posts.md", (ROOT / "references/formats.md").read_text())
 
     def test_benchmark_has_wrong_author_control_and_separate_key(self):
         text = (ROOT / "references/evaluation.md").read_text()

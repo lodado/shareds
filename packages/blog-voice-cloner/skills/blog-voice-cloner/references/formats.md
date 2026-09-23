@@ -173,6 +173,8 @@ Structures observed in popular Korean posts (2026-09 sample, `research.md`):
 - Summary or reference: numbered criteria with code, little first person. The structure is the value.
 - Naver review: the verdict in the title, frequent line breaks for mobile, 음슴체 and 해요체 mixed, a disclosure line on top for affiliate posts.
 
+For one keyword, `top-posts.md` measures what ranks now and finds the questions no post answers. Its numbers describe the sample; they are never targets.
+
 Myths to reject: keyword counts or density, word-count targets, llms.txt, FAQ schema for rich results, schema as the only GEO change, date bumps without changes, and chunking for AI. Naver's C-Rank and D.I.A. reward topic consistency and first-hand information according to secondary sources only, so do not state Naver rules as verified.
 
 AI default opening:

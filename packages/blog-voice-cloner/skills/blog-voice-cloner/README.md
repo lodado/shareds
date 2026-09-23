@@ -6,7 +6,7 @@
 
 이 폴더 전체를 호스트의 skill 디렉터리에 복사합니다. 예: Claude Code의 `~/.claude/skills/blog-voice-cloner/`, Codex의 `~/.agents/skills/blog-voice-cloner/`. 기존 설치가 있으면 덮어쓰지 말고 버전을 비교하세요. 이 저장소에서는 패키지 플러그인으로도 등록되어 있습니다.
 
-Python 3.10 이상, 표준 라이브러리만 사용합니다. Python 작업에는 네트워크·LLM API 키가 필요하지 않습니다. 정성 분석과 글 작성은 실행 중인 호스트 모델이 담당하므로 모델 처리까지 오프라인이라는 뜻은 아닙니다.
+Python 3.10 이상, 표준 라이브러리만 사용합니다. 검색 API와 티스토리에 접속하는 `find_top_posts.py`를 빼면 Python 작업에는 네트워크·API 키가 필요하지 않습니다. 정성 분석과 글 작성은 실행 중인 호스트 모델이 담당하므로 모델 처리까지 오프라인이라는 뜻은 아닙니다.
 
 ```text
 이 폴더 글들 분석해서 문체 프로필 만들어줘.
@@ -19,6 +19,7 @@ Python 3.10 이상, 표준 라이브러리만 사용합니다. Python 작업에�
 리팩터링 회고 쓰고 싶은데 나 인터뷰해줘.
 이 블로그 글을 스레드 5개로 바꿔줘.
 이 글 AI 티 나는지 봐줘.
+'엔비디아 주가 전망' 상위 글 분석해줘.
 ```
 
 ## 로컬 파일 분석
@@ -108,6 +109,20 @@ python3 scripts/check_draft.py ./post.md --format blog --genre experience --outp
 
 `--keyword "엔비디아 주가 전망"`처럼 검색어를 주면 체커가 제목의 검색어, 첫 문장 훅, 검색 미리보기 문장을 확인합니다. 남은 이미지 자리, 날마다 바뀌는 가격이 든 제목, 표 없이 흩어진 숫자도 알려줍니다.
 
+## 검색 상위 글 분석
+
+검색용 글을 계획하기 전에 같은 검색어로 지금 상위에 있는 글을 재볼 수 있습니다. 절차와 해석 기준은 [top-posts.md](references/top-posts.md)에 있습니다.
+
+```bash
+export NAVER_CLIENT_ID=... NAVER_CLIENT_SECRET=...   # 또는 KAKAO_REST_API_KEY (--engine daum)
+python3 scripts/find_top_posts.py "엔비디아 주가 전망" --engine naver --out ./runs/top-posts
+python3 scripts/scan_top_posts.py ./runs/top-posts/*.html --keyword "엔비디아 주가 전망" --output ./runs/top-posts/report.md
+```
+
+`find_top_posts.py`는 네이버 검색 API나 카카오(다음) 블로그 검색 API로 상위 글 목록을 받습니다. 키가 없으면 `--urls`로 링크를 순위대로 넘깁니다. 티스토리 글은 블로그마다 robots.txt를 확인하고, 요청 사이에 고정 간격(기본 3초)을 두고 한 번에 하나씩 저장합니다. 네이버 글은 자동으로 받지 않습니다. 네이버 robots.txt가 AI 검색 목적의 봇 접근을 금지하기 때문입니다. 대신 `list.md`에 적힌 `m.blog.naver.com` 링크를 브라우저로 열어 표의 파일 이름으로 저장하면 됩니다.
+
+`scan_top_posts.py`는 저장된 네이버·티스토리 본문의 글자 수, 사진, 소제목, 인용, 표, 동영상, 링크 카드, 첫 블록, 제목과 첫 세 문장의 검색어 위치를 표로 만들고 최솟값·중앙값·최댓값을 붙입니다. 이 숫자는 지금 상위 글이 어떤지 보여줄 뿐이고 목표 분량이 아닙니다. 순위는 블로그의 이력과 주제 집중도도 반영합니다. 보고서에는 상위 글들이 답하는 질문과 아무도 답하지 않은 질문을 덧붙이고, 새 글은 그 빈틈을 겨냥합니다. 상위 글의 사실·경험·문장은 새 글의 내용으로 쓰지 않습니다. 저장한 페이지는 로컬 실행 폴더에만 둡니다.
+
 ## 구성 요소
 
 - `SKILL.md`: 요청 라우팅, 데이터 경계, 필수 실행 순서.
@@ -116,6 +131,7 @@ python3 scripts/check_draft.py ./post.md --format blog --genre experience --outp
 - `scripts/manage_voice.py`: 작성자별 가져오기·버전·기간 스냅샷·수정 기록.
 - `scripts/build_blind_review.py`: 익명 검수 HTML·빈 평가지·분리된 대응표 생성.
 - `scripts/check_draft.py`: AI 문체 표시와 PR·스레드·블로그 형식 점검.
+- `scripts/find_top_posts.py`, `scan_top_posts.py`: 검색 상위 글 목록·티스토리 저장, 저장된 본문 측정.
 - `references/style-profile.{json,md}`: 빈 초기 템플릿. 실제 추론 결과가 아닙니다.
 - `references/style-metrics.json`: 빈 측정 템플릿. 실제 결과는 분석 출력 폴더에 생성합니다.
 - `references/examples.md`, `evidence.md`, `negative-examples.md`: 역할별 사례, 근거 형식, 피해야 할 모방.
@@ -123,7 +139,7 @@ python3 scripts/check_draft.py ./post.md --format blog --genre experience --outp
 - `references/language-ko.md`, `voice-brief.md`: 한국어 맥락별 어투와 작성용 문체 결정.
 - `references/writing-workflow.md`: 사실 장부, 문체 기반 계획, 독립 검토, 수정 학습.
 - `references/evaluation.md`: A~E 비교와 블라인드 사람 평가 절차.
-- `references/formats.md`, `ai-tells.md`, `grill-me.md`, `seo-review.md`: 형식별 계약, AI 문체 계열·판정 규칙, 쓰기 전 인터뷰, 검색 검토 루프.
+- `references/formats.md`, `ai-tells.md`, `grill-me.md`, `seo-review.md`, `top-posts.md`: 형식별 계약, AI 문체 계열·판정 규칙, 쓰기 전 인터뷰, 검색 검토 루프, 상위 글 분석.
 - `tests/`: 파싱·지표·중복·데이터 저장·CLI 회귀 테스트.
 
 ## 스키마
@@ -166,7 +182,9 @@ blog-voice-cloner/
 │   ├── validate_style.py
 │   ├── manage_voice.py
 │   ├── build_blind_review.py
-│   └── check_draft.py
+│   ├── check_draft.py
+│   ├── find_top_posts.py
+│   └── scan_top_posts.py
 ├── references/
 │   ├── style-profile.md
 │   ├── style-profile.json
@@ -175,7 +193,7 @@ blog-voice-cloner/
 │   ├── negative-examples.md
 │   ├── evidence.md
 │   ├── language-ko.md / voice-brief.md
-│   ├── formats.md / ai-tells.md / grill-me.md / seo-review.md
+│   ├── formats.md / ai-tells.md / grill-me.md / seo-review.md / top-posts.md
 │   └── analysis-guide.md / writing-workflow.md / collection.md / evaluation.md / research.md
 ├── tests/
 │   ├── test_analysis.py
@@ -183,6 +201,7 @@ blog-voice-cloner/
 │   ├── test_storage.py
 │   ├── test_skill_contract.py
 │   ├── test_check_draft.py
+│   ├── test_find_top_posts.py / test_scan_top_posts.py
 │   └── test_blind_review.py
 └── evals/                    # 실행 가능한 데모, A–E 출력, 요구사항별 관찰
 ```

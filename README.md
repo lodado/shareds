@@ -305,7 +305,7 @@ npm 릴리스는 조건이 두 개예요. 레포 변수 `ENABLE_NPM_RELEASE`가 
 
 ## Blog Voice Cloner
 
-[blog-voice-cloner](packages/blog-voice-cloner/skills/blog-voice-cloner/README.md)는 한국어·영어 블로그 문체를 근거와 함께 분석하고, 작성자별 기간 프로필을 저장하며, 새 내용에 문체를 적용하는 스킬입니다. 원문 내용과 작성 내용을 분리하고 의미·중복·과잉 모방을 검토합니다. 프로필이 없어도 PR 설명, X·Threads 글, SEO/GEO 블로그 글을 형식별 계약에 맞춰 씁니다. 경험·의견 글은 쓰기 전에 사용자를 인터뷰해 장면·감정·남은 의문을 모으고, `check_draft.py`로 AI 문체 표시·플랫폼 글자 수·PR과 diff의 불일치를 점검합니다. Python 3.10+ 표준 라이브러리 기반이며 웹 수집은 호스트 도구로 수행합니다.
+[blog-voice-cloner](packages/blog-voice-cloner/skills/blog-voice-cloner/README.md)는 한국어·영어 블로그 문체를 근거와 함께 분석하고, 작성자별 기간 프로필을 저장하며, 새 내용에 문체를 적용하는 스킬입니다. 원문 내용과 작성 내용을 분리하고 의미·중복·과잉 모방을 검토합니다. 프로필이 없어도 PR 설명, X·Threads 글, SEO/GEO 블로그 글을 형식별 계약에 맞춰 씁니다. 경험·의견 글은 쓰기 전에 사용자를 인터뷰해 장면·감정·남은 의문을 모으고, `check_draft.py`로 AI 문체 표시·플랫폼 글자 수·PR과 diff의 불일치를 점검합니다. 검색용 글은 쓰기 전에 같은 검색어의 상위 글을 재서 분량·사진 범위와 아무도 답하지 않은 질문을 찾습니다. Python 3.10+ 표준 라이브러리 기반이며 웹 수집은 호스트 도구로 하고, 티스토리 상위 글만 스크립트가 robots.txt를 확인한 뒤 받습니다.
 
 ## Agent Memory
 
