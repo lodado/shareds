@@ -1,4 +1,4 @@
 interface:
-  display_name: "Reference-Driven Game Design"
-  short_description: "Plan game rules, player flows, HUDs, and feedback"
-  default_prompt: "Use $reference-driven-game-design to turn my game idea into concrete rules, player flows, visual and game-feel specifications, business hypotheses, and a testable development handoff."
+  display_name: 'Reference-Driven Game Design'
+  short_description: 'Plan game rules, player flows, HUDs, and feedback'
+  default_prompt: 'Use $reference-driven-game-design to turn my game idea into concrete rules, player flows, visual and game-feel specifications, business hypotheses, and a testable development handoff.'

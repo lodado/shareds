@@ -1,7 +1,7 @@
 {
   "name": "game-interface-design",
-  "version": "0.1.0",
-  "description": "Independent mobile-web game planning, core-loop design, player flows, game feel, and optional editable Figma production.",
+  "version": "0.2.0",
+  "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, and FSD/ECS Three.js greybox prototypes.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
@@ -9,5 +9,5 @@
   "homepage": "https://github.com/lodado/shareds",
   "repository": "https://github.com/lodado/shareds",
   "license": "MIT",
-  "keywords": ["game-design", "mobile-web", "threejs", "game-feel", "figma", "ux"]
+  "keywords": ["game-design", "mobile-web", "threejs", "game-feel", "figma", "ux", "ecs", "fsd", "prototype"]
 }

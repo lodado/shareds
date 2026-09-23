@@ -1,6 +1,6 @@
 {
   "name": "@lodado/game-interface-design-plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, and FSD/ECS Three.js greybox prototypes.",
   "license": "MIT",
@@ -8,7 +8,8 @@
     "lint": "eslint scripts",
     "test": "node --test scripts/*.test.mjs",
     "check": "node scripts/check-contract.mjs",
-    "validate:example": "node scripts/validate-design.mjs skills/reference-driven-game-design/examples/merge-garden/delivery.json"
+    "validate:example": "node scripts/validate-design.mjs skills/reference-driven-game-design/examples/merge-garden/delivery.json",
+    "pack:zip": "mkdir -p dist && git archive --format=zip --prefix=game-interface-design/ -o dist/game-interface-design-$npm_package_version.zip HEAD:./"
   },
   "devDependencies": {
     "ajv": "8.20.0"

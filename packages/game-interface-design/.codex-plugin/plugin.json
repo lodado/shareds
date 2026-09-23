@@ -1,7 +1,7 @@
 {
   "name": "game-interface-design",
-  "version": "0.1.0",
-  "description": "Independent mobile-web game planning, core-loop design, player flows, game feel, and optional editable Figma production.",
+  "version": "0.2.0",
+  "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, and FSD/ECS Three.js greybox prototypes.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
@@ -12,15 +12,15 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Reference-Driven Game Design",
-    "shortDescription": "Design game rules, player flows, HUDs and game feel",
-    "longDescription": "An independent game-design fork: plan meaningful play, failure and replay, visual direction, business hypotheses and implementation contracts. Optional editable Figma output uses local source and verification gates.",
+    "shortDescription": "Plan games, then build FSD/ECS Three.js prototypes",
+    "longDescription": "Plan meaningful play, failure and replay, HUDs, game feel and business hypotheses; optionally produce editable Figma game UI; then turn the plan into a local Three.js prototype whose rules run in a headless ECS inside an FSD page slice, with typecheck, Steiger, headless, build and browser verification.",
     "developerName": "lodado",
     "category": "Productivity",
-    "capabilities": ["Research", "Figma", "Write"],
+    "capabilities": ["Research", "Figma", "Write", "Code"],
     "defaultPrompt": [
       "Design a one-handed mobile web game from its core decisions through player flows and a testable handoff.",
       "Design a merge puzzle with meaningful placement choices, clear failure feedback, and rapid replay.",
-      "Build an editable Figma pilot for the approved game HUD and result flow."
+      "Build a playable Three.js greybox of the approved game plan with its rules in a headless ECS."
     ],
     "websiteURL": "https://github.com/lodado/shareds"
   }

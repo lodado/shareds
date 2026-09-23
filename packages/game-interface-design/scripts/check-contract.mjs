@@ -134,6 +134,13 @@ function exampleErrors(root, ajv) {
   return [...requestErrors, ...validateReport(readJson(path.join(sample, 'delivery.json')), sample)]
 }
 
+// Redistribution guard: fonts, credentials and key material never ship in the package or its ZIP.
+const FORBIDDEN_FILE = /\.(?:ttf|otf|woff2?|pem|key|p12)$|^\.env(?:\..+)?$/i
+
+function forbiddenFileErrors(root) {
+  return walk(root, (name) => FORBIDDEN_FILE.test(name)).map((file) => `forbidden file: ${path.relative(root, file)}`)
+}
+
 export function checkPackage(root = ROOT) {
   const ajv = new Ajv({ strict: false, allErrors: true })
   return [
@@ -143,6 +150,7 @@ export function checkPackage(root = ROOT) {
     ...linkErrors(root),
     ...provenanceErrors(root),
     ...exampleErrors(root, ajv),
+    ...forbiddenFileErrors(root),
   ]
 }
 

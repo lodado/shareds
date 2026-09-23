@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Three.js game wireframe report",
+  "description": "What was built and what was actually verified. Declarations only; the validator checks consistency, not truth.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_source",
+    "target_dir",
+    "level",
+    "ecs",
+    "simulated",
+    "checks",
+    "ready_to_run",
+    "open_risks"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "plan_source": { "type": "string", "minLength": 1 },
+    "target_dir": { "type": "string", "minLength": 1 },
+    "level": { "enum": ["LAYOUT_ONLY", "FLOW_PROTOTYPE", "PLAYABLE_GREYBOX"] },
+    "ecs": { "enum": ["required", "optional", "n/a"] },
+    "simulated": {
+      "description": "Behaviors faked for this level (timers, scores, results). Empty for a playable greybox whose rules are all real.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "install",
+        "typecheck",
+        "lint",
+        "fsd",
+        "headless",
+        "build",
+        "browser",
+        "device",
+        "usability",
+        "fun",
+        "business"
+      ],
+      "properties": {
+        "install": { "$ref": "#/$defs/check" },
+        "typecheck": { "$ref": "#/$defs/check" },
+        "lint": { "$ref": "#/$defs/check" },
+        "fsd": { "$ref": "#/$defs/check" },
+        "headless": { "$ref": "#/$defs/check" },
+        "build": { "$ref": "#/$defs/check" },
+        "browser": { "$ref": "#/$defs/check" },
+        "device": { "$ref": "#/$defs/check" },
+        "usability": { "$ref": "#/$defs/check" },
+        "fun": { "$ref": "#/$defs/check" },
+        "business": { "$ref": "#/$defs/check" }
+      }
+    },
+    "ready_to_run": { "type": "boolean" },
+    "open_risks": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+  },
+  "$defs": {
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["PASS", "FAIL", "NOT_RUN", "BLOCKED", "N/A"] },
+        "command": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

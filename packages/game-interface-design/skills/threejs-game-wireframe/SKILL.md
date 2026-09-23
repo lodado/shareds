@@ -31,7 +31,7 @@ Figma is never a prerequisite.
 
 Existing repo: read its `CLAUDE.md`/`AGENTS.md`, package manager, framework (Vite, Next.js, React, R3F), TypeScript config,
 lint and any FSD checker before proposing anything. Keep React/R3F/Next.js if present; never add React to a DOM project.
-Empty or new target: the [starter](starter/README.md) is the default. Confirm versions from the actual lockfile, not memory.
+Empty or new target: copy the [starter](starter/README.md) with `node scripts/create-wireframe.mjs <TARGET_DIR>` from the package root; it refuses a non-empty directory. Confirm versions from the actual lockfile, not memory.
 
 ## Stage 2 — Blueprint
 
@@ -65,7 +65,7 @@ Every loop, listener, observer, pointer capture, subscription and GPU resource h
 ## Stage 6 — Verify and report
 
 Read [verification](references/verification.md). Run what exists: typecheck, lint, FSD check, headless tests, build, browser.
-Fill `wireframe-report.json` and validate it with `node scripts/validate-wireframe.mjs <report>` from the package root.
+Fill `wireframe-report.json` ([schema](schemas/wireframe-report.schema.json), [example](examples/stack-greybox/wireframe-report.json)) and validate it with `node scripts/validate-wireframe.mjs <report>` from the package root.
 Report each check as `PASS`, `FAIL`, `NOT_RUN` or `BLOCKED` with the command. No browser or WebGL → browser is `BLOCKED` or `NOT_RUN`, never `PASS`.
 Real device, usability, fun and business stay `not_run` unless observed with people. Tests written are not tests passed.
 

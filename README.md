@@ -29,12 +29,12 @@
 
 ## 뭐가 들어 있어요
 
-| 영역      | 들어 있는 것                                     | 배포              |
-| --------- | ------------------------------------------------ | ----------------- |
-| 코드 품질 | 조합형 ESLint 프리셋, 직접 만든 규칙             | npm               |
-| 검증      | Oracle 계약, TDD, 행동 테스트, 브라우저·스크린샷 | 에이전트 플러그인 |
-| 설계      | 프론트엔드 시스템 패턴, Figma 제품·랜딩 디자인   | 에이전트 플러그인 |
-| 에이전트  | 워크플로 그래프 설계랑 실행                      | 에이전트 플러그인 |
+| 영역      | 들어 있는 것                                                                  | 배포              |
+| --------- | ----------------------------------------------------------------------------- | ----------------- |
+| 코드 품질 | 조합형 ESLint 프리셋, 직접 만든 규칙                                          | npm               |
+| 검증      | Oracle 계약, TDD, 행동 테스트, 브라우저·스크린샷                              | 에이전트 플러그인 |
+| 설계      | 프론트엔드 시스템 패턴, Figma 제품·랜딩 디자인, 모바일 웹게임 기획·프로토타입 | 에이전트 플러그인 |
+| 에이전트  | 워크플로 그래프 설계랑 실행                                                   | 에이전트 플러그인 |
 
 ## 스킬 한눈에 보기
 
@@ -50,6 +50,9 @@
 | [`frontend-interface-design`](packages/frontend-interface-design/skills/frontend-interface-design/SKILL.md)             | 기존 이름으로 들어온 디자인 요청을 `reference-driven-figma-design`으로 연결해요. |
 | [`reference-driven-figma-design`](packages/frontend-interface-design/skills/reference-driven-figma-design/SKILL.md)     | 레퍼런스와 디자인 시스템을 바탕으로 편집 가능한 Figma 화면을 만들어요.           |
 | [`reference-driven-3d-character`](packages/reference-driven-3d-character/skills/reference-driven-3d-character/SKILL.md) | 레퍼런스 기반 3D 캐릭터의 도안·모델·요청한 동작을 만들고 단계별로 검수해요.      |
+| [`game-interface-design`](packages/game-interface-design/skills/game-interface-design/SKILL.md)                         | 게임 요청을 기획·Figma·Three.js 구현 중 맞는 스킬로 연결해요.                    |
+| [`reference-driven-game-design`](packages/game-interface-design/skills/reference-driven-game-design/SKILL.md)           | 모바일 웹게임의 핵심 규칙·플레이 흐름·HUD·손맛·검증 계획을 기획해요.             |
+| [`threejs-game-wireframe`](packages/game-interface-design/skills/threejs-game-wireframe/SKILL.md)                       | 기획을 받아 FSD·헤드리스 ECS 구조의 Three.js 프로토타입을 만들고 검증해요.       |
 | [`ux-flow-diagram`](packages/ux-flow-diagram/skills/ux-flow-diagram/SKILL.md)                                           | 명시적으로 호출하면 Figma·코드·요구사항에서 근거 있는 사용자 흐름도를 추출해요.  |
 | [`agent-graph-engineering`](packages/agent-graph-engineering/skills/agent-graph-engineering/SKILL.md)                   | 여러 에이전트와 도구의 분기·병렬 작업·재시도를 그래프로 설계하고 실행해요.       |
 | [`blog-voice-cloner`](packages/blog-voice-cloner/skills/blog-voice-cloner/SKILL.md)                                     | 블로그 문체를 분석하고 원래 의미를 유지하며 새 글에 적용해요.                    |
@@ -80,6 +83,7 @@ test
 frontend-visual-qa
 frontend-interface-design
 reference-driven-3d-character
+game-interface-design
 ux-flow-diagram
 blog-voice-cloner
 agent-memory
@@ -277,6 +281,7 @@ npm으로 나갈 것들이에요.
 | [`frontend-visual-qa`](packages/frontend-visual-qa)                       | 스크린샷 비교랑 직접 브라우저 QA                                                                      |
 | [`frontend-interface-design`](packages/frontend-interface-design)         | `$reference-driven-figma-design`: HCI·레퍼런스 비교 → 러프 와이어프레임 설명 → 편집 가능 Figma 디자인 |
 | [`reference-driven-3d-character`](packages/reference-driven-3d-character) | 레퍼런스 해석, 형태·변형·동작 설계, 편집 가능한 3D 캐릭터의 단계별 제작·검증                          |
+| [`game-interface-design`](packages/game-interface-design)                 | 모바일 웹게임 기획 → 선택형 Figma UI → FSD·ECS Three.js 그레이박스                                    |
 
 ## 개발
 

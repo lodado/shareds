@@ -1,114 +1,105 @@
 # game-interface-design
 
-**모바일 웹게임 기획·디자인·UI/UX를 위한 독립 스킬 패키지.**
+**모바일 웹게임을 기획하고, 필요하면 Figma UI를 만들고, 기획을 실제로 돌아가는 Three.js 프로토타입으로 옮기는 스킬 패키지.**
 
-기존 frontend-interface-design에 얹는 프롬프트가 아니다. 해당 패키지의 구조와 검증 계약을
-분기하고 게임용 진입점·레퍼런스·스키마·예제·검사 코드를 별도로 구성했다.
-기존 패키지를 설치하지 않아도 이 패키지 안의 파일만으로 절차를 읽고 실행할 수 있다.
-게임 본체 코드를 구현하는 엔진이나 자동 QA 훅은 아니다.
+게임 경험과 규칙 → 플레이 여정 → 와이어프레임 → 시각 방향·손맛 → 최소 Three.js 구현 → FSD·ECS 경계 → 검증 증거까지 한 패키지 안에서 이어진다.
+`frontend-interface-design`의 구조와 검증 계약을 분기했고, 다른 플러그인을 설치하지 않아도 동작한다.
 
-## 바로 사용할 요청
+## 스킬 세 개
 
-호스트가 이 패키지를 로드한 뒤 다음처럼 요청한다. 실제 호스트별 설치/로딩은 이 배포에서 실행하지 않았다.
+| 스킬                           | 하는 일                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `game-interface-design`        | 진입점. 요청을 `PLAN_ONLY` · `FIGMA` · `THREEJS_WIREFRAME` 중 하나로 보낸다.                            |
+| `reference-driven-game-design` | 핵심 규칙, 초보자/숙련자 판단, 첫 플레이, 실패·재시작, HUD 와이어프레임, 손맛, 수익화 가설, 구현 인계.  |
+| `threejs-game-wireframe`       | 기획을 받아 로컬 Three.js 프로토타입을 만든다. 규칙은 FSD 페이지 슬라이스 안의 헤드리스 ECS가 계산한다. |
+
+## 요청 예시
+
+기획만:
 
 ```text
 $game-interface-design
-
-세로형 모바일 웹게임을 기획해줘.
-Three.js로 표현하고 한 손으로 플레이하는 작은 합치기 게임이야.
-단순 복제가 아니라 배치 판단에서 차이가 나는 규칙을 제안해줘.
-
-DELIVERY_MODE: PLAN_ONLY
-
-핵심 규칙, 초보자/숙련자 판단, 첫 플레이, 실패·재시작,
-HUD 와이어프레임, 손맛, 수익화 가설, 구현 인계와 검증 계획까지 작성해줘.
+세로형 한 손 합치기 게임을 기획해줘. 코드는 아직 필요 없어.
 ```
 
-정식 이름은 `$reference-driven-game-design`이며 짧은 이름은 패키지 내부 별칭이다.
-명시적인 스킬 호출 형식은 사용하는 호스트의 실제 설정을 따른다.
-
-## 무엇이 달라졌나
-
-| 범위        | 게임용 동작                                                  |
-| ----------- | ------------------------------------------------------------ |
-| 출발점      | 화면 목록보다 먼저 반복되는 선택·규칙·실패·숙련을 정함       |
-| 기본 산출물 | 기획·플로우·와이어프레임·손맛·실험을 문서로 완성 가능        |
-| 시각 설계   | 플레이 필드·HUD·조작·피드백을 분리하고 판정 가독성을 검토    |
-| 상태        | 진행 상태와 hidden/user/ad 등 중단 이유를 분리               |
-| 수익화      | 실제 채널 조건을 확인하기 전 확정하지 않음; 보상과 재개 분리 |
-| 검증        | 계획/Figma/실제 게임/사용성/재미/사업성/승인을 별도 표시     |
-| 자산        | 책 원문·유료 사전·폰트·게임 아트 미포함                      |
-
-## 두 모드
-
-`PLAN_ONLY`가 기본이다. Figma가 없어도 기획을 완료할 수 있다.
-
-`FIGMA`는 실제 편집 가능한 HUD/메뉴/결과 화면과 프로토타입 연결까지 요청한다.
-허용된 대상과 쓰기 권한이 필요하다. 접근이 없으면 해당 제작만 차단하고 독립 기획은 계속한다.
-PLAN_ONLY 결과를 Figma 완료로 부르거나 Figma 연결을 실제 게임/재미 검증으로 부르지 않는다.
+Figma:
 
 ```text
 $game-interface-design
-위에서 확정한 게임 기획으로 플레이·정지·결과 화면을 제작해줘.
+확정한 기획으로 플레이·정지·결과 화면을 제작해줘.
 DELIVERY_MODE: FIGMA
-FIGMA_TARGET: 실제로 편집 권한을 부여한 파일의 URL
+FIGMA_TARGET: 편집 권한을 준 파일 URL
+```
+
+구현:
+
+```text
+$game-interface-design
+game-design.md 기준으로 플레이 가능한 Three.js 프로토타입을 만들어줘.
+PLAN_SOURCE: ./design/game-design.md
+TARGET_DIR: ./stack-proto
+PROTOTYPE_LEVEL: PLAYABLE_GREYBOX
 REVIEW_WAIT: false
 ```
+
+구현 요청이면 기획 인터뷰를 처음부터 반복하지 않는다. 비어 있는 부분만 기본값으로 채우고 설계서(`wireframe-blueprint.md`)에 표시한다.
+Figma는 구현의 선행 조건이 아니다.
+
+## 구현 충실도
+
+| 단계               | 실제                                    | 가짜/없음                           | ECS  |
+| ------------------ | --------------------------------------- | ----------------------------------- | ---- |
+| `LAYOUT_ONLY`      | Three.js 장면, 카메라, HUD 배치         | 규칙 전부                           | N/A  |
+| `FLOW_PROTOTYPE`   | 화면 전환, 입력 흐름                    | 타이머·점수·결과 (`simulated` 표시) | 선택 |
+| `PLAYABLE_GREYBOX` | 핵심 규칙, 점수, 실패, 재시작, 일시정지 | 아트, 사운드, 메타, 저장            | 필수 |
+
+## 스타터
+
+`skills/threejs-game-wireframe/starter/`는 Vite + TypeScript + Three.js + DOM HUD로 만든 Stack 그레이박스다.
+
+- `src/pages/play/` 한 슬라이스. 규칙은 `model/ecs`, 렌더·HUD·입력은 `ui`, 수치는 `config`.
+- 코어는 DOM·Three.js·시간·난수를 모른다. `tsconfig.core.json`이 DOM 없이 컴파일하고 경계 테스트가 import와 전역을 막는다.
+- 고정 스텝, 일시정지 사유 집합, runId로 늦은 입력 차단, 같은 값이면 같은 참조인 HUD 스냅샷, 멱등 dispose.
+- Steiger는 허용·위반 fixture로 실제로 잡는지까지 확인한다.
+
+```bash
+node scripts/create-wireframe.mjs ../my-game   # 비어 있지 않은 폴더면 거부
+cd ../my-game && npm ci && npm run verify
+```
+
+`npm run verify` = typecheck → headless → Steiger → build → Playwright(모바일 Chromium).
+의존성은 설치할 때 받는다. 폰트·아트·사운드는 들어 있지 않다.
+
+## 패키지 검사
+
+Node 22.18 이상. 모노레포 안에서는 루트 `pnpm install`, 압축을 푼 단독 복사본에서는 패키지 루트에서 `npm install`.
+
+```bash
+npm test                   # 계약·검증기·라우팅·스타터 헤드리스 테스트 (node --test)
+npm run check              # 매니페스트, 진입점, 링크, 스키마, 예제, 원본 해시, 금지 파일
+npm run validate:example   # 기획 예제 delivery.json
+node scripts/validate-wireframe.mjs skills/threejs-game-wireframe/examples/stack-greybox/wireframe-report.json
+npm run pack:zip           # 커밋된 상태만 dist/game-interface-design-<version>.zip 으로
+```
+
+검사기는 선언의 일관성만 본다. 명령이 실제로 실행됐는지, 재미·사용성·사업성은 확인하지 않는다.
+실행한 검사와 실행하지 않은 범위는 `VALIDATION.md`, 원본과의 관계는 `FORK_NOTES.md`, 권리 정보는 `NOTICE.md`에 있다.
 
 ## 구성
 
 ```text
 game-interface-design/
-  .claude-plugin/plugin.json
-  .codex-plugin/plugin.json
+  .claude-plugin/plugin.json  .codex-plugin/plugin.json  package.json
   skills/
-    game-interface-design/SKILL.md
-    reference-driven-game-design/
+    game-interface-design/SKILL.md          라우터
+    reference-driven-game-design/           기획 (references, schemas, templates, examples, evals)
+    threejs-game-wireframe/
       SKILL.md
-      agents/openai.yaml
-      references/                # 게임 전용 단계별 지침
-        figma/                   # 패키지 안으로 복제·이식한 검증 계약
-      schemas/                   # 요청/결과 JSON Schema
-      templates/                 # 5종 산출물 틀
-      examples/merge-garden/     # 구체적인 합성 기획 예제
-      evals/behavior-cases.json  # 에이전트 행동 평가 24개, 미실행
-  scripts/                       # 정적 구조/결과 검사와 로컬 등록 보조
-  tests/                         # 검사 코드의 회귀 테스트
-  provenance.json
-  FORK_NOTES.md
-  VALIDATION.md
+      references/                           fidelity, FSD, ECS·세션, 시간·수명, 렌더·입력, 검증
+      templates/wireframe-blueprint.md
+      schemas/wireframe-report.schema.json
+      examples/stack-greybox/               실제 검증 결과로 채운 보고서
+      evals/boundary-cases.json             라우팅 기대값 (미실행 루브릭)
+      starter/                              Stack 그레이박스
+  scripts/                                  검사기, 스캐폴드, 테스트
 ```
-
-## 설치
-
-shareds 레포의 `packages/game-interface-design`에 있고 루트 `.claude-plugin/marketplace.json`에 등록되어 있다.
-
-## 로컬 검사
-
-Node 22 이상. 모노레포 안에서는 루트 `pnpm install`, 단독 복사본에서는 패키지 루트에서 `npm install`.
-
-```bash
-cd packages/game-interface-design
-node scripts/check-contract.mjs
-node --test scripts/*.test.mjs
-node scripts/validate-design.mjs \
-  skills/reference-driven-game-design/examples/merge-garden/delivery.json
-```
-
-검사 범위: 매니페스트 일관성, 독립 진입점, 로컬 문서 링크, JSON Schema,
-실제 예제 파일, 중복/끊긴 ID, 상태/행동/trace 연결, 완료·증거 선언,
-파일 경로 안전성, 광고/중단 계약의 일부 명시적 조건이다.
-원본 검증 문서 3개의 SHA-256 동일성도 확인한다(업스트림 Git blob SHA는 provenance.json에 기록).
-
-검사하지 않는 것: 에이전트가 실제로 스킬을 준수하는지, Figma/API 접근,
-실제 물리·입력·모바일 성능·재미·매출. 24개 행동 시나리오는 별도의 실제 실행이 필요하다.
-통과한 JSON은 진실한 증거도, 강제 실행 훅도 아니다.
-
-## 읽을 순서
-
-`SKILL.md`는 짧은 라우터로 시작하고 단계에 필요한 지침만 읽는다.
-예제를 보려면 `skills/reference-driven-game-design/examples/merge-garden/game-design.md`부터 연다.
-예제는 실제로 테스트된 게임이나 수익화된 프로젝트가 아니다.
-
-원본 출처/변경 매핑은 `FORK_NOTES.md`, 권리 정보는 `NOTICE.md`,
-실행한 검사와 미실행 범위는 `VALIDATION.md`에 있다.

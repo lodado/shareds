@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Three.js Game Wireframe'
+  short_description: 'Build a planned game as an FSD/ECS Three.js prototype'
+  default_prompt: 'Use $threejs-game-wireframe to build a playable greybox of my game plan, with rules in a headless ECS and every check reported honestly.'
