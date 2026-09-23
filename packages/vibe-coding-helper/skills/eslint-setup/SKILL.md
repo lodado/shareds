@@ -7,7 +7,7 @@ allowed-tools:
 
 # ESLint setup with @lodado/eslint-config
 
-**Last updated:** 2026-09-21
+**Last updated:** 2026-09-23
 
 The config ships composable presets. Enable only what the package actually is.
 
@@ -53,19 +53,21 @@ import and spread each required preset. No Jest preset is added.
 
 ## Which presets
 
-| Package kind                                              | Presets                                            |
-| --------------------------------------------------------- | -------------------------------------------------- |
-| Node/TS library, no JSX                                   | base                                               |
-| React component library                                   | base + react + a11y + local-rules + testing        |
-| Next.js app                                               | base + next + react + a11y + local-rules + testing |
-| Any package inside Turborepo                              | add turbo                                          |
-| Any package using TanStack Query                          | add query                                          |
-| Any JS/TS package opting into broad quality checks        | add quality                                        |
-| TypeScript package with a tsconfig                        | add strict-types                                   |
-| TypeScript package with designated pure calculation files | add functional                                     |
-| Package styling with Tailwind CSS v4                      | add tailwind                                       |
-| Repo where coding agents write most of the code           | add ai                                             |
-| Repo with a Tailwind design system to hold the line on    | add design                                         |
+| Package kind                                                                    | Presets                                                                   |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Node/TS library, no JSX                                                         | base                                                                      |
+| React component library                                                         | base + react + a11y + local-rules + testing                               |
+| Next.js app                                                                     | base + next + react + a11y + local-rules + testing                        |
+| Any package inside Turborepo                                                    | add turbo                                                                 |
+| Any package using TanStack Query                                                | add query                                                                 |
+| Any JS/TS package opting into broad quality checks                              | add quality                                                               |
+| TypeScript package with a tsconfig                                              | add strict-types                                                          |
+| TypeScript package with designated pure calculation files                       | add functional                                                            |
+| Package styling with Tailwind CSS v4                                            | add tailwind                                                              |
+| Repo where coding agents write most of the code                                 | add ai                                                                    |
+| Repo with a Tailwind design system to hold the line on                          | add design                                                                |
+| New React or Next.js app, or new code in a repo with no hook-placement contract | add hook-tiers                                                            |
+| FSD repo that locks UI, model and API runtime ownership                         | add `strict(policy)`, see [`STRICT.md`](../../../eslint-config/STRICT.md) |
 
 Order matters: later entries win. Keep `base` first; `next` only carries the
 `@next/next/*` rules, so it composes with `react` and `a11y` in any order.
@@ -144,7 +146,7 @@ consumer project; JavaScript files are not enrolled by `strict-types`.
 
 ### Functional: a scoped pure core
 
-`functional` applies only to `domain/`, `selectors/`, and `reducers/` directories and
+`functional` applies only to `domain/` and `selectors/` directories and
 `*.pure.ts` files (also `.mts`/`.cts`); `*.test.*` and `*.spec.*` files are excluded.
 It does not impose these restrictions on every UI component, event handler or adapter.
 
@@ -178,6 +180,49 @@ effects remain allowed; these checks look for resource leaks rather than countin
 `eslint-plugin-react` conventions with no ESLint React equivalent are gone:
 `react/function-component-definition` (arrow components) and
 `react/jsx-props-no-spreading`. Add a project override if a repo still wants them.
+
+### Hook tiers: UI, domain hooks and micro-hooks
+
+`hook-tiers` checks where React state lives. It reads the tier from the path, so a repo needs no
+policy file:
+
+```text
+src/hooks/useCheckout/            domain hook folder, named after the hook
+  index.ts                        exports useCheckout and its types, never a micro-hook
+  useCheckout.ts                  composes micro-hooks and pure functions; no effects or owners
+  checkout.pure.ts                pure calculations (the functional preset owns *.pure.*)
+  useCartTotal/useCartTotal.ts    micro-hook: one state owner such as useQuery, plus its API call
+  useCouponCode/useCouponCode.ts  micro-hook: local state and its actions
+src/components/CheckoutPanel.tsx  UI: calls useCheckout(), keeps view-local useState/useRef/useId
+```
+
+- A UI file (`*.tsx`/`*.jsx` outside `use<Name>/` folders) imports domain hooks through their
+  folder entry. It does not call effects, state-owner hooks or API modules. Reading a route param
+  or navigating stays in UI.
+- A domain hook composes. Once it imports a micro-hook it may not import effects, state owners or
+  the API. A domain with a single owner may skip the micro-hook folder and use that owner directly
+  until a second one appears.
+- A micro-hook connects at most one state owner and never imports another hook; the domain hook
+  passes values between micro-hooks. Hooks have two tiers, so a third nested `use<Name>/` fails.
+- A `use*` file outside these folders is a view hook for DOM work only, and other modules may not
+  define stores.
+
+State owners default to `OWNERS`: `@tanstack/react-query`, `swr`, `zustand`, `jotai`, `valtio`,
+`react-redux`, `@reduxjs/toolkit`, `react-hook-form` and `@tanstack/react-form`. Routers are not
+owners. Extend the list for other libraries:
+
+```js
+import { hookTiers, OWNERS } from '@lodado/eslint-config/hook-tiers'
+
+export default [...base, ...react, ...localRules, ...hookTiers({ owners: [...OWNERS, '@apollo/client'] })]
+```
+
+With `strict(policy)`, spread `hookTiers({ strict: true })` instead: strict already reports UI
+runtime defects, so hook-tiers adds only tier placement and each defect reports once. In FSD,
+`model/use<Domain>/` takes the place of `hooks/use<Domain>/`. The preset sets
+`no-restricted-imports`, `no-restricted-syntax` and `no-restricted-globals` per tier; a later
+block that sets one of them replaces those options for its files. The runnable example is
+[`examples/hook-tiers`](../../../eslint-config/examples/hook-tiers).
 
 ### Tailwind: classes resolve against the real theme
 
@@ -224,8 +269,8 @@ turns those off and keeps the eight with no owner elsewhere:
 
 The off rules defer to `ts/no-floating-promises`, `ts/no-unnecessary-condition`
 (`strict-types`), `sonarjs/no-ignored-exceptions`, `no-hardcoded-passwords`,
-`sql-queries`, `no-identical-functions` (`quality`), `no-eval` and
-`unicorn/no-unnecessary-await` (`base`), and `@lodado/local-rules/no-console-log`.
+`sql-queries`, `no-identical-functions` (`quality`), and `no-eval`, `no-console` and
+`unicorn/no-unnecessary-await` (`base`).
 **A repo that does not enable `quality` or `strict-types` loses those checks
 entirely** - turn the matching `ai-guard` rules back on instead:
 
@@ -277,27 +322,29 @@ code-smell and complexity checks can surface existing debt when first adopted.
 
 `@lodado/eslint-config/local-rules` turns these on. Severity comes from each rule - certain
 defects are errors, judgement calls are warnings, and rules that clash with an existing repo
-convention ship off.
+convention or restate another preset's rule ship off.
 
-| Rule                               | Severity | What it catches                                                                                       |
-| ---------------------------------- | -------- | ----------------------------------------------------------------------------------------------------- |
-| `no-console-log`                   | error    | `console.log` left in source                                                                          |
-| `require-exact-call-count`         | error    | `toHaveBeenCalled()` where the contract is 0 / exactly 1 / 2+ calls                                   |
-| `require-skip-reason`              | error    | `test.skip` / `it.todo` with no comment saying which layer covers it instead                          |
-| `no-arbitrary-sleep-in-tests`      | error    | `await sleep(100)` / `new Promise(r => setTimeout(r, n))` in test files                               |
-| `no-css-locator-without-reason`    | error    | `page.locator('.thing')` in e2e specs with no justification comment                                   |
-| `no-refetch-in-effect`             | error    | `refetch()` inside an effect instead of putting the input in the query key                            |
-| `no-fetch-in-component`            | error    | `fetch` / `axios` called straight from a component                                                    |
-| `require-abort-signal-passthrough` | error    | a queryFn that destructures `signal` but never hands it to `fetch`                                    |
-| `no-response-type-assertion`       | error    | `(await res.json()) as Payload` — asserting a boundary payload instead of parsing it                  |
-| `require-discriminated-state`      | warn     | a `status` literal union sitting next to optional siblings instead of one member per state            |
-| `no-boolean-state-flags`           | warn     | parallel `isLoading` / `isError` flags for one flow, or two boolean `useState` in one component       |
-| `no-action-in-state`               | warn     | an action (`retry`, `reset`) stored inside a state union member or state value instead of beside it   |
-| `require-effect-annotation`        | warn     | `useEffect` with no comment naming the external system, reason and cleanup                            |
-| `no-use-client-above-leaf`         | warn     | `'use client'` on a Next.js `page`/`layout`/`template`/`default` route file                           |
-| `no-derived-state-effect`          | warn     | an effect whose only job is `setX(<value derived from the deps>)`                                     |
-| `no-derived-state-member`          | warn     | a state union member carrying the same fields as a sibling under a different tag (`ready` / `paging`) |
-| `scenario-test-filename`           | off      | test files that do not name their layer (`*.scenario.test.*` / `*.unit.test.*`)                       |
+| Rule                               | Severity | What it catches                                                                                                 |
+| ---------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
+| `require-exact-call-count`         | error    | `toHaveBeenCalled()` where the contract is 0 / exactly 1 / 2+ calls                                             |
+| `require-skip-reason`              | error    | `test.skip` / `it.todo` with no comment saying which layer covers it instead                                    |
+| `no-arbitrary-sleep-in-tests`      | error    | `await sleep(100)` / `new Promise(r => setTimeout(r, n))` in test files                                         |
+| `no-css-locator-without-reason`    | error    | `page.locator('.thing')` in e2e specs with no justification comment                                             |
+| `no-refetch-in-effect`             | error    | `refetch()` inside an effect instead of putting the input in the query key                                      |
+| `no-fetch-in-component`            | error    | `fetch` / `axios` called straight from a component                                                              |
+| `require-abort-signal-passthrough` | error    | a queryFn that destructures `signal` but never hands it to `fetch`                                              |
+| `no-response-type-assertion`       | error    | `(await res.json()) as Payload` — asserting a boundary payload instead of parsing it                            |
+| `require-discriminated-state`      | warn     | a `status` literal union sitting next to optional siblings instead of one member per state                      |
+| `no-boolean-state-flags`           | warn     | parallel `isLoading` / `isError` flags for one flow, or two boolean `useState` in one component                 |
+| `no-action-in-state`               | warn     | an action (`retry`, `reset`) stored inside a state union member or state value instead of beside it             |
+| `require-effect-annotation`        | warn     | `useEffect` with no comment naming the external system, reason and cleanup                                      |
+| `no-use-client-above-leaf`         | warn     | `'use client'` on a Next.js `page`/`layout`/`template`/`default` route file                                     |
+| `no-derived-state-member`          | warn     | a state union member carrying the same fields as a sibling under a different tag (`ready` / `paging`)           |
+| `no-complex-ternary`               | warn     | a ternary whose condition holds a logical operator or an optional chain; nesting is base `no-nested-ternary`    |
+| `interaction-hover-needs-focus`    | warn     | an interactive element that styles its hover state with no matching focus style                                 |
+| `no-console-log`                   | off      | `console.log` left in source; base `no-console` already reports it                                              |
+| `no-derived-state-effect`          | off      | an effect whose only job is `setX(<value derived from the deps>)`; `react-hooks/set-state-in-effect` reports it |
+| `scenario-test-filename`           | off      | test files that do not name their layer (`*.scenario.test.*` / `*.unit.test.*`)                                 |
 
 Turn an off-by-default rule on per project:
 

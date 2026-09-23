@@ -37,6 +37,8 @@ import policy from './strict-policy.mjs'
 export default [...base, ...strict(policy)]
 ```
 
+For the UI → domain hook → micro-hook tiers inside `model`, append `...hookTiers({ strict: true })` from `@lodado/eslint-config/hook-tiers`. Strict keeps the UI runtime checks; hook-tiers adds only tier placement, so each defect reports once.
+
 ```json
 {
   "name": "strict-consumer-example",

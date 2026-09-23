@@ -105,7 +105,7 @@ building interactive designs and verifies them by reading the reactions back.
 
 ## ESLint 쓰기
 
-**설정 기준:** 2026-09-21
+**설정 기준:** 2026-09-23
 
 ESLint 10 전용이에요. base 프리셋을 깔고, 그 위에 필요한 것만 얹으면 돼요.
 
@@ -123,7 +123,7 @@ export default [...base, ...react, ...a11y, ...quality, ...localRules]
 쓸 수 있는 프리셋이에요.
 
 ```text
-.(base) react next a11y turbo local-rules testing query quality fsd strict-types functional interaction tailwind ai design
+.(base) react next a11y turbo local-rules testing query quality fsd strict-types functional hook-tiers interaction tailwind ai design
 ```
 
 플러그인은 패키지 의존성으로 함께 설치되지만, **규칙은 해당 프리셋을 import해야 켜져요.**
@@ -144,8 +144,11 @@ export default [...base, ...react, ...a11y, ...quality, ...localRules]
   따로 설치해야 하고, Tailwind 테마가 실제로 스케일을 정의한 레포에서만 의미 있어요.
 - `strict-types`: 처리하지 않은 Promise, Promise 오용, `any`의 전파, 불필요한 조건,
   누락된 union 분기를 타입 정보로 검사해요.
-- `functional`: `domain/`, `selectors/`, `reducers/` 아래 TypeScript와 `*.pure.ts`
+- `functional`: `domain/`, `selectors/` 아래 TypeScript와 `*.pure.ts`
   계산 코드의 변경·I/O·시간/난수 접근을 제한해요. 테스트는 제외하며 `.mts`·`.cts`도 지원해요.
+- `hook-tiers`: 파일 경로로 훅 계층을 판정해요. UI는 `hooks/use<Domain>/` 진입점만 부르고,
+  도메인 훅은 마이크로 훅과 순수 함수를 조합만 하고, 마이크로 훅은 상태 소유 라이브러리를 하나만 연결해요.
+  소유자가 하나뿐인 도메인은 마이크로 폴더 없이 도메인 훅이 그 소유자를 바로 써도 돼요.
 
 `strict-types`와 `functional`은 tsconfig가 필요하고 선택해서 추가해요.
 `next`는 `@next/eslint-plugin-next`만 담고 있어서 `react`·`a11y`와 순서 상관없이 합쳐요.

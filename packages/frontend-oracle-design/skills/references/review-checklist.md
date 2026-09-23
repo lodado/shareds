@@ -108,7 +108,9 @@ finding. Do not suppress mandatory or global critical/high issues because no pat
   [`frontend/authoring.md`](frontend/authoring.md#2-set-declarative-ui-and-micro-hook-boundaries)?
   Compare the actual callers, state/effect owners and checks with the Implementation Decision;
   do not accept its self-assessment. Preserve an approved orchestration-only scope without
-  imposing it elsewhere. A trivial wrapper or giant hook is not justified by extracting a file.
+  imposing it elsewhere. Under an approved hook-tiers profile, check that the domain hook only
+  coordinates and that each micro-hook connects one state owner. A trivial wrapper or giant hook is
+  not justified by extracting a file.
 - For a material [responsibility assignment](delivery/implementation-decision.md#responsibility-assignment),
   derive the caller → state/policy owner → external effect path from code, then compare it with
   the Decision and the applicable approved boundary. Cite the actual decision/update sites in the

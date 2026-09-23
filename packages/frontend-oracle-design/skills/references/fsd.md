@@ -321,7 +321,7 @@ base config. The profile does not change FSD itself. It adds a project policy fo
 files: state and workflow belong in `model`, rendering and presentation hooks in `ui`, and request
 transport in `api`. The consumer declares its source roots, aliases, rendering targets, runtime
 modules, allowed React exports, public entries, and the reason for every exception in a separate
-policy module. See [`STRICT.md`](../../../eslint-config/STRICT.md) for the complete flat-config
+policy module. See [`STRICT.md`](https://github.com/lodado/shareds/blob/main/packages/eslint-config/STRICT.md) for the complete flat-config
 and script form.
 
 The profile's FSD checks still require normal layer direction, same-slice isolation, and a narrow

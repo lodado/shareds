@@ -223,8 +223,10 @@ reviewer taste. Leave the following values in the approval document as exact val
 | `orchestration-only` | the Page/UI file glob to apply | the actual ESLint rule ID | hook names to allow directly | hook names to forbid directly | the actual repo lint command | the config path and the actually installed version |
 
 - If an equivalent lint rule already exists, use it. Only when there is none, propose adopting
-  `use-encapsulation/prefer-custom-hooks` of `eslint-plugin-use-encapsulation`, and the dependency
-  installation and config change are also subject to architecture approval.
+  `@lodado/eslint-config/strict` or `@lodado/eslint-config/hook-tiers`; the dependency installation
+  and config change are also subject to architecture approval. `use-encapsulation/prefer-custom-hooks`
+  of `eslint-plugin-use-encapsulation` was audited and not adopted because its identifier matching
+  misses aliases and hidden hooks.
 - Do not leave `allow` and `block` to the plugin defaults. Check the target runtime's
   React·router·query·form hooks in the actually installed versions and state them explicitly.
 - Lock the config source as an Oracle local source and add `hook-encapsulation` to the required
@@ -237,8 +239,30 @@ For a repository that has approved `@lodado/eslint-config/strict`, record the sa
 `lodado-check-architecture ./strict-policy.mjs` command. The policy records source roots,
 rendering targets, module contracts, exact React exceptions, and public-entry/cross-slice reasons.
 It is an opt-in repository policy, not an assertion that FSD or React universally forbids local
-UI state. [`STRICT.md`](../../../eslint-config/STRICT.md) is the canonical package reference; do
+UI state. [`STRICT.md`](https://github.com/lodado/shareds/blob/main/packages/eslint-config/STRICT.md) is the canonical package reference; do
 not copy its policy table into an Oracle card.
+
+### Hook tiers profile
+
+The hook-tiers profile is an `orchestration-only` policy with fixed placement. UI imports domain
+hooks through their `use<Domain>/index.ts` entry and keeps only view-local state. The domain hook in
+`use<Domain>/use<Domain>.ts` coordinates micro-hooks and pure functions into render-ready values and
+meaningful operations, with no effects and no direct state-owner or API access. Each micro-hook in
+`use<Domain>/use<Micro>/` connects at most one state owner. FSD places the domain folder under
+`model/`. A domain with a single owner may keep that owner in its domain hook until a second one
+appears.
+
+Apply it only when the repository has no placement contract of its own and the user selected it,
+in this request or in a standing instruction the host loads for the task. That instruction is the
+user's explicit answer for placement; it never overrides a repository contract and does not license
+moving existing code without approval. Do not infer the profile from code shape.
+
+Record the `@lodado/eslint-config/hook-tiers` export, its `owners` list, the installed version, and
+the repository lint command over the changed files under the same `hook-encapsulation` label. Its
+rules are errors, so the command's exit code decides the label. Next to the strict profile, use
+`hookTiers({ strict: true })` so each defect reports once. Like the strict profile, the preset
+proves placement only; cohesion inside a micro-hook and the meaning of a domain operation stay with
+tests and independent review.
 
 ## Implementation judgment
 

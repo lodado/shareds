@@ -22,6 +22,7 @@
     "./strict-types": "./strict-types.js",
     "./interaction": "./interaction.js",
     "./functional": "./functional.mjs",
+    "./hook-tiers": "./hook-tiers.mjs",
     "./tailwind": "./tailwind.js",
     "./ai": "./ai.js",
     "./design": "./design.mjs",
@@ -37,9 +38,11 @@
     "a11y.js",
     "ai.js",
     "design.mjs",
+    "examples/hook-tiers",
     "examples/strict",
     "fsd.js",
     "functional.mjs",
+    "hook-tiers.mjs",
     "index.mjs",
     "interaction.js",
     "local-rules.js",
@@ -61,8 +64,8 @@
     "node": "^22.22.2 || >=24.15.0"
   },
   "scripts": {
-    "test": "node test.js && node --test feedback.test.mjs functional.test.mjs && pnpm test:strict",
-    "lint": "eslint index.mjs ai.js design.mjs react.mjs next.js a11y.js turbo.js local-rules.js testing.js query.js quality.js fsd.js interaction.js test.js strict-types.js tailwind.js functional.mjs feedback.test.mjs functional.test.mjs package.json strict.mjs strict-cli.mjs strict.test.mjs strict-distribution.test.mjs strict-example.test.mjs",
+    "test": "node test.js && node --test feedback.test.mjs functional.test.mjs hook-tiers.test.mjs skill-doc.test.mjs && pnpm test:strict",
+    "lint": "eslint index.mjs ai.js design.mjs react.mjs next.js a11y.js turbo.js local-rules.js testing.js query.js quality.js fsd.js interaction.js test.js strict-types.js tailwind.js functional.mjs hook-tiers.mjs hook-tiers.test.mjs skill-doc.test.mjs feedback.test.mjs functional.test.mjs package.json strict.mjs strict-cli.mjs strict.test.mjs strict-distribution.test.mjs strict-example.test.mjs",
     "test:strict": "node --test strict.test.mjs strict-example.test.mjs && node strict-distribution.test.mjs"
   },
   "peerDependencies": {

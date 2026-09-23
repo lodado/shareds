@@ -6,7 +6,8 @@
     "docs/save.md",
     "packages/oracle-red-fixture.test.mjs",
     "packages/oracle-green-fixture.test.mjs",
-    "packages/agent-graph-engineering/skills/agent-graph-engineering/scripts/graph-verify.mjs"
+    "packages/agent-graph-engineering/skills/agent-graph-engineering/scripts/graph-verify.mjs",
+    "packages/vibe-coding-helper/skills/eslint-setup/SKILL.md"
   ],
   "tasks": {
     "lint": {},

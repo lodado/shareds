@@ -846,7 +846,9 @@ dependency import when no additional seam is needed.
 - A UI component owns semantic JSX, accessibility, visual expression and user intent. Reuse the
   approved domain/transport/query owners; do not duplicate their policy, state or retry logic.
 - Extract a micro-hook when a React-connected responsibility above needs its own owner. Keep its
-  workflow cohesive; it does not own JSX·class·token·copy or unrelated workflows.
+  workflow cohesive; it does not own JSX·class·token·copy or unrelated workflows. Under an approved
+  [hook-tiers profile](../architecture-contract.md#hook-tiers-profile), a domain hook coordinates
+  micro-hooks and pure functions, and each micro-hook connects at most one state owner.
 - React-independent calculation belongs in an existing function or render derivation, not a hook.
   Do not create a model file solely because a calculation exists.
 - Stop at an existing function, render derivation, event handler, or query/router/form API when it
@@ -895,10 +897,10 @@ source, never added silently.
 
 1. A repo using `@lodado/eslint-config/react` already has it on —
    `react-hooks/set-state-in-effect`·`set-state-in-render` (synchronous setState inside an effect,
-   the starting point of derived state and chains) and
-   `react-you-might-not-need-an-effect` strict
-   (all rules as errors, including
-   `no-derived-state`·`no-chain-state-updates`·`no-event-handler`·`no-adjust-state-on-prop-change`)
+   the starting point of derived state and chains, and the single owner of derived-state reports) and
+   `react-you-might-not-need-an-effect` strict with its duplicate `no-derived-state` turned off
+   (the other rules are errors, including
+   `no-chain-state-updates`·`no-event-handler`·`no-adjust-state-on-prop-change`)
    correspond to the forbidden list above.
 2. For other repos, propose introducing `eslint-plugin-react-hooks` 6+ (4.x has only
    `rules-of-hooks`·`exhaustive-deps` and cannot catch these) and
@@ -915,9 +917,11 @@ Apply a deterministic lint gate to the Page/UI target glob only when the archite
 explicitly chosen `orchestration-only`. Do not select it automatically by LOC or effect count.
 
 1. If the repo has an ESLint rule that enforces the same boundary, reuse it.
-2. Only when there is no equivalent rule, propose introducing
-   `use-encapsulation/prefer-custom-hooks` from `eslint-plugin-use-encapsulation`.
-   Installation·config changes are recorded·locked in the architecture source after user approval,
+2. Only when there is no equivalent rule, propose `@lodado/eslint-config/strict` for UI/model/API
+   runtime ownership or `@lodado/eslint-config/hook-tiers` for the
+   [hook-tiers profile](../architecture-contract.md#hook-tiers-profile).
+   `use-encapsulation/prefer-custom-hooks` from `eslint-plugin-use-encapsulation` was audited and
+   not adopted: its identifier matching misses aliases and hidden hooks. Installation·config changes are recorded·locked in the architecture source after user approval,
    and silent addition is forbidden.
 3. Pin the target glob, rule ID, `allow`, `block`, lint command, and config source together with the
    actually installed version. **Name explicitly** render-local primitives in the approved `allow`,
@@ -937,7 +941,7 @@ bindings for supported static forms, while the latter is identifier based and ca
 the stricter ownership contract. Keep the same `hook-encapsulation` approval label and record the
 separate policy module plus `lodado-check-architecture ./strict-policy.mjs` command. The profile
 does not replace a review of external-system synchronization or a build check for client/server
-reachability. See [`STRICT.md`](../../../../eslint-config/STRICT.md).
+reachability. See [`STRICT.md`](https://github.com/lodado/shareds/blob/main/packages/eslint-config/STRICT.md).
 
 <!-- node:frontend-quality path:references/frontend/quality.md -->
 
