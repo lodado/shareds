@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["src/pages/*/model", "src/pages/*/config"],
+  "exclude": ["**/__test__/**"]
+}

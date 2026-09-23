@@ -1,0 +1,33 @@
+{
+  "name": "threejs-game-wireframe-starter",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Stack greybox: Vite + TypeScript + Three.js, DOM HUD, FSD pages-first slice with a headless ECS core.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run typecheck && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.core.json",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "check:fsd": "steiger ./src && node scripts/check-fsd-fixtures.mjs",
+    "test:e2e": "playwright test",
+    "verify": "npm run typecheck && npm test && npm run check:fsd && vite build && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@feature-sliced/steiger-plugin": "0.7.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "26.6.2",
+    "@types/three": "0.186.0",
+    "steiger": "0.6.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.0"
+  },
+  "dependencies": {
+    "three": "0.186.0"
+  }
+}

@@ -1,0 +1,102 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #1d2230;
+  color: #f4f1ea;
+  font: 16px/1.4 system-ui, sans-serif;
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.play-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.play-hud {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: max(12px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+.play-hud button {
+  pointer-events: auto;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 600;
+}
+
+.hud-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hud-score {
+  font-size: 40px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-pause {
+  padding: 0 14px;
+  background: rgb(255 255 255 / 0.14);
+  color: inherit;
+}
+
+.hud-flash {
+  margin: 0;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.hud-panel {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  text-align: center;
+}
+
+.hud-panel[hidden],
+.play-hud [hidden] {
+  display: none;
+}
+
+.hud-status {
+  margin: 0;
+}
+
+.hud-primary {
+  padding: 0 28px;
+  background: #f4f1ea;
+  color: #1d2230;
+}
+
+.play-hud :focus-visible {
+  outline: 3px solid #8fc1ff;
+  outline-offset: 2px;
+}
