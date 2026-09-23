@@ -26,6 +26,8 @@ class PackageTests(unittest.TestCase):
         entries = [p for p in market['plugins'] if p['name'] == 'agent-memory']
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0]['source'], './packages/agent-memory')
+        package = json.loads((ROOT / 'package.json').read_text())
+        self.assertEqual(package['version'], entries[0]['version'])
         for manifest in manifests:
             self.assertEqual(manifest['version'], entries[0]['version'])
             self.assertEqual(manifest['name'], 'agent-memory')

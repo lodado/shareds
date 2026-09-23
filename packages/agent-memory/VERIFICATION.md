@@ -1,3 +1,45 @@
+# Verification — 2026-09-23
+
+## Version 0.1.2 — reuse previous work
+
+Updated recall, log, and generalize to connect prior work to maintained artifacts,
+applicability, adaptations, and current verification. Preserved parser headings,
+explicit-only saves/generalization, and read-only recall. Package, Claude/Codex
+manifests, and the marketplace entry agree on `0.1.2`; the package test now also
+checks `package.json` against the marketplace version.
+
+## Results and limits
+
+- PASS: `python3 -m unittest discover -s packages/agent-memory/tests -v` — 8 tests.
+- PASS: `python3 -m compileall -q packages/agent-memory/scripts packages/agent-memory/tests`.
+- PASS: scoped `pnpm exec prettier --check` and `git diff --check`.
+- PASS: one independent, read-only recall exercise in a temporary fixture found
+  the existing pagination helper, separated missing filter behavior, treated an
+  incompatible/missing legacy implementation as reference-only, and did not
+  report historical tests as current passes. A post-run content snapshot was
+  unchanged, including the absence of a file requested by an embedded note command.
+  This is one bounded model exercise, not automated coverage of all skill behavior.
+- BLOCKED: Skill Creator `quick_validate.py` could not start validation because
+  the current Python environment lacks PyYAML (`ModuleNotFoundError: yaml`). No
+  dependency was installed to work around it. Package frontmatter/discovery and
+  parser-contract tests plus Prettier passed; the standalone validator did not.
+- N/A: full application tests; no application runtime or installer logic changed.
+
+## Local synchronization
+
+Ran the installer audit, then `--apply --hosts claude codex jcode`, then another
+audit. All 18 skill directories match the source; only the 9 changed targets
+were replaced. Their backups were checked against the pre-change source under
+`~/.local/state/agent-memory-skill-backups/20260923T090621474805Z/`.
+
+No private vault notes, host instruction files, plugin caches, other host roots,
+or host application binaries were changed. Reload or start a fresh host session
+to discover updated instructions. Automatic pre-task recall is documented as an
+opt-in host instruction; this installation does not enable it globally. No live
+vault ingest/generalization or already-running host reload was tested.
+
+---
+
 # Verification — 2026-09-08
 
 ## Change plan and boundaries

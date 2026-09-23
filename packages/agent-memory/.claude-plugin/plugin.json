@@ -1,6 +1,6 @@
 {
   "name": "agent-memory",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Evidence-backed Obsidian agent memory: recall, session logs, conditional concepts, TIL, rule review, and maintenance.",
   "author": {
     "name": "lodado"

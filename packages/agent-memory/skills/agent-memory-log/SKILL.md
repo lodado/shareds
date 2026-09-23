@@ -1,6 +1,6 @@
 ---
 name: agent-memory-log
-description: Save an explicitly requested session log to an Obsidian Agent Memory vault.
+description: Save explicitly requested session evidence and artifact pointers so similar work can be reused from an Obsidian Agent Memory vault.
 allowed-tools:
   - Bash
 ---
@@ -40,6 +40,18 @@ Keep these headings and their meaning stable for existing parsers:
 - Do not turn a successful one-off workaround into a permanent rule.
 - A session may produce no generalization or rule candidate. That is a valid result.
 - Keep unrelated topics in separate notes; one explicit ingest event produces one note.
+
+## Reuse evidence
+
+When the session produced or reused an implementation, script, template, or repeatable procedure, add `## 재사용 단서` under `# 배운 점`. Keep the required top-level headings unchanged and record only available evidence:
+
+- Problem and search terms: the task, symptom, and stack someone would search for next time.
+- Applicability: relevant versions, assumptions, exclusions, and project-specific constraints.
+- Original artifact: repository, file or entrypoint, and commit when available. Keep maintained code in its repository; link to it rather than copying a second maintained implementation into the vault. Do not imply uncommitted work is captured by an earlier commit.
+- Verification: actual command, result, environment, and verification date; distinguish checks not run from successful checks.
+- Reuse outcome: link the recalled concept/session, if any, and state what was reused unchanged, adapted, or rejected and why. Preserve failures and unresolved limits too.
+
+Missing source or verification is a gap to record, not a reason to invent an artifact or mark it reusable. Keep project-local recipes in the session/project note. A portable concept may be suggested for `agent-memory-generalize`, but this log request does not authorize creating one.
 
 ## Resume context
 

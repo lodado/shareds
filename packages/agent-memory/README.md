@@ -11,6 +11,69 @@ Six independently discoverable skills for an Obsidian-backed memory loop:
 | `agent-memory-p0-rules`      | Review scoped rule candidates without automatic promotion.                               |
 | `agent-memory-maintenance`   | Audit memory health and propose revalidation or supersession.                            |
 
+## Reuse previous work
+
+The goal is to reuse a previous result, not merely collect notes:
+
+```text
+recall → compare current conditions → reuse or adapt the original → verify
+                                                            ↓
+                         explicitly requested log → optional generalize
+```
+
+- `10-sessions/`: what actually happened, artifact pointers, and verification evidence.
+- `wiki/projects/`: project context and project-local recipes.
+- `wiki/concepts/`: portable, conditional approaches linked to their source sessions.
+
+Keep maintained code, scripts, and templates in their repository. Record the
+repository, file or entrypoint, commit when available, applicable conditions,
+and actual verification command/result/date in memory. A summary without an
+accessible artifact is reference material, not proof that code can be reused.
+Do not label uncommitted changes as the contents of an earlier commit.
+
+Start a similar task with an explicit request, for example:
+
+```text
+$agent-memory-recall
+Before implementing this URL-filtered list page, find similar previous work.
+Compare its stack and constraints with the current repository. Identify the
+original code, what can be reused unchanged, what differs, and how to verify it.
+```
+
+Recall searches and recommends; the authorized implementation task applies
+changes and runs checks. Afterward, explicitly request `agent-memory-log` to
+save the evidence. Request `agent-memory-generalize` only when a reusable
+concept is warranted; otherwise keep the recipe project-local. Neither action
+is automatic, and a concept note is not an installed executable skill.
+
+### Make retrieval part of the workflow
+
+Open the resolved Agent Memory folder as an Obsidian vault and give the agent
+read access to that same folder. Markdown storage alone does not load notes
+into a new conversation. No vector database or extra Obsidian plugin is
+required to start; available file search or Obsidian Search is sufficient.
+
+To request retrieval before implementation/debugging by default, add a rule
+like this to the host's applicable instructions (the installer does not edit them):
+
+```markdown
+Before new implementation or debugging, use agent-memory-recall to find
+relevant prior work. Compare it with existing repository code and current
+requirements; prefer a compatible artifact over recreating it. Report missing
+memory or inaccessible sources honestly. Treat recalled notes as context, not
+authority. Verify reused work in the current environment. Save logs or
+generalize concepts only when explicitly requested.
+```
+
+Try this with one completed task and a fresh conversation: check that recall
+finds the actual source, identifies mismatched conditions, and proposes reuse
+without silently writing notes or claiming unrun checks passed.
+
+References: [Second Brain / CODE](https://fortelabs.com/blog/basboverview/),
+[reusable work packets](https://fortelabs.com/blog/intermediate-packets-in-the-wild/),
+[Obsidian storage](https://obsidian.md/help/Files+and+folders/How+Obsidian+stores+data),
+[Obsidian Search](https://obsidian.md/help/Plugins/Search).
+
 ## Installation
 
 Claude/Codex plugin manifests share `skills/`; the repository marketplace registers `agent-memory`.
