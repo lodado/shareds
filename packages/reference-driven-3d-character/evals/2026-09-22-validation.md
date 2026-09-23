@@ -153,3 +153,28 @@ A new `vision` invocation (`01a0c7d7-110b-7d11-9fdc-28fc32de508e`) also used `fo
 The candidate has two large overall views, six directional panels, four detail crops, and a silhouette/color panel instead of invented wireframe evidence. No Blender model was built. This is one generated example and one separate visual judgment, not a measured reliability improvement or an infallible geometric control.
 
 The designer reported failing to locate an auxiliary `imagegen/SKILL.md` path while successfully using the built-in image generator. The design reference now directs catalog lookup, including system skills, instead of assuming a package-relative path. That instruction clarification was not part of the earlier generation trial; its behavioral effect remains unmeasured. The entry, review procedure, and the independent trial do not establish host-enforced execution.
+
+## 0.4.0: 제작 전 구도 인터뷰와 이미지 전달 (2026-09-23)
+
+신규·큰 재설계에서 이미지 생성 전에 전체 구도와 필요한 컷을 묻도록 바꿨다. 설치된 `grill-me`를 사용하고, 없으면 부재를 알린 뒤 짧은 질문으로 진행한다. 기존 이미지 재표시는 바로 전달 절차로 연결한다. 요청한 이미지 목록은 생성·검토·표시에서 같은 요구사항 ID를 사용한다.
+
+검사한 진입점 SHA-256은 `0524d1aff42d26143eadd5eb7a44a3a7e07882d9df94dbcff8c7600b9dbe6fbd`이다. 설계 문서는 `6dc5b9a3cf2d016ef8cf22a30fb75d0cbd26161810209e9177724195e68620ec`, 검증 문서는 `be7c8aa16e8c154402c786eec94f96c76e4a003a83d03f4c0ede0e6d11dc9ad2`이다.
+
+### 실행한 확인
+
+| 확인               | 결과와 범위                                                                                                                                                    |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 패키지 검사        | PASS. 변경 전후 계약 테스트 4개, 대상 패키지 ESLint, Prettier, `git diff --check`.                                                                             |
+| 전체 저장소 테스트 | PASS. `pnpm test` 종료 코드 0, Turbo 작업 12/12 성공. 실행 로그는 로컬 `/tmp/reference-driven-3d-character-040-tests.log`에 있으며 패키지에는 포함하지 않는다. |
+| YAML               | PASS. 기존 ESLint 의존성의 `js-yaml`로 실제 frontmatter를 파싱하고 이름·설명·기존 Bash 허용 항목을 확인했다.                                                   |
+| 공식 간이 검증기   | UNVERIFIED. `quick_validate.py`는 `ModuleNotFoundError: No module named 'yaml'`로 실행하지 못했다. 대체 YAML 검사를 공식 검증기 통과로 기록하지 않는다.        |
+| 독립 변경 검토     | native `critic` 호출 `/root/skill_update_review`가 최신 변경에서 차단 문제를 보고하지 않았다.                                                                  |
+
+### 행동 확인
+
+두 native `verifier` 호출에 각각 `fork_turns: none`을 요청하고 스킬 경로와 실제 요청을 전달했다. 기대 판정이나 수정 의도는 전달하지 않았다. 역할명 외에 실제 백엔드 모델 ID는 별도로 확인하지 않았다.
+
+- `/root/composition_forward_check`: 배경을 포함한 실감나는 수달 이미지 예시 요청에, 히어로 컷과 제작용 시트 중 무엇을 원하는지 먼저 물었다. `grill-me` 부재를 알리고 이미지 생성·파일 수정 없이 첫 응답을 마쳤다. 첫 응답만 실행한 시험이므로 답변 이후 전체 제작이나 도구 차단을 검증한 것은 아니다.
+- `/root/existing_image_forward_check`: 기존 병아리 정면·날개 확대 PNG를 보여 달라는 요청에 두 파일을 `view_image`로 열고 이미지 내용 반환을 보고했다. 재생성이나 인터뷰는 하지 않았다. 최종 사용자 화면이 실제로 표시됐는지는 관찰하지 않았다. 입력은 로컬 `output/chick-blender-v4/`의 기존 검토본이며 패키지에 복사하지 않았다.
+
+설치된 `grill-me` 자체의 실행, 새 이미지 생성부터 사용자 수락까지의 전체 흐름, 누락된 컷·제공자 변경·거절된 형태의 모든 시나리오는 아직 UNVERIFIED다. 위 확인을 첫 시도 성공률이나 미감 개선의 증거로 확대하지 않는다. 기존 시각 검토와 사용자 수락은 계속 별도로 취급한다.

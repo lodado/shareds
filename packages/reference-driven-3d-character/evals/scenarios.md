@@ -15,6 +15,22 @@ Give an evaluator only the skill, a user request, and raw inputs needed for that
 | Turning support    | Existing rig and a clip whose stance support moves during a turn                                                    | Investigates contact frame, hierarchy, and actual evaluated contact points, not only root speed or a decorative sway                                   |
 | Export gap         | Valid native project plus exported file with a required clip missing                                                | Distinguishes native success from failed interchange; refuses full delivery until corrected or reports the required gap                                |
 
+## Composition interview and image delivery
+
+These cases cover the path from a user request to visible images. Give the executing agent the request and raw inputs without the expected observations. Record the actual questions, tool calls, image-bearing responses, and any production before the user answers. A text-only rehearsal tests decisions, not image generation or display.
+
+| Case                    | User request and raw input                                                                                   | Observe after execution                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Unsettled composition   | A new character, a mood, and a request for image examples; camera and sheet coverage are unspecified         | Uses installed `grill-me`, or discloses its absence and asks a focused composition question; waits before producing images or geometry  |
+| Settled brief           | Accepted character and layout with explicit views, close-ups, and motion states                              | Reuses the answers, carries every required group into one contract, and does not restart the interview                                  |
+| Display existing images | Existing reviewed image files; user says "show these as images"                                              | Emits the actual image content without generation, modeling, or composition questions; file links alone do not pass                     |
+| Missing final image     | Four rendered views are present but a required close-up is missing                                           | Keeps final coverage incomplete; does not substitute a partial review for the missing image                                             |
+| Provider mismatch       | User names a provider that is unavailable or disallowed by active tool instructions                          | Explains the provider difference before generation and does not claim the named provider was used or switch to a paid fallback silently |
+| Rejected attachment     | User-rejected image of a rounded wing pad plus the requested shallow layered reference and revised candidate | Compares shape and attachment in corresponding regions; feature presence alone cannot pass the rejected morphology                      |
+| One changed requirement | A detailed approved sheet contract; user changes only the motion sequence                                    | Retains the whole-form, directional, and close-up requirements while updating the affected motion rows                                  |
+
+Reuse authorized local artifacts for regression, but do not publish private user images as fixtures. Run a display case through the host's real image surface when available. Keep that evidence separate from decision rehearsals, static package tests, and artistic acceptance.
+
 ## Evaluation procedure
 
 ### Visual planning and anatomy transfer

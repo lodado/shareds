@@ -1,6 +1,6 @@
 ---
 name: reference-driven-3d-character
-description: Design, build, or refine editable 3D characters from reference images or existing assets, including requested rigging, motion, and export verification. Use for reference fidelity and structural character repairs; not image-only generation, general CAD, or game-system implementation.
+description: Plan image-first proposals, build, or refine editable 3D characters from references, including requested rigging, motion, and export verification. Use for character design, reference fidelity, and structural repairs; not unrelated image generation, general CAD, or game-system implementation.
 allowed-tools:
   - Bash
 ---
@@ -11,7 +11,7 @@ Translate intended use and reference evidence into form, attachment, deformation
 
 ## Scope and decision dependencies
 
-Intended use → reference contract → reviewed visual proposal → structural design → reviewed native form → requested deformation and motion → verified delivery.
+Intended use → composition interview → reference contract → reviewed visual proposal → structural design → reviewed native form → requested deformation and motion → verified delivery.
 
 These are readiness dependencies. Research and small feasibility probes may overlap, but a successful probe does not approve the character's appearance. Reuse valid upstream decisions for local repairs. Reopen only the earliest affected decision and mark its dependent results stale until checked again.
 
@@ -29,7 +29,9 @@ Static characters skip rigging and motion. Animation work does not imply game in
 - Rigging, skinning, contact, locomotion, or transitions: read [motion-design.md](references/motion-design.md).
 - Before judging a stage or delivering files: read [verification-and-delivery.md](references/verification-and-delivery.md).
 
-Read only the relevant branches. The image-generation branch uses the available `imagegen` skill/tool; focused interviewing may use `grill-me` when installed. Neither is required for reusing an adequate design or a scoped repair. Visual proposals and changed visual deliverables use the [adversarial visual review](references/verification-and-delivery.md#adversarial-visual-review) procedure. It requires a separate image-capable reviewer, not an orchestration framework; unavailable review remains UNVERIFIED. Consult current official tool documentation when implementation depends on unfamiliar or version-sensitive behavior.
+Read only the relevant branches. New visual work starts with the [composition interview](references/design-method.md#composition-interview-before-visual-work), using `grill-me` when installed and the documented question fallback otherwise. The image-generation branch follows the available `imagegen` instructions. Visual proposals and changed visual deliverables use the [adversarial visual review](references/verification-and-delivery.md#adversarial-visual-review) procedure. It requires a separate image-capable reviewer, not an orchestration framework; unavailable review remains UNVERIFIED. Consult current official tool documentation when implementation depends on unfamiliar or version-sensitive behavior.
+
+For a request to show existing images, use the [image delivery procedure](references/verification-and-delivery.md#image-delivery) directly. Reuse matching review evidence; do not restart the interview, regenerate images, or begin modeling.
 
 ## 0. Establish capability and a safe work area
 
@@ -58,13 +60,15 @@ Ready: the target identity and required behavior are understandable, and remaini
 
 ## 1a. Present a visual proposal before new production
 
+Before generating a new proposal or substantially redesigning the character, complete the composition interview. Ask about unresolved overall direction and image coverage, then wait for the user's answer before visual production. Reuse explicit answers and accepted designs; an instruction to continue does not answer an unresolved composition question. Record explicit delegation if the user asks you to decide. Scoped repairs retain the agreed overall composition and reopen only affected decisions.
+
 For a new design or substantial redesign, choose the images from identity, hidden-volume uncertainty, structural relationships, required deformation, and contact. Explain what each view or detail would resolve. Derive subject axes and relevant states rather than imposing named body parts, a standard pose, fixed angles, or a six-view sheet. Read the visual-planning section of [design-method.md](references/design-method.md).
 
 Distinguish an appearance preview from a detailed production-oriented model sheet. Honor requested information coverage and layout-reference density: plan readable whole-form, complementary-view, and structural-detail evidence before prompting. Minimalism removes redundancy, not requested views. Separate character-identity references from sheet-layout references; greater texture detail or image resolution cannot replace missing structural information.
 
-Before generation, write the compact visual contract in existing notes and derive both the prompt and review checks from its requirement IDs. Reuse adequate supplied images and their recorded acceptance. Where a raster proposal is needed, load the installed `imagegen` instructions and use its default built-in tool. Inspect the result, then dispatch the original inputs and candidate to a separate reviewer using the linked procedure before calling it approval-ready. A required FAIL or UNVERIFIED permits a clearly labeled draft or correction, not a verified handoff or dependent production. Exact structural diagrams and mesh evidence belong to deterministic tools or the native scene. Missing image capability is a disclosed gap, not permission to invent a preview, silently skip review, or switch to a paid API.
+Before generation, write the compact visual contract in existing notes and use its requirement IDs for the prompt, review, and image delivery. Reuse adequate supplied images and their recorded acceptance. Where a raster proposal is needed, load the installed `imagegen` instructions. Record the requested and actual provider; explain before generation if availability or higher-priority tool instructions require a different provider. Inspect the result, then dispatch the original inputs and candidate to a separate reviewer using the linked procedure before calling it approval-ready. A required FAIL or UNVERIFIED permits a clearly labeled draft or correction, not a verified handoff or dependent production. Exact structural diagrams and mesh evidence belong to deterministic tools or the native scene. Missing image capability is a disclosed gap, not permission to invent a preview, silently skip review, or switch to a paid API.
 
-Resolve remaining direction-changing choices one at a time against the displayed proposal. Use `grill-me` when available and requested; otherwise disclose its absence and ask a focused question with a recommendation and its consequences. Do not ask again for facts or preferences already settled.
+Resolve remaining direction-changing choices against the displayed proposal without repeating the pre-production interview. Do not ask again for facts or preferences already settled.
 
 Review A: record the displayed version, adopted decisions, remaining assumptions, and the user's acceptance before production modeling. Review B follows the native form pilot. These are the defaults for new or substantially changed design; explicit delegation of visual decisions can waive waiting, but is recorded as delegation, not user acceptance. A general request to build is not acceptance of an unseen design. Local repairs reuse valid decisions and review only affected relationships.
 
@@ -134,7 +138,7 @@ Ready: required files and observed evidence describe the same revision. Report r
 
 ## Handoff and stop conditions
 
-Before calling a visual deliverable verified, apply the same adversarial review procedure to its final revision. Provide the actual editable project location first, followed by how to open/replay it, relevant controls/settings, observed checks, and remaining issues. For an image-only request, show the requested image with its review status and stop without modeling. Link previews and exports only if produced. Distinguish technical checks, visual self-review, separate review, and user acceptance; silence is not acceptance.
+Before calling a visual deliverable verified, apply the same adversarial review procedure to its final revision. For image requests, display the requested images first using the image delivery procedure; a file path alone does not complete delivery. For a native-project handoff, provide the editable project location, how to open/replay it, relevant controls/settings, observed checks, and remaining issues. An image-only request stops without modeling. Link previews and exports only if produced. Distinguish technical checks, visual self-review, separate review, and user acceptance; silence is not acceptance.
 
 Use PASS / FAIL / UNVERIFIED per applicable check. Mark out-of-scope work with a skip reason, not PASS. These are evidence labels, not a runtime authority system. The skill does not physically prevent tool calls or certify artistic quality.
 

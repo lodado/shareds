@@ -29,11 +29,23 @@ For a repair, preserve the baseline and explain the visible difference. Inspect 
 
 For a requested model sheet, compare delivered panels with the planned required observations. Check that the viewing directions and crops answer their questions, details remain readable, and identity and structural relationships agree across views. Report missing, contradictory, or unreadable observations separately from surface polish. A high-resolution poster or an angle label cannot compensate for absent evidence. Supplementary sheets must preserve the same design revision.
 
+## Image delivery
+
+Use the same requirement IDs established during the composition interview. Before final review, account for every required image or panel at readable size and freeze the candidate revision. An early review of a subset is partial evidence, not completion of the full image set.
+
+For each required row, distinguish file generation, visual review, and display to the user. Display the exact reviewed images through the host's image attachment or inline image-content surface. For a local file, load it with the image-view tool and forward its image content when the host requires that step. Reading a file, returning its hash, or printing a Markdown path does not by itself establish image delivery. Check that an image-bearing response was emitted; do not claim to have observed the user's screen.
+
+If the host cannot emit images, mark delivery UNVERIFIED and explain the limitation with accessible file links. Do not silently substitute links or declare the visual handoff complete. Images that fail review may still be shown as labeled drafts with their unresolved findings.
+
+When the user asks to see existing images, display those artifacts immediately. Reuse matching review evidence; do not regenerate them, restart the composition interview, or advance to modeling. Identify generated concepts and actual native renders clearly. Before concluding, account for every required row with display evidence or an explicit unresolved limitation. A missing required display keeps visual delivery incomplete.
+
 ## Adversarial visual review
 
 Use one separate image-capable reviewer for a new or revised visual proposal, a changed native form pilot, and the final visual deliverable before calling it approval-ready or verified. Reuse a review only when its contract, sources, candidate identity, and reviewed scope still match. Keep local repairs scoped to the changed relationships and their preservation checks. A quick appearance example needs no unrequested turnaround, native model, or extra reviewers.
 
 The reviewer tries to disprove that the candidate meets the visual contract. It must cite visible evidence and may return PASS when no defect is found. Do not impose a flaw count, redesign to the reviewer's taste, or mistake uncertainty for a demonstrated defect. The producer makes corrections; the reviewer stays read-only and does not generate replacements, edit the contract, or approve its own work.
+
+Compare the same feature in the reference and candidate, including its supporting surface. Feature presence or a valid connection does not establish the requested silhouette, thickness, layering, or material. For a user-rejected result, keep the rejected image and stated reason in the repair packet; a previous PASS cannot override that correction. Test the demonstrated defect again without turning a character-specific shape into a universal rule.
 
 For count or attachment requirements, inventory the visible parts by panel and location, including untextured or unpadded shapes. Describe occlusion rather than assuming a hidden part exists or is missing. Compare attachment sides in the character's coordinate frame, not screen-left versus screen-right. "Generally consistent" is insufficient evidence for these rows. For direction checks, name the visible surfaces that support or contradict the requested viewpoint. Keep exact camera metadata out of required checks unless the contract requests that proof; its absence alone does not fail an appearance concept.
 

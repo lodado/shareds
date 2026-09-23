@@ -40,6 +40,21 @@ Use low-cost variants only when a material direction remains open. Keep content,
 
 The pilot is the smallest editable model that can falsify the structural hypothesis. It is not necessarily the whole finished asset, a fixed number of parts, or a presentation render. Start with continuous or separate surfaces according to the intended form. Intentional separate attachments are compatible with a coherent silhouette; accidental seams and primitive collisions are not automatically acceptable.
 
+## Composition interview before visual work
+
+For a new proposal or substantial redesign, ask about the overall composition before generating images or building geometry. Load and use the installed `grill-me` skill when available. If it is unavailable, say so and conduct the interview with the host's question surface or a plain-text question. Do not claim to have run an unavailable skill or install a replacement without authorization.
+
+Inspect supplied references and prior answers first. Ask one focused question at a time about the unresolved choice that most affects the result. Offer a concrete recommendation and its tradeoff when useful. Cover only what the request leaves open:
+
+- Intended use, realism or stylization, and identity relationships to preserve.
+- Overall scene: pose or action, framing, camera direction, background, and mood.
+- Required image groups: overall views, complementary directions, enlarged details, and motion states. For motion, distinguish isolated poses from a sequence showing support and transitions.
+- Presentation: one sheet or readable separate images, information density, and any user-named generation provider.
+
+For example, if the character is settled but coverage is not, ask whether the user wants an appearance preview or a production sheet with directions, attachment close-ups, and motion phases. Do not turn these topics into a fixed questionnaire or impose one species' panel counts on another.
+
+Wait for answers before visual production. Stop asking once the supplied evidence and answers determine the composition and required coverage. Summarize those decisions in the existing visual contract, distinguishing user decisions from explicitly delegated choices. Reuse an accepted layout or complete supplied brief without asking the same questions again. A request to display existing images skips this interview; a scoped repair reopens only affected or unresolved decisions.
+
 ## Visual planning from uncertainty
 
 For each important decision, connect a principle to an observation, a choice, and a possible disproof. First identify the subject's dominant axes, meaningful symmetries, structural continuity, and intended motion. Direction labels are relative to that subject or a documented reference frame, not presumed anatomy. A fixed body-part list, camera-angle recipe, or standard pose cannot replace this analysis.
@@ -69,6 +84,13 @@ Before generation, write a compact visual contract in the existing project notes
 
 Carry an accepted design across views instead of independently redesigning each panel. Keep its proportions, markings, attached elements, connection paths, materials, and neutral state consistent. Separate deformation studies from neutral comparisons. Reuse adequate images rather than regenerating them just to assemble a board.
 
+Keep one requirement list through generation, review, and delivery. Extend the existing contract rows with the resulting image or panel, review result, and display evidence; do not create a second checklist with fewer requirements. A small table is sufficient:
+
+| Requirement ID | Requested observation and failure condition | Image or panel | Generation | Review | Delivery |
+| -------------- | ------------------------------------------- | -------------- | ---------- | ------ | -------- |
+
+Missing, pending, or unreadable observations remain incomplete. When the user changes one requirement, preserve the other rows. A saved file, a reviewed image, and an image displayed to the user are separate states. Follow the [image delivery procedure](verification-and-delivery.md#image-delivery) for the last state.
+
 Build the image prompt from this contract:
 
 ```text
@@ -88,13 +110,13 @@ Replace the placeholders from the actual analysis and omit inapplicable fields. 
 
 ### Generate, inspect, and discuss the proposal
 
-Reuse sufficient supplied designs before generating new ones. For raster design proposals, follow the available `imagegen` skill's built-in workflow. Resolve it through the host's skill catalog, including system skills; do not assume a package-relative `imagegen/SKILL.md` path. Describe source roles, invariants, the question each view answers, intended states, and unwanted deviations. Treat supplied design images as references unless the request is to edit them. Preserve originals; revise only the selected uncertainty and carry forward established decisions.
+Reuse sufficient supplied designs before generating new ones. For raster design proposals, follow the available `imagegen` instructions. Resolve the skill through the host's catalog, including system skills; do not assume a package-relative `imagegen/SKILL.md` path. Respect provider constraints and disclose any difference between the user's requested provider and the permitted, available tool before generation. Describe source roles, invariants, the question each view answers, intended states, and unwanted deviations. Treat supplied design images as references unless the request is to edit them. Preserve originals; revise only the selected uncertainty and carry forward established decisions.
 
 Inspect every applicable requirement row against the actual candidate. Record the panel or region, observation, and PASS / FAIL / UNVERIFIED, then run [adversarial visual review](verification-and-delivery.md#adversarial-visual-review) before presenting it as approval-ready. Check identity across views, plausible hidden volume, projection differences, unintended changes, and missing context. A label such as "side" does not establish the viewing direction. Generated grids and measurements are not topology or measured dimensions; use native or deterministic evidence for those claims.
 
 After an image edit or regeneration, recheck all required rows and the relationships between affected views. An edit aimed at one region can change another; do not carry the previous image's PASS into the new revision. A visible contradiction is FAIL; an occluded or unreadable relationship is UNVERIFIED. Fix the unmet requirement rather than adding polish. If attempts stop improving the evidence, disclose the remaining gap instead of repeatedly regenerating or weakening the contract. Exact matching projections require views from one native model; proposing that route does not authorize modeling before review A or expand an image-only request.
 
-Show a readable proposal before new production. Ask only about choices that materially affect identity, structure, movement, or delivery. Address the highest-impact uncertainty first, one question at a time, with the visible alternatives, a recommendation, and its consequences. Use an available, requested `grill-me` skill after reading its instructions; if unavailable, disclose that and use this focused questioning method without claiming to have run it. Reuse settled answers. Additional questioning ends when the direction is actionable.
+Show a readable proposal before new production. Ask about any remaining choices that materially affect identity, structure, movement, or delivery, using the visible result. Reuse answers from the composition interview instead of starting it again. Additional questioning ends when the direction is actionable.
 
 Record review A against the displayed design version. After acceptance, construct the native form pilot and present comparable native views for review B before investing in detailed geometry or deformation controls. Prior acceptance applies only to the decisions and revision it actually covers. Explicitly delegated visual decisions permit progress without waiting, but do not become user acceptance. Scoped repairs retain valid prior decisions and inspect only affected relationships.
 

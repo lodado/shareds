@@ -1,6 +1,6 @@
 {
   "name": "reference-driven-3d-character",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Design and refine editable 3D characters from references, verifying form, deformation, motion, and requested delivery targets.",
   "author": {
     "name": "lodado",

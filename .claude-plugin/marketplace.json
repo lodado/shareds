@@ -95,7 +95,7 @@
     {
       "name": "reference-driven-3d-character",
       "description": "Reference-driven editable 3D character design, scoped repairs, motion, and verified delivery.",
-      "version": "0.3.1",
+      "version": "0.4.0",
       "author": {
         "name": "lodado"
       },

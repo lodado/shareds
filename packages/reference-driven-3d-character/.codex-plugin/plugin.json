@@ -1,6 +1,6 @@
 {
   "name": "reference-driven-3d-character",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Design and refine editable 3D characters from references, verifying form, deformation, motion, and requested delivery targets.",
   "author": {
     "name": "lodado",
@@ -13,12 +13,12 @@
   "interface": {
     "displayName": "Reference-Driven 3D Character",
     "shortDescription": "Design, refine, and verify editable 3D characters",
-    "longDescription": "Plans readable model-sheet coverage from references and intended use, separates concept and native-form reviews, and verifies requested deformation, motion, and editable delivery. Reuses valid decisions for local repairs.",
+    "longDescription": "Interviews overall composition before new visual work using grill-me when available or focused questions otherwise. Tracks requested image coverage through display, separates concept and native-form reviews, and verifies requested editable delivery. Reuses valid decisions for local repairs.",
     "developerName": "lodado",
     "category": "Productivity",
     "capabilities": ["Research", "Write"],
     "defaultPrompt": [
-      "Create a detailed character design sheet from these references, then build and verify an editable 3D character after the visual reviews.",
+      "First use grill-me, or the skill's question fallback if unavailable, to ask about the overall composition and required views, details, and motion images. Then create and display the agreed design sheet before building the editable character.",
       "Fix this character's floating facial features while preserving its identity and existing motion."
     ],
     "websiteURL": "https://github.com/lodado/shareds"
