@@ -153,6 +153,7 @@ const NEXT_ACTIONS = {
   REPORT_STALE: 'the report predates the run — re-run with a fresh --report path',
   REPORT_PATH_EXISTS: 'choose a new --report path; an existing file cannot vouch for this run',
   RUN_ARTIFACTS_EXIST: 'a new revision gets a new <oracle-id> directory — never re-init to reset the baseline',
+  RISK_MISMATCH: "drop --risk to use the locked card's Risk — a different risk is a new revision, not an init flag",
   ORACLE_DIR_INVALID: 'pass --dir as <repository>/.ai/oracles/<oracle-id> — an existing directory inside the scan root',
 }
 
@@ -272,6 +273,26 @@ function sameDigests(left, right) {
 
 function contractRowIds(card) {
   return [...card.matchAll(/^\|\s*([OD]\d+)\s*\|/gm)].map((match) => match[1])
+}
+
+/** Outcome Brief `- Risk:`의 첫 단어를 run risk로 읽는다(뒤 사유 허용). 없으면 null — 이 필드 이전에 잠긴 카드다. */
+function cardRisk(card) {
+  const brief = card.split(/^## /m).find((section) => section.startsWith('Outcome Brief'))
+  const risk = brief?.match(/^- Risk:\s*(\w+)/m)?.[1]?.toLowerCase()
+  return REQUIRED_CONSECUTIVE_PASSES[risk] ? risk : null
+}
+
+/**
+ * 잠긴 카드의 Risk가 판정 강도를 정한다 — High 카드를 `--risk medium`으로 돌리면 mutation·3회 통과·blind mapping이
+ * 빠진다. `--risk`는 Risk 필드 이전에 잠긴 카드에만 쓰인다.
+ */
+function resolveRisk(requested, card) {
+  const locked = cardRisk(card)
+  if (!locked) return requested ?? 'medium'
+  if (requested !== undefined && requested !== locked) {
+    throw new CliError('RISK_MISMATCH', `--risk ${requested} disagrees with the locked card's Risk: ${locked}`)
+  }
+  return locked
 }
 
 function parseMilestones(values, availableRows) {
@@ -1205,7 +1226,6 @@ async function initialize(options) {
 
   const directory = resolve(options.dir)
   const scanRoot = resolve(options.scanRoot ?? process.cwd())
-  const risk = options.risk ?? 'medium'
 
   const scanRootReal = await realpath(scanRoot).catch((error) => {
     throw new CliError('ORACLE_DIR_INVALID', `Cannot resolve scan root: ${error.message}`)
@@ -1229,8 +1249,8 @@ async function initialize(options) {
     throw new CliError('ORACLE_DIR_INVALID', '--dir must be exactly <repository>/.ai/oracles/<oracle-id>')
   }
 
-  if (!REQUIRED_CONSECUTIVE_PASSES[risk]) {
-    throw new CliError('USAGE', `Unknown risk: ${risk}`, 2)
+  if (options.risk !== undefined && !REQUIRED_CONSECUTIVE_PASSES[options.risk]) {
+    throw new CliError('USAGE', `Unknown risk: ${options.risk}`, 2)
   }
 
   const harnessPaths = await validateHarnessPaths(scanRoot, options.harnessPaths)
@@ -1266,7 +1286,8 @@ async function initialize(options) {
     schemaVersion: 3,
     lock: portablePath(directory, resolve(options.lock)),
     scanRoot: portablePath(directory, scanRoot),
-    risk,
+    // 잠긴 카드를 읽은 뒤 resolveRisk가 정한다.
+    risk: null,
     requiredLabels,
     milestones: [],
     harnessPaths,
@@ -1284,6 +1305,7 @@ async function initialize(options) {
   state.lockSha256 = revision.oracleSha256
   state.lockManifestSha256 = revision.lockManifestSha256
   const oracle = await readFile(await lockedOraclePath(directory, state), 'utf8')
+  state.risk = resolveRisk(options.risk, oracle)
   state.milestones = parseMilestones(options.milestones, contractRowIds(oracle))
   state.snapshot = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
   const untrackedHarness = harnessPaths.filter((path) => !(path in state.snapshot))

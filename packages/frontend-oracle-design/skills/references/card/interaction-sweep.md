@@ -16,7 +16,11 @@ become rows. The prohibition on inventing states·transitions·policies stands �
 After the contract rows are drafted and before the Draft Oracle is shown (the cold-read gate reads
 the sweep too). Required whenever the revision inherits policies from a previous revision, or two or
 more decided policies share state, DOM, scroll, cache, timing, or async lifecycle. Otherwise record
-a one-line N/A with the reason in `journal.md` — silence is not a valid skip.
+a one-line N/A with the reason in `journal.md` — silence is not a valid skip. Two of these triggers
+are machine-visible, and a card without this section fails lint (`sweep-missing`) when either
+holds: `## Case space` declares the `Inherited` family, or the rows of two different policies pass
+through the same `## State Model` state. Sharing DOM, scroll, cache, or timing is still the author's
+call.
 
 ## Generating the space — derived, not chosen
 

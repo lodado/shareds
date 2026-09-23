@@ -26,6 +26,7 @@ success outcome the user can observe instead of inventing numbers.
 - Non-goals: what this change will not do
 - Worst regression: the worst damage from a false GREEN
 - Reversibility: how to revert, or the N/A reason
+- Risk: Low | Medium | High, then an optional reason after `—`; it matches the lane header's final risk
 - Sources: S1, S2
 ```
 

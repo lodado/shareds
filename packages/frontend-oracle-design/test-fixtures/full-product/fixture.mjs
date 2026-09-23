@@ -18,6 +18,7 @@ export const FIXTURE_CARD = `# Synthetic full-product reporter Oracle (not consu
 - Non-goals: deciding a real pagination API or proving browser behavior
 - Worst regression: missing, duplicated or stale evidence accepted as coverage
 - Reversibility: revert the isolated fixture
+- Risk: Medium
 - Sources: S1
 
 ## Source Registry

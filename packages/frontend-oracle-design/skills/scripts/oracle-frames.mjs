@@ -59,6 +59,8 @@ function tableRows(lines, headerFirstCell) {
 
 const STABLE_ID = /^[A-Z0-9][\w-]*$/i
 const MAX_FULL_PRODUCT = 100_000
+/** 단순 경로 상한 — 넘으면 lint가 실격시키고, 열거는 상한+1에서 멈춰 조밀한 전이표의 지수 탐색을 막는다. */
+export const MAX_STATE_PATHS = 50
 
 function parseCaseSpaceMetadata(section) {
   const matches = [...section.join('\n').matchAll(/^```json[^\S\n]*\n([\s\S]*?)^```[^\S\n]*$/gm)]
@@ -80,7 +82,11 @@ export function parseCaseSpace(document) {
   if (section.length === 0) return null
 
   const strengthLine = section.find((line) => line.trim().startsWith('- Strength:'))
-  const strength = strengthLine ? Number.parseInt(strengthLine.split(':')[1], 10) : 2
+  const strengthValue = strengthLine?.split(':').slice(1).join(':').trim()
+  if (strengthLine && !/^[1-9]\d*$/.test(strengthValue)) {
+    throw Object.assign(new Error(`Strength must be a positive integer: ${strengthValue || '(empty)'}`), { code: 'CASE_SPACE_STRENGTH' })
+  }
+  const strength = strengthLine ? Number.parseInt(strengthValue, 10) : 2
   const coverageLine = section.find((line) => line.trim().startsWith('- Coverage:'))
   const coverage = coverageLine ? coverageLine.split(':').slice(1).join(':').trim() : null
   if (coverage && coverage !== 'full-product') {
@@ -94,13 +100,9 @@ export function parseCaseSpace(document) {
   const families = tableRows(section, 'Family').map((cells) => {
     const [family = '', dimension = '', choicesCell = '', touchesCell = ''] = cells
     if (choicesCell.trim().startsWith('excluded:')) {
-      return {
-        family,
-        dimension: null,
-        choices: [],
-        excluded: choicesCell.trim().slice('excluded:'.length).trim(),
-        touches: null,
-      }
+      const excluded = choicesCell.trim().slice('excluded:'.length).trim()
+      if (!excluded) throw Object.assign(new Error(`Excluded family needs a reason: ${family}`), { code: 'CASE_SPACE_INCOMPLETE' })
+      return { family, dimension: null, choices: [], excluded, touches: null }
     }
     const choices = choicesCell
       .split(',')
@@ -118,19 +120,21 @@ export function parseCaseSpace(document) {
     return { family, dimension, choices, excluded: null, touches: parseTouches(touchesCell) }
   })
 
-  if (coverage === 'full-product') {
-    const seenDimensions = new Set()
-    for (const entry of families) {
-      if (entry.excluded) continue
-      if (!STABLE_ID.test(entry.dimension)) throw Object.assign(new Error(`Dimension is not an ASCII stable ID: ${entry.dimension}`), { code: 'CASE_SPACE_ID' })
-      if (seenDimensions.has(entry.dimension)) throw Object.assign(new Error(`Duplicate dimension ID: ${entry.dimension}`), { code: 'CASE_SPACE_ID' })
-      seenDimensions.add(entry.dimension)
-      const seenChoices = new Set()
-      for (const choice of entry.choices) {
-        if (!STABLE_ID.test(choice.value)) throw Object.assign(new Error(`Choice is not an ASCII stable ID: ${choice.value}`), { code: 'CASE_SPACE_ID' })
-        if (seenChoices.has(choice.value)) throw Object.assign(new Error(`Duplicate choice ID: ${entry.dimension}=${choice.value}`), { code: 'CASE_SPACE_ID' })
-        seenChoices.add(choice.value)
-      }
+  // 라벨은 차원 이름으로 판정 대상을 가리킨다 — 이름 없음·중복·빈 선택지는 조용히 강등하지 않고 거절한다.
+  const fullProduct = coverage === 'full-product'
+  const seenDimensions = new Set()
+  for (const entry of families) {
+    if (entry.excluded) continue
+    if (fullProduct && !STABLE_ID.test(entry.dimension)) throw Object.assign(new Error(`Dimension is not an ASCII stable ID: ${entry.dimension}`), { code: 'CASE_SPACE_ID' })
+    if (!entry.dimension || /^[—-]$/.test(entry.dimension)) throw Object.assign(new Error(`Dimension name required: ${entry.family}`), { code: 'CASE_SPACE_ID' })
+    if (seenDimensions.has(entry.dimension)) throw Object.assign(new Error(`Duplicate dimension ID: ${entry.dimension}`), { code: 'CASE_SPACE_ID' })
+    seenDimensions.add(entry.dimension)
+    if (entry.choices.length === 0) throw Object.assign(new Error(`Dimension has no choices: ${entry.dimension}`), { code: 'CASE_SPACE_INCOMPLETE' })
+    const seenChoices = new Set()
+    for (const choice of entry.choices) {
+      if (fullProduct && !STABLE_ID.test(choice.value)) throw Object.assign(new Error(`Choice is not an ASCII stable ID: ${choice.value}`), { code: 'CASE_SPACE_ID' })
+      if (seenChoices.has(choice.value)) throw Object.assign(new Error(`Duplicate choice ID: ${entry.dimension}=${choice.value}`), { code: 'CASE_SPACE_ID' })
+      seenChoices.add(choice.value)
     }
   }
 
@@ -381,12 +385,14 @@ export function enumerateStateModel(document) {
 
   const paths = []
   const walk = (state, visited, steps) => {
+    if (paths.length > MAX_STATE_PATHS) return
     const outgoing = transitions.filter((transition) => transition.from === state)
     if (outgoing.length === 0) {
       if (steps.length > 0) paths.push(steps)
       return
     }
     for (const transition of outgoing) {
+      if (paths.length > MAX_STATE_PATHS) return
       if (visited.has(transition.to)) {
         // 사이클을 닫는 전이는 마지막 한 발로 기록하고 중단한다 — 빼면 성공 복귀 경로가 통째로 사라진다.
         paths.push([...steps, transition])

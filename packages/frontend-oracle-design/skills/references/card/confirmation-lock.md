@@ -128,7 +128,6 @@ directory from the Grill onward and holds only stage rationale, separate from th
 node <skill-dir>/scripts/oracle-run.mjs init \
   --dir .ai/oracles/<oracle-id> \
   --lock .ai/oracles/<oracle-id>/oracle.lock.json \
-  --risk low|medium|high \
   --required-label behavior \
   --required-label lint \
   --harness-path vitest.config.ts \
@@ -141,6 +140,8 @@ node <skill-dir>/scripts/oracle-run.mjs init \
   re-verification after GREEN·review.
 - `init` verifies the lock and stores the current worktree digest as the `ORACLE_READY` baseline —
   the basis for the later TDD ordering judgment.
+- The run risk is the locked card's `- Risk:`. `--risk` is only for cards locked before that field
+  existed (default `medium`); a value that disagrees with the card fails `RISK_MISMATCH`.
 - The default for `--scan-root` is the current working directory. Specify it only to narrow the
   scope in a monorepo.
 - For config·setup·mock wiring that must change before RED, repeatedly declare the exact relative

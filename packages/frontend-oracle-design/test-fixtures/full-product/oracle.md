@@ -7,6 +7,7 @@
 - Non-goals: deciding a real pagination API or proving browser behavior
 - Worst regression: missing, duplicated or stale evidence accepted as coverage
 - Reversibility: revert the isolated fixture
+- Risk: Medium
 - Sources: S1
 
 ## Source Registry

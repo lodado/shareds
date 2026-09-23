@@ -100,3 +100,28 @@ test('applicability boundary ids stay unique across files and each boundary gets
   assert.equal(external.boundaries[0].kind, 'external-event')
   assert.equal(external.applicability.length, 6)
 })
+
+test('comments, imports and config keys are not action boundaries, and boundary ids stay short', () => {
+  const source = [
+    "import { useRouter } from 'next/navigation'",
+    '// next page is disabled at the end',
+    "const list = useQuery({ queryKey: ['list'], retry: 3 })",
+    '<button onClick={() => remove(id)}>delete</button>',
+  ].join('\n')
+  const { boundaries } = mineApplicability('src/List.tsx', source)
+  assert.deepEqual(boundaries.filter(({ kind }) => kind === 'action').map(({ source: citation }) => citation), ['code(src/List.tsx#L4)'])
+  for (const boundary of boundaries) assert.match(boundary.id, /^(?:action|async|external-event)-[0-9a-f]{12}-L\d+-\d+$/)
+  // a call such as fetchNextPage() or retry() is still an action
+  assert.equal(mineApplicability('src/Feed.tsx', 'fetchNextPage()\nretry()').boundaries.filter(({ kind }) => kind === 'action').length, 2)
+  // a commented-out effect is not a dimension candidate
+  assert.deepEqual(mineDimensions('src/x.ts', '// useEffect(() => { setTimeout(tick) })\n/* fetch(a) fetch(b) */'), [])
+})
+
+test('a list item key is identity, not a remount signal — a key on a single element still is', () => {
+  const list = "return rows.map((row) => (\n  <Row key={row.id} row={row} />\n))"
+  assert.equal(mineDimensions('src/List.tsx', list).find(({ dimension }) => dimension === 'remount'), undefined)
+  const inline = 'return rows.map((row) => <Row key={row.id} />)'
+  assert.equal(mineDimensions('src/Inline.tsx', inline).find(({ dimension }) => dimension === 'remount'), undefined)
+  const reset = 'return <ProfileForm key={userId} user={user} />'
+  assert.equal(mineDimensions('src/Profile.tsx', reset).find(({ dimension }) => dimension === 'remount')?.citation, 'code(src/Profile.tsx#L1)')
+})

@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
-import { canonicalTuple, enumerateStateModel, frameId, generateCaseFrames, generateFromDocument, parseCaseSpace } from './oracle-frames.mjs'
+import { fileURLToPath } from 'node:url'
+import { canonicalTuple, enumerateStateModel, frameId, generateCaseFrames, generateFromDocument, MAX_STATE_PATHS, parseCaseSpace } from './oracle-frames.mjs'
+
+const script = join(dirname(fileURLToPath(import.meta.url)), 'oracle-frames.mjs')
 
 const FULL_PRODUCT_CARD = `## Case space
 
@@ -149,6 +156,72 @@ test('strength가 차원 수보다 크면 1-way로 강등된다', () => {
     frames.map((frame) => frame.label),
     ['rows=0', 'rows=max'],
   )
+})
+
+const PAIRWISE_CARD = `## Case space
+
+- Strength: 2
+
+| Family | Dimension | Choices                 |
+| ------ | --------- | ----------------------- |
+| Data   | rows      | 0, max                  |
+| Async  | request   | success, http-5xx       |
+| Entry  | —         | excluded: fixture scope |
+`
+
+test('parseCaseSpace: 불완전한 선언은 조용히 강등하지 않고 거절한다', () => {
+  const code = (card) => {
+    try {
+      parseCaseSpace(card)
+      return 'ok'
+    } catch (error) {
+      return error.code
+    }
+  }
+  assert.equal(code(PAIRWISE_CARD), 'ok')
+  for (const strength of ['abc', '0', '-1', '2.5', '']) {
+    assert.equal(code(PAIRWISE_CARD.replace('- Strength: 2', `- Strength: ${strength}`)), 'CASE_SPACE_STRENGTH', strength)
+  }
+  assert.equal(code(PAIRWISE_CARD.replace('| 0, max                  |', '|                         |')), 'CASE_SPACE_INCOMPLETE')
+  assert.equal(code(PAIRWISE_CARD.replace('excluded: fixture scope', 'excluded:')), 'CASE_SPACE_INCOMPLETE')
+  assert.equal(code(PAIRWISE_CARD.replace('| Async  | request   |', '| Async  | rows      |')), 'CASE_SPACE_ID')
+  assert.equal(code(PAIRWISE_CARD.replace('0, max', '0, 0')), 'CASE_SPACE_ID')
+  assert.equal(code(PAIRWISE_CARD.replace('| Data   | rows      |', '| Data   | —         |')), 'CASE_SPACE_ID')
+})
+
+test('F* ID는 위치 기반이다 — 선택지 순서만 바꿔도 같은 ID가 다른 조합을 가리킨다', () => {
+  const before = generateFromDocument(PAIRWISE_CARD)
+  const reordered = generateFromDocument(PAIRWISE_CARD.replace('0, max', 'max, 0'))
+  assert.deepEqual(reordered.frames.map((frame) => frame.id), before.frames.map((frame) => frame.id))
+  assert.notDeepEqual(reordered.frames.map((frame) => frame.label), before.frames.map((frame) => frame.label))
+})
+
+test('CLI: 카드 Label 열에 옮겨 적을 라벨을 ID 뒤에 그대로 출력한다', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'oracle-frames-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const oracle = join(directory, 'oracle.md')
+  await writeFile(oracle, PAIRWISE_CARD)
+  const result = spawnSync(process.execPath, [script, '--oracle', oracle], { encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stderr)
+  const [first] = generateFromDocument(PAIRWISE_CARD).frames
+  assert.equal(result.stdout.split('\n')[0], `${first.id} ${first.label}`)
+})
+
+test('enumerateStateModel: 단순 경로가 상한을 넘으면 상한+1에서 멈춘다', () => {
+  const states = ['s0', 's1', 's2', 's3', 's4', 's5']
+  const transitions = states.flatMap((from) => states.filter((to) => to !== from).map((to) => `| ${from} | GO_${to} | ${to} | O1 |`))
+  const card = `## State Model
+
+- States: ${states.join(', ')}
+- Events: ${states.map((state) => `GO_${state}`).join(', ')}
+
+| From | Event | To | 행 |
+| ---- | ----- | -- | -- |
+${transitions.join('\n')}
+`
+  const { paths } = enumerateStateModel(card)
+  assert.equal(paths.length, MAX_STATE_PATHS + 1)
+  assert.equal(enumerateStateModel(SERVER_TABLE_CARD).paths.length, 2)
 })
 
 /** Touches 채택 카드 — 직접 공유 쌍만 조합, 파트너 없음·independent는 1-way. */

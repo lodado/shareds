@@ -104,8 +104,9 @@ Lane routing:
   and a recommendation, so a single `yes` both answers and confirms; a question never goes out ahead
   of the card unless its answer kills a branch. Before that confirmation: no lint, lock, tests, or
   production edits. A policy change is a new revision, never an in-place edit of a locked file.
-- Lint the card with `scripts/oracle-verify.mjs card`; `--case-space` is a structural preapproval
-  check only and never records user approval. Then lock it with `scripts/oracle-lock.mjs`.
+- Lint the card with `scripts/oracle-verify.mjs card --path <touched files>`; `--case-space` is a
+  structural preapproval check only and never records user approval. Then lock it with
+  `scripts/oracle-lock.mjs`.
   The revision lock is auto-verified immediately before each stage. No relocking to pass a
   mismatch.
 - TDD default: `ORACLE_READY` → write and run tests → record
@@ -363,7 +364,8 @@ When implementation, test-based self-verification, and subagent review are expli
    first. The impact scope is machine-fed, not judged: the required label `impact` runs the repo's
    related-tests command over `oracle-run.mjs status --changed-files`, and
    `oracle-verify.mjs scan --side-effects --oracle <card> --path <changed production files>` must
-   report every code side effect owned by a card row or exempted with `oracle:side-effect`.
+   report every code side effect owned by a card row or exempted with `oracle:side-effect`, and
+   every dimension family it mines declared on the card or cited in that family's exclusion.
    For an optional fresh implementation context after `VALID_RED`, use the existing runner's
    [task-scoped worker path](references/delivery/ledger.md#optional-task-scoped-implementation-worker).
    It is independent of graph opt-in and does not replace review or expand Low/Design-only.

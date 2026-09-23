@@ -7,8 +7,8 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { inflateSync } from 'node:zlib'
 import { isTrustedAdapter } from './oracle-adapters.mjs'
-import { APPLICABILITY_CANDIDATES } from './oracle-dimensions.mjs'
-import { canonicalTuple, frameId, generateFromDocument, TAXONOMY_FAMILIES } from './oracle-frames.mjs'
+import { APPLICABILITY_CANDIDATES, mineDimensions } from './oracle-dimensions.mjs'
+import { canonicalTuple, frameId, generateFromDocument, MAX_STATE_PATHS, TAXONOMY_FAMILIES } from './oracle-frames.mjs'
 import {
   assertSnapshotUnchanged,
   isPathInside,
@@ -65,8 +65,11 @@ const OUTCOME_FIELDS = [
   'Non-goals',
   'Worst regression',
   'Reversibility',
+  'Risk',
   'Sources',
 ]
+
+const RISK_LEVELS = ['Low', 'Medium', 'High']
 
 const SOURCE_KINDS = ['product-policy', 'mandatory-constraint', 'project-constraint', 'implementation-reference']
 
@@ -167,6 +170,8 @@ const NEXT_ACTIONS = {
   BLIND_MAP_INVALID: 'the blind map must be JSON of { "<test name>": "O1" | ["O1", "O2"] } written by a reviewer who never saw evidence.json',
   SIDE_EFFECT_UNOWNED:
     'add the row whose side-effect column owns that category, or exempt the line with `oracle:side-effect <row|reason>` — an unrequested effect is PRODUCT_DEFECT, a missing row is POLICY_GAP',
+  DIMENSION_UNDECLARED:
+    'record an `undeclared-dimension` escape in escapes.jsonl and route the family as POLICY_GAP — a new revision declares it or cites the file in its exclusion reason',
   SIDE_EFFECT_EXEMPTION_INVALID: 'write `oracle:side-effect O3` (a real row) or `oracle:side-effect <reason>` — a bare marker exempts nothing',
 }
 
@@ -795,6 +800,41 @@ function auditFullProduct(card, generated) {
   }
 }
 
+/** 서로 다른 두 정책의 행이 같은 state를 지나는 첫 state — 정책이 상태를 공유한다는 기계적 증거다. */
+function sharedStatePolicies(transitions, policies) {
+  const owners = new Map()
+  for (const cells of transitions) {
+    const [from = '', , to = ''] = cells
+    const cited = new Set(rowIds(cells.join(' ')))
+    const touching = [...policies].filter(([, { rows }]) => rows.some((row) => cited.has(row))).map(([id]) => id)
+    for (const state of [from, to]) owners.set(state, new Set([...(owners.get(state) ?? []), ...touching]))
+  }
+  const shared = [...owners].find(([, ids]) => ids.size >= 2)
+  return shared ? { state: shared[0], policies: [...shared[1]].sort() } : null
+}
+
+/** sweep이 소유할 교차가 카드 바이트에 보이는 이유 — 상속 정책, 또는 같은 state를 지나는 두 정책. 없으면 null. */
+function sweepTrigger(caseSpace, sharedState) {
+  if (caseSpace?.families.some((entry) => entry.family === 'Inherited' && !entry.excluded)) return 'Inherited is declared'
+  if (sharedState) return `${sharedState.policies.join(' and ')} share State Model state "${sharedState.state}"`
+  return null
+}
+
+/** 채굴 후보 중 카드가 계열째 침묵시킨 것 — 그 계열에 차원 선언도, 이 파일을 인용한 제외 사유도 없다. */
+function undeclaredDimensions(caseSpace, path, content) {
+  return mineDimensions(path, content)
+    .filter(
+      (candidate) =>
+        !caseSpace.families.some(
+          (entry) => entry.family === candidate.family && (!entry.excluded || entry.excluded.includes(path)),
+        ),
+    )
+    .map(
+      (candidate) =>
+        `dimension-candidate-undeclared: ${candidate.family}/${candidate.dimension} at ${candidate.citation} — declare a ${candidate.family} dimension or cite ${path} in its exclusion reason`,
+    )
+}
+
 async function lintCard(options) {
   if (!options.oracle) throw new CliError('USAGE', 'card requires --oracle', 2)
 
@@ -935,6 +975,8 @@ async function lintCard(options) {
   }
 
   const outcome = sectionLines(lines, 'Outcome Brief')
+  // 첫 단어가 수준이다 — `High — <reason>`처럼 사유가 뒤따를 수 있다.
+  const riskLevel = outcome.find((line) => line.trim().startsWith('- Risk:'))?.split(':').slice(1).join(':').trim().split(/\s/)[0]
   if (outcome.length === 0) {
     issues.push('outcome-brief: card has no `## Outcome Brief` section')
   } else {
@@ -949,6 +991,10 @@ async function lintCard(options) {
       if (!value || isEmptyCell(value)) {
         issues.push(`outcome-field: ${field} must have a concrete value`)
       }
+    }
+
+    if (riskLevel && !isEmptyCell(riskLevel) && !RISK_LEVELS.includes(riskLevel)) {
+      issues.push('outcome-risk: Risk must be Low, Medium or High')
     }
 
     const citedSources = outcome.find((line) => line.trim().startsWith('- Sources:'))?.match(/\bS\d+\b/g) ?? []
@@ -1133,6 +1179,10 @@ async function lintCard(options) {
 
   // State Model 섹션은 선택이다 — 없어도 lint를 막지 않고, 있으면 구조를 검증한다.
   const stateModel = sectionLines(lines, 'State Model')
+  const transitions = stateModel
+    .filter((line) => line.trim().startsWith('|'))
+    .map((line) => splitRow(line.trim()))
+    .filter((cells) => cells[0] !== 'From' && !/^:?-+:?$/.test(cells[0]))
 
   if (stateModel.length > 0) {
     for (const field of ['States', 'Events']) {
@@ -1146,11 +1196,6 @@ async function lintCard(options) {
         issues.push(`state-model-field: State Model must list concrete ${field}`)
       }
     }
-
-    const transitions = stateModel
-      .filter((line) => line.trim().startsWith('|'))
-      .map((line) => splitRow(line.trim()))
-      .filter((cells) => cells[0] !== 'From' && !/^:?-+:?$/.test(cells[0]))
 
     if (transitions.length === 0) {
       issues.push('state-model-transitions: State Model must include a From/Event/To transition table')
@@ -1380,6 +1425,15 @@ async function lintCard(options) {
     if (report.N_unresolved || report.questions.length) issues.push('disposition-open: full-product has unresolved expectations')
   }
 
+  if (!generated) {
+    issues.push('case-space-missing: card has no `## Case space` section — declare dimensions, or exclude each of the eight families with a reason')
+  }
+
+  const sweepReason = sweepTrigger(generated?.caseSpace, sharedStatePolicies(transitions, policies))
+  if (sweep.length === 0 && sweepReason) {
+    issues.push(`sweep-missing: ${sweepReason} — add \`## Interaction sweep\` pairs for them`)
+  }
+
   if (generated) {
     const declaredFamilies = new Set(generated.caseSpace.families.map((entry) => entry.family))
     for (const family of TAXONOMY_FAMILIES) {
@@ -1410,10 +1464,27 @@ async function lintCard(options) {
       }
     }
 
+    const combined = combinableFamilies.filter((entry) => entry.choices.some((choice) => !choice.error))
+    if (riskLevel === 'High' && generated.caseSpace.coverage !== 'full-product' && combined.length >= 2 && generated.caseSpace.strength < 3) {
+      issues.push('case-space-strength: High risk requires Strength: 3 or more')
+    }
+
     if (generated.caseSpace.coverage !== 'full-product' && generated.frames.length > 50) {
       issues.push(
         `case-space-too-wide: ${generated.frames.length} combinable frames — split the dimension or narrow the scope`,
       )
+    }
+    if (generated.paths.length > MAX_STATE_PATHS) {
+      issues.push(`state-model-too-wide: more than ${MAX_STATE_PATHS} simple paths — split the state model or narrow the scope`)
+    }
+
+
+    // 채굴 후보의 계열을 통째로 제외하려면 사유가 그 파일을 인용해야 한다 — "못 봤다"를 "봤고 제외했다"로 바꾼다.
+    for (const path of options.path) {
+      const content = await readFile(path, 'utf8').catch((error) => {
+        throw new CliError('SCAN_UNREADABLE', `Cannot read ${path}: ${error.message}`)
+      })
+      issues.push(...undeclaredDimensions(generated.caseSpace, path, content))
     }
 
     const generatedIds = new Set([
@@ -1428,6 +1499,12 @@ async function lintCard(options) {
       .map((line) => splitRow(line.trim()))
       .filter((cells) => cells[0] !== 'Frame' && !/^:?-+:?$/.test(cells[0]))
 
+    // full-product는 Tuple 열이 ID 해시로 같은 일을 한다. EMPTY는 ID 자체가 state×event를 말한다.
+    const frameLabels = new Map(
+      generated.caseSpace.coverage === 'full-product'
+        ? []
+        : [...generated.frames, ...generated.errorFrames, ...generated.paths].map(({ id, label }) => [id, label]),
+    )
     const dispositioned = new Set()
     for (const cells of dispositionRows) {
       const [frameId = '', disposition = ''] = cells
@@ -1437,6 +1514,11 @@ async function lintCard(options) {
       }
       if (dispositioned.has(frameId)) issues.push(`frame-duplicate: ${frameId}`)
       dispositioned.add(frameId)
+      // F*·E*·PATH* ID는 위치 기반이다 — Label이 생성기 라벨과 다르면 같은 ID가 다른 조합을 가리키는 옛 판정이다.
+      const expectedLabel = frameLabels.get(frameId)
+      if (expectedLabel !== undefined && (cells[2] ?? '').trim() !== expectedLabel) {
+        issues.push(`frame-label: ${frameId} must read "${expectedLabel}" as oracle-frames.mjs prints it — re-judge the frame if it changed`)
+      }
 
       const value = disposition.trim()
       if (isEmptyCell(value)) {
@@ -2677,10 +2759,12 @@ async function scanSideEffectInventory(options) {
   const hits = []
   const exemptions = []
   const invalid = []
+  const sources = []
   for (const path of options.path) {
     const content = await readFile(path, 'utf8').catch((error) => {
       throw new CliError('SCAN_UNREADABLE', `Cannot read ${path}: ${error.message}`)
     })
+    sources.push({ path, content })
     const scanned = scanSideEffects(path, content)
     hits.push(...scanned.hits)
     exemptions.push(...scanned.exemptions)
@@ -2744,7 +2828,21 @@ async function scanSideEffectInventory(options) {
         .join('\n  ')}`,
     )
   }
+  assertDimensionsDeclared(card, sources)
   process.stdout.write(`SCAN_OK ${options.path.length} files side-effects:${hits.length} owned\n`)
+}
+
+/** 변경 파일이 잠긴 Case space가 계열째 침묵한 차원을 가지면 막는다. Case space 이전에 잠긴 카드는 대조할 선언이 없다. */
+function assertDimensionsDeclared(card, sources) {
+  const caseSpace = generateFromDocument(card)?.caseSpace
+  if (!caseSpace) return
+  const undeclared = sources.flatMap(({ path, content }) => undeclaredDimensions(caseSpace, path, content))
+  if (undeclared.length > 0) {
+    throw new CliError(
+      'DIMENSION_UNDECLARED',
+      `the locked Case space silences a family these changed files carry:\n  ${undeclared.join('\n  ')}`,
+    )
+  }
 }
 
 async function scanNondeterminism(options) {

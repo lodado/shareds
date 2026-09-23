@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { fullProductFixture as buildFullProductFixture } from '../../test-fixtures/full-product/fixture.mjs'
+import { generateFromDocument } from './oracle-frames.mjs'
 import { stableStringify } from './oracle-fs.mjs'
 import { bracedValues, replacePlaceholders, stripTrailingParenthesized } from './oracle-verify-helpers.mjs'
 
@@ -33,8 +34,19 @@ async function directory(t) {
   return created
 }
 
-/** 자동 추가 TC 7종과 출처·Never·부작용을 모두 채운 최소 통과 카드. */
-const VALID_CARD = `# Sample Oracle Card
+/** P1~P3가 State Model의 pending을 공유하므로 sweep이 필요하다 — CORE_CARD가 싣는다. */
+const SWEEP_SECTION = `
+## Interaction sweep
+
+| Pair    | Disposition                                                           |
+| ------- | --------------------------------------------------------------------- |
+| P1 × P2 | covered(O4)                                                           |
+| P3 × P1 | covered(O7)                                                           |
+| P4      | impossible: 정적 문구, 공유 표면 없음 — constraint(S1)                                  |
+`
+
+/** 자동 추가 TC 7종과 출처·Never·부작용을 모두 채운 카드 본문 — Case space는 VALID_CARD가 붙인다. */
+const CORE_CARD = `# Sample Oracle Card
 
 ## Outcome Brief
 
@@ -43,6 +55,7 @@ const VALID_CARD = `# Sample Oracle Card
 - Non-goals: 저장 API 재설계
 - Worst regression: 중복 저장 또는 입력 유실
 - Reversibility: 변경 commit revert
+- Risk: Medium
 - Sources: S1
 
 ## Source Registry
@@ -95,7 +108,43 @@ const VALID_CARD = `# Sample Oracle Card
 | error   | RETRY            | pending | O4             |
 | pending | RESPONSE_OK      | done    | O5, O6, O7     |
 | pending | CANCEL           | idle    | O8             |
+${SWEEP_SECTION}`
+
+/** 여덟 계열 전부 제외 — "적용 차원 없음"도 선언이다. State Model 경로·빈 셀은 여전히 생성된다. */
+const EXCLUDED_CASE_SPACE = `
+## Case space
+
+| Family      | Dimension | Choices                    |
+| ----------- | --------- | -------------------------- |
+| Data        | —         | excluded: fixture scope    |
+| Value       | —         | excluded: fixture scope    |
+| Async       | —         | excluded: fixture scope    |
+| Order       | —         | excluded: fixture scope    |
+| Entry       | —         | excluded: fixture scope    |
+| Environment | —         | excluded: fixture scope    |
+| Platform    | —         | excluded: fixture scope    |
+| Inherited   | —         | excluded: first revision   |
 `
+
+/** 생성기가 낸 ID 전부를 판정하고 라벨을 Label 열에 옮긴다. 생성 ID가 없으면 섹션을 붙이지 않는다. */
+function withFrameDispositions(card, mutate = (rows) => rows) {
+  const generated = generateFromDocument(card)
+  const entries = [...generated.frames, ...generated.errorFrames, ...generated.paths, ...generated.emptyCells]
+  if (entries.length === 0) return card
+  const rows = entries.map(({ id, label = '' }) => `| ${id} | ${id.startsWith('EMPTY') ? 'impossible: fixture — constraint(S1)' : 'covered(O1)'} | ${label} |`)
+  return `${card}\n## Frame dispositions\n\n| Frame | Disposition | Label |\n| ----- | ----------- | ----- |\n${mutate(rows).join('\n')}\n`
+}
+
+/** Frame dispositions 한 행의 Disposition 칸만 바꾼다 — ID와 Label은 그대로 둔다. */
+function withDisposition(row, disposition) {
+  return row.replace(/^(\| [^|]+ \| )[^|]*( \|)/, `$1${disposition}$2`)
+}
+
+/** 자동 추가 TC 7종과 출처·Never·부작용을 모두 채운 최소 통과 카드. */
+const VALID_CARD = withFrameDispositions(CORE_CARD + EXCLUDED_CASE_SPACE)
+
+/** sweep 섹션 자체를 시험하는 테스트용 — 자기 sweep을 붙인다. */
+const SWEEPLESS_CARD = VALID_CARD.replace(SWEEP_SECTION, '')
 
 async function cardFile(t, content = VALID_CARD) {
   const path = join(await directory(t), 'oracle.md')
@@ -557,7 +606,7 @@ test('O17: 자동 TC 단어가 계약 행 밖에만 있으면 충족으로 보�
 })
 
 test('state-model: 섹션은 선택이다 — async 행이 있어도 없으면 그냥 통과한다', async (t) => {
-  const withoutStateModel = VALID_CARD.slice(0, VALID_CARD.indexOf('## State Model'))
+  const withoutStateModel = CORE_CARD.slice(0, CORE_CARD.indexOf('## State Model')) + EXCLUDED_CASE_SPACE
 
   const linted = run('card', '--oracle', await cardFile(t, withoutStateModel))
 
@@ -607,27 +656,18 @@ const INVARIANTS_SECTION = `
 | I2  | —      | console error·uncaught exception 0건   | implicit oracle  |
 `
 
-const SWEEP_SECTION = `
-## Interaction sweep
-
-| Pair    | Disposition                                                           |
-| ------- | --------------------------------------------------------------------- |
-| P1 × P2 | covered(O4)                                                           |
-| P3 × P1 | covered(O7)                                                           |
-| P4      | impossible: 정적 문구, 공유 표면 없음 — constraint(S1)                                  |
-`
 
 test('invariants·sweep: 구조가 유효한 선택 섹션은 lint를 통과한다', async (t) => {
-  const linted = run('card', '--oracle', await cardFile(t, VALID_CARD + INVARIANTS_SECTION + SWEEP_SECTION))
+  const linted = run('card', '--oracle', await cardFile(t, SWEEPLESS_CARD + INVARIANTS_SECTION + SWEEP_SECTION))
 
   assert.equal(linted.status, 0, linted.stderr)
   assert.equal(linted.stdout, 'CARD_LINT_OK 9 rows\n')
 })
 
 test('invariants: 없는 정책 인용·빈 관측 근거·I* 아닌 ID는 실패한다', async (t) => {
-  const unknownPolicy = VALID_CARD + INVARIANTS_SECTION.replace('| I1  | P1     |', '| I1  | P99    |') + SWEEP_SECTION
-  const emptyBasis = VALID_CARD + INVARIANTS_SECTION.replace('| network 로그     |', '| -                |') + SWEEP_SECTION
-  const badId = VALID_CARD + INVARIANTS_SECTION.replace('| I1  |', '| X1  |') + SWEEP_SECTION
+  const unknownPolicy = SWEEPLESS_CARD + INVARIANTS_SECTION.replace('| I1  | P1     |', '| I1  | P99    |') + SWEEP_SECTION
+  const emptyBasis = SWEEPLESS_CARD + INVARIANTS_SECTION.replace('| network 로그     |', '| -                |') + SWEEP_SECTION
+  const badId = SWEEPLESS_CARD + INVARIANTS_SECTION.replace('| I1  |', '| X1  |') + SWEEP_SECTION
 
   const policy = run('card', '--oracle', await cardFile(t, unknownPolicy))
   assert.equal(policy.status, 1)
@@ -643,9 +683,9 @@ test('invariants: 없는 정책 인용·빈 관측 근거·I* 아닌 ID는 실�
 })
 
 test('sweep: 빈 disposition·enum 밖 값·없는 행 인용은 실패한다', async (t) => {
-  const emptyCell = VALID_CARD + SWEEP_SECTION.replace('covered(O4)', '-')
-  const badEnum = VALID_CARD + SWEEP_SECTION.replace('covered(O4)', 'probably fine')
-  const unknownRow = VALID_CARD + SWEEP_SECTION.replace('covered(O4)', 'covered(O99)')
+  const emptyCell = SWEEPLESS_CARD + SWEEP_SECTION.replace('covered(O4)', '-')
+  const badEnum = SWEEPLESS_CARD + SWEEP_SECTION.replace('covered(O4)', 'probably fine')
+  const unknownRow = SWEEPLESS_CARD + SWEEP_SECTION.replace('covered(O4)', 'covered(O99)')
 
   const empty = run('card', '--oracle', await cardFile(t, emptyCell))
   assert.equal(empty.status, 1)
@@ -661,7 +701,7 @@ test('sweep: 빈 disposition·enum 밖 값·없는 행 인용은 실패한다', 
 })
 
 test('sweep: 어떤 pair에도 나타나지 않는 결정 정책은 실패한다 — 침묵은 셀로만 가능하다', async (t) => {
-  const missingPolicy = VALID_CARD + SWEEP_SECTION.replace(/\| P4[^\n]*\n/, '')
+  const missingPolicy = SWEEPLESS_CARD + SWEEP_SECTION.replace(/\| P4[^\n]*\n/, '')
 
   const linted = run('card', '--oracle', await cardFile(t, missingPolicy))
 
@@ -679,6 +719,7 @@ test('state-model: async 토큰이 없는 카드는 State Model 없이 통과한
 - Non-goals: 문구 재작성
 - Worst regression: 문구 누락
 - Reversibility: 변경 commit revert
+- Risk: Medium
 - Sources: S1
 
 ## Source Registry
@@ -705,7 +746,7 @@ test('state-model: async 토큰이 없는 카드는 State Model 없이 통과한
 | ID  | 정책 | Given     | When      | Then           | Never     | 부작용(종류×횟수) | BVA       |
 | --- | ---- | --------- | --------- | -------------- | --------- | ----------------- | --------- |
 | O1  | P1   | 화면 진입 | 렌더 완료 | 안내 문구 표시 | 문구 누락 | 요청×0            | 값: 문구  |
-`
+${EXCLUDED_CASE_SPACE}`
 
   const linted = run('card', '--oracle', await cardFile(t, syncCard))
 
@@ -3002,21 +3043,11 @@ const CASE_SPACE_SECTION = `
 `
 
 async function caseSpaceCard(mutate = (rows) => rows) {
-  const { generateFromDocument } = await import('./oracle-frames.mjs')
-  const base = VALID_CARD + CASE_SPACE_SECTION
-  const generated = generateFromDocument(base)
-  const ids = [
-    ...generated.frames.map((frame) => frame.id),
-    ...generated.errorFrames.map((frame) => frame.id),
-    ...generated.paths.map((path) => path.id),
-    ...generated.emptyCells.map((cell) => cell.id),
-  ]
-  const rows = ids.map((id) => `| ${id} | ${id.startsWith('EMPTY') ? 'impossible: fixture — constraint(S1)' : 'covered(O1)'} |`)
-  return `${base}\n## Frame dispositions\n\n| Frame | Disposition |\n| ----- | ----------- |\n${mutate(rows).join('\n')}\n`
+  return withFrameDispositions(CORE_CARD + CASE_SPACE_SECTION, mutate)
 }
 
 function fullProductFixture(mutateModel) {
-  return buildFullProductFixture(VALID_CARD, mutateModel)
+  return buildFullProductFixture(CORE_CARD, mutateModel)
 }
 
 test('full-product: twelve exact records pass and every structural mutation fails', async (t) => {
@@ -3171,25 +3202,190 @@ test('case-space: 판정 누락·미생성 ID 인용·계열 누락은 실패한
   assert.match(family.stderr, /family-undispositioned: Platform/)
 })
 
+test('case-space: 섹션이 없는 카드는 통과하지 못한다 — 여덟 계열 전부 제외가 "차원 없음"의 선언이다', async (t) => {
+  const missing = run('card', '--oracle', await cardFile(t, CORE_CARD))
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /case-space-missing/)
+
+  const linted = run('card', '--oracle', await cardFile(t, VALID_CARD))
+  assert.equal(linted.status, 0, linted.stderr)
+})
+
+test('case-space: 같은 F* ID가 다른 조합을 가리키면 이전 판정은 stale이다', async (t) => {
+  const card = await caseSpaceCard()
+  // choice 순서만 바꾸면 ID 집합은 그대로이고 F1이 가리키는 조합만 바뀐다.
+  const reordered = card.replace('| rows      | 0, max                     |', '| rows      | max, 0                     |')
+  assert.notEqual(reordered, card)
+  const stale = run('card', '--oracle', await cardFile(t, reordered))
+  assert.equal(stale.status, 1)
+  assert.match(stale.stderr, /frame-label: F1 must read "rows=max × keyword=empty × request=success"/)
+
+  // Label 열이 없는 옛 2열 표도 같은 검사에 걸린다 — EMPTY 행은 ID가 곧 라벨이라 제외다.
+  const split = card.indexOf('## Frame dispositions')
+  const twoColumns = card.slice(0, split) + card.slice(split).replace(/ \| [^|\n]* \|$/gm, ' |')
+  const unlabeled = run('card', '--oracle', await cardFile(t, twoColumns))
+  assert.equal(unlabeled.status, 1)
+  assert.match(unlabeled.stderr, /frame-label: F1 /)
+  assert.match(unlabeled.stderr, /frame-label: PATH1 /)
+  assert.doesNotMatch(unlabeled.stderr, /frame-label: EMPTY/)
+
+  const regenerated = withFrameDispositions(CORE_CARD + CASE_SPACE_SECTION.replace('| 0, max                     |', '| max, 0                     |'))
+  assert.equal(run('card', '--oracle', await cardFile(t, regenerated)).status, 0)
+})
+
+test('case-space: 불완전한 선언은 조용히 강등하지 않고 거절한다', async (t) => {
+  const card = await caseSpaceCard()
+  for (const [label, mutated, code] of [
+    ['strength', card.replace('- Strength: 2', '- Strength: abc'), /CASE_SPACE_STRENGTH/],
+    ['zero choices', card.replace('| 0, max                     |', '|                            |'), /CASE_SPACE_INCOMPLETE/],
+    ['empty exclusion', card.replace('excluded: single operation', 'excluded:'), /CASE_SPACE_INCOMPLETE/],
+    ['duplicate dimension', card.replace('| Async       | request   |', '| Async       | rows      |'), /CASE_SPACE_ID/],
+  ]) {
+    const linted = run('card', '--oracle', await cardFile(t, mutated))
+    assert.equal(linted.status, 1, label)
+    assert.match(linted.stderr, code, label)
+  }
+})
+
+test('outcome: Risk는 필수이고 High는 조합 차원에 Strength 3 이상을 요구한다', async (t) => {
+  const missing = run('card', '--oracle', await cardFile(t, VALID_CARD.replace('- Risk: Medium\n', '')))
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /outcome-field: Risk must have a concrete value/)
+
+  const unknown = run('card', '--oracle', await cardFile(t, VALID_CARD.replace('- Risk: Medium', '- Risk: Severe')))
+  assert.equal(unknown.status, 1)
+  assert.match(unknown.stderr, /outcome-risk: Risk must be Low, Medium or High/)
+
+  // 수준 뒤 사유는 허용한다 — live eval 카드 3장 중 2장이 `High — <reason>`으로 썼다.
+  const reasoned = run('card', '--oracle', await cardFile(t, VALID_CARD.replace('- Risk: Medium', '- Risk: Medium — save flow only')))
+  assert.equal(reasoned.status, 0, reasoned.stderr)
+
+  const high = (card) => card.replace('- Risk: Medium', '- Risk: High')
+  const weak = run('card', '--oracle', await cardFile(t, high(await caseSpaceCard())))
+  assert.equal(weak.status, 1)
+  assert.match(weak.stderr, /case-space-strength: High risk requires Strength: 3/)
+
+  const reasonedHigh = (await caseSpaceCard()).replace('- Risk: Medium', '- Risk: High — privacy boundary')
+  assert.match(run('card', '--oracle', await cardFile(t, reasonedHigh)).stderr, /case-space-strength/)
+
+  const strong = withFrameDispositions(high(CORE_CARD) + CASE_SPACE_SECTION.replace('- Strength: 2', '- Strength: 3'))
+  const passed = run('card', '--oracle', await cardFile(t, strong))
+  assert.equal(passed.status, 0, passed.stderr)
+
+  // 조합할 차원이 없으면 강도는 판정 대상이 아니다.
+  const noDimensions = run('card', '--oracle', await cardFile(t, high(VALID_CARD)))
+  assert.equal(noDimensions.status, 0, noDimensions.stderr)
+})
+
+test('sweep: 두 정책의 행이 State Model의 같은 state를 지나면 Interaction sweep이 있어야 한다', async (t) => {
+  const missing = run('card', '--oracle', await cardFile(t, SWEEPLESS_CARD))
+  assert.equal(missing.status, 1)
+  // idle은 P1(SUBMIT)과 P3(CANCEL)가 함께 지난다 — 선언 순서상 처음 발견되는 공유 state다.
+  assert.match(missing.stderr, /sweep-missing: P1 and P3 share State Model state "idle"/)
+
+  // State Model이 없으면 기계로 볼 공유 상태가 없다 — 그 판단은 여전히 작성자 몫이다.
+  const withoutStateModel = SWEEPLESS_CARD.slice(0, SWEEPLESS_CARD.indexOf('## State Model')) + EXCLUDED_CASE_SPACE
+  const linted = run('card', '--oracle', await cardFile(t, withoutStateModel))
+  assert.equal(linted.status, 0, linted.stderr)
+})
+
+test('sweep: Inherited 계열을 선언한 카드는 Interaction sweep이 있어야 한다', async (t) => {
+  const inherited = withFrameDispositions(
+    CORE_CARD.replace(SWEEP_SECTION, '') + EXCLUDED_CASE_SPACE.replace('| Inherited   | —         | excluded: first revision   |', '| Inherited   | prior P1  | kept                       |'),
+  )
+  const missing = run('card', '--oracle', await cardFile(t, inherited))
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /sweep-missing/)
+
+  const swept = run('card', '--oracle', await cardFile(t, inherited + SWEEP_SECTION))
+  assert.equal(swept.status, 0, swept.stderr)
+})
+
+test('card --path: 코드에서 채굴된 계열을 통째로 제외하려면 그 파일을 사유에 인용해야 한다', async (t) => {
+  const base = await directory(t)
+  const source = join(base, 'List.tsx')
+  await writeFile(source, "import { useRouter } from 'next/navigation'\nexport const List = () => useRouter()\n")
+  const entryRow = '| Entry       | —         | excluded: fixture scope    |'
+
+  const unacknowledged = run('card', '--oracle', await cardFile(t, VALID_CARD), '--path', source)
+  assert.equal(unacknowledged.status, 1)
+  assert.match(unacknowledged.stderr, /dimension-candidate-undeclared: Entry\/navigation/)
+
+  const acknowledged = VALID_CARD.replace(entryRow, `| Entry | — | excluded: ${source} navigates only on an explicit click |`)
+  const cited = run('card', '--oracle', await cardFile(t, acknowledged), '--path', source)
+  assert.equal(cited.status, 0, cited.stderr)
+
+  const declared = withFrameDispositions(CORE_CARD + EXCLUDED_CASE_SPACE.replace(entryRow, '| Entry       | entry     | fresh, back-forward        |'))
+  const dimension = run('card', '--oracle', await cardFile(t, declared), '--path', source)
+  assert.equal(dimension.status, 0, dimension.stderr)
+
+  const unreadable = run('card', '--oracle', await cardFile(t, VALID_CARD), '--path', join(base, 'absent.tsx'))
+  assert.equal(unreadable.status, 1)
+  assert.match(unreadable.stderr, /^SCAN_UNREADABLE/)
+})
+
+test('scan --side-effects --oracle: 변경 파일이 잠긴 Case space가 계열째 침묵한 차원을 가지면 막는다', async (t) => {
+  const base = await directory(t)
+  const source = join(base, 'List.tsx')
+  await writeFile(source, "import { useRouter } from 'next/navigation'\nexport const List = () => useRouter()\n")
+  const oracle = join(base, 'oracle.md')
+  const entryRow = '| Entry       | —         | excluded: fixture scope    |'
+
+  await writeFile(oracle, VALID_CARD)
+  const silenced = run('scan', '--side-effects', '--oracle', oracle, '--path', source)
+  assert.equal(silenced.status, 1)
+  assert.match(silenced.stderr, /^DIMENSION_UNDECLARED: /)
+  assert.match(silenced.stderr, /dimension-candidate-undeclared: Entry\/navigation at code\(.*List\.tsx#L1-L2\)/)
+  assert.match(silenced.stderr, /\nnext: record an `undeclared-dimension` escape/)
+
+  await writeFile(oracle, VALID_CARD.replace(entryRow, `| Entry | — | excluded: ${source} navigates only on an explicit click |`))
+  const acknowledged = run('scan', '--side-effects', '--oracle', oracle, '--path', source)
+  assert.equal(acknowledged.status, 0, acknowledged.stderr)
+
+  // Case space 필드 이전에 잠긴 카드는 대조할 선언이 없다 — side-effect 소유만 본다.
+  await writeFile(oracle, CORE_CARD)
+  const legacy = run('scan', '--side-effects', '--oracle', oracle, '--path', source)
+  assert.equal(legacy.status, 0, legacy.stderr)
+})
+
+test('case-space: 단순 경로 50개 초과 State Model은 설계 실격선이다', async (t) => {
+  // 6상태 완전 그래프 — 초기 상태에서 나가는 단순 경로가 수백 개다.
+  const states = ['s0', 's1', 's2', 's3', 's4', 's5']
+  const transitions = states.flatMap((from) => states.filter((to) => to !== from).map((to) => `| ${from} | GO_${to} | ${to} | O1 |`))
+  const dense = `## State Model
+
+- States: ${states.join(', ')}
+- Events: ${states.map((state) => `GO_${state}`).join(', ')}
+
+| From | Event | To | 행 |
+| ---- | ----- | -- | -- |
+${transitions.join('\n')}
+`
+  const card = withFrameDispositions(CORE_CARD.slice(0, CORE_CARD.indexOf('## State Model')) + dense + EXCLUDED_CASE_SPACE)
+  const linted = run('card', '--oracle', await cardFile(t, card))
+  assert.equal(linted.status, 1)
+  assert.match(linted.stderr, /state-model-too-wide: more than 50 simple paths/)
+})
+
 test('case-space: independent(O*)는 이유가 있어야 하고 F* 프레임에만 붙는다', async (t) => {
   const independent = await caseSpaceCard((rows) =>
-    rows.map((row) => (row.startsWith('| F1 ') ? '| F1 | independent(O1): rows count does not touch the pending policy |' : row)),
+    rows.map((row) => (row.startsWith('| F1 ') ? withDisposition(row, 'independent(O1): rows count does not touch the pending policy') : row)),
   )
   assert.equal(run('card', '--oracle', await cardFile(t, independent)).status, 0)
 
-  const noReason = await caseSpaceCard((rows) => rows.map((row) => (row.startsWith('| F1 ') ? '| F1 | independent(O1) |' : row)))
+  const noReason = await caseSpaceCard((rows) => rows.map((row) => (row.startsWith('| F1 ') ? withDisposition(row, 'independent(O1)') : row)))
   const missingReason = run('card', '--oracle', await cardFile(t, noReason))
   assert.equal(missingReason.status, 1)
   assert.match(missingReason.stderr, /frame-disposition: F1: independent\(\) must name why/)
 
   const onPath = await caseSpaceCard((rows) =>
-    rows.map((row) => (row.startsWith('| PATH1 ') ? '| PATH1 | independent(O1): reason |' : row)),
+    rows.map((row) => (row.startsWith('| PATH1 ') ? withDisposition(row, 'independent(O1): reason') : row)),
   )
   const pathIndependent = run('card', '--oracle', await cardFile(t, onPath))
   assert.equal(pathIndependent.status, 1)
   assert.match(pathIndependent.stderr, /frame-disposition: PATH1: independent\(\) applies to F\* combination frames only/)
 
-  const coveredReason = await caseSpaceCard((rows) => rows.map((row) => (row.startsWith('| F1 ') ? '| F1 | covered(O1): reason |' : row)))
+  const coveredReason = await caseSpaceCard((rows) => rows.map((row) => (row.startsWith('| F1 ') ? withDisposition(row, 'covered(O1): reason') : row)))
   const reasoned = run('card', '--oracle', await cardFile(t, coveredReason))
   assert.equal(reasoned.status, 1)
   assert.match(reasoned.stderr, /frame-disposition: F1: covered\(\) takes no reason/)
@@ -3289,8 +3485,7 @@ test('deviations: static 축약 한 줄이 timing·context·duration 세 유형�
 
 /** Touches 열 채택 카드 — 인용 id 실재·미기재 차원을 lint가 잡는다. */
 async function touchesCard(touchesRows) {
-  const { generateFromDocument } = await import('./oracle-frames.mjs')
-  const base = `${VALID_CARD}${INVARIANTS_SECTION}
+  const base = `${CORE_CARD}${INVARIANTS_SECTION}
 ## Case space
 
 - Strength: 2
@@ -3305,15 +3500,7 @@ ${touchesRows}
 | Platform    | —         | excluded: fixture | —                       |
 | Inherited   | —         | excluded: fixture | —                       |
 `
-  const generated = generateFromDocument(base)
-  const ids = [
-    ...generated.frames.map((frame) => frame.id),
-    ...generated.errorFrames.map((frame) => frame.id),
-    ...generated.paths.map((path) => path.id),
-    ...generated.emptyCells.map((cell) => cell.id),
-  ]
-  const rows = ids.map((id) => `| ${id} | ${id.startsWith('EMPTY') ? 'impossible: fixture — constraint(S1)' : 'covered(O1)'} |`)
-  return `${base}\n## Frame dispositions\n\n| Frame | Disposition |\n| ----- | ----------- |\n${rows.join('\n')}\n`
+  return withFrameDispositions(base)
 }
 
 test('touches: 실재하는 P·I 인용은 통과, 미상 id·미기재 차원은 실패한다', async (t) => {
@@ -3403,7 +3590,7 @@ test('evidence: covered() F* 프레임은 실행 evidence가 없으면 검증을
 
 test('case-space: 조합 프레임 50개 초과는 설계 실격선이다', async (t) => {
   const wideChoices = Array.from({ length: 8 }, (_, index) => `c${index}`).join(', ')
-  const wide = `${VALID_CARD}
+  const wide = `${CORE_CARD}
 ## Case space
 
 - Strength: 2
@@ -3493,7 +3680,7 @@ const R1_FRAMES = `
 
 test('a needs-decision cell that survives on an approved card fails the lock as disposition-open', async (t) => {
   const open = SWEEP_SECTION.replace('covered(O7)', 'needs-decision: 저장 pending 중 목록 갱신이 도착하면 어느 쪽이 이기나?')
-  const linted = run('card', '--oracle', await cardFile(t, VALID_CARD + open))
+  const linted = run('card', '--oracle', await cardFile(t, SWEEPLESS_CARD + open))
 
   assert.equal(linted.status, 1)
   assert.match(linted.stderr, /disposition-open: "P3 × P1": needs-decision survives on an approved card/)
@@ -3508,7 +3695,7 @@ test('R1: needs-evidence is grammatically accepted in every family, blocks the l
     '--oracle',
     await cardFile(
       t,
-      `${VALID_CARD}${R1_SWEEP}
+      `${SWEEPLESS_CARD}${R1_SWEEP}
 ## Deviations
 
 | Policy | Type   | Disposition                                                                   |
@@ -3541,13 +3728,13 @@ test('R1: needs-evidence is grammatically accepted in every family, blocks the l
   const lookupMissing = run(
     'card',
     '--oracle',
-    await cardFile(t, VALID_CARD + R1_SWEEP.replace(' — code(src/list.ts)', '')),
+    await cardFile(t, SWEEPLESS_CARD + R1_SWEEP.replace(' — code(src/list.ts)', '')),
   )
   assert.equal(lookupMissing.status, 1)
   assert.match(lookupMissing.stderr, /needs-evidence-lookup-missing: "P3 × P1"/)
 
   // 조사로 해소한 카드는 통과한다 — 조사 결과 인용이 witness가 된다
-  const resolved = VALID_CARD + R1_SWEEP.replace(
+  const resolved = SWEEPLESS_CARD + R1_SWEEP.replace(
     'needs-evidence: 목록 갱신이 저장 pending과 상태를 공유하나 — code(src/list.ts)',
     'impossible: 목록 갱신은 저장 상태를 읽지 않는다 — constraint(S1)',
   )
@@ -3564,7 +3751,7 @@ test('R1: impossible without a witness fails in every family, and code()·constr
 
   // needs-evidence 셀은 disposition-open으로 따로 막힌다 — 여기서는 witness 검사만 보도록 닫아 둔다
   const lint = async (sweep) => {
-    await writeFile(oracle, VALID_CARD + sweep.replace(/\| P3 × P1 \|[^\n]*\n/, '| P3 × P1 | covered(O7) |\n'))
+    await writeFile(oracle, SWEEPLESS_CARD + sweep.replace(/\| P3 × P1 \|[^\n]*\n/, '| P3 × P1 | covered(O7) |\n'))
     return run('card', '--oracle', oracle)
   }
 
@@ -3577,7 +3764,7 @@ test('R1: impossible without a witness fails in every family, and code()·constr
     '--oracle',
     await cardFile(
       t,
-      `${VALID_CARD}${R1_FRAMES}
+      `${CORE_CARD}${R1_FRAMES}
 ## Frame dispositions
 
 | Frame | Disposition        |
@@ -3612,7 +3799,7 @@ test('R1: impossible without a witness fails in every family, and code()·constr
 })
 
 test('R1: card --ir derives stable judgment ids from the card bytes, deterministically and without lint', async (t) => {
-  const card = VALID_CARD + SWEEP_SECTION + DEVIATIONS_SECTION + LANDMINES_SECTION
+  const card = SWEEPLESS_CARD + SWEEP_SECTION + DEVIATIONS_SECTION + LANDMINES_SECTION
   const oracle = await cardFile(t, card)
 
   const first = run('card', '--oracle', oracle, '--ir')
@@ -3670,7 +3857,9 @@ test('scan --side-effects inventories code effects and refuses one no card row o
   t.after(() => rm(directory, { recursive: true, force: true }))
   const source = join(directory, 'save.ts')
   const oracle = join(directory, 'oracle.md')
-  await writeFile(oracle, VALID_CARD)
+  // localStorage는 Data/persisted state 후보다 — 이 테스트는 side-effect 소유만 보므로 카드가 그 파일을 제외 사유에 인용한다.
+  const dataRow = '| Data        | —         | excluded: fixture scope    |'
+  await writeFile(oracle, VALID_CARD.replace(dataRow, `| Data | — | excluded: ${source} keeps no draft across reloads |`))
   await writeFile(source, "await fetch('/api/save')\nlocalStorage.setItem('draft', body)\n")
 
   const inventory = run('scan', '--side-effects', '--path', source)

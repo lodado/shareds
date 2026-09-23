@@ -97,6 +97,10 @@ production files>`. Every known side-effect token in the diff (network·storage�
    card lacks the row → `POLICY_GAP`; the card has the row and the implementation added an effect
    it never asked for → `PRODUCT_DEFECT`. The token list is known and finite — a clean scan is
    not evidence of no side effects.
+   The same scan mines the changed files for Case space dimension candidates. A family the locked
+   card excludes wholesale without citing that file is `DIMENSION_UNDECLARED`: record an
+   `undeclared-dimension` escape and route it as `POLICY_GAP`, since only a new revision can
+   declare it. A card locked before `## Case space` was required skips this comparison.
 
 If there is a performance requirement·improvement claim, add the existing repo command that checks a
 same-condition baseline/after as a required `performance` label. If the exported shared/package API

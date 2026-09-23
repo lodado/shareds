@@ -27,6 +27,22 @@ const lockScript = join(scriptDirectory, 'oracle-lock.mjs')
 const changeabilityReviewPoint = join(scriptDirectory, '../references/changeability.md')
 const checklistReviewPoint = join(scriptDirectory, '../references/review-checklist.md')
 
+/** 여덟 계열 전부 제외 — lint가 요구하는 Case space 선언의 최소형. State Model이 없어 판정할 프레임도 없다. */
+const EXCLUDED_CASE_SPACE = `
+## Case space
+
+| Family      | Dimension | Choices                 |
+| ----------- | --------- | ----------------------- |
+| Data        | —         | excluded: fixture scope |
+| Value       | —         | excluded: fixture scope |
+| Async       | —         | excluded: fixture scope |
+| Order       | —         | excluded: fixture scope |
+| Entry       | —         | excluded: fixture scope |
+| Environment | —         | excluded: fixture scope |
+| Platform    | —         | excluded: fixture scope |
+| Inherited   | —         | excluded: first revision |
+`
+
 const ORACLE = `# Oracle
 
 ## Outcome Brief
@@ -36,6 +52,7 @@ const ORACLE = `# Oracle
 - Non-goals: API 재설계
 - Worst regression: 중복 저장
 - Reversibility: revert
+- Risk: Medium
 - Sources: S1
 
 ## Source Registry
@@ -60,7 +77,7 @@ const ORACLE = `# Oracle
 | O1 | P1 | 입력 | 저장 | pending | 조기 성공 | POST×1 | 상태: loading |
 
 - N/A: 중복, 오류, 재시도, 빈 데이터, out-of-order, 취소는 이 fixture 범위가 아니다. (출처: S1)
-`
+${EXCLUDED_CASE_SPACE}`
 const VISUAL_ORACLE = `# Oracle
 
 ## Outcome Brief
@@ -70,6 +87,7 @@ const VISUAL_ORACLE = `# Oracle
 - Non-goals: redesign
 - Worst regression: overlap
 - Reversibility: revert
+- Risk: Medium
 - Sources: S1
 
 ## Source Registry
@@ -95,7 +113,7 @@ const VISUAL_ORACLE = `# Oracle
 | D1 | P1 | layout | relation | overlap | S1 | RELATIONAL |
 
 - N/A: 중복, 오류, 재시도, 빈 데이터, 로딩, out-of-order, 취소는 이 fixture 범위가 아니다. (출처: S1)
-`
+${EXCLUDED_CASE_SPACE}`
 /** ORACLE에 잠긴 repo 출처 하나를 더한 카드 — SOURCE_CHANGED 드리프트를 만들 수 있는 최소 변형이다. */
 const SOURCED_ORACLE = ORACLE.replace(
   '| S1 | product-policy | 저장 | PRD | user-confirmation | approved |',
@@ -114,6 +132,7 @@ const MILESTONE_ORACLE = `# Oracle
 - Non-goals: API 재설계
 - Worst regression: blank
 - Reversibility: revert
+- Risk: Medium
 - Sources: S1
 
 ## Source Registry
@@ -139,7 +158,7 @@ const MILESTONE_ORACLE = `# Oracle
 | O2 | P1 | detail input | open | detail shown | wrong item | GET×1 | state |
 
 - N/A: 중복, 오류, 재시도, 빈 데이터, 로딩, out-of-order, 취소는 이 fixture 범위가 아니다. (출처: S1)
-`
+${EXCLUDED_CASE_SPACE}`
 const EVIDENCE = {
   schemaVersion: 1,
   rows: {
@@ -311,7 +330,9 @@ async function workspace(
 
   const oracle = join(oracleDirectory, 'oracle.md')
   const lock = join(oracleDirectory, 'oracle.lock.json')
-  await writeFile(oracle, oracleContent)
+  // init은 잠긴 카드의 Risk를 run risk로 쓴다 — fixture 카드도 요청한 risk를 선언한다.
+  const card = oracleContent.replace(/^- Risk: \w+$/m, `- Risk: ${risk[0].toUpperCase()}${risk.slice(1)}`)
+  await writeFile(oracle, card)
   await writeFile(join(oracleDirectory, 'evidence.json'), JSON.stringify(evidence))
   await writeFile(join(oracleDirectory, 'findings.json'), JSON.stringify(CLEAR_REVIEW))
   await writeFile(join(oracleDirectory, 'implementation-decision.md'), 'Implement the approved change.\n')
@@ -336,7 +357,7 @@ async function workspace(
   assert.equal(locked.status, 0, locked.stderr)
   const receipt = locked.stdout.trim().match(/^ORACLE_LOCKED sha256:([a-f0-9]{64}) manifest-sha256:([a-f0-9]{64})$/)
   assert.ok(receipt, locked.stdout)
-  assert.equal(receipt[1], createHash('sha256').update(oracleContent).digest('hex'))
+  assert.equal(receipt[1], createHash('sha256').update(card).digest('hex'))
   assert.equal(
     receipt[2],
     createHash('sha256')
@@ -1486,6 +1507,26 @@ test('O6: RED 전에 production 파일이 바뀌면 PRODUCTION_TOUCHED_BEFORE_RE
   assert.match(transitioned.stderr, /src\/save\.mjs/)
   assert.doesNotMatch(transitioned.stderr, /src\/save\.test\.mjs/)
   assert.equal((await state(oracleDirectory)).state, 'ORACLE_READY')
+})
+
+test('init: 잠긴 카드의 Risk가 run risk이고, 다른 --risk는 RISK_MISMATCH로 거절한다', async (t) => {
+  const { root, oracleDirectory, lock } = await workspace(t, { risk: 'high', initialize: false })
+  const base = ['init', '--dir', oracleDirectory, '--lock', lock, '--scan-root', root, '--required-label', 'behavior']
+
+  const downgraded = run([...base, '--risk', 'medium'])
+  assert.equal(downgraded.status, 1)
+  assert.match(downgraded.stderr, /^RISK_MISMATCH: --risk medium disagrees with the locked card's Risk: high/)
+  assert.match(downgraded.stderr, /\nnext: drop --risk/)
+
+  const derived = run(base)
+  assert.equal(derived.status, 0, derived.stderr)
+  assert.equal((await state(oracleDirectory)).risk, 'high')
+
+  // 수준 뒤에 사유가 붙어도 카드 risk다 — 못 읽으면 `--risk` 기본값 medium으로 새던 경로다.
+  const reasoned = await workspace(t, { oracleContent: ORACLE.replace('- Risk: Medium', '- Risk: High — privacy boundary'), initialize: false })
+  const reasonedInit = run(['init', '--dir', reasoned.oracleDirectory, '--lock', reasoned.lock, '--scan-root', reasoned.root, '--required-label', 'behavior'])
+  assert.equal(reasonedInit.status, 0, reasonedInit.stderr)
+  assert.equal((await state(reasoned.oracleDirectory)).risk, 'high')
 })
 
 test('O6: harness-path는 scan root 안의 존재하는 정확한 파일만 받는다', async (t) => {

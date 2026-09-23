@@ -318,11 +318,15 @@ held-out은 grader가 점수 매기지 않습니다. `escapes[].assertion`을 Dr
 
 - `scripts/oracle-dimensions.mjs --path <file>...` — 고정 패턴 표로 코드에서 Case space 차원 후보
   (`code(path#L)` 인용 포함)와 side-effect 인벤토리를 뽑는다. 카드에 자동 기입하지 않는다.
+- `scripts/oracle-verify.mjs card --path <touched files>` — 같은 채굴을 lint에서 다시 돌린다. 후보가
+  나온 계열을 카드가 통째로 제외했다면 제외 사유가 그 파일을 인용해야 하고, 아니면
+  `dimension-candidate-undeclared`로 막는다. 차원을 대신 만들어 주지는 않는다.
 - `scripts/oracle-verify.mjs card --repo-policies` — 같은 레포의 잠긴 형제 카드 중 surface 토큰을
   공유하는 정책을 스윕 counterpart 후보(`P3 × <oracle-id>.P7`)로 낸다. 정보이지 게이트가 아니다.
 - `scripts/oracle-verify.mjs scan --side-effects --oracle <card> --path <changed files>` — diff의
   알려진 side-effect 토큰마다 카드의 어떤 행이 그 범주를 소유하는지 대조한다. 미소유는
-  `SIDE_EFFECT_UNOWNED`, 면제는 `oracle:side-effect <row|reason>` 주석.
+  `SIDE_EFFECT_UNOWNED`, 면제는 `oracle:side-effect <row|reason>` 주석. 같은 호출이 변경 파일에서
+  차원 후보도 채굴해, 잠긴 Case space가 계열째 제외한 차원이 나오면 `DIMENSION_UNDECLARED`로 막는다.
 - `scripts/oracle-run.mjs status --dir <dir> --changed-files` — init 기준선 이후 바뀐 경로만 한 줄씩.
   레포의 related-tests 명령에 그대로 넘겨 필수 라벨 `impact`를 만든다.
 - `scripts/oracle-verify.mjs card --ir` — 카드 바이트에서 파생한 Judgment Space IR(JSON) 덤프.

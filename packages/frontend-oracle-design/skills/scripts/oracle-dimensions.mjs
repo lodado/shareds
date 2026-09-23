@@ -46,6 +46,9 @@ export const DIMENSION_PATTERNS = [
     family: 'Entry',
     dimension: 'remount',
     pattern: /<Suspense|React\.lazy\(|\blazy\(|\bkey=\{/,
+    // 리스트 항목의 key는 identity다 — `.map(` 줄부터 두 줄 안의 key 단독 hit은 remount 신호가 아니다.
+    ignore: (lines, index) =>
+      !/<Suspense|lazy\(/.test(lines[index]) && lines.slice(Math.max(0, index - 2), index + 1).some((line) => /\.map\(/.test(line)),
     note: 'mount-time side effects on remount — scroll·focus·observers re-initialize',
   },
   {
@@ -80,10 +83,13 @@ export const DIMENSION_PATTERNS = [
   },
 ]
 
-function matchingLines(lines, pattern) {
+// 주석은 코드가 아니다 — 주석 처리된 effect나 "next page" 설명이 후보·boundary를 만들지 않는다.
+const COMMENT_LINE = /^\s*(?:\/\/|\/\*|\*|\{\/\*)/
+
+function matchingLines(lines, pattern, ignore = () => false) {
   const hits = []
   lines.forEach((line, index) => {
-    if (pattern.test(line)) hits.push(index + 1)
+    if (!COMMENT_LINE.test(line) && pattern.test(line) && !ignore(lines, index)) hits.push(index + 1)
   })
   return hits
 }
@@ -94,7 +100,7 @@ export function mineDimensions(path, content) {
   const candidates = []
 
   for (const rule of DIMENSION_PATTERNS) {
-    const hits = matchingLines(lines, rule.pattern)
+    const hits = matchingLines(lines, rule.pattern, rule.ignore)
     if (hits.length < (rule.minimum ?? 1)) continue
     if (rule.and && matchingLines(lines, rule.and).length === 0) continue
     const first = hits[0]
@@ -107,7 +113,7 @@ export function mineDimensions(path, content) {
 }
 
 function boundaryId(path, kind, line, index) {
-  const digest = sha256(path)
+  const digest = sha256(path).slice(0, 12)
   return `${kind}-${digest}-L${line}-${index + 1}`
 }
 
@@ -116,7 +122,8 @@ export function mineApplicability(path, content) {
   const lines = content.split('\n')
   const lineCitation = (line) => `code(${path}#L${line})`
   const fetchHits = matchingLines(lines, /\bfetch\(|\baxios[.(]|\bky[.(]|useQuery\(|useMutation\(/)
-  const actionHits = matchingLines(lines, /onClick|onSubmit|handle(?:Next|Previous|Page|Filter|Sort)|\b(?:next|previous|retry)\b/i)
+  // next·previous·retry는 호출일 때만 action이다 — `next/navigation` import나 `retry: 3` 설정 키는 아니다.
+  const actionHits = matchingLines(lines, /onClick|onSubmit|handle(?:Next|Previous|Page|Filter|Sort|Retry)|\b(?:fetch(?:Next|Previous)Page|next|previous|retry)\s*\(/i)
   const externalHits = matchingLines(lines, /addEventListener\(|\.subscribe\(|set(?:Timeout|Interval)\(|new (?:Resize|Intersection)Observer\(/)
   const boundaries = [
     ...fetchHits.map((line, index) => ({ id: boundaryId(path, 'async', line, index), kind: 'async', source: lineCitation(line) })),

@@ -15,6 +15,22 @@ function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex')
 }
 
+/** 여덟 계열 전부 제외 — lint가 요구하는 Case space 선언의 최소형. State Model이 없어 판정할 프레임도 없다. */
+const EXCLUDED_CASE_SPACE = `
+## Case space
+
+| Family      | Dimension | Choices                 |
+| ----------- | --------- | ----------------------- |
+| Data        | —         | excluded: fixture scope |
+| Value       | —         | excluded: fixture scope |
+| Async       | —         | excluded: fixture scope |
+| Order       | —         | excluded: fixture scope |
+| Entry       | —         | excluded: fixture scope |
+| Environment | —         | excluded: fixture scope |
+| Platform    | —         | excluded: fixture scope |
+| Inherited   | —         | excluded: first revision |
+`
+
 const VALID_CARD = `# Lockable Oracle Card
 
 ## Outcome Brief
@@ -24,6 +40,7 @@ const VALID_CARD = `# Lockable Oracle Card
 - Non-goals: 저장 API 재설계
 - Worst regression: 중복 저장 또는 입력 유실
 - Reversibility: 변경 commit revert
+- Risk: Medium
 - Sources: S1
 
 ## Source Registry
@@ -48,7 +65,7 @@ const VALID_CARD = `# Lockable Oracle Card
 | ID | 정책 | Given | When | Then | Never | 부작용(종류×횟수) | BVA |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | O1 | P1 | pending | 중복 클릭 | pending 유지 | 두 번째 POST | POST×1(총) | 중복 횟수 |
-`
+${EXCLUDED_CASE_SPACE}`
 
 function run(...args) {
   const lockIndex = args.indexOf('--lock')

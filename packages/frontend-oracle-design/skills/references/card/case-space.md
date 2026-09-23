@@ -19,6 +19,12 @@ family appears in `## Case space` either instantiated as dimensions or excluded 
 a missing family fails lint (`family-undispositioned`). "Did not think of it" is impossible;
 "excluded: reason" is the only way to skip, and it is auditable.
 
+The section itself is required: a card with no applicable dimension excludes all eight families,
+and a card without the section fails lint (`case-space-missing`). A family that
+`oracle-dimensions.mjs` mined from a touched file cannot be excluded silently either:
+`oracle-verify.mjs card --path <file>` fails `dimension-candidate-undeclared` unless the family
+declares a dimension or its exclusion reason cites that file.
+
 | Family      | Typical dimensions                                                                          | Provenance                   |
 | ----------- | ------------------------------------------------------------------------------------------- | ---------------------------- |
 | Data        | volume (0/1/page/boundary/max), staleness                                                   | SFDIPOT Data, bva value axis |
@@ -104,6 +110,11 @@ it must not retain the full-product execution claim.
 ```
 
 - `Strength: 2` is the default; High risk writes `3`. The generator and lint both read it.
+- Strength is a positive integer. With `- Risk: High` in the Outcome Brief and two or more
+  combinable dimensions, lint requires `3` or more (`case-space-strength`).
+- Malformed declarations are refused, never degraded: a non-integer Strength, a dimension with no
+  choices, a nameless or duplicate dimension, a duplicate choice, or an empty `excluded:` reason
+  stops the generator and lint with a `CASE_SPACE_*` code.
 - A choice suffixed `[error]` is excluded from combination and emits one standalone `E*` frame —
   the category-partition error annotation. Everything else joins t-way combination.
 - An excluded family writes `—` as the dimension and `excluded: <reason>` as its choices.
@@ -231,6 +242,13 @@ The generator emits, deterministically for the same card bytes:
 - `PATH*` — every simple path of the `## State Model` transition table from its initial state
 - `EMPTY <state> × <event>` — every undefined state×event cell
 
+These IDs are positional: an edited declaration can point an old `F1` at a different combination.
+Each disposition row therefore carries a third `Label` column, copied from the text the generator
+prints after the ID. Lint regenerates the frames and fails `frame-label` on any row whose label no
+longer matches, so a stale judgment is caught row by row and the cold-read reviewer can read what
+each frame means. `EMPTY` rows leave `Label` blank because the ID already names the cell;
+full-product cards bind their IDs through the Tuple column and the revisions instead.
+
 Every emitted ID gets a row in `## Frame dispositions`, with the sweep's three dispositions plus
 one that only `F*` frames may carry, under the same promotion rule — only `needs-decision` becomes
 a grill question, and one surviving to lock means `NEEDS_DECISION`:
@@ -238,25 +256,26 @@ a grill question, and one surviving to lock means `NEEDS_DECISION`:
 ```markdown
 ## Frame dispositions
 
-| Frame                | Disposition                                                                  |
-| -------------------- | ---------------------------------------------------------------------------- |
-| F1                   | covered(O5)                                                                  |
-| F2                   | needs-decision: back-forward while the request is pending?                   |
-| F3                   | independent(O5): row count never reaches the pending policy                  |
-| E1                   | covered(O9)                                                                  |
-| E2                   | impossible: a cached read has no 5xx path — constraint(S3)                   |
-| F4                   | needs-evidence: can the fixture reach 1000 rows — code(src/list/fixtures.ts) |
-| PATH1                | covered(O1, O5)                                                              |
-| EMPTY pending × SORT | needs-decision: sort while fetching — cancel or queue?                       |
+| Frame                | Disposition                                                                  | Label                                   |
+| -------------------- | ---------------------------------------------------------------------------- | --------------------------------------- |
+| F1                   | covered(O5)                                                                  | rows=0 × entry=fresh                    |
+| F2                   | needs-decision: back-forward while the request is pending?                   | rows=1 × entry=back-forward             |
+| F3                   | independent(O5): row count never reaches the pending policy                  | rows=max × entry=refresh                |
+| E1                   | covered(O9)                                                                  | [error] list request=http-5xx           |
+| E2                   | impossible: a cached read has no 5xx path — constraint(S3)                   | [error] keyword=unicode                 |
+| F4                   | needs-evidence: can the fixture reach 1000 rows — code(src/list/fixtures.ts) | rows=max × entry=back-forward           |
+| PATH1                | covered(O1, O5)                                                              | idle -PAGE_CHANGE-> fetching -OK-> idle |
+| EMPTY pending × SORT | needs-decision: sort while fetching — cancel or queue?                       |                                         |
 ```
 
 The four dispositions and their grammar — `impossible: <mechanism> — <witness>`,
 `needs-evidence: <fact> — <lookup>` — are the sweep's ([`interaction-sweep.md`](interaction-sweep.md));
 `independent(O*): reason` is the one addition, for `F*` frames only.
 
-Lint (`oracle-verify.mjs card`, active when `## Case space` exists):
+Lint (`oracle-verify.mjs card`; every card must carry `## Case space`):
 
 - every generated ID has a disposition — `frame-undispositioned`
+- every `F*`·`E*`·`PATH*` row's `Label` matches the regenerated frame — `frame-label`
 - no disposition cites an ID the generator did not emit — `frame-unknown`
 - disposition enum and `covered()`·`independent()` row citations are checked like the sweep.
   `covered(O5)` on an `F*` frame is an execution claim: O5's test actually runs under that
@@ -269,6 +288,8 @@ Lint (`oracle-verify.mjs card`, active when `## Case space` exists):
 - more than 50 combinable frames — `case-space-too-wide`: not a budget to fill but a design
   disqualification line; split the dimension or narrow the scope, mirroring bva's 30
   `@ts-expect-error` rule
+- more than 50 simple `PATH*` paths — `state-model-too-wide`: split the state model. Enumeration
+  stops at the 51st path, so a dense transition table cannot stall the generator
 
 A frame does not create a test by itself. `F*`·`E*` dispositions map to existing rows or promote
 questions — a `covered()` `F*` frame parameterizes the row's existing test, it does not add an
