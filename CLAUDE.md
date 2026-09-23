@@ -5,6 +5,9 @@ Do not copy them into `~/.claude/skills`, `~/.codex/skills`, or `~/.agents/skill
 it too): a second copy shows up as a duplicate, often stale, entry in the skill list. JCode has
 no plugin system, so it keeps plain copies in `~/.jcode/skills/`.
 
+Install these plugins at user scope only. Do not add `--scope project` installs or run
+`claude plugin update --scope project`: a project-scope install is a second copy that goes stale.
+
 After successfully committing and pushing a change under `packages/<plugin>/skills/`, with the
 version bump its contract test requires, refresh the installs:
 
