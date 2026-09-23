@@ -1,0 +1,321 @@
+{
+  "schema_version": "1.0.0",
+  "mode": "PLAN_ONLY",
+  "concept": {
+    "title": "도토리 정원 (합성 예제)",
+    "experience_promise": "배치가 만든 합체와 공간 관리를 짧게 반복한다.",
+    "core_decision": "지금 안전하게 합칠지 다음 물체의 공간을 남길지 결정한다.",
+    "first_meaningful_action": "직접 투하한 객체가 첫 merge에 참여한다.",
+    "out_of_scope": ["ads", "login", "store", "server", "production implementation"]
+  },
+  "readiness": {
+    "planning": "PLAN_READY",
+    "figma": "not_requested",
+    "playable": "planned",
+    "usability": "planned",
+    "fun": "planned",
+    "business": "not_run",
+    "user_acceptance": "not_obtained"
+  },
+  "artifacts": [
+    {
+      "id": "A-design",
+      "kind": "game_design",
+      "path": "game-design.md",
+      "status": "complete",
+      "evidence_ids": ["E-design"]
+    },
+    {
+      "id": "A-flow",
+      "kind": "ux_flow",
+      "path": "ux-flow.md",
+      "status": "complete",
+      "evidence_ids": ["E-flow"]
+    },
+    {
+      "id": "A-visual",
+      "kind": "visual_feel",
+      "path": "visual-and-feel.md",
+      "status": "complete",
+      "evidence_ids": ["E-visual"]
+    },
+    {
+      "id": "A-validation",
+      "kind": "validation_handoff",
+      "path": "validation-and-handoff.md",
+      "status": "complete",
+      "evidence_ids": ["E-validation"]
+    },
+    {
+      "id": "A-log",
+      "kind": "reference_log",
+      "path": "reference-log.md",
+      "status": "complete",
+      "evidence_ids": ["E-log"]
+    }
+  ],
+  "rules": [
+    {
+      "id": "R-drop",
+      "invariant": "gesture당 유효 release 투하 1회",
+      "verification": "중복 release와 pointercancel 테스트"
+    },
+    {
+      "id": "R-merge",
+      "invariant": "한 tick에서 entity가 최대 한 pair에 소모",
+      "verification": "같은 객체의 중복 pair 테스트"
+    },
+    {
+      "id": "R-score",
+      "invariant": "merge event ID당 점수 1회",
+      "verification": "사건과 효과 재생 중복 테스트"
+    },
+    {
+      "id": "R-end",
+      "invariant": "grace 이후 연속 overflow의 게임 시간만 누적",
+      "verification": "pause/짧은 통과 비교"
+    },
+    {
+      "id": "R-reset",
+      "invariant": "이전 run 사건이 새 판을 변경하지 않음",
+      "verification": "late event 테스트"
+    }
+  ],
+  "state_machines": [
+    {
+      "id": "M-run",
+      "initial_state": "ready",
+      "states": ["ready", "playing", "result"],
+      "transitions": [
+        {
+          "id": "T-start",
+          "from": "ready",
+          "to": "playing",
+          "event": "start",
+          "guard": "assets ready; no active run",
+          "effects": "reset run",
+          "recovery": "loading failure: retry"
+        },
+        {
+          "id": "T-drop",
+          "from": "playing",
+          "to": "playing",
+          "event": "release",
+          "guard": "canAdvance and valid gesture and cooldown elapsed",
+          "effects": "commit one object",
+          "recovery": "pointercancel: no object"
+        },
+        {
+          "id": "T-merge",
+          "from": "playing",
+          "to": "playing",
+          "event": "eligible pair",
+          "guard": "both unconsumed; same tier < 4",
+          "effects": "consume pair; score once",
+          "recovery": "duplicate: ignore"
+        },
+        {
+          "id": "T-fail",
+          "from": "playing",
+          "to": "result",
+          "event": "overflow committed",
+          "guard": "grace and continuous duration met",
+          "effects": "end run once",
+          "recovery": "repeat event: ignore"
+        },
+        {
+          "id": "T-replay",
+          "from": "result",
+          "to": "playing",
+          "event": "replay",
+          "guard": "no active replay transaction",
+          "effects": "new run; cancel old work",
+          "recovery": "duplicate button: one run"
+        }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "S-ready",
+      "purpose": "설정 없이 시작",
+      "primary_actions": [
+        {
+          "id": "C-start",
+          "label": "시작",
+          "transition_ids": ["T-start"]
+        }
+      ]
+    },
+    {
+      "id": "S-play",
+      "purpose": "미리 보고 배치",
+      "primary_actions": [
+        {
+          "id": "C-drop",
+          "label": "손을 떼어 투하",
+          "transition_ids": ["T-drop"]
+        }
+      ]
+    },
+    {
+      "id": "S-result",
+      "purpose": "실패를 이해하고 재도전",
+      "primary_actions": [
+        {
+          "id": "C-replay",
+          "label": "다시 하기",
+          "transition_ids": ["T-replay"]
+        }
+      ]
+    }
+  ],
+  "feedback": [
+    {
+      "id": "F-drop",
+      "action": "release",
+      "first_response": "preview 변경, 유효 release 생성",
+      "rule_result": "물체 1개",
+      "visual": "작은 위치 강조",
+      "audio": "선택적 낙하 소리",
+      "interruptions": "pointercancel 무생성",
+      "reduced_effects": "정적 강조",
+      "tuning_basis": "proposal"
+    },
+    {
+      "id": "F-merge",
+      "action": "merge",
+      "first_response": "새 객체와 점수 표시",
+      "rule_result": "소모/가산 1회",
+      "visual": "짧은 squash",
+      "audio": "선택적 접촉 소리",
+      "interruptions": "restart 시 이전 effect 폐기",
+      "reduced_effects": "모션 대신 정적 강조",
+      "tuning_basis": "proposal"
+    },
+    {
+      "id": "F-fail",
+      "action": "overflow",
+      "first_response": "초과 위치 강조",
+      "rule_result": "run 종료",
+      "visual": "결과 패널",
+      "audio": "무음도 가능",
+      "interruptions": "replay 시 효과 취소",
+      "reduced_effects": "shake 없음",
+      "tuning_basis": "proposal"
+    }
+  ],
+  "experiments": [
+    {
+      "id": "X-understand",
+      "hypothesis": "release와 합체를 이해한다",
+      "method": "탐색적 플레이 세션",
+      "measure": "자발적 시작/설명/막힘",
+      "status": "planned",
+      "evidence_ids": []
+    },
+    {
+      "id": "X-choice",
+      "hypothesis": "정보로 배치가 달라진다",
+      "method": "같은 seed 정보 유무 비교",
+      "measure": "선택 이유와 배치",
+      "status": "planned",
+      "evidence_ids": []
+    },
+    {
+      "id": "X-feel",
+      "hypothesis": "강조가 확신을 돕는다",
+      "method": "피드백 변수 비교",
+      "measure": "오입력/가림/재도전",
+      "status": "planned",
+      "evidence_ids": []
+    }
+  ],
+  "trace": [
+    {
+      "journey_id": "J-play",
+      "rule_ids": ["R-drop", "R-merge", "R-score"],
+      "screen_ids": ["S-ready", "S-play"],
+      "transition_ids": ["T-start", "T-drop", "T-merge"],
+      "feedback_ids": ["F-drop", "F-merge"],
+      "experiment_ids": ["X-understand", "X-choice", "X-feel"]
+    },
+    {
+      "journey_id": "J-replay",
+      "rule_ids": ["R-end", "R-reset"],
+      "screen_ids": ["S-result"],
+      "transition_ids": ["T-fail", "T-replay"],
+      "feedback_ids": ["F-fail"],
+      "experiment_ids": ["X-understand"]
+    }
+  ],
+  "interruption_policy": {
+    "independent_pause_reasons": true,
+    "resume_condition": "run=playing AND pauseReasons empty; visible clears hidden only",
+    "ads_enabled": false,
+    "resume_when_hidden": false,
+    "reward_idempotency_key": null,
+    "decline_path": null,
+    "provider_policy": "Ads out of scope; no provider verification claimed"
+  },
+  "figma": {
+    "interaction_required": false,
+    "artifacts": [],
+    "checks": {
+      "source": "not_run",
+      "structure": "not_run",
+      "visual": "not_run",
+      "prototype": "not_run"
+    },
+    "evidence_ids": [],
+    "unverified": []
+  },
+  "evidence": [
+    {
+      "id": "E-design",
+      "kind": "design_document",
+      "locator": "game-design.md",
+      "description": "작성된 합성 예제 문서만 증명하며 실제 플레이 검증은 아님"
+    },
+    {
+      "id": "E-flow",
+      "kind": "design_document",
+      "locator": "ux-flow.md",
+      "description": "작성된 합성 예제 문서만 증명하며 실제 플레이 검증은 아님"
+    },
+    {
+      "id": "E-visual",
+      "kind": "design_document",
+      "locator": "visual-and-feel.md",
+      "description": "작성된 합성 예제 문서만 증명하며 실제 플레이 검증은 아님"
+    },
+    {
+      "id": "E-validation",
+      "kind": "design_document",
+      "locator": "validation-and-handoff.md",
+      "description": "작성된 합성 예제 문서만 증명하며 실제 플레이 검증은 아님"
+    },
+    {
+      "id": "E-log",
+      "kind": "design_document",
+      "locator": "reference-log.md",
+      "description": "작성된 합성 예제 문서만 증명하며 실제 플레이 검증은 아님"
+    }
+  ],
+  "issues": [
+    {
+      "id": "I-market",
+      "scope": "business",
+      "severity": "nonblocking",
+      "status": "open",
+      "description": "사용자 수요와 수익성은 조사·관찰하지 않았다."
+    },
+    {
+      "id": "I-devices",
+      "scope": "playable",
+      "severity": "nonblocking",
+      "status": "open",
+      "description": "실제 기기와 물리 튜닝을 검증할 계획이다."
+    }
+  ]
+}

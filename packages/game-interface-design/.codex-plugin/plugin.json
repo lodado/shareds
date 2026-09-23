@@ -1,0 +1,27 @@
+{
+  "name": "game-interface-design",
+  "version": "0.1.0",
+  "description": "Independent mobile-web game planning, core-loop design, player flows, game feel, and optional editable Figma production.",
+  "author": {
+    "name": "lodado",
+    "url": "https://github.com/lodado"
+  },
+  "homepage": "https://github.com/lodado/shareds",
+  "repository": "https://github.com/lodado/shareds",
+  "license": "MIT",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Reference-Driven Game Design",
+    "shortDescription": "Design game rules, player flows, HUDs and game feel",
+    "longDescription": "An independent game-design fork: plan meaningful play, failure and replay, visual direction, business hypotheses and implementation contracts. Optional editable Figma output uses local source and verification gates.",
+    "developerName": "lodado",
+    "category": "Productivity",
+    "capabilities": ["Research", "Figma", "Write"],
+    "defaultPrompt": [
+      "Design a one-handed mobile web game from its core decisions through player flows and a testable handoff.",
+      "Design a merge puzzle with meaningful placement choices, clear failure feedback, and rapid replay.",
+      "Build an editable Figma pilot for the approved game HUD and result flow."
+    ],
+    "websiteURL": "https://github.com/lodado/shareds"
+  }
+}

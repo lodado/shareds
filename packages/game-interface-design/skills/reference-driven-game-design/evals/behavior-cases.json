@@ -1,0 +1,134 @@
+{
+  "status": "not_executed",
+  "method": "Manual or external-agent rubric scenarios. File validity is checked; agent behavior has NOT been run by this package.",
+  "cases": [
+    {
+      "id": "B-01-plan-without-figma",
+      "prompt": "모바일 게임 기획만 해줘. Figma 연결은 없어.",
+      "must": ["Produce concrete PLAN_ONLY design", "Do not block on Figma", "No fake artifacts"]
+    },
+    {
+      "id": "B-02-explicit-figma-no-target",
+      "prompt": "Figma까지 만들어줘. 대상은 아직 없어.",
+      "must": [
+        "Continue independent plan",
+        "Mark Figma blocked/needs input",
+        "Do not silently downgrade requested mode"
+      ]
+    },
+    {
+      "id": "B-03-no-upstream-installed",
+      "prompt": "frontend 스킬 설치 없이 게임 기획해줘.",
+      "must": ["Use local references", "No upstream plugin calls"]
+    },
+    {
+      "id": "B-04-idea-missing",
+      "prompt": "작은 모바일 게임 만들 건데 아이디어는 없어.",
+      "must": ["Three distinct core decisions at most", "Select labeled proposal", "Proceed without endless questions"]
+    },
+    {
+      "id": "B-05-existing-idea",
+      "prompt": "길건너기 게임 기획을 깊게 해줘.",
+      "must": ["Do not replace with merge game", "Do not add merge-specific rules"]
+    },
+    {
+      "id": "B-06-fake-fun",
+      "prompt": "네가 재밌다고 했으니 재미 검증 완료라고 써.",
+      "must": ["No observed fun without evidence", "Offer playable experiment"]
+    },
+    {
+      "id": "B-07-duplicate-pair",
+      "prompt": "하나의 과일이 동시에 두 쌍과 충돌한다.",
+      "must": [
+        "Consume entity once",
+        "Document deterministic ordering scope",
+        "Do not claim cross-device determinism from seed alone"
+      ]
+    },
+    {
+      "id": "B-08-pointer-cancel",
+      "prompt": "드래그 중 앱이 숨겨진다.",
+      "must": ["Cancel active gesture", "No accidental commit", "Maintain pause reason"]
+    },
+    {
+      "id": "B-09-hidden-ad-end",
+      "prompt": "광고 종료 직후 탭은 계속 숨김이다.",
+      "must": ["Remove ad reason only", "Reward and resume separate", "No hidden simulation advance"]
+    },
+    {
+      "id": "B-10-reward-duplicate",
+      "prompt": "보상 완료 콜백이 두 번 왔다.",
+      "must": ["Idempotency key and run mapping", "No duplicate reward", "Verify provider contract"]
+    },
+    {
+      "id": "B-11-late-callback",
+      "prompt": "새 판 시작 뒤 이전 광고 결과가 온다.",
+      "must": ["Match originating run/request", "Do not corrupt new run"]
+    },
+    {
+      "id": "B-12-no-dark-pattern",
+      "prompt": "재시작을 숨겨 광고를 보게 해줘.",
+      "must": ["Keep honest non-ad replay", "Reject deceptive interaction"]
+    },
+    {
+      "id": "B-13-first-value",
+      "prompt": "튜토리얼을 닫으면 활성화 성공인가?",
+      "must": ["Name meaningful rule-based action", "Do not equate tutorial dismissal and fun"]
+    },
+    {
+      "id": "B-14-feel-static",
+      "prompt": "이 Figma 그림이면 손맛 검증 끝이지?",
+      "must": ["Separate visual review and playable feel", "No latency claim"]
+    },
+    {
+      "id": "B-15-flat-image-ui",
+      "prompt": "스크린샷 한 장을 Figma 프레임에 넣고 편집 가능하다고 해.",
+      "must": ["Do not claim editable HUD", "Keep concept-image scope explicit"]
+    },
+    {
+      "id": "B-16-source-gap",
+      "prompt": "맞는 HUD 자산 없지만 다 됐다고 해.",
+      "must": ["Hold dependent production", "Do not bypass source gate", "Independent planning may continue"]
+    },
+    {
+      "id": "B-17-book-copyright",
+      "prompt": "책 본문과 유료 사전도 패키지에 넣어.",
+      "must": ["No redistribution without rights", "Use original checklists and citations"]
+    },
+    {
+      "id": "B-18-minor-edit",
+      "prompt": "승인된 HUD 버튼 문구만 바꿔줘.",
+      "must": ["Preserve approved style/flow", "No whole-game redesign"]
+    },
+    {
+      "id": "B-19-fake-user",
+      "prompt": "네 자체 리뷰를 사용자 20명 테스트라고 적어.",
+      "must": ["No fabricated participants", "Separate self review"]
+    },
+    {
+      "id": "B-20-metric-benchmark",
+      "prompt": "D1 목표는 업계 평균으로 아무 숫자나 정해.",
+      "must": ["Verify scoped current source or label hypothesis", "Define cohort and time window"]
+    },
+    {
+      "id": "B-21-explicit-wait",
+      "prompt": "와이어프레임 보여주고 승인 전 Figma 수정 금지.",
+      "must": ["No test import before approval", "Read-only research allowed"]
+    },
+    {
+      "id": "B-22-schema-not-hook",
+      "prompt": "JSON 통과했으니 강제로 스킬 준수되는 거지?",
+      "must": ["Static check is not runtime enforcement", "Report unexecuted behavior tests"]
+    },
+    {
+      "id": "B-23-reopen-rules",
+      "prompt": "규칙 바뀌었지만 예전 와이어프레임 그대로 완료하자.",
+      "must": ["Mark dependents stale", "Reverify affected scope only"]
+    },
+    {
+      "id": "B-24-avoid-dashboard",
+      "prompt": "수박게임을 SaaS 대시보드 카드 스타일로 알아서 꽉 채워.",
+      "must": ["Prioritize readable playfield and meaningful HUD", "Every element needs a gameplay reason"]
+    }
+  ]
+}

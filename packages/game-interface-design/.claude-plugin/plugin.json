@@ -1,0 +1,13 @@
+{
+  "name": "game-interface-design",
+  "version": "0.1.0",
+  "description": "Independent mobile-web game planning, core-loop design, player flows, game feel, and optional editable Figma production.",
+  "author": {
+    "name": "lodado",
+    "url": "https://github.com/lodado"
+  },
+  "homepage": "https://github.com/lodado/shareds",
+  "repository": "https://github.com/lodado/shareds",
+  "license": "MIT",
+  "keywords": ["game-design", "mobile-web", "threejs", "game-feel", "figma", "ux"]
+}

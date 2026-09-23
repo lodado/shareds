@@ -1,0 +1,17 @@
+{
+  "mode": "PLAN_ONLY",
+  "idea": "좁은 화분에서 씨앗을 합치며 다음 배치 공간을 판단하는 모바일 웹게임",
+  "constraints": {
+    "platform": "mobile web",
+    "renderer": "Three.js presentation, 2D gameplay",
+    "team": "solo frontend developer",
+    "orientation": "portrait (proposal)",
+    "input": "drag preview, release commit",
+    "camera": "fixed frontal (proposal)"
+  },
+  "figma_target": null,
+  "review_wait": false,
+  "known_decisions": ["설계 예제이며 실제 플레이 검증은 수행하지 않는다."],
+  "assumptions": ["규칙 수치는 초기 튜닝 제안이다."],
+  "excluded_features": ["login", "ads", "store", "multiplayer", "production code"]
+}

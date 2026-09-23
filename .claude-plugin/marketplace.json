@@ -105,6 +105,18 @@
       "tags": ["3d", "character-design", "blender", "reference-design"]
     },
     {
+      "name": "game-interface-design",
+      "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, and FSD/ECS Three.js greybox prototypes.",
+      "version": "0.1.0",
+      "author": {
+        "name": "lodado"
+      },
+      "source": "./packages/game-interface-design",
+      "category": "development",
+      "homepage": "https://github.com/lodado/shareds",
+      "tags": ["game-design", "mobile-web", "threejs", "game-feel", "figma"]
+    },
+    {
       "name": "ux-flow-diagram",
       "description": "Explicitly invoked, evidence-aware UX flow extraction and Mermaid diagramming from Figma, codebases, requirements, or Flow IR.",
       "version": "0.1.1",

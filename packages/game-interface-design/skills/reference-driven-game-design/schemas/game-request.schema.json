@@ -1,0 +1,78 @@
+{
+  "type": "object",
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": ["PLAN_ONLY", "FIGMA"]
+    },
+    "idea": {
+      "type": ["string", "null"]
+    },
+    "constraints": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "minLength": 1
+        },
+        "renderer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "team": {
+          "type": "string",
+          "minLength": 1
+        },
+        "orientation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input": {
+          "type": "string",
+          "minLength": 1
+        },
+        "camera": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["platform"],
+      "additionalProperties": true
+    },
+    "figma_target": {
+      "type": ["string", "null"]
+    },
+    "review_wait": {
+      "type": "boolean"
+    },
+    "known_decisions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0
+    },
+    "excluded_features": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 0
+    }
+  },
+  "required": ["mode", "idea", "constraints"],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Game design request (fork schema)",
+  "description": "Mode is explicit in serialized requests. The skill proposes PLAN_ONLY when not specified in natural language."
+}
