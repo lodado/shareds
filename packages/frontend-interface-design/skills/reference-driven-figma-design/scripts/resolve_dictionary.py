@@ -7,48 +7,41 @@ import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# One shared snapshot for every host and plugin version; nothing is copied into installs.
+DEFAULT_PATH = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share") / "vibe-dictionary"
 
 
-def resolve_dictionary(candidates, files):
-    checked = set()
-    for candidate in candidates:
-        root = Path(candidate).expanduser().resolve()
-        if root in checked:
-            continue
-        checked.add(root)
-        if not root.is_dir():
-            continue
-        try:
-            for entry in files:
-                name = entry["name"]
-                if Path(name).name != name or not name.endswith(".md"):
-                    raise ValueError("unsafe manifest filename")
-                path = (root / name).resolve()
-                if not path.is_relative_to(root):
-                    raise ValueError("reference file escapes the snapshot")
-                digest = hashlib.sha256(path.read_bytes()).hexdigest()
-                if digest != entry["sha256"]:
-                    raise ValueError(f"checksum mismatch: {name}")
-        except (OSError, ValueError) as error:
-            # A corrupt existing source is not silently bypassed by another candidate.
-            return {"status": "HOLD", "reason": str(error), "path": str(root)}
-        return {"status": "READY", "path": str(root), "files": [entry["name"] for entry in files]}
-    return {"status": "HOLD", "reason": "No verified local dictionary found; reference text is not bundled."}
+def resolve_dictionary(root, files):
+    root = Path(root).expanduser().resolve()
+    if not root.is_dir():
+        return {
+            "status": "HOLD",
+            "reason": "No local dictionary; reference text is not bundled. Place the snapshot here or set FIGMA_DESIGN_DICTIONARY.",
+            "path": str(root),
+        }
+    try:
+        for entry in files:
+            name = entry["name"]
+            if Path(name).name != name or not name.endswith(".md"):
+                raise ValueError("unsafe manifest filename")
+            path = (root / name).resolve()
+            if not path.is_relative_to(root):
+                raise ValueError("reference file escapes the snapshot")
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            if digest != entry["sha256"]:
+                raise ValueError(f"checksum mismatch: {name}")
+    except (OSError, ValueError) as error:
+        return {"status": "HOLD", "reason": str(error), "path": str(root)}
+    return {"status": "READY", "path": str(root), "files": [entry["name"] for entry in files]}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--path", help="Use this local snapshot only; do not silently fall back.")
+    parser.add_argument("--path", help="Use this local snapshot instead of the shared default.")
     args = parser.parse_args()
-    explicit = args.path or os.environ.get("FIGMA_DESIGN_DICTIONARY")
-    codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
-    candidates = [explicit] if explicit else [
-        ROOT / "references/dictionary",
-        codex_home / "skills/reference-driven-figma-design/references/dictionary",
-        Path.home() / ".agents/skills/reference-driven-figma-design/references/dictionary",
-    ]
+    root = args.path or os.environ.get("FIGMA_DESIGN_DICTIONARY") or DEFAULT_PATH
     manifest = json.loads((ROOT / "references/dictionary-sources.json").read_text())
-    result = resolve_dictionary(candidates, manifest["files"])
+    result = resolve_dictionary(root, manifest["files"])
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result["status"] == "READY" else 1
 

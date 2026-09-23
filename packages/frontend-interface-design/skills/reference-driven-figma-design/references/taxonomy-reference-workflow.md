@@ -9,8 +9,8 @@ fitting the new scope can itself be the screen evidence.
 ## 1. Dictionary interpretation integrity
 
 Source text is **local-only**, redistribution license unconfirmed, never committed to Git or shipped in the
-plugin package. Run [resolve_dictionary.py](../scripts/resolve_dictionary.py) (`--path` or
-`FIGMA_DESIGN_DICTIONARY` overrides). `READY` → pick files from the roles below and locate
+plugin package; one shared snapshot lives in `~/.local/share/vibe-dictionary/`. Run
+[resolve_dictionary.py](../scripts/resolve_dictionary.py) (`--path` or `FIGMA_DESIGN_DICTIONARY` overrides). `READY` → pick files from the roles below and locate
 entries via TOC.md; `HOLD`/missing → INCOMPLETE, don't fabricate IDs/terms. Other files in the
 snapshot (dev-wiki, photo and generative-image guides) are out of scope.
 

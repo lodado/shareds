@@ -52,8 +52,6 @@ $reference-driven-figma-design
 Figma 파일은 여기: https://www.figma.com/design/...
 ```
 
-기존 이름 `$frontend-interface-design`로 불러도 같은 스킬로 이어져요.
-
 ## 전체 흐름 한눈에 보기
 
 스킬은 네 단계를 순서대로 밟아요. 앞 단계가 정리돼야 뒤 단계 결과물이 확정돼요. 조사 같은 읽기 전용 작업은 겹쳐서 해도 되지만, Figma에 뭔가 쓰는 건 와이어프레임 설명 뒤에만 해요.
@@ -399,7 +397,6 @@ python3 packages/frontend-interface-design/skills/reference-driven-figma-design/
 ```text
 packages/frontend-interface-design/
 ├── skills/
-│   ├── frontend-interface-design/SKILL.md       # 호환용 진입점
 │   └── reference-driven-figma-design/
 │       ├── SKILL.md                              # 본체
 │       ├── references/

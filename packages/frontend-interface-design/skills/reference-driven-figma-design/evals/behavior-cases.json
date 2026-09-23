@@ -271,7 +271,7 @@
     },
     {
       "id": "taxonomy-resolved-before-search",
-      "prompt": "사용자가 taxonomy 키워드를 활용하라고 했다. 기존 local references/dictionary는 없지만 설치된 플러그인 스냅샷은 있다. 컴포넌트 검색을 시작해줘.",
+      "prompt": "사용자가 taxonomy 키워드를 활용하라고 했다. 설치된 스킬 안에는 사전이 없고 공유 스냅샷(~/.local/share/vibe-dictionary)만 있다. 컴포넌트 검색을 시작해줘.",
       "expected_invariants": [
         "Resolve and read the verified dictionary snapshot before deriving search intents",
         "Record dictionary file and exact taxonomy ID or term with definition and fit/avoid conditions",

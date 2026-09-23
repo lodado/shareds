@@ -48,16 +48,16 @@ def check():
         data = b"Synthetic taxonomy fixture, not third-party source text."
         (good / "sample.md").write_bytes(data)
         files = [{"name": "sample.md", "sha256": hashlib.sha256(data).hexdigest()}]
-        assert resolve([base / "missing"], files)["status"] == "HOLD"
-        assert resolve([base / "missing", good], files)["status"] == "READY"
+        assert resolve(base / "missing", files)["status"] == "HOLD"
+        assert resolve(good, files)["status"] == "READY"
         bad = base / "bad"
         bad.mkdir()
         (bad / "sample.md").write_bytes(b"tampered")
-        assert resolve([bad, good], files)["status"] == "HOLD", "do not bypass corruption"
-        assert resolve([good], [{**files[0], "name": "../sample.md"}])["status"] == "HOLD"
+        assert resolve(bad, files)["status"] == "HOLD", "reject corruption"
+        assert resolve(good, [{**files[0], "name": "../sample.md"}])["status"] == "HOLD"
         (bad / "sample.md").unlink()
         (bad / "sample.md").symlink_to(good / "sample.md")
-        assert resolve([bad], files)["status"] == "HOLD", "reject file escape"
+        assert resolve(bad, files)["status"] == "HOLD", "reject file escape"
     # Verify local Markdown destinations in the authored workflow; imported docs remain unchanged.
     authored = [ROOT / "SKILL.md", guide] + [ROOT / "references" / name for name in (
         "component-source-gate.md", "research-selection.md", "figma-composition.md",

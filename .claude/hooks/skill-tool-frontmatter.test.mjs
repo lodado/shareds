@@ -15,7 +15,7 @@ function findSkillFiles(directory) {
 
 test('every published skill explicitly permits Bash', () => {
   const skills = findSkillFiles(skillsRoot).filter((path) => path.includes('/skills/'))
-  assert.equal(skills.length, 20)
+  assert.equal(skills.length, 19)
   for (const skill of skills) {
     const frontmatter = /^---\n([\s\S]*?)\n---/.exec(readFileSync(skill, 'utf8'))?.[1]
     assert.ok(frontmatter, `${skill}: missing YAML frontmatter`)

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
-import { access, readdir, readFile } from 'node:fs/promises'
-import { dirname, extname, join, resolve } from 'node:path'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { access, mkdtemp, readdir, readFile, realpath, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { basename, dirname, extname, join, resolve } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package contract tests run with node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -234,13 +235,8 @@ test('plugin identity stays upgrade-compatible while UI and skill routing become
   assert.match(openai, /value: figma/)
   assert.match(openai, /\$reference-driven-figma-design/)
 
-  const legacyDirectory = join(packageDirectory, 'skills/frontend-interface-design')
-  const legacy = await readFile(join(legacyDirectory, 'SKILL.md'), 'utf8')
-  assert.match(legacy, /name: frontend-interface-design/)
-  const target = legacy.match(/\]\(([^)]+)\)/)?.[1]
-  assert.ok(target, 'Legacy invocation must resolve to the canonical skill')
-  assert.equal(resolve(legacyDirectory, target), join(skillDirectory, 'SKILL.md'))
-  await access(resolve(legacyDirectory, target))
+  // One entry per skill list; the legacy frontend-interface-design alias duplicated it.
+  assert.deepEqual(await readdir(join(packageDirectory, 'skills')), ['reference-driven-figma-design'])
 })
 
 test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and promotion boundaries', async () => {
@@ -330,8 +326,6 @@ test('requires taxonomy interpretation, separate screen evidence, adaptation and
 })
 
 test('ships source fingerprints and local resolution without redistributing dictionary text', async () => {
-  const legacy = await readFile(join(packageDirectory, 'skills/frontend-interface-design/SKILL.md'), 'utf8')
-  assert.match(legacy, /\.\.\/reference-driven-figma-design\/references\/taxonomy-reference-workflow\.md/)
   const manifest = JSON.parse(await readSkillFile('references/dictionary-sources.json'))
   assert.equal(manifest.source_index, 'https://vibedesignlab.net/dictionary')
   assert.match(manifest.usage, /Local use only/)
@@ -344,15 +338,24 @@ test('ships source fingerprints and local resolution without redistributing dict
   assert.equal(names.length, 9)
   assert.equal(new Set(names).size, 9)
   assert.equal(names.filter((name) => name.endsWith('taxonomy.md')).length, 6)
-  const resolver = await readSkillFile('scripts/resolve_dictionary.py')
-  // Installed copies live under the renamed skill directory; the legacy name resolves nothing.
-  assert.doesNotMatch(resolver, /skills\/frontend-interface-design\//)
+  // The snapshot lives once in the shared data directory, not inside each installed skill copy.
+  const home = await mkdtemp(join(tmpdir(), 'dictionary-home-'))
+  const env = { ...process.env, HOME: home }
+  delete env.XDG_DATA_HOME
+  delete env.FIGMA_DESIGN_DICTIONARY
+  const run = spawnSync(resolveExecutable('python3'), [join(skillDirectory, 'scripts/resolve_dictionary.py')], {
+    encoding: 'utf8',
+    env,
+  })
+  await rm(home, { recursive: true })
+  assert.equal(run.status, 1, run.stderr)
+  assert.equal(JSON.parse(run.stdout).path, join(await realpath(tmpdir()), basename(home), '.local/share/vibe-dictionary'))
   const workflow = await readSkillFile('references/taxonomy-reference-workflow.md')
   assert.match(workflow, /local-only[\s\S]*never committed to Git or shipped/i)
   assert.match(workflow, /FIGMA_DESIGN_DICTIONARY/)
   const repositoryDirectory = dirname(dirname(packageDirectory))
   if (packageDirectory === join(repositoryDirectory, 'packages/frontend-interface-design')) {
-    const dictionaryPaths = ['frontend-interface-design', 'reference-driven-figma-design'].map(
+    const dictionaryPaths = ['reference-driven-figma-design'].map(
       (skill) => `packages/frontend-interface-design/skills/${skill}/references/dictionary/`,
     )
     const options = { cwd: repositoryDirectory, encoding: 'utf8' }
