@@ -37,6 +37,8 @@ const mutations = {
   'build after a failed install': (d) =>
     Object.assign(d, { ready_to_run: false, checks: { ...d.checks, install: { status: 'FAIL', command: 'npm ci' } } }),
   'ready without a browser run': (d) => (d.checks.browser = { status: 'BLOCKED', reason: 'no browser' }),
+  'ready with a failed FSD check': (d) => (d.checks.fsd = { status: 'FAIL', command: 'npm run check:fsd' }),
+  'ready with lint not run': (d) => (d.checks.lint = { status: 'NOT_RUN', reason: 'skipped' }),
   'unknown status word': (d) => (d.checks.lint.status = 'SKIPPED'),
   'unknown level': (d) => (d.level = 'FULL_GAME'),
 }

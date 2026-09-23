@@ -45,7 +45,10 @@ function readinessErrors({ ready_to_run: ready, level, checks }) {
   if (!ready) return []
   const required = ['install', 'typecheck', 'build', 'browser', ...(level === 'LAYOUT_ONLY' ? [] : ['headless'])]
   const missing = required.filter((name) => checks[name].status !== 'PASS')
-  return missing.length > 0 ? [`ready_to_run needs PASS for ${missing.join(', ')}`] : []
+  // Lint and FSD may be N/A (no linter, no FSD host) but never failed or skipped.
+  const unresolved = ['lint', 'fsd'].filter((name) => !['PASS', 'N/A'].includes(checks[name].status))
+  const errors = missing.length > 0 ? [`ready_to_run needs PASS for ${missing.join(', ')}`] : []
+  return unresolved.length > 0 ? [...errors, `ready_to_run needs PASS or N/A for ${unresolved.join(', ')}`] : errors
 }
 
 export function validateWireframeReport(report) {

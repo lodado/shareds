@@ -15,7 +15,7 @@ export function mountPlayPage(root: HTMLElement): () => void {
   const view = createGameView(canvas, session)
   const hud = createGameHud(hudRoot, {
     dispatch: session.dispatch,
-    togglePause: () => (session.getSnapshot().paused ? session.resume('user') : session.pause('user')),
+    togglePause: () => (session.getSnapshot().userPaused ? session.resume('user') : session.pause('user')),
   })
   const unbindControls = bindPointerControls(canvas, session)
   const unsubscribe = session.subscribe(() => hud.render(session.getSnapshot()))

@@ -36,7 +36,8 @@ function moveSystem(world: World, rules: GameRules, dt: number): void {
     if (!pose) continue
     let next = pose[moving.axis] + moving.dir * moving.speed * dt
     if (Math.abs(next) > rules.travel) {
-      next = Math.sign(next) * rules.travel * 2 - next
+      // Reflect off the wall; the clamp covers a step longer than the whole span.
+      next = Math.min(rules.travel, Math.max(-rules.travel, Math.sign(next) * rules.travel * 2 - next))
       moving.dir = moving.dir === 1 ? -1 : 1
     }
     world.pose.set(id, withCoord(pose, moving.axis, next))

@@ -59,9 +59,10 @@ export function createGameHud(root: HTMLElement, actions: HudActions): GameHud {
       root.dataset.paused = String(snapshot.paused)
       root.dataset.runId = String(snapshot.runId)
       score.value = String(snapshot.score)
-      status.textContent = snapshot.paused ? 'Paused' : STATUS_TEXT[snapshot.status]
-      pause.textContent = snapshot.paused ? 'Resume' : 'Pause'
-      pause.hidden = snapshot.status !== 'playing'
+      status.textContent = snapshot.paused ? (snapshot.userPaused ? 'Paused' : 'Waiting for the game to return') : STATUS_TEXT[snapshot.status]
+      pause.textContent = snapshot.userPaused ? 'Resume' : 'Pause'
+      // A hidden-tab or context-lost pause has no user action to undo.
+      pause.hidden = snapshot.status !== 'playing' || (snapshot.paused && !snapshot.userPaused)
       panel.hidden = snapshot.status === 'playing' && !snapshot.paused
       primary.hidden = snapshot.status === 'playing'
       primary.textContent = snapshot.status === 'failed' ? `Retry · ${snapshot.score}` : 'Start'

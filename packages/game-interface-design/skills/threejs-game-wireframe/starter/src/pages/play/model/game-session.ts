@@ -17,6 +17,8 @@ export interface HudSnapshot {
   readonly score: number
   readonly combo: number
   readonly paused: boolean
+  /** Only a user pause can be resumed from the HUD; hidden or context-lost pauses clear themselves. */
+  readonly userPaused: boolean
   /** Increments per rule event so the HUD can replay a flash for equal consecutive kinds. */
   readonly lastEvent: { readonly kind: 'placed' | 'perfect' | 'failed'; readonly seq: number } | null
 }
@@ -62,7 +64,15 @@ export function createGameSession(rules: GameRules): GameSession {
   let snapshot = readSnapshot()
 
   function readSnapshot(): HudSnapshot {
-    return { runId, status: world.status, score: world.score, combo: world.combo, paused: pauseReasons.size > 0, lastEvent }
+    return {
+      runId,
+      status: world.status,
+      score: world.score,
+      combo: world.combo,
+      paused: pauseReasons.size > 0,
+      userPaused: pauseReasons.has('user'),
+      lastEvent,
+    }
   }
 
   function publish(): void {
@@ -73,6 +83,7 @@ export function createGameSession(rules: GameRules): GameSession {
       next.score === snapshot.score &&
       next.combo === snapshot.combo &&
       next.paused === snapshot.paused &&
+      next.userPaused === snapshot.userPaused &&
       next.lastEvent === snapshot.lastEvent
     if (same) return
     snapshot = next
@@ -93,6 +104,7 @@ export function createGameSession(rules: GameRules): GameSession {
     world = createWorld(rules)
     previousPoses = new Map(world.pose)
     lastEvent = null
+    discardNextDelta = false
     driver.reset()
     publish()
   }

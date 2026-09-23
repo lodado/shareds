@@ -96,7 +96,10 @@ test('restart discards the old world, events and queued input', () => {
   assert.equal(session.getSnapshot().status, 'failed')
   session.dispatch({ type: 'restart' })
   const snapshot = session.getSnapshot()
-  assert.deepEqual({ ...snapshot, runId: 0 }, { runId: 0, status: 'ready', score: 0, combo: 0, paused: false, lastEvent: null })
+  assert.deepEqual(
+    { ...snapshot, runId: 0 },
+    { runId: 0, status: 'ready', score: 0, combo: 0, paused: false, userPaused: false, lastEvent: null },
+  )
   assert.equal(session.renderFrame().filter((b) => b.kind !== 'placed').length, 0)
 })
 
@@ -154,4 +157,26 @@ test('the first delta after resume spans the pause and is not simulated', () => 
   // Rendering lags one step behind simulation, so two steps are needed to see movement.
   session.advance(STEP * 2)
   assert.notEqual(movingX(session), before)
+})
+
+test('restart after a resume does not swallow the new run first step', () => {
+  const session = started()
+  session.pause('hidden')
+  session.resume('hidden')
+  session.dispatch({ type: 'restart' })
+  session.dispatch({ type: 'start' })
+  session.advance(STEP)
+  assert.equal(session.getSnapshot().status, 'playing')
+})
+
+test('a system pause is not something the user can resume', () => {
+  const session = started()
+  session.pause('context-lost')
+  assert.deepEqual([session.getSnapshot().paused, session.getSnapshot().userPaused], [true, false])
+  session.pause('user')
+  assert.equal(session.getSnapshot().userPaused, true)
+  session.resume('user')
+  assert.deepEqual([session.getSnapshot().paused, session.getSnapshot().userPaused], [true, false])
+  session.resume('context-lost')
+  assert.equal(session.getSnapshot().paused, false)
 })

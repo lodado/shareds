@@ -16,7 +16,7 @@ Report every check separately. A passing type check says nothing about fun.
 
 - Core rules: start, success, partial success, failure, restart.
 - Time: zero, negative and non-finite deltas ignored; catch-up clamp; different delta splits give the same state.
-- Pause: independent reasons; input while paused discarded; first delta after resume discarded.
+- Pause: independent reasons; a system pause (hidden, context-lost) is not user-resumable; input while paused discarded; first delta after resume discarded, and restart clears that pending discard.
 - Runs: stale `runId` input ignored; restart leaves no entities, events or commands from the previous run.
 - Snapshot: same reference when unchanged, new immutable value on change.
 - Isolation: two sessions do not affect each other.

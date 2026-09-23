@@ -100,3 +100,13 @@ test('debris is removed below the floor', () => {
   for (let i = 0; i < 600 && world.falling.size > 0; i += 1) stepWorld(world, GAME_RULES, DT)
   assert.equal(world.falling.size, 0)
 })
+
+test('a step longer than the travel span never leaves the travel range', () => {
+  const world = startedWorld()
+  const id = movingId(world)
+  world.moving.set(id, { axis: 'x', dir: 1, speed: 1200 })
+  for (let i = 0; i < 5; i += 1) {
+    stepWorld(world, GAME_RULES, DT)
+    assert.ok(Math.abs(world.pose.get(id)?.x ?? Infinity) <= GAME_RULES.travel)
+  }
+})

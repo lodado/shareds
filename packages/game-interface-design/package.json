@@ -9,7 +9,7 @@
     "test": "node --test scripts/*.test.mjs",
     "check": "node scripts/check-contract.mjs",
     "validate:example": "node scripts/validate-design.mjs skills/reference-driven-game-design/examples/merge-garden/delivery.json",
-    "pack:zip": "mkdir -p dist && git archive --format=zip --prefix=game-interface-design/ -o dist/game-interface-design-$npm_package_version.zip HEAD:./"
+    "pack:zip": "mkdir -p dist && git -C \"$(git rev-parse --show-toplevel)\" archive --format=zip --prefix=game-interface-design/ -o \"$PWD/dist/game-interface-design-$npm_package_version.zip\" HEAD:packages/game-interface-design"
   },
   "devDependencies": {
     "ajv": "8.20.0"

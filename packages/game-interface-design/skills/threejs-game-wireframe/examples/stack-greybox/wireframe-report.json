@@ -14,7 +14,7 @@
       "command": "npm run check:fsd",
       "evidence": "steiger 0.6.0 + @feature-sliced/steiger-plugin 0.7.0; violation fixture reports forbidden-imports and no-public-api-sidestep"
     },
-    "headless": { "status": "PASS", "command": "npm test", "evidence": "34 node:test cases" },
+    "headless": { "status": "PASS", "command": "npm test", "evidence": "37 node:test cases" },
     "build": {
       "status": "PASS",
       "command": "vite build",
