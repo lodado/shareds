@@ -1,7 +1,7 @@
 {
   "name": "@lodado/blog-voice-cloner-plugin",
-  "version": "0.1.1",
-  "description": "Evidence-backed Korean/English blog voice profiles, content-isolated drafting, and local author history.",
+  "version": "0.2.0",
+  "description": "Evidence-backed Korean/English blog voice profiles, reader-first PR, X/Threads and SEO/GEO blog formats, AI-tell checks, and local author history.",
   "private": true,
   "scripts": {
     "test": "python3 -m unittest discover -s skills/blog-voice-cloner/tests -p 'test_*.py' -v"

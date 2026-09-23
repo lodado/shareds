@@ -28,7 +28,7 @@ class SkillContractTests(unittest.TestCase):
     def test_cli_help_outside_repository(self):
         import tempfile
         with tempfile.TemporaryDirectory() as directory:
-            for name in ["analyze_style.py", "validate_style.py", "manage_voice.py"]:
+            for name in ["analyze_style.py", "validate_style.py", "manage_voice.py", "check_draft.py"]:
                 result = subprocess.run([sys.executable, str(ROOT / "scripts" / name), "--help"], cwd=directory, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("usage:", result.stdout)
@@ -68,6 +68,25 @@ class SkillContractTests(unittest.TestCase):
         text = brief.read_text()
         for field in ["derived_contrast", "not author evidence", "PROFILE", "HELD-OUT"]:
             self.assertIn(field, text)
+
+    def test_formats_and_tells_are_routed_with_their_checker(self):
+        # Instruction coverage only, not proof that drafts read as human.
+        entry = (ROOT / "SKILL.md").read_text()
+        for field in ["references/formats.md", "references/ai-tells.md", "references/grill-me.md", "scripts/check_draft.py", "--genre"]:
+            self.assertIn(field, entry)
+        self.assertIn("references/seo-review.md", entry)
+        review = (ROOT / "references/seo-review.md").read_text()
+        for field in ["claude-seo:seo-content", "claude-seo:seo-geo", "## Fallback", "not_run", "reject", "at most once more"]:
+            self.assertIn(field, review)
+        grill = (ROOT / "references/grill-me.md").read_text()
+        for field in ["## How", "## Slots", "Never guess a memory or a feeling", "check_draft.py", "--genre experience"]:
+            self.assertIn(field, grill)
+        formats = (ROOT / "references/formats.md").read_text()
+        for field in ["## PR description", "## X and Threads", "## Blog: SEO and GEO", "check_draft.py", "--diff", "--keyword", "seo-review.md"]:
+            self.assertIn(field, formats)
+        tells = (ROOT / "references/ai-tells.md").read_text()
+        for field in ["## When to act", "## Not tells", "active author profile"]:
+            self.assertIn(field, tells)
 
     def test_benchmark_has_wrong_author_control_and_separate_key(self):
         text = (ROOT / "references/evaluation.md").read_text()

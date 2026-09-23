@@ -1,25 +1,30 @@
 ---
 name: blog-voice-cloner
-description: Use when analyzing an author's blog corpus, maintaining a recent-period voice profile, drafting new articles in a reference voice, applying style without changing meaning, or explaining evidence-backed style differences. 블로그 문체 분석, 최근 30일 글 등록, 문체 적용, 수정 기록 요청에 사용한다.
+description: Use when analyzing an author's blog corpus, maintaining a recent-period voice profile, drafting new articles in a reference voice, applying style without changing meaning, explaining evidence-backed style differences, or writing and reviewing PR descriptions, X/Threads posts and SEO/GEO blog posts so they read as a person wrote them. 블로그 문체 분석, 최근 30일 글 등록, 문체 적용, 수정 기록, PR 설명·스레드·블로그 글 작성과 AI 문체 점검 요청에 사용한다.
 allowed-tools:
   - Bash
 ---
 
 # Blog Voice Cloner
 
-Reproduce the target author's writing decisions, not generic human-sounding prose. Semantic correctness outranks voice match.
+Reproduce the target author's writing decisions, not generic human-sounding prose. Semantic correctness outranks voice match. Without a profile, the reader and the format decide order and length: `references/formats.md`.
 Python 3.10+ standard library. Resolve scripts relative to this skill, data relative to the user's project. Read `README.md` for commands.
 
 ## Route the request
 
-| Request                                      | Action / progressively loaded reference      |
-| -------------------------------------------- | -------------------------------------------- |
-| Analyze these posts / 이 폴더 문체 분석      | Analyze, then `references/analysis-guide.md` |
-| Register/update an influencer's last 30 days | `references/collection.md`, then analyze     |
-| Write new content in this voice              | `references/writing-workflow.md`             |
-| 내용은 절대 바꾸지 말고 문체만 적용          | Same workflow, strict rewrite mode           |
-| Compare / 왜 원래 문체와 다른지 근거 보여줘  | Independent reviews and block-level findings |
-| Remember an edit/preference                  | Correction workflow, not corpus ingestion    |
+| Request                                       | Action / progressively loaded reference                          |
+| --------------------------------------------- | ---------------------------------------------------------------- |
+| Analyze these posts / 이 폴더 문체 분석       | Analyze, then `references/analysis-guide.md`                     |
+| Register/update an influencer's last 30 days  | `references/collection.md`, then analyze                         |
+| Write new content in this voice               | `references/writing-workflow.md`                                 |
+| 내용은 절대 바꾸지 말고 문체만 적용           | Same workflow, strict rewrite mode                               |
+| Compare / 왜 원래 문체와 다른지 근거 보여줘   | Independent reviews and block-level findings                     |
+| Remember an edit/preference                   | Correction workflow, not corpus ingestion                        |
+| Experience, opinion or thread post / grill me | `references/grill-me.md` interview, then `references/formats.md` |
+| PR description, X/Threads post, SEO/GEO blog  | `references/formats.md`, then `scripts/check_draft.py`           |
+| AI 티 나는지 봐줘 / why does this read as AI  | `references/ai-tells.md` + `scripts/check_draft.py`              |
+| Turn one post into a thread/PR/blog           | `references/formats.md` one-source section, one ledger           |
+| SEO/GEO 평가받고 반영 / claude-seo review     | `references/seo-review.md` loop                                  |
 
 ## Non-negotiable boundaries
 
@@ -39,7 +44,7 @@ Python 3.10+ standard library. Resolve scripts relative to this skill, data rela
 
 ## Draft and review
 
-Follow `writing-workflow.md`: intent → content ledger → `references/voice-brief.md` → style-aware plan → draft → separate reviews → bounded revision → final. Run `validate_style.py` for overlap warnings. Rule compliance, target-voice resemblance, content preservation and generic-AI cleanup are different checks. Unperformed reviews are `not_run`, never passed. Human preference stays pending until collected.
+Follow `writing-workflow.md`: intent → content ledger → `references/voice-brief.md` → style-aware plan → draft → separate reviews → bounded revision → final. Run `validate_style.py` for overlap warnings. Before delivery run `scripts/check_draft.py DRAFT --format pr|thread|blog|general`, adding `--genre experience|opinion|reference` for posts: fix strong and co-occurring tells unless the active profile supports them, answer a thin human signal with more interview questions, and never present its output as AI detection or a score. For a blog post meant for search, finish with the claude-seo review loop in `references/seo-review.md`: at most two rounds, apply findings that keep meaning, ask the user for missing experience, reject myths with reasons. Rule compliance, target-voice resemblance, content preservation and generic-AI cleanup are different checks. Unperformed reviews are `not_run`, never passed. Human preference stays pending until collected.
 
 Save generated/edited text, diff and optional reason with `manage_voice.py correction`. Classify STYLE_CORRECTION, CONTENT_CORRECTION, PERSONAL_PREFERENCE or FACT_CORRECTION. Ask when ambiguous. Explicit future style preferences go separately into `user-overrides.json`. Never automatically retrain REFERENCE_STYLE or add generated drafts to the corpus.
 

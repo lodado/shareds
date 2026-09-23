@@ -6,7 +6,7 @@ Create a fresh `.blog-voice/<author>/runs/<run-id>/` containing intent.json, con
 
 ## 1. Intent and content extraction
 
-Determine draft-new vs strict-rewrite, topic, audience, genre, desired length and allowed sources. If no active profile, request one or label exploratory use. If no content beyond a topic, ask for facts or permission to research rather than inventing an experience. Extract only authorized CONTENT_SOURCE. Preserve source passages for audit. STYLE_REFERENCE may not substantiate the ledger.
+Determine draft-new vs strict-rewrite, topic, audience, genre, desired length and allowed sources. If no active profile, request one or label exploratory use. If no content beyond a topic, ask for facts or permission to research rather than inventing an experience. For experience and opinion pieces, interview the writer with `grill-me.md` and treat the verbatim answers as CONTENT_SOURCE. Extract only authorized CONTENT_SOURCE. Preserve source passages for audit. STYLE_REFERENCE may not substantiate the ledger.
 
 ## 2. Fact / claim ledger
 
@@ -17,7 +17,7 @@ Record protected literal `60`, condition `same key before expiry`, certainty `ma
 
 ## 3. Plan with style from the start
 
-Build the small per-run brief described in `voice-brief.md` from existing evidence, before outlining. It names the applicable decisions and what each changes in THIS content. Missing genre support is not repaired by louder punctuation. Preserve ordinary author-supported endings, connectors and deliberate fragments instead of running a generic humanizer over them.
+Build the small per-run brief described in `voice-brief.md` from existing evidence, before outlining. It names the applicable decisions and what each changes in THIS content. For a PR description, an X/Threads post or an SEO/GEO blog post, also apply the matching contract in `formats.md`: it fixes information order and platform limits, while the profile keeps deciding the voice. Missing genre support is not repaired by louder punctuation. Preserve ordinary author-supported endings, connectors and deliberate fragments instead of running a generic humanizer over them.
 
 Plan [{section, role, ledger_ids, rule_ids, example_ids, intended_relation}]. First select information order and permitted section roles, then select supported rules and role examples. Match genre and rhetorical role before topic. Read only a few short examples for the current role. Do not draft generically and swap vocabulary later. Do not insert a counterargument, analogy, first-person story or recommendation unless content permits it. Strict rewrite adds no new substantive claims and retains required source order when requested.
 
@@ -37,7 +37,7 @@ Required categories:
 2. style_match: cite supported rule IDs and actual blocks. Distinguish deliberate exceptions.
 3. over_imitation: compare marker distributions/context triggers, flag catchphrases and exaggerated quirks.
 4. source_leakage: flag author-specific facts, experiences, opinions, quotations or anecdotes unsupported by ledger.
-5. generic_ai_signals: identify unsupported abstract openings, filler, repetitive transitions, forced symmetrical sections and redundant summaries. A generic-looking phrase is not proof of AI origin.
+5. generic_ai_signals: identify unsupported abstract openings, filler, repetitive transitions, forced symmetrical sections and redundant summaries. Use `ai-tells.md` and the `check_draft.py` report: act on strong tells and on weak tells that co-occur, and leave traits the profile supports. A generic-looking phrase is not proof of AI origin.
 6. target_voice_match: compare the draft's actual title, information order, local register, reader distance and rhythm with source-supported decisions. Rules may be satisfied while the result remains generic. Flag a `major_style_gap` with the affected blocks, evidence and a specific change. Do not penalize a genuine source trait just because a generic AI-cleanup list dislikes it. If the brief supplies no comparable genre or content, report that limit rather than fabricating author-like experiences.
 
 Run validate_style.py for deterministic overlap/literal warnings. Keep those distinct from the six interpretive passes. Each pass records status not_run/review_required/passed, reviewer, evidence and findings. No aggregate similarity percentage. Finding shape: {block, category, rule, problem, suggestion, ledger_ids, evidence}. Revise until semantic blockers are resolved or explicitly report missing input. A failing content check blocks final delivery as verified prose even if style looks good.

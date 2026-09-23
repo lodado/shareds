@@ -130,15 +130,15 @@
     },
     {
       "name": "blog-voice-cloner",
-      "description": "Evidence-backed Korean/English blog voice profiles, content-isolated drafting, and local author history.",
-      "version": "0.1.1",
+      "description": "Evidence-backed Korean/English blog voice profiles, reader-first PR, X/Threads and SEO/GEO blog formats, AI-tell checks, and local author history.",
+      "version": "0.2.0",
       "author": {
         "name": "lodado"
       },
       "source": "./packages/blog-voice-cloner",
       "category": "productivity",
       "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
-      "tags": ["writing", "blog", "stylometry"]
+      "tags": ["writing", "blog", "stylometry", "pull-request", "seo"]
     },
     {
       "name": "agent-memory",

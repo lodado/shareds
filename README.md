@@ -55,7 +55,7 @@
 | [`threejs-game-wireframe`](packages/game-interface-design/skills/threejs-game-wireframe/SKILL.md)                       | 기획을 받아 FSD·헤드리스 ECS 구조의 Three.js 프로토타입을 만들고 검증해요.       |
 | [`ux-flow-diagram`](packages/ux-flow-diagram/skills/ux-flow-diagram/SKILL.md)                                           | 명시적으로 호출하면 Figma·코드·요구사항에서 근거 있는 사용자 흐름도를 추출해요.  |
 | [`agent-graph-engineering`](packages/agent-graph-engineering/skills/agent-graph-engineering/SKILL.md)                   | 여러 에이전트와 도구의 분기·병렬 작업·재시도를 그래프로 설계하고 실행해요.       |
-| [`blog-voice-cloner`](packages/blog-voice-cloner/skills/blog-voice-cloner/SKILL.md)                                     | 블로그 문체를 분석하고 원래 의미를 유지하며 새 글에 적용해요.                    |
+| [`blog-voice-cloner`](packages/blog-voice-cloner/skills/blog-voice-cloner/SKILL.md)                                     | 블로그 문체를 새 글에 적용하고, PR 설명·스레드·SEO 글의 AI 문체를 점검해요.      |
 | [`agent-memory-recall`](packages/agent-memory/skills/agent-memory-recall/SKILL.md)                                      | 현재 작업에 필요한 과거 기록을 Agent Memory에서 읽기 전용으로 찾아요.            |
 | [`agent-memory-log`](packages/agent-memory/skills/agent-memory-log/SKILL.md)                                            | 요청한 작업 기록을 Obsidian Agent Memory에 저장해요.                             |
 | [`agent-memory-todayilearned`](packages/agent-memory/skills/agent-memory-todayilearned/SKILL.md)                        | 요청한 배움을 날짜별 TIL 노트로 정리해요.                                        |
@@ -303,7 +303,7 @@ npm 릴리스는 조건이 두 개예요. 레포 변수 `ENABLE_NPM_RELEASE`가 
 
 ## Blog Voice Cloner
 
-[blog-voice-cloner](packages/blog-voice-cloner/skills/blog-voice-cloner/README.md)는 한국어·영어 블로그 문체를 근거와 함께 분석하고, 작성자별 기간 프로필을 저장하며, 새 내용에 문체를 적용하는 스킬입니다. 원문 내용과 작성 내용을 분리하고 의미·중복·과잉 모방을 검토합니다. Python 3.10+ 표준 라이브러리 기반이며 웹 수집은 호스트 도구로 수행합니다.
+[blog-voice-cloner](packages/blog-voice-cloner/skills/blog-voice-cloner/README.md)는 한국어·영어 블로그 문체를 근거와 함께 분석하고, 작성자별 기간 프로필을 저장하며, 새 내용에 문체를 적용하는 스킬입니다. 원문 내용과 작성 내용을 분리하고 의미·중복·과잉 모방을 검토합니다. 프로필이 없어도 PR 설명, X·Threads 글, SEO/GEO 블로그 글을 형식별 계약에 맞춰 씁니다. 경험·의견 글은 쓰기 전에 사용자를 인터뷰해 장면·감정·남은 의문을 모으고, `check_draft.py`로 AI 문체 표시·플랫폼 글자 수·PR과 diff의 불일치를 점검합니다. Python 3.10+ 표준 라이브러리 기반이며 웹 수집은 호스트 도구로 수행합니다.
 
 ## Agent Memory
 
