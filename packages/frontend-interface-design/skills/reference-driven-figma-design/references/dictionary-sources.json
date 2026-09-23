@@ -5,10 +5,6 @@
   "usage": "Third-party reference text has no established redistribution license. Local use only; do not commit or bundle original documents.",
   "files": [
     {
-      "name": "README.md",
-      "sha256": "8dcafb8579cd45217236566c5456c8a0d748e485d40910291803d3a64f8ae818"
-    },
-    {
       "name": "TOC.md",
       "sha256": "cf0a8670ef32a70166a367fd7cf01302b4a31ad60b55a4db362c770600482f18"
     },
@@ -16,11 +12,6 @@
       "name": "ai-slop-taxonomy.md",
       "sha256": "7d0317f117f3989d544e095f9eac94959e232603dc4091c723b5e3b726c0bdfe",
       "source_url": "https://vibedesignlab.net/dictionary/ai-slop-taxonomy"
-    },
-    {
-      "name": "commercial-photographic-taxonomy.md",
-      "sha256": "e01cea4ba688a259c9c7956598525c4530f0edaac4d3a77a56d10095edbbc053",
-      "source_url": "https://vibedesignlab.net/dictionary/commercial-photographic-taxonomy"
     },
     {
       "name": "design-movement-converted.md",
@@ -36,16 +27,6 @@
       "name": "design-taxonomy.md",
       "sha256": "97918dffa0a687af863631f0e9afc15ad2e2af493c58a92d928918594a84002d",
       "source_url": "https://vibedesignlab.net/dictionary/design-taxonomy"
-    },
-    {
-      "name": "dev-wiki-converted.md",
-      "sha256": "9d347579d3ab4ad9c6d9f1ef12c4bc257a7d4207d812a230b3b7a7e70704bb52",
-      "source_url": "https://vibedesignlab.net/dictionary/dev-wiki"
-    },
-    {
-      "name": "generative-image-taxonomy.md",
-      "sha256": "2eaf03d52ca5c90175b21e9559798073c48300176b280d111cd7d3dc823abc77",
-      "source_url": "https://vibedesignlab.net/dictionary/generative-image-taxonomy"
     },
     {
       "name": "layout-taxonomy.md",

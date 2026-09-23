@@ -89,12 +89,13 @@ re-confirms recipient/role, persists on back-nav. Sending blocks duplicate submi
 states what completed, failure keeps input and states retry. Hypothetical — not observed, not
 asset confirmation, not a usability-test pass; gains are hypotheses until observed.
 
-Explanation output (5 items): 1) task + structure, one line 2) reference adopt/reject reasons
+Explanation output:
 
-- unverified items 3) numbered ASCII/text wireframe: real headings/info/CTA/navigation
-
-4. success path + key failure/recovery + keyboard/focus intent 5) why this order / what
-   happens on click / which verified asset it maps to in Figma.
+1. Task + structure, one line.
+2. Reference adopt/reject reasons + unverified items.
+3. Numbered ASCII/text wireframe: real headings/info/CTA/navigation.
+4. Success path + key failure/recovery + keyboard/focus intent.
+5. Why this order / what happens on click / which verified asset it maps to in Figma.
 
 Show before the first target Figma write. Not user approval — don't record `accepted` or
 repeat "shall I proceed?". Stop only on explicit "wait for my review" / "don't edit before
@@ -126,9 +127,3 @@ feedback/completion visible after each action? Can they recover from/cancel the 
 keyboard read/focus order designed? Verify against agreed screens/states and the real
 prototype path — not static-mock verification, can't cover network/backend behavior. See
 [delivery-contract](delivery-contract.md) for QA.
-
-## 6. Prototype behavior is part of the approved interaction
-
-For a new or behavior-changing flow, the editable Figma deliverable includes the approved core prototype path, not just static frames. Attach only behavior supported by the brief: success, validation/error recovery, cancel/back, and required overlay open/close paths. Preserve existing reactions outside the approved change.
-
-After writing, reread the actual reactions and report the source hotspot, trigger, action, destination, and any unresolved or unverified branch. A prototype reaction is evidence of the Figma connection, not proof of backend success, production navigation, or usability. Static-only and small visual edits skip this step and record why.

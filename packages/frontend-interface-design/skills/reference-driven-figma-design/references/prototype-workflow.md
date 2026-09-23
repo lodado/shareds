@@ -1,8 +1,6 @@
 # Prototype workflow — approved behavior, then readback
 
-Use this workflow for new or behavior-changing interactive design. It is separate
-from the independently callable `ux-flow-diagram` skill: this workflow creates and
-checks approved Figma reactions while the diagram skill reads a prototype on demand.
+Use this workflow for new or behavior-changing interactive design.
 
 ## Before the first write
 

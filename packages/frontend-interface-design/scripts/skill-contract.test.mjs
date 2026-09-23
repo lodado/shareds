@@ -312,8 +312,6 @@ test('requires taxonomy interpretation, separate screen evidence, adaptation and
   assert.match(workflow, /HOLD/)
   assert.match(workflow, /INCOMPLETE/)
   assert.match(workflow, /Small[\s\S]*non-structural fixes[\s\S]*reuse existing rationale/i)
-  assert.match(workflow, /prompt execution contract/i)
-  assert.match(workflow, /real Figma execution or visual quality was[\s\S]*verified/i)
   for (const file of [
     'research-selection.md',
     'figma-composition.md',
@@ -342,9 +340,10 @@ test('ships source fingerprints and local resolution without redistributing dict
     assert.match(sha256, /^[\da-f]{64}$/)
     return name
   })
-  assert.equal(names.length, 13)
-  assert.equal(new Set(names).size, 13)
-  assert.equal(names.filter((name) => name.endsWith('taxonomy.md')).length, 8)
+  // Only files the workflow routes to; dev-wiki and photo/generative-image guides are out of scope.
+  assert.equal(names.length, 9)
+  assert.equal(new Set(names).size, 9)
+  assert.equal(names.filter((name) => name.endsWith('taxonomy.md')).length, 6)
   const resolver = await readSkillFile('scripts/resolve_dictionary.py')
   // Installed copies live under the renamed skill directory; the legacy name resolves nothing.
   assert.doesNotMatch(resolver, /skills\/frontend-interface-design\//)

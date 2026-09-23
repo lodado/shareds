@@ -47,12 +47,8 @@ Question targets by stage:
 - **UI verification:** Does new evidence invalidate the journey, interaction, or visual contract?
   Reopen the earliest affected stage only; keep unrelated decisions settled and dependent artifacts stale.
 
-External grill-me is optional. If available, read its real instructions and honor invocation
-restrictions, including explicit-only rules. If grill-me is unavailable, perform this embedded
-user-facing interview directly; do not claim to have invoked it or install another skill.
-Use the host's supported question surface: attached OMX/tmux uses `omx question` and waits for
-its returned answer; other hosts use native structured questions or one concise plain-text question.
-Missing tmux is not missing design capability.
+External grill-me is optional; if unavailable, run this interview directly and never claim it was
+invoked. Ask through the host's native question tool or one concise plain-text question.
 
 "Make it sleek" does not delegate brand positioning. Never invent payment, deletion, permission,
 or privacy policy. Log `decision → basis (source / user answer / delegated choice) → provisional

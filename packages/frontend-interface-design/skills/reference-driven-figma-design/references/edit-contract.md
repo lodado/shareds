@@ -10,7 +10,7 @@ Component linkage success is no evidence of design fidelity or completeness.
 - **RESKIN** — approved visual attributes / structure, content, behavior.
 - **REDESIGN** — approved composition redesign / out-of-scope sections, locked contracts.
 
-Mode is a work type, not authority; new screens record REDESIGN scope. One mode per section; ASSEMBLE needing copy edits isolates the LOCALIZE basis first; an integration request is not grounds for redesign. `ㄱㄱ` approves the agreed scope.
+Mode is a work type, not authority; new screens record REDESIGN scope. Refactor is a preservation constraint on a mode, not a mode ([foundations §1](foundations-brand-workflow.md#1-preserve-identity-before-defining-values)). One mode per section; ASSEMBLE needing copy edits isolates the LOCALIZE basis first; an integration request is not grounds for redesign. `ㄱㄱ` approves the agreed scope.
 
 One log row per target — file/page/node ID, mode, base source/version, preserve, allowed and forbidden changes, unresolved — links to `source_authority.locked_constraints` and `scope` ([request contract](request-contract.md)).
 
@@ -42,11 +42,3 @@ Menus/buttons: single-line fit, width, Hug→Fill, touch target. Body: content w
 ## 6. Delivery, versions
 
 Link source / previous review / improvement / rejected / delivery; desktop, mobile, prototype, integration each verified / unverified / out of scope. In-scope unresolved is INCOMPLETE.
-
-## Refactor boundary
-
-Refactor describes a preservation constraint, not a new mode or redesign permission. Record
-which existing mode fits each section; preserve appearance, behavior, content, and source ownership
-while normalizing tokens, aliases, bindings, and component reuse. Changes to those preserved
-properties require separately resolved scope. Missing source never authorizes a replacement design.
-Use [foundations-brand-workflow.md](foundations-brand-workflow.md) for source feasibility and binding verification.

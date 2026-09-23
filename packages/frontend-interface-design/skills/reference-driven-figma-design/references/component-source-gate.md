@@ -53,13 +53,4 @@ Gate pass isn't a visual-quality pass.
 - View full + readable partial captures directly; check transparent backgrounds against the real parent.
 - Check overlap/clipping/overflow at boundaries, search rows, list end, footer; re-measure after fixing. No PILOT_READY/FIGMA_READY/done while any remains.
 
-Execution contract, not a runtime hook blocking MCP calls; logs and self-judgment aren't independent QA or user approval.
-
-## Stage 3 source feasibility
-
-Before bulk adoption, run the representative import preflight in
-[foundations-brand-workflow.md](foundations-brand-workflow.md). Read access is not import access.
-The probe is a write: explain first, honor review-wait, and use only the recorded isolated
-Working/Experiment area. Verify actual returned IDs, editable layers, links, fonts, bindings,
-and real-content fit before expanding. Record cleanup. A required live-library contract cannot
-silently become a local snapshot or alternate library when import fails; report HOLD/BLOCKED.
+Bulk adoption first runs the import preflight in [foundations-brand-workflow.md](foundations-brand-workflow.md#2-import-preflight-before-adoption).

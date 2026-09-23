@@ -9,10 +9,10 @@ fitting the new scope can itself be the screen evidence.
 ## 1. Dictionary interpretation integrity
 
 Source text is **local-only**, redistribution license unconfirmed, never committed to Git or shipped in the
-plugin package. [dictionary-sources.json](dictionary-sources.json) is MIT;
-[resolve_dictionary.py](../scripts/resolve_dictionary.py) resolves `--path` /
-`FIGMA_DESIGN_DICTIONARY` / `references/dictionary` under `CODEX_HOME`. `READY` → read
-README.md/TOC.md first; `HOLD`/missing → INCOMPLETE, don't fabricate IDs/terms.
+plugin package. Run [resolve_dictionary.py](../scripts/resolve_dictionary.py) (`--path` or
+`FIGMA_DESIGN_DICTIONARY` overrides). `READY` → pick files from the roles below and locate
+entries via TOC.md; `HOLD`/missing → INCOMPLETE, don't fabricate IDs/terms. Other files in the
+snapshot (dev-wiki, photo and generative-image guides) are out of scope.
 
 Per-file role:
 
@@ -25,11 +25,11 @@ Per-file role:
 - `visual-asset-taxonomy.md` — search brief only when a real asset need exists
 - `ai-slop-taxonomy.md` — diagnostic; check decoration/nesting against evidence, don't
   blanket-ban a style name
-- `generative-image-taxonomy.md`, `commercial-photographic-taxonomy.md` — conditional asset
-  brief, only within an approved production scope
-- `design-references-converted.md`, `design-movement-converted.md` — map IDs like
-  `two-column-editorial`, `line-length-measure`, `visual-hierarchy`, `reflow-reorder` to real
-  MCP file/page/frame URLs and screen/crop evidence
+- `design-references-converted.md` — gallery and benchmark sites for finding real screens
+- `design-movement-converted.md` — vocabulary for naming direction options; not a style to copy
+
+Map IDs like `two-column-editorial` or `line-length-measure` to real file/page/frame URLs and
+screen/crop evidence.
 
 ## 2. Translate keywords into search intent
 
@@ -76,6 +76,4 @@ accessibility requirements outrank generic taxonomy style suggestions.
    real CSS/content.
 
 PASS/PILOT_READY/FIGMA_READY vs HOLD/INCOMPLETE follow
-[delivery-contract](delivery-contract.md); self-review is not independent QA. This file is a
-prompt execution contract; passing it does not mean real Figma execution or visual quality was
-verified.
+[delivery-contract](delivery-contract.md); self-review is not independent QA.

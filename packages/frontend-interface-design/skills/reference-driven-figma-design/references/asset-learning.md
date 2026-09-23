@@ -33,4 +33,4 @@ Don't generalize a once-used section into a primitive; don't redraw a recurring 
 
 ## 5. Link to the Reference Log
 
-A promoted pattern keeps its origin reference and the traits not copied. Research order: PRD → Component Catalog → Approved Patterns → Refero/Browser for what's missing. External reference is input for discovering patterns, not an authority above the internal system.
+A promoted pattern keeps its origin reference and the traits not copied. External reference is input for discovering patterns, not an authority above the internal system.

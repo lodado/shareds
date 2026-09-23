@@ -35,11 +35,11 @@ def check():
     entries = manifest["files"]
     assert manifest["source_index"] == "https://vibedesignlab.net/dictionary"
     assert "Local use only" in manifest["usage"]
-    assert len({entry["name"] for entry in entries}) == len(entries) == 13
+    assert len({entry["name"] for entry in entries}) == len(entries) == 9
     for entry in entries:
         assert Path(entry["name"]).name == entry["name"]
         assert re.fullmatch(r"[a-f0-9]{64}", entry["sha256"])
-    assert sum(entry["name"].endswith("taxonomy.md") for entry in entries) == 8
+    assert sum(entry["name"].endswith("taxonomy.md") for entry in entries) == 6
     resolve = runpy.run_path(str(ROOT / "scripts/resolve_dictionary.py"))["resolve_dictionary"]
     with tempfile.TemporaryDirectory() as directory:
         base = Path(directory)

@@ -15,13 +15,11 @@ Fix mode (ASSEMBLE / LOCALIZE / FIDELITY / RESKIN / REDESIGN) and per-section pr
 
 ## Decision dependencies
 
-Strategy → Scope → Structure → Skeleton → Surface are conceptual dependencies.
-The four execution stages below are artifact-readiness checkpoints, not a rigid waterfall:
-read-only discovery may overlap, but dependent outputs stay provisional until material
-upstream decisions are resolved. Reuse verified decisions; do not repeat settled interviews.
-Small structure-preserving edits reuse the existing journey and system with a recorded skip.
-Later evidence reopens only the earliest affected stage; mark dependent artifacts stale and
-reverify them. The independent `ux-flow-diagram` skill remains explicit-only, not an automatic step.
+The four stages below are readiness checkpoints, not a waterfall: read-only discovery may overlap,
+but dependent outputs stay provisional until upstream decisions resolve. Reuse verified decisions;
+small structure-preserving edits reuse the existing journey with a recorded skip. Later evidence
+reopens only the earliest affected stage; mark dependents stale and reverify.
+The `ux-flow-diagram` skill stays explicit-only.
 
 ## Production method
 
@@ -43,11 +41,7 @@ Editable frames, component instances, variables, auto layout in a real Figma fil
 
 ## Component source gate
 
-Pass [component-source-gate.md](references/component-source-gate.md) when a needed role, content, state, or device variant is missing, or comparison is requested.
-
-- Gaps: **two or more distinct external sources**, compared on the same content. Search hits, screenshots, one library's variants don't count.
-- No evidence → stop adoption, expansion, completion claims. "ㄱㄱ", "빨리", "한방에" are not waivers.
-- `PILOT_READY`/`FIGMA_READY` and "verified" only after the gate plus review at real reading size; zoomed-out shots aren't evidence.
+Pass [component-source-gate.md](references/component-source-gate.md) when a needed role, content, state, or device variant is missing, or comparison is requested: **two or more distinct external sources** compared on the same content. No evidence → no adoption, expansion, or completion claim.
 
 ## Capability gate
 
@@ -136,8 +130,6 @@ for unresolved scope, authority, permission, destructive changes, sharing, purch
 continue only independent safe work. A technical blocker does not reopen settled product questions.
 
 ## Completion gate
-
-Prompt contract, not a runtime hook; does not physically block MCP calls. Self-review is not user approval or independent QA.
 
 FIGMA_READY only when all hold.
 
