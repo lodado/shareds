@@ -55,5 +55,5 @@ After the step the session drains `events` into `HudSnapshot.lastEvent`.
 - Headless: `npm test` (rules, time, pause, restart, isolation, snapshot identity, core import/global boundary).
 - Types: `tsconfig.core.json` compiles `model` and `config` without the DOM lib.
 - FSD: `npm run check:fsd` (Steiger, plus allowed and violation fixtures).
-- Browser: `npm run test:e2e` (real taps, pause, failure, retry, hidden tab, small screen and resize).
+- Browser: `npm run test:e2e` (`__test__/play.e2e.ts`: real taps, pause, failure, retry, hidden tab, small screen and resize).
 - Not covered: real devices, frame-time budgets, fun and usability.

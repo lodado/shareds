@@ -25,7 +25,10 @@ test('starter ships without installed or generated output', () => {
 test('starter keeps FSD layers only, with no extra top-level ECS layer', () => {
   assert.deepEqual(readdirSync(path.join(STARTER, 'src')).sort(), ['app', 'pages'])
   assert.deepEqual(readdirSync(path.join(SLICE, 'model')).sort(), ['__test__', 'ecs', 'game-session.ts', 'runtime'])
-  assert.equal(readFileSync(path.join(SLICE, 'index.ts'), 'utf8').trim(), "export { mountPlayPage } from './ui/play-page.ts'")
+  assert.equal(
+    readFileSync(path.join(SLICE, 'index.ts'), 'utf8').trim(),
+    "export { mountPlayPage } from './ui/play-page.ts'",
+  )
 })
 
 test('architecture doc lists systems in the order stepWorld runs them', () => {

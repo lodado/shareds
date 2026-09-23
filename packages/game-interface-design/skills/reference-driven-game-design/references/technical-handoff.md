@@ -12,6 +12,8 @@ Web/mobile scope: warm/cold load, audio unlock, context loss, page lifecycle, sc
 
 Budgets are hypotheses until measured: identify a device/browser/OS, resolution/DPR, network profile, assets, first-interaction load, frame-time distribution and degradation strategy. Low-quality mode may reduce shadows/effects but not invisible threats or essential timing. Use current official API docs for concrete implementation advice.
 
-If competitive rankings are requested, separate local presentation from trusted score submission and anti-abuse design. Do not invent a server for a personal-best prototype. No automatic ECS, multiplayer backend, FSD migration or general-purpose framework.
+If competitive rankings are requested, separate local presentation from trusted score submission and anti-abuse design. Do not invent a server for a personal-best prototype. No multiplayer backend or general-purpose engine.
+
+Implementation handoff goes to the package-local [Three.js Game Wireframe](../../threejs-game-wireframe/SKILL.md) skill. For a `PLAYABLE_GREYBOX`, its contract applies: core rules run in a headless ECS inside the play page's FSD `model` segment, with one documented system order. `LAYOUT_ONLY` needs no ECS. An existing repo keeps its framework and architecture; do not migrate a working project to FSD just to host a prototype. Name the intended fidelity level and the rules each headless test must cover.
 
 Handoff ends with smallest playable slice, deterministic rule tests where possible, lifecycle integration tests and real-device feel/usability tasks. Planning artifacts are not implemented software.

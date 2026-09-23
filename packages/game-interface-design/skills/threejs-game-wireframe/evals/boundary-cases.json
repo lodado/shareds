@@ -1,0 +1,123 @@
+{
+  "status": "not_executed",
+  "description": "Routing and fidelity expectations for the game-interface-design entry and threejs-game-wireframe. Rubrics for a model-behavior run, not results.",
+  "cases": [
+    {
+      "id": "plan-only",
+      "prompt": "세로형 합치기 게임 기획만 해줘. 코드는 아직 필요 없어.",
+      "expect": { "skill": "reference-driven-game-design", "mode": "PLAN_ONLY", "level": null, "ecs": "n/a" },
+      "must_not": ["create project files", "run npm install"]
+    },
+    {
+      "id": "figma-hud",
+      "prompt": "확정한 기획으로 플레이·결과 화면을 Figma에 만들어줘. FIGMA_TARGET: <authorized url>",
+      "expect": { "skill": "reference-driven-game-design", "mode": "FIGMA", "level": null, "ecs": "n/a" },
+      "must_not": ["report playable readiness"]
+    },
+    {
+      "id": "figma-no-target",
+      "prompt": "Figma로 HUD 만들어줘.",
+      "expect": { "skill": "reference-driven-game-design", "mode": "FIGMA", "level": null, "ecs": "n/a" },
+      "must_not": ["silently downgrade to PLAN_ONLY", "claim FIGMA_READY"]
+    },
+    {
+      "id": "build-from-plan",
+      "prompt": "game-design.md 기준으로 Three.js 프로토타입 만들어줘. TARGET_DIR: ./stack-proto",
+      "expect": {
+        "skill": "threejs-game-wireframe",
+        "mode": "THREEJS_WIREFRAME",
+        "level": "PLAYABLE_GREYBOX",
+        "ecs": "required"
+      },
+      "must_not": ["rerun the full planning interview", "require Figma"]
+    },
+    {
+      "id": "layout-only",
+      "prompt": "HUD랑 필드 배치만 Three.js 장면으로 잡아줘.",
+      "expect": {
+        "skill": "threejs-game-wireframe",
+        "mode": "THREEJS_WIREFRAME",
+        "level": "LAYOUT_ONLY",
+        "ecs": "n/a"
+      },
+      "must_not": ["add model/ecs"]
+    },
+    {
+      "id": "flow-only",
+      "prompt": "시작→플레이→결과→재시작 화면 전환만 눌러볼 수 있게 해줘.",
+      "expect": {
+        "skill": "threejs-game-wireframe",
+        "mode": "THREEJS_WIREFRAME",
+        "level": "FLOW_PROTOTYPE",
+        "ecs": "optional"
+      },
+      "must_not": ["present fake scores as real", "claim fun tested"]
+    },
+    {
+      "id": "build-without-plan",
+      "prompt": "스택 게임 하나 플레이 가능하게 만들어줘.",
+      "expect": {
+        "skill": "threejs-game-wireframe",
+        "mode": "THREEJS_WIREFRAME",
+        "level": "PLAYABLE_GREYBOX",
+        "ecs": "required"
+      },
+      "must_not": ["run all planning stages before any code"]
+    },
+    {
+      "id": "existing-r3f",
+      "prompt": "우리 Next.js + R3F 프로젝트에 이 게임 화면을 붙여줘.",
+      "expect": {
+        "skill": "threejs-game-wireframe",
+        "mode": "THREEJS_WIREFRAME",
+        "level": "PLAYABLE_GREYBOX",
+        "ecs": "required"
+      },
+      "must_not": ["scaffold the Vite starter over the repo", "remove React", "setState inside useFrame"]
+    },
+    {
+      "id": "top-level-ecs",
+      "prompt": "src/ecs 폴더 만들어서 ECS 따로 빼줘.",
+      "expect": {
+        "skill": "threejs-game-wireframe",
+        "mode": "THREEJS_WIREFRAME",
+        "level": "PLAYABLE_GREYBOX",
+        "ecs": "required"
+      },
+      "must_not": ["create src/ecs", "create src/managers"]
+    },
+    {
+      "id": "merge-physics",
+      "prompt": "수박게임처럼 과일이 굴러서 합쳐지는 프로토타입. 빠르게만 해줘.",
+      "expect": {
+        "skill": "threejs-game-wireframe",
+        "mode": "THREEJS_WIREFRAME",
+        "level": "PLAYABLE_GREYBOX",
+        "ecs": "required"
+      },
+      "must_not": ["drop collision or settling rules for speed", "integrate engine-owned bodies in ECS"]
+    },
+    {
+      "id": "no-browser",
+      "prompt": "구현하고 검증까지 해줘. (브라우저 실행 불가 환경)",
+      "expect": {
+        "skill": "threejs-game-wireframe",
+        "mode": "THREEJS_WIREFRAME",
+        "level": "PLAYABLE_GREYBOX",
+        "ecs": "required"
+      },
+      "must_not": ["mark browser PASS", "declare ready to run"]
+    },
+    {
+      "id": "review-wait",
+      "prompt": "구현 전에 설계 먼저 보여줘. REVIEW_WAIT: true",
+      "expect": {
+        "skill": "threejs-game-wireframe",
+        "mode": "THREEJS_WIREFRAME",
+        "level": "PLAYABLE_GREYBOX",
+        "ecs": "required"
+      },
+      "must_not": ["write game code before approval"]
+    }
+  ]
+}

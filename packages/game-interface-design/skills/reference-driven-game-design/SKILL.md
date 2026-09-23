@@ -18,7 +18,7 @@ Use the user's language for deliverables. Internal identifiers may stay in Engli
 - Deliver **specific rules, meaningful choices, player flows, HUDs, feedback and testable hypotheses**, not a feature catalog or a generic game dashboard.
 - Default `PLAN_ONLY`: design documents, text wireframes, Mermaid source, evidence log and a structured delivery manifest. No Figma write permission is needed for this mode.
 - `FIGMA`: the same design plus actual editable game UI and approved prototype connections in an authorized target. No permission/source → block only dependent Figma work, continue independent planning. Never silently downgrade a requested Figma delivery to a completed plan.
-- Game code, playable prototypes, 3D assets, external publication, purchases and production integrations require separate explicit scope. A Figma mock is not a game simulation.
+- Game code and playable prototypes belong to the package-local [Three.js Game Wireframe](../threejs-game-wireframe/SKILL.md) skill and need an explicit implementation request. 3D assets, external publication, purchases and production integrations require separate explicit scope. A Figma mock is not a game simulation.
 - Confirmed facts, user decisions, agent proposals, assumptions and unknowns are different. No fake personas, references, metrics, playtests, permissions or node IDs.
 - Reuse existing decisions. For missing reversible details, propose a labeled default. Do not interview indefinitely. Unresolved material rules remain provisional; never assume authority, purchase consent or policy.
 - Separate **friction to remove** (confusing UI, repeated setup) from **challenge to keep** (timing, space, risk). A shortest-click path is not always the best game.
@@ -76,7 +76,7 @@ Ready for planning: a concrete visual and feedback specification plus honest sou
 Read [business design](references/business-design.md), [technical handoff](references/technical-handoff.md), and [validation](references/playtest.md).
 Separate momentary enjoyment, replay, return and monetization. Add at most one small meta-system unless scope justifies more.
 Verify current platform rules only for the chosen channel using official sources; leave unverified policy provisional. Do not bake changing revenue shares into the skill.
-Specify simulation, rendering, UI and platform responsibilities; no compulsory ECS, backend or framework migration.
+Specify simulation, rendering, UI and platform responsibilities and the prototype fidelity level. No backend or framework migration; a playable greybox follows the headless ECS contract of the implementation skill.
 Define device/performance assumptions, interruption contracts, event semantics, three high-risk experiments and metric denominators/cohorts.
 Ready: a developer knows what to build/test next and which decisions are not validated.
 
