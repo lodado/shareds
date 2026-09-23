@@ -345,7 +345,9 @@ test('ships source fingerprints and local resolution without redistributing dict
   assert.equal(names.length, 13)
   assert.equal(new Set(names).size, 13)
   assert.equal(names.filter((name) => name.endsWith('taxonomy.md')).length, 8)
-  await access(join(skillDirectory, 'scripts/resolve_dictionary.py'))
+  const resolver = await readSkillFile('scripts/resolve_dictionary.py')
+  // Installed copies live under the renamed skill directory; the legacy name resolves nothing.
+  assert.doesNotMatch(resolver, /skills\/frontend-interface-design\//)
   const workflow = await readSkillFile('references/taxonomy-reference-workflow.md')
   assert.match(workflow, /local-only[\s\S]*never committed to Git or shipped/i)
   assert.match(workflow, /FIGMA_DESIGN_DICTIONARY/)

@@ -45,7 +45,7 @@ def main():
     candidates = [explicit] if explicit else [
         ROOT / "references/dictionary",
         codex_home / "skills/reference-driven-figma-design/references/dictionary",
-        Path.home() / ".agents/skills/frontend-interface-design/references/dictionary",
+        Path.home() / ".agents/skills/reference-driven-figma-design/references/dictionary",
     ]
     manifest = json.loads((ROOT / "references/dictionary-sources.json").read_text())
     result = resolve_dictionary(candidates, manifest["files"])
