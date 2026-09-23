@@ -29,14 +29,15 @@ module.exports = {
   meta: {
     type: 'suggestion',
     docs: {
+      // Nesting is core `no-nested-ternary`'s job (the base preset turns it on); reporting it here
+      // too would report one defect twice.
       description:
-        'disallow nested ternaries and ternaries whose condition contains logical operators or optional chains - extract a named pure function with early returns, or a lookup object',
+        'disallow ternaries whose condition contains logical operators or optional chains - extract a named pure function with early returns, or a lookup object',
       category: 'Best Practices',
       recommended: 'warn',
     },
     schema: [],
     messages: {
-      nestedTernary: 'Nested ternary hides the branching rule. Extract a named pure function with early returns.',
       complexTest:
         'Ternary condition contains a logical operator or optional chain. Extract a named pure function with early returns, or a lookup object.',
     },
@@ -44,16 +45,6 @@ module.exports = {
   create(context) {
     return {
       ConditionalExpression(node) {
-        const isNested =
-          node.test.type === 'ConditionalExpression' ||
-          node.consequent.type === 'ConditionalExpression' ||
-          node.alternate.type === 'ConditionalExpression'
-
-        if (isNested) {
-          context.report({ node, messageId: 'nestedTernary' })
-          return
-        }
-
         if (containsComplexity(node.test)) {
           context.report({ node, messageId: 'complexTest' })
         }

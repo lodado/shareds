@@ -250,9 +250,10 @@ test('design preset reports token drift and server/client leaks, and defers a11y
   }
 })
 
-test('composed presets report console, redundant catch and includes only once', async () => {
+test('composed presets report console, redundant catch, includes and nested ternaries only once', async () => {
   const eslint = createLinter([...base, ...quality, ...localRules])
   const cases = [
+    ['export const label = (a, b) => a ? "a" : b ? "b" : "c"', 'no-nested-ternary', '@lodado/local-rules/no-complex-ternary'],
     ['console.log("debug")', 'no-console', '@lodado/local-rules/no-console-log'],
     ['export function run(work) { try { return work() } catch (error) { throw error } }', 'no-useless-catch', 'sonarjs/no-useless-catch'],
     ['export const has = (items, item) => items.indexOf(item) !== -1', 'unicorn/prefer-includes', 'e18e/prefer-includes'],

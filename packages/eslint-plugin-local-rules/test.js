@@ -26,16 +26,11 @@ ruleTester.run('no-complex-ternary', rules['no-complex-ternary'], {
     'const dir = current.dir === "asc" ? "desc" : "asc"',
     'const view = count > 0 ? renderList() : renderEmpty()',
     'const next = flag ? { key, dir: "asc" } : null',
+    // Nesting belongs to core no-nested-ternary; this rule judges only the condition.
+    'const dir = a ? (b ? "x" : "y") : "z"',
+    'const dir = a ? "x" : b ? "y" : "z"',
   ],
   invalid: [
-    {
-      code: 'const dir = a ? (b ? "x" : "y") : "z"',
-      errors: [{ messageId: 'nestedTernary' }],
-    },
-    {
-      code: 'const dir = a ? "x" : b ? "y" : "z"',
-      errors: [{ messageId: 'nestedTernary' }],
-    },
     {
       code: 'const sort = q.sort?.key === key && q.sort.dir === "asc" ? { key, dir: "desc" } : { key, dir: "asc" }',
       errors: [{ messageId: 'complexTest' }],

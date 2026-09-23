@@ -35,7 +35,7 @@ module.exports = [
       'ai-guard/no-sql-string-concat': 'off', // quality: sonarjs/sql-queries
       'ai-guard/no-duplicate-logic-block': 'off', // quality: sonarjs/no-identical-functions
       'ai-guard/no-dead-branch': 'off', // strict-types: ts/no-unnecessary-condition
-      'ai-guard/no-console-in-handler': 'off', // local-rules: no-console-log
+      'ai-guard/no-console-in-handler': 'off', // base: no-console
     },
   },
 ]
