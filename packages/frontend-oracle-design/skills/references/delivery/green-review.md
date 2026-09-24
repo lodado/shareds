@@ -87,8 +87,12 @@ through the `exec` of each label.
 3. typecheck and lint
 4. Oracle source lock verify and any structure verification command that exists in the repo
 5. required root or package test/build
-6. side-effect ownership — `oracle-verify.mjs scan --side-effects --oracle <card> --path <changed
-production files>`. Every known side-effect token in the diff (network·storage·navigation·
+6. side-effect ownership — the `IMPLEMENTED_GREEN` transition runs
+   `oracle-verify.mjs scan --side-effects --oracle <card>` itself over every production code file
+   changed since init (you do not choose the list), judging only lines that are new since init: it
+   rebuilds the init bytes from git `HEAD` when they match the init snapshot, and otherwise judges
+   the whole file. `REVIEW_VERIFIED` runs the same scans again, since review fixes can add effects.
+   Every known side-effect token in the diff (network·storage·navigation·
    messaging·analytics·timer·subscription·console·notification) must fall in a category some card
    row's side-effect column owns, or carry an `oracle:side-effect <row|reason>` comment on the
    same or the previous line. The exemption needs a real row (`oracle:side-effect O3`) or a reason
@@ -114,6 +118,10 @@ pre-existing failure, report the raw text and the impact separately and do not h
 
 Attempt the `--to IMPLEMENTED_GREEN` command from `status`; a rejected command does not advance
 state. Follow its code and recovery hint: `ORACLE_CHANGED` invalidates evidence;
+`WITNESS_INVALIDATED` means the implementation changed the code an `impossible` cell cites (the lock
+pins each `code()` witness block by hash; a block that only moved still counts), so that cell goes
+back to `NEEDS_DECISION`; `DIMENSION_NOT_EXECUTED` means the Case space declares StrictMode but no
+registered harness file or test enables it;
 `RUN_NOT_GREEN`, `EVIDENCE_REQUIRED` and `REQUIRED_RUN_MISSING` require real runs/mappings;
 `FLAKINESS_GATE` requires the existing consecutive-pass count; `TEST_WEAKENED` requires restoring
 test strength. Report `ENV_DRIFT` and investigate whether it affected the result.
@@ -124,7 +132,14 @@ repeated**. If a failure is mixed in, classify it as `HARNESS_DEFECT` and do not
 
 `TEST_WEAKENED` forbidden tokens: `test.skip`·`it.skip`·`describe.skip`·`.only(`·
 `waitForTimeout(`·`toBeTruthy(`·`toBeFalsy(`·`.first()`·`.nth(`·`setTimeout(` and raising the
-screenshot tolerance (`maxDiffPixels`·`maxDiffPixelRatio`·`threshold`).
+screenshot tolerance (`maxDiffPixels`·`maxDiffPixelRatio`·`threshold`). The trusted adapters also
+refuse the runner flags that loosen a verdict, in any spelling vitest's CLI accepts (kebab-case,
+`--retry.count`) — vitest `--retry`·`--update`/`-u`·`--passWithNoTests`·
+`--dangerouslyIgnoreUnhandledErrors`·`--allowOnly`·`--exclude` and node `--test-update-snapshots`·
+`--test-rerun-failures`. A flag that injects code or config — node `--import`·`--require`/`-r`·
+`--loader`, vitest `--config`/`-c`·`--setupFiles`·`--globalSetup` — is accepted only when its file is a
+registered harness path. A vitest test that passed only on a retry is recorded as `flaky`, never as a
+pass.
 
 The chosen GREEN run must be a card test run that has a parsed reporter. Separate lint·
 typecheck·build are each recorded under their declared label. The transition directly inspects every
@@ -207,9 +222,13 @@ and the actual verification command/PASS·FAIL counts, and the `oracle-verify.mj
 Record alongside them only the commit·runtime/browser version·locale/timezone·viewport/theme·role·clock/seed·data
 initialization that affect the result. If a non-N/A row is unmapped or the revision does not match, do not issue GREEN.
 
-Confirm the nondeterministic sources in the production diff by running `oracle-verify.mjs scan` on the
-changed files. Replace a detected `Date.now`·`Math.random`·`crypto.randomUUID`·`toLocale`·`new Intl.`
-with an injection seam, or record an exemption with an `oracle:nondeterminism <reason>` comment.
+The GREEN transition also runs `oracle-verify.mjs scan` on the changed production files. Replace a
+detected `Date.now`·`Math.random`·`crypto.randomUUID`·`toLocale`·`new Intl.` with an injection seam, or
+record an exemption with an `oracle:nondeterminism <reason>` comment. The same scan fails
+`TEST_ENV_BRANCH` on production that branches on the test environment (`process.env.VITEST*` or
+`import.meta.env.VITEST`, `JEST_WORKER_ID`, `NODE_ENV`/`MODE` compared with `'test'` in dot or bracket
+form, `__vitest_worker__`, `typeof vi`/`typeof jest`, `navigator.webdriver`, `asymmetricMatch`) — a
+test that passes on a path users never run. The token list is finite, like the side-effect list. A real need is exempted with `oracle:test-env <reason>`; a bare marker is not.
 
 ### Final review transition
 
@@ -221,7 +240,13 @@ demands a re-run — re-running the same bytes does not add evidence. The review
 blocking finding.
 
 Validate findings with `oracle-verify.mjs review`, then use the `REVIEW_VERIFIED` action printed
-by `status`. Supply the current evidence, packet, target revision, findings and ledger-bound review
+by `status`. Pass each findings file and blind mapping exactly as the reviewer subagent returned it:
+on a host whose hook recorded those outputs in `host-receipts.jsonl`, a file that matches none is
+`REVIEW_RECEIPT_UNATTESTED`, and two artifacts from the same subagent are `REVIEWER_NOT_INDEPENDENT`.
+Without that file the transition records `reviewAttestation: self-reported`; if the hook created the
+file during implementation, `IMPLEMENTED_GREEN` records that, and a file gone at review is
+`REVIEW_RECEIPT_UNATTESTED`. An agent with the same shell permissions can still forge or delete it:
+the receipt raises the cost of a rewritten finding, it is not proof. Supply the current evidence, packet, target revision, findings and ledger-bound review
 receipt; [`subagent-review.md`](../subagent-review.md) owns reviewer and blind-mapping requirements.
 
 High risk passes the reported failing run with the guard removed after GREEN and the affected card row
@@ -229,7 +254,11 @@ via `--mutation-run`·`--mutation-row`, and after restoring the guard makes the 
 again as the review run. The runner also inspects whether the production digest changed at the mutation
 relative to GREEN and returned exactly before the review. If either of the two is missing it is
 `MUTATION_EVIDENCE_REQUIRED`, and if the order·failure·reporter·digest conditions do not hold it is
-`MUTATION_EVIDENCE_INVALID`. Pass the second reviewer file together with `--intersect`.
+`MUTATION_EVIDENCE_INVALID`. The mutation run must cover at least the GREEN run's tests, and the kill
+must be targeted: the row's test fails on its own assertion, or a test mapped to another row still
+passes — a mutation that crashes the module kills the row test without proving its guard
+(`MUTATION_NOT_TARGETED`). When rows share one test, `--mutation-row`
+must be one of them, since that mapping is the least proven (`MUTATION_ROW_NOT_WEAKEST`). Pass the second reviewer file together with `--intersect`.
 A critical/high finding blocks the review even if it exists on only one side.
 
 ```bash

@@ -1,13 +1,20 @@
 #!/usr/bin/env node
-// PreToolUse guard — reads the hook payload on stdin and denies, before the write lands, what the
-// transition gate would reject afterwards: production edits while an oracle sits at ORACLE_READY,
-// and weakening tokens added to a test after VALID_RED. Everything else is silent. Any failure to
-// judge is fail-open (exit 0, no output): the gate in oracle-run.mjs stays the authority.
+// Oracle host hook — one script for three events, dispatched on the payload.
+// PreToolUse: denies, before the write lands, what the transition gate would reject afterwards —
+//   production edits while an oracle sits at ORACLE_READY, weakening tokens added to a test after
+//   VALID_RED, and any write to host-receipts.jsonl. A SubagentHandback call records a receipt.
+// SubagentStop: records a digest of the reviewer output the subagent actually returned.
+// Stop: blocks a final report whose Status line or cited runs disagree with the ledger.
+// Any failure to judge is fail-open (exit 0, no output): the gate in oracle-run.mjs stays the authority.
 import { Buffer } from 'node:buffer'
-import { readdir, readFile } from 'node:fs/promises'
+import { spawnSync } from 'node:child_process'
+import { appendFile, readdir, readFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { isPathInside, isTestPath, WEAKENING_TOKENS } from './oracle-fs.mjs'
+import { fileURLToPath } from 'node:url'
+import { HOST_RECEIPTS_FILE, isPathInside, isTestPath, reviewOutputDigest, WEAKENING_TOKENS } from './oracle-fs.mjs'
+
+const runScript = join(dirname(fileURLToPath(import.meta.url)), 'oracle-run.mjs')
 
 const GUARDED_STATES_BEFORE_RED = new Set(['ORACLE_READY'])
 const GUARDED_STATES_AFTER_RED = new Set(['VALID_RED', 'IMPLEMENTED_GREEN'])
@@ -83,8 +90,95 @@ function deny(reason) {
   )
 }
 
-async function main() {
-  const payload = JSON.parse(await readStdin())
+/** 리뷰어 반환문의 리뷰 산출물 digest 전부 — 통째 JSON과 파싱되는 fenced 블록 각각. 앞선 예시 블록이 뒤의 findings를 가리지 않는다. */
+function returnedDigests(text) {
+  const candidates = [text, ...[...text.matchAll(/```(?:json)?[ \t]*\n([\s\S]*?)```/g)].map(([, body]) => body)]
+  const digests = new Map()
+  for (const candidate of candidates) {
+    let document
+    try {
+      document = JSON.parse(candidate.trim())
+    } catch {
+      continue
+    }
+    const digest = reviewOutputDigest(document)
+    if (digest) digests.set(digest.sha256, digest)
+  }
+  return [...digests.values()]
+}
+
+/** 서브에이전트가 실제로 반환한 리뷰 산출물의 digest를 IMPLEMENTED_GREEN 오라클마다 남긴다. 컨트롤러는 이 파일을 쓸 수 없다. */
+async function recordHostReceipt(payload, cwd, text) {
+  if (typeof payload.agent_id !== 'string' || !payload.agent_id || typeof text !== 'string') return
+  const digests = returnedDigests(text)
+  if (digests.length === 0) return
+  // oracle:nondeterminism 영수증은 실제 기록 시각을 남긴다
+  const at = new Date().toISOString()
+  const lines = digests.map(
+    (digest) =>
+      `${JSON.stringify({ agentId: payload.agent_id, agentType: payload.agent_type ?? '', sessionId: payload.session_id ?? '', ...digest, at })}\n`,
+  )
+  for (const { directory, state } of await findStates(cwd, cwd)) {
+    if (state.state === 'IMPLEMENTED_GREEN') await appendFile(join(directory, HOST_RECEIPTS_FILE), lines.join(''))
+  }
+}
+
+/**
+ * 이 보고의 주인 후보 — 인용한 runId를 **전부** 원장에 가진 오라클. 보고가 `Oracle SHA-256 <digest>`를 적었으면 그
+ * 잠금의 오라클로 좁힌다. runId는 오라클마다 r-001부터라서, 원장 마지막 기록이 가장 최근인 순서로 둔다.
+ */
+async function reportOwners(cwd, cited, message) {
+  const lockSha256 = message.match(/Oracle SHA-256\s+([a-f0-9]{64})/)?.[1]
+  const owners = []
+  for (const { directory, state } of await findStates(cwd, cwd)) {
+    if (lockSha256 && state.lockSha256 !== lockSha256) continue
+    const ledger = await readFile(join(directory, 'runs.jsonl'), 'utf8').catch(() => '')
+    if (![...cited].every((runId) => ledger.includes(`"runId":"${runId}"`))) continue
+    let last = ''
+    try {
+      last = JSON.parse(ledger.trim().split('\n').at(-1)).at ?? ''
+    } catch {
+      // 읽을 수 없는 원장은 가장 오래된 것으로 둔다 — status가 판정 불가로 거른다
+    }
+    owners.push({ directory, last })
+  }
+  return owners.sort((left, right) => right.last.localeCompare(left.last)).map(({ directory }) => directory)
+}
+
+/**
+ * 최종 보고 대조 — 가장 최근에 움직인 주인 오라클 하나가 판정한다. 그 원장과 맞으면 통과, 어긋나면 막는다. 판정할 수 없는
+ * 후보(손상된 원장)는 건너뛰고 다음 후보로 간다. 주인이 없으면(Design-only·다른 레포) 판정하지 않는다. 막은 뒤의
+ * 재시도(stop_hook_active)는 다시 막지 않는다.
+ */
+async function checkFinalReport(payload, cwd) {
+  const message = payload.last_assistant_message
+  if (payload.stop_hook_active || typeof message !== 'string') return
+  if (!/^Status:\s*(?:ORACLE_READY|VALID_RED|IMPLEMENTED_GREEN|REVIEW_VERIFIED|NEEDS_DECISION|FAIL)\b/m.test(message)) return
+  const cited = new Set([...message.matchAll(/\b(r-\d{3,})\b/g)].map(([, runId]) => runId))
+  if (cited.size === 0) return
+
+  for (const directory of await reportOwners(cwd, cited, message)) {
+    const checked = spawnSync(process.execPath, [runScript, 'status', '--dir', directory, '--check-report', '-'], {
+      input: message,
+      encoding: 'utf8',
+      timeout: 8000,
+    })
+    if (checked.status === 0) return
+    const [line] = (checked.stderr ?? '').split('\n')
+    if (line.startsWith('REPORT_CLAIM_MISMATCH:')) {
+      process.stdout.write(
+        `${JSON.stringify({
+          decision: 'block',
+          reason: `${line} (${directory})\nThe ledger wins over the report — rewrite the Status line and the cited runs from \`oracle-run.mjs status --json\`.`,
+        })}\n`,
+      )
+      return
+    }
+    unjudged('REPORT_UNCHECKED', { oracle: directory, detail: line || checked.error?.message })
+  }
+}
+
+async function guardWrite(payload, cwd) {
   const toolName = payload.tool_name
   const input = payload.tool_input ?? {}
   // NotebookEdit writes a source file under another key; every other write path (shell rm·mv, an
@@ -92,10 +186,18 @@ async function main() {
   const targetPath = typeof input.file_path === 'string' ? input.file_path : input.notebook_path
   if (!['Write', 'Edit', 'MultiEdit', 'NotebookEdit'].includes(toolName) || typeof targetPath !== 'string') return
 
-  const cwd = typeof payload.cwd === 'string' ? payload.cwd : process.cwd()
   const absolutePath = resolve(cwd, targetPath)
 
   for (const { directory, state } of await findStates(cwd, absolutePath)) {
+    // 대소문자를 가리지 않는 파일 시스템(macOS·Windows)에서는 HOST-RECEIPTS.jsonl도 같은 파일이다
+    if (absolutePath.toLowerCase() === join(directory, HOST_RECEIPTS_FILE).toLowerCase()) {
+      deny(
+        `HOST_RECEIPT_PROTECTED: ${HOST_RECEIPTS_FILE} records what reviewer subagents actually returned — only the host hook writes it.`,
+      )
+      return
+    }
+    // hook이 도는 호스트라는 표시 — 구현 중 파일이 생겨 있으면 GREEN이 그 사실을 원장에 남기고, REVIEW는 사라진 파일을 막는다
+    if (GUARDED_STATES_AFTER_RED.has(state.state)) await appendFile(join(directory, HOST_RECEIPTS_FILE), '')
     if (typeof state.scanRoot !== 'string') {
       unjudged('SCAN_ROOT_MISSING', { oracle: directory })
       continue
@@ -108,7 +210,7 @@ async function main() {
 
     if (GUARDED_STATES_BEFORE_RED.has(state.state) && !test && !harness.includes(portable)) {
       deny(
-        `PRODUCTION_TOUCHED_BEFORE_RED: ${portable} — this oracle (${directory}) is at ORACLE_READY. Write the failing tests first and record VALID_RED with oracle-run.mjs red; a config·setup file that must change before RED is declared with --harness-path at init, never edited around the gate.`,
+        `PRODUCTION_TOUCHED_BEFORE_RED: ${portable} — this oracle (${directory}) is at ORACLE_READY. Write the failing tests first and record VALID_RED with oracle-run.mjs red; a config·setup file that must change before RED is declared with --harness-path at init, never edited around the gate. If this run was abandoned, close it with \`oracle-run.mjs transition --dir ${directory} --to FAIL --reason abandoned\` instead of deleting it.`,
       )
       return
     }
@@ -127,6 +229,16 @@ async function main() {
       return
     }
   }
+}
+
+async function main() {
+  const payload = JSON.parse(await readStdin())
+  const cwd = typeof payload.cwd === 'string' ? payload.cwd : process.cwd()
+  if (payload.hook_event_name === 'Stop') await checkFinalReport(payload, cwd)
+  else if (payload.hook_event_name === 'SubagentStop') await recordHostReceipt(payload, cwd, payload.last_assistant_message)
+  // v2.1.271+ 서브에이전트는 SubagentHandback 도구로 보고를 넘긴다 — 그때 마지막 메시지는 보고가 아니다
+  else if (payload.tool_name === 'SubagentHandback') await recordHostReceipt(payload, cwd, payload.tool_input?.message)
+  else await guardWrite(payload, cwd)
 }
 
 try {

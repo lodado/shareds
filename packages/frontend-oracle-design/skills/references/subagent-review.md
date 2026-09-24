@@ -244,7 +244,11 @@ forbidden, and final baseline approval is left to the user.
 Submit reviewer-produced findings JSON, not a free-form PASS. New artifacts use `schemaVersion: 2`,
 `reviewerRole`, stable `reviewerId`, `packetSha256`, `targetRevision`, `changeabilityReview`, and
 `findings`. Each finding records `id`, `row`, `classification`, `severity`, `source`, `finding`,
-`evidence`, and minimal `fix`. Each axis judgment records `axis`, `status`, `evidence`, and a
+`evidence`, and minimal `fix`. A `PRODUCT_DEFECT` whose `evidence` cites code as `path#La-Lb` also
+records `quote`, the cited line as it reads; the verifier looks for it within three lines of the range.
+A quote it cannot find turns a medium/low finding into `NON_ORACLE_OPINION` and sends a critical/high
+one back as `FINDINGS_INVALID` to be re-emitted — never dropped. A finding about missing behavior has
+no line to quote; cite the row or run instead and the check does not apply. Each axis judgment records `axis`, `status`, `evidence`, and a
 `findingId` when it reports a finding.
 
 `changeabilityReview` judges the five axes exactly once each as `PASS | FINDING | N/A`. Every
@@ -351,7 +355,9 @@ It does not claim complete dependency resolution: only registered harness paths 
 tests, never arbitrary relative imports, so production modules stay out of the blind read.
 
 Generate with `oracle-run.mjs blind-input --dir <dir> --output <input>`. The blind reviewer reads
-only that file and writes the mapping. The Controller then records `review-receipt` with
+only that file and returns the mapping JSON as its final message; the Controller saves it unchanged, as
+it does each code reviewer's findings JSON, because a host hook digests what the subagent returned
+(`host-receipts.jsonl`) and the transition compares the saved file with it. The Controller then records `review-receipt` with
 `--role blind-mapper`, the actual `--reviewer` and `--task-id`, that input as `--packet`, the mapping
 as `--findings`, and the input's `--revision`.
 

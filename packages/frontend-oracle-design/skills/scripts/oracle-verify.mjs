@@ -37,10 +37,15 @@ const FLAG_NAMES = [
   'revision',
   'lock',
   'blind-map',
+  'baseline-root',
 ]
 
-/** 값 없는 플래그 — `card --ir`, `card --repo-policies`, `scan --side-effects`. */
-const BOOLEAN_FLAGS = new Set(['ir', 'repo-policies', 'side-effects', 'case-space'])
+/**
+ * 값 없는 플래그 — `card --ir`, `card --delta`, `card --repo-policies`, `scan --side-effects`. `card --locked`는 이미 잠긴
+ * 카드를 다시 읽는 lock verify용이다: lock 생성만 막는 검사(witness 파일 실재, risk-below-floor)를 건너뛰어, 이후 버전의
+ * 규칙이나 구현 중 바뀐 코드가 기존 잠금을 매 exec마다 깨뜨리지 않게 한다.
+ */
+const BOOLEAN_FLAGS = new Set(['ir', 'delta', 'repo-policies', 'side-effects', 'case-space', 'locked'])
 
 const CLASSIFICATIONS = [
   'POLICY_GAP',
@@ -128,6 +133,23 @@ const NONDETERMINISM_TOKENS = ['Date.now', 'Math.random', 'crypto.randomUUID', '
 
 const EXEMPTION_MARKER = 'oracle:nondeterminism'
 
+/**
+ * production이 테스트 환경일 때만 다르게 동작하는 분기 — 테스트를 건드리지 않고 GREEN을 만드는 우회다(ImpossibleBench
+ * special-casing). `import.meta.vitest` in-source 테스트 블록은 테스트 자체라서 목록에 없다.
+ */
+const TEST_ENV_PATTERNS = [
+  // process.env.VITEST · VITEST_WORKER_ID · import.meta.env.VITEST · process.env['JEST_WORKER_ID']
+  /(?:process|import\.meta)\.env(?:\.|\[['"])(?:VITEST\w*|JEST_WORKER_ID)\b/,
+  // NODE_ENV·MODE를 'test'와 비교 — 점·대괄호 접근 모두, 양쪽 순서 모두
+  /(?:NODE_ENV|MODE)['"]?\]?\s*[!=]==?\s*['"]test['"]/,
+  /['"]test['"]\s*[!=]==?\s*(?:process|import\.meta)\.env/,
+  /__vitest_worker__|\btypeof\s+(?:vi|jest)\s*[!=]==?/,
+  /navigator\.webdriver\b/,
+  /\basymmetricMatch\b/,
+]
+
+const TEST_ENV_EXEMPTION_MARKER = 'oracle:test-env'
+
 class CliError extends Error {
   constructor(code, message, exitCode = 1) {
     super(message)
@@ -153,6 +175,7 @@ const NEXT_ACTIONS = {
   EVIDENCE_STALE: 'a frozen name changed after VALID_RED — spend the harness budget and record a new reported RED',
   RED_EVIDENCE_MISSING: 'run the mapped test with the reporter so the failing name is recorded',
   RED_EVIDENCE_UNVERIFIABLE: 'an exit-only or setup failure is not RED — re-run with the reporter and a failing mapped row',
+  RED_CAUSE_INFRA: "repair the test until the mapped row fails on its own assertion — a syntax·reference·timeout·hook failure is not VALID_RED",
   RUN_NOT_FOUND: 'cite a runId that exists in runs.jsonl — run `exec` again if needed',
   RUN_NOT_RED: 'the cited run must fail on the mapped row — write the test, run `red --row <row>`',
   FINDINGS_INVALID: 'findings must use the six classifications and cite real card rows — regenerate the findings file',
@@ -162,6 +185,8 @@ const NEXT_ACTIONS = {
   REVIEWER_NOT_INDEPENDENT: 'High risk needs two artifacts from different reviewerIds',
   VISUAL_EVIDENCE_INVALID: 'the artifact must be a schema-v3 receipt inside the Oracle directory with matching digests',
   NONDETERMINISM_FOUND: 'inject the source through a seam, or record `oracle:nondeterminism <reason>` next to the token',
+  TEST_ENV_BRANCH:
+    'remove the test-environment branch and make the real path pass — a genuine need (e.g. a dev-only tool) is exempted with `oracle:test-env <reason>`',
   ASSUMPTION_DRIFT: 're-run the landmine sweep for the drifted packages in a new revision — this is not a lock failure',
   LOCK_INVALID: 'FAIL — the determinism judgment is impossible; do not substitute LLM judgment',
   LEDGER_INVALID: 'do not edit runs.jsonl — recover from `oracle-run.mjs status --json`',
@@ -285,6 +310,27 @@ function cellOf(row, ...names) {
   return header ? row.cells[header] : ''
 }
 
+/** 계약 행의 선택 열 — 이 행이 지금 코드의 동작과 어떻게 다른가. */
+const AS_IS_COLUMNS = ['As-is', '기존 동작']
+
+/**
+ * 행의 delta — `As-is`가 비면 새 동작, `same`이면 이미 있는 동작(기존 테스트를 재사용한다), 그 밖의 글은 바뀌는 기존
+ * 동작이다(As-is → Then). 열이 없는 카드는 모든 행이 새 동작이라 이전과 같게 판정된다.
+ */
+function rowDelta(row) {
+  const value = cellOf(row, ...AS_IS_COLUMNS).trim()
+  if (value === '' || value === '-' || value === '—') return { delta: 'new', asIs: null }
+  if (/^same$/i.test(value)) return { delta: 'kept', asIs: null }
+  return { delta: 'changed', asIs: value }
+}
+
+/** 계약 칸 전부 — As-is는 옛 동작의 서술이라 자동 TC·N/A 판정 재료에서 뺀다. */
+function contractCells(row) {
+  return Object.entries(row.cells)
+    .filter(([key]) => !AS_IS_COLUMNS.some((name) => key.includes(name)))
+    .map(([, value]) => value)
+}
+
 function isEmptyCell(value) {
   return value === '' || value === '-' || value.toUpperCase() === 'TBD'
 }
@@ -364,6 +410,9 @@ async function checkWitness(witness, context, label) {
   if (witness.kind === 'code') {
     const match = witness.ref.match(/^([^#]+)#L(\d+)(?:-L?(\d+))?$/)
     if (!match) return [`impossible-witness-invalid: ${label}: code() must be code(<repo-path>#L<a>-L<b>)`]
+    // lock verify가 넘긴다: 파일 실재는 lock create가 보았고 블록 해시는 manifest에 있다. 구현 중 바뀐 코드는
+    // 매 exec의 lint 실패가 아니라 GREEN의 WITNESS_INVALIDATED로 드러나야 한다.
+    if (context.witnessesLocked) return []
     const [, path, from, to] = match
     const content = await readFile(resolve(context.rootDirectory, path), 'utf8').catch(() => null)
     if (content === null) {
@@ -534,7 +583,7 @@ function policyLines(lines) {
 /** 정책마다 surface 토큰 = 정책 문장 + 인용 행의 Given·When·Then·Never 셀. */
 function policySurfaces(cardText) {
   const lines = markdownLines(cardText)
-  const rowText = new Map(parseRows(lines).map((row) => [row.id, Object.values(row.cells).join(' ')]))
+  const rowText = new Map(parseRows(lines).map((row) => [row.id, contractCells(row).join(' ')]))
   return policyLines(lines).map((policy) => ({
     id: policy.id,
     tokens: surfaceTokens([policy.line, ...policy.rows.map((rowId) => rowText.get(rowId) ?? '')].join(' ')),
@@ -857,6 +906,13 @@ async function lintCard(options) {
     return
   }
 
+  // 데이터 뷰 — 행마다 new·kept·changed와 As-is 원문. VALID_RED가 행별 기대(실패·통과)를 이것으로 정한다.
+  if (options.delta) {
+    const deltas = Object.fromEntries(parseRows(markdownLines(card)).map((row) => [row.id, rowDelta(row)]))
+    process.stdout.write(`${stableStringify(deltas)}\n`)
+    return
+  }
+
   // 오라클 간 기억 — 형제 카드의 잠긴 정책 중 surface를 공유하는 counterpart 후보. 정보일 뿐 게이트가 아니다.
   if (options['repo-policies']) {
     const candidates = await repoPolicyCandidates(options.oracle, card)
@@ -1001,6 +1057,25 @@ async function lintCard(options) {
     for (const id of citedSources) {
       if (!sourceIds.has(id)) issues.push(`outcome-source: ${id} is not in Source Registry`)
     }
+
+    // 파괴적 동작은 High다(common.md Risk taxonomy). 카드가 스스로 적은 DELETE 부작용 아래로 Risk를 내리려면
+    // 승인된 비구현 출처가 사유에 있어야 한다 — 낮은 Risk는 mutation·2-review·3회 통과를 한꺼번에 뺀다.
+    if (riskLevel && riskLevel !== 'High' && !options.locked) {
+      const riskReason = outcome.find((line) => line.trim().startsWith('- Risk:')) ?? ''
+      const lowered = (riskReason.match(/\bS\d+\b/g) ?? []).some((id) => {
+        const source = sourceById.get(id)
+        return source && source.Kind !== 'implementation-reference' && isApproved(columnOf(source, SOURCE_COLUMNS.approval))
+      })
+      for (const row of rows) {
+        const effects = Object.entries(row.cells).filter(([key]) => /부작용|side effect/i.test(key)).map(([, value]) => value)
+        // DELETE×0은 "지우지 않는다"는 계약이다 — 양의 횟수만 파괴적 부작용이다
+        if (!lowered && effects.some((value) => /\bDELETE\b(?!\s*×\s*0\b)/.test(value))) {
+          issues.push(
+            `risk-below-floor: ${row.id}: a DELETE side effect under Risk ${riskLevel} — destructive actions are High; raise Risk or cite the approved source that lowers it on the Risk line`,
+          )
+        }
+      }
+    }
   }
 
   const confirmation = sectionLines(lines, 'User Confirmation')
@@ -1115,6 +1190,9 @@ async function lintCard(options) {
     }
 
     if (isEmptyCell(never)) issues.push(`empty-never: ${row.id}: Never is empty`)
+    if (cellOf(row, ...AS_IS_COLUMNS).trim().toUpperCase() === 'TBD') {
+      issues.push(`as-is-unknown: ${row.id}: As-is is TBD — investigate the current behavior, or leave it empty for new behavior`)
+    }
 
     if (row.id.startsWith('O')) {
       if (isEmptyCell(then)) issues.push(`empty-then: ${row.id}: Then is empty`)
@@ -1254,7 +1332,12 @@ async function lintCard(options) {
   // Deviations 섹션도 선택이다 — 있으면 P*×4 STPA 유형 커버리지와 disposition을 검증한다.
   const DEVIATION_TYPES = ['not-provided', 'unsafe-provided', 'wrong-timing-order', 'stopped-early-applied-long']
   // 4계열 disposition 공통 컨텍스트 — 행 실재, 등록 출처(constraint witness), code() witness의 기준 디렉터리
-  const dispositionContext = { seenRows, sourceIds: new Set(sourceById.keys()), rootDirectory }
+  const dispositionContext = {
+    seenRows,
+    sourceIds: new Set(sourceById.keys()),
+    rootDirectory,
+    witnessesLocked: Boolean(options.locked),
+  }
   // lint는 승인된 최종 카드에만 돈다 — 살아남은 needs-decision·needs-evidence는 lock 차단(disposition-open)
   const openCells = []
   const checkCell = async (value, context) => {
@@ -1551,7 +1634,7 @@ async function lintCard(options) {
     )
   }
 
-  const contractText = rows.flatMap((row) => Object.values(row.cells)).join(' ')
+  const contractText = rows.flatMap(contractCells).join(' ')
   const sourcedNaText = lines
     .filter((line) => /\bN\/A\b/i.test(line) && SOURCE_MARKERS.some((marker) => line.includes(marker)))
     .join(' ')
@@ -1654,7 +1737,7 @@ async function assertArtifactFiles(base, artifacts, id, label, snapshots) {
 }
 
 function rowText(row) {
-  return Object.values(row.cells).join(' ')
+  return contractCells(row).join(' ')
 }
 
 function approvedSourceIds(lines) {
@@ -1979,6 +2062,13 @@ async function verifyRedEvidence(options) {
     throw new CliError(
       'RED_EVIDENCE_MISSING',
       `${options.row}: "${entry.name}" must be failed in ${run.runId}; observed ${observed?.status ?? 'missing'}`,
+    )
+  }
+  // 리포터가 판정한 원인 — 이 필드 이전의 리포터 결과는 원인이 없고, 그대로 통과한다
+  if (observed.cause === 'infra') {
+    throw new CliError(
+      'RED_CAUSE_INFRA',
+      `${options.row}: "${entry.name}" failed in ${run.runId} on a syntax·reference error, a timeout or a hook failure — a harness failure, not the row's violation`,
     )
   }
 
@@ -2353,6 +2443,52 @@ function severityRank(finding) {
   return SEVERITIES.indexOf(finding.severity)
 }
 
+/**
+ * 인용 경로를 풀 루트 — 리뷰 패킷의 diff는 scan root 기준이고, 카드 witness는 레포 루트 기준이다. scan root는 패킷이
+ * 없으면 카드 옆 run-state에서 읽는다(패킷 전 `findings` 단계).
+ */
+async function reviewRoots(options) {
+  const oracleDirectory = dirname(resolve(options.oracle))
+  const packet = options.packet ? await readJson(options.packet, 'REVIEW_PACKET_INVALID').catch(() => null) : null
+  const state = packet?.state ?? (await readJson(join(oracleDirectory, 'run-state.json'), 'STATE_INVALID').catch(() => null))
+  const roots = typeof state?.scanRoot === 'string' ? [resolve(oracleDirectory, state.scanRoot)] : []
+  return [...roots, oracleRootDirectory(options.oracle)]
+}
+
+/**
+ * 코드 위치를 주장하는 PRODUCT_DEFECT가 `path#La-Lb`를 인용하면, 그 근처(±3줄)에 `quote`가 실제로 있어야 한다.
+ * 없는 행동("두 번째 클릭에 dedupe 없음")은 인용할 줄이 없으니 path#L 인용이 없는 finding은 검사하지 않는다.
+ */
+/** 문장 속 인용의 가장자리 괄호·마침표만 뗀다 — 경로 안의 괄호는 route group일 수 있어 남긴다. */
+function citationToken(token) {
+  let start = 0
+  let end = token.length
+  while (start < end && '(<['.includes(token[start])) start += 1
+  while (end > start && ')>].:'.includes(token[end - 1])) end -= 1
+  return token.slice(start, end)
+}
+
+async function citationProblem(finding, roots) {
+  if (finding.classification !== 'PRODUCT_DEFECT') return null
+  // 경로에 route group `(shop)`·동적 세그먼트 `[id]`·`+page`가 올 수 있어 괄호로 자르지 않는다 — 가장자리 괄호만 뗀다
+  const cited = String(finding.evidence)
+    .split(/[\s,;`'"]+/)
+    .map((token) => citationToken(token).match(/^([\w@./()[\]+-]+)#L(\d+)(?:-L?(\d+))?$/))
+    .find(Boolean)
+  if (!cited) return null
+  const [reference, path, from, to] = cited
+  if (isAbsolute(path) || path.split('/').includes('..')) return `cites ${reference} outside the repository — cite a repository-relative path`
+  if (typeof finding.quote !== 'string' || !finding.quote.trim()) return `cites ${reference} without a \`quote\` of the line`
+  const normalize = (text) => text.replace(/\s+/g, ' ').trim()
+  for (const root of roots) {
+    const content = await readFile(resolve(root, path), 'utf8').catch(() => null)
+    if (content === null) continue
+    const near = content.split('\n').slice(Math.max(0, Number(from) - 4), Number(to ?? from) + 3)
+    return normalize(near.join('\n')).includes(normalize(finding.quote)) ? null : `the quote is not at ${reference}`
+  }
+  return `${path} does not exist under the review roots`
+}
+
 async function findingsResult(options) {
   if (!options.file || !options.oracle) {
     throw new CliError('USAGE', 'findings requires --file and --oracle', 2)
@@ -2370,6 +2506,19 @@ async function findingsResult(options) {
   const opinions = (findings) => findings.filter((finding) => finding.classification === 'NON_ORACLE_OPINION')
   const claims = (findings) => findings.filter((finding) => finding.classification !== 'NON_ORACLE_OPINION')
   const mandatory = (finding) => finding.severity === 'critical' || finding.severity === 'high'
+
+  // 인용이 코드와 맞지 않는 결함 주장: critical/high는 버리지 않고 다시 내게 하고, medium/low는 의견으로 내린다
+  const roots = await reviewRoots(options)
+  for (const finding of [...primary, ...(secondary ?? [])]) {
+    const problem = await citationProblem(finding, roots)
+    if (!problem) continue
+    if (mandatory(finding)) {
+      throw new CliError('FINDINGS_INVALID', `finding ${finding.id}: ${problem} — re-emit it with the exact line; a high finding is never dropped`)
+    }
+    finding.classification = 'NON_ORACLE_OPINION'
+    finding.downgraded = true
+    finding.citationUnverified = true
+  }
 
   let blocking
   let advisory
@@ -2411,7 +2560,7 @@ async function findingsResult(options) {
   lines.push(
     ...[...primary, ...(secondary ?? [])]
       .filter((finding) => finding.downgraded)
-      .map((finding) => `DOWNGRADED ${finding.id} NON_ORACLE_OPINION`),
+      .map((finding) => `DOWNGRADED ${finding.id} NON_ORACLE_OPINION${finding.citationUnverified ? ' (citation unverified)' : ''}`),
   )
 
   return { blocking, advisory, lines }
@@ -2700,6 +2849,9 @@ function scaffoldRow(row) {
   }
   if (tier === 'RELATIONAL') return { kind: 'visual', artifact: '<visual-qa/<id>/evidence.json>' }
   if (tier === 'JUDGMENT') return { kind: 'reviewer', finding: '<finding id>', role: 'designer' }
+  const { delta } = rowDelta(row)
+  if (delta === 'kept') return { kind: 'test', name: '<이 행을 이미 검증하는 기존 테스트 이름>' }
+  if (delta === 'changed') return { kind: 'test', name: '<옛 기대값을 새 Then으로 고친 기존 테스트 이름>' }
   return { kind: 'test', name: '<이 행을 검증하는 테스트 이름>' }
 }
 
@@ -2752,6 +2904,16 @@ function sideEffectText(rows) {
 }
 
 /**
+ * `--baseline-root` 아래 같은 경로의 파일은 init 시점 바이트다. 그 파일에 이미 있던 줄은 이번 변경이 만든 것이 아니라서
+ * 토큰 판정에서 뺀다 — 손대지 않은 레거시 줄 때문에 무관한 면제 주석을 달게 하지 않는다. 기준선이 없으면 파일 전체가 새 줄이다.
+ */
+async function baselineLines(options, path) {
+  if (!options['baseline-root']) return new Set()
+  const content = await readFile(resolve(options['baseline-root'], path), 'utf8').catch(() => null)
+  return new Set((content ?? '').split('\n').map((line) => line.trim()).filter(Boolean))
+}
+
+/**
  * 정적 side-effect 인벤토리. --oracle이 있으면 범주 소유를 대조한다: 카드의 어떤 행도 그 범주의 side effect를
  * 소유하지 않으면 SIDE_EFFECT_UNOWNED. 알려진 토큰 목록일 뿐이라 검출 0은 효과 없음의 증거가 아니다.
  */
@@ -2766,9 +2928,12 @@ async function scanSideEffectInventory(options) {
     })
     sources.push({ path, content })
     const scanned = scanSideEffects(path, content)
-    hits.push(...scanned.hits)
+    const known = await baselineLines(options, path)
+    const lines = content.split('\n')
+    const fresh = (entry) => !known.has((lines[entry.line - 1] ?? '').trim())
+    hits.push(...scanned.hits.filter(fresh))
     exemptions.push(...scanned.exemptions)
-    invalid.push(...scanned.invalid)
+    invalid.push(...scanned.invalid.filter(fresh))
   }
 
   for (const hit of hits) process.stdout.write(`SIDE_EFFECT ${hit.category} ${hit.path}:${hit.line} ${hit.token}\n`)
@@ -2853,14 +3018,24 @@ async function scanNondeterminism(options) {
   }
 
   const hits = []
+  const testEnvHits = []
+  // 면제는 사유가 있어야 한다 — side-effect 면제와 같은 규칙
+  const testEnvExempt = (line) => new RegExp(`${TEST_ENV_EXEMPTION_MARKER}[ \\t]+\\S`).test(line)
 
   for (const path of options.path) {
     const content = await readFile(path, 'utf8').catch((error) => {
       throw new CliError('SCAN_UNREADABLE', `Cannot read ${path}: ${error.message}`)
     })
     const lines = content.split('\n')
+    const known = await baselineLines(options, path)
 
     lines.forEach((line, index) => {
+      if (known.has(line.trim())) return
+      if (!testEnvExempt(line) && !testEnvExempt(lines[index - 1] ?? '')) {
+        const pattern = TEST_ENV_PATTERNS.find((candidate) => candidate.test(line))
+        if (pattern) testEnvHits.push(`${path}:${index + 1}: ${line.match(pattern)[0]}`)
+      }
+
       const exempt = line.includes(EXEMPTION_MARKER) || (lines[index - 1] ?? '').includes(EXEMPTION_MARKER)
       if (exempt) return
 
@@ -2874,6 +3049,15 @@ async function scanNondeterminism(options) {
     throw new CliError(
       'NONDETERMINISM_FOUND',
       `nondeterministic sources need an injection seam or an \`${EXEMPTION_MARKER} <reason>\` comment:\n  ${hits.join(
+        '\n  ',
+      )}`,
+    )
+  }
+
+  if (testEnvHits.length > 0) {
+    throw new CliError(
+      'TEST_ENV_BRANCH',
+      `production branches on the test environment — the tests would pass on code users never run:\n  ${testEnvHits.join(
         '\n  ',
       )}`,
     )

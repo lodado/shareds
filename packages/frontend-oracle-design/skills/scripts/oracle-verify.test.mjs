@@ -4016,3 +4016,213 @@ test('O14 existing five-axis changeability validation remains strict with contex
     assert.match(result.stderr, /^FINDINGS_INVALID: /)
   }
 })
+
+test('RED cause: a mapped test that failed on a syntax·reference·timeout·hook error is not VALID_RED', async (t) => {
+  const redWith = async (cause) =>
+    run(
+      'red',
+      ...(
+        await evidenceFixture(
+          t,
+          { O1: { kind: 'test', name: 'save > pending 표시' } },
+          {
+            ledger: `${JSON.stringify({
+              runId: 'r-001',
+              exitCode: 1,
+              grade: 'reported',
+              tests: [{ name: 'save > pending 표시', status: 'failed', ...(cause ? { cause } : {}) }],
+            })}\n`,
+          },
+        )
+      ).slice(1),
+      '--row',
+      'O1',
+    )
+
+  const infra = await redWith('infra')
+  assert.equal(infra.status, 1)
+  assert.match(infra.stderr, /^RED_CAUSE_INFRA: O1: "save > pending 표시" failed in r-001/)
+  assert.match(infra.stderr, /\nnext: repair the test until the mapped row fails on its own assertion/)
+
+  // assertion·other(미구현 대상의 TypeError 포함)와 원인이 없는 이전 리포터 결과는 그대로 RED다
+  for (const cause of ['assertion', 'other', null]) {
+    const accepted = await redWith(cause)
+    assert.equal(accepted.status, 0, `${cause}: ${accepted.stderr}`)
+  }
+})
+
+test('scan: a production branch on the test environment fails as TEST_ENV_BRANCH unless exempted with a reason', async (t) => {
+  const base = await directory(t)
+  const path = join(base, 'save.ts')
+  await writeFile(path, "export const save = () => {\n  if (process.env.VITEST) return 'ok'\n  return post()\n}\n")
+
+  const branched = run('scan', '--path', path)
+  assert.equal(branched.status, 1)
+  assert.match(branched.stderr, /^TEST_ENV_BRANCH: /)
+  assert.match(branched.stderr, /save\.ts:2: process\.env\.VITEST/)
+
+  for (const line of ["if (process.env.NODE_ENV === 'test') skip()", 'if (navigator.webdriver) skip()', 'value.asymmetricMatch = () => true']) {
+    await writeFile(path, `${line}\n`)
+    const found = run('scan', '--path', path)
+    assert.equal(found.status, 1, line)
+    assert.match(found.stderr, /^TEST_ENV_BRANCH: /, line)
+  }
+
+  // in-source 테스트 블록과 production 환경 분기는 대상이 아니다
+  await writeFile(path, "if (import.meta.vitest) { run() }\nif (process.env.NODE_ENV === 'production') track()\n")
+  assert.equal(run('scan', '--path', path).status, 0)
+
+  // 맨 마커는 면제가 아니다 — 사유가 있어야 한다
+  await writeFile(path, '// oracle:test-env\nif (process.env.VITEST) mock()\n')
+  assert.equal(run('scan', '--path', path).status, 1)
+  await writeFile(path, '// oracle:test-env dev-only fixture loader, never bundled\nif (process.env.VITEST) mock()\n')
+  const exempt = run('scan', '--path', path)
+  assert.equal(exempt.status, 0, exempt.stderr)
+})
+
+test('risk floor: a DELETE side effect under Medium fails unless the Risk line cites an approved source', async (t) => {
+  const deleting = VALID_CARD.replace('| POST×1            | 상태: pending |', '| DELETE×1          | 상태: pending |')
+  assert.notEqual(deleting, VALID_CARD)
+  const floored = run('card', '--oracle', await cardFile(t, deleting))
+  assert.equal(floored.status, 1)
+  assert.match(floored.stderr, /risk-below-floor: O1: a DELETE side effect under Risk Medium/)
+
+  const high = run('card', '--oracle', await cardFile(t, deleting.replace(/^- Risk: Medium.*$/m, '- Risk: High')))
+  assert.doesNotMatch(high.stderr, /risk-below-floor/)
+
+  const sourced = run(
+    'card',
+    '--oracle',
+    await cardFile(t, deleting.replace(/^- Risk: Medium.*$/m, '- Risk: Medium — soft delete, restorable for 30 days per S1')),
+  )
+  assert.doesNotMatch(sourced.stderr, /risk-below-floor/)
+})
+
+test('findings: a PRODUCT_DEFECT that cites path#L must quote that line; high findings are re-emitted, lower ones demoted', async (t) => {
+  const oracle = await cardFile(t, EVIDENCE_CARD)
+  const root = dirname(oracle)
+  await mkdir(join(root, 'src'), { recursive: true })
+  await writeFile(join(root, 'src', 'save.ts'), 'export function save() {\n  if (pending) return\n  post()\n}\n')
+  const defect = (severity, quote) => ({
+    id: 'f-1',
+    row: 'O1',
+    classification: 'PRODUCT_DEFECT',
+    severity,
+    finding: 'a second click posts again',
+    evidence: 'src/save.ts#L2-L3',
+    ...(quote === undefined ? {} : { quote }),
+    fix: 'keep the pending guard',
+  })
+
+  const quoted = run('findings', '--file', await findingsFile(t, [defect('high', 'if (pending)   return')]), '--oracle', oracle)
+  assert.equal(quoted.status, 0, quoted.stderr)
+  assert.equal(quoted.stdout, 'FINDINGS_OK blocking:1 advisory:0\n')
+
+  const unquotedHigh = run('findings', '--file', await findingsFile(t, [defect('high')]), '--oracle', oracle)
+  assert.equal(unquotedHigh.status, 1)
+  assert.match(unquotedHigh.stderr, /^FINDINGS_INVALID: finding f-1: cites src\/save\.ts#L2-L3 without a `quote`/)
+
+  const wrongHigh = run('findings', '--file', await findingsFile(t, [defect('critical', 'await retry()')]), '--oracle', oracle)
+  assert.equal(wrongHigh.status, 1)
+  assert.match(wrongHigh.stderr, /the quote is not at src\/save\.ts#L2-L3/)
+
+  const wrongMedium = run('findings', '--file', await findingsFile(t, [defect('medium', 'await retry()')]), '--oracle', oracle)
+  assert.equal(wrongMedium.status, 0, wrongMedium.stderr)
+  assert.equal(wrongMedium.stdout, 'FINDINGS_OK blocking:0 advisory:1\nDOWNGRADED f-1 NON_ORACLE_OPINION (citation unverified)\n')
+
+  // 없는 행동에 대한 지적은 인용할 줄이 없다 — path#L 인용이 없으면 검사하지 않는다
+  const absent = run(
+    'findings',
+    '--file',
+    await findingsFile(t, [{ ...defect('high'), evidence: 'no dedupe on the second click (r-003)' }]),
+    '--oracle',
+    oracle,
+  )
+  assert.equal(absent.status, 0, absent.stderr)
+})
+
+test('scan widens TEST_ENV_BRANCH to the Vite and bracket spellings and reads only lines new against a baseline', async (t) => {
+  const base = await directory(t)
+  const path = join(base, 'save.ts')
+  for (const line of [
+    'if (process.env.VITEST_WORKER_ID) return 1',
+    "if (import.meta.env.MODE === 'test') return 1",
+    "if (process.env['NODE_ENV'] === 'test') return 1",
+    'if (globalThis.__vitest_worker__) return 1',
+    "if (typeof jest !== 'undefined') return 1",
+  ]) {
+    await writeFile(path, `${line}\n`)
+    const found = run('scan', '--path', path)
+    assert.equal(found.status, 1, line)
+    assert.match(found.stderr, /^TEST_ENV_BRANCH: /, line)
+  }
+
+  // 기준선에 이미 있던 줄은 이번 변경이 만든 것이 아니다
+  const baseline = join(base, 'baseline')
+  await mkdir(baseline, { recursive: true })
+  await writeFile(join(baseline, 'save.ts'), "const label = (n) => n.toLocaleString()\n")
+  await writeFile(path, "const label = (n) => n.toLocaleString()\nexport const stamp = () => Date.now()\n")
+  const fresh = spawnSync(process.execPath, [script, 'scan', '--path', 'save.ts', '--baseline-root', baseline], { cwd: base, encoding: 'utf8' })
+  assert.equal(fresh.status, 1)
+  assert.match(fresh.stderr, /save\.ts:2: Date\.now/)
+  assert.doesNotMatch(fresh.stderr, /toLocale/)
+})
+
+test('risk floor ignores DELETE×0 and is not re-applied to a card that is already locked', async (t) => {
+  const zero = VALID_CARD.replace('| POST×1            | 상태: pending |', '| DELETE×0          | 상태: pending |')
+  assert.doesNotMatch(run('card', '--oracle', await cardFile(t, zero)).stderr, /risk-below-floor/)
+  const deleting = VALID_CARD.replace('| POST×1            | 상태: pending |', '| DELETE×1          | 상태: pending |')
+  assert.doesNotMatch(run('card', '--oracle', await cardFile(t, deleting), '--locked').stderr, /risk-below-floor/)
+})
+
+test('findings citations resolve route groups and the run scan root without a packet', async (t) => {
+  const oracle = await cardFile(t, EVIDENCE_CARD)
+  const root = dirname(oracle)
+  await mkdir(join(root, 'packages', 'app', '(shop)', 'cart'), { recursive: true })
+  await writeFile(join(root, 'packages', 'app', '(shop)', 'cart', 'page.tsx'), 'export default function Cart() {\n  if (pending) return null\n}\n')
+  // 패킷 전 findings 단계: 카드 옆 run-state의 scan root로 푼다
+  await writeFile(join(root, 'run-state.json'), JSON.stringify({ scanRoot: 'packages' }))
+  const finding = (evidence, quote) => ({
+    id: 'f-1', row: 'O1', classification: 'PRODUCT_DEFECT', severity: 'high', finding: 'guard missing', evidence, quote, fix: 'keep it',
+  })
+  const grouped = run('findings', '--file', await findingsFile(t, [finding('(app/(shop)/cart/page.tsx#L2)', 'if (pending) return null')]), '--oracle', oracle)
+  assert.equal(grouped.status, 0, grouped.stderr)
+  const outside = run('findings', '--file', await findingsFile(t, [finding('../secret.ts#L1', 'x')]), '--oracle', oracle)
+  assert.equal(outside.status, 1)
+  assert.match(outside.stderr, /outside the repository/)
+})
+
+/** Behavior Contract에 As-is 열을 끼운다 — 값이 없는 행은 새 동작이다. */
+function withAsIs(card, values) {
+  const header = '| ID  | 정책 | Given         |'
+  const divider = '| --- | ---- | ------------- |'
+  assert.ok(card.includes(header) && card.includes(divider))
+  return card
+    .replace(header, '| ID  | 정책 | As-is | Given         |')
+    .replace(divider, '| --- | ---- | --- | ------------- |')
+    .replace(/^\| (O\d+) {2}\| (P\d+) {3}\|/gm, (line, id, policy) => `| ${id}  | ${policy}   | ${values[id] ?? ''} |`)
+}
+
+test('As-is: card --delta derives new·kept·changed per row, the column lints clean, and TBD is refused', async (t) => {
+  const card = withAsIs(VALID_CARD, { O2: 'same', O3: '5xx면 입력을 비운다 (N/A 아님)' })
+  const oracle = await cardFile(t, card)
+
+  const linted = run('card', '--oracle', oracle)
+  assert.equal(linted.status, 0, linted.stderr)
+
+  const deltas = JSON.parse(run('card', '--delta', '--oracle', oracle).stdout)
+  assert.deepEqual(deltas.O1, { delta: 'new', asIs: null })
+  assert.deepEqual(deltas.O2, { delta: 'kept', asIs: null })
+  assert.deepEqual(deltas.O3, { delta: 'changed', asIs: '5xx면 입력을 비운다 (N/A 아님)' })
+  // 열이 없는 표(Visual Contract)의 행은 새 동작이다
+  assert.deepEqual(deltas.D1, { delta: 'new', asIs: null })
+
+  // As-is의 옛 동작 서술은 N/A 판정 재료가 아니다 — 스캐폴드는 행의 delta에 맞는 테스트 자리를 만든다
+  const scaffold = JSON.parse(run('evidence-scaffold', '--oracle', oracle).stdout)
+  assert.deepEqual(scaffold.rows.O2, { kind: 'test', name: '<이 행을 이미 검증하는 기존 테스트 이름>' })
+  assert.deepEqual(scaffold.rows.O3, { kind: 'test', name: '<옛 기대값을 새 Then으로 고친 기존 테스트 이름>' })
+
+  const unknown = run('card', '--oracle', await cardFile(t, withAsIs(VALID_CARD, { O4: 'TBD' })))
+  assert.equal(unknown.status, 1)
+  assert.match(unknown.stderr, /as-is-unknown: O4: As-is is TBD/)
+})

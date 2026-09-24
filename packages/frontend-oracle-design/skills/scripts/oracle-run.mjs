@@ -1,26 +1,32 @@
 #!/usr/bin/env node
 
+import { Buffer } from 'node:buffer'
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { appendFile, lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { devNull } from 'node:os'
+import { appendFile, lstat, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { devNull, tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 import { loadGraph, splitDelivery } from './generate-reference-bundles.mjs'
-import { forbiddenArgument, isTrustedAdapter, TRUSTED_ADAPTER_NAMES, trustedAdapter } from './oracle-adapters.mjs'
+import { forbiddenArgument, injectedPaths, isTrustedAdapter, TRUSTED_ADAPTER_NAMES, trustedAdapter } from './oracle-adapters.mjs'
+import { parseCaseSpace } from './oracle-frames.mjs'
 import {
   assertSnapshotUnchanged,
+  FAILURE_CAUSES,
   sha256 as fsSha256,
+  HOST_RECEIPTS_FILE,
   isPathInside,
   isTestPath,
   pathsShareIdentity,
+  reviewOutputDigest,
   snapshotRegularFile,
   stableStringify,
   WEAKENING_TOKENS,
   ZERO_DIGEST,
 } from './oracle-fs.mjs'
+import { invalidatedWitnesses } from './oracle-lock.mjs'
 import { snapshotContext } from './oracle-review-context.mjs'
 import { claudeWorkerInvocation, parseWorkerSubmission } from './oracle-worker.mjs'
 import { spawnGit } from './resolve-executable.mjs'
@@ -73,6 +79,7 @@ const FLAG_NAMES = [
   'task',
   'max-budget-usd',
   'timeout-ms',
+  'check-report',
 ]
 
 const BOOLEAN_FLAGS = new Set(['json', 'changed-files'])
@@ -154,6 +161,31 @@ const NEXT_ACTIONS = {
   REPORT_PATH_EXISTS: 'choose a new --report path; an existing file cannot vouch for this run',
   RUN_ARTIFACTS_EXIST: 'a new revision gets a new <oracle-id> directory — never re-init to reset the baseline',
   RISK_MISMATCH: "drop --risk to use the locked card's Risk — a different risk is a new revision, not an init flag",
+  RED_CAUSE_INFRA:
+    "repair the test until the mapped row fails on its own assertion — a syntax·reference·timeout·hook failure is not VALID_RED",
+  WITNESS_INVALIDATED:
+    'the code an `impossible` cell cites changed — return to NEEDS_DECISION, re-disposition that cell against the new code, and lock a new revision',
+  DIMENSION_NOT_EXECUTED:
+    'the card declares StrictMode — enable it in a registered harness file (`configure({ reactStrictMode: true })`) or render the tests inside <StrictMode>, then record a fresh RED',
+  SIDE_EFFECT_UNOWNED:
+    'add the row whose side-effect column owns that category (POLICY_GAP), remove the unrequested effect (PRODUCT_DEFECT), or exempt the line with `oracle:side-effect <row|reason>`',
+  NONDETERMINISM_FOUND: 'inject the source through a seam, or record `oracle:nondeterminism <reason>` next to the token',
+  TEST_ENV_BRANCH:
+    'remove the test-environment branch and make the real path pass — a genuine need is exempted with `oracle:test-env <reason>`',
+  MUTATION_NOT_TARGETED:
+    'mutate only the guard the row owns and run the full GREEN suite — every other test must still pass, so the kill is the row assertion and not a crash',
+  MUTATION_ROW_NOT_WEAKEST:
+    'mutate a row whose test is shared with another row — that mapping is the weakest evidence and the one a mutation must prove',
+  REVIEW_RECEIPT_UNATTESTED:
+    'pass the findings exactly as the reviewer subagent returned them — this host recorded every reviewer output in host-receipts.jsonl',
+  REPORT_CLAIM_MISMATCH: 'rewrite the report from `status --json` — the ledger wins over the report',
+  RED_ROW_KEPT: 'cite a new or changed row with --row — a `same` row passes before implementation by definition',
+  CHANGED_ROW_NOT_RED:
+    'update the existing test in place so it asserts the new Then — while it still passes on the current code it asserts the As-is behavior',
+  KEPT_ROW_NOT_PASSING:
+    'include the existing test in the RED run; if it really fails, the behavior is not there — the row is new or changed, which is POLICY_GAP',
+  TEST_WEAKENED_BEFORE_RED:
+    'restore the existing test — only the file holding a changed row\'s test, or a file that row\'s As-is names, may change its expectations before RED',
   ORACLE_DIR_INVALID: 'pass --dir as <repository>/.ai/oracles/<oracle-id> — an existing directory inside the scan root',
 }
 
@@ -261,6 +293,42 @@ async function validateHarnessPaths(root, values) {
   }
 
   return paths
+}
+
+/** 소스 코드로 읽을 파일 — 스캔·테스트 강도 측정의 대상. 스크린샷 같은 바이너리는 바이트 digest로만 묶인다. */
+const SCANNABLE = /\.(?:[cm]?[jt]sx?|vue|svelte|astro)$/
+const RUNNER_CONFIG = /(?:^|\/)(?:vitest|playwright|jest)\.config\.[cm]?[jt]s$|(?:^|\/)vitest\.workspace\.[cm]?[jt]s$/
+const VITE_CONFIG = /(?:^|\/)vite\.config\.[cm]?[jt]s$/
+const SETUP_KEYS = /\b(?:setupFiles|setupFilesAfterEnv|globalSetup)\s*:\s*(\[[^\]]*\]|(?:require\.resolve\()?['"][^'"]+['"])/g
+const SETUP_EXTENSIONS = ['', '.ts', '.js', '.mjs', '.cjs', '.mts', '.tsx', '.jsx']
+
+/**
+ * 러너 설정과 setup 파일도 판정 입력이다 — `retry`·`exclude`·전역 mock을 VALID_RED 뒤에 바꾸면 테스트를 건드리지 않고
+ * GREEN을 만든다. 추적 중인 설정과 그 설정이 문자열로 적은 setup 파일을 harness로 자동 등록해 기존 harness 게이트에
+ * 태운다. 문자열이 아닌 setup 값은 추측하지 않고 알린다.
+ */
+async function runnerHarnessPaths(root, worktree) {
+  const paths = []
+  const unresolved = []
+  // vite 설정은 alias·plugin 같은 production 입력도 겸하므로 자동으로 얼리지 않고 제안만 한다
+  const suggested = Object.keys(worktree).filter((path) => VITE_CONFIG.test(path))
+  for (const path of Object.keys(worktree).filter((candidate) => RUNNER_CONFIG.test(candidate))) {
+    const content = await readFile(join(root, path), 'utf8')
+    paths.push(path)
+    const literals = [...content.matchAll(SETUP_KEYS)].flatMap(([, value]) =>
+      [...value.matchAll(/'([^']+)'|"([^"]+)"/g)].map(([, single, double]) => (single ?? double).replace(/^<rootDir>\//, '')),
+    )
+    for (const literal of literals) {
+      const base = portablePath(root, resolve(root, dirname(path), literal))
+      const found = SETUP_EXTENSIONS.map((extension) => `${base}${extension}`).find((candidate) => candidate in worktree)
+      if (found) paths.push(found)
+      else unresolved.push(`${path} → ${literal}`)
+    }
+    if (/\b(?:setupFiles|setupFilesAfterEnv|globalSetup)\s*:\s*(?!['"[]|require\.resolve)/.test(content)) {
+      unresolved.push(`${path} → non-literal setup`)
+    }
+  }
+  return { paths: [...new Set(paths)].sort(), unresolved, suggested }
 }
 
 function selectedDigests(snapshot, paths) {
@@ -727,6 +795,7 @@ function replayState(state, ledger) {
         // 멈춤 원인은 원장이 가진 사실이다 — state 쓰기가 끊겨 재생될 때도 잃지 않는다
         ...(entry.lockStop ? { lockStop: entry.lockStop } : {}),
         ...(entry.blindMapping ? { blindMapping: entry.blindMapping } : {}),
+        ...(entry.reviewAttestation ? { reviewAttestation: entry.reviewAttestation } : {}),
         runCount: entry.runCount ?? 0,
         at: entry.at,
         ledgerDigest: entry.digest,
@@ -834,8 +903,8 @@ async function lockedOraclePath(directory, state) {
   return resolve(dirname(lock), manifest.oracle.path)
 }
 
-function runVerifier(args) {
-  const verified = spawnSync(process.execPath, [verifyScript, ...args], { encoding: 'utf8' })
+function runVerifier(args, { cwd } = {}) {
+  const verified = spawnSync(process.execPath, [verifyScript, ...args], { encoding: 'utf8', ...(cwd ? { cwd } : {}) })
 
   if (verified.status !== 0) {
     const [code, ...message] = (verified.stderr || 'VERIFY_FAILED: oracle-verify failed').split(': ')
@@ -1002,6 +1071,13 @@ function fromPlaywrightReport(suites, ancestors = []) {
   })
 }
 
+function isTerminalTestData(data) {
+  const named = typeof data.name === 'string' && data.name !== ''
+  const known = ['passed', 'failed', 'skipped', 'todo', 'cancelled', 'flaky'].includes(data.status)
+  const cause = data.cause === undefined || FAILURE_CAUSES.includes(data.cause)
+  return named && known && cause && (data.file === undefined || typeof data.file === 'string')
+}
+
 function fromNodeReport(raw, cleanCommand = false) {
   const tests = []
   let complete = false
@@ -1022,15 +1098,10 @@ function fromNodeReport(raw, cleanCommand = false) {
     if (!['test:pass', 'test:fail'].includes(event?.type) || event?.data?.test !== true) {
       return { error: 'Node reporter output contains an unknown event' }
     }
-    const status = event.data.status
-    if (
-      typeof event.data.name !== 'string' ||
-      !event.data.name ||
-      !['passed', 'failed', 'skipped', 'todo', 'cancelled'].includes(status)
-    ) {
-      return { error: 'Node reporter output has an invalid terminal test event' }
-    }
-    tests.push({ name: event.data.name, status })
+    if (!isTerminalTestData(event.data)) return { error: 'Node reporter output has an invalid terminal test event' }
+    // 원인·파일이 없으면 undefined — 원장 JSON에서 키가 빠진다
+    const { name, status, cause, file } = event.data
+    tests.push({ name, status, cause, file })
   }
   if ((complete || cleanCommand) && tests.length > 0) return { tests }
   return { error: 'Node reporter output lacks completion or terminal tests' }
@@ -1308,6 +1379,13 @@ async function initialize(options) {
   state.risk = resolveRisk(options.risk, oracle)
   state.milestones = parseMilestones(options.milestones, contractRowIds(oracle))
   state.snapshot = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+  // RED 전 기존 테스트 변경을 as-is → to-be로만 허용하는 기준선 — 코드 테스트만 잰다(스크린샷 바이트는 재지 않는다)
+  state.testFilesAtInit = {}
+  for (const path of Object.keys(state.snapshot).filter((candidate) => isTestPath(candidate) && SCANNABLE.test(candidate))) {
+    state.testFilesAtInit[path] = measureTestFile(await readFile(join(scanRoot, path), 'utf8'))
+  }
+  const runnerHarness = await runnerHarnessPaths(scanRoot, state.snapshot)
+  harnessPaths.push(...runnerHarness.paths.filter((path) => !harnessPaths.includes(path)))
   const untrackedHarness = harnessPaths.filter((path) => !(path in state.snapshot))
   if (untrackedHarness.length > 0) {
     throw new CliError(
@@ -1337,7 +1415,17 @@ async function initialize(options) {
   state.ledgerHead = initialized.digest
   await writeState(directory, state)
 
-  process.stdout.write(`RUN_STATE_INITIALIZED sha256:${revision.oracleSha256} state:ORACLE_READY\n`)
+  process.stdout.write(
+    [
+      `RUN_STATE_INITIALIZED sha256:${revision.oracleSha256} state:ORACLE_READY`,
+      ...runnerHarness.paths.map((path) => `HARNESS_AUTO ${path}`),
+      ...runnerHarness.unresolved.map((entry) => `HARNESS_SETUP_UNRESOLVED ${entry} — register it with --harness-path`),
+      ...runnerHarness.suggested
+        .filter((path) => !harnessPaths.includes(path))
+        .map((path) => `HARNESS_SUGGESTED ${path} — register it with --harness-path if it carries the test config`),
+      '',
+    ].join('\n'),
+  )
 }
 
 async function execute(options) {
@@ -1360,7 +1448,20 @@ async function execute(options) {
       throw new CliError('ADAPTER_COMMAND_INVALID', adapter.expectation)
     }
     if (forbiddenArgument(adapter, options.command)) {
-      throw new CliError('ADAPTER_COMMAND_INVALID', `${options.adapter} adapter owns reporter and destination options`)
+      throw new CliError(
+        'ADAPTER_COMMAND_INVALID',
+        `${options.adapter} adapter owns reporter and destination options and refuses retry·snapshot-update·leniency flags`,
+      )
+    }
+    const harnessRoot = resolve(directory, state.scanRoot)
+    const unregistered = injectedPaths(options.adapter, options.command).filter(
+      (value) => !(state.harnessPaths ?? []).includes(portablePath(harnessRoot, resolve(options.cwd ?? process.cwd(), value))),
+    )
+    if (unregistered.length > 0) {
+      throw new CliError(
+        'ADAPTER_COMMAND_INVALID',
+        `${unregistered.join(', ')}: a preload·config·setup file must be a registered harness path (init --harness-path)`,
+      )
     }
   }
   const reportBefore = await reportSignature(options.report)
@@ -1595,45 +1696,197 @@ function assertSameCommand(expected, actual) {
   }
 }
 
-async function assertTestsNotWeakened(state, scanRoot) {
-  if (!state.testFiles) return
-
+/** 기준선 측정과 비교해 약해진 테스트 — 지워졌거나, assertion·기대값 리터럴이 줄었거나, 금지 토큰·허용치가 늘었다. */
+async function weakenedTests(baseline, scanRoot, since) {
   const weakened = []
 
-  for (const [path, recorded] of Object.entries(state.testFiles)) {
+  for (const [path, recorded] of Object.entries(baseline)) {
     let content
     try {
       content = await readFile(join(scanRoot, path), 'utf8')
     } catch {
-      weakened.push(`${path}: deleted after VALID_RED`)
+      weakened.push({ path, message: `${path}: deleted after ${since}` })
       continue
     }
 
     const current = measureTestFile(content)
+    if (current.sha256 === recorded.sha256) continue
+    const found = (message) => weakened.push({ path, message: `${path}: ${message}` })
 
-    if (current.assertions < recorded.assertions) {
-      weakened.push(`${path}: assertions ${recorded.assertions} → ${current.assertions}`)
-    }
+    if (current.assertions < recorded.assertions) found(`assertions ${recorded.assertions} → ${current.assertions}`)
 
     for (const [literal, count] of Object.entries(recorded.literals ?? {})) {
       const now = current.literals[literal] ?? 0
-      if (now < count) weakened.push(`${path}: expected literal ${literal} ${count} → ${now}`)
+      if (now < count) found(`expected literal ${literal} ${count} → ${now}`)
     }
 
     for (const [token, count] of Object.entries(current.banned)) {
       const before = recorded.banned[token] ?? 0
-      if (count > before) weakened.push(`${path}: ${token} ${before} → ${count}`)
+      if (count > before) found(`${token} ${before} → ${count}`)
     }
 
     for (const [token, value] of Object.entries(current.tolerances)) {
       const before = recorded.tolerances?.[token]
-      if (before !== undefined && value > before) weakened.push(`${path}: ${token} ${before} → ${value}`)
+      if (before !== undefined && value > before) found(`${token} ${before} → ${value}`)
     }
   }
 
+  return weakened
+}
+
+async function assertTestsNotWeakened(state, scanRoot) {
+  if (!state.testFiles) return
+  const weakened = await weakenedTests(state.testFiles, scanRoot, 'VALID_RED')
   if (weakened.length > 0) {
-    throw new CliError('TEST_WEAKENED', `tests weakened since VALID_RED:\n  ${weakened.join('\n  ')}`)
+    throw new CliError(
+      'TEST_WEAKENED',
+      `tests weakened since VALID_RED:\n  ${weakened.map(({ message }) => message).join('\n  ')}`,
+    )
   }
+}
+
+/**
+ * RED가 테스트 강도의 기준선이 되기 전, init 이후 기존 테스트가 약해졌는가. 옛 기대값을 바꿀 수 있는 곳은 바뀌는 행의
+ * 테스트가 사는 파일(리포터가 적은 file)과 그 행의 As-is가 경로로 가리킨 파일(옮기거나 지운 옛 테스트)뿐이다.
+ * ponytail: 판정 단위가 파일이다 — 바뀌는 행의 파일 안에서는 다른 테스트의 약화가 묻힌다. 필요하면 테스트 블록 단위로.
+ */
+async function assertExistingTestsNotWeakened(state, scanRoot, deltas, evidenceRows, redRunOf) {
+  if (!state.testFilesAtInit) return
+  const changed = Object.entries(deltas).filter(([, entry]) => entry.delta === 'changed')
+  // 러너는 실경로(/private/var/…)를 적는다 — 스냅샷 키와 같은 기준으로 맞춘다
+  const root = await realpath(scanRoot)
+  const authorized = new Set()
+  for (const [row] of changed) {
+    const name = evidenceRows[row]?.name
+    for (const test of redRunOf(row).tests ?? []) {
+      if (test.name !== name || typeof test.file !== 'string') continue
+      authorized.add(portablePath(root, await realpath(test.file).catch(() => resolve(test.file))))
+    }
+  }
+  const weakened = (await weakenedTests(state.testFilesAtInit, scanRoot, 'init')).filter(
+    ({ path }) => !authorized.has(path) && !changed.some(([, entry]) => entry.asIs.includes(path)),
+  )
+  if (weakened.length > 0) {
+    throw new CliError(
+      'TEST_WEAKENED_BEFORE_RED',
+      `existing tests lost strength since init and no changed row accounts for them:\n  ${weakened.map(({ message }) => message).join('\n  ')}`,
+    )
+  }
+}
+
+const STRICT_MODE_ENABLED =
+  /<(?:React\.)?StrictMode\b|wrapper:\s*(?:React\.)?StrictMode\b|createElement\(\s*(?:React\.)?StrictMode\b|reactStrictMode\s*:\s*true/
+
+/**
+ * init 기준선 바이트를 git HEAD에서 되살린다 — HEAD의 바이트가 init 스냅샷 digest와 같을 때만. 다르면(init 때 이미
+ * 더러웠거나 git이 없으면) 기준선이 없는 것으로 두고 파일 전체를 새 줄로 판정한다.
+ */
+async function writeBaselines(state, scanRoot, paths, baselineRoot) {
+  for (const path of paths.filter((candidate) => candidate in state.snapshot)) {
+    const shown = spawnGit(['-C', scanRoot, 'show', `HEAD:./${path}`], { maxBuffer: 16 * 1024 * 1024 })
+    if (shown.status !== 0 || sha256(shown.stdout) !== state.snapshot[path]) continue
+    await mkdir(dirname(join(baselineRoot, path)), { recursive: true })
+    await writeFile(join(baselineRoot, path), shown.stdout)
+  }
+}
+
+/**
+ * GREEN이 직접 스캔한다 — 변경된 production 코드의 side-effect 소유·Case space 차원·비결정성·테스트 환경 분기.
+ * 파일 목록은 init 기준선과의 diff라서 에이전트가 고르지 않는다. 토큰은 init 이후 새로 생긴 줄만 판정하고, 차원 계열은
+ * 파일 단위다. 경로는 scan root 기준이다.
+ */
+async function assertChangedProductionScanned(state, current, scanRoot, oracle) {
+  const changed = changedPaths(state.snapshot, current).filter(
+    (path) => path in current && !isTestPath(path) && !(state.harnessPaths ?? []).includes(path) && SCANNABLE.test(path),
+  )
+  if (changed.length === 0) return
+  const baselineRoot = await mkdtemp(join(tmpdir(), 'oracle-scan-baseline-'))
+  try {
+    await writeBaselines(state, scanRoot, changed, baselineRoot)
+    const paths = [...changed.flatMap((path) => ['--path', path]), '--baseline-root', baselineRoot]
+    runVerifier(['scan', '--side-effects', '--oracle', oracle, ...paths], { cwd: scanRoot })
+    runVerifier(['scan', ...paths], { cwd: scanRoot })
+  } finally {
+    await rm(baselineRoot, { recursive: true, force: true })
+  }
+}
+
+/** 카드가 StrictMode를 선언했으면 테스트가 실제로 그 아래에서 돌아야 한다 — 선언만 하고 한 번 렌더하면 r11b #1이 샌다. */
+async function assertStrictModeExecuted(state, current, scanRoot, oracleText) {
+  let caseSpace = null
+  try {
+    caseSpace = parseCaseSpace(oracleText)
+  } catch {
+    return // 잘못된 Case space는 card lint가 lock 전에 막는다
+  }
+  const declared = caseSpace?.families.some(
+    (entry) =>
+      entry.family === 'Environment' &&
+      !entry.excluded &&
+      [entry.dimension, ...(entry.choices ?? []).map((choice) => choice.value)].some((value) =>
+        /strict[\s_-]*mode/i.test(value ?? ''),
+      ),
+  )
+  if (!declared) return
+  // 이 카드의 테스트(VALID_RED가 얼린 것)와 등록된 harness만 본다 — 레포 어딘가의 다른 테스트나 주석은 증거가 아니다
+  const cardTests = Object.keys(state.testBindings?.tests ?? {}).filter((path) => path in current)
+  const files = [...new Set([...(state.harnessPaths ?? []), ...cardTests])].filter((path) => SCANNABLE.test(path))
+  for (const path of files) {
+    const code = (await readFile(join(scanRoot, path), 'utf8').catch(() => ''))
+      .split('\n')
+      .filter((line) => !/^\s*(?:\/\/|\*|\/\*)/.test(line))
+      .join('\n')
+    if (STRICT_MODE_ENABLED.test(code)) return
+  }
+  throw new CliError(
+    'DIMENSION_NOT_EXECUTED',
+    'the Case space declares StrictMode, but no registered harness file or test renders under <StrictMode> or reactStrictMode: true',
+  )
+}
+
+async function assertWitnessesHold(directory, state) {
+  const invalidated = await invalidatedWitnesses(resolve(directory, state.lock))
+  if (invalidated.length > 0) {
+    throw new CliError(
+      'WITNESS_INVALIDATED',
+      `the implementation changed the code these impossible cells cite: ${invalidated.join(', ')}`,
+    )
+  }
+}
+
+/**
+ * 호스트 영수증 — hook을 지원하는 호스트에서는 SubagentStop·SubagentHandback이 리뷰어가 실제로 반환한 산출물의 digest를
+ * host-receipts.jsonl에 적는다. 그 파일이 있으면 제출한 findings·블라인드 매핑은 서로 다른 서브에이전트의 반환물과 같아야
+ * 한다. 파일이 없으면(hook 없는 호스트) 컨트롤러 영수증뿐이며 `self-reported`로 남긴다.
+ */
+async function readJsonFile(path) {
+  return JSON.parse(await readFile(path, 'utf8'))
+}
+
+async function assertHostReceipts(directory, state, artifacts) {
+  const raw = await readFile(join(directory, HOST_RECEIPTS_FILE), 'utf8').catch(() => null)
+  if (raw === null && state.hostReceipts) {
+    throw new CliError('REVIEW_RECEIPT_UNATTESTED', `${HOST_RECEIPTS_FILE} existed at IMPLEMENTED_GREEN and is gone`)
+  }
+  if (raw === null) return 'self-reported'
+  const receipts = raw
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+  const agents = new Set()
+  for (const [label, document] of artifacts) {
+    const digest = reviewOutputDigest(document)
+    const matching = receipts.filter((receipt) => receipt.kind === digest?.kind && receipt.sha256 === digest?.sha256)
+    if (matching.length === 0) {
+      throw new CliError('REVIEW_RECEIPT_UNATTESTED', `the ${label} does not match any reviewer output this host recorded`)
+    }
+    const fresh = matching.find((receipt) => !agents.has(receipt.agentId))
+    if (!fresh) {
+      throw new CliError('REVIEWER_NOT_INDEPENDENT', `the ${label} came from the same subagent as another review artifact`)
+    }
+    agents.add(fresh.agentId)
+  }
+  return 'host'
 }
 
 function envDrift(state, redRun, greenRun) {
@@ -2042,6 +2295,7 @@ async function transitionUnderLock(options, directory) {
   let packetSha256 = null
   let implementationRevision = null
   let blindMapping = null
+  let reviewAttestation = null
 
   if (options.to === 'NEEDS_DECISION' || options.to === 'FAIL') {
     if (!options.reason) throw new CliError('MISSING_REASON', `${options.to} requires --reason`)
@@ -2067,6 +2321,37 @@ async function transitionUnderLock(options, directory) {
     const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
     const currentHarness = selectedDigests(current, state.harnessPaths ?? [])
     const oracle = await lockedOraclePath(directory, state)
+    // 행별 delta — As-is 열이 `same`이면 기존 유지, 글이면 바뀌는 기존 동작. 열이 없는 카드는 전부 새 동작이다
+    const deltas = JSON.parse(runVerifier(['card', '--delta', '--oracle', oracle]))
+    const deltaOf = (row) => deltas[row]?.delta ?? 'new'
+    if (options.row && deltaOf(options.row) === 'kept') {
+      throw new CliError('RED_ROW_KEPT', `${options.row} is marked same — its test passes before implementation`)
+    }
+    const verifyRedRow = (row, runId) => {
+      try {
+        runVerifier([
+          'red',
+          '--oracle',
+          oracle,
+          '--map',
+          resolve(options.evidence),
+          '--ledger',
+          ledgerPath(directory),
+          '--run',
+          runId,
+          '--row',
+          row,
+        ])
+      } catch (error) {
+        // 바뀌는 행의 테스트가 지금 코드에서 통과한다면 아직 As-is 동작을 단언하고 있다
+        if (error.code === 'RED_EVIDENCE_MISSING' && deltaOf(row) === 'changed') {
+          const [detail] = error.message.split('\nnext:')
+          throw new CliError('CHANGED_ROW_NOT_RED', `${detail} — the test still asserts the As-is behavior`)
+        }
+        throw error
+      }
+    }
+    const coveringRun = new Map()
     if (refreshingRed) {
       if (!isReportedFailingRun(run)) {
         throw new CliError('RUN_NOT_RED', `${run.runId} did not report a clean failing test run`)
@@ -2098,19 +2383,9 @@ async function transitionUnderLock(options, directory) {
           throw new CliError('HARNESS_RED_REQUIRED', `${milestone.run.runId} predates the current harness bytes`)
         }
         for (const row of milestone.rows) {
-          runVerifier([
-            'red',
-            '--oracle',
-            oracle,
-            '--map',
-            resolve(options.evidence),
-            '--ledger',
-            ledgerPath(directory),
-            '--run',
-            milestone.run.runId,
-            '--row',
-            row,
-          ])
+          coveringRun.set(row, milestone.run)
+          // 기존 유지 행은 RED에서 통과해야 한다 — 아래 delta 검사가 본다
+          if (deltaOf(row) !== 'kept') verifyRedRow(row, milestone.run.runId)
         }
       }
     } else {
@@ -2124,20 +2399,31 @@ async function transitionUnderLock(options, directory) {
         throw new CliError('HARNESS_RED_REQUIRED', 'the selected RED predates the current harness bytes')
       }
 
-      runVerifier([
-        'red',
-        '--oracle',
-        oracle,
-        '--map',
-        resolve(options.evidence),
-        '--ledger',
-        ledgerPath(directory),
-        '--run',
-        run.runId,
-        '--row',
-        options.row,
-      ])
+      verifyRedRow(options.row, run.runId)
     }
+
+    // 행별 RED 기대 — 바뀌는 행은 실패, 기존 유지 행은 통과. 구현 전부터 통과한 새 행은 알리기만 한다(Never 행은 흔히 그렇다)
+    const redRunOf = (row) => coveringRun.get(row) ?? run
+    const evidenceRows = JSON.parse(await readFile(resolve(options.evidence), 'utf8')).rows ?? {}
+    const vacuous = []
+    for (const [row, { delta }] of Object.entries(deltas)) {
+      const entry = evidenceRows[row]
+      if (entry?.kind !== 'test') continue
+      const covering = redRunOf(row)
+      const observed = (covering.tests ?? []).find((test) => test.name === entry.name)
+      if (delta === 'kept' && observed?.status !== 'passed') {
+        throw new CliError(
+          'KEPT_ROW_NOT_PASSING',
+          `${row} is marked same, but "${entry.name}" is ${observed?.status ?? 'missing'} in ${covering.runId} — the behavior the card calls existing is not there`,
+        )
+      }
+      if (delta === 'changed' && row !== options.row && !coveringRun.has(row)) verifyRedRow(row, covering.runId)
+      if (delta === 'new' && observed?.status === 'passed') vacuous.push(row)
+    }
+    if (vacuous.length > 0) {
+      notices.push(`RED_VACUOUS ${vacuous.join(', ')} — passed before implementation; only a mutation can show they catch this change`)
+    }
+    await assertExistingTestsNotWeakened(state, scanRoot, deltas, evidenceRows, redRunOf)
 
     state.testFiles = {}
     for (const path of Object.keys(current).filter(isTestPath)) {
@@ -2243,6 +2529,16 @@ async function transitionUnderLock(options, directory) {
       state.envDrift.push(drift)
       notices.push(`ENV_DRIFT ${drift.from}→${drift.to} ${drift.changed.join(', ')}`)
     }
+
+    const lockedOracle = await lockedOraclePath(directory, state)
+    await assertWitnessesHold(directory, state)
+    await assertStrictModeExecuted(state, current, scanRoot, await readFile(lockedOracle, 'utf8'))
+    await assertChangedProductionScanned(state, current, scanRoot, lockedOracle)
+    // 이 호스트의 hook이 영수증 파일을 만들었는가 — REVIEW는 그 뒤 파일이 사라진 것을 증거 삭제로 본다
+    state.hostReceipts = await lstat(join(directory, HOST_RECEIPTS_FILE)).then(
+      () => true,
+      () => false,
+    )
   }
 
   if (options.to === 'REVIEW_VERIFIED') {
@@ -2312,6 +2608,9 @@ async function transitionUnderLock(options, directory) {
       '--phase',
       'review',
     ])
+    await assertWitnessesHold(directory, state)
+    // 리뷰 반영으로 production이 바뀌었을 수 있다 — GREEN과 같은 스캔을 현재 바이트에 다시 건다
+    await assertChangedProductionScanned(state, current, scanRoot, oracle)
     if (state.risk === 'high') {
       const mutationRun = findRun(ledger, options.mutationRun)
       const mutationIndex = ledger.findIndex((entry) => entry.runId === mutationRun.runId)
@@ -2343,6 +2642,39 @@ async function transitionUnderLock(options, directory) {
         '--row',
         options.mutationRow,
       ])
+      // 한 행의 가드만 죽인 변이여야 한다 — 모듈 전체를 깨뜨린 변이도 행 테스트는 죽인다. 표적의 증거는 둘 중 하나:
+      // 행 테스트가 assertion으로 죽었거나, 다른 행에 매핑된 테스트가 살아 있다.
+      const evidenceRows = JSON.parse(await readFile(resolve(options.evidence), 'utf8')).rows ?? {}
+      const mutatedName = evidenceRows[options.mutationRow]?.name
+      const mutationTests = mutationRun.tests ?? []
+      const otherMapped = new Set(
+        Object.values(evidenceRows)
+          .filter((entry) => entry?.kind === 'test' && entry.name !== mutatedName)
+          .map((entry) => entry.name),
+      )
+      const killedByAssertion = mutationTests.some((test) => test.name === mutatedName && test.cause === 'assertion')
+      const otherRowSurvived = mutationTests.some((test) => otherMapped.has(test.name) && test.status === 'passed')
+      if (
+        mutationTests.length < (greenRun.tests?.length ?? 0) ||
+        (!killedByAssertion && otherMapped.size > 0 && !otherRowSurvived)
+      ) {
+        throw new CliError(
+          'MUTATION_NOT_TARGETED',
+          `${mutationRun.runId} must run the full GREEN suite (${greenRun.tests?.length ?? 0} tests) and kill the ${options.mutationRow} test on its assertion or while another row's test still passes`,
+        )
+      }
+      // 증거가 가장 약한 행 — 한 테스트를 여러 행이 나눠 쓰면 그 테스트가 각 행을 정말 assert하는지가 가장 덜 증명됐다
+      const shared = blindMappingApplicability(state.risk, { rows: evidenceRows }).shared
+      const weakest = Object.entries(evidenceRows)
+        .filter(([, entry]) => entry?.kind === 'test' && shared.includes(entry.name))
+        .map(([row]) => row)
+        .sort()
+      if (weakest.length > 0 && !weakest.includes(options.mutationRow)) {
+        throw new CliError(
+          'MUTATION_ROW_NOT_WEAKEST',
+          `${options.mutationRow} owns its test alone — mutate one of ${weakest.join(', ')}, whose test is shared`,
+        )
+      }
     }
 
     if (!options.packet || !options.revision) {
@@ -2435,6 +2767,11 @@ async function transitionUnderLock(options, directory) {
       }
     }
 
+    const reviewArtifacts = [['findings', findingsDocument]]
+    if (intersectDocument) reviewArtifacts.push(['intersect findings', intersectDocument])
+    if (blindMapping?.required) reviewArtifacts.push(['blind map', await readJsonFile(resolve(options.blindMap))])
+    reviewAttestation = await assertHostReceipts(directory, state, reviewArtifacts)
+
     const reviewArgs = [
       'review',
       '--oracle',
@@ -2473,6 +2810,7 @@ async function transitionUnderLock(options, directory) {
     mutationRow: options.mutationRow ?? null,
     ...(lockStop ? { lockStop } : {}),
     ...(blindMapping ? { blindMapping } : {}),
+    ...(reviewAttestation ? { reviewAttestation } : {}),
     runCount: ledger.length,
     at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
   }
@@ -2492,6 +2830,7 @@ async function transitionUnderLock(options, directory) {
     targetRevision: historyEntry.targetRevision,
     ...(lockStop ? { lockStop } : {}),
     ...(blindMapping ? { blindMapping } : {}),
+    ...(reviewAttestation ? { reviewAttestation } : {}),
     stateDelta: {
       state: options.to,
       testFiles: state.testFiles,
@@ -2499,6 +2838,7 @@ async function transitionUnderLock(options, directory) {
       harnessAtValidRed: state.harnessAtValidRed,
       harnessBudgetAtValidRed: state.harnessBudgetAtValidRed,
       envDrift: state.envDrift,
+      hostReceipts: state.hostReceipts ?? false,
     },
     runCount: ledger.length,
     at: historyEntry.at,
@@ -2753,8 +3093,9 @@ async function deriveBlindInput(directory, state, { protect } = {}) {
     .map((line) => line.trim())
     .filter((line) => /^\|\s*[OD]\d+\s*\|/.test(line))
   // 테스트 소스는 VALID_RED가 얼린 그 파일들이다 — 여기서 새로 고르지 않는다.
+  // 스크린샷 기준선은 바이트로만 묶인다 — 이미지를 글자로 풀어 블라인드 입력에 싣지 않는다
   const testPaths = Object.keys(state.testBindings?.tests ?? {})
-    .filter((path) => path in current)
+    .filter((path) => path in current && SCANNABLE.test(path))
     .sort()
   if (testPaths.length === 0) {
     throw new CliError('BLIND_INPUT_INVALID', 'blind mapping needs at least one frozen test source')
@@ -3430,6 +3771,37 @@ function formatReadNode(node) {
   return `${node.id} (${node.path})`
 }
 
+async function readStdinText() {
+  const chunks = []
+  for await (const chunk of process.stdin) chunks.push(chunk)
+  return Buffer.concat(chunks).toString('utf8')
+}
+
+const REPORTED_STATES = /^Status:\s*(ORACLE_READY|VALID_RED|IMPLEMENTED_GREEN|REVIEW_VERIFIED|NEEDS_DECISION|FAIL)\b/m
+
+/**
+ * 최종 보고의 주장을 원장과 대조한다 — `Status:` 상태어와 인용된 runId·exit code만. 보고서를 쓰는 에이전트의 자기
+ * 점검(SKILL.md "Verification — before the final report" 2·4번)을 기계 판정으로 옮긴 것이다.
+ */
+async function checkReport(state, ledger, source) {
+  const text = source === '-' ? await readStdinText() : await readFile(resolve(source), 'utf8')
+  const runs = new Map(ledger.filter((entry) => entry.type === 'run').map((entry) => [entry.runId, entry]))
+  const problems = []
+  const claimed = text.match(REPORTED_STATES)?.[1]
+  if (claimed !== state.state) {
+    problems.push(claimed ? `it claims ${claimed}, the ledger replays ${state.state}` : 'the report has no `Status: <state>` line')
+  }
+  const cited = new Set([...text.matchAll(/\b(r-\d{3,})\b/g)].map(([, runId]) => runId))
+  for (const runId of cited) if (!runs.has(runId)) problems.push(`${runId} is not in runs.jsonl`)
+  // 보고 양식의 `<runId> exit <n>`처럼 붙어 있는 주장만 짝이다 — 산문 속 다른 run의 exit를 끌어오지 않는다
+  for (const [, runId, exit] of text.matchAll(/\b(r-\d{3,})\s+exit\s+(-?\d+)/g)) {
+    const run = runs.get(runId)
+    if (run && run.exitCode !== Number(exit)) problems.push(`${runId} exit ${exit}, the ledger records exit ${run.exitCode}`)
+  }
+  if (problems.length > 0) throw new CliError('REPORT_CLAIM_MISMATCH', problems.join('; '))
+  process.stdout.write(`REPORT_CONSISTENT state:${state.state} runs:${cited.size}\n`)
+}
+
 async function reportStatus(options) {
   if (!options.dir) {
     throw new CliError('USAGE', 'status requires --dir', 2)
@@ -3438,6 +3810,11 @@ async function reportStatus(options) {
   const directory = resolve(options.dir)
   const ledger = await readLedger(directory)
   const state = replayState(await readState(directory), ledger)
+
+  if (options.checkReport) {
+    await checkReport(state, ledger, options.checkReport)
+    return
+  }
 
   // --changed-files: init 기준선 이후 바뀐 경로만 한 줄씩 — 레포의 related-tests 도구에 그대로 먹인다 (impact 라벨)
   if (options['changed-files']) {

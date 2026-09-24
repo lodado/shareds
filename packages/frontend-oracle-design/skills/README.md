@@ -404,6 +404,21 @@ NOT_RUN=12, host 실행 실패=0/0 attempted(시도 없음; 실패율 아님)입
 없어 산출하지 않았고, 비용·시간·토큰은 `unmeasured`입니다. 새로운 실제 사고·성공 기록이나
 개선 성과는 만들지 않았습니다. 실행환경을 갖춘 뒤의 실제 A/B 평가는 남아 있습니다.
 
+### 기존 기능 바꾸기 — As-is 열
+
+기존 기능을 고치는 카드는 Behavior Contract에 `As-is` 열을 둡니다. 비우면 새 동작, `same`이면 이미 있는
+동작, 글을 쓰면 지금 동작(as-is)이 `Then`(to-be)으로 바뀐다는 뜻입니다. 사용자는 Draft에서 행마다 이 변화를
+승인합니다.
+
+| As-is   | 테스트                                        | VALID_RED가 보는 것                                    |
+| ------- | --------------------------------------------- | ------------------------------------------------------ |
+| 비움    | 새로 씁니다                                   | 지금처럼 `--row` 하나가 실패. 미리 통과한 행은 알림    |
+| `same`  | 쓰지 않고 기존 테스트에 매핑합니다            | 그 테스트가 RED 실행에서 통과 (`KEPT_ROW_NOT_PASSING`) |
+| 옛 동작 | 옛 기대값을 제자리에서 새 `Then`으로 고칩니다 | 그 테스트가 RED 실행에서 실패 (`CHANGED_ROW_NOT_RED`)  |
+
+init이 기존 테스트 강도를 기록합니다. RED 전에 기존 테스트의 assert가 줄거나 파일이 지워지면, 바뀌는 행의
+테스트가 있는 파일이거나 그 행의 As-is가 경로로 적은 파일이 아닌 이상 `TEST_WEAKENED_BEFORE_RED`입니다.
+
 ### Hook이 사전 차단하는 것과 게이트만 보는 것
 
 hook은 가속기이고 `oracle-run.mjs transition`이 최종 권위입니다. 아래 표의 "게이트"는 쓰기가 이미
@@ -415,6 +430,22 @@ hook은 가속기이고 `oracle-run.mjs transition`이 최종 권위입니다. �
 | Bash `rm`·`mv`·`sed -i`·heredoc 쓰기      | 게이트           | 게이트      | hook은 도구 이름과 경로로만 보므로 판정 불가    |
 | MCP·에디터 확장 쓰기                      | 게이트           | 게이트      | 같은 이유                                       |
 | `.ai/oracles/**` 자체                     | 통과             | 통과        | 오라클 아티팩트는 production이 아님             |
+| `.ai/oracles/<id>/host-receipts.jsonl`    | hook이 사전 거절 | 해당 없음   | `HOST_RECEIPT_PROTECTED` — hook만 이 파일을 씀  |
+
+같은 스크립트가 두 이벤트를 더 봅니다.
+
+- **SubagentStop·`SubagentHandback`**: 오라클이 `IMPLEMENTED_GREEN`에서 리뷰를 기다리는 동안, 서브에이전트가
+  실제로 반환한 findings 배열·블라인드 매핑의 digest를 `host-receipts.jsonl`에 적습니다. 이 파일이 있으면
+  `REVIEW_VERIFIED`는 제출된 파일이 서로 다른 서브에이전트의 반환물과 같은지 봅니다
+  (`REVIEW_RECEIPT_UNATTESTED`·`REVIEWER_NOT_INDEPENDENT`). Codex·jcode처럼 hook이 없으면 파일이 없고,
+  전이 기록에 `reviewAttestation: self-reported`가 남습니다.
+- **Stop**: 마지막 메시지에 `Status: <state>` 줄과 runId가 있으면, 인용한 runId를 전부 가진 오라클 중 원장이
+  가장 최근에 움직인 것(보고가 `Oracle SHA-256`을 적었으면 그 잠금의 오라클)과
+  `oracle-run.mjs status --check-report -`로 대조하고, 어긋나면 `REPORT_CLAIM_MISMATCH`로 멈춤을 막습니다.
+  막은 뒤의 재시도(`stop_hook_active`)는 다시 막지 않습니다. hook이 없는 호스트는 같은 명령을 직접 돌립니다.
+
+영수증은 같은 셸 권한을 가진 에이전트가 위조하거나 지울 수 있습니다. 구현 중 쓰기에서 hook이 파일을 만들면
+`IMPLEMENTED_GREEN`이 그 사실을 원장에 남기고 리뷰 때 사라진 파일을 막지만, 이것은 비용을 올릴 뿐 증명이 아닙니다.
 
 판정 불가는 fail-open이지만 조용히 사라지지 않습니다. hook은 stderr에 한 줄 JSON을 남깁니다 —
 `{"oracleGuard":"unjudged","reason":"STATE_UNPARSEABLE"|"SCAN_ROOT_MISSING"|"PAYLOAD_UNREADABLE",...}`.

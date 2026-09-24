@@ -11,13 +11,13 @@ Risk in [common.md](common.md) sets the minimum evidence, independently of task 
 affected owners, dependencies and reversibility to choose the breadth and depth of investigation.
 Do not add another risk score, lifecycle state, approval gate or mandatory planning artifact.
 
-| Evidence at intake | Adaptation |
-| --- | --- |
-| Approved sources and existing owners already cover the change | Reuse them; explain the relevant choice in a sentence instead of producing a second design |
+| Evidence at intake                                            | Adaptation                                                                                     |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Approved sources and existing owners already cover the change | Reuse them; explain the relevant choice in a sentence instead of producing a second design     |
 | Existing-system owners or document/code agreement are unclear | Investigate only the affected journey and its state, API, side effects and verification owners |
-| A public boundary or shared owner changes | Load the applicable architecture/type/backend references under their existing conditions |
-| Several outcomes share a policy, state owner or side effect | Keep one Oracle; consider its existing non-overlapping milestones |
-| Independent cards would be needed | Propose boundaries and unresolved integration obligations; do not promise aggregate completion |
+| A public boundary or shared owner changes                     | Load the applicable architecture/type/backend references under their existing conditions       |
+| Several outcomes share a policy, state owner or side effect   | Keep one Oracle; consider its existing non-overlapping milestones                              |
+| Independent cards would be needed                             | Propose boundaries and unresolved integration obligations; do not promise aggregate completion |
 
 The reference graph's load conditions and the canonical confirmation, lock, RED/GREEN and review
 contracts remain the floor. A short High-risk change still gets High-risk evidence; an omitted
@@ -39,7 +39,8 @@ the whole repository or create a document at every component.
 
 Keep these distinctions in the investigation rationale, with actual paths/symbols/source locations:
 
-- **Observed as-is:** what code, tests or browser evidence currently do.
+- **Observed as-is:** what code, tests or browser evidence currently do. Once a row's as-is is
+  settled, it goes into that row's `As-is` cell on the card, where the user approves it.
 - **Approved to-be:** what accepted sources require, referencing Source Registry entries.
 - **Unknown:** missing evidence or unresolved policy, including disagreements between the two.
 

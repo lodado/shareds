@@ -20,8 +20,35 @@
 
 const FORBIDDEN_SHARED = ['--eval', '-e']
 
+/**
+ * 판정을 느슨하게 하는 러너 옵션 — 재시도는 경합을 숨기고, 기준선 갱신은 기대값을 현재 동작으로 바꾸고, 처리 안 된
+ * 오류 무시·빈 실행 통과·실패만 재실행은 실패를 통과로 읽게 하고, `.only` 허용·제외는 매핑된 테스트를 빼게 한다.
+ * 설정 파일 쪽은 init이 harness로 얼린다.
+ */
+const LENIENCY_FLAGS = {
+  'node-test': ['--test-update-snapshots', '--test-rerun-failures'],
+  vitest: ['--retry', '--update', '-u', '--passWithNoTests', '--dangerouslyIgnoreUnhandledErrors', '--allowOnly', '--exclude'],
+}
+
+/**
+ * 코드를 테스트 실행에 끼워 넣는 옵션 — 값이 등록된 harness 파일일 때만 허용한다. 아니면 VALID_RED 뒤에 만든 preload나
+ * 새 설정 파일이 얼린 harness를 우회해 전역 mock·느슨한 설정을 들여온다.
+ */
+const INJECTION_FLAGS = {
+  'node-test': ['--import', '--require', '-r', '--loader', '--experimental-loader'],
+  vitest: ['-c', '--config', '--setupFiles', '--globalSetup'],
+}
+
+/** `--pass-with-no-tests`·`--retry.count=2`도 cac가 camelCase·점 경로로 푸는 같은 옵션이다. */
+function optionName(argument) {
+  if (!argument.startsWith('--')) return argument
+  const name = argument.split('=')[0].split('.')[0]
+  return name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase()).replace(/^-([a-z])/, '--$1')
+}
+
 function hasArgument(command, names) {
-  return command.some((argument) => names.some((name) => argument === name || argument.startsWith(`${name}=`)))
+  const wanted = new Set(names.map(optionName))
+  return command.some((argument) => wanted.has(optionName(argument)))
 }
 
 export const TRUSTED_ADAPTERS = {
@@ -29,7 +56,7 @@ export const TRUSTED_ADAPTERS = {
     reporter: 'oracle-node-reporter.mjs',
     extension: 'ndjson',
     // node:test는 리포터 목적지를 CLI로 받는다.
-    forbidden: [...FORBIDDEN_SHARED, '--test-reporter', '--test-reporter-destination'],
+    forbidden: [...FORBIDDEN_SHARED, '--test-reporter', '--test-reporter-destination', ...LENIENCY_FLAGS['node-test']],
     matches: (command, { execPath }) => command[0] === execPath && command.includes('--test'),
     expectation: 'node-test adapter requires node --test',
     build: (command, { reporter, destination }) => {
@@ -51,7 +78,7 @@ export const TRUSTED_ADAPTERS = {
     extension: 'ndjson',
     // vitest는 custom reporter에 목적지를 넘기는 CLI 옵션이 없다. 오라클이 env로
     // 지정하고 리포터가 그 경로에만 쓴다.
-    forbidden: [...FORBIDDEN_SHARED, '--reporter', '--outputFile'],
+    forbidden: [...FORBIDDEN_SHARED, '--reporter', '--outputFile', ...LENIENCY_FLAGS.vitest],
     // `vitest`가 명령 어딘가에 있어야 하고(pnpm/npx 래퍼 허용), watch 모드를 막기
     // 위해 `run` 하위 명령을 요구한다. watch 모드는 종료하지 않아 판정이 불가능하다.
     matches: (command) =>
@@ -77,4 +104,16 @@ export function trustedAdapter(name) {
 
 export function forbiddenArgument(adapter, command) {
   return hasArgument(command, adapter.forbidden)
+}
+
+/** 주입 옵션의 값 목록 — `--import x`, `--import=x`, `-r x` 모두. 판정(등록 여부)은 호출자가 한다. */
+export function injectedPaths(adapterName, command) {
+  const names = new Set((INJECTION_FLAGS[adapterName] ?? []).map(optionName))
+  const values = []
+  command.forEach((argument, index) => {
+    if (!names.has(optionName(argument))) return
+    const inline = argument.includes('=') ? argument.slice(argument.indexOf('=') + 1) : null
+    values.push(inline ?? command[index + 1] ?? '')
+  })
+  return values
 }

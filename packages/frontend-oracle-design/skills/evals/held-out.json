@@ -11,22 +11,26 @@
         {
           "class": "DIMENSION_MISSING",
           "symptom": "append skeleton stuck forever — StrictMode re-ran the effect, cleanup cleared the timer but left the pending flag",
-          "assertion": "The Draft names, in the interaction sweep, deviations, or an Open question, the StrictMode double-invoke of the effect that owns the append timer (cleanup must restore the pending state, not only clear the timer)."
+          "assertion": "The Draft names, in the interaction sweep, deviations, or an Open question, the StrictMode double-invoke of the effect that owns the append timer (cleanup must restore the pending state, not only clear the timer).",
+          "check": "test:StrictMode declared in the Case space must actually run: no harness or test enabling it is DIMENSION_NOT_EXECUTED"
         },
         {
           "class": "DIMENSION_MISSING",
           "symptom": "every filter change scrolled to top — inherited filterKey remount × virtualizer mount-time scrollTo(0); initialOffset was the upstream fossil",
-          "assertion": "The Draft has a sweep cell or landmine for the inherited filterKey remount × the virtualizer's mount-time scroll reset (scrollTo / initialOffset), dispositioned as needs-decision or covered by a row that fixes the expected scroll position after remount."
+          "assertion": "The Draft has a sweep cell or landmine for the inherited filterKey remount × the virtualizer's mount-time scroll reset (scrollTo / initialOffset), dispositioned as needs-decision or covered by a row that fixes the expected scroll position after remount.",
+          "check": "test:mines the r11b defect dimensions from the code that carried them"
         },
         {
           "class": "DIMENSION_MISSING",
           "symptom": "screen jumped on every filter — first render used the default 4 columns, then ResizeObserver delivered the measured value",
-          "assertion": "The Draft names the initial default column count → first ResizeObserver measurement transition as a runtime dimension, deviation, or Open question (what is rendered before the first measurement)."
+          "assertion": "The Draft names the initial default column count → first ResizeObserver measurement transition as a runtime dimension, deviation, or Open question (what is rendered before the first measurement).",
+          "check": "test:mines the r11b defect dimensions from the code that carried them"
         },
         {
           "class": "POLICY_GAP",
           "symptom": "list height flickered between 5332px and 1190px on filter change — queryKey change → Suspense fallback; no revision ever asked what is shown during a filter switch",
-          "assertion": "The Draft raises, as an Open question or needs-decision, what the user sees during a filter switch (Suspense fallback vs the previous list kept), instead of silently inheriting the current behavior."
+          "assertion": "The Draft raises, as an Open question or needs-decision, what the user sees during a filter switch (Suspense fallback vs the previous list kept), instead of silently inheriting the current behavior.",
+          "check": "none — a question-bank row in interaction-sweep.md only; the 0.39 and 0.41 A/B arms both still missed it"
         }
       ],
       "expected": {
@@ -44,17 +48,20 @@
         {
           "class": "OUTPUT_CONTRACT_MISSING",
           "symptom": "The first plan listed unit/integration/e2e tests but did not say which async, cache, pagination, or response-order combinations would be exercised.",
-          "assertion": "The first substantive Draft explicitly declares the applicable Case-space dimensions and choices (for example page mode, cache or placeholder availability, request state, and completion order), gives the constraint or applicability reason for each, and connects the risky interactions to contract rows."
+          "assertion": "The first substantive Draft explicitly declares the applicable Case-space dimensions and choices (for example page mode, cache or placeholder availability, request state, and completion order), gives the constraint or applicability reason for each, and connects the risky interactions to contract rows.",
+          "check": "none — a proposed case, not an observed escape; the Draft is graded by reading"
         },
         {
           "class": "TEST_REALIZATION_MISSING",
           "symptom": "The plan named tests without identifying the real target, controllable boundary, completion barrier, or observable result.",
-          "assertion": "For each key failure mechanism, the Draft identifies the actual hook or compound UI under test, the fetcher or deferred response boundary it controls, the observable completion barrier, the user-visible or request observation, and whether this is planned or executed evidence."
+          "assertion": "For each key failure mechanism, the Draft identifies the actual hook or compound UI under test, the fetcher or deferred response boundary it controls, the observable completion barrier, the user-visible or request observation, and whether this is planned or executed evidence.",
+          "check": "none — a proposed case, not an observed escape; the Draft is graded by reading"
         },
         {
           "class": "PROTOCOL_OUTPUT_CONFUSION",
           "symptom": "A design explanation claimed Oracle/card/frame approval or passing test evidence merely because the procedure was described.",
-          "assertion": "The response distinguishes protocol obligations (Draft/card/frame generation/approval and later $test handoff) from design output: it may produce a Draft and generated/dispositioned frames when the procedure calls for them, but it does not fabricate frame IDs or claim card approval, lock, or executed test evidence."
+          "assertion": "The response distinguishes protocol obligations (Draft/card/frame generation/approval and later $test handoff) from design output: it may produce a Draft and generated/dispositioned frames when the procedure calls for them, but it does not fabricate frame IDs or claim card approval, lock, or executed test evidence.",
+          "check": "none — a proposed case, not an observed escape; the Draft is graded by reading"
         }
       ],
       "expected": {
@@ -72,17 +79,20 @@
         {
           "class": "TYPE_RUNTIME_BOUNDARY_MISSING",
           "symptom": "The answer said “type safety will be tested” but did not provide a compiler witness boundary or separate runtime observation plan.",
-          "assertion": "The first Draft separates compile-time and runtime verification: it names at least one valid inference witness and one single misuse rejected by the compiler, then identifies the runtime contract, target, controllable input, and observable result without duplicating production logic."
+          "assertion": "The first Draft separates compile-time and runtime verification: it names at least one valid inference witness and one single misuse rejected by the compiler, then identifies the runtime contract, target, controllable input, and observable result without duplicating production logic.",
+          "check": "none — a proposed case, not an observed escape; the Draft is graded by reading"
         },
         {
           "class": "DESIGN_ONLY_SCOPE_LEAK",
           "symptom": "A type-only request caused the plan to imply that test files, production code, dependencies, or executed results already exist.",
-          "assertion": "The response preserves the design-only scope: proposed compiler witnesses and runtime harness boundaries are clearly labeled as planned examples, with no production or test-file changes, dependency installation, test execution, or fabricated PASS evidence."
+          "assertion": "The response preserves the design-only scope: proposed compiler witnesses and runtime harness boundaries are clearly labeled as planned examples, with no production or test-file changes, dependency installation, test execution, or fabricated PASS evidence.",
+          "check": "none — a proposed case, not an observed escape; the Draft is graded by reading"
         },
         {
           "class": "PROTOCOL_OUTPUT_CONFUSION",
           "symptom": "The procedure was treated as approval or a completed Oracle card rather than a first Draft awaiting the existing gate.",
-          "assertion": "The response distinguishes a legitimately produced Draft from the approval/lock protocol: it may produce the Draft and planned witnesses, but does not claim user approval, ORACLE_READY, lock, or executed test evidence, and routes unresolved policy or API decisions to Open questions."
+          "assertion": "The response distinguishes a legitimately produced Draft from the approval/lock protocol: it may produce the Draft and planned witnesses, but does not claim user approval, ORACLE_READY, lock, or executed test evidence, and routes unresolved policy or API decisions to Open questions.",
+          "check": "none — a proposed case, not an observed escape; the Draft is graded by reading"
         }
       ],
       "expected": {
@@ -100,22 +110,26 @@
         {
           "class": "INTERACTION_DIMENSION_MISSING",
           "symptom": "The plan listed pending/success/error but omitted tenant scope × previous placeholder, cache hit or refetch failure, and A→B/B→A completion order.",
-          "assertion": "The first Draft names tenant or scope, data availability (no current key, current-key cache, previous-key placeholder), request state, and completion order as applicable dimensions; it explains non-combinable or policy-unknown cells instead of treating all unions as reachable."
+          "assertion": "The first Draft names tenant or scope, data availability (no current key, current-key cache, previous-key placeholder), request state, and completion order as applicable dimensions; it explains non-combinable or policy-unknown cells instead of treating all unions as reachable.",
+          "check": "none — a proposed case, not an observed escape; the Draft is graded by reading"
         },
         {
           "class": "ASYNC_CONTROL_OBSERVATION_MISSING",
           "symptom": "The design claimed race safety without saying how to hold A and B responses or how to prove the stale tenant result was not visible.",
-          "assertion": "The Draft connects the request-reversal and tenant/placeholder paths to a real query consumer, a fetcher/deferred completion boundary, an observable barrier after the late response is processed, and exact visible data/request assertions; cancellation is planned separately from response-order safety."
+          "assertion": "The Draft connects the request-reversal and tenant/placeholder paths to a real query consumer, a fetcher/deferred completion boundary, an observable barrier after the late response is processed, and exact visible data/request assertions; cancellation is planned separately from response-order safety.",
+          "check": "none — a proposed case, not an observed escape; the Draft is graded by reading"
         },
         {
           "class": "SEQUENCE_HANDOFF_MISSING",
           "symptom": "The design showed one race example but did not hand an Order dimension to the existing $test sequence requirement.",
-          "assertion": "When Order has two or more choices, the Draft explicitly plans the existing $test sequence evidence (fast-check or justified hand-enumerated deferred orderings) and distinguishes that future execution evidence from the current first-Draft plan."
+          "assertion": "When Order has two or more choices, the Draft explicitly plans the existing $test sequence evidence (fast-check or justified hand-enumerated deferred orderings) and distinguishes that future execution evidence from the current first-Draft plan.",
+          "check": "none — a proposed case, not an observed escape; the Draft is graded by reading"
         },
         {
           "class": "PROTOCOL_OUTPUT_CONFUSION",
           "symptom": "A proposed scenario was presented as an approved frame or a passing integration test.",
-          "assertion": "The response distinguishes protocol artifacts and gates (Draft, frame/card approval, $test handoff) from proposed verification content and reports no execution result, approval, or generated evidence that has not occurred."
+          "assertion": "The response distinguishes protocol artifacts and gates (Draft, frame/card approval, $test handoff) from proposed verification content and reports no execution result, approval, or generated evidence that has not occurred.",
+          "check": "none — a proposed case, not an observed escape; the Draft is graded by reading"
         }
       ],
       "expected": {
@@ -133,12 +147,14 @@
         {
           "class": "DERIVED_STATE_ENUMERATED",
           "symptom": "The type contract declared a client OrderTableState union with firstLoad·ready·paging·pageError·empty·firstError members — every member but ready was the query's status·isFetching·error or the row count wearing a tag, and ready·paging carried the same page.",
-          "assertion": "The Draft's state or type contract declares no client union whose members restate the query's lifecycle or a row count (no `paging`·`pageError`·`empty`·`firstLoad` members beside a `ready` member carrying the same page); it names the query's status·isFetching·error and the row count as the axes the screen is derived from, and any screen name is a literal union computed at render rather than stored state."
+          "assertion": "The Draft's state or type contract declares no client union whose members restate the query's lifecycle or a row count (no `paging`·`pageError`·`empty`·`firstLoad` members beside a `ready` member carrying the same page); it names the query's status·isFetching·error and the row count as the axes the screen is derived from, and any screen name is a literal union computed at render rather than stored state.",
+          "check": "none — a proposed case, not an observed escape; the Draft is graded by reading"
         },
         {
           "class": "STATE_OWNER_DUPLICATED",
           "symptom": "Five different screens were read as five states, so the derive-first and consume-the-framework-union rungs were judged inapplicable and the query's lifecycle was copied into a client union.",
-          "assertion": "Where the Draft or plan explains the state design, it distinguishes screens from states — the spinner, the failure notice, and the empty panel are render branches over independent axes, not members — and names the query as the single owner of the lifecycle with the cursor living in the query key."
+          "assertion": "Where the Draft or plan explains the state design, it distinguishes screens from states — the spinner, the failure notice, and the empty panel are render branches over independent axes, not members — and names the query as the single owner of the lifecycle with the cursor living in the query key.",
+          "check": "none — a proposed case, not an observed escape; the Draft is graded by reading"
         }
       ],
       "expected": {

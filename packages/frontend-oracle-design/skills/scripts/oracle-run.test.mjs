@@ -2,13 +2,15 @@ import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
-import { chmod, link, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { chmod, link, mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { generateFromDocument } from './oracle-frames.mjs'
+import { HOST_RECEIPTS_FILE, reviewOutputDigest } from './oracle-fs.mjs'
 import { resolveExecutable, spawnGit } from './resolve-executable.mjs'
 
 function gitCommand() {
@@ -1098,10 +1100,15 @@ test('O3: node-test adapter owns reporter output and records actual test names',
   const [record] = (await ledgerLines(oracleDirectory))
     .map((line) => JSON.parse(line))
     .filter((entry) => entry.type === 'run')
-  assert.deepEqual(record.tests, [
-    { name: '통과하는 계약', status: 'passed' },
-    { name: '실패하는 계약', status: 'failed' },
-  ])
+  // 실패한 테스트는 리포터가 판정한 원인을, 모든 테스트는 자기 파일을 함께 싣는다 — assert.equal은 assertion 실패다
+  const file = await realpath(target)
+  assert.deepEqual(
+    record.tests.map((test) => ({ ...test, file: test.file && realpathSync(test.file) })),
+    [
+      { name: '통과하는 계약', status: 'passed', file },
+      { name: '실패하는 계약', status: 'failed', cause: 'assertion', file },
+    ],
+  )
 })
 
 test('full-product: one parameterized node reporter run records twelve frame cases and ordered async scenarios', async (t) => {
@@ -1163,7 +1170,12 @@ test('full-product: one parameterized node reporter run records twelve frame cas
   assert.equal(record.adapter, 'node-test')
   assert.equal(record.tests.length, 12)
   assert.equal(new Set(record.tests.map(({ name }) => name)).size, 12)
-  assert.deepEqual(record.tests, frames.map(({ name }) => ({ name, status: 'passed' })))
+  // 리포터가 각 테스트의 파일을 함께 싣는다 — RED 전 기존 테스트 변경을 행에 귀속하는 재료다
+  assert.deepEqual(
+    record.tests.map(({ name, status }) => ({ name, status })),
+    frames.map(({ name }) => ({ name, status: 'passed' })),
+  )
+  assert.ok(record.tests.every((test) => test.file?.endsWith('full-product.test.mjs')))
 
   const frameMap = Object.fromEntries(frames.map((frame) => [frame.frame, {
     kind: 'test',
@@ -2380,11 +2392,14 @@ test('O9: bundled node reporter marks skip and todo as non-passing evidence', as
   assert.match(reported.stderr, /^REPORT_NONPASSING: /)
 
   const [record] = (await ledgerLines(oracleDirectory)).map(JSON.parse).slice(-1)
-  assert.deepEqual(record.tests, [
-    { name: 'skipped contract', status: 'skipped' },
-    { name: 'todo contract', status: 'todo' },
-    { name: 'real pass', status: 'passed' },
-  ])
+  assert.deepEqual(
+    record.tests.map(({ name, status }) => ({ name, status })),
+    [
+      { name: 'skipped contract', status: 'skipped' },
+      { name: 'todo contract', status: 'todo' },
+      { name: 'real pass', status: 'passed' },
+    ],
+  )
 
   const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002')
 
@@ -4863,4 +4878,589 @@ test('O12 contextual dimensions do not substitute for Medium or High independent
   const partitioned = verifyContextFixture(fixture)
   assert.equal(partitioned.status, 1)
   assert.match(partitioned.stderr, /FINDINGS_INVALID/)
+})
+
+/** P1의 static 편차를 production 코드로 증명한 카드 — code() witness가 잠기고 GREEN이 그 블록을 다시 확인한다. */
+const WITNESS_ORACLE = `${ORACLE}
+## Deviations
+
+| Policy | Type         | Disposition |
+| ------ | ------------ | ----------- |
+| P1     | not-provided | covered(O1) |
+| P1     | static       | impossible: 저장 가드가 pending을 고정한다 — code(packages/src/save.mjs#L1-L1) |
+`
+
+test('witness: GREEN fails WITNESS_INVALIDATED when the implementation edits the code an impossible cell cites', async (t) => {
+  const initialFiles = { 'src/save.mjs': 'export const guarded = true\n' }
+  const moved = await workspace(t, { oracleContent: WITNESS_ORACLE, initialFiles })
+  await reachValidRed(moved.oracleDirectory, moved.root)
+  // 위쪽에 줄이 들어와 번호만 밀린 블록은 살아 있다
+  await writeFile(join(moved.root, 'src', 'save.mjs'), 'export const other = 1\nexport const guarded = true\n')
+  greenRun(moved.oracleDirectory, 'green-1')
+  greenRun(moved.oracleDirectory, 'green-2')
+  const kept = transition(moved.oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(kept.status, 0, kept.stderr)
+
+  const edited = await workspace(t, { oracleContent: WITNESS_ORACLE, initialFiles })
+  await reachValidRed(edited.oracleDirectory, edited.root)
+  await writeFile(join(edited.root, 'src', 'save.mjs'), 'export const guarded = false\n')
+  greenRun(edited.oracleDirectory, 'green-1')
+  greenRun(edited.oracleDirectory, 'green-2')
+  const invalidated = transition(edited.oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(invalidated.status, 1)
+  assert.match(invalidated.stderr, /^WITNESS_INVALIDATED: .*packages\/src\/save\.mjs#L1-L1/)
+  assert.match(invalidated.stderr, /\nnext: the code an `impossible` cell cites changed/)
+})
+
+test('GREEN scans the changed production files itself — an unowned side effect or a test-environment branch blocks it', async (t) => {
+  const initialFiles = { 'src/save.mjs': 'export const save = (post) => post()\n' }
+  for (const [content, code] of [
+    ["export const save = (post) => { localStorage.setItem('draft', '') ; return post() }\n", /^SIDE_EFFECT_UNOWNED: /],
+    ['export const save = (post) => (process.env.VITEST ? 1 : post())\n', /^TEST_ENV_BRANCH: /],
+    ['export const save = (post) => post() && Date.now()\n', /^NONDETERMINISM_FOUND: /],
+  ]) {
+    const { root, oracleDirectory } = await workspace(t, { initialFiles })
+    await reachValidRed(oracleDirectory, root)
+    await writeFile(join(root, 'src', 'save.mjs'), content)
+    greenRun(oracleDirectory, 'green-1')
+    greenRun(oracleDirectory, 'green-2')
+    const blocked = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+    assert.equal(blocked.status, 1, content)
+    assert.match(blocked.stderr, code, blocked.stderr)
+  }
+
+  // 카드가 소유한 부작용(POST)만 더한 변경은 통과한다
+  const { root, oracleDirectory } = await workspace(t, { initialFiles })
+  await reachValidRed(oracleDirectory, root)
+  await writeFile(join(root, 'src', 'save.mjs'), "export const save = () => fetch('/save', { method: 'POST' })\n")
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  const owned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(owned.status, 0, owned.stderr)
+})
+
+/** Environment 차원에 StrictMode를 선언하고 생성 프레임을 전부 covered로 판정한 카드. */
+function strictModeOracle() {
+  const card = ORACLE.replace(
+    '| Environment | —         | excluded: fixture scope |',
+    '| Environment | render    | StrictMode              |',
+  )
+  assert.notEqual(card, ORACLE)
+  const generated = generateFromDocument(card)
+  const entries = [...generated.frames, ...generated.errorFrames, ...generated.paths, ...generated.emptyCells]
+  // 프레임 실행 증거는 이 테스트의 관심사가 아니다 — 선언만으로 StrictMode 실행 의무가 생기는지를 본다
+  const rows = entries.map(({ id, label = '' }) => `| ${id} | independent(O1): one render tree in this fixture | ${label} |`)
+  return `${card}\n## Frame dispositions\n\n| Frame | Disposition | Label |\n| ----- | ----------- | ----- |\n${rows.join('\n')}\n`
+}
+
+test('StrictMode declared in the Case space must actually run: no harness or test enabling it is DIMENSION_NOT_EXECUTED', async (t) => {
+  const plain = await workspace(t, { oracleContent: strictModeOracle() })
+  await reachValidRed(plain.oracleDirectory, plain.root)
+  greenRun(plain.oracleDirectory, 'green-1')
+  greenRun(plain.oracleDirectory, 'green-2')
+  const missing = transition(plain.oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /^DIMENSION_NOT_EXECUTED: /)
+
+  // setup 파일이 RTL을 StrictMode로 설정했다 — 설정 파일이 문자열로 적은 setup은 init이 harness로 얼린다
+  const strict = await workspace(t, {
+    oracleContent: strictModeOracle(),
+    initialFiles: {
+      'vitest.config.mjs': "export default { test: { setupFiles: ['./test/setup.mjs'] } }\n",
+      'test/setup.mjs': "configure({ reactStrictMode: true })\n",
+    },
+  })
+  const recorded = await state(strict.oracleDirectory)
+  assert.deepEqual(recorded.harnessPaths, ['test/setup.mjs', 'vitest.config.mjs'])
+  await reachValidRed(strict.oracleDirectory, strict.root)
+  greenRun(strict.oracleDirectory, 'green-1')
+  greenRun(strict.oracleDirectory, 'green-2')
+  const executed = transition(strict.oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(executed.status, 0, executed.stderr)
+})
+
+test('init freezes runner config and literal setup files as harness, and names a setup it cannot resolve', async (t) => {
+  const { root, oracleDirectory, lock } = await workspace(t, {
+    initialize: false,
+    initialFiles: {
+      'playwright.config.ts': "export default { globalSetup: require.resolve('./e2e/global-setup') }\n",
+      'e2e/global-setup.ts': 'export default async () => {}\n',
+      'vite.config.ts': 'export default { plugins: [] }\n',
+      'vitest.config.ts': 'export default { test: { setupFiles: setupPaths } }\n',
+    },
+  })
+  const initialized = run([
+    'init', '--dir', oracleDirectory, '--lock', lock, '--scan-root', root, '--required-label', 'behavior',
+  ])
+  assert.equal(initialized.status, 0, initialized.stderr)
+  // test 키 없는 vite 설정은 러너 설정이 아니다
+  assert.deepEqual((await state(oracleDirectory)).harnessPaths, ['e2e/global-setup.ts', 'playwright.config.ts', 'vitest.config.ts'])
+  assert.match(initialized.stdout, /^HARNESS_AUTO playwright\.config\.ts$/m)
+  assert.match(initialized.stdout, /^HARNESS_SETUP_UNRESOLVED vitest\.config\.ts → non-literal setup — register it with --harness-path$/m)
+  // vite 설정은 alias·plugin도 겸해서 얼리지 않고 제안만 한다
+  assert.match(initialized.stdout, /^HARNESS_SUGGESTED vite\.config\.ts — register it with --harness-path if it carries the test config$/m)
+})
+
+test('screenshot baselines are test paths frozen at VALID_RED, and runner leniency flags are refused', async (t) => {
+  const { isTestPath } = await import('./oracle-fs.mjs')
+  for (const path of ['e2e/grid.spec.ts-snapshots/grid-chromium.png', 'src/__screenshots__/grid.png', 'e2e/grid.aria.yml']) {
+    assert.equal(isTestPath(path), true, path)
+  }
+  assert.equal(isTestPath('src/snapshots/manager.ts'), false)
+  // 이름이 -snapshots로 끝나는 production 폴더는 기준선이 아니다
+  assert.equal(isTestPath('src/volume-snapshots/delete.ts'), false)
+
+  const { oracleDirectory } = await workspace(t)
+  for (const flag of ['--retry=2', '--retry.count=2', '--update', '-u', '--passWithNoTests', '--pass-with-no-tests', '--dangerously-ignore-unhandled-errors', '--allowOnly']) {
+    const refused = run([
+      'exec', '--dir', oracleDirectory, '--label', 'behavior', '--adapter', 'vitest',
+      '--report', join(oracleDirectory, `lenient-${flag.replace(/\W/g, '')}.ndjson`), '--', 'npx', 'vitest', 'run', flag,
+    ])
+    assert.equal(refused.status, 1, flag)
+    assert.match(refused.stderr, /^ADAPTER_COMMAND_INVALID: .*leniency/, flag)
+  }
+  // 등록되지 않은 preload·설정 파일은 얼린 harness를 우회한다
+  const preload = run([
+    'exec', '--dir', oracleDirectory, '--label', 'behavior', '--adapter', 'node-test',
+    '--report', join(oracleDirectory, 'preload.ndjson'), '--', process.execPath, '--import', './preload.mjs', '--test', 'x.test.mjs',
+  ])
+  assert.equal(preload.status, 1)
+  assert.match(preload.stderr, /^ADAPTER_COMMAND_INVALID: \.\/preload\.mjs: a preload·config·setup file must be a registered harness path/)
+})
+
+/** 행 두 개가 한 테스트를 나눠 쓰는 카드 — 그 테스트가 가장 약한 증거다. */
+const SHARED_ORACLE = MILESTONE_ORACLE.replace(
+  '- P1: 목록과 상세를 각각 표시한다. (출처: S1) (행: O1, O2)',
+  '- P1: 목록과 상세를 각각 표시한다. (출처: S1) (행: O1, O2, O3)',
+).replace(
+  '| O2 | P1 | detail input | open | detail shown | wrong item | GET×1 | state |',
+  '| O2 | P1 | list input | reload | list kept | blank | GET×1 | state |\n| O3 | P1 | detail input | open | detail shown | wrong item | GET×1 | state |',
+)
+
+const SHARED_EVIDENCE = {
+  schemaVersion: 1,
+  rows: {
+    O1: { kind: 'test', name: 'list > shown' },
+    O2: { kind: 'test', name: 'list > shown' },
+    O3: { kind: 'test', name: 'detail > shown' },
+  },
+}
+
+/** 파일 바이트는 고정하고 환경 변수로 실패 테스트를 고른다 — VALID_RED에 얼린 테스트 바이트를 건드리지 않는다. */
+const MODE_FIXTURE = `import test from 'node:test'
+const failing = { red: ['list > shown'], crash: ['list > shown', 'detail > shown'], list: ['list > shown'], detail: ['detail > shown'] }[process.env.ORACLE_FIXTURE_MODE] ?? []
+for (const name of ['list > shown', 'detail > shown']) test(name, () => { if (failing.includes(name)) throw new Error('expected RED') })
+`
+
+function modeRun(oracleDirectory, root, label, mode) {
+  reportSequence += 1
+  const report = join(oracleDirectory, `${label}-mode-${reportSequence}.ndjson`)
+  const fixture = join(root, 'oracle-mode-fixture.test.mjs')
+  const args = ['exec', '--dir', oracleDirectory, '--label', label, '--adapter', 'node-test', '--report', report]
+  return run([...args, '--', process.execPath, '--test', fixture], { ORACLE_FIXTURE_MODE: mode })
+}
+
+test('High mutation must be targeted and must hit the weakest row', async (t) => {
+  const source = 'src/save.mjs'
+  const { root, oracleDirectory } = await workspace(t, {
+    risk: 'high',
+    oracleContent: SHARED_ORACLE,
+    evidence: SHARED_EVIDENCE,
+    initialFiles: { [source]: 'export const guarded = true\n', 'oracle-mode-fixture.test.mjs': MODE_FIXTURE },
+  })
+  modeRun(oracleDirectory, root, 'red', 'red')
+  assert.equal(transition(oracleDirectory, 'VALID_RED', 'r-001').status, 0)
+  for (let index = 0; index < 3; index += 1) modeRun(oracleDirectory, root, 'behavior', 'green')
+  const green = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-004')
+  assert.equal(green.status, 0, green.stderr)
+
+  const second = join(oracleDirectory, 'findings-second.json')
+  await writeFile(second, JSON.stringify({ ...CLEAR_REVIEW, reviewer: 'second-code-reviewer', reviewerId: 'second-code-reviewer' }))
+  let next = 5
+  const mutate = (mode) => {
+    writeFileSync(join(root, source), 'export const guarded = false\n')
+    modeRun(oracleDirectory, root, 'mutation', mode)
+    writeFileSync(join(root, source), 'export const guarded = true\n')
+    modeRun(oracleDirectory, root, 'behavior', 'green')
+    const ids = [`r-${String(next).padStart(3, '0')}`, `r-${String(next + 1).padStart(3, '0')}`]
+    next += 2
+    return ids
+  }
+  const review = ([mutationRun, reviewRun], row) =>
+    transition(oracleDirectory, 'REVIEW_VERIFIED', reviewRun, [
+      '--intersect', second, '--mutation-run', mutationRun, '--mutation-row', row,
+    ])
+
+  // 모듈 전체를 깨뜨린 변이는 행 테스트를 죽여도 그 행의 가드를 증명하지 않는다
+  const crash = review(mutate('crash'), 'O1')
+  assert.equal(crash.status, 1)
+  assert.match(crash.stderr, /^MUTATION_NOT_TARGETED: /)
+
+  // 테스트를 혼자 가진 행은 가장 약한 증거가 아니다 — 공유 테스트 행을 쳐야 한다
+  const alone = review(mutate('detail'), 'O3')
+  assert.equal(alone.status, 1)
+  assert.match(alone.stderr, /^MUTATION_ROW_NOT_WEAKEST: O3 owns its test alone — mutate one of O1, O2/)
+
+  // 표적 변이는 mutation 게이트를 넘는다 — 다음 관문은 High의 블라인드 매핑이다
+  const targeted = review(mutate('list'), 'O1')
+  assert.equal(targeted.status, 1)
+  assert.match(targeted.stderr, /^BLIND_MAP_REQUIRED: /)
+})
+
+test('host receipts: when the host recorded reviewer outputs, the findings must be one of them', async (t) => {
+  const reach = async () => {
+    const { root, oracleDirectory } = await workspace(t)
+    await reachValidRed(oracleDirectory, root)
+    greenRun(oracleDirectory, 'green-1')
+    greenRun(oracleDirectory, 'green-2')
+    assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+    greenRun(oracleDirectory, 'review')
+    return oracleDirectory
+  }
+  const receipt = (agentId, document) =>
+    `${JSON.stringify({ agentId, agentType: 'code-reviewer', sessionId: 's', ...reviewOutputDigest(document), at: 'now' })}\n`
+
+  // 호스트가 다른 산출물만 기록했다 — 제출된 findings는 어떤 리뷰어도 반환하지 않았다
+  const forged = await reach()
+  await writeFile(
+    join(forged, HOST_RECEIPTS_FILE),
+    receipt('agent-1', { findings: [{ id: 'f-1', row: 'O1', classification: 'PRODUCT_DEFECT', severity: 'high' }] }),
+  )
+  const unattested = transition(forged, 'REVIEW_VERIFIED', 'r-004')
+  assert.equal(unattested.status, 1)
+  assert.match(unattested.stderr, /^REVIEW_RECEIPT_UNATTESTED: the findings does not match/)
+
+  const attested = await reach()
+  await writeFile(join(attested, HOST_RECEIPTS_FILE), receipt('agent-1', CLEAR_REVIEW))
+  const verified = transition(attested, 'REVIEW_VERIFIED', 'r-004')
+  assert.equal(verified.status, 0, verified.stderr)
+  assert.equal((await state(attested)).history.at(-1).reviewAttestation, 'host')
+
+  // hook 없는 호스트 — 컨트롤러 영수증만 있고 그렇게 기록된다
+  const selfReported = await reach()
+  assert.equal(transition(selfReported, 'REVIEW_VERIFIED', 'r-004').status, 0)
+  assert.equal((await state(selfReported)).history.at(-1).reviewAttestation, 'self-reported')
+})
+
+test('status --check-report compares the Status line and cited runs with the ledger', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  const check = (report) =>
+    spawnSync(process.execPath, [script, 'status', '--dir', oracleDirectory, '--check-report', '-'], {
+      input: report,
+      encoding: 'utf8',
+      env: isolatedEnvironment(),
+    })
+
+  const honest = check('Status: IMPLEMENTED_GREEN — card tests pass\n\n**Verification**\n- red r-001 exit 1 reported\n- behavior r-003 exit 0 reported\n')
+  assert.equal(honest.status, 0, honest.stderr)
+  assert.equal(honest.stdout, 'REPORT_CONSISTENT state:IMPLEMENTED_GREEN runs:2\n')
+
+  const inflated = check('Status: REVIEW_VERIFIED — reviewed\n- behavior r-003 exit 0 reported · r-009 exit 0\n- red r-001 exit 0\n')
+  assert.equal(inflated.status, 1)
+  assert.match(inflated.stderr, /^REPORT_CLAIM_MISMATCH: it claims REVIEW_VERIFIED, the ledger replays IMPLEMENTED_GREEN/)
+  assert.match(inflated.stderr, /r-009 is not in runs\.jsonl/)
+  assert.match(inflated.stderr, /r-001 exit 0, the ledger records exit 1/)
+  assert.match(inflated.stderr, /\nnext: rewrite the report from `status --json`/)
+})
+
+test('the Stop hook blocks a final report the ledger contradicts and stays silent otherwise', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  const stop = (message, extra = {}) => {
+    const result = spawnSync(process.execPath, [join(scriptDirectory, 'oracle-guard-hook.mjs')], {
+      input: JSON.stringify({ cwd: root, hook_event_name: 'Stop', last_assistant_message: message, ...extra }),
+      encoding: 'utf8',
+      env: isolatedEnvironment(),
+    })
+    assert.equal(result.status, 0, result.stderr)
+    return result.stdout.trim() ? JSON.parse(result.stdout) : null
+  }
+
+  assert.equal(stop('Status: IMPLEMENTED_GREEN — card tests pass\n- behavior r-003 exit 0 reported\n'), null)
+  const blocked = stop('Status: REVIEW_VERIFIED — done\n- behavior r-003 exit 0 reported\n')
+  assert.equal(blocked.decision, 'block')
+  assert.match(blocked.reason, /^REPORT_CLAIM_MISMATCH: it claims REVIEW_VERIFIED, the ledger replays IMPLEMENTED_GREEN/)
+  // 막은 뒤의 재시도, Status 줄이 없는 턴, 이 원장에 없는 runId만 인용한 보고는 판정하지 않는다
+  assert.equal(stop('Status: REVIEW_VERIFIED — done\n- behavior r-003 exit 0\n', { stop_hook_active: true }), null)
+  assert.equal(stop('Refactored the helper. r-003 exit 0.'), null)
+  assert.equal(stop('Status: REVIEW_VERIFIED — other repository\n- behavior r-777 exit 0\n'), null)
+})
+
+test('the vitest reporter records failure causes and never counts a retried pass as a pass', async (t) => {
+  const { default: OracleVitestReporter } = await import('./oracle-vitest-reporter.mjs')
+  const directory = await mkdtemp(join(tmpdir(), 'oracle-vitest-reporter-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const emitted = async (entries, legacy = false) => {
+    const destination = join(directory, `report-${legacy ? 'legacy' : 'modules'}.ndjson`)
+    const previous = process.env.ORACLE_REPORT_DESTINATION
+    process.env.ORACLE_REPORT_DESTINATION = destination
+    try {
+      const reporter = new OracleVitestReporter()
+      await (legacy ? reporter.onFinished(entries) : reporter.onTestRunEnd(entries))
+    } finally {
+      if (previous === undefined) delete process.env.ORACLE_REPORT_DESTINATION
+      else process.env.ORACLE_REPORT_DESTINATION = previous
+    }
+    return (await readFile(destination, 'utf8')).trim().split('\n').map((line) => JSON.parse(line).data)
+  }
+
+  // vitest v3+/v4 TestModule API
+  const testCase = (fullName, state, errors = [], flaky = false) => ({
+    fullName,
+    result: () => ({ state, errors }),
+    diagnostic: () => ({ flaky }),
+  })
+  const modules = [
+    {
+      children: {
+        allTests: () => [
+          testCase('save > asserts', 'failed', [{ name: 'AssertionError', message: 'expected 1 to be 2' }]),
+          testCase('save > references', 'failed', [{ name: 'ReferenceError', message: 'foo is not defined' }]),
+          testCase('save > waits', 'failed', [{ name: 'Error', message: 'Test timed out in 5000ms.' }]),
+          testCase('save > missing export', 'failed', [{ name: 'TypeError', message: 'save is not a function' }]),
+          testCase('save > retried', 'passed', [], true),
+          testCase('save > passes', 'passed'),
+        ],
+      },
+    },
+  ]
+  assert.deepEqual(await emitted(modules), [
+    { name: 'save > asserts', status: 'failed', test: true, cause: 'assertion' },
+    { name: 'save > references', status: 'failed', test: true, cause: 'infra' },
+    { name: 'save > waits', status: 'failed', test: true, cause: 'infra' },
+    { name: 'save > missing export', status: 'failed', test: true, cause: 'other' },
+    { name: 'save > retried', status: 'flaky', test: true },
+    { name: 'save > passes', status: 'passed', test: true },
+  ])
+
+  // vitest v1~v2 task tree
+  const legacy = [
+    {
+      type: 'suite',
+      name: 'save',
+      tasks: [
+        { type: 'test', name: 'retried', result: { state: 'pass', retryCount: 1 } },
+        { type: 'test', name: 'hook', result: { state: 'fail', errors: [{ name: 'Error', message: 'Hook timed out in 10000ms.' }] } },
+        // 테스트 본문의 SyntaxError는 잘못된 응답을 JSON.parse한 것일 수 있다 — 그 행의 위반 자체라서 막지 않는다
+        { type: 'test', name: 'parse', result: { state: 'fail', errors: [{ name: 'SyntaxError', message: 'Unexpected token <' }] } },
+      ],
+    },
+  ]
+  assert.deepEqual(await emitted(legacy, true), [
+    { name: 'save > retried', status: 'flaky', test: true },
+    { name: 'save > hook', status: 'failed', test: true, cause: 'infra' },
+    { name: 'save > parse', status: 'failed', test: true, cause: 'other' },
+  ])
+})
+
+test('GREEN judges only lines new since init: a token already in the touched file does not block it', async (t) => {
+  const initialFiles = { 'src/save.mjs': "console.info('save module loaded')\nexport const save = (post) => post()\n" }
+  const { root, oracleDirectory, lock } = await workspace(t, { git: true, initialize: false, initialFiles })
+  const repository = dirname(root)
+  const git = (args) => spawnGit(['-C', repository, ...args], { encoding: 'utf8', env: isolatedEnvironment() })
+  git(['add', '-A'])
+  assert.equal(git(['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', 'commit', '-qm', 'base']).status, 0)
+  const initialized = run(['init', '--dir', oracleDirectory, '--lock', lock, '--scan-root', root, '--required-label', 'behavior'])
+  assert.equal(initialized.status, 0, initialized.stderr)
+  await reachValidRed(oracleDirectory, root)
+
+  // 레거시 console 줄은 그대로 두고 함수만 바꿨다 — 그 줄 때문에 무관한 면제 주석을 요구하지 않는다
+  await writeFile(join(root, 'src', 'save.mjs'), "console.info('save module loaded')\nexport const save = (post) => post() ?? null\n")
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  const kept = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(kept.status, 0, kept.stderr)
+})
+
+test('a new unowned side effect added after GREEN during review fixes is caught at REVIEW_VERIFIED', async (t) => {
+  const initialFiles = { 'src/save.mjs': 'export const save = (post) => post()\n' }
+  const { root, oracleDirectory } = await workspace(t, { initialFiles })
+  await reachValidRed(oracleDirectory, root)
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  await writeFile(join(root, 'src', 'save.mjs'), "export const save = (post) => { localStorage.setItem('k', '') ; return post() }\n")
+  greenRun(oracleDirectory, 'review')
+  const reviewed = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-004')
+  assert.equal(reviewed.status, 1)
+  assert.match(reviewed.stderr, /^SIDE_EFFECT_UNOWNED: /)
+})
+
+test('host receipts: a receipts file that existed at GREEN and was deleted before review is not self-reported', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  // hook이 구현 중 쓰기에서 만든 파일 — GREEN이 그 존재를 원장에 남긴다
+  await writeFile(join(oracleDirectory, HOST_RECEIPTS_FILE), '')
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  assert.equal((await state(oracleDirectory)).hostReceipts, true)
+  await rm(join(oracleDirectory, HOST_RECEIPTS_FILE))
+  greenRun(oracleDirectory, 'review')
+  const deleted = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-004')
+  assert.equal(deleted.status, 1)
+  assert.match(deleted.stderr, /^REVIEW_RECEIPT_UNATTESTED: host-receipts\.jsonl existed at IMPLEMENTED_GREEN and is gone/)
+})
+
+test('the Stop hook judges the most recently active oracle, not any oracle that happens to share run numbers', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  const oracles = dirname(oracleDirectory)
+  // 예전 리비전 디렉터리 — 같은 r-001을 갖고 NEEDS_DECISION에 멈춰 있다. 복사 후 멈춤 기록으로 원장이 더 최근이 되지 않게
+  // 먼저 멈추고 나서 현재 오라클을 한 번 더 움직인다.
+  const { cp } = await import('node:fs/promises')
+  await cp(oracleDirectory, join(oracles, 'older'), { recursive: true })
+  assert.equal(run(['transition', '--dir', join(oracles, 'older'), '--to', 'NEEDS_DECISION', '--reason', 'older revision']).status, 0)
+  // 손상된 원장을 가진 미끼 — 판정 불가로 건너뛰어야 한다
+  await mkdir(join(oracles, 'zzz-decoy'), { recursive: true })
+  await writeFile(join(oracles, 'zzz-decoy', 'run-state.json'), '{}')
+  await writeFile(join(oracles, 'zzz-decoy', 'runs.jsonl'), '{"runId":"r-001","at":"9999-01-01T00:00:00.000Z"}\n')
+  greenRun(oracleDirectory, 'green-1')
+
+  const stop = (message) => {
+    const result = spawnSync(process.execPath, [join(scriptDirectory, 'oracle-guard-hook.mjs')], {
+      input: JSON.stringify({ cwd: root, hook_event_name: 'Stop', last_assistant_message: message }),
+      encoding: 'utf8',
+      env: isolatedEnvironment(),
+    })
+    return result.stdout.trim() ? JSON.parse(result.stdout) : null
+  }
+  const blocked = stop('Status: NEEDS_DECISION — waiting\n- red r-001 exit 1 reported\n')
+  assert.equal(blocked?.decision, 'block')
+  assert.match(blocked.reason, /it claims NEEDS_DECISION, the ledger replays VALID_RED/)
+  assert.match(blocked.reason, /\.ai\/oracles\/sample\)/)
+  assert.equal(stop('Status: VALID_RED — tests fail as the card says\n- red r-001 exit 1 reported\n'), null)
+})
+
+test('StrictMode counts only in this card\'s tests or harness, in code, including the RTL wrapper form', async (t) => {
+  // 주석 줄은 실행 증거가 아니다
+  const commented = await workspace(t, {
+    oracleContent: strictModeOracle(),
+    initialFiles: { 'src/unrelated.test.mjs': "import test from 'node:test'\n// TODO: wrap these in <StrictMode>\ntest('other', () => {})\n" },
+  })
+  await reachValidRed(commented.oracleDirectory, commented.root)
+  greenRun(commented.oracleDirectory, 'green-1')
+  greenRun(commented.oracleDirectory, 'green-2')
+  const rejected = transition(commented.oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(rejected.status, 1)
+  assert.match(rejected.stderr, /^DIMENSION_NOT_EXECUTED: /)
+
+  const wrapped = await workspace(t, {
+    oracleContent: strictModeOracle(),
+    initialFiles: { 'vitest.config.mjs': "export default { test: { setupFiles: ['./test/setup.mjs'] } }\n", 'test/setup.mjs': "export const render = (ui) => renderHook(ui, { wrapper: StrictMode })\n" },
+  })
+  await reachValidRed(wrapped.oracleDirectory, wrapped.root)
+  greenRun(wrapped.oracleDirectory, 'green-1')
+  greenRun(wrapped.oracleDirectory, 'green-2')
+  const executed = transition(wrapped.oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(executed.status, 0, executed.stderr)
+})
+
+/**
+ * As-is 열: O1 새 동작, O2 기존 유지(`same`, 기존 테스트 재사용), O3 바뀌는 기존 동작(옛 테스트를 제자리에서 고친다,
+ * 지운 옛 파일은 As-is가 경로로 가리킨다), O4 새 동작이지만 기존 테스트가 이미 통과한다(RED_VACUOUS 알림).
+ */
+const DELTA_ORACLE = ORACLE.replace(
+  '- P1: 저장 중 pending을 표시한다. (출처: S1) (행: O1)',
+  '- P1: 저장 중 pending을 표시한다. (출처: S1) (행: O1, O2, O3, O4)',
+).replace(
+  `| ID | 정책 | Given | When | Then | Never | 부작용(종류×횟수) | BVA |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| O1 | P1 | 입력 | 저장 | pending | 조기 성공 | POST×1 | 상태: loading |`,
+  `| ID | 정책 | As-is | Given | When | Then | Never | 부작용(종류×횟수) | BVA |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| O1 | P1 |  | 입력 | 저장 | pending | 조기 성공 | POST×1 | 상태: loading |
+| O2 | P1 | same | 목록 | 조회 | 목록 표시 | 빈 화면 | GET×1 | 상태: loading |
+| O3 | P1 | 5xx면 입력을 비운다 (src/old-export.test.mjs) | 입력 | 서버 5xx | 입력 유지 | 입력 유실 | POST×1 | 상태: loading |
+| O4 | P1 |  | 입력 | 진입 | 저장 버튼 표시 | 버튼 없음 | POST×0 | 상태: loading |`,
+)
+
+const DELTA_EVIDENCE = {
+  schemaVersion: 1,
+  rows: {
+    O1: { kind: 'test', name: 'save > pending' },
+    O2: { kind: 'test', name: 'list > shown' },
+    O3: { kind: 'test', name: 'input > after 5xx' },
+    O4: { kind: 'test', name: 'button > shown' },
+  },
+}
+
+const LEGACY_TESTS = `import assert from 'node:assert/strict'
+import test from 'node:test'
+test('list > shown', () => { assert.equal('list', 'list') })
+test('input > after 5xx', () => { assert.equal('', '') })
+test('button > shown', () => { assert.equal('button', 'button') })
+`
+
+/** 기존 테스트 3파일을 가진 채 init하고, `prepare`로 RED 전 변경을 한 뒤 RED run과 VALID_RED 전이까지 간다. */
+async function deltaRed(t, prepare, row = 'O1') {
+  const { root, oracleDirectory } = await workspace(t, {
+    oracleContent: DELTA_ORACLE,
+    evidence: DELTA_EVIDENCE,
+    initialFiles: {
+      'src/legacy.test.mjs': LEGACY_TESTS,
+      'src/other.test.mjs': "import assert from 'node:assert/strict'\nimport test from 'node:test'\ntest('other', () => { assert.equal(2, 2) })\n",
+      'src/old-export.test.mjs': "import assert from 'node:assert/strict'\nimport test from 'node:test'\ntest('export > shown', () => { assert.equal('export', 'export') })\n",
+    },
+  })
+  const legacy = join(root, 'src', 'legacy.test.mjs')
+  const save = join(root, 'src', 'save.test.mjs')
+  await writeFile(save, "import assert from 'node:assert/strict'\nimport test from 'node:test'\ntest('save > pending', () => { assert.equal('idle', 'pending') })\n")
+  // 기본 준비: O3의 옛 기대값('')을 제자리에서 새 Then('draft')으로 고치고, O3의 As-is가 가리킨 옛 파일을 지운다
+  await writeFile(legacy, LEGACY_TESTS.replace("assert.equal('', '')", "assert.equal('', 'draft')"))
+  await rm(join(root, 'src', 'old-export.test.mjs'))
+  await prepare({ root, legacy })
+
+  reportSequence += 1
+  const report = join(oracleDirectory, `delta-red-${reportSequence}.ndjson`)
+  const executed = run([
+    'exec', '--dir', oracleDirectory, '--label', 'red', '--adapter', 'node-test', '--report', report,
+    '--', process.execPath, '--test', legacy, save,
+  ])
+  assert.equal(executed.status, 0, executed.stderr)
+  return run([
+    'transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', 'r-001', '--row', row,
+    '--evidence', join(oracleDirectory, 'evidence.json'),
+  ])
+}
+
+test('As-is: a changed row updated in place, a kept row reusing an existing test, and a vacuous new row reach VALID_RED', async (t) => {
+  const red = await deltaRed(t, async () => {})
+  assert.equal(red.status, 0, red.stderr)
+  assert.match(red.stdout, /^STATE_VALID_RED run:r-001\n/)
+  assert.match(red.stdout, /^RED_VACUOUS O4 — passed before implementation/m)
+})
+
+test('As-is: a changed row whose test still passes, a kept row whose test fails, and a kept RED row are refused', async (t) => {
+  const stillOld = await deltaRed(t, async ({ legacy }) => writeFile(legacy, LEGACY_TESTS))
+  assert.equal(stillOld.status, 1)
+  assert.match(stillOld.stderr, /^CHANGED_ROW_NOT_RED: O3: "input > after 5xx" must be failed in r-001; observed passed — the test still asserts the As-is behavior\n/)
+
+  const notThere = await deltaRed(t, async ({ legacy }) =>
+    writeFile(legacy, LEGACY_TESTS.replace("assert.equal('', '')", "assert.equal('', 'draft')").replace("assert.equal('list', 'list')", "assert.equal('blank', 'list')")),
+  )
+  assert.equal(notThere.status, 1)
+  assert.match(notThere.stderr, /^KEPT_ROW_NOT_PASSING: O2 is marked same, but "list > shown" is failed in r-001/)
+
+  const keptRow = await deltaRed(t, async () => {}, 'O2')
+  assert.equal(keptRow.status, 1)
+  assert.match(keptRow.stderr, /^RED_ROW_KEPT: O2 is marked same/)
+})
+
+test('As-is: an existing test weakened before RED outside any changed row is TEST_WEAKENED_BEFORE_RED', async (t) => {
+  const weakened = await deltaRed(t, async ({ root }) =>
+    writeFile(join(root, 'src', 'other.test.mjs'), "import test from 'node:test'\ntest('other', () => {})\n"),
+  )
+  assert.equal(weakened.status, 1)
+  assert.match(weakened.stderr, /^TEST_WEAKENED_BEFORE_RED: existing tests lost strength since init/)
+  assert.match(weakened.stderr, /src\/other\.test\.mjs: assertions 1 → 0/)
+  // 바뀌는 행의 파일(legacy)과 As-is가 가리킨 지운 파일(old-export)은 목록에 없다
+  assert.doesNotMatch(weakened.stderr, /legacy\.test\.mjs|old-export/)
 })

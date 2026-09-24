@@ -30,6 +30,11 @@ success outcome the user can observe instead of inventing numbers.
 - Sources: S1, S2
 ```
 
+Destructive actions are High in the canonical taxonomy. A card whose side-effect column carries a
+`DELETE` with a positive count below Risk High fails lint as `risk-below-floor` (checked when the lock
+is created, not re-applied to existing locks), unless the Risk reason cites an approved,
+non-implementation `S*` that lowers it (for example `- Risk: Medium — soft delete, restorable per S2`).
+
 ### Requested mechanism check — separating mechanism from outcome
 
 When the user requested a concrete mechanism (screen·field·button·automation·condition) but the

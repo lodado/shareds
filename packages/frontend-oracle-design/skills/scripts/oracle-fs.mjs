@@ -24,20 +24,64 @@ export function stableStringify(value) {
   return JSON.stringify(value)
 }
 
-/** 테스트·mock 경로 판정 — oracle-run의 TDD 순서 게이트와 PreToolUse hook이 같은 판정을 쓴다. */
-export const TEST_PATH_SEGMENTS = new Set(['__test__', '__tests__', '__mocks__', '__snapshots__'])
+/**
+ * 테스트·mock 경로 판정 — oracle-run의 TDD 순서 게이트와 PreToolUse hook이 같은 판정을 쓴다. 스크린샷·ARIA 기준선도
+ * 기대값이다: VALID_RED에 얼리지 않으면 GREEN 직전에 기준선을 다시 찍어 통과시킬 수 있다.
+ */
+export const TEST_PATH_SEGMENTS = new Set(['__test__', '__tests__', '__mocks__', '__snapshots__', '__screenshots__'])
+
+const TEST_FILE_NAME = /\.(?:test|spec)\.[a-z]+$|\.test-d\.tsx?$|\.snap$|\.aria\.yml$/
 
 export function isTestPath(path) {
   const segments = path.split('/')
-  const name = segments.at(-1)
+  const directories = segments.slice(0, -1)
 
   return (
     segments.some((segment) => TEST_PATH_SEGMENTS.has(segment)) ||
-    /\.(?:test|spec)\.[a-z]+$/.test(name) ||
-    /\.test-d\.tsx?$/.test(name) ||
-    name.endsWith('.snap')
+    // Playwright `<spec file>-snapshots/` 기준선 디렉터리 — 이름이 -snapshots로 끝나는 production 폴더는 아니다
+    directories.some((segment) => /\.(?:test|spec)\.[cm]?[jt]sx?-snapshots$/.test(segment)) ||
+    TEST_FILE_NAME.test(segments.at(-1))
   )
 }
+
+/**
+ * 실패 원인 분류 — `$test` VALID_RED 술어 4의 기계 판정 가능한 부분만: reference 오류, 타임아웃, hook 실패는 하네스
+ * 결함(`infra`)이다. 테스트 본문의 SyntaxError는 `JSON.parse`가 잘못된 응답에 던진 것일 수 있어(그 행의 위반 자체) 막지
+ * 않는다 — 문법이 깨진 파일은 수집 단계에서 죽어 매핑 이름이 아예 없다. TypeError도 미구현 대상의 정상 RED
+ * (`save is not a function`)일 수 있어 `other`다.
+ */
+export function failureCause(errorName, { timeout = false, hook = false } = {}) {
+  if (timeout || hook || errorName === 'ReferenceError') return 'infra'
+  if (errorName === 'AssertionError') return 'assertion'
+  return 'other'
+}
+
+export const FAILURE_CAUSES = ['infra', 'assertion', 'other']
+
+/** 컨트롤러가 findings에 덧붙이는 결속 필드 — 리뷰어가 낸 원문과 비교할 때 뺀다. */
+const REVIEW_BINDING_FIELDS = new Set(['packetSha256', 'targetRevision'])
+
+/**
+ * 호스트 영수증이 묶는 리뷰어 산출물의 digest. findings 문서면 findings 배열을, 블라인드 매핑이면
+ * `{ "<test name>": "O1" | ["O1"] }` 객체를 정규화해 해시한다. 둘 다 아니면 null — 영수증 대상이 아니다.
+ */
+export function reviewOutputDigest(document) {
+  if (Array.isArray(document?.findings)) {
+    const findings = document.findings.map((finding) =>
+      Object.fromEntries(Object.entries(finding ?? {}).filter(([key]) => !REVIEW_BINDING_FIELDS.has(key))),
+    )
+    return { kind: 'findings', sha256: sha256(stableStringify(findings)) }
+  }
+  // 블라인드 매핑은 증거가 아닌 테스트를 null·[]로 둘 수 있다 — assertBlindMapping과 같은 모양
+  const isRowList = (value) =>
+    value === null || typeof value === 'string' || (Array.isArray(value) && value.every((row) => typeof row === 'string'))
+  if (!document || typeof document !== 'object' || Array.isArray(document)) return null
+  const values = Object.values(document)
+  if (values.length === 0 || !values.every(isRowList)) return null
+  return { kind: 'blind-map', sha256: sha256(stableStringify(document)) }
+}
+
+export const HOST_RECEIPTS_FILE = 'host-receipts.jsonl'
 
 /** 기존 테스트에서 새로 늘어나면 약화로 보는 토큰. 감소·유지는 통과한다. */
 export const WEAKENING_TOKENS = [

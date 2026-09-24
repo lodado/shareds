@@ -55,6 +55,7 @@ recommendation or the inference that "the user would want it" as the Source.
 
 | Column         | Meaning                                                       |
 | -------------- | ------------------------------------------------------------- |
+| `As-is`        | optional — how the current code behaves (see below)           |
 | `Given`        | state and premises immediately before the action              |
 | `When`         | user action, response, time or ordering change                |
 | `Then`         | the result that must be observed                              |
@@ -74,6 +75,23 @@ Rules:
   reason.
 - Do not invent a retry·cancel·race that does not exist for the sake of a test.
 - For errors, distinguish the message·recovery·side effects per subtype that applies to the feature.
+
+### As-is — changing an existing feature
+
+When the change touches behavior the product already has, add an `As-is` column after `Policy`. It
+states, per row, how the current code behaves, so the user approves the as-is → to-be delta row by
+row instead of reading it out of a summary. A card without the column treats every row as new.
+
+| `As-is` cell         | Delta   | What the row promises                                                                 |
+| -------------------- | ------- | ------------------------------------------------------------------------------------- |
+| empty                | new     | behavior that does not exist yet — its test is new                                    |
+| `same`               | kept    | behavior that already holds — map the row to the existing test that asserts it        |
+| the current behavior | changed | the As-is behavior becomes `Then` — update the existing test in place, it must go RED |
+
+`TBD` is not a value: investigate the current code first (`as-is-unknown`). A `changed` row may name
+an old test file it moves or deletes, e.g. `input cleared on 5xx (src/save-legacy.test.ts)`.
+[`delivery/red.md`](../delivery/red.md#as-is--what-red-checks-per-row) owns what `VALID_RED`
+checks for each delta; `oracle-verify.mjs card --delta` prints the per-row delta the gate reads.
 
 Abbreviated example:
 

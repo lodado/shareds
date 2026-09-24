@@ -113,7 +113,9 @@ Lane routing:
   `oracle-run.mjs transition --to VALID_RED` → classify `VALID_RED`; no production writing or
   editing before that. On Claude Code the plugin's PreToolUse hook (`hooks/hooks.json`) denies
   such a write before it lands and denies a weakening token entering a test after `VALID_RED`;
-  the transition gate stays the authority and hosts without hooks rely on it alone. Immediately before writing test files, explicitly load and invoke the
+  the transition gate stays the authority and hosts without hooks rely on it alone. The same hook
+  records what each reviewer subagent returned (`host-receipts.jsonl`) and, at Stop, checks the final
+  report against the ledger. Immediately before writing test files, explicitly load and invoke the
   `$test` skill by name; if it cannot be invoked, `FAIL`.
 - Judgment commands run through `scripts/oracle-run.mjs exec`. Results are recorded in the
   append-only ledger and reports cite runIds instead of free-form claims. Never report an execution
@@ -362,10 +364,11 @@ When implementation, test-based self-verification, and subagent review are expli
    in [`delivery/green-review.md`](references/delivery/green-review.md#bounded-simplification).
    Either GREEN path records `oracle-run.mjs transition --to IMPLEMENTED_GREEN` exactly once
    first. The impact scope is machine-fed, not judged: the required label `impact` runs the repo's
-   related-tests command over `oracle-run.mjs status --changed-files`, and
-   `oracle-verify.mjs scan --side-effects --oracle <card> --path <changed production files>` must
-   report every code side effect owned by a card row or exempted with `oracle:side-effect`, and
-   every dimension family it mines declared on the card or cited in that family's exclusion.
+   related-tests command over `oracle-run.mjs status --changed-files`. The transition itself runs
+   `oracle-verify.mjs scan --side-effects --oracle <card>` and the plain `scan` over every production
+   file changed since init, on the lines new since init: each code side effect must be owned by a card row or exempted with
+   `oracle:side-effect`, each dimension family it mines declared on the card or cited in that
+   family's exclusion, and no nondeterminism or test-environment branch may be left unexempted.
    For an optional fresh implementation context after `VALID_RED`, use the existing runner's
    [task-scoped worker path](references/delivery/ledger.md#optional-task-scoped-implementation-worker).
    It is independent of graph opt-in and does not replace review or expand Low/Design-only.
@@ -424,6 +427,10 @@ be answered from artifacts on disk is a `FAIL`, not a judgment call.
 4. **The recorded state agrees.** `oracle-run.mjs status --json` reports the same terminal state the
    report claims. On disagreement the artifact wins and the report is wrong.
 
+Checks 2 and 4 are also a command: `oracle-run.mjs status --dir <dir> --check-report <report|->`
+compares the `Status:` line and every cited `r-NNN exit <n>` with the ledger and fails as
+`REPORT_CLAIM_MISMATCH`. On Claude Code the plugin's Stop hook runs it on the final message.
+
 ## Final report
 
 The block below is the Oracle lane's report. The Low fast path reports three lines instead — changed
@@ -460,6 +467,7 @@ Blocked: <code> — <what it prevents> · <what would clear it>
 
 **Changes**
 - <path> — <observable behavior change>
+- Delta new <O*> · kept <O*> · changed <O*> — <as-is> → <then> (only when the card has an `As-is` column)
 
 **Verification**
 - <label> <runId> exit <n> <grade>

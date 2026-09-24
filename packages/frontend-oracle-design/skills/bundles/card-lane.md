@@ -199,6 +199,11 @@ success outcome the user can observe instead of inventing numbers.
 - Sources: S1, S2
 ```
 
+Destructive actions are High in the canonical taxonomy. A card whose side-effect column carries a
+`DELETE` with a positive count below Risk High fails lint as `risk-below-floor` (checked when the lock
+is created, not re-applied to existing locks), unless the Risk reason cites an approved,
+non-implementation `S*` that lowers it (for example `- Risk: Medium — soft delete, restorable per S2`).
+
 ### Requested mechanism check — separating mechanism from outcome
 
 When the user requested a concrete mechanism (screen·field·button·automation·condition) but the
@@ -672,6 +677,7 @@ recommendation or the inference that "the user would want it" as the Source.
 
 | Column         | Meaning                                                       |
 | -------------- | ------------------------------------------------------------- |
+| `As-is`        | optional — how the current code behaves (see below)           |
 | `Given`        | state and premises immediately before the action              |
 | `When`         | user action, response, time or ordering change                |
 | `Then`         | the result that must be observed                              |
@@ -691,6 +697,23 @@ Rules:
   reason.
 - Do not invent a retry·cancel·race that does not exist for the sake of a test.
 - For errors, distinguish the message·recovery·side effects per subtype that applies to the feature.
+
+### As-is — changing an existing feature
+
+When the change touches behavior the product already has, add an `As-is` column after `Policy`. It
+states, per row, how the current code behaves, so the user approves the as-is → to-be delta row by
+row instead of reading it out of a summary. A card without the column treats every row as new.
+
+| `As-is` cell         | Delta   | What the row promises                                                                 |
+| -------------------- | ------- | ------------------------------------------------------------------------------------- |
+| empty                | new     | behavior that does not exist yet — its test is new                                    |
+| `same`               | kept    | behavior that already holds — map the row to the existing test that asserts it        |
+| the current behavior | changed | the As-is behavior becomes `Then` — update the existing test in place, it must go RED |
+
+`TBD` is not a value: investigate the current code first (`as-is-unknown`). A `changed` row may name
+an old test file it moves or deletes, e.g. `input cleared on 5xx (src/save-legacy.test.ts)`.
+[`delivery/red.md`](../delivery/red.md#as-is--what-red-checks-per-row) owns what `VALID_RED`
+checks for each delta; `oracle-verify.mjs card --delta` prints the per-row delta the gate reads.
 
 Abbreviated example:
 
@@ -1075,6 +1098,13 @@ counterexample"; a disagreement is promoted to `needs-decision`, once per card.
 | `constraint(S*)`     | an approved source rules the interaction out | find a path the source's jurisdiction does not cover, or a version where the constraint changed    |
 | `type(<expression>)` | the type makes the state unrepresentable     | construct a value the type admits that the mechanism forbids, or a cast·`any` on the way in        |
 | `docs(<anchor>)`     | the maintainer documents the absence         | find the caveat, option, or issue on the same page that reintroduces the surface                   |
+
+A `code()` witness is the only kind a machine can hold to account after the lock. `oracle-lock.mjs
+create` resolves it against the repository, then pins the cited block by hash in the manifest's
+`witnesses`. The `IMPLEMENTED_GREEN` and `REVIEW_VERIFIED` transitions look for that block again and
+fail `WITNESS_INVALIDATED` when the implementation changed it: the claim rested on code that no
+longer exists. A block that only moved down the file still counts — and so does a verbatim copy left
+in a comment or dead code, which the reverse two-sample read and the reviewer must catch.
 
 ## Runtime dimensions — question bank
 
@@ -1502,6 +1532,7 @@ taxonomy.
 | `kind`                       | `mis-disposition` · `undeclared-dimension`                                                                            | the Case space verdict of [`case-space.md`](case-space.md). Required for the three escape-only classes: `JUDGMENT_ERROR` is `mis-disposition`, the other two are `undeclared-dimension`; omitted otherwise |
 | `should_have_been_caught_by` | `sweep:P3×P1` · `deviation:P1:stopped-early-applied-long` · `frame:F18` · `landmine:<package>:<option>` · `Q2` · `I1` | the existing cell, frame, landmine, question, or invariant that was judged wrong. Naming none means naming a new dimension — put it under `correction` instead                                             |
 | `correction`                 | `question-bank:` · `taxonomy:` · `MR:` · `policy:` followed by the fix                                                | where the fix lands                                                                                                                                                                                        |
+| `check`                      | `test:<test name>` · `eval:<case id>` · `none — <reason>`                                                             | the runnable check that fails without the fix and passes with it. A prose correction alone is `none — <reason>`: the r11b Suspense row was added as prose and both later A/B arms still missed it          |
 
 Rules:
 
@@ -1574,6 +1605,7 @@ direction only and say so wherever they are quoted.
 | Question Precision    | Open questions and `needs-decision` cells whose answer changed the card bytes ÷ all raised                  | the diff between the Draft and the locked bytes — a new `P*`, a `Then`·`Never` change, a new row counts; a restated answer does not   |
 | Oracle Cost           | dispositioned cells + questions raised to the user                                                          | sweep·deviation·frame·landmine tables and Open questions. Self-reported minutes are not a proxy; record wall-clock only when measured |
 | Test Duplication      | assertions with two or more owning tests                                                                    | `evidence.json` against the test files; expected 0 under the single-owner rule of `$test`                                             |
+| Prose-only Closures   | escapes whose `check` is `none` ÷ all escapes                                                               | `escapes.jsonl`; the skill's own `evals/held-out.json` carries the same field and a contract test resolves each named check           |
 | Turns to terminal     | user turns between the request and the reported terminal state                                              | `journal.md`; the final report prints `Turns <n>`                                                                                     |
 | Human Review Effort   | measured active human review time per change/journey bundle; report waiting time separately                 | observed start/stop and pause records in `journal.md`, linked to revision and review scope                                            |
 | Escalation Usefulness | escalated items that required human action or a decision ÷ all human-reviewed escalations                   | human disposition and original finding/question links in `journal.md`; an advisory preference is not automatically actionable         |

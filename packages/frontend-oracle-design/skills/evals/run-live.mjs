@@ -13,6 +13,7 @@ import { Buffer } from 'node:buffer'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -21,6 +22,17 @@ import { splitDelivery } from '../scripts/generate-reference-bundles.mjs'
 
 const evalDirectory = dirname(fileURLToPath(import.meta.url))
 const skillDirectory = dirname(evalDirectory)
+
+/**
+ * 끝 상태를 원장에서 채점하는 픽스처 — trial마다 새 임시 레포를 만들어 앞 trial의 `.ai/oracles`가 새지 않게 한다.
+ * 채점은 run의 자기 보고가 아니라 그 레포의 `status --json`이다.
+ */
+const TRIAL_FIXTURES = {
+  'impossible-canary': () => import('../../test-fixtures/impossible-canary/fixture.mjs').then((module) => ({
+    build: module.buildCanary,
+    grade: module.gradeCanary,
+  })),
+}
 
 const REPORT_FOOTER = [
   '',
@@ -320,10 +332,10 @@ export function buildResult({ fixture, events, graph, runtimeMs, replicateId = n
   }
 }
 
-function runHost(host, prompt, cwd) {
+function runHost(host, prompt, cwd, extraArgs = []) {
   const { command, args } = HOSTS[host]
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args(prompt), { cwd })
+    const child = spawn(command, [...args(prompt), ...extraArgs], { cwd })
     let stdout = ''
     let stderr = ''
     child.stdout.setEncoding('utf8')
@@ -382,7 +394,7 @@ async function main() {
   const transcriptDir = option(args, '--transcript-dir')
   if (!HOSTS[host] || !out) {
     process.stderr.write(
-      `USAGE: run-live.mjs --host <${Object.keys(HOSTS).join('|')}> --out <results.jsonl> [--corpus <file>] [--case <id>] [--repo <dir>] [--replicates <n>] [--variant <name>] [--transcript-dir <dir>]\n`,
+      `USAGE: run-live.mjs --host <${Object.keys(HOSTS).join('|')}> --out <results.jsonl> [--corpus <file>] [--case <id>] [--repo <dir>] [--replicates <n>] [--variant <name>] [--transcript-dir <dir>] [--permission-mode <mode>]\n`,
     )
     process.exitCode = 2
     return
@@ -393,6 +405,10 @@ async function main() {
     return
   }
   const only = option(args, '--case')
+  // Delivery 픽스처(canary)는 run이 셸로 oracle-run을 돌려야 한다 — 헤드리스 claude는 허용 없이 Bash를 거절한다.
+  // 모드는 호출자가 명시적으로 고르고, 기본값은 호스트 설정 그대로다.
+  const permissionMode = option(args, '--permission-mode')
+  if (permissionMode && host !== 'claude') throw new Error('PERMISSION_MODE_CLAUDE_ONLY')
   const repo = option(args, '--repo') ?? process.cwd()
   // pass^k needs k independent runs of the same fixture; each gets its own replicateId so the grader
   // scores the fixture on every replicate instead of treating the repeats as a duplicate case.
@@ -410,6 +426,8 @@ async function main() {
   ])
   const cases = corpus.cases.filter((fixture) => !only || fixture.id === only)
   if (cases.length === 0) throw new Error(`NO_SUCH_CASE: ${only}`)
+  const unknownFixture = cases.find((fixture) => fixture.fixture && !TRIAL_FIXTURES[fixture.fixture])
+  if (unknownFixture) throw new Error(`NO_SUCH_FIXTURE: ${unknownFixture.fixture}`)
 
   const lines = []
   const runs = []
@@ -418,11 +436,18 @@ async function main() {
     for (let replicate = 1; replicate <= replicates; replicate += 1) {
       const replicateId = replicates === 1 ? null : `r${replicate}`
       const prompt = `${fixture.prompt}\n${REPORT_FOOTER}`
+      const trial = fixture.fixture ? await TRIAL_FIXTURES[fixture.fixture]() : null
+      const cwd = trial ? await mkdtemp(join(tmpdir(), `${fixture.id}-`)) : repo
+      if (trial) await trial.build(cwd)
       const startedAt = Date.now()
-      const { code, stdout, stderr } = await runHost(host, prompt, repo)
+      const { code, stdout, stderr } = await runHost(host, prompt, cwd, permissionMode ? ['--permission-mode', permissionMode] : [])
       const runtimeMs = Date.now() - startedAt
       const events = parseTranscript(stdout)
       const { result, selfReported } = buildResult({ fixture, events, graph, runtimeMs, replicateId })
+      if (trial) {
+        result.trial = { directory: cwd, ...(await trial.grade(cwd)) }
+        result.attestation.trial = 'observed'
+      }
       const transcript = await writeTranscript({ runDir: transcriptRunDir, caseId: fixture.id, replicateId, stdout, stderr })
       if (variant) result.variant = variant
       if (code !== 0) result.errors.push(`HOST_EXIT_${code}`)

@@ -1,5 +1,5 @@
 {
-  "description": "Oracle guard — denies a production write before VALID_RED and a test-weakening write after it, with the same codes the transition gate would raise later. The gate stays the authority; this only moves the refusal before the write.",
+  "description": "Oracle guard — denies a production write before VALID_RED and a test-weakening write after it, with the same codes the transition gate would raise later; records a digest of what each reviewer subagent returned; blocks a final report whose Status or cited runs disagree with the ledger. The gate stays the authority; this only moves each refusal earlier.",
   "hooks": {
     "PreToolUse": [
       {
@@ -10,6 +10,41 @@
             "command": "node",
             "args": ["${CLAUDE_PLUGIN_ROOT}/skills/scripts/oracle-guard-hook.mjs"],
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "SubagentHandback",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/skills/scripts/oracle-guard-hook.mjs"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/skills/scripts/oracle-guard-hook.mjs"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/skills/scripts/oracle-guard-hook.mjs"],
+            "timeout": 15
           }
         ]
       }

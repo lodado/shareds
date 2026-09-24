@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import {
   assertSnapshotUnchanged,
   isPathInside,
+  sha256,
   snapshotRegularFile,
 } from './oracle-fs.mjs'
 
@@ -96,6 +97,11 @@ function sameEntries(left, right) {
   return sortedLeft.every((entry, index) => entry.path === sortedRight[index].path && entry.sha256 === sortedRight[index].sha256)
 }
 
+function sameWitnesses(left = [], right = []) {
+  const key = (entries) => JSON.stringify([...entries].map(({ ref, sha256: digest }) => [ref, digest]).sort())
+  return key(left) === key(right)
+}
+
 function assertManifest(manifest, lockDirectory) {
   const validEntry = (entry) => entry && typeof entry.path === 'string' && /^[a-f0-9]{64}$/.test(entry.sha256)
   if (
@@ -106,6 +112,14 @@ function assertManifest(manifest, lockDirectory) {
     !manifest.sources.every(validEntry)
   ) {
     throw new CliError('LOCK_INVALID', 'Lock manifest does not match schema version 1')
+  }
+  if (manifest.witnesses !== undefined) {
+    const validRef = (entry) => typeof entry.path === 'string' && !isAbsolute(entry.path) && String(entry.ref).startsWith(`${entry.path}#L`)
+    const validBlock = (entry) => Number.isInteger(entry.lines) && entry.lines > 0 && /^[a-f0-9]{64}$/.test(entry.sha256)
+    const validWitness = (entry) => Boolean(entry) && validRef(entry) && validBlock(entry)
+    if (!Array.isArray(manifest.witnesses) || !manifest.witnesses.every(validWitness)) {
+      throw new CliError('LOCK_INVALID', 'Lock manifest does not match schema version 1')
+    }
   }
   if (manifest.dependencies !== undefined) {
     const validDependency = (entry) =>
@@ -159,14 +173,65 @@ async function existingLock(lockPath, lockDirectory, rootDirectory) {
   return readManifest(lockPath, lockDirectory, 'LOCK_INVALID', rootDirectory)
 }
 
-async function assertCardLintSnapshot(oracle, sources, rootDirectory) {
+function lintFailure(result, fallback) {
+  const detail =
+    result.stderr ||
+    result.error?.message ||
+    (result.signal ? `CARD_LINT_FAILED: oracle-verify card terminated by ${result.signal}` : '') ||
+    `CARD_LINT_FAILED: ${fallback}`
+  const [code, ...message] = detail.split(': ')
+  return new CliError(code.trim(), message.join(': ').trim() || fallback)
+}
+
+const WITNESS_REF = /^([^#]+)#L(\d+)(?:-L?(\d+))?$/
+
+/** 카드의 `impossible … code(path#La-Lb)` witness ref — 판정 공간 IR에서 읽는다(카드를 다시 파싱하지 않는다). */
+function codeWitnessRefs(candidate, cwd) {
+  if (!candidate.bytes.includes('code(')) return []
+  const derived = spawnSync(process.execPath, [verifyScript, 'card', '--ir', '--oracle', candidate.path], { cwd, encoding: 'utf8' })
+  if (derived.status !== 0) throw lintFailure(derived, 'oracle-verify card --ir failed')
+  const refs = JSON.parse(derived.stdout)
+    .map((record) => record.disposition)
+    .filter((disposition) => disposition.type === 'impossible' && disposition.witness?.kind === 'code')
+    .map((disposition) => disposition.witness.ref)
+    .filter((ref) => WITNESS_REF.test(ref))
+  return [...new Set(refs)].sort()
+}
+
+function witnessBlock(content, ref) {
+  const [, , from, to] = ref.match(WITNESS_REF)
+  return content.split('\n').slice(Number(from) - 1, Number(to ?? from)).join('\n')
+}
+
+/** witness 파일을 스냅샷 레포에 복사하고 인용 블록을 해시한다. 레포 밖·링크·없는 파일은 건너뛴다 — lint가 보고한다. */
+async function stageWitnesses(refs, rootDirectory, repoRoot) {
+  const witnesses = []
+  for (const ref of refs) {
+    const path = ref.match(WITNESS_REF)[1]
+    const file = await snapshot(resolve(rootDirectory, path), 'INPUT_UNREADABLE', {
+      allowHardlinks: false,
+      base: rootDirectory,
+    }).catch(() => null)
+    if (!file) continue
+    const snapshotPath = join(repoRoot, portablePath(rootDirectory, file.realPath))
+    await mkdir(dirname(snapshotPath), { recursive: true })
+    await writeFile(snapshotPath, file.bytes)
+    const block = witnessBlock(file.bytes.toString('utf8'), ref)
+    witnesses.push({ ref, path, lines: block.split('\n').length, sha256: sha256(block) })
+  }
+  return witnesses
+}
+
+/**
+ * 카드를 레포 안 원래 상대 경로에 둔 스냅샷에서 lint한다 — code() witness가 스냅샷 레포 루트를 기준으로 풀린다.
+ * create는 witness 파일을 복사해 실재를 검사하고, verify는 manifest에 고정된 블록을 믿는다(`lockedWitnesses`).
+ * 구현 중 witness 코드가 바뀐 것은 매 exec의 lint 실패가 아니라 GREEN의 WITNESS_INVALIDATED로 드러난다.
+ */
+async function assertCardLintSnapshot(oracle, sources, rootDirectory, lockedWitnesses = null) {
   const snapshotRoot = await mkdtemp(join(tmpdir(), 'oracle-lock-snapshot-'))
   const repoRoot = join(snapshotRoot, 'repo')
   try {
-    const candidatePath = join(snapshotRoot, 'candidate', 'oracle.md')
     await mkdir(repoRoot, { recursive: true })
-    await mkdir(dirname(candidatePath), { recursive: true })
-    await writeFile(candidatePath, oracle.bytes)
 
     const sourcePaths = []
     for (const source of sources) {
@@ -180,21 +245,51 @@ async function assertCardLintSnapshot(oracle, sources, rootDirectory) {
       sourcePaths.push(portablePath(repoRoot, snapshotPath))
     }
 
-    const args = [verifyScript, 'card', '--oracle', '../candidate/oracle.md']
+    // 출처 뒤에 쓴다 — 같은 경로의 출처가 있어도 lint 대상은 잠글 카드 바이트다
+    const candidatePath = join(repoRoot, portablePath(rootDirectory, oracle.realPath))
+    await mkdir(dirname(candidatePath), { recursive: true })
+    await writeFile(candidatePath, oracle.bytes)
+    const candidate = { path: portablePath(repoRoot, candidatePath), bytes: oracle.bytes.toString('utf8') }
+
+    const refs = codeWitnessRefs(candidate, repoRoot)
+    if (lockedWitnesses && lockedWitnesses.map((entry) => entry.ref).sort().join('\n') !== refs.join('\n')) {
+      throw new CliError('LOCK_INVALID', 'Lock witness records do not match the code() witnesses the card cites')
+    }
+    const witnesses = lockedWitnesses ? [] : await stageWitnesses(refs, rootDirectory, repoRoot)
+
+    const args = [verifyScript, 'card', '--oracle', candidate.path]
+    if (lockedWitnesses) args.push('--locked')
     for (const source of sourcePaths.length > 0 ? sourcePaths : ['']) args.push('--source', source)
     const linted = spawnSync(process.execPath, args, { cwd: repoRoot, encoding: 'utf8' })
-    if (linted.status !== 0) {
-      const detail =
-        linted.stderr ||
-        linted.error?.message ||
-        (linted.signal ? `CARD_LINT_FAILED: oracle-verify card terminated by ${linted.signal}` : '') ||
-        'CARD_LINT_FAILED: oracle-verify card failed'
-      const [code, ...message] = detail.split(': ')
-      throw new CliError(code.trim(), message.join(': ').trim() || 'oracle-verify card failed')
-    }
+    if (linted.status !== 0) throw lintFailure(linted, 'oracle-verify card failed')
+    return witnesses
   } finally {
     await rm(snapshotRoot, { recursive: true, force: true })
   }
+}
+
+/**
+ * GREEN·REVIEW 직전: 잠긴 `impossible` witness 블록이 아직 그 파일 어딘가에 그대로 있는가. 위쪽 줄 삽입으로 번호만
+ * 밀린 블록은 살아 있다. 사라진 ref 목록을 돌려준다 — 판정 주장이 기대던 코드를 구현이 바꿨다는 뜻이다.
+ */
+export async function invalidatedWitnesses(lockPath) {
+  const lockDirectory = await realpath(dirname(resolve(lockPath)))
+  const rootDirectory = await realpath(repositoryRoot(lockDirectory))
+  const { manifest } = await readManifest(resolve(lockPath), lockDirectory, 'LOCK_INVALID', rootDirectory)
+  const invalidated = []
+  for (const witness of manifest.witnesses ?? []) {
+    const file = await snapshot(resolve(rootDirectory, witness.path), 'INPUT_UNREADABLE', {
+      allowHardlinks: false,
+      base: rootDirectory,
+    }).catch(() => null)
+    const lines = file ? file.bytes.toString('utf8').split('\n') : []
+    let found = false
+    for (let start = 0; !found && start + witness.lines <= lines.length; start += 1) {
+      found = sha256(lines.slice(start, start + witness.lines).join('\n')) === witness.sha256
+    }
+    if (!found) invalidated.push(witness.ref)
+  }
+  return invalidated
 }
 
 export async function createLock(options) {
@@ -227,7 +322,7 @@ export async function createLock(options) {
   const sourceSnapshots = await Promise.all(
     sourcePaths.map((path) => snapshot(path, 'INPUT_UNREADABLE', { allowHardlinks: false, base: rootDirectory })),
   )
-  await assertCardLintSnapshot(oracleSnapshot, sourceSnapshots, rootDirectory)
+  const witnesses = await assertCardLintSnapshot(oracleSnapshot, sourceSnapshots, rootDirectory)
 
   const dependencies = await installedDependencies(rootDirectory, options.deps ?? [])
   const manifest = {
@@ -238,6 +333,7 @@ export async function createLock(options) {
       .map((source) => ({ path: portablePath(canonicalLockDirectory, source.realPath), sha256: source.sha256 }))
       .sort(comparePath),
     ...(dependencies.length > 0 ? { dependencies } : {}),
+    ...(witnesses.length > 0 ? { witnesses } : {}),
   }
   await assertUnchanged(oracleSnapshot, 'INPUT_UNREADABLE', { allowHardlinks: false, base: rootDirectory })
   for (const source of sourceSnapshots) {
@@ -249,6 +345,7 @@ export async function createLock(options) {
     if (presentLock.manifest.oracle.sha256 !== manifest.oracle.sha256) throw new CliError('ORACLE_CHANGED', 'Existing lock belongs to different Oracle bytes')
     if (!sameEntries(presentLock.manifest.sources, manifest.sources)) throw new CliError('SOURCE_CHANGED', 'Existing lock belongs to different source bytes')
     if (!sameDependencies(presentLock.manifest.dependencies, manifest.dependencies)) throw new CliError('SOURCE_CHANGED', 'Existing lock belongs to a different dependency set')
+    if (!sameWitnesses(presentLock.manifest.witnesses, manifest.witnesses)) throw new CliError('SOURCE_CHANGED', 'Existing lock belongs to different witnessed code')
     finalLock = await assertUnchanged(presentLock.lockSnapshot, 'LOCK_INVALID', {
       allowHardlinks: false,
       base: rootDirectory,
@@ -263,7 +360,8 @@ export async function createLock(options) {
       if (
         racedLock.manifest.oracle.sha256 !== manifest.oracle.sha256 ||
         !sameEntries(racedLock.manifest.sources, manifest.sources) ||
-        !sameDependencies(racedLock.manifest.dependencies, manifest.dependencies)
+        !sameDependencies(racedLock.manifest.dependencies, manifest.dependencies) ||
+        !sameWitnesses(racedLock.manifest.witnesses, manifest.witnesses)
       ) {
         throw new CliError('LOCK_INVALID', 'Lock manifest appeared with different contents')
       }
@@ -299,7 +397,7 @@ export async function verifyLock(options, hooks = {}) {
   const oracleSnapshot = await verifyEntry(canonicalLockDirectory, rootDirectory, manifest.oracle, 'ORACLE_CHANGED')
   const sourceSnapshots = []
   for (const source of manifest.sources) sourceSnapshots.push(await verifyEntry(canonicalLockDirectory, rootDirectory, source, 'SOURCE_CHANGED'))
-  await assertCardLintSnapshot(oracleSnapshot, sourceSnapshots, rootDirectory)
+  await assertCardLintSnapshot(oracleSnapshot, sourceSnapshots, rootDirectory, manifest.witnesses ?? [])
   await hooks.beforeFinalUnchangedAssertions?.()
   await assertUnchanged(oracleSnapshot, 'ORACLE_CHANGED', { allowHardlinks: false, base: rootDirectory })
   for (const source of sourceSnapshots) {

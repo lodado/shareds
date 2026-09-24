@@ -9,16 +9,33 @@
  */
 import { writeFile } from 'node:fs/promises'
 import process from 'node:process'
+import { failureCause } from './oracle-fs.mjs'
 
 function statusFor(task) {
   const state = task.result?.state ?? task.mode
 
   if (task.mode === 'skip' || state === 'skipped') return 'skipped'
   if (task.mode === 'todo' || state === 'todo') return 'todo'
-  if (state === 'pass') return 'passed'
+  // 재시도 끝에 통과한 테스트는 경합을 숨길 수 있다 — 증거가 아니다
+  if (state === 'pass') return (task.result?.retryCount ?? 0) > 0 ? 'flaky' : 'passed'
 
   // 미실행(state 없음)도 통과로 세지 않는다. 증거는 실제 pass만이다.
   return 'failed'
+}
+
+/**
+ * 첫 오류로 실패 원인을 가른다 — vitest는 테스트·hook 타임아웃을 이름 없는 Error의 메시지로만 알린다. 던진 hook은
+ * 테스트 본문의 오류와 구별되지 않아 `other`로 남는다(hook 실패 판정은 node:test에서만 된다).
+ */
+function causeFor(errors) {
+  const [error] = errors ?? []
+  if (!error) return null
+  return failureCause(error.name, { timeout: /^(?:Test|Hook) timed out in \d+ms/.test(error.message ?? '') })
+}
+
+function withCause(test, errors) {
+  const cause = test.status === 'failed' ? causeFor(errors) : null
+  return cause ? { ...test, cause } : test
 }
 
 function flatten(tasks, ancestors = []) {
@@ -29,7 +46,7 @@ function flatten(tasks, ancestors = []) {
       return flatten(task.tasks, titles)
     }
 
-    return [{ name: titles.join(' > '), status: statusFor(task) }]
+    return [withCause({ name: titles.join(' > '), status: statusFor(task), file: task.file?.filepath }, task.result?.errors)]
   })
 }
 
@@ -45,7 +62,7 @@ async function emitTests(tests) {
     (test) =>
       `${JSON.stringify({
         type: test.status === 'passed' ? 'test:pass' : 'test:fail',
-        data: { name: test.name, status: test.status, test: true },
+        data: { name: test.name, status: test.status, test: true, cause: test.cause, file: test.file },
       })}\n`,
   )
 
@@ -77,13 +94,16 @@ function flattenModules(modules) {
     }
 
     return tests.map((test) => {
-      let state = 'failed'
+      let result = null
       try {
-        state = test.result?.().state ?? 'failed'
+        result = test.result?.() ?? null
       } catch {
-        state = 'failed'
+        result = null
       }
-      return { name: test.fullName ?? test.name, status: state === 'passed' ? 'passed' : state }
+      const state = result?.state ?? 'failed'
+      let status = state === 'passed' ? 'passed' : state
+      if (status === 'passed' && test.diagnostic?.()?.flaky) status = 'flaky'
+      return withCause({ name: test.fullName ?? test.name, status, file: module.moduleId }, result?.errors)
     })
   })
 }

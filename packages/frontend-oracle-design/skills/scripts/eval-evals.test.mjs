@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
@@ -58,4 +58,29 @@ test('evals.json is the skill-creator projection of the blackbox corpus and stay
     encoding: 'utf8',
   })
   assert.equal(checked.status, 0, checked.stderr)
+})
+
+test('every held-out escape names the check that now catches it, or says in words that none does', async () => {
+  const heldOut = JSON.parse(await readFile(join(evalDirectory, 'held-out.json'), 'utf8'))
+  const scripts = dirname(fileURLToPath(import.meta.url))
+  const testSources = (
+    await Promise.all(
+      (await readdir(scripts)).filter((name) => name.endsWith('.test.mjs')).map((name) => readFile(join(scripts, name), 'utf8')),
+    )
+  ).join('\n')
+  const evalIds = new Set(
+    (await Promise.all(['blackbox-corpus.json', 'held-out.json', 'boundary-cases.json'].map((name) => readFile(join(evalDirectory, name), 'utf8'))))
+      .flatMap((raw) => JSON.parse(raw).cases.map((entry) => entry.id)),
+  )
+
+  const escapes = heldOut.cases.flatMap((entry) => entry.escapes.map((scenario) => ({ id: entry.id, ...scenario })))
+  for (const { id, check } of escapes) {
+    // 문서 한 줄 추가는 escape를 닫지 않는다 — 고친 뒤 통과하는 테스트나 eval이 있거나, 없다고 적는다
+    assert.match(check ?? '', /^(?:test:.+|eval:.+|none — \S.+)$/, `${id}: ${check}`)
+    if (check.startsWith('test:')) assert.ok(testSources.includes(`test('${check.slice(5)}'`), `${id}: no test named ${check.slice(5)}`)
+    if (check.startsWith('eval:')) assert.ok(evalIds.has(check.slice(5)), `${id}: no eval case ${check.slice(5)}`)
+  }
+  // 방향 신호일 뿐 게이트가 아니다 — 산문으로만 닫힌 escape가 몇 개인지 숨기지 않는다
+  const proseOnly = escapes.filter(({ check }) => check.startsWith('none')).length
+  assert.ok(proseOnly < escapes.length, 'at least one escape is closed by a runnable check')
 })

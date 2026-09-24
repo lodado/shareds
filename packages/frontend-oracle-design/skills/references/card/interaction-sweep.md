@@ -152,6 +152,13 @@ counterexample"; a disagreement is promoted to `needs-decision`, once per card.
 | `type(<expression>)` | the type makes the state unrepresentable     | construct a value the type admits that the mechanism forbids, or a cast·`any` on the way in        |
 | `docs(<anchor>)`     | the maintainer documents the absence         | find the caveat, option, or issue on the same page that reintroduces the surface                   |
 
+A `code()` witness is the only kind a machine can hold to account after the lock. `oracle-lock.mjs
+create` resolves it against the repository, then pins the cited block by hash in the manifest's
+`witnesses`. The `IMPLEMENTED_GREEN` and `REVIEW_VERIFIED` transitions look for that block again and
+fail `WITNESS_INVALIDATED` when the implementation changed it: the claim rested on code that no
+longer exists. A block that only moved down the file still counts — and so does a verbatim copy left
+in a comment or dead code, which the reverse two-sample read and the reviewer must catch.
+
 ## Runtime dimensions — question bank
 
 Add the dimension as a counterpart **when its premise exists in the card**; otherwise it generates

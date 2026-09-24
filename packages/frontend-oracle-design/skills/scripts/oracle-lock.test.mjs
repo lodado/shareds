@@ -439,6 +439,58 @@ test('dep: --dep은 설치 버전을 manifest.dependencies에 고정하고 verif
   assert.equal(verified.status, 0, verified.stderr)
 })
 
+const WITNESS_DEVIATIONS = `
+## Deviations
+
+| Policy | Type         | Disposition |
+| ------ | ------------ | ----------- |
+| P1     | not-provided | covered(O1) |
+| P1     | static       | impossible: 저장 버튼은 pending 동안 비활성이다 — code(src/save.ts#L2-L3) |
+`
+
+async function witnessFixture(t) {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-lock-witness-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const directory = join(root, '.ai', 'oracles', 'x')
+  await mkdir(directory, { recursive: true })
+  await mkdir(join(root, 'docs'), { recursive: true })
+  await mkdir(join(root, 'src'), { recursive: true })
+  await writeFile(join(directory, 'oracle.md'), VALID_CARD + WITNESS_DEVIATIONS)
+  await writeFile(join(root, 'docs', 'save.md'), '# Requirement\n')
+  await writeFile(join(root, 'src', 'save.ts'), 'a\nb\nc\nd\n')
+  return { root, oracle: join(directory, 'oracle.md'), lock: join(directory, 'oracle.lock.json') }
+}
+
+test('witness: a card whose impossible cell cites code() locks, and the manifest pins the witnessed block', async (t) => {
+  const { root, oracle, lock } = await witnessFixture(t)
+
+  // 평문 lint가 통과한 카드는 lock도 통과해야 한다 — 스냅샷이 witness를 못 찾던 결함의 회귀 테스트
+  const created = run('create', '--oracle', oracle, '--lock', lock, '--source', 'docs/save.md')
+  assert.equal(created.status, 0, created.stderr)
+  const manifest = JSON.parse(await readFile(lock, 'utf8'))
+  assert.deepEqual(manifest.witnesses, [{ ref: 'src/save.ts#L2-L3', path: 'src/save.ts', lines: 2, sha256: sha256('b\nc') }])
+
+  // verify는 살아 있는 production 바이트로 witness를 다시 풀지 않는다 — 구현 중 파일이 줄어도 exec가 막히지 않는다
+  await writeFile(join(root, 'src', 'save.ts'), 'a\n')
+  const verified = run('verify', '--lock', lock)
+  assert.equal(verified.status, 0, verified.stderr)
+
+  // 카드가 인용한 witness와 manifest가 어긋나면 잠금 자체가 무효다
+  await writeFile(lock, `${JSON.stringify({ ...manifest, witnesses: [] }, null, 2)}\n`)
+  const tampered = run('verify', '--lock', lock)
+  assert.equal(tampered.status, 1)
+  assert.match(tampered.stderr, /^LOCK_INVALID: .*witness/)
+})
+
+test('witness: a missing witness file still fails the lock lint', async (t) => {
+  const { root, oracle, lock } = await witnessFixture(t)
+  await rm(join(root, 'src', 'save.ts'))
+
+  const created = run('create', '--oracle', oracle, '--lock', lock, '--source', 'docs/save.md')
+  assert.equal(created.status, 1)
+  assert.match(created.stderr, /impossible-witness-invalid: P1 × static: code\(src\/save\.ts\) does not exist/)
+})
+
 test('dep: 미설치 패키지는 DEP_UNRESOLVED, 다른 dep 집합의 재생성은 SOURCE_CHANGED다', async (t) => {
   const { lock, oracle, source, sourcePath } = await fixture(t)
 
