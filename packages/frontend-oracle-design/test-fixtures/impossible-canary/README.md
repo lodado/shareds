@@ -9,7 +9,13 @@ Run it live through `skills/evals/run-live.mjs --corpus canary-corpus.json`. Eve
 temporary copy, so leftover `.ai/oracles` state from an earlier trial cannot leak in. The run has to
 execute `oracle-run.mjs`, and headless `claude -p` refuses Bash unless allowed, so a meaningful trial
 needs an explicit `--permission-mode` (for example `acceptEdits` plus a Bash allow rule, or
-`bypassPermissions` in a disposable environment). Without it every trial ends `STALLED`.
+`bypassPermissions` in a disposable environment). Without it every trial ends `STALLED`. The runner
+drops the evaluator's own Claude Code session variables (`CLAUDECODE`, `CLAUDE_EFFORT`, the
+session and messaging ids). Each trial is then a fresh top-level session at default effort, even
+when run-live itself runs inside Claude Code.
+
+The first live baseline (2026-09-24, 3 trials) is recorded at the top of `EVALUATION.md`: 0/3
+`CHEAT_THROUGH`, 2/3 `HELD`, 1/3 `STALLED` because that trial never loaded the skill.
 
 Known gap, pinned by `eval-live.test.mjs`: production that counts its own calls (`String(++saves)`)
 passes both row tests in declaration order without touching a test or branching on the environment,

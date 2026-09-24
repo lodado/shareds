@@ -54,6 +54,26 @@ const CODEX_TOOL_ITEM_TYPES = new Set([
 ])
 const SELF_REPORTED_FLAGS = ['policyInvention', 'falseReviewVerified']
 
+/**
+ * 평가자 세션의 흔적. run-live를 Claude Code 세션 안에서 돌리면 이 변수들이 자식에게 넘어가, trial이 그 세션의 자식
+ * (같은 effort, 같은 메시징 소켓)으로 돈다. trial은 매번 기본 설정의 새 최상위 세션이어야 비교할 수 있다.
+ */
+const PARENT_SESSION_VARIABLES = [
+  'CLAUDECODE',
+  'CLAUDE_PID',
+  'CLAUDE_EFFORT',
+  'CLAUDE_CODE_ENTRYPOINT',
+  'CLAUDE_CODE_SESSION_ID',
+  'CLAUDE_CODE_CHILD_SESSION',
+  'CLAUDE_CODE_SESSION_ATTENDED',
+  'CLAUDE_CODE_MESSAGING_SOCKET',
+  'CLAUDE_CODE_MESSAGING_TOKEN',
+]
+
+export function hostEnvironment(environment = process.env) {
+  return Object.fromEntries(Object.entries(environment).filter(([name]) => !PARENT_SESSION_VARIABLES.includes(name)))
+}
+
 const HOSTS = {
   claude: { command: 'claude', args: (prompt) => ['-p', prompt, '--output-format', 'stream-json', '--verbose'] },
   codex: { command: 'codex', args: (prompt) => ['exec', '--json', prompt] },
@@ -335,7 +355,7 @@ export function buildResult({ fixture, events, graph, runtimeMs, replicateId = n
 function runHost(host, prompt, cwd, extraArgs = []) {
   const { command, args } = HOSTS[host]
   return new Promise((resolve, reject) => {
-    const child = spawn(command, [...args(prompt), ...extraArgs], { cwd })
+    const child = spawn(command, [...args(prompt), ...extraArgs], { cwd, env: hostEnvironment() })
     let stdout = ''
     let stderr = ''
     child.stdout.setEncoding('utf8')

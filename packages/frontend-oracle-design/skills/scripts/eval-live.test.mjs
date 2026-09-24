@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 import {
   buildResult,
   createTranscriptRun,
+  hostEnvironment,
   loadedNodesFrom,
   mentionedNodesFrom,
   parseTranscript,
@@ -439,6 +440,22 @@ test('main links fake-host transcripts, leaves opt-out untouched, and rejects a 
   } finally {
     await rm(root, { recursive: true, force: true })
   }
+})
+
+test('a live trial runs as a fresh top-level host session, not a child of the evaluator session', async () => {
+  const environment = hostEnvironment({
+    PATH: '/bin',
+    HOME: '/home/x',
+    ANTHROPIC_MODEL: 'kept',
+    CLAUDE_CODE_USE_VERTEX: '1',
+    CLAUDECODE: '1',
+    CLAUDE_EFFORT: 'max',
+    CLAUDE_CODE_SESSION_ID: 'parent',
+    CLAUDE_CODE_CHILD_SESSION: '1',
+    CLAUDE_CODE_MESSAGING_SOCKET: 'parent.sock',
+  })
+  // 설정 변수는 남고, 부모 세션을 가리키는 변수만 빠진다
+  assert.deepEqual(environment, { PATH: '/bin', HOME: '/home/x', ANTHROPIC_MODEL: 'kept', CLAUDE_CODE_USE_VERTEX: '1' })
 })
 
 test('manual adversarial fixtures stay ungraded and design-only', async () => {
