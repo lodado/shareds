@@ -457,6 +457,9 @@ test('keeps automatic routing narrow and leaves sibling concerns with their owne
   assert.match(description, /medium|high/i)
   assert.match(description, /Do not auto-invoke/i)
   assert.match(description, /low-risk/i)
+  // 잠긴 카드의 테스트를 통과시키는 일은 "이미 승인된 동작 안의 수정"처럼 읽힌다 — 기존 run은 이 스킬로만 움직인다
+  assert.match(description, /existing Oracle run under `\.ai\/oracles\/<id>\/`/)
+  assert.match(description, /already approved behavior that has no Oracle run/)
   assert.match(skill, /Low fast path.*loads no other reference nodes/s)
   assert.match(skill, /Oracle.*Outcome Brief.*Source Registry.*lock.*state transitions/s)
   assert.match(skill, /FSD.*do\s+not auto-invoke this skill on its own/s)
