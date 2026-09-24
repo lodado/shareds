@@ -5,10 +5,12 @@
  * `local-rules`.
  */
 const localRulesPlugin = require('@lodado/eslint-plugin-local-rules')
+const { CODE_FILES } = require('./code-files')
 
 module.exports = [
   {
     name: 'lodado/interaction',
+    files: CODE_FILES,
     plugins: { '@lodado/local-rules': localRulesPlugin },
     rules: {
       '@lodado/local-rules/interaction-pattern-contract': 'error',

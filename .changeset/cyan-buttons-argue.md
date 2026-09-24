@@ -5,14 +5,14 @@
 
 Enforce the frontend-oracle-design contract in lint.
 
-Eleven new local rules. Errors: `require-exact-call-count`, `require-skip-reason`,
-`no-arbitrary-sleep-in-tests`, `no-css-locator-without-reason`, `no-refetch-in-effect`,
+Nine new local rules. Errors: `require-exact-call-count`, `require-skip-reason`,
+`no-arbitrary-sleep-in-tests`, `no-refetch-in-effect`,
 `no-fetch-in-component`, `require-abort-signal-passthrough`. Warnings:
-`require-effect-annotation`, `no-use-client-above-leaf`, `no-derived-state-effect`. Off by
+`require-effect-annotation`, `no-use-client-above-leaf`. Off by
 default: `scenario-test-filename`.
 
-The `local-rules` preset now reads each rule's `meta.docs.recommended` for severity
-(`false` -> off, `'warn'` -> warn, otherwise error) instead of switching everything on as an error.
+The `local-rules` preset lists each rule's severity explicitly: certain defects are errors,
+judgement calls are warnings, and adding a rule to the plugin never switches it on silently.
 
 New presets: `testing` (Vitest + Testing Library on `*.test.*`, Playwright on `e2e/**`) and
 `query` (TanStack Query).

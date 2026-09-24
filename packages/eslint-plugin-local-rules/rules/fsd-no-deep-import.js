@@ -3,9 +3,7 @@
  * server-only consumers). Importing an internal segment file couples the consumer to
  * internals the slice is free to move. Ships off - the `fsd` preset turns it on.
  */
-const path = require('path')
-
-const { normalize, parseSlicedPath } = require('./lib/fsd-path')
+const { relativeFilename, parseLayerPath, resolveImport, importVisitors } = require('./lib/fsd-path')
 
 const PUBLIC_ENTRIES = new Set(['index', 'index.server'])
 
@@ -23,7 +21,7 @@ const isPublicSurface = (rest) => {
     return true
   }
 
-  // @x cross-import notation is a deliberately published surface
+  // @x cross-import notation is a deliberately published surface; fsd-layer-direction judges its consumer
   return rest[0] === '@x'
 }
 
@@ -42,27 +40,15 @@ module.exports = {
     },
   },
   create(context) {
-    const filename = normalize(context.filename)
-    const importer = parseSlicedPath(filename)
+    const filename = relativeFilename(context)
+    const importer = parseLayerPath(filename)
+    const inSlice = importer && !importer.sliceless && importer.layer !== 'app' && importer.layer !== '_app'
 
-    const check = (node, source) => {
-      if (typeof source !== 'string') {
-        return
-      }
+    return importVisitors((node, source) => {
+      const resolved = resolveImport(filename, source)
+      const target = resolved && parseLayerPath(resolved)
 
-      let resolved
-      if (source.startsWith('.')) {
-        resolved = path.posix.join(path.posix.dirname(filename), source)
-      } else if (source.startsWith('@/') || source.startsWith('~/')) {
-        resolved = source.slice(2)
-      }
-
-      if (!resolved) {
-        return
-      }
-      const target = parseSlicedPath(resolved)
-
-      if (!target || isPublicSurface(target.rest)) {
+      if (!target || !target.slice || isPublicSurface(target.rest)) {
         return
       }
 
@@ -70,26 +56,12 @@ module.exports = {
         return
       }
 
-      context.report({ node, messageId: 'deepImport', data: { slice: `${target.layer}/${target.slice}` } })
-    }
+      // Upward and sibling edges belong to fsd-layer-direction; a deep path there is the same defect.
+      if (inSlice && (target.rank > importer.rank || target.layer === importer.layer)) {
+        return
+      }
 
-    return {
-      ImportDeclaration(node) {
-        check(node.source, node.source.value)
-      },
-      ExportNamedDeclaration(node) {
-        if (node.source) {
-          check(node.source, node.source.value)
-        }
-      },
-      ExportAllDeclaration(node) {
-        check(node.source, node.source.value)
-      },
-      ImportExpression(node) {
-        if (node.source.type === 'Literal') {
-          check(node.source, node.source.value)
-        }
-      },
-    }
+      context.report({ node, messageId: 'deepImport', data: { slice: `${target.layer}/${target.slice}` } })
+    })
   },
 }

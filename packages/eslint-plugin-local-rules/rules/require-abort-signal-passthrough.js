@@ -1,7 +1,13 @@
 /**
- * Taking the `signal` out of the queryFn context and then not handing it to the request
- * means the abort never reaches the network - a stale response can still land last and win.
+ * A queryFn that makes a request without the context `signal` means the abort never reaches the
+ * network - a stale response can still land last and win. The rule checks every request the
+ * queryFn makes (fetch, `window.fetch`, an HTTP client or its instance), so deleting `{ signal }`
+ * does not silence it. The signal counts wherever it appears in the request arguments:
+ * `{ signal }`, `AbortSignal.any([signal, ...])`, `new Request(url, { signal })` or a local
+ * `const init = { signal }`.
  */
+const { findVariable, isTransport } = require('./lib/runtime-modules')
+
 const FUNCTION_TYPES = new Set(['FunctionExpression', 'ArrowFunctionExpression'])
 
 const signalBindingName = (fn) => {
@@ -22,51 +28,40 @@ const signalBindingName = (fn) => {
   return binding.name
 }
 
-const hasSignalOption = (call, signalName) => {
-  const options = call.arguments[1]
-
-  if (!options || options.type !== 'ObjectExpression') {
+/** Whether `name` is read anywhere under `node`, following one hop into a local const initializer. */
+const mentions = (sourceCode, node, name, followed = false) => {
+  if (!node || typeof node.type !== 'string') {
     return false
   }
-
-  return options.properties.some((property) => {
-    if (property.type !== 'Property' || property.computed || property.key.name !== 'signal') {
+  if (node.type === 'Identifier') {
+    if (node.name === name) {
+      return true
+    }
+    const init = followed ? null : findVariable(sourceCode, node)?.defs[0]?.node.init
+    return Boolean(init) && mentions(sourceCode, init, name, true)
+  }
+  return Object.keys(node).some((key) => {
+    if (key === 'parent' || (key === 'key' && node.type === 'Property' && !node.computed && !node.shorthand)) {
       return false
     }
-
-    return property.value.type === 'Identifier' && property.value.name === signalName
-  })
-}
-
-/** Every `fetch(...)` lexically inside the queryFn, nested callbacks included. */
-const collectFetchCalls = (node, found = []) => {
-  if (!node || typeof node.type !== 'string') {
-    return found
-  }
-
-  if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'fetch') {
-    found.push(node)
-  }
-
-  Object.keys(node).forEach((key) => {
-    if (key === 'parent') {
-      return
-    }
-
     const value = node[key]
-
-    if (Array.isArray(value)) {
-      value.forEach((child) => collectFetchCalls(child, found))
-      return
-    }
-
-    if (value && typeof value === 'object') {
-      collectFetchCalls(value, found)
-    }
+    return Array.isArray(value)
+      ? value.some((child) => mentions(sourceCode, child, name, followed))
+      : Boolean(value) && typeof value === 'object' && mentions(sourceCode, value, name, followed)
   })
-
-  return found
 }
+
+/** The queryFn function this node sits in, if any. */
+const enclosingQueryFn = (sourceCode, node) =>
+  sourceCode
+    .getAncestors(node)
+    .findLast(
+      (ancestor) =>
+        FUNCTION_TYPES.has(ancestor.type) &&
+        ancestor.parent.type === 'Property' &&
+        !ancestor.parent.computed &&
+        ancestor.parent.key.name === 'queryFn',
+    )
 
 module.exports = {
   meta: {
@@ -80,25 +75,29 @@ module.exports = {
     messages: {
       missingSignalPassthrough:
         'Pass the queryFn signal to this request - fetch(url, { signal }) - otherwise cancellation never reaches the network.',
+      missingSignal:
+        'Take `signal` from the queryFn context and pass it to this request - ({ signal }) => fetch(url, { signal }).',
     },
   },
   create(context) {
+    const sourceCode = context.sourceCode
+
     return {
-      Property(node) {
-        if (node.computed || node.key.name !== 'queryFn' || !FUNCTION_TYPES.has(node.value.type)) {
+      CallExpression(node) {
+        if (!isTransport(sourceCode, node.callee) || isTransport(sourceCode, node)) {
+          return
+        }
+        const queryFn = enclosingQueryFn(sourceCode, node)
+        if (!queryFn) {
           return
         }
 
-        const signalName = signalBindingName(node.value)
+        const signalName = signalBindingName(queryFn)
         if (!signalName) {
-          return
+          context.report({ node, messageId: 'missingSignal' })
+        } else if (!node.arguments.some((argument) => mentions(sourceCode, argument, signalName))) {
+          context.report({ node, messageId: 'missingSignalPassthrough' })
         }
-
-        collectFetchCalls(node.value.body).forEach((call) => {
-          if (!hasSignalOption(call, signalName)) {
-            context.report({ node: call, messageId: 'missingSignalPassthrough' })
-          }
-        })
       },
     }
   },

@@ -3,15 +3,17 @@ import path from 'node:path'
 import localPlugin from '@lodado/eslint-plugin-local-rules'
 import ymne from 'eslint-plugin-react-you-might-not-need-an-effect'
 import query from './query.js'
-import react from './react.mjs'
+import react, { EFFECT_STATE_DUPLICATES } from './react.mjs'
 import strictTypes from './strict-types.js'
 
 const boundaryRules = ['strict-ui-boundary', 'fsd-strict-boundaries'].map((name) => `@lodado/local-rules/${name}`)
+// fsd-strict-boundaries owns direction, public API and segments inside the roots; the fsd preset steps aside.
+const fsdHeuristics = ['fsd-layer-direction', 'fsd-no-banned-segments', 'fsd-no-deep-import'].map((name) => `@lodado/local-rules/${name}`)
 const hooks = ['rules-of-hooks', 'exhaustive-deps', 'set-state-in-effect', 'set-state-in-render', 'purity', 'immutability', 'refs', 'static-components']
 const resources = ['event-listener', 'fetch', 'intersection-observer', 'interval', 'resize-observer', 'timeout']
 const typedRules = ['no-floating-promises', 'no-misused-promises', 'no-explicit-any', 'no-unsafe-assignment', 'no-unsafe-argument', 'no-unsafe-call', 'no-unsafe-member-access', 'no-unsafe-return']
-// React Hooks owns derived-state diagnostics; avoid reporting the same effect twice.
-const ymneRules = Object.keys(ymne.configs.strict.rules || {}).filter((name) => !name.endsWith('/no-derived-state'))
+// React Hooks owns state updates inside effects; avoid reporting the same effect twice.
+const ymneRules = Object.keys(ymne.configs.strict.rules || {}).filter((name) => !EFFECT_STATE_DUPLICATES.includes(name.split('/')[1]))
 
 function validate(options) {
   if (!options || !path.isAbsolute(options.cwd || '') || !path.isAbsolute(options.tsconfig || '')) throw new TypeError('strict requires absolute cwd and tsconfig paths')
@@ -54,6 +56,7 @@ export default function strictProfile(options) {
       linterOptions: { noInlineConfig: true, reportUnusedDisableDirectives: 'error' },
       rules: {
         ...Object.fromEntries(boundaryRules.map((name) => [name, ['error', options]])),
+        ...Object.fromEntries(fsdHeuristics.map((name) => [name, 'off'])),
         ...Object.fromEntries(hooks.map((name) => [`react-hooks/${name}`, 'error'])),
         ...Object.fromEntries(resources.map((name) => [`@eslint-react/web-api-no-leaked-${name}`, 'error'])),
         'no-empty': ['error', { allowEmptyCatch: false }],
@@ -92,6 +95,7 @@ export async function verifyStrictProject(eslint, options) {
       for (const name of Object.keys(entry.rules || {})) if (name.startsWith('@tanstack/query/')) required.push(name)
     }
     for (const name of required) if (config.rules?.[name]?.[0] !== 2) throw new Error(`Strict rule weakened: ${name} in ${file}`)
+    for (const name of fsdHeuristics) if (config.rules?.[name]?.[0]) throw new Error(`Spread the fsd preset before strict: ${name} would report a strict defect twice in ${file}`)
     for (const name of boundaryRules) {
       if (JSON.stringify(config.rules[name][1]) !== JSON.stringify(options)) throw new Error(`Strict boundary options changed: ${name} in ${file}`)
     }

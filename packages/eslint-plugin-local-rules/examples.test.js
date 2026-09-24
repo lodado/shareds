@@ -1,4 +1,4 @@
-/* eslint-disable @lodado/local-rules/no-console-log -- test progress output */
+/* eslint-disable no-console -- test progress output */
 /**
  * The reference implementations under examples/ must satisfy the contracts they demonstrate:
  * jsx-a11y-x strict plus this plugin's interaction rules report nothing. Run with `node examples.test.js`.

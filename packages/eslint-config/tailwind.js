@@ -7,11 +7,13 @@
  * `@import "tailwindcss"` so unknown classes resolve against the real theme.
  */
 const betterTailwind = require('eslint-plugin-better-tailwindcss')
+const { CODE_FILES } = require('./code-files')
 
 module.exports = [
   {
     ...betterTailwind.configs['correctness-error'],
     name: 'lodado/tailwind',
+    files: CODE_FILES,
     rules: {
       ...betterTailwind.configs['correctness-error'].rules,
       'better-tailwindcss/no-duplicate-classes': 'error',

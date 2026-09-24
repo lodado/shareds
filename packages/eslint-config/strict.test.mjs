@@ -8,6 +8,7 @@ import process from 'node:process'
 import { after, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { ESLint } from 'eslint'
+import fsd, { fsdBoundaries } from './fsd.mjs'
 import base from './index.mjs'
 import strictProfile, { verifyStrictProject } from './strict.mjs'
 
@@ -199,4 +200,24 @@ test('strict keeps base restriction options and does not activate in base-only c
   assert.equal(before.rules['@lodado/local-rules/strict-ui-boundary'], undefined)
   const messages = await lint("import {useState} from 'react'; export const Panel = (): number => useState(0)[0]", 'src/features/users/ui/Panel.tsx', plain)
   assert.ok(!messages.some((message) => message.ruleId?.startsWith('@lodado/local-rules/strict-')))
+})
+
+test('fsd composes with strict and fsdBoundaries, and each FSD defect reports once', async () => {
+  const fsdMessages = async (configs, code, file) => {
+    const eslint = new ESLint({ cwd, overrideConfigFile: true, overrideConfig: [...base, ...configs] })
+    const [result] = await eslint.lintText(code, { filePath: path.join(cwd, file) })
+    assert.equal(result.fatalErrorCount, 0, JSON.stringify(result.messages))
+    return result.messages.filter((message) => message.ruleId?.includes('/fsd-')).map((message) => `${message.ruleId}:${message.messageId}`)
+  }
+  const deep = "import { Panel } from '@/features/users/ui/Panel'\nexport default function Page(): null { Panel(); return null }\n"
+  assert.deepEqual(await fsdMessages(fsd, deep, 'src/app/page.tsx'), ['@lodado/local-rules/fsd-no-deep-import:deepImport'])
+  assert.deepEqual(await fsdMessages([...fsd, ...strictProfile(policy)], deep, 'src/app/page.tsx'), ['@lodado/local-rules/fsd-strict-boundaries:deepImport'])
+  await assert.rejects(verifyStrictProject(createLinter(fsd), policy), /before strict/u)
+
+  const boundaries = fsdBoundaries({ cwd, tsconfig: policy.tsconfig, roots: policy.roots })
+  const upward = "import Page from '@/app/page'\nexport const page: unknown = Page\n"
+  assert.deepEqual(await fsdMessages(fsd, upward, 'src/features/users/model/page.ts'), ['@lodado/local-rules/fsd-layer-direction:upward'])
+  assert.deepEqual(await fsdMessages([...fsd, ...boundaries], upward, 'src/features/users/model/page.ts'), ['@lodado/local-rules/fsd-strict-boundaries:layerDirection'])
+  assert.throws(() => fsdBoundaries({ ...policy, cwd: 'relative' }), /absolute/u)
+  assert.throws(() => fsdBoundaries({ ...policy, roots: [{ path: 'src/**' }] }), /literal/u)
 })

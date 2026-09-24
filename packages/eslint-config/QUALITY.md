@@ -17,11 +17,26 @@ JS/TS 파일에만 적용하며 Markdown 코드 블록과 JSON·YAML은 제외�
 인지 복잡도는 error 대신 warn으로 보고한다. 파일·함수 줄 수와 반복 문자열은 검사하지 않는다.
 중첩 삼항연산자는 base의 `no-nested-ternary: error`가 담당하고,
 중복 보고를 피하기 위해 `sonarjs/no-nested-conditional`은 끈다. 단일 삼항연산자는 허용한다.
+같은 방식으로 base의 core·regexp·unused-vars·`test/` 규칙과 같은 결함을 보는 SonarJS 규칙은 끈다.
+`code-eval`(`no-eval`), `no-identical-expressions`(`no-self-compare`), `no-primitive-wrappers`,
+`constructor-for-side-effects`, `array-callback-without-return`, `prefer-default-last`, 정규식 규칙 5개,
+`no-unused-function-argument`, `no-exclusive-tests`, `no-duplicate-test-title`이 여기에 해당하며,
+`quality.js`의 각 줄에 담당 규칙을 적어 둔다. `no-reference-error`도 끈다. 선언하지 않은 이름은
+JS에서는 base `no-undef`, TS에서는 tsc가 담당하며, 이 규칙은 `React.ReactNode` 같은 전역 타입
+네임스페이스를 오탐했다. 복잡도는 `cognitive-complexity` 하나로 본다. `cyclomatic-complexity`는
+같은 함수를 거의 항상 함께 보고해 끈다.
 
 ## 다른 프리셋의 중복·과잉 검사
 
 - `console`은 base의 `no-console`, `includes` 권고는 Unicorn이 담당한다.
 - effect 안의 동기적인 상태 갱신은 React Hooks가 담당한다. 중복된 derived-state 검사는 끈다.
+  `sonarjs/no-hook-setter-in-body`도 `react-hooks/set-state-in-render`에 맡긴다.
+- 테스트 파일에서는 `testing` preset의 Vitest·Testing Library·Playwright 규칙이 담당한다.
+  `assertions-in-tests`, `no-empty-test-title`, `no-debug-commands-in-ui-tests`, `no-fixed-wait-in-tests`,
+  `no-networkidle-wait`, `no-forced-browser-interaction`은 테스트 파일에서 끈다. `react`나 `testing`을
+  쓰지 않는 레포는 해당 규칙을 다시 켠다.
+- `ai` preset을 켜면 비밀값과 SQL 문자열 결합은 `ai-guard`가 담당하고 `no-hardcoded-passwords`,
+  `no-hardcoded-secrets`, `sql-queries`는 꺼진다. `ai`는 `quality` 뒤에 펼친다.
 - 버튼의 `type` 누락 검사는 유지한다. 타입 검사가 버튼의 기본 submit 동작을 막아주지는 않는다.
 - 루트 설정에서 `react-perf`를 제거했다. 인라인 함수·객체라는 이유만으로 메모이제이션을 강제하지 않는다.
 - functional의 기본 범위는 domain·selectors·`*.pure.*`다. 일반 reducer는 제외하고, 명시적인 pure reducer는 계속 검사한다.
@@ -64,21 +79,21 @@ jscpd는 `packages/`의 JS/TS 코드에서 50토큰·5줄 이상인 복제를 �
 
 공식 recommended에서 특히 AI 결과 검수에 중요한 영역은 다음과 같다.
 
-| 영역               | 대표 활성 규칙                                                                                                                                      | 막는 실패                                                                                    |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| 분기와 데이터 흐름 | `no-identical-expressions`, `no-identical-conditions`, `no-duplicated-branches`, `no-invariant-returns`, `no-dead-store`                            | 복사·붙여넣기로 같아진 조건/분기, 항상 같은 결과, 사용되지 않는 계산                         |
-| 반환과 타입        | `array-callback-without-return`, `function-return-type`, `no-ignored-return`, `null-dereference`, `in-operator-type-error`                          | 누락된 반환, 호출마다 바뀌는 반환 타입, 무시된 순수 함수 결과, 확정적인 런타임 예외          |
-| 예외와 비동기      | `no-ignored-exceptions`, `no-unthrown-error`, `no-try-promise`, `async-test-assertions`                                                             | 삼킨 오류, 생성만 하고 던지지 않은 Error, 잘못된 Promise 예외 처리, await하지 않은 assertion |
-| 테스트 신뢰성      | `no-empty-test-file`, `no-empty-test-title`, `no-duplicate-test-title`, `test-check-exception`, `no-debug-commands-in-ui-tests`                     | 실행되지 않는 테스트, 이름 충돌, 예외 종류를 확인하지 않는 테스트, 커밋된 디버그 명령        |
-| 복잡도와 정규식    | `cognitive-complexity`, `regex-complexity`, `slow-regex`, `super-linear-regex`, `stateful-regex`                                                    | 리뷰하기 어려운 제어 흐름과 ReDoS/상태 누수 가능성이 있는 정규식                             |
-| 보안               | `code-eval`, `sql-queries`, `no-hardcoded-passwords`, `hardcoded-secret-signatures`, `pseudo-random`, `csrf`, `cors`, `insecure-cookie`, `weak-ssl` | 사용자 입력 실행, SQL injection, 비밀 유출, 보안 문맥의 PRNG, 완화책 비활성화                |
+| 영역               | 대표 활성 규칙                                                                                                                         | 막는 실패                                                                                    |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| 분기와 데이터 흐름 | `no-identical-conditions`, `no-duplicated-branches`, `no-invariant-returns`, `no-dead-store`                                           | 복사·붙여넣기로 같아진 조건/분기, 항상 같은 결과, 사용되지 않는 계산                         |
+| 반환과 타입        | `function-return-type`, `no-ignored-return`, `null-dereference`, `in-operator-type-error`                                              | 누락된 반환, 호출마다 바뀌는 반환 타입, 무시된 순수 함수 결과, 확정적인 런타임 예외          |
+| 예외와 비동기      | `no-ignored-exceptions`, `no-unthrown-error`, `no-try-promise`, `async-test-assertions`                                                | 삼킨 오류, 생성만 하고 던지지 않은 Error, 잘못된 Promise 예외 처리, await하지 않은 assertion |
+| 테스트 신뢰성      | `no-empty-test-file`, `test-check-exception`                                                                                           | 실행되지 않는 테스트, 이름 충돌, 예외 종류를 확인하지 않는 테스트, 커밋된 디버그 명령        |
+| 복잡도와 정규식    | `cognitive-complexity`, `regex-complexity`, `super-linear-regex`, `stateful-regex`                                                     | 리뷰하기 어려운 제어 흐름과 ReDoS/상태 누수 가능성이 있는 정규식                             |
+| 보안               | `sql-queries`, `no-hardcoded-passwords`, `hardcoded-secret-signatures`, `pseudo-random`, `csrf`, `cors`, `insecure-cookie`, `weak-ssl` | 사용자 입력 실행, SQL injection, 비밀 유출, 보안 문맥의 PRNG, 완화책 비활성화                |
 
 전체 공식 규칙 정의는 각 lint 메시지의 SonarSource RSPEC 링크가 권위다. 아래 목록은
 이 프리셋에서 추가하거나 경고 수준으로 조정한 규칙이다.
 
 ## 추가 error 16개
 
-`error`는 lint를 실패시킨다. Stop 훅에서 차단하려면 훅을 별도로 등록해야 한다.
+`error`는 lint를 실패시키고, CI와 pre-commit이 그 실패에서 멈춘다.
 
 | 규칙                                   | 검수 목적                                                                               |
 | -------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -90,7 +105,6 @@ jscpd는 `packages/`의 JS/TS 코드에서 50토큰·5줄 이상인 복제를 �
 | `no-implicit-dependencies`             | AI가 설치하지 않은 패키지를 import하거나 간접 의존성에 우연히 기대는 일을 막는다.       |
 | `no-inconsistent-returns`              | 같은 함수가 어떤 경로에서는 값, 다른 경로에서는 `undefined`를 반환하는 일을 막는다.     |
 | `no-incorrect-string-concat`           | 문자열과 비문자열을 의도 없이 더해 잘못된 payload/UI 값을 만드는 일을 막는다.           |
-| `no-reference-error`                   | 선언하지 않은 식별자를 생성해 런타임 `ReferenceError`가 나는 일을 막는다.               |
 | `no-sonar-comments`                    | AI가 `NOSONAR`로 검사를 통째로 숨기는 일을 막는다. 규칙 단위 disable에는 사유를 남긴다. |
 | `no-undefined-assignment`              | `undefined`를 직접 대입해 값 없음과 미초기화 상태를 섞는 일을 막는다.                   |
 | `no-variable-usage-before-declaration` | `var` hoisting에 기대어 초기화 전 값을 읽는 일을 막는다.                                |
@@ -104,22 +118,20 @@ jscpd는 `packages/`의 JS/TS 코드에서 50토큰·5줄 이상인 복제를 �
 문맥에 따라 정당할 수 있지만, AI 출력은 사람이 한 번 확인해야 하는 지점이다. 경고는
 기본적으로 lint를 실패시키지 않으며 팀이 `--max-warnings=0`을 선택하면 차단할 수 있다.
 
-| 규칙                                 | 검토 신호                                                                     |
-| ------------------------------------ | ----------------------------------------------------------------------------- |
-| `cognitive-complexity`               | 제어 흐름이 복잡해 사람이 검토할 필요가 있는 함수다.                          |
-| `cyclomatic-complexity`              | 독립 실행 경로가 많아 누락된 테스트 조합이 생기기 쉬운 함수다.                |
-| `elseif-without-else`                | 분기 체인에 나머지 입력 정책이 명시되지 않았다. 의도적 no-op인지 확인한다.    |
-| `expression-complexity`              | 한 식에 조건 연산자가 너무 많아 진리표 검토가 어렵다.                         |
-| `max-union-size`                     | 거대한 union이 상태 모델의 누락/중복을 숨길 수 있다.                          |
-| `nested-control-flow`                | 깊은 중첩 때문에 early return, cleanup, 오류 경로가 가려진다.                 |
-| `no-commented-code`                  | 과거 구현을 주석으로 남겨 실제 권위 코드가 무엇인지 흐리는 일을 찾는다.       |
-| `no-nested-incdec`                   | 증가·감소의 평가 순서를 한 식 안에서 추론해야 하는 코드를 찾는다.             |
-| `no-nested-switch`                   | 상태 전이 표가 여러 switch로 흩어져 조합 누락이 생길 가능성을 알린다.         |
-| `no-return-type-any`                 | AI가 타입 오류를 `any` 반환으로 덮어 계약 검증을 약화한 지점을 찾는다.        |
-| `no-unused-function-argument`        | 구현이 계약 입력을 빠뜨렸거나 복사한 signature를 정리하지 않은 지점을 찾는다. |
-| `no-wildcard-import`                 | 실제 사용 API와 의존 범위가 불명확한 import를 찾는다.                         |
-| `prefer-immediate-return`            | 중간 변수가 결과를 바꾸지 않는데 남아 데이터 흐름을 길게 만든 지점을 찾는다.  |
-| `too-many-break-or-continue-in-loop` | loop 탈출 경로가 많아 원소 처리 여부를 예측하기 어려운 코드를 찾는다.         |
+| 규칙                                 | 검토 신호                                                                    |
+| ------------------------------------ | ---------------------------------------------------------------------------- |
+| `cognitive-complexity`               | 제어 흐름이 복잡해 사람이 검토할 필요가 있는 함수다.                         |
+| `elseif-without-else`                | 분기 체인에 나머지 입력 정책이 명시되지 않았다. 의도적 no-op인지 확인한다.   |
+| `expression-complexity`              | 한 식에 조건 연산자가 너무 많아 진리표 검토가 어렵다.                        |
+| `max-union-size`                     | 거대한 union이 상태 모델의 누락/중복을 숨길 수 있다.                         |
+| `nested-control-flow`                | 깊은 중첩 때문에 early return, cleanup, 오류 경로가 가려진다.                |
+| `no-commented-code`                  | 과거 구현을 주석으로 남겨 실제 권위 코드가 무엇인지 흐리는 일을 찾는다.      |
+| `no-nested-incdec`                   | 증가·감소의 평가 순서를 한 식 안에서 추론해야 하는 코드를 찾는다.            |
+| `no-nested-switch`                   | 상태 전이 표가 여러 switch로 흩어져 조합 누락이 생길 가능성을 알린다.        |
+| `no-return-type-any`                 | AI가 타입 오류를 `any` 반환으로 덮어 계약 검증을 약화한 지점을 찾는다.       |
+| `no-wildcard-import`                 | 실제 사용 API와 의존 범위가 불명확한 import를 찾는다.                        |
+| `prefer-immediate-return`            | 중간 변수가 결과를 바꾸지 않는데 남아 데이터 흐름을 길게 만든 지점을 찾는다. |
+| `too-many-break-or-continue-in-loop` | loop 탈출 경로가 많아 원소 처리 여부를 예측하기 어려운 코드를 찾는다.        |
 
 ## frontend-oracle-design과의 관계
 

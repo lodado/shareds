@@ -3,9 +3,9 @@
  * mix view and state ownership the segments were meant to separate. Ships off - the
  * `fsd` preset turns it on.
  */
-const { normalize } = require('./lib/fsd-path')
+const { relativeFilename, parseLayerPath } = require('./lib/fsd-path')
 
-const BANNED_SEGMENT = /\/(?:pages|_pages|views|widgets|features|entities)\/[^/]+\/(components|hooks|utils)\//
+const BANNED_SEGMENTS = new Set(['components', 'hooks', 'utils'])
 
 module.exports = {
   meta: {
@@ -22,15 +22,16 @@ module.exports = {
     },
   },
   create(context) {
-    const match = BANNED_SEGMENT.exec(normalize(context.filename))
+    const at = parseLayerPath(relativeFilename(context))
+    const segment = at?.slice && at.rest.length > 1 ? at.rest[0] : null
 
-    if (!match) {
+    if (!BANNED_SEGMENTS.has(segment)) {
       return {}
     }
 
     return {
       Program(node) {
-        context.report({ node, messageId: 'bannedSegment', data: { segment: match[1] } })
+        context.report({ node, messageId: 'bannedSegment', data: { segment } })
       },
     }
   },

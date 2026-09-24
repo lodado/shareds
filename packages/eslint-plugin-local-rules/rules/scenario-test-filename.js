@@ -4,8 +4,8 @@
  */
 const { normalize, isE2EFile } = require('./lib/test-file')
 
-const UNIT_TEST_FILE = /\.(test|spec)\.[jt]sx?$/
-const CONVENTIONAL = /\.(scenario|unit|integration)\.(test|spec)\.[jt]sx?$/
+const UNIT_TEST_FILE = /\.(test|spec)\.[cm]?[jt]sx?$/
+const CONVENTIONAL = /\.(scenario|unit|integration)\.(test|spec)\.[cm]?[jt]sx?$/
 
 module.exports = {
   meta: {

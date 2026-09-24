@@ -1,5 +1,6 @@
 const fs = require('node:fs')
 const ts = require('typescript')
+const { OWNERS, OWNER_API, TRANSPORT } = require('./lib/runtime-modules')
 const { createProject } = require('./lib/strict-paths')
 
 const runtimeGlobals = new Set([
@@ -11,7 +12,12 @@ const runtimeGlobals = new Set([
   'ResizeObserver',
   'IntersectionObserver',
   'MutationObserver',
+  'requestIdleCallback',
+  'matchMedia',
 ])
+const networkGlobals = new Set(['fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource'])
+// Globals whose members reach the network or the DOM runtime: navigator.sendBeacon, document.addEventListener.
+const globalObjects = new Set(['window', 'globalThis', 'self', 'navigator', 'document'])
 const viewFactories = {
   react: ['createElement', 'cloneElement'],
   'react/jsx-runtime': ['jsx', 'jsxs'],
@@ -19,9 +25,16 @@ const viewFactories = {
   'react-dom': ['createPortal'],
 }
 
+// One owner list with the hook-tiers preset: choosing the strict profile never drops an owner check.
 const defaults = [
   { source: '@tanstack/react-query', exports: ['*'], kind: 'query' },
-  ...['axios', 'ky', 'node-fetch'].map((source) => ({ source, exports: ['*'], kind: 'transport' })),
+  ...OWNERS.filter((source) => source !== '@tanstack/react-query').map((source) => ({
+    source,
+    exports: [],
+    exportPattern: OWNER_API,
+    kind: 'store',
+  })),
+  ...TRANSPORT.map((source) => ({ source, exports: ['*'], kind: 'transport' })),
   ...['@prisma/client', 'pg', 'mongodb', 'drizzle-orm'].map((source) => ({ source, exports: ['*'], kind: 'database' })),
 ]
 const propertyName = (node) => {
@@ -81,12 +94,18 @@ module.exports = {
     const presentation = ui || viewHook || sharedRuntime
     const modules = [...defaults, ...(options.modules || [])]
     const seenReports = new Set()
+    const reportedStatements = new Set()
     const parsed = new Map()
+    const statementOf = (node) =>
+      sourceCode.getAncestors(node).find((ancestor) => ancestor.parent?.type === 'Program') ?? node
     const report = (node, messageId, symbol, direction = '') => {
       const owner = symbol.startsWith('react:') ? symbol : symbol.split(':')[0]
       const key = `${messageId}:${owner}`
-      if (seenReports.has(key)) return
+      // One statement is one defect even when a barrel names it twice (module and specifier).
+      const statement = `${messageId}:${sourceCode.getIndexFromLoc(statementOf(node).loc.start)}`
+      if (seenReports.has(key) || reportedStatements.has(statement)) return
       seenReports.add(key)
+      reportedStatements.add(statement)
       context.report({ node, messageId, data: { symbol, role, file: project.relative(filename), direction } })
     }
     const variable = (node) => {
@@ -169,9 +188,11 @@ module.exports = {
     }
     const access = (base, name) => {
       if (!base || !name) return null
-      if (base.source === '<global>' && ['window', 'globalThis', 'self'].includes(base.name)) {
-        if (name === 'fetch') return { source: '<network>', name: 'fetch' }
+      if (base.source === '<global>') {
+        if (networkGlobals.has(name) || (base.name === 'navigator' && name === 'sendBeacon'))
+          return { source: '<network>', name }
         if (runtimeGlobals.has(name)) return { source: '<runtime>', name }
+        if (globalObjects.has(name)) return { source: '<global>', name }
         return null
       }
       if (base.name === '*' || (base.name === 'default' && base.source === 'react'))
@@ -220,9 +241,9 @@ module.exports = {
       if (node.type !== 'Identifier') return null
       const binding = variable(node)
       if (!binding?.defs.length) {
-        if (node.name === 'fetch') return { source: '<network>', name: 'fetch' }
+        if (networkGlobals.has(node.name)) return { source: '<network>', name: node.name }
         if (runtimeGlobals.has(node.name)) return { source: '<runtime>', name: node.name }
-        if (['window', 'globalThis', 'self'].includes(node.name)) return { source: '<global>', name: node.name }
+        if (globalObjects.has(node.name)) return { source: '<global>', name: node.name }
         return null
       }
       if (visited.has(binding)) return null
@@ -300,7 +321,9 @@ module.exports = {
           (!configuredFile || configuredFile !== value.file)
         )
           continue
-        if (!policy.exports.includes('*') && !policy.exports.includes(value.name.split('.')[0])) continue
+        const exportName = value.name.split('.')[0]
+        const named = policy.exports.includes('*') || policy.exports.includes(exportName)
+        if (!named && !(policy.exportPattern && new RegExp(policy.exportPattern, 'u').test(exportName))) continue
         const transport = ['transport', 'database'].includes(policy.kind)
         let allowed = current.segment === 'model' && !presentation
         if (transport) allowed = (current.segment === 'api' || server) && !presentation
@@ -376,6 +399,13 @@ module.exports = {
       ImportExpression(node) {
         if (node.source.type === 'Literal' && typeof node.source.value === 'string')
           checkModule(node, node.source.value)
+        else if (presentation)
+          report(
+            node,
+            'forbiddenRuntime',
+            '<dynamic import>:*',
+            'Use a literal specifier so the boundary can be checked.',
+          )
       },
       Identifier(node) {
         if (isTypePosition(node)) return

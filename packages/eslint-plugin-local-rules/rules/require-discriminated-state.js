@@ -3,7 +3,8 @@
  * still allows `status: 'success'` with no payload, or an error message on a success state.
  * Split it into one union member per state so each state carries only its own fields.
  */
-const DISCRIMINANT_NAMES = new Set(['status', 'state', 'kind', 'type', 'phase'])
+// `type` and `kind` name component variants (`ButtonProps.type`), not lifecycle states.
+const DISCRIMINANT_NAMES = new Set(['status', 'state', 'phase'])
 
 const memberName = (member) => {
   if (member.type !== 'TSPropertySignature' || member.computed) {
@@ -13,8 +14,14 @@ const memberName = (member) => {
   return member.key.type === 'Identifier' ? member.key.name : null
 }
 
-const isStringLiteralUnion = (member) => {
-  const annotation = member.typeAnnotation?.typeAnnotation
+/** The annotation, or the union a same-file `type Status = 'a' | 'b'` alias names. */
+const resolveAlias = (annotation, aliases) =>
+  annotation?.type === 'TSTypeReference' && annotation.typeName.type === 'Identifier'
+    ? aliases.get(annotation.typeName.name) ?? annotation
+    : annotation
+
+const isStringLiteralUnion = (member, aliases) => {
+  const annotation = resolveAlias(member.typeAnnotation?.typeAnnotation, aliases)
 
   if (annotation?.type !== 'TSUnionType' || annotation.types.length < 2) {
     return false
@@ -26,17 +33,25 @@ const isStringLiteralUnion = (member) => {
   )
 }
 
-const report = (context, node, members) => {
+// `data: T | null` next to a status union is the same soup as `data?: T`.
+const isNullable = (member) =>
+  member.optional ||
+  (member.typeAnnotation?.typeAnnotation?.type === 'TSUnionType' &&
+    member.typeAnnotation.typeAnnotation.types.some((entry) =>
+      ['TSNullKeyword', 'TSUndefinedKeyword'].includes(entry.type),
+    ))
+
+const report = (context, node, members, aliases) => {
   const discriminant = members.find((member) => {
     const name = memberName(member)
-    return name !== null && DISCRIMINANT_NAMES.has(name) && isStringLiteralUnion(member)
+    return name !== null && DISCRIMINANT_NAMES.has(name) && isStringLiteralUnion(member, aliases)
   })
 
   if (!discriminant) {
     return
   }
 
-  const optional = members.filter((member) => member !== discriminant && member.optional)
+  const optional = members.filter((member) => member !== discriminant && isNullable(member))
 
   if (optional.length === 0) {
     return
@@ -67,12 +82,23 @@ module.exports = {
     },
   },
   create(context) {
+    const aliases = new Map()
+    const candidates = []
+
     return {
+      TSTypeAliasDeclaration(node) {
+        aliases.set(node.id.name, node.typeAnnotation)
+      },
       TSTypeLiteral(node) {
-        report(context, node, node.members)
+        candidates.push([node, node.members])
       },
       TSInterfaceBody(node) {
-        report(context, node, node.body)
+        candidates.push([node, node.body])
+      },
+      'Program:exit'() {
+        for (const [node, members] of candidates) {
+          report(context, node, members, aliases)
+        }
       },
     }
   },

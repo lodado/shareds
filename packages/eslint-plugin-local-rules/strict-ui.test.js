@@ -61,6 +61,8 @@ const tester = new RuleTester({
 try {
   tester.run('strict-ui-boundary', rule, {
     valid: [
+      // a Provider is composition, not state ownership
+      valid("import { Provider } from 'jotai'; export const Panel = ({ children }) => <Provider>{children}</Provider>"),
       valid("import type { useState, ReactNode } from 'react'; export type Props = { children: ReactNode }"),
       valid(
         "import React, { Fragment, createElement, memo, forwardRef } from 'react'; export default memo(() => createElement(Fragment))",
@@ -217,6 +219,18 @@ try {
         'src/features/users/ui/typed.ts',
       ),
       invalid("export { Panel } from '../ui/Panel'", 'viewImplementation', 'src/features/users/model/index.ts'),
+      // every owner the hook-tiers preset knows, without listing it in policy.modules
+      invalid("import { useAtom } from 'jotai'; export const Panel = () => useAtom(state)[0]"),
+      invalid("import useSWR from 'swr'; export const Panel = () => useSWR('/users').data"),
+      invalid("import { useSelector } from 'react-redux'; export const Panel = () => useSelector(pick)"),
+      invalid("import { ofetch } from 'ofetch'; export const Panel = () => ofetch('/users')"),
+      // other network and runtime primitives
+      invalid("export const Panel = () => { new WebSocket('wss://x'); return null }"),
+      invalid("export const Panel = () => { new EventSource('/stream'); return null }"),
+      invalid("export const Panel = () => { navigator.sendBeacon('/log'); return null }"),
+      invalid("export const Panel = () => { document.addEventListener('keydown', onKey); return null }"),
+      invalid("export const Panel = () => { window.matchMedia('(min-width: 1px)'); return null }"),
+      invalid('export const Panel = (name) => { import(`../api/${name}`); return null }'),
     ],
   })
   assert.equal(rule.meta.docs.recommended, false)

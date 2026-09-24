@@ -1,15 +1,12 @@
-/** Self-lint: plain CJS rule sources - recommended JS plus this plugin's own rules. */
+/** Self-lint: plain CJS rule sources - recommended JS, and console.log only as test progress output. */
 const js = require('@eslint/js')
 const globals = require('globals')
-
-const plugin = require('./index.js')
 
 module.exports = [
   js.configs.recommended,
   {
     files: ['**/*.js'],
     languageOptions: { sourceType: 'commonjs', globals: { ...globals.node } },
-    plugins: { '@lodado/local-rules': plugin },
-    rules: { '@lodado/local-rules/no-console-log': 'error' },
+    rules: { 'no-console': ['error', { allow: ['warn', 'error'] }] },
   },
 ]

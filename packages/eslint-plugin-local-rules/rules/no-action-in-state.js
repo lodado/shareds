@@ -43,11 +43,11 @@ const hasStateDiscriminant = (members, isDiscriminant) =>
     return name !== null && DISCRIMINANT_NAMES.has(name) && isDiscriminant(member)
   })
 
-const typeMembersOf = (node) => (node.type === 'TSTypeLiteral' ? node.members : [])
+// `retry: () => void` and `retry: (() => void) | undefined` are both actions.
+const isActionType = (node) =>
+  node?.type === 'TSFunctionType' || (node?.type === 'TSUnionType' && node.types.some(isActionType))
 
-const reportTypeLiteral = (context, node) => {
-  const members = typeMembersOf(node)
-
+const reportMembers = (context, members) => {
   if (!hasStateDiscriminant(members, (member) => isDiscriminantType(member.typeAnnotation?.typeAnnotation))) {
     return
   }
@@ -57,7 +57,7 @@ const reportTypeLiteral = (context, node) => {
       continue
     }
 
-    if (member.typeAnnotation?.typeAnnotation?.type !== 'TSFunctionType') {
+    if (!isActionType(member.typeAnnotation?.typeAnnotation)) {
       continue
     }
 
@@ -67,6 +67,27 @@ const reportTypeLiteral = (context, node) => {
       data: { field: propertyName(member) ?? 'this field' },
     })
   }
+}
+
+/** `'failure' as const` is still the literal `'failure'`. */
+const unwrap = (node) =>
+  node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression' ? unwrap(node.expression) : node
+
+const isStringLiteral = (node) => {
+  const value = unwrap(node)
+  return value.type === 'Literal' && typeof value.value === 'string'
+}
+
+// An options object handed to a library call (`toast({ status, onClose })`) is not state.
+const STATE_WRITER = /^(set[A-Z]\w*|useState|useReducer|dispatch)$/
+
+const isLibraryArgument = (node) => {
+  const { parent } = node
+  if (parent.type !== 'CallExpression' || !parent.arguments.includes(node)) {
+    return false
+  }
+  const callee = parent.callee.type === 'MemberExpression' ? parent.callee.property : parent.callee
+  return callee.type !== 'Identifier' || !STATE_WRITER.test(callee.name)
 }
 
 /** `retry: () => load()` is an action by shape; `retry: load` is one by name. */
@@ -101,27 +122,19 @@ module.exports = {
   },
   create(context) {
     return {
-      TSTypeAliasDeclaration(node) {
-        const annotation = node.typeAnnotation
-
-        if (annotation.type === 'TSUnionType') {
-          for (const member of annotation.types) {
-            reportTypeLiteral(context, member)
-          }
-          return
-        }
-
-        reportTypeLiteral(context, annotation)
+      TSTypeLiteral(node) {
+        reportMembers(context, node.members)
+      },
+      // Base autofix (`ts/consistent-type-definitions`) turns object types into interfaces.
+      TSInterfaceBody(node) {
+        reportMembers(context, node.body)
       },
       ObjectExpression(node) {
         const properties = node.properties.filter((property) => property.type === 'Property' && !property.computed)
 
-        const isStateValue = hasStateDiscriminant(
-          properties,
-          (property) => property.value.type === 'Literal' && typeof property.value.value === 'string',
-        )
+        const isStateValue = hasStateDiscriminant(properties, (property) => isStringLiteral(property.value))
 
-        if (!isStateValue) {
+        if (!isStateValue || isLibraryArgument(node)) {
           return
         }
 

@@ -9,9 +9,4 @@ export default [
   ...quality,
   ...strictTypes,
   ...localRules,
-  // Reference widget implementations are app code, not library surface: inferred return types are fine.
-  {
-    files: ['packages/eslint-plugin-local-rules/examples/**/*.tsx'],
-    rules: { 'ts/explicit-function-return-type': 'off' },
-  },
 ]

@@ -1,6 +1,6 @@
 /**
- * Typed strictness preset (flat) - opt-in promise safety, unsafe-any propagation,
- * redundant conditions and exhaustive discriminated unions. Requires type
+ * Typed strictness preset (flat) - opt-in promise safety, unsafe-any propagation and
+ * assertions, redundant conditions and exhaustive discriminated unions. Requires type
  * information; ships `parserOptions.project: true`, override it if the
  * nearest tsconfig.json is not the right project.
  */
@@ -24,6 +24,14 @@ module.exports = [
       'ts/no-unsafe-member-access': 'error',
       'ts/no-unsafe-return': 'error',
       'ts/no-unnecessary-condition': 'error',
+      // `any` and assertions are how a type contract is bypassed without a type error.
+      'ts/no-explicit-any': 'error',
+      'ts/no-unsafe-type-assertion': 'error',
+      'ts/no-non-null-assertion': 'error',
+      'ts/await-thenable': 'error',
+      'ts/use-unknown-in-catch-callback-variable': 'error',
+      // An agent writes the API it learned; a deprecation since then only shows up with types.
+      'ts/no-deprecated': 'warn',
       'ts/switch-exhaustiveness-check': [
         'error',
         {

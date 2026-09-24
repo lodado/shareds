@@ -17,14 +17,25 @@ const readExpectChain = (matcherCallee) => {
     current = current.object
   }
 
+  // `expect(x)` and `expect.soft(x)`
+  const callee = current?.type === 'CallExpression' ? current.callee : null
   const isExpectCall =
-    current &&
-    current.type === 'CallExpression' &&
-    current.callee.type === 'Identifier' &&
-    current.callee.name === 'expect'
+    callee?.type === 'Identifier'
+      ? callee.name === 'expect'
+      : callee?.type === 'MemberExpression' && callee.object.name === 'expect' && callee.property.name === 'soft'
 
   return isExpectCall ? { expectCall: current, negated } : null
 }
+
+const isMockCalls = (node) =>
+  node?.type === 'MemberExpression' &&
+  !node.computed &&
+  node.property.name === 'calls' &&
+  node.object.type === 'MemberExpression'
+
+/** `spy.mock.calls.length > 0` compares the count instead of stating it. */
+const comparesCallCount = (node) =>
+  node?.type === 'BinaryExpression' && [node.left, node.right].some((side) => isMockCallsLength(side))
 
 const isMockCallsLength = (node) =>
   node &&
@@ -70,7 +81,12 @@ module.exports = {
           return
         }
 
-        if (isMockCallsLength(chain.expectCall.arguments[0]) && !EXACT_VALUE_MATCHERS.has(matcher)) {
+        const [subject] = chain.expectCall.arguments
+        const countsCalls = isMockCallsLength(subject) || (isMockCalls(subject) && matcher === 'toHaveLength')
+        // `.not.toBe(0)` and `.not.toHaveLength(0)` are "was it called" in another spelling.
+        if (countsCalls && (chain.negated || !(EXACT_VALUE_MATCHERS.has(matcher) || matcher === 'toHaveLength'))) {
+          context.report({ node, messageId: 'exactLength', data: { matcher } })
+        } else if (comparesCallCount(subject)) {
           context.report({ node, messageId: 'exactLength', data: { matcher } })
         }
       },

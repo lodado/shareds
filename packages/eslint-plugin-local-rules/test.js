@@ -1,9 +1,10 @@
-/* eslint-disable @lodado/local-rules/no-console-log -- test progress output */
+/* eslint-disable no-console -- test progress output */
 /**
  * RuleTester suite for every rule shipped by this plugin.
  * Run with `node test.js` - RuleTester throws on the first mismatch.
  */
-const { RuleTester } = require('eslint')
+const assert = require('node:assert/strict')
+const { Linter, RuleTester } = require('eslint')
 
 const rules = require('./rules')
 
@@ -13,11 +14,6 @@ const ruleTester = new RuleTester({
     sourceType: 'module',
     parserOptions: { ecmaFeatures: { jsx: true } },
   },
-})
-
-ruleTester.run('no-console-log', rules['no-console-log'], {
-  valid: ['console.error("boom")', 'logger.log("hi")'],
-  invalid: [{ code: 'console.log("hi")', errors: 1 }],
 })
 
 ruleTester.run('no-complex-ternary', rules['no-complex-ternary'], {
@@ -54,6 +50,8 @@ ruleTester.run('require-exact-call-count', rules['require-exact-call-count'], {
     'expect(fetchSpy).toHaveBeenCalledWith({ id: "n1" })',
     'expect(fetchSpy.mock.calls.length).toBe(2)',
     'expect(items.length).toBeGreaterThan(0)',
+    'expect.soft(spy).toHaveBeenCalledTimes(2)',
+    'expect(spy.mock.calls).toHaveLength(2)',
   ],
   invalid: [
     { code: 'expect(fetchSpy).toHaveBeenCalled()', errors: [{ messageId: 'exactCount' }] },
@@ -61,6 +59,10 @@ ruleTester.run('require-exact-call-count', rules['require-exact-call-count'], {
     { code: 'expect(fetchSpy).resolves.toHaveBeenCalled()', errors: [{ messageId: 'exactCount' }] },
     { code: 'expect(fetchSpy.mock.calls.length).toBeGreaterThan(0)', errors: [{ messageId: 'exactLength' }] },
     { code: 'expect(fetchSpy.mock.calls.length).toBeTruthy()', errors: [{ messageId: 'exactLength' }] },
+    { code: 'expect.soft(spy).toHaveBeenCalled()', errors: [{ messageId: 'exactCount' }] },
+    { code: 'expect(spy.mock.calls.length).not.toBe(0)', errors: [{ messageId: 'exactLength' }] },
+    { code: 'expect(spy.mock.calls).not.toHaveLength(0)', errors: [{ messageId: 'exactLength' }] },
+    { code: 'expect(spy.mock.calls.length > 0).toBe(true)', errors: [{ messageId: 'exactLength' }] },
   ],
 })
 
@@ -71,6 +73,18 @@ ruleTester.run('require-skip-reason', rules['require-skip-reason'], {
     'it.todo("retry recovery") // pending API contract, tracked in ORACLE-12',
     '/* skip: needs a real payment sandbox */\ndescribe.skip("checkout", () => {})',
     '// skip: flaky under CI clock skew\ntest.describe.skip("timers", () => {})',
+    '// skip: webkit lacks the clipboard API\n// tracked upstream\ntest.skip("copies", () => {})',
+    // Playwright annotations carry their reason as an argument
+    {
+      code: 'test("copies", async () => { test.skip(browserName === "webkit", "webkit lacks the clipboard API") })',
+      filename: 'e2e/a.spec.ts',
+    },
+    'test("x", { retry: false }, () => {})',
+    '// the upload service answers in 40s on cold start\ntest("uploads", { timeout: 60000 }, () => {})',
+    'await waitFor(() => expect(save).toHaveBeenCalledTimes(1))',
+    'test("x", (ctx) => { ctx.expect(1).toBe(1) })',
+    // node:test and Vitest context skips take the reason as their message
+    'test("git path", (t) => { t.skip("git is not installed, so the git path cannot be judged") })',
   ],
   invalid: [
     { code: 'test.skip("out of order", () => {})', errors: [{ messageId: 'missingReason' }] },
@@ -80,6 +94,42 @@ ruleTester.run('require-skip-reason', rules['require-skip-reason'], {
     { code: 'test.describe.skip("timers", () => {})', errors: [{ messageId: 'missingReason' }] },
     { code: 'xit("retry", () => {})', errors: [{ messageId: 'missingReason' }] },
     { code: '//\ntest.skip("out of order", () => {})', errors: [{ messageId: 'missingReason' }] },
+    // a comment that is not a reason
+    { code: '// TODO\ntest.skip("out of order", () => {})', errors: [{ messageId: 'missingReason' }] },
+    { code: '// skip: wip\ntest.skip("out of order", () => {})', errors: [{ messageId: 'missingReason' }] },
+    {
+      code: '/* Copyright 2026 ACME */\n\ndescribe.skip("checkout", () => {})',
+      errors: [{ messageId: 'missingReason' }],
+    },
+    {
+      code: '// @ts-expect-error legacy title type here\nit.skip("X", () => {})',
+      errors: [{ messageId: 'missingReason' }],
+    },
+    { code: '// TODO fix this flaky test\nit.skip("X", () => {})', errors: [{ messageId: 'missingReason' }] },
+    // conditional, inverted and table skips
+    { code: 'test.skipIf(process.env.CI)("uploads", () => {})', errors: [{ messageId: 'missingReason' }] },
+    { code: 'it.runIf(false)("uploads", () => {})', errors: [{ messageId: 'missingReason' }] },
+    { code: 'describe.skipIf(true)("suite", () => {})', errors: [{ messageId: 'missingReason' }] },
+    { code: 'test.skip.each([[1]])("row %s", () => {})', errors: [{ messageId: 'missingReason' }] },
+    { code: 'it.fails("rejects", () => {})', errors: [{ messageId: 'missingReason' }] },
+    { code: 'test("copies", async () => { test.fail() })', errors: [{ messageId: 'missingReason' }] },
+    { code: 'test("x", (ctx) => { ctx.skip() })', errors: [{ messageId: 'missingReason' }] },
+    { code: 'test("x", ({ skip }) => { skip() })', errors: [{ messageId: 'missingReason' }] },
+    { code: 'it("x", { skip: true }, () => {})', errors: [{ messageId: 'missingWeakeningReason' }] },
+    { code: 'it("x", { fails: true }, () => {})', errors: [{ messageId: 'missingWeakeningReason' }] },
+    { code: 'it("x", { retry: 5, timeout: 30000 }, () => {})', errors: [{ messageId: 'missingWeakeningReason' }] },
+    { code: 'describe("flaky", { retry: 3 }, () => {})', errors: [{ messageId: 'missingWeakeningReason' }] },
+    { code: 'it("x", () => {}, 30000)', errors: [{ messageId: 'missingWeakeningReason' }] },
+    { code: 'test.describe.configure({ retries: 3 })', errors: [{ messageId: 'missingWeakeningReason' }] },
+    { code: 'test.setTimeout(120000)', errors: [{ messageId: 'missingWeakeningReason' }] },
+    {
+      code: 'await waitFor(() => expect(x).toBe(1), { timeout: 5000 })',
+      errors: [{ messageId: 'missingWeakeningReason' }],
+    },
+    {
+      code: 'await expect.poll(() => read(), { timeout: 10000 }).toBe(1)',
+      errors: [{ messageId: 'missingWeakeningReason' }],
+    },
   ],
 })
 
@@ -95,6 +145,9 @@ ruleTester.run('require-effect-annotation', rules['require-effect-annotation'], 
     { code: 'React.useEffect(() => {}, [])', errors: [{ messageId: 'missingAnnotation' }] },
     { code: 'useLayoutEffect(() => {}, [])', errors: [{ messageId: 'missingAnnotation' }] },
     { code: '// \nuseEffect(() => {}, [])', errors: [{ messageId: 'missingAnnotation' }] },
+    { code: '// TODO\nuseEffect(() => {}, [])', errors: [{ messageId: 'missingAnnotation' }] },
+    { code: '// wip\nuseEffect(() => {}, [])', errors: [{ messageId: 'missingAnnotation' }] },
+    { code: '// @ts-expect-error legacy types\nuseEffect(() => {}, [])', errors: [{ messageId: 'missingAnnotation' }] },
   ],
 })
 
@@ -104,8 +157,24 @@ ruleTester.run('no-refetch-in-effect', rules['no-refetch-in-effect'], {
     'useEffect(() => { subscribe() }, [])',
     'useEffect(() => {}, [refetch])',
     'useQuery({ queryKey: ["list", filter], queryFn })',
+    // a subscription callback reacts to an external system
+    'useEffect(() => { socket.onmessage = () => { queryClient.invalidateQueries({ queryKey }) } }, [])',
+    'useEffect(() => { const off = bus.subscribe(() => refetch()); return off }, [])',
+    'useEffect(() => { window.addEventListener("focus", () => refetch()) }, [])',
   ],
   invalid: [
+    {
+      code: 'const { refetch: reload } = useTodos()\nuseEffect(() => { reload() }, [filter])',
+      errors: [{ messageId: 'refetchInEffect' }],
+    },
+    {
+      code: 'useEffect(() => { queryClient.invalidateQueries({ queryKey: ["list"] }) }, [filter])',
+      errors: [{ messageId: 'refetchInEffect' }],
+    },
+    {
+      code: 'React.useEffect(() => { void (async () => { await refetch() })() }, [filter])',
+      errors: [{ messageId: 'refetchInEffect' }],
+    },
     { code: 'useEffect(() => { refetch() }, [filter])', errors: [{ messageId: 'refetchInEffect' }] },
     { code: 'useEffect(() => { query.refetch() }, [filter])', errors: [{ messageId: 'refetchInEffect' }] },
     { code: 'useLayoutEffect(() => { refetch() }, [filter])', errors: [{ messageId: 'refetchInEffect' }] },
@@ -136,6 +205,11 @@ ruleTester.run('no-use-client-above-leaf', rules['no-use-client-above-leaf'], {
       filename: 'app/dashboard/template.jsx',
       errors: [{ messageId: 'clientBoundaryTooHigh' }],
     },
+    {
+      code: "'use client'\nexport default function NotFound() { return null }",
+      filename: 'app/not-found.tsx',
+      errors: [{ messageId: 'clientBoundaryTooHigh' }],
+    },
   ],
 })
 
@@ -147,6 +221,13 @@ ruleTester.run('no-arbitrary-sleep-in-tests', rules['no-arbitrary-sleep-in-tests
     { code: 'await waitForRequest(page)', filename: 'e2e/checkout.spec.ts' },
     // Production code has its own reasons to wait - this rule is about test determinism.
     { code: 'await new Promise((resolve) => setTimeout(resolve, 100))', filename: 'src/retry.ts' },
+    // fake timers drive the wait
+    {
+      code: 'vi.useFakeTimers()\nconst done = new Promise((r) => setTimeout(r, 1000))\nvi.advanceTimersByTime(1000)',
+      filename: 'form.test.tsx',
+    },
+    { code: 'import { timeout } from "./retry"\nexpect(timeout(5)).toBe(5)', filename: 'retry.test.ts' },
+    { code: 'await fetchWithTimeout.timeout(5000)', filename: 'retry.test.ts' },
   ],
   invalid: [
     {
@@ -161,6 +242,38 @@ ruleTester.run('no-arbitrary-sleep-in-tests', rules['no-arbitrary-sleep-in-tests
       filename: '__tests__/form.js',
       errors: [{ messageId: 'arbitrarySleep' }],
     },
+    {
+      code: 'import { setTimeout } from "node:timers/promises"\nawait setTimeout(100)',
+      filename: 'form.test.ts',
+      errors: [{ messageId: 'arbitrarySleep' }],
+    },
+    {
+      code: 'import { setTimeout as wait } from "timers/promises"\nawait wait(100)',
+      filename: 'form.test.ts',
+      errors: [{ messageId: 'arbitrarySleep' }],
+    },
+    {
+      code: 'import { scheduler } from "node:timers/promises"\nawait scheduler.wait(100)',
+      filename: 'form.test.ts',
+      errors: [{ messageId: 'arbitrarySleep' }],
+    },
+    {
+      code: 'await new Promise((r) => globalThis.setTimeout(r, 100))',
+      filename: 'form.test.ts',
+      errors: [{ messageId: 'arbitrarySleep' }],
+    },
+    { code: 'await utils.sleep(100)', filename: 'form.test.ts', errors: [{ messageId: 'arbitrarySleep' }] },
+    {
+      code: 'import { sleep } from "../test-utils/wait"\nawait sleep(100)',
+      filename: 'form.test.ts',
+      errors: [{ messageId: 'arbitrarySleep' }],
+    },
+    // a helper in test support is reported where it is defined
+    {
+      code: 'export const waitMs = (ms) => new Promise((r) => setTimeout(r, ms))',
+      filename: 'src/test-utils/wait.ts',
+      errors: [{ messageId: 'arbitrarySleep' }],
+    },
   ],
 })
 
@@ -170,8 +283,39 @@ ruleTester.run('no-fetch-in-component', rules['no-fetch-in-component'], {
     'const Item = ({ data }) => <li>{data.name}</li>',
     'const Panel = ({ id }) => { const { data } = useQuery({ queryKey: ["item", id], queryFn: loadItem }); return <div>{data}</div> }',
     'export async function GET() { return fetch("/api/items") }',
+    // an api-layer factory is not a component, whatever its casing
+    'export const Repository = () => ({ list: () => fetch("/api/items") })',
+    // a prop named fetch is not the global
+    'const Item = ({ fetch }) => { fetch(); return <li /> }',
+    '"use server"\nexport async function Save() { await fetch("/api/save"); return <p /> }',
+    {
+      code: 'const Item = () => <li />\nit("loads", async () => { await fetch("/api/x") })',
+      filename: 'Item.test.tsx',
+    },
+    'const Item = ({ res }) => { res.json(); return <li /> }',
   ],
   invalid: [
+    { code: 'export function Feed() { fetch("/feed"); return null }', errors: [{ messageId: 'transportInComponent' }] },
+    {
+      code: 'const load = async () => (await fetch("/api/orders")).json()\nexport const Orders = () => { load(); return <ul /> }',
+      errors: [{ messageId: 'transportInComponent' }],
+    },
+    {
+      code: 'const Panel = () => { const request = fetch; request("/api/x"); return <div /> }',
+      errors: [{ messageId: 'transportInComponent' }],
+    },
+    {
+      code: 'const Panel = () => { window.fetch("/api/x"); globalThis.fetch("/api/y"); return <div /> }',
+      errors: [{ messageId: 'transportInComponent' }, { messageId: 'transportInComponent' }],
+    },
+    {
+      code: 'import ky from "ky"\nexport const Panel = () => { ky.get("/api/x"); return <div /> }',
+      errors: [{ messageId: 'transportInComponent' }],
+    },
+    {
+      code: 'import axios from "axios"\nconst api = axios.create({ baseURL: "/api" })\nexport const Panel = () => { api.get("/x"); return <div /> }',
+      errors: [{ messageId: 'transportInComponent' }],
+    },
     {
       code: 'const Item = ({ id }) => { const onClick = () => { fetch(`/api/items/${id}`) }; return <button onClick={onClick} /> }',
       errors: [{ messageId: 'transportInComponent' }],
@@ -197,13 +341,23 @@ ruleTester.run('require-abort-signal-passthrough', rules['require-abort-signal-p
     'useQuery({ queryKey: key, queryFn: ({ signal }) => fetch(url, { signal: signal }) })',
     'useQuery({ queryKey: key, queryFn: ({ signal: abortSignal }) => fetch(url, { signal: abortSignal }) })',
     'useQuery({ queryKey: key, queryFn: ({ signal: abortSignal = fallback }) => fetch(url, { signal: abortSignal }) })',
-    'useQuery({ queryKey: key, queryFn: () => fetch(url) })',
     'useQuery({ queryKey: key, queryFn: ({ signal }) => client.get(url, { signal }) })',
+    'useQuery({ queryKey: key, queryFn: ({ signal }) => fetch(url, { signal: AbortSignal.any([signal, AbortSignal.timeout(5000)]) }) })',
+    'useQuery({ queryKey: key, queryFn: ({ signal }) => { const init = { signal }; return fetch(url, init) } })',
+    'useQuery({ queryKey: key, queryFn: ({ signal }) => fetch(new Request(url, { signal })) })',
+    'useQuery({ queryKey: key, queryFn: () => getUser(id) })',
     'useQuery({ queryKey: key, queryFn: async ({ signal }) => { const res = await fetch(url, { method: "POST", signal }); return res.json() } })',
   ],
   invalid: [
     {
       code: 'useQuery({ queryKey: key, queryFn: ({ signal }) => fetch(url) })',
+      errors: [{ messageId: 'missingSignalPassthrough' }],
+    },
+    // deleting the unused `signal` does not silence the rule
+    { code: 'useQuery({ queryKey: key, queryFn: () => fetch(url) })', errors: [{ messageId: 'missingSignal' }] },
+    { code: 'useQuery({ queryKey: key, queryFn: () => window.fetch(url) })', errors: [{ messageId: 'missingSignal' }] },
+    {
+      code: 'import ky from "ky"\nuseQuery({ queryKey: key, queryFn: ({ signal }) => ky.get(url).json() })',
       errors: [{ messageId: 'missingSignalPassthrough' }],
     },
     {
@@ -236,53 +390,12 @@ ruleTester.run('scenario-test-filename', rules['scenario-test-filename'], {
     { code: 'export const x = 1', filename: 'e2e/checkout.e2e.mts' },
     { code: 'export const x = 1', filename: 'e2e/checkout.e2e.cts' },
     { code: 'export const x = 1', filename: 'src/index.ts' },
+    { code: 'export const x = 1', filename: 'src/format.unit.test.mts' },
   ],
   invalid: [
     { code: 'export const x = 1', filename: 'Button.test.tsx', errors: [{ messageId: 'unconventionalName' }] },
     { code: 'export const x = 1', filename: 'src/format.test.ts', errors: [{ messageId: 'unconventionalName' }] },
-  ],
-})
-
-ruleTester.run('no-css-locator-without-reason', rules['no-css-locator-without-reason'], {
-  valid: [
-    { code: 'page.getByRole("button", { name: "Save" })', filename: 'e2e/checkout.spec.ts' },
-    { code: 'page.locator("[data-testid=\\"cart\\"]")', filename: 'e2e/checkout.spec.ts' },
-    { code: 'page.locator("role=button[name=\\"Save\\"]")', filename: 'e2e/checkout.spec.ts' },
-    {
-      code: '// CSS is the only handle - the legacy widget renders no accessible name\npage.locator(".legacy-widget")',
-      filename: 'e2e/checkout.spec.ts',
-    },
-    { code: 'page.locator(".legacy-widget")', filename: 'src/app.ts' },
-  ],
-  invalid: [
-    { code: 'page.locator(".legacy-widget")', filename: 'e2e/checkout.spec.ts', errors: [{ messageId: 'cssLocator' }] },
-    { code: 'page.locator("div > span")', filename: 'e2e/checkout.spec.ts', errors: [{ messageId: 'cssLocator' }] },
-    {
-      code: 'const row = page.locator("#row-1")',
-      filename: 'e2e/checkout.spec.ts',
-      errors: [{ messageId: 'cssLocator' }],
-    },
-  ],
-})
-
-ruleTester.run('no-derived-state-effect', rules['no-derived-state-effect'], {
-  valid: [
-    'useEffect(() => { setSize(window.innerWidth) }, [])',
-    'useEffect(() => { setUser(mapUser(data)) }, [data])',
-    'useEffect(() => { setOpen(true) }, [])',
-    'useEffect(() => { setTotal(price * quantity); track("recalc") }, [price, quantity])',
-    'useEffect(() => { if (price) { setTotal(price) } }, [price])',
-  ],
-  invalid: [
-    {
-      code: 'useEffect(() => { setFullName(first + " " + last) }, [first, last])',
-      errors: [{ messageId: 'derivedStateInEffect' }],
-    },
-    {
-      code: 'useEffect(() => { setTotal(price * quantity) }, [price, quantity])',
-      errors: [{ messageId: 'derivedStateInEffect' }],
-    },
-    { code: 'useEffect(() => setVisible(count > 0), [count])', errors: [{ messageId: 'derivedStateInEffect' }] },
+    { code: 'export const x = 1', filename: 'src/format.test.mts', errors: [{ messageId: 'unconventionalName' }] },
   ],
 })
 
@@ -309,8 +422,14 @@ ruleTester.run('fsd-no-deep-import', rules['fsd-no-deep-import'], {
       errors: [{ messageId: 'deepImport' }],
     },
     {
-      code: "import { store } from '../../features/auth/model/store'",
+      code: "import { store } from '../../../features/auth/model/store'",
       filename: '/repo/src/views/login/ui/Page.tsx',
+      errors: [{ messageId: 'deepImport' }],
+    },
+    // a folder above the repo named like a layer does not hide a relative deep import
+    {
+      code: "import { store } from '../../../entities/user/model/store'",
+      filename: '/home/me/views/shop/src/features/cart/ui/Cart.tsx',
       errors: [{ messageId: 'deepImport' }],
     },
     {
@@ -327,11 +446,14 @@ ruleTester.run('fsd-no-banned-segments', rules['fsd-no-banned-segments'], {
     { code: 'export {}', filename: '/repo/src/features/auth/model/useLogin.ts' },
     // outside sliced layers the convention does not apply
     { code: 'export {}', filename: '/repo/src/shared/hooks/useDebounce.ts' },
+    // a folder above the repo named like a layer is not a slice
+    { code: 'export {}', filename: '/home/me/features/components/src/shared/ui/Button.tsx' },
   ],
   invalid: [
     { code: 'export {}', filename: '/repo/src/features/auth/components/LoginForm.tsx', errors: 1 },
     { code: 'export {}', filename: '/repo/src/features/auth/hooks/useLogin.ts', errors: 1 },
     { code: 'export {}', filename: '/repo/src/entities/product/utils/format.ts', errors: 1 },
+    { code: 'export {}', filename: '/home/me/features/shop/src/features/auth/hooks/useLogin.ts', errors: 1 },
   ],
 })
 
@@ -366,6 +488,25 @@ ruleTester.run('fsd-no-driver-outside-repository', rules['fsd-no-driver-outside-
   ],
 })
 
+// RuleTester lints from process.cwd(); a checkout under a folder named db needs its own cwd.
+{
+  const linter = new Linter({ cwd: '/Users/me/db/shop' })
+  const messages = linter.verify(
+    "import { drizzle } from 'drizzle-orm'",
+    {
+      files: ['**/*.ts'],
+      languageOptions: { ecmaVersion: 2022, sourceType: 'module' },
+      plugins: { local: { rules } },
+      rules: { 'local/fsd-no-driver-outside-repository': 'error' },
+    },
+    { filename: '/Users/me/db/shop/src/features/like/model/useToggleLike.ts' },
+  )
+  assert.deepEqual(
+    messages.map((message) => message.messageId),
+    ['driverOutsideBoundary'],
+  )
+}
+
 /** The state-modeling rules read TypeScript type nodes, so they need the TS parser. */
 const typedRuleTester = new RuleTester({
   languageOptions: {
@@ -376,6 +517,107 @@ const typedRuleTester = new RuleTester({
   },
 })
 
+typedRuleTester.run('fsd-layer-direction', rules['fsd-layer-direction'], {
+  valid: [
+    { code: "import { Avatar } from '@/entities/user'", filename: '/repo/src/features/cart/ui/Cart.tsx' },
+    { code: "import { store } from '../model/store'", filename: '/repo/src/features/cart/ui/Cart.tsx' },
+    { code: "import { Button } from '@/shared/ui/button'", filename: '/repo/src/entities/user/ui/Card.tsx' },
+    { code: "import { cn } from '../lib/cn'", filename: '/repo/src/shared/ui/Button.tsx' },
+    { code: "import { LoginForm } from '@/features/auth'", filename: '/repo/src/app/providers/index.tsx' },
+    {
+      code: "import type { User } from '@/entities/user/@x/order'",
+      filename: '/repo/src/entities/order/model/order.ts',
+    },
+    { code: "import { Header } from '@/widgets/header'", filename: '/repo/src/_pages/home/ui/Page.tsx' },
+    { code: "import { Header } from '@/widgets/header'", filename: '/repo/src/views/home/ui/Page.tsx' },
+    // Next routing folders outside src compose FSD layers
+    { code: "export { HomePage as default } from '@/_pages/home'", filename: '/repo/app/page.tsx' },
+    { code: "export { App as default } from '@/_app'", filename: '/repo/pages/_app.tsx' },
+    { code: "import { Auth } from '@company/features/auth'", filename: '/repo/src/features/cart/ui/Cart.tsx' },
+    // a monorepo package named shared is not the shared layer
+    { code: "import { login } from '@/features/auth'", filename: '/repo/packages/shared/src/lib/util.ts' },
+  ],
+  invalid: [
+    {
+      code: "import { login } from '@/features/auth'",
+      filename: '/repo/src/entities/user/model/user.ts',
+      errors: [{ messageId: 'upward' }],
+    },
+    {
+      code: "import { Avatar } from '@/entities/user'",
+      filename: '/repo/src/shared/ui/Header.tsx',
+      errors: [{ messageId: 'upward' }],
+    },
+    {
+      code: "import { store } from '@/app/store'",
+      filename: '/repo/src/features/cart/model/cart.ts',
+      errors: [{ messageId: 'upward' }],
+    },
+    {
+      code: "import { store } from '@/_app/store'",
+      filename: '/repo/src/_pages/home/model/home.ts',
+      errors: [{ messageId: 'upward' }],
+    },
+    {
+      code: "const load = () => import('@/pages/home')",
+      filename: '/repo/src/widgets/nav/ui/Nav.tsx',
+      errors: [{ messageId: 'upward' }],
+    },
+    {
+      code: "import { LoginForm } from '@/features/auth'",
+      filename: '/repo/src/features/cart/ui/Cart.tsx',
+      errors: [{ messageId: 'sibling' }],
+    },
+    {
+      code: "import { LoginForm } from '../../auth'",
+      filename: '/repo/src/features/cart/ui/Cart.tsx',
+      errors: [{ messageId: 'sibling' }],
+    },
+    {
+      code: "export { LoginForm } from '~/features/auth'",
+      filename: '/repo/src/features/cart/index.ts',
+      errors: [{ messageId: 'sibling' }],
+    },
+    {
+      code: "import { LoginForm } from 'src/features/auth'",
+      filename: '/repo/src/features/cart/ui/Cart.tsx',
+      errors: [{ messageId: 'sibling' }],
+    },
+    {
+      code: "import { Home } from '@/views/home'",
+      filename: '/repo/src/views/about/ui/Page.tsx',
+      errors: [{ messageId: 'sibling' }],
+    },
+    // type-only imports count, so switching to `import type` is not a fix
+    {
+      code: "import type { User } from '@/entities/user'",
+      filename: '/repo/src/entities/order/model/order.ts',
+      errors: [{ messageId: 'sibling' }],
+    },
+    {
+      code: "import { User } from '@/entities/user/@x/order'",
+      filename: '/repo/src/entities/cart/model/cart.ts',
+      errors: [{ messageId: 'crossImport' }],
+    },
+    {
+      code: "import { User } from '@/entities/user/@x/cart'",
+      filename: '/repo/src/features/cart/model/cart.ts',
+      errors: [{ messageId: 'crossImport' }],
+    },
+    {
+      code: "import { Home } from '@/features/home/@x/cart'",
+      filename: '/repo/src/features/cart/model/cart.ts',
+      errors: [{ messageId: 'crossImport' }],
+    },
+    // a folder above the repo named like a layer does not make every slice the same slice
+    {
+      code: "import { store } from '../../auth/model/store'",
+      filename: '/home/me/views/shop/src/features/cart/ui/Cart.tsx',
+      errors: [{ messageId: 'sibling' }],
+    },
+  ],
+})
+
 typedRuleTester.run('require-discriminated-state', rules['require-discriminated-state'], {
   valid: [
     // One member per state - every field belongs to the state that owns it.
@@ -384,6 +626,9 @@ typedRuleTester.run('require-discriminated-state', rules['require-discriminated-
     "type S = { status: 'idle' | 'done'; amount: number }",
     // Optional fields without a state discriminant are ordinary props.
     'type Props = { label?: string; icon?: string }',
+    // `type` and `kind` name component variants, not lifecycle states
+    "interface ButtonProps { type: 'button' | 'submit'; disabled?: boolean }",
+    "type BadgeProps = { kind: 'info' | 'warn'; icon?: string }",
   ],
   invalid: [
     {
@@ -392,6 +637,14 @@ typedRuleTester.run('require-discriminated-state', rules['require-discriminated-
     },
     {
       code: "interface S { phase: 'draft' | 'sent'; sentAt?: string }",
+      errors: [{ messageId: 'optionalSoup' }],
+    },
+    {
+      code: "type S = { status: 'idle' | 'loading' | 'failure'; data: User | null; error: string | null }",
+      errors: [{ messageId: 'optionalSoup' }],
+    },
+    {
+      code: "type Status = 'idle' | 'loading'\ninterface S { status: Status; data?: User }",
       errors: [{ messageId: 'optionalSoup' }],
     },
   ],
@@ -409,6 +662,9 @@ typedRuleTester.run('no-boolean-state-flags', rules['no-boolean-state-flags'], {
     'function Panel() { const [isOpen, setOpen] = useState(false); return isOpen }',
     // Non-boolean state is not a flag pair.
     'function Panel() { const [isOpen] = useState(false); const [name] = useState("") }',
+    // independent toggles set by different handlers are not one flow
+    'function Panel() { const [copied, setCopied] = useState(false); const [open, setOpen] = useState(false); const onCopy = () => setCopied(true); const onToggle = () => setOpen(!open) }',
+    'function Form() { const [isSubmitting] = useState(false); const [isDone] = useState(false) }',
   ],
   invalid: [
     {
@@ -424,7 +680,12 @@ typedRuleTester.run('no-boolean-state-flags', rules['no-boolean-state-flags'], {
       errors: [{ messageId: 'parallelFlags' }],
     },
     {
-      code: 'function Form() { const [isSubmitting] = useState(false); const [isDone] = useState(false) }',
+      code: 'function Form() { const [isSubmitting, setSubmitting] = useState(false); const [isDone, setDone] = useState(false); const submit = async () => { setSubmitting(true); await save(); setSubmitting(false); setDone(true) } }',
+      errors: [{ messageId: 'parallelState' }],
+    },
+    // the lazy and typed spellings are still boolean state
+    {
+      code: 'function Form() { const [a, setA] = useState(() => false); const [b, setB] = useState<boolean>(!1); function run() { setA(true); setB(true) } }',
       errors: [{ messageId: 'parallelState' }],
     },
   ],
@@ -438,8 +699,34 @@ typedRuleTester.run('no-response-type-assertion', rules['no-response-type-assert
     'const count = value as number',
     'const cached = cache.get(key) as CartState',
     'const cached = map.get(key) as CartState',
+    'const items = useQuery<Item[]>({ queryKey, queryFn })',
+    'import { z } from "zod"\nconst schema = z.object<Shape>({})',
   ],
   invalid: [
+    {
+      code: 'const user = JSON.parse(raw) as unknown as User',
+      errors: [{ messageId: 'assertedPayload' }],
+    },
+    {
+      code: 'const user = (await res.json()) as unknown as User',
+      errors: [{ messageId: 'assertedPayload' }],
+    },
+    {
+      code: 'const user = (await res.json())! as User',
+      errors: [{ messageId: 'assertedPayload' }],
+    },
+    {
+      code: 'const user = await res.json<User>()',
+      errors: [{ messageId: 'assertedPayload' }],
+    },
+    {
+      code: 'import axios from "axios"\nconst { data } = await axios.get<User>("/user")',
+      errors: [{ messageId: 'assertedPayload' }],
+    },
+    {
+      code: 'import ky from "ky"\nconst user = await ky.get("/user").json<User>()',
+      errors: [{ messageId: 'assertedPayload' }],
+    },
     {
       code: 'const payload = (await response.json()) as PaymentResponse',
       errors: [{ messageId: 'assertedPayload' }],
@@ -463,6 +750,8 @@ typedRuleTester.run('no-action-in-state', rules['no-action-in-state'], {
     "function useDetail() { const [state] = useState({ status: 'loading' }); return { state, retry } }",
     // A plain object with handlers and no state discriminant stays a handler map.
     'const handlers = { retry: () => load(), cancel: () => abort() }',
+    // a library options object is not state
+    "toast({ status: 'error', title: 'Failed', onCloseComplete: () => undefined })",
   ],
   invalid: [
     {
@@ -479,6 +768,19 @@ typedRuleTester.run('no-action-in-state', rules['no-action-in-state'], {
     },
     {
       code: "setState({ status: 'failure', reservationId: id, retry: load })",
+      errors: [{ messageId: 'actionInStateValue' }],
+    },
+    // base autofix turns object types into interfaces; the rule still sees them
+    {
+      code: "interface FailureState { status: 'failure'; retry: () => void }",
+      errors: [{ messageId: 'actionInStateType' }],
+    },
+    {
+      code: "type S = { status: 'failure'; retry: (() => void) | undefined }",
+      errors: [{ messageId: 'actionInStateType' }],
+    },
+    {
+      code: "const failed = { status: 'failure' as const, retry: () => load() }",
       errors: [{ messageId: 'actionInStateValue' }],
     },
   ],
@@ -517,6 +819,69 @@ typedRuleTester.run('no-derived-state-member', rules['no-derived-state-member'],
 console.log(`ok  ${Object.keys(rules).length} rules pass RuleTester`)
 
 // ---------- interaction: pattern contract ----------
+ruleTester.run('no-nondeterministic-render', rules['no-nondeterministic-render'], {
+  valid: [
+    'const Clock = ({ now }) => <time>{now.toISOString()}</time>',
+    'const Save = () => <button onClick={() => track(new Date())}>Save</button>',
+    'function useCart() { useEffect(() => { setId(crypto.randomUUID()) }, []) }',
+    'const Price = ({ value }) => <span>{value.toLocaleString("ko-KR")}</span>',
+    'export const expiresAt = (now, ttl) => new Date(now.getTime() + ttl)',
+    '// oracle:nondeterminism the footer shows the build year on purpose\nconst Footer = () => <p>{new Date().getFullYear()}</p>',
+  ],
+  invalid: [
+    {
+      code: 'const Clock = () => <time>{new Date().toISOString()}</time>',
+      errors: [{ messageId: 'nondeterministicRender' }],
+    },
+    {
+      code: 'const Row = ({ item }) => <li key={crypto.randomUUID()}>{item}</li>',
+      errors: [{ messageId: 'nondeterministicRender' }],
+    },
+    {
+      code: 'const List = ({ items }) => <ul>{items.map((item) => <li key={crypto.randomUUID()}>{item}</li>)}</ul>',
+      errors: [{ messageId: 'nondeterministicRender' }],
+    },
+    {
+      code: 'const Price = ({ value }) => <span>{value.toLocaleString()}</span>',
+      errors: [{ messageId: 'nondeterministicRender' }],
+    },
+    {
+      code: 'function useLabel(d) { return new Intl.DateTimeFormat().format(d) }',
+      errors: [{ messageId: 'nondeterministicRender' }],
+    },
+  ],
+})
+
+ruleTester.run('no-swallowed-rejection', rules['no-swallowed-rejection'], {
+  valid: [
+    'load().catch((error) => setStatus({ status: "failure", error }))',
+    'load().catch((error) => { throw new LoadError(error) })',
+    'load().then(render, (error) => report(error))',
+    '// analytics is best effort and must never block checkout\ntrack(event).catch(() => {})',
+    'try { run() } catch (error) { report(error) }',
+    // a missing file mapped to null is a value the caller handles
+    'const current = await readFile(path, "utf8").catch(() => null)',
+  ],
+  invalid: [
+    { code: 'load().catch(() => {})', errors: [{ messageId: 'swallowedRejection' }] },
+    { code: 'load().catch(() => undefined)', errors: [{ messageId: 'swallowedRejection' }] },
+    {
+      code: 'load().catch((error) => { console.error(error); return null })',
+      errors: [{ messageId: 'swallowedRejection' }],
+    },
+    { code: 'load().then(render, () => null)', errors: [{ messageId: 'swallowedRejection' }] },
+    {
+      code: 'const user = await load().catch((error) => { console.error(error); return null })',
+      errors: [{ messageId: 'swallowedRejection' }],
+    },
+    { code: 'void load().catch(() => undefined)', errors: [{ messageId: 'swallowedRejection' }] },
+    {
+      code: 'const user = await load().catch((error) => console.error(error))',
+      errors: [{ messageId: 'swallowedRejection' }],
+    },
+  ],
+})
+
 ruleTester.run('interaction-pattern-contract', rules['interaction-pattern-contract'], {
   valid: [
     // dialog with name and an Escape handler in the component
@@ -646,6 +1011,7 @@ ruleTester.run('interaction-hover-needs-focus', rules['interaction-hover-needs-f
     'const A = () => <button className="rounded px-3">x</button>',
     // focus handled through a shared class the tokens still mention
     'const A = () => <button className="control hover:bg-muted focus-within:ring">x</button>',
+    'const Nav = () => <Link href="/a" className="hover:underline focus-visible:underline">A</Link>',
   ],
   invalid: [
     {
@@ -668,5 +1034,11 @@ ruleTester.run('interaction-hover-needs-focus', rules['interaction-hover-needs-f
       code: 'const A = ({ active }) => <button className={`base ${active ? "hover:bg-muted" : "hover:bg-gray-50"}`}>x</button>',
       errors: [{ messageId: 'hoverWithoutFocus' }],
     },
+    // removing the outline on focus is not a focus style
+    {
+      code: '<button type="button" className="hover:bg-slate-100 focus:outline-none">Save</button>',
+      errors: [{ messageId: 'hoverWithoutFocus' }],
+    },
+    { code: '<Link href="/a" className="hover:underline">A</Link>', errors: [{ messageId: 'hoverWithoutFocus' }] },
   ],
 })

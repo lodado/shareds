@@ -4,13 +4,18 @@
  * eslint-config-next and its ESLint-9-only copies of eslint-plugin-react and jsx-a11y.
  */
 const next = require('@next/eslint-plugin-next')
+const { CODE_FILES, forCode } = require('./code-files')
 
 module.exports = [
-  next.configs['core-web-vitals'],
+  forCode(next.configs['core-web-vitals']),
   {
     name: 'lodado/next',
+    files: CODE_FILES,
     rules: {
       '@next/next/no-html-link-for-pages': 'off',
+      // Certain defects, not judgement calls.
+      '@next/next/no-async-client-component': 'error',
+      '@next/next/no-typos': 'error',
     },
   },
 ]

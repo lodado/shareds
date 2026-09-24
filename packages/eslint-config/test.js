@@ -18,7 +18,7 @@ const PRESETS = {
   testing: require('./testing.js'),
   query: require('./query.js'),
   quality: require('./quality.js'),
-  fsd: require('./fsd.js'),
+  fsd: require('./fsd.mjs').default,
   interaction: require('./interaction.js'),
   tailwind: require('./tailwind.js'),
   ai: require('./ai.js'),
@@ -67,6 +67,46 @@ const main = async () => {
   assertNoFatal(combined, 'combined')
   assert.strictEqual(combined.messages.length, 0, `combined: unexpected messages ${JSON.stringify(combined.messages)}`)
   console.log('ok  every preset combined')
+
+  // The base lints Markdown, JSON and YAML too; a preset's JS rules must stay on source files.
+  const { default: functional } = await import('./functional.mjs')
+  const { hookTiers } = await import('./hook-tiers.mjs')
+  const scoped = { ...PRESETS, functional, 'hook-tiers': hookTiers() }
+  const baseOnly = new ESLint({ cwd: __dirname, overrideConfigFile: true, overrideConfig: BASE })
+  for (const [file, text] of [
+    ['README.md', '# Title\n\ntext\n'],
+    ['sample.json', '{ "a": 1 }\n'],
+    ['sample.yaml', 'a: 1\n'],
+  ]) {
+    const filePath = path.join(__dirname, file)
+    const baseRules = (await baseOnly.calculateConfigForFile(filePath)).rules
+    for (const [preset, configs] of Object.entries(scoped)) {
+      const eslint = new ESLint({ cwd: __dirname, overrideConfigFile: true, overrideConfig: [...BASE, ...configs] })
+      const added = Object.keys((await eslint.calculateConfigForFile(filePath)).rules).filter(
+        (rule) => !(rule in baseRules),
+      )
+      assert.deepStrictEqual(added, [], `${preset} runs JS rules on ${file}`)
+      const [result] = await eslint.lintText(text, { filePath })
+      assertNoFatal(result, `${preset} on ${file}`)
+    }
+  }
+  console.log('ok  presets stay on source files')
+
+  // local-rules does not list the rules fsd and interaction turn on, so spread order cannot switch them off.
+  const ordered = new ESLint({
+    cwd: __dirname,
+    overrideConfigFile: true,
+    overrideConfig: [...BASE, ...PRESETS.fsd, ...PRESETS.interaction, ...PRESETS['local-rules']],
+  })
+  const orderedRules = (await ordered.calculateConfigForFile(path.join(__dirname, 'sample.tsx'))).rules
+  for (const rule of ['fsd-layer-direction', 'fsd-no-deep-import', 'interaction-pattern-contract']) {
+    assert.strictEqual(
+      orderedRules[`@lodado/local-rules/${rule}`]?.[0],
+      2,
+      `${rule} is switched off by a later local-rules spread`,
+    )
+  }
+  console.log('ok  local-rules spread order keeps fsd and interaction on')
 
   // Base owns console diagnostics; the local preset must not add a second report.
   const reported = await lint([...BASE, ...PRESETS['local-rules']], 'console.log("hi")\n', 'sample-console.tsx')
@@ -117,12 +157,18 @@ const main = async () => {
   )
 
   const TESTING = [...BASE, ...PRESETS.testing]
-  await assertReports(TESTING, 'test.only("submits", () => {})\n', 'sample.test.tsx', 'vitest/no-focused-tests')
+  await assertReports(TESTING, 'test.only("submits", () => {})\n', 'sample.test.tsx', 'test/no-focused-tests')
   await assertReports(
     TESTING,
     'test("submits", async ({ page }) => { await page.waitForTimeout(1000) })\n',
     'e2e/sample.spec.ts',
     'playwright/no-wait-for-timeout',
+  )
+  await assertReports(
+    TESTING,
+    "test('submits', async ({ page }) => { await page.locator('.btn-primary').click() })\n",
+    'e2e/sample.spec.ts',
+    'playwright/no-raw-locators',
   )
   await assertReports(
     [...BASE, ...PRESETS.query],
@@ -131,24 +177,45 @@ const main = async () => {
     'sample-query.tsx',
     '@tanstack/query/exhaustive-deps',
   )
-  await assertReports(
+  // Base no-self-compare owns a self comparison; sonarjs/no-identical-expressions steps aside.
+  const selfCompare = await lint(
     [...BASE, ...PRESETS.quality],
     'export const same = (value) => value < value\n',
-    'sample-quality.ts',
-    'sonarjs/no-identical-expressions',
+    'sample-quality.js',
   )
+  assert.deepStrictEqual(
+    selfCompare.messages.map((message) => message.ruleId),
+    ['no-self-compare'],
+    `quality: a self comparison should report once: ${JSON.stringify(selfCompare.messages)}`,
+  )
+  console.log('ok  quality defers self comparison to base')
   await assertReports(
     [...BASE, ...PRESETS.quality],
     "import value from 'ai-hallucinated-package'\nexport { value }\n",
     'sample-quality-dependency.ts',
     'sonarjs/no-implicit-dependencies',
   )
-  await assertReports(
+  // Undeclared names belong to base no-undef in JS and to tsc in TS, never to sonarjs as well.
+  const undeclared = await lint(
     [...BASE, ...PRESETS.quality],
     'export const answer = undeclaredAnswer\n',
-    'sample-quality-reference.ts',
-    'sonarjs/no-reference-error',
+    'sample-quality-reference.js',
   )
+  assert.deepStrictEqual(
+    undeclared.messages.map((message) => message.ruleId),
+    ['no-undef'],
+    'quality: an undeclared name should report once, from no-undef',
+  )
+  const typeNamespace = await lint(
+    [...BASE, ...PRESETS.quality],
+    'export function View(): React.ReactNode { return null }\n',
+    'sample-quality-reference.tsx',
+  )
+  assert.ok(
+    !typeNamespace.messages.some((message) => message.ruleId === 'sonarjs/no-reference-error'),
+    `quality: a global type namespace is not a ReferenceError: ${JSON.stringify(typeNamespace.messages)}`,
+  )
+  console.log('ok  undeclared names report once')
 
   const incompleteBranch = await lint(
     [...BASE, ...PRESETS.quality],

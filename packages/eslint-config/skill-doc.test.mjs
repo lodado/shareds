@@ -5,6 +5,7 @@ import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { ESLint } from 'eslint'
 
+import fsd from './fsd.mjs'
 import functional from './functional.mjs'
 import { OWNERS } from './hook-tiers.mjs'
 import base from './index.mjs'
@@ -48,4 +49,18 @@ test('eslint-setup names only directories the functional preset covers', async (
 test('eslint-setup lists every default hook-tiers owner', () => {
   const tiers = section('### Hook tiers')
   for (const owner of OWNERS) assert.ok(tiers.includes(`\`${owner}\``), owner)
+})
+
+test('eslint-setup names every exported preset in its preset table', () => {
+  const { exports } = JSON.parse(fs.readFileSync(path.join(configDir, 'package.json'), 'utf8'))
+  const table = section('## Which presets')
+  for (const subpath of Object.keys(exports).filter((key) => key !== '.')) {
+    const name = subpath.slice(2)
+    assert.match(table, new RegExp(`\\b${name}\\b`, 'u'), name)
+  }
+})
+
+test('eslint-setup documents every rule the fsd preset turns on', () => {
+  const fsdSection = section('### FSD')
+  for (const id of Object.keys(fsd[0].rules)) assert.ok(fsdSection.includes(`\`${id.replace('@lodado/local-rules/', '')}\``), id)
 })

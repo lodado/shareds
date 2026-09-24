@@ -1,3 +1,4 @@
+import localRulesPlugin from '@lodado/eslint-plugin-local-rules'
 import base from './index.mjs'
 
 /**
@@ -18,21 +19,10 @@ import base from './index.mjs'
  * A flat-config rule keeps the options of the last matching block, so the tier blocks never
  * overlap, keep the base restrictions, and skip the files `functional` and `testing` own.
  */
-export const OWNERS = [
-  '@tanstack/react-query',
-  'swr',
-  'zustand',
-  'jotai',
-  'valtio',
-  'react-redux',
-  '@reduxjs/toolkit',
-  'react-hook-form',
-  '@tanstack/react-form',
-]
-
-const TRANSPORT = ['axios', 'ky', 'node-fetch']
+// One owner and transport list with strict-ui-boundary and no-fetch-in-component.
+const { OWNERS: SHARED_OWNERS, OWNER_API, TRANSPORT } = localRulesPlugin.runtimeModules
+export const OWNERS = [...SHARED_OWNERS]
 const EFFECTS = ['useEffect', 'useLayoutEffect', 'useInsertionEffect']
-const OWNER_API = '^(?:use[A-Z]|create$|createStore$|atom$|proxy$|configureStore$|createSlice$)'
 const API = '(^|/)api(/|$)'
 const HOOK_INTERNALS = '(^|/)use[A-Z][^/]*/.+'
 const SERVER = ['**/app/**/{page,layout,template,default,not-found}.{jsx,tsx}']
@@ -47,14 +37,19 @@ const TOO_DEEP = '**/use[A-Z]*/use[A-Z]*/use[A-Z]*/**/*.{js,jsx,ts,tsx}'
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 // esquery attribute regexes are slash-delimited, so a literal slash in the pattern is escaped.
 const selectorRegex = (source) => source.replaceAll('/', '\\/')
+const escapeRegexLiteral = (value) => selectorRegex(escapeRegex(value))
 const MICRO_IMPORT = 'ImportDeclaration[source.value=/^\\.\\/use[A-Z]/]'
 const VALUE_IMPORT = ':has(:matches(ImportSpecifier[importKind!="type"], ImportDefaultSpecifier, ImportNamespaceSpecifier))'
 const importFrom = (regex) => `ImportDeclaration[importKind!="type"][source.value=/${selectorRegex(regex)}/]${VALUE_IMPORT}`
 
 const selector = (value, message) => ({ selector: value, message })
+const TRANSPORT_MESSAGE = 'Transport belongs to an api module that a micro-hook calls.'
+// `import('axios')` reaches the same client a static import would.
+const DYNAMIC_TRANSPORT = selector(`ImportExpression[source.value=/^(?:${TRANSPORT.map(escapeRegexLiteral).join('|')})(?:\\/|$)/]`, TRANSPORT_MESSAGE)
 const EFFECT_MESSAGE = 'Effects belong to a micro-hook or a view hook.'
 const EFFECT_ACCESS = [
   selector('MemberExpression[property.name=/^use(Layout|Insertion)?Effect$/]', EFFECT_MESSAGE),
+  selector('MemberExpression[computed=true][property.value=/^use(Layout|Insertion)?Effect$/]', EFFECT_MESSAGE),
   selector('ObjectPattern > Property[key.name=/^use(Layout|Insertion)?Effect$/]', EFFECT_MESSAGE),
 ]
 const NO_JSX = ['JSXElement', 'JSXFragment'].map((node) =>
@@ -85,14 +80,17 @@ export function hookTiers({ owners = OWNERS, strict = false } = {}) {
     {
       paths: [
         ...(react.length ? [{ name: 'react', importNames: react, message: 'Effects and subscriptions belong to a micro-hook.' }] : []),
-        ...(transport ? TRANSPORT.map((name) => ({ name, message: 'Transport belongs to an api module that a micro-hook calls.' })) : []),
+        ...(transport ? TRANSPORT.map((name) => ({ name, message: TRANSPORT_MESSAGE })) : []),
       ],
       patterns,
     },
   ]
-  const noFetch = withBase('no-restricted-globals', [
-    { name: 'fetch', message: 'Transport belongs to an api module that a micro-hook calls.' },
-  ])
+  const noFetch = withBase('no-restricted-globals', [{ name: 'fetch', message: TRANSPORT_MESSAGE }])
+  // `window.fetch` and `globalThis.fetch` are the same global; base already restricts `self`.
+  const noGlobalFetch = withBase(
+    'no-restricted-properties',
+    ['window', 'globalThis'].map((object) => ({ object, property: 'fetch', message: TRANSPORT_MESSAGE })),
+  )
   const ownerOf = (name) => importFrom(`^${escapeRegex(name)}(?:/.*)?$`)
   const ownerPairs = (scope, message) =>
     owners.flatMap((first, index) =>
@@ -108,9 +106,11 @@ export function hookTiers({ owners = OWNERS, strict = false } = {}) {
     'no-restricted-syntax': withBase('no-restricted-syntax', [
       ...ownerPairs('Program', (first, second) => `A micro-hook connects one state owner; split ${first} and ${second} into two micro-hooks.`),
       ...NO_JSX,
+      DYNAMIC_TRANSPORT,
       ...extra,
     ]),
     'no-restricted-globals': noFetch,
+    'no-restricted-properties': noGlobalFetch,
   })
   const uiRuntime = strict
     ? {}
@@ -123,7 +123,7 @@ export function hookTiers({ owners = OWNERS, strict = false } = {}) {
             { regex: API, message: 'UI does not call api or read its DTOs; a micro-hook owns the request.' },
           ],
         }),
-        'no-restricted-syntax': withBase('no-restricted-syntax', EFFECT_ACCESS),
+        'no-restricted-syntax': withBase('no-restricted-syntax', [...EFFECT_ACCESS, DYNAMIC_TRANSPORT]),
       }
 
   return [
@@ -146,6 +146,8 @@ export function hookTiers({ owners = OWNERS, strict = false } = {}) {
           ],
         }),
         'no-restricted-globals': noFetch,
+        'no-restricted-properties': noGlobalFetch,
+        'no-restricted-syntax': withBase('no-restricted-syntax', [DYNAMIC_TRANSPORT]),
       },
     },
     {
@@ -188,8 +190,10 @@ export function hookTiers({ owners = OWNERS, strict = false } = {}) {
           ),
           selector('ExportNamedDeclaration[declaration=null][exportKind!="type"]', 'A domain hook file exports its own declarations; micro-hooks stay private.'),
           selector('ExportAllDeclaration', 'A domain hook file exports its own declarations; micro-hooks stay private.'),
+          DYNAMIC_TRANSPORT,
         ]),
         'no-restricted-globals': noFetch,
+        'no-restricted-properties': noGlobalFetch,
       },
     },
     {

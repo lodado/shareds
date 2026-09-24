@@ -12,7 +12,7 @@ authentication or ownership check.
 Ten of the plugin's eighteen rules ship off. Each restates a judgement another preset
 already makes with more information - `ts/no-floating-promises`,
 `ts/no-unnecessary-condition`, several SonarJS security rules, `no-eval`,
-`unicorn/no-unnecessary-await` and `@lodado/local-rules/no-console-log` - so one defect
+`unicorn/no-unnecessary-await` and base `no-console` - so one defect
 reports once. A repo that skips `quality` or `strict-types` should turn the matching
 rules back on; the skill documents which.
 

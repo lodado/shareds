@@ -18,7 +18,8 @@
     "./testing": "./testing.js",
     "./query": "./query.js",
     "./quality": "./quality.js",
-    "./fsd": "./fsd.js",
+    "./fsd": "./fsd.mjs",
+    "./conventions": "./conventions.mjs",
     "./strict-types": "./strict-types.js",
     "./interaction": "./interaction.js",
     "./functional": "./functional.mjs",
@@ -34,13 +35,16 @@
   },
   "files": [
     "QUALITY.md",
+    "README.md",
     "STRICT.md",
     "a11y.js",
     "ai.js",
+    "code-files.js",
+    "conventions.mjs",
     "design.mjs",
     "examples/hook-tiers",
     "examples/strict",
-    "fsd.js",
+    "fsd.mjs",
     "functional.mjs",
     "hook-tiers.mjs",
     "index.mjs",
@@ -64,8 +68,8 @@
     "node": "^22.22.2 || >=24.15.0"
   },
   "scripts": {
-    "test": "node test.js && node --test feedback.test.mjs functional.test.mjs hook-tiers.test.mjs skill-doc.test.mjs && pnpm test:strict",
-    "lint": "eslint index.mjs ai.js design.mjs react.mjs next.js a11y.js turbo.js local-rules.js testing.js query.js quality.js fsd.js interaction.js test.js strict-types.js tailwind.js functional.mjs hook-tiers.mjs hook-tiers.test.mjs skill-doc.test.mjs feedback.test.mjs functional.test.mjs package.json strict.mjs strict-cli.mjs strict.test.mjs strict-distribution.test.mjs strict-example.test.mjs",
+    "test": "node test.js && node --test feedback.test.mjs functional.test.mjs hook-tiers.test.mjs skill-doc.test.mjs defect-corpus.test.mjs lint-variance.test.mjs && pnpm test:strict",
+    "lint": "eslint index.mjs ai.js design.mjs react.mjs next.js a11y.js turbo.js local-rules.js testing.js query.js quality.js fsd.mjs conventions.mjs interaction.js code-files.js test.js strict-types.js tailwind.js functional.mjs hook-tiers.mjs hook-tiers.test.mjs skill-doc.test.mjs feedback.test.mjs functional.test.mjs defect-corpus.test.mjs lint-variance.test.mjs scripts/lint-variance.mjs package.json strict.mjs strict-cli.mjs strict.test.mjs strict-distribution.test.mjs strict-example.test.mjs",
     "test:strict": "node --test strict.test.mjs strict-example.test.mjs && node strict-distribution.test.mjs"
   },
   "peerDependencies": {

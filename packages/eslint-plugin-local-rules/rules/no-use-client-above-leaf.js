@@ -2,7 +2,7 @@
  * `'use client'` on a route file drags the whole subtree into the client bundle.
  * The boundary belongs on the smallest leaf that actually needs handlers or browser APIs.
  */
-const ROUTE_FILE = /(^|\/)app\/(.*\/)?(layout|page|template|default)\.(js|jsx|ts|tsx)$/
+const ROUTE_FILE = /(^|\/)app\/(.*\/)?(layout|page|template|default|not-found|loading)\.(js|jsx|ts|tsx)$/
 
 module.exports = {
   meta: {

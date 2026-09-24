@@ -29,7 +29,7 @@ module.exports = {
     schema: [],
     messages: {
       missingAnnotation:
-        'Document this {{ hook }}: which external system it syncs, why it is an effect, and how it cleans up.',
+        'Document this {{ hook }} in a comment directly above it: which external system it syncs, why it is an effect, and how it cleans up.',
     },
   },
   create(context) {

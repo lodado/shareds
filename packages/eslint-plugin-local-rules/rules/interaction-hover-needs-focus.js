@@ -4,9 +4,14 @@
  * no trace of where you are. jsx-a11y checks handlers, not styles, so this one reads the class list.
  */
 const INTERACTIVE_TAGS = new Set(['button', 'a', 'input', 'select', 'textarea', 'summary'])
+// Router links render an anchor.
+const LINK_COMPONENTS = new Set(['Link', 'NavLink'])
 const CLASS_BUILDERS = new Set(['cn', 'clsx', 'classnames', 'classNames', 'cva', 'twMerge', 'tw'])
 const HOVER_VARIANT = /(?:^|:)(?:group-|peer-)?hover(?:\/[\w-]+)?:/
-const FOCUS_HINT = /focus/
+// A focus variant that paints something; `focus:outline-none` alone removes the indicator.
+const FOCUS_VARIANT = /(?:^|:)(?:group-|peer-)?focus(?:-visible|-within)?:/
+const FOCUS_REMOVAL = /:(?:outline-none|outline-0|outline-hidden|ring-0)$/
+const isFocusStyle = (token) => FOCUS_VARIANT.test(token) && !FOCUS_REMOVAL.test(token)
 
 const attributeName = (attribute) =>
   attribute.type === 'JSXAttribute' && attribute.name.type === 'JSXIdentifier' ? attribute.name.name : null
@@ -59,7 +64,7 @@ const classTokens = (attribute) => {
 const isInteractive = (node) => {
   const tag = node.name.type === 'JSXIdentifier' ? node.name.name : ''
 
-  if (INTERACTIVE_TAGS.has(tag)) {
+  if (INTERACTIVE_TAGS.has(tag) || LINK_COMPONENTS.has(tag)) {
     return true
   }
 
@@ -94,7 +99,7 @@ module.exports = {
         const tokens = classTokens(findAttribute(node, 'className'))
         const hovered = tokens.find((token) => HOVER_VARIANT.test(token))
 
-        if (!hovered || tokens.some((token) => FOCUS_HINT.test(token))) {
+        if (!hovered || tokens.some(isFocusStyle)) {
           return
         }
 

@@ -56,6 +56,26 @@ test('functional preset reports mutation and side effects only in pure scopes', 
   assert.ok(result.messages.some((message) => message.ruleId === 'no-restricted-imports'))
   assert.equal(result.messages.filter((message) => message.ruleId === 'no-restricted-syntax').length, 1)
 
+  // Every spelling of a time, random or I/O source is reported in pure code.
+  const entropy = await lint(root, 'domain/entropy.ts', [
+    'import { randomUUID } from "node:crypto"',
+    'import axios from "axios"',
+    'export const id = (): string => crypto.randomUUID() + randomUUID()',
+    'export const now = (): number => performance.now()',
+    'export const later = (): number => globalThis.Date.now()',
+    'const clock = Date',
+    'export const aliased = (): number => clock.now()',
+    'export const label = (value: Date): string => value.toLocaleString()',
+    'export const load = (): Promise<unknown> => import("node:fs")',
+    'export const client = axios',
+  ].join('\n'))
+  const byLine = (line) => entropy.messages.filter((message) => message.line === line).map((message) => message.ruleId)
+  for (const [line, rule] of [[1, 'no-restricted-imports'], [2, 'no-restricted-imports'], [3, 'no-restricted-globals'], [4, 'no-restricted-globals'], [5, 'no-restricted-properties'], [6, 'no-restricted-syntax'], [8, 'no-restricted-syntax'], [9, 'no-restricted-syntax']]) {
+    assert.ok(byLine(line).includes(rule), `line ${line}: ${JSON.stringify(entropy.messages)}`)
+  }
+  const hashing = await lint(root, 'domain/hash.ts', 'import { createHash } from "node:crypto"\nexport const digest = (text: string): string => createHash("sha256").update(text).digest("hex")\n')
+  assert.equal(hashing.messages.filter((message) => message.ruleId?.startsWith('no-restricted')).length, 0, JSON.stringify(hashing.messages))
+
   const ui = await lint(root, 'components/Widget.tsx', 'export function Widget() { window.localStorage.setItem("x", "y"); return null }\n')
   assert.equal(ui.messages.some((message) => message.ruleId === 'no-restricted-globals'), false)
   assert.equal(ui.messages.some((message) => message.ruleId === 'no-restricted-properties'), false)

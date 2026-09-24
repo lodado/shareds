@@ -114,11 +114,12 @@ test('React compiler diagnostics and exhaustive dependencies remain errors after
   for (const rule of ['purity', 'immutability', 'refs', 'static-components', 'exhaustive-deps', 'error-boundaries', 'globals', 'use-memo']) {
     assert.equal(config.rules[`react-hooks/${rule}`]?.[0], 2, rule)
   }
+  // A leaked listener is a defect, not a judgement call.
   for (const resource of ['event-listener', 'fetch', 'intersection-observer', 'interval', 'resize-observer', 'timeout']) {
-    assert.equal(config.rules[`@eslint-react/web-api-no-leaked-${resource}`]?.[0], 1, resource)
+    assert.equal(config.rules[`@eslint-react/web-api-no-leaked-${resource}`]?.[0], 2, resource)
   }
   // ESLint React ports of the compiler rules stay off so one defect reports once.
-  for (const rule of ['rules-of-hooks', 'purity', 'set-state-in-effect', 'exhaustive-deps']) {
+  for (const rule of ['rules-of-hooks', 'purity', 'set-state-in-effect', 'exhaustive-deps', 'globals', 'immutability', 'refs']) {
     assert.equal(config.rules[`@eslint-react/${rule}`]?.[0], 0, rule)
   }
   assert.equal(config.rules['@eslint-react/no-class-component']?.[0], 2)
@@ -156,12 +157,23 @@ test('base flags async and dependency habits that pass the type checker', async 
     ['unicorn/no-thenable', 'export const box = { then() { return 1 } }'],
     ['unicorn/no-useless-spread', 'export const copy = [...[1, 2]]'],
     ['unicorn/no-immediate-mutation', 'const items = []\nitems.push(1)\nexport { items }'],
-    ['unicorn/prefer-optional-catch-binding', 'try { JSON.parse("{") } catch (error) { console.error("bad") }'],
+    ['no-empty', 'try { JSON.parse("{") } catch {}'],
+    ['no-empty', 'try { JSON.parse("{") } catch (error) {}'],
     ['e18e/ban-dependencies', "import isOdd from 'is-odd'\nexport { isOdd }"],
   ]
   for (const [rule, code] of cases) {
     await reports(untyped, code, rule, path.join(cwd, 'sample-habits.ts'))
   }
+})
+
+test('autofix does not turn a reported empty catch into an unreported one', async () => {
+  const eslint = new ESLint({ cwd, overrideConfigFile: true, overrideConfig: [...base, ...quality], fix: true })
+  const [result] = await eslint.lintText('export function parse(text) { try { return JSON.parse(text) } catch (error) {} }\n', {
+    filePath: path.join(cwd, 'sample-catch.ts'),
+  })
+  assert.ok(result.messages.some((message) => message.ruleId === 'no-empty'), JSON.stringify(result))
+  const commented = await messagesFor(untyped, 'try { JSON.parse("{") } catch { /* malformed input keeps the default */ }', path.join(cwd, 'sample-catch.ts'))
+  assert.ok(!commented.some((message) => message.ruleId === 'no-empty'), JSON.stringify(commented))
 })
 
 test('tailwind preset reports conflicting and unknown classes against the CSS entry point', async () => {
@@ -187,6 +199,9 @@ test('ai preset adds the AI defects no other preset catches and defers on the re
     ['no-catch-log-rethrow', 'export function run(work: () => void): void { try { work() } catch (error) { console.error(error); throw error } }'],
     ['no-unsafe-deserialize', 'export const parse = (body: string): unknown => JSON.parse(body)'],
     ['no-async-without-await', 'export async function label(): Promise<string> { return "ready" }'],
+    // SonarJS misses these spellings, so ai-guard owns secrets and SQL when this preset is on.
+    ['no-hardcoded-secret', "export const STRIPE_SECRET_KEY = 'sk_live_51HxYzAbCdEfGhIjKlMnOp'"],
+    ['no-sql-string-concat', 'declare const pool: { query: (sql: string) => unknown }\nexport const find = (id: string): unknown => pool.query("SELECT * FROM users WHERE id = " + id)'],
   ]
   for (const [rule, code] of cases) {
     await reports(eslint, code, `ai-guard/${rule}`, file)
@@ -197,10 +212,8 @@ test('ai preset adds the AI defects no other preset catches and defers on the re
   const deferred = {
     'no-floating-promise': 'ts/no-floating-promises',
     'no-redundant-await': 'unicorn/no-unnecessary-await',
-    'no-catch-without-use': 'unicorn/prefer-optional-catch-binding',
-    'no-empty-catch': 'sonarjs/no-ignored-exceptions',
-    'no-hardcoded-secret': 'sonarjs/no-hardcoded-passwords',
-    'no-sql-string-concat': 'sonarjs/sql-queries',
+    'no-catch-without-use': 'unused-imports/no-unused-vars',
+    'no-empty-catch': 'no-empty',
     'no-eval-dynamic': 'no-eval',
     'no-dead-branch': 'ts/no-unnecessary-condition',
     'no-duplicate-logic-block': 'sonarjs/no-identical-functions',
@@ -229,32 +242,25 @@ test('design preset reports token drift and server/client leaks, and defers a11y
     await reports(eslint, code, `deslint/${rule}`, file)
   }
 
-  // Accessibility, security and Tailwind correctness already have owners.
+  // Placeholder and mock code fail rather than warn.
   const config = await eslint.calculateConfigForFile(file)
-  const deferred = {
-    'image-alt-text': 'jsx-a11y-x/alt-text',
-    'form-labels': 'jsx-a11y-x/label-has-associated-control',
-    'aria-validation': 'jsx-a11y-x/role-supports-aria-props',
-    'focus-visible-style': '@lodado/local-rules/interaction-hover-needs-focus',
-    'no-conflicting-classes': 'better-tailwindcss/no-conflicting-classes',
-    'no-hardcoded-secrets': 'sonarjs/no-hardcoded-passwords',
-    'no-sql-injection': 'sonarjs/sql-queries',
-    'no-eval': 'no-eval',
-    'no-empty-catch': 'sonarjs/no-ignored-exceptions',
-    'no-async-useeffect': 'react-hooks/set-state-in-effect',
-    'no-floating-promise-handler': 'ts/no-floating-promises',
-    'no-prod-console': 'no-console',
+  for (const rule of ['no-placeholder-code', 'no-mock-data-in-prod']) assert.equal(config.rules[`deslint/${rule}`]?.[0], 2, rule)
+  // Rules another preset owns stay off, and the preset lists rules one by one: a plugin release
+  // cannot switch a new one on.
+  const { DEFERRED } = await import('./design.mjs')
+  for (const [rule, owner] of Object.entries(DEFERRED)) {
+    assert.ok(!config.rules[`deslint/${rule}`]?.[0], `${rule} is owned by ${owner}`)
   }
-  for (const [rule, owner] of Object.entries(deferred)) {
-    assert.equal(config.rules[`deslint/${rule}`]?.[0], 0, `${rule} is owned by ${owner}`)
-  }
+  const plugin = (await import('@deslint/eslint-plugin')).default
+  const enabled = Object.keys(config.rules).filter((rule) => rule.startsWith('deslint/') && config.rules[rule][0])
+  assert.ok(enabled.length < Object.keys(plugin.rules).length, 'design lists its rules instead of spreading recommended')
+  await reports(eslint, 'export const Box = () => <button type="button" className="rounded outline-none">x</button>', 'deslint/focus-visible-style', file)
 })
 
 test('composed presets report console, redundant catch, includes and nested ternaries only once', async () => {
   const eslint = createLinter([...base, ...quality, ...localRules])
   const cases = [
     ['export const label = (a, b) => a ? "a" : b ? "b" : "c"', 'no-nested-ternary', '@lodado/local-rules/no-complex-ternary'],
-    ['console.log("debug")', 'no-console', '@lodado/local-rules/no-console-log'],
     ['export function run(work) { try { return work() } catch (error) { throw error } }', 'no-useless-catch', 'sonarjs/no-useless-catch'],
     ['export const has = (items, item) => items.indexOf(item) !== -1', 'unicorn/prefer-includes', 'e18e/prefer-includes'],
   ]
@@ -284,19 +290,19 @@ test('React keeps button safety and a single derived-effect owner', async () => 
   const config = await eslint.calculateConfigForFile(path.join(cwd, 'sample.tsx'))
   assert.equal(config.rules['react-hooks/set-state-in-effect'][0], 2)
   assert.equal(config.rules['react-you-might-not-need-an-effect/no-derived-state'][0], 0)
-  assert.equal(config.rules['@lodado/local-rules/no-derived-state-effect'][0], 0)
 })
 
 test('testing routes every supported extension without mixing unit and E2E rules', async () => {
   const eslint = createLinter([...base, ...testing])
   for (const extension of ['js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs', 'mts', 'cts']) {
     const unit = await eslint.calculateConfigForFile(path.join(cwd, `sample.test.${extension}`))
-    assert.equal(unit.rules['vitest/no-focused-tests'][0], 2, extension)
+    assert.equal(unit.rules['test/no-focused-tests'][0], 2, extension)
+    assert.equal(unit.rules['vitest/no-focused-tests'], undefined, 'the base registers the Vitest plugin once, as test/')
     assert.equal(unit.rules['playwright/no-wait-for-timeout'], undefined, extension)
     for (const file of [`e2e/sample.spec.${extension}`, `playwright/sample.spec.${extension}`, `sample.e2e.${extension}`]) {
       const e2e = await eslint.calculateConfigForFile(path.join(cwd, file))
       assert.equal(e2e.rules['playwright/no-wait-for-timeout'][0], 2, file)
-      assert.equal(e2e.rules['vitest/no-focused-tests'], undefined, file)
+      assert.equal(e2e.rules['test/no-focused-tests'], undefined, file)
     }
   }
 })

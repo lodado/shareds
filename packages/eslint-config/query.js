@@ -3,5 +3,6 @@
  * and a server QueryClient is never shared between requests.
  */
 const query = require('@tanstack/eslint-plugin-query')
+const { forCode } = require('./code-files')
 
-module.exports = [...query.configs['flat/recommended']]
+module.exports = query.configs['flat/recommended'].map(forCode)

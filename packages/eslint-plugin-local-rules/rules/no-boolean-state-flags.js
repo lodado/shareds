@@ -1,7 +1,13 @@
 /**
  * Parallel boolean flags in locally-owned state encode combinations the flow can
  * never enter. Framework projections and component props are not state ownership.
+ *
+ * Two boolean `useState`s are one flow when the same function sets both (`setLoading(true)`
+ * ... `setError(true)`); independent toggles set by different handlers are fine.
  */
+const { findVariable } = require('./lib/runtime-modules')
+
+const FUNCTION_TYPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'])
 const FLAG_PATTERN = /^(is|has|should|can)[A-Z]/
 const TYPE_WRAPPERS = new Set(['Readonly', 'Required', 'Partial'])
 
@@ -15,6 +21,21 @@ const calleeName = (callee) => {
   }
 
   return null
+}
+
+/** `false`, `!x`, `Boolean(x)` and the lazy `() => false`. */
+const isBooleanInit = (node) => {
+  if (!node) {
+    return false
+  }
+  if (node.type === 'ArrowFunctionExpression' && node.body.type !== 'BlockStatement') {
+    return isBooleanInit(node.body)
+  }
+  return (
+    (node.type === 'Literal' && typeof node.value === 'boolean') ||
+    (node.type === 'UnaryExpression' && node.operator === '!') ||
+    (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'Boolean')
+  )
 }
 
 const isBooleanMember = (member) => {
@@ -68,16 +89,15 @@ module.exports = {
       parallelFlags:
         '{{flags}} describe one flow as parallel booleans, which allows impossible combinations. Use a single `status` literal union.',
       parallelState:
-        'This function already owns a boolean state for the same flow. Use a single `status` literal union instead of parallel useState flags.',
+        'This function sets {{setters}} together, so they describe one flow as parallel booleans. Use a single `status` literal union instead.',
     },
   },
   create(context) {
-    const functionStack = []
+    const sourceCode = context.sourceCode
     const namedShapes = new Map()
     const usedStateTypes = new Set()
-
-    const enterFunction = () => functionStack.push({ booleanStates: [] })
-    const exitFunction = () => functionStack.pop()
+    const booleanSetters = new Set()
+    const setterCalls = new Map()
 
     return {
       TSTypeAliasDeclaration(node) {
@@ -90,16 +110,18 @@ module.exports = {
       TSInterfaceDeclaration(node) {
         namedShapes.set(node.id.name, { node: node.body, members: node.body.body })
       },
-      FunctionDeclaration: enterFunction,
-      'FunctionDeclaration:exit': exitFunction,
-      FunctionExpression: enterFunction,
-      'FunctionExpression:exit': exitFunction,
-      ArrowFunctionExpression: enterFunction,
-      'ArrowFunctionExpression:exit': exitFunction,
       CallExpression(node) {
-        const current = functionStack[functionStack.length - 1]
+        if (node.callee.type === 'Identifier') {
+          const variable = findVariable(sourceCode, node.callee)
+          if (booleanSetters.has(variable)) {
+            const fn = sourceCode.getAncestors(node).findLast((ancestor) => FUNCTION_TYPES.has(ancestor.type))
+            const calls = setterCalls.get(fn) ?? new Map()
+            calls.set(variable, calls.get(variable) ?? node)
+            setterCalls.set(fn, calls)
+          }
+        }
 
-        if (!current || calleeName(node.callee) !== 'useState') {
+        if (calleeName(node.callee) !== 'useState') {
           return
         }
 
@@ -112,18 +134,29 @@ module.exports = {
           usedStateTypes.add(shape.reference)
         }
 
-        const [initial] = node.arguments
-        if (initial?.type !== 'Literal' || typeof initial.value !== 'boolean') {
-          return
-        }
-
-        current.booleanStates.push(node)
-
-        if (current.booleanStates.length === 2) {
-          context.report({ node, messageId: 'parallelState' })
+        const setter =
+          node.parent.type === 'VariableDeclarator' && node.parent.id.type === 'ArrayPattern'
+            ? node.parent.id.elements[1]
+            : null
+        if (
+          setter?.type === 'Identifier' &&
+          (stateType?.type === 'TSBooleanKeyword' || isBooleanInit(node.arguments[0]))
+        ) {
+          booleanSetters.add(findVariable(sourceCode, setter))
         }
       },
       'Program:exit'() {
+        for (const calls of setterCalls.values()) {
+          if (calls.size >= 2) {
+            const [first, second] = calls.keys()
+            context.report({
+              node: [...calls.values()][1],
+              messageId: 'parallelState',
+              data: { setters: `${first.name} and ${second.name}` },
+            })
+          }
+        }
+
         for (const name of usedStateTypes) {
           const shape = namedShapes.get(name)
 

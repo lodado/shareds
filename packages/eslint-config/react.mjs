@@ -10,6 +10,14 @@
 import eslintReact from '@eslint-react/eslint-plugin'
 import reactHooks from 'eslint-plugin-react-hooks'
 import youMightNotNeedAnEffect from 'eslint-plugin-react-you-might-not-need-an-effect'
+import { forCode } from './code-files.js'
+
+// ESLint React ships ports of the React Compiler rules; react-hooks owns them, so every port is off -
+// derived from both plugins, so a new port in a minor release cannot start a second report.
+const compilerPorts = Object.keys(eslintReact.rules).filter((rule) => rule in reactHooks.rules)
+
+// react-hooks/set-state-in-effect reports every state update inside an effect, including these shapes.
+export const EFFECT_STATE_DUPLICATES = ['no-derived-state', 'no-adjust-state-on-prop-change', 'no-initialize-state', 'no-reset-all-state-on-prop-change']
 
 export default [
   eslintReact.configs['strict-typescript'],
@@ -20,21 +28,22 @@ export default [
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-hooks/exhaustive-deps': 'error',
-      'react-you-might-not-need-an-effect/no-derived-state': 'off', // react-hooks/set-state-in-effect
+      ...Object.fromEntries(EFFECT_STATE_DUPLICATES.map((rule) => [`react-you-might-not-need-an-effect/${rule}`, 'off'])),
+      ...Object.fromEntries(compilerPorts.map((rule) => [`@eslint-react/${rule}`, 'off'])),
 
-
-      '@eslint-react/error-boundaries': 'off',
-      '@eslint-react/exhaustive-deps': 'off',
-      '@eslint-react/purity': 'off',
-      '@eslint-react/rules-of-hooks': 'off',
-      '@eslint-react/set-state-in-effect': 'off',
-      '@eslint-react/set-state-in-render': 'off',
-      '@eslint-react/static-components': 'off',
-      '@eslint-react/unsupported-syntax': 'off',
-      '@eslint-react/use-memo': 'off',
+      // Certain defects, not judgement calls: a leaked listener, a `javascript:` URL, text leaked into render.
+      ...Object.fromEntries(
+        ['event-listener', 'fetch', 'intersection-observer', 'interval', 'resize-observer', 'timeout'].map((resource) => [
+          `@eslint-react/web-api-no-leaked-${resource}`,
+          'error',
+        ]),
+      ),
+      '@eslint-react/dom-no-script-url': 'error',
+      '@eslint-react/jsx-no-comment-textnodes': 'error',
+      '@eslint-react/jsx-no-leaked-semicolon': 'error',
 
       '@eslint-react/dom-no-missing-button-type': 'error',
       '@eslint-react/jsx-no-useless-fragment': 'off',
     },
   },
-]
+].map(forCode)

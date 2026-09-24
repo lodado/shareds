@@ -6,6 +6,7 @@
   "type": "commonjs",
   "main": "index.js",
   "files": [
+    "README.md",
     "index.js",
     "rules",
     "contracts",

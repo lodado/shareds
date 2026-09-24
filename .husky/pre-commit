@@ -4,5 +4,8 @@
 # Run lint-staged for efficient linting of staged files only
 pnpm exec lint-staged
 
+# Same lint gate as CI; turbo replays unchanged packages from cache
+pnpm lint
+
 # Run tests
 pnpm test
