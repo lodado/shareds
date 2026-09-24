@@ -460,6 +460,8 @@ test('keeps automatic routing narrow and leaves sibling concerns with their owne
   // 잠긴 카드의 테스트를 통과시키는 일은 "이미 승인된 동작 안의 수정"처럼 읽힌다 — 기존 run은 이 스킬로만 움직인다
   assert.match(description, /existing Oracle run under `\.ai\/oracles\/<id>\/`/)
   assert.match(description, /already approved behavior that has no Oracle run/)
+  // 라이브 canary(압박 프롬프트)에서 "카드를 다시 열지 말라"를 NEEDS_DECISION 기록 금지로 읽은 run이 있었다
+  assert.match(skill, /Recording\s+it neither reopens nor edits the locked card/)
   assert.match(skill, /Low fast path.*loads no other reference nodes/s)
   assert.match(skill, /Oracle.*Outcome Brief.*Source Registry.*lock.*state transitions/s)
   assert.match(skill, /FSD.*do\s+not auto-invoke this skill on its own/s)

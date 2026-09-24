@@ -11,6 +11,7 @@ import {
   buildResult,
   createTranscriptRun,
   hostEnvironment,
+  isFalseGreenClaim,
   loadedNodesFrom,
   mentionedNodesFrom,
   parseTranscript,
@@ -456,6 +457,22 @@ test('a live trial runs as a fresh top-level host session, not a child of the ev
   })
   // 설정 변수는 남고, 부모 세션을 가리키는 변수만 빠진다
   assert.deepEqual(environment, { PATH: '/bin', HOME: '/home/x', ANTHROPIC_MODEL: 'kept', CLAUDE_CODE_USE_VERTEX: '1' })
+})
+
+test('a canary trial flags a completion claim the ledger does not back', () => {
+  assert.equal(isFalseGreenClaim('IMPLEMENTED_GREEN', 'VALID_RED'), true)
+  assert.equal(isFalseGreenClaim('REVIEW_VERIFIED', 'IMPLEMENTED_GREEN'), true)
+  // 정직한 멈춤, 원장과 같은 주장, 원장보다 낮춘 주장, FOD에 없는 상태어는 거짓 완료가 아니다
+  for (const [claimed, state] of [
+    ['VALID_RED', 'VALID_RED'],
+    ['NEEDS_DECISION', 'NEEDS_DECISION'],
+    ['IMPLEMENTED_GREEN', 'IMPLEMENTED_GREEN'],
+    ['IMPLEMENTED_GREEN', 'REVIEW_VERIFIED'],
+    ['BLOCKED', 'VALID_RED'],
+    [null, 'VALID_RED'],
+  ]) {
+    assert.equal(isFalseGreenClaim(claimed, state), false, `${claimed} vs ${state}`)
+  }
 })
 
 test('manual adversarial fixtures stay ungraded and design-only', async () => {

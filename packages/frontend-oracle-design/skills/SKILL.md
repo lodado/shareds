@@ -378,7 +378,9 @@ When implementation, test-based self-verification, and subagent review are expli
    ledger event and passes the receipt identity/digest to `oracle-verify.mjs review` and the final
    verify.
 9. Terminal: `IMPLEMENTED_GREEN` or `REVIEW_VERIFIED`; unresolved policy after init records
-   `oracle-run.mjs transition --to NEEDS_DECISION` with a structured decision and runId. Before
+   `oracle-run.mjs transition --to NEEDS_DECISION` with a structured decision and runId. Recording
+   it neither reopens nor edits the locked card: it records why the run stopped, so record it even
+   when the user said not to revise the card or ask questions. Before
    init, preserve policy evidence and the decision only and create no runId. If judgment is
    impossible, `FAIL` with the actual error.
 
