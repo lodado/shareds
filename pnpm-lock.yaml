@@ -43,8 +43,6 @@ importers:
 
   packages/agent-memory: {}
 
-  packages/blog-voice-cloner: {}
-
   packages/eslint-config:
     dependencies:
       '@antfu/eslint-config':

@@ -129,18 +129,6 @@
       "tags": ["ux", "flow", "diagram", "figma", "mermaid"]
     },
     {
-      "name": "blog-voice-cloner",
-      "description": "Evidence-backed Korean/English blog voice profiles, reader-first PR, X/Threads and SEO/GEO blog formats, top-post scans, AI-tell checks, and local author history.",
-      "version": "0.3.0",
-      "author": {
-        "name": "lodado"
-      },
-      "source": "./packages/blog-voice-cloner",
-      "category": "productivity",
-      "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
-      "tags": ["writing", "blog", "stylometry", "pull-request", "seo"]
-    },
-    {
       "name": "agent-memory",
       "description": "Evidence-backed Obsidian agent memory: recall, session logs, conditional concepts, TIL, rule review, and maintenance.",
       "version": "0.1.2",
