@@ -5,7 +5,9 @@
     "**/examples/**",
     "**/*-fixture/**",
     "**/strict-types-fixture/**",
-    "**/tailwind-fixture/**"
+    "**/tailwind-fixture/**",
+    ".gitnexus/**",
+    "packages/game-interface-design/skills/threejs-game-wireframe/starter/**"
   ],
   "ignoreDependencies": ["@eslint/css", "typescript-eslint"],
   "ignoreBinaries": ["rtk"],

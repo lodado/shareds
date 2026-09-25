@@ -12,6 +12,9 @@ import fsd, { fsdBoundaries } from './fsd.mjs'
 import base from './index.mjs'
 import strictProfile, { verifyStrictProject } from './strict.mjs'
 
+// Dynamic fixtures need watch programs even when CI enables single-run parsing.
+process.env.TSESTREE_SINGLE_RUN = 'false'
+
 const here = path.dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
 const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'shareds-strict-consumer-'))
