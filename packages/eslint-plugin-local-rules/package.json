@@ -1,6 +1,6 @@
 {
   "name": "@lodado/eslint-plugin-local-rules",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Custom ESLint rules shared across lodado projects",
   "license": "MIT",
   "type": "commonjs",
