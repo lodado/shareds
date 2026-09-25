@@ -11,6 +11,6 @@
   ],
   "tasks": {
     "lint": {},
-    "test": {}
+    "test": { "env": ["TSESTREE_SINGLE_RUN"] }
   }
 }
