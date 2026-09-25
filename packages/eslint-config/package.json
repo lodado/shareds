@@ -1,6 +1,6 @@
 {
   "name": "@lodado/eslint-config",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Composable ESLint presets - enable only the ones you want",
   "license": "MIT",
   "repository": {
