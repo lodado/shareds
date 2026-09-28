@@ -34,7 +34,10 @@ Review is LLM judgment, so it wavers even on the same input. Pin it with two dev
 2. High risk runs **two independent reviews with the same input**. For critical and high findings, a
    lone finding that appeared on only one side is also blocking. Only medium and low findings block
    completion when they are the intersection of row·classification·normalized finding content, and a
-   finding that appears on only one side is recorded as advisory. Medium risk requires only a single
+   finding that appears on only one side is recorded as advisory. Two differently worded findings
+   also intersect when they share row and classification and cite overlapping `path#La-Lb` lines of
+   the same file, one to one; the kept finding carries the other's id and text as `alsoReportedAs`.
+   A finding that overlaps two on the other side, or cites nothing, is not paired. Medium risk requires only a single
    review and schema verification. A Medium single review may run on a faster model·lower reasoning
    effort if the surface supports it — the judgment criteria are owned by the review packet files and
    the findings are verified by schema. Do not lower the High risk two-review requirement.

@@ -54,7 +54,8 @@ graph verifier cannot be found, `FAIL` instead of falling back to sequential exe
   `oracle-run.mjs review-receipt` for both High-risk findings to create two ledger-bound receipts
   containing `packetSha256`, `targetRevision`, `role`, `taskId`, `outputSha256`, `reviewerId`,
   `findingsSha256`, `previousDigest`, and `digest`. The new run record and the receipts state the
-  locked `oracleSha256` and `adapter: node-test`. Finalization is split by route so the receipt
+  locked `oracleSha256` and `adapter: controller` — a receipt is a controller record, not a runner
+  result. Finalization is split by route so the receipt
   contract is executable on each: `review-finalize-standard` records and verifies the one primary
   receipt it was given, `review-finalize-high` verifies and records the two ledger-bound receipts
   the join produced plus the intersection rule, and neither substitutes for the other. Each performs

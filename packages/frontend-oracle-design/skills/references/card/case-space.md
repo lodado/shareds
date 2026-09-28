@@ -117,6 +117,13 @@ it must not retain the full-product execution claim.
   stops the generator and lint with a `CASE_SPACE_*` code.
 - A choice suffixed `[error]` is excluded from combination and emits one standalone `E*` frame —
   the category-partition error annotation. Everything else joins t-way combination.
+- `[error]` fits an error whose outcome is the same under every other choice. When the approved
+  outcome of an error depends on another condition — retry, cancel or leaving the screen, keeping
+  the previous data, a repeated input, a response arriving out of order — leave the suffix off so
+  the error joins t-way combination with that dimension, or carry the order through `PATH*` or the
+  `Order` sequence obligation. Keep the pairs that the failure mechanism and its damage justify,
+  not every error × every dimension. A pair with no approved expected result is `needs-decision`,
+  never an exclusion.
 - An excluded family writes `—` as the dimension and `excluded: <reason>` as its choices.
 
 ### Touches — optional fourth column that scopes the combination

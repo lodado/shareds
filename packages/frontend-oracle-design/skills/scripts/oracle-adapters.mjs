@@ -94,6 +94,9 @@ export const TRUSTED_ADAPTERS = {
 
 export const TRUSTED_ADAPTER_NAMES = Object.keys(TRUSTED_ADAPTERS)
 
+/** 거절 안내가 쓰는 어댑터 인자 — 표에서 만들어, 러너를 더해도 안내가 한 러너에 머물지 않는다. */
+export const TRUSTED_ADAPTER_FLAG = `--adapter ${TRUSTED_ADAPTER_NAMES.join('|')}`
+
 export function isTrustedAdapter(name) {
   return typeof name === 'string' && Object.hasOwn(TRUSTED_ADAPTERS, name)
 }

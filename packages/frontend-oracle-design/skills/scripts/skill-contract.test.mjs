@@ -217,7 +217,8 @@ test('routes already-satisfied red, standard one-review and high two-review path
   assert.match(node('high-review-join').task, /oracle-run\.mjs review-receipt/)
   assert.match(
     node('high-review-join').task,
-    /packetSha256.*targetRevision.*previousDigest.*digest.*adapter node-test.*oracleSha256/s,
+    // 영수증은 러너 결과가 아니라 controller 기록이다 — oracle-run.mjs review-receipt가 `adapter: 'controller'`로 쓰고 검증한다
+    /packetSha256.*targetRevision.*previousDigest.*digest.*adapter controller.*oracleSha256/s,
   )
   // Standard finalization records one controller-issued receipt; only High takes the two
   // ledger-bound receipts the join produced, so the Standard route cannot borrow them.
@@ -397,6 +398,22 @@ test('O26: backs reported verification with a run ledger, machine transitions an
   assert.match(skill, /Cite each runId once/)
   assert.match(skill, /- Transitions <\.\.\.> — last state <\.\.\.>/)
   assert.match(skill, /- Budgets policy <n>\/2 · harness <n>\/2 · product <n>\/3 · ENV_DRIFT <presence>/)
+})
+
+test('the ledger reference names exactly the trusted adapter registry, and the visual producer stays node-test', async () => {
+  const { TRUSTED_ADAPTER_NAMES } = await import('./oracle-adapters.mjs')
+  const [skill, ledger] = await Promise.all([read('SKILL.md'), read('references/delivery/ledger.md')])
+
+  // 러너를 표에 더하면 이 줄이 깨진다 — 문서가 registry보다 좁거나 넓게 "지원"을 말하지 못하게 한다
+  assert.match(ledger, loose(`--adapter <${TRUSTED_ADAPTER_NAMES.join('|')}>`))
+  assert.doesNotMatch(ledger, /Only a run that passes `--adapter node-test`/)
+  assert.doesNotMatch(ledger, /non-node:test runners/)
+  // 행 증거를 낼 수 있는 러너와 시각 PASS를 인증할 producer는 다른 능력이다
+  assert.match(ledger, loose('Reported behavior evidence and certifiable visual evidence are separate capabilities'))
+  assert.match(skill, /trusted `oracle-run --adapter node-test` run whose locked test drives Playwright/)
+  // 시각 producer 부재는 구현 뒤가 아니라 승인 전에 드러나고, 드러나도 행을 지우지 않는다
+  assert.match(ledger, loose('the same discovery also records the visual producer path'))
+  assert.match(ledger, loose('`unsupported` never removes or N/As the row'))
 })
 
 test('O27: lints the card structure and initializes run artifacts around the lock', async () => {
@@ -787,6 +804,8 @@ test('reads the interaction contracts before implementing a widget', async () =>
   assert.match(skill, /npx react-doctor@latest design --scope/)
   assert.match(skill, /web-design-guidelines/)
   assert.match(skill, /observation artifacts, pending and\s+non-verifying/)
+  assert.match(skill, loose('`@latest` names no version'))
+  assert.match(skill, loose('record the version that actually ran'))
   assert.match(subagentReview, /interactive widget[\s\S]*`designer`[\s\S]*interaction\s+surface/)
   assert.match(subagentReview, /re-derive every finding from the diff/)
 })
@@ -1547,6 +1566,15 @@ test('collects shared authority, policy sources, and feedback routing into one c
   assert.match(subagentReview, /common\.md/)
   assert.doesNotMatch(changeability, /권위 순서: 1\)/)
   assert.doesNotMatch(subagentReview, /^1\. 보안·개인정보·법적·접근성/m)
+
+  // 위험도 기준도 common.md 하나가 소유한다 — grill은 표를 가리키고 피해 기준의 읽는 법만 예시로 보인다.
+  // 키워드 목록("save"면 High)은 canonical 표와 다른 두 번째 기준이 되어 정상 작업을 과하게 올린다.
+  const grill = await read('references/card/risk-grill.md')
+  assert.match(common, /## Risk taxonomy — canonical/)
+  assert.match(grill, /\]\(\.\.\/common\.md#risk-taxonomy--canonical\)/)
+  assert.doesNotMatch(grill, /High \(payment, order, save, delete/)
+  assert.doesNotMatch(grill, /Medium \(read, search, form, cache\)/)
+  for (const risk of ['Low', 'Medium', 'High']) assert.match(grill, new RegExp(`\\|\\s+${risk}\\s+\\|$`, 'm'))
 })
 
 test('passes review criteria to reviewers as file links, not pasted text', async () => {
@@ -2259,6 +2287,10 @@ test('first substantive Draft exposes verification design without duplicating po
   assert.match(card, /without deciding expected values/)
   assert.match(space, /separate dimensions do not imply unrestricted independence/)
   assert.match(space, /Do not invent `F\*` or `PATH\*` identifiers/)
+  // 결과가 다른 조건에 따라 갈리는 오류는 단독 E* 프레임에 가두지 않는다 — 조합하거나 순서로 나르고, 기대값 없는 쌍은 질문이다
+  assert.match(space, loose('`[error]` fits an error whose outcome is the same under every other choice'))
+  assert.match(space, loose('not every error × every dimension'))
+  assert.match(space, loose('A pair with no approved expected result is `needs-decision`, never an exclusion'))
   assert.match(testSkill, /Reuse the approved verification realization plan/)
   assert.match(testSkill, /sequence.*evidence/s)
 })

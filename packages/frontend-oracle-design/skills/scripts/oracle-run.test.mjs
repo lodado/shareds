@@ -1111,6 +1111,51 @@ test('O3: node-test adapter owns reporter output and records actual test names',
   )
 })
 
+test('O3: vitest adapter owns reporter output and records a reported run — node:test is not the only trusted runner', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  // vitest를 설치하지 않고 어댑터 경로만 검증한다: 가짜 실행기는 오라클이 주입한 `--reporter`를 불러 vitest v3+ TestModule
+  // 모양의 결과를 넘길 뿐이고, 결과 파일은 리포터가 오라클이 env로 정한 목적지에만 쓴다
+  const runner = join(root, 'vitest.mjs')
+  await writeFile(
+    runner,
+    [
+      "import { pathToFileURL } from 'node:url'",
+      "const reporter = process.argv.find((argument) => argument.startsWith('--reporter=')).slice('--reporter='.length)",
+      'const { default: Reporter } = await import(pathToFileURL(reporter).href)',
+      'const testCase = (fullName, state, errors = []) => ({ fullName, result: () => ({ state, errors }), diagnostic: () => ({ flaky: false }) })',
+      'await new Reporter().onTestRunEnd([{ moduleId: "src/save.test.ts", children: { allTests: () => [',
+      '  testCase("save > pending 표시", "passed"),',
+      '  testCase("save > POST 1회", "failed", [{ name: "AssertionError", message: "expected 2 to be 1" }]),',
+      '] } }])',
+      'process.exit(1)',
+      '',
+    ].join('\n'),
+  )
+
+  const executed = run([
+    'exec', '--dir', oracleDirectory, '--label', 'red-1', '--adapter', 'vitest',
+    '--report', join(root, 'report.ndjson'), '--', process.execPath, runner, 'run',
+  ])
+
+  assert.equal(executed.status, 0, executed.stderr)
+  assert.match(executed.stdout, /^RUN_RECORDED r-001 exit:1 grade:reported commandMs:\d+ wrapperMs:\d+\n$/)
+  const [record] = (await ledgerLines(oracleDirectory)).map((line) => JSON.parse(line)).filter((entry) => entry.type === 'run')
+  assert.equal(record.adapter, 'vitest')
+  assert.deepEqual(record.tests, [
+    { name: 'save > pending 표시', status: 'passed', file: 'src/save.test.ts' },
+    { name: 'save > POST 1회', status: 'failed', cause: 'assertion', file: 'src/save.test.ts' },
+  ])
+
+  // 같은 어댑터라도 watch 모드(`run` 없음)는 끝나지 않아 판정할 수 없다 — 거부하고 원장에 남기지 않는다
+  const watch = run([
+    'exec', '--dir', oracleDirectory, '--label', 'red-2', '--adapter', 'vitest',
+    '--report', join(root, 'watch.ndjson'), '--', process.execPath, runner,
+  ])
+  assert.equal(watch.status, 1)
+  assert.match(watch.stderr, /^ADAPTER_COMMAND_INVALID: vitest adapter requires a `vitest run` command/)
+  assert.equal((await ledgerLines(oracleDirectory)).filter((line) => JSON.parse(line).type === 'run').length, 1)
+})
+
 test('full-product: one parameterized node reporter run records twelve frame cases and ordered async scenarios', async (t) => {
   const { fullProductFixture } = await import('../../test-fixtures/full-product/fixture.mjs')
   const fixture = fullProductFixture()

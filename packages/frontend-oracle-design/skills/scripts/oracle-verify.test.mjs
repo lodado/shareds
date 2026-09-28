@@ -1016,8 +1016,7 @@ test('O18: visual artifact는 같은 Oracle과 행의 PASS를 증명해야 한�
       },
     }),
   )
-  await writeFile(
-    ledger,
+  const producerLedger = (adapter) =>
     chainedLedger(
       `${JSON.stringify({
         runId: 'r-001',
@@ -1030,12 +1029,18 @@ test('O18: visual artifact는 같은 Oracle과 행의 PASS를 증명해야 한�
         exitCode: 0,
         signal: null,
         grade: 'exit-only',
+        adapter,
         oracleSha256,
         worktreeSha256,
       })}\n`,
       oracleSha256,
-    ),
-  )
+    )
+  // 다른 신뢰 러너의 통과는 행 증거일 뿐이다 — 인증 가능한 시각 producer는 node-test 런 하나다
+  await writeFile(ledger, producerLedger('vitest'))
+  const otherRunner = run('evidence', '--oracle', oracle, '--map', map, '--ledger', ledger, '--run', 'r-001', '--phase', 'review')
+  assert.equal(otherRunner.status, 1)
+  assert.match(otherRunner.stderr, /^VISUAL_EVIDENCE_INVALID: /)
+  await writeFile(ledger, producerLedger('node-test'))
 
   const verified = run(
     'evidence',
@@ -2013,6 +2018,79 @@ test('O23: 같은 key의 중복 지적은 가장 높은 severity와 그 출처�
     `BLOCKING O2 PRODUCT_DEFECT ${text.high}`,
     'BLOCKING O2 PRODUCT_DEFECT 입력이 사라진다',
     'ADVISORY O3 EVIDENCE_GAP 재시도 증거 없음',
+  ])
+})
+
+test('O23: 문장이 달라도 같은 행·분류·겹치는 인용이 1:1이면 같은 결함이고, 인용이 다르거나 모호하면 합치지 않는다', async (t) => {
+  const oracle = await cardFile(t, EVIDENCE_CARD)
+  const root = dirname(oracle)
+  await mkdir(join(root, 'src'), { recursive: true })
+  await writeFile(
+    join(root, 'src', 'save.ts'),
+    ['export function save() {', '  if (pending) return', '  post()', '}', 'export function onLate(response) {', '  setList(response)', '}', ''].join(
+      '\n',
+    ),
+  )
+  const defect = (id, severity, finding, evidence, quote) => ({
+    id,
+    row: 'O2',
+    classification: 'PRODUCT_DEFECT',
+    severity,
+    finding,
+    evidence,
+    quote,
+    fix: 'guard',
+  })
+  const pendingGuard = (id, severity, finding) => defect(id, severity, finding, 'src/save.ts#L2-L3', 'if (pending) return')
+  const lateWrite = (id, severity, finding) => defect(id, severity, finding, 'src/save.ts#L6', 'setList(response)')
+  const lines = (result) => result.stdout.trim().split('\n')
+  const intersect = async (left, right) =>
+    run('findings', '--file', await findingsFile(t, left, 'a.json'), '--intersect', await findingsFile(t, right, 'b.json'), '--oracle', oracle)
+
+  // 표현만 다른 같은 계약 위반 — 두 리뷰어의 교집합이므로 medium이어도 blocking이고, 두 원문이 모두 남는다
+  const reworded = await intersect(
+    [pendingGuard('a-1', 'medium', 'pending 중 두 번째 클릭이 POST를 다시 보낸다')],
+    [pendingGuard('b-7', 'low', 'duplicate submit is not deduplicated while pending')],
+  )
+  assert.equal(reworded.status, 0, reworded.stderr)
+  assert.deepEqual(lines(reworded), [
+    'FINDINGS_OK blocking:1 advisory:0',
+    'BLOCKING O2 PRODUCT_DEFECT pending 중 두 번째 클릭이 POST를 다시 보낸다 (same cited defect as b-7: duplicate submit is not deduplicated while pending)',
+  ])
+  const ir = JSON.parse(
+    run('findings', '--ir', '--file', await findingsFile(t, [pendingGuard('a-1', 'low', 'x')], 'c.json'), '--intersect',
+      await findingsFile(t, [pendingGuard('b-7', 'medium', 'y')], 'd.json'), '--oracle', oracle).stdout,
+  )
+  // 더 높은 severity 원문이 대표가 되고, 다른 원문은 id·severity·evidence와 함께 실린다 — severity를 평균내지 않는다
+  assert.deepEqual(
+    ir.blocking.map(({ id, severity, alsoReportedAs }) => ({ id, severity, alsoReportedAs })),
+    [{ id: 'b-7', severity: 'medium', alsoReportedAs: { id: 'a-1', severity: 'low', finding: 'x', evidence: 'src/save.ts#L2-L3', matchedBy: 'citation' } }],
+  )
+
+  // 문장은 비슷해도 원인이 다른 곳(늦은 응답의 덮어쓰기)을 인용하면 다른 결함이다 — 한쪽에만 있는 medium은 advisory
+  const differentCause = await intersect(
+    [pendingGuard('a-1', 'medium', '목록이 잘못 갱신된다')],
+    [lateWrite('b-1', 'medium', '목록이 잘못 갱신된다 (늦은 응답)')],
+  )
+  assert.deepEqual(lines(differentCause), [
+    'FINDINGS_OK blocking:0 advisory:2',
+    'ADVISORY O2 PRODUCT_DEFECT 목록이 잘못 갱신된다',
+    'ADVISORY O2 PRODUCT_DEFECT 목록이 잘못 갱신된다 (늦은 응답)',
+  ])
+
+  // 한쪽 지적 하나가 상대의 둘과 겹치면 어느 것이 같은 결함인지 알 수 없다 — 짝짓지 않고 원래 규칙에 맡긴다
+  const ambiguous = await intersect(
+    [pendingGuard('a-1', 'medium', '중복 제출'), defect('a-2', 'medium', 'post가 두 번 불린다', 'src/save.ts#L3', 'post()')],
+    [pendingGuard('b-1', 'medium', 'duplicate POST')],
+  )
+  assert.match(ambiguous.stdout, /^FINDINGS_OK blocking:0 advisory:3\n/)
+
+  // 한쪽에만 있는 high는 인용 매칭과 무관하게 단독으로 blocking이다
+  const loneHigh = await intersect([lateWrite('a-1', 'high', '늦은 응답이 새 목록을 덮어쓴다')], [pendingGuard('b-1', 'low', '중복 제출')])
+  assert.deepEqual(lines(loneHigh), [
+    'FINDINGS_OK blocking:1 advisory:1',
+    'BLOCKING O2 PRODUCT_DEFECT 늦은 응답이 새 목록을 덮어쓴다',
+    'ADVISORY O2 PRODUCT_DEFECT 중복 제출',
   ])
 })
 

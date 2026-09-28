@@ -154,7 +154,7 @@
       "id": "high-review-join",
       "kind": "join",
       "join": "all",
-      "task": "When both High-risk finding artifacts arrive, the Controller/join calls oracle-run.mjs review-receipt to record the packetSha256 of each, targetRevision, role, taskId, outputSha256, reviewerId, findingsSha256, and the digest-chain previousDigest·digest as the ledger-bound reviewReceiptA and reviewReceiptB, including adapter node-test and oracleSha256. When both receipts are valid, merge the findings with their sample provenance and return status READY with the receipt identities/digests. If a finding or a receipt is BLOCKED, return status BLOCKED; if the controller caught a reviewer dispatch or receipt command failure, return classification FAIL with the actual error·runId.",
+      "task": "When both High-risk finding artifacts arrive, the Controller/join calls oracle-run.mjs review-receipt to record the packetSha256 of each, targetRevision, role, taskId, outputSha256, reviewerId, findingsSha256, and the digest-chain previousDigest·digest as the ledger-bound reviewReceiptA and reviewReceiptB, including adapter controller and oracleSha256. When both receipts are valid, merge the findings with their sample provenance and return status READY with the receipt identities/digests. If a finding or a receipt is BLOCKED, return status BLOCKED; if the controller caught a reviewer dispatch or receipt command failure, return classification FAIL with the actual error·runId.",
       "input": ["findingsA", "findingsB", "reviewPacket", "reviewAssignments", "reviewDispatches", "runId"],
       "output": [
         "status",

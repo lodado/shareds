@@ -60,7 +60,7 @@ For tsconfig, follow the `extends` chain to the end and judge by the effective v
   GREEN, one effective mutation, intended verification failure, and restored GREEN. Classify
   `killed` / `survived` / `invalid` / `infrastructure-failure`, keeping malformed/no-op
   mutants out of the kill count. A suppressed negative or temporary mutant is not product `VALID_RED`.
-- Use existing trusted node-test execution to assert compiler results where possible. Record
+- Use an existing trusted adapter run (`node-test` or `vitest`) to assert compiler results where possible. Record
   compiler, runner, effective config, files, contract revision, diagnostics, mutation outcomes, and
   runId. Do not invent a TypeScript adapter or evidence kind. Fixture regression is not consumer
   product verification. Hashes and manually authored receipts do not prove policy or execution;

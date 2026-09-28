@@ -254,7 +254,9 @@ its own scope carve-out at disqualification, with no additional node or artifact
   non-verifying: `npx react-doctor@latest design --scope <changed files>` for the deterministic
   interaction·motion·affordance rules, and the `web-design-guidelines` skill on the changed files if
   it is installed. Fix what the card already covers; anything else is a candidate, never a new
-  policy. Skip a scanner that cannot run (offline, sandbox) and say so in the report.
+  policy. Skip a scanner that cannot run (offline, sandbox) and say so in the report. `@latest`
+  names no version: prefer a version the repo already installs or pins, and record the version
+  that actually ran (`react-doctor --version` from the same install) beside the artifact.
 - Hook Encapsulation only when the approved architecture chose `orchestration-only`. Existing
   equivalent rules first; no dependency installs or lint config changes.
 - Screenshot comparison and direct browser QA run only on explicit request, by invoking the

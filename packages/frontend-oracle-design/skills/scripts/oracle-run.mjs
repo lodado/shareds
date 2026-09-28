@@ -10,7 +10,14 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 import { loadGraph, splitDelivery } from './generate-reference-bundles.mjs'
-import { forbiddenArgument, injectedPaths, isTrustedAdapter, TRUSTED_ADAPTER_NAMES, trustedAdapter } from './oracle-adapters.mjs'
+import {
+  forbiddenArgument,
+  injectedPaths,
+  isTrustedAdapter,
+  TRUSTED_ADAPTER_FLAG,
+  TRUSTED_ADAPTER_NAMES,
+  trustedAdapter,
+} from './oracle-adapters.mjs'
 import { parseCaseSpace } from './oracle-frames.mjs'
 import {
   assertSnapshotUnchanged,
@@ -124,9 +131,9 @@ const NEXT_ACTIONS = {
   RUN_NOT_RED: 'the cited run must fail on the mapped row — write the test, run `red --row <row>`',
   EVIDENCE_REQUIRED: 'generate `oracle-verify.mjs evidence-scaffold --oracle <card> > evidence.json`, fill the slots, pass --evidence',
   EVIDENCE_MISSING_ROWS: 'regenerate the scaffold from the locked card and fill only the values',
-  EVIDENCE_NOT_IN_RUN: 'attach the reporter (`--adapter node-test --report <path>`) and re-run; never invent a test name',
-  EVIDENCE_UNVERIFIABLE: 'the run is exit-only — re-run with `--adapter node-test --report <path>`',
-  RED_EVIDENCE_MISSING: 'run the mapped test with `--adapter node-test --report <path>` so the failing name is recorded',
+  EVIDENCE_NOT_IN_RUN: `attach the reporter (\`${TRUSTED_ADAPTER_FLAG} --report <path>\`) and re-run; never invent a test name`,
+  EVIDENCE_UNVERIFIABLE: `the run is exit-only — re-run with \`${TRUSTED_ADAPTER_FLAG} --report <path>\``,
+  RED_EVIDENCE_MISSING: `run the mapped test with \`${TRUSTED_ADAPTER_FLAG} --report <path>\` so the failing name is recorded`,
   RED_EVIDENCE_UNVERIFIABLE: 'an exit-only or setup failure is not RED — re-run with the reporter and a failing mapped row',
   REQUIRED_RUN_MISSING: 're-run every declared required label with `exec --label <label>` and cite the latest pass',
   FLAKINESS_GATE: 're-run the same command unchanged until consecutive passes reach the risk count; a failure is HARNESS_DEFECT',
@@ -155,7 +162,7 @@ const NEXT_ACTIONS = {
   TRANSITION_NOT_ALLOWED: 'run `status --json` and take one of nextLegalActions',
   STATE_INVALID: 'run `init` if this oracle never entered Delivery; otherwise do not edit state files — recover from the ledger with `status --json`',
   STATE_LEDGER_DIVERGENCE: 'do not edit state files — run `status --json` and recover from the ledger',
-  ADAPTER_COMMAND_INVALID: 'drop the --test-reporter arguments — `--adapter node-test` injects the reporter itself',
+  ADAPTER_COMMAND_INVALID: `drop the reporter·destination and leniency arguments — \`${TRUSTED_ADAPTER_FLAG}\` injects its own reporter`,
   REPORT_MISSING: 'pass `--report <path>` and let the adapter write it',
   REPORT_STALE: 'the report predates the run — re-run with a fresh --report path',
   REPORT_PATH_EXISTS: 'choose a new --report path; an existing file cannot vouch for this run',

@@ -210,6 +210,15 @@ early as `ENVIRONMENT_DEFECT` → `FAIL`. Never promote `exit-only` to reported 
 approved runner change still has to satisfy the trusted adapter contract. Design-only and Low
 skip this discovery entirely; visual tool availability remains a separate explicit-visual-QA concern.
 
+When the Draft will carry a `RELATIONAL` row, the same discovery also records the visual producer
+path as its own `supported | unsupported | unknown` line: a trusted `node-test` run whose locked test
+drives Playwright (SKILL.md). An installed Playwright, a `vitest` run, a browser that opens, or a
+browser MCP observation is not that producer. Show the result next to the `Visual QA authorization`
+question so approval is given knowing whether a certifiable PASS is reachable. `unsupported` never
+removes or N/As the row: it stays the visual owner's `pending`, which may stop at
+`IMPLEMENTED_GREEN` and blocks `REVIEW_VERIFIED`. `HARD` rows need only the behavior runner and
+`JUDGMENT` rows the designer review; neither needs this producer.
+
 When entering Delivery after Design-only, perform the same investigation alongside the `$test`
 availability check before any new lock, init, or test writing. Do not recreate an already approved
 Draft merely to claim the check happened earlier, and do not extend an existing revision lock.
@@ -238,25 +247,32 @@ append-only ledger. provenance holds the skill version, optional runtime/model, 
 snapshot, and capability context. Do not store the raw prompt; if needed, put only a hash or
 sanitized metadata into `--capability-context`. A run that is not in the ledger is not evidence.
 
-Use `exec --dir <dir> --label <label> --adapter node-test --report <path> -- <repo command>`
+Use `exec --dir <dir> --label <label> --adapter <node-test|vitest> --report <path> -- <repo command>`
 for reported tests. For an immediate execution/transition pair, `red` or `green` performs the same
 checks in one call; add `--evidence <map>` and RED's `--row <row>`. Discover flags through the
 runner's usage; `status --dir <dir>` supplies state-specific transition commands.
 
-- Only a run that passes `--adapter node-test` together with `--report` becomes `grade: reported`.
-  This is because the Oracle directly owns and injects the reporter module and the output
-  destination, so the command being run cannot forge the result. If the user passes `--test-reporter`
-  family arguments directly, it is rejected with `ADAPTER_COMMAND_INVALID`.
-- Every other run is `exit-only`. If the vitest·jest `--reporter=json --outputFile` or
-  Playwright `--reporter=json` result is passed via `--report`, it is parsed and used for `reportError`
-  diagnostics but is not given the `reported` grade — the executed command itself can write
-  that file, so the Oracle cannot vouch for its origin.
+- Only a run that passes a trusted `--adapter` together with `--report` becomes `grade: reported`.
+  The trusted adapters are the entries of `TRUSTED_ADAPTERS` in `scripts/oracle-adapters.mjs`:
+  `node-test` (`node --test`) and `vitest` (`vitest run`; watch mode is refused because it never
+  exits). This is because the Oracle directly owns and injects the reporter module and the output
+  destination, so the command being run cannot forge the result. If the user passes reporter or
+  destination arguments directly (`--test-reporter` family, vitest `--reporter`·`--outputFile`), it
+  is rejected with `ADAPTER_COMMAND_INVALID`.
+- Every other run is `exit-only`. If a jest `--reporter=json --outputFile`, Playwright
+  `--reporter=json`, or a vitest JSON result that the command wrote itself is passed via
+  `--report` without the adapter, it is parsed and used for `reportError` diagnostics but is not
+  given the `reported` grade — the executed command itself can write that file, so the Oracle cannot
+  vouch for its origin.
 - An `exit-only` run passes neither the `VALID_RED` transition nor test-name-based evidence
-  verification. If a repo that has only non-node:test runners is blocked by this gate, it is
-  `ENVIRONMENT_DEFECT` rather than `HARNESS_DEFECT`, and you `FAIL` with the actual cause without
-  touching production.
-- A node:test repo uses the bundled `scripts/oracle-node-reporter.mjs`. `--test-reporter` is a
-  module specifier, so pass it as `./` or an absolute path.
+  verification. If a repo whose only runners have no trusted adapter (jest, standalone Playwright,
+  another language) is blocked by this gate, it is `ENVIRONMENT_DEFECT` rather than
+  `HARNESS_DEFECT`, and you `FAIL` with the actual cause without touching production.
+- Reported behavior evidence and certifiable visual evidence are separate capabilities. A reported
+  `vitest` run is row evidence; the visual producer stays the `node-test` run in SKILL.md.
+- A node:test repo uses the bundled `scripts/oracle-node-reporter.mjs`, and a vitest repo the bundled
+  `scripts/oracle-vitest-reporter.mjs`; the adapter injects either one by absolute path, so the repo
+  command never names a reporter.
 - Record state transitions only with `oracle-run.mjs transition`. The script inspects TDD ordering,
   per-row RED/GREEN evidence, `--required-label` runs, consecutive pass counts, test weakening, the
   review artifact, and the lock, and prints the rejection reason as a code.

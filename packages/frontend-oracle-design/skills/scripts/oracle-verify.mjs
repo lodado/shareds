@@ -2,11 +2,11 @@
 
 import { Buffer } from 'node:buffer'
 import { lstat, readdir, readFile, realpath } from 'node:fs/promises'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, posix, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { inflateSync } from 'node:zlib'
-import { isTrustedAdapter } from './oracle-adapters.mjs'
+import { isTrustedAdapter, TRUSTED_ADAPTER_FLAG } from './oracle-adapters.mjs'
 import { APPLICABILITY_CANDIDATES, mineDimensions } from './oracle-dimensions.mjs'
 import { canonicalTuple, frameId, generateFromDocument, MAX_STATE_PATHS, TAXONOMY_FAMILIES } from './oracle-frames.mjs'
 import {
@@ -169,8 +169,8 @@ const NEXT_ACTIONS = {
   EVIDENCE_MISSING_FRAME: 'name the covered frame case in evidence.json frames, or disposition the frame as independent()',
   SEQUENCE_EVIDENCE_MISSING: 'map the fast-check sequence test in evidence.json sequence, or record why fast-check is unavailable',
   EVIDENCE_OWNER_INVALID: 'match the evidence kind to the row tier — HARD→test, RELATIONAL→visual|pending, JUDGMENT→designer',
-  EVIDENCE_NOT_IN_RUN: 'attach the reporter (`--adapter node-test --report <path>`) and re-run; never invent a test name',
-  EVIDENCE_UNVERIFIABLE: 'the run is exit-only — re-run with `--adapter node-test --report <path>`',
+  EVIDENCE_NOT_IN_RUN: `attach the reporter (\`${TRUSTED_ADAPTER_FLAG} --report <path>\`) and re-run; never invent a test name`,
+  EVIDENCE_UNVERIFIABLE: `the run is exit-only — re-run with \`${TRUSTED_ADAPTER_FLAG} --report <path>\``,
   EVIDENCE_PENDING: 'complete the pending visual evidence before REVIEW_VERIFIED — IMPLEMENTED_GREEN is the honest stop',
   EVIDENCE_STALE: 'a frozen name changed after VALID_RED — spend the harness budget and record a new reported RED',
   RED_EVIDENCE_MISSING: 'run the mapped test with the reporter so the failing name is recorded',
@@ -1872,7 +1872,8 @@ async function verifyVisualArtifact(row, entry, mapPath, oracleSha256, approvedS
     producerLedger?.signal == null &&
     producerLedger?.oracleSha256 === oracleSha256 &&
     producerLedger?.worktreeSha256 === producer.worktreeSha256 &&
-    isTrustedAdapter(producerLedger?.adapter)
+    // 인증 가능한 시각 producer는 Playwright를 모는 node-test 런 하나뿐이다(SKILL.md) — 다른 신뢰 러너의 통과는 행 증거일 뿐이다
+    producerLedger?.adapter === 'node-test'
   if (
     artifact?.schemaVersion !== 3 ||
     artifact.oracleSha256 !== oracleSha256 ||
@@ -2468,8 +2469,8 @@ function citationToken(token) {
   return token.slice(start, end)
 }
 
-async function citationProblem(finding, roots) {
-  if (finding.classification !== 'PRODUCT_DEFECT') return null
+/** finding의 첫 `path#La-Lb` 인용 — 없으면 null. */
+function codeCitation(finding) {
   // 경로에 route group `(shop)`·동적 세그먼트 `[id]`·`+page`가 올 수 있어 괄호로 자르지 않는다 — 가장자리 괄호만 뗀다
   const cited = String(finding.evidence)
     .split(/[\s,;`'"]+/)
@@ -2477,16 +2478,42 @@ async function citationProblem(finding, roots) {
     .find(Boolean)
   if (!cited) return null
   const [reference, path, from, to] = cited
+  return { reference, path, from: Number(from), to: Number(to ?? from) }
+}
+
+async function citationProblem(finding, roots) {
+  if (finding.classification !== 'PRODUCT_DEFECT') return null
+  const cited = codeCitation(finding)
+  if (!cited) return null
+  const { reference, path, from, to } = cited
   if (isAbsolute(path) || path.split('/').includes('..')) return `cites ${reference} outside the repository — cite a repository-relative path`
   if (typeof finding.quote !== 'string' || !finding.quote.trim()) return `cites ${reference} without a \`quote\` of the line`
   const normalize = (text) => text.replace(/\s+/g, ' ').trim()
   for (const root of roots) {
     const content = await readFile(resolve(root, path), 'utf8').catch(() => null)
     if (content === null) continue
-    const near = content.split('\n').slice(Math.max(0, Number(from) - 4), Number(to ?? from) + 3)
+    const near = content.split('\n').slice(Math.max(0, from - 4), to + 3)
     return normalize(near.join('\n')).includes(normalize(finding.quote)) ? null : `the quote is not at ${reference}`
   }
   return `${path} does not exist under the review roots`
+}
+
+/**
+ * 두 리뷰어가 같은 결함을 다른 문장으로 쓴 경우 — 같은 행·분류에서 같은 파일의 겹치는 줄을 인용하면 같은 결함 후보다.
+ * 인용이 없거나 겹치지 않으면 후보가 아니다: 문장이 비슷하다는 이유로 원인이 다른 지적을 합치지 않는다.
+ */
+function sameCitedDefect(left, right) {
+  if (left.row !== right.row || left.classification !== right.classification) return false
+  const [a, b] = [codeCitation(left), codeCitation(right)]
+  if (!a || !b || posix.normalize(a.path) !== posix.normalize(b.path)) return false
+  return a.from <= b.to && b.from <= a.to
+}
+
+/** 인용으로 짝지은 두 원문 — 더 높은 severity 원문을 대표로 두고 다른 원문도 그대로 싣는다. severity를 평균내지 않는다. */
+function citedPair(left, right) {
+  const [kept, other] = severityRank(right) < severityRank(left) ? [right, left] : [left, right]
+  const { id, severity, finding, evidence } = other
+  return { ...kept, alsoReportedAs: { id, severity, finding, evidence, matchedBy: 'citation' } }
 }
 
 async function findingsResult(options) {
@@ -2535,13 +2562,30 @@ async function findingsResult(options) {
       if (!kept || severityRank(finding) < severityRank(kept)) retained.set(key, finding)
     }
 
+    // 문장만 다른 같은 결함 — 한쪽에만 있는 key끼리 같은 인용으로 1:1 대응할 때만 짝짓는다. 상대 후보가 둘 이상이면
+    // 어느 것이 같은 결함인지 알 수 없으니 짝짓지 않고 원래 규칙(한쪽에만 있는 medium·low는 advisory)에 맡긴다.
+    const oneSided = (own, other) => [...retained.keys()].filter((key) => own.has(key) && !other.has(key))
+    const primaryOnly = oneSided(primaryKeys, secondaryKeys)
+    const secondaryOnly = oneSided(secondaryKeys, primaryKeys)
+    const partners = (key, candidates) => candidates.filter((other) => sameCitedDefect(retained.get(key), retained.get(other)))
+    const pairOf = new Map()
+    for (const key of primaryOnly) {
+      const found = partners(key, secondaryOnly)
+      if (found.length === 1 && partners(found[0], primaryOnly).length === 1) pairOf.set(key, found[0])
+    }
+    const pairedSecondary = new Set(pairOf.values())
+
     blocking = []
     advisory = [...opinions(primary), ...opinions(secondary)]
 
     // Map은 첫 등장 순서를 유지한다 — 유지된 항목의 출력 순서는 severity 선택과 무관하게 같다.
     for (const [key, finding] of retained) {
-      if (mandatory(finding) || (secondaryKeys.has(key) && primaryKeys.has(key))) blocking.push(finding)
-      else advisory.push(finding)
+      // 짝지은 secondary 원문은 primary 짝 안에 실려 한 번만 나온다
+      if (pairedSecondary.has(key)) continue
+      const judged = pairOf.has(key) ? citedPair(finding, retained.get(pairOf.get(key))) : finding
+      const confirmed = pairOf.has(key) || (secondaryKeys.has(key) && primaryKeys.has(key))
+      if (mandatory(judged) || confirmed) blocking.push(judged)
+      else advisory.push(judged)
     }
   } else {
     blocking = claims(primary)
@@ -2552,7 +2596,12 @@ async function findingsResult(options) {
 
   if (secondary) {
     lines.push(
-      ...blocking.map((finding) => `BLOCKING ${finding.row} ${finding.classification} ${finding.finding}`),
+      ...blocking.map(
+        (finding) =>
+          `BLOCKING ${finding.row} ${finding.classification} ${finding.finding}${
+            finding.alsoReportedAs ? ` (same cited defect as ${finding.alsoReportedAs.id}: ${finding.alsoReportedAs.finding})` : ''
+          }`,
+      ),
       ...advisory.map((finding) => `ADVISORY ${finding.row} ${finding.classification} ${finding.finding}`),
     )
   }

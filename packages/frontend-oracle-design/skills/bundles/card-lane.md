@@ -370,11 +370,22 @@ Visual scope does not replace functional Risk. Record the two judgments separate
 Judge by the **worst damage from a false GREEN**, not by code complexity. Even when the UI is
 simple, it is High if the side effects are dangerous.
 
-- Low (static display, pure synchronous helper) → the card may be skipped — record risk and reason
-  in one line
-- Medium (read, search, form, cache) → write the card
-- High (payment, order, save, delete, permission, external mutation) → write the card + user card
-  confirmation required
+The entry criteria are the [canonical risk table](../common.md#risk-taxonomy--canonical); this
+section only shows how to read them. A word in the request is not the damage: "save" can be a label
+fix inside an approved form or an irreversible overwrite. Weigh the approved contract, what changes
+from current behavior, and whether a wrong result can be recovered.
+
+| Request (example)                                                           | Worst damage from a false GREEN                       | Risk   |
+| --------------------------------------------------------------------------- | ----------------------------------------------------- | ------ |
+| Fix the save button's label or spacing inside an already approved form      | wrong copy or layout, no new state or policy          | Low    |
+| Add search debounce, a form's validation states, or pending/error handling  | new outcomes that need a contract; the user can retry | Medium |
+| Autosave a draft that the user can undo or restore                          | a recoverable wrong value                             | Medium |
+| Charge a card, change a permission, or delete data that has no restore path | money, access, or data lost for good                  | High   |
+
+- Low → no card; record risk and reason in one line.
+- Medium and High → write the card, which passes the one Draft confirmation in
+  [`confirmation-lock.md`](confirmation-lock.md); High adds the High evidence of the canonical table.
+- A `mandatory-constraint` or a High entry criterion is never lowered because the UI looks simple.
 
 ## Policy Grill — system design interview
 
@@ -1287,6 +1298,13 @@ it must not retain the full-product execution claim.
   stops the generator and lint with a `CASE_SPACE_*` code.
 - A choice suffixed `[error]` is excluded from combination and emits one standalone `E*` frame —
   the category-partition error annotation. Everything else joins t-way combination.
+- `[error]` fits an error whose outcome is the same under every other choice. When the approved
+  outcome of an error depends on another condition — retry, cancel or leaving the screen, keeping
+  the previous data, a repeated input, a response arriving out of order — leave the suffix off so
+  the error joins t-way combination with that dimension, or carry the order through `PATH*` or the
+  `Order` sequence obligation. Keep the pairs that the failure mechanism and its damage justify,
+  not every error × every dimension. A pair with no approved expected result is `needs-decision`,
+  never an exclusion.
 - An excluded family writes `—` as the dimension and `excluded: <reason>` as its choices.
 
 ### Touches — optional fourth column that scopes the combination
