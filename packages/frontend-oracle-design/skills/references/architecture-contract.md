@@ -55,7 +55,8 @@ consistent existing structure, and do not slip an FSD migration into the work.
 5. Write the document with the approved exact bytes and include `--source <architecture.md>` when
    creating the Oracle lock.
 6. Tests, production, browser, and the `oracle-lock.mjs verify` right before review detect document
-   changes. On `SOURCE_CHANGED`, discard the existing evidence and get the new body approved again.
+   changes. On `SOURCE_CHANGED`, stop reusing the evidence for the changed revision, preserve the
+   historical artifacts and ledger, and get the new body approved again.
 
 If the user-approved architecture and the repo instructions conflict, or either side changes, do not
 guess the decision made at approval time. Re-compare the current document and instructions, get the

@@ -2343,7 +2343,7 @@ function normalizeFindings(document, rows, source) {
 
   return findings.map((finding) => {
     for (const field of ['id', 'classification', 'severity', 'finding', 'evidence', 'fix']) {
-      if (!finding?.[field]) {
+      if (typeof finding?.[field] !== 'string' || !finding[field].trim()) {
         throw new CliError('FINDINGS_INVALID', `${source}: finding ${finding?.id ?? '?'} requires ${field}`)
       }
     }
@@ -2361,13 +2361,14 @@ function normalizeFindings(document, rows, source) {
     }
 
     const mandatory = finding.severity === 'critical' || finding.severity === 'high'
-    const downgraded = !finding.row && !mandatory && finding.classification !== 'NON_ORACLE_OPINION'
+    if (!finding.row && !mandatory && !['POLICY_GAP', 'NON_ORACLE_OPINION'].includes(finding.classification)) {
+      throw new CliError('FINDINGS_INVALID', `${source}: finding ${finding.id} requires an affected row; investigate missing policy or keep an unconfirmed candidate in the journal — absence of a row does not establish preference`)
+    }
 
     return {
       ...finding,
       row: finding.row ?? '-',
-      classification: downgraded ? 'NON_ORACLE_OPINION' : finding.classification,
-      downgraded,
+      downgraded: false,
     }
   })
 }
@@ -2431,12 +2432,16 @@ function assertEmbeddedLedger(ledger) {
   }
 }
 
-function findingKey(finding) {
-  const normalized = finding.finding
+function normalizedFindingText(text) {
+  return String(text)
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
-  return `${finding.row}|${finding.classification}|${normalized}`
+}
+
+function findingKey(finding) {
+  return JSON.stringify([finding.row, finding.classification, normalizedFindingText(finding.finding),
+    ...['evidence', 'fix', 'quote'].map((field) => String(finding[field] ?? '').replace(/\s+/g, ' ').trim())])
 }
 
 /** SEVERITIES는 심각도 내림차순이다 — 낮은 인덱스가 더 높은 심각도다. */
@@ -2499,21 +2504,25 @@ async function citationProblem(finding, roots) {
 }
 
 /**
- * 두 리뷰어가 같은 결함을 다른 문장으로 쓴 경우 — 같은 행·분류에서 같은 파일의 겹치는 줄을 인용하면 같은 결함 후보다.
- * 인용이 없거나 겹치지 않으면 후보가 아니다: 문장이 비슷하다는 이유로 원인이 다른 지적을 합치지 않는다.
+ * ponytail: exact context matching is conservative, not semantic equivalence; ambiguous pairs stay advisory for human investigation.
+ * 같은 행·분류·인용뿐 아니라 조건/실패 관측(evidence), 수정(fix), quote가 맞아야 짝짓는다.
  */
 function sameCitedDefect(left, right) {
   if (left.row !== right.row || left.classification !== right.classification) return false
   const [a, b] = [codeCitation(left), codeCitation(right)]
   if (!a || !b || posix.normalize(a.path) !== posix.normalize(b.path)) return false
+  const context = (finding, citation) => finding.evidence.replace(citation.reference, '').replace(/\s+/g, ' ').trim()
+  const leftContext = context(left, a)
+  if (!leftContext || leftContext !== context(right, b)) return false
+  if (left.fix.trim() !== right.fix.trim()) return false
+  if ((left.quote ?? '').trim() !== (right.quote ?? '').trim()) return false
   return a.from <= b.to && b.from <= a.to
 }
 
 /** 인용으로 짝지은 두 원문 — 더 높은 severity 원문을 대표로 두고 다른 원문도 그대로 싣는다. severity를 평균내지 않는다. */
 function citedPair(left, right) {
   const [kept, other] = severityRank(right) < severityRank(left) ? [right, left] : [left, right]
-  const { id, severity, finding, evidence } = other
-  return { ...kept, alsoReportedAs: { id, severity, finding, evidence, matchedBy: 'citation' } }
+  return { ...kept, alsoReportedAs: { ...other, matchedBy: 'citation' } }
 }
 
 async function findingsResult(options) {
@@ -2534,17 +2543,12 @@ async function findingsResult(options) {
   const claims = (findings) => findings.filter((finding) => finding.classification !== 'NON_ORACLE_OPINION')
   const mandatory = (finding) => finding.severity === 'critical' || finding.severity === 'high'
 
-  // 인용이 코드와 맞지 않는 결함 주장: critical/high는 버리지 않고 다시 내게 하고, medium/low는 의견으로 내린다
+  // 부정확한 인용은 증거 보정 대상이지 취향이라는 의미 판정이 아니다. 원본은 그대로 둔다.
   const roots = await reviewRoots(options)
   for (const finding of [...primary, ...(secondary ?? [])]) {
     const problem = await citationProblem(finding, roots)
     if (!problem) continue
-    if (mandatory(finding)) {
-      throw new CliError('FINDINGS_INVALID', `finding ${finding.id}: ${problem} — re-emit it with the exact line; a high finding is never dropped`)
-    }
-    finding.classification = 'NON_ORACLE_OPINION'
-    finding.downgraded = true
-    finding.citationUnverified = true
+    throw new CliError('FINDINGS_INVALID', `finding ${finding.id}: ${problem} — re-emit it with the exact line; an unverified citation is not a preference`)
   }
 
   let blocking
@@ -2605,12 +2609,6 @@ async function findingsResult(options) {
       ...advisory.map((finding) => `ADVISORY ${finding.row} ${finding.classification} ${finding.finding}`),
     )
   }
-
-  lines.push(
-    ...[...primary, ...(secondary ?? [])]
-      .filter((finding) => finding.downgraded)
-      .map((finding) => `DOWNGRADED ${finding.id} NON_ORACLE_OPINION${finding.citationUnverified ? ' (citation unverified)' : ''}`),
-  )
 
   return { blocking, advisory, lines }
 }

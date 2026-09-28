@@ -380,6 +380,54 @@ async function workspace(
   return { root, oracleDirectory, oracle, lock, marker: join(root, 'marker.txt') }
 }
 
+test('metrics reports recorded facts read-only and leaves unobserved outcomes unmeasured', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  const executed = run(['exec', '--dir', oracleDirectory, '--label', 'inspection', '--', process.execPath, '-e', 'process.exit(0)'])
+  assert.equal(executed.status, 0, executed.stderr)
+  const escapeRecord = { symptom: 'synthetic task interruption', detected_after: 'REVIEW_VERIFIED', class: 'JUDGMENT_ERROR', kind: 'mis-disposition', correction: 'policy: pending review', check: 'none — investigation only' }
+  await writeFile(join(oracleDirectory, 'escapes.jsonl'), `${[escapeRecord, { ...escapeRecord, check: 'test: task resumption' }, { ...escapeRecord, check: null }].map((entry) => JSON.stringify(entry)).join('\n')}\n`)
+  const paths = await readdir(oracleDirectory)
+  const before = await Promise.all(['oracle.md', 'oracle.lock.json', 'run-state.json', 'runs.jsonl', 'escapes.jsonl'].filter((path) => paths.includes(path)).map(async (path) => [path, await readFile(join(oracleDirectory, path), 'utf8')]))
+  const checked = run(['metrics', '--dir', oracleDirectory])
+  assert.equal(checked.status, 0, checked.stderr)
+  const metrics = JSON.parse(checked.stdout)
+  assert.equal(metrics.authority, 'record-counts-only')
+  assert.equal(metrics.runs.records, 1)
+  assert.equal(metrics.runs.exitOnly, 1)
+  assert.equal(metrics.runs.reported, 0)
+  assert.equal(metrics.escapes.records, 3, 'append-only reclassifications are records, not distinct defects')
+  assert.equal(metrics.escapes.proseOnly, 1)
+  assert.equal(metrics.escapes.linkedCheck, 1)
+  assert.equal(metrics.escapes.unmeasuredCheck, 1)
+  assert.equal(metrics.escapes.byKind['mis-disposition'], 3)
+  assert.equal(Object.values(metrics.unmeasured).every((value) => value === 'unmeasured'), true)
+  assert.deepEqual(await readdir(oracleDirectory), paths)
+  for (const [path, bytes] of before) assert.equal(await readFile(join(oracleDirectory, path), 'utf8'), bytes)
+})
+
+test('metrics distinguishes absent, empty and invalid records without repairing artifacts', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'oracle-metrics-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const read = () => run(['metrics', '--dir', directory])
+  const absent = read()
+  assert.equal(absent.status, 0, absent.stderr)
+  assert.equal(JSON.parse(absent.stdout).runs, 'unmeasured')
+  assert.equal(JSON.parse(absent.stdout).escapes, 'unmeasured')
+  const path = join(directory, 'escapes.jsonl')
+  await writeFile(path, '')
+  assert.equal(JSON.parse(read().stdout).escapes.records, 0)
+  for (const invalid of ['{bad}\n', '{}', 'null\n', '[]\n']) {
+    await writeFile(path, invalid)
+    const rejected = read()
+    assert.equal(rejected.status, 1)
+    assert.match(rejected.stderr, /METRICS_INVALID/)
+    assert.equal(await readFile(path, 'utf8'), invalid)
+  }
+  await writeFile(path, '')
+  await writeFile(join(directory, 'runs.jsonl'), '{}\n')
+  assert.match(read().stderr, /LEDGER_INVALID/)
+})
+
 async function implementationWorkerFixture(t) {
   const fixture = await workspace(t, { initialFiles: { 'src/save.mjs': 'export const pending = false\n' }, oracleContent: SOURCED_ORACLE, sourceFiles: { 'docs/policy.md': 'Approved pending contract.' } })
   const { root, oracleDirectory } = fixture
@@ -636,8 +684,13 @@ test('review-brief preserves blockers and advisory provenance without changing e
           fix: 'Ask Q1',
         },
         {
+          id: 'omitted', classification: 'POLICY_GAP', severity: 'medium',
+          finding: 'Approved journey outcome absent from card rows',
+          evidence: 'S1 original task outcome', fix: 'Present the omitted requirement in a new Draft',
+        },
+        {
           id: 'taste',
-          classification: 'PRODUCT_DEFECT',
+          classification: 'NON_ORACLE_OPINION',
           severity: 'medium',
           finding: 'Prefer a different layout',
           evidence: 'reviewer preference',
@@ -668,11 +721,11 @@ test('review-brief preserves blockers and advisory provenance without changing e
   assert.equal(brief.openQuestions, 'Not present; consult the original Oracle.')
   assert.deepEqual(
     brief.blocking.map((entry) => entry.id),
-    ['critical'],
+    ['critical', 'omitted'],
   )
   assert.equal(brief.advisory[0].id, 'taste')
   assert.equal(brief.advisory[0].classification, 'NON_ORACLE_OPINION')
-  assert.equal(brief.advisory[0].downgraded, true)
+  assert.equal(brief.advisory[0].downgraded, false)
   assert.deepEqual(brief.pending, [])
   assert.deepEqual(brief.evidence.rows, EVIDENCE.rows)
   assert.deepEqual(await Promise.all(protectedPaths.map((path) => readFile(path, 'utf8'))), before)

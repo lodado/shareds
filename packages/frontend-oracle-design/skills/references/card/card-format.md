@@ -124,12 +124,11 @@ schema; confirmation and locking still follow the existing rules below and above
 
 ## Conditional source-aware fresh review
 
-Before user approval, run the review only when jurisdictions are combined, an approved policy or
-`identity-shaping` Design Intent changes, or investigation reveals a requirement missing from P/O/D
-and Open questions. The fresh reviewer receives relevant verbatim user messages and locations,
-approved source excerpts and exact locations/versions, affected dispositions, and Draft bytes.
-Every finding links to a P/O/D row, Open question, or justified N/A; a missing outcome-changing
-policy is `POLICY_GAP` and follows the existing approval path. Record a same-context fallback when
+Use the conditional triggers and complete original-input contract in
+[`policy-sources.md`](policy-sources.md#source-aware-intent-audit--conditional-fresh-and-non-authoritative).
+Every established finding links to a P/O/D row, Open question, or justified N/A; an unconfirmed
+candidate stays in the journal as `needs-evidence`, not a forced N/A or preference. A missing
+approved requirement or needed outcome-changing policy is `POLICY_GAP` and follows the existing approval path. Record a same-context fallback when
 independent dispatch is unavailable. This is an input contract, not a new state or schema, and does
 not replace card-only cold-read or reverse-impossible review.
 
@@ -151,6 +150,12 @@ existing confirmation/revision procedure. No new plan file, ledger, or state mod
 - Choose verification means for the guarantee being claimed; distinguish compile-time guarantees
   from runtime behavior where both apply. Explain the boundary and observations, not a prescribed
   library or harness recipe. `$test` owns implementation-specific test construction.
+- A frontend function call, HTTP request, server acceptance, durable write and success notification
+  are distinct observation boundaries. Name the actual observation location and residual guarantee
+  in Method/evidence status; observing one call does not prove one server-side effect. A declared
+  `pending` value alone does not verify re-input during pending: connect the action order and held
+  barrier to the existing frame/PATH/sequence when that failure mechanism applies. Expected counts
+  remain owned by the original row, not this plan.
 - When Case space requires Order/sequence evidence, include that obligation in the plan without
   duplicating row assertion owners. Concrete tooling and execution follow the existing `$test` contract.
 - Label nonexistent harness helpers as proposals, and tools as candidates or unresolved when needed.
@@ -314,8 +319,12 @@ answer, and record it in `journal.md`.
 - **First nail**: the cheapest observation that would falsify the root — an existing test, one repo
   read, one question to the user — chosen because it costs less than the delivery it pre-empts.
 
-Drive the first nail before confirmation. If it lands, the root is a `POLICY_GAP`: the card goes to
-`NEEDS_DECISION` with that question, not to the lock.
+Drive the first nail before confirmation and record its scope, result and remaining uncertainty.
+Use the [problem-definition review](policy-sources.md#problem-definition-review) for competing
+interpretations: refuting a cause is not refuting the user's problem. If an outcome-changing policy
+is needed or an approved requirement was omitted, the root is a `POLICY_GAP`: the card goes to
+`NEEDS_DECISION` with that question, not to the lock. A harness/environment explanation or an
+inconclusive observation uses its existing route; do not turn every falsification into new policy.
 
 When there is a Design Intent, also perform the genericity·restraint critique from
 [`visual-design.md`](../visual-design.md). Do not downgrade a sourced aesthetic requirement to

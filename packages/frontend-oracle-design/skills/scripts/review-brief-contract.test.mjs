@@ -47,7 +47,8 @@ test('review metrics require measurement and preserve safety gates', async () =>
   for (const metric of ['Human Review Effort', 'Escalation Usefulness', 'Semantic Escapes', 'Normal-sample Misses']) {
     assert.match(retro, new RegExp(`\\| ${metric} \\|`))
   }
-  assert.match(retro, /No automatic collection is provided/)
+  assert.match(retro, /No automatic semantic or human-time collection is provided/)
+  assert.match(retro, /oracle-run\.mjs metrics/)
   assert.match(retro, /unmeasured, not zero/)
   assert.match(retro, /No metric moves a gate/)
 })

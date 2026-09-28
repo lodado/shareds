@@ -85,7 +85,8 @@ Lane routing:
 
 - At the start of each stage, re-read disk, not conversation memory. `journal.md` is append-only
   stage rationale and is not duplicated into `implementation-decision.md`. The journal is neither a
-  policy source nor a lock target; when it conflicts with the card, the card wins.
+  policy source nor a lock target; the card governs implementation, but cannot erase contrary
+  observations from the journal. New evidence may reopen the problem definition, not authorize edits.
 
 ### TDD and judgment tools
 
@@ -171,7 +172,9 @@ its own scope carve-out at disqualification, with no additional node or artifact
   [`lifecycle-adaptation.md`](references/lifecycle-adaptation.md) with its dependencies. A small
   change with known owners and sufficient approved sources does not load it. Keep it out of the
   generic bundles and the Low fast path; it adjusts investigation, not required gates.
-- Card writing: [`card/policy-sources.md`](references/card/policy-sources.md),
+- Card writing and conditional problem-definition review (unclear purpose/task, cross-boundary
+  impact, unexplained task failure, material dismissal, conflicting new evidence or repeated escapes):
+  [`card/policy-sources.md`](references/card/policy-sources.md),
   [`card/risk-grill.md`](references/card/risk-grill.md), [`bva.md`](references/bva.md),
   [`card/card-format.md`](references/card/card-format.md),
   [`card/interaction-sweep.md`](references/card/interaction-sweep.md) — after drafting contract
@@ -389,7 +392,8 @@ When implementation, test-based self-verification, and subagent review are expli
 ## Feedback routing
 
 Canonical definitions live in [`common.md`](references/common.md). Record exactly one primary cause
-per observation.
+per established finding; unresolved candidates remain investigation/journal `needs-evidence`.
+Discovery without a card row is allowed; policy changes still require the existing confirmation.
 
 | Classification       | Route                                                         |
 | -------------------- | ------------------------------------------------------------- |

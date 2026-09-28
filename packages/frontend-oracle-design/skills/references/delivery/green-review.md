@@ -32,7 +32,8 @@ The canonical definition of classification·routing is the feedback routing in
 - `ENVIRONMENT_DEFECT` → `FAIL` without touching production
 - `NON_ORACLE_OPINION` → record it but do not change policy·assertions·completion state
 
-A revision mismatch is not a target of feedback classification. Immediately discard the existing
+A revision mismatch is not a target of feedback classification. Preserve the historical artifacts and
+ledger, invalidate current-revision reuse of the existing
 evidence and move to `NEEDS_DECISION` or `FAIL` per the lock rules of
 [`card/confirmation-lock.md`](../card/confirmation-lock.md).
 

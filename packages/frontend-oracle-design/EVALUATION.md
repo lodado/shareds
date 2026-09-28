@@ -1,3 +1,130 @@
+# 0.60.0 — contract boundaries and problem-definition review (2026-09-28)
+
+This is a skill/harness meta change, not delivery of a user product. No product Oracle state was
+assigned. Baseline: local origin is `https://github.com/lodado/shareds.git`, clean worktree before
+changes; Node v26.7.0. Baseline package tests: **554 passed, 0 failed**; package lint exited 0.
+Raw command logs for this work are under `/tmp/oracle-outer-loop-verification/` (local, ephemeral).
+
+## Findings and minimum changes
+
+| Improvement / status                              | Existing owner and guarantee                                                             | Confirmed gap / minimum change                                                                                                                                                                                                     | Verification and limit                                                                                                                                                        |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rowless findings — executable fix                 | `oracle-verify.mjs:normalizeFindings`, six classifications and risk-dependent review     | Every rowless medium/low finding, including a sourced `POLICY_GAP`, became opinion. Preserve `POLICY_GAP` and explicit opinion; require a row or investigation for other medium/low claims rather than inventing a classification. | CLI regression first failed with empty blocking list, then passed; classification meaning is still reviewer-owned.                                                            |
+| Unverified citations — executable fix             | `citationProblem`, original code quote checking                                          | Medium/low invalid quotes became preference. All severities now return `FINDINGS_INVALID` for correction; raw claims remain intact.                                                                                                | Both real quote acceptance and invalid quote rejection; no proof of semantic correctness.                                                                                     |
+| Finding correspondence — executable fix           | `findingKey`, `sameCitedDefect`, original risk intersection                              | Text alone could merge different targets; overlapping lines alone could merge different mechanisms. Compare existing evidence/fix context and quote conservatively; retain original paired fields.                                 | Same-defect paraphrase, same-summary different cause, bare citation, ambiguous pair and unilateral high cases. Exact context matching can leave semantic duplicates advisory. |
+| Problem definition — guidance/loading improvement | Outcome Brief, Source Registry, journal, source-aware audit                              | Explicit conditional triggers, four layers, competing explanations/First nail, bounded assumption attacks and scoped closure/reopening were incomplete. Extend existing owners and `card-policy-sources` load condition.           | Document/graph contracts and synthetic eval projection, **not measured agent behavior**.                                                                                      |
+| Observation boundaries — guidance improvement     | Card Verification realization plan and existing GWT/evidence mapping                     | Make function call/request/acceptance/persistence/notification distinction and residual guarantee explicit without duplicating expectations.                                                                                       | Existing frame, sequence and mapping tests plus reference checks; actual system boundaries still need review.                                                                 |
+| Metrics — executable read-only addition           | `retro-metrics.md`, existing `readLedger`                                                | Definitions existed without aggregation. Add `oracle-run metrics --dir` for actual run and escape-record counts only; reuse digest-chain validation.                                                                               | Temporary-run CLI tests check no artifact writes, absent/empty distinction, corrupt inputs and unknown measures.                                                              |
+| Runner/RED — already satisfied / known limit      | `oracle-adapters.mjs`, reporters, `verifyRed`, `oracle-fs.mjs:failureCause`              | node-test/Vitest trusted reported evidence, exit-only separation and TypeError/SyntaxError handling already tested; no new adapter or name-based failure engine.                                                                   | Existing actual node-test runs and Vitest reporter fixtures. Generic Vitest hook provenance and legacy missing cause remain limitations, not silently solved.                 |
+| Risk, coverage, exclusions — already satisfied    | `common.md`, `risk-grill.md`, frames/verify, type witnesses                              | Damage/reversibility examples, t-way/full-product, PATH/sequence and witness limits already exist. No new risk score or blanket full-product.                                                                                      | Existing regressions; textual witnesses cannot prove live call reachability, temporal ordering or server effects.                                                             |
+| Visual/review/ownership — already satisfied       | capability discovery, visual v3 producer binding, implementation decision, review packet | node-test + Playwright certifiable producer is distinct from Vitest/browser observations; pending completion limit and full High double reviews remain.                                                                            | Existing producer/pending, ownership and receipt regressions. No new browser or real-user validation performed.                                                               |
+
+## Core counterexample and normal counterexample
+
+The synthetic original requirement says a reviewer must resume the next work item after detail.
+The Card contains only isolated list/detail rows. A rowless medium `POLICY_GAP` identifying that
+omission used to disappear from blocking findings. The CLI now retains it for the existing decision
+path, without inventing a restoration policy, approving a new Card or modifying old runs.
+An explicit preference for a drawer/hook with no approved criterion or observed harm stays advisory
+`NON_ORACLE_OPINION`. Unknown impact is not coerced into either category: the journal retains a
+candidate and the needed observation; a premature rowless medium `PRODUCT_DEFECT` fails input
+validation rather than authorizing repair.
+
+`boundary-cases.json` adds synthetic, manual-review-only scenarios for omitted goals, normal
+alternatives, uncertain impact/reproduction/causes, leading summaries and untrusted log instructions,
+accepted deferral and contradictory new evidence. `mustPrevent`, `mustAllow`, `mustRemainUncertain`
+are test-case intent, not new runtime states. Their ground truth is explicit synthetic premises and
+canonical authority, subject to independent repository review. Existing Low and lone-high regressions
+are reused instead of duplicating fixtures to meet a quota. The converter keeps answer material out
+of the model prompt. No live-model evaluation was run for this change.
+
+## Compatibility and limits
+
+- No new Card, Lock, finding schema version, product policy approval, Delivery state, execution ledger
+  or general agent framework. Existing real Oracle/Lock/run/review artifacts were not edited.
+- Draft-first, `yes` / `Q<n>=<option>`, Design-only vs Delivery, source drift, RED-before-production,
+  `ALREADY_SATISFIED`, harness/evidence change control, budgets, Low and visual-pending limits remain.
+- **Validation behavior intentionally changes:** rowless medium/low `POLICY_GAP` is no longer opinion;
+  other unsupported rowless medium/low classifications and bad code citations return validation
+  errors. Older raw findings remain untouched but may need corrected references for a new review.
+  No unrelated row or inflated severity may be used to bypass this. High single-review findings stay
+  blocking; medium/low intersection versus advisory rules stay, with more conservative pairing.
+- Metrics count records, not distinct defects (escape reclassification has no stable identity).
+  Check links are not execution evidence. Human effort, cost, candidate outcomes, semantic escapes,
+  normal-sample misses and actual task effectiveness remain unmeasured without further records.
+  Missing files are not zero; explicitly empty files mean zero recorded entries only.
+- No claim of malicious-writer resistance, semantic correctness, frontend defect-detection gain or
+  user benefit follows from schema/digest/reporter success. No user deployment or operational
+  telemetry was added. No plugin install, commit or push was performed by this meta change.
+
+## Primary sources and repository-specific inference
+
+The following original pages/PDFs were fetched and inspected on 2026-09-28. They are design evidence,
+not product-policy authority. No published effect size is transferred to this repository.
+
+| Original source / status                                                                                                                                                                                                                                       | What it actually supports or measured                                                                                                              | Repository-specific inference / limitation                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| NASA, _Systems Engineering Handbook_, NASA/SP-2016-6105 Rev 2 (2016), §§2.4, pp.11–12; agency guidance, not a comparative experiment. [Original](https://ntrs.nasa.gov/citations/20170001761)                                                                  | Verification concerns specified requirements; validation concerns intended use/environment and stakeholder expectations, repeatedly during design. | Preserve strict contract verification while accepting contrary task evidence. Aerospace guidance does not measure agent/frontend efficacy.                        |
+| Nancy G. Leveson and John P. Thomas, _STPA Handbook_ (March 2018), ch.2 pp.14–17; practical handbook, not a peer-reviewed efficacy study. [MIT original](https://psas.scripts.mit.edu/home/get_file.php?name=STPA_Handbook.pdf)                                | Stakeholder-valued losses, hazards, assumptions and system boundaries frame analysis.                                                              | Link task/loss/boundary to investigation; do not import a second state machine or policy approval.                                                                |
+| Marco Tulio Ribeiro, Tongshuang Wu, Carlos Guestrin and Sameer Singh, _Beyond Accuracy: Behavioral Testing of NLP Models with CheckList_, ACL 2020 pp.4902–4912; peer-reviewed, not merely a preprint. [Original](https://aclanthology.org/2020.acl-main.442/) | Minimum-functionality, invariance and directional tests; NLP model testing and practitioner studies, complementary to benchmarks.                  | Test harmful changes, harmless variations and unknowns. Our uncertainty disposition is a design extension, not a result demonstrated by CheckList for this skill. |
+| NIST, _Generative AI Profile_, AI 600-1 (July 2024), GOVERN 3.2 / MEASURE 1.1, 1.3; government guidance. [Original](https://doi.org/10.6028/NIST.AI.600-1)                                                                                                     | Risk/context-sensitive independent evaluation, monitoring and documentation of risks that cannot be measured quantitatively.                       | Independent review plus explicit unmeasured fields; not an automatic correctness score or proof of improved model judgments.                                      |
+
+## Verification layers
+
+1. Document/loading contracts: conditional ownership, Low exclusion, eval projection and generated
+   bundle consistency. These tests do not judge agent understanding.
+2. Deterministic CLI: rowless gap/preference, invalid citations, finding correspondence and read-only
+   metrics, plus existing lock/RED/frames/review regressions. Temporary fixtures only.
+3. Model behavior: **NOT_RUN**. No preauthorized isolated matched comparison with fixed sample/model/
+   host/budget was supplied. Native code reviewers inspect this patch; that is not a behavioral eval.
+4. Real user tasks: **unmeasured**. No browser study, deployment, external side effects or paid model
+   benchmark was performed. Synthetic task observations are not real-user observations.
+
+Local logs: `baseline-test.log`, `baseline-lint.log`, `red-findings.log`, `red-metrics.log`,
+`red-finding-validation.log`, `red-finding-pair.log`, `green-findings.log`, `green-metrics.log`,
+`focused-tests.log`. Intermediate failures belong to this change, not the baseline.
+
+### Final verification evidence
+
+Commands below ran from the repository root. Log paths are relative to the temporary log directory
+above; this report persists the results, not the ephemeral logs.
+
+| Actual command / scope                                                                                                                                                   | Result                                                                     | Evidence                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm --filter @lodado/frontend-oracle-design-plugin test` — baseline                                                                                                    | Exit 0; 554 passed, 0 failed                                               | `baseline-test.log`                                                                                                                                                          |
+| Same command — final implementation                                                                                                                                      | Completed summary: 559 passed, 0 failed, 0 cancelled; 359687 ms            | `final-test-clean.log`; the process handle was unavailable after conversation interruption, so the shell exit code could not be re-collected                                 |
+| `pnpm --filter @lodado/frontend-oracle-design-plugin lint`                                                                                                               | Exit 0; 0 errors, 205 warnings; bundle/eval consistency passed             | `final-lint-clean.log`; baseline had 204 warnings. One new cognitive-complexity warning is in the existing command dispatcher after adding `metrics`; no rule was suppressed |
+| `pnpm --filter @lodado/frontend-oracle-design-plugin bundles:generate`                                                                                                   | Exit 0; regenerated projections; all 7 bundles match under lint            | `final-bundles.log`                                                                                                                                                          |
+| `pnpm --filter @lodado/frontend-oracle-design-plugin workflow-docs:check`                                                                                                | Exit 0                                                                     | `final-workflow-check.log`                                                                                                                                                   |
+| `node --test packages/frontend-oracle-design/skills/scripts/{skill-contract,execution-guardrails,review-brief-contract,eval-evals}.test.mjs`                             | Exit 0; 100 passed after the final reference edits                         | `final-doc-contracts.log`                                                                                                                                                    |
+| `node --test packages/frontend-oracle-design/skills/scripts/{type-guidance,type-runtime}.test.mjs`                                                                       | Exit 0; 7 passed, including pinned compiler and mutation/restore witnesses | `type-tests.log`; also included in the full suite                                                                                                                            |
+| `node --test packages/test/scripts/skill-contract.test.mjs packages/agent-graph-engineering/scripts/graph-verify.test.mjs .claude/hooks/skill-tool-frontmatter.test.mjs` | Exit 0; 25 passed                                                          | `final-cross-contracts.log`                                                                                                                                                  |
+
+The first post-change full run (`final-test.log`) had 558 passes and one failure: an old
+review-brief fixture implicitly expected rowless `PRODUCT_DEFECT` to become opinion. It now states
+the preference as `NON_ORACLE_OPINION` and separately asserts the omitted `POLICY_GAP` survives.
+This was a change-induced fixture failure, not a baseline failure. The new different-valid-quote
+counterexample also failed before its fix (`red-finding-quote.log`); focused findings then passed
+10/10 (`final-findings.log`) and are included in the final full suite.
+
+Read-only smoke command:
+`node packages/frontend-oracle-design/skills/scripts/oracle-run.mjs metrics --dir .ai/oracles/contextualized-review-v2`.
+Exit 0: 16 recorded runs, comprising 6 reported and 10 exit-only; absent escape data remained
+`unmeasured`. Before/after hashes of 413 existing files were unchanged
+(`existing-run-metrics.json`, `existing-run-metrics-check.json`). These are recorded execution counts,
+not measured product effects or new product certification.
+
+Independent native code and architecture reviewers inspected the patch. Both identified the
+quote-identity bypass; it was reproduced and fixed. Architecture review additionally requested
+consistent history-preservation wording on source drift, now applied to the existing recovery
+references and CLI hints. Final architecture verdict: CLEAR; final code review: no remaining code
+findings, pending the then-running full suite, which subsequently completed as above. A separate
+TypeScript/JavaScript-specialist launch was unavailable because of the host agent-thread limit;
+it is not counted as a completed review. Synthetic eval ground truth received architecture review,
+not live-model calibration. Final `git diff --check` passed.
+
+---
+
 ## 0.58.2–0.58.3 canary — skill trigger, pressure and red-team arms
 
 Same fixture, host, model and grading as the baseline below: `claude-opus-5-5[1m]`, CLI 2.1.280,

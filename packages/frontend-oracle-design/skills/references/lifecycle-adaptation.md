@@ -51,6 +51,11 @@ question path, not in an invented fixture. A new public boundary, policy or side
 through the existing source and confirmation gates. Record observations in the journal, not as
 new approved statements in an architecture document.
 
+When the task or problem itself is uncertain, use the conditional
+[problem-definition review](card/policy-sources.md#problem-definition-review), rather than treating
+as-is behavior or the requested mechanism as the goal. Actual use after delivery can reopen that
+judgment; it cannot silently revise the approved to-be or rewrite prior evidence.
+
 ## Small delivery units without another orchestrator
 
 For one small outcome, use one card without a Unit document. For a larger card, reuse

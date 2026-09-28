@@ -85,7 +85,7 @@
     {
       "id": "card-policy-sources",
       "path": "references/card/policy-sources.md",
-      "when": "start of card writing",
+      "when": "start of card writing, or conditional problem-definition review for unclear purpose/task, cross-boundary impact, unexplained task failure, material dismissal, conflicting new evidence or repeated escapes — Low keeps its single-node path",
       "requires": ["common"]
     },
     {

@@ -123,9 +123,9 @@ class CliError extends Error {
 
 /** 거절 코드마다 다음 합법 행동 한 줄 — green-review.md·red.md·ledger.md의 처방 표와 같은 내용이다. */
 const NEXT_ACTIONS = {
-  ORACLE_CHANGED: 'discard the RED·GREEN·review evidence, show the card diff, and return to NEEDS_DECISION — never relock',
-  SOURCE_CHANGED: 'discard the evidence, show the source diff, and confirm a new revision — never relock',
-  LOCK_MANIFEST_CHANGED: 'discard the evidence and confirm a new revision with the changed source set — never relock',
+  ORACLE_CHANGED: 'stop reusing RED·GREEN·review evidence for this revision, preserve history, show the card diff, and return to NEEDS_DECISION — never relock',
+  SOURCE_CHANGED: 'stop reusing evidence for this revision, preserve history, show the source diff, and confirm a new revision — never relock',
+  LOCK_MANIFEST_CHANGED: 'stop reusing evidence for this revision, preserve history, and confirm a new revision with the changed source set — never relock',
   LOCK_INVALID: 'FAIL — the determinism judgment is impossible; do not substitute LLM judgment',
   RUN_NOT_GREEN: 'produce an actually passing run with `exec --label <label>` and cite that runId',
   RUN_NOT_RED: 'the cited run must fail on the mapped row — write the test, run `red --row <row>`',
@@ -3809,6 +3809,71 @@ async function checkReport(state, ledger, source) {
   process.stdout.write(`REPORT_CONSISTENT state:${state.state} runs:${cited.size}\n`)
 }
 
+async function reportMetrics(options) {
+  if (!options.dir) throw new CliError('USAGE', 'metrics requires --dir', 2)
+  const directory = resolve(options.dir)
+  if (!(await lstat(directory)).isDirectory()) throw new CliError('METRICS_INVALID', 'metrics requires a directory')
+  const present = async (path) => lstat(path).catch((error) => {
+    if (error.code === 'ENOENT') return null
+    throw error
+  })
+  const ledger = await present(ledgerPath(directory)) ? await readLedger(directory) : null
+  const runs = ledger?.filter((entry) => entry.type === 'run')
+  const escapePath = join(directory, 'escapes.jsonl')
+  let escapes = null
+  let escapeSha256 = null
+  if (await present(escapePath)) {
+    const snapshot = await snapshotRegularFile(escapePath, {
+      base: directory, allowHardlinks: false, label: 'escape records',
+      fail: (message) => new CliError('METRICS_INVALID', message),
+    })
+    const raw = snapshot.bytes.toString('utf8')
+    escapeSha256 = snapshot.sha256
+    try {
+      if (raw && !raw.endsWith('\n')) throw new Error('truncated JSONL record')
+      escapes = raw ? raw.slice(0, -1).split('\n').map((line) => JSON.parse(line)) : []
+      if (escapes.some((entry) => !entry || typeof entry !== 'object' || Array.isArray(entry))) {
+        throw new Error('escape records must be objects')
+      }
+    } catch (error) {
+      throw new CliError('METRICS_INVALID', `Cannot count escape records: ${error.message}`)
+    }
+  }
+  const byField = (records, field) => {
+    const counts = new Map()
+    for (const record of records) {
+      let key = 'unmeasured'
+      if (typeof record[field] === 'string' && record[field].trim()) key = record[field]
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    return Object.fromEntries(counts)
+  }
+  const proseOnly = escapes?.filter((entry) => /^none(?:\s|$)/u.test(entry.check ?? '')).length
+  const linkedCheck = escapes?.filter((entry) => /^(?:test|eval):\s*\S/u.test(entry.check ?? '')).length
+  process.stdout.write(`${JSON.stringify({
+    authority: 'record-counts-only',
+    scope: directory,
+    runs: runs ? {
+      records: runs.length,
+      ledgerHead: ledger.at(-1)?.digest ?? 'unmeasured',
+      reported: runs.filter((entry) => entry.grade === 'reported').length,
+      exitOnly: runs.filter((entry) => entry.grade === 'exit-only').length,
+      byOracleRevision: byField(runs, 'oracleSha256'),
+      firstRecordedAt: runs[0]?.at ?? 'unmeasured',
+      lastRecordedAt: runs.at(-1)?.at ?? 'unmeasured',
+    } : 'unmeasured',
+    escapes: escapes ? {
+      records: escapes.length, sourceSha256: escapeSha256, byClass: byField(escapes, 'class'), byKind: byField(escapes, 'kind'),
+      proseOnly, linkedCheck, unmeasuredCheck: escapes.length - proseOnly - linkedCheck,
+    } : 'unmeasured',
+    unmeasured: {
+      distinctEscapes: 'unmeasured', semanticEscapes: 'unmeasured', normalSampleMisses: 'unmeasured',
+      escalationUsefulness: 'unmeasured', humanReviewEffort: 'unmeasured', candidateOutcomes: 'unmeasured',
+      observationWindow: 'unmeasured', cost: 'unmeasured', activeDuration: 'unmeasured',
+    },
+  }, null, 2)}\n`)
+}
+
 async function reportStatus(options) {
   if (!options.dir) {
     throw new CliError('USAGE', 'status requires --dir', 2)
@@ -4360,6 +4425,7 @@ async function main() {
   else if (command === 'migrate-ledger') await migrateLedger(options)
   else if (command === 'review-receipt') await reviewReceipt(options)
   else if (command === 'status') await reportStatus(options)
+  else if (command === 'metrics') await reportMetrics(options)
   else if (command === 'exec') await execute(options)
   else if (command === 'red') await executeThenTransition(options, 'VALID_RED')
   else if (command === 'green') await executeThenTransition(options, 'IMPLEMENTED_GREEN')
@@ -4373,7 +4439,7 @@ async function main() {
   else
     throw new CliError(
       'USAGE',
-      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, budget, status, review-packet, review-brief, blind-input, worker-packet or worker-run',
+      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, budget, status, metrics, review-packet, review-brief, blind-input, worker-packet or worker-run',
       2,
     )
 }

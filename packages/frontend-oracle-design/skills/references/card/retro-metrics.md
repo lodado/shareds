@@ -43,6 +43,9 @@ Rules:
 - One record per escape. Re-classify by appending a new line, never by editing.
 - An escape with `class: POLICY_GAP` still routes to `NEEDS_DECISION` as usual; the record does not
   replace the routing.
+- Unconfirmed problem candidates stay in the journal as investigation, not confirmed escapes.
+  Link confirmed candidates to their original observations and decision; do not count all reports
+  or every command failure as true positives.
 
 ## Execution observations → conditional guardrail candidates
 
@@ -113,7 +116,7 @@ direction only and say so wherever they are quoted.
 | Semantic Escapes      | distinct confirmed UX/product-meaning defects found after review, by severity and detection stage           | `escapes.jsonl` plus linked human classification/evidence in `journal.md`; state reviewed-card denominator and observation window     |
 | Normal-sample Misses  | confirmed missed issues, by severity, among audited normal-classified bundles                               | risk-stratified sample selection, audited denominator, AI/human disagreements and raw evidence in `journal.md`                        |
 
-No automatic collection is provided. Record missing measurements as unmeasured, not zero; preserve
+No automatic semantic or human-time collection is provided. Record missing measurements as unmeasured, not zero; preserve
 the existing escape schema and link any severity, review timing, or audit notes from the journal.
 Report sample size, risk mix, revision, and observation window alongside comparisons. Audit normal
 classifications as well as escalations: reviewing only raised warnings cannot reveal false negatives.
@@ -121,6 +124,30 @@ Read effort and usefulness alongside severity-specific escapes and misses; faste
 not evidence of better review. Separate actual user task completion/failure observations from
 agent/browser checks. Product metrics should follow the approved goal, not a generic UX score; see
 [goal-linked UX measurement](https://research.google/pubs/measuring-the-user-experience-on-a-large-scale-user-centered-metrics-for-web-applications/).
+
+### Read-only record counts
+
+`node scripts/oracle-run.mjs metrics --dir .ai/oracles/<id>` prints JSON to stdout, never writes
+state, approval, artifacts or a second ledger. It verifies the existing ledger chain and counts
+recorded runs by grade and Oracle revision. It counts escape **records** by class/kind and whether
+`check` names a test/eval, says `none`, or is unmeasured. A named check is not proof it ran or covers
+the escape. Malformed files fail rather than disappearing from the denominator; absent files are
+`unmeasured`, distinct from an explicitly empty file's zero records.
+
+Append-only reclassification has no stable escape identity in the current schema. Do not deduplicate
+by symptom or report these counts as distinct defects, true positives, escape rates or user effects.
+Run timestamps bound recorded executions, not the user observation window or active review time.
+Cost, active time, distinct semantic escapes, candidate confirmation/defer/rejection outcomes,
+escalation usefulness and normal-sample misses remain `unmeasured` until linked human evidence
+exists. Do not infer human turns from tool calls or active time from waiting.
+
+In the journal, retain normal-audit sample selection, denominator, period, risk mix and original
+dispositions (including impossible, independent, N/A, preference and out-of-scope reports). Prioritize
+high-risk exclusions and repeated escapes, without a fixed sampling percentage. Track reversals
+on new evidence and candidate outcomes with their original links and closure scope per common.md.
+Auditing only escalations cannot measure missed normal classifications. Use `mustPrevent`,
+`mustAllow` and, where evidence is insufficient, `mustRemainUncertain` in the existing evals; their
+synthetic ground truth needs independent repository review, not the generating agent's confidence.
 
 - No metric moves a gate. A rising Escape Rate raises the sweep·exploration budget; it never lowers
   a lint or skips a review.

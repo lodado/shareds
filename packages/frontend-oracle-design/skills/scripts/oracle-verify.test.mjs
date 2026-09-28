@@ -1784,7 +1784,40 @@ async function reviewFixture(t, findings, overrides = {}) {
   return { oracle, packetPath, map, ledger, revision, productionRevision, findingsPath, packetSha256, oracleSha256 }
 }
 
-test('O22: finding 스키마를 검증하고 행 인용이 없으면 NON_ORACLE_OPINION으로 강등한다', async (t) => {
+test('problem definition: missing card rows do not erase sourced gaps or explicit preferences', async (t) => {
+  const oracle = await cardFile(t, EVIDENCE_CARD)
+  const findings = [
+    {
+      id: 'missing-goal', classification: 'POLICY_GAP', severity: 'medium',
+      finding: 'The approved task requires resuming review of the next item; the card only checks isolated screens.',
+      evidence: 'Synthetic original user message: resume the next review item after inspecting details. Card has no journey row.',
+      fix: 'Present the omitted outcome in the next Draft; do not choose a restoration mechanism without approval.',
+    },
+    {
+      id: 'preference', classification: 'NON_ORACLE_OPINION', severity: 'low',
+      finding: 'Prefer a drawer to a detail page.', evidence: 'No approved criterion or observed task impact.',
+      fix: 'Record the preference only; do not change policy.',
+    },
+  ]
+  const file = await findingsFile(t, findings)
+  const before = await readFile(file, 'utf8')
+  const checked = run('findings', '--ir', '--file', file, '--oracle', oracle)
+  assert.equal(checked.status, 0, checked.stderr)
+  const result = JSON.parse(checked.stdout)
+  assert.deepEqual(result.blocking.map(({ id, classification }) => ({ id, classification })), [
+    { id: 'missing-goal', classification: 'POLICY_GAP' },
+  ])
+  assert.deepEqual(result.advisory.map(({ id, classification }) => ({ id, classification })), [
+    { id: 'preference', classification: 'NON_ORACLE_OPINION' },
+  ])
+  assert.equal(await readFile(file, 'utf8'), before, 'raw reviewer provenance remains unchanged')
+  const premature = await findingsFile(t, [{ ...findings[0], classification: 'PRODUCT_DEFECT' }])
+  const rejected = run('findings', '--file', premature, '--oracle', oracle)
+  assert.equal(rejected.status, 1, 'rowless candidates cannot authorize product repair')
+  assert.match(rejected.stderr, /FINDINGS_INVALID/)
+})
+
+test('O22: finding 스키마를 검증하고 명시적인 NON_ORACLE_OPINION은 advisory로 남긴다', async (t) => {
   const oracle = await cardFile(t, EVIDENCE_CARD)
 
   const valid = await findingsFile(t, [
@@ -1799,7 +1832,7 @@ test('O22: finding 스키마를 검증하고 행 인용이 없으면 NON_ORACLE_
     },
     {
       id: 'f-2',
-      classification: 'PRODUCT_DEFECT',
+      classification: 'NON_ORACLE_OPINION',
       severity: 'low',
       finding: '변수명이 마음에 들지 않는다',
       evidence: '없음',
@@ -1808,7 +1841,7 @@ test('O22: finding 스키마를 검증하고 행 인용이 없으면 NON_ORACLE_
   ])
   const checked = run('findings', '--file', valid, '--oracle', oracle)
   assert.equal(checked.status, 0, checked.stderr)
-  assert.equal(checked.stdout, 'FINDINGS_OK blocking:1 advisory:1\nDOWNGRADED f-2 NON_ORACLE_OPINION\n')
+  assert.equal(checked.stdout, 'FINDINGS_OK blocking:1 advisory:1\n')
 
   const unknownClassification = await findingsFile(t, [
     { id: 'f-1', row: 'O1', classification: 'STYLE_NIT', severity: 'low', finding: 'x', evidence: 'y', fix: 'z' },
@@ -2041,7 +2074,7 @@ test('O23: 문장이 달라도 같은 행·분류·겹치는 인용이 1:1이면
     quote,
     fix: 'guard',
   })
-  const pendingGuard = (id, severity, finding) => defect(id, severity, finding, 'src/save.ts#L2-L3', 'if (pending) return')
+  const pendingGuard = (id, severity, finding) => defect(id, severity, finding, 'src/save.ts#L2-L3 pending second input sends two requests', 'if (pending) return')
   const lateWrite = (id, severity, finding) => defect(id, severity, finding, 'src/save.ts#L6', 'setList(response)')
   const lines = (result) => result.stdout.trim().split('\n')
   const intersect = async (left, right) =>
@@ -2061,10 +2094,28 @@ test('O23: 문장이 달라도 같은 행·분류·겹치는 인용이 1:1이면
     run('findings', '--ir', '--file', await findingsFile(t, [pendingGuard('a-1', 'low', 'x')], 'c.json'), '--intersect',
       await findingsFile(t, [pendingGuard('b-7', 'medium', 'y')], 'd.json'), '--oracle', oracle).stdout,
   )
-  // 더 높은 severity 원문이 대표가 되고, 다른 원문은 id·severity·evidence와 함께 실린다 — severity를 평균내지 않는다
+  // 같은 줄과 같은 요약도 다른 조건·수정이면 합의가 아니다.
+  const sameLineDifferentCause = await intersect(
+    [pendingGuard('a-1', 'medium', 'request handling is wrong')],
+    [{ ...pendingGuard('b-1', 'medium', 'request handling is wrong'), evidence: 'src/save.ts#L2-L3 expired permission still sends a request', fix: 'check current permission' }],
+  )
+  assert.match(sameLineDifferentCause.stdout, /^FINDINGS_OK blocking:0 advisory:2\n/)
+  // 같은 요약·근거·수정이어도 인용한 코드가 다르면 exact-key 합의로 우회하지 않는다.
+  const conflictingQuotes = await intersect(
+    [pendingGuard('a-1', 'medium', 'request handling is wrong')],
+    [{ ...pendingGuard('b-1', 'medium', 'request handling is wrong'), quote: 'post()' }],
+  )
+  assert.equal(conflictingQuotes.status, 0, conflictingQuotes.stderr)
+  assert.match(conflictingQuotes.stdout, /^FINDINGS_OK blocking:0 advisory:2\n/)
+  const citationOnly = await intersect(
+    [defect('a-1', 'medium', 'first claim', 'src/save.ts#L2', 'if (pending) return')],
+    [defect('b-1', 'medium', 'second claim', 'src/save.ts#L2', 'if (pending) return')],
+  )
+  assert.match(citationOnly.stdout, /^FINDINGS_OK blocking:0 advisory:2\n/)
+  // 더 높은 severity 원문이 대표가 되고 다른 원문의 조건·수정·출처도 보존한다.
   assert.deepEqual(
     ir.blocking.map(({ id, severity, alsoReportedAs }) => ({ id, severity, alsoReportedAs })),
-    [{ id: 'b-7', severity: 'medium', alsoReportedAs: { id: 'a-1', severity: 'low', finding: 'x', evidence: 'src/save.ts#L2-L3', matchedBy: 'citation' } }],
+    [{ id: 'b-7', severity: 'medium', alsoReportedAs: { ...pendingGuard('a-1', 'low', 'x'), downgraded: false, matchedBy: 'citation' } }],
   )
 
   // 문장은 비슷해도 원인이 다른 곳(늦은 응답의 덮어쓰기)을 인용하면 다른 결함이다 — 한쪽에만 있는 medium은 advisory
@@ -2080,7 +2131,7 @@ test('O23: 문장이 달라도 같은 행·분류·겹치는 인용이 1:1이면
 
   // 한쪽 지적 하나가 상대의 둘과 겹치면 어느 것이 같은 결함인지 알 수 없다 — 짝짓지 않고 원래 규칙에 맡긴다
   const ambiguous = await intersect(
-    [pendingGuard('a-1', 'medium', '중복 제출'), defect('a-2', 'medium', 'post가 두 번 불린다', 'src/save.ts#L3', 'post()')],
+    [pendingGuard('a-1', 'medium', '중복 제출'), pendingGuard('a-2', 'medium', 'post가 두 번 불린다')],
     [pendingGuard('b-1', 'medium', 'duplicate POST')],
   )
   assert.match(ambiguous.stdout, /^FINDINGS_OK blocking:0 advisory:3\n/)
@@ -4176,7 +4227,7 @@ test('risk floor: a DELETE side effect under Medium fails unless the Risk line c
   assert.doesNotMatch(sourced.stderr, /risk-below-floor/)
 })
 
-test('findings: a PRODUCT_DEFECT that cites path#L must quote that line; high findings are re-emitted, lower ones demoted', async (t) => {
+test('findings: invalid PRODUCT_DEFECT code citations require correction at every severity, not opinion reclassification', async (t) => {
   const oracle = await cardFile(t, EVIDENCE_CARD)
   const root = dirname(oracle)
   await mkdir(join(root, 'src'), { recursive: true })
@@ -4205,8 +4256,9 @@ test('findings: a PRODUCT_DEFECT that cites path#L must quote that line; high fi
   assert.match(wrongHigh.stderr, /the quote is not at src\/save\.ts#L2-L3/)
 
   const wrongMedium = run('findings', '--file', await findingsFile(t, [defect('medium', 'await retry()')]), '--oracle', oracle)
-  assert.equal(wrongMedium.status, 0, wrongMedium.stderr)
-  assert.equal(wrongMedium.stdout, 'FINDINGS_OK blocking:0 advisory:1\nDOWNGRADED f-1 NON_ORACLE_OPINION (citation unverified)\n')
+  assert.equal(wrongMedium.status, 1)
+  assert.match(wrongMedium.stderr, /FINDINGS_INVALID/)
+  assert.doesNotMatch(wrongMedium.stdout, /NON_ORACLE_OPINION/)
 
   // 없는 행동에 대한 지적은 인용할 줄이 없다 — path#L 인용이 없으면 검사하지 않는다
   const absent = run(

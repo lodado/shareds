@@ -131,23 +131,60 @@ Attach a source to every decided policy. If even one policy lacks a source, it i
 
 ## Feedback routing — canonical classification
 
-For each new observation from tests·review·implementation, record one primary cause and use only
-these routes. Current implementation, test observations, and reviewer preference are classification
-evidence, not policy sources.
+For each established finding from tests·review·implementation, record one primary cause and use only
+these routes. An unconfirmed problem candidate stays in the existing investigation/journal as
+`needs-evidence`, not a guessed defect classification. Current implementation, test observations,
+and reviewer preference are classification evidence, not policy sources.
 
-| Classification       | Meaning                                                 | Routing                                                                     |
-| -------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `POLICY_GAP`         | outcome-changing policy missing or unresolved on card   | print the current card and questions, then `NEEDS_DECISION`                 |
-| `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope     | add only the missing test·reviewer mapping                                  |
-| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier          | repair allowed items only, shared 2-round budget (`budget --spend harness`) |
-| `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation | production improvement budget after a deterministic `VALID_RED`             |
-| `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                      | `FAIL` with the actual cause, production untouched                          |
-| `NON_ORACLE_OPINION` | sourceless preference·taste                             | record with rationale; never blocks completion or changes policy            |
+| Classification       | Meaning                                                                                             | Routing                                                                     |
+| -------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `POLICY_GAP`         | approved source requirement omitted from the card, or an outcome-changing policy decision is needed | print the current card and questions, then `NEEDS_DECISION`                 |
+| `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope                                                 | add only the missing test·reviewer mapping                                  |
+| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-round budget (`budget --spend harness`) |
+| `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation                                             | production improvement budget after a deterministic `VALID_RED`             |
+| `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                                                                  | `FAIL` with the actual cause, production untouched                          |
+| `NON_ORACLE_OPINION` | sourceless preference·taste                                                                         | record with rationale; never blocks completion or changes policy            |
 
-- A revision mismatch is not a feedback classification. Discard existing evidence immediately and
-  move to `NEEDS_DECISION` or `FAIL` per the lock rules.
+- A revision mismatch is not a feedback classification. Stop using existing evidence for the changed
+  revision and move to `NEEDS_DECISION` or `FAIL` per the lock rules. Preserve past artifacts and
+  execution facts; invalidation is not deletion or rewriting of history.
 - Budgets never substitute for each other. On `BUDGET_EXHAUSTED`, report `FAIL` with the last
   actual failure and never bypass via another budget.
+
+### Problem discovery is not policy authority
+
+The contract is the agreed implementation criterion, not proof that all user problems are defined.
+Anyone investigating may record a candidate without a card row. Only the existing source and
+Draft/delta confirmation procedure can authorize changed product behavior. Never infer
+`NON_ORACLE_OPINION` from a missing row: link observed impact to the user task, approved goal or
+mandatory constraint and use the conditional [problem-definition review](card/policy-sources.md#problem-definition-review).
+An approved requirement missing from the card is `POLICY_GAP`, not taste; an unobserved preference
+with no approved criterion remains `NON_ORACLE_OPINION`. A candidate alone establishes neither.
+
+An unrelated observation need not stop delivery. Investigate bounded uncertainty while proceeding
+only where the approved outcome remains judgeable. An unresolved outcome-changing policy uses
+`NEEDS_DECISION`; evidence of serious harm or a mandatory-constraint violation uses the existing
+risk and blocking rules. No candidate authorizes a production edit or bypasses `VALID_RED`.
+New observations alone do not invalidate all earlier runs: apply the existing lock/source/target
+snapshot rules when their inputs actually change, and confirm changed meaning in a new revision.
+
+### Closing a problem candidate
+
+Use the existing journal/finding/report, not a Delivery state. For an important closure, retain the
+judgment, checked scope, original evidence, remaining unknowns and evidence that would reopen it.
+Distinguish these conclusions; none implies the others:
+
+| Conclusion                           | Limit                                                                               |
+| ------------------------------------ | ----------------------------------------------------------------------------------- |
+| Not defined in the contract          | A statement about specification coverage, not absence of a user problem             |
+| Outside this change                  | An investment/scope decision, not nonexistence                                      |
+| Not reproduced in checked conditions | Limited negative observation, not impossibility                                     |
+| A hypothesis refuted                 | Refutes that explanation or impact claim, not all competing explanations            |
+| Owner accepted/deferred the risk     | Retain harm/uncertainty and the decision source; never lower a mandatory constraint |
+| Unsupported preference               | `NON_ORACLE_OPINION` only without approved criteria or observed user impact         |
+
+Presence, links and shape can be checked mechanically; filled-in prose does not validate the
+meaning of a dismissal. Low retains its single-node path and existing disqualification rules.
 
 ## Common state meanings
 

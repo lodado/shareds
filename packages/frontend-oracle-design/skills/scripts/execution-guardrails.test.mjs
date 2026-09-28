@@ -174,3 +174,42 @@ test('candidate seeds preserve graph ownership and non-activation boundaries', a
   assert.match(skill, /proposed|candidate/i)
   assert.doesNotMatch(skill, /guardrail delivery state machine/i)
 })
+
+// These checks validate fixture/loading contracts, not the model's semantic decisions.
+test('problem-definition fixtures preserve prevent, allow and uncertain judgments without an automatic grader', async () => {
+  const boundary = JSON.parse(await read('evals/boundary-cases.json'))
+  const cases = boundary.cases.filter((entry) => entry.id.startsWith('fod-sem-problem-'))
+  assert.deepEqual([...new Set(cases.map((entry) => entry.disposition))].sort(), ['mustAllow', 'mustPrevent', 'mustRemainUncertain'])
+  assert.equal(new Set(cases.map((entry) => entry.id)).size, cases.length)
+  const projected = boundaryEvals(boundary, 0)
+  for (const entry of cases) {
+    assert.equal(entry.origin, 'synthetic-fixture')
+    assert.equal(entry.manualReviewOnly, true)
+    assert.match(entry.groundTruth, /independent repository review/)
+    for (const reference of entry.authorityRefs) {
+      const [path, anchor] = reference.split('#')
+      assert.equal(markdownAnchorExists(await read(path), anchor), true, reference)
+    }
+    const rendered = projected.find((candidate) => candidate.name === entry.id)
+    assert.equal(rendered.prompt, entry.prompt)
+    assert.equal(rendered.expected_output, entry.expected_output)
+    assert.equal(rendered.prompt.includes(entry.expected_output), false)
+    assert.equal(rendered.grader, undefined)
+    assert.deepEqual(rendered.assertions, entry.assertions)
+  }
+})
+
+test('conditional problem definition reuses existing owners and keeps Low isolated', async () => {
+  const [common, sources, skill, graph] = await Promise.all([
+    read('references/common.md'), read('references/card/policy-sources.md'), read('SKILL.md'),
+    read('references/reference-graph.json').then(JSON.parse),
+  ])
+  assert.match(common, /Closing a problem candidate/)
+  assert.match(common, /judgment, checked scope, original evidence, remaining unknowns/)
+  for (const layer of ['Observation', 'User impact', 'Cause hypotheses', 'Solution candidates']) assert.ok(sources.includes(layer))
+  assert.match(sources, /not a required document or extra reviewer for every task/)
+  assert.match(sources, /exhaustion leaves unknowns/)
+  assert.match(skill, /conditional problem-definition review/)
+  assert.match(graph.nodes.find((node) => node.id === 'card-policy-sources').when, /conditional problem-definition review/)
+  assert.deepEqual(graph.lanes.find((lane) => lane.id === 'low-fast-path').nodes, ['low-fast-path'])
+})

@@ -25,7 +25,8 @@ keys·roles·focus against the contract instead of recalling them. The contract 
 policy: the card decides which keys the product needs.
 
 The primary agent runs the bundled `oracle-lock.mjs verify` right before the review. On a mismatch,
-do not call the reviewer and discard the existing evidence.
+do not call the reviewer or reuse the evidence for the changed revision. Preserve the historical
+artifacts and ledger; follow the existing lock recovery rules for a new approved revision.
 
 Review is LLM judgment, so it wavers even on the same input. Pin it with two devices:
 
@@ -35,8 +36,12 @@ Review is LLM judgment, so it wavers even on the same input. Pin it with two dev
    lone finding that appeared on only one side is also blocking. Only medium and low findings block
    completion when they are the intersection of row·classification·normalized finding content, and a
    finding that appears on only one side is recorded as advisory. Two differently worded findings
-   also intersect when they share row and classification and cite overlapping `path#La-Lb` lines of
-   the same file, one to one; the kept finding carries the other's id and text as `alsoReportedAs`.
+   also intersect when they share row and classification, cite overlapping `path#La-Lb` lines of
+   the same file, and have matching nonempty triggering/failure context in `evidence` outside the
+   citation plus matching `fix` and `quote`, one to one. The other's original fields stay in
+   `alsoReportedAs`. This conservative text matching is not proof of semantic identity; a bare
+   overlapping citation is insufficient. Identical summaries with different evidence or corrections
+   are not the same finding key.
    A finding that overlaps two on the other side, or cites nothing, is not paired. Medium risk requires only a single
    review and schema verification. A Medium single review may run on a faster model·lower reasoning
    effort if the surface supports it — the judgment criteria are owned by the review packet files and
@@ -214,10 +219,14 @@ judgments. Structural/runtime tests and known-defect fixtures do not establish i
 
 The source-aware review is a separate, pre-approval input contract, not a replacement for the
 Delivery review or card-only cold read. When triggered by [`card/policy-sources.md`](card/policy-sources.md),
-dispatch a fresh `analyst` context with only relevant verbatim user messages and message locations,
-approved source excerpts and exact locations/versions, affected P/O/D/Q dispositions, and Draft
-bytes. It returns locations, the linked or missing row, evidence, classification, and the existing
-Open question or investigation action. It must not set policy or add a product choice. If fresh
+dispatch a fresh `analyst` context with the original inputs defined there: verbatim user messages,
+actual task/approved purpose, mandatory constraints, original observations and unchecked scope,
+approved source excerpts and exact locations/versions, affected dispositions and Draft bytes when
+available. Do not prime it with the author's "not a problem" conclusion. It separates observations
+from hypotheses, considers alternatives and distinguishing observations, and distinguishes omitted
+approved requirements from undecided policy. It returns locations, the linked or missing row,
+evidence, classification when established, and an Open question or `needs-evidence` investigation.
+It must not set policy or add a product choice. If fresh
 independence is unavailable, record the same-context fallback and limitation. Do not claim this
 review as evidence of implementation readiness, and keep the card-only cold-read and reverse review.
 
@@ -249,8 +258,8 @@ Submit reviewer-produced findings JSON, not a free-form PASS. New artifacts use 
 `findings`. Each finding records `id`, `row`, `classification`, `severity`, `source`, `finding`,
 `evidence`, and minimal `fix`. A `PRODUCT_DEFECT` whose `evidence` cites code as `path#La-Lb` also
 records `quote`, the cited line as it reads; the verifier looks for it within three lines of the range.
-A quote it cannot find turns a medium/low finding into `NON_ORACLE_OPINION` and sends a critical/high
-one back as `FINDINGS_INVALID` to be re-emitted — never dropped. A finding about missing behavior has
+A quote it cannot find returns `FINDINGS_INVALID` at every severity for correction or investigation,
+not `NON_ORACLE_OPINION`: missing evidence does not prove preference. A finding about missing behavior has
 no line to quote; cite the row or run instead and the check does not apply. Each axis judgment records `axis`, `status`, `evidence`, and a
 `findingId` when it reports a finding.
 
@@ -268,8 +277,11 @@ Controller records `oracle-run.mjs review-receipt`; final `transition` rechecks 
 
 The classification is one of the upstream feedback router's `POLICY_GAP`, `EVIDENCE_GAP`,
 `HARNESS_DEFECT`, `PRODUCT_DEFECT`, `ENVIRONMENT_DEFECT`, `NON_ORACLE_OPINION`. Any other
-classification or a row ID that is not on the card is rejected as `FINDINGS_INVALID`. A medium/low
-finding that does not cite a card row is demoted to `NON_ORACLE_OPINION`. A critical/high finding
+classification or a row ID that is not on the card is rejected as `FINDINGS_INVALID`. A rowless
+`POLICY_GAP` retains its classification; an explicitly classified `NON_ORACLE_OPINION` stays advisory.
+Other medium/low classifications require an affected row; missing one is `FINDINGS_INVALID`, not
+automatic semantic dismissal. Correct the reference/classification or investigate the candidate
+in the journal. A critical/high finding
 without a row may be a global security·permission·data loss problem, so it is not demoted and stays
 blocking. `oracle-verify.mjs review` fails with `FINDINGS_BLOCKING` when blocking findings remain.
 
@@ -300,9 +312,9 @@ structural judgment. Compare the Decision with the diff, callers, owners and exe
 | Naming, folder or code-length preference                                       | Advisory `NON_ORACLE_OPINION`                                                                                                                                                                         |
 | Policy or required evidence is missing                                         | Investigate or use `POLICY_GAP` / `EVIDENCE_GAP`; never turn missing information into PASS or N/A                                                                                                     |
 
-The rowless medium/low normalization above is unchanged. It is not proof that a missing contract
-was resolved: the Controller must still use the existing decision/required-verification path.
-Do not attach an unrelated O\* row or raise severity to bypass normalization. A mandatory global
+Rowless findings do not authorize product edits. The Controller must still use the existing
+decision/required-verification path and repair only a locked contract after `VALID_RED`.
+Do not attach an unrelated O\* row or raise severity to bypass validation. A mandatory global
 critical/high concern retains its existing treatment; concrete cost alone does not make one.
 Do not require a finding count, a deletion, or a fix when the evidence supports keeping the code.
 
@@ -331,6 +343,12 @@ score that can authorize completion.
 - An agent/browser pass is not evidence of actual user usability or product value. Where those
   claims matter, separately observe users' task completion and failure reasons, and relate product
   outcomes to the approved goal. Do not defer security or data-loss checks to post-release learning.
+- A task-linked candidate without a row stays observable, not automatically a defect or taste.
+  Use [common.md's closure distinctions](common.md#closing-a-problem-candidate) and conditional
+  problem-definition review. Keep limited reproduction, refuted hypotheses, deferred scope/risk
+  and reopening conditions distinct. Budget exhaustion and summary wording cannot replace evidence.
+  Both High reviewers still receive the same complete packet and every applicable perspective,
+  never half the inputs each.
 
 Basis: [mixed evaluators and human calibration](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents),
 [usability heuristics, not product specifications](https://www.nngroup.com/articles/ten-usability-heuristics/),
