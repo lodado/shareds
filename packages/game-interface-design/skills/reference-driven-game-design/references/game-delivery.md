@@ -36,3 +36,10 @@ From package root:
 Install the listed dev requirements if JSON Schema support is absent. Validation includes files, local path safety, duplicate/dangling IDs, primary action coverage, trace references, readiness/evidence consistency and basic declared ad/lifecycle constraints. It does NOT execute a game, verify external links or run a model-behavior evaluation.
 
 Run self-review of substantive quality after structural checks. Deliver the selected idea, concrete decisions, wireframes and artifact locations first, then evidence/assumptions/gaps. Preserve requested mode and actual verification boundaries.
+
+For in-scope levels/progression, self-review the game-design contract: learning goals, challenge rhythm,
+layout/metrics, intended strategies, randomness/solvability limits and linked experiments; record N/A otherwise.
+Use the existing game_design and validation_handoff artifacts. This content gate is a self-review requirement,
+not a new schema guarantee; a valid manifest alone does not verify progression quality or player learning.
+Show the user concise decision summaries with inspected reference links, adopted principle, concrete
+application, relevant trade-offs and outstanding assumptions—not only artifact paths or a bibliography.

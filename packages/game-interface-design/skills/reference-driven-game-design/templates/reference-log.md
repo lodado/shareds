@@ -8,6 +8,13 @@ ID | class (rule/flow/screen/editable asset/book/policy) | locator/date/version 
 
 Source | selection_reason | role/gap | candidates | internal-fit/PASS/HOLD | imported/copy/derivative | actual target ID | inspection evidence | remaining gap.
 
+## Decision explanations
+
+D-ID | affected R/L/screen/component | decision and status | inspected source title/section/link + observation | application/adaptation | alternative and trade-off (if relevant) | validation/revision trigger | evidence gap.
+
+Show the important new/changed rows to the user at checkpoints and in delivery. Source observations,
+design proposals and actual test results remain separate; provide concise rationale, not internal deliberation.
+
 ## Checkpoints
 
 Stage | decision/source IDs | changed artifacts | executed checks | stale dependents | open issues | next work.

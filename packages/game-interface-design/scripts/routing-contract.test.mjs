@@ -50,6 +50,26 @@ test('router names every mode and links both target skills', () => {
   assert.match(router, /Figma is not a prerequisite/)
 })
 
+// Low risk: static instruction routing, not executed model behavior or visual-quality evidence.
+test('web UI polish stays code-first with reference and browser evidence', () => {
+  const router = read('game-interface-design/SKILL.md')
+  const skill = read('threejs-game-wireframe/SKILL.md')
+  const visual = read('threejs-game-wireframe/references/code-visual-design.md')
+  const blueprint = read('threejs-game-wireframe/templates/wireframe-blueprint.md')
+  const verification = read('threejs-game-wireframe/references/verification.md')
+  assert.match(router, /existing game web UI/)
+  assert.match(skill, /\(references\/code-visual-design\.md\)/)
+  assert.match(skill, /explicit greybox-only/)
+  assert.match(visual, /Do not invoke the Figma workflow/)
+  assert.match(visual, /two inspected references/)
+  assert.match(visual, /same content, viewport, and game state/)
+  assert.match(visual, /Do not change ECS rules/)
+  assert.match(visual, /320×568/)
+  assert.match(visual, /NOT_RUN/)
+  assert.match(blueprint, /## Code visual design/)
+  assert.match(verification, /\(code-visual-design\.md\)/)
+})
+
 test('wireframe skill states each level, its ECS duty and the default', () => {
   const skill = read('threejs-game-wireframe/SKILL.md')
   const levels = read('threejs-game-wireframe/references/fidelity-levels.md')
@@ -88,4 +108,34 @@ test('design skill no longer forbids the ECS handoff it now routes to', () => {
   assert.doesNotMatch(handoff, /No automatic ECS/)
   assert.doesNotMatch(design, /no compulsory ECS/)
   assert.match(handoff, /\(\.\.\/\.\.\/threejs-game-wireframe\/SKILL\.md\)/)
+})
+
+// Low risk: static document contracts; these checks do not execute an agent or a game.
+test('optional level design connects rules, content, blockout and observed learning', () => {
+  const design = read('reference-driven-game-design/SKILL.md')
+  const levels = read('reference-driven-game-design/references/level-progression.md')
+  const template = read('reference-driven-game-design/templates/game-design.md')
+  const implementation = read('threejs-game-wireframe/SKILL.md')
+  assert.match(design, /\(references\/level-progression\.md\)/)
+  assert.match(levels, /STAGED.*ENDLESS.*N\/A/)
+  assert.match(levels, /Learning objective/)
+  assert.match(levels, /Solvability/)
+  assert.match(levels, /board occupancy/)
+  assert.match(levels, /book\.leveldesignbook\.com/)
+  assert.match(levels, /not a validated difficulty curve/)
+  assert.match(template, /## Level or pressure progression/)
+  assert.match(implementation, /level-progression\.md/)
+})
+
+test('both game lanes expose concise reference-backed decision summaries', () => {
+  const checkpoint = read('reference-driven-game-design/references/checkpoint-protocol.md')
+  const log = read('reference-driven-game-design/templates/reference-log.md')
+  const implementation = read('threejs-game-wireframe/SKILL.md')
+  const delivery = read('reference-driven-game-design/references/game-delivery.md')
+  assert.match(checkpoint, /## User-facing decision summaries/)
+  assert.match(checkpoint, /Decision.*Evidence.*Application.*Trade-off.*Validation/)
+  assert.match(checkpoint, /not private chain-of-thought/)
+  assert.match(log, /## Decision explanations/)
+  assert.match(implementation, /checkpoint-protocol\.md/)
+  assert.match(delivery, /decision summaries/)
 })

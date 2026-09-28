@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1 — 2026-09-28
+
+- Add optional staged/endless level progression contracts with learning goals, layout/metrics, solvability limits and blockout/playtest handoff, grounded in The Level Design Book.
+- Surface concise reference-backed decision summaries at checkpoints and delivery in both planning and code lanes; separate source observations, adaptations and unverified assumptions.
+
+- Add a package-local reference-to-code visual design workflow for web HUDs and menus, adapted from frontend-interface-design 1.8.4 without invoking its Figma-only delivery contract.
+- Route existing game web UI polish to code; preserve rules, host framework, explicit greybox-only scope, and optional Figma delivery.
+- Require reference rationale, actual token/component bindings, a representative pilot, browser critique, and separate visual evidence; retain the existing report schema.
+
 ## 0.2.0 — 2026-09-23
 
 - New `threejs-game-wireframe` skill: LAYOUT_ONLY, FLOW_PROTOTYPE and PLAYABLE_GREYBOX fidelity levels,

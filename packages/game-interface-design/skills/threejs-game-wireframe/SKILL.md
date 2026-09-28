@@ -1,6 +1,6 @@
 ---
 name: threejs-game-wireframe
-description: 'Implement a local Three.js game prototype from an existing game plan: layout, flow, or a playable greybox whose rules run in a headless ECS inside an FSD page slice. Use when the user explicitly asks to build, prototype, or wire up a planned game; not for game planning alone, Figma UI, final art, or backend services.'
+description: 'Implement a local Three.js game prototype or refine its web UI directly in code using inspected references, semantic tokens, and browser critique. Supports layout, flow, or playable greybox with headless ECS in an FSD page slice. Use for explicit game build or web UI polish requests; not planning alone, Figma delivery, final game art, or backend services.'
 allowed-tools:
   - Bash
 ---
@@ -27,6 +27,13 @@ Missing plan detail → fill only the gap with a labeled, reversible default and
 A missing core rule that changes the build (what fails the run, what scores) is the one question worth asking.
 Figma is never a prerequisite.
 
+Web HUD/menu implementation includes reference-driven visual design by default; `PROTOTYPE_LEVEL`
+controls rule fidelity, not whether the UI receives design attention. An explicit greybox-only,
+layout-only, or mechanics-only request skips expanded polish, not readability or accessibility.
+An existing game web UI polish request preserves the host and rules; do not scaffold or rebuild its core.
+For UI-only changes, reuse the current architecture and skip Stage 3–4 implementation, then verify regressions.
+The prototype-level/ECS defaults apply to new prototypes, not a mandate to retrofit an existing game.
+
 ## Stage 1 — Inspect the target
 
 Existing repo: read its `CLAUDE.md`/`AGENTS.md`, package manager, framework (Vite, Next.js, React, R3F), TypeScript config,
@@ -34,6 +41,18 @@ lint and any FSD checker before proposing anything. Keep React/R3F/Next.js if pr
 Empty or new target: copy the [starter](starter/README.md) with `node scripts/create-wireframe.mjs <TARGET_DIR>` from the package root; it refuses a non-empty directory. Confirm versions from the actual lockfile, not memory.
 
 ## Stage 2 — Blueprint
+
+Use the shared [decision-summary protocol](../reference-driven-game-design/references/checkpoint-protocol.md):
+show important choices, inspected source links, application, trade-offs and pending validation in the user's
+language before dependent edits and after checks. Persist code-only decisions in the blueprint, not a second log.
+If levels or changing pressure are requested, reuse or fill only the relevant
+[level/progression contract](../reference-driven-game-design/references/level-progression.md).
+Carry the representative L-ID setup, units, rules and experiments into the blueprint; block out and test it
+before final art or expanding content. A UI-only request does not authorize changing level progression.
+
+Read [code visual design](references/code-visual-design.md): reuse the journey, inspect references,
+choose or preserve the direction, and map tokens/components before UI edits. This is a package-local
+code adapter, not an invocation of the Figma skill. Record explicit polish exclusions with a reason.
 
 Write `wireframe-blueprint.md` from [the template](templates/wireframe-blueprint.md) next to the plan, or in `TARGET_DIR/__docs__/`.
 It fixes goal and exclusions, real versus mocked boundaries, rules and their owners, public session operations,
@@ -62,12 +81,19 @@ The renderer reads interpolated poses and writes nothing back. The HUD reads an 
 React hosts use `useSyncExternalStore`; R3F `useFrame` mutates refs, never React state, per frame.
 Every loop, listener, observer, pointer capture, subscription and GPU resource has one owner and an idempotent teardown.
 
+Apply the code visual design pilot → browser critique → targeted fixes before expanding the HUD/menus.
+Basic world geometry is not an excuse for an unreviewed default-looking web interface.
+
 ## Stage 6 — Verify and report
 
 Read [verification](references/verification.md). Run what exists: typecheck, lint, FSD check, headless tests, build, browser.
-Fill `wireframe-report.json` ([schema](schemas/wireframe-report.schema.json), [example](examples/stack-greybox/wireframe-report.json)) and validate it with `node scripts/validate-wireframe.mjs <report>` from the package root.
+For new prototypes, fill `wireframe-report.json` ([schema](schemas/wireframe-report.schema.json), [example](examples/stack-greybox/wireframe-report.json)) and validate it with `node scripts/validate-wireframe.mjs <report>` from the package root.
 Report each check as `PASS`, `FAIL`, `NOT_RUN` or `BLOCKED` with the command. No browser or WebGL → browser is `BLOCKED` or `NOT_RUN`, never `PASS`.
 Real device, usability, fun and business stay `not_run` unless observed with people. Tests written are not tests passed.
+
+For UI-only work, update an existing compatible report without changing its level or declaring new ECS readiness.
+If the existing game has no compatible prototype report, record commands, visual status, and gaps in the blueprint;
+do not invent a fidelity level or an ECS implementation merely to fit the schema.
 
 ## Scope
 

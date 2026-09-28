@@ -1,6 +1,6 @@
 {
   "name": "game-interface-design",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, and FSD/ECS Three.js greybox prototypes.",
   "author": {
     "name": "lodado",

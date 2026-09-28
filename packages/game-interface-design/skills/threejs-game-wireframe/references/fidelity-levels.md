@@ -15,3 +15,7 @@ Rules:
 - "Clickable flow" or "screen transitions" → `FLOW_PROTOTYPE`.
 - A `simulated` value never feeds a readiness claim. A flow prototype does not test fun.
 - Raising the level later reuses the same slice: `LAYOUT_ONLY` ui → add `model/ecs` without moving files.
+
+Visual quality is independent of rule fidelity. `PLAYABLE_GREYBOX` may keep world art/audio absent
+while applying reference-driven design to the web HUD and menus. Explicit greybox-only, layout-only,
+or mechanics-only scope skips expanded polish, not readable controls or accessibility.

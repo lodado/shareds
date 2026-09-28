@@ -1,6 +1,6 @@
 ---
 name: reference-driven-game-design
-description: 'Design mobile-web games from core play decisions through player journeys, HUDs, game feel, business hypotheses and a testable implementation handoff. Optionally produce editable Figma game UI. Use for casual/merge/stack/arcade game planning; not general product UI, game implementation, or an automatic claim of fun.'
+description: 'Design mobile-web games from core play decisions through optional level/progression design, player journeys, HUDs, game feel, business hypotheses and a testable implementation handoff. Optionally produce editable Figma game UI. Use for casual/merge/stack/arcade game planning; not general product UI, game implementation, or an automatic claim of fun.'
 allowed-tools:
   - Bash
 metadata:
@@ -41,7 +41,7 @@ Read [request contract](references/game-request.md) and [checkpoint protocol](re
 Inspect provided assets and existing game/repo before proposing replacements. Confirm mode, target, authority and preservation scope.
 Default assumptions may be mobile web, portrait, one-handed, fixed camera, solo developer, Three.js visual layer; label them, never override supplied input.
 If no game idea exists, compare at most three **different core decisions**, select one provisional concept and continue. No three reskins of one mechanic.
-Write the experience promise, exclusions, hardest unproven assumption and source inventory. Start the Reference Log.
+Write the experience promise, exclusions, hardest unproven assumption and source inventory. Start the Reference Log. Show concise user-facing decision summaries at meaningful checkpoints per the checkpoint protocol, including inspected source links, application, trade-offs and unverified assumptions.
 
 ## Stage 1 — Core play and learning
 
@@ -51,6 +51,16 @@ Specify scoring/progression, failure, random information, simultaneous events, r
 Explain why the player might replay, plus a counterexample that would invalidate the fun hypothesis.
 Do not invent precise book quotations, chapter numbers or universal fun formulas.
 Ready: the proposed rules are coherent enough to simulate on paper and identify a falsifiable experiment; this is not a fun-test pass.
+
+## Stage 1.5 — Optional levels and pressure progression
+
+Read [level and progression contract](references/level-progression.md) when authored stages, learning
+order, spatial challenges, or endless-run pressure are in scope. Otherwise record N/A with a reason.
+Translate novice/expert judgments into a small content sequence, learning objectives, challenge rhythm,
+layout/metrics, viable strategies and per-level experiments. STAGED uses levels; ENDLESS uses observable
+pressure bands, not artificial level numbers. Document estimates and randomness/solvability limits.
+Keep the contract in game-design and the existing Reference Log; no extra manifest type is required.
+Ready for handoff means an actionable representative setup and check plan, not verified learning or fun.
 
 ## Stage 2 — Player journey, state and wireframes
 

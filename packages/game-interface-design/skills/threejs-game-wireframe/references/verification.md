@@ -31,6 +31,13 @@ Report every check separately. A passing type check says nothing about fun.
 - Wait for a state (`data-status`, a role, text), never a fixed sleep. Retry loops use `expect(...).toPass()` with a bound.
 - If Playwright or a WebGL-capable browser is unavailable, mark the browser check `BLOCKED` or `NOT_RUN` with the reason.
 
+## Visual review is separate from behavior checks
+
+Follow [code visual design](code-visual-design.md) for the reference-to-code pilot and screenshot critique.
+Record the visual status and evidence in the blueprint. When a compatible prototype report exists,
+link it from `checks.browser.evidence` and include unresolved gaps in `open_risks`. A passing browser journey does not automatically pass visual
+review; for in-scope polish, no inspected captures means `NOT_RUN` or `BLOCKED`, even if typecheck/build/E2E passed.
+
 ## Status words
 
 `PASS` (ran, exit status and output support it) · `FAIL` (ran, failed; quote the decisive line) ·
