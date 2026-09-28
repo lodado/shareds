@@ -32,6 +32,21 @@
 | Path | Owns |
 | ---- | ---- |
 
+## GLB asset plan
+
+- GLB usage: <none, or existing assets/own-generated fixtures and provenance; no loader required for shapes-only>
+- Decide before implementation. Resolve only the current screen/scene/selection; speculative cross-screen prefetch is off.
+
+| Screen/scene   | Condition           | Required GLB                                       | Load trigger                           | Fallback                                                   | Cache/disposal owner                        |
+| -------------- | ------------------- | -------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------- | ------------------------------------------- |
+| <e.g. 2D home> | <current selection> | <none, or IDs/URLs and dependent buffers/textures> | <entry/selection that needs the model> | <loading/error/retry/exit; optional decoration substitute> | <source cache / instance / final GPU owner> |
+
+- Immediately possible models: <required enemies/obstacles and why; no per-frame frustum load/unload>
+- Readiness and lifetime: <play gate, scene/selection generation, pending/shared consumer release, partial-failure retry>
+- Cache policy: <existing host cache/key, finite idle limit/eviction rule, active-consumer protection, warm re-entry behavior>
+- Eager-path audit: <actual removed paths or none; URL import versus download; monolithic GLB split work if needed>
+- Evidence: <cold-cache URL/parse logs, production manifest/bundle check, race/retry/disposal tests, unexecuted host cases>
+
 ## Verification plan
 
 | Check | Command | Expected |

@@ -31,6 +31,23 @@ test('starter keeps FSD layers only, with no extra top-level ECS layer', () => {
   )
 })
 
+test('shape-only starter remains free of GLB loaders, model URLs and preload side effects', () => {
+  const sourceFiles = []
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const file = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        walk(file)
+        continue
+      }
+      if (/\.(?:ts|tsx|js|jsx|md|json)$/.test(entry.name)) sourceFiles.push(file)
+    }
+  }
+  walk(STARTER)
+  const source = sourceFiles.map((file) => readFileSync(file, 'utf8')).join('\n')
+  assert.doesNotMatch(source, /GLTFLoader|useGLTF|useLoader|\.glb(?:['"`?]|$)|preloadAll/i)
+})
+
 test('architecture doc lists systems in the order stepWorld runs them', () => {
   const source = readFileSync(path.join(SLICE, 'model/ecs/step-world.ts'), 'utf8')
   const start = source.indexOf('export function stepWorld(')

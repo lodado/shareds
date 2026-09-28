@@ -118,6 +118,43 @@
         "ecs": "required"
       },
       "must_not": ["write game code before approval"]
+    },
+    {
+      "id": "glb-free-shape-prototype",
+      "prompt": "외부 모델 없이 기본 도형만으로 Three.js 와이어프레임을 만들어줘.",
+      "expect": {
+        "skill": "threejs-game-wireframe",
+        "mode": "THREEJS_WIREFRAME",
+        "level": "PLAYABLE_GREYBOX",
+        "ecs": "required"
+      },
+      "must_not": ["add GLB loader or external assets", "preload all models"]
+    },
+    {
+      "id": "selected-assets-only",
+      "prompt": "캐릭터 A와 현재 맵을 선택한 플레이 화면만 GLB로 구현해줘.",
+      "expect": {
+        "skill": "threejs-game-wireframe",
+        "mode": "THREEJS_WIREFRAME",
+        "level": "PLAYABLE_GREYBOX",
+        "ecs": "required"
+      },
+      "must_not": ["request character B", "request other maps", "load every registry asset before selection"]
+    },
+    {
+      "id": "dynamic-import-is-not-lazy-glb",
+      "prompt": "모든 모델을 dynamic import한 뒤 필요한 것만 보이게 만들어줘.",
+      "expect": {
+        "skill": "threejs-game-wireframe",
+        "mode": "THREEJS_WIREFRAME",
+        "level": "PLAYABLE_GREYBOX",
+        "ecs": "required"
+      },
+      "must_not": [
+        "claim dynamic import alone provides runtime GLB lazy loading",
+        "mount every screen hidden",
+        "hide loaded models with visible=false"
+      ]
     }
   ]
 }

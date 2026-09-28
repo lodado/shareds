@@ -1,5 +1,34 @@
 # 검증 결과
 
+## 0.2.2 — GLB 런타임 계약 변경 (2026-09-28, macOS, Node 26.7.0)
+
+스킬·템플릿·검증 계약을 수정했으며 기본 도형 starter, ECS/session API와 보고서 schema는 변경하지 않았다.
+기존 대상에서 제거할 전체 GLB preload 구현은 발견하지 못했다. 이는 소스 조사 결과이며 성능 개선 전후 측정이 아니다.
+
+| 검사                                                       | 결과 | 범위                                                                       |
+| ---------------------------------------------------------- | ---- | -------------------------------------------------------------------------- |
+| `pnpm --filter @lodado/game-interface-design-plugin test`  | PASS | 패키지 테스트 66개. 문서 계약·보고서 schema 보호·무자산 starter 검사 포함  |
+| `pnpm --filter @lodado/game-interface-design-plugin check` | PASS | 매니페스트 일치, 문서 링크, schema/예제, 원본 해시                         |
+| `pnpm --filter @lodado/game-interface-design-plugin lint`  | PASS | 저장소 지정 `eslint scripts` 범위, 신규 fixture 포함                       |
+| 패키지 루트 `node scripts/verify-asset-loading.mjs`        | PASS | production build + 실제 GLTFLoader/WebGL Chromium 13개 시나리오            |
+| 별도 기본 starter 복사본 `npm ci && npm run verify`        | PASS | 타입 검사, 헤드리스 37개, Steiger/위반 fixture, build, 모바일 Chromium 3개 |
+| `git diff --check`                                         | PASS | 변경 파일 공백 검사                                                        |
+
+런타임 fixture는 자체 생성 GLB 4개와 외부 PNG 텍스처를 사용한다. 초기 홈/registry import, 선택 자산,
+필수 자산 준비 전 차단, 동시 요청·parse 재사용, warm 재진입, A/B 두 응답 순서, 화면 이탈 후 늦은 결과,
+부분 실패/재시도/안전한 이탈, pending·활성 소비자 보호, material 격리, 유한 idle-cache와 실제 자원 정리를 검사했다.
+텍스처 누락에도 loader가 모델을 반환하는 경우를 실패 테스트로 확인한 뒤, 필수 텍스처 준비 검사와 재시도를 추가했다.
+문서 계약 테스트도 새 계약이 없는 상태의 실패를 확인한 뒤 통과시켰다.
+
+최종 로컬 증거: `.test-tmp/asset-loading/run-9WZGsk.log`,
+`.test-tmp/asset-loading/run-9WZGsk/asset-results.json`의 요청/parse/자원 관찰 첨부,
+동일 실행 디렉터리의 `dist/.vite/manifest.json`과 산출물. 실행기는 매번 독립 경로를 출력하며 임시 의존성은 제거한다.
+기본 starter 로그는 `/tmp/threejs-glb-greybox-verify.log`에 남겼다. 기존 500 kB 초과 청크 경고는 유지된다.
+
+이는 **vanilla Three.js 테스트 fixture**의 실행 결과다. 사용자 게임, R3F/React Strict Mode, Next.js/SSR,
+실제 PWA precache, 외부 `.bin`, 압축·스킨드 모델, pagehide teardown 전용 시나리오, 실제 기기는 `NOT_RUN`이다.
+초기 요청/전송량의 변경 전후 비교나 GPU 메모리 바이트 측정은 하지 않았다. 문서/루브릭 검사는 모델 행동의 실행 증거가 아니다.
+
 ## 0.2.0 (2026-09-23, macOS, Node 26.7.0)
 
 ### 패키지
@@ -51,7 +80,7 @@
 
 ## 실행하지 않은 것
 
-Claude/Codex 호스트 로딩, `behavior-cases.json` 24개와 `boundary-cases.json` 12개 행동 시나리오, 실제 Figma 편집,
+Claude/Codex 호스트 로딩, `behavior-cases.json` 24개와 `boundary-cases.json` 행동 시나리오(현재 15개), 실제 Figma 편집,
 실제 기기 입력 지연·프레임 시간, 사람 대상 플레이테스트.
 
 ## 0.1.0 → shareds 편입

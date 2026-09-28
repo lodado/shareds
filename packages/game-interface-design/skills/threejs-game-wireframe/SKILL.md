@@ -40,6 +40,10 @@ Existing repo: read its `CLAUDE.md`/`AGENTS.md`, package manager, framework (Vit
 lint and any FSD checker before proposing anything. Keep React/R3F/Next.js if present; never add React to a DOM project.
 Empty or new target: copy the [starter](starter/README.md) with `node scripts/create-wireframe.mjs <TARGET_DIR>` from the package root; it refuses a non-empty directory. Confirm versions from the actual lockfile, not memory.
 
+If the implementation uses GLB assets, follow [runtime GLB loading](references/asset-loading.md): audit eager paths,
+then download and parse only assets required by the current screen, scene and selection. This is runtime asset loading,
+not progressive disclosure of skill documents. A shapes-only prototype needs no model loader, registry or external assets.
+
 ## Stage 2 — Blueprint
 
 Use the shared [decision-summary protocol](../reference-driven-game-design/references/checkpoint-protocol.md):
@@ -57,6 +61,8 @@ code adapter, not an invocation of the Figma skill. Record explicit polish exclu
 Write `wireframe-blueprint.md` from [the template](templates/wireframe-blueprint.md) next to the plan, or in `TARGET_DIR/__docs__/`.
 It fixes goal and exclusions, real versus mocked boundaries, rules and their owners, public session operations,
 system order, fidelity level and the verification plan. Existing `__docs__/architecture.md` is updated, not duplicated.
+Before GLB implementation, fill the screen/scene asset plan: required models, load triggers, fallback, cache/disposal owner,
+and a finite idle-cache policy. Record `GLB: none` when unused; do not invent assets to fill the table.
 `REVIEW_WAIT=true` → present the blueprint and stop. Explanation is not approval.
 
 ## Stage 3 — Place code (FSD)
@@ -80,6 +86,8 @@ Read [render and input bridge](references/render-input-bridge.md). Basic shapes 
 The renderer reads interpolated poses and writes nothing back. The HUD reads an immutable snapshot.
 React hosts use `useSyncExternalStore`; R3F `useFrame` mutates refs, never React state, per frame.
 Every loop, listener, observer, pointer capture, subscription and GPU resource has one owner and an idempotent teardown.
+Keep GLB loading, parsing, cache and Three.js objects outside the ECS core. Gate play on required asset readiness;
+decoration alone may use an explicit substitute. Check scene validity before attaching async results, including after selection changes.
 
 Apply the code visual design pilot → browser critique → targeted fixes before expanding the HUD/menus.
 Basic world geometry is not an excuse for an unreviewed default-looking web interface.
@@ -90,6 +98,9 @@ Read [verification](references/verification.md). Run what exists: typecheck, lin
 For new prototypes, fill `wireframe-report.json` ([schema](schemas/wireframe-report.schema.json), [example](examples/stack-greybox/wireframe-report.json)) and validate it with `node scripts/validate-wireframe.mjs <report>` from the package root.
 Report each check as `PASS`, `FAIL`, `NOT_RUN` or `BLOCKED` with the command. No browser or WebGL → browser is `BLOCKED` or `NOT_RUN`, never `PASS`.
 Real device, usability, fun and business stay `not_run` unless observed with people. Tests written are not tests passed.
+For GLB work, verify cold-cache requests, parse reuse, transition/retry/disposal behavior and production asset output.
+Dynamic import or screenshots alone do not prove lazy loading. Link logs through existing evidence fields or the blueprint;
+do not extend the report schema. Report removed eager paths (or none), screen triggers, cache policy and unexecuted host checks.
 
 For UI-only work, update an existing compatible report without changing its level or declaring new ECS readiness.
 If the existing game has no compatible prototype report, record commands, visual status, and gaps in the blueprint;

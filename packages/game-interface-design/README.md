@@ -92,6 +92,22 @@ cd ../my-game && npm ci && npm run verify
 `npm run verify` = typecheck → headless → Steiger → build → Playwright(모바일 Chromium).
 의존성은 설치할 때 받는다. 폰트·아트·사운드는 들어 있지 않다.
 
+## GLB 런타임 지연 로딩
+
+GLB를 사용하는 구현에는 [자산 로딩 계약](skills/threejs-game-wireframe/references/asset-loading.md)을 적용한다.
+이는 스킬 문서를 나중에 읽는 방식이 아니라 **현재 화면·씬·선택에 필요한 GLB만 다운로드하고 파싱하는 규칙**이다.
+2D 홈은 GLB 0개, 플레이는 선택 캐릭터와 현재 맵, 스킨 상세는 표시 중인 스킨만 요청한다.
+전체 preload 후 숨기기나 코드 dynamic import만으로는 충족되지 않는다. 기본 도형 starter에는 로더를 추가하지 않는다.
+
+구현 전에 Blueprint의 화면별 자산 표를 채우고, 기존 호스트 캐시·진행 중 요청을 재사용한다.
+필수 자산 준비 전 플레이 차단, 오류·재시도·안전한 이탈, 늦은 결과 차단, 활성 소비자를 보호하는 유한 캐시와
+최종 소유자의 자원 정리까지 검증한다. ECS·session API·보고서 schema는 그대로 유지한다.
+
+[검증 지침](skills/threejs-game-wireframe/references/verification.md)은 cold-cache 요청, 실제 parse 횟수,
+production 번들 인라인 여부, 화면 전환·재사용·실패·정리 검사를 구분한다.
+별도 [자체 생성 GLB fixture](scripts/fixtures/asset-loading/README.md)는 starter 밖에서 실행하며,
+문서 계약 통과나 fixture 성공을 실제 사용자 게임/R3F/Next.js 검증으로 보고하지 않는다.
+
 ## 패키지 검사
 
 Node 22.18 이상. 모노레포 안에서는 루트 `pnpm install`, 압축을 푼 단독 복사본에서는 패키지 루트에서 `npm install`.

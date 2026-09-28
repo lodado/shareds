@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2 — 2026-09-28
+
+- Require demand-driven runtime GLB loading for the current screen, scene and selection, without adding assets to shape-only prototypes.
+- Define host readiness/error/retry boundaries, stale-result protection, shared resource ownership and finite idle-cache policies outside the ECS.
+- Add the screen asset blueprint table, cold-cache/parse/build verification contracts and an independent generated-GLB browser fixture with 13 passing scenarios; preserve the existing report schema.
+
 ## 0.2.1 — 2026-09-28
 
 - Add optional staged/endless level progression contracts with learning goals, layout/metrics, solvability limits and blockout/playtest handoff, grounded in The Level Design Book.

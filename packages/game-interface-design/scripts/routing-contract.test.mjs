@@ -102,6 +102,61 @@ test('wireframe skill links every reference it owns', () => {
   assert.match(skill, /\(starter\/README\.md\)/)
 })
 
+test('wireframe skill defines runtime GLB loading boundaries without changing the ECS contract', () => {
+  const skill = read('threejs-game-wireframe/SKILL.md')
+  const assets = read('threejs-game-wireframe/references/asset-loading.md')
+  const bridge = read('threejs-game-wireframe/references/render-input-bridge.md')
+  const lifecycle = read('threejs-game-wireframe/references/time-lifecycle.md')
+  const verification = read('threejs-game-wireframe/references/verification.md')
+  const blueprint = read('threejs-game-wireframe/templates/wireframe-blueprint.md')
+
+  assert.match(skill, /\(references\/asset-loading\.md\)/)
+  for (const term of [/current (?:screen|scene)/i, /GLB/i, /registry|resolver/i, /importing it must\s+not fetch|not fetch or parse/i]) {
+    assert.match(assets, term)
+  }
+  for (const term of [/visible=false/i, /preloadAll/i, /useGLTF\.preload|useLoader\.preload/i, /full model URL/i]) {
+    assert.match(assets, term)
+  }
+  for (const term of [/in.?flight.*(?:completed|reuse)|(?:completed|reuse).*in.?flight/i, /rejected.*(?:remove|retry)|failed Promise/i, /finite.*idle|bounded.*idle/i, /active.*(?:consumer|working).*not.*evict/i, /cache.*(?:separate|distinct).*dispose|dispose.*separate.*cache/i]) {
+    assert.match(assets, term)
+  }
+  for (const term of [/GLTFLoader/i, /React\/?R3F/i, /Next\.js/i, /conditionally render/i, /useGLTF|useLoader/i, /top level/i, /Suspense/i, /retry/i, /dynamic import/i]) {
+    assert.match(bridge, term)
+  }
+  for (const term of [/scene\/?selection.*generation|generation.*scene\/?selection/i, /runId/i, /stale|late result/i, /pending.*consumer/i, /dispose/i]) {
+    assert.match(lifecycle, term)
+  }
+  for (const term of [/network/i, /parse/i, /production.*(?:build|asset)|(?:build|asset).*production/i, /service worker|precache/i, /inline.*(?:GLB|binary)|(?:GLB|binary).*inline/i, /cold.?cache/i]) {
+    assert.match(verification, term)
+  }
+  for (const term of [/registry import/i, /concurrent|in.?flight/i, /duplicate/i, /retry/i, /selected.*(?:character|asset)/i]) {
+    assert.match(verification, term)
+  }
+  assert.match(blueprint, /Screen\/scene\s+\|\s+Condition\s+\|\s+Required GLB\s+\|\s+Load trigger\s+\|\s+Fallback\s+\|\s+Cache\/disposal owner/)
+})
+
+test('runtime GLB guidance keeps existing report and ECS schema contracts explicit', () => {
+  const skill = read('threejs-game-wireframe/SKILL.md')
+  const verification = read('threejs-game-wireframe/references/verification.md')
+  const schema = JSON.parse(read('threejs-game-wireframe/schemas/wireframe-report.schema.json'))
+  assert.match(skill, /FSD|headless ECS|session/i)
+  assert.match(skill, /GLB|asset/i)
+  assert.match(verification, /NOT_RUN|PASS|FAIL/)
+  assert.match(verification, /existing.*schema|schema.*(?:unchanged|existing)|no new fields/i)
+  assert.equal(schema.additionalProperties, false)
+  assert.equal(schema.properties.checks.additionalProperties, false)
+  assert.equal(schema.$defs.check.additionalProperties, false)
+  assert.deepEqual(Object.keys(schema.$defs.check.properties).sort(), ['command', 'evidence', 'reason', 'status'])
+  assert.deepEqual(
+    Object.keys(schema.properties).sort(),
+    ['checks', 'ecs', 'level', 'open_risks', 'plan_source', 'ready_to_run', 'schema_version', 'simulated', 'target_dir'].sort(),
+  )
+  assert.deepEqual(
+    Object.keys(schema.properties.checks.properties).sort(),
+    ['browser', 'build', 'business', 'device', 'fsd', 'fun', 'headless', 'install', 'lint', 'typecheck', 'usability'].sort(),
+  )
+})
+
 test('design skill no longer forbids the ECS handoff it now routes to', () => {
   const handoff = read('reference-driven-game-design/references/technical-handoff.md')
   const design = read('reference-driven-game-design/SKILL.md')
