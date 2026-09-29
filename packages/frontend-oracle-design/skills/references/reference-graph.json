@@ -61,6 +61,10 @@
     {
       "when": "performance requirement·improvement claim",
       "nodes": ["performance"]
+    },
+    {
+      "when": "Bend proof cross-verification selected automatically for applicable Oracle work or explicitly requested",
+      "nodes": ["bend-cross-verification"]
     }
   ],
   "nodes": [
@@ -273,6 +277,12 @@
       "path": "references/graph-orchestration.md",
       "when": "explicit request for a graph-orchestrated delivery loop only",
       "requires": ["oracle-workflow-graph"]
+    },
+    {
+      "id": "bend-cross-verification",
+      "path": "references/bend-cross-verification.md",
+      "when": "Oracle lane — automatically before Draft/lock for a pure calculation or deterministic state transition with a meaningful invariant, or an explicit Bend request; re-read before proof execution and GREEN/review",
+      "requires": ["common"]
     },
     {
       "id": "oracle-workflow-graph",

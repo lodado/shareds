@@ -173,6 +173,7 @@ flowchart LR
   subagent_review["subagent-review"]
   review_checklist["review-checklist"]
   graph_orchestration["graph-orchestration"]
+  bend_cross_verification["bend-cross-verification"]
   oracle_workflow_graph["oracle-workflow-graph"]
 
   common --> card_policy_sources
@@ -213,6 +214,7 @@ flowchart LR
   changeability --> subagent_review
   subagent_review --> review_checklist
   oracle_workflow_graph --> graph_orchestration
+  common --> bend_cross_verification
   IND["type-environment · fsd · backend · performance<br/><i>독립 노드 — 조건 충족 시에만</i>"]
 ```
 

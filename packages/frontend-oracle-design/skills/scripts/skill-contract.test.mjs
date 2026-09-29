@@ -48,6 +48,49 @@ async function readAll(relativePaths) {
 
 const REVIEW_NODE_FILES = ['references/subagent-review.md', 'references/review-checklist.md']
 
+test('Bend cross-verification loads automatically for applicable Oracle work without expanding Low or bundles', async () => {
+  const { loadGraph, splitDelivery } = await import('./generate-reference-bundles.mjs')
+  const graph = await loadGraph()
+  const id = 'bend-cross-verification'
+  const node = graph.nodes.find((candidate) => candidate.id === id)
+  assert.ok(node, 'applicable Oracle work needs a discoverable Bend reference')
+  assert.equal(
+    node.when,
+    'Oracle lane — automatically before Draft/lock for a pure calculation or deterministic state transition with a meaningful invariant, or an explicit Bend request; re-read before proof execution and GREEN/review',
+  )
+  assert.equal(node.path, 'references/bend-cross-verification.md')
+  assert.deepEqual(node.requires, ['common'])
+  assert.equal(node.implementationInput, undefined, 'ordinary workers must not acquire a Bend requirement')
+  const selected = splitDelivery(graph, { id: 'bend-request', nodes: [id] })
+  assert.deepEqual(
+    selected.delivered.map((candidate) => candidate.id),
+    ['common', id],
+  )
+  assert.deepEqual(selected.assumed, [])
+  for (const bundle of graph.bundles) {
+    const { delivered, assumed } = splitDelivery(graph, bundle)
+    assert.equal(
+      [...delivered, ...assumed].some((candidate) => candidate.id === id),
+      false,
+      bundle.id,
+    )
+  }
+  for (const entry of graph.nodes.filter((candidate) => candidate.id !== id)) {
+    const { delivered } = splitDelivery(graph, { id: entry.id, nodes: [entry.id] })
+    assert.equal(
+      delivered.some((candidate) => candidate.id === id),
+      false,
+      `${entry.id} must not load Bend transitively`,
+    )
+  }
+  const low = graph.lanes.find((lane) => lane.id === 'low-fast-path')
+  const lowDelivery = splitDelivery(graph, { id: low.id, nodes: low.nodes })
+  assert.deepEqual(
+    lowDelivery.delivered.map((candidate) => candidate.id),
+    ['low-fast-path'],
+  )
+})
+
 test('O1 Low and Design-only do not acquire contextual review requirements', async () => {
   const { splitDelivery } = await import('./generate-reference-bundles.mjs')
   const { selectTransitions } = await import(

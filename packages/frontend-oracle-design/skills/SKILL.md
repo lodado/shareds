@@ -167,6 +167,14 @@ its own scope carve-out at disqualification, with no additional node or artifact
   installed `$agent-graph-engineering` skill by name, read
   [`graph-orchestration.md`](references/graph-orchestration.md) in full, then execute the bundled
   workflow.
+- In the Oracle lane, automatically assess Bend applicability before Draft/lock. For a pure
+  calculation or deterministic state transition with a meaningful invariant, or an explicit Bend
+  request, read [`bend-cross-verification.md`](references/bend-cross-verification.md). No separate
+  user request to invoke Bend is needed; the proof harness still executes its CLI. Re-read before
+  proof execution and GREEN/review. Use supported, authorized native delegation with capacity for
+  parallel law/behavior analysis; later run proof/behavior checks concurrently on stable, isolated
+  inputs when the host supports it. Report a concrete reason for sequential fallback. Approval,
+  VALID_RED and final adjudication stay serial. This neither enables graph mode nor adds Bend to Low.
 - Oracle-lane inception: before selecting investigation breadth/depth for unclear existing-system
   ownership, cross-boundary scope, or single-card milestone grouping, read
   [`lifecycle-adaptation.md`](references/lifecycle-adaptation.md) with its dependencies. A small
