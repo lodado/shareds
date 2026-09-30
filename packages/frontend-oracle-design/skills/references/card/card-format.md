@@ -263,18 +263,28 @@ replaces the `O*`·`D*` row that owns a specific scenario outcome.
   lint — same contract as State Model.
 - `I*` rows are checked during every journey rather than mapped one-to-one to a scenario test.
 
-## Formal Model — optional
+## Mandatory verification stack
 
-Only on the Bend path: the section, its locked `MODEL.bend`/`LAWS.bend` sources and its checks are
-owned by [`bend-cross-verification.md`](../bend-cross-verification.md). Absence does not block lint.
+Every card, including Low and Design-only, must also record the real type-fest utility and the
+source-backed relation it protects, TypeScript positive/negative compiler witnesses, and a positive
+fast-check sampling plan. See [`mandatory-verification.md`](../mandatory-verification.md). A mention,
+dummy import, unrelated fixture or `runs=0` is not evidence; unresolved capability is `NEEDS_DECISION`
+and missing tools or failed execution is `FAIL`.
 
-## Terms and Adequacy — optional
+## Formal Model — required
 
-`## Terms` (the dictionary) may appear on any card; `## Adequacy` only on the Bend path with goals from
-the source text. Both, their locked world source and the adequacy check are owned by
-[`adequacy.md`](../adequacy.md). Absence does not block lint; a card without `## Adequacy` reports
-adequacy as not evaluated. For such a card, the reverse-impossible reviewer's input is the file
-`oracle-adequacy.mjs explore-input` derives, and its candidates go through `triage` (adequacy.md).
+Every card must include the section and its locked `MODEL.bend`/`LAWS.bend` sources and imports.
+`PROOF.bend` is required as a checked proof candidate but remains unlocked and repairable.
+The checks are owned by [`bend-cross-verification.md`](../bend-cross-verification.md); absence is a
+`FAIL`, including Low and Design-only.
+
+## Terms and Adequacy — required
+
+`## Terms` and `## Adequacy` are required on every card, with goals from the source text. Both, their
+locked world source and adequacy check are owned by [`adequacy.md`](../adequacy.md). Missing or
+incomplete content is `FAIL`; unresolved meanings or support are `NEEDS_DECISION`. The reverse-
+impossible reviewer uses the file `oracle-adequacy.mjs explore-input` derives, and its candidates go
+through `triage` (adequacy.md).
 
 ## Cold-read gate — adversarial self-review
 

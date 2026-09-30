@@ -13,8 +13,8 @@ delivery mechanism for the same bytes, not a node of its own.
 
 # Common contract — authority · policy sources · feedback routing
 
-Read this before any other reference node when entering the card procedure (an explicit Oracle
-request or a Medium/High judgment). Definitions that used to be duplicated across references are
+Read this before any other reference node on every invocation, regardless of risk or mode. Immediately
+after it, load `mandatory-verification.md` before Draft/lock. Definitions that used to be duplicated across references are
 canonical here — each reference adds only its own stage-specific rules, and on any conflict this
 document wins.
 
@@ -23,8 +23,8 @@ document wins.
 After the mandatory lane header, speak in the user's language. Keep internal codes as supporting
 labels, not the whole explanation. Distinguish facts, assumptions, and recommendations. This is
 not an extra approval gate: continue ordinary investigation and planning; preserve existing policy
-questions, Draft confirmation, lock, and delivery gates. The Low fast path keeps its own single-node
-procedure and report; this contract adds no reference load or Oracle artifacts to that lane.
+questions, Draft confirmation, lock, and delivery gates. The historical Low fast path is legacy-only; it adds no current routing exception. New Low work uses
+the same Oracle entry and mandatory verification as every other risk.
 
 | Message    | Required content                                                                                                                       |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -90,22 +90,20 @@ alternative, then `NEEDS_DECISION`.
 Risk judgment is canonical in this document. Other documents point to this table and add only their
 lane procedure.
 
-| Risk     | Entry criteria                                                                                                                                              | Lane            | Default evidence                                                                                          |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------- |
-| `Low`    | no new policy·card·architecture decisions; copy·token·isolated CSS·clear regression fixes inside existing approved contracts                                | `low-fast-path` | existing repo verification; no Oracle card·lock·ledger·independent review                                 |
-| `Medium` | needs a contract — new UI states·forms·responsive structure·async ordering·local/identity visual intent — but not payment·permission·data-loss-scale damage | `oracle`        | Oracle Card, `VALID_RED`, required-label GREEN, one independent review                                    |
-| `High`   | payment·permissions·destructive actions·data loss·legal/security/privacy/financial/complex concurrency, where a false GREEN is costly                       | `oracle`        | Medium evidence + consecutive-GREEN hardening, mutation kill·revert·re-GREEN, 2-sample independent review |
+| Risk     | Entry criteria                                                                                                                                              | Lane     | Default evidence                                                                                               |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `Low`    | no new policy·card·architecture decisions; copy·token·isolated CSS·clear regression fixes inside existing approved contracts                                | `oracle` | common + mandatory-verification + Bend/type-fest/TypeScript/fast-check; same Oracle gates (scope may be small) |
+| `Medium` | needs a contract — new UI states·forms·responsive structure·async ordering·local/identity visual intent — but not payment·permission·data-loss-scale damage | `oracle` | Oracle Card, `VALID_RED`, required-label GREEN, one independent review                                         |
+| `High`   | payment·permissions·destructive actions·data loss·legal/security/privacy/financial/complex concurrency, where a false GREEN is costly                       | `oracle` | Medium evidence + consecutive-GREEN hardening, mutation kill·revert·re-GREEN, 2-sample independent review      |
 
 Risk judgment may take one optional evidence input: `scripts/oracle-twr.mjs` scores the target
 files' time-weighted bug-fix history from git. A high score is grounds to raise the lane or spend
 more sweep·exploration budget; it is never a gate, never grounds to lower a judgment, and its
 absence blocks nothing.
 
-During Low work, a policy question, a visual identity change, an architecture/public API decision,
-or a new state transition disqualifies Low immediately: read `common` and escalate to the Oracle
-lane. When only part of the request disqualifies, escalate that part alone under the carve-out
-conditions in [`lanes/low-fast-path.md`](lanes/low-fast-path.md) and record the descope; a
-remainder that shares state, a side effect, or a type with the carved scope is never split.
+Low is not a bypass or escalation lane. Every Low invocation stays in the Oracle lane and loads
+common plus mandatory verification before Draft/lock. The historical [`lanes/low-fast-path.md`](lanes/low-fast-path.md)
+text only explains legacy records and cannot authorize a new-work carve-out.
 
 ## Jurisdiction rules
 
@@ -184,7 +182,8 @@ Distinguish these conclusions; none implies the others:
 | Unsupported preference               | `NON_ORACLE_OPINION` only without approved criteria or observed user impact         |
 
 Presence, links and shape can be checked mechanically; filled-in prose does not validate the
-meaning of a dismissal. Low retains its single-node path and existing disqualification rules.
+meaning of a dismissal. Low follows the same mandatory verification and Oracle gates; only historical
+records may retain the old single-node report shape.
 
 ## Common state meanings
 
@@ -371,6 +370,16 @@ guarantee about library behavior.
 <!-- node:types-state-ladder path:references/types/state-ladder.md -->
 
 # Type constraints — purpose·ownership·state design ladder
+
+## Mandatory verification stack
+
+Follow [`mandatory-verification.md`](../mandatory-verification.md) on every Oracle invocation, including
+Low and Design-only. Its tool-use, evidence and blocking rules remain mandatory; the selection
+ladders below choose meaningful contracts and never exempt a member of that stack.
+
+### Required type-fest and sampled evidence
+
+The chosen ladder rung still requires a real `type-fest` utility at the contract boundary, with the consumer's positive and negative TypeScript witnesses. Record its resolved version and the relation it protects. The same card must plan positive-count `fast-check` sampling against the locked Bend model; exhaustive enumeration or a passing `tsc` run alone is not a substitute.
 
 ## Purpose and authority
 
@@ -696,6 +705,16 @@ transition table·state machine, not a reason to build one.
 
 # Type constraints — constraint selection order and authoring rules
 
+## Mandatory verification stack
+
+Follow [`mandatory-verification.md`](../mandatory-verification.md) on every Oracle invocation, including
+Low and Design-only. Its tool-use, evidence and blocking rules remain mandatory; the selection
+ladders below choose meaningful contracts and never exempt a member of that stack.
+
+### Required type-fest relation
+
+Every type contract must select an installed, version-pinned `type-fest` utility that participates in the actual protected relation and is exercised by the consumer witness. Record the utility, version, import path, and the wrong usage it rejects. Do not satisfy this requirement with a dummy import, unused alias, transitive-dependency assumption, or a type-fest clone; if a built-in utility already expresses the same relation, do not add redundant scaffolding—raise `NEEDS_DECISION` for the missing meaningful relation instead.
+
 ## Constraint selection order
 
 - Classify the problem by axis first. Ownership·state space·API relation are different axes, so do
@@ -936,6 +955,16 @@ leaked into a public return type·Props, allow it only inside `types/internal`·
 
 # Type constraints — Props and the shared API surface
 
+## Mandatory verification stack
+
+Follow [`mandatory-verification.md`](../mandatory-verification.md) on every Oracle invocation, including
+Low and Design-only. Its tool-use, evidence and blocking rules remain mandatory; the selection
+ladders below choose meaningful contracts and never exempt a member of that stack.
+
+### Required library-backed witness
+
+A shared or local API contract must use an installed, pinned `type-fest` utility in the actual consumer path when the relation is authored, and compile that consumer with TypeScript positive/negative witnesses. Record the utility and relation; a dummy import, unused type alias, or custom duplicate is not evidence. Pair the contract run with positive-count `fast-check` sampling and the locked Bend relation.
+
 ## Consumer-facing contracts
 
 The [public-contract definition](../changeability.md#architecture-independent-ownership) applies to
@@ -1074,6 +1103,16 @@ Record the following four things in the Implementation Decision.
 <!-- node:types-advanced-contracts path:references/types/advanced-contracts.md -->
 
 # Type constraints — advanced type contracts and compiler witnesses
+
+## Mandatory verification stack
+
+Follow [`mandatory-verification.md`](../mandatory-verification.md) on every Oracle invocation, including
+Low and Design-only. Its tool-use, evidence and blocking rules remain mandatory; the selection
+ladders below choose meaningful contracts and never exempt a member of that stack.
+
+### Mandatory type-fest participation
+
+An advanced contract must use an installed, pinned `type-fest` utility in the real protected relation and include its consumer in the compiler witness packet. Choose a utility that adds semantic protection; never wrap or reimplement a built-in solely to mention type-fest. Record the resolved package version, import, relation, positive/negative witnesses, and the paired positive-count `fast-check` plan against the Bend model.
 
 ## When to read and scope of application
 

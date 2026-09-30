@@ -30,9 +30,10 @@ add production implementation and self-feedback. When modifying frontend product
 **TDD first.** After `ORACLE_READY`, write and run tests first; writing or modifying production
 before securing `VALID_RED` is forbidden.
 
-- Medium/High risk requires an `ORACLE_READY` card. The Low fast path is used only for easily
-  reversible changes inside an already approved contract with no new policy·card — the lane contract
-  is [`lanes/low-fast-path.md`](../lanes/low-fast-path.md).
+- Every risk, including Low, requires an `ORACLE_READY` card with mandatory Bend formal proof,
+  Terms/Adequacy, tool readiness and type-fest compiler witness/fast-check plans. Delivery records
+  actual consumer verification after initialization and test authoring. Low may shorten scope but never
+  skips Oracle or its mandatory verification labels.
 - A new card and a revision whose meaning changed are locked only after the Draft and delta are
   re-confirmed with the user, regardless of risk.
 - Read the target repo's `AGENTS.md`, `CLAUDE.md`, test scripts, adjacent tests, and required
@@ -56,8 +57,9 @@ This discovery is not runtime readiness, a reported run, `VALID_RED`, a lock, or
 the existing RED/GREEN/evidence gates. Resolve `unknown` by reading more; do not turn it into
 `unsupported`. If the actual path is structurally unsupported, report the concrete incompatibility
 early as `ENVIRONMENT_DEFECT` → `FAIL`. Never promote `exit-only` to reported evidence; a separately
-approved runner change still has to satisfy the trusted adapter contract. Design-only and Low
-skip this discovery entirely; visual tool availability remains a separate explicit-visual-QA concern.
+approved runner change still has to satisfy the trusted adapter contract. Design-only and Low still perform this discovery; visual tool availability remains a separate
+explicit-visual-QA concern. Missing Bend, type-fest/compiler or fast-check support is `FAIL`, not a
+skip.
 
 When the Draft will carry a `RELATIONAL` row, the same discovery also records the visual producer
 path as its own `supported | unsupported | unknown` line: a trusted `node-test` run whose locked test
@@ -68,11 +70,11 @@ removes or N/As the row: it stays the visual owner's `pending`, which may stop a
 `IMPLEMENTED_GREEN` and blocks `REVIEW_VERIFIED`. `HARD` rows need only the behavior runner and
 `JUDGMENT` rows the designer review; neither needs this producer.
 
-When the Bend proof path is selected ([`bend-cross-verification.md`](../bend-cross-verification.md)),
-the same discovery runs `scripts/ensure-bend.mjs` and records its `BEND_READY <path>` line or its
-failure code; that page decides whether a failure skips the proof or fails the run. A locked card
-with `## Formal Model` needs `--required-label bend-proof:reported` at `init`, and one with
-`## Adequacy` needs `--required-label bend-adequacy:reported`.
+Every run performs the mandatory Bend discovery with `scripts/ensure-bend.mjs` and records its
+`BEND_READY <path>` line or actual failure code. A missing tool, failed installation, type-fest/compiler
+check or fast-check runner is `ENVIRONMENT_DEFECT` → `FAIL`; never skip or fall back. Every locked
+card needs `--required-label bend-proof:reported`, `--required-label bend-adequacy:reported`,
+`--required-label type-contract:reported` and `--required-label fast-check:reported` at `init`.
 
 When entering Delivery after Design-only, perform the same investigation alongside the `$test`
 availability check before any new lock, init, or test writing. Do not recreate an already approved

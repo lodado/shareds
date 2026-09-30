@@ -5,10 +5,10 @@ the edges of that space, and the counterexamples they find widen the problem spa
 
 A card can pass every row and still miss the user's goal: its coordinates may lump together two
 situations the goal judges differently, or its rows may be weaker than the goal. This check catches
-both, inside a declared world. It runs only on the Bend path (eligibility in
-[`bend-cross-verification.md`](bend-cross-verification.md) §1); Low, Design-only's scope and cards
-without these sections are unchanged. A card without `## Adequacy` reports adequacy as not evaluated —
-never as proven.
+both, inside a declared world. It is mandatory for every Oracle risk and lane, including Low and Design-only. Every card must carry
+`## Terms` and `## Adequacy`, with a locked finite world, goals and checks. A missing section is a
+contract failure (`FAIL`), never “not evaluated” or proven by omission. Design-only performs the
+design, model and proof/adequacy checks; product test execution remains Delivery.
 
 The check reasons about a finite world that someone wrote down. It cannot find a phenomenon the world
 leaves out, and it does not prove anything about the product: product behavior is still judged by

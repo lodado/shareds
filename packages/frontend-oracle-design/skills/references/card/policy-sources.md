@@ -73,7 +73,8 @@ Use this conditional review within the existing Outcome Brief, investigation and
 
 Scale investigation to potential loss, reversibility, evidence sufficiency, affected scope and
 uncertainty of important assumptions, not LOC or words such as "save" or "async". A small approved
-change with adequate evidence adds no ceremony; the canonical Low conditions still apply.
+change with adequate evidence keeps investigation small; Low still uses the mandatory verification
+stack and the same confirmation/lock gates.
 
 For an important candidate, distinguish four layers rather than committing to the first solution:
 

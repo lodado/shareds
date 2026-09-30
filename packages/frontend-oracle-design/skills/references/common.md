@@ -1,7 +1,7 @@
 # Common contract — authority · policy sources · feedback routing
 
-Read this before any other reference node when entering the card procedure (an explicit Oracle
-request or a Medium/High judgment). Definitions that used to be duplicated across references are
+Read this before any other reference node on every invocation, regardless of risk or mode. Immediately
+after it, load `mandatory-verification.md` before Draft/lock. Definitions that used to be duplicated across references are
 canonical here — each reference adds only its own stage-specific rules, and on any conflict this
 document wins.
 
@@ -10,8 +10,8 @@ document wins.
 After the mandatory lane header, speak in the user's language. Keep internal codes as supporting
 labels, not the whole explanation. Distinguish facts, assumptions, and recommendations. This is
 not an extra approval gate: continue ordinary investigation and planning; preserve existing policy
-questions, Draft confirmation, lock, and delivery gates. The Low fast path keeps its own single-node
-procedure and report; this contract adds no reference load or Oracle artifacts to that lane.
+questions, Draft confirmation, lock, and delivery gates. The historical Low fast path is legacy-only; it adds no current routing exception. New Low work uses
+the same Oracle entry and mandatory verification as every other risk.
 
 | Message    | Required content                                                                                                                       |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -77,22 +77,20 @@ alternative, then `NEEDS_DECISION`.
 Risk judgment is canonical in this document. Other documents point to this table and add only their
 lane procedure.
 
-| Risk     | Entry criteria                                                                                                                                              | Lane            | Default evidence                                                                                          |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------- |
-| `Low`    | no new policy·card·architecture decisions; copy·token·isolated CSS·clear regression fixes inside existing approved contracts                                | `low-fast-path` | existing repo verification; no Oracle card·lock·ledger·independent review                                 |
-| `Medium` | needs a contract — new UI states·forms·responsive structure·async ordering·local/identity visual intent — but not payment·permission·data-loss-scale damage | `oracle`        | Oracle Card, `VALID_RED`, required-label GREEN, one independent review                                    |
-| `High`   | payment·permissions·destructive actions·data loss·legal/security/privacy/financial/complex concurrency, where a false GREEN is costly                       | `oracle`        | Medium evidence + consecutive-GREEN hardening, mutation kill·revert·re-GREEN, 2-sample independent review |
+| Risk     | Entry criteria                                                                                                                                              | Lane     | Default evidence                                                                                               |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `Low`    | no new policy·card·architecture decisions; copy·token·isolated CSS·clear regression fixes inside existing approved contracts                                | `oracle` | common + mandatory-verification + Bend/type-fest/TypeScript/fast-check; same Oracle gates (scope may be small) |
+| `Medium` | needs a contract — new UI states·forms·responsive structure·async ordering·local/identity visual intent — but not payment·permission·data-loss-scale damage | `oracle` | Oracle Card, `VALID_RED`, required-label GREEN, one independent review                                         |
+| `High`   | payment·permissions·destructive actions·data loss·legal/security/privacy/financial/complex concurrency, where a false GREEN is costly                       | `oracle` | Medium evidence + consecutive-GREEN hardening, mutation kill·revert·re-GREEN, 2-sample independent review      |
 
 Risk judgment may take one optional evidence input: `scripts/oracle-twr.mjs` scores the target
 files' time-weighted bug-fix history from git. A high score is grounds to raise the lane or spend
 more sweep·exploration budget; it is never a gate, never grounds to lower a judgment, and its
 absence blocks nothing.
 
-During Low work, a policy question, a visual identity change, an architecture/public API decision,
-or a new state transition disqualifies Low immediately: read `common` and escalate to the Oracle
-lane. When only part of the request disqualifies, escalate that part alone under the carve-out
-conditions in [`lanes/low-fast-path.md`](lanes/low-fast-path.md) and record the descope; a
-remainder that shares state, a side effect, or a type with the carved scope is never split.
+Low is not a bypass or escalation lane. Every Low invocation stays in the Oracle lane and loads
+common plus mandatory verification before Draft/lock. The historical [`lanes/low-fast-path.md`](lanes/low-fast-path.md)
+text only explains legacy records and cannot authorize a new-work carve-out.
 
 ## Jurisdiction rules
 
@@ -171,7 +169,8 @@ Distinguish these conclusions; none implies the others:
 | Unsupported preference               | `NON_ORACLE_OPINION` only without approved criteria or observed user impact         |
 
 Presence, links and shape can be checked mechanically; filled-in prose does not validate the
-meaning of a dismissal. Low retains its single-node path and existing disqualification rules.
+meaning of a dismissal. Low follows the same mandatory verification and Oracle gates; only historical
+records may retain the old single-node report shape.
 
 ## Common state meanings
 

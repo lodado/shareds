@@ -1,5 +1,15 @@
 # Type constraints — advanced type contracts and compiler witnesses
 
+## Mandatory verification stack
+
+Follow [`mandatory-verification.md`](../mandatory-verification.md) on every Oracle invocation, including
+Low and Design-only. Its tool-use, evidence and blocking rules remain mandatory; the selection
+ladders below choose meaningful contracts and never exempt a member of that stack.
+
+### Mandatory type-fest participation
+
+An advanced contract must use an installed, pinned `type-fest` utility in the real protected relation and include its consumer in the compiler witness packet. Choose a utility that adds semantic protection; never wrap or reimplement a built-in solely to mention type-fest. Record the resolved package version, import, relation, positive/negative witnesses, and the paired positive-count `fast-check` plan against the Bend model.
+
 ## When to read and scope of application
 
 - **Load** — always, together with [`state-ladder.md`](state-ladder.md)·[`authoring.md`](authoring.md)·[`api-surface.md`](api-surface.md), on every type task.

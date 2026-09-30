@@ -9,21 +9,23 @@
       "prompt": "Change an already-approved label in one existing button. Do not alter behavior, layout, state, or API.",
       "expected": {
         "risk": "Low",
-        "lane": "low-fast-path",
+        "lane": "oracle",
         "status": "GREEN",
         "loadedNodes": [
-          "low-fast-path"
+          "common",
+          "mandatory-verification"
         ]
       },
       "expectedConstraints": [
-        "Keep the Low single-node fast path",
-        "Use ordinary repository validation only"
+        "Use the common Oracle entry and mandatory Bend/type-fest/TypeScript/fast-check stack",
+        "Keep the scope small without inventing unrelated lifecycle ceremony"
       ],
       "forbiddenConstraints": [
-        "Do not invent an Oracle card, lifecycle plan, milestone, or review ceremony"
+        "Do not use the historical low-fast-path as a new-work bypass",
+        "Do not claim mandatory verification from labels or plans without actual evidence"
       ],
       "semanticAssertions": [
-        "The response preserves the Low path and explains why lifecycle-adaptation is not loaded"
+        "The reviewer confirms that a new Low invocation reads common and mandatory-verification before Draft/lock"
       ]
     },
     {

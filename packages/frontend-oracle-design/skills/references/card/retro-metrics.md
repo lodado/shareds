@@ -93,8 +93,8 @@ whether or not a reusable candidate is worth writing.
 
 Keep `escapes.jsonl`'s meaning/schema: defects discovered after lock. Do not insert every command
 failure or execution incident; link a qualifying escape instead of duplicating it. No sidecar,
-new log or normal-run artifact is required. Low does not load this node or perform candidate review;
-its single-node verification/carve-out remains sufficient. Design-only notes authorize neither
+new log or normal-run artifact is required. Low follows the same conditional review guidance;
+there is no new-work single-node exemption. Design-only notes authorize neither
 tests nor production edits. Reading Markdown is not compliance evidence or tool interception;
 existing host hooks and gates retain their documented capabilities and limitations.
 

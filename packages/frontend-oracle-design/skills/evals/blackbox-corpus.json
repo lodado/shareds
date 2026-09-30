@@ -9,11 +9,11 @@
       "prompt": "Change the approved helper text from 'Save' to '저장' in one existing button; no behavior or layout changes.",
       "expected": {
         "risk": "Low",
-        "lane": "low-fast-path",
+        "lane": "oracle",
         "status": "GREEN",
-        "loadedNodes": ["low-fast-path"],
-        "forbiddenCeremony": ["oracle-card", "revision-lock", "run-ledger", "independent-review"],
-        "requiredLabels": ["repo-validation"]
+        "loadedNodes": ["common", "mandatory-verification"],
+        "forbiddenCeremony": ["legacy-low-fast-path-bypass", "missing-mandatory-verification"],
+        "requiredLabels": ["bend-proof:reported", "bend-adequacy:reported", "type-contract:reported", "fast-check:reported", "repo-validation"]
       }
     },
     {
@@ -22,11 +22,11 @@
       "prompt": "Apply an already-approved spacing token to a local CSS rule; do not alter responsive structure or state.",
       "expected": {
         "risk": "Low",
-        "lane": "low-fast-path",
+        "lane": "oracle",
         "status": "GREEN",
-        "loadedNodes": ["low-fast-path"],
-        "forbiddenCeremony": ["oracle-card", "revision-lock", "run-ledger", "independent-review"],
-        "requiredLabels": ["repo-validation"]
+        "loadedNodes": ["common", "mandatory-verification"],
+        "forbiddenCeremony": ["legacy-low-fast-path-bypass", "missing-mandatory-verification"],
+        "requiredLabels": ["bend-proof:reported", "bend-adequacy:reported", "type-contract:reported", "fast-check:reported", "repo-validation"]
       }
     },
     {
@@ -300,11 +300,11 @@
       "prompt": "Change one approved button label from 'Save' to '저장'.",
       "expected": {
         "risk": "Low",
-        "lane": "low-fast-path",
+        "lane": "oracle",
         "status": "GREEN",
-        "loadedNodes": ["low-fast-path"],
-        "forbiddenCeremony": ["oracle-card", "revision-lock", "run-ledger", "independent-review"],
-        "requiredLabels": ["repo-validation"]
+        "loadedNodes": ["common", "mandatory-verification"],
+        "forbiddenCeremony": ["legacy-low-fast-path-bypass", "missing-mandatory-verification"],
+        "requiredLabels": ["bend-proof:reported", "bend-adequacy:reported", "type-contract:reported", "fast-check:reported", "repo-validation"]
       }
     },
     {
@@ -313,11 +313,11 @@
       "prompt": "Update the helper text in one existing component only.",
       "expected": {
         "risk": "Low",
-        "lane": "low-fast-path",
+        "lane": "oracle",
         "status": "GREEN",
-        "loadedNodes": ["low-fast-path"],
-        "forbiddenCeremony": ["oracle-card", "revision-lock", "run-ledger", "independent-review"],
-        "requiredLabels": ["repo-validation"]
+        "loadedNodes": ["common", "mandatory-verification"],
+        "forbiddenCeremony": ["legacy-low-fast-path-bypass", "missing-mandatory-verification"],
+        "requiredLabels": ["bend-proof:reported", "bend-adequacy:reported", "type-contract:reported", "fast-check:reported", "repo-validation"]
       }
     }
   ]

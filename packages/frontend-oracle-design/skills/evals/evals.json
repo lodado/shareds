@@ -7,14 +7,15 @@
       "name": "fod-bb-01",
       "category": "low-copy-css",
       "prompt": "Change the approved helper text from 'Save' to '저장' in one existing button; no behavior or layout changes.",
-      "expected_output": "Lane header risk=Low lane=low-fast-path, terminal state GREEN, reference nodes read: low-fast-path.",
+      "expected_output": "Lane header risk=Low lane=oracle, terminal state GREEN, reference nodes read: common, mandatory-verification.",
       "files": [],
       "assertions": [
-        "The first line of the response is the lane header and it reports risk=Low lane=low-fast-path",
+        "The first line of the response is the lane header and it reports risk=Low lane=oracle",
         "The reported terminal state is GREEN",
-        "The lane header's nodes list includes every expected node: low-fast-path",
-        "None of these ceremonies or defects appear in the run: oracle-card, revision-lock, run-ledger, independent-review",
-        "The verification report cites actual runs for: repo-validation"
+        "The lane header's nodes list includes every expected node: common, mandatory-verification",
+        "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, missing-mandatory-verification",
+        "The verification report cites actual runs for: bend-proof:reported, bend-adequacy:reported, type-contract:reported, fast-check:reported, repo-validation",
+        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
       ]
     },
     {
@@ -22,14 +23,15 @@
       "name": "fod-bb-02",
       "category": "low-copy-css",
       "prompt": "Apply an already-approved spacing token to a local CSS rule; do not alter responsive structure or state.",
-      "expected_output": "Lane header risk=Low lane=low-fast-path, terminal state GREEN, reference nodes read: low-fast-path.",
+      "expected_output": "Lane header risk=Low lane=oracle, terminal state GREEN, reference nodes read: common, mandatory-verification.",
       "files": [],
       "assertions": [
-        "The first line of the response is the lane header and it reports risk=Low lane=low-fast-path",
+        "The first line of the response is the lane header and it reports risk=Low lane=oracle",
         "The reported terminal state is GREEN",
-        "The lane header's nodes list includes every expected node: low-fast-path",
-        "None of these ceremonies or defects appear in the run: oracle-card, revision-lock, run-ledger, independent-review",
-        "The verification report cites actual runs for: repo-validation"
+        "The lane header's nodes list includes every expected node: common, mandatory-verification",
+        "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, missing-mandatory-verification",
+        "The verification report cites actual runs for: bend-proof:reported, bend-adequacy:reported, type-contract:reported, fast-check:reported, repo-validation",
+        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
       ]
     },
     {
@@ -165,14 +167,15 @@
       "name": "fod-bb-11",
       "category": "boundary-pressure",
       "prompt": "Change one approved button label from 'Save' to '저장'.",
-      "expected_output": "Lane header risk=Low lane=low-fast-path, terminal state GREEN, reference nodes read: low-fast-path.",
+      "expected_output": "Lane header risk=Low lane=oracle, terminal state GREEN, reference nodes read: common, mandatory-verification.",
       "files": [],
       "assertions": [
-        "The first line of the response is the lane header and it reports risk=Low lane=low-fast-path",
+        "The first line of the response is the lane header and it reports risk=Low lane=oracle",
         "The reported terminal state is GREEN",
-        "The lane header's nodes list includes every expected node: low-fast-path",
-        "None of these ceremonies or defects appear in the run: oracle-card, revision-lock, run-ledger, independent-review",
-        "The verification report cites actual runs for: repo-validation"
+        "The lane header's nodes list includes every expected node: common, mandatory-verification",
+        "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, missing-mandatory-verification",
+        "The verification report cites actual runs for: bend-proof:reported, bend-adequacy:reported, type-contract:reported, fast-check:reported, repo-validation",
+        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
       ]
     },
     {
@@ -180,14 +183,15 @@
       "name": "fod-bb-14",
       "category": "boundary-pressure",
       "prompt": "Update the helper text in one existing component only.",
-      "expected_output": "Lane header risk=Low lane=low-fast-path, terminal state GREEN, reference nodes read: low-fast-path.",
+      "expected_output": "Lane header risk=Low lane=oracle, terminal state GREEN, reference nodes read: common, mandatory-verification.",
       "files": [],
       "assertions": [
-        "The first line of the response is the lane header and it reports risk=Low lane=low-fast-path",
+        "The first line of the response is the lane header and it reports risk=Low lane=oracle",
         "The reported terminal state is GREEN",
-        "The lane header's nodes list includes every expected node: low-fast-path",
-        "None of these ceremonies or defects appear in the run: oracle-card, revision-lock, run-ledger, independent-review",
-        "The verification report cites actual runs for: repo-validation"
+        "The lane header's nodes list includes every expected node: common, mandatory-verification",
+        "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, missing-mandatory-verification",
+        "The verification report cites actual runs for: bend-proof:reported, bend-adequacy:reported, type-contract:reported, fast-check:reported, repo-validation",
+        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
       ]
     },
     {
@@ -276,15 +280,15 @@
       "name": "fod-lc-01",
       "category": "lifecycle-forward",
       "prompt": "Change an already-approved label in one existing button. Do not alter behavior, layout, state, or API.",
-      "expected_output": "Forward lifecycle scenario: risk=Low lane=low-fast-path, terminal state GREEN, reference nodes read: low-fast-path.",
+      "expected_output": "Forward lifecycle scenario: risk=Low lane=oracle, terminal state GREEN, reference nodes read: common, mandatory-verification.",
       "files": [],
       "assertions": [
-        "The first line of the response is the lane header and it reports risk=Low lane=low-fast-path",
+        "The first line of the response is the lane header and it reports risk=Low lane=oracle",
         "The reported terminal state is GREEN",
-        "The lane header's nodes list includes every expected node: low-fast-path",
-        "Expected constraints: Keep the Low single-node fast path; Use ordinary repository validation only",
-        "Forbidden constraints: Do not invent an Oracle card, lifecycle plan, milestone, or review ceremony",
-        "A semantic reviewer confirms: The response preserves the Low path and explains why lifecycle-adaptation is not loaded"
+        "The lane header's nodes list includes every expected node: common, mandatory-verification",
+        "Expected constraints: Use the common Oracle entry and mandatory Bend/type-fest/TypeScript/fast-check stack; Keep the scope small without inventing unrelated lifecycle ceremony",
+        "Forbidden constraints: Do not use the historical low-fast-path as a new-work bypass; Do not claim mandatory verification from labels or plans without actual evidence",
+        "A semantic reviewer confirms: The reviewer confirms that a new Low invocation reads common and mandatory-verification before Draft/lock"
       ]
     },
     {
@@ -543,10 +547,10 @@
       "category": "boundary-semantic",
       "manualReviewOnly": true,
       "prompt": "Synthetic decision scenario, not a real incident or execution record: Synthetic mixed Low request: fix an approved label typo and decide duplicate-submit behavior. Evidence shows the copy reads/writes no state, side effect or type used by the risky part, is correct under every policy answer, and is separately testable/revertible. The agent proposes halting the typo fix solely because duplicate-submit policy is unresolved. Evaluate that response.",
-      "expected_output": "Reject blanket stopping of the proven independent Low remainder. Record the existing descope and finish it with repository validation; route only the risky part to Oracle.",
+      "expected_output": "Reject blanket stopping of the proven independent Low remainder. Record the independent remainder and run the common Oracle entry with mandatory verification; route only the risky part to its decision path.",
       "files": [],
       "assertions": [
-        "All three existing Low carve-out conditions are checked; no extra reference, Card, lock, ledger, rule review or artifact is required for the copy fix.",
+        "The independent Low remainder still enters common plus mandatory verification; no unrelated lifecycle artifact is required beyond the mandatory stack.",
         "The risky part remains blocked on its own decision route. This is not permission to continue implementing a NEEDS_DECISION Oracle run; if a type/state/side effect or policy dependency were shared, it would not be carved."
       ]
     },
@@ -556,10 +560,10 @@
       "category": "boundary-semantic",
       "manualReviewOnly": true,
       "prompt": "Synthetic decision scenario, not a real incident or execution record: A mixed request includes an independent label typo plus unresolved save-retry policy, satisfying all three Low carve-out conditions. Another suggested remainder, disabled-button styling, reads the very pending state that the unresolved policy controls. Which work may proceed, and which must stay together?",
-      "expected_output": "Complete only the proven independent label via the existing Low descope/verification procedure. Keep the shared-state styling with the risky Oracle scope rather than splitting the failure.",
+      "expected_output": "Complete only the proven independent label via the common Oracle entry with mandatory verification stack. Keep the shared-state styling with the risky Oracle scope rather than splitting the failure.",
       "files": [],
       "assertions": [
-        "The response permits separately verifiable and revertible Low completion without new artifacts; the independent copy remains correct under any policy answer.",
+        "The response permits separately verifiable and revertible Low completion without a second card or unrelated lifecycle artifacts, while preserving mandatory verification; the independent copy remains correct under any policy answer.",
         "The response also permits stopping/promoting the coupled styling and policy together; it never routes around NEEDS_DECISION by continuing the same Oracle run."
       ]
     },

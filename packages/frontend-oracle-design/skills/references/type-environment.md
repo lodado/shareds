@@ -1,12 +1,19 @@
 # Type Contract Prerequisite Environment — Verify Once Per Repo
 
+## Mandatory verification stack
+
+Follow [`mandatory-verification.md`](mandatory-verification.md) on every Oracle invocation, including
+Low and Design-only. Its tool-use, evidence and blocking rules remain mandatory; the selection
+ladders below choose meaningful contracts and never exempt a member of that stack.
+
 ## When to Read
 
-- **Once per repo**, before creating a type contract
-  ([`types/state-ladder.md`](types/state-ladder.md)) with this skill in the target repo for the
-  first time.
-- Or when a diff changes the tsconfig·TypeScript version, compiler witness inclusion, or the
-  checker/harness path. Do not re-read it for every card.
+- **Once per repo**, before creating a type contract ([`types/state-ladder.md`](types/state-ladder.md))
+  with this skill in the target repo for the first time. On every later invocation, confirm that the
+  existing environment evidence still matches the current compiler, effective config, witnesses and
+  harness before Draft/lock.
+- Re-verify when a diff changes the tsconfig·TypeScript version, compiler witness inclusion, or the
+  checker/harness path.
 - Rationale — "it does not compile" is a function of the compiler settings. A type contract whose
   environment is not pinned is not deterministic. The same code may pass or fail depending on the
   repo settings.
@@ -29,13 +36,14 @@ For tsconfig, follow the `extends` chain to the end and judge by the effective v
 ## Judgment
 
 - **All satisfied** — record the tsconfig location·TypeScript version in the Source Registry as
-  `project-constraint` and proceed. Do not re-verify in later cards.
-- **`strict` or the version unmet** — the premise of the type contract is absent. Do not change the
+  `project-constraint` and proceed; confirm that prior evidence remains valid for this card.
+- **`strict`, the version, or any obligation-required flag unmet** — the premise of the type contract is absent. Do not change the
   tsconfig silently — it is a project policy change that ripples across the whole repo. Show the
   user the unmet items and their impact, then `NEEDS_DECISION`.
-- **Recommended flag unmet** — propose the change that turns it on, but if it is refused·deferred,
-  record the list of weakened contracts in the Implementation Decision and proceed. It means that
-  violations of those contracts must be caught by review·tests rather than by compilation.
+- **Recommended flag unmet but not required by a claimed obligation** — record the remaining
+  soundness limitation and any runtime complement. Do not claim a static guarantee that needs the
+  missing flag. A missing or broken compiler/checker is `ENVIRONMENT_DEFECT` → `FAIL`, not a
+  request to invent weaker types.
 
 ## Recording and Re-verification
 

@@ -184,6 +184,16 @@ guarantee about library behavior.
 
 # Type constraints — purpose·ownership·state design ladder
 
+## Mandatory verification stack
+
+Follow [`mandatory-verification.md`](../mandatory-verification.md) on every Oracle invocation, including
+Low and Design-only. Its tool-use, evidence and blocking rules remain mandatory; the selection
+ladders below choose meaningful contracts and never exempt a member of that stack.
+
+### Required type-fest and sampled evidence
+
+The chosen ladder rung still requires a real `type-fest` utility at the contract boundary, with the consumer's positive and negative TypeScript witnesses. Record its resolved version and the relation it protects. The same card must plan positive-count `fast-check` sampling against the locked Bend model; exhaustive enumeration or a passing `tsc` run alone is not a substitute.
+
 ## Purpose and authority
 
 - When to use — when the card has async·out-of-order·duplicate submit·retry·multi-step state `O*`
@@ -508,6 +518,16 @@ transition table·state machine, not a reason to build one.
 
 # Type constraints — constraint selection order and authoring rules
 
+## Mandatory verification stack
+
+Follow [`mandatory-verification.md`](../mandatory-verification.md) on every Oracle invocation, including
+Low and Design-only. Its tool-use, evidence and blocking rules remain mandatory; the selection
+ladders below choose meaningful contracts and never exempt a member of that stack.
+
+### Required type-fest relation
+
+Every type contract must select an installed, version-pinned `type-fest` utility that participates in the actual protected relation and is exercised by the consumer witness. Record the utility, version, import path, and the wrong usage it rejects. Do not satisfy this requirement with a dummy import, unused alias, transitive-dependency assumption, or a type-fest clone; if a built-in utility already expresses the same relation, do not add redundant scaffolding—raise `NEEDS_DECISION` for the missing meaningful relation instead.
+
 ## Constraint selection order
 
 - Classify the problem by axis first. Ownership·state space·API relation are different axes, so do
@@ -748,6 +768,16 @@ leaked into a public return type·Props, allow it only inside `types/internal`·
 
 # Type constraints — Props and the shared API surface
 
+## Mandatory verification stack
+
+Follow [`mandatory-verification.md`](../mandatory-verification.md) on every Oracle invocation, including
+Low and Design-only. Its tool-use, evidence and blocking rules remain mandatory; the selection
+ladders below choose meaningful contracts and never exempt a member of that stack.
+
+### Required library-backed witness
+
+A shared or local API contract must use an installed, pinned `type-fest` utility in the actual consumer path when the relation is authored, and compile that consumer with TypeScript positive/negative witnesses. Record the utility and relation; a dummy import, unused type alias, or custom duplicate is not evidence. Pair the contract run with positive-count `fast-check` sampling and the locked Bend relation.
+
 ## Consumer-facing contracts
 
 The [public-contract definition](../changeability.md#architecture-independent-ownership) applies to
@@ -886,6 +916,16 @@ Record the following four things in the Implementation Decision.
 <!-- node:types-advanced-contracts path:references/types/advanced-contracts.md -->
 
 # Type constraints — advanced type contracts and compiler witnesses
+
+## Mandatory verification stack
+
+Follow [`mandatory-verification.md`](../mandatory-verification.md) on every Oracle invocation, including
+Low and Design-only. Its tool-use, evidence and blocking rules remain mandatory; the selection
+ladders below choose meaningful contracts and never exempt a member of that stack.
+
+### Mandatory type-fest participation
+
+An advanced contract must use an installed, pinned `type-fest` utility in the real protected relation and include its consumer in the compiler witness packet. Choose a utility that adds semantic protection; never wrap or reimplement a built-in solely to mention type-fest. Record the resolved package version, import, relation, positive/negative witnesses, and the paired positive-count `fast-check` plan against the Bend model.
 
 ## When to read and scope of application
 

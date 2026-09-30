@@ -1,7 +1,22 @@
 # Type constraints — Reviewer judgment criteria
 
+## Mandatory verification stack
+
+Follow [`mandatory-verification.md`](../mandatory-verification.md) on every Oracle invocation, including
+Low and Design-only. Its tool-use, evidence and blocking rules remain mandatory; the selection
+ladders below choose meaningful contracts and never exempt a member of that stack.
+
 When reviewing a change that created a type·state contract, judge it by the same criteria as
 [`state-ladder.md`](state-ladder.md)·[`authoring.md`](authoring.md)·[`api-surface.md`](api-surface.md).
+
+## Mandatory stack findings
+
+- If the card omits Bend proof/adequacy, an actual pinned type-fest consumer relation, TypeScript
+  positive/negative witnesses, or positive-count fast-check sampling, it is an `EVIDENCE_GAP`.
+- If type-fest is only mentioned, imported unused, supplied transitively without target ownership, or
+  used as a duplicate of a built-in utility, it is a `FINDING`.
+- If a missing tool, compiler environment, unsupported relation, or failed runner is treated as N/A
+  or silently replaced by ordinary tests/enumeration, it is `FAIL`, not a completed contract.
 
 ## State model and ownership
 

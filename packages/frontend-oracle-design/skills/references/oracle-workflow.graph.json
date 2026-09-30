@@ -76,7 +76,7 @@
       "id": "delivery-init",
       "kind": "agent",
       "owner": "planner",
-      "task": "Verify the locked Delivery sources and load the conditional references. After explicitly invoking the installed $test, initialize the required run labels, ledger, state, and budgets with oracle-run.mjs init. The classification is READY, POLICY_GAP, or FAIL. On POLICY_GAP after init, record oracle-run.mjs transition --to NEEDS_DECISION and return the structured decision and the runId. An environment defect leaves the reason in the ledger and is reported as FAIL with the actual error.",
+      "task": "Verify the locked Delivery sources and load the mandatory verification references. After explicitly invoking the installed $test, initialize the four mandatory reported labels (bend-proof:reported, bend-adequacy:reported, type-contract:reported, fast-check:reported), plus repository labels, ledger, state, and budgets with oracle-run.mjs init. The classification is READY, POLICY_GAP, or FAIL. On POLICY_GAP after init, record oracle-run.mjs transition --to NEEDS_DECISION and return the structured decision and the runId. An environment defect leaves the reason in the ledger and is reported as FAIL with the actual error.",
       "input": ["oraclePath", "oracleSha256", "request"],
       "output": ["classification", "runState", "runId", "decision", "error"],
       "writeScope": [".ai/oracles/**"],

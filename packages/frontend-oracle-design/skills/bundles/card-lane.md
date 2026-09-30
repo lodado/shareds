@@ -13,8 +13,8 @@ delivery mechanism for the same bytes, not a node of its own.
 
 # Common contract — authority · policy sources · feedback routing
 
-Read this before any other reference node when entering the card procedure (an explicit Oracle
-request or a Medium/High judgment). Definitions that used to be duplicated across references are
+Read this before any other reference node on every invocation, regardless of risk or mode. Immediately
+after it, load `mandatory-verification.md` before Draft/lock. Definitions that used to be duplicated across references are
 canonical here — each reference adds only its own stage-specific rules, and on any conflict this
 document wins.
 
@@ -23,8 +23,8 @@ document wins.
 After the mandatory lane header, speak in the user's language. Keep internal codes as supporting
 labels, not the whole explanation. Distinguish facts, assumptions, and recommendations. This is
 not an extra approval gate: continue ordinary investigation and planning; preserve existing policy
-questions, Draft confirmation, lock, and delivery gates. The Low fast path keeps its own single-node
-procedure and report; this contract adds no reference load or Oracle artifacts to that lane.
+questions, Draft confirmation, lock, and delivery gates. The historical Low fast path is legacy-only; it adds no current routing exception. New Low work uses
+the same Oracle entry and mandatory verification as every other risk.
 
 | Message    | Required content                                                                                                                       |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -90,22 +90,20 @@ alternative, then `NEEDS_DECISION`.
 Risk judgment is canonical in this document. Other documents point to this table and add only their
 lane procedure.
 
-| Risk     | Entry criteria                                                                                                                                              | Lane            | Default evidence                                                                                          |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------- |
-| `Low`    | no new policy·card·architecture decisions; copy·token·isolated CSS·clear regression fixes inside existing approved contracts                                | `low-fast-path` | existing repo verification; no Oracle card·lock·ledger·independent review                                 |
-| `Medium` | needs a contract — new UI states·forms·responsive structure·async ordering·local/identity visual intent — but not payment·permission·data-loss-scale damage | `oracle`        | Oracle Card, `VALID_RED`, required-label GREEN, one independent review                                    |
-| `High`   | payment·permissions·destructive actions·data loss·legal/security/privacy/financial/complex concurrency, where a false GREEN is costly                       | `oracle`        | Medium evidence + consecutive-GREEN hardening, mutation kill·revert·re-GREEN, 2-sample independent review |
+| Risk     | Entry criteria                                                                                                                                              | Lane     | Default evidence                                                                                               |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `Low`    | no new policy·card·architecture decisions; copy·token·isolated CSS·clear regression fixes inside existing approved contracts                                | `oracle` | common + mandatory-verification + Bend/type-fest/TypeScript/fast-check; same Oracle gates (scope may be small) |
+| `Medium` | needs a contract — new UI states·forms·responsive structure·async ordering·local/identity visual intent — but not payment·permission·data-loss-scale damage | `oracle` | Oracle Card, `VALID_RED`, required-label GREEN, one independent review                                         |
+| `High`   | payment·permissions·destructive actions·data loss·legal/security/privacy/financial/complex concurrency, where a false GREEN is costly                       | `oracle` | Medium evidence + consecutive-GREEN hardening, mutation kill·revert·re-GREEN, 2-sample independent review      |
 
 Risk judgment may take one optional evidence input: `scripts/oracle-twr.mjs` scores the target
 files' time-weighted bug-fix history from git. A high score is grounds to raise the lane or spend
 more sweep·exploration budget; it is never a gate, never grounds to lower a judgment, and its
 absence blocks nothing.
 
-During Low work, a policy question, a visual identity change, an architecture/public API decision,
-or a new state transition disqualifies Low immediately: read `common` and escalate to the Oracle
-lane. When only part of the request disqualifies, escalate that part alone under the carve-out
-conditions in [`lanes/low-fast-path.md`](lanes/low-fast-path.md) and record the descope; a
-remainder that shares state, a side effect, or a type with the carved scope is never split.
+Low is not a bypass or escalation lane. Every Low invocation stays in the Oracle lane and loads
+common plus mandatory verification before Draft/lock. The historical [`lanes/low-fast-path.md`](lanes/low-fast-path.md)
+text only explains legacy records and cannot authorize a new-work carve-out.
 
 ## Jurisdiction rules
 
@@ -184,7 +182,8 @@ Distinguish these conclusions; none implies the others:
 | Unsupported preference               | `NON_ORACLE_OPINION` only without approved criteria or observed user impact         |
 
 Presence, links and shape can be checked mechanically; filled-in prose does not validate the
-meaning of a dismissal. Low retains its single-node path and existing disqualification rules.
+meaning of a dismissal. Low follows the same mandatory verification and Oracle gates; only historical
+records may retain the old single-node report shape.
 
 ## Common state meanings
 
@@ -279,7 +278,8 @@ Use this conditional review within the existing Outcome Brief, investigation and
 
 Scale investigation to potential loss, reversibility, evidence sufficiency, affected scope and
 uncertainty of important assumptions, not LOC or words such as "save" or "async". A small approved
-change with adequate evidence adds no ceremony; the canonical Low conditions still apply.
+change with adequate evidence keeps investigation small; Low still uses the mandatory verification
+stack and the same confirmation/lock gates.
 
 For an important candidate, distinguish four layers rather than committing to the first solution:
 
@@ -479,7 +479,7 @@ from current behavior, and whether a wrong result can be recovered.
 | Autosave a draft that the user can undo or restore                          | a recoverable wrong value                             | Medium |
 | Charge a card, change a permission, or delete data that has no restore path | money, access, or data lost for good                  | High   |
 
-- Low → no card; record risk and reason in one line.
+- Low → record risk and reason, then use the Oracle card and mandatory verification stack. Low risk does not waive a tool or the approval/lock procedure.
 - Medium and High → write the card, which passes the one Draft confirmation in
   [`confirmation-lock.md`](confirmation-lock.md); High adds the High evidence of the canonical table.
 - A `mandatory-constraint` or a High entry criterion is never lowered because the UI looks simple.
@@ -523,8 +523,9 @@ by observing code is only a `project-constraint` candidate, not a product policy
 
 Pruning:
 
-- When P1 judges Low, end the grill and route to the
-  [`lanes/low-fast-path.md`](../lanes/low-fast-path.md) lane.
+- When P1 judges Low, keep the smallest source-backed scope and continue the Oracle lane with
+  [`mandatory-verification.md`](../mandatory-verification.md). The historical
+  [`lanes/low-fast-path.md`](../lanes/low-fast-path.md) is not a route for new work.
 - Skip P4 entirely when there is no endpoint, P5 when there is no mutation·async, P7 when it is
   `behavior-only`, and P8 when there is no performance claim.
 - When the feature matches an installed `frontend-system-design` reference, convert that document's
@@ -994,18 +995,28 @@ replaces the `O*`·`D*` row that owns a specific scenario outcome.
   lint — same contract as State Model.
 - `I*` rows are checked during every journey rather than mapped one-to-one to a scenario test.
 
-## Formal Model — optional
+## Mandatory verification stack
 
-Only on the Bend path: the section, its locked `MODEL.bend`/`LAWS.bend` sources and its checks are
-owned by [`bend-cross-verification.md`](../bend-cross-verification.md). Absence does not block lint.
+Every card, including Low and Design-only, must also record the real type-fest utility and the
+source-backed relation it protects, TypeScript positive/negative compiler witnesses, and a positive
+fast-check sampling plan. See [`mandatory-verification.md`](../mandatory-verification.md). A mention,
+dummy import, unrelated fixture or `runs=0` is not evidence; unresolved capability is `NEEDS_DECISION`
+and missing tools or failed execution is `FAIL`.
 
-## Terms and Adequacy — optional
+## Formal Model — required
 
-`## Terms` (the dictionary) may appear on any card; `## Adequacy` only on the Bend path with goals from
-the source text. Both, their locked world source and the adequacy check are owned by
-[`adequacy.md`](../adequacy.md). Absence does not block lint; a card without `## Adequacy` reports
-adequacy as not evaluated. For such a card, the reverse-impossible reviewer's input is the file
-`oracle-adequacy.mjs explore-input` derives, and its candidates go through `triage` (adequacy.md).
+Every card must include the section and its locked `MODEL.bend`/`LAWS.bend` sources and imports.
+`PROOF.bend` is required as a checked proof candidate but remains unlocked and repairable.
+The checks are owned by [`bend-cross-verification.md`](../bend-cross-verification.md); absence is a
+`FAIL`, including Low and Design-only.
+
+## Terms and Adequacy — required
+
+`## Terms` and `## Adequacy` are required on every card, with goals from the source text. Both, their
+locked world source and adequacy check are owned by [`adequacy.md`](../adequacy.md). Missing or
+incomplete content is `FAIL`; unresolved meanings or support are `NEEDS_DECISION`. The reverse-
+impossible reviewer uses the file `oracle-adequacy.mjs explore-input` derives, and its candidates go
+through `triage` (adequacy.md).
 
 ## Cold-read gate — adversarial self-review
 
@@ -1674,8 +1685,10 @@ user confirmation.
 ## Deterministic revision lock
 
 After the cold-read gate, save the exact bytes of the user-confirmed card to a file and lock it with
-the bundled script. Work with no new policy·card, such as the Low fast path, does not enter this
-procedure.
+the bundled script. Every Oracle work item, including Low and Design-only work, enters this procedure.
+There is no bypass for work without a new policy card. Reuse a valid current lock; if mandatory
+verification sources or semantics are missing, confirm and lock a new revision, never extend or
+rewrite the historical lock.
 
 When a revision locked as Design-only is later extended to Delivery and a new local source such as
 architecture·backend becomes necessary, do not append to the existing lock. Show the source delta to
@@ -1745,7 +1758,8 @@ node <skill-dir>/scripts/oracle-lock.mjs verify \
 - `LOCK_INVALID`·a missing tool·an unrunnable command is a determinism judgment failure → `FAIL`.
 - Automatic regeneration to clear a mismatch is forbidden. Re-locking happens only after going
   through the source gate, the Draft delta, user re-confirmation, and the cold-read gate again.
-- When the card was skipped as Low risk, leave the lock N/A reason. At Medium/High, when the
+- A Low-risk card must not be marked skipped or N/A: record the mandatory Bend, adequacy, type-contract
+  and fast-check evidence. At Medium/High, when the
   filesystem·Node is unavailable, both Design-only and Delivery report `FAIL` instead of
   substituting LLM judgment.
 

@@ -25,12 +25,20 @@ const graph = {
 const referenceGraph = {
   entry: 'common',
   lanes: [
-    { id: 'low-fast-path', when: 'risk=Low', nodes: ['low-fast-path'], exclusive: true, escalation: 'escalate' },
+    {
+      id: 'low-fast-path',
+      when: 'risk=Low — legacy',
+      nodes: ['common', 'mandatory-verification'],
+      exclusive: false,
+      legacyOnly: true,
+      escalation: 'legacy',
+    },
     { id: 'oracle', when: 'medium or high', entry: 'common' },
   ],
   nodes: [
     { id: 'low-fast-path', requires: [] },
     { id: 'common', requires: [] },
+    { id: 'mandatory-verification', requires: ['common'] },
     { id: 'card-format', requires: ['common', 'bva'] },
     { id: 'bva', requires: [] },
     { id: 'standalone', requires: [] },
@@ -58,8 +66,9 @@ test('renders the reference loading diagram from declared lanes and requires edg
   const output = renderReferenceBlock(referenceGraph)
 
   // lane 분기와 승격 경로는 lanes 선언에서 나온다
-  assert.match(output, /RISK -->\|"risk=Low"\| low_fast_path/)
-  assert.match(output, /low_fast_path -\.->\|"escalate"\| common/)
+  assert.match(output, /RISK -->\|"모든 risk"\| common/)
+  assert.match(output, /LEGACY\["low-fast-path/)
+  assert.doesNotMatch(output, /risk=Low/)
 
   // 엣지는 requires 그대로다 — 손으로 그린 엣지를 발명하지 않는다
   assert.match(output, /^ {2}common --> card_format$/m)

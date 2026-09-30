@@ -77,9 +77,13 @@ export function renderReferenceBlock(referenceGraph) {
     throw new TypeError('Reference graph must define nodes and lanes arrays.')
   }
 
-  const lowLane = referenceGraph.lanes.find((lane) => lane.exclusive)
+  const lowLane = referenceGraph.lanes.find((lane) => lane.id === 'low-fast-path')
   if (!lowLane) {
-    throw new TypeError('Reference graph must declare an exclusive low-risk lane.')
+    throw new TypeError('Reference graph must declare a low-fast-path compatibility lane.')
+  }
+  const entryLane = referenceGraph.lanes.find((lane) => lane.id === 'oracle')
+  if (!entryLane) {
+    throw new TypeError('Reference graph must declare an oracle lane.')
   }
 
   const entry = referenceGraph.entry
@@ -95,13 +99,15 @@ export function renderReferenceBlock(referenceGraph) {
     }
   }
 
-  const independent = referenceGraph.nodes.filter((node) => !routed.has(node.id)).map((node) => node.id)
+  const independent = referenceGraph.nodes
+    .filter((node) => node.id !== lowLane.id && !routed.has(node.id))
+    .map((node) => node.id)
   const independentLine =
     independent.length > 0 ? `\n  IND["${independent.join(' · ')}<br/><i>독립 노드 — 조건 충족 시에만</i>"]` : ''
 
   // 라벨은 mermaid id와 파일 id가 다른 노드에만 필요하다 — lane·entry 노드는 위에서 이미 선언했다.
   const labels = referenceGraph.nodes
-    .filter((node) => routed.has(node.id) && node.id !== entry && !laneNodes.has(node.id))
+    .filter((node) => routed.has(node.id) && node.id !== entry)
     .filter((node) => mermaidId(node.id) !== node.id)
     .map((node) => `  ${mermaidId(node.id)}["${node.id}"]`)
 
@@ -117,9 +123,8 @@ export function renderReferenceBlock(referenceGraph) {
 \`\`\`mermaid
 flowchart LR
   START(["요청"]) --> RISK{"risk 판정"}
-  RISK -->|"${lowLane.when}"| ${mermaidId(lowLane.nodes[0])}["${lowLane.nodes[0]}<br/><i>exclusive · 이 노드만</i>"]
-  ${mermaidId(lowLane.nodes[0])} -.->|"${lowLane.escalation}"| ${mermaidId(entry)}
-  RISK -->|"그 외"| ${mermaidId(entry)}["${entry}"]
+  RISK -->|"모든 risk"| ${mermaidId(entry)}["${entry}<br/><i>common · mandatory verification</i>"]
+  LEGACY["low-fast-path<br/><i>legacy records only</i>"] -.-> ${mermaidId(entry)}
 
 ${labels.join('\n')}
 

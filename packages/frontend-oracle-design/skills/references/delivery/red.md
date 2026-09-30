@@ -14,7 +14,8 @@
    owns the boundary, and FSD placement follows the `__mocks__/` rule of [`fsd.md`](../fsd.md).
 4. Assert each row's `Then`, `Never`, and side-effect kind·count together. Observe request
    count·order in the handler.
-5. Actually run the tests with `exec`.
+5. Actually run the tests with `exec`, including a positive `fast-check` sample (`--runs N`, N > 0);
+   `runs=0` or omitted sampling is not evidence.
 6. If the failure satisfies `$test`'s `VALID_RED` predicate, confirm the reported test failure of the
    designated row with `oracle-verify.mjs red`. Record the transition with that runId·row, and modify
    production only after the transition passes.

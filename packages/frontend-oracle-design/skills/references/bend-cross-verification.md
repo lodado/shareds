@@ -1,22 +1,18 @@
-# Automatic Bend formal model path for applicable Oracle work
+# Mandatory Bend formal model path for every Oracle work
 
 Bend closes the defined problem space mathematically, fast-check attacks the real implementation and
 the edges of that space, and the counterexamples they find widen the problem space itself.
 
-Within the Oracle lane, assess applicability before Draft/lock without waiting for the user to say
-"Bend". Automatically select this path for a pure calculation or deterministic state transition with
-a meaningful invariant (for example bounded quantities, monetary conservation, stale responses, or
-legal state transitions) whose domain fits Bend's `Nat`, `U32`, `Bool` and finite datatypes. A domain
-that needs negative numbers, 64-bit values, strings or a provable floating-point result is not
-eligible (Bend's F32 is axiomatic): record that reason and continue normal Oracle verification. Also
-load it for an explicit Bend request. Start with one small core, not the whole UI; do not model copy,
-CSS, trivial formatting, or external I/O alone. An explicit request outside the provable scope needs
-an explanation, not a fake proof.
+Every Oracle run—Low, Medium, High, Design-only and Delivery—uses this path; do not gate it on
+applicability or an explicit request. Model the smallest pure core when the product contains one, and
+represent unsupported values or effects explicitly in the model boundary and Terms rather than
+dropping them. Bend does not make strings, negative values, 64-bit values, floating point, UI, CSS,
+I/O, time or randomness disappear: unsupported or unresolved scope is `NEEDS_DECISION`, and a missing
+tool or failed proof is `FAIL`. Never narrow the approved problem merely to obtain a proof.
 
-This adds a verification technique inside the existing card, lock, ledger and review — not a second
-orchestrator, approval, card or delivery state. Oracle owns approved policy and transitions; `$test`
-owns behavior tests and judgment. Low does not load this node. Automatic selection authorizes only
-the pinned install in §1, never policy approval or bypassing the existing gates.
+This is a mandatory verification technique inside the existing card, lock, ledger and review—not a
+second orchestrator, approval, card or delivery state. Oracle owns approved policy and transitions;
+`$test` owns behavior tests and judgment. It never bypasses confirmation, lock, ledger or review.
 
 The chain is: source text → card policies and rows → a reference model and laws locked with the card
 → a generated oracle space → the product observed on that space. AI proposes every link; `bend`,
@@ -35,10 +31,10 @@ proven about the product, and a finite space checked is not every run.
   unpacks it into the skill's own cache. It never pipes `curl` to a shell or edits PATH and shell
   files. Call the absolute path it prints with `BEND_NO_TELEMETRY=1`. Read `bend guide` before
   writing Bend; Bend 2 is not the old HVM runtime.
-- When `ensure-bend.mjs` fails (offline, sandbox, unsupported platform, checksum mismatch), an
-  automatically selected path records the printed code, drafts no `## Formal Model` and continues
-  with normal Oracle verification; an explicit Bend request is `ENVIRONMENT_DEFECT` → `FAIL`. Never
-  replace a proof with tests silently or call a tool failure "not applicable".
+- When `ensure-bend.mjs` fails (offline, sandbox, unsupported platform, checksum mismatch), record the
+  printed code as `ENVIRONMENT_DEFECT` → `FAIL`; draft no incomplete `## Formal Model` and do not
+  continue as if mandatory verification passed. Never replace a proof with tests silently or call a
+  tool failure “not applicable”.
 - Keep UI, browser, network, foreign code and uncontrolled time/randomness outside the pure model and
   name the Oracle rows that check them. An assumption about an external effect is not a proof of it.
 
@@ -139,13 +135,18 @@ the required scenarios with the law statements. `open`/`failed` means the model,
 work or a question; `timeout`/`unavailable` follows the §1 failure rule. The user approves the laws,
 environment, bound and observation line as part of the card. Lock with `--source` for `MODEL.bend`,
 `LAWS.bend` and every local file they import. A later change to any of them is a new revision with
-reconfirmation, never an in-place relock. Design-only stops here at `ORACLE_READY` with the card and
-the three `.bend` files; it writes no target test or production code.
+reconfirmation, never an in-place relock. Design-only stops here at `ORACLE_READY` with the card and the three `.bend` files; it performs and
+records `prove`, complete `space` and Adequacy checks, plus type-fest/static/fast-check plans and
+availability, but writes or executes no target tests or production code. Delivery executes the
+consumer checks under the four required labels.
 
 ## 4. Delivery: RED, conformance and the proof label
 
-`init` refuses a card with `## Formal Model` unless `--required-label bend-proof:reported` is
-registered (`FORMAL_PROOF_LABEL_REQUIRED`). Through the approved `$test` flow, write in the target
+At `init`, register `--required-label bend-proof:reported`, `--required-label bend-adequacy:reported`,
+`--required-label type-contract:reported` and `--required-label fast-check:reported` for every
+card. The existing `FORMAL_PROOF_LABEL_REQUIRED` gate checks the proof label when a Formal Model is
+present; registration of all four is the operating contract, not a new universal runner gate.
+Through the approved `$test` flow, write in the target
 repository's existing `node:test` harness:
 
 - a proof check that calls `proveLaws({ dir, bin })` from `<skill-dir>/scripts/oracle-model.mjs` and
@@ -229,14 +230,15 @@ the expected results — during the harness step, then it passes two gates befor
   model, laws or observation meaning.
 
 - `emit-trace --model --prefix --bound --adapter --out --row [--runs N --max-length L]` (differential):
-  every trace up to the bound with each prefix's expected observation, then, with `--runs`, fast-check
-  traces longer than the bound. fast-check draws choice indices and the model's `next(history)` picks
+  every trace up to the bound with each prefix's expected observation, then, with a positive `--runs N`, fast-check
+  traces longer than the bound; omitting `--runs` is invalid. fast-check draws choice indices and the model's `next(history)` picks
   the event, so no trace the environment forbids is generated and shrinking yields shorter, earlier
   choices. The adapter is the one above (`init`, `step`, `observe`).
 - `emit-state --model --prefix --state <Type> --command <Type> (--relation <def>)... [--differential]`
   (property): every state·command pair of the Bend types, or a fast-check sample when the domain is
   above `--threshold` (default 256) or infinite (`--nat-max`, `--list-max` bound the sample and are
-  printed in its scope). Each pair goes through `concretize` → `step` → `project`; the round trip
+  printed in its scope); a positive fast-check sample is mandatory even for small/exhaustive domains
+  and must run through a separate trusted harness when this generator stays exhaustive. Each pair goes through `concretize` → `step` → `project`; the round trip
   `project(concretize(s)) == s` is asserted every time, and each relation
   `<Prefix>.<R>(s, c, t) -> Bool` judges the projected result. A relation must be stated by a law in
   `LAWS.bend`; declare them in the Formal Model as `- State:`, `- Command:`, `- Relations:` (lint

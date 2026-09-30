@@ -1,5 +1,15 @@
 # Type constraints — Props and the shared API surface
 
+## Mandatory verification stack
+
+Follow [`mandatory-verification.md`](../mandatory-verification.md) on every Oracle invocation, including
+Low and Design-only. Its tool-use, evidence and blocking rules remain mandatory; the selection
+ladders below choose meaningful contracts and never exempt a member of that stack.
+
+### Required library-backed witness
+
+A shared or local API contract must use an installed, pinned `type-fest` utility in the actual consumer path when the relation is authored, and compile that consumer with TypeScript positive/negative witnesses. Record the utility and relation; a dummy import, unused type alias, or custom duplicate is not evidence. Pair the contract run with positive-count `fast-check` sampling and the locked Bend relation.
+
 ## Consumer-facing contracts
 
 The [public-contract definition](../changeability.md#architecture-independent-ownership) applies to

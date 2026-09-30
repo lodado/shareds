@@ -39,7 +39,7 @@ const TYPES_NODE_FILES = [
   'references/types/review-criteria.md',
 ]
 const ADVANCED_TYPES_LOAD_CONDITION =
-  'always with state-ladder during type work — loading unconditional, adoption via compiler witness packet gate'
+  'every invocation — mandatory type-fest/TypeScript contract path before Draft/lock; loading unconditional, adoption via compiler witness packet gate'
 
 async function readAll(relativePaths) {
   const parts = await Promise.all(relativePaths.map(read))
@@ -48,7 +48,7 @@ async function readAll(relativePaths) {
 
 const REVIEW_NODE_FILES = ['references/subagent-review.md', 'references/review-checklist.md']
 
-test('Bend cross-verification loads automatically for applicable Oracle work without expanding Low or bundles', async () => {
+test('Bend cross-verification is mandatory for every risk and is not bundled', async () => {
   const { loadGraph, splitDelivery } = await import('./generate-reference-bundles.mjs')
   const graph = await loadGraph()
   const id = 'bend-cross-verification'
@@ -56,11 +56,11 @@ test('Bend cross-verification loads automatically for applicable Oracle work wit
   assert.ok(node, 'applicable Oracle work needs a discoverable Bend reference')
   assert.equal(
     node.when,
-    'Oracle lane — automatically before Draft/lock for a pure calculation or deterministic state transition with a meaningful invariant, or an explicit Bend request; re-read before proof execution and GREEN/review',
+    'every invocation — mandatory Bend proof/model path before Draft/lock; re-read before proof execution and GREEN/review',
   )
   assert.equal(node.path, 'references/bend-cross-verification.md')
   assert.deepEqual(node.requires, ['common'])
-  assert.equal(node.implementationInput, undefined, 'ordinary workers must not acquire a Bend requirement')
+  assert.equal(node.implementationInput, undefined)
   const selected = splitDelivery(graph, { id: 'bend-request', nodes: [id] })
   assert.deepEqual(
     selected.delivered.map((candidate) => candidate.id),
@@ -87,7 +87,7 @@ test('Bend cross-verification loads automatically for applicable Oracle work wit
   const lowDelivery = splitDelivery(graph, { id: low.id, nodes: low.nodes })
   assert.deepEqual(
     lowDelivery.delivered.map((candidate) => candidate.id),
-    ['low-fast-path'],
+    ['common', 'mandatory-verification'],
   )
 })
 
@@ -99,10 +99,10 @@ test('O1 Low and Design-only do not acquire contextual review requirements', asy
   const graph = JSON.parse(await read('references/reference-graph.json'))
   const lane = graph.lanes.find(({ id }) => id === 'low-fast-path')
   const { delivered, assumed } = splitDelivery(graph, { id: 'low-contract', nodes: lane.nodes })
-  assert.equal(lane.exclusive, true)
+  assert.equal(lane.exclusive, false)
   assert.deepEqual(
     delivered.map(({ id }) => id),
-    ['low-fast-path'],
+    ['common', 'mandatory-verification'],
   )
   assert.deepEqual(assumed, [])
   const workflow = JSON.parse(await read('references/oracle-workflow.graph.json'))
@@ -111,6 +111,24 @@ test('O1 Low and Design-only do not acquire contextual review requirements', asy
     workflow.edges.filter(({ from }) => from === 'oracle-ready'),
     [],
   )
+})
+
+test('all risk lanes enter the common mandatory-verification path', async () => {
+  const [skill, common, lane, graphSource] = await Promise.all([
+    read('SKILL.md'),
+    read('references/common.md'),
+    read('references/lanes/low-fast-path.md'),
+    read('references/reference-graph.json'),
+  ])
+  const graph = JSON.parse(graphSource)
+  const low = graph.lanes.find(({ id }) => id === 'low-fast-path')
+  assert.deepEqual(low.nodes, ['common', 'mandatory-verification'])
+  assert.equal(low.exclusive, false)
+  assert.match(skill, /Read \[`common\.md`\]\(references\/common\.md\) for every risk/)
+  assert.match(skill, /Bend[\s\S]*unconditionally|unconditionally[\s\S]*Bend/i)
+  assert.match(skill, /type-fest[\s\S]*fast-check|fast-check[\s\S]*type-fest/i)
+  assert.match(common, /mandatory-verification\.md/)
+  assert.match(lane, /legacy/i)
 })
 
 test('O15 contextual review graph and generated artifacts remain synchronized', async () => {
@@ -522,7 +540,7 @@ test('keeps automatic routing narrow and leaves sibling concerns with their owne
   assert.match(description, /already approved behavior that has no Oracle run/)
   // 라이브 canary(압박 프롬프트)에서 "카드를 다시 열지 말라"를 NEEDS_DECISION 기록 금지로 읽은 run이 있었다
   assert.match(skill, /Recording\s+it neither reopens nor edits the locked card/)
-  assert.match(skill, /Low fast path.*loads no other reference nodes/s)
+  assert.match(skill, /low-fast-path node is legacy-only/s)
   assert.match(skill, /Oracle.*Outcome Brief.*Source Registry.*lock.*state transitions/s)
   assert.match(skill, /FSD.*do\s+not auto-invoke this skill on its own/s)
 })
@@ -827,7 +845,10 @@ test('gates approved hook encapsulation and reviews UI/business responsibility b
   assert.match(architectureContract, /### Hook tiers profile/)
   assert.match(architectureContract, /no\s+placement\s+contract\s+of\s+its\s+own[\s\S]*standing\s+instruction/)
   assert.match(architectureContract, /Do\s+not\s+infer\s+the\s+profile\s+from\s+code\s+shape/)
-  assert.match(frontendImplementation, /use-encapsulation\/prefer-custom-hooks`[\s\S]{0,120}audited\s+and\s+not\s+adopted/)
+  assert.match(
+    frontendImplementation,
+    /use-encapsulation\/prefer-custom-hooks`[\s\S]{0,120}audited\s+and\s+not\s+adopted/,
+  )
   assert.doesNotMatch(frontendImplementation, /propose\s+introducing\s+`use-encapsulation/)
   assert.match(frontendImplementation, /UI[\s\S]{0,40}business logic/i)
   assert.match(subagentReview, /micro-hook.*UI.*business logic/s)
@@ -1325,7 +1346,6 @@ test('type-environment: pins compiler environment once per repo and protects con
   assert.match(skill, /references\/type-environment\.md/)
   assert.match(skill, /Once per\s+repo/)
   assert.match(typeEnvironment, /[Oo]nce per repo/)
-  assert.match(typeEnvironment, /Do not re-read.*every card/i)
   assert.match(typeEnvironment, /tsc --showConfig/)
   assert.match(typeEnvironment, /`strict`/)
   assert.match(typeEnvironment, /noUncheckedIndexedAccess/)
@@ -1400,9 +1420,8 @@ test('reads load conditions at the decision point, not at the write stage', asyn
 })
 
 test('always loads advanced compiler contracts with type work and keeps adoption witness-gated', async () => {
-  const [skill, readme, advancedContracts, graphSource] = await Promise.all([
+  const [skill, advancedContracts, graphSource] = await Promise.all([
     read('SKILL.md'),
-    read('README.md'),
     read('references/types/advanced-contracts.md'),
     read('references/reference-graph.json'),
   ])
@@ -1414,8 +1433,7 @@ test('always loads advanced compiler contracts with type work and keeps adoption
   assert.equal(advancedNode?.when, ADVANCED_TYPES_LOAD_CONDITION)
   assert.deepEqual(advancedNode?.requires, ['types-api-surface'])
   assert.equal(byId.get('types-state-ladder').requires.includes('types-advanced-contracts'), false)
-  assert.ok(skill.includes(ADVANCED_TYPES_LOAD_CONDITION))
-  assert.ok(readme.includes(ADVANCED_TYPES_LOAD_CONDITION))
+  assert.match(skill, /type-fest\/TypeScript contract guidance.*before Draft\/lock/s)
 
   assert.match(advancedContracts, /AI-authored public type contract rejectable by the compiler/)
   assert.match(advancedContracts, /One `@ts-expect-error` line per axis/)
@@ -1668,7 +1686,7 @@ test('passes review criteria to reviewers as file links, not pasted text', async
   }
 })
 
-test('routes the low fast path as an explicit exclusive lane in the graph', async () => {
+test('routes the legacy low record through the common mandatory lane', async () => {
   const [skill, lane, card, delivery, graphSource] = await Promise.all([
     read('SKILL.md'),
     read('references/lanes/low-fast-path.md'),
@@ -1680,9 +1698,9 @@ test('routes the low fast path as an explicit exclusive lane in the graph', asyn
   const ids = new Set(graph.nodes.map((node) => node.id))
 
   // lane 노드가 진입 조건·절차·승격 규칙을 소유한다
-  assert.match(lane, /## Entry Conditions/)
-  assert.match(lane, /## What (?:This |the )?Lane Does Not Do/)
-  assert.match(lane, /## Promotion — Low Disqualification Conditions/)
+  assert.match(lane, /## Historical Entry Conditions/)
+  assert.match(lane, /## Historical Scope Notes/)
+  assert.match(lane, /## Historical Promotion Notes/)
   assert.match(lane, /Loading other reference nodes/)
   assert.match(lane, /not.{0,10}lane that skips verification/i)
   assert.match(lane, /immediately disqualif/i)
@@ -1692,15 +1710,17 @@ test('routes the low fast path as an explicit exclusive lane in the graph', asyn
   const lowLane = graph.lanes.find((entry) => entry.id === 'low-fast-path')
   const oracleLane = graph.lanes.find((entry) => entry.id === 'oracle')
   assert.ok(lowLane, 'low-fast-path lane must exist')
-  assert.equal(lowLane.exclusive, true)
+  assert.equal(lowLane.exclusive, false)
+  assert.equal(lowLane.legacyOnly, true)
+  assert.deepEqual(lowLane.nodes, ['common', 'mandatory-verification'])
   for (const node of lowLane.nodes) assert.ok(ids.has(node), `lane references unknown node ${node}`)
   assert.ok(lowLane.escalation, 'low lane must declare an escalation rule')
   assert.equal(oracleLane?.entry, 'common')
 
   // SKILL과 각 단계 문서가 lane 노드로 라우팅한다
-  assert.match(skill, /lanes\/low-fast-path\.md/)
-  assert.match(card, /lanes\/low-fast-path\.md/)
-  assert.match(delivery, /lanes\/low-fast-path\.md/)
+  assert.match(skill, /mandatory-verification\.md/)
+  assert.match(card, /common\.md/)
+  assert.match(delivery, /mandatory Bend/)
 })
 
 test('forces one entry-node read and a lane header before any other work', async () => {
@@ -1721,7 +1741,7 @@ test('forces one entry-node read and a lane header before any other work', async
   assert.match(skill, /The first tool call is a Read of exactly one lane entry node/)
   assert.match(skill, /any other reference load all come after it/)
   assert.match(skill, /Print the lane header as the first line of the response.*without the\s+header is a violation/s)
-  assert.match(skill, /risk=<Low\|Medium\|High> lane=<low-fast-path\|oracle> nodes=\[/)
+  assert.match(skill, /risk=<Low\|Medium\|High> lane=oracle nodes=\[/)
   assert.match(skill, /only the nodes \*\*actually Read\*\*/)
 
   // 설명·플랜 전용 요청도 같은 절차 — 이전 실패 모드
@@ -1730,7 +1750,7 @@ test('forces one entry-node read and a lane header before any other work', async
 
   // Low lane도 같은 헤더를 낸다
   assert.match(lane, /[Pp]rint the lane header (?:as|on) the first line/)
-  assert.match(lane, /risk=Low lane=low-fast-path nodes=\[low-fast-path\]/)
+  assert.match(lane, /risk=Low lane=oracle nodes=\[common, mandatory-verification/)
 
   // 그래프가 진입 계약을 기계 판독 가능하게 선언한다
   assert.ok(graph.entryContract, 'reference-graph.json must declare entryContract')
@@ -2021,12 +2041,13 @@ test('keeps the runtime reference prose in sync with the graph that owns the loa
   assert.doesNotMatch(skill, /\(references\/review-checklist\.md\)/)
 })
 
-test('reports the low lane in three lines instead of padding the oracle block with N/A', async () => {
+test('uses the Oracle report for new Low runs while retaining historical reports', async () => {
   const [skill, lane] = await Promise.all([read('SKILL.md'), read('references/lanes/low-fast-path.md')])
 
   assert.match(skill, /The block below is the Oracle lane's report/)
-  assert.match(skill, /The Low fast path reports three lines instead — changed\s+paths/)
-  assert.match(skill, /Padding those fields with N\/A is a\s+report defect/)
+  assert.match(skill, /report for every new invocation, including Low/)
+  assert.match(skill, /Historical Low\s+fast-path records retain their original three-line report/)
+  assert.match(skill, /Padding inapplicable fields with N\/A is a report defect/)
 
   // lane 문서의 보고 절차와 같은 세 항목이다
   assert.match(
@@ -2072,8 +2093,8 @@ test('carves the disqualifying scope out of a mixed low-risk request instead of 
   assert.match(lane, /the unresolved policy wearing a CSS costume/)
 
   // common과 그래프가 같은 조건을 반복한다
-  assert.match(common, /escalate that part alone under the carve-out/)
-  assert.match(common, /shares state, a side effect, or a type with the carved scope is never split/)
+  assert.match(common, /historical Low fast path.*legacy-only/i)
+  assert.match(common, /cannot authorize a new-work carve-out/)
 
   // 조건은 별도 필드가 소유한다 — escalation은 도식 라벨이라 짧게 유지한다
   assert.ok(lowLane.carveOut, 'low lane must declare machine-readable carve-out conditions')
@@ -2229,7 +2250,11 @@ test('records escapes as classes and run metrics as direction signals, never gat
   assert.equal(node?.path, 'references/card/retro-metrics.md')
   assert.deepEqual(node?.requires, ['common', 'card-case-space'])
   // lock 이후 노드다 — Draft를 쓰는 card-lane이 미리 싣지 않는다
-  assert.equal(cardLane?.nodes.includes('card-retro-metrics'), false, 'card-lane bundle must not carry the post-lock retro node')
+  assert.equal(
+    cardLane?.nodes.includes('card-retro-metrics'),
+    false,
+    'card-lane bundle must not carry the post-lock retro node',
+  )
   assert.match(skill, loose('card/retro-metrics.md'))
 
   // 막힌 3라운드는 같은 문맥의 4번째 시도가 아니라 fresh 재파견이다
@@ -2309,13 +2334,13 @@ test('extends machine derivation past the card bytes: witnesses, evidence lookup
   assert.match(readme, loose('### 기계 유도 — 코드와 형제 카드에서 빈칸을 만든다'))
 })
 
-test('first substantive Draft exposes verification design without duplicating policy or expanding Low', async () => {
+test('first substantive Draft exposes verification design at every risk without duplicating policy', async () => {
   const skill = await read('SKILL.md')
   const card = await read('references/card/card-format.md')
   const space = await read('references/card/case-space.md')
   const testSkill = await readFile(join(skillDirectory, '../../test/skills/test/SKILL.md'), 'utf8')
   assert.match(skill, /first substantive Draft or detailed design response/)
-  assert.match(skill, /does not expand the Low fast path/)
+  assert.match(skill, /This applies to Low too/)
   assert.match(card, /## Verification realization plan/)
   for (const field of [
     'Contract reference',
@@ -2384,7 +2409,7 @@ test('conditional guardrail loading projects existing owners without adding a de
   const graph = JSON.parse(await read('references/reference-graph.json'))
   const skill = await read('SKILL.md')
   const conditions = [
-    ['low-fast-path', /scope carve-out/, /scope carve-out at disqualification/],
+    ['low-fast-path', /legacy records only/, /low-fast-path node is legacy-only/],
     ['card-retro-metrics', /execution observation/, /candidate review from execution observations/],
     ['card-confirmation-lock', /revision mismatch/, /confirmation-lock on a\s+revision mismatch/],
     ['delivery-ledger', /uncertain command/, /delivery\/ledger before an uncertain command/],

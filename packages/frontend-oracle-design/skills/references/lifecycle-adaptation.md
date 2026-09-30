@@ -2,7 +2,7 @@
 
 Read only in the Oracle lane, before selecting investigation breadth/depth for unclear
 existing-system ownership, cross-boundary scope, or single-card milestone grouping. A small change
-with known owners and sufficient approved sources does not need this node. Low keeps its exclusive
+with known owners and sufficient approved sources does not need this node. Low has no exclusive
 fast path. If investigation discovers one of these conditions later, load here before replanning.
 
 ## Select work, not a weaker guarantee

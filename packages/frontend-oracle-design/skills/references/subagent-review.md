@@ -115,7 +115,10 @@ does not count as an independent review or replace evidence. Medium still requir
 review; High still requires two different reviewer IDs receiving the **same complete packet** and
 each reviewing **all applicable perspectives**. Dividing perspectives between two reviewers is not
 independent double review. Designer jurisdiction and the five `changeabilityReview` axes are unchanged.
-Low fast path and Design-only acquire no mandatory context artifacts or implementation-review requirements. An explicitly supplied `--context` on the existing locked-Oracle CLI is opt-in; it does not change Low fast-path routing.
+Design-only acquires no implementation-review packet requirements because it changes no product.
+New Low Delivery work uses the Oracle lane and mandatory verification review like other risks.
+Historical Low fast-path records retain their original scope. An explicitly supplied `--context` on
+the existing locked-Oracle CLI remains opt-in; it does not waive the mandatory verification stack.
 
 ### Collect and select
 

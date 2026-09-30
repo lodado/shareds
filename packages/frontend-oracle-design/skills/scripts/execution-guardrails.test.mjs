@@ -179,7 +179,11 @@ test('candidate seeds preserve graph ownership and non-activation boundaries', a
 test('problem-definition fixtures preserve prevent, allow and uncertain judgments without an automatic grader', async () => {
   const boundary = JSON.parse(await read('evals/boundary-cases.json'))
   const cases = boundary.cases.filter((entry) => entry.id.startsWith('fod-sem-problem-'))
-  assert.deepEqual([...new Set(cases.map((entry) => entry.disposition))].sort(), ['mustAllow', 'mustPrevent', 'mustRemainUncertain'])
+  assert.deepEqual([...new Set(cases.map((entry) => entry.disposition))].sort(), [
+    'mustAllow',
+    'mustPrevent',
+    'mustRemainUncertain',
+  ])
   assert.equal(new Set(cases.map((entry) => entry.id)).size, cases.length)
   const projected = boundaryEvals(boundary, 0)
   for (const entry of cases) {
@@ -199,17 +203,25 @@ test('problem-definition fixtures preserve prevent, allow and uncertain judgment
   }
 })
 
-test('conditional problem definition reuses existing owners and keeps Low isolated', async () => {
+test('conditional problem definition reuses existing owners without exempting Low from mandatory verification', async () => {
   const [common, sources, skill, graph] = await Promise.all([
-    read('references/common.md'), read('references/card/policy-sources.md'), read('SKILL.md'),
+    read('references/common.md'),
+    read('references/card/policy-sources.md'),
+    read('SKILL.md'),
     read('references/reference-graph.json').then(JSON.parse),
   ])
   assert.match(common, /Closing a problem candidate/)
   assert.match(common, /judgment, checked scope, original evidence, remaining unknowns/)
-  for (const layer of ['Observation', 'User impact', 'Cause hypotheses', 'Solution candidates']) assert.ok(sources.includes(layer))
+  for (const layer of ['Observation', 'User impact', 'Cause hypotheses', 'Solution candidates'])
+    assert.ok(sources.includes(layer))
   assert.match(sources, /not a required document or extra reviewer for every task/)
   assert.match(sources, /exhaustion leaves unknowns/)
   assert.match(skill, /conditional problem-definition review/)
-  assert.match(graph.nodes.find((node) => node.id === 'card-policy-sources').when, /conditional problem-definition review/)
-  assert.deepEqual(graph.lanes.find((lane) => lane.id === 'low-fast-path').nodes, ['low-fast-path'])
+  assert.match(
+    graph.nodes.find((node) => node.id === 'card-policy-sources').when,
+    /conditional problem-definition review/,
+  )
+  const lowLane = graph.lanes.find((lane) => lane.id === 'low-fast-path')
+  assert.equal(lowLane.legacyOnly, true)
+  assert.deepEqual(lowLane.nodes, ['common', 'mandatory-verification'])
 })

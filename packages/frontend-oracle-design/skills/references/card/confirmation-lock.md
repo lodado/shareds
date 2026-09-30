@@ -37,8 +37,10 @@ user confirmation.
 ## Deterministic revision lock
 
 After the cold-read gate, save the exact bytes of the user-confirmed card to a file and lock it with
-the bundled script. Work with no new policy·card, such as the Low fast path, does not enter this
-procedure.
+the bundled script. Every Oracle work item, including Low and Design-only work, enters this procedure.
+There is no bypass for work without a new policy card. Reuse a valid current lock; if mandatory
+verification sources or semantics are missing, confirm and lock a new revision, never extend or
+rewrite the historical lock.
 
 When a revision locked as Design-only is later extended to Delivery and a new local source such as
 architecture·backend becomes necessary, do not append to the existing lock. Show the source delta to
@@ -108,7 +110,8 @@ node <skill-dir>/scripts/oracle-lock.mjs verify \
 - `LOCK_INVALID`·a missing tool·an unrunnable command is a determinism judgment failure → `FAIL`.
 - Automatic regeneration to clear a mismatch is forbidden. Re-locking happens only after going
   through the source gate, the Draft delta, user re-confirmation, and the cold-read gate again.
-- When the card was skipped as Low risk, leave the lock N/A reason. At Medium/High, when the
+- A Low-risk card must not be marked skipped or N/A: record the mandatory Bend, adequacy, type-contract
+  and fast-check evidence. At Medium/High, when the
   filesystem·Node is unavailable, both Design-only and Delivery report `FAIL` instead of
   substituting LLM judgment.
 

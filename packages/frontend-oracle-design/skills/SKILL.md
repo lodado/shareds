@@ -14,15 +14,13 @@ operator map.
 
 ## Entry — always first
 
-1. **The first tool call is a Read of exactly one lane entry node.** If risk is Low, read
-   [`lanes/low-fast-path.md`](references/lanes/low-fast-path.md); otherwise read
-   [`common.md`](references/common.md). Repo exploration, answer drafting, any other tool call, and
+1. **The first tool call is a Read of exactly one lane entry node.** Read [`common.md`](references/common.md) for every risk; the low-fast-path node is legacy-only and must not be used for new work. Repo exploration, answer drafting, any other tool call, and
    any other reference load all come after it.
 2. **Print the lane header as the first line of the response.** Writing body text without the
    header is a violation.
 
    ```text
-   risk=<Low|Medium|High> lane=<low-fast-path|oracle> nodes=[node ids actually Read]
+   risk=<Low|Medium|High> lane=oracle nodes=[node ids actually Read]
    ```
 
    `nodes` lists only the nodes **actually Read** — never nodes you merely plan to read.
@@ -33,10 +31,9 @@ operator map.
 
 Lane routing:
 
-- **Low fast path** loads [`lanes/low-fast-path.md`](references/lanes/low-fast-path.md) alone and
-  loads no other reference nodes. It performs only existing repo verification — no card, lock, or
-  run artifacts. A policy question, a new contract, an architecture/public API or state-transition
-  decision, or visual identity work disqualifies Low immediately and escalates to the Oracle lane.
+- **All risks** enter the Oracle lane through [`common.md`](references/common.md), then load
+  [`mandatory-verification.md`](references/mandatory-verification.md) before Draft/lock. Low no
+  longer has a new-work fast path; `lanes/low-fast-path.md` only documents legacy records.
 - An explicit Oracle request or Medium/High starts from [`common.md`](references/common.md). Risk
   taxonomy, authority priority, policy sources, and feedback routing are canonical in `common.md`.
 - For requests that only need general architecture or FSD (Feature-Sliced Design) folder advice, do
@@ -62,8 +59,8 @@ Lane routing:
   `oracle-run.mjs review-brief` derives a read-only evidence index from the current packet and
   ledger-bound findings. It never approves policy, proves usability, or advances delivery; see
   `delivery/green-review.md` for the command and its limitations.
-- The Low fast path stays single-node: use its existing report, without loading Oracle references or
-  creating a test-space briefing, card, lock, or ledger.
+- Low is not a separate new-work lane. Existing legacy records may retain their historical low-fast-path
+  report, but every new invocation loads common and mandatory verification before Draft/lock.
 
 ### Document-driven progress
 
@@ -134,6 +131,11 @@ architecture, backend, type, and visual guidance below still applies. Status is 
 `transition` rechecks the gates and only success advances the state. Follow the rejection code and
 recovery hint, never bypass it by editing state or evidence.
 
+Every invocation loads [`mandatory-verification.md`](references/mandatory-verification.md) immediately
+after `common.md`, before Draft/lock, for both Low and Medium/High and for Design-only and Delivery.
+Bend, type-fest/TypeScript, and positive-count fast-check evidence are mandatory; labels or plans alone
+are not evidence. Re-read the node before verification and review.
+
 Read `when` as the decision point, not the deliverable stage. If applicability is ambiguous, load.
 Whether to skip a load is not a judgment call. The read instructions inlined into each step of
 "Mode selection" own execution order; do not defer to this section to proceed through a step.
@@ -144,32 +146,30 @@ delivery/red before a test/harness correction on the RED-to-GREEN path; delivery
 before reporting completion with missing or failed evidence. These are existing load conditions,
 not an extra approval or delivery state; proposed guardrail seeds live in eval metadata, not runtime
 instructions. For a reusable execution observation,
-use card/retro-metrics' candidate review after immediate existing feedback routing. Low checks only
-its own scope carve-out at disqualification, with no additional node or artifact.
+use card/retro-metrics' candidate review after immediate existing feedback routing. These conditions
+apply at every risk; Low has no new-work carve-out.
 
 - Only when a graph-orchestrated delivery loop is explicitly requested: load and invoke the
   installed `$agent-graph-engineering` skill by name, read
   [`graph-orchestration.md`](references/graph-orchestration.md) in full, then execute the bundled
   workflow.
-- In the Oracle lane, automatically assess Bend applicability before Draft/lock. For a pure
-  calculation or deterministic state transition with a meaningful invariant, or an explicit Bend
-  request, read [`bend-cross-verification.md`](references/bend-cross-verification.md). No separate
-  user request to invoke Bend is needed: `scripts/ensure-bend.mjs` provides the CLI (reuse or
+- In every lane, unconditionally load [`bend-cross-verification.md`](references/bend-cross-verification.md)
+  before Draft/lock. Bend is mandatory, not applicability-gated. No separate user request to invoke Bend
+  is needed: `scripts/ensure-bend.mjs` provides the CLI (reuse or
   checksum-pinned install) and `scripts/oracle-model.mjs` proves the locked laws, generates the
-  oracle space from the locked model and checks the product on it, recorded in an optional
+  oracle space from the locked model and checks the product on it, recorded in the required
   `## Formal Model`; with goals from the source text, `scripts/oracle-adequacy.mjs` checks the card's
   coordinates and rows against them (`## Terms`, `## Adequacy`, [`adequacy.md`](references/adequacy.md)),
   and `scripts/oracle-projection.mjs` generates the fast-check conformance tests from the model.
-  A failed install skips an automatically selected path and fails an explicit
-  Bend request. Re-read before proof execution and GREEN/review. Use supported, authorized native delegation with capacity for
+  A failed install is a mandatory verification failure; it cannot be skipped or downgraded. Re-read before proof execution and GREEN/review. Use supported, authorized native delegation with capacity for
   an independent model analyst; later run proof/behavior checks concurrently on stable, isolated
   inputs when the host supports it. Report a concrete reason for sequential fallback. Approval,
-  VALID_RED and final adjudication stay serial. This neither enables graph mode nor adds Bend to Low.
+  VALID_RED and final adjudication stay serial. This neither enables graph mode nor permits skipping Bend for Low.
 - Oracle-lane inception: before selecting investigation breadth/depth for unclear existing-system
   ownership, cross-boundary scope, or single-card milestone grouping, read
   [`lifecycle-adaptation.md`](references/lifecycle-adaptation.md) with its dependencies. A small
   change with known owners and sufficient approved sources does not load it. Keep it out of the
-  generic bundles and the Low fast path; it adjusts investigation, not required gates.
+  generic bundles; it adjusts investigation, not required gates.
 - Card writing and conditional problem-definition review (unclear purpose/task, cross-boundary
   impact, unexplained task failure, material dismissal, conflicting new evidence or repeated escapes):
   [`card/policy-sources.md`](references/card/policy-sources.md),
@@ -184,7 +184,7 @@ its own scope carve-out at disqualification, with no additional node or artifact
 - After the lock only, never while writing the card:
   [`card/retro-metrics.md`](references/card/retro-metrics.md) — the escape record written for any
   defect found after the lock, the run metrics recorded at `REVIEW_VERIFIED`, and conditional
-  guardrail candidate review from execution observations, none a gate; Low never loads this node.
+  guardrail candidate review from execution observations, none a gate; Low loads applicable review nodes.
 - Delivery: right after entering Delivery, explicitly load and invoke the installed `$test` skill
   by name and read [`delivery/ledger.md`](references/delivery/ledger.md). Load later nodes with
   their dependencies when needed: [`delivery/red.md`](references/delivery/red.md) before tests/RED;
@@ -196,12 +196,13 @@ its own scope carve-out at disqualification, with no additional node or artifact
   Delivery only: before contextual packet collection and independent review after implementation/test
   verification, use the existing `subagent-review` node for `--context` file selection and snapshot
   binding. Supporting context does not replace common inputs, five-axis judgments or independent
-  reviews. Low and Design-only acquire no context artifacts or review steps.
+  reviews. Low and Design-only follow the mandatory verification stack; context artifacts remain conditional by mode.
 - For Delivery only, after risk and source investigation and before Draft/lock/init/test work,
   perform the capability discovery in `delivery/ledger.md`. This is an investigation result, not
   runtime readiness or `VALID_RED` evidence. Do not reject a runner from its package name alone:
-  inspect the actual scripts, runner configuration, and supported reporter path. Design-only and
-  Low never load this check. Record `supported | unsupported | unknown`; a package name alone is
+  inspect the actual scripts, runner configuration, and supported reporter path. Low Delivery loads
+  this check too; Design-only checks tool readiness under mandatory verification without executing
+  consumer tests. Record `supported | unsupported | unknown`; a package name alone is
   not evidence, and an unknown result must be investigated rather than treated as unsupported.
 - Implementation decisions: [`changeability.md`](references/changeability.md),
   [`frontend/authoring.md`](references/frontend/authoring.md),
@@ -209,7 +210,8 @@ its own scope carve-out at disqualification, with no additional node or artifact
   [`frontend/quality.md`](references/frontend/quality.md). For React architecture boundary, state
   ownership, or public API changes:
   [`architecture-contract.md`](references/architecture-contract.md).
-- Types and state: before async·ordering·duplicate-submit·retry·multi-step `O*` rows, or client
+- Types and state: unconditionally load the type-fest/TypeScript contract guidance and compiler witness
+  path before Draft/lock; then, before async·ordering·duplicate-submit·retry·multi-step `O*` rows, or client
   state·exported Props·shared/package API·trust boundary type changes, read
   [`types/state-ladder.md`](references/types/state-ladder.md),
   [`types/authoring.md`](references/types/authoring.md),
@@ -218,7 +220,8 @@ its own scope carve-out at disqualification, with no additional node or artifact
   If an existing query·router·form owns the state, do not create a new `status` union, and never
   a member per screen — a member computable from a neighbour plus an owned flag (`paging`,
   `empty`) is derived state, not state.
-- always with state-ladder during type work — loading unconditional, adoption via compiler witness packet gate →
+- always with state-ladder during type work — loading unconditional, adoption via compiler witness packet gate;
+  the actual type-fest consumer and witnesses are mandatory →
   [`types/advanced-contracts.md`](references/types/advanced-contracts.md). Once per
   repo, or when tsconfig·TS version·witness inclusion·checker path changes:
   [`references/type-environment.md`](references/type-environment.md).
@@ -286,8 +289,9 @@ Use the verification realization plan and cold-read criteria in
 [`card/card-format.md`](references/card/card-format.md) and the existing
 [`card/case-space.md`](references/card/case-space.md) contract. Plans and examples are not execution
 evidence; unresolved expectations remain Open questions. "First" means the user-reviewable Draft,
-not a short progress preamble. This does not expand the Low fast path, authorize test or production
-edits or dependency installation for design-only requests, or replace Draft generation and approval.
+not a short progress preamble. This applies to Low too; it does not authorize consumer tests or production edits on Design-only
+requests, or replace Draft generation and approval. Tool preparation follows mandatory verification
+and the target repository's dependency rules.
 
 1. Read [`common.md`](references/common.md) and
    [`card/policy-sources.md`](references/card/policy-sources.md) → write the `Outcome Brief`.
@@ -383,7 +387,7 @@ When implementation, test-based self-verification, and subagent review are expli
    family's exclusion, and no nondeterminism or test-environment branch may be left unexempted.
    For an optional fresh implementation context after `VALID_RED`, use the existing runner's
    [task-scoped worker path](references/delivery/ledger.md#optional-task-scoped-implementation-worker).
-   It is independent of graph opt-in and does not replace review or expand Low/Design-only.
+   It is independent of graph opt-in and does not replace review or bypass mandatory verification.
 7. High risk: the sibling `test` skill's mutation kill·revert·re-GREEN first.
 8. The Controller generates raw review input and assignment/dispatch with `oracle-run.mjs review-packet`.
    Reviewers return findings only; the Controller/join creates the `oracle-run.mjs review-receipt`
@@ -449,10 +453,9 @@ runId fails the same way. On Claude Code the plugin's Stop hook runs it on the f
 
 ## Final report
 
-The block below is the Oracle lane's report. The Low fast path reports three lines instead — changed
-paths, the verification commands with their actual results, and the risk reason — because a card,
-lock, ledger, and review it never created cannot be reported on. Padding those fields with N/A is a
-report defect.
+The block below is the Oracle lane's report for every new invocation, including Low. Historical Low
+fast-path records retain their original three-line report; they do not waive current verification.
+Padding inapplicable fields with N/A is a report defect.
 
 Three rules decide what reaches the reader:
 

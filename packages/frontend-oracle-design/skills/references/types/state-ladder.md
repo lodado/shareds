@@ -1,5 +1,15 @@
 # Type constraints — purpose·ownership·state design ladder
 
+## Mandatory verification stack
+
+Follow [`mandatory-verification.md`](../mandatory-verification.md) on every Oracle invocation, including
+Low and Design-only. Its tool-use, evidence and blocking rules remain mandatory; the selection
+ladders below choose meaningful contracts and never exempt a member of that stack.
+
+### Required type-fest and sampled evidence
+
+The chosen ladder rung still requires a real `type-fest` utility at the contract boundary, with the consumer's positive and negative TypeScript witnesses. Record its resolved version and the relation it protects. The same card must plan positive-count `fast-check` sampling against the locked Bend model; exhaustive enumeration or a passing `tsc` run alone is not a substitute.
+
 ## Purpose and authority
 
 - When to use — when the card has async·out-of-order·duplicate submit·retry·multi-step state `O*`

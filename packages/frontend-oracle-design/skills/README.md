@@ -12,13 +12,19 @@ AI가 구현을 시작하기 전에 **무엇이 정답인지 먼저 잠그는** 
 - `.ai/oracles/<id>/`에 이미 있는 Oracle run을 이어 가는 작업 — 구현, 재개, 리뷰, 상태 보고. run의 상태는 이
   스킬의 스크립트로만 움직입니다
 
-단순 문구·토큰·고립된 CSS 수정이나 빠르게 버릴 프로토타입에는 기존 저장소 검증만
-사용합니다.
+단순 문구·토큰·고립된 CSS 수정에는 이 스킬을 자동 호출하지 않습니다. 다만 명시적으로
+호출하면 Low도 Oracle 경로를 사용하며, **Bend·type-fest·TypeScript·fast-check 모두 필수**입니다.
+필수 검증은 작업 크기를 이유로 생략하지 않습니다. 사용 불가·미정 범위는 `FAIL` 또는
+`NEEDS_DECISION`으로 보고하며, 기존 Low fast-path 기록은 역사 자료로만 보존합니다.
+상세 운영 계약은 [mandatory-verification.md](references/mandatory-verification.md),
+초심자 단계별 안내는 [가이드](../../../docs/frontend-oracle-design-beginner-guide.md)를 보세요.
 
 ## 동작 방식
 
 1. 사용자 답변과 승인된 명세만 정책 출처로 등록합니다.
-2. `Given / When / Then / Never / Source`를 Oracle Card에 기록하고 잠급니다.
+2. `Given / When / Then / Never / Source`, Terms·Formal Model·Adequacy, 실제 type-fest 관계와
+   타입 witness·fast-check 계획을 Oracle Card에 기록합니다. 모델 증명과 Adequacy를 확인하고
+   사용자 승인을 받아 잠급니다.
 3. 명시적으로 Delivery를 요청하면 테스트가 의도한 이유로 실패하는 `VALID_RED`를 먼저
    확인한 뒤 최소 구현으로 통과시킵니다.
 4. 실행 결과와 상태 전이를 기계가 기록하고, 정해진 반복 예산 안에서만 수정합니다.
@@ -57,7 +63,8 @@ new reviewer team or memoization mandate is not required.
 
 The four perspectives supplement the existing five changeability axes. Medium/High independence,
 approval, lock, RED/GREEN and final evidence gates are unchanged. Context-free v2 artifacts retain
-legacy behavior; supplied context is validated. Low fast path and Design-only add no mandatory context artifacts or implementation review.
+legacy behavior; supplied context is validated. Design-only adds no implementation-review packet;
+new Low Delivery work follows the same mandatory-stack review as other risks.
 See [the input contract](references/subagent-review.md#contextualized-review--collect-evidence-not-more-agents)
 and [paired questions](references/review-checklist.md#contextual-pattern-index).
 
@@ -144,10 +151,10 @@ view가 소유합니다.
 ```mermaid
 flowchart LR
   START(["요청"]) --> RISK{"risk 판정"}
-  RISK -->|"risk=Low"| low_fast_path["low-fast-path<br/><i>exclusive · 이 노드만</i>"]
-  low_fast_path -.->|"immediately disqualified when a policy question·new contract·architecture decision appears — promote to the oracle lane"| common
-  RISK -->|"그 외"| common["common"]
+  RISK -->|"모든 risk"| common["common<br/><i>common · mandatory verification</i>"]
+  LEGACY["low-fast-path<br/><i>legacy records only</i>"] -.-> common
 
+  mandatory_verification["mandatory-verification"]
   card_policy_sources["card-policy-sources"]
   lifecycle_adaptation["lifecycle-adaptation"]
   card_risk_grill["card-risk-grill"]
@@ -176,6 +183,7 @@ flowchart LR
   bend_cross_verification["bend-cross-verification"]
   oracle_workflow_graph["oracle-workflow-graph"]
 
+  common --> mandatory_verification
   common --> card_policy_sources
   common --> lifecycle_adaptation
   card_policy_sources --> lifecycle_adaptation
@@ -234,7 +242,7 @@ flowchart LR
 경계는 [`TYPESCRIPT-VERIFICATION.md`](../TYPESCRIPT-VERIFICATION.md)에 정리했습니다.
 
 첫 툴 콜은 lane 진입 노드 **하나**의 Read로 고정되고, 응답은
-`risk=<Low|Medium|High> lane=<low-fast-path|oracle> nodes=[실제로 읽은 노드]` 헤더로
+`risk=<Low|Medium|High> lane=oracle nodes=[실제로 읽은 노드]` 헤더로
 시작합니다. 구현 요청이든 설명·플랜 전용 요청이든 동일합니다 — 로딩을 건너뛴 사실이
 헤더에 드러나게 만드는 장치입니다.
 

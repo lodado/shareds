@@ -22,7 +22,8 @@ test('lifecycle adaptation is an Oracle-only conditional reference node', async 
   assert.match(node.when, /existing-system ownership|cross-boundary scope|single-card milestone grouping/i)
 
   const lowLane = graph.lanes.find((lane) => lane.id === 'low-fast-path')
-  assert.deepEqual(lowLane.nodes, ['low-fast-path'])
+  assert.equal(lowLane.legacyOnly, true)
+  assert.deepEqual(lowLane.nodes, ['common', 'mandatory-verification'])
   assert.equal(lowLane.nodes.includes('lifecycle-adaptation'), false)
 
   const byId = new Map(graph.nodes.map((candidate) => [candidate.id, candidate]))
@@ -64,12 +65,16 @@ test('lifecycle eval corpus is exported as forward evals without becoming a runt
     for (const id of loaded) {
       const node = nodes.get(id)
       assert.ok(node, `${entry.id} references declared node ${id}`)
-      for (const dependency of node.requires) assert.ok(loaded.has(dependency), `${entry.id} includes ${id}'s dependency ${dependency}`)
+      for (const dependency of node.requires)
+        assert.ok(loaded.has(dependency), `${entry.id} includes ${id}'s dependency ${dependency}`)
     }
   }
   assert.equal(evals.evals.length, corpus.cases.length + heldOut.cases.length + lifecycle.cases.length)
   const forward = evals.evals.slice(corpus.cases.length + heldOut.cases.length)
-  assert.deepEqual(forward.map(({ name }) => name), lifecycle.cases.map(({ id }) => id))
+  assert.deepEqual(
+    forward.map(({ name }) => name),
+    lifecycle.cases.map(({ id }) => id),
+  )
   for (const entry of forward) {
     assert.equal(entry.category, 'lifecycle-forward')
     assert.ok(entry.expected_output.includes('Forward lifecycle scenario'))

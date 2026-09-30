@@ -53,28 +53,33 @@ test('black-box corpus gives every case a mechanically gradable expectation', as
   }
 })
 
-test('low fast-path cases forbid Oracle ceremony and load only the lane node', async () => {
-  const corpus = await readJson(corpusPath)
-  const lowCases = corpus.cases.filter((fixture) => fixture.expected.lane === 'low-fast-path')
-
-  assert.equal(lowCases.length, 4)
-  for (const fixture of lowCases) {
-    assert.deepEqual(fixture.expected.loadedNodes, ['low-fast-path'])
-    assert.ok(fixture.expected.forbiddenCeremony.includes('oracle-card'))
-    assert.ok(fixture.expected.forbiddenCeremony.includes('revision-lock'))
-    assert.ok(fixture.expected.forbiddenCeremony.includes('run-ledger'))
-  }
+test('Low cases use the common mandatory-verification stack on new invocations', async () => {
+ const corpus = await readJson(corpusPath)
+ const lowCases = corpus.cases.filter((fixture) => fixture.expected.risk === 'Low')
+ assert.equal(lowCases.length, 4)
+ for (const fixture of lowCases) {
+ assert.equal(fixture.expected.lane, 'oracle')
+ assert.deepEqual(fixture.expected.loadedNodes, ['common', 'mandatory-verification'])
+ assert.deepEqual(fixture.expected.requiredLabels, [
+ 'bend-proof:reported',
+ 'bend-adequacy:reported',
+ 'type-contract:reported',
+ 'fast-check:reported',
+ 'repo-validation',
+ ])
+ assert.ok(fixture.expected.forbiddenCeremony.includes('legacy-low-fast-path-bypass'))
+ }
 })
-
 test('Oracle-lane cases require evidence labels that match their risk shape', async () => {
   const corpus = await readJson(corpusPath)
   const oracleCases = corpus.cases.filter((fixture) => fixture.expected.lane === 'oracle')
 
-  assert.equal(oracleCases.length, 8)
+  assert.equal(oracleCases.length, 12)
   for (const fixture of oracleCases) {
     assert.ok(fixture.expected.loadedNodes.includes('common'), `${fixture.id} common`)
-    assert.ok(fixture.expected.loadedNodes.includes('card-policy-sources'), `${fixture.id} policy sources`)
-    if (fixture.expected.status !== 'NEEDS_DECISION') {
+    if (fixture.expected.risk !== 'Low') assert.ok(fixture.expected.loadedNodes.includes('card-policy-sources'), `${fixture.id} policy sources`)
+    if (fixture.expected.risk === 'Low') assert.ok(fixture.expected.loadedNodes.includes('mandatory-verification'), `${fixture.id} mandatory verification`)
+    if (fixture.expected.status !== 'NEEDS_DECISION' && fixture.expected.risk !== 'Low') {
       assert.ok(fixture.expected.requiredLabels.includes('card-lint'), `${fixture.id} card lint`)
     }
   }

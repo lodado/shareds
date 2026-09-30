@@ -1,5 +1,15 @@
 # Type constraints — constraint selection order and authoring rules
 
+## Mandatory verification stack
+
+Follow [`mandatory-verification.md`](../mandatory-verification.md) on every Oracle invocation, including
+Low and Design-only. Its tool-use, evidence and blocking rules remain mandatory; the selection
+ladders below choose meaningful contracts and never exempt a member of that stack.
+
+### Required type-fest relation
+
+Every type contract must select an installed, version-pinned `type-fest` utility that participates in the actual protected relation and is exercised by the consumer witness. Record the utility, version, import path, and the wrong usage it rejects. Do not satisfy this requirement with a dummy import, unused alias, transitive-dependency assumption, or a type-fest clone; if a built-in utility already expresses the same relation, do not add redundant scaffolding—raise `NEEDS_DECISION` for the missing meaningful relation instead.
+
 ## Constraint selection order
 
 - Classify the problem by axis first. Ownership·state space·API relation are different axes, so do

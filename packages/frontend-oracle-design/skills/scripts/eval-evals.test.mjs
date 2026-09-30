@@ -52,7 +52,8 @@ test('evals.json is the skill-creator projection of the blackbox corpus and stay
   const oracleCase = evals.evals.find((entry) => entry.name === 'fod-bb-03')
   assert.ok(oracleCase.assertions.some((line) => /one user confirmation resolves and approves the card/.test(line)))
   const lowCase = evals.evals.find((entry) => entry.name === 'fod-bb-01')
-  assert.ok(!lowCase.assertions.some((line) => /Draft Oracle/.test(line)))
+  assert.ok(lowCase.assertions.some((line) => /one user confirmation resolves and approves the card/.test(line)))
+ assert.ok(lowCase.assertions.some((line) => /bend-proof:reported/.test(line)))
 
   const checked = spawnSync(process.execPath, [join(evalDirectory, 'to-skill-creator-evals.mjs'), '--check'], {
     encoding: 'utf8',

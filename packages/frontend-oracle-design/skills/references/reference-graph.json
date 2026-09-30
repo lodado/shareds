@@ -1,21 +1,21 @@
 {
   "id": "frontend-oracle-design-reference-graph",
   "version": 1,
-  "description": "Conditionally loaded reference node graph. The entry risk judgment selects the lane: Low takes the low-fast-path single-node exclusive lane, and an explicit Oracle request or Medium/High takes the oracle lane with the common entry. When a node when is satisfied, load its full path together with its requires edges, and do not load unrelated nodes. Each node's when is the canonical load condition. SKILL.md restates them as prose on purpose, because the agent reads SKILL.md at runtime and may never open this file — the copy is a projection, not a duplicate to delete, and skill-contract.test.mjs fails when a loader:agent node is missing from that section.",
+  "description": "Conditionally loaded reference node graph. The entry risk judgment selects the lane: every risk takes the common entry and mandatory-verification stack; low-fast-path is retained only as a legacy compatibility record. When a node when is satisfied, load its full path together with its requires edges, and do not load unrelated nodes. Each node's when is the canonical load condition. SKILL.md restates them as prose on purpose, because the agent reads SKILL.md at runtime and may never open this file — the copy is a projection, not a duplicate to delete, and skill-contract.test.mjs fails when a loader:agent node is missing from that section.",
   "entry": "common",
   "entryContract": {
-    "firstToolCall": "Read exactly one lane entry node — low-fast-path when risk=Low, otherwise common",
-    "responseHeader": "risk=<Low|Medium|High> lane=<low-fast-path|oracle> nodes=[node ids actually Read]",
+    "firstToolCall": "Read exactly one lane entry node — common for every risk (low-fast-path is legacy-only)",
+    "responseHeader": "risk=<Low|Medium|High> lane=oracle nodes=[node ids actually Read]",
     "appliesTo": "both implementation requests and explanation·plan-only requests",
     "loadConditionRule": "Read when as the decision point, not the deliverable stage — load it the moment you make the decision that node owns, and the same holds when you answer only with examples·structure·plans without writing files. If applicability is ambiguous, load. Whether to skip a load is not a judgment call."
   },
   "lanes": [
     {
       "id": "low-fast-path",
-      "when": "risk=Low",
-      "nodes": ["low-fast-path"],
-      "exclusive": true,
-      "escalation": "immediately disqualified when a policy question·new contract·architecture decision appears — promote to the oracle lane",
+      "when": "risk=Low — legacy compatibility record; new work enters common",
+      "nodes": ["common", "mandatory-verification"],
+      "exclusive": false,
+      "escalation": "legacy-only; new Low work uses common and mandatory-verification",
       "carveOut": {
         "when": "only part of the request disqualifies — escalate that part alone and finish the remainder in this lane",
         "requiresAll": [
@@ -25,18 +25,25 @@
         ],
         "otherwise": "promote the whole request — a split that shares a failure is worse than the ceremony it avoided",
         "record": "one descope line naming what was carved out, its trigger, and where it went; the Oracle card registers the remainder under Non-goals"
-      }
+      },
+      "legacyOnly": true
     },
     {
       "id": "oracle",
-      "when": "an explicit Oracle request or Medium/High",
+      "when": "an explicit Oracle request or any risk",
       "entry": "common"
     }
   ],
   "reviewPoints": [
     {
       "when": "always",
-      "nodes": ["review-checklist", "changeability"]
+      "nodes": [
+        "review-checklist",
+        "changeability",
+        "mandatory-verification",
+        "bend-cross-verification",
+        "types-advanced-contracts"
+      ]
     },
     {
       "when": "frontend production change",
@@ -63,7 +70,7 @@
       "nodes": ["performance"]
     },
     {
-      "when": "Bend proof cross-verification selected automatically for applicable Oracle work or explicitly requested",
+      "when": "always — mandatory Bend verification and review",
       "nodes": ["bend-cross-verification"]
     },
     {
@@ -75,14 +82,20 @@
     {
       "id": "low-fast-path",
       "path": "references/lanes/low-fast-path.md",
-      "when": "risk=Low — load only this node, including its existing scope carve-out at Low disqualification",
+      "when": "legacy records only — new work uses common and mandatory-verification",
       "requires": []
     },
     {
       "id": "common",
       "path": "references/common.md",
-      "when": "first priority on entering the card procedure",
+      "when": "first priority on every invocation before mandatory verification",
       "requires": []
+    },
+    {
+      "id": "mandatory-verification",
+      "path": "references/mandatory-verification.md",
+      "when": "every invocation — after common and before Draft/lock; all risks and both modes; re-read before verification and review",
+      "requires": ["common"]
     },
     {
       "id": "bva",
@@ -93,7 +106,7 @@
     {
       "id": "card-policy-sources",
       "path": "references/card/policy-sources.md",
-      "when": "start of card writing, or conditional problem-definition review for unclear purpose/task, cross-boundary impact, unexplained task failure, material dismissal, conflicting new evidence or repeated escapes — Low keeps its single-node path",
+      "when": "start of card writing, or conditional problem-definition review for unclear purpose/task, cross-boundary impact, unexplained task failure, material dismissal, conflicting new evidence or repeated escapes — Low follows the same current path; legacy single-node records are historical only",
       "requires": ["common"]
     },
     {
@@ -129,7 +142,7 @@
     {
       "id": "card-retro-metrics",
       "path": "references/card/retro-metrics.md",
-      "when": "recording any defect found after the lock, the run metrics at REVIEW_VERIFIED, or reviewing an execution observation as a conditional guardrail candidate — read with the card lane so the escape classes are known before the sweep; candidate review is not a delivery gate and Low never loads this node",
+      "when": "recording any defect found after the lock, the run metrics at REVIEW_VERIFIED, or reviewing an execution observation as a conditional guardrail candidate — read with the card lane so the escape classes are known before the sweep; candidate review is not a delivery gate and Low follows the same conditions",
       "requires": ["common", "card-case-space"]
     },
     {
@@ -225,7 +238,7 @@
       "id": "types-advanced-contracts",
       "implementationInput": "conditional",
       "path": "references/types/advanced-contracts.md",
-      "when": "always with state-ladder during type work — loading unconditional, adoption via compiler witness packet gate",
+      "when": "every invocation — mandatory type-fest/TypeScript contract path before Draft/lock; loading unconditional, adoption via compiler witness packet gate",
       "requires": ["types-api-surface"]
     },
     {
@@ -285,7 +298,7 @@
     {
       "id": "bend-cross-verification",
       "path": "references/bend-cross-verification.md",
-      "when": "Oracle lane — automatically before Draft/lock for a pure calculation or deterministic state transition with a meaningful invariant, or an explicit Bend request; re-read before proof execution and GREEN/review",
+      "when": "every invocation — mandatory Bend proof/model path before Draft/lock; re-read before proof execution and GREEN/review",
       "requires": ["common"]
     },
     {

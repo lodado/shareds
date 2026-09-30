@@ -140,7 +140,8 @@ In a `local`·`identity-shaping` change, if a UI-shaping interaction, a `RELATIO
 `JUDGMENT` row depends on real screen context, require one browser journey before review. Do not add
 a new dependency; use only one of the Playwright/Storybook/browser MCP/Figma handoff that already
 exists in the target repo. If no tool is installed or the user declined, leave that row only as
-`pending` or a sourced N/A. The Low fast path escalates to the Oracle lane the moment this condition arises.
+`pending` or a sourced N/A. All new skill invocations, including Low, already use the Oracle lane;
+visual requirements never waive the mandatory verification stack.
 
 `$frontend-visual-qa` returns only the following:
 

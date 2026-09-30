@@ -29,7 +29,7 @@ from current behavior, and whether a wrong result can be recovered.
 | Autosave a draft that the user can undo or restore                          | a recoverable wrong value                             | Medium |
 | Charge a card, change a permission, or delete data that has no restore path | money, access, or data lost for good                  | High   |
 
-- Low → no card; record risk and reason in one line.
+- Low → record risk and reason, then use the Oracle card and mandatory verification stack. Low risk does not waive a tool or the approval/lock procedure.
 - Medium and High → write the card, which passes the one Draft confirmation in
   [`confirmation-lock.md`](confirmation-lock.md); High adds the High evidence of the canonical table.
 - A `mandatory-constraint` or a High entry criterion is never lowered because the UI looks simple.
@@ -73,8 +73,9 @@ by observing code is only a `project-constraint` candidate, not a product policy
 
 Pruning:
 
-- When P1 judges Low, end the grill and route to the
-  [`lanes/low-fast-path.md`](../lanes/low-fast-path.md) lane.
+- When P1 judges Low, keep the smallest source-backed scope and continue the Oracle lane with
+  [`mandatory-verification.md`](../mandatory-verification.md). The historical
+  [`lanes/low-fast-path.md`](../lanes/low-fast-path.md) is not a route for new work.
 - Skip P4 entirely when there is no endpoint, P5 when there is no mutation·async, P7 when it is
   `behavior-only`, and P8 when there is no performance claim.
 - When the feature matches an installed `frontend-system-design` reference, convert that document's
