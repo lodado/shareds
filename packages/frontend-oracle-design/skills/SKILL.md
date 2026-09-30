@@ -154,10 +154,11 @@ its own scope carve-out at disqualification, with no additional node or artifact
 - In the Oracle lane, automatically assess Bend applicability before Draft/lock. For a pure
   calculation or deterministic state transition with a meaningful invariant, or an explicit Bend
   request, read [`bend-cross-verification.md`](references/bend-cross-verification.md). No separate
-  user request to invoke Bend is needed; the proof harness still executes its CLI, which Delivery
-  obtains with `scripts/ensure-bend.mjs` (reuse or checksum-pinned install). A failed install skips
-  an automatically selected proof and fails an explicit Bend request. Re-read before
-  proof execution and GREEN/review. Use supported, authorized native delegation with capacity for
+  user request to invoke Bend is needed: `scripts/ensure-bend.mjs` provides the CLI (reuse or
+  checksum-pinned install) and `scripts/oracle-model.mjs` proves the locked laws, generates the
+  oracle space from the locked model and checks the product on it, recorded in an optional
+  `## Formal Model`. A failed install skips an automatically selected path and fails an explicit
+  Bend request. Re-read before proof execution and GREEN/review. Use supported, authorized native delegation with capacity for
   parallel law/behavior analysis; later run proof/behavior checks concurrently on stable, isolated
   inputs when the host supports it. Report a concrete reason for sequential fallback. Approval,
   VALID_RED and final adjudication stay serial. This neither enables graph mode nor adds Bend to Low.

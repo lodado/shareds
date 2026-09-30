@@ -35,6 +35,7 @@ import {
   ZERO_DIGEST,
 } from './oracle-fs.mjs'
 import { invalidatedWitnesses } from './oracle-lock.mjs'
+import { parseFormalModel } from './oracle-model.mjs'
 import { snapshotContext } from './oracle-review-context.mjs'
 import { claudeWorkerInvocation, parseWorkerSubmission } from './oracle-worker.mjs'
 import { spawnGit } from './resolve-executable.mjs'
@@ -168,6 +169,8 @@ const NEXT_ACTIONS = {
   REPORT_STALE: 'the report predates the run — re-run with a fresh --report path',
   REPORT_PATH_EXISTS: 'choose a new --report path; an existing file cannot vouch for this run',
   RUN_ARTIFACTS_EXIST: 'a new revision gets a new <oracle-id> directory — never re-init to reset the baseline',
+  FORMAL_PROOF_LABEL_REQUIRED:
+    'register --required-label bend-proof:reported — its node-test run asserts `oracle-model.mjs prove` reports proven for the locked laws',
   RISK_MISMATCH: "drop --risk to use the locked card's Risk — a different risk is a new revision, not an init flag",
   RED_CAUSE_INFRA:
     "repair the test until the mapped row fails on its own assertion — a syntax·reference·timeout·hook failure is not VALID_RED",
@@ -1385,6 +1388,13 @@ async function initialize(options) {
   state.lockManifestSha256 = revision.lockManifestSha256
   const oracle = await readFile(await lockedOraclePath(directory, state), 'utf8')
   state.risk = resolveRisk(options.risk, oracle)
+  // 승인된 Formal Model은 법칙 증명을 계약에 넣었다 — 증명 실행 없이 GREEN으로 가는 init을 막는다.
+  if (parseFormalModel(oracle.split('\n')) && !requiredLabels.includes('bend-proof:reported')) {
+    throw new CliError(
+      'FORMAL_PROOF_LABEL_REQUIRED',
+      'the locked card has a ## Formal Model — add --required-label bend-proof:reported for its law proof run',
+    )
+  }
   state.milestones = parseMilestones(options.milestones, contractRowIds(oracle))
   state.snapshot = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
   // RED 전 기존 테스트 변경을 as-is → to-be로만 허용하는 기준선 — 코드 테스트만 잰다(스크린샷 바이트는 재지 않는다)

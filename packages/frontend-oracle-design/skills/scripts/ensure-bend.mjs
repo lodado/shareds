@@ -43,7 +43,7 @@ function platformKey(platform, arch) {
   return `${os}-${cpu}`
 }
 
-function reportedVersion(bin, env) {
+export function reportedVersion(bin, env = process.env) {
   const probe = spawnSync(bin, ['version'], {
     encoding: 'utf8',
     env: { ...env, BEND_NO_TELEMETRY: '1' },

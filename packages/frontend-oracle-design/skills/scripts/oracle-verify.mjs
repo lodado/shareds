@@ -19,6 +19,7 @@ import {
   snapshotRegularFile,
   stableStringify,
 } from './oracle-fs.mjs'
+import { formalModelIssues, parseFormalModel } from './oracle-model.mjs'
 import { contextGaps, snapshotContext, validateContextReview } from './oracle-review-context.mjs'
 import { bracedValues, replacePlaceholders, stripTrailingParenthesized } from './oracle-verify-helpers.mjs'
 
@@ -990,7 +991,7 @@ async function lintCard(options) {
   const registeredRepoSources = new Set()
   const realRoot = await realpath(process.cwd())
   for (const source of sources) {
-    const location = source['위치·version'] ?? ''
+    const location = columnOf(source, SOURCE_COLUMNS.location)
     const repoSource = location.startsWith('repo:') ? location.slice('repo:'.length).split('#')[0] : null
     if (repoSource !== null) {
       const sourcePath = resolve(repoSource)
@@ -1327,6 +1328,32 @@ async function lintCard(options) {
         }
       }
     }
+  }
+
+  // Formal Model 섹션도 선택이다 — 있으면 법칙·모델 출처·witness·잠금 범위를 검증한다(연결만, 뜻은 리뷰 소관).
+  const formal = parseFormalModel(lines)
+  if (formal) {
+    const formalSources = new Map(
+      sources.map((source) => {
+        const location = columnOf(source, SOURCE_COLUMNS.location)
+        return [
+          source.ID,
+          {
+            repoPath: location.startsWith('repo:') ? location.slice('repo:'.length).split('#')[0] : null,
+            authoritative: source.Kind !== 'implementation-reference' && isApproved(columnOf(source, SOURCE_COLUMNS.approval)),
+          },
+        ]
+      }),
+    )
+    issues.push(
+      ...(await formalModelIssues(formal, {
+        policies: new Set(policies.keys()),
+        rows: seenRows,
+        invariants: invariantIds,
+        sources: formalSources,
+        readSource: (repoPath) => readFile(resolve(repoPath), 'utf8').catch(() => null),
+      })),
+    )
   }
 
   // Deviations 섹션도 선택이다 — 있으면 P*×4 STPA 유형 커버리지와 disposition을 검증한다.

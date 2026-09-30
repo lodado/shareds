@@ -994,6 +994,11 @@ replaces the `O*`·`D*` row that owns a specific scenario outcome.
   lint — same contract as State Model.
 - `I*` rows are checked during every journey rather than mapped one-to-one to a scenario test.
 
+## Formal Model — optional
+
+Only on the Bend path: the section, its locked `MODEL.bend`/`LAWS.bend` sources and its checks are
+owned by [`bend-cross-verification.md`](../bend-cross-verification.md). Absence does not block lint.
+
 ## Cold-read gate — adversarial self-review
 
 The Draft passes three checks before it is shown to the user: a context-free read, five questions

@@ -1,167 +1,193 @@
-# Automatic Bend proof cross-verification for applicable Oracle work
+# Automatic Bend formal model path for applicable Oracle work
 
 Within the Oracle lane, assess applicability before Draft/lock without waiting for the user to say
 "Bend". Automatically select this path for a pure calculation or deterministic state transition with
-a meaningful invariant (for example bounded quantities, monetary conservation, or legal state
-transitions) whose domain fits Bend's `Nat` or `U32`. A domain that needs negative numbers, 64-bit
-values or a provable floating-point result is not eligible (Bend's F32 is axiomatic): record that
-reason and continue normal Oracle verification. Also load it for an explicit Bend request. Start with one small core, not the whole UI;
-do not invent a separate model for copy, CSS, trivial formatting, or external I/O alone. When no
-eligible core exists, record that reason in the existing investigation and continue normal Oracle
-verification. An explicit request outside the provable scope needs an explanation, not a fake proof.
+a meaningful invariant (for example bounded quantities, monetary conservation, stale responses, or
+legal state transitions) whose domain fits Bend's `Nat`, `U32`, `Bool` and finite datatypes. A domain
+that needs negative numbers, 64-bit values, strings or a provable floating-point result is not
+eligible (Bend's F32 is axiomatic): record that reason and continue normal Oracle verification. Also
+load it for an explicit Bend request. Start with one small core, not the whole UI; do not model copy,
+CSS, trivial formatting, or external I/O alone. An explicit request outside the provable scope needs
+an explanation, not a fake proof.
 
-This adds a verification technique, not a second orchestrator, runtime, approval flow, or delivery
-state. Oracle owns approved policy and transitions; `$test` owns behavior tests and judgment. Low
-does not load this node. Design-only may propose laws and their mapping, but writes no tests,
-proof/model implementation, or production code and claims no executed proof. Automatic selection
-authorizes only the pinned install in §1, never policy approval or bypassing the existing gates.
+This adds a verification technique inside the existing card, lock, ledger and review — not a second
+orchestrator, approval, card or delivery state. Oracle owns approved policy and transitions; `$test`
+owns behavior tests and judgment. Low does not load this node. Automatic selection authorizes only
+the pinned install in §1, never policy approval or bypassing the existing gates.
+
+The chain is: source text → card policies and rows → a reference model and laws locked with the card
+→ a generated oracle space → the product observed on that space. AI proposes every link; `bend`,
+`oracle-model.mjs`, the card lint, the lock and the runner judge them. Keep apart what each check
+establishes: structured is not faithful, type-checked is not proven, proven about the model is not
+proven about the product, and a finite space checked is not every run.
 
 ## 1. Scope and capability before Draft/lock
 
 - Identify the actual module/export, input domain, numeric representation/overflow, invalid-input
   behavior, state transitions, and external assumptions. Each assumption must trace to approved
   policy or remain an Open question; narrowing inputs just to make a proof pass changes policy.
-- In Delivery, run `scripts/ensure-bend.mjs` at capability discovery. It reuses a pinned-version
-  Bend already on PATH or under `BEND_HOME`/`~/.bend`; otherwise it downloads the GitHub release,
-  checks it against the sha256 pinned in the script and unpacks it into the skill's own cache. It
-  never pipes `curl` to a shell or edits PATH and shell files. Call the absolute path it prints with
-  `BEND_NO_TELEMETRY=1`. Design-only installs nothing and may record the limitation without
-  claiming execution. Also read `bend guide` and the repository's existing trusted test runner; do
-  not add a test dependency implicitly. Bend 2 is not the old HVM runtime.
+- Run `scripts/ensure-bend.mjs` before drafting the model, in Delivery capability discovery and in
+  Design-only. It reuses a pinned-version Bend already on PATH or under `BEND_HOME`/`~/.bend`;
+  otherwise it downloads the GitHub release, checks it against the sha256 pinned in the script and
+  unpacks it into the skill's own cache. It never pipes `curl` to a shell or edits PATH and shell
+  files. Call the absolute path it prints with `BEND_NO_TELEMETRY=1`. Read `bend guide` before
+  writing Bend; Bend 2 is not the old HVM runtime.
 - When `ensure-bend.mjs` fails (offline, sandbox, unsupported platform, checksum mismatch), an
-  automatically selected path records the printed code and continues with normal Oracle
-  verification; an explicit Bend request is `ENVIRONMENT_DEFECT` → `FAIL` for proof execution.
-  Either way, never replace proof with tests silently or call a tool failure "not applicable".
-- Keep UI, browser, network, foreign code and uncontrolled time/randomness outside the pure model;
-  name the corresponding Oracle behavior checks. An assumption about an external effect is not a
-  proof of that effect. Distinguish structural checks, executed tests, human acceptance, and formal
-  proof; none substitutes for another.
+  automatically selected path records the printed code, drafts no `## Formal Model` and continues
+  with normal Oracle verification; an explicit Bend request is `ENVIRONMENT_DEFECT` → `FAIL`. Never
+  replace a proof with tests silently or call a tool failure "not applicable".
+- Keep UI, browser, network, foreign code and uncontrolled time/randomness outside the pure model and
+  name the Oracle rows that check them. An assumption about an external effect is not a proof of it.
 
-## 2. Independent drafts, one approved contract
+## 2. From source text to a locked model
 
-When native delegation is supported, authorized and has capacity, dispatch two independent analyst
-tasks before waiting for either, so both actually run concurrently. Give them the same approved
-source excerpts and revision, not each other's initial answers. The law analyst proposes invariants
-and assumptions; the behavior analyst proposes observable outcomes, Never conditions, and
-boundary/ordering cases. Neither starts another full Oracle workflow or changes the shared contract.
-Before approval these are read-only investigations and candidate statements returned to the
-Controller, not implementation work. The Controller waits for both before merging their results.
+Write the card first: sourced `P*` policies and `O*` rows as usual. When native delegation is
+supported, authorized and has capacity, dispatch two independent read-only analysts before waiting
+for either, from the same approved source excerpts and revision and without each other's answers: a
+law analyst proposes laws and environment assumptions, a behavior analyst observable outcomes, Never
+conditions and ordering cases. The Controller waits for both, compares missing conditions, extra
+assumptions and conflicts, and maps each law to existing `P*`/`I*`/`O*` rows; agreement between
+agents is not approval. Without delegation, independent contexts or capacity, record the concrete
+limitation and run sequentially — never claim independence that did not occur.
 
-Join the drafts before showing the Draft Oracle: compare missing conditions, extra assumptions and
-conflicts. Map each candidate law to existing `P*`/`I*`/`O*` rows rather than creating another policy
-schema. A condition outside the formal model remains covered by Oracle, not silently omitted.
-Unresolved policy follows `POLICY_GAP` → `NEEDS_DECISION`; agreement between agents is not approval.
+Then formalize a small core as three tracked files inside the scan root, outside the Oracle
+directory:
 
-The Controller presents the exact law statements and assumptions with the Draft/delta. After user
-confirmation, materialize the approved `LAWS.bend` as a local Source Registry source and include its
-bytes in the existing revision lock before init. It may import the future implementation; that does
-not authorize writing it early. Implementers may write `PROOF.bend` and implementation later, but
-cannot edit approved laws, assumptions, or Oracle expectations. A semantic law change needs the
-existing new-revision confirmation/lock flow, never an in-place relock.
+- `MODEL.bend` — the reference behavior: a state and a message datatype, `<Prefix>.init()`,
+  `<Prefix>.step(s, m)`, `<Prefix>.observe(s)` (only what the contract observes, not internal
+  bookkeeping) and the environment `<Prefix>.next(history)`: every message the environment can
+  produce after `history`.
+- `LAWS.bend` — imports the model and states each approved law as an open claim.
+- `PROOF.bend` — imports `./LAWS.bend` and proves each law with `def Laws.<name>`. It is a proof
+  candidate: never locked, freely repaired, and never a place to restate laws.
 
-Disjoint file ownership alone does not prove independence: check shared mutable inputs and external
-resources too. If native delegation, independent contexts or concurrency capacity are unavailable,
-record the concrete limitation in the existing journal and run sequentially; never claim parallel
-or independent execution that did not occur. This path does not implicitly activate graph mode or
-replace Oracle's required reviewers.
+Translate precisely and record what is not translated. Check numbers and units, negation, "every"
+versus "some", temporal order, "may" versus "must", and request count versus effect count: "sends one
+HTTP request" and "the save takes effect once" are different laws, and a disabled button proves
+neither. A policy the source leaves open — for example which id a retry uses after a timeout whose
+server result is unknown — is a `Q*` and `NEEDS_DECISION`, never a guess inside the model.
 
-## 3. Delivery: preserve RED, then build and prove
+The environment is where coverage is lost. `next` lists every event the environment can produce,
+including user actions the product must reject or ignore; those stay in the space and their expected
+observation is "unchanged". Exclude only events the environment itself cannot produce, citing the
+source (a response cannot precede its request). Never drop an event because a correct product would
+prevent it, never deliver responses in issue order only, never feed only valid input, and never let
+an environment assumption restate the product obligation under test — report that circle as a
+`POLICY_GAP`. The rebuttal reviewer treats `next` exclusions and `Out of scope` like `impossible`.
 
-Follow `delivery/ledger.md` and `$test` at their normal load points. Before init, register the proof
-check as an additional required label, for example `bend-proof:reported`, while retaining every
-existing required label. Discovering applicability after init needs the existing revision/run
-procedure, not manual edits to required labels or the ledger.
+Add the section to the card:
 
-Prepare proof/correspondence harness tests with the behavior tests before RED, but use a real
-behavior violation to establish `VALID_RED`. A missing compiler/proof file or a checker/type error
-is not behavioral `VALID_RED`. Only then write the pure implementation/model and `PROOF.bend` through
-the existing implementation path; do not launch conflicting product writers to imitate parallelism.
-Keep proof authoring and behavior validation separate. Once their common inputs are stable, launch
-the proof harness and behavior tests as separate ledger-backed executions in the same scheduling
-batch, then wait for both. This is actual tool concurrency, not just two headings in a plan. Each
-run keeps its own label, runId and output/report paths; never share mutable test fixtures, browser
-contexts or output files. If the host cannot run them concurrently, or inputs/resources cannot be
-isolated, record the concrete reason and run sequentially. Do not test a model or product being edited.
-Do not execute proof checks before `VALID_RED`. The existing `ALREADY_SATISFIED` path may instead
-check existing proofs with zero production/model/proof edits; never fabricate RED to authorize edits.
+```markdown
+## Formal Model
 
-`PROOF.bend` must import the approved `LAWS.bend` and discharge every in-scope law. With the verified
-Bend 2 CLI, the checker invocation is:
+- Model: S2
+- Laws: S3
+- Prefix: Search
+- Bound: 4
+- Observation: `Search.observe` is the request id whose results the list shows, 0 when none
+- Out of scope: cancellation, retry, duplicate responses, a response before its request (S1)
+- Not formalized: none
+- Conformance row: O4
+
+| Law              | Kind    | Cites       |
+| ---------------- | ------- | ----------- |
+| stale_ignored    | safety  | P2 O2       |
+| latest_applied   | effect  | P3 O3       |
+| latest_reachable | witness | P1 P3 O1 O3 |
+```
+
+`Model`/`Laws` are approved, non-implementation `repo:<path>.bend` Source Registry entries. `safety`
+says something never happens, `effect` that a required outcome happens, and `witness` is an `exs`
+law showing that outcome is reachable from `init`. The conformance row is the one `O*` row whose
+evidence is the conformance run. `oracle-verify.mjs card` checks the section: required fields, a
+bound of 1..8, law rows that match `LAWS.bend` both ways, citations of real `P*`/`O*`/`D*`/`I*`, a
+witness for every policy with an effect law and at least one effect law (safety laws alone are
+satisfied by a model that does nothing), every policy either formalized or listed under
+`Not formalized`, laws that import the locked model, every transitively imported local file
+registered as a source, and no foreign, `@unsafe` or hub-imported code. It checks links, not
+meaning; whether a law says what its policy says is review-owned. A model with several allowed
+observations for one prefix is not supported yet — list those policies under `Not formalized`.
+
+## 3. Pre-lock checks: consistency, reachability and the space
+
+Before showing the Draft, run and report both:
 
 ```sh
-bend path/to/PROOF.bend --verdict
+node <skill-dir>/scripts/oracle-model.mjs prove --dir <model-dir> --require <law>...
+node <skill-dir>/scripts/oracle-model.mjs space --model <model-dir>/MODEL.bend --prefix Search --bound 4
 ```
 
-Use one test in the target repository's existing trusted `node-test` or `vitest` harness to invoke
-the pinned executable that `ensure-bend.mjs` printed, without a shell and with `BEND_NO_TELEMETRY=1`, capture stdout/stderr, and assert **exit 0, no signal, and an
-exact `ALL PROOFS CHECK` stdout line**. Missing/open laws, `?TODO`, failure output, timeout and tool
-errors must fail the check. Run that harness through the existing ledger, for example:
+`prove` runs `bend PROOF.bend --verdict` without a shell under a timeout and returns `proven`, `open`
+(a `?TODO` or a law without a def), `unsafe`, `failed` (with the failing law), `timeout` or
+`unavailable`, plus the command, exit status, raw output, law list and input digests. Only exit 0,
+no signal and an exact `ALL PROOFS CHECK` line is `proven`; it refuses a `PROOF.bend` that does not
+import `./LAWS.bend` or laws missing a required name before running. `proven` here means the model
+satisfies every law — so the laws are jointly satisfiable — and each witness scenario is reachable.
 
-```sh
-node <skill-dir>/scripts/oracle-run.mjs exec --dir <oracle-dir> \
-  --label bend-proof:reported --adapter node-test --report <report-path> \
-  -- node --test <proof-check.test.mjs>
-```
+`space` compiles `MODEL.bend` with `bend -o` into a temporary module and enumerates every trace of up
+to `Bound` messages from `init` that `next` allows; each prefix's `observe` value is the expected
+observation. Case IDs hash the trace, so the same model, bound and generator version give the same
+cases and `spaceDigest`; no time or runId enters them. A budget stop keeps the explored cases and
+reports `complete: false` — never trim cases to finish.
 
-The paths and test are target-repository artifacts to create through the approved `$test` flow,
-not utilities shipped by this skill. Do not invent a `bend` trusted adapter or forge a reporter.
-A direct CLI run is `exit-only` execution evidence; it cannot replace reported behavior evidence,
-establish `VALID_RED`, or by itself certify model/product correspondence. The wrapper's reported
-result attests its assertions, not the soundness of the compiler or completeness of the laws.
+Lock only when `prove` is `proven` and the space is complete; show the case count and the traces for
+the required scenarios with the law statements. `open`/`failed` means the model, laws or proof need
+work or a question; `timeout`/`unavailable` follows the §1 failure rule. The user approves the laws,
+environment, bound and observation line as part of the card. Lock with `--source` for `MODEL.bend`,
+`LAWS.bend` and every local file they import. A later change to any of them is a new revision with
+reconfirmation, never an in-place relock. Design-only stops here at `ORACLE_READY` with the card and
+the three `.bend` files; it writes no target test or production code.
 
-Record the executable/version, exact command, checked laws, assumptions, raw output and runId.
-Keep all proof inputs (laws, model, proofs, implementation and local imports) tracked/non-ignored
-inside the scan root, outside the excluded Oracle artifact directory. Pin external libraries and
-tool versions; a mutable external input cannot be treated as snapshot-bound by the runner.
+## 4. Delivery: RED, conformance and the proof label
 
-## 4. Cross-check the model against the product
+`init` refuses a card with `## Formal Model` unless `--required-label bend-proof:reported` is
+registered (`FORMAL_PROOF_LABEL_REQUIRED`). Through the approved `$test` flow, write in the target
+repository's existing `node:test` harness:
 
-Cross-check after the proof and behavior executions have joined; neither branch's PASS alone permits
-completion. The Controller owns the join and final state transition, not either worker.
+- a proof check that calls `proveLaws({ dir, bin })` from `<skill-dir>/scripts/oracle-model.mjs` and
+  asserts `status === 'proven'`, run through the ledger with `--label bend-proof:reported`;
+- a conformance test that calls `loadModel` and `enumerateSpace` with the card's bound, asserts
+  `space.complete`, and registers one test per case named `[<conformance row>] [<case id>] <label>`
+  asserting `conformCase(space, entry, adapter).status === 'pass'`. The adapter maps each model
+  message to the product's input and the product's observable state to the model's observation, as
+  the card's Observation line says; it throws on an unknown message or state. Map these tests to the
+  conformance row in `evidence.json`.
 
-After `VALID_RED`, put the mapping in the existing Implementation Decision and pass the raw inputs
-to independent review; do not create another state ledger. For each formalized contract, record:
+Invoke the pinned executable that `ensure-bend.mjs` printed. Do not invent a `bend` trusted adapter or
+forge a reporter; a direct CLI run is `exit-only` evidence. Once their inputs are stable, launch the
+proof run and the conformance/behavior runs as separate ledger-backed executions in one scheduling
+batch and wait for both; each keeps its own label, runId and report path and shares no mutable
+fixture. If the host cannot run them concurrently, record why and run sequentially. `VALID_RED` is a conformance case whose
+product observation differs from the model's (for example the late-response trace), under `$test`'s
+predicates; a compile error, `adapter-error`, missing tool or proof failure is not `VALID_RED`. Then
+change product code only. A failing case returns `caseId`, `label`, `step`, `event`, `expected`,
+`observed` and the `spaceDigest` — fix the product, the proof candidate or, as harness repair under
+the existing budget, the adapter's mechanics; never the locked model, laws, bound, environment or
+observation meaning, and never skip a case. GREEN needs both labels' runs fresh for the current
+snapshot; a proof run is never reused as product evidence and an earlier GREEN never covers new
+product bytes.
 
-```text
-P*/I*/O* → Bend law → actual product module/export
-shared input domain/representation → observable result/error mapping
-proof check name/runId → correspondence test name/runId → outside-proof behavior checks
-```
+If the product itself runs Bend-generated code, run the conformance on that generated artifact and
+its calling boundary; a proof of an unused model verifies nothing about the product.
 
-If the product uses a separate TypeScript implementation, run differential tests: feed the same
-policy-derived normal, boundary and invalid inputs (or transition sequences) into the executable
-Bend model and actual implementation; compare public results/errors. Do not paste Bend formulas
-into a JavaScript mock or call that correspondence evidence. Use the existing trusted runner and
-evidence mappings; these tests supplement rather than duplicate ownership of Oracle expectations.
-Differential tests cover sampled inputs, not a proof of equivalence for all inputs. If the product
-uses generated Bend code directly, still verify the actual generated artifact and its calling
-boundary; a proof of an unused model does not verify the product.
+## 5. What was established, and trust limits
 
-At the join, reconcile the law list against the approved contract, check assumptions and uncovered
-behavior, and inspect counterexamples from both paths. Classify the cause before repair: policy
-conflict → `POLICY_GAP`; missing proof/correspondence evidence → `EVIDENCE_GAP`; a demonstrated
-implementation violation → `PRODUCT_DEFECT`; tool/harness failure → the existing environment/harness
-route. Failure to construct a proof alone does not demonstrate a product defect. Preserve existing
-budgets; never weaken laws/tests, exclude failing inputs, or loop without a bound to force agreement.
+Report each guarantee with its target, method and scope, separately:
 
-## 5. Join, freshness and claims
+- laws proven about the reference model, for every value of its types, by `bend --verdict`;
+- the declared space enumerated in full (or incomplete, with the budget stop), traces up to `Bound`;
+- the product observed and matched to the model on every prefix of those traces, through the adapter;
+- not established: a formal correspondence between model and product, events listed out of scope,
+  browser or network behavior, or unstated intent.
 
-Before GREEN/review, require the proof harness, model/product correspondence checks and all normal
-Oracle checks to pass against the same current revision and inputs. A change to laws/assumptions
-requires reconfirmation; a change to model, proof, implementation, compiler or dependencies requires
-affected checks to run again. No stale proof result may authorize completion.
-
-Use the existing review packet/context mechanism to supply law, proof, model and actual source files
-plus the mapping, commands and runIds. Include this reference as an applicable review point. Keep
-law sources policy-bound and implementation/proof files as evidence, not new policy authority.
-Oracle alone makes the existing state transition after the join; neither worker may issue it.
-
-The existing runner enforces declared labels, snapshots and ordinary evidence gates. It does not
-interpret Bend laws or automatically verify this semantic mapping; independent review must inspect
-it. Report the proven property and model, tested correspondence, remaining runtime checks and trust
-limits separately. `--verdict` adds a Lean-proven kernel check, but does not prove the translation
-pipeline, foreign I/O, all compiler behavior, or the user's unstated intent. No `@unsafe`, foreign
-assumption or axiomatic F32 claim may be presented as a proof of real runtime behavior.
+`--verdict` rechecks with a kernel that has a Lean proof; it does not prove the translation, the JS
+backend that `space` runs, foreign I/O or compiler behavior. Keep `-o PROOF.bendtt` if the kernel
+input needs inspecting. A digest detects change, not truth. The runner enforces labels, snapshots
+and row evidence; it does not read Bend laws, so independent review compares the laws, `next`,
+`Out of scope`, the adapter and the counterexamples against the policies. Classify before repair:
+policy conflict → `POLICY_GAP`; missing proof or conformance evidence → `EVIDENCE_GAP`; a
+demonstrated product mismatch → `PRODUCT_DEFECT`; tool or adapter failure → the environment/harness
+route. Failing to construct a proof alone does not demonstrate a product defect.
 
 ## Official references
 
@@ -169,5 +195,6 @@ Checked against Bend v2.0.34, the version `scripts/ensure-bend.mjs` pins; a vers
 checksums and this page together.
 
 - [Laws, proofs and trust boundary](https://github.com/bendlang/bend/blob/v2.0.34/guide/GUIDE.md#laws-and-proofs)
+- [JS module output of non-IO defs](https://github.com/bendlang/bend/blob/v2.0.34/guide/GUIDE.md#io-and-concurrency)
 - [CLI verdict and exit behavior](https://github.com/bendlang/bend/blob/v2.0.34/bend2/main.ts)
 - [Language limitations](https://github.com/bendlang/bend/blob/v2.0.34/README.md#limitations)

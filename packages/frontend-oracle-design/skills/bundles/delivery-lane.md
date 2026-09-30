@@ -258,7 +258,8 @@ removes or N/As the row: it stays the visual owner's `pending`, which may stop a
 
 When the Bend proof path is selected ([`bend-cross-verification.md`](../bend-cross-verification.md)),
 the same discovery runs `scripts/ensure-bend.mjs` and records its `BEND_READY <path>` line or its
-failure code; that page decides whether a failure skips the proof or fails the run.
+failure code; that page decides whether a failure skips the proof or fails the run. A locked card
+with `## Formal Model` needs `--required-label bend-proof:reported` at `init`.
 
 When entering Delivery after Design-only, perform the same investigation alongside the `$test`
 availability check before any new lock, init, or test writing. Do not recreate an already approved

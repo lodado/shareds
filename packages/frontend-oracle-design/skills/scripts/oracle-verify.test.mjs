@@ -393,6 +393,25 @@ test('O5-O6: local Source Registry paths with anchors must be covered by --sourc
   assert.match(extra.stderr, /source-lock-unregistered/)
 })
 
+test('O5-O6: an English Location·version repo: source is lock-enforced like the Korean column', async (t) => {
+  const base = await directory(t)
+  const oracle = join(base, 'oracle.md')
+  await writeFile(
+    oracle,
+    VALID_CARD.replace(
+      '| ID  | Kind           | 관할      | 기준 | 위치·version    | 승인 상태 |',
+      '| ID  | Kind           | Jurisdiction | 기준 | Location·version | Approval status |',
+    ).replace('repo:docs/save.md#v3', 'repo:package.json#v3'),
+  )
+
+  const covered = run('card', '--oracle', oracle, '--source', 'package.json')
+  assert.equal(covered.status, 0, covered.stderr)
+
+  const missing = run('card', '--oracle', oracle, '--source', 'skills/README.md')
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /source-lock-missing: S1/)
+})
+
 test('O5-O6: repo: Source Registry path traversal is rejected even when supplied as --source', async (t) => {
   const traversal = VALID_CARD.replace('repo:docs/save.md#v3', 'repo:../outside.md#v1')
   const linted = run('card', '--oracle', await cardFile(t, traversal), '--source', '../outside.md')
