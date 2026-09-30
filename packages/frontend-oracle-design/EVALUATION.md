@@ -1,4 +1,74 @@
-# 0.64.0 — Bend formal model path: locked model, generated oracle space, product conformance (2026-09-30)
+# 0.65.0 — Oracle space adequacy: Terms, world model, kernel-checked space checks (2026-09-30)
+
+A skill/harness meta change; no product Oracle state was assigned. Baseline: 0.64.0 at `f09a01c`.
+Until now nothing checked whether a card's coordinates and observations can tell apart situations the
+user's goal judges differently, or whether its rows are weaker than that goal: the card was the only
+statement of the goal. This is wave W1 of the local plan `.ai/plans/fod-oracle-adequacy/PLAN.md`.
+
+Changes:
+
+- `scripts/oracle-adequacy.mjs` (new). `check` enumerates every world of the locked record (Bool and
+  constructor-only enum fields, at most 8192 worlds) and runs nine checks: world-nonempty,
+  card-satisfiable, goal-falsifiable, card-implies-goal, goal-witness, sufficiency, card-observable,
+  example and open-terms. Each conclusion becomes a law with its proof in one Bend file that
+  `bend --verdict` re-checks; a conclusion the kernel does not accept is `unknown`. Sufficiency groups
+  worlds by coordinates and observations instead of comparing every pair, and names the differing
+  fields with their category and a next step (coordinate, observation, or OBSERVATION_GAP for a hidden
+  field). `minimalPairs` lists single-field boundary pairs for the Human review brief. An infinite
+  field, a world past the cap and a kernel failure or timeout are `unknown`; a missing Bend is
+  `not-run`. `model-input` derives the model analyst's input — Outcome Brief, anchored source text,
+  hazards, authoring rules — without the card's rows, Case space, Terms, Adequacy, model files,
+  product code or tests.
+- Card: optional `## Terms` (bounded context, category controllable/observable/hidden/concept, one
+  field per meaning, the product path for observable fields, what the term does not mean, source,
+  status) and `## Adequacy` (world source and prefix, coordinates, observations, rows and rows outside
+  the world; Assumption, Goal, Example and Hazard tables). New lint codes `terms-*` and `adequacy-*`;
+  the world file gets the Formal Model lock-scope checks.
+- Runner: `init` refuses a locked card with `## Adequacy` unless `--required-label
+bend-adequacy:reported` is registered (`ADEQUACY_LABEL_REQUIRED`).
+- `oracle-model.mjs`: `compileBend`, `verdictOf` and `lockScopeIssues` were extracted for reuse with no
+  behavior change; its 24 tests pass with real Bend.
+- Fixture `test-fixtures/doc-save/`: policy text, a card (P1–P3, O1–O4, Terms T1–T6, goals G1–G4,
+  examples E1–E3, six hazards) and `World.bend` (five Bool fields: 32 worlds, 18 valid).
+- Docs: `references/adequacy.md`, a new graph node for cards with Terms or Adequacy that requires only
+  `common`. Pointers in `card-format.md`, `ledger.md`, the SKILL.md Bend bullet and
+  `bend-cross-verification.md` §2, where the two analysts become one model analyst whose reading the
+  check compares mechanically. Bundles and the README workflow block were regenerated.
+
+Shown on the fixture (tests, real Bend 2.0.34):
+
+- Demo A. With Coordinates `start`, Observations `ack reload` and the commit hidden, `sufficiency:G1`
+  is refuted on a kernel-checked pair. The differing fields are `held` (controllable: add it to
+  Coordinates) and `committed` (hidden: OBSERVATION_GAP). Adding `held` leaves only `committed`;
+  registering the server version read (T3 observable) proves sufficiency for G1–G3.
+- Demo B. Rows that only ask for the toast (`start ∧ held → ack`, `¬start → ¬ack`) pass while G1, G2
+  and G3 each fail on a kernel-checked counterexample world. The refined rows prove card ⇒ goal for
+  all three.
+- The fixture card is proven: 16 laws re-checked by the kernel in about 0.8 s, 26 minimal pairs.
+
+Checks after the last edit:
+
+- Package suite 612/612 passed, 0 skipped, exit 0.
+- `oracle-adequacy.test.mjs`: 21 tests, 5 of them on real Bend. With Bend hidden: 16 passed and 5
+  skipped with the reason.
+- Test sensitivity on a scratch copy of the package: a sufficiency check that never refutes fails 5
+  tests, universal checks that never refute fail 2, and a `model-input` that leaks the card fails 1.
+- `eslint skills`: 0 errors. The new files keep 12 structural warnings (complexity, `else if` without
+  `else`) of kinds the existing scripts already carry.
+- Bundles, workflow docs and the eval projection are consistent; Prettier is clean on the changed
+  files.
+
+Not done or not supported:
+
+- Host receipts do not cover the model analyst before the lock, so the result reports
+  `independence.evidence: self-reported`. Covering it needs the guard hook to record into and protect
+  Oracle directories that have no run state yet; that security-sensitive change is left for later.
+- Plan waves W2 (runtime `conform --world`, `replay`, fixture implementations, the fast-check link,
+  the expansion demo) and W3 (the planted-gap eval) are not implemented.
+- Case-space `impossible`/`independent` claims, trace-shaped worlds, numeric fields and progress are
+  not checked.
+- The tests were written after the implementation; the mutation check above stands in for a RED run.
+- No live model run exercised the path; only darwin-arm64 was run.
 
 A skill/harness meta change; no product Oracle state was assigned. Baseline: 0.63.0 at `fb873c0`,
 clean worktree. The existing Bend path proved laws about a model written after `VALID_RED` and left

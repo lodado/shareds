@@ -215,6 +215,7 @@ flowchart LR
   subagent_review --> review_checklist
   oracle_workflow_graph --> graph_orchestration
   common --> bend_cross_verification
+  common --> adequacy
   IND["type-environment · fsd · backend · performance<br/><i>독립 노드 — 조건 충족 시에만</i>"]
 ```
 

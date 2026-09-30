@@ -7,6 +7,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { inflateSync } from 'node:zlib'
 import { isTrustedAdapter, TRUSTED_ADAPTER_FLAG } from './oracle-adapters.mjs'
+import { adequacyIssues, parseAdequacy, parseTerms } from './oracle-adequacy.mjs'
 import { APPLICABILITY_CANDIDATES, mineDimensions } from './oracle-dimensions.mjs'
 import { canonicalTuple, frameId, generateFromDocument, MAX_STATE_PATHS, TAXONOMY_FAMILIES } from './oracle-frames.mjs'
 import {
@@ -1330,29 +1331,46 @@ async function lintCard(options) {
     }
   }
 
-  // Formal Model 섹션도 선택이다 — 있으면 법칙·모델 출처·witness·잠금 범위를 검증한다(연결만, 뜻은 리뷰 소관).
+  // Formal Model·Terms·Adequacy 섹션도 선택이다 — 있으면 출처·연결·범주·잠금 범위를 검증한다(연결만, 뜻은 리뷰 소관).
+  const formalSources = new Map(
+    sources.map((source) => {
+      const location = columnOf(source, SOURCE_COLUMNS.location)
+      return [
+        source.ID,
+        {
+          repoPath: location.startsWith('repo:') ? location.slice('repo:'.length).split('#')[0] : null,
+          authoritative: source.Kind !== 'implementation-reference' && isApproved(columnOf(source, SOURCE_COLUMNS.approval)),
+        },
+      ]
+    }),
+  )
+  const readSource = (repoPath) => readFile(resolve(repoPath), 'utf8').catch(() => null)
   const formal = parseFormalModel(lines)
   if (formal) {
-    const formalSources = new Map(
-      sources.map((source) => {
-        const location = columnOf(source, SOURCE_COLUMNS.location)
-        return [
-          source.ID,
-          {
-            repoPath: location.startsWith('repo:') ? location.slice('repo:'.length).split('#')[0] : null,
-            authoritative: source.Kind !== 'implementation-reference' && isApproved(columnOf(source, SOURCE_COLUMNS.approval)),
-          },
-        ]
-      }),
-    )
     issues.push(
       ...(await formalModelIssues(formal, {
         policies: new Set(policies.keys()),
         rows: seenRows,
         invariants: invariantIds,
         sources: formalSources,
-        readSource: (repoPath) => readFile(resolve(repoPath), 'utf8').catch(() => null),
+        readSource,
       })),
+    )
+  }
+  const terms = parseTerms(lines)
+  const adequacy = parseAdequacy(lines)
+  if (terms || adequacy) {
+    issues.push(
+      ...(await adequacyIssues(
+        { adequacy, terms },
+        {
+          rows: seenRows,
+          rowText: new Map(rows.map((row) => [row.id, contractCells(row).join(' ')])),
+          sources: formalSources,
+          questionIds: new Set(lines.map((entry) => entry.match(/^###\s+(Q\d+)\b/)?.[1]).filter(Boolean)),
+          readSource,
+        },
+      )),
     )
   }
 

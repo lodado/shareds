@@ -18,6 +18,7 @@ import {
   TRUSTED_ADAPTER_NAMES,
   trustedAdapter,
 } from './oracle-adapters.mjs'
+import { parseAdequacy } from './oracle-adequacy.mjs'
 import { parseCaseSpace } from './oracle-frames.mjs'
 import {
   assertSnapshotUnchanged,
@@ -171,6 +172,8 @@ const NEXT_ACTIONS = {
   RUN_ARTIFACTS_EXIST: 'a new revision gets a new <oracle-id> directory — never re-init to reset the baseline',
   FORMAL_PROOF_LABEL_REQUIRED:
     'register --required-label bend-proof:reported — its node-test run asserts `oracle-model.mjs prove` reports proven for the locked laws',
+  ADEQUACY_LABEL_REQUIRED:
+    'register --required-label bend-adequacy:reported — its node-test run asserts `oracle-adequacy.mjs check` reports proven for the locked card',
   RISK_MISMATCH: "drop --risk to use the locked card's Risk — a different risk is a new revision, not an init flag",
   RED_CAUSE_INFRA:
     "repair the test until the mapped row fails on its own assertion — a syntax·reference·timeout·hook failure is not VALID_RED",
@@ -1393,6 +1396,13 @@ async function initialize(options) {
     throw new CliError(
       'FORMAL_PROOF_LABEL_REQUIRED',
       'the locked card has a ## Formal Model — add --required-label bend-proof:reported for its law proof run',
+    )
+  }
+  // 승인된 Adequacy도 같다 — 적절성 점검 실행 없이 GREEN으로 가는 init을 막는다.
+  if (parseAdequacy(oracle.split('\n')) && !requiredLabels.includes('bend-adequacy:reported')) {
+    throw new CliError(
+      'ADEQUACY_LABEL_REQUIRED',
+      'the locked card has an ## Adequacy — add --required-label bend-adequacy:reported for its adequacy check run',
     )
   }
   state.milestones = parseMilestones(options.milestones, contractRowIds(oracle))

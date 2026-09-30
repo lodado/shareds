@@ -65,6 +65,10 @@
     {
       "when": "Bend proof cross-verification selected automatically for applicable Oracle work or explicitly requested",
       "nodes": ["bend-cross-verification"]
+    },
+    {
+      "when": "a card with ## Terms or ## Adequacy",
+      "nodes": ["adequacy"]
     }
   ],
   "nodes": [
@@ -282,6 +286,12 @@
       "id": "bend-cross-verification",
       "path": "references/bend-cross-verification.md",
       "when": "Oracle lane — automatically before Draft/lock for a pure calculation or deterministic state transition with a meaningful invariant, or an explicit Bend request; re-read before proof execution and GREEN/review",
+      "requires": ["common"]
+    },
+    {
+      "id": "adequacy",
+      "path": "references/adequacy.md",
+      "when": "Bend path with goals from the source text — writing ## Terms or ## Adequacy, dispatching the model analyst, or running oracle-adequacy.mjs",
       "requires": ["common"]
     },
     {

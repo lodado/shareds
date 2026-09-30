@@ -268,6 +268,13 @@ replaces the `O*`·`D*` row that owns a specific scenario outcome.
 Only on the Bend path: the section, its locked `MODEL.bend`/`LAWS.bend` sources and its checks are
 owned by [`bend-cross-verification.md`](../bend-cross-verification.md). Absence does not block lint.
 
+## Terms and Adequacy — optional
+
+`## Terms` (the dictionary) may appear on any card; `## Adequacy` only on the Bend path with goals from
+the source text. Both, their locked world source and the adequacy check are owned by
+[`adequacy.md`](../adequacy.md). Absence does not block lint; a card without `## Adequacy` reports
+adequacy as not evaluated.
+
 ## Cold-read gate — adversarial self-review
 
 The Draft passes three checks before it is shown to the user: a context-free read, five questions

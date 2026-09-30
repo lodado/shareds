@@ -42,12 +42,13 @@ proven about the product, and a finite space checked is not every run.
 ## 2. From source text to a locked model
 
 Write the card first: sourced `P*` policies and `O*` rows as usual. When native delegation is
-supported, authorized and has capacity, dispatch two independent read-only analysts before waiting
-for either, from the same approved source excerpts and revision and without each other's answers: a
-law analyst proposes laws and environment assumptions, a behavior analyst observable outcomes, Never
-conditions and ordering cases. The Controller waits for both, compares missing conditions, extra
-assumptions and conflicts, and maps each law to existing `P*`/`I*`/`O*` rows; agreement between
-agents is not approval. Without delegation, independent contexts or capacity, record the concrete
+supported, authorized and has capacity, dispatch one read-only model analyst with only the file
+`scripts/oracle-adequacy.mjs model-input` derives — the Outcome Brief, the source text, the hazards
+and the authoring rules, never the card's rows. It proposes the laws and environment assumptions; for
+a finite world, the record, assumptions and goals of [`adequacy.md`](adequacy.md), whose check then
+compares the two readings mechanically. The Controller maps each law to existing `P*`/`I*`/`O*` rows
+and does not edit the analyst's output; a disagreement is an Open question. Agreement between agents
+is not approval. Without delegation, independent contexts or capacity, record the concrete
 limitation and run sequentially — never claim independence that did not occur.
 
 Then formalize a small core as three tracked files inside the scan root, outside the Oracle

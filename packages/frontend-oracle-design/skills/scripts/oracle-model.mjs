@@ -123,15 +123,12 @@ function eventLabel(event) {
 }
 
 /**
- * MODEL.bend를 스킬 소유 임시 디렉터리에 `.mjs`로 컴파일해 불러온다. foreign·unsafe·hub import는 실행 전에 거부한다 —
+ * Bend 파일을 스킬 소유 임시 디렉터리에 `.mjs`로 컴파일해 불러온다. foreign·unsafe·hub import는 실행 전에 거부한다 —
  * 컴파일된 모듈은 이 프로세스에서 돌기 때문이다. 남는 코드는 Bend가 종료를 검사한 순수 def뿐이다.
- * ponytail: 모델 def는 시간·메모리 상한 없이 이 프로세스에서 돈다(상한은 bound ≤ 8과 max-cases뿐) — 큰 모델이 오면
- * 열거를 worker thread + resourceLimits·timeout으로 옮긴다.
+ * ponytail: def는 시간·메모리 상한 없이 이 프로세스에서 돈다(상한은 bound ≤ 8·max-cases·max-worlds뿐) — 큰 모델이
+ * 오면 열거를 worker thread + resourceLimits·timeout으로 옮긴다.
  */
-export async function loadModel({ model, prefix, bin, timeoutMs = 120_000 }) {
-  if (!/^[A-Z]\w*$/.test(prefix ?? ''))
-    throw new CliError('USAGE', 'prefix must name the model namespace, e.g. Search', 2)
-  const entry = resolve(model)
+export async function compileBend({ entry, bin, timeoutMs = 120_000 }) {
   const inputs = await bendInputs(entry)
   const untrusted = untrustedInputs(inputs)
   if (untrusted.length > 0) throw new CliError('MODEL_UNTRUSTED', untrusted.join('; '))
@@ -149,24 +146,32 @@ export async function loadModel({ model, prefix, bin, timeoutMs = 120_000 }) {
       throw new CliError('MODEL_TIMEOUT', `bend -o did not finish in ${timeoutMs}ms`)
     if (built.error) throw new CliError('BEND_UNAVAILABLE', `${bin}: ${built.error.message}`)
     if (built.status !== 0) throw new CliError('MODEL_INVALID', `${built.stdout}${built.stderr}`.trim())
-    const exported = (await import(pathToFileURL(out).href)).default
-    const api = {}
-    for (const name of MODEL_EXPORTS) {
-      const fn = exported[`${prefix}.${name}`]
-      if (typeof fn !== 'function')
-        throw new CliError('MODEL_INTERFACE', `${basename(entry)} does not define ${prefix}.${name}`)
-      // 컴파일된 def는 인자를 복사하지 않고 넘겨받는다 — 열거가 공유하는 상태·사건 값을 건드리지 못하게 복제해 넘긴다.
-      api[name] = (...args) => fn(...args.map((argument) => structuredClone(argument)))
-    }
-    return {
-      ...api,
-      prefix,
-      digest: inputDigest(inputs, dirname(entry)),
-      inputs: inputs.map(({ path, sha256: digest }) => ({ path: relative(dirname(entry), path), sha256: digest })),
-      bend: { bin, version: reportedVersion(bin) },
-    }
+    return { exported: (await import(pathToFileURL(out).href)).default, inputs }
   } finally {
     await rm(outDir, { recursive: true, force: true })
+  }
+}
+
+/** MODEL.bend → 오라클 공간을 만드는 init·step·next·observe. */
+export async function loadModel({ model, prefix, bin, timeoutMs = 120_000 }) {
+  if (!/^[A-Z]\w*$/.test(prefix ?? ''))
+    throw new CliError('USAGE', 'prefix must name the model namespace, e.g. Search', 2)
+  const entry = resolve(model)
+  const { exported, inputs } = await compileBend({ entry, bin, timeoutMs })
+  const api = {}
+  for (const name of MODEL_EXPORTS) {
+    const fn = exported[`${prefix}.${name}`]
+    if (typeof fn !== 'function')
+      throw new CliError('MODEL_INTERFACE', `${basename(entry)} does not define ${prefix}.${name}`)
+    // 컴파일된 def는 인자를 복사하지 않고 넘겨받는다 — 열거가 공유하는 상태·사건 값을 건드리지 못하게 복제해 넘긴다.
+    api[name] = (...args) => fn(...args.map((argument) => structuredClone(argument)))
+  }
+  return {
+    ...api,
+    prefix,
+    digest: inputDigest(inputs, dirname(entry)),
+    inputs: inputs.map(({ path, sha256: digest }) => ({ path: relative(dirname(entry), path), sha256: digest })),
+    bend: { bin, version: reportedVersion(bin) },
   }
 }
 
@@ -319,24 +324,64 @@ export async function proveLaws({ dir, bin, require = [], timeoutMs = 120_000 })
     stdout: run.stdout ?? '',
     stderr: run.stderr ?? '',
   }
-  if (run.error?.code === 'ETIMEDOUT') return { ...observed, status: 'timeout', reason: `no verdict in ${timeoutMs}ms` }
-  if (run.error) return { ...observed, status: 'unavailable', reason: `${bin}: ${run.error.message}` }
+  const verdict = verdictOf(run, { bin, timeoutMs })
+  return run.error ? { ...observed, ...verdict } : { ...observed, bend: { bin, version: reportedVersion(bin) }, ...verdict }
+}
 
-  const output = `${observed.stdout}\n${observed.stderr}`
+/** `bend <file> --verdict` 실행 결과 → 상태. proven은 exit 0·신호 없음·정확한 `ALL PROOFS CHECK` 줄이 함께일 때뿐이다. */
+export function verdictOf(run, { bin, timeoutMs }) {
+  if (run.error?.code === 'ETIMEDOUT') return { status: 'timeout', reason: `no verdict in ${timeoutMs}ms` }
+  if (run.error) return { status: 'unavailable', reason: `${bin}: ${run.error.message}` }
+  const output = `${run.stdout ?? ''}\n${run.stderr ?? ''}`
   const lines = output.split('\n').map((line) => line.trim())
-  const ran = { ...observed, bend: { bin, version: reportedVersion(bin) } }
   if (
     run.status === 0 &&
     run.signal === null &&
     lines.includes('ALL PROOFS CHECK') &&
     !lines.includes('SOME PROOFS FAIL')
   ) {
-    return { ...ran, status: 'proven' }
+    return { status: 'proven' }
   }
   const failedAt = output.match(/^Location:\s*(\S+)/m)?.[1] ?? null
-  if (/\b\d+ TODOs? found\b/.test(output)) return { ...ran, status: 'open', failedAt }
-  if (/rely on unsafe or foreign code/.test(output)) return { ...ran, status: 'unsafe', failedAt }
-  return { ...ran, status: 'failed', failedAt }
+  if (/\b\d+ TODOs? found\b/.test(output)) return { status: 'open', failedAt }
+  if (/rely on unsafe or foreign code/.test(output)) return { status: 'unsafe', failedAt }
+  return { status: 'failed', failedAt }
+}
+
+/**
+ * 잠금 범위 — 진입 Bend 파일과 그것이 `import ./x.bend`로 부르는 파일 전부가 Source Registry `repo:` 출처인지, 증명 밖
+ * 코드(foreign·@unsafe·hub import)가 없는지. structures는 읽은 파일의 scanBendSource 결과(못 읽으면 null)다.
+ */
+export async function lockScopeIssues(entries, context) {
+  const issues = []
+  const registered = new Set([...context.sources.values()].map(({ repoPath }) => repoPath).filter(Boolean))
+  const structures = new Map()
+  const scan = async (repoPath, importer) => {
+    if (structures.has(repoPath)) return
+    const text = await context.readSource(repoPath)
+    if (text === null) {
+      const via = importer ? ` (imported by ${importer})` : ''
+      issues.push(`formal-source-unreadable: ${repoPath}${via}`)
+      structures.set(repoPath, null)
+      return
+    }
+    const structure = scanBendSource(text)
+    structures.set(repoPath, { ...structure, text })
+    if (structure.foreign || structure.unsafe || structure.external.length > 0) {
+      issues.push(`formal-untrusted-code: ${repoPath} carries foreign, @unsafe or hub-imported code outside the proof`)
+    }
+    for (const target of structure.imports) {
+      const imported = join(dirname(repoPath), target).split('\\').join('/')
+      // 법칙이 기대는 predicate·helper도 같은 lock에 들어가야 한다 — 법칙 파일만 잠그면 뜻을 바깥에서 바꿀 수 있다.
+      if (!registered.has(imported))
+        issues.push(
+          `formal-import-unlocked: ${imported} (imported by ${repoPath}) is not a repo: Source Registry source`,
+        )
+      await scan(imported, repoPath)
+    }
+  }
+  for (const entry of entries) await scan(entry, null)
+  return { issues, structures }
 }
 
 /** `## Formal Model` 절 → 필드·law 표. 없으면 null — 절은 선택이다. */
@@ -445,35 +490,9 @@ export async function formalModelIssues(formal, context) {
     issues.push(`formal-policy-unlisted: ${id} is cited by no law and not listed under Not formalized`)
 
   if (!modelPath || !lawsPath) return issues
-  const registered = new Set([...context.sources.values()].map(({ repoPath }) => repoPath).filter(Boolean))
-  const scanned = new Map()
-  const scan = async (repoPath, importer) => {
-    if (scanned.has(repoPath)) return scanned.get(repoPath)
-    const text = await context.readSource(repoPath)
-    if (text === null) {
-      const via = importer ? ` (imported by ${importer})` : ''
-      issues.push(`formal-source-unreadable: ${repoPath}${via}`)
-      scanned.set(repoPath, null)
-      return null
-    }
-    const structure = scanBendSource(text)
-    scanned.set(repoPath, structure)
-    if (structure.foreign || structure.unsafe || structure.external.length > 0) {
-      issues.push(`formal-untrusted-code: ${repoPath} carries foreign, @unsafe or hub-imported code outside the proof`)
-    }
-    for (const target of structure.imports) {
-      const imported = join(dirname(repoPath), target).split('\\').join('/')
-      // 법칙이 기대는 predicate·helper도 같은 lock에 들어가야 한다 — 법칙 파일만 잠그면 뜻을 바깥에서 바꿀 수 있다.
-      if (!registered.has(imported))
-        issues.push(
-          `formal-import-unlocked: ${imported} (imported by ${repoPath}) is not a repo: Source Registry source`,
-        )
-      await scan(imported, repoPath)
-    }
-    return structure
-  }
-  await scan(modelPath, null)
-  const lawsSource = await scan(lawsPath, null)
+  const scope = await lockScopeIssues([modelPath, lawsPath], context)
+  issues.push(...scope.issues)
+  const lawsSource = scope.structures.get(lawsPath)
   if (!lawsSource) return issues
   if (!lawsSource.imports.some((target) => join(dirname(lawsPath), target).split('\\').join('/') === modelPath)) {
     issues.push(

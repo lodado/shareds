@@ -157,9 +157,11 @@ its own scope carve-out at disqualification, with no additional node or artifact
   user request to invoke Bend is needed: `scripts/ensure-bend.mjs` provides the CLI (reuse or
   checksum-pinned install) and `scripts/oracle-model.mjs` proves the locked laws, generates the
   oracle space from the locked model and checks the product on it, recorded in an optional
-  `## Formal Model`. A failed install skips an automatically selected path and fails an explicit
+  `## Formal Model`; with goals from the source text, `scripts/oracle-adequacy.mjs` checks the card's
+  coordinates and rows against them (`## Terms`, `## Adequacy`, [`adequacy.md`](references/adequacy.md)).
+  A failed install skips an automatically selected path and fails an explicit
   Bend request. Re-read before proof execution and GREEN/review. Use supported, authorized native delegation with capacity for
-  parallel law/behavior analysis; later run proof/behavior checks concurrently on stable, isolated
+  an independent model analyst; later run proof/behavior checks concurrently on stable, isolated
   inputs when the host supports it. Report a concrete reason for sequential fallback. Approval,
   VALID_RED and final adjudication stay serial. This neither enables graph mode nor adds Bend to Low.
 - Oracle-lane inception: before selecting investigation breadth/depth for unclear existing-system
