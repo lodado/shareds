@@ -5,15 +5,13 @@
 // 파일로 쓴다. 세계 모델에 없는 현상은 찾지 못한다 — 결론은 선언한 세계 안에서만 성립한다.
 
 import { Buffer } from 'node:buffer'
-import { spawnSync } from 'node:child_process'
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { readFile, writeFile } from 'node:fs/promises'
+import { basename, dirname, relative, resolve } from 'node:path'
 import process from 'node:process'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ensureBend, reportedVersion } from './ensure-bend.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
-import { bendInputs, compileBend, lockScopeIssues, toPlain, verdictOf } from './oracle-model.mjs'
+import { bendInputs, compileBend, keepArtifact, lockScopeIssues, toPlain, verdictBeside } from './oracle-model.mjs'
 
 export const ADEQUACY_VERSION = 1
 // ponytail: 열거와 커널 증명에 같은 상한 — 넘으면 점검 전체가 unknown이다. 더 큰 세계가 필요한 카드가 오면 세계를
@@ -28,6 +26,10 @@ export const HAZARDS = {
   'effect-count': 'an external effect (request, event, analytics, email) happens zero or several times',
   'identity-reference': 'the wrong actor, resource or version, or a dangling reference',
   'feature-composition': 'another feature or a later step changes the outcome',
+  'carry-over':
+    'state or an indicator from an earlier attempt remains in the next one (a stale toast, error or selection)',
+  'order-timing':
+    'the result depends on what happens first (a toast before the commit, a late response) — a record world sees end states only',
 }
 // 판정에 쓰이면 뜻이 갈리는 단어 — 카드 행에 나오면 ## Terms가 어느 뜻인지 정해야 한다(영문은 단어 시작, 한글은 부분 일치).
 const VAGUE_WORDS = [
@@ -51,25 +53,14 @@ const VAGUE_WORDS = [
   '권한',
   '변경',
 ]
-const TERM_COLUMNS = [
-  'Term',
-  'Context',
-  'Name',
-  'Category',
-  'Field',
-  'Observed via',
-  'Definition',
-  'Not',
-  'Source',
-  'Status',
-]
+const TERM_COLUMNS = ['Term', 'Context', 'Name', 'Category', 'Field', 'Path', 'Definition', 'Not', 'Source', 'Status']
 const ADEQUACY_FIELDS = ['World', 'Coordinates', 'Observations', 'Rows', 'Rows outside the world']
 const REFERENCE = fileURLToPath(new URL('../references/adequacy.md', import.meta.url))
 const SUGGESTIONS = {
   controllable: (field) => `add ${field} to Coordinates — the test sets it`,
   observable: (field) => `add ${field} to Observations — the test reads it`,
   hidden: (field) =>
-    `${field} is hidden — register a product observation path for it in ## Terms (observable + Observed via) or record an Open question; never read it from a test double (OBSERVATION_GAP)`,
+    `${field} is hidden — register a product observation path for it in ## Terms (observable + Path) or record an Open question; never read it from a test double (OBSERVATION_GAP)`,
 }
 
 class CliError extends Error {
@@ -119,7 +110,12 @@ export function parseTerms(lines) {
   const body = sectionOf(lines, '## Terms')
   if (!body) return null
   const table = tablesOf(body).find(({ header }) => header[0] === 'Term')
-  return { header: table?.header ?? [], rows: table?.rows ?? [] }
+  // 0.65.0 카드의 `Observed via` 열은 `Path`와 같다 — 관찰 가능한 용어의 읽는 경로.
+  const rename = (name) => (name === 'Observed via' ? 'Path' : name)
+  const rows = (table?.rows ?? []).map((row) =>
+    Object.fromEntries(Object.entries(row).map(([name, value]) => [rename(name), value])),
+  )
+  return { header: (table?.header ?? []).map(rename), rows }
 }
 
 /** `## Adequacy` 절 → 필드와 가정·목표·예시·위험 표. 없으면 null — 절은 선택이다. */
@@ -245,10 +241,12 @@ export async function adequacyIssues({ adequacy, terms }, context) {
           `terms-field: ${id}: a concept has Field —; a controllable, observable or hidden term names one world field`,
         )
       if (isField(row)) byField.set(row.Field, [...(byField.get(row.Field) ?? []), id])
-      const observed = Boolean(row['Observed via']) && row['Observed via'] !== '—'
-      if ((row.Category === 'observable') !== observed)
+      // 테스트가 설정하는 방법(controllable)과 제품에서 읽는 경로(observable)를 적는다 — 좌표의 뜻과 테스트가 실제로
+      // 만드는 상황이 어긋나면 그 좌표는 검사되지 않은 채 통과한다.
+      const hasPath = Boolean(row.Path) && row.Path !== '—'
+      if (['controllable', 'observable'].includes(row.Category) !== hasPath)
         issues.push(
-          `terms-observed-via: ${id}: an observable term names the product path that reads it; other terms have —`,
+          `terms-path: ${id}: a controllable term names how the test sets it and an observable term the product path that reads it; hidden and concept terms have —`,
         )
       if (!row.Definition || row.Definition === '—') issues.push(`terms-definition: ${id}: Definition is empty`)
       if (isField(row) && (!row.Not || row.Not === '—'))
@@ -290,6 +288,13 @@ export async function adequacyIssues({ adequacy, terms }, context) {
       issues.push(`adequacy-assumption: ${row.Assumption}: Source must be a Source Registry ID`)
     if (!row.Falsifier || row.Falsifier === '—')
       issues.push(`adequacy-assumption: ${row.Assumption}: name the observation that would show it false`)
+    // 가정은 제품이 바꿀 수 없는 사실만이다. 제품이 보장하는 것은 목표다 — 가정으로 적으면 위반하는 세계가 공간에서 사라진다.
+    if (!row.Owner || row.Owner === '—')
+      issues.push(
+        `adequacy-assumption-owner: ${row.Assumption}: name who guarantees it outside the product, or \`harness\``,
+      )
+    else if (/^product\b/i.test(row.Owner))
+      issues.push(`adequacy-assumption-owner: ${row.Assumption}: a duty of the product is a goal, not an assumption`)
   }
   const goals = new Set()
   for (const row of adequacy.goals) {
@@ -449,7 +454,10 @@ export function adequacySpec(cardText, worldText) {
     outside: {
       rows: adequacy.fields['Rows outside the world'] ?? '',
       hazards: adequacy.hazards.filter((row) => !(row.Disposition ?? '').startsWith('modeled:')),
+      // 테스트가 만들 수 없어서 둔 가정 — 그 가정이 뺀 세계는 검사되지 않았다.
+      harness: adequacy.assumptions.filter((row) => /^harness\b/i.test(row.Owner ?? '')).map((row) => row.Assumption),
     },
+    owners: Object.fromEntries(adequacy.assumptions.map((row) => [row.Assumption, row.Owner ?? ''])),
     digestInput: { adequacy, terms: terms.rows },
   }
 }
@@ -482,24 +490,7 @@ const lawName = (...parts) => parts.filter(Boolean).join('_').toLowerCase().repl
  */
 export function searchAdequacy(model, spec) {
   const defs = [...spec.assumptions, ...spec.rows, ...spec.goals.map(({ id }) => id)]
-  const worlds = enumerateWorlds(spec.fields).map((world) => {
-    const value = {
-      $: spec.prefix,
-      ...Object.fromEntries(
-        spec.fields.map((field) => [
-          field.name,
-          field.type === 'Bool' ? world.plain[field.name] : { $: world.plain[field.name] },
-        ]),
-      ),
-    }
-    const truth = Object.fromEntries(defs.map((id) => [id, evaluate(model, `${spec.prefix}.${id}`, value)]))
-    return {
-      ...world,
-      truth,
-      valid: spec.assumptions.every((id) => truth[id]),
-      card: spec.rows.every((id) => truth[id]),
-    }
-  })
+  const worlds = evaluateWorlds(model, spec)
   const byKey = new Map(worlds.map((world) => [worldKey(world.plain), world]))
   const valid = worlds.filter((world) => world.valid)
   const key = [...spec.coordinates, ...spec.observations]
@@ -709,6 +700,73 @@ export function searchAdequacy(model, spec) {
   }
 }
 
+/** 모든 세계와 각 def(가정·행·목표)의 값 — 컴파일된 def를 세계 값에 적용한다. */
+export function evaluateWorlds(model, spec) {
+  const defs = [...spec.assumptions, ...spec.rows, ...spec.goals.map(({ id }) => id)]
+  return enumerateWorlds(spec.fields).map((world) => {
+    const value = {
+      $: spec.prefix,
+      ...Object.fromEntries(
+        spec.fields.map((field) => [
+          field.name,
+          field.type === 'Bool' ? world.plain[field.name] : { $: world.plain[field.name] },
+        ]),
+      ),
+    }
+    const truth = Object.fromEntries(defs.map((id) => [id, evaluate(model, `${spec.prefix}.${id}`, value)]))
+    return {
+      ...world,
+      truth,
+      valid: spec.assumptions.every((id) => truth[id]),
+      card: spec.rows.every((id) => truth[id]),
+    }
+  })
+}
+
+/** 가정 끄기 결과를 사람이 읽을 한 줄로 — 무엇을 확인할지까지 적는다. */
+function sensitivityReading(id, broken, opened, owner) {
+  if (/^harness\b/i.test(owner))
+    return `${id} is a harness limit — the ${opened} worlds it excludes are untested; keep them in the outside list`
+  if (broken.length > 0) return `the goals ${broken.join(', ')} rest on ${id} — monitor or test its falsifier`
+  return `no goal depends on ${id} — review the ${opened} worlds it excludes for harm the goals do not name, and check its Owner: if the product guarantees it, it is a goal`
+}
+
+/**
+ * 가정 끄기 — 가정 하나를 뺐을 때 카드가 새로 허용하는 세계와 그중 깨지는 목표. 목표가 깨지면 그 가정이 목표를
+ * 떠받친다(falsifier를 테스트나 운영 감시로). 아무 목표도 안 깨지면 새로 허용된 세계를 사람이 본다: 해로운 세계가 있으면
+ * 목표가 빠진 것이다. 판정이 아니라 공간 밖을 들여다보는 도구다(evidenceKind: enumeration).
+ */
+export function assumptionSensitivity(worlds, spec) {
+  // 모든 가정 아래에서 이미 깨지는 목표는 card-implies-goal이 보고한다 — 여기서는 이 가정 하나가 떠받치는 목표만 센다.
+  const alreadyBroken = new Set(
+    spec.goals
+      .filter((goal) => worlds.some((world) => world.valid && world.card && !world.truth[goal.id]))
+      .map((goal) => goal.id),
+  )
+  return spec.assumptions.map((id) => {
+    const others = spec.assumptions.filter((other) => other !== id)
+    const opened = worlds.filter(
+      (world) => others.every((other) => world.truth[other]) && !world.truth[id] && world.card,
+    )
+    const broken = spec.goals
+      .filter(
+        (goal) =>
+          goal.kind === 'safety' && !alreadyBroken.has(goal.id) && opened.some((world) => !world.truth[goal.id]),
+      )
+      .map((goal) => goal.id)
+    return {
+      assumption: id,
+      cardAllows: opened.length,
+      brokenGoals: broken,
+      worlds: opened.slice(0, 10).map(({ plain, truth }) => ({
+        world: plain,
+        violates: spec.goals.filter((goal) => goal.kind === 'safety' && !truth[goal.id]).map((goal) => goal.id),
+      })),
+      reading: sensitivityReading(id, broken, opened.length, spec.owners?.[id] ?? ''),
+    }
+  })
+}
+
 const bendValue = (field, value) => {
   if (field.type === 'Bool') return value ? 'True{}' : 'False{}'
   return `M.${value}{}`
@@ -874,40 +932,11 @@ export function adequacyProofFile(obligations, spec, importPath) {
   return out.join('\n')
 }
 
-function commonDirectory(directories) {
-  return directories.reduce((common, directory) => {
-    const left = common.split(sep)
-    const right = directory.split(sep)
-    let index = 0
-    while (index < left.length && left[index] === right[index]) index += 1
-    return left.slice(0, index).join(sep) || sep
-  })
-}
-
 /** 결론 파일을 세계 파일의 import 전부와 함께 임시 디렉터리에 두고 `bend ADEQUACY.bend --verdict`를 돌린다. */
 export async function certify(search, spec, { worldPath, inputs, bin, timeoutMs = 120_000 }) {
   const text = adequacyProofFile(search.obligations, spec, `./${basename(worldPath)}`)
-  const directory = await mkdtemp(join(tmpdir(), 'oracle-adequacy-'))
-  try {
-    const root = commonDirectory(inputs.map(({ path }) => dirname(path)))
-    for (const { path } of inputs) {
-      const target = join(directory, relative(root, path))
-      await mkdir(dirname(target), { recursive: true })
-      await copyFile(path, target)
-    }
-    const cwd = join(directory, relative(root, dirname(worldPath)))
-    await writeFile(join(cwd, 'ADEQUACY.bend'), text)
-    const run = spawnSync(bin, ['ADEQUACY.bend', '--verdict'], {
-      cwd,
-      encoding: 'utf8',
-      env: { ...process.env, BEND_NO_TELEMETRY: '1' },
-      timeout: timeoutMs,
-      maxBuffer: 64 * 1024 * 1024,
-    })
-    return { ...verdictOf(run, { bin, timeoutMs }), laws: search.obligations.length, bytes: Buffer.byteLength(text) }
-  } finally {
-    await rm(directory, { recursive: true, force: true })
-  }
+  const verdict = await verdictBeside({ entry: worldPath, inputs, fileName: 'ADEQUACY.bend', text, bin, timeoutMs })
+  return { ...verdict, laws: search.obligations.length, bytes: Buffer.byteLength(text) }
 }
 
 /** 커널이 결론 파일 전체를 받아들이지 않으면 어느 점검도 확정하지 않는다 — 열거 결과는 searchStatus로만 남긴다. */
@@ -926,7 +955,56 @@ export function mergeKernel(checks, kernel) {
  * 카드 한 장의 적절성 점검. status: proven(점검 전부 증명·커널 통과) · refuted(커널이 확인한 반례가 있다) ·
  * unknown(무한 필드·상한 초과·커널 실패) · not-run(Bend 없음). pass는 proven일 때뿐이다.
  */
-export async function checkAdequacy({ card, bin, cwd = process.cwd(), maxWorlds = MAX_WORLDS, timeoutMs = 120_000 }) {
+export async function checkAdequacy({
+  card,
+  bin,
+  cwd = process.cwd(),
+  maxWorlds = MAX_WORLDS,
+  timeoutMs = 120_000,
+  out = null,
+}) {
+  const loaded = await loadWorld({ card, bin, cwd, maxWorlds, timeoutMs })
+  if (loaded.result) return loaded.result
+  const { spec, inputs, base, worldPath, model } = loaded
+  const search = searchAdequacy(model, spec)
+  const kernel = await certify(search, spec, { worldPath, inputs, bin, timeoutMs })
+  const checks = mergeKernel(search.checks, kernel)
+  let status = 'unknown'
+  if (kernel.status === 'proven') status = checks.every((check) => check.status === 'proven') ? 'proven' : 'refuted'
+  const result = {
+    ...base,
+    status,
+    pass: status === 'proven',
+    counts: search.counts,
+    checks,
+    minimalPairs: search.minimalPairs,
+    minimalPairsTotal: search.minimalPairsTotal,
+    sensitivity: assumptionSensitivity(evaluateWorlds(model, spec), spec),
+    kernel,
+    bend: { bin, version: reportedVersion(bin) },
+  }
+  if (!out) return result
+  // 남긴 파일이 증거다 — 결론 법칙과 증명 전부. 다시 검사: out에서 `bend ADEQUACY.bend --verdict`.
+  const header = [
+    `# Generated by oracle-adequacy.mjs check from ${base.card} — DO NOT EDIT.`,
+    `# inputDigest ${base.inputDigest}; re-check with \`bend ADEQUACY.bend --verdict\` in this directory.`,
+    '',
+  ].join('\n')
+  const kept = await keepArtifact({
+    out,
+    fileName: 'ADEQUACY.bend',
+    entry: worldPath,
+    render: (importPath) => `${header}${adequacyProofFile(search.obligations, spec, importPath)}`,
+    result,
+  })
+  return { ...result, artifacts: kept }
+}
+
+/**
+ * 카드 → 세계 모델 로드(스펙·입력 digest·컴파일된 def). 무한 필드·상한 초과는 unknown, Bend 없음은 not-run 결과를
+ * `result`로 돌려준다 — 부르는 쪽은 그 결과를 그대로 낸다.
+ */
+export async function loadWorld({ card, bin, cwd = process.cwd(), maxWorlds = MAX_WORLDS, timeoutMs = 120_000 }) {
   const cardText = await readFile(card, 'utf8')
   const lines = cardText.split('\n')
   const world = parseAdequacy(lines)?.fields.World?.match(/^(S\d+)\s+([A-Z]\w*)$/)
@@ -961,14 +1039,14 @@ export async function checkAdequacy({ card, bin, cwd = process.cwd(), maxWorlds 
       unsupported.length > 0
         ? `fields without a finite domain: ${unsupported.map(({ name, type }) => [name, type].join(': ')).join(', ')}`
         : `${total} worlds exceed max-worlds ${maxWorlds}`
-    return { ...base, status: 'unknown', pass: false, reason, checks: [] }
+    return { result: { ...base, status: 'unknown', pass: false, reason, checks: [] } }
   }
   let compiled
   try {
     compiled = await compileBend({ entry: worldPath, bin, timeoutMs })
   } catch (error) {
     if (error.code !== 'BEND_UNAVAILABLE') throw error
-    return { ...base, status: 'not-run', pass: false, reason: error.message, checks: [] }
+    return { result: { ...base, status: 'not-run', pass: false, reason: error.message, checks: [] } }
   }
   const model = {
     call: (name, value) => {
@@ -978,21 +1056,98 @@ export async function checkAdequacy({ card, bin, cwd = process.cwd(), maxWorlds 
       return fn(structuredClone(value))
     },
   }
-  const search = searchAdequacy(model, spec)
-  const kernel = await certify(search, spec, { worldPath, inputs, bin, timeoutMs })
-  const checks = mergeKernel(search.checks, kernel)
-  let status = 'unknown'
-  if (kernel.status === 'proven') status = checks.every((check) => check.status === 'proven') ? 'proven' : 'refuted'
+  return { spec, inputs, base, worldPath, model, cardText }
+}
+
+/**
+ * 세계 모델 대응 검사 — 좌표(조작 가능한 필드)의 모든 조합을 adapter.run으로 제품에 걸고, 돌아온 관찰값으로 유효
+ * 세계를 찾아 카드 행을 판정한다. 좌표·관찰에 맞는 유효 세계가 없으면 model-gap: 제품이 세계 모델이 불가능하다고 한
+ * 결과를 냈다(모델 밖 현상 — 문제 정의를 다시 연다). 가정이 제외한 좌표 조합은 실행하지 않고 excluded로 보고한다.
+ * card-observable이 증명된 카드에서만 판정이 좌표·관찰로 정해진다 — 판정이 갈리는 세계가 섞이면 unknown이다.
+ */
+export async function conformWorld({ card, adapter, bin, cwd = process.cwd(), maxWorlds, timeoutMs }) {
+  if (typeof adapter?.run !== 'function')
+    throw new CliError('ADAPTER_INTERFACE', 'a world adapter exports run(coordinates) → observations')
+  const loaded = await loadWorld({ card, bin, cwd, ...(maxWorlds ? { maxWorlds } : {}), timeoutMs })
+  if (loaded.result) return { ...loaded.result, settings: [] }
+  const { spec, base, model } = loaded
+  const worlds = evaluateWorlds(model, spec).filter((world) => world.valid)
+  const field = (name) => spec.fields.find((entry) => entry.name === name)
+  let settings = [{}]
+  for (const name of spec.coordinates)
+    settings = settings.flatMap((partial) => field(name).values.map((value) => ({ ...partial, [name]: value })))
+  const results = []
+  for (const coordinates of settings) {
+    const candidates = worlds.filter((world) =>
+      spec.coordinates.every((name) => world.plain[name] === coordinates[name]),
+    )
+    if (candidates.length === 0) {
+      results.push({ coordinates, status: 'excluded', reason: 'the assumptions allow no world with these coordinates' })
+      continue
+    }
+    let observations
+    try {
+      observations = await adapter.run(structuredClone(coordinates))
+      for (const name of spec.observations) {
+        if (!field(name).values.includes(observations?.[name]))
+          throw new Error(
+            `observation ${name} is ${JSON.stringify(observations?.[name])}, not one of ${JSON.stringify(
+              field(name).values,
+            )}`,
+          )
+      }
+    } catch (error) {
+      results.push({ coordinates, status: 'adapter-error', error: error?.message ?? String(error) })
+      continue
+    }
+    const matches = candidates.filter((world) =>
+      spec.observations.every((name) => world.plain[name] === observations[name]),
+    )
+    if (matches.length === 0) {
+      results.push({
+        coordinates,
+        observations,
+        status: 'model-gap',
+        route:
+          'the product produced a result the world model calls impossible — reopen the problem definition (DIMENSION_MISSING or a wrong assumption); never force it into the nearest world',
+      })
+      continue
+    }
+    const verdicts = new Set(matches.map((world) => world.card))
+    if (verdicts.size > 1) {
+      results.push({
+        coordinates,
+        observations,
+        status: 'unknown',
+        reason:
+          'the rows are not a function of the coordinates and observations — run the check (card-observable) first',
+      })
+      continue
+    }
+    const failed = spec.rows.filter((id) => !matches[0].truth[id])
+    results.push({
+      coordinates,
+      observations,
+      status: failed.length === 0 ? 'pass' : 'violation',
+      ...(failed.length > 0 ? { rows: failed } : {}),
+    })
+  }
+  const run = results.filter((entry) => entry.status !== 'excluded')
+  const pass = run.length > 0 && run.every((entry) => entry.status === 'pass')
   return {
     ...base,
-    status,
-    pass: status === 'proven',
-    counts: search.counts,
-    checks,
-    minimalPairs: search.minimalPairs,
-    minimalPairsTotal: search.minimalPairsTotal,
-    kernel,
-    bend: { bin, version: reportedVersion(bin) },
+    status: pass ? 'pass' : 'fail',
+    pass,
+    settings: results,
+    verification: {
+      level: 'conformance-tested',
+      strategy: 'exhaustive',
+      coordinates: spec.coordinates,
+      executed: run.length,
+      excluded: results.length - run.length,
+      claim:
+        'the product satisfies every row on every coordinate setting the assumptions allow; with card-implies-goal proven, the goals follow only while the assumptions hold and the observation paths are faithful — not a proof about the product',
+    },
   }
 }
 
@@ -1013,8 +1168,7 @@ function anchoredSection(text, anchor) {
  * 모델 분석가 입력 — 원문과 Outcome Brief, 위험 목록, 세계 모델 작성 규칙만 담는다. 카드의 행·Case space·Terms·
  * Adequacy·Formal Model, 모델 파일, 제품 코드와 테스트는 넣지 않는다: 두 해석이 서로 기대면 대조할 차이가 사라진다.
  */
-export async function modelInput({ card, cwd = process.cwd() }) {
-  const lines = (await readFile(card, 'utf8')).split('\n')
+async function sourceTexts(lines, cwd) {
   const registry = sectionOf(lines, '## Source Registry') ?? []
   const table = tablesOf(registry)[0]
   const column = table?.header.find((name) => /Location|위치/.test(name))
@@ -1032,6 +1186,12 @@ export async function modelInput({ card, cwd = process.cwd() }) {
       '',
     )
   }
+  return { registry, sources }
+}
+
+export async function modelInput({ card, cwd = process.cwd() }) {
+  const lines = (await readFile(card, 'utf8')).split('\n')
+  const { registry, sources } = await sourceTexts(lines, cwd)
   const rules = sectionOf((await readFile(REFERENCE, 'utf8')).split('\n'), '## World model authoring') ?? []
   return [
     '# Model analyst input',
@@ -1054,12 +1214,213 @@ export async function modelInput({ card, cwd = process.cwd() }) {
   ].join('\n')
 }
 
+const EXPLORER_SCHEMA = {
+  candidates: [
+    {
+      id: 'X1',
+      kind: 'in-world | new-fact | qualifier',
+      scenario: 'the steps, in the user’s terms',
+      harm: 'what the user loses, and which source sentence says it matters',
+      world: 'in-world only: a world literal, e.g. start !held committed ack reload',
+      newFact: {
+        name: 'new-fact only',
+        category: 'controllable | observable | hidden',
+        observedVia: 'the product path that shows it, or —',
+      },
+      whyOutside: 'new-fact only: why no field of the world expresses it',
+      sourceText: 'qualifier only: the exact source words the rows dropped, e.g. "while the retention conditions hold"',
+      rows: ['qualifier only: the O* rows that state more or less than the source'],
+      sources: ['S1'],
+    },
+  ],
+}
+
+/**
+ * AI 탐색가 입력 — 기존 reverse-impossible 리뷰어가 받는다. 모델 분석가와 달리 카드 전체를 본다: 역할이 공격이다.
+ * 원문·Outcome Brief·카드 행·Terms·Adequacy에 더해, 가정 끄기 결과와 모델 밖 목록을 붙인다.
+ */
+export async function exploreInput({ card, bin, cwd = process.cwd(), timeoutMs }) {
+  const loaded = await loadWorld({ card, bin, cwd, timeoutMs })
+  if (loaded.result) throw new CliError('EXPLORE_WORLD', `the world cannot be enumerated: ${loaded.result.reason}`)
+  const { spec, model, cardText, base } = loaded
+  const lines = cardText.split('\n')
+  const { sources } = await sourceTexts(lines, cwd)
+  const worlds = evaluateWorlds(model, spec)
+  const section = (heading) => sectionOf(lines, heading) ?? []
+  return [
+    '# Oracle space explorer input',
+    '',
+    'Every row of this card passes and the adequacy checks are proven inside the declared world. Your job is to break that:',
+    'find situations where every row passes and the user is still harmed. Three kinds count:',
+    '',
+    '- `in-world`: the harm is expressible with the existing fields. Give the world literal. The tool checks it mechanically.',
+    '- `new-fact`: the harm needs a fact the world does not have (another tab, a retry, a cache, an analytics call, a stale token, ...).',
+    '  Name the fact, its category and the product path that would show it, and say why no existing field expresses it.',
+    '- `qualifier`: a condition of the source text (while, unless, within, except, only if) that the rows dropped, so the card',
+    '  promises more or less than the source. Quote the words and name the rows.',
+    '',
+    'Ground every candidate in the source text; a candidate without a source-backed harm is noise. Return only JSON of this shape:',
+    '',
+    '```json',
+    JSON.stringify(EXPLORER_SCHEMA, null, 2),
+    '```',
+    '',
+    '## Outcome Brief',
+    ...section('## Outcome Brief'),
+    '## Source text',
+    '',
+    ...sources,
+    '## Behavior Contract',
+    ...section('## Behavior Contract'),
+    '## Terms',
+    ...section('## Terms'),
+    '## Adequacy',
+    ...section('## Adequacy'),
+    '## Assumption sensitivity (computed)',
+    '',
+    ...assumptionSensitivity(worlds, spec).flatMap((entry) => [
+      `- ${entry.assumption}: without it the rows allow ${entry.cardAllows} more worlds; ${entry.reading}.`,
+      ...entry.worlds.map(({ world }) => `  - ${literalOf(world, spec.fields)}`),
+    ]),
+    '',
+    '## Outside the world (declared)',
+    '',
+    `- Rows outside the world: ${base.outside.rows || 'none'}`,
+    ...base.outside.hazards.map((row) => `- hazard ${row.Hazard}: ${row.Disposition}`),
+    ...base.outside.harness.map((id) => `- ${id} is a harness limit: the worlds it excludes are untested`),
+  ].join('\n')
+}
+
+function literalOf(plain, fields) {
+  return fields
+    .map((field) => {
+      if (field.type !== 'Bool') return `${field.name}=${plain[field.name]}`
+      return plain[field.name] ? field.name : `!${field.name}`
+    })
+    .join(' ')
+}
+
+/**
+ * 탐색가 후보 분류 — 기계로 판정할 수 있는 것은 판정하고, 새 사실은 후보 축으로 남긴다. 무엇도 공간에 자동으로
+ * 들어가지 않는다: 후보는 Open question·journal로 가고, 승격 게이트와 사람 승인을 거친다.
+ */
+export async function triageCandidates({ card, candidates, bin, cwd = process.cwd(), timeoutMs }) {
+  const loaded = await loadWorld({ card, bin, cwd, timeoutMs })
+  if (loaded.result) throw new CliError('EXPLORE_WORLD', `the world cannot be enumerated: ${loaded.result.reason}`)
+  const { spec, model } = loaded
+  const worlds = new Map(evaluateWorlds(model, spec).map((world) => [worldKey(world.plain), world]))
+  const list = candidates?.candidates
+  if (!Array.isArray(list)) throw new CliError('EXPLORE_OUTPUT', 'candidates must be {"candidates": [...]}')
+  const fieldNames = new Set(spec.fields.map(({ name }) => name))
+  const safety = spec.goals.filter((goal) => goal.kind === 'safety')
+  const triaged = list.map((candidate) => {
+    const base = { id: candidate?.id ?? null, kind: candidate?.kind ?? null, scenario: candidate?.scenario ?? '' }
+    const missing = ['id', 'kind', 'scenario', 'harm'].filter(
+      (key) => typeof candidate?.[key] !== 'string' || !candidate[key].trim(),
+    )
+    if (missing.length > 0) return { ...base, verdict: 'invalid', reason: `missing ${missing.join(', ')}` }
+    if (!Array.isArray(candidate.sources) || candidate.sources.length === 0)
+      return { ...base, verdict: 'invalid', reason: 'a candidate cites the source text (sources)' }
+    if (candidate.kind === 'in-world') {
+      const { plain, errors } = parseWorldLiteral(candidate.world ?? '', spec.fields)
+      if (errors.length > 0) return { ...base, verdict: 'invalid', reason: errors.join('; ') }
+      const world = worlds.get(worldKey(plain))
+      if (!world.valid) {
+        const against = spec.assumptions.filter((id) => !world.truth[id])
+        return {
+          ...base,
+          verdict: 'assumption-challenge',
+          assumptions: against,
+          owners: Object.fromEntries(against.map((id) => [id, spec.owners?.[id] ?? ''])),
+          route: `the assumptions ${against.join(', ')} exclude this world`,
+          options: [
+            'the source calls it harmful → add a goal and a row; if the product guarantees the assumption, it was a goal all along',
+            'the source is silent → a policy question (Open question), not a goal',
+            'the assumption only reflects what the harness cannot build (Owner: harness) → the world stays untested and listed outside the space',
+          ],
+        }
+      }
+      if (!world.card) {
+        const rows = spec.rows.filter((id) => !world.truth[id])
+        return { ...base, verdict: 'covered', rows, route: `the rows ${rows.join(', ')} already reject this world` }
+      }
+      const violated = safety.filter((goal) => !world.truth[goal.id]).map((goal) => goal.id)
+      if (violated.length > 0) {
+        return {
+          ...base,
+          verdict: 'contradiction',
+          goals: violated,
+          route:
+            'the rows allow a world that violates a goal — re-run the adequacy check; card-implies-goal should have refuted this card',
+        }
+      }
+      return {
+        ...base,
+        verdict: 'goal-gap',
+        route:
+          'the rows allow it and every goal holds, yet the source calls it harmful — a candidate goal: Open question with the source sentence',
+      }
+    }
+    if (candidate.kind === 'new-fact') {
+      const fact = candidate.newFact ?? {}
+      if (typeof fact.name !== 'string' || !fact.name.trim())
+        return { ...base, verdict: 'invalid', reason: 'newFact.name is required' }
+      if (fieldNames.has(fact.name))
+        return {
+          ...base,
+          verdict: 'invalid',
+          reason: `${fact.name} is already a field — state it as an in-world candidate`,
+        }
+      if (!['controllable', 'observable', 'hidden'].includes(fact.category))
+        return { ...base, verdict: 'invalid', reason: 'newFact.category must be controllable | observable | hidden' }
+      if (fact.category === 'observable' && (!fact.observedVia || fact.observedVia === '—'))
+        return { ...base, verdict: 'invalid', reason: 'an observable fact names the product path that shows it' }
+      return {
+        ...base,
+        verdict: 'candidate-axis',
+        fact,
+        question: `Should the world model the ${fact.category} fact "${
+          fact.name
+        }" (${candidate.scenario.trim()})? Harm: ${candidate.harm.trim()} Sources: ${candidate.sources.join(', ')}.`,
+        route:
+          'promotion gate (expressible with existing axes? implementation detail? recurs elsewhere? matters to the user? observable?) → Open question → a new revision',
+      }
+    }
+    if (candidate.kind === 'qualifier') {
+      const rows = Array.isArray(candidate.rows) ? candidate.rows : []
+      if (typeof candidate.sourceText !== 'string' || !candidate.sourceText.trim())
+        return { ...base, verdict: 'invalid', reason: 'a qualifier quotes the source words (sourceText)' }
+      if (rows.length === 0 || !rows.every((id) => /^O\d+$/.test(id)))
+        return { ...base, verdict: 'invalid', reason: 'a qualifier names the O* rows that dropped it (rows)' }
+      return {
+        ...base,
+        verdict: 'dropped-qualifier',
+        rows,
+        route: `restate the scope of ${rows.join(
+          ', ',
+        )} with "${candidate.sourceText.trim()}" and define it in ## Terms (open → Open question) — the card must not promise more or less than the source`,
+      }
+    }
+    return { ...base, verdict: 'invalid', reason: 'kind must be in-world | new-fact | qualifier' }
+  })
+  const summary = {}
+  for (const { verdict } of triaged) summary[verdict] = (summary[verdict] ?? 0) + 1
+  return {
+    triaged,
+    summary,
+    note: 'nothing enters the space automatically — candidates go to Open questions or the journal',
+  }
+}
+
 function parseOptions(args) {
   const options = {}
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index]?.replace(/^--/, '')
     const value = args[index + 1]
-    if (!['card', 'max-worlds', 'timeout-ms', 'output'].includes(name) || value === undefined) {
+    if (
+      !['card', 'max-worlds', 'timeout-ms', 'output', 'adapter', 'candidates', 'out'].includes(name) ||
+      value === undefined
+    ) {
       throw new CliError('USAGE', `Unknown or incomplete option: ${args[index]}`, 2)
     }
     options[name] = value
@@ -1068,12 +1429,16 @@ function parseOptions(args) {
 }
 
 const USAGE = `usage:
-  oracle-adequacy.mjs check --card <oracle.md> [--max-worlds <n>] [--timeout-ms <n>]
-  oracle-adequacy.mjs model-input --card <oracle.md> --output <file>`
+  oracle-adequacy.mjs check --card <oracle.md> [--out <dir>] [--max-worlds <n>] [--timeout-ms <n>]
+  oracle-adequacy.mjs conform --card <oracle.md> --adapter <world-adapter.mjs>
+  oracle-adequacy.mjs model-input --card <oracle.md> --output <file>
+  oracle-adequacy.mjs explore-input --card <oracle.md> --output <file>
+  oracle-adequacy.mjs triage --card <oracle.md> --candidates <explorer-output.json>`
 
 async function main() {
   const [command, ...args] = process.argv.slice(2)
-  if (!['check', 'model-input'].includes(command)) throw new CliError('USAGE', USAGE, 2)
+  if (!['check', 'conform', 'model-input', 'explore-input', 'triage'].includes(command))
+    throw new CliError('USAGE', USAGE, 2)
   const options = parseOptions(args)
   if (!options.card) throw new CliError('USAGE', USAGE, 2)
   if (command === 'model-input') {
@@ -1083,11 +1448,35 @@ async function main() {
     return
   }
   const { bin } = await ensureBend()
+  const timeoutMs = options['timeout-ms'] ? Number(options['timeout-ms']) : undefined
+  if (command === 'explore-input') {
+    if (!options.output) throw new CliError('USAGE', USAGE, 2)
+    await writeFile(options.output, await exploreInput({ card: options.card, bin, timeoutMs }))
+    process.stdout.write(`EXPLORE_INPUT_WRITTEN ${options.output}\n`)
+    return
+  }
+  if (command === 'triage') {
+    if (!options.candidates) throw new CliError('USAGE', USAGE, 2)
+    const candidates = JSON.parse(await readFile(options.candidates, 'utf8'))
+    process.stdout.write(
+      `${JSON.stringify(await triageCandidates({ card: options.card, candidates, bin, timeoutMs }))}\n`,
+    )
+    return
+  }
+  if (command === 'conform') {
+    if (!options.adapter) throw new CliError('USAGE', USAGE, 2)
+    const adapter = await import(pathToFileURL(resolve(options.adapter)).href)
+    const result = await conformWorld({ card: options.card, adapter, bin, timeoutMs })
+    process.stdout.write(`${JSON.stringify(result)}\n`)
+    process.exitCode = result.pass ? 0 : 1
+    return
+  }
   const result = await checkAdequacy({
     card: options.card,
     bin,
     ...(options['max-worlds'] ? { maxWorlds: Number(options['max-worlds']) } : {}),
-    ...(options['timeout-ms'] ? { timeoutMs: Number(options['timeout-ms']) } : {}),
+    ...(timeoutMs ? { timeoutMs } : {}),
+    ...(options.out ? { out: options.out } : {}),
   })
   process.stdout.write(`${JSON.stringify(result)}\n`)
   process.exitCode = result.pass ? 0 : 1

@@ -14,17 +14,18 @@ The source text the card cites as S1:
 3. While the retention conditions hold, a reload must show the committed version.
 4. Under normal conditions the save can complete.
 
-Environment facts: permission is never regained while one save request is processed, and a reload
-reads the server, so it never shows a version the server did not commit. One editor edits one
-document with one request per attempt; concurrent editors, duplicate requests and other features are
-outside this fixture, and no guarantee is claimed for them.
+Environment facts: permission is never regained while one save request is processed. One editor
+edits one document with one request per attempt, and each attempt is judged by its end state;
+concurrent editors, duplicate requests, other features, state carried between attempts and timing
+within an attempt (when the toast appears relative to the commit) are outside this fixture, and no
+guarantee is claimed for them.
 
 ## Files
 
-| File         | Role                                                                           | Locked     |
-| ------------ | ------------------------------------------------------------------------------ | ---------- |
-| `oracle.md`  | Oracle card: policies P1–P3, rows O1–O4, `## Terms`, `## Adequacy`             | card bytes |
-| `World.bend` | world model: the `Save` record, assumptions A1–A2, goals G1–G4, row predicates | S2         |
+| File         | Role                                                                       | Locked     |
+| ------------ | -------------------------------------------------------------------------- | ---------- |
+| `oracle.md`  | Oracle card: policies P1–P3, rows O1–O5, `## Terms`, `## Adequacy`         | card bytes |
+| `World.bend` | world model: the `Save` record, assumption A1, goals G1–G5, row predicates | S2         |
 
 `skills/scripts/oracle-adequacy.test.mjs` runs the checks on this card and on copies reverted to the
 first draft: demo A (a coordinate that only knows the permission at submit, then a hidden commit) and

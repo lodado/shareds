@@ -273,7 +273,8 @@ owned by [`bend-cross-verification.md`](../bend-cross-verification.md). Absence 
 `## Terms` (the dictionary) may appear on any card; `## Adequacy` only on the Bend path with goals from
 the source text. Both, their locked world source and the adequacy check are owned by
 [`adequacy.md`](../adequacy.md). Absence does not block lint; a card without `## Adequacy` reports
-adequacy as not evaluated.
+adequacy as not evaluated. For such a card, the reverse-impossible reviewer's input is the file
+`oracle-adequacy.mjs explore-input` derives, and its candidates go through `triage` (adequacy.md).
 
 ## Cold-read gate — adversarial self-review
 

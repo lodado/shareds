@@ -5,14 +5,17 @@
 // 기대값은 증명된 그 모델 코드가 계산한다 — JS로 옮겨 적은 두 번째 의미를 두지 않는다.
 
 import { spawnSync } from 'node:child_process'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, relative, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 import { ensureBend, reportedVersion } from './ensure-bend.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
+import { toPlain } from './oracle-types.mjs'
+
+export { toPlain } from './oracle-types.mjs'
 
 export const GENERATOR_VERSION = 1
 export const MAX_BOUND = 8
@@ -29,6 +32,8 @@ const FORMAL_FIELDS = [
   'Not formalized',
   'Conformance row',
 ]
+// 성질 모드(Formal Oracle Projection state) 선언 — 선택. 관계는 LAWS.bend가 모델에 대해 증명한 Bool def다.
+const FORMAL_OPTIONAL_FIELDS = ['State', 'Command', 'Relations']
 
 class CliError extends Error {
   constructor(code, message, exitCode = 1) {
@@ -95,16 +100,6 @@ function inputDigest(inputs, root) {
   return sha256(stableStringify(inputs.map(({ path, sha256: digest }) => [relative(root, path), digest]).sort()))
 }
 
-/** Bend 값 → 비교·해시용 JSON. Nat은 안전 범위면 number, 목록은 배열, Bool은 boolean, 생성자는 `$` 태그를 유지한다. */
-export function toPlain(value) {
-  if (typeof value === 'bigint') return value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : value.toString()
-  if (value === null || typeof value !== 'object') return value
-  if (Array.isArray(value)) return value.map(toPlain)
-  if (value.$ === 'Nil' || value.$ === 'Con') return listItems(value).map(toPlain)
-  if (value.$ === 'True' || value.$ === 'False') return value.$ === 'True'
-  return Object.fromEntries(Object.entries(value).map(([key, field]) => [key, toPlain(field)]))
-}
-
 function listItems(list) {
   const items = []
   for (let cursor = list; cursor?.$ === 'Con'; cursor = cursor.tail) items.push(cursor.head)
@@ -146,10 +141,65 @@ export async function compileBend({ entry, bin, timeoutMs = 120_000 }) {
       throw new CliError('MODEL_TIMEOUT', `bend -o did not finish in ${timeoutMs}ms`)
     if (built.error) throw new CliError('BEND_UNAVAILABLE', `${bin}: ${built.error.message}`)
     if (built.status !== 0) throw new CliError('MODEL_INVALID', `${built.stdout}${built.stderr}`.trim())
-    return { exported: (await import(pathToFileURL(out).href)).default, inputs }
+    return { exported: (await import(pathToFileURL(out).href)).default, inputs, source: await readFile(out, 'utf8') }
   } finally {
     await rm(outDir, { recursive: true, force: true })
   }
+}
+
+function commonDirectory(directories) {
+  return directories.reduce((common, directory) => {
+    const left = common.split(sep)
+    const right = directory.split(sep)
+    let index = 0
+    while (index < left.length && left[index] === right[index]) index += 1
+    return left.slice(0, index).join(sep) || sep
+  })
+}
+
+/**
+ * 생성한 Bend 파일(text)을 진입 파일 옆에 두고 `bend <fileName> --verdict`를 돌린다. 진입 파일의 import 전부를
+ * 임시 디렉터리에 복사해 원본 트리에는 아무것도 쓰지 않는다.
+ */
+export async function verdictBeside({ entry, inputs, fileName, text, bin, timeoutMs = 120_000 }) {
+  const directory = await mkdtemp(join(tmpdir(), 'oracle-kernel-'))
+  try {
+    const root = commonDirectory(inputs.map(({ path }) => dirname(path)))
+    for (const { path } of inputs) {
+      const target = join(directory, relative(root, path))
+      await mkdir(dirname(target), { recursive: true })
+      await copyFile(path, target)
+    }
+    const cwd = join(directory, relative(root, dirname(entry)))
+    await writeFile(join(cwd, fileName), text)
+    const run = spawnSync(bin, [fileName, '--verdict'], {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env, BEND_NO_TELEMETRY: '1' },
+      timeout: timeoutMs,
+      maxBuffer: 64 * 1024 * 1024,
+    })
+    return verdictOf(run, { bin, timeoutMs })
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+}
+
+/**
+ * 커널에 넘긴 생성 Bend 파일과 결과를 out 디렉터리에 남긴다. 남긴 Bend 파일은 out에서 원본 모델을 상대 경로로
+ * import하므로 그 자리에서 `bend <file> --verdict`로 다시 검사할 수 있다. 결과 JSON은 같은 이름의 `.json`이다.
+ */
+export async function keepArtifact({ out, fileName, entry, render, result }) {
+  await mkdir(resolve(out), { recursive: true })
+  // Bend는 실제 경로로 import를 푼다 — /tmp 같은 심볼릭 링크를 풀어서 상대 경로를 만든다.
+  const outDir = await realpath(resolve(out))
+  const target = relative(outDir, await realpath(resolve(entry))).split(sep).join('/')
+  const importPath = target.startsWith('.') ? target : `./${target}`
+  const bendFile = join(outDir, fileName)
+  const jsonFile = join(outDir, fileName.replace(/\.bend$/, '.json'))
+  await writeFile(bendFile, render(importPath))
+  await writeFile(jsonFile, `${JSON.stringify(result, null, 2)}\n`)
+  return { bend: bendFile, result: jsonFile }
 }
 
 /** MODEL.bend → 오라클 공간을 만드는 init·step·next·observe. */
@@ -271,9 +321,11 @@ export function checkConformance(space, adapter) {
   for (const name of ['init', 'step', 'observe']) {
     if (typeof adapter?.[name] !== 'function') throw new CliError('ADAPTER_INTERFACE', `adapter must export ${name}()`)
   }
+  // 가장 짧은 반례가 먼저 — 재현과 원인 분리가 쉬운 순서다.
   const failures = space.cases
     .map((entry) => conformCase(space, entry, adapter))
     .filter(({ status }) => status !== 'pass')
+    .sort((left, right) => left.trace.length - right.trace.length)
   return {
     spaceDigest: space.spaceDigest,
     complete: space.complete,
@@ -281,7 +333,117 @@ export function checkConformance(space, adapter) {
     passed: space.cases.length - failures.length,
     failures,
     pass: space.complete && failures.length === 0,
+    verification: conformanceClaim(space, 0),
+    residue: projectionResidue(space, adapter),
   }
+}
+
+/**
+ * 투영이 버린 정보 — adapter.snapshot(state)가 있으면 공간의 모든 prefix에서 관찰값은 같은데 스냅샷이 다른 최상위
+ * 필드를 모은다. 각 필드는 사전에 "관찰 안 함 + 이유"로 적거나 후보 축으로 올린다. 판정이 아니라 발견 도구다.
+ */
+export function projectionResidue(space, adapter) {
+  if (typeof adapter.snapshot !== 'function') return null
+  const groups = new Map()
+  const record = (state) => {
+    const key = stableStringify(adapter.observe(state))
+    groups.set(key, [...(groups.get(key) ?? []), adapter.snapshot(state)])
+  }
+  for (const entry of space.cases) {
+    try {
+      let state = adapter.init()
+      record(state)
+      for (const event of entry.trace) {
+        state = adapter.step(state, structuredClone(event))
+        record(state)
+      }
+    } catch {
+      // 관측하지 못한 case는 대응 검사가 adapter-error로 보고한다 — 잔여 분석에서는 건너뛴다.
+    }
+  }
+  const fields = new Map()
+  for (const [observation, snapshots] of groups) {
+    const keys = new Set(snapshots.flatMap((snapshot) => Object.keys(snapshot ?? {})))
+    for (const key of keys) {
+      const values = [...new Set(snapshots.map((snapshot) => stableStringify(snapshot?.[key] ?? null)))]
+      if (values.length > 1 && !fields.has(key))
+        fields.set(key, {
+          field: key,
+          observation: JSON.parse(observation),
+          values: values.slice(0, 3).map((value) => JSON.parse(value)),
+        })
+    }
+  }
+  return {
+    fields: [...fields.values()].sort((left, right) => (left.field < right.field ? -1 : 1)),
+    note: 'implementation fields that vary while the observation stays the same — record each in ## Terms as not observed with a reason, or raise it as a candidate axis',
+  }
+}
+
+/** 대응 검사가 주장하는 것 — 모델에 대한 증명(prove)과 섞이지 않게 범위와 방법을 함께 적는다. */
+export function conformanceClaim(space, runs, seed = null) {
+  return {
+    level: 'conformance-tested',
+    exhaustive: { cases: space.cases.length, bound: space.bound, complete: space.complete },
+    sampled: runs > 0 ? { runs, seed, beyond: space.bound } : null,
+    claim:
+      'no counterexample in the declared space; not a proof about the implementation — the laws are proven about the model only',
+  }
+}
+
+const ROUTES = {
+  'outside-space':
+    'the environment does not allow this event, so the model missed it too — reopen the problem definition (POLICY_GAP or DIMENSION_MISSING); never force it into the nearest event',
+  'implementation-defect':
+    'the model predicts a different observation — a product defect candidate: reproduce it as a failing test (VALID_RED)',
+  'model-agrees':
+    'the model predicts exactly this behavior — if it is still a bug, the specification is wrong: POLICY_GAP',
+  'in-space': 'the trace is inside the space; expected observations are listed for a regression test',
+  'adapter-error': 'the adapter could not observe the product — a harness problem, not a verdict (HARNESS_DEFECT)',
+}
+
+/**
+ * 런타임 반례 한 건을 공간에 비춰 본다(bound와 무관하게 모델로 직접). 환경이 허용하지 않는 사건이 있으면 모델도 놓친
+ * 것이고, 안이면 모델 기대값과 관측을 대조한다. observed는 [초기 관측, 각 단계 뒤 관측...]이다.
+ */
+export function classifyTrace(model, trace, observed = null) {
+  const raw = []
+  let state = model.init()
+  const expected = [toPlain(model.observe(state))]
+  for (const [index, event] of trace.entries()) {
+    const allowed = listItems(model.next(listOf(raw)))
+    const match = allowed.find((choice) => isDeepStrictEqual(toPlain(choice), event))
+    if (!match) {
+      const verdict = 'outside-space'
+      return { verdict, step: index + 1, event, allowed: allowed.map(toPlain), route: ROUTES[verdict] }
+    }
+    raw.push(match)
+    state = model.step(state, match)
+    expected.push(toPlain(model.observe(state)))
+  }
+  if (observed === null) return { verdict: 'in-space', expected, route: ROUTES['in-space'] }
+  const step = expected.findIndex((value, index) => !isDeepStrictEqual(observed[index], value))
+  if (step === -1) return { verdict: 'model-agrees', expected, route: ROUTES['model-agrees'] }
+  const verdict = 'implementation-defect'
+  return {
+    verdict,
+    step,
+    event: step === 0 ? null : trace[step - 1],
+    expected: expected[step],
+    observed: observed[step] ?? null,
+    route: ROUTES[verdict],
+  }
+}
+
+/** adapter로 trace를 돌려 [초기 관측, 각 단계 뒤 관측...]을 모은다. 예외는 adapter-error다. */
+export function observeTrace(adapter, trace) {
+  let state = adapter.init()
+  const observed = [adapter.observe(state)]
+  for (const event of trace) {
+    state = adapter.step(state, structuredClone(event))
+    observed.push(adapter.observe(state))
+  }
+  return observed
 }
 
 /**
@@ -325,7 +487,9 @@ export async function proveLaws({ dir, bin, require = [], timeoutMs = 120_000 })
     stderr: run.stderr ?? '',
   }
   const verdict = verdictOf(run, { bin, timeoutMs })
-  return run.error ? { ...observed, ...verdict } : { ...observed, bend: { bin, version: reportedVersion(bin) }, ...verdict }
+  return run.error
+    ? { ...observed, ...verdict }
+    : { ...observed, bend: { bin, version: reportedVersion(bin) }, ...verdict }
 }
 
 /** `bend <file> --verdict` 실행 결과 → 상태. proven은 exit 0·신호 없음·정확한 `ALL PROOFS CHECK` 줄이 함께일 때뿐이다. */
@@ -393,7 +557,7 @@ export function parseFormalModel(lines) {
   const fields = {}
   for (const line of section) {
     const match = line.trim().match(/^- ([^:]+):(.*)$/)
-    if (match && FORMAL_FIELDS.includes(match[1])) fields[match[1]] = match[2].trim()
+    if (match && [...FORMAL_FIELDS, ...FORMAL_OPTIONAL_FIELDS].includes(match[1])) fields[match[1]] = match[2].trim()
   }
   const laws = section
     .filter((line) => line.trim().startsWith('|'))
@@ -507,6 +671,32 @@ export async function formalModelIssues(formal, context) {
   }
   for (const name of declared.keys()) {
     if (!names.has(name)) issues.push(`formal-law-unmapped: ${name} in ${lawsPath} has no Formal Model row`)
+  }
+  issues.push(...relationIssues(fields, scope.structures, lawsPath))
+  return issues
+}
+
+/** `- Relations:`가 있으면 State·Command와 함께, 각 관계가 모델의 def이고 LAWS.bend의 법칙이 그 관계를 말하는지 본다. */
+function relationIssues(fields, structures, lawsPath) {
+  const relations = (fields.Relations ?? '').split(/[\s,]+/).filter(Boolean)
+  if (relations.length === 0) return []
+  const issues = []
+  for (const field of ['State', 'Command']) {
+    if (!/^[A-Z]\w*$/.test(fields[field] ?? ''))
+      issues.push(`formal-relation-types: Relations need ${field}: the Bend type of the ${field.toLowerCase()}`)
+  }
+  const texts = [...structures.values()]
+    .filter(Boolean)
+    .map(({ text }) => text)
+    .join('\n')
+  const laws = structures.get(lawsPath)?.text ?? ''
+  for (const relation of relations) {
+    if (!new RegExp(`^def\\s+${fields.Prefix}\\.${relation}\\(`, 'm').test(texts))
+      issues.push(`formal-relation-def: ${fields.Prefix}.${relation} is not a def of the locked model`)
+    else if (!new RegExp(`\\b${fields.Prefix}\\.${relation}\\(`).test(laws))
+      issues.push(
+        `formal-relation-unproven: no law in ${lawsPath} states ${relation} — the generated test would judge with an unproven relation`,
+      )
   }
   return issues
 }

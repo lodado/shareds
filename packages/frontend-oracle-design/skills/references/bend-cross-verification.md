@@ -1,5 +1,8 @@
 # Automatic Bend formal model path for applicable Oracle work
 
+Bend closes the defined problem space mathematically, fast-check attacks the real implementation and
+the edges of that space, and the counterexamples they find widen the problem space itself.
+
 Within the Oracle lane, assess applicability before Draft/lock without waiting for the user to say
 "Bend". Automatically select this path for a pure calculation or deterministic state transition with
 a meaningful invariant (for example bounded quantities, monetary conservation, stale responses, or
@@ -51,8 +54,8 @@ and does not edit the analyst's output; a disagreement is an Open question. Agre
 is not approval. Without delegation, independent contexts or capacity, record the concrete
 limitation and run sequentially — never claim independence that did not occur.
 
-Then formalize a small core as three tracked files inside the scan root, outside the Oracle
-directory:
+Then formalize a small core as three tracked files in the `formal/` directory next to the code they
+model (placement below), inside the scan root and outside the Oracle directory:
 
 - `MODEL.bend` — the reference behavior: a state and a message datatype, `<Prefix>.init()`,
   `<Prefix>.step(s, m)`, `<Prefix>.observe(s)` (only what the contract observes, not internal
@@ -170,6 +173,94 @@ product bytes.
 
 If the product itself runs Bend-generated code, run the conformance on that generated artifact and
 its calling boundary; a proof of an unused model verifies nothing about the product.
+
+### Formal Oracle Projection — generated conformance tests
+
+Instead of hand-writing the conformance test, generate it from the locked model with
+`scripts/oracle-projection.mjs`. Every piece except the adapter is derived from Bend, so the test adds no
+second meaning: inputs come from the Bend types, expected values from the compiled model, judgments
+from compiled relation defs. The generated file starts `AUTO-GENERATED — DO NOT EDIT`, ships the
+compiled model beside it (the product's CI needs no Bend), and carries the SHA-256 of every model
+source: a changed source fails the file with `STALE_GENERATED_TESTS` until it is regenerated.
+
+#### Placement — everything formal lives in one `formal/` next to the code it models
+
+Put every file of the Bend path in one `__test__/formal/` directory at the narrowest architecture unit
+the model covers, following the test-locality rule of `$test` and [`fsd.md`](fsd.md):
+
+```
+features/feed-infinite-scroll/
+  model/
+    feed-pagination.ts              product code — the pure transition under test
+    __test__/formal/
+      MODEL.bend  LAWS.bend  PROOF.bend  World.bend   authored, locked (PROOF is free)
+      feed.adapter.mjs              the boundary — written by the AI, reviewed
+      feed.model.mjs                generated: compiled model
+      feed.oracle.test.mjs          generated: conformance test
+.ai/oracles/<id>/formal/            run evidence: ADEQUACY.bend/.json, REPLAY.bend/.json
+```
+
+- A model of one segment's logic goes in that segment's `__test__/formal/`; a model spanning several
+  segments of a slice goes in the slice's `__test__/formal/`; shared pure logic in the nearest shared
+  unit's. Outside FSD, next to the modeled file; an explicit repository convention wins.
+- Moving or deleting the slice moves or deletes its model, laws, adapter and generated tests with it,
+  and `__test__` keeps them out of the production bundle. No slice imports another slice's `formal/`,
+  the same direction rule as the layers.
+- Run `emit-*` with `--adapter` and `--out` both pointing at that `formal/` directory. Only run
+  evidence stays under `.ai/oracles/<id>/formal/`: it belongs to one revision, not to the code. A
+  sampled fast-check failure prints its seed and path; replay the shrunk counterexample with `--out`
+  there so the record survives the test log.
+
+#### The adapter — written by the AI, reviewed
+
+The adapter is the one piece not derived from Bend, so it is the one piece that must be reviewed. The
+AI writes it from the card's Terms `Path` column, Observation line and the model's types — not from
+the expected results — during the harness step, then it passes two gates before its tests count:
+
+- Machine: every generated test asserts the adapter's output has the Bend type's shape; `emit-state`
+  asserts the round trip `project(concretize(s)) == s` on every state; an unmapped event, command or
+  product state throws (never a default); `conform` reports `residue` from `snapshot`.
+- Review: the existing independent review reads the adapter against the card, using this checklist —
+  each model event or command maps to exactly the product call its term's `Path` names; each
+  observation is read through the product path its term names (no test double, no internal field the
+  Path does not name); no product logic or expected value is re-implemented in the adapter; unknown
+  inputs throw; the residue fields are each recorded in Terms or raised as candidates. A finding is a
+  harness defect and goes through the existing harness-repair budget; it never changes the locked
+  model, laws or observation meaning.
+
+- `emit-trace --model --prefix --bound --adapter --out --row [--runs N --max-length L]` (differential):
+  every trace up to the bound with each prefix's expected observation, then, with `--runs`, fast-check
+  traces longer than the bound. fast-check draws choice indices and the model's `next(history)` picks
+  the event, so no trace the environment forbids is generated and shrinking yields shorter, earlier
+  choices. The adapter is the one above (`init`, `step`, `observe`).
+- `emit-state --model --prefix --state <Type> --command <Type> (--relation <def>)... [--differential]`
+  (property): every state·command pair of the Bend types, or a fast-check sample when the domain is
+  above `--threshold` (default 256) or infinite (`--nat-max`, `--list-max` bound the sample and are
+  printed in its scope). Each pair goes through `concretize` → `step` → `project`; the round trip
+  `project(concretize(s)) == s` is asserted every time, and each relation
+  `<Prefix>.<R>(s, c, t) -> Bool` judges the projected result. A relation must be stated by a law in
+  `LAWS.bend`; declare them in the Formal Model as `- State:`, `- Command:`, `- Relations:` (lint
+  `formal-relation-*`). Relations may accept several results for one input, which the differential
+  mode cannot express.
+- Values are the compiled Bend runtime shape (Bool is a boolean, Nat a BigInt, List `Con`/`Nil` cells,
+  data `{$: <constructor>, ...fields}`); only the adapter converts to product values.
+- Name the generated tests' row in `evidence.json` as for a hand-written conformance test; run them
+  through `oracle-run.mjs exec`. Report `formal: proven` for the model and
+  `conformance: tested` (exhaustive N / sampled M runs, seed) for the product — never proven.
+- A failure prints the step or the pair; a sampled failure also prints fast-check's seed, path and
+  shrunk counterexample. Replay it with
+  `oracle-projection.mjs replay --model --prefix --trace <json> [--observed <json> | --adapter] [--out <dir>]`
+  (`--out` keeps `REPLAY.bend`, re-checkable in place, and `REPLAY.json` with the trace, observations,
+  verdict and law):
+  `outside-space` (the environment forbids an event — the model missed it too; reopen the problem
+  definition, never force it into the nearest event), `implementation-defect` (the model predicts a
+  different observation — reproduce it as `VALID_RED`) or `model-agrees` (if it is still a bug, the
+  specification is wrong — `POLICY_GAP`). The expected observation or the allowed events are re-checked
+  by the kernel as a law, so a compiled-JS miscalculation cannot pass as a verdict. After a new
+  revision, the counterexample is closed only when it replays inside the space and is judged.
+- `oracle-model.mjs conform` also reports `residue` when the adapter exports `snapshot(state)`: product
+  fields that change while the observation stays the same. Record each in `## Terms` as not observed,
+  with a reason, or raise it as a candidate axis.
 
 ## 5. What was established, and trust limits
 

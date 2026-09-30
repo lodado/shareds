@@ -1,0 +1,76 @@
+{
+  "candidates": [
+    {
+      "id": "X1",
+      "kind": "in-world",
+      "scenario": "Permission revoked before commit; server correctly commits nothing, no \"Saved\". Editor reloads; a client-side cache serves the page showing the submitted text. Editor concludes the change was kept.",
+      "harm": "Editor believes the edit persisted but the server still has the old version — silent loss. S1 environment facts say a reload \"never shows a version the server did not commit\", yet O4 only covers reloads after a commit; no row forbids a reload showing an uncommitted version. Once A2 is dropped this world passes O1-O4 and no G1-G4 names the harm.",
+      "world": "start !held !committed !ack reload",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X2",
+      "kind": "in-world",
+      "scenario": "Editor lacks permission at submit (revoked, page still open) and presses Save; an admin restores permission while the request is in flight. Server commits and \"Saved\" appears.",
+      "harm": "A change submitted without permission is committed and acknowledged; the Outcome Brief requires nothing commits after a revocation and names \"Saved\" for such a change as worst regression. S1 item 1 only checks permission at commit time, and S1's environment facts exclude this only by assumption A1 (permission never regained mid-request). No row covers it (O1 needs held throughout, O2 needs !held) and no goal depends on A1.",
+      "world": "!start held committed ack reload",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X3",
+      "kind": "in-world",
+      "scenario": "Editor submits without permission, permission is restored before the server would commit, so the editor holds permission at commit time — but the server drops the save anyway: nothing committed, no \"Saved\", reload shows old text.",
+      "harm": "A save that S1 item 1 permits (permission held at commit) is silently lost; S1 item 4 says under normal conditions the save can complete. O1 only demands a commit when permission is held throughout, so no row forces commit here, and with A1 dropped no goal distinguishes this from a correct rejection.",
+      "world": "!start held !committed !ack !reload",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X4",
+      "kind": "new-fact",
+      "scenario": "Editor saves version 1 with permission: commits, \"Saved\" appears. Editor types more (version 2) and saves again, but permission was revoked, so version 2 is not committed. The earlier \"Saved\" toast from version 1 is still on screen when the second attempt ends. Editor believes version 2 was saved and closes the tab.",
+      "harm": "Loss of version 2 while \"Saved\" is shown. S1 item 2: the \"Saved\" acknowledgement must correspond to a committed save — here it corresponds to an earlier save, not the edit the editor just made. Each attempt individually passes O1 then O2/O3.",
+      "newFact": {
+        "name": "ack attempt identity (which save the visible \"Saved\" refers to)",
+        "category": "observable",
+        "observedVia": "UI: the \"Saved\" toast still visible at the end of a later save attempt, compared against GET /documents/1"
+      },
+      "whyOutside": "The world models a single attempt; ack is a boolean with no attempt/version attached, and S1 says \"one request per attempt\" but not one attempt per session, so a toast carried over from a prior attempt is inexpressible.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X5",
+      "kind": "new-fact",
+      "scenario": "Editor saves with permission; commit happens, \"Saved\" appears, an immediate reload shows the new text (O1, O4 pass). Later the retention conditions stop holding (version purge, restore-from-backup); the editor reloads the next day and sees the old version.",
+      "harm": "\"Saved\" was shown for a change a later reload no longer shows — the Outcome Brief's named worst regression. S1 item 3 makes the reload guarantee conditional (\"While the retention conditions hold\") but the card never defines retention in Terms and O4 states the guarantee unconditionally, so the card overclaims relative to S1 and has no way to show when the promise ends.",
+      "newFact": { "name": "retention conditions hold at reload time", "category": "hidden", "observedVia": "—" },
+      "whyOutside": "reload is a single instant with no time/retention coordinate, and Terms has no entry for \"retention conditions\", so the world cannot distinguish a reload inside vs outside the retention window.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X6",
+      "kind": "new-fact",
+      "scenario": "Client shows \"Saved\" optimistically the moment the request is sent; the server commits a moment later. Before the commit lands, the editor checks from another view and GET /documents/1 still returns the old text. End state: committed, ack, reload all true.",
+      "harm": "For a window, \"Saved\" is displayed with no committed save behind it, violating S1 item 2 and O3's \"only after a commit\". The world only checks end states, so ack→committed holds at the end and every row passes.",
+      "newFact": {
+        "name": "order of the \"Saved\" toast relative to the server commit",
+        "category": "observable",
+        "observedVia": "UI: timestamp the \"Saved\" toast appears vs the first time GET /documents/1 returns the new version"
+      },
+      "whyOutside": "committed and ack are final truth values with no ordering between them; the world cannot express \"Saved shown before commit\" except as an end state.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X7",
+      "kind": "new-fact",
+      "scenario": "The server checks the editor's permission when the request arrives and commits later; permission is revoked between the check and the commit, and the server commits anyway. The O2 test revokes permission before the request arrives, so it sees no commit and passes.",
+      "harm": "A change is committed while the editor lacks edit permission at commit time — S1 item 1 forbidden — yet every row passes because O2's single boundary (revoked mid-request) never hits the check-to-commit window.",
+      "newFact": {
+        "name": "moment the server evaluates permission (check time vs commit time)",
+        "category": "hidden",
+        "observedVia": "—"
+      },
+      "whyOutside": "held is one boolean for permission at commit time; the world cannot separate \"revoked before the server's check\" from \"revoked between check and commit\", both are !held but only one exercises the rejection path.",
+      "sources": ["S1"]
+    }
+  ]
+}

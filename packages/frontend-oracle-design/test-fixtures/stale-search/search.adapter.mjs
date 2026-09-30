@@ -21,8 +21,10 @@ export function adapterFor(reduce, initial) {
         throw new Error(`unmapped reducer state ${JSON.stringify(state)}`)
       return requestId
     },
+    // the whole reducer state, for the projection residue report — never compared, only diffed
+    snapshot: (state) => state,
   }
 }
 
 // The product reducer, for `oracle-model.mjs conform --impl search.adapter.mjs`.
-export const { init, step, observe } = adapterFor(reduceSearch, initialSearch)
+export const { init, step, observe, snapshot } = adapterFor(reduceSearch, initialSearch)

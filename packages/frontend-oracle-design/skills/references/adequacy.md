@@ -1,5 +1,8 @@
 # Oracle space adequacy — Terms, world model and checks
 
+Bend closes the defined problem space mathematically, fast-check attacks the real implementation and
+the edges of that space, and the counterexamples they find widen the problem space itself.
+
 A card can pass every row and still miss the user's goal: its coordinates may lump together two
 situations the goal judges differently, or its rows may be weaker than the goal. This check catches
 both, inside a declared world. It runs only on the Bend path (eligibility in
@@ -18,14 +21,20 @@ screen's "delete", a trash move and a server purge are three terms). Terms can s
 with `## Adequacy`, every world field has exactly one term.
 
 ```markdown
-| Term | Context | Name                  | Category   | Field     | Observed via                        | Definition                    | Not                             | Source | Status    |
-| ---- | ------- | --------------------- | ---------- | --------- | ----------------------------------- | ----------------------------- | ------------------------------- | ------ | --------- |
-| T3   | server  | commit                | observable | committed | API: GET /documents/1 → new version | the server applied the change | request sent; server accepted   | S1     | confirmed |
-| T4   | editor  | Saved acknowledgement | observable | ack       | UI: the "Saved" toast               | the editor sees "Saved"       | request sent; response received | S1     | confirmed |
+| Term | Context | Name                   | Category     | Field     | Path                                                 | Definition                    | Not                           | Source | Status    |
+| ---- | ------- | ---------------------- | ------------ | --------- | ---------------------------------------------------- | ----------------------------- | ----------------------------- | ------ | --------- |
+| T2   | editor  | commit-time permission | controllable | held      | test: the server revokes after its check, pre-commit | still holds it at the commit  | permission at submit          | S1     | confirmed |
+| T3   | server  | commit                 | observable   | committed | API: GET /documents/1 → new version                  | the server applied the change | request sent; server accepted | S1     | confirmed |
 ```
 
-- `Category`: `controllable` (the test sets it), `observable` (the product exposes it; `Observed via`
-  names the path), `hidden` (the product exposes no path), `concept` (no field; `Field` is `—`).
+- `Category`: `controllable` (the test sets it), `observable` (the product exposes it), `hidden` (the
+  product exposes no path), `concept` (no field; `Field` is `—`).
+- `Path` says how the test realizes the term: for a controllable term how the test sets it, for an
+  observable term the product path that reads it; hidden and concept terms have `—` (`terms-path`).
+  A coordinate whose Path does not match its meaning goes untested while its tests pass — "permission
+  missing at commit" built by revoking before the request never reaches the gap between the server's
+  check and its commit. The adapter builds each coordinate exactly as its Path says. Cards from
+  0.65.0 name this column `Observed via`; it is read as `Path`.
 - One field per meaning: two terms on one field (`terms-field-conflated`) merge meanings such as sent,
   accepted, committed and shown. Split the field instead.
 - `Not` names the neighbouring meaning the term must not be confused with. A `confirmed` term cites an
@@ -48,12 +57,27 @@ Four tables follow, told apart by their first header cell. `A*`, `G*` and each l
 `<Prefix>.<ID>(w) -> Bool` in the world file; the tool composes validity from the Assumption table and
 the card predicate from `Rows`, so nothing outside those tables can enter either.
 
-| Table        | Columns                          | Rule                                                                                        |
-| ------------ | -------------------------------- | ------------------------------------------------------------------------------------------- |
-| `Assumption` | Assumption · Source · Falsifier  | an environment fact with its source and the observation that would show it false            |
-| `Goal`       | Goal · Kind · Cites              | from the source text: `Cites` names an `S*` directly; `safety` or `witness`                 |
-| `Example`    | Example · Goal · World · Verdict | an approved judgment, e.g. `start !held committed ack reload` → `violates`                  |
-| `Hazard`     | Hazard · Disposition             | each of the six hazards once: `modeled: <fields>`, `n/a: S<n> <reason>` or `question: Q<n>` |
+| Table        | Columns                                 | Rule                                                                                 |
+| ------------ | --------------------------------------- | ------------------------------------------------------------------------------------ |
+| `Assumption` | Assumption · Source · Owner · Falsifier | an environment fact, who guarantees it, and the observation that would show it false |
+| `Goal`       | Goal · Kind · Cites                     | from the source text: `Cites` names an `S*` directly; `safety` or `witness`          |
+| `Example`    | Example · Goal · World · Verdict        | an approved judgment, e.g. `start !held committed ack reload` → `violates`           |
+| `Hazard`     | Hazard · Disposition                    | each hazard once: `modeled: <fields>`, `n/a: S<n> <reason>` or `question: Q<n>`      |
+
+An assumption states only what the product cannot change. `Owner` names who guarantees it outside the
+product (a server team and its API contract, the browser, the OS, the user) or `harness` when the test
+cannot build the excluded setting; a product duty is a goal (`adequacy-assumption-owner`). Whether a
+reload reads the server or a client cache is decided by the product, so "a reload never shows an
+uncommitted version" is a goal with a row, not an assumption — written as an assumption it silently
+removes every world that violates it. A `harness` assumption does not shrink the claim: the worlds it
+excludes are reported as untested outside the space.
+
+The hazards are `permission-change`, `concurrent-change`, `display-vs-commit`, `effect-count`,
+`identity-reference`, `feature-composition`, `carry-over` (state or an indicator from an earlier
+attempt remains in the next: a stale toast, error or selection — a one-attempt world cannot see it)
+and `order-timing` (the result depends on what happens first: a toast before the commit, a late
+response — a record world compares end states only, so model the order in a trace model or scope it
+out). The lint requires a disposition for each.
 
 Coordinates are controllable fields and Observations are observable fields — plain field lists, not
 functions, so the answer cannot be smuggled into them. Every `O*` row is in `Rows` or in
@@ -70,8 +94,11 @@ The model analyst writes this from the source text alone, before seeing the card
 - Every fact the source talks about is a field, including outcomes the source forbids: a commit
   after a revocation, a "Saved" toast without a commit, a reload showing an old version. A world that
   allows only correct outcomes can never produce a counterexample.
-- `<Prefix>.A<n>(w) -> Bool` states an environment fact the product cannot change, with a source and
-  a falsifier. A duty of the product is a goal, never an assumption.
+- `<Prefix>.A<n>(w) -> Bool` states an environment fact the product cannot change, with a source, an
+  owner outside the product and a falsifier. A duty of the product is a goal, never an assumption.
+- Keep every qualifier of the source text — while, unless, within, except, only if. A qualifier the
+  goals or rows drop makes the card promise more or less than the source; an undefined qualifier is an
+  `open` term and an Open question.
 - `<Prefix>.G<n>(w) -> Bool` states a goal from the source text. `safety`: every world the card allows
   satisfies it. `witness`: some world the card allows reaches it (the normal path is possible).
 - No foreign or `@unsafe` code; every imported file is a registered `repo:` source.
@@ -83,6 +110,14 @@ The model analyst writes this from the source text alone, before seeing the card
 `scripts/oracle-adequacy.mjs check --card <oracle.md>` enumerates every world (at most 8192), writes
 each conclusion as a law with its proof, and has `bend --verdict` re-check the whole file. A
 conclusion the kernel does not accept is `unknown`, whatever the search found.
+
+Always pass `--out .ai/oracles/<id>/formal/` (run evidence; the world file itself lives in the code's
+`__test__/formal/`, bend-cross-verification.md §4 placement): the tool keeps `ADEQUACY.bend` (every conclusion as a law
+with its proof, importing the world file by relative path, headed by the `inputDigest`) and
+`ADEQUACY.json` (the full result). Anyone can re-check the conclusions later with
+`bend ADEQUACY.bend --verdict` in that directory; cite both files in the journal and the review
+packet. They are evidence, not sources — the lock covers the card and the world, and a changed input
+changes the `inputDigest`.
 
 | Check               | Claim                                               | Refuted means — action                                                                           |
 | ------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -128,6 +163,59 @@ the analyst's record, and runs the check.
   reading found.
 - Without delegation, record the limitation and run sequentially. The result states
   `independence.evidence: self-reported`: host receipts do not cover the analyst before the lock yet.
+
+## World conformance
+
+`scripts/oracle-adequacy.mjs conform --card <oracle.md> --adapter <world-adapter.mjs>` runs the product
+on every coordinate setting the assumptions allow. The adapter lives in the same `__test__/formal/`,
+is written by the AI and reviewed like the conformance adapter (bend-cross-verification.md §4). It exports `run(coordinates) →
+observations`, reading each observation through the product path its term names; a setting the
+product cannot build throws. For each setting the tool finds the valid worlds with those coordinates
+and observations and judges the rows with the compiled defs. No such world is `model-gap`: the product
+did something the world calls impossible, which reopens the problem definition. With
+`card-implies-goal` proven, passing every setting means the goals hold too — only while the assumptions
+hold and the observation paths are faithful. Report it as `conformance: tested`, never proven.
+
+## Finding problems outside the space
+
+No tool finds an axis nobody wrote down; outside information comes from outside the model. Point these
+sources at the four edges of the space and treat what they find as candidates:
+
+- Assumptions: `check` reports `sensitivity`. Per assumption, the worlds the rows allow once it is
+  dropped and the goals only it supports. A supported goal means its falsifier needs a test or a
+  monitor; opened worlds with no broken goal need a human look — a harmful one is a missing goal.
+- Observations: the conformance `residue` (product fields that vary under one observation).
+- Vocabulary and range: `outside-space` replays, `model-gap` settings, and fast-check beyond the bound.
+- Another reading: the model analyst above, and the AI explorer below.
+- History: `escapes.jsonl` records whose world model also missed the phenomenon.
+
+### AI explorer
+
+Extend the existing reverse-impossible review; do not add a subagent. For a card with `## Adequacy`,
+hand the reviewer only `oracle-adequacy.mjs explore-input --card <oracle.md> --output <file>`: the
+source text, the Outcome Brief, the rows, Terms and Adequacy, the sensitivity and the declared
+out-of-world list, with a JSON schema. Unlike the model analyst, the explorer sees the card — its job
+is to break it. It returns candidates where every row passes and the user is still harmed:
+`in-world` (a world literal over the existing fields), `new-fact` (a fact the world lacks, its
+category and the product path that would show it) or `qualifier` (source words such as "while the
+retention conditions hold" that the rows dropped). Run
+`oracle-adequacy.mjs triage --card <oracle.md> --candidates <json>`:
+
+| Verdict                | Meaning                                                                                                                                                                                                  |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `assumption-challenge` | an assumption excludes the world — the source calls it harmful: a goal and a row (the assumption was a product duty); the source is silent: a policy question; Owner `harness`: untested, listed outside |
+| `covered`              | a row already rejects the world                                                                                                                                                                          |
+| `goal-gap`             | the rows allow it and every goal holds — a candidate goal if the source calls it harmful                                                                                                                 |
+| `contradiction`        | the rows allow a goal violation — re-run the check                                                                                                                                                       |
+| `candidate-axis`       | a new fact, with a draft Open question                                                                                                                                                                   |
+| `dropped-qualifier`    | restate the rows' scope with the source words and define them in Terms                                                                                                                                   |
+| `invalid`              | missing fields or sources, or an existing field posed as new                                                                                                                                             |
+
+Nothing enters the space automatically. A candidate passes the promotion gate (not expressible with
+existing axes, not an implementation detail, recurring elsewhere, meaningful to the user, observable)
+and the user's approval, then lands in a new revision; it is closed when its original counterexample
+replays inside the new space and is judged. Record the explorer's raw output and the triage in the
+journal.
 
 ## Oracle refinement loop
 
@@ -176,3 +264,4 @@ is `FAIL`.
   by minimal pairs and examples); anything about the product; progress ("eventually"); phenomena the
   world leaves out; case-space `impossible` or `independent` claims.
 - Unknown, never a pass: an infinite field, more than 8192 worlds, a kernel timeout or rejection.
+- Discovery raises the odds of finding what the world leaves out; it never makes the world complete.

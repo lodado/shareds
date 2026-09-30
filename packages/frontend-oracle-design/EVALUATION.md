@@ -1,3 +1,135 @@
+# 0.66.0 — Formal Oracle Projection, world conformance and out-of-space discovery (2026-09-30)
+
+A skill/harness meta change; no product Oracle state was assigned. Baseline: 0.65.0 at `c13369c`.
+The model was proven and the card checked for adequacy, but nothing carried the proven model onto the
+real TypeScript exactly, and nothing systematically looked outside the declared world. This is wave
+W2 of `.ai/plans/fod-oracle-adequacy/PLAN.md` §10. Bend closes the defined space, fast-check attacks
+the implementation and the edges of that space, and counterexamples widen the space.
+
+Changes:
+
+- `scripts/oracle-types.mjs` (new): Bend `type` declarations become one domain IR (Bool, enum, record,
+  sum, bounded Nat, List, Maybe). The IR drives the cardinality, the exhaustive value list, the
+  fast-check arbitrary and the plain↔runtime conversion. Values keep the compiled Bend runtime shape
+  (Nat is a BigInt, lists are `Con`/`Nil` cells). A projection of the wrong shape is refused, and
+  recursive or unknown types are refused.
+- `scripts/oracle-projection.mjs` (new), Formal Oracle Projection:
+  - `emit-trace` generates a differential test: every trace up to the bound with expected
+    observations, plus fast-check traces beyond it. fast-check draws choice indices and the model's
+    `next` picks the event, so forbidden orders are never generated.
+  - `emit-state` generates a property test: every state·command pair of the Bend types, or a sample
+    above the threshold, judged by compiled relation defs that `LAWS.bend` proves. It asserts the
+    adapter round trip every time.
+  - Generated files are `DO NOT EDIT`, ship the compiled model and fail with
+    `STALE_GENERATED_TESTS` when a model source changes.
+  - `replay` classifies a runtime counterexample as `outside-space`, `implementation-defect` or
+    `model-agrees`, and has the kernel re-check the expected observation or the allowed events as a law.
+- `oracle-model.mjs`: `classifyTrace`, `observeTrace`, the `verification` claim block,
+  shortest-first failures, `residue` (product fields that vary under one observation, when the
+  adapter exports `snapshot`), the shared `verdictBeside` kernel runner, and the optional Formal Model
+  fields `State`/`Command`/`Relations` with lint `formal-relation-*`.
+- `oracle-adequacy.mjs`:
+  - `conform` runs a world adapter on every allowed coordinate setting, judges rows with compiled defs
+    and reports `model-gap` when no valid world matches.
+  - `check` now reports `sensitivity`: per assumption, the worlds the rows allow once it is dropped and
+    the goals only it supports.
+  - `explore-input` and `triage` implement the AI explorer on the existing reverse-impossible review.
+- Kept artifacts: `oracle-adequacy.mjs check --out <dir>` writes `ADEQUACY.bend` (every conclusion as a
+  law with its proof, importing the world by relative path, with the `inputDigest`) and
+  `ADEQUACY.json`; `oracle-projection.mjs replay --out <dir>` writes `REPLAY.bend` and `REPLAY.json`
+  (trace, observations, verdict, law). Both Bend files re-check in place with `bend <file> --verdict`.
+  The docs place them under `.ai/oracles/<id>/formal/`; generated fast-check tests were already files.
+- Placement: every file of the Bend path (models, laws, proof, world, adapter, generated test and
+  compiled model) lives in one `__test__/formal/` at the narrowest architecture unit the model covers,
+  following `$test` locality and `fsd.md`; only run evidence stays under `.ai/oracles/<id>/formal/`.
+  The adapter is written by the AI from Terms `Path` and reviewed against a checklist by the existing
+  independent review, besides the machine checks (shape, round trip, throw on unmapped, residue).
+- Skill rules drawn from the explorer run (general, not fixture-specific):
+  - An assumption states only what the product cannot change. The Assumption table gains `Owner`
+    (who guarantees it outside the product, or `harness`); a product duty is refused as
+    `adequacy-assumption-owner`. `harness` assumptions are reported as untested worlds outside the
+    space, and sensitivity tells the reviewer to check the Owner.
+  - Two hazards join the list: `carry-over` (state or an indicator from an earlier attempt remains in
+    the next) and `order-timing` (the result depends on what happens first; a record world sees end
+    states only). Every card with `## Adequacy` must disposition them.
+  - The Terms column `Observed via` becomes `Path`: a controllable term names how the test sets it,
+    an observable term the product path that reads it (`terms-path`). 0.65.0 cards still parse.
+  - Source qualifiers (while, unless, within, except, only if) must survive into the goals and rows;
+    the explorer gains a `qualifier` candidate kind and triage a `dropped-qualifier` verdict.
+  - An `assumption-challenge` now carries three options: the source calls the world harmful → goal and
+    row; the source is silent → policy question; Owner `harness` → untested and listed outside.
+- Fixtures:
+  - `toggle/`: a model with two relational laws and a case-split proof, a reducer, a `disabled && loading`
+    mutant and an adapter.
+  - `doc-save/`: a document store, three wrong stores and a world adapter; `explorer-candidates.json`
+    is the output of one real explorer run. Applying the Owner rule turned the 0.65.0 assumption A2
+    ("a reload reads the server", which the client decides) into goal G5 and row O5; the card also
+    gains `Owner`, `Path` and the two new hazard dispositions, scoped out by the fixture source text.
+  - `stale-search`: its adapter gained `snapshot`.
+- `fast-check` 4.10.2 was added as a devDependency (lockfile +16 lines) to run the generated tests
+  here. Product repositories need it only for sampled tests.
+- Docs: Formal Oracle Projection in `bend-cross-verification.md` §4; world conformance, out-of-space
+  discovery and the AI explorer in `adequacy.md`; one pointer each in SKILL.md and `card-format.md`.
+
+Shown on the fixtures (real Bend 2.0.34):
+
+- stale-search `emit-trace` (10 traces plus 100 sampled): the reducer passes 12/12. The
+  no-stale-check mutant fails at `step 4 (Respond{id:1}) of Issue · Issue · Respond{id:2} ·
+Respond{id:1}`. Editing `MODEL.bend` after generation fails the file with `STALE_GENERATED_TESTS`.
+- toggle `emit-state`:
+  - The reducer passes all 48 pairs, both relations and the differential check.
+  - The `&&` mutant fails exactly the 4 pairs where only one of disabled and loading holds, for example
+    `Toggle{checked:false,disabled:true,loading:false} · Set{next:true}`.
+  - Forced sampling finds it again with fast-check's seed and path.
+  - An adapter that drops `loading` in `concretize` fails the round trip.
+- replay:
+  - the late response is `implementation-defect`, expected 2, observed 1;
+  - a response before its request is `outside-space`, allowed `[Issue]`;
+  - the kernel proved both claims.
+- doc-save `conform`:
+  - the store passes the 3 settings the assumptions allow (1 excluded);
+  - checking permission at submit fails O2 when permission is revoked in flight;
+  - an early "Saved" fails O3 twice;
+  - a cached reload fails O1 and O4;
+  - a reload that shows an uncommitted version now fails O5 (0.65.0's A2 had erased that world);
+  - on a copy with an observation assumption, an observation the world calls impossible is
+    `model-gap`.
+- Sensitivity on the 0.65.0 card: dropping A2 let the rows allow two worlds where a reload shows an
+  uncommitted version while no goal broke — the signal that A2 was a product duty.
+- AI explorer, one real run (one subagent, input from `explore-input` only, 56k tokens). It proposed 7
+  candidates. Triage:
+  - 3 `assumption-challenge`: X1 reload of an uncommitted version (against A2), and permission regained
+    in flight twice (against A1);
+  - 4 `candidate-axis`: which save the visible "Saved" belongs to, retention conditions at reload time,
+    toast order relative to the commit, and the server's check-versus-commit moment.
+  - None was added to the space automatically. After the Owner rule made A2 a goal, re-triaging the
+    same recorded output classifies X1 as `covered` by O5 — the counterexample is closed inside the
+    new space. X2 and X3 remain `assumption-challenge` against A1 (the source allows commit-time
+    permission only, so they are policy questions, not goals). X4–X7 remain candidate axes; X7 is
+    already expressed by `start ∧ ¬held` once T2's Path is followed, and X4 and X6 are what the new
+    `carry-over` and `order-timing` hazards now force every card to consider.
+
+Checks after the last code edit:
+
+- Package suite 625/625 passed, 0 skipped, exit 0, after the kept-artifact change.
+- `oracle-projection.test.mjs` (9, 3 on real Bend) and `oracle-adequacy.test.mjs` (25, 7 on real
+  Bend). With Bend hidden they give 24 passed and 10 skipped, with the reason.
+- `eslint skills`: 0 errors. The three new files carry 5 structural warnings of kinds the existing
+  scripts already have.
+- Bundles, workflow docs and the eval projection are consistent. `tsc --strict --erasableSyntaxOnly`
+  passes on the new `.mts` fixtures.
+
+Not done or not supported:
+
+- Host receipts still do not cover the model analyst or the explorer before the lock:
+  `self-reported`.
+- The explorer ran once on one fixture; its value against a baseline is W3 (planted-gap eval, needs
+  cost approval). The candidate axes X4–X7 were not promoted into the fixture world.
+- Surface comparison (product inputs and intercepted effects against the vocabulary) is not built.
+- `emit-state` handles non-recursive types only; Nat and List need explicit bounds for sampling.
+- Async interleavings stay with `$test`'s `fc.scheduler`, and the `$test` skill text is unchanged.
+- There is no browser adapter; no live model run exercised the path; only darwin-arm64 was run.
+
 # 0.65.0 — Oracle space adequacy: Terms, world model, kernel-checked space checks (2026-09-30)
 
 A skill/harness meta change; no product Oracle state was assigned. Baseline: 0.64.0 at `f09a01c`.

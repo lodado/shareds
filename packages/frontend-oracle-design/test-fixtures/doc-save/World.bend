@@ -15,11 +15,6 @@ def Save.A1(w: Save) -> Bool:
     case Save{s, h, c, a, r}:
       Save.imp(h, s)
 
-# A2: a reload reads the server, so it never shows a version the server did not commit
-def Save.A2(w: Save) -> Bool:
-  match w:
-    case Save{s, h, c, a, r}:
-      Save.imp(r, c)
 
 # G1 (S1 item 1): nothing is committed without permission at commit time
 def Save.G1(w: Save) -> Bool:
@@ -38,6 +33,13 @@ def Save.G3(w: Save) -> Bool:
   match w:
     case Save{s, h, c, a, r}:
       Save.imp(c, r)
+
+# G5 (S1 item 2 and 3): a reload never shows a version the server did not commit — the client decides
+# whether a reload reads the server, so this is a duty of the product, not an assumption
+def Save.G5(w: Save) -> Bool:
+  match w:
+    case Save{s, h, c, a, r}:
+      Save.imp(r, c)
 
 # G4 (S1 item 4): with permission throughout, the save commits, shows "Saved" and survives a reload
 def Save.G4(w: Save) -> Bool:
@@ -68,3 +70,9 @@ def Save.O4(w: Save) -> Bool:
   match w:
     case Save{s, h, c, a, r}:
       Save.imp(c, r)
+
+# O5: without a commit, a reload shows the old version
+def Save.O5(w: Save) -> Bool:
+  match w:
+    case Save{s, h, c, a, r}:
+      Save.imp(Bool.not(c), Bool.not(r))

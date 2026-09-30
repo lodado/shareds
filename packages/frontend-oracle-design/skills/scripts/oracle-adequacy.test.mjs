@@ -11,13 +11,18 @@ import {
   adequacyIssues,
   adequacyProofFile,
   adequacySpec,
+  assumptionSensitivity,
   certify,
   checkAdequacy,
+  conformWorld,
+  evaluateWorlds,
+  exploreInput,
   mergeKernel,
   modelInput,
   parseAdequacy,
   parseTerms,
   searchAdequacy,
+  triageCandidates,
 } from './oracle-adequacy.mjs'
 
 const FIXTURE = fileURLToPath(new URL('../../test-fixtures/doc-save/', import.meta.url))
@@ -78,15 +83,16 @@ async function installedBend(t) {
 const imp = (a, b) => !a || b
 const SAVE = {
   A1: (w) => imp(w.held, w.start),
-  A2: (w) => imp(w.reload, w.committed),
   G1: (w) => imp(w.committed, w.held),
   G2: (w) => imp(w.ack, w.committed),
   G3: (w) => imp(w.committed, w.reload),
   G4: (w) => w.start && w.held && w.committed && w.ack && w.reload,
+  G5: (w) => imp(w.reload, w.committed),
   O1: (w) => imp(w.start && w.held, w.committed && w.ack && w.reload),
   O2: (w) => imp(!w.held, !w.committed),
   O3: (w) => imp(w.ack, w.committed),
   O4: (w) => imp(w.committed, w.reload),
+  O5: (w) => imp(!w.committed, !w.reload),
 }
 const handModel = (defs) => ({ call: (name, value) => defs[name.slice(name.lastIndexOf('.') + 1)](value) })
 const search = (card, defs = SAVE) => searchAdequacy(handModel(defs), adequacySpec(card, WORLD))
@@ -147,7 +153,49 @@ test('Terms: one word in one context, one field per meaning, a source for every 
   )
   const issues = await lint(sloppy)
   assert.ok(issues.some((issue) => issue.startsWith('terms-category: T1')))
-  assert.ok(issues.some((issue) => issue.startsWith('terms-observed-via: T1')))
+  assert.ok(issues.some((issue) => issue.startsWith('terms-path: T1')))
+
+  // 조작 가능한 용어는 테스트가 그 좌표를 만드는 방법을 적는다 — 없으면 좌표의 뜻과 실제 테스트가 어긋날 수 있다
+  const unset = CARD.replace(
+    /^\| T2 .*$/m,
+    '| T2 | editor | commit-time permission | controllable | held | — | still holds it at commit | permission at submit | S1 | confirmed |',
+  )
+  assert.ok(
+    (await lint(unset)).some((issue) =>
+      issue.startsWith('terms-path: T2: a controllable term names how the test sets it'),
+    ),
+  )
+
+  // 0.65.0 카드의 `Observed via` 열 이름은 그대로 받는다
+  assert.deepEqual(await lint(CARD.replace('| Field     | Path ', '| Field     | Observed via ')), [])
+})
+
+test('Assumptions: every assumption names an owner outside the product; a product duty is refused', async () => {
+  const noOwner = CARD.replace(
+    /^\| A1 .*$/m,
+    '| A1 | S1 | — | a permission log showing permission restored mid-request |',
+  )
+  assert.ok(
+    (await lint(noOwner)).some((issue) => issue.startsWith('adequacy-assumption-owner: A1: name who guarantees it')),
+  )
+  const duty = CARD.replace(
+    /^\| A1 .*$/m,
+    '| A1 | S1 | product client | a permission log showing permission restored mid-request |',
+  )
+  assert.ok(
+    (await lint(duty)).includes('adequacy-assumption-owner: A1: a duty of the product is a goal, not an assumption'),
+  )
+
+  // 테스트가 만들 수 없어서 둔 가정은 harness로 표시되고, 그 가정이 뺀 세계는 모델 밖 목록에 남는다
+  const harness = CARD.replace(
+    /^\| A1 .*$/m,
+    '| A1 | S1 | harness | a permission log showing permission restored mid-request |',
+  )
+  assert.deepEqual(await lint(harness), [])
+  const spec = adequacySpec(harness, WORLD)
+  assert.deepEqual(spec.outside.harness, ['A1'])
+  const [entry] = assumptionSensitivity(evaluateWorlds(handModel(SAVE), spec), spec)
+  assert.match(entry.reading, /^A1 is a harness limit — the 3 worlds it excludes are untested/)
 })
 
 test('Adequacy lint: coordinates are controllable, observations observable, goals cite the source text', async () => {
@@ -205,7 +253,7 @@ test('Adequacy lint: every hazard has a disposition, and a vague word in a row n
 })
 
 test('contradictory assumptions leave no world, so nothing can pass vacuously', () => {
-  const result = search(CARD, { ...SAVE, A2: (w) => imp(w.reload, w.committed) && w.start && !w.start })
+  const result = search(CARD, { ...SAVE, A1: (w) => imp(w.held, w.start) && w.start && !w.start })
   assert.equal(find(result, 'world-nonempty').status, 'refuted')
   assert.equal(find(result, 'card-satisfiable').status, 'refuted')
   assert.equal(find(result, 'goal-falsifiable', 'G1').status, 'refuted')
@@ -214,7 +262,7 @@ test('contradictory assumptions leave no world, so nothing can pass vacuously', 
 })
 
 test('moving a guarantee into the assumptions shows up: the goal can no longer be violated', () => {
-  const result = search(CARD, { ...SAVE, A2: (w) => imp(w.reload, w.committed) && imp(w.committed, w.reload) })
+  const result = search(CARD, { ...SAVE, A1: (w) => imp(w.held, w.start) && imp(w.committed, w.reload) })
   const swallowed = find(result, 'goal-falsifiable', 'G3')
   assert.equal(swallowed.status, 'refuted')
   assert.equal(find(result, 'goal-falsifiable', 'G1').status, 'proven')
@@ -250,7 +298,7 @@ test('demo B: rows that only ask for the toast all pass while every safety goal 
     const gap = find(result, 'card-implies-goal', goal)
     assert.equal(gap.status, 'refuted', goal)
     const world = gap.counterexample
-    assert.equal(SAVE.A1(world) && SAVE.A2(world) && draft.O1(world) && draft.O2(world), true)
+    assert.equal(SAVE.A1(world) && draft.O1(world) && draft.O2(world), true)
     assert.equal(SAVE[goal](world), false)
   }
   assert.equal(find(result, 'goal-witness', 'G4').status, 'proven')
@@ -360,7 +408,7 @@ test('card lint runs the adequacy checks on the fixture and init needs the adequ
     spawnSync(process.execPath, [join(SCRIPTS, script), ...args], { cwd: repository, encoding: 'utf8' })
   const clean = node('oracle-verify.mjs', ['card', '--oracle', 'oracle.md'])
   assert.equal(clean.status, 0, clean.stderr)
-  assert.match(clean.stdout, /CARD_LINT_OK 4 rows/)
+  assert.match(clean.stdout, /CARD_LINT_OK 5 rows/)
 
   const oracleDirectory = join(repository, '.ai', 'oracles', 'doc-save')
   await mkdir(oracleDirectory, { recursive: true })
@@ -416,19 +464,29 @@ test('[bend] the fixture card is proven: every conclusion re-checked by the kern
   assert.equal(result.bend.version, BEND_VERSION)
   assert.deepEqual(
     { worlds: result.counts.worlds, valid: result.counts.valid, excluded: result.counts.excluded },
-    { worlds: 32, valid: 18, excluded: 14 },
+    { worlds: 32, valid: 24, excluded: 8 },
   )
   assert.equal(find(result, 'sufficiency', 'G1').evidenceKind, 'kernel-proof-finite')
   assert.equal(find(result, 'goal-witness', 'G4').evidenceKind, 'kernel-witness')
   assert.equal(find(result, 'example', 'E2').evidenceKind, 'kernel-computation')
   assert.equal(result.independence.evidence, 'self-reported')
+
+  // --out: 커널에 넘긴 결론 파일과 결과를 남긴다 — 남긴 파일은 그 자리에서 다시 검사된다
+  const kept = await checkAdequacy({ card: join(root, 'oracle.md'), cwd: root, bin, out: join(root, 'evidence') })
+  const keptText = await readFile(kept.artifacts.bend, 'utf8')
+  assert.match(keptText, /^# Generated by oracle-adequacy\.mjs check .* DO NOT EDIT\./)
+  assert.match(keptText, /^import \.\.\/World\.bend as M$/m)
+  assert.match(keptText, new RegExp(`inputDigest ${kept.inputDigest}`))
+  assert.equal(JSON.parse(await readFile(kept.artifacts.result, 'utf8')).status, 'proven')
+  const recheck = spawnSync(bin, ['ADEQUACY.bend', '--verdict'], { cwd: join(root, 'evidence'), encoding: 'utf8' })
+  assert.equal(recheck.status, 0, recheck.stdout + recheck.stderr)
   for (const pair of result.minimalPairs) {
     const differing = Object.keys(pair.holds).filter((name) => pair.holds[name] !== pair.violates[name])
     assert.deepEqual(differing, [pair.field])
   }
   assert.deepEqual(
     result.outside.hazards.map(({ Hazard }) => Hazard),
-    ['concurrent-change', 'effect-count', 'identity-reference', 'feature-composition'],
+    ['concurrent-change', 'effect-count', 'identity-reference', 'feature-composition', 'carry-over', 'order-timing'],
   )
 })
 
@@ -538,4 +596,230 @@ test('[bend] the check CLI exits 0 only when every check is proven', async (t) =
   const refuted = cli()
   assert.equal(refuted.status, 1)
   assert.equal(JSON.parse(refuted.stdout).status, 'refuted')
+})
+
+test('assumption sensitivity: a goal only one assumption supports is named; otherwise the opened worlds are listed for review', () => {
+  const spec = adequacySpec(CARD, WORLD)
+  const [a1] = assumptionSensitivity(evaluateWorlds(handModel(SAVE), spec), spec)
+  assert.deepEqual([a1.assumption, a1.cardAllows, a1.brokenGoals], ['A1', 3, []])
+  assert.deepEqual(
+    a1.worlds.map(({ world }) => world),
+    [
+      { start: false, held: true, committed: false, ack: false, reload: false },
+      { start: false, held: true, committed: true, ack: false, reload: true },
+      { start: false, held: true, committed: true, ack: true, reload: true },
+    ],
+  )
+  assert.match(a1.reading, /review the 3 worlds it excludes for harm the goals do not name, and check its Owner/)
+
+  // 0.65.0 카드의 A2("재조회는 서버에서 읽는다")를 되살리면, 두 세계가 그 가정 하나로만 빠져 있었고 어떤 목표도 막지 않았다 —
+  // 그 가정의 주인은 제품이었으므로 목표 G5와 행 O5가 되었다
+  const legacyCard = CARD.replace(
+    /^\| A1 .*$/m,
+    (row) => `${row}\n| A2 | S1 | client | a reload served from a client cache |`,
+  )
+    .replace('- Rows: O1 O2 O3 O4 O5', '- Rows: O1 O2 O3 O4')
+    .replace(/^\| G5 .*$/m, '')
+  const legacyWorld = `${WORLD}\ndef Save.A2(w: Save) -> Bool:\n  match w:\n    case Save{s, h, c, a, r}:\n      Save.imp(r, c)\n`
+  const legacy = adequacySpec(legacyCard, legacyWorld)
+  const [, a2] = assumptionSensitivity(evaluateWorlds(handModel({ ...SAVE, A2: SAVE.G5 }), legacy), legacy)
+  assert.deepEqual([a2.assumption, a2.cardAllows, a2.brokenGoals], ['A2', 2, []])
+  assert.ok(a2.worlds.every(({ world }) => world.reload && !world.committed))
+
+  // 음성 대조: "저장됨이면 재조회에 보인다"(ack → reload) 행은 A2와 합쳐야 G2를 만든다 — 그러면 A2가 G2를 떠받친다
+  const leaning = { ...SAVE, A2: SAVE.G5, O3: (w) => imp(w.ack, w.reload) }
+  const [, supporting] = assumptionSensitivity(evaluateWorlds(handModel(leaning), legacy), legacy)
+  assert.deepEqual(supporting.brokenGoals, ['G2'])
+  assert.match(supporting.reading, /the goals G2 rest on A2/)
+})
+
+test('[bend] world conformance: the store passes every allowed setting; each wrong store fails on its own rows', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await fixtureCopy(t)
+  const adapters = await import(join(root, 'doc-save.adapter.mjs'))
+  const card = join(root, 'oracle.md')
+  const summary = (result) =>
+    result.settings.map(({ coordinates, status, rows }) => [coordinates.start, coordinates.held, status, rows ?? []])
+  const correct = await conformWorld({ card, cwd: root, adapter: adapters, bin })
+  assert.equal(correct.pass, true)
+  assert.deepEqual(summary(correct), [
+    [false, false, 'pass', []],
+    [false, true, 'excluded', []],
+    [true, false, 'pass', []],
+    [true, true, 'pass', []],
+  ])
+  assert.deepEqual([correct.verification.executed, correct.verification.excluded], [3, 1])
+  const failing = async (name) =>
+    summary(await conformWorld({ card, cwd: root, adapter: adapters.mutants[name], bin })).filter(
+      ([, , status]) => status !== 'pass' && status !== 'excluded',
+    )
+  assert.deepEqual(await failing('checkingAtSubmit'), [[true, false, 'violation', ['O2']]])
+  assert.deepEqual(await failing('acknowledgingEarly'), [
+    [false, false, 'violation', ['O3']],
+    [true, false, 'violation', ['O3']],
+  ])
+  assert.deepEqual(await failing('reloadingFromCache'), [[true, true, 'violation', ['O1', 'O4']]])
+
+  // 확정 없이 재조회에 새 버전 → O5 위반(0.65.0에서는 가정 A2가 이 세계를 지워 두었다)
+  const draft = await conformWorld({
+    card,
+    cwd: root,
+    adapter: { run: () => ({ committed: false, ack: false, reload: true }) },
+    bin,
+  })
+  assert.ok(
+    draft.settings
+      .filter(({ status }) => status !== 'excluded')
+      .every(({ status, rows }) => status === 'violation' && rows.includes('O5')),
+  )
+
+  // 세계 모델이 불가능하다고 한 결과 → model-gap. 이 세계에서는 서버가 확정을 조회 경로로 보여 주지 않는 일이 불가능하다고
+  // 가정한 복사본을 쓴다(확정됐는데 서버 조회가 옛 버전).
+  await edit(
+    join(root, 'oracle.md'),
+    /^\| A1 .*$/m,
+    (row) => `${row}\n| A2 | S1 | document service | a GET /documents/1 that lags the commit |`,
+  )
+  await edit(
+    join(root, 'World.bend'),
+    '# G1 (S1 item 1)',
+    'def Save.A2(w: Save) -> Bool:\n  match w:\n    case Save{s, h, c, a, r}:\n      Save.imp(Bool.and(s, h), Bool.or(c, Bool.not(a)))\n\n# G1 (S1 item 1)',
+  )
+  const gap = await conformWorld({
+    card,
+    cwd: root,
+    adapter: { run: () => ({ committed: false, ack: true, reload: false }) },
+    bin,
+  })
+  const heldThroughout = gap.settings.find(({ coordinates }) => coordinates.start && coordinates.held)
+  assert.equal(heldThroughout.status, 'model-gap')
+  assert.match(heldThroughout.route, /reopen the problem definition/)
+  assert.equal(gap.pass, false)
+  const broken = await conformWorld({
+    card,
+    cwd: root,
+    adapter: { run: () => ({ committed: 'yes', ack: false, reload: false }) },
+    bin,
+  })
+  assert.match(broken.settings[0].error, /observation committed is "yes"/)
+  await assert.rejects(conformWorld({ card, cwd: root, adapter: {}, bin }), /exports run\(coordinates\)/)
+})
+
+test('[bend] AI explorer: the input carries the card and the sensitivity; triage sorts recorded candidates without adding any', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await fixtureCopy(t)
+  const card = join(root, 'oracle.md')
+  const input = await exploreInput({ card, cwd: root, bin })
+  assert.match(input, /find situations where every row passes and the user is still harmed/)
+  assert.match(input, /^\| O2 /m)
+  assert.match(input, /^- A1: without it the rows allow 3 more worlds/m)
+  assert.match(input, /^ {2}- !start held committed ack reload$/m)
+  assert.match(input, /^- hazard carry-over: n\/a: S1 each attempt judged alone$/m)
+  assert.match(input, /"kind": "in-world \| new-fact \| qualifier"/)
+  assert.match(input, /`qualifier`: a condition of the source text/)
+
+  // 2026-09-30 실제 탐색가 한 번의 출력(기록본) — 분류기만 시험한다
+  const recorded = JSON.parse(await readFile(join(root, 'explorer-candidates.json'), 'utf8'))
+  const triage = await triageCandidates({ card, cwd: root, candidates: recorded, bin })
+  assert.deepEqual(
+    triage.triaged.map(({ id, verdict }) => [id, verdict]),
+    [
+      ['X1', 'covered'],
+      ['X2', 'assumption-challenge'],
+      ['X3', 'assumption-challenge'],
+      ['X4', 'candidate-axis'],
+      ['X5', 'candidate-axis'],
+      ['X6', 'candidate-axis'],
+      ['X7', 'candidate-axis'],
+    ],
+  )
+  // 닫힘: X1(캐시가 확정 안 된 버전을 보여 줌)은 0.65.0 카드에서 가정 A2에 대한 도전이었고, A2가 목표 G5·행 O5가 된
+  // 지금은 공간 안에서 O5가 판정한다
+  assert.deepEqual(triage.triaged[0].rows, ['O5'])
+  assert.deepEqual(triage.triaged[1].assumptions, ['A1'])
+  assert.equal(triage.triaged[1].options.length, 3)
+  assert.match(triage.triaged[1].options[2], /Owner: harness/)
+  assert.match(triage.triaged[3].question, /^Should the world model the observable fact "ack attempt identity/)
+
+  const synthetic = {
+    candidates: [
+      {
+        id: 'C1',
+        kind: 'in-world',
+        scenario: 'revoked in flight, committed anyway',
+        harm: 'h',
+        world: 'start !held committed ack reload',
+        sources: ['S1'],
+      },
+      {
+        id: 'C2',
+        kind: 'in-world',
+        scenario: 'nothing happens',
+        harm: 'h',
+        world: '!start !held !committed !ack !reload',
+        sources: ['S1'],
+      },
+      {
+        id: 'C3',
+        kind: 'new-fact',
+        scenario: 's',
+        harm: 'h',
+        newFact: { name: 'ack', category: 'observable', observedVia: 'UI' },
+        sources: ['S1'],
+      },
+      {
+        id: 'C4',
+        kind: 'new-fact',
+        scenario: 's',
+        harm: 'h',
+        newFact: { name: 'tab', category: 'observable', observedVia: '—' },
+        sources: ['S1'],
+      },
+      { id: 'C5', kind: 'in-world', scenario: 's', harm: 'h', world: 'start held', sources: ['S1'] },
+      { id: 'C6', kind: 'in-world', scenario: 's', harm: 'h', world: 'start held committed ack reload', sources: [] },
+    ],
+  }
+  const sorted = await triageCandidates({ card, cwd: root, candidates: synthetic, bin })
+  assert.deepEqual(
+    sorted.triaged.map(({ verdict }) => verdict),
+    ['covered', 'goal-gap', 'invalid', 'invalid', 'invalid', 'invalid'],
+  )
+  assert.deepEqual(sorted.triaged[0].rows, ['O2'])
+  await assert.rejects(triageCandidates({ card, cwd: root, candidates: [], bin }), /candidates must be/)
+
+  // 원문의 조건절을 행이 떨어뜨린 경우 — 원문 3번의 "보존 조건이 유지되는 동안"(기록본의 X5)
+  const qualifiers = await triageCandidates({
+    card,
+    cwd: root,
+    candidates: {
+      candidates: [
+        {
+          id: 'Q1',
+          kind: 'qualifier',
+          scenario: 's',
+          harm: 'h',
+          sourceText: 'While the retention conditions hold',
+          rows: ['O4'],
+          sources: ['S1'],
+        },
+        { id: 'Q2', kind: 'qualifier', scenario: 's', harm: 'h', rows: ['O4'], sources: ['S1'] },
+        { id: 'Q3', kind: 'qualifier', scenario: 's', harm: 'h', sourceText: 'while', rows: ['P3'], sources: ['S1'] },
+      ],
+    },
+    bin,
+  })
+  assert.deepEqual(
+    qualifiers.triaged.map(({ verdict }) => verdict),
+    ['dropped-qualifier', 'invalid', 'invalid'],
+  )
+  assert.match(qualifiers.triaged[0].route, /restate the scope of O4 with "While the retention conditions hold"/)
+
+  // 카드가 목표보다 약하면(시연 B의 초안 행) 같은 세계가 모순으로 분류된다 — 적절성 점검을 다시 돌리라는 뜻이다
+  await writeFile(card, line(CARD, 'Rows', 'O1 O2'))
+  await edit(join(root, 'World.bend'), DRAFT_ROWS.O1, DRAFT_ROWS.O1_DRAFT)
+  await edit(join(root, 'World.bend'), DRAFT_ROWS.O2, DRAFT_ROWS.O2_DRAFT)
+  const weak = await triageCandidates({ card, cwd: root, candidates: { candidates: [synthetic.candidates[0]] }, bin })
+  assert.deepEqual([weak.triaged[0].verdict, weak.triaged[0].goals], ['contradiction', ['G1']])
 })

@@ -26,7 +26,7 @@
 
 - P1: A change commits only while the editor holds edit permission at commit time. (source: S1) (rows: O1, O2)
 - P2: "Saved" is shown only for a committed change. (source: S1) (rows: O1, O3)
-- P3: After a commit, a reload shows the committed version. (source: S1) (rows: O1, O4)
+- P3: After a commit, a reload shows the committed version; without one it shows the old version. (source: S1) (rows: O1, O4, O5)
 
 ## Behavior Contract
 
@@ -36,6 +36,7 @@
 | O2  | P1         | permission is revoked before the server commits | the editor saves   | no commit; the server keeps the old version                    | a commit after the revocation                    | commit×0     | permission: revoked mid-request |
 | O3  | P2         | any save attempt                                | the attempt ends   | "Saved" appears only after a commit                            | "Saved" without a commit                         | toast×1      | outcome: committed, no commit   |
 | O4  | P3         | a committed save                                | the editor reloads | the reload shows the committed version                         | the old version after a commit                   | request×1    | reload: after a commit          |
+| O5  | P3         | a save attempt that did not commit              | the editor reloads | the reload shows the old version                               | the submitted text without a commit              | request×1    | reload: after no commit         |
 
 - N/A: loading indicator, error, retry, empty data, out-of-order responses, cancellation, concurrent editors, duplicate requests and offline editing are outside this fixture's policy. (source: S1)
 
@@ -54,27 +55,26 @@
 
 ## Terms
 
-| Term | Context | Name                   | Category     | Field     | Observed via                                  | Definition                                          | Not                                | Source | Status    |
-| ---- | ------- | ---------------------- | ------------ | --------- | --------------------------------------------- | --------------------------------------------------- | ---------------------------------- | ------ | --------- |
-| T1   | editor  | submit permission      | controllable | start     | —                                             | the editor holds edit permission when pressing Save | permission when the server commits | S1     | confirmed |
-| T2   | editor  | commit-time permission | controllable | held      | —                                             | the editor still holds it when the server commits   | permission at submit               | S1     | confirmed |
-| T3   | server  | commit                 | observable   | committed | API: GET /documents/1 returns the new version | the server applied the change durably               | request sent; server accepted      | S1     | confirmed |
-| T4   | editor  | Saved acknowledgement  | observable   | ack       | UI: the "Saved" toast                         | the editor sees "Saved"                             | request sent; response received    | S1     | confirmed |
-| T5   | editor  | reload                 | observable   | reload    | UI: the document after a page reload          | the reloaded page shows the submitted version       | the in-memory draft                | S1     | confirmed |
-| T6   | editor  | document               | concept      | —         | —                                             | the one document being edited                       | —                                  | S1     | confirmed |
+| Term | Context | Name                   | Category     | Field     | Path                                                                   | Definition                                          | Not                                | Source | Status    |
+| ---- | ------- | ---------------------- | ------------ | --------- | ---------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------- | ------ | --------- |
+| T1   | editor  | submit permission      | controllable | start     | test: create the server with or without the editor's permission        | the editor holds edit permission when pressing Save | permission when the server commits | S1     | confirmed |
+| T2   | editor  | commit-time permission | controllable | held      | test: the server revokes after its permission check, before it commits | the editor still holds it when the server commits   | permission at submit               | S1     | confirmed |
+| T3   | server  | commit                 | observable   | committed | API: GET /documents/1 returns the new version                          | the server applied the change durably               | request sent; server accepted      | S1     | confirmed |
+| T4   | editor  | Saved acknowledgement  | observable   | ack       | UI: the "Saved" toast                                                  | the editor sees "Saved"                             | request sent; response received    | S1     | confirmed |
+| T5   | editor  | reload                 | observable   | reload    | UI: the document after a page reload                                   | the reloaded page shows the submitted version       | the in-memory draft                | S1     | confirmed |
+| T6   | editor  | document               | concept      | —         | —                                                                      | the one document being edited                       | —                                  | S1     | confirmed |
 
 ## Adequacy
 
 - World: S2 Save
 - Coordinates: start held
 - Observations: committed ack reload
-- Rows: O1 O2 O3 O4
+- Rows: O1 O2 O3 O4 O5
 - Rows outside the world: none
 
-| Assumption | Source | Falsifier                                                           |
-| ---------- | ------ | ------------------------------------------------------------------- |
-| A1         | S1     | a permission log showing permission restored mid-request            |
-| A2         | S1     | a reload served from a client cache that the server never committed |
+| Assumption | Source | Owner              | Falsifier                                                |
+| ---------- | ------ | ------------------ | -------------------------------------------------------- |
+| A1         | S1     | permission service | a permission log showing permission restored mid-request |
 
 | Goal | Kind    | Cites |
 | ---- | ------- | ----- |
@@ -82,6 +82,7 @@
 | G2   | safety  | S1    |
 | G3   | safety  | S1    |
 | G4   | witness | S1    |
+| G5   | safety  | S1    |
 
 | Example | Goal | World                             | Verdict  |
 | ------- | ---- | --------------------------------- | -------- |
@@ -89,11 +90,13 @@
 | E2      | G1   | start !held committed ack reload  | violates |
 | E3      | G3   | start held committed !ack !reload | violates |
 
-| Hazard              | Disposition                     |
-| ------------------- | ------------------------------- |
-| permission-change   | modeled: start held             |
-| concurrent-change   | n/a: S1 one editor              |
-| display-vs-commit   | modeled: committed ack          |
-| effect-count        | n/a: S1 one request per attempt |
-| identity-reference  | n/a: S1 one document            |
-| feature-composition | n/a: S1 save only               |
+| Hazard              | Disposition                       |
+| ------------------- | --------------------------------- |
+| permission-change   | modeled: start held               |
+| concurrent-change   | n/a: S1 one editor                |
+| display-vs-commit   | modeled: committed ack            |
+| effect-count        | n/a: S1 one request per attempt   |
+| identity-reference  | n/a: S1 one document              |
+| feature-composition | n/a: S1 save only                 |
+| carry-over          | n/a: S1 each attempt judged alone |
+| order-timing        | n/a: S1 end state of one attempt  |
