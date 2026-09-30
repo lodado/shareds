@@ -35,7 +35,8 @@ copies of the policy.
    installation requested by this stack still uses the project's package manager, lockfile and
    dependency rules; it does not authorize unrelated upgrades or configuration edits.
 3. Record Terms, a finite Adequacy world and its goals/assumptions, the Formal Model and laws, and
-   the type-fest utility's real protected relation. Include the compiler witness and fast-check
+   the type-fest utility's real protected relation — for new work in the model package first, then
+   projected into the card (`bend-cross-verification.md` §2), never hand-copied into both. Include the compiler witness and fast-check
    realization plans in the existing Draft. Every declared assumption, excluded phenomenon, bound
    and expected outcome retains its approved source or an Open question.
 4. Check the Bend laws, complete the bounded space and run the Adequacy check before confirmation
@@ -79,11 +80,14 @@ target compiler; a separate fixture using unrelated types is not consumer eviden
 check must execute positive-count sampling and assert the owning model relation/invariant, not
 only import `fc` or assert that a generator exists.
 
-For trace projection, pass positive `--runs` and a stated `--max-length` greater than Bound; the
-existing `emit-trace` default of zero samples does not satisfy this contract. For state projection,
-keep the useful exhaustive check on small domains and add real fast-check sampling through the
-existing trusted harness; do not pretend the current small-domain generator executes sampling
-just because `--runs` was supplied. Do not reduce exhaustive coverage to obtain a library import.
+Both projection generators refuse a missing, zero or non-integer `--runs` (`SAMPLING_REQUIRED`). For
+trace projection, pass a stated `--max-length` greater than Bound; the generated test counts the
+executed runs and the length each trace actually reached, and fails when fewer runs executed than
+requested or when the environment allows traces past the bound but no sample reached one. For state
+projection, the useful exhaustive check on small domains stays and a separate fast-check property of
+`--runs` runs is always added and counted; the earlier small-domain generator that skipped sampling
+whenever it stayed exhaustive is gone — regenerate files it produced. Do not reduce exhaustive coverage
+to obtain a library import.
 
 Model proof, adequacy, static rejection and harness failure are not a product `VALID_RED`. Record a
 product contract violation before any product edit, or take the existing zero-production
@@ -91,7 +95,9 @@ product contract violation before any product edit, or take the existing zero-pr
 current snapshot at GREEN and again after independent review.
 
 The existing runner enforces the labels registered at initialization, lock drift and reported run
-evidence; it does not infer arbitrary library use from a label's spelling. The operator and
+evidence; it does not infer arbitrary library use from a label's spelling. For a card projected from a
+model package, `init` also refuses unless all four labels above are registered (`STACK_LABELS_REQUIRED`)
+and the lock covers the package (`PACKAGE_UNLOCKED`); a legacy card keeps its earlier gates. The operator and
 independent reviewers must check the consumer path, commands, reporter cases and artifacts. A
 label alone proves neither a proof nor a compiler rejection nor fast-check execution.
 
@@ -104,5 +110,7 @@ uses a new confirmed revision. No member is marked N/A to obtain completion.
 
 Report model laws as `formal: proven`, product correspondence as `conformance: tested` with
 exhaustive and sampled scope, and type guarantees as actual checked relations with diagnostics.
-State any residual model, type, observation and sampling limits. All existing visual-pending,
+State any residual model, type, observation and sampling limits. With a model package, add the
+closure verdict of [`discovery.md`](discovery.md) and its residual-risk list; the closure attacks the
+space these four obligations verify and replaces none of them. All existing visual-pending,
 independent-review, TDD, budget and final-report gates remain in force.

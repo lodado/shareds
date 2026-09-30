@@ -193,7 +193,9 @@ export async function keepArtifact({ out, fileName, entry, render, result }) {
   await mkdir(resolve(out), { recursive: true })
   // Bend는 실제 경로로 import를 푼다 — /tmp 같은 심볼릭 링크를 풀어서 상대 경로를 만든다.
   const outDir = await realpath(resolve(out))
-  const target = relative(outDir, await realpath(resolve(entry))).split(sep).join('/')
+  const target = relative(outDir, await realpath(resolve(entry)))
+    .split(sep)
+    .join('/')
   const importPath = target.startsWith('.') ? target : `./${target}`
   const bendFile = join(outDir, fileName)
   const jsonFile = join(outDir, fileName.replace(/\.bend$/, '.json'))
@@ -506,6 +508,11 @@ export function verdictOf(run, { bin, timeoutMs }) {
   ) {
     return { status: 'proven' }
   }
+  // 커널(Lean)이 없어 검사 자체를 못 한 것은 증명 실패가 아니다 — 환경 결함(ENVIRONMENT_DEFECT)으로 남긴다.
+  // 검사가 한 줄이라도 결론을 냈으면(ALL/SOME PROOFS …) 그 결론을 따른다 — 문구가 섞였다고 실패를 환경 탓으로 바꾸지 않는다.
+  const verdictLine = lines.some((line) => line === 'ALL PROOFS CHECK' || line === 'SOME PROOFS FAIL')
+  const kernelMissing = output.match(/^.*the kernel did not build.*$/m)?.[0]
+  if (kernelMissing && run.status !== 0 && !verdictLine) return { status: 'unavailable', reason: kernelMissing.trim() }
   const failedAt = output.match(/^Location:\s*(\S+)/m)?.[1] ?? null
   if (/\b\d+ TODOs? found\b/.test(output)) return { status: 'open', failedAt }
   if (/rely on unsafe or foreign code/.test(output)) return { status: 'unsafe', failedAt }

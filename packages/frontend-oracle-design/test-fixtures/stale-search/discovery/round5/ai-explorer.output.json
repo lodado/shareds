@@ -1,0 +1,39 @@
+{
+  "candidates": [
+    {
+      "id": "X1",
+      "kind": "new-fact",
+      "scenario": "The person types 'c', 'ca', then 'cat' faster than the searches answer, so three requests are in flight. The answer for 'c' comes back after 'cat' was issued. Or 'c' had answered and is on screen, and the answer for 'ca' comes back after 'cat' was issued. In a long session, the same happens when one of the earlier, unanswered searches answers after the tenth request.",
+      "harm": "The list switches to results for 'c' or 'ca' while the box says 'cat': an older request's late response replaces the kept results or precedes the latest ones, the card's worst regression. S1 item 2: \"A response to an older request does not change what the list shows.\" S1 item 4 delivers responses \"in any order\", and the brief's actor types successive queries. A product that ignores only the answer of the request just superseded, or ignores an answer only when it is older than what the list shows (or than the latest request, when the list is empty), passes O1, O2, O3 and O5 in every world.",
+      "newFact": {
+        "name": "a third request in flight: a response to a request older than the previous one arrives late",
+        "category": "controllable",
+        "observedVia": "test: the world adapter issues a third request, or answers one of longSession's earlier requests, and delivers that older response after the latest request is issued; reducer results.requestId after every event, read by search.adapter observe"
+      },
+      "whyOutside": "The world has exactly two requests that can answer: arrival (T1) places only response 1 against request 2 and response 2, newAnswers (T2) covers only response 2, and longSession (T9) adds eight earlier requests whose responses never arrive. So the only stale response in any world is the previous request's, arriving while the list is empty or shows response 2, and oldShown (T4) reads request 1 only. The long-session variant has more than 5 events, past O4's bound; O4 reaches the three-query traces only if S2's Search.next issues a third request.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X2",
+      "kind": "qualifier",
+      "scenario": "The person types 'c', then 'ca' while 'c' is still loading. The answer for 'ca' comes back first; the answer for 'c' is slow, or is lost and never comes. The list stays as it was until the 'c' answer finally arrives and only then shows the 'ca' results, or never shows them.",
+      "harm": "Results for what the person typed have arrived but stay hidden behind an answer they no longer want, for as long as it takes or for good. S1 item 3: \"The latest request's response is shown when it arrives.\" O1 only says the list ends with request 2's response, and final (T3) reads the list after the last event, which in the NewFirst world is response 1's arrival. No in-world field reads the list when response 2 arrives, and no arrival value withholds response 1, though S1 item 4 delivers each response at most once. A product that holds the latest results until the previous request settles passes O1, O2, O3 and O5 in every world (NewFirst: final=NewShown !oldShown itemsIntact). Only O4, outside the world, could catch it, if S2 shows response 2 at that prefix, and not in the long-session world, past its 5-event bound.",
+      "sourceText": "when it arrives",
+      "rows": ["O1"],
+      "sources": ["S1"]
+    },
+    {
+      "id": "X3",
+      "kind": "new-fact",
+      "scenario": "The person types 'c', then 'ca'. The 'ca' results arrive and are shown. Then the older 'c' search fails, with an error or a timeout, instead of answering, and the 'ca' results are cleared or replaced by an error message.",
+      "harm": "The person loses the results for what they typed because of a search they had already replaced. S1 item 2: \"A response to an older request does not change what the list shows.\" Read as no response at all, the failure still has no place in S1, where only the latest request's response changes the list (items 1 and 3). Either way the older search's end must leave the list alone.",
+      "newFact": {
+        "name": "an older request fails (error or timeout) after a newer one is issued",
+        "category": "controllable",
+        "observedVia": "test: the world adapter fails request 1 after request 2 is issued, before or after response 2; reducer results.requestId and results.items after every event, read by search.adapter observe and snapshot"
+      },
+      "whyOutside": "Every response in the world is a result list, empty or not (T7 oldEmpty, T8 newEmpty), and arrival (T1) only times it; no field ends request 1 with a failure. The N/A line drops error and timeout citing S1, but S1 item 4 puts only cancellation, retry, duplicate responses and a response before its request out of scope, and the brief's non-goals do not name them either.",
+      "sources": ["S1"]
+    }
+  ]
+}

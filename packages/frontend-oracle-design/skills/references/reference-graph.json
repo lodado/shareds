@@ -304,7 +304,13 @@
     {
       "id": "adequacy",
       "path": "references/adequacy.md",
-      "when": "Bend path with goals from the source text — writing ## Terms or ## Adequacy, dispatching the model analyst, or running oracle-adequacy.mjs",
+      "when": "Bend path with goals from the source text — writing the model package, ## Terms or ## Adequacy, dispatching the model analyst, or running oracle-adequacy.mjs or oracle-package.mjs",
+      "requires": ["common"]
+    },
+    {
+      "id": "discovery",
+      "path": "references/discovery.md",
+      "when": "Delivery with a model package — after IMPLEMENTED_GREEN and again before the final report; whenever a runtime anomaly or escape arrives; writing the requirement inventory, fault model, metamorphic relations, operator dispositions or discovery decisions, dispatching an AI operator, or running oracle-discovery.mjs",
       "requires": ["common"]
     },
     {

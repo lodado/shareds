@@ -1,0 +1,74 @@
+{
+  "candidates": [
+    {
+      "id": "X1",
+      "kind": "new-fact",
+      "scenario": "The user types quickly and issues three searches in a row. The third search's results arrive and show; then the response to the first search arrives (it may also arrive while the third search is still pending).",
+      "harm": "The list switches to results for a search the user replaced two searches ago, so the user reads answers to a query they no longer have. S1 item 2: \"A response to an older request does not change what the list shows.\" S1 item 4 lets the environment deliver responses \"in any order\", so the first search's response can come last.",
+      "newFact": {
+        "name": "thirdRequest",
+        "category": "controllable",
+        "observedVia": "—"
+      },
+      "whyOutside": "Every world has exactly two requests: arrival, newAnswers, oldEmpty and newEmpty describe only responses 1 and 2, and final can name only NoneShown, OldShown or NewShown, so the only older request is the one just before the latest. event.Msg.Respond.id reaches 4, but no world field issues a third request. longSession adds earlier requests, yet its not-clause says their responses never arrive. A list that ignores only the request immediately before the latest passes every current world.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X2",
+      "kind": "new-fact",
+      "scenario": "The user searches, then searches again. The second search's response comes back first, but the list stays as it was; only when the slower first response arrives does the list switch to the second search's results.",
+      "harm": "The user waits on a response the product will discard before seeing results that had already arrived for their latest search. S1 item 3: \"The latest request's response is shown when it arrives.\"",
+      "newFact": {
+        "name": "newShownOnArrival",
+        "category": "observable",
+        "observedVia": "the list right after the event that delivers response 2, before response 1 arrives (observation.Search.observe read at that step)"
+      },
+      "whyOutside": "final records only the end state, oldShown only whether a late response 1 changed the list to request 1's results, and itemsIntact only whether the items match whichever response is shown (its not-clause excludes which request that is). With arrival=NewFirst and newAnswers, a list that holds response 2 back until response 1 arrives ends as final=NewShown !oldShown itemsIntact, the same world as a list that shows it at once.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X3",
+      "kind": "in-world",
+      "scenario": "The user searches and the results appear. The user then searches again; when the attempt ends the second response has not arrived, and the list has gone blank instead of keeping the first results.",
+      "harm": "The user loses results that were rightly on screen (they arrived while the first search was still the latest) and has nothing in their place while waiting. S1 item 1: \"Issuing a request makes it the latest one; the list keeps showing what it showed until a response arrives.\"",
+      "world": "arrival=OldEarly !newAnswers !oldEmpty !newEmpty !longSession final=NoneShown !oldShown itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X4",
+      "kind": "in-world",
+      "scenario": "The user searches and the results appear. The user searches again; the second response arrives with no results, and the list keeps showing the first search's results.",
+      "harm": "The user takes the first search's results for answers to the second search and cannot tell that it found nothing. S1 item 3: \"The latest request's response is shown when it arrives\"; a response with no results is still the latest request's response.",
+      "world": "arrival=OldEarly newAnswers !oldEmpty newEmpty !longSession final=OldShown !oldShown itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X5",
+      "kind": "in-world",
+      "scenario": "Late in a session, the user's ninth search shows its results. The user runs a tenth search and its response arrives, but the list keeps showing the ninth search's results.",
+      "harm": "The user never sees results for their latest search; a check that a response is newer than what is shown fails when ids are compared as text, where 10 sorts before 9. S1 item 1: the request id \"grows by one per issued request\", so request 10 is the latest; S1 item 3: \"The latest request's response is shown when it arrives.\"",
+      "world": "arrival=OldEarly newAnswers !oldEmpty !newEmpty longSession final=OldShown !oldShown itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X6",
+      "kind": "in-world",
+      "scenario": "The user searches, then searches again. The second search's results arrive and show; then the late first response arrives with no results, and the list goes blank (it is cleared, not switched to the first search).",
+      "harm": "The user loses the results for their latest search because of a response to a search they already replaced. S1 item 2: \"A response to an older request does not change what the list shows.\"",
+      "world": "arrival=NewFirst newAnswers oldEmpty !newEmpty !longSession final=NoneShown !oldShown itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    }
+  ]
+}

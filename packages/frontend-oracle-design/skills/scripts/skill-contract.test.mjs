@@ -2041,6 +2041,29 @@ test('keeps the runtime reference prose in sync with the graph that owns the loa
   assert.doesNotMatch(skill, /\(references\/review-checklist\.md\)/)
 })
 
+test('discovery closure is evidence inside Delivery, never a second approval or state machine', async () => {
+  const [skill, discovery, graphSource, runner] = await Promise.all([
+    read('SKILL.md'),
+    read('references/discovery.md'),
+    read('references/reference-graph.json'),
+    read('scripts/oracle-run.mjs'),
+  ])
+  const node = JSON.parse(graphSource).nodes.find((entry) => entry.id === 'discovery')
+  assert.deepEqual([node.path, node.requires], ['references/discovery.md', ['common']])
+  assert.match(node.when, /after IMPLEMENTED_GREEN and again before the final report/)
+  assert.match(skill, /its verdict and residual-risk list are evidence, not a delivery state/)
+  assert.match(discovery, /not a second orchestrator, approval,\s+ledger or delivery state/)
+  assert.match(discovery, /The tool\s+never writes a decision/)
+
+  // 판정은 runner 상태가 되지 않는다 — 상태 기계는 oracle-run 하나다
+  for (const verdict of ['CLOSED_WITH_BOUNDS', 'PRODUCT_COMPLETE_WITH_BOUNDS', 'RUNTIME_REOPENED', 'EXPANSION_REQUIRED'])
+    assert.doesNotMatch(runner, new RegExp(verdict), verdict)
+
+  // 보고서는 모델 패키지가 있을 때만 판정을 싣고, 잔여 위험은 한 줄 라벨이 아니라 항목별로 싣는다
+  assert.match(skill, /\| Closure\s+\| the card was projected from a model package/)
+  assert.match(skill, /^- Residual <kind> — <what was not verified>$/m)
+})
+
 test('uses the Oracle report for new Low runs while retaining historical reports', async () => {
   const [skill, lane] = await Promise.all([read('SKILL.md'), read('references/lanes/low-fast-path.md')])
 

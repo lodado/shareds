@@ -1,0 +1,114 @@
+{
+  "candidates": [
+    {
+      "id": "old-answered-before-new-issued",
+      "kind": "new-fact",
+      "scenario": "The user types 'ca' (request 1), then 'cat' (request 2); the 'ca' response arrives before the 'cat' response (arrival=OldFirst). That label covers two traces S1 treats oppositely: if 'ca' was answered before 'cat' was issued (the user paused on the results, then typed on), request 1 was the latest when its response arrived and rule 3 requires showing it; if 'cat' was issued first (both in flight), rule 2 forbids showing it.",
+      "harm": "Whatever verdict the oracle gives arrival=OldFirst, newAnswers, final=NewShown, oldShown, itemsIntact, an S1 violation passes: accepting it passes a flash of 'ca' results after 'cat' was issued (S1 rule 2); rejecting it passes a product that suppresses an answer that was the latest when it arrived (S1 rule 3). A harness that realizes OldFirst by answering 'ca' before issuing 'cat' also passes a guard that accepts any response newer than the one shown, which is wrong only when the requests overlap.",
+      "world": null,
+      "newFact": {
+        "name": "oldAnsweredBeforeNewIssued",
+        "category": "order-timing",
+        "observedVia": "Harness delivers Respond(1) before or after the second Issue; visible as the Issue/Respond order in the event.Msg trace."
+      },
+      "whyOutside": "world.Race.arrival orders the two responses against each other only; nothing places Respond(old) relative to Issue(new), the order rules 2 and 3 turn on. event.Msg can produce both traces, but the Race world maps them to the same literal with different correct verdicts.",
+      "sourceText": "A response to an older request does not change what the list shows.",
+      "rows": [
+        "arrival=OldFirst, newAnswers",
+        "arrival=OldFirst, !newAnswers"
+      ],
+      "sources": ["S1"]
+    },
+    {
+      "id": "old-response-never-delivered",
+      "kind": "new-fact",
+      "scenario": "Requests 'ca' (1) and 'cat' (2) overlap; the 'cat' response arrives and the 'ca' response is never delivered, which rule 4 allows for any response. No Race row has this: arrival always has the old response arriving, first or second. A product that applies responses strictly in request order (holding response 2 until response 1 settles), or keeps the list loading until no request is pending, gets every row right because the old response always turns up; in the NewFirst row it shows 'cat' only once 'ca' lands, and the end-state record still reads final=NewShown, !oldShown, itemsIntact.",
+      "harm": "S1 rule 3 requires the latest response to be shown when it arrives. If the old response is lost, that product never shows the 'cat' answer; if it is merely slow, every answer waits for a superseded request. No current row can fail it.",
+      "world": null,
+      "newFact": {
+        "name": "oldAnswers",
+        "category": "effect-count",
+        "observedVia": "Harness withholds Respond(1) entirely, and separately delays it past Respond(2); check the list at the moment Respond(2) is delivered, not only at the end."
+      },
+      "whyOutside": "No world lets the old response go undelivered: world.Race.arrival places it first or second, and world.Race.newAnswers concerns only the new request. final, oldShown and itemsIntact are end states, so 'shown when it arrives' is never observed: showing 'cat' on arrival and holding it until 'ca' lands both record as arrival=NewFirst, newAnswers, final=NewShown, !oldShown, itemsIntact.",
+      "sourceText": "The latest request's response is shown when it arrives.",
+      "rows": [
+        "arrival=NewFirst, newAnswers"
+      ],
+      "sources": ["S1"]
+    },
+    {
+      "id": "latest-never-answered-left-silent",
+      "kind": "in-world",
+      "scenario": "Rapid typing: 'ca' then 'cat', both requests in flight. The 'ca' response arrives first and, being older, leaves the list unchanged; the 'cat' response is never delivered. The list keeps showing what it showed before the race (here nothing), with no end.",
+      "harm": "Every S1 rule holds: rule 2 drops the only response that arrived, rule 4 lets the latest never arrive, rule 1 keeps the list as it was, and S1 claims no retry. The user is left indefinitely with a list that does not answer the query in the box and looks the same as an answered search with no matches, with no sign that anything is pending (display-vs-commit).",
+      "world": "arrival=OldFirst, !newAnswers, final=NoneShown, !oldShown, itemsIntact",
+      "newFact": null,
+      "whyOutside": null,
+      "sourceText": "The environment delivers each response at most once, only after its request, in any order.",
+      "rows": [
+        "arrival=OldFirst, !newAnswers"
+      ],
+      "sources": ["S1"]
+    },
+    {
+      "id": "request-id-reused-after-reset",
+      "kind": "qualifier",
+      "scenario": "The user searches 'ca' (id 1), then leaves and returns (a route change and Back, or closing and reopening the search panel) before it is answered. The search state is created afresh and the counter restarts, so 'cat' is issued as id 1 too. The 'cat' response lands and is shown; the late 'ca' response then arrives carrying id 1, which equals latest, and replaces it.",
+      "harm": "S1 rule 2 exists to keep an older request's response off the list, but the guard and observation.Search.observe know requests only by id. With an id reused, the abandoned query's results are shown under the current query, and the id-level record reads it as this clean pass (identity-reference, carry-over).",
+      "world": "arrival=NewFirst, newAnswers, final=NewShown, !oldShown, itemsIntact",
+      "newFact": null,
+      "whyOutside": "Every verdict assumes rule 1's ids are unique for the lifetime of the list: there is one counter (state.Search.Search.latest), no event re-creates the state while a response is outstanding, and the assumption registry is empty. The environment-variation n/a ('a pure reducer') does not cover it: a reducer re-initialized while the environment still delivers an earlier request's response fails with no browser, device or viewport in play.",
+      "sourceText": "Every search request gets a request id that grows by one per issued request.",
+      "rows": [
+        "arrival=OldFirst, newAnswers",
+        "arrival=OldFirst, !newAnswers",
+        "arrival=NewFirst, newAnswers",
+        "arrival=NewFirst, !newAnswers"
+      ],
+      "sources": ["S1"]
+    },
+    {
+      "id": "kept-list-not-marked-stale",
+      "kind": "new-fact",
+      "scenario": "The list shows the answer to 'ca'; the user types 't' and 'cat' becomes the latest request. Rule 1 keeps the 'ca' results on screen for the whole round trip, however long, rendered exactly like an answer to 'cat'. The user presses Enter on the top row and opens a 'ca' result.",
+      "harm": "S1 makes the displayed list lag the latest request by design, so a product that presents the kept list as current is fully compliant while the user acts on another query's results; nothing in the space records whether the user is told the list is out of date (display-vs-commit).",
+      "world": null,
+      "newFact": {
+        "name": "keptListMarkedStale",
+        "category": "display-vs-commit",
+        "observedVia": "DOM while the latest request is unanswered: a pending or stale indication on the kept list (aria-busy, dimming, or a label naming the query it answers) compared with the input value."
+      },
+      "whyOutside": "final, oldShown and itemsIntact say which response the list ends on and whether a superseded one was displayed; observation.Search.observe gives only the shown request id. None observes the window between Issue and Respond or how the kept list is presented, and a record world sees end states only.",
+      "sourceText": "the list keeps showing what it showed until a response arrives.",
+      "rows": [
+        "arrival=OldFirst, newAnswers",
+        "arrival=OldFirst, !newAnswers",
+        "arrival=NewFirst, newAnswers",
+        "arrival=NewFirst, !newAnswers"
+      ],
+      "sources": ["S1"]
+    },
+    {
+      "id": "load-more-supersedes-pending-query",
+      "kind": "new-fact",
+      "scenario": "The list shows page 1 for 'ca'; the user types 't' ('cat', request 2) and, while it is pending, scrolls the kept 'ca' list to its end, which issues 'load more' for 'ca' (request 3). Request 3 is now the latest, so the 'cat' response is dropped as older and the 'ca' page 2 response is shown.",
+      "harm": "Every S1 rule holds (rule 1 orders by issue, rule 2 drops 'cat', rule 3 shows the 'ca' page), yet the list ends on results for the query the user replaced, under 'cat' in the input, with nothing pending that would correct it (feature-composition).",
+      "world": null,
+      "newFact": {
+        "name": "keptQueryRequestIssued",
+        "category": "feature-composition",
+        "observedVia": "Harness triggers load-more (or a refresh) on the kept list between Issue('cat') and its Respond; compare the query the final list answers with the input value."
+      },
+      "whyOutside": "The Race world has exactly two requests, both new queries, and event.Msg has a single Issue with no query or purpose, so a request that re-asks the displayed query cannot be told from a newer query: 'latest by issue order' and 'answers the input' coincide in every modeled trace.",
+      "sourceText": "Every search request gets a request id that grows by one per issued request.",
+      "rows": [
+        "arrival=OldFirst, newAnswers",
+        "arrival=OldFirst, !newAnswers",
+        "arrival=NewFirst, newAnswers",
+        "arrival=NewFirst, !newAnswers"
+      ],
+      "sources": ["S1"]
+    }
+  ]
+}

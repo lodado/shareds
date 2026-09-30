@@ -762,6 +762,23 @@ the order `Outcome Brief → Source Registry → User Confirmation → Decided p
 `oracle-verify.mjs card` checks the Outcome Brief required values and the Source Registry `Kind`
 before the lock.
 
+### Projected cards — the model decides, the card shows it
+
+A new card is projected from the model package (`oracle-package.mjs project-card`,
+[`bend-cross-verification.md`](../bend-cross-verification.md) §2), not typed. Everything the model
+fixes — the policies' rows, each row's formal predicate (`Formal` column), Case space family
+dispositions, Terms, Adequacy, Formal Model and the Derived Axes table — sits inside the
+`oracle:generated` region; a human change to it is `card-generated-drift`, and the way to change it is to
+edit the package, re-project and treat a changed meaning as a new revision. Outside the region the human
+records User Confirmation and any explanation; explanation never claims a meaning the formal column
+does not state. Show the user, from the region and the check outputs: the goals and their source
+sentences, key terms, assumptions and who guarantees them, the formal meaning, the derived axes, the
+order obligations and important success/failure/race traces, the adequacy and goal-implication results
+with their counterexamples and the `goalAudit` claim, the product boundaries the tests set and read, what
+is not formalized, open questions and the delta against the previous revision. UI, visual and
+accessibility contracts that stay outside the formal model keep their `D*` rows, sources and evidence
+paths — leaving the model does not remove the obligation.
+
 When there is a Design Intent, place the [`visual-design.md`](../visual-design.md) format
 immediately before the behavior matrix. Design Intent·`D*` rows·`O*` rows·confirmation evidence are
 all locked into the same Oracle bytes. Non-N/A `D*` rows map as `HARD → test`,
@@ -1347,6 +1364,14 @@ declares a dimension or its exclusion reason cites that file.
 | Environment | viewport boundaries, theme, reduced-motion, StrictMode                                      | SFDIPOT Platform, ISO 25010  |
 | Platform    | browser·OS — **derive choices from the repo's `browserslist`·`engines`, never from recall** | SFDIPOT Platform             |
 | Inherited   | still-effective prior `P*` (owned by the interaction sweep — reference, do not duplicate)   | escaped-bug retro            |
+
+With a model package the families audit the model instead of prompting free recall of new axes. A term
+that names a `family` maps its derived axis to that family; `oracle-package.mjs derive` reports each
+family as `mapped` (with its axes), `excluded` (with the reason the package's author wrote) or
+`undispositioned`. The projection never writes an exclusion the author did not: an undispositioned family
+gets no row, and the lint fails `family-undispositioned`. A family the environment or repository requires but the
+model lacks is a new axis candidate, an environment supplement, an explicit untested scope or a policy
+question — never "excluded because the model did not produce it".
 
 Choices come from [`bva.md`](../bva.md): value boundaries become Value choices, state boundaries
 become Async choices, time·order boundaries become Order choices, count boundaries become Data

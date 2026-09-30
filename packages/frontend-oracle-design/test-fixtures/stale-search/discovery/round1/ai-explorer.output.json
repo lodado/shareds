@@ -1,0 +1,56 @@
+{
+  "candidates": [
+    {
+      "id": "X1",
+      "kind": "in-world",
+      "scenario": "Type 'ca' (request 1), then 'cat' (request 2). The 'ca' response arrives and its items appear in the list with no request id attached, so the observer reads 'nothing shown'. The 'cat' response never arrives and the attempt ends that way. Had the 'cat' response come afterwards, the same 'ca' items would have stayed in the list until it replaced them. That run records as E2's world (arrival=OldFirst newAnswers final=NewShown !oldShown itemsIntact), which is judged 'holds'.",
+      "harm": "The user reads the older query's results as the answer to the current one. S1 item 2: \"A response to an older request does not change what the list shows.\" S1 item 1: the list keeps showing what it showed, here nothing, until a response arrives. T6 marks this list not intact. It is exactly O3's Never ('request 1's results shown') and breaks O3's 'results rendered×0'. Yet every row passes: O1 is vacuous without response 2, O2 and O3 read only the request id (none shown), and O5 applies only when 'a response is shown'.",
+      "world": "arrival=OldFirst !newAnswers final=NoneShown !oldShown !itemsIntact",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X2",
+      "kind": "qualifier",
+      "scenario": "Type 'ca', then 'cat'. The 'cat' response comes back first, but the list stays empty while it waits for the slower 'ca' search. Only when that returns does it drop 'ca' and show 'cat'. If the 'ca' response never comes, 'cat' never shows.",
+      "harm": "The user waits on a search they already abandoned before seeing results that have arrived. They may never see them, since S1 item 4 delivers each response \"at most once\". S1 item 3: \"The latest request's response is shown when it arrives.\" O1 checks only that 'the list ends with the results of request 2', and O5 checks only 'when the attempt ends'. When request 2 answers first, the last event is the stale response 1, so the waiting list ends at final=NewShown !oldShown itemsIntact. No world delivers response 2 while withholding response 1 (T1: 'delivers response 1 before or after response 2'), so the never-shown case is outside the world too.",
+      "sourceText": "shown when it arrives",
+      "rows": ["O1", "O5"],
+      "sources": ["S1"]
+    },
+    {
+      "id": "X3",
+      "kind": "qualifier",
+      "scenario": "Type 'ca' and pause: its response arrives and the list shows the 'ca' results. Then type 'cat' (request 2). While the 'cat' search is in flight, the list should still show the 'ca' results.",
+      "harm": "S1 item 1 keeps the list as it was until a response arrives, and item 2 only forbids a response to an older request from changing it. The brief likewise forbids 'an older request's late results'. O2 instead promises the list 'never shows request 1's results, at any step', and its Never is 'request 1's results shown after request 2 was issued, even briefly', which T4 records as oldShown. Applied to this sequence, O2 fails the list that keeps the 'ca' results and passes one that blanks on every keystroke (fault F4). The user would lose the results they are reading each time they type. O2 also contradicts the card's own MR1 (issueAppended keeps sameShown, R2). O3 narrows 'what it showed' to 'the list keeps showing nothing'. Every world issues both requests before any response (O1 Given), and carry-over is declared n/a as 'one attempt starting from an empty list', which S1 does not say. So no in-world row notices a list that is cleared when a request is issued.",
+      "sourceText": "the list keeps showing what it showed until a response arrives",
+      "rows": ["O2", "O3"],
+      "sources": ["S1"]
+    },
+    {
+      "id": "X4",
+      "kind": "new-fact",
+      "scenario": "Type 'c', 'ca', 'cat' in quick succession (requests 1, 2 and 3). Before the 'cat' results arrive, the slow 'c' response comes back and the list switches to the 'c' results.",
+      "harm": "The user sees results for a query two keystrokes old as if they were current, which is the card's worst regression. S1 item 2, \"A response to an older request does not change what the list shows.\", covers every older request. S1 item 1 gives each issued request the next id with no limit of two, and the actor types successive queries 'while earlier responses are in flight'.",
+      "newFact": {
+        "name": "a late response two or more requests behind the latest (a third request issued before it arrives)",
+        "category": "controllable",
+        "observedVia": "test: the world adapter issues requests 1, 2 and 3, then delivers response 1 before response 3; reducer results.requestId after response 1, read by search.adapter observe"
+      },
+      "whyOutside": "Every world issues exactly requests 1 and 2 (T1 'which of the two issued requests answers first', T2 'the response to request 2'), so the older request is always the latest minus one. A reducer that remembers only the previous request id, or one parity bit, and drops only that response passes O1, O2, O3 and O5 in every world. Only O4's trace check can issue a third request, and it is outside the world with a 4-event bound.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X5",
+      "kind": "new-fact",
+      "scenario": "Search 'lamp' and see its results. Then type 'lampz', which matches nothing. The 'lampz' response arrives with no items, and the list keeps showing the 'lamp' results as though they matched 'lampz'.",
+      "harm": "The user reads the previous query's results as the answer to the current one. S1 item 3, \"The latest request's response is shown when it arrives.\", has no exception for an empty response. S1 item 4 puts only \"Cancellation, retry, duplicate responses and a response before its request\" out of scope.",
+      "newFact": {
+        "name": "the latest request's response carries no results (empty item list)",
+        "category": "controllable",
+        "observedVia": "test: the world adapter delivers response 2 with an empty item list; reducer results.requestId after it, read by search.adapter observe"
+      },
+      "whyOutside": "The card's N/A line puts 'empty data' outside the policy, citing S1/R6, but R6 does not name empty data, so no world delivers an empty response. itemsIntact cannot see the difference either: its 'or shows nothing' clause treats a skipped empty response like a shown one. Once this fact exists, the existing O1 would catch a reducer that skips empty responses (final=NoneShown with newAnswers), even with no earlier results on screen.",
+      "sources": ["S1"]
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "candidates": [
+    {
+      "id": "X1",
+      "kind": "new-fact",
+      "scenario": "Type 'c', 'ca', 'cat' in quick succession so three searches are in flight. 'cat' answers first and its results show, 'ca' answers next, 'c' answers last.",
+      "harm": "The 'c' results replace the 'cat' results and nothing later corrects them, so the user reads matches for a query they no longer have. S1 rule 2 ('A response to an older request does not change what the list shows') covers every older request, not just the previous one, and rule 4 lets responses arrive 'in any order'. A stale check that rejects only the immediately previous request (id = latest - 1, or a generation flag that toggles per request) lets the 'c' response through.",
+      "newFact": {
+        "name": "thirdRequest",
+        "category": "controllable",
+        "observedVia": "search box: a third query issued while two requests are still in flight (request id 3)"
+      },
+      "whyOutside": "The Race world holds exactly two requests: arrival orders the old and new responses and newAnswers drops the new one. No world field issues a third request or orders three responses, although event.Msg.Respond.id already ranges over 1 2 3. With two requests, 'ignore every older response' and 'ignore only the previous request' give identical worlds, so the wrong check passes every row.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X2",
+      "kind": "new-fact",
+      "scenario": "Search 'ca' and wait for its results to show. Type 't' so 'cat' is issued; the 'cat' response is slow or, as S1 rule 4 allows, never delivered.",
+      "harm": "A product that blanks the list when a search is issued takes away the 'ca' results the user was reading while 'cat' is pending, and if 'cat' never answers the list stays empty. S1 rule 1: 'the list keeps showing what it showed until a response arrives.'",
+      "newFact": {
+        "name": "shownBeforeNewIssue",
+        "category": "controllable",
+        "observedVia": "results list already showing the first search's results (observation.Search.observe = 1) when the second search is issued"
+      },
+      "whyOutside": "Every Race world issues both requests before any response and starts from an empty list: arrival only orders the two responses, and final/oldShown count any display of the old response as a failure. No field lets the old response arrive before the new request is issued, so 'kept showing what it showed' and 'cleared on issue' both end as final=NoneShown, and this case's correct outcome when the new request never answers (oldShown, final=OldShown) is the same literal as a stale overwrite.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X3",
+      "kind": "new-fact",
+      "scenario": "Type 'ca', then 'cat'. The 'cat' response comes back; the 'ca' response never does.",
+      "harm": "A product that shows the latest response only once older requests settle (applies responses in request order, or waits for the in-flight count to reach zero) never shows the 'cat' results that already arrived. S1 rule 3: 'The latest request's response is shown when it arrives'; rule 4 delivers each response 'at most once', so the older response may never come.",
+      "newFact": {
+        "name": "oldAnswers",
+        "category": "controllable",
+        "observedVia": "—"
+      },
+      "whyOutside": "Only the new request's delivery is a knob (newAnswers); arrival=OldFirst|NewFirst presupposes that the old response arrives in every world. No world delivers the new response while withholding the old one, so a display deferred until the old response arrives is always flushed before the end state is judged.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X4",
+      "kind": "qualifier",
+      "scenario": "Type 'ca', then 'cat'. The 'cat' response arrives first, but the list stays as it was until the slow 'ca' response arrives; only then do the 'cat' results appear.",
+      "harm": "The user waits on a query they already abandoned before seeing results that have arrived, yet the end state (final=NewShown, !oldShown, itemsIntact) equals the correct one in every world. S1 rule 3: 'The latest request's response is shown when it arrives.'",
+      "sourceText": "\"when it arrives\" (S1 rule 3: \"The latest request's response is shown when it arrives.\"). The input names no contract rows. I believe the dropped words belong to the row that encodes rule 3 as an end state (newAnswers -> final=NewShown, judged after every response; the order-timing hazard notes a record world sees end states only). Listed as O3 by source-rule order: read it as whichever row states newAnswers -> final=NewShown.",
+      "rows": [
+        "O3"
+      ],
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X5",
+      "kind": "in-world",
+      "scenario": "Type 'ca', then 'cat'. The 'cat' search never answers; the 'ca' response arrives and its results appear under 'cat'.",
+      "harm": "Results for the previous query sit under the current query indefinitely, since no later response will correct them. S1 rule 2: 'A response to an older request does not change what the list shows'; rule 4 ('at most once') makes a latest request that never answers an in-scope case. A product that accepts any response newer than the one displayed (id > shown instead of id = latest) ends in this world.",
+      "world": "arrival=OldFirst !newAnswers final=OldShown oldShown itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X6",
+      "kind": "in-world",
+      "scenario": "Type 'ca', then 'cat'. The 'cat' results arrive and show; then the slow 'ca' response arrives and the list goes empty.",
+      "harm": "The user loses the correct 'cat' results that had already arrived and is left with nothing. S1 rule 2: 'A response to an older request does not change what the list shows' (keeping the old results off-screen is not enough; clearing is a change); rule 3: 'The latest request's response is shown when it arrives.'",
+      "world": "arrival=NewFirst newAnswers final=NoneShown !oldShown itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X7",
+      "kind": "new-fact",
+      "scenario": "Search 'cat' and read its results. Type 'catx', which matches nothing; the empty 'catx' response arrives.",
+      "harm": "A product that skips empty responses keeps showing the 'cat' results under 'catx', telling the user there are matches that do not exist. S1 rule 3: 'The latest request's response is shown when it arrives'; an empty response is still the latest request's response.",
+      "newFact": {
+        "name": "latestEmpty",
+        "category": "controllable",
+        "observedVia": "results list's no-results state for the latest query"
+      },
+      "whyOutside": "newAnswers says whether the new response arrives, not what it contains, and final only names which response is shown. No world gives the latest response zero items, and from the empty starting list a skipped empty response and a shown one both leave a blank list.",
+      "sources": [
+        "S1"
+      ]
+    }
+  ]
+}

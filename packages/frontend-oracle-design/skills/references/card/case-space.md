@@ -36,6 +36,14 @@ declares a dimension or its exclusion reason cites that file.
 | Platform    | browser·OS — **derive choices from the repo's `browserslist`·`engines`, never from recall** | SFDIPOT Platform             |
 | Inherited   | still-effective prior `P*` (owned by the interaction sweep — reference, do not duplicate)   | escaped-bug retro            |
 
+With a model package the families audit the model instead of prompting free recall of new axes. A term
+that names a `family` maps its derived axis to that family; `oracle-package.mjs derive` reports each
+family as `mapped` (with its axes), `excluded` (with the reason the package's author wrote) or
+`undispositioned`. The projection never writes an exclusion the author did not: an undispositioned family
+gets no row, and the lint fails `family-undispositioned`. A family the environment or repository requires but the
+model lacks is a new axis candidate, an environment supplement, an explicit untested scope or a policy
+question — never "excluded because the model did not produce it".
+
 Choices come from [`bva.md`](../bva.md): value boundaries become Value choices, state boundaries
 become Async choices, time·order boundaries become Order choices, count boundaries become Data
 choices. Only real boundaries of approved policy — the bva rule against mechanical 0/1 padding

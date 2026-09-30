@@ -1,0 +1,104 @@
+{
+  "candidates": [
+    {
+      "id": "X1",
+      "kind": "in-world",
+      "scenario": "The user searches \"a\" and sees its results, then searches \"ax\", which matches nothing. The empty \"ax\" response arrives, but the list keeps the \"a\" results because an empty response is treated as nothing to show.",
+      "harm": "The user reads the \"a\" results as matches for \"ax\". S1 item 3: \"The latest request's response is shown when it arrives\"; an empty response is still that response. Only OldEarly with a non-empty old result has results on screen for the empty answer to leave behind.",
+      "world": "arrival=OldEarly newAnswers !oldEmpty newEmpty final=OldShown oldShown itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X2",
+      "kind": "in-world",
+      "scenario": "The user searches \"a\" and reads the results, then searches \"ab\". The list clears while \"ab\" loads, and the \"ab\" response never arrives, so the list stays blank.",
+      "harm": "The user loses the results they were reading and is left with an empty list. S1 item 1: \"the list keeps showing what it showed until a response arrives\"; item 4 allows the new response never to arrive. Clearing the list on a new search changes the end state only when old results were on screen and no new response replaces them, as here.",
+      "world": "arrival=OldEarly !newAnswers !oldEmpty !newEmpty final=NoneShown oldShown itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X3",
+      "kind": "in-world",
+      "scenario": "The user types \"a\", then \"ab\". The \"a\" response arrives while \"ab\" is still loading and, because nothing newer is on screen yet, the list shows the \"a\" results; then the \"ab\" results replace them.",
+      "harm": "For a moment the user sees, and can click, results for a query they already replaced. S1 item 2: \"A response to an older request does not change what the list shows.\" The end state is right, so only oldShown catches a product that refuses only responses older than the one on screen.",
+      "world": "arrival=OldFirst newAnswers !oldEmpty !newEmpty final=NewShown oldShown itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X4",
+      "kind": "in-world",
+      "scenario": "The user types \"a\", then \"ab\". The \"ab\" results appear; then the late \"a\" response arrives and its items are appended to the list, which still presents itself as the \"ab\" results.",
+      "harm": "The user sees \"a\" items mixed into the \"ab\" results although the list reads as the new search. S1 item 2: \"A response to an older request does not change what the list shows.\"",
+      "world": "arrival=NewFirst newAnswers !oldEmpty !newEmpty final=NewShown !oldShown !itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X5",
+      "kind": "new-fact",
+      "scenario": "The user types \"a\", then \"ab\". The \"ab\" response arrives, but the \"a\" response is never delivered. The product handles responses in the order it sent the requests, so it waits for \"a\" and never shows \"ab\".",
+      "harm": "Results for what the user typed arrived and are never shown. S1 item 3: \"The latest request's response is shown when it arrives\"; item 4 delivers each response \"at most once\", the old one included.",
+      "newFact": {
+        "name": "oldAnswers",
+        "category": "controllable",
+        "observedVia": "—"
+      },
+      "whyOutside": "Every arrival value (OldFirst, NewFirst, OldEarly) delivers the old response and only the new response has an answers flag, so no world loses the old response.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X6",
+      "kind": "new-fact",
+      "scenario": "The user types \"a\", then \"ab\". The \"ab\" response arrives first, but the product holds it until the slow \"a\" response returns, and only then shows the \"ab\" results.",
+      "harm": "The user waits on a request they abandoned before seeing results that had already arrived. S1 item 3: \"The latest request's response is shown when it arrives.\"",
+      "newFact": {
+        "name": "newShownOnArrival",
+        "category": "observable",
+        "observedVia": "the result list after the new response is delivered and before the old one is"
+      },
+      "whyOutside": "final, oldShown and itemsIntact record the end of the run; a NewFirst run that holds the new results until the old response arrives ends with the same record (final=NewShown, !oldShown, itemsIntact) as one that shows them at once, so no field records when the new results appeared.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X7",
+      "kind": "new-fact",
+      "scenario": "The user types \"c\", \"ca\" and \"cat\" in quick succession, so three requests are in flight. The \"cat\" results appear; then the late \"c\" response arrives and replaces them, because the product marks only the request just before the latest as outdated.",
+      "harm": "The user sees results for \"c\" under \"cat\". S1 item 2, \"A response to an older request does not change what the list shows\", covers every older request, not only the previous one; item 1 numbers every issued request.",
+      "newFact": {
+        "name": "threeRequestsInFlight",
+        "category": "controllable",
+        "observedVia": "—"
+      },
+      "whyOutside": "world.Race holds one old and one new request, and arrival orders only their two responses; a response to request 1 arriving after request 3 was issued has no world field, although event.Msg.Respond.id reaches 3.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X8",
+      "kind": "new-fact",
+      "scenario": "The user searches \"shoes\", then presses Enter again on the same text while the first request is in flight. The second response arrives and is shown; then the first response arrives and, because its text matches the search box, replaces the list.",
+      "harm": "Older results replace newer ones for the same query. S1 item 1 gives every issued request its own id, and item 2 says \"A response to an older request does not change what the list shows\": older by request, not by query text.",
+      "newFact": {
+        "name": "sameQueryText",
+        "category": "controllable",
+        "observedVia": "the search box text when each request is issued"
+      },
+      "whyOutside": "The world's two requests differ only in arrival order and emptiness, and no world field or event carries the query text, so a product that matches responses to the box text instead of the request id passes every world.",
+      "sources": [
+        "S1"
+      ]
+    }
+  ]
+}

@@ -33,6 +33,62 @@ export function parseBendTypes(text) {
   return types
 }
 
+/**
+ * parseBendTypes와 같은 결과에 더해, 읽지 못한 선언을 조용히 버리지 않고 진단으로 돌려준다 — 축 도출이 지원하지 않는
+ * 문법(제네릭 사용자 타입, 생성자로 읽히지 않는 줄, 이름 없는 필드) 때문에 축을 빠뜨린 채 완결됐다고 말하지 않게 한다.
+ */
+export function parseBendTypesStrict(text) {
+  const types = new Map()
+  const diagnostics = []
+  let current = null
+  let currentName = null
+  for (const [index, line] of text.split('\n').entries()) {
+    const at = index + 1
+    const head = line.match(/^type\s+(\w+)\s+is\s+Data\s*:\s*$/)
+    if (head) {
+      current = []
+      currentName = head[1]
+      types.set(head[1], current)
+      continue
+    }
+    if (/^type\s/.test(line)) {
+      diagnostics.push({
+        code: 'type-unsupported',
+        symbol: line.match(/^type\s+(\w+)/)?.[1] ?? line.trim(),
+        line: at,
+        message: `unsupported type declaration "${line.trim()}" — only \`type X is Data:\` without parameters is derived`,
+      })
+      current = null
+      continue
+    }
+    if (current && /^\s/.test(line) && line.trim() && !line.trim().startsWith('#')) {
+      const declared = line.match(/^\s+(\w+)\{(.*)\}\s*$/)
+      if (!declared) {
+        diagnostics.push({
+          code: 'constructor-unsupported',
+          symbol: currentName,
+          line: at,
+          message: `"${line.trim()}" is not a constructor \`Name{field: Type, ...}\``,
+        })
+        continue
+      }
+      const fields = splitFields(declared[2])
+      for (const field of fields)
+        if (!/^\w+$/.test(field.name) || !field.type)
+          diagnostics.push({
+            code: 'field-unsupported',
+            symbol: `${currentName}.${declared[1]}`,
+            line: at,
+            message: `field "${field.name}: ${field.type}" is not \`name: Type\``,
+          })
+      current.push({ name: declared[1], fields })
+    } else if (line.trim() && !/^\s/.test(line)) {
+      current = null
+    }
+  }
+  return { types, diagnostics }
+}
+
 /** `a: Bool, b: List<&2, Nat>` → 필드 목록. 꺾쇠 안의 쉼표는 나누지 않는다. */
 function splitFields(text) {
   const fields = []

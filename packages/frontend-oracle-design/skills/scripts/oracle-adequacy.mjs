@@ -12,6 +12,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ensureBend, reportedVersion } from './ensure-bend.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
 import { bendInputs, compileBend, keepArtifact, lockScopeIssues, toPlain, verdictBeside } from './oracle-model.mjs'
+import { independenceOf, loadPackage, packageIssues, packageSpec, sourcePath } from './oracle-package.mjs'
+import { parseBendTypes } from './oracle-types.mjs'
 
 export const ADEQUACY_VERSION = 1
 // ponytail: 열거와 커널 증명에 같은 상한 — 넘으면 점검 전체가 unknown이다. 더 큰 세계가 필요한 카드가 오면 세계를
@@ -103,6 +105,18 @@ function tablesOf(body) {
 }
 
 const words = (value) => (value ?? '').split(/[\s,]+/).filter((token) => token && token !== 'none')
+
+/**
+ * `Rows:` 목록 — `O1`은 세계 def `<Prefix>.O1`, `O1=commitNeedsHeld`는 `<Prefix>.commitNeedsHeld`다. 모델 심볼로 쓴
+ * 계약 술어에 카드가 행 ID를 나중에 붙일 수 있게 한다(모델 작성 단계에 O* ID가 필요 없다).
+ */
+export function parseRowList(value) {
+  return words(value).map((token) => {
+    const [id, def] = token.split('=')
+    return { id, def: def ?? id }
+  })
+}
+
 const isField = (row) => Boolean(row.Field) && row.Field !== '—'
 
 /** `## Terms` 절 → 머리 칸과 행. 없으면 null — 사전은 선택이다. */
@@ -142,30 +156,8 @@ export function parseAdequacy(lines) {
  * 아니면(Nat·목록 등 무한 도메인) values: null을 준다. 레코드가 없으면 null.
  */
 export function parseWorldType(text, prefix) {
-  const types = new Map()
-  let current = null
-  for (const line of text.split('\n')) {
-    const head = line.match(/^type\s+(\w+)\s+is\s+Data\s*:\s*$/)
-    if (head) {
-      current = []
-      types.set(head[1], current)
-      continue
-    }
-    const declared = current && line.match(/^\s+(\w+)\{(.*)\}\s*$/)
-    if (declared) {
-      const fields = declared[2]
-        .split(',')
-        .map((field) => field.trim())
-        .filter(Boolean)
-        .map((field) => {
-          const [name, type] = field.split(':').map((part) => part.trim())
-          return { name, type }
-        })
-      current.push({ name: declared[1], fields })
-    } else if (line.trim() && !/^\s/.test(line)) {
-      current = null
-    }
-  }
+  // 꺾쇠 안의 쉼표를 나누지 않는 공용 파서를 쓴다 — `List<&2, Nat>` 필드가 두 필드로 잘못 읽히지 않게.
+  const types = parseBendTypes(text)
   const record = types.get(prefix)
   if (record?.length !== 1 || record[0].name !== prefix) return null
   return record[0].fields.map(({ name, type }) => {
@@ -317,8 +309,11 @@ export async function adequacyIssues({ adequacy, terms }, context) {
   if (!adequacy.goals.some((row) => row.Kind === 'safety'))
     issues.push('adequacy-goal-missing: state at least one safety goal from the source text')
 
-  const listed = words(fields.Rows)
+  const rowDefs = parseRowList(fields.Rows)
+  const listed = rowDefs.map(({ id }) => id)
   const outside = fields['Rows outside the world']?.match(/\bO\d+\b/g) ?? []
+  for (const { id, def } of rowDefs)
+    if (!/^[a-z_]\w*$/i.test(def)) issues.push(`adequacy-row-def: ${id}=${def} must name a world def`)
   for (const id of listed) {
     if (!/^O\d+$/.test(id) || !context.rows.has(id))
       issues.push(`adequacy-row-unknown: ${id} is not an O* row on this card`)
@@ -412,7 +407,7 @@ export async function adequacyIssues({ adequacy, terms }, context) {
     .filter(Boolean)
     .map(({ text }) => text)
     .join('\n')
-  for (const id of [...assumptions, ...goals, ...listed]) {
+  for (const id of [...assumptions, ...goals, ...rowDefs.map(({ def }) => def)]) {
     if (!new RegExp(`^def\\s+${prefix}\\.${id}\\(`, 'm').test(texts))
       issues.push(`adequacy-def-missing: ${prefix}.${id} is not defined in ${worldPath} or its imports`)
   }
@@ -440,7 +435,8 @@ export function adequacySpec(cardText, worldText) {
     fields,
     coordinates: words(adequacy.fields.Coordinates),
     observations: words(adequacy.fields.Observations),
-    rows: words(adequacy.fields.Rows),
+    rows: parseRowList(adequacy.fields.Rows).map(({ def }) => def),
+    rowIds: Object.fromEntries(parseRowList(adequacy.fields.Rows).map(({ id, def }) => [def, id])),
     assumptions: adequacy.assumptions.map((row) => row.Assumption),
     goals: adequacy.goals.map((row) => ({ id: row.Goal, kind: row.Kind })),
     examples: adequacy.examples.map((row) => ({
@@ -723,6 +719,38 @@ export function evaluateWorlds(model, spec) {
   })
 }
 
+/**
+ * 목표 거울 감사 — 유효 세계 전부에서 목표의 판정이 계약(행 전체의 논리곱) 또는 한 행과 똑같은지. 목표를 계약에서
+ * 베껴 쓰면 card-implies-goal은 공허하게 참이 된다. 같은 판정표가 곧 베꼈다는 증거는 아니다(원문이 한 행과 같은 말을
+ * 할 수 있다) — 그래서 막지 않고, 독립성 증거와 함께 결론의 수준(claim)을 낮춰 보고한다.
+ */
+export function goalAudit(worlds, spec, independence) {
+  const valid = worlds.filter((world) => world.valid)
+  const same = (left, right) => valid.every((world) => left(world) === right(world))
+  const goals = spec.goals.map(({ id, kind }) => {
+    const truth = (world) => world.truth[id]
+    return {
+      goal: id,
+      kind,
+      author: spec.goalAuthors?.[id] ?? null,
+      equalsContract: valid.length > 0 && same(truth, (world) => world.card),
+      mirrorsRows: spec.rows
+        .filter((row) => valid.length > 0 && same(truth, (world) => world.truth[row]))
+        .map((def) => spec.rowIds?.[def] ?? def),
+    }
+  })
+  const safety = goals.filter((goal) => goal.kind === 'safety')
+  const selfCheck =
+    independence?.evidence === 'none' || (safety.length > 0 && safety.every((goal) => goal.equalsContract))
+  return {
+    goals,
+    claim: selfCheck ? 'self-consistency' : 'independent-reading-recorded',
+    note: selfCheck
+      ? 'the goals are not an independent reading of the source (written by the contract author, or identical to the contract) — card-implies-goal shows only that the card agrees with itself, not that it is faithful to the source'
+      : 'the goals are recorded as a separate reading; whether they are faithful to the source is still review-owned',
+  }
+}
+
 /** 가정 끄기 결과를 사람이 읽을 한 줄로 — 무엇을 확인할지까지 적는다. */
 function sensitivityReading(id, broken, opened, owner) {
   if (/^harness\b/i.test(owner))
@@ -957,13 +985,14 @@ export function mergeKernel(checks, kernel) {
  */
 export async function checkAdequacy({
   card,
+  package: packagePath,
   bin,
   cwd = process.cwd(),
   maxWorlds = MAX_WORLDS,
   timeoutMs = 120_000,
   out = null,
 }) {
-  const loaded = await loadWorld({ card, bin, cwd, maxWorlds, timeoutMs })
+  const loaded = await loadWorld({ card, package: packagePath, bin, cwd, maxWorlds, timeoutMs })
   if (loaded.result) return loaded.result
   const { spec, inputs, base, worldPath, model } = loaded
   const search = searchAdequacy(model, spec)
@@ -980,13 +1009,14 @@ export async function checkAdequacy({
     minimalPairs: search.minimalPairs,
     minimalPairsTotal: search.minimalPairsTotal,
     sensitivity: assumptionSensitivity(evaluateWorlds(model, spec), spec),
+    goalAudit: goalAudit(evaluateWorlds(model, spec), spec, base.independence),
     kernel,
     bend: { bin, version: reportedVersion(bin) },
   }
   if (!out) return result
   // 남긴 파일이 증거다 — 결론 법칙과 증명 전부. 다시 검사: out에서 `bend ADEQUACY.bend --verdict`.
   const header = [
-    `# Generated by oracle-adequacy.mjs check from ${base.card} — DO NOT EDIT.`,
+    `# Generated by oracle-adequacy.mjs check from ${base.card ?? base.package} — DO NOT EDIT.`,
     `# inputDigest ${base.inputDigest}; re-check with \`bend ADEQUACY.bend --verdict\` in this directory.`,
     '',
   ].join('\n')
@@ -1004,7 +1034,8 @@ export async function checkAdequacy({
  * 카드 → 세계 모델 로드(스펙·입력 digest·컴파일된 def). 무한 필드·상한 초과는 unknown, Bend 없음은 not-run 결과를
  * `result`로 돌려준다 — 부르는 쪽은 그 결과를 그대로 낸다.
  */
-export async function loadWorld({ card, bin, cwd = process.cwd(), maxWorlds = MAX_WORLDS, timeoutMs = 120_000 }) {
+/** 카드 입력 어댑터 — 기존 카드의 `## Adequacy`·`## Terms`·Source Registry에서 점검 입력을 만든다. */
+async function cardInput({ card, cwd }) {
   const cardText = await readFile(card, 'utf8')
   const lines = cardText.split('\n')
   const world = parseAdequacy(lines)?.fields.World?.match(/^(S\d+)\s+([A-Z]\w*)$/)
@@ -1014,23 +1045,83 @@ export async function loadWorld({ card, bin, cwd = process.cwd(), maxWorlds = MA
   const repoPath = location.slice('repo:'.length).split('#')[0]
   const worldPath = resolve(cwd, repoPath)
   const spec = adequacySpec(cardText, await readFile(worldPath, 'utf8'))
+  return {
+    spec,
+    worldPath,
+    repoPath,
+    cardText,
+    label: { card: relative(cwd, resolve(card)) },
+    digestKey: 'card',
+    independence: {
+      evidence: 'self-reported',
+      reason: 'host receipts do not cover the model analyst before the lock yet',
+    },
+  }
+}
+
+/**
+ * 모델 패키지 입력 어댑터 — 카드 없이 점검 입력을 만든다. 모델 작성 단계의 구조 검사(`packageIssues` stage model)를
+ * 통과해야 한다. 좌표·관찰은 용어의 역할에서, 계약 술어는 모델 심볼에서 나온다.
+ */
+export async function packageInput({ package: packagePath, cwd }) {
+  const loaded = await loadPackage(packagePath, { root: cwd })
+  const issues = packageIssues(loaded.pkg, { stage: 'model' })
+  if (issues.length > 0) throw new CliError('ADEQUACY_SPEC', `the package is not ready for the model: ${issues.join('; ')}`)
+  const worldPath = sourcePath(loaded, loaded.pkg.world.source)
+  if (!worldPath) throw new CliError('ADEQUACY_SPEC', 'world.source must be a repo: source')
+  const spec = packageSpec(loaded.pkg, await readFile(worldPath, 'utf8'), parseWorldType)
+  if (spec.unmapped.length > 0)
+    throw new CliError('ADEQUACY_SPEC', `world fields without a term: ${spec.unmapped.join(', ')}`)
+  spec.examples = spec.rawExamples.map((row) => ({
+    id: row.id,
+    goal: row.goal,
+    verdict: row.verdict,
+    world: parseWorldLiteral(row.world, spec.fields),
+  }))
+  return {
+    spec,
+    worldPath,
+    repoPath: relative(loaded.root, worldPath).split('\\').join('/'),
+    cardText: null,
+    loaded,
+    label: { package: relative(cwd, loaded.path) },
+    digestKey: 'package',
+    independence: independenceOf(loaded.pkg),
+  }
+}
+
+/**
+ * 카드 또는 모델 패키지 → 세계 모델 로드(스펙·입력 digest·컴파일된 def). 무한 필드·상한 초과는 unknown, Bend 없음은
+ * not-run 결과를 `result`로 돌려준다 — 부르는 쪽은 그 결과를 그대로 낸다. 두 입력은 같은 스펙 모양으로 정규화되고,
+ * 그 뒤의 열거·커널 증명·대응 검사는 입력이 무엇이었는지 모른다.
+ */
+export async function loadWorld({
+  card,
+  package: packagePath,
+  bin,
+  cwd = process.cwd(),
+  maxWorlds = MAX_WORLDS,
+  timeoutMs = 120_000,
+}) {
+  if (Boolean(card) === Boolean(packagePath))
+    throw new CliError('USAGE', 'pass exactly one of --card or --package', 2)
+  const input = packagePath ? await packageInput({ package: packagePath, cwd }) : await cardInput({ card, cwd })
+  const { spec, worldPath, repoPath, cardText } = input
   const inputs = await bendInputs(worldPath)
   const base = {
     adequacyVersion: ADEQUACY_VERSION,
-    card: relative(cwd, resolve(card)),
+    ...input.label,
     world: { source: spec.source, path: repoPath, prefix: spec.prefix, fields: spec.fields },
     inputDigest: sha256(
       stableStringify({
         version: ADEQUACY_VERSION,
         world: inputs.map(({ path, sha256: digest }) => [relative(dirname(worldPath), path), digest]).sort(),
-        card: spec.digestInput,
+        [input.digestKey]: spec.digestInput,
       }),
     ),
+    ...(spec.rowIds ? { rowIds: spec.rowIds } : {}),
     outside: spec.outside,
-    independence: {
-      evidence: 'self-reported',
-      reason: 'host receipts do not cover the model analyst before the lock yet',
-    },
+    independence: input.independence,
   }
   const unsupported = spec.fields.filter((field) => field.values === null)
   const total = spec.fields.reduce((count, field) => count * (field.values?.length ?? 1), 1)
@@ -1056,7 +1147,7 @@ export async function loadWorld({ card, bin, cwd = process.cwd(), maxWorlds = MA
       return fn(structuredClone(value))
     },
   }
-  return { spec, inputs, base, worldPath, model, cardText }
+  return { spec, inputs, base, worldPath, model, cardText, loaded: input.loaded ?? null }
 }
 
 /**
@@ -1065,10 +1156,25 @@ export async function loadWorld({ card, bin, cwd = process.cwd(), maxWorlds = MA
  * 결과를 냈다(모델 밖 현상 — 문제 정의를 다시 연다). 가정이 제외한 좌표 조합은 실행하지 않고 excluded로 보고한다.
  * card-observable이 증명된 카드에서만 판정이 좌표·관찰로 정해진다 — 판정이 갈리는 세계가 섞이면 unknown이다.
  */
-export async function conformWorld({ card, adapter, bin, cwd = process.cwd(), maxWorlds, timeoutMs }) {
+export async function conformWorld({
+  card,
+  package: packagePath,
+  adapter,
+  bin,
+  cwd = process.cwd(),
+  maxWorlds,
+  timeoutMs,
+}) {
   if (typeof adapter?.run !== 'function')
     throw new CliError('ADAPTER_INTERFACE', 'a world adapter exports run(coordinates) → observations')
-  const loaded = await loadWorld({ card, bin, cwd, ...(maxWorlds ? { maxWorlds } : {}), timeoutMs })
+  const loaded = await loadWorld({
+    card,
+    package: packagePath,
+    bin,
+    cwd,
+    ...(maxWorlds ? { maxWorlds } : {}),
+    timeoutMs,
+  })
   if (loaded.result) return { ...loaded.result, settings: [] }
   const { spec, base, model } = loaded
   const worlds = evaluateWorlds(model, spec).filter((world) => world.valid)
@@ -1129,7 +1235,7 @@ export async function conformWorld({ card, adapter, bin, cwd = process.cwd(), ma
       coordinates,
       observations,
       status: failed.length === 0 ? 'pass' : 'violation',
-      ...(failed.length > 0 ? { rows: failed } : {}),
+      ...(failed.length > 0 ? { rows: failed.map((def) => spec.rowIds?.[def] ?? def) } : {}),
     })
   }
   const run = results.filter((entry) => entry.status !== 'excluded')
@@ -1151,7 +1257,7 @@ export async function conformWorld({ card, adapter, bin, cwd = process.cwd(), ma
   }
 }
 
-function anchoredSection(text, anchor) {
+export function anchoredSection(text, anchor) {
   if (!anchor) return text
   const lines = text.split('\n')
   const start = lines.findIndex((line) => {
@@ -1162,6 +1268,16 @@ function anchoredSection(text, anchor) {
   const level = lines[start].match(/^#+/)[0].length
   const end = lines.findIndex((line, index) => index > start && new RegExp(`^#{1,${level}}\\s`).test(line))
   return lines.slice(start, end === -1 ? lines.length : end).join('\n')
+}
+
+/** 모델 패키지(JSON, packageVersion 있음)인가 — 원문 절에 싣지 않는다. */
+function isModelPackage(repoPath, text) {
+  if (!repoPath.endsWith('.json') || text === null) return false
+  try {
+    return JSON.parse(text)?.packageVersion !== undefined
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -1179,6 +1295,9 @@ async function sourceTexts(lines, cwd) {
     const [repoPath, anchor] = location.slice('repo:'.length).split('#')
     if (repoPath.endsWith('.bend')) continue
     const text = await readFile(resolve(cwd, repoPath), 'utf8').catch(() => null)
+    // 모델 패키지는 원문이 아니다 — 작성자의 해석·계약·결정이 들어 있다. 원문 절에 실으면 해석이 원문처럼 읽히고, 패키지가
+    // 바뀔 때마다(결정 기록 하나만 늘어도) 입력이 바뀐다.
+    if (isModelPackage(repoPath, text)) continue
     sources.push(
       `### ${row.ID} ${location}`,
       '',
@@ -1189,7 +1308,52 @@ async function sourceTexts(lines, cwd) {
   return { registry, sources }
 }
 
-export async function modelInput({ card, cwd = process.cwd() }) {
+/**
+ * 패키지에서 분석가 입력 — 원문(승인된 비구현 출처의 본문)과 위험 목록·작성 규칙만. 주 작성자의 해석(Outcome 요약·정책
+ * 문장·용어·목표·계약·모델 파일)은 넣지 않는다: 분석가가 그 해석으로 유도되면 두 읽기의 차이가 사라진다.
+ */
+async function packageModelInput({ package: packagePath, cwd }) {
+  const loaded = await loadPackage(packagePath, { root: cwd })
+  const rules = sectionOf((await readFile(REFERENCE, 'utf8')).split('\n'), '## World model authoring') ?? []
+  const texts = []
+  const registry = []
+  for (const source of loaded.pkg.sources ?? []) {
+    const location = source.location ?? ''
+    const [repoPath, anchor] = location.startsWith('repo:') ? location.slice('repo:'.length).split('#') : [null, null]
+    if (source.self || source.kind === 'implementation-reference' || repoPath?.endsWith('.bend')) continue
+    registry.push(`- ${source.id} ${source.kind} · ${source.jurisdiction} · ${location} · ${source.approval}`)
+    const text = repoPath ? await readFile(resolve(loaded.root, repoPath), 'utf8').catch(() => null) : null
+    texts.push(
+      `### ${source.id} ${location}`,
+      '',
+      text === null ? '(not a readable repo: file — read it at its location)' : anchoredSection(text, anchor).trimEnd(),
+      '',
+    )
+  }
+  return [
+    '# Model analyst input',
+    '',
+    'Write the world model, assumptions and goals from this input only. Do not open the model package, the Oracle card, the behavior model, the product code or its tests.',
+    'This input carries the source text verbatim and no interpretation by the author of the contract.',
+    '',
+    '## Sources',
+    '',
+    ...registry,
+    '',
+    '## Source text',
+    '',
+    ...texts,
+    '## Hazards',
+    '',
+    ...Object.entries(HAZARDS).map(([id, text]) => `- ${id}: ${text}`),
+    '',
+    '## World model authoring',
+    ...rules,
+  ].join('\n')
+}
+
+export async function modelInput({ card, package: packagePath, cwd = process.cwd() }) {
+  if (packagePath) return packageModelInput({ package: packagePath, cwd })
   const lines = (await readFile(card, 'utf8')).split('\n')
   const { registry, sources } = await sourceTexts(lines, cwd)
   const rules = sectionOf((await readFile(REFERENCE, 'utf8')).split('\n'), '## World model authoring') ?? []
@@ -1214,7 +1378,7 @@ export async function modelInput({ card, cwd = process.cwd() }) {
   ].join('\n')
 }
 
-const EXPLORER_SCHEMA = {
+export const EXPLORER_SCHEMA = {
   candidates: [
     {
       id: 'X1',
@@ -1304,8 +1468,8 @@ function literalOf(plain, fields) {
  * 탐색가 후보 분류 — 기계로 판정할 수 있는 것은 판정하고, 새 사실은 후보 축으로 남긴다. 무엇도 공간에 자동으로
  * 들어가지 않는다: 후보는 Open question·journal로 가고, 승격 게이트와 사람 승인을 거친다.
  */
-export async function triageCandidates({ card, candidates, bin, cwd = process.cwd(), timeoutMs }) {
-  const loaded = await loadWorld({ card, bin, cwd, timeoutMs })
+export async function triageCandidates({ card, package: packagePath, candidates, bin, cwd = process.cwd(), timeoutMs }) {
+  const loaded = await loadWorld({ card, package: packagePath, bin, cwd, timeoutMs })
   if (loaded.result) throw new CliError('EXPLORE_WORLD', `the world cannot be enumerated: ${loaded.result.reason}`)
   const { spec, model } = loaded
   const worlds = new Map(evaluateWorlds(model, spec).map((world) => [worldKey(world.plain), world]))
@@ -1323,7 +1487,8 @@ export async function triageCandidates({ card, candidates, bin, cwd = process.cw
       return { ...base, verdict: 'invalid', reason: 'a candidate cites the source text (sources)' }
     if (candidate.kind === 'in-world') {
       const { plain, errors } = parseWorldLiteral(candidate.world ?? '', spec.fields)
-      if (errors.length > 0) return { ...base, verdict: 'invalid', reason: errors.join('; ') }
+      // literalErrors: the literal does not name this world's fields — a run made on an earlier world
+      if (errors.length > 0) return { ...base, verdict: 'invalid', reason: errors.join('; '), literalErrors: errors }
       const world = worlds.get(worldKey(plain))
       if (!world.valid) {
         const against = spec.assumptions.filter((id) => !world.truth[id])
@@ -1341,7 +1506,7 @@ export async function triageCandidates({ card, candidates, bin, cwd = process.cw
         }
       }
       if (!world.card) {
-        const rows = spec.rows.filter((id) => !world.truth[id])
+        const rows = spec.rows.filter((id) => !world.truth[id]).map((def) => spec.rowIds?.[def] ?? def)
         return { ...base, verdict: 'covered', rows, route: `the rows ${rows.join(', ')} already reject this world` }
       }
       const violated = safety.filter((goal) => !world.truth[goal.id]).map((goal) => goal.id)
@@ -1370,6 +1535,7 @@ export async function triageCandidates({ card, candidates, bin, cwd = process.cw
           ...base,
           verdict: 'invalid',
           reason: `${fact.name} is already a field — state it as an in-world candidate`,
+          existingField: fact.name,
         }
       if (!['controllable', 'observable', 'hidden'].includes(fact.category))
         return { ...base, verdict: 'invalid', reason: 'newFact.category must be controllable | observable | hidden' }
@@ -1418,7 +1584,7 @@ function parseOptions(args) {
     const name = args[index]?.replace(/^--/, '')
     const value = args[index + 1]
     if (
-      !['card', 'max-worlds', 'timeout-ms', 'output', 'adapter', 'candidates', 'out'].includes(name) ||
+      !['card', 'package', 'max-worlds', 'timeout-ms', 'output', 'adapter', 'candidates', 'out'].includes(name) ||
       value === undefined
     ) {
       throw new CliError('USAGE', `Unknown or incomplete option: ${args[index]}`, 2)
@@ -1428,22 +1594,25 @@ function parseOptions(args) {
   return options
 }
 
-const USAGE = `usage:
-  oracle-adequacy.mjs check --card <oracle.md> [--out <dir>] [--max-worlds <n>] [--timeout-ms <n>]
-  oracle-adequacy.mjs conform --card <oracle.md> --adapter <world-adapter.mjs>
-  oracle-adequacy.mjs model-input --card <oracle.md> --output <file>
+const USAGE = `usage (--package <oracle.package.json> works wherever --card does, except explore-input):
+  oracle-adequacy.mjs check (--card <oracle.md> | --package <pkg>) [--out <dir>] [--max-worlds <n>] [--timeout-ms <n>]
+  oracle-adequacy.mjs conform (--card <oracle.md> | --package <pkg>) --adapter <world-adapter.mjs>
+  oracle-adequacy.mjs model-input (--card <oracle.md> | --package <pkg>) --output <file>
   oracle-adequacy.mjs explore-input --card <oracle.md> --output <file>
-  oracle-adequacy.mjs triage --card <oracle.md> --candidates <explorer-output.json>`
+  oracle-adequacy.mjs triage (--card <oracle.md> | --package <pkg>) --candidates <explorer-output.json>`
 
 async function main() {
   const [command, ...args] = process.argv.slice(2)
   if (!['check', 'conform', 'model-input', 'explore-input', 'triage'].includes(command))
     throw new CliError('USAGE', USAGE, 2)
   const options = parseOptions(args)
-  if (!options.card) throw new CliError('USAGE', USAGE, 2)
+  if (Boolean(options.card) === Boolean(options.package)) throw new CliError('USAGE', USAGE, 2)
+  // explore-input는 투영된 Draft 카드를 공격한다 — 카드가 있어야 한다.
+  if (command === 'explore-input' && !options.card) throw new CliError('USAGE', USAGE, 2)
+  const input = options.package ? { package: options.package } : { card: options.card }
   if (command === 'model-input') {
     if (!options.output) throw new CliError('USAGE', USAGE, 2)
-    await writeFile(options.output, await modelInput({ card: options.card }))
+    await writeFile(options.output, await modelInput(input))
     process.stdout.write(`MODEL_INPUT_WRITTEN ${options.output}\n`)
     return
   }
@@ -1459,20 +1628,20 @@ async function main() {
     if (!options.candidates) throw new CliError('USAGE', USAGE, 2)
     const candidates = JSON.parse(await readFile(options.candidates, 'utf8'))
     process.stdout.write(
-      `${JSON.stringify(await triageCandidates({ card: options.card, candidates, bin, timeoutMs }))}\n`,
+      `${JSON.stringify(await triageCandidates({ ...input, candidates, bin, timeoutMs }))}\n`,
     )
     return
   }
   if (command === 'conform') {
     if (!options.adapter) throw new CliError('USAGE', USAGE, 2)
     const adapter = await import(pathToFileURL(resolve(options.adapter)).href)
-    const result = await conformWorld({ card: options.card, adapter, bin, timeoutMs })
+    const result = await conformWorld({ ...input, adapter, bin, timeoutMs })
     process.stdout.write(`${JSON.stringify(result)}\n`)
     process.exitCode = result.pass ? 0 : 1
     return
   }
   const result = await checkAdequacy({
-    card: options.card,
+    ...input,
     bin,
     ...(options['max-worlds'] ? { maxWorlds: Number(options['max-worlds']) } : {}),
     ...(timeoutMs ? { timeoutMs } : {}),

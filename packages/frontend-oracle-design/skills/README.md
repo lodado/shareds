@@ -224,6 +224,7 @@ flowchart LR
   oracle_workflow_graph --> graph_orchestration
   common --> bend_cross_verification
   common --> adequacy
+  common --> discovery
   IND["type-environment · fsd · backend · performance<br/><i>독립 노드 — 조건 충족 시에만</i>"]
 ```
 

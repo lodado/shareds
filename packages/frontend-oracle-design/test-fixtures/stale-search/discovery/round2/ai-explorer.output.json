@@ -1,0 +1,74 @@
+{
+  "candidates": [
+    {
+      "id": "X1",
+      "kind": "new-fact",
+      "scenario": "The person types \"ca\" and then \"cat\" while the \"ca\" request is still in flight. The \"ca\" response arrives first, then the \"cat\" response. The reducer's stale check guards results.requestId, but results.items takes every incoming response's items (for example, the items slice has no stale check), so the \"ca\" items go on screen with the request id unchanged until the \"cat\" response overwrites them.",
+      "harm": "Between the two arrivals the person sees the \"ca\" results while waiting for \"cat\": an older request's late results briefly precede the latest ones, the card's own worst regression (\"an older request's late response replaces or briefly precedes the latest results\"), against S1 item 2: \"A response to an older request does not change what the list shows.\" Every row passes: the run records arrival=OldFirst newAnswers final=NewShown !oldShown itemsIntact, the E2 world, which holds.",
+      "newFact": {
+        "name": "the items on screen after each event (per-step displayed results, not only the results.requestId tag)",
+        "category": "observable",
+        "observedVia": "reducer: results.items after every event from the second issue on, read through search.adapter snapshot and compared with the results delivered for the request that results.requestId names"
+      },
+      "whyOutside": "final (T3) and oldShown (T4) read only results.requestId, and itemsIntact (T6) compares results.items once, when the attempt ends (O5). No field records which items the list displayed at an intermediate step, so an items write that leaves requestId untouched and is overwritten by response 2 is indistinguishable from a correct run. O4 compares observations at each prefix, and the observe path (T3, T4) reads results.requestId; items are read only through the end-of-attempt snapshot (T6).",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X2",
+      "kind": "new-fact",
+      "scenario": "The person types \"ca\" and pauses; its response arrives while it is still the latest, so the list shows the \"ca\" results. They type \"cat\" and the \"cat\" response arrives. The reducer appends incoming items to what the list already shows (or fills the list only when it is empty) instead of replacing it.",
+      "harm": "After the \"cat\" response the list shows the \"ca\" results mixed in with the \"cat\" results (or keeps only the \"ca\" results), so the person reads matches for a query they have already changed. S1 item 3: \"The latest request's response is shown when it arrives\"; the brief's success: \"the list shows the latest request's results\". For the brief's actor, \"a person typing successive search queries\", a list that already shows results when the next response lands is the ordinary case.",
+      "newFact": {
+        "name": "a response that arrives before the next request is issued (the list already shows results when the latest response lands)",
+        "category": "controllable",
+        "observedVia": "test: the world adapter delivers response 1 before issuing request 2, then delivers response 2; reducer: results.items after response 2, read through search.adapter snapshot"
+      },
+      "whyOutside": "The Race world issues both requests before any response and starts from an empty list (carry-over: \"one attempt starting from an empty list\", which S1 does not say; S1 item 1 speaks of what the list showed when a request is issued), and arrival only orders the two responses against each other (T1 Not: \"the order in which the requests were issued\"). In every world that passes O2 the list shows nothing when response 2 lands, so replacing, appending and fill-if-empty all end final=NewShown itemsIntact. T4's Not column names this very case (request 1's results kept from before request 2 was issued), but no coordinate reaches it.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X3",
+      "kind": "new-fact",
+      "scenario": "The person types \"c\", \"ca\", \"cat\" in quick succession, so three requests are in flight (debouncing is a non-goal, so each query is its own request). The \"cat\" response arrives and is shown; then the \"c\" response arrives late. The reducer ignores only the response to the request it last superseded (a single previous-id slot, overwritten on every issue), which with two requests is the same as ignoring every older response.",
+      "harm": "The late \"c\" results replace the \"cat\" results the person is reading: the brief's worst regression (\"an older request's late response replaces or briefly precedes the latest results\"). S1 item 2 covers every older request, not just the previous one: \"A response to an older request does not change what the list shows\"; the brief's actor types successive queries \"while earlier responses are in flight\".",
+      "newFact": {
+        "name": "a third issued request (a late response to a request older than the previous one)",
+        "category": "controllable",
+        "observedVia": "test: the world adapter issues requests 1, 2 and 3, delivers response 3, then response 1; reducer: results.requestId after every event, read by search.adapter observe"
+      },
+      "whyOutside": "The Race world has exactly two requests: arrival orders responses 1 and 2, newAnswers concerns response 2, oldShown is defined only for request 1 after request 2 is issued, and final ranges over none, older and newer. With two requests \"older than the latest\" and \"the previous request\" always coincide, so no field separates a previous-only guard from a correct one.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X4",
+      "kind": "qualifier",
+      "scenario": "The person types \"ca\" then \"cat\". The \"cat\" response arrives first; the \"ca\" response arrives much later. The reducer applies responses in issue order: it holds the \"cat\" response until the \"ca\" request settles, drops the \"ca\" response as stale, and only then shows \"cat\".",
+      "harm": "The person faces an empty list although their latest results have already arrived, for as long as the superseded request takes, and permanently if the \"ca\" response is never delivered, which S1 item 4 allows (\"at most once\"). S1 item 3: \"The latest request's response is shown when it arrives.\" O1 only requires that \"the list ends with the results of request 2\", and final is read after the last event, so the run ends final=NewShown !oldShown itemsIntact and O1, O2, O3 and O5 all pass; no in-world field sees the delay, only O4's bounded prefix comparison outside the world could.",
+      "sourceText": "\"when it arrives\"",
+      "rows": ["O1"],
+      "sources": ["S1"]
+    },
+    {
+      "id": "X5",
+      "kind": "qualifier",
+      "scenario": "The person types \"ca\" and pauses; its response arrives while it is the latest and the list shows the \"ca\" results. They type \"cat\" (request 2), and the \"cat\" response is slow or never comes. The reducer clears the list whenever a request is issued.",
+      "harm": "The \"ca\" results the person was reading vanish the moment they type, and the list stays empty until the \"cat\" response arrives, indefinitely if it never does. S1 item 1: \"Issuing a request makes it the latest one; the list keeps showing what it showed until a response arrives.\" O3 narrows this to \"the list keeps showing nothing\" and adds the Never \"request 1's results shown\", so no row promises that shown results are kept and O3's wording even forbids the kept \"ca\" results; clear-on-issue passes O3 and every other row, because in the world the list is already empty at both issues.",
+      "sourceText": "\"keeps showing what it showed\"",
+      "rows": ["O3"],
+      "sources": ["S1"]
+    },
+    {
+      "id": "X6",
+      "kind": "new-fact",
+      "scenario": "The person mistypes \"cafx\" (no matches) and backspaces to \"caf\". The \"caf\" response arrives and the list shows its results; then the empty \"cafx\" response arrives late. The reducer handles an empty response in a \"no results\" branch that runs before its stale check.",
+      "harm": "The \"caf\" results are wiped and replaced by an empty list for a query the person already corrected: S1 item 2, \"A response to an older request does not change what the list shows\", and the brief's worst regression, \"an older request's late response replaces or briefly precedes the latest results\". Every row passes because no attempt ever delivers an empty list.",
+      "newFact": {
+        "name": "a response whose result list is empty",
+        "category": "controllable",
+        "observedVia": "test: the world adapter delivers an empty result list for the older request after the latest response; reducer: results.requestId and results.items after it arrives, read by search.adapter observe and snapshot"
+      },
+      "whyOutside": "Every world delivers non-empty results and no field says whether a response's list is empty. The N/A line leaves empty lists unexercised as an accepted risk citing S1, but S1 item 4's out-of-scope list (\"Cancellation, retry, duplicate responses and a response before its request\") does not name them, and item 2 applies to every response to an older request.",
+      "sources": ["S1"]
+    }
+  ]
+}

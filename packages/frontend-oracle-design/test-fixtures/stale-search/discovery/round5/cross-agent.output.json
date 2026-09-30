@@ -1,0 +1,114 @@
+{
+  "candidates": [
+    {
+      "id": "X1",
+      "kind": "in-world",
+      "scenario": "Search 'ab' and its results appear. Then type 'abc', which starts a new search whose response never comes back.",
+      "harm": "The list clears when the 'abc' search starts, so the 'ab' results disappear and the user is left with an empty list although no newer results arrived. S1 item 1: \"the list keeps showing what it showed until a response arrives\".",
+      "world": "arrival=OldEarly !newAnswers !oldEmpty !newEmpty !longSession final=NoneShown oldShown !itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X2",
+      "kind": "in-world",
+      "scenario": "Search 'ab' and its results appear. Then refine it to 'abq', which matches nothing; the empty 'abq' response arrives.",
+      "harm": "The list keeps the 'ab' results under the query 'abq', so the user takes them as matches instead of learning that nothing matches. S1 item 3: \"The latest request's response is shown when it arrives.\" An empty response is still that response.",
+      "world": "arrival=OldEarly newAnswers !oldEmpty newEmpty !longSession final=OldShown oldShown itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X3",
+      "kind": "in-world",
+      "scenario": "Type 'ab' then 'abc' quickly. The 'abc' results arrive and appear; then the late 'ab' response arrives, and it is empty.",
+      "harm": "The late empty response clears the list, so the user sees no results for 'abc', which has matches. S1 item 2: \"A response to an older request does not change what the list shows.\"",
+      "world": "arrival=NewFirst newAnswers oldEmpty !newEmpty !longSession final=NoneShown !oldShown !itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X4",
+      "kind": "in-world",
+      "scenario": "Type 'ab' then 'abc' quickly. The 'ab' response arrives after 'abc' was sent, and the 'abc' response never comes back.",
+      "harm": "The list shows the 'ab' results under the query 'abc' and the user takes them as its answer. S1 item 2: \"A response to an older request does not change what the list shows.\" That holds whether or not the newer response ever arrives.",
+      "world": "arrival=OldFirst !newAnswers !oldEmpty !newEmpty !longSession final=OldShown oldShown itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X5",
+      "kind": "in-world",
+      "scenario": "Late in a session, results of an earlier search are on screen. Type 'ab' then 'abc' quickly; the 'ab' response arrives after 'abc' was sent and is dropped as stale, and the 'abc' response never comes back.",
+      "harm": "Dropping the stale 'ab' response empties the list, so the earlier results are gone and nothing replaces them. S1 item 1: \"the list keeps showing what it showed until a response arrives\"; item 2: \"A response to an older request does not change what the list shows.\"",
+      "world": "arrival=OldFirst !newAnswers !oldEmpty !newEmpty longSession final=NoneShown !oldShown !itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X6",
+      "kind": "new-fact",
+      "scenario": "Type 'a', 'ab' and 'abc' quickly so three searches are in flight. The 'abc' results arrive, then the 'ab' response, then the 'a' response.",
+      "harm": "A list that guards only against the search just before the latest (a one-slot 'previous' token, or a flag that alternates per request) lets the 'a' response replace the 'abc' results, so the user sees 'a' results under 'abc'. S1 item 2: \"A response to an older request does not change what the list shows\" covers every older request, and item 4 lets the responses arrive \"in any order\".",
+      "newFact": {
+        "name": "searchesInFlight",
+        "category": "controllable",
+        "observedVia": "—"
+      },
+      "whyOutside": "The world races exactly two in-flight requests: arrival orders only the old and the new response, and final and oldShown name only those two. A third search in flight at the same time, and where its response falls against the other two, has no field.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X7",
+      "kind": "new-fact",
+      "scenario": "Type 'ab' then 'abc' quickly. The 'ab' response never comes back; the 'abc' response does.",
+      "harm": "A list that applies responses in request order holds the 'abc' results back until 'ab' answers, so the user never sees them. S1 item 3: \"The latest request's response is shown when it arrives.\" Item 4 delivers each response \"at most once\", so a missing older response is in scope.",
+      "newFact": {
+        "name": "oldAnswers",
+        "category": "controllable",
+        "observedVia": "—"
+      },
+      "whyOutside": "Every arrival value (OldFirst, NewFirst, OldEarly) delivers the old response, and only the new request has an answers flag. In NewFirst the late old response releases the held-back new one, so the end state reads NewShown and the delay never shows in a record world.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X8",
+      "kind": "new-fact",
+      "scenario": "Search 'ab'. While it is in flight, edit an item that matches 'ab' in another tab, then search 'ab' again to see the change. The second 'ab' results arrive first, then the first 'ab' response.",
+      "harm": "A list that matches a response to the current search by its query text instead of its request id takes the first 'ab' response as current and replaces the fresh results with the snapshot from before the edit. S1 item 2: \"A response to an older request does not change what the list shows\"; item 1 makes the request id, not the query text, decide which request is older.",
+      "newFact": {
+        "name": "repeatedQuery",
+        "category": "controllable",
+        "observedVia": "the search box text of each issued search"
+      },
+      "whyOutside": "No world field relates the query texts of the old and new requests, so no world makes an older request share the latest one's text, the only case in which matching responses by text instead of by id changes the outcome.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X9",
+      "kind": "new-fact",
+      "scenario": "Search 'cats'. Before it answers, leave the search screen within the app and come back, then search 'dogs'. The late 'cats' response arrives.",
+      "harm": "If the re-created list restarts its request counter and the late response still reaches it, 'dogs' carries the id the 'cats' request had, so the 'cats' results are shown under 'dogs'. S1 item 1: the id \"grows by one per issued request\", so it never repeats; item 2: \"A response to an older request does not change what the list shows.\"",
+      "newFact": {
+        "name": "listRecreated",
+        "category": "controllable",
+        "observedVia": "—"
+      },
+      "whyOutside": "latest and shown start once per world and only Issue and Respond change them, so nothing re-creates the list while a response is in flight; and observe reports only an id, so a late response carrying a reused id looks exactly like the latest one.",
+      "sources": [
+        "S1"
+      ]
+    }
+  ]
+}

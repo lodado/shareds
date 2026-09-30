@@ -1,0 +1,77 @@
+{
+  "candidates": [
+    {
+      "id": "X1",
+      "kind": "in-world",
+      "scenario": "The user searches 'lamp' and the lamp results appear. The user then searches 'desk', and no response to 'desk' arrives before the attempt ends. The list goes blank as soon as 'desk' is issued instead of keeping the lamp results.",
+      "harm": "The user loses the results they were reading and faces an empty list for as long as the new search goes unanswered. S1 item 1: \"Issuing a request makes it the latest one; the list keeps showing what it showed until a response arrives.\"",
+      "world": "arrival=OldEarly !newAnswers !oldEmpty !newEmpty !longSession final=NoneShown !oldShown itemsIntact",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X2",
+      "kind": "new-fact",
+      "scenario": "The user types 'a', then 'ab'. The response to 'a' never comes; the response to 'ab' arrives. The 'ab' results never appear, because the list applies responses in request order (or waits until no older request is pending) and keeps waiting for the 'a' response.",
+      "harm": "The user never gets results for the search they actually made. S1 item 3: \"The latest request's response is shown when it arrives.\" The lost response is in scope: S1 item 4 says \"The environment delivers each response at most once\" and excludes only cancellation, retry, duplicate responses and a response before its request.",
+      "newFact": {
+        "name": "oldNeverArrives",
+        "category": "controllable",
+        "observedVia": "—"
+      },
+      "whyOutside": "With newAnswers, every arrival value delivers response 1 too (before request 2 is issued, between request 2 and response 2, or after response 2); oldEmpty explicitly excludes 'response 1 not arriving', and newAnswers lets only response 2 go missing. A list that holds response 2 until response 1 arrives therefore always gets response 1 and ends at final=NewShown in every world with newAnswers.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X3",
+      "kind": "new-fact",
+      "scenario": "The user types 'a', then 'ab'. The 'ab' response arrives first and the slow 'a' response later. The 'ab' results appear only after the 'a' response has come in and been discarded.",
+      "harm": "Results for the latest search are withheld for as long as the stale request takes, although they have already arrived. S1 item 3: \"The latest request's response is shown when it arrives.\"",
+      "newFact": {
+        "name": "latestShownOnArrival",
+        "category": "observable",
+        "observedVia": "the results list right after the latest request's response arrives, before any later event (observe reads that request's id at that step)"
+      },
+      "whyOutside": "final is read only when the attempt ends, oldShown concerns only request 1's results, and itemsIntact only checks the items against whichever response is shown. Under arrival=NewFirst a list that holds response 2 until response 1 arrives ends in the same world (final=NewShown, !oldShown, itemsIntact) as one that shows it at once.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X4",
+      "kind": "new-fact",
+      "scenario": "The user types 'a', 'ab' and 'abc' quickly. The 'ab' and 'abc' responses arrive and the 'abc' results are shown; then the slow 'a' response arrives and the list switches to the 'a' results, because only the response to the request most recently replaced ('ab') is treated as outdated.",
+      "harm": "The list shows results for a query the user replaced two keystrokes earlier. S1 item 2: \"A response to an older request does not change what the list shows\" (any older request, not only the one just replaced), and S1 item 4 lets responses arrive \"in any order\".",
+      "newFact": {
+        "name": "earlierArrivesLate",
+        "category": "controllable",
+        "observedVia": "—"
+      },
+      "whyOutside": "The world covers only the attempt's two requests; the only earlier requests it knows are longSession's, and it states that their responses never arrive. oldShown tracks only request 1's results and final has no value for an earlier request's results, so a response older than request 1 arriving during the attempt can neither be set up nor seen.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X5",
+      "kind": "new-fact",
+      "scenario": "The user is reading results for 'lamp', then types 'de' and 'desk'. The 'de' response arrives after 'desk' was issued and before 'desk' answers. The list swaps the lamp results for the 'de' results (or blanks them), because it lets a stale response replace results that are already out of date, while it never puts stale results on an empty list or over the latest ones.",
+      "harm": "The user loses the lamp results they were reading and sees results for a query they have already replaced. S1 item 2: \"A response to an older request does not change what the list shows.\"",
+      "newFact": {
+        "name": "earlierShownAtStart",
+        "category": "controllable",
+        "observedVia": "—"
+      },
+      "whyOutside": "longSession states that responses to the earlier requests never arrive, so every attempt starts with nothing on screen; the only stale response that meets a list showing results is response 1 under NewFirst, when the list already shows the latest results. No field starts the attempt with an earlier search's results displayed, and final has no value for them.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X6",
+      "kind": "new-fact",
+      "scenario": "The user runs ten searches in one session. The ninth gets id 9 and the tenth id 10, and the ninth's response arrives after the tenth's results are shown. The list switches back to the ninth search's results, because ids compared as text put '9' after '10'.",
+      "harm": "After searching again the user sees the previous search's results. S1 item 2: \"A response to an older request does not change what the list shows.\" S1 item 1 makes the step from one digit to two part of any session of ten searches: each request gets \"a request id that grows by one per issued request\".",
+      "newFact": {
+        "name": "idGainsDigit",
+        "category": "controllable",
+        "observedVia": "—"
+      },
+      "whyOutside": "longSession fixes the attempt by position (the ninth and tenth requests) but says its requests 'have two-digit ids'. If both ids have two digits (10 and 11), or neither has (ids counted from 0 give 8 and 9), text order equals numeric order and the bug never shows, and S1 item 1 does not give the first id. No field states that request 1's id has fewer digits than request 2's.",
+      "sources": ["S1"]
+    }
+  ]
+}

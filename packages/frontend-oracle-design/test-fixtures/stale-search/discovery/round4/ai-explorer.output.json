@@ -1,0 +1,87 @@
+{
+  "candidates": [
+    {
+      "id": "X1",
+      "kind": "new-fact",
+      "scenario": "The user searches 'c' and its results appear. They then type 'a' and 't' quickly, so 'ca' and 'cat' are both in flight while the 'c' results stay on screen. The 'ca' response comes back after 'cat' was typed. The product ignores a late response when the list is empty or already shows the latest results, but lets it replace on-screen results older than itself, so the 'ca' results replace the 'c' results while 'cat' is pending, and stay if 'cat' never answers. A product that instead clears the kept 'c' results on that late arrival passes the same rows.",
+      "harm": "The user sees results for a query they have already typed past: the brief's worst regression, 'an older request's late response replaces or briefly precedes the latest results'. S1 item 2: 'A response to an older request does not change what the list shows.' The clearing variant loses the kept results, against S1 item 1: 'the list keeps showing what it showed until a response arrives.'",
+      "newFact": {
+        "name": "results of an earlier, already answered request on screen while two newer requests are in flight",
+        "category": "controllable",
+        "observedVia": "search, wait for the results, then type two more characters quickly so the middle query answers after the last one is typed"
+      },
+      "whyOutside": "The list is always empty when the attempt starts, because T9's earlier requests are never answered. T1 arrival makes 'request 1's results kept' (OldEarly) and 'a late response arrives' (OldFirst, NewFirst) mutually exclusive, so no world has a late response arriving while kept results are on screen; O3's Then ('request 1's results when they had arrived, else nothing') matches S1 item 1 only because of that empty start. O4 is bounded at 4 events, and the shortest trace for this harm has 5: issue c, response c, issue ca, issue cat, response ca.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X2",
+      "kind": "new-fact",
+      "scenario": "The user types 'c', 'ca' and 'cat' quickly, and the 'c' response is the slowest: it arrives after 'cat' was typed. In a long session the same happens when one of the earlier unanswered searches finally answers during the attempt. The product ignores only the response to the request it has just superseded (id = latest - 1), so the 'c' results replace the list while 'cat' is pending or after the 'cat' results are shown.",
+      "harm": "Results for a query several keystrokes old replace or precede the latest results, the brief's worst regression. S1 item 2 covers a response to any older request: 'A response to an older request does not change what the list shows'; item 4 lets responses arrive 'in any order'.",
+      "newFact": {
+        "name": "a late response to a request two or more behind the latest",
+        "category": "controllable",
+        "observedVia": "type three characters quickly so the first query's response arrives after the third query is issued"
+      },
+      "whyOutside": "The attempt has exactly two requests: T1 arrival only times response 1, always the latest's direct predecessor, and T9 defines the earlier requests as never answered ('Not: responses to the earlier requests (they never arrive)'). Every late response in the world comes from latest - 1, so a product that ignores only latest - 1 produces the same observations as one that ignores every older response. O4 reaches it (issue 1, 2, 3, then response 1 is 4 events) only if Search.next allows a third request.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X3",
+      "kind": "qualifier",
+      "scenario": "The user types 'ca', then 'cat'. The 'cat' response arrives first, but the product holds it and shows it only after the superseded 'ca' response has also come back and been discarded. Wherever response 2 arrives in the world, response 1 arrives too (T1 only chooses when), so the list still ends with request 2's response (final=NewShown, !oldShown, itemsIntact) and O1 passes. T3 final is read when the attempt ends; no in-world observation records when response 2 was shown, and only O4, outside the world, compares each prefix.",
+      "harm": "The answer to what the user typed has arrived, yet they keep seeing an empty or outdated list for as long as the superseded request takes, and forever if it never answers, which S1 item 4 allows ('at most once'). S1 item 3: 'The latest request's response is shown when it arrives.' O1 promises only that 'the list ends with request 2's response'.",
+      "sourceText": "\"when it arrives\"",
+      "rows": [
+        "O1"
+      ],
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X4",
+      "kind": "new-fact",
+      "scenario": "The user types 'ca', then 'cat'. The 'ca' request then fails with a server error or times out instead of returning results, either while 'cat' is pending or after the 'cat' results are shown. The product's failure path lacks the request-id check its success path has, so it replaces the list with an error message or clears it.",
+      "harm": "The user loses what the list was showing, the kept results or the 'cat' results, because of a request they have already superseded. S1 item 2: 'A response to an older request does not change what the list shows.' S1 item 1: 'the list keeps showing what it showed until a response arrives'; a timeout is not a response.",
+      "newFact": {
+        "name": "a failure (error response or timeout) for a superseded request",
+        "category": "controllable",
+        "observedVia": "a superseded search request fails after the next query was typed, and the results list is replaced or cleared"
+      },
+      "whyOutside": "Every response in the world carries a result list: T7 oldEmpty and T8 newEmpty only choose empty or not, T1 only times when response 1 arrives, and final, oldShown and itemsIntact read results.requestId and results.items. No field makes a response fail. The card's N/A line puts error and timeout outside the policy citing S1, but S1 item 4 puts only cancellation, retry, duplicate responses and a response before its request out of scope.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X5",
+      "kind": "new-fact",
+      "scenario": "The user has 'ca' results on screen and types 'cat'. While 'cat' is in flight the product replaces the list with a spinner or a 'Searching...' state, although its state still holds the 'ca' results. If 'cat' never answers, the spinner stays.",
+      "harm": "The user cannot see or use the results the list was showing while the new query is pending, or at all if it never answers. S1 item 1: 'the list keeps showing what it showed until a response arrives.'",
+      "newFact": {
+        "name": "a loading or pending display state that hides the kept results",
+        "category": "observable",
+        "observedVia": "the rendered results list between issuing a query and receiving its response"
+      },
+      "whyOutside": "final, oldShown and itemsIntact are all read from the reducer's results (results.requestId, results.items) through search.adapter observe and snapshot. No field records whether those results are visible, so O3 sees final=OldShown while the user sees a spinner. The display-vs-commit hazard is marked modeled by these same reducer reads, and the card's N/A line puts 'loading indicator' outside the policy citing S1, although S1 does not exclude it.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X6",
+      "kind": "in-world",
+      "scenario": "The user types 'ca', then 'cat' before 'ca' answers. The late 'ca' response arrives and its results are ignored, but the product then shows an empty result set as the 'cat' search ('No results'). The 'cat' response never arrives.",
+      "harm": "The user is told their latest query has no results although no answer for it arrived. S1 item 1: 'the list keeps showing what it showed until a response arrives' (it showed nothing), and S1 item 2: the late 'ca' response 'does not change what the list shows'; T8 separates an empty response 2 from response 2 not arriving. O1 is vacuous without response 2, O3's Never names only 'the kept results cleared, or request 1's late results shown', and oldShown only records a change to request 1's results.",
+      "world": "arrival=OldFirst !newAnswers !oldEmpty !newEmpty !longSession final=NewShown !oldShown itemsIntact",
+      "sources": [
+        "S1"
+      ]
+    }
+  ]
+}

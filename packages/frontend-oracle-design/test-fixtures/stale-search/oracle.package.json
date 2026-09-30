@@ -1,0 +1,1156 @@
+{
+  "packageVersion": 1,
+  "id": "stale-search",
+  "spaceVersion": 5,
+  "intent": {
+    "actor": "a person typing successive search queries while earlier responses are in flight",
+    "observableSuccess": "the list shows the latest request's results and never an older request's late results",
+    "nonGoals": "cancellation, retry, duplicate responses, debouncing, real network or browser behavior",
+    "worstRegression": "an older request's late response replaces or briefly precedes the latest results",
+    "reversibility": "revert the isolated fixture",
+    "risk": "Medium",
+    "openQuestions": [
+      {
+        "id": "Q1",
+        "text": "Does one request-id sequence outlive a remount of the search box? Recommended: no claim in this fixture — S1 describes one reducer lifetime, so a response that outlives its search box is owned by the component that mounts it (owner-lifetime), not by this policy",
+        "sources": ["S1"]
+      },
+      {
+        "id": "Q2",
+        "text": "Is anything outside the reducer in scope — the layer that sends requests and tags each response with its id (errors, timeouts, the id a response carries) or the view that renders the list (loading states, counts, labels)? Recommended: no claim in this fixture — S1 describes responses that carry results and says nothing of errors or rendering, and the product under test is the reducer, judged on the events it receives",
+        "sources": ["S1"]
+      }
+    ]
+  },
+  "sources": [
+    {
+      "id": "S1",
+      "kind": "product-policy",
+      "jurisdiction": "search response ordering",
+      "standard": "fixture policy text",
+      "location": "repo:README.md#fixture-policy",
+      "approval": "approved"
+    },
+    {
+      "id": "S2",
+      "kind": "product-policy",
+      "jurisdiction": "reference model and environment",
+      "standard": "Bend 2.0.34 model",
+      "location": "repo:MODEL.bend#v1",
+      "approval": "approved"
+    },
+    {
+      "id": "S3",
+      "kind": "product-policy",
+      "jurisdiction": "approved laws",
+      "standard": "Bend 2.0.34 laws",
+      "location": "repo:LAWS.bend#v1",
+      "approval": "approved"
+    },
+    {
+      "id": "S4",
+      "kind": "product-policy",
+      "jurisdiction": "adequacy world model",
+      "standard": "Bend 2.0.34 world",
+      "location": "repo:World.bend#v1",
+      "approval": "approved"
+    },
+    {
+      "id": "S6",
+      "kind": "product-policy",
+      "jurisdiction": "metamorphic relations",
+      "standard": "Bend 2.0.34 relations",
+      "location": "repo:Metamorphic.bend#v1",
+      "approval": "approved"
+    },
+    {
+      "id": "S5",
+      "kind": "project-constraint",
+      "jurisdiction": "oracle model package",
+      "standard": "oracle-package v1",
+      "location": "repo:oracle.package.json#v1",
+      "approval": "approved",
+      "self": true
+    }
+  ],
+  "requirements": [
+    {
+      "id": "R1",
+      "source": "S1",
+      "quote": "Every search request gets a request id that grows by one per issued request."
+    },
+    {
+      "id": "R2",
+      "source": "S1",
+      "quote": "Issuing a request makes it the latest one; the list keeps showing what it showed until a response arrives."
+    },
+    {
+      "id": "R3",
+      "source": "S1",
+      "quote": "A response to an older request does not change what the list shows."
+    },
+    {
+      "id": "R4",
+      "source": "S1",
+      "quote": "The latest request's response is shown when it arrives."
+    },
+    {
+      "id": "R5",
+      "source": "S1",
+      "quote": "The environment delivers each response at most once, only after its request, in any order."
+    },
+    {
+      "id": "R6",
+      "source": "S1",
+      "quote": "Cancellation, retry, duplicate responses and a response before its request are out of scope; no guarantee is claimed for them."
+    }
+  ],
+  "policies": [
+    {
+      "id": "P1",
+      "text": "Issuing a search request makes it the latest request; the list keeps what it shows until a response arrives.",
+      "sources": ["S1"],
+      "requirements": ["R2"]
+    },
+    {
+      "id": "P2",
+      "text": "A response to an older request does not alter what the list shows, at any step.",
+      "sources": ["S1"],
+      "requirements": ["R3"]
+    },
+    {
+      "id": "P3",
+      "text": "The latest request's response is shown when it arrives.",
+      "sources": ["S1"],
+      "requirements": ["R4"]
+    }
+  ],
+  "world": {
+    "source": "S4",
+    "prefix": "Race"
+  },
+  "terms": [
+    {
+      "id": "T1",
+      "context": "search",
+      "name": "response arrival order",
+      "role": "controllable",
+      "family": "Order",
+      "field": "arrival",
+      "path": "test: the world adapter delivers response 1 before request 2 is issued, or after it and before or after response 2",
+      "definition": "when response 1 arrives: after both requests were issued and before response 2 (OldFirst), after response 2 (NewFirst), or before request 2 is issued (OldEarly)",
+      "not": "the order in which the requests were issued",
+      "source": "S1",
+      "status": "confirmed"
+    },
+    {
+      "id": "T2",
+      "context": "search",
+      "name": "newer answer arrives",
+      "role": "controllable",
+      "family": "Async",
+      "field": "newAnswers",
+      "path": "test: the world adapter delivers or withholds response 2 within the attempt",
+      "definition": "the response to request 2 arrives within the attempt",
+      "not": "the response to request 1",
+      "source": "S1",
+      "status": "confirmed"
+    },
+    {
+      "id": "T3",
+      "context": "list",
+      "name": "final list",
+      "role": "observable",
+      "field": "final",
+      "path": "reducer: results.requestId after the last event, read by search.adapter observe",
+      "definition": "the request whose results the list shows when the attempt ends",
+      "not": "the latest issued request id",
+      "source": "S1",
+      "status": "confirmed"
+    },
+    {
+      "id": "T4",
+      "context": "list",
+      "name": "late older result shown",
+      "role": "observable",
+      "field": "oldShown",
+      "path": "reducer: results.requestId after every event from response 1's late arrival on, read by search.adapter observe",
+      "definition": "a response to request 1 that arrived after request 2 was issued changed the list to request 1's results, at some step",
+      "not": "request 1's results kept on screen from before request 2 was issued (S1 item 1 keeps them)",
+      "source": "S1",
+      "status": "confirmed"
+    },
+    {
+      "id": "T6",
+      "context": "list",
+      "name": "shown results intact",
+      "role": "observable",
+      "family": "Data",
+      "field": "itemsIntact",
+      "path": "reducer: results.items after every event, read through search.adapter snapshot, compared with the results the harness delivered with that response",
+      "definition": "after every event, the list displays exactly the results of the response it shows, and no results when it shows none",
+      "not": "which request the list shows",
+      "source": "S1",
+      "status": "confirmed"
+    },
+    {
+      "id": "T7",
+      "context": "search",
+      "name": "older response empty",
+      "role": "controllable",
+      "family": "Data",
+      "field": "oldEmpty",
+      "path": "test: the world adapter delivers response 1 with an empty result list",
+      "definition": "the response to request 1 carries no results; it is still request 1's response",
+      "not": "response 1 not arriving",
+      "source": "S1",
+      "status": "confirmed"
+    },
+    {
+      "id": "T8",
+      "context": "search",
+      "name": "newer response empty",
+      "role": "controllable",
+      "family": "Data",
+      "field": "newEmpty",
+      "path": "test: the world adapter delivers response 2 with an empty result list",
+      "definition": "the response to request 2 carries no results; it is still the latest request's response (S1 item 3)",
+      "not": "response 2 not arriving (T2)",
+      "source": "S1",
+      "status": "confirmed"
+    },
+    {
+      "id": "T9",
+      "context": "search",
+      "name": "long session",
+      "role": "controllable",
+      "family": "Value",
+      "field": "longSession",
+      "path": "test: the world adapter issues eight earlier requests, never answered, before the attempt, so the attempt's requests are 9 and 10",
+      "definition": "the attempt's requests are the ninth and tenth of the session, so their ids cross from one digit to two (9 and 10)",
+      "not": "responses to the earlier requests (they never arrive)",
+      "source": "S1",
+      "status": "confirmed"
+    },
+    {
+      "id": "T5",
+      "context": "search",
+      "name": "latest request",
+      "role": "concept",
+      "definition": "the most recently issued request",
+      "source": "S1",
+      "status": "confirmed"
+    },
+    {
+      "id": "T10",
+      "context": "list",
+      "name": "list change",
+      "role": "concept",
+      "definition": "an event after which the list shows another request's results, other results, or nothing where it showed results",
+      "not": "issuing a request, after which the list keeps what it shows (S1 item 1)",
+      "source": "S1",
+      "status": "confirmed"
+    }
+  ],
+  "assumptions": [],
+  "goals": [
+    {
+      "id": "G1",
+      "kind": "safety",
+      "cites": ["S1"],
+      "author": "controller",
+      "requirements": ["R3"]
+    },
+    {
+      "id": "G2",
+      "kind": "safety",
+      "cites": ["S1"],
+      "author": "controller",
+      "requirements": ["R4"]
+    },
+    {
+      "id": "G3",
+      "kind": "witness",
+      "cites": ["S1"],
+      "author": "controller",
+      "requirements": ["R2", "R4"]
+    },
+    {
+      "id": "G4",
+      "kind": "safety",
+      "cites": ["S1"],
+      "author": "controller",
+      "requirements": ["R2", "R3"]
+    },
+    {
+      "id": "G5",
+      "kind": "safety",
+      "cites": ["S1"],
+      "author": "controller",
+      "requirements": ["R4"]
+    }
+  ],
+  "examples": [
+    {
+      "id": "E1",
+      "goal": "G1",
+      "world": "arrival=OldFirst newAnswers !oldEmpty !newEmpty !longSession final=NewShown oldShown itemsIntact",
+      "verdict": "violates"
+    },
+    {
+      "id": "E2",
+      "goal": "G1",
+      "world": "arrival=OldFirst newAnswers !oldEmpty !newEmpty !longSession final=NewShown !oldShown itemsIntact",
+      "verdict": "holds"
+    },
+    {
+      "id": "E3",
+      "goal": "G5",
+      "world": "arrival=OldFirst newAnswers !oldEmpty !newEmpty !longSession final=NewShown !oldShown !itemsIntact",
+      "verdict": "violates"
+    },
+    {
+      "id": "E4",
+      "goal": "G4",
+      "world": "arrival=OldEarly !newAnswers !oldEmpty !newEmpty !longSession final=OldShown !oldShown itemsIntact",
+      "verdict": "holds"
+    },
+    {
+      "id": "E5",
+      "goal": "G4",
+      "world": "arrival=OldEarly !newAnswers !oldEmpty !newEmpty !longSession final=NoneShown !oldShown itemsIntact",
+      "verdict": "violates"
+    },
+    {
+      "id": "E6",
+      "goal": "G2",
+      "world": "arrival=NewFirst newAnswers !oldEmpty newEmpty !longSession final=NewShown !oldShown itemsIntact",
+      "verdict": "holds"
+    },
+    {
+      "id": "E7",
+      "goal": "G1",
+      "world": "arrival=NewFirst newAnswers !oldEmpty !newEmpty longSession final=NewShown !oldShown itemsIntact",
+      "verdict": "holds"
+    }
+  ],
+  "hazards": {
+    "permission-change": "n/a: S1 no permission in the search policy",
+    "concurrent-change": "n/a: S1 one search box",
+    "display-vs-commit": "modeled: final oldShown itemsIntact",
+    "effect-count": "n/a: S1 each response arrives at most once",
+    "identity-reference": "n/a: S1 request ids are the only identity",
+    "feature-composition": "n/a: S1 search only",
+    "carry-over": "modeled: arrival final itemsIntact",
+    "order-timing": "modeled: arrival oldShown"
+  },
+  "contract": [
+    {
+      "key": "latestShown",
+      "row": "O1",
+      "def": "latestShown",
+      "policies": ["P3"],
+      "given": "requests 1 and 2 issued; response 1 arrives before or after request 2 is issued",
+      "when": "response 2 arrives",
+      "then": "the list ends with request 2's response, also when it carries no results",
+      "never": "the list ends without request 2's response",
+      "sideEffects": "results rendered×1",
+      "bva": "arrival: 1 before request 2, 1 then 2, 2 then 1; response 2 empty or not"
+    },
+    {
+      "key": "staleNeverShown",
+      "row": "O2",
+      "def": "staleNeverShown",
+      "policies": ["P2"],
+      "given": "request 2 issued while request 1 is unanswered",
+      "when": "response 1 arrives, before or after response 2, empty or not",
+      "then": "a response to request 1 arriving after request 2 was issued never changes the list, at any step",
+      "never": "a late response to request 1 shown, even briefly",
+      "sideEffects": "stale results rendered×0",
+      "bva": "arrival: 1 then 2, 2 then 1; response 1 empty or not"
+    },
+    {
+      "key": "unansweredKeeps",
+      "row": "O3",
+      "def": "unansweredKeeps",
+      "policies": ["P1", "P2"],
+      "given": "requests 1 and 2 issued; response 2 does not arrive",
+      "when": "response 1 arrives before or after request 2 is issued, or nothing arrives",
+      "then": "the list keeps showing what it showed when request 2 was issued: request 1's results when they had arrived, else nothing",
+      "never": "the kept results cleared, or request 1's late results shown",
+      "sideEffects": "results rendered×0 after request 2 is issued",
+      "bva": "response 2: withheld; response 1: before or after request 2"
+    },
+    {
+      "key": "itemsShown",
+      "row": "O5",
+      "def": "itemsShown",
+      "policies": ["P3"],
+      "given": "any attempt",
+      "when": "after every event",
+      "then": "the list displays exactly the results of the response it shows, or none",
+      "never": "results of no shown response, a mix of two responses, or a shown response without its own results",
+      "sideEffects": "results rendered×1",
+      "bva": "final: none, older, newer; results: empty or not; every event",
+      "requirements": ["R4"]
+    },
+    {
+      "key": "traceConformance",
+      "row": "O4",
+      "outside": "trace conformance of the reducer on every trace of the Formal Model space (S2)",
+      "policies": ["P1", "P2", "P3"],
+      "given": "every trace of up to 5 events that `Search.next` allows",
+      "when": "each event is applied to the reducer",
+      "then": "the reducer's observation equals `Search.observe` at every prefix",
+      "never": "a prefix where they differ; an adapter error or budget stop counted as a pass",
+      "sideEffects": "none",
+      "bva": "bound: 5 events"
+    }
+  ],
+  "notApplicable": [
+    {
+      "text": "loading indicator, error, timeout, retry, duplicate responses, cancellation and pagination are outside this fixture's policy; out-of-order arrival is the arrival axis and the Formal Model space",
+      "sources": ["S1"],
+      "requirements": ["R6"]
+    }
+  ],
+  "families": {
+    "Entry": "excluded: one search box S1",
+    "Environment": "excluded: pure reducer fixture S1",
+    "Platform": "excluded: pure reducer fixture S1",
+    "Inherited": "excluded: first revision S1"
+  },
+  "behavior": {
+    "model": "S2",
+    "laws": "S3",
+    "prefix": "Search",
+    "bound": 5,
+    "observation": "`Search.observe` is the request id whose results the list shows, 0 when none; the adapter reads the reducer's `results.requestId`",
+    "outOfScope": "cancellation, retry, duplicate responses, a response before its request (S1 item 4)",
+    "notFormalized": "none",
+    "conformance": "traceConformance",
+    "lawRows": [
+      {
+        "name": "issue_advances",
+        "kind": "effect",
+        "cites": ["P1", "unansweredKeeps"]
+      },
+      {
+        "name": "stale_ignored",
+        "kind": "safety",
+        "cites": ["P2", "staleNeverShown"]
+      },
+      {
+        "name": "latest_applied",
+        "kind": "effect",
+        "cites": ["P3", "latestShown"]
+      },
+      {
+        "name": "latest_reachable",
+        "kind": "witness",
+        "cites": ["P1", "P3", "latestShown"]
+      }
+    ],
+    "requirements": ["R1", "R5"]
+  },
+  "product": {
+    "adapter": "search.adapter.mjs",
+    "worldAdapter": "world.adapter.mjs",
+    "files": ["search-reducer.mts"],
+    "runs": 100,
+    "maxLength": 8
+  },
+  "faultModel": [
+    {
+      "id": "F1",
+      "class": "ordering",
+      "file": "search-reducer.mts",
+      "find": "if (event.requestId !== state.latestRequestId) return state",
+      "replace": "",
+      "note": "drop the stale-response check"
+    },
+    {
+      "id": "F2",
+      "class": "conditional",
+      "file": "search-reducer.mts",
+      "find": "event.requestId !== state.latestRequestId",
+      "replace": "event.requestId < state.latestRequestId",
+      "note": "!== becomes <"
+    },
+    {
+      "id": "F3",
+      "class": "boundary",
+      "file": "search-reducer.mts",
+      "find": "latestRequestId: state.latestRequestId + 1",
+      "replace": "latestRequestId: state.latestRequestId + 2",
+      "note": "request ids grow by 2"
+    },
+    {
+      "id": "F4",
+      "class": "state-transition",
+      "file": "search-reducer.mts",
+      "find": "return { ...state, latestRequestId: state.latestRequestId + 1 }",
+      "replace": "return { latestRequestId: state.latestRequestId + 1, results: null }",
+      "note": "issuing clears the list"
+    },
+    {
+      "id": "F5",
+      "class": "stale-data",
+      "file": "search-reducer.mts",
+      "find": "items: event.items",
+      "replace": "items: []",
+      "note": "the shown results lose their items"
+    },
+    {
+      "id": "F6",
+      "class": "ordering",
+      "file": "search-reducer.mts",
+      "find": "if (event.requestId !== state.latestRequestId) return state",
+      "replace": "if (event.requestId === state.latestRequestId - 1) return state",
+      "note": "only the previous request counts as stale"
+    },
+    {
+      "id": "F7",
+      "class": "stale-data",
+      "file": "search-reducer.mts",
+      "find": "items: event.items",
+      "replace": "items: [...(state.results?.items ?? []), ...event.items]",
+      "note": "a response appends to the results already shown"
+    },
+    {
+      "id": "F8",
+      "class": "conditional",
+      "file": "search-reducer.mts",
+      "find": "if (event.requestId !== state.latestRequestId) return state",
+      "replace": "if (event.requestId !== state.latestRequestId || event.items.length === 0) return state",
+      "note": "an empty response is skipped"
+    },
+    {
+      "id": "F9",
+      "class": "ordering",
+      "file": "search-reducer.mts",
+      "find": "if (event.requestId !== state.latestRequestId) return state",
+      "replace": "if (event.items.length === 0) return { ...state, results: null }; if (event.requestId !== state.latestRequestId) return state",
+      "note": "an empty response clears the list before the stale check"
+    },
+    {
+      "id": "F10",
+      "class": "state-transition",
+      "file": "search-reducer.mts",
+      "find": "if (event.requestId !== state.latestRequestId) return state",
+      "replace": "if (event.requestId !== state.latestRequestId) return { ...state, results: null }",
+      "note": "a stale response clears the list"
+    },
+    {
+      "id": "F11",
+      "class": "conditional",
+      "file": "search-reducer.mts",
+      "find": "if (event.requestId !== state.latestRequestId) return state",
+      "replace": "if (String(event.requestId) < String(state.latestRequestId)) return state",
+      "note": "request ids compared as text"
+    },
+    {
+      "id": "F12",
+      "class": "conditional",
+      "file": "search-reducer.mts",
+      "find": "if (event.requestId !== state.latestRequestId) return state",
+      "replace": "if (event.requestId !== state.latestRequestId && (state.results === null || state.results.requestId === state.latestRequestId)) return state",
+      "note": "a late response is ignored only when nothing or the latest is shown"
+    }
+  ],
+  "metamorphic": {
+    "source": "S6",
+    "relations": [
+      {
+        "id": "MR1",
+        "transform": "Meta.issueAppended",
+        "relation": "Meta.sameShown",
+        "requirements": ["R2"]
+      }
+    ]
+  },
+  "operators": {
+    "dependency-failure": "n/a: S1 errors, retry and cancellation are outside this fixture policy",
+    "latency": "modeled: event.Msg",
+    "environment-variation": "n/a: S1 a pure reducer with no browser, device or viewport in scope",
+    "malformed-input": "n/a: S1 request ids come from the product, not from user input",
+    "concurrency": "modeled: event.Msg"
+  },
+  "residue": {
+    "latestRequestId": "modeled: state.Search.Search.latest"
+  },
+  "axisOrigins": {
+    "world.Race.oldShown": {
+      "origin": "counterexample",
+      "ref": "C-fee4ce433a",
+      "reason": "space v1 judged G1 differently on two worlds alike in every coordinate and observation; the differing fact was the hidden oldShown"
+    },
+    "world.Race.itemsIntact": {
+      "origin": "counterexample",
+      "ref": "C-069764844d",
+      "reason": "space v1 let the mutant that empties the shown results (F5) survive every check: the observation was only the request id"
+    },
+    "world.Race.newEmpty": {
+      "origin": "counterexample",
+      "ref": "C-b55fd8002e",
+      "reason": "no world delivered an empty response, so a product that skips empty responses passed every check of space v2"
+    },
+    "world.Race.oldEmpty": {
+      "origin": "counterexample",
+      "ref": "C-5b74ed91ab",
+      "reason": "no world delivered an empty late response, so an empty-response branch ahead of the stale check passed every check of space v2"
+    },
+    "world.Race.longSession": {
+      "origin": "counterexample",
+      "ref": "C-56c922678f",
+      "reason": "the space never reached a two-digit request id (the traces stop at 4 events, sampling at 8), so comparing ids as text passed every check of space v3"
+    }
+  },
+  "discoveryDecisions": [
+    {
+      "candidate": "C-fee4ce433a",
+      "decision": "promoted",
+      "axis": "world.Race.oldShown",
+      "source": "S1",
+      "reason": "S1 item 2 forbids showing an older result at any step, not only at the end — observe the list after every event"
+    },
+    {
+      "candidate": "C-3ac744e3e6",
+      "decision": "promoted",
+      "axis": "staleNeverShown",
+      "source": "S1",
+      "reason": "the end-state row let a brief older result pass; the contract now forbids it at every step"
+    },
+    {
+      "candidate": "C-069764844d",
+      "decision": "promoted",
+      "axis": "world.Race.itemsIntact",
+      "source": "S1",
+      "reason": "S1 item 3 shows the response, not only its id — observe that the shown results are the response's own"
+    },
+    {
+      "candidate": "C-9ac2b5f9d0",
+      "decision": "equivalent",
+      "reason": "the environment (S1 item 4) never delivers a response id above the latest issued id, so !== and < decide the same on every in-space trace"
+    },
+    {
+      "candidate": "C-3effbeff60",
+      "decision": "out-of-scope",
+      "source": "S1",
+      "reason": "a response before its request is out of scope (S1 item 4, R6); the reducer does accept a response with id 0 before any request because its initial latest id is 0 — kept as residual risk"
+    },
+    {
+      "candidate": "C-b7aba9a535",
+      "decision": "promoted",
+      "axis": "world.Race.arrival",
+      "source": "S1",
+      "reason": "S1 item 1 keeps what the list showed when a request is issued, and no world reached a list that already shows results: response 1 may arrive before request 2 is issued (arrival=OldEarly), so the list already shows results when the latest response lands; the append mutant F7 dies only there"
+    },
+    {
+      "candidate": "C-8d417c64ef",
+      "decision": "promoted",
+      "axis": "world.Race.arrival",
+      "source": "S1",
+      "reason": "the same gap as C-b7aba9a535: response 1 may arrive before request 2 is issued (arrival=OldEarly), so the list already shows results when the latest response lands; clearing on issue (F4) now fails the world as well"
+    },
+    {
+      "candidate": "C-313fa223e6",
+      "decision": "promoted",
+      "axis": "world.Race.arrival",
+      "source": "S1",
+      "reason": "malformed round-1 output (no category), but the finding stands and is the same gap: response 1 may arrive before request 2 is issued (arrival=OldEarly), so the list already shows results when the latest response lands"
+    },
+    {
+      "candidate": "C-83fa26de8f",
+      "decision": "promoted",
+      "axis": "unansweredKeeps",
+      "source": "S1",
+      "reason": "O3 had narrowed 'keeps showing what it showed' to 'keeps showing nothing'; it now keeps request 1's results when they arrived before request 2 was issued"
+    },
+    {
+      "candidate": "C-a0bb7a817b",
+      "decision": "promoted",
+      "axis": "unansweredKeeps",
+      "source": "S1",
+      "reason": "the round-1 form of C-83fa26de8f: O3 restated, O2 allows results kept from before request 2, and the world reaches that case through arrival=OldEarly"
+    },
+    {
+      "candidate": "C-4ec1477d3e",
+      "decision": "promoted",
+      "axis": "world.Race.itemsIntact",
+      "source": "S1",
+      "reason": "itemsIntact was read only when the attempt ended; S1 item 2 holds at every step, so T6 is now judged after every event"
+    },
+    {
+      "candidate": "C-b55fd8002e",
+      "decision": "promoted",
+      "axis": "world.Race.newEmpty",
+      "source": "S1",
+      "reason": "an empty response is still the latest request's response (S1 item 3) and no world delivered one; the mutant that skips empty responses (F8) dies only where a response is empty"
+    },
+    {
+      "candidate": "C-6fb9060ece",
+      "decision": "promoted",
+      "axis": "world.Race.newEmpty",
+      "source": "S1",
+      "reason": "the round-2 form of C-b55fd8002e"
+    },
+    {
+      "candidate": "C-5b74ed91ab",
+      "decision": "promoted",
+      "axis": "world.Race.oldEmpty",
+      "source": "S1",
+      "reason": "a late empty response to request 1 must not change the list either (S1 item 2); the mutant with an empty-response branch ahead of the stale check (F9) dies at arrival=NewFirst with oldEmpty"
+    },
+    {
+      "candidate": "C-4c4d03603f",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "a third request is in the Formal Model space (every trace of up to 4 events, e.g. Issue Issue Issue Respond{1}); the previous-only stale check F6 dies to trace conformance and fast-check"
+    },
+    {
+      "candidate": "C-804429b52d",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "the same third-request case as C-4c4d03603f; F6 dies to trace conformance"
+    },
+    {
+      "candidate": "C-ff51c87882",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "the round-1 form of the third-request case; F6 dies to trace conformance"
+    },
+    {
+      "candidate": "C-f388dfce32",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "a response 1 that never arrives is in the Formal Model space (Issue Issue Respond{2} and its extensions), observed at every prefix"
+    },
+    {
+      "candidate": "C-ba72d50172",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "malformed round-1 output (no category); the case (response 1 never delivered) is in the Formal Model space, observed at every prefix"
+    },
+    {
+      "candidate": "C-3222515638",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "'when it arrives': trace conformance observes every prefix, so the list must show response 2 at the step it arrives (Issue Issue Respond{2}), not after response 1 settles"
+    },
+    {
+      "candidate": "C-a85d963873",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "the same deferred-display case as C-3222515638, judged at every prefix by trace conformance"
+    },
+    {
+      "candidate": "C-b22aedb83d",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "the round-1 form of the deferred-display case, judged at every prefix by trace conformance"
+    },
+    {
+      "candidate": "C-93839bb0c1",
+      "decision": "covered",
+      "by": "staleNeverShown",
+      "reason": "round-2 in-world literal from space v2; with any value of oldEmpty and newEmpty, a late response to request 1 shown (oldShown) is rejected by O2"
+    },
+    {
+      "candidate": "C-8da778665e",
+      "decision": "covered",
+      "by": "latestShown",
+      "reason": "round-2 in-world literal from space v2; with any value of oldEmpty and newEmpty, newAnswers ending on no results is rejected by O1"
+    },
+    {
+      "candidate": "C-83664b20cc",
+      "decision": "covered",
+      "by": "itemsShown",
+      "reason": "round-1 in-world literal from space v1; with any value of the newer coordinates, !itemsIntact is rejected by O5"
+    },
+    {
+      "candidate": "C-0719e77402",
+      "decision": "out-of-scope",
+      "source": "S1",
+      "reason": "S1 item 1 keeps the list as it was and S1 claims nothing when the latest request never answers; a pending, timeout or error indication is outside the policy (the N/A line)"
+    },
+    {
+      "candidate": "C-ab8bb296ef",
+      "decision": "out-of-scope",
+      "source": "S1",
+      "reason": "S1 keeps the older results on screen by design; marking them as out of date is a loading or stale indicator, outside the policy (the N/A line)"
+    },
+    {
+      "candidate": "C-9d193e87ed",
+      "decision": "out-of-scope",
+      "source": "S1",
+      "reason": "pagination is outside the policy (the N/A line); within S1, a load-more request is a newer request and wins"
+    },
+    {
+      "candidate": "C-48d48f9fbc",
+      "decision": "out-of-scope",
+      "source": "Q1",
+      "reason": "a request-id sequence that restarts on remount is owner lifetime; Q1 records that this fixture claims nothing across a remount"
+    },
+    {
+      "candidate": "C-7d53bbf538",
+      "decision": "out-of-scope",
+      "source": "S1",
+      "reason": "duplicate responses are out of scope (S1 item 4, R6); INC-201 leaves the declared environment at its third event, and the reducer shows the duplicated latest response unchanged"
+    },
+    {
+      "candidate": "C-56c922678f",
+      "decision": "promoted",
+      "axis": "world.Race.longSession",
+      "source": "S1",
+      "reason": "request ids grow without limit (S1 item 1) but no check reached two digits; the attempt now also runs as requests 9 and 10, and the text-comparison mutant F11 dies only there"
+    },
+    {
+      "candidate": "C-40b216563d",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "clearing kept results on a stale arrival fails Issue Issue Respond{2} Respond{1}, and clearing on an issue while another request is unanswered fails Issue Respond{1} Issue Issue — both 4-event traces; F10 also dies in the world at arrival=NewFirst (O1)"
+    },
+    {
+      "candidate": "C-527afef41e",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "'shown when it arrives': trace conformance observes every prefix, so response 2 must show at the step it arrives (Issue Issue Respond{2})"
+    },
+    {
+      "candidate": "C-6929c1e1e1",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "the third-request case needs only Issue Issue Issue Respond{1}, a 4-event trace in the space; the previous-only check F6 dies there"
+    },
+    {
+      "candidate": "C-ca88536a44",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "a response 1 that never arrives is in the space (Issue Issue Respond{2} and its extensions), observed at every prefix"
+    },
+    {
+      "candidate": "C-6283df90b3",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "holding response 2 until response 1 returns fails the prefix Issue Issue Respond{2}"
+    },
+    {
+      "candidate": "C-6cac9580fd",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "the third-request case: Issue Issue Issue Respond{1} is in the space and F6 dies there"
+    },
+    {
+      "candidate": "C-d130723a2e",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "a response 1 that never arrives is in the space, and handling responses in request order fails the prefix Issue Issue Respond{2}"
+    },
+    {
+      "candidate": "C-a914a52911",
+      "decision": "rejected",
+      "source": "S1",
+      "reason": "S1 item 1 identifies every request by an id that grows by one, and the reducer's events carry no query text, so a response cannot match a newer request by its text in this product"
+    },
+    {
+      "candidate": "C-6ac4e276c0",
+      "decision": "covered",
+      "by": "latestShown",
+      "reason": "round-3 in-world literal from space v3; with either value of longSession, newAnswers ending on request 1's results is rejected by O1"
+    },
+    {
+      "candidate": "C-788c3b7f66",
+      "decision": "covered",
+      "by": "unansweredKeeps",
+      "reason": "round-3 in-world literal from space v3; with either value of longSession, clearing the results kept from before request 2 is rejected by O3"
+    },
+    {
+      "candidate": "C-62f6be8d3d",
+      "decision": "covered",
+      "by": "staleNeverShown",
+      "reason": "round-3 in-world literal from space v3; with either value of longSession, a late response to request 1 shown (oldShown) is rejected by O2"
+    },
+    {
+      "candidate": "C-c84c602f2d",
+      "decision": "covered",
+      "by": "itemsShown",
+      "reason": "round-3 in-world literal from space v3; with either value of longSession, results that are not the shown response's own (!itemsIntact) are rejected by O5"
+    },
+    {
+      "candidate": "C-32bf7f62bc",
+      "decision": "promoted",
+      "axis": "traceConformance",
+      "source": "S1",
+      "reason": "kept results with a late response for a middle request need five events (Issue Respond{1} Issue Issue Respond{2}); at bound 4 only fast-check sampling caught the mutant F12, so the Formal Model space now runs to 5 events and F12 dies to trace conformance"
+    },
+    {
+      "candidate": "C-1e26889c22",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "a late response two or more requests behind is in the space (Issue Issue Issue Respond{1}); F6 dies there"
+    },
+    {
+      "candidate": "C-5c718dc1ff",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "the three-requests case: Issue Issue Issue Respond{1} is in the space and F6 dies there"
+    },
+    {
+      "candidate": "C-2690768ff0",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "'when it arrives': trace conformance observes every prefix, so response 2 must show at the step it arrives (Issue Issue Respond{2})"
+    },
+    {
+      "candidate": "C-bec3bf01c5",
+      "decision": "covered",
+      "by": "unansweredKeeps",
+      "reason": "the prefix up to request 2 is the same with and without response 2, so a product that does not show an early empty response 1 when it arrives ends the world without response 2 on nothing, which O3 rejects; the skip-empty mutant F8 dies there (arrival=OldEarly, oldEmpty)"
+    },
+    {
+      "candidate": "C-130da87f14",
+      "decision": "out-of-scope",
+      "source": "Q2",
+      "reason": "errors and timeouts belong to the layer that sends requests; the reducer has no failure event, and Q2 records that this fixture claims nothing outside the reducer"
+    },
+    {
+      "candidate": "C-1c0992c3ee",
+      "decision": "out-of-scope",
+      "source": "Q2",
+      "reason": "tagging a response with the id its request was issued with is the job of the layer that sends requests; the reducer receives the id with the response (Q2)"
+    },
+    {
+      "candidate": "C-638e5e4d98",
+      "decision": "out-of-scope",
+      "source": "Q2",
+      "reason": "a loading state that hides the kept results is the view's; the reducer keeps them (O3), and Q2 records that rendering is outside this fixture"
+    },
+    {
+      "candidate": "C-5fce3005a2",
+      "decision": "out-of-scope",
+      "source": "Q2",
+      "reason": "counts, labels and empty-state text are rendered by the view from the shown response; the reducer holds no such field (projection-residue finds none), and Q2 records that rendering is outside this fixture"
+    },
+    {
+      "candidate": "C-07462bda3d",
+      "decision": "out-of-scope",
+      "source": "Q1",
+      "reason": "a request-id sequence that restarts on remount is owner lifetime; Q1 records that this fixture claims nothing across a remount"
+    },
+    {
+      "candidate": "C-d7a18d2dea",
+      "decision": "rejected",
+      "source": "S1",
+      "reason": "the sentence introduces the numbered list; the list items are the policy, quoted as R1–R6"
+    },
+    {
+      "candidate": "C-6e183d4a31",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "three requests in flight: Issue Issue Issue Respond{1} is in the space and the previous-only check F6 dies there"
+    },
+    {
+      "candidate": "C-18b259073e",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "three requests in flight: Issue Issue Issue Respond{1} is in the space and F6 dies there"
+    },
+    {
+      "candidate": "C-335b47dc61",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "'when it arrives': trace conformance observes every prefix, so response 2 must show at the step it arrives, whether response 1 comes late or never"
+    },
+    {
+      "candidate": "C-dab929e7e0",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "a response 1 that never arrives is in the space (Issue Issue Respond{2}), observed at every prefix"
+    },
+    {
+      "candidate": "C-b748d2ab89",
+      "decision": "out-of-scope",
+      "source": "Q2",
+      "reason": "errors and timeouts belong to the layer that sends requests; the reducer has no failure event (Q2)"
+    },
+    {
+      "candidate": "C-acc673dab9",
+      "decision": "rejected",
+      "source": "S1",
+      "reason": "S1 item 1 identifies every request by an id that grows by one, and the reducer's events carry no query text, so an older response cannot pass for a newer one by its text"
+    },
+    {
+      "candidate": "C-a6d169c7a0",
+      "decision": "out-of-scope",
+      "source": "Q1",
+      "reason": "a list re-created while a request is in flight restarts its ids: owner lifetime, which Q1 records as outside this fixture"
+    },
+    {
+      "candidate": "C-826523b49a",
+      "decision": "promoted",
+      "axis": "world.Race.longSession",
+      "source": "S1",
+      "reason": "T9 said the attempt's ids have two digits, but the adapter's ninth and tenth requests are 9 and 10 — the crossing from one digit to two that exposes a text comparison; T9 now says so"
+    },
+    {
+      "candidate": "C-e0da77922f",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "a response 1 that never arrives is in the space (Issue Issue Respond{2}), observed at every prefix"
+    },
+    {
+      "candidate": "C-d4ecbdf7e2",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "holding response 2 until response 1 arrives fails the prefix Issue Issue Respond{2}, where the model already shows request 2"
+    },
+    {
+      "candidate": "C-6b568b6fea",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "a late response older than the previous request: Issue Issue Issue Respond{1} is in the space, and the previous-only check F6 dies there"
+    },
+    {
+      "candidate": "C-608aec1f10",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "results kept on screen when a late response for a middle request arrives: Issue Respond{1} Issue Issue Respond{2} is in the space since bound 5, and F12 dies there"
+    },
+    {
+      "candidate": "C-854d99c901",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "a late answer two or more requests behind is in the space (Issue Issue Issue Respond{1}); the previous-only check F6 and an any-newer-than-shown check both differ from the model there"
+    },
+    {
+      "candidate": "C-e4e474c293",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "three searches in flight: Issue Issue Issue Respond{1} is in the space and F6 dies there"
+    },
+    {
+      "candidate": "C-9e829a38b2",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "'when it arrives': trace conformance observes every prefix, so holding an answer until an older request answers or until the next event differs from the model at the prefix that ends with that answer (Issue Respond{1}, Issue Issue Respond{2})"
+    },
+    {
+      "candidate": "C-1607eaa246",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "holding response 2 until response 1 arrives fails the prefix Issue Issue Respond{2}"
+    },
+    {
+      "candidate": "C-f05e174c61",
+      "decision": "covered",
+      "by": "traceConformance",
+      "reason": "a response 1 that never arrives is in the space (Issue Issue Respond{2}), observed at every prefix"
+    },
+    {
+      "candidate": "C-3df9c15d59",
+      "decision": "out-of-scope",
+      "source": "Q1",
+      "reason": "an id counter that restarts when the search state is re-created is owner lifetime; Q1 records that this fixture claims nothing across a remount or reset"
+    },
+    {
+      "candidate": "C-b326afc146",
+      "decision": "out-of-scope",
+      "source": "Q2",
+      "reason": "a view that draws from its own copy of the results is outside the reducer; Q2 records that rendering is outside this fixture"
+    }
+  ],
+  "aiRuns": [
+    {
+      "operator": "ai-explorer",
+      "file": "discovery/round1/ai-explorer.output.json",
+      "agent": "fresh-context general-purpose subagent, round 1 (read only the input file)",
+      "inputDigest": "384d69971af87bb13773302b60c9a9557d1bcc5ed7878dd92d7d1843fce77bb0",
+      "outputDigest": "42a249864d90b32bceafbece119de1200d050b7ee2481b3e758a191f3d618808"
+    },
+    {
+      "operator": "cross-agent",
+      "file": "discovery/round1/cross-agent.output.json",
+      "agent": "fresh-context general-purpose subagent, round 1 (read only the input file)",
+      "inputDigest": "8eec3961650de44bce5425e10abb6ac2c843d6ffdbab261691dca39b8a8abf44",
+      "outputDigest": "f89a731f2ee6e879b705f94a34d6ea42d8da4d994a41ff712c983c98c1d8ef0c"
+    },
+    {
+      "operator": "cross-agent",
+      "file": "discovery/round2/cross-agent.output.json",
+      "agent": "fresh-context general-purpose subagent, round 2 (read only the input file)",
+      "inputDigest": "bbabd2ce7df0548a279ec8a2427993742698c4bfa048e6ee8e4faa8258c00adb",
+      "outputDigest": "2d9cde1b4aec47f2ff53ddc080c0958b01049862b9f1f7be6c2cf063c214c904"
+    },
+    {
+      "operator": "ai-explorer",
+      "file": "discovery/round2/ai-explorer.output.json",
+      "agent": "fresh-context general-purpose subagent, round 2 (read only the input file)",
+      "inputDigest": "6059ccec5777070edb0b6a660245ddc6d51bfe59c41b4bb1bbe6f9b080f6db1d",
+      "outputDigest": "1b4482b382a53d41fb107a78b2bfca3c8af82efe8eff98e69864bb5fb3dd7045"
+    },
+    {
+      "operator": "ai-explorer",
+      "file": "discovery/round3/ai-explorer.output.json",
+      "agent": "fresh-context general-purpose subagent, round 3 (read only the input file)",
+      "inputDigest": "45307eebfa537bede89a2e12f69023637ac2be84b9e547b8fba8fba5ffc83baa",
+      "outputDigest": "81a59c403e3c065ce63ef47e9e074d2df167d22c9b4b95b9d8592584a5b2b0d2"
+    },
+    {
+      "operator": "cross-agent",
+      "file": "discovery/round3/cross-agent.output.json",
+      "agent": "fresh-context general-purpose subagent, round 3 (read only the input file)",
+      "inputDigest": "3cc47894fd42416dc72216b91ae75f97e62c82b241b1ba105219a419c20c1b03",
+      "outputDigest": "bc8ddf8efcd427a303b936a1043e80dadbe98c3e479d2a424125ba6cd6ef1b02"
+    },
+    {
+      "operator": "ai-explorer",
+      "file": "discovery/round4/ai-explorer.output.json",
+      "agent": "fresh-context general-purpose subagent, round 4 (read only the input file)",
+      "inputDigest": "3e9b227559e1aa996a8ff066de8ea17a01c6c711533f78c981d8c95632627691",
+      "outputDigest": "912d401901233a0d395456920ec0876fb624506ef63bec95aac23e95483f9844"
+    },
+    {
+      "operator": "cross-agent",
+      "file": "discovery/round4/cross-agent.output.json",
+      "agent": "fresh-context general-purpose subagent, round 4 (read only the input file)",
+      "inputDigest": "fa7bb2a1328a8866267510389cded6d3ddf01509f2dcf305006a617c707691f2",
+      "outputDigest": "ebc96bcc5acb9a530d22051cc90569bfff5775b51927e57bdd45f6ed20589154"
+    },
+    {
+      "operator": "ai-explorer",
+      "file": "discovery/round5/ai-explorer.output.json",
+      "agent": "fresh-context general-purpose subagent, round 5 (read only the input file)",
+      "inputDigest": "5346fe9a5966f12903db0656bba7fe15aff83dea890831928c65d0fba60c9889",
+      "outputDigest": "801f5e915bc7e54748a5facc0f80c2d0d2196dffc38c09c99c964249be53b75a"
+    },
+    {
+      "operator": "cross-agent",
+      "file": "discovery/round5/cross-agent.output.json",
+      "agent": "fresh-context general-purpose subagent, round 5 (read only the input file)",
+      "inputDigest": "fc69aa7e1136971473bf11f5247c35337c943102198dc0a2afa6b7354075c1d3",
+      "outputDigest": "c7ef16e902ed1a8bc980e3605edaf4433d9a4f8720d40a566356254bfade5d1c"
+    },
+    {
+      "operator": "cross-agent",
+      "file": "discovery/round6/cross-agent.output.json",
+      "agent": "fresh-context general-purpose subagent, round 6 (read only the input file)",
+      "inputDigest": "749e454a7017635ae5a70d40970c23fcdd8adf3369d1405671575d1cb1555ff8",
+      "outputDigest": "ee1253025d5369606ae93745d8c3c2621f71f4eefc0fc3434a5c6935b98a50ad"
+    },
+    {
+      "operator": "ai-explorer",
+      "file": "discovery/ai-explorer.output.json",
+      "agent": "fresh-context general-purpose subagent, round 7 (read only the input file)",
+      "inputDigest": "645cb007247b12f989fc74785006c416c19313e96085eeadd24eb0e0d1737760",
+      "outputDigest": "628fe42decb55736702e7529119d792dba3ba13d6ec6820c684eb94bfb8d72a7"
+    },
+    {
+      "operator": "cross-agent",
+      "file": "discovery/cross-agent.output.json",
+      "agent": "fresh-context general-purpose subagent, round 7 (read only the input file)",
+      "inputDigest": "9c38635b6fd06e443e3cac2473511432afb04761fb8aeff8e66a2d319bcab457",
+      "outputDigest": "c03a6ed6bbf564747898703aaee89456b455fb4940e103e552d27d9e7e19d7b7"
+    }
+  ]
+}

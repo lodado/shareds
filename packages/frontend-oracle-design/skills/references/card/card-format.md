@@ -30,6 +30,23 @@ the order `Outcome Brief → Source Registry → User Confirmation → Decided p
 `oracle-verify.mjs card` checks the Outcome Brief required values and the Source Registry `Kind`
 before the lock.
 
+### Projected cards — the model decides, the card shows it
+
+A new card is projected from the model package (`oracle-package.mjs project-card`,
+[`bend-cross-verification.md`](../bend-cross-verification.md) §2), not typed. Everything the model
+fixes — the policies' rows, each row's formal predicate (`Formal` column), Case space family
+dispositions, Terms, Adequacy, Formal Model and the Derived Axes table — sits inside the
+`oracle:generated` region; a human change to it is `card-generated-drift`, and the way to change it is to
+edit the package, re-project and treat a changed meaning as a new revision. Outside the region the human
+records User Confirmation and any explanation; explanation never claims a meaning the formal column
+does not state. Show the user, from the region and the check outputs: the goals and their source
+sentences, key terms, assumptions and who guarantees them, the formal meaning, the derived axes, the
+order obligations and important success/failure/race traces, the adequacy and goal-implication results
+with their counterexamples and the `goalAudit` claim, the product boundaries the tests set and read, what
+is not formalized, open questions and the delta against the previous revision. UI, visual and
+accessibility contracts that stay outside the formal model keep their `D*` rows, sources and evidence
+paths — leaving the model does not remove the obligation.
+
 When there is a Design Intent, place the [`visual-design.md`](../visual-design.md) format
 immediately before the behavior matrix. Design Intent·`D*` rows·`O*` rows·confirmation evidence are
 all locked into the same Oracle bytes. Non-N/A `D*` rows map as `HARD → test`,
