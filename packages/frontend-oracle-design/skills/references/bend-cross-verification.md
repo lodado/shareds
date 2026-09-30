@@ -351,6 +351,15 @@ seed}}`, fails if fewer runs executed than requested, and fails if the environme
   fields that change while the observation stays the same. Record each in `## Terms` as not observed,
   with a reason, or raise it as a candidate axis.
 
+### Attacking the space after GREEN — discovery-driven closure
+
+Conformance shows the product matches the declared space; it cannot show the space is the right one.
+With a model package, [`discovery.md`](discovery.md) runs `oracle-discovery.mjs close` after
+`IMPLEMENTED_GREEN` and before the final report: the requirement inventory, the declared fault model
+(mutants run in child processes), metamorphic relations, the exploration operators and runtime
+anomalies attack the space, and every candidate they find goes to a human decision and a new revision.
+The closure verdict and its residual-risk list are evidence in the report, not a delivery state.
+
 ## 5. What was established, and trust limits
 
 Report each guarantee with its target, method and scope, separately:

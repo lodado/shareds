@@ -4,15 +4,25 @@
 
 import { initialSearch, reduceSearch } from './search-reducer.mts'
 
+// The harness delivers these results with response `id` — the world adapter reads them back from the product.
+export const itemsFor = (id) => [`result ${id}`]
+
 export function adapterFor(reduce, initial) {
   return {
     init: () => initial,
     step(state, event) {
       if (event.$ === 'Issue') return reduce(state, { type: 'issue' })
       if (event.$ === 'Respond' && Number.isInteger(event.id)) {
-        return reduce(state, { type: 'respond', requestId: event.id, items: [`result ${event.id}`] })
+        return reduce(state, { type: 'respond', requestId: event.id, items: itemsFor(event.id) })
       }
       throw new Error(`unmapped model event ${JSON.stringify(event)}`)
+    },
+    // The world adapter delivers a response with the results it chose (T7, T8: an empty list); the model's
+    // events carry no results, so step always delivers itemsFor(id).
+    respond(state, id, items) {
+      if (!Number.isInteger(id) || !Array.isArray(items))
+        throw new Error(`unmapped delivery ${JSON.stringify({ id, items })}`)
+      return reduce(state, { type: 'respond', requestId: id, items })
     },
     observe(state) {
       if (state?.results === null) return 0

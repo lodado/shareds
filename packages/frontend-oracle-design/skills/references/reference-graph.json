@@ -308,6 +308,12 @@
       "requires": ["common"]
     },
     {
+      "id": "discovery",
+      "path": "references/discovery.md",
+      "when": "Delivery with a model package — after IMPLEMENTED_GREEN and again before the final report; whenever a runtime anomaly or escape arrives; writing the requirement inventory, fault model, metamorphic relations, operator dispositions or discovery decisions, dispatching an AI operator, or running oracle-discovery.mjs",
+      "requires": ["common"]
+    },
+    {
       "id": "oracle-workflow-graph",
       "path": "references/oracle-workflow.graph.json",
       "when": "together with graph-orchestration",

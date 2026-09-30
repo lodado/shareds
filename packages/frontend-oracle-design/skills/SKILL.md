@@ -164,6 +164,11 @@ apply at every risk; Low has no new-work carve-out.
   coordinates and rows against them (`## Terms`, `## Adequacy`, [`adequacy.md`](references/adequacy.md)),
   `scripts/oracle-package.mjs` derives the axes from the model package and projects the card from it,
   and `scripts/oracle-projection.mjs` generates the fast-check conformance tests from the model.
+  In Delivery with a model package — after `IMPLEMENTED_GREEN` and again before the final report, on
+  every runtime anomaly or escape, and when writing the requirement inventory, fault model,
+  metamorphic relations, operator dispositions or discovery decisions or dispatching an AI operator —
+  read [`discovery.md`](references/discovery.md): `scripts/oracle-discovery.mjs close` attacks the
+  declared space, and its verdict and residual-risk list are evidence, not a delivery state.
   A failed install is a mandatory verification failure; it cannot be skipped or downgraded. Re-read before proof execution and GREEN/review. Use supported, authorized native delegation with capacity for
   an independent model analyst; later run proof/behavior checks concurrently on stable, isolated
   inputs when the host supports it. Report a concrete reason for sequential fallback. Approval,
@@ -397,7 +402,11 @@ When implementation, test-based self-verification, and subagent review are expli
    For an optional fresh implementation context after `VALID_RED`, use the existing runner's
    [task-scoped worker path](references/delivery/ledger.md#optional-task-scoped-implementation-worker).
    It is independent of graph opt-in and does not replace review or bypass mandatory verification.
-7. High risk: the sibling `test` skill's mutation kill·revert·re-GREEN first.
+7. High risk: the sibling `test` skill's mutation kill·revert·re-GREEN first. With a model package, at
+   every risk, run `oracle-discovery.mjs close --package <pkg> --dir <dir>` next
+   ([`discovery.md`](references/discovery.md)): an open candidate or a failing level goes back through
+   a human decision and a new revision — never into the locked card — and the verdict with its
+   residual-risk list goes into the report. Run it again before the final report.
 8. The Controller generates raw review input and assignment/dispatch with `oracle-run.mjs review-packet`.
    Reviewers return findings only; the Controller/join creates the `oracle-run.mjs review-receipt`
    ledger event and passes the receipt identity/digest to `oracle-verify.mjs review` and the final
@@ -482,6 +491,7 @@ Three rules decide what reaches the reader:
 | Design, Design confirmation | the visual scope is `local` or `identity-shaping`                    |
 | External visual QA          | `$frontend-visual-qa` actually ran                                   |
 | Mutation                    | risk is High                                                         |
+| Closure                     | the card was projected from a model package                          |
 
 ```text
 Status: <state> — <what actually happened, one line>
@@ -501,6 +511,9 @@ Blocked: <code> — <what it prevents> · <what would clear it>
 - <label> <runId> exit <n> <grade>
 - evidence verify <output> · findings verify <output>
 - accessibility · performance — <claim, or the reason it does not apply>
+
+**Closure** <verdict> — L1…L7 <pass|fail|n/a|no-evidence> · open candidates <n>
+- Residual <kind> — <what was not verified>
 
 **Risk and recovery** worst regression · what blocks it · reversibility·rollback
 

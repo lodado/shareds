@@ -33,6 +33,49 @@ export const HAZARD_IDS = [
   'carry-over',
   'order-timing',
 ]
+// Discovery 레지스트리 — 발견 연산자 카탈로그의 ID는 oracle-discovery.mjs의 OPERATORS와 같다(테스트가 일치를 확인한다).
+export const OPERATOR_IDS = [
+  'requirement-coverage',
+  'observation-sufficiency',
+  'goal-implication',
+  'goal-witness',
+  'assumption-sensitivity',
+  'temporal-order',
+  'trace-extension',
+  'boundary-perturbation',
+  'order-perturbation',
+  'projection-residue',
+  'world-model-gap',
+  'mutation',
+  'metamorphic',
+  'dependency-failure',
+  'latency',
+  'environment-variation',
+  'malformed-input',
+  'concurrency',
+  'ai-explorer',
+  'cross-agent',
+]
+// 도구가 일반적으로 만들어 낼 수 없는 계열 — 모델이 그 현상을 표현하면 `modeled: <축>`, 아니면 출처가 있는 n/a.
+export const DECLARED_OPERATORS = ['dependency-failure', 'latency', 'environment-variation', 'malformed-input', 'concurrency']
+export const AI_OPERATORS = ['ai-explorer', 'cross-agent']
+export const FAULT_CLASSES = [
+  'conditional',
+  'boundary',
+  'state-transition',
+  'permission',
+  'retry',
+  'timeout',
+  'error-suppression',
+  'ordering',
+  'caching',
+  'stale-data',
+]
+export const DECISIONS = ['promoted', 'covered', 'out-of-scope', 'equivalent', 'accepted-risk', 'rejected']
+export const AXIS_ORIGINS = ['source', 'model', 'counterexample', 'incident', 'analyst', 'review']
+export const TESTABILITY = ['tested', 'monitored', 'untestable']
+export const ASSUMPTION_STATUS = ['open', 'confirmed', 'refuted']
+export const LIFECYCLE_KEYS = ['valid', 'invalid', 'transitions', 'owner', 'lifetime', 'invariant']
 const SOURCE_KINDS = ['product-policy', 'mandatory-constraint', 'project-constraint', 'implementation-reference']
 const RISKS = ['Low', 'Medium', 'High']
 const BEGIN = '<!-- oracle:generated:begin'
@@ -133,6 +176,11 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
       push('package-source-kind', `${source?.id}: kind must be ${SOURCE_KINDS.join(' | ')}`)
     for (const field of ['jurisdiction', 'standard', 'location', 'approval'])
       if (!nonEmpty(source?.[field])) push('package-source-field', `${source?.id}: ${field} is required`)
+    // Bend imports only plain names (letters, digits, _ and -): a dotted file name such as World.v1.bend cannot be
+    // imported, and the kernel would report a failed proof instead of naming the file.
+    const bendPath = repoPathOf(source?.location)
+    if (/\.bend$/.test(bendPath ?? '') && !bendPath.replace(/\.bend$/, '').split('/').every((segment) => /^(?:[\w-]+|\.{1,2})$/.test(segment)))
+      push('package-bend-name', `${source?.id}: ${bendPath} — Bend imports only plain names (letters, digits, _ and -) in each path segment`)
   }
   if (sources.size === 0) push('package-sources', 'list the source text as sources')
   const authoritative = (id) => {
@@ -193,6 +241,17 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
       push('package-term-family', `${term?.id}: family must be one of ${FAMILIES.join(', ')}`)
     if (!sources.has(term?.source))
       push('package-cite-unknown', `term ${term?.id}: ${term?.source} is not a package source`)
+    // Ubiquitous Language — 수명주기는 선택이지만, 적으면 여섯 칸 모두 문자열이어야 한다(빠진 용어는 closure가 known
+    // unknown으로 보고한다).
+    if (term?.lifecycle !== undefined) {
+      const keys = Object.keys(term.lifecycle ?? {})
+      if (
+        typeof term.lifecycle !== 'object' ||
+        keys.some((key) => !LIFECYCLE_KEYS.includes(key)) ||
+        LIFECYCLE_KEYS.some((key) => !nonEmpty(term.lifecycle[key]))
+      )
+        push('package-term-lifecycle', `${term?.id}: lifecycle needs exactly ${LIFECYCLE_KEYS.join(', ')}`)
+    }
   }
   for (const [field, owners] of fieldOwners)
     if (owners.length > 1) push('package-term-conflated', `${field}: ${owners.join(', ')} name one world field`)
@@ -209,10 +268,41 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
     if (!nonEmpty(assumption?.owner)) push('package-assumption-owner', `${assumption?.id}: owner is required`)
     else if (/^product\b/i.test(assumption.owner))
       push('package-assumption-owner', `${assumption?.id}: a duty of the product is a goal, not an assumption`)
+    // Assumption Registry — 무엇을 근거로 믿는지, 틀리면 무엇이 깨지는지, 검사할 수 있는지, 지금 어떤 상태인지.
+    for (const field of ['evidence', 'riskIfFalse'])
+      if (!nonEmpty(assumption?.[field])) push('package-assumption-registry', `${assumption?.id}: ${field} is required`)
+    if (!TESTABILITY.includes(assumption?.testability))
+      push('package-assumption-registry', `${assumption?.id}: testability must be ${TESTABILITY.join(' | ')}`)
+    if (!ASSUMPTION_STATUS.includes(assumption?.status))
+      push('package-assumption-registry', `${assumption?.id}: status must be ${ASSUMPTION_STATUS.join(' | ')}`)
   }
+
+  // Requirement Inventory — 원문 문장 하나가 요구사항 하나다. quote는 원문에 글자 그대로 있어야 한다(closure가 확인한다).
+  const requirements = new Set()
+  for (const requirement of pkg?.requirements ?? []) {
+    if (!/^R\d+$/.test(requirement?.id ?? '') || requirements.has(requirement.id))
+      push('package-requirement-id', `"${requirement?.id}" must be a unique R* ID`)
+    requirements.add(requirement?.id)
+    if (!nonEmpty(requirement?.quote)) push('package-requirement-quote', `${requirement?.id}: quote the source text`)
+    const source = sources.get(requirement?.source)
+    if (!source || source.kind === 'implementation-reference' || source.self || source.approval !== 'approved')
+      push('package-requirement-source', `${requirement?.id}: source must be an authoritative package source`)
+    else if (/\.bend$/.test(repoPathOf(source.location) ?? ''))
+      push('package-requirement-source', `${requirement?.id}: a requirement quotes the source text, not a model`)
+  }
+  if (requirements.size === 0)
+    push('package-requirements', 'list the source requirements as R* entries with verbatim quotes')
+  const citeRequirements = (where, list) => {
+    if (list === undefined) return
+    if (!Array.isArray(list)) push('package-requirement-ref', `${where}: requirements must be a list of R* IDs`)
+    for (const id of Array.isArray(list) ? list : [])
+      if (!requirements.has(id)) push('package-requirement-ref', `${where}: ${id} is not a requirement`)
+  }
+  for (const assumption of pkg?.assumptions ?? []) citeRequirements(`assumption ${assumption?.id}`, assumption?.requirements)
 
   const goals = new Set()
   for (const goal of pkg?.goals ?? []) {
+    citeRequirements(`goal ${goal?.id}`, goal?.requirements)
     if (!/^G\d+$/.test(goal?.id ?? '') || goals.has(goal.id))
       push('package-goal-id', `"${goal?.id}" must be a unique G* ID`)
     goals.add(goal?.id)
@@ -249,6 +339,7 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
   }
 
   issues.push(...contractRowIssues(pkg?.contract))
+  issues.push(...discoveryRegistryIssues(pkg, { sources, requirements, questions }))
   if (stage === 'model') return issues
 
   const policies = new Set()
@@ -258,6 +349,7 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
     policies.add(policy?.id)
     if (!nonEmpty(policy?.text)) push('package-policy-text', `${policy?.id}: text is required`)
     cite(`policy ${policy?.id}`, policy?.sources, { authority: true })
+    citeRequirements(`policy ${policy?.id}`, policy?.requirements)
   }
   if (policies.size === 0) push('package-policies', 'list the decided policies')
 
@@ -281,6 +373,7 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
     if ((entry?.policies ?? []).length === 0) push('package-contract-policy', `${entry?.key}: cite at least one policy`)
     for (const field of ['given', 'when', 'then', 'never', 'sideEffects'])
       if (!nonEmpty(entry?.[field])) push('package-contract-text', `${entry?.key}: ${field} is required`)
+    citeRequirements(`contract ${entry?.key}`, entry?.requirements)
   }
   if (keys.size === 0) push('package-contract', 'list the contract predicates')
   for (const policy of policies)
@@ -289,6 +382,7 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
   for (const entry of pkg?.notApplicable ?? []) {
     if (!nonEmpty(entry?.text)) push('package-na', 'a notApplicable entry needs text')
     cite('notApplicable', entry?.sources, { authority: true })
+    citeRequirements('notApplicable', entry?.requirements)
   }
 
   const families = pkg?.families ?? {}
@@ -325,6 +419,140 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
           push('package-law', `${law?.name}: ${id} is neither a policy nor a contract key`)
     }
     if ((behavior.lawRows ?? []).length === 0) push('package-law', 'behavior.lawRows lists every law in the laws file')
+    citeRequirements('behavior', behavior.requirements)
+  }
+  return issues
+}
+
+const DISPOSITION = /^(?:n\/a:\s*(S\d+)\s+\S.*|modeled:\s*([\w.]+)\s*)$/
+
+/**
+ * Discovery 레지스트리의 구조 검사 — 있으면 모든 단계에서 본다. 이 필드들은 closure(oracle-discovery.mjs)가 요구하고,
+ * 카드 투영은 요구하지 않는다: 공간을 공격하는 방법(E)·결함 모델(F)·결정 기록이 여기 있다. 결정(discoveryDecisions)은
+ * 사람이 출처와 함께 적는다 — 도구는 쓰지 않는다.
+ */
+function discoveryRegistryIssues(pkg, { sources, requirements, questions }) {
+  const issues = []
+  const push = (code, message) => issues.push(`${code}: ${message}`)
+  // 권위 — 승인된 원문. 구현 참고·패키지 자신·Bend 모델 파일은 결정이나 n/a의 근거가 되지 못한다(자기 참조다).
+  const sourceOk = (id) => {
+    const source = sources.get(id)
+    return (
+      Boolean(source) &&
+      source.kind !== 'implementation-reference' &&
+      !source.self &&
+      source.approval === 'approved' &&
+      !/\.bend$/.test(repoPathOf(source.location) ?? '')
+    )
+  }
+  const repoFile = (where, value) => {
+    if (!nonEmpty(value) || value.startsWith('/') || value.includes('..'))
+      push('package-discovery-path', `${where} must be a repository-relative path`)
+  }
+
+  if (pkg?.spaceVersion !== undefined && !(Number.isInteger(pkg.spaceVersion) && pkg.spaceVersion >= 1))
+    push('package-space-version', 'spaceVersion must be a positive integer')
+
+  for (const [axis, origin] of Object.entries(pkg?.axisOrigins ?? {})) {
+    if (!AXIS_ORIGINS.includes(origin?.origin))
+      push('package-axis-origin', `${axis}: origin must be ${AXIS_ORIGINS.join(' | ')}`)
+    for (const field of ['ref', 'reason'])
+      if (!nonEmpty(origin?.[field])) push('package-axis-origin', `${axis}: ${field} is required`)
+  }
+
+  const faults = new Set()
+  for (const fault of pkg?.faultModel ?? []) {
+    if (!/^F\d+$/.test(fault?.id ?? '') || faults.has(fault.id))
+      push('package-fault-id', `"${fault?.id}" must be a unique F* ID`)
+    faults.add(fault?.id)
+    if (!FAULT_CLASSES.includes(fault?.class))
+      push('package-fault-class', `${fault?.id}: class must be one of ${FAULT_CLASSES.join(', ')}`)
+    repoFile(`fault ${fault?.id}: file`, fault?.file)
+    // 결함은 제품에 심는다 — 어댑터나 하네스를 바꾸면 검사가 스스로 실패해 변이를 "죽인" 것처럼 보인다
+    if (Array.isArray(pkg?.product?.files) && !pkg.product.files.includes(fault?.file))
+      push('package-fault-file', `${fault?.id}: ${fault?.file} is not one of product.files`)
+    if (typeof fault?.find !== 'string' || fault.find === '' || typeof fault?.replace !== 'string' || fault.find === fault.replace)
+      push('package-fault-edit', `${fault?.id}: find and replace are two different strings`)
+  }
+  if (pkg?.mutationThreshold !== undefined && !(typeof pkg.mutationThreshold === 'number' && pkg.mutationThreshold > 0 && pkg.mutationThreshold <= 1))
+    push('package-mutation-threshold', 'mutationThreshold is a number in (0, 1]')
+
+  const metamorphic = pkg?.metamorphic
+  if (typeof metamorphic === 'string') {
+    const match = metamorphic.match(/^n\/a:\s*(S\d+)\s+\S/)
+    if (!match || !sourceOk(match[1])) push('package-metamorphic', 'metamorphic is { source, relations } or "n/a: S<n> <reason>"')
+  } else if (metamorphic !== undefined) {
+    if (!/\.bend$/.test(repoPathOf(sources.get(metamorphic?.source)?.location) ?? ''))
+      push('package-metamorphic', 'metamorphic.source must name a repo:<path>.bend package source')
+    const ids = new Set()
+    for (const relation of metamorphic?.relations ?? []) {
+      if (!/^MR\d+$/.test(relation?.id ?? '') || ids.has(relation.id))
+        push('package-metamorphic', `"${relation?.id}" must be a unique MR* ID`)
+      ids.add(relation?.id)
+      for (const field of ['transform', 'relation'])
+        if (!/^[A-Z]\w*\.\w+$/.test(relation?.[field] ?? ''))
+          push('package-metamorphic', `${relation?.id}: ${field} must name a def as <Namespace>.<name>`)
+      for (const id of relation?.requirements ?? [])
+        if (!requirements.has(id)) push('package-requirement-ref', `metamorphic ${relation?.id}: ${id} is not a requirement`)
+    }
+    if ((metamorphic?.relations ?? []).length === 0) push('package-metamorphic', 'metamorphic.relations lists at least one relation')
+  }
+
+  const product = pkg?.product
+  if (product !== undefined) {
+    for (const field of ['adapter', 'worldAdapter']) repoFile(`product.${field}`, product?.[field])
+    if (!Array.isArray(product?.files) || product.files.length === 0) push('package-product', 'product.files lists the product modules under test')
+    for (const file of product?.files ?? []) repoFile('product.files', file)
+    if (!Number.isInteger(product?.runs) || product.runs < 1) push('package-product', 'product.runs is a positive fast-check run count')
+    if (!Number.isInteger(product?.maxLength) || product.maxLength < 2)
+      push('package-product', 'product.maxLength is the longest sampled trace')
+  }
+
+  for (const [id, disposition] of Object.entries(pkg?.operators ?? {})) {
+    if (!OPERATOR_IDS.includes(id)) push('package-operator', `${id} is not a discovery operator`)
+    const match = typeof disposition === 'string' ? disposition.match(DISPOSITION) : null
+    if (!match) push('package-operator', `${id}: "n/a: S<n> <reason>" or "modeled: <axis id>"`)
+    else if (match[1] && !sourceOk(match[1])) push('package-operator', `${id}: ${match[1]} is not an authoritative source`)
+    else if (match[2] && !DECLARED_OPERATORS.includes(id))
+      push('package-operator', `${id} runs mechanically — only ${DECLARED_OPERATORS.join(', ')} are declared as modeled`)
+  }
+  for (const [field, disposition] of Object.entries(pkg?.residue ?? {})) {
+    const match = typeof disposition === 'string' ? disposition.match(DISPOSITION) : null
+    if (!match || (match[1] && !sourceOk(match[1])))
+      push('package-residue', `${field}: "modeled: <axis id>" or "n/a: S<n> <reason>"`)
+  }
+
+  for (const run of pkg?.aiRuns ?? []) {
+    if (!AI_OPERATORS.includes(run?.operator)) push('package-ai-run', `operator must be ${AI_OPERATORS.join(' | ')}`)
+    repoFile('aiRuns.file', run?.file)
+    if (!nonEmpty(run?.agent)) push('package-ai-run', 'name the agent that produced the run')
+    if (!/^[a-f0-9]{64}$/.test(run?.inputDigest ?? ''))
+      push('package-ai-run', 'inputDigest is the sha256 of the exact input the agent received (oracle-discovery.mjs ai-input)')
+    if (!/^[a-f0-9]{64}$/.test(run?.outputDigest ?? ''))
+      push('package-ai-run', 'outputDigest is the sha256 of the output file as recorded — an edited output is not the run')
+  }
+
+  const decided = new Set()
+  for (const decision of pkg?.discoveryDecisions ?? []) {
+    const where = `decision ${decision?.candidate}`
+    if (!/^C-[a-f0-9]{10}$/.test(decision?.candidate ?? '') || decided.has(decision.candidate))
+      push('package-decision', `${where}: candidate must be a unique C-<10 hex> ID from a discovery run`)
+    decided.add(decision?.candidate)
+    if (!DECISIONS.includes(decision?.decision)) push('package-decision', `${where}: decision must be ${DECISIONS.join(' | ')}`)
+    if (!nonEmpty(decision?.reason)) push('package-decision', `${where}: reason is required`)
+    // 범위 밖·위험 수용·기각은 사람의 정책 결정이다 — 승인된 출처나 Open question이 있어야 한다.
+    if (['out-of-scope', 'accepted-risk', 'promoted', 'rejected'].includes(decision?.decision)) {
+      const source = decision?.source ?? ''
+      if (!(sourceOk(source) || questions.has(source)))
+        push('package-decision', `${where}: ${decision?.decision} cites an authoritative S* or an Open question Q*`)
+    }
+    if (decision?.decision === 'promoted' && !nonEmpty(decision?.axis))
+      push('package-decision', `${where}: a promotion names the axis, goal, contract key or assumption it became`)
+    // 이미 덮인 후보 — 어느 행(O*·계약 키)이 덮는지 적고, 그 행이 실제로 있어야 한다.
+    if (decision?.decision === 'covered') {
+      const rows = new Set((pkg?.contract ?? []).flatMap((entry) => [entry?.key, entry?.row].filter(Boolean)))
+      if (!rows.has(decision?.by)) push('package-decision', `${where}: covered names the contract row (by: O* or key) that already rejects it`)
+    }
   }
   return issues
 }
@@ -754,6 +982,31 @@ function table(header, rows) {
   return [line(header), `| ${widths.map((width) => '-'.repeat(width)).join(' | ')} |`, ...rows.map(line)]
 }
 
+/**
+ * 요구사항 → 그것을 담은 오라클 요소(목표·정책·가정·계약 행·N/A·행동 모델·metamorphic 관계). L1 Requirement Closure의
+ * 재료다. N/A만으로 담긴 요구사항은 명시적으로 범위 밖으로 둔 것이다(scoped-out) — 누락과 구별한다.
+ */
+export function requirementMapping(pkg) {
+  let rows = new Map()
+  try {
+    ;({ rows } = assignRows(pkg.contract ?? []))
+  } catch {
+    rows = new Map()
+  }
+  const mapping = new Map((pkg.requirements ?? []).map((requirement) => [requirement.id, []]))
+  const add = (list, label) => {
+    for (const id of list ?? []) mapping.get(id)?.push(label)
+  }
+  for (const goal of pkg.goals ?? []) add(goal.requirements, goal.id)
+  for (const policy of pkg.policies ?? []) add(policy.requirements, policy.id)
+  for (const assumption of pkg.assumptions ?? []) add(assumption.requirements, assumption.id)
+  for (const entry of pkg.contract ?? []) add(entry.requirements, rows.get(entry.key) ?? entry.key)
+  for (const entry of pkg.notApplicable ?? []) add(entry.requirements, 'N/A')
+  add(pkg.behavior?.requirements, 'behavior')
+  if (typeof pkg.metamorphic === 'object') for (const relation of pkg.metamorphic?.relations ?? []) add(relation.requirements, relation.id)
+  return mapping
+}
+
 function orderSummary(order) {
   if (!order) return 'unchecked — no trace space was enumerated'
   const counts = {}
@@ -764,6 +1017,42 @@ function orderSummary(order) {
   const detail = kinds ? ` (${kinds})` : ''
   const incomplete = order.complete ? '' : ' — space incomplete'
   return `${order.total} within bound ${order.bound}${detail}${incomplete}`
+}
+
+/** 사용자가 함께 승인하는 공격 방법 — Fault Model F, metamorphic 관계, 연산자·잔여 필드 처분, 기본값이 아닌 축 기원. */
+function discoverySpaceSection(pkg) {
+  const faults = pkg.faultModel ?? []
+  const relations = typeof pkg.metamorphic === 'object' ? pkg.metamorphic?.relations ?? [] : []
+  const operators = Object.entries(pkg.operators ?? {})
+  const residue = Object.entries(pkg.residue ?? {})
+  const origins = Object.entries(pkg.axisOrigins ?? {})
+  if (faults.length + relations.length + operators.length + residue.length + origins.length === 0 && !pkg.metamorphic)
+    return []
+  const out = ['## Discovery Space', '', `- Space version: ${pkg.spaceVersion ?? 1}`]
+  if (typeof pkg.metamorphic === 'string') out.push(`- Metamorphic: ${pkg.metamorphic}`)
+  if (pkg.mutationThreshold !== undefined) out.push(`- Mutation threshold: ${pkg.mutationThreshold}`)
+  out.push('')
+  if (faults.length > 0)
+    out.push(...table(['Fault', 'Class', 'File', 'Mutation'], faults.map((fault) => [fault.id, fault.class, fault.file, fault.note ?? '—'])), '')
+  if (relations.length > 0)
+    out.push(
+      ...table(
+        ['Relation', 'Transform', 'Holds', 'Requirements'],
+        relations.map((relation) => [relation.id, relation.transform, relation.relation, (relation.requirements ?? []).join(' ') || '—']),
+      ),
+      '',
+    )
+  if (operators.length > 0) out.push(...table(['Operator', 'Disposition'], operators), '')
+  if (residue.length > 0) out.push(...table(['Residue field', 'Disposition'], residue), '')
+  if (origins.length > 0)
+    out.push(
+      ...table(
+        ['Axis', 'Origin', 'Ref', 'Reason'],
+        origins.map(([axis, origin]) => [axis, origin.origin, origin.ref, origin.reason]),
+      ),
+      '',
+    )
+  return out
 }
 
 /** 생성 영역 본문. 같은 패키지·세계·모델 원문이면 같은 바이트다. */
@@ -797,9 +1086,25 @@ export function renderGenerated(pkg, derived) {
       ]),
     ),
     '',
-    '## Decided policies',
-    '',
   )
+  if ((pkg.requirements ?? []).length > 0) {
+    const mapping = requirementMapping(pkg)
+    out.push(
+      '## Requirements',
+      '',
+      ...table(
+        ['ID', 'Source', 'Quote', 'Mapped by'],
+        pkg.requirements.map((requirement) => [
+          requirement.id,
+          requirement.source,
+          requirement.quote,
+          mapping.get(requirement.id).join(' ') || 'unmapped',
+        ]),
+      ),
+      '',
+    )
+  }
+  out.push('## Decided policies', '')
   for (const policy of pkg.policies) {
     const linked = (pkg.contract ?? [])
       .filter((entry) => entry.policies.includes(policy.id))
@@ -938,6 +1243,7 @@ export function renderGenerated(pkg, derived) {
       '',
     )
   }
+  out.push(...discoverySpaceSection(pkg))
   out.push(
     '## Derived Axes',
     '',
@@ -1069,7 +1375,8 @@ export async function packageInputs(loaded) {
   const { pkg } = loaded
   const portable = (path) => relative(loaded.root, path).split('\\').join('/')
   const entries = [{ path: portable(loaded.path), sha256: sha256(loaded.text) }]
-  for (const id of [pkg.world?.source, pkg.behavior?.model, pkg.behavior?.laws]) {
+  const metamorphic = typeof pkg.metamorphic === 'object' ? pkg.metamorphic?.source : undefined
+  for (const id of [pkg.world?.source, pkg.behavior?.model, pkg.behavior?.laws, metamorphic]) {
     const path = id ? sourcePath(loaded, id) : null
     if (!path) continue
     for (const input of await bendInputs(path)) entries.push({ path: portable(input.path), sha256: input.sha256 })

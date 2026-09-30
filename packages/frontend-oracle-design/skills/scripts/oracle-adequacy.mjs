@@ -1257,7 +1257,7 @@ export async function conformWorld({
   }
 }
 
-function anchoredSection(text, anchor) {
+export function anchoredSection(text, anchor) {
   if (!anchor) return text
   const lines = text.split('\n')
   const start = lines.findIndex((line) => {
@@ -1268,6 +1268,16 @@ function anchoredSection(text, anchor) {
   const level = lines[start].match(/^#+/)[0].length
   const end = lines.findIndex((line, index) => index > start && new RegExp(`^#{1,${level}}\\s`).test(line))
   return lines.slice(start, end === -1 ? lines.length : end).join('\n')
+}
+
+/** 모델 패키지(JSON, packageVersion 있음)인가 — 원문 절에 싣지 않는다. */
+function isModelPackage(repoPath, text) {
+  if (!repoPath.endsWith('.json') || text === null) return false
+  try {
+    return JSON.parse(text)?.packageVersion !== undefined
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -1285,6 +1295,9 @@ async function sourceTexts(lines, cwd) {
     const [repoPath, anchor] = location.slice('repo:'.length).split('#')
     if (repoPath.endsWith('.bend')) continue
     const text = await readFile(resolve(cwd, repoPath), 'utf8').catch(() => null)
+    // 모델 패키지는 원문이 아니다 — 작성자의 해석·계약·결정이 들어 있다. 원문 절에 실으면 해석이 원문처럼 읽히고, 패키지가
+    // 바뀔 때마다(결정 기록 하나만 늘어도) 입력이 바뀐다.
+    if (isModelPackage(repoPath, text)) continue
     sources.push(
       `### ${row.ID} ${location}`,
       '',
@@ -1365,7 +1378,7 @@ export async function modelInput({ card, package: packagePath, cwd = process.cwd
   ].join('\n')
 }
 
-const EXPLORER_SCHEMA = {
+export const EXPLORER_SCHEMA = {
   candidates: [
     {
       id: 'X1',
@@ -1474,7 +1487,8 @@ export async function triageCandidates({ card, package: packagePath, candidates,
       return { ...base, verdict: 'invalid', reason: 'a candidate cites the source text (sources)' }
     if (candidate.kind === 'in-world') {
       const { plain, errors } = parseWorldLiteral(candidate.world ?? '', spec.fields)
-      if (errors.length > 0) return { ...base, verdict: 'invalid', reason: errors.join('; ') }
+      // literalErrors: the literal does not name this world's fields — a run made on an earlier world
+      if (errors.length > 0) return { ...base, verdict: 'invalid', reason: errors.join('; '), literalErrors: errors }
       const world = worlds.get(worldKey(plain))
       if (!world.valid) {
         const against = spec.assumptions.filter((id) => !world.truth[id])
@@ -1521,6 +1535,7 @@ export async function triageCandidates({ card, package: packagePath, candidates,
           ...base,
           verdict: 'invalid',
           reason: `${fact.name} is already a field — state it as an in-world candidate`,
+          existingField: fact.name,
         }
       if (!['controllable', 'observable', 'hidden'].includes(fact.category))
         return { ...base, verdict: 'invalid', reason: 'newFact.category must be controllable | observable | hidden' }

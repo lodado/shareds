@@ -1,0 +1,77 @@
+{
+  "candidates": [
+    {
+      "id": "X1",
+      "kind": "qualifier",
+      "scenario": "The person types 'ca', then 'cat' before 'ca' answers. The 'cat' results come back first, but the list stays empty until the slow 'ca' response arrives and is dropped; only then do the 'cat' results appear. O1 still passes: final is read after the last event, and in the '2 then 1' order the last event is the late 'ca' response.",
+      "harm": "For as long as the older request takes, the person looks at an empty list while the results for what they typed are already there. S1 item 3 says the latest request's response is shown when it arrives, but O1 only promises that the list ends with it, so a reducer that applies responses in request order passes O1, O2, O3 and O5.",
+      "sourceText": "is shown when it arrives",
+      "rows": [
+        "O1"
+      ],
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X2",
+      "kind": "new-fact",
+      "scenario": "The person types 'ca', then 'cat'. The 'ca' request is never answered and the 'cat' response arrives. A reducer that holds a response until every earlier request has answered never shows the 'cat' results.",
+      "harm": "The results for the latest query never appear. S1 item 3 says the latest request's response is shown when it arrives, and S1 item 4 says the environment delivers each response at most once, so a response 1 that never comes is inside the stated environment.",
+      "newFact": {
+        "name": "response 1 never delivered while response 2 arrives",
+        "category": "controllable",
+        "observedVia": "test: the world adapter withholds response 1 for the whole attempt and delivers response 2"
+      },
+      "whyOutside": "arrival has only OldFirst, NewFirst and OldEarly, and each of them delivers response 1; newAnswers can withhold only response 2. No world delivers response 2 without response 1: O1's Given assumes response 1 arrives, and the 'or nothing arrives' case that O3 names has no world either.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X3",
+      "kind": "new-fact",
+      "scenario": "The person types 'c', 'ca' and 'cat' quickly, so three requests are in flight. The 'ca' response arrives and is dropped; then the 'c' response arrives and the list shows 'c' results until the 'cat' results replace them.",
+      "harm": "An older request's late results show before the latest ones, the Brief's worst regression. S1 item 2 covers a response to any older request, not just the one issued right before the latest, yet a reducer that drops only the previous request's response passes O1, O2, O3 and O5.",
+      "newFact": {
+        "name": "a third request issued before responses 1 and 2 arrive",
+        "category": "controllable",
+        "observedVia": "test: the world adapter issues request 3, then delivers response 2, then response 1, before response 3"
+      },
+      "whyOutside": "Every coordinate and observation names request 1 or request 2: arrival places response 1 against request 2 and response 2, final is NewShown, OldShown or NoneShown, and oldShown watches only response 1. No world has a response two requests behind the latest, and O4's traces stop at 4 events, one short of three requests followed by responses 2 and 1.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X4",
+      "kind": "new-fact",
+      "scenario": "The person types 'ca' and its results show. They add 't' and then 's' before 'cat' answers. The 'ca' results vanish, either when 'cats' is issued while 'cat' is unanswered or when the late 'cat' response arrives, and the list stays blank until 'cats' answers.",
+      "harm": "The person loses the results they were reading while they wait. S1 item 1 says the list keeps showing what it showed until a response arrives, and S1 item 2 says a response to an older request does not change what the list shows.",
+      "newFact": {
+        "name": "earlier results on screen while an older request is still unanswered",
+        "category": "controllable",
+        "observedVia": "test: the world adapter answers request 1, issues requests 2 and 3, then delivers response 2 before response 3"
+      },
+      "whyOutside": "The list starts empty and only response 1 can fill it before request 2 is issued, so kept results exist only in OldEarly, where no older request is still in flight. No world issues a request, or delivers a stale response, while results are on screen, so a reducer that clears the list when a request is issued while another is unanswered, or when a stale response arrives before the latest one, passes O1, O2, O3 and O5. oldShown records only a change to request 1's results, not a stale response that clears the list.",
+      "sources": [
+        "S1"
+      ]
+    },
+    {
+      "id": "X5",
+      "kind": "new-fact",
+      "scenario": "The person types a long query one letter at a time. Requests 9 and 10 race: response 10 arrives and shows, then the late response 9 arrives and, with ids compared as text ('9' sorts after '10'), is taken as the newer one and replaces the list.",
+      "harm": "An older request's late results replace the latest ones, the Brief's worst regression. S1 item 1 makes request 10 the latest, since ids grow by one per issued request, and S1 item 2 says response 9 does not change what the list shows.",
+      "newFact": {
+        "name": "request ids of two or more digits",
+        "category": "controllable",
+        "observedVia": "test: the world adapter issues nine earlier requests (or starts the id counter at 9) so the racing requests are 9 and 10"
+      },
+      "whyOutside": "The world has only requests 1 and 2 and no field sets id values, so an id comparison that is right for 1 and 2 but wrong past 9, such as comparing ids as text ('10' before '9'), passes every row. O4's traces of at most 4 events hold at most four requests.",
+      "sources": [
+        "S1"
+      ]
+    }
+  ]
+}

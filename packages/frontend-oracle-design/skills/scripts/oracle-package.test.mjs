@@ -36,6 +36,12 @@ const DRAFT = JSON.parse(await readFile(join(FIXTURE, 'oracle.package.draft.json
 const WORLD = await readFile(join(FIXTURE, 'World.bend'), 'utf8')
 const MODEL = await readFile(join(FIXTURE, 'MODEL.bend'), 'utf8')
 const clone = (value) => structuredClone(value)
+// 모델 단계 변형 — 발견 레지스트리(결정·실행 기록·축 기원)는 계약·카드가 생긴 뒤의 것이라 함께 뺀다.
+const modelOnly = (pkg) => {
+  const copy = clone(pkg)
+  for (const field of ['discoveryDecisions', 'aiRuns', 'axisOrigins']) delete copy[field]
+  return copy
+}
 
 /** 설치된 고정 Bend가 있을 때만 돈다 — 테스트는 내려받지 않는다. skip은 통과가 아니라 skipped로 남는다. */
 async function installedBend(t) {
@@ -70,13 +76,17 @@ test('the package hazard list is the adequacy hazard list', () => {
 
 // ── stage A: 카드 없이 모델 작성에 들어간다 ─────────────────────────────────────────────────────────────
 
-test('model stage needs sources, world, terms and goals only — no card, no O* row, no contract', () => {
+test('model stage needs sources, the requirement inventory, world, terms and goals — no card, no O* row, no contract', () => {
   assert.deepEqual(packageIssues(PKG), [])
   assert.deepEqual(packageIssues(DRAFT), [])
-  const early = clone(PKG)
+  const early = modelOnly(PKG)
   for (const field of ['policies', 'contract', 'behavior', 'families', 'notApplicable']) delete early[field]
   early.sources = early.sources.filter((source) => !source.self)
   assert.deepEqual(packageIssues(early, { stage: 'model' }), [])
+  // the requirement inventory is part of reading the source, so the model stage already needs it
+  const unread = clone(early)
+  delete unread.requirements
+  assert.ok(packageIssues(unread, { stage: 'model' }).some((issue) => issue.startsWith('package-requirements')))
   // projecting a card is a later stage: it needs the contract, the policies, the behavior model and the self source
   const projectIssues = packageIssues(early, { stage: 'project' }).map((issue) => issue.split(':')[0])
   for (const code of ['package-policies', 'package-contract', 'package-self', 'package-behavior-missing'])
@@ -109,6 +119,15 @@ test('the package refuses readings that would hide a goal or merge meanings', ()
     policies: entry.policies.filter((id) => id !== 'P3'),
   }))
   assert.ok(codes(unlinked).includes('package-policy-unlinked'))
+})
+
+test('a Bend source must have a name Bend can import, so a dotted file name is refused instead of failing the kernel', () => {
+  const dotted = clone(PKG)
+  dotted.sources.find((source) => source.id === 'S4').location = 'repo:World.v1.bend#v1'
+  assert.ok(packageIssues(dotted).some((issue) => issue.startsWith('package-bend-name: S4: World.v1.bend')))
+  const nested = clone(PKG)
+  nested.sources.find((source) => source.id === 'S4').location = 'repo:formal/world-v1/World_2.bend#v1'
+  assert.ok(!packageIssues(nested).some((issue) => issue.startsWith('package-bend-name')))
 })
 
 test('row IDs come from pinned model symbols; a new predicate never shifts an existing row', () => {
@@ -146,8 +165,10 @@ test('axes are derived from the world record and the behavior types, with roles 
   const derived = derive(PKG, { world: WORLD, model: MODEL })
   assert.equal(derived.status, 'derived')
   const byId = Object.fromEntries(derived.axes.map((axis) => [axis.id, axis]))
-  assert.deepEqual(derived.summary.coordinates, ['arrival', 'newAnswers'])
-  assert.deepEqual(derived.summary.observations, ['final', 'oldShown'])
+  assert.deepEqual(derived.summary.coordinates, ['arrival', 'newAnswers', 'oldEmpty', 'newEmpty', 'longSession'])
+  assert.deepEqual(derived.summary.observations, ['final', 'oldShown', 'itemsIntact'])
+  // spaces v3 and v4: the discovery rounds added the early arrival, the empty responses and the long session (axisOrigins)
+  assert.deepEqual(byId['world.Race.arrival'].domain.enumerated, { values: ['OldFirst', 'NewFirst', 'OldEarly'], by: 'type' })
   assert.deepEqual(byId['world.Race.final'].domain.enumerated, {
     values: ['NoneShown', 'OldShown', 'NewShown'],
     by: 'type',
@@ -177,13 +198,13 @@ test('a new enum value in the world model reaches the axes and the digest; an un
     'NewShown',
     'BothShown',
   ])
-  assert.equal(widened.summary.rawCombinations, 32)
+  assert.equal(widened.summary.rawCombinations, 768)
   assert.notEqual(widened.digest, base.digest)
 
   const unsupported = derive(PKG, {
     world: `${WORLD.replace(
-      'oldShown: Bool}',
-      'oldShown: Bool, query: String}',
+      'itemsIntact: Bool}',
+      'itemsIntact: Bool, query: String}',
     )}\ntype Pair<A> is Data:\n  Pair{a: A}\n`,
     model: MODEL,
   })
@@ -224,7 +245,7 @@ test('the family audit maps derived axes and demands a human reason for every ot
   const derived = derive(PKG, { world: WORLD, model: MODEL })
   assert.deepEqual(
     derived.families.filter((entry) => entry.status === 'mapped').map((entry) => entry.family),
-    ['Async', 'Order'],
+    ['Data', 'Value', 'Async', 'Order'],
   )
   const silent = clone(PKG)
   delete silent.families.Platform
@@ -247,11 +268,17 @@ test('the projected card is deterministic, marks its generated region and never 
   const block = generatedBlock(card)
   assert.equal(block.fields.package, 'oracle.package.json')
   assert.equal(block.fields['inputs-sha256'], inputsDigest)
-  assert.match(block.content, /^- Rows: O1=latestShown O2=staleNeverShown O3=unansweredKeeps$/m)
+  assert.match(block.content, /^- Rows: O1=latestShown O2=staleNeverShown O3=unansweredKeeps O5=itemsShown$/m)
+  // the requirement inventory and the attack methods are part of what the user approves
+  assert.match(block.content, /^## Requirements$/m)
+  assert.match(block.content, /^\| R6 +\| S1 +\| Cancellation, retry, duplicate responses .* \| N\/A +\|$/m)
+  assert.match(block.content, /^## Discovery Space$/m)
+  assert.match(block.content, /^\| F5 +\| stale-data +\| search-reducer\.mts +\| the shown results lose their items +\|$/m)
   assert.match(block.content, /^- P2: .* \(rows: O2, O3, O4\)$/m)
   assert.deepEqual(await generatedIssues(card), [])
   // editing the generated region by hand is drift, whatever the edit says
-  const edited = card.replace('the list never shows request 1', 'the list rarely shows request 1')
+  assert.ok(card.includes('never changes the list, at any step'))
+  const edited = card.replace('never changes the list, at any step', 'rarely changes the list, at any step')
   assert.deepEqual(
     (await generatedIssues(edited)).map((issue) => issue.split(':')[0]),
     ['card-generated-drift'],
@@ -327,7 +354,7 @@ test('[bend] card lint regenerates the region: hand edits (even re-signed), mode
   const lint = () => node(root, 'oracle-verify.mjs', ['card', '--oracle', 'oracle.model-first.md'])
   const clean = lint()
   assert.equal(clean.status, 0, clean.stderr)
-  assert.match(clean.stdout, /CARD_LINT_OK 4 rows/)
+  assert.match(clean.stdout, /CARD_LINT_OK 5 rows/)
 
   const card = await readFile(join(root, 'oracle.model-first.md'), 'utf8')
   await writeFile(join(root, 'oracle.model-first.md'), card.replace('results rendered×1', 'results rendered×2'))
@@ -377,7 +404,7 @@ test('[bend] the model-first chain: draft refuted by a hidden observation, refin
 
   const refined = await checkAdequacy({ package: 'oracle.package.json', cwd: root, bin, out: join(root, 'evidence') })
   assert.equal(refined.status, 'proven', JSON.stringify(refined.checks.filter((check) => check.status !== 'proven')))
-  assert.deepEqual(refined.rowIds, { latestShown: 'O1', staleNeverShown: 'O2', unansweredKeeps: 'O3' })
+  assert.deepEqual(refined.rowIds, { latestShown: 'O1', staleNeverShown: 'O2', unansweredKeeps: 'O3', itemsShown: 'O5' })
   // written in one context: the goals are the contract author's, so the claim is self-consistency, not independence
   assert.equal(refined.independence.evidence, 'none')
   assert.equal(refined.goalAudit.claim, 'self-consistency')
@@ -392,10 +419,12 @@ test('[bend] the model-first chain: draft refuted by a hidden observation, refin
   const adapters = await import(join(root, 'world.adapter.mjs'))
   const good = await conformWorld({ package: 'oracle.package.json', cwd: root, adapter: adapters, bin })
   assert.equal(good.status, 'pass')
+  // the draft is checked with the adapter frozen for its world (space v1)
+  const draftAdapters = await import(join(root, 'world.v1.adapter.mjs'))
   const flickerOnDraft = await conformWorld({
     package: 'oracle.package.draft.json',
     cwd: root,
-    adapter: adapters.mutants.withoutStaleCheck,
+    adapter: draftAdapters.mutants.withoutStaleCheck,
     bin,
   })
   const flickerSetting = (result) =>
@@ -437,13 +466,24 @@ test('[bend] moving a product duty into an assumption hides the goal, and a card
   const bin = await installedBend(t)
   if (!bin) return
   const root = await fixtureCopy(t)
-  const hidden = clone(PKG)
+  const hidden = modelOnly(PKG)
   // "the list never shows an older result" is the product's duty; stated as an assumption it removes every violating world
   await writeFile(
     join(root, 'World.bend'),
     `${WORLD}\n# A1: (wrongly) the environment never lets an older result show\ndef Race.A1(w: Race) -> Bool:\n  Race.G1(w)\n`,
   )
-  hidden.assumptions = [{ id: 'A1', source: 'S1', owner: 'search backend', falsifier: 'an older result on screen' }]
+  hidden.assumptions = [
+    {
+      id: 'A1',
+      source: 'S1',
+      owner: 'search backend',
+      falsifier: 'an older result on screen',
+      evidence: 'none — this is the planted mistake',
+      riskIfFalse: 'every late response the product shows goes unjudged',
+      testability: 'untestable',
+      status: 'open',
+    },
+  ]
   await writeFile(join(root, 'hidden.json'), JSON.stringify(hidden))
   const hiddenResult = await checkAdequacy({ package: 'hidden.json', cwd: root, bin })
   assert.equal(
@@ -451,13 +491,16 @@ test('[bend] moving a product duty into an assumption hides the goal, and a card
     'refuted',
   )
 
-  const nothing = clone(PKG)
+  const nothing = modelOnly(PKG)
   // a contract that allows only an empty list satisfies every safety goal and forbids the normal path
   await writeFile(
     join(root, 'World.bend'),
-    `${WORLD}\ndef Race.neverShows(w: Race) -> Bool:\n  match w:\n    case Race{a, n, f, o}:\n      Race.isNone(f)\n`,
+    `${WORLD}\ndef Race.neverShows(w: Race) -> Bool:\n  match w:\n    case Race{a, n, oe, ne, ls, f, o, i}:\n      Race.isNone(f)\n`,
   )
-  nothing.contract = [{ ...PKG.contract[0], key: 'neverShows', def: 'neverShows' }, PKG.contract[3]]
+  nothing.contract = [
+    { ...PKG.contract[0], key: 'neverShows', def: 'neverShows' },
+    PKG.contract.find((entry) => entry.key === 'traceConformance'),
+  ]
   await writeFile(join(root, 'nothing.json'), JSON.stringify(nothing))
   const nothingResult = await checkAdequacy({ package: 'nothing.json', cwd: root, bin })
   assert.equal(nothingResult.checks.find((check) => check.kind === 'goal-witness').status, 'refuted')
@@ -469,16 +512,17 @@ test('[bend] derive with the trace space finds the history-sensitive late respon
   const loaded = await loadPackage('oracle.package.json', { root: FIXTURE })
   const { derived } = await derivePackage(loaded, { bin })
   assert.equal(derived.status, 'derived')
-  const history = derived.order.obligations.find((entry) => entry.kind === 'history-sensitive')
+  // the late response 3·1 and the in-order 1·3 both end showing request 3, through different observations
+  const late = 'Issue · Issue · Issue · Respond{id:3} · Respond{id:1}'
+  const history = derived.order.obligations.find(
+    (entry) => entry.kind === 'history-sensitive' && entry.traces.some((trace) => trace.label === late),
+  )
   assert.ok(history, JSON.stringify(derived.order))
-  // the late response 2·1 and the in-order 1·2 both end showing request 2, through different observations
-  const labels = history.traces.map((entry) => entry.label)
-  assert.ok(labels.includes('Issue · Issue · Respond{id:2} · Respond{id:1}'))
-  assert.ok(labels.includes('Issue · Issue · Respond{id:1} · Respond{id:2}'))
+  assert.ok(history.traces.some((trace) => trace.label === 'Issue · Issue · Issue · Respond{id:1} · Respond{id:3}'))
   assert.deepEqual(derived.axes.find((axis) => axis.id === 'event.Msg.Respond.id').domain.enumerated, {
-    values: ['1', '2', '3'],
+    values: ['1', '2', '3', '4'],
     by: 'trace-space',
-    bound: 4,
+    bound: 5,
   })
   assert.deepEqual(
     await generatedIssues(await readFile(join(FIXTURE, 'oracle.model-first.md'), 'utf8'), {
@@ -506,7 +550,7 @@ test('[bend] end to end: lock the projected card, RED on the wrong reducer, VALI
   if (!bin) return
   const repository = await mkdtemp(join(tmpdir(), 'oracle-model-first-'))
   t.after(() => rm(repository, { recursive: true, force: true }))
-  for (const file of ['README.md', 'MODEL.bend', 'LAWS.bend', 'PROOF.bend', 'World.bend', 'oracle.package.json'])
+  for (const file of ['README.md', 'MODEL.bend', 'LAWS.bend', 'PROOF.bend', 'World.bend', 'Metamorphic.bend', 'oracle.package.json'])
     await cp(join(FIXTURE, file), join(repository, file))
   const formal = join(repository, 'src', '__test__', 'formal')
   await mkdir(formal, { recursive: true })
@@ -544,7 +588,7 @@ test('[bend] end to end: lock the projected card, RED on the wrong reducer, VALI
   await mkdir(oracleDirectory, { recursive: true })
   await writeFile(join(oracleDirectory, 'oracle.md'), card)
 
-  const sources = ['README.md', 'MODEL.bend', 'LAWS.bend', 'World.bend']
+  const sources = ['README.md', 'MODEL.bend', 'LAWS.bend', 'World.bend', 'Metamorphic.bend']
   const lock = join(oracleDirectory, 'oracle.lock.json')
   const lockWith = (list) =>
     node(repository, 'oracle-lock.mjs', [

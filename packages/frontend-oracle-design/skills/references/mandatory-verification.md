@@ -110,5 +110,7 @@ uses a new confirmed revision. No member is marked N/A to obtain completion.
 
 Report model laws as `formal: proven`, product correspondence as `conformance: tested` with
 exhaustive and sampled scope, and type guarantees as actual checked relations with diagnostics.
-State any residual model, type, observation and sampling limits. All existing visual-pending,
+State any residual model, type, observation and sampling limits. With a model package, add the
+closure verdict of [`discovery.md`](discovery.md) and its residual-risk list; the closure attacks the
+space these four obligations verify and replaces none of them. All existing visual-pending,
 independent-review, TDD, budget and final-report gates remain in force.

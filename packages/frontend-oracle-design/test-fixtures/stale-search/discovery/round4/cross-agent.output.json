@@ -1,0 +1,128 @@
+{
+  "candidates": [
+    {
+      "id": "X1",
+      "kind": "in-world",
+      "scenario": "The user types 'ab', then 'abc' before either search answers. The 'ab' response arrives first and the list switches to the 'ab' results; a moment later the 'abc' response arrives and replaces them.",
+      "harm": "For that interval the user reads, and can click, results for a query they already changed, and the correct end state hides it. S1: \"A response to an older request does not change what the list shows.\"",
+      "world": "arrival=OldFirst newAnswers !oldEmpty !newEmpty !longSession final=NewShown oldShown itemsIntact",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X2",
+      "kind": "in-world",
+      "scenario": "The user types 'ab', then 'abc'. The 'ab' response arrives; the 'abc' response never does. The product shows the 'ab' results because nothing newer has come.",
+      "harm": "The user is left with 'ab' results under the query 'abc' and nothing ever corrects them. S1: \"A response to an older request does not change what the list shows.\" S1 also allows the latest response never to come: \"The environment delivers each response at most once\".",
+      "world": "arrival=OldFirst !newAnswers !oldEmpty !newEmpty !longSession final=OldShown oldShown itemsIntact",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X3",
+      "kind": "in-world",
+      "scenario": "The user types 'ab', then 'abc'. The stale 'ab' response arrives first and is discarded, but discarding it also ends the pending search, so when the 'abc' response arrives it is dropped and the list never shows results.",
+      "harm": "The user waits on a list that never fills although the answer arrived. S1: \"The latest request's response is shown when it arrives.\"",
+      "world": "arrival=OldFirst newAnswers !oldEmpty !newEmpty !longSession final=NoneShown !oldShown itemsIntact",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X4",
+      "kind": "in-world",
+      "scenario": "The user searches 'ab' and its results show. They type 'abq', which matches nothing. The empty 'abq' response arrives, but the list keeps the 'ab' results because an empty answer is treated as no answer.",
+      "harm": "The user reads the 'ab' results as matches for 'abq'. S1: \"The latest request's response is shown when it arrives.\" An empty response is still that response.",
+      "world": "arrival=OldEarly newAnswers !oldEmpty newEmpty !longSession final=OldShown oldShown itemsIntact",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X5",
+      "kind": "in-world",
+      "scenario": "The user searches 'zzq', which matches nothing. Its empty response arrives while 'zzq' is still the latest search, but the list does not switch to the empty result. The user then types 'zz' and its results show, so the end state looks right.",
+      "harm": "The user never learns that 'zzq' had no matches; the list looked as if that search had not run. S1: \"The latest request's response is shown when it arrives.\" 'zzq' was the latest request when its empty response arrived.",
+      "world": "arrival=OldEarly newAnswers oldEmpty !newEmpty !longSession final=NewShown !oldShown itemsIntact",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X6",
+      "kind": "in-world",
+      "scenario": "The user searches 'ab' and is reading its results. They type 'abc' and the list empties at once. The 'abc' response never arrives.",
+      "harm": "The results the user was reading disappear and nothing replaces them. S1: \"the list keeps showing what it showed until a response arrives\", and S1 allows that response never to come (\"at most once\").",
+      "world": "arrival=OldEarly !newAnswers !oldEmpty !newEmpty !longSession final=NoneShown oldShown itemsIntact",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X7",
+      "kind": "in-world",
+      "scenario": "The user types 'ab', then 'abc'. The 'abc' results show. The late 'ab' response arrives; the list stays the 'abc' result set, but rows from the 'ab' response are appended to it or rewrite entries in it (for example through a shared item cache).",
+      "harm": "The 'abc' list now holds entries or details that belong to 'ab', while it still counts as showing the latest response. S1: \"A response to an older request does not change what the list shows.\"",
+      "world": "arrival=NewFirst newAnswers !oldEmpty !newEmpty !longSession final=NewShown !oldShown !itemsIntact",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X8",
+      "kind": "in-world",
+      "scenario": "The user types 'zzq' and quickly corrects it to 'zz'. The 'zz' results show. The late, empty 'zzq' response arrives and the list switches to no results, because the empty-result path skips the staleness check.",
+      "harm": "The user is told 'zz' has no matches although its results arrived. S1: \"A response to an older request does not change what the list shows.\" An empty older response is no exception.",
+      "world": "arrival=NewFirst newAnswers oldEmpty !newEmpty !longSession final=OldShown oldShown itemsIntact",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X9",
+      "kind": "in-world",
+      "scenario": "Late in a long session, after many searches, the user types 'ab', then 'abc'. The 'abc' results show, then the late 'ab' response arrives and replaces them (for example because ids that have reached double digits no longer compare as numbers).",
+      "harm": "The user sees 'ab' results under 'abc'. S1 puts no bound on the ids (\"a request id that grows by one per issued request\"), and \"A response to an older request does not change what the list shows\" holds however many searches came before.",
+      "world": "arrival=NewFirst newAnswers !oldEmpty !newEmpty longSession final=OldShown oldShown itemsIntact",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X10",
+      "kind": "new-fact",
+      "scenario": "The user types 'a', 'ab' and 'abc' before any response returns. The 'abc' results show and the late 'ab' response is discarded, but the 'a' response arrives after it and replaces the list, because only the request just before the latest is treated as stale.",
+      "harm": "The user sees results two keystrokes out of date under 'abc'. S1: \"A response to an older request does not change what the list shows\" covers every older request, not only the one just before the latest.",
+      "newFact": {
+        "name": "requestsInFlight",
+        "category": "controllable",
+        "observedVia": "typing three or more characters before the first response returns; the list shows which response won"
+      },
+      "whyOutside": "arrival orders only the old and the new response, and oldEmpty, oldShown and final=OldShown each name a single older request. No field orders a second older request's response against the other two or records that it changed the list, so a guard that discards only the previous request's response passes every world.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X11",
+      "kind": "new-fact",
+      "scenario": "The user searches 'ab', leaves the search view before the results return, comes back and searches 'x'. The re-created list restarted its request ids, so 'x' gets the id 'ab' had, and the late 'ab' response is shown as the answer to 'x'.",
+      "harm": "The user sees 'ab' results under 'x'. S1: \"Every search request gets a request id that grows by one per issued request\" rules out reusing an id, and \"A response to an older request does not change what the list shows.\"",
+      "newFact": {
+        "name": "resetWhilePending",
+        "category": "controllable",
+        "observedVia": "leaving and re-entering the search view while a search is pending; the list then shows the earlier query's results"
+      },
+      "whyOutside": "event.Msg has only Issue and Respond, so latest and shown are never re-initialized and every issued id is new. No world field places a reset between the old and the new request, and the old/new split assumes they carry different ids, so an old response that shares the new request's id cannot be stated. Re-creating the list's state is a product event, not the browser, device or viewport variation the environment-variation disposition sets aside.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X12",
+      "kind": "new-fact",
+      "scenario": "The user types 'zzq' and corrects it to 'zz'. The 'zz' results show with a count of 12. The late, empty 'zzq' response is kept out of the rows, but the count or empty-state text above them switches to 0 results / No results.",
+      "harm": "The list contradicts itself, and a user who trusts the header concludes 'zz' has no matches. S1: \"A response to an older request does not change what the list shows.\"",
+      "newFact": {
+        "name": "listTextMatchesItems",
+        "category": "observable",
+        "observedVia": "the result count, empty-state message and query label shown with the list"
+      },
+      "whyOutside": "final, oldShown and observe record which response is shown, and itemsIntact concerns the rows. No field records the count, empty-state message or label shown with them, so a list whose rows are right while that text came from an older response passes every field.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X13",
+      "kind": "new-fact",
+      "scenario": "The user types 'ab', then 'abc'. The 'abc' results show. The late 'ab' response arrives and the product tags it with the id that is latest when it arrives instead of the id 'ab' was issued with, so it is accepted as the latest and replaces the 'abc' results.",
+      "harm": "The user sees 'ab' results under 'abc' while the product's own state says the latest response is shown. S1: \"A response to an older request does not change what the list shows.\"",
+      "newFact": {
+        "name": "answeredRequest",
+        "category": "hidden",
+        "observedVia": "—"
+      },
+      "whyOutside": "event.Msg.Respond.id is both the request a response answers and the id it arrives with, so every modeled response is paired correctly. No field or event can state a response that answers an older request but carries the latest id; observe reports the carried id, so it would read as the latest being shown. The mislabeling is the product's own, not user input, so the malformed-input disposition does not cover it.",
+      "sources": ["S1"]
+    }
+  ]
+}

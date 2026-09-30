@@ -1,6 +1,7 @@
 {
   "packageVersion": 1,
   "id": "stale-search",
+  "spaceVersion": 1,
   "intent": {
     "actor": "a person typing successive search queries while earlier responses are in flight",
     "observableSuccess": "the list shows the latest request's results and never an older request's late results",
@@ -40,7 +41,15 @@
       "kind": "product-policy",
       "jurisdiction": "adequacy world model",
       "standard": "Bend 2.0.34 world",
-      "location": "repo:World.bend#v1",
+      "location": "repo:WorldV1.bend#v1",
+      "approval": "approved"
+    },
+    {
+      "id": "S6",
+      "kind": "product-policy",
+      "jurisdiction": "metamorphic relations",
+      "standard": "Bend 2.0.34 relations",
+      "location": "repo:Metamorphic.bend#v1",
       "approval": "approved"
     },
     {
@@ -53,21 +62,56 @@
       "self": true
     }
   ],
+  "requirements": [
+    {
+      "id": "R1",
+      "source": "S1",
+      "quote": "Every search request gets a request id that grows by one per issued request."
+    },
+    {
+      "id": "R2",
+      "source": "S1",
+      "quote": "Issuing a request makes it the latest one; the list keeps showing what it showed until a response arrives."
+    },
+    {
+      "id": "R3",
+      "source": "S1",
+      "quote": "A response to an older request does not change what the list shows."
+    },
+    {
+      "id": "R4",
+      "source": "S1",
+      "quote": "The latest request's response is shown when it arrives."
+    },
+    {
+      "id": "R5",
+      "source": "S1",
+      "quote": "The environment delivers each response at most once, only after its request, in any order."
+    },
+    {
+      "id": "R6",
+      "source": "S1",
+      "quote": "Cancellation, retry, duplicate responses and a response before its request are out of scope; no guarantee is claimed for them."
+    }
+  ],
   "policies": [
     {
       "id": "P1",
       "text": "Issuing a search request makes it the latest request; the list keeps what it shows until a response arrives.",
-      "sources": ["S1"]
+      "sources": ["S1"],
+      "requirements": ["R2"]
     },
     {
       "id": "P2",
       "text": "A response to an older request does not alter what the list shows, at any step.",
-      "sources": ["S1"]
+      "sources": ["S1"],
+      "requirements": ["R3"]
     },
     {
       "id": "P3",
       "text": "The latest request's response is shown when it arrives.",
-      "sources": ["S1"]
+      "sources": ["S1"],
+      "requirements": ["R4"]
     }
   ],
   "world": {
@@ -140,25 +184,29 @@
       "id": "G1",
       "kind": "safety",
       "cites": ["S1"],
-      "author": "controller"
+      "author": "controller",
+      "requirements": ["R3"]
     },
     {
       "id": "G2",
       "kind": "safety",
       "cites": ["S1"],
-      "author": "controller"
+      "author": "controller",
+      "requirements": ["R4"]
     },
     {
       "id": "G3",
       "kind": "witness",
       "cites": ["S1"],
-      "author": "controller"
+      "author": "controller",
+      "requirements": ["R2", "R4"]
     },
     {
       "id": "G4",
       "kind": "safety",
       "cites": ["S1"],
-      "author": "controller"
+      "author": "controller",
+      "requirements": ["R2", "R3"]
     }
   ],
   "examples": [],
@@ -225,7 +273,8 @@
   "notApplicable": [
     {
       "text": "loading indicator, error, retry, empty data, duplicate responses and cancellation are outside this fixture's policy; out-of-order arrival is the arrival axis and the Formal Model space",
-      "sources": ["S1"]
+      "sources": ["S1"],
+      "requirements": ["R6"]
     }
   ],
   "families": {
@@ -266,6 +315,77 @@
         "kind": "witness",
         "cites": ["P1", "P3", "latestShown"]
       }
+    ],
+    "requirements": ["R1", "R5"]
+  },
+  "product": {
+    "adapter": "search.adapter.mjs",
+    "worldAdapter": "world.v1.adapter.mjs",
+    "files": ["search-reducer.mts"],
+    "runs": 100,
+    "maxLength": 8
+  },
+  "faultModel": [
+    {
+      "id": "F1",
+      "class": "ordering",
+      "file": "search-reducer.mts",
+      "find": "if (event.requestId !== state.latestRequestId) return state",
+      "replace": "",
+      "note": "drop the stale-response check"
+    },
+    {
+      "id": "F2",
+      "class": "conditional",
+      "file": "search-reducer.mts",
+      "find": "event.requestId !== state.latestRequestId",
+      "replace": "event.requestId < state.latestRequestId",
+      "note": "!== becomes <"
+    },
+    {
+      "id": "F3",
+      "class": "boundary",
+      "file": "search-reducer.mts",
+      "find": "latestRequestId: state.latestRequestId + 1",
+      "replace": "latestRequestId: state.latestRequestId + 2",
+      "note": "request ids grow by 2"
+    },
+    {
+      "id": "F4",
+      "class": "state-transition",
+      "file": "search-reducer.mts",
+      "find": "return { ...state, latestRequestId: state.latestRequestId + 1 }",
+      "replace": "return { latestRequestId: state.latestRequestId + 1, results: null }",
+      "note": "issuing clears the list"
+    },
+    {
+      "id": "F5",
+      "class": "stale-data",
+      "file": "search-reducer.mts",
+      "find": "items: event.items",
+      "replace": "items: []",
+      "note": "the shown results lose their items"
+    }
+  ],
+  "metamorphic": {
+    "source": "S6",
+    "relations": [
+      {
+        "id": "MR1",
+        "transform": "Meta.issueAppended",
+        "relation": "Meta.sameShown",
+        "requirements": ["R2"]
+      }
     ]
+  },
+  "operators": {
+    "dependency-failure": "n/a: S1 errors, retry and cancellation are outside this fixture policy",
+    "latency": "modeled: event.Msg",
+    "environment-variation": "n/a: S1 a pure reducer with no browser, device or viewport in scope",
+    "malformed-input": "n/a: S1 request ids come from the product, not from user input",
+    "concurrency": "modeled: event.Msg"
+  },
+  "residue": {
+    "latestRequestId": "modeled: state.Search.Search.latest"
   }
 }

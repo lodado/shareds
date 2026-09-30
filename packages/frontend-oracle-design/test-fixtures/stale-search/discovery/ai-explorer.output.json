@@ -1,0 +1,65 @@
+{
+  "candidates": [
+    {
+      "id": "X1",
+      "kind": "new-fact",
+      "scenario": "The user types 'c', 'ca' and 'cat' in quick succession, so requests 1, 2 and 3 are in flight and request 3 is the latest. The 'c' answer arrives last, after 'cat' was issued. A product that discards only answers to the request it superseded most recently (request 2) puts the 'c' results on screen under 'cat', and in a long session does the same when an answer to one of the eight earlier requests finally arrives. Another trace: 'c' answers while it is the latest, then 'ca' and 'cat' are typed, and the 'ca' answer arrives after 'cat' was issued; a product that accepts any answer newer than the one on screen replaces the 'c' results with 'ca' results. Both products pass every world.",
+      "harm": "The user sees results for a query they have already typed past, the brief's worst regression. S1 item 2, 'A response to an older request does not change what the list shows', covers every older request, not only the one issued just before the latest, and S1 item 4 lets responses arrive 'in any order'.",
+      "newFact": {
+        "name": "a late response to a request two or more behind the latest (three or more requests in flight)",
+        "category": "controllable",
+        "observedVia": "test: the world adapter issues a third request and then delivers response 1 or response 2 late, or delivers a response to one of longSession's eight earlier requests after request 10 is issued; results.requestId read through search.adapter observe"
+      },
+      "whyOutside": "The attempt holds exactly two requests: arrival (T1) orders only response 1 against request 2 and response 2, and oldShown (T4) watches only request 1's response. longSession (T9) adds eight earlier requests, but its Not column says their responses never arrive. So every late response in the world belongs to the request issued right before the latest, and none arrives while an older answer is on screen.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X2",
+      "kind": "qualifier",
+      "scenario": "The product holds the latest request's answer back until the request before it has answered, or until the next event. (a) The user types 'ca' then 'cat'; the 'cat' answer arrives first, yet the list stays empty until the slow 'ca' answer lands, and only then shows the 'cat' results. (b) Late in a session the user types a query (request 9) whose answer arrives while it is still the latest, but it is held because an earlier request never answered; when the user types the next query (request 10), the list fills with request 9's results. O1 only needs the list to end on request 2's response, O3 only needs it to end on request 1's results when response 1 had arrived, and O2's oldShown counts only answers that arrive after request 2 is issued, so every in-world row passes.",
+      "harm": "The latest results are not shown when they arrive: the user waits on an answer they no longer want, and in (b) an older query's results appear right after a newer one was typed, which is what the brief calls the worst regression. S1 item 3: 'The latest request's response is shown when it arrives.' O1 turns this into 'the list ends with request 2's response' and drops the timing; O3 also reads only the final list.",
+      "sourceText": "when it arrives",
+      "rows": ["O1", "O3"],
+      "sources": ["S1"]
+    },
+    {
+      "id": "X3",
+      "kind": "new-fact",
+      "scenario": "The user types 'ca' then 'cat'. The 'ca' request is lost and never answers; the 'cat' answer arrives. A product that holds the latest answer back until the request before it has answered, or until the next event (it passes every world, see X2), leaves the list empty however long the user waits; when they type again, the 'cat' results appear under the new query.",
+      "harm": "The latest results never appear although they arrived, and then surface under a newer query. S1 item 3: 'The latest request's response is shown when it arrives'; S1 item 4 delivers each response 'at most once', so request 1's answer may never come.",
+      "newFact": {
+        "name": "request 1's response never arrives while request 2's does",
+        "category": "controllable",
+        "observedVia": "test: the world adapter withholds response 1 for the whole attempt and delivers response 2; results.requestId read through search.adapter observe after response 2"
+      },
+      "whyOutside": "Every arrival value (T1: OldFirst, NewFirst, OldEarly) delivers response 1; newAnswers (T2) withholds only response 2; longSession's unanswered requests all precede the attempt, and request 9 always answers. O1's Given assumes response 1 arrives, and no world ends right after response 2 with response 1 still outstanding, so final never reads the list in that state.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X4",
+      "kind": "new-fact",
+      "scenario": "The user types 'ca' (request 1) and, before it answers, leaves the search view and comes back, or resets the search. The search state is created afresh and ids restart at 1. The user types 'dog', issued as request 1 again. The old 'ca' answer still reaches the search state carrying id 1, matches the latest request, and the list shows 'ca' results under 'dog'.",
+      "harm": "An older request's response changes the list, the brief's worst regression. S1 item 2: 'A response to an older request does not change what the list shows.' It gets through because S1 item 1, 'Every search request gets a request id that grows by one per issued request', stops holding across the restart, and ids are the only identity.",
+      "newFact": {
+        "name": "a request id issued before the id counter restarted (a stale token): search state re-created or reset while a request is in flight",
+        "category": "controllable",
+        "observedVia": "product: leave and reopen the search view, or reset the search, while a query is loading, then type a new query; test: re-create the search state while request 1 is unanswered, issue a new request, deliver the old response and read results.requestId through search.adapter observe"
+      },
+      "whyOutside": "Every world is one uninterrupted session: ids start at 1, or at 9 with longSession, and only grow. No field restarts the counter or delivers a response issued before a restart, and the identity-reference hazard is set to n/a because 'request ids are the only identity', the very assumption a restart breaks.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "X5",
+      "kind": "new-fact",
+      "scenario": "The user types 'ca' then 'cat', and the 'ca' answer arrives late. The search state ignores it correctly, but the results component draws from its own copy of the last answer it received, so 'ca' results appear under 'cat'. In another form the component blanks the list while any request is pending, so the results the user was reading vanish as soon as they type, and stay gone if the new request never answers.",
+      "harm": "The user sees stale results, or loses the results they were reading. S1 item 2: 'A response to an older request does not change what the list shows'; S1 item 1: 'the list keeps showing what it showed until a response arrives'. Both are about the list on screen.",
+      "newFact": {
+        "name": "the rendered result list, as distinct from the search state's results",
+        "category": "observable",
+        "observedVia": "the search page's rendered result list (DOM or screenshot) after every event, rather than search.adapter"
+      },
+      "whyOutside": "final (T3), oldShown (T4) and itemsIntact (T6) all read reducer state (results.requestId, results.items) through search.adapter observe and snapshot, and no field counts the renders the Side effects column claims (results rendered×1, stale results rendered×0). So display-vs-commit is modeled only on the commit side, and a view that diverges from the reducer passes every row, O4 included.",
+      "sources": ["S1"]
+    }
+  ]
+}

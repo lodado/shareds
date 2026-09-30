@@ -1,0 +1,17 @@
+{
+  "anomalies": [
+    {
+      "id": "INC-184",
+      "source": "synthetic fixture incident — not a real production record",
+      "summary": "a stale search response overwrote the latest results",
+      "trace": [{ "$": "Issue" }, { "$": "Issue" }, { "$": "Respond", "id": 2 }, { "$": "Respond", "id": 1 }],
+      "observed": [0, 0, 0, 2, 1]
+    },
+    {
+      "id": "INC-201",
+      "source": "synthetic fixture proxy log — not a real production record",
+      "summary": "a retrying proxy delivered the same response twice",
+      "trace": [{ "$": "Issue" }, { "$": "Respond", "id": 1 }, { "$": "Respond", "id": 1 }]
+    }
+  ]
+}

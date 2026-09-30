@@ -1,32 +1,69 @@
-// World adapter between World.bend (the Race record) and the search reducer, for
+// World adapter between World.bend (the Race record, space v4) and the search reducer, for
 // `oracle-adequacy.mjs conform --package oracle.package.json`. It sets the coordinates the way the terms'
-// Path says (T1: which response the adapter delivers first; T2: whether response 2 is delivered at all),
-// drives the reducer through search.adapter's step, and reads both observations through search.adapter's
-// observe — the request id the list shows — after every event from the second issue on (T4) and at the end
-// (T3). It computes no expected value and re-implements no reducer logic; an unknown setting throws.
+// Path says — T1: when response 1 arrives (before request 2 is issued, or after it and before or after
+// response 2); T2: whether response 2 is delivered at all; T7, T8: whether response 1 or 2 carries an empty
+// result list; T9: whether eight earlier requests, never answered, come first so the attempt's requests are
+// 9 and 10 — drives the reducer through search.adapter, and reads the observations after every event: the
+// request id the list shows (search.adapter observe) for T3 and T4, and the shown results (search.adapter
+// snapshot) against the results the harness itself delivered with that response for T6 — the test's own
+// input, not a model value. It computes no expected value and re-implements no reducer logic; an unknown
+// setting or an id outside the attempt throws.
 
-import { adapterFor } from './search.adapter.mjs'
+import { isDeepStrictEqual } from 'node:util'
+import { adapterFor, itemsFor } from './search.adapter.mjs'
 import { initialSearch, reduceSearch } from './search-reducer.mts'
 import { reduceIgnoringResponses, reduceShowingPrevious, reduceWithoutStaleCheck } from './search-reducer.mutants.mts'
 
-const SHOWN = { 0: 'NoneShown', 1: 'OldShown', 2: 'NewShown' }
+const ARRIVALS = ['OldFirst', 'NewFirst', 'OldEarly']
+const EARLIER = 8
 
 export function worldAdapterFor(search) {
   return {
-    run({ arrival, newAnswers }) {
-      if (!['OldFirst', 'NewFirst'].includes(arrival) || typeof newAnswers !== 'boolean')
-        throw new Error(`unmapped coordinates ${JSON.stringify({ arrival, newAnswers })}`)
-      const responses = newAnswers ? (arrival === 'OldFirst' ? [1, 2] : [2, 1]) : [1]
-      const events = [{ $: 'Issue' }, { $: 'Issue' }, ...responses.map((id) => ({ $: 'Respond', id }))]
+    run({ arrival, newAnswers, oldEmpty, newEmpty, longSession }) {
+      const flags = [newAnswers, oldEmpty, newEmpty, longSession]
+      if (!ARRIVALS.includes(arrival) || flags.some((value) => typeof value !== 'boolean'))
+        throw new Error(
+          `unmapped coordinates ${JSON.stringify({ arrival, newAnswers, oldEmpty, newEmpty, longSession })}`,
+        )
+      const older = longSession ? EARLIER + 1 : 1
+      const newer = older + 1
+      const shownAs = new Map([
+        [0, 'NoneShown'],
+        [older, 'OldShown'],
+        [newer, 'NewShown'],
+      ])
+      const delivered = new Map([
+        [older, oldEmpty ? [] : itemsFor(older)],
+        [newer, newEmpty ? [] : itemsFor(newer)],
+      ])
+      const late = newAnswers ? (arrival === 'NewFirst' ? [newer, older] : [older, newer]) : [older]
+      const attempt =
+        arrival === 'OldEarly' ? ['issue', older, 'issue', ...(newAnswers ? [newer] : [])] : ['issue', 'issue', ...late]
       let state = search.init()
-      const seen = []
-      for (const [index, event] of events.entries()) {
-        state = search.step(state, event)
-        if (index >= 1) seen.push(search.observe(state))
+      for (let index = 0; index < older - 1; index += 1) state = search.step(state, { $: 'Issue' })
+      let issued = 0
+      let lateOld = false
+      let oldShown = false
+      let itemsIntact = true
+      let shownId = search.observe(state)
+      for (const event of attempt) {
+        if (event === 'issue') {
+          state = search.step(state, { $: 'Issue' })
+          issued += 1
+        } else {
+          state = search.respond(state, event, delivered.get(event))
+          // T4 counts response 1 only when it arrives after request 2 was issued; before that it is the latest
+          if (event === older && issued === 2) lateOld = true
+        }
+        shownId = search.observe(state)
+        if (lateOld && shownId === older) oldShown = true
+        const shown = search.snapshot(state).results
+        // nothing shown: no results can be wrong (T6)
+        if (shown !== null && !isDeepStrictEqual(shown.items, delivered.get(shown.requestId))) itemsIntact = false
       }
-      const final = SHOWN[seen.at(-1)]
-      if (!final) throw new Error(`unmapped observation ${seen.at(-1)}`)
-      return { final, oldShown: seen.includes(1) }
+      const final = shownAs.get(shownId)
+      if (!final) throw new Error(`unmapped observation ${shownId}`)
+      return { final, oldShown, itemsIntact }
     },
   }
 }
