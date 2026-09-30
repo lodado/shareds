@@ -85,12 +85,12 @@
       "name": "fod-bb-06",
       "category": "visual-local-identity",
       "prompt": "Change one card's visual emphasis using the approved brand palette; user confirmation is required before lock.",
-      "expected_output": "Lane header risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, visual-design, card-confirmation-lock.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, visual-design, card-confirmation-lock.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
         "The reported terminal state is NEEDS_DECISION",
-        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, visual-design, card-confirmation-lock",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, visual-design, card-confirmation-lock",
         "None of these ceremonies or defects appear in the run: unconfirmed-design-lock, browser-verified-by-oracle",
         "The verification report cites actual runs for: card-lint, design-confirmation",
         "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"

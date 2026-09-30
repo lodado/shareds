@@ -6,12 +6,23 @@ import { readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { chmod, link, mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
-// eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
-import test from 'node:test'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { generateFromDocument } from './oracle-frames.mjs'
 import { HOST_RECEIPTS_FILE, reviewOutputDigest } from './oracle-fs.mjs'
 import { resolveExecutable, spawnGit } from './resolve-executable.mjs'
+
+// oracle-run.shard-N.test.mjs가 이 목록을 나눠 등록한다 — 프로세스를 많이 띄우는 케이스를 node --test가 병렬
+// 파일로 돌린다. 수집 순서가 고정이라 샤드 구성도 고정이다.
+// ponytail: 수집 순서 index 샤딩, 한 샤드만 유독 느려지면 관심사별 파일로 나눈다.
+const collected = []
+function test(...args) {
+  collected.push(args)
+}
+
+export function oracleRunCases(shardIndex, shardCount) {
+  return collected.filter((_, index) => index % shardCount === shardIndex - 1)
+}
 
 function gitCommand() {
   try {
@@ -501,6 +512,9 @@ test('worker fresh transport executes the existing GREEN gate and duplicate deli
   assert.equal(before.lockedSources.length > 0, true)
   assert.match(before.evidence.content, /O1/)
   assert.equal(before.references.some((node) => node.id === 'subagent-review'), false)
+  // 러너 규칙만 싣는다 — 테스트 본문(*.test.mjs, 샤드가 나눠 등록하는 *.cases.mjs)은 worker 입력이 아니다
+  assert.equal(before.inputs.some(({ path }) => path.endsWith('/oracle-run.mjs')), true)
+  assert.deepEqual(before.inputs.filter(({ path }) => /\.(?:test|cases)\.mjs$/.test(path)), [])
   const accepted = fixture.invoke(packet)
   assert.equal(accepted.status, 0, accepted.stderr)
   assert.match(accepted.stdout, /WORKER_ACCEPTED/)
@@ -5263,6 +5277,11 @@ test('status --check-report compares the Status line and cited runs with the led
   assert.match(inflated.stderr, /r-009 is not in runs\.jsonl/)
   assert.match(inflated.stderr, /r-001 exit 0, the ledger records exit 1/)
   assert.match(inflated.stderr, /\nnext: rewrite the report from `status --json`/)
+
+  // 실행으로만 닿는 상태는 인용한 run이 없으면 대조할 근거가 없다
+  const uncited = check('Status: IMPLEMENTED_GREEN — card tests pass\n')
+  assert.equal(uncited.status, 1)
+  assert.match(uncited.stderr, /^REPORT_CLAIM_MISMATCH: it claims IMPLEMENTED_GREEN but cites no runId\n/)
 })
 
 test('the Stop hook blocks a final report the ledger contradicts and stays silent otherwise', async (t) => {
@@ -5289,6 +5308,11 @@ test('the Stop hook blocks a final report the ledger contradicts and stays silen
   assert.equal(stop('Status: REVIEW_VERIFIED — done\n- behavior r-003 exit 0\n', { stop_hook_active: true }), null)
   assert.equal(stop('Refactored the helper. r-003 exit 0.'), null)
   assert.equal(stop('Status: REVIEW_VERIFIED — other repository\n- behavior r-777 exit 0\n'), null)
+  // runId 없는 GREEN 주장은 가장 최근에 움직인 오라클이 판정한다. 실행 없이 닿는 상태의 무인용 보고는 판정하지 않는다
+  const uncited = stop('Status: IMPLEMENTED_GREEN — card tests pass\n')
+  assert.equal(uncited?.decision, 'block')
+  assert.match(uncited.reason, /^REPORT_CLAIM_MISMATCH: it claims IMPLEMENTED_GREEN but cites no runId \(/)
+  assert.equal(stop('Status: NEEDS_DECISION — waiting on Q1\n'), null)
 })
 
 test('the vitest reporter records failure causes and never counts a retried pass as a pass', async (t) => {

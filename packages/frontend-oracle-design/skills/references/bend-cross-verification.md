@@ -3,7 +3,9 @@
 Within the Oracle lane, assess applicability before Draft/lock without waiting for the user to say
 "Bend". Automatically select this path for a pure calculation or deterministic state transition with
 a meaningful invariant (for example bounded quantities, monetary conservation, or legal state
-transitions). Also load it for an explicit Bend request. Start with one small core, not the whole UI;
+transitions) whose domain fits Bend's `Nat` or `U32`. A domain that needs negative numbers, 64-bit
+values or a provable floating-point result is not eligible (Bend's F32 is axiomatic): record that
+reason and continue normal Oracle verification. Also load it for an explicit Bend request. Start with one small core, not the whole UI;
 do not invent a separate model for copy, CSS, trivial formatting, or external I/O alone. When no
 eligible core exists, record that reason in the existing investigation and continue normal Oracle
 verification. An explicit request outside the provable scope needs an explanation, not a fake proof.
@@ -12,19 +14,24 @@ This adds a verification technique, not a second orchestrator, runtime, approval
 state. Oracle owns approved policy and transitions; `$test` owns behavior tests and judgment. Low
 does not load this node. Design-only may propose laws and their mapping, but writes no tests,
 proof/model implementation, or production code and claims no executed proof. Automatic selection
-never authorizes installation, policy approval, or bypassing the existing gates.
+authorizes only the pinned install in §1, never policy approval or bypassing the existing gates.
 
 ## 1. Scope and capability before Draft/lock
 
 - Identify the actual module/export, input domain, numeric representation/overflow, invalid-input
   behavior, state transitions, and external assumptions. Each assumption must trace to approved
   policy or remain an Open question; narrowing inputs just to make a proof pass changes policy.
-- Investigate the installed Bend executable/version and its `bend guide`, plus the repository's
-  existing trusted test runner. Do not install Bend or a test dependency implicitly. Bend 2 is not
-  the old HVM runtime. Once this path is selected, missing/incompatible tooling is
-  `ENVIRONMENT_DEFECT` → `FAIL` for proof execution, whether selected automatically or explicitly;
-  do not silently replace proof with tests or call a tool failure "not applicable". A Design-only
-  proposal may record the limitation without claiming execution.
+- In Delivery, run `scripts/ensure-bend.mjs` at capability discovery. It reuses a pinned-version
+  Bend already on PATH or under `BEND_HOME`/`~/.bend`; otherwise it downloads the GitHub release,
+  checks it against the sha256 pinned in the script and unpacks it into the skill's own cache. It
+  never pipes `curl` to a shell or edits PATH and shell files. Call the absolute path it prints with
+  `BEND_NO_TELEMETRY=1`. Design-only installs nothing and may record the limitation without
+  claiming execution. Also read `bend guide` and the repository's existing trusted test runner; do
+  not add a test dependency implicitly. Bend 2 is not the old HVM runtime.
+- When `ensure-bend.mjs` fails (offline, sandbox, unsupported platform, checksum mismatch), an
+  automatically selected path records the printed code and continues with normal Oracle
+  verification; an explicit Bend request is `ENVIRONMENT_DEFECT` → `FAIL` for proof execution.
+  Either way, never replace proof with tests silently or call a tool failure "not applicable".
 - Keep UI, browser, network, foreign code and uncontrolled time/randomness outside the pure model;
   name the corresponding Oracle behavior checks. An assumption about an external effect is not a
   proof of that effect. Distinguish structural checks, executed tests, human acceptance, and formal
@@ -86,7 +93,7 @@ bend path/to/PROOF.bend --verdict
 ```
 
 Use one test in the target repository's existing trusted `node-test` or `vitest` harness to invoke
-the pinned executable without a shell, capture stdout/stderr, and assert **exit 0, no signal, and an
+the pinned executable that `ensure-bend.mjs` printed, without a shell and with `BEND_NO_TELEMETRY=1`, capture stdout/stderr, and assert **exit 0, no signal, and an
 exact `ALL PROOFS CHECK` stdout line**. Missing/open laws, `?TODO`, failure output, timeout and tool
 errors must fail the check. Run that harness through the existing ledger, for example:
 
@@ -158,7 +165,8 @@ assumption or axiomatic F32 claim may be presented as a proof of real runtime be
 
 ## Official references
 
-Checked against Bend v2.0.34; verify the installed version before applying its commands or guarantees.
+Checked against Bend v2.0.34, the version `scripts/ensure-bend.mjs` pins; a version bump updates its
+checksums and this page together.
 
 - [Laws, proofs and trust boundary](https://github.com/bendlang/bend/blob/v2.0.34/guide/GUIDE.md#laws-and-proofs)
 - [CLI verdict and exit behavior](https://github.com/bendlang/bend/blob/v2.0.34/bend2/main.ts)

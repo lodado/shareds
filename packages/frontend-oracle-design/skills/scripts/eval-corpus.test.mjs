@@ -243,7 +243,12 @@ test('an exception may not cover a node the current workflow reads unconditional
       assert.equal(fixture.expected.status, 'NEEDS_DECISION', `${fixture.id} may skip the sweep only when it stops`)
     } else {
       assert.ok(fixture.expected.loadedNodes.includes('card-case-space'), `${fixture.id} case space`)
-      assert.ok(fixture.expected.loadedNodes.includes('card-retro-metrics'), `${fixture.id} retro metrics`)
+      // retro-metrics는 lock 이후 노드 — REVIEW_VERIFIED에서 run metrics를 남기는 run만 읽는다
+      assert.equal(
+        fixture.expected.loadedNodes.includes('card-retro-metrics'),
+        fixture.expected.status === 'REVIEW_VERIFIED',
+        `${fixture.id} retro metrics`,
+      )
     }
   }
 })

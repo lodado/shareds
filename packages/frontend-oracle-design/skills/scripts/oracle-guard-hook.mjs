@@ -12,7 +12,14 @@ import { appendFile, readdir, readFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { HOST_RECEIPTS_FILE, isPathInside, isTestPath, reviewOutputDigest, WEAKENING_TOKENS } from './oracle-fs.mjs'
+import {
+  HOST_RECEIPTS_FILE,
+  isPathInside,
+  isTestPath,
+  reviewOutputDigest,
+  RUN_BACKED_STATES,
+  WEAKENING_TOKENS,
+} from './oracle-fs.mjs'
 
 const runScript = join(dirname(fileURLToPath(import.meta.url)), 'oracle-run.mjs')
 
@@ -153,9 +160,12 @@ async function reportOwners(cwd, cited, message) {
 async function checkFinalReport(payload, cwd) {
   const message = payload.last_assistant_message
   if (payload.stop_hook_active || typeof message !== 'string') return
-  if (!/^Status:\s*(?:ORACLE_READY|VALID_RED|IMPLEMENTED_GREEN|REVIEW_VERIFIED|NEEDS_DECISION|FAIL)\b/m.test(message)) return
+  const claimed = message.match(/^Status:\s*(ORACLE_READY|VALID_RED|IMPLEMENTED_GREEN|REVIEW_VERIFIED|NEEDS_DECISION|FAIL)\b/m)?.[1]
+  if (!claimed) return
   const cited = new Set([...message.matchAll(/\b(r-\d{3,})\b/g)].map(([, runId]) => runId))
-  if (cited.size === 0) return
+  // 실행으로만 닿는 상태를 runId 없이 주장하면 모든 오라클이 주인 후보가 되고, 가장 최근에 움직인 오라클에서 runner가
+  // 무인용을 불일치로 판정한다. 실행 없이 닿는 상태(Design-only 보고)의 무인용은 판정하지 않는다.
+  if (cited.size === 0 && !RUN_BACKED_STATES.has(claimed)) return
 
   for (const directory of await reportOwners(cwd, cited, message)) {
     const checked = spawnSync(process.execPath, [runScript, 'status', '--dir', directory, '--check-report', '-'], {

@@ -28,6 +28,7 @@ import {
   isTestPath,
   pathsShareIdentity,
   reviewOutputDigest,
+  RUN_BACKED_STATES,
   snapshotRegularFile,
   stableStringify,
   WEAKENING_TOKENS,
@@ -3799,6 +3800,7 @@ async function checkReport(state, ledger, source) {
     problems.push(claimed ? `it claims ${claimed}, the ledger replays ${state.state}` : 'the report has no `Status: <state>` line')
   }
   const cited = new Set([...text.matchAll(/\b(r-\d{3,})\b/g)].map(([, runId]) => runId))
+  if (RUN_BACKED_STATES.has(claimed) && cited.size === 0) problems.push(`it claims ${claimed} but cites no runId`)
   for (const runId of cited) if (!runs.has(runId)) problems.push(`${runId} is not in runs.jsonl`)
   // 보고 양식의 `<runId> exit <n>`처럼 붙어 있는 주장만 짝이다 — 산문 속 다른 run의 exit를 끌어오지 않는다
   for (const [, runId, exit] of text.matchAll(/\b(r-\d{3,})\s+exit\s+(-?\d+)/g)) {
@@ -4277,7 +4279,7 @@ async function workerPacket(options) {
     const evidence = await workerFile(evidencePathFor(directory, state))
     if (spec.decision && (typeof spec.decision !== 'string' || !isPathInside(directory, resolve(directory, spec.decision)))) throw new CliError('WORKER_SCOPE_INVALID', 'decision must stay inside Oracle artifacts')
     const decisions = spec.decision ? [await workerFile(resolve(directory, spec.decision), directory)] : []
-    const ruleNames = (await readdir(scriptDirectory)).filter((name) => name.startsWith('oracle-') && name.endsWith('.mjs') && !name.endsWith('.test.mjs'))
+    const ruleNames = (await readdir(scriptDirectory)).filter((name) => name.startsWith('oracle-') && name.endsWith('.mjs') && !/\.(?:test|cases)\.mjs$/.test(name))
     const rules = await Promise.all([...ruleNames, 'generate-reference-bundles.mjs', 'resolve-executable.mjs'].map((name) => workerFile(join(scriptDirectory, name))))
     const entry = await workerFile(join(scriptDirectory, '../SKILL.md'))
     const ledger = await readLedger(directory)

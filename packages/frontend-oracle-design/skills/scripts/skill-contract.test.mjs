@@ -845,11 +845,12 @@ test('reads the interaction contracts before implementing a widget', async () =>
   assert.match(checklist, /name the WAI-ARIA\s+pattern it behaves like/)
   assert.match(checklist, /not from the role it happens to declare/)
   assert.match(subagentReview, /contracts\/<pattern>\.json[\s\S]*as raw input/)
-  assert.match(skill, /npx react-doctor@latest design --scope/)
+  // pinned on-the-fly install: no @latest, no telemetry, and --scope takes a mode, not a file list
+  assert.match(skill, /npx --yes react-doctor@\d+\.\d+\.\d+ design <project dir> --scope files[^`]*--no-telemetry/)
+  assert.doesNotMatch(skill, /react-doctor@latest|--scope <changed files>/)
   assert.match(skill, /web-design-guidelines/)
   assert.match(skill, /observation artifacts, pending and\s+non-verifying/)
-  assert.match(skill, loose('`@latest` names no version'))
-  assert.match(skill, loose('record the version that actually ran'))
+  assert.match(skill, loose('records the `version` that actually ran'))
   assert.match(subagentReview, /interactive widget[\s\S]*`designer`[\s\S]*interaction\s+surface/)
   assert.match(subagentReview, /re-derive every finding from the diff/)
 })
@@ -2227,7 +2228,8 @@ test('records escapes as classes and run metrics as direction signals, never gat
   // 그래프·번들·SKILL 산문이 같은 노드를 안다
   assert.equal(node?.path, 'references/card/retro-metrics.md')
   assert.deepEqual(node?.requires, ['common', 'card-case-space'])
-  assert.ok(cardLane?.nodes.includes('card-retro-metrics'), 'card-lane bundle must carry the retro node')
+  // lock 이후 노드다 — Draft를 쓰는 card-lane이 미리 싣지 않는다
+  assert.equal(cardLane?.nodes.includes('card-retro-metrics'), false, 'card-lane bundle must not carry the post-lock retro node')
   assert.match(skill, loose('card/retro-metrics.md'))
 
   // 막힌 3라운드는 같은 문맥의 4번째 시도가 아니라 fresh 재파견이다

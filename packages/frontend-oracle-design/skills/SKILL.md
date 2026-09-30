@@ -7,22 +7,6 @@ allowed-tools:
 
 # Frontend Oracle Design
 
-## Case-space completeness gates
-
-Before planning, run `scripts/oracle-dimensions.mjs --path <touched files>` and disposition the
-applicability checklist for `action-repeat`, `request-lifecycle`, `response-order`,
-`owner-lifetime`, `server-boundary`, and `data-value`. Each candidate needs a source plus a mapped
-dimension, a non-application reason, or an Open-question ID. This checklist catches declared-model
-omissions but is not proof of all real interactions; cursor expiry and retry policy must not be
-invented when the contract is silent.
-
-When the card opts into `Coverage: full-product`, `oracle-frames.mjs` emits every raw Cartesian
-tuple, including error values, and records deterministic dimension/constraint revisions. It does
-not use pairwise, `Touches`, `independent`, or the legacy frame cap. Every tuple needs exactly one
-existing disposition and an identifiable GWT scenario; Delivery additionally requires reporter and
-ledger evidence through the existing approval, lock, and `$test` boundaries. Raw, valid, excluded,
-unresolved, scenario, and executed counts are separate; no count alone proves assertions.
-
 Frontend Oracle is not an implementation generator. It is a delivery/evidence harness that preserves
 approved frontend behavior and visual intent as `Outcome Brief → Source Registry → contract rows →
 revision lock → ledger state transitions`. References own the detailed rules; this file is the
@@ -170,7 +154,9 @@ its own scope carve-out at disqualification, with no additional node or artifact
 - In the Oracle lane, automatically assess Bend applicability before Draft/lock. For a pure
   calculation or deterministic state transition with a meaningful invariant, or an explicit Bend
   request, read [`bend-cross-verification.md`](references/bend-cross-verification.md). No separate
-  user request to invoke Bend is needed; the proof harness still executes its CLI. Re-read before
+  user request to invoke Bend is needed; the proof harness still executes its CLI, which Delivery
+  obtains with `scripts/ensure-bend.mjs` (reuse or checksum-pinned install). A failed install skips
+  an automatically selected proof and fails an explicit Bend request. Re-read before
   proof execution and GREEN/review. Use supported, authorized native delegation with capacity for
   parallel law/behavior analysis; later run proof/behavior checks concurrently on stable, isolated
   inputs when the host supports it. Report a concrete reason for sequential fallback. Approval,
@@ -190,10 +176,11 @@ its own scope carve-out at disqualification, with no additional node or artifact
   [`card/case-space.md`](references/card/case-space.md) — before planning, explain the candidate space;
   after drafting rows, declare the dimension space and
   dispositioning the machine-generated frames of `scripts/oracle-frames.mjs`,
+  [`card/confirmation-lock.md`](references/card/confirmation-lock.md).
+- After the lock only, never while writing the card:
   [`card/retro-metrics.md`](references/card/retro-metrics.md) — the escape record written for any
   defect found after the lock, the run metrics recorded at `REVIEW_VERIFIED`, and conditional
-  guardrail candidate review from execution observations, none a gate; Low never loads this node,
-  [`card/confirmation-lock.md`](references/card/confirmation-lock.md).
+  guardrail candidate review from execution observations, none a gate; Low never loads this node.
 - Delivery: right after entering Delivery, explicitly load and invoke the installed `$test` skill
   by name and read [`delivery/ledger.md`](references/delivery/ledger.md). Load later nodes with
   their dependencies when needed: [`delivery/red.md`](references/delivery/red.md) before tests/RED;
@@ -260,14 +247,17 @@ its own scope carve-out at disqualification, with no additional node or artifact
   rule and the reviewer's widget check, so the contract reaches review as a shared checklist, not
   as a fresh opinion. A contract is guidance, never policy: a key or state it names that the card
   does not cover is `POLICY_GAP`.
-- After `implement-green` touches UI, before review-dispatch, run the two design scanners the
-  repo does not have to install and record their output as observation artifacts, pending and
-  non-verifying: `npx react-doctor@latest design --scope <changed files>` for the deterministic
-  interaction·motion·affordance rules, and the `web-design-guidelines` skill on the changed files if
-  it is installed. Fix what the card already covers; anything else is a candidate, never a new
-  policy. Skip a scanner that cannot run (offline, sandbox) and say so in the report. `@latest`
-  names no version: prefer a version the repo already installs or pins, and record the version
-  that actually ran (`react-doctor --version` from the same install) beside the artifact.
+- After `implement-green` touches UI, before review-dispatch, run the two design scanners and
+  record their output as observation artifacts, pending and non-verifying: react-doctor for the
+  deterministic interaction·motion·affordance rules, and the `web-design-guidelines` skill on the
+  changed files if it is installed. Use the repo's own react-doctor when it has one; otherwise
+  install the pinned version on the fly, which leaves the repo's package.json and lockfile alone:
+  `npx --yes react-doctor@0.9.14 design <project dir> --scope files --include-untracked --json --no-telemetry`.
+  `--no-telemetry` is required: by default the tool reports crashes to an external service.
+  `--scope` takes `full`·`files`·`changed`·`lines`, never a file list, so keep only findings on
+  paths from `oracle-run.mjs status --changed-files`. The JSON report records the `version` that
+  actually ran. Fix what the card already covers; anything else is a candidate, never a new policy.
+  If the install or run fails (offline, sandbox), skip the scanner and say so in the report.
 - Hook Encapsulation only when the approved architecture chose `orchestration-only`. Existing
   equivalent rules first; no dependency installs or lint config changes.
 - Screenshot comparison and direct browser QA run only on explicit request, by invoking the
@@ -324,7 +314,12 @@ edits or dependency installation for design-only requests, or replace Draft gene
    user. Before drafting, run `scripts/oracle-dimensions.mjs --path <touched files>` and
    `scripts/oracle-verify.mjs card --repo-policies` — the dimension candidates, side-effect
    inventory, and the sibling cards' policies that share a surface are counterparts to
-   disposition, never rows to copy. Follow the phase order
+   disposition, never rows to copy. Its applicability checklist (`action-repeat`,
+   `request-lifecycle`, `response-order`, `owner-lifetime`, `server-boundary`, `data-value`) gives
+   each candidate a source plus a mapped dimension, a non-application reason, or an Open-question
+   ID; it catches declared-model omissions, not all real interactions, and never licenses inventing
+   cursor expiry or retry policy the contract is silent on. A `Coverage: full-product` card follows
+   the full-product opt-in in `card/case-space.md`. Follow the phase order
    (outcome → risk → data·architecture → API → concurrency·async → state → visual →
    performance·ops); a question goes out ahead of the Draft only when its answer kills a branch,
    and if the user asks for a one-question-at-a-time interview, run it without a round cap.
@@ -445,7 +440,8 @@ be answered from artifacts on disk is a `FAIL`, not a judgment call.
 
 Checks 2 and 4 are also a command: `oracle-run.mjs status --dir <dir> --check-report <report|->`
 compares the `Status:` line and every cited `r-NNN exit <n>` with the ledger and fails as
-`REPORT_CLAIM_MISMATCH`. On Claude Code the plugin's Stop hook runs it on the final message.
+`REPORT_CLAIM_MISMATCH`; a `VALID_RED`·`IMPLEMENTED_GREEN`·`REVIEW_VERIFIED` Status that cites no
+runId fails the same way. On Claude Code the plugin's Stop hook runs it on the final message.
 
 ## Final report
 

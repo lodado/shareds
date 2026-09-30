@@ -65,7 +65,8 @@ test('every held-out escape names the check that now catches it, or says in word
   const scripts = dirname(fileURLToPath(import.meta.url))
   const testSources = (
     await Promise.all(
-      (await readdir(scripts)).filter((name) => name.endsWith('.test.mjs')).map((name) => readFile(join(scripts, name), 'utf8')),
+      // oracle-run.cases.mjs는 샤드 파일이 나눠 등록하는 테스트 본문이다
+      (await readdir(scripts)).filter((name) => /\.(?:test|cases)\.mjs$/.test(name)).map((name) => readFile(join(scripts, name), 'utf8')),
     )
   ).join('\n')
   const evalIds = new Set(
