@@ -21,6 +21,7 @@ import {
   stableStringify,
 } from './oracle-fs.mjs'
 import { formalModelIssues, parseFormalModel } from './oracle-model.mjs'
+import { generatedBlock, generatedIssues, regenerateAtRoot } from './oracle-package.mjs'
 import { contextGaps, snapshotContext, validateContextReview } from './oracle-review-context.mjs'
 import { bracedValues, replacePlaceholders, stripTrailingParenthesized } from './oracle-verify-helpers.mjs'
 
@@ -937,6 +938,11 @@ async function lintCard(options) {
   const issues = []
   const rootDirectory = oracleRootDirectory(options.oracle)
 
+  // 모델 패키지에서 투영한 카드 — 생성 영역을 패키지에서 다시 만들어 비교한다: 손으로 고쳤거나(drift) 패키지·Bend 파일이
+  // 바뀐 뒤 다시 투영하지 않았으면(stale) 막고, 다시 만들 수 없으면(unverified) 통과시키지 않는다. 생성 영역이 없는 기존
+  // 카드는 이 검사를 받지 않는다 — 단 모델 패키지를 출처로 등록한 카드는 아래에서 영역을 요구한다.
+  issues.push(...(await generatedIssues(card, { regenerate: regenerateAtRoot() })))
+
   const sourceSection = sectionLines(lines, 'Source Registry')
   if (sourceSection.length === 0) {
     issues.push('source-registry: card has no `## Source Registry` section')
@@ -1345,6 +1351,23 @@ async function lintCard(options) {
     }),
   )
   const readSource = (repoPath) => readFile(resolve(repoPath), 'utf8').catch(() => null)
+  // 표식을 지워 모델 우선 카드를 기존 카드처럼 보이게 하는 길을 막는다: 모델 패키지를 출처로 등록한 카드는 생성 영역이
+  // 있어야 한다. 패키지 없이 처음부터 손으로 쓴 카드는 기존 카드와 구별할 수 없다 — 그 경우는 리뷰가 잡는다.
+  if (!generatedBlock(card).present) {
+    for (const [id, { repoPath }] of formalSources) {
+      if (!repoPath?.endsWith('.json')) continue
+      let registered = null
+      try {
+        registered = JSON.parse((await readSource(repoPath)) ?? 'null')
+      } catch {
+        registered = null
+      }
+      if (registered?.packageVersion !== undefined)
+        issues.push(
+          `card-generated-missing: ${id} registers the model package ${repoPath}, but the card has no generated region — project it with oracle-package.mjs; never strip the markers or hand-copy the sections`,
+        )
+    }
+  }
   const formal = parseFormalModel(lines)
   if (formal) {
     issues.push(

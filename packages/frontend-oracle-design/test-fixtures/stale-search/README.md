@@ -32,3 +32,25 @@ The source text the card cites as S1:
 up to 4 events (10 cases, each prefix observed), conformance of the reducer, and the rejection of each
 mutant with its first counterexample. It shows the reducer matches the model on that declared space;
 it is not a proof about the reducer and not a browser test.
+
+## Model-first path (added with oracle-package v1)
+
+The same fixture also runs the model-first chain of `bend-cross-verification.md` §2 without changing
+the legacy card above. The package is the input; the card is projected from it.
+
+| File                        | Role                                                                                              | Locked |
+| --------------------------- | ------------------------------------------------------------------------------------------------- | ------ |
+| `oracle.package.json`       | model package: sources, reading, world terms, goals, contract by model symbol, behavior, law rows | S5     |
+| `oracle.package.draft.json` | the first draft: `oldShown` hidden and an end-state-only stale row — kept as the refuted record   | no     |
+| `World.bend`                | adequacy world `Race` (one attempt, two requests), goals G1–G4, contract predicates by symbol     | S4     |
+| `oracle.model-first.md`     | card projected by `oracle-package.mjs project-card`; only User Confirmation is hand-written       | card   |
+| `world.adapter.mjs`         | world adapter: drives the reducer per coordinate setting and reads both observations              | no     |
+
+The goals were written in the same context as the contract (`author: controller`), so every adequacy
+result on this package is reported as `independence.evidence: none` and `goalAudit.claim:
+self-consistency` — it shows the card agrees with its model, not that the model is faithful to the text.
+The approval in `oracle.model-first.md` is a synthetic fixture approval, like the legacy card's.
+`skills/scripts/oracle-package.test.mjs` runs the chain: the draft refuted by a hidden observation, the
+refined package proven, the flicker mutant passing the draft and failing the refined world, the projected
+card linted and locked with the package, a ledger-bound RED on the wrong reducer, VALID_RED, GREEN on the
+fix, and `IMPLEMENTED_GREEN` refused because this fixture has no type-fest contract.

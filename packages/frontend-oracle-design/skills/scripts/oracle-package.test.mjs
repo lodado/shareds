@@ -1,0 +1,714 @@
+import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { chmod, cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+// eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
+import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+import { BEND_VERSION, ensureBend } from './ensure-bend.mjs'
+import { checkAdequacy, conformWorld, HAZARDS, modelInput, triageCandidates } from './oracle-adequacy.mjs'
+import { sha256 } from './oracle-fs.mjs'
+import { enumerateSpace, verdictOf } from './oracle-model.mjs'
+import {
+  assignRows,
+  derive,
+  derivePackage,
+  generatedBlock,
+  generatedIssues,
+  HAZARD_IDS,
+  inputsDigestOf,
+  loadPackage,
+  orderObligations,
+  packageInputs,
+  packageIssues,
+  projectCard,
+  regenerateAtRoot,
+  renderGenerated,
+} from './oracle-package.mjs'
+import { emitTrace } from './oracle-projection.mjs'
+
+const PACKAGE_DIR = fileURLToPath(new URL('../../', import.meta.url))
+const FIXTURE = join(PACKAGE_DIR, 'test-fixtures', 'stale-search')
+const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
+const PKG = JSON.parse(await readFile(join(FIXTURE, 'oracle.package.json'), 'utf8'))
+const DRAFT = JSON.parse(await readFile(join(FIXTURE, 'oracle.package.draft.json'), 'utf8'))
+const WORLD = await readFile(join(FIXTURE, 'World.bend'), 'utf8')
+const MODEL = await readFile(join(FIXTURE, 'MODEL.bend'), 'utf8')
+const clone = (value) => structuredClone(value)
+
+/** 설치된 고정 Bend가 있을 때만 돈다 — 테스트는 내려받지 않는다. skip은 통과가 아니라 skipped로 남는다. */
+async function installedBend(t) {
+  try {
+    const { bin } = await ensureBend({
+      download: () => {
+        throw Object.assign(new Error('tests never download Bend'), { code: 'BEND_NOT_INSTALLED' })
+      },
+    })
+    return bin
+  } catch (error) {
+    t.skip(`Bend ${BEND_VERSION} is not installed (${error.code ?? error.message}) — real Bend integration not run`)
+    return null
+  }
+}
+
+async function fixtureCopy(t) {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-package-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  await cp(FIXTURE, root, { recursive: true })
+  return root
+}
+
+// 바깥 node --test의 자식 프로토콜 변수를 지운다 — 남기면 러너가 부르는 node --test가 보고 대신 직렬화된 출력을 낸다.
+const { NODE_TEST_CONTEXT: _parent, ...CHILD_ENV } = process.env
+const node = (cwd, script, args) =>
+  spawnSync(process.execPath, [join(SCRIPTS, script), ...args], { cwd, encoding: 'utf8', env: CHILD_ENV })
+
+test('the package hazard list is the adequacy hazard list', () => {
+  assert.deepEqual(HAZARD_IDS, Object.keys(HAZARDS))
+})
+
+// ── stage A: 카드 없이 모델 작성에 들어간다 ─────────────────────────────────────────────────────────────
+
+test('model stage needs sources, world, terms and goals only — no card, no O* row, no contract', () => {
+  assert.deepEqual(packageIssues(PKG), [])
+  assert.deepEqual(packageIssues(DRAFT), [])
+  const early = clone(PKG)
+  for (const field of ['policies', 'contract', 'behavior', 'families', 'notApplicable']) delete early[field]
+  early.sources = early.sources.filter((source) => !source.self)
+  assert.deepEqual(packageIssues(early, { stage: 'model' }), [])
+  // projecting a card is a later stage: it needs the contract, the policies, the behavior model and the self source
+  const projectIssues = packageIssues(early, { stage: 'project' }).map((issue) => issue.split(':')[0])
+  for (const code of ['package-policies', 'package-contract', 'package-self', 'package-behavior-missing'])
+    assert.ok(projectIssues.includes(code), code)
+})
+
+test('the package refuses readings that would hide a goal or merge meanings', () => {
+  const codes = (pkg) => packageIssues(pkg).map((issue) => issue.split(':')[0])
+  const goalFromModel = clone(PKG)
+  goalFromModel.goals[0].cites = ['S2']
+  assert.ok(codes(goalFromModel).includes('package-goal-source'))
+  const noAuthor = clone(PKG)
+  delete noAuthor.goals[0].author
+  assert.ok(codes(noAuthor).includes('package-goal-author'))
+  const productDuty = clone(PKG)
+  productDuty.assumptions = [{ id: 'A1', source: 'S1', owner: 'product', falsifier: 'an old result on screen' }]
+  assert.ok(codes(productDuty).includes('package-assumption-owner'))
+  const conflated = clone(PKG)
+  conflated.terms[3].field = 'final'
+  assert.ok(codes(conflated).includes('package-term-conflated'))
+  const pathless = clone(PKG)
+  delete pathless.terms[0].path
+  assert.ok(codes(pathless).includes('package-term-path'))
+  const both = clone(PKG)
+  both.contract[0].outside = 'also outside'
+  assert.ok(codes(both).includes('package-contract-def'))
+  const unlinked = clone(PKG)
+  unlinked.contract = unlinked.contract.map((entry) => ({
+    ...entry,
+    policies: entry.policies.filter((id) => id !== 'P3'),
+  }))
+  assert.ok(codes(unlinked).includes('package-policy-unlinked'))
+})
+
+test('row IDs come from pinned model symbols; a new predicate never shifts an existing row', () => {
+  const contract = [{ key: 'a', row: 'O2' }, { key: 'b' }, { key: 'c', row: 'O1' }]
+  const first = assignRows(contract)
+  assert.deepEqual(Object.fromEntries(first.rows), { a: 'O2', b: 'O3', c: 'O1' })
+  assert.deepEqual(first.unpinned, [{ key: 'b', row: 'O3' }])
+  const grown = assignRows([{ key: 'new' }, ...contract])
+  assert.equal(grown.rows.get('a'), 'O2')
+  assert.equal(grown.rows.get('c'), 'O1')
+  assert.notEqual(grown.rows.get('new'), 'O1')
+})
+
+test('the analyst input from a package carries the source text only — no contract, terms, goals or model', async () => {
+  const input = await modelInput({ package: 'oracle.package.json', cwd: FIXTURE })
+  assert.match(input, /A response to an older request does not change what the list shows\./)
+  assert.match(input, /## Hazards/)
+  for (const leaked of [
+    'staleNeverShown',
+    'latestShown',
+    'Race{',
+    'Search.step',
+    'oldShown',
+    'P2:',
+    'G1',
+    'World.bend',
+    'MODEL.bend',
+  ])
+    assert.ok(!input.includes(leaked), `${leaked} leaked into the analyst input`)
+})
+
+// ── stage B: 축은 모델에서 도출된다 ────────────────────────────────────────────────────────────────────
+
+test('axes are derived from the world record and the behavior types, with roles from the terms and no silent gaps', () => {
+  const derived = derive(PKG, { world: WORLD, model: MODEL })
+  assert.equal(derived.status, 'derived')
+  const byId = Object.fromEntries(derived.axes.map((axis) => [axis.id, axis]))
+  assert.deepEqual(derived.summary.coordinates, ['arrival', 'newAnswers'])
+  assert.deepEqual(derived.summary.observations, ['final', 'oldShown'])
+  assert.deepEqual(byId['world.Race.final'].domain.enumerated, {
+    values: ['NoneShown', 'OldShown', 'NewShown'],
+    by: 'type',
+  })
+  assert.deepEqual(byId['world.Race.arrival'].termRefs, ['T1'])
+  assert.equal(byId['world.Race.arrival'].realizationRef, PKG.terms[0].path)
+  // a sum type is split per constructor: Respond.id is conditional on Respond and never crossed with Issue
+  assert.equal(byId['event.Msg.Respond.id'].conditionalOn, 'Msg=Respond')
+  assert.ok(!Object.keys(byId).some((id) => id.startsWith('event.Msg.Issue.')))
+  // Nat has no finite value list: the model domain stays Nat and nothing claims a product domain
+  assert.equal(byId['event.Msg.Respond.id'].domain.model, 'Nat')
+  assert.equal(byId['event.Msg.Respond.id'].domain.enumerated, null)
+  assert.equal(byId['state.Search.Search.shown'].role, 'hidden')
+  // no trace space was enumerated here, so order obligations are unknown — reported, not absent
+  assert.equal(derived.order, null)
+  assert.ok(derived.diagnostics.some((entry) => entry.code === 'order-unchecked'))
+  // the same inputs give the same derivation, byte for byte
+  assert.equal(derive(PKG, { world: WORLD, model: MODEL }).digest, derived.digest)
+})
+
+test('a new enum value in the world model reaches the axes and the digest; an unsupported declaration is diagnosed, not dropped', () => {
+  const base = derive(PKG, { world: WORLD, model: MODEL })
+  const widened = derive(PKG, { world: WORLD.replace('  NewShown{}\n', '  NewShown{}\n  BothShown{}\n'), model: MODEL })
+  assert.deepEqual(widened.axes.find((axis) => axis.id === 'world.Race.final').domain.enumerated.values, [
+    'NoneShown',
+    'OldShown',
+    'NewShown',
+    'BothShown',
+  ])
+  assert.equal(widened.summary.rawCombinations, 32)
+  assert.notEqual(widened.digest, base.digest)
+
+  const unsupported = derive(PKG, {
+    world: `${WORLD.replace(
+      'oldShown: Bool}',
+      'oldShown: Bool, query: String}',
+    )}\ntype Pair<A> is Data:\n  Pair{a: A}\n`,
+    model: MODEL,
+  })
+  assert.equal(unsupported.status, 'incomplete')
+  const codes = unsupported.diagnostics.map((entry) => `${entry.code} ${entry.symbol}`)
+  assert.ok(codes.includes('type-unsupported Pair'), codes.join('; '))
+  assert.ok(codes.includes('axis-type-unsupported Race.query'), codes.join('; '))
+  assert.ok(codes.includes('axis-term-missing Race.query'), codes.join('; '))
+  assert.equal(unsupported.axes.find((axis) => axis.id === 'world.Race.query').status, 'unsupported')
+})
+
+test('order obligations separate order-sensitive from history-sensitive traces, which an end-state world cannot see', () => {
+  // a hand model: `a` adds one, `b` doubles; observe the value. a·b and b·a end differently; a·a' pairs do not exist.
+  const model = {
+    init: () => 1n,
+    step: (state, event) => (event.$ === 'A' ? state + 1n : state * 2n),
+    observe: (state) => state,
+    next: () => ({ $: 'Con', head: { $: 'A' }, tail: { $: 'Con', head: { $: 'B' }, tail: { $: 'Nil' } } }),
+    prefix: 'Hand',
+    digest: 'hand',
+  }
+  const orders = orderObligations(enumerateSpace(model, { bound: 2 }))
+  assert.equal(orders.total, 1)
+  assert.equal(orders.obligations[0].kind, 'order-sensitive')
+  // a model whose events commute at the end but not on the way: set x then y vs y then x, observing the last set
+  const commuting = {
+    init: () => ({ $: 'S', x: false, y: false }),
+    step: (state, event) => ({ ...state, [event.$ === 'X' ? 'x' : 'y']: true }),
+    observe: (state) => Number(state.x) + Number(state.y) * 2,
+    next: () => ({ $: 'Con', head: { $: 'X' }, tail: { $: 'Con', head: { $: 'Y' }, tail: { $: 'Nil' } } }),
+  }
+  const history = orderObligations(enumerateSpace(commuting, { bound: 2 }))
+  const kinds = history.obligations.map((entry) => entry.kind)
+  assert.ok(kinds.includes('history-sensitive'), JSON.stringify(history))
+})
+
+test('the family audit maps derived axes and demands a human reason for every other family', () => {
+  const derived = derive(PKG, { world: WORLD, model: MODEL })
+  assert.deepEqual(
+    derived.families.filter((entry) => entry.status === 'mapped').map((entry) => entry.family),
+    ['Async', 'Order'],
+  )
+  const silent = clone(PKG)
+  delete silent.families.Platform
+  const audit = derive(silent, { world: WORLD, model: MODEL }).families.find((entry) => entry.family === 'Platform')
+  assert.equal(audit.status, 'undispositioned')
+  // the projection never invents an exclusion: the family has no row, which the card lint blocks as undispositioned
+  assert.doesNotMatch(renderGenerated(silent, derive(silent, { world: WORLD, model: MODEL })), /\| Platform /)
+})
+
+// ── stage C/D: 카드는 모델에서 투영된다 ────────────────────────────────────────────────────────────────
+
+test('the projected card is deterministic, marks its generated region and never records approval', async () => {
+  const loaded = await loadPackage('oracle.package.json', { root: FIXTURE })
+  const inputsDigest = inputsDigestOf(await packageInputs(loaded))
+  const derived = derive(PKG, { world: WORLD, model: MODEL })
+  const card = projectCard(PKG, derived, { packagePath: 'oracle.package.json', inputsDigest })
+  assert.equal(projectCard(PKG, derived, { packagePath: 'oracle.package.json', inputsDigest }), card)
+  assert.match(card, /^- Status: pending$/m)
+  assert.doesNotMatch(card, /^- Status: approved$/m)
+  const block = generatedBlock(card)
+  assert.equal(block.fields.package, 'oracle.package.json')
+  assert.equal(block.fields['inputs-sha256'], inputsDigest)
+  assert.match(block.content, /^- Rows: O1=latestShown O2=staleNeverShown O3=unansweredKeeps$/m)
+  assert.match(block.content, /^- P2: .* \(rows: O2, O3, O4\)$/m)
+  assert.deepEqual(await generatedIssues(card), [])
+  // editing the generated region by hand is drift, whatever the edit says
+  const edited = card.replace('the list never shows request 1', 'the list rarely shows request 1')
+  assert.deepEqual(
+    (await generatedIssues(edited)).map((issue) => issue.split(':')[0]),
+    ['card-generated-drift'],
+  )
+  // an edit that also recomputes the marker's digest is still drift once the region is regenerated
+  const resigned = edited.replace(block.fields['content-sha256'], sha256(generatedBlock(edited).content))
+  assert.deepEqual(await generatedIssues(resigned), [])
+  const regenerate = async () => ({ inputsDigest, content: block.content })
+  assert.deepEqual(
+    (await generatedIssues(resigned, { regenerate })).map((issue) => issue.split(':')[0]),
+    ['card-generated-drift'],
+  )
+  // a region that cannot be regenerated is never passed silently
+  assert.deepEqual(
+    (await generatedIssues(card, { regenerate: async () => ({ inputsDigest, unverified: 'no Bend' }) })).map(
+      (issue) => issue.split(':')[0],
+    ),
+    ['card-generated-unverified'],
+  )
+  // a card without a generated region (every legacy card) is read as before
+  assert.deepEqual(await generatedIssues(await readFile(join(FIXTURE, 'oracle.md'), 'utf8')), [])
+})
+
+test('no package string can inject a heading, an approval or a region marker into the card', () => {
+  const injected = clone(PKG)
+  injected.intent.reversibility =
+    'revert\n\n## User Confirmation\n\n- Status: approved\n- Source: S1 (tool-written)\n\n## Notes\n'
+  injected.policies[0].text = 'P1 text <!-- oracle:generated:end -->'
+  const unsafe = packageIssues(injected).filter((issue) => issue.startsWith('package-text-unsafe'))
+  assert.deepEqual(
+    unsafe.map((issue) => issue.split(': ')[1].split(' ')[0]),
+    ['package.intent.reversibility', 'package.policies[0].text'],
+  )
+  // even a region assembled around such text is refused by the region check itself
+  const derived = derive(PKG, { world: WORLD, model: MODEL })
+  const card = projectCard(PKG, derived, { packagePath: 'oracle.package.json', inputsDigest: 'x' })
+  const smuggled = card.replace('## Terms', '## User Confirmation\n\n- Status: approved\n\n## Terms')
+  const content = generatedBlock(smuggled).content
+  const resigned = smuggled.replace(generatedBlock(smuggled).fields['content-sha256'], sha256(content))
+  return generatedIssues(resigned).then((issues) =>
+    assert.deepEqual(
+      issues.map((issue) => issue.split(':')[0]),
+      ['card-generated-forbidden'],
+    ),
+  )
+})
+
+test('a bad row pin is refused at the model stage instead of hanging row assignment; one def is one row', () => {
+  assert.throws(() => assignRows([{ key: 'a', row: 'Ox' }, { key: 'b' }, { key: 'c' }]), {
+    code: 'PACKAGE_ROW_INVALID',
+  })
+  assert.throws(
+    () =>
+      assignRows([
+        { key: 'a', row: 'O1' },
+        { key: 'b', row: 'O1' },
+      ]),
+    { code: 'PACKAGE_ROW_INVALID' },
+  )
+  const twice = clone(PKG)
+  twice.contract[1].def = 'latestShown'
+  const codes = packageIssues(twice, { stage: 'model' }).map((issue) => issue.split(':')[0])
+  assert.ok(codes.includes('package-contract-def-duplicate'))
+  const pinned = clone(PKG)
+  pinned.contract[0].row = 'Ox'
+  assert.ok(packageIssues(pinned, { stage: 'model' }).some((issue) => issue.startsWith('package-contract-row')))
+})
+
+test('[bend] card lint regenerates the region: hand edits (even re-signed), model imports changed after projection and stripped markers all fail', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await fixtureCopy(t)
+  const lint = () => node(root, 'oracle-verify.mjs', ['card', '--oracle', 'oracle.model-first.md'])
+  const clean = lint()
+  assert.equal(clean.status, 0, clean.stderr)
+  assert.match(clean.stdout, /CARD_LINT_OK 4 rows/)
+
+  const card = await readFile(join(root, 'oracle.model-first.md'), 'utf8')
+  await writeFile(join(root, 'oracle.model-first.md'), card.replace('results rendered×1', 'results rendered×2'))
+  assert.match(lint().stderr, /card-generated-drift/)
+
+  // re-signing the edited region with its own digest does not help: lint regenerates it from the package
+  const retargeted = card.replace('`Race.staleNeverShown`', '`Race.latestShown`')
+  const block = generatedBlock(retargeted)
+  await writeFile(
+    join(root, 'oracle.model-first.md'),
+    retargeted.replace(block.fields['content-sha256'], sha256(block.content)),
+  )
+  const resigned = lint()
+  assert.equal(resigned.status, 1)
+  assert.match(resigned.stderr, /card-generated-drift: regenerating from the package does not reproduce/)
+
+  // stripping the markers does not turn the card into a legacy card while it registers the package
+  await writeFile(
+    join(root, 'oracle.model-first.md'),
+    card.replace(/^<!-- oracle:generated:begin.*-->$/m, '').replace('<!-- oracle:generated:end -->', ''),
+  )
+  assert.match(lint().stderr, /card-generated-missing: S5 registers the model package oracle\.package\.json/)
+
+  await writeFile(join(root, 'oracle.model-first.md'), card)
+  // MODEL.bend imports nothing today; add a helper file it imports — a change to an imported file is a change
+  await writeFile(join(root, 'Helper.bend'), 'import Base\n\ndef Helper.one() -> Nat:\n  1n\n')
+  await writeFile(join(root, 'MODEL.bend'), MODEL.replace('import Base\n', 'import Base\nimport ./Helper.bend as H\n'))
+  assert.match(lint().stderr, /card-generated-stale/)
+})
+
+// ── 실제 Bend 2.0.34 통합 ─────────────────────────────────────────────────────────────────────────────
+
+test('[bend] the model-first chain: draft refuted by a hidden observation, refined proven, the flicker mutant caught only after refinement', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await fixtureCopy(t)
+  const draft = await checkAdequacy({ package: 'oracle.package.draft.json', cwd: root, bin })
+  assert.equal(draft.status, 'refuted')
+  assert.equal(draft.kernel.status, 'proven')
+  const sufficiency = draft.checks.find((check) => check.kind === 'sufficiency' && check.target === 'G1')
+  assert.equal(sufficiency.status, 'refuted')
+  assert.deepEqual(sufficiency.differing, [{ field: 'oldShown', category: 'hidden' }])
+  assert.equal(
+    draft.checks.find((check) => check.kind === 'card-implies-goal' && check.target === 'G1').status,
+    'refuted',
+  )
+
+  const refined = await checkAdequacy({ package: 'oracle.package.json', cwd: root, bin, out: join(root, 'evidence') })
+  assert.equal(refined.status, 'proven', JSON.stringify(refined.checks.filter((check) => check.status !== 'proven')))
+  assert.deepEqual(refined.rowIds, { latestShown: 'O1', staleNeverShown: 'O2', unansweredKeeps: 'O3' })
+  // written in one context: the goals are the contract author's, so the claim is self-consistency, not independence
+  assert.equal(refined.independence.evidence, 'none')
+  assert.equal(refined.goalAudit.claim, 'self-consistency')
+  assert.deepEqual(refined.goalAudit.goals.find((goal) => goal.goal === 'G1').mirrorsRows, ['O2'])
+  const recheck = spawnSync(bin, ['ADEQUACY.bend', '--verdict'], {
+    cwd: join(root, 'evidence'),
+    encoding: 'utf8',
+    env: { ...process.env, BEND_NO_TELEMETRY: '1' },
+  })
+  assert.equal(recheck.status, 0, `${recheck.stdout}${recheck.stderr}`)
+
+  const adapters = await import(join(root, 'world.adapter.mjs'))
+  const good = await conformWorld({ package: 'oracle.package.json', cwd: root, adapter: adapters, bin })
+  assert.equal(good.status, 'pass')
+  const flickerOnDraft = await conformWorld({
+    package: 'oracle.package.draft.json',
+    cwd: root,
+    adapter: adapters.mutants.withoutStaleCheck,
+    bin,
+  })
+  const flickerSetting = (result) =>
+    result.settings.find((entry) => entry.coordinates.arrival === 'OldFirst' && entry.coordinates.newAnswers)
+  // with only the end state observed, "shown briefly, then replaced" passes the draft
+  assert.equal(flickerSetting(flickerOnDraft).status, 'pass')
+  const flickerOnRefined = await conformWorld({
+    package: 'oracle.package.json',
+    cwd: root,
+    adapter: adapters.mutants.withoutStaleCheck,
+    bin,
+  })
+  assert.equal(flickerSetting(flickerOnRefined).status, 'violation')
+  assert.deepEqual(flickerSetting(flickerOnRefined).rows, ['O2'])
+
+  // an explorer candidate is triaged against the package without a card; nothing enters the space
+  const triaged = await triageCandidates({
+    package: 'oracle.package.json',
+    cwd: root,
+    bin,
+    candidates: {
+      candidates: [
+        {
+          id: 'X1',
+          kind: 'qualifier',
+          scenario: 'the policy says a response to an older request; the rows could be read as any earlier response',
+          harm: 'a response to the same request id delivered twice is not covered',
+          sourceText: 'at most once',
+          rows: ['O2'],
+          sources: ['S1'],
+        },
+      ],
+    },
+  })
+  assert.equal(triaged.triaged[0].verdict, 'dropped-qualifier')
+})
+
+test('[bend] moving a product duty into an assumption hides the goal, and a card that forbids the normal path fails its witness', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await fixtureCopy(t)
+  const hidden = clone(PKG)
+  // "the list never shows an older result" is the product's duty; stated as an assumption it removes every violating world
+  await writeFile(
+    join(root, 'World.bend'),
+    `${WORLD}\n# A1: (wrongly) the environment never lets an older result show\ndef Race.A1(w: Race) -> Bool:\n  Race.G1(w)\n`,
+  )
+  hidden.assumptions = [{ id: 'A1', source: 'S1', owner: 'search backend', falsifier: 'an older result on screen' }]
+  await writeFile(join(root, 'hidden.json'), JSON.stringify(hidden))
+  const hiddenResult = await checkAdequacy({ package: 'hidden.json', cwd: root, bin })
+  assert.equal(
+    hiddenResult.checks.find((check) => check.kind === 'goal-falsifiable' && check.target === 'G1').status,
+    'refuted',
+  )
+
+  const nothing = clone(PKG)
+  // a contract that allows only an empty list satisfies every safety goal and forbids the normal path
+  await writeFile(
+    join(root, 'World.bend'),
+    `${WORLD}\ndef Race.neverShows(w: Race) -> Bool:\n  match w:\n    case Race{a, n, f, o}:\n      Race.isNone(f)\n`,
+  )
+  nothing.contract = [{ ...PKG.contract[0], key: 'neverShows', def: 'neverShows' }, PKG.contract[3]]
+  await writeFile(join(root, 'nothing.json'), JSON.stringify(nothing))
+  const nothingResult = await checkAdequacy({ package: 'nothing.json', cwd: root, bin })
+  assert.equal(nothingResult.checks.find((check) => check.kind === 'goal-witness').status, 'refuted')
+})
+
+test('[bend] derive with the trace space finds the history-sensitive late response; check-card regenerates the committed card byte for byte', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const loaded = await loadPackage('oracle.package.json', { root: FIXTURE })
+  const { derived } = await derivePackage(loaded, { bin })
+  assert.equal(derived.status, 'derived')
+  const history = derived.order.obligations.find((entry) => entry.kind === 'history-sensitive')
+  assert.ok(history, JSON.stringify(derived.order))
+  // the late response 2·1 and the in-order 1·2 both end showing request 2, through different observations
+  const labels = history.traces.map((entry) => entry.label)
+  assert.ok(labels.includes('Issue · Issue · Respond{id:2} · Respond{id:1}'))
+  assert.ok(labels.includes('Issue · Issue · Respond{id:1} · Respond{id:2}'))
+  assert.deepEqual(derived.axes.find((axis) => axis.id === 'event.Msg.Respond.id').domain.enumerated, {
+    values: ['1', '2', '3'],
+    by: 'trace-space',
+    bound: 4,
+  })
+  assert.deepEqual(
+    await generatedIssues(await readFile(join(FIXTURE, 'oracle.model-first.md'), 'utf8'), {
+      regenerate: regenerateAtRoot(FIXTURE),
+    }),
+    [],
+  )
+  const checked = node(FIXTURE, 'oracle-package.mjs', [
+    'check-card',
+    '--package',
+    'oracle.package.json',
+    '--card',
+    'oracle.model-first.md',
+  ])
+  assert.equal(checked.status, 0, `${checked.stdout}${checked.stderr}`)
+})
+
+/**
+ * 끝에서 끝까지 — 잠긴 모델 우선 카드에서 실제 ledger로: 잘못된 제품에서 생성 테스트가 RED, VALID_RED 전이, 제품을 고친
+ * 뒤 같은 테스트가 GREEN. 필수 스택 라벨 가운데 이 fixture가 채우지 않는 type-contract가 없으니 IMPLEMENTED_GREEN은
+ * 거부된다 — 기능의 일부가 통과했다고 완료로 올라가지 않는다.
+ */
+test('[bend] end to end: lock the projected card, RED on the wrong reducer, VALID_RED, GREEN on the fix, completion refused without the type contract', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const repository = await mkdtemp(join(tmpdir(), 'oracle-model-first-'))
+  t.after(() => rm(repository, { recursive: true, force: true }))
+  for (const file of ['README.md', 'MODEL.bend', 'LAWS.bend', 'PROOF.bend', 'World.bend', 'oracle.package.json'])
+    await cp(join(FIXTURE, file), join(repository, file))
+  const formal = join(repository, 'src', '__test__', 'formal')
+  await mkdir(formal, { recursive: true })
+  await mkdir(join(repository, 'node_modules'))
+  await symlink(join(PACKAGE_DIR, 'node_modules', 'fast-check'), join(repository, 'node_modules', 'fast-check'))
+  const reducer = await readFile(join(FIXTURE, 'search-reducer.mts'), 'utf8')
+  const mutants = await readFile(join(FIXTURE, 'search-reducer.mutants.mts'), 'utf8')
+  // the product starts wrong: its exported reducer shows every response (the stale check is missing)
+  const wrong = `${reducer.split('export function reduceSearch')[0]}${mutants
+    .split('\n')
+    .filter((line) => !line.startsWith('import'))
+    .join('\n')
+    .replace('export function reduceWithoutStaleCheck', 'export function reduceSearch')}`
+  await writeFile(join(repository, 'src', 'search-reducer.mts'), wrong)
+  await writeFile(
+    join(formal, 'search.adapter.mjs'),
+    (
+      await readFile(join(FIXTURE, 'search.adapter.mjs'), 'utf8')
+    ).replace("'./search-reducer.mts'", "'../../search-reducer.mts'"),
+  )
+
+  const project = node(repository, 'oracle-package.mjs', [
+    'project-card',
+    '--package',
+    'oracle.package.json',
+    '--out',
+    'oracle.md',
+  ])
+  assert.equal(project.status, 0, project.stderr)
+  // the only human edit: the approval, recorded outside the generated region (synthetic fixture approval)
+  const card = (await readFile(join(repository, 'oracle.md'), 'utf8'))
+    .replace('- Status: pending', '- Status: approved')
+    .replace(/^- Source: none yet.*$/m, '- Source: synthetic fixture approval; not a real consumer user confirmation')
+  const oracleDirectory = join(repository, '.ai', 'oracles', 'stale-search')
+  await mkdir(oracleDirectory, { recursive: true })
+  await writeFile(join(oracleDirectory, 'oracle.md'), card)
+
+  const sources = ['README.md', 'MODEL.bend', 'LAWS.bend', 'World.bend']
+  const lock = join(oracleDirectory, 'oracle.lock.json')
+  const lockWith = (list) =>
+    node(repository, 'oracle-lock.mjs', [
+      'create',
+      '--oracle',
+      join(oracleDirectory, 'oracle.md'),
+      '--lock',
+      lock,
+      ...list.flatMap((path) => ['--source', path]),
+    ])
+  // the package is a registered source: the lock lints a snapshot of the locked files only, so without the package
+  // the generated region cannot be recomputed and S5 is not a locked file — the lock is refused
+  const withoutPackage = lockWith(sources)
+  assert.equal(withoutPackage.status, 1)
+  assert.match(withoutPackage.stderr, /card-generated-package: oracle\.package\.json cannot be read/)
+  assert.match(withoutPackage.stderr, /S5/)
+  const locked = lockWith([...sources, 'oracle.package.json'])
+  assert.equal(locked.status, 0, locked.stderr)
+
+  const init = (labels) =>
+    node(repository, 'oracle-run.mjs', [
+      'init',
+      '--dir',
+      oracleDirectory,
+      '--lock',
+      lock,
+      '--scan-root',
+      join(repository, 'src'),
+      ...labels.flatMap((label) => ['--required-label', label]),
+    ])
+  const partial = init(['behavior', 'bend-proof:reported', 'bend-adequacy:reported'])
+  assert.equal(partial.status, 1)
+  assert.match(partial.stderr, /^STACK_LABELS_REQUIRED: .*type-contract:reported.*fast-check:reported/)
+  const stack = [
+    'behavior',
+    'bend-proof:reported',
+    'bend-adequacy:reported',
+    'type-contract:reported',
+    'fast-check:reported',
+  ]
+  const initialized = init(stack)
+  assert.equal(initialized.status, 0, initialized.stderr)
+
+  // tests first: generate the conformance test from the locked model (test files only, under __test__)
+  await emitTrace({
+    model: join(repository, 'MODEL.bend'),
+    prefix: 'Search',
+    bound: 4,
+    adapter: join(formal, 'search.adapter.mjs'),
+    out: formal,
+    row: 'O4',
+    runs: 100,
+    maxLength: 8,
+    bin,
+    regenerate: 'test',
+  })
+  const lateCase = '[O4] [M8e56dbd72890] Issue · Issue · Respond{id:2} · Respond{id:1}'
+  await writeFile(
+    join(oracleDirectory, 'evidence.json'),
+    JSON.stringify({ schemaVersion: 1, rows: { O4: { kind: 'test', name: lateCase } } }),
+  )
+  const exec = (label, report) =>
+    node(repository, 'oracle-run.mjs', [
+      'exec',
+      '--dir',
+      oracleDirectory,
+      '--label',
+      label,
+      '--adapter',
+      'node-test',
+      '--report',
+      join(oracleDirectory, report),
+      '--',
+      process.execPath,
+      '--test',
+      join(formal, 'search.oracle.test.mjs'),
+    ])
+  const red = exec('behavior', 'red.ndjson')
+  assert.equal(red.status, 0, red.stderr)
+  assert.match(red.stdout, /^RUN_RECORDED r-001 exit:1 grade:reported/)
+  const valid = node(repository, 'oracle-run.mjs', [
+    'transition',
+    '--dir',
+    oracleDirectory,
+    '--to',
+    'VALID_RED',
+    '--run',
+    'r-001',
+    '--evidence',
+    join(oracleDirectory, 'evidence.json'),
+    '--row',
+    'O4',
+  ])
+  assert.equal(valid.status, 0, valid.stderr)
+
+  // only now the production fix: the approved reducer
+  await writeFile(join(repository, 'src', 'search-reducer.mts'), reducer)
+  const green = exec('behavior', 'green.ndjson')
+  assert.equal(green.status, 0, green.stderr)
+  assert.match(green.stdout, /^RUN_RECORDED r-002 exit:0 grade:reported/)
+  const sampled = exec('fast-check:reported', 'fast-check.ndjson')
+  assert.match(sampled.stdout, /^RUN_RECORDED r-003 exit:0 grade:reported/)
+
+  const done = node(repository, 'oracle-run.mjs', [
+    'transition',
+    '--dir',
+    oracleDirectory,
+    '--to',
+    'IMPLEMENTED_GREEN',
+    '--run',
+    'r-002',
+    '--evidence',
+    join(oracleDirectory, 'evidence.json'),
+  ])
+  assert.equal(done.status, 1)
+  assert.match(done.stderr, /REQUIRED_RUN_MISSING: required label "bend-proof:reported" has no recorded run/)
+  const status = JSON.parse(node(repository, 'oracle-run.mjs', ['status', '--dir', oracleDirectory, '--json']).stdout)
+  assert.equal(status.currentState, 'VALID_RED')
+})
+
+test('a kernel that could not be built is unavailable (environment), never a failed proof', () => {
+  const run = {
+    status: 1,
+    signal: null,
+    stdout: '',
+    stderr:
+      'Error: the kernel did not build (lean: Executable not found in $PATH: "lean"); --verdict needs Lean v4.34.0\n',
+  }
+  const verdict = verdictOf(run, { bin: 'bend', timeoutMs: 1 })
+  assert.equal(verdict.status, 'unavailable')
+  assert.match(verdict.reason, /kernel did not build/)
+})
+
+test('the kernel phrase never overrides a verdict the checker printed', () => {
+  const run = {
+    status: 1,
+    signal: null,
+    stdout: 'SOME PROOFS FAIL\n',
+    stderr: 'note: the kernel did not build on a previous attempt\n',
+  }
+  assert.equal(verdictOf(run, { bin: 'bend', timeoutMs: 1 }).status, 'failed')
+})
+
+test('project-card never overwrites a hand-written card that has no generated region', async (t) => {
+  const root = await fixtureCopy(t)
+  const refused = node(root, 'oracle-package.mjs', [
+    'project-card',
+    '--package',
+    'oracle.package.json',
+    '--out',
+    'oracle.md',
+    '--no-bend',
+  ])
+  assert.equal(refused.status, 1)
+  assert.match(refused.stderr, /^CARD_NOT_GENERATED: /)
+  assert.equal(await readFile(join(root, 'oracle.md'), 'utf8'), await readFile(join(FIXTURE, 'oracle.md'), 'utf8'))
+})
+
+test('a fake bend on PATH cannot turn an unbuilt kernel into a proof', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-fake-bend-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const fake = join(root, 'bend')
+  await writeFile(fake, '#!/bin/sh\necho "the kernel did not build (lean missing)" >&2\nexit 1\n')
+  await chmod(fake, 0o755)
+  const run = spawnSync(fake, ['PROOF.bend', '--verdict'], { encoding: 'utf8' })
+  assert.equal(verdictOf(run, { bin: fake, timeoutMs: 1 }).status, 'unavailable')
+})

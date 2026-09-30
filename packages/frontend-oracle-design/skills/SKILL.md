@@ -9,8 +9,10 @@ allowed-tools:
 
 Frontend Oracle is not an implementation generator. It is a delivery/evidence harness that preserves
 approved frontend behavior and visual intent as `Outcome Brief → Source Registry → contract rows →
-revision lock → ledger state transitions`. References own the detailed rules; this file is the
-operator map.
+revision lock → ledger state transitions`. New work reaches the contract rows model-first: sources and
+two readings → a Bend model package → axes derived from the model → counterexample refinement → a card
+projected from the model for approval (`bend-cross-verification.md` §2). References own the detailed
+rules; this file is the operator map.
 
 ## Entry — always first
 
@@ -158,8 +160,9 @@ apply at every risk; Low has no new-work carve-out.
   is needed: `scripts/ensure-bend.mjs` provides the CLI (reuse or
   checksum-pinned install) and `scripts/oracle-model.mjs` proves the locked laws, generates the
   oracle space from the locked model and checks the product on it, recorded in the required
-  `## Formal Model`; with goals from the source text, `scripts/oracle-adequacy.mjs` checks the card's
+  `## Formal Model`; with goals from the source text, `scripts/oracle-adequacy.mjs` checks the
   coordinates and rows against them (`## Terms`, `## Adequacy`, [`adequacy.md`](references/adequacy.md)),
+  `scripts/oracle-package.mjs` derives the axes from the model package and projects the card from it,
   and `scripts/oracle-projection.mjs` generates the fast-check conformance tests from the model.
   A failed install is a mandatory verification failure; it cannot be skipped or downgraded. Re-read before proof execution and GREEN/review. Use supported, authorized native delegation with capacity for
   an independent model analyst; later run proof/behavior checks concurrently on stable, isolated
@@ -310,10 +313,16 @@ and the target repository's dependency rules.
    [`lifecycle-adaptation.md`](references/lifecycle-adaptation.md) before choosing investigation
    breadth/depth. Reuse existing artifacts; emit the Case space briefing before presenting a plan.
    This does not move implementation decisions ahead of VALID_RED or waive source/confirmation gates. The lane header's `risk` is finalized here.
+   Then model first, card second: write the model package from the sources, dispatch the analyst with
+   `oracle-adequacy.mjs model-input --package`, write the Bend world, behavior model and laws, run
+   `oracle-package.mjs derive` and `oracle-adequacy.mjs check --package` until each counterexample is
+   resolved or becomes an Open question, then `oracle-package.mjs project-card` — rows, axes and formal
+   sections are projected, never hand-written a second time
+   ([`bend-cross-verification.md`](references/bend-cross-verification.md) §2).
 7. Read [`card/risk-grill.md`](references/card/risk-grill.md)·[`bva.md`](references/bva.md)·
    [`card/card-format.md`](references/card/card-format.md)·
    [`card/interaction-sweep.md`](references/card/interaction-sweep.md)·
-   [`card/case-space.md`](references/card/case-space.md) → write the **Draft Oracle**
+   [`card/case-space.md`](references/card/case-space.md) → complete the **Draft Oracle**
    with every surviving Grill question as an Open question — candidate rows plus a
    recommendation — and BVA, then fill the interaction sweep, declare the Case space, run
    `scripts/oracle-frames.mjs --oracle` and disposition every emitted frame under the recommended

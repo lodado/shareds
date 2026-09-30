@@ -15,7 +15,7 @@ import {
   parseFormalModel,
   projectionResidue,
 } from './oracle-model.mjs'
-import { emitState, emitTrace, replay } from './oracle-projection.mjs'
+import { auditAdapterSource, emitState, emitTrace, replay } from './oracle-projection.mjs'
 import {
   arbitraryOf,
   bendLiteral,
@@ -270,13 +270,20 @@ test('[bend] emit-trace: the generated test passes for the reducer, fails a muta
   })
   assert.deepEqual(emitted.verification.exhaustive, { cases: 10, bound: 4, complete: true })
   assert.equal(emitted.verification.sampled.runs, 100)
+  assert.equal(emitted.verification.beyondBoundReachable, true)
   const testFile = join(dir, 'generated', 'search.oracle.test.mjs')
   const text = await readFile(testFile, 'utf8')
   assert.match(text, /^\/\/ AUTO-GENERATED .* DO NOT EDIT\./)
   assert.match(text, /Passing it is not a proof about the implementation/)
   const clean = runGenerated(testFile)
   assert.equal(clean.status, 0, clean.output)
-  assert.deepEqual([clean.tests, clean.fail], [12, 0])
+  // 10 traces + sources unchanged + adapter audit + the sampled property
+  assert.deepEqual([clean.tests, clean.fail], [13, 0])
+  // the sampled test reports what fast-check actually executed, including runs past the bound
+  const stats = JSON.parse(clean.output.match(/\{"fastCheck":.*\}/)[0]).fastCheck
+  assert.equal(stats.requested, 100)
+  assert.ok(stats.executed >= 100)
+  assert.ok(stats.beyondBound > 0 && stats.longest > 4)
 
   await writeFile(
     join(dir, 'mutant.adapter.mjs'),
@@ -289,14 +296,16 @@ test('[bend] emit-trace: the generated test passes for the reducer, fails a muta
     adapter: join(dir, 'mutant.adapter.mjs'),
     out: join(dir, 'mutant'),
     row: 'O4',
+    runs: 100,
     bin,
     regenerate: 'test',
   })
   const mutant = runGenerated(join(dir, 'mutant', 'search.oracle.test.mjs'))
   assert.equal(mutant.status, 1)
   assert.ok(mutant.fail >= 1)
+  // the exhaustive part names the shortest failing trace; sampling fails the mutant on its own as well
   assert.match(mutant.output, /step 4 \(Respond\{id:1\}\) of Issue · Issue · Respond\{id:2\} · Respond\{id:1\}/)
-  assert.doesNotMatch(mutant.output, /fast-check/)
+  assert.match(mutant.output, /✖ \[O4\] sampled traces \(fast-check\)/)
 
   await writeFile(
     join(dir, 'MODEL.bend'),
@@ -314,6 +323,7 @@ test('[bend] emit-trace: the generated test passes for the reducer, fails a muta
       adapter: join(dir, 'search.adapter.mjs'),
       out: join(dir, 'x'),
       row: 'O4',
+      runs: 100,
       maxCases: 3,
       bin,
       regenerate: 'test',
@@ -334,6 +344,7 @@ test('[bend] emit-state: proven relations judge the reducer on all 48 pairs; the
     commandType: 'Cmd',
     relations: ['R_blocked_keeps', 'R_free_applies'],
     row: 'O1',
+    runs: 200,
     bin,
     regenerate: 'test',
   }
@@ -349,11 +360,13 @@ test('[bend] emit-state: proven relations judge the reducer on all 48 pairs; the
       domain: exhaustive.verification.domain,
       cases: exhaustive.verification.cases,
     },
-    { strategy: 'exhaustive', domain: 48, cases: 48 },
+    { strategy: 'exhaustive+sampled', domain: 48, cases: 48 },
   )
   const clean = runGenerated(join(dir, 'ok', 'toggle.oracle.test.mjs'))
   assert.equal(clean.status, 0, clean.output)
-  assert.deepEqual([clean.tests, clean.fail], [49, 0])
+  // 48 pairs + sources unchanged + adapter audit + the sampled property — sampling runs even on a small domain
+  assert.deepEqual([clean.tests, clean.fail], [51, 0])
+  assert.equal(JSON.parse(clean.output.match(/\{"fastCheck":.*\}/)[0]).fastCheck.executed, 200)
 
   await writeFile(
     join(dir, 'mutant.adapter.mjs'),
@@ -362,8 +375,8 @@ test('[bend] emit-state: proven relations judge the reducer on all 48 pairs; the
   await emitState({ ...base, adapter: join(dir, 'mutant.adapter.mjs'), out: join(dir, 'mutant') })
   const mutant = runGenerated(join(dir, 'mutant', 'toggle.oracle.test.mjs'))
   assert.equal(mutant.status, 1)
-  // 막혀 있어야 하는데(disabled 또는 loading 하나만) Set이 checked를 바꾸는 네 쌍
-  assert.equal(mutant.fail, 4)
+  // 막혀 있어야 하는데(disabled 또는 loading 하나만) Set이 checked를 바꾸는 네 쌍, 그리고 같은 결함을 찾은 표본
+  assert.equal(mutant.fail, 5)
   assert.match(
     mutant.output,
     /R_blocked_keeps violated at Toggle\{checked:false,disabled:true,loading:false\} · Set\{next:true\} → Toggle\{checked:true,disabled:true,loading:false\}/,
@@ -377,6 +390,7 @@ test('[bend] emit-state: proven relations judge the reducer on all 48 pairs; the
     runs: 300,
   })
   assert.equal(sampled.verification.strategy, 'sampled')
+  assert.equal(sampled.verification.sampled.runs, 300)
   const found = runGenerated(join(dir, 'sampled', 'toggle.oracle.test.mjs'))
   assert.equal(found.status, 1)
   assert.match(found.output, /seed: \d+, path: "[\d:]+"/)
@@ -396,10 +410,13 @@ test('[bend] emit-state: proven relations judge the reducer on all 48 pairs; the
     emitState({ ...base, relations: ['blocked'], adapter: join(dir, 'toggle.adapter.mjs'), out: join(dir, 'bad') }),
     /Toggle\.blocked must be def Toggle\.blocked\(s: Toggle, c: Cmd, t: Toggle\) -> Bool/,
   )
-  await assert.rejects(
-    emitState({ ...base, adapter: join(dir, 'toggle.adapter.mjs'), out: join(dir, 'big'), threshold: 10 }),
-    /48 state·command pairs, above the threshold 10 — pass --runs/,
-  )
+  // positive-count sampling is mandatory: omitting runs or passing 0 is refused before anything is written
+  for (const runs of [undefined, 0]) {
+    await assert.rejects(
+      emitState({ ...base, runs, adapter: join(dir, 'toggle.adapter.mjs'), out: join(dir, 'unsampled') }),
+      { code: 'SAMPLING_REQUIRED' },
+    )
+  }
 })
 
 test('[bend] replay: each verdict carries a kernel-checked claim, and only an in-space counterexample closes', async (t) => {
@@ -443,4 +460,144 @@ test('[bend] replay: each verdict carries a kernel-checked claim, and only an in
   })
   assert.equal(viaAdapter.verdict, 'implementation-defect')
   assert.equal(viaAdapter.certification.status, 'proven')
+})
+
+// 선택지가 16개를 넘는 환경 — 예전 생성기는 fc.nat({ max: 15 }) % 선택지 수라서 17번째 이후 선택지를 영원히 뽑지 못했다.
+const WIDE = `import Base
+
+type Msg is Data:
+  Pick{n: Nat}
+
+type Wide is Data:
+  Wide{last: Nat}
+
+def Wide.init() -> Wide:
+  Wide{0n}
+
+def Wide.step(s: Wide, m: Msg) -> Wide:
+  match m:
+    case Pick{n}:
+      Wide{n}
+
+def Wide.observe(s: Wide) -> Nat:
+  match s:
+    case Wide{last}:
+      last
+
+def Wide.picks(+k: Nat) -> List<Msg>:
+  match k:
+    case 0n:
+      Nil{}
+    case 1n+p:
+      Pick{1n+p} <> Wide.picks(p)
+
+def Wide.next(+h: +List<Msg>) -> List<Msg>:
+  Wide.picks(20n)
+`
+// 결함 있는 제품: 첫 사건 뒤의 Pick{1}을 무시한다. bound 1의 전수 공간은 첫 사건만 보므로 이 결함은 표본만 찾는다.
+const WIDE_PRODUCT = `export function reduce(state, n, index) {
+  return index > 0 && n === 1 ? state : n
+}
+`
+const WIDE_ADAPTER = `import { reduce } from './wide-product.mjs'
+export const init = () => ({ last: 0, index: 0 })
+export function step(state, event) {
+  if (event.$ !== 'Pick' || !Number.isInteger(event.n)) throw new Error('unmapped event ' + JSON.stringify(event))
+  return { last: reduce(state.last, event.n, state.index), index: state.index + 1 }
+}
+export const observe = (state) => state.last
+`
+
+test('[bend] emit-trace samples every environment choice: a defect behind the 20th branch past the bound is found', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'wide')
+  await mkdir(dir)
+  await writeFile(join(dir, 'MODEL.bend'), WIDE)
+  await writeFile(join(dir, 'wide-product.mjs'), WIDE_PRODUCT)
+  await writeFile(join(dir, 'wide.adapter.mjs'), WIDE_ADAPTER)
+  const emitted = await emitTrace({
+    model: join(dir, 'MODEL.bend'),
+    prefix: 'Wide',
+    bound: 1,
+    adapter: join(dir, 'wide.adapter.mjs'),
+    out: join(dir, 'generated'),
+    row: 'O1',
+    runs: 300,
+    maxLength: 3,
+    bin,
+    regenerate: 'test',
+  })
+  assert.deepEqual(emitted.verification.exhaustive, { cases: 20, bound: 1, complete: true })
+  const run = runGenerated(join(dir, 'generated', 'wide.oracle.test.mjs'))
+  // every exhaustive case passes — the defect is past the bound — and only the sampled property fails
+  assert.equal(run.status, 1, run.output)
+  assert.equal(run.fail, 1, run.output)
+  assert.match(run.output, /✖ \[O1\] sampled traces \(fast-check\)/)
+  assert.match(run.output, /Pick\{n:1\}/)
+})
+
+test('the adapter audit sees through comments, query strings, computed imports, require and file reads', () => {
+  const audit = (text) => auditAdapterSource(text).map((finding) => finding.code)
+  assert.deepEqual(audit('// from "./product.mjs"\nexport const init = () => 0\n'), ['adapter-no-product'])
+  assert.deepEqual(audit('import p from "./p.mjs"\nconst m = await import("./MODEL" + ".model.mjs")\n'), [
+    'adapter-opaque-load',
+  ])
+  assert.deepEqual(audit('import m from "./MODEL.model.mjs?v=1"\nimport p from "./p.mjs"\n'), [
+    'adapter-imports-oracle',
+  ])
+  assert.deepEqual(
+    audit(
+      'import { createRequire } from "node:module"\nimport p from "./p.mjs"\ncreateRequire(import.meta.url)("./m.cjs")\n',
+    ),
+    ['adapter-opaque-load'],
+  )
+  assert.deepEqual(
+    audit('import _ from "lodash"\nimport { readFileSync } from "node:fs"\nreadFileSync("MODEL.bend")\n'),
+    ['adapter-opaque-load'],
+  )
+  assert.deepEqual(audit('import p from "./p.mjs"\nimport x from "../scripts/oracle-package.mjs"\n'), [
+    'adapter-imports-oracle',
+  ])
+})
+
+test('[bend] emit-trace refuses to generate without positive-count sampling or with an adapter that does not observe the product', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'stale-search')
+  const base = { model: join(dir, 'MODEL.bend'), prefix: 'Search', bound: 4, row: 'O4', bin, regenerate: 'test' }
+  for (const runs of [undefined, 0, -1, 1.5]) {
+    await assert.rejects(emitTrace({ ...base, runs, adapter: join(dir, 'search.adapter.mjs'), out: join(dir, 'x') }), {
+      code: 'SAMPLING_REQUIRED',
+    })
+  }
+  // an adapter that reads the compiled model can return the expected observation instead of the product's
+  await writeFile(
+    join(dir, 'echo.adapter.mjs'),
+    "import model from './generated/search.model.mjs'\nexport const init = () => model['Search.init']()\nexport const step = (s, e) => model['Search.step'](s, e)\nexport const observe = (s) => model['Search.observe'](s)\n",
+  )
+  await assert.rejects(
+    emitTrace({ ...base, runs: 10, adapter: join(dir, 'echo.adapter.mjs'), out: join(dir, 'echo') }),
+    (error) => error.code === 'ADAPTER_SUSPECT' && /adapter-imports-oracle/.test(error.message),
+  )
+  // an adapter that imports nothing treats every event as a no-op on its own state — it observes no product
+  await writeFile(
+    join(dir, 'noop.adapter.mjs'),
+    'export const init = () => 0\nexport const step = (s) => s\nexport const observe = () => 0\n',
+  )
+  await assert.rejects(
+    emitTrace({ ...base, runs: 10, adapter: join(dir, 'noop.adapter.mjs'), out: join(dir, 'noop') }),
+    (error) => error.code === 'ADAPTER_SUSPECT' && /adapter-no-product/.test(error.message),
+  )
+  // the generated test re-audits the adapter, so a later edit that makes it echo the model fails the run
+  await emitTrace({ ...base, runs: 10, adapter: join(dir, 'search.adapter.mjs'), out: join(dir, 'generated') })
+  await writeFile(
+    join(dir, 'search.adapter.mjs'),
+    `${await readFile(join(dir, 'search.adapter.mjs'), 'utf8')}\nimport './generated/search.model.mjs'\n`,
+  )
+  const edited = runGenerated(join(dir, 'generated', 'search.oracle.test.mjs'))
+  assert.equal(edited.status, 1)
+  assert.match(edited.output, /ADAPTER_SUSPECT: .*adapter-imports-oracle/)
 })

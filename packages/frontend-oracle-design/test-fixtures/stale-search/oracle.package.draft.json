@@ -1,0 +1,271 @@
+{
+  "packageVersion": 1,
+  "id": "stale-search",
+  "intent": {
+    "actor": "a person typing successive search queries while earlier responses are in flight",
+    "observableSuccess": "the list shows the latest request's results and never an older request's late results",
+    "nonGoals": "cancellation, retry, duplicate responses, debouncing, real network or browser behavior",
+    "worstRegression": "an older request's late response replaces or briefly precedes the latest results",
+    "reversibility": "revert the isolated fixture",
+    "risk": "Medium",
+    "openQuestions": []
+  },
+  "sources": [
+    {
+      "id": "S1",
+      "kind": "product-policy",
+      "jurisdiction": "search response ordering",
+      "standard": "fixture policy text",
+      "location": "repo:README.md#fixture-policy",
+      "approval": "approved"
+    },
+    {
+      "id": "S2",
+      "kind": "product-policy",
+      "jurisdiction": "reference model and environment",
+      "standard": "Bend 2.0.34 model",
+      "location": "repo:MODEL.bend#v1",
+      "approval": "approved"
+    },
+    {
+      "id": "S3",
+      "kind": "product-policy",
+      "jurisdiction": "approved laws",
+      "standard": "Bend 2.0.34 laws",
+      "location": "repo:LAWS.bend#v1",
+      "approval": "approved"
+    },
+    {
+      "id": "S4",
+      "kind": "product-policy",
+      "jurisdiction": "adequacy world model",
+      "standard": "Bend 2.0.34 world",
+      "location": "repo:World.bend#v1",
+      "approval": "approved"
+    },
+    {
+      "id": "S5",
+      "kind": "project-constraint",
+      "jurisdiction": "oracle model package",
+      "standard": "oracle-package v1",
+      "location": "repo:oracle.package.draft.json#v1",
+      "approval": "approved",
+      "self": true
+    }
+  ],
+  "policies": [
+    {
+      "id": "P1",
+      "text": "Issuing a search request makes it the latest request; the list keeps what it shows until a response arrives.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "P2",
+      "text": "A response to an older request does not alter what the list shows, at any step.",
+      "sources": ["S1"]
+    },
+    {
+      "id": "P3",
+      "text": "The latest request's response is shown when it arrives.",
+      "sources": ["S1"]
+    }
+  ],
+  "world": {
+    "source": "S4",
+    "prefix": "Race"
+  },
+  "terms": [
+    {
+      "id": "T1",
+      "context": "search",
+      "name": "response arrival order",
+      "role": "controllable",
+      "family": "Order",
+      "field": "arrival",
+      "path": "test: the world adapter delivers response 1 before or after response 2",
+      "definition": "which of the two issued requests answers first",
+      "not": "the order in which the requests were issued",
+      "source": "S1",
+      "status": "confirmed"
+    },
+    {
+      "id": "T2",
+      "context": "search",
+      "name": "newer answer arrives",
+      "role": "controllable",
+      "family": "Async",
+      "field": "newAnswers",
+      "path": "test: the world adapter delivers or withholds response 2 within the attempt",
+      "definition": "the response to request 2 arrives within the attempt",
+      "not": "the response to request 1",
+      "source": "S1",
+      "status": "confirmed"
+    },
+    {
+      "id": "T3",
+      "context": "list",
+      "name": "final list",
+      "role": "observable",
+      "field": "final",
+      "path": "reducer: results.requestId after the last event, read by search.adapter observe",
+      "definition": "the request whose results the list shows when the attempt ends",
+      "not": "the latest issued request id",
+      "source": "S1",
+      "status": "confirmed"
+    },
+    {
+      "id": "T4",
+      "context": "list",
+      "name": "older result shown",
+      "role": "hidden",
+      "field": "oldShown",
+      "definition": "at some step after request 2 was issued, the list showed request 1's results",
+      "not": "what the list shows at the end",
+      "source": "S1",
+      "status": "confirmed"
+    },
+    {
+      "id": "T5",
+      "context": "search",
+      "name": "latest request",
+      "role": "concept",
+      "definition": "the most recently issued request",
+      "source": "S1",
+      "status": "confirmed"
+    }
+  ],
+  "assumptions": [],
+  "goals": [
+    {
+      "id": "G1",
+      "kind": "safety",
+      "cites": ["S1"],
+      "author": "controller"
+    },
+    {
+      "id": "G2",
+      "kind": "safety",
+      "cites": ["S1"],
+      "author": "controller"
+    },
+    {
+      "id": "G3",
+      "kind": "witness",
+      "cites": ["S1"],
+      "author": "controller"
+    },
+    {
+      "id": "G4",
+      "kind": "safety",
+      "cites": ["S1"],
+      "author": "controller"
+    }
+  ],
+  "examples": [],
+  "hazards": {
+    "permission-change": "n/a: S1 no permission in the search policy",
+    "concurrent-change": "n/a: S1 one search box",
+    "display-vs-commit": "modeled: final oldShown",
+    "effect-count": "n/a: S1 each response arrives at most once",
+    "identity-reference": "n/a: S1 request ids are the only identity",
+    "feature-composition": "n/a: S1 search only",
+    "carry-over": "n/a: S1 one attempt starting from an empty list",
+    "order-timing": "modeled: arrival oldShown"
+  },
+  "contract": [
+    {
+      "key": "latestShown",
+      "row": "O1",
+      "def": "latestShown",
+      "policies": ["P3"],
+      "given": "requests 1 and 2 issued before any response",
+      "when": "response 2 arrives",
+      "then": "the list ends with the results of request 2",
+      "never": "the list ends without request 2's results",
+      "sideEffects": "results rendered×1",
+      "bva": "arrival: 1 then 2, 2 then 1"
+    },
+    {
+      "key": "staleNeverFinal",
+      "row": "O2",
+      "def": "staleNeverFinal",
+      "policies": ["P2"],
+      "given": "request 2 issued after request 1",
+      "when": "response 1 arrives, before or after response 2",
+      "then": "the list does not end with request 1's results",
+      "never": "request 1's results in the final list",
+      "sideEffects": "stale results rendered×0",
+      "bva": "arrival: 1 then 2, 2 then 1"
+    },
+    {
+      "key": "unansweredKeeps",
+      "row": "O3",
+      "def": "unansweredKeeps",
+      "policies": ["P1", "P2"],
+      "given": "requests 1 and 2 issued; response 2 does not arrive",
+      "when": "response 1 arrives or nothing arrives",
+      "then": "the list keeps showing nothing",
+      "never": "request 1's results shown",
+      "sideEffects": "results rendered×0",
+      "bva": "response 2: arrives, withheld"
+    },
+    {
+      "key": "traceConformance",
+      "row": "O4",
+      "outside": "trace conformance of the reducer on every trace of the Formal Model space (S2)",
+      "policies": ["P1", "P2", "P3"],
+      "given": "every trace of up to 4 events that `Search.next` allows",
+      "when": "each event is applied to the reducer",
+      "then": "the reducer's observation equals `Search.observe` at every prefix",
+      "never": "a prefix where they differ; an adapter error or budget stop counted as a pass",
+      "sideEffects": "none",
+      "bva": "bound: 4 events"
+    }
+  ],
+  "notApplicable": [
+    {
+      "text": "loading indicator, error, retry, empty data, duplicate responses and cancellation are outside this fixture's policy; out-of-order arrival is the arrival axis and the Formal Model space",
+      "sources": ["S1"]
+    }
+  ],
+  "families": {
+    "Data": "excluded: result items are opaque to the policy S1",
+    "Value": "excluded: request ids are enumerated by the Formal Model space (S2)",
+    "Entry": "excluded: one search box S1",
+    "Environment": "excluded: pure reducer fixture S1",
+    "Platform": "excluded: pure reducer fixture S1",
+    "Inherited": "excluded: first revision S1"
+  },
+  "behavior": {
+    "model": "S2",
+    "laws": "S3",
+    "prefix": "Search",
+    "bound": 4,
+    "observation": "`Search.observe` is the request id whose results the list shows, 0 when none; the adapter reads the reducer's `results.requestId`",
+    "outOfScope": "cancellation, retry, duplicate responses, a response before its request (S1 item 4)",
+    "notFormalized": "none",
+    "conformance": "traceConformance",
+    "lawRows": [
+      {
+        "name": "issue_advances",
+        "kind": "effect",
+        "cites": ["P1", "unansweredKeeps"]
+      },
+      {
+        "name": "stale_ignored",
+        "kind": "safety",
+        "cites": ["P2", "staleNeverFinal"]
+      },
+      {
+        "name": "latest_applied",
+        "kind": "effect",
+        "cites": ["P3", "latestShown"]
+      },
+      {
+        "name": "latest_reachable",
+        "kind": "witness",
+        "cites": ["P1", "P3", "latestShown"]
+      }
+    ]
+  }
+}

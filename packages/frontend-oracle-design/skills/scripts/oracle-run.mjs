@@ -37,9 +37,18 @@ import {
 } from './oracle-fs.mjs'
 import { invalidatedWitnesses } from './oracle-lock.mjs'
 import { parseFormalModel } from './oracle-model.mjs'
+import { generatedBlock, inputsDigestOf, loadPackage, packageInputs } from './oracle-package.mjs'
+
 import { snapshotContext } from './oracle-review-context.mjs'
 import { claudeWorkerInvocation, parseWorkerSubmission } from './oracle-worker.mjs'
 import { spawnGit } from './resolve-executable.mjs'
+
+const MANDATORY_STACK_LABELS = [
+  'bend-proof:reported',
+  'bend-adequacy:reported',
+  'type-contract:reported',
+  'fast-check:reported',
+]
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const lockScript = join(scriptDirectory, 'oracle-lock.mjs')
@@ -170,6 +179,10 @@ const NEXT_ACTIONS = {
   REPORT_STALE: 'the report predates the run — re-run with a fresh --report path',
   REPORT_PATH_EXISTS: 'choose a new --report path; an existing file cannot vouch for this run',
   RUN_ARTIFACTS_EXIST: 'a new revision gets a new <oracle-id> directory — never re-init to reset the baseline',
+  STACK_LABELS_REQUIRED:
+    'register every mandatory-stack label: bend-proof:reported, bend-adequacy:reported, type-contract:reported and fast-check:reported',
+  PACKAGE_UNLOCKED: 'recreate the lock with --source <package> — the model package is part of the approved meaning',
+  PACKAGE_STALE: 're-project the card from the package, re-confirm a changed meaning, and lock a new revision',
   FORMAL_PROOF_LABEL_REQUIRED:
     'register --required-label bend-proof:reported — its node-test run asserts `oracle-model.mjs prove` reports proven for the locked laws',
   ADEQUACY_LABEL_REQUIRED:
@@ -1404,6 +1417,39 @@ async function initialize(options) {
       'ADEQUACY_LABEL_REQUIRED',
       'the locked card has an ## Adequacy — add --required-label bend-adequacy:reported for its adequacy check run',
     )
+  }
+  // 모델 패키지에서 투영한 카드는 새 계약으로 만든 카드다 — 필수 검증 스택의 네 라벨을 모두 등록하고, 잠금이 그 패키지를
+  // 덮어야 한다. 생성 영역이 없는 기존 카드는 이전 기록의 규칙을 그대로 따른다(기존 형식을 읽는 것과 새 규칙 면제는 별개).
+  const generated = generatedBlock(oracle)
+  if (generated.present) {
+    const missing = MANDATORY_STACK_LABELS.filter((label) => !requiredLabels.includes(label))
+    if (missing.length > 0) {
+      throw new CliError(
+        'STACK_LABELS_REQUIRED',
+        `the locked card was projected from a model package — add --required-label ${missing.join(' --required-label ')}`,
+      )
+    }
+    const manifest = JSON.parse(await readFile(resolve(directory, state.lock), 'utf8'))
+    const lockDirectory = dirname(resolve(directory, state.lock))
+    // 표식의 package는 저장소 루트 기준 경로다 — 잠금이 바로 그 파일을 덮어야 하고(접미사가 같은 다른 파일은 아니다),
+    // 그 파일과 그것이 부르는 Bend 파일의 digest가 투영할 때와 같아야 한다.
+    const oracles = `${sep}.ai${sep}oracles${sep}`
+    const repositoryRoot = lockDirectory.includes(oracles) ? lockDirectory.slice(0, lockDirectory.indexOf(oracles)) : lockDirectory
+    const locked = new Set(manifest.sources.map(({ path }) => resolve(lockDirectory, path)))
+    const packagePath = generated.fields.package ? resolve(repositoryRoot, generated.fields.package) : null
+    if (!packagePath || !locked.has(packagePath)) {
+      throw new CliError(
+        'PACKAGE_UNLOCKED',
+        `the card's model package ${generated.fields.package ?? '(none)'} is not a locked source — lock it with --source`,
+      )
+    }
+    const loaded = await loadPackage(generated.fields.package, { root: repositoryRoot })
+    if (inputsDigestOf(await packageInputs(loaded)) !== generated.fields['inputs-sha256']) {
+      throw new CliError(
+        'PACKAGE_STALE',
+        `${generated.fields.package} or a Bend file it names differs from the projection the locked card records`,
+      )
+    }
   }
   state.milestones = parseMilestones(options.milestones, contractRowIds(oracle))
   state.snapshot = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)

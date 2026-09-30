@@ -10,6 +10,14 @@ both, inside a declared world. It is mandatory for every Oracle risk and lane, i
 contract failure (`FAIL`), never “not evaluated” or proven by omission. Design-only performs the
 design, model and proof/adequacy checks; product test execution remains Delivery.
 
+New work runs this check **before the card exists**, on the model package
+([`bend-cross-verification.md`](bend-cross-verification.md) §2): every command below that takes
+`--card` also takes `--package <oracle.package.json>` (except `explore-input`, whose explorer attacks the
+projected Draft card). The package holds the same Terms, assumptions, goals, examples and hazards as
+fields; Coordinates and Observations are not written — they are the world fields whose term role is
+`controllable` or `observable`. The card's `## Terms` and `## Adequacy` sections are then projected from
+the package, not written a second time. The card format below stays readable for existing cards.
+
 The check reasons about a finite world that someone wrote down. It cannot find a phenomenon the world
 leaves out, and it does not prove anything about the product: product behavior is still judged by
 VALID_RED, GREEN and conformance.
@@ -79,6 +87,10 @@ and `order-timing` (the result depends on what happens first: a toast before the
 response — a record world compares end states only, so model the order in a trace model or scope it
 out). The lint requires a disposition for each.
 
+`Rows` lists `O*` IDs whose defs are `<Prefix>.O<n>`, or `O<n>=<def>` when the contract predicate is
+named by model symbol (`O2=staleNeverShown` judges with `<Prefix>.staleNeverShown`) — the projected card
+writes this form, so a law or def never needs a card ID before the card exists.
+
 Coordinates are controllable fields and Observations are observable fields — plain field lists, not
 functions, so the answer cannot be smuggled into them. Every `O*` row is in `Rows` or in
 `Rows outside the world` with a reason. Moving a guarantee into the Assumption table changes the
@@ -107,7 +119,7 @@ The model analyst writes this from the source text alone, before seeing the card
 
 ## The checks
 
-`scripts/oracle-adequacy.mjs check --card <oracle.md>` enumerates every world (at most 8192), writes
+`scripts/oracle-adequacy.mjs check (--card <oracle.md> | --package <pkg>)` enumerates every world (at most 8192), writes
 each conclusion as a law with its proof, and has `bend --verdict` re-check the whole file. A
 conclusion the kernel does not accept is `unknown`, whatever the search found.
 
@@ -152,21 +164,32 @@ when a law's text is unchanged.
 
 Independence lives in the world model and the goals, not in the proofs: the kernel re-checks proofs
 whoever writes them, and the tool generates them. Dispatch one read-only analyst with only the file
-from `oracle-adequacy.mjs model-input --card <oracle.md> --output <file>`: the Outcome Brief, the
-source text, the hazards and the authoring rules above — no rows, Case space, Terms, product code or
-tests. The Controller writes the card as usual, translates its rows into `<Prefix>.O<n>` defs over
-the analyst's record, and runs the check.
+from `oracle-adequacy.mjs model-input --package <oracle.package.json> --output <file>`: the source text
+verbatim, the hazards and the authoring rules above — no Outcome reading, policy sentence, term, goal,
+contract, model file, product code or test of the author (a legacy `--card` input also carries the
+Outcome Brief). The Controller writes the behavior model and the contract predicates as defs named by
+model symbol over the analyst's record, records each goal's `author` in the package, and runs the
+check before projecting the card.
+
+A goal read off the contract makes `card-implies-goal` true by construction. The result's `goalAudit`
+lists, per goal, whether its verdict over every valid world equals the whole contract or one row
+(`mirrorsRows`), and states the claim: `self-consistency` when any goal was written by the controller
+or every safety goal equals the contract, otherwise `independent-reading-recorded`. Equal verdicts are
+not proof of copying — a source sentence can say what one row says — so the audit lowers the claim; it
+does not block. Report a `self-consistency` result as the card agreeing with itself, never as fidelity
+to the source.
 
 - The Controller does not edit the analyst's world, assumptions or goals. A disagreement is an Open
   question; re-dispatch the analyst with the user's answer.
 - Record the counterexamples of the first comparison in the journal; they measure what the second
   reading found.
-- Without delegation, record the limitation and run sequentially. The result states
-  `independence.evidence: self-reported`: host receipts do not cover the analyst before the lock yet.
+- Without delegation, record the limitation and run sequentially; goals written in the same context are
+  `author: controller` and the result states `independence.evidence: none`. With a recorded analyst the
+  result states `self-reported`: host receipts do not cover the analyst before the lock yet.
 
 ## World conformance
 
-`scripts/oracle-adequacy.mjs conform --card <oracle.md> --adapter <world-adapter.mjs>` runs the product
+`scripts/oracle-adequacy.mjs conform (--card <oracle.md> | --package <pkg>) --adapter <world-adapter.mjs>` runs the product
 on every coordinate setting the assumptions allow. The adapter lives in the same `__test__/formal/`,
 is written by the AI and reviewed like the conformance adapter (bend-cross-verification.md §4). It exports `run(coordinates) →
 observations`, reading each observation through the product path its term names; a setting the

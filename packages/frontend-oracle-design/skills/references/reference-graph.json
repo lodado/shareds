@@ -304,7 +304,7 @@
     {
       "id": "adequacy",
       "path": "references/adequacy.md",
-      "when": "Bend path with goals from the source text — writing ## Terms or ## Adequacy, dispatching the model analyst, or running oracle-adequacy.mjs",
+      "when": "Bend path with goals from the source text — writing the model package, ## Terms or ## Adequacy, dispatching the model analyst, or running oracle-adequacy.mjs or oracle-package.mjs",
       "requires": ["common"]
     },
     {

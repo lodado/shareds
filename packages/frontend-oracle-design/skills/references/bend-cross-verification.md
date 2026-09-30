@@ -14,11 +14,20 @@ This is a mandatory verification technique inside the existing card, lock, ledge
 second orchestrator, approval, card or delivery state. Oracle owns approved policy and transitions;
 `$test` owns behavior tests and judgment. It never bypasses confirmation, lock, ledger or review.
 
-The chain is: source text → card policies and rows → a reference model and laws locked with the card
-→ a generated oracle space → the product observed on that space. AI proposes every link; `bend`,
-`oracle-model.mjs`, the card lint, the lock and the runner judge them. Keep apart what each check
-establishes: structured is not faithful, type-checked is not proven, proven about the model is not
-proven about the product, and a finite space checked is not every run.
+The chain is model-first: source text → the author's reading and an independent reading → a Bend world,
+behavior model and laws → axes, observations and event orders derived from the model → counterexamples
+that refine them → a card projected from the model for the user to approve → a lock → tests generated
+from the same model against the real product. AI proposes every link; `bend`, `oracle-model.mjs`,
+`oracle-package.mjs`, `oracle-adequacy.mjs`, the card lint, the lock and the runner judge them. Keep
+apart what each check establishes: structured is not faithful, type-checked is not proven, proven about
+the model is not proven about the product, a finite space checked is not every run, and a card that
+agrees with its own model is not thereby faithful to the source.
+
+Authority stays where it was. The source text, approved policy and mandatory constraints decide what
+must hold; the model and laws express that meaning; derived axes and the card show the formalized
+meaning and its scope; tests and runs are evidence about the product; independent review judges the
+reading, the modeling, the adapter and the evidence links. A requirement that is hard to prove is never
+narrowed to fit Bend, and a phenomenon the model cannot express is never declared harmless.
 
 ## 1. Scope and capability before Draft/lock
 
@@ -31,6 +40,9 @@ proven about the product, and a finite space checked is not every run.
   unpacks it into the skill's own cache. It never pipes `curl` to a shell or edits PATH and shell
   files. Call the absolute path it prints with `BEND_NO_TELEMETRY=1`. Read `bend guide` before
   writing Bend; Bend 2 is not the old HVM runtime.
+- `ensure-bend.mjs` provides Bend only. `bend --verdict` builds its Lean kernel on first use and needs
+  the Lean toolchain Bend names (Lean v4.34.0 for Bend 2.0.34, via elan); installing it follows the same
+  environment rules. Without it every proof and adequacy verdict is `unavailable`.
 - When `ensure-bend.mjs` fails (offline, sandbox, unsupported platform, checksum mismatch), record the
   printed code as `ENVIRONMENT_DEFECT` → `FAIL`; draft no incomplete `## Formal Model` and do not
   continue as if mandatory verification passed. Never replace a proof with tests silently or call a
@@ -38,19 +50,74 @@ proven about the product, and a finite space checked is not every run.
 - Keep UI, browser, network, foreign code and uncontrolled time/randomness outside the pure model and
   name the Oracle rows that check them. An assumption about an external effect is not a proof of it.
 
-## 2. From source text to a locked model
+## 2. From source text to a locked model — model-first
 
-Write the card first: sourced `P*` policies and `O*` rows as usual. When native delegation is
-supported, authorized and has capacity, dispatch one read-only model analyst with only the file
-`scripts/oracle-adequacy.mjs model-input` derives — the Outcome Brief, the source text, the hazards
-and the authoring rules, never the card's rows. It proposes the laws and environment assumptions; for
-a finite world, the record, assumptions and goals of [`adequacy.md`](adequacy.md), whose check then
-compares the two readings mechanically. The Controller maps each law to existing `P*`/`I*`/`O*` rows
-and does not edit the analyst's output; a disagreement is an Open question. Agreement between agents
-is not approval. Without delegation, independent contexts or capacity, record the concrete
-limitation and run sequentially — never claim independence that did not occur.
+The card is no longer written first. Work enters through the **model package**
+(`oracle.package.json`, in the `formal/` directory next to the modeled code, placement below): one JSON
+file that names the sources and records the author's reading, read by every tool that previously parsed
+the card. Its `repo:` locations resolve from the repository root, exactly like the card's Source
+Registry, so the same string names the same file in the package, the projected card and its locked copy.
 
-Then formalize a small core as three tracked files in the `formal/` directory next to the code they
+| Stage   | Package content the tools require                                                                                  | Command                                     |
+| ------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
+| model   | sources (verbatim, located), the Outcome reading, the world record and its terms, goals with their author, hazards | `oracle-package.mjs validate --stage model` |
+| project | policies, contract predicates named by model symbol, notApplicable, family exclusions, behavior model and law rows | `oracle-package.mjs validate`               |
+
+The model stage needs no card, no `O*` row and no contract: the analyst and the adequacy check start from
+the sources alone. Contract predicates are Bend defs named by symbol (`Race.staleNeverShown`); the
+card projection gives them `O*` IDs, and a `row` pin in the package keeps an ID stable across revisions
+so evidence never moves to a different meaning. Never create empty `O*` rows, placeholder policies or a
+pending approval to get past the model stage.
+
+1. **Two readings.** When native delegation is supported, authorized and has capacity, dispatch one
+   read-only model analyst with only the file `oracle-adequacy.mjs model-input --package <pkg>` writes:
+   the source text verbatim, the hazards and the authoring rules — no Outcome reading, policy sentence,
+   term, goal, contract, model file or product code of the author. The analyst writes the world record,
+   assumptions and goals of [`adequacy.md`](adequacy.md); the author writes the behavior model and the
+   contract predicates. Record each goal's `author` (`analyst` or `controller`). The author never edits
+   the analyst's output; a disagreement is an Open question. Without delegation, record the limitation
+   and write `author: controller`: the tools then report `independence.evidence: none` and the adequacy
+   claim as `self-consistency`, never as an independent reading. Agreement between agents is not approval.
+2. **Derive the axes.** `oracle-package.mjs derive --package <pkg>` reads the world record, the behavior
+   model's `step`/`observe`/state types and, with Bend, the bounded trace space. It emits one record per
+   axis — role (`controllable`, `observable`, `hidden`, `environment`), model symbol, term, source,
+   domain (model type, the product domain the terms state or `unstated`, the values enumerated by type or
+   by the trace space with its bound), derivation (`structural`, `model-checked`) and limitations — plus
+   model-checked **order obligations**: traces that apply the same events in another order and end
+   differently (`order-sensitive`) or end alike through different observations (`history-sensitive`,
+   which no end-state world can check). A sum type is split per constructor, so a field of one
+   constructor is an axis conditional on that constructor, never crossed with the others. Unsupported
+   declarations (parameterized types, unreadable constructors, `String`, unbounded domains) are
+   diagnostics that make the derivation `incomplete`, never silent omissions. Coordinates and
+   Observations are the controllable and observable world fields; they are not listed a second time.
+3. **Refine by counterexample.** Run `oracle-adequacy.mjs check --package <pkg>` and the refinement loop
+   of [`adequacy.md`](adequacy.md) on the package: a missing observation, a coarse coordinate, a weak
+   contract or a product duty stated as an assumption each shows up as a kernel-checked counterexample
+   before any card exists.
+4. **Project the card.** `oracle-package.mjs project-card --package <pkg> --out <oracle.md>` writes the
+   Outcome Brief, Source Registry, policies with their rows, the Behavior Contract (a `Formal` column
+   names each row's def), Case space, Terms, Adequacy, Formal Model and Derived Axes inside an
+   `oracle:generated` region whose marker records the input digest (the package and every Bend file it
+   reaches, transitively) and the region's own digest. User Confirmation and any further explanation
+   stay outside the region. The projector never writes an approval: the approving response is recorded
+   in User Confirmation, and approval values in the Source Registry are copied from what the package's
+   author recorded. Package strings containing a line break or an HTML comment marker are refused
+   (`package-text-unsafe`), so no package value can inject a heading or end the region early. Card lint
+   regenerates the region from the package with the installed Bend (never downloading) and compares it
+   byte for byte: `card-generated-stale` when the package or a Bend file changed since projection,
+   `card-generated-drift` when the inputs match but the region does not (a hand edit, even one that
+   recomputed the marker's digest), `card-generated-unverified` when it cannot regenerate (no Bend), and
+   `card-generated-missing` when the Source Registry registers a model package but the card has no
+   region (stripped markers). A card written entirely by hand without a package is indistinguishable
+   from a legacy card; review owns that case.
+   Prose columns explain the formal meaning and never override it — whether they agree is review-owned.
+
+Existing cards without a generated region are read and linted exactly as before. That keeps historical
+records interpretable; it does not exempt new work from this order. A new card follows the model-first
+path, and a legacy run continued under new requirements goes through the source and semantic delta and
+a new revision.
+
+Then formalize the behavior as three tracked files in the `formal/` directory next to the code they
 model (placement below), inside the scan root and outside the Oracle directory:
 
 - `MODEL.bend` — the reference behavior: a state and a message datatype, `<Prefix>.init()`,
@@ -75,7 +142,8 @@ prevent it, never deliver responses in issue order only, never feed only valid i
 an environment assumption restate the product obligation under test — report that circle as a
 `POLICY_GAP`. The rebuttal reviewer treats `next` exclusions and `Out of scope` like `impossible`.
 
-Add the section to the card:
+The projection writes this section from the package's `behavior` (law rows cite policies and contract keys,
+which become `O*` IDs); a legacy card carries it by hand:
 
 ```markdown
 ## Formal Model
@@ -144,8 +212,12 @@ consumer checks under the four required labels.
 
 At `init`, register `--required-label bend-proof:reported`, `--required-label bend-adequacy:reported`,
 `--required-label type-contract:reported` and `--required-label fast-check:reported` for every
-card. The existing `FORMAL_PROOF_LABEL_REQUIRED` gate checks the proof label when a Formal Model is
-present; registration of all four is the operating contract, not a new universal runner gate.
+card. For a card projected from a model package, `init` enforces it: it refuses with
+`STACK_LABELS_REQUIRED` unless all four are registered and with `PACKAGE_UNLOCKED` unless the lock
+covers the package named in the generated region. A legacy card without a generated region keeps the
+earlier gates (`FORMAL_PROOF_LABEL_REQUIRED` with a Formal Model, `ADEQUACY_LABEL_REQUIRED` with an
+Adequacy section); for it, registering all four remains an operating contract the runner does not
+infer.
 Through the approved `$test` flow, write in the target
 repository's existing `node:test` harness:
 
@@ -220,7 +292,14 @@ the expected results — during the harness step, then it passes two gates befor
 
 - Machine: every generated test asserts the adapter's output has the Bend type's shape; `emit-state`
   asserts the round trip `project(concretize(s)) == s` on every state; an unmapped event, command or
-  product state throws (never a default); `conform` reports `residue` from `snapshot`.
+  product state throws (never a default); `conform` reports `residue` from `snapshot`. Both `emit-*`
+  commands refuse (`ADAPTER_SUSPECT`) an adapter that imports the model, the compiled model, a `.bend`
+  file, fast-check or an `oracle-*.mjs` script (query strings and comments do not hide it), that loads
+  code the audit cannot read (a computed `import()`, `require`/`createRequire`, a file-system read,
+  `eval`/`vm`), or that imports no product module at all; each generated file re-runs that audit so a
+  later edit fails the test. The audit is a static heuristic, not a proof of honesty: an adapter that
+  re-implements product logic inline, or hides a model behind an innocent-looking product import, is
+  still found only by the review checklist below.
 - Review: the existing independent review reads the adapter against the card, using this checklist —
   each model event or command maps to exactly the product call its term's `Path` names; each
   observation is read through the product path its term names (no test double, no internal field the
@@ -229,16 +308,24 @@ the expected results — during the harness step, then it passes two gates befor
   harness defect and goes through the existing harness-repair budget; it never changes the locked
   model, laws or observation meaning.
 
-- `emit-trace --model --prefix --bound --adapter --out --row [--runs N --max-length L]` (differential):
-  every trace up to the bound with each prefix's expected observation, then, with a positive `--runs N`, fast-check
-  traces longer than the bound; omitting `--runs` is invalid. fast-check draws choice indices and the model's `next(history)` picks
-  the event, so no trace the environment forbids is generated and shrinking yields shorter, earlier
-  choices. The adapter is the one above (`init`, `step`, `observe`).
-- `emit-state --model --prefix --state <Type> --command <Type> (--relation <def>)... [--differential]`
-  (property): every state·command pair of the Bend types, or a fast-check sample when the domain is
-  above `--threshold` (default 256) or infinite (`--nat-max`, `--list-max` bound the sample and are
-  printed in its scope); a positive fast-check sample is mandatory even for small/exhaustive domains
-  and must run through a separate trusted harness when this generator stays exhaustive. Each pair goes through `concretize` → `step` → `project`; the round trip
+- `emit-trace --model --prefix --bound --adapter --out --row --runs N [--max-length L]` (differential):
+  every trace up to the bound with each prefix's expected observation, then N fast-check traces drawn
+  longer than the bound; a missing, zero or non-integer `--runs` is refused (`SAMPLING_REQUIRED`).
+  fast-check draws choice indices over the full non-negative range and the model's `next(history)`
+  picks the event, so every event the environment offers can be drawn (a fixed small index range under
+  modulo would give later choices probability zero), no forbidden trace is generated, and shrinking
+  yields shorter, earlier choices. The generated test counts what fast-check executed and the length
+  each trace actually reached: it prints `{"fastCheck": {requested, executed, beyondBound, longest,
+seed}}`, fails if fewer runs executed than requested, and fails if the environment allows traces past
+  the bound yet no sample reached one — a drawn array longer than the bound is not a trace past it when
+  the environment ends early. Longer traces over the same events and assumptions are more cases, not a
+  new axis. The adapter is the one above (`init`, `step`, `observe`).
+- `emit-state --model --prefix --state <Type> --command <Type> --runs N (--relation <def>)... [--differential]`
+  (property): every state·command pair of the Bend types when the domain is at most `--threshold`
+  (default 256), and always a separate fast-check property of N runs over the same domain — small
+  domains keep their exhaustive check and still sample; the property counts executed runs and fails
+  below N. An unbounded Nat or List is refused until `--nat-max`/`--list-max` bound it; the bound is
+  printed in the sampled scope and is a test bound, not the product's domain. Each pair goes through `concretize` → `step` → `project`; the round trip
   `project(concretize(s)) == s` is asserted every time, and each relation
   `<Prefix>.<R>(s, c, t) -> Bool` judges the projected result. A relation must be stated by a law in
   `LAWS.bend`; declare them in the Formal Model as `- State:`, `- Command:`, `- Relations:` (lint
@@ -274,6 +361,8 @@ Report each guarantee with its target, method and scope, separately:
 - not established: a formal correspondence between model and product, events listed out of scope,
   browser or network behavior, or unstated intent.
 
+`--verdict` needs the Lean kernel it builds on first use (Lean v4.34.0 for Bend 2.0.34). When the kernel
+cannot be built, every verdict is `unavailable` — an `ENVIRONMENT_DEFECT`, never a failed or open proof.
 `--verdict` rechecks with a kernel that has a Lean proof; it does not prove the translation, the JS
 backend that `space` runs, foreign I/O or compiler behavior. Keep `-o PROOF.bendtt` if the kernel
 input needs inspecting. A digest detects change, not truth. The runner enforces labels, snapshots
