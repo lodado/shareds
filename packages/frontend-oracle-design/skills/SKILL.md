@@ -194,6 +194,9 @@ apply at every risk; Low has no new-work carve-out.
   an independent model analyst; later run proof/behavior checks concurrently on stable, isolated
   inputs when the host supports it. Report a concrete reason for sequential fallback. Approval,
   VALID_RED and final adjudication stay serial. This neither enables graph mode nor permits skipping Bend for Low.
+- Writing `MODEL.bend` for retries, delays, staleness, error kinds, remounts or request counts: read
+  [`model-patterns.md`](references/model-patterns.md) — time as events, attempts, error sum types and
+  separate request, fetch and effect counts — instead of folding them into one event.
 - Oracle-lane inception: before selecting investigation breadth/depth for unclear existing-system
   ownership, cross-boundary scope, or single-card milestone grouping, read
   [`lifecycle-adaptation.md`](references/lifecycle-adaptation.md) with its dependencies. A small

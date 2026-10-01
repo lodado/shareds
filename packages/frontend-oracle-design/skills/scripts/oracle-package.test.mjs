@@ -787,3 +787,23 @@ test('a fake bend on PATH cannot turn an unbuilt kernel into a proof', async (t)
   const run = spawnSync(fake, ['PROOF.bend', '--verdict'], { encoding: 'utf8' })
   assert.equal(verdictOf(run, { bin: fake, timeoutMs: 1 }).status, 'unavailable')
 })
+
+test('an Order or Async family with only observed axes is not mapped: the card lint blocks it as undispositioned', () => {
+  const observedOnly = clone(PKG)
+  for (const term of observedOnly.terms) if (term.family === 'Order') term.role = 'observable'
+  delete observedOnly.families.Order
+  const derived = derive(observedOnly, { world: WORLD })
+  const order = derived.families.find((entry) => entry.family === 'Order')
+  assert.equal(order.status, 'undispositioned')
+  assert.equal(order.blocked, 'family-observation-only')
+  assert.ok(derived.diagnostics.some((entry) => entry.code === 'family-observation-only' && entry.symbol === 'Order'))
+  assert.doesNotMatch(renderGenerated(observedOnly, derived), /\| Order /)
+
+  // a sourced exclusion is still allowed — the author owns the reason
+  observedOnly.families.Order = 'excluded: one request in flight at a time (S1)'
+  const excused = derive(observedOnly, { world: WORLD }).families.find((entry) => entry.family === 'Order')
+  assert.equal(excused.status, 'excluded')
+
+  // the stale-search fixture keeps its controllable arrival axis mapped
+  assert.equal(derive(PKG, { world: WORLD, model: MODEL }).families.find((entry) => entry.family === 'Order').status, 'mapped')
+})

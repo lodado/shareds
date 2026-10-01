@@ -181,6 +181,7 @@ flowchart LR
   review_checklist["review-checklist"]
   graph_orchestration["graph-orchestration"]
   bend_cross_verification["bend-cross-verification"]
+  model_patterns["model-patterns"]
   oracle_workflow_graph["oracle-workflow-graph"]
 
   common --> mandatory_verification
@@ -223,6 +224,7 @@ flowchart LR
   subagent_review --> review_checklist
   oracle_workflow_graph --> graph_orchestration
   common --> bend_cross_verification
+  common --> model_patterns
   common --> adequacy
   common --> discovery
   IND["type-environment · fsd · backend · performance · model-package-example<br/><i>독립 노드 — 조건 충족 시에만</i>"]

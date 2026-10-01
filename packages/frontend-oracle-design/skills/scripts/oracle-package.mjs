@@ -914,10 +914,27 @@ function enumeratedBySpace(axes, space) {
  * 누락 감사 — 여덟 계열을 도출된 축에 잇는다. 축이 없는 계열은 패키지가 적은 excluded 사유가 있어야 한다: 모델에
  * 없다는 사실만으로 excluded를 쓰지 않는다(`family-undispositioned`는 사람의 결정이 필요한 자리다).
  */
-export function familyAudit(pkg, axes) {
+// Order·Async는 입력의 순서·시점이다. 관찰 축만 매핑된 계열은 테스트가 그 순서를 몰 수 없으므로 "world로 전부 열거됨"이
+// 근거가 되지 못한다 — 몰 수 있는 축(controllable·environment·event)이나 모델 검사 순서 의무가 있어야 매핑으로 인정한다.
+const DRIVEN_FAMILIES = new Set(['Order', 'Async'])
+const drivable = (axis) => axis.role === 'controllable' || axis.role === 'environment' || axis.id.startsWith('event.')
+
+export function familyAudit(pkg, axes, order = null) {
   return FAMILIES.map((family) => {
-    const mapped = axes.filter((axis) => axis.family === family).map((axis) => axis.id)
+    const members = axes.filter((axis) => axis.family === family)
+    const mapped = members.map((axis) => axis.id)
     const declared = pkg.families?.[family] ?? null
+    const driven = members.some(drivable) || (family === 'Order' && (order?.total ?? 0) > 0)
+    if (mapped.length > 0 && DRIVEN_FAMILIES.has(family) && !driven) {
+      if (declared) return { family, status: 'excluded', reason: declared, axes: mapped }
+      return {
+        family,
+        status: 'undispositioned',
+        axes: mapped,
+        blocked: 'family-observation-only',
+        message: `${family} maps only observed axes (${mapped.join(', ')}); add a controllable or environment axis, an event the model orders, or a sourced exclusion`,
+      }
+    }
     if (mapped.length > 0) return { family, status: 'mapped', axes: mapped, ...(declared ? { declared } : {}) }
     if (declared) return { family, status: 'excluded', reason: declared }
     return { family, status: 'undispositioned' }
@@ -961,6 +978,9 @@ export function derive(pkg, texts, { space = null, inputs = [] } = {}) {
       symbol: pkg.behavior.prefix,
       message: 'no trace space was enumerated (Bend not run) — order obligations are unknown, not absent',
     })
+  const families = familyAudit(pkg, axes, order)
+  for (const entry of families.filter((candidate) => candidate.blocked))
+    diagnostics.push({ code: entry.blocked, symbol: entry.family, message: entry.message })
   const { rows, unpinned } = assignRows(pkg.contract ?? [])
   const byRole = (role) =>
     world.axes.filter((axis) => axis.role === role).map((axis) => axis.modelRefs[0].split('.').at(-1))
@@ -978,7 +998,7 @@ export function derive(pkg, texts, { space = null, inputs = [] } = {}) {
     package: pkg.id,
     axes,
     order,
-    families: familyAudit(pkg, axes),
+    families,
     contractRows: Object.fromEntries(rows),
     unpinnedRows: unpinned,
     diagnostics,

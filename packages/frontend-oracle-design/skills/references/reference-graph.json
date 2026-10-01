@@ -302,6 +302,12 @@
       "requires": ["common"]
     },
     {
+      "id": "model-patterns",
+      "path": "references/model-patterns.md",
+      "when": "writing MODEL.bend for retries, delays, staleness, error kinds, remounts or request counts — time as events, attempts, error sum types and separate effect counts",
+      "requires": ["common"]
+    },
+    {
       "id": "adequacy",
       "path": "references/adequacy.md",
       "when": "Bend path with goals from the source text — writing the model package, ## Terms or ## Adequacy, dispatching the model analyst, or running oracle-adequacy.mjs or oracle-package.mjs",
