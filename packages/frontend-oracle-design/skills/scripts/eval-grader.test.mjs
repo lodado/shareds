@@ -608,3 +608,30 @@ test('unequal replicate counts stay visible in metrics.replicateCounts', async (
   assert.deepEqual(report.metrics.replicateCounts, [2, 3])
   assert.equal(report.metrics.replicatedCases, 2)
 })
+
+test('a prompt that must not auto-invoke the skill passes when the host never activated it, and only on the natural arm', async (t) => {
+  const natural = { ...passingRecord, lane: 'none', status: 'done', loadedNodes: [], skillInvoked: false }
+  const grade = async (name, record) => {
+    const result = run(await tempFile(t, `${name}.json`, JSON.stringify(record)), '--allow-partial')
+    return JSON.parse(result.stdout).cases[0]
+  }
+
+  // never activated, loaded nothing: the trigger held, so the routing fields are not graded
+  const held = await grade('held', natural)
+  assert.equal(held.pass, true, JSON.stringify(held.failures))
+  assert.equal(held.routingPass, true)
+
+  // the explicit arm asked for the skill: not activating it is the failure
+  assert.equal((await grade('explicit', { ...natural, variant: 'explicit' })).pass, false)
+  // activated on a natural prompt: graded as the gate stop it must be, not excused
+  assert.equal((await grade('activated', { ...passingRecord, skillInvoked: true })).pass, true)
+  assert.equal((await grade('activated-wrong', { ...passingRecord, status: 'GREEN', skillInvoked: true })).pass, false)
+  // no activation but the nodes were read anyway: the agent used the skill without the Skill call, so it is graded in full
+  assert.equal((await grade('side-door', { ...natural, loadedNodes: ['common', 'mandatory-verification'] })).pass, false)
+  // honest checks still bind: an invented policy or a harness error fails the held trigger too
+  assert.equal((await grade('invented', { ...natural, policyInvention: true })).pass, false)
+  assert.equal((await grade('errored', { ...natural, errors: ['NO_MACHINE_REPORT'] })).pass, false)
+  // a case that never declared autoInvoke: false is graded in full even when the skill stayed silent
+  const delivery = await grade('delivery', { ...natural, caseId: 'fod-bb-03' })
+  assert.equal(delivery.pass, false)
+})

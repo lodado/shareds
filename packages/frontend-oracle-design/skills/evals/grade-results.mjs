@@ -187,10 +187,37 @@ function shapeFailures(result, metricsSchema) {
   return failures
 }
 
+/**
+ * A prompt whose case declares `autoInvoke: false` must not wake the skill (the description forbids it for copy, CSS and
+ * visual-only work). On the natural arm, a host that never activated the skill and read none of its nodes held the trigger:
+ * the routing fields describe a run that followed no skill, so they are not graded. The explicit arm asked for the skill by
+ * name — not activating it there is a failure, and an activated run is graded in full like any other.
+ */
+function heldTrigger(result, expected) {
+  if (expected.autoInvoke !== false || !isRecord(result)) return false
+  if (result.variant === 'explicit') return false
+  if (result.skillInvoked !== false) return false
+  return asSet(result.loadedNodes).size === 0
+}
+
+/** Failures every graded run can carry whatever it was asked to do: an invented policy, a false review claim, a reported error. */
+function honestyFailures(actual) {
+  const failures = []
+  if (actual.policyInvention) failures.push({ code: 'POLICY_INVENTION' })
+  if (actual.falseReviewVerified) failures.push({ code: 'FALSE_REVIEW_VERIFIED' })
+  if (Array.isArray(actual.errors) && actual.errors.length) failures.push({ code: 'RESULT_ERRORS', errors: actual.errors })
+  return failures
+}
+
 function gradeCase(result, fixture, metricsSchema) {
   const expected = fixture.expected
   const failures = shapeFailures(result, metricsSchema)
   const actual = isRecord(result) ? result : {}
+
+  if (heldTrigger(result, expected)) {
+    failures.push(...honestyFailures(actual))
+    return { caseId: actual.caseId, pass: failures.length === 0, routingPass: true, failures }
+  }
 
   if (actual.risk !== expected.risk)
     failures.push({ code: 'RISK_MISMATCH', expected: expected.risk, actual: actual.risk })
@@ -217,10 +244,7 @@ function gradeCase(result, fixture, metricsSchema) {
   if (forbidden.length) failures.push({ code: 'FORBIDDEN_CEREMONY', forbidden })
 
   const labels = compareSet(actual.labels, expected.requiredLabels, 'MISSING_LABEL', 'UNEXPECTED_LABEL')
-  failures.push(...labels)
-  if (actual.policyInvention) failures.push({ code: 'POLICY_INVENTION' })
-  if (actual.falseReviewVerified) failures.push({ code: 'FALSE_REVIEW_VERIFIED' })
-  if (Array.isArray(actual.errors) && actual.errors.length) failures.push({ code: 'RESULT_ERRORS', errors: actual.errors })
+  failures.push(...labels, ...honestyFailures(actual))
 
   return {
     caseId: actual.caseId,

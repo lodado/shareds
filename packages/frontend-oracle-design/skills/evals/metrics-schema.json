@@ -63,6 +63,10 @@
       },
       "description": "Reference node ids whose path appears anywhere in the transcript. Exposure only; loadedNodes requires a successful read tool result."
     },
+    "skillInvoked": {
+      "type": "boolean",
+      "description": "Observed from the host transcript: an assistant Skill tool call named the Oracle skill. Claude hosts only; absent elsewhere."
+    },
     "ceremony": {
       "type": "array",
       "items": {

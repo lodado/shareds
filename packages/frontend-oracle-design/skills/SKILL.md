@@ -16,8 +16,10 @@ rules; this file is the operator map.
 
 ## Entry — always first
 
-1. **The first tool call is a Read of exactly one lane entry node.** Read [`common.md`](references/common.md) for every risk; the low-fast-path node is legacy-only and must not be used for new work. Repo exploration, answer drafting, any other tool call, and
-   any other reference load all come after it.
+1. **After the skill loads, the first tool call is a Read of exactly one lane entry node.** The `Skill`
+   call is the activation, not a step of this rule. Read [`common.md`](references/common.md) for every risk; the
+   low-fast-path node is legacy-only and must not be used for new work. Repo exploration, answer drafting, any
+   other tool call, and any other reference load all come after it.
 2. **Print the lane header as the first line of the response.** Writing body text without the
    header is a violation.
 
@@ -31,17 +33,21 @@ rules; this file is the operator map.
    procedure too. "Already known", "the spec is detailed enough", and "no code changes" are not
    skip reasons.
 4. **Scope gate — after `common.md`, before `mandatory-verification.md`.** Oracle runs only on
-   behavior a Bend model can state: state, ordering, counts, permissions or effects. A request with
-   no such behavior (copy, tokens, layout, CSS, animation timing, a pure display) stops here with no
-   card, lock or stack: report `Status: OUT_OF_SCOPE — <where it was routed>` (a report word, not a
-   ledger state) and route it — `$test` for a regression,
-   `$frontend-visual-qa` for rendered UI, a plain edit otherwise. A request that mixes both keeps
-   the stateful behavior in the model and lists the rest under `Not formalized`/`Out of scope` with
-   the skill that owns it; the report says Oracle did not verify those parts. When the requirement
-   itself can only be stated by the part Bend cannot model, record `NEEDS_DECISION` — never narrow
-   the requirement to fit Bend. The test is whether the behavior can be written as a state machine,
-   not whether Bend has a native type for it (abstract a string to valid/invalid). When unsure,
-   continue; the same stop applies once source investigation shows no modelable behavior.
+   behavior a Bend model can state: state, ordering, counts, permissions or effects, or a calculation over a
+   domain Bend can represent. Classify the request by what it contains:
+   - **None of that** (copy, tokens, layout, CSS, animation timing, a pure display): stop here with no
+     card, lock or stack. Report `Status: OUT_OF_SCOPE — <where it was routed>` (a report word, not a
+     ledger state) and route it — `$test` for a regression, `$frontend-visual-qa` for rendered UI, a plain
+     edit otherwise. A source the request needs but the repo lacks is asked for in that report, never guessed.
+   - **Behavior whose domain Bend cannot represent** (floating point, negative numbers, string content, time,
+     randomness): not out of scope. It is an unsupported domain and ends `NEEDS_DECISION` — never narrow
+     the requirement to fit Bend.
+   - **A mix**: keep the stateful behavior in the model and list the rest under `Not formalized`/`Out of scope`
+     with the skill that owns it; the report says Oracle did not verify those parts. When the core
+     requirement can only be stated by the part Bend cannot model, record `NEEDS_DECISION`.
+     The test is whether the behavior can be written as a state machine, not whether Bend has a native type
+     for it (abstract a string to valid/invalid). When unsure, continue; the same stop applies once source
+     investigation shows no modelable behavior.
 
 Lane routing:
 
@@ -339,7 +345,8 @@ and the target repository's dependency rules.
    breadth/depth. Reuse existing artifacts; read [`card/case-space.md`](references/card/case-space.md)
    with its dependencies and emit the Case space briefing before presenting a plan.
    This does not move implementation decisions ahead of VALID_RED or waive source/confirmation gates. The lane header's `risk` is finalized here.
-   Then model first, card second: write the model package from the sources, dispatch the analyst with
+   Then model first, card second: write the model package from the sources (start from
+   [`model-package.example.json`](references/model-package.example.json), never from `MODEL.bend` or a hand-written card), dispatch the analyst with
    `oracle-adequacy.mjs model-input --package`, write the Bend world, behavior model and laws, run
    `oracle-package.mjs derive` and `oracle-adequacy.mjs check --package` until each counterexample is
    resolved or becomes an Open question, then `oracle-package.mjs project-card` — rows, axes and formal

@@ -4,7 +4,7 @@
   "description": "Conditionally loaded reference node graph. The entry risk judgment selects the lane: every risk takes the common entry and mandatory-verification stack; low-fast-path is retained only as a legacy compatibility record. When a node when is satisfied, load its full path together with its requires edges, and do not load unrelated nodes. Each node's when is the canonical load condition. SKILL.md restates them as prose on purpose, because the agent reads SKILL.md at runtime and may never open this file — the copy is a projection, not a duplicate to delete, and skill-contract.test.mjs fails when a loader:agent node is missing from that section.",
   "entry": "common",
   "entryContract": {
-    "firstToolCall": "Read exactly one lane entry node — common for every risk (low-fast-path is legacy-only)",
+    "firstToolCall": "After the Skill load, Read exactly one lane entry node — common for every risk (low-fast-path is legacy-only)",
     "responseHeader": "risk=<Low|Medium|High> lane=oracle nodes=[node ids actually Read]",
     "appliesTo": "both implementation requests and explanation·plan-only requests",
     "loadConditionRule": "Read when as the decision point, not the deliverable stage — load it the moment you make the decision that node owns, and the same holds when you answer only with examples·structure·plans without writing files. If applicability is ambiguous, load. Whether to skip a load is not a judgment call."
@@ -306,6 +306,12 @@
       "path": "references/adequacy.md",
       "when": "Bend path with goals from the source text — writing the model package, ## Terms or ## Adequacy, dispatching the model analyst, or running oracle-adequacy.mjs or oracle-package.mjs",
       "requires": ["common"]
+    },
+    {
+      "id": "model-package-example",
+      "path": "references/model-package.example.json",
+      "when": "writing the model package — start from it and replace every value; it passes oracle-package.mjs validate --stage model",
+      "requires": []
     },
     {
       "id": "discovery",

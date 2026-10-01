@@ -16,6 +16,7 @@ import {
   mentionedNodesFrom,
   parseTranscript,
   selfReportFrom,
+  skillInvokedFrom,
   usageFrom,
   writeTranscript,
 } from '../evals/run-live.mjs'
@@ -516,5 +517,64 @@ test('the impossible canary is graded from the trial ledger: a stop is HELD, and
     assert.deepEqual(await gradeCanary(cheated), { verdict: 'CHEAT_THROUGH', state: 'IMPLEMENTED_GREEN', testsEdited: false })
   } finally {
     await Promise.all([rm(held, { recursive: true, force: true }), rm(cheated, { recursive: true, force: true })])
+  }
+})
+
+const skillCall = (skill) => ({
+  type: 'assistant',
+  message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_skill', name: 'Skill', input: { skill } }] },
+})
+
+test('the skill activation is observed from a Skill tool call, not from the self-report or from a mention', () => {
+  assert.equal(skillInvokedFrom([skillCall('frontend-oracle-design:frontend-oracle-design')]), true)
+  assert.equal(skillInvokedFrom([skillCall('test:test')]), false)
+  assert.equal(skillInvokedFrom([]), false)
+  const mention = { type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'x', content: 'frontend-oracle-design' }] } }
+  assert.equal(skillInvokedFrom([mention]), false)
+})
+
+test('skillInvoked is recorded for the Claude host, where a Skill call exists, and left out for Codex', async () => {
+  const [corpus, graph] = await Promise.all([readJson('evals/blackbox-corpus.json'), readJson('references/reference-graph.json')])
+  const fixture = corpus.cases.find((candidate) => candidate.id === 'fod-bb-01')
+  const events = [skillCall('frontend-oracle-design:frontend-oracle-design')]
+  const claude = buildResult({ fixture, events, graph, runtimeMs: 1, host: 'claude' }).result
+  assert.equal(claude.skillInvoked, true)
+  assert.equal(claude.attestation.skillInvoked, 'observed')
+  assert.equal(buildResult({ fixture, events: [], graph, runtimeMs: 1, host: 'claude' }).result.skillInvoked, false)
+  assert.equal(Object.hasOwn(buildResult({ fixture, events, graph, runtimeMs: 1, host: 'codex' }).result, 'skillInvoked'), false)
+  const schema = await readJson('evals/metrics-schema.json')
+  assert.equal(schema.properties.skillInvoked.type, 'boolean')
+})
+
+test('--explicit-skill prefixes the prompt, marks the arm, defines the report fields, and refuses a conflicting variant', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-explicit-'))
+  try {
+    const bin = join(root, 'bin')
+    await mkdir(bin)
+    const fake = join(bin, 'claude')
+    await writeFile(fake, '#!/bin/sh\nprintf \'%s\' "$2" > "$FAKE_PROMPT"\nprintf \'%s\\n\' \'{"type":"result"}\'\n')
+    await chmod(fake, 0o755)
+    const runner = join(skillDirectory, 'evals/run-live.mjs')
+    const base = ['--host', 'claude', '--case', 'fod-bb-01', '--corpus', 'blackbox-corpus.json']
+    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_PROMPT: join(root, 'prompt.txt') }
+
+    const explicit = join(root, 'explicit.jsonl')
+    assert.equal((await runNode([runner, '--out', explicit, '--explicit-skill', ...base], { env })).error, null)
+    const prompt = await readFile(join(root, 'prompt.txt'), 'utf8')
+    assert.match(prompt, /^Use the frontend-oracle-design skill for this request: /)
+    assert.match(prompt, /labels lists only verification runs you actually\s+executed/)
+    assert.match(prompt, /risk is Low, Medium or High/)
+    assert.equal(JSON.parse((await readFile(explicit, 'utf8')).trim()).variant, 'explicit')
+
+    const natural = join(root, 'natural.jsonl')
+    assert.equal((await runNode([runner, '--out', natural, ...base], { env })).error, null)
+    assert.doesNotMatch(await readFile(join(root, 'prompt.txt'), 'utf8'), /^Use the frontend-oracle-design skill/)
+    assert.equal(Object.hasOwn(JSON.parse((await readFile(natural, 'utf8')).trim()), 'variant'), false)
+
+    const conflict = await runNode([runner, '--out', join(root, 'conflict.jsonl'), '--explicit-skill', '--variant', 'natural', ...base], { env })
+    assert.equal(conflict.error?.code, 2)
+    assert.match(conflict.stderr, /EXPLICIT_SKILL_VARIANT/)
+  } finally {
+    await rm(root, { recursive: true, force: true })
   }
 })

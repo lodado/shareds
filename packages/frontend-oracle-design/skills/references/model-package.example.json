@@ -1,0 +1,84 @@
+{
+  "packageVersion": 1,
+  "id": "pending-save",
+  "spaceVersion": 1,
+  "intent": {
+    "actor": "a person who presses Save twice while the first save request is still pending",
+    "observableSuccess": "exactly one save request is sent and the button reads as pending until it settles",
+    "nonGoals": "retry after failure, offline queueing, server-side idempotency",
+    "worstRegression": "the second press sends a second save request",
+    "reversibility": "revert the form change; no data is migrated",
+    "risk": "Medium",
+    "openQuestions": []
+  },
+  "sources": [
+    {
+      "id": "S1",
+      "kind": "product-policy",
+      "jurisdiction": "save form behavior",
+      "standard": "the user's request",
+      "location": "repo:README.md#save-policy",
+      "approval": "approved"
+    },
+    {
+      "id": "S2",
+      "kind": "product-policy",
+      "jurisdiction": "adequacy world model",
+      "standard": "Bend world",
+      "location": "repo:src/features/save/__test__/formal/World.bend",
+      "approval": "approved"
+    },
+    {
+      "id": "S3",
+      "kind": "project-constraint",
+      "jurisdiction": "oracle model package",
+      "standard": "oracle-package v1",
+      "location": "repo:src/features/save/__test__/formal/oracle.package.json",
+      "approval": "approved",
+      "self": true
+    }
+  ],
+  "requirements": [
+    { "id": "R1", "source": "S1", "quote": "While a save request is pending, a second submit sends no request." }
+  ],
+  "world": { "source": "S2", "prefix": "Save" },
+  "terms": [
+    {
+      "id": "T1",
+      "context": "form",
+      "name": "presses while pending",
+      "role": "controllable",
+      "field": "presses",
+      "path": "test: the adapter submits twice before the first request settles",
+      "definition": "how many times Save is pressed before the first response",
+      "not": "the number of requests sent",
+      "source": "S1",
+      "status": "confirmed"
+    },
+    {
+      "id": "T2",
+      "context": "network",
+      "name": "requests sent",
+      "role": "observable",
+      "field": "requests",
+      "path": "fetch mock call count read by the adapter",
+      "definition": "how many save requests reached the network layer",
+      "not": "the number of button presses",
+      "source": "S1",
+      "status": "confirmed"
+    }
+  ],
+  "assumptions": [],
+  "goals": [{ "id": "G1", "kind": "safety", "cites": ["S1"], "author": "controller", "requirements": ["R1"] }],
+  "examples": [],
+  "hazards": {
+    "permission-change": "n/a: S1 the policy has no permission",
+    "concurrent-change": "n/a: S1 one form",
+    "display-vs-commit": "n/a: S1 the policy states no display rule",
+    "effect-count": "modeled: requests",
+    "identity-reference": "n/a: S1 no identity is involved",
+    "feature-composition": "n/a: S1 one form",
+    "carry-over": "n/a: S1 one attempt",
+    "order-timing": "modeled: presses"
+  }
+}

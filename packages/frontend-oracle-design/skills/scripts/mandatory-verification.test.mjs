@@ -3,6 +3,8 @@ import { readFile, stat } from 'node:fs/promises'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 
+import { packageIssues } from './oracle-package.mjs'
+
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
 test('every Oracle invocation loads the mandatory stack without a new Low exemption', async () => {
@@ -158,4 +160,30 @@ test('the procedure no longer contradicts itself on lint, dependencies and type 
     graph.nodes.find(({ id }) => id === 'types-advanced-contracts').when,
     /^the card has an exposed type boundary/,
   )
+})
+
+test('the scope gate sorts a request three ways: no behavior, an unrepresentable domain, a mix', async () => {
+  const skill = await read('SKILL.md')
+  assert.match(skill, /\*\*None of that\*\*/)
+  assert.match(skill, /\*\*Behavior whose domain Bend cannot represent\*\*[\s\S]*?unsupported domain and ends `NEEDS_DECISION`/)
+  assert.match(skill, /\*\*A mix\*\*/)
+  // a missing source is asked for, never guessed
+  assert.match(skill, /asked for in that\s+report, never guessed/)
+  // OUT_OF_SCOPE is not the answer for a domain the stack itself calls unsupported
+  const graph = await read('references/bend-cross-verification.md')
+  assert.match(graph, /unsupported or unresolved scope is `NEEDS_DECISION`/)
+})
+
+test('the model package has a small copyable example that passes the model-stage validator', async () => {
+  const [skill, doc, raw] = await Promise.all([
+    read('SKILL.md'),
+    read('references/bend-cross-verification.md'),
+    read('references/model-package.example.json'),
+  ])
+  assert.match(doc, /\[`model-package\.example\.json`\]\(model-package\.example\.json\)/)
+  assert.match(skill, /\[`model-package\.example\.json`\]\(references\/model-package\.example\.json\)/)
+  // the doc names the example instead of a 47KB fixture the agent can only half read
+  assert.match(doc, /Do not take\s+`cat` of a fixture's/)
+  assert.deepEqual(packageIssues(JSON.parse(raw), { stage: 'model' }), [])
+  assert.ok(raw.length < 6000, 'small enough to read whole in one call')
 })

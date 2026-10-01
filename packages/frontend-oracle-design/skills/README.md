@@ -225,7 +225,7 @@ flowchart LR
   common --> bend_cross_verification
   common --> adequacy
   common --> discovery
-  IND["type-environment · fsd · backend · performance<br/><i>독립 노드 — 조건 충족 시에만</i>"]
+  IND["type-environment · fsd · backend · performance · model-package-example<br/><i>독립 노드 — 조건 충족 시에만</i>"]
 ```
 
 화살표는 실행 순서가 아니라 **선행 조건**입니다. `card-format`을 읽으려면 `common`과

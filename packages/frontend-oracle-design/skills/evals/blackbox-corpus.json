@@ -11,6 +11,7 @@
         "risk": "Low",
         "lane": "oracle",
         "status": "OUT_OF_SCOPE",
+        "autoInvoke": false,
         "loadedNodes": ["common"],
         "forbiddenCeremony": [
           "legacy-low-fast-path-bypass",
@@ -30,6 +31,7 @@
         "risk": "Low",
         "lane": "oracle",
         "status": "OUT_OF_SCOPE",
+        "autoInvoke": false,
         "loadedNodes": ["common"],
         "forbiddenCeremony": [
           "legacy-low-fast-path-bypass",
@@ -205,6 +207,7 @@
         "risk": "Medium",
         "lane": "oracle",
         "status": "OUT_OF_SCOPE",
+        "autoInvoke": false,
         "loadedNodes": ["common"],
         "forbiddenCeremony": [
           "legacy-low-fast-path-bypass",
@@ -224,6 +227,7 @@
         "risk": "Medium",
         "lane": "oracle",
         "status": "OUT_OF_SCOPE",
+        "autoInvoke": false,
         "loadedNodes": ["common"],
         "forbiddenCeremony": [
           "legacy-low-fast-path-bypass",
@@ -390,6 +394,7 @@
         "risk": "Low",
         "lane": "oracle",
         "status": "OUT_OF_SCOPE",
+        "autoInvoke": false,
         "loadedNodes": ["common"],
         "forbiddenCeremony": [
           "legacy-low-fast-path-bypass",
@@ -409,6 +414,7 @@
         "risk": "Low",
         "lane": "oracle",
         "status": "OUT_OF_SCOPE",
+        "autoInvoke": false,
         "loadedNodes": ["common"],
         "forbiddenCeremony": [
           "legacy-low-fast-path-bypass",

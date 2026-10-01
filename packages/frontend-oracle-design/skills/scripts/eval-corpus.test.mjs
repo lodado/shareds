@@ -288,3 +288,21 @@ test('an exception may not cover a node the current workflow reads unconditional
     }
   }
 })
+
+test('only a gate stop declares that its prompt must not auto-invoke the skill', async () => {
+  const corpus = await readJson(corpusPath)
+  for (const fixture of corpus.cases) {
+    const stops = fixture.expected.status === 'OUT_OF_SCOPE'
+    assert.equal(fixture.expected.autoInvoke === false, stops, `${fixture.id} autoInvoke must match the gate stop`)
+    assert.equal(Object.hasOwn(fixture.expected, 'autoInvoke') && typeof fixture.expected.autoInvoke !== 'boolean', false, fixture.id)
+  }
+})
+
+test('behavior whose domain Bend cannot represent expects NEEDS_DECISION through the stack, not a gate stop', async () => {
+  const corpus = await readJson(corpusPath)
+  const fixture = corpus.cases.find((candidate) => candidate.id === 'fod-bb-16')
+  assert.equal(fixture.expected.status, 'NEEDS_DECISION')
+  assert.ok(fixture.expected.loadedNodes.includes('mandatory-verification'))
+  assert.ok(fixture.expected.loadedNodes.includes('bend-cross-verification'))
+  assert.ok(fixture.expected.forbiddenCeremony.includes('narrowed-requirement'))
+})

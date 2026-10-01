@@ -1738,7 +1738,7 @@ test('forces one entry-node read and a lane header before any other work', async
   assert.ok(entryIndex < skill.indexOf('## Mode selection'))
   assert.ok(entryIndex < skill.indexOf('## Reference loading'))
 
-  assert.match(skill, /The first tool call is a Read of exactly one lane entry node/)
+  assert.match(skill, /After the skill loads, the first tool call is a Read of exactly one lane entry node/)
   assert.match(skill, /any other reference load all come after it/)
   assert.match(skill, /Print the lane header as the first line of the response.*without the\s+header is a violation/s)
   assert.match(skill, /risk=<Low\|Medium\|High> lane=oracle nodes=\[/)
