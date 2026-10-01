@@ -635,3 +635,32 @@ test('a prompt that must not auto-invoke the skill passes when the host never ac
   const delivery = await grade('delivery', { ...natural, caseId: 'fod-bb-03' })
   assert.equal(delivery.pass, false)
 })
+
+test('an optional label is tolerated and never required, while any other extra label still fails', async (t) => {
+  const corpus = JSON.parse(await readFile(join(evalDirectory, 'blackbox-corpus.json'), 'utf8'))
+  const { expected } = corpus.cases.find((candidate) => candidate.id === 'fod-bb-15')
+  assert.ok(expected.optionalLabels.length > 0)
+  const record = {
+    caseId: 'fod-bb-15',
+    risk: expected.risk,
+    lane: expected.lane,
+    status: expected.status,
+    loadedNodes: expected.loadedNodes,
+    ceremony: [],
+    labels: expected.requiredLabels,
+    policyInvention: false,
+    falseReviewVerified: false,
+    toolCalls: 1,
+    tokens: 10,
+    runtimeMs: 20,
+    errors: [],
+  }
+  const grade = async (name, labels) => {
+    const result = run(await tempFile(t, `${name}.json`, JSON.stringify({ ...record, labels })), '--allow-partial')
+    return JSON.parse(result.stdout).cases[0].failures.map((failure) => failure.code)
+  }
+  assert.deepEqual(await grade('required', expected.requiredLabels), [])
+  assert.deepEqual(await grade('optional', [...expected.requiredLabels, expected.optionalLabels[0]]), [])
+  assert.deepEqual(await grade('extra', [...expected.requiredLabels, 'made-up-label']), ['UNEXPECTED_LABEL'])
+  assert.deepEqual(await grade('missing', expected.requiredLabels.slice(1)), ['MISSING_LABEL'])
+})

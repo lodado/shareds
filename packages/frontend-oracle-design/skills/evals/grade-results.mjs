@@ -243,7 +243,7 @@ function gradeCase(result, fixture, metricsSchema) {
   const forbidden = (expected.forbiddenCeremony ?? []).filter((item) => ceremony.has(item))
   if (forbidden.length) failures.push({ code: 'FORBIDDEN_CEREMONY', forbidden })
 
-  const labels = compareSet(actual.labels, expected.requiredLabels, 'MISSING_LABEL', 'UNEXPECTED_LABEL')
+  const labels = compareSet(actual.labels, expected.requiredLabels, 'MISSING_LABEL', 'UNEXPECTED_LABEL', expected.optionalLabels)
   failures.push(...labels, ...honestyFailures(actual))
 
   return {

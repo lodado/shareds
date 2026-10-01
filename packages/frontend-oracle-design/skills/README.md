@@ -312,6 +312,13 @@ inventories manually to assess source-review input isolation or failure before D
 Missing records mean unverified, not PASS. The separate `adversarial-corpus.json` contains manual
 source-intent diagnostics, not additional authoritative black-box grades.
 
+`--explicit-skill` prefixes each prompt with a request for the skill and marks the arm `explicit`; without it
+the prompt is natural. A case that declares `autoInvoke: false` (a scope-gate stop) passes the natural arm when
+the host never activated the skill and read none of its nodes (`skillInvoked` is observed from the Claude transcript);
+the explicit arm and any activated run are graded in full. `optionalLabels` are tolerated, never required. A
+single `-p` run cannot confirm a Draft, so a Delivery case that needs `yes` first ends at `NEEDS_DECISION`
+awaiting that confirmation, whatever its `REVIEW_VERIFIED` expectation says.
+
 For A/B comparisons, pin each skill revision and use a pristine fixture workspace and independent
 host session for every case/replicate. Verify the actual loaded skill paths; repeating `--repo`
 does not isolate filesystem changes. Static fixture tests do not establish model quality gains.

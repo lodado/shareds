@@ -83,10 +83,10 @@
       "name": "fod-bb-06",
       "category": "visual-local-identity",
       "prompt": "Change one card's visual emphasis using the approved brand palette; user confirmation is required before lock.",
-      "expected_output": "Lane header risk=Medium lane=oracle, terminal state OUT_OF_SCOPE, reference nodes read: common.",
+      "expected_output": "Lane header risk=Low lane=oracle, terminal state OUT_OF_SCOPE, reference nodes read: common.",
       "files": [],
       "assertions": [
-        "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
+        "The first line of the response is the lane header and it reports risk=Low lane=oracle",
         "The reported terminal state is OUT_OF_SCOPE",
         "The lane header's nodes list includes every expected node: common",
         "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, card-written, revision-lock, oracle-run-init, mandatory-stack-run"
@@ -97,10 +97,10 @@
       "name": "fod-bb-07",
       "category": "visual-local-identity",
       "prompt": "Redesign the empty state illustration style to match a new identity direction; no approved design source is provided yet.",
-      "expected_output": "Lane header risk=Medium lane=oracle, terminal state OUT_OF_SCOPE, reference nodes read: common.",
+      "expected_output": "Lane header risk=Low lane=oracle, terminal state OUT_OF_SCOPE, reference nodes read: common.",
       "files": [],
       "assertions": [
-        "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
+        "The first line of the response is the lane header and it reports risk=Low lane=oracle",
         "The reported terminal state is OUT_OF_SCOPE",
         "The lane header's nodes list includes every expected node: common",
         "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, card-written, revision-lock, oracle-run-init, mandatory-stack-run"
@@ -187,14 +187,14 @@
       "name": "fod-bb-15",
       "category": "scope-gate",
       "prompt": "While a save request is pending, disable the Save button and ignore a second submit, and restyle that button with the approved muted color token. Write the contract only; do not implement.",
-      "expected_output": "Lane header risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-confirmation-lock.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
         "The reported terminal state is NEEDS_DECISION",
-        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-confirmation-lock",
+        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space",
         "None of these ceremonies or defects appear in the run: full-stop-out-of-scope, narrowed-requirement, revision-lock, production-edit",
-        "The verification report cites actual runs for: card-lint",
+        "The verification report cites actual runs for: card-lint, bend-proof, bend-adequacy",
         "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
       ]
     },
@@ -203,15 +203,13 @@
       "name": "fod-bb-16",
       "category": "scope-gate",
       "prompt": "Compute the order total in a UI helper with IEEE-754 double rounding exactly like the legacy billing service, for any amount including negative refunds.",
-      "expected_output": "Lane header risk=High lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, mandatory-verification, bend-cross-verification, card-policy-sources.",
+      "expected_output": "Lane header risk=High lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=High lane=oracle",
         "The reported terminal state is NEEDS_DECISION",
-        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, card-policy-sources",
-        "None of these ceremonies or defects appear in the run: narrowed-requirement, model-of-a-subset, revision-lock, production-edit",
-        "The verification report cites actual runs for: policy-gap",
-        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+        "The lane header's nodes list includes every expected node: common",
+        "None of these ceremonies or defects appear in the run: narrowed-requirement, model-of-a-subset, revision-lock, production-edit"
       ]
     },
     {

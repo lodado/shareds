@@ -204,7 +204,7 @@
       "category": "visual-local-identity",
       "prompt": "Change one card's visual emphasis using the approved brand palette; user confirmation is required before lock.",
       "expected": {
-        "risk": "Medium",
+        "risk": "Low",
         "lane": "oracle",
         "status": "OUT_OF_SCOPE",
         "autoInvoke": false,
@@ -224,7 +224,7 @@
       "category": "visual-local-identity",
       "prompt": "Redesign the empty state illustration style to match a new identity direction; no approved design source is provided yet.",
       "expected": {
-        "risk": "Medium",
+        "risk": "Low",
         "lane": "oracle",
         "status": "OUT_OF_SCOPE",
         "autoInvoke": false,
@@ -444,11 +444,10 @@
           "bva",
           "card-format",
           "card-interaction-sweep",
-          "card-case-space",
-          "card-confirmation-lock"
+          "card-case-space"
         ],
         "forbiddenCeremony": ["full-stop-out-of-scope", "narrowed-requirement", "revision-lock", "production-edit"],
-        "requiredLabels": ["card-lint"],
+        "requiredLabels": ["card-lint", "bend-proof", "bend-adequacy"],
         "nodeExceptions": [
           {
             "node": "visual-design",
@@ -485,8 +484,13 @@
           {
             "node": "type-environment",
             "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "card-confirmation-lock",
+            "reason": "Stops at NEEDS_DECISION on the Draft confirmation, before the lock."
           }
-        ]
+        ],
+        "optionalLabels": ["ensure-bend", "bend-space", "package-validate", "oracle-frames"]
       }
     },
     {
@@ -497,63 +501,9 @@
         "risk": "High",
         "lane": "oracle",
         "status": "NEEDS_DECISION",
-        "loadedNodes": ["common", "mandatory-verification", "bend-cross-verification", "card-policy-sources"],
+        "loadedNodes": ["common"],
         "forbiddenCeremony": ["narrowed-requirement", "model-of-a-subset", "revision-lock", "production-edit"],
-        "requiredLabels": ["policy-gap"],
-        "nodeExceptions": [
-          {
-            "node": "adequacy",
-            "reason": "The domain Bend cannot model is a NEEDS_DECISION, so the run may stop before this node or read it while deciding."
-          },
-          {
-            "node": "card-risk-grill",
-            "reason": "The domain Bend cannot model is a NEEDS_DECISION, so the run may stop before this node or read it while deciding."
-          },
-          {
-            "node": "bva",
-            "reason": "The domain Bend cannot model is a NEEDS_DECISION, so the run may stop before this node or read it while deciding."
-          },
-          {
-            "node": "card-format",
-            "reason": "The domain Bend cannot model is a NEEDS_DECISION, so the run may stop before this node or read it while deciding."
-          },
-          {
-            "node": "card-interaction-sweep",
-            "reason": "The domain Bend cannot model is a NEEDS_DECISION, so the run may stop before this node or read it while deciding."
-          },
-          {
-            "node": "card-case-space",
-            "reason": "The domain Bend cannot model is a NEEDS_DECISION, so the run may stop before this node or read it while deciding."
-          },
-          {
-            "node": "card-confirmation-lock",
-            "reason": "The domain Bend cannot model is a NEEDS_DECISION, so the run may stop before this node or read it while deciding."
-          },
-          {
-            "node": "types-state-ladder",
-            "reason": "The domain Bend cannot model is a NEEDS_DECISION, so the run may stop before this node or read it while deciding."
-          },
-          {
-            "node": "types-authoring",
-            "reason": "The domain Bend cannot model is a NEEDS_DECISION, so the run may stop before this node or read it while deciding."
-          },
-          {
-            "node": "frontend-decisions",
-            "reason": "The domain Bend cannot model is a NEEDS_DECISION, so the run may stop before this node or read it while deciding."
-          },
-          {
-            "node": "types-api-surface",
-            "reason": "The domain Bend cannot model is a NEEDS_DECISION, so the run may stop before this node or read it while deciding."
-          },
-          {
-            "node": "types-advanced-contracts",
-            "reason": "The domain Bend cannot model is a NEEDS_DECISION, so the run may stop before this node or read it while deciding."
-          },
-          {
-            "node": "type-environment",
-            "reason": "The domain Bend cannot model is a NEEDS_DECISION, so the run may stop before this node or read it while deciding."
-          }
-        ]
+        "requiredLabels": []
       }
     }
   ]

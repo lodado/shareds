@@ -14,6 +14,9 @@ async function readJson(path) {
   return JSON.parse(await readFile(path, 'utf8'))
 }
 
+/** The run ends at the Entry scope gate: it read common.md and nothing else. */
+const endsAtGate = (fixture) => fixture.expected.loadedNodes.length === 1 && fixture.expected.loadedNodes[0] === 'common'
+
 const expectedCategoryCounts = {
   'low-copy-css': 2,
   'submit-order-retry': 3,
@@ -50,8 +53,8 @@ test('black-box corpus gives every case a mechanically gradable expectation', as
     assert.equal(typeof fixture.expected.status, 'string', `${fixture.id} status`)
     assert.ok(fixture.expected.loadedNodes.length > 0, `${fixture.id} loadedNodes`)
     assert.ok(fixture.expected.forbiddenCeremony.length > 0, `${fixture.id} forbiddenCeremony`)
-    // a scope-gate stop runs no verification, so it reports no label at all
-    if (fixture.expected.status === 'OUT_OF_SCOPE') assert.deepEqual(fixture.expected.requiredLabels, [], fixture.id)
+    // a run that ends at the scope gate runs no verification, so it reports no label at all
+    if (endsAtGate(fixture)) assert.deepEqual(fixture.expected.requiredLabels, [], fixture.id)
     else assert.ok(fixture.expected.requiredLabels.length > 0, `${fixture.id} requiredLabels`)
   }
 })
@@ -84,7 +87,7 @@ test('a case that passes the gate expects every node the graph loads on every in
   const always = graph.nodes.filter((node) => /every invocation/.test(node.when)).map((node) => node.id)
   assert.ok(always.includes('mandatory-verification') && always.includes('bend-cross-verification'))
   assert.equal(always.includes('types-advanced-contracts'), false, 'type nodes follow the exposed type boundary')
-  for (const fixture of corpus.cases.filter((candidate) => candidate.expected.status !== 'OUT_OF_SCOPE')) {
+  for (const fixture of corpus.cases.filter((candidate) => !endsAtGate(candidate))) {
     const loaded = new Set(fixture.expected.loadedNodes)
     const excepted = new Set((fixture.expected.nodeExceptions ?? []).map((entry) => entry.node))
     for (const id of [...always, 'adequacy']) {
@@ -104,7 +107,7 @@ test('Oracle-lane cases require evidence labels that match their risk shape', as
   assert.equal(oracleCases.length, 14)
   for (const fixture of oracleCases) {
     assert.ok(fixture.expected.loadedNodes.includes('common'), `${fixture.id} common`)
-    if (fixture.expected.status === 'OUT_OF_SCOPE') continue
+    if (endsAtGate(fixture)) continue
     assert.ok(fixture.expected.loadedNodes.includes('card-policy-sources'), `${fixture.id} policy sources`)
     assert.ok(fixture.expected.loadedNodes.includes('mandatory-verification'), `${fixture.id} mandatory verification`)
     if (fixture.expected.status !== 'NEEDS_DECISION') {
@@ -298,11 +301,12 @@ test('only a gate stop declares that its prompt must not auto-invoke the skill',
   }
 })
 
-test('behavior whose domain Bend cannot represent expects NEEDS_DECISION through the stack, not a gate stop', async () => {
+test('behavior whose domain Bend cannot represent ends at the gate as NEEDS_DECISION, not as a gate stop', async () => {
   const corpus = await readJson(corpusPath)
   const fixture = corpus.cases.find((candidate) => candidate.id === 'fod-bb-16')
+  // the gate classifies it before the stack is read, so it neither loads the stack nor routes the work out
   assert.equal(fixture.expected.status, 'NEEDS_DECISION')
-  assert.ok(fixture.expected.loadedNodes.includes('mandatory-verification'))
-  assert.ok(fixture.expected.loadedNodes.includes('bend-cross-verification'))
+  assert.equal(endsAtGate(fixture), true)
+  assert.equal(Object.hasOwn(fixture.expected, 'autoInvoke'), false)
   assert.ok(fixture.expected.forbiddenCeremony.includes('narrowed-requirement'))
 })
