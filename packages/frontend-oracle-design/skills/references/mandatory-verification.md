@@ -84,6 +84,8 @@ declares `## Type Contract` not applicable registers the other three.
 Use existing trusted `node-test`/`vitest` reporter paths to assert each check and record the actual
 runs. Do not invent a Bend or TypeScript trusted adapter. Inspect current runner support before
 choosing the harness; a directly executed CLI's exit code is not a reported product test result.
+The recommended pair is `vitest` with `fast-check` ([`bend-cross-verification.md`](bend-cross-verification.md) §4);
+an existing `node:test` harness stays, and a missing runner is a Draft approval item.
 
 When registered, the type-contract check must compile the actual type-fest consumer and its witnesses with the
 target compiler; a separate fixture using unrelated types is not consumer evidence. The fast-check

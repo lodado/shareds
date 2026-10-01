@@ -225,7 +225,11 @@ earlier gates (`FORMAL_PROOF_LABEL_REQUIRED` with a Formal Model, `ADEQUACY_LABE
 Adequacy section); for it, registering all four remains an operating contract the runner does not
 infer. A card that declares `## Type Contract` not applicable registers the other three labels only.
 Through the approved `$test` flow, write in the target
-repository's existing `node:test` harness:
+repository's existing test runner. Recommend `vitest` with `fast-check`: `vitest` runs TypeScript, JSX
+and a per-file `jsdom` environment, so one projected model can drive both the pure core and the real
+React component through the adapter, and the bundled vitest reporter records each case. A repository
+that already uses `node:test` keeps it. A repository with no runner lists `vitest` and `fast-check`
+as one dependency approval item in the Draft, never installed before `yes`. In that runner:
 
 - a proof check that calls `proveLaws({ dir, bin })` from `<skill-dir>/scripts/oracle-model.mjs` and
   asserts `status === 'proven'`, run through the ledger with `--label bend-proof:reported`;
@@ -325,7 +329,10 @@ the expected results — during the harness step, then it passes two gates befor
 seed}}`, fails if fewer runs executed than requested, and fails if the environment allows traces past
   the bound yet no sample reached one — a drawn array longer than the bound is not a trace past it when
   the environment ends early. Longer traces over the same events and assumptions are more cases, not a
-  new axis. The adapter is the one above (`init`, `step`, `observe`).
+  new axis. The adapter is the one above (`init`, `step`, `observe`). Pass `--runner vitest` in a vitest
+  repository, the recommended runner above. The generated test calls the adapter synchronously, so an
+  adapter that must await a render, a query or a response cannot be projected yet; record that as a
+  harness gap, never as a reason to drop the conformance row.
 - `emit-state --model --prefix --state <Type> --command <Type> --runs N (--relation <def>)... [--differential]`
   (property): every state·command pair of the Bend types when the domain is at most `--threshold`
   (default 256), and always a separate fast-check property of N runs over the same domain — small
