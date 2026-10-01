@@ -601,3 +601,208 @@ test('[bend] emit-trace refuses to generate without positive-count sampling or w
   assert.equal(edited.status, 1)
   assert.match(edited.output, /ADAPTER_SUSPECT: .*adapter-imports-oracle/)
 })
+
+// 비동기 제품: 상태는 macrotask 뒤에 바뀐다. init은 이전 case가 dispose되지 않았으면 던진다 — GREEN이면 모든 case와
+// 표본 사이에서 dispose가 돌았다는 뜻이다.
+const asyncSearchAdapter = (reducer, { hangOn = null } = {}) => {
+  const reduce = reducer === 'reduceSearch' ? reducer : `mutants.${reducer}`
+  return [
+    "import { adapterFor } from './search.adapter.mjs'",
+    "import { initialSearch, reduceSearch } from './search-reducer.mts'",
+    "import * as mutants from './search-reducer.mutants.mts'",
+    `const sync = adapterFor(${reduce}, initialSearch)`,
+    'const later = (compute) => new Promise((settle) => setTimeout(() => settle(compute()), 1))',
+    'let live = 0',
+    'export async function init() {',
+    "  if (live !== 0) throw new Error('previous case leaked ' + live + ' mounted state')",
+    '  live += 1',
+    '  return later(() => ({ current: sync.init() }))',
+    '}',
+    'export async function step(box, event) {',
+    ...(hangOn ? [`  if (event.$ === ${JSON.stringify(hangOn)}) return new Promise(() => {})`] : []),
+    '  box.current = await later(() => sync.step(box.current, event))',
+    '  return box',
+    '}',
+    'export const observe = async (box) => sync.observe(box.current)',
+    'export function dispose() {',
+    '  live -= 1',
+    '}',
+    '',
+  ].join('\n')
+}
+
+test('[bend] async adapter: the generated test awaits it, disposes every case and sample, and still kills the mutant', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'stale-search')
+  const base = {
+    model: join(dir, 'MODEL.bend'),
+    prefix: 'Search',
+    bound: 4,
+    row: 'O4',
+    runs: 50,
+    maxLength: 8,
+    bin,
+    regenerate: 'test',
+  }
+  await writeFile(join(dir, 'async.adapter.mjs'), asyncSearchAdapter('reduceSearch'))
+  await emitTrace({ ...base, adapter: join(dir, 'async.adapter.mjs'), out: join(dir, 'async') })
+  const clean = runGenerated(join(dir, 'async', 'search.oracle.test.mjs'))
+  assert.equal(clean.status, 0, clean.output)
+  // 10 exhaustive traces + sources unchanged + adapter audit + sampled property
+  assert.deepEqual([clean.tests, clean.fail], [13, 0])
+  assert.equal(JSON.parse(clean.output.match(/\{"fastCheck":.*\}/)[0]).fastCheck.executed, 50)
+
+  await writeFile(join(dir, 'async-mutant.adapter.mjs'), asyncSearchAdapter('reduceWithoutStaleCheck'))
+  await emitTrace({ ...base, adapter: join(dir, 'async-mutant.adapter.mjs'), out: join(dir, 'async-mutant') })
+  const mutant = runGenerated(join(dir, 'async-mutant', 'search.oracle.test.mjs'))
+  assert.equal(mutant.status, 1)
+  assert.match(mutant.output, /step 4 \(Respond\{id:1\}\) of Issue · Issue · Respond\{id:2\} · Respond\{id:1\}/)
+  assert.match(mutant.output, /✖ \[O4\] sampled traces \(fast-check\)/)
+  assert.doesNotMatch(mutant.output, /previous case leaked/)
+
+  // a step that never settles fails as ADAPTER_TIMEOUT at that step instead of hanging the suite
+  await writeFile(join(dir, 'hang.adapter.mjs'), asyncSearchAdapter('reduceSearch', { hangOn: 'Respond' }))
+  await emitTrace({
+    ...base,
+    runs: 1,
+    caseTimeout: 50,
+    adapter: join(dir, 'hang.adapter.mjs'),
+    out: join(dir, 'hang'),
+  })
+  const hung = runGenerated(join(dir, 'hang', 'search.oracle.test.mjs'))
+  assert.equal(hung.status, 1)
+  // the one Respond-free case passes; every other case fails at its first Respond step
+  assert.deepEqual([hung.tests, hung.fail], [13, 10])
+  assert.match(
+    hung.output,
+    /ADAPTER_TIMEOUT: step 4 \(Respond\{id:1\}\) of Issue · Issue · Issue · Respond\{id:1\} did not settle within 50ms/,
+  )
+  assert.doesNotMatch(hung.output, /previous case leaked/)
+})
+
+test('[bend] async adapter: emit-state awaits concretize, step, project and dispose', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'toggle')
+  await writeFile(
+    join(dir, 'async.adapter.mjs'),
+    [
+      "import { concretize as toProduct, step as apply, project as read } from './toggle.adapter.mjs'",
+      "import './toggle.mts'",
+      'const later = (compute) => new Promise((settle) => setTimeout(() => settle(compute()), 1))',
+      'let live = 0',
+      'export async function concretize(state) {',
+      "  if (live !== 0) throw new Error('previous pair leaked')",
+      '  live += 1',
+      '  return later(() => toProduct(state))',
+      '}',
+      'export const step = (state, command) => later(() => apply(state, command))',
+      'export const project = async (state) => read(state)',
+      'export function dispose() {',
+      '  live -= 1',
+      '}',
+      '',
+    ].join('\n'),
+  )
+  await emitState({
+    model: join(dir, 'MODEL.bend'),
+    prefix: 'Toggle',
+    stateType: 'Toggle',
+    commandType: 'Cmd',
+    relations: ['R_blocked_keeps', 'R_free_applies'],
+    adapter: join(dir, 'async.adapter.mjs'),
+    out: join(dir, 'async'),
+    row: 'O3',
+    runs: 30,
+    bin,
+    regenerate: 'test',
+  })
+  const run = runGenerated(join(dir, 'async', 'toggle.oracle.test.mjs'))
+  assert.equal(run.status, 0, run.output)
+  assert.deepEqual([run.tests, run.fail], [51, 0])
+  assert.equal(JSON.parse(run.output.match(/\{"fastCheck":.*\}/)[0]).fastCheck.executed, 30)
+})
+
+test('[bend] replay accepts an async adapter and disposes it', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const { adapterFor } = await import(join(FIXTURES, 'stale-search', 'search.adapter.mjs'))
+  const { initialSearch } = await import(join(FIXTURES, 'stale-search', 'search-reducer.mts'))
+  const { reduceShowingPrevious } = await import(join(FIXTURES, 'stale-search', 'search-reducer.mutants.mts'))
+  const sync = adapterFor(reduceShowingPrevious, initialSearch)
+  let disposed = 0
+  const result = await replay({
+    model: join(FIXTURES, 'stale-search', 'MODEL.bend'),
+    prefix: 'Search',
+    trace: [{ $: 'Issue' }, { $: 'Issue' }, { $: 'Respond', id: 2 }, { $: 'Respond', id: 1 }],
+    adapter: {
+      init: async () => sync.init(),
+      step: async (state, event) => sync.step(state, event),
+      observe: async (state) => sync.observe(state),
+      dispose: () => {
+        disposed += 1
+      },
+    },
+    bin,
+  })
+  assert.equal(result.verdict, 'implementation-defect')
+  assert.equal(result.certification.status, 'proven')
+  assert.equal(disposed, 1)
+})
+
+test('a React adapter must export dispose; React and testing-library imports are not the product', () => {
+  const audit = (text) => auditAdapterSource(text).map((finding) => finding.code)
+  const product = 'import { FeedGrid } from "../ui/FeedGrid"\n'
+  const render = 'import { render } from "@testing-library/react"\nimport { StrictMode } from "react"\n'
+  assert.deepEqual(audit(`${render}${product}export function init() {}\n`), ['adapter-dispose-missing'])
+  assert.deepEqual(audit(`${render}${product}export function dispose(s) { s.ui.unmount() }\n`), [])
+  assert.deepEqual(audit(`${render}${product}const dispose = () => {}\nexport { init, dispose }\n`), [])
+  assert.deepEqual(audit(`${render}import { act } from "react-dom/test-utils"\nexport const dispose = () => {}\n`), [
+    'adapter-no-product',
+  ])
+  // a pure reducer adapter keeps dispose optional
+  assert.deepEqual(audit(product), [])
+})
+
+test('[bend] JSX adapters and the environment pragma are vitest-only; the pragma leads the generated file', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'stale-search')
+  const base = {
+    model: join(dir, 'MODEL.bend'),
+    prefix: 'Search',
+    bound: 2,
+    row: 'O4',
+    runs: 5,
+    bin,
+    regenerate: 'test',
+  }
+  await writeFile(join(dir, 'feed.adapter.tsx'), await readFile(join(dir, 'search.adapter.mjs'), 'utf8'))
+  await assert.rejects(emitTrace({ ...base, adapter: join(dir, 'feed.adapter.tsx'), out: join(dir, 'x') }), {
+    code: 'USAGE',
+    message: /feed\.adapter\.tsx is JSX — pass --runner vitest/,
+  })
+  await assert.rejects(
+    emitTrace({ ...base, environment: 'jsdom', adapter: join(dir, 'search.adapter.mjs'), out: join(dir, 'x') }),
+    { code: 'USAGE', message: /environment needs --runner vitest/ },
+  )
+  await assert.rejects(
+    emitTrace({ ...base, caseTimeout: 0, adapter: join(dir, 'search.adapter.mjs'), out: join(dir, 'x') }),
+    { code: 'USAGE', message: /case-timeout must be a positive integer/ },
+  )
+  const emitted = await emitTrace({
+    ...base,
+    runner: 'vitest',
+    environment: 'jsdom',
+    adapter: join(dir, 'feed.adapter.tsx'),
+    out: join(dir, 'vitest'),
+  })
+  const text = await readFile(emitted.files[1], 'utf8')
+  assert.match(text, /^\/\/ @vitest-environment jsdom\n\/\/ AUTO-GENERATED/)
+  assert.match(text, /import \{ test \} from 'vitest'/)
+  assert.match(text, /import \* as adapter from "\.\.\/feed\.adapter\.tsx"/)
+})

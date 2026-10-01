@@ -306,7 +306,10 @@ the expected results — during the harness step, then it passes two gates befor
   commands refuse (`ADAPTER_SUSPECT`) an adapter that imports the model, the compiled model, a `.bend`
   file, fast-check or an `oracle-*.mjs` script (query strings and comments do not hide it), that loads
   code the audit cannot read (a computed `import()`, `require`/`createRequire`, a file-system read,
-  `eval`/`vm`), or that imports no product module at all; each generated file re-runs that audit so a
+  `eval`/`vm`), or that imports no product module at all (`react`, `react-dom` and `@testing-library/*`
+  are the render harness, not the product), and refuse an adapter that imports one of those without
+  exporting `dispose` (`adapter-dispose-missing`): the sampled property runs inside one test, so the
+  runner's `afterEach` cleanup never runs between samples. Each generated file re-runs that audit so a
   later edit fails the test. The audit is a static heuristic, not a proof of honesty: an adapter that
   re-implements product logic inline, or hides a model behind an innocent-looking product import, is
   still found only by the review checklist below.
@@ -314,7 +317,10 @@ the expected results — during the harness step, then it passes two gates befor
   each model event or command maps to exactly the product call its term's `Path` names; each
   observation is read through the product path its term names (no test double, no internal field the
   Path does not name); no product logic or expected value is re-implemented in the adapter; unknown
-  inputs throw; the residue fields are each recorded in Terms or raised as candidates. A finding is a
+  inputs throw; `step` feeds one event and then waits until the screen settles (an `act` flush or the
+  deferred barrier releasing), never a fixed sleep tuned to the expected value; `dispose` unmounts and
+  restores every client, timer and global the case installed; the residue fields are each recorded in
+  Terms or raised as candidates. A finding is a
   harness defect and goes through the existing harness-repair budget; it never changes the locked
   model, laws or observation meaning.
 
@@ -329,10 +335,8 @@ the expected results — during the harness step, then it passes two gates befor
 seed}}`, fails if fewer runs executed than requested, and fails if the environment allows traces past
   the bound yet no sample reached one — a drawn array longer than the bound is not a trace past it when
   the environment ends early. Longer traces over the same events and assumptions are more cases, not a
-  new axis. The adapter is the one above (`init`, `step`, `observe`). Pass `--runner vitest` in a vitest
-  repository, the recommended runner above. The generated test calls the adapter synchronously, so an
-  adapter that must await a render, a query or a response cannot be projected yet; record that as a
-  harness gap, never as a reason to drop the conformance row.
+  new axis. The adapter is the one above (`init`, `step`, `observe`, optional `dispose`). Pass
+  `--runner vitest` in a vitest repository, the recommended runner above.
 - `emit-state --model --prefix --state <Type> --command <Type> --runs N (--relation <def>)... [--differential]`
   (property): every state·command pair of the Bend types when the domain is at most `--threshold`
   (default 256), and always a separate fast-check property of N runs over the same domain — small
@@ -344,6 +348,14 @@ seed}}`, fails if fewer runs executed than requested, and fails if the environme
   `LAWS.bend`; declare them in the Formal Model as `- State:`, `- Command:`, `- Relations:` (lint
   `formal-relation-*`). Relations may accept several results for one input, which the differential
   mode cannot express.
+- Both `emit-*` and `replay --adapter` await every adapter call, so a synchronous reducer adapter and
+  an async React adapter use the same generated file. Each call must settle within `--case-timeout` ms
+  (default 5000) or the case fails with `ADAPTER_TIMEOUT` naming the step; that is a harness failure,
+  never `VALID_RED`. `dispose(state)` runs after every case and every sample, pass or fail. A
+  `.tsx`/`.jsx` adapter needs `--runner vitest`, and `--environment jsdom` (vitest only) writes the
+  `// @vitest-environment` pragma as the file's first line. `oracle-model.mjs conform` and
+  `oracle-discovery.mjs` still call the adapter synchronously; run them on the pure core until they
+  await too.
 - Values are the compiled Bend runtime shape (Bool is a boolean, Nat a BigInt, List `Con`/`Nil` cells,
   data `{$: <constructor>, ...fields}`); only the adapter converts to product values.
 - Name the generated tests' row in `evidence.json` as for a hand-written conformance test; run them
@@ -363,6 +375,84 @@ seed}}`, fails if fewer runs executed than requested, and fails if the environme
 - `oracle-model.mjs conform` also reports `residue` when the adapter exports `snapshot(state)`: product
   fields that change while the observation stays the same. Record each in `## Terms` as not observed,
   with a reason, or raise it as a candidate axis.
+
+#### Writing fast-check tests from a Bend model
+
+Generate first; hand-write only what `emit-*` cannot express, and keep the same rule either way: the
+model computes every expected value, fast-check only chooses inputs, the product is reached only
+through the adapter.
+
+1. **Pick the mode from the card.** An Order or sequence dimension → `emit-trace` (the model's
+   `next(history)` is the environment). A per-step rule over a state·command domain, or several
+   allowed results → `emit-state` with relations proven in `LAWS.bend`.
+2. **Write the adapter, not the test.** Map each event to the product call its term's `Path` names,
+   read the observation through the product, throw on anything unmapped. For a React component:
+
+   ```tsx
+   // feed.adapter.tsx — run with: emit-trace ... --runner vitest --environment jsdom
+   import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+   import { act, render } from '@testing-library/react'
+   import { FeedGrid } from '../../ui/FeedGrid'
+
+   const flush = () => act(async () => {})
+
+   export async function init() {
+     const net = deferredFetch() // the test owns when each response resolves
+     const io = installFakeIntersectionObserver()
+     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+     const ui = render(
+       <QueryClientProvider client={client}>
+         <FeedGrid />
+       </QueryClientProvider>,
+     )
+     await flush()
+     return { ui, net, io, client }
+   }
+
+   export async function step(s, event) {
+     if (event.$ === 'Enter') s.io.enter(s.ui.getByTestId('feed-sentinel'))
+     else if (event.$ === 'Resolve') s.net.resolve(event.id)
+     else throw new Error(`unmapped model event ${JSON.stringify(event)}`)
+     await flush()
+     return s
+   }
+
+   export function observe(s) {
+     return { $: 'View', items: s.ui.queryAllByRole('article').length }
+   }
+
+   export function dispose(s) {
+     s.ui.unmount()
+     s.client.clear()
+     s.io.restore()
+     s.net.restore()
+   }
+   ```
+
+   The model's `Resolve` event, not a timer, decides when a response lands — out-of-order responses
+   come from the model's environment, so fast-check explores them with expected values attached.
+   `deferredFetch` and `installFakeIntersectionObserver` stand for the repository's own test helpers:
+   the pending barrier of [`bva.md`](bva.md) around `fetch`, and an observer the test triggers. The
+   adapter receives plain values (a `Nat` is a number) and returns plain values; `observe` reads the
+   DOM by role, never component state.
+
+3. **Run it** through `oracle-run.mjs exec` and read the printed `fastCheck` line: `executed` must
+   equal the requested runs and `beyondBound` must be positive when the environment allows it.
+4. **On failure** copy the shrunk trace into `replay --adapter` before touching code; the verdict
+   decides product fix, model revision or `POLICY_GAP`.
+
+Hand-written fast-check, only for what projection cannot express (a property spanning two models, an
+oracle that is a card `I*` invariant rather than a Bend def):
+
+- `fc.asyncProperty` + `await fc.assert(..., { numRuns, seed })` with a fixed seed recorded in the
+  report; count executed runs and assert the count, as the generated file does.
+- Draw indices and let the model choose the event; never write a parallel arbitrary of "valid"
+  events — it drifts from the model the first time the model changes.
+- Compute the expected value by calling the compiled model, never by restating its rule in the test.
+- Clean up inside the property (`try … finally`), not in `afterEach`.
+- `fc.scheduler` is for interleavings the model does not name; when the model has the event, drive it
+  from the trace instead so the expected value comes with it.
+- Fixed sleeps, `toBeTruthy` and `>0` assertions are forbidden here as everywhere ([`bva.md`](bva.md)).
 
 ### Attacking the space after GREEN — discovery-driven closure
 

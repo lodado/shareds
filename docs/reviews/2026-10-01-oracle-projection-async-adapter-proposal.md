@@ -3,6 +3,11 @@
 > 2026-10-01 · frontend-oracle-design v0.70.1 · 구현 전 제안
 > **계기:** 홈 피드 무한스크롤(`next-fsd-app`)의 Bend 모델을 실제 React 컴포넌트에 연결하려다 생성기가
 > 동기 adapter만 지원한다는 것을 확인했다.
+>
+> **구현됨 (v0.71.0)** — 제안과 다른 결정: `--async` 옵션 없이 생성 템플릿 하나가 모든 adapter 호출을 await한다
+> (동기 adapter도 그대로 통과). React·testing-library를 import하는 adapter가 `dispose`를 내보내지 않으면 경고가
+> 아니라 `ADAPTER_SUSPECT`(`adapter-dispose-missing`)로 거부한다. `replay --adapter`도 async adapter를 받는다.
+> `oracle-model.mjs conform`과 `oracle-discovery.mjs`는 아직 동기다.
 
 ## 1. 문제
 
