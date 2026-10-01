@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
@@ -370,6 +370,28 @@ test('the mutation hook swaps one product module for its mutant and leaves every
   const mutated = run({ [pathToFileURL(join(root, 'product.mjs')).href]: pathToFileURL(join(mutantDirectory, 'product.mjs')).href })
   assert.equal(mutated.stdout.trim(), '42', mutated.stderr)
   assert.equal(await readFile(join(root, 'product.mjs'), 'utf8'), "import { two } from './helper.mjs'\nexport const value = () => two\n")
+})
+
+test('the mutation hook finds a product module that the redirect names through a symlinked path', async (t) => {
+  // macOS tmpdir() is /var/..., a symlink to /private/var/... — Node loads the real path, so a redirect keyed by the link path never matched
+  const real = await mkdtemp(join(tmpdir(), 'oracle-hook-real-'))
+  const holder = await mkdtemp(join(tmpdir(), 'oracle-hook-link-'))
+  t.after(() => Promise.all([rm(real, { recursive: true, force: true }), rm(holder, { recursive: true, force: true })]))
+  const link = join(holder, 'repo')
+  await symlink(real, link)
+  await writeFile(join(real, 'product.mjs'), 'export const value = () => 2\n')
+  await writeFile(join(real, 'main.mjs'), "import { value } from './product.mjs'\nconsole.log(value())\n")
+  const mutantDirectory = await mkdtemp(join(tmpdir(), 'oracle-hook-mutant-'))
+  t.after(() => rm(mutantDirectory, { recursive: true, force: true }))
+  await writeFile(join(mutantDirectory, 'product.mjs'), 'export const value = () => 42\n')
+  const mutated = spawnSync(process.execPath, ['--import', pathToFileURL(join(SCRIPTS, 'oracle-mutation-register.mjs')).href, join(real, 'main.mjs')], {
+    encoding: 'utf8',
+    env: {
+      ...CHILD_ENV,
+      ORACLE_MUTATION_REDIRECT: JSON.stringify({ [pathToFileURL(join(link, 'product.mjs')).href]: pathToFileURL(join(mutantDirectory, 'product.mjs')).href }),
+    },
+  })
+  assert.equal(mutated.stdout.trim(), '42', mutated.stderr)
 })
 
 // ── 실제 Bend 2.0.34 통합 ─────────────────────────────────────────────────────────────────────────────────────────

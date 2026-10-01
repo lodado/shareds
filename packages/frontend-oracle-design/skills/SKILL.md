@@ -1,6 +1,6 @@
 ---
 name: frontend-oracle-design
-description: Use when the user explicitly requests an Oracle contract or graph-orchestrated delivery loop; when the work touches an existing Oracle run under `.ai/oracles/<id>/` (deliver it, resume it, make its card tests pass, review it, or report its state — that run's state moves only through this skill's scripts); or when medium/high-risk frontend behavior or approved visual intent has unresolved policy that must be locked before implementation. Typical cases are mutations, async ordering, duplicate submits, destructive actions, payments, permissions, or data-integrity boundaries. Do not auto-invoke for low-risk copy/token/isolated CSS, straightforward regression fixes inside already approved behavior that has no Oracle run, screenshot/browser QA, or FSD folder advice alone.
+description: Use when the user explicitly requests an Oracle contract or graph-orchestrated delivery loop; when the work touches an existing Oracle run under `.ai/oracles/<id>/` (deliver it, resume it, make its card tests pass, review it, or report its state — that run's state moves only through this skill's scripts); or when medium/high-risk frontend behavior has unresolved policy that must be locked before implementation. Typical cases are mutations, async ordering, duplicate submits, destructive actions, payments, permissions, or data-integrity boundaries. Do not auto-invoke for low-risk copy/token/isolated CSS, visual-only work, straightforward regression fixes inside already approved behavior that has no Oracle run, screenshot/browser QA, or FSD folder advice alone.
 allowed-tools:
   - Bash
 ---
@@ -30,6 +30,18 @@ rules; this file is the operator map.
 3. Requests that only **explain in words** a plan, design, file structure, or types are inside this
    procedure too. "Already known", "the spec is detailed enough", and "no code changes" are not
    skip reasons.
+4. **Scope gate — after `common.md`, before `mandatory-verification.md`.** Oracle runs only on
+   behavior a Bend model can state: state, ordering, counts, permissions or effects. A request with
+   no such behavior (copy, tokens, layout, CSS, animation timing, a pure display) stops here with no
+   card, lock or stack: report `Status: OUT_OF_SCOPE — <where it was routed>` (a report word, not a
+   ledger state) and route it — `$test` for a regression,
+   `$frontend-visual-qa` for rendered UI, a plain edit otherwise. A request that mixes both keeps
+   the stateful behavior in the model and lists the rest under `Not formalized`/`Out of scope` with
+   the skill that owns it; the report says Oracle did not verify those parts. When the requirement
+   itself can only be stated by the part Bend cannot model, record `NEEDS_DECISION` — never narrow
+   the requirement to fit Bend. The test is whether the behavior can be written as a state machine,
+   not whether Bend has a native type for it (abstract a string to valid/invalid). When unsure,
+   continue; the same stop applies once source investigation shows no modelable behavior.
 
 Lane routing:
 
@@ -86,8 +98,10 @@ Lane routing:
 - New cards and semantically changed revisions are re-confirmed with the user via the Draft Oracle
   and its delta. The Draft carries every surviving question as an Open question with candidate rows
   and a recommendation, so a single `yes` both answers and confirms; a question never goes out ahead
-  of the card unless its answer kills a branch. Before that confirmation: no lint, lock, tests, or
-  production edits. A policy change is a new revision, never an in-place edit of a locked file.
+  of the card unless its answer kills a branch. Before that confirmation: no lock, no target tests,
+  no production or dependency edits. Only the pre-lock checks this procedure names run — `prove`,
+  `space`, `derive`, the adequacy check, `card --repo-policies`, `--case-space` and the frame
+  dispositions. A policy change is a new revision, never an in-place edit of a locked file.
 - Lint the card with `scripts/oracle-verify.mjs card --path <touched files>`; `--case-space` is a
   structural preapproval check only and never records user approval. Then lock it with
   `scripts/oracle-lock.mjs`.
@@ -133,10 +147,11 @@ architecture, backend, type, and visual guidance below still applies. Status is 
 `transition` rechecks the gates and only success advances the state. Follow the rejection code and
 recovery hint, never bypass it by editing state or evidence.
 
-Every invocation loads [`mandatory-verification.md`](references/mandatory-verification.md) immediately
+Every invocation that passes the scope gate loads [`mandatory-verification.md`](references/mandatory-verification.md) immediately
 after `common.md`, before Draft/lock, for both Low and Medium/High and for Design-only and Delivery.
-Bend, type-fest/TypeScript, and positive-count fast-check evidence are mandatory; labels or plans alone
-are not evidence. Re-read the node before verification and review.
+Bend and positive-count fast-check evidence are mandatory; type-fest/TypeScript evidence is mandatory
+when the card has an exposed type boundary. Labels or plans alone are not evidence. Re-read the node
+before verification and review.
 
 Read `when` as the decision point, not the deliverable stage. If applicability is ambiguous, load.
 Whether to skip a load is not a judgment call. The read instructions inlined into each step of
@@ -218,8 +233,11 @@ apply at every risk; Low has no new-work carve-out.
   [`frontend/quality.md`](references/frontend/quality.md). For React architecture boundary, state
   ownership, or public API changes:
   [`architecture-contract.md`](references/architecture-contract.md).
-- Types and state: unconditionally load the type-fest/TypeScript contract guidance and compiler witness
-  path before Draft/lock; then, before async·ordering·duplicate-submit·retry·multi-step `O*` rows, or client
+- Types and state: when the card has an exposed type boundary — exported Props, a shared/package API,
+  a client state union or a trust-boundary type — load the type-fest/TypeScript contract guidance and
+  compiler witness path before Draft/lock. A card with none declares `typeContract` not applicable in
+  the model package with the investigated paths (`## Type Contract` on the card); no type-fest utility
+  is invented to fill the slot. Before async·ordering·duplicate-submit·retry·multi-step `O*` rows, or client
   state·exported Props·shared/package API·trust boundary type changes, read
   [`types/state-ladder.md`](references/types/state-ladder.md),
   [`types/authoring.md`](references/types/authoring.md),
@@ -228,8 +246,8 @@ apply at every risk; Low has no new-work carve-out.
   If an existing query·router·form owns the state, do not create a new `status` union, and never
   a member per screen — a member computable from a neighbour plus an owned flag (`paging`,
   `empty`) is derived state, not state.
-- always with state-ladder during type work — loading unconditional, adoption via compiler witness packet gate;
-  the actual type-fest consumer and witnesses are mandatory →
+- with that type-fest/TypeScript guidance — adoption via compiler witness packet gate; the actual
+  type-fest consumer and witnesses are mandatory once the card has an exposed type boundary →
   [`types/advanced-contracts.md`](references/types/advanced-contracts.md). Once per
   repo, or when tsconfig·TS version·witness inclusion·checker path changes:
   [`references/type-environment.md`](references/type-environment.md).
@@ -249,7 +267,9 @@ apply at every risk; Low has no new-work carve-out.
   [`references/performance.md`](references/performance.md).
 - Prefer the network test boundary the repo already uses. If MSW is installed or its adoption is
   approved, keep handlers and example data at the nearest owner — no root concentration. Never
-  silently add test-only dependencies.
+  silently add test-only dependencies: a dependency the verification stack needs and the target
+  lacks is one approval item in the Draft (package, version, owning `package.json`), added only
+  after `yes` and never during Design-only.
 - If the `frontend-system-design` skill is installed, read only its references while keeping Oracle
   intake and control. Every choice is a policy candidate; anything that cannot be mapped to an
   approved source or user answer is `POLICY_GAP` → `NEEDS_DECISION`. Document recommendations are
@@ -316,7 +336,8 @@ and the target repository's dependency rules.
 6. Judge risk and investigate policy sources. When existing-system ownership is unclear,
    scope crosses boundaries, or single-card milestones need grouping, read
    [`lifecycle-adaptation.md`](references/lifecycle-adaptation.md) before choosing investigation
-   breadth/depth. Reuse existing artifacts; emit the Case space briefing before presenting a plan.
+   breadth/depth. Reuse existing artifacts; read [`card/case-space.md`](references/card/case-space.md)
+   with its dependencies and emit the Case space briefing before presenting a plan.
    This does not move implementation decisions ahead of VALID_RED or waive source/confirmation gates. The lane header's `risk` is finalized here.
    Then model first, card second: write the model package from the sources, dispatch the analyst with
    `oracle-adequacy.mjs model-input --package`, write the Bend world, behavior model and laws, run
@@ -347,16 +368,17 @@ and the target repository's dependency rules.
    and if the user asks for a one-question-at-a-time interview, run it without a round cap.
    Before presenting the Draft, apply the conditional source-aware review in
    `card/policy-sources.md` and merge its unresolved policy findings into these Open questions.
-8. Show existing revisions as a semantic delta and new cards in full with their Open questions,
-   then ask for one confirmation: `yes` adopts every recommendation and approves the card;
-   `Q<n>=<option>` swaps one option and re-confirms only if a new `needs-decision` appears.
-9. Before showing the Draft, run the cold-read gate: hand the card bytes alone to a context-free
+8. Before showing the Draft, run the cold-read gate: hand the card bytes alone to a context-free
    reviewer, apply the five questions per row, and collapse both into one root plus the first nail
    that falsifies it cheapest. Drive that nail. In the same gate run the reverse two-sample read
    once per card: extract the `impossible` dispositions with `scripts/oracle-verify.mjs card --ir`,
    hand them with the witness falsifier table of `card/interaction-sweep.md` to a second
    context-free reviewer under the framing "one of these is wrong — build the counterexample", and
-   promote every disagreement to `needs-decision`. Then record the approval's location in
+   promote every disagreement to `needs-decision`.
+9. Show existing revisions as a semantic delta and new cards in full with their Open questions,
+   then ask for one confirmation: `yes` adopts every recommendation and approves the card;
+   `Q<n>=<option>` swaps one option and re-confirms only if a new `needs-decision` appears.
+   Then record the approval's location in
    `User Confirmation`. On a change request, fix the Draft and re-confirm; on no answer,
    `NEEDS_DECISION`.
 10. Read [`card/confirmation-lock.md`](references/card/confirmation-lock.md) → after

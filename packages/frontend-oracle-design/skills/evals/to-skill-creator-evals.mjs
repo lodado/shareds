@@ -22,7 +22,7 @@ export function assertionsFor(expected) {
   if (expected.requiredLabels?.length) {
     assertions.push(`The verification report cites actual runs for: ${expected.requiredLabels.join(', ')}`)
   }
-  if (expected.lane === 'oracle') {
+  if (expected.lane === 'oracle' && expected.status !== 'OUT_OF_SCOPE') {
     assertions.push(
       'Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card',
     )

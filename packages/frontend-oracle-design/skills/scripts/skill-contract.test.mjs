@@ -39,7 +39,7 @@ const TYPES_NODE_FILES = [
   'references/types/review-criteria.md',
 ]
 const ADVANCED_TYPES_LOAD_CONDITION =
-  'every invocation — mandatory type-fest/TypeScript contract path before Draft/lock; loading unconditional, adoption via compiler witness packet gate'
+  'the card has an exposed type boundary (exported Props · shared/package API · client state union · trust-boundary type) — mandatory type-fest/TypeScript contract path before Draft/lock; adoption via compiler witness packet gate'
 
 async function readAll(relativePaths) {
   const parts = await Promise.all(relativePaths.map(read))
@@ -1815,7 +1815,12 @@ test('gates the draft card on a context-free read that collapses to one root and
 
   // SKILL의 Design-only 9단계가 같은 순서를 지시한다
   const designOnly = skill.slice(skill.indexOf('### Design-only'), skill.indexOf('### Delivery'))
-  assert.match(designOnly, /9\. Before showing the Draft, run the cold-read gate/)
+  // the gate comes before the step that shows the Draft (it was numbered after it)
+  assert.match(designOnly, /8\. Before showing the Draft, run the cold-read gate/)
+  assert.ok(
+    designOnly.indexOf('8. Before showing the Draft') < designOnly.indexOf('9. Show existing revisions'),
+    'the cold-read gate runs before the Draft is shown',
+  )
   assert.match(designOnly, /hand the card bytes alone to a context-free\s+reviewer/)
   assert.match(designOnly, /Drive that nail/)
 })

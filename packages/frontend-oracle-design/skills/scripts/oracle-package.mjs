@@ -22,6 +22,19 @@ export const FAMILIES = ['Data', 'Value', 'Async', 'Order', 'Entry', 'Environmen
 export const WORLD_ROLES = ['controllable', 'observable', 'hidden', 'concept']
 export const GOAL_AUTHORS = ['analyst', 'controller']
 export const LAW_KINDS = ['safety', 'effect', 'witness']
+
+// 투영된 카드가 init에서 등록해야 하는 필수 검증 스택의 라벨.
+export const STACK_LABELS = ['bend-proof:reported', 'bend-adequacy:reported', 'type-contract:reported', 'fast-check:reported']
+
+/**
+ * 패키지가 노출 타입 경계 없음을 조사한 경로와 함께 선언하면 카드의 생성 영역에 `## Type Contract` 절이 생기고, 그때만
+ * type-contract 라벨을 요구하지 않는다. 생성 영역 밖의 같은 문장은 선언이 아니다(생성 영역은 패키지에서 다시 만들어 비교한다).
+ */
+export function stackLabelsFor(content = '') {
+  return /^## Type Contract\n\n- Not applicable: \S/m.test(content)
+    ? STACK_LABELS.filter((label) => label !== 'type-contract:reported')
+    : STACK_LABELS
+}
 // oracle-adequacy.mjs HAZARDS와 같은 목록이다 — 순환 import를 피하려고 이름만 둔다(테스트가 두 목록의 일치를 확인한다).
 export const HAZARD_IDS = [
   'permission-change',
@@ -378,6 +391,13 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
   if (keys.size === 0) push('package-contract', 'list the contract predicates')
   for (const policy of policies)
     if (!cited.has(policy)) push('package-policy-unlinked', `${policy} is cited by no contract entry`)
+
+  // 노출 타입 경계(Props·공유 API·상태 유니온·신뢰 경계 타입)가 없다는 선언 — 사유와 조사한 파일이 둘 다 있어야 한다.
+  if (pkg?.typeContract !== undefined) {
+    const { notApplicable, paths } = pkg.typeContract ?? {}
+    if (!nonEmpty(notApplicable) || !Array.isArray(paths) || paths.length === 0 || !paths.every(nonEmpty))
+      push('package-type-contract', 'typeContract needs notApplicable (why no exported Props, shared API, state union or trust-boundary type is involved) and paths (the investigated repo:<path> files)')
+  }
 
   for (const entry of pkg?.notApplicable ?? []) {
     if (!nonEmpty(entry?.text)) push('package-na', 'a notApplicable entry needs text')
@@ -1243,6 +1263,8 @@ export function renderGenerated(pkg, derived) {
       '',
     )
   }
+  if (pkg.typeContract)
+    out.push('## Type Contract', '', `- Not applicable: ${pkg.typeContract.notApplicable}`, `- Investigated: ${pkg.typeContract.paths.join(', ')}`, '')
   out.push(...discoverySpaceSection(pkg))
   out.push(
     '## Derived Axes',

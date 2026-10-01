@@ -21,6 +21,7 @@ const expectedCategoryCounts = {
   'policy-source': 2,
   'already-satisfied': 1,
   'boundary-pressure': 2,
+  'scope-gate': 2,
 }
 
 function countBy(items, key) {
@@ -33,7 +34,7 @@ test('black-box corpus contains the smoke cases by category', async () => {
   const corpus = await readJson(corpusPath)
 
   assert.equal(corpus.version, 1)
-  assert.equal(corpus.cases.length, 12)
+  assert.equal(corpus.cases.length, 14)
   assert.deepEqual(countBy(corpus.cases, 'category'), expectedCategoryCounts)
 })
 
@@ -49,37 +50,64 @@ test('black-box corpus gives every case a mechanically gradable expectation', as
     assert.equal(typeof fixture.expected.status, 'string', `${fixture.id} status`)
     assert.ok(fixture.expected.loadedNodes.length > 0, `${fixture.id} loadedNodes`)
     assert.ok(fixture.expected.forbiddenCeremony.length > 0, `${fixture.id} forbiddenCeremony`)
-    assert.ok(fixture.expected.requiredLabels.length > 0, `${fixture.id} requiredLabels`)
+    // a scope-gate stop runs no verification, so it reports no label at all
+    if (fixture.expected.status === 'OUT_OF_SCOPE') assert.deepEqual(fixture.expected.requiredLabels, [], fixture.id)
+    else assert.ok(fixture.expected.requiredLabels.length > 0, `${fixture.id} requiredLabels`)
   }
 })
 
-test('Low cases use the common mandatory-verification stack on new invocations', async () => {
- const corpus = await readJson(corpusPath)
- const lowCases = corpus.cases.filter((fixture) => fixture.expected.risk === 'Low')
- assert.equal(lowCases.length, 4)
- for (const fixture of lowCases) {
- assert.equal(fixture.expected.lane, 'oracle')
- assert.deepEqual(fixture.expected.loadedNodes, ['common', 'mandatory-verification'])
- assert.deepEqual(fixture.expected.requiredLabels, [
- 'bend-proof:reported',
- 'bend-adequacy:reported',
- 'type-contract:reported',
- 'fast-check:reported',
- 'repo-validation',
- ])
- assert.ok(fixture.expected.forbiddenCeremony.includes('legacy-low-fast-path-bypass'))
- }
+test('work with no modelable behavior stops at the scope gate after common.md', async () => {
+  const corpus = await readJson(corpusPath)
+  const stops = corpus.cases.filter((fixture) => fixture.expected.status === 'OUT_OF_SCOPE')
+  // copy and token (Low), local CSS, and the two visual-only redesigns
+  assert.deepEqual(
+    stops.map((fixture) => fixture.id),
+    ['fod-bb-01', 'fod-bb-02', 'fod-bb-06', 'fod-bb-07', 'fod-bb-11', 'fod-bb-14'],
+  )
+  for (const fixture of stops) {
+    assert.equal(fixture.expected.lane, 'oracle')
+    assert.deepEqual(fixture.expected.loadedNodes, ['common'], `${fixture.id} stops before the stack`)
+    assert.equal(fixture.expected.nodeExceptions, undefined, fixture.id)
+    for (const ceremony of ['card-written', 'revision-lock', 'oracle-run-init', 'mandatory-stack-run']) {
+      assert.ok(fixture.expected.forbiddenCeremony.includes(ceremony), `${fixture.id} forbids ${ceremony}`)
+    }
+  }
+  // every Low case is a gate stop: Low has no stack-running path of its own
+  for (const fixture of corpus.cases.filter((candidate) => candidate.expected.risk === 'Low')) {
+    assert.equal(fixture.expected.status, 'OUT_OF_SCOPE', fixture.id)
+  }
 })
+
+test('a case that passes the gate expects every node the graph loads on every invocation, and a completed Delivery its closure', async () => {
+  const [corpus, graph] = await Promise.all([readJson(corpusPath), readJson(referenceGraphPath)])
+  // derived from the graph, so a node made mandatory later fails here instead of drifting out of the corpus unnoticed
+  const always = graph.nodes.filter((node) => /every invocation/.test(node.when)).map((node) => node.id)
+  assert.ok(always.includes('mandatory-verification') && always.includes('bend-cross-verification'))
+  assert.equal(always.includes('types-advanced-contracts'), false, 'type nodes follow the exposed type boundary')
+  for (const fixture of corpus.cases.filter((candidate) => candidate.expected.status !== 'OUT_OF_SCOPE')) {
+    const loaded = new Set(fixture.expected.loadedNodes)
+    const excepted = new Set((fixture.expected.nodeExceptions ?? []).map((entry) => entry.node))
+    for (const id of [...always, 'adequacy']) {
+      assert.ok(loaded.has(id) || excepted.has(id), `${fixture.id} neither expects nor excepts ${id}`)
+    }
+    // nothing a stop before the model stage may skip is excepted without a stop
+    if (fixture.expected.status === 'REVIEW_VERIFIED') {
+      for (const id of [...always, 'adequacy', 'discovery']) assert.ok(loaded.has(id), `${fixture.id} completes without ${id}`)
+    }
+  }
+})
+
 test('Oracle-lane cases require evidence labels that match their risk shape', async () => {
   const corpus = await readJson(corpusPath)
   const oracleCases = corpus.cases.filter((fixture) => fixture.expected.lane === 'oracle')
 
-  assert.equal(oracleCases.length, 12)
+  assert.equal(oracleCases.length, 14)
   for (const fixture of oracleCases) {
     assert.ok(fixture.expected.loadedNodes.includes('common'), `${fixture.id} common`)
-    if (fixture.expected.risk !== 'Low') assert.ok(fixture.expected.loadedNodes.includes('card-policy-sources'), `${fixture.id} policy sources`)
-    if (fixture.expected.risk === 'Low') assert.ok(fixture.expected.loadedNodes.includes('mandatory-verification'), `${fixture.id} mandatory verification`)
-    if (fixture.expected.status !== 'NEEDS_DECISION' && fixture.expected.risk !== 'Low') {
+    if (fixture.expected.status === 'OUT_OF_SCOPE') continue
+    assert.ok(fixture.expected.loadedNodes.includes('card-policy-sources'), `${fixture.id} policy sources`)
+    assert.ok(fixture.expected.loadedNodes.includes('mandatory-verification'), `${fixture.id} mandatory verification`)
+    if (fixture.expected.status !== 'NEEDS_DECISION') {
       assert.ok(fixture.expected.requiredLabels.includes('card-lint'), `${fixture.id} card lint`)
     }
   }
@@ -193,12 +221,15 @@ test('O13: eval fails on errors duplicates malformed JSONL and missing graph clo
   assert.ok(asyncCases.length > 0)
   for (const fixture of asyncCases) {
     assert.ok(fixture.expected.loadedNodes.includes('types-authoring'), `${fixture.id} types authoring`)
-    assert.ok(fixture.expected.loadedNodes.includes('types-api-surface'), `${fixture.id} types API surface`)
+    // the API-surface and advanced-contracts nodes follow an exposed type boundary, so they may be read but are never required
+    const optional = new Set((fixture.expected.nodeExceptions ?? []).map((entry) => entry.node))
+    assert.ok(optional.has('types-api-surface') && optional.has('types-advanced-contracts'), `${fixture.id} type boundary nodes`)
   }
 
-  const visualConfirmation = corpus.cases.find((fixture) => fixture.id === 'fod-bb-06')
-  assert.equal(visualConfirmation.expected.status, 'NEEDS_DECISION')
-  assert.equal(Object.hasOwn(visualConfirmation.expected, 'statuses'), false)
+  // visual-only work has no modelable behavior: it stops at the scope gate instead of waiting for a design confirmation
+  const visualOnly = corpus.cases.find((fixture) => fixture.id === 'fod-bb-06')
+  assert.equal(visualOnly.expected.status, 'OUT_OF_SCOPE')
+  assert.equal(Object.hasOwn(visualOnly.expected, 'statuses'), false)
 })
 
 // A lane bundle is the canonical node closure the workflow reads together, so a corpus case that

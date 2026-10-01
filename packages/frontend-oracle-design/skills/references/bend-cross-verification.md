@@ -67,7 +67,10 @@ The model stage needs no card, no `O*` row and no contract: the analyst and the 
 the sources alone. Contract predicates are Bend defs named by symbol (`Race.staleNeverShown`); the
 card projection gives them `O*` IDs, and a `row` pin in the package keeps an ID stable across revisions
 so evidence never moves to a different meaning. Never create empty `O*` rows, placeholder policies or a
-pending approval to get past the model stage.
+pending approval to get past the model stage. A package whose touched code exposes no Props, shared
+API, state union or trust-boundary type may declare `typeContract: {notApplicable, paths}` — the reason
+and the investigated files; it is projected as `## Type Contract` and only then drops the
+`type-contract:reported` label.
 
 1. **Two readings.** When native delegation is supported, authorized and has capacity, dispatch one
    read-only model analyst with only the file `oracle-adequacy.mjs model-input --package <pkg>` writes:
@@ -217,7 +220,7 @@ card. For a card projected from a model package, `init` enforces it: it refuses 
 covers the package named in the generated region. A legacy card without a generated region keeps the
 earlier gates (`FORMAL_PROOF_LABEL_REQUIRED` with a Formal Model, `ADEQUACY_LABEL_REQUIRED` with an
 Adequacy section); for it, registering all four remains an operating contract the runner does not
-infer.
+infer. A card that declares `## Type Contract` not applicable registers the other three labels only.
 Through the approved `$test` flow, write in the target
 repository's existing `node:test` harness:
 

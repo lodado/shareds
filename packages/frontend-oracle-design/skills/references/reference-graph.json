@@ -238,7 +238,7 @@
       "id": "types-advanced-contracts",
       "implementationInput": "conditional",
       "path": "references/types/advanced-contracts.md",
-      "when": "every invocation — mandatory type-fest/TypeScript contract path before Draft/lock; loading unconditional, adoption via compiler witness packet gate",
+      "when": "the card has an exposed type boundary (exported Props · shared/package API · client state union · trust-boundary type) — mandatory type-fest/TypeScript contract path before Draft/lock; adoption via compiler witness packet gate",
       "requires": ["types-api-surface"]
     },
     {

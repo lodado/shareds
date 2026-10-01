@@ -37,18 +37,11 @@ import {
 } from './oracle-fs.mjs'
 import { invalidatedWitnesses } from './oracle-lock.mjs'
 import { parseFormalModel } from './oracle-model.mjs'
-import { generatedBlock, inputsDigestOf, loadPackage, packageInputs } from './oracle-package.mjs'
+import { generatedBlock, inputsDigestOf, loadPackage, packageInputs, stackLabelsFor } from './oracle-package.mjs'
 
 import { snapshotContext } from './oracle-review-context.mjs'
 import { claudeWorkerInvocation, parseWorkerSubmission } from './oracle-worker.mjs'
 import { spawnGit } from './resolve-executable.mjs'
-
-const MANDATORY_STACK_LABELS = [
-  'bend-proof:reported',
-  'bend-adequacy:reported',
-  'type-contract:reported',
-  'fast-check:reported',
-]
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const lockScript = join(scriptDirectory, 'oracle-lock.mjs')
@@ -180,7 +173,7 @@ const NEXT_ACTIONS = {
   REPORT_PATH_EXISTS: 'choose a new --report path; an existing file cannot vouch for this run',
   RUN_ARTIFACTS_EXIST: 'a new revision gets a new <oracle-id> directory — never re-init to reset the baseline',
   STACK_LABELS_REQUIRED:
-    'register every mandatory-stack label: bend-proof:reported, bend-adequacy:reported, type-contract:reported and fast-check:reported',
+    'register every mandatory-stack label: bend-proof:reported, bend-adequacy:reported, fast-check:reported and — unless the card declares ## Type Contract not applicable — type-contract:reported',
   PACKAGE_UNLOCKED: 'recreate the lock with --source <package> — the model package is part of the approved meaning',
   PACKAGE_STALE: 're-project the card from the package, re-confirm a changed meaning, and lock a new revision',
   FORMAL_PROOF_LABEL_REQUIRED:
@@ -1422,7 +1415,7 @@ async function initialize(options) {
   // 덮어야 한다. 생성 영역이 없는 기존 카드는 이전 기록의 규칙을 그대로 따른다(기존 형식을 읽는 것과 새 규칙 면제는 별개).
   const generated = generatedBlock(oracle)
   if (generated.present) {
-    const missing = MANDATORY_STACK_LABELS.filter((label) => !requiredLabels.includes(label))
+    const missing = stackLabelsFor(generated.content).filter((label) => !requiredLabels.includes(label))
     if (missing.length > 0) {
       throw new CliError(
         'STACK_LABELS_REQUIRED',

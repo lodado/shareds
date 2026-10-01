@@ -90,11 +90,11 @@ alternative, then `NEEDS_DECISION`.
 Risk judgment is canonical in this document. Other documents point to this table and add only their
 lane procedure.
 
-| Risk     | Entry criteria                                                                                                                                              | Lane     | Default evidence                                                                                               |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| `Low`    | no new policy·card·architecture decisions; copy·token·isolated CSS·clear regression fixes inside existing approved contracts                                | `oracle` | common + mandatory-verification + Bend/type-fest/TypeScript/fast-check; same Oracle gates (scope may be small) |
-| `Medium` | needs a contract — new UI states·forms·responsive structure·async ordering·local/identity visual intent — but not payment·permission·data-loss-scale damage | `oracle` | Oracle Card, `VALID_RED`, required-label GREEN, one independent review                                         |
-| `High`   | payment·permissions·destructive actions·data loss·legal/security/privacy/financial/complex concurrency, where a false GREEN is costly                       | `oracle` | Medium evidence + consecutive-GREEN hardening, mutation kill·revert·re-GREEN, 2-sample independent review      |
+| Risk     | Entry criteria                                                                                                                                                                        | Lane     | Default evidence                                                                                                                                   |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Low`    | no new policy·architecture decisions; a clear regression fix inside an existing approved behavior contract that still has a modelable core                                            | `oracle` | common + mandatory-verification + Bend/fast-check, plus type-fest/TypeScript with an exposed type boundary; same Oracle gates (scope may be small) |
+| `Medium` | needs a contract — new UI states·forms·responsive structure·async ordering·local/identity visual intent beside modelable behavior — but not payment·permission·data-loss-scale damage | `oracle` | Oracle Card, `VALID_RED`, required-label GREEN, one independent review                                                                             |
+| `High`   | payment·permissions·destructive actions·data loss·legal/security/privacy/financial/complex concurrency, where a false GREEN is costly                                                 | `oracle` | Medium evidence + consecutive-GREEN hardening, mutation kill·revert·re-GREEN, 2-sample independent review                                          |
 
 Risk judgment may take one optional evidence input: `scripts/oracle-twr.mjs` scores the target
 files' time-weighted bug-fix history from git. A high score is grounds to raise the lane or spend
@@ -102,7 +102,8 @@ more sweep·exploration budget; it is never a gate, never grounds to lower a jud
 absence blocks nothing.
 
 Low is not a bypass or escalation lane. Every Low invocation stays in the Oracle lane and loads
-common plus mandatory verification before Draft/lock. The historical [`lanes/low-fast-path.md`](lanes/low-fast-path.md)
+common plus mandatory verification before Draft/lock. Copy, token and isolated-CSS work has no behavior a model can state: the scope gate in `SKILL.md`
+Entry stops it before this stack instead of looping in `NEEDS_DECISION`. The historical [`lanes/low-fast-path.md`](lanes/low-fast-path.md)
 text only explains legacy records and cannot authorize a new-work carve-out.
 
 ## Jurisdiction rules
@@ -262,6 +263,7 @@ Every run performs the mandatory Bend discovery with `scripts/ensure-bend.mjs` a
 check or fast-check runner is `ENVIRONMENT_DEFECT` → `FAIL`; never skip or fall back. Every locked
 card needs `--required-label bend-proof:reported`, `--required-label bend-adequacy:reported`,
 `--required-label type-contract:reported` and `--required-label fast-check:reported` at `init`.
+`type-contract:reported` is dropped only when the card declares `## Type Contract` not applicable.
 
 When entering Delivery after Design-only, perform the same investigation alongside the `$test`
 availability check before any new lock, init, or test writing. Do not recreate an already approved

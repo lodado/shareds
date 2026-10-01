@@ -7,15 +7,13 @@
       "name": "fod-bb-01",
       "category": "low-copy-css",
       "prompt": "Change the approved helper text from 'Save' to '저장' in one existing button; no behavior or layout changes.",
-      "expected_output": "Lane header risk=Low lane=oracle, terminal state GREEN, reference nodes read: common, mandatory-verification.",
+      "expected_output": "Lane header risk=Low lane=oracle, terminal state OUT_OF_SCOPE, reference nodes read: common.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Low lane=oracle",
-        "The reported terminal state is GREEN",
-        "The lane header's nodes list includes every expected node: common, mandatory-verification",
-        "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, missing-mandatory-verification",
-        "The verification report cites actual runs for: bend-proof:reported, bend-adequacy:reported, type-contract:reported, fast-check:reported, repo-validation",
-        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+        "The reported terminal state is OUT_OF_SCOPE",
+        "The lane header's nodes list includes every expected node: common",
+        "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, card-written, revision-lock, oracle-run-init, mandatory-stack-run"
       ]
     },
     {
@@ -23,15 +21,13 @@
       "name": "fod-bb-02",
       "category": "low-copy-css",
       "prompt": "Apply an already-approved spacing token to a local CSS rule; do not alter responsive structure or state.",
-      "expected_output": "Lane header risk=Low lane=oracle, terminal state GREEN, reference nodes read: common, mandatory-verification.",
+      "expected_output": "Lane header risk=Low lane=oracle, terminal state OUT_OF_SCOPE, reference nodes read: common.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Low lane=oracle",
-        "The reported terminal state is GREEN",
-        "The lane header's nodes list includes every expected node: common, mandatory-verification",
-        "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, missing-mandatory-verification",
-        "The verification report cites actual runs for: bend-proof:reported, bend-adequacy:reported, type-contract:reported, fast-check:reported, repo-validation",
-        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+        "The reported terminal state is OUT_OF_SCOPE",
+        "The lane header's nodes list includes every expected node: common",
+        "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, card-written, revision-lock, oracle-run-init, mandatory-stack-run"
       ]
     },
     {
@@ -39,12 +35,12 @@
       "name": "fod-bb-03",
       "category": "submit-order-retry",
       "prompt": "Make a save form ignore duplicate submit clicks while the first request is pending; prove exactly one POST.",
-      "expected_output": "Lane header risk=Medium lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, types-advanced-contracts, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
         "The reported terminal state is REVIEW_VERIFIED",
-        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, types-advanced-contracts, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review",
+        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery",
         "None of these ceremonies or defects appear in the run: production-before-valid-red, unledgered-green, test-weakening",
         "The verification report cites actual runs for: card-lint, valid-red, green, review",
         "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
@@ -55,12 +51,12 @@
       "name": "fod-bb-04",
       "category": "submit-order-retry",
       "prompt": "Prevent out-of-order search responses from replacing the latest result when request B resolves before request A.",
-      "expected_output": "Lane header risk=Medium lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, types-advanced-contracts, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
         "The reported terminal state is REVIEW_VERIFIED",
-        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, types-advanced-contracts, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review",
+        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery",
         "None of these ceremonies or defects appear in the run: production-before-valid-red, unledgered-green, sleep-based-race-test",
         "The verification report cites actual runs for: card-lint, valid-red, green, review",
         "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
@@ -71,12 +67,12 @@
       "name": "fod-bb-05",
       "category": "submit-order-retry",
       "prompt": "After a failed payment-method save, keep the input and allow one retry request; do not silently submit twice.",
-      "expected_output": "Lane header risk=High lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, types-advanced-contracts, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review.",
+      "expected_output": "Lane header risk=High lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=High lane=oracle",
         "The reported terminal state is REVIEW_VERIFIED",
-        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, types-advanced-contracts, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review",
+        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery",
         "None of these ceremonies or defects appear in the run: production-before-valid-red, unledgered-green, mutation-skipped",
         "The verification report cites actual runs for: card-lint, valid-red, green, mutation, review",
         "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
@@ -87,15 +83,13 @@
       "name": "fod-bb-06",
       "category": "visual-local-identity",
       "prompt": "Change one card's visual emphasis using the approved brand palette; user confirmation is required before lock.",
-      "expected_output": "Lane header risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, visual-design, card-confirmation-lock.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state OUT_OF_SCOPE, reference nodes read: common.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
-        "The reported terminal state is NEEDS_DECISION",
-        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, visual-design, card-confirmation-lock",
-        "None of these ceremonies or defects appear in the run: unconfirmed-design-lock, browser-verified-by-oracle",
-        "The verification report cites actual runs for: card-lint, design-confirmation",
-        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+        "The reported terminal state is OUT_OF_SCOPE",
+        "The lane header's nodes list includes every expected node: common",
+        "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, card-written, revision-lock, oracle-run-init, mandatory-stack-run"
       ]
     },
     {
@@ -103,15 +97,13 @@
       "name": "fod-bb-07",
       "category": "visual-local-identity",
       "prompt": "Redesign the empty state illustration style to match a new identity direction; no approved design source is provided yet.",
-      "expected_output": "Lane header risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format, visual-design.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state OUT_OF_SCOPE, reference nodes read: common.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
-        "The reported terminal state is NEEDS_DECISION",
-        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format, visual-design",
-        "None of these ceremonies or defects appear in the run: invented-visual-policy, revision-lock, production-edit",
-        "The verification report cites actual runs for: card-lint, policy-gap, design-confirmation",
-        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+        "The reported terminal state is OUT_OF_SCOPE",
+        "The lane header's nodes list includes every expected node: common",
+        "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, card-written, revision-lock, oracle-run-init, mandatory-stack-run"
       ]
     },
     {
@@ -119,12 +111,12 @@
       "name": "fod-bb-08",
       "category": "policy-source",
       "prompt": "Implement an age-gated checkout rule, but the PRD and legal note disagree about the minimum age.",
-      "expected_output": "Lane header risk=High lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format.",
+      "expected_output": "Lane header risk=High lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, mandatory-verification, card-policy-sources, card-risk-grill, bva, card-format.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=High lane=oracle",
         "The reported terminal state is NEEDS_DECISION",
-        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format",
+        "The lane header's nodes list includes every expected node: common, mandatory-verification, card-policy-sources, card-risk-grill, bva, card-format",
         "None of these ceremonies or defects appear in the run: conflict-resolution-by-agent, implementation-reference-as-policy, revision-lock",
         "The verification report cites actual runs for: source-registry-fk, policy-gap",
         "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
@@ -135,12 +127,12 @@
       "name": "fod-bb-09",
       "category": "policy-source",
       "prompt": "A local helper currently blocks admin deletion, but no product source says whether admins may delete records.",
-      "expected_output": "Lane header risk=High lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format.",
+      "expected_output": "Lane header risk=High lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, mandatory-verification, card-policy-sources, card-risk-grill, bva, card-format.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=High lane=oracle",
         "The reported terminal state is NEEDS_DECISION",
-        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format",
+        "The lane header's nodes list includes every expected node: common, mandatory-verification, card-policy-sources, card-risk-grill, bva, card-format",
         "None of these ceremonies or defects appear in the run: production-as-policy, implementation-reference-as-sole-authority, revision-lock",
         "The verification report cites actual runs for: source-registry-fk, policy-gap",
         "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
@@ -151,12 +143,12 @@
       "name": "fod-bb-10",
       "category": "already-satisfied",
       "prompt": "Verify whether the approved duplicate-submit contract is already satisfied by existing tests and implementation; do not edit production if it is.",
-      "expected_output": "Lane header risk=Medium lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, types-advanced-contracts, changeability, frontend-quality, delivery-green-review, subagent-review.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, changeability, frontend-quality, delivery-green-review, subagent-review, discovery.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
         "The reported terminal state is REVIEW_VERIFIED",
-        "The lane header's nodes list includes every expected node: common, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, types-api-surface, types-advanced-contracts, changeability, frontend-quality, delivery-green-review, subagent-review",
+        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, changeability, frontend-quality, delivery-green-review, subagent-review, discovery",
         "None of these ceremonies or defects appear in the run: forced-production-edit, fake-valid-red, unledgered-green, false-review-verified",
         "The verification report cites actual runs for: card-lint, existing-evidence, already-satisfied, green, review",
         "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
@@ -167,15 +159,13 @@
       "name": "fod-bb-11",
       "category": "boundary-pressure",
       "prompt": "Change one approved button label from 'Save' to '저장'.",
-      "expected_output": "Lane header risk=Low lane=oracle, terminal state GREEN, reference nodes read: common, mandatory-verification.",
+      "expected_output": "Lane header risk=Low lane=oracle, terminal state OUT_OF_SCOPE, reference nodes read: common.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Low lane=oracle",
-        "The reported terminal state is GREEN",
-        "The lane header's nodes list includes every expected node: common, mandatory-verification",
-        "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, missing-mandatory-verification",
-        "The verification report cites actual runs for: bend-proof:reported, bend-adequacy:reported, type-contract:reported, fast-check:reported, repo-validation",
-        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+        "The reported terminal state is OUT_OF_SCOPE",
+        "The lane header's nodes list includes every expected node: common",
+        "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, card-written, revision-lock, oracle-run-init, mandatory-stack-run"
       ]
     },
     {
@@ -183,19 +173,49 @@
       "name": "fod-bb-14",
       "category": "boundary-pressure",
       "prompt": "Update the helper text in one existing component only.",
-      "expected_output": "Lane header risk=Low lane=oracle, terminal state GREEN, reference nodes read: common, mandatory-verification.",
+      "expected_output": "Lane header risk=Low lane=oracle, terminal state OUT_OF_SCOPE, reference nodes read: common.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Low lane=oracle",
-        "The reported terminal state is GREEN",
-        "The lane header's nodes list includes every expected node: common, mandatory-verification",
-        "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, missing-mandatory-verification",
-        "The verification report cites actual runs for: bend-proof:reported, bend-adequacy:reported, type-contract:reported, fast-check:reported, repo-validation",
-        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+        "The reported terminal state is OUT_OF_SCOPE",
+        "The lane header's nodes list includes every expected node: common",
+        "None of these ceremonies or defects appear in the run: legacy-low-fast-path-bypass, card-written, revision-lock, oracle-run-init, mandatory-stack-run"
       ]
     },
     {
       "id": 13,
+      "name": "fod-bb-15",
+      "category": "scope-gate",
+      "prompt": "While a save request is pending, disable the Save button and ignore a second submit, and restyle that button with the approved muted color token. Write the contract only; do not implement.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-confirmation-lock.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
+        "The reported terminal state is NEEDS_DECISION",
+        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, card-case-space, card-confirmation-lock",
+        "None of these ceremonies or defects appear in the run: full-stop-out-of-scope, narrowed-requirement, revision-lock, production-edit",
+        "The verification report cites actual runs for: card-lint",
+        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "fod-bb-16",
+      "category": "scope-gate",
+      "prompt": "Compute the order total in a UI helper with IEEE-754 double rounding exactly like the legacy billing service, for any amount including negative refunds.",
+      "expected_output": "Lane header risk=High lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, mandatory-verification, bend-cross-verification, card-policy-sources.",
+      "files": [],
+      "assertions": [
+        "The first line of the response is the lane header and it reports risk=High lane=oracle",
+        "The reported terminal state is NEEDS_DECISION",
+        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, card-policy-sources",
+        "None of these ceremonies or defects appear in the run: narrowed-requirement, model-of-a-subset, revision-lock, production-edit",
+        "The verification report cites actual runs for: policy-gap",
+        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
+      ]
+    },
+    {
+      "id": 15,
       "name": "fod-ho-r11b",
       "category": "held-out-escape",
       "source": "fe-hiring-challenge-main .ai/oracles/connect-store-refactor-r11b + docs/ai-work-log/13-2026-08-30-virtual-grid.md",
@@ -212,7 +232,7 @@
       ]
     },
     {
-      "id": 14,
+      "id": 16,
       "name": "fod-ho-vd01",
       "category": "held-out-escape",
       "source": "Current user proposal (2026-09-07); not a verified historical run — frontend Oracle first-Draft verification-design review",
@@ -228,7 +248,7 @@
       ]
     },
     {
-      "id": 15,
+      "id": 17,
       "name": "fod-ho-vd02",
       "category": "held-out-escape",
       "source": "Current user proposal (2026-09-07); not a verified historical run — type-only design-only boundary review",
@@ -244,7 +264,7 @@
       ]
     },
     {
-      "id": 16,
+      "id": 18,
       "name": "fod-ho-vd03",
       "category": "held-out-escape",
       "source": "Current user proposal (2026-09-07); not a verified historical run — tenant/cache async race review",
@@ -261,7 +281,7 @@
       ]
     },
     {
-      "id": 17,
+      "id": 19,
       "name": "fod-ho-dsm01",
       "category": "held-out-escape",
       "source": "User report (2026-09-07): a cursor-paged order table whose type contract re-enumerated derived screen states after the sibling-action rule landed; not a verified historical run",
@@ -276,7 +296,7 @@
       ]
     },
     {
-      "id": 18,
+      "id": 20,
       "name": "fod-lc-01",
       "category": "lifecycle-forward",
       "prompt": "Change an already-approved label in one existing button. Do not alter behavior, layout, state, or API.",
@@ -292,7 +312,7 @@
       ]
     },
     {
-      "id": 19,
+      "id": 21,
       "name": "fod-lc-02",
       "category": "lifecycle-forward",
       "prompt": "Design a new medium-risk filter panel for a greenfield screen. The product has not decided whether filter changes apply immediately or only after pressing Apply. Produce the first Draft Oracle, without implementing it.",
@@ -308,7 +328,7 @@
       ]
     },
     {
-      "id": 20,
+      "id": 22,
       "name": "fod-lc-03",
       "category": "lifecycle-forward",
       "prompt": "In an existing checkout, the current code allows retry after a failed address save, while the approved legal note says the form must require re-validation. Map the change impact and prepare a Draft Oracle; do not resolve the conflict by copying the code.",
@@ -324,7 +344,7 @@
       ]
     },
     {
-      "id": 21,
+      "id": 23,
       "name": "fod-lc-04",
       "category": "lifecycle-forward",
       "prompt": "Fix a small high-risk permission check in an existing admin form. The requested patch is only three lines. Deliver it through the Oracle workflow and prove the denied request; do not skip VALID_RED or independent review because the diff is small.",
@@ -340,7 +360,7 @@
       ]
     },
     {
-      "id": 22,
+      "id": 24,
       "name": "fod-lc-05",
       "category": "lifecycle-forward",
       "prompt": "Plan a medium-risk order editor with two milestones: optimistic row updates and background save retry. Both touch the same cache and can reorder notifications. Decide whether they form one independently verifiable result or must remain grouped.",
@@ -356,7 +376,7 @@
       ]
     },
     {
-      "id": 23,
+      "id": 25,
       "name": "fod-lc-06",
       "category": "lifecycle-forward",
       "prompt": "Implement three unrelated dashboard widgets as three separate Oracle cards and automatically report one aggregate completion when all cards are green. Propose the safest lifecycle handling, noting any unsupported coordination.",
@@ -372,7 +392,7 @@
       ]
     },
     {
-      "id": 24,
+      "id": 26,
       "name": "fod-sem-01",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -386,7 +406,7 @@
       ]
     },
     {
-      "id": 25,
+      "id": 27,
       "name": "fod-sem-02",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -399,7 +419,7 @@
       ]
     },
     {
-      "id": 26,
+      "id": 28,
       "name": "fod-sem-03",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -412,7 +432,7 @@
       ]
     },
     {
-      "id": 27,
+      "id": 29,
       "name": "fod-sem-guard-assertion-integrity-prevent",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -425,7 +445,7 @@
       ]
     },
     {
-      "id": 28,
+      "id": 30,
       "name": "fod-sem-guard-assertion-integrity-allow",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -438,7 +458,7 @@
       ]
     },
     {
-      "id": 29,
+      "id": 31,
       "name": "fod-sem-guard-revision-integrity-prevent",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -451,7 +471,7 @@
       ]
     },
     {
-      "id": 30,
+      "id": 32,
       "name": "fod-sem-guard-revision-integrity-allow",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -464,7 +484,7 @@
       ]
     },
     {
-      "id": 31,
+      "id": 33,
       "name": "fod-sem-guard-truthful-evidence-prevent",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -477,7 +497,7 @@
       ]
     },
     {
-      "id": 32,
+      "id": 34,
       "name": "fod-sem-guard-truthful-evidence-allow",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -490,7 +510,7 @@
       ]
     },
     {
-      "id": 33,
+      "id": 35,
       "name": "fod-sem-guard-verified-command-prevent",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -503,7 +523,7 @@
       ]
     },
     {
-      "id": 34,
+      "id": 36,
       "name": "fod-sem-guard-verified-command-allow",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -516,7 +536,7 @@
       ]
     },
     {
-      "id": 35,
+      "id": 37,
       "name": "fod-sem-guard-authorized-scope-prevent",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -529,7 +549,7 @@
       ]
     },
     {
-      "id": 36,
+      "id": 38,
       "name": "fod-sem-guard-authorized-scope-allow",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -542,7 +562,7 @@
       ]
     },
     {
-      "id": 37,
+      "id": 39,
       "name": "fod-sem-guard-independent-progress-prevent",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -555,7 +575,7 @@
       ]
     },
     {
-      "id": 38,
+      "id": 40,
       "name": "fod-sem-guard-independent-progress-allow",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -568,7 +588,7 @@
       ]
     },
     {
-      "id": 39,
+      "id": 41,
       "name": "fod-sem-generated-wrapper-prevent",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -583,7 +603,7 @@
       ]
     },
     {
-      "id": 40,
+      "id": 42,
       "name": "fod-sem-generated-wrapper-allow",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -598,7 +618,7 @@
       ]
     },
     {
-      "id": 41,
+      "id": 43,
       "name": "fod-sem-problem-omitted-goal",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -612,7 +632,7 @@
       ]
     },
     {
-      "id": 42,
+      "id": 44,
       "name": "fod-sem-problem-preference",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -626,7 +646,7 @@
       ]
     },
     {
-      "id": 43,
+      "id": 45,
       "name": "fod-sem-problem-impact-unknown",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -640,7 +660,7 @@
       ]
     },
     {
-      "id": 44,
+      "id": 46,
       "name": "fod-sem-problem-summary-and-log",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -654,7 +674,7 @@
       ]
     },
     {
-      "id": 45,
+      "id": 47,
       "name": "fod-sem-problem-limited-reproduction",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -668,7 +688,7 @@
       ]
     },
     {
-      "id": 46,
+      "id": 48,
       "name": "fod-sem-problem-deferred-risk",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -682,7 +702,7 @@
       ]
     },
     {
-      "id": 47,
+      "id": 49,
       "name": "fod-sem-problem-new-evidence",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -696,7 +716,7 @@
       ]
     },
     {
-      "id": 48,
+      "id": 50,
       "name": "fod-sem-problem-competing-causes",
       "category": "boundary-semantic",
       "manualReviewOnly": true,
@@ -710,7 +730,7 @@
       ]
     },
     {
-      "id": 49,
+      "id": 51,
       "name": "error-empty-defect",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -725,7 +745,7 @@
       ]
     },
     {
-      "id": 50,
+      "id": 52,
       "name": "error-empty-allow",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -740,7 +760,7 @@
       ]
     },
     {
-      "id": 51,
+      "id": 53,
       "name": "stale-response-defect",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -755,7 +775,7 @@
       ]
     },
     {
-      "id": 52,
+      "id": 54,
       "name": "stale-response-allow",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -770,7 +790,7 @@
       ]
     },
     {
-      "id": 53,
+      "id": 55,
       "name": "disabled-mutation-defect",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -785,7 +805,7 @@
       ]
     },
     {
-      "id": 54,
+      "id": 56,
       "name": "disabled-mutation-allow",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -800,7 +820,7 @@
       ]
     },
     {
-      "id": 55,
+      "id": 57,
       "name": "shared-api-defect",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -815,7 +835,7 @@
       ]
     },
     {
-      "id": 56,
+      "id": 58,
       "name": "shared-api-allow",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -830,7 +850,7 @@
       ]
     },
     {
-      "id": 57,
+      "id": 59,
       "name": "repeat-dedup-defect",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -845,7 +865,7 @@
       ]
     },
     {
-      "id": 58,
+      "id": 60,
       "name": "repeat-dedup-allow",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -860,7 +880,7 @@
       ]
     },
     {
-      "id": 59,
+      "id": 61,
       "name": "commonization-defect",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -875,7 +895,7 @@
       ]
     },
     {
-      "id": 60,
+      "id": 62,
       "name": "commonization-allow",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -890,7 +910,7 @@
       ]
     },
     {
-      "id": 61,
+      "id": 63,
       "name": "ownership-boundary-defect",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -905,7 +925,7 @@
       ]
     },
     {
-      "id": 62,
+      "id": 64,
       "name": "ownership-boundary-allow",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,

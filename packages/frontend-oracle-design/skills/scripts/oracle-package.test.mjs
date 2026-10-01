@@ -25,6 +25,8 @@ import {
   projectCard,
   regenerateAtRoot,
   renderGenerated,
+  STACK_LABELS,
+  stackLabelsFor,
 } from './oracle-package.mjs'
 import { emitTrace } from './oracle-projection.mjs'
 
@@ -300,6 +302,35 @@ test('the projected card is deterministic, marks its generated region and never 
   )
   // a card without a generated region (every legacy card) is read as before
   assert.deepEqual(await generatedIssues(await readFile(join(FIXTURE, 'oracle.md'), 'utf8')), [])
+})
+
+test('a package with no exposed type boundary says so with the paths it investigated, and only then drops the type-contract label', () => {
+  const derived = derive(PKG, { world: WORLD, model: MODEL })
+  // default: the stack stays whole and the card has no such section
+  assert.doesNotMatch(renderGenerated(PKG, derived), /^## Type Contract$/m)
+  assert.deepEqual(stackLabelsFor(renderGenerated(PKG, derived)), STACK_LABELS)
+
+  const declared = clone(PKG)
+  declared.typeContract = {
+    notApplicable: 'the reducer is module-private and exports no Props, shared API or state union',
+    paths: ['repo:src/search-reducer.mts'],
+  }
+  assert.deepEqual(packageIssues(declared), packageIssues(PKG))
+  const content = renderGenerated(declared, derive(declared, { world: WORLD, model: MODEL }))
+  assert.match(content, /^## Type Contract\n\n- Not applicable: the reducer is module-private .*\n- Investigated: repo:src\/search-reducer\.mts$/m)
+  assert.deepEqual(
+    stackLabelsFor(content),
+    STACK_LABELS.filter((label) => label !== 'type-contract:reported'),
+  )
+  // the declaration counts only as a section of the generated card, never as a stray sentence
+  assert.deepEqual(stackLabelsFor('- Not applicable: nothing exposed'), STACK_LABELS)
+
+  // a bare "n/a" is refused: the reason and the investigated files are both required
+  for (const typeContract of [{}, { notApplicable: '—', paths: ['repo:a.ts'] }, { notApplicable: 'internal only', paths: [] }]) {
+    const bad = clone(PKG)
+    bad.typeContract = typeContract
+    assert.ok(packageIssues(bad).some((issue) => issue.startsWith('package-type-contract:')), JSON.stringify(typeContract))
+  }
 })
 
 test('no package string can inject a heading, an approval or a region marker into the card', () => {
