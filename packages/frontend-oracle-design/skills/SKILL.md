@@ -30,8 +30,9 @@ rules; this file is the operator map.
    `nodes` lists only the nodes **actually Read** — never nodes you merely plan to read.
 
 3. Requests that only **explain in words** a plan, design, file structure, or types are inside this
-   procedure too. "Already known", "the spec is detailed enough", and "no code changes" are not
-   skip reasons.
+   procedure too. "Already known", "the spec is detailed enough", "no code changes", "write the
+   tests now" and "the code already exists" are not skip reasons: existing code is verified through
+   the same interview, model, Draft and lock before any test is written.
 4. **Scope gate — after `common.md`, before `mandatory-verification.md`.** Oracle runs only on
    behavior a Bend model can state: state, ordering, counts, permissions or effects, or a calculation over a
    domain Bend can represent. Classify the request by what it contains:
@@ -122,7 +123,9 @@ Lane routing:
 - TDD default: `ORACLE_READY` → write and run tests → record
   `oracle-run.mjs transition --to VALID_RED` → classify `VALID_RED`; no production writing or
   editing before that. On Claude Code the plugin's PreToolUse hook (`hooks/hooks.json`) denies
-  such a write before it lands and denies a weakening token entering a test after `VALID_RED`;
+  such a write before it lands, denies a test file written in a session that activated this skill
+  before a lock exists from that session (`TEST_BEFORE_LOCK`), and denies a weakening token
+  entering a test after `VALID_RED`;
   the transition gate stays the authority and hosts without hooks rely on it alone. The same hook
   records what each reviewer subagent returned (`host-receipts.jsonl`) and, at Stop, checks the final
   report against the ledger. Immediately before writing test files, explicitly load and invoke the

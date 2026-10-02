@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
@@ -246,4 +246,65 @@ test('every review artifact in a reply is recorded, the receipt file is protecte
   const red = await repository(t, 'VALID_RED')
   hook(write(red, 'packages/src/save.ts'))
   assert.equal(await readFile(join(red, '.ai', 'oracles', 'sample', 'host-receipts.jsonl'), 'utf8'), '')
+})
+
+/** 스킬을 켠 세션 기록 — Skill 호출 시각과 그 뒤의 assistant 문장들. */
+async function transcript(root, { at = '2026-10-02T03:00:00.000Z', skill = 'frontend-oracle-design:frontend-oracle-design', after = [] } = {}) {
+  const path = join(root, 'session.jsonl')
+  const entries = [
+    { type: 'user', timestamp: '2026-10-02T02:59:00.000Z', message: { content: 'write the tests now' } },
+    { type: 'assistant', timestamp: at, message: { content: [{ type: 'tool_use', name: 'Skill', input: { skill } }] } },
+    ...after.map((text) => ({ type: 'assistant', timestamp: at, message: { content: [{ type: 'text', text }] } })),
+  ]
+  await writeFile(path, `${entries.map((entry) => JSON.stringify(entry)).join('\n')}\n`)
+  return path
+}
+
+const writeIn = (cwd, transcript_path, file_path) => ({ ...write(cwd, file_path, "test('x', () => {})\n"), transcript_path })
+
+test('a session that activated the skill cannot write a test before a lock exists — the interview and the model come first', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-guard-prelock-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const session = await transcript(root)
+
+  const denied = hook(writeIn(root, session, 'src/features/run/TemplateRun.scenario.test.tsx'))
+  assert.equal(denied.decision?.permissionDecision, 'deny')
+  assert.match(denied.decision.permissionDecisionReason, /^TEST_BEFORE_LOCK: src\/features\/run\/TemplateRun\.scenario\.test\.tsx/)
+  assert.match(denied.decision.permissionDecisionReason, /NEEDS_DECISION/)
+
+  // 모델 파일과 오라클 기록, 제품 코드 조사 메모는 lock 전에 쓴다 — 이 관문은 테스트만 본다
+  for (const path of ['src/features/run/__test__/formal/MODEL.bend', '.ai/oracles/run/oracle.package.json', 'src/features/run/notes.ts']) {
+    assert.equal(hook(writeIn(root, session, path)).decision, null, path)
+  }
+})
+
+test('a lock created after the activation opens the test gate; a lock left from an earlier session does not', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-guard-lock-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const session = await transcript(root)
+  const oracle = join(root, '.ai', 'oracles', 'run')
+  await mkdir(oracle, { recursive: true })
+  const lock = join(oracle, 'oracle.lock.json')
+  await writeFile(lock, '{}\n')
+  const test_file = 'src/features/run/__test__/run.test.ts'
+
+  const stale = new Date('2026-10-01T00:00:00.000Z')
+  await utimes(lock, stale, stale)
+  assert.equal(hook(writeIn(root, session, test_file)).decision?.permissionDecision, 'deny')
+
+  const fresh = new Date('2026-10-02T03:05:00.000Z')
+  await utimes(lock, fresh, fresh)
+  assert.equal(hook(writeIn(root, session, test_file)).decision, null)
+})
+
+test('the test gate stays out of sessions that never activated the skill or routed the request out of scope', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-guard-other-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const test_file = 'src/save.test.ts'
+
+  assert.equal(hook(writeIn(root, await transcript(root, { skill: 'test:test' }), test_file)).decision, null)
+  assert.equal(hook(writeIn(root, join(root, 'missing.jsonl'), test_file)).decision, null)
+  assert.equal(hook(write(root, test_file)).decision, null)
+  const routed = await transcript(root, { after: ['Status: OUT_OF_SCOPE — copy change, routed to $test'] })
+  assert.equal(hook(writeIn(root, routed, test_file)).decision, null)
 })

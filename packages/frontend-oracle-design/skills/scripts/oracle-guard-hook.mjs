@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 // Oracle host hook — one script for three events, dispatched on the payload.
 // PreToolUse: denies, before the write lands, what the transition gate would reject afterwards —
-//   production edits while an oracle sits at ORACLE_READY, weakening tokens added to a test after
-//   VALID_RED, and any write to host-receipts.jsonl. A SubagentHandback call records a receipt.
+//   a test written in a session that activated the skill before any lock exists, production edits
+//   while an oracle sits at ORACLE_READY, weakening tokens added to a test after VALID_RED, and any
+//   write to host-receipts.jsonl. A SubagentHandback call records a receipt.
 // SubagentStop: records a digest of the reviewer output the subagent actually returned.
 // Stop: blocks a final report whose Status line or cited runs disagree with the ledger.
 // Any failure to judge is fail-open (exit 0, no output): the gate in oracle-run.mjs stays the authority.
 import { Buffer } from 'node:buffer'
 import { spawnSync } from 'node:child_process'
-import { appendFile, readdir, readFile } from 'node:fs/promises'
+import { appendFile, readdir, readFile, stat } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -32,8 +33,8 @@ async function readStdin() {
   return Buffer.concat(chunks).toString('utf8')
 }
 
-/** cwd와 대상 파일의 조상 디렉터리에서 `.ai/oracles/<id>/run-state.json`을 모은다. */
-async function findStates(cwd, filePath) {
+/** cwd와 대상 파일의 조상 디렉터리에서 `.ai/oracles/<id>/` 디렉터리를 모은다. */
+async function oracleDirectories(cwd, filePath) {
   const roots = new Set([cwd])
   let cursor = dirname(filePath)
   while (true) {
@@ -43,24 +44,72 @@ async function findStates(cwd, filePath) {
     cursor = parent
   }
 
-  const states = []
+  const directories = []
   for (const root of roots) {
     const oracles = join(root, '.ai', 'oracles')
     const entries = await readdir(oracles, { withFileTypes: true }).catch(() => [])
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue
-      const directory = join(oracles, entry.name)
-      const raw = await readFile(join(directory, 'run-state.json'), 'utf8').catch(() => null)
-      if (!raw) continue
-      try {
-        states.push({ directory, state: JSON.parse(raw) })
-      } catch {
-        // 손상된 상태 파일은 이 hook이 판정할 수 없다 — 게이트가 STATE_INVALID로 잡는다
-        unjudged('STATE_UNPARSEABLE', { oracle: directory })
-      }
+    directories.push(...entries.filter((entry) => entry.isDirectory()).map((entry) => join(oracles, entry.name)))
+  }
+  return directories
+}
+
+/** 그 디렉터리들의 `run-state.json`을 모은다. */
+async function findStates(cwd, filePath) {
+  const states = []
+  for (const directory of await oracleDirectories(cwd, filePath)) {
+    const raw = await readFile(join(directory, 'run-state.json'), 'utf8').catch(() => null)
+    if (!raw) continue
+    try {
+      states.push({ directory, state: JSON.parse(raw) })
+    } catch {
+      // 손상된 상태 파일은 이 hook이 판정할 수 없다 — 게이트가 STATE_INVALID로 잡는다
+      unjudged('STATE_UNPARSEABLE', { oracle: directory })
     }
   }
   return states
+}
+
+/** 세션 기록 한 줄의 assistant 내용 조각 — 읽을 수 없거나 assistant가 아니면 빈 배열. */
+function assistantParts(line) {
+  try {
+    const entry = JSON.parse(line)
+    if (entry.type !== 'assistant' || !Array.isArray(entry.message?.content)) return []
+    return entry.message.content.map((part) => ({ part, at: Date.parse(entry.timestamp) || 0 }))
+  } catch {
+    return []
+  }
+}
+
+const activatesSkill = ({ type, name, input }) =>
+  type === 'tool_use' && name === 'Skill' && /frontend-oracle-design/.test(input?.skill ?? '')
+const routesOut = ({ type, text }) => type === 'text' && /^Status:\s*OUT_OF_SCOPE\b/m.test(text ?? '')
+
+/**
+ * 이 세션이 스킬을 처음 켠 시각(ms) — 세션 기록의 Skill 호출로 본다. 그 뒤 `Status: OUT_OF_SCOPE`로 넘겼으면 null.
+ * 기록을 읽을 수 없으면 null(fail-open). 시각이 없는 기록은 0으로 두어 아무 lock이나 통과시킨다.
+ */
+async function skillActivation(transcriptPath) {
+  if (typeof transcriptPath !== 'string') return null
+  const raw = await readFile(transcriptPath, 'utf8').catch(() => '')
+  const parts = raw
+    .split('\n')
+    .filter((line) => line.includes('frontend-oracle-design') || line.includes('OUT_OF_SCOPE'))
+    .flatMap(assistantParts)
+  const first = parts.findIndex(({ part }) => activatesSkill(part))
+  if (first === -1 || parts.slice(first).some(({ part }) => routesOut(part))) return null
+  return parts[first].at
+}
+
+/** 스킬을 켠 뒤 만들어진 lock(`*.lock.json`)이 있는가 — 앞 세션의 lock은 이번 요청의 승인이 아니다. */
+async function lockedSince(cwd, filePath, since) {
+  for (const directory of await oracleDirectories(cwd, filePath)) {
+    const names = await readdir(directory).catch(() => [])
+    for (const name of names.filter((entry) => entry.endsWith('.lock.json'))) {
+      const lock = await stat(join(directory, name)).catch(() => null)
+      if (lock && lock.mtimeMs >= since) return true
+    }
+  }
+  return false
 }
 
 function countTokens(text) {
@@ -188,6 +237,21 @@ async function checkFinalReport(payload, cwd) {
   }
 }
 
+/**
+ * 스킬을 켠 세션에서 그 뒤의 lock 없이 테스트를 쓰면 막는다. 비대화 실행이 "테스트부터 써 달라"는 요청을 근거로
+ * 인터뷰·Bend·lock을 건너뛴 적이 있다 — 문서 규칙만으로는 막지 못했다. `.bend`는 lock 전에 쓰는 모델이다.
+ */
+async function deniedBeforeLock(payload, cwd, absolutePath) {
+  const portable = relative(cwd, absolutePath).split(sep).join('/')
+  if (!isTestPath(portable) || portable.endsWith('.bend')) return false
+  const activatedAt = await skillActivation(payload.transcript_path)
+  if (activatedAt === null || (await lockedSince(cwd, absolutePath, activatedAt))) return false
+  deny(
+    `TEST_BEFORE_LOCK: ${portable} — this session activated frontend-oracle-design and no oracle lock has been created since. Tests come after the Space discovery interview, the Bend model package, the Draft \`yes\` and the lock. A run that cannot ask the user ends NEEDS_DECISION with the first question; a request to write tests now or to verify existing code is not a reason to skip.`,
+  )
+  return true
+}
+
 async function guardWrite(payload, cwd) {
   const toolName = payload.tool_name
   const input = payload.tool_input ?? {}
@@ -197,6 +261,8 @@ async function guardWrite(payload, cwd) {
   if (!['Write', 'Edit', 'MultiEdit', 'NotebookEdit'].includes(toolName) || typeof targetPath !== 'string') return
 
   const absolutePath = resolve(cwd, targetPath)
+
+  if (await deniedBeforeLock(payload, cwd, absolutePath)) return
 
   for (const { directory, state } of await findStates(cwd, absolutePath)) {
     // 대소문자를 가리지 않는 파일 시스템(macOS·Windows)에서는 HOST-RECEIPTS.jsonl도 같은 파일이다

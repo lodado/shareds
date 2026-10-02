@@ -1746,7 +1746,8 @@ test('forces one entry-node read and a lane header before any other work', async
 
   // 설명·플랜 전용 요청도 같은 절차 — 이전 실패 모드
   assert.match(skill, /only \*\*explain in words\*\*.*inside this\s+procedure too/s)
-  assert.match(skill, /"Already known", "the spec is detailed enough", and "no code changes" are not\s+skip reasons/)
+  assert.match(skill, /"Already known", "the spec is detailed enough", "no code changes", "write\s+the\s+tests now"\s+and\s+"the code already exists" are not skip reasons/)
+  assert.match(skill, /existing code is verified through\s+the same interview, model, Draft and lock before any test is written/)
 
   // Low lane도 같은 헤더를 낸다
   assert.match(lane, /[Pp]rint the lane header (?:as|on) the first line/)
