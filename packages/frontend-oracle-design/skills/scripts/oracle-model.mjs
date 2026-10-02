@@ -291,6 +291,80 @@ export function enumerateSpace(model, { bound, maxCases = 5000 }) {
   }
 }
 
+export const MAX_COVER_CONFIGURATIONS = 2000
+
+/**
+ * 전이 커버 — 도달 가능한 구성(모델 상태 + 환경이 허용하는 사건)마다 허용 사건 전부를 한 번씩. 각 구성은 너비 우선의 가장
+ * 짧은 접근 trace로 닿고, 그 trace에 사건 하나를 이은 것이 커버 case다. bound 안의 trace는 공간이 이미 전부 돌므로 bound를
+ * 넘는 case만 남긴다. 유한 모델이면 모든 구성을 덮고 closed다. 상태가 끝없이 자라 상한에 걸리면 capped: bound 안에서 닿는
+ * 구성까지만 덮고(그 너머는 fast-check 표본의 몫이다) 그 깊이를 보고한다.
+ */
+export function transitionCover(model, space, { maxConfigurations = MAX_COVER_CONFIGURATIONS } = {}) {
+  const allowedAfter = (raw) => {
+    const seenEvents = new Set()
+    return listItems(model.next(listOf(raw))).filter((event) => {
+      const key = stableStringify(toPlain(event))
+      if (seenEvents.has(key)) return false
+      seenEvents.add(key)
+      return true
+    })
+  }
+  // 처음 닿은 구성만 줄에 넣는다(너비 우선이므로 가장 짧은 접근). 구성의 깊이 = 접근 trace의 길이다.
+  const seen = new Set()
+  const firstVisit = (node) => {
+    const allowed = allowedAfter(node.raw)
+    const key = stableStringify({ state: toPlain(node.state), allowed: allowed.map(toPlain) })
+    if (seen.has(key)) return null
+    seen.add(key)
+    return { ...node, allowed }
+  }
+  const cases = []
+  let pairs = 0
+  let expanded = 0
+  const queue = [firstVisit({ raw: [], trace: [], state: model.init(), observations: [] })]
+  while (queue.length > 0 && expanded < maxConfigurations) {
+    const node = queue.shift()
+    expanded += 1
+    pairs += node.allowed.length
+    for (const event of node.allowed) {
+      const state = model.step(node.state, event)
+      const next = {
+        raw: [...node.raw, event],
+        trace: [...node.trace, toPlain(event)],
+        state,
+        observations: [...node.observations, toPlain(model.observe(state))],
+      }
+      if (next.trace.length > space.bound)
+        cases.push({ trace: next.trace, observations: next.observations, depth: node.trace.length })
+      const child = firstVisit(next)
+      if (child) queue.push(child)
+    }
+  }
+  // 줄에 남은 구성이 있으면 상한에 걸린 것이다 — 그 앞 깊이까지는 전부 덮었다
+  const capped = queue.length > 0 ? queue[0].trace.length - 1 : null
+  const coveredDepth = capped === null ? null : Math.min(capped, space.bound)
+  return {
+    status: capped === null ? 'closed' : 'capped',
+    configurations: expanded,
+    pairs,
+    ...(capped === null
+      ? {}
+      : {
+          coveredDepth,
+          reason: `more than ${maxConfigurations} configurations — the model state grows without bound; every configuration within depth ${coveredDepth} is covered, fast-check samples past it`,
+        }),
+    cases: cases
+      .filter(({ depth }) => coveredDepth === null || depth <= coveredDepth)
+      .map(({ trace, observations }) => ({
+        id: `C${sha256(stableStringify(trace)).slice(0, 12)}`,
+        label: trace.map(eventLabel).join(' · '),
+        trace,
+        observations,
+      }))
+      .sort((left, right) => left.trace.length - right.trace.length || (left.label < right.label ? -1 : Number(left.label > right.label))),
+  }
+}
+
 /** 한 case를 구현 adapter에 넣고 초기 상태와 매 단계의 관측값을 모델 관측값과 대조한다. 첫 불일치에서 멈춘다. */
 export function conformCase(space, entry, adapter) {
   let step = 0
@@ -752,7 +826,9 @@ async function main() {
     ...(options['max-cases'] ? { maxCases: Number(options['max-cases']) } : {}),
   })
   if (command === 'space') {
-    process.stdout.write(`${JSON.stringify({ ...space, bend: model.bend, inputs: model.inputs })}\n`)
+    const { cases: coverCases, ...cover } = transitionCover(model, space)
+    const report = { ...space, cover: { ...cover, cases: coverCases.length }, bend: model.bend, inputs: model.inputs }
+    process.stdout.write(`${JSON.stringify(report)}\n`)
     process.exitCode = space.complete ? 0 : 1
     return
   }

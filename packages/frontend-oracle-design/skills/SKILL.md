@@ -65,9 +65,9 @@ Lane routing:
 
 - After the required lane header, summarize the goal, scope, and expected artifacts in the user's
   language. Follow the five message shapes in `common.md`; progress is informational, not approval.
-- In the Oracle lane, after source investigation and before writing the plan or Draft, print the test-space briefing
-  in `card/case-space.md`: dimensions, provenance, candidate product, constraints, selection, and unknowns.
-  Read that node with its dependencies at this point, not only after contract rows are drafted.
+- In the Oracle lane, after source investigation and before writing the plan or Draft, run the Space discovery
+  interview in `card/case-space.md`: propose the axes, ask the counterexample questions, and freeze the answers
+  before any Bend. Read that node with its dependencies at this point, not only after contract rows are drafted.
 - Report meaningful changes only. Keep facts, assumptions, recommendations, and ledger-backed results
   distinct; the existing Final report remains authoritative for completion evidence and state.
 - When explaining material implementation choices, state the choice, current-code rationale, and
@@ -109,7 +109,8 @@ Lane routing:
 - New cards and semantically changed revisions are re-confirmed with the user via the Draft Oracle
   and its delta. The Draft carries every surviving question as an Open question with candidate rows
   and a recommendation, so a single `yes` both answers and confirms; a question never goes out ahead
-  of the card unless its answer kills a branch. Before that confirmation: no lock, no target tests,
+  of the card unless its answer kills a branch — the Space discovery axis questions are such questions.
+  Before that confirmation: no lock, no target tests,
   no production or dependency edits. Only the pre-lock checks this procedure names run — `prove`,
   `space`, `derive`, the adequacy check, `card --repo-policies`, `--case-space` and the frame
   dispositions. A policy change is a new revision, never an in-place edit of a locked file.
@@ -214,10 +215,11 @@ apply at every risk; Low has no new-work carve-out.
   [`card/card-format.md`](references/card/card-format.md),
   [`card/interaction-sweep.md`](references/card/interaction-sweep.md) — after drafting contract
   rows and before showing the Draft, the disposition sweep of new×inherited×runtime interactions,
-  [`card/case-space.md`](references/card/case-space.md) — before planning, explain the candidate space;
-  after drafting rows, declare the dimension space and
-  dispositioning the machine-generated frames of `scripts/oracle-frames.mjs`,
-  [`card/confirmation-lock.md`](references/card/confirmation-lock.md).
+  [`card/case-space.md`](references/card/case-space.md) — before planning, the Space discovery
+  interview; while writing the model package, the seven input families and the possible cases,
+  [`card/confirmation-lock.md`](references/card/confirmation-lock.md). A legacy card without a model
+  package declares dimensions and dispositions the frames of `scripts/oracle-frames.mjs` with
+  [`card/case-space-frames.md`](references/card/case-space-frames.md).
 - After the lock only, never while writing the card:
   [`card/retro-metrics.md`](references/card/retro-metrics.md) — the escape record written for any
   defect found after the lock, the run metrics recorded at `REVIEW_VERIFIED`, and conditional
@@ -351,11 +353,13 @@ and the target repository's dependency rules.
    scope crosses boundaries, or single-card milestones need grouping, read
    [`lifecycle-adaptation.md`](references/lifecycle-adaptation.md) before choosing investigation
    breadth/depth. Reuse existing artifacts; read [`card/case-space.md`](references/card/case-space.md)
-   with its dependencies and emit the Case space briefing before presenting a plan.
+   with its dependencies and run the Space discovery interview before presenting a plan: no Bend
+   until the user confirms the axes, and a run the user cannot answer ends `NEEDS_DECISION` with the
+   first question.
    This does not move implementation decisions ahead of VALID_RED or waive source/confirmation gates. The lane header's `risk` is finalized here.
    Then model first, card second: write the model package from the sources (start from
    [`model-package.example.json`](references/model-package.example.json), never from `MODEL.bend` or a hand-written card), dispatch the analyst with
-   `oracle-adequacy.mjs model-input --package`, write the Bend world, behavior model and laws, run
+   `oracle-adequacy.mjs model-input --package`, write the Bend world from the confirmed axes, the behavior model and laws, run
    `oracle-package.mjs derive` and `oracle-adequacy.mjs check --package` until each counterexample is
    resolved or becomes an Open question, then `oracle-package.mjs project-card` — rows, axes and formal
    sections are projected, never hand-written a second time
@@ -365,8 +369,9 @@ and the target repository's dependency rules.
    [`card/interaction-sweep.md`](references/card/interaction-sweep.md)·
    [`card/case-space.md`](references/card/case-space.md) → complete the **Draft Oracle**
    with every surviving Grill question as an Open question — candidate rows plus a
-   recommendation — and BVA, then fill the interaction sweep, declare the Case space, run
-   `scripts/oracle-frames.mjs --oracle` and disposition every emitted frame under the recommended
+   recommendation — and BVA, then fill the interaction sweep. A projected card's Case space comes
+   from the world (`Coverage: model`, no frames); a legacy card declares it, runs
+   `scripts/oracle-frames.mjs --oracle` and dispositions every emitted frame under the recommended
    options — every `needs-decision` cell or frame cites an Open question. Resolve every
    `needs-evidence` cell by investigation in the same pass; only `needs-decision` reaches the
    user. Before drafting, run `scripts/oracle-dimensions.mjs --path <touched files>` and

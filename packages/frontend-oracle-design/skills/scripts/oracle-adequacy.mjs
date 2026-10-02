@@ -19,7 +19,7 @@ export const ADEQUACY_VERSION = 1
 // ponytail: 열거와 커널 증명에 같은 상한 — 넘으면 점검 전체가 unknown이다. 더 큰 세계가 필요한 카드가 오면 세계를
 // 나누거나 기호 backend(Z3)를 붙인다.
 export const MAX_WORLDS = 8192
-export const TERM_CATEGORIES = ['controllable', 'observable', 'hidden', 'concept']
+export const TERM_CATEGORIES = ['controllable', 'observable', 'hidden', 'concept', 'derived']
 export const GOAL_KINDS = ['safety', 'witness']
 export const HAZARDS = {
   'permission-change': 'permission, role or ownership changes between the check and the effect',
@@ -117,7 +117,8 @@ export function parseRowList(value) {
   })
 }
 
-const isField = (row) => Boolean(row.Field) && row.Field !== '—'
+// derived 행의 Field 칸은 `def: <이름>`이다 — 세계 필드가 아니라 다른 필드에서 계산되는 def.
+const isField = (row) => row.Category !== 'derived' && Boolean(row.Field) && row.Field !== '—'
 
 /** `## Terms` 절 → 머리 칸과 행. 없으면 null — 사전은 선택이다. */
 export function parseTerms(lines) {
@@ -228,10 +229,12 @@ export async function adequacyIssues({ adequacy, terms }, context) {
       names.add(name)
       if (!TERM_CATEGORIES.includes(row.Category))
         issues.push(`terms-category: ${id}: Category must be ${TERM_CATEGORIES.join(' | ')}`)
-      if ((row.Category === 'concept') === isField(row))
+      if ((row.Category === 'concept') === isField(row) && row.Category !== 'derived')
         issues.push(
           `terms-field: ${id}: a concept has Field —; a controllable, observable or hidden term names one world field`,
         )
+      if (row.Category === 'derived' && !/^def: \S+$/.test(row.Field ?? ''))
+        issues.push(`terms-field: ${id}: a derived term's Field is \`def: <world def>\``)
       if (isField(row)) byField.set(row.Field, [...(byField.get(row.Field) ?? []), id])
       // 테스트가 설정하는 방법(controllable)과 제품에서 읽는 경로(observable)를 적는다 — 좌표의 뜻과 테스트가 실제로
       // 만드는 상황이 어긋나면 그 좌표는 검사되지 않은 채 통과한다.

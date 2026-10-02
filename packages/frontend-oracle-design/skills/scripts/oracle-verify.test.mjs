@@ -3359,6 +3359,14 @@ test('case-space: 섹션이 없는 카드는 통과하지 못한다 — 여덟 �
   assert.equal(linted.status, 0, linted.stderr)
 })
 
+test('case-space: only a card projected from a model package may declare Coverage: model and skip the frames', async (t) => {
+  // a hand-written card cannot opt out of frame dispositions with one line
+  const declared = (await caseSpaceCard()).replace('## Case space\n', '## Case space\n\n- Coverage: model\n')
+  const handWritten = run('card', '--oracle', await cardFile(t, declared))
+  assert.equal(handWritten.status, 1)
+  assert.match(handWritten.stderr, /case-space-coverage-model: only a card projected from a model package/)
+})
+
 test('case-space: 같은 F* ID가 다른 조합을 가리키면 이전 판정은 stale이다', async (t) => {
   const card = await caseSpaceCard()
   // choice 순서만 바꾸면 ID 집합은 그대로이고 F1이 가리키는 조합만 바뀐다.

@@ -89,7 +89,8 @@ export function parseCaseSpace(document) {
   const strength = strengthLine ? Number.parseInt(strengthValue, 10) : 2
   const coverageLine = section.find((line) => line.trim().startsWith('- Coverage:'))
   const coverage = coverageLine ? coverageLine.split(':').slice(1).join(':').trim() : null
-  if (coverage && coverage !== 'full-product') {
+  // model — 모델 패키지에서 투영된 공간: 세계와 행동 모델이 가능한 경우를 열거하므로 프레임을 만들지 않는다
+  if (coverage && !['full-product', 'model'].includes(coverage)) {
     throw Object.assign(new Error(`Unknown Case space coverage: ${coverage}`), { code: 'CASE_SPACE_COVERAGE' })
   }
   const metadata = coverage === 'full-product' ? parseCaseSpaceMetadata(section) : null
@@ -416,7 +417,8 @@ export function enumerateStateModel(document) {
 export function generateFromDocument(document) {
   const caseSpace = parseCaseSpace(document)
   if (!caseSpace) return null
-  const { frames, errorFrames, dimensionRevision, constraintRevision, rawCount } = generateCaseFrames(caseSpace)
+  const { frames, errorFrames, dimensionRevision, constraintRevision, rawCount } =
+    caseSpace.coverage === 'model' ? { frames: [], errorFrames: [] } : generateCaseFrames(caseSpace)
   const { paths, emptyCells } = enumerateStateModel(document)
   return { caseSpace, frames, errorFrames, paths, emptyCells, ...(caseSpace.coverage === 'full-product' ? { dimensionRevision, constraintRevision, rawCount } : {}) }
 }

@@ -15,25 +15,35 @@ import { fileURLToPath } from 'node:url'
 import { sha256, stableStringify } from './oracle-fs.mjs'
 import { parseBendTypesStrict, typeIR } from './oracle-types.mjs'
 
-export const PACKAGE_VERSION = 1
+// 2: the axes were confirmed with the user (Space discovery) and every input family is decided at the model stage.
+// 1: the earlier shape — read as before.
+export const PACKAGE_VERSION = 2
+const PACKAGE_VERSIONS = [1, 2]
 export const DERIVE_VERSION = 1
 export const PROJECT_VERSION = 1
 export const FAMILIES = ['Data', 'Value', 'Async', 'Order', 'Entry', 'Environment', 'Platform', 'Inherited']
-export const WORLD_ROLES = ['controllable', 'observable', 'hidden', 'concept']
+// 테스트가 몰아야 하는 입력 계열 — Inherited(이전 정책)는 interaction sweep의 몫이다.
+export const INPUT_FAMILIES = FAMILIES.filter((family) => family !== 'Inherited')
+export const WORLD_ROLES = ['controllable', 'observable', 'hidden', 'concept', 'derived']
 export const GOAL_AUTHORS = ['analyst', 'controller']
 export const LAW_KINDS = ['safety', 'effect', 'witness']
 
 // 투영된 카드가 init에서 등록해야 하는 필수 검증 스택의 라벨.
 export const STACK_LABELS = ['bend-proof:reported', 'bend-adequacy:reported', 'type-contract:reported', 'fast-check:reported']
+// 행동 모델이 없는 카드 — 법칙 증명과 trace 표본 대신, 가능한 좌표 설정 전부를 제품에 돌리는 세계 대응 검사.
+export const WORLD_STACK_LABELS = ['bend-adequacy:reported', 'type-contract:reported', 'world-conformance:reported']
 
 /**
- * 패키지가 노출 타입 경계 없음을 조사한 경로와 함께 선언하면 카드의 생성 영역에 `## Type Contract` 절이 생기고, 그때만
- * type-contract 라벨을 요구하지 않는다. 생성 영역 밖의 같은 문장은 선언이 아니다(생성 영역은 패키지에서 다시 만들어 비교한다).
+ * 생성 영역의 절이 라벨을 정한다. `## Formal Model`이 없으면(시간이 없는 요청) 세계 스택이다. 패키지가 노출 타입 경계
+ * 없음을 조사한 경로와 함께 선언하면 `## Type Contract` 절이 생기고, 그때만 type-contract 라벨을 요구하지 않는다. 생성
+ * 영역 밖의 같은 문장은 선언이 아니다(생성 영역은 패키지에서 다시 만들어 비교한다).
  */
 export function stackLabelsFor(content = '') {
+  const timeless = !/^## Formal Model$/m.test(content) && /^## Adequacy$/m.test(content)
+  const labels = timeless ? WORLD_STACK_LABELS : STACK_LABELS
   return /^## Type Contract\n\n- Not applicable: \S/m.test(content)
-    ? STACK_LABELS.filter((label) => label !== 'type-contract:reported')
-    : STACK_LABELS
+    ? labels.filter((label) => label !== 'type-contract:reported')
+    : labels
 }
 // oracle-adequacy.mjs HAZARDS와 같은 목록이다 — 순환 import를 피하려고 이름만 둔다(테스트가 두 목록의 일치를 확인한다).
 export const HAZARD_IDS = [
@@ -106,6 +116,17 @@ const nonEmpty = (value) => typeof value === 'string' && value.trim() !== '' && 
 const repoPathOf = (location) =>
   typeof location === 'string' && location.startsWith('repo:') ? location.slice('repo:'.length).split('#')[0] : null
 
+/**
+ * 계열 처분 — 매핑은 용어의 family로 하고, 여기는 나머지 둘이다: 행동 모델의 사건이 그 계열을 모는 경우와,
+ * 원문이 허락하는 제외(사유가 S*를 인용한다). 그 밖의 문자열은 null.
+ */
+export function familyDisposition(value) {
+  if (typeof value !== 'string') return null
+  if (/^modeled:\s*behavior\s*$/.test(value)) return { kind: 'behavior' }
+  const excluded = value.match(/^excluded:\s*(\S.*)$/)
+  return excluded ? { kind: 'excluded', reason: excluded[1], sources: excluded[1].match(/\bS\d+\b/g) ?? [] } : null
+}
+
 /** 객체 안의 모든 문자열 값과 그 경로. */
 function stringsOf(value, path = 'package') {
   if (typeof value === 'string') return [[path, value]]
@@ -177,7 +198,9 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
   for (const [path, value] of stringsOf(pkg))
     if (/[\r\n]|<!--|-->/.test(value))
       push('package-text-unsafe', `${path} contains a line break or an HTML comment marker`)
-  if (pkg?.packageVersion !== PACKAGE_VERSION) push('package-version', `packageVersion must be ${PACKAGE_VERSION}`)
+  if (!PACKAGE_VERSIONS.includes(pkg?.packageVersion))
+    push('package-version', `packageVersion must be ${PACKAGE_VERSION} (1 is the earlier shape without Space discovery)`)
+  const confirmedAxes = pkg?.packageVersion >= 2
   if (!/^[a-z][\w-]*$/.test(pkg?.id ?? '')) push('package-id', 'id must be a lowercase identifier')
 
   const sources = new Map()
@@ -196,6 +219,17 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
       push('package-bend-name', `${source?.id}: ${bendPath} — Bend imports only plain names (letters, digits, _ and -) in each path segment`)
   }
   if (sources.size === 0) push('package-sources', 'list the source text as sources')
+  // 축은 사용자와 확정한 뒤에 세계가 된다 — 그 문답 기록이 원문 출처로 남고 lock이 덮는다.
+  const sourceText = (id) => {
+    const source = sources.get(id)
+    if (!source || source.self || source.approval !== 'approved') return false
+    return source.kind !== 'implementation-reference' && !/\.bend$/.test(repoPathOf(source.location) ?? '')
+  }
+  if (confirmedAxes && !sourceText(pkg?.spaceDiscovery))
+    push(
+      'package-space-discovery',
+      'name the approved source that records the axes and the counterexample answers the user confirmed — not this package, a model file or an implementation reference',
+    )
   const authoritative = (id) => {
     const source = sources.get(id)
     return Boolean(source) && source.kind !== 'implementation-reference'
@@ -236,14 +270,17 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
     if (!WORLD_ROLES.includes(term?.role))
       push('package-term-role', `${term?.id}: role must be ${WORLD_ROLES.join(' | ')}`)
     const hasField = nonEmpty(term?.field)
-    if ((term?.role === 'concept') === hasField)
-      push('package-term-field', `${term?.id}: a concept has no field; every other role names one world field`)
+    if (['concept', 'derived'].includes(term?.role) === hasField)
+      push('package-term-field', `${term?.id}: a concept or derived term has no field; every other role names one world field`)
+    // derived — 다른 필드에서 계산되는 값: 세계 def를 가리키고, 제품은 그것을 상태로 저장하지 않는다
+    if ((term?.role === 'derived') !== nonEmpty(term?.def))
+      push('package-term-def', `${term?.id}: a derived term names the world def that computes it; no other role names a def`)
     if (hasField) fieldOwners.set(term.field, [...(fieldOwners.get(term.field) ?? []), term.id])
     const hasPath = nonEmpty(term?.path)
     if (['controllable', 'observable'].includes(term?.role) !== hasPath)
       push(
         'package-term-path',
-        `${term?.id}: a controllable term says how the test sets it and an observable term the product path that reads it; hidden and concept terms have none`,
+        `${term?.id}: a controllable term says how the test sets it and an observable term the product path that reads it; hidden, concept and derived terms have none`,
       )
     for (const field of ['context', 'name', 'definition'])
       if (!nonEmpty(term?.[field])) push('package-term-field', `${term?.id}: ${field} is required`)
@@ -351,6 +388,34 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
       push('package-example', `${example?.id}: verdict must be holds | violates`)
   }
 
+  const families = pkg?.families ?? {}
+  for (const family of Object.keys(families))
+    if (!FAMILIES.includes(family)) push('package-family', `${family} is not one of ${FAMILIES.join(', ')}`)
+  const familyIssue = (family) => {
+    const declared = families[family]
+    const disposition = familyDisposition(declared)
+    const tagged = (pkg?.terms ?? []).filter((term) => term?.family === family)
+    const driven = tagged.filter((term) => term.role === 'controllable')
+    const form = `map it to a controllable field (terms[].family), write "modeled: behavior" or "excluded: <reason citing the S* source text>"`
+    if (declared !== undefined && !disposition) return ['package-family', `${family}: "${declared}" — ${form}`]
+    if (disposition?.kind === 'excluded' && !disposition.sources.some(sourceText))
+      return ['package-family', `${family}: an exclusion cites the source text that allows it (an S* that is not a model file)`]
+    if (disposition?.kind === 'excluded' && driven.length > 0)
+      return ['package-family', `${family} is mapped by ${driven.map((term) => term.id).join(', ')} and also excluded — keep one`]
+    if (disposition || driven.length > 0) return null
+    if (family !== 'Inherited' && tagged.length > 0)
+      return [
+        'package-family-observation-only',
+        `${family}: ${tagged.map((term) => term.id).join(', ')} only observe — an input family needs a field the test sets; ${form}`,
+      ]
+    return family === 'Inherited' && tagged.length > 0 ? null : ['package-family', `${family}: ${form}`]
+  }
+  if (confirmedAxes)
+    for (const family of INPUT_FAMILIES) {
+      const issue = familyIssue(family)
+      if (issue) push(...issue)
+    }
+
   issues.push(...contractRowIssues(pkg?.contract))
   issues.push(...discoveryRegistryIssues(pkg, { sources, requirements, questions }))
   if (stage === 'model') return issues
@@ -405,22 +470,35 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
     citeRequirements('notApplicable', entry?.requirements)
   }
 
-  const families = pkg?.families ?? {}
-  for (const family of FAMILIES) {
-    const declared = families[family]
-    if (declared !== undefined && !/^excluded:\s*\S/.test(declared))
-      push('package-family', `${family}: a declared family disposition is "excluded: <reason with S*>"`)
+  if (confirmedAxes) {
+    const issue = familyIssue('Inherited')
+    if (issue) push(...issue)
+  } else {
+    for (const family of FAMILIES) {
+      const declared = families[family]
+      if (declared !== undefined && !familyDisposition(declared))
+        push('package-family', `${family}: a declared family disposition is "excluded: <reason with S*>" or "modeled: behavior"`)
+    }
   }
-  for (const family of Object.keys(families))
-    if (!FAMILIES.includes(family)) push('package-family', `${family} is not one of ${FAMILIES.join(', ')}`)
 
   const selfSource = [...sources.values()].find((source) => source?.self === true)
   if (!selfSource)
     push('package-self', 'register this package file as a source with "self": true so the lock covers it')
 
+  // 시간이 든 요청만 행동 모델(MODEL·LAWS·PROOF)을 쓴다 — Order나 Async가 매핑되면 필수, 둘 다 원문으로 제외되면 세계와
+  // 적절성 점검과 세계 대응 검사로 충분하다. 버전 1 패키지는 예전처럼 늘 필요하다.
   const behavior = pkg?.behavior
+  const temporal =
+    !confirmedAxes ||
+    ['Order', 'Async'].some((family) => familyDisposition(families[family])?.kind !== 'excluded')
   if (!behavior) {
-    push('package-behavior-missing', 'the mandatory Formal Model needs behavior: {model, laws, prefix, bound, ...}')
+    if (temporal)
+      push(
+        'package-behavior-missing',
+        confirmedAxes
+          ? 'Order or Async is part of the space, so the behavior model is required: behavior: {model, laws, prefix, bound, ...}'
+          : 'the mandatory Formal Model needs behavior: {model, laws, prefix, bound, ...}',
+      )
   } else {
     for (const field of ['model', 'laws'])
       if (!sources.has(behavior[field]) || !repoPathOf(sources.get(behavior[field])?.location)?.endsWith('.bend'))
@@ -734,6 +812,26 @@ function worldAxes(pkg, worldText) {
       limitations,
     })
   }
+  // derived — 필드가 아니라 세계 def다. 축으로 남기되 좌표·관찰이 아니고, 제품은 이 값을 계산해 쓴다(저장하지 않는다).
+  for (const term of (pkg.terms ?? []).filter((entry) => entry.role === 'derived' && nonEmpty(entry.def))) {
+    const escaped = term.def.replaceAll('.', String.raw`\.`)
+    const defined = new RegExp(String.raw`^def\s+${escaped}\(`, 'm').test(worldText)
+    if (!defined)
+      diagnostics.push({ code: 'derived-def-missing', symbol: term.def, message: `${term.id} names ${term.def}, which the world does not define` })
+    axes.push({
+      id: `derived.${term.def}`,
+      role: 'derived',
+      modelRefs: [term.def],
+      termRefs: [term.id],
+      sourceRefs: [term.source],
+      domainRef: term.def,
+      derivation: 'structural',
+      status: defined ? 'derived' : 'unresolved',
+      ...(term.family ? { family: term.family } : {}),
+      domain: { model: term.def, product: term.productDomain ?? 'unstated', enumerated: null },
+      limitations: ['derived from other fields — the product computes it and never stores it as state'],
+    })
+  }
   return { axes, diagnostics }
 }
 
@@ -914,31 +1012,58 @@ function enumeratedBySpace(axes, space) {
  * 누락 감사 — 여덟 계열을 도출된 축에 잇는다. 축이 없는 계열은 패키지가 적은 excluded 사유가 있어야 한다: 모델에
  * 없다는 사실만으로 excluded를 쓰지 않는다(`family-undispositioned`는 사람의 결정이 필요한 자리다).
  */
-// Order·Async는 입력의 순서·시점이다. 관찰 축만 매핑된 계열은 테스트가 그 순서를 몰 수 없으므로 "world로 전부 열거됨"이
-// 근거가 되지 못한다 — 몰 수 있는 축(controllable·environment·event)이나 모델 검사 순서 의무가 있어야 매핑으로 인정한다.
-const DRIVEN_FAMILIES = new Set(['Order', 'Async'])
+// 입력 계열은 테스트가 모는 축이어야 한다. 관찰 축만 매핑된 계열은 테스트가 그 조건을 만들 수 없으므로 "world로 전부
+// 열거됨"이 근거가 되지 못한다 — 몰 수 있는 축(controllable·environment·event)이나 모델 검사 순서 의무가 있어야 매핑이다.
 const drivable = (axis) => axis.role === 'controllable' || axis.role === 'environment' || axis.id.startsWith('event.')
 
 export function familyAudit(pkg, axes, order = null) {
-  return FAMILIES.map((family) => {
-    const members = axes.filter((axis) => axis.family === family)
-    const mapped = members.map((axis) => axis.id)
-    const declared = pkg.families?.[family] ?? null
-    const driven = members.some(drivable) || (family === 'Order' && (order?.total ?? 0) > 0)
-    if (mapped.length > 0 && DRIVEN_FAMILIES.has(family) && !driven) {
-      if (declared) return { family, status: 'excluded', reason: declared, axes: mapped }
-      return {
-        family,
-        status: 'undispositioned',
-        axes: mapped,
-        blocked: 'family-observation-only',
-        message: `${family} maps only observed axes (${mapped.join(', ')}); add a controllable or environment axis, an event the model orders, or a sourced exclusion`,
-      }
+  const events = axes.filter((axis) => axis.id.startsWith('event.') && !axis.conditionalOn).map((axis) => axis.id)
+  return FAMILIES.map((family) =>
+    auditFamily(family, pkg.families?.[family] ?? null, axes.filter((axis) => axis.family === family), {
+      events,
+      ordered: family === 'Order' && (order?.total ?? 0) > 0,
+    }),
+  )
+}
+
+/** 행동 모델의 가능한 trace — bound까지의 공간과, 도달 가능한 구성마다 모든 사건을 도는 전이 커버. */
+function traceSummary(space, cover) {
+  const summary = { cases: space.cases.length, bound: space.bound, complete: space.complete }
+  if (!cover) return summary
+  const { status, configurations, pairs, coveredDepth } = cover
+  return {
+    ...summary,
+    cover: { status, configurations, pairs, cases: cover.cases.length, ...(status === 'capped' ? { coveredDepth } : {}) },
+  }
+}
+
+/** 한 계열의 처분 — 행동 모델이 모는 계열, 테스트가 모는 축으로 매핑된 계열, 원문이 제외한 계열, 처분 없음. */
+function auditFamily(family, declared, members, { events, ordered }) {
+  const mapped = members.map((axis) => axis.id)
+  const driven = members.filter(drivable).map((axis) => axis.id)
+  if (familyDisposition(declared)?.kind === 'behavior') {
+    if (events.length > 0) return { family, status: 'mapped', via: 'behavior', axes: [...driven, ...events] }
+    return {
+      family,
+      status: 'undispositioned',
+      blocked: 'family-behavior-missing',
+      message: `${family} is "modeled: behavior" but no behavior model event drives it`,
     }
-    if (mapped.length > 0) return { family, status: 'mapped', axes: mapped, ...(declared ? { declared } : {}) }
-    if (declared) return { family, status: 'excluded', reason: declared }
-    return { family, status: 'undispositioned' }
-  })
+  }
+  const observedOnly = mapped.length > 0 && family !== 'Inherited' && driven.length === 0 && !ordered
+  if (observedOnly && declared) return { family, status: 'excluded', reason: declared, axes: mapped }
+  if (observedOnly)
+    return {
+      family,
+      status: 'undispositioned',
+      axes: mapped,
+      blocked: 'family-observation-only',
+      message: `${family} maps only observed axes (${mapped.join(', ')}); add a controllable or environment axis, an event the model orders, or a sourced exclusion`,
+    }
+  if (mapped.length > 0)
+    return { family, status: 'mapped', axes: driven.length > 0 ? driven : mapped, ...(declared ? { declared } : {}) }
+  if (declared) return { family, status: 'excluded', reason: declared }
+  return { family, status: 'undispositioned' }
 }
 
 /** 파생 IR의 결정적 digest — 실행 시각·runId 없이 입력과 생성기 버전만. */
@@ -951,7 +1076,7 @@ export function deriveDigest(inputs) {
  * 넘긴다). 구조적으로 알 수 있는 것만 structural로, 공간에서 계산한 것은 model-checked로 표시한다. 지원하지 않는
  * 입력은 조용히 빠지지 않고 diagnostics에 남는다.
  */
-export function derive(pkg, texts, { space = null, inputs = [] } = {}) {
+export function derive(pkg, texts, { space = null, inputs = [], worlds = null, cover = null } = {}) {
   const world = worldAxes(pkg, texts.world)
   const behavior = pkg.behavior && texts.model ? behaviorAxes(pkg.behavior, texts.model, [pkg.behavior.model]) : null
   const axes = [...world.axes, ...(behavior?.axes ?? [])]
@@ -984,20 +1109,24 @@ export function derive(pkg, texts, { space = null, inputs = [] } = {}) {
   const { rows, unpinned } = assignRows(pkg.contract ?? [])
   const byRole = (role) =>
     world.axes.filter((axis) => axis.role === role).map((axis) => axis.modelRefs[0].split('.').at(-1))
+  const fields = world.axes.filter((axis) => axis.role !== 'derived')
   const summary = {
-    fields: world.axes.length,
+    fields: fields.length,
     worldAxes: world.axes.length,
     behaviorAxes: behavior?.axes.length ?? 0,
     coordinates: byRole('controllable'),
     observations: byRole('observable'),
     hidden: byRole('hidden'),
-    rawCombinations: world.axes.reduce((count, axis) => count * (axis.domain.enumerated?.values.length ?? Infinity), 1),
+    rawCombinations: fields.reduce((count, axis) => count * (axis.domain.enumerated?.values.length ?? Infinity), 1),
   }
   const result = {
     deriveVersion: DERIVE_VERSION,
     package: pkg.id,
     axes,
     order,
+    // 가능한 경우 — 가정이 남긴 세계(컴파일된 세계 모델로 센다)와 행동 모델이 허락한 trace. 원시 곱은 실행하지 않는다.
+    worlds: worlds ?? { status: 'not-run', reason: 'Bend was not run' },
+    traces: space ? traceSummary(space, cover) : null,
     families,
     contractRows: Object.fromEntries(rows),
     unpinnedRows: unpinned,
@@ -1095,6 +1224,49 @@ function discoverySpaceSection(pkg) {
   return out
 }
 
+const termField = (term) => {
+  if (term.role === 'derived') return `def: ${term.def}`
+  return nonEmpty(term.field) ? term.field : '—'
+}
+
+/** `- Possible cases:` — 원시 곱이 아니라 가정이 남긴 세계 수와, 행동 모델이 허락한 trace 수. */
+function possibleCases({ worlds, traces }) {
+  const parts = []
+  if (worlds?.status === 'enumerated') {
+    const excluded = worlds.raw - worlds.possible
+    const by = worlds.excludedBy.map((entry) => `${entry.id} ${entry.count}`).join(', ')
+    const detail = by ? `: ${by}` : ''
+    parts.push(`${worlds.possible} of ${worlds.raw} worlds (${excluded} excluded${detail})`)
+  } else parts.push(`not enumerated — ${worlds?.reason ?? 'Bend was not run'}`)
+  if (traces) parts.push(`${traces.cases} traces of up to ${traces.bound} events${traces.complete ? '' : ' (budget stop)'}`)
+  const cover = traces?.cover
+  if (cover?.status === 'closed')
+    parts.push(`transition cover closed: every event from all ${cover.configurations} configurations (${cover.cases} cases past the bound)`)
+  if (cover?.status === 'capped')
+    parts.push(`transition cover capped at ${cover.coveredDepth} events (${cover.cases} cases; the state grows without bound)`)
+  return parts.join('; ')
+}
+
+const choiceText = (axis) => {
+  if (axis.domain.enumerated?.by === 'type') return axis.domain.enumerated.values.join(', ')
+  if (axis.constructors) return axis.constructors.join(', ')
+  return `unbounded ${axis.domain.model}`
+}
+
+/** 계열마다 테스트가 모는 축 한 행 — 관찰은 차원이 아니다. 처분 없는 계열은 행이 없다(lint가 family-undispositioned로 막는다). */
+function caseSpaceRows(derived) {
+  const byId = new Map(derived.axes.map((axis) => [axis.id, axis]))
+  return derived.families.flatMap((entry) => {
+    if (entry.status === 'excluded') return [[entry.family, '—', `excluded: ${entry.reason.replace(/^excluded:\s*/, '')}`]]
+    if (entry.status !== 'mapped') return []
+    return entry.axes.map((id) => {
+      const axis = byId.get(id)
+      const dimension = id.startsWith('world.') ? id.split('.').at(-1) : `${entry.family}:${id}`
+      return [entry.family, dimension, axis ? choiceText(axis) : '—']
+    })
+  })
+}
+
 /** 생성 영역 본문. 같은 패키지·세계·모델 원문이면 같은 바이트다. */
 export function renderGenerated(pkg, derived) {
   const { rows } = assignRows(pkg.contract ?? [])
@@ -1175,23 +1347,13 @@ export function renderGenerated(pkg, derived) {
     '',
     '## Case space',
     '',
+    // 공간은 세계와 행동 모델이다 — 도구가 가능한 경우를 열거하고 프레임은 만들지 않는다(Coverage: model).
+    '- Coverage: model',
+    `- Possible cases: ${possibleCases(derived)}`,
+    '',
   )
   out.push(
-    ...table(
-      ['Family', 'Dimension', 'Choices'],
-      // 사유 없는 계열은 행을 쓰지 않는다 — 기존 lint가 family-undispositioned로 막고, 생성기는 제외 사유를 지어내지 않는다.
-      derived.families
-        .filter((entry) => entry.status !== 'undispositioned')
-        .map((entry) => {
-          if (entry.status === 'excluded') return [entry.family, '—', entry.reason]
-          const fields = entry.axes.map((id) => id.split('.').at(-1)).join(', ')
-          return [
-            entry.family,
-            '—',
-            `excluded: enumerated exhaustively as the derived world axes ${fields} (${pkg.world.source})`,
-          ]
-        }),
-    ),
+    ...table(['Family', 'Dimension', 'Choices'], caseSpaceRows(derived)),
     '',
     '## Terms',
     '',
@@ -1202,7 +1364,7 @@ export function renderGenerated(pkg, derived) {
         term.context,
         term.name,
         term.role,
-        nonEmpty(term.field) ? term.field : '—',
+        termField(term),
         nonEmpty(term.path) ? term.path : '—',
         term.definition,
         nonEmpty(term.not) ? term.not : '—',
@@ -1443,18 +1605,17 @@ export function regenerateAtRoot(root = process.cwd()) {
     } catch (error) {
       return { unreadable: error.message }
     }
+    // 가능한 세계 수와 trace 공간이 생성 영역에 들어간다 — 둘 다 설치된 Bend로만 다시 센다
     let bin = null
-    if (loaded.pkg.behavior) {
-      try {
-        const { ensureBend } = await import('./ensure-bend.mjs')
-        ;({ bin } = await ensureBend({
-          download: () => {
-            throw Object.assign(new Error('card lint never downloads Bend'), { code: 'BEND_NOT_INSTALLED' })
-          },
-        }))
-      } catch (error) {
-        return { inputsDigest, unverified: `Bend is not installed (${error.code ?? error.message})` }
-      }
+    try {
+      const { ensureBend } = await import('./ensure-bend.mjs')
+      ;({ bin } = await ensureBend({
+        download: () => {
+          throw Object.assign(new Error('card lint never downloads Bend'), { code: 'BEND_NOT_INSTALLED' })
+        },
+      }))
+    } catch (error) {
+      return { inputsDigest, unverified: `Bend is not installed (${error.code ?? error.message})` }
     }
     try {
       const { derived } = await derivePackage(loaded, { bin })
@@ -1479,14 +1640,43 @@ export async function derivePackage(loaded, { bin = null, timeoutMs } = {}) {
     }),
     model: modelPath ? await readFile(modelPath, 'utf8').catch(() => null) : null,
   }
-  const { enumerateSpace, loadModel } = await import('./oracle-model.mjs')
+  const { enumerateSpace, loadModel, transitionCover } = await import('./oracle-model.mjs')
   const inputs = await packageInputs(loaded)
   let space = null
+  let cover = null
   if (bin && modelPath && texts.model) {
     const model = await loadModel({ model: modelPath, prefix: pkg.behavior.prefix, bin, timeoutMs })
     space = enumerateSpace(model, { bound: pkg.behavior.bound })
+    cover = transitionCover(model, space)
   }
-  return { derived: derive(pkg, texts, { space, inputs }), texts, inputs, inputsDigest: inputsDigestOf(inputs) }
+  const worlds = bin ? await possibleWorlds(loaded, { bin, timeoutMs }) : null
+  return {
+    derived: derive(pkg, texts, { space, inputs, worlds, cover }),
+    texts,
+    inputs,
+    inputsDigest: inputsDigestOf(inputs),
+  }
+}
+
+/**
+ * 컴파일된 세계 모델로 센 가능한 세계 — 원시 곱(raw), 모든 가정이 참인 세계(possible), 가정마다 그것이 거짓인 세계 수.
+ * 적절성 점검이 증명하는 바로 그 세계 집합이다. 셀 수 없으면(무한 필드·상한·Bend 없음) 그 이유를 남긴다.
+ */
+async function possibleWorlds(loaded, { bin, timeoutMs }) {
+  const { evaluateWorlds, loadWorld } = await import('./oracle-adequacy.mjs')
+  try {
+    const world = await loadWorld({ package: loaded.path, cwd: loaded.root, bin, timeoutMs })
+    if (world.result) return { status: world.result.status, reason: world.result.reason }
+    const all = evaluateWorlds(world.model, world.spec)
+    return {
+      status: 'enumerated',
+      raw: all.length,
+      possible: all.filter((entry) => entry.valid).length,
+      excludedBy: world.spec.assumptions.map((id) => ({ id, count: all.filter((entry) => !entry.truth[id]).length })),
+    }
+  } catch (error) {
+    return { status: 'unknown', reason: `${error.code ?? 'WORLD_FAILED'}: ${error.message}` }
+  }
 }
 
 function parseOptions(args) {
@@ -1533,7 +1723,8 @@ async function main() {
     return
   }
   const timeoutMs = options['timeout-ms'] ? Number(options['timeout-ms']) : undefined
-  const { derived, inputsDigest } = await derivePackage(loaded, { bin: await binFor(options), timeoutMs })
+  const bin = await binFor(options)
+  const { derived, inputsDigest } = await derivePackage(loaded, { bin, timeoutMs })
   if (command === 'derive') {
     const text = `${JSON.stringify(derived, null, 2)}\n`
     if (options.out) await writeFile(options.out, text)
@@ -1567,25 +1758,22 @@ async function main() {
   const content = renderGenerated(loaded.pkg, derived).replace(/\n$/, '')
   const result = found.present
     ? await generatedIssues(existing, {
-        regenerate: async () =>
-          loaded.pkg.behavior && !derived.order
-            ? { inputsDigest, unverified: 'Bend was not run (--no-bend)' }
-            : { inputsDigest, content },
+        regenerate: async () => (bin ? { inputsDigest, content } : { inputsDigest, unverified: 'Bend was not run (--no-bend)' }),
       })
     : ['card-generated-missing: the card has no generated region']
   process.stdout.write(`${JSON.stringify({ issues: result })}\n`)
   process.exitCode = result.length === 0 ? 0 : 1
 }
 
+// top-level await을 쓰지 않는다 — derive가 oracle-adequacy를 import하고 그것이 이 모듈을 다시 import하므로, 이 모듈의
+// 평가가 main을 기다리면 그 import가 영원히 끝나지 않는다(순환 + TLA 교착).
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    await main()
-  } catch (error) {
+  main().catch((error) => {
     const cliError =
       error instanceof PackageError
         ? error
         : new PackageError(error.code ?? 'PACKAGE_FAILED', error.message ?? String(error))
     process.stderr.write(`${cliError.code}: ${cliError.message}\n`)
     process.exitCode = cliError.exitCode
-  }
+  })
 }

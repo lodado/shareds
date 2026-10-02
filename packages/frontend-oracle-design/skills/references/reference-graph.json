@@ -136,8 +136,14 @@
     {
       "id": "card-case-space",
       "path": "references/card/case-space.md",
-      "when": "after source investigation and before writing the plan or Draft — explain the candidate test space; after drafting contract rows and before showing the Draft — declare the dimension space and disposition the machine-generated frames",
+      "when": "after source investigation and before writing the plan or Draft — run the Space discovery interview and confirm the axes before any Bend; while writing the model package — decide the seven input families and keep only the possible cases",
       "requires": ["common", "bva", "card-format"]
+    },
+    {
+      "id": "card-case-space-frames",
+      "path": "references/card/case-space-frames.md",
+      "when": "a legacy card without a model package — declaring dimensions by hand, the pre-plan test-space briefing, generating frames with oracle-frames.mjs and dispositioning them, or the full-product opt-in",
+      "requires": ["card-case-space"]
     },
     {
       "id": "card-retro-metrics",

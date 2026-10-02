@@ -238,7 +238,8 @@ export async function requirementClosure(loaded) {
   }
   const quotes = (pkg.requirements ?? []).map((requirement) => normalize(requirement.quote ?? ''))
   const unquoted = []
-  for (const source of pkg.sources ?? []) {
+  // Space discovery 기록은 축에 대한 사용자 답이다 — 용어·계열이 이미 싣고 있으니 문장마다 후보를 만들지 않는다
+  for (const source of (pkg.sources ?? []).filter((entry) => entry.id !== pkg.spaceDiscovery)) {
     const location = source.location ?? ''
     if (source.kind === 'implementation-reference' || source.self || source.approval !== 'approved' || !location.startsWith('repo:'))
       continue

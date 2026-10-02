@@ -8,6 +8,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { BEND_VERSION, ensureBend } from './ensure-bend.mjs'
 import { checkAdequacy, conformWorld, HAZARDS, modelInput, triageCandidates } from './oracle-adequacy.mjs'
+import { generateFromDocument } from './oracle-frames.mjs'
 import { sha256 } from './oracle-fs.mjs'
 import { enumerateSpace, verdictOf } from './oracle-model.mjs'
 import {
@@ -800,4 +801,224 @@ test('an Order or Async family with only observed axes is not mapped: the card l
 
   // the stale-search fixture keeps its controllable arrival axis mapped
   assert.equal(derive(PKG, { world: WORLD, model: MODEL }).families.find((entry) => entry.family === 'Order').status, 'mapped')
+})
+
+// ── Space discovery: the axes are confirmed with the user before the world (package version 2) ─────────────────
+
+const SPACE_RECORD = {
+  id: 'S7',
+  kind: 'product-policy',
+  jurisdiction: 'oracle space axes',
+  standard: "the user's answers in Space discovery",
+  location: 'repo:space-discovery.md',
+  approval: 'approved',
+}
+
+/** The fixture as a version-2 package: the same reading plus the record of the axes the user confirmed. */
+function confirmed(pkg) {
+  const copy = clone(pkg)
+  copy.packageVersion = 2
+  copy.sources = [...copy.sources, SPACE_RECORD]
+  copy.spaceDiscovery = 'S7'
+  return copy
+}
+
+test('a version-2 package names the Space discovery record and disposes every input family before the world is written', () => {
+  const ready = confirmed(PKG)
+  assert.deepEqual(packageIssues(ready), [])
+  const issuesAt = (pkg, stage = 'model') => packageIssues(pkg, { stage })
+  const codesAt = (pkg, stage = 'model') => issuesAt(pkg, stage).map((issue) => issue.split(':')[0])
+
+  // no record of the interview: the axes were never confirmed with the user
+  const unconfirmed = clone(ready)
+  delete unconfirmed.spaceDiscovery
+  assert.ok(codesAt(unconfirmed).includes('package-space-discovery'))
+  // the record is the user's text — not this package, not a model file
+  for (const id of ['S5', 'S2', 'S9']) {
+    const wrong = clone(ready)
+    wrong.spaceDiscovery = id
+    assert.ok(codesAt(wrong).includes('package-space-discovery'), id)
+  }
+
+  // each of the seven input families is decided at the model stage, before any card exists
+  const silent = clone(ready)
+  delete silent.families.Platform
+  assert.ok(issuesAt(silent).some((issue) => issue.startsWith('package-family: Platform')))
+  // an exclusion names the source text that allows it — never no source, never a model file
+  for (const reason of ['excluded: one search box', 'excluded: the model has no entry event (S2)']) {
+    const bad = clone(ready)
+    bad.families.Entry = reason
+    assert.ok(issuesAt(bad).some((issue) => issue.startsWith('package-family: Entry')), reason)
+  }
+  // observing a family is not testing it: Data with only an observable term is refused
+  const observedOnly = clone(ready)
+  for (const term of observedOnly.terms) if (term.family === 'Data' && term.role === 'controllable') delete term.family
+  assert.ok(codesAt(observedOnly).includes('package-family-observation-only'))
+  // a family the behavior model's events drive says so
+  const modeled = clone(ready)
+  for (const term of modeled.terms) if (term.family === 'Order') delete term.family
+  modeled.families.Order = 'modeled: behavior'
+  assert.deepEqual(packageIssues(modeled), [])
+  // Inherited belongs to the interaction sweep: required by the projection, not by the model stage
+  const noInherited = clone(ready)
+  delete noInherited.families.Inherited
+  assert.ok(!codesAt(noInherited).includes('package-family'))
+  assert.ok(issuesAt(noInherited, 'project').some((issue) => issue.startsWith('package-family: Inherited')))
+  // an unknown family or disposition is refused
+  const unknown = clone(ready)
+  unknown.families.Network = 'excluded: S1 not a family'
+  unknown.families.Platform = 'maybe later'
+  const unknownCodes = issuesAt(unknown)
+  assert.ok(unknownCodes.some((issue) => issue.startsWith('package-family: Network')))
+  assert.ok(unknownCodes.some((issue) => issue.startsWith('package-family: Platform')))
+
+  // a version-1 package is read as before
+  assert.deepEqual(packageIssues(PKG), [])
+  assert.ok(!codesAt(PKG).includes('package-space-discovery'))
+})
+
+test('a derived term names the def that computes it — no field, no path — and is never a coordinate or an observation', () => {
+  const ready = confirmed(PKG)
+  ready.terms.push({
+    id: 'T11',
+    context: 'search',
+    name: 'answered',
+    role: 'derived',
+    def: 'Race.answered',
+    definition: 'some response has arrived — computed from the arrival order',
+    source: 'S1',
+    status: 'confirmed',
+  })
+  assert.deepEqual(packageIssues(ready), [])
+  for (const [field, value] of [
+    ['def', undefined],
+    ['field', 'final2'],
+    ['path', 'test: sets it'],
+  ]) {
+    const bad = clone(ready)
+    const term = bad.terms.find((entry) => entry.id === 'T11')
+    if (value === undefined) delete term[field]
+    else term[field] = value
+    assert.ok(packageIssues(bad).some((issue) => /^package-term-(?:field|path|def)/.test(issue)), field)
+  }
+  const world = `${WORLD}\ndef Race.answered(w: Race) -> Bool:\n  True{}\n`
+  const derived = derive(ready, { world, model: MODEL })
+  const axis = derived.axes.find((entry) => entry.id === 'derived.Race.answered')
+  assert.equal(axis.role, 'derived')
+  assert.equal(axis.status, 'derived')
+  assert.ok(!derived.summary.coordinates.includes('answered') && !derived.summary.observations.includes('answered'))
+  // a derived term whose def the world does not define is diagnosed, never dropped
+  const missing = derive(ready, { world: WORLD, model: MODEL })
+  assert.ok(missing.diagnostics.some((entry) => entry.code === 'derived-def-missing' && entry.symbol === 'Race.answered'))
+  // the Terms table shows the def in the Field column
+  assert.match(renderGenerated(ready, derived), /^\| T11 +\| search +\| answered +\| derived +\| def: Race\.answered +\|/m)
+})
+
+test('every input family counts only axes the test drives; modeled: behavior maps a family to the event axes', () => {
+  // the column card's mistake: Environment tagged on an observation is blocked, not mapped
+  const observed = clone(PKG)
+  observed.terms.find((term) => term.field === 'final').family = 'Environment'
+  delete observed.families.Environment
+  const environment = derive(observed, { world: WORLD, model: MODEL }).families.find((entry) => entry.family === 'Environment')
+  assert.equal(environment.status, 'undispositioned')
+  assert.equal(environment.blocked, 'family-observation-only')
+
+  const modeled = clone(PKG)
+  for (const term of modeled.terms) if (term.family === 'Value') delete term.family
+  modeled.families.Value = 'modeled: behavior'
+  const value = derive(modeled, { world: WORLD, model: MODEL }).families.find((entry) => entry.family === 'Value')
+  assert.equal(value.status, 'mapped')
+  assert.ok(value.axes.length > 0 && value.axes.every((id) => id.startsWith('event.')), JSON.stringify(value))
+  // without a behavior model there is nothing to drive it
+  const noModel = clone(modeled)
+  delete noModel.behavior
+  const missing = derive(noModel, { world: WORLD }).families.find((entry) => entry.family === 'Value')
+  assert.equal(missing.blocked, 'family-behavior-missing')
+})
+
+test('the Case space is projected from the world: Coverage: model, the possible cases and one row per driven axis, with no frames', () => {
+  const worlds = { status: 'enumerated', raw: 384, possible: 96, excludedBy: [{ id: 'A1', count: 288 }] }
+  const derived = derive(PKG, { world: WORLD, model: MODEL }, { worlds })
+  const content = renderGenerated(PKG, derived)
+  assert.match(content, /^## Case space\n\n- Coverage: model\n- Possible cases: 96 of 384 worlds \(288 excluded: A1 288\)/m)
+  assert.match(content, /^\| Order +\| arrival +\| OldFirst, NewFirst, OldEarly +\|$/m)
+  assert.match(content, /^\| Data +\| oldEmpty +\| false, true +\|$/m)
+  assert.match(content, /^\| Entry +\| — +\| excluded: one search box S1 +\|$/m)
+  // an observation is not a dimension: itemsIntact (Data, observable) has no row
+  assert.doesNotMatch(content, /^\| Data +\| itemsIntact /m)
+  // the machine enumerates the world; the frame generator has nothing to do
+  const generated = generateFromDocument(content)
+  assert.equal(generated.caseSpace.coverage, 'model')
+  assert.deepEqual([generated.frames.length, generated.errorFrames.length], [0, 0])
+  assert.equal(new Set(generated.caseSpace.families.map((entry) => entry.family)).size, 8)
+  // the behavior model's transition cover is stated next to the counts: closed for a finite model, capped otherwise
+  const traces = { cases: 10, bound: 4, complete: true }
+  const closed = renderGenerated(
+    PKG,
+    derive(PKG, { world: WORLD, model: MODEL }, { worlds, space: { ...traces, cases: [], spaceDigest: 'x' }, cover: { status: 'closed', configurations: 8, pairs: 200, cases: Array.from({ length: 50 }, () => ({})) } }),
+  )
+  assert.match(closed, /transition cover closed: every event from all 8 configurations \(50 cases past the bound\)/)
+  const capped = renderGenerated(
+    PKG,
+    derive(PKG, { world: WORLD, model: MODEL }, { worlds, space: { ...traces, cases: [], spaceDigest: 'x' }, cover: { status: 'capped', configurations: 2000, pairs: 9000, coveredDepth: 4, cases: Array.from({ length: 12 }, () => ({})) } }),
+  )
+  assert.match(capped, /transition cover capped at 4 events \(12 cases; the state grows without bound\)/)
+  // without Bend the counts are reported as not enumerated, never invented
+  assert.match(renderGenerated(PKG, derive(PKG, { world: WORLD, model: MODEL })), /^- Possible cases: not enumerated — Bend was not run/m)
+})
+
+test('[bend] derive counts the possible worlds with the compiled world, the same counts the adequacy check proves over', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await fixtureCopy(t)
+  const loaded = await loadPackage('oracle.package.json', { root })
+  const { derived } = await derivePackage(loaded, { bin })
+  const adequacy = await checkAdequacy({ package: 'oracle.package.json', cwd: root, bin })
+  assert.equal(derived.worlds.status, 'enumerated')
+  assert.equal(derived.worlds.raw, adequacy.counts.worlds)
+  assert.equal(derived.worlds.possible, adequacy.counts.valid)
+  assert.equal(derived.worlds.raw - derived.worlds.possible, adequacy.counts.excluded)
+})
+
+// ── W4: the behavior model is required only when the request has time in it (Order or Async) ───────────────────
+
+/** A version-2 package with no temporal family: Order and Async excluded by the source, no behavior model. */
+function timeless() {
+  const pkg = confirmed(PKG)
+  for (const term of pkg.terms) if (['Order', 'Async'].includes(term.family)) delete term.family
+  pkg.families.Order = 'excluded: S7 one response per search, nothing to order'
+  pkg.families.Async = 'excluded: S7 the response is already in when the screen renders'
+  delete pkg.behavior
+  pkg.contract = pkg.contract.filter((entry) => entry.def)
+  return pkg
+}
+
+test('without Order or Async the behavior model is optional; with either it is required', () => {
+  const codes = (pkg) => packageIssues(pkg).map((issue) => issue.split(':')[0])
+  assert.ok(!codes(timeless()).includes('package-behavior-missing'))
+  const ordered = timeless()
+  ordered.terms.find((term) => term.field === 'arrival').family = 'Order'
+  delete ordered.families.Order
+  assert.ok(codes(ordered).includes('package-behavior-missing'))
+  const asynchronous = timeless()
+  asynchronous.families.Async = 'modeled: behavior'
+  assert.ok(codes(asynchronous).includes('package-behavior-missing'))
+  // a version-1 package keeps the earlier rule: the behavior model is always required
+  const legacy = clone(PKG)
+  delete legacy.behavior
+  assert.ok(codes(legacy).includes('package-behavior-missing'))
+})
+
+test('a card without a Formal Model registers the adequacy proof and the world conformance instead of the law proof and fast-check', () => {
+  const pkg = timeless()
+  const content = renderGenerated(pkg, derive(pkg, { world: WORLD }))
+  assert.doesNotMatch(content, /^## Formal Model$/m)
+  assert.deepEqual(stackLabelsFor(content), ['bend-adequacy:reported', 'type-contract:reported', 'world-conformance:reported'])
+  pkg.typeContract = { notApplicable: 'the reducer is module-private', paths: ['repo:src/search-reducer.mts'] }
+  assert.deepEqual(stackLabelsFor(renderGenerated(pkg, derive(pkg, { world: WORLD }))), [
+    'bend-adequacy:reported',
+    'world-conformance:reported',
+  ])
+  // a card with a Formal Model keeps the four labels
+  assert.deepEqual(stackLabelsFor(renderGenerated(PKG, derive(PKG, { world: WORLD, model: MODEL }))), STACK_LABELS)
 })

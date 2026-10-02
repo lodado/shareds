@@ -161,6 +161,7 @@ flowchart LR
   card_format["card-format"]
   card_interaction_sweep["card-interaction-sweep"]
   card_case_space["card-case-space"]
+  card_case_space_frames["card-case-space-frames"]
   card_retro_metrics["card-retro-metrics"]
   card_confirmation_lock["card-confirmation-lock"]
   visual_design["visual-design"]
@@ -197,6 +198,7 @@ flowchart LR
   common --> card_case_space
   bva --> card_case_space
   card_format --> card_case_space
+  card_case_space --> card_case_space_frames
   common --> card_retro_metrics
   card_case_space --> card_retro_metrics
   common --> card_confirmation_lock

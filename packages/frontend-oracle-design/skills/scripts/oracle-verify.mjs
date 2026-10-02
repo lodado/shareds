@@ -1579,6 +1579,10 @@ async function lintCard(options) {
   if (!generated) {
     issues.push('case-space-missing: card has no `## Case space` section — declare dimensions, or exclude each of the eight families with a reason')
   }
+  // Coverage: model은 모델 패키지에서 투영된 공간에만 있다 — 손으로 쓴 카드가 이 한 줄로 프레임 판정을 건너뛰지 못한다
+  const modelCoverage = generated?.caseSpace.coverage === 'model'
+  if (modelCoverage && !generatedBlock(card).present)
+    issues.push('case-space-coverage-model: only a card projected from a model package declares `Coverage: model` — declare the dimensions and disposition the frames')
 
   const sweepReason = sweepTrigger(generated?.caseSpace, sharedStatePolicies(transitions, policies))
   if (sweep.length === 0 && sweepReason) {
@@ -1597,7 +1601,10 @@ async function lintCard(options) {
     }
 
     // Touches 열 채택 시 — 인용 id는 실재해야 하고, 조합 가능한 차원은 인용하거나 independent 사유를 쓴다.
-    const combinableFamilies = generated.caseSpace.families.filter((entry) => !entry.excluded && entry.dimension)
+    // 투영된 공간은 세계 모델이 가능한 경우를 전부 열거한다 — t-way 조합·Touches·Strength는 손으로 쓴 카드의 일이다
+    const combinableFamilies = modelCoverage
+      ? []
+      : generated.caseSpace.families.filter((entry) => !entry.excluded && entry.dimension)
     const touchesAdopted = combinableFamilies.some(
       (entry) => entry.touches && (entry.touches.independent || entry.touches.ids.length > 0),
     )

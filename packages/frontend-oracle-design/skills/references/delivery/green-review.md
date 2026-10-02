@@ -80,6 +80,8 @@ After the card tests pass, actually run the repo verifications pinned with `--re
 through the `exec` of each label. GREEN is blocked unless all mandatory labels are fresh for the
 current snapshot: `bend-proof:reported`, `bend-adequacy:reported`, `type-contract:reported` and
 `fast-check:reported` (with positive sampling runs); `type-contract:reported` only when the card has an exposed type boundary.
+A card without a `## Formal Model` needs `bend-adequacy:reported` and `world-conformance:reported` instead of the law
+proof and sampling labels.
 
 1. targeted test
 2. impact-scope test — the required label `impact`. The file list is machine-fed, never judged:

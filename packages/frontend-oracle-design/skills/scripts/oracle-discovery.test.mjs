@@ -185,6 +185,25 @@ test('L1: every requirement quotes the source verbatim and is carried by the ora
   const gap = await requirementClosure(await loadPackage('dropped.json', { root }))
   assert.ok(gap.unquoted.some((entry) => entry.sentence === 'A response to an older request does not change what the list shows.'))
 
+  // the Space discovery record holds the user's answers about the axes; its lines are decisions the Terms and the
+  // families already carry, not requirement sentences to sweep — a requirement it states is still quoted from it as an R*
+  await writeFile(join(root, 'space-discovery.md'), '# Space discovery\n\nThe arrival order matters. Entry is out of scope.\n')
+  const confirmed = clone(PKG)
+  confirmed.packageVersion = 2
+  confirmed.sources.push({
+    id: 'S7',
+    kind: 'product-policy',
+    jurisdiction: 'oracle space axes',
+    standard: "the user's answers in Space discovery",
+    location: 'repo:space-discovery.md',
+    approval: 'approved',
+  })
+  confirmed.spaceDiscovery = 'S7'
+  await writePackage(root, 'confirmed.json', confirmed)
+  const withRecord = await requirementClosure(await loadPackage('confirmed.json', { root }))
+  assert.equal(withRecord.status, 'pass')
+  assert.deepEqual(withRecord.unquoted, clean.unquoted)
+
   // a location whose anchor does not resolve is not the whole file
   const moved = clone(PKG)
   moved.sources.find((entry) => entry.id === 'S1').location = 'repo:README.md#no-such-section'

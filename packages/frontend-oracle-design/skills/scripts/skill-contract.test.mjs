@@ -1937,8 +1937,9 @@ test('anticipates escapes: deviation types, landmine fossils, premortem framing,
 
 test('enumerates the declared case space by machine and dispositions every generated frame', async () => {
   const repositoryDirectory = join(skillDirectory, '../../..')
-  const [caseSpace, skill, verifier, frames, testSkill, visualSkill, runner, sweep] = await Promise.all([
+  const [caseSpace, frameSpace, skill, verifier, frames, testSkill, visualSkill, runner, sweep] = await Promise.all([
     read('references/card/case-space.md'),
+    read('references/card/case-space-frames.md'),
     read('SKILL.md'),
     read('scripts/oracle-verify.mjs'),
     read('scripts/oracle-frames.mjs'),
@@ -1953,6 +1954,14 @@ test('enumerates the declared case space by machine and dispositions every gener
   assert.match(frames, /export const TAXONOMY_FAMILIES/)
   assert.match(caseSpace, /## Family taxonomy — imported, not invented/)
   assert.match(caseSpace, /derive choices from the repo's `browserslist`/)
+  // 모델 카드의 공간은 세계에서 투영되고 프레임이 없다 — 일곱 입력 계열은 모델 단계에서 정해진다
+  assert.match(caseSpace, /The first seven are input families: the\s+test drives them/)
+  assert.match(caseSpace, /`excluded: <reason citing an S\*>`/)
+  assert.match(caseSpace, /package-family-observation-only/)
+  assert.match(caseSpace, /The\s+raw product of the axes is never run and never the claim/)
+  assert.match(caseSpace, /`oracle-frames\.mjs`\s+generates no frames for `Coverage: model`/)
+  assert.match(frames, /caseSpace\.coverage === 'model' \? \{ frames: \[\], errorFrames: \[\] \}/)
+  assert.match(verifier, /case-space-coverage-model/)
   assert.match(verifier, /frame-undispositioned/)
   assert.match(verifier, /frame-unknown/)
   assert.match(verifier, /family-undispositioned/)
@@ -1971,10 +1980,10 @@ test('enumerates the declared case space by machine and dispositions every gener
   assert.match(testSkill, /fc\.scheduler/)
 
   // 곱 → 테스트 다리: independent()는 커버리지가 아닌 독립성 주장, PATH·sequence는 evidence 키로 기계 검사
-  assert.match(caseSpace, /`independent\(O5\):\s+<mechanism>`/)
-  assert.match(caseSpace, /never\s+counted as coverage/)
-  assert.match(caseSpace, /EVIDENCE_MISSING_PATH/)
-  assert.match(caseSpace, /SEQUENCE_EVIDENCE_MISSING/)
+  assert.match(frameSpace, /`independent\(O5\):\s+<mechanism>`/)
+  assert.match(frameSpace, /never\s+counted as coverage/)
+  assert.match(frameSpace, /EVIDENCE_MISSING_PATH/)
+  assert.match(frameSpace, /SEQUENCE_EVIDENCE_MISSING/)
   assert.match(verifier, /EVIDENCE_MISSING_PATH/)
   assert.match(verifier, /SEQUENCE_EVIDENCE_MISSING/)
   assert.match(verifier, /independent\(\) applies to F\* combination frames only/)
@@ -1982,18 +1991,18 @@ test('enumerates the declared case space by machine and dispositions every gener
   assert.match(testSkill, /Unreachability has exactly two forms/)
   assert.match(testSkill, /as `it\.each` rows of the owning row's test/)
   assert.match(testSkill, /SEQUENCE_EVIDENCE_MISSING/)
-  assert.match(caseSpace, /the `VALID_RED` transition freezes them alongside the row\s+mapping/)
+  assert.match(frameSpace, /the `VALID_RED` transition freezes them alongside the row\s+mapping/)
   assert.match(runner, /PATH\*·Order 시퀀스 매핑도 RED 시점에 얼린다/)
 
   // Touches: 조합 의무는 인용이 직접 겹치는 차원 쌍만, 1-way는 하네스 설정, 주장 단위 감사
-  assert.match(caseSpace, /### Touches — optional fourth column that scopes the combination/)
-  assert.match(caseSpace, /only between dimensions whose citations\s+directly intersect/)
-  assert.match(caseSpace, /A 1-way dimension maps to\s+harness configuration/)
+  assert.match(frameSpace, /### Touches — optional fourth column that scopes the combination/)
+  assert.match(frameSpace, /only between dimensions whose citations\s+directly intersect/)
+  assert.match(frameSpace, /A 1-way dimension maps to\s+harness configuration/)
   assert.match(verifier, /touches-unknown/)
   assert.match(verifier, /touches-missing/)
 
   // covered F*는 실행 evidence 게이트, RED 동결 대상
-  assert.match(caseSpace, /EVIDENCE_MISSING_FRAME/)
+  assert.match(frameSpace, /EVIDENCE_MISSING_FRAME/)
   assert.match(verifier, /EVIDENCE_MISSING_FRAME/)
   assert.match(testSkill, /EVIDENCE_MISSING_FRAME/)
 
@@ -2010,7 +2019,7 @@ test('enumerates the declared case space by machine and dispositions every gener
   assert.match(testSkill, /evidence mapping is N:1/)
   assert.match(testSkill, /never re-owns a row's expected values/)
   assert.match(testSkill, /one shared place per harness/)
-  assert.match(caseSpace, /assertion ownership stays\s+single/)
+  assert.match(frameSpace, /assertion ownership stays\s+single/)
 
   // visual-qa: webkit 매트릭스 — 축을 몰라도 관측면이 받는다 (L4)
   assert.match(visualSkill, /chromium과 \*\*webkit\*\* 두 engine/)
@@ -2292,11 +2301,11 @@ test('records escapes as classes and run metrics as direction signals, never gat
 })
 
 test('extends machine derivation past the card bytes: witnesses, evidence lookups, code inventory, sibling policies, the guard hook', async () => {
-  const [skill, sweep, caseSpace, sources, lock, red, green, subagent, verifier, runner, hooks, readme] =
+  const [skill, sweep, frameSpace, sources, lock, red, green, subagent, verifier, runner, hooks, readme] =
     await Promise.all([
       read('SKILL.md'),
       read('references/card/interaction-sweep.md'),
-      read('references/card/case-space.md'),
+      read('references/card/case-space-frames.md'),
       read('references/card/policy-sources.md'),
       read('references/card/confirmation-lock.md'),
       read('references/delivery/red.md'),
@@ -2313,7 +2322,7 @@ test('extends machine derivation past the card bytes: witnesses, evidence lookup
   assert.match(sweep, loose('Only `needs-decision` reaches the user.'))
   assert.match(sweep, loose('## Witness kinds and falsifiers'))
   assert.match(sweep, loose('a cell never carries its own falsifier text'))
-  assert.match(caseSpace, loose('The four dispositions and their grammar'))
+  assert.match(frameSpace, loose('The four dispositions and their grammar'))
   assert.match(sources, loose('one of the four dispositions'))
   assert.match(lock, loose('every `impossible` carries a witness the lint could resolve'))
   assert.match(skill, loose('Resolve every `needs-evidence` cell by investigation in the same pass'))
@@ -2365,7 +2374,7 @@ test('extends machine derivation past the card bytes: witnesses, evidence lookup
 test('first substantive Draft exposes verification design at every risk without duplicating policy', async () => {
   const skill = await read('SKILL.md')
   const card = await read('references/card/card-format.md')
-  const space = await read('references/card/case-space.md')
+  const space = await read('references/card/case-space-frames.md')
   const testSkill = await readFile(join(skillDirectory, '../../test/skills/test/SKILL.md'), 'utf8')
   assert.match(skill, /first substantive Draft or detailed design response/)
   assert.match(skill, /This applies to Low too/)

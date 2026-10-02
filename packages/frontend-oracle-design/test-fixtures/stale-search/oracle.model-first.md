@@ -3,7 +3,7 @@
 > Projected from the Oracle model package. Edit the package and regenerate; the region between the
 > `oracle:generated` markers is checked against its digest and the package on every lint.
 
-<!-- oracle:generated:begin generator=oracle-package@1.1 package=oracle.package.json inputs-sha256=a7ab77bbd2532d5b402129c55af47ec900feb26dcd04867d8659f6d9a2ec1de5 content-sha256=be98102758dddaccc26b98f7f734f0d98cac33f4e12d77d76eee2be9339f7476 -->
+<!-- oracle:generated:begin generator=oracle-package@1.1 package=oracle.package.json inputs-sha256=a7ab77bbd2532d5b402129c55af47ec900feb26dcd04867d8659f6d9a2ec1de5 content-sha256=975d6d448d5ed9eb68d6606eaa1304e93293babd9636cafbe670dcc95de01695 -->
 
 ## Outcome Brief
 
@@ -58,16 +58,20 @@
 
 ## Case space
 
-| Family      | Dimension | Choices                                                                                          |
-| ----------- | --------- | ------------------------------------------------------------------------------------------------ |
-| Data        | —         | excluded: enumerated exhaustively as the derived world axes oldEmpty, newEmpty, itemsIntact (S4) |
-| Value       | —         | excluded: enumerated exhaustively as the derived world axes longSession (S4)                     |
-| Async       | —         | excluded: enumerated exhaustively as the derived world axes newAnswers (S4)                      |
-| Order       | —         | excluded: enumerated exhaustively as the derived world axes arrival (S4)                         |
-| Entry       | —         | excluded: one search box S1                                                                      |
-| Environment | —         | excluded: pure reducer fixture S1                                                                |
-| Platform    | —         | excluded: pure reducer fixture S1                                                                |
-| Inherited   | —         | excluded: first revision S1                                                                      |
+- Coverage: model
+- Possible cases: 576 of 576 worlds (0 excluded); 26 traces of up to 5 events; transition cover capped at 5 events (44 cases; the state grows without bound)
+
+| Family      | Dimension   | Choices                           |
+| ----------- | ----------- | --------------------------------- |
+| Data        | oldEmpty    | false, true                       |
+| Data        | newEmpty    | false, true                       |
+| Value       | longSession | false, true                       |
+| Async       | newAnswers  | false, true                       |
+| Order       | arrival     | OldFirst, NewFirst, OldEarly      |
+| Entry       | —           | excluded: one search box S1       |
+| Environment | —           | excluded: pure reducer fixture S1 |
+| Platform    | —           | excluded: pure reducer fixture S1 |
+| Inherited   | —           | excluded: first revision S1       |
 
 ## Terms
 
@@ -184,7 +188,7 @@
 
 ## Derived Axes
 
-- Derivation: oracle-package.mjs derive v1 · digest 9687ce7329f10cfae5b765627d49b6986cd155fcaa1c89161bf768a47704a431 · status derived
+- Derivation: oracle-package.mjs derive v1 · digest 2e7c4cf72c66ab5efa90f24699625d3fdea8504d70a3c678006c62aa50b54026 · status derived
 - Order obligations: 6 within bound 5 (order-sensitive 4, history-sensitive 2)
 - Diagnostics: none
 

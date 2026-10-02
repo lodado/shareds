@@ -4,7 +4,10 @@ Bend closes the defined problem space mathematically, fast-check attacks the rea
 the edges of that space, and the counterexamples they find widen the problem space itself.
 
 Every Oracle run—Low, Medium, High, Design-only and Delivery—uses this path; do not gate it on
-applicability or an explicit request. Model the smallest pure core when the product contains one, and
+applicability or an explicit request. The world and its adequacy checks are always required; the
+behavior model (`MODEL.bend`, `LAWS.bend`, `PROOF.bend`) is required when the Order or Async family is
+part of the space and optional when the source excludes both — then the world conformance tests of §4
+carry the product evidence. Model the smallest pure core when the product contains one, and
 represent unsupported values or effects explicitly in the model boundary and Terms rather than
 dropping them. Bend does not make strings, negative values, 64-bit values, floating point, UI, CSS,
 I/O, time or randomness disappear: unsupported or unresolved scope is `NEEDS_DECISION`, and a missing
@@ -60,13 +63,15 @@ Registry, so the same string names the same file in the package, the projected c
 Source text that exists only in the conversation is saved verbatim under `.ai/oracles/<id>/sources/`,
 never in the product tree.
 
-| Stage   | Package content the tools require                                                                                  | Command                                     |
-| ------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
-| model   | sources (verbatim, located), the Outcome reading, the world record and its terms, goals with their author, hazards | `oracle-package.mjs validate --stage model` |
-| project | policies, contract predicates named by model symbol, notApplicable, family exclusions, behavior model and law rows | `oracle-package.mjs validate`               |
+| Stage   | Package content the tools require                                                                                                                                                            | Command                                     |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| model   | sources (verbatim, located), the Outcome reading, the Space discovery record (`spaceDiscovery`), the world record and its terms, each input family decided, goals with their author, hazards | `oracle-package.mjs validate --stage model` |
+| project | policies, contract predicates named by model symbol, notApplicable, the Inherited disposition, behavior model and law rows                                                                   | `oracle-package.mjs validate`               |
 
 The model stage needs no card, no `O*` row and no contract: the analyst and the adequacy check start from
-the sources alone. Contract predicates are Bend defs named by symbol (`Race.staleNeverShown`); the
+the sources and the axes the user confirmed in the Space discovery interview of
+[`card/case-space.md`](card/case-space.md) (`packageVersion: 2`; version 1 is the earlier shape, read as
+before). Contract predicates are Bend defs named by symbol (`Race.staleNeverShown`); the
 card projection gives them `O*` IDs, and a `row` pin in the package keeps an ID stable across revisions
 so evidence never moves to a different meaning. Never create empty `O*` rows, placeholder policies or a
 pending approval to get past the model stage. For retries, delays, staleness, error kinds, remounts or
@@ -190,7 +195,8 @@ observations for one prefix is not supported yet — list those policies under `
 
 ## 3. Pre-lock checks: consistency, reachability and the space
 
-Before showing the Draft, run both and report each as one journal line (status, counts, digest), never a saved output file:
+With a behavior model, run both before showing the Draft and report each as one journal line (status, counts, digest),
+never a saved output file; without one, the adequacy check is the pre-lock check:
 
 ```sh
 node <skill-dir>/scripts/oracle-model.mjs prove --dir <model-dir> --require <law>...
@@ -209,8 +215,13 @@ to `Bound` messages from `init` that `next` allows; each prefix's `observe` valu
 observation. Case IDs hash the trace, so the same model, bound and generator version give the same
 cases and `spaceDigest`; no time or runId enters them. A budget stop keeps the explored cases and
 reports `complete: false` — never trim cases to finish.
+It also reports the transition cover: every configuration the model can reach (its state plus the events the
+environment allows) takes every allowed event once, through the shortest trace that reaches it. A finite
+model is `closed` — every (configuration, event) pair runs, including those first reached past the bound;
+a state that grows without bound is `capped` at the bound with the depth it covered, and fast-check samples
+past it. The projected Case space states which.
 
-Lock only when `prove` is `proven` and the space is complete; show the case count and the traces for
+With a behavior model, lock only when `prove` is `proven` and the space is complete; show the case count and the traces for
 the required scenarios with the law statements. `open`/`failed` means the model, laws or proof need
 work or a question; `timeout`/`unavailable` follows the §1 failure rule. The user approves the laws,
 environment, bound and observation line as part of the card. Lock with `--source` for `MODEL.bend`,
@@ -224,7 +235,11 @@ consumer checks under the four required labels.
 
 At `init`, register `--required-label bend-proof:reported`, `--required-label bend-adequacy:reported`,
 `--required-label type-contract:reported` and `--required-label fast-check:reported` for every
-card. For a card projected from a model package, `init` enforces it: it refuses with
+card with a Formal Model; a card without one registers `bend-adequacy:reported`,
+`world-conformance:reported` and `type-contract:reported`, and generates its product tests with
+`oracle-projection.mjs emit-world (--package <pkg> | --card <oracle.md>) --adapter <world adapter> --out
+<formal dir> --row <O*>`: one test per coordinate setting the assumptions allow, judged by the outcomes
+the compiled world allows (`violates O*` or `MODEL_GAP`), run under `world-conformance:reported`. For a card projected from a model package, `init` enforces it: it refuses with
 `STACK_LABELS_REQUIRED` unless all four are registered and with `PACKAGE_UNLOCKED` unless the lock
 covers the package named in the generated region. A legacy card without a generated region keeps the
 earlier gates (`FORMAL_PROOF_LABEL_REQUIRED` with a Formal Model, `ADEQUACY_LABEL_REQUIRED` with an
@@ -336,7 +351,8 @@ the expected results — during the harness step, then it passes two gates befor
   model, laws or observation meaning.
 
 - `emit-trace --model --prefix --bound --adapter --out --row --runs N [--max-length L]` (differential):
-  every trace up to the bound with each prefix's expected observation, then N fast-check traces drawn
+  every trace up to the bound with each prefix's expected observation, the transition cover's cases past the
+  bound (`[O*] [C…]`, expectations from the model), then N fast-check traces drawn
   longer than the bound; a missing, zero or non-integer `--runs` is refused (`SAMPLING_REQUIRED`).
   fast-check draws choice indices over the full non-negative range and the model's `next(history)`
   picks the event, so every event the environment offers can be drawn (a fixed small index range under

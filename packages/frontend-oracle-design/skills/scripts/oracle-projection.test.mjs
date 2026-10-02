@@ -15,7 +15,7 @@ import {
   parseFormalModel,
   projectionResidue,
 } from './oracle-model.mjs'
-import { auditAdapterSource, emitState, emitTrace, replay } from './oracle-projection.mjs'
+import { auditAdapterSource, emitState, emitTrace, emitWorld, replay } from './oracle-projection.mjs'
 import {
   arbitraryOf,
   bendLiteral,
@@ -66,7 +66,7 @@ async function workspace(t) {
   t.after(() => rm(root, { recursive: true, force: true }))
   await mkdir(join(root, 'node_modules'))
   await symlink(join(PACKAGE, 'node_modules', 'fast-check'), join(root, 'node_modules', 'fast-check'))
-  for (const name of ['stale-search', 'toggle']) await cp(join(FIXTURES, name), join(root, name), { recursive: true })
+  for (const name of ['stale-search', 'toggle', 'doc-save']) await cp(join(FIXTURES, name), join(root, name), { recursive: true })
   return root
 }
 
@@ -271,14 +271,21 @@ test('[bend] emit-trace: the generated test passes for the reducer, fails a muta
   assert.deepEqual(emitted.verification.exhaustive, { cases: 10, bound: 4, complete: true })
   assert.equal(emitted.verification.sampled.runs, 100)
   assert.equal(emitted.verification.beyondBoundReachable, true)
+  // the request ids grow without bound, so the transition cover stops at the bound: every configuration the bound
+  // reaches takes every event once, one step past the bound, with the expectation the model computed
+  const { cover } = emitted.verification
+  assert.equal(cover.status, 'capped')
+  assert.equal(cover.coveredDepth, 4)
+  assert.ok(cover.cases > 0)
   const testFile = join(dir, 'generated', 'search.oracle.test.mjs')
   const text = await readFile(testFile, 'utf8')
   assert.match(text, /^\/\/ AUTO-GENERATED .* DO NOT EDIT\./)
   assert.match(text, /Passing it is not a proof about the implementation/)
+  assert.match(text, /"id":"C[a-f0-9]{12}"/)
   const clean = runGenerated(testFile)
   assert.equal(clean.status, 0, clean.output)
-  // 10 traces + sources unchanged + adapter audit + the sampled property
-  assert.deepEqual([clean.tests, clean.fail], [13, 0])
+  // 10 traces + the cover cases + sources unchanged + adapter audit + the sampled property
+  assert.deepEqual([clean.tests, clean.fail], [13 + cover.cases, 0])
   // the sampled test reports what fast-check actually executed, including runs past the bound
   const stats = JSON.parse(clean.output.match(/\{"fastCheck":.*\}/)[0]).fastCheck
   assert.equal(stats.requested, 100)
@@ -530,12 +537,15 @@ test('[bend] emit-trace samples every environment choice: a defect behind the 20
     regenerate: 'test',
   })
   assert.deepEqual(emitted.verification.exhaustive, { cases: 20, bound: 1, complete: true })
+  // 21 configurations (last = 0..20) × 20 picks: the cover takes Pick{n:1} once from every configuration, so the
+  // defect past the bound is now found deterministically — 19 cover cases (Pick{n:1} twice is no defect)
+  assert.deepEqual(emitted.verification.cover, { status: 'closed', configurations: 21, pairs: 420, cases: 400 })
   const run = runGenerated(join(dir, 'generated', 'wide.oracle.test.mjs'))
-  // every exhaustive case passes — the defect is past the bound — and only the sampled property fails
   assert.equal(run.status, 1, run.output)
-  assert.equal(run.fail, 1, run.output)
+  assert.match(run.output, /✖ \[O1\] \[C[a-f0-9]{12}\] Pick\{n:2\} · Pick\{n:1\}/)
+  // and the sampled property still finds it on its own: it draws every environment choice, not a small index range
   assert.match(run.output, /✖ \[O1\] sampled traces \(fast-check\)/)
-  assert.match(run.output, /Pick\{n:1\}/)
+  assert.equal(run.fail, 19 + 1, run.output)
 })
 
 test('the adapter audit sees through comments, query strings, computed imports, require and file reads', () => {
@@ -647,11 +657,11 @@ test('[bend] async adapter: the generated test awaits it, disposes every case an
     regenerate: 'test',
   }
   await writeFile(join(dir, 'async.adapter.mjs'), asyncSearchAdapter('reduceSearch'))
-  await emitTrace({ ...base, adapter: join(dir, 'async.adapter.mjs'), out: join(dir, 'async') })
+  const emitted = await emitTrace({ ...base, adapter: join(dir, 'async.adapter.mjs'), out: join(dir, 'async') })
   const clean = runGenerated(join(dir, 'async', 'search.oracle.test.mjs'))
   assert.equal(clean.status, 0, clean.output)
-  // 10 exhaustive traces + sources unchanged + adapter audit + sampled property
-  assert.deepEqual([clean.tests, clean.fail], [13, 0])
+  // 10 exhaustive traces + the transition cover + sources unchanged + adapter audit + sampled property
+  assert.deepEqual([clean.tests, clean.fail], [13 + emitted.verification.cover.cases, 0])
   assert.equal(JSON.parse(clean.output.match(/\{"fastCheck":.*\}/)[0]).fastCheck.executed, 50)
 
   await writeFile(join(dir, 'async-mutant.adapter.mjs'), asyncSearchAdapter('reduceWithoutStaleCheck'))
@@ -664,7 +674,7 @@ test('[bend] async adapter: the generated test awaits it, disposes every case an
 
   // a step that never settles fails as ADAPTER_TIMEOUT at that step instead of hanging the suite
   await writeFile(join(dir, 'hang.adapter.mjs'), asyncSearchAdapter('reduceSearch', { hangOn: 'Respond' }))
-  await emitTrace({
+  const hanging = await emitTrace({
     ...base,
     runs: 1,
     caseTimeout: 50,
@@ -673,8 +683,10 @@ test('[bend] async adapter: the generated test awaits it, disposes every case an
   })
   const hung = runGenerated(join(dir, 'hang', 'search.oracle.test.mjs'))
   assert.equal(hung.status, 1)
-  // the one Respond-free case passes; every other case fails at its first Respond step
-  assert.deepEqual([hung.tests, hung.fail], [13, 10])
+  // the Respond-free cases pass — one exhaustive trace and the all-Issue cover case — and every other case fails at
+  // its first Respond step
+  const cover = hanging.verification.cover.cases
+  assert.deepEqual([hung.tests, hung.fail], [13 + cover, 10 + cover - 1])
   assert.match(
     hung.output,
     /ADAPTER_TIMEOUT: step 4 \(Respond\{id:1\}\) of Issue · Issue · Issue · Respond\{id:1\} did not settle within 50ms/,
@@ -805,4 +817,59 @@ test('[bend] JSX adapters and the environment pragma are vitest-only; the pragma
   assert.match(text, /^\/\/ @vitest-environment jsdom\n\/\/ AUTO-GENERATED/)
   assert.match(text, /import \{ test \} from 'vitest'/)
   assert.match(text, /import \* as adapter from "\.\.\/feed\.adapter\.tsx"/)
+})
+
+// ── emit-world: one product test per possible coordinate setting, for a card without a behavior model ──────────
+
+test('[bend] emit-world: every possible setting runs once with the outcomes the world allows; a wrong store fails its row; a changed world is stale', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'doc-save')
+  const emitted = await emitWorld({
+    card: join(dir, 'oracle.md'),
+    cwd: dir,
+    adapter: join(dir, 'doc-save.adapter.mjs'),
+    out: join(dir, 'generated'),
+    row: 'O1',
+    bin,
+    regenerate: 'test',
+  })
+  // start × held = 4 settings; the assumption that permission is never regained in flight excludes one
+  assert.deepEqual(
+    { strategy: emitted.verification.strategy, settings: emitted.verification.settings, excluded: emitted.verification.excluded },
+    { strategy: 'exhaustive', settings: 3, excluded: 1 },
+  )
+  const testFile = join(dir, 'generated', 'save.world.test.mjs')
+  const text = await readFile(testFile, 'utf8')
+  assert.match(text, /^\/\/ AUTO-GENERATED .* DO NOT EDIT\./)
+  assert.doesNotMatch(text, /from 'fast-check'/)
+  const clean = runGenerated(testFile)
+  assert.equal(clean.status, 0, clean.output)
+  // 3 settings + sources unchanged + adapter audit
+  assert.deepEqual([clean.tests, clean.fail], [5, 0])
+
+  // a store that still commits after the permission was revoked in flight violates O2 at exactly that setting
+  await writeFile(
+    join(dir, 'submit-check.adapter.mjs'),
+    "import { adapterFor } from './doc-save.adapter.mjs'\nimport { saveCheckingAtSubmit } from './doc-store.mutants.mts'\nexport const { run } = adapterFor({ saveWith: saveCheckingAtSubmit })\n",
+  )
+  await emitWorld({
+    card: join(dir, 'oracle.md'),
+    cwd: dir,
+    adapter: join(dir, 'submit-check.adapter.mjs'),
+    out: join(dir, 'mutant'),
+    row: 'O1',
+    bin,
+    regenerate: 'test',
+  })
+  const mutant = runGenerated(join(dir, 'mutant', 'save.world.test.mjs'))
+  assert.equal(mutant.status, 1)
+  assert.equal(mutant.fail, 1, mutant.output)
+  assert.match(mutant.output, /violates O2 at start !held/)
+
+  await writeFile(join(dir, 'World.bend'), `${await readFile(join(dir, 'World.bend'), 'utf8')}\n# edited after generation\n`)
+  const stale = runGenerated(testFile)
+  assert.equal(stale.status, 1)
+  assert.match(stale.output, /STALE_GENERATED_TESTS: \.\.\/World\.bend changed since generation/)
 })

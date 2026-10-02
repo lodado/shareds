@@ -22,6 +22,7 @@ import {
   parseFormalModel,
   proveLaws,
   scanBendSource,
+  transitionCover,
 } from './oracle-model.mjs'
 
 const FIXTURE = fileURLToPath(new URL('../../test-fixtures/stale-search/', import.meta.url))
@@ -248,6 +249,70 @@ test('space refuses a bound outside 1..8', () => {
       (error) => error.code === 'USAGE',
     )
   }
+})
+
+// ── transition cover: 도달 가능한 (상태, 허용 사건) 조합마다 모든 사건 (손 모델) ───────────────────────────────
+
+/** 세 열의 순서처럼 유한한 모델: 상태는 0..3, R은 한 칸 회전, X는 그대로. 3에는 bound 1의 trace가 닿지 않는다. */
+function ringModel() {
+  return {
+    prefix: 'Ring',
+    digest: 'ring-model',
+    init: () => ({ $: 'Ring', at: 0n }),
+    step: (state, event) => ({ $: 'Ring', at: event.$ === 'R' ? (state.at + 1n) % 4n : state.at }),
+    observe: (state) => state.at,
+    next: () => ({ $: 'Con', head: { $: 'R' }, tail: { $: 'Con', head: { $: 'X' }, tail: { $: 'Nil' } } }),
+  }
+}
+
+test('the transition cover takes every allowed event from every reachable configuration, with the model computing each expectation', () => {
+  const model = ringModel()
+  const space = enumerateSpace(model, { bound: 2 })
+  const cover = transitionCover(model, space)
+  assert.equal(cover.status, 'closed')
+  assert.equal(cover.configurations, 4)
+  assert.equal(cover.pairs, 8)
+  // state 2 is first reached by R·R (depth 2) and state 3 by R·R·R: their events are traces the bound-2 space never ran
+  assert.deepEqual(
+    cover.cases.map(({ label }) => label),
+    ['R · R · R', 'R · R · X', 'R · R · R · R', 'R · R · R · X'],
+  )
+  assert.ok(cover.cases.every(({ trace }) => trace.length > space.bound))
+  assert.deepEqual(cover.cases.find(({ label }) => label === 'R · R · R · R').observations, [1, 2, 3, 0])
+  assert.match(cover.cases[0].id, /^C[a-f0-9]{12}$/)
+  // deterministic: the same model and bound give the same cover
+  assert.deepEqual(transitionCover(ringModel(), enumerateSpace(ringModel(), { bound: 2 })), cover)
+
+  // a product wrong only in state 3 passes every bound-2 case and fails a cover case
+  const product = {
+    init: () => 0,
+    // R from 3 should wrap to 0; this product sticks at 3
+    step: (state, event) => (event.$ === 'R' ? Math.min(state + 1, 3) : state),
+    observe: (state) => state,
+  }
+  assert.equal(checkConformance(space, product).pass, true)
+  const failed = checkConformance({ ...space, cases: cover.cases }, product)
+  assert.equal(failed.pass, false)
+  assert.deepEqual(failed.failures[0].trace.map(({ $ }) => $), ['R', 'R', 'R', 'R'])
+})
+
+test('an unbounded model caps its transition cover at a stated depth instead of running forever', () => {
+  const counter = {
+    prefix: 'Count',
+    digest: 'count-model',
+    init: () => 0n,
+    step: (state) => state + 1n,
+    observe: (state) => state,
+    next: () => ({ $: 'Con', head: { $: 'Inc' }, tail: { $: 'Nil' } }),
+  }
+  const space = enumerateSpace(counter, { bound: 2 })
+  const cover = transitionCover(counter, space, { maxConfigurations: 5 })
+  assert.equal(cover.status, 'capped')
+  assert.equal(cover.configurations, 5)
+  // capped covers the configurations the bound reaches and every event from them; fast-check samples past it
+  assert.equal(cover.coveredDepth, 2)
+  assert.deepEqual(cover.cases.map(({ label }) => label), ['Inc · Inc · Inc'])
+  assert.match(cover.reason, /more than 5 configurations/)
 })
 
 // ── conform: 관측 대조 (합성 공간, mock) ─────────────────────────────────────────────

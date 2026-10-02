@@ -206,3 +206,19 @@ test('the Bend model is the oracle the tests compute with, never the shape of th
   assert.match(ladder, /Model\s+messages\s+are\s+test\s+vocabulary,\s+not\s+product\s+actions/)
   assert.match(patterns, /no\s+product\s+structure/)
 })
+
+test('time decides the stack: Order or Async needs the behavior model and fast-check; a timeless card runs every possible world setting', async () => {
+  const [contract, bend, ledger, green] = await Promise.all([
+    read('references/mandatory-verification.md'),
+    read('references/bend-cross-verification.md'),
+    read('references/delivery/ledger.md'),
+    read('references/delivery/green-review.md'),
+  ])
+  assert.match(contract, /The behavior model\s+\(MODEL, LAWS, PROOF\) and fast-check apply when time is part of the space/)
+  assert.match(contract, /\| World +\| Without a behavior model: every possible coordinate setting run on the product/)
+  assert.match(contract, /`world-conformance:reported`/)
+  assert.match(bend, /behavior model \(`MODEL\.bend`, `LAWS\.bend`, `PROOF\.bend`\) is required when the Order or Async family is\s+part of the space/)
+  assert.match(bend, /oracle-projection\.mjs emit-world/)
+  assert.match(ledger, /A card without a `## Formal Model` registers `bend-adequacy:reported`, `world-conformance:reported`/)
+  assert.match(green, /needs `bend-adequacy:reported` and `world-conformance:reported` instead/)
+})

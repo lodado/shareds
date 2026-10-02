@@ -1,0 +1,288 @@
+# Oracle Card — Case space of a legacy card: declared dimensions and machine-generated frames
+
+Read this for a card written without a model package — every card older than the model-first path, and a
+legacy run continued as one. A card projected from a model package does not use it: its `## Case space` is
+projected from the world (`- Coverage: model`, [`case-space.md`](case-space.md)) and has no frames.
+
+Free-recall enumeration is measurably incomplete; a machine walking a declared space is complete
+relative to that space. The legacy card **declares** the space (dimensions × choices — this is where the
+BVA axes become raw material), `scripts/oracle-frames.mjs` **generates** the judgment frames
+deterministically, and the author only fills dispositions. An undispositioned frame fails lint —
+the same silence-to-cell move as the interaction sweep, one level deeper. The family taxonomy, the
+section's required families and the escape record are [`case-space.md`](case-space.md)'s.
+
+## Card section — declaring the space
+
+### Full-product opt-in
+
+For a request that explicitly requires every Cartesian tuple, add `- Coverage: full-product`.
+The existing table remains the source of dimension and choice IDs; full-product IDs must be ASCII
+stable tokens. Put exactly one fenced JSON metadata object in the section. This is an incomplete
+shape sketch, not a ready card; populate every boundary and its six candidate dispositions:
+
+```json
+{
+  "dimensionSources": { "rows": "S1" },
+  "dimensionKinds": { "rows": "input" },
+  "observationAxes": {},
+  "boundaries": [],
+  "applicability": [],
+  "constraints": []
+}
+```
+
+`dimensionKinds` is required for each declared dimension and is either `input` or `observation`.
+An observation dimension also requires `observationAxes.<id>.at` and `.constraints`; it is an
+expected observation at an explicit sample time, not an input axis. `boundaries` use `action`,
+`external-event`, or `async`; each boundary retains a non-empty source, and `applicability` records
+every candidate for every boundary with exactly one of a `dimensionId`, a non-empty reason, or a real
+Open-question ID. Predicates name their referenced constraints. `constraints` retain an ID, source,
+mechanism, and falsifier. A missing
+contract does not justify inventing cursor expiry, retry, or navigation policy: retain a question.
+
+The full generator emits every raw tuple, including `[error]` values, with deterministic tuple IDs;
+it does not apply `Touches`, `independent`, pairwise reduction, or the legacy 50-frame cap. A raw
+tuple receives exactly one disposition record. Counts are reported separately as raw tuples,
+valid/scenario/excluded/unresolved cases, and executed unique cases; no count is evidence of an
+assertion. The product remains complete only relative to the declared model, not all real behavior.
+
+The repository's `test-fixtures/full-product/fixture.mjs` and generated `oracle.md` provide the
+complete 2×3×2 example. Run `oracle-frames.mjs --oracle <card> --json`, then
+`oracle-verify.mjs card --case-space --oracle <card>` before reporting counts. The second command
+is a preapproval structural audit, not card approval or an execution claim. Normal `card` and lock
+still require approval and reject unresolved policy/evidence. Full-product currently refuses more
+than 100,000 tuples with `CASE_SPACE_INCOMPLETE`; it never silently samples.
+
+The audit reports dimension/constraint revisions, source-linked values, `N_raw`, `N_valid`,
+`N_excluded`, `N_unresolved`, `N_scenarios`, `N_executed_unique`, `N_passed_unique`, missing/extra/
+duplicate/malformed/stale-mapping, exclusions and questions. Execution counts are null in design.
+`N_raw = N_scenarios + N_excluded + N_unresolved` is an audit identity, not a replacement for the
+ID/tuple set comparison. Test function/file counts are never substituted for reporter case counts.
+Resource failure is incomplete; without an actual command result report “검수 미실행”. A reduction
+to pairwise/representatives requires explicit approval of a new coverage contract and revision;
+it must not retain the full-product execution claim.
+
+```markdown
+## Case space
+
+- Strength: 2
+
+| Family      | Dimension    | Choices                                |
+| ----------- | ------------ | -------------------------------------- |
+| Data        | rows         | 0, 1, pageSize, pageSize+1, max        |
+| Value       | keyword      | empty, min, unicode [error]            |
+| Async       | list request | success, http-5xx [error]              |
+| Order       | filter/page  | sequential, inverted                   |
+| Entry       | entry        | fresh, refresh, back-forward           |
+| Environment | viewport     | 320, desktop                           |
+| Platform    | —            | excluded: single-engine scope per S1   |
+| Inherited   | —            | excluded: first revision, no prior P\* |
+```
+
+- `Strength: 2` is the default; High risk writes `3`. The generator and lint both read it.
+- Strength is a positive integer. With `- Risk: High` in the Outcome Brief and two or more
+  combinable dimensions, lint requires `3` or more (`case-space-strength`).
+- Malformed declarations are refused, never degraded: a non-integer Strength, a dimension with no
+  choices, a nameless or duplicate dimension, a duplicate choice, or an empty `excluded:` reason
+  stops the generator and lint with a `CASE_SPACE_*` code.
+- A choice suffixed `[error]` is excluded from combination and emits one standalone `E*` frame —
+  the category-partition error annotation. Everything else joins t-way combination.
+- `[error]` fits an error whose outcome is the same under every other choice. When the approved
+  outcome of an error depends on another condition — retry, cancel or leaving the screen, keeping
+  the previous data, a repeated input, a response arriving out of order — leave the suffix off so
+  the error joins t-way combination with that dimension, or carry the order through `PATH*` or the
+  `Order` sequence obligation. Keep the pairs that the failure mechanism and its damage justify,
+  not every error × every dimension. A pair with no approved expected result is `needs-decision`,
+  never an exclusion.
+- An excluded family writes `—` as the dimension and `excluded: <reason>` as its choices.
+
+### Touches — optional fourth column that scopes the combination
+
+Without it, every combinable dimension pair is an obligation and the residue frames force
+copy-pasted independence claims. With it, the author states the interaction claim **once per
+dimension** and the machine expands it:
+
+```markdown
+| Family      | Dimension | Choices          | Touches                                          |
+| ----------- | --------- | ---------------- | ------------------------------------------------ |
+| Data        | rows      | 0, 1, max        | P1, I1                                           |
+| Value       | keyword   | empty, min       | P1                                               |
+| Environment | viewport  | 320, desktop     | I1                                               |
+| Platform    | browser   | chromium, webkit | independent: engine cannot alter the policy (S2) |
+```
+
+- `Touches` cites the decided `P*`/`I*` the dimension can affect. Combination obligations exist
+  only between dimensions whose citations directly intersect (`rows × keyword` via P1,
+  `rows × viewport` via I1 — `keyword × viewport` produces no frames; that doubt belongs to the
+  sweep as a question, not to twenty residue frames). Strength 3 combines only mutually sharing
+  cliques.
+- `independent: <reason>` excludes the dimension from combination; each choice still emits a
+  1-way frame. A cited dimension with no partner is 1-way too. **A 1-way dimension maps to
+  harness configuration** — Playwright projects, the journey matrix — not to per-row test cases.
+- A cited id that is not a decided policy or invariant fails `touches-unknown`; a combinable
+  dimension (two or more non-error choices) with neither citations nor `independent:` fails
+  `touches-missing` once any dimension adopts the column. A card without the column keeps the
+  all-pairs behavior unchanged.
+- The claim is the audit unit: an escaped webkit-only defect falsifies the one recorded
+  `independent:` line, not a guess about twenty dispositions.
+
+## Pre-plan test-space briefing
+
+After source investigation and before writing the plan or Draft, show the user the proposed space.
+This is an informational preview: it does not replace Draft confirmation or authorize a lock,
+test edits, or production work. Unknown policies stay Open questions under the existing grill rules.
+The first Draft still reconciles this preview against declared dimensions and generated frames.
+
+Include, in the user's language:
+
+- **Goal and axes:** each applicable family, dimension and choice set, with the source ID and exact location
+  (approved requirement/API version, or investigation `file:line`). Code/test/browser observations are investigation evidence, not approved policy.
+  Label inferred axes `Assumption` and missing facts `Unknown`; retain all eight family dispositions.
+- **Candidate product:** show each cardinality and the multiplication, explicitly before constraints.
+  For example, entry (2) × response (3) × submit order (2): `2 × 3 × 2 = 12` raw candidates.
+  This is illustrative, not a prescribed scenario list or a claim about generated or executed tests.
+  State: **candidate combinations ≠ generated frames ≠ executable tests**.
+- **Constraints:** name impossible combinations with witnesses, inapplicable scope with reasons,
+  and unresolved policy separately. Unknown is not excluded. Count the union of excluded combinations
+  once, not the sum of overlapping exclusions. Give a valid-combination count only when computed
+  from those constraints; otherwise say `uncomputed` (미산정), never guess a reduced number.
+- **Selection and risk:** explain the actual generator, not an invented full-product runner:
+  `Strength: 2` is t-way/pairwise by default, High uses `3`; `Touches` scopes obligations,
+  `[error]` choices produce standalone `E*` frames outside the combinable product, and state paths
+  and undefined cells produce `PATH*` / `EMPTY`. Label whether the displayed product includes error
+  choices; show the generator's non-error product separately if different. Full-product review or
+  representative harness configurations do not replace mandatory generated-frame dispositions.
+  Never silently reduce required high-risk combinations; identify how their rows/frames will be
+  retained, or mark the unresolved mapping. Name residual risk outside the declared space.
+- **Counts and limits:** before generation, frame/test counts are `uncomputed`. After generation,
+  report actual counts by kind, not fabricated IDs. Executable test counts wait for `$test`'s realization;
+  an independent harness dimension or several frames mapping to one row is not one new test per cell.
+  With zero dimensions, state `no applicable dimensions` and the reason, not “1 test” from the empty
+  product. A dimension with zero choices is incomplete input, not zero-risk coverage.
+  Do not multiply assertion criteria (accessibility, visual quality, success invariants) as though they
+  were independent input dimensions. Separate relevant harness/configuration checks instead.
+
+Keep rationale next to the existing parsed table, not in new schema columns. Use this compact shape:
+
+```text
+[플랜 전 · 테스트 범위]
+목표: <검증할 사용자 결과>
+축 | 값 | 근거 위치·종류 | 확정/가정/미확인
+<해당 축들; 제외된 family는 이유 표시>
+후보: <개수 × 개수 = 전체 곱; 오류값 포함 여부>
+제약: <불가능/해당 없음과 근거> · 유효 조합: <계산값 또는 미산정>
+선정: <strength / Touches / 별도 오류·경로> · 필수 위험 조합: <보존 방법>
+생성 프레임: <종류별 실제 개수 또는 미산정> · 실행 테스트: <미산정 또는 실제 매핑 근거>
+미확정·잔여 위험: <정책 질문 / 선언 범위 밖>
+다음: <계획 작성; 기존 승인 절차 유지>
+```
+
+If investigation or planning changes the scope, print only added/removed dimensions, the reason,
+count delta (or `uncomputed` if either count is unknown), and changed residual risk. Reconcile the
+first Draft rather than maintaining a second source of truth or silently changing the denominator.
+
+## Explain the selected space in the first Draft
+
+Show applicable dimensions, choices, reasons tied to contracts, and cross-dimension constraints;
+separate dimensions do not imply unrestricted independence. Keep the existing eight families and
+exclusion reasons. Do not add explanatory columns to the parsed table: put rationale and constraints
+in adjacent prose, referring to the declared dimensions and existing policy/row IDs. This explanation
+does not change generation or disposition grammar and does not promise exhaustive execution.
+
+Distinguish impossible combinations with witnesses, inapplicable scope with reasons, and unresolved
+policy with an Open question; uncertainty is not an exclusion. Explain outcome-changing interactions
+for this product rather than importing a fixed scenario list. Declared dimensions describe verification
+conditions, not instructions to duplicate state already owned by a library or framework.
+
+Connect risk combinations and temporal paths to the verification realization plan in
+[`card-format.md`](card-format.md). Do not invent `F*` or `PATH*` identifiers before generation; afterwards
+reference the emitted dispositions rather than creating a second mapping. An Order dimension with
+at least two choices carries the existing `$test` sequence obligation and `evidence.json` `sequence`
+mapping, in addition to representative paths. Concrete test construction belongs to `$test`.
+A dimension list or representative path does not claim coverage of all possible sequences.
+Sequence witnesses use the action/request identity, not a bare state token: a duplicate is
+`start:<action>:<request>` followed by `repeat:<action>:pending` before `complete`, `fail`, or
+`cancel`; an inversion is `start:A`, `start:B`, `complete:B`, `complete:A`; an owner-lifetime
+witness places `owner:<change>` before the late completion. Other sequence steps may use arbitrary
+strings, but these witnesses must remain identifiable for the applicable candidate.
+
+## Generated frames — run, then disposition
+
+```bash
+node <skill-dir>/scripts/oracle-frames.mjs --oracle .ai/oracles/<id>/oracle.md
+```
+
+The generator emits, deterministically for the same card bytes:
+
+- `F*` — t-way covering frames over the combinable choices
+- `E*` — one frame per `[error]` choice
+- `PATH*` — every simple path of the `## State Model` transition table from its initial state
+- `EMPTY <state> × <event>` — every undefined state×event cell
+
+These IDs are positional: an edited declaration can point an old `F1` at a different combination.
+Each disposition row therefore carries a third `Label` column, copied from the text the generator
+prints after the ID. Lint regenerates the frames and fails `frame-label` on any row whose label no
+longer matches, so a stale judgment is caught row by row and the cold-read reviewer can read what
+each frame means. `EMPTY` rows leave `Label` blank because the ID already names the cell;
+full-product cards bind their IDs through the Tuple column and the revisions instead.
+
+Every emitted ID gets a row in `## Frame dispositions`, with the sweep's three dispositions plus
+one that only `F*` frames may carry, under the same promotion rule — only `needs-decision` becomes
+a grill question, and one surviving to lock means `NEEDS_DECISION`:
+
+```markdown
+## Frame dispositions
+
+| Frame                | Disposition                                                                  | Label                                   |
+| -------------------- | ---------------------------------------------------------------------------- | --------------------------------------- |
+| F1                   | covered(O5)                                                                  | rows=0 × entry=fresh                    |
+| F2                   | needs-decision: back-forward while the request is pending?                   | rows=1 × entry=back-forward             |
+| F3                   | independent(O5): row count never reaches the pending policy                  | rows=max × entry=refresh                |
+| E1                   | covered(O9)                                                                  | [error] list request=http-5xx           |
+| E2                   | impossible: a cached read has no 5xx path — constraint(S3)                   | [error] keyword=unicode                 |
+| F4                   | needs-evidence: can the fixture reach 1000 rows — code(src/list/fixtures.ts) | rows=max × entry=back-forward           |
+| PATH1                | covered(O1, O5)                                                              | idle -PAGE_CHANGE-> fetching -OK-> idle |
+| EMPTY pending × SORT | needs-decision: sort while fetching — cancel or queue?                       |                                         |
+```
+
+The four dispositions and their grammar — `impossible: <mechanism> — <witness>`,
+`needs-evidence: <fact> — <lookup>` — are the sweep's ([`interaction-sweep.md`](interaction-sweep.md));
+`independent(O*): reason` is the one addition, for `F*` frames only.
+
+Lint (`oracle-verify.mjs card`; every card must carry `## Case space`):
+
+- every generated ID has a disposition — `frame-undispositioned`
+- every `F*`·`E*`·`PATH*` row's `Label` matches the regenerated frame — `frame-label`
+- no disposition cites an ID the generator did not emit — `frame-unknown`
+- disposition enum and `covered()`·`independent()` row citations are checked like the sweep.
+  `covered(O5)` on an `F*` frame is an execution claim: O5's test actually runs under that
+  frame's choice combination — as an `it.each` row over the frames the fixture can control, or a
+  dedicated case. When the choices cannot change the row's outcome, write
+  `independent(O5): <mechanism>` instead; it is a claim of independence, audited as such, never
+  counted as coverage. `independent()` without a reason, on a non-`F*` frame, or `covered()` with
+  a reason fails `frame-disposition`.
+- every taxonomy family appears — `family-undispositioned`
+- more than 50 combinable frames — `case-space-too-wide`: not a budget to fill but a design
+  disqualification line; split the dimension or narrow the scope, mirroring bva's 30
+  `@ts-expect-error` rule
+- more than 50 simple `PATH*` paths — `state-model-too-wide`: split the state model. Enumeration
+  stops at the 51st path, so a dense transition table cannot stall the generator
+
+A frame does not create a test by itself. `F*`·`E*` dispositions map to existing rows or promote
+questions — a `covered()` `F*` frame parameterizes the row's existing test, it does not add an
+owner; `PATH*` frames become the Delivery path-test enumeration ($test maps each path to one test,
+and that path test doubles as the evidence for every row it traverses — assertion ownership stays
+single, so a row covered by a path gets no standalone test); `EMPTY` cells resolve to impossible
+or a policy question, per the State Model rule that already owns them.
+
+Three of these are machine-checked at `oracle-verify.mjs evidence`, not only promised in prose:
+every generated `PATH*` needs an `evidence.json` `paths.<id>` entry of `{ kind: "test", name }`
+whose name is in the run (`EVIDENCE_MISSING_PATH`·`EVIDENCE_UNKNOWN_PATH`), an `Order`
+dimension with two or more combinable choices needs `evidence.json` `sequence` naming the
+sequence test (`SEQUENCE_EVIDENCE_MISSING`), and every `covered()` `F*` frame needs an
+`evidence.json` `frames.<id>` entry naming the case that actually runs that combination
+(`EVIDENCE_MISSING_FRAME`·`EVIDENCE_UNKNOWN_FRAME`) — `independent()`·`impossible`·
+`needs-decision` frames are exempt. `oracle-verify.mjs evidence-scaffold` emits both
+keys when the card declares them, and the `VALID_RED` transition freezes them alongside the row
+mapping — swapping a `PATH*` or `sequence` name for another passing test after RED is
+`HARNESS_BUDGET_REQUIRED`·`EVIDENCE_STALE`, the same gate the row mapping already had.

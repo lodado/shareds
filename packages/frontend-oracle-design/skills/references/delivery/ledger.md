@@ -58,6 +58,8 @@ check or fast-check runner is `ENVIRONMENT_DEFECT` → `FAIL`; never skip or fal
 card needs `--required-label bend-proof:reported`, `--required-label bend-adequacy:reported`,
 `--required-label type-contract:reported` and `--required-label fast-check:reported` at `init`.
 `type-contract:reported` is dropped only when the card declares `## Type Contract` not applicable.
+A card without a `## Formal Model` registers `bend-adequacy:reported`, `world-conformance:reported` and
+`type-contract:reported` instead (`mandatory-verification.md`).
 
 When entering Delivery after Design-only, perform the same investigation alongside the `$test`
 availability check before any new lock, init, or test writing. Do not recreate an already approved

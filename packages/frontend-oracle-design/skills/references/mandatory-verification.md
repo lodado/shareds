@@ -8,7 +8,11 @@ fast path, sourceless N/A, or silent substitution for any member of the stack. T
 permissions or effects a model can state — and is not an opt-out for work that does. type-fest and
 TypeScript apply when the card has an exposed type boundary (exported Props, a shared/package API,
 a client state union, a trust-boundary type); a card with none declares `typeContract` not applicable
-with the files it investigated and never adds an unused utility to fill the slot.
+with the files it investigated and never adds an unused utility to fill the slot. The behavior model
+(MODEL, LAWS, PROOF) and fast-check apply when time is part of the space — the Order or Async family is
+mapped. A card whose source excludes both is decided by its finite world: the adequacy proof plus world
+conformance, which runs every possible coordinate setting on the product, replace the law proof and the
+sampling, because nothing is left to sample.
 
 This changes the skill's operating contract, not the meaning of earlier execution records. Preserve
 earlier cards, locks and ledgers; do not claim that a historical run used this stack. Resume against
@@ -23,6 +27,7 @@ as a new revision. Never rewrite an old lock or ledger to manufacture compliance
 | type-fest  | With an exposed type boundary: an actually installed, version-pinned utility used at the real type-contract boundary to preserve a source-backed relation                | Merely mentioning the library, a dummy import, an unused alias, or assuming a transitive dependency is available to consumers |
 | TypeScript | With an exposed type boundary: effective compiler environment, real positive and negative witnesses for that relation, checker canary and relevant mutation evidence     | Transpilation, suppressed unrelated diagnostics, or a runtime assertion alone                                                 |
 | fast-check | Positive-count property/sequence sampling against the approved model, with actual run count, domain bounds, seed, failure path and shrunk counterexample when applicable | Hand enumeration, generated-but-unexecuted tests, exhaustive cases alone, or `--runs 0`                                       |
+| World      | Without a behavior model: every possible coordinate setting run on the product (`oracle-projection.mjs emit-world`), each judged by the compiled world                   | A sample of settings, settings the assumptions exclude, or hand-picked cases                                                  |
 
 The members protect different boundaries. Do not claim that a type enforces async ordering, that a
 model proof establishes server writes, or that sampling proves every possible product execution.
@@ -79,7 +84,9 @@ fast-check:reported
 ```
 
 `type-contract:reported` is required only when the card has an exposed type boundary; a card that
-declares `## Type Contract` not applicable registers the other three.
+declares `## Type Contract` not applicable registers the other three. A card without a `## Formal
+Model` (no Order or Async in its space) registers `bend-adequacy:reported`,
+`world-conformance:reported` and, with an exposed type boundary, `type-contract:reported`.
 
 Use existing trusted `node-test`/`vitest` reporter paths to assert each check and record the actual
 runs. Do not invent a Bend or TypeScript trusted adapter. Inspect current runner support before

@@ -1,5 +1,5 @@
 {
-  "packageVersion": 1,
+  "packageVersion": 2,
   "id": "pending-save",
   "spaceVersion": 1,
   "intent": {
@@ -29,19 +29,34 @@
       "approval": "approved"
     },
     {
+      "id": "S4",
+      "kind": "product-policy",
+      "jurisdiction": "oracle space axes",
+      "standard": "the user's answers in Space discovery",
+      "location": "repo:.ai/oracles/pending-save/sources/space-discovery.md",
+      "approval": "approved"
+    },
+    {
       "id": "S3",
       "kind": "project-constraint",
       "jurisdiction": "oracle model package",
-      "standard": "oracle-package v1",
+      "standard": "oracle-package v2",
       "location": "repo:.ai/oracles/pending-save/oracle.package.json",
       "approval": "approved",
       "self": true
     }
   ],
   "requirements": [
-    { "id": "R1", "source": "S1", "quote": "While a save request is pending, a second submit sends no request." }
+    {
+      "id": "R1",
+      "source": "S1",
+      "quote": "While a save request is pending, a second submit sends no request."
+    }
   ],
-  "world": { "source": "S2", "prefix": "Save" },
+  "world": {
+    "source": "S2",
+    "prefix": "Save"
+  },
   "terms": [
     {
       "id": "T1",
@@ -53,7 +68,8 @@
       "definition": "how many times Save is pressed before the first response",
       "not": "the number of requests sent",
       "source": "S1",
-      "status": "confirmed"
+      "status": "confirmed",
+      "family": "Order"
     },
     {
       "id": "T2",
@@ -69,7 +85,15 @@
     }
   ],
   "assumptions": [],
-  "goals": [{ "id": "G1", "kind": "safety", "cites": ["S1"], "author": "controller", "requirements": ["R1"] }],
+  "goals": [
+    {
+      "id": "G1",
+      "kind": "safety",
+      "cites": ["S1"],
+      "author": "controller",
+      "requirements": ["R1"]
+    }
+  ],
   "examples": [],
   "hazards": {
     "permission-change": "n/a: S1 the policy has no permission",
@@ -80,5 +104,14 @@
     "feature-composition": "n/a: S1 one form",
     "carry-over": "n/a: S1 one attempt",
     "order-timing": "modeled: presses"
+  },
+  "spaceDiscovery": "S4",
+  "families": {
+    "Data": "excluded: S4 one form, no list or volume",
+    "Value": "excluded: S4 the form's field values do not change the request count",
+    "Async": "excluded: S4 the save response is not awaited by this policy; only the presses before it count",
+    "Entry": "excluded: S4 one form opened fresh",
+    "Environment": "excluded: S4 no viewport or theme rule",
+    "Platform": "excluded: S1 any browser the repo supports behaves alike"
   }
 }

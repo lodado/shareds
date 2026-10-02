@@ -5,21 +5,31 @@ import test from 'node:test'
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
-test('briefs the test space before planning without replacing Draft approval', async () => {
-  const [skill, space, graph] = await Promise.all([
+test('confirms the axes with the user before any Bend without replacing Draft approval', async () => {
+  const [skill, space, frames, graph] = await Promise.all([
     read('SKILL.md'),
     read('references/card/case-space.md'),
+    read('references/card/case-space-frames.md'),
     read('references/reference-graph.json'),
   ])
-  assert.match(skill, /before writing the plan or Draft, print the test-space briefing/)
-  assert.match(space, /## Pre-plan test-space briefing/)
-  assert.match(space, /does not replace Draft confirmation or authorize a lock/)
-  const node = JSON.parse(graph).nodes.find(({ id }) => id === 'card-case-space')
-  assert.match(node.when, /before writing the plan or Draft/)
+  assert.match(skill, /before writing the plan or Draft, run the Space discovery\s+interview/)
+  assert.match(space, /## Space discovery — before any Bend/)
+  assert.match(space, /confirmed axes do not replace Draft confirmation or authorize a\s+lock/)
+  // the counterexample question and the frozen record
+  assert.match(space, /Case A — .*→ correct\s+Case B — .*→ bug/)
+  assert.match(space, /SUFFICIENCY FAILURE/)
+  assert.match(space, /sources\/space-discovery\.md/)
+  assert.match(space, /A run where the user cannot answer ends `NEEDS_DECISION` with the first question/)
+  // the legacy briefing stays for hand-written cards
+  assert.match(frames, /## Pre-plan test-space briefing/)
+  assert.match(frames, /does not replace Draft confirmation or authorize a lock/)
+  const nodes = JSON.parse(graph).nodes
+  assert.match(nodes.find(({ id }) => id === 'card-case-space').when, /before writing the plan or Draft/)
+  assert.match(nodes.find(({ id }) => id === 'card-case-space-frames').when, /^a legacy card without a model package/)
 })
 
 test('explains dimension provenance without promoting implementation into policy', async () => {
-  const space = await read('references/card/case-space.md')
+  const space = await read('references/card/case-space-frames.md')
   assert.match(space, /source ID and exact location/)
   assert.match(space, /file:line/)
   assert.match(space, /observations are investigation evidence, not approved policy/)
@@ -28,7 +38,7 @@ test('explains dimension provenance without promoting implementation into policy
 })
 
 test('separates Cartesian candidates, generated frames and executable tests', async () => {
-  const space = await read('references/card/case-space.md')
+  const space = await read('references/card/case-space-frames.md')
   assert.match(space, /2 × 3 × 2 = 12/)
   assert.match(space, /candidate combinations ≠ generated frames ≠ executable tests/)
   assert.match(space, /union of excluded combinations/)
@@ -56,7 +66,7 @@ test('provides five user-facing messages with evidence and uncertainty boundarie
 test('keeps progress informational and makes scope changes visible', async () => {
   const [common, space] = await Promise.all([
     read('references/common.md'),
-    read('references/card/case-space.md'),
+    read('references/card/case-space-frames.md'),
   ])
   assert.match(common, /not an extra approval gate/)
   assert.match(space, /added\/removed dimensions/)
@@ -85,4 +95,13 @@ test('material implementation explanations cite applied guidance without adding 
   assert.match(decision, /existing symbols from proposed ones/)
   assert.match(decision, /not evidence of compilation or execution/)
   assert.match(decision, /do not authorize production edits before VALID_RED/)
+})
+
+test('the Space discovery interview keeps provenance and never confirms an axis for the user', async () => {
+  const space = await read('references/card/case-space.md')
+  assert.match(space, /source ID and exact location/)
+  assert.match(space, /observations are investigation evidence, not approved policy/)
+  assert.match(space, /Unknown is not excluded/)
+  assert.match(space, /An axis that changes product policy is the user's to confirm,\s+never the agent's/)
+  assert.match(space, /added\/removed\s+dimensions/)
 })

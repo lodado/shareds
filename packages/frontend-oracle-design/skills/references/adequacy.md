@@ -36,9 +36,10 @@ with `## Adequacy`, every world field has exactly one term.
 ```
 
 - `Category`: `controllable` (the test sets it), `observable` (the product exposes it), `hidden` (the
-  product exposes no path), `concept` (no field; `Field` is `—`).
+  product exposes no path), `concept` (no field; `Field` is `—`), `derived` (computed from other fields by
+  a world def; `Field` is `def: <name>`, and the product computes it instead of storing it as state).
 - `Path` says how the test realizes the term: for a controllable term how the test sets it, for an
-  observable term the product path that reads it; hidden and concept terms have `—` (`terms-path`).
+  observable term the product path that reads it; hidden, concept and derived terms have `—` (`terms-path`).
   A coordinate whose Path does not match its meaning goes untested while its tests pass — "permission
   missing at commit" built by revoking before the request never reaches the gap between the server's
   check and its commit. The adapter builds each coordinate exactly as its Path says. Cards from
@@ -142,7 +143,9 @@ digest. The journal records the command and its one-line result.
 `card-implies-goal` and `sufficiency` fail for different reasons. The first is a weak card: add or
 strengthen rows. The second is a blind card: rows alone cannot fix it without forbidding normal
 behavior, so add a coordinate or an observation. A hidden differing field is never read from a test
-double: register a real product path for it in Terms or record an Open question.
+double: register a real product path for it in Terms or record an Open question. Either way, ask the user
+in the Space discovery A/B form of [`card/case-space.md`](card/case-space.md): the two worlds, the hidden value,
+and the axis or signal you recommend.
 
 The result has `status` (`proven`, `refuted`, `unknown`, `not-run`) and, per check, an
 `evidenceKind`: `kernel-proof-finite` (every world, proven by the kernel), `kernel-witness` (a
