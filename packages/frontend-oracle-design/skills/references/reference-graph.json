@@ -304,7 +304,7 @@
     {
       "id": "model-patterns",
       "path": "references/model-patterns.md",
-      "when": "writing MODEL.bend for retries, delays, staleness, error kinds, remounts or request counts — time as events, attempts, error sum types and separate effect counts",
+      "when": "writing or revising MODEL.bend, LAWS.bend or PROOF.bend — rules instead of answer tables, laws that pin every result, proofs by case or induction; time as events, attempts, error sum types and separate effect counts",
       "requires": ["common"]
     },
     {

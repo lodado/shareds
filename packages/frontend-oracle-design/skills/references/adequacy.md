@@ -120,16 +120,12 @@ The model analyst writes this from the source text alone, before seeing the card
 ## The checks
 
 `scripts/oracle-adequacy.mjs check (--card <oracle.md> | --package <pkg>)` enumerates every world (at most 8192), writes
-each conclusion as a law with its proof, and has `bend --verdict` re-check the whole file. A
+each conclusion as a law with its proof into a temporary file, and has `bend --verdict` re-check the whole file. A
 conclusion the kernel does not accept is `unknown`, whatever the search found.
 
-Always pass `--out .ai/oracles/<id>/formal/` (run evidence; the world file itself lives in the code's
-`__test__/formal/`, bend-cross-verification.md §4 placement): the tool keeps `ADEQUACY.bend` (every conclusion as a law
-with its proof, importing the world file by relative path, headed by the `inputDigest`) and
-`ADEQUACY.json` (the full result). Anyone can re-check the conclusions later with
-`bend ADEQUACY.bend --verdict` in that directory; cite both files in the journal and the review
-packet. They are evidence, not sources — the lock covers the card and the world, and a changed input
-changes the `inputDigest`.
+The proof file is generated and discarded, never kept. To re-check, run `check` again: the result
+carries the `inputDigest`, and the lock covers the card and the world, so a changed input changes the
+digest. The journal records the command and its one-line result.
 
 | Check               | Claim                                               | Refuted means — action                                                                           |
 | ------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -164,7 +160,7 @@ when a law's text is unchanged.
 
 Independence lives in the world model and the goals, not in the proofs: the kernel re-checks proofs
 whoever writes them, and the tool generates them. Dispatch one read-only analyst with only the file
-from `oracle-adequacy.mjs model-input --package <oracle.package.json> --output <file>`: the source text
+from `oracle-adequacy.mjs model-input --package <oracle.package.json> --output <file outside the repository>`: the source text
 verbatim, the hazards and the authoring rules above — no Outcome reading, policy sentence, term, goal,
 contract, model file, product code or test of the author (a legacy `--card` input also carries the
 Outcome Brief). The Controller writes the behavior model and the contract predicates as defs named by
@@ -237,8 +233,8 @@ retention conditions hold" that the rows dropped). Run
 Nothing enters the space automatically. A candidate passes the promotion gate (not expressible with
 existing axes, not an implementation detail, recurring elsewhere, meaningful to the user, observable)
 and the user's approval, then lands in a new revision; it is closed when its original counterexample
-replays inside the new space and is judged. Record the explorer's raw output and the triage in the
-journal.
+replays inside the new space and is judged. Record one journal line per triaged candidate (verdict and
+summary), not the raw output.
 
 ## Oracle refinement loop
 

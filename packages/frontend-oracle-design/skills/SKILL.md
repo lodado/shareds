@@ -88,6 +88,11 @@ Lane routing:
   stage rationale and is not duplicated into `implementation-decision.md`. The journal is neither a
   policy source nor a lock target; the card governs implementation, but cannot erase contrary
   observations from the journal. New evidence may reopen the problem definition, not authorize edits.
+- Write only what a later stage reads. The product's `__test__/formal/` holds the `.bend` files, the
+  adapter and the generated model and tests; the rest of the run stays in `.ai/oracles/<id>/`. Never
+  save a tool's output to a file or keep a second copy (raw analyst output, a duplicated package, a
+  generated proof): the tools are deterministic, so the journal records the command and its one-line
+  result and a rerun shows the rest.
 
 ### TDD and judgment tools
 

@@ -35,7 +35,8 @@ the same Oracle entry and mandatory verification as every other risk.
 | Completion | Actual state, result, changed paths, verification evidence, unverified scope and artifact paths.                                       |
 
 Emit progress only when the stage, evidence, scope, or blocker changes. Do not invent percentages or ETAs.
-Put the short result first; link actual artifact paths for detail instead of dumping raw tool logs.
+Put the short result first; for detail, link files the workflow already keeps (card, journal, ledger
+reports) instead of dumping raw tool logs, and never create a file just to hold tool output.
 Never claim a linked file exists without checking it. No new progress artifact is required.
 
 Example shapes (placeholders, not execution claims; translate to the user's language):

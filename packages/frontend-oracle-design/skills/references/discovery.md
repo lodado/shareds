@@ -7,8 +7,8 @@ fault model F, and whatever is left is listed as residual risk under the constra
 bugs" and never "the space is complete".
 
 This is evidence inside the existing card, lock, ledger and review — not a second orchestrator, approval,
-ledger or delivery state. `oracle-run.mjs` still owns the delivery states; the closure report is an
-evidence file (`CLOSURE.json`) whose verdict is derived from those states and the checks below. Nothing a
+ledger or delivery state. `oracle-run.mjs` still owns the delivery states; the closure report is
+printed, not kept, and its verdict is derived from those states and the checks below. Nothing a
 tool finds enters Ω by itself: a candidate becomes part of the space only through a recorded human
 decision and a new revision.
 
@@ -90,8 +90,8 @@ are decided, not ignored.
 ## AI operators — non-deterministic discovery, deterministic record
 
 AI finds; it does not judge. Produce the input with
-`oracle-discovery.mjs ai-input --package <pkg> --operator ai-explorer|cross-agent --output <file>`, hand
-exactly that file to a fresh-context agent, keep its JSON output, and record the run in `aiRuns` with the
+`oracle-discovery.mjs ai-input --package <pkg> --operator ai-explorer|cross-agent --output <file outside the repository>`, hand
+exactly that file to a fresh-context agent, keep its JSON output in the Oracle directory, and record the run in `aiRuns` with the
 input's sha256. A run counts only while its input digest matches the current space: a changed space makes
 earlier runs `stale`, and closure needs a current run. Every output candidate is triaged mechanically
 (`triage`): in-world candidates are judged against the world, the rest become candidates for a decision,
@@ -138,7 +138,7 @@ stage is recomputed from the current run, the package and the lock every time.
 
 ## Closure levels and the verdict
 
-`oracle-discovery.mjs close --package <pkg> [--out <dir>] [--runtime <anomalies.json>] [--dir <oracle dir>] [--lock <lock>]`
+`oracle-discovery.mjs close --package <pkg> [--runtime <anomalies.json>] [--dir <oracle dir>] [--lock <lock>]`
 
 | Level | Passes when                                                                                                                                                                                                                                                                                                                                                                              |
 | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

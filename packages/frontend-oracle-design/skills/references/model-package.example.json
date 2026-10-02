@@ -33,7 +33,7 @@
       "kind": "project-constraint",
       "jurisdiction": "oracle model package",
       "standard": "oracle-package v1",
-      "location": "repo:src/features/save/__test__/formal/oracle.package.json",
+      "location": "repo:.ai/oracles/pending-save/oracle.package.json",
       "approval": "approved",
       "self": true
     }

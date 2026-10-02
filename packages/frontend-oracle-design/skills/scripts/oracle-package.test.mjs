@@ -433,19 +433,13 @@ test('[bend] the model-first chain: draft refuted by a hidden observation, refin
     'refuted',
   )
 
-  const refined = await checkAdequacy({ package: 'oracle.package.json', cwd: root, bin, out: join(root, 'evidence') })
+  const refined = await checkAdequacy({ package: 'oracle.package.json', cwd: root, bin })
   assert.equal(refined.status, 'proven', JSON.stringify(refined.checks.filter((check) => check.status !== 'proven')))
   assert.deepEqual(refined.rowIds, { latestShown: 'O1', staleNeverShown: 'O2', unansweredKeeps: 'O3', itemsShown: 'O5' })
   // written in one context: the goals are the contract author's, so the claim is self-consistency, not independence
   assert.equal(refined.independence.evidence, 'none')
   assert.equal(refined.goalAudit.claim, 'self-consistency')
   assert.deepEqual(refined.goalAudit.goals.find((goal) => goal.goal === 'G1').mirrorsRows, ['O2'])
-  const recheck = spawnSync(bin, ['ADEQUACY.bend', '--verdict'], {
-    cwd: join(root, 'evidence'),
-    encoding: 'utf8',
-    env: { ...process.env, BEND_NO_TELEMETRY: '1' },
-  })
-  assert.equal(recheck.status, 0, `${recheck.stdout}${recheck.stderr}`)
 
   const adapters = await import(join(root, 'world.adapter.mjs'))
   const good = await conformWorld({ package: 'oracle.package.json', cwd: root, adapter: adapters, bin })

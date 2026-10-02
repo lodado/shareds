@@ -53,10 +53,12 @@ narrowed to fit Bend, and a phenomenon the model cannot express is never declare
 ## 2. From source text to a locked model — model-first
 
 The card is no longer written first. Work enters through the **model package**
-(`oracle.package.json`, in the `formal/` directory next to the modeled code, placement below): one JSON
+(`oracle.package.json`, in the Oracle directory `.ai/oracles/<id>/` beside the card, placement below): one JSON
 file that names the sources and records the author's reading, read by every tool that previously parsed
 the card. Its `repo:` locations resolve from the repository root, exactly like the card's Source
 Registry, so the same string names the same file in the package, the projected card and its locked copy.
+Source text that exists only in the conversation is saved verbatim under `.ai/oracles/<id>/sources/`,
+never in the product tree.
 
 | Stage   | Package content the tools require                                                                                  | Command                                     |
 | ------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
@@ -78,12 +80,12 @@ and the investigated files; it is projected as `## Type Contract` and only then 
 `type-contract:reported` label.
 
 1. **Two readings.** When native delegation is supported, authorized and has capacity, dispatch one
-   read-only model analyst with only the file `oracle-adequacy.mjs model-input --package <pkg>` writes:
+   read-only model analyst with only the file `oracle-adequacy.mjs model-input --package <pkg>` writes outside the repository:
    the source text verbatim, the hazards and the authoring rules — no Outcome reading, policy sentence,
    term, goal, contract, model file or product code of the author. The analyst writes the world record,
    assumptions and goals of [`adequacy.md`](adequacy.md); the author writes the behavior model and the
    contract predicates. Record each goal's `author` (`analyst` or `controller`). The author never edits
-   the analyst's output; a disagreement is an Open question. Without delegation, record the limitation
+   the analyst's output — `World.bend` is that output byte for byte, with no second copy; a disagreement is an Open question. Without delegation, record the limitation
    and write `author: controller`: the tools then report `independence.evidence: none` and the adequacy
    claim as `self-consistency`, never as an independent reading. Agreement between agents is not approval.
 2. **Derive the axes.** `oracle-package.mjs derive --package <pkg>` reads the world record, the behavior
@@ -126,7 +128,9 @@ path, and a legacy run continued under new requirements goes through the source 
 a new revision.
 
 Then formalize the behavior as three tracked files in the `formal/` directory next to the code they
-model (placement below), inside the scan root and outside the Oracle directory:
+model (placement below), inside the scan root and outside the Oracle directory. Read
+[`model-patterns.md`](model-patterns.md) first: define rules, never tables of answers, and state laws
+that pin every result.
 
 - `MODEL.bend` — the reference behavior: a state and a message datatype, `<Prefix>.init()`,
   `<Prefix>.step(s, m)`, `<Prefix>.observe(s)` (only what the contract observes, not internal
@@ -186,7 +190,7 @@ observations for one prefix is not supported yet — list those policies under `
 
 ## 3. Pre-lock checks: consistency, reachability and the space
 
-Before showing the Draft, run and report both:
+Before showing the Draft, run both and report each as one journal line (status, counts, digest), never a saved output file:
 
 ```sh
 node <skill-dir>/scripts/oracle-model.mjs prove --dir <model-dir> --require <law>...
@@ -268,10 +272,11 @@ from compiled relation defs. The generated file starts `AUTO-GENERATED — DO NO
 compiled model beside it (the product's CI needs no Bend), and carries the SHA-256 of every model
 source: a changed source fails the file with `STALE_GENERATED_TESTS` until it is regenerated.
 
-#### Placement — everything formal lives in one `formal/` next to the code it models
+#### Placement — laws and tests next to the code, the run in the Oracle directory
 
-Put every file of the Bend path in one `__test__/formal/` directory at the narrowest architecture unit
-the model covers, following the test-locality rule of `$test` and [`fsd.md`](fsd.md):
+Put the Bend files, the adapter and the generated files in one `__test__/formal/` directory at the
+narrowest architecture unit the model covers, following the test-locality rule of `$test` and
+[`fsd.md`](fsd.md). Nothing else goes there:
 
 ```
 features/feed-infinite-scroll/
@@ -282,7 +287,7 @@ features/feed-infinite-scroll/
       feed.adapter.mjs              the boundary — written by the AI, reviewed
       feed.model.mjs                generated: compiled model
       feed.oracle.test.mjs          generated: conformance test
-.ai/oracles/<id>/formal/            run evidence: ADEQUACY.bend/.json, REPLAY.bend/.json
+.ai/oracles/<id>/                   the run: card, journal, oracle.package.json, sources/, lock, ledger
 ```
 
 - A model of one segment's logic goes in that segment's `__test__/formal/`; a model spanning several
@@ -291,10 +296,10 @@ features/feed-infinite-scroll/
 - Moving or deleting the slice moves or deletes its model, laws, adapter and generated tests with it,
   and `__test__` keeps them out of the production bundle. No slice imports another slice's `formal/`,
   the same direction rule as the layers.
-- Run `emit-*` with `--adapter` and `--out` both pointing at that `formal/` directory. Only run
-  evidence stays under `.ai/oracles/<id>/formal/`: it belongs to one revision, not to the code. A
-  sampled fast-check failure prints its seed and path; replay the shrunk counterexample with `--out`
-  there so the record survives the test log.
+- Run `emit-*` with `--adapter` and `--out` both pointing at that `formal/` directory. What belongs to
+  one revision, not to the code, stays in `.ai/oracles/<id>/`. A sampled fast-check failure prints its
+  seed and path; replay it, and its verdict carries it forward as a `VALID_RED` test, a journal line or
+  an Open question.
 
 #### The adapter — written by the AI, reviewed
 
@@ -365,9 +370,7 @@ seed}}`, fails if fewer runs executed than requested, and fails if the environme
   `conformance: tested` (exhaustive N / sampled M runs, seed) for the product — never proven.
 - A failure prints the step or the pair; a sampled failure also prints fast-check's seed, path and
   shrunk counterexample. Replay it with
-  `oracle-projection.mjs replay --model --prefix --trace <json> [--observed <json> | --adapter] [--out <dir>]`
-  (`--out` keeps `REPLAY.bend`, re-checkable in place, and `REPLAY.json` with the trace, observations,
-  verdict and law):
+  `oracle-projection.mjs replay --model --prefix --trace <json> [--observed <json> | --adapter]`:
   `outside-space` (the environment forbids an event — the model missed it too; reopen the problem
   definition, never force it into the nearest event), `implementation-defect` (the model predicts a
   different observation — reproduce it as `VALID_RED`) or `model-agrees` (if it is still a bug, the
