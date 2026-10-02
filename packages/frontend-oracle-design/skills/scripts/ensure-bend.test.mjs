@@ -123,3 +123,20 @@ test('an unsupported platform fails before any download', async (t) => {
     (error) => error.code === 'BEND_UNSUPPORTED_PLATFORM',
   )
 })
+
+test('ORACLE_REQUIRE_BEND=1 makes a missing Bend fail the integration test instead of skipping it', async () => {
+  const { installedBend } = await import('./oracle-test-bend.mjs')
+  const missing = { skip: () => assert.fail('must not skip when Bend is required') }
+  const before = process.env
+  // PATH·BEND_HOME·cache가 모두 비어 있는 환경 — 고정 버전을 찾지 못하고 다운로드는 막힌다
+  process.env = { ...before, PATH: '', BEND_HOME: '/nonexistent-bend-home', HOME: '/nonexistent-home', ORACLE_REQUIRE_BEND: '1' }
+  try {
+    await assert.rejects(() => installedBend(missing), /ORACLE_REQUIRE_BEND=1 but Bend .* is not installed/)
+    process.env.ORACLE_REQUIRE_BEND = ''
+    const skipped = []
+    assert.equal(await installedBend({ skip: (reason) => skipped.push(reason) }), null)
+    assert.match(skipped[0], /real Bend integration not run/)
+  } finally {
+    process.env = before
+  }
+})

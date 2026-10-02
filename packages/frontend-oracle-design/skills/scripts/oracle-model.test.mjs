@@ -13,7 +13,8 @@ import {
   reduceWithoutStaleCheck,
 } from '../../test-fixtures/stale-search/search-reducer.mutants.mts'
 import { adapterFor } from '../../test-fixtures/stale-search/search.adapter.mjs'
-import { BEND_VERSION, ensureBend } from './ensure-bend.mjs'
+import { BEND_VERSION } from './ensure-bend.mjs'
+import { sha256 } from './oracle-fs.mjs'
 import {
   checkConformance,
   enumerateSpace,
@@ -24,6 +25,7 @@ import {
   scanBendSource,
   transitionCover,
 } from './oracle-model.mjs'
+import { installedBend } from './oracle-test-bend.mjs'
 
 const FIXTURE = fileURLToPath(new URL('../../test-fixtures/stale-search/', import.meta.url))
 const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
@@ -45,24 +47,6 @@ async function edit(path, from, to) {
   const text = await readFile(path, 'utf8')
   assert.ok(text.includes(from), `${path} lacks the text the mutation replaces`)
   await writeFile(path, text.replace(from, to))
-}
-
-/**
- * 실제 Bend 통합 테스트용 — 고정 버전이 이미 설치됐을 때만 돈다. 테스트는 내려받지 않는다: 설치본이 없으면
- * 이유를 남기고 skip한다. skip은 통과가 아니다 — node:test 요약에 skipped로 남는다.
- */
-async function installedBend(t) {
-  try {
-    const { bin } = await ensureBend({
-      download: () => {
-        throw Object.assign(new Error('tests never download Bend'), { code: 'BEND_NOT_INSTALLED' })
-      },
-    })
-    return bin
-  } catch (error) {
-    t.skip(`Bend ${BEND_VERSION} is not installed (${error.code ?? error.message}) — real Bend integration not run`)
-    return null
-  }
 }
 
 /** 가짜 bend — 주어진 출력과 exit code를 내고, 실행됐다는 흔적을 남긴다. 분류 로직만 시험한다. */
@@ -313,6 +297,48 @@ test('an unbounded model caps its transition cover at a stated depth instead of 
   assert.equal(cover.coveredDepth, 2)
   assert.deepEqual(cover.cases.map(({ label }) => label), ['Inc · Inc · Inc'])
   assert.match(cover.reason, /more than 5 configurations/)
+})
+
+/** `next(history)`가 상태·지금 허용 사건에 없는 과거를 읽는 환경: A·B 뒤에는 둘 다 C만 허용하지만 C 다음은 B로 시작했을 때만 Bad다. */
+function historyModel() {
+  const names = (list) => {
+    const found = []
+    for (let cursor = list; cursor.$ === 'Con'; cursor = cursor.tail) found.push(cursor.head.$)
+    return found
+  }
+  const listOfNames = (items) => items.reduceRight((tail, name) => ({ $: 'Con', head: { $: name }, tail }), { $: 'Nil' })
+  return {
+    prefix: 'History',
+    digest: 'history-model',
+    init: () => ({ $: 'State', bad: 0n }),
+    step: (state, event) => ({ $: 'State', bad: event.$ === 'Bad' ? 1n : state.bad }),
+    observe: (state) => state.bad,
+    next: (history) => {
+      const path = names(history).join(',')
+      if (path === '') return listOfNames(['A', 'B'])
+      if (path === 'A' || path === 'B') return listOfNames(['C'])
+      if (path === 'B,C') return listOfNames(['Bad'])
+      return listOfNames([])
+    },
+  }
+}
+
+test('the transition cover does not merge two histories whose next allowed events differ one step later', () => {
+  const model = historyModel()
+  const space = enumerateSpace(model, { bound: 1 })
+  const cover = transitionCover(model, space)
+  // A and B reach the same state with the same allowed events (C), yet only B·C allows Bad — merging them loses B·C·Bad
+  assert.ok(cover.cases.some(({ label }) => label === 'B · C · Bad'))
+  assert.equal(cover.status, 'closed')
+  // the closed claim names what a configuration is, so a reader sees which environments it can merge
+  assert.match(cover.basis, /allowed events.*one step later/)
+
+  // a product that never reaches the bad state passes the bound-1 space and fails the cover
+  const product = { init: () => 0, step: (state) => state, observe: (state) => state }
+  assert.equal(checkConformance(space, product).pass, true)
+  const failed = checkConformance({ ...space, cases: cover.cases }, product)
+  assert.equal(failed.pass, false)
+  assert.deepEqual(failed.failures[0].trace.map(({ $ }) => $), ['B', 'C', 'Bad'])
 })
 
 test('a joint case starts the product on its world coordinates; an adapter that cannot take them fails instead of passing on the default fixture', () => {
@@ -577,6 +603,13 @@ test('card lint runs the Formal Model checks on the fixture card and on a broken
 
 test('the lock covers the model and laws: a changed law fails verify, a changed proof candidate does not', async (t) => {
   const root = await fixtureCopy(t)
+  // this test is about what the lock covers, not the pre-lock stages (oracle-stage.test.mjs): the package sits beside the
+  // card here, so record it as DRAFTED on its current bytes
+  const packageBytes = await readFile(join(root, 'oracle.package.json'))
+  await writeFile(
+    join(root, 'stage.json'),
+    JSON.stringify({ schemaVersion: 1, stage: 'DRAFTED', packageSha256: sha256(packageBytes), history: [] }),
+  )
   const lock = (...args) =>
     spawnSync(process.execPath, [join(SCRIPTS, 'oracle-lock.mjs'), ...args], { cwd: root, encoding: 'utf8' })
 

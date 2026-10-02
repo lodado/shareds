@@ -898,11 +898,11 @@ function transition(oracleDirectory, to, runId, extra = []) {
 
   if (to === 'VALID_RED') {
     args.push('--evidence', join(oracleDirectory, 'evidence.json'), '--row', 'O1')
-  } else if (to === 'IMPLEMENTED_GREEN' || to === 'REVIEW_VERIFIED') {
+  } else if (to === 'IMPLEMENTED_GREEN' || to === 'REVIEW_VERIFIED' || to === 'PARTIAL_VERIFIED') {
     args.push('--evidence', join(oracleDirectory, 'evidence.json'))
   }
 
-  if (to === 'REVIEW_VERIFIED') {
+  if (to === 'REVIEW_VERIFIED' || to === 'PARTIAL_VERIFIED') {
     const findings = join(oracleDirectory, 'findings.json')
     args.push('--findings', findings)
     if (!extra.includes('--packet')) {
@@ -3480,6 +3480,56 @@ test('O17: REVIEW_VERIFIED는 clear findings와 GREEN 이후 인용 run 재실�
   const verified = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-004')
   assert.equal(verified.status, 0, verified.stderr)
   assert.equal((await state(oracleDirectory)).state, 'REVIEW_VERIFIED')
+})
+
+test('열린 hold가 있으면 REVIEW_VERIFIED는 거부되고 PARTIAL_VERIFIED가 같은 리뷰 관문 뒤에 hold ID를 원장에 남긴다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  await writeFile(join(oracleDirectory, 'findings.json'), JSON.stringify(CLEAR_REVIEW))
+  greenRun(oracleDirectory, 'review')
+
+  // hold가 없으면 PARTIAL을 주장할 수 없다
+  const none = transition(oracleDirectory, 'PARTIAL_VERIFIED', 'r-004')
+  assert.equal(none.status, 1)
+  assert.match(none.stderr, /^NO_OPEN_HOLDS: /)
+
+  const hold = (status) => ({ id: 'H1', question: 'late success after a timeout?', blocks: ['O9'], status })
+  await writeFile(join(oracleDirectory, 'oracle.package.json'), JSON.stringify({ holds: [hold('open')] }))
+  const full = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-004')
+  assert.equal(full.status, 1)
+  assert.match(full.stderr, /^HOLDS_OPEN: H1 still open/)
+  assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+
+  // status가 같은 규칙을 미리 알린다
+  const packets = JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout).nextActions
+  assert.deepEqual(packets.find((entry) => entry.to === 'REVIEW_VERIFIED').blockers, ['HOLDS_OPEN'])
+  assert.equal(packets.find((entry) => entry.to === 'PARTIAL_VERIFIED').blockers.includes('NO_OPEN_HOLDS'), false)
+
+  // 같은 리뷰 관문(findings가 막으면 PARTIAL도 막힌다)
+  await writeFile(
+    join(oracleDirectory, 'findings.json'),
+    JSON.stringify({ ...CLEAR_REVIEW, findings: [{ id: 'f-1', row: 'O1', classification: 'PRODUCT_DEFECT', severity: 'high', finding: 'x', evidence: 'r-003', fix: 'y', packetSha256: CLEAR_REVIEW.packetSha256, targetRevision: CLEAR_REVIEW.targetRevision }] }),
+  )
+  const blocked = transition(oracleDirectory, 'PARTIAL_VERIFIED', 'r-004')
+  assert.equal(blocked.status, 1)
+  assert.match(blocked.stderr, /^FINDINGS_BLOCKING: /)
+
+  await writeFile(join(oracleDirectory, 'findings.json'), JSON.stringify(CLEAR_REVIEW))
+  const partial = transition(oracleDirectory, 'PARTIAL_VERIFIED', 'r-004')
+  assert.equal(partial.status, 0, partial.stderr)
+  assert.match(partial.stdout, /^STATE_PARTIAL_VERIFIED /)
+  const after = await state(oracleDirectory)
+  assert.equal(after.state, 'PARTIAL_VERIFIED')
+  assert.deepEqual(after.history.at(-1).holds, ['H1'])
+  // PARTIAL은 끝이 아니다: 되돌아가는 길은 새 리비전(NEEDS_DECISION)뿐이다
+  assert.deepEqual(JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout).nextLegalActions, ['NEEDS_DECISION', 'FAIL'])
+  // 같은 실행 보고의 Status 줄은 원장의 PARTIAL_VERIFIED와 대조된다
+  const report = join(oracleDirectory, 'report.md')
+  await writeFile(report, 'Status: PARTIAL_VERIFIED\nr-004 exit 0\n')
+  assert.equal(run(['status', '--dir', oracleDirectory, '--check-report', report]).status, 0)
 })
 
 test('O17: bytes가 그대로인 필수 label은 GREEN 이전 run을 재사용하고, 바뀌면 다시 요구한다', async (t) => {

@@ -7,7 +7,6 @@ import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { BEND_VERSION, ensureBend } from './ensure-bend.mjs'
 import { conformWorld } from './oracle-adequacy.mjs'
 import {
   aiInput,
@@ -33,27 +32,13 @@ import {
 import { parseCaseSpace } from './oracle-frames.mjs'
 import { enumerateSpace } from './oracle-model.mjs'
 import { loadPackage, OPERATOR_IDS, packageInputs, packageIssues } from './oracle-package.mjs'
+import { installedBend } from './oracle-test-bend.mjs'
 
 const FIXTURE = fileURLToPath(new URL('../../test-fixtures/stale-search/', import.meta.url))
 const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
 const PKG = JSON.parse(await readFile(join(FIXTURE, 'oracle.package.json'), 'utf8'))
 const clone = (value) => structuredClone(value)
 const { NODE_TEST_CONTEXT: _parent, ...CHILD_ENV } = process.env
-
-/** 설치된 고정 Bend가 있을 때만 돈다 — 테스트는 내려받지 않는다. skip은 통과가 아니라 skipped로 남는다. */
-async function installedBend(t) {
-  try {
-    const { bin } = await ensureBend({
-      download: () => {
-        throw Object.assign(new Error('tests never download Bend'), { code: 'BEND_NOT_INSTALLED' })
-      },
-    })
-    return bin
-  } catch (error) {
-    t.skip(`Bend ${BEND_VERSION} is not installed (${error.code ?? error.message}) — real Bend integration not run`)
-    return null
-  }
-}
 
 async function fixtureCopy(t) {
   const root = await mkdtemp(join(tmpdir(), 'oracle-discovery-'))
@@ -127,6 +112,18 @@ test('observation patterns ignore magnitudes and keep the kind of change per eve
 })
 
 // ── 수명주기 ───────────────────────────────────────────────────────────────────────────────────────────────────────
+
+test('a held candidate is closed while its hold is open and reopens once the hold is resolved', () => {
+  const candidate = { id: 'C-000000000a', operator: 'projection-residue', class: 'hidden-state', reproducible: true, evidence: {} }
+  const decision = { candidate: candidate.id, decision: 'held', hold: 'H1', reason: 'waits for the timeout policy' }
+  const hold = (status) => ({ id: 'H1', question: 'late success?', blocks: ['O9'], status })
+  const record = (status) => lifecycle([candidate], { ...clone(PKG), discoveryDecisions: [decision], holds: [hold(status)] }, { axes: [] })[0]
+
+  assert.deepEqual([record('open').stage, record('open').open], ['HELD', false])
+  const resolved = record('resolved')
+  assert.deepEqual([resolved.stage, resolved.open], ['HELD', true])
+  assert.match(resolved.reason, /H1 is resolved — promote, scope out or reject the candidate/)
+})
 
 test('the candidate lifecycle is computed from evidence, never stored: produced, decided, promoted, absorbed, locked', () => {
   const derived = { axes: [{ id: 'world.Race.oldShown' }] }

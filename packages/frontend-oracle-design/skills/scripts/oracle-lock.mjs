@@ -12,6 +12,7 @@ import {
   sha256,
   snapshotRegularFile,
 } from './oracle-fs.mjs'
+import { assertReadyToLock, markLocked } from './oracle-stage.mjs'
 
 const verifyScript = join(dirname(fileURLToPath(import.meta.url)), 'oracle-verify.mjs')
 
@@ -292,6 +293,14 @@ export async function invalidatedWitnesses(lockPath) {
   return invalidated
 }
 
+async function assertStaged(directory) {
+  try {
+    await assertReadyToLock(directory)
+  } catch (error) {
+    throw new CliError(error.code ?? 'STAGE_GATE', error.message)
+  }
+}
+
 export async function createLock(options) {
   if (!options.oracle || !options.lock) throw new CliError('USAGE', 'create requires --oracle and --lock', 2)
   const lockPath = resolve(options.lock)
@@ -302,6 +311,8 @@ export async function createLock(options) {
   const rootDirectory = await realpath(repositoryRoot(lockDirectory)).catch((error) => {
     throw new CliError('ORACLE_PATH_INVALID', `Cannot resolve repository root: ${error.message}`)
   })
+  // 패키지 경로의 오라클은 인터뷰·모델·검사·Draft 단계를 모두 거친 뒤에만 잠긴다(oracle-stage.mjs)
+  await assertStaged(canonicalLockDirectory)
   const oraclePath = resolve(options.oracle)
   const canonicalOracle = await realpath(oraclePath).catch((error) => {
     throw new CliError('ORACLE_PATH_INVALID', `Cannot resolve Oracle: ${error.message}`)
@@ -372,6 +383,7 @@ export async function createLock(options) {
     }
     finalLock ??= await snapshot(lockPath, 'LOCK_INVALID', { allowHardlinks: false, base: rootDirectory })
   }
+  await markLocked(canonicalLockDirectory)
   process.stdout.write(`ORACLE_LOCKED sha256:${manifest.oracle.sha256} manifest-sha256:${finalLock.sha256}\n`)
 }
 

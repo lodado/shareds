@@ -292,9 +292,12 @@ export function enumerateSpace(model, { bound, maxCases = 5000 }) {
 }
 
 export const MAX_COVER_CONFIGURATIONS = 2000
+/** 구성이 무엇인지 — closed는 이 키 아래의 주장이다. 이보다 깊은 곳에서야 갈리는 이력 의존 환경은 한 구성으로 합쳐진다. */
+export const COVER_BASIS =
+  'a configuration is the model state, the allowed events, and the events allowed one step later; histories that differ only deeper are merged'
 
 /**
- * 전이 커버 — 도달 가능한 구성(모델 상태 + 환경이 허용하는 사건)마다 허용 사건 전부를 한 번씩. 각 구성은 너비 우선의 가장
+ * 전이 커버 — 도달 가능한 구성(모델 상태 + 환경이 허용하는 사건 + 각 사건 한 걸음 뒤에 허용되는 사건)마다 허용 사건 전부를 한 번씩. 각 구성은 너비 우선의 가장
  * 짧은 접근 trace로 닿고, 그 trace에 사건 하나를 이은 것이 커버 case다. bound 안의 trace는 공간이 이미 전부 돌므로 bound를
  * 넘는 case만 남긴다. 유한 모델이면 모든 구성을 덮고 closed다. 상태가 끝없이 자라 상한에 걸리면 capped: bound 안에서 닿는
  * 구성까지만 덮고(그 너머는 fast-check 표본의 몫이다) 그 깊이를 보고한다.
@@ -313,7 +316,9 @@ export function transitionCover(model, space, { maxConfigurations = MAX_COVER_CO
   const seen = new Set()
   const firstVisit = (node) => {
     const allowed = allowedAfter(node.raw)
-    const key = stableStringify({ state: toPlain(node.state), allowed: allowed.map(toPlain) })
+    // next(history)는 과거 전체를 읽는다 — 상태와 지금 허용 사건이 같아도 각 사건 뒤에 허용되는 사건이 다르면 다른 구성이다
+    const ahead = allowed.map((event) => allowedAfter([...node.raw, event]).map(toPlain))
+    const key = stableStringify({ state: toPlain(node.state), allowed: allowed.map(toPlain), ahead })
     if (seen.has(key)) return null
     seen.add(key)
     return { ...node, allowed }
@@ -345,6 +350,7 @@ export function transitionCover(model, space, { maxConfigurations = MAX_COVER_CO
   const coveredDepth = capped === null ? null : Math.min(capped, space.bound)
   return {
     status: capped === null ? 'closed' : 'capped',
+    basis: COVER_BASIS,
     configurations: expanded,
     pairs,
     ...(capped === null

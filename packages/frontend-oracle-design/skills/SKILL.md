@@ -358,7 +358,11 @@ and the target repository's dependency rules.
    breadth/depth. Reuse existing artifacts; read [`card/case-space.md`](references/card/case-space.md)
    with its dependencies and run the Space discovery interview before presenting a plan: no Bend
    until the user confirms the axes, and a run the user cannot answer ends `NEEDS_DECISION` with the
-   first question.
+   first question. A policy question found later that blocks only part of the scope is not a stop:
+   record it as a hold (`card/case-space.md`), model and implement the rest, and ask every open hold in
+   one batch when the model work is done. Put the cells the sources leave open in front of the user before
+   writing the model, not while writing it (`bend-cross-verification.md`), and run scope that shares no Term,
+   state or file as parallel slices (`lifecycle-adaptation.md`).
    This does not move implementation decisions ahead of VALID_RED or waive source/confirmation gates. The lane header's `risk` is finalized here.
    Then model first, card second: write the model package from the sources (start from
    [`model-package.example.json`](references/model-package.example.json), never from `MODEL.bend` or a hand-written card), dispatch the analyst with
@@ -368,7 +372,10 @@ and the target repository's dependency rules.
    `oracle-discovery.mjs cross-check --package` and bring each candidate back to the interview, then
    `oracle-package.mjs project-card` — rows, axes and formal
    sections are projected, never hand-written a second time
-   ([`bend-cross-verification.md`](references/bend-cross-verification.md) §2).
+   ([`bend-cross-verification.md`](references/bend-cross-verification.md) §2). Walk the stages with
+   `scripts/oracle-stage.mjs`: `begin`, then `advance --to MODELED | CHECKED | DRAFTED` once each gate
+   passes. `oracle-lock.mjs create` refuses a package oracle that is not at `DRAFTED` on the same package
+   bytes, and only that script writes `stage.json`.
 7. Read [`card/risk-grill.md`](references/card/risk-grill.md)·[`bva.md`](references/bva.md)·
    [`card/card-format.md`](references/card/card-format.md)·
    [`card/interaction-sweep.md`](references/card/interaction-sweep.md)·
@@ -489,6 +496,7 @@ failure.
 | ------------------- | --------------------------------------------------------------------------- |
 | `IMPLEMENTED_GREEN` | card tests and required repo verification actually passed                   |
 | `REVIEW_VERIFIED`   | tests and required verification re-passed after independent review findings |
+| `PARTIAL_VERIFIED`  | the same review passed over the locked scope while a hold is still open     |
 | `NEEDS_DECISION`    | outcome-changing policy unresolved — print the current card and questions   |
 | `FAIL`              | judgment impossible: environment·harness·tool failure or budget exhausted   |
 
@@ -496,6 +504,9 @@ Delivery's normal completion state is `REVIEW_VERIFIED`. But when `RELATIONAL`·
 evidence is `pending`, or Visual QA was `declined` with no source-backed N/A revision, the run
 stops at the resumable `IMPLEMENTED_GREEN` terminal. On resume, complete the pending visual
 evidence and then proceed to review; never claim this intermediate state means `REVIEW_VERIFIED`.
+With an open hold `REVIEW_VERIFIED` is refused (`HOLDS_OPEN`): finish at `PARTIAL_VERIFIED`, report the
+holds, and write no test or production code for the held rows. Resolve them in a new revision
+(`NEEDS_DECISION` → `ORACLE_READY`) that adds only those rows.
 
 ## Verification — before the final report
 

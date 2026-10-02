@@ -3,14 +3,14 @@
 // PreToolUse: denies, before the write lands, what the transition gate would reject afterwards —
 //   a test written in a session that activated the skill before any lock exists, production edits
 //   while an oracle sits at ORACLE_READY, weakening tokens added to a test after VALID_RED, and any
-//   write to host-receipts.jsonl. A SubagentHandback call records a receipt.
+//   write to host-receipts.jsonl or the pre-lock stage record. A SubagentHandback call records a receipt.
 // SubagentStop: records a digest of the reviewer output the subagent actually returned.
 // Stop: blocks a final report whose Status line or cited runs disagree with the ledger.
 // Any failure to judge is fail-open (exit 0, no output): the gate in oracle-run.mjs stays the authority.
 import { Buffer } from 'node:buffer'
 import { spawnSync } from 'node:child_process'
 import { appendFile, readdir, readFile, realpath, stat } from 'node:fs/promises'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import {
@@ -21,6 +21,7 @@ import {
   RUN_BACKED_STATES,
   WEAKENING_TOKENS,
 } from './oracle-fs.mjs'
+import { STAGE_FILE } from './oracle-stage.mjs'
 import { spawnGit } from './resolve-executable.mjs'
 
 const runScript = join(dirname(fileURLToPath(import.meta.url)), 'oracle-run.mjs')
@@ -262,7 +263,7 @@ async function reportOwners(cwd, cited, message) {
 async function checkFinalReport(payload, cwd) {
   const message = payload.last_assistant_message
   if (payload.stop_hook_active || typeof message !== 'string') return
-  const claimed = message.match(/^Status:\s*(ORACLE_READY|VALID_RED|IMPLEMENTED_GREEN|REVIEW_VERIFIED|NEEDS_DECISION|FAIL)\b/m)?.[1]
+  const claimed = message.match(/^Status:\s*(ORACLE_READY|VALID_RED|IMPLEMENTED_GREEN|REVIEW_VERIFIED|PARTIAL_VERIFIED|NEEDS_DECISION|FAIL)\b/m)?.[1]
   if (!claimed) return
   const cited = new Set([...message.matchAll(/\b(r-\d{3,})\b/g)].map(([, runId]) => runId))
   // 실행으로만 닿는 상태를 runId 없이 주장하면 모든 오라클이 주인 후보가 되고, 가장 최근에 움직인 오라클에서 runner가
@@ -307,6 +308,13 @@ async function deniedBeforeLock(payload, cwd, absolutePath) {
   return true
 }
 
+/** 단계 기록은 oracle-stage.mjs가 걸음마다 검사를 돌린 뒤에만 쓴다 — 손으로 고쳐 단계를 건너뛰지 못하게 한다. */
+function deniedStageWrite(absolutePath) {
+  if (basename(absolutePath) !== STAGE_FILE || !absolutePath.split(sep).includes('oracles')) return false
+  deny(`STAGE_PROTECTED: ${STAGE_FILE} moves only through oracle-stage.mjs (begin, advance, rewind) — each step runs its gate.`)
+  return true
+}
+
 async function guardWrite(payload, cwd) {
   const toolName = payload.tool_name
   const input = payload.tool_input ?? {}
@@ -316,6 +324,8 @@ async function guardWrite(payload, cwd) {
   if (!['Write', 'Edit', 'MultiEdit', 'NotebookEdit'].includes(toolName) || typeof targetPath !== 'string') return
 
   const absolutePath = resolve(cwd, targetPath)
+
+  if (deniedStageWrite(absolutePath)) return
 
   if (await deniedBeforeLock(payload, cwd, absolutePath)) return
 

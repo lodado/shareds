@@ -6,7 +6,7 @@ import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { BEND_VERSION, ensureBend } from './ensure-bend.mjs'
+import { BEND_VERSION } from './ensure-bend.mjs'
 import {
   adequacyIssues,
   adequacyProofFile,
@@ -24,6 +24,7 @@ import {
   searchAdequacy,
   triageCandidates,
 } from './oracle-adequacy.mjs'
+import { installedBend } from './oracle-test-bend.mjs'
 
 const FIXTURE = fileURLToPath(new URL('../../test-fixtures/doc-save/', import.meta.url))
 const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
@@ -62,21 +63,6 @@ async function edit(path, from, to) {
     `${path} lacks the text the edit replaces`,
   )
   await writeFile(path, text.replace(from, to))
-}
-
-/** 설치된 고정 Bend가 있을 때만 돈다 — 테스트는 내려받지 않는다. skip은 통과가 아니라 skipped로 남는다. */
-async function installedBend(t) {
-  try {
-    const { bin } = await ensureBend({
-      download: () => {
-        throw Object.assign(new Error('tests never download Bend'), { code: 'BEND_NOT_INSTALLED' })
-      },
-    })
-    return bin
-  } catch (error) {
-    t.skip(`Bend ${BEND_VERSION} is not installed (${error.code ?? error.message}) — real Bend integration not run`)
-    return null
-  }
 }
 
 /** 탐색 엔진만 시험하는 손 모델 — World.bend의 def를 JS로 옮긴 test double. 기대값의 출처가 아니다. */

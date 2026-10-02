@@ -6,7 +6,6 @@ import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { BEND_VERSION, ensureBend } from './ensure-bend.mjs'
 import { checkAdequacy, conformWorld, HAZARDS, modelInput, triageCandidates } from './oracle-adequacy.mjs'
 import { generateFromDocument } from './oracle-frames.mjs'
 import { sha256 } from './oracle-fs.mjs'
@@ -30,6 +29,7 @@ import {
   stackLabelsFor,
 } from './oracle-package.mjs'
 import { emitTrace } from './oracle-projection.mjs'
+import { installedBend } from './oracle-test-bend.mjs'
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../', import.meta.url))
 const FIXTURE = join(PACKAGE_DIR, 'test-fixtures', 'stale-search')
@@ -46,21 +46,6 @@ const modelOnly = (pkg) => {
   return copy
 }
 
-/** 설치된 고정 Bend가 있을 때만 돈다 — 테스트는 내려받지 않는다. skip은 통과가 아니라 skipped로 남는다. */
-async function installedBend(t) {
-  try {
-    const { bin } = await ensureBend({
-      download: () => {
-        throw Object.assign(new Error('tests never download Bend'), { code: 'BEND_NOT_INSTALLED' })
-      },
-    })
-    return bin
-  } catch (error) {
-    t.skip(`Bend ${BEND_VERSION} is not installed (${error.code ?? error.message}) — real Bend integration not run`)
-    return null
-  }
-}
-
 async function fixtureCopy(t) {
   const root = await mkdtemp(join(tmpdir(), 'oracle-package-'))
   t.after(() => rm(root, { recursive: true, force: true }))
@@ -72,6 +57,32 @@ async function fixtureCopy(t) {
 const { NODE_TEST_CONTEXT: _parent, ...CHILD_ENV } = process.env
 const node = (cwd, script, args) =>
   spawnSync(process.execPath, [join(SCRIPTS, script), ...args], { cwd, encoding: 'utf8', env: CHILD_ENV })
+
+test('a hold defers a policy question: well-formed holds pass, a resolved hold needs the answer and an approved source, a held decision names its hold', () => {
+  const hold = (extra = {}) => ({ id: 'H1', question: 'late success after a timeout?', blocks: ['O9'], status: 'open', ...extra })
+  const withHolds = (holds, decisions) => {
+    const pkg = clone(PKG)
+    pkg.holds = holds
+    if (decisions) pkg.discoveryDecisions = [...(pkg.discoveryDecisions ?? []), ...decisions]
+    return packageIssues(pkg)
+  }
+  assert.deepEqual(withHolds([hold()]), [])
+  assert.deepEqual(withHolds([hold({ status: 'resolved', answer: 'late success is shown', source: 'S1' })]), [])
+
+  assert.match(withHolds([hold({ id: 'Q1' })]).join('\n'), /package-hold: "Q1" must be a unique H<n> ID/)
+  assert.match(withHolds([hold(), hold()]).join('\n'), /package-hold: "H1" must be a unique H<n> ID/)
+  assert.match(withHolds([hold({ question: '' })]).join('\n'), /hold H1: question is required/)
+  assert.match(withHolds([hold({ blocks: [] })]).join('\n'), /hold H1: blocks names what the question keeps out of the lock/)
+  assert.match(withHolds([hold({ status: 'later' })]).join('\n'), /hold H1: status must be open \| resolved/)
+  // a hold cannot be closed by inventing the answer: it needs the user's answer and an approved authoritative source
+  for (const resolved of [{ status: 'resolved' }, { status: 'resolved', answer: 'shown' }, { status: 'resolved', answer: 'shown', source: 'S99' }])
+    assert.match(withHolds([hold(resolved)]).join('\n'), /hold H1: a resolved hold records the answer and an approved authoritative S\* source/)
+
+  const held = { candidate: 'C-0123456789', decision: 'held', hold: 'H1', reason: 'waits for the timeout policy' }
+  assert.deepEqual(withHolds([hold()], [held]), [])
+  assert.match(withHolds([hold()], [{ ...held, hold: 'H2' }]).join('\n'), /held names the hold \(H<n>\) that defers it/)
+  assert.match(withHolds([], [held]).join('\n'), /held names the hold \(H<n>\) that defers it/)
+})
 
 test('the package hazard list is the adequacy hazard list', () => {
   assert.deepEqual(HAZARD_IDS, Object.keys(HAZARDS))

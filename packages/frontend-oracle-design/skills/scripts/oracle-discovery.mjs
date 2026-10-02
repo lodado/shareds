@@ -1628,6 +1628,18 @@ export function lifecycle(candidates, pkg, derived, { locked = false } = {}) {
       })
       continue
     }
+    if (decision.decision === 'held') {
+      // 미룬 후보는 hold가 열려 있는 동안만 닫힌 것이다 — 답이 오면 승격·범위 밖·기각 중 하나로 처분한다
+      const resolved = (pkg.holds ?? []).some((hold) => hold.id === decision.hold && hold.status === 'resolved')
+      records.push({
+        ...entry,
+        decision,
+        stage: 'HELD',
+        open: resolved,
+        ...(resolved ? { reason: `${decision.hold} is resolved — promote, scope out or reject the candidate` } : {}),
+      })
+      continue
+    }
     records.push({ ...entry, decision, stage: 'DOMAIN_VALIDATED', open: false })
   }
   for (const decision of pkg.discoveryDecisions ?? []) {

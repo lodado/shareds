@@ -1382,6 +1382,18 @@ on the Draft. A run where the user cannot answer ends `NEEDS_DECISION` with the 
 confirm axes on the user's behalf. If investigation later changes the axes, print only the added/removed
 dimensions, the reason, the possible-case count delta and the changed residual risk.
 
+## Holds — a question that blocks only part of the scope
+
+A policy question found while modelling that the user has not answered does not stop the run when the rest can
+be modelled without it. Record it in the package: `holds: [{ id: "H1", question, blocks: [the rows, terms, goals
+or behaviours it keeps out], status: "open" }]`. The model, laws, card and tests cover only what no hold blocks,
+and no test or production code is written for the blocked part. A discovery candidate that waits on the answer
+is decided `held` (`hold: H1`). While a hold is open the run ends `PARTIAL_VERIFIED`, never `REVIEW_VERIFIED`
+(`HOLDS_OPEN`). Ask every open hold in one batch once the model work is done (the A/B form above); the answer
+becomes `status: resolved` with the `answer` and an approved authoritative `S*`, each `held` candidate is then
+promoted, scoped out or rejected, and a new revision adds the blocked rows. A question that leaves nothing to
+model — the axes themselves — still stops the run.
+
 ## Family taxonomy — imported, not invented
 
 Eight families, merged from catalogs the industry already paid for. The first seven are input families: the
@@ -1428,7 +1440,9 @@ as though they were independent input dimensions.
 - The kernel proves the goals over the possible worlds (adequacy) and the laws over the model. The generated
   tests run each possible case on the product: every trace the environment allows up to the bound, the
   transition cover (every event from every reachable configuration, `closed` for a finite model, `capped`
-  at the bound otherwise), the joint cases that run each world value the test sets with every behavior value
+  at the bound otherwise; a configuration is the model state, the allowed events and the events allowed one
+  step later, so a `next(history)` that differs only deeper is merged — keep the environment a function of the
+  model state), the joint cases that run each world value the test sets with every behavior value
   (`emit-trace --package`), and fast-check beyond it.
 - The projection states the counts and the cover. A world several assumptions reject is excluded once in the
   total.

@@ -84,6 +84,27 @@ API, state union or trust-boundary type may declare `typeContract: {notApplicabl
 and the investigated files; it is projected as `## Type Contract` and only then drops the
 `type-contract:reported` label.
 
+Ask before modelling, not while modelling. A Bend model is total: every (state, event) cell needs an answer, and
+a cell the sources leave open surfaces as a question only when its transition is written. Put those cells in front
+of the user once, before the author writes `MODEL.bend`. Take them from the analyst's `## State Model` (an empty
+cell, or a cell that disagrees with the author's reading) and, for each async operation, from this checklist: a
+late success after a timeout, cancel or route exit; a late failure after a success; a response from an older
+request after a newer one; a duplicate completion; a lost response whose server effect is unknown; a retry while
+one is pending; an unmount before the request settles. Each cell is one of `source` (quote the `S*`), `default`
+(an approved project default) or `question`. Questions that kill a model branch go out together as one A/B batch;
+the rest become holds ([`card/case-space.md`](card/case-space.md#holds--a-question-that-blocks-only-part-of-the-scope)).
+A project default is a policy set the user approved once — for example newest request wins, no rollback after a
+newer completed mutation, one success notice per logical operation. Save the approved text verbatim as a source
+and cite its `S*`; a recommendation the user did not approve is never a default, and a default stays visible on
+the card as the policy of the cells it decided.
+
+Design the proof before the first Bend file. For each law write the claim, its quantifier scope (all traces, all
+transitions from states that meet a precondition, one fixed trace, or a witness) and the cells and policies it
+reads. A law that reads an open cell takes the policy as a model parameter: prove now every law that holds under
+each option, and let only the policy-dependent laws wait as holds. Never pick a policy inside the model to make a
+law provable — that is a silent decision. Report each result by its scope: a fixed trace is not all traces, and
+`exs trace` shows a path exists, not that every run reaches it.
+
 1. **Two readings.** When native delegation is supported, authorized and has capacity, dispatch one
    read-only model analyst with only the file `oracle-adequacy.mjs model-input --package <pkg>` writes outside the repository:
    the source text verbatim, the hazards and the authoring rules — no Outcome reading, policy sentence,
@@ -148,7 +169,8 @@ Translate precisely and record what is not translated. Check numbers and units, 
 versus "some", temporal order, "may" versus "must", and request count versus effect count: "sends one
 HTTP request" and "the save takes effect once" are different laws, and a disabled button proves
 neither. A policy the source leaves open — for example which id a retry uses after a timeout whose
-server result is unknown — is a `Q*` and `NEEDS_DECISION`, never a guess inside the model.
+server result is unknown — is a `Q*`, never a guess inside the model. When it blocks only part of the scope,
+record it as a hold (`card/case-space.md`) and model the rest; when nothing is left to model, `NEEDS_DECISION`.
 
 The environment is where coverage is lost. `next` lists every event the environment can produce,
 including user actions the product must reject or ignore; those stay in the space and their expected

@@ -95,7 +95,8 @@ export const FAULT_CLASSES = [
   'caching',
   'stale-data',
 ]
-export const DECISIONS = ['promoted', 'covered', 'out-of-scope', 'equivalent', 'accepted-risk', 'rejected']
+export const DECISIONS = ['promoted', 'covered', 'out-of-scope', 'equivalent', 'accepted-risk', 'rejected', 'held']
+export const HOLD_STATUS = ['open', 'resolved']
 export const AXIS_ORIGINS = ['source', 'model', 'counterexample', 'incident', 'analyst', 'review']
 export const TESTABILITY = ['tested', 'monitored', 'untestable']
 export const ASSUMPTION_STATUS = ['open', 'confirmed', 'refuted']
@@ -656,6 +657,21 @@ function discoveryRegistryIssues(pkg, { sources, requirements, questions }) {
       push('package-ai-run', 'outputDigest is the sha256 of the output file as recorded — an edited output is not the run')
   }
 
+  // hold — 답을 미룬 정책 질문. 질문이 막는 범위는 lock 밖에 남고, 나머지는 끝까지 간다. 열린 hold가 있으면 REVIEW_VERIFIED는 없다.
+  const holds = new Map()
+  for (const hold of pkg?.holds ?? []) {
+    const where = `hold ${hold?.id}`
+    if (!/^H\d+$/.test(hold?.id ?? '') || holds.has(hold.id)) push('package-hold', `"${hold?.id}" must be a unique H<n> ID`)
+    holds.set(hold?.id, hold)
+    if (!nonEmpty(hold?.question)) push('package-hold', `${where}: question is required`)
+    if (!Array.isArray(hold?.blocks) || hold.blocks.length === 0 || !hold.blocks.every(nonEmpty))
+      push('package-hold', `${where}: blocks names what the question keeps out of the lock (rows, terms, goals or behaviours)`)
+    if (!HOLD_STATUS.includes(hold?.status)) push('package-hold', `${where}: status must be ${HOLD_STATUS.join(' | ')}`)
+    // 풀린 hold는 사용자의 답과 승인된 출처를 남긴다 — 답을 지어 닫을 수 없다
+    if (hold?.status === 'resolved' && !(nonEmpty(hold?.answer) && sourceOk(hold?.source)))
+      push('package-hold', `${where}: a resolved hold records the answer and an approved authoritative S* source`)
+  }
+
   const decided = new Set()
   for (const decision of pkg?.discoveryDecisions ?? []) {
     const where = `decision ${decision?.candidate}`
@@ -670,6 +686,8 @@ function discoveryRegistryIssues(pkg, { sources, requirements, questions }) {
       if (!(sourceOk(source) || questions.has(source)))
         push('package-decision', `${where}: ${decision?.decision} cites an authoritative S* or an Open question Q*`)
     }
+    if (decision?.decision === 'held' && !holds.has(decision?.hold))
+      push('package-decision', `${where}: held names the hold (H<n>) that defers it`)
     if (decision?.decision === 'promoted' && !nonEmpty(decision?.axis))
       push('package-decision', `${where}: a promotion names the axis, goal, contract key or assumption it became`)
     // 이미 덮인 후보 — 어느 행(O*·계약 키)이 덮는지 적고, 그 행이 실제로 있어야 한다.

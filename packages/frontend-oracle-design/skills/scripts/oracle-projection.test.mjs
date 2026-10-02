@@ -7,7 +7,6 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import fc from 'fast-check'
-import { BEND_VERSION, ensureBend } from './ensure-bend.mjs'
 import {
   classifyTrace,
   enumerateSpace,
@@ -16,6 +15,7 @@ import {
   projectionResidue,
 } from './oracle-model.mjs'
 import { auditAdapterSource, emitState, emitTrace, emitWorld, replay } from './oracle-projection.mjs'
+import { installedBend } from './oracle-test-bend.mjs'
 import {
   arbitraryOf,
   bendLiteral,
@@ -44,21 +44,6 @@ type Tree is Data:
   Leaf{}
   Node{left: Tree}
 `
-
-/** 설치된 고정 Bend가 있을 때만 돈다 — 테스트는 내려받지 않는다. skip은 통과가 아니라 skipped로 남는다. */
-async function installedBend(t) {
-  try {
-    const { bin } = await ensureBend({
-      download: () => {
-        throw Object.assign(new Error('tests never download Bend'), { code: 'BEND_NOT_INSTALLED' })
-      },
-    })
-    return bin
-  } catch (error) {
-    t.skip(`Bend ${BEND_VERSION} is not installed (${error.code ?? error.message}) — real Bend integration not run`)
-    return null
-  }
-}
 
 /** fixture 복사본 + 생성 테스트가 fast-check를 찾을 수 있게 node_modules/fast-check 링크. 원본은 건드리지 않는다. */
 async function workspace(t) {

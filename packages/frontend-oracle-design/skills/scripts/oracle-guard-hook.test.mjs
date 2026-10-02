@@ -46,6 +46,17 @@ const write = (cwd, file_path, content = 'export const a = 1\n') => ({
   tool_input: { file_path, content },
 })
 
+test('denies a hand write of the pre-lock stage record, before any run-state exists', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-guard-stage-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  await mkdir(join(root, '.ai', 'oracles', 'sample'), { recursive: true })
+  const denied = hook(write(root, '.ai/oracles/sample/stage.json', '{"stage":"DRAFTED"}\n'))
+  assert.equal(denied.decision?.permissionDecision, 'deny')
+  assert.match(denied.decision.permissionDecisionReason, /^STAGE_PROTECTED: stage\.json moves only through oracle-stage\.mjs/)
+  // another stage.json outside an oracle folder is not ours
+  assert.equal(hook(write(root, 'src/stage.json', '{}\n')).decision, null)
+})
+
 test('denies a production write while the oracle sits at ORACLE_READY, with the gate code', async (t) => {
   const root = await repository(t, 'ORACLE_READY')
 

@@ -69,11 +69,23 @@ Name the row owning a cross-boundary claim and its real verification target in t
 GREEN is not proof of a combined journey; avoid assigning the same assertion to several tests.
 Detailed implementation choices still belong in `implementation-decision.md` after `VALID_RED`.
 
-This adaptation supports single-card milestones, not a multi-card scheduler or aggregate terminal
-state. If the scope cannot safely fit one card, present the proposed split and missing integration
+This adaptation supports single-card milestones and the independent slices below, not a multi-card
+scheduler or an aggregate terminal state. If the scope cannot safely fit one card, present the proposed split and missing integration
 contract; do not silently descope the request, auto-launch Team, or report independent GREENs as
 whole-feature completion. Future multi-card delivery needs approved revision dependencies,
 integration ownership and evidence in an owning Oracle, not mutable `done` rows in a journal.
+
+## Parallel slices
+
+When the interview shows scope that shares no Term, state owner, side effect or file, make each part its own
+oracle (`.ai/oracles/<id>/`) and run them in parallel agents with disjoint file ownership; scope that shares any
+of these stays one oracle. Within a slice the order does not change: Bend model → lock → generated tests →
+`VALID_RED` → implementation, and production writes stay denied until `VALID_RED`. The speed comes from
+slices overlapping — one slice implements while another is still modelling — and from the generated tests
+(`emit-trace`, `emit-world`) making the test step mechanical. A question that blocks part of a slice is a hold
+(`PARTIAL_VERIFIED`), not a stop for the other slices; ask every open hold in one batch after the model work.
+Each slice reports its own state. A claim that crosses slices needs an owning integration row and its own
+evidence; independent GREENs are never reported as whole-feature completion.
 
 ## Confirmation and lifecycle limits
 

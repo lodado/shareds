@@ -27,6 +27,7 @@ import {
   HOST_RECEIPTS_FILE,
   isPathInside,
   isTestPath,
+  openHolds,
   pathsShareIdentity,
   reviewOutputDigest,
   RUN_BACKED_STATES,
@@ -103,11 +104,15 @@ const BUDGET_LIMITS = { policy: 2, harness: 2, product: 3 }
 const TRANSITIONS = {
   ORACLE_READY: ['VALID_RED', 'IMPLEMENTED_GREEN', 'NEEDS_DECISION', 'FAIL'],
   VALID_RED: ['VALID_RED', 'IMPLEMENTED_GREEN', 'NEEDS_DECISION', 'FAIL'],
-  IMPLEMENTED_GREEN: ['REVIEW_VERIFIED', 'NEEDS_DECISION', 'FAIL'],
+  IMPLEMENTED_GREEN: ['REVIEW_VERIFIED', 'PARTIAL_VERIFIED', 'NEEDS_DECISION', 'FAIL'],
   REVIEW_VERIFIED: ['NEEDS_DECISION', 'FAIL'],
+  PARTIAL_VERIFIED: ['NEEDS_DECISION', 'FAIL'],
   NEEDS_DECISION: ['ORACLE_READY', 'FAIL'],
   FAIL: [],
 }
+
+/** 리뷰 관문을 거치는 목표 상태 — PARTIAL_VERIFIED는 열린 hold를 남긴 채 같은 관문을 통과한 결과다. */
+const REVIEW_TARGETS = new Set(['REVIEW_VERIFIED', 'PARTIAL_VERIFIED'])
 
 const ASSERTION_TOKENS = ['expect(', 'assert.', 'assert(']
 
@@ -2332,7 +2337,25 @@ async function assertBlindMappingEvidence(directory, state, options, expected) {
   }
 }
 
+/**
+ * hold(답을 미룬 정책 질문)가 열려 있으면 완전한 REVIEW_VERIFIED는 없다. 같은 리뷰 관문을 거치되 PARTIAL_VERIFIED로 끝나고,
+ * 남은 hold ID가 원장에 기록된다 — hold가 풀리면 새 리비전으로 그 행만 다시 돈다. 반대로 열린 hold가 없는데 PARTIAL을
+ * 주장할 수는 없다.
+ */
 async function transitionUnderLock(options, directory) {
+  const holds = await openHolds(directory)
+  if (options.to === 'REVIEW_VERIFIED' && holds.length > 0) {
+    throw new CliError(
+      'HOLDS_OPEN',
+      `${holds.map(({ id }) => id).join(', ')} still open — finish as PARTIAL_VERIFIED, or resolve the hold in a new revision`,
+    )
+  }
+  if (options.to !== 'PARTIAL_VERIFIED') return reviewGatedTransition(options, directory)
+  if (holds.length === 0) throw new CliError('NO_OPEN_HOLDS', 'PARTIAL_VERIFIED needs an open hold; use REVIEW_VERIFIED')
+  return reviewGatedTransition({ ...options, to: 'REVIEW_VERIFIED' }, directory, holds.map(({ id }) => id))
+}
+
+async function reviewGatedTransition(options, directory, partialHolds = null) {
   const state = await readConsistentState(directory)
   const allowed = TRANSITIONS[state.state] ?? []
 
@@ -2860,9 +2883,11 @@ async function transitionUnderLock(options, directory) {
     runVerifier(reviewArgs)
   }
 
-  state.state = options.to
+  const finalState = partialHolds ? 'PARTIAL_VERIFIED' : options.to
+  state.state = finalState
   const historyEntry = {
-    state: options.to,
+    state: finalState,
+    ...(partialHolds ? { holds: partialHolds } : {}),
     ...(options.workerAttemptId ? { workerAttemptId: options.workerAttemptId } : {}),
     runId: run?.runId ?? null,
     reason: options.reason ?? null,
@@ -2885,7 +2910,8 @@ async function transitionUnderLock(options, directory) {
 
   const transitionEvent = await appendLedger(directory, {
     type: 'transition',
-    state: options.to,
+    state: finalState,
+    ...(partialHolds ? { holds: partialHolds } : {}),
     ...(options.workerAttemptId ? { workerAttemptId: options.workerAttemptId } : {}),
     evidenceRunId: run?.runId ?? null,
     reason: options.reason ?? null,
@@ -2899,7 +2925,7 @@ async function transitionUnderLock(options, directory) {
     ...(blindMapping ? { blindMapping } : {}),
     ...(reviewAttestation ? { reviewAttestation } : {}),
     stateDelta: {
-      state: options.to,
+      state: finalState,
       testFiles: state.testFiles,
       testBindings: state.testBindings,
       harnessAtValidRed: state.harnessAtValidRed,
@@ -2915,7 +2941,7 @@ async function transitionUnderLock(options, directory) {
   await writeState(directory, state)
   // 드리프트 위에서 멈춤을 기록했다는 사실은 조용히 넘어가지 않는다 — 다음 사람이 잠금 상태를 오해하면 안 된다.
   if (lockStop) notices.push(`LOCK_UNVERIFIED ${lockStop.code}`)
-  process.stdout.write([`STATE_${options.to} run:${run?.runId ?? 'none'}`, ...notices, ''].join('\n'))
+  process.stdout.write([`STATE_${finalState} run:${run?.runId ?? 'none'}`, ...notices, ''].join('\n'))
 }
 
 async function withDirectoryLock(directory, name, work) {
@@ -3633,7 +3659,7 @@ async function evidenceStatus(directory, state, ledger) {
     const missingRows = rows.filter((row) => !mapped.has(row))
     const evidenceEntry = [...(state.history ?? [])]
       .reverse()
-      .find((entry) => entry.state === 'REVIEW_VERIFIED' || entry.state === 'IMPLEMENTED_GREEN')
+      .find((entry) => ['REVIEW_VERIFIED', 'PARTIAL_VERIFIED', 'IMPLEMENTED_GREEN'].includes(entry.state))
     if (!evidenceEntry?.runId || missingRows.length > 0) {
       return {
         status: 'pending',
@@ -3657,7 +3683,7 @@ async function evidenceStatus(directory, state, ledger) {
       '--run',
       evidenceRun.runId,
       '--phase',
-      state.state === 'REVIEW_VERIFIED' ? 'review' : 'green',
+      ['REVIEW_VERIFIED', 'PARTIAL_VERIFIED'].includes(state.state) ? 'review' : 'green',
     ])
     return {
       status: 'verified',
@@ -3684,6 +3710,7 @@ const PACKET_READ_NODES = {
   VALID_RED: ['delivery-ledger', 'delivery-red'],
   IMPLEMENTED_GREEN: ['delivery-ledger', 'delivery-implementation-decision', 'delivery-green-review'],
   REVIEW_VERIFIED: ['delivery-green-review', 'subagent-review', 'review-checklist'],
+  PARTIAL_VERIFIED: ['delivery-green-review', 'subagent-review', 'review-checklist'],
   NEEDS_DECISION: [],
   ORACLE_READY: ['card-confirmation-lock'],
   FAIL: [],
@@ -3724,7 +3751,7 @@ function transitionPacket(to, { state, runEntries, staleRunIds, blockers, eviden
     const predicate = wantsFailing ? isReportedFailingRun : isReportedPassingRun
     // 인용 가능한 run: 신선하고 보고서가 파싱된 run을 최신순으로 — 오래된 run을 예시로 권하지 않는다.
     let entries = runEntries.filter((entry) => !stale.has(entry.runId) && predicate(entry))
-    if (to === 'REVIEW_VERIFIED') {
+    if (REVIEW_TARGETS.has(to)) {
       // GREEN 이후의 실제 재실행만 리뷰 인용이 가능하다 (REVIEW_RERUN_REQUIRED와 같은 규칙).
       const greenEntry = lastEntryFor(state, 'IMPLEMENTED_GREEN')
       if (greenEntry) {
@@ -3762,7 +3789,7 @@ function transitionPacket(to, { state, runEntries, staleRunIds, blockers, eviden
       })
       if (candidateRuns.length > 0 && !satisfied) packetBlockers.push(`FLAKINESS_GATE_${required}_CONSECUTIVE`)
     }
-    if (to === 'REVIEW_VERIFIED') {
+    if (REVIEW_TARGETS.has(to)) {
       requires.push(...reviewRequiredFlags(state.risk, blindMapping))
       // transitionUnderLock이 실제로 쓰는 것과 같은 규칙에서 파생한다 — 규칙 사본을 유지하지 않는다.
       if (blindMapping?.required) {
@@ -3777,12 +3804,12 @@ function transitionPacket(to, { state, runEntries, staleRunIds, blockers, eviden
 
 /** REVIEW_VERIFIED 패킷에만 블라인드 매핑 상태를 붙인다 — 다른 전이에는 해당 개념이 없다. */
 function blindMappingReport(to, blindMapping) {
-  if (to !== 'REVIEW_VERIFIED') return {}
+  if (!REVIEW_TARGETS.has(to)) return {}
   if (!blindMapping) return {}
   return { blindMapping }
 }
 
-function transitionPackets({ state, directory, runEntries, staleRunIds, blockers, evidence, blindMapping }) {
+function transitionPackets({ state, directory, runEntries, staleRunIds, blockers, evidence, blindMapping, holds }) {
   const dir = portablePath(process.cwd(), directory)
   return (TRANSITIONS[state.state] ?? []).map((to) => {
     const { requires, packetBlockers, candidateRuns } = transitionPacket(to, {
@@ -3793,6 +3820,9 @@ function transitionPackets({ state, directory, runEntries, staleRunIds, blockers
       evidence,
       blindMapping,
     })
+    // 열린 hold가 있으면 완전한 REVIEW_VERIFIED는 막히고 PARTIAL_VERIFIED가 그 자리다 — transition이 같은 규칙을 강제한다
+    if (to === 'REVIEW_VERIFIED' && holds.length > 0) packetBlockers.push('HOLDS_OPEN')
+    if (to === 'PARTIAL_VERIFIED' && holds.length === 0) packetBlockers.push('NO_OPEN_HOLDS')
     const example = [`oracle-run.mjs transition --dir ${dir} --to ${to}`]
     for (const flag of requires) {
       if (flag === '--run') example.push(`--run ${candidateRuns[0] ?? '<runId>'}`)
@@ -3844,7 +3874,7 @@ async function readStdinText() {
   return Buffer.concat(chunks).toString('utf8')
 }
 
-const REPORTED_STATES = /^Status:\s*(ORACLE_READY|VALID_RED|IMPLEMENTED_GREEN|REVIEW_VERIFIED|NEEDS_DECISION|FAIL)\b/m
+const REPORTED_STATES = /^Status:\s*(ORACLE_READY|VALID_RED|IMPLEMENTED_GREEN|REVIEW_VERIFIED|PARTIAL_VERIFIED|NEEDS_DECISION|FAIL)\b/m
 
 /**
  * 최종 보고의 주장을 원장과 대조한다 — `Status:` 상태어와 인용된 runId·exit code만. 보고서를 쓰는 에이전트의 자기
@@ -4036,6 +4066,7 @@ async function reportStatus(options) {
       blockers,
       evidence,
       blindMapping,
+      holds: await openHolds(directory),
     }),
   }
   if (options.json) {

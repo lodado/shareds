@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
-import { lstat, open, realpath, stat } from 'node:fs/promises'
+import { lstat, open, readFile, realpath, stat } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
 
 export const ZERO_DIGEST = '0'.repeat(64)
@@ -84,7 +84,22 @@ export function reviewOutputDigest(document) {
 export const HOST_RECEIPTS_FILE = 'host-receipts.jsonl'
 
 /** 실행 없이는 닿지 않는 상태 — 최종 보고가 이 상태를 주장하면 인용한 run이 있어야 원장과 대조할 수 있다. */
-export const RUN_BACKED_STATES = new Set(['VALID_RED', 'IMPLEMENTED_GREEN', 'REVIEW_VERIFIED'])
+export const RUN_BACKED_STATES = new Set(['VALID_RED', 'IMPLEMENTED_GREEN', 'REVIEW_VERIFIED', 'PARTIAL_VERIFIED'])
+
+/**
+ * 오라클 폴더의 패키지에서 아직 답이 없는 hold(`holds[].status: open`). 패키지가 없거나 읽히지 않으면 비어 있다 —
+ * hold는 패키지 경로의 개념이라 손으로 쓴 카드는 해당하지 않는다.
+ */
+export async function openHolds(directory) {
+  let pkg
+  try {
+    pkg = JSON.parse(await readFile(resolve(directory, 'oracle.package.json'), 'utf8'))
+  } catch {
+    return []
+  }
+  if (!Array.isArray(pkg?.holds)) return []
+  return pkg.holds.filter((hold) => hold?.status === 'open')
+}
 
 /** 기존 테스트에서 새로 늘어나면 약화로 보는 토큰. 감소·유지는 통과한다. */
 export const WEAKENING_TOKENS = [
