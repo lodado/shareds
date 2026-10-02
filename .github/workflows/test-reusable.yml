@@ -44,6 +44,32 @@ jobs:
       - name: Install pinned Bend
         run: node packages/frontend-oracle-design/skills/scripts/ensure-bend.mjs
 
+      # `bend --verdict` runs a proof kernel that Bend builds once with Lean into ~/.bend/bendtt. Cache the built
+      # kernel per Bend version; only a cache miss downloads the pinned Lean release (sha256 from its GitHub
+      # release asset) and builds it by proving the fixture laws.
+      - name: Cache the Bend proof kernel
+        id: bend-kernel
+        uses: actions/cache@v4
+        with:
+          path: ~/.bend/bendtt
+          key: ${{ runner.os }}-bendtt-bend-2.0.34-lean-4.34.0
+
+      - name: Build the Bend proof kernel
+        if: steps.bend-kernel.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/lean-4.34.0-linux.tar.zst"
+          curl -fsSL -o "$archive" https://github.com/leanprover/lean4/releases/download/v4.34.0/lean-4.34.0-linux.tar.zst
+          echo "caaa98356098c85dc0fcbbd28e1ec66f39eb6551829972b752ff20e1286b646b  $archive" | sha256sum -c -
+          toolchain="$HOME/.elan/toolchains/leanprover--lean4---v4.34.0"
+          mkdir -p "$toolchain"
+          tar --zstd -xf "$archive" -C "$toolchain" --strip-components=1
+          rm "$archive"
+          cd packages/frontend-oracle-design/test-fixtures/stale-search
+          node ../../skills/scripts/oracle-model.mjs prove --dir . > "$RUNNER_TEMP/prove.json"
+          grep -q '"status":"proven"' "$RUNNER_TEMP/prove.json"
+          ls "$HOME"/.bend/bendtt/*/bendtt
+
       - name: Run tests
         run: pnpm test
         env:
