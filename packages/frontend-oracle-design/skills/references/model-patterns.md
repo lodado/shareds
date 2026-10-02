@@ -1,7 +1,8 @@
 # Model patterns — rules, strong laws, time, errors, attempts and effect counts
 
 Read this before writing `MODEL.bend`, `LAWS.bend` and `PROOF.bend`. It adds modeling patterns to
-[`bend-cross-verification.md`](bend-cross-verification.md) §2; it creates no policy. Every value below
+[`bend-cross-verification.md`](bend-cross-verification.md) §2; it creates no policy and no product
+structure — the product keeps the shape [`types/state-ladder.md`](types/state-ladder.md) gives it. Every value below
 (retry count, delay, error kind, staleness bound) comes from an approved source or an Open question —
 never from the pattern.
 

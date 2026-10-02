@@ -260,8 +260,12 @@ observation meaning, and never skip a case. GREEN needs both labels' runs fresh 
 snapshot; a proof run is never reused as product evidence and an earlier GREEN never covers new
 product bytes.
 
-If the product itself runs Bend-generated code, run the conformance on that generated artifact and
-its calling boundary; a proof of an unused model verifies nothing about the product.
+The model is the oracle, not the product's design. Write the product by the state ladder
+([`types/state-ladder.md`](types/state-ladder.md)): never mirror the model's message union, `step` or
+state record as a reducer, transition table or state machine, never extract one so a test can drive
+it, and never import the model or its compiled module from product code — the conformance would then
+compare the model with itself. The tests reach the product only through the adapter, so the product
+keeps the shape the ladder gives it.
 
 ### Formal Oracle Projection — generated conformance tests
 
@@ -280,13 +284,13 @@ narrowest architecture unit the model covers, following the test-locality rule o
 
 ```
 features/feed-infinite-scroll/
-  model/
-    feed-pagination.ts              product code — the pure transition under test
-    __test__/formal/
-      MODEL.bend  LAWS.bend  PROOF.bend  World.bend   authored, locked (PROOF is free)
-      feed.adapter.mjs              the boundary — written by the AI, reviewed
-      feed.model.mjs                generated: compiled model
-      feed.oracle.test.mjs          generated: conformance test
+  api/feed-query.ts                 product code — the query owns pages, retries and fetch state
+  ui/FeedGrid.tsx                   product code — shaped by the state ladder, not by the model
+  __test__/formal/
+    MODEL.bend  LAWS.bend  PROOF.bend  World.bend   authored, locked (PROOF is free)
+    feed.adapter.tsx                the boundary — drives FeedGrid; written by the AI, reviewed
+    feed.model.mjs                  generated: compiled model, imported only by the test
+    feed.oracle.test.mjs            generated: conformance test
 .ai/oracles/<id>/                   the run: card, journal, oracle.package.json, sources/, lock, ledger
 ```
 
@@ -389,7 +393,10 @@ through the adapter.
 
 1. **Pick the mode from the card.** An Order or sequence dimension → `emit-trace` (the model's
    `next(history)` is the environment). A per-step rule over a state·command domain, or several
-   allowed results → `emit-state` with relations proven in `LAWS.bend`.
+   allowed results → `emit-state` with relations proven in `LAWS.bend`. `emit-trace` drives the real
+   component; `emit-state` needs a pure product function over exactly that domain, so use it only
+   where the ladder already produced one (`moveColumn(order, from, to)`), never a reducer written
+   for the test.
 2. **Write the adapter, not the test.** Map each event to the product call its term's `Path` names,
    read the observation through the product, throw on anything unmapped. For a React component:
 

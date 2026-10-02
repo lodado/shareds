@@ -127,11 +127,17 @@ Reducers·transition tables·state machines are not the default.
   the need is proven.
 - XState is a candidate only when hierarchical·parallel state or actor coordination is actually in
   the card, and use it only when it is installed or its adoption is approved.
-- **Merely because the card has a `## State Model`**, do not build runtime machinery such as an
-  Event union·transition function·transition command. The State Model is a notation that writes
-  down the policy without omission, and this ladder decides what to implement that policy with. The
-  loading·success·failure of a single simple query ends at rung 2, and even at rung 3 what is
+- **Merely because the card has a `## State Model` or a Bend model**, do not build runtime
+  machinery such as an Event union·transition function·transition command. The State Model is a
+  notation that writes down the policy without omission, `MODEL.bend` is the oracle the generated
+  tests compute expected values with, and this ladder decides what to implement that policy with.
+  The loading·success·failure of a single simple query ends at rung 2, and even at rung 3 what is
   needed is one state union and a few intent functions.
+- Model messages are test vocabulary, not product actions. An event the product only has to survive
+  (a view switch that keeps an order, a response that arrives late) is performed by the adapter; it
+  needs product code only where the owner's placement does not already give the outcome. A model
+  field the product can derive or a library owns (attempt counts, fetch state) stays derived or
+  owned (rungs 1·2).
 
 ### State ownership is singular
 

@@ -187,3 +187,22 @@ test('the model package has a small copyable example that passes the model-stage
   assert.deepEqual(packageIssues(JSON.parse(raw), { stage: 'model' }), [])
   assert.ok(raw.length < 6000, 'small enough to read whole in one call')
 })
+
+test('the Bend model is the oracle the tests compute with, never the shape of the product code', async () => {
+  const [bend, ladder, patterns] = await Promise.all([
+    read('references/bend-cross-verification.md'),
+    read('references/types/state-ladder.md'),
+    read('references/model-patterns.md'),
+  ])
+  assert.match(bend, /The\s+model\s+is\s+the\s+oracle,\s+not\s+the\s+product's\s+design/)
+  assert.match(bend, /never\s+mirror\s+the\s+model's\s+message\s+union/)
+  assert.match(bend, /never\s+import\s+the\s+model\s+or\s+its\s+compiled\s+module\s+from\s+product\s+code/)
+  // emit-state drives a pure function the ladder produced, never a reducer written for the test
+  assert.match(bend, /never\s+a\s+reducer\s+written\s+for\s+the\s+test/)
+  // the placement example drives a component; it no longer shows product code as the model's transition
+  assert.doesNotMatch(bend, /the pure transition under test/)
+  assert.match(bend, /ui\/FeedGrid\.tsx\s+product code — shaped by the state ladder, not by the model/)
+  assert.match(ladder, /`## State Model`\s+or\s+a\s+Bend\s+model/)
+  assert.match(ladder, /Model\s+messages\s+are\s+test\s+vocabulary,\s+not\s+product\s+actions/)
+  assert.match(patterns, /no\s+product\s+structure/)
+})
