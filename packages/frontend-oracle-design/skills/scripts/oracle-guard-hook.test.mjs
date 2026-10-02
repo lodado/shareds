@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { reviewOutputDigest } from './oracle-fs.mjs'
+import { spawnGit } from './resolve-executable.mjs'
 
 const script = join(dirname(fileURLToPath(import.meta.url)), 'oracle-guard-hook.mjs')
 
@@ -248,12 +249,26 @@ test('every review artifact in a reply is recorded, the receipt file is protecte
   assert.equal(await readFile(join(red, '.ai', 'oracles', 'sample', 'host-receipts.jsonl'), 'utf8'), '')
 })
 
-/** 스킬을 켠 세션 기록 — Skill 호출 시각과 그 뒤의 assistant 문장들. */
-async function transcript(root, { at = '2026-10-02T03:00:00.000Z', skill = 'frontend-oracle-design:frontend-oracle-design', after = [] } = {}) {
+/** 사용자가 슬래시 명령으로 스킬을 켠 기록 — Claude Code는 Skill tool_use 없이 이 user 문자열만 남긴다. */
+const slashEntry = (skill, at) => ({
+  type: 'user',
+  timestamp: at,
+  message: { content: `<command-message>${skill}</command-message>\n<command-name>/${skill}</command-name>\n<command-args>go</command-args>` },
+})
+
+/** 스킬을 켠 세션 기록 — Skill 호출(또는 슬래시 명령) 시각과 그 뒤의 assistant 문장들. */
+async function transcript(
+  root,
+  { at = '2026-10-02T03:00:00.000Z', skill = 'frontend-oracle-design:frontend-oracle-design', via = 'tool', after = [] } = {},
+) {
   const path = join(root, 'session.jsonl')
+  const activation =
+    via === 'slash'
+      ? slashEntry(skill, at)
+      : { type: 'assistant', timestamp: at, message: { content: [{ type: 'tool_use', name: 'Skill', input: { skill } }] } }
   const entries = [
     { type: 'user', timestamp: '2026-10-02T02:59:00.000Z', message: { content: 'write the tests now' } },
-    { type: 'assistant', timestamp: at, message: { content: [{ type: 'tool_use', name: 'Skill', input: { skill } }] } },
+    activation,
     ...after.map((text) => ({ type: 'assistant', timestamp: at, message: { content: [{ type: 'text', text }] } })),
   ]
   await writeFile(path, `${entries.map((entry) => JSON.stringify(entry)).join('\n')}\n`)
@@ -307,4 +322,86 @@ test('the test gate stays out of sessions that never activated the skill or rout
   assert.equal(hook(write(root, test_file)).decision, null)
   const routed = await transcript(root, { after: ['Status: OUT_OF_SCOPE — copy change, routed to $test'] })
   assert.equal(hook(writeIn(root, routed, test_file)).decision, null)
+})
+
+test('a slash-command activation closes the test gate like a Skill call; a tool result quoting the tag does not', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-guard-slash-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const test_file = 'src/features/run/__test__/run.test.ts'
+
+  for (const skill of ['frontend-oracle-design:frontend-oracle-design', 'frontend-oracle-design']) {
+    const denied = hook(writeIn(root, await transcript(root, { via: 'slash', skill }), test_file))
+    assert.equal(denied.decision?.permissionDecision, 'deny', skill)
+    assert.match(denied.decision.permissionDecisionReason, /^TEST_BEFORE_LOCK: /)
+  }
+  assert.equal(hook(writeIn(root, await transcript(root, { via: 'slash', skill: 'test:test' }), test_file)).decision, null)
+
+  // grep 결과처럼 태그 문자열을 담은 tool_result는 활성화가 아니다
+  const quoted = join(root, 'quoted.jsonl')
+  const { message } = slashEntry('frontend-oracle-design:frontend-oracle-design', '2026-10-02T03:00:00.000Z')
+  await writeFile(
+    quoted,
+    `${JSON.stringify({ type: 'user', timestamp: '2026-10-02T03:00:00.000Z', message: { content: [{ type: 'tool_result', content: message.content }] } })}\n`,
+  )
+  assert.equal(hook(writeIn(root, quoted, test_file)).decision, null)
+})
+
+/** 오라클을 cwd 아래 패키지에 둔 모노레포 — 세션은 레포 루트에서 시작한다. */
+async function monorepo(t, state, { git = false } = {}) {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-guard-mono-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const oracle = join(root, 'packages', 'app', '.ai', 'oracles', 'sample')
+  await mkdir(oracle, { recursive: true })
+  await mkdir(join(root, 'packages', 'web'), { recursive: true })
+  // 탐색이 무거운 폴더로 내려가지 않는다 — 여기 둔 오라클은 찾지 않아야 한다
+  await mkdir(join(root, 'node_modules', 'dep', '.ai', 'oracles', 'vendored'), { recursive: true })
+  await writeFile(join(root, 'node_modules', 'dep', '.ai', 'oracles', 'vendored', 'run-state.json'), JSON.stringify({ state }))
+  await writeFile(join(oracle, 'run-state.json'), JSON.stringify({ schemaVersion: 3, state, scanRoot: '../../..' }))
+  if (git) assert.equal(spawnGit(['init', '-q', root]).status, 0)
+  return { root, oracle }
+}
+
+const reviewFindings = { findings: [{ id: 'f-1', row: 'O1', severity: 'low' }] }
+const reviewerStop = (cwd) => ({
+  cwd,
+  hook_event_name: 'SubagentStop',
+  agent_id: 'agent-1',
+  last_assistant_message: JSON.stringify(reviewFindings),
+})
+
+test('a review receipt reaches an oracle below the start folder, and one in a sibling package of the git repository', async (t) => {
+  const below = await monorepo(t, 'IMPLEMENTED_GREEN')
+  assert.equal(hook(reviewerStop(below.root)).status, 0)
+  const recorded = await readFile(join(below.oracle, 'host-receipts.jsonl'), 'utf8')
+  assert.equal(JSON.parse(recorded).sha256, reviewOutputDigest(reviewFindings).sha256)
+  await assert.rejects(readFile(join(below.root, 'node_modules', 'dep', '.ai', 'oracles', 'vendored', 'host-receipts.jsonl')), {
+    code: 'ENOENT',
+  })
+
+  const sibling = await monorepo(t, 'IMPLEMENTED_GREEN', { git: true })
+  hook(reviewerStop(join(sibling.root, 'packages', 'web')))
+  assert.equal(JSON.parse(await readFile(join(sibling.oracle, 'host-receipts.jsonl'), 'utf8')).sha256, reviewOutputDigest(reviewFindings).sha256)
+})
+
+test('a final report finds its oracle below the start folder, and says so when no oracle owns its runs', async (t) => {
+  const { root, oracle } = await monorepo(t, 'IMPLEMENTED_GREEN')
+  await writeFile(join(oracle, 'runs.jsonl'), `${JSON.stringify({ runId: 'r-001', at: '2026-10-02T03:00:00.000Z' })}\n`)
+  const stop = (cwd, message) =>
+    spawnSync(process.execPath, [script], {
+      input: JSON.stringify({ cwd, hook_event_name: 'Stop', last_assistant_message: message }),
+      encoding: 'utf8',
+    })
+
+  // 이 최소 원장은 runner가 판정하지 못한다 — 그래도 주인 오라클로 골라졌다는 흔적이 남는다
+  const owned = stop(root, 'Status: IMPLEMENTED_GREEN — done\n- behavior r-001 exit 0\n')
+  assert.equal(owned.status, 0)
+  assert.doesNotMatch(owned.stderr, /ORACLE_NOT_FOUND/)
+  assert.match(owned.stderr, /packages\/app\/\.ai\/oracles\/sample/)
+
+  const orphan = stop(root, 'Status: REVIEW_VERIFIED — done\n- behavior r-042 exit 0\n')
+  assert.equal(orphan.status, 0)
+  assert.equal(orphan.stdout.trim(), '')
+  assert.equal(JSON.parse(orphan.stderr.trim()).reason, 'ORACLE_NOT_FOUND')
+  // 실행 없이 닿는 상태의 무인용 보고는 주인을 찾지 않는다
+  assert.equal(stop(root, 'Status: NEEDS_DECISION — waiting on Q1\n').stderr.trim(), '')
 })

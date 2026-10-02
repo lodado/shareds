@@ -9,7 +9,7 @@
 // Any failure to judge is fail-open (exit 0, no output): the gate in oracle-run.mjs stays the authority.
 import { Buffer } from 'node:buffer'
 import { spawnSync } from 'node:child_process'
-import { appendFile, readdir, readFile, stat } from 'node:fs/promises'
+import { appendFile, readdir, readFile, realpath, stat } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -21,6 +21,7 @@ import {
   RUN_BACKED_STATES,
   WEAKENING_TOKENS,
 } from './oracle-fs.mjs'
+import { spawnGit } from './resolve-executable.mjs'
 
 const runScript = join(dirname(fileURLToPath(import.meta.url)), 'oracle-run.mjs')
 
@@ -33,8 +34,41 @@ async function readStdin() {
   return Buffer.concat(chunks).toString('utf8')
 }
 
-/** cwd와 대상 파일의 조상 디렉터리에서 `.ai/oracles/<id>/` 디렉터리를 모은다. */
-async function oracleDirectories(cwd, filePath) {
+const SKIPPED_DIRECTORIES = new Set(['node_modules', 'dist', 'build', 'coverage'])
+const NESTED_DEPTH = 4
+
+/** git 저장소 루트 — 없으면 cwd. 레포 루트나 형제 패키지에서 시작한 세션도 같은 범위를 본다. */
+function repositoryRoot(cwd) {
+  const result = spawnGit(['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', timeout: 2000 })
+  const root = result.status === 0 ? result.stdout.trim() : ''
+  return root || cwd
+}
+
+/** 한 폴더에 `.ai`가 있는지와 내려갈 하위 폴더 — 의존성·빌드 산출물·숨김 폴더로는 내려가지 않는다. */
+async function scanDirectory(directory) {
+  const entries = await readdir(directory, { withFileTypes: true }).catch(() => [])
+  const folders = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name)
+  const children = folders.filter((name) => !name.startsWith('.') && !SKIPPED_DIRECTORIES.has(name))
+  return { hasOracleRoot: folders.includes('.ai'), children: children.map((name) => join(directory, name)) }
+}
+
+/** base부터 NESTED_DEPTH 단계 아래까지 `.ai`를 가진 폴더. */
+async function nestedRoots(base) {
+  const roots = []
+  let level = [base]
+  for (let depth = 0; depth <= NESTED_DEPTH && level.length > 0; depth++) {
+    const scanned = await Promise.all(level.map(scanDirectory))
+    roots.push(...level.filter((_, index) => scanned[index].hasOracleRoot))
+    level = scanned.flatMap(({ children }) => children)
+  }
+  return roots
+}
+
+/**
+ * cwd와 대상 파일의 조상 디렉터리에서 `.ai/oracles/<id>/` 디렉터리를 모은다. `nested`면 저장소 루트 아래도 찾는다 —
+ * 쓰기는 대상 파일에서 위로 올라가면 닿지만, 보고·영수증은 cwd밖에 없어서 cwd 아래 패키지의 오라클을 놓친다.
+ */
+async function oracleDirectories(cwd, filePath, nested = false) {
   const roots = new Set([cwd])
   let cursor = dirname(filePath)
   while (true) {
@@ -43,20 +77,29 @@ async function oracleDirectories(cwd, filePath) {
     if (parent === cursor) break
     cursor = parent
   }
+  if (nested) for (const root of await nestedRoots(repositoryRoot(cwd))) roots.add(root)
 
+  // git은 실제 경로를 돌려준다(macOS /var → /private/var) — 같은 오라클을 두 번 세지 않게 실제 경로로 거른다
+  const seen = new Set()
   const directories = []
   for (const root of roots) {
     const oracles = join(root, '.ai', 'oracles')
     const entries = await readdir(oracles, { withFileTypes: true }).catch(() => [])
-    directories.push(...entries.filter((entry) => entry.isDirectory()).map((entry) => join(oracles, entry.name)))
+    for (const entry of entries.filter((candidate) => candidate.isDirectory())) {
+      const directory = join(oracles, entry.name)
+      const key = await realpath(directory).catch(() => directory)
+      if (seen.has(key)) continue
+      seen.add(key)
+      directories.push(directory)
+    }
   }
   return directories
 }
 
 /** 그 디렉터리들의 `run-state.json`을 모은다. */
-async function findStates(cwd, filePath) {
+async function findStates(cwd, filePath, nested = false) {
   const states = []
-  for (const directory of await oracleDirectories(cwd, filePath)) {
+  for (const directory of await oracleDirectories(cwd, filePath, nested)) {
     const raw = await readFile(join(directory, 'run-state.json'), 'utf8').catch(() => null)
     if (!raw) continue
     try {
@@ -69,19 +112,27 @@ async function findStates(cwd, filePath) {
   return states
 }
 
-/** 세션 기록 한 줄의 assistant 내용 조각 — 읽을 수 없거나 assistant가 아니면 빈 배열. */
-function assistantParts(line) {
+const SLASH_ACTIVATION = /<command-name>\/(?:frontend-oracle-design:)?frontend-oracle-design<\/command-name>/
+
+/**
+ * 세션 기록 한 줄의 판정 조각 — assistant 내용과, 슬래시 명령으로 스킬을 켠 user 줄. 슬래시 명령은 Skill tool_use 없이
+ * 문자열 content만 남긴다. 같은 태그를 인용한 tool_result(배열 content)는 활성화가 아니다. 읽을 수 없으면 빈 배열.
+ */
+function transcriptParts(line) {
   try {
     const entry = JSON.parse(line)
-    if (entry.type !== 'assistant' || !Array.isArray(entry.message?.content)) return []
-    return entry.message.content.map((part) => ({ part, at: Date.parse(entry.timestamp) || 0 }))
+    const at = Date.parse(entry.timestamp) || 0
+    const content = entry.message?.content
+    if (entry.type === 'user' && typeof content === 'string' && SLASH_ACTIVATION.test(content)) return [{ part: { type: 'slash' }, at }]
+    if (entry.type !== 'assistant' || !Array.isArray(content)) return []
+    return content.map((part) => ({ part, at }))
   } catch {
     return []
   }
 }
 
 const activatesSkill = ({ type, name, input }) =>
-  type === 'tool_use' && name === 'Skill' && /frontend-oracle-design/.test(input?.skill ?? '')
+  type === 'slash' || (type === 'tool_use' && name === 'Skill' && /frontend-oracle-design/.test(input?.skill ?? ''))
 const routesOut = ({ type, text }) => type === 'text' && /^Status:\s*OUT_OF_SCOPE\b/m.test(text ?? '')
 
 /**
@@ -94,7 +145,7 @@ async function skillActivation(transcriptPath) {
   const parts = raw
     .split('\n')
     .filter((line) => line.includes('frontend-oracle-design') || line.includes('OUT_OF_SCOPE'))
-    .flatMap(assistantParts)
+    .flatMap(transcriptParts)
   const first = parts.findIndex(({ part }) => activatesSkill(part))
   if (first === -1 || parts.slice(first).some(({ part }) => routesOut(part))) return null
   return parts[first].at
@@ -174,7 +225,9 @@ async function recordHostReceipt(payload, cwd, text) {
     (digest) =>
       `${JSON.stringify({ agentId: payload.agent_id, agentType: payload.agent_type ?? '', sessionId: payload.session_id ?? '', ...digest, at })}\n`,
   )
-  for (const { directory, state } of await findStates(cwd, cwd)) {
+  const states = await findStates(cwd, cwd, true)
+  if (states.length === 0) unjudged('ORACLE_NOT_FOUND', { event: 'SubagentStop', agentId: payload.agent_id })
+  for (const { directory, state } of states) {
     if (state.state === 'IMPLEMENTED_GREEN') await appendFile(join(directory, HOST_RECEIPTS_FILE), lines.join(''))
   }
 }
@@ -186,7 +239,7 @@ async function recordHostReceipt(payload, cwd, text) {
 async function reportOwners(cwd, cited, message) {
   const lockSha256 = message.match(/Oracle SHA-256\s+([a-f0-9]{64})/)?.[1]
   const owners = []
-  for (const { directory, state } of await findStates(cwd, cwd)) {
+  for (const { directory, state } of await findStates(cwd, cwd, true)) {
     if (lockSha256 && state.lockSha256 !== lockSha256) continue
     const ledger = await readFile(join(directory, 'runs.jsonl'), 'utf8').catch(() => '')
     if (![...cited].every((runId) => ledger.includes(`"runId":"${runId}"`))) continue
@@ -203,8 +256,8 @@ async function reportOwners(cwd, cited, message) {
 
 /**
  * 최종 보고 대조 — 가장 최근에 움직인 주인 오라클 하나가 판정한다. 그 원장과 맞으면 통과, 어긋나면 막는다. 판정할 수 없는
- * 후보(손상된 원장)는 건너뛰고 다음 후보로 간다. 주인이 없으면(Design-only·다른 레포) 판정하지 않는다. 막은 뒤의
- * 재시도(stop_hook_active)는 다시 막지 않는다.
+ * 후보(손상된 원장)는 건너뛰고 다음 후보로 간다. 주인이 없으면(Design-only·다른 레포) 판정하지 않고
+ * `ORACLE_NOT_FOUND` 흔적만 남긴다. 막은 뒤의 재시도(stop_hook_active)는 다시 막지 않는다.
  */
 async function checkFinalReport(payload, cwd) {
   const message = payload.last_assistant_message
@@ -216,7 +269,9 @@ async function checkFinalReport(payload, cwd) {
   // 무인용을 불일치로 판정한다. 실행 없이 닿는 상태(Design-only 보고)의 무인용은 판정하지 않는다.
   if (cited.size === 0 && !RUN_BACKED_STATES.has(claimed)) return
 
-  for (const directory of await reportOwners(cwd, cited, message)) {
+  const owners = await reportOwners(cwd, cited, message)
+  if (owners.length === 0) unjudged('ORACLE_NOT_FOUND', { event: 'Stop', claimed, runs: [...cited] })
+  for (const directory of owners) {
     const checked = spawnSync(process.execPath, [runScript, 'status', '--dir', directory, '--check-report', '-'], {
       input: message,
       encoding: 'utf8',
@@ -312,7 +367,8 @@ async function main() {
   const cwd = typeof payload.cwd === 'string' ? payload.cwd : process.cwd()
   if (payload.hook_event_name === 'Stop') await checkFinalReport(payload, cwd)
   else if (payload.hook_event_name === 'SubagentStop') await recordHostReceipt(payload, cwd, payload.last_assistant_message)
-  // v2.1.271+ 서브에이전트는 SubagentHandback 도구로 보고를 넘긴다 — 그때 마지막 메시지는 보고가 아니다
+  // SubagentHandback으로 넘긴 보고 — 2026-10-02 기준 hooks 문서에 없고 2.1.286 로컬 기록에서 관찰 0건이다(서브에이전트는
+  // 마지막 메시지로 반환했다). 놓치면 영수증이 self-reported로 내려갈 뿐이라 남겨 둔다
   else if (payload.tool_name === 'SubagentHandback') await recordHostReceipt(payload, cwd, payload.tool_input?.message)
   else await guardWrite(payload, cwd)
 }

@@ -468,12 +468,19 @@ hook은 가속기이고 `oracle-run.mjs transition`이 최종 권위입니다. �
   가장 최근에 움직인 것(보고가 `Oracle SHA-256`을 적었으면 그 잠금의 오라클)과
   `oracle-run.mjs status --check-report -`로 대조하고, 어긋나면 `REPORT_CLAIM_MISMATCH`로 멈춤을 막습니다.
   막은 뒤의 재시도(`stop_hook_active`)는 다시 막지 않습니다. hook이 없는 호스트는 같은 명령을 직접 돌립니다.
+- **오라클 찾기**: 쓰기는 대상 파일에서 위로 올라가며 찾습니다. SubagentStop과 Stop은 cwd의 조상에 더해 git 저장소
+  루트(없으면 cwd)부터 4단계 아래까지 `.ai/`를 찾습니다(`node_modules`·`dist`·`build`·`coverage`·숨김 폴더 제외).
+  레포 루트에서 시작한 세션도 `packages/app/.ai/oracles/`의 오라클에 영수증을 남기고 보고를 대조합니다.
+- **스킬 활성화(`TEST_BEFORE_LOCK`)**: 세션 기록에서 `Skill` 호출이나 `/frontend-oracle-design` 슬래시 명령을
+  봅니다. 서브에이전트 hook도 부모 세션 기록을 받으므로(2026-10-02, 2.1.286에서 확인) 부모가 켰으면 막힙니다.
+  `claude -p`·teammate처럼 새로 시작한 세션은 자기 기록만 보므로, 그 세션이 스킬을 직접 켜야 이 관문이 걸립니다.
 
 영수증은 같은 셸 권한을 가진 에이전트가 위조하거나 지울 수 있습니다. 구현 중 쓰기에서 hook이 파일을 만들면
 `IMPLEMENTED_GREEN`이 그 사실을 원장에 남기고 리뷰 때 사라진 파일을 막지만, 이것은 비용을 올릴 뿐 증명이 아닙니다.
 
 판정 불가는 fail-open이지만 조용히 사라지지 않습니다. hook은 stderr에 한 줄 JSON을 남깁니다 —
-`{"oracleGuard":"unjudged","reason":"STATE_UNPARSEABLE"|"SCAN_ROOT_MISSING"|"PAYLOAD_UNREADABLE",...}`.
+`{"oracleGuard":"unjudged","reason":"STATE_UNPARSEABLE"|"SCAN_ROOT_MISSING"|"PAYLOAD_UNREADABLE"|"ORACLE_NOT_FOUND",...}`.
+`ORACLE_NOT_FOUND`는 runId를 인용한 보고나 리뷰어 반환물의 주인 오라클을 찾지 못했다는 뜻입니다.
 stdout과 종료 코드는 그대로이므로 쓰기는 계속 진행되고, 흔적만 남습니다.
 
 ### Harness garbage collection
