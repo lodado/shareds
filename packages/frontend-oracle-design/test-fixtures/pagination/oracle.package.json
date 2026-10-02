@@ -218,6 +218,16 @@
         "RESPONSE_CURRENT": "CurrentReply",
         "RESPONSE_STALE": "StaleReply"
       }
+    },
+    "reviewedBy": {
+      "agent": "fixture stand-in: ocx-gpt-5-6-sol, fresh context (this fixture has no analyst run to continue)",
+      "inputDigest": "b62c3fd1dd4e1865448cc69d1c08200ea2e7cea9dd99499051abae4046dde469",
+      "disputes": [
+        "response=success -> Answered: Grid.response answers any Arrive without a success status; it cannot tell success from failure",
+        "response=http-5xx has no mapping",
+        "state error has no mapping",
+        "events ERROR_5XX and RETRY have no mapping"
+      ]
     }
   }
 }

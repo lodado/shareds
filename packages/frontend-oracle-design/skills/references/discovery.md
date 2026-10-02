@@ -126,8 +126,14 @@ a transition the model takes that the declaration lacks or states otherwise is a
 witness trace. The translation table is an interpretation the agent writes, so the findings are
 candidates, never a verdict, and the declared table never becomes a second source of truth. A version-1
 package is `not-applicable`; a version-2 package without `crossCheck` is `undeclared` until mapped or
-written off with a sourced `n/a`. The same check gates the lock: card lint fails `cross-check-undecided` for
-every candidate without a fitting decision, and closure runs the joint cases in its trace conformance.
+written off with a sourced `n/a`. The same check gates the lock: card lint fails `cross-check-undecided` for every candidate without a fitting decision, and closure runs the joint cases in its trace conformance.
+Two readings make the comparison meaningful. The model analyst writes the declared `## State Model` from the
+source alone (registered as its own source, `crossCheck.states`) while the author writes the behavior model,
+and the same analyst — continued, never a fresh agent and never the author — then checks the translation table from `oracle-discovery.mjs
+mapping-input` — the declared tables, the model's types and classifiers, never `step` — and is recorded as
+`crossCheck.reviewedBy: {agent, inputDigest}`. The gate fails `cross-check-unreviewed` without a review of the
+current input. Run the analyst on the newest model the host can dispatch, from another family when one is as recent (for example the newest `ocx-gpt-*` agent under Claude), and name the exact model in `agent`; where no delegation exists, `agent: controller`
+records that the two readings are one.
 
 ## Axis Breaker — classifying what was found
 

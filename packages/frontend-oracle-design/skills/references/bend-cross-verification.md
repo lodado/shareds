@@ -88,8 +88,7 @@ and the investigated files; it is projected as `## Type Contract` and only then 
    read-only model analyst with only the file `oracle-adequacy.mjs model-input --package <pkg>` writes outside the repository:
    the source text verbatim, the hazards and the authoring rules — no Outcome reading, policy sentence,
    term, goal, contract, model file or product code of the author. The analyst writes the world record,
-   assumptions and goals of [`adequacy.md`](adequacy.md); the author writes the behavior model and the
-   contract predicates. Record each goal's `author` (`analyst` or `controller`). The author never edits
+   assumptions and goals of [`adequacy.md`](adequacy.md) — and, when the flow has states, its own `## State Model` — in parallel with the author, who writes the behavior model and the contract predicates; run the analyst on the newest model the host can dispatch, from another family when one is as recent. Record each goal's `author` (`analyst` or `controller`). The author never edits
    the analyst's output — `World.bend` is that output byte for byte, with no second copy; a disagreement is an Open question. Without delegation, record the limitation
    and write `author: controller`: the tools then report `independence.evidence: none` and the adequacy
    claim as `self-consistency`, never as an independent reading. Agreement between agents is not approval.

@@ -21,6 +21,7 @@ import {
   declaredStatus,
   killedChecks,
   lifecycle,
+  mappingInput,
   OPERATORS,
   perturbations,
   productCompleteReasons,
@@ -994,4 +995,54 @@ test('[bend] the cross-check gate lists every undecided candidate and clears onc
   assert.deepEqual(await crossCheckIssues({ loaded: await loadPackage('written-off.json', { root }), bin }), [])
   // a version-1 package is not gated
   assert.deepEqual(await crossCheckIssues({ loaded: { pkg: PKG, root: FIXTURE, path: join(FIXTURE, 'oracle.package.json') }, bin }), [])
+})
+
+// ── two readings: the analyst's state table and the review of the translation table ────────────────────────────
+
+test('[bend] the mapping review input shows the declared tables, the types, the classifiers and the mapping — never the step logic', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = fileURLToPath(new URL('../../test-fixtures/pagination/', import.meta.url))
+  const input = await mappingInput({ loaded: await loadPackage('oracle.package.json', { root }) })
+  for (const shown of ['## Case space', '## State Model', 'type Grid is Data:', 'def Grid.arrival(', '"crossCheck"', 'Grid.phase'])
+    assert.ok(input.includes(shown), shown)
+  for (const hidden of ['def Grid.step(', 'def Grid.next(', 'Env.scan'])
+    assert.ok(!input.includes(hidden), `${hidden} leaked into the mapping review input`)
+  // the review record names the reviewer and the digest of exactly this input; the record itself is not part of it
+  const pkg = JSON.parse(await readFile(join(root, 'oracle.package.json'), 'utf8'))
+  assert.equal(pkg.crossCheck.reviewedBy.inputDigest, createHash('sha256').update(input).digest('hex'))
+})
+
+test('[bend] the gate needs a current review of the translation table, and reads the analyst state table from its own source', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await mkdtemp(join(tmpdir(), 'oracle-review-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  await cp(fileURLToPath(new URL('../../test-fixtures/pagination/', import.meta.url)), root, { recursive: true })
+  const pkg = JSON.parse(await readFile(join(root, 'oracle.package.json'), 'utf8'))
+  const gate = async (name, value) => {
+    await writePackage(root, name, value)
+    return crossCheckIssues({ loaded: await loadPackage(name, { root }), bin })
+  }
+  const unreviewed = clone(pkg)
+  delete unreviewed.crossCheck.reviewedBy
+  assert.ok((await gate('unreviewed.json', unreviewed)).some((issue) => issue.startsWith('cross-check-unreviewed: ')))
+  // a mapping changed after the review makes the review stale
+  const moved = clone(pkg)
+  moved.crossCheck.dimensions.arrival.values.sequential = 'Overtaken'
+  assert.ok((await gate('moved.json', moved)).some((issue) => /^cross-check-unreviewed: .*stale/.test(issue)))
+  // the analyst's own state table, registered as its own source, is what the model is compared with
+  await writeFile(
+    join(root, 'analyst-states.md'),
+    '# Analyst reading\n\n## State Model\n\n- States: showing, loading\n- Events: GO_PAGE, RESPONSE_CURRENT, RESPONSE_STALE\n\n| From | Event | To |\n| ---- | ----- | -- |\n| showing | GO_PAGE | loading |\n| loading | RESPONSE_CURRENT | showing |\n| loading | RESPONSE_STALE | loading |\n| showing | RESPONSE_STALE | showing |\n',
+  )
+  const split = clone(pkg)
+  split.sources.push({ id: 'S6', kind: 'product-policy', jurisdiction: 'analyst state reading', standard: 'model analyst', location: 'repo:analyst-states.md', approval: 'approved' })
+  split.crossCheck.states = 'S6'
+  await writePackage(root, 'split.json', split)
+  const result = await spaceCrossCheck({ loaded: await loadPackage('split.json', { root }), bin })
+  const silent = result.candidates.filter((entry) => entry.class === 'silent-decision').map((entry) => entry.evidence.transition)
+  // the analyst read a stale reply while showing as ignored, like the model; the other three remain disagreements
+  assert.ok(!silent.includes('showing -RESPONSE_STALE-> showing'), silent.join(' | '))
+  assert.ok(silent.includes('loading -GO_PAGE-> showing'), silent.join(' | '))
 })

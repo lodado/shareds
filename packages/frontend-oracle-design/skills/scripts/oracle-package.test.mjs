@@ -1080,6 +1080,11 @@ test('[bend] card lint refuses a version-2 card while a cross-check candidate is
   }
   pkg.sources.find((source) => source.self).location = 'repo:oracle.package.v2.json#v1'
   await writeFile(join(root, 'oracle.package.v2.json'), `${JSON.stringify(pkg, null, 2)}\n`)
+  // a reviewer that did not write the model read exactly this mapping input
+  const { mappingInput } = await import('./oracle-discovery.mjs')
+  const review = await mappingInput({ loaded: await loadPackage('oracle.package.v2.json', { root }) })
+  pkg.crossCheck.reviewedBy = { agent: 'ocx-gpt-5-5 (test stand-in)', inputDigest: sha256(review) }
+  await writeFile(join(root, 'oracle.package.v2.json'), `${JSON.stringify(pkg, null, 2)}\n`)
   const projected = node(root, 'oracle-package.mjs', ['project-card', '--package', 'oracle.package.v2.json', '--out', 'oracle.v2.md'])
   assert.equal(projected.status, 0, projected.stderr)
   const lint = () => node(root, 'oracle-verify.mjs', ['card', '--oracle', 'oracle.v2.md'])
@@ -1094,6 +1099,7 @@ test('[bend] card lint refuses a version-2 card while a cross-check candidate is
   await writeFile(join(root, 'space-discovery.md'), record.replace('| short, long                |', '| short, long, expired       |'))
   const gated = lint()
   assert.equal(gated.status, 1)
-  assert.deepEqual(issueCodes(gated.stderr), ['cross-check-undecided', 'user-confirmation-status'])
+  // the declaration changed under the review, so the mapping review is stale as well
+  assert.deepEqual(issueCodes(gated.stderr), ['cross-check-unreviewed', 'cross-check-undecided', 'user-confirmation-status'])
   assert.match(gated.stderr, /cross-check-undecided: C-[a-f0-9]{10} new-axis — longSession=expired has no counterpart/)
 })

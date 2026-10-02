@@ -117,6 +117,13 @@ The model analyst writes this from the source text alone, before seeing the card
 - No foreign or `@unsafe` code; every imported file is a registered `repo:` source.
 - Return the Bend file, the Assumption and Goal rows with sources, one candidate Terms row per field
   (with its category), boundary examples, and the questions the source leaves open.
+- When the flow has states, also return a `## State Model` table of your own reading — `- States:`,
+  `- Events:` and one `| From | Event | To |` row per transition the source implies, including the
+  events a correct product ignores — without seeing the behavior model. It is registered as its own
+  source and named in `crossCheck.states`; `space-cross-check` compares it with the model, so a
+  transition the two readings decide differently becomes a question. Once the author has written the behavior model, the same analyst is continued to review the `crossCheck`
+  translation table from `oracle-discovery.mjs mapping-input` (types and classifiers, never `step`); each
+  dispute is recorded in `crossCheck.reviewedBy.disputes` and becomes an Open question or a fix.
 
 ## The checks
 

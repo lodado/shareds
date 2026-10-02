@@ -65,6 +65,10 @@ conflict location and the affected card rows as a finding and return to `NEEDS_D
 - Claude Agent surface: `subagent_type: code-reviewer`.
 - If role routing is not supported, do not impersonate the role with a prompt; use a supported
   independent review surface or report `FAIL`.
+- Every review runs on the newest, most capable model the host can dispatch — a model override or an agent
+  routed to it — never a smaller or older one to save cost. Prefer one from another family than the
+  author's when it is as recent. Record the exact model in the review record; a review on an older model
+  than the host offers is a `HARNESS_DEFECT`.
 
 For `identity-shaping`, a `JUDGMENT` row, an intentional visual baseline change, or a diff that adds
 an interactive widget or a click target with no native element, specify the installed `designer`

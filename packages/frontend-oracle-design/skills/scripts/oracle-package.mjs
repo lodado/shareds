@@ -435,6 +435,11 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
     for (const field of ['phase', 'step'])
       if (cross?.stateModel !== undefined && !nonEmpty(cross.stateModel?.[field]))
         push('package-cross-check', `stateModel.${field} names a behavior model def`)
+    if (cross?.states !== undefined && !sourceText(cross.states))
+      push('package-cross-check', 'crossCheck.states names the approved source with the analyst state table, never a model file')
+    const review = cross?.reviewedBy
+    if (review !== undefined && (!nonEmpty(review?.agent) || !/^[a-f0-9]{64}$/.test(review?.inputDigest ?? '')))
+      push('package-cross-check', 'crossCheck.reviewedBy is {agent, inputDigest: sha256 of the mapping-input it read}')
   }
 
   issues.push(...contractRowIssues(pkg?.contract))

@@ -564,10 +564,13 @@ export async function spaceCrossCheck({ loaded, bin, timeoutMs }) {
       return exported[def](...args.map((argument) => structuredClone(argument)))?.$ ?? null
     }
   }
+  // 상태표는 분석 에이전트가 따로 읽은 것일 수 있다(crossCheck.states) — 그러면 모델과 두 독립 해석을 비교한다
+  const statesPath = pkg.crossCheck.states ? sourcePath(loaded, pkg.crossCheck.states) : declaredPath
+  const statesText = statesPath === declaredPath ? text : await readFile(statesPath, 'utf8').catch(() => '')
   try {
     return crossCheckSpace({
       caseSpace,
-      stateModel: declaredStateModel(text),
+      stateModel: declaredStateModel(statesText),
       mapping: pkg.crossCheck,
       worlds: evaluateWorlds(world.model, world.spec),
       traces,
@@ -578,6 +581,74 @@ export async function spaceCrossCheck({ loaded, bin, timeoutMs }) {
     if (error.code === 'CROSS_CHECK_DEF') return { status: 'invalid', reason: error.message, candidates: [] }
     throw error
   }
+}
+
+/** 행동 모델 원문에서 타입 선언과 이름이 붙은 def만 — step·next·환경 로직은 싣지 않는다. */
+function bendExcerpt(text, defs) {
+  const blocks = text.split(/\n(?=\S)/)
+  const wanted = (block) =>
+    /^type\s/.test(block) || defs.some((def) => block.startsWith(`def ${def}(`) || block.startsWith(`def ${def}Of(`))
+  return blocks.filter(wanted).join('\n').trimEnd()
+}
+
+/**
+ * 번역표 검토 입력 — 선언(축 기록·분석 상태표), 모델의 타입과 분류 def, 번역표. 행동 로직(step·next)은 없다: 검토자는
+ * 매핑이 선언의 뜻대로인지 보고, 모델이 무엇을 하는지는 보지 않는다. 이 바이트의 sha256이 crossCheck.reviewedBy와 맞아야
+ * 그 검토를 현재 매핑에 대한 것으로 센다.
+ */
+export async function mappingInput({ loaded }) {
+  const { pkg } = loaded
+  const read = async (id) => {
+    const path = id ? sourcePath(loaded, id) : null
+    return path ? readFile(path, 'utf8').catch(() => '') : ''
+  }
+  const { reviewedBy: _review, ...mapping } = pkg.crossCheck ?? {}
+  const classifiers = [
+    ...Object.values(mapping.dimensions ?? {}).map((entry) => entry.classify),
+    mapping.stateModel?.phase,
+    mapping.stateModel?.step,
+  ].filter(Boolean)
+  const model = pkg.behavior ? await read(pkg.behavior.model) : ''
+  const states = mapping.states ? await read(mapping.states) : ''
+  return [
+    '# Translation table review input',
+    '',
+    'Check that every declared value, state and event maps to the world value or constructor that means the same thing.',
+    'Report each mapping you dispute, with the declared meaning and the constructor that would fit; do not judge the model.',
+    '',
+    '## Declared space (Space discovery record)',
+    '',
+    (await read(mapping.declared ?? pkg.spaceDiscovery)).trimEnd(),
+    ...(states ? ['', '## Analyst state table', '', states.trimEnd()] : []),
+    '',
+    '## Model types and classifiers',
+    '',
+    '```python',
+    bendExcerpt(model, classifiers),
+    '```',
+    '',
+    '## World types',
+    '',
+    '```python',
+    bendExcerpt(await read(pkg.world?.source), []),
+    '```',
+    '',
+    '## Translation table',
+    '',
+    '```json',
+    JSON.stringify({ crossCheck: mapping }, null, 2),
+    '```',
+    '',
+  ].join('\n')
+}
+
+/** 번역표는 해석이다 — 모델을 쓰지 않은 분석 에이전트가 현재 매핑 입력(digest)을 검토한 기록이 있어야 한다. */
+async function mappingReviewIssues(loaded) {
+  const review = loaded.pkg.crossCheck?.reviewedBy
+  if (!review?.agent || !review?.inputDigest)
+    return ['cross-check-unreviewed: record crossCheck.reviewedBy {agent, inputDigest} from oracle-discovery.mjs mapping-input']
+  if (review.inputDigest === sha256(await mappingInput({ loaded }))) return []
+  return ['cross-check-unreviewed: the review is stale — the mapping or its inputs changed since it was reviewed']
 }
 
 /**
@@ -593,16 +664,20 @@ export async function crossCheckIssues({ loaded, bin, timeoutMs }) {
     return writtenOff ? [] : [`cross-check-undeclared: ${result.reason}`]
   }
   if (result.status !== 'run') return [`cross-check-${result.status}: ${result.reason}`]
-  if (result.candidates.length === 0) return []
+  const reviewIssues = await mappingReviewIssues(loaded)
+  if (result.candidates.length === 0) return reviewIssues
   const { derived } = await derivePackage(loaded, { bin, timeoutMs })
   const open = new Set(
     lifecycle(result.candidates, loaded.pkg, derived)
       .filter((record) => record.open)
       .map((record) => record.id),
   )
-  return result.candidates
-    .filter((entry) => open.has(entry.id))
-    .map((entry) => `cross-check-undecided: ${entry.id} ${entry.class} — ${entry.summary}`)
+  return [
+    ...reviewIssues,
+    ...result.candidates
+      .filter((entry) => open.has(entry.id))
+      .map((entry) => `cross-check-undecided: ${entry.id} ${entry.class} — ${entry.summary}`),
+  ]
 }
 
 /** card lint용 — 저장소 루트(cwd)에서 패키지를 읽고 설치된 Bend로 관문을 돈다(내려받지 않는다 — 없으면 unverified). */
@@ -2324,7 +2399,26 @@ const USAGE = `usage:
   oracle-discovery.mjs close --package <oracle.package.json> [--out <dir>] [--runtime <anomalies.json>] [--dir <.ai/oracles/<id>>] [--lock <oracle.lock.json>]
   oracle-discovery.mjs ai-input --package <oracle.package.json> --operator ai-explorer|cross-agent --output <file>
   oracle-discovery.mjs cross-check --package <oracle.package.json>
+  oracle-discovery.mjs mapping-input --package <oracle.package.json> --output <file outside the repository>
   oracle-discovery.mjs catalog`
+
+/** 교차검증 명령 — mapping-input은 검토 입력만 쓰고(Bend 불필요), cross-check는 후보를 출력한다. */
+async function crossCheckCommand(command, options) {
+  const loaded = await loadPackage(options.package)
+  if (command === 'mapping-input') {
+    if (!options.output) throw new CliError('USAGE', USAGE, 2)
+    const text = await mappingInput({ loaded })
+    await writeFile(options.output, text)
+    process.stdout.write(`MAPPING_INPUT_WRITTEN ${options.output} sha256:${sha256(text)}\n`)
+    return
+  }
+  const { bin } = await ensureBend()
+  const timeoutMs = options['timeout-ms'] ? Number(options['timeout-ms']) : undefined
+  const result = await spaceCrossCheck({ loaded, bin, timeoutMs })
+  process.stdout.write(`${JSON.stringify(result)}\n`)
+  const clean = result.status === 'run' && result.candidates.length === 0
+  process.exitCode = clean ? 0 : 1
+}
 
 async function main() {
   const [command, ...args] = process.argv.slice(2)
@@ -2336,18 +2430,15 @@ async function main() {
     process.stdout.write(`${JSON.stringify(OPERATORS, null, 2)}\n`)
     return
   }
-  if (!['close', 'ai-input', 'cross-check'].includes(command)) throw new CliError('USAGE', USAGE, 2)
+  if (!['close', 'ai-input', 'cross-check', 'mapping-input'].includes(command)) throw new CliError('USAGE', USAGE, 2)
   const options = parseOptions(args)
   if (!options.package) throw new CliError('USAGE', USAGE, 2)
-  const { bin } = await ensureBend()
-  const timeoutMs = options['timeout-ms'] ? Number(options['timeout-ms']) : undefined
-  if (command === 'cross-check') {
-    const result = await spaceCrossCheck({ loaded: await loadPackage(options.package), bin, timeoutMs })
-    process.stdout.write(`${JSON.stringify(result)}\n`)
-    const clean = result.status === 'run' && result.candidates.length === 0
-    process.exitCode = clean ? 0 : 1
+  if (['mapping-input', 'cross-check'].includes(command)) {
+    await crossCheckCommand(command, options)
     return
   }
+  const { bin } = await ensureBend()
+  const timeoutMs = options['timeout-ms'] ? Number(options['timeout-ms']) : undefined
   if (command === 'ai-input') {
     if (!options.operator || !options.output) throw new CliError('USAGE', USAGE, 2)
     const loaded = await loadPackage(options.package)

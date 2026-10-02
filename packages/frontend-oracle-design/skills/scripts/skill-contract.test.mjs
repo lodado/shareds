@@ -2498,3 +2498,23 @@ test('the space cross-check compares the declared space with the Bend space and 
   assert.match(bend, /ADAPTER_JOINT_UNSUPPORTED/)
   assert.match(verifier, /crossCheckAtRoot/)
 })
+
+test('two readings: the analyst writes its own state table, a reviewer on the newest model checks the translation table', async () => {
+  const [discovery, review, adequacy, bend, tool] = await Promise.all([
+    read('references/discovery.md'),
+    read('references/subagent-review.md'),
+    read('references/adequacy.md'),
+    read('references/bend-cross-verification.md'),
+    read('scripts/oracle-discovery.mjs'),
+  ])
+  assert.match(review, /Every review runs on the newest, most capable model the host can dispatch/)
+  assert.match(review, /a review on an older model\s+than the host offers is a `HARNESS_DEFECT`/)
+  assert.match(discovery, /`crossCheck\.reviewedBy: \{agent, inputDigest\}`/)
+  assert.match(discovery, /fails `cross-check-unreviewed`/)
+  assert.match(adequacy, /return a `## State Model` table of your own reading/)
+  // the review is the same analyst, continued — not a third agent, never the author
+  assert.match(discovery, /the same analyst — continued, never a fresh agent and never the author/)
+  assert.match(adequacy, /the same analyst is continued to review the `crossCheck`/)
+  assert.match(bend, /in parallel with the author/)
+  assert.match(tool, /export async function mappingInput/)
+})
