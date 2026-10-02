@@ -370,7 +370,12 @@ export function conformCase(space, entry, adapter) {
   let step = 0
   const failure = (fields) => ({ caseId: entry.id, label: entry.label, trace: entry.trace, step, ...fields })
   try {
-    let state = adapter.init()
+    // 결합 케이스는 세계 조건으로 시작한다 — 매개변수를 선언하지 않은 init은 기본 fixture로 돌아 공허하게 통과할 것이다
+    if (entry.coordinates !== undefined && adapter.init.length < 1)
+      throw new Error(
+        'ADAPTER_JOINT_UNSUPPORTED: init declares no coordinates parameter, so the joint case would run on the default fixture (a parameter with a default value is not counted — declare it without one)',
+      )
+    let state = entry.coordinates === undefined ? adapter.init() : adapter.init(structuredClone(entry.coordinates))
     const mismatch = (expected, event) => {
       const observed = adapter.observe(state)
       return isDeepStrictEqual(observed, expected)

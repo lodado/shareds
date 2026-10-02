@@ -36,7 +36,13 @@ lock, test edits or production work.
    two worlds and the hidden value, and recommend promoting it to an observable or adding a substitute signal.
 5. **Freeze the record.** Save the confirmed axes and every question and answer verbatim as
    `.ai/oracles/<id>/sources/space-discovery.md`, register it as an approved source and name it in the
-   package's `spaceDiscovery`; the lock covers it. An answer that states product behavior is also quoted as
+   package's `spaceDiscovery`; the lock covers it. Keep the confirmed axes in it as a `## Case space` table
+   (and the flow's states as a `## State Model` when it has them): once the Bend files exist,
+   `oracle-discovery.mjs cross-check --package <pkg>` compares that declaration with the Bend space
+   ([`discovery.md`](../discovery.md)), and each candidate comes back here — a `new-axis` or a `cross-term` as an
+   A/B question, a `silent-decision` as a policy question. Card lint fails `cross-check-undecided` — so the
+   card cannot be locked — until each candidate is resolved in the model or the record, or decided in
+   `discoveryDecisions` with its source. An answer that states product behavior is also quoted as
    an `R*`. Only then write Terms, World, Assumptions and Goals and run the adequacy checks. Each kernel
    counterexample (`sufficiency`, a minimal pair) comes back here in the same A/B form.
 
@@ -91,7 +97,8 @@ as though they were independent input dimensions.
 - The kernel proves the goals over the possible worlds (adequacy) and the laws over the model. The generated
   tests run each possible case on the product: every trace the environment allows up to the bound, the
   transition cover (every event from every reachable configuration, `closed` for a finite model, `capped`
-  at the bound otherwise), and fast-check beyond it.
+  at the bound otherwise), the joint cases that run each world value the test sets with every behavior value
+  (`emit-trace --package`), and fast-check beyond it.
 - The projection states the counts and the cover. A world several assumptions reject is excluded once in the
   total.
 

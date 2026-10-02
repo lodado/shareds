@@ -27,6 +27,7 @@ import {
   searchAdequacy,
   triageCandidates,
 } from './oracle-adequacy.mjs'
+import { parseCaseSpace } from './oracle-frames.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
 import {
   checkConformance,
@@ -37,6 +38,7 @@ import {
   MAX_BOUND,
   observeTrace,
   proveLaws,
+  transitionCover,
 } from './oracle-model.mjs'
 import {
   AI_OPERATORS,
@@ -70,6 +72,13 @@ export const OPERATORS = [
     layer: 'deterministic',
     target: 'requirements',
     attacks: 'sentences of an authoritative source that no requirement quotes',
+  },
+  {
+    id: 'space-cross-check',
+    layer: 'deterministic',
+    target: 'space',
+    attacks:
+      'declared axis values, value pairs and state transitions the model never produces, pairs split across the world and the behavior model, and transitions the model decides that the declaration lacks',
   },
   {
     id: 'observation-sufficiency',
@@ -176,6 +185,448 @@ export function candidateId(operator, key) {
 
 function candidate({ operator, cls, key, summary, evidence = {}, reproducible = true }) {
   return { id: candidateId(operator, key), operator, class: cls, summary, reproducible, evidence }
+}
+
+// ── space-cross-check: 선언한 공간(Space discovery 기록) ↔ Bend 공간 ──────────────────────────────────────────────
+
+/** `## State Model` → { states, events, transitions } — 없으면 null. oracle-frames.mjs의 표 문법과 같다. */
+export function declaredStateModel(text) {
+  const lines = text.split('\n')
+  const start = lines.findIndex((line) => line.trim() === '## State Model')
+  if (start === -1) return null
+  const end = lines.findIndex((line, index) => index > start && line.startsWith('## '))
+  const section = lines.slice(start + 1, end === -1 ? lines.length : end)
+  const list = (name) =>
+    (section.find((line) => line.trim().startsWith(`- ${name}:`)) ?? '')
+      .split(':')
+      .slice(1)
+      .join(':')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+  const transitions = section
+    .filter((line) => line.trim().startsWith('|'))
+    .map((line) =>
+      line
+        .trim()
+        .replace(/^\||\|$/g, '')
+        .split('|')
+        .map((cell) => cell.trim()),
+    )
+    .filter(([from]) => from && from !== 'From' && !/^:?-+:?$/.test(from))
+    .map(([from, event, to]) => ({ from, event, to }))
+  return { states: list('States'), events: list('Events'), transitions }
+}
+
+/** 한 trace를 모델로 다시 걸어 단계마다 런타임 값(이전 상태·사건·다음 상태)을 얻는다 — 분류 def가 읽는다. */
+function runtimeSteps(model, trace) {
+  const raw = []
+  let state = model.init()
+  return trace.map((event) => {
+    const match = listItems(model.next(listOf(raw))).find((choice) => isDeepStrictEqual(toPlain(choice), event))
+    const after = model.step(state, match)
+    const step = { before: state, event: match, after, label: label(event) }
+    raw.push(match)
+    state = after
+    return step
+  })
+}
+
+/** 가정이 지운 세계에서 거짓이 된 가정 — 쌍·값이 왜 빠졌는지의 근거. */
+const rejectedBy = (list) =>
+  [
+    ...new Set(
+      list.flatMap((world) =>
+        Object.entries(world.truth ?? {})
+          .filter(([id, holds]) => /^A\d+$/.test(id) && !holds)
+          .map(([id]) => id),
+      ),
+    ),
+  ].sort()
+
+/** 번역표 조회 — 선언 값을 세계 값이나 분류 생성자로 옮긴다. 값·쌍 점검이 함께 쓴다. */
+function crossLookup({ caseSpace, mapping, worlds, traces, classify, coordinates = [] }) {
+  const maps = mapping.dimensions ?? {}
+  const dimensions = caseSpace.families.filter((entry) => !entry.excluded && entry.dimension)
+  const kindOf = (dimension) => {
+    const entry = maps[dimension.dimension]
+    if (entry?.world) return 'world'
+    if (entry?.classify) return 'behavior'
+    return null
+  }
+  const target = (dimension, value) => maps[dimension.dimension]?.values?.[value]
+  const mapped = (dimension, value) => kindOf(dimension) !== null && target(dimension, value) !== undefined
+  const worldHas = (world, dimension, value) => world.plain[maps[dimension.dimension].world] === target(dimension, value)
+  // 한 trace가 보인 선언 값 — 단계마다 분류 def가 그 단계의 값을 말한다
+  const behavior = dimensions.filter((dimension) => kindOf(dimension) === 'behavior')
+  const shown = traces.map(
+    (trace) =>
+      new Set(
+        trace.steps.flatMap((step) =>
+          behavior.map(
+            (dimension) => `${dimension.dimension}=${classify(maps[dimension.dimension].classify, step.before, step.event)}`,
+          ),
+        ),
+      ),
+  )
+  const traceHas = (seen, dimension, value) => seen.has(`${dimension.dimension}=${target(dimension, value)}`)
+  return { dimensions, worlds, traces, coordinates, maps, kindOf, target, mapped, worldHas, shown, traceHas }
+}
+
+/** 순서와 무관한 쌍 이름 — 결합 커버와 쌍 점검이 같은 열쇠로 만난다. */
+const pairKey = (left, right) => [left, right].sort().join(' × ')
+
+/**
+ * 결합 커버 — 세계 축(테스트가 설정하는 필드)과 행동 축의 값 쌍마다, 그 세계 값을 가진 가능한 설정 위에서 그 행동 값을 보이는
+ * trace를 한 번 돌린다. 쌍을 가장 많이 덮는 (설정, trace)를 차례로 고른다(같으면 짧은 trace, 먼저 나온 것). 기대값은 그
+ * trace에 대해 모델이 계산한 그대로다 — 결합 케이스는 "행동이 그 세계 조건과 무관하다"는 주장을 시험한다.
+ */
+function jointCover(lookup) {
+  const settable = lookup.dimensions.filter(
+    (dimension) => lookup.kindOf(dimension) === 'world' && lookup.coordinates.includes(lookup.maps[dimension.dimension].world),
+  )
+  const behavior = lookup.dimensions.filter((dimension) => lookup.kindOf(dimension) === 'behavior')
+  const plain = (dimension) => dimension.choices.filter((choice) => !choice.error && lookup.mapped(dimension, choice.value))
+  const shownValues = behavior.flatMap((dimension) =>
+    plain(dimension)
+      .filter((choice) => lookup.shown.some((seen) => lookup.traceHas(seen, dimension, choice.value)))
+      .map((choice) => [dimension, choice]),
+  )
+  const valid = lookup.worlds.filter((world) => world.valid)
+  const worldValues = settable.flatMap((dimension) =>
+    plain(dimension)
+      .filter((choice) => valid.some((world) => lookup.worldHas(world, dimension, choice.value)))
+      .map((choice) => [dimension, choice]),
+  )
+  const name = ([dimension, choice]) => `${dimension.dimension}=${choice.value}`
+  const required = new Set(worldValues.flatMap((world) => shownValues.map((value) => pairKey(name(world), name(value)))))
+  const settings = [
+    ...new Map(
+      valid.map((world) => {
+        const setting = Object.fromEntries(lookup.coordinates.map((field) => [field, world.plain[field]]))
+        return [stableStringify(setting), setting]
+      }),
+    ),
+  ].sort(([left], [right]) => (left < right ? -1 : Number(left > right)))
+  const pairsOf = (setting, index) =>
+    worldValues
+      .filter(([dimension, choice]) => setting[lookup.maps[dimension.dimension].world] === lookup.target(dimension, choice.value))
+      .flatMap((world) =>
+        shownValues
+          .filter(([dimension, choice]) => lookup.traceHas(lookup.shown[index], dimension, choice.value))
+          .map((value) => pairKey(name(world), name(value))),
+      )
+  const remaining = new Set(required)
+  const chosen = []
+  while (remaining.size > 0) {
+    let best = null
+    for (const [, setting] of settings)
+      lookup.traces.forEach((trace, index) => {
+        const gain = pairsOf(setting, index).filter((pair) => remaining.has(pair))
+        const better = !best || gain.length > best.gain.length || (gain.length === best.gain.length && trace.trace.length < best.trace.trace.length)
+        if (gain.length > 0 && better) best = { setting, trace, gain }
+      })
+    if (!best) break
+    for (const pair of best.gain) remaining.delete(pair)
+    chosen.push(best)
+  }
+  const literal = (setting) => Object.entries(setting).map(([field, value]) => `${field}=${String(value)}`).join(' ')
+  return {
+    required: required.size,
+    covered: required.size - remaining.size,
+    pairs: new Set([...required].filter((pair) => !remaining.has(pair))),
+    cases: chosen.map(({ setting, trace }) => ({
+      id: `J${sha256(stableStringify({ coordinates: setting, trace: trace.trace })).slice(0, 12)}`,
+      label: `${literal(setting)} · ${trace.label}`,
+      coordinates: setting,
+      trace: trace.trace,
+      observations: trace.observations,
+    })),
+  }
+}
+
+/** 선언 값 하나 — 대응이 없음·모델이 만들지 않음·세계가 갖지 않음·가정이 전부 지움이면 후보, 덮였으면 null. */
+function valueFinding(lookup, dimension, choice) {
+  const name = `${dimension.dimension}=${choice.value}`
+  if (!lookup.mapped(dimension, choice.value))
+    return ['new-axis', { unmapped: name }, `${name} has no counterpart in the world or the behavior model — map it in crossCheck or add it to the model`, { value: name }]
+  if (lookup.kindOf(dimension) === 'behavior') {
+    if (lookup.shown.some((seen) => lookup.traceHas(seen, dimension, choice.value))) return null
+    return ['new-axis', { unreached: name }, `${name} is declared, but the behavior model never produces it`, { value: name }]
+  }
+  const having = lookup.worlds.filter((world) => lookup.worldHas(world, dimension, choice.value))
+  if (having.length === 0)
+    return ['new-axis', { absent: name }, `${name} maps to ${String(lookup.target(dimension, choice.value))}, which no world takes`, { value: name }]
+  if (having.some((world) => world.valid)) return null
+  const by = rejectedBy(having)
+  return ['assumption-risk', { excluded: name }, `${name} is declared, but ${by.join(', ')} excludes every world with it`, { value: name, by }]
+}
+
+/** 선언 차원의 2-way 값 쌍 전부 — 오류 값([error])은 조합하지 않는다. */
+function valuePairs(dimensions) {
+  const plain = (dimension) => dimension.choices.filter((choice) => !choice.error)
+  return dimensions.flatMap((first, index) =>
+    dimensions
+      .slice(index + 1)
+      .flatMap((second) => plain(first).flatMap((a) => plain(second).map((b) => [[first, a], [second, b]]))),
+  )
+}
+
+/** 값 쌍 하나의 자리: unmapped · joint(결합 케이스가 덮음) · cross(아무도 함께 돌리지 않음) · world · excluded · traces · unreached. */
+function pairPlace(lookup, [first, a], [second, b], joint) {
+  if (!lookup.mapped(first, a.value) || !lookup.mapped(second, b.value)) return { place: 'unmapped' }
+  if (lookup.kindOf(first) !== lookup.kindOf(second)) {
+    const key = pairKey(`${first.dimension}=${a.value}`, `${second.dimension}=${b.value}`)
+    return { place: joint.pairs.has(key) ? 'joint' : 'cross' }
+  }
+  if (lookup.kindOf(first) === 'world') {
+    const having = lookup.worlds.filter(
+      (world) => lookup.worldHas(world, first, a.value) && lookup.worldHas(world, second, b.value),
+    )
+    if (having.some((world) => world.valid)) return { place: 'world' }
+    return { place: 'excluded', by: rejectedBy(having) }
+  }
+  const together = lookup.shown.some((seen) => lookup.traceHas(seen, first, a.value) && lookup.traceHas(seen, second, b.value))
+  return { place: together ? 'traces' : 'unreached' }
+}
+
+const PAIR_COUNTERS = {
+  unmapped: 'unmapped',
+  joint: 'coveredByJoint',
+  cross: 'crossTerm',
+  world: 'coveredByWorld',
+  traces: 'coveredByTraces',
+  unreached: 'unreached',
+}
+
+/** 값 쌍 점검 — 쌍마다 자리를 세고, 덮이지 않은 쌍은 차원 쌍마다 한 후보로 묶는다. */
+function pairFindings(lookup, joint) {
+  const pairs = { total: 0, coveredByWorld: 0, coveredByTraces: 0, coveredByJoint: 0, crossTerm: 0, unmapped: 0, excluded: [], unreached: 0 }
+  const groups = { cross: new Map(), unreached: new Map() }
+  for (const [first, second] of valuePairs(lookup.dimensions)) {
+    const pair = `${first[0].dimension}=${first[1].value} × ${second[0].dimension}=${second[1].value}`
+    const { place, by } = pairPlace(lookup, first, second, joint)
+    pairs.total += 1
+    if (place === 'excluded') pairs.excluded.push({ pair, by })
+    else pairs[PAIR_COUNTERS[place]] += 1
+    const group = groups[place]
+    if (!group) continue
+    const names = [first[0].dimension, second[0].dimension].sort()
+    const key = names.join(' × ')
+    group.set(key, { dimensions: names, pairs: [...(group.get(key)?.pairs ?? []), pair] })
+  }
+  const findings = [
+    ...[...groups.cross.values()].map(({ dimensions: names, pairs: list }) => [
+      'cross-term',
+      { crossTerm: names },
+      `${names.join(' × ')}: ${list.length} value pairs split across the world and the behavior model that no joint case can run (the world field is not one the test sets) — make it settable, add the axis to the model's events, or decide them independent with a reason`,
+      { dimensions: names, pairs: list },
+    ]),
+    ...[...groups.unreached.values()].map(({ dimensions: names, pairs: list }) => [
+      'new-axis',
+      { unreachedPairs: names },
+      `${names.join(' × ')}: ${list.length} declared value pairs no trace produces together`,
+      { dimensions: names, pairs: list },
+    ]),
+  ]
+  return { pairs, findings }
+}
+
+/** 모델의 전이를 선언 이름으로 추상화한다 — 대응 없는 생성자는 `<생성자>`, 증인은 그 전이를 처음 밟은 trace 앞부분. */
+function modelTransitions(machine, traces, classify) {
+  const taken = new Map()
+  if (!machine.phase || !machine.step) return taken
+  const named = (map, value) => Object.keys(map).find((name) => map[name] === value) ?? `<${value}>`
+  const states = machine.states ?? {}
+  const events = machine.events ?? {}
+  for (const trace of traces)
+    trace.steps.forEach((step, index) => {
+      const from = named(states, classify(machine.phase, step.before))
+      const event = named(events, classify(machine.step, step.before, step.event))
+      const edge = `${from} -${event}-> ${named(states, classify(machine.phase, step.after))}`
+      if (!taken.has(edge)) taken.set(edge, trace.steps.slice(0, index + 1).map((entry) => entry.label ?? '?').join(' · '))
+    })
+  return taken
+}
+
+/** 상태표 점검 — 대응 없는 상태·사건, 선언에 없는 모델 전이(silent-decision), 모델이 밟지 않는 선언 전이. */
+function transitionFindings(stateModel, machine = {}, traces, classify) {
+  const states = machine.states ?? {}
+  const events = machine.events ?? {}
+  const declaredStates = [...new Set([...stateModel.states, ...stateModel.transitions.flatMap(({ from, to }) => [from, to])])]
+  const declaredEvents = [...new Set([...stateModel.events, ...stateModel.transitions.map(({ event }) => event)])]
+  const findings = [
+    ...declaredStates
+      .filter((state) => states[state] === undefined)
+      .map((name) => ['new-axis', { unmappedState: name }, `state ${name} has no counterpart in the behavior model — map it in crossCheck.stateModel or add it to the model`, { state: name }]),
+    ...declaredEvents
+      .filter((event) => events[event] === undefined)
+      .map((name) => ['new-axis', { unmappedEvent: name }, `event ${name} has no counterpart in the behavior model — map it in crossCheck.stateModel or add it to the model`, { event: name }]),
+  ]
+  const taken = modelTransitions(machine, traces, classify)
+  const edgeOf = ({ from, event, to }) => `${from} -${event}-> ${to}`
+  const declared = new Set(stateModel.transitions.map(edgeOf))
+  const silent = [...taken]
+    .filter(([edge]) => !declared.has(edge))
+    .sort(([left], [right]) => (left < right ? -1 : Number(left > right)))
+  for (const [edge, witness] of silent) {
+    const [from, rest] = edge.split(' -')
+    const event = rest.split('-> ')[0]
+    const declaredEmpty = !stateModel.transitions.some((entry) => entry.from === from && entry.event === event)
+    const how = declaredEmpty ? ', a cell the declaration left empty' : ', which the declaration states differently'
+    findings.push([
+      'silent-decision',
+      { transition: edge },
+      `the model takes ${edge}${how} — confirm it as policy or fix the model (witness ${witness})`,
+      { transition: edge, witness, declaredEmpty },
+    ])
+  }
+  const mappedEdge = (entry) => [states[entry.from], states[entry.to], events[entry.event]].every((value) => value !== undefined)
+  const unrealized = stateModel.transitions.filter((entry) => mappedEdge(entry) && !taken.has(edgeOf(entry)))
+  for (const entry of unrealized)
+    findings.push(['new-axis', { unrealized: edgeOf(entry) }, `the model never takes the declared transition ${edgeOf(entry)}`, { transition: edgeOf(entry) }])
+  return {
+    transitions: { declared: stateModel.transitions.length, model: taken.size, silent: silent.length, unrealized: unrealized.length },
+    findings,
+  }
+}
+
+const NO_STATE_MODEL = { transitions: { declared: 0, model: 0, silent: 0, unrealized: 0 }, findings: [] }
+
+/**
+ * 선언한 공간이 Bend 공간에 다 있는가, 거꾸로 모델이 선언에 없는 결정을 하는가. 선언한 축 값마다 세계 필드 값이나 분류
+ * def의 생성자로 옮긴 번역표(crossCheck)를 따라:
+ * - 값: 대응이 없거나(new-axis), 모델이 만들지 않거나(new-axis), 가정이 전부 지운다(assumption-risk).
+ * - 값 쌍(2-way): 세계끼리는 가능한 세계가, 행동끼리는 한 trace가 함께 보이면 덮였다. 세계 축과 행동 축의 쌍은 두 모델이
+ *   따로 열거해 함께 돈 적이 없다(cross-term, 차원 쌍마다 한 후보).
+ * - 상태표: 모델의 전이를 선언 이름으로 추상화해, 선언에 없는 전이(silent-decision)와 대응이 없는 상태·사건을 낸다.
+ * 번역표는 사람이 쓴 해석이다 — 결과는 판정이 아니라 결정할 후보다.
+ */
+export function crossCheckSpace({ caseSpace, stateModel = null, mapping = {}, worlds = [], traces = [], classify, coordinates = [] }) {
+  const lookup = crossLookup({ caseSpace, mapping, worlds, traces, classify, coordinates })
+  const joint = jointCover(lookup)
+  const values = lookup.dimensions
+    .flatMap((dimension) => dimension.choices.map((choice) => valueFinding(lookup, dimension, choice)))
+    .filter(Boolean)
+  const { pairs, findings: pairList } = pairFindings(lookup, joint)
+  const machine = stateModel ? transitionFindings(stateModel, mapping.stateModel, traces, classify) : NO_STATE_MODEL
+  return {
+    status: 'run',
+    summary: {
+      values: lookup.dimensions.reduce((count, dimension) => count + dimension.choices.length, 0),
+      pairs,
+      transitions: machine.transitions,
+    },
+    joint: { required: joint.required, covered: joint.covered, cases: joint.cases },
+    candidates: [...values, ...pairList, ...machine.findings].map(([cls, key, summary, evidence]) =>
+      candidate({ operator: 'space-cross-check', cls, key, summary, evidence }),
+    ),
+  }
+}
+
+/**
+ * space-cross-check 실행 — 버전 2 패키지의 선언 공간(spaceDiscovery 기록의 `## Case space`·`## State Model`)을 세계 열거와,
+ * 행동 모델의 trace(bound까지의 공간 + 전이 커버)에 비춘다. 분류 def는 행동 모델 파일에 있다.
+ */
+export async function spaceCrossCheck({ loaded, bin, timeoutMs }) {
+  const { pkg } = loaded
+  if ((pkg.packageVersion ?? 1) < 2)
+    return { status: 'not-applicable', reason: 'a version-1 package has no Space discovery record to compare', candidates: [] }
+  if (!pkg.crossCheck)
+    return {
+      status: 'undeclared',
+      reason: 'map the Space discovery record onto the model in crossCheck, or write the operator off with a sourced n/a',
+      candidates: [],
+    }
+  const declaredPath = sourcePath(loaded, pkg.crossCheck.declared ?? pkg.spaceDiscovery)
+  const text = declaredPath ? await readFile(declaredPath, 'utf8').catch(() => null) : null
+  const caseSpace = text === null ? null : parseCaseSpace(text)
+  if (!caseSpace)
+    return { status: 'invalid', reason: 'the declared source has no ## Case space table of the confirmed axes', candidates: [] }
+  const world = await loadWorld({ package: relative(loaded.root, loaded.path), cwd: loaded.root, bin, timeoutMs })
+  if (world.result) return { status: 'not-run', reason: `the world cannot be enumerated: ${world.result.reason}`, candidates: [] }
+  let traces = []
+  let classify = () => null
+  if (pkg.behavior) {
+    const modelPath = sourcePath(loaded, pkg.behavior.model)
+    const model = await loadModel({ model: modelPath, prefix: pkg.behavior.prefix, bin, timeoutMs })
+    const space = enumerateSpace(model, { bound: pkg.behavior.bound })
+    traces = [...space.cases, ...transitionCover(model, space).cases].map((entry) => ({
+      label: entry.label,
+      trace: entry.trace,
+      observations: entry.observations,
+      steps: runtimeSteps(model, entry.trace),
+    }))
+    const { exported } = await compileBend({ entry: modelPath, bin, timeoutMs })
+    classify = (def, ...args) => {
+      if (typeof exported[def] !== 'function')
+        throw Object.assign(new Error(`${basename(modelPath)} does not define ${def}`), { code: 'CROSS_CHECK_DEF' })
+      return exported[def](...args.map((argument) => structuredClone(argument)))?.$ ?? null
+    }
+  }
+  try {
+    return crossCheckSpace({
+      caseSpace,
+      stateModel: declaredStateModel(text),
+      mapping: pkg.crossCheck,
+      worlds: evaluateWorlds(world.model, world.spec),
+      traces,
+      classify,
+      coordinates: world.spec.coordinates,
+    })
+  } catch (error) {
+    if (error.code === 'CROSS_CHECK_DEF') return { status: 'invalid', reason: error.message, candidates: [] }
+    throw error
+  }
+}
+
+/**
+ * lock 전 관문 — 카드 lint가 부른다. 교차검증 후보마다 결정(discoveryDecisions)이 있어야 통과한다: 승격·범위 밖·위험 수용·
+ * 기각을 그 출처와 함께. 모델이나 선언 기록을 고쳐 후보가 사라져도 된다. 버전 1 패키지는 관문이 없다. 매핑이 없는 버전 2
+ * 패키지는 출처 있는 n/a로만 넘어간다.
+ */
+export async function crossCheckIssues({ loaded, bin, timeoutMs }) {
+  const result = await spaceCrossCheck({ loaded, bin, timeoutMs })
+  if (result.status === 'not-applicable') return []
+  if (result.status === 'undeclared') {
+    const writtenOff = loaded.pkg.operators?.['space-cross-check']?.startsWith('n/a:')
+    return writtenOff ? [] : [`cross-check-undeclared: ${result.reason}`]
+  }
+  if (result.status !== 'run') return [`cross-check-${result.status}: ${result.reason}`]
+  if (result.candidates.length === 0) return []
+  const { derived } = await derivePackage(loaded, { bin, timeoutMs })
+  const open = new Set(
+    lifecycle(result.candidates, loaded.pkg, derived)
+      .filter((record) => record.open)
+      .map((record) => record.id),
+  )
+  return result.candidates
+    .filter((entry) => open.has(entry.id))
+    .map((entry) => `cross-check-undecided: ${entry.id} ${entry.class} — ${entry.summary}`)
+}
+
+/** card lint용 — 저장소 루트(cwd)에서 패키지를 읽고 설치된 Bend로 관문을 돈다(내려받지 않는다 — 없으면 unverified). */
+export function crossCheckAtRoot(root = process.cwd()) {
+  return async (packagePath) => {
+    let loaded
+    try {
+      loaded = await loadPackage(packagePath, { root })
+    } catch (error) {
+      return [`cross-check-unverified: ${error.message}`]
+    }
+    if ((loaded.pkg.packageVersion ?? 1) < 2) return []
+    let bin
+    try {
+      ;({ bin } = await ensureBend({
+        download: () => {
+          throw Object.assign(new Error('card lint never downloads Bend'), { code: 'BEND_NOT_INSTALLED' })
+        },
+      }))
+    } catch (error) {
+      return [`cross-check-unverified: Bend is not installed (${error.code ?? error.message})`]
+    }
+    return crossCheckIssues({ loaded, bin })
+  }
 }
 
 // ── L1 Requirement Closure ─────────────────────────────────────────────────────────────────────────────────────────
@@ -1351,13 +1802,17 @@ export async function closure({ packagePath, root = process.cwd(), bin, timeoutM
     ),
   })
   record('temporal-order', temporalCandidates(derived, pkg))
+  const crossCheck = await spaceCrossCheck({ loaded, bin, timeoutMs })
+  record('space-cross-check', crossCheck)
   const extension = traceExtension(model, space, pkg.behavior.bound)
 
   // 제품: 기준 실행(변이 없음) — 공간·표본·세계·metamorphic·교란을 한 자식에서
   const work = await mkdtemp(join(tmpdir(), 'oracle-discovery-'))
   try {
     const spacePath = join(work, 'space.json')
-    await writeFile(spacePath, JSON.stringify({ bound: space.bound, initial: space.initial, cases: space.cases, complete: space.complete, spaceDigest: space.spaceDigest }))
+    // 결합 케이스도 같은 대응 검사로 돈다 — 기준 실행과 변이 실행이 세계 조건 위의 trace까지 본다
+    const cases = [...space.cases, ...(crossCheck.joint?.cases ?? [])]
+    await writeFile(spacePath, JSON.stringify({ bound: space.bound, initial: space.initial, cases, complete: space.complete, spaceDigest: space.spaceDigest }))
     const meta = await metamorphicPairs({ loaded, model, space, bin, timeoutMs, eventIR, modelPath })
     const perturbed = perturbations(model, space)
     const seed = Number.parseInt(space.spaceDigest.slice(0, 8), 16) % 2_147_483_647
@@ -1868,6 +2323,7 @@ function parseOptions(args) {
 const USAGE = `usage:
   oracle-discovery.mjs close --package <oracle.package.json> [--out <dir>] [--runtime <anomalies.json>] [--dir <.ai/oracles/<id>>] [--lock <oracle.lock.json>]
   oracle-discovery.mjs ai-input --package <oracle.package.json> --operator ai-explorer|cross-agent --output <file>
+  oracle-discovery.mjs cross-check --package <oracle.package.json>
   oracle-discovery.mjs catalog`
 
 async function main() {
@@ -1880,11 +2336,18 @@ async function main() {
     process.stdout.write(`${JSON.stringify(OPERATORS, null, 2)}\n`)
     return
   }
-  if (!['close', 'ai-input'].includes(command)) throw new CliError('USAGE', USAGE, 2)
+  if (!['close', 'ai-input', 'cross-check'].includes(command)) throw new CliError('USAGE', USAGE, 2)
   const options = parseOptions(args)
   if (!options.package) throw new CliError('USAGE', USAGE, 2)
   const { bin } = await ensureBend()
   const timeoutMs = options['timeout-ms'] ? Number(options['timeout-ms']) : undefined
+  if (command === 'cross-check') {
+    const result = await spaceCrossCheck({ loaded: await loadPackage(options.package), bin, timeoutMs })
+    process.stdout.write(`${JSON.stringify(result)}\n`)
+    const clean = result.status === 'run' && result.candidates.length === 0
+    process.exitCode = clean ? 0 : 1
+    return
+  }
   if (command === 'ai-input') {
     if (!options.operator || !options.output) throw new CliError('USAGE', USAGE, 2)
     const loaded = await loadPackage(options.package)

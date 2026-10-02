@@ -315,6 +315,38 @@ test('an unbounded model caps its transition cover at a stated depth instead of 
   assert.match(cover.reason, /more than 5 configurations/)
 })
 
+test('a joint case starts the product on its world coordinates; an adapter that cannot take them fails instead of passing on the default fixture', () => {
+  const space = {
+    spaceDigest: 'synthetic',
+    complete: true,
+    initial: 0,
+    cases: [
+      { id: 'Mplain', label: 'A', trace: [{ $: 'A' }], observations: [1] },
+      { id: 'Jjoint', label: 'rows=Empty · A', coordinates: { rows: 'Empty' }, trace: [{ $: 'A' }], observations: [1] },
+    ],
+  }
+  const seen = []
+  const adapter = {
+    init: (coordinates) => {
+      seen.push(coordinates)
+      return 0
+    },
+    step: (state) => state + 1,
+    observe: (state) => state,
+  }
+  assert.equal(checkConformance(space, adapter).pass, true)
+  assert.deepEqual(seen, [undefined, { rows: 'Empty' }])
+  // init() without a parameter would run the joint case on the default fixture and pass vacuously
+  const blind = { init: () => 0, step: (state) => state + 1, observe: (state) => state }
+  const report = checkConformance(space, blind)
+  assert.equal(report.pass, false)
+  assert.deepEqual(
+    report.failures.map((failure) => [failure.caseId, failure.status]),
+    [['Jjoint', 'adapter-error']],
+  )
+  assert.match(report.failures[0].error, /^ADAPTER_JOINT_UNSUPPORTED/)
+})
+
 // ── conform: 관측 대조 (합성 공간, mock) ─────────────────────────────────────────────
 
 const SPACE = {

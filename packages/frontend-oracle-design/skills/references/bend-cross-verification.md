@@ -350,9 +350,14 @@ the expected results — during the harness step, then it passes two gates befor
   harness defect and goes through the existing harness-repair budget; it never changes the locked
   model, laws or observation meaning.
 
-- `emit-trace --model --prefix --bound --adapter --out --row --runs N [--max-length L]` (differential):
-  every trace up to the bound with each prefix's expected observation, the transition cover's cases past the
-  bound (`[O*] [C…]`, expectations from the model), then N fast-check traces drawn
+- `emit-trace (--package <pkg> | --model --prefix --bound) --adapter --out --row --runs N [--max-length L]`
+  (differential): every trace up to the bound with each prefix's expected observation, the transition cover's
+  cases past the bound (`[O*] [C…]`, expectations from the model), with `--package` the joint cases of
+  `space-cross-check` (`[O*] [J…]`: each declared world value the test sets runs one trace that shows the
+  declared behavior values — 4 cases cover the 33 world × behavior pairs of the paging fixture, against 9,120
+  runs for the full product; `init(coordinates)` starts the product on that setting and must declare the
+  parameter, or the case fails `ADAPTER_JOINT_UNSUPPORTED`; a failure means a product defect or an axis the model
+  must take), then N fast-check traces drawn
   longer than the bound; a missing, zero or non-integer `--runs` is refused (`SAMPLING_REQUIRED`).
   fast-check draws choice indices over the full non-negative range and the model's `next(history)`
   picks the event, so every event the environment offers can be drawn (a fixed small index range under

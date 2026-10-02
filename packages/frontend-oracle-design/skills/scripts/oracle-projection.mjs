@@ -10,6 +10,7 @@ import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ensureBend } from './ensure-bend.mjs'
 import { evaluateWorlds, loadWorld } from './oracle-adequacy.mjs'
+import { spaceCrossCheck } from './oracle-discovery.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
 import {
   bendInputs,
@@ -22,6 +23,7 @@ import {
   transitionCover,
   verdictBeside,
 } from './oracle-model.mjs'
+import { loadPackage, sourcePath } from './oracle-package.mjs'
 import {
   arbitraryOf,
   bendLiteral,
@@ -412,15 +414,35 @@ export async function emitWorld(options) {
 const seedOf = (digest) => Number.parseInt(digest.slice(0, 8), 16) % 2_147_483_647
 
 /**
+ * trace 모드의 입력 — `--model --prefix --bound` 그대로이거나, 패키지에서 읽는다. 패키지(버전 2, crossCheck)가 있으면
+ * space-cross-check가 고른 결합 케이스(세계 설정 × trace)를 함께 싣는다.
+ */
+async function traceInputs({ package: packagePath, cwd = process.cwd(), model, prefix, bound, bin, timeoutMs }) {
+  if (!packagePath) return { model, prefix, bound, joint: null, jointSources: [] }
+  const loaded = await loadPackage(packagePath, { root: cwd })
+  const { pkg } = loaded
+  if (!pkg.behavior)
+    throw new CliError('USAGE', 'the package has no behavior model — project its world with emit-world instead', 2)
+  const cross = await spaceCrossCheck({ loaded, bin, timeoutMs })
+  const joint = cross.status === 'run' ? cross.joint : null
+  const declared = pkg.crossCheck ? sourcePath(loaded, pkg.crossCheck.declared ?? pkg.spaceDiscovery) : null
+  return {
+    model: sourcePath(loaded, pkg.behavior.model),
+    prefix: pkg.behavior.prefix,
+    bound: pkg.behavior.bound,
+    joint,
+    jointSources: joint ? [loaded.path, declared, sourcePath(loaded, pkg.world.source)].filter(Boolean) : [],
+  }
+}
+
+/**
  * trace 모드(차분): bound 안의 모든 trace는 각 prefix의 기대 관측과 함께 데이터로, bound 밖은 선택적으로 fast-check
  * 표본이다. 표본은 선택 인덱스만 만들고 사건은 모델 환경 `next(history)`가 허용하는 것에서 고른다 — 모델이 불가능하다고
  * 한 순서는 생성되지 않고, shrink는 더 짧고 앞선 선택의 trace가 된다. 공간이 예산 안에서 완결되지 않으면 쓰지 않는다.
  */
 export async function emitTrace(options) {
+  const { model, prefix, bound, joint, jointSources } = await traceInputs(options)
   const {
-    model,
-    prefix,
-    bound,
     adapter,
     out,
     row,
@@ -439,6 +461,7 @@ export async function emitTrace(options) {
   await assertAdapterTrusted(adapter)
   const loaded = await loadModel({ model, prefix, bin, timeoutMs })
   const space = enumerateSpace(loaded, { bound, ...(maxCases ? { maxCases } : {}) })
+  const jointCases = joint?.cases ?? []
   if (!space.complete) {
     throw new CliError(
       'SPACE_INCOMPLETE',
@@ -455,7 +478,12 @@ export async function emitTrace(options) {
   const base = name ?? prefix.toLowerCase()
   const modelFile = `${base}.model.mjs`
   const testFile = `${base}.oracle.test.mjs`
-  const { sources } = await writeModel({ model, bin, timeoutMs, outDir, modelFile })
+  const written = await writeModel({ model, bin, timeoutMs, outDir, modelFile })
+  // 결합 케이스는 패키지·선언 기록·세계 파일에서 나온다 — 그중 하나가 바뀌면 이 파일은 낡았다
+  const extra = await Promise.all(
+    jointSources.map(async (path) => ({ path: toImport(relative(outDir, path)), sha256: sha256(await readFile(path, 'utf8')) })),
+  )
+  const sources = [...written.sources, ...extra]
   const seed = seedOf(space.spaceDigest)
   const sampled = true
   const beyond = beyondBoundReachable(loaded, space)
@@ -463,9 +491,10 @@ export async function emitTrace(options) {
     cover.status === 'closed'
       ? `every event from each of the ${cover.configurations} reachable configurations (${cover.cases.length} cases past the bound)`
       : `every event from each configuration within ${cover.coveredDepth} events (${cover.cases.length} cases; the state grows without bound)`
+  const jointScope = joint ? `, ${jointCases.length} joint cases on the world settings (${joint.covered}/${joint.required} world × behavior pairs)` : ''
   const scope = `exhaustive over the ${space.cases.length} traces up to ${
     space.bound
-  } events, the transition cover — ${coverScope} — and sampled (fast-check, ${runs} runs, seed ${seed}, drawn lengths ${space.bound + 1}..${longest}; ${
+  } events, the transition cover — ${coverScope}${jointScope} — and sampled (fast-check, ${runs} runs, seed ${seed}, drawn lengths ${space.bound + 1}..${longest}; ${
     beyond
       ? 'executed lengths are reported and at least one must pass the bound'
       : 'the environment ends every trace within the bound, so no sample can pass it'
@@ -487,13 +516,22 @@ export async function emitTrace(options) {
     }),
     `const INITIAL = ${JSON.stringify(space.initial)}`,
     `const CASES = ${JSON.stringify(
-      [...space.cases, ...cover.cases].map(({ id, label, trace, observations }) => ({ id, label, trace, observations })),
+      [...space.cases, ...cover.cases, ...jointCases].map(({ id, label, trace, observations, coordinates }) => ({
+        id,
+        label,
+        trace,
+        observations,
+        ...(coordinates === undefined ? {} : { coordinates }),
+      })),
     )}`,
     eventLabel.toString(),
     '',
     '// 기대값은 모델이 동기로 계산했다. await는 제품 쪽 adapter 호출에만 붙고, dispose는 실패해도 다음 case 전에 돈다.',
-    'async function drive(trace, expected) {',
-    "  let state = await within(adapter.init(), 'init')",
+    '// 결합 케이스는 세계 조건으로 시작한다 — 매개변수가 없는 init은 기본 fixture로 돌아 공허하게 통과할 것이다.',
+    'async function drive(trace, expected, coordinates) {',
+    '  if (coordinates !== undefined && adapter.init.length < 1)',
+    "    throw new Error('ADAPTER_JOINT_UNSUPPORTED: init declares no coordinates parameter (a parameter with a default value is not counted)')",
+    "  let state = await within(coordinates === undefined ? adapter.init() : adapter.init(structuredClone(coordinates)), 'init')",
     '  try {',
     "    assert.deepEqual(await within(adapter.observe(state), 'initial observe'), INITIAL, 'initial observation')",
     '    for (const [index, event] of trace.entries()) {',
@@ -507,7 +545,7 @@ export async function emitTrace(options) {
     '}',
     '',
     'for (const entry of CASES) {',
-    "  test('[' + ROW + '] [' + entry.id + '] ' + entry.label, UNLIMITED, () => drive(entry.trace, entry.observations))",
+    "  test('[' + ROW + '] [' + entry.id + '] ' + entry.label, UNLIMITED, () => drive(entry.trace, entry.observations, entry.coordinates))",
     '}',
   ]
   if (sampled) {
@@ -564,6 +602,7 @@ export async function emitTrace(options) {
         cases: cover.cases.length,
         ...(cover.status === 'capped' ? { coveredDepth: cover.coveredDepth } : {}),
       },
+      joint: joint ? { required: joint.required, covered: joint.covered, cases: jointCases.length } : null,
     },
   }
 }
@@ -876,7 +915,7 @@ function parseOptions(args) {
 }
 
 const USAGE = `usage:
-  oracle-projection.mjs emit-trace --model <MODEL.bend> --prefix <Name> --bound <n> --adapter <adapter.mjs> --out <dir> --row <O*> --runs <n> [--max-length <n>] [--runner node-test|vitest] [--environment <jsdom>] [--case-timeout <ms>] [--name <base>]
+  oracle-projection.mjs emit-trace (--package <oracle.package.json> | --model <MODEL.bend> --prefix <Name> --bound <n>) --adapter <adapter.mjs> --out <dir> --row <O*> --runs <n> [--max-length <n>] [--runner node-test|vitest] [--environment <jsdom>] [--case-timeout <ms>] [--name <base>]
   oracle-projection.mjs emit-state --model <MODEL.bend> --prefix <Name> --state <Type> --command <Type> --adapter <adapter.mjs> --out <dir> --row <O*> (--relation <def>)... --runs <n> [--differential] [--threshold <n>] [--nat-max <n>] [--list-max <n>] [--runner node-test|vitest] [--environment <jsdom>] [--case-timeout <ms>]
   oracle-projection.mjs replay --model <MODEL.bend> --prefix <Name> --trace <json> [--observed <json> | --adapter <adapter.mjs>] [--out <dir>]
   oracle-projection.mjs emit-world (--card <oracle.md> | --package <oracle.package.json>) --adapter <world-adapter.mjs> --out <dir> --row <O*> [--runner node-test|vitest] [--environment <jsdom>] [--case-timeout <ms>] [--name <base>]`
@@ -903,11 +942,12 @@ async function main() {
     process.stdout.write(`${JSON.stringify(result)}\n`)
     return
   }
-  if (!options.model || !options.prefix) throw new CliError('USAGE', USAGE, 2)
+  const fromPackage = command === 'emit-trace' && Boolean(options.package)
+  if (!fromPackage && (!options.model || !options.prefix)) throw new CliError('USAGE', USAGE, 2)
   const { bin } = await ensureBend()
   let result
   if (command === 'emit-trace') {
-    if (!options.bound || !options.adapter || !options.out) throw new CliError('USAGE', USAGE, 2)
+    if ((!fromPackage && !options.bound) || !options.adapter || !options.out) throw new CliError('USAGE', USAGE, 2)
     result = await emitTrace({
       ...options,
       bound: Number(options.bound),

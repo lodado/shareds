@@ -1,0 +1,223 @@
+{
+  "packageVersion": 2,
+  "id": "orders-pagination",
+  "spaceVersion": 1,
+  "intent": {
+    "actor": "a person paging through the orders table",
+    "observableSuccess": "the table always ends on the rows of the page the person asked for last",
+    "nonGoals": "sorting, filtering, editing an order",
+    "worstRegression": "the rows of an older page replace the rows of the page on screen",
+    "reversibility": "revert the table change; no data is written",
+    "risk": "Medium",
+    "openQuestions": []
+  },
+  "sources": [
+    {
+      "id": "S1",
+      "kind": "product-policy",
+      "jurisdiction": "orders table paging",
+      "standard": "the user's request",
+      "location": "repo:README.md#orders-table-policy",
+      "approval": "approved"
+    },
+    {
+      "id": "S2",
+      "kind": "product-policy",
+      "jurisdiction": "end-state world",
+      "standard": "Bend world",
+      "location": "repo:World.bend",
+      "approval": "approved"
+    },
+    {
+      "id": "S3",
+      "kind": "product-policy",
+      "jurisdiction": "paging behavior",
+      "standard": "Bend behavior model",
+      "location": "repo:MODEL.bend",
+      "approval": "approved"
+    },
+    {
+      "id": "S4",
+      "kind": "product-policy",
+      "jurisdiction": "oracle space axes",
+      "standard": "the user's answers in Space discovery",
+      "location": "repo:space-discovery.md",
+      "approval": "approved"
+    },
+    {
+      "id": "S5",
+      "kind": "project-constraint",
+      "jurisdiction": "oracle model package",
+      "standard": "oracle-package v2",
+      "location": "repo:oracle.package.json",
+      "approval": "approved",
+      "self": true
+    }
+  ],
+  "spaceDiscovery": "S4",
+  "requirements": [
+    {
+      "id": "R1",
+      "source": "S1",
+      "quote": "The last page the user asked for wins: a response for an older request never replaces the rows."
+    }
+  ],
+  "world": {
+    "source": "S2",
+    "prefix": "Pager"
+  },
+  "terms": [
+    {
+      "id": "T1",
+      "context": "table",
+      "name": "entry",
+      "role": "controllable",
+      "field": "entry",
+      "family": "Entry",
+      "path": "test: open the route fresh, reload it, come back with history, or open a deep link",
+      "definition": "how the person reached the table",
+      "not": "the page number",
+      "source": "S4",
+      "status": "confirmed"
+    },
+    {
+      "id": "T2",
+      "context": "table",
+      "name": "page parameter",
+      "role": "controllable",
+      "field": "pageParam",
+      "family": "Value",
+      "path": "test: set ?page= to a valid, a malformed or an out-of-range value",
+      "definition": "the page number the URL asks for",
+      "not": "the page on screen",
+      "source": "S4",
+      "status": "confirmed"
+    },
+    {
+      "id": "T3",
+      "context": "table",
+      "name": "row volume",
+      "role": "controllable",
+      "field": "volume",
+      "family": "Data",
+      "path": "test: the MSW fixture returns 0, 1, 20 or 21 orders",
+      "definition": "how many orders the server has",
+      "not": "rows on one page",
+      "source": "S4",
+      "status": "confirmed"
+    },
+    {
+      "id": "T4",
+      "context": "table",
+      "name": "lands on requested page",
+      "role": "observable",
+      "field": "landsOnRequested",
+      "path": "DOM: the current page button (aria-current) matches ?page=",
+      "definition": "the table shows the page the URL asked for",
+      "not": "the rows of that page",
+      "source": "S1",
+      "status": "confirmed"
+    }
+  ],
+  "assumptions": [
+    {
+      "id": "A1",
+      "source": "S4",
+      "owner": "router",
+      "falsifier": "a fresh entry that carries ?page=",
+      "evidence": "S4 answer: a fresh entry always opens the first page",
+      "riskIfFalse": "a fresh entry with a broken page parameter is never tested",
+      "testability": "tested",
+      "status": "confirmed"
+    }
+  ],
+  "goals": [
+    {
+      "id": "G1",
+      "kind": "safety",
+      "cites": ["S1"],
+      "author": "analyst",
+      "requirements": ["R1"]
+    }
+  ],
+  "examples": [],
+  "hazards": {
+    "permission-change": "n/a: S1 no permission in the policy",
+    "concurrent-change": "n/a: S1 one viewer",
+    "display-vs-commit": "n/a: S1 nothing is written",
+    "effect-count": "n/a: S1 the policy counts no requests",
+    "identity-reference": "n/a: S1 rows are read only",
+    "feature-composition": "n/a: S1 paging only",
+    "carry-over": "n/a: S1 each page request is judged on its own",
+    "order-timing": "modeled: behavior"
+  },
+  "families": {
+    "Async": "modeled: behavior",
+    "Order": "modeled: behavior",
+    "Environment": "excluded: S4 no viewport rule",
+    "Platform": "excluded: S4 one supported engine",
+    "Inherited": "excluded: S4 first revision"
+  },
+  "behavior": {
+    "model": "S3",
+    "prefix": "Grid",
+    "bound": 3
+  },
+  "crossCheck": {
+    "declared": "S4",
+    "dimensions": {
+      "rows": {
+        "world": "volume",
+        "values": {
+          "0": "Empty",
+          "1": "One",
+          "20": "Full",
+          "21": "FullPlusOne"
+        }
+      },
+      "pageParam": {
+        "world": "pageParam",
+        "values": {
+          "valid": "Valid",
+          "invalid": "Invalid",
+          "outOfRange": "OutOfRange"
+        }
+      },
+      "entry": {
+        "world": "entry",
+        "values": {
+          "fresh": "Fresh",
+          "reload": "Reload",
+          "backForward": "BackForward",
+          "deepLink": "DeepLink"
+        }
+      },
+      "response": {
+        "classify": "Grid.response",
+        "values": {
+          "success": "Answered"
+        }
+      },
+      "arrival": {
+        "classify": "Grid.arrival",
+        "values": {
+          "sequential": "InOrder",
+          "inverted": "Overtaken"
+        }
+      }
+    },
+    "stateModel": {
+      "phase": "Grid.phase",
+      "step": "Grid.kind",
+      "states": {
+        "showing": "Showing",
+        "loading": "Waiting"
+      },
+      "events": {
+        "GO_PAGE": "Navigate",
+        "RESPONSE_CURRENT": "CurrentReply",
+        "RESPONSE_STALE": "StaleReply"
+      }
+    }
+  }
+}

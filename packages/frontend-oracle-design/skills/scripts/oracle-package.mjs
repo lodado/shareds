@@ -59,6 +59,7 @@ export const HAZARD_IDS = [
 // Discovery 레지스트리 — 발견 연산자 카탈로그의 ID는 oracle-discovery.mjs의 OPERATORS와 같다(테스트가 일치를 확인한다).
 export const OPERATOR_IDS = [
   'requirement-coverage',
+  'space-cross-check',
   'observation-sufficiency',
   'goal-implication',
   'goal-witness',
@@ -415,6 +416,26 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
       const issue = familyIssue(family)
       if (issue) push(...issue)
     }
+
+  // 교차검증 번역표 — 선언한 차원마다 세계 필드 하나 또는 행동 모델 def 하나, 선언 값마다 그 값이나 생성자
+  const cross = pkg?.crossCheck
+  if (cross !== undefined) {
+    if (!confirmedAxes) push('package-cross-check', 'crossCheck needs a version-2 package with a Space discovery record')
+    if (!sourceText(cross?.declared ?? pkg?.spaceDiscovery))
+      push(
+        'package-cross-check',
+        'crossCheck.declared names the approved source with the declared ## Case space — the Space discovery record by default, never a model file',
+      )
+    for (const [name, entry] of Object.entries(cross?.dimensions ?? {})) {
+      if ([entry?.world, entry?.classify].filter(nonEmpty).length !== 1)
+        push('package-cross-check', `${name}: name exactly one of world (a world field) or classify (a behavior model def)`)
+      if (!entry?.values || typeof entry.values !== 'object' || Object.keys(entry.values).length === 0)
+        push('package-cross-check', `${name}: values maps each declared value to a world value or a constructor`)
+    }
+    for (const field of ['phase', 'step'])
+      if (cross?.stateModel !== undefined && !nonEmpty(cross.stateModel?.[field]))
+        push('package-cross-check', `stateModel.${field} names a behavior model def`)
+  }
 
   issues.push(...contractRowIssues(pkg?.contract))
   issues.push(...discoveryRegistryIssues(pkg, { sources, requirements, questions }))

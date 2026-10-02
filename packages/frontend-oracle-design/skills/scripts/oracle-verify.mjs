@@ -942,6 +942,12 @@ async function lintCard(options) {
   // 바뀐 뒤 다시 투영하지 않았으면(stale) 막고, 다시 만들 수 없으면(unverified) 통과시키지 않는다. 생성 영역이 없는 기존
   // 카드는 이 검사를 받지 않는다 — 단 모델 패키지를 출처로 등록한 카드는 아래에서 영역을 요구한다.
   issues.push(...(await generatedIssues(card, { regenerate: regenerateAtRoot() })))
+  // 선언한 공간과 Bend 공간의 교차검증 — 결정 안 된 후보가 있으면 카드가 lint를 통과하지 못하므로 잠기지 않는다
+  const block = generatedBlock(card)
+  if (block.present && block.fields.package) {
+    const { crossCheckAtRoot } = await import('./oracle-discovery.mjs')
+    issues.push(...(await crossCheckAtRoot()(block.fields.package)))
+  }
 
   const sourceSection = sectionLines(lines, 'Source Registry')
   if (sourceSection.length === 0) {

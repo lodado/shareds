@@ -15,6 +15,8 @@ import {
   applyFault,
   candidateId,
   closure,
+  crossCheckIssues,
+  crossCheckSpace,
   decisionMisfit,
   declaredStatus,
   killedChecks,
@@ -24,8 +26,10 @@ import {
   productCompleteReasons,
   requirementClosure,
   sourceSentences,
+  spaceCrossCheck,
   stepPatterns,
 } from './oracle-discovery.mjs'
+import { parseCaseSpace } from './oracle-frames.mjs'
 import { enumerateSpace } from './oracle-model.mjs'
 import { loadPackage, OPERATOR_IDS, packageInputs, packageIssues } from './oracle-package.mjs'
 
@@ -780,4 +784,214 @@ test('[bend] a metamorphic relation the model itself breaks is a candidate, and 
   assert.ok(result.candidates.some((entry) => entry.class === 'relation-invalid' && entry.open))
   // F4 (issuing clears the list) is killed by MR1 on the product
   assert.ok(result.operators.mutation.mutants.find((entry) => entry.fault === 'F4').killedBy.includes('metamorphic MR1'))
+})
+
+// ── space-cross-check: the declared space (Space discovery record) against the Bend space ─────────────────────────
+
+const DECLARED = `## Case space
+
+| Family | Dimension | Choices             |
+| ------ | --------- | ------------------- |
+| Data   | rows      | 0, 1                |
+| Entry  | entry     | fresh, deep         |
+| Order  | arrival   | inOrder, overtaken  |
+| Async  | response  | ok, fail [error]    |
+`
+
+test('space-cross-check: every declared value, value pair and transition is placed in the world, the traces, or a candidate', () => {
+  // two coordinates of the world; the assumption rejects the fresh entry with one row
+  const worlds = ['Zero', 'One'].flatMap((rows) =>
+    ['Fresh', 'Deep'].map((entry) => ({ plain: { rows, entry }, valid: !(rows === 'One' && entry === 'Fresh'), truth: { A1: !(rows === 'One' && entry === 'Fresh') } })),
+  )
+  // two traces: an in-order reply and an overtaken one; a step names its arrival kind and its state phase
+  const step = (arrival, from, to) => ({ before: { phase: from }, event: { arrival }, after: { phase: to } })
+  const traces = [
+    { label: 'go · reply', steps: [step('None', 'Shown', 'Busy'), step('InOrder', 'Busy', 'Shown')] },
+    { label: 'go · go · old reply', steps: [step('None', 'Shown', 'Busy'), step('None', 'Busy', 'Busy'), step('Overtaken', 'Busy', 'Busy')] },
+  ]
+  // the classifier defs of a hand model: the arrival kind of a step, whether it is a reply, the phase of a state
+  const CLASSIFIERS = {
+    'M.arrival': (state, event) => event.arrival,
+    'M.reply': (state, event) => (event.arrival === 'None' ? 'None' : 'Reply'),
+    'M.phase': (state) => state.phase,
+    'M.step': (state, event) => event.arrival,
+  }
+  const classify = (def, ...args) => CLASSIFIERS[def](...args)
+  const result = crossCheckSpace({
+    caseSpace: parseCaseSpace(DECLARED),
+    stateModel: {
+      states: ['shown', 'busy'],
+      events: ['GO', 'REPLY'],
+      transitions: [
+        { from: 'shown', event: 'GO', to: 'busy' },
+        { from: 'busy', event: 'REPLY', to: 'shown' },
+        { from: 'busy', event: 'CANCEL', to: 'shown' },
+      ],
+    },
+    mapping: {
+      dimensions: {
+        rows: { world: 'rows', values: { 0: 'Zero', 1: 'One' } },
+        entry: { world: 'entry', values: { fresh: 'Fresh', deep: 'Deep' } },
+        arrival: { classify: 'M.arrival', values: { inOrder: 'InOrder', overtaken: 'Overtaken' } },
+        response: { classify: 'M.reply', values: { ok: 'Reply' } },
+      },
+      stateModel: { phase: 'M.phase', step: 'M.step', states: { shown: 'Shown', busy: 'Busy' }, events: { GO: 'None', REPLY: 'InOrder' } },
+    },
+    worlds,
+    traces,
+    classify,
+  })
+  const byClass = (cls) => result.candidates.filter((entry) => entry.class === cls)
+  // the error value has no counterpart; nothing invented for it
+  assert.match(byClass('new-axis').map((entry) => entry.summary).join(' | '), /response=fail has no counterpart/)
+  // a pair split across the world and the traces is one candidate per dimension pair, listing its value pairs
+  const cross = byClass('cross-term')
+  assert.deepEqual(cross.map((entry) => entry.evidence.dimensions.join(' × ')).sort(), ['arrival × entry', 'arrival × rows', 'entry × response', 'response × rows'])
+  assert.equal(cross.find((entry) => entry.evidence.dimensions.join(' × ') === 'arrival × rows').evidence.pairs.length, 4)
+  // the world pair the assumption removes is reported with the assumption, not as a candidate
+  assert.deepEqual(result.summary.pairs.excluded, [{ pair: 'rows=1 × entry=fresh', by: ['A1'] }])
+  // the model takes busy -GO-> busy, which the declaration lacks, and an overtaken reply the declaration has no event
+  // for (shown as <Overtaken>); the declared CANCEL has no counterpart in the model
+  assert.deepEqual(byClass('silent-decision').map((entry) => entry.evidence.transition), ['busy -<Overtaken>-> busy', 'busy -GO-> busy'])
+  assert.ok(byClass('new-axis').some((entry) => /CANCEL has no counterpart/.test(entry.summary)))
+  // stable: the same inputs give the same candidates
+  assert.deepEqual(
+    crossCheckSpace({ caseSpace: parseCaseSpace(DECLARED), stateModel: null, mapping: { dimensions: {} }, worlds, traces, classify }).candidates.map((entry) => entry.id),
+    crossCheckSpace({ caseSpace: parseCaseSpace(DECLARED), stateModel: null, mapping: { dimensions: {} }, worlds, traces, classify }).candidates.map((entry) => entry.id),
+  )
+})
+
+test('space-cross-check: given the fields the test sets, a few joint cases cover every world × behavior pair the traces can show', () => {
+  const worlds = ['Zero', 'One'].flatMap((rows) =>
+    ['Fresh', 'Deep'].map((entry) => ({ plain: { rows, entry }, valid: !(rows === 'One' && entry === 'Fresh'), truth: {} })),
+  )
+  const step = (arrival) => ({ before: {}, event: { arrival }, after: {} })
+  const traces = [
+    { label: 'go · reply', trace: [{ $: 'Go' }, { $: 'Reply' }], observations: [1, 2], steps: [step('None'), step('InOrder')] },
+    { label: 'go · go · old reply', trace: [{ $: 'Go' }, { $: 'Go' }, { $: 'Reply' }], observations: [1, 1, 1], steps: [step('None'), step('None'), step('Overtaken')] },
+  ]
+  const CLASSIFIERS = {
+    'M.arrival': (state, event) => event.arrival,
+    'M.reply': (state, event) => (event.arrival === 'None' ? 'None' : 'Reply'),
+  }
+  const mapping = {
+    dimensions: {
+      rows: { world: 'rows', values: { 0: 'Zero', 1: 'One' } },
+      entry: { world: 'entry', values: { fresh: 'Fresh', deep: 'Deep' } },
+      arrival: { classify: 'M.arrival', values: { inOrder: 'InOrder', overtaken: 'Overtaken' } },
+      response: { classify: 'M.reply', values: { ok: 'Reply' } },
+    },
+  }
+  const run = (coordinates) =>
+    crossCheckSpace({ caseSpace: parseCaseSpace(DECLARED), mapping, worlds, traces, classify: (def, ...args) => CLASSIFIERS[def](...args), coordinates })
+  const both = run(['rows', 'entry'])
+  // 4 world values × 3 behavior values = 12 pairs, all covered; no pair is left to a claim
+  assert.deepEqual({ required: both.joint.required, covered: both.joint.covered }, { required: 12, covered: 12 })
+  assert.equal(both.summary.pairs.coveredByJoint, 12)
+  assert.equal(both.candidates.filter((entry) => entry.class === 'cross-term').length, 0)
+  // fewer cases than the product of the settings and the traces, each a setting the assumptions allow, each with
+  // the expectations the model computed for its trace
+  assert.ok(both.joint.cases.length < 3 * 2, JSON.stringify(both.joint.cases.map((entry) => entry.label)))
+  for (const entry of both.joint.cases) {
+    assert.notDeepEqual(entry.coordinates, { entry: 'Fresh', rows: 'One' })
+    assert.match(entry.id, /^J[a-f0-9]{12}$/)
+    const source = traces.find((trace) => JSON.stringify(trace.trace) === JSON.stringify(entry.trace))
+    assert.ok(source, entry.label)
+    assert.deepEqual(entry.observations, source.observations)
+  }
+  assert.deepEqual(run(['rows', 'entry']).joint.cases, both.joint.cases)
+  // a world field the test cannot set leaves its pairs as cross-term candidates
+  const rowsOnly = run(['rows'])
+  assert.deepEqual(
+    rowsOnly.candidates.filter((entry) => entry.class === 'cross-term').map((entry) => entry.evidence.dimensions.join(' × ')).sort(),
+    ['arrival × entry', 'entry × response'],
+  )
+})
+
+test('[bend] space-cross-check on the paging fixture finds the split pairs, the missing failure and the transitions only the model decides', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = fileURLToPath(new URL('../../test-fixtures/pagination/', import.meta.url))
+  const loaded = await loadPackage('oracle.package.json', { root })
+  const result = await spaceCrossCheck({ loaded, bin })
+  assert.equal(result.status, 'run')
+  // 75 pairwise obligations: 38 by the world, 2 by the traces, 2 removed by A1, and the 33 that split across the two
+  // models by 4 joint cases — every world value with one trace that shows a late and an in-order response
+  assert.deepEqual(
+    {
+      total: result.summary.pairs.total,
+      world: result.summary.pairs.coveredByWorld,
+      traces: result.summary.pairs.coveredByTraces,
+      joint: result.summary.pairs.coveredByJoint,
+      cross: result.summary.pairs.crossTerm,
+    },
+    { total: 75, world: 38, traces: 2, joint: 33, cross: 0 },
+  )
+  assert.equal(result.summary.pairs.excluded.length, 2)
+  assert.equal(result.joint.cases.length, 4)
+  const byClass = (cls) => result.candidates.filter((entry) => entry.class === cls)
+  assert.equal(byClass('cross-term').length, 0)
+  // the 5xx failure, the error state and its events have no counterpart in the model
+  const missing = byClass('new-axis').map((entry) => entry.summary).join(' | ')
+  for (const name of ['response=http-5xx', 'state error', 'event ERROR_5XX', 'event RETRY']) assert.match(missing, new RegExp(name.replace('=', '=')))
+  // four transitions only the model decides, two of them in cells the declaration left empty
+  const silent = byClass('silent-decision')
+  assert.deepEqual(silent.map((entry) => entry.evidence.transition).sort(), [
+    'loading -GO_PAGE-> showing',
+    'showing -GO_PAGE-> showing',
+    'showing -RESPONSE_CURRENT-> showing',
+    'showing -RESPONSE_STALE-> showing',
+  ])
+  assert.deepEqual(silent.filter((entry) => entry.evidence.declaredEmpty).map((entry) => entry.evidence.transition).sort(), [
+    'showing -RESPONSE_CURRENT-> showing',
+    'showing -RESPONSE_STALE-> showing',
+  ])
+  assert.match(silent.find((entry) => entry.evidence.transition === 'showing -RESPONSE_STALE-> showing').evidence.witness, /Arrive/)
+})
+
+test('space-cross-check runs only on a version-2 package; one without a crossCheck mapping blocks until mapped or written off', async () => {
+  const v1 = await spaceCrossCheck({ loaded: { pkg: PKG, root: FIXTURE }, bin: null })
+  assert.equal(v1.status, 'not-applicable')
+  const v2 = { ...clone(PKG), packageVersion: 2 }
+  const undeclared = await spaceCrossCheck({ loaded: { pkg: v2, root: FIXTURE }, bin: null })
+  assert.equal(undeclared.status, 'undeclared')
+  // a sourced n/a turns the blocking undeclared status into not-applicable
+  const operators = applyDispositions({ 'space-cross-check': undeclared }, { 'space-cross-check': 'n/a: S1 no declared space exists for this legacy port' })
+  assert.equal(operators['space-cross-check'].status, 'not-applicable')
+})
+
+// ── the lock gate: an undecided cross-check candidate keeps the card from passing lint ────────────────────────────
+
+test('[bend] the cross-check gate lists every undecided candidate and clears once each is decided with its source', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await mkdtemp(join(tmpdir(), 'oracle-gate-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  await cp(fileURLToPath(new URL('../../test-fixtures/pagination/', import.meta.url)), root, { recursive: true })
+  const pkg = JSON.parse(await readFile(join(root, 'oracle.package.json'), 'utf8'))
+  const open = await crossCheckIssues({ loaded: await loadPackage('oracle.package.json', { root }), bin })
+  // the 5xx failure (4 new-axis) and the 4 transitions only the model decides; the split pairs are covered by joint cases
+  assert.equal(open.length, 8, open.join('\n'))
+  assert.ok(open.every((issue) => /^cross-check-undecided: C-[a-f0-9]{10} (?:new-axis|silent-decision) — /.test(issue)), open.join('\n'))
+  // a decision citing the Space discovery record closes each one
+  const decided = clone(pkg)
+  decided.discoveryDecisions = open.map((issue) => ({
+    candidate: issue.match(/C-[a-f0-9]{10}/)[0],
+    decision: 'out-of-scope',
+    reason: 'failures and returning to a shown page are decided in a later revision',
+    source: 'S4',
+  }))
+  assert.deepEqual(packageIssues(decided, { stage: 'model' }), [])
+  await writePackage(root, 'decided.json', decided)
+  assert.deepEqual(await crossCheckIssues({ loaded: await loadPackage('decided.json', { root }), bin }), [])
+  // a version-2 package without the mapping is blocked unless the operator is written off with a source
+  const unmapped = clone(pkg)
+  delete unmapped.crossCheck
+  await writePackage(root, 'unmapped.json', unmapped)
+  assert.match((await crossCheckIssues({ loaded: await loadPackage('unmapped.json', { root }), bin })).join(' '), /^cross-check-undeclared: /)
+  unmapped.operators = { 'space-cross-check': 'n/a: S4 no declared space exists for this port' }
+  await writePackage(root, 'written-off.json', unmapped)
+  assert.deepEqual(await crossCheckIssues({ loaded: await loadPackage('written-off.json', { root }), bin }), [])
+  // a version-1 package is not gated
+  assert.deepEqual(await crossCheckIssues({ loaded: { pkg: PKG, root: FIXTURE, path: join(FIXTURE, 'oracle.package.json') }, bin }), [])
 })

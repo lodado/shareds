@@ -2472,3 +2472,29 @@ test('conditional guardrail loading projects existing owners without adding a de
   assert.match(retro, /No sidecar,\s+new log or normal-run artifact is required/)
   assert.match(retro, /Design-only notes authorize neither\s+tests nor production edits/)
 })
+
+test('the space cross-check compares the declared space with the Bend space and only produces candidates', async () => {
+  const [discovery, caseSpace, tool] = await Promise.all([
+    read('references/discovery.md'),
+    read('references/card/case-space.md'),
+    read('scripts/oracle-discovery.mjs'),
+  ])
+  assert.match(discovery, /## Space cross-check — the declared space against the Bend space/)
+  assert.match(discovery, /the findings are\s+candidates, never a verdict, and the declared table never becomes a second source of truth/)
+  assert.match(discovery, /\| `cross-term` +\| a world axis and a behavior axis that no joint case can run together/)
+  assert.match(caseSpace, /Keep the confirmed axes in it as a `## Case space` table/)
+  assert.match(tool, /export function crossCheckSpace/)
+  // it runs before the lock, and every candidate goes back to the user as a question
+  const skill = await read('SKILL.md')
+  assert.match(skill, /`card --repo-policies`, `cross-check`, `--case-space`/)
+  assert.match(skill, /`oracle-discovery\.mjs cross-check --package` and bring each candidate back to the interview/)
+  assert.match(caseSpace, /each candidate comes back here — a `new-axis` or a `cross-term` as an\s+A\/B question, a `silent-decision` as a policy question/)
+  // the lock gate and the joint cases that turn an independence claim into a test
+  assert.match(caseSpace, /Card lint fails `cross-check-undecided` — so the\s+card cannot be locked/)
+  assert.match(discovery, /covered by a joint case — a setting the assumptions allow/)
+  assert.match(discovery, /closure runs the joint cases in its trace conformance/)
+  const [bend, verifier] = await Promise.all([read('references/bend-cross-verification.md'), read('scripts/oracle-verify.mjs')])
+  assert.match(bend, /`init\(coordinates\)` starts the product on that setting/)
+  assert.match(bend, /ADAPTER_JOINT_UNSUPPORTED/)
+  assert.match(verifier, /crossCheckAtRoot/)
+})

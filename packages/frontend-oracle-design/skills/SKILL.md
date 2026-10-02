@@ -112,7 +112,7 @@ Lane routing:
   of the card unless its answer kills a branch — the Space discovery axis questions are such questions.
   Before that confirmation: no lock, no target tests,
   no production or dependency edits. Only the pre-lock checks this procedure names run — `prove`,
-  `space`, `derive`, the adequacy check, `card --repo-policies`, `--case-space` and the frame
+  `space`, `derive`, the adequacy check, `card --repo-policies`, `cross-check`, `--case-space` and the frame
   dispositions. A policy change is a new revision, never an in-place edit of a locked file.
 - Lint the card with `scripts/oracle-verify.mjs card --path <touched files>`; `--case-space` is a
   structural preapproval check only and never records user approval. Then lock it with
@@ -361,7 +361,9 @@ and the target repository's dependency rules.
    [`model-package.example.json`](references/model-package.example.json), never from `MODEL.bend` or a hand-written card), dispatch the analyst with
    `oracle-adequacy.mjs model-input --package`, write the Bend world from the confirmed axes, the behavior model and laws, run
    `oracle-package.mjs derive` and `oracle-adequacy.mjs check --package` until each counterexample is
-   resolved or becomes an Open question, then `oracle-package.mjs project-card` — rows, axes and formal
+   resolved or becomes an Open question, run
+   `oracle-discovery.mjs cross-check --package` and bring each candidate back to the interview, then
+   `oracle-package.mjs project-card` — rows, axes and formal
    sections are projected, never hand-written a second time
    ([`bend-cross-verification.md`](references/bend-cross-verification.md) §2).
 7. Read [`card/risk-grill.md`](references/card/risk-grill.md)·[`bva.md`](references/bva.md)·

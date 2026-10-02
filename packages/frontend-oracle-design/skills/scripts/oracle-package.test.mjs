@@ -1022,3 +1022,78 @@ test('a card without a Formal Model registers the adequacy proof and the world c
   // a card with a Formal Model keeps the four labels
   assert.deepEqual(stackLabelsFor(renderGenerated(PKG, derive(PKG, { world: WORLD, model: MODEL }))), STACK_LABELS)
 })
+
+test('crossCheck maps each declared dimension onto exactly one world field or behavior def, from an approved declaration', () => {
+  const codes = (pkg) => packageIssues(pkg, { stage: 'model' }).filter((issue) => issue.startsWith('package-cross-check'))
+  const ready = confirmed(PKG)
+  ready.crossCheck = {
+    dimensions: {
+      arrival: { world: 'arrival', values: { early: 'OldEarly' } },
+      reply: { classify: 'Search.reply', values: { late: 'Late' } },
+    },
+    stateModel: { phase: 'Search.phase', step: 'Search.kind', states: {}, events: {} },
+  }
+  assert.deepEqual(codes(ready), [])
+  const both = clone(ready)
+  both.crossCheck.dimensions.arrival.classify = 'Search.arrival'
+  assert.match(codes(both).join(' | '), /arrival: name exactly one of world/)
+  const empty = clone(ready)
+  empty.crossCheck.dimensions.reply.values = {}
+  assert.match(codes(empty).join(' | '), /reply: values maps each declared value/)
+  const fromModel = clone(ready)
+  fromModel.crossCheck.declared = 'S2'
+  assert.match(codes(fromModel).join(' | '), /crossCheck\.declared names the approved source/)
+  const noPhase = clone(ready)
+  delete noPhase.crossCheck.stateModel.phase
+  assert.match(codes(noPhase).join(' | '), /stateModel\.phase names a behavior model def/)
+  // a version-1 package has no Space discovery record to cross-check
+  const legacy = clone(PKG)
+  legacy.crossCheck = ready.crossCheck
+  assert.match(codes(legacy).join(' | '), /needs a version-2 package/)
+})
+
+test('[bend] card lint refuses a version-2 card while a cross-check candidate is undecided, so the card cannot be locked', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await fixtureCopy(t)
+  // the Space discovery record keeps the confirmed world axes; crossCheck maps each declared value onto the world
+  const record = [
+    '# Space discovery — search',
+    '',
+    '## Case space',
+    '',
+    '| Family | Dimension   | Choices                    |',
+    '| ------ | ----------- | -------------------------- |',
+    '| Order  | arrival     | oldFirst, newFirst, oldEarly |',
+    '| Data   | oldEmpty    | no, yes                    |',
+    '| Value  | longSession | short, long                |',
+    '',
+  ].join('\n')
+  await writeFile(join(root, 'space-discovery.md'), record)
+  const pkg = confirmed(PKG)
+  pkg.crossCheck = {
+    dimensions: {
+      arrival: { world: 'arrival', values: { oldFirst: 'OldFirst', newFirst: 'NewFirst', oldEarly: 'OldEarly' } },
+      oldEmpty: { world: 'oldEmpty', values: { no: false, yes: true } },
+      longSession: { world: 'longSession', values: { short: false, long: true } },
+    },
+  }
+  pkg.sources.find((source) => source.self).location = 'repo:oracle.package.v2.json#v1'
+  await writeFile(join(root, 'oracle.package.v2.json'), `${JSON.stringify(pkg, null, 2)}\n`)
+  const projected = node(root, 'oracle-package.mjs', ['project-card', '--package', 'oracle.package.v2.json', '--out', 'oracle.v2.md'])
+  assert.equal(projected.status, 0, projected.stderr)
+  const lint = () => node(root, 'oracle-verify.mjs', ['card', '--oracle', 'oracle.v2.md'])
+  const issueCodes = (output) =>
+    output
+      .split('\n')
+      .filter((line) => /^ {2}[a-z-]+: /.test(line))
+      .map((line) => line.trim().split(':')[0])
+  // the only issue left on the fresh projection is the approval the user has not given yet
+  assert.deepEqual(issueCodes(lint().stderr), ['user-confirmation-status'])
+  // the user confirms a value the model has no counterpart for: lint names it until it is decided
+  await writeFile(join(root, 'space-discovery.md'), record.replace('| short, long                |', '| short, long, expired       |'))
+  const gated = lint()
+  assert.equal(gated.status, 1)
+  assert.deepEqual(issueCodes(gated.stderr), ['cross-check-undecided', 'user-confirmation-status'])
+  assert.match(gated.stderr, /cross-check-undecided: C-[a-f0-9]{10} new-axis — longSession=expired has no counterpart/)
+})

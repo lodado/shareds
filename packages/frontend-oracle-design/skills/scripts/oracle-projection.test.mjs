@@ -66,7 +66,8 @@ async function workspace(t) {
   t.after(() => rm(root, { recursive: true, force: true }))
   await mkdir(join(root, 'node_modules'))
   await symlink(join(PACKAGE, 'node_modules', 'fast-check'), join(root, 'node_modules', 'fast-check'))
-  for (const name of ['stale-search', 'toggle', 'doc-save']) await cp(join(FIXTURES, name), join(root, name), { recursive: true })
+  for (const name of ['stale-search', 'toggle', 'doc-save', 'pagination'])
+    await cp(join(FIXTURES, name), join(root, name), { recursive: true })
   return root
 }
 
@@ -872,4 +873,46 @@ test('[bend] emit-world: every possible setting runs once with the outcomes the 
   const stale = runGenerated(testFile)
   assert.equal(stale.status, 1)
   assert.match(stale.output, /STALE_GENERATED_TESTS: \.\.\/World\.bend changed since generation/)
+})
+
+// ── emit-trace --package: the joint cases run the behavior on the world settings ───────────────────────────────
+
+test('[bend] emit-trace --package adds the joint cases; only they catch a defect that needs an empty page and a late response', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'pagination')
+  const base = { package: 'oracle.package.json', cwd: dir, row: 'O1', runs: 50, bin, regenerate: 'test' }
+  const emitted = await emitTrace({ ...base, adapter: join(dir, 'pager.adapter.mjs'), out: join(dir, 'generated') })
+  // the package names the model, the prefix and the bound; the cross-check chooses 4 joint cases for 33 pairs
+  assert.deepEqual(emitted.verification.exhaustive, { cases: 51, bound: 3, complete: true })
+  assert.deepEqual(emitted.verification.joint, { required: 33, covered: 33, cases: 4 })
+  const testFile = join(dir, 'generated', 'grid.oracle.test.mjs')
+  assert.match(await readFile(testFile, 'utf8'), /"coordinates":\{"entry":/)
+  const clean = runGenerated(testFile)
+  assert.equal(clean.status, 0, clean.output)
+  // 51 traces + the cover + 4 joint cases + sources unchanged + adapter audit + the sampled property
+  assert.deepEqual([clean.tests, clean.fail], [51 + emitted.verification.cover.cases + 4 + 3, 0])
+
+  // every trace and cover case runs on the default full page, so the mutant passes them all; the joint case on the
+  // empty page with a late response is the one that fails
+  await writeFile(
+    join(dir, 'empty.adapter.mjs'),
+    "import { adapterFor } from './pager.adapter.mjs'\nimport { reducePagerApplyingEmpty } from './pager-product.mjs'\nexport const { init, step, observe } = adapterFor(reducePagerApplyingEmpty)\n",
+  )
+  await emitTrace({ ...base, adapter: join(dir, 'empty.adapter.mjs'), out: join(dir, 'empty') })
+  const mutant = runGenerated(join(dir, 'empty', 'grid.oracle.test.mjs'))
+  assert.equal(mutant.status, 1)
+  assert.equal(mutant.fail, 1, mutant.output)
+  assert.match(mutant.output, /✖ \[O1\] \[J[a-f0-9]{12}\] [^\n]*volume=Empty/)
+
+  // an adapter whose init takes no coordinates cannot run a joint case: it fails instead of passing on the default page
+  await writeFile(
+    join(dir, 'blind.adapter.mjs'),
+    "import { adapterFor } from './pager.adapter.mjs'\nimport { initialPager, reducePager } from './pager-product.mjs'\nconst full = adapterFor(reducePager)\nexport const init = () => initialPager(20)\nexport const { step, observe } = full\n",
+  )
+  await emitTrace({ ...base, adapter: join(dir, 'blind.adapter.mjs'), out: join(dir, 'blind') })
+  const blind = runGenerated(join(dir, 'blind', 'grid.oracle.test.mjs'))
+  assert.equal(blind.fail, 4, blind.output)
+  assert.match(blind.output, /ADAPTER_JOINT_UNSUPPORTED/)
 })
