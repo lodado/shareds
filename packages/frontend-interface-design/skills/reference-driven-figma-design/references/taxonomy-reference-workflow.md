@@ -33,6 +33,12 @@ screen/crop evidence.
 
 ## 2. Translate keywords into search intent
 
+For ambiguous intent in a new screen or authorized redesign, use
+[Bend generative design](bend-generative-design.md) to derive contextual axes and coupling
+rules from these meanings and observations. A taxonomy enum or a post-hoc Bend explanation
+is not a generator; the rules must produce the composition used in Figma. Keep the three
+evidence kinds separate and dictionary text local-only.
+
 Translate a taxonomy term into `user task + UI role + needed state/device` before searching —
 not a fixed recipe, adapt per task. Example: a taxonomy entry naming a pattern becomes a
 search like "settings form validation error mobile", not the taxonomy ID itself.

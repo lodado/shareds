@@ -18,6 +18,13 @@ For interactive scope, record prototype readback separately from visual inspecti
 
 ## 3. Critique trace
 
+On the [Bend path](bend-generative-design.md), link the executed model, selected DesignPlan,
+runtime/hash provenance, and axis/rule-to-Figma-node mapping through the existing Reference Log
+(`source_trace.references`: `source`/`selection_reason`). Include axis-change comparison and
+visual review and any required correction/recheck evidence; an unexecuted model or unrendered plan is
+preparation only. Internal Bend/compiled JavaScript is not frontend output: keep
+`code_generation_allowed` and `figma.code_generated` false and preserve the v1 field structure.
+
 Per round: top issues and fixes, viewports/states checked, AI slop removed vs kept, unresolved and unreviewed.
 
 `iteration_count` = real `rounds` length, each with its own version and observations. No problems → `top_issues`/`fixes` empty, `result` names the criteria reviewed. Never invent issues to fill rounds. Reconcile requested sections, viewports, states against the done list with tool results; schema validity is neither scope match nor observation.

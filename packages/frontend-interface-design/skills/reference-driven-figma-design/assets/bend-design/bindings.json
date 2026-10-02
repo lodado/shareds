@@ -1,0 +1,28 @@
+{
+  "assets": {
+    "heading.quiet": { "locator": "fixture:heading/quiet", "properties": ["Title", "Subtitle"] },
+    "heading.expressive": { "locator": "fixture:heading/expressive", "properties": ["Title", "Subtitle"] },
+    "reference-list.compact": { "locator": "fixture:reference-list/compact", "properties": ["Title", "Items"] },
+    "reference-list.comfortable": { "locator": "fixture:reference-list/comfortable", "properties": ["Title", "Items"] },
+    "comparison.compact": { "locator": "fixture:comparison/compact", "properties": ["Title", "Items"] },
+    "comparison.comfortable": { "locator": "fixture:comparison/comfortable", "properties": ["Title", "Items"] },
+    "reference.detail": { "locator": "fixture:reference/detail", "properties": ["Title", "Body"] },
+    "comparison.notes": { "locator": "fixture:comparison/notes", "properties": ["Body"] }
+  },
+  "tokens": {
+    "space.none": { "kind": "spacing", "value": 0, "locator": "fixture:space/none" },
+    "space.group": { "kind": "spacing", "value": 16, "locator": "fixture:space/group" },
+    "space.page": { "kind": "spacing", "value": 24, "locator": "fixture:space/page" },
+    "space.page-mobile": { "kind": "spacing", "value": 16, "locator": "fixture:space/page-mobile" },
+    "surface.page": { "kind": "color", "value": "#F5F4F0", "locator": "fixture:surface/page" }
+  },
+  "content": {
+    "page-title": "Design language research",
+    "page-subtitle": "Meaning, composition and visual judgement",
+    "collection-title": "References",
+    "references": "Penrose — semantic descriptions and visual style\nUIClip — UI screenshots and natural-language quality assessment\nCassowary — required and preferred layout constraints",
+    "detail-title": "Penrose",
+    "detail-body": "Domain defines concepts and relations. Substance describes an instance. Style maps that meaning to a visual representation.\n\nA useful precedent for separating design intent from appearance. Its optimization does not prove universal aesthetic quality.\n\nhttps://github.com/penrose/penrose",
+    "comparison-notes": "Compare what each approach owns: semantic structure, perceptual evaluation, or geometric constraints. They solve different parts of the design problem."
+  }
+}

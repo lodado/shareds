@@ -269,6 +269,7 @@
           "const": "editable-figma"
         },
         "code_generation_allowed": {
+          "description": "Frontend implementation output is not part of this editable-Figma contract. Internal Bend models and compiled JavaScript used to generate a DesignPlan do not change this flag or replace Figma delivery.",
           "const": false
         },
         "prototype_required": {

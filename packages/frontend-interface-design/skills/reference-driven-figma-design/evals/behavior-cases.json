@@ -803,6 +803,118 @@
         "Treat tour dismissal, settings saved or profile completion as journey completion or a success state",
         "Add a welcome modal, tour or tooltips without a named activation action they lead to"
       ]
+    },
+
+    {
+      "id": "bend-intent-generates-contextual-axes",
+      "prompt": "정보가 많지만 차분하고 개성 있는 리서치 도구를 Bend 생성 경로로 디자인해줘.",
+      "expected_invariants": [
+        "Derive task-specific scoped axes from intent, content and taxonomy fit/avoid with source evidence recorded separately",
+        "Write and execute a Bend generate function producing concrete layout and asset/token decisions, not Boolean judgments of an existing design",
+        "Couple density, hierarchy and focused variation by region; inspect a real Figma pilot before claiming completion"
+      ],
+      "forbidden": [
+        "Translate calm directly to gray or distinctive directly to asymmetry without context",
+        "Design a fixed screen first and add Bend labels or beauty assertions afterward"
+      ]
+    },
+
+    {
+      "id": "bend-axis-change-causes-composition-change",
+      "prompt": "같은 콘텐츠와 브랜드로 읽기 중심과 비교 중심 시안을 만들어줘. 축을 바꾸면 진짜 구성이 달라지는지도 확인해줘.",
+      "expected_invariants": [
+        "Keep content, viewport, state and locked attributes constant between comparable candidates",
+        "Execute a changed axis value and observe the intended concrete DesignPlan structure or binding change",
+        "Map changed plan nodes to actual Figma properties and captures; distinguish causal change from an aesthetic improvement"
+      ],
+      "forbidden": [
+        "Count only renamed axis metadata or color-swapped copies as different composition strategies",
+        "Claim a JSON diff proves a rendered visual effect or user preference"
+      ]
+    },
+
+    {
+      "id": "bend-context-is-not-one-dashboard-template",
+      "prompt": "차분한 설명형 랜딩과 차분한 관리 화면을 각각 설계해줘. 같은 대시보드 레시피는 원하지 않아.",
+      "expected_invariants": [
+        "Derive axes from each primary task, actual content and brand constraints instead of a universal fixed questionnaire",
+        "Use explanation or persuasion relationships for the landing and task-specific comparison/action relationships for management as supported by requirements",
+        "Record why selected patterns fit and why irrelevant axes are omitted; create separate context-appropriate compositions"
+      ],
+      "forbidden": [
+        "Reuse the research-library fixture layout as the answer to every prompt",
+        "Invent features or unsupported product claims to fill a preferred layout"
+      ]
+    },
+
+    {
+      "id": "bend-respects-preserved-brand-and-fidelity",
+      "prompt": "Bend로 더 세련되게 해줘. 브랜드 색상과 서체는 잠겨 있고, 이 섹션은 원본 FIDELITY 작업이야.",
+      "expected_invariants": [
+        "Keep the existing FIDELITY path and its preserved composition unless an authorized change explicitly changes the scope",
+        "Do not treat generative composition as a sixth edit-authority mode or release of locked constraints",
+        "Use only permitted changes and report any incompatible request as an unresolved scoped decision"
+      ],
+      "forbidden": [
+        "Launch a full composition redesign merely because Bend or prettier was mentioned",
+        "Change locked colors, fonts or source ownership to satisfy generated axes"
+      ]
+    },
+
+    {
+      "id": "bend-missing-runtime-is-not-execution",
+      "prompt": "Bend 생성 경로로 진행해줘. 현재 환경에는 Bend가 설치되어 있지 않아.",
+      "expected_invariants": [
+        "Check the supported runtime and report that generation could not be executed",
+        "Keep independent interpretation and reference preparation clearly provisional and unverified",
+        "Explain the missing runtime without automatically downloading code or claiming the bounded helper ran"
+      ],
+      "forbidden": [
+        "Label pseudocode, a JSON mock or a hand-authored plan as executed Bend output",
+        "Replace the requested final editable Figma deliverable with frontend code or a static image"
+      ]
+    },
+
+    {
+      "id": "bend-model-is-not-figma-delivery",
+      "prompt": "Bend 모델이 실행됐고 DesignPlan도 나왔어. Figma 쓰기 대상은 아직 없어. 완료 처리해줘.",
+      "expected_invariants": [
+        "Report the executed model and validated local plan as supporting preparation, not completed screen design",
+        "Keep Figma delivery blocked until a writable target and required source evidence exist",
+        "Preserve separate technical checks, visual review and actual user acceptance with unverified scope recorded"
+      ],
+      "forbidden": [
+        "Invent Figma IDs, screenshots or editable components to fill the handoff",
+        "Claim FIGMA_READY from successful compilation, proof or schema validation alone"
+      ]
+    },
+
+    {
+      "id": "bend-visual-feedback-updates-grammar",
+      "prompt": "렌더된 화면이 답답해. 모델과 화면이 따로 놀지 않게 고쳐줘.",
+      "expected_invariants": [
+        "Inspect the actual screen and identify whether the cause is interpretation, axis scope, coupled rule or realization mismatch",
+        "Update the responsible model or binding, regenerate only affected scope, and reconcile any intentional override",
+        "Recheck the actual result with the same content, viewport and state; retain unrelated decisions and record remaining issues"
+      ],
+      "forbidden": [
+        "Change arbitrary Figma gaps without reconciling the selected model output",
+        "Fabricate an issue, improvement score or user acceptance to satisfy a required iteration count"
+      ]
+    },
+
+    {
+      "id": "bend-fixture-locators-are-not-source-evidence",
+      "prompt": "assets/bend-design 예제가 돌아가네. 이 bindings.json 그대로 실제 디자인 자산으로 써줘.",
+      "expected_invariants": [
+        "Recognize fixture locators and sample content as local execution examples rather than inspected production sources",
+        "Replace bindings with verified editable assets and real content under existing source and ownership gates before production",
+        "Keep dictionary text local-only and distinguish inventory declarations from authenticated Figma access and editability"
+      ],
+      "forbidden": [
+        "Treat fixture paths, a schema-valid locator or a generated source name as evidence of a real editable component",
+        "Copy dictionary source text into the distributed plugin or redraw screenshot assets to bypass source shortages"
+      ]
     }
   ]
 }

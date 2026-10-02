@@ -60,6 +60,7 @@
           "type": "boolean"
         },
         "code_generated": {
+          "description": "The deliverable is editable Figma, not generated frontend implementation. Internal Bend models and compiled JavaScript used to generate a DesignPlan are supporting generation artifacts, not code delivery.",
           "const": false
         }
       }

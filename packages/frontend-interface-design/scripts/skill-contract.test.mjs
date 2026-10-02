@@ -244,7 +244,7 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
   const ids = cases.map(({ id }) => id)
 
   assert.equal(schemaVersion, '1.0')
-  assert.equal(cases.length, 63)
+  assert.equal(cases.length, 71)
   assert.equal(new Set(ids).size, cases.length)
   for (const id of [
     'editable-reference-assembly-not-redraw',
@@ -277,6 +277,14 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
     'targeted-reopen-upstream-dependency',
     'boundaries-preserve-no-redraw-and-explicit-diagram',
     'activation-before-onboarding-ceremony',
+    'bend-intent-generates-contextual-axes',
+    'bend-axis-change-causes-composition-change',
+    'bend-context-is-not-one-dashboard-template',
+    'bend-respects-preserved-brand-and-fidelity',
+    'bend-missing-runtime-is-not-execution',
+    'bend-model-is-not-figma-delivery',
+    'bend-visual-feedback-updates-grammar',
+    'bend-fixture-locators-are-not-source-evidence',
   ]) {
     assert.ok(ids.includes(id), `Missing assembly regression case: ${id}`)
   }
@@ -285,6 +293,24 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
     assert.ok(entry.expected_invariants.length >= 3, `${entry.id}: weak expected contract`)
     assert.ok(entry.forbidden.length >= 2, `${entry.id}: weak forbidden contract`)
   }
+})
+
+test('routes contextual Bend generation without changing design authority or delivery', async () => {
+  const [skill, grammar, composition, delivery] = await Promise.all([
+    readSkillFile('SKILL.md'),
+    readSkillFile('references/bend-generative-design.md'),
+    readSkillFile('references/figma-composition.md'),
+    readSkillFile('references/delivery-contract.md'),
+  ])
+  assert.match(skill, /references\/bend-generative-design\.md/)
+  assert.match(grammar, /Bend generates the composition/)
+  assert.match(grammar, /axes with no effect/)
+  assert.match(grammar, /fixture locators/)
+  assert.match(grammar, /No Figma write means preparation only/)
+  assert.match(grammar, /--model[\s\S]*--args[\s\S]*--bindings/)
+  assert.match(composition, /Bend[\s\S]*read back/)
+  assert.match(delivery, /Internal Bend\/compiled JavaScript is not frontend output/)
+  assert.match(delivery, /preserve the v1 field structure/)
 })
 
 test('requires taxonomy interpretation, separate screen evidence, adaptation and pilot comparison', async () => {

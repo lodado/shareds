@@ -29,6 +29,12 @@ At most 3 highest-impact problems per round; don't pad. Touch only frames/compon
 
 ## 4. Round record
 
+For [Bend-generated work](bend-generative-design.md), compare the original intent and each
+axis's expected effect with the actual screen. Route corrections to interpretation, scoped
+axis, coupling rule, or realization/binding; regenerate affected scope and recheck under the
+same conditions. Link model/output provenance and node mapping to the existing round record.
+Passing model checks is not evidence of beauty or user preference.
+
 Per round: page/frame + viewport/state inspected, problems and impact, chosen fixes, changed frame/component/variable, what was kept, improvement/regression vs. previous round, remaining unresolved. Canvas keeps final frame + concise history only, unless comparison copies were requested.
 
 ## 5. Completion gate

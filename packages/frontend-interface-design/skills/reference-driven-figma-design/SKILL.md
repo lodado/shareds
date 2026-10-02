@@ -1,6 +1,6 @@
 ---
 name: reference-driven-figma-design
-description: 'Define core journeys, requirements and wireframes, brand foundations and semantic tokens, then compose and verify editable Figma product or landing designs. Use for Figma-first design and appearance-preserving design-system refactors; not frontend implementation, design-to-code, or static-image-only delivery.'
+description: 'Define core journeys, requirements and wireframes, brand foundations and semantic tokens, then compose and verify editable Figma product or landing designs. Interpret ambiguous design intent with contextual axes and Bend-generated composition when needed. Use for Figma-first design and appearance-preserving design-system refactors; not frontend implementation, design-to-code, or static-image-only delivery.'
 allowed-tools:
   - Bash
 metadata:
@@ -36,6 +36,14 @@ Direction open → [visual-direction.md](references/visual-direction.md): compar
 Before searching → [taxonomy-reference-workflow.md](references/taxonomy-reference-workflow.md). After INTERNAL_FIT, translate entry definition and fit/avoid into search intent; verify **taxonomy rationale / observed screen composition / actual editable asset** separately. Never draw off a keyword. Templates are a start, not a ceiling — on mismatch adapt other approved-scope sources; record source and link state.
 
 ## Output boundary
+
+For new screens or authorized redesign with ambiguous visual intent, use
+[Bend generative design](references/bend-generative-design.md): context → taxonomy-grounded axes
+and coupling rules → executable composition → Figma → visual feedback. Bend generates the
+design, not a post-hoc explanation or beauty verdict. This is a path within the four stages,
+not a new edit mode. Skip it for small fixes, FIDELITY, and appearance-preserving refactors;
+RESKIN may vary only authorized surface axes. Internal Bend models and compiled JavaScript
+are generation tools, not frontend implementation or a substitute deliverable.
 
 Editable frames, component instances, variables, auto layout in a real Figma file. No React, HTML/CSS, Next.js, Tailwind, design-to-code unless implementation is explicitly asked — even then completion here is the Figma handoff. PNG, docs, code, generated images never replace editable Figma.
 
@@ -87,6 +95,10 @@ See [hci-wireframe-workflow.md](references/hci-wireframe-workflow.md).
 
 ### Stage 2 — Requirements and wireframes
 
+When using Bend, derive scoped axes and structural rules from the intent, task, and observed
+references. Record their basis in the existing brief/Reference Log; unresolved Stage 3 bindings
+keep candidates provisional, not ready for production.
+
 Translate the journey into screen purposes, required content, actions, states, acceptance checks,
 and numbered low-fidelity wireframes. Explain success, back/cancel, error/retry, and focus intent
 before the first target Figma write; a sketch is not user approval. Honor explicit review-wait.
@@ -94,6 +106,10 @@ Ready when important actions have a next state and recovery rule, with no materi
 UX is defined in these first two stages, then realized and verified in Stage 4.
 
 ### Stage 3 — Brand, foundations, and semantic tokens
+
+For the Bend path, resolve the axes' allowed domains and bind the generated composition to
+verified assets and semantic tokens. Locked brand, content, and edit constraints remain inputs,
+not values the generator may silently change.
 
 Follow [foundations-brand-workflow.md](references/foundations-brand-workflow.md): preserve or
 resolve brand authority → foundation sources → semantic roles → component contracts.
@@ -105,6 +121,10 @@ Ready means actual in-scope Figma Variables, Styles, editable components, and ve
 not only a token table. Missing required source keeps dependent production blocked or incomplete.
 
 ### Stage 4 — UI composition and verification
+
+For the Bend path, execute and validate the model before assembly; map its selected DesignPlan
+to actual Figma nodes and read back the result. Feed visual problems back to the responsible
+interpretation, axis, rule, or binding; regenerate only affected scope and recheck it.
 
 Compose the wireframes with Stage 3 assets in a recorded Working Page / duplicated frame /
 Experiment Area; preserve originals and avoid detach. Build a representative pilot with real copy
@@ -130,6 +150,9 @@ for unresolved scope, authority, permission, destructive changes, sharing, purch
 continue only independent safe work. A technical blocker does not reopen settled product questions.
 
 ## Completion gate
+
+For Bend-generated work, also require axis → plan → actual-screen change evidence and
+visual review with any needed correction/recheck. A valid model or plan alone cannot pass this gate.
 
 FIGMA_READY only when all hold.
 

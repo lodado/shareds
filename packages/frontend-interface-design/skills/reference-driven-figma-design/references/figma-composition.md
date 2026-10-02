@@ -32,6 +32,12 @@ Priority: (1) existing component/variant, fit verified; (2) external component/f
 
 ## 4. One visual system
 
+For [Bend-generated composition](bend-generative-design.md), use the validated DesignPlan as
+the assembly specification. Map its node and binding references to inspected Figma assets and
+actual applied nodes; read back layout, content, and token bindings. Declared inventory is not
+source evidence. Unsupported operations, unavailable sources, or intentional overrides go back
+to the model for reconciliation, not silent reinterpretation or a frontend-code substitute.
+
 Keep as one system: typography, semantic color/mode, spacing/grid, radius/border/elevation, button/card/nav/form/icon language, screenshot treatment.
 
 External reference contributes structure, not styling: section order, text/image proportion, screenshot crop, CTA-evidence adjacency, comparison/workflow relationships, rhythm. Reuse an external hero composition without its font, color, radius, glow. If reskinning loses the source's core hierarchy, redo the mapping.

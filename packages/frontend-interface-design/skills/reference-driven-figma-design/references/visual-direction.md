@@ -8,6 +8,11 @@
 
 ## 2. Explain → compare sources → alternatives → select → expand
 
+On the [Bend path](bend-generative-design.md), alternatives are generated axis/rule choices
+with an expected visible effect, not designs later described in Bend. Hold content, viewport,
+state, and locked properties constant; compare plan changes with actual Figma readback and
+captures. Record candidate model/output provenance in the existing option log.
+
 1. Wireframes from [HCI pre-design](hci-wireframe-workflow.md), the visual question, fixed conditions, per-option hypothesis — in conversation, before any write. Stated wait-for-review: research yes, writes no.
 2. Compare sources per [component source gate](component-source-gate.md); alternatives come from the editable source. Alternative comparison never replaces it.
 3. One representative section + key states in a Figma Working/Experiment area, not whole pages. Same content, images, viewport, state every option; unavoidable differences logged as confounders.
