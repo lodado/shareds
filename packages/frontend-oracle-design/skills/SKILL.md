@@ -375,7 +375,8 @@ and the target repository's dependency rules.
    ([`bend-cross-verification.md`](references/bend-cross-verification.md) §2). Walk the stages with
    `scripts/oracle-stage.mjs`: `begin`, then `advance --to MODELED | CHECKED | DRAFTED` once each gate
    passes. `oracle-lock.mjs create` refuses a package oracle that is not at `DRAFTED` on the same package
-   bytes, and only that script writes `stage.json`.
+   bytes, and only that script writes `stage.json`; the lock still runs card lint itself, so a hand-written
+   record skips no check.
 7. Read [`card/risk-grill.md`](references/card/risk-grill.md)·[`bva.md`](references/bva.md)·
    [`card/card-format.md`](references/card/card-format.md)·
    [`card/interaction-sweep.md`](references/card/interaction-sweep.md)·

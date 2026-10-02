@@ -7,9 +7,10 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { basename, join, posix, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { pathToFileURL } from 'node:url'
 import { ensureBend } from './ensure-bend.mjs'
 import { evaluateWorlds, loadWorld } from './oracle-adequacy.mjs'
+import { runCli } from './oracle-cli.mjs'
 import { spaceCrossCheck } from './oracle-discovery.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
 import {
@@ -18,6 +19,7 @@ import {
   compileBend,
   conformanceClaim,
   enumerateSpace,
+  eventLabel,
   keepArtifact,
   loadModel,
   transitionCover,
@@ -53,14 +55,6 @@ class CliError extends Error {
 const toImport = (path) => {
   const portable = path.split(sep).join(posix.sep)
   return portable.startsWith('.') ? portable : `./${portable}`
-}
-
-export function eventLabel(event) {
-  if (event === null || typeof event !== 'object' || Array.isArray(event)) return JSON.stringify(event)
-  const fields = Object.entries(event)
-    .filter(([key]) => key !== '$')
-    .map(([key, value]) => `${key}:${JSON.stringify(value)}`)
-  return fields.length === 0 ? event.$ : `${event.$}{${fields.join(',')}}`
 }
 
 /**
@@ -996,15 +990,5 @@ async function main() {
     process.exitCode = result.certification?.status === 'proven' || result.certification?.status === 'not-run' ? 0 : 1
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    await main()
-  } catch (error) {
-    const cliError =
-      error instanceof CliError
-        ? error
-        : new CliError(error.code ?? 'PROJECTION_FAILED', error.message ?? String(error))
-    process.stderr.write(`${cliError.code}: ${cliError.message}\n`)
-    process.exitCode = cliError.exitCode
-  }
-}
+// await하지 않는다 — 이 모듈은 순환 import(derive ↔ adequacy)에 있어 top-level await가 import를 교착시킨다
+runCli(import.meta, main, { CliError, fallback: 'PROJECTION_FAILED' })

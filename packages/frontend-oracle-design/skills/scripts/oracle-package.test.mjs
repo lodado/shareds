@@ -12,6 +12,8 @@ import { sha256 } from './oracle-fs.mjs'
 import { enumerateSpace, verdictOf } from './oracle-model.mjs'
 import {
   assignRows,
+  ASYNC_CELLS,
+  asyncCellIssues,
   derive,
   derivePackage,
   generatedBlock,
@@ -82,6 +84,39 @@ test('a hold defers a policy question: well-formed holds pass, a resolved hold n
   assert.deepEqual(withHolds([hold()], [held]), [])
   assert.match(withHolds([hold()], [{ ...held, hold: 'H2' }]).join('\n'), /held names the hold \(H<n>\) that defers it/)
   assert.match(withHolds([], [held]).join('\n'), /held names the hold \(H<n>\) that defers it/)
+})
+
+test('asyncCells: each async operation decides the seven cells before modelling — a default cites an approved source, a question a Q* or H*', () => {
+  const decided = (decision, ref) => Object.fromEntries(ASYNC_CELLS.map((id) => [id, { decision, ref }]))
+  const withCells = (asyncCells, extra = {}) => ({ ...clone(PKG), ...extra, ...(asyncCells === undefined ? {} : { asyncCells }) })
+
+  // required only at the MODELED gate, and only when Async is in the space of a version 2 package
+  assert.deepEqual(asyncCellIssues(withCells(undefined)), [])
+  assert.deepEqual(asyncCellIssues(withCells(undefined), { required: true }), [], 'a version 1 package keeps its earlier shape')
+  const v2 = withCells(undefined, { packageVersion: 2 })
+  assert.match(asyncCellIssues(v2, { required: true }).join('\n'), /package-async-cells: Async is in the space/)
+  const excluded = { ...v2, families: { ...PKG.families, Async: 'excluded: S1 no request in this flow' } }
+  assert.deepEqual(asyncCellIssues(excluded, { required: true }), [])
+
+  assert.deepEqual(asyncCellIssues(withCells([{ operation: 'search', cells: decided('source', 'S1') }]), { required: true }), [])
+  assert.deepEqual(packageIssues(withCells([{ operation: 'search', cells: decided('default', 'S1') }])), [])
+
+  const { 'lost-response': _dropped, ...sixCells } = decided('source', 'S1')
+  const missing = { operation: 'search', cells: sixCells }
+  assert.match(asyncCellIssues(withCells([missing])).join('\n'), /asyncCells search lost-response: decision must be source \| default \| n\/a \| question/)
+  // a recommendation nobody approved cannot stand in for a default, and a model file is no authority
+  const unapproved = withCells([{ operation: 'search', cells: decided('default', 'S9') }], {
+    sources: [...PKG.sources, { id: 'S9', kind: 'product-policy', jurisdiction: 'x', standard: 'x', location: 'repo:README.md#x', approval: 'pending' }],
+  })
+  assert.match(asyncCellIssues(unapproved).join('\n'), /default cites an approved authoritative S\* — an unapproved recommendation is not a default/)
+  assert.match(asyncCellIssues(withCells([{ operation: 'search', cells: decided('source', 'S2') }])).join('\n'), /source cites an approved authoritative S\*/)
+  // a question must be asked somewhere: an Open question or a hold
+  assert.match(asyncCellIssues(withCells([{ operation: 'search', cells: decided('question', 'Q9') }])).join('\n'), /a question cites an Open question Q\* or a hold H\*/)
+  const held = withCells([{ operation: 'search', cells: decided('question', 'H1') }], {
+    holds: [{ id: 'H1', question: 'late success after cancel?', blocks: ['O1'], status: 'open' }],
+  })
+  assert.deepEqual(asyncCellIssues(held), [])
+  assert.match(asyncCellIssues(withCells([])).join('\n'), /asyncCells is a non-empty list of operations/)
 })
 
 test('the package hazard list is the adequacy hazard list', () => {

@@ -6,10 +6,12 @@ import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { sha256 } from './oracle-fs.mjs'
 import { assertReadyToLock, markLocked, readStage } from './oracle-stage.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 
 const FIXTURE = fileURLToPath(new URL('../../test-fixtures/stale-search/', import.meta.url))
+const PAGINATION = fileURLToPath(new URL('../../test-fixtures/pagination/', import.meta.url))
 const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
 const { NODE_TEST_CONTEXT: _parent, ...CHILD_ENV } = process.env
 const node = (cwd, script, args) =>
@@ -133,4 +135,46 @@ test('DRAFTED opens the lock gate for the package bytes it was recorded on, and 
   const packagePath = join(directory, 'oracle.package.json')
   await writeFile(packagePath, `${await readFile(packagePath, 'utf8')}\n`)
   await assert.rejects(() => assertReadyToLock(directory), { code: 'STAGE_STALE' })
+})
+
+test('MODELED needs every async cell decided when Async is in a version 2 space — the open cells are asked before the model', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-stage-async-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  await cp(PAGINATION, root, { recursive: true })
+  const directory = join(root, '.ai', 'oracles', 'pagination')
+  await mkdir(directory, { recursive: true })
+  const packagePath = join(directory, 'oracle.package.json')
+  await cp(join(PAGINATION, 'oracle.package.json'), packagePath)
+  assert.equal(stage(root, directory, 'begin').status, 0)
+
+  const refused = stage(root, directory, 'advance', 'MODELED')
+  assert.equal(refused.status, 1)
+  assert.match(refused.stderr, /^STAGE_GATE: package is not model-complete: package-async-cells: Async is in the space/)
+
+  const pkg = JSON.parse(await readFile(packagePath, 'utf8'))
+  const cells = (decision, ref) =>
+    Object.fromEntries(
+      ['late-success-after-cancel', 'late-failure-after-success', 'older-response-after-newer', 'duplicate-completion', 'lost-response', 'retry-while-pending', 'unmount-before-settle'].map(
+        (id) => [id, { decision, ref }],
+      ),
+    )
+  pkg.holds = [{ id: 'H1', question: 'does a late page after a filter change show?', blocks: ['load'], status: 'open' }]
+  pkg.asyncCells = [{ operation: 'load page', cells: { ...cells('source', 'S1'), 'late-success-after-cancel': { decision: 'question', ref: 'H1' } } }]
+  await writeFile(packagePath, JSON.stringify(pkg, null, 2))
+  // the package changed after begin, which pinned nothing yet: MODELED runs its gate on the new bytes
+  const modeled = stage(root, directory, 'advance', 'MODELED')
+  assert.equal(modeled.status, 0, modeled.stderr)
+})
+
+test('a forged DRAFTED record skips no gate: the lock still lints the card against the package', async (t) => {
+  const { root, directory } = await repository(t)
+  // a host without the hook can write stage.json by hand; the lock re-runs card lint, which regenerates the card from
+  // the package and checks the cross-check decisions, so the forgery buys nothing
+  const bytes = await readFile(join(directory, 'oracle.package.json'))
+  await writeFile(join(directory, 'stage.json'), JSON.stringify({ schemaVersion: 1, stage: 'DRAFTED', packageSha256: sha256(bytes), history: [] }))
+  await cp(join(FIXTURE, 'oracle.md'), join(directory, 'oracle.md'))
+  const locked = lock(root, directory)
+  assert.equal(locked.status, 1)
+  assert.doesNotMatch(locked.stderr, /^STAGE_/)
+  assert.match(locked.stderr, /^CARD_LINT_FAILED: /)
 })

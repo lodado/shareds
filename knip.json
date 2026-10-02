@@ -4,6 +4,7 @@
     "**/test-fixtures/**",
     "**/examples/**",
     "**/*-fixture/**",
+    "**/scripts/fixtures/**",
     "**/strict-types-fixture/**",
     "**/tailwind-fixture/**",
     ".gitnexus/**",

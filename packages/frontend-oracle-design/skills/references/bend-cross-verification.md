@@ -91,7 +91,11 @@ cell, or a cell that disagrees with the author's reading) and, for each async op
 late success after a timeout, cancel or route exit; a late failure after a success; a response from an older
 request after a newer one; a duplicate completion; a lost response whose server effect is unknown; a retry while
 one is pending; an unmount before the request settles. Each cell is one of `source` (quote the `S*`), `default`
-(an approved project default) or `question`. Questions that kill a model branch go out together as one A/B batch;
+(an approved project default) or `question`. Record them in the package as `asyncCells: [{operation, cells}]` with
+the seven keys `late-success-after-cancel`, `late-failure-after-success`, `older-response-after-newer`,
+`duplicate-completion`, `lost-response`, `retry-while-pending`, `unmount-before-settle`; each cell is
+`{decision: source | default | n/a, ref: S*}` or `{decision: question, ref: Q* | H*}`. When Async is in a version 2
+space, `oracle-stage.mjs advance --to MODELED` refuses a package that leaves any cell undecided. Questions that kill a model branch go out together as one A/B batch;
 the rest become holds ([`card/case-space.md`](card/case-space.md#holds--a-question-that-blocks-only-part-of-the-scope)).
 A project default is a policy set the user approved once — for example newest request wins, no rollback after a
 newer completed mutation, one success notice per logical operation. Save the approved text verbatim as a source

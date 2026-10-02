@@ -129,6 +129,64 @@ export function familyDisposition(value) {
   return excluded ? { kind: 'excluded', reason: excluded[1], sources: excluded[1].match(/\bS\d+\b/g) ?? [] } : null
 }
 
+/**
+ * 비동기 작업마다 모델을 쓰기 전에 처분할 칸 — 원문이 비워 두기 쉬워 Bend 전이를 쓰는 도중에야 질문이 되던 것들이다.
+ * 각 칸은 원문(`source`)·승인된 프로젝트 기본 정책(`default`)·해당 없음(`n/a`) 중 하나로 승인된 S*를 인용하거나,
+ * `question`으로 Open question Q* 또는 hold H*를 인용한다.
+ */
+export const ASYNC_CELLS = [
+  'late-success-after-cancel',
+  'late-failure-after-success',
+  'older-response-after-newer',
+  'duplicate-completion',
+  'lost-response',
+  'retry-while-pending',
+  'unmount-before-settle',
+]
+const CELL_DECISIONS = ['source', 'default', 'n/a', 'question']
+
+/** 권위 — 승인된 원문. 구현 참고·패키지 자신·Bend 모델 파일은 결정의 근거가 되지 못한다(자기 참조다). */
+function approvedAuthority(source) {
+  if (!source || source.self || source.approval !== 'approved') return false
+  return source.kind !== 'implementation-reference' && !/\.bend$/.test(repoPathOf(source.location) ?? '')
+}
+
+function cellIssue(where, cell, { approved, questions, holds }) {
+  if (!CELL_DECISIONS.includes(cell?.decision)) return `${where}: decision must be ${CELL_DECISIONS.join(' | ')}`
+  if (cell.decision === 'question')
+    return questions.has(cell.ref) || holds.has(cell.ref) ? null : `${where}: a question cites an Open question Q* or a hold H*`
+  return approved(cell.ref) ? null : `${where}: ${cell.decision} cites an approved authoritative S* — an unapproved recommendation is not a default`
+}
+
+/**
+ * `asyncCells` 검사. 있으면 모양을 늘 본다. `required`(lock 전 단계 기계의 MODELED 관문)이면 Async가 공간에 있는 버전 2
+ * 패키지에서 작업마다 일곱 칸이 모두 처분돼야 한다 — 모델을 쓰기 전에 열린 칸을 한 번에 묻게 하는 장치다.
+ */
+export function asyncCellIssues(pkg, { required = false } = {}) {
+  const sources = new Map((pkg?.sources ?? []).map((source) => [source?.id, source]))
+  const approved = (id) => approvedAuthority(sources.get(id))
+  const questions = new Set((pkg?.intent?.openQuestions ?? []).map((question) => question?.id))
+  const holds = new Set((pkg?.holds ?? []).map((hold) => hold?.id))
+  const issues = []
+  const operations = pkg?.asyncCells
+  const asyncInSpace = (pkg?.packageVersion ?? 1) >= 2 && familyDisposition(pkg?.families?.Async)?.kind !== 'excluded'
+  if (operations === undefined) {
+    if (required && asyncInSpace)
+      issues.push('package-async-cells: Async is in the space — list asyncCells per async operation with all seven cells decided before writing the model')
+    return issues
+  }
+  if (!Array.isArray(operations) || operations.length === 0) return ['package-async-cells: asyncCells is a non-empty list of operations']
+  for (const operation of operations) {
+    const where = `asyncCells ${operation?.operation}`
+    if (!nonEmpty(operation?.operation)) issues.push('package-async-cells: each entry names its operation')
+    for (const id of ASYNC_CELLS) {
+      const issue = cellIssue(`${where} ${id}`, operation?.cells?.[id], { approved, questions, holds })
+      if (issue) issues.push(`package-async-cells: ${issue}`)
+    }
+  }
+  return issues
+}
+
 /** 객체 안의 모든 문자열 값과 그 경로. */
 function stringsOf(value, path = 'package') {
   if (typeof value === 'string') return [[path, value]]
@@ -444,7 +502,7 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
   }
 
   issues.push(...contractRowIssues(pkg?.contract))
-  issues.push(...discoveryRegistryIssues(pkg, { sources, requirements, questions }))
+  issues.push(...discoveryRegistryIssues(pkg, { sources, requirements, questions }), ...asyncCellIssues(pkg))
   if (stage === 'model') return issues
 
   const policies = new Set()
@@ -559,17 +617,7 @@ const DISPOSITION = /^(?:n\/a:\s*(S\d+)\s+\S.*|modeled:\s*([\w.]+)\s*)$/
 function discoveryRegistryIssues(pkg, { sources, requirements, questions }) {
   const issues = []
   const push = (code, message) => issues.push(`${code}: ${message}`)
-  // 권위 — 승인된 원문. 구현 참고·패키지 자신·Bend 모델 파일은 결정이나 n/a의 근거가 되지 못한다(자기 참조다).
-  const sourceOk = (id) => {
-    const source = sources.get(id)
-    return (
-      Boolean(source) &&
-      source.kind !== 'implementation-reference' &&
-      !source.self &&
-      source.approval === 'approved' &&
-      !/\.bend$/.test(repoPathOf(source.location) ?? '')
-    )
-  }
+  const sourceOk = (id) => approvedAuthority(sources.get(id))
   const repoFile = (where, value) => {
     if (!nonEmpty(value) || value.startsWith('/') || value.includes('..'))
       push('package-discovery-path', `${where} must be a repository-relative path`)

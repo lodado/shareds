@@ -152,16 +152,37 @@ async function skillActivation(transcriptPath) {
   return parts[first].at
 }
 
-/** 스킬을 켠 뒤 만들어진 lock(`*.lock.json`)이 있는가 — 앞 세션의 lock은 이번 요청의 승인이 아니다. */
-async function lockedSince(cwd, filePath, since) {
-  for (const directory of await oracleDirectories(cwd, filePath)) {
-    const names = await readdir(directory).catch(() => [])
-    for (const name of names.filter((entry) => entry.endsWith('.lock.json'))) {
-      const lock = await stat(join(directory, name)).catch(() => null)
-      if (lock && lock.mtimeMs >= since) return true
-    }
+async function lockedAfter(directory, since) {
+  const names = await readdir(directory).catch(() => [])
+  for (const name of names.filter((entry) => entry.endsWith('.lock.json'))) {
+    const lock = await stat(join(directory, name)).catch(() => null)
+    if (lock && lock.mtimeMs >= since) return true
   }
   return false
+}
+
+/** 오라클이 init으로 받은 scan root — 아직 init 전이거나 읽을 수 없으면 null(범위 없는 lock). */
+async function scanRootOf(directory) {
+  const raw = await readFile(join(directory, 'run-state.json'), 'utf8').catch(() => null)
+  try {
+    const scanRoot = raw && JSON.parse(raw).scanRoot
+    return typeof scanRoot === 'string' ? resolve(directory, scanRoot) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 스킬을 켠 뒤 만들어진 lock(`*.lock.json`)마다 그 오라클의 scan root — 앞 세션의 lock은 이번 요청의 승인이 아니다.
+ * 병렬 슬라이스는 오라클마다 lock과 scan root가 따로라, 한 슬라이스의 lock이 아직 모델링 중인 다른 슬라이스의 테스트를
+ * 열지 않게 범위로 본다.
+ */
+async function lockedScopes(cwd, filePath, since) {
+  const scopes = []
+  for (const directory of await oracleDirectories(cwd, filePath)) {
+    if (await lockedAfter(directory, since)) scopes.push(await scanRootOf(directory))
+  }
+  return scopes
 }
 
 function countTokens(text) {
@@ -301,9 +322,18 @@ async function deniedBeforeLock(payload, cwd, absolutePath) {
   const portable = relative(cwd, absolutePath).split(sep).join('/')
   if (!isTestPath(portable) || portable.endsWith('.bend')) return false
   const activatedAt = await skillActivation(payload.transcript_path)
-  if (activatedAt === null || (await lockedSince(cwd, absolutePath, activatedAt))) return false
+  if (activatedAt === null) return false
+  const scopes = await lockedScopes(cwd, absolutePath, activatedAt)
+  if (scopes.length === 0) {
+    deny(
+      `TEST_BEFORE_LOCK: ${portable} — this session activated frontend-oracle-design and no oracle lock has been created since. Tests come after the Space discovery interview, the Bend model package, the Draft \`yes\` and the lock. A run that cannot ask the user ends NEEDS_DECISION with the first question; a request to write tests now or to verify existing code is not a reason to skip.`,
+    )
+    return true
+  }
+  // init 전의 lock은 범위를 모른다 — 예전처럼 연다. 범위가 있으면 그 안의 테스트만 연다
+  if (scopes.includes(null) || scopes.some((scanRoot) => isPathInside(scanRoot, absolutePath))) return false
   deny(
-    `TEST_BEFORE_LOCK: ${portable} — this session activated frontend-oracle-design and no oracle lock has been created since. Tests come after the Space discovery interview, the Bend model package, the Draft \`yes\` and the lock. A run that cannot ask the user ends NEEDS_DECISION with the first question; a request to write tests now or to verify existing code is not a reason to skip.`,
+    `TEST_OUTSIDE_LOCKED_SLICE: ${portable} — the oracles locked in this session own other scan roots. Lock this slice's own oracle (its own scan root) before writing its tests; another slice's lock does not cover it.`,
   )
   return true
 }

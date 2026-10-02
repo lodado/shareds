@@ -373,9 +373,7 @@ async function workspace(
   assert.equal(receipt[1], createHash('sha256').update(card).digest('hex'))
   assert.equal(
     receipt[2],
-    createHash('sha256')
-      .update(await readFile(lock))
-      .digest('hex'),
+    await fileSha256(lock),
   )
 
   const initArgs = ['init', '--dir', oracleDirectory, '--lock', lock, '--risk', risk, '--scan-root', root]
@@ -778,6 +776,17 @@ test('review-brief preserves blockers and advisory provenance without changing e
   assert.equal(await readFile(packetPath, 'utf8'), packetBytes)
 })
 
+/** strict 리뷰 패킷을 만들고 findings를 그 패킷에 묶는다 — review-brief 테스트의 공통 준비. */
+async function boundReviewInput(oracleDirectory) {
+  const packetPath = join(oracleDirectory, 'review-input.json')
+  assert.equal(run(strictReviewPacketArgs(oracleDirectory, packetPath)).status, 0)
+  const packetBytes = await readFile(packetPath, 'utf8')
+  const packet = JSON.parse(packetBytes)
+  const findingsPath = join(oracleDirectory, 'findings.json')
+  bindReviewDocument(findingsPath, createHash('sha256').update(packetBytes).digest('hex'), packet.targetRevision)
+  return { packetPath, packet, findingsPath }
+}
+
 test('review-brief keeps pending visual evidence visible and rejects unbound reviewer output', async (t) => {
   const { oracleDirectory } = await workspace(t, {
     risk: 'low',
@@ -786,12 +795,7 @@ test('review-brief keeps pending visual evidence visible and rejects unbound rev
   })
   greenRun(oracleDirectory, 'green')
   assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-001', ['--reason', 'existing behavior']).status, 0)
-  const packetPath = join(oracleDirectory, 'review-input.json')
-  assert.equal(run(strictReviewPacketArgs(oracleDirectory, packetPath)).status, 0)
-  const packetBytes = await readFile(packetPath, 'utf8')
-  const packet = JSON.parse(packetBytes)
-  const findingsPath = join(oracleDirectory, 'findings.json')
-  bindReviewDocument(findingsPath, createHash('sha256').update(packetBytes).digest('hex'), packet.targetRevision)
+  const { packetPath, packet, findingsPath } = await boundReviewInput(oracleDirectory)
   const args = ['review-brief', '--dir', oracleDirectory, '--packet', packetPath, '--findings', findingsPath, '--json']
   const unbound = run(args)
   assert.equal(unbound.status, 1)
@@ -813,12 +817,7 @@ test('review-brief exposes mandatory High-risk review work even when supplied fi
   for (const label of ['green-1', 'green-2', 'green-3']) greenRun(oracleDirectory, label)
   const green = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003', ['--reason', 'existing behavior'])
   assert.equal(green.status, 0, green.stderr)
-  const packetPath = join(oracleDirectory, 'review-input.json')
-  assert.equal(run(strictReviewPacketArgs(oracleDirectory, packetPath)).status, 0)
-  const packetBytes = await readFile(packetPath, 'utf8')
-  const packet = JSON.parse(packetBytes)
-  const findingsPath = join(oracleDirectory, 'findings.json')
-  bindReviewDocument(findingsPath, createHash('sha256').update(packetBytes).digest('hex'), packet.targetRevision)
+  const { packetPath, packet, findingsPath } = await boundReviewInput(oracleDirectory)
   assert.equal(issueReviewReceipt(oracleDirectory, packetPath, findingsPath, packet.targetRevision).status, 0)
   const args = ['review-brief', '--dir', oracleDirectory, '--packet', packetPath, '--findings', findingsPath]
   const result = run([...args, '--json'])
@@ -949,16 +948,7 @@ test('O1: exec는 명령을 한 번 실행하고 ledger에 한 줄을 남긴다'
   const { root, oracleDirectory, marker } = await workspace(t)
   const before = await snapshotOf(root)
 
-  const executed = run([
-    'exec',
-    '--dir',
-    oracleDirectory,
-    '--label',
-    'red-1',
-    '--',
-    process.execPath,
-    ...appendMarker(marker, 0),
-  ])
+  const executed = execMarked(oracleDirectory, marker)
 
   assert.equal(executed.status, 0, executed.stderr)
   assert.match(executed.stdout, /^RUN_RECORDED r-001 exit:0 grade:exit-only commandMs:\d+ wrapperMs:\d+\n$/)
@@ -993,16 +983,7 @@ test('O2: lock mismatch면 명령을 실행하지 않고 ORACLE_CHANGED로 멈�
   const { oracleDirectory, oracle, marker } = await workspace(t)
   await writeFile(oracle, '# Tampered Oracle\n')
 
-  const executed = run([
-    'exec',
-    '--dir',
-    oracleDirectory,
-    '--label',
-    'red-1',
-    '--',
-    process.execPath,
-    ...appendMarker(marker, 0),
-  ])
+  const executed = execMarked(oracleDirectory, marker)
 
   assert.equal(executed.status, 1)
   assert.match(executed.stderr, /^ORACLE_CHANGED: /)
@@ -1161,8 +1142,7 @@ test('O3: node-test adapter owns reporter output and records actual test names',
     target,
   ])
 
-  assert.equal(executed.status, 0, executed.stderr)
-  assert.match(executed.stdout, /^RUN_RECORDED r-001 exit:1 grade:reported commandMs:\d+ wrapperMs:\d+\n$/)
+  assertRecordedRed(executed)
 
   const [record] = (await ledgerLines(oracleDirectory))
     .map((line) => JSON.parse(line))
@@ -1204,8 +1184,7 @@ test('O3: vitest adapter owns reporter output and records a reported run — nod
     '--report', join(root, 'report.ndjson'), '--', process.execPath, runner, 'run',
   ])
 
-  assert.equal(executed.status, 0, executed.stderr)
-  assert.match(executed.stdout, /^RUN_RECORDED r-001 exit:1 grade:reported commandMs:\d+ wrapperMs:\d+\n$/)
+  assertRecordedRed(executed)
   const [record] = (await ledgerLines(oracleDirectory)).map((line) => JSON.parse(line)).filter((entry) => entry.type === 'run')
   assert.equal(record.adapter, 'vitest')
   assert.deepEqual(record.tests, [
@@ -1318,16 +1297,7 @@ test('O2: lock manifest byte changes stop runner operations even when declared h
   manifest.sources = [...manifest.sources]
   await writeFile(lock, `${JSON.stringify(manifest)}\n`)
 
-  const executed = run([
-    'exec',
-    '--dir',
-    oracleDirectory,
-    '--label',
-    'red-1',
-    '--',
-    process.execPath,
-    ...appendMarker(marker, 0),
-  ])
+  const executed = execMarked(oracleDirectory, marker)
 
   assert.equal(executed.status, 1)
   assert.match(executed.stderr, /^LOCK_MANIFEST_CHANGED: /)
@@ -1376,19 +1346,7 @@ test('O3: pre-existing reporter artifact must be rewritten by the command', asyn
   const report = join(oracleDirectory, 'stale-report.json')
   await writeFile(report, JSON.stringify(GREEN_REPORT))
 
-  const executed = run([
-    'exec',
-    '--dir',
-    oracleDirectory,
-    '--label',
-    'behavior',
-    '--report',
-    report,
-    '--',
-    process.execPath,
-    '-e',
-    'process.exit(0)',
-  ])
+  const executed = execWithReport(oracleDirectory, report)
 
   assert.equal(executed.status, 1)
   assert.match(executed.stderr, /^REPORT_STALE: /)
@@ -1401,19 +1359,7 @@ test('O3: exec never deletes a caller-owned pre-existing report file', async (t)
   const report = join(oracleDirectory, 'caller-owned.json')
   await writeFile(report, JSON.stringify(GREEN_REPORT))
 
-  const executed = run([
-    'exec',
-    '--dir',
-    oracleDirectory,
-    '--label',
-    'behavior',
-    '--report',
-    report,
-    '--',
-    process.execPath,
-    '-e',
-    'process.exit(0)',
-  ])
+  const executed = execWithReport(oracleDirectory, report)
 
   assert.equal(executed.status, 1)
   assert.match(executed.stderr, /^REPORT_STALE: /)
@@ -1736,12 +1682,7 @@ test('O6: milestone은 알려진 행을 중복 없이 한 번씩만 소유한다
 })
 
 test('O6: signal-terminated milestone reporter cannot satisfy milestone RED', async (t) => {
-  const { root, oracleDirectory } = await workspace(t, {
-    oracleContent: MILESTONE_ORACLE,
-    evidence: MILESTONE_EVIDENCE,
-    milestones: ['list:O1', 'detail:O2'],
-  })
-  await writeFile(join(root, 'src', 'milestones.test.mjs'), "import 'node:assert'\n")
+  const { oracleDirectory } = await milestoneWorkspace(t)
   const listReport = join(oracleDirectory, 'red-list.json')
   const detailReport = join(oracleDirectory, 'red-detail.json')
   const listContent = { testResults: [{ assertionResults: [{ fullName: 'list > shown', status: 'failed' }] }] }
@@ -1788,12 +1729,7 @@ test('O6: signal-terminated milestone reporter cannot satisfy milestone RED', as
 })
 
 test('O6: 모든 milestone의 red:<name> reported RED 후에만 전역 VALID_RED로 간다', async (t) => {
-  const { root, oracleDirectory } = await workspace(t, {
-    oracleContent: MILESTONE_ORACLE,
-    evidence: MILESTONE_EVIDENCE,
-    milestones: ['list:O1', 'detail:O2'],
-  })
-  await writeFile(join(root, 'src', 'milestones.test.mjs'), "import 'node:assert'\n")
+  const { root, oracleDirectory } = await milestoneWorkspace(t)
   for (const [label, name] of [
     ['red:list', 'list > shown'],
     ['red:detail', 'detail > shown'],
@@ -1937,6 +1873,96 @@ test('O7: reporter와 지정 행의 실패 증거가 없는 non-zero run은 VALI
   assert.match(transitioned.stderr, /^RED_EVIDENCE_UNVERIFIABLE: /)
   assert.equal((await state(oracleDirectory)).state, 'ORACLE_READY')
 })
+
+/** VALID_RED 뒤 연속 통과 두 번으로 IMPLEMENTED_GREEN(r-003)까지 — 리뷰 단계 테스트의 공통 출발점. */
+async function reachGreen(oracleDirectory, root, { greens = 2, product = false, labels = [] } = {}) {
+  await reachValidRed(oracleDirectory, root)
+  if (product) await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
+  for (let index = 1; index <= greens; index += 1) greenRun(oracleDirectory, `green-${index}`)
+  for (const label of labels) reportedLabelRun(oracleDirectory, label)
+  // r-001은 RED, 그 뒤 통과가 r-002부터 — GREEN은 마지막 통과를 인용한다
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', `r-00${greens + 1}`).status, 0)
+}
+
+/** 실행 marker를 남기는 RED 실행 — 실행 전 게이트가 막으면 marker가 생기지 않는다. */
+function execMarked(oracleDirectory, marker) {
+  return run(['exec', '--dir', oracleDirectory, '--label', 'red-1', '--', process.execPath, ...appendMarker(marker, 0)])
+}
+
+/** 주어진 reporter 파일을 증거로 대며 exit 0으로 끝나는 behavior 실행. */
+function execWithReport(oracleDirectory, report) {
+  return run(['exec', '--dir', oracleDirectory, '--label', 'behavior', '--report', report, '--', process.execPath, '-e', 'process.exit(0)'])
+}
+
+function assertRecordedRed(executed) {
+  assert.equal(executed.status, 0, executed.stderr)
+  assert.match(executed.stdout, /^RUN_RECORDED r-001 exit:1 grade:reported commandMs:\d+ wrapperMs:\d+\n$/)
+}
+
+/** 테스트를 고친 뒤 두 번 통과해 GREEN을 시도한다 — 약화 게이트가 거부해야 한다. */
+function weakenedGreen(oracleDirectory) {
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^TEST_WEAKENED: /)
+  return transitioned
+}
+
+async function assertNotGreen(oracleDirectory) {
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002')
+  assert.equal(transitioned.status, 1)
+  assert.match(transitioned.stderr, /^RUN_NOT_GREEN: /)
+  assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
+}
+
+/** 통과하지 않은 테스트가 섞인 보고서는 기록되되 REPORT_NONPASSING이다 — 그 영수증을 돌려준다. */
+async function nonPassingReceipt(oracleDirectory, command) {
+  const reported = run(command)
+  assert.equal(reported.status, 1)
+  assert.match(reported.stderr, /^REPORT_NONPASSING: /)
+  return (await ledgerLines(oracleDirectory)).map(JSON.parse).at(-1)
+}
+
+function strictPacket(oracleDirectory, packetPath) {
+  const packetResult = run(strictReviewPacketArgs(oracleDirectory, packetPath))
+  assert.equal(packetResult.status, 0, packetResult.stderr)
+  const packetRaw = readFileSync(packetPath, 'utf8')
+  return { packet: JSON.parse(packetRaw), packetSha256: createHash('sha256').update(packetRaw).digest('hex') }
+}
+
+async function heroStyleAtRed(oracleDirectory, root) {
+  await writeFile(
+    join(root, 'src', 'hero.style.test.ts'),
+    "import assert from 'node:assert'\nassert.equal(1, 1)\nawait expectScreenshot({ maxDiffPixels: 10 })\n",
+  )
+  redRun(oracleDirectory)
+  assert.equal(transition(oracleDirectory, 'VALID_RED', 'r-001').status, 0)
+}
+
+/** 필수 label에 lint를 더한 run을 GREEN까지 보내고 clear findings를 둔다 — label run 재사용 테스트의 출발점. */
+async function lintLabelGreen(t) {
+  const created = await workspace(t, { requiredLabels: ['behavior', 'lint'] })
+  await reachGreen(created.oracleDirectory, created.root, { labels: ['lint'] })
+  await writeFile(join(created.oracleDirectory, 'findings.json'), JSON.stringify(CLEAR_REVIEW))
+  return created
+}
+
+async function milestoneWorkspace(t) {
+  const created = await workspace(t, {
+    oracleContent: MILESTONE_ORACLE,
+    evidence: MILESTONE_EVIDENCE,
+    milestones: ['list:O1', 'detail:O2'],
+  })
+  await writeFile(join(created.root, 'src', 'milestones.test.mjs'), "import 'node:assert'\n")
+  return created
+}
+
+async function fileSha256(path) {
+  return createHash('sha256')
+    .update(await readFile(path))
+    .digest('hex')
+}
 
 async function reachValidRed(oracleDirectory, root) {
   await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
@@ -2179,15 +2205,11 @@ test('O20: review-packet은 lock·source·state·ledger·evidence·diff만 결�
   assert.deepEqual(packet.reviewPoints, [
     {
       path: 'review-checklist.md',
-      sha256: createHash('sha256')
-        .update(await readFile(checklistReviewPoint))
-        .digest('hex'),
+      sha256: await fileSha256(checklistReviewPoint),
     },
     {
       path: 'changeability.md',
-      sha256: createHash('sha256')
-        .update(await readFile(changeabilityReviewPoint))
-        .digest('hex'),
+      sha256: await fileSha256(changeabilityReviewPoint),
     },
   ])
   assert.ok(packet.changedFiles.some((entry) => entry.path === 'src/save.mjs'))
@@ -2229,10 +2251,7 @@ test('O20: review-packet은 lock·source·state·ledger·evidence·diff만 결�
 
 test('O7-O8: review-packet은 검증된 implementation decision 원문과 digest를 포함한다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-  await reachValidRed(oracleDirectory, root)
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  await reachGreen(oracleDirectory, root)
   const decision = join(oracleDirectory, 'implementation-decision.md')
   const content = '# Implementation Decision\n\n- Changeability: Predictability\n'
   await writeFile(decision, content)
@@ -2416,20 +2435,13 @@ test('O9: exit 0 reports with any failed test cannot satisfy GREEN', async (t) =
       JSON.stringify(mixedReport),
     )}); process.exit(0)`,
   ]
-  const reported = run(command)
-  assert.equal(reported.status, 1)
-  assert.match(reported.stderr, /^REPORT_NONPASSING: /)
-  const [receipt] = (await ledgerLines(oracleDirectory)).map(JSON.parse).slice(-1)
+  const receipt = await nonPassingReceipt(oracleDirectory, command)
   assert.deepEqual(receipt.tests, [
     { name: 'save > pending', status: 'passed' },
     { name: 'save > duplicate guard', status: 'failed' },
   ])
 
-  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002')
-
-  assert.equal(transitioned.status, 1)
-  assert.match(transitioned.stderr, /^RUN_NOT_GREEN: /)
-  assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
+  await assertNotGreen(oracleDirectory)
 })
 
 test('O9: exit 0 reports with pending tests cannot satisfy GREEN', async (t) => {
@@ -2452,17 +2464,10 @@ test('O9: exit 0 reports with pending tests cannot satisfy GREEN', async (t) => 
     )}); process.exit(0)`,
   ]
 
-  const reported = run(command)
-  assert.equal(reported.status, 1)
-  assert.match(reported.stderr, /^REPORT_NONPASSING: /)
-  const [receipt] = (await ledgerLines(oracleDirectory)).map(JSON.parse).slice(-1)
+  const receipt = await nonPassingReceipt(oracleDirectory, command)
   assert.deepEqual(receipt.tests, [{ name: 'save > pending', status: 'pending' }])
 
-  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-002')
-
-  assert.equal(transitioned.status, 1)
-  assert.match(transitioned.stderr, /^RUN_NOT_GREEN: /)
-  assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
+  await assertNotGreen(oracleDirectory)
 })
 
 test('O9: bundled node reporter marks skip and todo as non-passing evidence', async (t) => {
@@ -2635,13 +2640,7 @@ test('O10: assertion이 줄면 TEST_WEAKENED로 GREEN을 거부한다', async (t
   assert.equal(transition(oracleDirectory, 'VALID_RED', 'r-001').status, 0)
 
   await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-
-  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
-
-  assert.equal(transitioned.status, 1)
-  assert.match(transitioned.stderr, /^TEST_WEAKENED: /)
+  const transitioned = weakenedGreen(oracleDirectory)
   assert.match(transitioned.stderr, /src\/save\.test\.mjs/)
   assert.match(transitioned.stderr, /assertions 2 → 1/)
   assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
@@ -2660,13 +2659,7 @@ test('O10: assertion 수는 같아도 기대값 리터럴을 바꾸면 TEST_WEAK
     join(root, 'src', 'save.test.mjs'),
     "import assert from 'node:assert'\nassert.equal(posts, 2)\nassert.equal(status, 'pending')\n",
   )
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-
-  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
-
-  assert.equal(transitioned.status, 1)
-  assert.match(transitioned.stderr, /^TEST_WEAKENED: /)
+  const transitioned = weakenedGreen(oracleDirectory)
   assert.match(transitioned.stderr, /expected literal 1 1 → 0/)
   assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
 })
@@ -2679,13 +2672,7 @@ test('O10: 금지 토큰이 새로 들어오면 TEST_WEAKENED로 GREEN을 거부
     join(root, 'src', 'save.test.mjs'),
     "import assert from 'node:assert'\nassert.equal(1, 1)\ntest.skip('later', () => {})\n",
   )
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-
-  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
-
-  assert.equal(transitioned.status, 1)
-  assert.match(transitioned.stderr, /^TEST_WEAKENED: /)
+  const transitioned = weakenedGreen(oracleDirectory)
   assert.match(transitioned.stderr, /test\.skip/)
 })
 
@@ -2713,37 +2700,21 @@ test('O10: screenshot 허용치를 올리면 TEST_WEAKENED로 GREEN을 거부한
 
 test('O10: 토큰 수를 늘리지 않고 screenshot 허용치 값만 올려도 TEST_WEAKENED로 거부한다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-  await writeFile(
-    join(root, 'src', 'hero.style.test.ts'),
-    "import assert from 'node:assert'\nassert.equal(1, 1)\nawait expectScreenshot({ maxDiffPixels: 10 })\n",
-  )
-  redRun(oracleDirectory)
-  assert.equal(transition(oracleDirectory, 'VALID_RED', 'r-001').status, 0)
+  await heroStyleAtRed(oracleDirectory, root)
 
   // 토큰 수는 그대로 1회, 값만 상향한다.
   await writeFile(
     join(root, 'src', 'hero.style.test.ts'),
     "import assert from 'node:assert'\nassert.equal(1, 1)\nawait expectScreenshot({ maxDiffPixels: 99999 })\n",
   )
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-
-  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
-
-  assert.equal(transitioned.status, 1)
-  assert.match(transitioned.stderr, /^TEST_WEAKENED: /)
+  const transitioned = weakenedGreen(oracleDirectory)
   assert.match(transitioned.stderr, /maxDiffPixels 10 → 99999/)
   assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
 })
 
 test('O10: 허용치를 낮추거나 유지하면 GREEN을 막지 않는다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-  await writeFile(
-    join(root, 'src', 'hero.style.test.ts'),
-    "import assert from 'node:assert'\nassert.equal(1, 1)\nawait expectScreenshot({ maxDiffPixels: 10 })\n",
-  )
-  redRun(oracleDirectory)
-  assert.equal(transition(oracleDirectory, 'VALID_RED', 'r-001').status, 0)
+  await heroStyleAtRed(oracleDirectory, root)
 
   await writeFile(
     join(root, 'src', 'hero.style.test.ts'),
@@ -2812,13 +2783,7 @@ test('O10: RED에 기록된 테스트 파일이 사라지면 TEST_WEAKENED로 GR
   await reachValidRed(oracleDirectory, root)
 
   await rm(join(root, 'src', 'save.test.mjs'))
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-
-  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
-
-  assert.equal(transitioned.status, 1)
-  assert.match(transitioned.stderr, /^TEST_WEAKENED: /)
+  const transitioned = weakenedGreen(oracleDirectory)
   assert.match(transitioned.stderr, /deleted/)
 })
 
@@ -3310,11 +3275,7 @@ test('O16: production이 바뀐 상태에서는 RED 없이 GREEN으로 갈 수 �
 
 test('O17: REVIEW_VERIFIED rejects a review packet from a different lock manifest identity', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-  await reachValidRed(oracleDirectory, root)
-  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  await reachGreen(oracleDirectory, root, { product: true })
   greenRun(oracleDirectory, 'review')
 
   const packetPath = join(oracleDirectory, 'cross-oracle-review.json')
@@ -3341,11 +3302,7 @@ test('O17: REVIEW_VERIFIED rejects a review packet from a different lock manifes
 
 test('O17: REVIEW_VERIFIED rejects a packet that predates the current review snapshot', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-  await reachValidRed(oracleDirectory, root)
-  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  await reachGreen(oracleDirectory, root, { product: true })
 
   const packet = join(oracleDirectory, 'stale-review.json')
   const packetResult = run(strictReviewPacketArgs(oracleDirectory, packet))
@@ -3374,21 +3331,13 @@ test('O17: REVIEW_VERIFIED rejects a packet that predates the current review sna
 // 게이트는 "GREEN 이후 변경 금지"가 아니라 "변경된 리비전에서 필수 라벨이 실제로 다시 통과했는가"다.
 test('O17: a tracked change after GREEN certifies only once the required label re-passes at that revision', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-  await reachValidRed(oracleDirectory, root)
-  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  await reachGreen(oracleDirectory, root, { product: true })
 
   await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 2\n')
   greenRun(oracleDirectory, 'review')
 
   const packetPath = join(oracleDirectory, 'review-current.json')
-  const packetResult = run(strictReviewPacketArgs(oracleDirectory, packetPath))
-  assert.equal(packetResult.status, 0, packetResult.stderr)
-  const packetRaw = readFileSync(packetPath, 'utf8')
-  const packet = JSON.parse(packetRaw)
-  const packetSha256 = createHash('sha256').update(packetRaw).digest('hex')
+  const { packet, packetSha256 } = strictPacket(oracleDirectory, packetPath)
   assert.equal(packet.targetRevision, packet.targetSnapshot.worktreeSha256)
   assert.notEqual(packet.targetRevision, packet.ledger.find((entry) => entry.runId === 'r-003').worktreeSha256)
   const findings = join(oracleDirectory, 'findings.json')
@@ -3409,20 +3358,12 @@ test('O17: a tracked change after GREEN certifies only once the required label r
 
 test('O17: a tracked change after GREEN cannot certify on the pre-change run alone', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-  await reachValidRed(oracleDirectory, root)
-  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 1\n')
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  await reachGreen(oracleDirectory, root, { product: true })
 
   // GREEN 이후 재실행까지 마쳐 REVIEW_RERUN_REQUIRED 를 만족시킨 뒤, 스냅샷 게이트만 남긴다
   greenRun(oracleDirectory, 'review')
   const packetPath = join(oracleDirectory, 'review-prechange.json')
-  const packetResult = run(strictReviewPacketArgs(oracleDirectory, packetPath))
-  assert.equal(packetResult.status, 0, packetResult.stderr)
-  const packetRaw = readFileSync(packetPath, 'utf8')
-  const packet = JSON.parse(packetRaw)
-  const packetSha256 = createHash('sha256').update(packetRaw).digest('hex')
+  const { packet, packetSha256 } = strictPacket(oracleDirectory, packetPath)
   const findings = join(oracleDirectory, 'findings.json')
   bindReviewDocument(findings, packetSha256, packet.targetRevision)
   assert.equal(issueReviewReceipt(oracleDirectory, packetPath, findings, packet.targetRevision).status, 0)
@@ -3443,10 +3384,7 @@ test('O17: a tracked change after GREEN cannot certify on the pre-change run alo
 
 test('O17: REVIEW_VERIFIED는 clear findings와 GREEN 이후 인용 run 재실행을 요구한다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-  await reachValidRed(oracleDirectory, root)
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  await reachGreen(oracleDirectory, root)
 
   const withoutRerun = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-003')
   assert.equal(withoutRerun.status, 1)
@@ -3484,10 +3422,7 @@ test('O17: REVIEW_VERIFIED는 clear findings와 GREEN 이후 인용 run 재실�
 
 test('열린 hold가 있으면 REVIEW_VERIFIED는 거부되고 PARTIAL_VERIFIED가 같은 리뷰 관문 뒤에 hold ID를 원장에 남긴다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-  await reachValidRed(oracleDirectory, root)
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  await reachGreen(oracleDirectory, root)
   await writeFile(join(oracleDirectory, 'findings.json'), JSON.stringify(CLEAR_REVIEW))
   greenRun(oracleDirectory, 'review')
 
@@ -3533,14 +3468,7 @@ test('열린 hold가 있으면 REVIEW_VERIFIED는 거부되고 PARTIAL_VERIFIED�
 })
 
 test('O17: bytes가 그대로인 필수 label은 GREEN 이전 run을 재사용하고, 바뀌면 다시 요구한다', async (t) => {
-  const { root, oracleDirectory } = await workspace(t, { requiredLabels: ['behavior', 'lint'] })
-  await reachValidRed(oracleDirectory, root)
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  reportedLabelRun(oracleDirectory, 'lint')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
-
-  await writeFile(join(oracleDirectory, 'findings.json'), JSON.stringify(CLEAR_REVIEW))
+  const { oracleDirectory } = await lintLabelGreen(t)
   greenRun(oracleDirectory, 'review')
 
   // lint는 GREEN 이전 run(r-004)뿐이지만 lock·worktree·production·harness digest가 그대로라 재사용된다
@@ -3550,14 +3478,7 @@ test('O17: bytes가 그대로인 필수 label은 GREEN 이전 run을 재사용�
 })
 
 test('O17: production이 바뀌면 재사용하던 필수 label run이 stale로 막힌다', async (t) => {
-  const { root, oracleDirectory } = await workspace(t, { requiredLabels: ['behavior', 'lint'] })
-  await reachValidRed(oracleDirectory, root)
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  reportedLabelRun(oracleDirectory, 'lint')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
-
-  await writeFile(join(oracleDirectory, 'findings.json'), JSON.stringify(CLEAR_REVIEW))
+  const { root, oracleDirectory } = await lintLabelGreen(t)
   await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 3\n')
   greenRun(oracleDirectory, 'review')
 
@@ -3575,11 +3496,7 @@ test('O17: High risk REVIEW_VERIFIED는 GREEN 이후 mutation kill 증거를 요
     risk: 'high',
     initialFiles: { [source]: original },
   })
-  await reachValidRed(oracleDirectory, root)
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  greenRun(oracleDirectory, 'green-3')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-004').status, 0)
+  await reachGreen(oracleDirectory, root, { greens: 3 })
 
   redRun(oracleDirectory)
   greenRun(oracleDirectory, 'review')
@@ -3633,10 +3550,7 @@ test('O17: High risk REVIEW_VERIFIED는 GREEN 이후 mutation kill 증거를 요
 
 test('review-packet은 리뷰 포인트를 본문 없이 path·digest 링크로만 기록한다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-  await reachValidRed(oracleDirectory, root)
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  await reachGreen(oracleDirectory, root)
   const criteria = changeabilityReviewPoint
   const content = await readFile(criteria)
 
@@ -3648,9 +3562,7 @@ test('review-packet은 리뷰 포인트를 본문 없이 path·digest 링크로�
   assert.deepEqual(packet.reviewPoints, [
     {
       path: 'review-checklist.md',
-      sha256: createHash('sha256')
-        .update(await readFile(checklistReviewPoint))
-        .digest('hex'),
+      sha256: await fileSha256(checklistReviewPoint),
     },
     { path: 'changeability.md', sha256: createHash('sha256').update(content).digest('hex') },
   ])
@@ -4062,10 +3974,7 @@ test('O11: review packets require post-GREEN state decision and canonical review
   assert.equal(preGreen.status, 1)
   assert.match(preGreen.stderr, /^REVIEW_PACKET_STATE: /)
 
-  await reachValidRed(oracleDirectory, root)
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  await reachGreen(oracleDirectory, root)
 
   const decision = join(oracleDirectory, 'implementation-decision.md')
   await writeFile(decision, 'Implement the approved change.\n')
@@ -4205,9 +4114,7 @@ test('card drift blocks progress but still records a FAIL·NEEDS_DECISION stop w
   assert.equal(entry.lockStop.expectedOracleSha256, lockedOracle)
   assert.match(entry.lockStop.observedManifestSha256, /^[a-f0-9]{64}$/)
   assert.equal(entry.lockStop.observedManifestSha256, lockedManifest) // manifest는 아직 그대로다
-  const driftedCard = createHash('sha256')
-    .update(await readFile(oracle))
-    .digest('hex')
+  const driftedCard = await fileSha256(oracle)
   assert.equal(entry.lockStop.observedOracleSha256, driftedCard)
   assert.notEqual(entry.lockStop.observedOracleSha256, entry.lockStop.expectedOracleSha256)
   const events = (await allLedgerLines(oracleDirectory)).map((line) => JSON.parse(line))
@@ -4416,9 +4323,7 @@ test('a stop observation never follows a drifted manifest pointer out of the rep
   t.after(() => rm(outside, { recursive: true, force: true }))
   const secret = join(outside, 'secret.md')
   await writeFile(secret, 'secret bytes the stop record must never claim as an observation\n')
-  const secretDigest = createHash('sha256')
-    .update(await readFile(secret))
-    .digest('hex')
+  const secretDigest = await fileSha256(secret)
 
   // 1) manifest가 저장소 밖을 가리키도록 조작한다 — manifest 바이트가 바뀌므로 신뢰 대상이 아니다
   const escaping = await workspace(t, { risk: 'low' })
@@ -4476,11 +4381,7 @@ async function highRiskReviewReady(t, options = {}) {
     risk: 'high',
     initialFiles: { ...options.initialFiles, [source]: original },
   })
-  await reachValidRed(oracleDirectory, root)
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  greenRun(oracleDirectory, 'green-3')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-004').status, 0)
+  await reachGreen(oracleDirectory, root, { greens: 3 })
 
   // GREEN 이후 mutation kill 증거 — 가드를 지우면 실패하고, 정확히 복원한 뒤 다시 통과한다
   await writeFile(join(root, source), 'export const guarded = false\n')
@@ -4952,38 +4853,38 @@ test('O4 context manifest preserves selected file bytes and outside-scanRoot cal
   }
 })
 
-test('O7 changing or deleting a selected context file invalidates packet verification', async (t) => {
-  for (const frame of CONTEXT_FRAMES.filter(([, , , timing]) => timing === 'after-packet')) {
-    await t.test(frame.join(' '), async (t) => {
-      const fixture = await contextualReviewFixture(t, frame)
+/** timing이 맞는 문맥 frame마다 유효한 fixture를 만들고 선택된 문맥 파일을 바꾼 뒤 `check`에 넘긴다. */
+async function withChangedContext(t, timing, note, check) {
+  for (const frame of CONTEXT_FRAMES.filter(([, , , at]) => at === timing)) {
+    await t.test(frame.join(' '), async (subtest) => {
+      const fixture = await contextualReviewFixture(subtest, frame)
       const valid = verifyContextFixture(fixture)
       assert.equal(valid.status, 0, valid.stderr)
-      await writeFile(fixture.selectedPath, `${fixture.contents}\nchanged selected bytes\n`)
-      const stale = verifyContextFixture(fixture)
-      assert.equal(stale.status, 1)
-      assert.match(stale.stderr, /REVIEW_PACKET_STALE|SOURCE_CHANGED/)
-      await rm(fixture.selectedPath)
-      const deleted = verifyContextFixture(fixture)
-      assert.equal(deleted.status, 1)
-      assert.match(deleted.stderr, /REVIEW_PACKET_STALE|SOURCE_CHANGED/)
+      await writeFile(fixture.selectedPath, `${fixture.contents}\n${note}\n`)
+      await check(fixture)
       assert.equal((await state(fixture.oracleDirectory)).state, 'IMPLEMENTED_GREEN')
     })
   }
+}
+
+test('O7 changing or deleting a selected context file invalidates packet verification', async (t) => {
+  await withChangedContext(t, 'after-packet', 'changed selected bytes', async (fixture) => {
+    const stale = verifyContextFixture(fixture)
+    assert.equal(stale.status, 1)
+    assert.match(stale.stderr, /REVIEW_PACKET_STALE|SOURCE_CHANGED/)
+    await rm(fixture.selectedPath)
+    const deleted = verifyContextFixture(fixture)
+    assert.equal(deleted.status, 1)
+    assert.match(deleted.stderr, /REVIEW_PACKET_STALE|SOURCE_CHANGED/)
+  })
 })
 
 test('O8 changing selected context after receipt blocks REVIEW_VERIFIED transition', async (t) => {
-  for (const frame of CONTEXT_FRAMES.filter(([, , , timing]) => timing === 'after-review')) {
-    await t.test(frame.join(' '), async (t) => {
-      const fixture = await contextualReviewFixture(t, frame)
-      const valid = verifyContextFixture(fixture)
-      assert.equal(valid.status, 0, valid.stderr)
-      await writeFile(fixture.selectedPath, `${fixture.contents}\nchanged after receipt\n`)
-      const stale = transition(fixture.oracleDirectory, 'REVIEW_VERIFIED', fixture.reviewRunId, fixture.extra)
-      assert.equal(stale.status, 1)
-      assert.match(stale.stderr, /^(?:REVIEW_PACKET_STALE|REVIEW_RUN_STALE|SOURCE_CHANGED):/)
-      assert.equal((await state(fixture.oracleDirectory)).state, 'IMPLEMENTED_GREEN')
-    })
-  }
+  await withChangedContext(t, 'after-review', 'changed after receipt', async (fixture) => {
+    const stale = transition(fixture.oracleDirectory, 'REVIEW_VERIFIED', fixture.reviewRunId, fixture.extra)
+    assert.equal(stale.status, 1)
+    assert.match(stale.stderr, /^(?:REVIEW_PACKET_STALE|REVIEW_RUN_STALE|SOURCE_CHANGED):/)
+  })
 })
 
 test('O3 contextual packet cannot bypass approval lock or VALID_RED gates', async (t) => {
@@ -5306,10 +5207,7 @@ test('host receipts: when the host recorded reviewer outputs, the findings must 
 
 test('status --check-report compares the Status line and cited runs with the ledger', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-  await reachValidRed(oracleDirectory, root)
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  await reachGreen(oracleDirectory, root)
   const check = (report) =>
     spawnSync(process.execPath, [script, 'status', '--dir', oracleDirectory, '--check-report', '-'], {
       input: report,
@@ -5336,10 +5234,7 @@ test('status --check-report compares the Status line and cited runs with the led
 
 test('the Stop hook blocks a final report the ledger contradicts and stays silent otherwise', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
-  await reachValidRed(oracleDirectory, root)
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  await reachGreen(oracleDirectory, root)
   const stop = (message, extra = {}) => {
     const result = spawnSync(process.execPath, [join(scriptDirectory, 'oracle-guard-hook.mjs')], {
       input: JSON.stringify({ cwd: root, hook_event_name: 'Stop', last_assistant_message: message, ...extra }),
@@ -5454,10 +5349,7 @@ test('GREEN judges only lines new since init: a token already in the touched fil
 test('a new unowned side effect added after GREEN during review fixes is caught at REVIEW_VERIFIED', async (t) => {
   const initialFiles = { 'src/save.mjs': 'export const save = (post) => post()\n' }
   const { root, oracleDirectory } = await workspace(t, { initialFiles })
-  await reachValidRed(oracleDirectory, root)
-  greenRun(oracleDirectory, 'green-1')
-  greenRun(oracleDirectory, 'green-2')
-  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  await reachGreen(oracleDirectory, root)
   await writeFile(join(root, 'src', 'save.mjs'), "export const save = (post) => { localStorage.setItem('k', '') ; return post() }\n")
   greenRun(oracleDirectory, 'review')
   const reviewed = transition(oracleDirectory, 'REVIEW_VERIFIED', 'r-004')

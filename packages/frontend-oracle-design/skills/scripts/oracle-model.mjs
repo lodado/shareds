@@ -9,9 +9,10 @@ import { copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'nod
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { pathToFileURL } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 import { ensureBend, reportedVersion } from './ensure-bend.mjs'
+import { runCli } from './oracle-cli.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
 import { toPlain } from './oracle-types.mjs'
 
@@ -110,7 +111,9 @@ function listOf(items) {
   return items.reduceRight((tail, head) => ({ $: 'Con', head, tail }), { $: 'Nil' })
 }
 
-function eventLabel(event) {
+/** 사건 하나의 사람용 이름 — 생성된 테스트에도 `toString()`으로 실린다(그래서 바깥 이름을 참조하지 않는다). */
+export function eventLabel(event) {
+  if (event === null || typeof event !== 'object' || Array.isArray(event)) return JSON.stringify(event)
   const fields = Object.entries(event)
     .filter(([key]) => key !== '$')
     .map(([key, value]) => `${key}:${JSON.stringify(value)}`)
@@ -852,13 +855,5 @@ async function main() {
   process.exitCode = report.pass ? 0 : 1
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    await main()
-  } catch (error) {
-    const cliError =
-      error instanceof CliError ? error : new CliError(error.code ?? 'MODEL_FAILED', error.message ?? String(error))
-    process.stderr.write(`${cliError.code}: ${cliError.message}\n`)
-    process.exitCode = cliError.exitCode
-  }
-}
+// await하지 않는다 — 이 모듈은 순환 import(derive ↔ adequacy)에 있어 top-level await가 import를 교착시킨다
+runCli(import.meta, main, { CliError, fallback: 'MODEL_FAILED' })

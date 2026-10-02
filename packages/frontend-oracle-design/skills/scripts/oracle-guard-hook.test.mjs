@@ -323,6 +323,36 @@ test('a lock created after the activation opens the test gate; a lock left from 
   assert.equal(hook(writeIn(root, session, test_file)).decision, null)
 })
 
+test('with parallel slices one slice lock opens tests only inside its own scan root; a lock before init stays unscoped', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-guard-slice-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const session = await transcript(root)
+  const fresh = new Date('2026-10-02T03:05:00.000Z')
+  const lockSlice = async (id, scanRoot) => {
+    const oracle = join(root, '.ai', 'oracles', id)
+    await mkdir(oracle, { recursive: true })
+    await writeFile(join(oracle, 'oracle.lock.json'), '{}\n')
+    await utimes(join(oracle, 'oracle.lock.json'), fresh, fresh)
+    if (scanRoot) await writeFile(join(oracle, 'run-state.json'), JSON.stringify({ schemaVersion: 3, state: 'ORACLE_READY', scanRoot }))
+  }
+  await mkdir(join(root, 'src', 'features', 'run'), { recursive: true })
+  await mkdir(join(root, 'src', 'features', 'billing'), { recursive: true })
+  await lockSlice('run', '../../../src/features/run')
+
+  assert.equal(hook(writeIn(root, session, 'src/features/run/__test__/run.test.ts')).decision, null)
+  const other = hook(writeIn(root, session, 'src/features/billing/__test__/billing.test.ts'))
+  assert.equal(other.decision?.permissionDecision, 'deny')
+  assert.match(other.decision.permissionDecisionReason, /^TEST_OUTSIDE_LOCKED_SLICE: src\/features\/billing\/__test__\/billing\.test\.ts/)
+
+  // the billing slice locks its own oracle: its tests open
+  await lockSlice('billing', '../../../src/features/billing')
+  assert.equal(hook(writeIn(root, session, 'src/features/billing/__test__/billing.test.ts')).decision, null)
+
+  // a lock that has no run-state yet does not know its scope, so it stays open as before
+  await lockSlice('search')
+  assert.equal(hook(writeIn(root, session, 'src/features/search/__test__/search.test.ts')).decision, null)
+})
+
 test('the test gate stays out of sessions that never activated the skill or routed the request out of scope', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'oracle-guard-other-'))
   t.after(() => rm(root, { recursive: true, force: true }))

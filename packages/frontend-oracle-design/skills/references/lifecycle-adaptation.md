@@ -82,7 +82,9 @@ oracle (`.ai/oracles/<id>/`) and run them in parallel agents with disjoint file 
 of these stays one oracle. Within a slice the order does not change: Bend model → lock → generated tests →
 `VALID_RED` → implementation, and production writes stay denied until `VALID_RED`. The speed comes from
 slices overlapping — one slice implements while another is still modelling — and from the generated tests
-(`emit-trace`, `emit-world`) making the test step mechanical. A question that blocks part of a slice is a hold
+(`emit-trace`, `emit-world`) making the test step mechanical. Give each slice its own scan root (its feature
+folder): on Claude Code the hook opens tests only inside the scan root of an oracle locked in this session
+(`TEST_OUTSIDE_LOCKED_SLICE`), so one slice's lock does not open another slice's tests. A question that blocks part of a slice is a hold
 (`PARTIAL_VERIFIED`), not a stop for the other slices; ask every open hold in one batch after the model work.
 Each slice reports its own state. A claim that crosses slices needs an owning integration row and its own
 evidence; independent GREENs are never reported as whole-feature completion.

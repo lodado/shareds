@@ -10,6 +10,7 @@ import { basename, dirname, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ensureBend, reportedVersion } from './ensure-bend.mjs'
+import { runCli } from './oracle-cli.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
 import { bendInputs, compileBend, lockScopeIssues, toPlain, verdictBeside } from './oracle-model.mjs'
 import { independenceOf, loadPackage, packageIssues, packageSpec, sourcePath } from './oracle-package.mjs'
@@ -1638,13 +1639,5 @@ async function main() {
   process.exitCode = result.pass ? 0 : 1
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    await main()
-  } catch (error) {
-    const cliError =
-      error instanceof CliError ? error : new CliError(error.code ?? 'ADEQUACY_FAILED', error.message ?? String(error))
-    process.stderr.write(`${cliError.code}: ${cliError.message}\n`)
-    process.exitCode = cliError.exitCode
-  }
-}
+// await하지 않는다 — 이 모듈은 순환 import(derive ↔ adequacy)에 있어 top-level await가 import를 교착시킨다
+runCli(import.meta, main, { CliError, fallback: 'ADEQUACY_FAILED' })

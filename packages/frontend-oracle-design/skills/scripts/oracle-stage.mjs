@@ -88,10 +88,10 @@ export async function markLocked(directory) {
 
 async function gate(directory, target, { timeoutMs } = {}) {
   const packagePath = join(directory, PACKAGE_FILE)
-  const { loadPackage, packageIssues, derivePackage } = await import('./oracle-package.mjs')
+  const { asyncCellIssues, loadPackage, packageIssues, derivePackage } = await import('./oracle-package.mjs')
   const loaded = await loadPackage(packagePath, { root: process.cwd() })
   if (target === 'MODELED') {
-    const issues = packageIssues(loaded.pkg, { stage: 'model' })
+    const issues = [...packageIssues(loaded.pkg, { stage: 'model' }), ...asyncCellIssues(loaded.pkg, { required: true })]
     if (issues.length > 0) throw new StageError('STAGE_GATE', `package is not model-complete: ${issues.join('; ')}`)
     return 'package validate --stage model'
   }

@@ -540,7 +540,7 @@ test('keeps automatic routing narrow and leaves sibling concerns with their owne
   assert.match(description, /already approved behavior that has no Oracle run/)
   // 라이브 canary(압박 프롬프트)에서 "카드를 다시 열지 말라"를 NEEDS_DECISION 기록 금지로 읽은 run이 있었다
   assert.match(skill, /Recording\s+it neither reopens nor edits the locked card/)
-  assert.match(skill, /low-fast-path node is legacy-only/s)
+  assert.match(skill, /low-fast-path node is legacy-only/)
   assert.match(skill, /Oracle.*Outcome Brief.*Source Registry.*lock.*state transitions/s)
   assert.match(skill, /FSD.*do\s+not auto-invoke this skill on its own/s)
 })
@@ -2551,4 +2551,17 @@ test('the docs ask the open cells before modelling, design the proof by scope, a
   assert.match(lifecycle, /## Parallel slices/)
   assert.match(lifecycle, /Bend model → lock → generated tests →\s+`VALID_RED` → implementation, and production writes stay denied until `VALID_RED`/)
   assert.match(lifecycle, /independent GREENs are never reported as whole-feature completion/)
+})
+
+test('the docs name the async cells the MODELED gate checks and the slice-scoped test gate', async () => {
+  const skill = await read('SKILL.md')
+  const bend = await read('references/bend-cross-verification.md')
+  const lifecycle = await read('references/lifecycle-adaptation.md')
+  assert.match(bend, /`asyncCells: \[\{operation, cells\}\]`/)
+  for (const cell of ['late-success-after-cancel', 'late-failure-after-success', 'older-response-after-newer', 'duplicate-completion', 'lost-response', 'retry-while-pending', 'unmount-before-settle'])
+    assert.match(bend, new RegExp(`\`${cell}\``))
+  assert.match(bend, /`oracle-stage\.mjs advance --to MODELED` refuses a package that leaves any cell undecided/)
+  assert.match(lifecycle, /Give each slice its own scan root/)
+  assert.match(lifecycle, /`TEST_OUTSIDE_LOCKED_SLICE`/)
+  assert.match(skill, /the lock still runs card lint itself, so a hand-written\s+record skips no check/)
 })
