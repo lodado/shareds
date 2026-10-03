@@ -244,7 +244,8 @@ It also reports the transition cover: every configuration the model can reach (i
 environment allows) takes every allowed event once, through the shortest trace that reaches it. A finite
 model is `closed` — every (configuration, event) pair runs, including those first reached past the bound;
 a state that grows without bound is `capped` at the bound with the depth it covered, and fast-check samples
-past it. The projected Case space states which.
+past it. The projected Case space states which. That is the model's possible space; `emit-trace` runs a
+minimum cover of it on the product (§ `emit-trace`).
 
 With a behavior model, lock only when `prove` is `proven` and the space is complete; show the case count and the traces for
 the required scenarios with the law statements. `open`/`failed` means the model, laws or proof need
@@ -331,6 +332,7 @@ features/feed-infinite-scroll/
     feed.adapter.tsx                the boundary — drives FeedGrid; written by the AI, reviewed
     feed.model.mjs                  generated: compiled model, imported only by the test
     feed.oracle.test.mjs            generated: conformance test
+    BUGS.json                       authored: traces of bugs that happened, beside MODEL.bend
 .ai/oracles/<id>/                   the run: card, journal, oracle.package.json, sources/, lock, ledger
 ```
 
@@ -343,7 +345,8 @@ features/feed-infinite-scroll/
 - Run `emit-*` with `--adapter` and `--out` both pointing at that `formal/` directory. What belongs to
   one revision, not to the code, stays in `.ai/oracles/<id>/`. A sampled fast-check failure prints its
   seed and path; replay it, and its verdict carries it forward as a `VALID_RED` test, a journal line or
-  an Open question.
+  an Open question. Append an `implementation-defect` trace to `BUGS.json` beside `MODEL.bend` as
+  `{ "id": "B<n>", "trace": [...], "note": "..." }` — never an expected value.
 
 #### The adapter — written by the AI, reviewed
 
@@ -376,8 +379,16 @@ the expected results — during the harness step, then it passes two gates befor
   model, laws or observation meaning.
 
 - `emit-trace (--package <pkg> | --model --prefix --bound) --adapter --out --row --runs N [--max-length L]`
-  (differential): every trace up to the bound with each prefix's expected observation, the transition cover's
-  cases past the bound (`[O*] [C…]`, expectations from the model), with `--package` the joint cases of
+  (differential): the minimum cover (`[O*] [T…]`, expectations from the model) — the fewest traces, each
+  the shortest legal route to a configuration plus one event, that take every event class, every event class ×
+  state class pair and every observed class once, with equivalence classes and boundary values doing the
+  folding (a domain of at most five values keeps each value; a wider one keeps low, low+1, one mid value,
+  high-1 and high; an array counts by length): a 13-event model whose space is 2,197 traces at bound 3 runs
+  tens of traces, not thousands. The model still enumerates the whole space, so write the event alphabet as
+  classes — one event per class and the boundary values of a payload, not every value. A defect that needs
+  three classes at once is left to the fast-check sample. Each trace in `BUGS.json` beside `MODEL.bend` runs
+  as `[O*] [B…]` with the current model's expectation; editing it makes the test stale, and a trace the
+  environment no longer allows stops generation (`BUG_OUTSIDE_SPACE`). With `--package` the joint cases of
   `space-cross-check` (`[O*] [J…]`: each declared world value the test sets runs one trace that shows the
   declared behavior values — 4 cases cover the 33 world × behavior pairs of the paging fixture, against 9,120
   runs for the full product; `init(coordinates)` starts the product on that setting and must declare the
@@ -391,7 +402,11 @@ the expected results — during the harness step, then it passes two gates befor
   each trace actually reached: it prints `{"fastCheck": {requested, executed, beyondBound, longest,
 seed}}`, fails if fewer runs executed than requested, and fails if the environment allows traces past
   the bound yet no sample reached one — a drawn array longer than the bound is not a trace past it when
-  the environment ends early. Longer traces over the same events and assumptions are more cases, not a
+  the environment ends early. Two stages: the first half draws uniformly and counts cover-item hits; the
+  second freezes them and weights each event by Σ 1/(1 + hits) of its items (frozen, so shrinking stays
+  deterministic). Each run also draws a swarm subset of event kinds. `{"coverage"}` reports zero-hit items,
+  Good–Turing and 3/N; up to 8 forbidden-event probes report `ignored`, `unspecified-behavior` or
+  `unhandled-event` as POLICY_GAP candidates. Neither fails the test. Longer traces over the same events and assumptions are more cases, not a
   new axis. The adapter is the one above (`init`, `step`, `observe`, optional `dispose`). Pass
   `--runner vitest` in a vitest repository, the recommended runner above.
 - `emit-state --model --prefix --state <Type> --command <Type> --runs N (--relation <def>)... [--differential]`

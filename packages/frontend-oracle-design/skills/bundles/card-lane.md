@@ -1437,13 +1437,16 @@ as though they were independent input dimensions.
 - Assumptions (each with a source, an owner and a falsifier) remove impossible worlds; the environment
   `next(history)` removes impossible event orders. A removal is a claim with a falsifier, never a way to
   shrink the space; an unknown combination stays in.
-- The kernel proves the goals over the possible worlds (adequacy) and the laws over the model. The generated
-  tests run each possible case on the product: every trace the environment allows up to the bound, the
-  transition cover (every event from every reachable configuration, `closed` for a finite model, `capped`
-  at the bound otherwise; a configuration is the model state, the allowed events and the events allowed one
-  step later, so a `next(history)` that differs only deeper is merged — keep the environment a function of the
-  model state), the joint cases that run each world value the test sets with every behavior value
-  (`emit-trace --package`), and fast-check beyond it.
+- The kernel proves the goals over the possible worlds (adequacy) and the laws over the model. The model
+  enumerates every possible case; the generated tests run a minimum of them on the product — equivalence
+  partitioning and boundary values, not the space. `emit-trace` runs the fewest traces that take every event
+  class, every event × state-field class pair and every observed class (a class is one value of a small
+  domain, or low, low+1, mid, high-1 or high of a wide one; `closed` for a finite model, `capped` at the bound
+  otherwise; a configuration is the model state, the allowed events and the events allowed one step later,
+  so a `next(history)` that differs only deeper is merged — keep the environment a function of the model
+  state), the joint cases that run each world value the test sets with every behavior value
+  (`emit-trace --package`), and fast-check beyond it. A defect that needs three classes at once is the
+  sample's to find.
 - The projection states the counts and the cover. A world several assumptions reject is excluded once in the
   total.
 

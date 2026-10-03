@@ -17,9 +17,11 @@ import { BEND_VERSION } from './ensure-bend.mjs'
 import { sha256 } from './oracle-fs.mjs'
 import {
   checkConformance,
+  classifyTrace,
   enumerateSpace,
   formalModelIssues,
   loadModel,
+  minimalCover,
   parseFormalModel,
   proveLaws,
   scanBendSource,
@@ -339,6 +341,89 @@ test('the transition cover does not merge two histories whose next allowed event
   const failed = checkConformance({ ...space, cases: cover.cases }, product)
   assert.equal(failed.pass, false)
   assert.deepEqual(failed.failures[0].trace.map(({ $ }) => $), ['B', 'C', 'Bad'])
+})
+
+// ── minimum cover: 동치류·경계값 항목을 모두 덮는 최소 trace 묶음 (손 모델) ──────────────────────────────────
+
+test('the minimum cover takes every event × state class once, so a single-pair defect still fails with far fewer traces', () => {
+  const model = ringModel()
+  const space = enumerateSpace(model, { bound: 2 })
+  const cover = minimalCover(model, space)
+  assert.equal(cover.status, 'closed')
+  assert.equal(cover.configurations, 4)
+  // X at 0, 1, 2 and 3 and R at 3 are the pairs the shortest traces reach; R at 0, 1 and 2 ride along inside them
+  assert.deepEqual(
+    cover.cases.map(({ label }) => label),
+    ['X', 'R · X', 'R · R · X', 'R · R · R · R', 'R · R · R · X'],
+  )
+  assert.match(cover.cases[0].id, /^T[a-f0-9]{12}$/)
+  assert.deepEqual(minimalCover(ringModel(), enumerateSpace(ringModel(), { bound: 2 })), cover)
+
+  // R from 3 should wrap to 0; this product sticks at 3 — only the (R, at=3) pair shows it, and bound 2 never gets there
+  const product = {
+    init: () => 0,
+    step: (state, event) => (event.$ === 'R' ? Math.min(state + 1, 3) : state),
+    observe: (state) => state,
+  }
+  assert.equal(checkConformance(space, product).pass, true)
+  const failed = checkConformance({ ...space, cases: cover.cases }, product)
+  assert.equal(failed.pass, false)
+  assert.deepEqual(failed.failures[0].trace.map(({ $ }) => $), ['R', 'R', 'R', 'R'])
+})
+
+test('a wide event domain folds to its boundary values: twenty picks need a handful of traces, not four hundred', () => {
+  const list = (items) => items.reduceRight((tail, head) => ({ $: 'Con', head, tail }), { $: 'Nil' })
+  const model = {
+    prefix: 'Wide',
+    digest: 'wide-model',
+    init: () => 0n,
+    step: (_state, event) => event.n,
+    observe: (state) => state,
+    next: () => list(Array.from({ length: 20 }, (_, index) => ({ $: 'Pick', n: BigInt(index + 1) }))),
+  }
+  const space = enumerateSpace(model, { bound: 2 })
+  const cover = minimalCover(model, space)
+  assert.equal(space.cases.length, 400)
+  assert.equal(cover.cases.length, 20)
+  // low, low+1, high-1 and high of 1..20 are all in; the middle of the domain is one representative, not seventeen
+  const values = new Set(cover.cases.flatMap(({ trace }) => trace.map(({ n }) => n)))
+  for (const boundary of [1, 2, 19, 20]) assert.ok(values.has(boundary), `Pick{${boundary}} is a boundary value`)
+  assert.equal([...values].filter((value) => value > 2 && value < 19).length, 1)
+
+  // a product that ignores Pick{1} after the first event sits behind no boundary of the space, yet a cover trace takes it
+  const product = {
+    init: () => ({ last: 0, index: 0 }),
+    step: (state, event) => {
+      const ignored = state.index > 0 && event.n === 1
+      return { last: ignored ? state.last : event.n, index: state.index + 1 }
+    },
+    observe: (state) => state.last,
+  }
+  assert.equal(checkConformance({ ...space, cases: cover.cases }, product).pass, false)
+})
+
+test('the minimum cover only takes events the environment allows, even when it merges histories', () => {
+  const model = historyModel()
+  const cover = minimalCover(model, enumerateSpace(model, { bound: 1 }))
+  assert.equal(cover.status, 'closed')
+  assert.ok(cover.cases.every(({ trace }) => classifyTrace(model, trace).verdict === 'in-space'))
+  // Bad is allowed only after B · C, and a state class alone cannot name that path — the trace is still found
+  assert.ok(cover.cases.some(({ label }) => label === 'B · C · Bad'))
+})
+
+test('an unbounded model caps its minimum cover at the bound and says so', () => {
+  const counter = {
+    prefix: 'Count',
+    digest: 'count-model',
+    init: () => 0n,
+    step: (state) => state + 1n,
+    observe: (state) => state,
+    next: () => ({ $: 'Con', head: { $: 'Inc' }, tail: { $: 'Nil' } }),
+  }
+  const cover = minimalCover(counter, enumerateSpace(counter, { bound: 2 }), { maxConfigurations: 5 })
+  assert.equal(cover.status, 'capped')
+  assert.equal(cover.coveredDepth, 2)
+  assert.deepEqual(cover.cases.map(({ label }) => label), ['Inc · Inc · Inc'])
 })
 
 test('a joint case starts the product on its world coordinates; an adapter that cannot take them fails instead of passing on the default fixture', () => {

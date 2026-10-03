@@ -5,13 +5,13 @@
 // 사람이 쓰는 경계는 adapter 하나다. 생성 테스트의 통과는 구현의 대응 증거이지 증명이 아니다.
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { basename, join, posix, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, posix, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { ensureBend } from './ensure-bend.mjs'
 import { evaluateWorlds, loadWorld } from './oracle-adequacy.mjs'
 import { runCli } from './oracle-cli.mjs'
-import { spaceCrossCheck } from './oracle-discovery.mjs'
+import { perturbations, spaceCrossCheck } from './oracle-discovery.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
 import {
   bendInputs,
@@ -21,8 +21,9 @@ import {
   enumerateSpace,
   eventLabel,
   keepArtifact,
+  leaves,
   loadModel,
-  transitionCover,
+  minimalCover,
   verdictBeside,
 } from './oracle-model.mjs'
 import { loadPackage, sourcePath } from './oracle-package.mjs'
@@ -429,6 +430,49 @@ async function traceInputs({ package: packagePath, cwd = process.cwd(), model, p
   }
 }
 
+export const BUGS_FILE = 'BUGS.json'
+const MAX_PROBES = 8
+
+/**
+ * MODEL.bend 옆의 BUGS.json — 실제로 일어난 버그의 trace를 사람이 적어 둔 원천. 기대값은 적지 않는다: 생성할 때마다 지금 모델이
+ * 계산하므로 정책이 바뀌어도 낡은 값이 남지 않는다. 지금 환경이 허용하지 않는 trace는 조용히 버리지 않고 생성을 멈춘다.
+ */
+async function bugCases(model, path, outDir) {
+  let text
+  try {
+    text = await readFile(path, 'utf8')
+  } catch (error) {
+    if (error.code === 'ENOENT') return { cases: [], sources: [] }
+    throw error
+  }
+  let entries
+  try {
+    entries = JSON.parse(text)
+  } catch (error) {
+    throw new CliError('BUGS_INVALID', `${BUGS_FILE} is not JSON: ${error.message}`)
+  }
+  if (!Array.isArray(entries)) throw new CliError('BUGS_INVALID', `${BUGS_FILE} must be an array of { id, trace }`)
+  const seen = new Set()
+  const cases = entries.map((entry, index) => {
+    if (!/^B\d+$/.test(entry?.id ?? '') || seen.has(entry.id) || !Array.isArray(entry.trace) || entry.trace.length === 0)
+      throw new CliError('BUGS_INVALID', `${BUGS_FILE}[${index}] needs a unique id B<n> and a non-empty trace`)
+    seen.add(entry.id)
+    const verdict = classifyTrace(model, entry.trace)
+    if (verdict.verdict === 'outside-space')
+      throw new CliError(
+        'BUG_OUTSIDE_SPACE',
+        `${entry.id}: step ${verdict.step} is not allowed by the model's environment — reopen the problem definition or remove the entry; never drop it silently`,
+      )
+    return {
+      id: entry.id,
+      label: entry.trace.map(eventLabel).join(' · '),
+      trace: entry.trace,
+      observations: verdict.expected.slice(1),
+    }
+  })
+  return { cases, sources: [{ path: toImport(relative(outDir, path)), sha256: sha256(text) }] }
+}
+
 /**
  * trace 모드(차분): bound 안의 모든 trace는 각 prefix의 기대 관측과 함께 데이터로, bound 밖은 선택적으로 fast-check
  * 표본이다. 표본은 선택 인덱스만 만들고 사건은 모델 환경 `next(history)`가 허용하는 것에서 고른다 — 모델이 불가능하다고
@@ -465,9 +509,15 @@ export async function emitTrace(options) {
   const longest = maxLength ?? bound * 2
   if (!Number.isInteger(longest) || longest <= bound)
     throw new CliError('USAGE', 'max-length must be an integer above the bound', 2)
-  // 공간이 bound까지의 trace를 전부 돌고, 전이 커버가 도달 가능한 구성마다 모든 사건을 한 번 더 돈다
-  const cover = transitionCover(loaded, space)
+  // 제품에는 공간 전체가 아니라 동치류·경계값 항목을 모두 덮는 최소 trace 묶음만 돈다 — 공간 전체는 모델이 이미 열거했다
+  const cover = minimalCover(loaded, space)
   const outDir = resolve(out)
+  // 버그 기록은 그 버그가 난 모델 옆(MODEL.bend와 같은 폴더)에 둔다
+  const bugs = await bugCases(loaded, join(dirname(resolve(model)), BUGS_FILE), outDir)
+  // 교란은 환경이 막은 사건이다 — 모델은 기대값을 말하지 않으므로 생성 테스트는 판정하지 않고 보고만 한다
+  const probes = perturbations(loaded, { ...space, cases: cover.cases })
+    .list.slice(0, MAX_PROBES)
+    .map(({ key, trace, leaveAt }) => ({ key, trace, leaveAt }))
   await mkdir(outDir, { recursive: true })
   const base = name ?? prefix.toLowerCase()
   const modelFile = `${base}.model.mjs`
@@ -477,18 +527,21 @@ export async function emitTrace(options) {
   const extra = await Promise.all(
     jointSources.map(async (path) => ({ path: toImport(relative(outDir, path)), sha256: sha256(await readFile(path, 'utf8')) })),
   )
-  const sources = [...written.sources, ...extra]
+  const sources = [...written.sources, ...extra, ...bugs.sources]
   const seed = seedOf(space.spaceDigest)
   const sampled = true
   const beyond = beyondBoundReachable(loaded, space)
-  const coverScope =
+  // 모델이 연 공간 전체와 제품에 돌린 집합은 다르다 — 앞의 것만 exhaustive다
+  const { exhaustive: modelSpace, ...claim } = conformanceClaim(space, runs, seed)
+  const coverScope = `a minimum cover of ${cover.cases.length} traces for the ${cover.items} items of ${
     cover.status === 'closed'
-      ? `every event from each of the ${cover.configurations} reachable configurations (${cover.cases.length} cases past the bound)`
-      : `every event from each configuration within ${cover.coveredDepth} events (${cover.cases.length} cases; the state grows without bound)`
+      ? `the ${cover.configurations} reachable configurations`
+      : `the configurations within ${cover.coveredDepth} events (the state grows without bound)`
+  } — ${cover.basis}`
   const jointScope = joint ? `, ${jointCases.length} joint cases on the world settings (${joint.covered}/${joint.required} world × behavior pairs)` : ''
-  const scope = `exhaustive over the ${space.cases.length} traces up to ${
+  const scope = `${coverScope}${jointScope} — not every trace of the ${space.cases.length} the model enumerates up to ${
     space.bound
-  } events, the transition cover — ${coverScope}${jointScope} — and sampled (fast-check, ${runs} runs, seed ${seed}, drawn lengths ${space.bound + 1}..${longest}; ${
+  } events — and sampled (fast-check, ${runs} runs, seed ${seed}, drawn lengths ${space.bound + 1}..${longest}; ${
     beyond
       ? 'executed lengths are reported and at least one must pass the bound'
       : 'the environment ends every trace within the bound, so no sample can pass it'
@@ -510,7 +563,7 @@ export async function emitTrace(options) {
     }),
     `const INITIAL = ${JSON.stringify(space.initial)}`,
     `const CASES = ${JSON.stringify(
-      [...space.cases, ...cover.cases, ...jointCases].map(({ id, label, trace, observations, coordinates }) => ({
+      [...bugs.cases, ...cover.cases, ...jointCases].map(({ id, label, trace, observations, coordinates }) => ({
         id,
         label,
         trace,
@@ -543,42 +596,127 @@ export async function emitTrace(options) {
     '}',
   ]
   if (sampled) {
+    const kinds = [...new Set([...space.cases, ...cover.cases].flatMap(({ trace }) => trace.map((event) => event.$)))].sort()
     lines.push(
       '',
       `const RUNS = ${runs}`,
+      `const FIRST = ${Math.ceil(runs / 2)}`,
       `const BOUND = ${space.bound}`,
       `const BEYOND_REACHABLE = ${beyond}`,
+      `const CLASSES = ${JSON.stringify(cover.classes)}`,
+      `const ITEMS = ${JSON.stringify(cover.itemList)}`,
+      `const EVENT_KINDS = ${JSON.stringify(kinds)}`,
+      leaves.toString(),
       'function allowed(raw) {',
       '  const items = []',
       "  for (let cursor = call('next', raw.reduceRight((tail, head) => ({ $: 'Con', head, tail }), { $: 'Nil' })); cursor?.$ === 'Con'; cursor = cursor.tail) items.push(cursor.head)",
       '  return items',
       '}',
       '',
+      '// 표본의 매 단계를 최소 묶음과 같은 류로 센다. 이름표에 없는 값(bound 밖에서 처음 나온 값)은 unseen 류다.',
+      'function classOf([path, value]) {',
+      '  const name = CLASSES[path]?.[JSON.stringify(value)]',
+      "  return path + '=' + (name ?? 'unseen:' + JSON.stringify(value))",
+      '}',
+      'function itemsOfStep(state, event, observation) {',
+      "  const states = leaves(toPlain(state), 'state').map(classOf)",
+      "  const events = leaves(event, event.$ ?? 'event').map(classOf)",
+      "  const observed = leaves(observation, 'observation').map(classOf)",
+      "  return [...events, ...observed, ...events.flatMap((left) => states.map((right) => left + ' × ' + right))]",
+      '}',
+      '',
+      '// 두 단계: 1단계는 균등하게 뽑으며 항목별 횟수를 세고, 2단계는 그 횟수를 얼려 덜 밟은 항목을 덮는 사건에 가중치를',
+      '// 준다. 가중치는 2단계 안에서 바뀌지 않으므로 같은 입력은 같은 trace다 — shrink가 결정적으로 남는다.',
+      '// swarm: 실행마다 쓸 사건 종류의 부분집합도 입력이다. 남은 사건끼리 더 깊이 섞인다. 허용 사건이 모두 빠지면 전부 쓴다.',
+      'const hits = new Map()',
+      'let frozen = null',
+      'function weightOf(state, event) {',
+      "  const observation = toPlain(call('observe', call('step', state, event)))",
+      '  return itemsOfStep(state, toPlain(event), observation).reduce((sum, item) => sum + 1 / (1 + (frozen.get(item) ?? 0)), 0)',
+      '}',
+      'function pick(choices, index, state) {',
+      '  if (frozen === null) return choices[index % choices.length]',
+      '  const scores = choices.map((event) => weightOf(state, event))',
+      '  let left = ((index % 1_000_000) / 1_000_000) * scores.reduce((sum, score) => sum + score, 0)',
+      '  for (const [position, score] of scores.entries()) {',
+      '    left -= score',
+      '    if (left < 0) return choices[position]',
+      '  }',
+      '  return choices.at(-1)',
+      '}',
+      'const lengths = []',
+      'async function sample({ enabled, indices }) {',
+      '  const raw = []',
+      '  const expected = []',
+      "  let state = call('init')",
+      '  for (const index of indices) {',
+      '    const all = allowed(raw)',
+      '    if (all.length === 0) break',
+      '    const swarm = all.filter((event) => enabled.includes(event.$) || !EVENT_KINDS.includes(event.$))',
+      '    const event = pick(swarm.length > 0 ? swarm : all, index, state)',
+      "    const next = call('step', state, event)",
+      "    const observation = toPlain(call('observe', next))",
+      '    for (const item of itemsOfStep(state, toPlain(event), observation)) hits.set(item, (hits.get(item) ?? 0) + 1)',
+      '    raw.push(event)',
+      '    expected.push(observation)',
+      '    state = next',
+      '  }',
+      '  lengths.push(raw.length)',
+      '  await drive(raw.map(toPlain), expected)',
+      '}',
+      '',
       '// 선택 인덱스는 0..2^31-1이다 — 고정된 작은 범위를 modulo하면 그보다 많은 선택지 가운데 일부가 영원히 뽑히지 않는다.',
       '// 실제로 실행한 길이를 센다: 뽑은 배열이 bound보다 길어도 환경이 일찍 끝나면 bound 밖을 검사한 것이 아니다.',
       "test('[' + ROW + '] sampled traces (fast-check)', UNLIMITED, async () => {",
-      '  const lengths = []',
-      '  await fc.assert(',
-      `    fc.asyncProperty(fc.array(fc.nat(), { minLength: ${
-        space.bound + 1
-      }, maxLength: ${longest} }), async (indices) => {`,
-      '      const raw = []',
-      '      for (const index of indices) {',
-      '        const choices = allowed(raw)',
-      '        if (choices.length === 0) break',
-      '        raw.push(choices[index % choices.length])',
-      '      }',
-      '      lengths.push(raw.length)',
-      "      let state = call('init')",
-      "      const expected = raw.map((event) => toPlain(call('observe', (state = call('step', state, event)))))",
-      '      await drive(raw.map(toPlain), expected)',
-      '    }),',
-      `    { numRuns: RUNS, seed: ${seed} },`,
-      '  )',
+      '  const input = fc.record({',
+      '    enabled: fc.subarray(EVENT_KINDS, { minLength: 1 }),',
+      `    indices: fc.array(fc.nat(), { minLength: ${space.bound + 1}, maxLength: ${longest} }),`,
+      '  })',
+      `  await fc.assert(fc.asyncProperty(input, sample), { numRuns: FIRST, seed: ${seed} })`,
+      '  if (RUNS > FIRST) {',
+      '    frozen = new Map(hits)',
+      `    await fc.assert(fc.asyncProperty(input, sample), { numRuns: RUNS - FIRST, seed: ${seed + 1} })`,
+      '  }',
       '  const beyond = lengths.filter((length) => length > BOUND).length',
-      `  console.log(JSON.stringify({ fastCheck: { row: ROW, requested: RUNS, executed: lengths.length, beyondBound: beyond, longest: Math.max(...lengths), seed: ${seed} } }))`,
+      `  console.log(JSON.stringify({ fastCheck: { row: ROW, requested: RUNS, executed: lengths.length, beyondBound: beyond, longest: Math.max(...lengths), seed: ${seed}, stages: [FIRST, RUNS - FIRST] } }))`,
+      '  // 커버리지: 0번 밟은 항목, Good-Turing(다음 실행이 못 본 항목을 밟을 확률 ≈ 한 번만 본 항목 수 / 전체 관측 수),',
+      '  // 3의 법칙(한 번도 안 나온 사건의 확률은 95% 신뢰도로 3/N 이하). 판정이 아니라 어디가 얇은지 보여 준다.',
+      '  const counts = [...hits.values()]',
+      '  const total = counts.reduce((sum, count) => sum + count, 0)',
+      '  const zero = ITEMS.filter((item) => !hits.has(item))',
+      "  const unseen = [...hits.keys()].filter((item) => item.includes('=unseen:'))",
+      '  console.log(JSON.stringify({ coverage: { row: ROW, items: ITEMS.length, hit: ITEMS.length - zero.length, zero: zero.slice(0, 20), zeroCount: zero.length, goodTuring: total === 0 ? 1 : counts.filter((count) => count === 1).length / total, ruleOfThree: 3 / lengths.length, unseen: unseen.slice(0, 20) } }))',
       "  assert.ok(lengths.length >= RUNS, 'fast-check executed ' + lengths.length + ' of ' + RUNS + ' requested runs')",
       "  if (BEYOND_REACHABLE) assert.ok(beyond > 0, 'no sampled trace passed the bound — the sampled claim beyond the bound would be false')",
+      '})',
+    )
+  }
+  if (probes.length > 0) {
+    lines.push(
+      '',
+      '// 환경이 막은 사건을 끼운 trace — 제품이 무시하는지, 화면을 바꾸는지, 던지는지 보고만 한다. 기대값은 정책이라',
+      '// 모델이 말하지 않는다: 바뀐 것은 POLICY_GAP 후보이고 이 테스트는 실패하지 않는다.',
+      `const PROBES = ${JSON.stringify(probes)}`,
+      "test('[' + ROW + '] outside-environment probes (report only)', UNLIMITED, async () => {",
+      '  const found = []',
+      '  for (const probe of PROBES) {',
+      "    const label = probe.trace.map(eventLabel).join(' · ')",
+      "    let state = await within(adapter.init(), 'init')",
+      '    try {',
+      "      const observed = [await within(adapter.observe(state), 'initial observe')]",
+      '      for (const event of probe.trace) {',
+      "        state = await within(adapter.step(state, structuredClone(event)), label)",
+      '        observed.push(await within(adapter.observe(state), label))',
+      '      }',
+      '      const changed = JSON.stringify(observed[probe.leaveAt]) !== JSON.stringify(observed[probe.leaveAt + 1])',
+      "      found.push({ key: probe.key, trace: label, result: changed ? 'unspecified-behavior' : 'ignored' })",
+      '    } catch (error) {',
+      "      found.push({ key: probe.key, trace: label, result: 'unhandled-event', error: String(error?.message ?? error) })",
+      '    } finally {',
+      "      if (adapter.dispose) await within(adapter.dispose(state), 'dispose')",
+      '    }',
+      '  }',
+      '  console.log(JSON.stringify({ outsideEnvironment: { row: ROW, probes: found } }))',
       '})',
     )
   }
@@ -587,16 +725,19 @@ export async function emitTrace(options) {
     files: [join(outDir, modelFile), join(outDir, testFile)],
     spaceDigest: space.spaceDigest,
     verification: {
-      ...conformanceClaim(space, runs, seed),
+      ...claim,
+      modelSpace,
       beyondBoundReachable: beyond,
       cover: {
         status: cover.status,
         configurations: cover.configurations,
-        pairs: cover.pairs,
+        items: cover.items,
         cases: cover.cases.length,
         ...(cover.status === 'capped' ? { coveredDepth: cover.coveredDepth } : {}),
       },
       joint: joint ? { required: joint.required, covered: joint.covered, cases: jointCases.length } : null,
+      bugs: bugs.cases.length,
+      probes: probes.length,
     },
   }
 }

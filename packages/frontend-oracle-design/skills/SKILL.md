@@ -110,10 +110,15 @@ Lane routing:
   policy source nor a lock target; the card governs implementation, but cannot erase contrary
   observations from the journal. New evidence may reopen the problem definition, not authorize edits.
 - Write only what a later stage reads. The product's `__test__/formal/` holds the `.bend` files, the
-  adapter and the generated model and tests; the rest of the run stays in `.ai/oracles/<id>/`. Never
+  adapter, the generated model and tests, and `BUGS.json` (bug traces) beside `MODEL.bend`; the
+  rest of the run stays in `.ai/oracles/<id>/`. Never
   save a tool's output to a file or keep a second copy (raw analyst output, a duplicated package, a
   generated proof): the tools are deterministic, so the journal records the command and its one-line
   result and a rerun shows the rest.
+- People do not read run records. The one file written for a person is `.ai/oracles/<id>/PLAN.md`,
+  rewritten in place: goal, approved decisions, open questions, verification scope, next step — one
+  line each. The other run files are for the scripts; do not summarize them to the user unless asked.
+  Reports carry no screenshots or captures; a visual finding is one line naming the file.
 
 ### TDD and judgment tools
 

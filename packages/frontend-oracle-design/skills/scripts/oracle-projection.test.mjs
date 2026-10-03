@@ -254,11 +254,11 @@ test('[bend] emit-trace: the generated test passes for the reducer, fails a muta
     bin,
     regenerate: 'test',
   })
-  assert.deepEqual(emitted.verification.exhaustive, { cases: 10, bound: 4, complete: true })
+  assert.deepEqual(emitted.verification.modelSpace, { cases: 10, bound: 4, complete: true })
   assert.equal(emitted.verification.sampled.runs, 100)
   assert.equal(emitted.verification.beyondBoundReachable, true)
-  // the request ids grow without bound, so the transition cover stops at the bound: every configuration the bound
-  // reaches takes every event once, one step past the bound, with the expectation the model computed
+  // the request ids grow without bound, so the minimum cover stops at the bound: the product runs a few traces that
+  // cover every event class × state class pair of the configurations the bound reaches, not all 10 traces and their cover
   const { cover } = emitted.verification
   assert.equal(cover.status, 'capped')
   assert.equal(cover.coveredDepth, 4)
@@ -267,16 +267,30 @@ test('[bend] emit-trace: the generated test passes for the reducer, fails a muta
   const text = await readFile(testFile, 'utf8')
   assert.match(text, /^\/\/ AUTO-GENERATED .* DO NOT EDIT\./)
   assert.match(text, /Passing it is not a proof about the implementation/)
-  assert.match(text, /"id":"C[a-f0-9]{12}"/)
+  assert.match(text, /"id":"T[a-f0-9]{12}"/)
+  assert.match(text, /a minimum cover of \d+ traces/)
+  assert.ok(cover.cases < 10 + 12, 'the minimum cover is smaller than the exhaustive space it replaces')
   const clean = runGenerated(testFile)
   assert.equal(clean.status, 0, clean.output)
-  // 10 traces + the cover cases + sources unchanged + adapter audit + the sampled property
-  assert.deepEqual([clean.tests, clean.fail], [13 + cover.cases, 0])
-  // the sampled test reports what fast-check actually executed, including runs past the bound
+  // the cover traces + sources unchanged + adapter audit + the sampled property + the outside-environment report
+  assert.ok(emitted.verification.probes > 0)
+  assert.deepEqual([clean.tests, clean.fail], [4 + cover.cases, 0])
+  // the sampled test reports what fast-check actually executed, including runs past the bound, in two stages
   const stats = JSON.parse(clean.output.match(/\{"fastCheck":.*\}/)[0]).fastCheck
   assert.equal(stats.requested, 100)
   assert.ok(stats.executed >= 100)
   assert.ok(stats.beyondBound > 0 && stats.longest > 4)
+  assert.deepEqual(stats.stages, [50, 50])
+  // and which cover items the samples stepped on: every item is counted against the same class table
+  const coverage = JSON.parse(clean.output.match(/\{"coverage":.*\}/)[0]).coverage
+  assert.equal(coverage.items, cover.items)
+  assert.equal(coverage.hit + coverage.zeroCount, cover.items)
+  assert.ok(coverage.goodTuring >= 0 && coverage.goodTuring <= 1)
+  assert.equal(coverage.ruleOfThree, 3 / stats.executed)
+  // the probes run forbidden events on the product and only report what it did
+  const outside = JSON.parse(clean.output.match(/\{"outsideEnvironment":.*\}/)[0]).outsideEnvironment
+  assert.equal(outside.probes.length, emitted.verification.probes)
+  assert.ok(outside.probes.every(({ result }) => ['ignored', 'unspecified-behavior', 'unhandled-event'].includes(result)))
 
   await writeFile(
     join(dir, 'mutant.adapter.mjs'),
@@ -522,16 +536,69 @@ test('[bend] emit-trace samples every environment choice: a defect behind the 20
     bin,
     regenerate: 'test',
   })
-  assert.deepEqual(emitted.verification.exhaustive, { cases: 20, bound: 1, complete: true })
-  // 21 configurations (last = 0..20) × 20 picks: the cover takes Pick{n:1} once from every configuration, so the
-  // defect past the bound is now found deterministically — 19 cover cases (Pick{n:1} twice is no defect)
-  assert.deepEqual(emitted.verification.cover, { status: 'closed', configurations: 21, pairs: 420, cases: 400 })
+  assert.deepEqual(emitted.verification.modelSpace, { cases: 20, bound: 1, complete: true })
+  // 21 configurations (last = 0..20) × 20 picks are 420 transitions; the minimum cover runs 20 traces for the 47 items
+  // (Pick.n and state.last each fold to low, low+1, mid, high-1, high), and one of them takes Pick{n:1} after another pick
+  assert.deepEqual(emitted.verification.cover, { status: 'closed', configurations: 21, items: 47, cases: 20 })
   const run = runGenerated(join(dir, 'generated', 'wide.oracle.test.mjs'))
   assert.equal(run.status, 1, run.output)
-  assert.match(run.output, /✖ \[O1\] \[C[a-f0-9]{12}\] Pick\{n:2\} · Pick\{n:1\}/)
+  assert.match(run.output, /✖ \[O1\] \[T[a-f0-9]{12}\] Pick\{n:\d+\} · Pick\{n:1\}/)
   // and the sampled property still finds it on its own: it draws every environment choice, not a small index range
   assert.match(run.output, /✖ \[O1\] sampled traces \(fast-check\)/)
-  assert.equal(run.fail, 19 + 1, run.output)
+  // the cover traces that take Pick{n:1} after Pick{n:10}, Pick{n:19} and Pick{n:20} (mid, high-1 and high of state.last), plus the sample
+  assert.equal(run.fail, 3 + 1, run.output)
+})
+
+test('[bend] emit-trace: a bug recorded in BUGS.json beside MODEL.bend runs as a fixed case, with the expectation the model computes now', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'stale-search')
+  const out = join(dir, 'generated')
+  await mkdir(out)
+  await writeFile(
+    join(dir, 'mutant.adapter.mjs'),
+    "import { adapterFor } from './search.adapter.mjs'\nimport { initialSearch } from './search-reducer.mts'\nimport { reduceWithoutStaleCheck } from './search-reducer.mutants.mts'\nexport const { init, step, observe } = adapterFor(reduceWithoutStaleCheck, initialSearch)\n",
+  )
+  const late = [{ $: 'Issue' }, { $: 'Issue' }, { $: 'Issue' }, { $: 'Respond', id: 3 }, { $: 'Respond', id: 2 }]
+  // only the trace is recorded — no expected value that a later policy change could leave stale
+  await writeFile(join(dir, 'BUGS.json'), JSON.stringify([{ id: 'B1', trace: late, note: 'late response replaced newer results' }]))
+  const base = { model: join(dir, 'MODEL.bend'), prefix: 'Search', bound: 4, row: 'O4', runs: 10, bin, regenerate: 'test' }
+  const emitted = await emitTrace({ ...base, adapter: join(dir, 'mutant.adapter.mjs'), out })
+  assert.equal(emitted.verification.bugs, 1)
+  const run = runGenerated(join(out, 'search.oracle.test.mjs'))
+  assert.equal(run.status, 1)
+  assert.match(run.output, /✖ \[O4\] \[B1\] Issue · Issue · Issue · Respond\{id:3\} · Respond\{id:2\}/)
+
+  // the file is a source: editing it makes the generated test stale
+  await writeFile(join(dir, 'BUGS.json'), JSON.stringify([{ id: 'B1', trace: late.slice(0, 4) }]))
+  assert.match(runGenerated(join(out, 'search.oracle.test.mjs')).output, /STALE_GENERATED_TESTS: \.\.\/BUGS\.json changed since generation/)
+
+  // a bug the current environment no longer allows stops generation instead of disappearing
+  await writeFile(join(dir, 'BUGS.json'), JSON.stringify([{ id: 'B1', trace: [{ $: 'Respond', id: 1 }] }]))
+  await assert.rejects(emitTrace({ ...base, adapter: join(dir, 'search.adapter.mjs'), out }), { code: 'BUG_OUTSIDE_SPACE' })
+  await writeFile(join(dir, 'BUGS.json'), JSON.stringify([{ id: 'bug', trace: late }]))
+  await assert.rejects(emitTrace({ ...base, adapter: join(dir, 'search.adapter.mjs'), out }), { code: 'BUGS_INVALID' })
+})
+
+test('[bend] emit-trace: the second sampling stage steps on cover items the uniform stage left untouched', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'wide')
+  await mkdir(dir)
+  await writeFile(join(dir, 'MODEL.bend'), WIDE)
+  await writeFile(join(dir, 'wide-product.mjs'), 'export function reduce(state, n) {\n  return n\n}\n')
+  await writeFile(join(dir, 'wide.adapter.mjs'), WIDE_ADAPTER)
+  const options = { model: join(dir, 'MODEL.bend'), prefix: 'Wide', bound: 1, row: 'O1', runs: 40, maxLength: 3, bin, regenerate: 'test' }
+  await emitTrace({ ...options, adapter: join(dir, 'wide.adapter.mjs'), out: join(dir, 'generated') })
+  const file = join(dir, 'generated', 'wide.oracle.test.mjs')
+  const coverageOf = (run) => JSON.parse(run.output.match(/\{"coverage":.*\}/)[0]).coverage
+  const twoStage = coverageOf(runGenerated(file))
+  // the same file with every run in the uniform stage, same seed and total — the baseline the weights must beat
+  await writeFile(file, (await readFile(file, 'utf8')).replace('const FIRST = 20', 'const FIRST = 40'))
+  const uniform = coverageOf(runGenerated(file))
+  assert.ok(twoStage.hit > uniform.hit, `two-stage hit ${twoStage.hit} of ${twoStage.items}, uniform ${uniform.hit}`)
 })
 
 test('the adapter audit sees through comments, query strings, computed imports, require and file reads', () => {
@@ -646,8 +713,8 @@ test('[bend] async adapter: the generated test awaits it, disposes every case an
   const emitted = await emitTrace({ ...base, adapter: join(dir, 'async.adapter.mjs'), out: join(dir, 'async') })
   const clean = runGenerated(join(dir, 'async', 'search.oracle.test.mjs'))
   assert.equal(clean.status, 0, clean.output)
-  // 10 exhaustive traces + the transition cover + sources unchanged + adapter audit + sampled property
-  assert.deepEqual([clean.tests, clean.fail], [13 + emitted.verification.cover.cases, 0])
+  // the minimum cover + sources unchanged + adapter audit + sampled property
+  assert.deepEqual([clean.tests, clean.fail], [4 + emitted.verification.cover.cases, 0])
   assert.equal(JSON.parse(clean.output.match(/\{"fastCheck":.*\}/)[0]).fastCheck.executed, 50)
 
   await writeFile(join(dir, 'async-mutant.adapter.mjs'), asyncSearchAdapter('reduceWithoutStaleCheck'))
@@ -669,13 +736,13 @@ test('[bend] async adapter: the generated test awaits it, disposes every case an
   })
   const hung = runGenerated(join(dir, 'hang', 'search.oracle.test.mjs'))
   assert.equal(hung.status, 1)
-  // the Respond-free cases pass — one exhaustive trace and the all-Issue cover case — and every other case fails at
-  // its first Respond step
+  // the one Respond-free cover trace passes, and every other case — and the sample — fails at its first Respond step;
+  // the report-only probe test records the timeouts and passes
   const cover = hanging.verification.cover.cases
-  assert.deepEqual([hung.tests, hung.fail], [13 + cover, 10 + cover - 1])
+  assert.deepEqual([hung.tests, hung.fail], [4 + cover, cover])
   assert.match(
     hung.output,
-    /ADAPTER_TIMEOUT: step 4 \(Respond\{id:1\}\) of Issue · Issue · Issue · Respond\{id:1\} did not settle within 50ms/,
+    /ADAPTER_TIMEOUT: step \d \(Respond\{id:\d\}\) of [^\n]*Respond\{id:\d\} did not settle within 50ms/,
   )
   assert.doesNotMatch(hung.output, /previous case leaked/)
 })
@@ -870,14 +937,14 @@ test('[bend] emit-trace --package adds the joint cases; only they catch a defect
   const base = { package: 'oracle.package.json', cwd: dir, row: 'O1', runs: 50, bin, regenerate: 'test' }
   const emitted = await emitTrace({ ...base, adapter: join(dir, 'pager.adapter.mjs'), out: join(dir, 'generated') })
   // the package names the model, the prefix and the bound; the cross-check chooses 4 joint cases for 33 pairs
-  assert.deepEqual(emitted.verification.exhaustive, { cases: 51, bound: 3, complete: true })
+  assert.deepEqual(emitted.verification.modelSpace, { cases: 51, bound: 3, complete: true })
   assert.deepEqual(emitted.verification.joint, { required: 33, covered: 33, cases: 4 })
   const testFile = join(dir, 'generated', 'grid.oracle.test.mjs')
   assert.match(await readFile(testFile, 'utf8'), /"coordinates":\{"entry":/)
   const clean = runGenerated(testFile)
   assert.equal(clean.status, 0, clean.output)
-  // 51 traces + the cover + 4 joint cases + sources unchanged + adapter audit + the sampled property
-  assert.deepEqual([clean.tests, clean.fail], [51 + emitted.verification.cover.cases + 4 + 3, 0])
+  // the minimum cover (not the 51 traces) + 4 joint cases + sources unchanged + adapter audit + sampled property + probes
+  assert.deepEqual([clean.tests, clean.fail], [emitted.verification.cover.cases + 4 + 4, 0])
 
   // every trace and cover case runs on the default full page, so the mutant passes them all; the joint case on the
   // empty page with a late response is the one that fails

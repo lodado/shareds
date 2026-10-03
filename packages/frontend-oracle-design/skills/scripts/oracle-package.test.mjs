@@ -717,7 +717,8 @@ test('[bend] end to end: lock the projected card, RED on the wrong reducer, VALI
     bin,
     regenerate: 'test',
   })
-  const lateCase = '[O4] [M8e56dbd72890] Issue · Issue · Respond{id:2} · Respond{id:1}'
+  // the late-response trace is still in the minimum cover (T, not the exhaustive space's M): the same trace hashes to the same digits
+  const lateCase = '[O4] [T8e56dbd72890] Issue · Issue · Respond{id:2} · Respond{id:1}'
   await writeFile(
     join(oracleDirectory, 'evidence.json'),
     JSON.stringify({ schemaVersion: 1, rows: { O4: { kind: 'test', name: lateCase } } }),

@@ -300,12 +300,11 @@ export const COVER_BASIS =
   'a configuration is the model state, the allowed events, and the events allowed one step later; histories that differ only deeper are merged'
 
 /**
- * 전이 커버 — 도달 가능한 구성(모델 상태 + 환경이 허용하는 사건 + 각 사건 한 걸음 뒤에 허용되는 사건)마다 허용 사건 전부를 한 번씩. 각 구성은 너비 우선의 가장
- * 짧은 접근 trace로 닿고, 그 trace에 사건 하나를 이은 것이 커버 case다. bound 안의 trace는 공간이 이미 전부 돌므로 bound를
- * 넘는 case만 남긴다. 유한 모델이면 모든 구성을 덮고 closed다. 상태가 끝없이 자라 상한에 걸리면 capped: bound 안에서 닿는
- * 구성까지만 덮고(그 너머는 fast-check 표본의 몫이다) 그 깊이를 보고한다.
+ * 구성 그래프 — 너비 우선으로 구성(모델 상태 + 허용 사건 + 각 사건 한 걸음 뒤 허용 사건)을 처음 닿은 이력으로 합쳐 간선을 모은다.
+ * next(history)는 과거 전체를 읽는다 — 상태와 지금 허용 사건이 같아도 각 사건 뒤에 허용되는 사건이 다르면 다른 구성이다.
+ * 각 구성의 trace는 가장 짧은 접근 이력이고, 간선은 그 trace에 사건 하나를 이은 것이다.
  */
-export function transitionCover(model, space, { maxConfigurations = MAX_COVER_CONFIGURATIONS } = {}) {
+function configurationGraph(model, maxConfigurations) {
   const allowedAfter = (raw) => {
     const seenEvents = new Set()
     return listItems(model.next(listOf(raw))).filter((event) => {
@@ -315,42 +314,59 @@ export function transitionCover(model, space, { maxConfigurations = MAX_COVER_CO
       return true
     })
   }
-  // 처음 닿은 구성만 줄에 넣는다(너비 우선이므로 가장 짧은 접근). 구성의 깊이 = 접근 trace의 길이다.
+  const nodes = []
   const seen = new Set()
-  const firstVisit = (node) => {
+  const visit = (node) => {
     const allowed = allowedAfter(node.raw)
-    // next(history)는 과거 전체를 읽는다 — 상태와 지금 허용 사건이 같아도 각 사건 뒤에 허용되는 사건이 다르면 다른 구성이다
     const ahead = allowed.map((event) => allowedAfter([...node.raw, event]).map(toPlain))
     const key = stableStringify({ state: toPlain(node.state), allowed: allowed.map(toPlain), ahead })
-    if (seen.has(key)) return null
+    if (seen.has(key)) return
     seen.add(key)
-    return { ...node, allowed }
+    nodes.push({ ...node, allowed, edges: [] })
   }
-  const cases = []
+  visit({ raw: [], trace: [], state: model.init(), observations: [] })
   let pairs = 0
   let expanded = 0
-  const queue = [firstVisit({ raw: [], trace: [], state: model.init(), observations: [] })]
-  while (queue.length > 0 && expanded < maxConfigurations) {
-    const node = queue.shift()
-    expanded += 1
+  for (; expanded < nodes.length && expanded < maxConfigurations; expanded += 1) {
+    const node = nodes[expanded]
     pairs += node.allowed.length
     for (const event of node.allowed) {
       const state = model.step(node.state, event)
-      const next = {
+      const observation = toPlain(model.observe(state))
+      const child = {
         raw: [...node.raw, event],
         trace: [...node.trace, toPlain(event)],
         state,
-        observations: [...node.observations, toPlain(model.observe(state))],
+        observations: [...node.observations, observation],
       }
-      if (next.trace.length > space.bound)
-        cases.push({ trace: next.trace, observations: next.observations, depth: node.trace.length })
-      const child = firstVisit(next)
-      if (child) queue.push(child)
+      node.edges.push({ event: toPlain(event), observation, trace: child.trace, observations: child.observations })
+      visit(child)
     }
   }
   // 줄에 남은 구성이 있으면 상한에 걸린 것이다 — 그 앞 깊이까지는 전부 덮었다
-  const capped = queue.length > 0 ? queue[0].trace.length - 1 : null
+  const capped = nodes.length > expanded ? nodes[expanded].trace.length - 1 : null
+  return { nodes: nodes.slice(0, expanded), expanded, pairs, capped }
+}
+
+/**
+ * 전이 커버 — 도달 가능한 구성마다 허용 사건 전부를 한 번씩. 각 구성은 너비 우선의 가장 짧은 접근 trace로 닿고, 그 trace에 사건
+ * 하나를 이은 것이 커버 case다. bound 안의 trace는 공간이 이미 전부 돌므로 bound를 넘는 case만 남긴다. 유한 모델이면 모든
+ * 구성을 덮고 closed다. 상태가 끝없이 자라 상한에 걸리면 capped: bound 안에서 닿는 구성까지만 덮고(그 너머는 fast-check
+ * 표본의 몫이다) 그 깊이를 보고한다. 모델 수준의 가능한 케이스 보고에 쓴다 — 제품에 돌리는 집합은 minimalCover다.
+ */
+export function transitionCover(model, space, { maxConfigurations = MAX_COVER_CONFIGURATIONS } = {}) {
+  const { nodes, expanded, pairs, capped } = configurationGraph(model, maxConfigurations)
   const coveredDepth = capped === null ? null : Math.min(capped, space.bound)
+  const cases = nodes
+    .flatMap((node) => node.edges.map((edge) => ({ ...edge, depth: node.trace.length })))
+    .filter(({ trace, depth }) => trace.length > space.bound && (coveredDepth === null || depth <= coveredDepth))
+    .map(({ trace, observations }) => ({
+      id: `C${sha256(stableStringify(trace)).slice(0, 12)}`,
+      label: trace.map(eventLabel).join(' · '),
+      trace,
+      observations,
+    }))
+    .sort((left, right) => left.trace.length - right.trace.length || (left.label < right.label ? -1 : Number(left.label > right.label)))
   return {
     status: capped === null ? 'closed' : 'capped',
     basis: COVER_BASIS,
@@ -362,15 +378,148 @@ export function transitionCover(model, space, { maxConfigurations = MAX_COVER_CO
           coveredDepth,
           reason: `more than ${maxConfigurations} configurations — the model state grows without bound; every configuration within depth ${coveredDepth} is covered, fast-check samples past it`,
         }),
-    cases: cases
-      .filter(({ depth }) => coveredDepth === null || depth <= coveredDepth)
-      .map(({ trace, observations }) => ({
-        id: `C${sha256(stableStringify(trace)).slice(0, 12)}`,
-        label: trace.map(eventLabel).join(' · '),
-        trace,
-        observations,
-      }))
-      .sort((left, right) => left.trace.length - right.trace.length || (left.label < right.label ? -1 : Number(left.label > right.label))),
+    cases,
+  }
+}
+
+// 값이 이만큼 이하로 갈리면 값마다 하나의 동치류, 넘으면 경계값 다섯(low·low+1·mid·high-1·high)으로 접는다
+const ENUM_CLASSES = 5
+export const MINIMAL_BASIS =
+  'every event class, every event × state class pair and every observed class — a class is one value of a small domain, or one of low, low+1, mid, high-1, high of a wide one; arrays count by length'
+
+/**
+ * [경로, 값] 잎. 객체는 필드로 펼치고(`$` 포함 — 합 타입의 갈래도 한 잎이다) 배열은 길이만 센다. 생성된 테스트에도
+ * `toString()`으로 실린다(그래서 바깥 이름을 참조하지 않는다).
+ */
+export function leaves(value, path, found = []) {
+  if (Array.isArray(value)) found.push([`${path}.length`, value.length])
+  else if (value !== null && typeof value === 'object')
+    for (const [key, field] of Object.entries(value)) leaves(field, `${path}.${key}`, found)
+  else found.push([path, value])
+  return found
+}
+
+function compareValues(left, right) {
+  if (typeof left === 'number' && typeof right === 'number') return left - right
+  return stableStringify(left) > stableStringify(right) ? 1 : -1
+}
+
+/** 경로마다 관측한 값들로 동치류 이름 함수를 만든다 — 값 하나가 어느 류인지는 같은 경로의 다른 값에 달렸다. */
+function classifier(observed) {
+  const names = new Map()
+  for (const [path, values] of observed) {
+    const distinct = [...new Map(values.map((value) => [stableStringify(value), value])).values()].sort(compareValues)
+    const last = distinct.length - 1
+    const rank = (index) => {
+      if (index === 0) return 'low'
+      if (index === 1) return 'low+1'
+      if (index === last) return 'high'
+      return index === last - 1 ? 'high-1' : 'mid'
+    }
+    const classOf = (value, index) => [stableStringify(value), distinct.length <= ENUM_CLASSES ? stableStringify(value) : rank(index)]
+    names.set(path, new Map(distinct.map(classOf)))
+  }
+  const table = Object.fromEntries([...names].map(([path, byValue]) => [path, Object.fromEntries(byValue)]))
+  return { classOf: ([path, value]) => `${path}=${names.get(path).get(stableStringify(value))}`, table }
+}
+
+/** 요구 항목: 구성마다 허용 사건의 (사건 류, 관측 류, 사건 류 × 상태 류). 값의 류는 요구 구성 전체에서 본 값들로 정한다. */
+function itemsByEdge(required) {
+  const stateLeaves = new Map(required.map((node) => [node, leaves(toPlain(node.state), 'state')]))
+  const eventLeaves = (edge) => leaves(edge.event, edge.event.$ ?? 'event')
+  const observed = new Map()
+  const note = ([path, value]) => observed.set(path, [...(observed.get(path) ?? []), value])
+  for (const node of required) {
+    stateLeaves.get(node).forEach(note)
+    for (const edge of node.edges) {
+      eventLeaves(edge).forEach(note)
+      leaves(edge.observation, 'observation').forEach(note)
+    }
+  }
+  const { classOf, table } = classifier(observed)
+  const itemsOf = (node, edge) => {
+    const states = stateLeaves.get(node).map(classOf)
+    const events = eventLeaves(edge).map(classOf)
+    const observations = leaves(edge.observation, 'observation').map(classOf)
+    return [...events, ...observations, ...events.flatMap((event) => states.map((state) => `${event} × ${state}`))]
+  }
+  return { itemsOf, table }
+}
+
+/** 후보 = 구성의 간선 하나(접근 trace + 사건). 한 후보는 접근 trace가 지나는 모든 단계의 항목과 마지막 사건의 항목을 덮는다. */
+function coverCandidates(required, itemsOf) {
+  const candidates = []
+  const upTo = new Map([[required[0], new Set()]])
+  const nodeOf = new Map(required.map((node) => [stableStringify(node.trace), node]))
+  for (const node of required) {
+    for (const edge of node.edges) {
+      const items = new Set([...upTo.get(node), ...itemsOf(node, edge)])
+      candidates.push({ trace: edge.trace, observations: edge.observations, items, gain: Infinity })
+      const child = nodeOf.get(stableStringify(edge.trace))
+      if (child && !upTo.has(child)) upTo.set(child, items)
+    }
+  }
+  return candidates.sort(
+    (left, right) => left.trace.length - right.trace.length || compareValues(stableStringify(left.trace), stableStringify(right.trace)),
+  )
+}
+
+/** 탐욕 집합 덮개 — 새로 덮는 항목이 가장 많은 후보부터. gain은 줄기만 하므로 이전 값이 최선 이하인 후보는 다시 세지 않는다. */
+function greedyCover(candidates) {
+  const uncovered = new Set(candidates.flatMap(({ items }) => [...items]))
+  const chosen = []
+  while (uncovered.size > 0) {
+    let best = null
+    for (const candidate of candidates) {
+      if (best && candidate.gain <= best.gain) continue
+      candidate.gain = [...candidate.items].filter((item) => uncovered.has(item)).length
+      if (!best || candidate.gain > best.gain) best = candidate
+    }
+    chosen.push(best)
+    best.items.forEach((item) => uncovered.delete(item))
+  }
+  return chosen
+}
+
+/** 다른 선택 trace의 앞부분인 trace는 그 trace가 이미 지난다 — 마운트 수만 늘린다. */
+function dropPrefixes(chosen) {
+  const keys = chosen.map(({ trace }) => trace.map(stableStringify))
+  const isPrefix = (short, long) => short.length < long.length && short.every((key, index) => key === long[index])
+  return chosen.filter((_, index) => !keys.some((other) => isPrefix(keys[index], other)))
+}
+
+/**
+ * 제품에 돌릴 최소 집합 — 동치 분할과 경계값으로 접은 요구 항목(사건 류, 사건 류 × 상태 류 쌍, 관측 류)을 모두 덮는 가장 작은
+ * trace 묶음이다. 후보는 구성마다의 최단 접근 trace + 사건 하나(항상 환경이 허용하는 이력)이고, 한 trace는 지나는 모든 단계의
+ * 항목을 덮는다. 탐욕으로 가장 많이 새로 덮는 후보부터 고르고, 다른 선택 trace의 앞부분인 trace는 버린다. 모든 전이를 도는
+ * 전이 커버보다 약한 주장이다 — 항목 사이의 3-way 상호작용과 깊은 이력은 fast-check 표본의 몫이다.
+ * ponytail: 탐욕 집합 덮개(최적 아님)·접두사 병합만 한다. 서로 접두사가 아닌 trace를 한 긴 trace로 잇는 일은 마운트 수가 문제일 때 추가한다.
+ */
+export function minimalCover(model, space, { maxConfigurations = MAX_COVER_CONFIGURATIONS } = {}) {
+  const { nodes, expanded, capped } = configurationGraph(model, maxConfigurations)
+  const coveredDepth = capped === null ? null : Math.min(capped, space.bound)
+  const required = nodes.filter((node) => coveredDepth === null || node.trace.length <= coveredDepth)
+  const { itemsOf, table } = itemsByEdge(required)
+  const candidates = coverCandidates(required, itemsOf)
+  const items = [...new Set(candidates.flatMap((candidate) => [...candidate.items]))].sort()
+  const cases = dropPrefixes(greedyCover(candidates))
+    .map(({ trace, observations }) => ({
+      id: `T${sha256(stableStringify(trace)).slice(0, 12)}`,
+      label: trace.map(eventLabel).join(' · '),
+      trace,
+      observations,
+    }))
+    .sort((left, right) => left.trace.length - right.trace.length || compareValues(left.label, right.label))
+  return {
+    status: capped === null ? 'closed' : 'capped',
+    basis: MINIMAL_BASIS,
+    configurations: expanded,
+    items: items.length,
+    // 생성된 테스트가 표본의 각 단계를 같은 류로 세려면 류 이름표와 항목 목록이 필요하다
+    classes: table,
+    itemList: items,
+    ...(capped === null ? {} : { coveredDepth }),
+    cases,
   }
 }
 
