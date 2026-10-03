@@ -594,7 +594,14 @@ test('locks all approved Delivery sources once instead of extending an existing 
 })
 
 test('keeps feedback routing and evidence tied to the locked revision', async () => {
-  const [skill, implementationLoop] = await Promise.all([read('SKILL.md'), readDelivery()])
+  const [skill, common, implementationLoop] = await Promise.all([
+    read('SKILL.md'),
+    read('references/common.md'),
+    readDelivery(),
+  ])
+
+  // The entry loads common first; classifications stay with that canonical owner, not a prose copy.
+  assert.match(skill, /common\.md.*Feedback routing/)
 
   for (const classification of [
     'POLICY_GAP',
@@ -604,7 +611,7 @@ test('keeps feedback routing and evidence tied to the locked revision', async ()
     'ENVIRONMENT_DEFECT',
     'NON_ORACLE_OPINION',
   ]) {
-    assert.match(skill, new RegExp(classification))
+    assert.match(common, new RegExp(classification))
     assert.match(implementationLoop, new RegExp(classification))
   }
 
@@ -1433,7 +1440,7 @@ test('always loads advanced compiler contracts with type work and keeps adoption
   assert.equal(advancedNode?.when, ADVANCED_TYPES_LOAD_CONDITION)
   assert.deepEqual(advancedNode?.requires, ['types-api-surface'])
   assert.equal(byId.get('types-state-ladder').requires.includes('types-advanced-contracts'), false)
-  assert.match(skill, /type-fest\/TypeScript contract guidance.*before Draft\/lock/s)
+  assert.match(skill, /type-fest\/TypeScript guidance.*before Draft\/lock/s)
 
   assert.match(advancedContracts, /AI-authored public type contract rejectable by the compiler/)
   assert.match(advancedContracts, /One `@ts-expect-error` line per axis/)
@@ -1746,8 +1753,14 @@ test('forces one entry-node read and a lane header before any other work', async
 
   // 설명·플랜 전용 요청도 같은 절차 — 이전 실패 모드
   assert.match(skill, /only \*\*explain in words\*\*.*inside this\s+procedure too/s)
-  assert.match(skill, /"Already known", "the spec is detailed enough", "no code changes", "write\s+the\s+tests now"\s+and\s+"the code already exists" are not skip reasons/)
-  assert.match(skill, /existing code is verified through\s+the same interview, model, Draft and lock before any test is written/)
+  assert.match(
+    skill,
+    /"Already known", "the spec is detailed enough", "no code changes", "write\s+the\s+tests now"\s+and\s+"the code already exists" are not skip reasons/,
+  )
+  assert.match(
+    skill,
+    /existing code is verified through\s+the same interview, model, Draft and lock before any test is written/,
+  )
 
   // Low lane도 같은 헤더를 낸다
   assert.match(lane, /[Pp]rint the lane header (?:as|on) the first line/)
@@ -1760,7 +1773,7 @@ test('forces one entry-node read and a lane header before any other work', async
   assert.match(graph.entryContract.appliesTo, /explanation·plan-only requests/)
 })
 
-test('inlines the required reference reads into the mode steps instead of a separate section', async () => {
+test('inlines design reads and delegates delivery reads to the selected runtime guide, not the catalog', async () => {
   const skill = await read('SKILL.md')
   const designOnly = skill.slice(skill.indexOf('### Design-only'), skill.indexOf('### Delivery'))
   const delivery = skill.slice(skill.indexOf('### Delivery'), skill.indexOf('## Feedback routing'))
@@ -1774,10 +1787,18 @@ test('inlines the required reference reads into the mode steps instead of a sepa
   assert.match(designOnly, /\[`card\/card-format\.md`\]/)
   assert.match(designOnly, /10\. Read \[`card\/confirmation-lock\.md`\]/)
   assert.match(designOnly, /lane header's `risk` is finalized here/)
-  assert.match(delivery, /read \[`delivery\/ledger\.md`\][\s\S]*\[`delivery\/red\.md`\]/)
+  assert.match(delivery, /read \[`delivery\/ledger\.md`\]/)
+  assert.match(delivery, /current-step `guide` above at entry, resume, and after each transition/)
+  assert.match(skill, /guide --dir <dir> --to <target>/)
+  const ledger = await read('references/delivery/ledger.md')
+  assert.match(ledger, /Read its missing primary references in dependency order/)
+  assert.match(ledger, /reviewer references belong in the independent review context/)
 
   // 카탈로그 섹션은 실행 순서를 소유하지 않는다
-  assert.match(skill, /inlined into each step of\s+"Mode selection" own execution order/)
+  assert.match(
+    skill,
+    /inlined into each step of\s+"Mode selection" and the selected Delivery guide own execution order/,
+  )
 })
 
 test('gates the draft card on a context-free read that collapses to one root and its first nail', async () => {
@@ -2027,26 +2048,40 @@ test('enumerates the declared case space by machine and dispositions every gener
   assert.match(visualSkill, /축을 몰라도 불변식 위반은 관측면에 뜬다/)
 })
 
-test('keeps the runtime reference prose in sync with the graph that owns the load conditions', async () => {
+test('covers every reference through typed routing or the manual catalog without leaking reviewer ownership', async () => {
   const [skill, graphSource] = await Promise.all([read('SKILL.md'), read('references/reference-graph.json')])
   const graph = JSON.parse(graphSource)
+  const { routeReferences } = await import('./oracle-reference-route.mjs')
+  const routed = routeReferences(graph, { point: 'scope-decision' })
+  const manualIds = new Set(
+    Object.values(routed.manualConditions)
+      .flat()
+      .map(({ id }) => id),
+  )
 
-  // 정본은 그래프의 when, SKILL의 산문은 런타임 투영 — 지울 중복이 아니다
-  assert.match(graph.description, /Each node's when is the canonical load condition/)
-  assert.match(graph.description, /the copy is a projection, not a duplicate to delete/)
-  assert.match(skill, /owns each node's `when` as the canonical load condition/)
-  assert.match(skill, /a projection of the graph, kept in sync by\s+`skill-contract\.test\.mjs`/)
+  // Typed routes execute only their declared decision points; uncompiled prose is never false.
+  assert.match(graph.description, /typed route fields are executable projections/)
+  assert.match(graph.description, /Uncompiled conditions remain manual/)
+  assert.match(skill, /oracle-reference-route\.mjs/)
+  assert.match(skill, /uncompiled `when` rules remain manual/)
+  assert.match(skill, /Routing is partial, advisory/)
 
   // primary agent가 읽지 않는 노드는 명시적으로 위임 표시한다 — 조용한 opt-out 불가
   const delegated = graph.nodes.filter((node) => node.loader).map((node) => `${node.id}:${node.loader}`)
   assert.deepEqual(delegated.sort(), [
+    'delivery-protocol-spec:script',
     'oracle-workflow-graph:graph-tooling',
     'review-checklist:reviewer',
     'types-review-criteria:reviewer',
   ])
 
-  // 나머지 노드는 전부 SKILL 산문에 나타난다 — 그래프에만 추가하면 실패한다
+  // Uncompiled agent nodes must still be visible in both the router remainder and the catalog.
   for (const node of graph.nodes) {
+    if (node.route) {
+      assert.equal(manualIds.has(node.id), false)
+      continue
+    }
+    assert.equal(manualIds.has(node.id), true, `${node.id} lost its manual load condition`)
     if (node.loader) continue
     const relative = node.path.replace(/^references\//, '')
     assert.ok(skill.includes(relative), `SKILL.md must state the load condition for node ${node.id}`)
@@ -2071,7 +2106,12 @@ test('discovery closure is evidence inside Delivery, never a second approval or 
   assert.match(discovery, /The tool\s+never writes a decision/)
 
   // 판정은 runner 상태가 되지 않는다 — 상태 기계는 oracle-run 하나다
-  for (const verdict of ['CLOSED_WITH_BOUNDS', 'PRODUCT_COMPLETE_WITH_BOUNDS', 'RUNTIME_REOPENED', 'EXPANSION_REQUIRED'])
+  for (const verdict of [
+    'CLOSED_WITH_BOUNDS',
+    'PRODUCT_COMPLETE_WITH_BOUNDS',
+    'RUNTIME_REOPENED',
+    'EXPANSION_REQUIRED',
+  ])
     assert.doesNotMatch(runner, new RegExp(verdict), verdict)
 
   // 보고서는 모델 패키지가 있을 때만 판정을 싣고, 잔여 위험은 한 줄 라벨이 아니라 항목별로 싣는다
@@ -2481,7 +2521,10 @@ test('the space cross-check compares the declared space with the Bend space and 
     read('scripts/oracle-discovery.mjs'),
   ])
   assert.match(discovery, /## Space cross-check — the declared space against the Bend space/)
-  assert.match(discovery, /the findings are\s+candidates, never a verdict, and the declared table never becomes a second source of truth/)
+  assert.match(
+    discovery,
+    /the findings are\s+candidates, never a verdict, and the declared table never becomes a second source of truth/,
+  )
   assert.match(discovery, /\| `cross-term` +\| a world axis and a behavior axis that no joint case can run together/)
   assert.match(caseSpace, /Keep the confirmed axes in it as a `## Case space` table/)
   assert.match(tool, /export function crossCheckSpace/)
@@ -2489,12 +2532,18 @@ test('the space cross-check compares the declared space with the Bend space and 
   const skill = await read('SKILL.md')
   assert.match(skill, /`card --repo-policies`, `cross-check`, `--case-space`/)
   assert.match(skill, /`oracle-discovery\.mjs cross-check --package` and bring each candidate back to the interview/)
-  assert.match(caseSpace, /each candidate comes back here — a `new-axis` or a `cross-term` as an\s+A\/B question, a `silent-decision` as a policy question/)
+  assert.match(
+    caseSpace,
+    /each candidate comes back here — a `new-axis` or a `cross-term` as an\s+A\/B question, a `silent-decision` as a policy question/,
+  )
   // the lock gate and the joint cases that turn an independence claim into a test
   assert.match(caseSpace, /Card lint fails `cross-check-undecided` — so the\s+card cannot be locked/)
   assert.match(discovery, /covered by a joint case — a setting the assumptions allow/)
   assert.match(discovery, /closure runs the joint cases in its trace conformance/)
-  const [bend, verifier] = await Promise.all([read('references/bend-cross-verification.md'), read('scripts/oracle-verify.mjs')])
+  const [bend, verifier] = await Promise.all([
+    read('references/bend-cross-verification.md'),
+    read('scripts/oracle-verify.mjs'),
+  ])
   assert.match(bend, /`init\(coordinates\)` starts the product on that setting/)
   assert.match(bend, /ADAPTER_JOINT_UNSUPPORTED/)
   assert.match(verifier, /crossCheckAtRoot/)
@@ -2524,9 +2573,18 @@ test('the docs name the pre-lock stage machine, the hold and the partial state t
   const skill = await read('SKILL.md')
   const space = await read('references/card/case-space.md')
   const discovery = await read('references/discovery.md')
-  assert.match(skill, /Walk the stages with\s+`scripts\/oracle-stage\.mjs`: `begin`, then `advance --to MODELED \| CHECKED \| DRAFTED`/)
-  assert.match(skill, /refuses a package oracle that is not at `DRAFTED` on the same package\s+bytes, and only that script writes `stage\.json`/)
-  assert.match(skill, /\| `PARTIAL_VERIFIED`\s+\| the same review passed over the locked scope while a hold is still open\s+\|/)
+  assert.match(
+    skill,
+    /Walk the stages with\s+`scripts\/oracle-stage\.mjs`: `begin`, then `advance --to MODELED \| CHECKED \| DRAFTED`/,
+  )
+  assert.match(
+    skill,
+    /refuses a package oracle that is not at `DRAFTED` on the same package\s+bytes, and only that script writes `stage\.json`/,
+  )
+  assert.match(
+    skill,
+    /\| `PARTIAL_VERIFIED`\s+\| the same review passed over the locked scope while a hold is still open\s+\|/,
+  )
   assert.match(skill, /With an open hold `REVIEW_VERIFIED` is refused \(`HOLDS_OPEN`\)/)
   assert.match(skill, /write no test or production code for the held rows/)
   assert.match(space, /## Holds — a question that blocks only part of the scope/)
@@ -2539,17 +2597,26 @@ test('the docs ask the open cells before modelling, design the proof by scope, a
   const skill = await read('SKILL.md')
   const bend = await read('references/bend-cross-verification.md')
   const lifecycle = await read('references/lifecycle-adaptation.md')
-  assert.match(skill, /Put the cells the sources leave open in front of the user before\s+writing the model, not while writing it/)
+  assert.match(
+    skill,
+    /Put the cells the sources leave open in front of the user before\s+writing the model, not while writing it/,
+  )
   assert.match(skill, /run scope that shares no Term,\s+state or file as parallel slices/)
   assert.match(bend, /Ask before modelling, not while modelling\. A Bend model is total/)
   assert.match(bend, /a\s+late success after a timeout, cancel or route exit; a late failure after a\s+success/)
-  assert.match(bend, /Each cell is one of `source` \(quote the `S\*`\), `default`\s+\(an approved project default\) or `question`/)
+  assert.match(
+    bend,
+    /Each cell is one of `source` \(quote the `S\*`\), `default`\s+\(an approved project default\) or `question`/,
+  )
   assert.match(bend, /a recommendation the user did not approve is never a default/)
   assert.match(bend, /Design the proof before the first Bend file/)
   assert.match(bend, /Never pick a policy inside the model to make a\s+law provable/)
   assert.match(bend, /a fixed trace is not all traces/)
   assert.match(lifecycle, /## Parallel slices/)
-  assert.match(lifecycle, /Bend model → lock → generated tests →\s+`VALID_RED` → implementation, and production writes stay denied until `VALID_RED`/)
+  assert.match(
+    lifecycle,
+    /Bend model → lock → generated tests →\s+`VALID_RED` → implementation, and production writes stay denied until `VALID_RED`/,
+  )
   assert.match(lifecycle, /independent GREENs are never reported as whole-feature completion/)
 })
 
@@ -2558,7 +2625,15 @@ test('the docs name the async cells the MODELED gate checks and the slice-scoped
   const bend = await read('references/bend-cross-verification.md')
   const lifecycle = await read('references/lifecycle-adaptation.md')
   assert.match(bend, /`asyncCells: \[\{operation, cells\}\]`/)
-  for (const cell of ['late-success-after-cancel', 'late-failure-after-success', 'older-response-after-newer', 'duplicate-completion', 'lost-response', 'retry-while-pending', 'unmount-before-settle'])
+  for (const cell of [
+    'late-success-after-cancel',
+    'late-failure-after-success',
+    'older-response-after-newer',
+    'duplicate-completion',
+    'lost-response',
+    'retry-while-pending',
+    'unmount-before-settle',
+  ])
     assert.match(bend, new RegExp(`\`${cell}\``))
   assert.match(bend, /`oracle-stage\.mjs advance --to MODELED` refuses a package that leaves any cell undecided/)
   assert.match(lifecycle, /Give each slice its own scan root/)

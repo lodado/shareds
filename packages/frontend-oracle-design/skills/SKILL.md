@@ -7,6 +7,8 @@ allowed-tools:
 
 # Frontend Oracle Design
 
+**Last Updated:** 2026-10-03
+
 Frontend Oracle is not an implementation generator. It is a delivery/evidence harness that preserves
 approved frontend behavior and visual intent as `Outcome Brief → Source Registry → contract rows →
 revision lock → ledger state transitions`. New work reaches the contract rows model-first: sources and
@@ -14,11 +16,36 @@ two readings → a Bend model package → axes derived from the model → counte
 projected from the model for approval (`bend-cross-verification.md` §2). References own the detailed
 rules; this file is the operator map.
 
+## Executable delivery contract
+
+[`delivery.protocol.json`](references/delivery.protocol.json) is the machine-readable source of
+ledger transition edges, target reference roots, and conditional CLI input obligations. Its closed
+`oracle-delivery/v1` language is compiled by `scripts/oracle-protocol.mjs`; `oracle-run.mjs`
+uses the same rules for transition execution and the `status`/`guide` projections. For example,
+the actual `VALID_RED` row obligation is:
+
+```json
+{
+  "id": "red-row",
+  "when": { "any": [{ "eq": ["from", "VALID_RED"] }, { "eq": ["milestoneCount", 0] }] },
+  "flags": ["--row"]
+}
+```
+
+This is executable data, not pseudocode: the predicate decides whether that input is required.
+It does not establish that the row or its evidence is valid. The runner still owns deep evidence,
+lock, TDD and independent-review checks, at their existing rejection points. Human policy,
+source interpretation and design judgment remain in the references; Bend verifies the modeled
+product behavior, not this entire delivery process. The contract grants no filesystem permissions
+and is not a claim of complete formal verification. Read the
+[grammar and boundaries](references/delivery-protocol.md) when inspecting or changing the contract;
+ordinary operation still begins with the entry rule below.
+
 ## Entry — always first
 
 1. **After the skill loads, the first tool call is a Read of exactly one lane entry node.** The `Skill`
    call is the activation, not a step of this rule. Read [`common.md`](references/common.md) for every risk; the
-   low-fast-path node is legacy-only and must not be used for new work. Repo exploration, answer drafting, any
+   low-fast-path node is legacy-only and must not be used for new work (`lanes/low-fast-path.md`). Repo exploration, answer drafting, any
    other tool call, and any other reference load all come after it.
 2. **Print the lane header as the first line of the response.** Writing body text without the
    header is a violation.
@@ -52,11 +79,9 @@ rules; this file is the operator map.
 
 Lane routing:
 
-- **All risks** enter the Oracle lane through [`common.md`](references/common.md), then load
-  [`mandatory-verification.md`](references/mandatory-verification.md) before Draft/lock. Low no
-  longer has a new-work fast path; `lanes/low-fast-path.md` only documents legacy records.
-- An explicit Oracle request or Medium/High starts from [`common.md`](references/common.md). Risk
-  taxonomy, authority priority, policy sources, and feedback routing are canonical in `common.md`.
+- After the scope gate, all risks load [`mandatory-verification.md`](references/mandatory-verification.md)
+  before investigation choices, Draft/lock. Risk, authority, policy sources and feedback routing
+  belong to the already-loaded `common.md`.
 - For requests that only need general architecture or FSD (Feature-Sliced Design) folder advice, do
   not auto-invoke this skill on its own.
 
@@ -64,13 +89,10 @@ Lane routing:
 
 ### User-facing progress
 
-- After the required lane header, summarize the goal, scope, and expected artifacts in the user's
-  language. Follow the five message shapes in `common.md`; progress is informational, not approval.
+- Follow `common.md`'s User communication contract.
 - In the Oracle lane, after source investigation and before writing the plan or Draft, run the Space discovery
   interview in `card/case-space.md`: propose the axes, ask the counterexample questions, and freeze the answers
   before any Bend. Read that node with its dependencies at this point, not only after contract rows are drafted.
-- Report meaningful changes only. Keep facts, assumptions, recommendations, and ledger-backed results
-  distinct; the existing Final report remains authoritative for completion evidence and state.
 - When explaining material implementation choices, state the choice, current-code rationale, and
   applied skill section actually read, with short illustrative type or code examples where useful.
   Follow the [explanation guidance](references/delivery/implementation-decision.md#explain-material-choices)
@@ -80,8 +102,6 @@ Lane routing:
   `oracle-run.mjs review-brief` derives a read-only evidence index from the current packet and
   ledger-bound findings. It never approves policy, proves usability, or advances delivery; see
   `delivery/green-review.md` for the command and its limitations.
-- Low is not a separate new-work lane. Existing legacy records may retain their historical low-fast-path
-  report, but every new invocation loads common and mandatory verification before Draft/lock.
 
 ### Document-driven progress
 
@@ -100,8 +120,6 @@ Lane routing:
 - Oracle owns only the `Outcome Brief`, `Source Registry`, approved contracts, revision locks, and
   state transitions. `$test` owns test writing and judgment, `$frontend-visual-qa` owns screenshots
   and direct browser runs, `$frontend-system-design` owns per-feature implementation options.
-- Production code, existing tests, and browser observation are investigation evidence, not policy
-  sources. Unresolved policy is `POLICY_GAP` → `NEEDS_DECISION`.
 - When a trigger applies, perform one **source-aware fresh review** before approval: compare the
   verbatim user messages and approved source excerpts with every affected card decision. Record
   each item as a linked P/O/D row, Open question, or justified N/A. This supplements (and never
@@ -138,15 +156,26 @@ Lane routing:
 - Delivery state transitions are recorded only via `scripts/oracle-run.mjs transition`. Iteration
   budgets are counted by `oracle-run.mjs budget`. Card-row evidence goes into `evidence.json` and
   is checked against actual run results with `scripts/oracle-verify.mjs evidence`.
-- Forbidden: weakening assertions, `test.skip`, arbitrary sleeps, adopting current browser behavior
-  as the expected value, inventing states·transitions·policies not on the card.
+- `common.md`'s Common prohibitions apply throughout.
 
 ## Reference loading — graph
 
 References are nodes declared in [`reference-graph.json`](references/reference-graph.json), which
-owns each node's `when` as the canonical load condition. The bullets below restate those conditions
-because this file is what gets read at runtime — they are a projection of the graph, kept in sync by
-`skill-contract.test.mjs`, not a duplicate to collapse.
+owns load conditions: typed `route` rules are executable; uncompiled `when` rules remain manual.
+The catalog below preserves those manual conditions and stage-specific commands. Before a scoped
+decision, model/package authoring, or protocol inspection, use the read-only router:
+
+```sh
+node scripts/oracle-reference-route.mjs --point <scope-decision|model-authoring|package-authoring|protocol-inspection> --json
+```
+
+At `scope-decision`, optional `--facts <json-file>` supplies `architectureBoundaryChange` (including
+state ownership/public API), `backendBoundaryChange` (including DB/data-access), and `performanceClaim`
+(requirement or improvement), each `true`, `false` or `"unknown"`. Missing facts load conservatively;
+set `false` only from inspected scope. Load returned references with their dependencies, respecting
+reader ownership, and apply `manualConditions` through the catalog; `--include <id>` resolves a manual
+node's dependencies. Routing is partial, advisory, never permission or a substitute for entry, mode
+order or re-read rules.
 
 `bundles/` optionally joins reference nodes in dependency-first order with the same bytes and a
 stable prefix. Use a `-continued` bundle only when its header's assumed nodes are already loaded;
@@ -155,22 +184,21 @@ Bundles are a delivery mechanism, never an authority. Never hand-edit `bundles/`
 and regenerate with `scripts/generate-reference-bundles.mjs`; `--check` detects drift.
 
 Delivery bundles are **entry only**: common rules and `delivery/ledger.md`, not all later phases.
-After init, run `oracle-run.mjs status --dir <dir>` at entry, resume, and after a rejection. Select
-the current action, read its listed references with dependencies if not already loaded, and run
-the printed command with actual inputs. Do not load every future action's references. Conditional
-architecture, backend, type, and visual guidance below still applies. Status is advisory;
-`transition` rechecks the gates and only success advances the state. Follow the rejection code and
-recovery hint, never bypass it by editing state or evidence.
+After init or on resume, run `oracle-run.mjs guide --dir <dir>`, select a legal target, then request
+`guide --dir <dir> --to <target>`. Follow that current-step guide, reading its missing primary
+references with dependencies; reviewer reads belong in the independent review context. Do not load
+every future step. Conditional architecture, backend, type, and visual loads below still apply.
+Guide is read-only advice, not approval, a PASS or a transition. `transition` rechecks every gate;
+only a successful transition advances state. Rejection recovery is in `delivery/ledger.md`; never edit state or
+evidence to bypass a gate.
 
-Every invocation that passes the scope gate loads [`mandatory-verification.md`](references/mandatory-verification.md) immediately
-after `common.md`, before Draft/lock, for both Low and Medium/High and for Design-only and Delivery.
-Bend and positive-count fast-check evidence are mandatory; type-fest/TypeScript evidence is mandatory
-when the card has an exposed type boundary. Labels or plans alone are not evidence. Re-read the node
-before verification and review.
+Re-read `mandatory-verification.md` before verification and review; it owns stack applicability
+and evidence requirements.
 
 Read `when` as the decision point, not the deliverable stage. If applicability is ambiguous, load.
 Whether to skip a load is not a judgment call. The read instructions inlined into each step of
-"Mode selection" own execution order; do not defer to this section to proceed through a step.
+"Mode selection" and the selected Delivery guide own execution order; do not defer to this
+catalog to proceed through a step.
 
 Conditional execution guidance stays at the existing owner nodes: check confirmation-lock on a
 revision mismatch. In Delivery only, check delivery/ledger before an uncertain command or scope-changing recovery;
@@ -181,6 +209,8 @@ instructions. For a reusable execution observation,
 use card/retro-metrics' candidate review after immediate existing feedback routing. These conditions
 apply at every risk; Low has no new-work carve-out.
 
+- When inspecting or changing the executable delivery protocol, read
+  [`delivery-protocol.md`](references/delivery-protocol.md) for its grammar, interpretation and limits.
 - Only when a graph-orchestrated delivery loop is explicitly requested: load and invoke the
   installed `$agent-graph-engineering` skill by name, read
   [`graph-orchestration.md`](references/graph-orchestration.md) in full, then execute the bundled
@@ -252,11 +282,9 @@ apply at every risk; Low has no new-work carve-out.
   [`frontend/quality.md`](references/frontend/quality.md). For React architecture boundary, state
   ownership, or public API changes:
   [`architecture-contract.md`](references/architecture-contract.md).
-- Types and state: when the card has an exposed type boundary — exported Props, a shared/package API,
-  a client state union or a trust-boundary type — load the type-fest/TypeScript contract guidance and
-  compiler witness path before Draft/lock. A card with none declares `typeContract` not applicable in
-  the model package with the investigated paths (`## Type Contract` on the card); no type-fest utility
-  is invented to fill the slot. Before async·ordering·duplicate-submit·retry·multi-step `O*` rows, or client
+- Types and state: with an exposed type boundary, load the type-fest/TypeScript guidance and compiler
+  witness path below before Draft/lock, per mandatory verification. Before
+  async·ordering·duplicate-submit·retry·multi-step `O*` rows, or client
   state·exported Props·shared/package API·trust boundary type changes, read
   [`types/state-ladder.md`](references/types/state-ladder.md),
   [`types/authoring.md`](references/types/authoring.md),
@@ -286,9 +314,8 @@ apply at every risk; Low has no new-work carve-out.
   [`references/performance.md`](references/performance.md).
 - Prefer the network test boundary the repo already uses. If MSW is installed or its adoption is
   approved, keep handlers and example data at the nearest owner — no root concentration. Never
-  silently add test-only dependencies: a dependency the verification stack needs and the target
-  lacks is one approval item in the Draft (package, version, owning `package.json`), added only
-  after `yes` and never during Design-only.
+  silently add test-only dependencies. For mandatory verification's dependency approval item,
+  identify the package, version and owning `package.json` in the Draft.
 - If the `frontend-system-design` skill is installed, read only its references while keeping Oracle
   intake and control. Every choice is a policy candidate; anything that cannot be mapped to an
   approved source or user answer is `POLICY_GAP` → `NEEDS_DECISION`. Document recommendations are
@@ -432,64 +459,40 @@ When implementation, test-based self-verification, and subagent review are expli
 3. After all outcome-changing decisions including architecture·backend and local source
    finalization: card lint → create the final lock once with the same source set. Never extend an
    existing lock — confirm and lock a new revision.
-4. Pin the repo's real required command labels with `oracle-run.mjs init --required-label`,
-   creating the run ledger and state files. Run `oracle-run.mjs status --dir <dir>` for the current
-   action's reads and command; call `transition` (or the combined `red`/`green` command) at every
-   state change. The revision lock is auto-verified immediately before each stage.
-5. Read [`delivery/red.md`](references/delivery/red.md) with its dependencies.
-   Invoke the `$test` skill explicitly right before writing test files; write and run tests first.
-   Map the reporter's failing test names to card rows; only a run that passes
-   `oracle-verify.mjs red` and then records `oracle-run.mjs transition --to VALID_RED` is
-   `VALID_RED`.
-6. Only `VALID_RED` may edit production: record the implementation decision and any material
+4. Pin the repo's real required command labels with `oracle-run.mjs init --required-label`, then
+   use the current-step `guide` above at entry, resume, and after each transition. It supplies the
+   selected target's instructions and command example; supply real inputs. The revision lock is
+   auto-verified before each stage.
+5. Invoke the `$test` skill explicitly right before writing test files; write and run tests first.
+   Only recorded `VALID_RED` may edit production. The `ORACLE_READY` → `IMPLEMENTED_GREEN`
+   `ALREADY_SATISFIED` path performs zero-production verification and approves no production edits.
+   After `VALID_RED`, record the implementation decision and any material
    [responsibility assignment](references/delivery/implementation-decision.md#responsibility-assignment)
-   with `frontend/authoring.md`, then minimal implementation →
-   GREEN. `ALREADY_SATISFIED` performs zero-production verification only and approves no production
-   edits. After the first relevant test pass, before final evidence, apply the bounded simplification
+   with `frontend/authoring.md`, then implement minimally. After the first relevant test pass,
+   before final evidence, apply the bounded simplification
    in [`delivery/green-review.md`](references/delivery/green-review.md#bounded-simplification).
-   Either GREEN path records `oracle-run.mjs transition --to IMPLEMENTED_GREEN` exactly once
-   first. The impact scope is machine-fed, not judged: the required label `impact` runs the repo's
-   related-tests command over `oracle-run.mjs status --changed-files`. The transition itself runs
-   `oracle-verify.mjs scan --side-effects --oracle <card>` and the plain `scan` over every production
-   file changed since init, on the lines new since init: each code side effect must be owned by a card row or exempted with
-   `oracle:side-effect`, each dimension family it mines declared on the card or cited in that
-   family's exclusion, and no nondeterminism or test-environment branch may be left unexempted.
+   Record `IMPLEMENTED_GREEN` exactly once; resume from it, never record it again.
    For an optional fresh implementation context after `VALID_RED`, use the existing runner's
    [task-scoped worker path](references/delivery/ledger.md#optional-task-scoped-implementation-worker).
    It is independent of graph opt-in and does not replace review or bypass mandatory verification.
-7. High risk: the sibling `test` skill's mutation kill·revert·re-GREEN first. With a model package, at
-   every risk, run `oracle-discovery.mjs close --package <pkg> --dir <dir>` next
-   ([`discovery.md`](references/discovery.md)): an open candidate or a failing level goes back through
-   a human decision and a new revision — never into the locked card — and the verdict with its
-   residual-risk list goes into the report. Run it again before the final report.
-8. The Controller generates raw review input and assignment/dispatch with `oracle-run.mjs review-packet`.
-   Reviewers return findings only; the Controller/join creates the `oracle-run.mjs review-receipt`
-   ledger event and passes the receipt identity/digest to `oracle-verify.mjs review` and the final
-   verify.
-9. Terminal: `IMPLEMENTED_GREEN` or `REVIEW_VERIFIED`; unresolved policy after init records
-   `oracle-run.mjs transition --to NEEDS_DECISION` with a structured decision and runId. Recording
-   it neither reopens nor edits the locked card: it records why the run stopped, so record it even
-   when the user said not to revise the card or ask questions. Before
-   init, preserve policy evidence and the decision only and create no runId. If judgment is
+6. After GREEN, use the review target's guide and required nodes for High mutation checks,
+   independent `oracle-run.mjs review-packet` review, Controller-issued `review-receipt` records
+   and post-GREEN reruns. Reviewers return findings only, never their own approval. With a model
+   package, run discovery closure after `IMPLEMENTED_GREEN` and again before the final report as
+   required above; findings that change policy need a human decision and a new revision, never
+   edits to the locked card.
+7. Follow Feedback routing and Status for stop/resume behavior: visual-pending stops at
+   `IMPLEMENTED_GREEN`; open holds block `REVIEW_VERIFIED`. Unresolved policy after init requires a
+   structured decision and the `NEEDS_DECISION` transition/runId even if the user forbids revising
+   the card or asking questions. Recording it neither reopens nor edits the locked card.
+   Before init, preserve the decision and evidence without creating a runId. If judgment is
    impossible, `FAIL` with the actual error.
 
 ## Feedback routing
 
-Canonical definitions live in [`common.md`](references/common.md). Record exactly one primary cause
-per established finding; unresolved candidates remain investigation/journal `needs-evidence`.
-Discovery without a card row is allowed; policy changes still require the existing confirmation.
-
-| Classification       | Route                                                         |
-| -------------------- | ------------------------------------------------------------- |
-| `POLICY_GAP`         | print the current card and questions → `NEEDS_DECISION`       |
-| `EVIDENCE_GAP`       | add tests·mappings within the locked card scope               |
-| `HARNESS_DEFECT`     | repair within `$test` allowances and `budget --spend harness` |
-| `PRODUCT_DEFECT`     | production improvement budget after `VALID_RED`               |
-| `ENVIRONMENT_DEFECT` | `FAIL` without touching production                            |
-| `NON_ORACLE_OPINION` | record only; never blocks policy or completion                |
-
-Budgets: policy 2, harness 2, product 3. On `BUDGET_EXHAUSTED`, `FAIL` with the last actual
-failure.
+Use [`common.md`](references/common.md)'s Feedback routing, including candidate handling and
+budget exhaustion. Harness repairs remain within `$test` allowances. Budgets: policy 2, harness 2,
+product 3.
 
 ## Delivery states
 

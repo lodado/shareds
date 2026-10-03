@@ -145,15 +145,17 @@ test('the scope gate stops work with no modelable behavior before the stack inst
 })
 
 test('the procedure no longer contradicts itself on lint, dependencies and type guidance', async () => {
-  const skill = await read('SKILL.md')
+  const [skill, mandatory] = await Promise.all([read('SKILL.md'), read('references/mandatory-verification.md')])
   // the pre-lock model and card checks are named, not forbidden
   assert.doesNotMatch(skill, /no\s+lint,\s+lock,\s+tests,\s+or\s+production edits/)
   assert.match(skill, /Only\s+the pre-lock checks this procedure names run/)
-  // a stack dependency is one Draft approval item, never installed during Design-only
-  assert.match(skill, /one approval item in the Draft \(package, version, owning `package\.json`\)/)
-  assert.match(skill, /never during Design-only/)
+  // The already-loaded stack owner carries approval timing; the entry retains manifest detail.
+  assert.match(skill, /mandatory verification's dependency approval item/)
+  assert.match(skill, /package, version and owning `package\.json` in the Draft/)
+  assert.match(mandatory, /dependency is one approval item in the Draft/)
+  assert.match(mandatory, /Design-only records it as unavailable until approved\s+and installs nothing/)
   // type guidance follows the exposed type boundary, so no node pulls the type ladder into every run
-  assert.match(skill, /when the card has an exposed type boundary/)
+  assert.match(mandatory, /when the card has an exposed type boundary/)
   assert.doesNotMatch(skill, /unconditionally load the type-fest/)
   const graph = JSON.parse(await read('references/reference-graph.json'))
   assert.match(
@@ -165,7 +167,10 @@ test('the procedure no longer contradicts itself on lint, dependencies and type 
 test('the scope gate sorts a request three ways: no behavior, an unrepresentable domain, a mix', async () => {
   const skill = await read('SKILL.md')
   assert.match(skill, /\*\*None of that\*\*/)
-  assert.match(skill, /\*\*Behavior whose domain Bend cannot represent\*\*[\s\S]*?unsupported domain and ends `NEEDS_DECISION`/)
+  assert.match(
+    skill,
+    /\*\*Behavior whose domain Bend cannot represent\*\*[\s\S]*?unsupported domain and ends `NEEDS_DECISION`/,
+  )
   assert.match(skill, /\*\*A mix\*\*/)
   // a missing source is asked for, never guessed
   assert.match(skill, /asked for in that\s+report, never guessed/)
@@ -214,11 +219,20 @@ test('time decides the stack: Order or Async needs the behavior model and fast-c
     read('references/delivery/ledger.md'),
     read('references/delivery/green-review.md'),
   ])
-  assert.match(contract, /The behavior model\s+\(MODEL, LAWS, PROOF\) and fast-check apply when time is part of the space/)
+  assert.match(
+    contract,
+    /The behavior model\s+\(MODEL, LAWS, PROOF\) and fast-check apply when time is part of the space/,
+  )
   assert.match(contract, /\| World +\| Without a behavior model: every possible coordinate setting run on the product/)
   assert.match(contract, /`world-conformance:reported`/)
-  assert.match(bend, /behavior model \(`MODEL\.bend`, `LAWS\.bend`, `PROOF\.bend`\) is required when the Order or Async family is\s+part of the space/)
+  assert.match(
+    bend,
+    /behavior model \(`MODEL\.bend`, `LAWS\.bend`, `PROOF\.bend`\) is required when the Order or Async family is\s+part of the space/,
+  )
   assert.match(bend, /oracle-projection\.mjs emit-world/)
-  assert.match(ledger, /A card without a `## Formal Model` registers `bend-adequacy:reported`, `world-conformance:reported`/)
+  assert.match(
+    ledger,
+    /A card without a `## Formal Model` registers `bend-adequacy:reported`, `world-conformance:reported`/,
+  )
   assert.match(green, /needs `bend-adequacy:reported` and `world-conformance:reported` instead/)
 })

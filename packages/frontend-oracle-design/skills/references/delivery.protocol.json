@@ -1,0 +1,83 @@
+{
+  "language": "oracle-delivery/v1",
+  "transitions": {
+    "ORACLE_READY": ["VALID_RED", "IMPLEMENTED_GREEN", "NEEDS_DECISION", "FAIL"],
+    "VALID_RED": ["VALID_RED", "IMPLEMENTED_GREEN", "NEEDS_DECISION", "FAIL"],
+    "IMPLEMENTED_GREEN": ["REVIEW_VERIFIED", "PARTIAL_VERIFIED", "NEEDS_DECISION", "FAIL"],
+    "REVIEW_VERIFIED": ["NEEDS_DECISION", "FAIL"],
+    "PARTIAL_VERIFIED": ["NEEDS_DECISION", "FAIL"],
+    "NEEDS_DECISION": ["ORACLE_READY", "FAIL"],
+    "FAIL": []
+  },
+  "targets": {
+    "ORACLE_READY": {
+      "kind": "resume",
+      "readNodes": ["card-confirmation-lock"],
+      "obligations": [{ "id": "run", "when": true, "flags": ["--run"] }]
+    },
+    "VALID_RED": {
+      "kind": "red",
+      "readNodes": ["delivery-ledger", "delivery-red"],
+      "obligations": [
+        { "id": "run", "when": true, "flags": ["--run"] },
+        { "id": "red-evidence", "when": true, "flags": ["--evidence"] },
+        {
+          "id": "red-row",
+          "when": { "any": [{ "eq": ["from", "VALID_RED"] }, { "eq": ["milestoneCount", 0] }] },
+          "flags": ["--row"]
+        }
+      ]
+    },
+    "IMPLEMENTED_GREEN": {
+      "kind": "green",
+      "readNodes": ["delivery-ledger", "delivery-implementation-decision", "delivery-green-review"],
+      "obligations": [
+        { "id": "run", "when": true, "flags": ["--run"] },
+        { "id": "green-evidence", "when": true, "flags": ["--evidence"] },
+        { "id": "skip-red-reason", "when": { "eq": ["from", "ORACLE_READY"] }, "flags": ["--reason"] }
+      ]
+    },
+    "REVIEW_VERIFIED": {
+      "kind": "review",
+      "readNodes": ["delivery-green-review", "subagent-review", "review-checklist"],
+      "obligations": [
+        { "id": "run", "when": true, "flags": ["--run"] },
+        { "id": "review-evidence", "when": true, "flags": ["--evidence", "--findings"] },
+        { "id": "review-packet", "when": true, "flags": ["--packet", "--revision"] },
+        { "id": "review-intersect", "when": { "eq": ["risk", "high"] }, "flags": ["--intersect"] },
+        { "id": "review-mutation", "when": { "eq": ["risk", "high"] }, "flags": ["--mutation-run", "--mutation-row"] },
+        {
+          "id": "review-blind",
+          "when": { "eq": ["blindMappingRequired", true] },
+          "flags": ["--blind-input", "--blind-map"]
+        }
+      ]
+    },
+    "PARTIAL_VERIFIED": {
+      "kind": "review",
+      "readNodes": ["delivery-green-review", "subagent-review", "review-checklist"],
+      "obligations": [
+        { "id": "run", "when": true, "flags": ["--run"] },
+        { "id": "review-evidence", "when": true, "flags": ["--evidence", "--findings"] },
+        { "id": "review-packet", "when": true, "flags": ["--packet", "--revision"] },
+        { "id": "review-intersect", "when": { "eq": ["risk", "high"] }, "flags": ["--intersect"] },
+        { "id": "review-mutation", "when": { "eq": ["risk", "high"] }, "flags": ["--mutation-run", "--mutation-row"] },
+        {
+          "id": "review-blind",
+          "when": { "eq": ["blindMappingRequired", true] },
+          "flags": ["--blind-input", "--blind-map"]
+        }
+      ]
+    },
+    "NEEDS_DECISION": {
+      "kind": "escape",
+      "readNodes": [],
+      "obligations": [{ "id": "stop-reason", "when": true, "flags": ["--reason"] }]
+    },
+    "FAIL": {
+      "kind": "escape",
+      "readNodes": [],
+      "obligations": [{ "id": "stop-reason", "when": true, "flags": ["--reason"] }]
+    }
+  }
+}

@@ -1,7 +1,7 @@
 {
   "id": "frontend-oracle-design-reference-graph",
   "version": 1,
-  "description": "Conditionally loaded reference node graph. The entry risk judgment selects the lane: every risk takes the common entry and mandatory-verification stack; low-fast-path is retained only as a legacy compatibility record. When a node when is satisfied, load its full path together with its requires edges, and do not load unrelated nodes. Each node's when is the canonical load condition. SKILL.md restates them as prose on purpose, because the agent reads SKILL.md at runtime and may never open this file — the copy is a projection, not a duplicate to delete, and skill-contract.test.mjs fails when a loader:agent node is missing from that section.",
+  "description": "Conditionally loaded reference node graph. Every risk takes the common entry and mandatory-verification stack; low-fast-path is retained only as a legacy compatibility record. Each node's when is the canonical descriptive load condition. Optional typed route fields are executable projections at named decision points; oracle-reference-route.mjs includes unknown conditions conservatively and resolves requires edges. Uncompiled conditions remain manual in the SKILL.md catalog, never silently false. Routing is advice, not policy approval or a replacement for entry order. Contract tests cover both routing behavior and manual catalog coverage.",
   "entry": "common",
   "entryContract": {
     "firstToolCall": "After the Skill load, Read exactly one lane entry node — common for every risk (low-fast-path is legacy-only)",
@@ -79,6 +79,20 @@
     }
   ],
   "nodes": [
+    {
+      "id": "delivery-protocol",
+      "route": { "at": ["protocol-inspection"], "if": true },
+      "path": "references/delivery-protocol.md",
+      "when": "when inspecting or changing the executable delivery protocol",
+      "requires": []
+    },
+    {
+      "id": "delivery-protocol-spec",
+      "path": "references/delivery.protocol.json",
+      "when": "oracle-run.mjs command startup — compile before dispatch",
+      "loader": "script",
+      "requires": []
+    },
     {
       "id": "low-fast-path",
       "path": "references/lanes/low-fast-path.md",
@@ -214,6 +228,7 @@
     },
     {
       "id": "architecture-contract",
+      "route": { "at": ["scope-decision"], "if": { "eq": ["architectureBoundaryChange", true] } },
       "implementationInput": "conditional",
       "path": "references/architecture-contract.md",
       "when": "architecture boundary·state ownership·public API change",
@@ -270,6 +285,7 @@
     },
     {
       "id": "backend",
+      "route": { "at": ["scope-decision"], "if": { "eq": ["backendBoundaryChange", true] } },
       "implementationInput": "conditional",
       "path": "references/backend.md",
       "when": "before a backend·DB·data-access boundary change",
@@ -277,6 +293,7 @@
     },
     {
       "id": "performance",
+      "route": { "at": ["scope-decision"], "if": { "eq": ["performanceClaim", true] } },
       "implementationInput": "conditional",
       "path": "references/performance.md",
       "when": "performance requirement·improvement claim",
@@ -309,6 +326,7 @@
     },
     {
       "id": "model-patterns",
+      "route": { "at": ["model-authoring"], "if": true },
       "path": "references/model-patterns.md",
       "when": "writing or revising MODEL.bend, LAWS.bend or PROOF.bend — rules instead of answer tables, laws that pin every result, proofs by case or induction; time as events, attempts, error sum types and separate effect counts",
       "requires": ["common"]
@@ -321,6 +339,7 @@
     },
     {
       "id": "model-package-example",
+      "route": { "at": ["package-authoring"], "if": true },
       "path": "references/model-package.example.json",
       "when": "writing the model package — start from it and replace every value; it passes oracle-package.mjs validate --stage model",
       "requires": []

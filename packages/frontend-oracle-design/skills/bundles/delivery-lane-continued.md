@@ -18,6 +18,20 @@ the full lane bundle instead.
 
 # Delivery — authority·schedule·adjudication command ledger
 
+## Executable contract boundary
+
+[`delivery.protocol.json`](../delivery.protocol.json) owns legal ledger edges, target reference
+roots and conditional input obligations. `scripts/oracle-protocol.mjs` compiles its closed,
+typed predicates; transition execution, `status` and `guide` consume the same contract rather
+than maintain separate rule tables. The [language manual](../delivery-protocol.md) is for
+inspection and changes, not an additional routine delivery load.
+
+An allowed edge and present flags are necessary, not sufficient: the existing runner validates
+their contents, evidence provenance, locks, TDD order and review independence. Obligation checks
+stay at their existing execution sites so the first rejection is not reordered by a preliminary
+flag sweep. Human approval and policy/design judgment remain in their owning prose references.
+Neither the contract nor the guide changes filesystem permissions or proves the whole workflow.
+
 ## Authority and entry conditions
 
 Immediately before writing a test file, explicitly load and invoke the installed `$test` skill by
@@ -110,7 +124,7 @@ sanitized metadata into `--capability-context`. A run that is not in the ledger 
 Use `exec --dir <dir> --label <label> --adapter <node-test|vitest> --report <path> -- <repo command>`
 for reported tests. For an immediate execution/transition pair, `red` or `green` performs the same
 checks in one call; add `--evidence <map>` and RED's `--row <row>`. Discover flags through the
-runner's usage; `status --dir <dir>` supplies state-specific transition commands.
+selected target's `guide --dir <dir> --to <target>` and the runner's usage.
 
 - Only a run that passes a trusted `--adapter` together with `--report` becomes `grade: reported`.
   The trusted adapters are the entries of `TRUSTED_ADAPTERS` in `scripts/oracle-adapters.mjs`:
@@ -145,18 +159,27 @@ runner's usage; `status --dir <dir>` supplies state-specific transition commands
   change.** If something is real production but gitignored, clean up `--scan-root` or the ignore
   settings first.
 
-## Status query and resume
+## Current-step guide and resume
 
-Run `node <skill-dir>/scripts/oracle-run.mjs status --dir <dir>` after init, on resume, or after
-rejection. It recomputes from the lock, state, ledger, budget and evidence; it creates no new state.
-The default output lists the current state, blockers, and each legal action's command and
-dependency-closed reference paths. Read only the chosen action's missing references; conditional
-loads still apply. Do not pre-read all later phases.
+After init or on resume, run `node <skill-dir>/scripts/oracle-run.mjs guide --dir <dir>` for the
+current state and legal target IDs. It never chooses a target by readiness. Select one, then run
+`guide --dir <dir> --to <target>` for its purpose, write boundary, steps, observed blockers, flags,
+candidate runs and command example. Read its missing primary references in dependency order;
+reviewer references belong in the independent review context. Both lists close dependencies from
+the reference graph. Conditional loads still apply; do not pre-read future phases.
 
-`status --json` retains the machine packet (`nextLegalActions`, `nextActions`, `requires`,
-`candidateRuns`, primary `readNodes`, `example`); JSON consumers resolve reference dependencies.
-Neither view is a verdict: `transition` repeats every check. Escape actions `NEEDS_DECISION` and
-`FAIL` remain available; their presence is not a recommendation to abandon recoverable work.
+After a rejection, pass the actual code to `guide --dir <dir> --to <target> --rejection <CODE>`;
+`guide --rejection <CODE>` also works without run state. Uppercase diagnostic codes reuse the
+runner's recovery hints, including its generic status advice when no specific hint exists. The
+code is caller-supplied, never a stored or inferred last rejection; advice does not prove it occurred.
+Use `--json` on either form for machine output. Guide creates no artifacts and changes no budgets;
+it is advisory, never approval, a PASS or a transition. `transition` repeats the gates. A
+`NEEDS_DECISION` or `FAIL` stop can record observed lock faults without accepting the changed
+revision; progress and resume remain blocked by drift. Listing an escape does not recommend
+abandoning recoverable work. Never relock or edit evidence to force acceptance.
+
+`status` remains the detailed diagnostic view, with unchanged `--json`, `--changed-files` and
+`--check-report` behavior; the guide does not replace report validation.
 
 A stale run no longer matches the current lock/worktree/production snapshot. An `orphanedRun` has
 an ID reservation but no completion record. Neither is reusable: run a fresh `exec`, never edit a
