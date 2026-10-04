@@ -160,6 +160,28 @@ test('controller links and explicitly invokes every sibling role and external te
   ], 'controller')
 })
 
+test('initial or preliminary investigation cannot defer the intake handoff until a later turn', () => {
+  const text = entry('frontend-oracle-design')
+  const entryGate = text.split('## Mode selection and explicit role invocation')[0]
+  assert.match(entryGate, /before any source investigation or Outcome Brief/i)
+  assert.match(entryGate, /invoke[^\n]*\$oracle-intake/)
+  assert.match(entryGate, /preliminary|first investigation/i)
+  assert.match(entryGate, /(?:do not|never)[^\n]*(?:defer|postpone)/i)
+  assert.match(entryGate, /(?:blocked|unavailable)[\s\S]{0,180}(?:stop|return)/i)
+  assert.match(entryGate, /Read without offset or limit/)
+})
+
+test('intake loads its current-stage dependencies before even a preliminary brief', () => {
+  const text = entry('oracle-intake')
+  assert.match(text, /even if the controller read it/i)
+  assert.match(text, /before source inspection or any preliminary brief/i)
+  for (const path of ['card/policy-sources.md', 'card/risk-grill.md', 'roles/space-discovery.md', 'roles/case-space-inputs.md', 'bva.md']) {
+    assert.ok(localLinks(entryPath('oracle-intake'), text).includes(join(core, 'references', path)), `intake directly names current-stage dependency ${path}`)
+  }
+  assert.match(text, /same turn/i)
+  assert.match(text, /Read without offset or limit/)
+})
+
 for (const name of names.slice(1)) {
   test(`${name} cannot bootstrap missing prerequisites or grant itself authority`, () => {
     const text = roleContract(name)

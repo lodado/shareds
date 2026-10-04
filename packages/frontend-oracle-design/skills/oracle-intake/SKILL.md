@@ -11,6 +11,8 @@ allowed-tools:
 
 After activation, the first tool call is a Read of
 [`common.md`](../frontend-oracle-design/references/common.md), before exploration or other reference loads.
+Re-read it even if the controller read it earlier in this conversation. Skill activation starts this gate again.
+For required reference nodes, use Read without offset or limit. Keep source-code investigation reads bounded.
 Print `risk=<Low|Medium|High> lane=oracle nodes=[node ids actually Read]` first.
 Only actually Read nodes belong in the header. This applies to explanation and plan-only work too.
 
@@ -28,6 +30,13 @@ Common authority, mandatory verification and shared budgets apply at every risk,
 ## Procedure
 
 Read [intake procedure](../frontend-oracle-design/references/roles/intake.md) at investigation start.
+Before source inspection or any preliminary brief, axes or questions, finish its current-stage reads
+in the same turn: [policy sources](../frontend-oracle-design/references/card/policy-sources.md),
+[risk grill](../frontend-oracle-design/references/card/risk-grill.md),
+[Space discovery](../frontend-oracle-design/references/roles/space-discovery.md),
+[input families](../frontend-oracle-design/references/roles/case-space-inputs.md) and
+[BVA](../frontend-oracle-design/references/bva.md). Do not postpone these dependencies until Draft.
+If a required read is unavailable, return the blocker, not substitute intake output.
 
 1. Re-read current sources and run documents from disk. Establish Outcome Brief and Source Registry,
    separating approved policy and mandatory/project constraints from implementation observations.

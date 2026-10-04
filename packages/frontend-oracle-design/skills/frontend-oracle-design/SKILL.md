@@ -19,6 +19,8 @@ One canonical runtime, reference graph and ledger serve all roles. No role has i
    Read [`common.md`](references/common.md) for every risk. The low-fast-path node is legacy-only.
    The Skill call is activation, not this read. Repo exploration, answer drafting, any other tool call,
    and any other reference load all come after it.
+   Required reference nodes need their full bodies: use Read without offset or limit.
+   Keep source-code investigation reads bounded. A prefix or headings alone cannot satisfy a node.
 2. **Print the lane header as the first line of the response.** Body text without the header is a violation:
    `risk=<Low|Medium|High> lane=oracle nodes=[node ids actually Read]`.
    List only the nodes **actually Read**, never planned reads or a bundle name.
@@ -43,6 +45,11 @@ One canonical runtime, reference graph and ledger serve all roles. No role has i
    General architecture or FSD folder advice alone: do not auto-invoke this skill on its own.
 6. Read [loading rules](references/roles/loading.md) for reference routing, stage-time dependencies,
    fresh-context and bundle rules, disk/journal discipline and protocol boundaries.
+7. **Before any source investigation or Outcome Brief** for an in-scope request, complete steps 1–6
+   and invoke [`$oracle-intake`](../oracle-intake/SKILL.md). "First investigation", "preliminary" and
+   "read-only" requests are intake work, not a controller-only phase. Do not defer these reads or the
+   role invocation until answers arrive or a later turn. If a required read or invocation is unavailable,
+   stop and report the blocker instead of producing a substitute brief, axes or interview questions.
 
 ## Mode selection and explicit role invocation
 
