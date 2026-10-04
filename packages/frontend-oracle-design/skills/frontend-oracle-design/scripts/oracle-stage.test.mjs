@@ -33,6 +33,22 @@ const stage = (root, directory, command, to) =>
 const lock = (root, directory) =>
   node(root, 'oracle-lock.mjs', ['create', '--oracle', join(directory, 'oracle.md'), '--lock', join(directory, 'oracle.lock.json')])
 
+test('request-only Contract begin binds profile before card exists and rejects a later legacy card', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-contract-begin-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const directory = join(root, 'contract')
+  const started = node(root, 'oracle-stage.mjs', ['begin', '--dir', directory, '--profile', 'contract/v1'])
+  assert.equal(started.status, 0, started.stderr)
+  const bytes = await readFile(join(directory, 'stage.json'))
+  assert.equal(JSON.parse(bytes).verificationProfile, 'contract/v1')
+  assert.equal(JSON.parse(bytes).cardSha256, null)
+  await writeFile(join(directory, 'oracle.md'), '# Legacy card\n')
+  const refused = stage(root, directory, 'advance', 'CHECKED')
+  assert.equal(refused.status, 1)
+  assert.match(refused.stderr, /^PROFILE_MISMATCH:/)
+  assert.deepEqual(await readFile(join(directory, 'stage.json')), bytes)
+})
+
 test('a package oracle cannot be locked without a stage record, before DRAFTED, or on package bytes that changed after it', async (t) => {
   const { root, directory } = await repository(t)
 

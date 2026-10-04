@@ -12,7 +12,8 @@ import {
   sha256,
   snapshotRegularFile,
 } from './oracle-fs.mjs'
-import { assertReadyToLock, markLocked } from './oracle-stage.mjs'
+import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
+import { assertReadyToLock, markLocked, readStage } from './oracle-stage.mjs'
 
 const verifyScript = join(dirname(fileURLToPath(import.meta.url)), 'oracle-verify.mjs')
 
@@ -33,7 +34,7 @@ function parseOptions(args) {
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index]
     const value = args[index + 1]
-    if (!['--oracle', '--lock', '--source', '--dep'].includes(flag) || !value) {
+    if (!['--oracle', '--lock', '--source', '--dep', '--profile'].includes(flag) || !value) {
       throw new CliError('USAGE', `Unknown or incomplete option: ${flag}`, 2)
     }
     if (flag === '--source') options.sources.push(value)
@@ -293,11 +294,53 @@ export async function invalidatedWitnesses(lockPath) {
   return invalidated
 }
 
-async function assertStaged(directory) {
+async function assertStaged(directory, requestedProfile) {
   try {
-    await assertReadyToLock(directory)
+    return await assertReadyToLock(directory, requestedProfile)
   } catch (error) {
     throw new CliError(error.code ?? 'STAGE_GATE', error.message)
+  }
+}
+
+async function stagedAuthorization(directory, requestedProfile, rootDirectory) {
+  const stage = await readStage(directory)
+  const stageSnapshot = stage?.verificationProfile !== undefined ? await snapshot(join(directory, 'stage.json'), 'STAGE_CHANGED', {
+    allowHardlinks: false, base: rootDirectory,
+  }) : null
+  const binding = await assertStaged(directory, requestedProfile)
+  if (binding.kind === 'explicit' && !stageSnapshot) throw new CliError('STAGE_CHANGED', 'Explicit stage appeared during authorization')
+  const authorization = { binding, stageSnapshot, rootDirectory }
+  if (stageSnapshot) {
+    authorization.record = JSON.parse(stageSnapshot.bytes.toString('utf8'))
+    if (binding.profile === 'formal-bend/v1') {
+      authorization.packageSnapshot = await snapshot(join(directory, 'oracle.package.json'), 'STAGE_STALE', {
+        allowHardlinks: false, base: rootDirectory,
+      })
+      if (authorization.packageSnapshot.sha256 !== authorization.record.packageSha256) {
+        throw new CliError('STAGE_STALE', 'Staged package does not match the authorized snapshot')
+      }
+    }
+  }
+  await assertAuthorizationUnchanged(authorization)
+  return authorization
+}
+
+async function assertAuthorizationUnchanged({ stageSnapshot, packageSnapshot, rootDirectory }) {
+  if (packageSnapshot) await assertUnchanged(packageSnapshot, 'STAGE_STALE', { allowHardlinks: false, base: rootDirectory })
+  if (stageSnapshot) await assertUnchanged(stageSnapshot, 'STAGE_CHANGED', { allowHardlinks: false, base: rootDirectory })
+}
+
+function assertAuthorizedCard({ binding, record }, oracleSnapshot) {
+  try {
+    resolveProfileBinding({ bindings: [
+      { artifact: 'staged authorization', profile: binding.profile },
+      { artifact: 'card snapshot', profile: readCardProfile(oracleSnapshot.bytes.toString('utf8')) },
+    ] })
+  } catch (error) {
+    throw new CliError(error.code ?? 'STAGE_GATE', error.message)
+  }
+  if (binding.profile === 'contract/v1' && record?.cardSha256 !== oracleSnapshot.sha256) {
+    throw new CliError('STAGE_STALE', 'Card snapshot differs from the whole approved staged card')
   }
 }
 
@@ -312,7 +355,8 @@ export async function createLock(options) {
     throw new CliError('ORACLE_PATH_INVALID', `Cannot resolve repository root: ${error.message}`)
   })
   // 패키지 경로의 오라클은 인터뷰·모델·검사·Draft 단계를 모두 거친 뒤에만 잠긴다(oracle-stage.mjs)
-  await assertStaged(canonicalLockDirectory)
+  const authorization = await stagedAuthorization(canonicalLockDirectory, options.profile, rootDirectory)
+  const { binding } = authorization
   const oraclePath = resolve(options.oracle)
   const canonicalOracle = await realpath(oraclePath).catch((error) => {
     throw new CliError('ORACLE_PATH_INVALID', `Cannot resolve Oracle: ${error.message}`)
@@ -323,6 +367,7 @@ export async function createLock(options) {
   }
 
   const presentLock = await existingLock(lockPath, lockDirectory, rootDirectory)
+  if (presentLock) resolveProfileBinding({ requestedProfile: options.profile, bindings: [{ artifact: 'card/stage', profile: binding.profile }, { artifact: 'lock', profile: presentLock.manifest.verificationProfile }] })
   const sourceInputs = [...new Set(options.sources)]
   if (sourceInputs.some(isAbsolute)) throw new CliError('INPUT_UNREADABLE', 'Sources must be repository-relative')
   const sourcePaths = sourceInputs.map((path) => resolve(rootDirectory, path))
@@ -330,6 +375,7 @@ export async function createLock(options) {
     allowHardlinks: false,
     base: rootDirectory,
   })
+  assertAuthorizedCard(authorization, oracleSnapshot)
   const sourceSnapshots = await Promise.all(
     sourcePaths.map((path) => snapshot(path, 'INPUT_UNREADABLE', { allowHardlinks: false, base: rootDirectory })),
   )
@@ -338,6 +384,7 @@ export async function createLock(options) {
   const dependencies = await installedDependencies(rootDirectory, options.deps ?? [])
   const manifest = {
     algorithm: 'sha256',
+    ...(binding.kind === 'explicit' ? { verificationProfile: binding.profile } : {}),
     oracle: { path: 'oracle.md', sha256: oracleSnapshot.sha256 },
     schemaVersion: 1,
     sources: sourceSnapshots
@@ -351,6 +398,7 @@ export async function createLock(options) {
     await assertUnchanged(source, 'INPUT_UNREADABLE', { allowHardlinks: false, base: rootDirectory })
   }
 
+  await assertAuthorizationUnchanged(authorization)
   let finalLock
   if (presentLock) {
     if (presentLock.manifest.oracle.sha256 !== manifest.oracle.sha256) throw new CliError('ORACLE_CHANGED', 'Existing lock belongs to different Oracle bytes')
@@ -363,12 +411,18 @@ export async function createLock(options) {
     })
   } else {
     await mkdir(lockDirectory, { recursive: true })
+    await assertUnchanged(oracleSnapshot, 'INPUT_UNREADABLE', { allowHardlinks: false, base: rootDirectory })
+    for (const source of sourceSnapshots) {
+      await assertUnchanged(source, 'INPUT_UNREADABLE', { allowHardlinks: false, base: rootDirectory })
+    }
+    await assertAuthorizationUnchanged(authorization)
     try {
       await writeFile(lockPath, `${JSON.stringify(manifest, null, 2)}\n`, { flag: 'wx' })
     } catch (error) {
       if (error.code !== 'EEXIST') throw error
       const racedLock = await readManifest(lockPath, lockDirectory, 'LOCK_INVALID', rootDirectory)
       if (
+        racedLock.manifest.verificationProfile !== manifest.verificationProfile ||
         racedLock.manifest.oracle.sha256 !== manifest.oracle.sha256 ||
         !sameEntries(racedLock.manifest.sources, manifest.sources) ||
         !sameDependencies(racedLock.manifest.dependencies, manifest.dependencies) ||
@@ -407,6 +461,15 @@ export async function verifyLock(options, hooks = {}) {
   })
   const { manifest, lockSnapshot } = await readManifest(lockPath, canonicalLockDirectory, 'LOCK_INVALID', rootDirectory)
   const oracleSnapshot = await verifyEntry(canonicalLockDirectory, rootDirectory, manifest.oracle, 'ORACLE_CHANGED')
+  const cardProfile = readCardProfile(oracleSnapshot.bytes.toString('utf8'))
+  const authorization = cardProfile ? await stagedAuthorization(canonicalLockDirectory, options.profile, rootDirectory) : null
+  const stage = authorization?.record ?? await readStage(canonicalLockDirectory)
+  resolveProfileBinding({ requestedProfile: options.profile, bindings: [
+    { artifact: 'card', profile: cardProfile },
+    { artifact: 'lock', profile: manifest.verificationProfile },
+    ...(cardProfile || manifest.verificationProfile ? [{ artifact: 'stage', profile: stage?.verificationProfile }] : []),
+  ] })
+  if (authorization) assertAuthorizedCard(authorization, oracleSnapshot)
   const sourceSnapshots = []
   for (const source of manifest.sources) sourceSnapshots.push(await verifyEntry(canonicalLockDirectory, rootDirectory, source, 'SOURCE_CHANGED'))
   await assertCardLintSnapshot(oracleSnapshot, sourceSnapshots, rootDirectory, manifest.witnesses ?? [])
@@ -416,6 +479,7 @@ export async function verifyLock(options, hooks = {}) {
     await assertUnchanged(source, 'SOURCE_CHANGED', { allowHardlinks: false, base: rootDirectory })
   }
   await assertUnchanged(lockSnapshot, 'LOCK_MANIFEST_CHANGED', { allowHardlinks: false, base: rootDirectory })
+  if (authorization) await assertAuthorizationUnchanged(authorization)
   process.stdout.write(`ORACLE_VERIFIED sha256:${manifest.oracle.sha256} manifest-sha256:${lockSnapshot.sha256}\n`)
 }
 

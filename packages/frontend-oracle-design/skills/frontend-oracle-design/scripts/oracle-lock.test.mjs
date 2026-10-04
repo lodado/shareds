@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { Buffer } from 'node:buffer'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { link, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
@@ -7,9 +8,93 @@ import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { fullProductFixture } from '../../../test-fixtures/full-product/fixture.mjs'
 import { verifyLock } from './oracle-lock.mjs'
 
 const script = join(dirname(fileURLToPath(import.meta.url)), 'oracle-lock.mjs')
+
+async function contractFixture(t) {
+  const directory = await mkdtemp(join(tmpdir(), 'oracle-lock-contract-race-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const oracle = join(directory, 'oracle.md')
+  const lock = join(directory, 'oracle.lock.json')
+  const stage = join(directory, 'stage.json')
+  const card = `${fullProductFixture().render()}\n## Verification Profile\n\n- Profile: contract/v1\n`
+  await writeFile(oracle, card)
+  const stageScript = new URL('./oracle-stage.mjs', import.meta.url).pathname
+  for (const args of [['begin'], ['advance', '--to', 'CHECKED'], ['advance', '--to', 'DRAFTED']]) {
+    const result = spawnSync(process.execPath, [stageScript, ...args, '--dir', directory], { encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+  }
+  return { directory, oracle, lock, stage, card }
+}
+
+for (const mutation of ['card', 'profile', 'stage', 'late-stage']) {
+  test(`public create rejects during-operation staged authorization ${mutation} mutation`, async (t) => {
+    const { directory, oracle, lock, stage, card } = await contractFixture(t)
+    const stageBytes = await readFile(stage)
+    const preload = join(directory, 'mutate.mjs')
+    const changedCard = mutation === 'card' ? `${card}\n` : card.replace('contract/v1', 'formal-bend/v1')
+    const changesStage = mutation === 'stage' || mutation === 'late-stage'
+    const mutationScript = changesStage
+      ? `const record = JSON.parse(await fs.readFile(${JSON.stringify(stage)}, 'utf8'))\nrecord.stage = 'DISCOVERING'\nawait fs.writeFile(${JSON.stringify(stage)}, JSON.stringify(record))`
+      : `await fs.writeFile(${JSON.stringify(oracle)}, ${JSON.stringify(changedCard)})`
+    // realpath(oracle.md): readiness -> snapshot. mkdir(directory): after awaited lint/dependency gates.
+    const operation = mutation === 'late-stage' ? 'mkdir' : 'realpath'
+    const target = mutation === 'late-stage' ? directory : oracle
+    await writeFile(preload, `import fs from 'node:fs/promises'
+import { syncBuiltinESMExports } from 'node:module'
+const original = fs.${operation}
+let changed = false
+fs.${operation} = async function(path, ...args) {
+  if (!changed && path === ${JSON.stringify(target)}) {
+    changed = true
+    ${mutationScript}
+  }
+  return original.call(this, path, ...args)
+}
+syncBuiltinESMExports()
+`)
+    const result = spawnSync(process.execPath, ['--import', preload, script, 'create', '--oracle', oracle, '--lock', lock], { cwd: directory, encoding: 'utf8' })
+    assert.notEqual(result.status, 0)
+    const expectedCode = { card: 'STAGE_STALE', profile: 'PROFILE_MISMATCH', stage: 'STAGE_CHANGED', 'late-stage': 'STAGE_CHANGED' }[mutation]
+    assert.match(result.stderr, new RegExp(`^${expectedCode}:`))
+    assert.doesNotMatch(result.stdout, /ORACLE_LOCKED/)
+    await assert.rejects(readFile(lock), { code: 'ENOENT' })
+    if (!changesStage) {
+      assert.deepEqual(await readFile(stage), stageBytes)
+      assert.equal(await readFile(oracle, 'utf8'), changedCard)
+    } else assert.equal(JSON.parse(await readFile(stage)).stage, 'DISCOVERING')
+  })
+}
+
+for (const mutation of ['rewind', 'profile', 'pin', 'replacement']) {
+  test(`verify rejects during-operation explicit stage ${mutation}`, async (t) => {
+    const { oracle, lock, stage } = await contractFixture(t)
+    const created = run('create', '--oracle', oracle, '--lock', lock)
+    assert.equal(created.status, 0, created.stderr)
+    const lockBytes = await readFile(lock)
+    const stageBytes = await readFile(stage)
+    const replacement = `${stage}.replacement`
+    const record = JSON.parse(stageBytes)
+    if (mutation === 'rewind') record.stage = 'DISCOVERING'
+    if (mutation === 'profile') delete record.verificationProfile
+    if (mutation === 'pin') record.cardSha256 = '0'.repeat(64)
+    const changedBytes = mutation === 'replacement' ? stageBytes : Buffer.from(JSON.stringify(record))
+    await writeFile(replacement, changedBytes)
+    let output = ''
+    const originalWrite = process.stdout.write
+    process.stdout.write = (chunk) => { output += chunk; return true }
+    try {
+      await assert.rejects(verifyLock({ lock, sources: [] }, {
+        beforeFinalUnchangedAssertions: () => rename(replacement, stage),
+      }), (error) => error.code === 'STAGE_CHANGED')
+    } finally { process.stdout.write = originalWrite }
+    assert.doesNotMatch(output, /ORACLE_VERIFIED/)
+    assert.deepEqual(await readFile(lock), lockBytes)
+    assert.deepEqual(await readFile(stage), changedBytes)
+  })
+}
 
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex')
@@ -91,6 +176,25 @@ async function fixture(t) {
 
   return { lock, oracle, source, sourcePath }
 }
+
+test('explicit Formal cannot inherit package-less legacy lock bypass', async (t) => {
+  const { lock, oracle, source } = await fixture(t)
+  await writeFile(oracle, `${VALID_CARD}\n## Verification Profile\n\n- Profile: formal-bend/v1\n`)
+  const result = run('create', '--oracle', oracle, '--lock', lock, '--source', source, '--profile', 'formal-bend/v1')
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /^STAGE_NO_PACKAGE:/)
+  await assert.rejects(readFile(lock), { code: 'ENOENT' })
+})
+
+test('legacy lock and card cannot be authorized through requested Contract profile', async (t) => {
+  const { lock, oracle, source } = await fixture(t)
+  assert.equal(run('create', '--oracle', oracle, '--lock', lock, '--source', source).status, 0)
+  const bytes = await readFile(lock)
+  const result = run('create', '--oracle', oracle, '--lock', lock, '--source', source, '--profile', 'contract/v1')
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /^PROFILE_MISMATCH:/)
+  assert.deepEqual(await readFile(lock), bytes)
+})
 
 test('creates and verifies an exact-byte lock', async (t) => {
   const { lock, oracle, source } = await fixture(t)

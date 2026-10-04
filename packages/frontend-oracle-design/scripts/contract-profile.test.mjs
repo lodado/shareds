@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- scoped package tests use node --test.
@@ -10,6 +11,84 @@ import { fullProductFixture } from '../test-fixtures/full-product/fixture.mjs'
 const moduleUrl = new URL('../skills/frontend-oracle-design/scripts/oracle-profile.mjs', import.meta.url)
 const verifier = new URL('../skills/frontend-oracle-design/scripts/oracle-verify.mjs', import.meta.url)
 const profileSection = '\n## Verification Profile\n\n- Profile: contract/v1\n'
+
+test('Contract public stage and lock bind approved whole card without a package', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'oracle-contract-stage-'))
+  const stage = new URL('../skills/frontend-oracle-design/scripts/oracle-stage.mjs', import.meta.url).pathname
+  const lock = new URL('../skills/frontend-oracle-design/scripts/oracle-lock.mjs', import.meta.url).pathname
+  const fixture = fullProductFixture()
+  for (const record of fixture.records) record.scenario.given = { enabled: false }
+  const card = `${fixture.render()}${profileSection}`
+  const oracle = join(directory, 'oracle.md')
+  const manifest = join(directory, 'oracle.lock.json')
+  const loader = `data:text/javascript,${encodeURIComponent("export async function resolve(s,c,n){if(/oracle-(package|model|adequacy|discovery)\\.mjs$|ensure-bend\\.mjs$/.test(s))throw Error('FORMAL_IMPORT_DENIED:'+s);return n(s,c)}")}`
+  const run = (script, ...args) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: `--experimental-loader=${loader}` } })
+  const digest = (bytes) => createHash('sha256').update(bytes).digest('hex')
+  const advance = (to, ...args) => run(stage, 'advance', '--dir', directory, '--to', to, ...args)
+  const create = (...args) => run(lock, 'create', '--oracle', oracle, '--lock', manifest, ...args)
+  try {
+    writeFileSync(oracle, fixture.render())
+    const denied = run(verifier.pathname, 'card', '--oracle', oracle)
+    assert.notEqual(denied.status, 0)
+    assert.match(denied.stderr, /FORMAL_IMPORT_DENIED/)
+    writeFileSync(oracle, card.replace('- Status: approved', '- Status: pending'))
+    let result = run(stage, 'begin', '--dir', directory, '--profile', 'contract/v1')
+    assert.equal(result.status, 0, result.stderr)
+    assert.notEqual(advance('DRAFTED').status, 0)
+    assert.notEqual(advance('MODELED').status, 0)
+    assert.notEqual(advance('CHECKED').status, 0)
+    assert.notEqual(create().status, 0)
+    writeFileSync(oracle, card)
+    assert.notEqual(advance('CHECKED', '--profile', 'formal-bend/v1').status, 0)
+    result = advance('CHECKED')
+    assert.equal(result.status, 0, result.stderr)
+    const checked = JSON.parse(readFileSync(join(directory, 'stage.json'), 'utf8'))
+    assert.equal(checked.cardSha256, digest(card))
+    assert.equal(checked.verificationProfile, 'contract/v1')
+    writeFileSync(oracle, `${card}\n`)
+    assert.notEqual(run(stage, 'rewind', '--dir', directory, '--to', 'CHECKED').status, 0)
+    assert.notEqual(advance('DRAFTED').status, 0)
+    writeFileSync(oracle, card)
+    result = advance('DRAFTED')
+    assert.equal(result.status, 0, result.stderr)
+    assert.notEqual(advance('ORACLE_READY').status, 0)
+    result = create('--profile', 'contract/v1')
+    assert.equal(result.status, 0, result.stderr)
+    const lockedBytes = readFileSync(manifest)
+    assert.equal(JSON.parse(lockedBytes).verificationProfile, 'contract/v1')
+    assert.equal(JSON.parse(lockedBytes).oracle.sha256, digest(card))
+    assert.equal(JSON.parse(readFileSync(join(directory, 'stage.json'), 'utf8')).stage, 'ORACLE_READY')
+    result = create()
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(readFileSync(manifest), lockedBytes)
+    result = run(lock, 'verify', '--lock', manifest)
+    assert.equal(result.status, 0, result.stderr)
+    assert.notEqual(create('--profile', 'formal-bend/v1').status, 0)
+    const stagePath = join(directory, 'stage.json')
+    const stageBytes = readFileSync(stagePath)
+    for (const profile of ['formal-bend/v1', null]) {
+      const changed = JSON.parse(stageBytes)
+      if (profile) changed.verificationProfile = profile
+      else delete changed.verificationProfile
+      writeFileSync(stagePath, JSON.stringify(changed))
+      assert.notEqual(create().status, 0)
+      assert.notEqual(run(lock, 'verify', '--lock', manifest).status, 0)
+      assert.deepEqual(readFileSync(manifest), lockedBytes)
+    }
+    writeFileSync(stagePath, stageBytes)
+    const removed = JSON.parse(lockedBytes)
+    delete removed.verificationProfile
+    writeFileSync(manifest, JSON.stringify(removed))
+    assert.notEqual(create().status, 0)
+    assert.notEqual(run(lock, 'verify', '--lock', manifest).status, 0)
+    writeFileSync(manifest, lockedBytes)
+    writeFileSync(oracle, card.replace('- Source:', '- Changed Source:'))
+    assert.notEqual(create().status, 0)
+    assert.deepEqual(readFileSync(manifest), lockedBytes)
+    writeFileSync(oracle, card.replace(profileSection, ''))
+    assert.notEqual(create().status, 0)
+  } finally { rmSync(directory, { recursive: true, force: true }) }
+})
 
 async function profiles() { return import(moduleUrl) }
 function lint(card, ...args) {

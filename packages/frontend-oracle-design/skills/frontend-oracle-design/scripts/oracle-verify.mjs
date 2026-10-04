@@ -7,7 +7,6 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { inflateSync } from 'node:zlib'
 import { isTrustedAdapter, TRUSTED_ADAPTER_FLAG } from './oracle-adapters.mjs'
-import { adequacyIssues, parseAdequacy, parseTerms } from './oracle-adequacy.mjs'
 import { mineDimensions } from './oracle-dimensions.mjs'
 import { canonicalTuple, generateFromDocument, MAX_STATE_PATHS, TAXONOMY_FAMILIES } from './oracle-frames.mjs'
 import {
@@ -20,8 +19,6 @@ import {
   snapshotRegularFile,
   stableStringify,
 } from './oracle-fs.mjs'
-import { formalModelIssues, parseFormalModel } from './oracle-model.mjs'
-import { generatedBlock, generatedIssues, regenerateAtRoot } from './oracle-package.mjs'
 import { readCardProfile } from './oracle-profile.mjs'
 import { contextGaps, snapshotContext, validateContextReview } from './oracle-review-context.mjs'
 import {
@@ -502,7 +499,7 @@ function undeclaredDimensions(caseSpace, path, content) {
 function chooseContract(card) {
   if (readCardProfile(card) !== 'contract/v1') return false
   const lines = markdownLines(card)
-  if (lines.some((line) => /^## (?:Formal Model|Terms|Adequacy)\s*$/.test(line.trim())) || generatedBlock(card).present || /<!--\s*oracle(?::generated:|-generated[:\s])/.test(card)) {
+  if (lines.some((line) => /^## (?:Formal Model|Terms|Adequacy)\s*$/.test(line.trim())) || /<!--\s*oracle(?::generated:|-generated[:\s])/.test(card)) {
     throw new CliError('CONTRACT_FORMAL_FORBIDDEN', 'Contract cards cannot contain Formal Model or projected model markers')
   }
   const generated = generateFromDocument(card)
@@ -570,9 +567,15 @@ async function lintCard(options) {
   // 모델 패키지에서 투영한 카드 — 생성 영역을 패키지에서 다시 만들어 비교한다: 손으로 고쳤거나(drift) 패키지·Bend 파일이
   // 바뀐 뒤 다시 투영하지 않았으면(stale) 막고, 다시 만들 수 없으면(unverified) 통과시키지 않는다. 생성 영역이 없는 기존
   // 카드는 이 검사를 받지 않는다 — 단 모델 패키지를 출처로 등록한 카드는 아래에서 영역을 요구한다.
-  issues.push(...(await generatedIssues(card, { regenerate: regenerateAtRoot() })))
-  // 선언한 공간과 Bend 공간의 교차검증 — 결정 안 된 후보가 있으면 카드가 lint를 통과하지 못하므로 잠기지 않는다
-  const block = generatedBlock(card)
+  const formalModules = contract ? null : {
+    ...await import('./oracle-package.mjs'),
+    ...await import('./oracle-model.mjs'),
+    ...await import('./oracle-adequacy.mjs'),
+  }
+  const { generatedBlock, generatedIssues, regenerateAtRoot, parseFormalModel, formalModelIssues, parseTerms, parseAdequacy, adequacyIssues } = formalModules ?? {}
+  const block = contract ? { present: false } : generatedBlock(card)
+  if (!contract) issues.push(...(await generatedIssues(card, { regenerate: regenerateAtRoot() })))
+  // Formal projection cross-check retains its existing gate.
   if (block.present && block.fields.package) {
     const { crossCheckAtRoot } = await import('./oracle-discovery.mjs')
     issues.push(...(await crossCheckAtRoot()(block.fields.package)))
@@ -988,7 +991,7 @@ async function lintCard(options) {
   const readSource = (repoPath) => readFile(resolve(repoPath), 'utf8').catch(() => null)
   // 표식을 지워 모델 우선 카드를 기존 카드처럼 보이게 하는 길을 막는다: 모델 패키지를 출처로 등록한 카드는 생성 영역이
   // 있어야 한다. 패키지 없이 처음부터 손으로 쓴 카드는 기존 카드와 구별할 수 없다 — 그 경우는 리뷰가 잡는다.
-  if (!generatedBlock(card).present) {
+  if (!block.present) {
     for (const [id, { repoPath }] of formalSources) {
       if (!repoPath?.endsWith('.json')) continue
       let registered = null
@@ -1003,7 +1006,7 @@ async function lintCard(options) {
         )
     }
   }
-  const formal = parseFormalModel(lines)
+  const formal = contract ? null : parseFormalModel(lines)
   if (formal) {
     issues.push(
       ...(await formalModelIssues(formal, {
@@ -1015,8 +1018,8 @@ async function lintCard(options) {
       })),
     )
   }
-  const terms = parseTerms(lines)
-  const adequacy = parseAdequacy(lines)
+  const terms = contract ? null : parseTerms(lines)
+  const adequacy = contract ? null : parseAdequacy(lines)
   if (terms || adequacy) {
     issues.push(
       ...(await adequacyIssues(
@@ -1216,7 +1219,7 @@ async function lintCard(options) {
   }
   // Coverage: model은 모델 패키지에서 투영된 공간에만 있다 — 손으로 쓴 카드가 이 한 줄로 프레임 판정을 건너뛰지 못한다
   const modelCoverage = generated?.caseSpace.coverage === 'model'
-  if (modelCoverage && !generatedBlock(card).present)
+  if (modelCoverage && !block.present)
     issues.push('case-space-coverage-model: only a card projected from a model package declares `Coverage: model` — declare the dimensions and disposition the frames')
 
   const sweepReason = sweepTrigger(generated?.caseSpace, sharedStatePolicies(transitions, policies))
