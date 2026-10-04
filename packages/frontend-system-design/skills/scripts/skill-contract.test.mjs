@@ -253,14 +253,19 @@ test('SKILL.md defines the compact result returned after a reference is loaded',
 
 test('the Oracle remains the orchestrator when it loads system-design references', async () => {
   const oracleSkill = await readFile(
-    join(repositoryDirectory, 'packages/frontend-oracle-design/skills/SKILL.md'),
+    join(repositoryDirectory, 'packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md'),
+    'utf8',
+  )
+  const intake = await readFile(
+    join(repositoryDirectory, 'packages/frontend-oracle-design/skills/frontend-oracle-design/references/roles/intake.md'),
     'utf8',
   )
 
   assert.match(oracleSkill, /frontend-system-design/)
-  assert.match(oracleSkill, /policy candidate/)
-  assert.match(oracleSkill, /Oracle\s+intake and control|Oracle's orchestration/)
+  assert.match(intake, /policy candidate/)
+  assert.match(intake, /Oracle\s+intake and control|Oracle's orchestration/)
   assert.doesNotMatch(oracleSkill, /기본 추천과 다를 항목만/)
+  assert.doesNotMatch(intake, /기본 추천과 다를 항목만/)
 })
 
 test('plugin metadata publishes the Oracle-first contract under a new cache identity', async () => {

@@ -1,0 +1,520 @@
+{
+  "version": 1,
+  "name": "frontend-oracle-design-blackbox-smoke-v1",
+  "purpose": "Small held-out prompts for checking Oracle routing and ceremony without hosted evals.",
+  "cases": [
+    {
+      "id": "fod-bb-01",
+      "category": "low-copy-css",
+      "prompt": "Change the approved helper text from 'Save' to '저장' in one existing button; no behavior or layout changes.",
+      "expected": {
+        "risk": "Low",
+        "lane": "oracle",
+        "status": "OUT_OF_SCOPE",
+        "autoInvoke": false,
+        "loadedNodes": ["common"],
+        "forbiddenCeremony": [
+          "legacy-low-fast-path-bypass",
+          "card-written",
+          "revision-lock",
+          "oracle-run-init",
+          "mandatory-stack-run"
+        ],
+        "requiredLabels": []
+      }
+    },
+    {
+      "id": "fod-bb-02",
+      "category": "low-copy-css",
+      "prompt": "Apply an already-approved spacing token to a local CSS rule; do not alter responsive structure or state.",
+      "expected": {
+        "risk": "Low",
+        "lane": "oracle",
+        "status": "OUT_OF_SCOPE",
+        "autoInvoke": false,
+        "loadedNodes": ["common"],
+        "forbiddenCeremony": [
+          "legacy-low-fast-path-bypass",
+          "card-written",
+          "revision-lock",
+          "oracle-run-init",
+          "mandatory-stack-run"
+        ],
+        "requiredLabels": []
+      }
+    },
+    {
+      "id": "fod-bb-03",
+      "category": "submit-order-retry",
+      "prompt": "Make a save form ignore duplicate submit clicks while the first request is pending; prove exactly one POST.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "REVIEW_VERIFIED",
+        "loadedNodes": [
+          "common",
+          "mandatory-verification",
+          "bend-cross-verification",
+          "adequacy",
+          "card-policy-sources",
+          "card-risk-grill",
+          "bva",
+          "card-format",
+          "card-interaction-sweep",
+          "role-case-space-inputs",
+          "role-space-discovery",
+          "card-case-space",
+          "card-retro-metrics",
+          "card-confirmation-lock",
+          "delivery-ledger",
+          "delivery-red",
+          "frontend-decisions",
+          "types-state-ladder",
+          "types-authoring",
+          "frontend-authoring",
+          "changeability",
+          "delivery-implementation-decision",
+          "frontend-quality",
+          "delivery-green-review",
+          "subagent-review",
+          "discovery"
+        ],
+        "forbiddenCeremony": ["production-before-valid-red", "unledgered-green", "test-weakening"],
+        "requiredLabels": ["card-lint", "valid-red", "green", "review"],
+        "nodeExceptions": [
+          {
+            "node": "types-api-surface",
+            "reason": "Read only when the card has an exposed type boundary (exported Props, shared/package API, client state union, trust-boundary type)."
+          },
+          {
+            "node": "types-advanced-contracts",
+            "reason": "Read only when the card has an exposed type boundary (exported Props, shared/package API, client state union, trust-boundary type)."
+          },
+          {
+            "node": "type-environment",
+            "reason": "Read only when the card has an exposed type boundary (exported Props, shared/package API, client state union, trust-boundary type)."
+          }
+        ]
+      }
+    },
+    {
+      "id": "fod-bb-04",
+      "category": "submit-order-retry",
+      "prompt": "Prevent out-of-order search responses from replacing the latest result when request B resolves before request A.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "REVIEW_VERIFIED",
+        "loadedNodes": [
+          "common",
+          "mandatory-verification",
+          "bend-cross-verification",
+          "adequacy",
+          "card-policy-sources",
+          "card-risk-grill",
+          "bva",
+          "card-format",
+          "card-interaction-sweep",
+          "role-case-space-inputs",
+          "role-space-discovery",
+          "card-case-space",
+          "card-retro-metrics",
+          "card-confirmation-lock",
+          "delivery-ledger",
+          "delivery-red",
+          "frontend-decisions",
+          "types-state-ladder",
+          "types-authoring",
+          "frontend-authoring",
+          "changeability",
+          "delivery-implementation-decision",
+          "frontend-quality",
+          "delivery-green-review",
+          "subagent-review",
+          "discovery"
+        ],
+        "forbiddenCeremony": ["production-before-valid-red", "unledgered-green", "sleep-based-race-test"],
+        "requiredLabels": ["card-lint", "valid-red", "green", "review"],
+        "nodeExceptions": [
+          {
+            "node": "types-api-surface",
+            "reason": "Read only when the card has an exposed type boundary (exported Props, shared/package API, client state union, trust-boundary type)."
+          },
+          {
+            "node": "types-advanced-contracts",
+            "reason": "Read only when the card has an exposed type boundary (exported Props, shared/package API, client state union, trust-boundary type)."
+          },
+          {
+            "node": "type-environment",
+            "reason": "Read only when the card has an exposed type boundary (exported Props, shared/package API, client state union, trust-boundary type)."
+          }
+        ]
+      }
+    },
+    {
+      "id": "fod-bb-05",
+      "category": "submit-order-retry",
+      "prompt": "After a failed payment-method save, keep the input and allow one retry request; do not silently submit twice.",
+      "expected": {
+        "risk": "High",
+        "lane": "oracle",
+        "status": "REVIEW_VERIFIED",
+        "loadedNodes": [
+          "common",
+          "mandatory-verification",
+          "bend-cross-verification",
+          "adequacy",
+          "card-policy-sources",
+          "card-risk-grill",
+          "bva",
+          "card-format",
+          "card-interaction-sweep",
+          "role-case-space-inputs",
+          "role-space-discovery",
+          "card-case-space",
+          "card-retro-metrics",
+          "card-confirmation-lock",
+          "delivery-ledger",
+          "delivery-red",
+          "frontend-decisions",
+          "types-state-ladder",
+          "types-authoring",
+          "frontend-authoring",
+          "changeability",
+          "delivery-implementation-decision",
+          "frontend-quality",
+          "delivery-green-review",
+          "subagent-review",
+          "discovery"
+        ],
+        "forbiddenCeremony": ["production-before-valid-red", "unledgered-green", "mutation-skipped"],
+        "requiredLabels": ["card-lint", "valid-red", "green", "mutation", "review"],
+        "nodeExceptions": [
+          {
+            "node": "types-api-surface",
+            "reason": "Read only when the card has an exposed type boundary (exported Props, shared/package API, client state union, trust-boundary type)."
+          },
+          {
+            "node": "types-advanced-contracts",
+            "reason": "Read only when the card has an exposed type boundary (exported Props, shared/package API, client state union, trust-boundary type)."
+          },
+          {
+            "node": "type-environment",
+            "reason": "Read only when the card has an exposed type boundary (exported Props, shared/package API, client state union, trust-boundary type)."
+          }
+        ]
+      }
+    },
+    {
+      "id": "fod-bb-06",
+      "category": "visual-local-identity",
+      "prompt": "Change one card's visual emphasis using the approved brand palette; user confirmation is required before lock.",
+      "expected": {
+        "risk": "Low",
+        "lane": "oracle",
+        "status": "OUT_OF_SCOPE",
+        "autoInvoke": false,
+        "loadedNodes": ["common"],
+        "forbiddenCeremony": [
+          "legacy-low-fast-path-bypass",
+          "card-written",
+          "revision-lock",
+          "oracle-run-init",
+          "mandatory-stack-run"
+        ],
+        "requiredLabels": []
+      }
+    },
+    {
+      "id": "fod-bb-07",
+      "category": "visual-local-identity",
+      "prompt": "Redesign the empty state illustration style to match a new identity direction; no approved design source is provided yet.",
+      "expected": {
+        "risk": "Low",
+        "lane": "oracle",
+        "status": "OUT_OF_SCOPE",
+        "autoInvoke": false,
+        "loadedNodes": ["common"],
+        "forbiddenCeremony": [
+          "legacy-low-fast-path-bypass",
+          "card-written",
+          "revision-lock",
+          "oracle-run-init",
+          "mandatory-stack-run"
+        ],
+        "requiredLabels": []
+      }
+    },
+    {
+      "id": "fod-bb-08",
+      "category": "policy-source",
+      "prompt": "Implement an age-gated checkout rule, but the PRD and legal note disagree about the minimum age.",
+      "expected": {
+        "risk": "High",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "loadedNodes": [
+          "common",
+          "mandatory-verification",
+          "card-policy-sources",
+          "card-risk-grill",
+          "bva",
+          "card-format"
+        ],
+        "forbiddenCeremony": ["conflict-resolution-by-agent", "implementation-reference-as-policy", "revision-lock"],
+        "requiredLabels": ["source-registry-fk", "policy-gap"],
+        "nodeExceptions": [
+          {
+            "node": "card-interaction-sweep",
+            "reason": "Source conflict resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          },
+          {
+            "node": "card-case-space",
+            "reason": "Source conflict resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          },
+          {
+            "node": "card-retro-metrics",
+            "reason": "Source conflict resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          },
+          {
+            "node": "card-confirmation-lock",
+            "reason": "Source conflict resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          },
+          {
+            "node": "bend-cross-verification",
+            "reason": "Stops at NEEDS_DECISION at source classification, before the model package is written."
+          },
+          {
+            "node": "adequacy",
+            "reason": "Stops at NEEDS_DECISION at source classification, before the model package is written."
+          }
+        ]
+      }
+    },
+    {
+      "id": "fod-bb-09",
+      "category": "policy-source",
+      "prompt": "A local helper currently blocks admin deletion, but no product source says whether admins may delete records.",
+      "expected": {
+        "risk": "High",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "loadedNodes": [
+          "common",
+          "mandatory-verification",
+          "card-policy-sources",
+          "card-risk-grill",
+          "bva",
+          "card-format"
+        ],
+        "forbiddenCeremony": ["production-as-policy", "implementation-reference-as-sole-authority", "revision-lock"],
+        "requiredLabels": ["source-registry-fk", "policy-gap"],
+        "nodeExceptions": [
+          {
+            "node": "card-interaction-sweep",
+            "reason": "Missing product source resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          },
+          {
+            "node": "card-case-space",
+            "reason": "Missing product source resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          },
+          {
+            "node": "card-retro-metrics",
+            "reason": "Missing product source resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          },
+          {
+            "node": "card-confirmation-lock",
+            "reason": "Missing product source resolves to NEEDS_DECISION at source classification, before the Draft sweep and the lock."
+          },
+          {
+            "node": "bend-cross-verification",
+            "reason": "Stops at NEEDS_DECISION at source classification, before the model package is written."
+          },
+          {
+            "node": "adequacy",
+            "reason": "Stops at NEEDS_DECISION at source classification, before the model package is written."
+          }
+        ]
+      }
+    },
+    {
+      "id": "fod-bb-10",
+      "category": "already-satisfied",
+      "prompt": "Verify whether the approved duplicate-submit contract is already satisfied by existing tests and implementation; do not edit production if it is.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "REVIEW_VERIFIED",
+        "loadedNodes": [
+          "common",
+          "mandatory-verification",
+          "bend-cross-verification",
+          "adequacy",
+          "card-policy-sources",
+          "card-risk-grill",
+          "bva",
+          "card-format",
+          "card-interaction-sweep",
+          "role-case-space-inputs",
+          "role-space-discovery",
+          "card-case-space",
+          "card-retro-metrics",
+          "card-confirmation-lock",
+          "delivery-ledger",
+          "delivery-red",
+          "frontend-decisions",
+          "types-state-ladder",
+          "types-authoring",
+          "changeability",
+          "frontend-quality",
+          "delivery-green-review",
+          "subagent-review",
+          "discovery"
+        ],
+        "forbiddenCeremony": ["forced-production-edit", "fake-valid-red", "unledgered-green", "false-review-verified"],
+        "requiredLabels": ["card-lint", "existing-evidence", "already-satisfied", "green", "review"],
+        "route": "valid-red:ALREADY_SATISFIED→implement-green",
+        "nodeExceptions": [
+          {
+            "node": "delivery-implementation-decision",
+            "reason": "ALREADY_SATISFIED verifies the existing implementation without a production change, so no implementation-method decision is read."
+          },
+          {
+            "node": "types-api-surface",
+            "reason": "Read only when the card has an exposed type boundary (exported Props, shared/package API, client state union, trust-boundary type)."
+          },
+          {
+            "node": "types-advanced-contracts",
+            "reason": "Read only when the card has an exposed type boundary (exported Props, shared/package API, client state union, trust-boundary type)."
+          },
+          {
+            "node": "type-environment",
+            "reason": "Read only when the card has an exposed type boundary (exported Props, shared/package API, client state union, trust-boundary type)."
+          }
+        ]
+      }
+    },
+    {
+      "id": "fod-bb-11",
+      "category": "boundary-pressure",
+      "prompt": "Change one approved button label from 'Save' to '저장'.",
+      "expected": {
+        "risk": "Low",
+        "lane": "oracle",
+        "status": "OUT_OF_SCOPE",
+        "autoInvoke": false,
+        "loadedNodes": ["common"],
+        "forbiddenCeremony": [
+          "legacy-low-fast-path-bypass",
+          "card-written",
+          "revision-lock",
+          "oracle-run-init",
+          "mandatory-stack-run"
+        ],
+        "requiredLabels": []
+      }
+    },
+    {
+      "id": "fod-bb-14",
+      "category": "boundary-pressure",
+      "prompt": "Update the helper text in one existing component only.",
+      "expected": {
+        "risk": "Low",
+        "lane": "oracle",
+        "status": "OUT_OF_SCOPE",
+        "autoInvoke": false,
+        "loadedNodes": ["common"],
+        "forbiddenCeremony": [
+          "legacy-low-fast-path-bypass",
+          "card-written",
+          "revision-lock",
+          "oracle-run-init",
+          "mandatory-stack-run"
+        ],
+        "requiredLabels": []
+      }
+    },
+    {
+      "id": "fod-bb-15",
+      "category": "scope-gate",
+      "prompt": "While a save request is pending, disable the Save button and ignore a second submit, and restyle that button with the approved muted color token. Write the contract only; do not implement.",
+      "expected": {
+        "risk": "Medium",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "loadedNodes": [
+          "common",
+          "mandatory-verification",
+          "bend-cross-verification",
+          "adequacy",
+          "card-policy-sources",
+          "card-risk-grill",
+          "bva",
+          "card-format",
+          "card-interaction-sweep",
+          "role-case-space-inputs",
+          "role-space-discovery",
+          "card-case-space"
+        ],
+        "forbiddenCeremony": ["full-stop-out-of-scope", "narrowed-requirement", "revision-lock", "production-edit"],
+        "requiredLabels": ["card-lint", "bend-proof", "bend-adequacy"],
+        "nodeExceptions": [
+          {
+            "node": "visual-design",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "lifecycle-adaptation",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "card-retro-metrics",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "types-state-ladder",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "types-authoring",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "frontend-decisions",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "types-api-surface",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "types-advanced-contracts",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "type-environment",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "card-confirmation-lock",
+            "reason": "Stops at NEEDS_DECISION on the Draft confirmation, before the lock."
+          }
+        ],
+        "optionalLabels": ["ensure-bend", "bend-space", "package-validate", "oracle-frames"]
+      }
+    },
+    {
+      "id": "fod-bb-16",
+      "category": "scope-gate",
+      "prompt": "Compute the order total in a UI helper with IEEE-754 double rounding exactly like the legacy billing service, for any amount including negative refunds.",
+      "expected": {
+        "risk": "High",
+        "lane": "oracle",
+        "status": "NEEDS_DECISION",
+        "loadedNodes": ["common"],
+        "forbiddenCeremony": ["narrowed-requirement", "model-of-a-subset", "revision-lock", "production-edit"],
+        "requiredLabels": []
+      }
+    }
+  ]
+}

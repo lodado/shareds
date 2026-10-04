@@ -8,7 +8,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/skills/scripts/oracle-guard-hook.mjs"],
+            "args": ["${CLAUDE_PLUGIN_ROOT}/skills/frontend-oracle-design/scripts/oracle-guard-hook.mjs"],
             "timeout": 10
           }
         ]
@@ -19,7 +19,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/skills/scripts/oracle-guard-hook.mjs"],
+            "args": ["${CLAUDE_PLUGIN_ROOT}/skills/frontend-oracle-design/scripts/oracle-guard-hook.mjs"],
             "timeout": 10
           }
         ]
@@ -31,7 +31,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/skills/scripts/oracle-guard-hook.mjs"],
+            "args": ["${CLAUDE_PLUGIN_ROOT}/skills/frontend-oracle-design/scripts/oracle-guard-hook.mjs"],
             "timeout": 10
           }
         ]
@@ -43,7 +43,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/skills/scripts/oracle-guard-hook.mjs"],
+            "args": ["${CLAUDE_PLUGIN_ROOT}/skills/frontend-oracle-design/scripts/oracle-guard-hook.mjs"],
             "timeout": 15
           }
         ]

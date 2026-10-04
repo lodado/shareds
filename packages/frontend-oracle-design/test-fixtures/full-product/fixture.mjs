@@ -1,4 +1,4 @@
-import { generateFromDocument } from '../../skills/scripts/oracle-frames.mjs'
+import { generateFromDocument } from '../../skills/frontend-oracle-design/scripts/oracle-frames.mjs'
 
 export const FULL_CANDIDATES = [
   'action-repeat',

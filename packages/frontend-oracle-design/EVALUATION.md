@@ -521,9 +521,9 @@ unchanged and record these extra instruction bytes. The runner does not select t
 you. Then use the existing runner, for example:
 
 ```sh
-node packages/frontend-oracle-design/skills/evals/run-live.mjs \
+node packages/frontend-oracle-design/skills/frontend-oracle-design/evals/run-live.mjs \
   --host claude --repo <prepared-repository> \
-  --corpus packages/frontend-oracle-design/skills/evals/worker-context-cases.json \
+  --corpus packages/frontend-oracle-design/skills/frontend-oracle-design/evals/worker-context-cases.json \
   --case fod-worker-short-fix --variant C --replicates 1 \
   --out <results.jsonl> --transcript-dir <transcripts>
 ```

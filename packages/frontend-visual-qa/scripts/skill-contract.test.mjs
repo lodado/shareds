@@ -140,7 +140,7 @@ test('treats an approved Oracle visual authorization as an explicit request', as
 
 test('is referenced as a separate responsibility by Oracle and behavior test skills', async () => {
   const [oracleSkill, testSkill] = await Promise.all([
-    readFile(join(repositoryDirectory, 'packages/frontend-oracle-design/skills/SKILL.md'), 'utf8'),
+    readFile(join(repositoryDirectory, 'packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md'), 'utf8'),
     readFile(join(repositoryDirectory, 'packages/test/skills/test/SKILL.md'), 'utf8'),
   ])
 

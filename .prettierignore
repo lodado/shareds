@@ -3,7 +3,7 @@ build
 coverage
 playwright.config.ts
 # Generated from references / the full-product fixture; edit their sources instead.
-packages/frontend-oracle-design/skills/bundles/
+packages/frontend-oracle-design/skills/frontend-oracle-design/bundles/
 packages/frontend-oracle-design/test-fixtures/full-product/oracle.md
 # Recorded AI operator runs: the exact bytes an agent read and wrote, pinned by sha256 in the model package.
 packages/frontend-oracle-design/test-fixtures/stale-search/discovery/

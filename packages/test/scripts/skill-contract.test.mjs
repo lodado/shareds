@@ -13,7 +13,7 @@ test('ships the frontend test contract with its required BVA reference', async (
   const [skill, bundledBva, oracleBva] = await Promise.all([
     readFile(join(skillDirectory, 'SKILL.md'), 'utf8'),
     readFile(join(skillDirectory, 'references/bva.md'), 'utf8'),
-    readFile(join(repositoryDirectory, 'packages/frontend-oracle-design/skills/references/bva.md'), 'utf8'),
+    readFile(join(repositoryDirectory, 'packages/frontend-oracle-design/skills/frontend-oracle-design/references/bva.md'), 'utf8'),
   ])
 
   assert.match(skill, /name: test/)

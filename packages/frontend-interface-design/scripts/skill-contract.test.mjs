@@ -6,7 +6,7 @@ import { basename, dirname, extname, join, resolve } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package contract tests run with node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { resolveExecutable } from '../../frontend-oracle-design/skills/scripts/resolve-executable.mjs'
+import { resolveExecutable } from '../../frontend-oracle-design/skills/frontend-oracle-design/scripts/resolve-executable.mjs'
 
 const packageDirectory = dirname(dirname(fileURLToPath(import.meta.url)))
 const skillDirectory = join(packageDirectory, 'skills/reference-driven-figma-design')

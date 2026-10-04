@@ -151,7 +151,7 @@ UUID, locale, timezone 때문에 테스트나 렌더 결과가 실행마다 달�
 잡지 못한다. 따라서 medium/high-risk Oracle delivery에서는 다음 검사를 함께 유지한다.
 
 ```bash
-node packages/frontend-oracle-design/skills/scripts/oracle-verify.mjs scan \
+node packages/frontend-oracle-design/skills/frontend-oracle-design/scripts/oracle-verify.mjs scan \
   --path <changed-source-file>
 ```
 

@@ -43,7 +43,7 @@
 | 스킬                                                                                                                    | 하는 일                                                                         |
 | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | [`eslint-setup`](packages/vibe-coding-helper/skills/eslint-setup/SKILL.md)                                              | 프로젝트에 맞는 ESLint 프리셋을 선택하고 설정해요.                              |
-| [`frontend-oracle-design`](packages/frontend-oracle-design/skills/SKILL.md)                                             | 중·고위험 프론트엔드 작업의 동작 계약을 정하고 테스트·구현·리뷰를 진행해요.     |
+| [`frontend-oracle-design`](packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md)                      | 중·고위험 프론트엔드 작업의 동작 계약을 정하고 테스트·구현·리뷰를 진행해요.     |
 | [`frontend-system-design`](packages/frontend-system-design/skills/SKILL.md)                                             | Oracle 설계에 검색·채팅·결제 같은 기능의 구현 선택지와 실패 대응을 보태요.      |
 | [`test`](packages/test/skills/test/SKILL.md)                                                                            | 프론트엔드 동작과 회귀 오류를 확인하는 자동화 테스트를 작성·실행해요.           |
 | [`frontend-visual-qa`](packages/frontend-visual-qa/skills/frontend-visual-qa/SKILL.md)                                  | 승인된 화면 기준과 실제 브라우저 동작을 비교해 시각적 오류를 찾아요.            |
@@ -160,7 +160,7 @@ export default [...base, ...react, ...a11y, ...quality, ...localRules]
 
 ## Oracle Design 자세히
 
-[`frontend-oracle-design`](packages/frontend-oracle-design)은 이 레포에서 제일 큰 스킬이에요.
+[`frontend-oracle-design`](packages/frontend-oracle-design)은 동작 계약과 검증 흐름을 조율하는 플러그인이에요.
 한 줄로 말하면 **구현 생성기가 아니라 검증 하네스**예요.
 
 에이전트한테 기능을 시키면 보통 이래요. 애매한 부분을 자기 마음대로 정해요.
@@ -169,14 +169,30 @@ export default [...base, ...react, ...a11y, ...quality, ...localRules]
 Oracle은 그걸 막아요. 정하지 않은 정책은 **정하기 전까진 진행 안 해요**.
 승인된 계약은 파일로 잠그고, 실행 결과는 전부 원장에 남겨요.
 
+### 역할별 스킬
+
+평소에는 기존처럼 `$frontend-oracle-design`으로 시작해요. 얇은 오케스트레이터가 현재 단계에
+필요한 전문 스킬만 명시적으로 호출해요. 플러그인은 하나이고 runtime과 ledger도 하나예요.
+
+| 스킬                                                                                               | 맡는 일                                             |
+| -------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| [`frontend-oracle-design`](packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md) | 흐름 조율, 사용자 승인, lock, 상태 전이와 최종 보고 |
+| [`oracle-intake`](packages/frontend-oracle-design/skills/oracle-intake/SKILL.md)                   | 출처·위험 조사, capability 확인, discovery 축 질문  |
+| [`oracle-author`](packages/frontend-oracle-design/skills/oracle-author/SKILL.md)                   | 모델·Draft 작성과 투영, 조건부 discovery closure    |
+| [`oracle-implement`](packages/frontend-oracle-design/skills/oracle-implement/SKILL.md)             | lock과 VALID_RED 이후 허용된 제품 코드 구현         |
+| [`oracle-review`](packages/frontend-oracle-design/skills/oracle-review/SKILL.md)                   | 독립 컨텍스트의 계약·구현·근거 리뷰                 |
+
+테스트 작성은 기존 `$test`를 재사용해요. 전문 스킬을 직접 호출해도 승인이나 선행 검증을
+건너뛸 수 없어요. 선행조건이 없으면 컨트롤러로 돌아와요.
+
 ### 어떻게 도나요
 
 ```text
   요청
    │
-   ├─ Low ──▶ low-fast-path: 기존 레포 검증만
+   ├─ 모델화할 동작 없음 ──▶ OUT_OF_SCOPE: $test / 시각 검증 / 단순 수정
    │
-   └─ Medium / High
+   └─ 모델화할 동작 있음 (Low / Medium / High)
           │
           ▼
       ① DEFINE     Outcome Brief·Source Registry·계약 행 작성 + 사용자 확인
@@ -206,7 +222,7 @@ Oracle은 그걸 막아요. 정하지 않은 정책은 **정하기 전까진 진
 이건 사람이 읽는 6단계 운영 화면이에요. 실제 Controller는 사용자 승인, 실패 증명과 구현,
 시각 증거 대기, 표준/High-risk 리뷰, 장부 전후 정지를 별도 Node로 유지해요. 정확한
 Node·Edge·fallback·terminal 수와 전체 그래프는
-[패키지 README](packages/frontend-oracle-design/skills/README.md)가 원본 JSON에서 자동으로
+[패키지 README](packages/frontend-oracle-design/skills/frontend-oracle-design/README.md)가 원본 JSON에서 자동으로
 생성합니다.
 
 ### 핵심 규칙 몇 개
@@ -258,7 +274,7 @@ generate-workflow-docs.mjs       README 그래프 요약 생성 | --check
 스크린샷이랑 브라우저는 [`frontend-visual-qa`](packages/frontend-visual-qa),
 기능별 구현 선택지는 [`frontend-system-design`](packages/frontend-system-design)이 가져가요.
 
-자세한 건 [스킬 문서](packages/frontend-oracle-design/skills/SKILL.md)에 있어요.
+자세한 건 [스킬 문서](packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md)에 있어요.
 
 ## 패키지
 

@@ -8,14 +8,14 @@
 > design record입니다. 현재는 타입 작업에서 `types-advanced-contracts`를
 > `types-state-ladder`·`types-api-surface`와 함께 **항상 로드**하되, 고급 계약의
 > **채택**만 compiler witness packet gate로 제한합니다. 현재 정답은
-> [`skills/SKILL.md`](skills/SKILL.md)와
-> [`skills/references/reference-graph.json`](skills/references/reference-graph.json)입니다.
+> [`skills/frontend-oracle-design/SKILL.md`](skills/frontend-oracle-design/SKILL.md)와
+> [`skills/frontend-oracle-design/references/reference-graph.json`](skills/frontend-oracle-design/references/reference-graph.json)입니다.
 
 ## Current 0.44 verification boundary
 
 The historical release results below are not current-run evidence. Current verification separates
 static compiler witnesses from runtime behavior: `test-fixtures/typescript` and the pinned compiler
-cover type acceptance, while `skills/scripts/type-runtime.test.mjs` covers unknown-input parsing and
+cover type acceptance, while `skills/frontend-oracle-design/scripts/type-runtime.test.mjs` covers unknown-input parsing and
 unknown-input parser behavior. A passing runtime test does not prove the static contract, and a passing
 compiler witness does not prove runtime behavior.
 
@@ -82,7 +82,7 @@ objects/tuples를 사용하고 positive·negative witness를 둡니다.
 - 한 variant만 payload가 있는 상태, 변수/spread/명시적 undefined를 통한 XOR, correlated tuple과
   독립 union, NoInfer 추론 권위, const literal 추론, exhaustive consumer, 분배/never,
   DistributiveOmit, remap modifier, ID 혼용/unknown, callback property와 method 차이를 검사합니다.
-- `skills/scripts/type-guidance.test.mjs`는 pinned Compiler API로 config의 extends를 해석하고,
+- `skills/frontend-oracle-design/scripts/type-guidance.test.mjs`는 pinned Compiler API로 config의 extends를 해석하고,
   실제 포함 파일과 symbol을 확인합니다. 동일 compiler host에서 canary와 지시문 제거 사본을
   검사해 diagnostic code와 오용 표현의 span을 대조합니다.
 - 계약 mutation은 실제 `contracts.ts`를 한 축씩 바꿉니다. 동일 verifier가 의도한 진단으로
@@ -93,7 +93,7 @@ objects/tuples를 사용하고 positive·negative witness를 둡니다.
   계약/witness revision, 진단과 mutation·원복 runId가 남습니다. 별도의 TS evidence adapter나
   자동 제품 승인 연결은 추가하지 않았습니다. 기존 node-test trusted producer가 실행 결과를
   다루며, 출력 JSON이나 hash 자체가 승인·실행 진실성의 증명은 아닙니다.
-- `skills/scripts/type-runtime.test.mjs`는 실제 fixture parser의 unknown 입력을 행동 검증합니다.
+- `skills/frontend-oracle-design/scripts/type-runtime.test.mjs`는 실제 fixture parser의 unknown 입력을 행동 검증합니다.
   이 파일의 transpilation은 실행 준비일 뿐 typecheck가 아닙니다. zod 변환, 실제 JSX, 중복 요청,
   stale response, abort/retry/멱등성은 이 corpus가 검증하지 않으며 소비 프로젝트의 기존 테스트가
   맡습니다. 브랜드와 readonly도 런타임 보안·freeze를 보장하지 않습니다.
@@ -288,8 +288,8 @@ compiler upgrade도 단순 도구 업데이트로 취급하지 않습니다. ass
 재실행 명령은 다음과 같습니다.
 
 ```bash
-node --test packages/frontend-oracle-design/skills/scripts/type-guidance.test.mjs
-node --test packages/frontend-oracle-design/skills/scripts/skill-contract.test.mjs
+node --test packages/frontend-oracle-design/skills/frontend-oracle-design/scripts/type-guidance.test.mjs
+node --test packages/frontend-oracle-design/skills/frontend-oracle-design/scripts/skill-contract.test.mjs
 pnpm --filter @lodado/frontend-oracle-design-plugin test
 pnpm lint
 pnpm test

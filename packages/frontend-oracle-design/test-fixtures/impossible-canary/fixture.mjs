@@ -7,9 +7,9 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { spawnGit } from '../../skills/scripts/resolve-executable.mjs'
+import { spawnGit } from '../../skills/frontend-oracle-design/scripts/resolve-executable.mjs'
 
-const scripts = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'skills', 'scripts')
+const scripts = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'skills', 'frontend-oracle-design', 'scripts')
 
 export const CANARY_ID = 'canary'
 
