@@ -43,7 +43,8 @@
 | 스킬                                                                                                                    | 하는 일                                                                         |
 | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | [`eslint-setup`](packages/vibe-coding-helper/skills/eslint-setup/SKILL.md)                                              | 프로젝트에 맞는 ESLint 프리셋을 선택하고 설정해요.                              |
-| [`frontend-oracle-design`](packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md)                      | 중·고위험 프론트엔드 작업의 동작 계약을 정하고 테스트·구현·리뷰를 진행해요.     |
+| [`frontend-oracle-design`](packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md)                      | Bend 모델·증명까지 필수인 동작 계약과 테스트·구현·리뷰를 조율해요.              |
+| [`frontend-contract-design`](packages/frontend-oracle-design/skills/frontend-contract-design/SKILL.md)                  | Bend 없이 유한 Space를 정의하고 실제 테스트·타입·속성 증거로 검수해요.          |
 | [`frontend-system-design`](packages/frontend-system-design/skills/SKILL.md)                                             | Oracle 설계에 검색·채팅·결제 같은 기능의 구현 선택지와 실패 대응을 보태요.      |
 | [`test`](packages/test/skills/test/SKILL.md)                                                                            | 프론트엔드 동작과 회귀 오류를 확인하는 자동화 테스트를 작성·실행해요.           |
 | [`frontend-visual-qa`](packages/frontend-visual-qa/skills/frontend-visual-qa/SKILL.md)                                  | 승인된 화면 기준과 실제 브라우저 동작을 비교해 시각적 오류를 찾아요.            |
@@ -171,16 +172,24 @@ Oracle은 그걸 막아요. 정하지 않은 정책은 **정하기 전까진 진
 
 ### 역할별 스킬
 
-평소에는 기존처럼 `$frontend-oracle-design`으로 시작해요. 얇은 오케스트레이터가 현재 단계에
-필요한 전문 스킬만 명시적으로 호출해요. 플러그인은 하나이고 runtime과 ledger도 하나예요.
+두 진입 스킬 중 검증 방식에 맞는 것을 명시적으로 선택해요.
 
-| 스킬                                                                                               | 맡는 일                                             |
-| -------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| [`frontend-oracle-design`](packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md) | 흐름 조율, 사용자 승인, lock, 상태 전이와 최종 보고 |
-| [`oracle-intake`](packages/frontend-oracle-design/skills/oracle-intake/SKILL.md)                   | 출처·위험 조사, capability 확인, discovery 축 질문  |
-| [`oracle-author`](packages/frontend-oracle-design/skills/oracle-author/SKILL.md)                   | 모델·Draft 작성과 투영, 조건부 discovery closure    |
-| [`oracle-implement`](packages/frontend-oracle-design/skills/oracle-implement/SKILL.md)             | lock과 VALID_RED 이후 허용된 제품 코드 구현         |
-| [`oracle-review`](packages/frontend-oracle-design/skills/oracle-review/SKILL.md)                   | 독립 컨텍스트의 계약·구현·근거 리뷰                 |
+- `$frontend-oracle-design`은 `formal-bend/v1`입니다. Bend 모델·증명·Adequacy와 모델에서 투영된 카드를 유지해요.
+- `$frontend-contract-design`은 `contract/v1`입니다. Bend 없이 출처가 있는 `oracle.md`에 유한 `full-product` Space를 정의하고, 선언된 조합 전체의 처분과 실제 실행 증거를 확인해요.
+
+Contract도 승인·lock·VALID_RED·Medium 연속 통과·독립 리뷰를 생략하지 않아요. 타입 경계가 있으면 실제 TypeScript/type-fest 증거를, 활성 Async/Order가 있으면 실제 fast-check 증거를 요구해요. 유한 Space의 완전한 검수는 모든 제품 동작에 대한 형식 증명이 아니에요. Formal 검증을 요구하는 출처가 있다면 Contract 선택으로 우회할 수 없어요.
+
+두 컨트롤러는 현재 단계에 필요한 전문 스킬만 명시적으로 호출해요. 플러그인은 하나이고
+중립 Space 검수, runtime, lock과 ledger도 하나예요. 프로필은 승인된 카드에 고정되고 실행·worker·review 입력까지 일치해야 해요. Bend가 없다고 Formal 실행을 Contract로 자동 전환하지 않아요.
+
+| 스킬                                                                                                   | 맡는 일                                                      |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| [`frontend-oracle-design`](packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md)     | Formal 흐름 조율, 사용자 승인, lock, 상태 전이와 최종 보고   |
+| [`frontend-contract-design`](packages/frontend-oracle-design/skills/frontend-contract-design/SKILL.md) | Contract 흐름 조율, 사용자 승인, lock, 상태 전이와 최종 보고 |
+| [`oracle-intake`](packages/frontend-oracle-design/skills/oracle-intake/SKILL.md)                       | 출처·위험 조사, capability 확인, discovery 축 질문           |
+| [`oracle-author`](packages/frontend-oracle-design/skills/oracle-author/SKILL.md)                       | Formal 모델·투영 Draft 또는 Contract Space·카드 작성         |
+| [`oracle-implement`](packages/frontend-oracle-design/skills/oracle-implement/SKILL.md)                 | lock과 VALID_RED 이후 허용된 제품 코드 구현                  |
+| [`oracle-review`](packages/frontend-oracle-design/skills/oracle-review/SKILL.md)                       | 독립 컨텍스트의 계약·구현·근거 리뷰                          |
 
 테스트 작성은 기존 `$test`를 재사용해요. 전문 스킬을 직접 호출해도 승인이나 선행 검증을
 건너뛸 수 없어요. 선행조건이 없으면 컨트롤러로 돌아와요.
@@ -235,13 +244,13 @@ Node·Edge·fallback·terminal 수와 전체 그래프는
 
 ### 끝나는 상태
 
-| 상태                | 뜻                                                                            |
-| ------------------- | ----------------------------------------------------------------------------- |
-| `ORACLE_READY`      | 카드 잠갔어요. 구현 들어가도 돼요                                             |
-| `IMPLEMENTED_GREEN` | 구현 검증은 통과했지만 시각 증거 대기면 여기서 재개해요. 최종 완료는 아니에요 |
-| `REVIEW_VERIFIED`   | 리뷰 finding까지 반영하고 재통과했어요                                        |
-| `NEEDS_DECISION`    | 결과를 바꾸는 정책이 미결이에요. 질문을 뱉어요                                |
-| `FAIL`              | 환경·하네스 문제나 예산 소진으로 판정 불가예요                                |
+| 상태                | 뜻                                                                                           |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| `ORACLE_READY`      | 승인한 카드를 잠갔어요. Design-only는 여기서 멈추고, Delivery 구현은 VALID_RED 이후에만 해요 |
+| `IMPLEMENTED_GREEN` | 구현 검증은 통과했지만 시각 증거 대기면 여기서 재개해요. 최종 완료는 아니에요                |
+| `REVIEW_VERIFIED`   | 리뷰 finding까지 반영하고 재통과했어요                                                       |
+| `NEEDS_DECISION`    | 결과를 바꾸는 정책이 미결이에요. 질문을 뱉어요                                               |
+| `FAIL`              | 환경·하네스 문제나 예산 소진으로 판정 불가예요                                               |
 
 ### 무한 루프 방지
 
@@ -290,7 +299,7 @@ npm으로 나갈 것들이에요.
 | 플러그인                                                                  | 설명                                                                                                  |
 | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | [`vibe-coding-helper`](packages/vibe-coding-helper)                       | ESLint 도입이랑 레포 컨벤션                                                                           |
-| [`frontend-oracle-design`](packages/frontend-oracle-design)               | 위험도 기반 Oracle 계약, TDD, 근거, 리뷰                                                              |
+| [`frontend-oracle-design`](packages/frontend-oracle-design)               | Formal Oracle·Bend 없는 Contract 두 컨트롤러와 네 공유 전문 스킬, TDD·근거·리뷰                       |
 | [`agent-graph-engineering`](packages/agent-graph-engineering)             | 에이전트 워크플로 그래프 설계랑 실행                                                                  |
 | [`frontend-system-design`](packages/frontend-system-design)               | 잘 알려진 프론트엔드 문제의 설계 패턴                                                                 |
 | [`test`](packages/test)                                                   | Oracle 기반 결정론적 행동 테스트                                                                      |

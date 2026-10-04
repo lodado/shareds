@@ -21,6 +21,7 @@ import {
   RUN_BACKED_STATES,
   WEAKENING_TOKENS,
 } from './oracle-fs.mjs'
+import { profileForController, readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import { STAGE_FILE } from './oracle-stage.mjs'
 import { spawnGit } from './resolve-executable.mjs'
 
@@ -113,7 +114,7 @@ async function findStates(cwd, filePath, nested = false) {
   return states
 }
 
-const ORACLE_SKILL_NAME = '(?:frontend-oracle-design:)?(?:frontend-oracle-design|oracle-(?:intake|author|implement|review))'
+const ORACLE_SKILL_NAME = '(?:frontend-oracle-design:)?(?:frontend-(?:oracle|contract)-design|oracle-(?:intake|author|implement|review))'
 const SKILL_ACTIVATION = new RegExp(`^${ORACLE_SKILL_NAME}$`)
 const SLASH_ACTIVATION = new RegExp(`<command-name>/${ORACLE_SKILL_NAME}</command-name>`)
 
@@ -126,7 +127,7 @@ function transcriptParts(line) {
     const entry = JSON.parse(line)
     const at = Date.parse(entry.timestamp) || 0
     const content = entry.message?.content
-    if (entry.type === 'user' && typeof content === 'string' && SLASH_ACTIVATION.test(content)) return [{ part: { type: 'slash' }, at }]
+    if (entry.type === 'user' && typeof content === 'string' && SLASH_ACTIVATION.test(content)) return [{ part: { type: 'slash', skill: content.match(SLASH_ACTIVATION)[0].slice('<command-name>/'.length, -'</command-name>'.length) }, at }]
     if (entry.type !== 'assistant' || !Array.isArray(content)) return []
     return content.map((part) => ({ part, at }))
   } catch {
@@ -147,18 +148,49 @@ async function skillActivation(transcriptPath) {
   const raw = await readFile(transcriptPath, 'utf8').catch(() => '')
   const parts = raw
     .split('\n')
-    .filter((line) => line.includes('oracle-') || line.includes('OUT_OF_SCOPE'))
+    .filter((line) => line.includes('oracle-') || line.includes('frontend-contract-design') || line.includes('OUT_OF_SCOPE'))
     .flatMap(transcriptParts)
   const first = parts.findIndex(({ part }) => activatesSkill(part))
   if (first === -1 || parts.slice(first).some(({ part }) => routesOut(part))) return null
-  return parts[first].at
+  const controllers = parts.slice(first).filter(({ part }) => activatesSkill(part))
+    .map(({ part }) => part.skill ?? part.input?.skill)
+    .filter((name) => /^(?:frontend-oracle-design:)?frontend-(?:oracle|contract)-design$/.test(name))
+  const profiles = [...new Set(controllers.map(profileForController))]
+  return { at: parts[first].at, profile: profiles.length === 1 ? profiles[0] : undefined, conflicting: profiles.length > 1 }
 }
 
-async function lockedAfter(directory, since) {
+async function lockedAfter(directory, activation) {
   const names = await readdir(directory).catch(() => [])
   for (const name of names.filter((entry) => entry.endsWith('.lock.json'))) {
-    const lock = await stat(join(directory, name)).catch(() => null)
-    if (lock && lock.mtimeMs >= since) return true
+    const lockPath = join(directory, name)
+    const lock = await stat(lockPath).catch(() => null)
+    if (!lock || lock.mtimeMs < activation.at || activation.conflicting) continue
+    try {
+      const manifest = JSON.parse(await readFile(lockPath, 'utf8'))
+      const card = await readFile(join(directory, 'oracle.md'), 'utf8').catch(() => null)
+      const stageRaw = await readFile(join(directory, STAGE_FILE), 'utf8').catch(() => null)
+      const stage = stageRaw && JSON.parse(stageRaw)
+      const stateRaw = await readFile(join(directory, 'run-state.json'), 'utf8').catch(() => null)
+      const state = stateRaw && JSON.parse(stateRaw)
+      const bindings = [
+        { artifact: 'lock', profile: manifest.verificationProfile },
+        { artifact: 'card', profile: card === null ? null : readCardProfile(card) },
+        { artifact: 'stage', profile: stage?.verificationProfile },
+        ...(state ? [{ artifact: 'state', profile: state.verificationProfile }] : []),
+      ]
+      // Historical profile-less Formal locks retain their lower-level compatibility only.
+      if (bindings.every(({ profile }) => profile == null)) {
+        if (activation.profile === 'formal-bend/v1') return true
+        continue
+      }
+      resolveProfileBinding({ requestedProfile: activation.profile, bindings })
+      const verified = spawnSync(process.execPath, [join(dirname(runScript), 'oracle-lock.mjs'), 'verify', '--lock', lockPath], {
+        cwd: directory, encoding: 'utf8', timeout: 8000,
+      })
+      if (verified.status === 0) return true
+    } catch {
+      // Invalid or mixed artifacts cannot authorize this session. Leave their bytes untouched.
+    }
   }
   return false
 }
@@ -320,15 +352,40 @@ async function checkFinalReport(payload, cwd) {
  * 스킬을 켠 세션에서 그 뒤의 lock 없이 테스트를 쓰면 막는다. 비대화 실행이 "테스트부터 써 달라"는 요청을 근거로
  * 인터뷰·Bend·lock을 건너뛴 적이 있다 — 문서 규칙만으로는 막지 못했다. `.bend`는 lock 전에 쓰는 모델이다.
  */
+async function prelockProfile(cwd, filePath, activation) {
+  if (activation.conflicting) return undefined
+  if (activation.profile) return activation.profile
+  const profiles = new Set()
+  for (const directory of await oracleDirectories(cwd, filePath)) {
+    try {
+      const card = await readFile(join(directory, 'oracle.md'), 'utf8')
+      const stage = JSON.parse(await readFile(join(directory, STAGE_FILE), 'utf8'))
+      const binding = resolveProfileBinding({ bindings: [
+        { artifact: 'card', profile: readCardProfile(card) },
+        { artifact: 'stage', profile: stage.verificationProfile },
+      ] })
+      if (binding.kind === 'explicit') profiles.add(binding.profile)
+    } catch {
+      // Guidance cannot infer a profile from incomplete or inconsistent context.
+    }
+  }
+  return profiles.size === 1 ? [...profiles][0] : undefined
+}
+
 async function deniedBeforeLock(payload, cwd, absolutePath) {
   const portable = relative(cwd, absolutePath).split(sep).join('/')
   if (!isTestPath(portable) || portable.endsWith('.bend')) return false
   const activatedAt = await skillActivation(payload.transcript_path)
   if (activatedAt === null) return false
   const scopes = await lockedScopes(cwd, absolutePath, activatedAt)
+  const profile = await prelockProfile(cwd, absolutePath, activatedAt)
+  const guidance = {
+    'contract/v1': 'frontend-contract-design profile, whole card and Space',
+    'formal-bend/v1': 'frontend-oracle-design profile, Space, Bend model package and Draft `yes`',
+  }
   if (scopes.length === 0) {
     deny(
-      `TEST_BEFORE_LOCK: ${portable} — this session activated frontend-oracle-design and no oracle lock has been created since. Tests come after the Space discovery interview, the Bend model package, the Draft \`yes\` and the lock. A run that cannot ask the user ends NEEDS_DECISION with the first question; a request to write tests now or to verify existing code is not a reason to skip.`,
+      `TEST_BEFORE_LOCK: ${portable}: approve the resolved ${guidance[profile] ?? 'controller profile first (frontend-contract-design or frontend-oracle-design), then its card and Space'} and create its valid immutable lock. NEEDS_DECISION until approval; tests remain blocked until lock and production writes require the existing VALID_RED prerequisites. A request to write tests or verify existing code is not approval.`,
     )
     return true
   }
@@ -361,7 +418,13 @@ async function guardWrite(payload, cwd) {
 
   if (await deniedBeforeLock(payload, cwd, absolutePath)) return
 
+  const activation = await skillActivation(payload.transcript_path)
   for (const { directory, state } of await findStates(cwd, absolutePath)) {
+    const ownedRoot = typeof state.scanRoot === 'string' ? resolve(directory, state.scanRoot) : null
+    if (activation && ownedRoot && isPathInside(ownedRoot, absolutePath) && !isPathInside(directory, absolutePath) && !(await lockedAfter(directory, activation))) {
+      deny(`PROFILE_LOCK_REQUIRED: ${absolutePath}: current controller, approved card, stage, state and valid lock must agree before writes.`)
+      return
+    }
     // 대소문자를 가리지 않는 파일 시스템(macOS·Windows)에서는 HOST-RECEIPTS.jsonl도 같은 파일이다
     if (absolutePath.toLowerCase() === join(directory, HOST_RECEIPTS_FILE).toLowerCase()) {
       deny(

@@ -567,6 +567,28 @@ console.log(JSON.stringify({type:'result',subtype:'success',is_error:false,sessi
   return { ...fixture, spec, issue, invoke, environment }
 }
 
+test('profile packets reject mixed legacy worker metadata before budget or ledger mutation', async (t) => {
+  const fixture = await implementationWorkerFixture(t)
+  const path = fixture.issue()
+  const packet = JSON.parse(await readFile(path, 'utf8'))
+  assert.equal(Object.hasOwn(packet, 'verificationProfile'), false)
+  assert.equal(Object.hasOwn(packet, 'controller'), false)
+  const reservationPath = join(fixture.oracleDirectory, '.run-ids', packet.attemptId)
+  const reservation = JSON.parse(await readFile(reservationPath, 'utf8'))
+  const before = await readFile(join(fixture.oracleDirectory, 'runs.jsonl'), 'utf8')
+  const stateBefore = await readFile(join(fixture.oracleDirectory, 'run-state.json'), 'utf8')
+  for (const metadata of [{ verificationProfile: 'contract/v1', controller: 'frontend-contract-design' }, { controller: 'frontend-oracle-design' }]) {
+    const bytes = JSON.stringify({ ...packet, ...metadata })
+    await writeFile(path, bytes)
+    await writeFile(reservationPath, JSON.stringify({ ...reservation, packetSha256: createHash('sha256').update(bytes).digest('hex') }))
+    const result = fixture.invoke(path)
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /PROFILE_MISMATCH/)
+    assert.equal(await readFile(join(fixture.oracleDirectory, 'runs.jsonl'), 'utf8'), before)
+    assert.equal(await readFile(join(fixture.oracleDirectory, 'run-state.json'), 'utf8'), stateBefore)
+  }
+})
+
 test('worker fresh transport executes the existing GREEN gate and duplicate delivery is idempotent', async (t) => {
   const fixture = await implementationWorkerFixture(t)
   const packet = fixture.issue()

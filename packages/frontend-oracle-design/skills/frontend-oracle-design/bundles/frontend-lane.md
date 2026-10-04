@@ -14,7 +14,7 @@ delivery mechanism for the same bytes, not a node of its own.
 # Common contract — authority · policy sources · feedback routing
 
 Read this before any other reference node on every invocation, regardless of risk or mode. Immediately
-after it, load `mandatory-verification.md` before Draft/lock. Definitions that used to be duplicated across references are
+after it, read [verification-common](verification-common.md) and the resolved profile's current-stage requirements. Definitions that used to be duplicated across references are
 canonical here — each reference adds only its own stage-specific rules, and on any conflict this
 document wins.
 
@@ -91,11 +91,11 @@ alternative, then `NEEDS_DECISION`.
 Risk judgment is canonical in this document. Other documents point to this table and add only their
 lane procedure.
 
-| Risk     | Entry criteria                                                                                                                                                                        | Lane     | Default evidence                                                                                                                                   |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Low`    | no new policy·architecture decisions; a clear regression fix inside an existing approved behavior contract that still has a modelable core                                            | `oracle` | common + mandatory-verification + Bend/fast-check, plus type-fest/TypeScript with an exposed type boundary; same Oracle gates (scope may be small) |
-| `Medium` | needs a contract — new UI states·forms·responsive structure·async ordering·local/identity visual intent beside modelable behavior — but not payment·permission·data-loss-scale damage | `oracle` | Oracle Card, `VALID_RED`, required-label GREEN, one independent review                                                                             |
-| `High`   | payment·permissions·destructive actions·data loss·legal/security/privacy/financial/complex concurrency, where a false GREEN is costly                                                 | `oracle` | Medium evidence + consecutive-GREEN hardening, mutation kill·revert·re-GREEN, 2-sample independent review                                          |
+| Risk     | Entry criteria                                                                                                                                                                        | Lane     | Default evidence                                                                                                                     |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `Low`    | no new policy·architecture decisions; a clear regression fix inside an existing approved finite behavior contract                                                                     | `oracle` | common + selected-profile requirements, actual case evidence and applicable type/property evidence; same approval and Delivery gates |
+| `Medium` | needs a contract — new UI states·forms·responsive structure·async ordering·local/identity visual intent beside modelable behavior — but not payment·permission·data-loss-scale damage | `oracle` | Oracle Card, `VALID_RED`, required-label GREEN, one independent review                                                               |
+| `High`   | payment·permissions·destructive actions·data loss·legal/security/privacy/financial/complex concurrency, where a false GREEN is costly                                                 | `oracle` | Medium evidence + consecutive-GREEN hardening, mutation kill·revert·re-GREEN, 2-sample independent review                            |
 
 Risk judgment may take one optional evidence input: `scripts/oracle-twr.mjs` scores the target
 files' time-weighted bug-fix history from git. A high score is grounds to raise the lane or spend
@@ -103,9 +103,7 @@ more sweep·exploration budget; it is never a gate, never grounds to lower a jud
 absence blocks nothing.
 
 Low is not a bypass or escalation lane. Every Low invocation stays in the Oracle lane and loads
-common plus mandatory verification before Draft/lock. Copy, token and isolated-CSS work has no behavior a model can state: the scope gate in `SKILL.md`
-Entry stops it before this stack instead of looping in `NEEDS_DECISION`. The historical [`lanes/low-fast-path.md`](lanes/low-fast-path.md)
-text only explains legacy records and cannot authorize a new-work carve-out.
+common plus selected-profile verification before Draft/lock. Copy, token and isolated-CSS work without a behavioral contract stops at the controller's scope gate instead of looping in `NEEDS_DECISION`. Historical low-fast-path records cannot authorize a new-work carve-out.
 
 ## Jurisdiction rules
 
@@ -157,7 +155,7 @@ The contract is the agreed implementation criterion, not proof that all user pro
 Anyone investigating may record a candidate without a card row. Only the existing source and
 Draft/delta confirmation procedure can authorize changed product behavior. Never infer
 `NON_ORACLE_OPINION` from a missing row: link observed impact to the user task, approved goal or
-mandatory constraint and use the conditional [problem-definition review](card/policy-sources.md#problem-definition-review).
+mandatory constraint and use the selected profile's conditional problem-definition review at that decision point.
 An approved requirement missing from the card is `POLICY_GAP`, not taste; an unobserved preference
 with no approved criterion remains `NON_ORACLE_OPINION`. A candidate alone establishes neither.
 
@@ -258,7 +256,7 @@ actual change history, or an observed dependency leak — not an imagined future
 preserved contract, the owning responsibility, and the understanding·modification·verification
 path. Compare the simplest existing solution with the proposed boundary and name the cost accepted.
 Keep this reasoning in the existing Decision; its short example is owned by
-[`delivery/implementation-decision.md`](delivery/implementation-decision.md#material-change-sketch).
+[selected-profile delivery/implementation-decision.md procedure via loader](roles/loading.md).
 
 Use only relevant scenarios: an API representation change, a policy change, a presentation-only
 change, or feature removal. Tests and docs changing with their owner can be healthy cohesion;
@@ -360,7 +358,7 @@ merely call hooks with the same name.
 
 A simple input setter or generic transport PATCH remains appropriate when it is the actual
 contract. A named function can be enough; neither a command object, generic executor, nor global
-command bus is required. See [consumer-facing contracts](types/api-surface.md#consumer-facing-contracts).
+command bus is required. See [consumer-facing contracts](roles/loading.md).
 
 ### Separate decisions, coordination, and connections
 
@@ -373,7 +371,7 @@ This is not a five-file design. Small operations can keep functions together; ex
 and module boundaries may already suffice. A React-independent calculation needs no hook, and a
 pure business rule still belongs to its business owner, not a global utility bucket. A current
 explicit import may express an external dependency adequately; do not create a port or DI layer
-for every call. [React application](frontend/authoring.md#2-set-declarative-ui-and-micro-hook-boundaries)
+for every call. [React application](roles/loading.md)
 adds lifecycle and presentation guidance without changing these owners.
 
 ### Core patterns
@@ -506,7 +504,7 @@ collaboration instead of copying the supplier's entire public surface. This redu
 unrelated store, Context, or SDK details. Ask: does the consumer need the whole object, or only this
 role? A single value is preferable when sufficient; handling a whole domain object is legitimate
 when that is the responsibility. Keep supplier assembly at the existing composition owner, not in
-every consumer. See [consumer-facing contracts](types/api-surface.md#consumer-facing-contracts) for
+every consumer. See [consumer-facing contracts](roles/loading.md) for
 type relationships; a new interface is not mandatory.
 
 ### Provide purpose-specific reads
@@ -633,10 +631,10 @@ five-axis checklist. Its example lives in the delivery document linked above.
 
 This document owns only the meaning of change cost and its rationale.
 
-- The React runtime criteria are owned by [`frontend/decisions.md`](frontend/decisions.md) and
-  [`frontend/authoring.md`](frontend/authoring.md).
+- The React runtime criteria are owned by [selected-profile frontend/decisions.md procedure via loader](roles/loading.md) and
+  [selected-profile frontend/authoring.md procedure via loader](roles/loading.md).
 - The Implementation Decision's path·fields·writing time are owned by
-  [`delivery/implementation-decision.md`](delivery/implementation-decision.md).
+  [selected-profile delivery/implementation-decision.md procedure via loader](roles/loading.md).
 - `PASS | FINDING | N/A`, the finding router, and the minimal fix procedure are owned by
   [`subagent-review.md`](subagent-review.md).
 

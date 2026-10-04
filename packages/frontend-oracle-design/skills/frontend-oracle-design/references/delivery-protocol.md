@@ -3,7 +3,8 @@
 **Last Updated:** 2026-10-03
 
 Read when inspecting or changing the executable delivery protocol. Normal delivery uses the
-current-step guide and [ledger rules](delivery/ledger.md), not this authoring manual.
+current-step guide and named [`delivery-ledger`](roles/loading.md) rules, not this authoring manual.
+Resolve that named graph node with the same explicit profile and current-stage applicability before reading.
 
 ## Source and consumers
 

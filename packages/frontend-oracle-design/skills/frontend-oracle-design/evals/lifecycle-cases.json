@@ -53,7 +53,7 @@
         "risk": "High",
         "lane": "oracle",
         "status": "NEEDS_DECISION",
-        "loadedNodes": ["common", "card-policy-sources", "lifecycle-adaptation"]
+        "loadedNodes": ["common", "card-policy-sources", "lifecycle-adaptation", "lifecycle-adaptation-formal"]
       },
       "expectedConstraints": [
         "Separate observed-as-is, approved-to-be, and unknown",
@@ -97,7 +97,7 @@
         "risk": "Medium",
         "lane": "oracle",
         "status": "NEEDS_DECISION",
-        "loadedNodes": ["common", "card-policy-sources", "lifecycle-adaptation"]
+        "loadedNodes": ["common", "card-policy-sources", "lifecycle-adaptation", "lifecycle-adaptation-formal"]
       },
       "expectedConstraints": [
         "Evaluate milestone boundaries by independently verifiable outcomes",
@@ -117,7 +117,7 @@
         "risk": "Medium",
         "lane": "oracle",
         "status": "NEEDS_DECISION",
-        "loadedNodes": ["common", "card-policy-sources", "lifecycle-adaptation"]
+        "loadedNodes": ["common", "card-policy-sources", "lifecycle-adaptation", "lifecycle-adaptation-formal"]
       },
       "expectedConstraints": [
         "State that multi-card aggregate coordination is not supported by this update",

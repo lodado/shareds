@@ -1,7 +1,7 @@
 {
   "id": "frontend-oracle-design-reference-graph",
   "version": 1,
-  "description": "Conditionally loaded reference node graph. Every risk takes the common entry and mandatory-verification stack; low-fast-path is retained only as a legacy compatibility record. Each node's when is the canonical descriptive load condition. Optional typed route fields are executable projections at named decision points; oracle-reference-route.mjs includes unknown conditions conservatively and resolves requires edges. Uncompiled conditions remain manual in the SKILL.md catalog, never silently false. Routing is advice, not policy approval or a replacement for entry order. Contract tests cover both routing behavior and manual catalog coverage.",
+  "description": "Conditionally loaded reference graph with two closed profiles, formal-bend/v1 and contract/v1. Every canonical node declares its supported profiles. Selection filters profile before loading and follows unconditional requires plus only the selected requiresByProfile branch. Omitted profile preserves Formal compatibility. Uncompiled conditions remain manual advisory guidance, never approval. Fresh role contexts resolve their full current-profile closure without continuation assumptions.",
   "entry": "common",
   "entryContract": {
     "firstToolCall": "After the Skill load, Read exactly one lane entry node — common for every risk (low-fast-path is legacy-only)",
@@ -12,6 +12,7 @@
   "lanes": [
     {
       "id": "low-fast-path",
+      "profiles": ["formal-bend/v1"],
       "when": "risk=Low — legacy compatibility record; new work enters common",
       "nodes": ["common", "mandatory-verification"],
       "exclusive": false,
@@ -37,13 +38,11 @@
   "reviewPoints": [
     {
       "when": "always",
-      "nodes": [
-        "review-checklist",
-        "changeability",
-        "mandatory-verification",
-        "bend-cross-verification",
-        "types-advanced-contracts"
-      ]
+      "nodes": ["review-checklist", "changeability", "verification-common", "types-advanced-contracts"],
+      "nodesByProfile": {
+        "formal-bend/v1": ["mandatory-verification", "bend-cross-verification"],
+        "contract/v1": ["contract-review"]
+      }
     },
     {
       "when": "frontend production change",
@@ -70,17 +69,162 @@
       "nodes": ["performance"]
     },
     {
-      "when": "always — mandatory Bend verification and review",
+      "when": "always for formal-bend/v1: mandatory Bend verification and review",
+      "profiles": ["formal-bend/v1"],
       "nodes": ["bend-cross-verification"]
     },
     {
-      "when": "a card with ## Terms or ## Adequacy",
+      "when": "a Formal card with ## Terms or ## Adequacy",
+      "profiles": ["formal-bend/v1"],
       "nodes": ["adequacy"]
     }
   ],
   "nodes": [
     {
+      "id": "controller-entry-formal",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/controller-entry-formal.md",
+      "when": "Formal controller only: preserved controller entry contract",
+      "requires": ["common", "verification-common", "mandatory-verification"]
+    },
+    {
+      "id": "lifecycle-adaptation-formal",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/lifecycle-adaptation-formal.md",
+      "when": "Formal investigation breadth and lifecycle decision",
+      "requires": ["common", "card-policy-sources"]
+    },
+    {
+      "id": "graph-orchestration-formal",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/graph-orchestration-formal.md",
+      "when": "explicit Formal graph-orchestrated delivery request",
+      "requires": ["oracle-workflow-graph"]
+    },
+    {
+      "id": "formal-reference-links",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/formal-reference-links.md",
+      "when": "Formal current-stage link index, not automatic all-phase reads",
+      "requires": []
+    },
+    {
+      "id": "role-controller-formal",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/roles/controller-formal.md",
+      "when": "Formal controller only at current stage",
+      "requires": ["mandatory-verification", "controller-entry-formal"]
+    },
+    {
+      "id": "role-reporting-formal",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/roles/reporting-formal.md",
+      "when": "Formal controller only before reporting",
+      "requires": ["mandatory-verification"]
+    },
+    {
+      "id": "role-loading-formal",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/roles/loading-formal.md",
+      "when": "Formal context loading rules",
+      "requires": ["common", "formal-reference-links"]
+    },
+    {
+      "id": "role-case-space-inputs-formal",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/roles/case-space-inputs-formal.md",
+      "when": "Formal model input families",
+      "requires": ["common", "bva"]
+    },
+    {
+      "id": "role-space-discovery-formal",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/roles/space-discovery-formal.md",
+      "when": "Formal source and axes investigation",
+      "requires": ["common", "card-policy-sources"]
+    },
+    {
+      "id": "role-intake-formal",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/roles/intake-formal.md",
+      "when": "Formal intake procedure",
+      "requires": ["mandatory-verification"]
+    },
+    {
+      "id": "role-implement-formal",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/roles/implement-formal.md",
+      "when": "Formal implementation procedure after VALID_RED",
+      "requires": ["mandatory-verification"]
+    },
+    {
+      "id": "role-review-formal",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/roles/review-formal.md",
+      "when": "Formal independent review with assigned blinded inputs",
+      "loader": "reviewer",
+      "requires": ["mandatory-verification"]
+    },
+    {
+      "id": "verification-common",
+      "profiles": ["formal-bend/v1", "contract/v1"],
+      "path": "references/verification-common.md",
+      "when": "common verification authority in each fresh context",
+      "requires": ["common"]
+    },
+    {
+      "id": "contract-requirements",
+      "profiles": ["contract/v1"],
+      "path": "references/contract/requirements.md",
+      "when": "Contract requirements before authoring and verification",
+      "requires": ["verification-common"]
+    },
+    {
+      "id": "contract-space",
+      "profiles": ["contract/v1"],
+      "path": "references/contract/space.md",
+      "when": "Contract Space discovery and full-product case disposition",
+      "requires": ["contract-requirements", "bva"]
+    },
+    {
+      "id": "contract-authoring",
+      "profiles": ["contract/v1"],
+      "path": "references/contract/authoring.md",
+      "when": "Contract authoring after human-confirmed axes",
+      "requires": ["contract-requirements", "contract-space"]
+    },
+    {
+      "id": "contract-review",
+      "profiles": ["contract/v1"],
+      "path": "references/contract/review.md",
+      "when": "independent Contract reviewer with assigned blinded mode inputs",
+      "loader": "reviewer",
+      "requires": ["verification-common", "contract-requirements"]
+    },
+    {
+      "id": "role-author-formal",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/roles/author-formal.md",
+      "when": "Formal source-bound model package and projected Draft authoring",
+      "requires": [
+        "mandatory-verification",
+        "bend-cross-verification",
+        "adequacy",
+        "model-patterns",
+        "model-package-example",
+        "discovery"
+      ]
+    },
+    {
+      "id": "role-author-closure-formal",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/roles/author-closure-formal.md",
+      "when": "Formal post-GREEN discovery closure or runtime anomaly",
+      "requires": ["mandatory-verification", "bend-cross-verification", "discovery"]
+    },
+    {
       "id": "delivery-protocol",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "route": { "at": ["protocol-inspection"], "if": true },
       "path": "references/delivery-protocol.md",
       "when": "when inspecting or changing the executable delivery protocol",
@@ -88,6 +232,7 @@
     },
     {
       "id": "delivery-protocol-spec",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/delivery.protocol.json",
       "when": "oracle-run.mjs command startup — compile before dispatch",
       "loader": "script",
@@ -95,167 +240,222 @@
     },
     {
       "id": "low-fast-path",
+      "profiles": ["formal-bend/v1"],
       "path": "references/lanes/low-fast-path.md",
       "when": "legacy records only — new work uses common and mandatory-verification",
       "requires": []
     },
     {
       "id": "common",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/common.md",
-      "when": "first priority on every invocation before mandatory verification",
+      "when": "first priority on every invocation before current-profile verification",
       "requires": []
     },
     {
       "id": "mandatory-verification",
+      "profiles": ["formal-bend/v1"],
       "path": "references/mandatory-verification.md",
       "when": "every invocation — after common and before Draft/lock; all risks and both modes; re-read before verification and review",
       "requires": ["common"]
     },
     {
       "id": "role-controller",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/roles/controller.md",
       "when": "controller only at the selected runtime stage, approval, lock, dispatch, recovery or resume decision; not a specialist dependency",
-      "requires": ["role-loading", "mandatory-verification"]
+      "requires": ["role-loading", "verification-common"],
+      "requiresByProfile": {
+        "formal-bend/v1": ["mandatory-verification", "role-controller-formal"],
+        "contract/v1": ["contract-requirements"]
+      }
     },
     {
       "id": "role-reporting",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/roles/reporting.md",
       "when": "controller only before final reporting or reporting a stopped, held or visual-pending run",
-      "requires": ["role-loading", "mandatory-verification"]
+      "requires": ["role-loading", "verification-common"],
+      "requiresByProfile": {
+        "formal-bend/v1": ["mandatory-verification", "role-reporting-formal"],
+        "contract/v1": ["contract-requirements"]
+      }
     },
     {
       "id": "role-loading",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/roles/loading.md",
       "when": "each controller or specialist context before resolving applicable references or recording stage documents; fresh workers load their own dependencies",
-      "requires": ["common"]
+      "requires": ["common"],
+      "requiresByProfile": { "formal-bend/v1": ["role-loading-formal"], "contract/v1": [] }
     },
     {
       "id": "role-case-space-inputs",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/roles/case-space-inputs.md",
-      "when": "proposing Space discovery axes or deciding model-package input families",
-      "requires": ["common", "bva"]
+      "when": "proposing current-profile Space discovery axes and input taxonomy",
+      "requires": ["common", "bva"],
+      "requiresByProfile": { "formal-bend/v1": ["role-case-space-inputs-formal"], "contract/v1": ["contract-space"] }
     },
     {
       "id": "role-space-discovery",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/roles/space-discovery.md",
-      "when": "after source investigation and before any Bend, plan or Draft; confirm axes with the human and revisit changed axes or discovery questions",
-      "requires": ["common", "card-policy-sources", "role-case-space-inputs"]
+      "when": "after source investigation and before authoring; confirm axes with the human and revisit changed axes or discovery questions",
+      "requires": ["common", "card-policy-sources", "role-case-space-inputs"],
+      "requiresByProfile": { "formal-bend/v1": ["role-space-discovery-formal"], "contract/v1": ["contract-space"] }
     },
     {
       "id": "role-intake",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/roles/intake.md",
       "when": "oracle-intake invocation for source investigation, Outcome Brief, risk, capability or Space discovery; no card authoring",
       "requires": [
         "role-loading",
-        "mandatory-verification",
+        "verification-common",
         "card-policy-sources",
         "card-risk-grill",
         "role-space-discovery"
-      ]
+      ],
+      "requiresByProfile": {
+        "formal-bend/v1": ["mandatory-verification", "role-intake-formal"],
+        "contract/v1": ["contract-requirements", "contract-space"]
+      }
     },
     {
       "id": "role-author",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/roles/author.md",
-      "when": "oracle-author invocation after human-confirmed axes to author the source-bound model package and projected Draft",
+      "when": "oracle-author invocation after human-confirmed axes to author the current-profile source-bound Draft and required verification artifacts",
       "requires": [
         "role-loading",
-        "mandatory-verification",
-        "bend-cross-verification",
-        "adequacy",
+        "verification-common",
         "card-policy-sources",
         "card-risk-grill",
         "card-format",
         "card-interaction-sweep",
         "card-case-space"
-      ]
+      ],
+      "requiresByProfile": { "formal-bend/v1": ["role-author-formal"], "contract/v1": ["contract-authoring"] }
     },
     {
       "id": "role-author-closure",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/roles/author-closure.md",
       "when": "Delivery with a model package after IMPLEMENTED_GREEN and before final reporting, or runtime anomaly, escape, discovery candidate or operator work",
-      "requires": ["role-loading", "mandatory-verification", "bend-cross-verification", "discovery"]
+      "requires": ["role-loading", "verification-common"],
+      "requiresByProfile": {
+        "formal-bend/v1": ["role-author-closure-formal"],
+        "contract/v1": ["contract-requirements", "contract-space"]
+      }
     },
     {
       "id": "role-implement",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "implementationInput": "always",
       "path": "references/roles/implement.md",
       "when": "oracle-implement invocation and every fresh implementation worker; only verified lock and accepted VALID_RED permit ordinary production changes",
-      "requires": [
-        "role-loading",
-        "mandatory-verification",
-        "delivery-implementation-decision",
-        "delivery-green-review"
-      ]
+      "requires": ["role-loading", "verification-common", "delivery-implementation-decision"],
+      "requiresByProfile": {
+        "formal-bend/v1": ["mandatory-verification", "role-implement-formal"],
+        "contract/v1": ["contract-requirements"]
+      }
     },
     {
       "id": "role-review",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/roles/review.md",
       "when": "oracle-review invocation in its independent reviewer context for the assigned cold-read, reverse-impossible, source-aware or delivery review mode",
       "loader": "reviewer",
-      "requires": ["role-loading", "mandatory-verification"]
+      "requires": ["role-loading", "verification-common"],
+      "requiresByProfile": {
+        "formal-bend/v1": ["mandatory-verification", "role-review-formal"],
+        "contract/v1": ["contract-review"]
+      }
     },
     {
       "id": "bva",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/bva.md",
       "when": "writing contract rows·translating tests (shared byte-identical with $test)",
       "requires": []
     },
     {
       "id": "card-policy-sources",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/card/policy-sources.md",
+      "pathsByProfile": { "contract/v1": "references/contract/policy-sources.md" },
       "when": "start of card writing, or conditional problem-definition review for unclear purpose/task, cross-boundary impact, unexplained task failure, material dismissal, conflicting new evidence or repeated escapes — Low follows the same current path; legacy single-node records are historical only",
       "requires": ["common"]
     },
     {
       "id": "lifecycle-adaptation",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/lifecycle-adaptation.md",
       "when": "Oracle lane only — before selecting investigation breadth/depth for unclear existing-system ownership, cross-boundary scope, or single-card milestone grouping",
-      "requires": ["common", "card-policy-sources"]
+      "requires": ["common", "card-policy-sources"],
+      "requiresByProfile": { "formal-bend/v1": ["lifecycle-adaptation-formal"], "contract/v1": [] }
     },
     {
       "id": "card-risk-grill",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/card/risk-grill.md",
+      "pathsByProfile": { "contract/v1": "references/contract/risk-grill.md" },
       "when": "start of card writing",
       "requires": ["common", "card-policy-sources"]
     },
     {
       "id": "card-format",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/card/card-format.md",
+      "pathsByProfile": { "contract/v1": "references/contract/card-format.md" },
       "when": "writing contract rows·State Model",
       "requires": ["common", "bva"]
     },
     {
       "id": "card-interaction-sweep",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/card/interaction-sweep.md",
+      "pathsByProfile": { "contract/v1": "references/contract/interaction-sweep.md" },
       "when": "after drafting contract rows and before showing the Draft — disposition sweep of new×inherited×runtime interactions",
       "requires": ["common", "card-format"]
     },
     {
       "id": "card-case-space",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/card/case-space.md",
-      "when": "authoring the model package or projected card: decide seven input families, holds, possible cases and residual limits; intake-only discovery uses role-space-discovery instead",
+      "pathsByProfile": { "contract/v1": "references/contract/case-space.md" },
+      "when": "current-profile card or verification-artifact authoring: decide finite input cases, holds, dispositions and residual limits; intake-only discovery uses role-space-discovery instead",
       "requires": ["common", "bva", "card-format", "role-space-discovery", "role-case-space-inputs"]
     },
     {
       "id": "card-case-space-frames",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/card/case-space-frames.md",
-      "when": "a legacy card without a model package — declaring dimensions by hand, the pre-plan test-space briefing, generating frames with oracle-frames.mjs and dispositioning them, or the full-product opt-in",
+      "pathsByProfile": { "contract/v1": "references/contract/case-space-frames.md" },
+      "when": "current-profile frame enumeration and current revision/ID dispositions; Contract requires full-product enumeration, while historical Formal frame records retain their legacy conditions",
       "requires": ["card-case-space"]
     },
     {
       "id": "card-retro-metrics",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/card/retro-metrics.md",
+      "pathsByProfile": { "contract/v1": "references/contract/retro-metrics.md" },
       "when": "recording any defect found after the lock, the run metrics at REVIEW_VERIFIED, or reviewing an execution observation as a conditional guardrail candidate — read with the card lane so the escape classes are known before the sweep; candidate review is not a delivery gate and Low follows the same conditions",
-      "requires": ["common", "card-case-space"]
+      "requires": ["common"],
+      "requiresByProfile": { "formal-bend/v1": ["card-case-space"], "contract/v1": ["contract-space"] }
     },
     {
       "id": "card-confirmation-lock",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/card/confirmation-lock.md",
+      "pathsByProfile": { "contract/v1": "references/contract/confirmation-lock.md" },
       "when": "just before user confirmation·lock·init, or when a stage detects a revision mismatch",
       "requires": ["common"]
     },
     {
       "id": "visual-design",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "implementationInput": "conditional",
       "path": "references/visual-design.md",
       "when": "before a visible UI change; re-read at review when a Design Intent exists",
@@ -263,54 +463,70 @@
     },
     {
       "id": "delivery-ledger",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/delivery/ledger.md",
+      "pathsByProfile": { "contract/v1": "references/contract/ledger.md" },
       "when": "right after entering Delivery (after the explicit $test call), and within Delivery before an uncertain command or scope-changing recovery",
       "requires": ["common"]
     },
     {
       "id": "delivery-red",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/delivery/red.md",
+      "pathsByProfile": { "contract/v1": "references/contract/red.md" },
       "when": "Delivery only — writing tests·the VALID_RED transition, and before a test/harness correction on the RED-to-GREEN path",
       "requires": ["delivery-ledger", "bva"]
     },
     {
       "id": "delivery-implementation-decision",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/delivery/implementation-decision.md",
+      "pathsByProfile": { "contract/v1": "references/contract/implementation-decision.md" },
       "when": "just before modifying production after VALID_RED",
       "requires": ["changeability", "frontend-authoring"]
     },
     {
       "id": "delivery-green-review",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/delivery/green-review.md",
+      "pathsByProfile": { "contract/v1": "references/contract/green-review.md" },
       "when": "Delivery only — self-feedback·GREEN·the review transition, and before reporting completion with missing or failed evidence",
       "requires": ["delivery-ledger", "frontend-quality"]
     },
     {
       "id": "changeability",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/changeability.md",
       "when": "before choosing the implementation method·boundaries·unification (including production changes)·independent review",
       "requires": ["common"]
     },
     {
       "id": "frontend-decisions",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/frontend/decisions.md",
+      "pathsByProfile": { "contract/v1": "references/contract/decisions.md" },
       "when": "before choosing the frontend implementation means — selecting loading·error boundaries, placing state ownership, deciding the execution location. Modifying production is only one point in that decision",
       "requires": ["common"]
     },
     {
       "id": "frontend-authoring",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/frontend/authoring.md",
+      "pathsByProfile": { "contract/v1": "references/contract/decisions.md" },
       "when": "just before writing frontend production code·component structure — component splitting·micro-hook·effect boundaries",
       "requires": ["frontend-decisions"]
     },
     {
       "id": "frontend-quality",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/frontend/quality.md",
+      "pathsByProfile": { "contract/v1": "references/contract/quality.md" },
       "when": "before the GREEN gate·independent review — checking Design Intent implementation·performance·accessibility",
       "requires": []
     },
     {
       "id": "architecture-contract",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "route": { "at": ["scope-decision"], "if": { "eq": ["architectureBoundaryChange", true] } },
       "implementationInput": "conditional",
       "path": "references/architecture-contract.md",
@@ -319,41 +535,52 @@
     },
     {
       "id": "types-state-ladder",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "implementationInput": "conditional",
       "path": "references/types/state-ladder.md",
+      "pathsByProfile": { "contract/v1": "references/contract/state-ladder.md" },
       "when": "before async·duplicate-submit O* rows or a client state·boundary type change",
       "requires": ["common", "frontend-decisions"]
     },
     {
       "id": "types-authoring",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "implementationInput": "conditional",
       "path": "references/types/authoring.md",
+      "pathsByProfile": { "contract/v1": "references/contract/api-surface.md" },
       "when": "together with state-ladder",
       "requires": ["types-state-ladder"]
     },
     {
       "id": "types-api-surface",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "implementationInput": "conditional",
       "path": "references/types/api-surface.md",
+      "pathsByProfile": { "contract/v1": "references/contract/api-surface.md" },
       "when": "together with state-ladder",
       "requires": ["types-state-ladder", "types-authoring"]
     },
     {
       "id": "types-advanced-contracts",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "implementationInput": "conditional",
       "path": "references/types/advanced-contracts.md",
+      "pathsByProfile": { "contract/v1": "references/contract/advanced-contracts.md" },
       "when": "the card has an exposed type boundary (exported Props · shared/package API · client state union · trust-boundary type) — mandatory type-fest/TypeScript contract path before Draft/lock; adoption via compiler witness packet gate",
       "requires": ["types-api-surface"]
     },
     {
       "id": "types-review-criteria",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/types/review-criteria.md",
+      "pathsByProfile": { "contract/v1": "references/contract/review-criteria.md" },
       "when": "independent review of a type·state contract change",
       "loader": "reviewer",
       "requires": ["subagent-review"]
     },
     {
       "id": "type-environment",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "implementationInput": "conditional",
       "path": "references/type-environment.md",
       "when": "once per repo — the first type contract or a tsconfig·TS version·witness inclusion·checker path change",
@@ -361,6 +588,7 @@
     },
     {
       "id": "fsd",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "implementationInput": "conditional",
       "path": "references/fsd.md",
       "when": "FSD repo (or approved adoption) + before proposing·designing·reviewing FSD adoption·domain boundaries·slice ownership·public APIs·dependencies·folder structure, including boundary changes with no folder moves",
@@ -368,6 +596,7 @@
     },
     {
       "id": "backend",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "route": { "at": ["scope-decision"], "if": { "eq": ["backendBoundaryChange", true] } },
       "implementationInput": "conditional",
       "path": "references/backend.md",
@@ -376,6 +605,7 @@
     },
     {
       "id": "performance",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "route": { "at": ["scope-decision"], "if": { "eq": ["performanceClaim", true] } },
       "implementationInput": "conditional",
       "path": "references/performance.md",
@@ -384,12 +614,14 @@
     },
     {
       "id": "subagent-review",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/subagent-review.md",
       "when": "Delivery only — before contextual packet collection and independent review after implementation/test verification",
       "requires": ["common", "changeability"]
     },
     {
       "id": "review-checklist",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/review-checklist.md",
       "when": "when the reviewer adjudicates — the primary agent does not load it and only registers it with --review-point",
       "loader": "reviewer",
@@ -397,18 +629,22 @@
     },
     {
       "id": "graph-orchestration",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/graph-orchestration.md",
       "when": "explicit request for a graph-orchestrated delivery loop only",
-      "requires": ["oracle-workflow-graph"]
+      "requires": ["oracle-workflow-graph"],
+      "requiresByProfile": { "formal-bend/v1": ["graph-orchestration-formal"], "contract/v1": [] }
     },
     {
       "id": "bend-cross-verification",
+      "profiles": ["formal-bend/v1"],
       "path": "references/bend-cross-verification.md",
       "when": "every invocation — mandatory Bend proof/model path before Draft/lock; re-read before proof execution and GREEN/review",
       "requires": ["common"]
     },
     {
       "id": "model-patterns",
+      "profiles": ["formal-bend/v1"],
       "route": { "at": ["model-authoring"], "if": true },
       "path": "references/model-patterns.md",
       "when": "writing or revising MODEL.bend, LAWS.bend or PROOF.bend — rules instead of answer tables, laws that pin every result, proofs by case or induction; time as events, attempts, error sum types and separate effect counts",
@@ -416,12 +652,14 @@
     },
     {
       "id": "adequacy",
+      "profiles": ["formal-bend/v1"],
       "path": "references/adequacy.md",
       "when": "Bend path with goals from the source text — writing the model package, ## Terms or ## Adequacy, dispatching the model analyst, or running oracle-adequacy.mjs or oracle-package.mjs",
       "requires": ["common"]
     },
     {
       "id": "model-package-example",
+      "profiles": ["formal-bend/v1"],
       "route": { "at": ["package-authoring"], "if": true },
       "path": "references/model-package.example.json",
       "when": "writing the model package — start from it and replace every value; it passes oracle-package.mjs validate --stage model",
@@ -429,12 +667,14 @@
     },
     {
       "id": "discovery",
+      "profiles": ["formal-bend/v1"],
       "path": "references/discovery.md",
       "when": "Delivery with a model package — after IMPLEMENTED_GREEN and again before the final report; whenever a runtime anomaly or escape arrives; writing the requirement inventory, fault model, metamorphic relations, operator dispositions or discovery decisions, dispatching an AI operator, or running oracle-discovery.mjs",
       "requires": ["common"]
     },
     {
       "id": "oracle-workflow-graph",
+      "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/oracle-workflow.graph.json",
       "when": "together with graph-orchestration",
       "loader": "graph-tooling",
@@ -442,6 +682,121 @@
     }
   ],
   "bundles": [
+    {
+      "id": "contract-card-lane",
+      "profile": "contract/v1",
+      "when": "Contract card authoring after confirmed axes",
+      "nodes": [
+        "common",
+        "contract-authoring",
+        "card-policy-sources",
+        "card-risk-grill",
+        "bva",
+        "card-format",
+        "card-interaction-sweep",
+        "card-case-space",
+        "card-confirmation-lock"
+      ]
+    },
+    {
+      "id": "contract-delivery-lane",
+      "profile": "contract/v1",
+      "when": "Contract Delivery entry only after ORACLE_READY",
+      "nodes": ["delivery-ledger"]
+    },
+    {
+      "id": "contract-types-lane",
+      "profile": "contract/v1",
+      "when": "applicable Contract type boundary",
+      "nodes": [
+        "types-state-ladder",
+        "types-authoring",
+        "types-api-surface",
+        "types-advanced-contracts",
+        "frontend-decisions"
+      ]
+    },
+    {
+      "id": "contract-frontend-lane",
+      "profile": "contract/v1",
+      "when": "applicable Contract frontend criteria",
+      "nodes": ["changeability", "frontend-decisions", "frontend-authoring", "frontend-quality"]
+    },
+    {
+      "id": "contract-delivery-lane-continued",
+      "profile": "contract/v1",
+      "when": "Contract Delivery entry with card nodes already read in this context",
+      "after": ["contract-card-lane"],
+      "nodes": ["delivery-ledger"]
+    },
+    {
+      "id": "contract-types-lane-continued",
+      "profile": "contract/v1",
+      "when": "Contract types with card and Delivery nodes already read in this context",
+      "after": ["contract-card-lane", "contract-delivery-lane"],
+      "nodes": [
+        "types-state-ladder",
+        "types-authoring",
+        "types-api-surface",
+        "types-advanced-contracts",
+        "frontend-decisions"
+      ]
+    },
+    {
+      "id": "contract-frontend-lane-continued",
+      "profile": "contract/v1",
+      "when": "Contract frontend with Delivery nodes already read in this context",
+      "after": ["contract-delivery-lane"],
+      "nodes": ["changeability", "frontend-decisions", "frontend-authoring", "frontend-quality"]
+    },
+    {
+      "id": "role-intake",
+      "profile": "formal-bend/v1",
+      "when": "fresh Formal intake context",
+      "nodes": ["role-intake"]
+    },
+    {
+      "id": "role-author",
+      "profile": "formal-bend/v1",
+      "when": "fresh Formal author context",
+      "nodes": ["role-author"]
+    },
+    {
+      "id": "role-implement",
+      "profile": "formal-bend/v1",
+      "when": "fresh Formal implementation context after accepted VALID_RED",
+      "nodes": ["role-implement"]
+    },
+    {
+      "id": "role-review",
+      "profile": "formal-bend/v1",
+      "when": "fresh independent Formal review context with assigned blinded inputs",
+      "nodes": ["role-review"]
+    },
+    {
+      "id": "contract-role-intake",
+      "profile": "contract/v1",
+      "when": "fresh Contract intake context",
+      "nodes": ["role-intake"]
+    },
+    {
+      "id": "contract-role-author",
+      "profile": "contract/v1",
+      "when": "fresh Contract author context",
+      "nodes": ["role-author"]
+    },
+    {
+      "id": "contract-role-implement",
+      "profile": "contract/v1",
+      "when": "fresh Contract implementation context after accepted VALID_RED",
+      "nodes": ["role-implement"]
+    },
+    {
+      "id": "contract-role-review",
+      "profile": "contract/v1",
+      "when": "fresh independent Contract review context with assigned blinded inputs",
+      "nodes": ["role-review"]
+    },
     {
       "id": "card-lane",
       "when": "oracle lane, writing an Oracle Card — replaces the common·card·bva node reads",

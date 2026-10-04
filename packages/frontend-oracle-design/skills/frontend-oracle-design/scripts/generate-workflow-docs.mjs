@@ -92,10 +92,15 @@ export function renderReferenceBlock(referenceGraph) {
   const edges = []
 
   for (const node of referenceGraph.nodes) {
-    for (const dependency of node.requires) {
-      edges.push(`  ${mermaidId(dependency)} --> ${mermaidId(node.id)}`)
+    const dependencies = [
+      ...node.requires.map((id) => ({ id, profile: null })),
+      ...Object.entries(node.requiresByProfile ?? {}).flatMap(([profile, ids]) => ids.map((id) => ({ id, profile }))),
+    ]
+    for (const dependency of dependencies) {
+      const edge = dependency.profile ? ` -. "${dependency.profile}" .-> ` : ' --> '
+      edges.push(`  ${mermaidId(dependency.id)}${edge}${mermaidId(node.id)}`)
       routed.add(node.id)
-      routed.add(dependency)
+      routed.add(dependency.id)
     }
   }
 
@@ -117,13 +122,16 @@ export function renderReferenceBlock(referenceGraph) {
 
 계약 문서는 한 번에 다 읽지 않습니다.
 [\`reference-graph.json\`](references/reference-graph.json)이 진입 risk로 lane을 고르고,
-\`when\` 조건이 충족된 노드의 전문과 그 \`requires\` 엣지만 로드합니다. 아래 도식은 그
-파일에서 생성되므로 노드나 \`requires\`가 바뀌면 함께 갱신됩니다.
+\`when\` 조건이 충족된 현재 profile 노드의 전문과 \`requires\`, 선택한
+\`requiresByProfile\` 엣지만 로드합니다. profile은 \`formal-bend/v1\` 또는 \`contract/v1\`이고,
+생략한 저수준 호출은 기존 Formal 동작을 유지합니다. 점선은 해당 profile에서만 적용되는 의존성입니다.
+Fresh specialist는 부모의 continuation bundle 가정을 상속하지 않고 전체 역할 closure를 읽습니다.
+아래 도식은 같은 canonical graph에서 생성되며 두 번째 실행 그래프가 아닙니다.
 
 \`\`\`mermaid
 flowchart LR
   START(["요청"]) --> RISK{"risk 판정"}
-  RISK -->|"모든 risk"| ${mermaidId(entry)}["${entry}<br/><i>common · mandatory verification</i>"]
+  RISK -->|"모든 risk"| ${mermaidId(entry)}["${entry}<br/><i>common · current-profile verification</i>"]
   LEGACY["low-fast-path<br/><i>legacy records only</i>"] -.-> ${mermaidId(entry)}
 
 ${labels.join('\n')}

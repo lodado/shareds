@@ -1,3 +1,53 @@
+# 0.84.0: explicit Oracle / Contract verification profiles
+
+Integration evidence for the approved two-entry split. The existing `frontend-oracle-design`
+remains `formal-bend/v1`; `frontend-contract-design` selects `contract/v1`. Both share four
+specialist skills, the neutral finite-Space auditor, the canonical Delivery runner and the
+append-only lock/ledger machinery. Profile identity is bound by approved card bytes and checked
+across authoring stages, locks, run state, worker/review inputs and receipts. Historical cards
+without metadata remain legacy artifacts, not newly authorized Contract profiles.
+
+## Public acceptance paths
+
+- `scripts/contract-public-runner.test.mjs`: real imported toggle assertions fail on the defective
+  product, then pass after a product-only repair. Public lock/init/VALID_RED, Medium consecutive
+  reported passes, IMPLEMENTED_GREEN and standalone evidence run under a deny-Formal loader.
+- `scripts/contract-stale-search.test.mjs`: real existing reducer and adapter, old-first/new-first
+  completion order, immutable state and latest-result assertions. Actual reported cases, real
+  TypeScript/type-fest positive/negative witnesses and sampled fast-check results share the current
+  registered source snapshot. The two declared frames do not exhaust unbounded application history.
+- `scripts/contract-evidence.test.mjs`: actual case identity/tuple/revision binding, real fixed Node
+  compiler/property producers, current product/harness/manifest freshness and refused-operation
+  immutability. Missing TypeScript, fast-check or type-fest cannot supply genuine product RED,
+  including mixed nonzero runs with an unrelated assertion failure.
+- `scripts/profile-public-failures.test.mjs`: unavailable Contract runner, Design-only/approval
+  holds, profile tampering, ALREADY_SATISFIED, metadata-less legacy reopening, unavailable Bend
+  without fallback and actual cached Bend/Lean Formal proof/adequacy/projection/Delivery.
+- `scripts/profile-packets.test.mjs` and `scripts/profile-reference-isolation.test.mjs`: profile
+  identity, fresh physical reference closures, blinded audiences and stale-input rejection. Fake
+  host events and scripted review findings exercise transport, not native independent judgment.
+- `scripts/installed-skill-acceptance.mjs`: coordinator-supplied actual registry cache paths and
+  six installed Jcode directories must match source metadata and SHA256 bytes. Its unit fixtures
+  are synthetic mechanics checks, not actual installation evidence.
+
+## Scope and reporting limits
+
+Contract requires nonempty finite `full-product` coverage, sourced constraints/dispositions,
+actual reported `contract-cases` and applicable genuine type/property producers. It does not create
+an `oracle.package.json`, import Formal evaluators or claim Bend proof. Required Formal verification
+cannot be waived by selecting Contract. Missing capability stops with the actual cause.
+
+Producer diagnostic requests are currently globally name-keyed rather than authenticated to the
+emitting test/file scope. Genuine execution and registered-input hashes do not prove per-test
+cryptographic provenance, witness relevance, invariant adequacy or source completeness. Independent
+review still adjudicates those limits. Case count, sampled property count and formal verification
+status remain separate; before actual accepted execution, unique execution/pass counts are null.
+
+Final integrated root/package gates, release push, user-scope refresh, actual three-host byte parity
+and fresh exact-Sol native Skill/full-reference/outcome traces must be recorded separately before
+claiming installed acceptance. Pre-review GREEN is not REVIEW_VERIFIED. Prior evaluations below are
+historical evidence and retain their original versions, commands and limits.
+
 # 0.66.0 — Formal Oracle Projection, world conformance and out-of-space discovery (2026-09-30)
 
 A skill/harness meta change; no product Oracle state was assigned. Baseline: 0.65.0 at `c13369c`.

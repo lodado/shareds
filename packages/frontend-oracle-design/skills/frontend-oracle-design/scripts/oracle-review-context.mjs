@@ -1,6 +1,8 @@
 import { realpath } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { snapshotRegularFile } from './oracle-fs.mjs'
+import { fileURLToPath } from 'node:url'
+import { loadGraph, splitDelivery } from './generate-reference-bundles.mjs'
+import { snapshotRegularFile, stableStringify } from './oracle-fs.mjs'
 
 export const REVIEW_DIMENSIONS = Object.freeze(['readability', 'maintainability', 'reliability', 'performance'])
 const SOURCES = ['approved-policy', 'implementation-reference', 'observation']
@@ -152,6 +154,19 @@ export async function snapshotContext(manifest, { root, oracle, lock, lockDirect
     }
   }
   return { context: { ...manifest, files }, snapshots }
+}
+
+export async function assertProfileReviewReferences(packet) {
+  if (!packet.verificationProfile) return
+  const base = fileURLToPath(new URL('../', import.meta.url))
+  const graph = await loadGraph()
+  const { delivered } = splitDelivery(graph, { id: 'review-packet', profile: packet.verificationProfile, nodes: ['role-review'] })
+  if (delivered.some(({ id }) => /^(?:role-(?:controller|reporting)(?:-formal)?|controller-entry-formal)$/.test(id))) throw new Error('review references contain controller authority')
+  const expected = await Promise.all(delivered.map(async (node) => {
+    const file = await snapshotRegularFile(resolve(base, node.path), { base, allowHardlinks: false, label: 'review reference' })
+    return { id: node.id, path: node.path, sha256: file.sha256 }
+  }))
+  if (stableStringify(packet.references) !== stableStringify(expected)) throw new Error('review profile reference closure is omitted, mismatched or stale')
 }
 
 export function contextGaps(context) {

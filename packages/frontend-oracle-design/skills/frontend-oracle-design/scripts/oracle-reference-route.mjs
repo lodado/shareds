@@ -4,7 +4,7 @@ import { readFile, realpath } from 'node:fs/promises'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
-import { loadGraph, splitDelivery } from './generate-reference-bundles.mjs'
+import { loadGraph, REFERENCE_PROFILES, referenceDependencies, referencePathFor, referenceProfile, splitDelivery, validateReferenceProfiles } from './generate-reference-bundles.mjs'
 
 const POINTS = ['scope-decision', 'model-authoring', 'package-authoring', 'protocol-inspection']
 const FACTS = ['architectureBoundaryChange', 'backendBoundaryChange', 'performanceClaim']
@@ -82,7 +82,11 @@ function validateGraph(graph) {
   }
   // Validate unused nodes too: a false predicate must not hide malformed dependency wiring.
   try {
-    splitDelivery(graph, { id: 'route-validation', nodes: [...ids] })
+    validateReferenceProfiles(graph)
+    for (const profile of REFERENCE_PROFILES) {
+      const nodes = graph.nodes.filter((node) => (node.profiles ?? ['formal-bend/v1']).includes(profile)).map((node) => node.id)
+      splitDelivery(graph, { id: 'route-validation', nodes, profile })
+    }
   } catch (error) {
     invalid(error.message)
   }
@@ -103,9 +107,10 @@ function truth(predicate, facts) {
 
 export function routeReferences(graph, options) {
   object(options, 'request')
-  if (Object.keys(options).some((key) => !['point', 'facts', 'include'].includes(key)))
+  if (Object.keys(options).some((key) => !['point', 'facts', 'include', 'profile'].includes(key)))
     invalid('request has unknown fields')
   const { point, facts = {}, include = [] } = options
+  const profile = referenceProfile(options.profile)
   if (!POINTS.includes(point)) invalid('unknown decision point')
   object(facts, 'facts')
   for (const [name, value] of Object.entries(facts)) {
@@ -115,15 +120,20 @@ export function routeReferences(graph, options) {
   const normalized = Object.fromEntries(FACTS.map((name) => [name, facts[name] ?? 'unknown']))
   const ids = validateGraph(graph)
   if (!Array.isArray(include) || include.some((id) => !ids.has(id))) invalid('include must name existing nodes')
+  for (const id of include) {
+    const node = graph.nodes.find((candidate) => candidate.id === id)
+    if (!(node.profiles ?? ['formal-bend/v1']).includes(profile)) invalid(`wrong-profile include ${id}`)
+  }
   const selected = new Map()
   const manualConditions = { agent: [], reviewer: [], external: [] }
   for (const node of graph.nodes) {
+    if (!(node.profiles ?? ['formal-bend/v1']).includes(profile)) continue
     if (!node.route) {
       manualConditions[audience(node)].push({
         id: node.id,
-        path: node.path,
+        path: referencePathFor(node, profile),
         when: node.when,
-        requires: [...node.requires],
+        requires: referenceDependencies(node, profile),
         loader: node.loader ?? 'agent',
       })
       continue
@@ -133,7 +143,7 @@ export function routeReferences(graph, options) {
     if (result !== false) selected.set(node.id, result === 'unknown' ? 'unknown' : 'matched')
   }
   for (const id of include) selected.set(id, 'manual')
-  const { delivered } = splitDelivery(graph, { id: `route-${point}`, nodes: [...selected.keys()] })
+  const { delivered } = splitDelivery(graph, { id: `route-${point}`, profile, nodes: [...selected.keys()] })
   const result = {
     schemaVersion: 1,
     authority: 'advisory',
@@ -148,9 +158,9 @@ export function routeReferences(graph, options) {
   for (const node of delivered) {
     result[audience(node)].push({
       id: node.id,
-      path: node.path,
+      path: referencePathFor(node, profile),
       reason: selected.get(node.id) ?? 'dependency',
-      requires: [...node.requires],
+      requires: referenceDependencies(node, profile),
     })
   }
   return result
@@ -181,7 +191,7 @@ function argumentsOf(args) {
       options.json = true
       continue
     }
-    if (!['--point', '--facts', '--include'].includes(flag)) invalid(`unknown argument ${JSON.stringify(flag)}`)
+    if (!['--point', '--facts', '--include', '--profile'].includes(flag)) invalid(`unknown argument ${JSON.stringify(flag)}`)
     const value = args[index + 1]
     if (!value || value.startsWith('--')) invalid(`${flag} needs a value`)
     index += 1
@@ -196,7 +206,7 @@ function argumentsOf(args) {
 async function main() {
   const options = argumentsOf(process.argv.slice(2))
   const facts = options.facts ? JSON.parse(await readFile(options.facts, 'utf8')) : {}
-  const result = routeReferences(await loadGraph(), { point: options.point, facts, include: options.include })
+  const result = routeReferences(await loadGraph(), { point: options.point, facts, include: options.include, profile: options.profile })
   process.stdout.write(options.json ? `${JSON.stringify(result, null, 2)}\n` : renderReferenceRoute(result))
 }
 

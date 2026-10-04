@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict'
+// eslint-disable-next-line test/no-import-node-test -- real fixture assertions run with node --test.
+import test from 'node:test'
+import { toggle } from './product.mjs'
+
+// P1/O1 and P2/O2 in policy.md fix these expectations independently of metadata.
+test('[F93b83b42b4c9568530d6b25bf3750e2e9d32471c984157bccb31feb4646eaad8] disabled becomes enabled oracle-case:eyJpZCI6IkY5M2I4M2I0MmI0Yzk1Njg1MzBkNmIyNWJmMzc1MGUyZTlkMzI0NzFjOTg0MTU3YmNjYjMxZmViNDY0NmVhYWQ4Iiwic2NlbmFyaW8iOiJHLUY5M2I4M2I0MmI0Yzk1Njg1MzBkNmIyNWJmMzc1MGUyZTlkMzI0NzFjOTg0MTU3YmNjYjMxZmViNDY0NmVhYWQ4IiwidHVwbGUiOnsiZW5hYmxlZCI6ImZhbHNlIn0sImRpbWVuc2lvblJldmlzaW9uIjoiZmI5YjllZjc0Y2Y3OTc2YjIyNjRkODZiYzQ2NjM3NjBlYmJmZjRiNTczNGVhYTE4YjVhNzI0ODlkMzFkYzMzYyIsImNvbnN0cmFpbnRSZXZpc2lvbiI6IjRmNTNjZGExOGMyYmFhMGMwMzU0YmI1ZjlhM2VjYmU1ZWQxMmFiNGQ4ZTExYmE4NzNjMmYxMTE2MTIwMmI5NDUifQ', () => {
+  assert.equal(toggle(false), true)
+})
+
+test('[F2a0e8eaf8d470c9b95c9f65e9c30ac0ba173d688572526afebeefcee41b85893] enabled becomes disabled oracle-case:eyJpZCI6IkYyYTBlOGVhZjhkNDcwYzliOTVjOWY2NWU5YzMwYWMwYmExNzNkNjg4NTcyNTI2YWZlYmVlZmNlZTQxYjg1ODkzIiwic2NlbmFyaW8iOiJHLUYyYTBlOGVhZjhkNDcwYzliOTVjOWY2NWU5YzMwYWMwYmExNzNkNjg4NTcyNTI2YWZlYmVlZmNlZTQxYjg1ODkzIiwidHVwbGUiOnsiZW5hYmxlZCI6InRydWUifSwiZGltZW5zaW9uUmV2aXNpb24iOiJmYjliOWVmNzRjZjc5NzZiMjI2NGQ4NmJjNDY2Mzc2MGViYmZmNGI1NzM0ZWFhMThiNWE3MjQ4OWQzMWRjMzNjIiwiY29uc3RyYWludFJldmlzaW9uIjoiNGY1M2NkYTE4YzJiYWEwYzAzNTRiYjVmOWEzZWNiZTVlZDEyYWI0ZDhlMTFiYTg3M2MyZjExMTYxMjAyYjk0NSJ9', () => {
+  assert.equal(toggle(true), false)
+})

@@ -5,10 +5,28 @@ import test from 'node:test'
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
+test('shared intake asks actual human axes and implementation uses current-profile decision guidance', async () => {
+  const intake = await read('references/roles/intake.md')
+  assert.match(intake, /controller-resolved profile/)
+  assert.match(intake, /Before source inspection or any preliminary brief, read current-stage dependencies/)
+  assert.match(intake, /record only actual answers/)
+  assert.match(intake, /Never edit a model, target tests or product code, approve policy, change lock/)
+  const space = await read('references/roles/space-discovery.md')
+  assert.match(space, /A recommendation is not approval/)
+  assert.match(space, /Changed axes return to confirmation/)
+  assert.match(space, /NEEDS_DECISION/)
+  assert.match(space, /never silently removes unknown combinations/)
+  const implement = await read('references/roles/implement.md')
+  assert.match(implement, /profile-safe implementation decision guidance at the actual boundary decision/)
+  assert.match(implement, /Record responsibility assignment, alternatives and rationale/)
+  assert.match(implement, /accepted VALID_RED/)
+  assert.match(implement, /Never change expectations, policy, card, lock, sources or consumer tests/)
+})
+
 test('confirms the axes with the user before any Bend without replacing Draft approval', async () => {
   const [skill, space, frames, graph] = await Promise.all([
-    read('references/roles/intake.md'),
-    read('references/roles/space-discovery.md'),
+    read('references/roles/intake-formal.md'),
+    read('references/roles/space-discovery-formal.md'),
     read('references/card/case-space-frames.md'),
     read('references/reference-graph.json'),
   ])
@@ -24,9 +42,13 @@ test('confirms the axes with the user before any Bend without replacing Draft ap
   assert.match(frames, /## Pre-plan test-space briefing/)
   assert.match(frames, /does not replace Draft confirmation or authorize a lock/)
   const nodes = JSON.parse(graph).nodes
-  assert.match(nodes.find(({ id }) => id === 'role-space-discovery').when, /before any Bend, plan or Draft/)
-  assert.match(nodes.find(({ id }) => id === 'card-case-space').when, /authoring the model package or projected card/)
-  assert.match(nodes.find(({ id }) => id === 'card-case-space-frames').when, /^a legacy card without a model package/)
+  assert.match(nodes.find(({ id }) => id === 'role-space-discovery').when, /after source investigation and before authoring/)
+  assert.match(nodes.find(({ id }) => id === 'role-space-discovery-formal').when, /Formal source and axes investigation/)
+  assert.match(nodes.find(({ id }) => id === 'card-case-space').when, /current-profile card or verification-artifact authoring/)
+  assert.match(nodes.find(({ id }) => id === 'card-case-space-frames').when, /current-profile frame enumeration/)
+  const formalSpace = await read('references/card/case-space.md')
+  assert.match(formalSpace, /model package|projected card/)
+  assert.match(frames, /legacy|hand-written/)
 })
 
 test('explains dimension provenance without promoting implementation into policy', async () => {
@@ -77,7 +99,7 @@ test('keeps progress informational and makes scope changes visible', async () =>
 
 test('material implementation explanations cite applied guidance without adding ceremony', async () => {
   const [skill, decision] = await Promise.all([
-    read('references/roles/implement.md'),
+    read('references/roles/implement-formal.md'),
     read('references/delivery/implementation-decision.md'),
   ])
   assert.match(skill, /implementation-decision\.md#explain-material-choices/)
@@ -99,7 +121,7 @@ test('material implementation explanations cite applied guidance without adding 
 })
 
 test('the Space discovery interview keeps provenance and never confirms an axis for the user', async () => {
-  const space = await read('references/roles/space-discovery.md')
+  const space = await read('references/roles/space-discovery-formal.md')
   assert.match(space, /source ID and exact location/)
   assert.match(space, /observations are investigation evidence, not approved policy/)
   assert.match(space, /Unknown is not excluded/)

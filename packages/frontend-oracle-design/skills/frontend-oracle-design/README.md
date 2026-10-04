@@ -1,4 +1,18 @@
-# Frontend Oracle Design
+# Frontend Oracle / Contract Design
+
+이 플러그인은 **두 컨트롤러와 네 공유 전문 스킬**을 제공합니다. 기존
+[`frontend-oracle-design`](SKILL.md)은 `formal-bend/v1`으로 Bend 모델·증명·Adequacy를
+필수로 유지합니다. 새 [`frontend-contract-design`](../frontend-contract-design/SKILL.md)은
+`contract/v1`으로 Bend 없이 출처가 있는 유한 `full-product` Space와 실제 실행 증거를
+검수합니다. 네 역할, 중립 Space 감사, runtime·lock·ledger는 공유하되 참조와 필수 증거는
+승인된 프로필에 따라 선택합니다. Formal 환경 오류를 Contract로 자동 우회하지 않습니다.
+
+Contract의 타입 경계에는 실제 TypeScript/type-fest 양성·음성 witness가 필요하고,
+활성 Async/Order에는 실제 fast-check 속성 실행이 필요합니다. 명확히 조사한 출처 근거가
+있을 때만 적용 불가를 기록합니다. Contract는 형식 증명을 수행했다고 보고하지 않으며,
+선언된 유한 Space의 검수가 모든 제품 동작이나 정책 출처의 완전성을 증명하지 않습니다.
+[Contract 요구사항](references/contract/requirements.md)과
+[공유 프로필 로더](references/roles/loading.md)를 참고하세요.
 
 AI가 구현을 시작하기 전에 **무엇이 정답인지 먼저 잠그는** Claude Code / Codex
 스킬입니다. 승인된 요구사항을 Oracle Card로 만들고, 테스트·실행 장부·상태 전이·독립
@@ -13,13 +27,17 @@ AI가 구현을 시작하기 전에 **무엇이 정답인지 먼저 잠그는** 
   스킬의 스크립트로만 움직입니다
 
 단순 문구·토큰·고립된 CSS 수정에는 이 스킬을 자동 호출하지 않습니다. 다만 명시적으로
-호출하면 Low도 Oracle 경로를 사용하며, **Bend·type-fest·TypeScript·fast-check 모두 필수**입니다.
+호출하면 Low도 Oracle 경로를 사용하며, **Formal Oracle에서는 Bend·type-fest·TypeScript·fast-check 모두 필수**입니다.
 필수 검증은 작업 크기를 이유로 생략하지 않습니다. 사용 불가·미정 범위는 `FAIL` 또는
 `NEEDS_DECISION`으로 보고하며, 기존 Low fast-path 기록은 역사 자료로만 보존합니다.
 상세 운영 계약은 [mandatory-verification.md](references/mandatory-verification.md),
 초심자 단계별 안내는 [가이드](../../../docs/frontend-oracle-design-beginner-guide.md)를 보세요.
 
-## 동작 방식
+## Formal Oracle 동작 방식
+
+다음 모델·투영 절차는 `formal-bend/v1` 기준입니다. Contract에서는 사람이 작성한
+출처 기반 `oracle.md`와 유한 Space를 검수하며 모델 패키지·Bend 증명·투영 단계를 만들지
+않습니다. 승인, immutable lock, genuine RED, 실제 보고된 GREEN과 독립 리뷰는 공유합니다.
 
 1. 사용자 답변과 승인된 명세만 정책 출처로 등록합니다.
 2. `Given / When / Then / Never / Source`, Terms·Formal Model·Adequacy, 실제 type-fest 관계와
@@ -145,15 +163,37 @@ view가 소유합니다.
 
 계약 문서는 한 번에 다 읽지 않습니다.
 [`reference-graph.json`](references/reference-graph.json)이 진입 risk로 lane을 고르고,
-`when` 조건이 충족된 노드의 전문과 그 `requires` 엣지만 로드합니다. 아래 도식은 그
-파일에서 생성되므로 노드나 `requires`가 바뀌면 함께 갱신됩니다.
+`when` 조건이 충족된 현재 profile 노드의 전문과 `requires`, 선택한
+`requiresByProfile` 엣지만 로드합니다. profile은 `formal-bend/v1` 또는 `contract/v1`이고,
+생략한 저수준 호출은 기존 Formal 동작을 유지합니다. 점선은 해당 profile에서만 적용되는 의존성입니다.
+Fresh specialist는 부모의 continuation bundle 가정을 상속하지 않고 전체 역할 closure를 읽습니다.
+아래 도식은 같은 canonical graph에서 생성되며 두 번째 실행 그래프가 아닙니다.
 
 ```mermaid
 flowchart LR
   START(["요청"]) --> RISK{"risk 판정"}
-  RISK -->|"모든 risk"| common["common<br/><i>common · mandatory verification</i>"]
+  RISK -->|"모든 risk"| common["common<br/><i>common · current-profile verification</i>"]
   LEGACY["low-fast-path<br/><i>legacy records only</i>"] -.-> common
 
+  controller_entry_formal["controller-entry-formal"]
+  lifecycle_adaptation_formal["lifecycle-adaptation-formal"]
+  graph_orchestration_formal["graph-orchestration-formal"]
+  formal_reference_links["formal-reference-links"]
+  role_controller_formal["role-controller-formal"]
+  role_reporting_formal["role-reporting-formal"]
+  role_loading_formal["role-loading-formal"]
+  role_case_space_inputs_formal["role-case-space-inputs-formal"]
+  role_space_discovery_formal["role-space-discovery-formal"]
+  role_intake_formal["role-intake-formal"]
+  role_implement_formal["role-implement-formal"]
+  role_review_formal["role-review-formal"]
+  verification_common["verification-common"]
+  contract_requirements["contract-requirements"]
+  contract_space["contract-space"]
+  contract_authoring["contract-authoring"]
+  contract_review["contract-review"]
+  role_author_formal["role-author-formal"]
+  role_author_closure_formal["role-author-closure-formal"]
   mandatory_verification["mandatory-verification"]
   role_controller["role-controller"]
   role_reporting["role-reporting"]
@@ -193,46 +233,104 @@ flowchart LR
   graph_orchestration["graph-orchestration"]
   bend_cross_verification["bend-cross-verification"]
   model_patterns["model-patterns"]
+  model_package_example["model-package-example"]
   oracle_workflow_graph["oracle-workflow-graph"]
 
+  common --> controller_entry_formal
+  verification_common --> controller_entry_formal
+  mandatory_verification --> controller_entry_formal
+  common --> lifecycle_adaptation_formal
+  card_policy_sources --> lifecycle_adaptation_formal
+  oracle_workflow_graph --> graph_orchestration_formal
+  mandatory_verification --> role_controller_formal
+  controller_entry_formal --> role_controller_formal
+  mandatory_verification --> role_reporting_formal
+  common --> role_loading_formal
+  formal_reference_links --> role_loading_formal
+  common --> role_case_space_inputs_formal
+  bva --> role_case_space_inputs_formal
+  common --> role_space_discovery_formal
+  card_policy_sources --> role_space_discovery_formal
+  mandatory_verification --> role_intake_formal
+  mandatory_verification --> role_implement_formal
+  mandatory_verification --> role_review_formal
+  common --> verification_common
+  verification_common --> contract_requirements
+  contract_requirements --> contract_space
+  bva --> contract_space
+  contract_requirements --> contract_authoring
+  contract_space --> contract_authoring
+  verification_common --> contract_review
+  contract_requirements --> contract_review
+  mandatory_verification --> role_author_formal
+  bend_cross_verification --> role_author_formal
+  adequacy --> role_author_formal
+  model_patterns --> role_author_formal
+  model_package_example --> role_author_formal
+  discovery --> role_author_formal
+  mandatory_verification --> role_author_closure_formal
+  bend_cross_verification --> role_author_closure_formal
+  discovery --> role_author_closure_formal
   common --> mandatory_verification
   role_loading --> role_controller
-  mandatory_verification --> role_controller
+  verification_common --> role_controller
+  mandatory_verification -. "formal-bend/v1" .-> role_controller
+  role_controller_formal -. "formal-bend/v1" .-> role_controller
+  contract_requirements -. "contract/v1" .-> role_controller
   role_loading --> role_reporting
-  mandatory_verification --> role_reporting
+  verification_common --> role_reporting
+  mandatory_verification -. "formal-bend/v1" .-> role_reporting
+  role_reporting_formal -. "formal-bend/v1" .-> role_reporting
+  contract_requirements -. "contract/v1" .-> role_reporting
   common --> role_loading
+  role_loading_formal -. "formal-bend/v1" .-> role_loading
   common --> role_case_space_inputs
   bva --> role_case_space_inputs
+  role_case_space_inputs_formal -. "formal-bend/v1" .-> role_case_space_inputs
+  contract_space -. "contract/v1" .-> role_case_space_inputs
   common --> role_space_discovery
   card_policy_sources --> role_space_discovery
   role_case_space_inputs --> role_space_discovery
+  role_space_discovery_formal -. "formal-bend/v1" .-> role_space_discovery
+  contract_space -. "contract/v1" .-> role_space_discovery
   role_loading --> role_intake
-  mandatory_verification --> role_intake
+  verification_common --> role_intake
   card_policy_sources --> role_intake
   card_risk_grill --> role_intake
   role_space_discovery --> role_intake
+  mandatory_verification -. "formal-bend/v1" .-> role_intake
+  role_intake_formal -. "formal-bend/v1" .-> role_intake
+  contract_requirements -. "contract/v1" .-> role_intake
+  contract_space -. "contract/v1" .-> role_intake
   role_loading --> role_author
-  mandatory_verification --> role_author
-  bend_cross_verification --> role_author
-  adequacy --> role_author
+  verification_common --> role_author
   card_policy_sources --> role_author
   card_risk_grill --> role_author
   card_format --> role_author
   card_interaction_sweep --> role_author
   card_case_space --> role_author
+  role_author_formal -. "formal-bend/v1" .-> role_author
+  contract_authoring -. "contract/v1" .-> role_author
   role_loading --> role_author_closure
-  mandatory_verification --> role_author_closure
-  bend_cross_verification --> role_author_closure
-  discovery --> role_author_closure
+  verification_common --> role_author_closure
+  role_author_closure_formal -. "formal-bend/v1" .-> role_author_closure
+  contract_requirements -. "contract/v1" .-> role_author_closure
+  contract_space -. "contract/v1" .-> role_author_closure
   role_loading --> role_implement
-  mandatory_verification --> role_implement
+  verification_common --> role_implement
   delivery_implementation_decision --> role_implement
-  delivery_green_review --> role_implement
+  mandatory_verification -. "formal-bend/v1" .-> role_implement
+  role_implement_formal -. "formal-bend/v1" .-> role_implement
+  contract_requirements -. "contract/v1" .-> role_implement
   role_loading --> role_review
-  mandatory_verification --> role_review
+  verification_common --> role_review
+  mandatory_verification -. "formal-bend/v1" .-> role_review
+  role_review_formal -. "formal-bend/v1" .-> role_review
+  contract_review -. "contract/v1" .-> role_review
   common --> card_policy_sources
   common --> lifecycle_adaptation
   card_policy_sources --> lifecycle_adaptation
+  lifecycle_adaptation_formal -. "formal-bend/v1" .-> lifecycle_adaptation
   common --> card_risk_grill
   card_policy_sources --> card_risk_grill
   common --> card_format
@@ -246,7 +344,8 @@ flowchart LR
   role_case_space_inputs --> card_case_space
   card_case_space --> card_case_space_frames
   common --> card_retro_metrics
-  card_case_space --> card_retro_metrics
+  card_case_space -. "formal-bend/v1" .-> card_retro_metrics
+  contract_space -. "contract/v1" .-> card_retro_metrics
   common --> card_confirmation_lock
   common --> visual_design
   common --> delivery_ledger
@@ -271,11 +370,12 @@ flowchart LR
   changeability --> subagent_review
   subagent_review --> review_checklist
   oracle_workflow_graph --> graph_orchestration
+  graph_orchestration_formal -. "formal-bend/v1" .-> graph_orchestration
   common --> bend_cross_verification
   common --> model_patterns
   common --> adequacy
   common --> discovery
-  IND["delivery-protocol · delivery-protocol-spec · type-environment · fsd · backend · performance · model-package-example<br/><i>독립 노드 — 조건 충족 시에만</i>"]
+  IND["delivery-protocol · delivery-protocol-spec · type-environment · fsd · backend · performance<br/><i>독립 노드 — 조건 충족 시에만</i>"]
 ```
 
 화살표는 실행 순서가 아니라 **선행 조건**입니다. `card-format`을 읽으려면 `common`과

@@ -51,7 +51,7 @@ actual change history, or an observed dependency leak — not an imagined future
 preserved contract, the owning responsibility, and the understanding·modification·verification
 path. Compare the simplest existing solution with the proposed boundary and name the cost accepted.
 Keep this reasoning in the existing Decision; its short example is owned by
-[`delivery/implementation-decision.md`](delivery/implementation-decision.md#material-change-sketch).
+[selected-profile delivery/implementation-decision.md procedure via loader](roles/loading.md).
 
 Use only relevant scenarios: an API representation change, a policy change, a presentation-only
 change, or feature removal. Tests and docs changing with their owner can be healthy cohesion;
@@ -153,7 +153,7 @@ merely call hooks with the same name.
 
 A simple input setter or generic transport PATCH remains appropriate when it is the actual
 contract. A named function can be enough; neither a command object, generic executor, nor global
-command bus is required. See [consumer-facing contracts](types/api-surface.md#consumer-facing-contracts).
+command bus is required. See [consumer-facing contracts](roles/loading.md).
 
 ### Separate decisions, coordination, and connections
 
@@ -166,7 +166,7 @@ This is not a five-file design. Small operations can keep functions together; ex
 and module boundaries may already suffice. A React-independent calculation needs no hook, and a
 pure business rule still belongs to its business owner, not a global utility bucket. A current
 explicit import may express an external dependency adequately; do not create a port or DI layer
-for every call. [React application](frontend/authoring.md#2-set-declarative-ui-and-micro-hook-boundaries)
+for every call. [React application](roles/loading.md)
 adds lifecycle and presentation guidance without changing these owners.
 
 ### Core patterns
@@ -299,7 +299,7 @@ collaboration instead of copying the supplier's entire public surface. This redu
 unrelated store, Context, or SDK details. Ask: does the consumer need the whole object, or only this
 role? A single value is preferable when sufficient; handling a whole domain object is legitimate
 when that is the responsibility. Keep supplier assembly at the existing composition owner, not in
-every consumer. See [consumer-facing contracts](types/api-surface.md#consumer-facing-contracts) for
+every consumer. See [consumer-facing contracts](roles/loading.md) for
 type relationships; a new interface is not mandatory.
 
 ### Provide purpose-specific reads
@@ -426,10 +426,10 @@ five-axis checklist. Its example lives in the delivery document linked above.
 
 This document owns only the meaning of change cost and its rationale.
 
-- The React runtime criteria are owned by [`frontend/decisions.md`](frontend/decisions.md) and
-  [`frontend/authoring.md`](frontend/authoring.md).
+- The React runtime criteria are owned by [selected-profile frontend/decisions.md procedure via loader](roles/loading.md) and
+  [selected-profile frontend/authoring.md procedure via loader](roles/loading.md).
 - The Implementation Decision's path·fields·writing time are owned by
-  [`delivery/implementation-decision.md`](delivery/implementation-decision.md).
+  [selected-profile delivery/implementation-decision.md procedure via loader](roles/loading.md).
 - `PASS | FINDING | N/A`, the finding router, and the minimal fix procedure are owned by
   [`subagent-review.md`](subagent-review.md).
 

@@ -48,8 +48,30 @@ async function readAll(relativePaths) {
 
 const REVIEW_NODE_FILES = ['references/subagent-review.md', 'references/review-checklist.md']
 
-test('Bend cross-verification is mandatory for every risk and is not bundled', async () => {
-  const { loadGraph, splitDelivery } = await import('./generate-reference-bundles.mjs')
+test('shared author closure retains conditional current-profile authority without a second state machine', async () => {
+  const closure = await read('references/roles/author-closure.md')
+  assert.match(closure, /Load only on a selected-profile closure trigger after GREEN/)
+  assert.match(closure, /controller dispatch, matching locked revision\/sources and fresh evidence/)
+  assert.match(closure, /Read only the profile's applicable current-stage closure procedure/)
+  assert.match(closure, /Never edit locked policy, approve\/activate your own candidate, change lock, issue receipts or transitions/)
+  assert.match(closure, /Outcome-changing findings require actual human decision and a new revision/)
+  assert.match(closure, /Missing observations are not PASS/)
+  assert.match(closure, /Closure is evidence, not a new state/)
+})
+
+test('shared reporting names actual state and selected-profile evidence, never synthetic acceptance', async () => {
+  const reporting = await read('references/roles/reporting.md')
+  assert.match(reporting, /Controller-only, load at reporting, not every role entry/)
+  assert.match(reporting, /actual ledger runId, label, exit and grade once each, never fabricated before init/)
+  assert.match(reporting, /oracle-run\.mjs status --json.*--check-report/)
+  assert.match(reporting, /IMPLEMENTED_GREEN is not REVIEW_VERIFIED/)
+  assert.match(reporting, /Use selected-profile reporting requirements/)
+  assert.match(reporting, /scanner observations and browser observations cannot be promoted to PASS/)
+  assert.match(reporting, /Any artifact disagreement wins over prose/)
+})
+
+test('Bend cross-verification is mandatory for Formal author modes and isolated from Contract closures', async () => {
+  const { loadGraph, splitDelivery, referenceDependencies } = await import('./generate-reference-bundles.mjs')
   const graph = await loadGraph()
   const id = 'bend-cross-verification'
   const node = graph.nodes.find((candidate) => candidate.id === id)
@@ -69,21 +91,26 @@ test('Bend cross-verification is mandatory for every risk and is not bundled', a
   assert.deepEqual(selected.assumed, [])
   for (const bundle of graph.bundles) {
     const { delivered, assumed } = splitDelivery(graph, bundle)
+    const formalAuthor = bundle.profile !== 'contract/v1' && bundle.nodes.some((nodeId) => ['role-author', 'role-author-closure'].includes(nodeId))
     assert.equal(
       [...delivered, ...assumed].some((candidate) => candidate.id === id),
-      false,
+      formalAuthor,
       bundle.id,
     )
   }
-  for (const entry of graph.nodes.filter((candidate) => candidate.id !== id)) {
-    const { delivered } = splitDelivery(graph, { id: entry.id, nodes: [entry.id] })
-    const authorMode = ['role-author', 'role-author-closure'].includes(entry.id)
-    if (authorMode) assert.ok(entry.requires.includes(id), `${entry.id} explicitly owns its Bend load`)
+  for (const entry of graph.nodes.filter((candidate) => candidate.id !== id && candidate.profiles.includes('formal-bend/v1'))) {
+    const { delivered } = splitDelivery(graph, { id: entry.id, nodes: [entry.id], profile: 'formal-bend/v1' })
+    const authorMode = ['role-author', 'role-author-closure', 'role-author-formal', 'role-author-closure-formal'].includes(entry.id)
+    if (entry.id.endsWith('-formal') && authorMode) assert.ok(referenceDependencies(entry, 'formal-bend/v1').includes(id), `${entry.id} explicitly owns its Bend load`)
     assert.equal(
       delivered.some((candidate) => candidate.id === id),
       authorMode,
-      `${entry.id} must load Bend only for the two explicit author modes`,
+      `${entry.id} must load Bend only for the two explicit author modes and their Formal owners`,
     )
+  }
+  for (const entry of graph.nodes.filter((candidate) => candidate.profiles.includes('contract/v1'))) {
+    const { delivered } = splitDelivery(graph, { id: entry.id, nodes: [entry.id], profile: 'contract/v1' })
+    assert.equal(delivered.some((candidate) => candidate.id === id), false, `${entry.id} Contract closure must not load Bend`)
   }
   const low = graph.lanes.find((lane) => lane.id === 'low-fast-path')
   const lowDelivery = splitDelivery(graph, { id: low.id, nodes: low.nodes })
@@ -117,7 +144,7 @@ test('O1 Low and Design-only do not acquire contextual review requirements', asy
 
 test('all risk lanes enter the common mandatory-verification path', async () => {
   const [skill, common, lane, graphSource] = await Promise.all([
-    read('SKILL.md'),
+    read('references/controller-entry-formal.md'),
     read('references/common.md'),
     read('references/lanes/low-fast-path.md'),
     read('references/reference-graph.json'),
@@ -126,10 +153,12 @@ test('all risk lanes enter the common mandatory-verification path', async () => 
   const low = graph.lanes.find(({ id }) => id === 'low-fast-path')
   assert.deepEqual(low.nodes, ['common', 'mandatory-verification'])
   assert.equal(low.exclusive, false)
-  assert.match(skill, /Read \[`common\.md`\]\(references\/common\.md\) for every risk/)
+  assert.match(skill, /Read \[`common\.md`\]\(common\.md\) for every risk/)
   assert.match(skill, /Bend[\s\S]*unconditionally|unconditionally[\s\S]*Bend/i)
   assert.match(skill, /type-fest[\s\S]*fast-check|fast-check[\s\S]*type-fest/i)
-  assert.match(common, /mandatory-verification\.md/)
+  assert.match(common, /verification-common\.md/)
+  assert.match(await read('references/verification-common.md'), /selected.profile|resolved profile/i)
+  assert.match(skill, /mandatory-verification\.md/)
   assert.match(lane, /legacy/i)
 })
 
@@ -149,7 +178,7 @@ test('O15 contextual review graph and generated artifacts remain synchronized', 
     const result = spawnSync(process.execPath, [join(skillDirectory, script), '--check'], { encoding: 'utf8' })
     assert.equal(result.status, 0, result.stderr || result.stdout)
   }
-  const skill = await read('references/roles/controller.md')
+  const skill = await read('references/roles/controller-formal.md')
   assert.match(
     skill,
     /[Bb]efore contextual packet collection and independent review after implementation\/test\s+verification/,
@@ -164,8 +193,8 @@ const readFrontend = () => readAll(FRONTEND_NODE_FILES)
 
 test('runs the Oracle contract through the bundled deterministic workflow graph', async () => {
   const [skill, graphOrchestration, graphSource] = await Promise.all([
-    read('SKILL.md'),
-    read('references/graph-orchestration.md'),
+    read('references/controller-entry-formal.md'),
+    read('references/graph-orchestration-formal.md'),
     read('references/oracle-workflow.graph.json'),
   ])
   const graph = JSON.parse(graphSource)
@@ -448,8 +477,8 @@ test('O14: harness packages expose lint and provenance captures reproducibility 
 })
 
 test('O26: backs reported verification with a run ledger, machine transitions and counted budgets', async () => {
-  const skill = await read('references/roles/controller.md')
-  const report = await read('references/roles/reporting.md')
+  const skill = await read('references/roles/controller-formal.md')
+  const report = await read('references/roles/reporting-formal.md')
 
   assert.match(skill, /scripts\/oracle-run\.mjs exec/)
   assert.match(skill, /append-only\s+ledger and reports cite runIds instead of free-form claims/)
@@ -466,7 +495,7 @@ test('O26: backs reported verification with a run ledger, machine transitions an
 
 test('the ledger reference names exactly the trusted adapter registry, and the visual producer stays node-test', async () => {
   const { TRUSTED_ADAPTER_NAMES } = await import('./oracle-adapters.mjs')
-  const [skill, ledger] = await Promise.all([read('references/roles/controller.md'), read('references/delivery/ledger.md')])
+  const [skill, ledger] = await Promise.all([read('references/roles/controller-formal.md'), read('references/delivery/ledger.md')])
 
   // 러너를 표에 더하면 이 줄이 깨진다 — 문서가 registry보다 좁거나 넓게 "지원"을 말하지 못하게 한다
   assert.match(ledger, loose(`--adapter <${TRUSTED_ADAPTER_NAMES.join('|')}>`))
@@ -532,7 +561,7 @@ test('O28: routes delivery runs through exec and gates GREEN on flakiness and te
 })
 
 test('keeps automatic routing narrow and leaves sibling concerns with their owners', async () => {
-  const skill = await read('SKILL.md')
+  const skill = await read('references/controller-entry-formal.md')
   const description = skill.match(/^description: ([^\n]+)$/m)?.[1] ?? ''
 
   assert.match(description, /medium|high/i)
@@ -565,7 +594,7 @@ test('O29: gives reviewers raw run evidence and a validated finding schema', asy
 })
 
 test('O30: delegates screenshot and direct-browser execution to a separate skill', async () => {
-  const [skill, visualDesign] = await Promise.all([read('SKILL.md'), read('references/visual-design.md')])
+  const [skill, visualDesign] = await Promise.all([read('references/controller-entry-formal.md'), read('references/visual-design.md')])
 
   assert.match(skill, /\$frontend-visual-qa/)
   assert.match(skill, /run only on explicit request.*by name/s)
@@ -575,7 +604,7 @@ test('O30: delegates screenshot and direct-browser execution to a separate skill
 })
 
 test('requires automatic deterministic locking at delivery boundaries', async () => {
-  const [skill, oracleCard] = await Promise.all([read('references/roles/controller.md'), readCard()])
+  const [skill, oracleCard] = await Promise.all([read('references/roles/controller-formal.md'), readCard()])
 
   assert.match(skill, /scripts\/oracle-lock\.mjs/)
   assert.match(skill, /revision lock is auto-verified immediately before each stage/)
@@ -587,7 +616,7 @@ test('requires automatic deterministic locking at delivery boundaries', async ()
 })
 
 test('locks all approved Delivery sources once instead of extending an existing lock', async () => {
-  const [skill, oracleCard, implementationLoop] = await Promise.all([read('references/roles/controller.md'), readCard(), readDelivery()])
+  const [skill, oracleCard, implementationLoop] = await Promise.all([read('references/roles/controller-formal.md'), readCard(), readDelivery()])
 
   assert.match(skill, /Delivery was known from the start, defer the\s+lock/)
   assert.match(skill, /architecture.*backend.*final lock once/s)
@@ -598,7 +627,7 @@ test('locks all approved Delivery sources once instead of extending an existing 
 
 test('keeps feedback routing and evidence tied to the locked revision', async () => {
   const [skill, common, implementationLoop] = await Promise.all([
-    read('SKILL.md'),
+    read('references/controller-entry-formal.md'),
     read('references/common.md'),
     readDelivery(),
   ])
@@ -624,7 +653,7 @@ test('keeps feedback routing and evidence tied to the locked revision', async ()
 
 test('carries the locked revision through tests and review without owning visual QA', async () => {
   const [skill, implementationLoop, subagentReview] = await Promise.all([
-    read('SKILL.md'),
+    read('references/controller-entry-formal.md'),
     readDelivery(),
     readReview(),
   ])
@@ -639,7 +668,7 @@ test('carries the locked revision through tests and review without owning visual
 })
 
 test('generates reviewer input from raw locked artifacts without a hand-written conclusion', async () => {
-  const [skill, subagentReview] = await Promise.all([read('references/roles/controller.md'), readReview()])
+  const [skill, subagentReview] = await Promise.all([read('references/roles/controller-formal.md'), readReview()])
 
   assert.match(skill, /oracle-run\.mjs review-packet/)
   assert.match(subagentReview, /oracle-run\.mjs review-packet/)
@@ -683,7 +712,7 @@ test('separates requested mechanism from intended outcome without letting the ag
 
 test('loads the performance reference only for measured performance claims', async () => {
   const [skill, performance, frontendImplementation] = await Promise.all([
-    read('references/roles/intake.md'),
+    read('references/roles/intake-formal.md'),
     read('references/performance.md'),
     readFrontend(),
   ])
@@ -745,7 +774,7 @@ test('records new dependency decisions and reviews them against real problems an
 
 test('reuses the repository network boundary and colocates approved MSW handlers', async () => {
   const [skill, implementationLoop, fsd] = await Promise.all([
-    read('references/roles/author.md'),
+    read('references/roles/author-formal.md'),
     readDelivery(),
     read('references/fsd.md'),
   ])
@@ -761,7 +790,7 @@ test('reuses the repository network boundary and colocates approved MSW handlers
 })
 
 test('explicitly invokes $test before writing frontend tests', async () => {
-  const [skill, implementationLoop] = await Promise.all([read('references/roles/controller.md'), readDelivery()])
+  const [skill, implementationLoop] = await Promise.all([read('references/roles/controller-formal.md'), readDelivery()])
 
   assert.match(skill, /Immediately before writing test files, explicitly load\s+and invoke the `\$test` skill by name/)
   assert.match(skill, /Right after entering Delivery, explicitly load and invoke the installed `\$test` skill by name/)
@@ -798,8 +827,8 @@ test('batches delivery decisions without prescribing an implementation topology'
 
 test('defines the FSD contract and wires it through loading, architecture, implementation, and review', async () => {
   const [skill, controller, fsd, architectureContract, frontendImplementation, subagentReview, backend] = await Promise.all([
-    read('references/roles/author.md'),
-    read('references/roles/controller.md'),
+    read('references/roles/author-formal.md'),
+    read('references/roles/controller-formal.md'),
     read('references/fsd.md'),
     read('references/architecture-contract.md'),
     readFrontend(),
@@ -839,7 +868,7 @@ test('defines the FSD contract and wires it through loading, architecture, imple
 
 test('gates approved hook encapsulation and reviews UI/business responsibility boundaries', async () => {
   const [skill, architectureContract, frontendImplementation, subagentReview] = await Promise.all([
-    read('references/roles/implement.md'),
+    read('references/roles/implement-formal.md'),
     read('references/architecture-contract.md'),
     readFrontend(),
     readReview(),
@@ -868,7 +897,7 @@ test('gates approved hook encapsulation and reviews UI/business responsibility b
 })
 
 test('reads the interaction contracts before implementing a widget', async () => {
-  const skill = await read('references/roles/implement.md')
+  const skill = await read('references/roles/implement-formal.md')
   assert.match(skill, /eslint-plugin-local-rules\/contracts\/<pattern>\.json/)
   assert.match(skill, /interaction-pattern-contract/)
   assert.match(skill, /A contract is guidance, never policy/)
@@ -888,7 +917,7 @@ test('reads the interaction contracts before implementing a widget', async () =>
 })
 
 test('keeps Oracle control while consuming optional system-design references', async () => {
-  const skill = await read('references/roles/intake.md')
+  const skill = await read('references/roles/intake-formal.md')
   assert.match(skill, /frontend-system-design/)
   assert.match(skill, /while keeping Oracle\s+intake and control/)
   assert.match(skill, /Every choice is a policy candidate/)
@@ -899,7 +928,7 @@ test('keeps Oracle control while consuming optional system-design references', a
 
 test('loads visual design guidance only for UI-shaping work and carries its contract through delivery', async () => {
   const [skill, visualDesign, oracleCard, frontendImplementation, subagentReview] = await Promise.all([
-    read('references/roles/intake.md'),
+    read('references/roles/intake-formal.md'),
     read('references/visual-design.md'),
     readCard(),
     readFrontend(),
@@ -947,7 +976,7 @@ test('requires independent design review for judgment while visual QA owns basel
 
 test('O1-O7: loads one detailed changeability reference before implementation decisions', async () => {
   const [skill, changeability, frontendImplementation, implementationLoop] = await Promise.all([
-    read('references/roles/implement.md'),
+    read('references/roles/implement-formal.md'),
     read('references/changeability.md'),
     readFrontend(),
     readDelivery(),
@@ -1009,7 +1038,7 @@ test('material responsibility assignment is consumed before editing and checked 
     read('references/delivery/implementation-decision.md'),
     read('references/delivery/green-review.md'),
     read('references/review-checklist.md'),
-    read('references/roles/implement.md'),
+    read('references/roles/implement-formal.md'),
     read('references/oracle-workflow.graph.json'),
   ])
   // These assertions test entry-point wiring, not whether a model follows the assignment.
@@ -1018,9 +1047,11 @@ test('material responsibility assignment is consumed before editing and checked 
   assert.match(decision, /file.*symbol.*owns.*must not/s)
   assert.match(decision, /technically equivalent.*update.*Decision/s)
   assert.match(decision, /not.*policy.*approval/s)
-  for (const entry of [green, checklist, skill, graph]) {
+  for (const entry of [green, skill, graph]) {
     assert.match(entry, /implementation-decision\.md#responsibility-assignment/)
   }
+  assert.match(checklist, /\[responsibility assignment\]\(roles\/loading\.md\)/)
+  assert.match(await read('references/formal-reference-links.md'), /implementation-decision\.md#responsibility-assignment/)
   assert.match(green, /actual.*caller.*owner.*Decision/s)
   assert.match(checklist, /Cohesion.*Coupling.*evidence/s)
   assert.match(checklist, /passing.*behavior.*not.*responsibility/s)
@@ -1047,7 +1078,7 @@ test('hook extraction follows responsibility rather than branch or side-effect c
 test('self-feedback includes one bounded simplification pass before final evidence', async () => {
   const [green, skill, graph] = await Promise.all([
     read('references/delivery/green-review.md'),
-    read('references/roles/implement.md'),
+    read('references/roles/implement-formal.md'),
     read('references/oracle-workflow.graph.json'),
   ])
   assert.match(green, /### Bounded simplification/)
@@ -1164,7 +1195,7 @@ test('O8-O10: reviews with the same changeability reference without turning tast
 })
 
 test('O2: 기존 Oracle Delivery gate를 유지한다', async () => {
-  const [skill, oracleCard, implementationLoop] = await Promise.all([read('SKILL.md'), readCard(), readDelivery()])
+  const [skill, oracleCard, implementationLoop] = await Promise.all([read('references/controller-entry-formal.md'), readCard(), readDelivery()])
 
   for (const contract of ['VALID_RED', 'oracle-lock.mjs', 'oracle-run.mjs', 'evidence.json']) {
     assert.match(`${skill}\n${oracleCard}\n${implementationLoop}`, new RegExp(contract.replace('.', '\\.')))
@@ -1172,7 +1203,7 @@ test('O2: 기존 Oracle Delivery gate를 유지한다', async () => {
 })
 
 test('pins document-driven stage journal and disk recall', async () => {
-  const [skill, oracleCard] = await Promise.all([read('references/roles/loading.md'), readCard()])
+  const [skill, oracleCard] = await Promise.all([read('references/roles/loading-formal.md'), readCard()])
 
   assert.match(skill, /## Document-driven progress/)
   assert.match(skill, /re-read disk, not conversation memory/)
@@ -1189,7 +1220,7 @@ test('pins document-driven stage journal and disk recall', async () => {
 
 test('pins the system-design grill phases and the conditional API contract format', async () => {
   const [skill, oracleCard, architectureContract] = await Promise.all([
-    read('references/roles/author.md'),
+    read('references/roles/author-formal.md'),
     readCard(),
     read('references/architecture-contract.md'),
   ])
@@ -1227,7 +1258,7 @@ test('pins the system-design grill phases and the conditional API contract forma
 
 test('O7: 조건부 품질 계약과 human-first 보고를 안내한다', async () => {
   const [skill, oracleCard, frontendImplementation, implementationLoop, architecture, review] = await Promise.all([
-    read('references/roles/reporting.md'),
+    read('references/roles/reporting-formal.md'),
     readCard(),
     readFrontend(),
     readDelivery(),
@@ -1249,7 +1280,7 @@ test('O7: 조건부 품질 계약과 human-first 보고를 안내한다', async 
 })
 
 test('reports the state and its blocker first, and drops groups instead of padding them with N/A', async () => {
-  const skill = await read('references/roles/reporting.md')
+  const skill = await read('references/roles/reporting-formal.md')
   const report = skill.slice(skill.indexOf('## Final report'))
 
   // 읽는 사람이 행동할 근거가 첫 두 줄에 온다
@@ -1282,7 +1313,7 @@ test('O8: 카드 schema version 분기와 migration을 추가하지 않는다', 
 
 test('type-constraints: derives state contracts from card rows and narrows AI choice space', async () => {
   const [skill, oracleCard, frontendImplementation, typeConstraints, verifier] = await Promise.all([
-    read('references/roles/author.md'),
+    read('references/roles/author-formal.md'),
     readCard(),
     readFrontend(),
     readTypes(),
@@ -1347,7 +1378,7 @@ test('type-constraints: derives state contracts from card rows and narrows AI ch
 
 test('type-environment: pins compiler environment once per repo and protects contract files', async () => {
   const [skill, typeConstraints, typeEnvironment] = await Promise.all([
-    read('references/roles/author.md'),
+    read('references/roles/author-formal.md'),
     readTypes(),
     read('references/type-environment.md'),
   ])
@@ -1400,8 +1431,8 @@ test('prefers Suspense and Error Boundary over in-component loading branches', a
 
 test('reads load conditions at the decision point, not at the write stage', async () => {
   const [skill, loading, typeConstraints, graphSource] = await Promise.all([
-    read('references/roles/author.md'),
-    read('references/roles/loading.md'),
+    read('references/roles/author-formal.md'),
+    read('references/roles/loading-formal.md'),
     readTypes(),
     read('references/reference-graph.json'),
   ])
@@ -1432,7 +1463,7 @@ test('reads load conditions at the decision point, not at the write stage', asyn
 
 test('always loads advanced compiler contracts with type work and keeps adoption witness-gated', async () => {
   const [skill, advancedContracts, graphSource] = await Promise.all([
-    read('references/roles/author.md'),
+    read('references/roles/author-formal.md'),
     read('references/types/advanced-contracts.md'),
     read('references/reference-graph.json'),
   ])
@@ -1546,7 +1577,7 @@ test('does not enumerate derived states as union members', async () => {
     readTypes(),
     readFrontend(),
     readCard(),
-    read('references/roles/author.md'),
+    read('references/roles/author-formal.md'),
   ])
 
   // rung 1은 스칼라만이 아니라 union 멤버에도 적용된다 — 태그 하나가 flag 하나를 인코딩하면 상태가 아니다
@@ -1577,7 +1608,7 @@ test('does not enumerate derived states as union members', async () => {
 
 test('declares every reference as a loadable graph node with resolvable edges', async () => {
   const { readdir } = await import('node:fs/promises')
-  const [skill, graphSource] = await Promise.all([read('references/roles/loading.md'), read('references/reference-graph.json')])
+  const [skill, graphSource] = await Promise.all([read('references/roles/loading-formal.md'), read('references/reference-graph.json')])
   const graph = JSON.parse(graphSource)
   const ids = graph.nodes.map((node) => node.id)
 
@@ -1601,7 +1632,7 @@ test('declares every reference as a loadable graph node with resolvable edges', 
       join(entry.parentPath ?? entry.path, entry.name).slice(join(skillDirectory, 'references').length + 1),
     )
     .map((relative) => `references/${relative}`)
-  const nodePaths = new Set(graph.nodes.map((node) => node.path))
+  const nodePaths = new Set(graph.nodes.flatMap((node) => [node.path, ...Object.values(node.pathsByProfile ?? {})]))
   for (const file of files) {
     if (file === 'references/reference-graph.json') continue
     assert.ok(nodePaths.has(file), `${file} is not declared in reference-graph.json`)
@@ -1610,7 +1641,7 @@ test('declares every reference as a loadable graph node with resolvable edges', 
 
 test('collects shared authority, policy sources, and feedback routing into one common file', async () => {
   const [skill, common, card, delivery, changeability, subagentReview] = await Promise.all([
-    read('SKILL.md'),
+    read('references/controller-entry-formal.md'),
     read('references/common.md'),
     readCard(),
     readDelivery(),
@@ -1654,7 +1685,7 @@ test('collects shared authority, policy sources, and feedback routing into one c
 
 test('passes review criteria to reviewers as file links, not pasted text', async () => {
   const [skill, subagentReview, graphSource, runner] = await Promise.all([
-    read('references/roles/controller.md'),
+    read('references/roles/controller-formal.md'),
     readReview(),
     read('references/reference-graph.json'),
     read('scripts/oracle-run.mjs'),
@@ -1699,7 +1730,7 @@ test('passes review criteria to reviewers as file links, not pasted text', async
 
 test('routes the legacy low record through the common mandatory lane', async () => {
   const [skill, lane, card, delivery, graphSource] = await Promise.all([
-    read('SKILL.md'),
+    read('references/controller-entry-formal.md'),
     read('references/lanes/low-fast-path.md'),
     readCard(),
     readDelivery(),
@@ -1736,7 +1767,7 @@ test('routes the legacy low record through the common mandatory lane', async () 
 
 test('forces one entry-node read and a lane header before any other work', async () => {
   const [skill, lane, graphSource] = await Promise.all([
-    read('SKILL.md'),
+    read('references/controller-entry-formal.md'),
     read('references/lanes/low-fast-path.md'),
     read('references/reference-graph.json'),
   ])
@@ -1778,11 +1809,11 @@ test('forces one entry-node read and a lane header before any other work', async
 })
 
 test('role procedures own design reads and the selected runtime guide owns delivery order', async () => {
-  const skill = await read('SKILL.md')
-  const intake = await read('references/roles/intake.md')
-  const author = await read('references/roles/author.md')
-  const controller = await read('references/roles/controller.md')
-  const loading = await read('references/roles/loading.md')
+  const skill = await read('references/controller-entry-formal.md')
+  const intake = await read('references/roles/intake-formal.md')
+  const author = await read('references/roles/author-formal.md')
+  const controller = await read('references/roles/controller-formal.md')
+  const loading = await read('references/roles/loading-formal.md')
   assert.match(intake, /Read \[`card\/policy-sources\.md`\].*with common before writing Outcome Brief/)
   assert.match(author, /\[`card\/risk-grill\.md`\]/)
   assert.match(author, /\[`bva\.md`\]/)
@@ -1813,7 +1844,7 @@ test('role procedures own design reads and the selected runtime guide owns deliv
 
 test('gates the draft card on a context-free read that collapses to one root and its first nail', async () => {
   const [skill, format, lock] = await Promise.all([
-    read('references/roles/controller.md'),
+    read('references/roles/controller-formal.md'),
     read('references/card/card-format.md'),
     read('references/card/confirmation-lock.md'),
   ])
@@ -1858,7 +1889,7 @@ test('gates the draft card on a context-free read that collapses to one root and
 
 test('sweeps new×inherited×runtime interactions into lintable dispositions instead of free recall', async () => {
   const [skill, sweep, format, verifier] = await Promise.all([
-    read('references/roles/author.md'),
+    read('references/roles/author-formal.md'),
     read('references/card/interaction-sweep.md'),
     read('references/card/card-format.md'),
     read('scripts/oracle-verify.mjs'),
@@ -1971,14 +2002,14 @@ test('enumerates the declared case space by machine and dispositions every gener
   const [caseSpace, frameSpace, skill, verifier, frames, testSkill, visualSkill, runner, sweep, inputFamilies] = await Promise.all([
     read('references/card/case-space.md'),
     read('references/card/case-space-frames.md'),
-    read('references/roles/author.md'),
+    read('references/roles/author-formal.md'),
     read('scripts/oracle-verify.mjs'),
     read('scripts/oracle-frames.mjs'),
     readFile(join(repositoryDirectory, 'packages/test/skills/test/SKILL.md'), 'utf8'),
     readFile(join(repositoryDirectory, 'packages/frontend-visual-qa/skills/frontend-visual-qa/SKILL.md'), 'utf8'),
     read('scripts/oracle-run.mjs'),
     read('references/card/interaction-sweep.md'),
-    read('references/roles/case-space-inputs.md'),
+    read('references/roles/case-space-inputs-formal.md'),
   ])
 
   // 열거는 기계, LLM은 판정만 — 같은 카드 바이트는 같은 프레임 집합이다
@@ -2059,10 +2090,10 @@ test('enumerates the declared case space by machine and dispositions every gener
 })
 
 test('covers every reference through typed routing or an explicit role owner without leaking reviewer ownership', async () => {
-  const [skill, graphSource] = await Promise.all([read('references/roles/loading.md'), read('references/reference-graph.json')])
+  const [skill, graphSource] = await Promise.all([read('references/roles/loading-formal.md'), read('references/reference-graph.json')])
   const graph = JSON.parse(graphSource)
   const { routeReferences } = await import('./oracle-reference-route.mjs')
-  const routed = routeReferences(graph, { point: 'scope-decision' })
+  const routed = routeReferences(graph, { point: 'scope-decision', profile: 'formal-bend/v1' })
   const manualIds = new Set(
     Object.values(routed.manualConditions)
       .flat()
@@ -2070,8 +2101,9 @@ test('covers every reference through typed routing or an explicit role owner wit
   )
 
   // Typed routes execute only their declared decision points; uncompiled prose is never false.
-  assert.match(graph.description, /typed route fields are executable projections/)
+  assert.match(graph.description, /Selection filters profile before loading/)
   assert.match(graph.description, /Uncompiled conditions remain manual/)
+  assert.match(graph.description, /requiresByProfile/)
   assert.match(skill, /oracle-reference-route\.mjs/)
   assert.match(skill, /uncompiled `when` rules remain manual/)
   assert.match(skill, /Routing is partial, advisory/)
@@ -2079,9 +2111,11 @@ test('covers every reference through typed routing or an explicit role owner wit
   // primary agent가 읽지 않는 노드는 명시적으로 위임 표시한다 — 조용한 opt-out 불가
   const delegated = graph.nodes.filter((node) => node.loader).map((node) => `${node.id}:${node.loader}`)
   assert.deepEqual(delegated.sort(), [
+    'contract-review:reviewer',
     'delivery-protocol-spec:script',
     'oracle-workflow-graph:graph-tooling',
     'review-checklist:reviewer',
+    'role-review-formal:reviewer',
     'role-review:reviewer',
     'types-review-criteria:reviewer',
   ])
@@ -2090,22 +2124,30 @@ test('covers every reference through typed routing or an explicit role owner wit
   // This inventory is deliberately explicit: a new orphan node cannot pass just because
   // some unrelated document contains its basename. No document bodies are concatenated.
   const ownerNodes = {
-    'SKILL.md': ['common', 'mandatory-verification', 'role-controller', 'role-reporting', 'role-loading', 'graph-orchestration'],
-    'references/common.md': ['low-fast-path'],
+    'references/controller-entry-formal.md': ['common', 'mandatory-verification', 'role-controller', 'role-reporting', 'role-loading', 'graph-orchestration'],
+    'SKILL.md': ['controller-entry-formal', 'role-controller-formal', 'role-reporting-formal', 'verification-common'],
+    'references/roles/loading-formal.md': ['formal-reference-links'],
     '../oracle-intake/SKILL.md': ['role-intake'],
     '../oracle-author/SKILL.md': ['role-author', 'role-author-closure'],
     '../oracle-implement/SKILL.md': ['role-implement'],
-    'references/roles/intake.md': ['role-space-discovery', 'card-policy-sources', 'lifecycle-adaptation', 'visual-design', 'fsd'],
-    'references/roles/author.md': [
-      'role-case-space-inputs', 'bva', 'card-risk-grill', 'card-format', 'card-interaction-sweep',
+    'references/roles/intake-formal.md': ['card-policy-sources', 'lifecycle-adaptation', 'visual-design', 'fsd', 'role-space-discovery-formal'],
+    'references/roles/intake.md': ['role-space-discovery'],
+    'references/roles/author-formal.md': [
+      'role-case-space-inputs-formal', 'bva', 'card-risk-grill', 'card-format', 'card-interaction-sweep',
       'card-case-space', 'card-case-space-frames', 'types-state-ladder', 'types-authoring',
       'types-api-surface', 'types-advanced-contracts', 'type-environment', 'bend-cross-verification', 'adequacy',
     ],
-    'references/roles/controller.md': ['card-retro-metrics', 'card-confirmation-lock', 'delivery-ledger', 'delivery-red', 'delivery-green-review', 'subagent-review'],
-    'references/roles/implement.md': ['delivery-implementation-decision', 'changeability', 'frontend-decisions', 'frontend-authoring', 'frontend-quality'],
-    'references/roles/author-closure.md': ['discovery'],
+    'references/roles/space-discovery.md': ['role-case-space-inputs'],
+    'references/roles/controller-formal.md': ['card-retro-metrics', 'card-confirmation-lock', 'delivery-ledger', 'delivery-red', 'delivery-green-review', 'subagent-review'],
+    'references/roles/implement-formal.md': ['delivery-implementation-decision', 'changeability', 'frontend-decisions', 'frontend-authoring', 'frontend-quality'],
+    'references/roles/author-closure-formal.md': ['discovery'],
   }
-  const covered = new Set()
+  const covered = new Set(['low-fast-path'])
+  const legacyLane = graph.lanes.find((lane) => lane.id === 'low-fast-path')
+  assert.equal(legacyLane.legacyOnly, true)
+  assert.deepEqual(legacyLane.nodes, ['common', 'mandatory-verification'])
+  assert.match(await read('references/common.md'), /Historical low-fast-path records cannot authorize a new-work carve-out/)
+  assert.equal(graph.nodes.find((node) => node.id === 'low-fast-path').path, 'references/lanes/low-fast-path.md')
   for (const [owner, ids] of Object.entries(ownerNodes)) {
     const text = await read(owner)
     const links = new Set([...text.matchAll(/\]\(([^)\s]+)\)/g)].map((match) =>
@@ -2119,7 +2161,22 @@ test('covers every reference through typed routing or an explicit role owner wit
       covered.add(id)
     }
   }
-  for (const node of graph.nodes) {
+  const profileOwners = {
+    'role-intake-formal': 'role-intake',
+    'role-author-formal': 'role-author',
+    'role-author-closure-formal': 'role-author-closure',
+    'role-implement-formal': 'role-implement',
+    'role-loading-formal': 'role-loading',
+    'lifecycle-adaptation-formal': 'lifecycle-adaptation',
+    'graph-orchestration-formal': 'graph-orchestration',
+  }
+  for (const [id, owner] of Object.entries(profileOwners)) {
+    const { referenceDependencies } = await import('./generate-reference-bundles.mjs')
+    assert.ok(referenceDependencies(graph.nodes.find((candidate) => candidate.id === owner), 'formal-bend/v1').includes(id), `${id} must have its specific profile owner`)
+    assert.equal(covered.has(id), false, `${id} has one tested owner`)
+    covered.add(id)
+  }
+  for (const node of graph.nodes.filter((candidate) => candidate.profiles.includes('formal-bend/v1'))) {
     if (node.route) {
       assert.equal(manualIds.has(node.id), false)
       continue
@@ -2140,11 +2197,11 @@ test('covers every reference through typed routing or an explicit role owner wit
 
 test('discovery closure is evidence inside Delivery, never a second approval or state machine', async () => {
   const [skill, discovery, graphSource, runner, report] = await Promise.all([
-    read('references/roles/author-closure.md'),
+    read('references/roles/author-closure-formal.md'),
     read('references/discovery.md'),
     read('references/reference-graph.json'),
     read('scripts/oracle-run.mjs'),
-    read('references/roles/reporting.md'),
+    read('references/roles/reporting-formal.md'),
   ])
   const node = JSON.parse(graphSource).nodes.find((entry) => entry.id === 'discovery')
   assert.deepEqual([node.path, node.requires], ['references/discovery.md', ['common']])
@@ -2168,7 +2225,7 @@ test('discovery closure is evidence inside Delivery, never a second approval or 
 })
 
 test('uses the Oracle report for new Low runs while retaining historical reports', async () => {
-  const [skill, lane] = await Promise.all([read('references/roles/reporting.md'), read('references/lanes/low-fast-path.md')])
+  const [skill, lane] = await Promise.all([read('references/roles/reporting-formal.md'), read('references/lanes/low-fast-path.md')])
 
   assert.match(skill, /The block below is the Oracle lane's report/)
   assert.match(skill, /report for every new invocation, including Low/)
@@ -2253,7 +2310,7 @@ test('states its own evidence with the reproduction commands and the unproven pa
 })
 
 test('closes every run with artifact-backed self-checks before the report is written', async () => {
-  const skill = await read('references/roles/reporting.md')
+  const skill = await read('references/roles/reporting-formal.md')
 
   // 검증 절은 보고 양식보다 앞에 온다 — 보고는 검증 결과를 옮겨 적는 자리다
   const verifyIndex = skill.indexOf('## Verification before the final report')
@@ -2273,7 +2330,7 @@ test('closes every run with artifact-backed self-checks before the report is wri
 })
 
 test('publishes the neighbour-skill coupling map with its deliberate strength differences', async () => {
-  const [readme, skill] = await Promise.all([read('README.md'), read('SKILL.md')])
+  const [readme, skill] = await Promise.all([read('README.md'), read('references/controller-entry-formal.md')])
 
   // 결합 강도가 셋이고, 각 이웃이 어느 칸인지 문서가 소유한다
   assert.match(readme, /## 이웃 스킬과의 결합/)
@@ -2286,8 +2343,8 @@ test('publishes the neighbour-skill coupling map with its deliberate strength di
   assert.match(readme, /증거가 순환합니다/)
 
   // SKILL의 실제 규칙이 지도와 어긋나지 않는다
-  const controller = await read('references/roles/controller.md')
-  const intake = await read('references/roles/intake.md')
+  const controller = await read('references/roles/controller-formal.md')
+  const intake = await read('references/roles/intake-formal.md')
   assert.match(controller, /invoke the\s+`\$test` skill by name; if it cannot be invoked, FAIL/)
   assert.match(skill, /only on explicit request, by invoking the separate\s+`\$frontend-visual-qa` skill by name/)
   assert.match(intake, /If the frontend-system-design skill is installed/)
@@ -2313,7 +2370,7 @@ function loose(text) {
 
 test('answers ride the Draft as Open questions so one confirmation resolves and approves the card', async () => {
   const [skill, grill, format, sweep, lock] = await Promise.all([
-    read('references/roles/controller.md'),
+    read('references/roles/controller-formal.md'),
     read('references/card/risk-grill.md'),
     read('references/card/card-format.md'),
     read('references/card/interaction-sweep.md'),
@@ -2339,12 +2396,12 @@ test('answers ride the Draft as Open questions so one confirmation resolves and 
   // SKILL의 절차·불변식·보고가 같은 계약을 말한다
   assert.match(skill, loose('a single `yes` both answers and confirms'))
   assert.match(skill, loose('`Q<n>=<option>` swaps one option and re-confirms only if a new needs-decision appears'))
-  assert.match(await read('references/roles/reporting.md'), loose('- Turns <n>: user turns from the request to this state'))
+  assert.match(await read('references/roles/reporting-formal.md'), loose('- Turns <n>: user turns from the request to this state'))
 })
 
 test('records escapes as classes and run metrics as direction signals, never gates', async () => {
   const [skill, retro, caseSpace, graphSource, review] = await Promise.all([
-    read('references/roles/controller.md'),
+    read('references/roles/controller-formal.md'),
     read('references/card/retro-metrics.md'),
     read('references/card/case-space.md'),
     read('references/reference-graph.json'),
@@ -2376,7 +2433,9 @@ test('records escapes as classes and run metrics as direction signals, never gat
 
   // 그래프·번들·SKILL 산문이 같은 노드를 안다
   assert.equal(node?.path, 'references/card/retro-metrics.md')
-  assert.deepEqual(node?.requires, ['common', 'card-case-space'])
+  const { referenceDependencies } = await import('./generate-reference-bundles.mjs')
+  assert.deepEqual(referenceDependencies(node, 'formal-bend/v1'), ['common', 'card-case-space'])
+  assert.deepEqual(referenceDependencies(node, 'contract/v1'), ['common', 'contract-space'])
   // lock 이후 노드다 — Draft를 쓰는 card-lane이 미리 싣지 않는다
   assert.equal(
     cardLane?.nodes.includes('card-retro-metrics'),
@@ -2394,7 +2453,7 @@ test('records escapes as classes and run metrics as direction signals, never gat
 test('extends machine derivation past the card bytes: witnesses, evidence lookups, code inventory, sibling policies, the guard hook', async () => {
   const [skill, sweep, frameSpace, sources, lock, red, green, subagent, verifier, runner, hooks, readme] =
     await Promise.all([
-      read('references/roles/author.md'),
+      read('references/roles/author-formal.md'),
       read('references/card/interaction-sweep.md'),
       read('references/card/case-space-frames.md'),
       read('references/card/policy-sources.md'),
@@ -2416,7 +2475,7 @@ test('extends machine derivation past the card bytes: witnesses, evidence lookup
   assert.match(frameSpace, loose('The four dispositions and their grammar'))
   assert.match(sources, loose('one of the four dispositions'))
   assert.match(lock, loose('every `impossible` carries a witness the lint could resolve'))
-  const controller = await read('references/roles/controller.md')
+  const controller = await read('references/roles/controller-formal.md')
   assert.match(skill, loose('Resolve every needs-evidence cell by investigation in the same pass'))
   assert.match(controller, loose('run the reverse two-sample read once per card'))
   assert.match(controller, loose('`scripts/oracle-verify.mjs card --ir`'))
@@ -2477,7 +2536,7 @@ test('extends machine derivation past the card bytes: witnesses, evidence lookup
 })
 
 test('first substantive Draft exposes verification design at every risk without duplicating policy', async () => {
-  const skill = await read('references/roles/author.md')
+  const skill = await read('references/roles/author-formal.md')
   const card = await read('references/card/card-format.md')
   const space = await read('references/card/case-space-frames.md')
   const testSkill = await readFile(join(skillDirectory, '../../../test/skills/test/SKILL.md'), 'utf8')
@@ -2511,7 +2570,7 @@ test('first substantive Draft exposes verification design at every risk without 
 
 test('P0-A adds a conditional source-aware intent audit without weakening the card-only review', async () => {
   const [skill, sources, grill, card, review] = await Promise.all([
-    read('references/roles/author.md'),
+    read('references/roles/author-formal.md'),
     read('references/card/policy-sources.md'),
     read('references/card/risk-grill.md'),
     read('references/card/card-format.md'),
@@ -2531,7 +2590,7 @@ test('P0-A adds a conditional source-aware intent audit without weakening the ca
 
 test('P0-B checks Delivery capability early while preserving Low and Design-only paths', async () => {
   const [skill, ledger, readme] = await Promise.all([
-    read('references/roles/intake.md'),
+    read('references/roles/intake-formal.md'),
     read('references/delivery/ledger.md'),
     read('README.md'),
   ])
@@ -2549,8 +2608,8 @@ test('P0-B checks Delivery capability early while preserving Low and Design-only
 
 test('conditional guardrail loading projects existing owners without adding a delivery gate', async () => {
   const graph = JSON.parse(await read('references/reference-graph.json'))
-  const skill = await read('SKILL.md')
-  const controller = await read('references/roles/controller.md')
+  const skill = await read('references/controller-entry-formal.md')
+  const controller = await read('references/roles/controller-formal.md')
   const conditions = [
     ['low-fast-path', /legacy records only/, /low-fast-path node is legacy-only/, skill],
     ['card-retro-metrics', /execution observation/, /execution observations,[\s\S]*candidate review/, controller],
@@ -2583,7 +2642,7 @@ test('conditional guardrail loading projects existing owners without adding a de
 test('the space cross-check compares the declared space with the Bend space and only produces candidates', async () => {
   const [discovery, caseSpace, tool] = await Promise.all([
     read('references/discovery.md'),
-    read('references/roles/space-discovery.md'),
+    read('references/roles/space-discovery-formal.md'),
     read('scripts/oracle-discovery.mjs'),
   ])
   assert.match(discovery, /## Space cross-check — the declared space against the Bend space/)
@@ -2595,8 +2654,8 @@ test('the space cross-check compares the declared space with the Bend space and 
   assert.match(caseSpace, /Keep confirmed axes in a\s+`## Case space` table/)
   assert.match(tool, /export function crossCheckSpace/)
   // it runs before the lock, and every candidate goes back to the user as a question
-  const controller = await read('references/roles/controller.md')
-  const author = await read('references/roles/author.md')
+  const controller = await read('references/roles/controller-formal.md')
+  const author = await read('references/roles/author-formal.md')
   assert.match(controller, /`card --repo-policies`, cross-check, --case-space/)
   assert.match(author, /`oracle-discovery\.mjs cross-check --package` and bring each candidate back to the interview/)
   assert.match(
@@ -2637,7 +2696,7 @@ test('two readings: the analyst writes its own state table, a reviewer on the ne
 })
 
 test('the docs name the pre-lock stage machine, the hold and the partial state the scripts enforce', async () => {
-  const skill = await read('references/roles/controller.md')
+  const skill = await read('references/roles/controller-formal.md')
   const space = await read('references/card/case-space.md')
   const discovery = await read('references/discovery.md')
   assert.match(
@@ -2661,9 +2720,9 @@ test('the docs name the pre-lock stage machine, the hold and the partial state t
 })
 
 test('the docs ask the open cells before modelling, design the proof by scope, and run independent slices in parallel without moving TDD', async () => {
-  const skill = await read('references/roles/intake.md')
+  const skill = await read('references/roles/intake-formal.md')
   const bend = await read('references/bend-cross-verification.md')
-  const lifecycle = await read('references/lifecycle-adaptation.md')
+  const lifecycle = await read('references/lifecycle-adaptation-formal.md')
   assert.match(
     skill,
     /Put the cells the sources leave open in\s+front of the user before writing the model, not while writing it/,
@@ -2688,9 +2747,9 @@ test('the docs ask the open cells before modelling, design the proof by scope, a
 })
 
 test('the docs name the async cells the MODELED gate checks and the slice-scoped test gate', async () => {
-  const skill = await read('references/roles/controller.md')
+  const skill = await read('references/roles/controller-formal.md')
   const bend = await read('references/bend-cross-verification.md')
-  const lifecycle = await read('references/lifecycle-adaptation.md')
+  const lifecycle = await read('references/lifecycle-adaptation-formal.md')
   assert.match(bend, /`asyncCells: \[\{operation, cells\}\]`/)
   for (const cell of [
     'late-success-after-cancel',

@@ -11,13 +11,16 @@ const plugin = fileURLToPath(new URL('../', import.meta.url))
 const skills = join(plugin, 'skills')
 const core = join(skills, 'frontend-oracle-design')
 const ceilings = {
+  'frontend-contract-design': 140,
   'frontend-oracle-design': 140,
   'oracle-intake': 150,
   'oracle-author': 240,
   'oracle-implement': 180,
   'oracle-review': 180,
 }
-const names = Object.keys(ceilings)
+const controllers = ['frontend-oracle-design', 'frontend-contract-design']
+const specialists = ['oracle-intake', 'oracle-author', 'oracle-implement', 'oracle-review']
+const names = [...controllers, ...specialists]
 const entryPath = (name) => join(skills, name, 'SKILL.md')
 
 function entry(name) {
@@ -126,7 +129,7 @@ test('Markdown link validation handles relative definitions and balanced paths w
   )
 })
 
-test('exactly five named skill entries are discoverable, with no flat duplicate', () => {
+test('exactly six named skill entries are discoverable, with no flat duplicate', () => {
   for (const name of names) entry(name)
   assert.equal(existsSync(join(skills, 'SKILL.md')), false, 'flat SKILL.md must not remain discoverable')
   const discovered = files(skills).filter((path) => path.endsWith('/SKILL.md')).map((path) => relative(skills, path)).sort()
@@ -144,10 +147,10 @@ for (const [name, ceiling] of Object.entries(ceilings)) {
   })
 }
 
-test('controller links and explicitly invokes every sibling role and external test skill', () => {
-  const text = entry('frontend-oracle-design')
-  const targets = localLinks(entryPath('frontend-oracle-design'), text)
-  for (const name of names.slice(1)) {
+for (const controllerName of controllers) test(`${controllerName} links and explicitly invokes every sibling role and external test skill`, () => {
+  const text = entry(controllerName)
+  const targets = localLinks(entryPath(controllerName), text)
+  for (const name of specialists) {
     assert.ok(targets.includes(entryPath(name)), `controller must link the actual ${name} entry`)
     assert.match(text, new RegExp(`\\$${name}\\b`), `controller must explicitly invoke $${name}`)
   }
@@ -160,8 +163,8 @@ test('controller links and explicitly invokes every sibling role and external te
   ], 'controller')
 })
 
-test('initial or preliminary investigation cannot defer the intake handoff until a later turn', () => {
-  const text = entry('frontend-oracle-design')
+for (const controllerName of controllers) test(`${controllerName} initial or preliminary investigation cannot defer the intake handoff until a later turn`, () => {
+  const text = entry(controllerName)
   const entryGate = text.split('## Mode selection and explicit role invocation')[0]
   assert.match(entryGate, /before any source investigation or Outcome Brief/i)
   assert.match(entryGate, /invoke[^\n]*\$oracle-intake/)
@@ -175,14 +178,25 @@ test('intake loads its current-stage dependencies before even a preliminary brie
   const text = entry('oracle-intake')
   assert.match(text, /even if the controller read it/i)
   assert.match(text, /before source inspection or any preliminary brief/i)
-  for (const path of ['card/policy-sources.md', 'card/risk-grill.md', 'roles/space-discovery.md', 'roles/case-space-inputs.md', 'bva.md']) {
+  for (const path of ['common.md', 'verification-common.md', 'roles/space-discovery.md', 'roles/case-space-inputs.md', 'bva.md']) {
     assert.ok(localLinks(entryPath('oracle-intake'), text).includes(join(core, 'references', path)), `intake directly names current-stage dependency ${path}`)
+  }
+  assert.match(text, /selected-profile source\/risk\/requirements guidance/, 'source and risk guidance remain current-profile intake prerequisites')
+  for (const [owner, sourcePath, riskPath] of [
+    ['Formal', 'roles/intake-formal.md', 'card/risk-grill.md'],
+    ['Contract', 'contract/requirements.md', 'contract/risk-grill.md'],
+  ]) {
+    const path = join(core, 'references', sourcePath)
+    const body = readFileSync(path, 'utf8')
+    localLinks(path, body)
+    assert.ok(existsSync(join(core, 'references', riskPath)), `${owner} current-stage risk procedure must exist`)
+    assert.match(body, /policy.sources|source investigation/i, `${owner} source procedure is not waived`)
   }
   assert.match(text, /same turn/i)
   assert.match(text, /Read without offset or limit/)
 })
 
-for (const name of names.slice(1)) {
+for (const name of specialists) {
   test(`${name} cannot bootstrap missing prerequisites or grant itself authority`, () => {
     const text = roleContract(name)
     requires(text, [
@@ -208,10 +222,13 @@ test('specialist write and evidence authority follows each bounded role', () => 
   const author = roleContract('oracle-author')
   requires(author, [
     ['approved source inputs', /source|출처/i],
-    ['model-first projection', /model[\s\S]{0,200}(?:project|generat)|모델[\s\S]{0,200}(?:투영|생성)/i],
-    ['independent analyst', /independent[\s\S]{0,100}analyst|독립[\s\S]{0,100}분석/i],
     ['post-GREEN closure', /GREEN/],
   ], 'author')
+  const formalAuthor = readFileSync(join(core, 'references/roles/author-formal.md'), 'utf8')
+  requires(formalAuthor, [
+    ['model-first projection', /model[\s\S]{0,200}(?:project|generat)|모델[\s\S]{0,200}(?:투영|생성)/i],
+    ['independent analyst', /independent[\s\S]{0,100}analyst|독립[\s\S]{0,100}분석/i],
+  ], 'Formal author')
   forbids(author, /lock|policy|잠금|정책/i, 'author')
 
   const implement = roleContract('oracle-implement')
@@ -237,11 +254,113 @@ test('one canonical runtime owns scripts, references, bundles and evals', () => 
   for (const resource of ['scripts', 'references', 'bundles', 'evals']) {
     assert.ok(existsSync(join(core, resource)), `canonical ${resource} must exist`)
     assert.equal(existsSync(join(skills, resource)), false, `old flat ${resource} must not remain`)
-    for (const name of names.slice(1)) assert.equal(existsSync(join(skills, name, resource)), false, `${name} must not duplicate ${resource}`)
+    for (const name of specialists) assert.equal(existsSync(join(skills, name, resource)), false, `${name} must not duplicate ${resource}`)
   }
   for (const basename of ['oracle-run.mjs', 'oracle-reference-route.mjs', 'reference-graph.json']) {
     const matches = files(skills).filter((path) => path.endsWith(`/${basename}`))
     assert.deepEqual(matches, [join(core, basename.endsWith('.json') ? 'references' : 'scripts', basename)])
+  }
+})
+
+test('controllers fix profile identity while bare shared roles never default a profile', () => {
+  for (const [name, profile] of [['frontend-oracle-design', 'formal-bend/v1'], ['frontend-contract-design', 'contract/v1']]) {
+    assert.ok(entry(name).includes(`Fixed verification profile: \`${profile}\``), `${name} fixed profile`)
+  }
+  for (const name of specialists) {
+    const text = roleContract(name)
+    assert.match(text, /formal-bend\/v1/)
+    assert.match(text, /contract\/v1/)
+    assert.match(text, /bare[\s\S]{0,180}(?:controller|default)/i)
+    assert.match(text, /unknown\/bare|unknown\s+profile/i)
+    assert.match(text, /current.stage|current.step/i)
+    assert.ok(!localLinks(entryPath(name), entry(name)).some((path) => controllers.some((controller) => path === entryPath(controller))), `${name} must not read a controller entry to bootstrap`)
+  }
+})
+
+test('shared role bodies and Contract Markdown closure do not load Formal procedures', () => {
+  const specialized = /mandatory-verification\.md|bend-cross-verification\.md|ensure-bend|MODEL\.bend|LAWS\.bend|PROOF\.bend|oracle-adequacy|project-card/
+  const shared = ['common.md', 'verification-common.md', 'lifecycle-adaptation.md', 'graph-orchestration.md', 'type-environment.md',
+    'changeability.md', 'performance.md', 'review-checklist.md', 'subagent-review.md',
+    ...['loading', 'controller', 'intake', 'author', 'author-closure', 'implement', 'review', 'reporting', 'space-discovery', 'case-space-inputs'].map((name) => `roles/${name}.md`)]
+  for (const path of shared) assert.doesNotMatch(readFileSync(join(core, 'references', path), 'utf8'), specialized, path)
+  for (const name of specialists) assert.doesNotMatch(entry(name), specialized, name)
+  const seen = new Set()
+  const visit = (path) => {
+    if (seen.has(path) || !path.endsWith('.md')) return
+    seen.add(path)
+    assert.notEqual(path, entryPath('frontend-oracle-design'), 'Contract never reads Formal entry')
+    assert.doesNotMatch(path, /-formal\.md$/)
+    const text = readFileSync(path, 'utf8')
+    assert.doesNotMatch(text, specialized, relative(core, path))
+    for (const target of localLinks(path, text)) visit(target)
+  }
+  visit(entryPath('frontend-contract-design'))
+  for (const path of files(join(core, 'references/contract'))) visit(path)
+  for (const path of shared) visit(join(core, 'references', path))
+  assert.ok(seen.size > names.length, 'actual local documentation closure was checked, not entry words alone')
+})
+
+test('Contract documentation keeps finite coverage, approval ordering and honest reported evidence', () => {
+  const read = (name) => readFileSync(join(core, 'references/contract', `${name}.md`), 'utf8')
+  requires(read('space'), [
+    ['full product', /full-product/], ['raw cap before exclusions', /100000[\s\S]{0,100}before exclusions/],
+    ['unresolved cells block lock', /needs-decision[\s\S]{0,100}needs-evidence[\s\S]{0,100}block lock/],
+    ['stale identities rejected', /Reject[\s\S]{0,100}stale|revision-mismatched/i],
+    ['source-approved outcomes', /source-approved expected outcomes/],
+  ], 'Contract Space')
+  requires(read('authoring'), [
+    ['generic record', /given` is a generic record/], ['falsy values preserved', /false`[\s\S]{0,60}`0`[\s\S]{0,60}null/],
+    ['no new DSL', /No second source-of-truth DSL/], ['source not current behavior', /Never derive expected outcomes from existing code\/tests/],
+  ], 'Contract author')
+  requires(read('requirements'), [
+    ['approval before whole-card hash', /Approval precedes CHECKED and its whole-card hash/],
+    ['lock-only readiness', /Only the lock tool writes ORACLE_READY/],
+    ['no synthetic stage/package', /Never create MODELED or a[\s\S]{0,20}fake package/],
+    ['actual case IDs', /contract-cases:reported[\s\S]{0,80}actual reported case IDs/],
+    ['type evidence', /type-contract:reported/], ['property evidence', /fast-check:reported/],
+    ['honest formal status', /formalVerification: not-performed/],
+  ], 'Contract requirements')
+})
+
+test('Contract Async/Order requires actual invariant property evidence independent of types', () => {
+  const read = (name) => readFileSync(join(core, 'references/contract', `${name}.md`), 'utf8')
+  for (const name of ['requirements', 'review']) {
+    requires(read(name), [
+      ['active Async/Order trigger', /When Async\/Order is active[\s\S]{0,100}fast-check:reported/],
+      ['independent type applicability', /independent of (?:an |any )?exposed type boundary/],
+      ['approved invariant criterion', /approved contract invariants/],
+      ['actual positive executions and seed/domain', /positive actual execution count[\s\S]{0,60}seed[\s\S]{0,60}domain/],
+      ['failure shrink evidence', /shrink (?:information|evidence) on failure/],
+    ], `Contract ${name}`)
+  }
+})
+
+test('Contract type omission requires investigated paths and grounded current-stage determination', () => {
+  const read = (name) => readFileSync(join(core, 'references/contract', `${name}.md`), 'utf8')
+  for (const name of ['requirements', 'risk-grill', 'authoring', 'review']) {
+    requires(read(name), [
+      ['exact investigated paths', /exact investigated file paths/],
+      ['grounded no-boundary and approved source', /grounded no-boundary rationale[\s\S]{0,60}approved source/],
+      ['unknown is investigation', /Unknown applicability[\s\S]{0,100}investigation/],
+      ['unavailable tools are failure not N/A', /unavailable required tools[\s\S]{0,100}failure[\s\S]{0,50}not N\/A/],
+    ], `Contract ${name}`)
+  }
+  assert.match(read('requirements'), /Before omitting `type-contract:reported`/)
+  assert.match(read('risk-grill'), /At current-stage intake, investigate/)
+  assert.match(read('authoring'), /At current-stage authoring, investigate/)
+  assert.match(read('review'), /Verify the recorded applicability determination/)
+  assert.match(read('review'), /not self-approval or semantic-runtime inference/)
+})
+
+test('all canonical Task5a role and Contract links resolve locally including preserved Formal procedures', () => {
+  for (const directory of ['roles', 'contract']) {
+    for (const path of files(join(core, 'references', directory))) {
+      if (path.endsWith('.md')) localLinks(path, readFileSync(path, 'utf8'))
+    }
+  }
+  for (const name of ['controller-entry-formal', 'lifecycle-adaptation-formal', 'graph-orchestration-formal', 'formal-reference-links', 'changeability', 'performance', 'review-checklist', 'subagent-review']) {
+    const path = join(core, 'references', `${name}.md`)
+    localLinks(path, readFileSync(path, 'utf8'))
   }
 })
 

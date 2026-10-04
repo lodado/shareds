@@ -8,6 +8,20 @@ import { boundaryEvals } from '../evals/to-skill-creator-evals.mjs'
 
 const skillDirectory = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (relativePath) => readFile(join(skillDirectory, relativePath), 'utf8')
+
+test('shared loading and controller preserve current-profile reads and non-activation authority', async () => {
+  const loading = await read('references/roles/loading.md')
+  assert.match(loading, /--profile <resolved-profile>/)
+  assert.match(loading, /Read returned full same-profile dependency\s+closure/)
+  assert.match(loading, /Unavailable routing is a blocker/)
+  assert.match(loading, /Fresh workers cannot inherit a parent's continued-bundle assumptions/)
+  assert.match(loading, /Router advice neither\s+advances stages nor authorizes excluded context/)
+  const controller = await read('references/roles/controller.md')
+  assert.match(controller, /Only actual human confirmation approves policy/)
+  assert.match(controller, /Lock mismatch stops, never auto-relocks/)
+  assert.match(controller, /Only existing stage\/lock scripts\s+write state/)
+  assert.doesNotMatch(controller, /guardrail delivery state machine/i)
+})
 const owners = {
   'assertion-integrity': 'references/delivery/red.md',
   'revision-integrity': 'references/card/confirmation-lock.md',
@@ -162,8 +176,8 @@ test('candidate seeds preserve graph ownership and non-activation boundaries', a
   const [rules, graph, loading, controller] = await Promise.all([
     readRuleBlocks(),
     read('references/reference-graph.json').then(JSON.parse),
-    read('references/roles/loading.md'),
-    read('references/roles/controller.md'),
+    read('references/roles/loading-formal.md'),
+    read('references/roles/controller-formal.md'),
   ])
   assertRuleInventory(rules)
   const graphPaths = new Set(graph.nodes.map((node) => node.path))
@@ -208,7 +222,7 @@ test('conditional problem definition reuses existing owners without exempting Lo
   const [common, sources, intake, graph] = await Promise.all([
     read('references/common.md'),
     read('references/card/policy-sources.md'),
-    read('references/roles/intake.md'),
+    read('references/roles/intake-formal.md'),
     read('references/reference-graph.json').then(JSON.parse),
   ])
   assert.match(common, /Closing a problem candidate/)

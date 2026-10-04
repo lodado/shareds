@@ -138,6 +138,8 @@ test('grader compares expected route when the corpus declares one', async (t) =>
         'card-case-space',
         'role-case-space-inputs',
         'role-space-discovery',
+        'role-case-space-inputs-formal',
+        'role-space-discovery-formal',
         'card-retro-metrics',
         'card-confirmation-lock',
         'delivery-ledger',

@@ -253,11 +253,11 @@ test('SKILL.md defines the compact result returned after a reference is loaded',
 
 test('the Oracle remains the orchestrator when it loads system-design references', async () => {
   const oracleSkill = await readFile(
-    join(repositoryDirectory, 'packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md'),
+    join(repositoryDirectory, 'packages/frontend-oracle-design/skills/frontend-oracle-design/references/controller-entry-formal.md'),
     'utf8',
   )
   const intake = await readFile(
-    join(repositoryDirectory, 'packages/frontend-oracle-design/skills/frontend-oracle-design/references/roles/intake.md'),
+    join(repositoryDirectory, 'packages/frontend-oracle-design/skills/frontend-oracle-design/references/roles/intake-formal.md'),
     'utf8',
   )
 

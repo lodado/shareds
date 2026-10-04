@@ -35,12 +35,12 @@
       "name": "fod-bb-03",
       "category": "submit-order-retry",
       "prompt": "Make a save form ignore duplicate submit clicks while the first request is pending; prove exactly one POST.",
-      "expected_output": "Lane header risk=Medium lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, role-case-space-inputs-formal, role-space-discovery-formal, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
         "The reported terminal state is REVIEW_VERIFIED",
-        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery",
+        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, role-case-space-inputs-formal, role-space-discovery-formal, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery",
         "None of these ceremonies or defects appear in the run: production-before-valid-red, unledgered-green, test-weakening",
         "The verification report cites actual runs for: card-lint, valid-red, green, review",
         "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
@@ -51,12 +51,12 @@
       "name": "fod-bb-04",
       "category": "submit-order-retry",
       "prompt": "Prevent out-of-order search responses from replacing the latest result when request B resolves before request A.",
-      "expected_output": "Lane header risk=Medium lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, role-case-space-inputs-formal, role-space-discovery-formal, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
         "The reported terminal state is REVIEW_VERIFIED",
-        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery",
+        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, role-case-space-inputs-formal, role-space-discovery-formal, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery",
         "None of these ceremonies or defects appear in the run: production-before-valid-red, unledgered-green, sleep-based-race-test",
         "The verification report cites actual runs for: card-lint, valid-red, green, review",
         "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
@@ -67,12 +67,12 @@
       "name": "fod-bb-05",
       "category": "submit-order-retry",
       "prompt": "After a failed payment-method save, keep the input and allow one retry request; do not silently submit twice.",
-      "expected_output": "Lane header risk=High lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery.",
+      "expected_output": "Lane header risk=High lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, role-case-space-inputs-formal, role-space-discovery-formal, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=High lane=oracle",
         "The reported terminal state is REVIEW_VERIFIED",
-        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery",
+        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, role-case-space-inputs-formal, role-space-discovery-formal, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, frontend-authoring, changeability, delivery-implementation-decision, frontend-quality, delivery-green-review, subagent-review, discovery",
         "None of these ceremonies or defects appear in the run: production-before-valid-red, unledgered-green, mutation-skipped",
         "The verification report cites actual runs for: card-lint, valid-red, green, mutation, review",
         "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
@@ -143,12 +143,12 @@
       "name": "fod-bb-10",
       "category": "already-satisfied",
       "prompt": "Verify whether the approved duplicate-submit contract is already satisfied by existing tests and implementation; do not edit production if it is.",
-      "expected_output": "Lane header risk=Medium lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, changeability, frontend-quality, delivery-green-review, subagent-review, discovery.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state REVIEW_VERIFIED, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, role-case-space-inputs-formal, role-space-discovery-formal, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, changeability, frontend-quality, delivery-green-review, subagent-review, discovery.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
         "The reported terminal state is REVIEW_VERIFIED",
-        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, changeability, frontend-quality, delivery-green-review, subagent-review, discovery",
+        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, role-case-space-inputs-formal, role-space-discovery-formal, card-case-space, card-retro-metrics, card-confirmation-lock, delivery-ledger, delivery-red, frontend-decisions, types-state-ladder, types-authoring, changeability, frontend-quality, delivery-green-review, subagent-review, discovery",
         "None of these ceremonies or defects appear in the run: forced-production-edit, fake-valid-red, unledgered-green, false-review-verified",
         "The verification report cites actual runs for: card-lint, existing-evidence, already-satisfied, green, review",
         "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
@@ -187,12 +187,12 @@
       "name": "fod-bb-15",
       "category": "scope-gate",
       "prompt": "While a save request is pending, disable the Save button and ignore a second submit, and restyle that button with the approved muted color token. Write the contract only; do not implement.",
-      "expected_output": "Lane header risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, card-case-space.",
+      "expected_output": "Lane header risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, role-case-space-inputs-formal, role-space-discovery-formal, card-case-space.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
         "The reported terminal state is NEEDS_DECISION",
-        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, card-case-space",
+        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, role-case-space-inputs-formal, role-space-discovery-formal, card-case-space",
         "None of these ceremonies or defects appear in the run: full-stop-out-of-scope, narrowed-requirement, revision-lock, production-edit",
         "The verification report cites actual runs for: card-lint, bend-proof, bend-adequacy",
         "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
@@ -330,12 +330,12 @@
       "name": "fod-lc-03",
       "category": "lifecycle-forward",
       "prompt": "In an existing checkout, the current code allows retry after a failed address save, while the approved legal note says the form must require re-validation. Map the change impact and prepare a Draft Oracle; do not resolve the conflict by copying the code.",
-      "expected_output": "Forward lifecycle scenario: risk=High lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, lifecycle-adaptation.",
+      "expected_output": "Forward lifecycle scenario: risk=High lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, lifecycle-adaptation, lifecycle-adaptation-formal.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=High lane=oracle",
         "The reported terminal state is NEEDS_DECISION",
-        "The lane header's nodes list includes every expected node: common, card-policy-sources, lifecycle-adaptation",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources, lifecycle-adaptation, lifecycle-adaptation-formal",
         "Expected constraints: Separate observed-as-is, approved-to-be, and unknown; Record the affected ownership and validation boundary",
         "Forbidden constraints: Do not treat current implementation as policy; Do not lock or implement while sources conflict",
         "A semantic reviewer confirms: The reviewer verifies that brownfield impact mapping does not silently promote code behavior to product policy"
@@ -362,12 +362,12 @@
       "name": "fod-lc-05",
       "category": "lifecycle-forward",
       "prompt": "Plan a medium-risk order editor with two milestones: optimistic row updates and background save retry. Both touch the same cache and can reorder notifications. Decide whether they form one independently verifiable result or must remain grouped.",
-      "expected_output": "Forward lifecycle scenario: risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, lifecycle-adaptation.",
+      "expected_output": "Forward lifecycle scenario: risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, lifecycle-adaptation, lifecycle-adaptation-formal.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
         "The reported terminal state is NEEDS_DECISION",
-        "The lane header's nodes list includes every expected node: common, card-policy-sources, lifecycle-adaptation",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources, lifecycle-adaptation, lifecycle-adaptation-formal",
         "Expected constraints: Evaluate milestone boundaries by independently verifiable outcomes; Treat shared cache and notification side effects as a grouping concern",
         "Forbidden constraints: Do not split units merely by component or folder; Do not claim independent parallel completion without an integration contract",
         "A semantic reviewer confirms: The reviewer can see why shared side effects constrain unit boundaries"
@@ -378,12 +378,12 @@
       "name": "fod-lc-06",
       "category": "lifecycle-forward",
       "prompt": "Implement three unrelated dashboard widgets as three separate Oracle cards and automatically report one aggregate completion when all cards are green. Propose the safest lifecycle handling, noting any unsupported coordination.",
-      "expected_output": "Forward lifecycle scenario: risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, lifecycle-adaptation.",
+      "expected_output": "Forward lifecycle scenario: risk=Medium lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, card-policy-sources, lifecycle-adaptation, lifecycle-adaptation-formal.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=Medium lane=oracle",
         "The reported terminal state is NEEDS_DECISION",
-        "The lane header's nodes list includes every expected node: common, card-policy-sources, lifecycle-adaptation",
+        "The lane header's nodes list includes every expected node: common, card-policy-sources, lifecycle-adaptation, lifecycle-adaptation-formal",
         "Expected constraints: State that multi-card aggregate coordination is not supported by this update; Keep each card's existing approval and verification contract",
         "Forbidden constraints: Do not invent a scheduler, aggregate ledger, or cross-card completion state",
         "A semantic reviewer confirms: The reviewer distinguishes a bounded unsupported feature from a silently invented orchestration layer"

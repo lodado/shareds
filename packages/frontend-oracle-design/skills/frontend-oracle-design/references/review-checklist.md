@@ -97,21 +97,21 @@ finding. Do not suppress mandatory or global critical/high issues because no pat
 
 - The type·state contract — state union and action placement, hiding impossible states,
   reimplementing server state, Suspense/Error Boundary branching, late-response defense — is judged
-  only by [`types/review-criteria.md`](types/review-criteria.md) and
-  [`frontend/decisions.md`](frontend/decisions.md) received as review points. Do not repeat the same
+  only by [selected-profile types/review-criteria.md procedure via loader](roles/loading.md) and
+  [selected-profile frontend/decisions.md procedure via loader](roles/loading.md) received as review points. Do not repeat the same
   criteria in this list.
 - Do the query cache and local/global state avoid duplicate ownership of server state?
 - Was work for which a Server Component is sufficient not moved to a Client Component·TanStack Query?
 - Does retry recover only the scope of the failed query/boundary without indiscriminately resetting
   the whole cache?
 - Does the micro-hook separate UI and business logic for a responsibility identified in
-  [`frontend/authoring.md`](frontend/authoring.md#2-set-declarative-ui-and-micro-hook-boundaries)?
+  [selected-profile frontend/authoring.md procedure via loader](roles/loading.md)?
   Compare the actual callers, state/effect owners and checks with the Implementation Decision;
   do not accept its self-assessment. Preserve an approved orchestration-only scope without
   imposing it elsewhere. Under an approved hook-tiers profile, check that the domain hook only
   coordinates and that each micro-hook connects one state owner. A trivial wrapper or giant hook is
   not justified by extracting a file.
-- For a material [responsibility assignment](delivery/implementation-decision.md#responsibility-assignment),
+- For a material [responsibility assignment](roles/loading.md),
   derive the caller → state/policy owner → external effect path from code, then compare it with
   the Decision and the applicable approved boundary. Cite the actual decision/update sites in the
   existing Cohesion/Coupling evidence, including a View that still owns the workflow behind a

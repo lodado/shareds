@@ -23,7 +23,61 @@ export async function loadGraph() {
   return JSON.parse(await readFile(graphPath, 'utf8'))
 }
 
+export const REFERENCE_PROFILES = Object.freeze(['formal-bend/v1', 'contract/v1'])
+
+export function referenceProfile(profile = 'formal-bend/v1') {
+  if (!REFERENCE_PROFILES.includes(profile)) throw new TypeError('Invalid reference profile')
+  return profile
+}
+
+export function referenceDependencies(node, profile) {
+  return [...new Set([...node.requires, ...(node.requiresByProfile?.[referenceProfile(profile)] ?? [])])]
+}
+
+export function referencePathFor(node, profile) {
+  return node.pathsByProfile?.[referenceProfile(profile)] ?? node.path
+}
+
+function validateProfilePaths(node, profiles) {
+  if (node.pathsByProfile === undefined) return
+  const paths = node.pathsByProfile
+  if (!paths || typeof paths !== 'object' || Array.isArray(paths) || Object.keys(paths).some((profile) => !profiles.includes(profile))) throw new TypeError(`Invalid path profiles for ${node.id}`)
+  for (const path of Object.values(paths)) {
+    if (typeof path !== 'string' || !path.startsWith('references/') || /[\\?#]/.test(path) || path.split('/').some((part) => ['', '.', '..'].includes(part))) throw new TypeError(`Invalid reference path variant for ${node.id}`)
+  }
+}
+
+export function validateReferenceProfiles(graph) {
+  const byId = new Map(graph.nodes.map((node) => [node.id, node]))
+  const annotated = graph.nodes.some((node) => Object.hasOwn(node, 'profiles'))
+  for (const node of graph.nodes) {
+    const profiles = node.profiles ?? (annotated ? [] : ['formal-bend/v1'])
+    if (!Array.isArray(profiles) || profiles.length === 0 || new Set(profiles).size !== profiles.length || profiles.some((profile) => !REFERENCE_PROFILES.includes(profile))) {
+      throw new TypeError(`Invalid profiles for ${node.id}`)
+    }
+    validateProfilePaths(node, profiles)
+    if (node.requiresByProfile !== undefined) {
+      const conditional = node.requiresByProfile
+      if (!conditional || typeof conditional !== 'object' || Array.isArray(conditional) || Object.keys(conditional).some((profile) => !profiles.includes(profile))) throw new TypeError(`Invalid dependency profiles for ${node.id}`)
+      for (const dependencies of Object.values(conditional)) {
+        if (!Array.isArray(dependencies) || new Set(dependencies).size !== dependencies.length) throw new TypeError(`Invalid profile dependencies for ${node.id}`)
+      }
+    }
+    for (const profile of profiles) {
+      for (const id of referenceDependencies(node, profile)) {
+        const dependency = byId.get(id)
+        if (!dependency) throw new TypeError(`Unknown profile dependency ${id} for ${node.id}`)
+        if (!(dependency.profiles ?? ['formal-bend/v1']).includes(profile)) throw new TypeError(`Profile ${profile}: ${node.id} requires wrong-profile ${id}`)
+        if (annotated && ['role-controller', 'role-reporting', 'role-controller-formal', 'role-reporting-formal', 'controller-entry-formal'].includes(id) && !['role-controller', 'role-reporting', 'role-controller-formal', 'role-reporting-formal', 'controller-entry-formal'].includes(node.id)) throw new TypeError(`Controller-only dependency ${id} for ${node.id}`)
+        if (annotated && dependency.loader === 'reviewer' && node.loader !== 'reviewer') throw new TypeError(`Reviewer-only dependency ${id} for ${node.id}`)
+      }
+    }
+  }
+}
+
 function resolveNodes(graph, bundle) {
+  validateReferenceProfiles(graph)
+  const profile = referenceProfile(bundle.profile)
   const byId = new Map(graph.nodes.map((node) => [node.id, node]))
   const seen = new Set()
   const resolved = []
@@ -32,10 +86,11 @@ function resolveNodes(graph, bundle) {
     if (trail.includes(id)) throw new Error(`bundle ${bundle.id} has a requires cycle at ${id}`)
     const node = byId.get(id)
     if (!node) throw new Error(`bundle ${bundle.id} references unknown node ${id}`)
-    for (const dependency of node.requires) visit(dependency, [...trail, id])
+    if (!(node.profiles ?? ['formal-bend/v1']).includes(profile)) throw new Error(`bundle ${bundle.id} includes wrong-profile node ${id}`)
+    for (const dependency of referenceDependencies(node, profile)) visit(dependency, [...trail, id])
     if (seen.has(id)) return
     seen.add(id)
-    resolved.push(node)
+    resolved.push({ ...node, path: referencePathFor(node, profile) })
   }
 
   for (const id of bundle.nodes) visit(id, [])
@@ -52,6 +107,7 @@ export function resolveAssumed(graph, bundle, trail = []) {
     if (trail.includes(afterId)) throw new Error(`bundle ${bundle.id} has an after cycle at ${afterId}`)
     const parent = (graph.bundles ?? []).find((candidate) => candidate.id === afterId)
     if (!parent) throw new Error(`bundle ${bundle.id} declares unknown after bundle ${afterId}`)
+    if (referenceProfile(parent.profile) !== referenceProfile(bundle.profile)) throw new Error(`bundle ${bundle.id} has wrong-profile after bundle ${afterId}`)
     for (const node of resolveNodes(graph, parent)) assumed.add(node.id)
     for (const id of resolveAssumed(graph, parent, [...trail, afterId])) assumed.add(id)
   }
@@ -107,7 +163,7 @@ export async function renderBundle(graph, bundle) {
 }
 
 export function bundlePath(bundle) {
-  return join(bundleDirectory, `${bundle.id}.md`)
+  return join(bundleDirectory, ...(bundle.profile === 'contract/v1' ? ['contract'] : []), `${bundle.id}.md`)
 }
 
 async function main() {
@@ -117,14 +173,18 @@ async function main() {
   if (bundles.length === 0) throw new Error('reference-graph.json declares no bundles')
 
   const expected = new Map()
-  for (const bundle of bundles) expected.set(`${bundle.id}.md`, await renderBundle(graph, bundle))
+  for (const bundle of bundles) expected.set(bundle.profile === 'contract/v1' ? `contract/${bundle.id}.md` : `${bundle.id}.md`, await renderBundle(graph, bundle))
 
   if (check) {
-    const present = new Set(
-      (await readdir(bundleDirectory, { withFileTypes: true }).catch(() => []))
-        .filter((entry) => entry.isFile())
-        .map((entry) => entry.name),
-    )
+    const present = new Set()
+    const collect = async (directory, prefix = '') => {
+      for (const entry of await readdir(directory, { withFileTypes: true }).catch(() => [])) {
+        const name = `${prefix}${entry.name}`
+        if (entry.isDirectory()) await collect(join(directory, entry.name), `${name}/`)
+        else if (entry.isFile()) present.add(name)
+      }
+    }
+    await collect(bundleDirectory)
     const problems = []
     for (const [name, content] of expected) {
       const actual = await readFile(join(bundleDirectory, name), 'utf8').catch(() => null)
@@ -147,7 +207,10 @@ async function main() {
 
   await rm(bundleDirectory, { recursive: true, force: true })
   await mkdir(bundleDirectory, { recursive: true })
-  for (const [name, content] of expected) await writeFile(join(bundleDirectory, name), content, 'utf8')
+  for (const [name, content] of expected) {
+    await mkdir(dirname(join(bundleDirectory, name)), { recursive: true })
+    await writeFile(join(bundleDirectory, name), content, 'utf8')
+  }
   process.stdout.write(`generated ${expected.size} bundles in bundles/\n`)
 }
 

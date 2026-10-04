@@ -2,13 +2,13 @@
 
 ## Mandatory verification stack
 
-Follow [`mandatory-verification.md`](mandatory-verification.md) on every Oracle invocation, including
+Follow [verification-common](verification-common.md) and the resolved profile requirements on every invocation, including
 Low and Design-only. Its tool-use, evidence and blocking rules remain mandatory; the selection
 ladders below choose meaningful contracts and never exempt a member of that stack.
 
 ## When to Read
 
-- **Once per repo**, before creating a type contract ([`types/state-ladder.md`](types/state-ladder.md))
+- **Once per repo**, before creating a type contract using the selected profile's type/state guidance
   with this skill in the target repo for the first time. On every later invocation, confirm that the
   existing environment evidence still matches the current compiler, effective config, witnesses and
   harness before Draft/lock.

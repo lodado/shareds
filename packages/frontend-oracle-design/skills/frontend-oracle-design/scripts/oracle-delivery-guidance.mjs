@@ -97,12 +97,17 @@ export function deliveryGuidance({ status, to, graph, rejection, protocol }) {
   const guide = { schemaVersion: 1, authority: 'advisory' }
   if (protocol) guide.protocol = { language: protocol.language, source: 'references/delivery.protocol.json' }
   if (status) {
+    if (status.verificationProfile) {
+      guide.verificationProfile = status.verificationProfile
+      guide.controller = status.controller
+    }
+    if (status.verificationProfile) guide.verification = status.verification
     guide.currentState = status.currentState
     guide.availableTargets = status.nextLegalActions
     guide.observations = status.blockers
     if (to) {
       const packet = status.nextActions.find((action) => action.to === to)
-      const { delivered } = splitDelivery(graph, { id: `guide-${to}`, nodes: packet.readNodes })
+      const { delivered } = splitDelivery(graph, { id: `guide-${to}`, ...(status.verificationProfile ? { profile: status.verificationProfile } : {}), nodes: packet.readNodes })
       guide.action = {
         ...packet,
         ...(protocol ? { contract: protocol.targets[to] } : {}),

@@ -30,9 +30,8 @@ import {
   TRUSTED_ADAPTER_NAMES,
   trustedAdapter,
 } from './oracle-adapters.mjs'
-import { parseAdequacy } from './oracle-adequacy.mjs'
 import { deliveryGuidance, renderGuidance } from './oracle-delivery-guidance.mjs'
-import { parseCaseSpace } from './oracle-frames.mjs'
+import { generateFromDocument, parseCaseSpace } from './oracle-frames.mjs'
 import {
   assertSnapshotUnchanged,
   FAILURE_CAUSES,
@@ -50,8 +49,7 @@ import {
   ZERO_DIGEST,
 } from './oracle-fs.mjs'
 import { invalidatedWitnesses } from './oracle-lock.mjs'
-import { parseFormalModel } from './oracle-model.mjs'
-import { generatedBlock, inputsDigestOf, loadPackage, packageInputs, stackLabelsFor } from './oracle-package.mjs'
+import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import {
   compileDeliveryProtocol,
   missingObligationFlags,
@@ -61,7 +59,8 @@ import {
   targetKind,
 } from './oracle-protocol.mjs'
 
-import { snapshotContext } from './oracle-review-context.mjs'
+import { assertProfileReviewReferences, snapshotContext } from './oracle-review-context.mjs'
+import { approvedSourceIds, auditFullProduct, markdownLines, sectionLines } from './oracle-space.mjs'
 import { redRefreshBlocker, reviewHoldBlocker } from './oracle-transition-guards.mjs'
 import { claudeWorkerInvocation, parseWorkerSubmission } from './oracle-worker.mjs'
 import { spawnGit } from './resolve-executable.mjs'
@@ -691,10 +690,48 @@ function evidencePathFor(directory, state) {
 
 async function readState(directory) {
   try {
-    return JSON.parse(await readFile(statePath(directory), 'utf8'))
+    const state = JSON.parse(await readFile(statePath(directory), 'utf8'))
+    await resolveRunProfile(directory, state, true)
+    return state
   } catch (error) {
+    if (error.code?.startsWith('PROFILE_')) throw new CliError(error.code, error.message)
     throw new CliError('STATE_INVALID', `Cannot read run state: ${error.message}`)
   }
+}
+
+async function resolveRunProfile(directory, state, includeState = false) {
+  const lock = resolve(directory, state.lock)
+  const manifest = JSON.parse(await readFile(lock, 'utf8'))
+  const card = await readFile(resolve(dirname(lock), manifest.oracle.path), 'utf8')
+  try {
+    return resolveProfileBinding({ bindings: [
+      { artifact: 'card', profile: readCardProfile(card) },
+      { artifact: 'lock', profile: manifest.verificationProfile },
+      ...(includeState ? [{ artifact: 'state', profile: state.verificationProfile }] : []),
+    ] })
+  } catch (error) {
+    throw new CliError(error.code, error.message)
+  }
+}
+
+async function runIdentity(directory, state) {
+  const binding = await resolveRunProfile(directory, state, true)
+  return binding.kind === 'explicit' ? { verificationProfile: binding.profile, controller: binding.controller } : {}
+}
+
+async function assertArtifactIdentity(directory, state, artifact) {
+  const expected = await runIdentity(directory, state)
+  if (artifact.verificationProfile !== expected.verificationProfile || artifact.controller !== expected.controller ||
+      (!expected.verificationProfile && (Object.hasOwn(artifact, 'verificationProfile') || Object.hasOwn(artifact, 'controller')))) {
+    throw new CliError('PROFILE_MISMATCH', 'artifact profile/controller must match the current card, lock and state')
+  }
+  return expected
+}
+
+async function assertReviewPacketIdentity(directory, state, packet) {
+  await assertArtifactIdentity(directory, state, packet)
+  try { await assertProfileReviewReferences(packet) }
+  catch (error) { throw new CliError('REVIEW_PACKET_STALE', error.message) }
 }
 
 async function writeState(directory, state) {
@@ -844,6 +881,9 @@ function replayState(state, ledger) {
       if (recorded) continue
       if (!entry.stateDelta || typeof entry.stateDelta !== 'object') {
         throw new CliError('STATE_LEDGER_DIVERGENCE', 'transition event has no complete state delta')
+      }
+      if (Object.hasOwn(entry.stateDelta, 'verificationProfile') && entry.stateDelta.verificationProfile !== state.verificationProfile) {
+        throw new CliError('PROFILE_MISMATCH', 'A replayed transition cannot change the initialized verification profile')
       }
       Object.assign(state, entry.stateDelta)
       state.state = entry.state
@@ -1165,8 +1205,8 @@ function fromNodeReport(raw, cleanCommand = false) {
     }
     if (!isTerminalTestData(event.data)) return { error: 'Node reporter output has an invalid terminal test event' }
     // 원인·파일이 없으면 undefined — 원장 JSON에서 키가 빠진다
-    const { name, status, cause, file } = event.data
-    tests.push({ name, status, cause, file })
+    const { name, status, cause, file, contractEvidence } = event.data
+    tests.push({ name, status, cause, file, ...(contractEvidence ? { contractEvidence } : {}) })
   }
   if ((complete || cleanCommand) && tests.length > 0) return { tests }
   return { error: 'Node reporter output lacks completion or terminal tests' }
@@ -1450,7 +1490,93 @@ async function initialize(options) {
   state.lockSha256 = revision.oracleSha256
   state.lockManifestSha256 = revision.lockManifestSha256
   const oracle = await readFile(await lockedOraclePath(directory, state), 'utf8')
+  const binding = await resolveRunProfile(directory, state)
+  if (binding.kind === 'explicit') state.verificationProfile = binding.profile
   state.risk = resolveRisk(options.risk, oracle)
+  if (binding.profile === 'contract/v1') {
+    if (!requiredLabels.includes('contract-cases:reported')) {
+      throw new CliError('CONTRACT_CASES_LABEL_REQUIRED', 'Contract init requires --required-label contract-cases:reported')
+    }
+    const lines = markdownLines(oracle)
+    const typeContract = sectionLines(lines, 'Type Contract').join('\n')
+    const approved = approvedSourceIds(lines)
+    const notApplicable = /^- Not applicable: (.+)$/m.exec(typeContract)?.[1]
+    const investigated = /^- Investigated: (.+)$/m.exec(typeContract)?.[1]
+    const substantiveDeclaration = (value) => Boolean(value?.trim()) && !/^(?:[-\u2010-\u2015]+|TBD)$/i.test(value.trim())
+    const reason = notApplicable?.replace(/\(source: [^)]+\)/g, '').trim()
+    const noTypeBoundary = substantiveDeclaration(reason) && substantiveDeclaration(investigated)
+      && [...approved].some((id) => notApplicable.includes(`(source: ${id})`))
+    if (!noTypeBoundary && !requiredLabels.includes('type-contract:reported')) {
+      throw new CliError('TYPE_CONTRACT_LABEL_REQUIRED', 'Contract init requires --required-label type-contract:reported unless the approved card declares Type Contract not applicable')
+    }
+    const temporal = parseCaseSpace(oracle)?.families.some((entry) => ['Async', 'Order'].includes(entry.family) && !entry.excluded)
+    if (temporal && !requiredLabels.includes('fast-check:reported')) {
+      throw new CliError('FAST_CHECK_LABEL_REQUIRED', 'Contract Async/Order requires --required-label fast-check:reported')
+    }
+  } else {
+    await validateFormalInit(directory, state, oracle, requiredLabels, binding)
+  }
+  state.milestones = parseMilestones(options.milestones, contractRowIds(oracle))
+  state.snapshot = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+  // RED 전 기존 테스트 변경을 as-is → to-be로만 허용하는 기준선 — 코드 테스트만 잰다(스크린샷 바이트는 재지 않는다)
+  state.testFilesAtInit = {}
+  for (const path of Object.keys(state.snapshot).filter(
+    (candidate) => isTestPath(candidate) && SCANNABLE.test(candidate),
+  )) {
+    state.testFilesAtInit[path] = measureTestFile(await readFile(join(scanRoot, path), 'utf8'))
+  }
+  const runnerHarness = await runnerHarnessPaths(scanRoot, state.snapshot)
+  harnessPaths.push(...runnerHarness.paths.filter((path) => !harnessPaths.includes(path)))
+  const untrackedHarness = harnessPaths.filter((path) => !(path in state.snapshot))
+  if (untrackedHarness.length > 0) {
+    throw new CliError(
+      'HARNESS_PATH_INVALID',
+      `harness path is outside the tracked scan snapshot: ${untrackedHarness.join(', ')}`,
+    )
+  }
+  // oracle:nondeterminism 상태 이력은 실제 시각을 기록한다
+  const initializedAt = new Date().toISOString()
+  state.history.push({ state: 'ORACLE_READY', runId: null, reason: null, runCount: 0, at: initializedAt })
+
+  try {
+    await writeFile(statePath(directory), `${JSON.stringify(state, null, 2)}\n`, { flag: 'wx' })
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error
+    throw new CliError(
+      'RUN_ARTIFACTS_EXIST',
+      'Run state already exists — start a new <oracle-id> directory for a new revision',
+    )
+  }
+  const initialized = await appendLedger(directory, {
+    type: 'init',
+    state: 'ORACLE_READY',
+    stateDelta: { state: state.state, history: state.history },
+    at: initializedAt,
+  })
+  state.ledgerHead = initialized.digest
+  await writeState(directory, state)
+
+  process.stdout.write(
+    [
+      `RUN_STATE_INITIALIZED sha256:${revision.oracleSha256} state:ORACLE_READY`,
+      ...runnerHarness.paths.map((path) => `HARNESS_AUTO ${path}`),
+      ...runnerHarness.unresolved.map((entry) => `HARNESS_SETUP_UNRESOLVED ${entry} — register it with --harness-path`),
+      ...runnerHarness.suggested
+        .filter((path) => !harnessPaths.includes(path))
+        .map((path) => `HARNESS_SUGGESTED ${path} — register it with --harness-path if it carries the test config`),
+      '',
+    ].join('\n'),
+  )
+}
+
+async function validateFormalInit(directory, state, oracle, requiredLabels, binding) {
+  const { parseFormalModel } = await import('./oracle-model.mjs')
+  const { parseAdequacy } = await import('./oracle-adequacy.mjs')
+  const { generatedBlock, inputsDigestOf, loadPackage, packageInputs, stackLabelsFor } = await import('./oracle-package.mjs')
+  if (binding.profile === 'formal-bend/v1') {
+    if (!parseAdequacy(oracle.split('\n'))) throw new CliError('ADEQUACY_REQUIRED', 'Explicit Formal requires Adequacy')
+    if (!generatedBlock(oracle).present) throw new CliError('PACKAGE_REQUIRED', 'Explicit Formal requires a projected model package')
+  }
   // 승인된 Formal Model은 법칙 증명을 계약에 넣었다 — 증명 실행 없이 GREEN으로 가는 init을 막는다.
   if (parseFormalModel(oracle.split('\n')) && !requiredLabels.includes('bend-proof:reported')) {
     throw new CliError(
@@ -1504,57 +1630,6 @@ async function initialize(options) {
       )
     }
   }
-  state.milestones = parseMilestones(options.milestones, contractRowIds(oracle))
-  state.snapshot = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
-  // RED 전 기존 테스트 변경을 as-is → to-be로만 허용하는 기준선 — 코드 테스트만 잰다(스크린샷 바이트는 재지 않는다)
-  state.testFilesAtInit = {}
-  for (const path of Object.keys(state.snapshot).filter(
-    (candidate) => isTestPath(candidate) && SCANNABLE.test(candidate),
-  )) {
-    state.testFilesAtInit[path] = measureTestFile(await readFile(join(scanRoot, path), 'utf8'))
-  }
-  const runnerHarness = await runnerHarnessPaths(scanRoot, state.snapshot)
-  harnessPaths.push(...runnerHarness.paths.filter((path) => !harnessPaths.includes(path)))
-  const untrackedHarness = harnessPaths.filter((path) => !(path in state.snapshot))
-  if (untrackedHarness.length > 0) {
-    throw new CliError(
-      'HARNESS_PATH_INVALID',
-      `harness path is outside the tracked scan snapshot: ${untrackedHarness.join(', ')}`,
-    )
-  }
-  // oracle:nondeterminism 상태 이력은 실제 시각을 기록한다
-  const initializedAt = new Date().toISOString()
-  state.history.push({ state: 'ORACLE_READY', runId: null, reason: null, runCount: 0, at: initializedAt })
-
-  try {
-    await writeFile(statePath(directory), `${JSON.stringify(state, null, 2)}\n`, { flag: 'wx' })
-  } catch (error) {
-    if (error.code !== 'EEXIST') throw error
-    throw new CliError(
-      'RUN_ARTIFACTS_EXIST',
-      'Run state already exists — start a new <oracle-id> directory for a new revision',
-    )
-  }
-  const initialized = await appendLedger(directory, {
-    type: 'init',
-    state: 'ORACLE_READY',
-    stateDelta: { state: state.state, history: state.history },
-    at: initializedAt,
-  })
-  state.ledgerHead = initialized.digest
-  await writeState(directory, state)
-
-  process.stdout.write(
-    [
-      `RUN_STATE_INITIALIZED sha256:${revision.oracleSha256} state:ORACLE_READY`,
-      ...runnerHarness.paths.map((path) => `HARNESS_AUTO ${path}`),
-      ...runnerHarness.unresolved.map((entry) => `HARNESS_SETUP_UNRESOLVED ${entry} — register it with --harness-path`),
-      ...runnerHarness.suggested
-        .filter((path) => !harnessPaths.includes(path))
-        .map((path) => `HARNESS_SUGGESTED ${path} — register it with --harness-path if it carries the test config`),
-      '',
-    ].join('\n'),
-  )
 }
 
 async function execute(options) {
@@ -1623,7 +1698,7 @@ async function execute(options) {
       destination: adapterDestination,
     })
     command = built.command
-    adapterEnv = built.env
+    adapterEnv = { ...built.env, ORACLE_VERIFICATION_PROFILE: (await resolveRunProfile(directory, state)).profile ?? 'legacy/unclassified' }
   }
   const controls = options.capture ? await workerControls(directory) : null
   const commandStartedAt = Date.now() // oracle:nondeterminism 명령 소요 시간 계측
@@ -1667,6 +1742,7 @@ async function execute(options) {
       ? { worker: { ...options.worker, ...(options.capture ? { outputSha256: sha256(executed.stdout ?? '') } : {}) } }
       : {}),
     adapter: options.adapter ?? null,
+    ...((await resolveRunProfile(directory, state)).profile === 'contract/v1' ? { verificationProfile: 'contract/v1', contractSourceRoot: scanRoot } : {}),
     exitCode: executed.status,
     signal: executed.signal ?? null,
     grade: reportGrade(options.adapter, report),
@@ -1801,6 +1877,21 @@ function assertRunFresh(record, currentWorktree, currentProduction, currentHarne
   }
   if (!sameDigests(record.harnessSha256 ?? {}, currentHarness ?? {})) {
     throw new CliError(code, `${record.runId} predates the current harness bytes`)
+  }
+}
+
+// Standalone Contract evidence uses the same registered state and snapshot authority
+// as transitions. Importing this module does not execute the Delivery CLI.
+export async function assertCurrentContractRuns(directory, oracle, runs) {
+  const state = await readConsistentState(directory)
+  if (state.verificationProfile !== 'contract/v1') throw new CliError('EVIDENCE_STALE', 'current Contract state authority required')
+  if (await lockedOraclePath(directory, state) !== resolve(oracle)) throw new CliError('EVIDENCE_STALE', 'current state locks another Oracle')
+  const revision = verifyLock(directory, state)
+  const scanRoot = resolve(directory, state.scanRoot)
+  const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+  for (const run of runs) {
+    if (run.contractSourceRoot !== scanRoot || run.oracleSha256 !== revision.oracleSha256) throw new CliError('EVIDENCE_STALE', `${run.runId} belongs to another registered source/Oracle`)
+    assertRunFresh(run, sha256(JSON.stringify(current)), productionSha256(current, state.harnessPaths), selectedDigests(current, state.harnessPaths ?? []), revision.lockManifestSha256, 'EVIDENCE_STALE')
   }
 }
 
@@ -2094,8 +2185,10 @@ async function blindMapReceipt(options, directory, state) {
     throw new CliError('BLIND_MAP_INVALID', 'the blind mapping must be a non-empty JSON object keyed by test name')
   }
   const revision = verifyLock(directory, state)
+  const identity = await runIdentity(directory, state)
   const receiptId = sha256(
     stableStringify({
+      ...identity,
       inputSha256: inputSnapshot.sha256,
       mapSha256: mapSnapshot.sha256,
       revision: options.revision,
@@ -2106,6 +2199,7 @@ async function blindMapReceipt(options, directory, state) {
   )
   const event = await appendLedger(directory, {
     type: 'review-receipt',
+    ...identity,
     receiptId,
     // 블라인드 리뷰어는 리뷰 패킷을 읽지 않는다 — packetSha256 자리에는 그가 실제로 읽은 입력을 적는다.
     packetSha256: inputSnapshot.sha256,
@@ -2152,6 +2246,7 @@ async function reviewReceipt(options) {
     if (packetDocument?.schemaVersion !== 2 || packetDocument?.targetSnapshot?.worktreeSha256 !== options.revision) {
       throw new CliError('REVIEW_REVISION_MISMATCH', 'review receipt revision must match canonical schema-v2 packet')
     }
+    await assertReviewPacketIdentity(directory, state, packetDocument)
     const findingsPath = resolve(options.findings)
     const findings = await snapshotRegularFile(findingsPath, {
       base: directory,
@@ -2169,12 +2264,14 @@ async function reviewReceipt(options) {
     }
     if (document.orchestrationReceipt)
       throw new CliError('REVIEW_RECEIPT_EXISTS', 'findings already has an orchestration receipt')
+    const identity = await assertArtifactIdentity(directory, state, document)
     document.packetSha256 = packet.sha256
     document.targetRevision = options.revision
     const output = { ...document }
     const outputSha256 = sha256(stableStringify(output))
     const receiptId = sha256(
       stableStringify({
+        ...identity,
         packetSha256: packet.sha256,
         revision: options.revision,
         role: options.role,
@@ -2184,6 +2281,7 @@ async function reviewReceipt(options) {
       }),
     )
     document.orchestrationReceipt = {
+      ...identity,
       receiptId,
       packetSha256: packet.sha256,
       targetRevision: options.revision,
@@ -2197,6 +2295,7 @@ async function reviewReceipt(options) {
     const revision = verifyLock(directory, state)
     const event = await appendLedger(directory, {
       type: 'review-receipt',
+      ...identity,
       receiptId,
       packetSha256: packet.sha256,
       targetRevision: options.revision,
@@ -2387,6 +2486,7 @@ async function assertBlindMappingEvidence(directory, state, options, expected) {
       'the blind mapping requires a ledger receipt bound to this input, this mapping and this revision',
     )
   }
+  await assertArtifactIdentity(directory, state, receiptEvent)
   // 블라인드 리뷰어는 판정 리뷰어와 같을 수 없다 — 리뷰 패킷을 읽은 사람은 이미 evidence.json을 봤다.
   // 작업 식별자도 재사용할 수 없다: 패킷을 읽은 그 작업이 블라인드 읽기까지 겸했다고 주장할 수 없다.
   if (expected.reviewerIds.includes(receiptEvent.reviewerId)) {
@@ -2883,6 +2983,7 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
       throw new CliError('REVIEW_PACKET_INVALID', `Cannot read review packet: ${error.message}`)
     })
     const packet = JSON.parse(packetRaw)
+    await assertReviewPacketIdentity(directory, state, packet)
     packetSha256 = sha256(packetRaw)
     const packetGreenEntry = [...(packet.state?.history ?? [])]
       .reverse()
@@ -2913,6 +3014,8 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
       fail: (message) => new CliError('FINDINGS_INVALID', message),
     })
     const findingsDocument = JSON.parse(findingsSnapshot.bytes.toString('utf8'))
+    await assertArtifactIdentity(directory, state, findingsDocument)
+    await assertArtifactIdentity(directory, state, findingsDocument?.orchestrationReceipt ?? {})
     const receipt = findingsDocument?.orchestrationReceipt
     const receiptEvent = allLedger.find(
       (entry) =>
@@ -2925,11 +3028,16 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
     if (!receiptEvent) {
       throw new CliError('REVIEWER_EVIDENCE_INVALID', 'review findings require a pre-verification ledger receipt')
     }
+    await assertArtifactIdentity(directory, state, receiptEvent)
 
     // 블라인드 행↔테스트 매핑 — 필요 여부는 검증된 런의 risk와 증거 매핑에서 파생한다. 호출자가 옵션을
     // 빼는 것으로는 우회할 수 없다. 판정은 마지막 게이트인 여기서만 하고, 앞선 단계는 조기에 잠그지 않는다.
     const evidenceDocument = JSON.parse(await readFile(resolve(options.evidence), 'utf8'))
     const intersectDocument = options.intersect ? JSON.parse(await readFile(resolve(options.intersect), 'utf8')) : null
+    if (intersectDocument) {
+      await assertArtifactIdentity(directory, state, intersectDocument)
+      await assertArtifactIdentity(directory, state, intersectDocument.orchestrationReceipt ?? {})
+    }
     const intersectReviewerId = intersectDocument?.reviewerId ?? null
     const intersectTaskId = intersectDocument?.orchestrationReceipt?.taskId ?? null
     blindMapping = blindMappingApplicability(state.risk, evidenceDocument)
@@ -3703,8 +3811,23 @@ async function reviewPacket(options) {
     .map(([row, entry]) => ({ row, ...entry }))
     .sort((left, right) => left.row.localeCompare(right.row))
 
+  const identity = await runIdentity(directory, state)
+  let profileReferences
+  if (identity.verificationProfile) {
+    const graph = await loadGraph()
+    const { delivered } = splitDelivery(graph, { id: 'review-packet', profile: identity.verificationProfile, nodes: ['role-review'] })
+    if (delivered.some(({ id }) => /^(?:role-(?:controller|reporting)(?:-formal)?|controller-entry-formal)$/.test(id))) {
+      throw new CliError('REVIEW_PACKET_INVALID', 'review references cannot include controller authority')
+    }
+    profileReferences = await Promise.all(delivered.map(async (node) => {
+      const file = await snapshotPacketFile(join(scriptDirectory, '..', node.path), join(scriptDirectory, '..'), 'review reference', inputSnapshots)
+      return { id: node.id, path: node.path, sha256: file.sha256 }
+    }))
+  }
   const packet = {
     schemaVersion: 2,
+    ...identity,
+    ...(profileReferences ? { references: profileReferences } : {}),
     lockVerification: {
       command: [process.execPath, lockScript, 'verify', '--lock', lock],
       exitCode: 0,
@@ -4005,10 +4128,37 @@ const REPORTED_STATES =
  * 최종 보고의 주장을 원장과 대조한다 — `Status:` 상태어와 인용된 runId·exit code만. 보고서를 쓰는 에이전트의 자기
  * 점검(SKILL.md "Verification — before the final report" 2·4번)을 기계 판정으로 옮긴 것이다.
  */
-async function checkReport(state, ledger, source) {
+async function verificationSummary(directory, state, ledger, staleRunIds = []) {
+  const binding = await resolveRunProfile(directory, state)
+  if (binding.profile !== 'contract/v1') return { profile: binding.profile ?? 'legacy/unclassified', coverage: 'not-assessed', executionStatus: 'not-assessed', N_executed_unique: null, N_passed_unique: null, formalVerification: 'not-assessed', limits: ['No retroactive verification claim'] }
+  const oracle = await lockedOraclePath(directory, state)
+  const card = await readFile(oracle, 'utf8')
+  const generated = generateFromDocument(card)
+  const summary = { ...auditFullProduct(card, generated, { scenarioShape: 'contract' }), profile: 'contract/v1', coverage: 'full-product', executionStatus: 'not-run', formalVerification: 'not-performed', limits: ['Declared finite Space only', 'Product assertion and source/invariant relevance require independent review'] }
+  const run = ledger.filter((entry) => entry.type === 'run' && entry.label === 'contract-cases:reported').at(-1)
+  if (!run) return summary
+  if (staleRunIds.includes(run.runId)) return { ...summary, executionStatus: 'stale', executionIssue: 'SNAPSHOT_STALE' }
+  try {
+    const output = runVerifier(['evidence', '--oracle', oracle, '--map', evidencePathFor(directory, state), '--ledger', ledgerPath(directory), '--run', run.runId, '--phase', 'green'])
+    const report = JSON.parse(output.split('\n').at(-1))
+    return { ...summary, ...report }
+  } catch (error) {
+    return { ...summary, executionStatus: 'incomplete', executionIssue: error.code ?? 'EVIDENCE_INVALID' }
+  }
+}
+
+async function checkReport(state, ledger, source, directory) {
   const text = source === '-' ? await readStdinText() : await readFile(resolve(source), 'utf8')
   const runs = new Map(ledger.filter((entry) => entry.type === 'run').map((entry) => [entry.runId, entry]))
   const problems = []
+  const verification = await verificationSummary(directory, state, ledger, (await collectStatus(directory, state, ledger)).staleOrMissingRuns)
+  const fields = { Profile: verification.profile, Coverage: verification.coverage, 'Executed unique': verification.N_executed_unique, 'Passed unique': verification.N_passed_unique, 'Formal verification': verification.formalVerification }
+  if (verification.profile === 'contract/v1') {
+    for (const [field, value] of Object.entries(fields)) {
+      const lines = text.split('\n').map((line) => line.trim()).filter((line) => line.startsWith(`${field}:`))
+      if (lines.length !== 1 || lines[0] !== `${field}: ${value}`) problems.push(`report requires exactly ${field}: ${value}`)
+    }
+  } else if (/Profile:\s*contract\/v1/.test(text)) problems.push('legacy/Formal records cannot claim Contract verification')
   const claimed = text.match(REPORTED_STATES)?.[1]
   if (claimed !== state.state) {
     problems.push(
@@ -4179,6 +4329,8 @@ async function collectStatus(directory, state, ledger) {
   if (needsEvidence && evidence.missingRows?.length > 0) blockers.push('EVIDENCE_MISSING_ROWS')
 
   return {
+    ...(await runIdentity(directory, state)),
+    verification: await verificationSummary(directory, state, ledger, staleOrMissingRuns),
     currentState: state.state,
     currentSnapshot,
     lockStatus,
@@ -4218,7 +4370,7 @@ async function reportStatus(options) {
   const state = replayState(await readState(directory), ledger)
 
   if (options.checkReport) {
-    await checkReport(state, ledger, options.checkReport)
+    await checkReport(state, ledger, options.checkReport, directory)
     return
   }
 
@@ -4239,9 +4391,9 @@ async function reportStatus(options) {
     return
   }
   const graph = await loadGraph()
-  const lines = [`state: ${statusResult.currentState}`, `blockers: ${statusResult.blockers.join(', ') || 'none'}`]
+  const lines = [`state: ${statusResult.currentState}`, `blockers: ${statusResult.blockers.join(', ') || 'none'}`, `verification: ${JSON.stringify(statusResult.verification)}`]
   for (const action of statusResult.nextActions) {
-    const { delivered } = splitDelivery(graph, { id: `status-${action.to}`, nodes: action.readNodes ?? [] })
+    const { delivered } = splitDelivery(graph, { id: `status-${action.to}`, ...(statusResult.verificationProfile ? { profile: statusResult.verificationProfile } : {}), nodes: action.readNodes ?? [] })
     const agentNodes = delivered.filter((node) => node.loader !== 'reviewer')
     const reviewerNodes = delivered.filter((node) => node.loader === 'reviewer')
     lines.push(`action: ${action.to}`)
@@ -4315,6 +4467,7 @@ async function reviewBrief(options) {
   const revision = verifyLock(directory, state)
   const packetSnapshot = await snapshotPacketFile(resolve(options.packet), directory, 'review packet', inputs)
   const packet = JSON.parse(packetSnapshot.bytes.toString('utf8'))
+  await assertReviewPacketIdentity(directory, state, packet)
   if (!isReviewPacketShape(packet) || packet.schemaVersion !== 2) {
     throw new CliError('REVIEW_PACKET_INVALID', 'review-brief requires a schema-v2 review packet')
   }
@@ -4528,6 +4681,25 @@ async function assertWorkerInputs(packet) {
   }
 }
 
+async function assertWorkerReferences(packet) {
+  if (!packet.verificationProfile) return
+  const graph = await loadGraph()
+  const conditional = graph.nodes.filter((node) => node.implementationInput === 'conditional' &&
+    (node.profiles ?? ['formal-bend/v1']).includes(packet.verificationProfile))
+  const omitted = packet.referenceSelection?.notApplicable
+  if (!omitted || typeof omitted !== 'object' || Array.isArray(omitted) ||
+      Object.entries(omitted).some(([id, reason]) => !conditional.some((node) => node.id === id) || typeof reason !== 'string' || !reason.trim()) ||
+      !Array.isArray(packet.references)) throw new CliError('WORKER_INPUT_STALE', 'invalid profile reference selection')
+  const nodes = [...new Set([...readNodes(deliveryProtocol, 'IMPLEMENTED_GREEN'), 'delivery-red', 'role-implement',
+    ...conditional.filter((node) => !omitted[node.id]).map((node) => node.id), ...packet.references.map(({ id }) => id)])]
+  const { delivered } = splitDelivery(graph, { id: 'implementation-task', profile: packet.verificationProfile, nodes })
+  if (delivered.some((node) => node.loader === 'reviewer' || node.loader === 'graph-tooling' || node.id === 'low-fast-path' || /^(?:role-(?:controller|reporting)(?:-formal)?|controller-entry-formal)$/.test(node.id))) {
+    throw new CliError('WORKER_INPUT_STALE', 'implementation references cannot carry review or controller authority')
+  }
+  const expected = await Promise.all(delivered.map(async (node) => ({ id: node.id, ...(await workerFile(join(scriptDirectory, '..', node.path))) })))
+  if (stableStringify(packet.references) !== stableStringify(expected)) throw new CliError('WORKER_INPUT_STALE', 'profile reference closure is omitted, mismatched or stale')
+}
+
 async function workerPacket(options) {
   if (!options.dir || !options.task) throw new CliError('USAGE', 'worker-packet requires --dir and --task', 2)
   const directory = resolve(options.dir)
@@ -4600,7 +4772,9 @@ async function workerPacket(options) {
       throw new CliError('WORKER_SKILL_MISSING', 'testSkill must name the test skill')
     const graphFile = await workerFile(join(scriptDirectory, '../references/reference-graph.json'))
     const graph = JSON.parse(graphFile.content)
-    const conditional = graph.nodes.filter((node) => node.implementationInput === 'conditional')
+    const identity = await runIdentity(directory, state)
+    const conditional = graph.nodes.filter((node) => node.implementationInput === 'conditional' &&
+      (!identity.verificationProfile || (node.profiles ?? ['formal-bend/v1']).includes(identity.verificationProfile)))
     const omitted = spec.notApplicable ?? {}
     if (
       !omitted ||
@@ -4621,10 +4795,10 @@ async function workerPacket(options) {
         ...spec.referenceNodes,
       ]),
     ]
-    const { delivered } = splitDelivery(graph, { id: 'implementation-task', nodes: required })
+    const { delivered } = splitDelivery(graph, { id: 'implementation-task', ...(identity.verificationProfile ? { profile: identity.verificationProfile } : {}), nodes: required })
     if (
       delivered.some(
-        (node) => node.loader === 'reviewer' || node.loader === 'graph-tooling' || node.id === 'low-fast-path',
+        (node) => node.loader === 'reviewer' || node.loader === 'graph-tooling' || node.id === 'low-fast-path' || /^(?:role-(?:controller|reporting)(?:-formal)?|controller-entry-formal)$/.test(node.id),
       )
     ) {
       throw new CliError('WORKER_TASK_INVALID', 'implementation input cannot switch lanes or replace review')
@@ -4657,7 +4831,7 @@ async function workerPacket(options) {
         workerFile(join(scriptDirectory, name)),
       ),
     )
-    const entry = await workerFile(join(scriptDirectory, '../SKILL.md'))
+    const entry = await workerFile(join(scriptDirectory, identity.controller === 'frontend-contract-design' ? '../../frontend-contract-design/SKILL.md' : '../SKILL.md'))
     const implementationSkill = await workerFile(join(scriptDirectory, '../../oracle-implement/SKILL.md'))
     const ledger = await readLedger(directory)
     const runs = ledger.filter((event) => event.type === 'run')
@@ -4692,6 +4866,7 @@ async function workerPacket(options) {
     const attemptId = await reserveRunId(directory, `worker:${spec.taskId}`)
     const packet = {
       schemaVersion: 1,
+      ...identity,
       taskId: spec.taskId,
       attemptId,
       phase: 'implement-green',
@@ -4797,6 +4972,8 @@ async function workerRun(options) {
       throw new CliError('WORKER_INPUT_STALE', 'packet does not match its run reservation')
     await assertWorkerInputs(packet)
     let state = await readConsistentState(directory)
+    await assertArtifactIdentity(directory, state, packet)
+    await assertWorkerReferences(packet)
     const revision = verifyLock(directory, state)
     if (
       revision.oracleSha256 !== packet.baseline.oracleSha256 ||
@@ -4851,6 +5028,7 @@ async function workerRun(options) {
         capture: { input: invocation.input, outputPath, timeout },
         worker: {
           kind: 'implementation',
+          ...(await runIdentity(directory, state)),
           taskId: packet.taskId,
           attemptId: packet.attemptId,
           packetSha256: input.sha256,
@@ -4983,7 +5161,7 @@ async function main() {
     )
 }
 
-try {
+if (process.argv[1] && (await realpath(resolve(process.argv[1])).catch(() => null)) === fileURLToPath(import.meta.url)) try {
   await main()
 } catch (error) {
   const workerCode = /^WORKER_[A-Z_]+:/.exec(error.message ?? '')?.[0].slice(0, -1)

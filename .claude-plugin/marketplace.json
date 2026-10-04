@@ -22,8 +22,8 @@
     },
     {
       "name": "frontend-oracle-design",
-      "description": "Medium/high-risk Oracle-driven frontend contracts, TDD, evidence gates, and review.",
-      "version": "0.83.1",
+      "description": "Shared formal Oracle and finite Contract frontend design, TDD, evidence gates, and independent review.",
+      "version": "0.84.0",
       "author": {
         "name": "lodado"
       },

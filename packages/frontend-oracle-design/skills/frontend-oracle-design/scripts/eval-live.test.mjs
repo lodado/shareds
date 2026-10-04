@@ -357,7 +357,13 @@ test('a successful bundle read counts as reading every node the bundle contains'
 
   assert.deepEqual(
     loadedNodesFrom(events, graph).sort(),
-    [...bundle.nodes, 'role-case-space-inputs', 'role-space-discovery'].sort(),
+    [
+      ...bundle.nodes,
+      'role-case-space-inputs',
+      'role-space-discovery',
+      'role-case-space-inputs-formal',
+      'role-space-discovery-formal',
+    ].sort(),
   )
 })
 

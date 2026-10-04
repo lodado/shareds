@@ -90,16 +90,16 @@ SHA-256 digest are recorded in the packet — the reviewer reads **all** of the 
 and the digest pins which revision of the criteria was read. Summarizing·excerpting the criteria body
 into the prompt violates the input-pinning principle.
 
-| Condition (by diff)                       | Review point file                                                                                 |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Always                                    | [`review-checklist.md`](review-checklist.md) — all judgment items                                 |
-| Always                                    | [`changeability.md`](changeability.md) — five-axis judgment criteria                              |
-| frontend production change                | [`frontend/decisions.md`](frontend/decisions.md)·[`frontend/authoring.md`](frontend/authoring.md) |
-| type·state contract creation·change       | [`types/review-criteria.md`](types/review-criteria.md)                                            |
-| FSD repo                                  | [`fsd.md`](fsd.md) — the "Common violations" table                                                |
-| Design Intent included                    | [`visual-design.md`](visual-design.md) — evidence tiers·Delivery responsibility                   |
-| backend·DB·data-access change             | [`backend.md`](backend.md) — boundary·validation sections                                         |
-| performance requirement·improvement claim | [`performance.md`](performance.md)                                                                |
+| Condition (by diff)                       | Review point file                                                                                                                                               |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Always                                    | [`review-checklist.md`](review-checklist.md) — all judgment items                                                                                               |
+| Always                                    | [`changeability.md`](changeability.md) — five-axis judgment criteria                                                                                            |
+| frontend production change                | [selected-profile frontend/decisions.md procedure via loader](roles/loading.md)·[selected-profile frontend/authoring.md procedure via loader](roles/loading.md) |
+| type·state contract creation·change       | [selected-profile types/review-criteria.md procedure via loader](roles/loading.md)                                                                              |
+| FSD repo                                  | [`fsd.md`](fsd.md) — the "Common violations" table                                                                                                              |
+| Design Intent included                    | [`visual-design.md`](visual-design.md) — evidence tiers·Delivery responsibility                                                                                 |
+| backend·DB·data-access change             | [`backend.md`](backend.md) — boundary·validation sections                                                                                                       |
+| performance requirement·improvement claim | [`performance.md`](performance.md)                                                                                                                              |
 
 Do not register a criteria file whose condition does not apply — the reviewer also follows the graph
 loading rules and does not create findings from unrelated criteria. The condition→node mapping is
@@ -225,7 +225,7 @@ judgments. Structural/runtime tests and known-defect fixtures do not establish i
 ### Conditional source-aware analyst review
 
 The source-aware review is a separate, pre-approval input contract, not a replacement for the
-Delivery review or card-only cold read. When triggered by [`card/policy-sources.md`](card/policy-sources.md),
+Delivery review or card-only cold read. When triggered by [selected-profile card/policy-sources.md procedure via loader](roles/loading.md),
 dispatch a fresh `analyst` context with the original inputs defined there: verbatim user messages,
 actual task/approved purpose, mandatory constraints, original observations and unchecked scope,
 approved source excerpts and exact locations/versions, affected dispositions and Draft bytes when

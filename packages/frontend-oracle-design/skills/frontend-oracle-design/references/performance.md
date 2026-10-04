@@ -8,8 +8,8 @@ approved performance contract or a user answer; without one it is a `POLICY_GAP`
 `NEEDS_DECISION`.
 
 Measurement commands·baseline/after runs·the required `performance` label are owned by the
-performance·quality check section of [`frontend/quality.md`](frontend/quality.md) and the GREEN gate
-of [`delivery/green-review.md`](delivery/green-review.md). This document owns only problem
+performance·quality check section of [selected-profile frontend/quality.md procedure via loader](roles/loading.md) and the GREEN gate
+of [selected-profile delivery/green-review.md procedure via loader](roles/loading.md). This document owns only problem
 classification·cause confirmation·trade-off judgment.
 
 ## 1. Classify the Problem on Three Axes
@@ -43,7 +43,7 @@ classification·cause confirmation·trade-off judgment.
 - Every improvement has a cost: memory, code volume, bundle, complexity, maintenance. Record the
   cost you accepted as a trade-off in the Performance item of the Implementation Decision.
 - Do not build a render-derived value with an effect+setState chain —
-  follow the state ownership table in [`frontend/decisions.md`](frontend/decisions.md).
+  follow the state ownership table in [selected-profile frontend/decisions.md procedure via loader](roles/loading.md).
 
 ## 4. Verification
 

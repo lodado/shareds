@@ -19,8 +19,8 @@ import {
   snapshotRegularFile,
   stableStringify,
 } from './oracle-fs.mjs'
-import { readCardProfile } from './oracle-profile.mjs'
-import { contextGaps, snapshotContext, validateContextReview } from './oracle-review-context.mjs'
+import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
+import { assertProfileReviewReferences, contextGaps, snapshotContext, validateContextReview } from './oracle-review-context.mjs'
 import {
   approvedSourceIds,
   AS_IS_COLUMNS,
@@ -1804,7 +1804,7 @@ function collectFrameEvidence(card, map) {
   const covered = coveredFrameIds(card, generated)
   const frameEntries = map?.frames ?? {}
   if (generated.caseSpace.coverage === 'full-product') {
-    const audit = auditFullProduct(card, generated)
+    const audit = auditFullProduct(card, generated, { scenarioShape: readCardProfile(card) === 'contract/v1' ? 'contract' : 'legacy' })
     if (!audit.ready) throw new CliError('CASE_SPACE_FAILED', [...audit.issues, ...audit.questions].join('\n') || 'Unresolved full-product expectations')
     const records = new Map(fullProductRecords(card).map((record) => [record.id, record]))
     const names = new Set()
@@ -1849,6 +1849,69 @@ function collectFrameEvidence(card, map) {
   }
 
   return entries
+}
+
+async function contractCaseExecution(card, map, run, records) {
+  if (run.verificationProfile !== 'contract/v1' || typeof run.contractSourceRoot !== 'string') throw new CliError('CONTRACT_EXECUTION_REQUIRED', 'legacy/unclassified runs cannot provide retrospective Contract execution evidence')
+  const generated = generateFromDocument(card)
+  const required = fullProductRecords(card).filter((record) => record.disposition.type === 'covered')
+  const expected = new Map(required.map((record) => [record.id, record]))
+  const observed = new Map()
+  for (const test of run.tests ?? []) {
+    const tokens = [...test.name.matchAll(/oracle-case:([\w-]+)/g)]
+    if (tokens.length === 0) continue
+    if (tokens.length !== 1) throw new CliError('EVIDENCE_CASE_COLLISION', 'one observed case identity per reporter test required')
+    let identity
+    try { identity = JSON.parse(Buffer.from(tokens[0][1], 'base64url').toString('utf8')) } catch { throw new CliError('EVIDENCE_INVALID', 'invalid observed Contract case identity') }
+    const record = expected.get(identity.id)
+    if (!record) throw new CliError('EVIDENCE_UNKNOWN_FRAME', `unexpected observed case ${identity.id}`)
+    if (observed.has(identity.id)) throw new CliError('EVIDENCE_CASE_COLLISION', `duplicate observed case ${identity.id}`)
+    if (identity.dimensionRevision !== generated.dimensionRevision || identity.constraintRevision !== generated.constraintRevision || identity.scenario !== record.scenario.id || canonicalTuple(identity.tuple ?? {}) !== canonicalTuple(record.tuple)) throw new CliError('EVIDENCE_STALE', `${identity.id}: reporter executed another tuple/scenario/revision`)
+    if (map.frames?.[identity.id]?.name !== test.name || test.status !== 'passed') throw new CliError('EVIDENCE_NOT_IN_RUN', `${identity.id}: observed case does not match current mapping`)
+    observed.set(identity.id, test)
+  }
+  const missing = [...expected.keys()].filter((id) => !observed.has(id))
+  if (missing.length) throw new CliError('EVIDENCE_MISSING_FRAME', `actual reporter case IDs missing: ${missing.join(', ')}`)
+  // Existing init labels select applicability. A label is never execution evidence.
+  const labels = records.find((entry) => entry.type === 'init')?.stateDelta?.requiredLabels ?? []
+  const obligations = []
+  if (labels.includes('type-contract:reported') || !/^- Not applicable: .+/m.test(sectionLines(markdownLines(card), 'Type Contract').join('\n'))) obligations.push(['type-contract:reported', 'type-contract'])
+  if (labels.includes('fast-check:reported') || generated.caseSpace.families.some((entry) => ['Async', 'Order'].includes(entry.family) && !entry.excluded)) obligations.push(['fast-check:reported', 'fast-check'])
+  const sourceBound = async (witness, evidenceRun) => {
+    if (!witness || typeof witness.path !== 'string' || typeof evidenceRun.contractSourceRoot !== 'string') return false
+    try {
+      const root = await realpath(evidenceRun.contractSourceRoot)
+      // Reporter paths are canonical. Resolve registered files as well as the root,
+      // retaining containment and exact registered bytes rather than trusting aliases.
+      if (!isPathInside(root, witness.path) || await realpath(witness.path) !== witness.path) return false
+      for (const [path, hash] of Object.entries(evidenceRun.harnessSha256 ?? {})) {
+        if (hash !== witness.sourceSha256) continue
+        const registered = resolve(evidenceRun.contractSourceRoot, path)
+        if (!isPathInside(evidenceRun.contractSourceRoot, registered)) continue
+        const canonical = await realpath(registered)
+        if (canonical === witness.path && isPathInside(root, canonical)) return true
+      }
+    } catch { return false }
+    return false
+  }
+  const evidence = {}
+  const currentRuns = [run]
+  for (const [label, kind] of obligations) {
+    const evidenceRun = records.filter((entry) => entry.type === 'run' && entry.label === label).at(-1)
+    if (!evidenceRun || evidenceRun.verificationProfile !== 'contract/v1' || evidenceRun.adapter !== 'node-test' || evidenceRun.grade !== 'reported' || evidenceRun.exitCode !== 0 || evidenceRun.signal || evidenceRun.tests?.some((test) => test.status !== 'passed')) throw new CliError('CONTRACT_EXECUTION_REQUIRED', `${label}: genuine reported producer execution required`)
+    if (['oracleSha256', 'worktreeSha256', 'productionSha256', 'lockManifestSha256', 'contractSourceRoot'].some((field) => evidenceRun[field] !== run[field])) throw new CliError('EVIDENCE_STALE', `${label}: producer execution is from another snapshot`)
+    const outputs = evidenceRun.tests.filter((test) => test.contractEvidence?.kind === kind).map((test) => test.contractEvidence)
+    if (!outputs.length || outputs.some((output) => output.error)) throw new CliError('CONTRACT_EXECUTION_REQUIRED', `${label}: missing actual producer output`)
+    for (const output of outputs) {
+      const valid = kind === 'type-contract'
+        ? await sourceBound(output.positive, evidenceRun) && await sourceBound(output.negative, evidenceRun) && output.positive.path !== output.negative.path && output.positive.exitCode === 0 && Number.isInteger(output.negative.exitCode) && output.negative.exitCode !== 0 && /error TS\d+:/.test(output.negative.diagnostics ?? '') && isDigest(output.compilerSha256)
+        : await sourceBound(output, evidenceRun) && output.failed === false && Number.isSafeInteger(output.numRuns) && output.numRuns > 0 && Number.isSafeInteger(output.seed) && typeof output.domain === 'string' && output.domain.trim() && Number.isSafeInteger(output.numShrinks)
+      if (!valid) throw new CliError('CONTRACT_EXECUTION_REQUIRED', `${label}: source-bound positive/negative compiler witnesses or actual property count/seed/domain required`)
+    }
+    evidence[kind] = { runId: evidenceRun.runId, outputs }
+    currentRuns.push(evidenceRun)
+  }
+  return { N_executed_unique: observed.size, N_passed_unique: observed.size, obligations: evidence, currentRuns }
 }
 
 async function verifyEvidence(options) {
@@ -1956,14 +2019,24 @@ async function verifyEvidence(options) {
     }
   }
 
+  const contractExecution = readCardProfile(card) === 'contract/v1' ? await contractCaseExecution(card, map, run, records) : null
+  if (contractExecution) {
+    const { assertCurrentContractRuns } = await import('./oracle-run.mjs')
+    try {
+      await assertCurrentContractRuns(dirname(resolve(options.ledger)), options.oracle, contractExecution.currentRuns)
+    } catch (error) {
+      throw new CliError(error.code ?? 'CONTRACT_CURRENT_AUTHORITY_REQUIRED', error.message)
+    }
+  }
   const notices = pending.length > 0 ? `VISUAL_EVIDENCE_PENDING ${pending.join(', ')}\n` : ''
   await assertSnapshots(snapshots, base, 'EVIDENCE_INVALID')
   process.stdout.write(`EVIDENCE_VERIFIED ${rows.length} rows\n${notices}`)
   if (fullProduct) {
-    const report = auditFullProduct(card, generated)
+    const report = auditFullProduct(card, generated, { scenarioShape: readCardProfile(card) === 'contract/v1' ? 'contract' : 'legacy' })
     const covered = coveredFrameIds(card, generated)
-    report.N_executed_unique = covered.length
-    report.N_passed_unique = covered.length
+    report.N_executed_unique = contractExecution?.N_executed_unique ?? covered.length
+    report.N_passed_unique = contractExecution?.N_passed_unique ?? covered.length
+    if (contractExecution) Object.assign(report, { verificationProfile: 'contract/v1', coverage: 'full-product', formalVerification: 'not-performed', executionStatus: 'executed', obligations: contractExecution.obligations })
     report.execution = { runId: run.runId, ledger: options.ledger, oracle: options.oracle, map: options.map }
     process.stdout.write(`${JSON.stringify(report)}\n`)
   }
@@ -2331,6 +2404,28 @@ async function assertReviewBinding(options) {
   const packetSha256 = packetSnapshot.sha256
   const oracleRaw = oracleSnapshot.bytes.toString('utf8')
   const oracleSha256 = oracleSnapshot.sha256
+  let identityBinding
+  try {
+    identityBinding = resolveProfileBinding({ bindings: [
+      { artifact: 'card', profile: readCardProfile(oracleRaw) },
+      { artifact: 'lock', profile: packet?.lock?.verificationProfile },
+      { artifact: 'state', profile: packet?.state?.verificationProfile },
+      { artifact: 'packet', profile: packet?.verificationProfile },
+    ] })
+  } catch (error) {
+    throw new CliError(error.code, error.message)
+  }
+  const assertIdentity = (artifact) => {
+    const explicit = identityBinding.kind === 'explicit'
+    if (artifact?.verificationProfile !== (explicit ? identityBinding.profile : undefined) ||
+        artifact?.controller !== (explicit ? identityBinding.controller : undefined) ||
+        (!explicit && (Object.hasOwn(artifact ?? {}, 'verificationProfile') || Object.hasOwn(artifact ?? {}, 'controller')))) {
+      throw new CliError('PROFILE_MISMATCH', 'review artifact identity does not match current approved profile')
+    }
+  }
+  assertIdentity(packet)
+  try { await assertProfileReviewReferences(packet) }
+  catch (error) { throw new CliError('REVIEW_PACKET_STALE', error.message) }
   const canonicalChangeabilitySha256 = sha256(
     await readFile(resolve(dirname(fileURLToPath(import.meta.url)), '../references/changeability.md')),
   )
@@ -2458,6 +2553,8 @@ async function assertReviewBinding(options) {
       throw new CliError('REVIEW_REVISION_MISMATCH', 'findings must cite the target implementation worktree')
     }
     const receipt = document.orchestrationReceipt
+    assertIdentity(document)
+    assertIdentity(receipt)
     const output = { ...document }
     delete output.orchestrationReceipt
     if (
@@ -2477,6 +2574,7 @@ async function assertReviewBinding(options) {
       (event) =>
         event.type === 'review-receipt' && event.taskId === receipt.taskId && event.reviewerId === document.reviewerId,
     )
+    assertIdentity(receiptEvent)
     if (
       !receiptEvent ||
       receiptEvent.packetSha256 !== packetSha256 ||

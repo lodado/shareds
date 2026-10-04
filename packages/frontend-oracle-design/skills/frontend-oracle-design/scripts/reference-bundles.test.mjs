@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { bundlePath, loadGraph, renderBundle, splitDelivery } from './generate-reference-bundles.mjs'
+import { bundlePath, loadGraph, referenceDependencies, referenceProfile, renderBundle, splitDelivery } from './generate-reference-bundles.mjs'
 
 const skillDirectory = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (relative) => readFile(join(skillDirectory, relative), 'utf8')
@@ -48,11 +48,10 @@ test('bundle nodes resolve their requires edges inside the same bundle', async (
 
   for (const bundle of graph.bundles) {
     const content = await readFile(bundlePath(bundle), 'utf8')
-    const { assumed } = splitDelivery(graph, bundle)
+    const { delivered, assumed } = splitDelivery(graph, bundle)
     const assumedIds = new Set(assumed.map((node) => node.id))
-    for (const id of bundle.nodes) {
-      if (assumedIds.has(id)) continue
-      for (const dependency of byId.get(id).requires) {
+    for (const { id } of delivered) {
+      for (const dependency of referenceDependencies(byId.get(id), bundle.profile)) {
         if (assumedIds.has(dependency)) continue
         assert.match(
           content,
@@ -98,7 +97,7 @@ test('a continuation bundle omits exactly its after bundles\u2019 nodes and decl
       for (const node of splitDelivery(graph, base).assumed) baseIds.add(node.id)
     }
     const fullLane = graph.bundles.find(
-      (candidate) => !(candidate.after ?? []).length && candidate.nodes.join() === bundle.nodes.join(),
+      (candidate) => referenceProfile(candidate.profile) === referenceProfile(bundle.profile) && !(candidate.after ?? []).length && candidate.nodes.join() === bundle.nodes.join(),
     )
     assert.ok(fullLane, `continuation bundle ${bundle.id} must mirror a full lane bundle's node set`)
     for (const node of splitDelivery(graph, fullLane).delivered) {
@@ -120,14 +119,43 @@ test('entry bundles defer later phases and conditional architecture without drop
     assert.ok(!delivered(id).includes('architecture-contract'))
     assert.ok(delivered(id).includes('frontend-authoring'))
   }
-  const controller = await read('references/roles/controller.md')
+  const controllerNode = graph.nodes.find((node) => node.id === 'role-controller')
+  const formalControllerNode = graph.nodes.find((node) => node.id === 'role-controller-formal')
+  assert.equal(controllerNode.path, 'references/roles/controller.md')
+  assert.deepEqual(controllerNode.profiles, ['formal-bend/v1', 'contract/v1'])
+  assert.equal(formalControllerNode.path, 'references/roles/controller-formal.md')
+  assert.deepEqual(formalControllerNode.profiles, ['formal-bend/v1'])
+  const controller = await read(controllerNode.path)
+  const formalController = await read(formalControllerNode.path)
   const reporting = await read('references/roles/reporting.md')
   assert.match(reporting, /status --json/)
-  assert.match(controller, /[Tt]ransition.*rechecks|[Tt]ransition.*repeats/s)
+  assert.match(formalController, /[Tt]ransition.*rechecks|[Tt]ransition.*repeats/s)
+  assert.match(controller, /Re-run required verification on final bytes after findings\./)
+  assert.match(controller, /Reviewer returns are not acceptance\./)
 })
 
 test('role loading documents bundles as an optional cache-stable read, not a new authority', async () => {
-  const skill = await read('references/roles/loading.md')
-  assert.match(skill, /bundles\//)
-  assert.match(skill, /node ids/)
+  const graph = await loadGraph()
+  const loadingNode = graph.nodes.find((node) => node.id === 'role-loading')
+  assert.equal(loadingNode.path, 'references/roles/loading.md')
+  assert.deepEqual(loadingNode.profiles, ['formal-bend/v1', 'contract/v1'])
+  const skill = await read(loadingNode.path)
+  const readme = await read('README.md')
+  assert.ok(readme.includes('[`reference-graph.json`](references/reference-graph.json)'))
+  assert.match(readme, /`requiresByProfile`/)
+  assert.match(readme, /profile은 `formal-bend\/v1` 또는 `contract\/v1`/)
+  assert.match(readme, /Fresh specialist는 부모의 continuation bundle 가정을 상속하지 않고 전체 역할 closure를 읽습니다\./)
+  for (const bundle of graph.bundles) {
+    const relative = `bundles/${bundle.profile === 'contract/v1' ? 'contract/' : ''}${bundle.id}.md`
+    assert.equal(bundlePath(bundle), join(skillDirectory, relative))
+    assert.equal(await read(relative), await renderBundle(graph, bundle), `canonical bundle ${bundle.id} must remain a readable delivery copy`)
+  }
+  assert.match(skill, /--profile <resolved-profile> --point scope-decision --include <role-id> --json/)
+  assert.match(skill, /Read returned full same-profile dependency\s+closure with native Read without offset or limit\./)
+  assert.match(skill, /Resolve that named graph node with the same explicit profile and current-stage applicability before reading\./)
+  assert.match(skill, /Fresh workers cannot inherit a parent's continued-bundle assumptions\./)
+  assert.match(skill, /Use continued bundles only for nodes actually read in the same context\./)
+  assert.match(skill, /Report actual node IDs, not\s+bundle IDs\./)
+  assert.match(skill, /Bundles are generated delivery copies, never authority\. Do not hand-edit them\./)
+  assert.match(skill, /node IDs/)
 })
