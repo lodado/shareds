@@ -113,7 +113,16 @@ export function checkInstallation({ repo = DEFAULT_REPO, version, claudeCache, c
           // legacy payload is inspected/reported, never deleted or migrated.
           actual = readdirSync(root).sort().flatMap(name => {
             if (SKILLS.includes(name)) return filesUnder(root, name)
-            if (name === 'SKILL.md') return filesUnder(root, name)
+            if (name === 'SKILL.md') {
+              const extra = unownedFiles(root, name, result.uncheckedUnrelated.jcode)
+              const text = readFileSync(safePath(root, name), 'utf8')
+              const frontmatter = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(text)
+              if (frontmatter && /^name: (?:'[^\s'"]+'|"[^\s'"]+"|[^\s'"]+)[\t ]*$/m.test(frontmatter[1])) {
+                result.uncheckedUnrelated.jcode.push(name)
+                return []
+              }
+              return extra
+            }
             // Discover only regular SKILL entries before considering payload.
             // Unrelated links are not followed and cannot certify entry scans.
             const extra = unownedFiles(root, name, result.uncheckedUnrelated.jcode)
@@ -131,6 +140,7 @@ export function checkInstallation({ repo = DEFAULT_REPO, version, claudeCache, c
           entries(root, actual, 'skills')
         }
         result.localOnly[host] = actual.filter(path => !expected.includes(path))
+        if (host === 'jcode' && result.uncheckedUnrelated.jcode.includes('SKILL.md')) result.localOnly.jcode.push('SKILL.md')
         for (const path of expected) {
           const digest = hash(safePath(root, path))
           result.hashes[host][path] = digest

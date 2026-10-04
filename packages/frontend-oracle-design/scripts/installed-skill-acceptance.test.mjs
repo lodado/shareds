@@ -65,6 +65,51 @@ scenario('extra nondiscoverable payload preserved and reported', f => {
   assert.ok(result.localOnly.jcode.includes('old-flat-payload'))
   assert.equal(readFileSync(join(f.jcodeSkillsRoot, 'old-flat-payload'), 'utf8'), 'keep flat')
 })
+scenario('unrelated flat root SKILL is unchecked and local-only', f => {
+  writeFileSync(join(f.jcodeSkillsRoot, 'SKILL.md'), '---\nname: frontend-system-design\n---\nname: frontend-oracle-design\n')
+}, (result, f) => {
+  assert.equal(result.ok, true, result.errors.join('\n'))
+  assert.ok(result.uncheckedUnrelated.jcode.includes('SKILL.md'))
+  assert.ok(result.localOnly.jcode.includes('SKILL.md'))
+  assert.equal(Object.hasOwn(result.hashes.jcode, 'SKILL.md'), false)
+  assert.equal(readFileSync(join(f.jcodeSkillsRoot, 'SKILL.md'), 'utf8'), '---\nname: frontend-system-design\n---\nname: frontend-oracle-design\n')
+})
+for (const [label, text] of [
+  ['missing closing delimiter', '---\nname: frontend-system-design\n'],
+  ['non-delimiter closing prefix', '---\nname: frontend-system-design\n---not-a-delimiter\n'],
+  ['unmatched single opening quote', "---\nname: 'frontend-system-design\n---\n"],
+  ['unmatched double opening quote', '---\nname: "frontend-system-design\n---\n'],
+  ['unmatched closing quote', "---\nname: frontend-system-design'\n---\n"],
+  ['mismatched quotes', `---\nname: 'frontend-system-design"\n---\n`],
+]) {
+  scenario(`malformed unrelated flat root ${label} fails`, f => {
+    writeFileSync(join(f.jcodeSkillsRoot, 'SKILL.md'), text)
+  }, (result, f) => {
+    assert.equal(result.ok, false)
+    assert.ok(result.errors.some(error => error.includes('Expected exactly six SKILL.md entries')))
+    assert.equal(result.uncheckedUnrelated.jcode.includes('SKILL.md'), false)
+    assert.equal(readFileSync(join(f.jcodeSkillsRoot, 'SKILL.md'), 'utf8'), text)
+  })
+}
+for (const scalar of ['frontend-system-design', "'frontend-system-design'", '"frontend-system-design"']) {
+  scenario(`valid unrelated flat root scalar ${scalar} is preserved`, f => {
+    writeFileSync(join(f.jcodeSkillsRoot, 'SKILL.md'), `---\nname: ${scalar}\n---\n`)
+  }, (result, f) => {
+    assert.equal(result.ok, true, result.errors.join('\n'))
+    assert.ok(result.uncheckedUnrelated.jcode.includes('SKILL.md'))
+    assert.ok(result.localOnly.jcode.includes('SKILL.md'))
+    assert.equal(Object.hasOwn(result.hashes.jcode, 'SKILL.md'), false)
+    assert.equal(readFileSync(join(f.jcodeSkillsRoot, 'SKILL.md'), 'utf8'), `---\nname: ${scalar}\n---\n`)
+  })
+}
+for (const name of SKILLS) {
+  scenario(`flat Oracle duplicate ${name} fails`, f => {
+    writeFileSync(join(f.jcodeSkillsRoot, 'SKILL.md'), `---\nname: '${name}'\n---\n`)
+  }, result => {
+    assert.equal(result.ok, false)
+    assert.ok(result.errors.some(error => error.includes('Duplicate Jcode skill: SKILL.md')))
+  })
+}
 scenario('flat discoverable SKILL fails', f => { writeFileSync(join(f.jcodeSkillsRoot, 'SKILL.md'), 'old core') }, result => assert.equal(result.ok, false))
 scenario('extra Jcode duplicate core outside six roots fails', f => {
   mkdirSync(join(f.jcodeSkillsRoot, 'old-core'), { recursive: true })
