@@ -310,7 +310,7 @@ function sequenceWitness(events, candidate, boundary) {
 }
 
 /** Structural legacy full-product audit. Source relevance and assertion sufficiency remain review-owned. */
-export function auditFullProduct(card, generated) {
+export function auditFullProduct(card, generated, { scenarioShape = 'legacy' } = {}) {
   const { caseSpace, frames, dimensionRevision, constraintRevision, rawCount } = generated
   const model = caseSpace.model
   const lines = markdownLines(card)
@@ -318,6 +318,9 @@ export function auditFullProduct(card, generated) {
   const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
   const text = (value) => typeof value === 'string' && !isEmptyCell(value)
   const strings = (value) => Array.isArray(value) && value.length > 0 && value.every(text)
+  const validGiven = (value) => object(value) && (scenarioShape === 'contract'
+    ? Object.keys(value).length > 0
+    : ['query', 'page', 'history', 'data', 'pending'].every((key) => Object.hasOwn(value, key) && value[key] !== null))
   const dimensions = caseSpace.families.filter((entry) => !entry.excluded && entry.dimension)
   const domains = new Map(dimensions.map((entry) => [entry.dimension, new Set(entry.choices.map((choice) => choice.value))]))
   const sourceIds = new Set(tableCells(lines, 'Source Registry', 'ID').map(([id]) => id))
@@ -426,7 +429,7 @@ export function auditFullProduct(card, generated) {
     } else if (disposition.type === 'covered' && !disposition.reason && disposition.rows.length > 0 && disposition.rows.every((id) => rowSet.has(id))) {
       if (applicable.length) issues.push(`exclusion: ${record.id} contradicts applicable constraint ${applicable.map((c) => c.id).join(',')}`)
       const gwt = record.scenario
-      if (!object(gwt) || !text(gwt.id) || scenarios.has(gwt.id) || !strings(gwt.sources) || !gwt.sources.every((id) => approved.has(id)) || !strings(gwt.rows) || stableStringify([...new Set(gwt.rows)].sort()) !== stableStringify([...disposition.rows].sort()) || !object(gwt.given) || !['query', 'page', 'history', 'data', 'pending'].every((key) => Object.hasOwn(gwt.given, key) && gwt.given[key] !== null) || !strings(gwt.when) || !object(gwt.then) || !['requests', 'display', 'effects', 'never'].every((key) => text(gwt.then[key])) || !['target', 'control', 'barrier', 'observe'].every((key) => text(gwt[key]))) {
+      if (!object(gwt) || !text(gwt.id) || scenarios.has(gwt.id) || !strings(gwt.sources) || !gwt.sources.every((id) => approved.has(id)) || !strings(gwt.rows) || stableStringify([...new Set(gwt.rows)].sort()) !== stableStringify([...disposition.rows].sort()) || !validGiven(gwt.given) || !strings(gwt.when) || !object(gwt.then) || !['requests', 'display', 'effects', 'never'].every((key) => text(gwt.then[key])) || !['target', 'control', 'barrier', 'observe'].every((key) => text(gwt[key]))) {
         issues.push(`scenario: ${record.id} requires unique sourced GWT, contract rows and realization`)
         continue
       }

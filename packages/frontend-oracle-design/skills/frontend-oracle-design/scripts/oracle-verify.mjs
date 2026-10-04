@@ -22,6 +22,7 @@ import {
 } from './oracle-fs.mjs'
 import { formalModelIssues, parseFormalModel } from './oracle-model.mjs'
 import { generatedBlock, generatedIssues, regenerateAtRoot } from './oracle-package.mjs'
+import { readCardProfile } from './oracle-profile.mjs'
 import { contextGaps, snapshotContext, validateContextReview } from './oracle-review-context.mjs'
 import {
   approvedSourceIds,
@@ -497,6 +498,22 @@ function undeclaredDimensions(caseSpace, path, content) {
     )
 }
 
+// Only a validated explicit Contract card selects the generic scenario shape.
+function chooseContract(card) {
+  if (readCardProfile(card) !== 'contract/v1') return false
+  const lines = markdownLines(card)
+  if (lines.some((line) => /^## (?:Formal Model|Terms|Adequacy)\s*$/.test(line.trim())) || generatedBlock(card).present || /<!--\s*oracle(?::generated:|-generated[:\s])/.test(card)) {
+    throw new CliError('CONTRACT_FORMAL_FORBIDDEN', 'Contract cards cannot contain Formal Model or projected model markers')
+  }
+  const generated = generateFromDocument(card)
+  if (generated?.caseSpace.coverage !== 'full-product') throw new CliError('CASE_SPACE_REQUIRED', 'Contract v1 requires Coverage: full-product')
+  const dimensions = generated.caseSpace.families.filter((entry) => !entry.excluded && entry.dimension)
+  if (!dimensions.length || dimensions.some((entry) => !entry.choices.length || entry.choices.some((choice) => typeof choice.value !== 'string' || !choice.value.trim()))) {
+    throw new CliError('CASE_SPACE_FAILED', 'Contract requires finite nonempty dimensions and values')
+  }
+  return true
+}
+
 async function lintCard(options) {
   if (!options.oracle) throw new CliError('USAGE', 'card requires --oracle', 2)
 
@@ -504,12 +521,14 @@ async function lintCard(options) {
     throw new CliError('CARD_UNREADABLE', `Cannot read ${options.oracle}: ${error.message}`)
   })
 
+  const contract = chooseContract(card)
+  const scenarioShape = contract ? 'contract' : 'legacy'
   if (options['case-space']) {
     const generated = generateFromDocument(card)
     if (generated?.caseSpace.coverage !== 'full-product') throw new CliError('CASE_SPACE_REQUIRED', 'Expected Coverage: full-product')
-    const report = auditFullProduct(card, generated)
+    const report = auditFullProduct(card, generated, { scenarioShape })
     process.stdout.write(`${JSON.stringify(report)}\n`)
-    if (report.issues.length) throw new CliError('CASE_SPACE_FAILED', report.issues.join('\n'))
+    if (report.issues.length || (contract && !report.ready)) throw new CliError('CASE_SPACE_FAILED', report.issues.join('\n') || 'Unresolved Contract expectations')
     return
   }
 
@@ -1187,7 +1206,7 @@ async function lintCard(options) {
   // Case space 섹션 — 있으면 프레임을 결정적으로 재생성해 disposition 완전성을 대조한다. 열거는 기계, 판정만 사람.
   const generated = generateFromDocument(card)
   if (generated?.caseSpace.coverage === 'full-product') {
-    const report = auditFullProduct(card, generated)
+    const report = auditFullProduct(card, generated, { scenarioShape })
     issues.push(...report.issues)
     if (report.N_unresolved || report.questions.length) issues.push('disposition-open: full-product has unresolved expectations')
   }

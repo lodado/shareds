@@ -36,6 +36,23 @@ test('space audit preserves the complete legacy twelve-case report without mutat
   assert.deepEqual(generated, before)
 })
 
+test('Contract given accepts JSON field values but rejects empty or non-record whole states', () => {
+  const fixture = fullProductFixture()
+  for (const given of [{ enabled: false }, { count: 0 }, { label: '' }, { selection: null }]) {
+    const records = structuredClone(fixture.records)
+    for (const record of records) record.scenario.given = given
+    const text = fixture.render(records)
+    assert.equal(auditFullProduct(text, generateFromDocument(text), { scenarioShape: 'contract' }).ready, true)
+    assert.equal(audit(text).ready, false, 'legacy list schema is not relaxed')
+  }
+  for (const given of [{}, [], null, false, 0, '']) {
+    const records = structuredClone(fixture.records)
+    records[0].scenario.given = given
+    const text = fixture.render(records)
+    assert.equal(auditFullProduct(text, generateFromDocument(text), { scenarioShape: 'contract' }).ready, false)
+  }
+})
+
 test('coverage compares identities rather than equal counts', () => {
   assert.deepEqual(auditIdCoverage(['A', 'B'], ['A', 'A', 'C']), {
     missing: ['B'], extra: ['C'], duplicate: ['A'],
