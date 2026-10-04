@@ -2,7 +2,7 @@
 
 날짜: 2026-10-04
 대상: 승인된 1+4 분할 및 후속 교정 0.83.1
-상태: 소스·공개 실행·읽기 전용 위임 검증 완료. push 후 0.83.1 설치 확인 대기.
+상태: 0.83.1 소스·공개 실행·읽기 전용 위임 검증 및 push 후 Claude/Codex/Jcode 설치 동기화 완료.
 
 초기 배포의 103줄, 835개 테스트 및 0.83.0 설치 기록은
 [초기 검증 기록](2026-10-04-oracle-role-modularization-verification.md)에 남긴다.
@@ -136,7 +136,12 @@ Codex native 전체 실행과 실제 토큰/비용 비교도 하지 않았다.
 
 ## 배포 후 확인
 
-0.83.1 검증된 코드의 일반 commit/push, 실제 registry/cache 경로, 파일별 SHA-256 parity와
-다섯 Jcode 스킬 동기화 결과를 여기 기록한다. 현재 이 단계는 대기 중이다.
-이미 열린 Claude/Codex 세션은 재시작해야 하며 사용자 세션을 자동 종료하지 않는다.
+- 검증된 코드와 이 문서의 prepush 증거는 `cf7dc9e` (`fix(oracle): require early intake handoff and full references`)로 commit했고 `origin/main` push가 성공했다. 설치를 먼저 갱신하지 않았다.
+- 그 뒤 공개 명령 `claude plugin marketplace update`, `claude plugin update … --scope user --json`, `codex plugin add … --json`을 실행했다. Claude update는 0.83.0→0.83.1, Codex add는 0.83.1의 실제 installedPath를 반환했다.
+- 실제 `claude plugin list --json`은 version 0.83.1, scope user, enabled true 및 `~/.claude/plugins/cache/my-vibe-coding-helper/frontend-oracle-design/0.83.1` 경로를 반환했다. 실제 Codex list 역시 version 0.83.1, installed/enabled true다. marketplace 이름의 source-resolved details를 설치 증거로 쓰지 않았다.
+- Claude와 Codex 실제 cache의 skills/hooks/package.json/양쪽 manifest를 소스와 파일별 SHA-256으로 비교했다. 각각 **223/223 일치**, 세 manifest 모두 0.83.1, 정확히 다섯 named entry이고 flat 중복은 없다. Codex cache는 `~/.codex/plugins/cache/my-vibe-coding-helper/frontend-oracle-design/0.83.1`이다. 실제 Claude cached manifest의 공개 validate도 exit 0이다.
+- 다섯 Jcode 디렉터리를 `rsync -a`로 동기화하고 파일별 SHA-256을 비교했다. core 215개+네 role entry로 **219/219 일치**다. 로컬 전용 파일은 0개이며 `--delete`, 사용자 파일 삭제 및 Codex plain-copy 설치를 하지 않았다.
+- 증거는 `$JCODE_SCRATCH_DIR/oracle-0831-{claude,codex}-installed.json`과 `oracle-0831-install-parity.log`다. 양쪽 marketplace가 같은 작업 디렉터리를 가리켜 별도 merge는 하지 않았다. 기존 user 미추적 파일은 그대로 보존했다.
+
+이미 열린 Claude/Codex/Jcode 세션은 재시작해서 새 entry를 로드해야 한다. 사용자 세션을 자동 종료하거나 Codex trust를 우회하지 않았다.
 버전·경로·입력 digest 변경으로 기존 worker packet은 다시 발행해야 할 수 있다.
