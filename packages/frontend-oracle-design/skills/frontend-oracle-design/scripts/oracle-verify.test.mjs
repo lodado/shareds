@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { fullProductFixture as buildFullProductFixture } from '../../../test-fixtures/full-product/fixture.mjs'
 import { generateFromDocument } from './oracle-frames.mjs'
 import { stableStringify } from './oracle-fs.mjs'
+import { auditFullProduct, buildJudgmentSpace, fullProductRecords } from './oracle-space.mjs'
 import { bracedValues, replacePlaceholders, stripTrailingParenthesized } from './oracle-verify-helpers.mjs'
 
 const script = join(dirname(fileURLToPath(import.meta.url)), 'oracle-verify.mjs')
@@ -3229,6 +3230,50 @@ test('full-product: twelve exact records pass and every structural mutation fail
     assert.equal(result.status, 1, result.stdout)
     assert.match(result.stdout + result.stderr, message)
   })
+})
+
+test('full-product: public case-space reports match the pure Space audit including legacy failure diagnostics', async (t) => {
+  const fixture = buildFullProductFixture()
+  const first = fixture.records[0].frame
+  const duplicate = fixture.records[1].frame
+  const mutations = [
+    ['complete declared space', () => {}, 0],
+    ['missing plus duplicate at unchanged count', (records) => { records.shift(); records.push(structuredClone(records[0])) }, 1],
+    ['unknown ID repeated three times', (records) => { records.push(...Array.from({ length: 3 }, () => ({ ...records[0], frame: 'Funknown' }))) }, 1],
+    ['legacy generic given stays invalid', (records) => { records[0].scenario.given = { enabled: false } }, 1],
+  ]
+  for (const [name, mutate, status] of mutations) await t.test(name, async (st) => {
+    const records = structuredClone(fixture.records)
+    mutate(records)
+    const card = fixture.render(records)
+    const expected = auditFullProduct(card, generateFromDocument(card))
+    const result = run('card', '--case-space', '--oracle', await cardFile(st, card))
+    assert.equal(result.status, status, result.stderr)
+    assert.equal(result.stdout, `${JSON.stringify(expected)}\n`, 'all public fields and diagnostic ordering are preserved')
+    assert.equal(fullProductRecords(card).length, records.length)
+    if (name.startsWith('missing')) {
+      assert.deepEqual(expected.missing, [first])
+      assert.deepEqual(expected.duplicate, [duplicate])
+    }
+    if (name.startsWith('unknown')) {
+      assert.deepEqual(expected.extra, ['Funknown'])
+      assert.deepEqual(expected.duplicate, ['Funknown', 'Funknown'])
+    }
+  })
+  const open = structuredClone(fixture.records)
+  open[0].disposition = 'needs-decision: Q1 choose the API'
+  open[0].scenario = null
+  const card = `${fixture.render(open)}\n## Open questions\n\n- Q1: Which API?\n`
+  const result = run('card', '--case-space', '--oracle', await cardFile(t, card))
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stdout, `${JSON.stringify(auditFullProduct(card, generateFromDocument(card)))}\n`)
+  assert.equal(JSON.parse(result.stdout).ready, false, 'unresolved design audit is not execution or readiness')
+})
+
+test('Space extraction preserves the public judgment IR for the same legacy card', async (t) => {
+  const result = run('card', '--ir', '--oracle', await cardFile(t, VALID_CARD))
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stdout, `${stableStringify(buildJudgmentSpace(VALID_CARD))}\n`)
 })
 
 test('full-product: committed example is generated from the runnable fixture', async () => {

@@ -2432,7 +2432,20 @@ test('extends machine derivation past the card bytes: witnesses, evidence lookup
   ]) {
     assert.match(verifier, new RegExp(code), `oracle-verify.mjs must issue ${code}`)
   }
-  assert.match(verifier, /export function buildJudgmentSpace/)
+  const space = await read('scripts/oracle-space.mjs')
+  assert.match(space, /export function buildJudgmentSpace\(cardText\)/)
+  assert.match(verifier, /export \{ buildJudgmentSpace \} from '\.\/oracle-space\.mjs'/)
+  const publicExport = spawnSync(process.execPath, ['--input-type=module', '-e', `
+    import assert from 'node:assert/strict'
+    import { buildJudgmentSpace as shared } from './oracle-space.mjs'
+    import { buildJudgmentSpace as publicExport } from './oracle-verify.mjs'
+    assert.equal(typeof shared, 'function')
+    assert.equal(publicExport, shared)
+  `, 'export-identity', 'card', '--ir', '--oracle', '../../../test-fixtures/full-product/oracle.md'], {
+    cwd: dirname(fileURLToPath(import.meta.url)),
+    encoding: 'utf8',
+  })
+  assert.equal(publicExport.status, 0, publicExport.stderr)
 
   // R3: 코드·형제 카드에서 빈칸을 — 카드에 자동 기입 금지
   assert.match(skill, loose('`scripts/oracle-dimensions.mjs --path <touched files>`'))
