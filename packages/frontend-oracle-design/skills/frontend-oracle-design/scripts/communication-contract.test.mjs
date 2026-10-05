@@ -128,3 +128,64 @@ test('the Space discovery interview keeps provenance and never confirms an axis 
   assert.match(space, /An axis that changes product policy is the user's to\s+confirm,\s+never the agent's/)
   assert.match(space, /added\/removed\s+dimensions/)
 })
+
+/** prettier가 산문을 다시 줄바꿈해도 살아남는 pin — 공백은 전부 `\s+`. */
+const loose = (text) => new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'))
+
+test('the request text is S1, so an empty repo never blocks intake or the Draft', async () => {
+  const [common, entry, skill, intake, contract] = await Promise.all([
+    read('references/common.md'),
+    read('references/controller-entry-formal.md'),
+    read('SKILL.md'),
+    read('references/roles/intake.md'),
+    read('../frontend-contract-design/SKILL.md'),
+  ])
+  assert.match(common, /### The request text is S1/)
+  assert.match(common, loose('Intake registers it as `S1`'))
+  assert.match(common, loose('for exactly what it states, nothing more. Anything the request does not state stays an Open question'))
+  assert.match(common, loose('record `no code observation` in the Source Registry and continue intake and the Draft from `S1`'))
+  // 멈춤은 Delivery의 실제 코드 부재, 또는 사용자가 지목한 문서를 못 읽고 요청도 그 결정을 말하지 않을 때만
+  assert.match(common, loose('applies only when Delivery needs actual code that is not there'))
+  assert.match(common, loose('a substitute brief is one built from guessed sources'))
+  assert.match(entry, loose('A substitute brief is one built from guessed sources'))
+  assert.match(entry, loose('never blocks intake or the Draft'))
+  assert.match(skill, loose('an empty repo is `no code observation`, never a blocker'))
+  assert.match(intake, loose('`no code observation`, not a missing source'))
+  assert.match(contract, loose('one built from guessed sources'))
+})
+
+test('the first response carries axes, a provisional Draft and Open questions under one yes', async () => {
+  const [common, entry, space, controller, author] = await Promise.all([
+    read('references/common.md'),
+    read('references/controller-entry-formal.md'),
+    read('references/roles/space-discovery-formal.md'),
+    read('references/roles/controller-formal.md'),
+    read('references/roles/author-formal.md'),
+  ])
+  assert.match(common, /### First response — one message, one confirmation/)
+  assert.match(common, loose('starts with the literal lane header line, even when it stops'))
+  assert.match(common, loose('payment, permission, destructive or data-loss work is `risk=High`'))
+  assert.match(common, loose('each of the eight input families declared'))
+  assert.match(common, loose('a non-empty Never (never `—`) and a side-effect count'))
+  assert.match(common, loose('each with at least two options and exactly one recommended'))
+  assert.match(common, loose('a bare `yes` adopts every recommendation and confirms the axes and the Draft together'))
+  assert.match(common, loose('Do not ask questions before this message'))
+  assert.match(common, loose('Every row and policy line has a Source column or tag: `S1` only for what the request states'))
+  assert.match(common, loose('It asks for nothing else: no code path, repository or document location'))
+  assert.match(common, loose('and both release orders. Label it planned, not run'))
+  assert.match(common, loose('Until the `yes` arrives the state is `NEEDS_DECISION`'))
+  assert.match(common, loose('Outcome Brief with its `Risk:` line and the worst regression a false pass would ship'))
+  assert.match(common, loose('split it out of an `S1` row into a row citing that question'))
+  assert.match(common, /Interaction sweep:\n- pending × \{click,Enter,tap\} → covered\(R1\)/)
+  assert.match(entry, loose('It is the literal first line of the first response even when that response stops'))
+  // Bend는 여전히 yes 뒤에만; 증명이 찾은 것만 후속 질문
+  assert.match(space, loose('Do not write World.bend, a state machine or a law before that `yes`'))
+  assert.match(space, loose('Only what the proof finds comes back as a follow-up question'))
+  assert.match(space, loose("ride the first response's provisional Draft, never a round of their own before it"))
+  assert.doesNotMatch(space, /go out before the Draft/)
+  assert.match(author, loose('only proof counterexamples and new axes return as follow-up questions'))
+  // lock 승인은 그대로 실제 사람의 재확인
+  assert.match(space, loose('the projected card is still re-presented and approved before lock'))
+  assert.match(controller, loose('This re-presents the projected card after proof'))
+  assert.doesNotMatch(controller, /answer kills a branch, including the discovery axes/)
+})

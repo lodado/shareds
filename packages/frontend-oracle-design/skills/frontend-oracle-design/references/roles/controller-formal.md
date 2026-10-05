@@ -5,9 +5,10 @@ The core entry owns scope and mode. Common prohibitions apply throughout. At eac
 
 ## Draft, review, confirmation and lock
 
-1. Invoke $oracle-intake for approved source investigation and risk/capability discovery, then ask its
-   branch-killing Space discovery questions. Obtain actual axis confirmation before dispatching any model
-   authoring. A source the user cannot provide is not an agent assumption. Hold only separable blocked scope.
+1. Invoke $oracle-intake for approved source investigation and risk/capability discovery, then send the
+   first response: proposed axes, a provisional Draft on their recommendations and Open questions under one
+   confirmation ([first response](../common.md#first-response--one-message-one-confirmation)). Obtain that
+   actual `yes` (axis confirmation) before dispatching any model authoring. A source the user cannot provide is not an agent assumption. Hold only separable blocked scope.
 2. Invoke $oracle-author for the source-bound model package, independent analyst inputs, checks and projected
    Draft with all manual duties. Walk the stages with `scripts/oracle-stage.mjs`: `begin`, then
    `advance --to MODELED | CHECKED | DRAFTED` once each gate passes. Read acceptance back.
@@ -32,7 +33,9 @@ The core entry owns scope and mode. Common prohibitions apply throughout. At eac
    `yes` adopts every recommendation and approves the card; `Q<n>=<option>` swaps one option and
    re-confirms only if a new needs-decision appears. Record approval location in User Confirmation.
    A change request requires Draft repair and re-confirmation; no answer means NEEDS_DECISION.
-   Questions go ahead of the Draft only when their answer kills a branch, including the discovery axes.
+   This re-presents the projected card after proof; only proof counterexamples, new axes or a changed
+   meaning since the provisional Draft need a new question. Questions go ahead of the Draft only when
+   their answer changes the lane, the actor or the side-effect class; discovery axes ride the Draft.
 6. Read [`card/confirmation-lock.md`](../card/confirmation-lock.md) before confirmation/lock/init.
    Lint with `scripts/oracle-verify.mjs card --path <touched files>`; `--case-space` is structural
    preapproval checking only, never user approval. After card lint passes, lock through

@@ -1,7 +1,7 @@
 # Oracle Card — Case space: confirm the axes, prove and test only the possible cases
 
 The space is the Bend world (end states) plus the behavior model (event orders). The user confirms its axes
-before any Bend is written; the tools enumerate what the assumptions and the environment allow; the kernel
+before any Bend is written, with the one `yes` to the first response's provisional Draft; the tools enumerate what the assumptions and the environment allow; the kernel
 proves the goals over those possible cases; the generated tests run exactly those cases on the product. The
 raw product of the axes is never run and never the claim. A card projected from a model package carries the
 result as a generated `## Case space` (`- Coverage: model`). A legacy card written by hand declares dimensions

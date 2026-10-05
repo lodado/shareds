@@ -217,7 +217,8 @@ Rules:
   a change request and re-confirms the whole card.
 - No answer, or an answer outside the listed options, is `NEEDS_DECISION` — never a default.
 - A question whose answer would change the lane, the actor, or the side-effect class of most rows
-  is not an Open question; ask it in a pre-Draft round per [`risk-grill.md`](risk-grill.md).
+  is not an Open question; ask it in a pre-Draft round per [`risk-grill.md`](risk-grill.md). Axis
+  confirmation and A/B counterexample questions are not such questions: they stay Open questions.
 - The section is empty at lock: `ORACLE_READY` requires that no `## Open questions` content remains
   and no policy cites a `Q*` source.
 

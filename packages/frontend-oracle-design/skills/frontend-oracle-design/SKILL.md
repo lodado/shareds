@@ -16,11 +16,13 @@ One canonical runtime and shared budgets serve both controllers and all roles.
 After activation the first tool call is Read [common](references/common.md), before other references
 or exploration, even for explanation/design-only work. Use Read without offset or limit for required
 reference bodies, bounded source-code reads. Print `risk=<Low|Medium|High> lane=oracle nodes=[actual node IDs]`
-first. Include only nodes actually Read. Read [verification-common](references/verification-common.md),
+as the literal first line of the first response, even when it stops; payment/permission work is High.
+Include only nodes actually Read. Read [verification-common](references/verification-common.md),
 [loading](references/roles/loading.md) and the current-stage Formal requirements.
 Before any source investigation or Outcome Brief invoke [`$oracle-intake`](../oracle-intake/SKILL.md),
 including preliminary/read-only investigation. Do not defer invocation or reads to a later turn.
-If reads/invocation are unavailable, stop and return the blocker, not a substitute brief.
+If reads/invocation are unavailable, stop and return the blocker, not a substitute brief (one built from
+guessed sources). The request text is `S1`; an empty repo is `no code observation`, never a blocker.
 
 Scope without behavioral state/order/count/permission/effect stops OUT_OF_SCOPE, not a fake contract.
 Unsupported outcome-changing scope is NEEDS_DECISION, not a skipped verification obligation.
@@ -33,7 +35,8 @@ Design-only is default. Delivery needs an explicit implementation/self-verificat
 Read [controller](references/roles/controller.md) and [Formal coordination](references/roles/controller-formal.md)
 only for the current stage, not every future phase.
 
-1. Invoke `$oracle-intake` for sources, risk/capability and confirmed Space axes.
+1. Invoke `$oracle-intake` for sources, risk/capability and proposed Space axes. The first response shows
+   axes, a provisional Draft and Open questions under one `yes` ([first response](references/common.md#first-response--one-message-one-confirmation)).
 2. Invoke [`$oracle-author`](../oracle-author/SKILL.md) after approved-source/axis prerequisites.
    Its selected Formal procedures own specialized authoring and checks.
 3. Invoke [`$oracle-review`](../oracle-review/SKILL.md) in independent review contexts with permitted inputs.

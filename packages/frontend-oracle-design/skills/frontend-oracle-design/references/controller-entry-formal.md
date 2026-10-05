@@ -23,6 +23,8 @@ One canonical runtime, reference graph and ledger serve all roles. No role has i
    Keep source-code investigation reads bounded. A prefix or headings alone cannot satisfy a node.
 2. **Print the lane header as the first line of the response.** Body text without the header is a violation:
    `risk=<Low|Medium|High> lane=oracle nodes=[node ids actually Read]`.
+   It is the literal first line of the first response even when that response stops (OUT_OF_SCOPE,
+   NEEDS_DECISION, a blocker). Risk is common's classification: payment or permission work is High.
    List only the nodes **actually Read**, never planned reads or a bundle name.
 3. Requests that only **explain in words** a plan, design, file structure or types are inside this procedure too.
    "Already known", "the spec is detailed enough", "no code changes", "write the tests now" and
@@ -54,6 +56,9 @@ One canonical runtime, reference graph and ledger serve all roles. No role has i
    "read-only" requests are intake work, not a controller-only phase. Do not defer these reads or the
    role invocation until answers arrive or a later turn. If a required read or invocation is unavailable,
    stop and report the blocker instead of producing a substitute brief, axes or interview questions.
+   A substitute brief is one built from guessed sources; a brief built from the request text (`S1`)
+   is intake work. An empty repository or no code in Design-only is recorded as `no code observation`
+   and never blocks intake or the Draft ([common](common.md#the-request-text-is-s1)).
 
 ## Mode selection and explicit role invocation
 
@@ -62,14 +67,16 @@ At entry or resume read current disk state. Read [controller procedure](roles/co
 when coordinating the selected stages; read only current-step dependencies, not all future role procedures.
 
 1. Explicitly load and invoke [`$oracle-intake`](../../oracle-intake/SKILL.md) for sources, Outcome Brief,
-   risk/capability and Space discovery. Controller asks the proposed questions and obtains actual answers.
-   Confirm axes and source-open cells before any model. Missing/unsupported sources follow common routing.
+   risk/capability and Space discovery. The first response carries the proposed axes, a provisional Draft
+   on their recommendations and the Open questions under one confirmation
+   ([first response](common.md#first-response--one-message-one-confirmation)). Its actual `yes` confirms
+   axes and source-open cells before any model. Missing/unsupported sources follow common routing.
 2. Explicitly load and invoke [`$oracle-author`](../../oracle-author/SKILL.md) after source/axis prerequisites.
    Obtain source-bound package, independent analyst inputs, proof/adequacy/cross-check and projected Draft,
    with manual sections, realization plan, interaction sweep and semantic delta. Controller owns stage intent.
 3. Explicitly load and invoke [`$oracle-review`](../../oracle-review/SKILL.md) in the required independent
    contexts for card-only cold-read, second reverse-impossible read and conditional source-aware review.
-   Drive the first nail and record the result before showing the Draft. Same-context switching is not independence.
+   Drive the first nail and record the result before showing the projected Draft for lock. Same-context switching is not independence.
 4. Present the full new Draft or semantic delta and Open questions. Obtain human confirmation, lint and lock
    through the existing scripts. No lock, target tests, production or dependency edits before confirmation.
    Design-only ends ORACLE_READY, NEEDS_DECISION or tool-failure FAIL. Write/execute no consumer tests or production.

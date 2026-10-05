@@ -3,7 +3,8 @@
 Controller-only. Input: selected profile, requested outcome, approved sources, mode and disk state.
 Read common and verification-common, then only current-stage profile requirements via loading.
 Invoke `$oracle-intake` before source investigation, including preliminary brief/axes/questions.
-Ask returned source-open and branch-killing questions and record actual human answers.
+Send the [first response](../common.md#first-response--one-message-one-confirmation): proposed axes,
+a provisional Draft and Open questions under one confirmation. Record actual human answers.
 Invoke `$oracle-author` with source identities and confirmed axes. Obtain independent `$oracle-review`
 in the dispatched mode, preserve raw findings, drive the cheapest falsifying nail and record its result.
 Show new Drafts in full or revisions as semantic delta, with all unresolved questions and recommendations.

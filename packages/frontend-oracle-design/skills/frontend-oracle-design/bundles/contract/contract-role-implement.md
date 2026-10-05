@@ -39,6 +39,62 @@ Put the short result first; for detail, link files the workflow already keeps (c
 reports) instead of dumping raw tool logs, and never create a file just to hold tool output.
 Never claim a linked file exists without checking it. No new progress artifact is required.
 
+### First response — one message, one confirmation
+
+The first response to an in-scope request starts with the literal lane header line, even when it
+stops. Classify risk with the [risk taxonomy](#risk-taxonomy--canonical) before printing it: payment, permission, destructive or
+data-loss work is `risk=High`. The rest of that message carries, in this order:
+
+1. Outcome Brief with its `Risk:` line and the worst regression a false pass would ship (a real
+   double charge, a leaked tenant), and the Source Registry, `S1` = the request text (see [the request text is S1](#the-request-text-is-s1)).
+2. Proposed axes: each of the eight input families declared with candidate values or excluded with a
+   reason, plus the request's own axes, each with its recommended choice.
+3. A provisional Draft built on those recommendations: contract rows with Given, When, Then, a
+   non-empty Never (never `—`) and a side-effect count; the case-space dimensions; the
+   interaction/deviation sweep as a short list that dispositions combinations of those dimensions.
+   Every row and policy line has a Source column or tag: `S1` only for what the request states,
+   otherwise `Q<n> — recommended`. A behavior the request does not state (a retry, a dedup, a
+   cache or reset rule, what a screen shows, a disabled button or spinner) with no `Q<n>` is an
+   invention: add the question, or split it out of an `S1` row into a row citing that question.
+   Rows whose correctness depends on response order also carry a planned verification line: the
+   consumer under test, the deferred response it holds, the barrier it waits on, the exact visible
+   data and request count, and both release orders. Label it planned, not run.
+4. Numbered Open questions `Q1..Qn`, each with at least two options and exactly one recommended.
+   Outcome-changing A/B counterexamples ride here too, not in a round before the Draft.
+5. One confirmation request: a bare `yes` adopts every recommendation and confirms the axes and the
+   Draft together; `Q<n>=<option>` swaps one. It asks for nothing else: no code path, repository or
+   document location. An unread named document stays an `S*` marked unread, and the request's own
+   words about it are the options.
+
+When the user names a file for the plan, write the same provisional Draft there; the message still
+shows it in full. Until the `yes` arrives the state is `NEEDS_DECISION`; say so in a `Status:` line.
+Shape (placeholders; the sweep is its own list, never a sentence about t-way reduction):
+
+```text
+risk=High lane=oracle nodes=[common, …]
+Status: NEEDS_DECISION — Draft awaits one confirmation
+## Outcome Brief · Source Registry   Risk: High — <worst regression>
+                                    S1 | conversation: request | "<verbatim>" | approved
+## Proposed axes                     <family>: <values> ★<recommended> | excluded: <reason>
+## Provisional Draft
+| ID | Given | When | Then | Never | Effects | Source |
+| R1 | pending | Pay again | no new request | a second charge | POST×1 | S1 |
+| R2 | timeout | Pay again | … | … | POST×0 | Q2 — recommended |
+Case space: Async{idle,pending,ok,fail,unknown} × Repeat{click,Enter,tap} × Entry{fresh,reload}
+Interaction sweep:
+- pending × {click,Enter,tap} → covered(R1)
+- unknown × {click,Enter,tap} → covered(R2)
+- idle × reload → impossible: no request in flight to lose
+- unknown × reload → needs-decision: Q3
+## Open questions   Q1 … (a) ★recommended (b) …
+Reply `yes` to adopt every ★ and confirm axes + Draft, or `Q<n>=<option>` to swap one.
+```
+
+Do not ask questions before this message, end it with "once you answer, I'll propose …", or ask for a
+code path or document before showing the Draft. A question goes out alone ahead of the Draft only when its answer
+changes the risk lane, the actor or the side-effect class of most rows. The `yes` approves meaning,
+not a lock: the selected profile's after-`yes` steps and lock approval still apply.
+
 Example shapes (placeholders, not execution claims; translate to the user's language):
 
 ```text
@@ -126,6 +182,21 @@ evidence·critique from tests or subagents.
 
 Attach a source to every decided policy. If even one policy lacks a source, it is not
 `ORACLE_READY`.
+
+### The request text is S1
+
+The user's request in the conversation is an explicit answer. Intake registers it as `S1`
+(`product-policy`, location `conversation: request`, the request quoted verbatim, `approved`) for
+exactly what it states, nothing more. Anything the request does not state stays an Open question;
+the agent never fills it in. A document the request only names (a PRD, a legal memo) is a separate
+`S*` marked unread; what the request says about it is quoted under `S1`, and a conflict between
+them is an Open question with both values as options.
+
+An empty working directory, or no code in Design-only, is not a missing source: record
+`no code observation` in the Source Registry and continue intake and the Draft from `S1`. Stopping
+for a missing source (`Blocked`, or no brief) applies only when Delivery needs actual code that is not
+there, or a document the user named cannot be read and the request does not state what it decides.
+A brief built from `S1` is not a substitute brief; a substitute brief is one built from guessed sources.
 
 ## Feedback routing — canonical classification
 

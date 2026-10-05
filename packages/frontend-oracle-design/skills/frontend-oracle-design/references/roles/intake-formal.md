@@ -17,9 +17,9 @@ runtime transitions. Common authority and mandatory verification apply at every 
    [`lifecycle-adaptation.md`](../lifecycle-adaptation.md) with dependencies. Known owners and sufficient
    approved sources for a small change do not require that conditional node. Reuse existing artifacts.
 4. After source investigation and before writing the plan or Draft, read
-   [Space discovery](space-discovery-formal.md) with dependencies. Propose axes, ask counterexamples through
-   the controller and freeze actual answers before any Bend. Put the cells the sources leave open in
-   front of the user before writing the model, not while writing it. Unanswerable axes stop with the
+   [Space discovery](space-discovery-formal.md) with dependencies. Propose axes and counterexamples for the
+   controller's first response, beside its provisional Draft, and freeze actual answers before any Bend.
+   Put the cells the sources leave open in front of the user before writing the model, not while writing it. Unanswerable axes stop with the
    first question. A question that blocks only part is recorded as a hold by the author, not erased.
 5. Run scope that shares no Term, state or file as parallel slices under lifecycle-adaptation when
    supported and authorized. This does not move implementation decisions ahead of VALID_RED or waive

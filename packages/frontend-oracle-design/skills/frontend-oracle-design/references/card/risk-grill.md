@@ -93,7 +93,8 @@ exists only when an earlier answer kills a later branch** — a P1·P2 answer th
 lane, the actor, or the side-effect class so much that drafting both branches is wasted work. Then
 Round 1 = those surviving P1~P3 questions and Round 2 = surviving P4~P7 questions; when 5 or fewer
 surviving questions remain after pruning, bundle the two rounds into the Draft itself. Splitting
-rounds with no branch to kill only adds round trips. When the user explicitly requests a
+rounds with no branch to kill only adds round trips. Space discovery axes and A/B counterexamples
+ride the Draft too ([first response](../common.md#first-response--one-message-one-confirmation)). When the user explicitly requests a
 one-question-at-a-time interview (e.g. "grill me"), proceed in phase order without a round cap, for
 Design-only investigation only. Policy questions during Delivery still follow the 2 rounds of
 `oracle-run.mjs budget`.

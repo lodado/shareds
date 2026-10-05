@@ -17,8 +17,12 @@ transition, target test write or production edit is authorized here. Re-read dis
    `scripts/ensure-bend.mjs` reuses or installs the checksum-pinned CLI. A failed install is a mandatory
    verification failure, never skipped or downgraded. Re-read Bend before proof execution and GREEN/review.
 2. Put the cells the sources leave open in front of the user before writing the model, not while writing
-   it. The [Space discovery](space-discovery-formal.md) answers must be confirmed before any Bend. A changed
+   it. The [Space discovery](space-discovery-formal.md) answers must be confirmed before any Bend; the
+   first response's one `yes` confirms them with the provisional Draft. After it, write and prove the
+   model; only proof counterexamples and new axes return as follow-up questions. A changed
    axis or candidate returns there through the controller, never silently becomes an agent decision.
+   When the user named the card path, the provisional Draft written there moves to
+   `provisional-draft.md` in the same folder before `project-card` writes the projected card.
 3. Write the model package from sources, starting from
    [`model-package.example.json`](../model-package.example.json), never from MODEL.bend or a hand-written
    card. Use package-authoring and model-authoring reference routes with their dependencies.
@@ -82,8 +86,8 @@ A Coverage: full-product card follows the existing opt-in rather than claiming a
 The raw Cartesian candidates, generated frames and actual executable tests are distinct sets.
 
 Follow the phase order: outcome → risk → data/architecture → API → concurrency/async → state → visual →
-performance/ops. A question goes ahead of the Draft only when its answer kills a branch, including axis
-discovery. A requested one-question-at-a-time interview runs without a round cap. This does not change
+performance/ops. A question goes ahead of the provisional Draft only when its answer changes the lane,
+the actor or the side-effect class; axis discovery rides the provisional Draft. A requested one-question-at-a-time interview runs without a round cap. This does not change
 Delivery's shared policy budget. Before presenting the Draft, request the conditional source-aware fresh
 review in card/policy-sources and merge unresolved policy findings into Open questions. It supplements
 card-only cold-read and reverse-impossible review, never replaces them.

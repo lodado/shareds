@@ -21,7 +21,8 @@ first, listing only actually Read nodes. Read [verification-common](../frontend-
 [Contract requirements](../frontend-oracle-design/references/contract/requirements.md) for the current stage.
 Before any source investigation or Outcome Brief invoke [`$oracle-intake`](../oracle-intake/SKILL.md),
 including preliminary/read-only work. Do not defer reads or invocation. If unavailable, stop and return
-blocker, never a substitute brief. Scope without a behavioral contract stops OUT_OF_SCOPE. Unresolved
+blocker, never a substitute brief (one built from guessed sources; the request text is `S1` and an
+empty repo is `no code observation`). Scope without a behavioral contract stops OUT_OF_SCOPE. Unresolved
 outcome-changing sources/capabilities are NEEDS_DECISION or actual-cause FAIL, never guessed approval.
 Never read the other controller's entry or profile-specific procedures.
 

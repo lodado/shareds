@@ -5,6 +5,8 @@ Before source inspection or any preliminary brief, read current-stage dependenci
 [source priority](../common.md#policy-sources), [Space discovery](space-discovery.md),
 [input families](case-space-inputs.md), [BVA](../bva.md), and selected-profile source/risk/requirements guidance.
 Missing sources or prerequisites return to the controller, never substitute assumptions.
+The request text is `S1` and an empty repo is `no code observation`, not a missing source
+([common](../common.md#the-request-text-is-s1)); continue to the brief and proposed axes.
 
 Pin exact source location/version. Distinguish product policy, mandatory/project constraints and
 implementation observations. Mandatory conflict is NEEDS_DECISION, never a downgraded preference.
@@ -13,7 +15,7 @@ Inspect actual runners/reporters before proposing verification, not package name
 investigation never executes consumer tests or installs target dependencies. Return approval items with
 package/version/owner when needed. Unknown capability requires investigation, not guessed unsupported.
 
-Ask A/B counterexamples through the controller and record only actual answers. At relevant scope
+Return A/B counterexamples as Open questions for the controller's one confirmation and record only actual answers. At relevant scope
 decisions load applicable profile-safe architecture, backend, visual, type/state and performance guidance.
 Do not load authoring/review/final-report procedures merely because they exist in a catalog.
 Output: source identities, facts versus assumptions, risk/capabilities, axes provenance, verbatim answers,

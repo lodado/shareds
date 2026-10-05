@@ -39,6 +39,62 @@ Put the short result first; for detail, link files the workflow already keeps (c
 reports) instead of dumping raw tool logs, and never create a file just to hold tool output.
 Never claim a linked file exists without checking it. No new progress artifact is required.
 
+### First response — one message, one confirmation
+
+The first response to an in-scope request starts with the literal lane header line, even when it
+stops. Classify risk with the [risk taxonomy](#risk-taxonomy--canonical) before printing it: payment, permission, destructive or
+data-loss work is `risk=High`. The rest of that message carries, in this order:
+
+1. Outcome Brief with its `Risk:` line and the worst regression a false pass would ship (a real
+   double charge, a leaked tenant), and the Source Registry, `S1` = the request text (see [the request text is S1](#the-request-text-is-s1)).
+2. Proposed axes: each of the eight input families declared with candidate values or excluded with a
+   reason, plus the request's own axes, each with its recommended choice.
+3. A provisional Draft built on those recommendations: contract rows with Given, When, Then, a
+   non-empty Never (never `—`) and a side-effect count; the case-space dimensions; the
+   interaction/deviation sweep as a short list that dispositions combinations of those dimensions.
+   Every row and policy line has a Source column or tag: `S1` only for what the request states,
+   otherwise `Q<n> — recommended`. A behavior the request does not state (a retry, a dedup, a
+   cache or reset rule, what a screen shows, a disabled button or spinner) with no `Q<n>` is an
+   invention: add the question, or split it out of an `S1` row into a row citing that question.
+   Rows whose correctness depends on response order also carry a planned verification line: the
+   consumer under test, the deferred response it holds, the barrier it waits on, the exact visible
+   data and request count, and both release orders. Label it planned, not run.
+4. Numbered Open questions `Q1..Qn`, each with at least two options and exactly one recommended.
+   Outcome-changing A/B counterexamples ride here too, not in a round before the Draft.
+5. One confirmation request: a bare `yes` adopts every recommendation and confirms the axes and the
+   Draft together; `Q<n>=<option>` swaps one. It asks for nothing else: no code path, repository or
+   document location. An unread named document stays an `S*` marked unread, and the request's own
+   words about it are the options.
+
+When the user names a file for the plan, write the same provisional Draft there; the message still
+shows it in full. Until the `yes` arrives the state is `NEEDS_DECISION`; say so in a `Status:` line.
+Shape (placeholders; the sweep is its own list, never a sentence about t-way reduction):
+
+```text
+risk=High lane=oracle nodes=[common, …]
+Status: NEEDS_DECISION — Draft awaits one confirmation
+## Outcome Brief · Source Registry   Risk: High — <worst regression>
+                                    S1 | conversation: request | "<verbatim>" | approved
+## Proposed axes                     <family>: <values> ★<recommended> | excluded: <reason>
+## Provisional Draft
+| ID | Given | When | Then | Never | Effects | Source |
+| R1 | pending | Pay again | no new request | a second charge | POST×1 | S1 |
+| R2 | timeout | Pay again | … | … | POST×0 | Q2 — recommended |
+Case space: Async{idle,pending,ok,fail,unknown} × Repeat{click,Enter,tap} × Entry{fresh,reload}
+Interaction sweep:
+- pending × {click,Enter,tap} → covered(R1)
+- unknown × {click,Enter,tap} → covered(R2)
+- idle × reload → impossible: no request in flight to lose
+- unknown × reload → needs-decision: Q3
+## Open questions   Q1 … (a) ★recommended (b) …
+Reply `yes` to adopt every ★ and confirm axes + Draft, or `Q<n>=<option>` to swap one.
+```
+
+Do not ask questions before this message, end it with "once you answer, I'll propose …", or ask for a
+code path or document before showing the Draft. A question goes out alone ahead of the Draft only when its answer
+changes the risk lane, the actor or the side-effect class of most rows. The `yes` approves meaning,
+not a lock: the selected profile's after-`yes` steps and lock approval still apply.
+
 Example shapes (placeholders, not execution claims; translate to the user's language):
 
 ```text
@@ -126,6 +182,21 @@ evidence·critique from tests or subagents.
 
 Attach a source to every decided policy. If even one policy lacks a source, it is not
 `ORACLE_READY`.
+
+### The request text is S1
+
+The user's request in the conversation is an explicit answer. Intake registers it as `S1`
+(`product-policy`, location `conversation: request`, the request quoted verbatim, `approved`) for
+exactly what it states, nothing more. Anything the request does not state stays an Open question;
+the agent never fills it in. A document the request only names (a PRD, a legal memo) is a separate
+`S*` marked unread; what the request says about it is quoted under `S1`, and a conflict between
+them is an Open question with both values as options.
+
+An empty working directory, or no code in Design-only, is not a missing source: record
+`no code observation` in the Source Registry and continue intake and the Draft from `S1`. Stopping
+for a missing source (`Blocked`, or no brief) applies only when Delivery needs actual code that is not
+there, or a document the user named cannot be read and the request does not state what it decides.
+A brief built from `S1` is not a substitute brief; a substitute brief is one built from guessed sources.
 
 ## Feedback routing — canonical classification
 
@@ -543,7 +614,8 @@ exists only when an earlier answer kills a later branch** — a P1·P2 answer th
 lane, the actor, or the side-effect class so much that drafting both branches is wasted work. Then
 Round 1 = those surviving P1~P3 questions and Round 2 = surviving P4~P7 questions; when 5 or fewer
 surviving questions remain after pruning, bundle the two rounds into the Draft itself. Splitting
-rounds with no branch to kill only adds round trips. When the user explicitly requests a
+rounds with no branch to kill only adds round trips. Space discovery axes and A/B counterexamples
+ride the Draft too ([first response](../common.md#first-response--one-message-one-confirmation)). When the user explicitly requests a
 one-question-at-a-time interview (e.g. "grill me"), proceed in phase order without a round cap, for
 Design-only investigation only. Policy questions during Delivery still follow the 2 rounds of
 `oracle-run.mjs budget`.
@@ -949,7 +1021,8 @@ Rules:
   a change request and re-confirms the whole card.
 - No answer, or an answer outside the listed options, is `NEEDS_DECISION` — never a default.
 - A question whose answer would change the lane, the actor, or the side-effect class of most rows
-  is not an Open question; ask it in a pre-Draft round per [`risk-grill.md`](risk-grill.md).
+  is not an Open question; ask it in a pre-Draft round per [`risk-grill.md`](risk-grill.md). Axis
+  confirmation and A/B counterexample questions are not such questions: they stay Open questions.
 - The section is empty at lock: `ORACLE_READY` requires that no `## Open questions` content remains
   and no policy cites a `Q*` source.
 
@@ -1374,19 +1447,22 @@ Every family is decided: a declared dimension, or `excluded: <reason>` (`family-
 
 Read with common, card/policy-sources and [input families](case-space-inputs-formal.md), including dependencies.
 This interview is separate from the author-only card-format and case-space projection procedure.
-The controller asks the questions and obtains actual human answers. Intake proposes and records them.
-Do not write World.bend, a state machine or a law from the request. Run the interview first, in the
-user's language. It is not Draft approval: confirmed axes do not replace Draft confirmation or authorize
-a lock, test edits or production work.
+Intake proposes and records; the controller shows the proposal in the first response, in the user's
+language, beside a provisional Draft built on the recommended choices, and obtains one actual human
+confirmation ([first response](../common.md#first-response--one-message-one-confirmation)). Do not write
+World.bend, a state machine or a law before that `yes`. The same `yes` confirms the axes and the
+provisional Draft, but confirmed axes do not replace Draft confirmation or authorize a lock, test
+edits or production work: the projected card is still re-presented and approved before lock.
 
 1. **Propose the axes.** Start from the seven input families and add the request's own. Give each axis
    one line: meaning, candidate values, role, and why a correct and wrong result differ on it. Each axis
    names its source ID and exact location, an approved requirement or investigation file:line.
    Code, test and browser observations are investigation evidence, not approved policy. Label an inferred
-   axis Assumption and a missing fact Unknown. Unknown is not excluded. Ask which axis is missing for
-   judging right and wrong and which is unnecessary; an actual human `yes` accepts the proposal.
-2. **Ask counterexamples.** Find two situations the confirmed axes cannot tell apart, one correct and
-   one a bug, and ask one at a time with a recommendation:
+   axis Assumption and a missing fact Unknown. Unknown is not excluded. Give each axis a recommended
+   choice; an actual human `yes` accepts the proposal, and an axis the user names as missing or
+   unnecessary is a change request.
+2. **Pose counterexamples.** Find two situations the proposed axes cannot tell apart, one correct and
+   one a bug, and put each in the first response as a numbered Open question with a recommendation:
 
    ```text
    Case A: <axis>=<value>, <axis>=<value> → correct
@@ -1394,8 +1470,8 @@ a lock, test edits or production work.
    The axes above are identical. Tell them apart? Then I add <axis> (<role>): <how the test sets or reads it>.
    ```
 
-3. **Repeat** until no such pair comes easily. An axis that changes product policy is the user's to
-   confirm, never the agent's.
+3. **Repeat** before sending until no such pair comes easily.
+   An axis that changes product policy is the user's to confirm, never the agent's.
 4. **Classify each axis.** controllable: the test sets it to build the situation. observable: read from
    the product. hidden: real, but no test reads it. derived: computed from other axes and never stored
    as product state. A hidden axis that decides correct versus bug is a SUFFICIENCY FAILURE: show the
@@ -1408,14 +1484,15 @@ a lock, test edits or production work.
 
 Only after confirmation may the author write Terms, World, Assumptions and Goals and run adequacy.
 Once Bend files exist, oracle-discovery.mjs cross-check --package compares the source declaration with
-the Bend space. Each new-axis or cross-term candidate returns here as an A/B question, and each
+the Bend space. Only what the proof finds comes back as a follow-up question.
+Each new-axis or cross-term candidate returns here as an A/B question, and each
 silent-decision as a policy question. Card lint fails cross-check-undecided until each candidate is
 resolved in model/record or decided in discoveryDecisions with its source. Each kernel sufficiency
 counterexample (a minimal pair) returns here in the same A/B form. The author loads discovery.md when
 running those checks; intake need not load its whole closure procedure merely to interview.
 
-These questions decide the model, so they go out before the Draft, the exception to carrying questions
-on the Draft. A run where the user cannot answer ends NEEDS_DECISION with the first question.
+These questions decide the model, so they ride the first response's provisional Draft, never a round
+of their own before it. A run where the user cannot answer ends NEEDS_DECISION with the first question.
 If later investigation changes axes, print only added/removed dimensions, reason, possible-case count
 delta and changed residual risk. A policy question blocking only a separable part becomes a hold under
 the author-owned case-space rules, never permission for tests or production on its blocked part.
@@ -1427,7 +1504,8 @@ the author-owned case-space rules, never permission for tests or production on i
 Read at intake with [input families](case-space-inputs.md) and approved policy sources, not all future
 authoring procedures. Propose finite axes from observable outcome differences, source identities and
 A/B counterexamples. Record value boundaries and missing policy without inferring from current code.
-Ask the controller to obtain actual human answers before authoring. Distinguish Unknown, Assumption,
+The controller shows them in the first response with a provisional Draft on the recommendations and
+obtains one actual human confirmation before authoring the model. Distinguish Unknown, Assumption,
 proposed and confirmed answers. A recommendation is not approval. Changed axes return to confirmation.
 Unanswerable outcome-changing scope is NEEDS_DECISION. A separable hold excludes edits to held rows,
 never silently removes unknown combinations. Return confirmed axes, provenance, answers and open questions.
@@ -1437,7 +1515,7 @@ never silently removes unknown combinations. Return confirmed axes, provenance, 
 # Oracle Card — Case space: confirm the axes, prove and test only the possible cases
 
 The space is the Bend world (end states) plus the behavior model (event orders). The user confirms its axes
-before any Bend is written; the tools enumerate what the assumptions and the environment allow; the kernel
+before any Bend is written, with the one `yes` to the first response's provisional Draft; the tools enumerate what the assumptions and the environment allow; the kernel
 proves the goals over those possible cases; the generated tests run exactly those cases on the product. The
 raw product of the axes is never run and never the claim. A card projected from a model package carries the
 result as a generated `## Case space` (`- Coverage: model`). A legacy card written by hand declares dimensions

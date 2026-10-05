@@ -1,7 +1,7 @@
 # Contract approval and immutable lock
 
 Follow [requirements](requirements.md) for approval-before-CHECKED whole-card hashing and tool-only
-ORACLE_READY. Confirm discovery axes before authoring, then obtain blind reviews, drive/record the nail,
+ORACLE_READY. Confirm discovery axes with the first response's one `yes`, then obtain blind reviews, drive/record the nail,
 conditional source-aware review and actual human approval of final full Draft/semantic delta/questions.
 Unresolved dispositions block lock. Before confirmation no consumer tests, production or dependency edits.
 Preflight checks do not advance DISCOVERING. After approval strict Space check and full-card lint bind

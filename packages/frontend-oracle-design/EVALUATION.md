@@ -441,6 +441,35 @@ not live-model calibration. Final `git diff --check` passed.
 
 ---
 
+## 0.87.0 one-shot first response (Sonnet, `claude plugin eval`, 2026-10-05)
+
+Same staging recipe as below, working-tree copies, `--allow-tools Write`, 1 run per case, `suite.plugins`
+= `frontend-oracle-design@0.87.0` in every run. `+` pass, `−` fail; `card` = `card-approvable`,
+`single` = `single-confirmation`, `invented` = `no-invented-policy`. `skill-fired`, `lane-header`,
+`no-code-files`, `no-lock-or-ledger` and `no-self-approval` passed in every run.
+
+| Iteration | Change under test                                           | 03 (card / single / invented) | 04 (card / single / invented / charge) | 05 (card / single / invented / needs-decision) | Cost  |
+| --------- | ----------------------------------------------------------- | ----------------------------- | -------------------------------------- | ---------------------------------------------- | ----- |
+| 1         | `S1` = request text; first response with one `yes`          | − / + / −                     | − / + / + / +                          | − / − / + / +                                  | $2.96 |
+| 2         | Source tag per row, no-`—` Never, planned race verification | − / − / −                     | − / + / + / +                          | − / + / + / −                                  | $3.17 |
+| 3         | Shape example with sweep list, `Status: NEEDS_DECISION`     | not run (budget)              | + / + / − / −                          | + / + / + / +                                  | $2.14 |
+
+- **Before (0.86.1).** 04 stopped `BLOCKED` on the empty repo, 05 asked for the PRD path, 03 asked seven
+  questions and ended "once you answer, I'll propose axes". From iteration 1 every case answered in one
+  message with axes, a provisional Draft, Open questions and one `yes`.
+- **Iteration 1 → 2.** 05 asked for the PRD and memo locations beside `yes`; 04 marked a Never `—` and
+  cited S1 for rows the request does not state. The rule now asks for nothing but the confirmation and
+  requires a Source tag per row. 03 then passed `race-verification-plan` and lost `race-dimensions`.
+- **Iteration 2 → 3.** The sweep was a sentence ("t-way reduces …"), and 05 dropped its status. A shape
+  example with a sweep list and a `Status: NEEDS_DECISION` line fixed `card-approvable` in 04 and 05.
+- **Open after 3.** 04 omitted the High risk line and cited S1 for a disabled-button row
+  (`charge-boundaries`, `no-invented-policy`). A follow-up rule (Risk line in the Brief, split unstated
+  UI behavior out of S1 rows) is pinned but was not rerun. 03 was not rerun after iteration 2.
+  LLM judges are noisy on the 13 KB 03 card; k=1 per cell is a direction signal, not a rate.
+- 06/07 negative cases were not rerun: the $8 budget was spent ($8.27). The description did not change.
+
+---
+
 ## 0.85.0–0.86.1 trigger evals (Sonnet, `claude plugin eval`, 2026-10-05)
 
 Each run staged a copy of the plugin root in a scratch directory, because `--eval-dir` may not sit
