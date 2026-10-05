@@ -441,6 +441,50 @@ not live-model calibration. Final `git diff --check` passed.
 
 ---
 
+## 0.87.1 mechanical graders (Sonnet, `claude plugin eval`, 2026-10-05)
+
+The `claude plugin eval` cases had 24 `llm` graders; 8 remain. Format and keyword claims became `regex` graders
+(`target` = card file or `last_message`). `scripts/eval-plugin-graders.test.mjs` replays the CLI's regex semantics over
+outputs recorded in earlier live runs (`test-fixtures/plugin-eval-samples/`). Regex grader bodies are raw RegExp source,
+so `.prettierignore` skips `evals/*/graders/`. Prettier had already turned `\s*` into `\s\*` in `no-self-approval` and
+`no-oracle-ceremony`, which made both graders pass whatever the output said.
+
+- Shared Draft graders (01–05): `contract-rows-complete` (every `R*`/`O*`/`D*` contract row has a `kind×N` count and a
+  non-empty Never), `rows-cite-source` (`S<n>` or `Q<n>`), `open-questions-recommend` (an `Open questions` heading; each
+  `Q<n>` has a (b) option and one ★ or recommendation), `case-space-swept` (an `A × B` space and a dispositioned sweep
+  item), `single-confirmation` (`yes` with `Q<n>=`, no question or location ask before the Draft).
+- Per case: 01 `filter-switch-question` and `named-runtime-escapes`; 02 `query-owns-lifecycle`; 03 `race-dimensions` and
+  `race-verification-plan`; 04 `repeat-activation-boundaries` and `unknown-outcome-question`; 05
+  `age-options-one-question`; 06 `answers-label`; 07 `names-one-layer`.
+- Still `llm`, with narrowed rubrics: `no-invented-policy` (01–05; only whether an `S1` citation is stated by the
+  prompt), 02 `no-stored-screen-state`, 04 `no-server-dedup-assumed`, 05 `age-conflict-not-self-resolved`.
+- The 01 and 02 regex graders are checked only on hand-written shapes, because no recorded run wrote those cards.
+
+Live run with 03–07, 1 run each, `--judge-model sonnet`, `suite.plugins` = `frontend-oracle-design@0.87.1`, cost
+$0.85. Each failed regex grader matched real card text: a `—`, `≤1`, `POST 합계 1` or `Q2` in the Effects cell, a 04
+reply that asks for the repository path, and a 05 `Q7` that asks where the documents are and offers no options.
+`skill-fired` fails on 06 and 07 by design: they are negative cases.
+
+| Case | Regex fail                                                               | LLM fail                                    | Score |
+| ---- | ------------------------------------------------------------------------ | ------------------------------------------- | ----- |
+| 03   | `contract-rows-complete`, `rows-cite-source` (grader bug, fixed offline) | `no-invented-policy`                        | 0.77  |
+| 04   | `contract-rows-complete`, `single-confirmation`                          | `no-invented-policy`                        | 0.77  |
+| 05   | `contract-rows-complete`, `open-questions-recommend`                     | `age-conflict-not-self-resolved` (see note) | 0.76  |
+| 06   | none                                                                     | none                                        | 0.75  |
+| 07   | none                                                                     | none                                        | 0.75  |
+
+- `rows-cite-source` read the Source Registry row `| O1 | observation | … |` as a contract row. A contract row now needs
+  five more cells. `single-confirmation` missed "Point me to the repo"; that phrasing is now caught. Both fixes are
+  checked offline against the recorded live text.
+- The 05 judge voted FAIL 3/3 but kept no rationale. Replaying the same evidence with the CLI's judge framing on Sonnet
+  gave PASS 6/6. Claim 2 now spells out that a hedged "legal usually outranks" passes. This divergence is not
+  explained, and the new wording has not been rerun live.
+- `no-invented-policy` FAIL on 03 and 04 matches a Sonnet replay that quotes `S1` rows with behaviour the prompt
+  never stated (04 R1–R3: pending indicator, Enter/tap, same-tick events). This is the skill issue still open from
+  0.87.0.
+
+---
+
 ## 0.87.0 one-shot first response (Sonnet, `claude plugin eval`, 2026-10-05)
 
 Same staging recipe as below, working-tree copies, `--allow-tools Write`, 1 run per case, `suite.plugins`

@@ -1,0 +1,86 @@
+risk=High lane=oracle nodes=[common, verification-common, loading, intake, space-discovery, case-space-inputs, bva, controller-entry-formal, mandatory-verification]
+
+Status: NEEDS_DECISION. The PRD and the legal memo disagree on the threshold, so I can't build this yet. This is a Design-only first pass: I haven't written or edited any code or tests. The working directory has no files, so the Source Registry records `no code observation`.
+
+"Ship it" doesn't settle which source wins. The memo is a legal constraint, which outranks the PRD, but I haven't read either document. The memo is also the only place that scopes 19+ to KR, so I can't tell whether it also changes the rules elsewhere. The Draft below uses my recommendations. One `yes` adopts them all.
+
+## Outcome Brief · Source Registry
+| ID | Source | Content | Status |
+|---|---|---|---|
+| S1 | conversation: request | "Add an age gate to checkout. The PRD says 18+, but the legal memo from last week says 19+ for the KR market. Ship it." | approved |
+| S2 | PRD (location/version not given) | Per S1: 18+ | unread |
+| S3 | legal memo, "last week" (location/version not given) | Per S1: 19+ for KR | unread |
+| — | code | none | `no code observation` |
+
+## Proposed axes
+- **Data:** cart contents ★all checkouts | excluded: age-restricted-items-only, because S1 says "checkout" and doesn't mention items.
+- **Value (birth date):** empty, invalid, future date, under threshold by 1 day, exactly the threshold birthday ★, over. Market is KR or non-KR. I'll fix the exact boundary rules in Q4.
+- **Async (age check):** idle, pending, ok, fail-definitive, outcome-unknown ★ (a timeout after sending).
+- **Order:** double submit while pending ★; market changes while a check is pending ★ | excluded: out-of-order responses, since a single check has no second request. I'll revisit this if Q3 picks a server check.
+- **Entry:** fresh ★, reload, deep link straight to the payment step ★ (bypass).
+- **Environment:** excluded: viewport, theme and motion don't change the gate outcome. They'd matter for visual QA, which is out of scope.
+- **Platform:** excluded: no repo, so no browserslist to derive from.
+- **Inherited:** none; there's no prior behavior to inherit.
+
+## Provisional Draft
+| ID | Given | When | Then | Never | Effects | Source |
+|---|---|---|---|---|---|---|
+| R1 | KR market, age under 19 | Proceed to pay | Blocked with a message; cart kept | Payment request sent | charge×0 | Q1 recommended |
+| R2 | KR market, age exactly 19 (birthday today) | Proceed to pay | Allowed | Wrongly blocked | charge×1 | Q1, Q4 recommended |
+| R3 | Non-KR market, age 18 | Proceed to pay | Allowed | Blocked by the KR threshold | charge×1 | Q1 recommended |
+| R4 | Non-KR market, age 17 | Proceed to pay | Blocked | Payment request sent | charge×0 | Q1 recommended |
+| R5 | Age check pending | Click or press Enter again | No new check | Duplicate check or payment | check×1 | S1 gate + Q3 recommended |
+| R6 | Check outcome unknown | Retry | Treated as not verified; may retry | Payment without a verified age | charge×0 | Q5 recommended |
+| R7 | Not verified | Deep link or reload into the payment step | Redirected back to the gate | Reaching payment unverified | charge×0 | Q3 recommended |
+| R8 | Empty, invalid or future birth date | Submit | Validation error | Treated as a pass | charge×0 | Q2 recommended |
+| R9 | Check pending, market changes | Market change lands | Result discarded; re-check under the new market | Stale pass applied | charge×0 | Q6 recommended |
+
+Case space: Market{KR, non-KR} × AgeBand{under-by-1-day, exactly threshold, over, invalid/empty} × Async{idle, pending, ok, fail, unknown} × Repeat{click, Enter} × Entry{fresh, reload, deep-link}
+
+Interaction sweep:
+- pending × {click, Enter} → covered(R5)
+- unknown × retry → covered(R6)
+- deep-link × not-verified → covered(R7)
+- market change × pending → covered(R9)
+- ok × reload → needs-decision: Q6, whether the pass persists
+- non-KR × 18 under a "19 everywhere" outcome → needs-decision: Q1
+
+Planned verification (not run): the consumer under test and the gate's server check would hold a deferred response. A barrier would wait on the check request. The exact visible payment request count is 0 until `ok`. I'd check both release orders for R9. Bend, TypeScript and fast-check need dependency approval once a repo exists. I'll record them as unavailable and install nothing in Design-only.
+
+## Open questions
+- **Q1. Threshold:**
+  - (a) ★ 19 for KR, 18 elsewhere.
+  - (b) 19 everywhere.
+  - (c) 18 everywhere. I'd rule this out, because it contradicts a legal constraint.
+  - I need to read S3 to confirm this. If the memo says anything beyond KR, the answer changes.
+- **Q2. Age input:**
+  - (a) ★ Birth date entry.
+  - (b) A "I am 19+" checkbox.
+  - (c) Verified identity.
+  - Please confirm with legal whether self-declaration satisfies the KR rule at all. If it doesn't, (c) becomes mandatory and this becomes a larger integration.
+- **Q3. Enforcement:**
+  - (a) ★ Client gate plus a server check that rejects underage payments.
+  - (b) Client gate only.
+  - A client-only gate can be bypassed, as R7 shows.
+- **Q4. Age calculation:**
+  - (a) ★ Full years completed on the checkout date, in the market's timezone (KST for KR).
+  - (b) Korean-style year-count age.
+  - (c) Another rule.
+- **Q5. Unknown outcome:**
+  - (a) ★ Block payment and allow retry.
+  - (b) Block payment with no retry.
+  - (c) Let the user through and re-check later.
+- **Q6. Market and persistence:**
+  - Which field decides "KR market"?
+    - (a) ★ Shipping country.
+    - (b) Billing country.
+    - (c) Account locale or IP.
+  - Does a pass persist?
+    - (a) ★ For the session only; re-check if the market changes.
+    - (b) Stored on the account.
+    - (c) Asked every checkout.
+- **Q7. Sources:** Where are the PRD and the legal memo, with versions?
+  - (a) ★ I'll read them when you point me to them.
+  - (b) You paste the relevant sections.
+
+Reply `yes` to adopt every ★ and confirm the axes and Draft, or `Q<n>=<option>` to swap one. `yes` approves the meaning only. Authoring, independent review and the lock still follow, and none of them is started.

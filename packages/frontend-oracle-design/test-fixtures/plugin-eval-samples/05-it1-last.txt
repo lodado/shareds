@@ -1,0 +1,85 @@
+risk=High lane=oracle nodes=[common, verification-common, loading, controller-entry-formal, mandatory-verification, intake, space-discovery, case-space-inputs, bva]
+
+**Status: NEEDS_DECISION.** I haven't written any code. The age threshold is the behavior under test and your sources disagree on it, so it's an open policy question, not something I should pick. Nothing is locked, so there's nothing to ship yet.
+
+## Outcome Brief
+
+Checkout is blocked for buyers below the legal minimum age. The rule is a legal and permission gate, so I've classed it High risk.
+
+## Source Registry
+
+| ID | Kind | Location | Status |
+|---|---|---|---|
+| S1 | product-policy | conversation: request. Quoted: "Add an age gate to checkout. The PRD says 18+, but the legal memo from last week says 19+ for the KR market. Ship it." | approved, for exactly what it states |
+| S2 | product-policy | the PRD (claimed value: 18+) | **unread**. Only S1's claim about it is recorded. |
+| S3 | mandatory-constraint (legal) | the legal memo (claimed value: 19+ for KR) | **unread**. Only S1's claim about it is recorded. |
+| Code | observation | working directory | `no code observation`. The directory is empty. |
+
+- **Conflict:** S2 says 18+ and S3 says 19+ for KR. Under the authority priority, a legal constraint outranks a PRD within its jurisdiction. I still need to read S3 to confirm its scope, so this goes in as Q1.
+- **What the request doesn't say:** it doesn't say how the age is obtained, how "KR" is determined, what non-KR markets get, or what the blocked state looks like. I haven't guessed any of these.
+- **Verification stack:** Bend, TypeScript and fast-check apply, and type-fest applies only if the gate exposes a type boundary. There's no code, runner or package.json yet, so capability is unknown. Design-only never installs or runs anything.
+
+## Proposed axes (all eight families)
+
+| Family | Decision |
+|---|---|
+| Data | Cart contents: empty, 1 item, many. Age-restricted items vs all items is Q3. |
+| Value | Age relative to the threshold: threshold−1, threshold, threshold+1, and the birthday-today boundary. Missing, malformed and future birthdates. |
+| Async | Age check pending, passed, failed (definitive), and outcome-unknown (timeout). |
+| Order | Double submit while the check is pending. A late "pass" response after the market or birthdate changes. |
+| Entry | Fresh load, refresh, and deep-link straight to the checkout URL. This bypass is the main risk. |
+| Environment | Excluded for now: no source gives a viewport, theme or timezone rule. Exception: timezone matters for the birthday boundary (Q5). |
+| Platform | Excluded: no browserslist or engines to derive from, since the repo is empty. |
+| Inherited | Excluded: no prior behavior to inherit. |
+
+## Provisional Draft (built on my recommendations)
+
+| Row | Given | When | Then | Never | Side effects |
+|---|---|---|---|---|---|
+| R1 | KR market, age ≥ 19 | Submit checkout | Proceeds to payment | — | 1 order request |
+| R2 | KR market, age = 18 | Submit checkout | Blocked with an age-restriction message and cart retained | An order or payment request is sent | 0 |
+| R3 | KR market, turns 19 today (in KST) | Submit | Proceeds | Blocked on the birthday | 1 |
+| R4 | KR market, age missing or invalid | Submit | Blocked, asks for a valid birthdate | Treated as passing | 0 |
+| R5 | Non-KR market, age 18 | Submit | Proceeds (the PRD threshold applies) | KR's 19+ rule applied | 1 |
+| R6 | Any market, age below the threshold | Deep-link or refresh straight onto checkout | Gate re-evaluated and blocked | Bypassed through direct entry | 0 |
+| R7 | Check pending | Double click or Enter | Exactly one check | A second check or order | ≤1 |
+| R8 | Check times out (outcome unknown) | Submit | Blocked, retry allowed | Passes by default | 0 |
+
+Case-space dimensions are market × age class × entry path × check state. The interaction sweep covers R6 against R7 and R8, and the market-changed-mid-session case.
+
+## Open questions
+
+- **Q1. Threshold for KR.**
+  - (a) 19+ **(recommended)**: the legal memo outranks the PRD under the authority priority.
+  - (b) 18+: the PRD value.
+  - Before locking, I need to read the memo itself. If you want 19+, please point me at the file or link. Otherwise only your summary of it exists as a source.
+- **Q2. Non-KR markets.**
+  - (a) 18+ per the PRD **(recommended)**.
+  - (b) 19+ everywhere.
+  - (c) The PRD has no per-market rule, so hold non-KR rows.
+- **Q3. Scope of the gate.**
+  - (a) All checkouts **(recommended)**: the request says "checkout", not specific products.
+  - (b) Only carts with age-restricted items.
+- **Q4. Source of the age.**
+  - (a) Self-declared birthdate at checkout **(recommended as a default)**.
+  - (b) Existing account birthdate.
+  - (c) Verified identity (for example a KR identity-verification provider).
+  - If the memo requires verification, (c) overrides my recommendation.
+- **Q5. How age is computed.**
+  - (a) Full years since the birthdate, evaluated in KST for KR **(recommended)**.
+  - (b) Korean-style age. I recommend against this given "19+" in a legal context.
+- **Q6. Where the market is determined.**
+  - (a) Account country **(recommended)**.
+  - (b) Shipping country.
+  - (c) Billing country.
+  - (d) Locale or IP.
+- **Q7. Server enforcement.**
+  - (a) Backend also rejects underage orders **(recommended)**: a client-only gate is bypassable.
+  - (b) Client-only gate.
+- **Q8. Blocked-state UX.**
+  - (a) Message plus cart retained, with no redirect **(recommended)**.
+  - (b) Redirect away from checkout.
+
+**To proceed:** reply `yes` to adopt every recommendation and confirm the axes and Draft together, or `Q<n>=<option>` to swap one, for example `Q4=c`. Please also give me the PRD and memo locations.
+
+After `yes` I'll author and review the contract and lock it. Delivery and implementation only start once you explicitly ask for them. That is the "ship" step, and it comes after the contract is locked.

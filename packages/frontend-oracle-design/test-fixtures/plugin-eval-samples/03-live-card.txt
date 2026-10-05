@@ -1,0 +1,108 @@
+# tenant-data-view — provisional Draft (architecture plan, design-only)
+
+Status: NEEDS_DECISION — Draft awaits one confirmation. Nothing here is locked, approved or implemented.
+Profile: formal-bend/v1 · Risk: High · Mode: Design-only (no tests, no production code, no dependencies)
+
+## Outcome Brief · Source Registry
+
+Risk: High — a stale or cross-tenant cache entry shows tenant A's data to tenant B (data leak), or an
+out-of-order response overwrites the current tenant's view.
+
+| ID | Type | Location | Content | Status |
+| -- | ---- | -------- | ------- | ------ |
+| S1 | product-policy | conversation: request | "Design a multi-tenant async data view with query caching and placeholder data. Give the first detailed architecture plan, without implementing it." | approved |
+| O1 | observation | repo `/private/tmp/e-n82ldi/home/cwd` | `no code observation` (empty working directory) | observed |
+
+S1 states only: multi-tenant, async, query caching, placeholder data, plan-only. It states no
+invalidation, staleness, tenant-switch, error, retention or placeholder-source rules. Those are Open questions.
+
+Facts: S1 text; the repo is empty. Assumptions: none adopted as policy. Every `Q<n> — recommended` is a recommendation, not approval.
+
+## Architecture plan (proposal; boundaries only, no file layout yet)
+
+1. **Tenant-scoped query key.** The key is `[tenantId, resource, normalizedParams]`. `tenantId` is mandatory and
+   first. A key cannot be built without it. Tenant identity is never read from ambient state at fetch time; it is
+   captured when the query is created.
+2. **Cache store partitioned per tenant.** One `Map<tenantId, Map<keyHash, Entry>>`, not a flat map. Entry =
+   `{ data, status, fetchedAt, requestId }`. Dropping a tenant partition is O(1) and cannot touch another tenant.
+3. **Request lifecycle.** The state machine per (tenant, key) is `idle → pending → ok | fail | unknown`.
+   Every fetch carries a monotonically increasing `requestId` and an `AbortSignal`. A response commits only if its
+   `requestId` is still the latest for that key AND its `tenantId` equals the active tenant. Otherwise it is dropped,
+   with no screen or cache write.
+4. **In-flight dedup.** Concurrent subscribers to the same (tenant, key) share one request (request count = 1).
+5. **Placeholder data.** A placeholder is rendered with an explicit `isPlaceholder` flag. It is never written to
+   the cache as real data and never counts as `ok`. Allowed sources are same-tenant only (see Q3). A placeholder must
+   not be derived from another tenant's entry.
+6. **Tenant switch.** On switch, the view re-binds to the new tenant's partition. The previous tenant's in-flight
+   requests are aborted and their late responses discarded. The previous tenant's data is never visible, even for one frame.
+7. **Staleness and invalidation.** Staleness is time-based, with time modeled as a `Tick`/`Expire` event, not a clock
+   read. Mutations invalidate by exact (tenant, resource) prefix only.
+8. **Session/permission boundary.** A 401/403 or tenant-membership loss purges that tenant's partition (see Q5).
+9. **Layers.** Pure core (key, reducer/state machine, commit guard) is separated from the adapters (fetch, timers,
+   rendering). Only the pure core is modeled formally; I/O and rendering are listed as Not formalized.
+
+Not formalized (Oracle will not verify): visual layout of the placeholder/skeleton, animation timing, real network behavior.
+
+## Proposed axes
+
+- Data: tenants {A, B}; entry {absent, fresh, stale}; result size {0, 1, many} ★ | excluded: pagination (not in S1)
+- Value: tenantId {valid, empty/unknown} ★ | excluded: param string classes (not in S1)
+- Async: {idle, pending, ok, fail-definitive, unknown(timeout)} ★
+- Order: {sequential, inverted (late older response), late-after-tenant-switch, duplicate-subscribe} ★
+- Entry: {fresh mount, remount with warm cache, tenant switch while mounted} ★ | excluded: deep-link/back-forward (no routing in S1)
+- Environment: {StrictMode double-mount} ★ | excluded: viewport/theme/reduced-motion (visual only, out of scope)
+- Platform: excluded: no repo, no browserslist (`no code observation`)
+- Inherited: excluded: no prior P* exists
+
+## Provisional Draft
+
+| ID | Given | When | Then | Never | Effects | Source |
+| -- | ----- | ---- | ---- | ----- | ------- | ------ |
+| R1 | tenant A active, no entry | view mounts | pending shown; one fetch keyed by A | request without tenantId | GET×1 | S1 |
+| R2 | A pending, same key | second subscriber mounts | shares the in-flight request | second request | GET×1 total | Q1 — recommended |
+| R3 | A has fresh entry | view mounts | cached data shown, no refetch | refetch inside fresh window | GET×0 | Q2 — recommended |
+| R4 | A has stale entry | view mounts | stale data shown, background refetch | blank flash; loss of stale data | GET×1 | Q2 — recommended |
+| R5 | A pending, no entry | placeholder allowed | placeholder shown with `isPlaceholder` | placeholder cached as real data; placeholder from tenant B | cache writes×0 | Q3 — recommended |
+| R6 | A active, data shown | switch to B | B's partition shown (placeholder or pending); A requests aborted | any A data visible under B | GET(B)×1 | S1 + Q4 — recommended |
+| R7 | A pending, then switch to B | A's response arrives late | dropped | A data in B's view or cache | cache writes×0 | S1 + Q4 — recommended |
+| R8 | two requests for A key, older sent first | newer responds first, older later | newer data stays | older overwrites newer | commits×1 | S1 |
+| R9 | A pending | fetch fails definitively | error shown, loading cleared, no success effect | stale placeholder presented as ok | — | Q6 — recommended |
+| R10 | A pending | timeout (outcome unknown) | error-unknown shown; retry allowed | silent success | GET×1 per retry | Q6 — recommended |
+| R11 | A mutation succeeds | mutation completes | A's matching queries invalidated | B's entries invalidated; A's unrelated resources invalidated | invalidate A only | Q7 — recommended |
+| R12 | A active | 401/403 or membership lost | A's partition purged; B untouched | A data retained after loss of access | cache purge A | Q5 — recommended |
+| R13 | StrictMode double-mount | mount, unmount, mount | one request, no leaked abort-induced error | duplicate request; error from the discarded mount | GET×1 | S1 |
+
+Planned verification for order-dependent rows (planned, not run): consumer under test = the pure commit guard plus
+the state machine; deferred responses held per request; barrier waits until both requests are issued; visible data and
+request count asserted; both release orders (R7, R8) run.
+
+Case space: Async{idle,pending,ok,fail,unknown} × Order{sequential,inverted,late-after-switch} × Tenant{same,switched} × Entry{absent,fresh,stale}
+
+Interaction sweep:
+- pending × late-after-switch → covered(R7)
+- ok × inverted → covered(R8)
+- fresh × mount → covered(R3); stale × mount → covered(R4)
+- fail × placeholder → needs-decision: Q3, Q6
+- unknown × tenant switch → needs-decision: Q4
+- idle × late response → impossible: no request in flight to deliver one
+- stale × tenant switch → covered(R6); stale data of the previous tenant is never shown
+- ok × membership lost → covered(R12)
+
+## Open questions
+
+- Q1 In-flight dedup: (a) ★ share one request per (tenant, key); (b) one request per subscriber.
+- Q2 Freshness: (a) ★ stale-while-revalidate with a fresh window (duration to be set, default 30s); (b) always refetch on mount; (c) no refetch until invalidated.
+- Q3 Placeholder source: (a) ★ static or same-tenant data only, flagged `isPlaceholder`; (b) previous-key data of the same tenant kept while the new key loads; (c) no placeholders.
+- Q4 Tenant switch: (a) ★ abort the old tenant's requests and keep its cache partition; (b) abort and purge it; (c) let it finish in the background.
+- Q5 Access loss (401/403 or membership removed): (a) ★ purge that tenant's partition immediately; (b) keep it until the next switch; (c) keep it until reload.
+- Q6 Failure display: (a) ★ show the error and keep the last good same-tenant data, marked stale; (b) show the error only; plus: retry on definitive failure is manual; on unknown outcome, retry is allowed for reads.
+- Q7 Mutation invalidation: (a) ★ exact (tenant, resource) prefix; (b) the whole tenant partition; (c) none, TTL only.
+- Q8 Cache lifetime / memory: (a) ★ per-tenant LRU cap (size to be set) with eviction on unmount-after-grace; (b) unbounded for the session.
+
+Reply `yes` to adopt every ★ and confirm axes + Draft, or `Q<n>=<option>` to swap one.
+Numbers marked "to be set" (fresh window, LRU cap) are unspecified in S1 and stay open until answered.
+
+## Next controller action
+
+After `yes`: invoke `$oracle-author` to turn the confirmed rows into a source-bound model, then independent
+`$oracle-review`, then human approval and lock via the scripts. No tests, production code or dependencies are touched before that.

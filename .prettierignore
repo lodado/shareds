@@ -7,6 +7,8 @@ packages/frontend-oracle-design/skills/frontend-oracle-design/bundles/
 packages/frontend-oracle-design/test-fixtures/full-product/oracle.md
 # Recorded AI operator runs: the exact bytes an agent read and wrote, pinned by sha256 in the model package.
 packages/frontend-oracle-design/test-fixtures/stale-search/discovery/
+# `claude plugin eval` regex grader bodies are raw JS RegExp source; markdown escaping breaks them.
+packages/frontend-oracle-design/skills/frontend-oracle-design/evals/*/graders/
 
 # Ignore all HTML files:
 *.html

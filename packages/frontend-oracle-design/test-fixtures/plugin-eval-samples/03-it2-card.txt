@@ -1,0 +1,141 @@
+# Tenant data view — provisional architecture plan (Draft, unconfirmed)
+
+Status: DRAFT / NEEDS_DECISION. Not locked, not ORACLE_READY. Design-only: no code, tests or dependencies written.
+Profile: `formal-bend/v1`. Risk: High (cross-tenant data exposure is a privacy/permission failure; async ordering).
+Nodes Read: common, verification-common, loading, mandatory-verification, intake, space-discovery, case-space-inputs, bva.
+Not yet Read (needed before lock): bend-cross-verification, adequacy, type-environment, authoring/review procedures.
+
+## 1. Outcome Brief
+
+A client view that loads a tenant-scoped list/detail resource asynchronously, caches query results, and shows
+placeholder data while a query has no real data yet. Switching tenant must never show, reuse or write another
+tenant's data.
+
+## 2. Source Registry
+
+| ID | Kind | Location | Status | Content |
+| -- | ---- | -------- | ------ | ------- |
+| S1 | product-policy | conversation: request | approved | "Design a multi-tenant async data view with query caching and placeholder data. Give the first detailed architecture plan, without implementing it. Write the plan to `.ai/oracles/tenant-data-view/oracle.md`" |
+| C0 | code observation | repo `/private/tmp/e-u0e5qi/home/cwd` | `no code observation` | Directory is empty: no framework, runner, query library, tenant model or API observed. |
+
+S1 states only: multi-tenant, async, query caching, placeholder data, plan-only. Everything below beyond that is
+`Q<n> — recommended`, i.e. proposed, not approved.
+
+## 3. Architecture (proposed, implementation-reference only)
+
+### 3.1 Layers
+
+1. **Tenant scope** — a single `TenantId` value owned by one provider/store. All other layers receive it, never read it ambient.
+2. **Query key** — `["tenant", tenantId, resource, normalizedParams]`. `tenantId` is the first element and is mandatory;
+   a key builder that cannot receive a tenant does not type-check (type boundary, see §6).
+3. **Query cache** — in-memory map from serialized key to entry `{status, data, error, fetchedAt, staleAt, inflight}`.
+   Partitioned by tenant (`Map<TenantId, Map<Key, Entry>>`) so tenant eviction is one delete, not a scan.
+4. **Fetcher** — `fetch(tenantId, params, signal)`; request carries the tenant it was issued for, and the response is
+   committed only into that tenant's partition under that key.
+5. **Placeholder resolver** — pure function `(entry, placeholderPolicy) -> ViewData` deciding what the view renders.
+6. **View state machine** — derives `idle | loading-placeholder | loading-empty | success | success-refreshing | error | error-with-stale`
+   from entry + placeholder policy; the view renders only this derived union.
+7. **Lifecycle** — owner lifetime: subscription refcount per entry, gc timer after last unsubscribe, abort on unmount.
+
+### 3.2 Core invariants (candidate LAWS for the Bend model)
+
+- L1 Isolation: a committed entry's tenant equals the tenant in its key and the tenant of the request that produced it.
+- L2 No cross-tenant render: the view for active tenant T only ever renders data from partition T (or placeholder defined as non-data).
+- L3 Late response: a response whose request tenant or key generation is not current may update its own partition entry
+  (if that partition is retained) but never the active view of another tenant.
+- L4 Placeholder is not data: placeholder content is never written to the cache, never marked fresh, never persisted,
+  and never triggers "success" side effects.
+- L5 Dedup: concurrent subscribers of the same (tenant, key) share one in-flight request (count = 1).
+- L6 Staleness: an entry past `staleAt` triggers a background refetch at policy-defined moments; stale data stays visible
+  per the stale policy (Q4).
+- L7 Teardown: tenant switch/logout leaves no readable entry of the former tenant according to the retention policy (Q3).
+
+### 3.3 Data flow
+
+mount/key change → read partition → (hit fresh → success) | (hit stale → success-refreshing + refetch) |
+(miss → loading-placeholder or loading-empty + fetch) → response → commit-if-current → notify subscribers.
+Mutation (if in scope, Q9) → exact invalidation of affected keys within the tenant partition only.
+
+### 3.4 Placeholder data strategies (decision Q2)
+
+- A: static skeleton shape (no data-like content) — safest; cannot leak.
+- B: previous-key data for same tenant (keep-previous, e.g. pagination/param change) — allowed only within one tenant.
+- C: seeded/initial data supplied by caller (e.g. from list into detail) — must be tenant-matched; mismatch → ignored.
+- Cross-tenant placeholder (previous tenant's data while new tenant loads) is forbidden under L2 (Q2 recommends A + B-same-tenant).
+
+## 4. Proposed axes (eight input families — each dispositioned)
+
+| Family | Dimension / values | Disposition |
+| ------ | ------------------ | ----------- |
+| Data | result volume {0, 1, many}; entry freshness {absent, fresh, stale}; placeholder available {no, yes} | declared |
+| Value | query params {valid, empty, duplicate of current key, over-length/unicode}; tenantId {valid, unknown/unauthorized, empty} | declared (bounds from Q5) |
+| Async | per-query {pending, success, error: network / 401-403 / 5xx / malformed}; refetch {pending-with-data, pending-without} | declared; subtypes per Q6 |
+| Order | {sequential, inverted, duplicate-in-flight, tenant-switch during pending, late-after-unmount, late-after-tenant-switch-back} | declared |
+| Entry | {fresh mount, refresh, back/forward, deep-link with tenant in URL} | declared; deep-link only if Q7 = URL-owned tenant |
+| Environment | StrictMode double-mount {on, off}; viewport/theme/reduced-motion | StrictMode declared; viewport/theme/motion `excluded: pure display, no behavioral difference` (OUT_OF_SCOPE part, owned by visual QA) |
+| Platform | browser/OS | `excluded: no browserslist/engines in empty repo; revisit when a repo exists` |
+| Inherited | prior P* | `excluded: no prior contract rows (new run)`; interaction sweep below |
+
+Time (staleTime, gcTime, placeholder min-display) is modeled as `Tick`/`Expire` events, not wall-clock sleeps.
+
+## 5. Provisional contract rows
+
+Source tag: `S1` only where the request states it; everything else `Q<n> — recommended`.
+
+| # | Given | When | Then | Never | Side-effect count | Source |
+| - | ----- | ---- | ---- | ----- | ----------------- | ------ |
+| R1 | tenant A active, no cache | view mounts | placeholder shown; 1 request for A; on success real data replaces placeholder | placeholder written to cache; request for another tenant | 1 | S1 (async, placeholder) + Q2 |
+| R2 | A cached fresh | remount | cached data shown, 0 requests | refetch while fresh; loading flash | 0 | S1 (caching) + Q4 |
+| R3 | A cached stale | remount | cached data shown + refetch 1 | blank state; 2 requests | 1 | Q4 — recommended |
+| R4 | A active, B cached | switch to B | B's data/placeholder only; A's data not rendered at any instant | any A datum rendered under B | ≤1 (0 if B fresh) | S1 (multi-tenant) + Q3 |
+| R5 | A request pending | switch to B, then A's response arrives | A's response not shown in B's view | overwrite of B view/entry; request count > 1 for B | A:1, B:≤1 | S1 + Q3 |
+| R6 | A pending, B pending | B resolves, then A resolves (and reverse) | view shows B in both release orders | A over B | A:1, B:1 | S1 + Q3 |
+| R7 | A active, switch A→B→A | back at A | A entry per retention policy (Q3): reuse if retained and fresh else refetch | B data in A view | per Q3 | Q3 — recommended |
+| R8 | two components subscribe same (A, key) | both mount | one shared request | duplicate in-flight request | 1 | Q8 — recommended |
+| R9 | request fails (subtype X) | failure | error shown, loading cleared, no success side effect; existing data kept or not per Q6; retry → exactly 1 new request | error + success shown together; cached error treated as data | 1 per retry | Q6 — recommended |
+| R10 | A pending | unmount | request aborted; late response does not update any view | state update after unmount; cache poisoning | 1 | S1 + Q8 |
+| R11 | tenant unauthorized (401/403) for B | switch to B | no data, error state, B partition cleared | showing A data; retry loop | 1 | Q6 — recommended |
+| R12 | logout / tenant revoked | event | all tenant partitions dropped (or that tenant's), in-flight aborted | any readable entry afterwards | 0 new | Q3 — recommended |
+| R13 | param change within A | key changes | keep-previous placeholder (same tenant) until new data; param key part of cache key | previous-params data labeled as fresh for new params | 1 | Q2 — recommended |
+
+Each order-dependent row (R5, R6, R10) carries a planned verification line (planned, not run): consumer under test = the
+view/hook with fake fetcher; deferred responses A and B held by a barrier; barrier waits until both requests are issued;
+assert visible data and request count (A=1, B=1) in both release orders.
+
+## 6. Case space (dimensions) and interaction sweep
+
+Dimensions: tenantTransition {none, A→B, A→B→A, revoke} × entryState {absent, fresh, stale} × responseOrder {in-order, inverted, late-after-switch, late-after-unmount} × outcome {success, empty, error subtype} × placeholderPolicy {none, skeleton, keep-previous-same-tenant}.
+Full product is large; plan = t-way coverage of the finite space for the product tests plus an exhaustive finite Bend world with ≤2 tenants, ≤2 keys, ≤3 time steps (Q10).
+Sweep dispositions (short list): switch × late response (R5/R6); stale refetch × tenant switch (refetch result must land in its own partition); placeholder × error (placeholder cleared on error); dedup × StrictMode double-mount (still 1 request); gc expiry × revisit (entry gone → treated as absent); revoke × in-flight (aborted/ignored).
+
+## 7. Verification plan (planned, nothing run)
+
+- **Bend**: model state = (activeTenant, partitions, inflight set, clock); events = Mount, Switch(t), Respond(req, result), Fail(req), Tick, Evict, Revoke, Unmount. Laws L1–L7; bounded world as §6; Terms + Adequacy world to be authored by `$oracle-author`.
+- **Type boundary**: tenant-required key builder and `TenantId` branded type are an exposed boundary. Plan: type-fest (e.g. `Opaque`/`Tagged`) used to make `Key` unconstructible without a tenant; positive and negative `@ts-expect-error` witnesses (`tenantId` missing, raw string tenant, cross-tenant partition access). Not applicable until a TypeScript target exists — availability unknown (empty repo).
+- **fast-check**: model-based command sequences over the events above, positive `--runs`, stated `--max-length` > Bound; asserts L1–L7 on the product, not just generator existence.
+- **Delivery labels (when delivered)**: `bend-proof:reported`, `bend-adequacy:reported`, `type-contract:reported`, `fast-check:reported`.
+- **Dependencies**: runner, fast-check, type-fest, query library are all unresolved approval items (empty repo) — Design-only installs nothing.
+
+## 8. Not formalized / out of scope (owner)
+
+Visual look of skeleton/placeholder, animation, layout, theme (visual QA); server-side tenant authorization and row-level security (backend — the client cache cannot prove server isolation, only avoid client-side mixing); HTTP transport/retry middleware correctness; persisted cache across reloads (excluded unless Q3 says otherwise).
+
+## 9. Open questions (one confirmation: bare `yes` adopts every recommendation; `Q<n>=<option>` swaps one)
+
+- **Q1 Framework/library.** (a) **recommended: framework-agnostic core + thin adapter; library choice deferred until a target repo exists**, (b) TanStack Query, (c) hand-rolled only. Affects which APIs the key/cache/placeholder layers map onto.
+- **Q2 Placeholder policy.** (a) **recommended: skeleton (no data) + same-tenant keep-previous**, (b) skeleton only, (c) caller-supplied initial data allowed if tenant-matched. Cross-tenant placeholder is rejected under all options.
+- **Q3 Tenant switch retention.** (a) **recommended: keep per-tenant partitions in memory for gc window; render only active tenant; drop on logout/revoke**, (b) clear all other-tenant data at switch, (c) clear on switch and never retain. A/B counterexample: under (a) switching A→B→A within gc shows A instantly; under (b) it refetches — different request count and visible data.
+- **Q4 Freshness.** (a) **recommended: stale-while-revalidate — show stale data, refetch once; fixed `staleTime`/`gcTime` values to be supplied**, (b) never show stale (blocking refetch), (c) manual refresh only. Durations are unspecified: need numbers or `NEEDS_DECISION`.
+- **Q5 Param/tenant value boundaries.** (a) **recommended: tenantId non-empty opaque string, unknown tenant → Q6 permission error; params normalized (sorted, trimmed) before keying**, (b) no normalization. Max lengths unspecified.
+- **Q6 Error handling.** (a) **recommended: subtypes network / 401·403 / 5xx / malformed; on error keep same-tenant stale data with error banner except 401·403 which clears that tenant partition; manual retry = exactly 1 request; no auto-retry**, (b) auto-retry with backoff, (c) discard data on any error.
+- **Q7 Tenant source.** (a) **recommended: tenant is an explicit prop/context value owned by the host app; URL deep-link is out of scope**, (b) tenant derived from URL, (c) from session token.
+- **Q8 Dedup and abort.** (a) **recommended: same (tenant,key) shares one in-flight request; unmount of last subscriber aborts it**, (b) no abort, let finish and cache.
+- **Q9 Mutations.** (a) **recommended: out of scope for first version (read-only view)**, (b) include mutation + exact invalidation, (c) include optimistic updates. Option (b)/(c) raises risk rows (rollback, concurrent edits, idempotency).
+- **Q10 Bounds for formal world.** (a) **recommended: 2 tenants, 2 keys, 3 time steps, 2 subscribers**, (b) larger. Bounds are verification choices, not policy.
+- **Q11 Persistence.** (a) **recommended: in-memory only; nothing in localStorage/IndexedDB**, (b) persist per-tenant with tenant-scoped namespace. Persistence would add a leak surface across sessions/users.
+
+## 10. Next controller action
+
+1. Show this Draft with the proposed axes and Q1–Q11 to the user for one confirmation.
+2. On actual `yes` / `Q<n>=` answers: invoke `$oracle-author` (Terms, Adequacy world, Formal Model, laws, projected card), then `$oracle-review` in independent contexts (card-only cold-read, reverse-impossible read), then human lock approval and lock via scripts.
+3. Nothing here is approved policy. No lock, tests, production code or dependencies exist.

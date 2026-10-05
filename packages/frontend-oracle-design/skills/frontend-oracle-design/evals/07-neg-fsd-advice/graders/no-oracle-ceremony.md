@@ -5,4 +5,4 @@ match: not_contains
 flags: mi
 ---
 
-lane=oracle|^#+\s*Open questions|\|\s*Never\s\*\|
+lane=oracle|^#+\s*Open questions|\|\s*Never\s*\|

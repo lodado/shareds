@@ -1,0 +1,65 @@
+risk=High lane=oracle nodes=[common, verification-common, loading, intake, space-discovery, case-space-inputs, bva]
+Status: NEEDS_DECISION. The Draft below awaits one confirmation. I can't ship yet because the PRD and legal memo conflict and the working directory has no code.
+
+## Outcome Brief · Source Registry
+Risk: High. This is a legal/age-restriction gate. The worst false pass is a under-19 KR buyer completing checkout because the 18+ rule was applied, or because only the UI blocks and the server accepts the order.
+
+| ID | Source | Content | Status |
+|---|---|---|---|
+| S1 | conversation: request | "Add an age gate to checkout. The PRD says 18+, but the legal memo from last week says 19+ for the KR market. Ship it." | approved. It states only that a gate exists, that the PRD says 18+ and that the memo says 19+ for KR. |
+| S2 | PRD | 18+ is only what S1 reports. | **unread**, location unknown |
+| S3 | legal memo (last week) | 19+ for KR is only what S1 reports. | **unread**, location unknown |
+| — | code | `no code observation`: the working directory is empty. | — |
+
+Facts: S1 says the two documents disagree. Assumptions: none adopted. Whether S3 overrides S2 is a policy call, so it is Q1 and not something I decided.
+
+## Proposed axes
+- **Data** (user age vs threshold): under−1 / exactly threshold−1 day / exactly the threshold birthday / over ★. Excluded: missing DOB, which sits in Value.
+- **Value** (DOB input): valid / future date / malformed / missing ★. Excluded: leap-day births, until Q6 is answered.
+- **Market** (request's own axis): KR ★ / non-KR ★ / unknown market.
+- **Async**: age check idle / pending / ok / fail / outcome-unknown ★.
+- **Order**: late age-check response after a market or DOB change. Declared, not excluded.
+- **Entry**: fresh / reload / deep-link straight to the checkout URL ★. Deep-link matters because it can skip a UI-only gate.
+- **Environment**: excluded. No age-specific viewport or theme outcome, and there is no repo browserslist to derive from.
+- **Platform**: excluded. There is no repo to derive from (no code observation).
+- **Inherited**: none, since there is no prior P* in the repo.
+
+## Provisional Draft
+| ID | Given | When | Then | Never | Effects | Source |
+|---|---|---|---|---|---|---|
+| R1 | KR market, age < 19 | Submit checkout | Blocked with an age-restriction message, cart kept | An order is created | order POST×0 | Q1 — recommended |
+| R2 | KR market, age ≥ 19 | Submit checkout | Proceeds | The user is blocked | order POST×1 | Q1 — recommended |
+| R3 | Non-KR market, age < 18 | Submit | Blocked | An order is created | POST×0 | Q1 — recommended |
+| R4 | Non-KR market, age ≥ 18 | Submit | Proceeds | The user is blocked | POST×1 | S1 (PRD 18+) / Q1 |
+| R5 | Birthday is today | Submit | Uses the exact-birthday rule | Off-by-one in either direction | per R1/R2 | Q4 — recommended |
+| R6 | DOB missing or invalid | Submit | Blocked, DOB prompt shown | The order proceeds | POST×0 | Q3 — recommended |
+| R7 | Age check pending | Click and Enter repeatedly | One check only | Duplicate orders | POST≤1 | Q5 — recommended |
+| R8 | Age check outcome-unknown | Retry | Fail closed, retry allowed | The order proceeds unverified | POST×0 | Q5 — recommended |
+| R9 | Gate bypassed via deep-link or direct API | Order POST | Server rejects | A client-only gate | POST×0 | Q2 — recommended |
+
+Planned verification (not run): the consumer is the checkout submit. A deferred response holds the age check, the barrier waits on it, and the visible data and request count are asserted for both release orders.
+
+Case space: Market{KR, non-KR, unknown} × Age{threshold−1, threshold, over} × DOB{valid, missing, invalid} × Async{idle, pending, ok, fail, unknown} × Entry{fresh, reload, deep-link}
+
+Interaction sweep:
+- KR × threshold−1 → covered (R1, R5)
+- KR × 18-year-old → covered (R1). This is the PRD-vs-memo discriminator.
+- unknown market × any age → needs-decision: Q3
+- pending × {click, Enter} → covered (R7)
+- unknown outcome × retry → covered (R8)
+- deep-link × under-age → covered (R9)
+- reload × pending → needs-decision: Q5
+- idle × late response → impossible: no request is in flight
+
+## Open questions
+- **Q1. Which threshold applies?** (a) ★ KR = 19 per the legal memo, everything else = 18 per the PRD. Legal constraints usually outrank product preference, but this is still your call. (b) 18 everywhere, as in the PRD. (c) 19 everywhere.
+- **Q2. Where is the gate enforced?** (a) ★ Server-side, with the UI as a convenience. (b) Client only.
+- **Q3. How is age and market determined, and what happens if either is unknown?** (a) ★ Age comes from the account DOB, or a DOB prompt if absent. Market comes from the account or shipping country. Unknown means block. (b) Self-declared checkbox only. (c) ID verification.
+- **Q4. How is the birthday boundary computed?** (a) ★ Full years elapsed, in the buyer's market timezone (KST for KR). (b) UTC.
+- **Q5. What happens on a pending, failed or unknown-outcome age check?** (a) ★ Fail closed with a retry, never proceed unverified. (b) Fail open.
+- **Q6. Under-age UX?** (a) ★ Block with a message and keep the cart. (b) Remove the age-restricted items.
+- **Q7. Where are the PRD and legal memo?** I can't read them, and nothing in this repo is empty or wrong about that. If the memo says something different from the S1 paraphrase, it replaces my Q1 default. I need a path or link, or paste the relevant lines.
+
+Delivery also needs the actual checkout code. Point me to the repo, because the working directory is empty and I can't ship against nothing.
+
+Reply `yes` to adopt every ★ and confirm the axes and Draft together, or `Q<n>=<option>` to swap one.

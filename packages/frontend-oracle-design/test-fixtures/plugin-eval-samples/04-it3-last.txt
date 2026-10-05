@@ -1,0 +1,80 @@
+코드 저장소가 비어 있어서(`no code observation`) 결제 페이지 코드는 확인하지 못했습니다. 요청 문장(S1)만으로 Draft를 만들었습니다. 이 단계에서는 코드를 고치지 않습니다.
+
+Status: NEEDS_DECISION — Draft는 확인 1회를 기다리는 중입니다.
+
+## Outcome Brief · Source Registry
+| ID | 출처 | 내용 | 상태 |
+|---|---|---|---|
+| S1 | conversation: request | "결제 페이지에서 Pay 버튼을 더블클릭하면 카드가 두 번 결제된다는 CS 티켓이 이번 주에만 3건 들어왔어. 고쳐줘. 참고로 서버는 idempotency key를 받지 않아." | approved |
+| — | 코드 | 저장소가 비어 있음 | no code observation |
+
+- **사실(S1)**
+  - 더블클릭하면 이중 결제가 발생합니다.
+  - 서버는 idempotency key를 받지 않으므로, 중복 방지는 클라이언트에서만 해야 합니다.
+- **가정**: 클라이언트는 Pay 클릭 한 번당 결제 POST를 한 번 보냅니다. 코드로 확인하지 못했습니다.
+
+## Proposed axes
+- **Async**: idle, pending, ok, fail-definitive, fail-unknown ★
+  - fail-unknown은 서버 처리 여부를 알 수 없는 타임아웃이나 응답 유실입니다.
+- **Repeat**: click, Enter, Space/tap ★
+  - 더블클릭이 핵심 케이스입니다.
+  - 첫 이벤트와 disabled 반영 사이의 두 번째 이벤트도 포함합니다.
+- **Order**: 순차, 중복(동시), 응답 지연 후 재시도 ★
+  - 지연 응답과 재진입은 아래 Q로 따로 묻습니다.
+- **Entry**: fresh, 새로고침/뒤로가기(pending 중) ★
+- **Data**: 제외. 금액이나 장바구니 크기에 따라 결과가 달라진다는 근거가 S1에 없습니다.
+- **Value**: 제외. 입력 필드 값에 따른 분기가 S1에 없습니다.
+- **Environment**: 제외. 뷰포트나 테마와 중복 결제는 무관합니다. StrictMode의 이중 effect는 코드를 본 뒤 재검토합니다.
+- **Platform**: 제외. 저장소가 비어 있어 browserslist를 확인할 수 없습니다.
+- **Inherited**: 해당 없음. 이전 P*가 없습니다.
+
+## Provisional Draft
+| ID | Given | When | Then | Never | Effects | Source |
+|---|---|---|---|---|---|---|
+| R1 | idle | Pay 더블클릭(click×2) | 결제 요청 1건만 발송 | 두 번째 결제 요청 | POST×1 | S1 |
+| R2 | pending | Pay 재입력(click / Enter / Space·tap) | 새 요청 없음, 버튼 비활성 + 진행 표시 | 추가 POST | POST×0 추가 | S1 |
+| R3 | ok | Pay 재입력 | Q1 권고안: 결제 완료 상태라 Pay 불가, 요청 없음 | 같은 주문 재결제 | POST×0 | Q1 recommended |
+| R4 | fail-definitive (예: 카드 거절) | Pay 재입력 | Q2 권고안: 재시도 허용, 새 요청 정확히 1건 | 실패 중 다중 요청 | POST×1 | Q2 recommended |
+| R5 | fail-unknown (타임아웃, 응답 유실) | Pay 재입력 | Q3 권고안: 자동 재시도 없음, 수동 재시도 전 "결제 여부 확인 필요" 안내 | 무조건 재시도로 인한 이중 결제 | POST×0 (확인 전) | Q3 recommended |
+| R6 | pending | 새로고침 또는 뒤로가기 후 재진입 | Q4 권고안: 서버가 진행 중인 결제를 알려줄 수 없으므로 재진입 시 Pay를 막고 확인 안내 | 재진입 후 즉시 재결제 | POST×0 | Q4 recommended |
+
+- **Case space**: Async{idle,pending,ok,fail-def,fail-unk} × Repeat{click,Enter,Space·tap} × Order{순차,동시,지연 후 재시도} × Entry{fresh,reload}
+- **Interaction sweep**:
+  - pending × {click,Enter,Space·tap} → covered(R2)
+  - idle × 더블클릭 → covered(R1)
+  - ok × 재입력 → covered(R3)
+  - fail-def × 재입력 → covered(R4)
+  - fail-unk × 재입력 → covered(R5)
+  - pending × reload → needs-decision: Q4
+  - idle × reload → impossible: 진행 중인 요청이 없어 잃을 것이 없습니다.
+- **Planned verification (계획이며 실행한 것이 아님)**
+  - 대상은 Pay 컴포넌트가 결제 요청을 보내는 지점입니다. 코드가 없어 실제 이름은 아직 모릅니다.
+  - 결제 응답은 deferred로 붙잡습니다(sleep 사용 안 함). 같은 tick에서 click 2회를 보내 UI 비활성과 요청 수 `POST=1`을 같은 행에서 함께 검증합니다.
+  - 응답 해제 순서는 (a) 성공 먼저, (b) 실패 먼저 두 가지입니다.
+  - 모델 검증은 Bend, 샘플링은 fast-check을 씁니다. type-fest/TypeScript는 노출된 타입 경계가 코드에서 확인될 때만 적용합니다.
+
+이 스택이 도입하는 의존성과 도구는 아직 구체화하지 않았습니다. 코드와 러너를 확인한 뒤 승인 항목으로 따로 올리겠습니다.
+
+## Open questions
+- **Q1. 결제 성공(ok) 이후 Pay 버튼 처리**
+  - (a) ★ 비활성화하거나 완료 화면으로 이동해 재결제를 막습니다.
+  - (b) 버튼을 유지하고 서버에 맡깁니다. 서버에 중복 방지가 없어 위험합니다.
+- **Q2. 결제 실패(확정 실패) 후 재시도**
+  - (a) ★ 입력을 유지하고 다시 누르면 새 요청 정확히 1건을 보냅니다.
+  - (b) 페이지를 새로고침해야 재시도할 수 있습니다.
+- **Q3. 결과 불명 실패(타임아웃·응답 유실) 후 동작**
+  - (a) ★ 자동 재시도는 하지 않고, "결제 여부 확인 필요"를 안내한 뒤 수동 재시도를 허용합니다.
+  - (b) 안내 없이 일반 실패처럼 취급합니다. 이 경우 이중 결제가 다시 생길 수 있습니다.
+  - (c) 재시도를 막고 고객센터나 주문 내역 확인으로 유도합니다.
+- **Q4. 결제 진행 중 새로고침이나 뒤로가기로 재진입했을 때**
+  - (a) ★ 서버에 중복 방지가 없으므로 재진입 시 Pay를 막고 주문 상태 확인을 안내합니다. 클라이언트 저장소(sessionStorage 등)로 진행 중 상태를 기억하는 방식입니다.
+  - (b) 새 세션으로 보고 Pay를 다시 허용합니다. 이 경우 새로고침으로 이중 결제가 가능합니다.
+  - (c) 이번 범위에서 제외하고 알려진 한계로 기록합니다.
+- **Q5. Pay 이벤트 차단 방식(A/B 반례)**
+  - 같은 tick에 이벤트 2개가 들어오면 `disabled`만으로는 둘 다 통과할 수 있습니다. 이 경우 요청이 2건 나갑니다.
+  - (a) ★ 요청 발송 전에 동기 in-flight 가드를 둡니다. UI disabled는 별도로 검증합니다.
+  - (b) `disabled`만 사용합니다. 이 방식은 R1을 보장하지 못해 권고하지 않습니다.
+
+**답변 방법**: `yes`라고 하면 위 ★를 전부 채택하고 axes와 Draft를 함께 확정합니다. 일부만 바꾸려면 `Q<n>=<옵션>`으로 답해 주세요. 예: `Q4=c`.
+
+`yes`는 의미만 승인하는 것이고 lock은 아닙니다. 이후 모델 작성, 리뷰, lock 단계는 별도 절차대로 진행합니다. 구현은 Delivery를 명시적으로 요청하셔야 시작됩니다.

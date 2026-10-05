@@ -1,0 +1,48 @@
+risk=High lane=oracle nodes=[common, verification-common, loading, controller-entry-formal, mandatory-verification, intake, space-discovery, case-space-inputs, bva]
+
+[시작] Goal: an architecture plan for a multi-tenant async data view with query caching and placeholder data. Design only, nothing implemented. The risk is High because a tenant cache leak is a privacy and security failure.
+
+I wrote the provisional Draft to `.ai/oracles/tenant-data-view/oracle.md`. It is not approved, not locked, and has not been executed.
+
+**Facts and assumptions**
+- **S1:** your request text is the only approved source.
+- **Repo:** the working directory is empty, so there is `no code observation`. There is no stack, runner, TypeScript config or query library to read.
+- **Assumptions:** the tenant id is an opaque client-side value, and "placeholder" means provisional content that is never stored as real data. Both depend on Q1 and Q2 below.
+- **Not done:** I did not run the profile router for the selected-profile guidance, and I did not run the Bend or capability checks. The repo is empty, so there is nothing to check yet.
+
+**Architecture**
+- **TenantScope:** holds the active tenant plus an epoch counter that increases on every switch.
+- **QueryKey:** `(tenantId, resource, params)`, with the tenant required and first.
+- **QueryCache:** partitioned by tenant, so a tenant can be evicted as a whole.
+- **Fetcher:** deduplicates identical in-flight reads and tags each request with its tenant and epoch.
+- **Commit gate:** drops late or superseded responses instead of writing them to the cache.
+- **View binding:** reads only the active tenant's entry.
+- **PlaceholderProvider:** returns a tagged placeholder that is never cached as real data and never taken from another tenant.
+
+**Proposed axes**
+- **Data:** two tenants, empty/one/page/max volumes, fresh/stale/expired.
+- **Async:** network, 401/403, 5xx and malformed-response errors.
+- **Order:** response inversion, a late response after a tenant switch, a late response after unmount, and A→B→A switches.
+- **Entry:** includes deep-link.
+- **Environment:** StrictMode included.
+- **Excluded:** viewport, theme, reduced-motion and Platform have no behavioral outcome yet.
+
+The file has 17 contract rows, each with a non-empty Never and an effect count. The core rows cover cross-tenant isolation, late responses after a switch, placeholder lifecycle, deduplication and error/retry. It also has the Bend laws, the type-fest/TypeScript witness plan and the fast-check sampling plan. Those plans are not executed.
+
+**Open questions** (★ = recommended)
+- **Q1: Tenant identity.** (a) Opaque id from the session or URL, with the server enforcing access ★. (b) Derived from user claims.
+- **Q2: Placeholder source.** (a) Static shell derived from the key only ★. (b) Previous data of the same tenant. (c) Another tenant's data, which I recommend against because it conflicts with isolation.
+- **Q3: Old tenant's cache on switch.** (a) Keep it in its own bounded partition ★. (b) Drop it at once.
+- **Q4: Out-of-order responses.** (a) Latest-issued request wins ★. (b) First wins. (c) Forbid concurrent requests for the same key.
+- **Q5: Query library.** (a) The repo's library, or TanStack-style semantics ★. (b) A bespoke cache. This is blocked until a repo stack exists.
+- **Q6: Mutations and optimistic updates.** (a) Out of scope for this first plan ★. (b) In scope.
+- **Q7: Error behavior.** (a) Keep the last good same-tenant data with an error banner, and retry only definitive failures ★. (b) Replace the data with the error.
+- **Q8: Revocation.** (a) A 401/403 purges that tenant's cached data ★. (b) Keep it.
+- **Q9: Invalidation while a request is in flight.** (a) Discard the in-flight result and refetch ★. (b) Let it commit, then refetch.
+- **Q10: Persistence.** (a) Memory only ★. (b) localStorage or IndexedDB.
+
+**Confirmation:** reply `yes` to adopt every ★ and confirm the axes and Draft together, or `Q<n>=<option>` to swap one.
+
+**Blocked until then:** the Bend model, independent review and lock.
+
+**Unverified:** everything in the plan, since nothing has been modeled or run. It cannot cover server-side authorization, rendering, accessibility announcements or visual placeholder styling.

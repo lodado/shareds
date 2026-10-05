@@ -1,0 +1,24 @@
+Status: **NEEDS_DECISION**. The plan is written to `/private/tmp/e-LHUTYr/home/cwd/.ai/oracles/tenant-data-view/oracle.md`. Nothing is locked or implemented. I read the file back only through the Write result, not separately.
+
+I rated this High risk because a tenant cache leak or a stale response overwriting newer data is costly. The repo is empty, with no PRD, spec or API contract, so every rule in the plan is an Assumption or Unknown rather than approved policy. The Oracle workflow can't treat it as `ORACLE_READY` until you answer the open questions.
+
+**What the plan covers**
+- **Layers:** a tenant context with an epoch counter, a key factory that can't build a key without a tenant ID, a tenant-namespaced cache, an abortable fetcher, a pure state machine for the view, and a placeholder provider that marks its output as placeholder.
+- **Six invariants:**
+  - Rendered data always belongs to the active tenant.
+  - Cache keys always include the tenant.
+  - Only the latest response for the current tenant epoch is applied.
+  - Placeholder data is never cached or treated as a success.
+  - Tenant switch, logout and session expiry abort in-flight requests and clear or quarantine the old tenant's cache entries.
+  - Identical concurrent requests are sent once.
+- **State model and axes:** the view's states and events, plus about 13 proposed axes (cache state, placeholder source, error subtype, order inversion, tenant switch during a request, and so on). None are confirmed yet.
+- **Verification plan:** what would be proven or tested once approved, and what falls outside the Oracle (visual styling, real network timing).
+
+**Questions I need answered**, in this order:
+1. **Placeholder content:** is it a static skeleton, or can it show the same tenant's last-known data? I recommend a static skeleton or same-tenant data only, never another tenant's.
+2. **Tenant echo:** does the API return the tenant ID in its response, so a mismatch can be rejected?
+3. **Late response after a switch:** should a late response for tenant A be discarded after the user switches to B? I recommend discarding it.
+4. **Cache on tenant switch:** purge the old tenant's cache, or keep it namespaced for fast return?
+5. **Remaining decisions:** staleness policy, persisted versus in-memory cache, error handling, whether the view is read-only, multi-tab or multiple tenants on screen, and which framework and cache library to use.
+
+The next step is for you to confirm or amend the axes and answer those questions. I'd then record your answers as the approved source, and only after that move to authoring, independent review and the lock.

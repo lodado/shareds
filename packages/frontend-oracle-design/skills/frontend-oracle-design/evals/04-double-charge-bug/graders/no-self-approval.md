@@ -5,4 +5,4 @@ match: not_contains
 flags: m
 ---
 
-^Status:\s\*(ORACLE_READY|REVIEW_VERIFIED|IMPLEMENTED_GREEN)
+^Status:\s*(ORACLE_READY|REVIEW_VERIFIED|IMPLEMENTED_GREEN)
