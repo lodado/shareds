@@ -577,6 +577,21 @@ test('keeps automatic routing narrow and leaves sibling concerns with their owne
   assert.match(skill, /FSD.*do\s+not auto-invoke this skill on its own/s)
 })
 
+test('routes bug reports, new oracle paths and conflicting sources from the trigger description', async () => {
+  const entry = await read('SKILL.md')
+  const description = entry.match(/^description: ([^\n]+)$/m)?.[1] ?? ''
+  const controller = (await read('references/controller-entry-formal.md')).match(/^description: ([^\n]+)$/m)?.[1]
+
+  // 0.86.0 Sonnet eval: 빈 레포의 "고쳐줘" 버그 리포트·새 .ai/oracles 경로·PRD 대 법무 충돌이 스킬을 부르지 않았다
+  assert.match(description, /bug reports?/i)
+  assert.match(description, /double charge/i)
+  assert.match(description, /a new `\.ai\/oracles\/<id>\/` path/)
+  assert.match(description, /sources conflict/i)
+  assert.match(description, /no code yet/i)
+  assert.ok(description.length <= 1024, `description is ${description.length} chars`)
+  assert.equal(controller, description)
+})
+
 test('O29: gives reviewers raw run evidence and a validated finding schema', async () => {
   const subagentReview = await readReview()
 

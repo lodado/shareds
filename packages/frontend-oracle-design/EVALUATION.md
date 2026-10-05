@@ -441,6 +441,31 @@ not live-model calibration. Final `git diff --check` passed.
 
 ---
 
+## 0.85.0–0.86.1 trigger evals (Sonnet, `claude plugin eval`, 2026-10-05)
+
+Each run staged a copy of the plugin root in a scratch directory, because `--eval-dir` may not sit
+under `skills/` and a `skills/` target loads no plugin. Results record `frontend-oracle-design@<version>`
+in `suite.plugins`. All runs used `--allow-tools Write`, so no Oracle script could run.
+
+| Version            | Cases (1 run each)                     | Skill fired, positive cases | Negative cases fired | Cost                                                                  |
+| ------------------ | -------------------------------------- | --------------------------- | -------------------- | --------------------------------------------------------------------- |
+| 0.85.0             | 04                                     | 0/1                         | —                    | $0.17                                                                 |
+| 0.86.0             | 01–07, session expiry                  | 2/6 (01, 02)                | 0/2                  | $1.08                                                                 |
+| 0.86.1 description | 01–07, session expiry; 03 and 04 twice | 8/8                         | 0/2                  | $2.25, stopped at the 10-minute host limit, second 04 run interrupted |
+
+- **Cause.** The description led with explicit Oracle requests and excluded "straightforward regression
+  fixes". In an empty working directory Sonnet read a double-charge or session-expiry bug report as a
+  plain fix and answered "no code here" without the skill. 0.86.1 leads with user-language triggers:
+  bug reports whose correct behavior is not written down, conflicting sources, a new `.ai/oracles/<id>/`
+  path, even with no code yet. The Contract description now fires only on an explicit request for
+  finite test coverage.
+- **Not fixed.** Fired runs still fail `card-approvable` and `single-confirmation` in every case, and
+  `lane-header` in some. Write-only tools may contribute; this was not isolated.
+- **Session expiry** passed `time-not-out-of-scope` with the skill fired. The Bend path itself was not
+  exercised live (Write-only); its evidence is the `test-fixtures/session-expiry` Bend proof and mutant test.
+
+---
+
 ## 0.58.2–0.58.3 canary — skill trigger, pressure and red-team arms
 
 Same fixture, host, model and grading as the baseline below: `claude-opus-5-5[1m]`, CLI 2.1.280,
