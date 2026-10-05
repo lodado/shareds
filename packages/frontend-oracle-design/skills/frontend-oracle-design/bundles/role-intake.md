@@ -48,14 +48,29 @@ data-loss work is `risk=High`. The rest of that message carries, in this order:
 1. Outcome Brief with its `Risk:` line and the worst regression a false pass would ship (a real
    double charge, a leaked tenant), and the Source Registry, `S1` = the request text (see [the request text is S1](#the-request-text-is-s1)).
 2. Proposed axes: each of the eight input families declared with candidate values or excluded with a
-   reason, plus the request's own axes, each with its recommended choice.
+   reason, plus the request's own axes, each with its recommended choice. Axes are proposals: a
+   value the request does not name carries the question that decides it (`deep-link (Q5)`), and no
+   axis line states a policy ("one request in flight is the policy") as fact.
 3. A provisional Draft built on those recommendations: contract rows with Given, When, Then, a
    non-empty Never (never `—`) and a side-effect count; the case-space dimensions; the
    interaction/deviation sweep as a short list that dispositions combinations of those dimensions.
+   The count is an exact `<kind>×<n>` in every row, `×0` when the row fires nothing (`request×0`):
+   never `≤`, a range, a total in words (`POST 1 total`, `합계 1`), `—`, or a question ID. When the
+   count depends on an open question, write the recommended count and cite that question.
    Every row and policy line has a Source column or tag: `S1` only for what the request states,
-   otherwise `Q<n> — recommended`. A behavior the request does not state (a retry, a dedup, a
-   cache or reset rule, what a screen shows, a disabled button or spinner) with no `Q<n>` is an
-   invention: add the question, or split it out of an `S1` row into a row citing that question.
+   otherwise `Q<n> — recommended`. An `S1` source quotes the request's own phrase
+   (`S1 "<phrase>"`), and every Given, When, Then, Never and count of that row follows from that
+   phrase alone. When the phrase leaves any cell open, the row cites the question too
+   (`S1 "<phrase>"; Q2 — recommended`). Other inputs (Enter, tap, a second event in the same
+   tick), indicators, messages and timings the request does not name belong in a row citing a
+   question; an `S1` row's Then adds none of them ("pending shown" goes to a `Q<n>` row). A value two sources disagree on (18+ vs 19+) appears only in rows citing the
+   conflict's question. Design notes, cache or retry choices and the reasons for a recommendation
+   (which source outranks which) are not facts: they sit inside the cited `Q<n>`, not as plain
+   lines. This holds in every section of a written plan, architecture notes included: a dedup,
+   cancellation or retry line there names its `Q<n>`. A behavior the request does not
+   state (a retry, a dedup, a cache or reset rule, what a screen shows, a disabled button or
+   spinner) with no `Q<n>` is an invention: add the question, or split it out of an `S1` row into
+   a row citing that question.
    Rows whose correctness depends on response order also carry a planned verification line: the
    consumer under test, the deferred response it holds, the barrier it waits on, the exact visible
    data and request count, and both release orders. Label it planned, not run.
@@ -63,8 +78,11 @@ data-loss work is `risk=High`. The rest of that message carries, in this order:
    Outcome-changing A/B counterexamples ride here too, not in a round before the Draft.
 5. One confirmation request: a bare `yes` adopts every recommendation and confirms the axes and the
    Draft together; `Q<n>=<option>` swaps one. It asks for nothing else: no code path, repository or
-   document location. An unread named document stays an `S*` marked unread, and the request's own
-   words about it are the options.
+   document location, not even as a closing note ("point me to the repo", "경로를 알려주세요"). An
+   empty directory is reported once as `no code observation`; where Delivery finds the code is
+   settled after `yes`. An unread named document stays an `S*` marked unread, and the request's
+   own words about it are the options of a `Q<n>`, never a request to paste or link it. No other
+   line before the Draft ends in a question mark.
 
 When the user names a file for the plan, write the same provisional Draft there; the message still
 shows it in full. Until the `yes` arrives the state is `NEEDS_DECISION`; say so in a `Status:` line.
@@ -75,18 +93,25 @@ risk=High lane=oracle nodes=[common, …]
 Status: NEEDS_DECISION — Draft awaits one confirmation
 ## Outcome Brief · Source Registry   Risk: High — <worst regression>
                                     S1 | conversation: request | "<verbatim>" | approved
-## Proposed axes                     <family>: <values> ★<recommended> | excluded: <reason>
+## Proposed axes                     <family>: <values> ★<recommended> | <unnamed value> (Q<n>) | excluded: <reason>
 ## Provisional Draft
 | ID | Given | When | Then | Never | Effects | Source |
-| R1 | pending | Pay again | no new request | a second charge | POST×1 | S1 |
-| R2 | timeout | Pay again | … | … | POST×0 | Q2 — recommended |
+| R1 | first click sent | second click of a double-click | no new request | a second charge | POST×1 | S1 "double-click charges twice" |
+| R2 | pending | Enter or tap | no new request, pending shown | a second charge | POST×0 | Q1 — recommended |
+| R3 | timeout | Pay again | status check, no new charge | a blind retry | POST×0 | Q2 — recommended |
+Planned verification (not run), R1–R3: <consumer> under test, deferred POST response, barrier on the
+  second activation, visible pending state and exact POST count, both release orders
 Case space: Async{idle,pending,ok,fail,unknown} × Repeat{click,Enter,tap} × Entry{fresh,reload}
 Interaction sweep:
-- pending × {click,Enter,tap} → covered(R1)
-- unknown × {click,Enter,tap} → covered(R2)
+- pending × click → covered(R1)
+- pending × {Enter,tap} → covered(R2)
+- unknown × {click,Enter,tap} → covered(R3)
 - idle × reload → impossible: no request in flight to lose
 - unknown × reload → needs-decision: Q3
-## Open questions   Q1 … (a) ★recommended (b) …
+## Open questions
+- Q1 Enter/tap while pending: (a) ★ ignored like the click (b) allowed
+- Q2 timeout then Pay: (a) ★ check status first (b) retry at once
+- Q3 reload while unknown: (a) ★ out of scope, recorded (b) persist pending
 Reply `yes` to adopt every ★ and confirm axes + Draft, or `Q<n>=<option>` to swap one.
 ```
 
@@ -1225,7 +1250,8 @@ runtime transitions. Common authority and mandatory verification apply at every 
 2. Investigate approved specs, PRD, acceptance criteria, design system and Figma; pin exact
    location/frame/version. Classify product-policy, mandatory-constraint, project-constraint and
    implementation-reference. On conflict with a mandatory constraint never downgrade it: NEEDS_DECISION.
-   Conflicting external standards or inaccessible required material also require NEEDS_DECISION.
+   Conflicting external standards or inaccessible required material also require NEEDS_DECISION:
+   the conflict becomes a `Q<n>` with both values as options, never a request for the document's location.
 3. Judge risk and investigate policy sources. The lane header's risk is finalized here.
    Before selecting investigation breadth/depth for unclear existing-system ownership, cross-boundary
    scope or single-card milestone grouping, read
@@ -1304,7 +1330,8 @@ Missing sources or prerequisites return to the controller, never substitute assu
 The request text is `S1` and an empty repo is `no code observation`, not a missing source
 ([common](../common.md#the-request-text-is-s1)); continue to the brief and proposed axes.
 
-Pin exact source location/version. Distinguish product policy, mandatory/project constraints and
+Pin exact source location/version of sources you can read; a named document you cannot find stays an
+unread `S*`, and the first response never asks where it lives. Distinguish product policy, mandatory/project constraints and
 implementation observations. Mandatory conflict is NEEDS_DECISION, never a downgraded preference.
 Establish Outcome Brief and Source Registry, risk, confirmed/proposed axes and actual capability results.
 Inspect actual runners/reporters before proposing verification, not package names. Design-only capability

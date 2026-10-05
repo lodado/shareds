@@ -1,0 +1,116 @@
+# tenant-data-view — Oracle plan (provisional Draft)
+
+Status: NEEDS_DECISION — Draft awaits one confirmation (`yes` adopts every ★, or `Q<n>=<option>`)
+Profile: formal-bend/v1 · Mode: Design-only · Nothing implemented, no tests written, no lock.
+
+## Outcome Brief · Source Registry
+
+Risk: High — a cache hit or late response from tenant A rendered under tenant B (cross-tenant data leak).
+
+| ID | Kind | Location | Content | State |
+| -- | ---- | -------- | ------- | ----- |
+| S1 | product-policy | conversation: request | "Design a multi-tenant async data view with query caching and placeholder data. Give the first detailed architecture plan, without implementing it." | approved |
+
+Code observation: `no code observation` (working directory empty). Framework, query library, API shape and
+tenant-identity source are unknown and are Open questions, not assumptions.
+
+Facts (S1): multi-tenant, async, query cache, placeholder data, plan only. Everything else is a recommendation.
+
+## Axes (proposed; one value set per input family)
+
+| Family | Dimension / values | Note |
+| ------ | ------------------ | ---- |
+| Data | cache{miss, fresh, stale}; result{0 items, ≥1 item} | staleness boundary = Q2 |
+| Value | excluded: no user-entered values in S1 (query params only via tenant+key) | revisit if filters are added (Q9) |
+| Async | fetch{pending, ok, definitive-fail, forbidden(401/403)} | outcome-unknown timeout folded into definitive-fail (read-only query, safe to retry) |
+| Order | {in-order, late response after tenant switch, duplicate concurrent request} | |
+| Entry | {fresh load, reload, back/forward, deep-link to tenant} | cache survives reload? = Q7 |
+| Environment | excluded: no viewport/theme dependence in S1; StrictMode double-mount kept as Order duplicate | |
+| Platform | excluded: no repo, no browserslist to derive from | |
+| Inherited | none (no prior P*) | |
+| Request-own | tenant{A, B, none}; placeholder{none, available} | |
+
+## Architecture plan
+
+1. **Tenant scope is part of every cache key.** Key factory `tenantKey(tenantId, resource, params)`
+   → `["t", tenantId, resource, params]`. Callers cannot build keys without a tenantId (type-level: branded
+   `TenantId`). A view mounted with no active tenant renders nothing and fires no request.
+2. **Cache store (per-tenant partitions).** `Map<TenantId, Map<QueryHash, Entry>>`. Entry =
+   `{ data, fetchedAt, status, error?, inflight? }`. Reads and writes always go through the partition for the
+   tenantId captured when the request was *issued*, never the "current" tenant at response time.
+3. **Request lifecycle.** `observe(key)` → state machine
+   `idle → pending → ok | fail`, with `ok → stale` by clock event `Expire`. A single in-flight promise per
+   key is shared by all observers (dedup). Each fetch carries an `AbortController` and the issuing
+   `(tenantId, requestSeq)`.
+4. **Late-response guard.** On resolution: write into the *issuing* tenant's partition only; the view
+   re-renders from the *active* tenant's partition. A response for a non-active tenant is stored (or dropped,
+   Q4) but can never reach the rendered output.
+5. **Placeholder data.** Placeholder is a view-layer value, never written to the cache as real data.
+   Rendered state carries `isPlaceholder: true`; consumers/UI must distinguish it (visual + `aria-busy`,
+   no actions that need real data). Placeholder source is per-tenant or generic (Q3); it must never be
+   another tenant's real data.
+6. **View states** (exactly one rendered): `no-tenant`, `loading` (miss, no placeholder), `placeholder`
+   (miss + placeholder, fetch pending), `data` (fresh), `data+refreshing` (stale, background fetch),
+   `data+error` (cached data, refetch failed), `error` (no data), `empty` (ok, 0 items).
+7. **Invalidation & lifetime.** Tenant switch does not evict by itself (Q1). Logout / permission loss purges
+   (Q7). `gcTime` evicts unobserved entries (Q8). Mutation-driven invalidation is out of scope until a write
+   path exists (Q9).
+8. **Boundaries.** `TenantProvider` (active tenant, switch), `QueryCache` (partitions, dedup, gc),
+   `useTenantQuery` (observer → view state), `TenantDataView` (render + a11y: `role="status"`/`aria-live`
+   for loading/error, accessible name, keyboard retry).
+9. **Verification (planned, not run).** Deferred-response barrier per fetch; assert visible data AND request
+   count; both release orders for the A/B switch race; per-test isolated cache and fake clock for `Expire`;
+   Bend model of {tenant, cache, fetch, order} with a "tenant leak" property: rendered data ∈ active
+   tenant's partition ∪ placeholder. Consumer tests require explicit Delivery request.
+
+## Contract rows
+
+| ID | Given | When | Then | Never | Effects | Source |
+| -- | ----- | ---- | ---- | ----- | ------- | ------ |
+| R1 | tenant A has cached data for key K | switch to B, B has no cache for K | A's data not shown; B shows loading/placeholder; fetch for B | any A data rendered under B | fetch×1 | S1 "multi-tenant"; Q1 — recommended |
+| R2 | cache hit, fresh | view mounts | cached data shown | refetch of fresh data | fetch×0 | Q2 — recommended |
+| R3 | cache hit, stale | view mounts | cached data shown + refreshing | blank flash; second concurrent fetch | fetch×1 | Q2 — recommended |
+| R4 | miss, no placeholder | view mounts | loading shown | empty/data shown before response | fetch×1 | S1 "async data view"; Q3 — recommended |
+| R5 | miss, placeholder available | view mounts | placeholder shown, flagged as placeholder; replaced by data on ok | placeholder written to cache as real; placeholder shown as real | fetch×1 | S1 "placeholder data"; Q3 — recommended |
+| R6 | A's request pending | switch to B, then A's response arrives | B's view unchanged | A's response rendered under B | fetch×0 | S1 "multi-tenant"; Q4 — recommended |
+| R7 | cached data, refetch fails | failure arrives | cached data kept + error indicator | cache wiped on failure | fetch×0 | Q5 — recommended |
+| R8 | miss, fetch fails | failure arrives | error state, placeholder cleared, retry offered | placeholder left looking like data | fetch×0 | Q5 — recommended |
+| R9 | error state | user retries | pending, one new request | double request on repeat click | fetch×1 | Q5 — recommended |
+| R10 | two observers, same tenant+key | both mount | one shared request | duplicate requests | fetch×1 | S1 "query caching"; Q6 — recommended |
+| R11 | fetch returns 401/403 for tenant A | response arrives | A's partition purged, forbidden state | A's old data still readable | fetch×0 | Q7 — recommended |
+| R12 | logout | session ends | all partitions cleared | any tenant data surviving | fetch×0 | Q7 — recommended |
+| R13 | ok, 0 items | response arrives | empty state | placeholder or loading kept | fetch×0 | Q3 — recommended |
+
+Planned verification (order-dependent rows R1, R6, R10): consumer = `TenantDataView` via `useTenantQuery`;
+deferred responses for A and B; barrier waits until both requests are issued; asserts visible data and request
+count; both release orders (A then B, B then A). Labeled planned, not run.
+
+## Case space
+
+Tenant{A,B,none} × Cache{miss,fresh,stale} × Placeholder{none,available} × Fetch{pending,ok,fail,forbidden}
+× Order{in-order,late-after-switch,duplicate} × Entry{fresh,reload,back-forward}
+(t-way reduction is the author's job after confirmation.)
+
+## Interaction sweep
+- switch × pending → covered(R6)
+- switch × cache hit(other tenant) → covered(R1)
+- placeholder × fail → covered(R8)
+- placeholder × cache hit → impossible: placeholder only shown on miss
+- stale × fail → covered(R7)
+- forbidden × cached data → covered(R11)
+- reload × cache → needs-decision: Q7
+- A→B→A quickly with A pending → needs-decision: Q4
+- no-tenant × any → covered(R4 variant: nothing rendered, fetch×0) — needs-decision: Q1
+
+## Open questions
+- Q1 Tenant switch and cache: (a) ★ keep each tenant's partition, show only active (b) clear previous tenant's cache on switch
+- Q2 Freshness: (a) ★ per-resource `staleTime`, default 30s, stale = show + background refetch (b) always refetch on mount (c) never stale
+- Q3 Placeholder source: (a) ★ static per-resource skeleton shape, never real data (b) last-known data of the *same* tenant+key (c) none
+- Q4 Late response for non-active tenant: (a) ★ write to its own partition, never render (b) discard
+- Q5 Error handling: (a) ★ keep cached data + error banner; no auto-retry, manual retry (b) auto-retry with backoff (c) drop cache on error
+- Q6 Dedup scope: (a) ★ one in-flight request per tenant+key (b) no dedup
+- Q7 Persistence/security: (a) ★ memory-only cache; purge tenant on 401/403; purge all on logout; reload starts empty (b) persist to storage per tenant
+- Q8 Eviction: (a) ★ `gcTime` 5 min after last observer (b) never evict
+- Q9 Scope: (a) ★ read-only queries only; mutations/invalidation out of scope for this plan (b) include mutation invalidation
+
+Reply `yes` to adopt every ★ and confirm axes + Draft, or `Q<n>=<option>` to swap one.

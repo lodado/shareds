@@ -176,7 +176,32 @@ test('the first response carries axes, a provisional Draft and Open questions un
   assert.match(common, loose('Until the `yes` arrives the state is `NEEDS_DECISION`'))
   assert.match(common, loose('Outcome Brief with its `Risk:` line and the worst regression a false pass would ship'))
   assert.match(common, loose('split it out of an `S1` row into a row citing that question'))
-  assert.match(common, /Interaction sweep:\n- pending × \{click,Enter,tap\} → covered\(R1\)/)
+  assert.match(common, /Interaction sweep:\n- pending × click → covered\(R1\)\n- pending × \{Enter,tap\} → covered\(R2\)/)
+  // 0.87.1 live: `POST≤1`, `POST 합계 1`, `—` effects, S1 rows adding Enter/tap, a closing repo-path ask
+  assert.match(common, loose('The count is an exact `<kind>×<n>` in every row, `×0` when the row fires nothing'))
+  assert.match(common, loose('never `≤`, a range, a total in words'))
+  assert.match(common, loose('An `S1` source quotes the request\'s own phrase'))
+  assert.match(common, loose('Other inputs (Enter, tap, a second event in the same tick), indicators, messages and timings'))
+  assert.match(common, loose('not even as a closing note'))
+  assert.match(common, loose('never a request to paste or link it'))
+  assert.match(common, loose('When the phrase leaves any cell open, the row cites the question too'))
+  assert.match(common, loose('appears only in rows citing the conflict\'s question'))
+  assert.match(common, loose('they sit inside the cited `Q<n>`, not as plain lines'))
+  assert.match(common, loose('architecture notes included: a dedup, cancellation or retry line there names its `Q<n>`'))
+  assert.match(await read('references/roles/intake.md'), loose('the first response never asks where it lives'))
+  assert.match(
+    await read('references/card/card-format.md'),
+    loose('`≤`, a range, a total in words or `—` is incomplete'),
+  )
+  // The shape example obeys its own rules: every S1 row quotes, every effect is kind×n.
+  const shape = common.slice(common.indexOf('Shape (placeholders'), common.indexOf('Do not ask questions before'))
+  const shapeRows = shape.split('\n').filter((line) => /^\| R\d/.test(line))
+  assert.ok(shapeRows.length >= 3)
+  for (const row of shapeRows) {
+    const cells = row.split('|').map((cell) => cell.trim())
+    assert.match(cells.at(-3), /^\S+×\d+$/, row)
+    assert.match(cells.at(-2), /^(?:S1 ".+"|Q\d+ — recommended)$/, row)
+  }
   assert.match(entry, loose('It is the literal first line of the first response even when that response stops'))
   // Bend는 여전히 yes 뒤에만; 증명이 찾은 것만 후속 질문
   assert.match(space, loose('Do not write World.bend, a state machine or a law before that `yes`'))

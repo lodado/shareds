@@ -441,6 +441,49 @@ not live-model calibration. Final `git diff --check` passed.
 
 ---
 
+## 0.87.2 exact counts and quoted S1 (Sonnet, `claude plugin eval`, 2026-10-05)
+
+Fixes for the defects the 0.87.1 mechanical graders exposed. `common.md` first response: every
+contract row's count is an exact `<kind>×<n>` (`×0` included; no `≤`, totals in words, `—`); an `S1`
+source quotes the request's phrase and every cell of that row must follow from it, otherwise the row
+also cites the question; a value two sources disagree on appears only in rows citing the conflict's
+`Q<n>`; axis values the request does not name carry their `Q<n>`; design notes sit inside a `Q<n>`;
+the response never asks for a code, repository or document location, not even as a closing note
+(intake roles say the same). The shape example obeys every rule (pinned in
+`communication-contract.test.mjs`). `card-format.md` calls `≤`, ranges and word totals incomplete.
+
+Grader bugs found offline and fixed: `open-questions-recommend` read a wrapped `(Q4)` as a new
+question block; `case-space-swept` missed a case space wrapped onto a second line;
+`race-verification-plan` rejected `consumer = <component>`. `no-invented-policy` now quotes the prompt
+(the judge sees only the output) and exempts the required `Risk:` line, axis candidates and options.
+New fixtures: `03-v2-card`, `04-v2-last`, `05-v2-last` (pass), `05-v2-docask-last` (document-path ask
+fails); each new test fails against the pre-fix grader.
+
+Same staging recipe, `--runs 1 --ablation none --allow-tools Write -j 1 --max-cost-usd 1.5`,
+`suite.plugins` = `frontend-oracle-design@0.87.2`. Regex failures listed; all other regex graders passed.
+
+| Iteration                                             | 03                                                                                                                         | 04                                                           | 05                                                                                                                          | Cost  |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ----- |
+| 1 (counts, quoted S1, no location ask)                | `race-verification-plan`; LLM `no-invented-policy`                                                                         | LLM `no-invented-policy`                                     | `age-options-one-question`, `open-questions-recommend`, `single-confirmation` (Q6 asks for paths); LLM `no-invented-policy` | $1.11 |
+| 2 (conflict rows, axes cite Q, design notes in Q)     | `case-space-swept`, `open-questions-recommend`, `race-verification-plan` (all three grader bugs); LLM `no-invented-policy` | LLM `no-invented-policy`                                     | LLM `no-invented-policy`                                                                                                    | $0.95 |
+| 3 (graders fixed, planned-verification line in shape) | regex all pass; LLM `no-invented-policy` FAIL PASS FAIL                                                                    | regex all pass; LLM `no-server-dedup-assumed` PASS FAIL FAIL | regex all pass; LLM `age-conflict-not-self-resolved` FAIL×3                                                                 | $0.86 |
+| 06/07 negatives                                       | —                                                                                                                          | —                                                            | —                                                                                                                           | $0.06 |
+
+- Iteration 3 `no-invented-policy` passed for 04 and 05 (3/3 votes each).
+- The judges ran through the host's `ANTHROPIC_BASE_URL` proxy (headroom, `--mode token`). It
+  compresses long inputs: the judge saw `[34 lines omitted: 6 FAIL]` in place of the Draft rows and
+  failed what it could not read. Replayed with the API URL in `--settings`, 3 votes each:
+  04 `no-server-dedup-assumed` PASS×3, 05 `age-conflict-not-self-resolved` PASS×3, 04 and 05
+  `no-invented-policy` PASS×3. Live verdicts on this host understate the outputs.
+- 03 `no-invented-policy` is a real remaining defect (direct replay 1/3 PASS): the card's architecture
+  section has uncited "Dedup" and "Cancellation (`AbortSignal`)" lines. After the run, `common.md`
+  says the rule covers architecture notes too; that wording is not yet measured live.
+- 06/07: the skill did not fire (correct). 06 `answers-label` failed with no skill loaded, so it
+  measures base-model behaviour in an empty directory, not this plugin.
+- Total live spend $2.98 of the $6 cap.
+
+---
+
 ## 0.87.1 mechanical graders (Sonnet, `claude plugin eval`, 2026-10-05)
 
 The `claude plugin eval` cases had 24 `llm` graders; 8 remain. Format and keyword claims became `regex` graders

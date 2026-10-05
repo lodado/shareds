@@ -10,7 +10,8 @@ runtime transitions. Common authority and mandatory verification apply at every 
 2. Investigate approved specs, PRD, acceptance criteria, design system and Figma; pin exact
    location/frame/version. Classify product-policy, mandatory-constraint, project-constraint and
    implementation-reference. On conflict with a mandatory constraint never downgrade it: NEEDS_DECISION.
-   Conflicting external standards or inaccessible required material also require NEEDS_DECISION.
+   Conflicting external standards or inaccessible required material also require NEEDS_DECISION:
+   the conflict becomes a `Q<n>` with both values as options, never a request for the document's location.
 3. Judge risk and investigate policy sources. The lane header's risk is finalized here.
    Before selecting investigation breadth/depth for unclear existing-system ownership, cross-boundary
    scope or single-card milestone grouping, read

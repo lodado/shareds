@@ -1,0 +1,60 @@
+risk=High lane=oracle nodes=[common, verification-common, loading, intake, space-discovery, case-space-inputs, bva, controller-entry-formal]
+Status: NEEDS_DECISION — the Draft awaits one confirmation
+
+The working directory is empty (`no code observation`), so I built this from your request text only. I haven't read the PRD or the legal memo. They are recorded as unread sources. Nothing is implemented yet: "ship it" starts design, and I need your `yes` before any lock or tests. If it should go straight to Delivery, say so.
+
+## Outcome Brief · Source Registry
+Risk: High. A false pass would let a minor (18 in KR) complete an age-restricted purchase, which is a legal and compliance failure. It could also block an adult for no reason.
+
+| ID | Source | Content | Status |
+|----|--------|---------|--------|
+| S1 | conversation: request | "Add an age gate to checkout. The PRD says 18+, but the legal memo from last week says 19+ for the KR market." | approved |
+| S2 | PRD | 18+ (as quoted in S1) | unread |
+| S3 | legal memo | 19+ for KR (as quoted in S1) | unread |
+
+S2 and S3 disagree. Legal and mandatory constraints outrank a PRD, so I recommend 19+ for KR (Q1). That is a recommendation, not an approval.
+
+## Proposed axes (eight families)
+- **Data:** the user's age evidence, which is {none, minor, exactly at threshold, adult}.
+- **Value:** the age relative to the threshold, which is {threshold−1, threshold, threshold+1}. For KR the threshold is 19 and for other markets 18 (Q1, Q2). The age calculation is by birthday, not by year (Q3).
+- **Market:** {KR, non-KR, unknown}. This comes from your request's own "for the KR market".
+- **Async:** age verification {idle, pending, ok, fail, unknown}, only if verification is a request (Q4).
+- **Order:** a market or birthdate change while verification is pending, and a late response arriving after the user changes input.
+- **Entry:** {fresh, reload, deep-link straight to the payment step} (Q5).
+- **Environment:** excluded. The request gives no viewport or theme behavior.
+- **Platform:** excluded. There is no repo to read a browserslist from.
+- **Inherited:** none. There is no prior behavior.
+
+## Provisional Draft (built on the recommendations)
+| ID | Given | When | Then | Never | Effects | Source |
+|----|-------|------|------|-------|---------|--------|
+| R1 | KR market, age ≥19 | Proceed to pay | Order is allowed | Adult blocked | order×1 | S1 "age gate to checkout"; Q1 — recommended |
+| R2 | KR market, age 18 | Proceed to pay | Blocked, reason shown | Order placed | order×0 | S1 "19+ for the KR market"; Q1 — recommended |
+| R3 | Non-KR market, age 18 | Proceed to pay | Order is allowed | The KR 19+ rule applied outside KR | order×1 | S1 "19+ for the KR market"; Q2 — recommended |
+| R4 | Non-KR market, age 17 | Proceed to pay | Blocked | Order placed | order×0 | S1 "PRD says 18+"; Q2 — recommended |
+| R5 | No age evidence | Proceed to pay | Blocked until age is given | Order placed without a check | order×0 | S1 "age gate"; Q3 — recommended |
+| R6 | Deep-link or reload straight into payment | Proceed to pay | Same gate applies | Gate bypassed via a direct entry | order×0 | Q5 — recommended |
+| R7 | Verification pending or unknown | Click, Enter or tap | No order | Order placed on a failed or unknown result | order×0 | Q4 — recommended |
+| R8 | Birthday is the day before the 19th birthday | Proceed to pay | Blocked | Year-only age calculation | order×0 | Q3 — recommended |
+
+**Case space:** Market{KR, non-KR, unknown} × Age{none, threshold−1, threshold, threshold+1} × Entry{fresh, reload, deep-link} × Async{idle, pending, ok, fail, unknown}
+
+**Interaction sweep:**
+- KR × threshold−1 → covered (R2)
+- KR × threshold → covered (R1)
+- non-KR × 18 → covered (R3)
+- unknown market × any age → needs-decision: Q2
+- deep-link × any age → covered (R6)
+- pending × {click, Enter, tap} → covered (R7)
+- unknown × reload → needs-decision: Q4
+
+**Planned verification, not yet run:** R7 depends on response order. The consumer under test is the checkout submit. A deferred verification response is held, and a barrier waits on it. I would check that no order request is sent while it is held, and run both release orders.
+
+## Open questions
+- **Q1** Threshold for KR: (a) ★ 19+, because the legal memo outranks the PRD (b) 18+ per the PRD (c) hold the feature until legal and product reconcile them.
+- **Q2** Threshold outside KR and when the market is unknown: (a) ★ 18+ outside KR, and an unknown market uses the stricter 19+ (b) 18+ everywhere except a confirmed KR (c) 19+ everywhere.
+- **Q3** Source of age and how it is calculated: (a) ★ self-declared birthdate, compared by full date (b) a year-of-birth check only (c) identity verification through an external provider.
+- **Q4** Verification and failure: (a) ★ client-side check only, with no request (b) server verification, where unknown or failed means blocked and the user can retry (c) server verification with automatic retry.
+- **Q5** Direct entry into payment without passing the gate: (a) ★ the gate is enforced at the payment step regardless of entry (b) the gate is only on the cart page.
+
+Reply `yes` to adopt every ★ and confirm the axes and Draft together. Reply `Q<n>=<option>` to swap one. If the PRD and memo are available to read, I can check the thresholds against them, but you don't need to answer anything else.

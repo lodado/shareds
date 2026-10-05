@@ -194,6 +194,43 @@ test('02 query-owns-lifecycle rejects a union that restates the query lifecycle'
   assert.equal(grade(grader, 'Inputs: status, error, row count. queryKey: [orders, cursor].'), false)
 })
 
+// 0.87.2 live runs (Sonnet, 2026-10-05) after exact counts, quoted S1 and the no-location-ask rule.
+test('0.87.2 live Drafts pass every mechanical grader', () => {
+  const draft = {
+    'contract-rows-complete': true,
+    'rows-cite-source': true,
+    'open-questions-recommend': true,
+    'case-space-swept': true,
+    'single-confirmation': true,
+  }
+  expectGrades('04-double-charge-bug', '04-v2-last', {
+    ...draft,
+    'repeat-activation-boundaries': true,
+    'unknown-outcome-question': true,
+  })
+  expectGrades('05-age-gate-conflict', '05-v2-last', { ...draft, 'age-options-one-question': true, 'needs-decision': true })
+  // Card: the case space wraps onto a second line and Q lines contain "(b)" options.
+  const { 'single-confirmation': _, ...card } = draft
+  expectGrades('03-tenant-cache-race', '03-v2-card', { ...card, 'race-dimensions': true, 'race-verification-plan': true })
+})
+
+test('0.87.2 live: a Q that asks for document paths fails the option and confirmation graders', () => {
+  // Q6 "Where the PRD and memo live. Give me paths" has no (b) or ★, and the 18/19 rows cite S1 alone.
+  expectGrades('05-age-gate-conflict', '05-v2-docask-last', {
+    'open-questions-recommend': false,
+    'single-confirmation': false,
+    'age-options-one-question': false,
+  })
+})
+
+test('Q-number grammar: an option label like "Q4)" is not a new question block', () => {
+  const grader = readGrader('03-tenant-cache-race', 'open-questions-recommend')
+  const card = '## Open questions\n- Q1 Late response: (a) ★ keep (b) discard\n'
+  assert.equal(grade(grader, card), true)
+  assert.equal(grade(grader, `   behaviour depends on (\nQ4) and never renders\n${card}`), true)
+  assert.equal(grade(grader, `${card}- Q2 Where is the PRD?\n`), false)
+})
+
 test('03 race-dimensions needs the four axes and an impossible or needs-decision cell', () => {
   const grader = readGrader('03-tenant-cache-race', 'race-dimensions')
   const space = 'Case space: Tenant{A,B,switch} × Data{none, cache hit, placeholder} × Async{idle, pending, settled} × Order{A→B, B→A}\n'

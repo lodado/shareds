@@ -1,0 +1,55 @@
+risk=High lane=oracle nodes=[common, verification-common, loading, controller-entry-formal, intake, space-discovery, case-space-inputs, bva]
+
+Status: NEEDS_DECISION. The 18+ vs 19+ conflict is outcome-changing, and I haven't written any code. The working directory is empty (`no code observation`). The PRD and the legal memo aren't in the repo, so I haven't read either one. Everything below is built from your request (`S1`).
+
+## Outcome Brief · Source Registry
+Risk: High. The worst regression is a 18-year-old in KR completing a purchase that the legal memo forbids, or a legitimate buyer being blocked wrongly.
+
+| ID | Source | Content | Status |
+|---|---|---|---|
+| S1 | conversation: request | "age gate to checkout", "PRD says 18+", "legal memo … says 19+ for the KR market" | approved |
+| S2 | PRD (location not given) | 18+ | unread, not verified |
+| S3 | legal memo (location not given) | 19+ for KR | unread, not verified |
+
+Legal constraints rank above the PRD in the authority order. My recommendation is 19+ for KR and 18+ elsewhere, but the memo needs to be read to confirm it. A recommendation is not an approval.
+
+## Proposed axes
+- **Value:** age relative to the threshold, with boundary cases at threshold−1, exactly the threshold, and threshold+1. ★ Market is {KR, other}. An empty or invalid date of birth is also a value class.
+- **Async:** age verification {idle, pending, ok, fail, unknown}. ★ Included because the verification may be a server call.
+- **Order:** a second Pay click while verification is pending. ★ Included because any side-effecting action needs a duplicate-click case.
+- **Entry:** fresh load vs reload or deep link straight to the payment step. ★ Included so the gate can't be skipped.
+- **Data:** cart empty or not. Excluded because it doesn't change the gate outcome.
+- **Environment, Platform:** excluded because there are no viewport or browser rules in the sources.
+- **Inherited:** none, since there is no prior behavior.
+
+## Provisional Draft
+| ID | Given | When | Then | Never | Effects | Source |
+|---|---|---|---|---|---|---|
+| R1 | market KR, age ≥19 | Pay | order proceeds | block | POST×1 | S1 "19+ for the KR market"; Q1 recommended |
+| R2 | market KR, age 18 | Pay | blocked, with an age message | order placed | POST×0 | S1 "19+ for the KR market"; Q1 recommended |
+| R3 | market other, age ≥18 | Pay | order proceeds | block | POST×1 | S1 "PRD says 18+"; Q1 recommended |
+| R4 | market other, age 17 | Pay | blocked | order placed | POST×0 | S1 "PRD says 18+" |
+| R5 | age not provided or invalid | Pay | blocked, asks for DOB | order placed | POST×0 | Q2 recommended |
+| R6 | verification pending | second Pay | ignored | duplicate order | POST×0 | Q3 recommended |
+| R7 | verification unknown (timeout) | Pay | check status before retrying | blind retry | POST×0 | Q3 recommended |
+| R8 | gate not passed | deep link or reload to payment | redirected to the gate | bypass | POST×0 | Q4 recommended |
+
+Case space: Market{KR, other} × Age{t−1, t, t+1, missing} × Async{idle, pending, ok, fail, unknown} × Entry{fresh, reload}
+
+Interaction sweep:
+- KR × age 18 → covered (R2)
+- other × age 17 → covered (R4)
+- pending × repeat Pay → covered (R6)
+- unknown × Pay → covered (R7)
+- reload × gate not passed → covered (R8)
+- market undetermined → needs-decision, Q5
+
+## Open questions
+- **Q1** KR threshold: (a) ★ 19+ per the legal memo, 18+ elsewhere (b) 18+ everywhere per the PRD
+- **Q2** How age is obtained: (a) ★ self-declared date of birth entered at checkout (b) taken from the account profile (c) external ID verification
+- **Q3** Failure and timeout of age verification: (a) ★ block, and check status before any retry (b) fail open
+- **Q4** Server-side enforcement: (a) ★ the gate is also enforced on the order API (b) UI only
+- **Q5** How the market is determined: (a) ★ shipping or account country (b) IP geolocation (c) the user's choice
+- **Q6** Where the PRD and memo live. Give me the paths and I'll read them, otherwise they stay unread.
+
+Reply `yes` to adopt every ★ recommendation, or `Q<n>=<option>` to change one.

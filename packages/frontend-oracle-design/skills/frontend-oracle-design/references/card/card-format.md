@@ -82,7 +82,8 @@ recommendation or the inference that "the user would want it" as the Source.
 
 Rules:
 
-- A row with an empty `Never` or side-effect count is incomplete.
+- A row with an empty `Never` or side-effect count is incomplete. The count is an exact
+  `<kind>×<n>` (`request×0` when nothing fires); `≤`, a range, a total in words or `—` is incomplete.
 - Give each decision a stable policy ID (`P*`) and its applied rows, and put the same ID in the
   `Policy` column of each `O*`·`D*` row. The bidirectional reference between policy IDs and row IDs
   must match exactly. Each policy source must be an approved `S*` in the Source Registry or

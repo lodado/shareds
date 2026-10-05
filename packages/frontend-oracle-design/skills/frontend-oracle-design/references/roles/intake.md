@@ -8,7 +8,8 @@ Missing sources or prerequisites return to the controller, never substitute assu
 The request text is `S1` and an empty repo is `no code observation`, not a missing source
 ([common](../common.md#the-request-text-is-s1)); continue to the brief and proposed axes.
 
-Pin exact source location/version. Distinguish product policy, mandatory/project constraints and
+Pin exact source location/version of sources you can read; a named document you cannot find stays an
+unread `S*`, and the first response never asks where it lives. Distinguish product policy, mandatory/project constraints and
 implementation observations. Mandatory conflict is NEEDS_DECISION, never a downgraded preference.
 Establish Outcome Brief and Source Registry, risk, confirmed/proposed axes and actual capability results.
 Inspect actual runners/reporters before proposing verification, not package names. Design-only capability
