@@ -3,7 +3,7 @@
 이 플러그인은 **두 컨트롤러와 네 공유 전문 스킬**을 제공합니다. 기존
 [`frontend-oracle-design`](SKILL.md)은 `formal-bend/v1`으로 Bend 모델·증명·Adequacy를
 필수로 유지합니다. 새 [`frontend-contract-design`](../frontend-contract-design/SKILL.md)은
-`contract/v1`으로 Bend 없이 출처가 있는 유한 `full-product` Space와 실제 실행 증거를
+`contract/v1`으로 Bend 없이 출처가 있는 유한 Space(기본 t-way `Strength: 2`, High는 3, 명시적 opt-in일 때만 `full-product`)와 실제 실행 증거를
 검수합니다. 네 역할, 중립 Space 감사, runtime·lock·ledger는 공유하되 참조와 필수 증거는
 승인된 프로필에 따라 선택합니다. Formal 환경 오류를 Contract로 자동 우회하지 않습니다.
 
@@ -258,6 +258,7 @@ flowchart LR
   verification_common --> contract_requirements
   contract_requirements --> contract_space
   bva --> contract_space
+  card_case_space_frames --> contract_space
   contract_requirements --> contract_authoring
   contract_space --> contract_authoring
   verification_common --> contract_review
@@ -342,7 +343,8 @@ flowchart LR
   card_format --> card_case_space
   role_space_discovery --> card_case_space
   role_case_space_inputs --> card_case_space
-  card_case_space --> card_case_space_frames
+  card_case_space -. "formal-bend/v1" .-> card_case_space_frames
+  bva -. "contract/v1" .-> card_case_space_frames
   common --> card_retro_metrics
   card_case_space -. "formal-bend/v1" .-> card_retro_metrics
   contract_space -. "contract/v1" .-> card_retro_metrics

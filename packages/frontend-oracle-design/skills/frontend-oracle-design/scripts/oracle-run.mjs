@@ -60,7 +60,7 @@ import {
 } from './oracle-protocol.mjs'
 
 import { assertProfileReviewReferences, snapshotContext } from './oracle-review-context.mjs'
-import { approvedSourceIds, auditFullProduct, markdownLines, sectionLines } from './oracle-space.mjs'
+import { approvedSourceIds, auditFullProduct, markdownLines, sectionLines, tWaySummary } from './oracle-space.mjs'
 import { redRefreshBlocker, reviewHoldBlocker } from './oracle-transition-guards.mjs'
 import { claudeWorkerInvocation, parseWorkerSubmission } from './oracle-worker.mjs'
 import { spawnGit } from './resolve-executable.mjs'
@@ -1509,9 +1509,11 @@ async function initialize(options) {
     if (!noTypeBoundary && !requiredLabels.includes('type-contract:reported')) {
       throw new CliError('TYPE_CONTRACT_LABEL_REQUIRED', 'Contract init requires --required-label type-contract:reported unless the approved card declares Type Contract not applicable')
     }
-    const temporal = parseCaseSpace(oracle)?.families.some((entry) => ['Async', 'Order'].includes(entry.family) && !entry.excluded)
+    const caseSpace = parseCaseSpace(oracle)
+    // Default t-way carries Async/Order as evidence.json `sequence`; only explicit full-product requires the producer label.
+    const temporal = caseSpace?.coverage === 'full-product' && caseSpace.families.some((entry) => ['Async', 'Order'].includes(entry.family) && !entry.excluded)
     if (temporal && !requiredLabels.includes('fast-check:reported')) {
-      throw new CliError('FAST_CHECK_LABEL_REQUIRED', 'Contract Async/Order requires --required-label fast-check:reported')
+      throw new CliError('FAST_CHECK_LABEL_REQUIRED', 'Contract full-product Async/Order requires --required-label fast-check:reported')
     }
   } else {
     await validateFormalInit(directory, state, oracle, requiredLabels, binding)
@@ -4134,7 +4136,8 @@ async function verificationSummary(directory, state, ledger, staleRunIds = []) {
   const oracle = await lockedOraclePath(directory, state)
   const card = await readFile(oracle, 'utf8')
   const generated = generateFromDocument(card)
-  const summary = { ...auditFullProduct(card, generated, { scenarioShape: 'contract' }), profile: 'contract/v1', coverage: 'full-product', executionStatus: 'not-run', formalVerification: 'not-performed', limits: ['Declared finite Space only', 'Product assertion and source/invariant relevance require independent review'] }
+  const declared = generated.caseSpace.coverage === 'full-product' ? { ...auditFullProduct(card, generated, { scenarioShape: 'contract' }), coverage: 'full-product' } : tWaySummary(generated)
+  const summary = { ...declared, profile: 'contract/v1', executionStatus: 'not-run', formalVerification: 'not-performed', limits: ['Declared finite Space only', 'Product assertion and source/invariant relevance require independent review'] }
   const run = ledger.filter((entry) => entry.type === 'run' && entry.label === 'contract-cases:reported').at(-1)
   if (!run) return summary
   if (staleRunIds.includes(run.runId)) return { ...summary, executionStatus: 'stale', executionIssue: 'SNAPSHOT_STALE' }

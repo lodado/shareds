@@ -2009,7 +2009,7 @@ test('enumerates the declared case space by machine and dispositions every gener
     readFile(join(repositoryDirectory, 'packages/frontend-visual-qa/skills/frontend-visual-qa/SKILL.md'), 'utf8'),
     read('scripts/oracle-run.mjs'),
     read('references/card/interaction-sweep.md'),
-    read('references/roles/case-space-inputs-formal.md'),
+    read('references/roles/case-space-inputs.md'),
   ])
 
   // 열거는 기계, LLM은 판정만 — 같은 카드 바이트는 같은 프레임 집합이다

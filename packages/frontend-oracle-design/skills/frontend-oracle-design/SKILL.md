@@ -1,6 +1,6 @@
 ---
 name: frontend-oracle-design
-description: Coordinate source-approved frontend behavior contracts with the fixed formal-bend/v1 profile and four shared roles.
+description: Use when the user explicitly requests an Oracle contract or graph-orchestrated delivery loop; when the work touches an existing Oracle run under `.ai/oracles/<id>/` (deliver it, resume it, make its card tests pass, review it, or report its state, that run's state moves only through this skill's scripts; a `contract/v1` run belongs to frontend-contract-design); or when medium/high-risk frontend behavior has unresolved policy that must be locked before implementation. Typical cases are mutations, async ordering, duplicate submits, destructive actions, payments, permissions, or data-integrity boundaries. Do not auto-invoke for low-risk copy/token/isolated CSS, visual-only work, straightforward regression fixes inside already approved behavior that has no Oracle run, screenshot/browser QA, or FSD folder advice alone.
 allowed-tools:
   - Bash
 ---

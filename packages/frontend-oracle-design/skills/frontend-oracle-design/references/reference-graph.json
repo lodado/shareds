@@ -183,8 +183,8 @@
       "id": "contract-space",
       "profiles": ["contract/v1"],
       "path": "references/contract/space.md",
-      "when": "Contract Space discovery and full-product case disposition",
-      "requires": ["contract-requirements", "bva"]
+      "when": "Contract Space discovery and t-way or explicit full-product case disposition",
+      "requires": ["contract-requirements", "bva", "card-case-space-frames"]
     },
     {
       "id": "contract-authoring",
@@ -432,9 +432,9 @@
       "id": "card-case-space-frames",
       "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/card/case-space-frames.md",
-      "pathsByProfile": { "contract/v1": "references/contract/case-space-frames.md" },
-      "when": "current-profile frame enumeration and current revision/ID dispositions; Contract requires full-product enumeration, while historical Formal frame records retain their legacy conditions",
-      "requires": ["card-case-space"]
+      "when": "current-profile frame enumeration and current revision/ID dispositions for hand-written cards; Contract t-way default or explicit full-product, while historical Formal frame records retain their legacy conditions",
+      "requires": [],
+      "requiresByProfile": { "formal-bend/v1": ["card-case-space"], "contract/v1": ["bva"] }
     },
     {
       "id": "card-retro-metrics",

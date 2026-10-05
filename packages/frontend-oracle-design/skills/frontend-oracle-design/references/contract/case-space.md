@@ -1,6 +1,6 @@
 # Contract case Space and residual limits
 
-Read [Space](space.md) for full-product enumeration and dispositions. Approved `oracle.md`, not
+Read [Space](space.md) for t-way or explicit full-product coverage and dispositions. Approved `oracle.md`, not
 implementation observations, owns finite scope. Every undecided cell remains visible and blocks lock.
 Raw candidates, generated IDs and executable tests are different sets. A held row receives no edits.
 Finite enumeration establishes declared-scope completeness only, not absence of unrepresented user

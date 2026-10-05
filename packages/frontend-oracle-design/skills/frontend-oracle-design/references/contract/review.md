@@ -16,12 +16,16 @@ accepting omission of `type-contract:reported`: exact investigated file paths, g
 and its approved source, not self-approval or semantic-runtime inference. Intake/authoring owns investigation.
 Unknown applicability requires further investigation; unavailable required tools are an actual environment
 failure, not N/A.
+Under t-way, verify the `sequence` test exists and passed for an active Async/Order family. Full-product:
 When Async/Order is active, verify `fast-check:reported` against approved contract invariants,
 independent of an exposed type boundary and without Bend comparison. Check a positive actual execution count,
 seed, domain, sampling scope, current snapshot and shrink evidence on failure on final bytes.
 Required missing evidence or producer capability is failure, not inferred success.
 
-For `contract-cases:reported`, inspect actual unique terminal names retaining `[<frame ID>]` and
+Under t-way, compare `evidence.json` `frames`/`paths`/`sequence` names with passed terminals of the same
+trusted `node-test`/`vitest` run, every `covered()` `F*` and `PATH*` exactly once; `independent()` frames
+are audited claims, never counted coverage. For explicit full-product
+`contract-cases:reported`, inspect actual unique terminal names retaining `[<frame ID>]` and
 exactly one `oracle-case:<base64url JSON>` token. Compare decoded `id`, `scenario`, `tuple`,
 `dimensionRevision` and `constraintRevision` with the current locked full-product records and exact
 frame-map/row/sequence names. Check all required observed IDs and passed terminals, not metadata
@@ -52,12 +56,13 @@ may be ignored, so do not claim universal explicit schema rejection.
 Compare the actual status verification summary with the existing `status --check-report <file>`
 fields: unique exact `Profile`, `Coverage`, `Executed unique`, `Passed unique`, `Formal verification`,
 plus existing state/run/exit checks. Contract values are `contract/v1`, `full-product` and
-`not-performed`. Before execution unique counts are `null` and `executionStatus` is `not-run`.
+`not-performed`, with `t-way <Strength>` in place of `full-product` by default. Before execution
+unique counts are `null` and `executionStatus` is `not-run`.
 Stale/incomplete evidence must not gain verified counts. Separate declared Space/audit, actual unique
 execution/pass counts and residual uncertainty. Use the [selected-profile loader](../roles/loading.md)
 for named current-stage criteria. Controller-only approval/receipt ownership remains unchanged.
 
 Return findings only with exact cases/rows/evidence, checked scope and residual uncertainty. Never issue
 receipts, transitions, policy approval or edit product/tests/lock. Preserve High hardening and independence.
-Report `formalVerification: not-performed`, finite full-product coverage, source completeness limits and
+Report `formalVerification: not-performed`, finite t-way or full-product coverage, source completeness limits and
 sampling/type/observation limits separately. Mechanical completion is not unbounded correctness proof.

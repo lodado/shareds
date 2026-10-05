@@ -2,7 +2,7 @@
 
 Input: resolved profile, controller-scoped mode/task, approved source identities, confirmed finite axes.
 Read [Space](space.md) at this stage. Author `oracle.md` directly, with Verification Profile, outcome,
-source registry/mappings, rows, scenarios, full-product Space, dispositions, realization plans and open
+source registry/mappings, rows, scenarios, t-way (or explicit full-product) Space, dispositions, realization plans and open
 questions in the existing card format. No second source-of-truth DSL or generated policy package.
 Never derive expected outcomes from existing code/tests, recommendations or observed browser behavior.
 
@@ -30,7 +30,12 @@ When choosing exposed type/state/API contracts, read [state selection](state-lad
 Use real consumer type-fest relations and compiler witnesses, no dummy import/custom duplicate,
 compiler-setting weakening or unrelated dependency change. Property plans target approved invariants.
 
-Plan actual `contract-cases:reported` names as `[<frame ID>]` plus exactly one
+Under default t-way, run `oracle-verify.mjs evidence-scaffold` and plan one test per `covered()` `F*`
+frame (an `it.each` row over the frame's choices), one per `PATH*` (`[<ID>] <label>`) and, for an active
+Async/Order family, the `sequence` test (fast-check, or hand-enumerated deferred orderings with the reason
+fast-check is unavailable). Names map through `evidence.json`; no encoded identity token is needed.
+
+For explicit full-product only, plan actual `contract-cases:reported` names as `[<frame ID>]` plus exactly one
 `oracle-case:<base64url JSON>` token encoding this fixed identity shape:
 
 ```json

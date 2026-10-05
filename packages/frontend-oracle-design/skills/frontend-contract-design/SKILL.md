@@ -1,6 +1,6 @@
 ---
 name: frontend-contract-design
-description: Coordinate source-approved frontend contracts with fixed contract/v1 finite full-product Space and four shared roles.
+description: Use when the user explicitly requests a frontend behavior contract without Bend proof (the `contract/v1` profile, source-approved rows, a t-way Case space by default or an explicit full-product opt-in, reported test evidence and independent review), or when the work touches an existing `contract/v1` run under `.ai/oracles/<id>/` (deliver it, resume it, make its card tests pass, review it, or report its state, that run's state moves only through these scripts). Typical cases are mutations, async ordering, duplicate submits, destructive actions, permissions, or data-integrity boundaries where the user asks for finite test coverage rather than a formal model. Do not auto-invoke for low-risk copy/token/isolated CSS, visual-only work, straightforward regression fixes inside already approved behavior that has no Oracle run, screenshot/browser QA, FSD folder advice alone, or requests for Bend formal proof (frontend-oracle-design owns those).
 allowed-tools:
   - Bash
 ---
@@ -32,7 +32,8 @@ Read [controller](../frontend-oracle-design/references/roles/controller.md) only
 
 1. Invoke `$oracle-intake` for source identities, risk/capability and actual human-confirmed finite axes.
 2. Invoke [`$oracle-author`](../oracle-author/SKILL.md) with approved sources/axes. Contract authoring owns
-   direct `oracle.md`, full-product Space and dispositions, not a new DSL or companion policy package.
+   direct `oracle.md`, t-way (or explicit full-product) Space and dispositions, not a new DSL or
+   companion policy package.
 3. Invoke [`$oracle-review`](../oracle-review/SKILL.md) in independent mode-bounded contexts. Preserve raw
    findings and drive the falsifying nail before presenting full Draft/semantic delta and questions.
 4. Obtain actual human approval before CHECKED whole-card hash. Unresolved dispositions block lock.

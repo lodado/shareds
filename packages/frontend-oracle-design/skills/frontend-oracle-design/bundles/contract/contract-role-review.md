@@ -270,8 +270,9 @@ skip flag or reinterpretation of legacy records. The authoritative contract is `
 `## Verification Profile` with `- Profile: contract/v1`. No new DSL or companion policy package.
 Shared source priority, human approval, immutable locks, RED/GREEN, budgets and independent review apply.
 
-At intake read [policy sources](policy-sources.md) and [risk grill](risk-grill.md), investigate actual finite coverage and supported reporters. At authoring read [Space](space.md)
-and [authoring](authoring.md). At review read [review](review.md) only in the dispatched context.
+At intake read [policy sources](policy-sources.md), [risk grill](risk-grill.md) and [Space](space.md), mine touched
+files and show the Pre-plan test-space briefing before any plan or Draft; investigate supported reporters.
+At authoring read [Space](space.md) and [authoring](authoring.md). At review read [review](review.md) only in the dispatched context.
 Do not load another profile's entry, procedures or verification modules. Unrelated project files are
 not grounds for failure. Missing Contract runners/reporters are actual environment failures, not waivers.
 
@@ -281,12 +282,17 @@ immutable lock tool → ORACLE_READY. Only the lock tool writes ORACLE_READY. Ne
 fake package. Modified CHECKED bytes rewind for rechecking, changed meaning also requires reapproval.
 
 Delivery requires `contract-cases:reported` with actual reported case IDs covering every required
-executable frame/scenario, not labels or test counts. Applicable exposed type boundaries require
+executable frame/scenario, not labels or test counts. Under default t-way coverage these are the
+`evidence.json` `frames`/`paths`/`sequence` test names: every `covered()` `F*` frame and every `PATH*` names
+one passed test in the same trusted `node-test` or `vitest` reported run, gated by the existing
+`EVIDENCE_MISSING_FRAME`/`EVIDENCE_UNKNOWN_FRAME`/`EVIDENCE_MISSING_PATH`/`EVIDENCE_NOT_IN_RUN` checks. Applicable exposed type boundaries require
 `type-contract:reported` with actual TypeScript/type-fest consumer witnesses and diagnostics.
 Before omitting `type-contract:reported`, require a recorded applicability determination with exact investigated file paths,
 a grounded no-boundary rationale and its approved source. Current-stage intake/authoring owns this investigation;
 Delivery review checks the actual determination. Unknown applicability requires further investigation;
 unavailable required tools are an actual environment failure, not N/A.
+Under t-way, an active Async/Order family requires the `evidence.json` `sequence` test (fast-check
+or hand-enumerated deferred orderings, `SEQUENCE_EVIDENCE_MISSING` otherwise). For explicit full-product:
 When Async/Order is active, require `fast-check:reported` against approved contract invariants,
 independent of an exposed type boundary and without Bend comparison. Record a positive actual execution count,
 seed, domain, sampling scope, current snapshot and shrink information on failure.
@@ -294,7 +300,7 @@ Missing required producer capability is FAIL. No observation-only evidence becom
 Report `formalVerification: not-performed` honestly, finite contract coverage and type/property limits
 separately. Exhaustive declared Space is not proof of all product behavior or source completeness.
 
-For `contract-cases:reported`, each actual reporter case name retains `[<frame ID>]` and contains
+For explicit full-product `contract-cases:reported`, each actual reporter case name retains `[<frame ID>]` and contains
 exactly one `oracle-case:<base64url JSON>` token. Its decoded object has `id`, `scenario`, `tuple`,
 `dimensionRevision` and `constraintRevision`, matching the current locked full-product frame ID,
 scenario ID, tuple and revisions. Existing frame-map and row/sequence names must match the actual
@@ -316,8 +322,8 @@ Actual compiler rejection/property falsification is distinct.
 Use the existing status verification summary and `status --check-report <file>`, not a new subcommand
 or flag. Check-report requires unique exact `Profile`, `Coverage`, `Executed unique`, `Passed unique`
 and `Formal verification` fields in addition to existing state/run/exit checks. Contract reports
-`contract/v1`, `full-product` and `not-performed`; before execution unique counts are `null` and
-`executionStatus` is `not-run`. Stale/incomplete evidence must not acquire verified execution counts.
+`contract/v1`, `t-way <Strength>` (e.g. `t-way 2`) or explicit `full-product`, and `not-performed`;
+before execution unique counts are `null` and `executionStatus` is `not-run`. Stale/incomplete evidence must not acquire verified execution counts.
 Declared coverage/audit, actual unique execution/pass counts and residual limits remain distinct.
 Resolve current-stage named criteria through the [selected-profile loader](../roles/loading.md),
 never a hardcoded different-profile target. Existing controller-only approval and receipt authority
@@ -343,12 +349,16 @@ accepting omission of `type-contract:reported`: exact investigated file paths, g
 and its approved source, not self-approval or semantic-runtime inference. Intake/authoring owns investigation.
 Unknown applicability requires further investigation; unavailable required tools are an actual environment
 failure, not N/A.
+Under t-way, verify the `sequence` test exists and passed for an active Async/Order family. Full-product:
 When Async/Order is active, verify `fast-check:reported` against approved contract invariants,
 independent of an exposed type boundary and without Bend comparison. Check a positive actual execution count,
 seed, domain, sampling scope, current snapshot and shrink evidence on failure on final bytes.
 Required missing evidence or producer capability is failure, not inferred success.
 
-For `contract-cases:reported`, inspect actual unique terminal names retaining `[<frame ID>]` and
+Under t-way, compare `evidence.json` `frames`/`paths`/`sequence` names with passed terminals of the same
+trusted `node-test`/`vitest` run, every `covered()` `F*` and `PATH*` exactly once; `independent()` frames
+are audited claims, never counted coverage. For explicit full-product
+`contract-cases:reported`, inspect actual unique terminal names retaining `[<frame ID>]` and
 exactly one `oracle-case:<base64url JSON>` token. Compare decoded `id`, `scenario`, `tuple`,
 `dimensionRevision` and `constraintRevision` with the current locked full-product records and exact
 frame-map/row/sequence names. Check all required observed IDs and passed terminals, not metadata
@@ -379,14 +389,15 @@ may be ignored, so do not claim universal explicit schema rejection.
 Compare the actual status verification summary with the existing `status --check-report <file>`
 fields: unique exact `Profile`, `Coverage`, `Executed unique`, `Passed unique`, `Formal verification`,
 plus existing state/run/exit checks. Contract values are `contract/v1`, `full-product` and
-`not-performed`. Before execution unique counts are `null` and `executionStatus` is `not-run`.
+`not-performed`, with `t-way <Strength>` in place of `full-product` by default. Before execution
+unique counts are `null` and `executionStatus` is `not-run`.
 Stale/incomplete evidence must not gain verified counts. Separate declared Space/audit, actual unique
 execution/pass counts and residual uncertainty. Use the [selected-profile loader](../roles/loading.md)
 for named current-stage criteria. Controller-only approval/receipt ownership remains unchanged.
 
 Return findings only with exact cases/rows/evidence, checked scope and residual uncertainty. Never issue
 receipts, transitions, policy approval or edit product/tests/lock. Preserve High hardening and independence.
-Report `formalVerification: not-performed`, finite full-product coverage, source completeness limits and
+Report `formalVerification: not-performed`, finite t-way or full-product coverage, source completeness limits and
 sampling/type/observation limits separately. Mechanical completion is not unbounded correctness proof.
 
 <!-- node:role-review path:references/roles/review.md -->

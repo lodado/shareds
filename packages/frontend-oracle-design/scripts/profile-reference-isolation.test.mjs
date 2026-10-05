@@ -191,10 +191,14 @@ test('unused profile variants reject unsafe paths and unknown profiles', () => {
   }
 })
 
-test('all twenty frozen Contract physical variants preserve canonical IDs and original Formal paths', async () => {
+// card-case-space-frames is intentionally shared: Contract uses the same hand-written t-way frame procedure.
+test('all nineteen frozen Contract physical variants preserve canonical IDs and original Formal paths', async () => {
+  const shared = (await loadGraph()).nodes.find((entry) => entry.id === 'card-case-space-frames')
+  assert.equal(shared.pathsByProfile, undefined)
+  assert.ok(shared.profiles.includes(contract))
   const variants = {
     'card-policy-sources': 'policy-sources', 'card-risk-grill': 'risk-grill', 'card-format': 'card-format',
-    'card-interaction-sweep': 'interaction-sweep', 'card-case-space': 'case-space', 'card-case-space-frames': 'case-space-frames',
+    'card-interaction-sweep': 'interaction-sweep', 'card-case-space': 'case-space',
     'card-confirmation-lock': 'confirmation-lock', 'card-retro-metrics': 'retro-metrics', 'delivery-ledger': 'ledger',
     'delivery-red': 'red', 'delivery-green-review': 'green-review', 'delivery-implementation-decision': 'implementation-decision',
     'types-state-ladder': 'state-ladder', 'types-authoring': 'api-surface', 'types-api-surface': 'api-surface',

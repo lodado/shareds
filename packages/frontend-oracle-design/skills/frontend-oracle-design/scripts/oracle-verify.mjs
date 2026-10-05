@@ -43,6 +43,7 @@ import {
   sectionLines,
   SOURCE_COLUMNS,
   splitRow,
+  tWaySummary,
 } from './oracle-space.mjs'
 
 export { buildJudgmentSpace } from './oracle-space.mjs'
@@ -503,7 +504,8 @@ function chooseContract(card) {
     throw new CliError('CONTRACT_FORMAL_FORBIDDEN', 'Contract cards cannot contain Formal Model or projected model markers')
   }
   const generated = generateFromDocument(card)
-  if (generated?.caseSpace.coverage !== 'full-product') throw new CliError('CASE_SPACE_REQUIRED', 'Contract v1 requires Coverage: full-product')
+  // Default t-way (Strength) or explicit full-product. A projected model Space is Formal-only.
+  if (!generated || generated.caseSpace.coverage === 'model') throw new CliError('CASE_SPACE_REQUIRED', 'Contract v1 requires a t-way Case space or explicit Coverage: full-product')
   const dimensions = generated.caseSpace.families.filter((entry) => !entry.excluded && entry.dimension)
   if (!dimensions.length || dimensions.some((entry) => !entry.choices.length || entry.choices.some((choice) => typeof choice.value !== 'string' || !choice.value.trim()))) {
     throw new CliError('CASE_SPACE_FAILED', 'Contract requires finite nonempty dimensions and values')
@@ -520,7 +522,9 @@ async function lintCard(options) {
 
   const contract = chooseContract(card)
   const scenarioShape = contract ? 'contract' : 'legacy'
-  if (options['case-space']) {
+  // Contract t-way has no separate structural audit: --case-space runs the whole card lint, then prints its summary.
+  const tWayReport = contract && options['case-space'] && generateFromDocument(card).caseSpace.coverage !== 'full-product'
+  if (options['case-space'] && !tWayReport) {
     const generated = generateFromDocument(card)
     if (generated?.caseSpace.coverage !== 'full-product') throw new CliError('CASE_SPACE_REQUIRED', 'Expected Coverage: full-product')
     const report = auditFullProduct(card, generated, { scenarioShape })
@@ -1362,6 +1366,7 @@ async function lintCard(options) {
   }
 
   process.stdout.write(`CARD_LINT_OK ${rows.length} rows\n`)
+  if (tWayReport) process.stdout.write(`${JSON.stringify({ ...tWaySummary(generated), verificationProfile: 'contract/v1', formalVerification: 'not-performed' })}\n`)
 }
 
 function assertEvidenceShape(id, entry) {
@@ -1838,11 +1843,17 @@ function collectFrameEvidence(card, map) {
 
   const order = generated.caseSpace.families.find((entry) => entry.family === 'Order' && !entry.excluded)
   const orderChoices = order ? order.choices.filter((choice) => !choice.error).length : 0
-  if (orderChoices >= 2) {
+  // Contract t-way has no fast-check producer obligation — any active Async/Order dimension carries the sequence test instead.
+  const temporal = readCardProfile(card) === 'contract/v1' && generated.caseSpace.coverage !== 'full-product'
+    ? generated.caseSpace.families.find((entry) => ['Async', 'Order'].includes(entry.family) && !entry.excluded)
+    : null
+  if (orderChoices >= 2 || temporal) {
     if (map?.sequence?.kind !== 'test' || !map.sequence.name) {
       throw new CliError(
         'SEQUENCE_EVIDENCE_MISSING',
-        `Order dimension "${order.dimension}" has ${orderChoices} choices — evidence.sequence must name the fast-check (or hand-enumerated) sequence test`,
+        orderChoices >= 2
+          ? `Order dimension "${order.dimension}" has ${orderChoices} choices — evidence.sequence must name the fast-check (or hand-enumerated) sequence test`
+          : `Contract ${temporal.family} dimension "${temporal.dimension}" — evidence.sequence must name the fast-check (or hand-enumerated) sequence test`,
       )
     }
     entries.push(['sequence', map.sequence.name])
@@ -1851,13 +1862,16 @@ function collectFrameEvidence(card, map) {
   return entries
 }
 
-async function contractCaseExecution(card, map, run, records) {
+async function contractCaseExecution(card, map, run, records, frameEvidence) {
   if (run.verificationProfile !== 'contract/v1' || typeof run.contractSourceRoot !== 'string') throw new CliError('CONTRACT_EXECUTION_REQUIRED', 'legacy/unclassified runs cannot provide retrospective Contract execution evidence')
   const generated = generateFromDocument(card)
-  const required = fullProductRecords(card).filter((record) => record.disposition.type === 'covered')
+  const fullProduct = generated.caseSpace.coverage === 'full-product'
+  const required = fullProduct ? fullProductRecords(card).filter((record) => record.disposition.type === 'covered') : []
   const expected = new Map(required.map((record) => [record.id, record]))
   const observed = new Map()
-  for (const test of run.tests ?? []) {
+  // t-way: evidence.json frames/paths/sequence names already passed the run gate (EVIDENCE_NOT_IN_RUN). One case per generated ID.
+  if (!fullProduct) for (const [id, name] of frameEvidence) observed.set(id, name)
+  for (const test of fullProduct ? run.tests ?? [] : []) {
     const tokens = [...test.name.matchAll(/oracle-case:([\w-]+)/g)]
     if (tokens.length === 0) continue
     if (tokens.length !== 1) throw new CliError('EVIDENCE_CASE_COLLISION', 'one observed case identity per reporter test required')
@@ -1876,7 +1890,8 @@ async function contractCaseExecution(card, map, run, records) {
   const labels = records.find((entry) => entry.type === 'init')?.stateDelta?.requiredLabels ?? []
   const obligations = []
   if (labels.includes('type-contract:reported') || !/^- Not applicable: .+/m.test(sectionLines(markdownLines(card), 'Type Contract').join('\n'))) obligations.push(['type-contract:reported', 'type-contract'])
-  if (labels.includes('fast-check:reported') || generated.caseSpace.families.some((entry) => ['Async', 'Order'].includes(entry.family) && !entry.excluded)) obligations.push(['fast-check:reported', 'fast-check'])
+  // Full-product Async/Order needs the fast-check producer; t-way carries it as evidence.json `sequence` (fast-check or hand-enumerated).
+  if (labels.includes('fast-check:reported') || (fullProduct && generated.caseSpace.families.some((entry) => ['Async', 'Order'].includes(entry.family) && !entry.excluded))) obligations.push(['fast-check:reported', 'fast-check'])
   const sourceBound = async (witness, evidenceRun) => {
     if (!witness || typeof witness.path !== 'string' || typeof evidenceRun.contractSourceRoot !== 'string') return false
     try {
@@ -2019,7 +2034,7 @@ async function verifyEvidence(options) {
     }
   }
 
-  const contractExecution = readCardProfile(card) === 'contract/v1' ? await contractCaseExecution(card, map, run, records) : null
+  const contractExecution = readCardProfile(card) === 'contract/v1' ? await contractCaseExecution(card, map, run, records, frameEvidence) : null
   if (contractExecution) {
     const { assertCurrentContractRuns } = await import('./oracle-run.mjs')
     try {
@@ -2037,6 +2052,10 @@ async function verifyEvidence(options) {
     report.N_executed_unique = contractExecution?.N_executed_unique ?? covered.length
     report.N_passed_unique = contractExecution?.N_passed_unique ?? covered.length
     if (contractExecution) Object.assign(report, { verificationProfile: 'contract/v1', coverage: 'full-product', formalVerification: 'not-performed', executionStatus: 'executed', obligations: contractExecution.obligations })
+    report.execution = { runId: run.runId, ledger: options.ledger, oracle: options.oracle, map: options.map }
+    process.stdout.write(`${JSON.stringify(report)}\n`)
+  } else if (contractExecution) {
+    const report = { ...tWaySummary(generated), verificationProfile: 'contract/v1', formalVerification: 'not-performed', executionStatus: 'executed', N_executed_unique: contractExecution.N_executed_unique, N_passed_unique: contractExecution.N_passed_unique, obligations: contractExecution.obligations }
     report.execution = { runId: run.runId, ledger: options.ledger, oracle: options.oracle, map: options.map }
     process.stdout.write(`${JSON.stringify(report)}\n`)
   }
@@ -2709,7 +2728,9 @@ async function scaffoldEvidence(options) {
     )
   }
   const order = generated?.caseSpace.families.find((entry) => entry.family === 'Order' && !entry.excluded)
-  if (order && order.choices.filter((choice) => !choice.error).length >= 2) {
+  const contractTemporal = generated && readCardProfile(card) === 'contract/v1' && generated.caseSpace.coverage !== 'full-product'
+    && generated.caseSpace.families.some((entry) => ['Async', 'Order'].includes(entry.family) && !entry.excluded)
+  if ((order && order.choices.filter((choice) => !choice.error).length >= 2) || contractTemporal) {
     manifest.sequence = { kind: 'test', name: '<fast-check sequence test over the Order dimension>' }
   }
   const covered = generated ? coveredFrameIds(card, generated) : []

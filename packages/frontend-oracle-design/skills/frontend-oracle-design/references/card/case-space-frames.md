@@ -2,14 +2,16 @@
 
 Read this for a card written without a model package — every card older than the model-first path, and a
 legacy run continued as one. A card projected from a model package does not use it: its `## Case space` is
-projected from the world (`- Coverage: model`, [`case-space.md`](case-space.md)) and has no frames.
+projected from the world (`- Coverage: model`, [`card-case-space`](../roles/loading.md)) and has no frames.
+A `contract/v1` card is always written by hand: this document is its Space procedure, with the Contract
+evidence additions in [`contract-requirements`](../roles/loading.md).
 
 Free-recall enumeration is measurably incomplete; a machine walking a declared space is complete
 relative to that space. The legacy card **declares** the space (dimensions × choices — this is where the
 BVA axes become raw material), `scripts/oracle-frames.mjs` **generates** the judgment frames
 deterministically, and the author only fills dispositions. An undispositioned frame fails lint —
-the same silence-to-cell move as the interaction sweep, one level deeper. The family taxonomy, the
-section's required families and the escape record are [`case-space.md`](case-space.md)'s.
+the same silence-to-cell move as the interaction sweep, one level deeper. The eight-family taxonomy is
+[`role-case-space-inputs`](../roles/loading.md); the escape record is [`card-retro-metrics`](../roles/loading.md)'s.
 
 ## Card section — declaring the space
 
@@ -195,7 +197,7 @@ for this product rather than importing a fixed scenario list. Declared dimension
 conditions, not instructions to duplicate state already owned by a library or framework.
 
 Connect risk combinations and temporal paths to the verification realization plan in
-[`card-format.md`](card-format.md). Do not invent `F*` or `PATH*` identifiers before generation; afterwards
+[`card-format`](../roles/loading.md). Do not invent `F*` or `PATH*` identifiers before generation; afterwards
 reference the emitted dispositions rather than creating a second mapping. An Order dimension with
 at least two choices carries the existing `$test` sequence obligation and `evidence.json` `sequence`
 mapping, in addition to representative paths. Concrete test construction belongs to `$test`.
@@ -246,7 +248,7 @@ a grill question, and one surviving to lock means `NEEDS_DECISION`:
 ```
 
 The four dispositions and their grammar — `impossible: <mechanism> — <witness>`,
-`needs-evidence: <fact> — <lookup>` — are the sweep's ([`interaction-sweep.md`](interaction-sweep.md));
+`needs-evidence: <fact> — <lookup>` — are the sweep's ([`card-interaction-sweep`](../roles/loading.md));
 `independent(O*): reason` is the one addition, for `F*` frames only.
 
 Lint (`oracle-verify.mjs card`; every card must carry `## Case space`):

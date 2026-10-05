@@ -285,6 +285,22 @@ export function auditIdCoverage(expectedIds, actualIds) {
   return { missing: [...expected].filter((id) => !seen.has(id)), extra, duplicate }
 }
 
+/** Default t-way Contract summary — generated identity counts only. Execution counts stay null until evidence. */
+export function tWaySummary(generated) {
+  const { strength } = generated.caseSpace
+  return {
+    coverage: `t-way ${strength}`,
+    strength,
+    N_frames: generated.frames.length,
+    N_error_frames: generated.errorFrames.length,
+    N_paths: generated.paths.length,
+    N_empty_cells: generated.emptyCells.length,
+    N_executed_unique: null,
+    N_passed_unique: null,
+    executionStatus: 'not-run',
+  }
+}
+
 export function fullProductRecords(card) {
   return tableCells(markdownLines(card), 'Frame dispositions', 'Frame').map(([id, disposition, tuple, scenario]) => {
     const parse = (value) => { try { return JSON.parse(value) } catch { return null } }
