@@ -124,6 +124,24 @@ type Msg is Data:
 `next` offers `Tick` only while the model waits, so a delay that never started cannot elapse; it offers
 user events at every step, including while waiting.
 
+The same move turns the other values the scope gate used to stop on into finite axes. Name the class
+the policy distinguishes, never the raw value; the adapter owns the concrete source constant:
+
+- **Clock, expiry:** `Expire` is an event, as above (a 30-minute session ends → a submit after it
+  issues 0 payment requests). `Date.now`/`new Date` in the product maps to a fake clock in the adapter.
+- **Negative, quantity:** a Value class per sign boundary — `BelowZero{}`, `Zero{}`, `One{}`, `AtMax{}`,
+  `AboveMax{}` — for "quantity ±" and the step that crosses each boundary.
+- **Money, decimal:** count in the minimal unit (`Nat` cents) so rounding is a law over integers; the
+  classes are `Exact{}`, `HalfUnit{}` (the rounding tie) and `SubUnit{}`; `toFixed`/`parseFloat` stay in
+  the adapter and the product test.
+- **String:** length and format classes — `Empty{}`, `Valid{}`, `TooLong{}`, `Malformed{}`,
+  `Unicode{}` — never the text itself.
+- **Randomness:** the environment chooses — `next(history)` offers every outcome (`JitterLow{}`,
+  `JitterHigh{}` for a retry delay), so a law holds for all of them; the adapter pins `Math.random`.
+
+A source that leaves the boundary, precision or duration open is a `NEEDS_DECISION` question about
+that class, not a reason to drop the axis.
+
 ## Attempts, not outcomes
 
 Count attempts in the state and decide the visible failure from the count:

@@ -4127,11 +4127,55 @@ const REPORTED_STATES =
   /^Status:\s*(ORACLE_READY|VALID_RED|IMPLEMENTED_GREEN|REVIEW_VERIFIED|PARTIAL_VERIFIED|NEEDS_DECISION|FAIL)\b/m
 
 /**
+ * Formal 요약은 원장이 이미 가진 결과만 읽는다 — required label마다 최신 run을 assertRequiredRuns와 같은 기준으로
+ * 판정하고, 증명·적절성은 bend-proof·bend-adequacy run의 결과다. 새 실행이나 재증명은 하지 않는다.
+ */
+function formalVerificationSummary(state, ledger, staleRunIds, card) {
+  const runs = ledger.filter((entry) => entry.type === 'run')
+  const outcome = (label) => {
+    const run = runs.findLast((entry) => entry.label === label)
+    if (!run) return { status: 'not-run', run: null }
+    if (staleRunIds.includes(run.runId)) return { status: 'stale', run }
+    const graded = label.endsWith(':exit') ? run.grade === 'exit-only' : isReportedPassingRun(run)
+    const passed = graded && run.exitCode === 0 && !run.signal
+    return { status: passed ? 'passed' : 'failed', run }
+  }
+  const required = Object.fromEntries((state.requiredLabels ?? []).map((label) => [label, outcome(label)]))
+  const statuses = Object.values(required).map(({ status }) => status)
+  // 첫 번째로 맞는 조건이 이긴다 — 실패가 stale보다, stale이 미실행보다 먼저 보고된다.
+  const executionStatus = [
+    ['failing', statuses.includes('failed')],
+    ['stale', statuses.includes('stale')],
+    ['not-run', statuses.every((status) => status === 'not-run')],
+    ['incomplete', statuses.includes('not-run')],
+    ['executed', true],
+  ].find(([, applies]) => applies)[0]
+  const tests = new Map()
+  for (const { status, run } of Object.values(required)) {
+    if (status === 'not-run' || status === 'stale') continue
+    for (const test of run.tests ?? []) tests.set(test.name, (tests.get(test.name) ?? true) && test.status === 'passed')
+  }
+  const kernel = (label) => ({ passed: 'proven', failed: 'failed', stale: 'stale', 'not-run': 'not-run' })[outcome(label).status]
+  return {
+    profile: 'formal-bend/v1',
+    coverage: parseCaseSpace(card)?.coverage ?? 'not-declared',
+    executionStatus,
+    N_executed_unique: executionStatus === 'not-run' ? null : tests.size,
+    N_passed_unique: executionStatus === 'not-run' ? null : [...tests.values()].filter(Boolean).length,
+    formalVerification: kernel('bend-proof:reported'),
+    adequacy: kernel('bend-adequacy:reported'),
+    labels: Object.fromEntries(Object.entries(required).map(([label, { status, run }]) => [label, { status, runId: run?.runId ?? null }])),
+    limits: ['Bend proofs cover the declared model space only', 'Product conformance is the recorded runs, not a proof about product code'],
+  }
+}
+
+/**
  * 최종 보고의 주장을 원장과 대조한다 — `Status:` 상태어와 인용된 runId·exit code만. 보고서를 쓰는 에이전트의 자기
  * 점검(SKILL.md "Verification — before the final report" 2·4번)을 기계 판정으로 옮긴 것이다.
  */
 async function verificationSummary(directory, state, ledger, staleRunIds = []) {
   const binding = await resolveRunProfile(directory, state)
+  if (binding.profile === 'formal-bend/v1') return formalVerificationSummary(state, ledger, staleRunIds, await readFile(await lockedOraclePath(directory, state), 'utf8'))
   if (binding.profile !== 'contract/v1') return { profile: binding.profile ?? 'legacy/unclassified', coverage: 'not-assessed', executionStatus: 'not-assessed', N_executed_unique: null, N_passed_unique: null, formalVerification: 'not-assessed', limits: ['No retroactive verification claim'] }
   const oracle = await lockedOraclePath(directory, state)
   const card = await readFile(oracle, 'utf8')

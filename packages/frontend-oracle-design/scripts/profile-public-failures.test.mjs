@@ -399,6 +399,15 @@ test('explicit Formal real pinned Bend package projection and initialization pre
     assert.ok(recorded.tests.some((item) => item.name === lateCase))
     console.log(`FORMAL_ACTUAL_PRODUCT ${JSON.stringify(recorded)}`)
   }
+  // Formal status reads the ledger it has: product runs exist, the kernel proof has not run yet.
+  const partialStatus = w.cli('run', 'status', '--dir', w.directory, '--json')
+  ok(partialStatus)
+  const partialVerification = JSON.parse(partialStatus.stdout).verification
+  assert.equal(partialVerification.profile, 'formal-bend/v1')
+  assert.equal(partialVerification.coverage, 'model')
+  assert.equal(partialVerification.executionStatus, 'incomplete')
+  assert.equal(partialVerification.formalVerification, 'not-run')
+  assert.equal(partialVerification.labels['fast-check:reported'].status, 'passed')
   const beforeRefusal = { state: readFileSync(w.state), ledger: readFileSync(w.ledger) }
   const refused = w.cli('run', 'transition', '--dir', w.directory, '--to', 'IMPLEMENTED_GREEN', '--run', 'r-002', '--evidence', w.evidence, '--reason', 'existing implementation already satisfies deterministic rows')
   assert.notEqual(refused.status, 0)
@@ -457,6 +466,13 @@ test('explicit Formal real pinned Bend package projection and initialization pre
   assert.equal(observed.evidenceStatus.status, 'verified')
   assert.deepEqual(observed.staleOrMissingRuns, [])
   assert.deepEqual(observed.runIssues, [])
+  // The recorded kernel runs, not a retroactive `not-assessed`, decide the Formal verification summary.
+  assert.equal(observed.verification.profile, 'formal-bend/v1')
+  assert.equal(observed.verification.executionStatus, 'executed')
+  assert.equal(observed.verification.formalVerification, 'proven')
+  assert.equal(observed.verification.adequacy, 'proven')
+  assert.equal(observed.verification.N_passed_unique, observed.verification.N_executed_unique)
+  assert.ok(observed.verification.N_executed_unique > 0)
   for (const record of entries(w.ledger).filter((entry) => entry.type === 'run')) {
     assert.equal(record.worktreeSha256, observed.currentSnapshot.worktreeSha256)
     assert.equal(record.productionSha256, observed.currentSnapshot.productionSha256)

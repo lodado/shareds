@@ -5387,7 +5387,9 @@ test('GREEN scans the changed production files itself — an unowned side effect
   for (const [content, code] of [
     ["export const save = (post) => { localStorage.setItem('draft', '') ; return post() }\n", /^SIDE_EFFECT_UNOWNED: /],
     ['export const save = (post) => (process.env.VITEST ? 1 : post())\n', /^TEST_ENV_BRANCH: /],
-    ['export const save = (post) => post() && Date.now()\n', /^NONDETERMINISM_FOUND: /],
+    ['export const save = (post) => post() && crypto.randomUUID()\n', /^NONDETERMINISM_FOUND: /],
+    // a clock is a proof axis: the card's Case space excludes Async, so the mined timer/clock blocks first
+    ['export const save = (post) => post() && Date.now()\n', /^DIMENSION_UNDECLARED: [\s\S]*Async\/timer \/ clock at code\(src\/save\.mjs#L1\)/],
   ]) {
     const { root, oracleDirectory } = await workspace(t, { initialFiles })
     await reachValidRed(oracleDirectory, root)

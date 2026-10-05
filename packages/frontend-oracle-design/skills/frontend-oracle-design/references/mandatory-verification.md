@@ -64,8 +64,9 @@ Within Oracle orchestration, a sibling test skill's standalone Low/card exemptio
 fallback cannot waive this stack. Standalone test requests outside Oracle retain their own scope.
 
 Behavior no model can state is stopped by the scope gate before this stack. Inside work that passed
-it, an unsupported domain, a requirement only the unmodelable part can state, or a necessary
-unapproved source/configuration change is a blocking decision, not permission to create meaningless
+it, a boundary, precision or duration the sources leave undecided, a requirement only the
+unmodelable part (UI, CSS, I/O) can state, or a necessary unapproved source/configuration change
+is a blocking decision, not permission to create meaningless
 proofs or types: retain the evidence and use `NEEDS_DECISION`. A missing tool, failed approved
 installation, broken checker or structurally unsupported runner is `ENVIRONMENT_DEFECT` → `FAIL`.
 Automatic Bend selection no longer permits falling back to ordinary tests. Never silently narrow

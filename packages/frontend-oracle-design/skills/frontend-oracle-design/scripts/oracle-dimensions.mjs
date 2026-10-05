@@ -81,6 +81,25 @@ export const DIMENSION_PATTERNS = [
     pattern: /debounce\(|throttle\(|useDeferredValue\(|startTransition\(/,
     note: 'intermediate values may each spawn a request — request-count contract under scheduling',
   },
+  // 시간·난수·금액은 게이트가 멈출 영역이 아니라 축이다 — model-patterns.md "Time is an event"가 인코딩을 정한다.
+  {
+    family: 'Async',
+    dimension: 'timer / clock',
+    pattern: /set(?:Timeout|Interval)\(|Date\.now\(|new Date\(/,
+    note: 'a delay or expiry ends as a model event (Tick/Expire) — the adapter owns the duration',
+  },
+  {
+    family: 'Order',
+    dimension: 'random choice',
+    pattern: /Math\.random\(|crypto\.getRandomValues\(/,
+    note: 'the environment chooses every outcome in next(history) — the adapter pins the value',
+  },
+  {
+    family: 'Value',
+    dimension: 'money / decimal',
+    pattern: /parseFloat\(|\.toFixed\(|\bNumber\(/,
+    note: 'sign, rounding and minimal-unit classes — integers in the model, decimals in the adapter',
+  },
 ]
 
 // 주석은 코드가 아니다 — 주석 처리된 effect나 "next page" 설명이 후보·boundary를 만들지 않는다.

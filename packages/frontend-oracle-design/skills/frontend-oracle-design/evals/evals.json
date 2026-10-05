@@ -203,13 +203,15 @@
       "name": "fod-bb-16",
       "category": "scope-gate",
       "prompt": "Compute the order total in a UI helper with IEEE-754 double rounding exactly like the legacy billing service, for any amount including negative refunds.",
-      "expected_output": "Lane header risk=High lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common.",
+      "expected_output": "Lane header risk=High lane=oracle, terminal state NEEDS_DECISION, reference nodes read: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, role-case-space-inputs-formal, role-space-discovery-formal, card-case-space.",
       "files": [],
       "assertions": [
         "The first line of the response is the lane header and it reports risk=High lane=oracle",
         "The reported terminal state is NEEDS_DECISION",
-        "The lane header's nodes list includes every expected node: common",
-        "None of these ceremonies or defects appear in the run: narrowed-requirement, model-of-a-subset, revision-lock, production-edit"
+        "The lane header's nodes list includes every expected node: common, mandatory-verification, bend-cross-verification, adequacy, card-policy-sources, card-risk-grill, bva, card-format, card-interaction-sweep, role-case-space-inputs, role-space-discovery, role-case-space-inputs-formal, role-space-discovery-formal, card-case-space",
+        "None of these ceremonies or defects appear in the run: full-stop-out-of-scope, narrowed-requirement, model-of-a-subset, revision-lock, production-edit",
+        "The verification report cites actual runs for: card-lint, bend-proof, bend-adequacy",
+        "Every open question rides the Draft Oracle with candidate rows and a recommendation, and one user confirmation resolves and approves the card"
       ]
     },
     {

@@ -301,12 +301,15 @@ test('only a gate stop declares that its prompt must not auto-invoke the skill',
   }
 })
 
-test('behavior whose domain Bend cannot represent ends at the gate as NEEDS_DECISION, not as a gate stop', async () => {
+test('money and negative values pass the gate as Value axes; only the undecided rounding source is NEEDS_DECISION', async () => {
   const corpus = await readJson(corpusPath)
   const fixture = corpus.cases.find((candidate) => candidate.id === 'fod-bb-16')
-  // the gate classifies it before the stack is read, so it neither loads the stack nor routes the work out
+  // the gate no longer stops on a value domain: the run models it and stops at the Draft on the open source
   assert.equal(fixture.expected.status, 'NEEDS_DECISION')
-  assert.equal(endsAtGate(fixture), true)
+  assert.equal(endsAtGate(fixture), false)
   assert.equal(Object.hasOwn(fixture.expected, 'autoInvoke'), false)
-  assert.ok(fixture.expected.forbiddenCeremony.includes('narrowed-requirement'))
+  for (const node of ['mandatory-verification', 'bend-cross-verification', 'card-case-space'])
+    assert.ok(fixture.expected.loadedNodes.includes(node), node)
+  for (const ceremony of ['full-stop-out-of-scope', 'narrowed-requirement', 'model-of-a-subset', 'revision-lock'])
+    assert.ok(fixture.expected.forbiddenCeremony.includes(ceremony), ceremony)
 })

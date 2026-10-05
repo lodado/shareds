@@ -33,12 +33,16 @@ One canonical runtime, reference graph and ledger serve all roles. No role has i
      tokens, layout, CSS, animation timing, pure display): stop without card/lock/stack.
      Report `Status: OUT_OF_SCOPE` and route to `$test` for regression, `$frontend-visual-qa` for rendered UI,
      or a plain edit. Ask for a required missing source, never guess it. OUT_OF_SCOPE is not a ledger state.
-   - Behavior with a domain Bend cannot represent (floating point, negative numbers, string content,
-     time, randomness): unsupported domain, `NEEDS_DECISION`, never narrow the requirement to fit Bend.
+   - Time, money, negative or decimal values, string content and randomness are axes, not a gate stop:
+     time is an Order/Async event (`Tick`/`Expire`), negative/decimal/money/string inputs are Value
+     classes, randomness is an environment choice in `next(history)`; see
+     [model patterns](model-patterns.md#time-is-an-event). `NEEDS_DECISION` only when the sources leave the
+     boundary, precision or duration undecided — the same as any other open policy question.
    - Mixed: model the stateful part and list the rest as Not formalized/Out of scope with its owner.
-     Report that Oracle did not verify it. If the core requirement can only be stated by the unsupported
-     part, NEEDS_DECISION. Test whether a state machine can express it, not whether Bend has a native
-     type (a string can be abstracted to valid/invalid). When unsure continue investigation, then reassess.
+     Report that Oracle did not verify it. If the core requirement can only be stated by the unmodelable
+     part (UI, CSS, I/O), NEEDS_DECISION. Test whether a state machine can express it, not whether Bend
+     has a native type (a string can be abstracted to valid/invalid), and never narrow
+     the requirement to fit Bend. When unsure continue investigation, then reassess.
 5. All in-scope risks load [`mandatory-verification.md`](mandatory-verification.md) before
    investigation choices, Draft/lock. Bend is unconditionally required; type-fest/TypeScript and
    fast-check/world paths follow that contract's applicability, never a role's standalone exemption.

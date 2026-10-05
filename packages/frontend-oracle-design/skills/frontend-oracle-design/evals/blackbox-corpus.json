@@ -521,9 +521,73 @@
         "risk": "High",
         "lane": "oracle",
         "status": "NEEDS_DECISION",
-        "loadedNodes": ["common"],
-        "forbiddenCeremony": ["narrowed-requirement", "model-of-a-subset", "revision-lock", "production-edit"],
-        "requiredLabels": []
+        "loadedNodes": [
+          "common",
+          "mandatory-verification",
+          "bend-cross-verification",
+          "adequacy",
+          "card-policy-sources",
+          "card-risk-grill",
+          "bva",
+          "card-format",
+          "card-interaction-sweep",
+          "role-case-space-inputs",
+          "role-space-discovery",
+          "role-case-space-inputs-formal",
+          "role-space-discovery-formal",
+          "card-case-space"
+        ],
+        "forbiddenCeremony": [
+          "full-stop-out-of-scope",
+          "narrowed-requirement",
+          "model-of-a-subset",
+          "revision-lock",
+          "production-edit"
+        ],
+        "requiredLabels": ["card-lint", "bend-proof", "bend-adequacy"],
+        "nodeExceptions": [
+          {
+            "node": "visual-design",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "lifecycle-adaptation",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "card-retro-metrics",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "types-state-ladder",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "types-authoring",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "frontend-decisions",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "types-api-surface",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "types-advanced-contracts",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "type-environment",
+            "reason": "Conditional on the card: read only when its trigger applies, and the run stops at the Draft confirmation."
+          },
+          {
+            "node": "card-confirmation-lock",
+            "reason": "Stops at NEEDS_DECISION on the legacy rounding source the Draft cannot fix, before lock."
+          }
+        ],
+        "optionalLabels": ["ensure-bend", "bend-space", "package-validate", "oracle-frames"]
       }
     }
   ]

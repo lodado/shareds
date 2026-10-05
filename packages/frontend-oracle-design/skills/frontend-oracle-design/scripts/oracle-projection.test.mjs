@@ -51,7 +51,7 @@ async function workspace(t) {
   t.after(() => rm(root, { recursive: true, force: true }))
   await mkdir(join(root, 'node_modules'))
   await symlink(join(PACKAGE, 'node_modules', 'fast-check'), join(root, 'node_modules', 'fast-check'))
-  for (const name of ['stale-search', 'toggle', 'doc-save', 'pagination'])
+  for (const name of ['stale-search', 'toggle', 'doc-save', 'pagination', 'session-expiry'])
     await cp(join(FIXTURES, name), join(root, name), { recursive: true })
   return root
 }
@@ -426,6 +426,52 @@ test('[bend] emit-state: proven relations judge the reducer on all 48 pairs; the
   }
 })
 
+test('[bend] time as an event: the miner finds the clock, Bend proves the expiry laws, and the projected test kills the off-by-one', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'session-expiry')
+  // 1. the miner sees the clock in the product and names its family — the gate does not stop on time
+  const { mineDimensions } = await import('./oracle-dimensions.mjs')
+  const product = await readFile(join(dir, 'session.mts'), 'utf8')
+  assert.deepEqual(
+    mineDimensions('session.mts', product).map(({ family, dimension }) => [family, dimension]),
+    [['Async', 'timer / clock']],
+  )
+  // 2. the kernel proves both laws over every state and command
+  const { proveLaws } = await import('./oracle-model.mjs')
+  const proof = await proveLaws({ dir, bin, require: ['expired_blocks', 'live_sends'] })
+  assert.equal(proof.status, 'proven', `${proof.stdout}${proof.stderr}`)
+  // 3. the proven relations judge the product through the adapter's fake clock
+  const base = {
+    model: join(dir, 'MODEL.bend'),
+    prefix: 'Session',
+    stateType: 'Session',
+    commandType: 'Cmd',
+    relations: ['R_expired_blocks', 'R_live_sends'],
+    row: 'O1',
+    runs: 100,
+    bin,
+    regenerate: 'test',
+  }
+  const emitted = await emitState({ ...base, adapter: join(dir, 'session.adapter.mjs'), out: join(dir, 'ok') })
+  // 4 states × 2 commands, all enumerated
+  assert.deepEqual([emitted.verification.domain, emitted.verification.cases], [8, 8])
+  const clean = runGenerated(join(dir, 'ok', 'session.oracle.test.mjs'))
+  assert.equal(clean.status, 0, clean.output)
+  assert.equal(clean.fail, 0)
+  assert.ok(clean.tests >= 8, clean.output)
+  // 4. a submit at exactly SESSION_MS that still pays is caught at the boundary the adapter concretizes
+  await writeFile(
+    join(dir, 'mutant.adapter.mjs'),
+    "import { mutants } from './session.adapter.mjs'\nexport const { concretize, step, project } = mutants.offByOne\n",
+  )
+  await emitState({ ...base, adapter: join(dir, 'mutant.adapter.mjs'), out: join(dir, 'mutant') })
+  const mutant = runGenerated(join(dir, 'mutant', 'session.oracle.test.mjs'))
+  assert.equal(mutant.status, 1)
+  assert.match(mutant.output, /R_expired_blocks/)
+})
+
 test('[bend] replay: each verdict carries a kernel-checked claim, and only an in-space counterexample closes', async (t) => {
   const bin = await installedBend(t)
   if (!bin) return
@@ -444,9 +490,10 @@ test('[bend] replay: each verdict carries a kernel-checked claim, and only an in
   assert.equal(outside.certification.law, '{M.Search.next([]) == [M.Issue{}] : List<M.Msg>}')
 
   // --out: 반례 기록(REPLAY.bend·REPLAY.json)을 남기고, 남긴 법칙은 그 자리에서 다시 검사된다
-  const root = await mkdtemp(join(tmpdir(), 'oracle-replay-'))
-  t.after(() => rm(root, { recursive: true, force: true }))
-  const kept = await replay({ model, prefix: 'Search', trace: late, observed: [0, 0, 0, 2, 1], bin, out: root })
+  // the record sits beside a copy of the model, so its import is `./MODEL.bend` wherever the package lives
+  // (a path through a dot directory such as `.claude/worktrees` is not a valid Bend import)
+  const root = join(await workspace(t), 'stale-search')
+  const kept = await replay({ model: join(root, 'MODEL.bend'), prefix: 'Search', trace: late, observed: [0, 0, 0, 2, 1], bin, out: root })
   const record = JSON.parse(await readFile(kept.artifacts.result, 'utf8'))
   assert.deepEqual(
     [record.verdict, record.trace.length, record.observed],

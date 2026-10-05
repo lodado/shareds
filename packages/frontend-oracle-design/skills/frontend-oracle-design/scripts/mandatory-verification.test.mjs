@@ -208,16 +208,27 @@ test('the procedure no longer contradicts itself on lint, dependencies and type 
   )
 })
 
-test('the scope gate sorts a request three ways: no behavior, an unrepresentable domain, a mix', async () => {
+test('the scope gate sorts a request: no behavior stops, value domains become axes, a mix models its core', async () => {
   const skill = await read('references/controller-entry-formal.md')
   assert.match(skill, /No modelable state/)
-  assert.match(skill, /Behavior with a domain Bend cannot represent[\s\S]*?unsupported domain, `NEEDS_DECISION`/)
+  // time, money, negative, string and randomness are axes, never a gate stop of their own
+  assert.doesNotMatch(skill, /domain Bend cannot represent|unsupported domain/)
+  assert.match(skill, /time is an Order\/Async event[\s\S]*?Value\s+classes[\s\S]*?environment choice in `next\(history\)`/)
+  assert.match(skill, /`NEEDS_DECISION` only when the sources leave the\s+boundary, precision or duration undecided/)
   assert.match(skill, /Mixed: model the stateful part/)
   // a missing source is asked for, never guessed
   assert.match(skill, /Ask for a required missing source, never guess it/)
-  // OUT_OF_SCOPE is not the answer for a domain the stack itself calls unsupported
-  const graph = await read('references/bend-cross-verification.md')
-  assert.match(graph, /unsupported or unresolved scope is `NEEDS_DECISION`/)
+  const [graph, mandatory, patterns] = await Promise.all([
+    read('references/bend-cross-verification.md'),
+    read('references/mandatory-verification.md'),
+    read('references/model-patterns.md'),
+  ])
+  assert.doesNotMatch(`${graph}\n${mandatory}`, /unsupported domain|unsupported or unresolved scope/)
+  assert.match(graph, /unresolved \(a boundary, precision or duration\) is `NEEDS_DECISION`/)
+  // the encoding guidance sits beside "Time is an event"
+  for (const kind of [/\*\*Clock, expiry:\*\*/, /\*\*Negative, quantity:\*\*/, /\*\*Money, decimal:\*\*/, /\*\*String:\*\*/, /\*\*Randomness:\*\*/])
+    assert.match(patterns, kind)
+  assert.match(patterns, /`Empty\{\}`, `Valid\{\}`, `TooLong\{\}`, `Malformed\{\}`,\s+`Unicode\{\}`/)
 })
 
 test('the model package has a small copyable example that passes the model-stage validator', async () => {

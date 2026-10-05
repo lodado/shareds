@@ -9,9 +9,10 @@ behavior model (`MODEL.bend`, `LAWS.bend`, `PROOF.bend`) is required when the Or
 part of the space and optional when the source excludes both — then the world conformance tests of §4
 carry the product evidence. Model the smallest pure core when the product contains one, and
 represent unsupported values or effects explicitly in the model boundary and Terms rather than
-dropping them. Bend does not make strings, negative values, 64-bit values, floating point, UI, CSS,
-I/O, time or randomness disappear: unsupported or unresolved scope is `NEEDS_DECISION`, and a missing
-tool or failed proof is `FAIL`. Never narrow the approved problem merely to obtain a proof.
+dropping them. Time, money, negative or decimal values, strings and randomness become finite axes
+([model patterns](model-patterns.md#time-is-an-event)); UI, CSS and I/O stay at the adapter boundary.
+Scope the sources leave unresolved (a boundary, precision or duration) is `NEEDS_DECISION`, and a
+missing tool or failed proof is `FAIL`. Never narrow the approved problem merely to obtain a proof.
 
 This is a mandatory verification technique inside the existing card, lock, ledger and review—not a
 second orchestrator, approval, card or delivery state. Oracle owns approved policy and transitions;

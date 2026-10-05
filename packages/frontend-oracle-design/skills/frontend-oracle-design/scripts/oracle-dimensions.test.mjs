@@ -125,3 +125,26 @@ test('a list item key is identity, not a remount signal — a key on a single el
   const reset = 'return <ProfileForm key={userId} user={user} />'
   assert.equal(mineDimensions('src/Profile.tsx', reset).find(({ dimension }) => dimension === 'remount')?.citation, 'code(src/Profile.tsx#L1)')
 })
+
+test('time, randomness and money are mined as axes in their families, not left for a scope-gate stop', () => {
+  const source = [
+    'const expiresAt = Date.now() + SESSION_MS',
+    'const jitter = Math.random() * BASE_DELAY',
+    'const total = Number(input).toFixed(2)',
+    '// setTimeout(retry, jitter) — a comment is not a timer',
+  ].join('\n')
+  const byDimension = Object.fromEntries(mineDimensions('src/Pay.ts', source).map((entry) => [entry.dimension, entry]))
+  assert.deepEqual(
+    [byDimension['timer / clock'], byDimension['random choice'], byDimension['money / decimal']].map(({ family, citation }) => [family, citation]),
+    [
+      ['Async', 'code(src/Pay.ts#L1)'],
+      ['Order', 'code(src/Pay.ts#L2)'],
+      ['Value', 'code(src/Pay.ts#L3)'],
+    ],
+  )
+  // each pattern stays on its own token: crypto randomness and a plain timer, with no money in sight
+  const other = mineDimensions('src/Retry.ts', 'crypto.getRandomValues(buffer)\nsetInterval(poll, POLL_MS)').map(({ dimension }) => dimension)
+  assert.deepEqual(other.sort(), ['random choice', 'timer / clock'])
+  // a name that merely ends in Number( is not a decimal parse
+  assert.deepEqual(mineDimensions('src/Phone.ts', 'formatPhoneNumber(value)'), [])
+})
