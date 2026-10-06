@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- plugin contracts run through node --test.
@@ -120,6 +120,28 @@ test('prepared Formal context lock admits only its fixed Formal controller, neve
   for (const skill of ['frontend-contract-design', 'frontend-oracle-design:frontend-contract-design']) assert.equal((await fixture.check([skill]))?.permissionDecision, 'deny', skill)
   assert.deepEqual(await readFile(fixture.lock), bytes)
   assert.equal(await readFile(fixture.ledger, 'utf8'), '')
+})
+
+test('a resumed session opens the valid lock an earlier session made; a tampered or stage-less one stays closed', async (t) => {
+  const fixture = await contextFixture(t, 'formal-bend/v1')
+  const earlier = new Date('2026-10-01T00:00:00.000Z')
+  await utimes(fixture.lock, earlier, earlier)
+  assert.equal(await fixture.check(['frontend-oracle-design']), null)
+  assert.equal(await fixture.check(['oracle-author']), null)
+  assert.equal((await fixture.check(['frontend-contract-design']))?.permissionDecision, 'deny')
+
+  await writeFile(fixture.oracle, `${fixture.card}\nchanged approved bytes\n`)
+  assert.equal((await fixture.check(['frontend-oracle-design']))?.permissionDecision, 'deny')
+  await writeFile(fixture.oracle, fixture.card)
+
+  // lock 관문을 지나지 않은 stage에 run-state도 없으면 앞 세션의 승인으로 보지 않는다
+  const stagePath = join(fixture.directory, 'stage.json')
+  const stage = await readFile(stagePath, 'utf8')
+  assert.equal(JSON.parse(stage).stage, 'ORACLE_READY')
+  await writeFile(stagePath, JSON.stringify({ ...JSON.parse(stage), stage: 'DRAFTED' }))
+  assert.equal((await fixture.check(['frontend-oracle-design']))?.permissionDecision, 'deny')
+  await writeFile(stagePath, stage)
+  assert.equal(await fixture.check(['frontend-oracle-design']), null)
 })
 
 test('real approved Contract card/stage/lock resolves shared roles without selecting or falling back', async (t) => {

@@ -164,7 +164,10 @@ async function lockedAfter(directory, activation) {
   for (const name of names.filter((entry) => entry.endsWith('.lock.json'))) {
     const lockPath = join(directory, name)
     const lock = await stat(lockPath).catch(() => null)
-    if (!lock || lock.mtimeMs < activation.at || activation.conflicting) continue
+    if (!lock || activation.conflicting) continue
+    // 앞 세션이 만든 lock도 재개한 세션에서 연다 — 아래 검증(프로필 바인딩 + lock verify)을 통과하고, lock 관문이 stage를
+    // ORACLE_READY로 옮겼거나 run-state가 이어지는 오라클일 때만. 검증을 못 넘기는 낡은 lock은 예전처럼 닫혀 있다.
+    const earlier = lock.mtimeMs < activation.at
     try {
       const manifest = JSON.parse(await readFile(lockPath, 'utf8'))
       const card = await readFile(join(directory, 'oracle.md'), 'utf8').catch(() => null)
@@ -172,6 +175,7 @@ async function lockedAfter(directory, activation) {
       const stage = stageRaw && JSON.parse(stageRaw)
       const stateRaw = await readFile(join(directory, 'run-state.json'), 'utf8').catch(() => null)
       const state = stateRaw && JSON.parse(stateRaw)
+      if (earlier && stage?.stage !== 'ORACLE_READY' && !state) continue
       const bindings = [
         { artifact: 'lock', profile: manifest.verificationProfile },
         { artifact: 'card', profile: card === null ? null : readCardProfile(card) },
@@ -185,7 +189,7 @@ async function lockedAfter(directory, activation) {
       }
       resolveProfileBinding({ requestedProfile: activation.profile, bindings })
       const verified = spawnSync(process.execPath, [join(dirname(runScript), 'oracle-lock.mjs'), 'verify', '--lock', lockPath], {
-        cwd: directory, encoding: 'utf8', timeout: 8000,
+        cwd: directory, encoding: 'utf8',
       })
       if (verified.status === 0) return true
     } catch {

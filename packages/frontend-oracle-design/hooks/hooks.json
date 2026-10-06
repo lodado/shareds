@@ -8,8 +8,7 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/skills/frontend-oracle-design/scripts/oracle-guard-hook.mjs"],
-            "timeout": 10
+            "args": ["${CLAUDE_PLUGIN_ROOT}/skills/frontend-oracle-design/scripts/oracle-guard-hook.mjs"]
           }
         ]
       },

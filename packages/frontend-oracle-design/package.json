@@ -1,6 +1,6 @@
 {
   "name": "@lodado/frontend-oracle-design-plugin",
-  "version": "0.87.3",
+  "version": "0.87.4",
   "private": true,
   "description": "Shared formal Oracle and finite Contract frontend design, TDD, evidence gates, and independent review.",
   "license": "MIT",
