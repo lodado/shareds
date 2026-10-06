@@ -384,8 +384,13 @@ async function deniedBeforeLock(payload, cwd, absolutePath) {
     'formal-bend/v1': 'frontend-oracle-design profile, Space, Bend model package and Draft `yes`',
   }
   if (scopes.length === 0) {
+    const located = (await oracleDirectories(cwd, absolutePath)).length > 0
+    // 서브에이전트가 다른 worktree·cwd에서 쓰면 오라클이 있어도 안 보인다 — 잠금 문제로 오해하지 않게 짚는다
+    const where = located
+      ? ''
+      : ` No \`.ai/oracles/\` was found above this path or the cwd: a subagent must write by the absolute path inside the oracle's own worktree (the controller passes it), not a relative path from another worktree.`
     deny(
-      `TEST_BEFORE_LOCK: ${portable}: approve the resolved ${guidance[profile] ?? 'controller profile first (frontend-contract-design or frontend-oracle-design), then its card and Space'} and create its valid immutable lock. NEEDS_DECISION until approval; tests remain blocked until lock and production writes require the existing VALID_RED prerequisites. A request to write tests or verify existing code is not approval.`,
+      `TEST_BEFORE_LOCK: ${portable}: approve the resolved ${guidance[profile] ?? 'controller profile first (frontend-contract-design or frontend-oracle-design), then its card and Space'} and create its valid immutable lock. NEEDS_DECISION until approval; tests remain blocked until lock and production writes require the existing VALID_RED prerequisites. A request to write tests or verify existing code is not approval.${where}`,
     )
     return true
   }

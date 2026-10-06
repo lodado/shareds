@@ -297,6 +297,8 @@ test('a session that activated the skill cannot write a test before a lock exist
   assert.equal(denied.decision?.permissionDecision, 'deny')
   assert.match(denied.decision.permissionDecisionReason, /^TEST_BEFORE_LOCK: src\/features\/run\/TemplateRun\.scenario\.test\.tsx/)
   assert.match(denied.decision.permissionDecisionReason, /NEEDS_DECISION/)
+  // 오라클이 하나도 안 보이면 잠금 문제가 아니라 경로 문제라고 짚는다 — 서브에이전트는 오라클 worktree의 절대경로로 쓴다
+  assert.match(denied.decision.permissionDecisionReason, /absolute path inside the oracle's own worktree/)
 
   // 모델 파일과 오라클 기록, 제품 코드 조사 메모는 lock 전에 쓴다 — 이 관문은 테스트만 본다
   for (const path of ['src/features/run/__test__/formal/MODEL.bend', '.ai/oracles/run/oracle.package.json', 'src/features/run/notes.ts']) {
