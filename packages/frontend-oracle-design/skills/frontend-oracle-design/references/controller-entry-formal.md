@@ -77,6 +77,8 @@ when coordinating the selected stages; read only current-step dependencies, not 
 3. Explicitly load and invoke [`$oracle-review`](../../oracle-review/SKILL.md) in the required independent
    contexts for card-only cold-read, second reverse-impossible read and conditional source-aware review.
    Drive the first nail and record the result before showing the projected Draft for lock. Same-context switching is not independence.
+   Card review is capped at 2 rounds per revision; round 2 only confirms round 1's repairs
+   ([budget](card/card-format.md#review-round-budget--at-most-2)). Never start a round 3 without the user's approval.
 4. Present the full new Draft or semantic delta and Open questions. Obtain human confirmation, lint and lock
    through the existing scripts. No lock, target tests, production or dependency edits before confirmation.
    Design-only ends ORACLE_READY, NEEDS_DECISION or tool-failure FAIL. Write/execute no consumer tests or production.

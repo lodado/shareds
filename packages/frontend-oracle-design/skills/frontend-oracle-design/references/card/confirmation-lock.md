@@ -19,7 +19,8 @@ by the user.
    rows and a recommendation, the Draft dispositioned under the recommended options
    ([`card-format.md`](card-format.md)).
 3. Run the cold-read gate in [`card-format.md`](card-format.md) — a context-free read, the five
-   questions, the single root and its first nail — and repair the Draft before showing it.
+   questions, the single root and its first nail — and repair the Draft before showing it. The gate
+   has a budget of 2 review rounds per revision ([`card-format.md`](card-format.md#review-round-budget--at-most-2)).
 4. Show the full card and the delta to the user and ask for one confirmation: `yes` adopts every
    recommended option and approves the card; `Q<n>=<option>` swaps one option. Resolution is
    mechanical and needs no second confirmation unless it creates a new `needs-decision`.

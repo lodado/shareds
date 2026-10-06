@@ -1142,6 +1142,30 @@ sweep, any Invariants, and the Open questions with their candidate rows — the 
 sweep's `impossible` reasons and the recommended options too. After the lock, a repair is a new revision,
 not a re-review, so this gate is the last cheap place to find a defect.
 
+### Review round budget — at most 2
+
+Card review (cold read, reverse-impossible, source-aware) runs at most 2 rounds per revision, and the
+count is recorded in `journal.md`. A reviewer asked for a defect always returns one, and every fix
+that adds a state, message or event gives the next round a new surface, so unbounded rounds do not
+converge.
+
+1. **Round 1** is the full review. Group its findings by shared root cause and repair each group
+   once, in one pass, before round 2.
+2. **Round 2** only confirms that round 1's findings are resolved and that those repairs did not
+   break an existing row or an earlier repair. Hand it round 1's finding IDs and the repair diff, not
+   a request for a fresh defect hunt.
+3. A new round 2 finding blocks only when it contradicts an approved policy row or forces an
+   implementer to choose an expected value. Any other "this world is also possible" finding is
+   recorded as a residual risk in the card and does not block.
+4. A repair that adds more than 3 model states or message kinds is not a repair: stop and return the
+   scope to `NEEDS_DECISION`, since the user owns widening the modeled world.
+5. The same row in the findings of both rounds is a card design defect, not a wording defect. Return
+   a decision to narrow that row's scope instead of repairing it a third time.
+6. After round 2, a user who delegated the remaining choices ("decide everything and implement")
+   takes the surviving blockers as residual risks into the lock. Without that delegation, stop at
+   `NEEDS_DECISION`. A round 3 needs the user's explicit approval and is never started by the
+   controller on its own.
+
 ### 1. Cold read — a reader who was not in the conversation
 
 The author cannot un-see the conversation and is therefore the worst judge of whether the card
@@ -1669,7 +1693,8 @@ by the user.
    rows and a recommendation, the Draft dispositioned under the recommended options
    ([`card-format.md`](card-format.md)).
 3. Run the cold-read gate in [`card-format.md`](card-format.md) — a context-free read, the five
-   questions, the single root and its first nail — and repair the Draft before showing it.
+   questions, the single root and its first nail — and repair the Draft before showing it. The gate
+   has a budget of 2 review rounds per revision ([`card-format.md`](card-format.md#review-round-budget--at-most-2)).
 4. Show the full card and the delta to the user and ask for one confirmation: `yes` adopts every
    recommended option and approves the card; `Q<n>=<option>` swaps one option. Resolution is
    mechanical and needs no second confirmation unless it creates a new `needs-decision`.

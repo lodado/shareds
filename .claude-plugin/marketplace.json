@@ -23,7 +23,7 @@
     {
       "name": "frontend-oracle-design",
       "description": "Shared formal Oracle and finite Contract frontend design, TDD, evidence gates, and independent review.",
-      "version": "0.88.0",
+      "version": "0.89.0",
       "author": {
         "name": "lodado"
       },

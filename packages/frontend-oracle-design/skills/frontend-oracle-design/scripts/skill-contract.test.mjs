@@ -2781,3 +2781,18 @@ test('the docs name the async cells the MODELED gate checks and the slice-scoped
   assert.match(lifecycle, /`TEST_OUTSIDE_LOCKED_SLICE`/)
   assert.match(skill, /The lock still runs card lint itself, so a hand-written\s+record skips no check/)
 })
+
+test('card review is capped at two rounds and round two never reopens the defect hunt', async () => {
+  const [cardFormat, lock, controller] = await Promise.all([
+    read('references/card/card-format.md'),
+    read('references/card/confirmation-lock.md'),
+    read('references/controller-entry-formal.md'),
+  ])
+  assert.match(cardFormat, /### Review round budget\s+—\s+at most 2/)
+  assert.match(cardFormat, /Round 2\*\* only confirms that round 1's findings are resolved/)
+  assert.match(cardFormat, /adds more than 3 model states or message kinds/)
+  assert.match(cardFormat, /A round 3 needs the user's explicit approval/)
+  for (const doc of [lock, controller]) {
+    assert.match(doc, /review-round-budget--at-most-2/)
+  }
+})
