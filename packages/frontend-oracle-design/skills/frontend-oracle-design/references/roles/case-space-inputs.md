@@ -17,7 +17,7 @@ Eight families, imported rather than invented. The first seven are input familie
 | Async       | per-operation states (pending/success/error subtype)                               | bva state axis, SFDIPOT Time                                 |
 | Order       | operation-pair interleavings (sequential/inverted/duplicate/late-after-cancel)     | bva time/order axis                                          |
 | Entry       | fresh/refresh/back-forward/deep-link                                               | SFDIPOT Operations                                           |
-| Environment | viewport boundaries, theme, reduced-motion, StrictMode                             | SFDIPOT Platform, ISO 25010                                  |
+| Environment | StrictMode, measured layout (observer·scroll ownership)                            | SFDIPOT Platform, ISO 25010                                  |
 | Platform    | browser/OS choices derived from the repo's browserslist/engines, never from recall | SFDIPOT Platform                                             |
 | Inherited   | still-effective prior P\*                                                          | interaction sweep owns this, reference rather than duplicate |
 

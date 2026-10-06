@@ -125,9 +125,7 @@ Attempt the `--to IMPLEMENTED_GREEN` command from `status`; a rejected command d
 state. Follow its code and recovery hint: `ORACLE_CHANGED` invalidates evidence;
 `WITNESS_INVALIDATED` means the implementation changed the code an `impossible` cell cites (the lock
 pins each `code()` witness block by hash; a block that only moved still counts), so that cell goes
-back to `NEEDS_DECISION`; `DIMENSION_NOT_EXECUTED` means the Case space declares StrictMode but no
-registered harness file or test enables it;
-`RUN_NOT_GREEN`, `EVIDENCE_REQUIRED` and `REQUIRED_RUN_MISSING` require real runs/mappings;
+back to `NEEDS_DECISION`; `RUN_NOT_GREEN`, `EVIDENCE_REQUIRED` and `REQUIRED_RUN_MISSING` require real runs/mappings;
 `FLAKINESS_GATE` requires the existing consecutive-pass count; `TEST_WEAKENED` requires restoring
 test strength. Report `ENV_DRIFT` and investigate whether it affected the result.
 

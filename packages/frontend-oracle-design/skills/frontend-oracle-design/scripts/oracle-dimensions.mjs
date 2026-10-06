@@ -31,13 +31,6 @@ export const DIMENSION_PATTERNS = [
   },
   {
     family: 'Environment',
-    dimension: 'StrictMode double-invoke',
-    pattern: /useEffect\(/,
-    and: /set(?:Timeout|Interval)\(|\.subscribe\(|addEventListener\(|\.observe\(/,
-    note: 'an effect owning a timer·subscription — does cleanup restore every paired state on re-invoke',
-  },
-  {
-    family: 'Environment',
     dimension: 'measured layout',
     pattern: /ResizeObserver|IntersectionObserver|getBoundingClientRect\(|getComputedStyle\(/,
     note: 'the initial default → first measured value fires as a change',

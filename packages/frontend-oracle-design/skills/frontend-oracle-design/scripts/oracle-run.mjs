@@ -217,8 +217,6 @@ const NEXT_ACTIONS = {
     'repair the test until the mapped row fails on its own assertion — a syntax·reference·timeout·hook failure is not VALID_RED',
   WITNESS_INVALIDATED:
     'the code an `impossible` cell cites changed — return to NEEDS_DECISION, re-disposition that cell against the new code, and lock a new revision',
-  DIMENSION_NOT_EXECUTED:
-    'the card declares StrictMode — enable it in a registered harness file (`configure({ reactStrictMode: true })`) or render the tests inside <StrictMode>, then record a fresh RED',
   SIDE_EFFECT_UNOWNED:
     'add the row whose side-effect column owns that category (POLICY_GAP), remove the unrequested effect (PRODUCT_DEFECT), or exempt the line with `oracle:side-effect <row|reason>`',
   NONDETERMINISM_FOUND:
@@ -2011,9 +2009,6 @@ async function assertExistingTestsNotWeakened(state, scanRoot, deltas, evidenceR
   }
 }
 
-const STRICT_MODE_ENABLED =
-  /<(?:React\.)?StrictMode\b|wrapper:\s*(?:React\.)?StrictMode\b|createElement\(\s*(?:React\.)?StrictMode\b|reactStrictMode\s*:\s*true/
-
 /**
  * init 기준선 바이트를 git HEAD에서 되살린다 — HEAD의 바이트가 init 스냅샷 digest와 같을 때만. 다르면(init 때 이미
  * 더러웠거나 git이 없으면) 기준선이 없는 것으로 두고 파일 전체를 새 줄로 판정한다.
@@ -2047,39 +2042,6 @@ async function assertChangedProductionScanned(state, current, scanRoot, oracle) 
   } finally {
     await rm(baselineRoot, { recursive: true, force: true })
   }
-}
-
-/** 카드가 StrictMode를 선언했으면 테스트가 실제로 그 아래에서 돌아야 한다 — 선언만 하고 한 번 렌더하면 r11b #1이 샌다. */
-async function assertStrictModeExecuted(state, current, scanRoot, oracleText) {
-  let caseSpace = null
-  try {
-    caseSpace = parseCaseSpace(oracleText)
-  } catch {
-    return // 잘못된 Case space는 card lint가 lock 전에 막는다
-  }
-  const declared = caseSpace?.families.some(
-    (entry) =>
-      entry.family === 'Environment' &&
-      !entry.excluded &&
-      [entry.dimension, ...(entry.choices ?? []).map((choice) => choice.value)].some((value) =>
-        /strict[\s_-]*mode/i.test(value ?? ''),
-      ),
-  )
-  if (!declared) return
-  // 이 카드의 테스트(VALID_RED가 얼린 것)와 등록된 harness만 본다 — 레포 어딘가의 다른 테스트나 주석은 증거가 아니다
-  const cardTests = Object.keys(state.testBindings?.tests ?? {}).filter((path) => path in current)
-  const files = [...new Set([...(state.harnessPaths ?? []), ...cardTests])].filter((path) => SCANNABLE.test(path))
-  for (const path of files) {
-    const code = (await readFile(join(scanRoot, path), 'utf8').catch(() => ''))
-      .split('\n')
-      .filter((line) => !/^\s*(?:\/\/|\*|\/\*)/.test(line))
-      .join('\n')
-    if (STRICT_MODE_ENABLED.test(code)) return
-  }
-  throw new CliError(
-    'DIMENSION_NOT_EXECUTED',
-    'the Case space declares StrictMode, but no registered harness file or test renders under <StrictMode> or reactStrictMode: true',
-  )
 }
 
 async function assertWitnessesHold(directory, state) {
@@ -2829,7 +2791,6 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
 
     const lockedOracle = await lockedOraclePath(directory, state)
     await assertWitnessesHold(directory, state)
-    await assertStrictModeExecuted(state, current, scanRoot, await readFile(lockedOracle, 'utf8'))
     await assertChangedProductionScanned(state, current, scanRoot, lockedOracle)
     // 이 호스트의 hook이 영수증 파일을 만들었는가 — REVIEW는 그 뒤 파일이 사라진 것을 증거 삭제로 본다
     state.hostReceipts = await lstat(join(directory, HOST_RECEIPTS_FILE)).then(

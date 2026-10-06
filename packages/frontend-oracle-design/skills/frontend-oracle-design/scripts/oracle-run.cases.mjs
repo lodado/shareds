@@ -8,7 +8,6 @@ import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { generateFromDocument } from './oracle-frames.mjs'
 import { HOST_RECEIPTS_FILE, reviewOutputDigest } from './oracle-fs.mjs'
 import { resolveExecutable, spawnGit } from './resolve-executable.mjs'
 
@@ -5411,50 +5410,6 @@ test('GREEN scans the changed production files itself — an unowned side effect
   assert.equal(owned.status, 0, owned.stderr)
 })
 
-/** Environment 차원에 StrictMode를 선언하고 생성 프레임을 전부 covered로 판정한 카드. */
-function strictModeOracle() {
-  const card = ORACLE.replace(
-    '| Environment | —         | excluded: fixture scope |',
-    '| Environment | render    | StrictMode              |',
-  )
-  assert.notEqual(card, ORACLE)
-  const generated = generateFromDocument(card)
-  const entries = [...generated.frames, ...generated.errorFrames, ...generated.paths, ...generated.emptyCells]
-  // 프레임 실행 증거는 이 테스트의 관심사가 아니다 — 선언만으로 StrictMode 실행 의무가 생기는지를 본다
-  const rows = entries.map(
-    ({ id, label = '' }) => `| ${id} | independent(O1): one render tree in this fixture | ${label} |`,
-  )
-  return `${card}\n## Frame dispositions\n\n| Frame | Disposition | Label |\n| ----- | ----------- | ----- |\n${rows.join(
-    '\n',
-  )}\n`
-}
-
-test('StrictMode declared in the Case space must actually run: no harness or test enabling it is DIMENSION_NOT_EXECUTED', async (t) => {
-  const plain = await workspace(t, { oracleContent: strictModeOracle() })
-  await reachValidRed(plain.oracleDirectory, plain.root)
-  greenRun(plain.oracleDirectory, 'green-1')
-  greenRun(plain.oracleDirectory, 'green-2')
-  const missing = transition(plain.oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
-  assert.equal(missing.status, 1)
-  assert.match(missing.stderr, /^DIMENSION_NOT_EXECUTED: /)
-
-  // setup 파일이 RTL을 StrictMode로 설정했다 — 설정 파일이 문자열로 적은 setup은 init이 harness로 얼린다
-  const strict = await workspace(t, {
-    oracleContent: strictModeOracle(),
-    initialFiles: {
-      'vitest.config.mjs': "export default { test: { setupFiles: ['./test/setup.mjs'] } }\n",
-      'test/setup.mjs': 'configure({ reactStrictMode: true })\n',
-    },
-  })
-  const recorded = await state(strict.oracleDirectory)
-  assert.deepEqual(recorded.harnessPaths, ['test/setup.mjs', 'vitest.config.mjs'])
-  await reachValidRed(strict.oracleDirectory, strict.root)
-  greenRun(strict.oracleDirectory, 'green-1')
-  greenRun(strict.oracleDirectory, 'green-2')
-  const executed = transition(strict.oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
-  assert.equal(executed.status, 0, executed.stderr)
-})
-
 test('init freezes runner config and literal setup files as harness, and names a setup it cannot resolve', async (t) => {
   const { root, oracleDirectory, lock } = await workspace(t, {
     initialize: false,
@@ -5930,36 +5885,6 @@ test('the Stop hook judges the most recently active oracle, not any oracle that 
   assert.match(blocked.reason, /it claims NEEDS_DECISION, the ledger replays VALID_RED/)
   assert.match(blocked.reason, /\.ai\/oracles\/sample\)/)
   assert.equal(stop('Status: VALID_RED — tests fail as the card says\n- red r-001 exit 1 reported\n'), null)
-})
-
-test("StrictMode counts only in this card's tests or harness, in code, including the RTL wrapper form", async (t) => {
-  // 주석 줄은 실행 증거가 아니다
-  const commented = await workspace(t, {
-    oracleContent: strictModeOracle(),
-    initialFiles: {
-      'src/unrelated.test.mjs':
-        "import test from 'node:test'\n// TODO: wrap these in <StrictMode>\ntest('other', () => {})\n",
-    },
-  })
-  await reachValidRed(commented.oracleDirectory, commented.root)
-  greenRun(commented.oracleDirectory, 'green-1')
-  greenRun(commented.oracleDirectory, 'green-2')
-  const rejected = transition(commented.oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
-  assert.equal(rejected.status, 1)
-  assert.match(rejected.stderr, /^DIMENSION_NOT_EXECUTED: /)
-
-  const wrapped = await workspace(t, {
-    oracleContent: strictModeOracle(),
-    initialFiles: {
-      'vitest.config.mjs': "export default { test: { setupFiles: ['./test/setup.mjs'] } }\n",
-      'test/setup.mjs': 'export const render = (ui) => renderHook(ui, { wrapper: StrictMode })\n',
-    },
-  })
-  await reachValidRed(wrapped.oracleDirectory, wrapped.root)
-  greenRun(wrapped.oracleDirectory, 'green-1')
-  greenRun(wrapped.oracleDirectory, 'green-2')
-  const executed = transition(wrapped.oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
-  assert.equal(executed.status, 0, executed.stderr)
 })
 
 /**

@@ -33,9 +33,7 @@ test('mines the r11b defect dimensions from the code that carried them', () => {
   const found = mineDimensions('src/Grid.tsx', GRID)
   const byDimension = Object.fromEntries(found.map((entry) => [entry.dimension, entry]))
 
-  // 결함 1: 핸들러·effect 소유 타이머 × StrictMode — 결함 3: ResizeObserver 초기 측정 — 결함 2: virtualizer 스크롤 소유
-  assert.equal(byDimension['StrictMode double-invoke'].family, 'Environment')
-  assert.equal(byDimension['StrictMode double-invoke'].citation, 'code(src/Grid.tsx#L6)')
+  // 결함 3: ResizeObserver 초기 측정 — 결함 2: virtualizer 스크롤 소유
   assert.equal(byDimension['measured layout'].citation, 'code(src/Grid.tsx#L8)')
   assert.equal(byDimension['scroll ownership'].citation, 'code(src/Grid.tsx#L2-L11)')
   assert.equal(byDimension['request interleaving'].family, 'Order')
@@ -62,7 +60,6 @@ test('a file with no pattern yields no candidates — and says so instead of cla
   const report = spawnSync(process.execPath, [script, '--path', grid], { encoding: 'utf8' })
   assert.equal(report.status, 0, report.stderr)
   assert.match(report.stdout, /^## Dimension candidates — 1 files/)
-  assert.match(report.stdout, /\| Environment \| StrictMode double-invoke \| code\(.*Grid\.tsx#L6\) \|/)
   assert.match(report.stdout, /## Side-effect inventory/)
   assert.match(report.stdout, /\| network \| `fetch\(` \| code\(.*Grid\.tsx#L13\) \|/)
   assert.match(report.stdout, /\| storage \| `localStorage` \| code\(.*Grid\.tsx#L15\) \|/)

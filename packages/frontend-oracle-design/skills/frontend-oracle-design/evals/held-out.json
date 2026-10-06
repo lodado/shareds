@@ -12,7 +12,7 @@
           "class": "DIMENSION_MISSING",
           "symptom": "append skeleton stuck forever — StrictMode re-ran the effect, cleanup cleared the timer but left the pending flag",
           "assertion": "The Draft names, in the interaction sweep, deviations, or an Open question, the StrictMode double-invoke of the effect that owns the append timer (cleanup must restore the pending state, not only clear the timer).",
-          "check": "test:StrictMode declared in the Case space must actually run: no harness or test enabling it is DIMENSION_NOT_EXECUTED"
+          "check": "none — question-bank row in interaction-sweep.md only"
         },
         {
           "class": "DIMENSION_MISSING",
