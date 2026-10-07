@@ -115,6 +115,13 @@ For async tests, read [`references/async-testing.md`](references/async-testing.m
   only for rows no path traverses — static `D*` rows, error subtypes outside the model.
   Duplicating a row's expected values into a second test is a defect, not extra safety: when the
   policy changes, two owners drift apart.
+- On a card with a `Formal` column, a row whose cell names a Bend def, and the `## Formal Model`
+  `Conformance row`, are owned by the tests `oracle-projection.mjs` generated from the model; do not
+  write a vitest test for them. Write tests only for the other rows (`outside the world`, `HARD`
+  `D*`): vitest for component and integration
+  observations, Playwright when the observation needs a real browser (layout, scroll, focus,
+  IntersectionObserver, real timers). The verifier refuses the wrong owner with
+  `EVIDENCE_FORMAL_HAND_TEST` or `EVIDENCE_GENERATED_OUTSIDE_MODEL`.
 - When the card's Case space has an Order dimension with two or more choices, a fast-check
   sequence test is **required**, not optional: `fc.commands` against a model, or `fc.scheduler`
   shuffling promise resolution order — combined with the deferred pending barrier. The sequence

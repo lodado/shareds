@@ -160,7 +160,11 @@ slots with actual test names, artifacts, findings or sources. Do not overwrite p
 on resume. An unfilled placeholder fails verification. One observation may cover multiple rows;
 give a row a separate test only when it needs its own observation, not an invented production export.
 Validate with `oracle-verify.mjs evidence --oracle <card> --map <map> --ledger <ledger> --run <id>
---phase green`; the GREEN transition requires and rechecks the same manifest.
+--phase green`; the GREEN transition requires and rechecks the same manifest. On a card with a
+`Formal` column the reporter's test file must match the row's owner: a row with a Bend def, or the
+Formal Model `Conformance row`, maps to a generated or model-driven conformance test
+(`EVIDENCE_FORMAL_HAND_TEST` otherwise), and any other row maps to a hand-written test
+(`EVIDENCE_GENERATED_OUTSIDE_MODEL` otherwise), per [`red.md`](red.md) step 2.
 
 `D*` row owners: `HARD → test`, `RELATIONAL → visual | pending`, `JUDGMENT → designer
 reviewer`. A visual `pending` or a Visual QA `declined` is reported as an unverified item in GREEN

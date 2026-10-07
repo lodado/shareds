@@ -8,6 +8,18 @@
    user can observe. Do not create a production export whose only reason to exist is to give a row
    something to import — if the row is only observable through a module invented for the test, the
    observation tier is wrong, not the code.
+   On a card with a `Formal` column, the model decides which rows it owns: each row whose `Formal`
+   cell names a Bend def, and the `## Formal Model` `Conformance row` (the behavior model's trace row,
+   whose cell reads `outside the world`). A model row is owned by the tests generated from the model
+   (`emit-trace`, `emit-state`, `emit-world`, fast-check included), or by a hand-written conformance
+   test that runs `oracle-model.mjs` or `oracle-adequacy.mjs`. Do not write a second vitest test for
+   it: the model already computes its expected values. Every other row (the rest of `outside the
+world` and every `HARD` `D*` row) gets a hand-written test through `$test`: vitest for component
+   and integration observations, Playwright when the observation needs a real browser (layout,
+   scroll, focus, IntersectionObserver, real timers). `evidence` and `red` enforce the ownership
+   from the reporter's test file: `EVIDENCE_FORMAL_HAND_TEST` refuses a model row mapped to a
+   hand-written test, and `EVIDENCE_GENERATED_OUTSIDE_MODEL` refuses any other row mapped to a
+   generated test.
 3. For the network boundary, prefer the test boundary the repo already uses. If MSW is installed or
    its adoption is approved, use an MSW handler; otherwise use the existing transport seam. Do not
    quietly add a dependency just for tests. Handlers·example data belong in the closest place that

@@ -1998,9 +1998,13 @@ the expected results — during the harness step, then it passes two gates befor
   inputs throw; `step` feeds one event and then waits until the screen settles (an `act` flush or the
   deferred barrier releasing), never a fixed sleep tuned to the expected value; `dispose` unmounts and
   restores every client, timer and global the case installed; the residue fields are each recorded in
-  Terms or raised as candidates. A finding is a
+  Terms or raised as candidates; a row whose observation the adapter reads only through a fake
+  browser API (IntersectionObserver, ResizeObserver, `matchMedia`, layout, scroll or focus under
+  jsdom) also has one Playwright test of the same journey in a real browser, named in the review
+  brief. A finding is a
   harness defect and goes through the existing harness-repair budget; it never changes the locked
-  model, laws or observation meaning.
+  model, laws or observation meaning. A missing Playwright test for such a row is `EVIDENCE_GAP`
+  instead: the generated test then shows only that the product agrees with the fake.
 
 - `emit-trace (--package <pkg> | --model --prefix --bound) --adapter --out --row --runs N [--max-length L]`
   (differential): the minimum cover (`[O*] [T…]`, expectations from the model) — the fewest traces, each
@@ -2055,7 +2059,11 @@ seed}}`, fails if fewer runs executed than requested, and fails if the environme
 - Values are the compiled Bend runtime shape (Bool is a boolean, Nat a BigInt, List `Con`/`Nil` cells,
   data `{$: <constructor>, ...fields}`); only the adapter converts to product values.
 - Name the generated tests' row in `evidence.json` as for a hand-written conformance test; run them
-  through `oracle-run.mjs exec`. Report `formal: proven` for the model and
+  through `oracle-run.mjs exec`. They are the only owner of a row whose `Formal` cell names a def
+  and of the Formal Model `Conformance row`, so do not write a vitest test that restates their
+  expected values. Every other row is owned by a hand-written vitest or Playwright test
+  ([`delivery/red.md`](delivery/red.md) step 2, enforced as `EVIDENCE_FORMAL_HAND_TEST` and
+  `EVIDENCE_GENERATED_OUTSIDE_MODEL`). Report `formal: proven` for the model and
   `conformance: tested` (exhaustive N / sampled M runs, seed) for the product — never proven.
 - A failure prints the step or the pair; a sampled failure also prints fast-check's seed, path and
   shrunk counterexample. Replay it with
