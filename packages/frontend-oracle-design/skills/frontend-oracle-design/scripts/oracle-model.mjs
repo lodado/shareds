@@ -19,7 +19,6 @@ import { toPlain } from './oracle-types.mjs'
 export { toPlain } from './oracle-types.mjs'
 
 export const GENERATOR_VERSION = 1
-export const MAX_BOUND = 8
 // safety: 나쁜 일이 일어나지 않는다 · effect: 요구된 일이 일어난다 · witness: `exs`로 그 일이 init에서 도달 가능함을 보인다
 export const FORMAL_LAW_KINDS = ['safety', 'effect', 'witness']
 const MODEL_EXPORTS = ['init', 'step', 'next', 'observe']
@@ -123,7 +122,7 @@ export function eventLabel(event) {
 /**
  * Bend 파일을 스킬 소유 임시 디렉터리에 `.mjs`로 컴파일해 불러온다. foreign·unsafe·hub import는 실행 전에 거부한다 —
  * 컴파일된 모듈은 이 프로세스에서 돌기 때문이다. 남는 코드는 Bend가 종료를 검사한 순수 def뿐이다.
- * ponytail: def는 시간·메모리 상한 없이 이 프로세스에서 돈다(상한은 bound ≤ 8·max-cases·max-worlds뿐) — 큰 모델이
+ * ponytail: def는 시간·메모리 상한 없이 이 프로세스에서 돈다(열거 예산은 max-cases·max-worlds) — 큰 모델이
  * 오면 열거를 worker thread + resourceLimits·timeout으로 옮긴다.
  */
 export async function compileBend({ entry, bin, timeoutMs = 120_000 }) {
@@ -234,10 +233,11 @@ export async function loadModel({ model, prefix, bin, timeoutMs = 120_000 }) {
  * 선언 범위의 오라클 공간: `init`에서 시작해 환경 `next(history)`가 허용하는 사건을 `bound`개까지 이은 모든 trace.
  * 모든 prefix의 관측값이 기대값이다. 같은 모델·범위·생성기 버전이면 같은 case ID·순서가 나온다 — 시각·runId는 섞지 않는다.
  * 예산을 넘기면 그때까지의 case를 지우지 않고 `complete: false`로 남긴다.
+ * ponytail: 재귀 깊이는 JS call stack에 묶인다 — 수천 단계 trace가 필요하면 반복 DFS로 옮긴다.
  */
 export function enumerateSpace(model, { bound, maxCases = 5000 }) {
-  if (!Number.isInteger(bound) || bound < 1 || bound > MAX_BOUND) {
-    throw new CliError('USAGE', `bound must be an integer 1..${MAX_BOUND}`, 2)
+  if (!Number.isSafeInteger(bound) || bound < 1) {
+    throw new CliError('USAGE', 'bound must be a positive safe integer', 2)
   }
   if (!Number.isInteger(maxCases) || maxCases < 1)
     throw new CliError('USAGE', 'max-cases must be a positive integer', 2)
@@ -943,9 +943,9 @@ export async function formalModelIssues(formal, context) {
     issues.push('formal-prefix: Prefix must be the model namespace, e.g. Search')
   if (
     fields.Bound &&
-    !(Number.isInteger(Number(fields.Bound)) && Number(fields.Bound) >= 1 && Number(fields.Bound) <= MAX_BOUND)
+    !(Number.isSafeInteger(Number(fields.Bound)) && Number(fields.Bound) >= 1)
   ) {
-    issues.push(`formal-bound: Bound must be an integer 1..${MAX_BOUND}`)
+    issues.push('formal-bound: Bound must be a positive safe integer')
   }
   if (
     fields['Conformance row'] &&

@@ -48,6 +48,19 @@ const modelOnly = (pkg) => {
   return copy
 }
 
+test('behavior bounds have no policy ceiling but must be positive safe integers', () => {
+  for (const bound of [8, 9, 40, Number.MAX_SAFE_INTEGER]) {
+    const pkg = clone(PKG)
+    pkg.behavior.bound = bound
+    assert.deepEqual(packageIssues(pkg), [])
+  }
+  for (const bound of [-1, 0, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+    const pkg = clone(PKG)
+    pkg.behavior.bound = bound
+    assert.ok(packageIssues(pkg).some((issue) => issue.startsWith('package-behavior: behavior.bound')))
+  }
+})
+
 async function fixtureCopy(t) {
   const root = await mkdtemp(join(tmpdir(), 'oracle-package-'))
   t.after(() => rm(root, { recursive: true, force: true }))

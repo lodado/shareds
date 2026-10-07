@@ -35,7 +35,6 @@ import {
   compileBend,
   enumerateSpace,
   loadModel,
-  MAX_BOUND,
   observeTrace,
   proveLaws,
   transitionCover,
@@ -947,10 +946,10 @@ function signatures(space) {
   return found
 }
 
-/** bound 너머에서만 나타나는 행동 패턴 — 모델만으로 계산한다. bound를 늘리지 못하면(최대) 미실행으로 남긴다. */
-function traceExtension(model, space, bound) {
-  const extended = Math.min(bound + 2, MAX_BOUND)
-  if (extended === bound) return { status: 'not-run', reason: `bound ${bound} is already the maximum`, candidates: [] }
+/** bound 너머에서만 나타나는 행동 패턴 — 모델만으로 계산한다. 안전한 정수 범위를 넘으면 미실행으로 남긴다. */
+export function traceExtension(model, space, bound) {
+  const extended = bound + 2
+  if (!Number.isSafeInteger(extended)) return { status: 'not-run', reason: `bound ${bound} cannot be extended by two as a safe integer`, candidates: [] }
   const wide = enumerateSpace(model, { bound: extended })
   if (!wide.complete)
     return { status: 'incomplete', reason: `the space at bound ${extended} stopped at its budget`, candidates: [] }
@@ -2485,4 +2484,3 @@ if (process.argv[1] && resolve(process.argv[1]) === SCRIPT) {
     process.exitCode = cliError.exitCode
   }
 }
-

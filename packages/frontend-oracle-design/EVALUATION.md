@@ -1,3 +1,11 @@
+# 0.93.0: remove the Bend trace-depth ceiling
+
+`Bound` is a positive safe integer, no longer restricted to 1..8. Model enumeration, package
+validation and card lint accept deeper approved traces; discovery extends the declared bound by
+two rather than stopping at eight. Case/world budgets and Bend execution timeouts are unchanged.
+Regression checks cover depths 9 and 40, retained case-budget stops and invalid numeric bounds.
+Earlier version evidence below retains its historical limits.
+
 # 0.84.0: explicit Oracle / Contract verification profiles
 
 Integration evidence for the approved two-entry split. The existing `frontend-oracle-design`

@@ -232,8 +232,22 @@ test('a budget stop keeps the explored cases and reports the space as incomplete
   assert.notEqual(stopped.inputDigest, full.inputDigest)
 })
 
-test('space refuses a bound outside 1..8', () => {
-  for (const bound of [0, 9, 1.5]) {
+test('space accepts bounds beyond eight and preserves the case budget', () => {
+  const full = enumerateSpace(handModel(), { bound: 9 })
+  assert.equal(full.complete, true)
+  assert.equal(full.cases.length, 512)
+  const stopped = enumerateSpace(handModel(), { bound: 9, maxCases: 3 })
+  assert.equal(stopped.complete, false)
+  assert.equal(stopped.cases.length, 3)
+  const linear = { ...handModel(), next: () => ({ $: 'Con', head: { $: 'A' }, tail: { $: 'Nil' } }) }
+  const deep = enumerateSpace(linear, { bound: 40 })
+  assert.equal(deep.complete, true)
+  assert.equal(deep.cases.length, 1)
+  assert.equal(deep.cases[0].trace.length, 40)
+})
+
+test('space refuses bounds that are not positive safe integers', () => {
+  for (const bound of [-1, 0, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
     assert.throws(
       () => enumerateSpace(handModel(), { bound }),
       (error) => error.code === 'USAGE',
@@ -685,9 +699,13 @@ test('card lint runs the Formal Model checks on the fixture card and on a broken
   assert.match(clean.stdout, /CARD_LINT_OK 4 rows/)
 
   await edit(join(root, 'oracle.md'), '- Bound: 4', '- Bound: 40')
+  const deep = verify(root)
+  assert.equal(deep.status, 0, deep.stderr)
+
+  await edit(join(root, 'oracle.md'), '- Bound: 40', '- Bound: 0')
   const broken = verify(root)
   assert.equal(broken.status, 1)
-  assert.match(broken.stderr, /formal-bound: Bound must be an integer 1\.\.8/)
+  assert.match(broken.stderr, /formal-bound: Bound must be a positive safe integer/)
 })
 
 test('the lock covers the model and laws: a changed law fails verify, a changed proof candidate does not', async (t) => {

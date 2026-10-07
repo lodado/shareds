@@ -211,7 +211,7 @@ which become `O*` IDs); a legacy card carries it by hand:
 says something never happens, `effect` that a required outcome happens, and `witness` is an `exs`
 law showing that outcome is reachable from `init`. The conformance row is the one `O*` row whose
 evidence is the conformance run. `oracle-verify.mjs card` checks the section: required fields, a
-bound of 1..8, law rows that match `LAWS.bend` both ways, citations of real `P*`/`O*`/`D*`/`I*`, a
+positive safe-integer bound with no policy ceiling, law rows that match `LAWS.bend` both ways, citations of real `P*`/`O*`/`D*`/`I*`, a
 witness for every policy with an effect law and at least one effect law (safety laws alone are
 satisfied by a model that does nothing), every policy either formalized or listed under
 `Not formalized`, laws that import the locked model, every transitively imported local file
@@ -241,6 +241,9 @@ to `Bound` messages from `init` that `next` allows; each prefix's `observe` valu
 observation. Case IDs hash the trace, so the same model, bound and generator version give the same
 cases and `spaceDigest`; no time or runId enters them. A budget stop keeps the explored cases and
 reports `complete: false` — never trim cases to finish.
+`Bound` has no fixed depth ceiling; case/world budgets and Bend execution timeouts remain in force.
+Enumeration still uses recursive DFS and fast-check allocates sampled index arrays up front; extreme
+depths can exhaust the JavaScript stack or memory before a case budget is reached.
 It also reports the transition cover: every configuration the model can reach (its state plus the events the
 environment allows) takes every allowed event once, through the shortest trace that reaches it. A finite
 model is `closed` — every (configuration, event) pair runs, including those first reached past the bound;

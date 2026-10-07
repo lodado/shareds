@@ -28,6 +28,7 @@ import {
   sourceSentences,
   spaceCrossCheck,
   stepPatterns,
+  traceExtension,
 } from './oracle-discovery.mjs'
 import { parseCaseSpace } from './oracle-frames.mjs'
 import { enumerateSpace } from './oracle-model.mjs'
@@ -86,6 +87,23 @@ const oneShot = {
     return { $: 'Nil' }
   },
 }
+
+test('trace extension crosses eight but does not overflow safe integers', () => {
+  for (const bound of [8, 9, 40]) {
+    const space = enumerateSpace(oneShot, { bound })
+    const extended = traceExtension(oneShot, space, bound)
+    assert.equal(extended.status, 'run')
+    assert.equal(extended.extendedBound, bound + 2)
+    assert.deepEqual(extended.novel, [])
+  }
+  for (const bound of [Number.MAX_SAFE_INTEGER - 1, Number.MAX_SAFE_INTEGER]) {
+    const space = enumerateSpace(oneShot, { bound })
+    const extended = traceExtension(oneShot, space, bound)
+    assert.equal(extended.status, 'not-run')
+    assert.match(extended.reason, /cannot be extended by two as a safe integer/)
+    assert.deepEqual(extended.candidates, [])
+  }
+})
 
 test('perturbations only leave the declared environment: boundary values, duplicates, swaps and early events', () => {
   const space = enumerateSpace(oneShot, { bound: 2 })
