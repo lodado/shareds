@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { access, chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import process from 'node:process'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -16,6 +17,8 @@ import { adapterFor } from '../../../test-fixtures/stale-search/search.adapter.m
 import { BEND_VERSION } from './ensure-bend.mjs'
 import { sha256 } from './oracle-fs.mjs'
 import {
+  bendFailureHint,
+  checkBendFiles,
   checkConformance,
   classifyTrace,
   enumerateSpace,
@@ -24,6 +27,7 @@ import {
   minimalCover,
   parseFormalModel,
   proveLaws,
+  scaffoldWorld,
   scanBendSource,
   transitionCover,
 } from './oracle-model.mjs'
@@ -905,4 +909,80 @@ test('[bend] the reducer conforms on the space, and each wrong reducer fails wit
     observed: 0,
   })
   assert.equal(checkConformance(space, adapterFor(reduceShowingPrevious, initialSearch)).pass, false)
+})
+
+// ── check·scaffold: Bend 실패를 한 턴 안에 고치게 한다 ──────────────────────────────────────
+
+test('bend failure hints name one fix for each check failure seen in real runs', () => {
+  const cases = [
+    ["- expected : a fresh name (duplicate declaration: Event)", /domain name/],
+    ["- observed : catalog (consumed more than once)", /\+x = v/],
+    ["- message  : a match on a parameter or field (this name is a def or a consumed bind)", /before its first other use/],
+    ["- message  : a declared constructor (unknown: Ui.Marks)", /type block/],
+    ["- expected : a filled definition (an unfilled law is a dead claim: live code cannot", /def f/],
+    ["- expected : an import ('import Base', or 'import <path> as <Name>')", /import Base/],
+  ]
+  for (const [output, fix] of cases) assert.match(bendFailureHint(`SOME PROOFS FAIL\nError:\n${output}`), fix, output)
+  assert.equal(bendFailureHint('SOME PROOFS FAIL\nError:\n- expected : Nat'), null)
+})
+
+test('check runs bend --check-only per file and attaches the failure hint', async (t) => {
+  const dir = await workspace(t)
+  await writeFile(join(dir, 'World.bend'), 'import Base\n')
+  const ok = await checkBendFiles({ files: [join(dir, 'World.bend')], bin: (await fakeBend(dir, { stdout: '' })).bin })
+  assert.deepEqual(ok.map(({ status }) => status), ['ok'])
+  const failing = await fakeBend(dir, {
+    stdout: 'SOME PROOFS FAIL\nError:\n- expected : a fresh name (duplicate declaration: Event)\nLocation: World.bend:3',
+    exitCode: 1,
+  })
+  const [failed] = await checkBendFiles({ files: [join(dir, 'World.bend')], bin: failing.bin })
+  assert.equal(failed.status, 'failed')
+  assert.match(failed.hint, /domain name/)
+  assert.match(failed.output, /duplicate declaration: Event/)
+  const [missing] = await checkBendFiles({ files: [join(dir, 'World.bend')], bin: join(dir, 'no-such-bend') })
+  assert.equal(missing.status, 'unavailable')
+})
+
+test('prove attaches the same hint to a failed verdict', async (t) => {
+  const dir = await proofDir(t)
+  const fake = await fakeBend(dir, { stdout: 'SOME PROOFS FAIL\nError:\n- observed : at (consumed more than once)\nLocation: Laws.a', exitCode: 1 })
+  const result = await proveLaws({ dir, bin: fake.bin })
+  assert.equal(result.status, 'failed')
+  assert.match(result.hint, /reusable/)
+})
+
+test('scaffold writes the world record and finite field types and refuses names Base declares', () => {
+  const base = 'type Result<a> is Data:\n  Fail{error: E}\n  Done{value: A}\ntype Event is Data:\n  Move{x: U32}\n'
+  const world = scaffoldWorld({ prefix: 'Race', fields: ['arrival=OldFirst,NewFirst', 'newAnswers=bool'], baseText: base })
+  assert.match(world, /^import Base\n/)
+  assert.match(world, /type Arrival is Data:\n {2}OldFirst\{\}\n {2}NewFirst\{\}/)
+  assert.match(world, /type Race is Data:\n {2}Race\{arrival: Arrival, newAnswers: Bool\}/)
+  assert.throws(
+    () => scaffoldWorld({ prefix: 'Race', fields: ['outcome=Done,Fail'], baseText: base }),
+    (error) => error.code === 'SCAFFOLD_NAME' && /Done/.test(error.message) && /Fail/.test(error.message),
+  )
+  assert.throws(
+    () => scaffoldWorld({ prefix: 'Race', fields: ['a=On,Off', 'b=On,Idle'], baseText: base }),
+    (error) => error.code === 'SCAFFOLD_NAME' && /On/.test(error.message),
+  )
+  assert.throws(() => scaffoldWorld({ prefix: 'race', fields: ['a=bool'], baseText: base }), (error) => error.code === 'USAGE')
+  assert.throws(() => scaffoldWorld({ prefix: 'Race', fields: ['a='], baseText: base }), (error) => error.code === 'USAGE')
+})
+
+test('scaffolded world checks with the installed Bend', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const dir = await workspace(t)
+  const base = spawnSync(bin, ['base'], { encoding: 'utf8', env: { ...process.env, BEND_NO_TELEMETRY: '1' } }).stdout
+  const path = join(dir, 'World.bend')
+  await writeFile(path, scaffoldWorld({ prefix: 'Race', fields: ['arrival=OldFirst,NewFirst', 'newAnswers=bool'], baseText: base }))
+  const [result] = await checkBendFiles({ files: [path], bin })
+  assert.equal(result.status, 'ok', result.output)
+})
+
+test('oracle-model help prints usage on stdout with scaffold and check', () => {
+  const run = spawnSync(process.execPath, [join(SCRIPTS, 'oracle-model.mjs'), '--help'], { encoding: 'utf8' })
+  assert.equal(run.status, 0, run.stderr)
+  assert.match(run.stdout, /oracle-model\.mjs scaffold --prefix/)
+  assert.match(run.stdout, /oracle-model\.mjs check --file/)
 })

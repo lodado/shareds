@@ -235,7 +235,7 @@ test('public protocol-inspection resolves ledger by current profile without phys
   assert.match(body, /same explicit profile and current-stage applicability before reading/)
   assert.match(body, /not this authoring manual/)
   const loader = await readFile(new URL('references/roles/loading.md', core), 'utf8')
-  assert.match(loader, /--profile <resolved-profile> --point scope-decision --include <role-id> --json/)
+  assert.match(loader, /--profile <resolved-profile> --point scope-decision --include <role-id>`/)
   assert.match(loader, /Resolve that named graph node with the same explicit profile and current-stage applicability before reading/)
   for (const profile of [formal, contract]) {
     const resolved = JSON.parse(execFileSync(process.execPath, [script, '--profile', profile, '--point', 'scope-decision', '--include', 'delivery-ledger', '--json'], { encoding: 'utf8' }))

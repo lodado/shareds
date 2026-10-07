@@ -354,14 +354,15 @@ role procedure preserves the manual conditions at the decision point where they 
 Before a scoped decision, model/package authoring, or protocol inspection, use the read-only router:
 
 ```sh
-node scripts/oracle-reference-route.mjs --point <scope-decision|model-authoring|package-authoring|protocol-inspection> --json
+node scripts/oracle-reference-route.mjs --point <scope-decision|model-authoring|package-authoring|protocol-inspection>
 ```
 
 At scope-decision, optional `--facts <json-file>` supplies architectureBoundaryChange (including state
 ownership/public API), backendBoundaryChange (including DB/data-access), and performanceClaim (requirement
 or improvement), each true, false or unknown. Missing facts load conservatively, false requires inspected
 scope. Load returned references with dependencies, respecting reader ownership. Apply manualConditions
-through the active role's conditional loads, using `--include <id>` to resolve manual-node dependencies.
+through the active role's conditional loads, using `--include <id>` to resolve manual-node dependencies;
+`--json` adds each manual condition's `when` text when a decision needs it.
 Routing is partial, advisory, never permission or a substitute for entry, mode order or re-read rules.
 
 Read `when` as the decision point, not the deliverable stage. If applicability is ambiguous, load.
@@ -417,9 +418,11 @@ Read after common and verification-common. Prerequisites: resolved profile, role
 Unknown/bare roles return to the controller, never silently select a profile.
 
 Use the canonical read-only router at the current decision point with the already resolved profile:
-`scripts/oracle-reference-route.mjs --profile <resolved-profile> --point scope-decision --include <role-id> --json`.
-`<role-id>` is the shared role node (`role-intake`, `role-author`, `role-review`, `role-implement`); a bare
-role or skill name (`author`, `oracle-author`) resolves to it.
+`scripts/oracle-reference-route.mjs --profile <resolved-profile> --point scope-decision --include <role-id>`.
+Its plain output names each node, path and reason in about 3 KB; `--json` adds every manual condition
+(about 26 KB) for tooling, so a worker reads the plain output.
+`<role-id>` is the shared role node (`role-intake`, `role-author`, `role-review`, `role-implement`); the role
+or skill name alone (`author`, `oracle-author`) resolves to it.
 Pass inspected scope facts, treating unknown conservatively. Read returned full same-profile dependency
 closure with native Read without offset or limit. Keep source-code reads bounded. Router advice neither
 advances stages nor authorizes excluded context. Unavailable routing is a blocker, not permission to

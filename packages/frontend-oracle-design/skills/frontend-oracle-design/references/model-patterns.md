@@ -209,8 +209,9 @@ Reusable traces need `+List<Msg>` in `run` and in `exs` witnesses.
 
 A check costs seconds; a guessed rewrite costs a model turn. Before declaring a constructor or type run
 `bend base | grep -w <Name>` (no match means it is free; `bend base <Name>` finds only top-level names).
-Read the failure's `Location:` line, apply the matching fix once, and rerun the same file. Do not
-rewrite the whole model to fix one reported line.
+Check with `scripts/oracle-model.mjs check --file <file>` (`bend <file> --check-only` per file); it and
+`prove` print the matching fix below as `hint`. Read the failure's `Location:` line, apply the fix once,
+and rerun the same file. Do not rewrite the whole model to fix one reported line.
 
 | Failure text                                | Cause                                                  | Fix                                                                                        |
 | ------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------ |

@@ -216,6 +216,13 @@
       ]
     },
     {
+      "id": "role-author-draft-formal",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/roles/author-draft-formal.md",
+      "when": "Formal author after project-card, before completing and showing the Draft",
+      "requires": ["card-policy-sources", "card-risk-grill", "bva", "card-format", "card-interaction-sweep"]
+    },
+    {
       "id": "role-author-closure-formal",
       "profiles": ["formal-bend/v1"],
       "path": "references/roles/author-closure-formal.md",
@@ -327,16 +334,17 @@
       "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/roles/author.md",
       "when": "oracle-author invocation after human-confirmed axes to author the current-profile source-bound Draft and required verification artifacts",
-      "requires": [
-        "role-loading",
-        "verification-common",
-        "card-policy-sources",
-        "card-risk-grill",
-        "card-format",
-        "card-interaction-sweep",
-        "card-case-space"
-      ],
-      "requiresByProfile": { "formal-bend/v1": ["role-author-formal"], "contract/v1": ["contract-authoring"] }
+      "requires": ["role-loading", "verification-common", "card-case-space"],
+      "requiresByProfile": {
+        "formal-bend/v1": ["role-author-formal"],
+        "contract/v1": [
+          "contract-authoring",
+          "card-policy-sources",
+          "card-risk-grill",
+          "card-format",
+          "card-interaction-sweep"
+        ]
+      }
     },
     {
       "id": "role-author-closure",

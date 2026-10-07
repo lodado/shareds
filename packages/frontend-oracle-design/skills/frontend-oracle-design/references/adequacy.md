@@ -115,6 +115,10 @@ The model analyst writes this from the source text alone, before seeing the card
 - `<Prefix>.G<n>(w) -> Bool` states a goal from the source text. `safety`: every world the card allows
   satisfies it. `witness`: some world the card allows reaches it (the normal path is possible).
 - No foreign or `@unsafe` code; every imported file is a registered `repo:` source.
+- Start the world file with `scripts/oracle-model.mjs scaffold --prefix <Prefix> --out <file>` and one
+  `--field <name=bool|A,B>` per field: it writes the record and field types and refuses names Base already declares.
+  Then add the A and G defs. Run `scripts/oracle-model.mjs check --file <file>` after each edit; a
+  failure carries its fix in `hint`. The dispatch names the absolute scripts directory.
 - Return the Bend file, the Assumption and Goal rows with sources, one candidate Terms row per field
   (with its category), boundary examples, and the questions the source leaves open.
 - When the flow has states, also return a `## State Model` table of your own reading — `- States:`,

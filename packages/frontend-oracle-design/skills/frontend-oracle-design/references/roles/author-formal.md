@@ -11,6 +11,11 @@ transition, target test write or production edit is authorized here. Re-read dis
 
 ## Model first, card second
 
+Read in two phases. Until `project-card` succeeds, load only the nodes steps 1–6 name and the router's
+package-authoring and model-authoring results. Load the Draft-completion nodes below after it through
+[`role-author-draft-formal`](author-draft-formal.md), not at entry: every model and proof turn carries
+whatever is already loaded.
+
 1. Unconditionally read [`bend-cross-verification.md`](../bend-cross-verification.md) before Draft/lock,
    in every lane and risk. Bend is mandatory, not applicability-gated and needs no separate user request.
    Read [`adequacy.md`](../adequacy.md) for source goals, Terms, Adequacy and independent analyst inputs.
@@ -38,7 +43,8 @@ transition, target test write or production edit is authorized here. Re-read dis
 5. Write the Bend world, behavior model and laws according to stack applicability. Read
    [`model-patterns.md`](../model-patterns.md) while writing/revising MODEL, LAWS or PROOF, especially retries,
    delays, staleness, error kinds, remounts and request counts: time as events, attempts, error sum types,
-   and separate request/fetch/effect counts, not one collapsed event.
+   and separate request/fetch/effect counts, not one collapsed event. Check each Bend file with
+   `scripts/oracle-model.mjs check --file <file>` before `prove`; a failure carries its fix in `hint`.
 6. Run `oracle-package.mjs derive` and `oracle-adequacy.mjs check --package` until each counterexample is
    resolved or becomes an Open question. Read [`discovery.md`](../discovery.md) before
    `oracle-discovery.mjs cross-check --package` and bring each candidate back to the interview.
@@ -62,7 +68,7 @@ so a hand-written record skips no check. Authoring never fabricates stage accept
 
 ## Complete the Draft, without rewriting generated policy
 
-Read [`card/policy-sources.md`](../card/policy-sources.md), [`card/risk-grill.md`](../card/risk-grill.md),
+After `project-card`, read [`card/policy-sources.md`](../card/policy-sources.md), [`card/risk-grill.md`](../card/risk-grill.md),
 [`bva.md`](../bva.md), [`card/card-format.md`](../card/card-format.md),
 [`card/interaction-sweep.md`](../card/interaction-sweep.md) and card/case-space with dependencies.
 Keep every surviving Grill question as an Open question, candidate rows plus a recommendation.

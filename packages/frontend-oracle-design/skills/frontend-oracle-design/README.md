@@ -193,6 +193,7 @@ flowchart LR
   contract_authoring["contract-authoring"]
   contract_review["contract-review"]
   role_author_formal["role-author-formal"]
+  role_author_draft_formal["role-author-draft-formal"]
   role_author_closure_formal["role-author-closure-formal"]
   mandatory_verification["mandatory-verification"]
   role_controller["role-controller"]
@@ -269,6 +270,11 @@ flowchart LR
   model_patterns --> role_author_formal
   model_package_example --> role_author_formal
   discovery --> role_author_formal
+  card_policy_sources --> role_author_draft_formal
+  card_risk_grill --> role_author_draft_formal
+  bva --> role_author_draft_formal
+  card_format --> role_author_draft_formal
+  card_interaction_sweep --> role_author_draft_formal
   mandatory_verification --> role_author_closure_formal
   bend_cross_verification --> role_author_closure_formal
   discovery --> role_author_closure_formal
@@ -305,13 +311,13 @@ flowchart LR
   contract_space -. "contract/v1" .-> role_intake
   role_loading --> role_author
   verification_common --> role_author
-  card_policy_sources --> role_author
-  card_risk_grill --> role_author
-  card_format --> role_author
-  card_interaction_sweep --> role_author
   card_case_space --> role_author
   role_author_formal -. "formal-bend/v1" .-> role_author
   contract_authoring -. "contract/v1" .-> role_author
+  card_policy_sources -. "contract/v1" .-> role_author
+  card_risk_grill -. "contract/v1" .-> role_author
+  card_format -. "contract/v1" .-> role_author
+  card_interaction_sweep -. "contract/v1" .-> role_author
   role_loading --> role_author_closure
   verification_common --> role_author_closure
   role_author_closure_formal -. "formal-bend/v1" .-> role_author_closure

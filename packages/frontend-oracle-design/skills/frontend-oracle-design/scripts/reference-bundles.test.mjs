@@ -150,7 +150,7 @@ test('role loading documents bundles as an optional cache-stable read, not a new
     assert.equal(bundlePath(bundle), join(skillDirectory, relative))
     assert.equal(await read(relative), await renderBundle(graph, bundle), `canonical bundle ${bundle.id} must remain a readable delivery copy`)
   }
-  assert.match(skill, /--profile <resolved-profile> --point scope-decision --include <role-id> --json/)
+  assert.match(skill, /--profile <resolved-profile> --point scope-decision --include <role-id>`/)
   assert.match(skill, /Read returned full same-profile dependency\s+closure with native Read without offset or limit\./)
   assert.match(skill, /Resolve that named graph node with the same explicit profile and current-stage applicability before reading\./)
   assert.match(skill, /Fresh workers cannot inherit a parent's continued-bundle assumptions\./)

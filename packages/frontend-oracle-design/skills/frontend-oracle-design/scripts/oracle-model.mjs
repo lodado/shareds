@@ -726,9 +726,10 @@ export async function proveLaws({ dir, bin, require = [], timeoutMs = 120_000 })
     stderr: run.stderr ?? '',
   }
   const verdict = verdictOf(run, { bin, timeoutMs })
+  const hint = verdict.status === 'failed' ? bendFailureHint(`${observed.stdout}\n${observed.stderr}`) : null
   return run.error
     ? { ...observed, ...verdict }
-    : { ...observed, bend: { bin, version: reportedVersion(bin) }, ...verdict }
+    : { ...observed, bend: { bin, version: reportedVersion(bin) }, ...verdict, ...(hint ? { hint } : {}) }
 }
 
 /** `bend <file> --verdict` 실행 결과 → 상태. proven은 exit 0·신호 없음·정확한 `ALL PROOFS CHECK` 줄이 함께일 때뿐이다. */
@@ -754,6 +755,116 @@ export function verdictOf(run, { bin, timeoutMs }) {
   if (/\b\d+ TODOs? found\b/.test(output)) return { status: 'open', failedAt }
   if (/rely on unsafe or foreign code/.test(output)) return { status: 'unsafe', failedAt }
   return { status: 'failed', failedAt }
+}
+
+// 실제 실행에서 반복된 Bend 검사 실패 → 고치는 한 가지 방법. model-patterns.md "Bend check failures" 표와 같은 내용이다.
+const BEND_FAILURE_HINTS = [
+  [
+    /duplicate declaration: ([\w.]+)/,
+    (name) => `${name} is already declared (Base or an import): rename it to a domain name; check with \`bend base | grep -w ${name}\``,
+  ],
+  [
+    /\(consumed more than once\)/,
+    () => 'a plain binding or parameter is affine (one use): make it reusable (`+x = v`, `+x: T`, `+D<A>`) or destructure once and reuse the parts',
+  ],
+  [/a match on a parameter or field/, () => 'match the value before its first other use, or bind it reusable with `+`'],
+  [
+    /a declared constructor \(unknown: ([^)]+)\)/,
+    (name) => `${name} is not a constructor of that type: use one from the type block under its import alias`,
+  ],
+  [/a filled definition/, () => 'a law has no def of the same name: add `def f` that proves it, or remove a law the card does not claim'],
+  [/an import \('import Base'/, () => 'open the file with `import Base`, then `import ./file.bend as M`'],
+]
+
+/** Bend 실패 출력 → 알려진 원인의 고칠 방법 한 줄. 모르는 실패는 null — 추측한 처방을 붙이지 않는다. */
+export function bendFailureHint(output) {
+  for (const [pattern, fix] of BEND_FAILURE_HINTS) {
+    const match = output.match(pattern)
+    if (match) return fix(match[1])
+  }
+  return null
+}
+
+function bendOutput(run) {
+  return `${run.stdout ?? ''}${run.stderr ?? ''}`
+    .split('\n')
+    .filter((line) => !/^bend \S+ is available/.test(line))
+    .slice(0, 40)
+    .join('\n')
+    .trim()
+}
+
+/** `bend <file> --check-only`를 파일마다 — 증명 전 타입·이름·import 검사. 실패에는 알려진 고칠 방법을 붙인다. */
+export async function checkBendFiles({ files, bin, timeoutMs = 60_000 }) {
+  return files.map((file) => {
+    const path = resolve(file)
+    const run = spawnSync(bin, [basename(path), '--check-only'], {
+      cwd: dirname(path),
+      encoding: 'utf8',
+      env: { ...process.env, BEND_NO_TELEMETRY: '1' },
+      timeout: timeoutMs,
+      maxBuffer: 16 * 1024 * 1024,
+    })
+    if (run.error?.code === 'ETIMEDOUT') return { file, status: 'timeout', reason: `no check in ${timeoutMs}ms` }
+    if (run.error) return { file, status: 'unavailable', reason: `${bin}: ${run.error.message}` }
+    const output = bendOutput(run)
+    if (run.status === 0 && run.signal === null && !/^SOME PROOFS FAIL$/m.test(output)) return { file, status: 'ok' }
+    const hint = bendFailureHint(output)
+    return { file, status: 'failed', output, ...(hint ? { hint } : {}) }
+  })
+}
+
+const capitalize = (name) => `${name[0].toUpperCase()}${name.slice(1)}`
+
+/** `bend base` 출력에서 최상위 이름(type·constructor·def 머리)을 모은다 — 같은 이름의 선언은 증명 전에 실패한다. */
+function baseNames(baseText) {
+  const names = new Set()
+  for (const line of baseText.split('\n')) {
+    const text = line.trimStart()
+    const name = /^(?:type|def) (\w+)/.exec(text)?.[1] ?? (text === line ? null : /^([A-Z]\w*)\{/.exec(text)?.[1])
+    if (name) names.add(name)
+  }
+  return names
+}
+
+const typeBlock = ({ type, values }) => [`type ${type} is Data:`, ...values.map((value) => `  ${value}{}`), ''].join('\n')
+
+/**
+ * 세계 파일 뼈대 — record와 유한 필드 타입만 쓴다. 목표·행 def는 분석가가 원문에서 쓴다(뼈대는 의미를 정하지 않는다).
+ * field는 `name=bool` 또는 `name=A,B,...`. Base나 다른 필드와 겹치는 이름은 쓰기 전에 거절한다.
+ */
+export function scaffoldWorld({ prefix, fields, baseText }) {
+  if (!/^[A-Z]\w*$/.test(prefix ?? '')) throw new CliError('USAGE', 'prefix must name the world record type, e.g. Race', 2)
+  if (fields.length === 0) throw new CliError('USAGE', 'scaffold needs at least one --field name=bool|A,B', 2)
+  const parsed = fields.map((spec) => {
+    const [name, domain = ''] = spec.split('=')
+    const values = domain === 'bool' ? null : domain.split(',').filter(Boolean)
+    if (!/^[a-z]\w*$/.test(name) || (values && (values.length < 2 || values.some((value) => !/^[A-Z]\w*$/.test(value)))))
+      throw new CliError('USAGE', `field must be name=bool or name=Value,Value (lowerCamel name, UpperCamel values): ${spec}`, 2)
+    return { name, type: values ? capitalize(name) : 'Bool', values }
+  })
+  const declared = [prefix, ...parsed.filter(({ values }) => values).flatMap(({ type, values }) => [type, ...values])]
+  const repeated = declared.filter((name, index) => declared.indexOf(name) !== index)
+  const taken = baseNames(baseText)
+  const clashes = [...new Set([...repeated, ...declared.filter((name) => taken.has(name))])]
+  if (clashes.length > 0) {
+    const renamed = clashes.map((name) => prefix + name).join(', ')
+    throw new CliError(
+      'SCAFFOLD_NAME',
+      `already declared by Base or another field: ${clashes.join(', ')} — rename with a domain prefix (e.g. ${renamed})`,
+    )
+  }
+  const types = parsed.filter(({ values }) => values).map(typeBlock)
+  const record = parsed.map(({ name, type }) => `${name}: ${type}`).join(', ')
+  return [
+    'import Base',
+    '',
+    '# World scaffold from `oracle-model.mjs scaffold`: the record and its finite field types only. Add one Bool def',
+    `# per goal or row (${prefix}.G1, ${prefix}.O1, ...) that matches the record once and uses each bound field once.`,
+    ...types,
+    `type ${prefix} is Data:\n  ${prefix}{${record}}\n`,
+    `def ${prefix}.imp(a: Bool, b: Bool) -> Bool:\n  Bool.or(Bool.not(a), b)\n`,
+  ].join('\n')
 }
 
 /**
@@ -946,33 +1057,65 @@ function relationIssues(fields, structures, lawsPath) {
 }
 
 function parseOptions(args) {
-  const options = { require: [] }
+  const options = { require: [], file: [], field: [] }
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index]?.replace(/^--/, '')
     const value = args[index + 1]
     if (
-      !['dir', 'require', 'timeout-ms', 'model', 'prefix', 'bound', 'max-cases', 'impl'].includes(name) ||
+      !['dir', 'require', 'timeout-ms', 'model', 'prefix', 'bound', 'max-cases', 'impl', 'file', 'field', 'out'].includes(
+        name,
+      ) ||
       value === undefined
     ) {
       throw new CliError('USAGE', `Unknown or incomplete option: ${args[index]}`, 2)
     }
-    if (name === 'require') options.require.push(value)
+    if (['require', 'file', 'field'].includes(name)) options[name].push(value)
     else options[name] = value
   }
   return options
 }
 
 const USAGE = `usage:
+  oracle-model.mjs scaffold --prefix <Name> --field <name=bool|A,B>... --out <World.bend>
+  oracle-model.mjs check --file <x.bend> [--file <y.bend>]... [--timeout-ms <n>]
   oracle-model.mjs prove --dir <dir with LAWS.bend and PROOF.bend> [--require <law>]... [--timeout-ms <n>]
   oracle-model.mjs space --model <MODEL.bend> --prefix <Name> --bound <n> [--max-cases <n>]
   oracle-model.mjs conform --model <MODEL.bend> --prefix <Name> --bound <n> --impl <adapter.mjs> [--max-cases <n>]`
 
 async function main() {
   const [command, ...args] = process.argv.slice(2)
-  if (!['prove', 'space', 'conform'].includes(command)) throw new CliError('USAGE', USAGE, 2)
+  if (command === '--help' || command === '-h') {
+    process.stdout.write(`${USAGE}\n`)
+    return
+  }
+  if (!['scaffold', 'check', 'prove', 'space', 'conform'].includes(command)) throw new CliError('USAGE', USAGE, 2)
   const options = parseOptions(args)
   const timeoutMs = options['timeout-ms'] ? Number(options['timeout-ms']) : undefined
   const { bin } = await ensureBend()
+
+  if (command === 'scaffold') {
+    if (!options.out) throw new CliError('USAGE', USAGE, 2)
+    const exists = await readFile(options.out).then(
+      () => true,
+      () => false,
+    )
+    if (exists) throw new CliError('SCAFFOLD_EXISTS', `${options.out} exists — scaffold never overwrites a world file`)
+    const base = spawnSync(bin, ['base'], { encoding: 'utf8', env: { ...process.env, BEND_NO_TELEMETRY: '1' } })
+    if (base.status !== 0) throw new CliError('BEND_UNAVAILABLE', `${bin} base: ${bendOutput(base)}`)
+    await writeFile(options.out, scaffoldWorld({ prefix: options.prefix, fields: options.field, baseText: base.stdout }))
+    const [check] = await checkBendFiles({ files: [options.out], bin, timeoutMs })
+    process.stdout.write(`${JSON.stringify({ out: options.out, check })}\n`)
+    process.exitCode = check.status === 'ok' ? 0 : 1
+    return
+  }
+
+  if (command === 'check') {
+    if (options.file.length === 0) throw new CliError('USAGE', USAGE, 2)
+    const results = await checkBendFiles({ files: options.file, bin, timeoutMs })
+    process.stdout.write(`${JSON.stringify({ files: results })}\n`)
+    process.exitCode = results.every(({ status }) => status === 'ok') ? 0 : 1
+    return
+  }
 
   if (command === 'prove') {
     if (!options.dir) throw new CliError('USAGE', USAGE, 2)

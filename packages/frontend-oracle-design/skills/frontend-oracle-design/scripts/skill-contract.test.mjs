@@ -2151,6 +2151,7 @@ test('covers every reference through typed routing or an explicit role owner wit
       'role-case-space-inputs-formal', 'bva', 'card-risk-grill', 'card-format', 'card-interaction-sweep',
       'card-case-space', 'card-case-space-frames', 'types-state-ladder', 'types-authoring',
       'types-api-surface', 'types-advanced-contracts', 'type-environment', 'bend-cross-verification', 'adequacy',
+      'role-author-draft-formal',
     ],
     'references/roles/space-discovery.md': ['role-case-space-inputs'],
     'references/roles/controller-formal.md': ['card-retro-metrics', 'card-confirmation-lock', 'delivery-ledger', 'delivery-red', 'delivery-green-review', 'subagent-review'],
@@ -2810,9 +2811,27 @@ test('runs keep going after yes, continue the author for repairs and fix Bend fa
   assert.match(controller, /Send every repair of the same revision[\s\S]+?to\s+the author context that wrote the package/)
   assert.match(controller, /Dispatch a fresh author only when that context is unavailable or for a new revision/)
   assert.match(loading, /A continued worker re-reads changed run files, not reference nodes/)
-  assert.match(loading, /a bare\s+role or skill name \(`author`, `oracle-author`\) resolves to it/)
+  assert.match(loading, /the role\s+or skill name alone \(`author`, `oracle-author`\) resolves to it/)
   assert.match(patterns, /## Bend check failures/)
   for (const failure of ['consumed more than once', 'duplicate declaration', 'a declared constructor', 'a filled definition']) {
     assert.ok(patterns.includes(failure), failure)
   }
+})
+
+test('authors read the Draft nodes after project-card and Bend files go through scaffold and check', async () => {
+  const [author, adequacy, patterns, loading, controller] = await Promise.all([
+    read('references/roles/author-formal.md'),
+    read('references/adequacy.md'),
+    read('references/model-patterns.md'),
+    read('references/roles/loading.md'),
+    read('references/roles/controller-formal.md'),
+  ])
+  assert.match(author, /Read in two phases\. Until `project-card` succeeds/)
+  assert.match(author, /After `project-card`, read \[/)
+  assert.match(author, /scripts\/oracle-model\.mjs check --file <file>` before `prove`/)
+  assert.match(adequacy, /scripts\/oracle-model\.mjs scaffold --prefix <Prefix>/)
+  assert.match(adequacy, /The dispatch names the absolute scripts directory/)
+  assert.match(patterns, /it and\s+`prove` print the matching fix below as `hint`/)
+  assert.match(loading, /a worker reads the plain output/)
+  assert.match(controller, /this skill's `scripts\/`\s+directory and every file it may write/)
 })

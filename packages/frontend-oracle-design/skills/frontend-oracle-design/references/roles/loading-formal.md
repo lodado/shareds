@@ -15,14 +15,15 @@ role procedure preserves the manual conditions at the decision point where they 
 Before a scoped decision, model/package authoring, or protocol inspection, use the read-only router:
 
 ```sh
-node scripts/oracle-reference-route.mjs --point <scope-decision|model-authoring|package-authoring|protocol-inspection> --json
+node scripts/oracle-reference-route.mjs --point <scope-decision|model-authoring|package-authoring|protocol-inspection>
 ```
 
 At scope-decision, optional `--facts <json-file>` supplies architectureBoundaryChange (including state
 ownership/public API), backendBoundaryChange (including DB/data-access), and performanceClaim (requirement
 or improvement), each true, false or unknown. Missing facts load conservatively, false requires inspected
 scope. Load returned references with dependencies, respecting reader ownership. Apply manualConditions
-through the active role's conditional loads, using `--include <id>` to resolve manual-node dependencies.
+through the active role's conditional loads, using `--include <id>` to resolve manual-node dependencies;
+`--json` adds each manual condition's `when` text when a decision needs it.
 Routing is partial, advisory, never permission or a substitute for entry, mode order or re-read rules.
 
 Read `when` as the decision point, not the deliverable stage. If applicability is ambiguous, load.

@@ -101,8 +101,8 @@ without a lock from that activated session, and weakening tokens in tests after 
 gate stays authority and hosts without hooks rely on it alone. The hook records reviewer subagent returns
 in host-receipts.jsonl, and Stop checks the final report against the ledger. Hook absence is not an exemption.
 
-When delegating to a subagent, give it the absolute path of the Oracle's worktree and the absolute path of
-every file it may write, inside the Oracle's scan root. The hook finds the lock from the cwd and the target
+When delegating to a subagent, give it the absolute path of the Oracle's worktree, this skill's `scripts/`
+directory and every file it may write, inside the Oracle's scan root. The hook finds the lock from the cwd and the target
 file's ancestors, so a relative path or another worktree's cwd reads as no lock. Never route around a deny
 with shell writes.
 

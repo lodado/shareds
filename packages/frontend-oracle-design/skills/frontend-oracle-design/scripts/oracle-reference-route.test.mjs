@@ -341,3 +341,17 @@ test('router CLI help as usage on stdout so a worker need not read the script so
     assert.match(run.stdout, /role-author/)
   }
 })
+
+test('the Formal author entry closure leaves Draft-completion reads to role-author-draft-formal', () => {
+  const ids = (profile, include) =>
+    routeReferences(GRAPH, { point: 'package-authoring', facts: FALSE, include, profile }).agent.map(({ id }) => id)
+  const entry = ids('formal-bend/v1', ['role-author'])
+  for (const id of ['card-risk-grill', 'card-interaction-sweep']) assert.equal(entry.includes(id), false, id)
+  assert.ok(entry.includes('model-patterns') && entry.includes('bend-cross-verification'))
+  const draft = ids('formal-bend/v1', ['role-author-draft-formal'])
+  for (const id of ['card-policy-sources', 'card-risk-grill', 'bva', 'card-format', 'card-interaction-sweep'])
+    assert.ok(draft.includes(id), id)
+  const contract = ids('contract/v1', ['role-author'])
+  for (const id of ['card-policy-sources', 'card-risk-grill', 'card-format', 'card-interaction-sweep'])
+    assert.ok(contract.includes(id), `contract author keeps ${id}`)
+})
