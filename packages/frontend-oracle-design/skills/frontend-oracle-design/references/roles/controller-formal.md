@@ -15,6 +15,12 @@ The core entry owns scope and mode. Common prohibitions apply throughout. At eac
    `oracle-lock.mjs create` refuses a package oracle that is not at DRAFTED on the same package bytes,
    and only the stage runtime writes stage.json. The lock still runs card lint itself, so a hand-written
    record skips no check. A role return does not advance a stage.
+   Send every repair of the same revision (review findings, lint or proof failures, a user answer) to
+   the author context that wrote the package, continued with only the findings and changed inputs
+   (SendMessage on Claude Code). It already holds its references and re-reads only changed run files.
+   Dispatch a fresh author only when that context is unavailable or for a new revision; its packet names
+   the run directory and the open findings. The Delivery test worker is continued the same way.
+   Reviewers and analysts keep their own independence rules.
 3. Before showing the Draft, run the cold-read gate by invoking $oracle-review in a context-free context
    with card bytes alone. Apply five questions per row, collapse to one root and its cheapest first nail.
    Drive that nail and record root, falsifying observation and result in journal.md. In the same gate,

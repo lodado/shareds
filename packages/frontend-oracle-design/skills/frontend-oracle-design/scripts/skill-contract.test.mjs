@@ -2796,3 +2796,23 @@ test('card review is capped at two rounds and round two never reopens the defect
     assert.match(doc, /review-round-budget--at-most-2/)
   }
 })
+
+test('runs keep going after yes, continue the author for repairs and fix Bend failures from a table', async () => {
+  const [common, controller, loading, patterns] = await Promise.all([
+    read('references/common.md'),
+    read('references/roles/controller-formal.md'),
+    read('references/roles/loading.md'),
+    read('references/model-patterns.md'),
+  ])
+  assert.match(common, /### Keep going after `yes`/)
+  assert.match(common, /Do not stop between stages to ask whether to continue/)
+  assert.match(common, /Delegation never answers a question without a recommendation/)
+  assert.match(controller, /Send every repair of the same revision[\s\S]+?to\s+the author context that wrote the package/)
+  assert.match(controller, /Dispatch a fresh author only when that context is unavailable or for a new revision/)
+  assert.match(loading, /A continued worker re-reads changed run files, not reference nodes/)
+  assert.match(loading, /a bare\s+role or skill name \(`author`, `oracle-author`\) resolves to it/)
+  assert.match(patterns, /## Bend check failures/)
+  for (const failure of ['consumed more than once', 'duplicate declaration', 'a declared constructor', 'a filled definition']) {
+    assert.ok(patterns.includes(failure), failure)
+  }
+})

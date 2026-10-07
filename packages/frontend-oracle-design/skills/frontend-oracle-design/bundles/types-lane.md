@@ -39,6 +39,18 @@ Put the short result first; for detail, link files the workflow already keeps (c
 reports) instead of dumping raw tool logs, and never create a file just to hold tool output.
 Never claim a linked file exists without checking it. No new progress artifact is required.
 
+### Keep going after `yes`
+
+Do not stop between stages to ask whether to continue. After the `yes`, run to the next terminal state
+(`ORACLE_READY`, `NEEDS_DECISION`, `FAIL` or the Delivery end state) and stop only for a new
+outcome-changing question, a gate rejection the budgets cannot repair, or an approval the selected
+profile names (the post-proof card approval, Design Change Confirmation, a third review round).
+A user who delegates the remaining choices ("decide everything", "알아서 해", "go with your
+recommendations") answers every current and later question that has a recommendation: adopt it, record
+the user's words as the approval location and list the adopted `Q<n>` in the next message instead of
+asking. Delegation never answers a question without a recommendation, never turns Design-only into
+Delivery and never waives review, lint, lock or mandatory verification.
+
 ### First response — one message, one confirmation
 
 The first response to an in-scope request starts with the literal lane header line, even when it

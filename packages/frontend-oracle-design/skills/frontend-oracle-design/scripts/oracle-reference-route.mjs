@@ -93,6 +93,19 @@ function validateGraph(graph) {
   return ids
 }
 
+// Workers pass the role or skill name they were dispatched as; resolve it to the shared role node.
+function includeId(id, ids) {
+  if (typeof id !== 'string' || ids.has(id)) return id
+  const role = `role-${id.replace(/^(oracle-|role-)/, '')}`
+  return ids.has(role) ? role : id
+}
+
+function roleIds(graph, profile) {
+  return graph.nodes
+    .filter((node) => /^role-[a-z-]+$/.test(node.id) && !node.id.endsWith('-formal') && (node.profiles ?? ['formal-bend/v1']).includes(profile))
+    .map((node) => node.id)
+}
+
 function audience(node) {
   if (node.loader === 'reviewer') return 'reviewer'
   if (node.loader === 'script' || node.loader === 'graph-tooling') return 'external'
@@ -109,7 +122,7 @@ export function routeReferences(graph, options) {
   object(options, 'request')
   if (Object.keys(options).some((key) => !['point', 'facts', 'include', 'profile'].includes(key)))
     invalid('request has unknown fields')
-  const { point, facts = {}, include = [] } = options
+  const { point, facts = {}, include: requested = [] } = options
   const profile = referenceProfile(options.profile)
   if (!POINTS.includes(point)) invalid('unknown decision point')
   object(facts, 'facts')
@@ -119,7 +132,13 @@ export function routeReferences(graph, options) {
   }
   const normalized = Object.fromEntries(FACTS.map((name) => [name, facts[name] ?? 'unknown']))
   const ids = validateGraph(graph)
-  if (!Array.isArray(include) || include.some((id) => !ids.has(id))) invalid('include must name existing nodes')
+  if (!Array.isArray(requested)) invalid('include must name existing nodes')
+  const include = requested.map((id) => includeId(id, ids))
+  const unknown = include.filter((id) => !ids.has(id))
+  if (unknown.length > 0) {
+    const names = unknown.map((id) => JSON.stringify(id)).join(', ')
+    invalid(`include must name existing nodes: unknown ${names}; role nodes: ${roleIds(graph, profile).join(', ')}`)
+  }
   for (const id of include) {
     const node = graph.nodes.find((candidate) => candidate.id === id)
     if (!(node.profiles ?? ['formal-bend/v1']).includes(profile)) invalid(`wrong-profile include ${id}`)
@@ -183,10 +202,25 @@ export function renderReferenceRoute(result) {
   return `${lines.join('\n')}\n`
 }
 
+function usage(graph, profile = 'formal-bend/v1') {
+  return [
+    'usage: oracle-reference-route.mjs --point <point> [--profile <profile>] [--facts <json-file>] [--include <node-id|role>]... [--json]',
+    `points: ${POINTS.join(', ')}`,
+    `profiles: ${REFERENCE_PROFILES.join(', ')}`,
+    `facts (true, false or "unknown"; missing means unknown): ${FACTS.join(', ')}`,
+    `role nodes (${profile}): ${roleIds(graph, profile).join(', ')}; a bare role or skill name resolves to its role node`,
+    '',
+  ].join('\n')
+}
+
 function argumentsOf(args) {
   const options = { include: [] }
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index]
+    if (flag === '--help' || flag === '-h') {
+      options.help = true
+      continue
+    }
     if (flag === '--json' && !options.json) {
       options.json = true
       continue
@@ -205,6 +239,10 @@ function argumentsOf(args) {
 
 async function main() {
   const options = argumentsOf(process.argv.slice(2))
+  if (options.help) {
+    process.stdout.write(usage(await loadGraph(), options.profile))
+    return
+  }
   const facts = options.facts ? JSON.parse(await readFile(options.facts, 'utf8')) : {}
   const result = routeReferences(await loadGraph(), { point: options.point, facts, include: options.include, profile: options.profile })
   process.stdout.write(options.json ? `${JSON.stringify(result, null, 2)}\n` : renderReferenceRoute(result))

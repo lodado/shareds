@@ -5,6 +5,8 @@ Unknown/bare roles return to the controller, never silently select a profile.
 
 Use the canonical read-only router at the current decision point with the already resolved profile:
 `scripts/oracle-reference-route.mjs --profile <resolved-profile> --point scope-decision --include <role-id> --json`.
+`<role-id>` is the shared role node (`role-intake`, `role-author`, `role-review`, `role-implement`); a bare
+role or skill name (`author`, `oracle-author`) resolves to it.
 Pass inspected scope facts, treating unknown conservatively. Read returned full same-profile dependency
 closure with native Read without offset or limit. Keep source-code reads bounded. Router advice neither
 advances stages nor authorizes excluded context. Unavailable routing is a blocker, not permission to
@@ -18,7 +20,8 @@ criteria into primary workers. Fresh workers cannot inherit a parent's continued
 Use continued bundles only for nodes actually read in the same context. Report actual node IDs, not
 bundle IDs. Bundles are generated delivery copies, never authority. Do not hand-edit them.
 
-Re-read disk at stage entry/resume. journal.md records rationale and command/result, not policy authority.
+Re-read disk at stage entry/resume. A continued worker re-reads changed run files, not reference nodes
+it already Read in full in the same context. journal.md records rationale and command/result, not policy authority.
 Keep existing runtime evidence and raw reviewer inputs, no duplicate convenience manuals or output logs.
 PLAN.md is the human-facing goal, approved decisions, open questions, scope and next action.
 Use the current Delivery guide for legal targets and missing current-step reads. Read protocol documents

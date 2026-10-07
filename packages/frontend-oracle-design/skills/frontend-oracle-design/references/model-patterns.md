@@ -204,3 +204,19 @@ new bound and the sampled length range together.
 Base already declares some constructor names (for example `Fail`, `Move` and the `Scroll` input event). A
 duplicate declaration fails before any law runs; pick a domain name (`AttemptFailed`, `FeedWorld`).
 Reusable traces need `+List<Msg>` in `run` and in `exs` witnesses.
+
+## Bend check failures
+
+A check costs seconds; a guessed rewrite costs a model turn. Before declaring a constructor or type run
+`bend base | grep -w <Name>` (no match means it is free; `bend base <Name>` finds only top-level names).
+Read the failure's `Location:` line, apply the matching fix once, and rerun the same file. Do not
+rewrite the whole model to fix one reported line.
+
+| Failure text                                | Cause                                                  | Fix                                                                                        |
+| ------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `a fresh name (duplicate declaration: X)`   | Base or another import already declares `X`            | rename to a domain name (`FeedEvent`, `AttemptFailed`)                                     |
+| `X (consumed more than once)`               | a plain `x = v` or parameter is affine: one use only   | bind it reusable (`+x = v`, `+x: T`), type it `+D<A>`, or destructure once and reuse parts |
+| `a match on a parameter or field`           | the matched name is a def or a bind already consumed   | match the value before its first other use, or bind it with `+`                            |
+| `a declared constructor (unknown: M.X)`     | `X` is not in that type, or the module prefix is wrong | use a constructor from the type's `type` block under its import alias                      |
+| `a filled definition (an unfilled law ...)` | a `law f` has no `def f` with the same name            | add `def f` that proves it, or remove a law the card does not claim                        |
+| `an import ('import Base', ...)`            | the file does not open with its imports                | first line `import Base`, then `import ./file.bend as M`                                   |

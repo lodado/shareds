@@ -316,3 +316,28 @@ test('router CLI as a read-only interface to honor JSON facts and repeated inclu
   }
   assert.deepEqual(await readdir(root), ['facts.json'])
 })
+
+test('router includes as role names workers pass to resolve to the shared role node', () => {
+  const byNode = routeReferences(GRAPH, { point: 'scope-decision', facts: FALSE, include: ['role-author'] })
+  for (const alias of ['author', 'oracle-author']) {
+    assert.deepEqual(routeReferences(GRAPH, { point: 'scope-decision', facts: FALSE, include: [alias] }), byNode, alias)
+  }
+  assert.throws(
+    () => routeReferences(GRAPH, { point: 'scope-decision', include: ['oracle-intake-x'] }),
+    (error) =>
+      error instanceof TypeError &&
+      /unknown "oracle-intake-x"/.test(error.message) &&
+      /role-author/.test(error.message),
+  )
+})
+
+test('router CLI help as usage on stdout so a worker need not read the script source', () => {
+  const { NODE_TEST_CONTEXT: _parent, ...env } = process.env
+  for (const flag of ['--help', '-h']) {
+    const run = spawnSync(process.execPath, [SCRIPT, flag], { env, encoding: 'utf8' })
+    assert.equal(run.status, 0, run.stderr)
+    assert.match(run.stdout, /^usage: oracle-reference-route\.mjs/)
+    assert.match(run.stdout, /scope-decision/)
+    assert.match(run.stdout, /role-author/)
+  }
+})

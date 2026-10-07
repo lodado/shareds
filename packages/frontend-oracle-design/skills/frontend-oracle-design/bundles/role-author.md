@@ -39,6 +39,18 @@ Put the short result first; for detail, link files the workflow already keeps (c
 reports) instead of dumping raw tool logs, and never create a file just to hold tool output.
 Never claim a linked file exists without checking it. No new progress artifact is required.
 
+### Keep going after `yes`
+
+Do not stop between stages to ask whether to continue. After the `yes`, run to the next terminal state
+(`ORACLE_READY`, `NEEDS_DECISION`, `FAIL` or the Delivery end state) and stop only for a new
+outcome-changing question, a gate rejection the budgets cannot repair, or an approval the selected
+profile names (the post-proof card approval, Design Change Confirmation, a third review round).
+A user who delegates the remaining choices ("decide everything", "알아서 해", "go with your
+recommendations") answers every current and later question that has a recommendation: adopt it, record
+the user's words as the approval location and list the adopted `Q<n>` in the next message instead of
+asking. Delegation never answers a question without a recommendation, never turns Design-only into
+Delivery and never waives review, lint, lock or mandatory verification.
+
 ### First response — one message, one confirmation
 
 The first response to an in-scope request starts with the literal lane header line, even when it
@@ -406,6 +418,8 @@ Unknown/bare roles return to the controller, never silently select a profile.
 
 Use the canonical read-only router at the current decision point with the already resolved profile:
 `scripts/oracle-reference-route.mjs --profile <resolved-profile> --point scope-decision --include <role-id> --json`.
+`<role-id>` is the shared role node (`role-intake`, `role-author`, `role-review`, `role-implement`); a bare
+role or skill name (`author`, `oracle-author`) resolves to it.
 Pass inspected scope facts, treating unknown conservatively. Read returned full same-profile dependency
 closure with native Read without offset or limit. Keep source-code reads bounded. Router advice neither
 advances stages nor authorizes excluded context. Unavailable routing is a blocker, not permission to
@@ -419,7 +433,8 @@ criteria into primary workers. Fresh workers cannot inherit a parent's continued
 Use continued bundles only for nodes actually read in the same context. Report actual node IDs, not
 bundle IDs. Bundles are generated delivery copies, never authority. Do not hand-edit them.
 
-Re-read disk at stage entry/resume. journal.md records rationale and command/result, not policy authority.
+Re-read disk at stage entry/resume. A continued worker re-reads changed run files, not reference nodes
+it already Read in full in the same context. journal.md records rationale and command/result, not policy authority.
 Keep existing runtime evidence and raw reviewer inputs, no duplicate convenience manuals or output logs.
 PLAN.md is the human-facing goal, approved decisions, open questions, scope and next action.
 Use the current Delivery guide for legal targets and missing current-step reads. Read protocol documents
@@ -3048,6 +3063,22 @@ new bound and the sampled length range together.
 Base already declares some constructor names (for example `Fail`, `Move` and the `Scroll` input event). A
 duplicate declaration fails before any law runs; pick a domain name (`AttemptFailed`, `FeedWorld`).
 Reusable traces need `+List<Msg>` in `run` and in `exs` witnesses.
+
+## Bend check failures
+
+A check costs seconds; a guessed rewrite costs a model turn. Before declaring a constructor or type run
+`bend base | grep -w <Name>` (no match means it is free; `bend base <Name>` finds only top-level names).
+Read the failure's `Location:` line, apply the matching fix once, and rerun the same file. Do not
+rewrite the whole model to fix one reported line.
+
+| Failure text                                | Cause                                                  | Fix                                                                                        |
+| ------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `a fresh name (duplicate declaration: X)`   | Base or another import already declares `X`            | rename to a domain name (`FeedEvent`, `AttemptFailed`)                                     |
+| `X (consumed more than once)`               | a plain `x = v` or parameter is affine: one use only   | bind it reusable (`+x = v`, `+x: T`), type it `+D<A>`, or destructure once and reuse parts |
+| `a match on a parameter or field`           | the matched name is a def or a bind already consumed   | match the value before its first other use, or bind it with `+`                            |
+| `a declared constructor (unknown: M.X)`     | `X` is not in that type, or the module prefix is wrong | use a constructor from the type's `type` block under its import alias                      |
+| `a filled definition (an unfilled law ...)` | a `law f` has no `def f` with the same name            | add `def f` that proves it, or remove a law the card does not claim                        |
+| `an import ('import Base', ...)`            | the file does not open with its imports                | first line `import Base`, then `import ./file.bend as M`                                   |
 
 <!-- node:model-package-example path:references/model-package.example.json -->
 
