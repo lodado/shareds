@@ -1,6 +1,6 @@
 ---
 name: threejs-game-wireframe
-description: 'Implement a local Three.js game prototype or refine its web UI directly in code using inspected references, semantic tokens, and browser critique. Supports layout, flow, or playable greybox with headless ECS in an FSD page slice. Use for explicit game build or web UI polish requests; not planning alone, Figma delivery, final game art, or backend services.'
+description: 'Implement a local Three.js game prototype or refine its web UI directly in code using inspected references, semantic tokens, and browser critique. Supports layout, flow, or playable greybox with headless ECS in an FSD page slice. Use for explicit game build or web UI polish requests, or a read-only review of an existing game web UI; not planning alone, Figma delivery, final game art, or backend services.'
 allowed-tools:
   - Bash
 ---
@@ -31,6 +31,8 @@ Web HUD/menu implementation includes reference-driven visual design by default; 
 controls rule fidelity, not whether the UI receives design attention. An explicit greybox-only,
 layout-only, or mechanics-only request skips expanded polish, not readability or accessibility.
 An existing game web UI polish request preserves the host and rules; do not scaffold or rebuild its core.
+A review request on an existing game web UI inspects the running app and reports findings ordered P0–P3
+(location, evidence, player impact, smallest fix); it edits nothing until the user asks for changes.
 For UI-only changes, reuse the current architecture and skip Stage 3–4 implementation, then verify regressions.
 The prototype-level/ECS defaults apply to new prototypes, not a mandate to retrofit an existing game.
 

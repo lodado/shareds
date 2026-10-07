@@ -5,7 +5,7 @@ Component linkage success is no evidence of design fidelity or completeness.
 ## 1. Mode (allowed / preserve)
 
 - **ASSEMBLE** — reorder, recompose frames / copy, style, images, component source, inner size.
-- **LOCALIZE** — translation, font, line breaks, content height / composition, hierarchy, color, control shape.
+- **LOCALIZE** — translation, copy rewrite, font, line breaks, content height / composition, hierarchy, color, control shape.
 - **FIDELITY** — reproduce named source, swap content and brand / layout, size, leading, spacing, color, ornament, interaction.
 - **RESKIN** — approved visual attributes / structure, content, behavior.
 - **REDESIGN** — approved composition redesign / out-of-scope sections, locked contracts.

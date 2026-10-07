@@ -8,6 +8,7 @@
  * count. Whether the handler actually works is a browser test's job.
  */
 const { keyHint, stepGuidance } = require('./lib/interaction-contracts')
+const { findAttribute } = require('./lib/jsx')
 
 const FUNCTION_TYPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'])
 // Library primitives own the contract themselves; a wrapper only has to pass props through.
@@ -48,11 +49,6 @@ const PATTERNS = {
   switch: { roles: ['switch'], bound: ['aria-checked'], attrStep: 'space-toggles' },
   disclosure: { bound: ['aria-expanded'], requiredAny: [['aria-controls']], attrStep: 'toggle-opens' },
 }
-
-const attributeName = (attribute) =>
-  attribute.type === 'JSXAttribute' && attribute.name.type === 'JSXIdentifier' ? attribute.name.name : null
-
-const findAttribute = (node, name) => node.attributes.find((attribute) => attributeName(attribute) === name)
 
 const literalValue = (attribute) => {
   if (!attribute || attribute.value === null) return attribute ? '' : null

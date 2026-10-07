@@ -1,5 +1,17 @@
 # 검증 결과
 
+## 0.3.0 — 리뷰 읽기 전용 라우팅과 카피 규칙 (2026-10-07, macOS)
+
+스킬 문서와 문서 계약 테스트만 바꿨다. starter, ECS/session API, 보고서 schema는 그대로다.
+
+| 검사                                                       | 결과 | 범위                                                                     |
+| ---------------------------------------------------------- | ---- | ------------------------------------------------------------------------ |
+| `pnpm --filter @lodado/game-interface-design-plugin test`  | PASS | 패키지 테스트 68개. 리뷰 읽기 전용 라우팅, `product-copy.md` 동일성 포함 |
+| `pnpm --filter @lodado/game-interface-design-plugin check` | PASS | 매니페스트 일치, 문서 링크, schema/예제, 원본 해시                       |
+| `pnpm --filter @lodado/game-interface-design-plugin lint`  | PASS | `eslint scripts`                                                         |
+
+리뷰 요청을 실제 모델에 보내 읽기 전용으로 끝나는지는 실행하지 않았다(`NOT_RUN`). 문서 계약 테스트는 모델 행동의 실행 증거가 아니다.
+
 ## 0.2.2 — GLB 런타임 계약 변경 (2026-09-28, macOS, Node 26.7.0)
 
 스킬·템플릿·검증 계약을 수정했으며 기본 도형 starter, ECS/session API와 보고서 schema는 변경하지 않았다.

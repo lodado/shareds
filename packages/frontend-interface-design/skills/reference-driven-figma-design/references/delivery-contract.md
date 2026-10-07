@@ -5,6 +5,7 @@ Read first: [edit contract](edit-contract.md); Source/Fidelity/Content/Layout ga
 ## 1. Deliver first
 
 Hand off after the [HCI pre-design](hci-wireframe-workflow.md) explanation: real Figma URL; file/page/frame IDs and final frame name; state PILOT_READY / FIGMA_READY / INCOMPLETE / BLOCKED; where to review desktop/mobile or prototype. Blocked build → prep results reported separately, never as the Figma result.
+Shape hands off the journey and wireframe as `BRIEF_READY`. Review hands off its findings ([critique §6](critique-refinement.md#6-review-output)) as a report outside `schemas/design-delivery.schema.json`; it claims no Figma result state.
 
 ## 2. Source trace
 

@@ -70,6 +70,26 @@ test('web UI polish stays code-first with reference and browser evidence', () =>
   assert.match(verification, /\(code-visual-design\.md\)/)
 })
 
+// Low risk: static instruction routing, not executed review behavior.
+test('review requests stay read-only in the skill that owns the artifact', () => {
+  const router = read('game-interface-design/SKILL.md')
+  const wireframe = read('threejs-game-wireframe/SKILL.md')
+  const design = read('reference-driven-game-design/SKILL.md')
+  assert.match(router, /A review request[^\n]*Reference-Driven Game Design[^\n]*Three\.js Game Wireframe[^\n]*stays read-only/)
+  assert.match(router, /names the scope, not edit permission/)
+  for (const [name, skill] of Object.entries({ wireframe, design })) assert.match(skill, /ordered P0–P3/, name)
+  assert.match(wireframe, /edits nothing until the user asks/)
+  assert.match(design, /changes no document or Figma node until the user asks/)
+})
+
+test('product copy rules ship byte-identical to the frontend-interface-design copy', () => {
+  const copy = read('threejs-game-wireframe/references/product-copy.md')
+  const source = path.join(SKILLS, '../../frontend-interface-design/skills/reference-driven-figma-design/references/product-copy.md')
+  assert.equal(copy, readFileSync(source, 'utf8'))
+  assert.match(read('threejs-game-wireframe/references/code-visual-design.md'), /\]\(product-copy\.md\)/)
+  assert.match(copy, /^## copy\/destructive-verb-noun$/m)
+})
+
 test('wireframe skill states each level, its ECS duty and the default', () => {
   const skill = read('threejs-game-wireframe/SKILL.md')
   const levels = read('threejs-game-wireframe/references/fidelity-levels.md')

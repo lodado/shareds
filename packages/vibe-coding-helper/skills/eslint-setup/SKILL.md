@@ -70,7 +70,7 @@ import and spread each required preset. No Jest preset is added.
 | Package styling with Tailwind CSS v4                                            | add tailwind                                                                |
 | Repo where coding agents write most of the code                                 | add ai                                                                      |
 | Repo with a Tailwind design system to hold the line on                          | add design                                                                  |
-| Repo implementing WAI-ARIA widgets (menu, listbox, dialog, tabs ...)            | add interaction                                                             |
+| Repo implementing WAI-ARIA widgets, dialogs or selects (menu, tabs ...)         | add interaction                                                             |
 | Repo that wants one export, function and file-name style everywhere             | add conventions, see [Conventions](#conventions-one-spelling-per-choice)    |
 | FSD repo                                                                        | add fsd, optionally `fsdBoundaries(...)`, see [FSD](#fsd-layers-and-slices) |
 | New React or Next.js app, or new code in a repo with no hook-placement contract | add hook-tiers                                                              |
@@ -396,6 +396,23 @@ classes, hydration, secrets, SQL - stay off, and `DEFERRED` in `design.mjs` name
 owner. `@deslint/eslint-plugin` is ESM-only, which is why the
 preset is `design.mjs`; the public import stays `@lodado/eslint-config/design`.
 
+### Interaction: widget contracts and widget choice
+
+`interaction` is opt-in. `interaction-pattern-contract` (error) checks the source-visible part
+of the WAI-ARIA pattern a `role` or `aria-haspopup` declares, using `contracts/*.json` in the
+plugin. Two warnings judge which widget was chosen:
+
+- `no-nested-dialog`: a dialog opened inside another dialog in the same file's JSX. `<dialog>`,
+  a native element with a literal `role="dialog"`/`"alertdialog"`, `Dialog`, `AlertDialog`, `Modal`,
+  `Drawer`, `Sheet` and their `.Root` count. A library part (`DialogContent`, `.Content`, `.Panel`)
+  and the direct child surface of a `Modal` or `Drawer` (React Aria `<Modal><Dialog>`, Joy
+  `<Modal><Sheet>`) belong to the same dialog. `{ dialogs: [...] }` replaces the component list;
+  `<dialog>` and native roles always count.
+- `prefer-radio-for-few-options`: a `<select>` with two or three literal `<option>` choices.
+  A mapped, conditional or grouped child, `multiple`, `size` above 1, a `hidden` option, or a
+  placeholder first option (disabled, or empty in a `required` select) does not count;
+  `{ components: ['Select'] }` adds a design-system select that takes `<option>` children.
+
 ### Other presets
 
 `testing` routes by path: `*.test.*` / `*.spec.*` receive Vitest and Testing Library
@@ -461,3 +478,9 @@ rules: {
 - Do not re-declare rules the preset already sets. Change the preset instead and release it.
 - Formatting is Prettier's job, not ESLint's - the base preset only turns conflicting rules off.
 - A rule that should apply everywhere belongs in `@lodado/eslint-plugin-local-rules`, not in a per-project override.
+- Before turning a guideline into a lint rule, ask in order. Can code find the failure without
+  rendering? Can the rule avoid likely false positives? Is there one concrete fix? Three yeses
+  make an error. A fix that depends on context makes a warning. A no on either of the first two
+  keeps it as written guidance. A decision that needs product context stays with the skill or
+  the reviewer, and a new product policy needs a person. A rule that keeps collecting exceptions
+  goes back to guidance.

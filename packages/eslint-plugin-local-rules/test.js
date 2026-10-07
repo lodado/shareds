@@ -1042,3 +1042,126 @@ ruleTester.run('interaction-hover-needs-focus', rules['interaction-hover-needs-f
     { code: '<Link href="/a" className="hover:underline">A</Link>', errors: [{ messageId: 'hoverWithoutFocus' }] },
   ],
 })
+
+// ---------- interaction: a select with two or three fixed choices ----------
+// Boundaries: 1 choice (min-1), 2 (min), 3 (max), 4 (max+1). The first option is a placeholder only
+// when disabled, or empty in a required select (the HTML placeholder label option).
+ruleTester.run('prefer-radio-for-few-options', rules['prefer-radio-for-few-options'], {
+  valid: [
+    '<select><option value="a">A</option></select>',
+    '<select><option value="a">A</option><option value="b">B</option><option value="c">C</option><option value="d">D</option></select>',
+    '<select required><option value="">Choose</option><option value="a">A</option></select>',
+    '<select><option disabled="disabled">Choose</option><option value="a">A</option></select>',
+    // an "All" option in a filter is a real choice: 4 choices
+    '<select><option value="">All statuses</option><option value="open">Open</option><option value="closed">Closed</option><option value="draft">Draft</option></select>',
+    // a sold-out size is still shown as a choice: 4 choices
+    '<select><option value="s">S</option><option value="m">M</option><option value="l">L</option><option disabled>XL (sold out)</option></select>',
+    // the list can grow, so the source does not show the real count
+    '<select>{plans.map((plan) => <option key={plan} value={plan}>{plan}</option>)}</select>',
+    '<select><option value="a">A</option><option value="b">B</option>{admin && <option value="c">C</option>}</select>',
+    '<select><optgroup label="Plans"><option value="a">A</option><option value="b">B</option></optgroup></select>',
+    // these already show every choice
+    '<select multiple><option value="a">A</option><option value="b">B</option></select>',
+    '<select size={3}><option value="a">A</option><option value="b">B</option></select>',
+    // a component is judged only when the repo names it
+    '<Select><option value="a">A</option><option value="b">B</option></Select>',
+  ],
+  invalid: [
+    {
+      code: '<select><option value="m">Monthly</option><option value="y">Yearly</option></select>',
+      errors: [{ messageId: 'preferRadio', data: { name: 'select', count: '2' } }],
+    },
+    {
+      code: '<select><option value="" disabled>Choose</option><option value="s">S</option><option value="m">M</option><option value="l">L</option></select>',
+      errors: [{ messageId: 'preferRadio', data: { name: 'select', count: '3' } }],
+    },
+    {
+      code: '<select required><option value={``}>Pick</option>{/* billing period */}<option value="m">Monthly</option>{" "}<option value="y">Yearly</option></select>',
+      errors: [{ messageId: 'preferRadio', data: { name: 'select', count: '2' } }],
+    },
+    {
+      code: '<select><option hidden value="x">Pick</option><option value="m">Monthly</option><option value="y">Yearly</option></select>',
+      errors: [{ messageId: 'preferRadio', data: { name: 'select', count: '2' } }],
+    },
+    // {false} turns the attribute off
+    {
+      code: '<select multiple={false} size="1"><option value="a" disabled={false}>A</option><option value="b">B</option></select>',
+      errors: [{ messageId: 'preferRadio', data: { name: 'select', count: '2' } }],
+    },
+    {
+      code: '<Form.Select><option value="a">A</option><option value="b">B</option></Form.Select>',
+      options: [{ components: ['Form.Select'] }],
+      errors: [{ messageId: 'preferRadio', data: { name: 'Form.Select', count: '2' } }],
+    },
+  ],
+})
+
+// ---------- interaction: a dialog opened inside another dialog ----------
+ruleTester.run('no-nested-dialog', rules['no-nested-dialog'], {
+  valid: [
+    '<><Dialog /><AlertDialog /></>',
+    // parts of one dialog are not a second dialog, even with a role of their own
+    '<Dialog.Root><Dialog.Trigger /><Dialog.Content role="alertdialog"><p>x</p></Dialog.Content></Dialog.Root>',
+    '<Dialog><DialogTrigger /><DialogContent role="alertdialog"><DialogTitle>x</DialogTitle></DialogContent></Dialog>',
+    '<Dialog><Dialog.Panel>x</Dialog.Panel></Dialog>',
+    // a Modal or Drawer hosts its surface as a direct child: React Aria, Joy UI
+    '<DialogTrigger><Button /><Modal><Dialog>x</Dialog></Modal></DialogTrigger>',
+    '<ModalOverlay><Modal><Dialog role="alertdialog">x</Dialog></Modal></ModalOverlay>',
+    '<Modal open={open}><Sheet variant="outlined">x</Sheet></Modal>',
+    '<Drawer>{open && <Sheet>x</Sheet>}</Drawer>',
+    // a role decided at runtime is not visible in the source
+    '<div role={role}><Dialog /></div>',
+    // `dialogs` replaces the default list
+    { code: '<Dialog><div><Sheet /></div></Dialog>', options: [{ dialogs: ['Modal'] }] },
+  ],
+  invalid: [
+    {
+      code: '<Dialog><AlertDialog /></Dialog>',
+      errors: [{ messageId: 'nestedDialog', data: { inner: 'AlertDialog', outer: 'Dialog' } }],
+    },
+    {
+      code: '<Dialog><DialogContent>{confirming && <AlertDialog open />}</DialogContent></Dialog>',
+      errors: [{ messageId: 'nestedDialog', data: { inner: 'AlertDialog', outer: 'Dialog' } }],
+    },
+    {
+      code: '<Dialog.Root><Dialog.Content><AlertDialog.Root /></Dialog.Content></Dialog.Root>',
+      errors: [{ messageId: 'nestedDialog', data: { inner: 'AlertDialog.Root', outer: 'Dialog.Root' } }],
+    },
+    {
+      code: '<dialog open><div role="alertdialog">x</div></dialog>',
+      errors: [{ messageId: 'nestedDialog', data: { inner: 'role="alertdialog"', outer: 'dialog' } }],
+    },
+    // a surface behind another element is a second dialog
+    {
+      code: '<Modal><div>{() => <Sheet />}</div></Modal>',
+      errors: [{ messageId: 'nestedDialog', data: { inner: 'Sheet', outer: 'Modal' } }],
+    },
+    {
+      code: '<Dialog footer={<AlertDialog />} />',
+      errors: [{ messageId: 'nestedDialog', data: { inner: 'AlertDialog', outer: 'Dialog' } }],
+    },
+    // a React Aria dialog opened from inside another dialog
+    {
+      code: '<Modal><Dialog><DialogTrigger><Modal><Dialog>x</Dialog></Modal></DialogTrigger></Dialog></Modal>',
+      errors: [{ messageId: 'nestedDialog', data: { inner: 'Modal', outer: 'Dialog' } }],
+    },
+    // each nested dialog reports once, against its nearest dialog
+    {
+      code: '<Dialog><Drawer><div><Sheet /></div></Drawer></Dialog>',
+      errors: [
+        { messageId: 'nestedDialog', data: { inner: 'Drawer', outer: 'Dialog' } },
+        { messageId: 'nestedDialog', data: { inner: 'Sheet', outer: 'Drawer' } },
+      ],
+    },
+    {
+      code: '<Modal><Modal /></Modal>',
+      options: [{ dialogs: ['Modal'] }],
+      errors: [{ messageId: 'nestedDialog', data: { inner: 'Modal', outer: 'Modal' } }],
+    },
+    {
+      code: '<UI.Dialog><div><UI.Dialog /></div></UI.Dialog>',
+      options: [{ dialogs: ['UI.Dialog'] }],
+      errors: [{ messageId: 'nestedDialog', data: { inner: 'UI.Dialog', outer: 'UI.Dialog' } }],
+    },
+  ],
+})

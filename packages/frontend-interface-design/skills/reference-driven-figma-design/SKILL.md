@@ -1,6 +1,6 @@
 ---
 name: reference-driven-figma-design
-description: 'Define core journeys, requirements and wireframes, brand foundations and semantic tokens, then compose and verify editable Figma product or landing designs. Interpret ambiguous design intent with contextual axes and Bend-generated composition when needed. Use for Figma-first design and appearance-preserving design-system refactors; not frontend implementation, design-to-code, or static-image-only delivery.'
+description: 'Define core journeys, requirements and wireframes, brand foundations and semantic tokens, then compose and verify editable Figma product or landing designs. Interpret ambiguous design intent with contextual axes and Bend-generated composition when needed. Use for Figma-first design, review or copy edits of an existing Figma design, and appearance-preserving design-system refactors; not frontend implementation, design-to-code, or static-image-only delivery.'
 allowed-tools:
   - Bash
 metadata:
@@ -12,6 +12,21 @@ metadata:
 Core journey → Requirements and wireframes → Brand, foundations, semantic tokens → UI composition and verification. Translate researched structure into the existing visual system; ship editable Figma.
 
 Fix mode (ASSEMBLE / LOCALIZE / FIDELITY / RESKIN / REDESIGN) and per-section preserve/change scope before editing: [edit-contract.md](references/edit-contract.md). Verify linkage, fidelity, content, layout independently.
+
+## Request mode
+
+Resolve the request mode from the user's verb and artifact before the edit mode, and use the
+narrowest mode the verb supports.
+
+- **Shape** — "how should this work?", a brief without settled UI: Stages 1–2 only (journey, states, wireframe, open decisions). No Figma write.
+- **Compose** — make, build, fix, redesign, apply: the execution loop below.
+- **Review** — review, critique, "what's wrong?": inspect the target and report findings per [critique-refinement.md](references/critique-refinement.md) §6. No Figma write.
+- **Copy** — "fix the copy", rewrite errors or labels: text and layer names only, under the LOCALIZE edit mode. Report structural blockers instead of fixing them.
+
+A Figma URL, screenshot, or frame names the scope; it does not authorize a write. Shape and Review
+move to Compose only when the user asks. Every mode that writes or judges copy applies
+[product-copy.md](references/product-copy.md). Areas in [coverage-gaps.md](references/coverage-gaps.md)
+have no standard here; say so instead of presenting a choice as this skill's rule.
 
 ## Decision dependencies
 

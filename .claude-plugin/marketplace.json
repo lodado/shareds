@@ -11,7 +11,7 @@
     {
       "name": "vibe-coding-helper",
       "description": "ESLint preset adoption and repo conventions for lodado projects.",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "author": {
         "name": "lodado"
       },
@@ -47,7 +47,7 @@
     {
       "name": "frontend-system-design",
       "description": "Oracle-dependent policy candidates and verification duties for well-known frontend system design problems.",
-      "version": "0.2.2",
+      "version": "0.3.0",
       "author": {
         "name": "lodado"
       },
@@ -71,7 +71,7 @@
     {
       "name": "frontend-visual-qa",
       "description": "Screenshot comparison and direct-browser frontend QA against approved visual sources.",
-      "version": "0.5.1",
+      "version": "0.6.0",
       "author": {
         "name": "lodado"
       },
@@ -83,7 +83,7 @@
     {
       "name": "frontend-interface-design",
       "description": "Figma-first product and landing design from internal assets, structured templates, and verified references.",
-      "version": "1.9.0",
+      "version": "1.10.0",
       "author": {
         "name": "lodado"
       },
@@ -107,7 +107,7 @@
     {
       "name": "game-interface-design",
       "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, and FSD/ECS Three.js greybox prototypes.",
-      "version": "0.2.2",
+      "version": "0.3.0",
       "author": {
         "name": "lodado"
       },

@@ -21,6 +21,14 @@ All required before Approved candidacy:
 
 Missing any → stays an Experiment in the current file. No designated shared library → keep validation records in the current product file; don't claim "Shared/Approved."
 
+The Approved candidate's Notes carry one decision record: Decision, Rationale, Evidence (links to
+the real pages and critique rounds), Exceptions, Bad example, Good example. One screenshot, one
+shipped file, or one review comment never makes a pattern or rule by itself.
+
+A learned decision goes to the narrowest home: a Catalog entry, an Approved Pattern, a
+[product-copy.md](product-copy.md) rule (user approval required), a line in
+[coverage-gaps.md](coverage-gaps.md), or no change.
+
 ## 3. Component Catalog
 
 Record in the designated Figma catalog page/library — Component Name, Status (Experiment/Approved/Deprecated), Purpose, Best For, Avoid When, Supported Content, Variants, Editable Properties, Figma Component Reference, Originating Reference, Used In, Notes. Deprecated is not deletion — leave a replacement and migration note.

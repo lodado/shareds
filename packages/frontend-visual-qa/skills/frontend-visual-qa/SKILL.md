@@ -92,6 +92,19 @@ UI 변경이면 최소 320px과 대표 desktop을 확인한다. 앱이 두 theme
 확인하고 motion 변경이면 reduced-motion도 확인한다. 무관한 조합을 곱집합으로
 늘리지 않고 영향받은 상태만 선택한다.
 
+내용 길이에 따라 레이아웃이 달라지는 행이면 아래 콘텐츠 스트레스 조건을 확인 후보로 둔다. 사용자 요청이나
+승인된 authorization에 들어 있는 조건만 실행하고, 빠진 조건은 `남은 것`에 미검증으로 적는다.
+
+- 긴 문자열: 이름, 제목, 버튼 라벨, 오류 문구
+- 큰 숫자: 긴 금액, 큰 개수, 음수, 소수점
+- 번역 길이: 앱이 지원하는 locale 중 가장 긴 번역
+- 좁은 컨테이너: 사이드바·카드·모달처럼 viewport보다 좁은 부모
+- RTL: 앱이 RTL을 지원할 때만
+
+값은 승인 source나 기존 fixture에서 고르고, 맞는 fixture가 없으면 값을 지어내지 않고 미검증으로 남긴다. 잘림·말줄임·줄바꿈 중 무엇이 맞는지는
+정책이다. 승인 source가 정하지 않았으면 겹침·가로 오버플로·조작 불가처럼 어떤 정책에서도
+틀린 결과만 결함으로 보고하고, 나머지는 `POLICY_GAP` 후보로 남긴다.
+
 임의 sleep을 사용하지 않는다. 화면 readiness, network response, animation 종료,
 font readiness 같은 관찰 가능한 barrier를 기다린다.
 
@@ -165,7 +178,7 @@ dogfood 스킬을 자동 설치하지 않는다. 없으면 아래 절차를 직�
    화면 밖 요소 조작 시의 스크롤 이동은 사용자 등가 행동이 아니다. 재현 경로에 도구
    개입 여부를 명시한다.
 6. 산출물은 run 디렉터리의 `exploration.md`. 발견은 verdict가 아니라 **후보**다:
-   - 이슈별 route·환경·재현 단계·expected/actual·영향도와 스크린샷 경로를 기록한다.
+   - 이슈별 route·환경·재현 단계·expected/actual·심각도(§7)와 스크린샷 경로를 기록한다.
      동적 문제는 가능하면 녹화/trace를 함께 남기고, 재현하지 못하면 그 사실을 명시한다.
      증거의 토큰·쿠키·개인정보는 마스킹하고 최종 저장된 bytes의 digest를 기록한다.
    - `I*`·implicit oracle 위반 → `PRODUCT_DEFECT` 후보 + 재현 증거 →
@@ -191,6 +204,19 @@ dogfood 스킬을 자동 설치하지 않는다. 없으면 아래 절차를 직�
 
 결함을 발견해도 이 스킬 안에서 product를 고치고 재승인하지 않는다.
 
+### 심각도
+
+판정 코드와 별개로 발견마다 사용자 영향 기준의 심각도를 붙인다.
+
+- **P0** — 핵심 작업을 막음, 심각한 접근성 실패, 되돌릴 수 없는 피해
+- **P1** — 작업이 실패할 가능성이 큼, 결과를 오해하게 함, 필수 상태 누락, 큰 반응형·접근성 결함
+- **P2** — 의미 있는 마찰, 불일치, 약한 위계, 복구 경로 부족
+- **P3** — 사소한 완성도·일관성
+
+발견마다 위치(route·viewport·state와 selector 또는 artifact 경로), 검증 상태(근거 run 또는
+`pending`), 기준 출처(Oracle 행·baseline·승인 source), 사용자 영향, 가장 작은 수정 방향을
+적는다. `NON_ORACLE_OPINION`은 P3를 넘지 않는다. 심각도는 판정과 라우팅을 바꾸지 않는다.
+
 ## 8. Artifact
 
 레포가 위치를 정하지 않았다면 기존 Oracle 아래에 새 run 디렉터리를 만든다.
@@ -214,6 +240,7 @@ Oracle: revision 또는 N/A
 baseline: source·revision 또는 N/A
 환경: driver(playwright|agent-browser|mcp:<name>), tool/version, browser/version, viewport, theme, motion, locale/TZ, fixture
 행: D1/O1 → PASS|FAIL|N/A + 실제 관찰
+발견: P0~P3 · 위치 · 검증 상태 · 기준 출처 · 사용자 영향 · 최소 수정 방향, 없으면 없음
 artifact: actual/diff/trace 경로와 digest
 network: 요청 횟수·payload·실패 또는 N/A
 console: uncaught error·console error 또는 없음

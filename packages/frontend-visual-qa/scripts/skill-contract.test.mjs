@@ -48,6 +48,36 @@ test('requires approved baselines and reproducible browser evidence', async () =
   assert.match(skill, /임의 sleep을 사용하지 않는다/)
 })
 
+test('stresses content length without inventing a truncation policy', async () => {
+  const skill = await read('SKILL.md')
+  const environment = skill.match(/## 3\. 공통 환경 고정\n[\s\S]*?(?=\n## )/)?.[0]
+  assert.ok(environment, 'missing ## 3. 공통 환경 고정')
+
+  for (const condition of ['긴 문자열', '큰 숫자', '번역 길이', '좁은 컨테이너', 'RTL']) {
+    assert.match(environment, new RegExp(`^- ${condition}: \\S`, 'm'), condition)
+  }
+  assert.match(environment, /RTL: 앱이 RTL을 지원할 때만/)
+  assert.match(environment, /잘림·말줄임·줄바꿈 중 무엇이 맞는지는\s+정책이다/)
+  assert.match(environment, /나머지는\s+`POLICY_GAP`\s+후보로 남긴다/)
+  // Stress rows widen scope only when the request or approval names them.
+  assert.match(environment, /authorization에 들어 있는 조건만 실행하고,\s+빠진 조건은 `남은 것`에 미검증으로 적는다/)
+  assert.match(environment, /맞는 fixture가 없으면 값을 지어내지 않고 미검증으로 남긴다/)
+})
+
+test('ranks findings P0–P3 without letting severity change the verdict', async () => {
+  const skill = await read('SKILL.md')
+  const severity = skill.match(/### 심각도\n[\s\S]*?(?=\n## )/)?.[0]
+  assert.ok(severity, 'missing ### 심각도 under ## 7')
+  const position = skill.indexOf('### 심각도')
+  assert.ok(skill.indexOf('## 7. 판정과 라우팅') < position && position < skill.indexOf('## 8. Artifact'), 'severity sits under ## 7')
+
+  for (const level of ['P0', 'P1', 'P2', 'P3']) assert.match(severity, new RegExp(`^- \\*\\*${level}\\*\\* — \\S`, 'm'))
+  assert.match(severity, /`NON_ORACLE_OPINION`은 P3를 넘지 않는다/)
+  assert.match(severity, /심각도는 판정과 라우팅을 바꾸지 않는다/)
+  assert.match(skill, /^발견: P0~P3 · 위치 · 검증 상태 · 기준 출처 · 사용자 영향/m)
+  assert.match(skill, /expected\/actual·심각도\(§7\)/)
+})
+
 test('allows agent-browser observations without changing trusted PASS producers', async () => {
   const skill = await read('SKILL.md')
 

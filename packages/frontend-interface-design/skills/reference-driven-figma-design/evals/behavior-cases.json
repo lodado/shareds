@@ -915,6 +915,76 @@
         "Treat fixture paths, a schema-valid locator or a generated source name as evidence of a real editable component",
         "Copy dictionary source text into the distributed plugin or redraw screenshot assets to bypass source shortages"
       ]
+    },
+
+    {
+      "id": "review-mode-reports-without-write",
+      "prompt": "이 결제 화면 피그마 뭐가 문제인지 봐줘. https://www.figma.com/design/abc123/checkout",
+      "expected_invariants": [
+        "Resolve Review mode from the verb and treat the Figma URL as scope, not write authority",
+        "Inspect the real canvas at reading size and order findings P0–P3 by user impact",
+        "Give each finding a location, verification status, source, user consequence and smallest fix; label sourceless preferences and keep them at P3 or below"
+      ],
+      "forbidden": [
+        "Edit, duplicate or annotate the target Figma file during the review",
+        "Present a preference with no source as a P0–P2 defect"
+      ]
+    },
+
+    {
+      "id": "shape-mode-no-figma-write",
+      "prompt": "온보딩 흐름을 어떻게 가져갈지 같이 정리해보자. 피그마는 여기 있어: https://www.figma.com/design/xyz789/onboarding",
+      "expected_invariants": [
+        "Resolve Shape mode and produce the journey, states, wireframe and open decisions only",
+        "Read the linked file as context without treating it as permission to write",
+        "Ask the earliest unresolved material decision instead of choosing it silently"
+      ],
+      "forbidden": [
+        "Write frames, pages or prototype connections to the Figma file",
+        "Report the shaped flow as PILOT_READY or FIGMA_READY"
+      ]
+    },
+
+    {
+      "id": "copy-mode-text-only",
+      "prompt": "이 설정 화면 문구만 다듬어줘. 레이아웃은 건드리지 마.",
+      "expected_invariants": [
+        "Use Copy mode under the LOCALIZE edit mode and change only text and layer names",
+        "Apply the product's content guide first and product-copy rules where it is silent, citing rule IDs",
+        "Report structural problems found during the pass as blockers without fixing them"
+      ],
+      "forbidden": [
+        "Restructure layout, swap components or change hierarchy while rewriting copy",
+        "Rename a product object away from its glossary or shipped term"
+      ]
+    },
+
+    {
+      "id": "destructive-copy-names-object",
+      "prompt": "프로젝트 삭제 확인 모달 만들어줘.",
+      "expected_invariants": [
+        "Label the destructive action verb + object, such as 프로젝트 삭제, and name the project in the title",
+        "State what else is lost and whether it can be undone only from sourced facts, marking unknown counts as placeholders",
+        "Keep the cancel path and focus intent explicit in the wireframe before the first Figma write"
+      ],
+      "forbidden": [
+        "Use 확인, OK, 예 or a bare 삭제 as the destructive action label",
+        "Invent deletion policy such as an undo window or a retention period"
+      ]
+    },
+
+    {
+      "id": "coverage-gap-reported-not-invented",
+      "prompt": "관리자 대시보드에 주문 데이터 테이블이랑 매출 차트 넣어줘.",
+      "expected_invariants": [
+        "Say that data tables and charts are coverage gaps with no standard in this skill",
+        "Take the table and chart decisions from the highest available source in the design authority order and cite it",
+        "Record those choices as agent proposals in the Reference Log"
+      ],
+      "forbidden": [
+        "Present an invented table or chart convention as this skill's rule",
+        "Refuse or stall the request because the area is a coverage gap"
+      ]
     }
   ]
 }

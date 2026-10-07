@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 — 2026-10-07
+
+- Route a review request to the skill that owns the artifact and keep it read-only: findings ordered P0–P3 with location, evidence, player impact and smallest fix, and no edits until the user asks.
+- Ship `product-copy.md` in the code UI lane: stable-ID rules for action, destructive, error, loading, naming and accessible-name copy, byte-identical to the frontend-interface-design copy and pinned by both packages' tests.
+
 ## 0.2.2 — 2026-09-28
 
 - Require demand-driven runtime GLB loading for the current screen, scene and selection, without adding assets to shape-only prototypes.

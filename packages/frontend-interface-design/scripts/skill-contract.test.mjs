@@ -244,7 +244,7 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
   const ids = cases.map(({ id }) => id)
 
   assert.equal(schemaVersion, '1.0')
-  assert.equal(cases.length, 71)
+  assert.equal(cases.length, 76)
   assert.equal(new Set(ids).size, cases.length)
   for (const id of [
     'editable-reference-assembly-not-redraw',
@@ -285,6 +285,11 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
     'bend-model-is-not-figma-delivery',
     'bend-visual-feedback-updates-grammar',
     'bend-fixture-locators-are-not-source-evidence',
+    'review-mode-reports-without-write',
+    'shape-mode-no-figma-write',
+    'copy-mode-text-only',
+    'destructive-copy-names-object',
+    'coverage-gap-reported-not-invented',
   ]) {
     assert.ok(ids.includes(id), `Missing assembly regression case: ${id}`)
   }
@@ -293,6 +298,66 @@ test('behavior cases cover tool truthfulness, reuse, adaptation, critique, and p
     assert.ok(entry.expected_invariants.length >= 3, `${entry.id}: weak expected contract`)
     assert.ok(entry.forbidden.length >= 2, `${entry.id}: weak forbidden contract`)
   }
+})
+
+test('resolves the narrowest request mode and routes copy rules, review output and coverage gaps', async () => {
+  const [skill, copy, gaps, critique, edit, learning, delivery] = await Promise.all([
+    readSkillFile('SKILL.md'),
+    readSkillFile('references/product-copy.md'),
+    readSkillFile('references/coverage-gaps.md'),
+    readSkillFile('references/critique-refinement.md'),
+    readSkillFile('references/edit-contract.md'),
+    readSkillFile('references/asset-learning.md'),
+    readSkillFile('references/delivery-contract.md'),
+  ])
+
+  const modes = skill.match(/## Request mode\n[\s\S]*?(?=\n## )/)?.[0]
+  assert.ok(modes, 'missing ## Request mode section')
+  assert.match(modes, /narrowest\s+mode\s+the\s+verb\s+supports/)
+  // Each mode is one bullet line, so a clause cannot be satisfied by the next mode's text.
+  assert.match(modes, /\*\*Shape\*\*[^\n]*Stages 1–2 only[^\n]*No Figma write/)
+  assert.match(modes, /\*\*Compose\*\*[^\n]*execution loop/)
+  assert.match(modes, /\*\*Review\*\*[^\n]*critique-refinement\.md[^\n]*No Figma write/)
+  assert.match(modes, /\*\*Copy\*\*[^\n]*LOCALIZE edit mode/)
+  assert.match(delivery, /Shape hands off[^\n]*`BRIEF_READY`[^\n]*Review hands off[^\n]*outside `schemas\/design-delivery\.schema\.json`/)
+  assert.match(modes, /it\s+does\s+not\s+authorize\s+a\s+write/)
+  assert.match(modes, /references\/product-copy\.md[\s\S]*references\/coverage-gaps\.md/)
+  assert.match(edit, /\*\*LOCALIZE\*\* — translation, copy rewrite,/)
+
+  // Stable IDs are the citation target for review findings, so their order and fields are pinned.
+  const rules = copy.split(/^## /m).filter((section) => section.startsWith('copy/'))
+  assert.deepEqual(
+    rules.map((section) => section.slice(0, section.indexOf('\n'))),
+    [
+      'copy/action-names-outcome',
+      'copy/destructive-verb-noun',
+      'copy/error-cause-recovery',
+      'copy/stable-loading-label',
+      'copy/canonical-names',
+      'copy/accessible-name-matches-label',
+    ],
+  )
+  for (const rule of rules) {
+    for (const field of ['Scope', 'Rule', 'Why', 'Exceptions', 'Source', 'Bad', 'Good']) {
+      assert.match(rule, new RegExp(`^- ${field}: \\S`, 'm'), `${rule.slice(0, rule.indexOf('\n'))} lacks ${field}`)
+    }
+  }
+  assert.match(copy, /product's\s+content\s+guide\s+and\s+glossary\s+win/)
+  assert.match(copy, /never\s+becomes\s+a\s+rule\s+by\s+itself/)
+  assert.match(copy, /unknown\s+count\s+or\s+recovery\s+policy\s+stays\s+a\s+visible\s+placeholder/)
+  // game-interface-design ships the same rules; either package's tests catch a one-sided edit.
+  const gameCopy = join(packageDirectory, '../game-interface-design/skills/threejs-game-wireframe/references/product-copy.md')
+  assert.equal(await readFile(gameCopy, 'utf8'), copy)
+
+  assert.match(gaps, /has\s+no\s+standard\s+for\s+it/)
+  assert.match(gaps, /`agent proposal`/)
+  const review = critique.match(/## 6\. Review output\n[\s\S]*/)?.[0]
+  assert.ok(review, 'missing ## 6. Review output')
+  for (const level of ['P0', 'P1', 'P2', 'P3']) assert.match(review, new RegExp(`\\*\\*${level}\\*\\* — \\S`))
+  assert.match(review, /reports\s+and\s+does\s+not\s+write/)
+  assert.match(review, /never\s+rank\s+it\s+above\s+P3/)
+  assert.match(review, /`visually-inspected`,\s+`structure-inspected`,\s+or\s+`preview-only`/)
+  assert.match(learning, /never\s+makes\s+a\s+pattern\s+or\s+rule\s+by\s+itself/)
 })
 
 test('routes contextual Bend generation without changing design authority or delivery', async () => {

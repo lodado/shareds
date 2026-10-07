@@ -48,6 +48,8 @@ Use semantic DOM controls for HUD/menu interactions, visible keyboard focus, suf
 targets, safe-area padding, and reduced-motion behavior. Decorative overlays must not steal gameplay input;
 interactive overlays must prevent taps leaking into the game. Keep real copy and actual game data; retain
 `simulated` labels at flow-prototype fidelity. CSS polish never proves that a simulated rule became real.
+Menu, purchase, reset-progress and delete-save labels, error text and icon-button names follow
+[product-copy.md](product-copy.md) unless the game's own content guide says otherwise; review findings cite its rule IDs.
 
 ## 4. Implement a representative pilot, inspect, then expand
 

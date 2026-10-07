@@ -42,3 +42,20 @@ Per round: page/frame + viewport/state inspected, problems and impact, chosen fi
 Not FIGMA_READY if: never reopened for review; an agreed desktop/mobile/state unreviewed; core product asset is a real-looking placeholder; hierarchy/content-fit failure covered by polish; no critique-and-recheck record; references' visual systems mixed.
 
 Record `design-self-review: ready | incomplete | unreviewed`. `user-acceptance` is `accepted` only with a real user response; self-review never substitutes.
+
+## 6. Review output
+
+Review mode reports and does not write. Inspect the real canvas or preview at reading size against
+the six axes, §2, and [product-copy.md](product-copy.md); a node dump alone is not an inspection.
+Order findings by user impact:
+
+- **P0** — blocks the primary task, a severe accessibility failure, or unrecoverable harm.
+- **P1** — likely task failure, a misleading consequence, a missing critical state, or a major responsive or accessibility defect.
+- **P2** — real friction, inconsistency, weak hierarchy, or a recovery gap.
+- **P3** — minor craft or consistency.
+
+Each finding gives: page/frame/node ID or viewport location; verification (`visually-inspected`,
+`structure-inspected`, or `preview-only`, the delivery schema's labels); source (rule ID, `file.md` section, PRD line, or design-system
+page); user consequence; smallest fix. A finding with no source is a preference: label it so and
+never rank it above P3. Areas in [coverage-gaps.md](coverage-gaps.md) are reported as having no
+standard. No findings → name the axes, viewports, and states reviewed.

@@ -28,6 +28,8 @@ const main = async () => {
         rules: {
           '@lodado/local-rules/interaction-pattern-contract': 'error',
           '@lodado/local-rules/interaction-hover-needs-focus': 'error',
+          '@lodado/local-rules/no-nested-dialog': 'error',
+          '@lodado/local-rules/prefer-radio-for-few-options': 'error',
         },
       },
     ],

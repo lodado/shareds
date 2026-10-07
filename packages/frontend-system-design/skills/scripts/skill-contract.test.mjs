@@ -162,6 +162,44 @@ test('every reference separates product choices from failure modes', async () =>
   }
 })
 
+test('every reference keeps citable verification and pitfall IDs unique', async () => {
+  for (const { name, body } of await readReferences()) {
+    const items = sectionOf(body, '## 6. 남길 검증', name)
+      .split('\n')
+      .filter((line) => line.startsWith('- '))
+    const labels = items.map((line) => line.match(/^- \*\*([^*]+)\*\*:/)?.[1])
+    assert.ok(items.length >= 4, `${name}: 검증 항목이 ${items.length}개뿐이다`)
+    assert.ok(
+      labels.every(Boolean),
+      `${name}: 검증 항목이 '- **이름**:'으로 시작하지 않는다: ${items[labels.indexOf(undefined)]}`,
+    )
+    assert.equal(new Set(labels).size, labels.length, `${name}: 검증 ID가 겹친다`)
+
+    const symptoms = tableRows(sectionOf(body, '## 5. 함정', name), PITFALL_HEADER, name, '함정').map(([symptom]) => symptom)
+    assert.equal(new Set(symptoms).size, symptoms.length, `${name}: 함정 ID(증상)가 겹친다`)
+  }
+})
+
+test('SKILL.md cites existing names as IDs and lists the problems it does not cover', async () => {
+  const skill = await read('SKILL.md')
+  const reference = await readFile(join(referenceDirectory, 'infinite-scroll.md'), 'utf8')
+
+  assert.match(skill, /Oracle 증거 매핑: <검증 ID·함정 ID → 카드 행>/)
+  assert.match(skill, /`infinite-scroll\/중복 요청 차단`/)
+  assert.match(skill, /`infinite-scroll\/함정: 같은 항목이 두 번 보임`/)
+  // The worked examples must name a real item, or the ID rule teaches a format nothing follows.
+  assert.match(reference, /^- \*\*중복 요청 차단\*\*:/m)
+  assert.match(reference, /^\| 같은 항목이 두 번 보임\s+\|/m)
+  assert.match(skill, /한 번 쓴 이름은 바꾸지 않는다/)
+
+  const gaps = skill.match(/## 다루지 않는 문제\n[\s\S]*?(?=\n## )/)?.[0]
+  assert.ok(gaps, "SKILL.md에 '## 다루지 않는 문제'가 없다")
+  assert.ok(gaps.split('\n').filter((line) => line.startsWith('- ')).length >= 5, '다루지 않는 문제가 5개 미만이다')
+  assert.match(gaps, /`로드한 reference: 없음`/)
+  assert.match(gaps, /사용자가 승인했을 때만\s+추가하고/)
+  assert.match(gaps, /실행 한 번이나 리뷰 코멘트 하나만으로/)
+})
+
 test('every reference keeps its verification and placement duties', async () => {
   for (const { name, body } of await readReferences()) {
     assert.match(body, /MSW handler로 세운다/, `${name}: MSW 경계 규칙이 없다`)

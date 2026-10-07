@@ -63,6 +63,8 @@ const CASES = [
   ['an environment read outside config', 'src/features/cart/model/api.ts', "import process from 'node:process'\n\nexport const baseUrl = process.env.API_URL\n", 'node/no-process-env'],
   ['a described disable of a correctness rule', 'src/lib/load.ts', 'export function save(send: () => Promise<void>): void {\n  // eslint-disable-next-line @lodado/local-rules/no-swallowed-rejection -- best effort\n  send().catch(() => {})\n}\n', 'eslint-comments/no-restricted-disable'],
   ['a div acting as a button', 'src/components/Row.tsx', 'export function Row({ onOpen }: { onOpen: () => void }): React.ReactNode {\n  return <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={onOpen}>Open</div>\n}\n', 'jsx-a11y-x/prefer-tag-over-role'],
+  ['a select hiding two fixed choices', 'src/components/Billing.tsx', 'export function Billing(): React.ReactNode {\n  return <label>Billing<select name="period"><option value="m">Monthly</option><option value="y">Yearly</option></select></label>\n}\n', '@lodado/local-rules/prefer-radio-for-few-options'],
+  ['a confirmation dialog inside an edit dialog', 'src/components/EditProject.tsx', component('  return <Dialog><AlertDialog /></Dialog>', "import { AlertDialog, Dialog } from '@/shared/ui'\n\n"), '@lodado/local-rules/no-nested-dialog'],
   ['a hover style whose focus style removes the outline', 'src/components/Save.tsx', 'export function Save(): React.ReactNode {\n  return <button type="button" className="hover:bg-slate-100 focus:outline-none">Save</button>\n}\n', '@lodado/local-rules/interaction-hover-needs-focus'],
 ]
 
