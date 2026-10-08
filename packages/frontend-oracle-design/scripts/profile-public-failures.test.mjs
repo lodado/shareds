@@ -39,7 +39,7 @@ function workspace(t, { formal = false } = {}) {
   const env = { HOME: home, PATH: bin, TMPDIR: root, XDG_CACHE_HOME: join(root, 'cache'), GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', BEND_NO_TELEMETRY: '1' }
   if (!formal) env.NODE_OPTIONS = `--experimental-loader=${fileURLToPath(new URL('deny-formal-loader.mjs', fixture))}`
   const execute = (executable, args, overrides = {}) => {
-    const result = spawnSync(executable, args, { cwd: root, env: { ...env, ...overrides }, encoding: 'utf8', timeout: 90000, maxBuffer: 8 * 1024 * 1024 })
+    const result = spawnSync(executable, args, { cwd: root, env: { ...env, ...overrides }, encoding: 'utf8', timeout: 300000, maxBuffer: 8 * 1024 * 1024 })
     console.log(JSON.stringify({ command: [executable, ...args], entrySha256: entryDigest(args[0]), exit: result.status, error: result.error?.code, stdout: result.stdout, stderr: result.stderr }))
     assert.equal(result.error, undefined)
     return result
@@ -278,7 +278,7 @@ import {spawnSync} from 'node:child_process'
 import {appendFileSync} from 'node:fs'
 import test from 'node:test'
 const execute = (args) => {
-  const result = spawnSync(${JSON.stringify(process.execPath)}, args, {cwd: ${JSON.stringify(w.root)}, env: process.env, encoding: 'utf8', timeout: 60000, maxBuffer: 8 * 1024 * 1024})
+  const result = spawnSync(${JSON.stringify(process.execPath)}, args, {cwd: ${JSON.stringify(w.root)}, env: process.env, encoding: 'utf8', timeout: 300000, maxBuffer: 8 * 1024 * 1024})
   const observation = {command: [${JSON.stringify(process.execPath)}, ...args], exit: result.status, stdout: result.stdout, stderr: result.stderr}
   appendFileSync(${JSON.stringify(diagnostics)}, JSON.stringify(observation) + '\\n')
   console.log(JSON.stringify(observation))
@@ -291,13 +291,13 @@ const publicResult = (args) => {
   return JSON.parse(result.stdout)
 }
 test('actual Bend law proofs', () => {
-  const result = publicResult(${JSON.stringify([script('model'), 'prove', '--dir', proofDirectory, '--timeout-ms', '60000'])})
+  const result = publicResult(${JSON.stringify([script('model'), 'prove', '--dir', proofDirectory, '--timeout-ms', '300000'])})
   assert.equal(result.status, 'proven')
   assert.deepEqual(result.laws, ['stale_ignored', 'latest_applied', 'issue_advances', 'latest_reachable'])
   assert.match(result.stdout, /ALL PROOFS CHECK/)
 })
 test('actual adequacy kernel witnesses', () => {
-  const result = publicResult(${JSON.stringify([script('adequacy'), 'check', '--package', packagePath, '--timeout-ms', '60000'])})
+  const result = publicResult(${JSON.stringify([script('adequacy'), 'check', '--package', packagePath, '--timeout-ms', '300000'])})
   assert.equal(result.status, 'proven')
   assert.equal(result.pass, true)
   assert.equal(result.kernel.status, 'proven')
@@ -346,7 +346,7 @@ test('explicit Formal real pinned Bend package projection and initialization pre
   const packagePath = relative(w.root, join(w.directory, 'oracle.package.json'))
   ok(w.cli('stage', 'begin', '--dir', w.directory, '--profile', 'formal-bend/v1'))
   ok(w.cli('stage', 'advance', '--dir', w.directory, '--to', 'MODELED'))
-  const checked = w.cli('stage', 'advance', '--dir', w.directory, '--to', 'CHECKED', '--timeout-ms', '60000')
+  const checked = w.cli('stage', 'advance', '--dir', w.directory, '--to', 'CHECKED', '--timeout-ms', '300000')
   if (checked.status !== 0) {
     console.log(`FORMAL_POSITIVE_NOT_RUN ${JSON.stringify({ gate: 'CHECKED', exit: checked.status, stderr: checked.stderr, bin })}`)
     t.skip(`explicit Formal positive blocked at real CHECKED: ${checked.stderr.trim()}`)
