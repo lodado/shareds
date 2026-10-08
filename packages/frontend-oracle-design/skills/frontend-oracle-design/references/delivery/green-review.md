@@ -280,6 +280,30 @@ node <skill-dir>/scripts/oracle-run.mjs transition \
   --mutation-row O3
 ```
 
+### Delivery review round budget — at most 2
+
+Delivery review (both High reviewers count as one round) runs at most 2 rounds per lock revision, and
+the count is recorded in `journal.md`. A reviewer asked for a defect always returns one, and every fix
+changes the snapshot, so `REVIEW_PACKET_STALE` plus a fresh full review never converges.
+
+1. **Round 1** is the full review. Group its blocking findings by shared root cause, fix each group
+   once in one pass inside the product budget, and rerun the labels above before round 2.
+2. **Round 2** only confirms that round 1's blocking findings are resolved and that the fix diff broke
+   no locked row. Hand the same reviewers (High: both) round 1's finding IDs, the fix diff and the
+   raw rerun evidence, not a request for a fresh defect hunt. The packet is regenerated for the
+   current snapshot; the narrowed task changes, the gate does not.
+3. A new round 2 finding blocks only when it is a `PRODUCT_DEFECT` that contradicts a locked row's
+   `Then`/`Never`, or a critical/high security·permission·data-loss finding. Every other new finding
+   is recorded as advisory in the report and is not fixed: fixing it would change the snapshot and
+   restart the loop.
+4. A fix that needs a new state, message kind or row is `POLICY_GAP` → `NEEDS_DECISION`, not a repair.
+5. The same row blocking in both rounds is a card design defect, not a wording defect. Return a
+   decision to narrow that row instead of repairing it a third time.
+6. If blockers survive round 2, stop at `NEEDS_DECISION` (or `FAIL` for an environment cause) with the
+   surviving findings; `REVIEW_VERIFIED` is not recorded over a blocking finding, and delegating
+   choices does not waive it. A round 3 needs the user's explicit approval and is never started by
+   the controller on its own.
+
 ## Forbidden
 
 In addition to the common prohibitions in [`common.md`](../common.md):
@@ -288,6 +312,7 @@ In addition to the common prohibitions in [`common.md`](../common.md):
 - Reporting a run that did not go through the ledger as evidence
 - Routing around a rejected transition or editing `run-state.json`·`runs.jsonl` directly
 - Repeating correction·improvement rounds without counting the budget
+- Starting a third Delivery review round, or fixing an advisory finding after review, without the user's approval
 - Hiding errors with assertion weakening, `test.skip`, or `first()`/`nth()`
 - Encoding the expected result into a fixture
 - Serializing a race with an arbitrary sleep or by waiting on the assertion target

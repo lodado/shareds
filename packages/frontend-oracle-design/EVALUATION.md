@@ -1,3 +1,13 @@
+# 0.95.0: cap Delivery review at two rounds
+
+Card review already stopped at two rounds; the post-GREEN Delivery review had no cap, so each fix
+changed the snapshot, staled the packet and sent the work to a fresh full review that always found
+something. Delivery review now runs at most 2 rounds per revision: round 1 is the full review, round 2
+only confirms round 1's blocking findings and the fix diff. A new round 2 finding blocks only when it
+contradicts a locked row's `Then`/`Never` or is critical/high security·permission·data loss; the rest are
+advisory and are not fixed. Surviving blockers stop at `NEEDS_DECISION`; a round 3 needs user approval.
+Wording is pinned by `skill-contract.test.mjs`; no runtime state or gate changed.
+
 # 0.94.0: remove the default Bend case-count ceiling
 
 Shared trace enumeration no longer stops at 5,000 cases by default. Model space/conformance,

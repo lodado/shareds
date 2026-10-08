@@ -416,8 +416,8 @@ its body. Do not transcribe the criteria body into this document or the prompt.
 4. Re-run the full card tests and the repo mandatory verification.
 5. If the user separately requested `$frontend-visual-qa` and an affected artifact exists, return to
    that skill and re-run.
-6. If possible, pass the raw re-verification evidence to the same reviewer and confirm only whether
-   the finding is resolved.
+6. Pass the raw re-verification evidence to the same reviewer and confirm only whether the finding
+   is resolved. Delivery review stops after 2 rounds (budget: `delivery/green-review.md`).
 
 Separate reviewer and fixer. Do not let the reviewer fix directly and give final approval to their
 own fix. The reviewer proposes only one risk and a minimal fix per finding and does not demand a

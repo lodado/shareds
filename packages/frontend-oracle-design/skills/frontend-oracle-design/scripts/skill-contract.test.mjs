@@ -2798,6 +2798,18 @@ test('card review is capped at two rounds and round two never reopens the defect
   }
 })
 
+test('delivery review is capped at two rounds and round two only confirms round one', async () => {
+  const [greenReview, subagentReview] = await Promise.all([
+    read('references/delivery/green-review.md'),
+    read('references/subagent-review.md'),
+  ])
+  assert.match(greenReview, /### Delivery review round budget\s+—\s+at most 2/)
+  assert.match(greenReview, /Round 2\*\* only confirms that round 1's blocking findings are resolved/)
+  assert.match(greenReview, /Every other new finding\s+is recorded as advisory in the report and is not fixed/)
+  assert.match(greenReview, /A round 3 needs the user's explicit approval/)
+  assert.match(subagentReview, /Delivery review stops after 2 rounds/)
+})
+
 test('runs keep going after yes, continue the author for repairs and fix Bend failures from a table', async () => {
   const [common, controller, loading, patterns] = await Promise.all([
     read('references/common.md'),
