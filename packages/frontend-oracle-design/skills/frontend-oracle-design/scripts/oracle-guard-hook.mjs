@@ -159,6 +159,18 @@ async function skillActivation(transcriptPath) {
   return { at: parts[first].at, profile: profiles.length === 1 ? profiles[0] : undefined, conflicting: profiles.length > 1 }
 }
 
+/**
+ * 이번 세션이 맡은 오라클만 쓰기를 닫는다. 앞 세션에서 방치한 run은 scanRoot가 겹쳐도 지금 작업의 소유가 아니다 —
+ * 활성화 뒤에 상태가 바뀌었거나 세션 기록이 그 오라클 폴더를 부른 run만 이번 세션 것이다. 판정에서 빠진 run은
+ * 전이 관문이 계속 본다.
+ */
+async function engagedThisSession(directory, activation, transcriptPath) {
+  const state = await stat(join(directory, 'run-state.json')).catch(() => null)
+  if (state && state.mtimeMs >= activation.at) return true
+  const raw = typeof transcriptPath === 'string' ? await readFile(transcriptPath, 'utf8').catch(() => '') : ''
+  return raw.includes(`oracles/${basename(directory)}`)
+}
+
 async function lockedAfter(directory, activation) {
   const names = await readdir(directory).catch(() => [])
   for (const name of names.filter((entry) => entry.endsWith('.lock.json'))) {
@@ -413,6 +425,15 @@ function deniedStageWrite(absolutePath) {
   return true
 }
 
+/** 이 세션이 맡은 오라클의 scan root 안, 오라클 폴더 밖 쓰기인데 활성화 뒤의 유효한 lock이 없으면 닫는다. */
+async function lockRequired({ directory, state, absolutePath, activation, transcriptPath }) {
+  if (typeof state.scanRoot !== 'string') return false
+  const ownedRoot = resolve(directory, state.scanRoot)
+  if (!isPathInside(ownedRoot, absolutePath) || isPathInside(directory, absolutePath)) return false
+  if (!(await engagedThisSession(directory, activation, transcriptPath))) return false
+  return !(await lockedAfter(directory, activation))
+}
+
 async function guardWrite(payload, cwd) {
   const toolName = payload.tool_name
   const input = payload.tool_input ?? {}
@@ -429,8 +450,7 @@ async function guardWrite(payload, cwd) {
 
   const activation = await skillActivation(payload.transcript_path)
   for (const { directory, state } of await findStates(cwd, absolutePath)) {
-    const ownedRoot = typeof state.scanRoot === 'string' ? resolve(directory, state.scanRoot) : null
-    if (activation && ownedRoot && isPathInside(ownedRoot, absolutePath) && !isPathInside(directory, absolutePath) && !(await lockedAfter(directory, activation))) {
+    if (activation && (await lockRequired({ directory, state, absolutePath, activation, transcriptPath: payload.transcript_path }))) {
       deny(`PROFILE_LOCK_REQUIRED: ${absolutePath}: current controller, approved card, stage, state and valid lock must agree before writes.`)
       return
     }

@@ -325,6 +325,32 @@ test('a lock created after the activation opens the test gate; a lock left from 
   assert.equal(hook(writeIn(root, session, test_file)).decision, null)
 })
 
+test('an unlocked run this session never touched does not close writes under its scan root', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-guard-stale-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const leftover = async (id, touched) => {
+    const oracle = join(root, '.ai', 'oracles', id)
+    await mkdir(oracle, { recursive: true })
+    const statePath = join(oracle, 'run-state.json')
+    await writeFile(statePath, JSON.stringify({ schemaVersion: 3, state: 'NEEDS_DECISION', scanRoot: '../../../apps/lab' }))
+    await utimes(statePath, new Date(touched), new Date(touched))
+  }
+  const production = (session) => ({ ...write(root, 'apps/lab/src/model.ts'), transcript_path: session })
+  await leftover('old-r1', '2026-10-01T00:00:00.000Z')
+
+  // 앞 세션에서 방치한 run은 scanRoot가 겹쳐도 지금 작업의 소유가 아니다
+  assert.equal(hook(production(await transcript(root))).decision, null)
+
+  // 같은 run이라도 이번 세션이 이름을 부른 뒤에는 이어받은 것이다
+  const resumed = await transcript(root, { after: ['oracle-run.mjs status --dir .ai/oracles/old-r1'] })
+  assert.match(hook(production(resumed)).decision?.permissionDecisionReason ?? '', /^PROFILE_LOCK_REQUIRED/)
+
+  // 활성화 뒤에 상태가 바뀐 run은 이번 세션 것이다
+  await leftover('new-r1', '2026-10-02T03:05:00.000Z')
+  await rm(join(root, '.ai', 'oracles', 'old-r1'), { recursive: true })
+  assert.match(hook(production(await transcript(root))).decision?.permissionDecisionReason ?? '', /^PROFILE_LOCK_REQUIRED/)
+})
+
 test('with parallel slices one slice lock opens tests only inside its own scan root; a lock before init stays unscoped', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'oracle-guard-slice-'))
   t.after(() => rm(root, { recursive: true, force: true }))

@@ -1,3 +1,12 @@
+# 0.95.1: write guard ignores runs this session never touched
+
+`PROFILE_LOCK_REQUIRED` denied every write under a scan root while any unlocked `run-state.json` above the
+path overlapped it, so runs left from earlier tasks blocked unrelated work (11 leftovers under one app).
+The guard now closes writes only for oracles this session engaged: state changed after the skill activation,
+or the session transcript names the oracle folder. Other runs stay with the transition gate. Regression test:
+`oracle-guard-hook.test.mjs` (stale, named, and fresh runs). `PRODUCTION_TOUCHED_BEFORE_RED` for runs left
+at `ORACLE_READY` is unchanged.
+
 # 0.95.0: cap Delivery review at two rounds
 
 Card review already stopped at two rounds; the post-GREEN Delivery review had no cap, so each fix
