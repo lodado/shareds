@@ -21,6 +21,7 @@ import {
   HAZARD_IDS,
   inputsDigestOf,
   loadPackage,
+  ORDER_WITNESSES,
   orderObligations,
   packageInputs,
   packageIssues,
@@ -301,6 +302,43 @@ test('order obligations separate order-sensitive from history-sensitive traces, 
   const history = orderObligations(enumerateSpace(commuting, { bound: 2 }))
   const kinds = history.obligations.map((entry) => entry.kind)
   assert.ok(kinds.includes('history-sensitive'), JSON.stringify(history))
+})
+
+test('an order obligation carries a few witness traces and the full count, not every permutation', () => {
+  // four distinct events in any order: 24 permutations of one bag, each ending in a different observation
+  const events = ['A', 'B', 'C', 'D']
+  const list = (names) =>
+    names.reduceRight((tail, name) => ({ $: 'Con', head: { $: name }, tail }), { $: 'Nil' })
+  const model = {
+    init: () => 0n,
+    step: (state, event) => state * 5n + BigInt(events.indexOf(event.$) + 1),
+    observe: (state) => state,
+    next: (history) => {
+      const used = new Set()
+      for (let node = history; node.$ === 'Con'; node = node.tail) used.add(node.head.$)
+      return list(events.filter((name) => !used.has(name)))
+    },
+    prefix: 'Perm',
+    digest: 'perm',
+  }
+  const space = enumerateSpace(model, { bound: 4 })
+  const { obligations, total } = orderObligations(space)
+  const permutations = obligations.find((entry) => entry.traceCount === 24)
+  assert.ok(permutations, JSON.stringify(obligations.map((entry) => entry.traceCount)))
+  assert.equal(permutations.kind, 'order-sensitive')
+  assert.equal(permutations.traces.length, ORDER_WITNESSES)
+  const finals = new Set(permutations.traces.map((trace) => trace.observations.at(-1)))
+  assert.ok(finals.size > 1, 'the witnesses include two traces whose end observations differ')
+  assert.deepEqual(
+    permutations.traces.map((trace) => trace.id),
+    [...permutations.traces.map((trace) => trace.id)].sort(),
+  )
+  // the id still names the whole group, so trimming witnesses does not rename an obligation
+  assert.equal(orderObligations(space, { witnesses: 24 }).obligations.find((entry) => entry.id === permutations.id).traces.length, 24)
+  assert.equal(total, orderObligations(space, { witnesses: 24 }).total)
+  // a group that fits keeps the previous shape: no traceCount field
+  const small = orderObligations(space, { witnesses: 24 }).obligations.find((entry) => entry.id === permutations.id)
+  assert.equal('traceCount' in small, false)
 })
 
 test('the family audit maps derived axes and demands a human reason for every other family', () => {

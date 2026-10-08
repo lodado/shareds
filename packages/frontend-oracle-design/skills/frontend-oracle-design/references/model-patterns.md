@@ -186,6 +186,16 @@ observe the cache and the screen separately: a response may still update a cache
 the unmounted screen must not change. Late completions after `Unmount` stay in `next` — dropping them
 because a correct product ignores them hides the defect.
 
+## Counters and ids
+
+An unbounded counter (request ids, retries, list length) makes every value its own state: the transition
+cover reports `capped` and the trace space multiplies per depth. Give the counter the resolution the policy
+distinguishes. When an approved source states a threshold T (retry limit 3, page size 20), let the counter
+saturate at T+1 and add a law that two counts above T observe alike, so the kernel checks the saturation.
+When the observation shows the value (ids on screen, a displayed total) or no source states a threshold,
+keep the counter exact and lower the bound instead. Saturating to avoid an induction is the shrink the
+rule above forbids; saturating because the policy cannot tell the values apart is the model.
+
 ## Identity and session lifetime
 
 When completions can belong to different owners, give every request event the owner it was sent for

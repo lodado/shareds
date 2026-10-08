@@ -294,6 +294,18 @@ export function enumerateSpace(model, { bound, maxCases = null }) {
   }
 }
 
+export const LISTED_CASES = 200
+
+/**
+ * `space`가 stdout에 나열하는 case 수 — 공간 전체는 bound마다 곱절로 자라 대화 문맥에 들어오지 못한다. 총 개수와 digest는
+ * 늘 싣고, 나열은 label 순 앞쪽 `listed`건이다. 전부 필요하면 `--cases`에 총 개수 이상을 준다.
+ */
+export function listedSpace(space, listed = LISTED_CASES) {
+  if (!Number.isSafeInteger(listed) || listed < 0)
+    throw new CliError('USAGE', 'cases must be a non-negative safe integer', 2)
+  return { ...space, caseCount: space.cases.length, cases: space.cases.slice(0, listed) }
+}
+
 export const MAX_COVER_CONFIGURATIONS = 2000
 /** 구성이 무엇인지 — closed는 이 키 아래의 주장이다. 이보다 깊은 곳에서야 갈리는 이력 의존 환경은 한 구성으로 합쳐진다. */
 export const COVER_BASIS =
@@ -1062,7 +1074,7 @@ function parseOptions(args) {
     const name = args[index]?.replace(/^--/, '')
     const value = args[index + 1]
     if (
-      !['dir', 'require', 'timeout-ms', 'model', 'prefix', 'bound', 'max-cases', 'impl', 'file', 'field', 'out'].includes(
+      !['dir', 'require', 'timeout-ms', 'model', 'prefix', 'bound', 'max-cases', 'cases', 'impl', 'file', 'field', 'out'].includes(
         name,
       ) ||
       value === undefined
@@ -1079,7 +1091,7 @@ const USAGE = `usage:
   oracle-model.mjs scaffold --prefix <Name> --field <name=bool|A,B>... --out <World.bend>
   oracle-model.mjs check --file <x.bend> [--file <y.bend>]... [--timeout-ms <n>]
   oracle-model.mjs prove --dir <dir with LAWS.bend and PROOF.bend> [--require <law>]... [--timeout-ms <n>]
-  oracle-model.mjs space --model <MODEL.bend> --prefix <Name> --bound <n> [--max-cases <n>]
+  oracle-model.mjs space --model <MODEL.bend> --prefix <Name> --bound <n> [--max-cases <n>] [--cases <listed>]
   oracle-model.mjs conform --model <MODEL.bend> --prefix <Name> --bound <n> --impl <adapter.mjs> [--max-cases <n>]`
 
 async function main() {
@@ -1133,7 +1145,12 @@ async function main() {
   })
   if (command === 'space') {
     const { cases: coverCases, ...cover } = transitionCover(model, space)
-    const report = { ...space, cover: { ...cover, cases: coverCases.length }, bend: model.bend, inputs: model.inputs }
+    const report = {
+      ...listedSpace(space, options.cases === undefined ? LISTED_CASES : Number(options.cases)),
+      cover: { ...cover, cases: coverCases.length },
+      bend: model.bend,
+      inputs: model.inputs,
+    }
     process.stdout.write(`${JSON.stringify(report)}\n`)
     process.exitCode = space.complete ? 0 : 1
     return

@@ -125,7 +125,8 @@ law provable — that is a silent decision. Report each result by its scope: a f
    by the trace space with its bound), derivation (`structural`, `model-checked`) and limitations — plus
    model-checked **order obligations**: traces that apply the same events in another order and end
    differently (`order-sensitive`) or end alike through different observations (`history-sensitive`,
-   which no end-state world can check). A sum type is split per constructor, so a field of one
+   which no end-state world can check); each obligation carries four witness traces — two whose observations
+   differ first — and `traceCount` when the group is larger, never every permutation. A sum type is split per constructor, so a field of one
    constructor is an axis conditional on that constructor, never crossed with the others. Unsupported
    declarations (parameterized types, unreadable constructors, `String`, unbounded domains) are
    diagnostics that make the derivation `incomplete`, never silent omissions. Coordinates and
@@ -246,6 +247,10 @@ Use `--max-cases <n>` to opt into a case budget; metadata records `maxCases: nul
 World/configuration/perturbation budgets and Bend execution timeouts remain in force.
 Enumeration still uses recursive DFS and fast-check allocates sampled index arrays up front; extreme
 depths can exhaust the JavaScript stack or memory before a case budget is reached.
+The report lists the first 200 cases in label order and always carries `caseCount` and `spaceDigest`;
+`--cases <n>` lists more (pass `caseCount` for all). A card and a lock quote the count, never the trace list:
+the space multiplies per depth (about ×3 per event in a request-id model), so a listing grows past what a
+reader or a model context can hold. Read a required scenario's trace from `--cases`, not from a full dump.
 It also reports the transition cover: every configuration the model can reach (its state plus the events the
 environment allows) takes every allowed event once, through the shortest trace that reaches it. A finite
 model is `closed` — every (configuration, event) pair runs, including those first reached past the bound;

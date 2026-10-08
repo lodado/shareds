@@ -1,3 +1,15 @@
+# 0.95.3: the derived output and the `space` report stop growing with the trace space
+
+A card projection came out at 15 MB. Measured on the `stale-search` fixture (request ids are a counter): the
+card stays 28 KB, `derived.json` grows 15 KB at bound 4, 97 KB at 7, 943 KB at 9, and `space` stdout lists
+every trace (about ×3 per event). The cause was `order.obligations[].traces`, which listed every permutation
+of an event bag with its observations, and `space` printing all cases. Each obligation now carries four
+witness traces (two whose observations differ first) and `traceCount` when the group is larger; `space` lists
+the first 200 cases and always prints `caseCount` (`--cases <n>` for more). The `derived` digest is still
+computed from the full obligations, so cards generated before this change regenerate unchanged. `model-patterns.md`
+gains "Counters and ids": saturate a counter at a stated threshold T+1 with a law, or keep it exact and lower
+the bound. Pinned in `skill-contract.test.mjs`, `oracle-package.test.mjs` and `oracle-model.test.mjs`.
+
 # 0.95.2: event order comes from the model; identity and session changes are model events
 
 A review asked for `fc.commands` so fast-check explores more event orders. `emit-trace` already does: each

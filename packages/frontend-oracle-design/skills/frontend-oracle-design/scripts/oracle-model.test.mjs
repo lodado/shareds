@@ -23,6 +23,8 @@ import {
   classifyTrace,
   enumerateSpace,
   formalModelIssues,
+  LISTED_CASES,
+  listedSpace,
   loadModel,
   minimalCover,
   parseFormalModel,
@@ -245,6 +247,20 @@ test('space has no default case ceiling and still honors explicit limits', () =>
   assert.equal(limited.stopped, 'budget')
   assert.equal(limited.maxCases, 5000)
   assert.notEqual(limited.inputDigest, full.inputDigest)
+})
+
+test('the space report lists a bounded prefix of cases and always carries the full count', () => {
+  const full = enumerateSpace(handModel(), { bound: 10 })
+  assert.equal(full.cases.length, 1024)
+  const report = listedSpace(full)
+  assert.equal(report.caseCount, 1024)
+  assert.equal(report.cases.length, LISTED_CASES)
+  assert.deepEqual(report.cases, full.cases.slice(0, LISTED_CASES))
+  assert.equal(report.spaceDigest, full.spaceDigest)
+  assert.equal(listedSpace(full, 1024).cases.length, 1024)
+  assert.equal(listedSpace(full, 0).cases.length, 0)
+  assert.throws(() => listedSpace(full, -1), { code: 'USAGE' })
+  assert.throws(() => listedSpace(full, 1.5), { code: 'USAGE' })
 })
 
 test('space refuses invalid explicit case limits', () => {

@@ -2824,6 +2824,19 @@ test('event order comes from the model, and identity and session changes are mod
   assert.match(patterns, /resets every\s+global it touched in `dispose`/)
 })
 
+test('the space report is bounded, order obligations carry witnesses, and counters get a resolution rule', async () => {
+  const [bend, patterns] = await Promise.all([
+    read('references/bend-cross-verification.md'),
+    read('references/model-patterns.md'),
+  ])
+  assert.match(bend, /each obligation carries four witness traces/)
+  assert.match(bend, /The report lists the first 200 cases in label order and always carries `caseCount`/)
+  assert.match(bend, /A card and a lock quote the count, never the trace list/)
+  assert.match(patterns, /## Counters and ids/)
+  assert.match(patterns, /let the counter\s+saturate at T\+1 and add a law that two counts above T observe alike/)
+  assert.match(patterns, /keep the counter exact and lower the bound instead/)
+})
+
 test('runs keep going after yes, continue the author for repairs and fix Bend failures from a table', async () => {
   const [common, controller, loading, patterns] = await Promise.all([
     read('references/common.md'),

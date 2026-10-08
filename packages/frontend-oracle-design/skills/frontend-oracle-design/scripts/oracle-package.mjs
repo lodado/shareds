@@ -1024,12 +1024,30 @@ function behaviorAxes(behavior, modelText, sourceIds) {
   return { axes, diagnostics }
 }
 
+/** 의무마다 싣는 증거 trace 수 — 같은 사건 묶음의 순열 전부를 싣으면 derived가 bound마다 곱절로 자란다. */
+export const ORDER_WITNESSES = 4
+
+/**
+ * 의무가 참인 증거: 끝 관찰(order-sensitive)이나 중간 관찰(history-sensitive)이 갈리는 두 trace를 먼저, 나머지는 id 순으로.
+ * 전체 개수는 `traceCount`로 남기고, 다 싣는 경우에는 필드를 더하지 않는다 — 작은 의무의 digest는 그대로다.
+ */
+function witnessTraces(members, kind, witnesses) {
+  const byId = [...members].sort((a, b) => (a.id < b.id ? -1 : 1))
+  const view = ({ id, label, observations }) => ({ id, label, observations })
+  if (byId.length <= witnesses) return { traces: byId.map(view) }
+  const key = (entry) => stableStringify(kind === 'order-sensitive' ? entry.observations.at(-1) : entry.observations)
+  const other = byId.find((entry) => key(entry) !== key(byId[0]))
+  const picked = new Set([byId[0], other])
+  for (const entry of byId) if (picked.size < witnesses) picked.add(entry)
+  return { traceCount: byId.length, traces: byId.filter((entry) => picked.has(entry)).map(view) }
+}
+
 /**
  * 사건 순서 의무 — 같은 사건 묶음을 다른 순서로 적용한 trace끼리 비교한다. 끝 관찰이 다르면 순서가 결과를 바꾼다
  * (`order-sensitive`). 끝 관찰은 같은데 중간 관찰이 다르면, 끝 상태만 보는 세계로는 구별할 수 없는 시간적 의무다
  * (`history-sensitive`). 모델이 계산한 것이다(model-checked) — 선언한 bound 안의 trace에 대해서만.
  */
-export function orderObligations(space, { limit = 50 } = {}) {
+export function orderObligations(space, { limit = 50, witnesses = ORDER_WITNESSES } = {}) {
   const groups = new Map()
   for (const entry of space.cases) {
     const bag = stableStringify(entry.trace.map((event) => stableStringify(event)).sort())
@@ -1048,9 +1066,7 @@ export function orderObligations(space, { limit = 50 } = {}) {
       kind,
       derivation: 'model-checked',
       events: members[0].trace.map((event) => stableStringify(event)).sort(),
-      traces: members
-        .map(({ id, label, observations }) => ({ id, label, observations }))
-        .sort((a, b) => (a.id < b.id ? -1 : 1)),
+      ...witnessTraces(members, kind, witnesses),
       claim:
         kind === 'order-sensitive'
           ? 'the same events in another order end in a different observation — the order is part of the contract'
@@ -1228,7 +1244,9 @@ export function derive(pkg, texts, { space = null, inputs = [], worlds = null, c
       ? 'incomplete'
       : 'derived',
   }
-  return { ...result, digest: deriveDigest({ result, inputs }) }
+  // 증거 trace를 줄이기 전의 전체 의무로 digest를 낸다 — 출력만 줄이므로, 이미 만든 카드의 digest가 달라지지 않는다
+  const digested = space ? { ...result, order: orderObligations(space, { witnesses: Infinity }) } : result
+  return { ...result, digest: deriveDigest({ result: digested, inputs }) }
 }
 
 // ── card projection ───────────────────────────────────────────────────────────────────────────────────────────
