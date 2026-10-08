@@ -241,7 +241,9 @@ to `Bound` messages from `init` that `next` allows; each prefix's `observe` valu
 observation. Case IDs hash the trace, so the same model, bound and generator version give the same
 cases and `spaceDigest`; no time or runId enters them. A budget stop keeps the explored cases and
 reports `complete: false` — never trim cases to finish.
-`Bound` has no fixed depth ceiling; case/world budgets and Bend execution timeouts remain in force.
+`Bound` has no fixed depth ceiling and trace enumeration has no default case-count ceiling.
+Use `--max-cases <n>` to opt into a case budget; metadata records `maxCases: null` when unlimited.
+World/configuration/perturbation budgets and Bend execution timeouts remain in force.
 Enumeration still uses recursive DFS and fast-check allocates sampled index arrays up front; extreme
 depths can exhaust the JavaScript stack or memory before a case budget is reached.
 It also reports the transition cover: every configuration the model can reach (its state plus the events the

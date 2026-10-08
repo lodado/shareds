@@ -1,3 +1,13 @@
+# 0.94.0: remove the default Bend case-count ceiling
+
+Shared trace enumeration no longer stops at 5,000 cases by default. Model space/conformance,
+projection, package derivation and discovery inherit the unlimited default (`maxCases: null`);
+explicit `--max-cases` limits still report an incomplete space when exhausted. Regression checks
+enumerate all 8,192 binary traces at depth 13 and retain the explicit 5,000-case budget stop.
+World/configuration/perturbation budgets, execution timeouts and physical resource limits remain.
+The package test runner uses four file workers to reduce Bend/Lean subprocess contention;
+assertions, coverage and timeout values are unchanged.
+
 # 0.93.0: remove the Bend trace-depth ceiling
 
 `Bound` is a positive safe integer, no longer restricted to 1..8. Model enumeration, package

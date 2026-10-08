@@ -498,7 +498,7 @@ export async function emitTrace(options) {
   checkCommon({ row, runner, runs, adapter, environment, caseTimeout })
   await assertAdapterTrusted(adapter)
   const loaded = await loadModel({ model, prefix, bin, timeoutMs })
-  const space = enumerateSpace(loaded, { bound, ...(maxCases ? { maxCases } : {}) })
+  const space = enumerateSpace(loaded, { bound, maxCases })
   const jointCases = joint?.cases ?? []
   if (!space.complete) {
     throw new CliError(

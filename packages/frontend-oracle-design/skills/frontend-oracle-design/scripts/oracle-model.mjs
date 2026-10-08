@@ -122,7 +122,7 @@ export function eventLabel(event) {
 /**
  * Bend 파일을 스킬 소유 임시 디렉터리에 `.mjs`로 컴파일해 불러온다. foreign·unsafe·hub import는 실행 전에 거부한다 —
  * 컴파일된 모듈은 이 프로세스에서 돌기 때문이다. 남는 코드는 Bend가 종료를 검사한 순수 def뿐이다.
- * ponytail: def는 시간·메모리 상한 없이 이 프로세스에서 돈다(열거 예산은 max-cases·max-worlds) — 큰 모델이
+ * ponytail: def는 시간·메모리 상한 없이 이 프로세스에서 돈다(선택적 max-cases·세계의 max-worlds 예산) — 큰 모델이
  * 오면 열거를 worker thread + resourceLimits·timeout으로 옮긴다.
  */
 export async function compileBend({ entry, bin, timeoutMs = 120_000 }) {
@@ -232,15 +232,15 @@ export async function loadModel({ model, prefix, bin, timeoutMs = 120_000 }) {
 /**
  * 선언 범위의 오라클 공간: `init`에서 시작해 환경 `next(history)`가 허용하는 사건을 `bound`개까지 이은 모든 trace.
  * 모든 prefix의 관측값이 기대값이다. 같은 모델·범위·생성기 버전이면 같은 case ID·순서가 나온다 — 시각·runId는 섞지 않는다.
- * 예산을 넘기면 그때까지의 case를 지우지 않고 `complete: false`로 남긴다.
+ * 기본 case 개수 상한은 없다. 명시한 예산을 넘기면 그때까지의 case를 지우지 않고 `complete: false`로 남긴다.
  * ponytail: 재귀 깊이는 JS call stack에 묶인다 — 수천 단계 trace가 필요하면 반복 DFS로 옮긴다.
  */
-export function enumerateSpace(model, { bound, maxCases = 5000 }) {
+export function enumerateSpace(model, { bound, maxCases = null }) {
   if (!Number.isSafeInteger(bound) || bound < 1) {
     throw new CliError('USAGE', 'bound must be a positive safe integer', 2)
   }
-  if (!Number.isInteger(maxCases) || maxCases < 1)
-    throw new CliError('USAGE', 'max-cases must be a positive integer', 2)
+  if (maxCases !== null && (!Number.isSafeInteger(maxCases) || maxCases < 1))
+    throw new CliError('USAGE', 'max-cases must be a positive safe integer', 2)
 
   const initialState = model.init()
   const collected = []
@@ -249,7 +249,7 @@ export function enumerateSpace(model, { bound, maxCases = 5000 }) {
     if (stopped) return
     const choices = raw.length < bound ? listItems(model.next(listOf(raw))) : []
     if (choices.length === 0) {
-      if (collected.length >= maxCases) stopped = 'budget'
+      if (maxCases !== null && collected.length >= maxCases) stopped = 'budget'
       else collected.push({ trace, observations })
       return
     }

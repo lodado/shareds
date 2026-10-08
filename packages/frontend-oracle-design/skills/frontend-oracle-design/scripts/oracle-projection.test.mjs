@@ -322,21 +322,23 @@ test('[bend] emit-trace: the generated test passes for the reducer, fails a muta
   assert.equal(stale.status, 1)
   assert.match(stale.output, /STALE_GENERATED_TESTS: \.\.\/MODEL\.bend changed since generation/)
 
-  await assert.rejects(
-    emitTrace({
-      model: join(dir, 'MODEL.bend'),
-      prefix: 'Search',
-      bound: 4,
-      adapter: join(dir, 'search.adapter.mjs'),
-      out: join(dir, 'x'),
-      row: 'O4',
-      runs: 100,
-      maxCases: 3,
-      bin,
-      regenerate: 'test',
-    }),
-    /SPACE_INCOMPLETE|the space stopped at 3 cases/,
-  )
+  for (const [maxCases, error] of [[0, /max-cases must be a positive safe integer/], [3, /SPACE_INCOMPLETE|the space stopped at 3 cases/]]) {
+    await assert.rejects(
+      emitTrace({
+        model: join(dir, 'MODEL.bend'),
+        prefix: 'Search',
+        bound: 4,
+        adapter: join(dir, 'search.adapter.mjs'),
+        out: join(dir, 'x'),
+        row: 'O4',
+        runs: 100,
+        maxCases,
+        bin,
+        regenerate: 'test',
+      }),
+      error,
+    )
+  }
 })
 
 test('[bend] emit-state: proven relations judge the reducer on all 48 pairs; the && mutant fails exhaustively and sampled', async (t) => {

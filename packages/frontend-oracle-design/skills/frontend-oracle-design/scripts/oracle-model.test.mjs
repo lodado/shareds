@@ -232,6 +232,30 @@ test('a budget stop keeps the explored cases and reports the space as incomplete
   assert.notEqual(stopped.inputDigest, full.inputDigest)
 })
 
+test('space has no default case ceiling and still honors explicit limits', () => {
+  const full = enumerateSpace(handModel(), { bound: 13 })
+  assert.equal(full.cases.length, 8192)
+  assert.equal(full.complete, true)
+  assert.equal(full.stopped, null)
+  assert.equal(full.maxCases, null)
+  assert.equal(JSON.parse(JSON.stringify(full)).maxCases, null)
+  const limited = enumerateSpace(handModel(), { bound: 13, maxCases: 5000 })
+  assert.equal(limited.cases.length, 5000)
+  assert.equal(limited.complete, false)
+  assert.equal(limited.stopped, 'budget')
+  assert.equal(limited.maxCases, 5000)
+  assert.notEqual(limited.inputDigest, full.inputDigest)
+})
+
+test('space refuses invalid explicit case limits', () => {
+  for (const maxCases of [-1, 0, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(
+      () => enumerateSpace(handModel(), { bound: 1, maxCases }),
+      (error) => error.code === 'USAGE',
+    )
+  }
+})
+
 test('space accepts bounds beyond eight and preserves the case budget', () => {
   const full = enumerateSpace(handModel(), { bound: 9 })
   assert.equal(full.complete, true)
