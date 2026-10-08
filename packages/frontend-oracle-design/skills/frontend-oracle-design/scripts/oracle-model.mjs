@@ -14,6 +14,7 @@ import { isDeepStrictEqual } from 'node:util'
 import { ensureBend, reportedVersion } from './ensure-bend.mjs'
 import { runCli } from './oracle-cli.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
+import { analyzeConfigurations } from './oracle-quotient.mjs'
 import { toPlain } from './oracle-types.mjs'
 
 export { toPlain } from './oracle-types.mjs'
@@ -314,9 +315,10 @@ export const COVER_BASIS =
 /**
  * 구성 그래프 — 너비 우선으로 구성(모델 상태 + 허용 사건 + 각 사건 한 걸음 뒤 허용 사건)을 처음 닿은 이력으로 합쳐 간선을 모은다.
  * next(history)는 과거 전체를 읽는다 — 상태와 지금 허용 사건이 같아도 각 사건 뒤에 허용되는 사건이 다르면 다른 구성이다.
- * 각 구성의 trace는 가장 짧은 접근 이력이고, 간선은 그 trace에 사건 하나를 이은 것이다.
+ * 각 구성의 trace는 가장 짧은 접근 이력이고, 간선은 그 trace에 사건 하나를 이은 것이다. 구성은 `key`, 간선은 닿는 구성의
+ * `to`(이미 있던 구성이면 그 구성)를 가진다 — 분석(oracle-quotient)이 그래프만 보고 몫·교환·도달을 계산한다.
  */
-function configurationGraph(model, maxConfigurations) {
+export function configurationGraph(model, maxConfigurations) {
   const allowedAfter = (raw) => {
     const seenEvents = new Set()
     return listItems(model.next(listOf(raw))).filter((event) => {
@@ -332,9 +334,11 @@ function configurationGraph(model, maxConfigurations) {
     const allowed = allowedAfter(node.raw)
     const ahead = allowed.map((event) => allowedAfter([...node.raw, event]).map(toPlain))
     const key = stableStringify({ state: toPlain(node.state), allowed: allowed.map(toPlain), ahead })
-    if (seen.has(key)) return
-    seen.add(key)
-    nodes.push({ ...node, allowed, edges: [] })
+    if (!seen.has(key)) {
+      seen.add(key)
+      nodes.push({ ...node, key, observation: toPlain(model.observe(node.state)), allowed, edges: [] })
+    }
+    return key
   }
   visit({ raw: [], trace: [], state: model.init(), observations: [] })
   let pairs = 0
@@ -351,8 +355,13 @@ function configurationGraph(model, maxConfigurations) {
         state,
         observations: [...node.observations, observation],
       }
-      node.edges.push({ event: toPlain(event), observation, trace: child.trace, observations: child.observations })
-      visit(child)
+      node.edges.push({
+        event: toPlain(event),
+        observation,
+        trace: child.trace,
+        observations: child.observations,
+        to: visit(child),
+      })
     }
   }
   // 줄에 남은 구성이 있으면 상한에 걸린 것이다 — 그 앞 깊이까지는 전부 덮었다
@@ -366,8 +375,8 @@ function configurationGraph(model, maxConfigurations) {
  * 구성을 덮고 closed다. 상태가 끝없이 자라 상한에 걸리면 capped: bound 안에서 닿는 구성까지만 덮고(그 너머는 fast-check
  * 표본의 몫이다) 그 깊이를 보고한다. 모델 수준의 가능한 케이스 보고에 쓴다 — 제품에 돌리는 집합은 minimalCover다.
  */
-export function transitionCover(model, space, { maxConfigurations = MAX_COVER_CONFIGURATIONS } = {}) {
-  const { nodes, expanded, pairs, capped } = configurationGraph(model, maxConfigurations)
+export function transitionCover(model, space, { maxConfigurations = MAX_COVER_CONFIGURATIONS, graph = null } = {}) {
+  const { nodes, expanded, pairs, capped } = graph ?? configurationGraph(model, maxConfigurations)
   const coveredDepth = capped === null ? null : Math.min(capped, space.bound)
   const cases = nodes
     .flatMap((node) => node.edges.map((edge) => ({ ...edge, depth: node.trace.length })))
@@ -507,8 +516,8 @@ function dropPrefixes(chosen) {
  * 전이 커버보다 약한 주장이다 — 항목 사이의 3-way 상호작용과 깊은 이력은 fast-check 표본의 몫이다.
  * ponytail: 탐욕 집합 덮개(최적 아님)·접두사 병합만 한다. 서로 접두사가 아닌 trace를 한 긴 trace로 잇는 일은 마운트 수가 문제일 때 추가한다.
  */
-export function minimalCover(model, space, { maxConfigurations = MAX_COVER_CONFIGURATIONS } = {}) {
-  const { nodes, expanded, capped } = configurationGraph(model, maxConfigurations)
+export function minimalCover(model, space, { maxConfigurations = MAX_COVER_CONFIGURATIONS, graph = null } = {}) {
+  const { nodes, expanded, capped } = graph ?? configurationGraph(model, maxConfigurations)
   const coveredDepth = capped === null ? null : Math.min(capped, space.bound)
   const required = nodes.filter((node) => coveredDepth === null || node.trace.length <= coveredDepth)
   const { itemsOf, table } = itemsByEdge(required)
@@ -1074,7 +1083,7 @@ function parseOptions(args) {
     const name = args[index]?.replace(/^--/, '')
     const value = args[index + 1]
     if (
-      !['dir', 'require', 'timeout-ms', 'model', 'prefix', 'bound', 'max-cases', 'cases', 'impl', 'file', 'field', 'out'].includes(
+      !['dir', 'require', 'timeout-ms', 'model', 'prefix', 'bound', 'max-cases', 'cases', 'impl', 'file', 'field', 'out', 'order-ways'].includes(
         name,
       ) ||
       value === undefined
@@ -1091,7 +1100,7 @@ const USAGE = `usage:
   oracle-model.mjs scaffold --prefix <Name> --field <name=bool|A,B>... --out <World.bend>
   oracle-model.mjs check --file <x.bend> [--file <y.bend>]... [--timeout-ms <n>]
   oracle-model.mjs prove --dir <dir with LAWS.bend and PROOF.bend> [--require <law>]... [--timeout-ms <n>]
-  oracle-model.mjs space --model <MODEL.bend> --prefix <Name> --bound <n> [--max-cases <n>] [--cases <listed>]
+  oracle-model.mjs space --model <MODEL.bend> --prefix <Name> --bound <n> [--max-cases <n>] [--cases <listed>] [--order-ways <t>]
   oracle-model.mjs conform --model <MODEL.bend> --prefix <Name> --bound <n> --impl <adapter.mjs> [--max-cases <n>]`
 
 async function main() {
@@ -1144,10 +1153,18 @@ async function main() {
     ...(options['max-cases'] ? { maxCases: Number(options['max-cases']) } : {}),
   })
   if (command === 'space') {
-    const { cases: coverCases, ...cover } = transitionCover(model, space)
+    const graph = configurationGraph(model, MAX_COVER_CONFIGURATIONS)
+    const { cases: coverCases, ...cover } = transitionCover(model, space, { graph })
+    const minimum = minimalCover(model, space, { graph })
     const report = {
       ...listedSpace(space, options.cases === undefined ? LISTED_CASES : Number(options.cases)),
       cover: { ...cover, cases: coverCases.length },
+      analysis: analyzeConfigurations(graph, {
+        traces: minimum.cases.map(({ trace }) => trace),
+        label: eventLabel,
+        legal: (trace) => classifyTrace(model, trace).verdict === 'in-space',
+        ...(options['order-ways'] ? { orderWays: Number(options['order-ways']) } : {}),
+      }),
       bend: model.bend,
       inputs: model.inputs,
     }

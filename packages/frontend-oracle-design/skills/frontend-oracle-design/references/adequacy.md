@@ -270,18 +270,23 @@ nearest field; it reopens the problem definition.
 
 Useful shapes for goals and rows; none is required.
 
-| Pattern          | Claim shape                                            |
-| ---------------- | ------------------------------------------------------ |
-| Invariant        | every allowed world satisfies P                        |
-| Preservation     | P before an operation implies P after it               |
-| Idempotence      | applying the operation twice observes the same as once |
-| Non-interference | changing A leaves B's projection unchanged             |
-| Round-trip       | decode after encode returns the value                  |
-| Referential      | every reference points at an existing target           |
-| Ordering         | the operation keeps the order relation                 |
-| Determinism      | the same input gives the same observation              |
-| Commutativity    | two operations in either order observe the same        |
-| Monotonicity     | progress never goes back                               |
+| Pattern          | Claim shape                                                                                     |
+| ---------------- | ----------------------------------------------------------------------------------------------- |
+| Invariant        | every allowed world satisfies P                                                                 |
+| Preservation     | P before an operation implies P after it                                                        |
+| Idempotence      | applying the operation twice observes the same as once                                          |
+| Non-interference | changing A leaves B's projection unchanged                                                      |
+| Round-trip       | decode after encode returns the value                                                           |
+| Referential      | every reference points at an existing target                                                    |
+| Ordering         | the operation keeps the order relation                                                          |
+| Determinism      | the same input gives the same observation                                                       |
+| Commutativity    | two operations in either order observe the same                                                 |
+| Monotonicity     | progress never goes back                                                                        |
+| Convergence      | the same updates in any delivery order give one state                                           |
+| Read-your-writes | after a write completes, the same session reads it or a later value                             |
+| Monotonic reads  | a later read never shows an older version than an earlier one                                   |
+| Progress         | every step keeps a terminal state or lowers a live state's rank (`model-patterns.md`, Progress) |
+| Permutation      | an order change keeps the length and every item's count (`model-patterns.md`, Collections)      |
 
 When a counterexample appears, check in this order before calling it a product defect: implementation,
 formal model, projection (Coordinates·Observations), missing assumption, ambiguous source, wrong goal,
@@ -294,7 +299,7 @@ is `FAIL`.
 - Proven: the stated claims over every world of the declared record that the assumptions allow,
   re-checked by the Bend kernel.
 - Not proven: that the world, the goals or the terms mean what the source means (human review, helped
-  by minimal pairs and examples); anything about the product; progress ("eventually"); phenomena the
+  by minimal pairs and examples); anything about the product; progress without a ranking function (strong fairness, starvation between actors); phenomena the
   world leaves out; case-space `impossible` or `independent` claims.
 - Unknown, never a pass: an infinite field, more than 8192 worlds, a kernel timeout or rejection.
 - Discovery raises the odds of finding what the world leaves out; it never makes the world complete.

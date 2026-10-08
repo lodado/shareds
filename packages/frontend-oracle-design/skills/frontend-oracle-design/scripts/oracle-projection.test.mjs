@@ -13,6 +13,7 @@ import {
   formalModelIssues,
   parseFormalModel,
   projectionResidue,
+  proveLaws,
 } from './oracle-model.mjs'
 import { auditAdapterSource, emitState, emitTrace, emitWorld, replay } from './oracle-projection.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
@@ -51,7 +52,7 @@ async function workspace(t) {
   t.after(() => rm(root, { recursive: true, force: true }))
   await mkdir(join(root, 'node_modules'))
   await symlink(join(PACKAGE, 'node_modules', 'fast-check'), join(root, 'node_modules', 'fast-check'))
-  for (const name of ['stale-search', 'toggle', 'doc-save', 'pagination', 'session-expiry'])
+  for (const name of ['stale-search', 'toggle', 'doc-save', 'pagination', 'session-expiry', 'reorder'])
     await cp(join(FIXTURES, name), join(root, name), { recursive: true })
   return root
 }
@@ -582,6 +583,8 @@ test('[bend] emit-trace samples every environment choice: a defect behind the 20
     row: 'O1',
     runs: 300,
     maxLength: 3,
+    wSet: false,
+    orderWays: false,
     bin,
     regenerate: 'test',
   })
@@ -976,6 +979,202 @@ test('[bend] emit-world: every possible setting runs once with the outcomes the 
   assert.match(stale.output, /STALE_GENERATED_TESTS: \.\.\/World\.bend changed since generation/)
 })
 
+// ── order changes: a law proved by induction holds for every length; fast-check carries it to the product ───────
+
+test('[bend] reorder: length and permutation are proven for every list by induction, and a drag that drops or overwrites an item is refused', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'reorder')
+  const proven = await proveLaws({ dir, bin, require: ['length_kept', 'items_kept'] })
+  assert.equal(proven.status, 'proven', `${proven.stdout}${proven.stderr}`)
+
+  const swap = 'b <> (a <> r)'
+  const model = await readFile(join(dir, 'MODEL.bend'), 'utf8')
+  assert.ok(model.includes(swap), 'the fixture swaps the dragged item with its neighbour')
+  // a dropped item changes the length; an overwritten one keeps the length, so only the permutation law refuses it
+  for (const mutant of ['b <> r', 'b <> (0n <> r)']) {
+    await writeFile(join(dir, 'MODEL.bend'), model.replace(swap, mutant))
+    const refused = await proveLaws({ dir, bin })
+    assert.equal(refused.status, 'failed', `${mutant}: ${refused.stdout}${refused.stderr}`)
+  }
+})
+
+test('[bend] reorder emit-state: three items hide a defect on long boards; the same relations sampled on boards of seven catch it', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'reorder')
+  const base = {
+    model: join(dir, 'MODEL.bend'),
+    prefix: 'Board',
+    stateType: 'Board',
+    commandType: 'Drag',
+    relations: ['R_length_kept', 'R_items_kept'],
+    row: 'O1',
+    bin,
+    regenerate: 'test',
+  }
+  const small = { ...base, runs: 50, natMax: 2, listMax: 3 }
+  const long = { ...base, runs: 300, natMax: 4, listMax: 7 }
+
+  const clean = await emitState({ ...small, adapter: join(dir, 'board.adapter.mjs'), out: join(dir, 'clean') })
+  assert.equal(clean.verification.strategy, 'exhaustive+sampled')
+  assert.equal(runGenerated(join(dir, 'clean', 'board.oracle.test.mjs')).status, 0)
+
+  // the premise: every board of up to three items, exhaustively, passes the defective product
+  const hidden = await emitState({ ...small, adapter: join(dir, 'mutant.adapter.mjs'), out: join(dir, 'hidden') })
+  assert.equal(hidden.verification.domain, 120)
+  const missed = runGenerated(join(dir, 'hidden', 'board.oracle.test.mjs'))
+  assert.equal(missed.status, 0, missed.output)
+
+  const sampled = await emitState({ ...long, adapter: join(dir, 'mutant.adapter.mjs'), out: join(dir, 'caught') })
+  assert.equal(sampled.verification.strategy, 'sampled')
+  assert.ok(sampled.verification.domain > 400_000, 'the domain is far too large to list')
+  const caught = runGenerated(join(dir, 'caught', 'board.oracle.test.mjs'))
+  assert.equal(caught.status, 1, caught.output)
+  assert.match(caught.output, /Counterexample: \[\{"\$":"Board"/)
+
+  // and the correct product passes the same long boards
+  await emitState({ ...long, adapter: join(dir, 'board.adapter.mjs'), out: join(dir, 'longclean') })
+  assert.equal(runGenerated(join(dir, 'longclean', 'board.oracle.test.mjs')).status, 0)
+})
+
+// ── emit-trace: the characterizing and event-order suites run by default; each can be turned off ────────────────
+
+test('[bend] emit-trace adds the characterizing and event-order cases by default; turning both off gives the bare cover', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'pagination')
+  const base = { package: 'oracle.package.json', cwd: dir, row: 'O1', runs: 50, bin, regenerate: 'test' }
+  const bare = await emitTrace({ ...base, wSet: false, orderWays: false, adapter: join(dir, 'pager.adapter.mjs'), out: join(dir, 'bare') })
+  assert.equal(bare.verification.wSet, undefined)
+  assert.equal(bare.verification.orderWays, undefined)
+
+  const dense = await emitTrace({ ...base, adapter: join(dir, 'pager.adapter.mjs'), out: join(dir, 'dense') })
+  const { wSet, orderWays } = dense.verification
+  // the pagination model is finite, so both suites exist; the cover itself does not move
+  assert.deepEqual(dense.verification.cover, bare.verification.cover)
+  assert.ok(wSet.cases > 0 && wSet.size > 0, JSON.stringify(wSet))
+  assert.equal(wSet.unavailable, undefined)
+  assert.match(wSet.assumption, /at most as many states as the model/)
+  assert.equal(wSet.illegal, 0, 'the fixture environment is a function of the model state, so no trace is dropped')
+  assert.equal(orderWays.unplaced, 0)
+  assert.equal(orderWays.t, 3, 'the default is 3-way')
+  assert.equal(orderWays.covered + orderWays.missing, orderWays.feasible)
+  assert.ok(orderWays.cases >= 1, 'the cover leaves some event orders out')
+
+  const testFile = join(dir, 'dense', 'grid.oracle.test.mjs')
+  const source = await readFile(testFile, 'utf8')
+  assert.match(source, /W-method/)
+  assert.match(source, /"id":"W[a-f0-9]{12}"/)
+  assert.match(source, /"id":"S[a-f0-9]{12}"/)
+  const clean = runGenerated(testFile)
+  assert.equal(clean.status, 0, clean.output)
+  const bareRun = runGenerated(join(dir, 'bare', 'grid.oracle.test.mjs'))
+  assert.equal(clean.tests - bareRun.tests, wSet.cases + orderWays.cases, 'each added case is one test')
+
+  // an explicit t replaces the default, and one suite can stay on while the other is off
+  const pairs = await emitTrace({ ...base, wSet: false, orderWays: 2, adapter: join(dir, 'pager.adapter.mjs'), out: join(dir, 'pairs') })
+  assert.equal(pairs.verification.wSet, undefined)
+  assert.equal(pairs.verification.orderWays.t, 2)
+})
+
+test('[bend] emit-trace: the characterizing suite catches a flag the cover misses, and the bare cover does not', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'pagination')
+  // hidden state: asking twice for the same page leaves a flag that swallows the answer. The output stays right until
+  // the answer arrives, and the minimum cover reaches that configuration by a trace that asked once.
+  await writeFile(
+    join(dir, 'double.adapter.mjs'),
+    `import { adapterFor } from './pager.adapter.mjs'
+import { reducePager } from './pager-product.mjs'
+function reduce(state, event) {
+  if (event.type === 'goTo') return { ...state, page: event.page, dup: event.page === state.page }
+  if (event.type === 'arrive' && state.dup) return state
+  return reducePager(state, event)
+}
+export const { init, step, observe } = adapterFor(reduce)
+`,
+  )
+  const base = { package: 'oracle.package.json', cwd: dir, row: 'O1', runs: 1, bin, regenerate: 'test', adapter: join(dir, 'double.adapter.mjs') }
+  await emitTrace({ ...base, wSet: false, orderWays: false, out: join(dir, 'bare') })
+  await emitTrace({ ...base, out: join(dir, 'dense') })
+  // no cover case fails: judge by case ids, because the random sample can find the defect by luck
+  const bare = runGenerated(join(dir, 'bare', 'grid.oracle.test.mjs'))
+  assert.doesNotMatch(bare.output, /✖ \[O1\] \[[TJ][a-f0-9]{12}\]/, 'the cover alone passes this defect, which is why the suite is on by default')
+  const dense = runGenerated(join(dir, 'dense', 'grid.oracle.test.mjs'))
+  assert.notEqual(dense.status, 0, dense.output)
+  assert.match(dense.output, /✖ \[O1\] \[W[a-f0-9]{12}\] [^\n]*GoTo\{pg:\{"\$":"P2"\}\} · GoTo\{pg:\{"\$":"P2"\}\} · Arrive/)
+})
+
+test('[bend] emit-trace on a model it cannot close writes the cover and says why the suites are missing; an explicit request still refuses', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'stale-search')
+  const base = {
+    model: join(dir, 'MODEL.bend'),
+    prefix: 'Search',
+    bound: 4,
+    adapter: join(dir, 'search.adapter.mjs'),
+    row: 'O4',
+    runs: 20,
+    bin,
+    regenerate: 'test',
+  }
+  const emitted = await emitTrace({ ...base, out: join(dir, 'generated') })
+  assert.match(emitted.verification.wSet.unavailable, /hit its cap/)
+  assert.match(emitted.verification.orderWays.unavailable, /hit its cap/)
+  assert.equal(emitted.verification.wSet.cases, undefined)
+  assert.equal(emitted.verification.orderWays.cases, undefined)
+
+  await assert.rejects(emitTrace({ ...base, wSet: true, out: join(dir, 'w') }), { code: 'SUITE_UNAVAILABLE' })
+  await assert.rejects(emitTrace({ ...base, orderWays: 3, out: join(dir, 'o') }), { code: 'SUITE_UNAVAILABLE' })
+})
+
+test('[bend] emit-trace CLI: --no-w-set and --no-order-ways turn the suites off; --w-set and --order-ways <t> ask for them', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'pagination')
+  const run = (name, ...flags) => {
+    const done = spawnSync(
+      process.execPath,
+      [
+        fileURLToPath(new URL('./oracle-projection.mjs', import.meta.url)),
+        'emit-trace',
+        '--package',
+        'oracle.package.json',
+        '--adapter',
+        join(dir, 'pager.adapter.mjs'),
+        '--out',
+        join(dir, name),
+        '--row',
+        'O1',
+        '--runs',
+        '20',
+        ...flags,
+      ],
+      { cwd: dir, encoding: 'utf8' },
+    )
+    assert.equal(done.status, 0, done.stderr || done.stdout)
+    return JSON.parse(done.stdout).verification
+  }
+  const off = run('off', '--no-w-set', '--no-order-ways')
+  assert.equal(off.wSet, undefined)
+  assert.equal(off.orderWays, undefined)
+  const on = run('on')
+  assert.ok(on.wSet.cases > 0)
+  assert.equal(on.orderWays.t, 3)
+  const asked = run('asked', '--w-set', '--order-ways', '2')
+  assert.ok(asked.wSet.cases > 0)
+  assert.equal(asked.orderWays.t, 2)
+})
+
 // ── emit-trace --package: the joint cases run the behavior on the world settings ───────────────────────────────
 
 test('[bend] emit-trace --package adds the joint cases; only they catch a defect that needs an empty page and a late response', async (t) => {
@@ -983,7 +1182,8 @@ test('[bend] emit-trace --package adds the joint cases; only they catch a defect
   if (!bin) return
   const root = await workspace(t)
   const dir = join(root, 'pagination')
-  const base = { package: 'oracle.package.json', cwd: dir, row: 'O1', runs: 50, bin, regenerate: 'test' }
+  // the premise is the cover plus the joint cases, so the characterizing and event-order suites (on by default) stay off
+  const base = { package: 'oracle.package.json', cwd: dir, row: 'O1', runs: 50, wSet: false, orderWays: false, bin, regenerate: 'test' }
   const emitted = await emitTrace({ ...base, adapter: join(dir, 'pager.adapter.mjs'), out: join(dir, 'generated') })
   // the package names the model, the prefix and the bound; the cross-check chooses 4 joint cases for 33 pairs
   assert.deepEqual(emitted.verification.modelSpace, { cases: 51, bound: 3, complete: true })

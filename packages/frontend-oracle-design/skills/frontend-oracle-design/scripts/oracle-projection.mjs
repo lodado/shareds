@@ -17,16 +17,19 @@ import {
   bendInputs,
   classifyTrace,
   compileBend,
+  configurationGraph,
   conformanceClaim,
   enumerateSpace,
   eventLabel,
   keepArtifact,
   leaves,
   loadModel,
+  MAX_COVER_CONFIGURATIONS,
   minimalCover,
   verdictBeside,
 } from './oracle-model.mjs'
 import { loadPackage, sourcePath } from './oracle-package.mjs'
+import { characterizationSet, orderWaysCover, stateQuotient, wSuite } from './oracle-quotient.mjs'
 import {
   arbitraryOf,
   bendLiteral,
@@ -473,6 +476,64 @@ async function bugCases(model, path, outDir) {
   return { cases, sources: [{ path: toImport(relative(outDir, path)), sha256: sha256(text) }] }
 }
 
+const DEFAULT_ORDER_WAYS = 3
+
+/**
+ * 최소 커버에 기본으로 더하는 촘촘한 묶음. W 묶음: 모든 구성의 접근 trace와 전이 뒤에 특성 집합 W의 사건열을 이어 같은
+ * 관측으로 보이는 상태를 가른다(W-method — 제품 상태가 모델 이하라는 가정 아래 출력·전이 결함을 모두 잡는다). 순서 묶음:
+ * 모델이 허용하는 사건 종류 t-튜플 중 최소 커버가 지나지 않는 순서를 가장 짧은 trace로 덮는다(t 기본 3).
+ * `wSet`/`orderWays`가 undefined면 기본 켬이다 — 모델이 닫히지 않았거나(상태가 끝없이 자란다) 예산을 넘으면 그 묶음만 빼고
+ * `verification.<묶음>.unavailable`에 이유를 남긴다. `true`/t를 직접 주면 요청이므로 못 만들 때 멈추고, `false`면 끈다.
+ */
+function denseSuites(model, graph, cover, { wSet, orderWays }) {
+  if (wSet === false && orderWays === false) return { cases: [], scope: '', verification: {} }
+  const cases = []
+  const verification = {}
+  const scopes = []
+  // 요청한 묶음을 못 만들면 멈추고, 기본으로 켜진 묶음이면 빠졌다는 사실과 이유를 남긴다
+  const unavailable = (key, flag, asked, reason) => {
+    if (asked) throw new CliError('SUITE_UNAVAILABLE', `${flag} needs a closed model within the budget: ${reason}`)
+    verification[key] = { unavailable: reason }
+    scopes.push(`no ${key === 'wSet' ? 'W-method' : 'event-order'} cases (${reason})`)
+  }
+  // 그래프는 이력을 합친다 — 내보낼 trace는 모델의 `next(history)`가 실제로 허용하는지 다시 확인한다
+  const legal = (trace) => classifyTrace(model, trace).verdict === 'in-space'
+  if (wSet !== false) {
+    const quotient = stateQuotient(graph, { label: eventLabel })
+    const characterization = characterizationSet(graph, quotient, { label: eventLabel })
+    if (characterization.status === 'closed') {
+      const suite = wSuite(graph, characterization, { label: eventLabel, legal })
+      cases.push(...suite.cases)
+      verification.wSet = {
+        cases: suite.cases.length,
+        skipped: suite.skipped,
+        illegal: suite.illegal,
+        size: characterization.size,
+        enablingOnlyPairs: characterization.enablingOnlyPairs,
+        assumption: characterization.assumption,
+      }
+      scopes.push(`${suite.cases.length} W-method cases (every state and transition cover trace, then each of ${characterization.size} characterizing sequences; ${characterization.assumption})`)
+    } else unavailable('wSet', '--w-set', wSet !== undefined, characterization.reason)
+  }
+  if (orderWays !== false) {
+    const t = orderWays ?? DEFAULT_ORDER_WAYS
+    const ways = orderWaysCover(graph, cover.cases.map(({ trace }) => trace), { label: eventLabel, t, legal })
+    if (ways.status === 'closed') {
+      cases.push(...ways.cases)
+      verification.orderWays = {
+        t: ways.t,
+        feasible: ways.feasible,
+        covered: ways.covered,
+        missing: ways.missing,
+        unplaced: ways.unplaced,
+        cases: ways.cases.length,
+      }
+      scopes.push(`${ways.cases.length} event-order cases (${ways.t}-way: ${ways.covered}/${ways.feasible} orders were already in the minimum cover)`)
+    } else unavailable('orderWays', '--order-ways', orderWays !== undefined, ways.reason)
+  }
+  return { cases, scope: `, ${scopes.join(', ')}`, verification }
+}
+
 /**
  * trace 모드(차분): bound 안의 모든 trace는 각 prefix의 기대 관측과 함께 데이터로, bound 밖은 선택적으로 fast-check
  * 표본이다. 표본은 선택 인덱스만 만들고 사건은 모델 환경 `next(history)`가 허용하는 것에서 고른다 — 모델이 불가능하다고
@@ -494,6 +555,8 @@ export async function emitTrace(options) {
     timeoutMs,
     maxCases,
     regenerate,
+    wSet,
+    orderWays,
   } = options
   checkCommon({ row, runner, runs, adapter, environment, caseTimeout })
   await assertAdapterTrusted(adapter)
@@ -510,7 +573,9 @@ export async function emitTrace(options) {
   if (!Number.isInteger(longest) || longest <= bound)
     throw new CliError('USAGE', 'max-length must be an integer above the bound', 2)
   // 제품에는 공간 전체가 아니라 동치류·경계값 항목을 모두 덮는 최소 trace 묶음만 돈다 — 공간 전체는 모델이 이미 열거했다
-  const cover = minimalCover(loaded, space)
+  const graph = configurationGraph(loaded, MAX_COVER_CONFIGURATIONS)
+  const cover = minimalCover(loaded, space, { graph })
+  const dense = denseSuites(loaded, graph, cover, { wSet, orderWays })
   const outDir = resolve(out)
   // 버그 기록은 그 버그가 난 모델 옆(MODEL.bend와 같은 폴더)에 둔다
   const bugs = await bugCases(loaded, join(dirname(resolve(model)), BUGS_FILE), outDir)
@@ -539,7 +604,7 @@ export async function emitTrace(options) {
       : `the configurations within ${cover.coveredDepth} events (the state grows without bound)`
   } — ${cover.basis}`
   const jointScope = joint ? `, ${jointCases.length} joint cases on the world settings (${joint.covered}/${joint.required} world × behavior pairs)` : ''
-  const scope = `${coverScope}${jointScope} — not every trace of the ${space.cases.length} the model enumerates up to ${
+  const scope = `${coverScope}${jointScope}${dense.scope} — not every trace of the ${space.cases.length} the model enumerates up to ${
     space.bound
   } events — and sampled (fast-check, ${runs} runs, seed ${seed}, drawn lengths ${space.bound + 1}..${longest}; ${
     beyond
@@ -563,7 +628,7 @@ export async function emitTrace(options) {
     }),
     `const INITIAL = ${JSON.stringify(space.initial)}`,
     `const CASES = ${JSON.stringify(
-      [...bugs.cases, ...cover.cases, ...jointCases].map(({ id, label, trace, observations, coordinates }) => ({
+      [...bugs.cases, ...cover.cases, ...dense.cases, ...jointCases].map(({ id, label, trace, observations, coordinates }) => ({
         id,
         label,
         trace,
@@ -736,6 +801,7 @@ export async function emitTrace(options) {
         ...(cover.status === 'capped' ? { coveredDepth: cover.coveredDepth } : {}),
       },
       joint: joint ? { required: joint.required, covered: joint.covered, cases: jointCases.length } : null,
+      ...dense.verification,
       bugs: bugs.cases.length,
       probes: probes.length,
     },
@@ -1006,7 +1072,7 @@ async function certifyReplay({ model, prefix, trace, result, bin, timeoutMs }) {
 
 function parseOptions(args) {
   const options = { relation: [] }
-  const flags = new Set(['differential'])
+  const flags = new Set(['differential', 'w-set', 'no-w-set', 'no-order-ways'])
   const known = [
     'model',
     'prefix',
@@ -1032,6 +1098,7 @@ function parseOptions(args) {
     'case-timeout',
     'card',
     'package',
+    'order-ways',
   ]
   for (let index = 0; index < args.length; index += 1) {
     const name = args[index]?.replace(/^--/, '')
@@ -1050,12 +1117,18 @@ function parseOptions(args) {
 }
 
 const USAGE = `usage:
-  oracle-projection.mjs emit-trace (--package <oracle.package.json> | --model <MODEL.bend> --prefix <Name> --bound <n>) --adapter <adapter.mjs> --out <dir> --row <O*> --runs <n> [--max-length <n>] [--runner node-test|vitest] [--environment <jsdom>] [--case-timeout <ms>] [--name <base>]
+  oracle-projection.mjs emit-trace (--package <oracle.package.json> | --model <MODEL.bend> --prefix <Name> --bound <n>) --adapter <adapter.mjs> --out <dir> --row <O*> --runs <n> [--max-length <n>] [--w-set | --no-w-set] [--order-ways <t> | --no-order-ways] [--runner node-test|vitest] [--environment <jsdom>] [--case-timeout <ms>] [--name <base>]
   oracle-projection.mjs emit-state --model <MODEL.bend> --prefix <Name> --state <Type> --command <Type> --adapter <adapter.mjs> --out <dir> --row <O*> (--relation <def>)... --runs <n> [--differential] [--threshold <n>] [--nat-max <n>] [--list-max <n>] [--runner node-test|vitest] [--environment <jsdom>] [--case-timeout <ms>]
   oracle-projection.mjs replay --model <MODEL.bend> --prefix <Name> --trace <json> [--observed <json> | --adapter <adapter.mjs>] [--out <dir>]
   oracle-projection.mjs emit-world (--card <oracle.md> | --package <oracle.package.json>) --adapter <world-adapter.mjs> --out <dir> --row <O*> [--runner node-test|vitest] [--environment <jsdom>] [--case-timeout <ms>] [--name <base>]`
 
 const integer = (value) => (value === undefined ? undefined : Number(value))
+
+/** 묶음 스위치: 기본(undefined)은 켬, `--no-…`는 false, `--…`로 직접 준 값은 요청이다. 둘을 함께 주면 모순이다. */
+function suiteSwitch(asked, off, flag) {
+  if (off && asked !== undefined) throw new CliError('USAGE', `${flag} and --no-${flag.slice(2)} contradict each other`, 2)
+  return off ? false : asked
+}
 
 async function main() {
   const [command, ...args] = process.argv.slice(2)
@@ -1089,6 +1162,8 @@ async function main() {
       runs: integer(options.runs),
       maxLength: integer(options['max-length']),
       maxCases: integer(options['max-cases']),
+      wSet: suiteSwitch(options['w-set'], options['no-w-set'], '--w-set'),
+      orderWays: suiteSwitch(integer(options['order-ways']), options['no-order-ways'], '--order-ways'),
       caseTimeout: integer(options['case-timeout']) ?? CASE_TIMEOUT,
       bin,
       timeoutMs,

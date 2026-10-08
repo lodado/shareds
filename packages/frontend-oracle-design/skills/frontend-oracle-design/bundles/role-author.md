@@ -1283,6 +1283,8 @@ and repeats, request lifecycle, response ordering, owner lifetime, server/trust 
 Use real approved boundaries, not mechanical 0/1 padding. Record source-backed applicability or reason
 for non-application. Include inherited behavior and cross-family interactions changing outcomes.
 Keep unknown combinations until decided. Timing is represented by finite event/order paths where relevant.
+Decide each environment fault (delayed or duplicate delivery, silence, late after cancel, offline) as an
+event or an excluded reason — the list is `model-patterns.md`, Environment faults.
 Return axes/value proposals, constraints and provenance, not an invented product answer or approval.
 The selected profile's Space procedure owns enumeration/dispositions and current-stage checks.
 
@@ -1881,6 +1883,29 @@ a state that grows without bound is `capped` at the bound with the depth it cove
 past it. The projected Case space states which. That is the model's possible space; `emit-trace` runs a
 minimum cover of it on the product (§ `emit-trace`).
 
+`space` also prints an `analysis` block computed from the same configuration graph. A graph that hits the
+configuration cap (a state that grows without bound, or a finite model larger than the cap) is `capped`: the
+frontier is unexplored, so no analysis answers for it. The block inherits the configuration basis above —
+histories that differ only deeper are merged — so keep the environment a function of the model state; the
+suites that `emit-trace` builds from it are replayed against `next(history)` and a trace it forbids is dropped
+and counted (`illegal`, `unplaced`).
+
+- `quotient` splits configurations by observation, then by what follows. A `hiddenState` group looks the same
+  now and behaves differently later; it names the shortest event sequence that tells two of them apart.
+  `byObservation` counts the pairs that some events both configurations allow separate by observation,
+  `byEnabling` the pairs only an event allowed on one side separates (a request in flight the screen does
+  not show). Every stateful model has some; read the
+  sequence, not the count. An `equivalent` group never splits yet differs in model state: that field changes
+  no future observation, so remove it or find the observation it should change.
+- `independence` lists each pair of event kinds as `independent` (wherever both are allowed, both orders are
+  allowed and reach the same configuration) or `dependent` with a witness. An Order axis needs both orders only
+  for dependent pairs; the list is evidence for an `independent` claim, not a gate.
+- `characterization` is a small set W of event sequences (chosen greedily, not proven fewest) that tell every pair of same-looking classes apart.
+- `orderWays` (`--order-ways <t>`, default 3, also what `emit-trace` runs) counts the orders of t event kinds the environment allows and
+  how many the minimum cover already runs.
+- `reachability` compares the product of the state's leaf values with the states the model reaches. Combinations
+  in the product that are never reached are candidates for a narrower type or an `impossible` claim.
+
 With a behavior model, lock only when `prove` is `proven` and the space is complete; show the case count and the traces for
 the required scenarios with the law statements. `open`/`failed` means the model, laws or proof need
 work or a question; `timeout`/`unavailable` follows the §1 failure rule. The user approves the laws,
@@ -2047,6 +2072,18 @@ seed}}`, fails if fewer runs executed than requested, and fails if the environme
   `unhandled-event` as POLICY_GAP candidates. Neither fails the test. Longer traces over the same events and assumptions are more cases, not a
   new axis. The adapter is the one above (`init`, `step`, `observe`, optional `dispose`). Pass
   `--runner vitest` in a vitest repository, the recommended runner above.
+  Two suites densify the cover and run by default. The W-method suite runs every configuration's access trace and
+  every transition, then appends each sequence of the characterization set W after them (`[O*] [W…]`) — complete
+  for output and transfer faults while the product has at most as many states as the model, for the sequences
+  that ran; one the environment does not allow there is skipped and counted. It costs about
+  (configurations + transitions) × |W| traces (the paging fixture: 337 beside a minimum cover of 8), and it found a
+  product that swallows the answer after the same page was requested twice, which the cover missed and a
+  random sample finds only by chance. The event-order suite adds the shortest traces (`[O*] [S…]`) for the 3-orders of event kinds the
+  minimum cover does not run; that covers an order, and the trace it picks does not make every fault in that
+  order observable. `--no-w-set` and `--no-order-ways` turn them off, `--order-ways <t>` sets another t, and
+  `--w-set` or `--order-ways <t>` given explicitly is a request: it stops with `SUITE_UNAVAILABLE` on a `capped` model or
+  one over the budget. By default such a model keeps the cover and the report says why in
+  `verification.wSet.unavailable` or `verification.orderWays.unavailable`; the file's scope line says the suite is missing.
 - `emit-state --model --prefix --state <Type> --command <Type> --runs N (--relation <def>)... [--differential]`
   (property): every state·command pair of the Bend types when the domain is at most `--threshold`
   (default 256), and always a separate fast-check property of N runs over the same domain — small
@@ -2490,18 +2527,23 @@ nearest field; it reopens the problem definition.
 
 Useful shapes for goals and rows; none is required.
 
-| Pattern          | Claim shape                                            |
-| ---------------- | ------------------------------------------------------ |
-| Invariant        | every allowed world satisfies P                        |
-| Preservation     | P before an operation implies P after it               |
-| Idempotence      | applying the operation twice observes the same as once |
-| Non-interference | changing A leaves B's projection unchanged             |
-| Round-trip       | decode after encode returns the value                  |
-| Referential      | every reference points at an existing target           |
-| Ordering         | the operation keeps the order relation                 |
-| Determinism      | the same input gives the same observation              |
-| Commutativity    | two operations in either order observe the same        |
-| Monotonicity     | progress never goes back                               |
+| Pattern          | Claim shape                                                                                     |
+| ---------------- | ----------------------------------------------------------------------------------------------- |
+| Invariant        | every allowed world satisfies P                                                                 |
+| Preservation     | P before an operation implies P after it                                                        |
+| Idempotence      | applying the operation twice observes the same as once                                          |
+| Non-interference | changing A leaves B's projection unchanged                                                      |
+| Round-trip       | decode after encode returns the value                                                           |
+| Referential      | every reference points at an existing target                                                    |
+| Ordering         | the operation keeps the order relation                                                          |
+| Determinism      | the same input gives the same observation                                                       |
+| Commutativity    | two operations in either order observe the same                                                 |
+| Monotonicity     | progress never goes back                                                                        |
+| Convergence      | the same updates in any delivery order give one state                                           |
+| Read-your-writes | after a write completes, the same session reads it or a later value                             |
+| Monotonic reads  | a later read never shows an older version than an earlier one                                   |
+| Progress         | every step keeps a terminal state or lowers a live state's rank (`model-patterns.md`, Progress) |
+| Permutation      | an order change keeps the length and every item's count (`model-patterns.md`, Collections)      |
 
 When a counterexample appears, check in this order before calling it a product defect: implementation,
 formal model, projection (Coordinates·Observations), missing assumption, ambiguous source, wrong goal,
@@ -2514,7 +2556,7 @@ is `FAIL`.
 - Proven: the stated claims over every world of the declared record that the assumptions allow,
   re-checked by the Bend kernel.
 - Not proven: that the world, the goals or the terms mean what the source means (human review, helped
-  by minimal pairs and examples); anything about the product; progress ("eventually"); phenomena the
+  by minimal pairs and examples); anything about the product; progress without a ranking function (strong fairness, starvation between actors); phenomena the
   world leaves out; case-space `impossible` or `independent` claims.
 - Unknown, never a pass: an infinite field, more than 8192 worlds, a kernel timeout or rejection.
 - Discovery raises the odds of finding what the world leaves out; it never makes the world complete.
@@ -2681,6 +2723,53 @@ type Feed is Data:
 
 State one law per transition and one witness for "fails N times, then succeeds".
 
+## Environment faults — decide each
+
+`next(history)` is the environment model: it offers exactly what the user, network, timers and other tabs
+may do. Decide every row as an event in `next` or as `excluded: S<n> <reason>`; "the model did not need it"
+is not a reason.
+
+| Fault                                            | Event in `next`                                     | Pattern                                           |
+| ------------------------------------------------ | --------------------------------------------------- | ------------------------------------------------- |
+| delayed or reordered response                    | `Resolve{run}` offered after later requests         | Identity and session lifetime                     |
+| duplicate delivery (double click, at-least-once) | the same event offered again                        | idempotence law                                   |
+| the network never answers                        | `Timeout{}` while a request is pending              | the policy's answer to silence; Progress needs it |
+| late after cancel, unmount or logout             | `Resolve` stays in `next` after `Cancel`, `Unmount` | Owner lifetime                                    |
+| partial failure                                  | one error kind per outcome the policy distinguishes | Error kinds                                       |
+| retry resend                                     | `Tick{}` re-sends the same request                  | Attempts, not outcomes                            |
+| offline, hidden tab, second tab or device        | `Offline{}`, `Hidden{}`, `OtherTab{…}`              | only when a row depends on them                   |
+| clock jump, expiry                               | `Expire{}`, `Remount{elapsed}`                      | Time is an event                                  |
+
+## Progress is a ranking function
+
+Bend states no "eventually"; it proves a number that shrinks. Give the live states a rank in `Nat`, prove
+that every step keeps a terminal state or lowers the rank of a live one, and the rank of `init` bounds the
+path to a terminal state. A bounded retry ranks by the retries left:
+
+```python
+def Load.progress(s: Load, t: Load) -> Bool:
+  match s t:
+    case Loading{n} Loading{p}:
+      Nat.is_lt(p, n)
+    case Loading{n} Ready{}:
+      True{}
+    # … GaveUp, and the terminal states keep any t
+```
+
+The law is `for s, for m: {Load.progress(s, Load.step(s, m)) == True{} : Bool}`. The proof is a case split
+plus one induction for the shrinking step (`def lt_succ(p: Nat) -> {Nat.is_lt(p, 1n+p) == True{} : Bool}`;
+a lemma cannot sit under the `Laws.` alias). Register it as `safety`, beside an `effect` law that a live state
+reaches the terminal one and its `witness`.
+
+- Fairness is `next`: it offers an event at every live state. A live state with no event is a hang; "the
+  network never answers" is the `Timeout{}` row above, and without it no rank exists.
+- A step that does not lower the rank (a retry that re-enters `Loading{n}`) fails the kernel. That is the
+  finding: the wait has no bound, so ask the policy for one (`NEEDS_DECISION`); do not weaken the law.
+- Set `Bound` at least the rank of `init` plus one, so the space holds a full path to a terminal state.
+- The product needs no second test: conformance compares it with the model on every traced step, so the
+  rank carries over within the checked traces. Strong fairness and starvation between actors have no rank;
+  they stay `Not formalized`.
+
 ## Error kinds are a sum type
 
 ```python
@@ -2718,6 +2807,48 @@ saturate at T+1 and add a law that two counts above T observe alike, so the kern
 When the observation shows the value (ids on screen, a displayed total) or no source states a threshold,
 keep the counter exact and lower the bound instead. Saturating to avoid an induction is the shrink the
 rule above forbids; saturating because the policy cannot tell the values apart is the model.
+
+## Collections and order — prove every length, list few
+
+Reordering (drag and drop, move to top) makes every arrangement its own state: up to n! for n items, and at
+seven items the 5040 arrangements pass the 2000-configuration cap, so `space` reports `capped` and the density
+analyses and the W-method suite skip. Do not list the arrangements to show the operation is sound; split the claim.
+
+- Order-changing operations get a length law and a permutation law proved by induction on the list, for every
+  length and every index. Item ids are `Nat`. The relation `R_items_kept(s, c, t)` says the length is the same
+  and every item of `s` appears as often in `t`. The proof follows the recursion of the operation:
+
+```python
+def Board.swap_at(xs: List<&2, Nat>, +n: Nat) -> List<&2, Nat>:
+  match xs n:
+    case Nil{} n:
+      Nil{}
+    case +a <> Nil{} n:
+      a <> Nil{}
+    case +a <> (+b <> +r) 0n:
+      b <> (a <> r)
+    case +a <> (+b <> +r) 1n+p:
+      a <> Board.swap_at(b <> r, p)
+```
+
+- State each claim as a `Bool` relation built from `Nat.is_eq`: it reduces on `1n+x`, so at the recursive case the
+  recursive call is the proof (`length_kept(b <> r, p)`), and a lemma `eq_refl(+n)` closes the swap. The
+  permutation case adds two small lemmas — swapping two hits keeps a sum (`swap_hits`, four cases on two `Bool`s)
+  and adding the same hit to equal counts keeps them equal (`hit_cong`) — and `and_true(p, q, ep, eq)` joins two
+  proven `Bool`s. A value used twice needs `+` (`+x`, `+a`, `+r` in the patterns); a lemma cannot sit under the
+  `Laws.` alias; `Nil` and `Cons` are Base names, so use `List<&2, Nat>` with `<>` or another constructor name.
+- Write both laws. A drag that drops an item fails the length law; one that overwrites an item keeps the length
+  and fails only the permutation law. Where the item lands (the target index, a locked row staying put) is its own
+  law, and the permutation law does not state it.
+- Enumerate boards of at most three items in the trace model: the first, a middle and the last place, and a drag
+  to the same place all occur, and the induction laws carry every longer list.
+- Carry the same relations to the product with `emit-state` with `--relation` and `--list-max` (and `--nat-max`),
+  which draws boards longer than the model lists. Observed on a fixture: a product that overwrites a neighbour
+  only on a board of more than four items passed every board of three items exhaustively, and sampling boards
+  up to seven found it within 300 draws.
+- The claim is bounded: the induction proves the model, not the product, and fast-check shows the product
+  agrees with the relation on the boards it drew. An operation whose result depends on an item's value (sort by
+  name) needs its own law saying how.
 
 ## Identity and session lifetime
 

@@ -1,3 +1,42 @@
+# 0.96.0: the space gets denser from the model itself — progress law, environment faults, quotient, independence, W-method, event orders
+
+Asked whether TLA+ should carry the time axis, the answer was no second semantics: liveness enters as a Bend
+law and the model is analysed for density. Spike (Bend 2.0.36): a bounded-retry model, `Load.progress(s,
+step(s, m))` over the retries left, passes `bend PROOF.bend --verdict` with one induction lemma; a retry that
+does not shrink (`Loading{1n+p}`) fails the kernel. Not measured: whether an AI finds the ranking function unaided.
+`model-patterns.md` gains "Environment faults — decide each" (delay, duplicate, silence, late after cancel,
+offline as events or sourced exclusions) and "Progress is a ranking function"; `adequacy.md` gains
+Convergence, Read-your-writes, Monotonic reads and Progress law patterns, and no longer lists progress as
+unprovable. `oracle-quotient.mjs` reads the configuration graph (closed models only) and `space` prints an
+`analysis` block: a state quotient (hidden state with the shortest event sequence, redundant model coordinates),
+event independence with witnesses, the characterization set W, event-order t-way counts and reachability
+density. `emit-trace` runs two denser suites by default, the W-method (the paging fixture: 337 cases beside a
+minimum cover of 8) and 3-way event orders; `--no-w-set` / `--no-order-ways` turn them off, `--order-ways <t>`
+changes t, and an explicit `--w-set` or `--order-ways <t>` still stops with `SUITE_UNAVAILABLE` on a model it
+cannot close, while a default run keeps the cover and records `unavailable`. Observed on the paging fixture with
+three product defects written to hide in history: the bare cover caught 1, the W suite all 3 (a double-request flag,
+a late answer accepted after going back, a dropped third answer); the order suite alone added one case and no catch.
+Two older tests (the 20th-branch sample, the joint cases) keep the bare cover as their premise and pass
+`wSet: false, orderWays: false`; that is intentional.
+An Opus review of the first version found two defects and they are fixed with tests: the W suite emitted no
+transitions when W was empty (it now runs P·({ε} ∪ W), every state and transition first), and a W or order
+trace could leave `next(history)` where the graph had merged histories (`emit-trace` and `space` now replay each
+trace against the model and count `illegal` / `unplaced`). Also fixed: a pair is `byEnabling` only when no event
+both sides allow separates them by observation, density counts each constructor shape on its own, an invalid
+`t` is `invalid`, and the greedy order walk never emits a trace that covers nothing. On the paging fixture all
+120 same-looking class pairs are `byEnabling` (the requests in flight are not on the screen), so W there checks
+the product's pending-request bookkeeping, not a visible difference.
+`model-patterns.md` also gains "Collections and order — prove every length, list few": a reorder makes up to n! states
+(seven items pass the 2000-configuration cap), so the length and permutation of an order change are proved by induction
+on the list and the trace model lists at most three items. Spiked on Bend 2.0.36 and fixed as `test-fixtures/reorder`:
+both laws check for every list, a drag that drops an item fails the length law, and one that overwrites an item fails
+only the permutation law. The same relations run through `emit-state --list-max`: a reducer that overwrites a
+neighbour only past four items passes every board of three items and is caught by sampling boards of seven.
+Not measured: whether an AI writes these proofs unaided.
+Not done: cone-of-influence and symmetry reduction, a mutation score (the `mutation` operator exists), and
+turning the analyses into discovery operators — they are reports, not gates. Pinned in `oracle-quotient.test.mjs`,
+`oracle-projection.test.mjs` and `skill-contract.test.mjs`.
+
 # 0.95.3: the derived output and the `space` report stop growing with the trace space
 
 A card projection came out at 15 MB. Measured on the `stale-search` fixture (request ids are a counter): the

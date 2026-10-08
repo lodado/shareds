@@ -2837,6 +2837,45 @@ test('the space report is bounded, order obligations carry witnesses, and counte
   assert.match(patterns, /keep the counter exact and lower the bound instead/)
 })
 
+test('environment faults are decided as events, progress is a ranking function, and the space report carries its density analysis', async () => {
+  const [bend, patterns, adequacy, inputs] = await Promise.all([
+    read('references/bend-cross-verification.md'),
+    read('references/model-patterns.md'),
+    read('references/adequacy.md'),
+    read('references/roles/case-space-inputs.md'),
+  ])
+  assert.match(patterns, /## Environment faults — decide each/)
+  assert.match(patterns, /Decide\s+every\s+row\s+as\s+an\s+event\s+in\s+`next`\s+or\s+as\s+`excluded:\s+S<n>\s+<reason>`/)
+  assert.match(patterns, /## Progress is a ranking function/)
+  assert.match(patterns, /Bend\s+states\s+no\s+"eventually";\s+it\s+proves\s+a\s+number\s+that\s+shrinks/)
+  assert.match(patterns, /Fairness\s+is\s+`next`/)
+  assert.match(patterns, /rank\s+carries\s+over\s+within\s+the\s+checked\s+traces/)
+  assert.match(adequacy, /\|\s+Convergence\s+\|/)
+  assert.match(adequacy, /\|\s+Read-your-writes\s+\|/)
+  assert.match(adequacy, /\|\s+Monotonic reads\s+\|/)
+  assert.match(adequacy, /\|\s+Progress\s+\|/)
+  assert.doesNotMatch(adequacy, /progress \("eventually"\)/)
+  assert.match(inputs, /Decide\s+each\s+environment\s+fault/)
+  assert.match(bend, /`space`\s+also\s+prints\s+an\s+`analysis`\s+block/)
+  assert.match(bend, /Two\s+suites\s+densify\s+the\s+cover\s+and\s+run\s+by\s+default/)
+  assert.match(bend, /`--no-w-set`/)
+  assert.match(bend, /`--no-order-ways`/)
+  assert.match(bend, /`verification\.wSet\.unavailable`/)
+  assert.match(bend, /`SUITE_UNAVAILABLE`/)
+  assert.match(bend, /the\s+list\s+is\s+evidence\s+for\s+an\s+`independent`\s+claim,\s+not\s+a\s+gate/)
+})
+
+test('an order change is proved for every length by induction, enumerated on few items and carried to the product by fast-check', async () => {
+  const [patterns, adequacy] = await Promise.all([read('references/model-patterns.md'), read('references/adequacy.md')])
+  assert.match(patterns, /## Collections and order — prove every length, list few/)
+  assert.match(patterns, /Order-changing\s+operations\s+get\s+a\s+length\s+law\s+and\s+a\s+permutation\s+law\s+proved\s+by\s+induction/)
+  assert.match(patterns, /Enumerate\s+boards\s+of\s+at\s+most\s+three\s+items/)
+  assert.match(patterns, /`emit-state`\s+with\s+`--relation`\s+and\s+`--list-max`/)
+  assert.match(patterns, /the\s+induction\s+proves\s+the\s+model,\s+not\s+the\s+product/)
+  assert.match(patterns, /one\s+that\s+overwrites\s+an\s+item\s+keeps\s+the\s+length\s+and\s+fails\s+only\s+the\s+permutation\s+law/)
+  assert.match(adequacy, /\|\s+Permutation\s+\|/)
+})
+
 test('runs keep going after yes, continue the author for repairs and fix Bend failures from a table', async () => {
   const [common, controller, loading, patterns] = await Promise.all([
     read('references/common.md'),

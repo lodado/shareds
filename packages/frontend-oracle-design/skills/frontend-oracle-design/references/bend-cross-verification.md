@@ -258,6 +258,29 @@ a state that grows without bound is `capped` at the bound with the depth it cove
 past it. The projected Case space states which. That is the model's possible space; `emit-trace` runs a
 minimum cover of it on the product (§ `emit-trace`).
 
+`space` also prints an `analysis` block computed from the same configuration graph. A graph that hits the
+configuration cap (a state that grows without bound, or a finite model larger than the cap) is `capped`: the
+frontier is unexplored, so no analysis answers for it. The block inherits the configuration basis above —
+histories that differ only deeper are merged — so keep the environment a function of the model state; the
+suites that `emit-trace` builds from it are replayed against `next(history)` and a trace it forbids is dropped
+and counted (`illegal`, `unplaced`).
+
+- `quotient` splits configurations by observation, then by what follows. A `hiddenState` group looks the same
+  now and behaves differently later; it names the shortest event sequence that tells two of them apart.
+  `byObservation` counts the pairs that some events both configurations allow separate by observation,
+  `byEnabling` the pairs only an event allowed on one side separates (a request in flight the screen does
+  not show). Every stateful model has some; read the
+  sequence, not the count. An `equivalent` group never splits yet differs in model state: that field changes
+  no future observation, so remove it or find the observation it should change.
+- `independence` lists each pair of event kinds as `independent` (wherever both are allowed, both orders are
+  allowed and reach the same configuration) or `dependent` with a witness. An Order axis needs both orders only
+  for dependent pairs; the list is evidence for an `independent` claim, not a gate.
+- `characterization` is a small set W of event sequences (chosen greedily, not proven fewest) that tell every pair of same-looking classes apart.
+- `orderWays` (`--order-ways <t>`, default 3, also what `emit-trace` runs) counts the orders of t event kinds the environment allows and
+  how many the minimum cover already runs.
+- `reachability` compares the product of the state's leaf values with the states the model reaches. Combinations
+  in the product that are never reached are candidates for a narrower type or an `impossible` claim.
+
 With a behavior model, lock only when `prove` is `proven` and the space is complete; show the case count and the traces for
 the required scenarios with the law statements. `open`/`failed` means the model, laws or proof need
 work or a question; `timeout`/`unavailable` follows the §1 failure rule. The user approves the laws,
@@ -424,6 +447,18 @@ seed}}`, fails if fewer runs executed than requested, and fails if the environme
   `unhandled-event` as POLICY_GAP candidates. Neither fails the test. Longer traces over the same events and assumptions are more cases, not a
   new axis. The adapter is the one above (`init`, `step`, `observe`, optional `dispose`). Pass
   `--runner vitest` in a vitest repository, the recommended runner above.
+  Two suites densify the cover and run by default. The W-method suite runs every configuration's access trace and
+  every transition, then appends each sequence of the characterization set W after them (`[O*] [W…]`) — complete
+  for output and transfer faults while the product has at most as many states as the model, for the sequences
+  that ran; one the environment does not allow there is skipped and counted. It costs about
+  (configurations + transitions) × |W| traces (the paging fixture: 337 beside a minimum cover of 8), and it found a
+  product that swallows the answer after the same page was requested twice, which the cover missed and a
+  random sample finds only by chance. The event-order suite adds the shortest traces (`[O*] [S…]`) for the 3-orders of event kinds the
+  minimum cover does not run; that covers an order, and the trace it picks does not make every fault in that
+  order observable. `--no-w-set` and `--no-order-ways` turn them off, `--order-ways <t>` sets another t, and
+  `--w-set` or `--order-ways <t>` given explicitly is a request: it stops with `SUITE_UNAVAILABLE` on a `capped` model or
+  one over the budget. By default such a model keeps the cover and the report says why in
+  `verification.wSet.unavailable` or `verification.orderWays.unavailable`; the file's scope line says the suite is missing.
 - `emit-state --model --prefix --state <Type> --command <Type> --runs N (--relation <def>)... [--differential]`
   (property): every state·command pair of the Bend types when the domain is at most `--threshold`
   (default 256), and always a separate fast-check property of N runs over the same domain — small

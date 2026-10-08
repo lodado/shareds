@@ -1028,6 +1028,8 @@ and repeats, request lifecycle, response ordering, owner lifetime, server/trust 
 Use real approved boundaries, not mechanical 0/1 padding. Record source-backed applicability or reason
 for non-application. Include inherited behavior and cross-family interactions changing outcomes.
 Keep unknown combinations until decided. Timing is represented by finite event/order paths where relevant.
+Decide each environment fault (delayed or duplicate delivery, silence, late after cancel, offline) as an
+event or an excluded reason — the list is `model-patterns.md`, Environment faults.
 Return axes/value proposals, constraints and provenance, not an invented product answer or approval.
 The selected profile's Space procedure owns enumeration/dispositions and current-stage checks.
 

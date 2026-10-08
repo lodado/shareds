@@ -158,6 +158,53 @@ type Feed is Data:
 
 State one law per transition and one witness for "fails N times, then succeeds".
 
+## Environment faults — decide each
+
+`next(history)` is the environment model: it offers exactly what the user, network, timers and other tabs
+may do. Decide every row as an event in `next` or as `excluded: S<n> <reason>`; "the model did not need it"
+is not a reason.
+
+| Fault                                            | Event in `next`                                     | Pattern                                           |
+| ------------------------------------------------ | --------------------------------------------------- | ------------------------------------------------- |
+| delayed or reordered response                    | `Resolve{run}` offered after later requests         | Identity and session lifetime                     |
+| duplicate delivery (double click, at-least-once) | the same event offered again                        | idempotence law                                   |
+| the network never answers                        | `Timeout{}` while a request is pending              | the policy's answer to silence; Progress needs it |
+| late after cancel, unmount or logout             | `Resolve` stays in `next` after `Cancel`, `Unmount` | Owner lifetime                                    |
+| partial failure                                  | one error kind per outcome the policy distinguishes | Error kinds                                       |
+| retry resend                                     | `Tick{}` re-sends the same request                  | Attempts, not outcomes                            |
+| offline, hidden tab, second tab or device        | `Offline{}`, `Hidden{}`, `OtherTab{…}`              | only when a row depends on them                   |
+| clock jump, expiry                               | `Expire{}`, `Remount{elapsed}`                      | Time is an event                                  |
+
+## Progress is a ranking function
+
+Bend states no "eventually"; it proves a number that shrinks. Give the live states a rank in `Nat`, prove
+that every step keeps a terminal state or lowers the rank of a live one, and the rank of `init` bounds the
+path to a terminal state. A bounded retry ranks by the retries left:
+
+```python
+def Load.progress(s: Load, t: Load) -> Bool:
+  match s t:
+    case Loading{n} Loading{p}:
+      Nat.is_lt(p, n)
+    case Loading{n} Ready{}:
+      True{}
+    # … GaveUp, and the terminal states keep any t
+```
+
+The law is `for s, for m: {Load.progress(s, Load.step(s, m)) == True{} : Bool}`. The proof is a case split
+plus one induction for the shrinking step (`def lt_succ(p: Nat) -> {Nat.is_lt(p, 1n+p) == True{} : Bool}`;
+a lemma cannot sit under the `Laws.` alias). Register it as `safety`, beside an `effect` law that a live state
+reaches the terminal one and its `witness`.
+
+- Fairness is `next`: it offers an event at every live state. A live state with no event is a hang; "the
+  network never answers" is the `Timeout{}` row above, and without it no rank exists.
+- A step that does not lower the rank (a retry that re-enters `Loading{n}`) fails the kernel. That is the
+  finding: the wait has no bound, so ask the policy for one (`NEEDS_DECISION`); do not weaken the law.
+- Set `Bound` at least the rank of `init` plus one, so the space holds a full path to a terminal state.
+- The product needs no second test: conformance compares it with the model on every traced step, so the
+  rank carries over within the checked traces. Strong fairness and starvation between actors have no rank;
+  they stay `Not formalized`.
+
 ## Error kinds are a sum type
 
 ```python
@@ -195,6 +242,48 @@ saturate at T+1 and add a law that two counts above T observe alike, so the kern
 When the observation shows the value (ids on screen, a displayed total) or no source states a threshold,
 keep the counter exact and lower the bound instead. Saturating to avoid an induction is the shrink the
 rule above forbids; saturating because the policy cannot tell the values apart is the model.
+
+## Collections and order — prove every length, list few
+
+Reordering (drag and drop, move to top) makes every arrangement its own state: up to n! for n items, and at
+seven items the 5040 arrangements pass the 2000-configuration cap, so `space` reports `capped` and the density
+analyses and the W-method suite skip. Do not list the arrangements to show the operation is sound; split the claim.
+
+- Order-changing operations get a length law and a permutation law proved by induction on the list, for every
+  length and every index. Item ids are `Nat`. The relation `R_items_kept(s, c, t)` says the length is the same
+  and every item of `s` appears as often in `t`. The proof follows the recursion of the operation:
+
+```python
+def Board.swap_at(xs: List<&2, Nat>, +n: Nat) -> List<&2, Nat>:
+  match xs n:
+    case Nil{} n:
+      Nil{}
+    case +a <> Nil{} n:
+      a <> Nil{}
+    case +a <> (+b <> +r) 0n:
+      b <> (a <> r)
+    case +a <> (+b <> +r) 1n+p:
+      a <> Board.swap_at(b <> r, p)
+```
+
+- State each claim as a `Bool` relation built from `Nat.is_eq`: it reduces on `1n+x`, so at the recursive case the
+  recursive call is the proof (`length_kept(b <> r, p)`), and a lemma `eq_refl(+n)` closes the swap. The
+  permutation case adds two small lemmas — swapping two hits keeps a sum (`swap_hits`, four cases on two `Bool`s)
+  and adding the same hit to equal counts keeps them equal (`hit_cong`) — and `and_true(p, q, ep, eq)` joins two
+  proven `Bool`s. A value used twice needs `+` (`+x`, `+a`, `+r` in the patterns); a lemma cannot sit under the
+  `Laws.` alias; `Nil` and `Cons` are Base names, so use `List<&2, Nat>` with `<>` or another constructor name.
+- Write both laws. A drag that drops an item fails the length law; one that overwrites an item keeps the length
+  and fails only the permutation law. Where the item lands (the target index, a locked row staying put) is its own
+  law, and the permutation law does not state it.
+- Enumerate boards of at most three items in the trace model: the first, a middle and the last place, and a drag
+  to the same place all occur, and the induction laws carry every longer list.
+- Carry the same relations to the product with `emit-state` with `--relation` and `--list-max` (and `--nat-max`),
+  which draws boards longer than the model lists. Observed on a fixture: a product that overwrites a neighbour
+  only on a board of more than four items passed every board of three items exhaustively, and sampling boards
+  up to seven found it within 300 draws.
+- The claim is bounded: the induction proves the model, not the product, and fast-check shows the product
+  agrees with the relation on the boards it drew. An operation whose result depends on an item's value (sort by
+  name) needs its own law saying how.
 
 ## Identity and session lifetime
 
