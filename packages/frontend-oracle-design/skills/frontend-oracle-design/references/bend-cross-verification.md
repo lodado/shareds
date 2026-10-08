@@ -539,6 +539,13 @@ oracle that is a card `I*` invariant rather than a Bend def):
 - Clean up inside the property (`try … finally`), not in `afterEach`.
 - `fc.scheduler` is for interleavings the model does not name; when the model has the event, drive it
   from the trace instead so the expected value comes with it.
+- On a card with a Bend model, event order is already explored by `emit-trace`: each step picks one event
+  from what `next(history)` allows, so a trace is a random topological order of the model's precedence
+  rules (`Resolve{id}` only after its `Request{id}`), and that test is the card's `sequence` evidence.
+  Do not shuffle a list of events and filter it, and do not rebuild the model as `fc.commands` classes
+  with `check`/`run`: that is a second copy of `next` and the expected value, and it drifts. A precedence
+  the traces never reach is a missing `next` arm or a bound too low, not a reason for a second generator.
+  `fc.commands` stays the sequence test only for a card with no model.
 - Fixed sleeps, `toBeTruthy` and `>0` assertions are forbidden here as everywhere ([`bva.md`](bva.md)).
 
 ### Attacking the space after GREEN — discovery-driven closure

@@ -1,3 +1,13 @@
+# 0.95.2: event order comes from the model; identity and session changes are model events
+
+A review asked for `fc.commands` so fast-check explores more event orders. `emit-trace` already does: each
+step draws a choice index and `next(history)` picks the event, so a trace is a random topological order of
+the model's precedence rules. `bend-cross-verification.md` now says so and rules out shuffle-and-filter and
+`fc.commands` on a card with a model (a second copy of `next` and the expected value). `model-patterns.md`
+gains "Identity and session lifetime": owner on request events, `Logout`/`Login{account}` as events with the
+old identity's late `Resolve` kept in `next`, adapter `dispose` resetting globals, and server-side
+deduplication left to the API contract. Documentation only; pinned in `skill-contract.test.mjs`.
+
 # 0.95.1: write guard ignores runs this session never touched
 
 `PROFILE_LOCK_REQUIRED` denied every write under a scan root while any unlocked `run-state.json` above the

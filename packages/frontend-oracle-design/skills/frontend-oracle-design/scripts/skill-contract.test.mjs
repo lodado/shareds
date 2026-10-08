@@ -2810,6 +2810,20 @@ test('delivery review is capped at two rounds and round two only confirms round 
   assert.match(subagentReview, /Delivery review stops after 2 rounds/)
 })
 
+test('event order comes from the model, and identity and session changes are model events', async () => {
+  const [bend, patterns] = await Promise.all([
+    read('references/bend-cross-verification.md'),
+    read('references/model-patterns.md'),
+  ])
+  assert.match(bend, /a trace is a random topological order of the model's precedence\s+rules/)
+  assert.match(bend, /Do not shuffle a list of events and filter it, and do not rebuild the model as\s+`fc\.commands` classes/)
+  assert.match(bend, /`fc\.commands` stays the sequence test only for a card with no model/)
+  assert.match(patterns, /## Identity and session lifetime/)
+  assert.match(patterns, /give every request event the owner it was sent for/)
+  assert.match(patterns, /keep the old identity's late `Resolve` in\s+`next`/)
+  assert.match(patterns, /resets every\s+global it touched in `dispose`/)
+})
+
 test('runs keep going after yes, continue the author for repairs and fix Bend failures from a table', async () => {
   const [common, controller, loading, patterns] = await Promise.all([
     read('references/common.md'),

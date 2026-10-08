@@ -2162,6 +2162,13 @@ oracle that is a card `I*` invariant rather than a Bend def):
 - Clean up inside the property (`try … finally`), not in `afterEach`.
 - `fc.scheduler` is for interleavings the model does not name; when the model has the event, drive it
   from the trace instead so the expected value comes with it.
+- On a card with a Bend model, event order is already explored by `emit-trace`: each step picks one event
+  from what `next(history)` allows, so a trace is a random topological order of the model's precedence
+  rules (`Resolve{id}` only after its `Request{id}`), and that test is the card's `sequence` evidence.
+  Do not shuffle a list of events and filter it, and do not rebuild the model as `fc.commands` classes
+  with `check`/`run`: that is a second copy of `next` and the expected value, and it drifts. A precedence
+  the traces never reach is a missing `next` arm or a bound too low, not a reason for a second generator.
+  `fc.commands` stays the sequence test only for a card with no model.
 - Fixed sleeps, `toBeTruthy` and `>0` assertions are forbidden here as everywhere ([`bva.md`](bva.md)).
 
 ### Attacking the space after GREEN — discovery-driven closure
@@ -2696,6 +2703,18 @@ Model leaving and returning as events (`Unmount`, `Remount{elapsed}`) when a row
 observe the cache and the screen separately: a response may still update a cache after unmount, while
 the unmounted screen must not change. Late completions after `Unmount` stay in `next` — dropping them
 because a correct product ignores them hides the defect.
+
+## Identity and session lifetime
+
+When completions can belong to different owners, give every request event the owner it was sent for
+(`Request{run}`, `Resolve{run}`) so `next` can order two runs against each other: run A's response
+arriving after run B's start and after B's response are different traces, and a settlement keyed by
+the wrong run shows up as a wrong observation. When the identity can change under an in-flight request
+(`Logout{}`, `Login{account}`), model it as events too and keep the old identity's late `Resolve` in
+`next`; the law says whose state it may touch (none of the new account's). The adapter resets every
+global it touched in `dispose` (mock handlers, stores, the render root), so one trace cannot leak into
+the next. Server-side deduplication of the same run is a server contract: record it in the API
+contract and test the client's resend, not the server's rule.
 
 ## Library-owned behavior
 
