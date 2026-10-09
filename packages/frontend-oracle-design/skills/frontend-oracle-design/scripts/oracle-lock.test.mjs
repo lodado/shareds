@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { link, mkdir, mkdtemp, readdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, link, lstat, mkdir, mkdtemp, readdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
@@ -427,6 +427,56 @@ test('a planted receipt (empty, wrong content, or a symlink) is not a hit', asyn
   await writeFile(elsewhere, `${name}\n`)
   await symlink(elsewhere, receipt)
   assert.match(await after(), /card-lint miss/)
+})
+
+test('a receipt is never written through a symlink planted at its name', async (t) => {
+  const { lock, oracle, source } = await fixture(t)
+  const receipts = await receiptFixture(t)
+  const env = { ORACLE_LINT_CACHE: receipts, ORACLE_TIMING: '1' }
+  assert.equal(runWith(env, 'create', '--oracle', oracle, '--lock', lock, '--source', source).status, 0)
+  assert.equal(runWith(env, 'verify', '--lock', lock).status, 0)
+  const [name] = await readdir(receipts)
+  const receipt = join(receipts, name)
+  const precious = join(receipts, 'precious')
+  await writeFile(precious, 'precious\n')
+  await rm(receipt)
+  await symlink(precious, receipt)
+  const verified = runWith(env, 'verify', '--lock', lock)
+  assert.equal(verified.status, 0, verified.stderr)
+  assert.match(verified.stderr, /card-lint miss/)
+  // the link is replaced by a regular receipt; what it pointed at is untouched
+  assert.equal(await readFile(precious, 'utf8'), 'precious\n')
+  assert.equal((await lstat(receipt)).isFile(), true)
+  assert.match(runWith(env, 'verify', '--lock', lock).stderr, /card-lint hit/)
+})
+
+test('a receipt directory that is a symlink or that others can write is not used', async (t) => {
+  const { lock, oracle, source } = await fixture(t)
+  const real = await receiptFixture(t)
+  const linked = `${real}-link`
+  await symlink(real, linked)
+  t.after(() => rm(linked, { force: true }))
+  const writable = await receiptFixture(t)
+  await chmod(writable, 0o777)
+  for (const directory of [linked, writable]) {
+    const env = { ORACLE_LINT_CACHE: directory, ORACLE_TIMING: '1' }
+    assert.equal(runWith(env, 'create', '--oracle', oracle, '--lock', lock, '--source', source).status, 0)
+    for (let attempt = 0; attempt < 2; attempt += 1) assert.match(runWith(env, 'verify', '--lock', lock).stderr, /card-lint miss/)
+  }
+  assert.deepEqual(await readdir(real), [])
+  assert.deepEqual(await readdir(writable), [])
+})
+
+test('without ORACLE_LINT_CACHE the receipts go to a directory private to the user', async (t) => {
+  const { lock, oracle, source } = await fixture(t)
+  const temporary = await receiptFixture(t)
+  const env = { TMPDIR: temporary, TMP: temporary, TEMP: temporary, ORACLE_TIMING: '1' }
+  assert.equal(runWith(env, 'create', '--oracle', oracle, '--lock', lock, '--source', source).status, 0)
+  assert.equal(runWith(env, 'verify', '--lock', lock).status, 0)
+  const [directory] = await readdir(temporary)
+  assert.equal(directory, `oracle-lint-receipts-${process.getuid?.() ?? 'user'}`)
+  assert.equal((await lstat(join(temporary, directory))).mode & 0o777, 0o700)
+  assert.match(runWith(env, 'verify', '--lock', lock).stderr, /card-lint hit/)
 })
 
 test('a receipt issued with Bend installed is not a hit once Bend cannot be found', async (t) => {

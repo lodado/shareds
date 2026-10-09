@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
-import { lstat, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { createHash, randomBytes } from 'node:crypto'
+import { lstat, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
@@ -279,7 +279,7 @@ async function lintReceipt(oracle, sources, rootDirectory) {
       sources: sources.map((source) => [portablePath(rootDirectory, source.realPath), source.sha256]),
     }),
   )
-  return { directory: setting || join(tmpdir(), 'oracle-lint-receipts'), key }
+  return { directory: setting || join(tmpdir(), `oracle-lint-receipts-${process.getuid?.() ?? 'user'}`), key }
 }
 
 /**
@@ -299,9 +299,24 @@ async function lintBend(oracle) {
   )
 }
 
+/**
+ * 영수증 디렉터리가 내 것인가 — 심볼릭 링크가 아니고, 같은 사용자 소유이고, 다른 사용자가 쓸 수 없다. 공용 tmp에서 남이 심어 둔
+ * 디렉터리나 링크를 따라 읽고 쓰지 않으려는 검사다.
+ */
+async function ownDirectory(directory) {
+  try {
+    const entry = await lstat(directory)
+    if (!entry.isDirectory() || (process.getuid && entry.uid !== process.getuid())) return false
+    return (entry.mode & 0o022) === 0
+  } catch {
+    return false
+  }
+}
+
 /** 영수증이 있고 내 것이며(일반 파일, 같은 사용자) 내용이 키와 같을 때만 맞은 것이다. */
 async function hasReceipt({ directory, key }) {
   try {
+    if (!(await ownDirectory(directory))) return false
     const path = join(directory, key)
     const entry = await lstat(path)
     if (!entry.isFile() || (process.getuid && entry.uid !== process.getuid())) return false
@@ -309,6 +324,18 @@ async function hasReceipt({ directory, key }) {
   } catch {
     return false
   }
+}
+
+/**
+ * 영수증을 쓴다 — 내 디렉터리에만, 임시 파일(`wx`: 이미 있으면 실패하고 링크를 따르지 않는다)에 쓴 뒤 이름을 바꿔 놓는다. 이름 자리에
+ * 링크나 엉뚱한 파일이 있어도 바꿔치기할 뿐 그 가리키는 곳에는 쓰지 않는다.
+ */
+async function writeReceipt({ directory, key }) {
+  await mkdir(directory, { recursive: true, mode: 0o700 })
+  if (!(await ownDirectory(directory))) return
+  const temporary = join(directory, `.${key}.${process.pid}.${randomBytes(4).toString('hex')}`)
+  await writeFile(temporary, `${key}\n`, { flag: 'wx', mode: 0o600 })
+  await rename(temporary, join(directory, key))
 }
 
 /**
@@ -359,9 +386,7 @@ async function assertCardLintSnapshot(oracle, sources, rootDirectory, lockedWitn
     if (linted.status !== 0) throw lintFailure(linted, 'oracle-verify card failed')
     if (receipt) {
       // 영수증은 속도를 위한 캐시다 — 쓸 수 없는 위치(읽기 전용 tmpdir, 샌드박스)는 다음 verify가 다시 lint하게 둘 뿐이다
-      await mkdir(receipt.directory, { recursive: true, mode: 0o700 })
-        .then(() => writeFile(join(receipt.directory, receipt.key), `${receipt.key}\n`, { mode: 0o600 }))
-        .catch(() => {})
+      await writeReceipt(receipt).catch(() => {})
     }
     reportTiming('card-lint miss', started)
     return witnesses

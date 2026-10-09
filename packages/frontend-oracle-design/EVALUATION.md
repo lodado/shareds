@@ -1,3 +1,15 @@
+# 0.96.2: lint receipts are written only into a private directory, never through a link
+
+A background security review of the 0.96.1 push found that the receipt write followed symlinks: `mkdir` then `writeFile`
+on `<dir>/<key>` overwrote whatever a planted link pointed at (reproduced first: a file named `precious` became the key),
+and the default directory was one shared `oracle-lint-receipts` under `os.tmpdir()`, which is common to all users on Linux
+(on macOS `os.tmpdir()` is already per user). Reads were already checked (regular file, same owner, content equals key).
+Now the default directory is `oracle-lint-receipts-<uid>`, a directory is used for reading or writing only when it is a
+real directory (not a link) owned by the user and not group- or world-writable, and a receipt is written to a `wx`
+temporary file in it and renamed into place, so a link or stray file at the receipt name is replaced rather than written
+through. Three tests cover the link at the name, a linked or world-writable `ORACLE_LINT_CACHE`, and the private default.
+The limit stays as written for 0.96.1: a shell of the same user can still write a valid receipt.
+
 # 0.96.1: the card lint stops taking minutes — a rewritten greedy, lint receipts, shared model graph
 
 The Oracle was slow in four real sessions (playwright-spec-for-AI-Agent, Side-Projects; main and subagents). Unlike the
