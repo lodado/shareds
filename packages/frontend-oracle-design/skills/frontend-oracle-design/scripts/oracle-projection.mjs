@@ -9,7 +9,7 @@ import { basename, dirname, join, posix, relative, resolve, sep } from 'node:pat
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { ensureBend } from './ensure-bend.mjs'
-import { evaluateWorlds, loadWorld } from './oracle-adequacy.mjs'
+import { evaluateWorlds, loadWorld, settingLabel, settingReport } from './oracle-adequacy.mjs'
 import { runCli } from './oracle-cli.mjs'
 import { perturbations, spaceCrossCheck } from './oracle-discovery.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
@@ -30,6 +30,7 @@ import {
 } from './oracle-model.mjs'
 import { loadPackage, sourcePath } from './oracle-package.mjs'
 import { characterizationSet, orderWaysCover, stateQuotient, wSuite } from './oracle-quotient.mjs'
+import { SWEEP_FUNCTIONS } from './oracle-sweep.mjs'
 import {
   arbitraryOf,
   bendLiteral,
@@ -304,16 +305,21 @@ export async function emitWorld(options) {
   const loaded = await loadWorld({ card, package: packagePath, bin, cwd, timeoutMs })
   if (loaded.result) throw new CliError('WORLD_UNAVAILABLE', `the world cannot be enumerated: ${loaded.result.reason}`)
   const { spec, model, inputs } = loaded
-  const valid = evaluateWorlds(model, spec).filter((world) => world.valid)
+  const worlds = evaluateWorlds(model, spec)
+  const unsatisfiable = settingReport(worlds, spec)
+  // 어떤 제품도 통과할 수 없는 설정의 테스트는 만들지 않는다 — 만들어 놓고 건너뛰면 그 결함은 모델 안에 남는다
+  if (unsatisfiable.deadTotal > 0) {
+    const blame = (rows) => (rows.length > 0 ? `[${rows.join(', ')} false in every world]` : '[the rows conflict]')
+    const named = unsatisfiable.dead.slice(0, 5).map(({ setting, rows }) => `${setting || '(no coordinates)'} ${blame(rows)}`)
+    if (unsatisfiable.deadTotal > named.length) named.push('…')
+    throw new CliError(
+      'WORLD_SETTING_UNSATISFIABLE',
+      `${unsatisfiable.deadTotal} of ${unsatisfiable.total} coordinate settings allow no observation that satisfies every row, so no product can pass them: ${named.join('; ')} — exclude them with a sourced assumption or fix the row in the model package; a locked card cannot, so do this before the lock`,
+    )
+  }
+  const valid = worlds.filter((world) => world.valid)
   const field = (fieldName) => spec.fields.find((entry) => entry.name === fieldName)
-  const literal = (coordinates) =>
-    spec.coordinates
-      .map((fieldName) => {
-        const value = coordinates[fieldName]
-        if (typeof value === 'boolean') return value ? fieldName : `!${fieldName}`
-        return `${fieldName}=${value}`
-      })
-      .join(' ')
+  const literal = (coordinates) => settingLabel(spec, coordinates)
   const keyOf = (plain) => JSON.stringify(Object.fromEntries(spec.observations.map((fieldName) => [fieldName, plain[fieldName]])))
   let all = [{}]
   for (const fieldName of spec.coordinates)
@@ -808,6 +814,84 @@ export async function emitTrace(options) {
   }
 }
 
+const SWEEP_WALKS = 300
+const SWEEP_STEPS = 60
+
+/**
+ * sweep 모드: 어긋남을 한 번에 다 모으는 보고용 테스트. 행동 모델이 허용하는 사건으로 긴 무작위 걸음을 제품에 걸고, 첫
+ * 불일치에서 전체를 멈추지 않고 걸음마다 새로 시작해 어긋남을 사건 종류와 다른 관찰 경로로 묶는다. 판정이 아니라 목록이다:
+ * 대응 증거는 emit-trace의 테스트가 내고, 이 테스트는 SWEEP=1일 때만 돌며 어긋남이 있으면 실패해 목록을 보인다.
+ * 잠근 모델은 고칠 수 없으므로 어긋남을 한 건씩 고치고 다시 도는 대신 이 목록으로 제품 수리와 모델 revision을 한 번에 정한다.
+ */
+export async function emitSweep(options) {
+  const { adapter, out, row, walks = SWEEP_WALKS, steps = SWEEP_STEPS, seed = 1, runner = 'node-test', environment, name, bin, timeoutMs, regenerate } = options
+  const caseTimeout = options.caseTimeout ?? CASE_TIMEOUT
+  checkHarness({ row, runner, adapter, environment, caseTimeout })
+  for (const [label, value] of [['walks', walks], ['steps', steps]])
+    if (!Number.isInteger(value) || value < 1) throw new CliError('USAGE', `${label} must be a positive integer`, 2)
+  if (!Number.isInteger(seed) || seed < 0) throw new CliError('USAGE', 'seed must be a non-negative integer', 2)
+  await assertAdapterTrusted(adapter)
+  const { model, prefix } = await sweepInputs(options)
+  await loadModel({ model, prefix, bin, timeoutMs })
+  const outDir = resolve(out)
+  await mkdir(outDir, { recursive: true })
+  const base = name ?? prefix.toLowerCase()
+  const modelFile = `${base}.model.mjs`
+  const testFile = `${base}.sweep.oracle.test.mjs`
+  const written = await writeModel({ model, bin, timeoutMs, outDir, modelFile })
+  const scope = `a report of ${walks} random walks of up to ${steps} events (seed ${seed}) — triage input for one batch of fixes, not conformance evidence`
+  const run = `SWEEP=1 ${runner === 'vitest' ? 'vitest run' : 'node --test'} ${join(out, testFile)}`
+  const lines = [
+    ...header({
+      mode: 'sweep',
+      prefix,
+      regenerate,
+      scope,
+      runner,
+      environment,
+      caseTimeout,
+      sampled: false,
+      adapterImport: toImport(relative(outDir, resolve(adapter))),
+      modelFile,
+      sources: written.sources,
+      row,
+    }),
+    ...SWEEP_FUNCTIONS.map((fn) => fn.toString()),
+    eventLabel.toString(),
+    '',
+    '// 스윕은 보고용이다 — SWEEP=1이 없으면 건너뛴다. 환경 변수로 걸음 수·길이·시드를 바꾼다(같은 시드는 같은 걸음).',
+    `const WALKS = Number(process.env.SWEEP_WALKS ?? ${walks})`,
+    `const STEPS = Number(process.env.SWEEP_STEPS ?? ${steps})`,
+    `const SEED = Number(process.env.SWEEP_SEED ?? ${seed})`,
+    '',
+    "test('[' + ROW + '] sweep: every first divergence of random walks, grouped (report)', { ...UNLIMITED, skip: process.env.SWEEP === undefined ? 'set SWEEP=1 to run the sweep' : false }, async () => {",
+    '  const report = await sweep({ adapter, call, toPlain, within, eventLabel, walks: WALKS, steps: STEPS, seed: SEED })',
+    '  console.log(JSON.stringify({ sweep: { row: ROW, ...report } }))',
+    '  const shown = report.clusters.slice(0, 12).map((cluster) => {',
+    "    const at = cluster.shortest",
+    "    return cluster.count + 'x ' + cluster.key + ' | walks ' + cluster.walks.join(',') + ' | shortest ' + at.at + ' events: ' + at.trace.map(eventLabel).join(' · ') + ' | expected ' + at.expected + ' | observed ' + at.observed",
+    '  })',
+    "  assert.equal(report.aborted, undefined, 'SWEEP_ABORTED: ' + report.aborted)",
+    "  assert.equal(report.clusters.length, 0, 'SWEEP_DIVERGENCES: ' + report.clusters.length + ' kinds in ' + WALKS + ' walks of up to ' + STEPS + ' events (seed ' + SEED + ')\\n' + shown.join('\\n'))",
+    '})',
+  ]
+  await writeFile(join(outDir, testFile), `${lines.join('\n')}\n`)
+  return {
+    files: [join(outDir, modelFile), join(outDir, testFile)],
+    run,
+    verification: { level: 'report-only', strategy: 'random-walks', walks, steps, seed },
+  }
+}
+
+/** sweep의 입력 — `--model --prefix` 그대로이거나, 패키지의 행동 모델에서 읽는다. 공간을 열거하지 않는다. */
+async function sweepInputs({ package: packagePath, cwd = process.cwd(), model, prefix }) {
+  if (!packagePath) return { model, prefix }
+  const loaded = await loadPackage(packagePath, { root: cwd })
+  if (!loaded.pkg.behavior)
+    throw new CliError('USAGE', 'the package has no behavior model — a sweep walks events; project its world with emit-world instead', 2)
+  return { model: sourcePath(loaded, loaded.pkg.behavior.model), prefix: loaded.pkg.behavior.prefix }
+}
+
 /**
  * state 모드(성질 + 선택적 차분): 상태 타입×명령 타입의 도메인에서 adapter가 concretize → step → project 한 결과를
  * 컴파일된 관계 def `<Prefix>.<R>(s, c, t)`로 판정한다. 관계는 LAWS.bend가 모델에 대해 증명한 바로 그 def다.
@@ -1099,6 +1183,9 @@ function parseOptions(args) {
     'card',
     'package',
     'order-ways',
+    'walks',
+    'steps',
+    'seed',
   ]
   for (let index = 0; index < args.length; index += 1) {
     const name = args[index]?.replace(/^--/, '')
@@ -1119,6 +1206,7 @@ function parseOptions(args) {
 const USAGE = `usage:
   oracle-projection.mjs emit-trace (--package <oracle.package.json> | --model <MODEL.bend> --prefix <Name> --bound <n>) --adapter <adapter.mjs> --out <dir> --row <O*> --runs <n> [--max-length <n>] [--w-set | --no-w-set] [--order-ways <t> | --no-order-ways] [--runner node-test|vitest] [--environment <jsdom>] [--case-timeout <ms>] [--name <base>]
   oracle-projection.mjs emit-state --model <MODEL.bend> --prefix <Name> --state <Type> --command <Type> --adapter <adapter.mjs> --out <dir> --row <O*> (--relation <def>)... --runs <n> [--differential] [--threshold <n>] [--nat-max <n>] [--list-max <n>] [--runner node-test|vitest] [--environment <jsdom>] [--case-timeout <ms>]
+  oracle-projection.mjs emit-sweep (--package <oracle.package.json> | --model <MODEL.bend> --prefix <Name>) --adapter <adapter.mjs> --out <dir> --row <O*> [--walks <n>] [--steps <n>] [--seed <n>] [--runner node-test|vitest] [--environment <jsdom>] [--case-timeout <ms>] [--name <base>]
   oracle-projection.mjs replay --model <MODEL.bend> --prefix <Name> --trace <json> [--observed <json> | --adapter <adapter.mjs>] [--out <dir>]
   oracle-projection.mjs emit-world (--card <oracle.md> | --package <oracle.package.json>) --adapter <world-adapter.mjs> --out <dir> --row <O*> [--runner node-test|vitest] [--environment <jsdom>] [--case-timeout <ms>] [--name <base>]`
 
@@ -1132,7 +1220,7 @@ function suiteSwitch(asked, off, flag) {
 
 async function main() {
   const [command, ...args] = process.argv.slice(2)
-  if (!['emit-trace', 'emit-state', 'replay', 'emit-world'].includes(command)) throw new CliError('USAGE', USAGE, 2)
+  if (!['emit-trace', 'emit-sweep', 'emit-state', 'replay', 'emit-world'].includes(command)) throw new CliError('USAGE', USAGE, 2)
   const options = parseOptions(args)
   const timeoutMs = integer(options['timeout-ms'])
   const regenerate = `node oracle-projection.mjs ${[command, ...args].join(' ')}`
@@ -1150,7 +1238,7 @@ async function main() {
     process.stdout.write(`${JSON.stringify(result)}\n`)
     return
   }
-  const fromPackage = command === 'emit-trace' && Boolean(options.package)
+  const fromPackage = ['emit-trace', 'emit-sweep'].includes(command) && Boolean(options.package)
   if (!fromPackage && (!options.model || !options.prefix)) throw new CliError('USAGE', USAGE, 2)
   const { bin } = await ensureBend()
   let result
@@ -1164,6 +1252,18 @@ async function main() {
       maxCases: integer(options['max-cases']),
       wSet: suiteSwitch(options['w-set'], options['no-w-set'], '--w-set'),
       orderWays: suiteSwitch(integer(options['order-ways']), options['no-order-ways'], '--order-ways'),
+      caseTimeout: integer(options['case-timeout']) ?? CASE_TIMEOUT,
+      bin,
+      timeoutMs,
+      regenerate,
+    })
+  } else if (command === 'emit-sweep') {
+    if (!options.adapter || !options.out) throw new CliError('USAGE', USAGE, 2)
+    result = await emitSweep({
+      ...options,
+      walks: integer(options.walks),
+      steps: integer(options.steps),
+      seed: integer(options.seed),
       caseTimeout: integer(options['case-timeout']) ?? CASE_TIMEOUT,
       bin,
       timeoutMs,

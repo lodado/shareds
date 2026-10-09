@@ -335,6 +335,19 @@ observation meaning, and never skip a case. GREEN needs both labels' runs fresh 
 snapshot; a proof run is never reused as product evidence and an earlier GREEN never covers new
 product bytes.
 
+**Sweep once before any revision.** A model gap costs a new revision, and a fast-check property stops
+at one shrunk counterexample, so fixing what the first failure shows and running again costs one lock
+cycle per mismatch. When a conformance case fails and the cause is not one obvious product line,
+list every mismatch first: `oracle-projection.mjs emit-sweep (--package <pkg> | --model <MODEL.bend>
+--prefix <Name>) --adapter <adapter> --out <formal dir> --row <O*>`, then run the printed command
+(`SWEEP=1`; skipped otherwise, so a leftover file is harmless — delete it after triage). It walks
+`SWEEP_WALKS` (300) model-chosen paths of up to `SWEEP_STEPS` (60) events, seed `SWEEP_SEED`, restarts
+a walk at its first mismatch instead of stopping, and groups the mismatches by event kind and
+differing observation path with the shortest trace of each group. Feed each trace to `replay
+--adapter`: the verdicts sort the groups into product fixes (make them together), model gaps and
+`POLICY_GAP`. Open **one** revision for all model gaps and decisions at once. A sweep is a report,
+never mapped in `evidence.json` and never cited as GREEN.
+
 The model is the oracle, not the product's design. Write the product by the state ladder
 ([`types/state-ladder.md`](types/state-ladder.md)): never mirror the model's message union, `step` or
 state record as a reducer, transition table or state machine, never extract one so a test can drive

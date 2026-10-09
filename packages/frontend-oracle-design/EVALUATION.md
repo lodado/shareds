@@ -1,3 +1,42 @@
+# 0.97.0: the revision loop — model defects are stopped before the lock, mismatches are listed in one sweep
+
+The user's complaint was "why does it keep going round": identity r1 → r2 → r3 and a planned r4 (Side-Projects),
+consent r1 → r2, adapter-isomorphism r1 → r2 → r3 (playwright-spec-for-AI-Agent). A locked model cannot be edited, so
+every defect found after the lock costs a new revision: author, translation review, lock, regenerate the tests,
+implement again. Reading the three families, the laps came from two causes, and the harness caught neither.
+(1) Defects the model alone shows, found only after the lock. adapter-isomorphism r1 had 72 of 192 coordinate settings
+in which row O4 is false in every world (no product can pass them); r2 had a goal (G3) that an assumption made always
+true, which `bend-adequacy` refutes only in the label run, after the lock. Re-running `oracle-adequacy.mjs check` on
+the shipped packages with the new report finds the first exactly (72 dead settings, row O4, while `pass` stays true)
+and names the second (`goal-falsifiable G3 refuted`); r3 is clean. The same report finds 3 dead settings (row O6, the
+`LateApplied` attempt) in identity r1, r2 and r3 — never fixed in the model, hand-skipped in the test instead — and 660
+of 1,068 settings (row O1) in consent r1 and r2, where the generated `consent.world.test.mjs` was edited to
+`SETTINGS.filter((setting) => setting.allowed.length > 0)` while its header still says "exhaustive over the 1068 coordinate
+settings". (2) Mismatches between model and product, found one per run: a fast-check property stops at one shrunk
+counterexample, so each fix and each model revision was followed by a run that showed the next one; the session wrote
+its own 450-walk scanner to get the list.
+What changed, each with a test. `oracle-adequacy.mjs`: `settingReport` names every coordinate setting the assumptions
+allow in which no valid world satisfies all rows, with the row that is false in all of it (empty when the rows conflict);
+`check` prints it as `settings` next to the checks and `pass` is unchanged, so no delivered oracle starts failing;
+`preLockIssues` runs the enumeration (no kernel) and returns refuted checks plus dead settings. `oracle-stage.mjs`:
+`advance CHECKED` calls it and refuses with the defects named; a world that cannot be judged (infinite field, over the
+cap) is recorded as not judged, not refused. `oracle-projection.mjs emit-world` refuses a dead setting with
+`WORLD_SETTING_UNSATISFIABLE` instead of writing a test that cannot pass. New `emit-sweep` and `oracle-sweep.mjs`:
+`SWEEP=1` runs `SWEEP_WALKS` (300) model-chosen walks of up to `SWEEP_STEPS` (60) events; a walk restarts at its first
+mismatch (the product's state has left the model's, so going on shows one defect as a chain), mismatches are grouped by
+event kind and differing observation path with the shortest trace per group, a quarter of the event kinds is switched
+off per walk so a common group does not hide the rest, three adapter timeouts stop the run. The file is skipped without
+`SWEEP=1`, so a forgotten one fails no CI. On the stale-search fixture the clean reducer reports nothing and the stale
+mutant is one group (`Respond → $`, shortest trace `Issue · Issue · Respond{id:1}`) that `replay` classifies as an
+implementation defect. `bend-cross-verification.md` §4 says to sweep once before any revision and to open one revision
+for the whole list; `mandatory-verification.md` states the CHECKED gate.
+Limits. The sweep is a report: it is not mapped in `evidence.json` and proves nothing about unwalked paths (it prints
+the events it walked). The dead-setting rule is a model rule only: it cannot tell whether an assumption that removes a
+setting is true, so each one still needs its source. A hand-edit of a generated test is still not detected by the
+harness (the `sources unchanged` test hashes the inputs, not the file); the dead settings that made the edit necessary
+are what is now refused. Not done: a sweep before the lock, because the adapter is a target-repo file that the Draft
+approval has not yet allowed at that point.
+
 # 0.96.2: lint receipts are written only into a private directory, never through a link
 
 A background security review of the 0.96.1 push found that the receipt write followed symlinks: `mkdir` then `writeFile`

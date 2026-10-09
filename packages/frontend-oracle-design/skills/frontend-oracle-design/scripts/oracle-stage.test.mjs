@@ -153,6 +153,31 @@ test('DRAFTED opens the lock gate for the package bytes it was recorded on, and 
   await assert.rejects(() => assertReadyToLock(directory), { code: 'STAGE_STALE' })
 })
 
+test('CHECKED refuses a model the lock would freeze with a defect: a row that no longer implies its goal is named with a counterexample before the lock', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const { root, directory } = await repository(t)
+  const world = join(root, 'World.bend')
+  const text = await readFile(world, 'utf8')
+  // the row now forbids the newer answer being shown, so the rows no longer imply goal G2: the adequacy run label would
+  // refute card-implies-goal only after the lock, and a locked model cannot be edited
+  const forbidding = text.replace('      Race.imp(n, Race.isNew(f))\n', '      Race.imp(n, Bool.not(Race.isNew(f)))\n')
+  assert.notEqual(forbidding, text)
+  await writeFile(world, forbidding)
+  assert.equal(stage(root, directory, 'begin').status, 0)
+  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  const refused = stage(root, directory, 'advance', 'CHECKED')
+  assert.equal(refused.status, 1)
+  assert.match(refused.stderr, /^STAGE_GATE: the model has defects the lock would freeze: adequacy card-implies-goal G2 refuted: \{"arrival"/)
+  assert.equal((await readStage(directory)).stage, 'MODELED')
+
+  // fixed in the package's world, the same stage advances and its record says what was judged
+  await writeFile(world, text)
+  const checked = stage(root, directory, 'advance', 'CHECKED')
+  assert.equal(checked.status, 0, checked.stderr)
+  assert.match((await readStage(directory)).history.at(-1).evidence, /adequacy found no refuted check or unsatisfiable setting over \d+ worlds/)
+})
+
 test('MODELED needs every async cell decided when Async is in a version 2 space — the open cells are asked before the model', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'oracle-stage-async-'))
   t.after(() => rm(root, { recursive: true, force: true }))

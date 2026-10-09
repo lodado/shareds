@@ -21,7 +21,9 @@ import {
   modelInput,
   parseAdequacy,
   parseTerms,
+  preLockIssues,
   searchAdequacy,
+  settingReport,
   triageCandidates,
 } from './oracle-adequacy.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
@@ -254,6 +256,28 @@ test('moving a guarantee into the assumptions shows up: the goal can no longer b
   assert.equal(find(result, 'goal-falsifiable', 'G1').status, 'proven')
 })
 
+test('a setting no valid world satisfies is dead: no product can pass it, and the report names the row that is false in all of it', () => {
+  const spec = adequacySpec(CARD, WORLD)
+  const report = (defs) => settingReport(evaluateWorlds(handModel(defs), spec), spec)
+  const named = ({ dead }) => dead.map(({ setting, rows }) => [setting, rows]).sort(([left], [right]) => left.localeCompare(right))
+
+  // start × held, minus the setting A1 excludes
+  const clean = report(SAVE)
+  assert.deepEqual([clean.total, clean.deadTotal, clean.dead], [3, 0, []])
+
+  // O3 now forbids a save whose permission was gone: the setting `start !held` has no world left, and O3 is the row to blame
+  const forbidden = report({ ...SAVE, O3: (w) => imp(w.ack, w.committed) && !(w.start && !w.held) })
+  assert.deepEqual(named(forbidden), [['start !held', ['O3']]])
+
+  // two rows that ask for opposite things: every world fails one of them, none is false in all, so no row is named
+  const conflict = report({ ...SAVE, O2: (w) => imp(w.start && w.held, !w.committed) })
+  assert.deepEqual(named(conflict), [['start held', []]])
+
+  // a setting the assumptions exclude is not dead, it is not a setting
+  const excluded = report({ ...SAVE, A1: (w) => imp(w.held, w.start) && !w.start })
+  assert.deepEqual([excluded.total, excluded.deadTotal], [1, 0])
+})
+
 test('demo A: a start-only coordinate cannot separate a revoked-midway commit; the refinement closes the gap', () => {
   const draft = search(line(hideCommit(CARD), 'Coordinates', 'start'))
   const first = find(draft, 'sufficiency', 'G1')
@@ -475,6 +499,30 @@ test('[bend] the fixture card is proven: every conclusion re-checked by the kern
     result.outside.hazards.map(({ Hazard }) => Hazard),
     ['concurrent-change', 'effect-count', 'identity-reference', 'feature-composition', 'carry-over', 'order-timing'],
   )
+})
+
+test('[bend] before the lock: a refuted check and a dead setting are named, a clean card reports nothing, and the pass flag is unchanged', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await fixtureCopy(t)
+  const clean = await preLockIssues({ card: join(root, 'oracle.md'), cwd: root, bin })
+  assert.deepEqual([clean.checked, clean.worlds, clean.settings, clean.issues], [true, 32, 3, []])
+
+  // O3 forbids a save whose permission was gone: adequacy still passes (the card is satisfiable elsewhere) but one setting is dead
+  await edit(join(root, 'World.bend'), 'Save.imp(a, c)\n\n# O4', 'Bool.and(Save.imp(a, c), Bool.not(Bool.and(s, Bool.not(h))))\n\n# O4')
+  const forbidden = await preLockIssues({ card: join(root, 'oracle.md'), cwd: root, bin })
+  assert.equal(forbidden.checked, true)
+  assert.equal(forbidden.issues.length, 1, forbidden.issues.join('\n'))
+  assert.match(forbidden.issues[0], /^1 of 3 coordinate settings allow no observation that satisfies every row, so no product can pass them \(start !held\)$/)
+  const full = await checkAdequacy({ card: join(root, 'oracle.md'), cwd: root, bin })
+  assert.equal(full.pass, true, 'a card that was passing keeps passing: the settings are reported next to the checks, not inside them')
+  assert.deepEqual([full.settings.total, full.settings.deadTotal, full.settings.dead[0].rows], [3, 1, ['O3']])
+
+  // a goal an assumption already guarantees can never be violated: the label run refutes it only after the lock
+  await writeFile(join(root, 'World.bend'), WORLD)
+  await edit(join(root, 'World.bend'), 'Save.imp(h, s)\n', 'Save.imp(c, h)\n')
+  const swallowed = await preLockIssues({ card: join(root, 'oracle.md'), cwd: root, bin })
+  assert.ok(swallowed.issues.some((issue) => issue.startsWith('adequacy goal-falsifiable G1 refuted')), swallowed.issues.join('\n'))
 })
 
 test('[bend] demos A and B on the first draft: kernel-checked counterexamples, then proven after refinement', async (t) => {

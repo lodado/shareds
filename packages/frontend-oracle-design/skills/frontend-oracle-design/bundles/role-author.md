@@ -1539,7 +1539,11 @@ copies of the policy.
 4. Check the Bend laws, complete the bounded space and run the Adequacy check before confirmation
    and lock. Preserve their actual results. These pre-lock model checks do not authorize writing
    target tests or production code. The card, MODEL, LAWS, world and imported local sources are
-   confirmed and locked together; PROOF remains a repairable proof candidate.
+   confirmed and locked together; PROOF remains a repairable proof candidate. The CHECKED stage of
+   `oracle-stage.mjs` runs the adequacy search itself and refuses a refuted check or a coordinate
+   setting no product can pass (`settings.dead` in `oracle-adequacy.mjs check`; `emit-world` refuses
+   the same with `WORLD_SETTING_UNSATISFIABLE`): exclude it with a sourced assumption or fix the row
+   before the lock, never skip its test.
 5. Design-only stops at the approved, checked and locked `ORACLE_READY` contract. It uses the
    formal checks and records the type-fest/static/fast-check plans and capability results, but
    does not write or execute consumer test files or production changes. Do not report these plans
@@ -1959,6 +1963,19 @@ the existing budget, the adapter's mechanics; never the locked model, laws, boun
 observation meaning, and never skip a case. GREEN needs both labels' runs fresh for the current
 snapshot; a proof run is never reused as product evidence and an earlier GREEN never covers new
 product bytes.
+
+**Sweep once before any revision.** A model gap costs a new revision, and a fast-check property stops
+at one shrunk counterexample, so fixing what the first failure shows and running again costs one lock
+cycle per mismatch. When a conformance case fails and the cause is not one obvious product line,
+list every mismatch first: `oracle-projection.mjs emit-sweep (--package <pkg> | --model <MODEL.bend>
+--prefix <Name>) --adapter <adapter> --out <formal dir> --row <O*>`, then run the printed command
+(`SWEEP=1`; skipped otherwise, so a leftover file is harmless — delete it after triage). It walks
+`SWEEP_WALKS` (300) model-chosen paths of up to `SWEEP_STEPS` (60) events, seed `SWEEP_SEED`, restarts
+a walk at its first mismatch instead of stopping, and groups the mismatches by event kind and
+differing observation path with the shortest trace of each group. Feed each trace to `replay
+--adapter`: the verdicts sort the groups into product fixes (make them together), model gaps and
+`POLICY_GAP`. Open **one** revision for all model gaps and decisions at once. A sweep is a report,
+never mapped in `evidence.json` and never cited as GREEN.
 
 The model is the oracle, not the product's design. Write the product by the state ladder
 ([`types/state-ladder.md`](types/state-ladder.md)): never mirror the model's message union, `step` or

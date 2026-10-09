@@ -488,9 +488,8 @@ const lawName = (...parts) => parts.filter(Boolean).join('_').toLowerCase().repl
  * 점검 — 모든 세계를 열거해 각 점검의 증명 또는 반례를 찾는다. model.call(name, value)는 세계 값에 def를 적용한 Bool이다.
  * obligations는 커널이 다시 검사할 결론이다: 존재는 witness, 전칭은 경우 전부, 인수분해는 판정표와 경우 전부.
  */
-export function searchAdequacy(model, spec) {
+export function searchAdequacy(model, spec, worlds = evaluateWorlds(model, spec)) {
   const defs = [...spec.assumptions, ...spec.rows, ...spec.goals.map(({ id }) => id)]
-  const worlds = evaluateWorlds(model, spec)
   const byKey = new Map(worlds.map((world) => [worldKey(world.plain), world]))
   const valid = worlds.filter((world) => world.valid)
   const key = [...spec.coordinates, ...spec.observations]
@@ -721,6 +720,51 @@ export function evaluateWorlds(model, spec) {
       card: spec.rows.every((id) => truth[id]),
     }
   })
+}
+
+/** 좌표 설정의 표기 — `held !open count=2`. 점검 보고와 생성 테스트가 같은 이름으로 설정을 가리킨다. */
+export function settingLabel(spec, coordinates) {
+  return spec.coordinates
+    .map((name) => {
+      const value = coordinates[name]
+      if (typeof value === 'boolean') return value ? name : `!${name}`
+      return `${name}=${value}`
+    })
+    .join(' ')
+}
+
+const MAX_DEAD_REPORTED = 50
+
+/**
+ * 설정별 판정 — 가정이 허용한 좌표 설정마다 카드 행이 모두 참인 유효 세계가 하나는 있어야 한다. 없는 설정은 어떤 제품도
+ * 통과할 수 없다: 제품이 내는 관찰은 모두 어느 행을 위반하거나 세계에 없다. `rows`는 그 설정의 모든 유효 세계에서 거짓인
+ * 행이다(비어 있으면 관찰마다 위반하는 행이 달라 행끼리 부딪친다). 모델만으로 아는 결함이라 잠그기 전에 가정으로
+ * 빼거나 행을 고친다 — 잠근 뒤에 생성 테스트가 알려 주면 새 revision이 든다.
+ */
+export function settingReport(worlds, spec) {
+  const settings = new Map()
+  for (const world of worlds) {
+    if (!world.valid) continue
+    const coordinates = Object.fromEntries(spec.coordinates.map((name) => [name, world.plain[name]]))
+    const key = stableStringify(coordinates)
+    const failing = spec.rows.filter((id) => !world.truth[id])
+    const seen = settings.get(key)
+    settings.set(key, {
+      coordinates,
+      satisfiable: Boolean(seen?.satisfiable) || world.card,
+      always: seen ? seen.always.filter((id) => failing.includes(id)) : failing,
+    })
+  }
+  const dead = [...settings.values()].filter(({ satisfiable }) => !satisfiable)
+  return {
+    total: settings.size,
+    deadTotal: dead.length,
+    dead: dead.slice(0, MAX_DEAD_REPORTED).map(({ coordinates, always }) => ({
+      setting: settingLabel(spec, coordinates),
+      coordinates,
+      rows: always.map((id) => spec.rowIds?.[id] ?? id),
+    })),
+  }
 }
 
 /**
@@ -998,7 +1042,8 @@ export async function checkAdequacy({
   const loaded = await loadWorld({ card, package: packagePath, bin, cwd, maxWorlds, timeoutMs })
   if (loaded.result) return loaded.result
   const { spec, inputs, base, worldPath, model } = loaded
-  const search = searchAdequacy(model, spec)
+  const worlds = evaluateWorlds(model, spec)
+  const search = searchAdequacy(model, spec, worlds)
   const kernel = await certify(search, spec, { worldPath, inputs, bin, timeoutMs })
   const checks = mergeKernel(search.checks, kernel)
   let status = 'unknown'
@@ -1012,8 +1057,9 @@ export async function checkAdequacy({
     checks,
     minimalPairs: search.minimalPairs,
     minimalPairsTotal: search.minimalPairsTotal,
-    sensitivity: assumptionSensitivity(evaluateWorlds(model, spec), spec),
-    goalAudit: goalAudit(evaluateWorlds(model, spec), spec, base.independence),
+    settings: settingReport(worlds, spec),
+    sensitivity: assumptionSensitivity(worlds, spec),
+    goalAudit: goalAudit(worlds, spec, base.independence),
     kernel,
     bend: { bin, version: reportedVersion(bin) },
   }
@@ -1023,6 +1069,46 @@ export async function checkAdequacy({
  * 카드 → 세계 모델 로드(스펙·입력 digest·컴파일된 def). 무한 필드·상한 초과는 unknown, Bend 없음은 not-run 결과를
  * `result`로 돌려준다 — 부르는 쪽은 그 결과를 그대로 낸다.
  */
+const clip = (value, limit = 160) => {
+  const text = JSON.stringify(value)
+  return text.length > limit ? `${text.slice(0, limit)}…` : text
+}
+
+/** 반박된 점검이 들고 있는 근거 — 이유, 반례, 판정이 갈리는 세계 쌍 가운데 있는 것. */
+function detailOf({ reason, counterexample, pair }) {
+  if (reason) return reason
+  const witness = counterexample ?? pair
+  return witness ? clip(witness) : null
+}
+
+/**
+ * 잠그기 전에 모델만으로 잡히는 결함 — 반박된 점검과 어떤 제품도 통과할 수 없는 설정. 커널 인증은 하지 않는다: 열거가
+ * 이미 반례이고 인증은 전달 단계의 bend-adequacy 라벨 런이 한다. 무한 필드·상한 초과·Bend 없음은 판정하지 못한 것이지
+ * 결함이 아니다 — `checked: false`와 이유만 돌려주고 막지 않는다.
+ */
+export async function preLockIssues({ card, package: packagePath, bin, cwd = process.cwd(), maxWorlds = MAX_WORLDS, timeoutMs = 120_000 }) {
+  const loaded = await loadWorld({ card, package: packagePath, bin, cwd, maxWorlds, timeoutMs })
+  if (loaded.result) return { checked: false, reason: loaded.result.reason, issues: [] }
+  const { spec, model } = loaded
+  const worlds = evaluateWorlds(model, spec)
+  const issues = searchAdequacy(model, spec, worlds)
+    .checks.filter(({ status }) => status === 'refuted')
+    .map((check) => {
+      const name = [check.kind, check.target].filter(Boolean).join(' ')
+      const detail = detailOf(check)
+      return detail ? `adequacy ${name} refuted: ${detail}` : `adequacy ${name} refuted`
+    })
+  const settings = settingReport(worlds, spec)
+  if (settings.deadTotal > 0) {
+    const named = settings.dead.slice(0, 3).map(({ setting }) => setting || '(no coordinates)')
+    if (settings.deadTotal > named.length) named.push('…')
+    issues.push(
+      `${settings.deadTotal} of ${settings.total} coordinate settings allow no observation that satisfies every row, so no product can pass them (${named.join('; ')})`,
+    )
+  }
+  return { checked: true, worlds: worlds.length, settings: settings.total, issues }
+}
+
 /** 카드 입력 어댑터 — 기존 카드의 `## Adequacy`·`## Terms`·Source Registry에서 점검 입력을 만든다. */
 async function cardInput({ card, cwd }) {
   const cardText = await readFile(card, 'utf8')

@@ -152,7 +152,17 @@ async function gate(directory, target, { timeoutMs, profile } = {}) {
     if (derived.status !== 'derived') throw new StageError('STAGE_GATE', `derive returned ${derived.status}`)
     const open = await crossCheckIssues({ loaded, bin, timeoutMs })
     if (open.length > 0) throw new StageError('STAGE_GATE', `cross-check is not settled: ${open.join('; ')}`)
-    return `derive ${derived.digest}; cross-check settled`
+    // 모델만으로 아는 결함은 잠그기 전에 막는다 — 잠근 뒤에 라벨 런이 알려 주면 그 모델은 고칠 수 없고 새 revision이 든다
+    const { preLockIssues } = await import('./oracle-adequacy.mjs')
+    const adequacy = await preLockIssues({ package: packagePath, bin, cwd: process.cwd(), timeoutMs })
+    if (adequacy.issues.length > 0)
+      throw new StageError(
+        'STAGE_GATE',
+        `the model has defects the lock would freeze: ${adequacy.issues.join('; ')} — fix them in the package or world, then run oracle-adequacy.mjs check --package for the full report`,
+      )
+    return `derive ${derived.digest}; cross-check settled; ${
+      adequacy.checked ? `adequacy found no refuted check or unsatisfiable setting over ${adequacy.worlds} worlds` : `adequacy not judged (${adequacy.reason})`
+    }`
   }
   // DRAFTED — 카드의 생성 영역이 패키지에서 다시 만든 것과 같다
   // 카드의 투영 다이제스트가 패키지 경로 표기를 품는다 — 저장소 루트 기준 상대 경로로 project-card한 카드와 같은 표기로 비교한다

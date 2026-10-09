@@ -53,7 +53,11 @@ copies of the policy.
 4. Check the Bend laws, complete the bounded space and run the Adequacy check before confirmation
    and lock. Preserve their actual results. These pre-lock model checks do not authorize writing
    target tests or production code. The card, MODEL, LAWS, world and imported local sources are
-   confirmed and locked together; PROOF remains a repairable proof candidate.
+   confirmed and locked together; PROOF remains a repairable proof candidate. The CHECKED stage of
+   `oracle-stage.mjs` runs the adequacy search itself and refuses a refuted check or a coordinate
+   setting no product can pass (`settings.dead` in `oracle-adequacy.mjs check`; `emit-world` refuses
+   the same with `WORLD_SETTING_UNSATISFIABLE`): exclude it with a sourced assumption or fix the row
+   before the lock, never skip its test.
 5. Design-only stops at the approved, checked and locked `ORACLE_READY` contract. It uses the
    formal checks and records the type-fest/static/fast-check plans and capability results, but
    does not write or execute consumer test files or production changes. Do not report these plans
