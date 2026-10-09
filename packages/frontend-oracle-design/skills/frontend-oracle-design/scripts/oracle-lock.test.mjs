@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { link, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
+import { link, mkdir, mkdtemp, readdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
@@ -339,6 +339,119 @@ test('verify reruns card lint against the manifest oracle and exact source set',
   assert.equal(verified.status, 1)
   assert.match(verified.stderr, /source-(?:repo-path|lock-missing|lock-unregistered)/)
   assert.match(verified.stderr, /docs\/(?:save|other)\.md/)
+})
+
+// 영수증 디렉터리를 테스트마다 격리한다 — 기본 위치(os tmpdir)를 공유하면 같은 바이트의 다른 테스트가 서로의 영수증을 맞힌다.
+async function receiptFixture(t) {
+  const receipts = await mkdtemp(join(tmpdir(), 'oracle-lint-receipts-'))
+  t.after(() => rm(receipts, { recursive: true, force: true }))
+  return receipts
+}
+
+const runWith = (env, ...args) => {
+  const lockIndex = args.indexOf('--lock')
+  return spawnSync(process.execPath, [script, ...args], { cwd: dirname(args[lockIndex + 1]), encoding: 'utf8', env: { ...process.env, ...env } })
+}
+
+test('verify records a lint receipt and the next verify of the same bytes skips the lint', async (t) => {
+  const { lock, oracle, source } = await fixture(t)
+  const receipts = await receiptFixture(t)
+  const env = { ORACLE_LINT_CACHE: receipts, ORACLE_TIMING: '1' }
+  const created = runWith(env, 'create', '--oracle', oracle, '--lock', lock, '--source', source)
+  assert.equal(created.status, 0, created.stderr)
+
+  const first = runWith(env, 'verify', '--lock', lock)
+  assert.equal(first.status, 0, first.stderr)
+  assert.match(first.stderr, /^TIMING card-lint miss \d+ms$/m)
+  assert.equal((await readdir(receipts)).length, 1)
+
+  const second = runWith(env, 'verify', '--lock', lock)
+  assert.equal(second.status, 0, second.stderr)
+  assert.match(second.stderr, /^TIMING card-lint hit \d+ms$/m)
+  assert.equal(second.stdout, first.stdout)
+})
+
+test('a lint receipt never stands in for bytes it was not issued for', async (t) => {
+  const { lock, oracle, source, sourcePath } = await fixture(t)
+  const receipts = await receiptFixture(t)
+  const env = { ORACLE_LINT_CACHE: receipts, ORACLE_TIMING: '1' }
+  assert.equal(runWith(env, 'create', '--oracle', oracle, '--lock', lock, '--source', source).status, 0)
+  assert.equal(runWith(env, 'verify', '--lock', lock).status, 0)
+
+  // a changed Oracle or source is rejected by the lock before any receipt is looked up
+  await writeFile(sourcePath, '# Changed Requirement\n')
+  const changedSource = runWith(env, 'verify', '--lock', lock)
+  assert.equal(changedSource.status, 1)
+  assert.match(changedSource.stderr, /SOURCE_CHANGED/)
+  await writeFile(sourcePath, '# Requirement\n')
+
+  // a lint that fails leaves no receipt: the same lock with the manifest pointed at a card the lint rejects
+  const directory = dirname(lock)
+  const otherOracle = join(directory, 'other-oracle.md')
+  await writeFile(join(directory, 'docs', 'other.md'), '# Other Requirement\n')
+  await writeFile(otherOracle, VALID_CARD.replace('repo:docs/save.md#v1', 'repo:docs/other.md#v1'))
+  const manifest = JSON.parse(await readFile(lock, 'utf8'))
+  manifest.oracle = { path: 'other-oracle.md', sha256: sha256(await readFile(otherOracle)) }
+  await writeFile(lock, `${JSON.stringify(manifest, null, 2)}\n`)
+  const before = (await readdir(receipts)).length
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const rejected = runWith(env, 'verify', '--lock', lock)
+    assert.equal(rejected.status, 1)
+    assert.match(rejected.stderr, /source-(?:repo-path|lock-missing|lock-unregistered)/)
+  }
+  assert.equal((await readdir(receipts)).length, before)
+})
+
+// 영수증 파일 이름만 아는 쪽이 `touch`로 lint를 건너뛰게 할 수 없다 — 내용이 키와 같아야 하고, 심볼릭 링크는 받지 않는다.
+test('a planted receipt (empty, wrong content, or a symlink) is not a hit', async (t) => {
+  const { lock, oracle, source } = await fixture(t)
+  const receipts = await receiptFixture(t)
+  const env = { ORACLE_LINT_CACHE: receipts, ORACLE_TIMING: '1' }
+  assert.equal(runWith(env, 'create', '--oracle', oracle, '--lock', lock, '--source', source).status, 0)
+  assert.equal(runWith(env, 'verify', '--lock', lock).status, 0)
+  const [name] = await readdir(receipts)
+  const receipt = join(receipts, name)
+  assert.equal((await readFile(receipt, 'utf8')).trim(), name)
+  const after = async () => runWith(env, 'verify', '--lock', lock).stderr
+  assert.match(await after(), /card-lint hit/)
+
+  await writeFile(receipt, '')
+  assert.match(await after(), /card-lint miss/)
+  assert.equal((await readFile(receipt, 'utf8')).trim(), name)
+
+  await writeFile(receipt, 'something else\n')
+  assert.match(await after(), /card-lint miss/)
+
+  await rm(receipt)
+  const elsewhere = join(receipts, 'elsewhere')
+  await writeFile(elsewhere, `${name}\n`)
+  await symlink(elsewhere, receipt)
+  assert.match(await after(), /card-lint miss/)
+})
+
+test('a receipt issued with Bend installed is not a hit once Bend cannot be found', async (t) => {
+  const { lock, oracle, source } = await fixture(t)
+  const receipts = await receiptFixture(t)
+  const env = { ORACLE_LINT_CACHE: receipts, ORACLE_TIMING: '1' }
+  assert.equal(runWith(env, 'create', '--oracle', oracle, '--lock', lock, '--source', source).status, 0)
+  assert.equal(runWith(env, 'verify', '--lock', lock).status, 0)
+  assert.match(runWith(env, 'verify', '--lock', lock).stderr, /card-lint hit/)
+  // no Bend on PATH, none under BEND_HOME or the user cache: the lint decides again instead of trusting the old receipt
+  const empty = await mkdtemp(join(tmpdir(), 'oracle-no-bend-'))
+  t.after(() => rm(empty, { recursive: true, force: true }))
+  const without = runWith({ ...env, PATH: dirname(process.execPath), HOME: empty, BEND_HOME: empty }, 'verify', '--lock', lock)
+  assert.match(without.stderr, /card-lint miss/)
+})
+
+test('ORACLE_LINT_CACHE=off keeps verify linting every time', async (t) => {
+  const { lock, oracle, source } = await fixture(t)
+  const env = { ORACLE_LINT_CACHE: 'off', ORACLE_TIMING: '1' }
+  assert.equal(runWith(env, 'create', '--oracle', oracle, '--lock', lock, '--source', source).status, 0)
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const verified = runWith(env, 'verify', '--lock', lock)
+    assert.equal(verified.status, 0, verified.stderr)
+    assert.match(verified.stderr, /^TIMING card-lint miss \d+ms$/m)
+  }
 })
 
 test('rejects an atomic source rename before final verify success', async (t) => {

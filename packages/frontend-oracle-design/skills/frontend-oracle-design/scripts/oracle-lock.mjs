@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process'
-import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { lstat, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
@@ -9,8 +10,10 @@ import { fileURLToPath } from 'node:url'
 import {
   assertSnapshotUnchanged,
   isPathInside,
+  reportTiming,
   sha256,
   snapshotRegularFile,
+  stableStringify,
 } from './oracle-fs.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import { assertReadyToLock, markLocked, readStage } from './oracle-stage.mjs'
@@ -224,6 +227,90 @@ async function stageWitnesses(refs, rootDirectory, repoRoot) {
   return witnesses
 }
 
+const skillRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
+let harness
+
+/**
+ * 하네스의 지문 — 카드 lint는 카드·출처 말고는 이 스크립트(테스트 제외)와 참조 문서만 읽는다(bend는 버전이 고정이다). 하네스가
+ * 바뀌면 영수증이 맞지 않는다. 프로세스당 한 번 계산한다.
+ */
+function harnessDigest() {
+  harness ??= (async () => {
+    const files = []
+    const collect = async (directory, include) => {
+      const entries = await readdir(directory, { withFileTypes: true }).catch((error) => {
+        if (error.code === 'ENOENT') return []
+        throw error
+      })
+      for (const entry of entries) {
+        const path = join(directory, entry.name)
+        if (entry.isDirectory()) await collect(path, include)
+        else if (entry.isFile() && include(entry.name)) files.push(path)
+      }
+    }
+    await collect(join(skillRoot, 'scripts'), (name) => name.endsWith('.mjs') && !name.endsWith('.test.mjs'))
+    await collect(join(skillRoot, 'references'), () => true)
+    const hash = createHash('sha256')
+    for (const file of files.sort()) hash.update(relative(skillRoot, file)).update('\0').update(await readFile(file)).update('\0')
+    return hash.digest('hex')
+  })()
+  return harness
+}
+
+/**
+ * lint 영수증 — 잠긴 카드·출처 바이트와 하네스가 같으면 `card --locked` lint는 같은 결과를 낸다. 한 번 통과한 조합은 파일 하나로
+ * 기억해 둔다: 모델 패키지에서 투영한 카드는 lint가 생성 영역을 다시 만들어 크면 분 단위인데, `oracle-run`이 명령마다 verify를
+ * 부른다. 위치는 ORACLE_LINT_CACHE(기본 os tmpdir, `off`면 끔)이고, 파일 이름이 키이며 내용도 키다. 실패한 lint는 영수증을
+ * 남기지 않는다. 키에는 카드·출처의 경로와 해시, 하네스 지문, node 버전, lint가 쓰는 bend가 든다.
+ * 한계: 영수증은 같은 사용자의 로컬 캐시이지 보안 경계가 아니다 — 같은 사용자의 셸은 키를 계산해 영수증을 쓸 수 있고, 그러면
+ * 카드가 lint를 통과하지 못해도 verify가 통과한다(lock manifest·run-state도 같은 사용자가 고칠 수 있는 파일이다). 우연한 변경과
+ * 다른 사용자·심볼릭 링크·빈 파일은 거른다. 카드·출처 해시와 lock 대조는 영수증을 보기 전에 끝난다.
+ */
+async function lintReceipt(oracle, sources, rootDirectory) {
+  const setting = process.env.ORACLE_LINT_CACHE
+  if (setting === 'off') return null
+  const bend = await lintBend(oracle)
+  const key = sha256(
+    stableStringify({
+      harness: await harnessDigest(),
+      node: process.version,
+      bend,
+      oracle: [portablePath(rootDirectory, oracle.realPath), oracle.sha256],
+      sources: sources.map((source) => [portablePath(rootDirectory, source.realPath), source.sha256]),
+    }),
+  )
+  return { directory: setting || join(tmpdir(), 'oracle-lint-receipts'), key }
+}
+
+/**
+ * lint가 생성 영역을 다시 만들 때 쓰는 bend와 같은 해석 — 설치돼 있지 않으면 lint는 통과하지 못한다. Contract 카드는 Bend 없이
+ * lint되고 Formal 모듈을 불러서도 안 되므로(그 프로필의 verify는 Formal import를 막은 채 돈다) 묻지 않는다.
+ */
+async function lintBend(oracle) {
+  if (readCardProfile(oracle.bytes.toString('utf8')) === 'contract/v1') return null
+  const { ensureBend } = await import('./ensure-bend.mjs')
+  return ensureBend({
+    download: () => {
+      throw new Error('card lint never downloads Bend')
+    },
+  }).then(
+    ({ bin }) => bin,
+    () => null,
+  )
+}
+
+/** 영수증이 있고 내 것이며(일반 파일, 같은 사용자) 내용이 키와 같을 때만 맞은 것이다. */
+async function hasReceipt({ directory, key }) {
+  try {
+    const path = join(directory, key)
+    const entry = await lstat(path)
+    if (!entry.isFile() || (process.getuid && entry.uid !== process.getuid())) return false
+    return (await readFile(path, 'utf8')).trim() === key
+  } catch {
+    return false
+  }
+}
+
 /**
  * 카드를 레포 안 원래 상대 경로에 둔 스냅샷에서 lint한다 — code() witness가 스냅샷 레포 루트를 기준으로 풀린다.
  * create는 witness 파일을 복사해 실재를 검사하고, verify는 manifest에 고정된 블록을 믿는다(`lockedWitnesses`).
@@ -259,11 +346,24 @@ async function assertCardLintSnapshot(oracle, sources, rootDirectory, lockedWitn
     }
     const witnesses = lockedWitnesses ? [] : await stageWitnesses(refs, rootDirectory, repoRoot)
 
+    const started = performance.now()
+    const receipt = lockedWitnesses ? await lintReceipt(oracle, sources, rootDirectory) : null
+    if (receipt && (await hasReceipt(receipt))) {
+      reportTiming('card-lint hit', started)
+      return witnesses
+    }
     const args = [verifyScript, 'card', '--oracle', candidate.path]
     if (lockedWitnesses) args.push('--locked')
     for (const source of sourcePaths.length > 0 ? sourcePaths : ['']) args.push('--source', source)
     const linted = spawnSync(process.execPath, args, { cwd: repoRoot, encoding: 'utf8' })
     if (linted.status !== 0) throw lintFailure(linted, 'oracle-verify card failed')
+    if (receipt) {
+      // 영수증은 속도를 위한 캐시다 — 쓸 수 없는 위치(읽기 전용 tmpdir, 샌드박스)는 다음 verify가 다시 lint하게 둘 뿐이다
+      await mkdir(receipt.directory, { recursive: true, mode: 0o700 })
+        .then(() => writeFile(join(receipt.directory, receipt.key), `${receipt.key}\n`, { mode: 0o600 }))
+        .catch(() => {})
+    }
+    reportTiming('card-lint miss', started)
     return witnesses
   } finally {
     await rm(snapshotRoot, { recursive: true, force: true })

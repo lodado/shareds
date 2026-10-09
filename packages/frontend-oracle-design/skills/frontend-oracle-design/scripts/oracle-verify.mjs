@@ -12,6 +12,7 @@ import { canonicalTuple, generateFromDocument, MAX_STATE_PATHS, TAXONOMY_FAMILIE
 import {
   assertSnapshotUnchanged,
   isPathInside,
+  reportTiming,
   scanSideEffects,
   sha256,
   SIDE_EFFECT_CATEGORIES,
@@ -582,11 +583,15 @@ async function lintCard(options) {
   }
   const { generatedBlock, generatedIssues, regenerateAtRoot, parseFormalModel, formalModelIssues, parseTerms, parseAdequacy, adequacyIssues } = formalModules ?? {}
   const block = contract ? { present: false } : generatedBlock(card)
+  let phaseStarted = performance.now()
   if (!contract) issues.push(...(await generatedIssues(card, { regenerate: regenerateAtRoot() })))
+  reportTiming('card-regenerate', phaseStarted)
   // Formal projection cross-check retains its existing gate.
   if (block.present && block.fields.package) {
+    phaseStarted = performance.now()
     const { crossCheckAtRoot } = await import('./oracle-discovery.mjs')
     issues.push(...(await crossCheckAtRoot()(block.fields.package)))
+    reportTiming('card-cross-check', phaseStarted)
   }
 
   const sourceSection = sectionLines(lines, 'Source Registry')

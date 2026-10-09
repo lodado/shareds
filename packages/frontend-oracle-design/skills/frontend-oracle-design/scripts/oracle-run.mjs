@@ -41,6 +41,7 @@ import {
   isTestPath,
   openHolds,
   pathsShareIdentity,
+  reportTiming,
   reviewOutputDigest,
   RUN_BACKED_STATES,
   snapshotRegularFile,
@@ -975,7 +976,9 @@ function verifyLock(directory, state) {
     throw new CliError('LOCK_MANIFEST_CHANGED', 'Lock manifest bytes no longer match run state')
   }
 
+  const started = performance.now()
   const verified = spawnSync(process.execPath, [lockScript, 'verify', '--lock', lock], { encoding: 'utf8' })
+  reportTiming('verify-lock', started)
 
   if (verified.status !== 0) {
     const [code, ...message] = (verified.stderr || 'LOCK_INVALID: oracle-lock verify failed').split(': ')

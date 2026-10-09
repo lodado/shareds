@@ -207,11 +207,26 @@ export async function keepArtifact({ out, fileName, entry, render, result }) {
   return { bend: bendFile, result: jsonFile }
 }
 
-/** MODEL.bend → 오라클 공간을 만드는 init·step·next·observe. */
+const loadedModels = new Map()
+
+/**
+ * MODEL.bend → 오라클 공간을 만드는 init·step·next·observe. 같은 파일 바이트·접두·bend면 한 프로세스에서 한 모델을 나눠 쓴다 —
+ * 카드 lint는 패키지 투영과 교차 점검이 같은 모델을 각자 불러 컴파일·열거를 되풀이했다. 실패는 기억하지 않는다.
+ */
 export async function loadModel({ model, prefix, bin, timeoutMs = 120_000 }) {
   if (!/^[A-Z]\w*$/.test(prefix ?? ''))
     throw new CliError('USAGE', 'prefix must name the model namespace, e.g. Search', 2)
   const entry = resolve(model)
+  const key = [entry, prefix, bin, inputDigest(await bendInputs(entry), dirname(entry))].join('\0')
+  if (!loadedModels.has(key)) {
+    const loading = compileModel({ entry, prefix, bin, timeoutMs })
+    loading.catch(() => loadedModels.delete(key))
+    loadedModels.set(key, loading)
+  }
+  return loadedModels.get(key)
+}
+
+async function compileModel({ entry, prefix, bin, timeoutMs }) {
   const { exported, inputs } = await compileBend({ entry, bin, timeoutMs })
   const api = {}
   for (const name of MODEL_EXPORTS) {
@@ -318,7 +333,23 @@ export const COVER_BASIS =
  * 각 구성의 trace는 가장 짧은 접근 이력이고, 간선은 그 trace에 사건 하나를 이은 것이다. 구성은 `key`, 간선은 닿는 구성의
  * `to`(이미 있던 구성이면 그 구성)를 가진다 — 분석(oracle-quotient)이 그래프만 보고 몫·교환·도달을 계산한다.
  */
+// 모델마다·상한마다 한 번 — 카드 lint가 전이 커버와 교차 점검에서 같은 그래프를 두 번 걸었다. 호출자가 나눠 쓰므로 얼려 둔다.
+const graphs = new WeakMap()
+
 export function configurationGraph(model, maxConfigurations) {
+  const byCap = graphs.get(model) ?? new Map()
+  graphs.set(model, byCap)
+  if (!byCap.has(maxConfigurations)) byCap.set(maxConfigurations, frozenGraph(exploreConfigurations(model, maxConfigurations)))
+  return byCap.get(maxConfigurations)
+}
+
+function frozenGraph(graph) {
+  for (const node of graph.nodes) Object.freeze(node.edges)
+  graph.nodes.forEach(Object.freeze)
+  return Object.freeze({ ...graph, nodes: Object.freeze(graph.nodes) })
+}
+
+function exploreConfigurations(model, maxConfigurations) {
   const allowedAfter = (raw) => {
     const seenEvents = new Set()
     return listItems(model.next(listOf(raw))).filter((event) => {

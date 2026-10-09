@@ -1,3 +1,48 @@
+# 0.96.1: the card lint stops taking minutes — a rewritten greedy, lint receipts, shared model graph
+
+The Oracle was slow in four real sessions (playwright-spec-for-AI-Agent, Side-Projects; main and subagents). Unlike the
+10-07 measurement (Bend about 3%), the harness scripts were 37% of harness plus model time and more once `sleep`
+polling is counted: 161 of 879 `oracle-*` calls took 60 s or more and made up 482 of 564 harness minutes, 54 commands
+hit the 280–590 s Bash timeout, and the machine ran at load 9–21 on 10 cores. `oracle-run` calls `verifyLock` at 15
+sites, which spawns `oracle-lock verify`, which re-lints the whole card (`oracle-verify card --locked`). For a card
+projected from a model package that lint regenerates the generated region from the package and the Bend model, and the
+space cross-check inside it spent 95% of the lint (375 s of 392 s on a 441 KB card) in one `jointCover` call: the greedy
+rebuilt every pair name for every setting × trace on every round, over 15,768 traces.
+What changed, each with a test: `jointCover` groups settings by the world values they hold and traces by the behavior
+values they show, counts pairs by number, and keeps the old choice rule (gain, then shorter trace, then earlier); a
+120-seed comparison with the old greedy kept in the test as the reference gives identical cases, and 6,000 traces take
+0.1 s instead of 15.8 s. `oracle-lock verify` records a receipt (a file whose name and content are a hash of the card
+and source paths and bytes, the scripts and references, the node version and the Bend the lint would use) after a
+`card --locked` lint passes and skips the lint when it finds a regular file of the same user with that content; a
+failing lint leaves none, `ORACLE_LINT_CACHE=off` or a directory path controls it, and the lock hash checks run before
+the receipt is read. `loadModel` returns one model for unchanged bytes, `configurationGraph` is computed once
+per model and cap (frozen, since callers share it), and the cross-check walks traces through a prefix-sharing `stepper`.
+`table()` no longer pads a column past 200 characters (one 14 KB observation cell had padded all 29 rows of a Derived
+Axes table, 381 KB of a 441 KB card), and the regeneration compare ignores table padding so cards locked under the old
+width still pass. `ORACLE_TIMING=1` prints `TIMING card-regenerate`, `card-cross-check`, `card-lint hit|miss` and
+`verify-lock` lines to stderr.
+Measured on ten real runs with a valid lock, `oracle-lock verify`, both codes at four runs in parallel (load 10–20):
+
+| run                           | 0.96.0                | 0.96.1 first   | 0.96.1 receipt |
+| ----------------------------- | --------------------- | -------------- | -------------- |
+| adapter-isomorphism, -r2, -r3 | over 300 s each (cut) | 10.4–10.9 s    | 0.3 s          |
+| asset-lab consent-r1          | over 300 s (cut)      | 22.3 s         | 0.2 s          |
+| asset-lab identity-r1         | 148 s                 | 58.5 s         | 0.2 s          |
+| asset-lab entry-flow-r1       | 97 s                  | 23.3 s         | 0.3 s          |
+| ports-r1, version-update-r1   | 21 s, 16 s            | 11.0 s, 11.9 s | 0.2 s          |
+| async-boundary-r1, -r2        | 14 s, 13 s            | 5.7 s, 5.2 s   | 0.2 s          |
+
+`oracle-run status` on adapter-isomorphism-r3 went from over 280 s (the Bash timeout) to 6.4 s on the first call and
+0.5 s after; `guide` from 300 s timeouts to 0.5 s. Limits: each old figure is one run, cut at 300 s, so the large gains are
+lower bounds; the first lint of a model with a large space still takes tens of seconds (identity-r1: 47,768 cases, bound 5;
+the next cost is `stableStringify` keys in `derive` and the configuration walk); a card changed between `stage advance`
+calls is linted again by design. The receipt is a local cache, not a security boundary: a shell of the same user can
+compute a key and write the file, so a card that fails the lint could be accepted by `verify` (the lock manifest and
+run-state are files that user can edit as well); a planted empty file, a symlink or another user's file is refused. An
+Opus review of the first version found three defects, fixed with tests: the regeneration compare re-joined cells with
+`|` so moving an escaped pipe or a trailing backslash read as the same table (it now compares cell lists), a receipt
+was a bare `touch`-able file, and whether Bend is installed was not in the key.
+
 # 0.96.0: the space gets denser from the model itself — progress law, environment faults, quotient, independence, W-method, event orders
 
 Asked whether TLA+ should carry the time axis, the answer was no second semantics: liveness enters as a Bend

@@ -16,8 +16,10 @@ import {
   closure,
   crossCheckIssues,
   crossCheckSpace,
+  crossLookup,
   decisionMisfit,
   declaredStatus,
+  jointCover,
   killedChecks,
   lifecycle,
   mappingInput,
@@ -28,9 +30,11 @@ import {
   sourceSentences,
   spaceCrossCheck,
   stepPatterns,
+  stepper,
   traceExtension,
 } from './oracle-discovery.mjs'
 import { parseCaseSpace } from './oracle-frames.mjs'
+import { sha256, stableStringify } from './oracle-fs.mjs'
 import { enumerateSpace } from './oracle-model.mjs'
 import { loadPackage, OPERATOR_IDS, packageInputs, packageIssues } from './oracle-package.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
@@ -922,6 +926,181 @@ test('space-cross-check: given the fields the test sets, a few joint cases cover
     rowsOnly.candidates.filter((entry) => entry.class === 'cross-term').map((entry) => entry.evidence.dimensions.join(' × ')).sort(),
     ['arrival × entry', 'entry × response'],
   )
+})
+
+// 결합 커버의 기준 구현 — 라운드마다 모든 (설정, trace)에서 쌍 문자열을 새로 만들던 순진한 탐욕이다. 느리지만 규칙(이득이
+// 크면, 같으면 짧은 trace, 같으면 먼저 나온 것)이 그대로 읽힌다. 빠른 구현은 이것과 같은 결과를 내야 한다.
+function referenceJointCover(lookup) {
+  const pairKey = (left, right) => [left, right].sort().join(' × ')
+  const settable = lookup.dimensions.filter(
+    (dimension) => lookup.kindOf(dimension) === 'world' && lookup.coordinates.includes(lookup.maps[dimension.dimension].world),
+  )
+  const behavior = lookup.dimensions.filter((dimension) => lookup.kindOf(dimension) === 'behavior')
+  const plain = (dimension) => dimension.choices.filter((choice) => !choice.error && lookup.mapped(dimension, choice.value))
+  const shownValues = behavior.flatMap((dimension) =>
+    plain(dimension)
+      .filter((choice) => lookup.shown.some((seen) => lookup.traceHas(seen, dimension, choice.value)))
+      .map((choice) => [dimension, choice]),
+  )
+  const valid = lookup.worlds.filter((world) => world.valid)
+  const worldValues = settable.flatMap((dimension) =>
+    plain(dimension)
+      .filter((choice) => valid.some((world) => lookup.worldHas(world, dimension, choice.value)))
+      .map((choice) => [dimension, choice]),
+  )
+  const name = ([dimension, choice]) => `${dimension.dimension}=${choice.value}`
+  const required = new Set(worldValues.flatMap((world) => shownValues.map((value) => pairKey(name(world), name(value)))))
+  const settings = [
+    ...new Map(
+      valid.map((world) => {
+        const setting = Object.fromEntries(lookup.coordinates.map((field) => [field, world.plain[field]]))
+        return [stableStringify(setting), setting]
+      }),
+    ),
+  ].sort(([left], [right]) => (left < right ? -1 : Number(left > right)))
+  const pairsOf = (setting, index) =>
+    worldValues
+      .filter(([dimension, choice]) => setting[lookup.maps[dimension.dimension].world] === lookup.target(dimension, choice.value))
+      .flatMap((world) =>
+        shownValues
+          .filter(([dimension, choice]) => lookup.traceHas(lookup.shown[index], dimension, choice.value))
+          .map((value) => pairKey(name(world), name(value))),
+      )
+  const remaining = new Set(required)
+  const chosen = []
+  while (remaining.size > 0) {
+    let best = null
+    for (const [, setting] of settings)
+      lookup.traces.forEach((trace, index) => {
+        const gain = pairsOf(setting, index).filter((pair) => remaining.has(pair))
+        const better = !best || gain.length > best.gain.length || (gain.length === best.gain.length && trace.trace.length < best.trace.trace.length)
+        if (gain.length > 0 && better) best = { setting, trace, gain }
+      })
+    if (!best) break
+    for (const pair of best.gain) remaining.delete(pair)
+    chosen.push(best)
+  }
+  const literal = (setting) => Object.entries(setting).map(([field, value]) => `${field}=${String(value)}`).join(' ')
+  return {
+    required: required.size,
+    covered: required.size - remaining.size,
+    pairs: [...required].filter((pair) => !remaining.has(pair)),
+    cases: chosen.map(({ setting, trace }) => ({
+      id: `J${sha256(stableStringify({ coordinates: setting, trace: trace.trace })).slice(0, 12)}`,
+      label: `${literal(setting)} · ${trace.label}`,
+      coordinates: setting,
+      trace: trace.trace,
+      observations: trace.observations,
+    })),
+  }
+}
+
+// 같은 입력은 같은 표본이다 — 시드 고정 의사난수(mulberry32)로 세계 축·행동 축·trace를 만든다.
+function jointInputs(seed, { worldDims, behaviorDims, valuesPer, traceCount, validRate = 0.8 }) {
+  let state = seed >>> 0
+  const random = () => {
+    state = (state + 0x6d2b79f5) >>> 0
+    let mixed = Math.imul(state ^ (state >>> 15), 1 | state)
+    mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296
+  }
+  const pick = (count) => Math.floor(random() * count)
+  const values = (prefix) => Array.from({ length: valuesPer }, (_, index) => `${prefix}${index}`)
+  const worldNames = Array.from({ length: worldDims }, (_, index) => `w${index}`)
+  const behaviorNames = Array.from({ length: behaviorDims }, (_, index) => `b${index}`)
+  const families = [
+    ...worldNames.map((dimension) => ({ family: 'Data', excluded: false, dimension, choices: values('V').map((value) => ({ value, error: false })) })),
+    ...behaviorNames.map((dimension) => ({ family: 'Order', excluded: false, dimension, choices: values('B').map((value) => ({ value, error: false })) })),
+  ]
+  const dimensions = Object.fromEntries([
+    ...worldNames.map((dimension) => [dimension, { world: dimension, values: Object.fromEntries(values('V').map((value) => [value, value])) }]),
+    ...behaviorNames.map((dimension) => [dimension, { classify: `M.${dimension}`, values: Object.fromEntries(values('B').map((value) => [value, value])) }]),
+  ])
+  const worlds = worldNames
+    .reduce((rows, field) => rows.flatMap((row) => values('V').map((value) => ({ ...row, [field]: value }))), [{}])
+    .map((plain) => ({ plain, valid: random() < validRate, truth: {} }))
+  const traces = Array.from({ length: traceCount }, (_, index) => {
+    const length = 1 + pick(4)
+    const steps = Array.from({ length }, () => ({ before: {}, event: Object.fromEntries(behaviorNames.map((dimension) => [dimension, `B${pick(valuesPer)}`])), after: {} }))
+    return { label: `t${index}`, trace: steps.map((_, stepIndex) => ({ $: `E${index % 7}`, stepIndex })), observations: steps.map((_, stepIndex) => stepIndex), steps }
+  })
+  return {
+    caseSpace: { families },
+    mapping: { dimensions },
+    worlds,
+    traces,
+    classify: (def, _before, event) => event[def.slice(2)],
+    coordinates: worldNames,
+  }
+}
+
+const jointLookup = (inputs) => crossLookup(inputs)
+const plainJoint = (result) => ({ required: result.required, covered: result.covered, pairs: [...result.pairs], cases: result.cases })
+
+test('space-cross-check: the joint cover picks exactly the cases of the plain greedy it replaces, ties included', () => {
+  for (let seed = 1; seed <= 120; seed += 1) {
+    const inputs = jointInputs(seed, { worldDims: 1 + (seed % 3), behaviorDims: 1 + (seed % 2), valuesPer: 2 + (seed % 3), traceCount: 4 + (seed % 40) })
+    const lookup = jointLookup(inputs)
+    assert.deepEqual(plainJoint(jointCover(lookup)), referenceJointCover(lookup), `seed ${seed}`)
+  }
+})
+
+test('space-cross-check: the joint cover picks the same cases when pairs collide on one name and when no world is valid', () => {
+  const inputs = jointInputs(7, { worldDims: 2, behaviorDims: 2, valuesPer: 3, traceCount: 30 })
+  // two choices of one dimension that name the same pair: the plain greedy counts a collision once per cell
+  const collided = { ...inputs, caseSpace: { families: inputs.caseSpace.families.map((family) => (family.dimension === 'w0' ? { ...family, choices: [...family.choices, { value: 'V0', error: false }] } : family)) } }
+  assert.deepEqual(plainJoint(jointCover(jointLookup(collided))), referenceJointCover(jointLookup(collided)))
+  const none = { ...inputs, worlds: inputs.worlds.map((world) => ({ ...world, valid: false })) }
+  assert.deepEqual(plainJoint(jointCover(jointLookup(none))), referenceJointCover(jointLookup(none)))
+  assert.deepEqual(jointCover(jointLookup(none)).cases, [])
+})
+
+test('space-cross-check: the joint cover of thousands of traces stays inside a time budget', () => {
+  // a model space of this size made the plain greedy rebuild every pair name for every setting × trace each round (minutes)
+  const lookup = jointLookup(jointInputs(3, { worldDims: 3, behaviorDims: 3, valuesPer: 4, traceCount: 6000 }))
+  const started = performance.now()
+  const result = jointCover(lookup)
+  const elapsed = performance.now() - started
+  assert.equal(result.covered, result.required)
+  assert.ok(elapsed < 3000, `joint cover took ${Math.round(elapsed)}ms`)
+})
+
+test('trace steps share the steps of a common prefix and equal a replay of each trace from the start', () => {
+  const list = (items) => items.reduceRight((tail, head) => ({ $: 'Con', head, tail }), { $: 'Nil' })
+  const A = { $: 'A' }
+  const B = { $: 'B' }
+  const modelOf = (counter) => ({
+    init: () => ({ n: 0 }),
+    step: (state, event) => ({ n: state.n + (event.$ === 'A' ? 1 : 10) }),
+    next: () => {
+      counter.calls += 1
+      return list([A, B])
+    },
+  })
+  const replay = (model, trace) => {
+    const raw = []
+    let state = model.init()
+    return trace.map((event) => {
+      const match = [...(function* (cursor) { for (; cursor.$ === 'Con'; cursor = cursor.tail) yield cursor.head })(model.next(list(raw)))].find((choice) => choice.$ === event.$)
+      const after = model.step(state, match)
+      const step = { before: state, event: match, after, label: event.$ }
+      raw.push(match)
+      state = after
+      return step
+    })
+  }
+  const traces = [[A, A, B], [A, A, A], [A, B], [B]]
+  const shared = { calls: 0 }
+  const stepsOf = stepper(modelOf(shared))
+  const stepped = traces.map(stepsOf)
+  const plain = { calls: 0 }
+  const replayed = traces.map((trace) => replay(modelOf(plain), trace))
+  assert.deepEqual(stepped, replayed)
+  // A, AA, AAB, AAA, AB, B: one model call per distinct prefix instead of one per event of every trace
+  assert.deepEqual({ shared: shared.calls, plain: plain.calls }, { shared: 6, plain: 9 })
+  // asking again costs nothing
+  traces.map(stepsOf)
+  assert.equal(shared.calls, 6)
 })
 
 test('[bend] space-cross-check on the paging fixture finds the split pairs, the missing failure and the transitions only the model decides', async (t) => {

@@ -402,6 +402,61 @@ test('the projected card is deterministic, marks its generated region and never 
   assert.deepEqual(await generatedIssues(await readFile(join(FIXTURE, 'oracle.md'), 'utf8')), [])
 })
 
+test('a column far wider than the rest is not padded across every row of the projected table', async () => {
+  const loaded = await loadPackage('oracle.package.json', { root: FIXTURE })
+  const inputsDigest = inputsDigestOf(await packageInputs(loaded))
+  const plain = projectCard(PKG, derive(PKG, { world: WORLD, model: MODEL }), { packagePath: 'oracle.package.json', inputsDigest })
+  const wide = clone(PKG)
+  wide.requirements[0].quote = 'a very long quotation '.repeat(300)
+  const card = projectCard(wide, derive(wide, { world: WORLD, model: MODEL }), { packagePath: 'oracle.package.json', inputsDigest })
+  const rows = (text) => text.split('\n').filter((line) => /^\| R\d+ /.test(line))
+  // one 6,600-character cell used to pad the other requirement rows to the same width; now only that row is long
+  const longest = Math.max(...rows(card).map((line) => line.length))
+  const others = rows(card).filter((line) => line.length < longest)
+  assert.ok(longest > 6000)
+  assert.ok(others.length >= 3 && Math.max(...others.map((line) => line.length)) < 600, JSON.stringify(others.map((line) => line.length)))
+  // a table whose columns are all narrow is written exactly as before
+  assert.match(plain, /^\| R6 +\| S1 +\| Cancellation, retry, duplicate responses .* \| N\/A +\|$/m)
+})
+
+test('a generated region written with other column padding is the same region, and a real edit is still drift', async () => {
+  const loaded = await loadPackage('oracle.package.json', { root: FIXTURE })
+  const inputsDigest = inputsDigestOf(await packageInputs(loaded))
+  const card = projectCard(PKG, derive(PKG, { world: WORLD, model: MODEL }), { packagePath: 'oracle.package.json', inputsDigest })
+  const block = generatedBlock(card)
+  // what an older generator wrote: every cell padded further, separator rows longer
+  const repad = (text) => text.split('\n').map((line) => (line.startsWith('|') ? line.replaceAll(' |', '       |').replace(/-{3,}/g, (dashes) => `${dashes}------`) : line)).join('\n')
+  const widened = card.replace(block.content, repad(block.content))
+  assert.notEqual(widened, card)
+  const resigned = widened.replace(block.fields['content-sha256'], sha256(generatedBlock(widened).content))
+  const regenerate = async () => ({ inputsDigest, content: block.content })
+  assert.deepEqual(await generatedIssues(resigned, { regenerate }), [])
+  const edited = resigned.replace('never changes the list, at any step', 'rarely changes the list, at any step')
+  const resignedEdit = edited.replace(sha256(generatedBlock(resigned).content), sha256(generatedBlock(edited).content))
+  assert.deepEqual((await generatedIssues(resignedEdit, { regenerate })).map((issue) => issue.split(':')[0]), ['card-generated-drift'])
+})
+
+test('table padding is ignored but the cells are not: a hand edit that moves a pipe or a backslash is still drift', async () => {
+  const loaded = await loadPackage('oracle.package.json', { root: FIXTURE })
+  const inputsDigest = inputsDigestOf(await packageInputs(loaded))
+  const card = projectCard(PKG, derive(PKG, { world: WORLD, model: MODEL }), { packagePath: 'oracle.package.json', inputsDigest })
+  const block = generatedBlock(card)
+  const cell = 'search response ordering'
+  assert.ok(block.content.includes(`| ${cell} `))
+  const drift = async (fresh, found) => {
+    const edited = card.replace(block.content, found)
+    const resigned = edited.replace(block.fields['content-sha256'], sha256(generatedBlock(edited).content))
+    return (await generatedIssues(resigned, { regenerate: async () => ({ inputsDigest, content: fresh }) })).map((issue) => issue.split(':')[0])
+  }
+  const withCell = (text) => block.content.replace(`| ${cell} `, `| ${text} `)
+  // an escaped pipe inside one cell, against the same characters written as a cell separator
+  assert.deepEqual(await drift(withCell(String.raw`a\|b`), withCell(String.raw`a\ |b`)), ['card-generated-drift'])
+  // a cell that ends in a backslash, against two cells joined by an escaped pipe
+  assert.deepEqual(await drift(withCell(String.raw`C:\|x`), withCell(String.raw`C:\ | x`)), ['card-generated-drift'])
+  // the same cells with other padding are not drift
+  assert.deepEqual(await drift(withCell(String.raw`a\|b`), withCell(String.raw`a\|b    `)), [])
+})
+
 test('a package with no exposed type boundary says so with the paths it investigated, and only then drops the type-contract label', () => {
   const derived = derive(PKG, { world: WORLD, model: MODEL })
   // default: the stack stays whole and the card has no such section

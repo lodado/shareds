@@ -217,18 +217,30 @@ export function declaredStateModel(text) {
   return { states: list('States'), events: list('Events'), transitions }
 }
 
-/** 한 trace를 모델로 다시 걸어 단계마다 런타임 값(이전 상태·사건·다음 상태)을 얻는다 — 분류 def가 읽는다. */
-function runtimeSteps(model, trace) {
-  const raw = []
-  let state = model.init()
-  return trace.map((event) => {
-    const match = listItems(model.next(listOf(raw))).find((choice) => isDeepStrictEqual(toPlain(choice), event))
-    const after = model.step(state, match)
-    const step = { before: state, event: match, after, label: label(event) }
-    raw.push(match)
-    state = after
-    return step
-  })
+/**
+ * trace를 모델로 걸어 단계마다 런타임 값(이전 상태·사건·다음 상태)을 얻는다 — 분류 def가 읽는다. 공간의 trace는 대부분 앞 사건을
+ * 나누므로 접두마다 한 번만 걷는다: 사건 하나를 걸 때마다 `next`가 지금까지의 이력 전체를 읽는다.
+ */
+export function stepper(model) {
+  const root = { children: new Map(), raw: [], state: model.init() }
+  return (trace) => {
+    let node = root
+    return trace.map((event) => {
+      const key = stableStringify(event)
+      if (!node.children.has(key)) {
+        const match = listItems(model.next(listOf(node.raw))).find((choice) => isDeepStrictEqual(toPlain(choice), event))
+        const after = model.step(node.state, match)
+        node.children.set(key, {
+          children: new Map(),
+          raw: [...node.raw, match],
+          state: after,
+          step: { before: node.state, event: match, after, label: label(event) },
+        })
+      }
+      node = node.children.get(key)
+      return node.step
+    })
+  }
 }
 
 /** 가정이 지운 세계에서 거짓이 된 가정 — 쌍·값이 왜 빠졌는지의 근거. */
@@ -244,7 +256,7 @@ const rejectedBy = (list) =>
   ].sort()
 
 /** 번역표 조회 — 선언 값을 세계 값이나 분류 생성자로 옮긴다. 값·쌍 점검이 함께 쓴다. */
-function crossLookup({ caseSpace, mapping, worlds, traces, classify, coordinates = [] }) {
+export function crossLookup({ caseSpace, mapping, worlds, traces, classify, coordinates = [] }) {
   const maps = mapping.dimensions ?? {}
   const dimensions = caseSpace.families.filter((entry) => !entry.excluded && entry.dimension)
   const kindOf = (dimension) => {
@@ -275,12 +287,25 @@ function crossLookup({ caseSpace, mapping, worlds, traces, classify, coordinates
 /** 순서와 무관한 쌍 이름 — 결합 커버와 쌍 점검이 같은 열쇠로 만난다. */
 const pairKey = (left, right) => [left, right].sort().join(' × ')
 
+/** 결합 커버의 고르는 순서 — 이득이 큰 쪽, 같으면 짧은 trace, 같으면 설정 순서, 같으면 trace 순서. */
+function beats(left, right) {
+  if (left.gain !== right.gain) return left.gain > right.gain
+  if (left.length !== right.length) return left.length < right.length
+  if (left.setting !== right.setting) return left.setting < right.setting
+  return left.trace < right.trace
+}
+
 /**
  * 결합 커버 — 세계 축(테스트가 설정하는 필드)과 행동 축의 값 쌍마다, 그 세계 값을 가진 가능한 설정 위에서 그 행동 값을 보이는
  * trace를 한 번 돌린다. 쌍을 가장 많이 덮는 (설정, trace)를 차례로 고른다(같으면 짧은 trace, 먼저 나온 것). 기대값은 그
  * trace에 대해 모델이 계산한 그대로다 — 결합 케이스는 "행동이 그 세계 조건과 무관하다"는 주장을 시험한다.
+ *
+ * 한 (설정, trace)의 이득은 설정이 갖는 세계 값 집합과 trace가 보이는 행동 값 집합에만 달렸다. 같은 집합을 가진 설정끼리,
+ * 같은 집합을 보이는 trace끼리 묶어 묶음 쌍마다 이득을 한 번만 세고, 쌍은 문자열이 아니라 번호로 센다 — 라운드마다 모든
+ * (설정, trace)에서 쌍 이름을 새로 만들면 trace가 수천 개일 때 분 단위가 된다. 고르는 규칙은 묶기 전과 같다: 이득이 크면,
+ * 같으면 짧은 trace, 같으면 설정 순서·trace 순서로 먼저 나온 것.
  */
-function jointCover(lookup) {
+export function jointCover(lookup) {
   const settable = lookup.dimensions.filter(
     (dimension) => lookup.kindOf(dimension) === 'world' && lookup.coordinates.includes(lookup.maps[dimension.dimension].world),
   )
@@ -298,7 +323,19 @@ function jointCover(lookup) {
       .map((choice) => [dimension, choice]),
   )
   const name = ([dimension, choice]) => `${dimension.dimension}=${choice.value}`
-  const required = new Set(worldValues.flatMap((world) => shownValues.map((value) => pairKey(name(world), name(value)))))
+  // 쌍마다 번호를 준다 — 같은 이름은 같은 번호이고, 처음 나온 순서가 필요한 쌍의 순서다
+  const pairNames = []
+  const pairNumber = new Map()
+  const cell = worldValues.map((world) =>
+    shownValues.map((value) => {
+      const pair = pairKey(name(world), name(value))
+      if (!pairNumber.has(pair)) {
+        pairNumber.set(pair, pairNames.length)
+        pairNames.push(pair)
+      }
+      return pairNumber.get(pair)
+    }),
+  )
   const settings = [
     ...new Map(
       valid.map((world) => {
@@ -307,33 +344,69 @@ function jointCover(lookup) {
       }),
     ),
   ].sort(([left], [right]) => (left < right ? -1 : Number(left > right)))
-  const pairsOf = (setting, index) =>
-    worldValues
-      .filter(([dimension, choice]) => setting[lookup.maps[dimension.dimension].world] === lookup.target(dimension, choice.value))
-      .flatMap((world) =>
-        shownValues
-          .filter(([dimension, choice]) => lookup.traceHas(lookup.shown[index], dimension, choice.value))
-          .map((value) => pairKey(name(world), name(value))),
-      )
-  const remaining = new Set(required)
+  // 항목을 신호(번호 목록)가 같은 것끼리 묶는다 — 묶음 안 순서는 항목 순서다
+  const groupBySignal = (items, signalOf) => {
+    const groups = new Map()
+    items.forEach((item, index) => {
+      const signal = signalOf(item, index)
+      const key = signal.join(',')
+      if (!groups.has(key)) groups.set(key, { signal, members: [] })
+      groups.get(key).members.push(index)
+    })
+    return [...groups.values()].filter((group) => group.signal.length > 0)
+  }
+  const settingGroups = groupBySignal(settings, ([, setting]) =>
+    worldValues.flatMap(([dimension, choice], index) =>
+      setting[lookup.maps[dimension.dimension].world] === lookup.target(dimension, choice.value) ? [index] : [],
+    ),
+  )
+  const traceGroups = groupBySignal(lookup.traces, (_, index) =>
+    shownValues.flatMap(([dimension, choice], position) => (lookup.traceHas(lookup.shown[index], dimension, choice.value) ? [position] : [])),
+  ).map((group) => ({
+    ...group,
+    // 같은 이득이면 짧은 trace, 같으면 먼저 나온 것
+    first: group.members.reduce((best, index) => (lookup.traces[index].trace.length < lookup.traces[best].trace.length ? index : best)),
+  }))
+  const open = new Uint8Array(pairNames.length).fill(1)
+  let remaining = pairNames.length
+  const gainOf = (settingGroup, traceGroup) => {
+    let gain = 0
+    for (const world of settingGroup.signal) for (const value of traceGroup.signal) gain += open[cell[world][value]]
+    return gain
+  }
   const chosen = []
-  while (remaining.size > 0) {
+  while (remaining > 0) {
     let best = null
-    for (const [, setting] of settings)
-      lookup.traces.forEach((trace, index) => {
-        const gain = pairsOf(setting, index).filter((pair) => remaining.has(pair))
-        const better = !best || gain.length > best.gain.length || (gain.length === best.gain.length && trace.trace.length < best.trace.trace.length)
-        if (gain.length > 0 && better) best = { setting, trace, gain }
-      })
+    for (const settingGroup of settingGroups)
+      for (const traceGroup of traceGroups) {
+        const gain = gainOf(settingGroup, traceGroup)
+        if (gain === 0) continue
+        const candidate = {
+          gain,
+          length: lookup.traces[traceGroup.first].trace.length,
+          setting: settingGroup.members[0],
+          trace: traceGroup.first,
+          settingGroup,
+          traceGroup,
+        }
+        if (!best || beats(candidate, best)) best = candidate
+      }
     if (!best) break
-    for (const pair of best.gain) remaining.delete(pair)
-    chosen.push(best)
+    for (const world of best.settingGroup.signal)
+      for (const value of best.traceGroup.signal) {
+        const pair = cell[world][value]
+        if (open[pair]) {
+          open[pair] = 0
+          remaining -= 1
+        }
+      }
+    chosen.push({ setting: settings[best.setting][1], trace: lookup.traces[best.trace] })
   }
   const literal = (setting) => Object.entries(setting).map(([field, value]) => `${field}=${String(value)}`).join(' ')
   return {
-    required: required.size,
-    covered: required.size - remaining.size,
-    pairs: new Set([...required].filter((pair) => !remaining.has(pair))),
+    required: pairNames.length,
+    covered: pairNames.length - remaining,
+    pairs: new Set(pairNames.filter((_, pair) => !open[pair])),
     cases: chosen.map(({ setting, trace }) => ({
       id: `J${sha256(stableStringify({ coordinates: setting, trace: trace.trace })).slice(0, 12)}`,
       label: `${literal(setting)} · ${trace.label}`,
@@ -550,11 +623,12 @@ export async function spaceCrossCheck({ loaded, bin, timeoutMs }) {
     const modelPath = sourcePath(loaded, pkg.behavior.model)
     const model = await loadModel({ model: modelPath, prefix: pkg.behavior.prefix, bin, timeoutMs })
     const space = enumerateSpace(model, { bound: pkg.behavior.bound })
+    const stepsOf = stepper(model)
     traces = [...space.cases, ...transitionCover(model, space).cases].map((entry) => ({
       label: entry.label,
       trace: entry.trace,
       observations: entry.observations,
-      steps: runtimeSteps(model, entry.trace),
+      steps: stepsOf(entry.trace),
     }))
     const { exported } = await compileBend({ entry: modelPath, bin, timeoutMs })
     classify = (def, ...args) => {

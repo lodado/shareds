@@ -1255,8 +1255,12 @@ const cell = (value) =>
   String(value ?? '')
     .replaceAll('|', String.raw`\|`)
     .replaceAll('\n', ' ')
+// 한 열을 이 폭 너머로 맞추지 않는다 — 관측값 JSON 한 칸(수 KB)이 표의 모든 행을 공백으로 채워 카드를 수백 KB로 만들었다
+const MAX_COLUMN_PAD = 200
 function table(header, rows) {
-  const widths = header.map((name, index) => Math.max(3, name.length, ...rows.map((row) => cell(row[index]).length)))
+  const widths = header.map((name, index) =>
+    Math.min(MAX_COLUMN_PAD, Math.max(3, name.length, ...rows.map((row) => cell(row[index]).length))),
+  )
   const line = (cells) => `| ${cells.map((value, index) => cell(value).padEnd(widths[index])).join(' | ')} |`
   return [line(header), `| ${widths.map((width) => '-'.repeat(width)).join(' | ')} |`, ...rows.map(line)]
 }
@@ -1649,6 +1653,34 @@ export function generatedBlock(card) {
  * 입력이 바뀌었으면 stale, 입력은 같은데 본문이 다르면 drift(손 편집)다. 다시 만들 수 없으면(Bend 없음) unverified로
  * 막는다 — 확인하지 못한 영역을 통과시키지 않는다.
  */
+/** 표 행을 칸으로 가른다 — `\`로 이스케이프한 글자는 칸 안에 남고, 이스케이프 안 된 `|`가 칸을 가른다. */
+function tableCells(line) {
+  const cells = ['']
+  for (let index = 0; index < line.length; index += 1) {
+    if (line[index] === '\\' && index + 1 < line.length) {
+      cells[cells.length - 1] += line.slice(index, index + 2)
+      index += 1
+    } else if (line[index] === '|') cells.push('')
+    else cells[cells.length - 1] += line[index]
+  }
+  return cells
+}
+
+/**
+ * 표 행을 칸 목록(앞뒤 공백을 지운 칸, 구분선 칸은 `---`)으로 바꾼 텍스트 — 칸 너비 맞춤은 생성기 판마다 달랐다. 이미 잠긴
+ * 카드를 같은 표로 읽는다. 칸의 내용(공백 포함)과 칸 수는 그대로이고, 칸을 다시 `|`로 이어 붙이지 않으므로 `\|` 이스케이프
+ * 경계를 옮기는 손 편집은 다른 표다.
+ */
+const withoutTablePadding = (text) =>
+  text
+    .split('\n')
+    .map((line) =>
+      line.startsWith('|')
+        ? JSON.stringify(tableCells(line).map((cell) => (/^\s*:?-{3,}:?\s*$/.test(cell) ? '---' : cell.trim())))
+        : line,
+    )
+    .join('\n')
+
 export async function generatedIssues(card, { regenerate = null } = {}) {
   const found = generatedBlock(card)
   if (!found.present) return []
@@ -1676,7 +1708,7 @@ export async function generatedIssues(card, { regenerate = null } = {}) {
     )
   else if (fresh.unverified)
     issues.push(`card-generated-unverified: the generated region could not be regenerated — ${fresh.unverified}`)
-  else if (fresh.content !== found.content)
+  else if (withoutTablePadding(fresh.content) !== withoutTablePadding(found.content))
     issues.push(
       'card-generated-drift: regenerating from the package does not reproduce the generated region — it was edited by hand (even with a recomputed digest); edit the package and regenerate',
     )

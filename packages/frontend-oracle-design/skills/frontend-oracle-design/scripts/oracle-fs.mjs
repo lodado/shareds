@@ -2,11 +2,17 @@ import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { lstat, open, readFile, realpath, stat } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
+import process from 'node:process'
 
 export const ZERO_DIGEST = '0'.repeat(64)
 
 export function sha256(value) {
   return createHash('sha256').update(value).digest('hex')
+}
+
+/** ORACLE_TIMING이 켜져 있으면 단계 시간을 stderr에 한 줄로 남긴다 — 느린 단계를 로그에서 바로 찾는다. */
+export function reportTiming(label, started) {
+  if (process.env.ORACLE_TIMING) process.stderr.write(`TIMING ${label} ${Math.round(performance.now() - started)}ms\n`)
 }
 
 export function stableStringify(value) {

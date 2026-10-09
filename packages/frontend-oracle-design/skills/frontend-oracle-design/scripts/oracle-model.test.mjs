@@ -21,6 +21,7 @@ import {
   checkBendFiles,
   checkConformance,
   classifyTrace,
+  configurationGraph,
   enumerateSpace,
   formalModelIssues,
   LISTED_CASES,
@@ -194,6 +195,27 @@ function handModel({ reverse = false, forbidRepeatB = false, duplicate = false }
     },
   }
 }
+
+test('a configuration graph is computed once per model and cap, and callers cannot change the shared graph', () => {
+  const model = handModel({ forbidRepeatB: true })
+  let calls = 0
+  const next = model.next
+  model.next = (history) => {
+    calls += 1
+    return next(history)
+  }
+  const first = configurationGraph(model, 40)
+  const used = calls
+  assert.ok(used > 0)
+  assert.equal(configurationGraph(model, 40), first)
+  assert.equal(calls, used)
+  // another cap is another graph; so is another model, even one that reports the same digest
+  assert.notEqual(configurationGraph(model, 39), first)
+  assert.ok(calls > used)
+  assert.notEqual(configurationGraph(handModel({ forbidRepeatB: true }), 40), first)
+  assert.throws(() => first.nodes.push({}), TypeError)
+  assert.throws(() => first.nodes[0].edges.push({}), TypeError)
+})
 
 test('space enumeration is deterministic and its case IDs do not depend on the environment order', () => {
   const first = enumerateSpace(handModel(), { bound: 3 })
@@ -904,6 +926,19 @@ test('[bend] a wrong model, an open proof and an unsafe helper are each refused 
   }
   // 변형은 복사본에만 했다 — 원본 fixture는 여전히 증명된다.
   assert.equal((await proveLaws({ dir: FIXTURE, bin })).status, 'proven')
+})
+
+test('[bend] loading an unchanged model returns the one compiled model, and a changed file returns another', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await fixtureCopy(t)
+  const entry = join(root, 'MODEL.bend')
+  const first = await loadModel({ model: entry, prefix: 'Search', bin })
+  assert.equal(await loadModel({ model: entry, prefix: 'Search', bin }), first)
+  await writeFile(entry, `${await readFile(entry, 'utf8')}\n# a comment changes the bytes, not the model\n`)
+  const edited = await loadModel({ model: entry, prefix: 'Search', bin })
+  assert.notEqual(edited, first)
+  assert.notEqual(edited.digest, first.digest)
 })
 
 test('[bend] the compiled model yields the same 10-case space every time, with every required scenario', async (t) => {
