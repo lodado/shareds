@@ -1,0 +1,13 @@
+{
+  "name": "developer-agents",
+  "version": "0.1.0",
+  "description": "Frontend and backend developer subagents that place code by FSD, separate UI from business logic, and build backends in three layers with Clean Architecture and DDD.",
+  "author": {
+    "name": "lodado",
+    "url": "https://github.com/lodado"
+  },
+  "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "repository": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "license": "MIT",
+  "keywords": ["agents", "fsd", "clean-architecture", "ddd", "claude-code"]
+}

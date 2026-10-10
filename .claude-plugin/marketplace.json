@@ -139,6 +139,18 @@
       "category": "productivity",
       "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
       "tags": ["obsidian", "memory", "learning"]
+    },
+    {
+      "name": "developer-agents",
+      "description": "Frontend and backend developer subagents that place code by FSD, separate UI from business logic, and build backends in three layers with Clean Architecture and DDD.",
+      "version": "0.1.0",
+      "author": {
+        "name": "lodado"
+      },
+      "source": "./packages/developer-agents",
+      "category": "development",
+      "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+      "tags": ["agents", "fsd", "clean-architecture", "ddd"]
     }
   ]
 }

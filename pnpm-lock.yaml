@@ -43,6 +43,8 @@ importers:
 
   packages/agent-memory: {}
 
+  packages/developer-agents: {}
+
   packages/eslint-config:
     dependencies:
       '@antfu/eslint-config':

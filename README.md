@@ -85,6 +85,7 @@ reference-driven-3d-character
 game-interface-design
 ux-flow-diagram
 agent-memory
+developer-agents
 ```
 
 패키지 안에 `.claude-plugin/plugin.json`이랑 `.codex-plugin/plugin.json`이 같이 들어 있어요.
@@ -296,17 +297,18 @@ npm으로 나갈 것들이에요.
 
 에이전트에 꽂는 플러그인이에요.
 
-| 플러그인                                                                  | 설명                                                                                                  |
-| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| [`vibe-coding-helper`](packages/vibe-coding-helper)                       | ESLint 도입이랑 레포 컨벤션                                                                           |
-| [`frontend-oracle-design`](packages/frontend-oracle-design)               | Formal Oracle·Bend 없는 Contract 두 컨트롤러와 네 공유 전문 스킬, TDD·근거·리뷰                       |
-| [`agent-graph-engineering`](packages/agent-graph-engineering)             | 에이전트 워크플로 그래프 설계랑 실행                                                                  |
-| [`frontend-system-design`](packages/frontend-system-design)               | 잘 알려진 프론트엔드 문제의 설계 패턴                                                                 |
-| [`test`](packages/test)                                                   | Oracle 기반 결정론적 행동 테스트                                                                      |
-| [`frontend-visual-qa`](packages/frontend-visual-qa)                       | 스크린샷 비교랑 직접 브라우저 QA                                                                      |
-| [`frontend-interface-design`](packages/frontend-interface-design)         | `$reference-driven-figma-design`: HCI·레퍼런스 비교 → 러프 와이어프레임 설명 → 편집 가능 Figma 디자인 |
-| [`reference-driven-3d-character`](packages/reference-driven-3d-character) | 레퍼런스 해석, 형태·변형·동작 설계, 편집 가능한 3D 캐릭터의 단계별 제작·검증                          |
-| [`game-interface-design`](packages/game-interface-design)                 | 모바일 웹게임 기획 → 선택형 Figma UI → FSD·ECS Three.js 그레이박스                                    |
+| 플러그인                                                                  | 설명                                                                                                                                              |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`vibe-coding-helper`](packages/vibe-coding-helper)                       | ESLint 도입이랑 레포 컨벤션                                                                                                                       |
+| [`frontend-oracle-design`](packages/frontend-oracle-design)               | Formal Oracle·Bend 없는 Contract 두 컨트롤러와 네 공유 전문 스킬, TDD·근거·리뷰                                                                   |
+| [`agent-graph-engineering`](packages/agent-graph-engineering)             | 에이전트 워크플로 그래프 설계랑 실행                                                                                                              |
+| [`frontend-system-design`](packages/frontend-system-design)               | 잘 알려진 프론트엔드 문제의 설계 패턴                                                                                                             |
+| [`test`](packages/test)                                                   | Oracle 기반 결정론적 행동 테스트                                                                                                                  |
+| [`frontend-visual-qa`](packages/frontend-visual-qa)                       | 스크린샷 비교랑 직접 브라우저 QA                                                                                                                  |
+| [`frontend-interface-design`](packages/frontend-interface-design)         | `$reference-driven-figma-design`: HCI·레퍼런스 비교 → 러프 와이어프레임 설명 → 편집 가능 Figma 디자인                                             |
+| [`reference-driven-3d-character`](packages/reference-driven-3d-character) | 레퍼런스 해석, 형태·변형·동작 설계, 편집 가능한 3D 캐릭터의 단계별 제작·검증                                                                      |
+| [`game-interface-design`](packages/game-interface-design)                 | 모바일 웹게임 기획 → 선택형 Figma UI → FSD·ECS Three.js 그레이박스                                                                                |
+| [`developer-agents`](packages/developer-agents)                           | Claude Code 서브에이전트 두 개: FSD로 UI와 비즈니스 로직을 나누는 `frontend-developer`, 3계층·클린 아키텍처·DDD로 서버를 짜는 `backend-developer` |
 
 ## 개발
 

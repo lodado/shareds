@@ -1,0 +1,10 @@
+{
+  "name": "@lodado/developer-agents-plugin",
+  "version": "0.1.0",
+  "description": "Claude Code plugin with FSD frontend and three-layer backend developer subagents.",
+  "private": true,
+  "scripts": {
+    "test": "node --test scripts/*.test.mjs"
+  },
+  "license": "MIT"
+}
