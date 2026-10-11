@@ -1,3 +1,55 @@
+# 0.100.2: retain classifier isolation while reusing snapshot encoding
+
+## Measured bottleneck and rejected hypothesis
+
+The installed 0.100.1 public `oracle-verify.mjs card` passed on the unchanged real Bend
+mailbox package in 425.441 seconds. A second, CPU-profiled run passed in 424.218 seconds:
+`structuredClone` accounted for 294.193 seconds of sampled self time (69.36%). The model
+has 17 behavior classifiers. Extending exact-input classification reuse across axes and
+state transitions passed its regression but took 424.390 seconds on the actual mailbox.
+That is not a meaningful measured improvement and is not reported as one.
+
+Successive classifiers now serialize the last immutable argument tuple once and deserialize
+fresh independent arguments for every actual classifier call. Only the last tuple's encoding
+is retained. It is not a persistent cache or an encoding for every reached state. This keeps
+defensive isolation rather than trusting compiled code not to mutate an input. Serialization
+bytes are not equality keys. Classification results remain scoped to one cross-check and
+keyed by def, arity and complete input values, with raw equality after digest bucketing.
+
+The final candidate's real public card command passed in **371.164 seconds**, reporting
+`CARD_LINT_OK 18 rows`, with 53.231 seconds for regeneration and 317.582 seconds for the
+cross-check. This is about **12.8% less elapsed time** than the installed 425.441-second
+baseline, not an order-of-magnitude speedup. The wrapper verified unchanged package,
+model-input, original card and lock digests. The run's maximum resident set size was
+4,403,478,528 bytes. No comparative memory reduction is claimed, and six minutes and
+roughly 4.40 GB are still material costs. These are local observations, not a portable SLA.
+
+## Requirement-to-check mapping
+
+| Requirement                                          | Concrete check and observed result                                                                                                                                                                                                                                                                                                                                                     |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Improve the path users actually run                  | Actual unchanged mailbox package through the public `card` CLI: 425.441 seconds before, 371.164 seconds after, exit 0 and 18 accepted rows in both.                                                                                                                                                                                                                                    |
+| Do not replace correctness with a faster unsafe call | `classifier snapshots isolate each call and argument while preserving exact Bend values` passes: mutation cannot leak between calls or arguments, original inputs remain unchanged, and shared/cyclic references, BigInt, signed zero and special primitive values survive. Missing defs retain `CROSS_CHECK_DEF`.                                                                     |
+| Reuse only equivalent classifier work                | Existing exact-input test and `axes and transitions share exact classifier results while keeping the first ordered witness` pass. They distinguish payload, history, numeric type and signed zero, preserve the first ordered transition witness and prohibit cross-run result reuse.                                                                                                  |
+| Keep lint inside the declared finite bound           | The compiled Bend pagination regression rejects `next` beyond bound 1 and passes the card adapter. Default discovery still explores its extended cover.                                                                                                                                                                                                                                |
+| Preserve unresolved-policy and mapping-review checks | Compiled Bend gate regressions still report undecided candidates and require current source-bound mapping review.                                                                                                                                                                                                                                                                      |
+| Preserve event order and intermediate observations   | The final source passes an exhaustive comparison on the actual compiled Bend mailbox: all 32,821 prefixes, 32,820 edges and intermediate observations match the unmerged ordered space. It retains 11,643 differing-order comparisons, rejects incomplete enumeration and accepts no fourth edge at bound 3. This supplements the public CLI check, not a proof of unbounded behavior. |
+
+This optimization does not change card contents, the finite Space contract, or the Bend proof,
+adequacy, lock and product-conformance requirements. The wrapper is tested only with immutable
+stepper snapshots from the pure compiled Bend path, not advertised as a general mutable-object
+memoizer.
+
+The full package test command completed with **1,148 passing tests, zero failures and zero
+skips**. The combined test/lint wrapper subsequently reached its 600-second limit during
+lint, so that wrapper is not counted as a full verification pass. A separate final targeted
+run passed all 13 classifier, replay, bounded-card and compiled-Bend gate checks. Targeted
+ESLint passed after correcting one named-import ordering error. The exhaustive mailbox
+comparison also confirmed the public derivation summary is unchanged and the original
+model inputs are untouched. Lint, generated-document checks and installation verification
+remain separate release checks, not consequences of the test count. This performance
+change does not rerun the mailbox's 146 Bend law proofs or assert a new product lock.
+
 # 0.100.1: keep card cross-checks inside the declared finite Space
 
 ## Acceptance-discovered regression

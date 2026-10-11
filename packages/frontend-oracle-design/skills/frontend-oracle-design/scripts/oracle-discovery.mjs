@@ -14,6 +14,7 @@ import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { isDeepStrictEqual, parseArgs } from 'node:util'
+import { deserialize, serialize } from 'node:v8'
 import { ensureBend } from './ensure-bend.mjs'
 import {
   anchoredSection,
@@ -272,8 +273,8 @@ export function crossLookup({ caseSpace, mapping, worlds, traces, classify, coor
   const worldHas = (world, dimension, value) => world.plain[maps[dimension.dimension].world] === target(dimension, value)
   // 한 trace가 보인 선언 값 — 단계마다 분류 def가 그 단계의 값을 말한다
   const behavior = dimensions.filter((dimension) => kindOf(dimension) === 'behavior')
-  // Classifiers are pure functions of the full before-state and event, not the trace history.
-  // Digests only select a bucket. Exact raw-value equality also checks payloads, BigInt and signed zero.
+  // Classifiers are pure functions of their full inputs, not the trace history.
+  // Keep defs and argument lists separate. Digests only select a bucket; raw equality checks types and signed zero.
   const keys = new WeakMap()
   const keyOf = (value) => {
     const digest = () => sha256(stableStringify(toPlain(value)))
@@ -282,21 +283,23 @@ export function crossLookup({ caseSpace, mapping, worlds, traces, classify, coor
     return keys.get(value)
   }
   const classifications = new Map()
-  const shownBy = ({ before, event }) => {
-    const key = `${keyOf(before)}:${keyOf(event)}`
-    if (!classifications.has(key)) classifications.set(key, [])
-    const bucket = classifications.get(key)
-    const known = bucket.find((entry) => isDeepStrictEqual(entry.before, before) && isDeepStrictEqual(entry.event, event))
-    if (known) return known.shown
-    const shown = behavior.map(
-      (dimension) => `${dimension.dimension}=${classify(maps[dimension.dimension].classify, before, event)}`,
-    )
-    bucket.push({ before, event, shown })
-    return shown
+  const classifyOnce = (def, ...args) => {
+    if (!classifications.has(def)) classifications.set(def, new Map())
+    const results = classifications.get(def)
+    const key = args.map(keyOf).join(':')
+    if (!results.has(key)) results.set(key, [])
+    const bucket = results.get(key)
+    const known = bucket.find((entry) => isDeepStrictEqual(entry.args, args))
+    if (known) return known.value
+    const value = classify(def, ...args)
+    bucket.push({ args, value })
+    return value
   }
-  const shown = traces.map((trace) => new Set(trace.steps.flatMap(shownBy)))
+  const shown = traces.map((trace) => new Set(trace.steps.flatMap(({ before, event }) => behavior.map(
+    (dimension) => `${dimension.dimension}=${classifyOnce(maps[dimension.dimension].classify, before, event)}`,
+  ))))
   const traceHas = (seen, dimension, value) => seen.has(`${dimension.dimension}=${target(dimension, value)}`)
-  return { dimensions, worlds, traces, coordinates, maps, kindOf, target, mapped, worldHas, shown, traceHas }
+  return { dimensions, worlds, traces, coordinates, maps, kindOf, target, mapped, worldHas, shown, traceHas, classify: classifyOnce }
 }
 
 /** 순서와 무관한 쌍 이름 — 결합 커버와 쌍 점검이 같은 열쇠로 만난다. */
@@ -596,7 +599,7 @@ export function crossCheckSpace({ caseSpace, stateModel = null, mapping = {}, wo
     .flatMap((dimension) => dimension.choices.map((choice) => valueFinding(lookup, dimension, choice)))
     .filter(Boolean)
   const { pairs, findings: pairList } = pairFindings(lookup, joint)
-  const machine = stateModel ? transitionFindings(stateModel, mapping.stateModel, traces, classify) : NO_STATE_MODEL
+  const machine = stateModel ? transitionFindings(stateModel, mapping.stateModel, traces, lookup.classify) : NO_STATE_MODEL
   return {
     status: 'run',
     summary: {
@@ -612,7 +615,26 @@ export function crossCheckSpace({ caseSpace, stateModel = null, mapping = {}, wo
 }
 
 /**
- * space-cross-check 실행 — 버전 2 패키지의 선언 공간(spaceDiscovery 기록의 `## Case space`·`## State Model`)을 세계 열거와,
+ * Inputs are immutable stepper snapshots for one cross-check run. Consecutive axes inspect the same
+ * arguments, so encode those once but still give every def (and argument) its own defensive copy.
+ * Keep only the latest tuple, not an encoding for every reached state. Bytes are never equality keys.
+ */
+export function isolatedClassifier(exported, source) {
+  let previous = null
+  let encoded = []
+  return (def, ...args) => {
+    if (typeof exported[def] !== 'function')
+      throw Object.assign(new Error(`${source} does not define ${def}`), { code: 'CROSS_CHECK_DEF' })
+    if (!previous || previous.length !== args.length || args.some((arg, index) => !Object.is(arg, previous[index]))) {
+      encoded = args.map((arg) => serialize(arg))
+      previous = args
+    }
+    return exported[def](...encoded.map((value) => deserialize(value)))?.$ ?? null
+  }
+}
+
+/**
+ * space-cross-check 실행: 버전 2 패키지의 선언 공간(spaceDiscovery 기록의 `## Case space`·`## State Model`)을 세계 열거와,
  * 행동 모델의 trace(bound까지의 공간, 기본 discovery 경로에서는 추가 전이 커버)에 비춘다. 카드 lint는 선언 bound만 쓴다.
  */
 export async function spaceCrossCheck({ loaded, bin, timeoutMs, includeTransitionCover = true }) {
@@ -649,11 +671,7 @@ export async function spaceCrossCheck({ loaded, bin, timeoutMs, includeTransitio
       steps: stepsOf(entry.trace),
     }))
     const { exported } = await compileBend({ entry: modelPath, bin, timeoutMs })
-    classify = (def, ...args) => {
-      if (typeof exported[def] !== 'function')
-        throw Object.assign(new Error(`${basename(modelPath)} does not define ${def}`), { code: 'CROSS_CHECK_DEF' })
-      return exported[def](...args.map((argument) => structuredClone(argument)))?.$ ?? null
-    }
+    classify = isolatedClassifier(exported, basename(modelPath))
   }
   // 상태표는 분석 에이전트가 따로 읽은 것일 수 있다(crossCheck.states) — 그러면 모델과 두 독립 해석을 비교한다
   const statesPath = pkg.crossCheck.states ? sourcePath(loaded, pkg.crossCheck.states) : declaredPath

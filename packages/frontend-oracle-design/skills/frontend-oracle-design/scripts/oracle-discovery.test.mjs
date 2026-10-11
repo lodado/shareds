@@ -20,6 +20,7 @@ import {
   crossLookup,
   decisionMisfit,
   declaredStatus,
+  isolatedClassifier,
   jointCover,
   killedChecks,
   lifecycle,
@@ -1067,6 +1068,39 @@ test('space-cross-check: classification reuses exact inputs without merging payl
   assert.deepEqual([...crossLookup(inputs).shown[0]], ['b0=Changed', 'b1=Changed'])
 })
 
+test('space-cross-check: axes and transitions share exact classifier results while keeping the first ordered witness', () => {
+  const inputs = jointInputs(1, { worldDims: 0, behaviorDims: 2, valuesPer: 2, traceCount: 0 })
+  const idle = { phase: 'Idle' }
+  const busy = { phase: 'Busy' }
+  const go = { before: idle, event: { $: 'B0' }, after: busy, label: 'go' }
+  const reply = { before: busy, event: { $: 'B1' }, after: idle, label: 'reply' }
+  inputs.traces = [[go, reply], [clone(go), clone(reply), go]].map((steps) => ({
+    label: steps.map((step) => step.label).join(' · '), trace: steps.map((step) => step.event),
+    observations: steps.map((step) => step.after.phase), steps,
+  }))
+  for (const dimension of Object.values(inputs.mapping.dimensions)) dimension.classify = 'M.event'
+  inputs.mapping.stateModel = {
+    phase: 'M.phase', step: 'M.event', states: { idle: 'Idle', busy: 'Busy' }, events: { GO: 'B0', REPLY: 'B1' },
+  }
+  inputs.stateModel = { states: ['idle', 'busy'], events: ['GO', 'REPLY'], transitions: [{ from: 'idle', event: 'GO', to: 'busy' }] }
+  const unchanged = clone(inputs.traces)
+  const calls = { 'M.event': 0, 'M.phase': 0 }
+  inputs.classify = (def, before, event) => {
+    calls[def] += 1
+    return def === 'M.phase' ? before.phase : event.$
+  }
+  const result = crossCheckSpace(inputs)
+  assert.deepEqual(result.summary.transitions, { declared: 1, model: 2, silent: 1, unrealized: 0 })
+  assert.deepEqual(result.candidates.map(({ class: cls, evidence }) => ({ cls, evidence })), [{
+    cls: 'silent-decision', evidence: { transition: 'busy -REPLY-> idle', witness: 'go · reply', declaredEmpty: true },
+  }])
+  assert.deepEqual(inputs.traces, unchanged)
+  // Two full state/event inputs shared by two axes and the event map, and two phase inputs.
+  assert.deepEqual(calls, { 'M.event': 2, 'M.phase': 2 })
+  assert.deepEqual(crossCheckSpace(inputs), result)
+  assert.deepEqual(calls, { 'M.event': 4, 'M.phase': 4 })
+})
+
 test('space-cross-check: the joint cover picks exactly the cases of the plain greedy it replaces, ties included', () => {
   for (let seed = 1; seed <= 120; seed += 1) {
     const inputs = jointInputs(seed, { worldDims: 1 + (seed % 3), behaviorDims: 1 + (seed % 2), valuesPer: 2 + (seed % 3), traceCount: 4 + (seed % 40) })
@@ -1131,6 +1165,39 @@ test('trace steps share the steps of a common prefix and equal a replay of each 
   // asking again costs nothing
   traces.map(stepsOf)
   assert.equal(shared.calls, 3)
+})
+
+test('classifier snapshots isolate each call and argument while preserving exact Bend values', () => {
+  const shared = { $: 'Payload', values: [1, 1n, 0, -0, NaN, Infinity, undefined] }
+  const state = { $: 'State', first: shared, second: shared }
+  state.self = state
+  const event = { $: 'Event', payload: shared }
+  const original = structuredClone({ state, event })
+  const received = []
+  const exported = {
+    check: (left, right) => {
+      assert.deepEqual(left, original.state)
+      assert.deepEqual(right, original.event)
+      assert.equal(left.first, left.second)
+      assert.equal(left.self, left)
+      assert.notEqual(left.first, right.payload, 'arguments remain separately cloned')
+      received.push(left)
+      left.first.values.push('mutated')
+      right.payload.values.push('mutated')
+      return { $: 'EXACT' }
+    },
+    tag: (value) => ({ $: typeof value }),
+  }
+  const classify = isolatedClassifier(exported, 'MODEL.bend')
+  assert.equal(classify('check', state, event), 'EXACT')
+  assert.equal(classify('check', state, event), 'EXACT')
+  assert.notEqual(received[0], received[1], 'a cached snapshot is decoded afresh for each invocation')
+  assert.deepEqual({ state, event }, original)
+  assert.equal(classify('tag', 1), 'number')
+  assert.equal(classify('tag', 1n), 'bigint')
+  assert.equal(classify('check', structuredClone(state), structuredClone(event)), 'EXACT')
+  assert.equal(isolatedClassifier(exported, 'MODEL.bend')('check', state, event), 'EXACT')
+  assert.throws(() => classify('missing', state), { code: 'CROSS_CHECK_DEF', message: 'MODEL.bend does not define missing' })
 })
 
 test('[bend] space-cross-check on the paging fixture finds the split pairs, the missing failure and the transitions only the model decides', async (t) => {
