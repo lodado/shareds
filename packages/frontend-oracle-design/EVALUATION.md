@@ -1,3 +1,65 @@
+# 0.99.1: lazy configuration lookahead without dropping transitions
+
+## Reproduced bottleneck and change
+
+`exploreConfigurations` eagerly computed every allowed event's next-event list for every candidate,
+including candidates whose distinct state already ruled out a merge. With a wide environment this
+spent substantially more time on equality keys than on the bounded Space enumeration itself.
+
+The graph now groups candidates by the same serialized state and current allowed-event list first.
+Only a collision in that group needs the existing one-step lookahead comparison. The first member's
+lookahead is cached when that comparison becomes necessary. Node keys are opaque graph-local IDs
+derived from the first access trace, rather than copies of the complete lookahead table.
+
+The equality relation, BFS order, configuration cap, permitted edges, observations and cover selection
+are unchanged for total, deterministic model operations. This is lazy equality refinement, not partial-order reduction:
+it neither assumes unrelated action names are independent nor drops permitted action orderings.
+Histories with the same state and current events but different one-step futures must still stay apart.
+Proof, adequacy, card freshness, lock and Delivery gates are not bypassed or weakened.
+
+## Controlled measurements and regression checks
+
+A synthetic model starts at `0n`, always enables 32 distinct `Pick(n)` events (`n = 0..31`), steps to
+`state * 32n + n + 1n`, and observes that state. In separate local Node processes, Space used bound 3,
+then graph exploration used cap 200, then minimal cover used that same graph. The pre-change source
+was `362c847`; the post-change source was this patch. Each timing below is one run, not a distribution.
+
+| Phase               |       Before |     After | Work retained                            |
+| ------------------- | -----------: | --------: | ---------------------------------------- |
+| Space enumeration   |    181.27 ms | 222.25 ms | 32,768 traces                            |
+| Configuration graph | 24,239.62 ms | 293.36 ms | 200 expanded configurations, 6,400 edges |
+| Minimal cover       |     12.36 ms |  17.79 ms | 20 cases                                 |
+
+Graph-only `next` calls fell from 211,233 to 6,401. The timing ratio is approximately 83 for this
+unique-state synthetic graph, not for the whole Oracle workflow. Enumeration was not optimized.
+
+`oracle-model-graph.test.mjs` keeps a test-only eager control. Its operation-count regression failed
+before the runtime change (3,201 calls versus the expected 97 at cap 3), then passed after it. Twenty
+deterministic history-sensitive models at caps 1, 7 and 40 compare topology, observations, transition
+cover, minimal cover and quotient/independence/order/reachability analysis with the eager control.
+Duplicate events and reversed allowed-event lists are included. Existing history-divergence, capped
+and closed graph, generated-card and real Bend/public CLI tests remain part of the package suite.
+
+Reproduce the deterministic guard with
+`node --test packages/frontend-oracle-design/skills/frontend-oracle-design/scripts/oracle-model-graph.test.mjs`.
+Release checks remain `pnpm --filter @lodado/frontend-oracle-design-plugin test` and
+`pnpm --filter @lodado/frontend-oracle-design-plugin lint`.
+
+Observed checks: the full package suite passed 1,137 tests with zero failures or skips. Package lint
+passed with zero errors and 403 warnings; reference bundles and the evaluation corpus matched their
+sources. The final graph regression (2 tests), release-metadata contract (106 tests), changed-test lint
+and workflow-document check were also rerun successfully after the relevant edits.
+
+## Limits
+
+The reported multi-megabyte mailbox card and its 11-minute lint / 18-minute lock were not run in this
+session. Their end-to-end improvement is unmeasured. Repeated cross-process derivation and full card
+serialization are unchanged, and models with many state/current-event collisions still require
+lookahead. No language replacement, new dependency, persistent cache or unproved transition pruning
+was introduced. The eager differential control establishes equivalence to the prior bounded algorithm,
+not the soundness of an arbitrary abstraction or unbounded history equivalence. Same-context review
+is not independent review; the native swarm API was unavailable in this session.
+
 # 0.99.0: bounded authoring and review, with risky premises checked earlier
 
 ## Reproduced behavior and changes

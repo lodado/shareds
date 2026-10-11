@@ -360,15 +360,26 @@ function exploreConfigurations(model, maxConfigurations) {
     })
   }
   const nodes = []
-  const seen = new Set()
+  const buckets = new Map()
+  const aheadOf = (node) => stableStringify(node.allowed.map((event) => allowedAfter([...node.raw, event]).map(toPlain)))
   const visit = (node) => {
     const allowed = allowedAfter(node.raw)
-    const ahead = allowed.map((event) => allowedAfter([...node.raw, event]).map(toPlain))
-    const key = stableStringify({ state: toPlain(node.state), allowed: allowed.map(toPlain), ahead })
-    if (!seen.has(key)) {
-      seen.add(key)
-      nodes.push({ ...node, key, observation: toPlain(model.observe(node.state)), allowed, edges: [] })
+    const base = stableStringify({ state: toPlain(node.state), allowed: allowed.map(toPlain) })
+    const bucket = buckets.get(base)
+    let ahead
+    if (bucket) {
+      // 상태와 지금 허용 사건이 같을 때만 한 걸음 뒤를 비교한다. 다른 상태는 앞을 펼쳐도 합쳐질 수 없다.
+      bucket.byAhead ??= new Map([[aheadOf(bucket.first), bucket.first.key]])
+      ahead = aheadOf({ ...node, allowed })
+      if (bucket.byAhead.has(ahead)) return bucket.byAhead.get(ahead)
     }
+
+    // key는 그래프 안의 불투명한 식별자다. 최초 접근 trace로 이름만 붙이고 구성 동치는 위에서 판정한다.
+    const key = stableStringify(node.trace)
+    const found = { ...node, key, observation: toPlain(model.observe(node.state)), allowed, edges: [] }
+    nodes.push(found)
+    if (bucket) bucket.byAhead.set(ahead, key)
+    else buckets.set(base, { first: found, byAhead: null })
     return key
   }
   visit({ raw: [], trace: [], state: model.init(), observations: [] })
