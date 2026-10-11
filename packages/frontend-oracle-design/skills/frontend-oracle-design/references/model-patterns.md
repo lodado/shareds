@@ -178,8 +178,9 @@ is not a reason.
 ## Progress is a ranking function
 
 Bend states no "eventually"; it proves a number that shrinks. Give the live states a rank in `Nat`, prove
-that every step keeps a terminal state or lowers the rank of a live one, and the rank of `init` bounds the
-path to a terminal state. A bounded retry ranks by the retries left:
+that each modeled transition from a live state either reaches a terminal state or lowers that rank.
+Together with a successor at each live state, this bounds how many modeled transitions can precede
+termination. It does not make a scheduler take those transitions. A bounded retry ranks by the retries left:
 
 ```python
 def Load.progress(s: Load, t: Load) -> Bool:
@@ -196,14 +197,28 @@ plus one induction for the shrinking step (`def lt_succ(p: Nat) -> {Nat.is_lt(p,
 a lemma cannot sit under the `Laws.` alias). Register it as `safety`, beside an `effect` law that a live state
 reaches the terminal one and its `witness`.
 
-- Fairness is `next`: it offers an event at every live state. A live state with no event is a hang; "the
-  network never answers" is the `Timeout{}` row above, and without it no rank exists.
-- A step that does not lower the rank (a retry that re-enters `Loading{n}`) fails the kernel. That is the
-  finding: the wait has no bound, so ask the policy for one (`NEEDS_DECISION`); do not weaken the law.
-- Set `Bound` at least the rank of `init` plus one, so the space holds a full path to a terminal state.
-- The product needs no second test: conformance compares it with the model on every traced step, so the
-  rank carries over within the checked traces. Strong fairness and starvation between actors have no rank;
-  they stay `Not formalized`.
+- `next` establishes enabledness, not fairness: a nonempty result offers a possible event, not an
+  eventual execution. A live state with no successor is a modeled deadlock. A scheduler that never
+  selects an offered event can still stall. Weak fairness concerns continuously enabled actions,
+  strong fairness actions enabled infinitely often. Neither follows from enumerating `next`.
+- `Timeout{}` states what happens if the timeout event occurs. State the sourced timer/scheduler
+  assumptions separately and observe the product's timer boundary. Offering a timeout does not prove
+  that a real timer fires, a network answers, or an actor is not starved.
+- A live-to-live step that leaves the rank unchanged refutes this strict-decrease law, not necessarily
+  the product's liveness. If policy permits stuttering or unrelated events, record the missing premise
+  and the narrower claim. Do not delete those events, weaken the law, or invent a retry bound to pass.
+  An undecided policy goes to `NEEDS_DECISION`.
+- Set `Bound` at least the rank of `init` plus one for this strict-decrease pattern. It bounds modeled
+  transitions, not elapsed time or an unbounded number of scheduler stutters. State which live states,
+  transitions and terminal condition the law covers.
+- The rank carries over within the checked traces only when the adapter observes the relevant product
+  transitions. It does not cover unexecuted traces or real scheduling. Strong fairness, starvation and
+  wall-clock deadlines remain `Not formalized` unless separate evidence establishes them. Reuse existing
+  conformance tests where they observe the required behavior, add product-boundary checks where they do not.
+
+Terminology follows Leslie Lamport's _A High-Level View of TLA+_ (next-state actions versus fairness)
+and _PlusCal Tutorial_, Session 9 (weak and strong fairness), rather than treating a generator as a scheduler.
+The rank argument assumes a well-founded order and strict decrease on the transitions being claimed.
 
 ## Error kinds are a sum type
 

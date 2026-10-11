@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -69,6 +70,106 @@ function runGenerated(file) {
     pass: count('pass'),
     fail: count('fail'),
   }
+}
+
+test('[bend] generated output integrity refuses silently filtered cases', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'stale-search')
+  await emitTrace({
+    model: join(dir, 'MODEL.bend'), prefix: 'Search', bound: 4,
+    adapter: join(dir, 'search.adapter.mjs'), out: join(dir, 'generated'),
+    row: 'O4', runs: 10, bin, regenerate: 'test',
+  })
+  const file = join(dir, 'generated', 'search.oracle.test.mjs')
+  const clean = await readFile(file, 'utf8')
+  assert.equal(runGenerated(file).status, 0)
+  const filtered = clean.replace('for (const entry of CASES)', 'for (const entry of CASES.slice(0, 0))')
+  assert.notEqual(filtered, clean)
+  await writeFile(file, filtered)
+  const run = runGenerated(file)
+  assert.equal(run.status, 1, 'editing generated cases must not remain GREEN')
+  assert.match(run.output, /GENERATED_TESTS_DRIFT/)
+})
+
+function verifyOutput(file) {
+  return spawnSync(process.execPath, [fileURLToPath(new URL('./oracle-projection.mjs', import.meta.url)),
+    'verify-generated', '--file', file], { encoding: 'utf8' })
+}
+
+for (const mode of ['trace', 'world', 'state', 'sweep']) {
+  test(`[bend] public generated verification: ${mode} is read-only and rejects rehashed edits`, async (t) => {
+    const bin = await installedBend(t)
+    if (!bin) return
+    const root = await workspace(t)
+    const fixture = { world: 'doc-save', state: 'toggle', trace: 'stale-search', sweep: 'stale-search' }[mode]
+    const dir = join(root, fixture)
+    const base = { out: join(dir, 'generated'), row: 'O1', bin, regenerate: 'test' }
+    const search = { ...base, model: join(dir, 'MODEL.bend'), prefix: 'Search',
+      adapter: join(dir, 'search.adapter.mjs'), bound: 4, runs: 10 }
+    const emissions = {
+      trace: () => emitTrace(search),
+      sweep: () => emitSweep({ ...search, walks: 2, steps: 3 }),
+      world: () => emitWorld({ ...base, card: join(dir, 'oracle.md'), cwd: dir, adapter: join(dir, 'doc-save.adapter.mjs') }),
+      state: () => emitState({ ...base, model: join(dir, 'MODEL.bend'), prefix: 'Toggle',
+        adapter: join(dir, 'toggle.adapter.mjs'), stateType: 'Toggle', commandType: 'Cmd',
+        relations: ['R_blocked_keeps', 'R_free_applies'], runs: 10 }),
+    }
+    const result = await emissions[mode]()
+    const file = result.files.at(-1)
+    const clean = await readFile(file, 'utf8')
+    const good = verifyOutput(file)
+    assert.equal(good.status, 0, good.stderr)
+    assert.equal(JSON.parse(good.stdout).status, 'verified')
+    assert.equal(await readFile(file, 'utf8'), clean)
+
+    // A matching self-hash is not enough: remove the in-file assertion and recompute its hash.
+    const hashLine = /^\/\/ Oracle output sha256: [a-f0-9]{64}\n/m
+    const changed = clean.replace(/^.*assert.equal\(createHash\('sha256'\).*GENERATED_TESTS_DRIFT.*\n/m, '')
+    assert.notEqual(changed, clean)
+    const digest = createHash('sha256').update(changed.replace(hashLine, '')).digest('hex')
+    const forged = changed.replace(hashLine, `// Oracle output sha256: ${digest}\n`)
+    await writeFile(file, forged)
+    const rejected = verifyOutput(file)
+    assert.equal(rejected.status, 1)
+    assert.match(rejected.stderr, /GENERATED_TESTS_DRIFT.*differs from canonical generation/)
+    assert.equal(await readFile(file, 'utf8'), forged, 'verification must never repair evidence')
+    await writeFile(file, clean)
+    assert.equal(verifyOutput(file).status, 0)
+
+    // A missing recipe on an older generated file is explicit migration, not silent acceptance.
+    await writeFile(file, clean.replace(/^\/\/ Oracle projection recipe: .*\n/m, ''))
+    assert.match(verifyOutput(file).stderr, /GENERATED_TESTS_DRIFT.*generation recipe/)
+    await writeFile(file, clean)
+
+    if (mode === 'state') {
+      const compiled = result.files.find((path) => path.endsWith('.model.mjs'))
+      assert.ok(compiled, 'state generation must provide its actual compiled model')
+      const modelBytes = await readFile(compiled, 'utf8')
+      await writeFile(compiled, `${modelBytes}\n// unexpected edit\n`)
+      assert.match(verifyOutput(file).stderr, /GENERATED_TESTS_DRIFT.*canonical generation/)
+      await rm(compiled)
+      assert.match(verifyOutput(file).stderr, /GENERATED_TESTS_DRIFT/)
+      await writeFile(compiled, modelBytes)
+    }
+    if (mode === 'world') {
+      const saved = join(dir, 'saved-output.mjs')
+      await writeFile(saved, clean)
+      await rm(file)
+      await symlink(saved, file)
+      assert.match(verifyOutput(file).stderr, /GENERATED_TESTS_DRIFT/)
+      await rm(file)
+      await writeFile(file, clean)
+      for (const recipe of ['{', JSON.stringify({ version: 2, mode, options: {} }),
+        JSON.stringify({ version: 1, mode, options: { bin: 'untrusted-command' } })]) {
+        await writeFile(file, clean.replace(/^\/\/ Oracle projection recipe: .*$/m, `// Oracle projection recipe: ${recipe}`))
+        assert.match(verifyOutput(file).stderr, /GENERATED_TESTS_DRIFT/)
+      }
+      await writeFile(file, clean)
+      assert.equal(verifyOutput(file).status, 0)
+    }
+  })
 }
 
 test('Bend types become one IR: records, sums, enums, bounded Nat, List and Maybe; recursion and unknown types are refused', () => {

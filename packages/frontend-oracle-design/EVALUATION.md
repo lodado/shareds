@@ -1,3 +1,69 @@
+# 0.98.0: executable evidence integrity and bounded claims
+
+The update separates three levels of assurance: software-engineering basics (parseable native entry,
+immutable generated tests, reproducible failures), model-based reasoning (the abstraction and its
+observable product boundary), and empirical evaluation (a controlled comparison rather than a claim
+that more instructions must be better).
+
+## Reproduced defects and changes
+
+- The Oracle entry's unquoted `description` contained `yet: bug reports`. The repository's actual YAML
+  parser rejected that frontmatter while the five sibling entries parsed. A quoted scalar preserves the
+  description and existing single-line trigger consumers in both the native entry and its Formal controller
+  reference. `scripts/skill-frontmatter.test.mjs` parses all six real entries with the YAML parser already
+  configured by ESLint, checks names, descriptions and tool declarations, and rejects the old
+  colon-space form. No new parser dependency or copied skill installation was introduced.
+- Filtering the emitted trace loop to zero cases originally left the real Node test run GREEN. The
+  generated source check now also hashes the complete output. A new public `verify-generated` command
+  regenerates expected bytes without writing them, using the existing world/trace/state/sweep emitters.
+  It rejects body edits even when the editor removes the assertion and recomputes the self-hash.
+- The public `oracle-run exec` originally ran the command and recorded evidence despite the edited
+  generated test. It now verifies generated outputs first, including Git-ignored outputs, and compares
+  their snapshots after execution. The regression checks the actual marker side effect and ledger:
+  preflight refusal causes neither, and in-command output replacement/deletion yields no accepted run.
+  A linked generated test initially escaped the scan as well. Its RED was reproduced and fixed.
+- The documentation previously equated `next` with fairness and implied all enumerated traces were
+  executed. `model-patterns.md` now separates enabledness, scheduling premises and strict-decrease
+  termination. `bend-cross-verification.md` requires claims about actually executed cases and the
+  product boundary observed by the adapter, including a separate DOM/browser journey when needed.
+  The old documentation assertion requiring the incorrect fairness sentence was intentionally replaced.
+
+These are deterministic defect regressions through real public CLIs and the installed Bend, not evidence
+that a new model-facing prompt improves completion rates. The fixture products establish the tested
+harness behavior, not arbitrary application correctness. The full package suite, generated bundles,
+workflow documentation and host-installation acceptance remain the release gates.
+
+## Controlled skill-effect evaluation: NOT_RUN for this revision
+
+Before claiming improved agent outcomes, compare 0.97.0 and 0.98.0 in clean isolated task workspaces.
+Keep the task source, host/model version, tools, budget and grading rubric fixed. Counterbalance version
+order, repeat runs with recorded seeds where supported, and blind the outcome reviewer to the version.
+Hold out task families from prompt tuning. The existing corpus, held-out set and lifecycle/boundary
+canaries remain distinct from a fresh end-to-end completion experiment.
+
+A pilot can use 12 task families, five repeats and two versions (120 runs), including clean controls,
+ambiguous policy, stale response, identity/cancel, timeout, access/keyboard, package upgrade and native
+skill entry. This is a budget proposal, not a power calculation or an experiment already performed.
+Freeze the expected product assertions and seeded defects before either version runs. Report false
+GREEN (accepted but fails the independent acceptance path), false BLOCK (refuses a valid task), defect
+recovery, completion and interruptions separately. Record elapsed time, tool calls and cost as secondary
+outcomes. Do not average a serious false GREEN away with faster clean tasks.
+
+Compare paired outcomes and report uncertainty at the task-family level, not as if every assertion were
+an independent sample. Retain all failures and environment exclusions with reasons. A live host/API or
+budget constraint is `NOT_RUN` or interrupted, not a synthetic replacement pass. If gains are unclear,
+retain the deterministic safety fixes without advertising a general productivity improvement.
+
+## Migration and limits
+
+Regenerate pre-0.98.0 outputs with their approved settings before guarded execution. The new reserved
+output suffixes are `*.oracle.test.mjs` and `*.world.test.mjs`. The read-only check does not authorize a
+recipe's assumptions/bounds, prove adapter fidelity, or find outputs outside its scan scope. A hostile
+process can restore bytes between snapshots or coordinate a rename and marker removal. Existing locks,
+coverage records and review remain necessary. Each preflight repeats compilation/enumeration, so
+measure that cost on large consumer models before making a performance claim. Native discovery must
+be checked after installation, not inferred from byte parity alone.
+
 # 0.97.0: the revision loop — model defects are stopped before the lock, mismatches are listed in one sweep
 
 The user's complaint was "why does it keep going round": identity r1 → r2 → r3 and a planned r4 (Side-Projects),

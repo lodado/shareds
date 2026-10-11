@@ -2239,15 +2239,50 @@ With a model package, [`discovery.md`](discovery.md) runs `oracle-discovery.mjs 
 anomalies attack the space, and every candidate they find goes to a human decision and a new revision.
 The closure verdict and its residual-risk list are evidence in the report, not a delivery state.
 
+### Generated test integrity
+
+Generated tests are executable evidence, not editable scaffolding. The four emitters include a JSON
+recipe and an output digest. `oracle-projection.mjs verify-generated --file <generated.test.mjs>`
+reuses the emitter in read-only comparison mode: it checks complete test and compiled-model bytes,
+without importing the adapter or running a shell recipe. A matching self-hash alone is insufficient.
+`oracle-run.mjs exec` performs this comparison before reserving a run or launching the command, then
+checks the same output snapshots after execution and before recording evidence. Changed bytes, missing
+companions and linked generated outputs fail with `GENERATED_TESTS_DRIFT`, not a product RED.
+
+The scan includes Git-ignored files under `scanRoot`, using generated header markers and the reserved
+`*.oracle.test.mjs` / `*.world.test.mjs` names. Keep generated files there as regular files, outside
+ignored build/dependency directories and linked directories. Do not rename them to hide their origin.
+Pre-0.98.0 outputs have no recipe and must be regenerated with the approved original settings before
+`exec` can accept them. Never repair a drift by editing a digest or filtering cases. Correct a model
+through its source/approval/revision path and regenerate all outputs, or fix the product/adapter at its
+proper boundary. The verifier does not silently rewrite the evidence it checks.
+
+This is a consistency check, not an authorization signature or a hostile-process sandbox. It does not
+establish that a recipe's bound is approved, that every output still exists before the first scan, or
+that renamed/hidden files were found. It does not catch changes made and restored between snapshots.
+The existing lock, row coverage and independent review must still establish approved scope and actual
+execution. Regeneration also costs model compilation/enumeration time on each guarded execution.
+
 ## 5. What was established, and trust limits
 
 Report each guarantee with its target, method and scope, separately:
 
 - laws proven about the reference model, for every value of its types, by `bend --verdict`;
 - the declared space enumerated in full (or incomplete, with the budget stop), traces up to `Bound`;
-- the product observed and matched to the model on every prefix of those traces, through the adapter;
-- not established: a formal correspondence between model and product, events listed out of scope,
-  browser or network behavior, or unstated intent.
+- the product observed through the adapter on prefixes of actually executed traces. Name the executed
+  cover/joint/W/order suites, sampled run count and seed, omissions and stops. Enumerating all traces
+  does not mean all were executed, and a skipped sweep is not conformance evidence;
+- not established by those results alone: a formal correspondence between model and product, events
+  listed out of scope, real browser or network behavior, scheduling fairness, or unstated intent.
+
+For each critical row, connect its approved source and Terms mapping to the model law, the adapter's
+public product observation, and the actual assertion/runId. Use the existing verification realization
+plan and evidence records, not a second parallel matrix. Identify where model input classes lose
+information and how the observation distinguishes a correct product from a plausible wrong one.
+A reducer adapter does not observe DOM focus, keyboard activation, accessible names or navigation.
+Where a row depends on those, execute the corresponding DOM/browser journey and assert its observable
+result. A mock-only or model-only pass cannot stand in for that acceptance path. If the real path is
+blocked, report the constraint and leave that claim unverified instead of widening a fixture result.
 
 `--verdict` needs the Lean kernel it builds on first use (Lean v4.34.0 for Bend 2.0.34). When the kernel
 cannot be built, every verdict is `unavailable` — an `ENVIRONMENT_DEFECT`, never a failed or open proof.
@@ -2760,8 +2795,9 @@ is not a reason.
 ## Progress is a ranking function
 
 Bend states no "eventually"; it proves a number that shrinks. Give the live states a rank in `Nat`, prove
-that every step keeps a terminal state or lowers the rank of a live one, and the rank of `init` bounds the
-path to a terminal state. A bounded retry ranks by the retries left:
+that each modeled transition from a live state either reaches a terminal state or lowers that rank.
+Together with a successor at each live state, this bounds how many modeled transitions can precede
+termination. It does not make a scheduler take those transitions. A bounded retry ranks by the retries left:
 
 ```python
 def Load.progress(s: Load, t: Load) -> Bool:
@@ -2778,14 +2814,28 @@ plus one induction for the shrinking step (`def lt_succ(p: Nat) -> {Nat.is_lt(p,
 a lemma cannot sit under the `Laws.` alias). Register it as `safety`, beside an `effect` law that a live state
 reaches the terminal one and its `witness`.
 
-- Fairness is `next`: it offers an event at every live state. A live state with no event is a hang; "the
-  network never answers" is the `Timeout{}` row above, and without it no rank exists.
-- A step that does not lower the rank (a retry that re-enters `Loading{n}`) fails the kernel. That is the
-  finding: the wait has no bound, so ask the policy for one (`NEEDS_DECISION`); do not weaken the law.
-- Set `Bound` at least the rank of `init` plus one, so the space holds a full path to a terminal state.
-- The product needs no second test: conformance compares it with the model on every traced step, so the
-  rank carries over within the checked traces. Strong fairness and starvation between actors have no rank;
-  they stay `Not formalized`.
+- `next` establishes enabledness, not fairness: a nonempty result offers a possible event, not an
+  eventual execution. A live state with no successor is a modeled deadlock. A scheduler that never
+  selects an offered event can still stall. Weak fairness concerns continuously enabled actions,
+  strong fairness actions enabled infinitely often. Neither follows from enumerating `next`.
+- `Timeout{}` states what happens if the timeout event occurs. State the sourced timer/scheduler
+  assumptions separately and observe the product's timer boundary. Offering a timeout does not prove
+  that a real timer fires, a network answers, or an actor is not starved.
+- A live-to-live step that leaves the rank unchanged refutes this strict-decrease law, not necessarily
+  the product's liveness. If policy permits stuttering or unrelated events, record the missing premise
+  and the narrower claim. Do not delete those events, weaken the law, or invent a retry bound to pass.
+  An undecided policy goes to `NEEDS_DECISION`.
+- Set `Bound` at least the rank of `init` plus one for this strict-decrease pattern. It bounds modeled
+  transitions, not elapsed time or an unbounded number of scheduler stutters. State which live states,
+  transitions and terminal condition the law covers.
+- The rank carries over within the checked traces only when the adapter observes the relevant product
+  transitions. It does not cover unexecuted traces or real scheduling. Strong fairness, starvation and
+  wall-clock deadlines remain `Not formalized` unless separate evidence establishes them. Reuse existing
+  conformance tests where they observe the required behavior, add product-boundary checks where they do not.
+
+Terminology follows Leslie Lamport's _A High-Level View of TLA+_ (next-state actions versus fairness)
+and _PlusCal Tutorial_, Session 9 (weak and strong fairness), rather than treating a generator as a scheduler.
+The rank argument assumes a well-founded order and strict decrease on the transitions being claimed.
 
 ## Error kinds are a sum type
 

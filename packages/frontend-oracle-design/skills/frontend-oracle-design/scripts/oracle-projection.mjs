@@ -12,7 +12,7 @@ import { ensureBend } from './ensure-bend.mjs'
 import { evaluateWorlds, loadWorld, settingLabel, settingReport } from './oracle-adequacy.mjs'
 import { runCli } from './oracle-cli.mjs'
 import { perturbations, spaceCrossCheck } from './oracle-discovery.mjs'
-import { sha256, stableStringify } from './oracle-fs.mjs'
+import { assertSnapshotUnchanged, sha256, snapshotRegularFile, stableStringify } from './oracle-fs.mjs'
 import {
   bendInputs,
   classifyTrace,
@@ -49,6 +49,13 @@ export const PROJECTION_VERSION = 1
 const RUNNERS = { 'node-test': "import { test } from 'node:test'", vitest: "import { test } from 'vitest'" }
 export const CASE_TIMEOUT = 5000
 
+const RECIPE_MARKER = '// Oracle projection recipe: '
+const OUTPUT_HASH = /^\/\/ Oracle output sha256: ([a-f0-9]{64})\n/m
+const RECIPE_PATHS = ['adapter', 'model', 'package', 'card', 'cwd']
+const RECIPE_VALUES = ['prefix', 'row', 'runs', 'bound', 'maxLength', 'maxCases', 'runner', 'environment',
+  'caseTimeout', 'name', 'regenerate', 'wSet', 'orderWays', 'stateType', 'commandType', 'relations',
+  'differential', 'threshold', 'natMax', 'listMax', 'walks', 'steps', 'seed']
+
 class CliError extends Error {
   constructor(code, message, exitCode = 1) {
     super(message)
@@ -60,6 +67,79 @@ class CliError extends Error {
 const toImport = (path) => {
   const portable = path.split(sep).join(posix.sep)
   return portable.startsWith('.') ? portable : `./${portable}`
+}
+
+// The recipe is data, never a shell command. Reuse the emitter itself as the comparison oracle.
+function projectionRecipe(mode, options) {
+  const out = resolve(options.out)
+  const values = Object.fromEntries(RECIPE_VALUES.filter((key) => options[key] !== undefined).map((key) => [key, options[key]]))
+  for (const key of RECIPE_PATHS) {
+    if (options[key] === undefined) continue
+    const cwd = ['package', 'card'].includes(key) ? options.cwd ?? process.cwd() : process.cwd()
+    values[key] = toImport(relative(out, resolve(cwd, options[key])))
+  }
+  if (options.cwd === undefined) values.cwd = toImport(relative(out, process.cwd()))
+  return { version: 1, mode, options: values }
+}
+
+async function writeOrCompare(file, text, verify) {
+  if (!verify) {
+    await writeFile(file, text)
+    return
+  }
+  const actual = await snapshotRegularFile(file, {
+    allowHardlinks: false,
+    label: 'generated projection',
+    fail: (message) => new CliError('GENERATED_TESTS_DRIFT', message),
+  })
+  if (actual.bytes.toString('utf8') !== text)
+    throw new CliError('GENERATED_TESTS_DRIFT', `${file} differs from canonical generation; regenerate, do not edit tests`)
+}
+
+async function writeProjection(mode, options, file, lines) {
+  const recipe = `${RECIPE_MARKER}${JSON.stringify(projectionRecipe(mode, options))}\n`
+  const body = `${lines.join('\n')}\n`.replace('// Regenerate: ', `${recipe}// Regenerate: `)
+  const text = body.replace(recipe, `${recipe}// Oracle output sha256: ${sha256(body)}\n`)
+  await writeOrCompare(file, text, options.verify)
+}
+
+/** Checks complete bytes without importing the generated test or adapter, or repairing any output. */
+export async function verifyGenerated(file, { bin, timeoutMs } = {}) {
+  const target = resolve(file)
+  const snapshot = await snapshotRegularFile(target, {
+    allowHardlinks: false,
+    label: 'generated projection',
+    fail: (message) => new CliError('GENERATED_TESTS_DRIFT', message),
+  })
+  const text = snapshot.bytes.toString('utf8')
+  const lines = text.split('\n').filter((line) => line.startsWith(RECIPE_MARKER))
+  let recipe
+  try {
+    if (lines.length !== 1) throw new Error('expected one generation recipe; regenerate older files')
+    recipe = JSON.parse(lines[0].slice(RECIPE_MARKER.length))
+    if (recipe.version !== 1 || !['world', 'trace', 'state', 'sweep'].includes(recipe.mode)) throw new Error('unsupported recipe')
+    if (!recipe.options || typeof recipe.options !== 'object' || Array.isArray(recipe.options)) throw new Error('invalid options')
+    for (const [key, value] of Object.entries(recipe.options)) {
+      if (![...RECIPE_PATHS, ...RECIPE_VALUES].includes(key)) throw new Error(`unsupported option ${key}`)
+      if (RECIPE_PATHS.includes(key) && typeof value !== 'string') throw new Error(`invalid path ${key}`)
+      if (key === 'relations' ? !Array.isArray(value) || !value.every((item) => typeof item === 'string')
+        : !['string', 'number', 'boolean'].includes(typeof value)) throw new Error(`invalid value ${key}`)
+    }
+    if (recipe.options.name !== undefined && !/^[\w.-]+$/.test(recipe.options.name)) throw new Error('invalid output name')
+  } catch (error) {
+    throw new CliError('GENERATED_TESTS_DRIFT', `${target}: ${error.message}`)
+  }
+  const digest = text.match(OUTPUT_HASH)?.[1]
+  if (digest !== sha256(text.replace(OUTPUT_HASH, '')))
+    throw new CliError('GENERATED_TESTS_DRIFT', `${target}: output digest differs; regenerate`)
+  const options = { ...recipe.options, out: dirname(target), verify: true, bin: bin ?? (await ensureBend()).bin, timeoutMs }
+  for (const key of RECIPE_PATHS)
+    if (options[key] !== undefined) options[key] = resolve(dirname(target), options[key])
+  const emitters = { world: emitWorld, trace: emitTrace, state: emitState, sweep: emitSweep }
+  const result = await emitters[recipe.mode](options)
+  if (!result.files.includes(target)) throw new CliError('GENERATED_TESTS_DRIFT', `${target}: not the recipe's generated output`)
+  await assertSnapshotUnchanged(snapshot, { fail: (message) => new CliError('GENERATED_TESTS_DRIFT', message) })
+  return { file: target, mode: recipe.mode, status: 'verified', files: result.files, sha256: snapshot.sha256 }
 }
 
 /**
@@ -203,6 +283,9 @@ function header({
     'const UNLIMITED = { timeout: Number.POSITIVE_INFINITY }',
     '',
     "test('[' + ROW + '] oracle sources unchanged since generation', () => {",
+    "  const generated = readFileSync(new URL(import.meta.url), 'utf8')",
+    '  const outputHash = /^\\/\\/ Oracle output sha256: ([a-f0-9]{64})\\n/m',
+    "  assert.equal(createHash('sha256').update(generated.replace(outputHash, '')).digest('hex'), generated.match(outputHash)?.[1], 'GENERATED_TESTS_DRIFT: generated test was edited; regenerate it')",
     '  for (const { path, sha256 } of SOURCES) {',
     "    const actual = createHash('sha256').update(readFileSync(new URL(path, import.meta.url), 'utf8')).digest('hex')",
     "    assert.equal(actual, sha256, 'STALE_GENERATED_TESTS: ' + path + ' changed since generation — regenerate this file')",
@@ -222,11 +305,11 @@ function header({
 }
 
 /** 생성 테스트가 부를 컴파일된 모델을 쓰고, 원본 파일들과 그 모델의 digest 목록을 돌려준다. */
-async function writeModel({ model, bin, timeoutMs, outDir, modelFile }) {
+async function writeModel({ model, bin, timeoutMs, outDir, modelFile, verify }) {
   const entry = resolve(model)
   const { source, inputs } = await compileBend({ entry, bin, timeoutMs })
   const text = `// AUTO-GENERATED by frontend-oracle-design from ${basename(entry)} (bend -o) — DO NOT EDIT.\n${source}`
-  await writeFile(join(outDir, modelFile), text)
+  await writeOrCompare(join(outDir, modelFile), text, verify)
   return {
     inputs,
     sources: [
@@ -353,7 +436,7 @@ export async function emitWorld(options) {
     })
   }
   const outDir = resolve(out)
-  await mkdir(outDir, { recursive: true })
+  if (!options.verify) await mkdir(outDir, { recursive: true })
   const testFile = `${name ?? spec.prefix.toLowerCase()}.world.test.mjs`
   // 기대값은 세계 파일과, 행·가정·용어를 정한 카드나 패키지에서 나온다 — 어느 쪽이 바뀌어도 이 파일은 낡았다
   const meaning = resolve(cwd, card ?? packagePath)
@@ -400,7 +483,7 @@ export async function emitWorld(options) {
     '  })',
     '}',
   ]
-  await writeFile(join(outDir, testFile), `${lines.join('\n')}\n`)
+  await writeProjection('world', options, join(outDir, testFile), lines)
   return {
     files: [join(outDir, testFile)],
     verification: {
@@ -589,11 +672,11 @@ export async function emitTrace(options) {
   const probes = perturbations(loaded, { ...space, cases: cover.cases })
     .list.slice(0, MAX_PROBES)
     .map(({ key, trace, leaveAt }) => ({ key, trace, leaveAt }))
-  await mkdir(outDir, { recursive: true })
+  if (!options.verify) await mkdir(outDir, { recursive: true })
   const base = name ?? prefix.toLowerCase()
   const modelFile = `${base}.model.mjs`
   const testFile = `${base}.oracle.test.mjs`
-  const written = await writeModel({ model, bin, timeoutMs, outDir, modelFile })
+  const written = await writeModel({ model, bin, timeoutMs, outDir, modelFile, verify: options.verify })
   // 결합 케이스는 패키지·선언 기록·세계 파일에서 나온다 — 그중 하나가 바뀌면 이 파일은 낡았다
   const extra = await Promise.all(
     jointSources.map(async (path) => ({ path: toImport(relative(outDir, path)), sha256: sha256(await readFile(path, 'utf8')) })),
@@ -791,7 +874,7 @@ export async function emitTrace(options) {
       '})',
     )
   }
-  await writeFile(join(outDir, testFile), `${lines.join('\n')}\n`)
+  await writeProjection('trace', options, join(outDir, testFile), lines)
   return {
     files: [join(outDir, modelFile), join(outDir, testFile)],
     spaceDigest: space.spaceDigest,
@@ -834,11 +917,11 @@ export async function emitSweep(options) {
   const { model, prefix } = await sweepInputs(options)
   await loadModel({ model, prefix, bin, timeoutMs })
   const outDir = resolve(out)
-  await mkdir(outDir, { recursive: true })
+  if (!options.verify) await mkdir(outDir, { recursive: true })
   const base = name ?? prefix.toLowerCase()
   const modelFile = `${base}.model.mjs`
   const testFile = `${base}.sweep.oracle.test.mjs`
-  const written = await writeModel({ model, bin, timeoutMs, outDir, modelFile })
+  const written = await writeModel({ model, bin, timeoutMs, outDir, modelFile, verify: options.verify })
   const scope = `a report of ${walks} random walks of up to ${steps} events (seed ${seed}) — triage input for one batch of fixes, not conformance evidence`
   const run = `SWEEP=1 ${runner === 'vitest' ? 'vitest run' : 'node --test'} ${join(out, testFile)}`
   const lines = [
@@ -875,7 +958,7 @@ export async function emitSweep(options) {
     "  assert.equal(report.clusters.length, 0, 'SWEEP_DIVERGENCES: ' + report.clusters.length + ' kinds in ' + WALKS + ' walks of up to ' + STEPS + ' events (seed ' + SEED + ')\\n' + shown.join('\\n'))",
     '})',
   ]
-  await writeFile(join(outDir, testFile), `${lines.join('\n')}\n`)
+  await writeProjection('sweep', options, join(outDir, testFile), lines)
   return {
     files: [join(outDir, modelFile), join(outDir, testFile)],
     run,
@@ -964,11 +1047,11 @@ export async function emitState(options) {
     ? valuesOf(stateIR).flatMap((state) => valuesOf(commandIR).map((command) => [toPlain(state), toPlain(command)]))
     : []
   const outDir = resolve(out)
-  await mkdir(outDir, { recursive: true })
+  if (!options.verify) await mkdir(outDir, { recursive: true })
   const base = name ?? prefix.toLowerCase()
   const modelFile = `${base}.model.mjs`
   const testFile = `${base}.oracle.test.mjs`
-  const { sources } = await writeModel({ model, bin, timeoutMs, outDir, modelFile })
+  const { sources } = await writeModel({ model, bin, timeoutMs, outDir, modelFile, verify: options.verify })
   const seed = seedOf(sha256(stableStringify({ stateIR, commandIR, relations, sources })))
   const limits = [
     ...(bounds.nat === undefined ? [] : [`Nat ≤ ${bounds.nat}`]),
@@ -1043,7 +1126,7 @@ export async function emitState(options) {
     `  assert.ok(executed >= ${runs}, 'fast-check executed ' + executed + ' of ${runs} requested runs')`,
     '})',
   )
-  await writeFile(join(outDir, testFile), `${lines.join('\n')}\n`)
+  await writeProjection('state', options, join(outDir, testFile), lines)
   return {
     files: [join(outDir, modelFile), join(outDir, testFile)],
     verification: {
@@ -1204,6 +1287,7 @@ function parseOptions(args) {
 }
 
 const USAGE = `usage:
+  oracle-projection.mjs verify-generated --file <generated.test.mjs>
   oracle-projection.mjs emit-trace (--package <oracle.package.json> | --model <MODEL.bend> --prefix <Name> --bound <n>) --adapter <adapter.mjs> --out <dir> --row <O*> --runs <n> [--max-length <n>] [--w-set | --no-w-set] [--order-ways <t> | --no-order-ways] [--runner node-test|vitest] [--environment <jsdom>] [--case-timeout <ms>] [--name <base>]
   oracle-projection.mjs emit-state --model <MODEL.bend> --prefix <Name> --state <Type> --command <Type> --adapter <adapter.mjs> --out <dir> --row <O*> (--relation <def>)... --runs <n> [--differential] [--threshold <n>] [--nat-max <n>] [--list-max <n>] [--runner node-test|vitest] [--environment <jsdom>] [--case-timeout <ms>]
   oracle-projection.mjs emit-sweep (--package <oracle.package.json> | --model <MODEL.bend> --prefix <Name>) --adapter <adapter.mjs> --out <dir> --row <O*> [--walks <n>] [--steps <n>] [--seed <n>] [--runner node-test|vitest] [--environment <jsdom>] [--case-timeout <ms>] [--name <base>]
@@ -1220,6 +1304,11 @@ function suiteSwitch(asked, off, flag) {
 
 async function main() {
   const [command, ...args] = process.argv.slice(2)
+  if (command === 'verify-generated') {
+    if (args.length !== 2 || args[0] !== '--file') throw new CliError('USAGE', 'verify-generated --file <generated.test.mjs>', 2)
+    process.stdout.write(`${JSON.stringify(await verifyGenerated(args[1]))}\n`)
+    return
+  }
   if (!['emit-trace', 'emit-sweep', 'emit-state', 'replay', 'emit-world'].includes(command)) throw new CliError('USAGE', USAGE, 2)
   const options = parseOptions(args)
   const timeoutMs = integer(options['timeout-ms'])

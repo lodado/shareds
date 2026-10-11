@@ -3,12 +3,14 @@ import { Buffer } from 'node:buffer'
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFileSync, realpathSync, writeFileSync } from 'node:fs'
-import { chmod, link, mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, cp, link, mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { HOST_RECEIPTS_FILE, reviewOutputDigest } from './oracle-fs.mjs'
+import { emitWorld } from './oracle-projection.mjs'
+import { installedBend } from './oracle-test-bend.mjs'
 import { resolveExecutable, spawnGit } from './resolve-executable.mjs'
 
 // oracle-run.shard-N.test.mjs가 이 목록을 나눠 등록한다 — 프로세스를 많이 띄우는 케이스를 node --test가 병렬
@@ -384,6 +386,59 @@ async function workspace(
 
   return { repository, root, oracleDirectory, oracle, lock, marker: join(root, 'marker.txt') }
 }
+
+test('public exec refuses edited generated tests before command effects or ledger evidence', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const { root, oracleDirectory, marker } = await workspace(t, { git: true })
+  const dir = join(root, 'doc-save')
+  await cp(resolve(scriptDirectory, '../../../test-fixtures/doc-save'), dir, { recursive: true })
+  await emitWorld({ card: join(dir, 'oracle.md'), cwd: dir, adapter: join(dir, 'doc-save.adapter.mjs'),
+    out: join(dir, 'generated'), row: 'O1', bin, regenerate: 'test' })
+  // Generated paths can be ignored by Git; execution must still inspect them.
+  await writeFile(join(dir, '.gitignore'), 'generated/\n')
+  const args = ['exec', '--dir', oracleDirectory, '--label', 'inspection', '--', process.execPath, ...appendMarker(marker, 0)]
+  const clean = run(args)
+  assert.equal(clean.status, 0, clean.stderr)
+  assert.equal(await markerCount(marker), 1)
+  const before = await ledgerLines(oracleDirectory)
+  const file = join(dir, 'generated', 'save.world.test.mjs')
+  const original = await readFile(file, 'utf8')
+  await writeFile(file, original.replace('for (const setting of SETTINGS)', 'for (const setting of SETTINGS.slice(0, 0))'))
+  const rejected = run(args)
+  assert.equal(rejected.status, 1, 'public exec must refuse drift, not record the command as passing')
+  assert.match(rejected.stderr, /GENERATED_TESTS_DRIFT/)
+  assert.equal(await markerCount(marker), 1)
+  assert.deepEqual(await ledgerLines(oracleDirectory), before)
+  await writeFile(file, original)
+  assert.equal(run(args).status, 0)
+  assert.equal(await markerCount(marker), 2)
+
+  for (const operation of ['writeFileSync', 'unlinkSync']) {
+    const ledgerBefore = await ledgerLines(oracleDirectory)
+    const code = `require('node:fs').${operation}(${JSON.stringify(file)}${operation === 'writeFileSync' ? ", '// replaced during execution\\n'" : ''})`
+    const changedDuringRun = run(['exec', '--dir', oracleDirectory, '--label', 'inspection', '--', process.execPath, '-e', code])
+    assert.equal(changedDuringRun.status, 1)
+    assert.match(changedDuringRun.stderr, /GENERATED_TESTS_DRIFT/)
+    assert.deepEqual(await ledgerLines(oracleDirectory), ledgerBefore)
+    await writeFile(file, original)
+  }
+
+  const saved = join(dir, 'saved-output.mjs')
+  await writeFile(saved, original)
+  await rm(file)
+  await symlink(saved, file)
+  const linked = run(args)
+  assert.equal(linked.status, 1, 'a linked generated test must not evade the scanner')
+  assert.match(linked.stderr, /GENERATED_TESTS_DRIFT/)
+  assert.equal(await markerCount(marker), 2)
+  await rm(file)
+  await writeFile(file, original.replace(/^\/\/.*\n/gm, ''))
+  const stripped = run(args)
+  assert.equal(stripped.status, 1, 'the reserved output name must survive removal of all header markers')
+  assert.match(stripped.stderr, /GENERATED_TESTS_DRIFT/)
+  assert.equal(await markerCount(marker), 2)
+})
 
 test('metrics reports recorded facts read-only and leaves unobserved outcomes unmeasured', async (t) => {
   const { oracleDirectory } = await workspace(t)
