@@ -1815,7 +1815,10 @@ law provable — that is a silent decision. Report each result by its scope: a f
    histories that diverge several steps later. No model calls or transition-cover exploration past
    the bound are needed. The card binds the finite automaton's state/transition counts and digest;
    outside the bound is explicitly `unverified`, and a budget-stopped Space is refused rather than
-   certified. The model's Bend laws, adequacy, lock and product-test gates remain separate and required.
+   certified. Card lint's Space cross-check also uses only those bounded traces, retaining mapping
+   review and undecided-candidate gates and labeling findings with that scope. Explicit discovery
+   and stage checks keep their extended transition cover; bounded absence is not an unbounded
+   impossibility claim. The model's Bend laws, adequacy, lock and product-test gates remain separate and required.
    This is exact finite-language minimization, not a Bend-kernel proof of the JavaScript transformer
    and not an unbounded equivalence claim. Exhaustive Space construction can still grow exponentially.
 3. **Refine by counterexample.** Run `oracle-adequacy.mjs check --package <pkg>` and the refinement loop

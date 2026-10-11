@@ -229,7 +229,8 @@ export function stepper(model) {
     return trace.map((event) => {
       const key = stableStringify(event)
       if (!node.children.has(key)) {
-        const match = listItems(model.next(listOf(node.raw))).find((choice) => isDeepStrictEqual(toPlain(choice), event))
+        node.choices ??= listItems(model.next(listOf(node.raw)))
+        const match = node.choices.find((choice) => isDeepStrictEqual(toPlain(choice), event))
         const after = model.step(node.state, match)
         node.children.set(key, {
           children: new Map(),
@@ -271,16 +272,29 @@ export function crossLookup({ caseSpace, mapping, worlds, traces, classify, coor
   const worldHas = (world, dimension, value) => world.plain[maps[dimension.dimension].world] === target(dimension, value)
   // 한 trace가 보인 선언 값 — 단계마다 분류 def가 그 단계의 값을 말한다
   const behavior = dimensions.filter((dimension) => kindOf(dimension) === 'behavior')
-  const shown = traces.map(
-    (trace) =>
-      new Set(
-        trace.steps.flatMap((step) =>
-          behavior.map(
-            (dimension) => `${dimension.dimension}=${classify(maps[dimension.dimension].classify, step.before, step.event)}`,
-          ),
-        ),
-      ),
-  )
+  // Classifiers are pure functions of the full before-state and event, not the trace history.
+  // Digests only select a bucket. Exact raw-value equality also checks payloads, BigInt and signed zero.
+  const keys = new WeakMap()
+  const keyOf = (value) => {
+    const digest = () => sha256(stableStringify(toPlain(value)))
+    if (value === null || typeof value !== 'object') return digest()
+    if (!keys.has(value)) keys.set(value, digest())
+    return keys.get(value)
+  }
+  const classifications = new Map()
+  const shownBy = ({ before, event }) => {
+    const key = `${keyOf(before)}:${keyOf(event)}`
+    if (!classifications.has(key)) classifications.set(key, [])
+    const bucket = classifications.get(key)
+    const known = bucket.find((entry) => isDeepStrictEqual(entry.before, before) && isDeepStrictEqual(entry.event, event))
+    if (known) return known.shown
+    const shown = behavior.map(
+      (dimension) => `${dimension.dimension}=${classify(maps[dimension.dimension].classify, before, event)}`,
+    )
+    bucket.push({ before, event, shown })
+    return shown
+  }
+  const shown = traces.map((trace) => new Set(trace.steps.flatMap(shownBy)))
   const traceHas = (seen, dimension, value) => seen.has(`${dimension.dimension}=${target(dimension, value)}`)
   return { dimensions, worlds, traces, coordinates, maps, kindOf, target, mapped, worldHas, shown, traceHas }
 }
@@ -599,9 +613,9 @@ export function crossCheckSpace({ caseSpace, stateModel = null, mapping = {}, wo
 
 /**
  * space-cross-check 실행 — 버전 2 패키지의 선언 공간(spaceDiscovery 기록의 `## Case space`·`## State Model`)을 세계 열거와,
- * 행동 모델의 trace(bound까지의 공간 + 전이 커버)에 비춘다. 분류 def는 행동 모델 파일에 있다.
+ * 행동 모델의 trace(bound까지의 공간, 기본 discovery 경로에서는 추가 전이 커버)에 비춘다. 카드 lint는 선언 bound만 쓴다.
  */
-export async function spaceCrossCheck({ loaded, bin, timeoutMs }) {
+export async function spaceCrossCheck({ loaded, bin, timeoutMs, includeTransitionCover = true }) {
   const { pkg } = loaded
   if ((pkg.packageVersion ?? 1) < 2)
     return { status: 'not-applicable', reason: 'a version-1 package has no Space discovery record to compare', candidates: [] }
@@ -624,8 +638,11 @@ export async function spaceCrossCheck({ loaded, bin, timeoutMs }) {
     const modelPath = sourcePath(loaded, pkg.behavior.model)
     const model = await loadModel({ model: modelPath, prefix: pkg.behavior.prefix, bin, timeoutMs })
     const space = enumerateSpace(model, { bound: pkg.behavior.bound })
+    if (!space.complete)
+      return { status: 'not-run', reason: 'the declared behavior space was not completely enumerated', candidates: [] }
     const stepsOf = stepper(model)
-    traces = [...space.cases, ...transitionCover(model, space).cases].map((entry) => ({
+    const cases = includeTransitionCover ? [...space.cases, ...transitionCover(model, space).cases] : space.cases
+    traces = cases.map((entry) => ({
       label: entry.label,
       trace: entry.trace,
       observations: entry.observations,
@@ -642,7 +659,7 @@ export async function spaceCrossCheck({ loaded, bin, timeoutMs }) {
   const statesPath = pkg.crossCheck.states ? sourcePath(loaded, pkg.crossCheck.states) : declaredPath
   const statesText = statesPath === declaredPath ? text : await readFile(statesPath, 'utf8').catch(() => '')
   try {
-    return crossCheckSpace({
+    const result = crossCheckSpace({
       caseSpace,
       stateModel: declaredStateModel(statesText),
       mapping: pkg.crossCheck,
@@ -651,6 +668,9 @@ export async function spaceCrossCheck({ loaded, bin, timeoutMs }) {
       classify,
       coordinates: world.spec.coordinates,
     })
+    return !includeTransitionCover && pkg.behavior
+      ? { ...result, traceScope: { kind: 'bounded-traces', bound: pkg.behavior.bound, outside: 'unverified' } }
+      : result
   } catch (error) {
     if (error.code === 'CROSS_CHECK_DEF') return { status: 'invalid', reason: error.message, candidates: [] }
     throw error
@@ -730,8 +750,8 @@ async function mappingReviewIssues(loaded) {
  * 기각을 그 출처와 함께. 모델이나 선언 기록을 고쳐 후보가 사라져도 된다. 버전 1 패키지는 관문이 없다. 매핑이 없는 버전 2
  * 패키지는 출처 있는 n/a로만 넘어간다.
  */
-export async function crossCheckIssues({ loaded, bin, timeoutMs }) {
-  const result = await spaceCrossCheck({ loaded, bin, timeoutMs })
+export async function crossCheckIssues({ loaded, bin, timeoutMs, includeTransitionCover = true }) {
+  const result = await spaceCrossCheck({ loaded, bin, timeoutMs, includeTransitionCover })
   if (result.status === 'not-applicable') return []
   if (result.status === 'undeclared') {
     const writtenOff = loaded.pkg.operators?.['space-cross-check']?.startsWith('n/a:')
@@ -750,7 +770,10 @@ export async function crossCheckIssues({ loaded, bin, timeoutMs }) {
     ...reviewIssues,
     ...result.candidates
       .filter((entry) => open.has(entry.id))
-      .map((entry) => `cross-check-undecided: ${entry.id} ${entry.class} — ${entry.summary}`),
+      .map((entry) => {
+        const scope = result.traceScope ? ` (within ${result.traceScope.bound} events; outside unverified)` : ''
+        return `cross-check-undecided: ${entry.id} ${entry.class} — ${entry.summary}${scope}`
+      }),
   ]
 }
 
@@ -774,7 +797,7 @@ export function crossCheckAtRoot(root = process.cwd()) {
     } catch (error) {
       return [`cross-check-unverified: Bend is not installed (${error.code ?? error.message})`]
     }
-    return crossCheckIssues({ loaded, bin })
+    return crossCheckIssues({ loaded, bin, includeTransitionCover: false })
   }
 }
 

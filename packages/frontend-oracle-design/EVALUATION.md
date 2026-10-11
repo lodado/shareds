@@ -1,3 +1,78 @@
+# 0.100.1: keep card cross-checks inside the declared finite Space
+
+## Acceptance-discovered regression
+
+A real local Bend mailbox package (32,000 traces at bound 3) completed public `derive` with
+0.100.0 in 30.506 seconds. On the same inputs and Node executable, 0.99.0 aborted after 143.934
+seconds with V8 heap exhaustion at about 4 GB. The old run did not finish, so this is not an exact
+speedup ratio. Public `project-card` and `check-card` also passed in 59.772 and 59.824 seconds.
+But the full 0.100.0 `oracle-verify.mjs card` still exceeded a 240-second limit: after regeneration,
+`crossCheckAtRoot` called `spaceCrossCheck`, which separately built an extended `transitionCover`.
+The earlier derivation-only change did not close the full card acceptance path.
+
+The bounded replay also enumerated the same parent's successor list separately for each sibling
+edge. It now caches that list on the ordered prefix node, still matching the complete event payload
+and applying each distinct edge to the parent's state. The existing independent replay comparison
+is unchanged. Its strengthened call-count assertion failed at 6 calls before the fix and passes
+at 3 calls after it (versus 9 without prefix sharing); replaying the traces again adds no calls.
+This removes duplicate work, not events, ordering constraints, or observations.
+
+A five-second CPU profile of the real public card process then placed 3,263 of 3,943 samples
+inside `structuredClone`, called by behavior classification in `crossLookup`. The run was
+intentionally interrupted after profiling, not counted as a successful or timed-out acceptance
+run. Classifications now reuse only exactly equal complete before-state/event inputs, within
+one lookup. A digest chooses a candidate bucket; raw deep equality decides reuse, so numeric
+normalization or a hash collision cannot merge distinct classifier inputs. Defensive input
+cloning remains on every actual Bend classifier call. Ordered traces and their steps are not
+removed. The new regression first failed at 16 calls versus 8 and now passes with identical
+per-trace results, unchanged inputs, type/signed-zero distinctions and no cross-run cache.
+
+Card cross-checks now opt out of that extended cover and classify only completely enumerated,
+ordered, bounded traces. Results and unresolved findings explicitly identify the finite scope;
+outside it remains unverified. Mapping review and unresolved-policy gates remain. Explicit
+Space discovery and stage checks retain their default extended cover. Bend proofs, product tests,
+adequacy and lock requirements are not removed or claimed to have become faster.
+
+## Requirement-specific regression evidence
+
+The real compiled pagination model at bound 1 rejects any `next` call on a nonempty history.
+Before the fix, the public card cross-check adapter failed this assertion (`Con` versus `Nil`)
+inside `transitionCover`. Afterward it passes while still emitting mapping-review and unresolved
+candidate issues, each unresolved finding labeled with the bound. The same test restores the model
+and verifies that default discovery still observes strictly more model transitions.
+
+As supplemental evidence, the real mailbox model's 32,821 ordered prefixes and 32,820 prefix-tree
+edges were compared exhaustively with its compressed 3,075-state automaton. Every intermediate
+observation and exact outgoing event set matched, all 32,000 bound-3 leaves had no fourth edge,
+and 11,643 reordered trace comparisons retained their differing observations. Budget-stopped
+Space was rejected and the automaton summary exactly matched the public `derive` artifact.
+This is an executable comparison of actual compiled Bend data, not a kernel proof of the JS
+transformer and not a substitute for the public card CLI acceptance path.
+
+## Real public card acceptance
+
+The final candidate's public `oracle-verify.mjs card` completed against the unchanged local
+mailbox package: exit 0, `CARD_LINT_OK 18 rows`, 421.464 seconds. Instrumented phases were
+52.086 seconds for card regeneration and 369.023 seconds for the bounded cross-check. The
+wrapper compared package, model-input, original card and lock digests before and after and
+confirmed they were unchanged; its temporary card link was removed. This closes the real
+card path, not just a copied model or synthetic harness. The earlier 0.100.0 run timed out
+at 240 seconds, so these observations do **not** establish a full-card speedup ratio. Seven
+minutes is still expensive: finite scope and reuse do not eliminate model enumeration or
+compiled-classifier input cloning. Card size, the complete Bend proof/lock workflow and
+product correctness are not claimed improved by this result.
+
+## Final repository verification
+
+The final production implementation passed all 1,146 package tests with no failures or skips.
+That combined run failed only on a nested template literal in the new test's expected-value
+builder. After the test-only lint fix, all 40 tests in `oracle-discovery.test.mjs` passed again
+with no failures or skips. The final package lint exited 0 with 0 errors and 405 warnings;
+all 22 reference bundles matched, and eval conversion checks passed for 14 corpus, 5 held-out,
+6 lifecycle and 25 boundary cases. No production code changed after the successful real public
+card acceptance run. Warning debt and the remaining seven-minute card cost are not hidden by
+these passing checks.
+
 # 0.100.0: bounded finite automata for package/card space checks
 
 ## Contract and implementation

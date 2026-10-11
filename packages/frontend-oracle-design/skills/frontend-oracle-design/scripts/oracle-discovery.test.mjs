@@ -14,6 +14,7 @@ import {
   applyFault,
   candidateId,
   closure,
+  crossCheckAtRoot,
   crossCheckIssues,
   crossCheckSpace,
   crossLookup,
@@ -35,7 +36,7 @@ import {
 } from './oracle-discovery.mjs'
 import { parseCaseSpace } from './oracle-frames.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
-import { enumerateSpace } from './oracle-model.mjs'
+import { enumerateSpace, loadModel } from './oracle-model.mjs'
 import { loadPackage, OPERATOR_IDS, packageInputs, packageIssues } from './oracle-package.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 
@@ -1037,6 +1038,35 @@ function jointInputs(seed, { worldDims, behaviorDims, valuesPer, traceCount, val
 const jointLookup = (inputs) => crossLookup(inputs)
 const plainJoint = (result) => ({ required: result.required, covered: result.covered, pairs: [...result.pairs], cases: result.cases })
 
+test('space-cross-check: classification reuses exact inputs without merging payloads, histories or numeric types', () => {
+  const inputs = jointInputs(1, { worldDims: 0, behaviorDims: 2, valuesPer: 2, traceCount: 0 })
+  const step = (before, event) => ({ before, event, after: {} })
+  const first = step({ n: 0 }, { $: 'E', payload: 1n })
+  const second = step({ n: 1 }, { $: 'E', payload: 1n })
+  inputs.traces = [
+    { steps: [first, second] },
+    { steps: [second, first] },
+    { steps: [clone(first), clone(second)] },
+    { steps: [step({ n: 0 }, { $: 'E', payload: 1 }), step({ n: -0 }, { $: 'E', payload: 1n })] },
+  ]
+  const classify = (def, before, event) => `${def}:${Object.is(before.n, -0) ? '-0' : before.n}:${typeof event.payload}:${event.payload}`
+  const expected = inputs.traces.map(({ steps }) => new Set(steps.flatMap(({ before, event }) =>
+    ['b0', 'b1'].map((dimension) => {
+      const value = classify(`M.${dimension}`, before, event)
+      return `${dimension}=${value}`
+    }),
+  )))
+  const unchanged = clone(inputs.traces)
+  let calls = 0
+  inputs.classify = (...args) => { calls += 1; return classify(...args) }
+  assert.deepEqual(crossLookup(inputs).shown, expected)
+  assert.deepEqual(inputs.traces, unchanged)
+  // Four exact input pairs, two classifiers. Neither trace position nor a lossy JSON key is sufficient.
+  assert.equal(calls, 8)
+  inputs.classify = () => 'Changed'
+  assert.deepEqual([...crossLookup(inputs).shown[0]], ['b0=Changed', 'b1=Changed'])
+})
+
 test('space-cross-check: the joint cover picks exactly the cases of the plain greedy it replaces, ties included', () => {
   for (let seed = 1; seed <= 120; seed += 1) {
     const inputs = jointInputs(seed, { worldDims: 1 + (seed % 3), behaviorDims: 1 + (seed % 2), valuesPer: 2 + (seed % 3), traceCount: 4 + (seed % 40) })
@@ -1096,11 +1126,11 @@ test('trace steps share the steps of a common prefix and equal a replay of each 
   const plain = { calls: 0 }
   const replayed = traces.map((trace) => replay(modelOf(plain), trace))
   assert.deepEqual(stepped, replayed)
-  // A, AA, AAB, AAA, AB, B: one model call per distinct prefix instead of one per event of every trace
-  assert.deepEqual({ shared: shared.calls, plain: plain.calls }, { shared: 6, plain: 9 })
+  // Root, A, AA: enumerate outgoing events once per parent, not once per sibling edge.
+  assert.deepEqual({ shared: shared.calls, plain: plain.calls }, { shared: 3, plain: 9 })
   // asking again costs nothing
   traces.map(stepsOf)
-  assert.equal(shared.calls, 6)
+  assert.equal(shared.calls, 3)
 })
 
 test('[bend] space-cross-check on the paging fixture finds the split pairs, the missing failure and the transitions only the model decides', async (t) => {
@@ -1142,6 +1172,44 @@ test('[bend] space-cross-check on the paging fixture finds the split pairs, the 
     'showing -RESPONSE_STALE-> showing',
   ])
   assert.match(silent.find((entry) => entry.evidence.transition === 'showing -RESPONSE_STALE-> showing').evidence.witness, /Arrive/)
+})
+
+test('[bend] card cross-check never asks for successors beyond the declared bound while discovery keeps its extended cover', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await mkdtemp(join(tmpdir(), 'oracle-bounded-cross-check-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  await cp(fileURLToPath(new URL('../../../test-fixtures/pagination/', import.meta.url)), root, { recursive: true })
+  const pkg = JSON.parse(await readFile(join(root, 'oracle.package.json'), 'utf8'))
+  pkg.behavior.bound = 1
+  delete pkg.crossCheck.reviewedBy
+  await writePackage(root, 'oracle.package.json', pkg)
+  const loaded = await loadPackage('oracle.package.json', { root })
+  const model = await loadModel({ model: join(root, 'MODEL.bend'), prefix: 'Grid', bin })
+  const next = model.next
+  let calls = 0
+  model.next = (history) => {
+    calls += 1
+    assert.equal(history.$, 'Nil', 'card cross-check explored successors at or beyond bound 1')
+    return next(history)
+  }
+  let bounded
+  try {
+    bounded = await spaceCrossCheck({ loaded, bin, includeTransitionCover: false })
+    assert.equal(bounded.status, 'run')
+    assert.deepEqual(bounded.traceScope, { kind: 'bounded-traces', bound: 1, outside: 'unverified' })
+    const issues = await crossCheckAtRoot(root)('oracle.package.json')
+    const unresolved = issues.filter((issue) => issue.startsWith('cross-check-undecided: '))
+    assert.ok(unresolved.length > 0, 'bounded mode must keep unresolved policy gates')
+    assert.ok(unresolved.every((issue) => issue.endsWith('(within 1 events; outside unverified)')))
+    assert.ok(issues.some((issue) => issue.startsWith('cross-check-unreviewed: ')), 'bounded mode must keep mapping review gates')
+    assert.ok(calls > 0, 'the real Bend model was not exercised')
+  } finally {
+    model.next = next
+  }
+  const extended = await spaceCrossCheck({ loaded, bin })
+  assert.equal(extended.status, 'run')
+  assert.ok(extended.summary.transitions.model > bounded.summary.transitions.model, 'discovery must still examine the extended cover')
 })
 
 test('space-cross-check runs only on a version-2 package; one without a crossCheck mapping blocks until mapped or written off', async () => {
