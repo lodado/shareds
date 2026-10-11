@@ -1,3 +1,56 @@
+# 0.100.0: bounded finite automata for package/card space checks
+
+## Contract and implementation
+
+Package derivation and card regeneration now consume only the already enumerated, complete bounded
+Space. They no longer call `transitionCover` to explore configurations past the declared behavior
+bound. `oracle-automaton.mjs` constructs a prefix trie and minimizes it bottom-up using exact
+signatures: observation, bound-boundary marker, and every canonical event/successor-class pair.
+Hashes identify output artifacts, not state equivalence. Canonical traversal makes the result
+independent of case-list ordering. Every prefix is accepted; omitted transitions are outside this
+finite language, not proof that the underlying model can never take them.
+
+The preservation argument is induction on trie height: equal leaves have equal observations and
+boundary labels; equal parents have equal observations, enabled events and equivalent successors.
+Thus merged histories have identical permitted suffixes and output sequences within the declared
+Space, including distinctions that appear arbitrarily many steps later within that finite bound.
+This is not a Bend-kernel proof of the JavaScript transformer. The enumerator, compiler, observation
+selection and implementation remain trusted/tested components, not newly formally verified ones.
+
+Cards carry bounded scope, prefix/state/transition counts and the automaton digest rather than the
+whole graph. The stale-search fixture has 26 traces, 44 prefixes, 20 minimized states and 38 transitions
+at bound 5. Its card explicitly says outside the bound is unverified. Budget-stopped spaces and
+contradictory prefix observations are refused. Regeneration still binds the package and transitive
+Bend sources and detects drift. Existing cards must be regenerated; meaning/approval changes still
+follow the existing revision process. Bend laws, adequacy, lock and product-execution gates are not
+removed. The separate projection/extended-cover tooling is unchanged and is not upgraded to an
+unbounded-equivalence proof by this change.
+
+## Regression evidence
+
+The real Bend/card integration first failed because the old derivation had no finite-automaton
+scope. After integration it correctly rejected the old generated card as drift; regenerating through
+`project-card` made the public `check-card` and byte-for-byte comparison pass. Seven new automaton
+tests passed, including real compiled Bend traces, late future divergence, intermediate observations,
+exact suffix merging, boundary versus natural endpoints, budget refusal and malformed spaces.
+Twelve deterministic models compare every word of lengths 0 through 5 over a three-event alphabet
+against the bounded Space's prefix/output map. Each Space is asserted to have exactly 16 nonempty
+maximal traces, preventing a malformed synthetic list constructor from vacuously passing this check.
+The new module and tests pass targeted lint without warnings. Full release commands remain the
+package `test` and `lint` scripts, including public CLI, contract and generated-reference checks.
+
+## Controlled cost measurement and limits
+
+One local run reused the 32-choice unique-state model described in 0.99.1, now with the default
+2,000-configuration extended-cover cap. Space produced 32,768 traces in 280.26 ms with 1,057 `next`
+calls. The finite automaton took another 240.01 ms with **zero additional model calls**, retaining
+33,825 states and 33,824 transitions because all observations differ. The prior extended-cover step,
+after the 0.99.1 lazy-comparison optimization, took 2,506.83 ms and 64,001 additional `next` calls.
+These phases intentionally have different scopes: the new lint path checks only its declared finite
+Space instead of exploring beyond it. This is a single-run synthetic measurement, not an end-to-end
+mailbox benchmark or a distribution. Space enumeration, full axis rendering and other verification
+gates can still dominate; exhaustive enumeration remains exponential in the worst case.
+
 # 0.99.1: lazy configuration lookahead without dropping transitions
 
 ## Reproduced bottleneck and change

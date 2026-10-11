@@ -3,7 +3,7 @@
 > Projected from the Oracle model package. Edit the package and regenerate; the region between the
 > `oracle:generated` markers is checked against its digest and the package on every lint.
 
-<!-- oracle:generated:begin generator=oracle-package@1.1 package=oracle.package.json inputs-sha256=a7ab77bbd2532d5b402129c55af47ec900feb26dcd04867d8659f6d9a2ec1de5 content-sha256=975d6d448d5ed9eb68d6606eaa1304e93293babd9636cafbe670dcc95de01695 -->
+<!-- oracle:generated:begin generator=oracle-package@1.1 package=oracle.package.json inputs-sha256=a7ab77bbd2532d5b402129c55af47ec900feb26dcd04867d8659f6d9a2ec1de5 content-sha256=fe99e1863e3108ac584a05ffa907048aa7f71e2dc24ff3ae9fe504d60a3d5af7 -->
 
 ## Outcome Brief
 
@@ -59,7 +59,7 @@
 ## Case space
 
 - Coverage: model
-- Possible cases: 576 of 576 worlds (0 excluded); 26 traces of up to 5 events; transition cover capped at 5 events (44 cases; the state grows without bound)
+- Possible cases: 576 of 576 worlds (0 excluded); 26 traces of up to 5 events; finite automaton: 20 states, 38 transitions, 44 prefixes within 5 events; outside the bound is unverified (sha256 b91c817479ff033825e4d1a27a5c80a1926a3630bb781ce0757c1c44726a1196)
 
 | Family      | Dimension   | Choices                           |
 | ----------- | ----------- | --------------------------------- |
@@ -188,7 +188,7 @@
 
 ## Derived Axes
 
-- Derivation: oracle-package.mjs derive v1 · digest 2e7c4cf72c66ab5efa90f24699625d3fdea8504d70a3c678006c62aa50b54026 · status derived
+- Derivation: oracle-package.mjs derive v1 · digest 478f8213ccaae3ece94e86245daefae4d8063908563fc3cfb5b0fc05f0a869c9 · status derived
 - Order obligations: 6 within bound 5 (order-sensitive 4, history-sensitive 2)
 - Diagnostics: none
 

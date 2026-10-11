@@ -690,6 +690,10 @@ test('[bend] derive with the trace space finds the history-sensitive late respon
   const loaded = await loadPackage('oracle.package.json', { root: FIXTURE })
   const { derived } = await derivePackage(loaded, { bin })
   assert.equal(derived.status, 'derived')
+  assert.deepEqual(derived.traces.automaton.scope, { kind: 'bounded-traces', bound: 5, outside: 'unverified' })
+  assert.equal(derived.traces.automaton.status, 'complete')
+  assert.equal(derived.traces.cover, undefined)
+  assert.match(renderGenerated(loaded.pkg, derived), /finite automaton.*outside the bound is unverified/)
   // the late response 3·1 and the in-order 1·3 both end showing request 3, through different observations
   const late = 'Issue · Issue · Issue · Respond{id:3} · Respond{id:1}'
   const history = derived.order.obligations.find(

@@ -12,6 +12,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { automatonSummary, finiteAutomaton } from './oracle-automaton.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
 import { parseBendTypesStrict, typeIR } from './oracle-types.mjs'
 
@@ -1134,9 +1135,9 @@ export function familyAudit(pkg, axes, order = null) {
   )
 }
 
-/** 행동 모델의 가능한 trace — bound까지의 공간과, 도달 가능한 구성마다 모든 사건을 도는 전이 커버. */
-function traceSummary(space, cover) {
-  const summary = { cases: space.cases.length, bound: space.bound, complete: space.complete }
+/** 행동 모델의 bound 안 trace와 유한 오토마타. 별도 호출자가 제공한 기존 전이 커버 요약도 읽는다. */
+function traceSummary(space, cover, automaton) {
+  const summary = { cases: space.cases.length, bound: space.bound, complete: space.complete, ...(automaton ? { automaton } : {}) }
   if (!cover) return summary
   const { status, configurations, pairs, coveredDepth } = cover
   return {
@@ -1184,7 +1185,7 @@ export function deriveDigest(inputs) {
  * 넘긴다). 구조적으로 알 수 있는 것만 structural로, 공간에서 계산한 것은 model-checked로 표시한다. 지원하지 않는
  * 입력은 조용히 빠지지 않고 diagnostics에 남는다.
  */
-export function derive(pkg, texts, { space = null, inputs = [], worlds = null, cover = null } = {}) {
+export function derive(pkg, texts, { space = null, inputs = [], worlds = null, cover = null, automaton = null } = {}) {
   const world = worldAxes(pkg, texts.world)
   const behavior = pkg.behavior && texts.model ? behaviorAxes(pkg.behavior, texts.model, [pkg.behavior.model]) : null
   const axes = [...world.axes, ...(behavior?.axes ?? [])]
@@ -1234,7 +1235,7 @@ export function derive(pkg, texts, { space = null, inputs = [], worlds = null, c
     order,
     // 가능한 경우 — 가정이 남긴 세계(컴파일된 세계 모델로 센다)와 행동 모델이 허락한 trace. 원시 곱은 실행하지 않는다.
     worlds: worlds ?? { status: 'not-run', reason: 'Bend was not run' },
-    traces: space ? traceSummary(space, cover) : null,
+    traces: space ? traceSummary(space, cover, automaton) : null,
     families,
     contractRows: Object.fromEntries(rows),
     unpinnedRows: unpinned,
@@ -1353,6 +1354,9 @@ function possibleCases({ worlds, traces }) {
     parts.push(`${worlds.possible} of ${worlds.raw} worlds (${excluded} excluded${detail})`)
   } else parts.push(`not enumerated — ${worlds?.reason ?? 'Bend was not run'}`)
   if (traces) parts.push(`${traces.cases} traces of up to ${traces.bound} events${traces.complete ? '' : ' (budget stop)'}`)
+  const automaton = traces?.automaton
+  if (automaton)
+    parts.push(`finite automaton: ${automaton.states} states, ${automaton.transitions} transitions, ${automaton.prefixes} prefixes within ${automaton.scope.bound} events; outside the bound is unverified (sha256 ${automaton.digest})`)
   const cover = traces?.cover
   if (cover?.status === 'closed')
     parts.push(`transition cover closed: every event from all ${cover.configurations} configurations (${cover.cases} cases past the bound)`)
@@ -1782,18 +1786,18 @@ export async function derivePackage(loaded, { bin = null, timeoutMs } = {}) {
     }),
     model: modelPath ? await readFile(modelPath, 'utf8').catch(() => null) : null,
   }
-  const { enumerateSpace, loadModel, transitionCover } = await import('./oracle-model.mjs')
+  const { enumerateSpace, loadModel } = await import('./oracle-model.mjs')
   const inputs = await packageInputs(loaded)
   let space = null
-  let cover = null
+  let automaton = null
   if (bin && modelPath && texts.model) {
     const model = await loadModel({ model: modelPath, prefix: pkg.behavior.prefix, bin, timeoutMs })
     space = enumerateSpace(model, { bound: pkg.behavior.bound })
-    cover = transitionCover(model, space)
+    automaton = automatonSummary(finiteAutomaton(space))
   }
   const worlds = bin ? await possibleWorlds(loaded, { bin, timeoutMs }) : null
   return {
-    derived: derive(pkg, texts, { space, inputs, worlds, cover }),
+    derived: derive(pkg, texts, { space, inputs, worlds, automaton }),
     texts,
     inputs,
     inputsDigest: inputsDigestOf(inputs),

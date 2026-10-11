@@ -1808,6 +1808,16 @@ law provable — that is a silent decision. Report each result by its scope: a f
    declarations (parameterized types, unreadable constructors, `String`, unbounded domains) are
    diagnostics that make the derivation `incomplete`, never silent omissions. Coordinates and
    Observations are the controllable and observable world fields; they are not listed a second time.
+   Package derivation and card regeneration use only this complete bounded trace Space for their
+   behavior-space check. `oracle-automaton.mjs` builds a prefix trie and interns exact suffix
+   signatures bottom-up: current observation, bound-boundary marker, and every event with its
+   successor class. This preserves permitted event order and every prefix observation, including
+   histories that diverge several steps later. No model calls or transition-cover exploration past
+   the bound are needed. The card binds the finite automaton's state/transition counts and digest;
+   outside the bound is explicitly `unverified`, and a budget-stopped Space is refused rather than
+   certified. The model's Bend laws, adequacy, lock and product-test gates remain separate and required.
+   This is exact finite-language minimization, not a Bend-kernel proof of the JavaScript transformer
+   and not an unbounded equivalence claim. Exhaustive Space construction can still grow exponentially.
 3. **Refine by counterexample.** Run `oracle-adequacy.mjs check --package <pkg>` and the refinement loop
    of [`adequacy.md`](adequacy.md) on the package: a missing observation, a coarse coordinate, a weak
    contract or a product duty stated as an assumption each shows up as a kernel-checked counterexample
