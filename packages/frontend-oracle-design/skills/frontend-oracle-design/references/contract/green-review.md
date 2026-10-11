@@ -12,3 +12,11 @@ certified visual evidence uses the supported trusted node-test producer. Explici
 opt-in. Unresolved/declined visual evidence without locked source-backed non-application ends resumably
 at IMPLEMENTED_GREEN, not REVIEW_VERIFIED. Open holds retain PARTIAL_VERIFIED with no held-row edits.
 Final report uses actual state/runIds and `formalVerification: not-performed`, finite coverage and limits.
+
+Delivery packets persist a two-round budget in the existing ledger. Both High reviewers share one
+round. Round 2 requires preceding receipt-bound `--findings` and, for High, `--intersect`; preserve
+`reviewScope.mode: "confirm-fixes"`, prior finding IDs and the repair diff rather than dispatch a fresh
+defect hunt. A third changed snapshot is refused, not automatically approved. Only an actual explicit
+user approval permits `oracle-run.mjs review-extend --dir <dir> --approval <file>`, using the approval
+fields from the selected confirmation procedure with `phase: "delivery-review"`. No blocker, evidence,
+independence or final acceptance gate is waived.

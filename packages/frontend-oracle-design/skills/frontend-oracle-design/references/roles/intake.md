@@ -12,6 +12,10 @@ Pin exact source location/version of sources you can read; a named document you 
 unread `S*`, and the first response never asks where it lives. Distinguish product policy, mandatory/project constraints and
 implementation observations. Mandatory conflict is NEEDS_DECISION, never a downgraded preference.
 Establish Outcome Brief and Source Registry, risk, confirmed/proposed axes and actual capability results.
+Separate proposed success criteria and non-goals from unresolved policy and risky premises. For the
+premise whose failure would force the largest redesign, record the cheapest disconfirming check and
+its actual result or explicit unverified limit before detailed authoring. Use existing artifacts and
+mode permissions, not a new planning document or approval gate. Apply common's convergent planning.
 Inspect actual runners/reporters before proposing verification, not package names. Design-only capability
 investigation never executes consumer tests or installs target dependencies. Return approval items with
 package/version/owner when needed. Unknown capability requires investigation, not guessed unsupported.

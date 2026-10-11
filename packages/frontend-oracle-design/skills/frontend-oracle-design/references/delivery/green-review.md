@@ -282,9 +282,10 @@ node <skill-dir>/scripts/oracle-run.mjs transition \
 
 ### Delivery review round budget — at most 2
 
-Delivery review (both High reviewers count as one round) runs at most 2 rounds per lock revision, and
-the count is recorded in `journal.md`. A reviewer asked for a defect always returns one, and every fix
-changes the snapshot, so `REVIEW_PACKET_STALE` plus a fresh full review never converges.
+Delivery review (both High reviewers count as one round) runs at most 2 rounds per lock revision.
+`review-packet` persists the round in the existing ledger/run-state, with a `reviewScope` bound to the
+target snapshot. Re-emitting the same snapshot is idempotent, not a new full review. Every unrelated
+post-review fix changes the snapshot and can otherwise restart the defect hunt.
 
 1. **Round 1** is the full review. Group its blocking findings by shared root cause, fix each group
    once in one pass inside the product budget, and rerun the labels above before round 2.
@@ -303,6 +304,19 @@ changes the snapshot, so `REVIEW_PACKET_STALE` plus a fresh full review never co
    surviving findings; `REVIEW_VERIFIED` is not recorded over a blocking finding, and delegating
    choices does not waive it. A round 3 needs the user's explicit approval and is never started by
    the controller on its own.
+
+Round 2 packet generation requires the preceding raw receipt-bound `--findings` and, for High,
+`--intersect`. It includes their IDs/original findings and the repair diff under
+`reviewScope.mode: "confirm-fixes"`; preserve that scope in both reviewer tasks. The runtime refuses a
+third changed snapshot with `ITERATION_BUDGET_EXHAUSTED`, missing/changed/non-independent previous
+findings with `REVIEW_FOLLOWUP_REQUIRED`, and rewritten task scope with `REVIEW_SCOPE_INVALID`.
+The existing blocker, independence, mutation, rerun and final transition gates are unchanged.
+
+An actual explicit approval of one additional round is recorded by
+`oracle-run.mjs review-extend --dir <dir> --approval <file>`. The JSON uses the same approval fields as
+the card budget with `phase: "delivery-review"`. It extends only that limit, never clears findings,
+resets product/harness budgets, or records REVIEW_VERIFIED. The source reference is self-reported,
+not authenticated user identity. Keep the original user message, never manufacture it.
 
 ## Forbidden
 

@@ -20,6 +20,7 @@ import {
   snapshotRegularFile,
   stableStringify,
 } from './oracle-fs.mjs'
+import { assertReviewIterationEvent } from './oracle-iterations.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import { assertProfileReviewReferences, contextGaps, snapshotContext, validateContextReview } from './oracle-review-context.mjs'
 import {
@@ -1694,10 +1695,16 @@ async function ledgerRun(options, base, snapshots) {
         record.type !== 'init' &&
         record.type !== 'run' &&
         record.type !== 'review-receipt' &&
+        record.type !== 'review-round' &&
+        record.type !== 'review-extension' &&
         record.type !== 'transition' &&
         record.type !== 'budget'
       ) {
         throw new CliError('LEDGER_INVALID', `ledger record ${index} has an unknown type`)
+      }
+      if (record.type === 'review-round' || record.type === 'review-extension') {
+        try { assertReviewIterationEvent(record) }
+        catch (error) { throw new CliError('LEDGER_INVALID', error.message) }
       }
       if (
         record.type === 'init' &&
@@ -2243,6 +2250,10 @@ function assertEmbeddedLedger(ledger) {
     if (record.previousDigest !== previousDigest || sha256(stableStringify(unsigned)) !== digest) {
       throw new CliError('REVIEW_PACKET_INVALID', `embedded ledger record ${index} breaks its digest chain`)
     }
+    if (record.type === 'review-round' || record.type === 'review-extension') {
+      try { assertReviewIterationEvent(record) }
+      catch (error) { throw new CliError('REVIEW_PACKET_INVALID', error.message) }
+    }
     if (record.type === 'run') {
       if (
         !record.runId ||
@@ -2539,6 +2550,11 @@ async function assertReviewBinding(options) {
     )
   }
   assertEmbeddedLedger(packet.ledger)
+  if (packet.reviewScope || externalLedger.records.some((entry) => entry.type === 'review-round')) {
+    const bound = externalLedger.records.some((entry) => entry.type === 'review-round' &&
+      entry.targetRevision === packet.targetRevision && stableStringify(entry.scope) === stableStringify(packet.reviewScope))
+    if (!bound) throw new CliError('REVIEW_SCOPE_INVALID', 'review scope must match the recorded round and confirmation task')
+  }
   const contextSnapshots = []
   let contextRoot
   if (Object.hasOwn(packet, 'reviewContext')) {

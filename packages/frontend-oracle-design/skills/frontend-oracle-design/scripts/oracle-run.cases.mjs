@@ -2441,6 +2441,18 @@ test('O18: visual pending은 GREEN에 남기되지만 review 완료를 차단한
   assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
 })
 
+test('review-packet reports LOCK_BUSY and preserves artifacts while its state lock is held', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  const heldLock = join(oracleDirectory, '.lock-state')
+  await mkdir(heldLock)
+  const output = join(oracleDirectory, 'review-input.json')
+  const blocked = run(strictReviewPacketArgs(oracleDirectory, output))
+  assert.equal(blocked.status, 1)
+  assert.match(blocked.stderr, /^LOCK_BUSY: /)
+  assert.ok((await readdir(oracleDirectory)).includes('.lock-state'))
+  assert.equal((await readdir(oracleDirectory)).includes('review-input.json'), false)
+})
+
 test('O20: review-packet은 lock·source·state·ledger·evidence·diff만 결정론적으로 쓴다', async (t) => {
   const created = await workspace(t, {
     git: true,
@@ -2483,11 +2495,14 @@ test('O20: review-packet은 lock·source·state·ledger·evidence·diff만 결�
   assert.equal(packet.schemaVersion, 2)
   assert.equal(packet.lockVerification.exitCode, 0)
   assert.equal(packet.state.state, 'IMPLEMENTED_GREEN')
-  assert.equal(packet.ledger.length, 6)
+  assert.equal(packet.ledger.length, 7)
   assert.deepEqual(
     packet.ledger.map((entry) => entry.type ?? 'run'),
-    ['init', 'run', 'transition', 'run', 'run', 'transition'],
+    ['init', 'run', 'transition', 'run', 'run', 'transition', 'review-round'],
   )
+  assert.equal(packet.reviewScope.round, 1)
+  assert.equal(packet.reviewScope.mode, 'full')
+  assert.deepEqual(packet.ledger.at(-1).scope, packet.reviewScope)
   assert.equal(packet.targetRevision, packet.targetSnapshot.worktreeSha256)
   assert.deepEqual(packet.evidence, EVIDENCE)
   assert.deepEqual(packet.lockedSources, [])
@@ -4351,6 +4366,86 @@ test('O6: concurrent transition and budget writes preserve both state changes', 
     (await ledgerLines(oracleDirectory)).map((line) => JSON.parse(line).type),
     ['budget', 'transition'],
   )
+})
+
+test('review iterations bind High reviewers to one round, require prior findings for confirmation, and reject a third snapshot', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { risk: 'high' })
+  await reachGreen(oracleDirectory, root, { greens: 3 })
+  const preReviewState = await readFile(join(oracleDirectory, 'run-state.json'))
+  const output = join(oracleDirectory, 'packet-round-1.json')
+  const first = run(strictReviewPacketArgs(oracleDirectory, output))
+  assert.equal(first.status, 0, first.stderr)
+  const packet = JSON.parse(await readFile(output, 'utf8'))
+  assert.equal(packet.reviewScope.round, 1)
+  assert.equal(packet.reviewScope.mode, 'full')
+  const copy = run(strictReviewPacketArgs(oracleDirectory, join(oracleDirectory, 'packet-copy.json')))
+  assert.equal(copy.status, 0, copy.stderr)
+  assert.equal((await state(oracleDirectory)).reviewIterations.round, 1)
+  const findingsPaths = []
+  for (const reviewerId of ['primary', 'independent']) {
+    const findingsPath = join(oracleDirectory, `${reviewerId}.json`)
+    await writeFile(findingsPath, JSON.stringify({ ...CLEAR_REVIEW, reviewerId }))
+    const receipt = issueReviewReceipt(oracleDirectory, output, findingsPath, packet.targetRevision)
+    assert.equal(receipt.status, 0, receipt.stderr)
+    findingsPaths.push(findingsPath)
+  }
+  await writeFile(join(root, 'src', 'repair.mjs'), 'export const repaired = 1\n')
+  greenRun(oracleDirectory, 'repair-one')
+  const repaired = join(oracleDirectory, 'packet-round-2.json')
+  const missing = run(strictReviewPacketArgs(oracleDirectory, repaired))
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /^REVIEW_FOLLOWUP_REQUIRED:/)
+  const args = [...strictReviewPacketArgs(oracleDirectory, repaired), '--findings', findingsPaths[0], '--intersect', findingsPaths[1]]
+  const second = run(args)
+  assert.equal(second.status, 0, second.stderr)
+  const confirmation = JSON.parse(await readFile(repaired, 'utf8'))
+  assert.equal(confirmation.reviewScope.round, 2)
+  assert.equal(confirmation.reviewScope.mode, 'confirm-fixes')
+  assert.deepEqual(confirmation.reviewScope.previousFindings.map((entry) => entry.reviewerId).sort(), ['independent', 'primary'])
+  assert.match(confirmation.reviewScope.instruction, /not a fresh defect hunt/)
+  const confirmedBytes = await readFile(repaired)
+  const firstFollowup = join(oracleDirectory, 'primary-round-2.json')
+  await writeFile(firstFollowup, JSON.stringify({ ...CLEAR_REVIEW, reviewerId: 'primary' }))
+  await writeFile(repaired, JSON.stringify({ ...confirmation, reviewScope: { ...confirmation.reviewScope, mode: 'full' } }))
+  const forged = issueReviewReceipt(oracleDirectory, repaired, firstFollowup, confirmation.targetRevision)
+  assert.equal(forged.status, 1)
+  assert.match(forged.stderr, /^REVIEW_SCOPE_INVALID:/)
+  await writeFile(repaired, confirmedBytes)
+  const followupPaths = []
+  for (const reviewerId of ['primary', 'independent']) {
+    const path = join(oracleDirectory, `${reviewerId}-round-2.json`)
+    await writeFile(path, JSON.stringify({ ...CLEAR_REVIEW, reviewerId }))
+    const receipt = issueReviewReceipt(oracleDirectory, repaired, path, confirmation.targetRevision)
+    assert.equal(receipt.status, 0, receipt.stderr)
+    followupPaths.push(path)
+  }
+  await writeFile(join(root, 'src', 'repair.mjs'), 'export const repaired = 2\n')
+  greenRun(oracleDirectory, 'repair-two')
+  const beforeState = await readFile(join(oracleDirectory, 'run-state.json'))
+  const beforeLedger = await readFile(join(oracleDirectory, 'runs.jsonl'))
+  const beforePacket = await readFile(repaired)
+  const third = run(args)
+  assert.equal(third.status, 1)
+  assert.match(third.stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
+  assert.deepEqual(await readFile(join(oracleDirectory, 'run-state.json')), beforeState)
+  assert.deepEqual(await readFile(join(oracleDirectory, 'runs.jsonl')), beforeLedger)
+  assert.deepEqual(await readFile(repaired), beforePacket)
+  // Recovery replays the same budget from the real ledger even if the state cache write was lost.
+  await writeFile(join(oracleDirectory, 'run-state.json'), preReviewState)
+  assert.match(run(args).stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
+  const approval = join(oracleDirectory, 'round-3-approval.json')
+  await writeFile(approval, JSON.stringify({ decision: 'approve-one-more-round', phase: 'delivery-review', round: 3,
+    source: 'conversation: user explicitly approved round 3', reason: 'resolve the surviving locked-row defect' }))
+  const extension = run(['review-extend', '--dir', oracleDirectory, '--approval', approval])
+  assert.equal(extension.status, 0, extension.stderr)
+  const allowed = run([...strictReviewPacketArgs(oracleDirectory, join(oracleDirectory, 'packet-round-3.json')),
+    '--findings', followupPaths[0], '--intersect', followupPaths[1]])
+  assert.equal(allowed.status, 0, allowed.stderr)
+  const extended = JSON.parse(await readFile(join(oracleDirectory, 'packet-round-3.json'), 'utf8'))
+  assert.equal(extended.reviewScope.round, 3)
+  assert.equal(extended.reviewScope.mode, 'confirm-fixes')
+  assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN', 'an extension is not delivery approval')
+  assert.equal(run(['review-extend', '--dir', oracleDirectory, '--approval', approval]).status, 1)
 })
 
 test('O11: review packets require post-GREEN state decision and canonical review points', async (t) => {

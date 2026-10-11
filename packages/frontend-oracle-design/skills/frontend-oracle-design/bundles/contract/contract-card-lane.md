@@ -159,6 +159,34 @@ report. Cite each runId once. Design-only work reports the card/approval state w
 test execution; unavailable evidence is unverified, never PASS. File creation is not execution,
 and `IMPLEMENTED_GREEN` is not `REVIEW_VERIFIED`. Progress summaries cannot create ledger states.
 
+## Convergent planning
+
+The goal is an implementable, verifiable plan, not a claim that every possible world is covered.
+Separate success criteria, non-goals, unresolved policy and risky assumptions in the existing Outcome
+Brief, Open questions and PLAN/journal. Proposed scope becomes fixed only through the existing human
+confirmation. Do not turn reviewer suggestions or plausible extra scenarios into approved requirements.
+
+Before expensive model/proof construction, identify the premise most likely to invalidate the design
+and run the cheapest authorized disconfirming check. Record the premise, its source, observed result
+and what would reopen it. Read-only source/API investigation or a small model counterexample may be
+enough for that premise, not for final verification. Design-only still cannot execute consumer tests,
+edit production or install target dependencies. An unavailable check stays unverified, never assumed
+true; decide its scope/capability consequence before investing in the full design.
+
+Collect the applicable first-pass reviews before repairing, classify their findings and group shared
+causes. Repair each group once. Separate a defect in agreed behavior from a proposed new requirement:
+the former needs evidence and a fix, the latter needs the existing scope decision, not automatic model
+growth. Second-pass work confirms the listed fixes and their regressions, not a new search for defects.
+Security, privacy, accessibility and data integrity are never downgraded to keep the work moving.
+
+The authoring budget is shared by model/analyst, translation, card review and stage rewinds, not a
+fresh allowance for each role. Delivery review has its own existing two-round limit and does not
+borrow authoring, policy, harness or product allowances. Scripts persist both in existing artifacts;
+restarting a role, regenerating a packet or rewinding never resets them. At exhaustion stop with the
+remaining findings, not a false pass. A new revision is not a budget-reset trick. The selected
+profile's authoring and Delivery procedures own dispatch commands; do not load another profile's
+procedures for their budget instructions.
+
 ## Authority priority
 
 Priority of material the user provided or the repo designated as an approved standard. A lower
@@ -1108,3 +1136,12 @@ Use existing stage/lock tools, verify lock before each stage, never relock to pa
 Changed policy/source set requires confirmed new revision. Changed CHECKED bytes rewind for rechecking.
 Design-only has no consumer execution. Delivery initialization preserves scope/milestones, labels,
 source/target identity and one ledger, never resets budgets or grants production edits before VALID_RED.
+
+Common's convergent planning applies before detailed authoring. The stage runtime shares two authoring
+rounds across card reviews and rewinds. Register each independent dispatch with
+`oracle-stage.mjs review-input --dir <dir> --kind cold-read|source-aware --input <raw-input> --attempt <dispatch-id>`.
+Only transport redelivery reuses an attempt. New analysis is another attempt even on unchanged input.
+At `ITERATION_BUDGET_EXHAUSTED`, stop with the remaining findings, never reset the record or weaken approval.
+An explicit one-round extension uses `oracle-stage.mjs extend --dir <dir> --approval <file>` with JSON
+`decision: "approve-one-more-round"`, `phase: "authoring"`, exact next `round`, approving user-message
+`source` and `reason`. This is auditable self-report, not authenticated identity or permission to unlock.

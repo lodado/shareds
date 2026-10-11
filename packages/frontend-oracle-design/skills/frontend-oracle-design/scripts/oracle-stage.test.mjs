@@ -33,6 +33,136 @@ const stage = (root, directory, command, to) =>
 const lock = (root, directory) =>
   node(root, 'oracle-lock.mjs', ['create', '--oracle', join(directory, 'oracle.md'), '--lock', join(directory, 'oracle.lock.json')])
 
+test('authoring iterations stop a third repair and a restart cannot reset the shared budget', async (t) => {
+  const { root, directory } = await repository(t)
+  assert.equal(stage(root, directory, 'begin').status, 0)
+  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  assert.equal(stage(root, directory, 'rewind', 'DISCOVERING').status, 0)
+  // A retried delivery of the same rewind is not another repair.
+  assert.equal(stage(root, directory, 'rewind', 'DISCOVERING').status, 0)
+  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  const before = await readFile(join(directory, 'stage.json'))
+  const third = stage(root, directory, 'rewind', 'DISCOVERING')
+  assert.equal(third.status, 1, 'a third authoring cycle must not start automatically')
+  assert.match(third.stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
+  assert.deepEqual(await readFile(join(directory, 'stage.json')), before)
+  assert.match(stage(root, directory, 'begin').stderr, /^STAGE_EXISTS:/)
+  const current = JSON.parse(stage(root, directory, 'status').stdout)
+  assert.equal(current.iterations.round, 2)
+  assert.equal(current.iterations.limit, 2)
+  assert.equal(current.iterations.mode, 'confirm-fixes')
+})
+
+test('analyst, mapping, card review and rewind share one repair round instead of multiplying their allowances', async (t) => {
+  const { root, directory } = await repository(t)
+  assert.equal(stage(root, directory, 'begin').status, 0)
+  const input = join(root, 'review-input.md')
+  const review = (kind) => node(root, 'oracle-stage.mjs', ['review-input', '--dir', directory, '--kind', kind, '--input', input])
+  await writeFile(input, 'approved source v1\n')
+  for (const kind of ['model-analyst', 'translation', 'cold-read']) assert.equal(review(kind).status, 0)
+  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  await writeFile(input, 'approved source v2\n')
+  for (const kind of ['model-analyst', 'translation', 'cold-read']) {
+    const repair = review(kind)
+    assert.equal(repair.status, 0, repair.stderr)
+    assert.equal(JSON.parse(repair.stdout).iterations.round, 2)
+    assert.equal(JSON.parse(repair.stdout).iterations.mode, 'confirm-fixes')
+  }
+  assert.equal(stage(root, directory, 'rewind', 'DISCOVERING').status, 0)
+  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  await writeFile(input, 'another newly discovered possibility\n')
+  const before = await readFile(join(directory, 'stage.json'))
+  const rejected = review('translation')
+  assert.equal(rejected.status, 1)
+  assert.match(rejected.stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
+  assert.deepEqual(await readFile(join(directory, 'stage.json')), before)
+  assert.equal(JSON.parse(stage(root, directory, 'status').stdout).stage, 'MODELED')
+})
+
+test('legacy rewind history is counted on upgrade, never silently reset or rewritten by status', async (t) => {
+  const { root, directory } = await repository(t)
+  const record = { schemaVersion: 1, stage: 'DISCOVERING', packageSha256: null,
+    history: [{ stage: 'DISCOVERING', packageSha256: null, evidence: 'begin' },
+      ...Array.from({ length: 8 }, () => ({ stage: 'DISCOVERING', packageSha256: null, evidence: 'rewind' }))] }
+  const path = join(directory, 'stage.json')
+  const bytes = `${JSON.stringify(record)}\n`
+  await writeFile(path, bytes)
+  const observed = stage(root, directory, 'status')
+  assert.equal(observed.status, 0, observed.stderr)
+  assert.equal(JSON.parse(observed.stdout).iterations.round, 9)
+  assert.equal(JSON.parse(observed.stdout).iterations.exhausted, true)
+  assert.equal(await readFile(path, 'utf8'), bytes)
+  const refused = stage(root, directory, 'advance', 'MODELED')
+  assert.equal(refused.status, 1)
+  assert.match(refused.stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
+  assert.equal(await readFile(path, 'utf8'), bytes)
+})
+
+test('public model-input uses the same budget and refuses before overwriting output on the third source revision', async (t) => {
+  const { root, directory } = await repository(t)
+  const output = join(root, 'analyst.md')
+  const invoke = () => node(root, 'oracle-adequacy.mjs', ['model-input', '--package', join(directory, 'oracle.package.json'), '--output', output])
+  const first = invoke()
+  assert.equal(first.status, 0, first.stderr)
+  assert.equal(invoke().status, 0, 're-emitting identical inputs is idempotent')
+  const source = join(directory, 'oracle.package.json')
+  const pkg = JSON.parse(await readFile(source, 'utf8'))
+  // Sources-only analyst input excludes author intent and unrelated README sections.
+  pkg.sources[0].jurisdiction += ' First approved clarification.'
+  await writeFile(source, JSON.stringify(pkg))
+  const second = invoke()
+  assert.equal(second.status, 0, second.stderr)
+  assert.match(second.stdout, /round:2 mode:confirm-fixes/)
+  const bytes = await readFile(output)
+  pkg.sources[0].jurisdiction += ' Second approved clarification.'
+  await writeFile(source, JSON.stringify(pkg))
+  const third = invoke()
+  assert.equal(third.status, 1)
+  assert.match(third.stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
+  assert.deepEqual(await readFile(output), bytes)
+})
+
+test('one explicit authoring approval extends exactly one round, never unlocks or grants a blanket waiver', async (t) => {
+  const { root, directory } = await repository(t)
+  assert.equal(stage(root, directory, 'begin').status, 0)
+  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  assert.equal(stage(root, directory, 'rewind', 'DISCOVERING').status, 0)
+  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  const approval = join(root, 'approval.json')
+  const extend = () => node(root, 'oracle-stage.mjs', ['extend', '--dir', directory, '--approval', approval])
+  await writeFile(approval, JSON.stringify({ decision: 'do-everything', source: 'conversation: delegated choices' }))
+  const rejected = extend()
+  assert.equal(rejected.status, 1)
+  assert.match(rejected.stderr, /^ITERATION_APPROVAL_REQUIRED:/)
+  await writeFile(approval, JSON.stringify({ decision: 'approve-one-more-round', phase: 'authoring', round: 3,
+    source: 'conversation: explicit approval of round 3', reason: 'resolve the listed source contradiction' }))
+  const granted = extend()
+  assert.equal(granted.status, 0, granted.stderr)
+  assert.equal(JSON.parse(granted.stdout).iterations.limit, 3)
+  assert.equal(stage(root, directory, 'rewind', 'DISCOVERING').status, 0)
+  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  assert.match(stage(root, directory, 'rewind', 'DISCOVERING').stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
+  assert.equal(extend().status, 1, 'an old approval cannot buy another round')
+})
+
+test('new analyst dispatches spend rounds even with identical source input while transport retries do not', async (t) => {
+  const { root, directory } = await repository(t)
+  const input = join(root, 'sources.md')
+  await writeFile(input, 'unchanged approved sources\n')
+  const invoke = (attempt) => node(root, 'oracle-stage.mjs', ['review-input', '--dir', directory,
+    '--kind', 'model-analyst', '--input', input, '--attempt', attempt])
+  const first = invoke('analyst-task-1')
+  assert.equal(first.status, 0, first.stderr)
+  assert.equal(JSON.parse(first.stdout).iterations.round, 1)
+  assert.equal(JSON.parse(invoke('analyst-task-1').stdout).iterations.round, 1)
+  const second = invoke('analyst-task-2')
+  assert.equal(second.status, 0, second.stderr)
+  assert.equal(JSON.parse(second.stdout).iterations.round, 2)
+  const third = invoke('analyst-task-3')
+  assert.equal(third.status, 1)
+  assert.match(third.stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
+})
+
 test('request-only Contract begin binds profile before card exists and rejects a later legacy card', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'oracle-contract-begin-'))
   t.after(() => rm(root, { recursive: true, force: true }))

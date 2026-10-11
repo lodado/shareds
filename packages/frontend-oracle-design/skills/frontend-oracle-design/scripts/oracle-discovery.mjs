@@ -52,6 +52,7 @@ import {
   requirementMapping,
   sourcePath,
 } from './oracle-package.mjs'
+import { recordAuthoringInput } from './oracle-stage.mjs'
 import { defSignature, parseBendTypes, toPlain, toRuntime, typeIR } from './oracle-types.mjs'
 
 export const DISCOVERY_VERSION = 1
@@ -2493,8 +2494,9 @@ async function crossCheckCommand(command, options) {
   if (command === 'mapping-input') {
     if (!options.output) throw new CliError('USAGE', USAGE, 2)
     const text = await mappingInput({ loaded })
+    const iterations = await recordAuthoringInput(dirname(resolve(options.package)), 'translation', text)
     await writeFile(options.output, text)
-    process.stdout.write(`MAPPING_INPUT_WRITTEN ${options.output} sha256:${sha256(text)}\n`)
+    process.stdout.write(`MAPPING_INPUT_WRITTEN ${options.output} sha256:${sha256(text)} round:${iterations.round} mode:${iterations.mode}\n`)
     return
   }
   const { bin } = await ensureBend()

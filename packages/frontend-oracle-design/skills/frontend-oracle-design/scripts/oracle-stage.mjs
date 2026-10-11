@@ -12,7 +12,8 @@ import { mkdir, readFile, realpath, rename, writeFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { sha256 } from './oracle-fs.mjs'
+import { sha256, withDirectoryLock } from './oracle-fs.mjs'
+import { assertIterationAvailable, extendIterations, iterationBudget, iterationStatus, observeIteration } from './oracle-iterations.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import { isEmptyCell, markdownLines, sectionLines } from './oracle-space.mjs'
 
@@ -24,6 +25,7 @@ export const AUTHORING_STAGES = Object.freeze({
 export const STAGE_FILE = 'stage.json'
 const PACKAGE_FILE = 'oracle.package.json'
 const packageScript = join(fileURLToPath(new URL('.', import.meta.url)), 'oracle-package.mjs')
+const REVIEW_KINDS = new Set(['model-analyst', 'translation', 'cold-read', 'reverse-impossible', 'source-aware'])
 
 class StageError extends Error {
   constructor(code, message, exitCode = 1) {
@@ -47,6 +49,8 @@ export async function readStage(directory) {
     const binding = resolveProfileBinding({ bindings: [{ artifact: 'stage', profile: record.verificationProfile }] })
     if (!AUTHORING_STAGES[binding.profile]?.includes(record.stage)) throw new StageError('STAGE_INVALID', 'stage is not in its bound authoring profile')
   }
+  // Old histories remain evidence. Upgrading must not grant eight completed rewinds a fresh allowance.
+  record.iterations = iterationBudget(record.iterations, 1 + record.history.filter((entry) => entry.evidence === 'rewind').length)
   return record
 }
 
@@ -74,11 +78,13 @@ async function bindingAt(directory, record, requestedProfile) {
 }
 
 function moved(record, stage, digest, evidence) {
+  const iterations = record.iterations
   return {
     ...record,
     stage,
     ...(record.verificationProfile === 'contract/v1' ? { cardSha256: digest } : { packageSha256: digest }),
-    history: [...record.history, { stage, ...(record.verificationProfile === 'contract/v1' ? { cardSha256: digest } : { packageSha256: digest }), evidence }],
+    iterations: { ...iterations, inputs: { ...iterations.inputs, stage: { digest: digest ?? sha256(evidence), round: iterations.round } } },
+    history: [...record.history, { stage, ...(record.verificationProfile === 'contract/v1' ? { cardSha256: digest } : { packageSha256: digest }), evidence, iterationRound: iterations.round }],
   }
 }
 
@@ -91,6 +97,7 @@ export async function assertReadyToLock(directory, requestedProfile) {
   const binding = await bindingAt(directory, record, requestedProfile)
   if (binding.profile === 'contract/v1') {
     if (!record) throw new StageError('STAGE_MISSING', 'Contract lock requires a DRAFTED stage')
+    if (record.stage !== 'ORACLE_READY') assertIterationAvailable(record.iterations)
     if (!['DRAFTED', 'ORACLE_READY'].includes(record.stage)) throw new StageError('STAGE_NOT_DRAFTED', `the oracle is at ${record.stage}; the lock needs DRAFTED`)
     if (record.cardSha256 !== sha256(await cardBytes(directory))) throw new StageError('STAGE_STALE', 'whole approved card changed after CHECKED')
     return binding
@@ -106,6 +113,7 @@ export async function assertReadyToLock(directory, requestedProfile) {
       `${PACKAGE_FILE} exists but there is no ${STAGE_FILE} — oracle-stage.mjs begin, then advance through MODELED, CHECKED and DRAFTED before the lock`,
     )
   }
+  if (record.stage !== 'ORACLE_READY') assertIterationAvailable(record.iterations)
   if (!['DRAFTED', 'ORACLE_READY'].includes(record.stage))
     throw new StageError('STAGE_NOT_DRAFTED', `the oracle is at ${record.stage}; the lock needs DRAFTED`)
   if (record.packageSha256 !== sha256(bytes))
@@ -180,7 +188,7 @@ async function begin(directory, requestedProfile) {
   const binding = await bindingAt(directory, null, requestedProfile)
   if (binding.profile !== 'contract/v1' && !(await packageBytes(directory))) throw new StageError('STAGE_NO_PACKAGE', `${PACKAGE_FILE} is not in ${directory}`)
   if (await readStage(directory)) throw new StageError('STAGE_EXISTS', `${STAGE_FILE} already exists — use rewind to revisit a stage`)
-  const record = { schemaVersion: 1, stage: 'DISCOVERING', packageSha256: null, history: [{ stage: 'DISCOVERING', packageSha256: null, evidence: 'begin' }] }
+  const record = { schemaVersion: 1, stage: 'DISCOVERING', packageSha256: null, iterations: iterationBudget(), history: [{ stage: 'DISCOVERING', packageSha256: null, evidence: 'begin' }] }
   if (binding.kind === 'explicit') {
     record.verificationProfile = binding.profile
     if (binding.profile === 'contract/v1') {
@@ -197,6 +205,7 @@ async function begin(directory, requestedProfile) {
 async function advance(directory, target, options) {
   const record = await readStage(directory)
   if (!record) throw new StageError('STAGE_MISSING', `no ${STAGE_FILE} — run begin first`)
+  assertIterationAvailable(record.iterations)
   if (target === 'ORACLE_READY') throw new StageError('STAGE_LOCK_ONLY', 'ORACLE_READY is written by oracle-lock.mjs create, not by advance')
   const binding = await bindingAt(directory, record, options.requestedProfile)
   const stages = AUTHORING_STAGES[binding.profile] ?? STAGES
@@ -231,7 +240,42 @@ async function rewind(directory, target) {
   const contract = binding.profile === 'contract/v1'
   const bytes = contract ? await cardBytes(directory) : await packageBytes(directory)
   if (contract && target !== 'DISCOVERING' && record.cardSha256 !== sha256(bytes)) throw new StageError('STAGE_STALE', 'changed Contract must rewind to DISCOVERING for approval and strict Space recheck')
-  const result = moved(record, target, rewoundDigest(target, bytes), 'rewind')
+  const inputSha256 = sha256(JSON.stringify([bytes?.toString('utf8'), (await cardBytes(directory))?.toString('utf8')]))
+  const previous = record.history.at(-1)
+  if (record.stage === target && previous?.evidence === 'rewind' && previous.inputSha256 === inputSha256) return record
+  const budget = record.iterations.inputs.stage ? record.iterations : {
+    ...record.iterations, inputs: { ...record.iterations.inputs, stage: { digest: sha256('begin'), round: record.iterations.round } },
+  }
+  const iterations = observeIteration(budget, 'stage', inputSha256, { force: true })
+  const result = moved({ ...record, iterations }, target, rewoundDigest(target, bytes), 'rewind')
+  result.history.at(-1).inputSha256 = inputSha256
+  await writeStage(directory, result)
+  return result
+}
+
+/** Pure review-input builders stay pure; public dispatch commands register their final bytes here. */
+export async function recordAuthoringInput(directory, kind, text, attempt) {
+  if (!REVIEW_KINDS.has(kind)) throw new StageError('USAGE', `unknown review kind: ${kind}`, 2)
+  if (attempt !== undefined && !attempt.trim()) throw new StageError('USAGE', '--attempt must name one dispatch', 2)
+  return withDirectoryLock(directory, 'stage', async () => {
+    const record = await readStage(directory) ?? await begin(directory)
+    if (record.stage === 'ORACLE_READY') throw new StageError('STAGE_LOCKED', 'authoring review cannot reopen a locked revision')
+    let iterations = observeIteration(record.iterations, kind, sha256(text))
+    if (attempt !== undefined) iterations = observeIteration(iterations, `${kind}:dispatch`, sha256(attempt))
+    if (iterations !== record.iterations) await writeStage(directory, { ...record, iterations })
+    const result = iterationStatus(iterations)
+    if (!record.iterations.inputs[kind]) result.mode = 'full'
+    return result
+  })
+}
+
+async function extend(directory, path) {
+  if (!path) throw new StageError('ITERATION_APPROVAL_REQUIRED', 'extend requires --approval <explicit-user-approval.json>')
+  const record = await readStage(directory)
+  if (!record) throw new StageError('STAGE_MISSING', `no ${STAGE_FILE}`)
+  if (record.stage === 'ORACLE_READY') throw new StageError('STAGE_LOCKED', 'an extension cannot unlock an approved revision')
+  const approval = JSON.parse(await readFile(resolve(path), 'utf8'))
+  const result = { ...record, iterations: extendIterations(record.iterations, approval, 'authoring') }
   await writeStage(directory, result)
   return result
 }
@@ -243,14 +287,14 @@ async function status(directory) {
   const contract = binding.profile === 'contract/v1'
   const bytes = contract ? await cardBytes(directory) : await packageBytes(directory)
   const digest = contract ? record.cardSha256 : record.packageSha256
-  return { stage: record.stage, ...(binding.kind === 'explicit' ? { verificationProfile: binding.profile } : {}), stale: Boolean(digest) && (!bytes || digest !== sha256(bytes)), history: record.history }
+  return { stage: record.stage, ...(binding.kind === 'explicit' ? { verificationProfile: binding.profile } : {}), stale: Boolean(digest) && (!bytes || digest !== sha256(bytes)), iterations: iterationStatus(record.iterations), history: record.history }
 }
 
 function parse(args) {
   const options = {}
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index]?.replace(/^--/, '')
-    if (!['dir', 'to', 'timeout-ms', 'profile'].includes(name) || args[index + 1] === undefined)
+    if (!['dir', 'to', 'timeout-ms', 'profile', 'kind', 'input', 'approval', 'attempt'].includes(name) || args[index + 1] === undefined)
       throw new StageError('USAGE', `Unknown or incomplete option: ${args[index]}`, 2)
     options[name] = args[index + 1]
   }
@@ -261,21 +305,35 @@ const USAGE = `usage:
   oracle-stage.mjs begin --dir <.ai/oracles/<id>>
   oracle-stage.mjs advance --dir <dir> --to MODELED|CHECKED|DRAFTED [--timeout-ms <n>]
   oracle-stage.mjs rewind --dir <dir> --to DISCOVERING|MODELED|CHECKED|DRAFTED
+  oracle-stage.mjs review-input --dir <dir> --kind <review-kind> --input <raw-input> --attempt <dispatch-id>
+  oracle-stage.mjs extend --dir <dir> --approval <explicit-user-approval.json>
   oracle-stage.mjs status --dir <dir>`
 
 async function main() {
   const [command, ...args] = process.argv.slice(2)
   const options = parse(args)
-  if (!options.dir || !['begin', 'advance', 'rewind', 'status'].includes(command)) throw new StageError('USAGE', USAGE, 2)
+  if (!options.dir || !['begin', 'advance', 'rewind', 'status', 'review-input', 'extend'].includes(command)) throw new StageError('USAGE', USAGE, 2)
   // cwd는 realpath로 보고된다(macOS /var → /private/var) — 같은 표기로 저장소 루트 기준 상대 경로를 만든다
   const directory = await realpath(resolve(options.dir)).catch(() => resolve(options.dir))
   const timeoutMs = options['timeout-ms'] ? Number(options['timeout-ms']) : undefined
-  let result
-  if (command === 'begin') result = await begin(directory, options.profile)
-  else if (command === 'advance') result = await advance(directory, options.to, { timeoutMs, requestedProfile: options.profile })
-  else if (command === 'rewind') result = await rewind(directory, options.to)
-  else result = await status(directory)
-  process.stdout.write(`${JSON.stringify(command === 'status' ? result : { stage: result.stage, evidence: result.history.at(-1).evidence })}\n`)
+  if (command === 'status') {
+    process.stdout.write(`${JSON.stringify(await status(directory))}\n`)
+    return
+  }
+  if (command === 'review-input') {
+    if (!options.input) throw new StageError('USAGE', 'review-input requires --input', 2)
+    const iterations = await recordAuthoringInput(directory, options.kind, await readFile(resolve(options.input), 'utf8'), options.attempt)
+    process.stdout.write(`${JSON.stringify({ iterations })}\n`)
+    return
+  }
+  if (command === 'begin') await mkdir(directory, { recursive: true })
+  const result = await withDirectoryLock(directory, 'stage', async () => {
+    if (command === 'begin') return begin(directory, options.profile)
+    if (command === 'advance') return advance(directory, options.to, { timeoutMs, requestedProfile: options.profile })
+    if (command === 'extend') return extend(directory, options.approval)
+    return rewind(directory, options.to)
+  })
+  process.stdout.write(`${JSON.stringify({ stage: result.stage, evidence: result.history.at(-1).evidence, iterations: iterationStatus(result.iterations) })}\n`)
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

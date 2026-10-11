@@ -1970,7 +1970,7 @@ test('locks machine-observable invariants and the bounded exploration authorizat
   assert.match(visualSkill, /`POLICY_GAP` 후보/)
 })
 
-test('anticipates escapes: deviation types, landmine fossils, premortem framing, drift signal, TWR evidence', async () => {
+test('anticipates escapes: deviation types, landmine fossils, supported counterexamples, drift signal, TWR evidence', async () => {
   const [sweep, sources, format, common, verifier, lock, twr] = await Promise.all([
     read('references/card/interaction-sweep.md'),
     read('references/card/policy-sources.md'),
@@ -1995,9 +1995,11 @@ test('anticipates escapes: deviation types, landmine fossils, premortem framing,
   assert.match(verifier, /landmine-citation-missing/)
   assert.match(verifier, /landmine-undispositioned/)
 
-  // 예지-0: cold-read는 가능성이 아니라 확정 premortem으로 읽는다
-  assert.match(format, /this card was locked and\s+shipped, and one defect escaped it/)
-  assert.match(format, /a worry that cannot point at a location is discarded/i)
+  // 결함을 강제로 만들어내지 않고 위치와 관찰 가능한 결과가 있는 반례만 요구한다
+  assert.match(format, /supported counterexamples to the agreed rows, not a guaranteed defect/)
+  assert.match(format, /"No supported defect"\*\*\s+is a valid result with the checked scope and limits/)
+  assert.match(format, /A worry needs a concrete row\/cell, source and\s+observable consequence/)
+  assert.doesNotMatch(format, /one defect escaped it/)
 
   // 예지-4: dep 버전은 lock에 고정되고 드리프트는 재스윕 지시로 보고된다
   assert.match(lock, /--dep/)
@@ -2808,6 +2810,23 @@ test('delivery review is capped at two rounds and round two only confirms round 
   assert.match(greenReview, /Every other new finding\s+is recorded as advisory in the report and is not fixed/)
   assert.match(greenReview, /A round 3 needs the user's explicit approval/)
   assert.match(subagentReview, /Delivery review stops after 2 rounds/)
+})
+
+test('planning settles scope and risky premises before expensive authoring and preserves runtime iteration limits', async () => {
+  const common = await read('references/common.md')
+  const intake = await read('references/roles/intake.md')
+  const author = await read('references/roles/author-formal.md')
+  const card = await read('references/card/card-format.md')
+  const delivery = await read('references/delivery/green-review.md')
+  assert.match(common, /## Convergent planning/)
+  assert.match(common, /success criteria, non-goals, unresolved policy and risky assumptions/)
+  assert.match(common, /before expensive model\/proof construction/i)
+  assert.match(intake, /cheapest disconfirming check/)
+  assert.match(author, /shared authoring iteration budget/)
+  assert.match(card, /ITERATION_BUDGET_EXHAUSTED/)
+  assert.match(card, /No supported defect/)
+  assert.match(delivery, /reviewScope/)
+  assert.match(delivery, /review-extend/)
 })
 
 test('event order comes from the model, and identity and session changes are model events', async () => {

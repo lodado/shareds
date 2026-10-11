@@ -1,3 +1,50 @@
+# 0.99.0: bounded authoring and review, with risky premises checked earlier
+
+## Reproduced behavior and changes
+
+The existing prose capped card and Delivery review at two rounds, but the public stage CLI accepted
+another rewind and the Delivery packet generator did not track review rounds. Public CLI regression
+tests reproduced those gaps before the runtime changes. Planning now separates success criteria,
+non-goals, unresolved policy and risky assumptions, checks the most consequential premise before
+expensive authoring within existing mode permissions, and batches first-pass findings by root cause.
+An unsupported demand to find a defect is no longer a review criterion.
+
+- `oracle-stage.mjs` persists a shared authoring budget in `stage.json`. Analyst/model input,
+  translation, card review and rewind share a repair round. Stable input and transport retries are
+  idempotent. A new registered dispatch attempt counts even when its source bytes are unchanged.
+  Old rewind history is counted on upgrade, not reset; status does not rewrite it.
+- `oracle-run.mjs review-packet` records rounds in the existing digest-chained ledger. High's two
+  independent reviewers share one round. Confirmation requires the preceding receipt-bound findings,
+  includes their original IDs/findings and the repair diff, and rejects a third changed snapshot.
+  Both the runner and standalone verifier bind `reviewScope` to the recorded round.
+- Explicit source-referenced approval extends exactly one round, never resets history or grants
+  policy, lock or Delivery approval. Replaying the ledger recovers the review budget from a lost state
+  cache write. Existing RED/GREEN, mutation, independent review and blocking-finding gates remain.
+- Formal and Contract use the same runtime without importing each other's procedure references.
+
+## Verification and limits
+
+Eight added public CLI behavior regressions live in `oracle-stage.test.mjs` and `oracle-run.cases.mjs`:
+automatic third-cycle refusal, cross-role shared repair, historical count preservation, real analyst
+input generation, explicit one-round approval, identical-source dispatch counting, and High review
+packet/receipt integration, and held-lock refusal with stable `LOCK_BUSY` reporting. The High path also
+checks scope tampering, cache rollback, refusal without artifact mutation and authorized extension
+without REVIEW_VERIFIED. Existing modular/profile
+isolation tests cover the shared documentation boundary. Full package test/lint commands remain the
+release checks, not a replacement with a copied implementation or a new custom runner.
+
+These checks establish bounded behavior through the supported public commands. They do not establish
+that every plan is complete, that every reviewer obeys its task, or that a live model workflow takes
+less time. No controlled before/after model evaluation was run. Human approval references and dispatch
+IDs are auditable self-report, not authenticated identity; arbitrary shell writes, fabricated approval
+documents or direct unregistered model calls are not made impossible by a local CLI. The controller
+must register actual attempts and retain the user's original approval. Existing active projects were
+not edited or advanced to manufacture a successful outcome.
+
+Independent worker code review was not run in this session: the native swarm API returned
+`Not in a swarm` for both spawn and task-graph initialization. Same-context inspection is not reported
+as independent review.
+
 # 0.98.0: executable evidence integrity and bounded claims
 
 The update separates three levels of assurance: software-engineering basics (parseable native entry,

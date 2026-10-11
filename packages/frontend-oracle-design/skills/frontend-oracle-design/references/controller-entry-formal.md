@@ -72,12 +72,14 @@ when coordinating the selected stages; read only current-step dependencies, not 
    ([first response](common.md#first-response--one-message-one-confirmation)). Its actual `yes` confirms
    axes and source-open cells before any model. Missing/unsupported sources follow common routing.
 2. Explicitly load and invoke [`$oracle-author`](../../oracle-author/SKILL.md) after source/axis prerequisites.
+   First apply common's convergent planning: settle scope and check the highest-risk premise before
+   expensive authoring. Begin the shared stage budget before model/analyst/translation dispatch.
    Obtain source-bound package, independent analyst inputs, proof/adequacy/cross-check and projected Draft,
    with manual sections, realization plan, interaction sweep and semantic delta. Controller owns stage intent.
 3. Explicitly load and invoke [`$oracle-review`](../../oracle-review/SKILL.md) in the required independent
    contexts for card-only cold-read, second reverse-impossible read and conditional source-aware review.
    Drive the first nail and record the result before showing the projected Draft for lock. Same-context switching is not independence.
-   Card review is capped at 2 rounds per revision; round 2 only confirms round 1's repairs
+   Card review shares the authoring budget of 2 rounds per revision; round 2 only confirms round 1's repairs
    ([budget](card/card-format.md#review-round-budget--at-most-2)). Never start a round 3 without the user's approval.
 4. Present the full new Draft or semantic delta and Open questions. Obtain human confirmation, lint and lock
    through the existing scripts. No lock, target tests, production or dependency edits before confirmation.

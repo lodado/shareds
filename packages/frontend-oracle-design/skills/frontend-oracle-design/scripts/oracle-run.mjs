@@ -47,8 +47,10 @@ import {
   snapshotRegularFile,
   stableStringify,
   WEAKENING_TOKENS,
+  withDirectoryLock,
   ZERO_DIGEST,
 } from './oracle-fs.mjs'
+import { assertReviewIterationEvent, extendIterations, iterationBudget, IterationError, iterationStatus, observeIteration } from './oracle-iterations.mjs'
 import { invalidatedWitnesses } from './oracle-lock.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import {
@@ -116,6 +118,7 @@ const FLAG_NAMES = [
   'timeout-ms',
   'check-report',
   'rejection',
+  'approval',
 ]
 
 const BOOLEAN_FLAGS = new Set(['json', 'changed-files'])
@@ -673,6 +676,8 @@ function assertLedgerSchema(entry) {
     ) {
       throw new Error('invalid review receipt event')
     }
+  } else if (entry.type === 'review-round' || entry.type === 'review-extension') {
+    assertReviewIterationEvent(entry)
   } else if (entry.type === 'checkpoint') {
     if (!isDigest(entry.prefixSha256) || entry.previousDigest !== ZERO_DIGEST || !strings(['at']))
       throw new Error('invalid checkpoint event')
@@ -731,6 +736,11 @@ async function assertReviewPacketIdentity(directory, state, packet) {
   await assertArtifactIdentity(directory, state, packet)
   try { await assertProfileReviewReferences(packet) }
   catch (error) { throw new CliError('REVIEW_PACKET_STALE', error.message) }
+  if (state.reviewIterations || packet.reviewScope) {
+    const recorded = (await readLedger(directory)).some((entry) => entry.type === 'review-round' &&
+      entry.targetRevision === packet.targetRevision && stableStringify(entry.scope) === stableStringify(packet.reviewScope))
+    if (!recorded) throw new CliError('REVIEW_SCOPE_INVALID', 'review scope must match a ledger-bound round; never replace confirmation with a fresh review')
+  }
 }
 
 async function writeState(directory, state) {
@@ -860,6 +870,13 @@ async function migrateLedger(options) {
 
 function replayState(state, ledger) {
   for (const entry of ledger) {
+    if (entry.type === 'review-round' || entry.type === 'review-extension') {
+      state.reviewIterations = iterationBudget(entry.iterations)
+      if (entry.type === 'review-round') {
+        state.reviewScope = entry.scope
+        state.reviewSnapshot = entry.snapshot
+      }
+    }
     if (entry.type === 'budget') {
       const budget = state.budgets?.[entry.budget]
       if (!budget) continue
@@ -3163,24 +3180,6 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
   process.stdout.write([`STATE_${finalState} run:${run?.runId ?? 'none'}`, ...notices, ''].join('\n'))
 }
 
-async function withDirectoryLock(directory, name, work) {
-  const lock = join(directory, `.lock-${name}`)
-  for (let attempt = 0; attempt < 1000; attempt += 1) {
-    try {
-      await mkdir(lock)
-      try {
-        return await work()
-      } finally {
-        await rm(lock, { recursive: true, force: true })
-      }
-    } catch (error) {
-      if (error.code !== 'EEXIST') throw error
-      await new Promise((resolveLock) => setImmediate(resolveLock))
-    }
-  }
-  throw new CliError('LOCK_BUSY', `${name} lock remained busy`)
-}
-
 async function budgetDigest(directory, state, name) {
   const scanRoot = resolve(directory, state.scanRoot)
   const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
@@ -3524,7 +3523,58 @@ async function blindInput(options) {
   )
 }
 
+function reviewBudget(state, ledger) {
+  if (state.reviewIterations) return iterationBudget(state.reviewIterations)
+  const revisions = [...new Set(ledger.filter((entry) => entry.type === 'review-receipt' && entry.role !== 'blind-mapper').map((entry) => entry.targetRevision))]
+  const budget = iterationBudget(undefined, Math.max(1, revisions.length))
+  if (revisions.length) budget.inputs.snapshot = { digest: revisions.at(-1), round: budget.round }
+  return budget
+}
+
+async function reviewFollowup(options, directory, state, ledger, previousRevision, inputs) {
+  if (!options.findings || (state.risk === 'high' && !options.intersect)) {
+    throw new CliError('REVIEW_FOLLOWUP_REQUIRED', 'confirmation requires prior --findings and, for High, --intersect from both independent reviewers')
+  }
+  const previousFindings = []
+  const identities = new Set()
+  const tasks = new Set()
+  for (const path of [options.findings, ...(options.intersect ? [options.intersect] : [])]) {
+    const input = await snapshotPacketFile(resolve(path), directory, 'prior reviewer findings', inputs)
+    const document = JSON.parse(input.bytes.toString('utf8'))
+    const receipt = ledger.find((entry) => entry.type === 'review-receipt' &&
+      entry.receiptId === document.orchestrationReceipt?.receiptId && entry.findingsSha256 === input.sha256 &&
+      entry.targetRevision === previousRevision && entry.role !== 'blind-mapper')
+    if (!receipt || identities.has(receipt.reviewerId) || tasks.has(receipt.taskId)) {
+      throw new CliError('REVIEW_FOLLOWUP_REQUIRED', 'prior findings must be unchanged, ledger-bound and independently reviewed on the preceding snapshot')
+    }
+    identities.add(receipt.reviewerId)
+    tasks.add(receipt.taskId)
+    previousFindings.push({ path: portablePath(directory, input.path), sha256: input.sha256,
+      reviewerId: receipt.reviewerId, reviewerRole: receipt.role, findings: document.findings })
+  }
+  return previousFindings
+}
+
+async function extendReview(options) {
+  if (!options.dir || !options.approval) throw new CliError('USAGE', 'review-extend requires --dir --approval <explicit-user-approval.json>', 2)
+  const directory = resolve(options.dir)
+  await withDirectoryLock(directory, 'state', async () => {
+    const state = await readConsistentState(directory)
+    if (state.state !== 'IMPLEMENTED_GREEN') throw new CliError('REVIEW_PACKET_STATE', 'review-extend requires IMPLEMENTED_GREEN')
+    const approval = JSON.parse(await readFile(resolve(options.approval), 'utf8'))
+    const iterations = extendIterations(reviewBudget(state, await readLedger(directory)), approval, 'delivery-review')
+    const event = await appendLedger(directory, { type: 'review-extension', iterations, at: new Date().toISOString() })
+    await writeState(directory, { ...state, reviewIterations: iterations, ledgerHead: event.digest })
+    process.stdout.write(`REVIEW_EXTENDED ${iterations.limit}\n`)
+  })
+}
+
 async function reviewPacket(options) {
+  if (!options.dir || !options.output) throw new CliError('USAGE', 'review-packet requires --dir and --output', 2)
+  return withDirectoryLock(resolve(options.dir), 'state', () => reviewPacketUnderLock(options))
+}
+
+async function reviewPacketUnderLock(options) {
   if (!options.dir || !options.output) {
     throw new CliError('USAGE', 'review-packet requires --dir and --output', 2)
   }
@@ -3810,6 +3860,20 @@ async function reviewPacket(options) {
   ])
   const evidenceArtifacts = await collectEvidenceArtifacts(directoryReal, evidenceSnapshot, inputSnapshots)
   const targetRevision = targetSnapshot.worktreeSha256
+  const beforeIterations = reviewBudget(state, fullLedger)
+  const iterations = observeIteration(beforeIterations, 'snapshot', targetRevision)
+  const repeat = state.reviewScope && beforeIterations.inputs.snapshot?.digest === targetRevision
+  const previousFindings = !repeat && iterations.round > 1
+    ? await reviewFollowup(options, directory, state, fullLedger, beforeIterations.inputs.snapshot?.digest, inputSnapshots) : []
+  const reviewScope = repeat ? state.reviewScope : {
+    ...iterationStatus(iterations),
+    previousRevision: beforeIterations.inputs.snapshot?.digest ?? null,
+    previousFindings,
+    repairDiff: state.reviewSnapshot ? gitDiff(scanRoot, changedPaths(state.reviewSnapshot, current), state.reviewSnapshot, current) : null,
+    instruction: iterations.round === 1
+      ? 'Review the agreed scope once. Collect all supported findings, group shared causes, and distinguish contract defects from proposed scope.'
+      : 'Confirm prior finding IDs and regressions in the repair diff, not a fresh defect hunt. Do not fix advisory suggestions. Preserve locked-row violations and critical/high security, permission or data-loss blockers.',
+  }
   const pending = Object.entries(evidence.rows ?? {})
     .filter(([, entry]) => entry.kind === 'pending')
     .map(([row, entry]) => ({ row, ...entry }))
@@ -3830,6 +3894,7 @@ async function reviewPacket(options) {
   }
   const packet = {
     schemaVersion: 2,
+    reviewScope,
     ...identity,
     ...(profileReferences ? { references: profileReferences } : {}),
     lockVerification: {
@@ -3865,6 +3930,16 @@ async function reviewPacket(options) {
         label,
         fail: (message) => new CliError('REVIEW_PACKET_INPUT_CHANGED', message),
       })
+    }
+    if (!repeat) {
+      const event = await appendLedger(directory, { type: 'review-round', iterations, scope: reviewScope,
+        targetRevision, snapshot: current, at: new Date().toISOString() })
+      state.reviewIterations = iterations
+      state.reviewScope = reviewScope
+      state.reviewSnapshot = current
+      state.ledgerHead = event.digest
+      await writeState(directory, state)
+      packet.ledger = [...ledger, event]
     }
     await writeFile(temp, `${JSON.stringify(packet, null, 2)}\n`)
     await rename(temp, output)
@@ -5198,6 +5273,7 @@ async function main() {
   else if (command === 'transition') await transition(options)
   else if (command === 'budget') await spendBudget(options)
   else if (command === 'review-packet') await reviewPacket(options)
+  else if (command === 'review-extend') await extendReview(options)
   else if (command === 'review-brief') await reviewBrief(options)
   else if (command === 'blind-input') await blindInput(options)
   else if (command === 'worker-packet') await workerPacket(options)
@@ -5205,7 +5281,7 @@ async function main() {
   else
     throw new CliError(
       'USAGE',
-      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, budget, status, guide, metrics, review-packet, review-brief, blind-input, worker-packet or worker-run',
+      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, budget, status, guide, metrics, review-packet, review-extend, review-brief, blind-input, worker-packet or worker-run',
       2,
     )
 }
@@ -5214,8 +5290,9 @@ if (process.argv[1] && (await realpath(resolve(process.argv[1])).catch(() => nul
   await main()
 } catch (error) {
   const workerCode = /^WORKER_[A-Z_]+:/.exec(error.message ?? '')?.[0].slice(0, -1)
+  const sharedCode = error instanceof IterationError || error.code === 'LOCK_BUSY' ? error.code : null
   const cliError =
-    error instanceof CliError ? error : new CliError(workerCode ?? 'INPUT_UNREADABLE', error.message ?? String(error))
+    error instanceof CliError ? error : new CliError(sharedCode ?? workerCode ?? 'INPUT_UNREADABLE', error.message ?? String(error))
   let dirOption
   try {
     dirOption = parseOptions(process.argv.slice(3)).dir

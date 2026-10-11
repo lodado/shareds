@@ -14,6 +14,7 @@ import { runCli } from './oracle-cli.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
 import { bendInputs, compileBend, lockScopeIssues, toPlain, verdictBeside } from './oracle-model.mjs'
 import { independenceOf, loadPackage, packageIssues, packageSpec, sourcePath } from './oracle-package.mjs'
+import { readStage, recordAuthoringInput } from './oracle-stage.mjs'
 import { parseBendTypes } from './oracle-types.mjs'
 
 export const ADEQUACY_VERSION = 1
@@ -1687,16 +1688,25 @@ async function main() {
   const input = options.package ? { package: options.package } : { card: options.card }
   if (command === 'model-input') {
     if (!options.output) throw new CliError('USAGE', USAGE, 2)
-    await writeFile(options.output, await modelInput(input))
-    process.stdout.write(`MODEL_INPUT_WRITTEN ${options.output}\n`)
+    const text = await modelInput(input)
+    const directory = dirname(resolve(options.package ?? options.card))
+    const iterations = options.package || await readStage(directory)
+      ? await recordAuthoringInput(directory, 'model-analyst', text) : null
+    await writeFile(options.output, text)
+    const suffix = iterations ? ` round:${iterations.round} mode:${iterations.mode}` : ''
+    process.stdout.write(`MODEL_INPUT_WRITTEN ${options.output}${suffix}\n`)
     return
   }
   const { bin } = await ensureBend()
   const timeoutMs = options['timeout-ms'] ? Number(options['timeout-ms']) : undefined
   if (command === 'explore-input') {
     if (!options.output) throw new CliError('USAGE', USAGE, 2)
-    await writeFile(options.output, await exploreInput({ card: options.card, bin, timeoutMs }))
-    process.stdout.write(`EXPLORE_INPUT_WRITTEN ${options.output}\n`)
+    const text = await exploreInput({ card: options.card, bin, timeoutMs })
+    const directory = dirname(resolve(options.card))
+    const iterations = await readStage(directory) ? await recordAuthoringInput(directory, 'reverse-impossible', text) : null
+    await writeFile(options.output, text)
+    const suffix = iterations ? ` round:${iterations.round} mode:${iterations.mode}` : ''
+    process.stdout.write(`EXPLORE_INPUT_WRITTEN ${options.output}${suffix}\n`)
     return
   }
   if (command === 'triage') {

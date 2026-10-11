@@ -10,7 +10,8 @@ perform transitions or approve the card/delivery. The controller owns acceptance
 ## Contract cold-read
 
 Read the Cold-read gate criteria in [`card/card-format.md`](../card/card-format.md), with procedural
-dependencies, but receive the card bytes alone as task input. No repo path, conversation, rationale or
+dependencies. Round 1 receives the card bytes alone as task input. Round 2 receives the prior finding
+IDs and repair diff for confirmation only. No repo path, conversation, rationale or
 intended reading. A forced guess is a card defect, not a reader failure. Apply the five questions per row.
 Collapse to one root assumption plus the first nail, the cheapest falsifying observation. Return both,
 not a list of opinions. The controller must drive that nail and record the observation/result in journal.md
@@ -49,6 +50,11 @@ or a controller's hand-written conclusion. Conditional --context artifacts remai
 Supporting context does not replace common inputs, five-axis judgments or independent reviews.
 Follow the exact role-specific raw-input and blind-context restrictions in subagent-review; High's two
 samples remain independent, not two passes in one context. Reviewers never issue their own review-receipt.
+
+Use the packet's ledger-bound `reviewScope`. `confirm-fixes` receives the preceding finding IDs/raw
+findings, repair diff and rerun evidence. Confirm those fixes and regressions only, not a fresh defect
+hunt or a demand that a defect must exist. Preserve serious blockers and all required evidence checks.
+An unchanged row may refer to still-current earlier evidence; scope narrowing never waives a gate.
 
 Re-read [`mandatory-verification.md`](../mandatory-verification.md) and
 [`bend-cross-verification.md`](../bend-cross-verification.md) before verification/review. Review all

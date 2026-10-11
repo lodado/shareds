@@ -32,6 +32,9 @@ whatever is already loaded.
    [`model-package.example.json`](../model-package.example.json), never from MODEL.bend or a hand-written
    card. Use package-authoring and model-authoring reference routes with their dependencies.
    Write Terms, the finite world, assumptions/owners/falsifiers and source goals from confirmed axes.
+   Before full model/proof construction, check the intake's highest-risk premise within current
+   permissions. Preserve confirmed success criteria and non-goals. Do not discover basic product policy
+   by repeatedly rewriting the proof. Begin the stage record before the first independent input.
    Read [`card/case-space.md`](../card/case-space.md) and [input families](case-space-inputs-formal.md) to decide
    all seven input families, inherited dispositions and possible cases. Unknown combinations stay in.
 4. Use supported, authorized native delegation with capacity for an independent model analyst.
@@ -45,8 +48,9 @@ whatever is already loaded.
    delays, staleness, error kinds, remounts and request counts: time as events, attempts, error sum types,
    and separate request/fetch/effect counts, not one collapsed event. Check each Bend file with
    `scripts/oracle-model.mjs check --file <file>` before `prove`; a failure carries its fix in `hint`.
-6. Run `oracle-package.mjs derive` and `oracle-adequacy.mjs check --package` until each counterexample is
-   resolved or becomes an Open question. Read [`discovery.md`](../discovery.md) before
+6. Run `oracle-package.mjs derive` and `oracle-adequacy.mjs check --package`, collect the available
+   counterexamples, and repair shared causes in one batch within the shared authoring iteration budget.
+   Unresolved policy becomes an Open question, never an unbounded fix/check loop. Read [`discovery.md`](../discovery.md) before
    `oracle-discovery.mjs cross-check --package` and bring each candidate back to the interview.
    New-axis/cross-term uses the A/B question and silent-decision uses the policy question.
 7. Run `oracle-package.mjs project-card`. Rows, axes and formal sections are projected, never
@@ -60,11 +64,18 @@ whatever is already loaded.
    Consumer test generation/writes belong to the explicitly invoked $test role only after approval/lock,
    not to this pre-lock authoring role.
 
-The controller walks `scripts/oracle-stage.mjs`: begin, then advance --to MODELED | CHECKED | DRAFTED
+The controller walks `scripts/oracle-stage.mjs`: begin before independent inputs, then advance --to MODELED | CHECKED | DRAFTED
 once each gate passes. Return actual artifacts and gate results for those transitions.
 oracle-lock.mjs create refuses a package oracle that is not at DRAFTED on the same package bytes,
 and only that script path's stage runtime writes stage.json. The lock still runs card lint itself,
 so a hand-written record skips no check. Authoring never fabricates stage acceptance.
+`status` reports the shared authoring round. `model-input` and `mapping-input` register their permitted
+input bytes automatically. Re-emitting identical input is idempotent, not permission to dispatch another
+fresh defect hunt. Changed inputs and rewind share one repair batch; a third batch requires an explicit
+user-approved extension. Do not rename the run, reset stage.json or restart the analyst to evade it.
+Before every actual analyst dispatch or resumed analysis, register `review-input --kind model-analyst
+--input <permitted-source-input> --attempt <dispatch-id>`. A transport retry reuses the same ID; a new
+analysis does not, even when its source bytes are unchanged.
 
 ## Complete the Draft, without rewriting generated policy
 

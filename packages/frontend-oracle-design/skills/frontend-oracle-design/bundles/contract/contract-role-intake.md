@@ -159,6 +159,34 @@ report. Cite each runId once. Design-only work reports the card/approval state w
 test execution; unavailable evidence is unverified, never PASS. File creation is not execution,
 and `IMPLEMENTED_GREEN` is not `REVIEW_VERIFIED`. Progress summaries cannot create ledger states.
 
+## Convergent planning
+
+The goal is an implementable, verifiable plan, not a claim that every possible world is covered.
+Separate success criteria, non-goals, unresolved policy and risky assumptions in the existing Outcome
+Brief, Open questions and PLAN/journal. Proposed scope becomes fixed only through the existing human
+confirmation. Do not turn reviewer suggestions or plausible extra scenarios into approved requirements.
+
+Before expensive model/proof construction, identify the premise most likely to invalidate the design
+and run the cheapest authorized disconfirming check. Record the premise, its source, observed result
+and what would reopen it. Read-only source/API investigation or a small model counterexample may be
+enough for that premise, not for final verification. Design-only still cannot execute consumer tests,
+edit production or install target dependencies. An unavailable check stays unverified, never assumed
+true; decide its scope/capability consequence before investing in the full design.
+
+Collect the applicable first-pass reviews before repairing, classify their findings and group shared
+causes. Repair each group once. Separate a defect in agreed behavior from a proposed new requirement:
+the former needs evidence and a fix, the latter needs the existing scope decision, not automatic model
+growth. Second-pass work confirms the listed fixes and their regressions, not a new search for defects.
+Security, privacy, accessibility and data integrity are never downgraded to keep the work moving.
+
+The authoring budget is shared by model/analyst, translation, card review and stage rewinds, not a
+fresh allowance for each role. Delivery review has its own existing two-round limit and does not
+borrow authoring, policy, harness or product allowances. Scripts persist both in existing artifacts;
+restarting a role, regenerating a packet or rewinding never resets them. At exhaustion stop with the
+remaining findings, not a false pass. A new revision is not a budget-reset trick. The selected
+profile's authoring and Delivery procedures own dispatch commands; do not load another profile's
+procedures for their budget instructions.
+
 ## Authority priority
 
 Priority of material the user provided or the repo designated as an approved standard. A lower
@@ -999,6 +1027,10 @@ Pin exact source location/version of sources you can read; a named document you 
 unread `S*`, and the first response never asks where it lives. Distinguish product policy, mandatory/project constraints and
 implementation observations. Mandatory conflict is NEEDS_DECISION, never a downgraded preference.
 Establish Outcome Brief and Source Registry, risk, confirmed/proposed axes and actual capability results.
+Separate proposed success criteria and non-goals from unresolved policy and risky premises. For the
+premise whose failure would force the largest redesign, record the cheapest disconfirming check and
+its actual result or explicit unverified limit before detailed authoring. Use existing artifacts and
+mode permissions, not a new planning document or approval gate. Apply common's convergent planning.
 Inspect actual runners/reporters before proposing verification, not package names. Design-only capability
 investigation never executes consumer tests or installs target dependencies. Return approval items with
 package/version/owner when needed. Unknown capability requires investigation, not guessed unsupported.

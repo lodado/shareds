@@ -1,10 +1,29 @@
 import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
-import { lstat, open, readFile, realpath, stat } from 'node:fs/promises'
-import { isAbsolute, relative, resolve } from 'node:path'
+import { lstat, mkdir, open, readFile, realpath, rm, stat } from 'node:fs/promises'
+import { isAbsolute, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 
 export const ZERO_DIGEST = '0'.repeat(64)
+
+export async function withDirectoryLock(directory, name, work) {
+  const lock = join(directory, `.lock-${name}`)
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    try {
+      await mkdir(lock)
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error
+      await new Promise((resolveLock) => setImmediate(resolveLock))
+      continue
+    }
+    try {
+      return await work()
+    } finally {
+      await rm(lock, { recursive: true, force: true })
+    }
+  }
+  throw Object.assign(new Error(`${name} lock remained busy`), { code: 'LOCK_BUSY' })
+}
 
 export function sha256(value) {
   return createHash('sha256').update(value).digest('hex')

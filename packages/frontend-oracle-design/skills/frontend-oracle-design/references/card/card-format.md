@@ -315,10 +315,10 @@ not a re-review, so this gate is the last cheap place to find a defect.
 
 ### Review round budget — at most 2
 
-Card review (cold read, reverse-impossible, source-aware) runs at most 2 rounds per revision, and the
-count is recorded in `journal.md`. A reviewer asked for a defect always returns one, and every fix
-that adds a state, message or event gives the next round a new surface, so unbounded rounds do not
-converge.
+Card review (cold read, reverse-impossible, source-aware), analyst/model revision, translation and
+stage rewind share at most 2 authoring rounds per revision. The runtime keeps the count in `stage.json`;
+the journal explains findings and scope decisions. A fresh defect hunt after every repair can keep
+expanding the modeled world rather than verify the agreed outcome.
 
 1. **Round 1** is the full review. Group its findings by shared root cause and repair each group
    once, in one pass, before round 2.
@@ -332,22 +332,42 @@ converge.
    scope to `NEEDS_DECISION`, since the user owns widening the modeled world.
 5. The same row in the findings of both rounds is a card design defect, not a wording defect. Return
    a decision to narrow that row's scope instead of repairing it a third time.
-6. After round 2, a user who delegated the remaining choices ("decide everything and implement")
-   takes the surviving blockers as residual risks into the lock. Without that delegation, stop at
-   `NEEDS_DECISION`. A round 3 needs the user's explicit approval and is never started by the
+6. After round 2, unresolved blockers stop at `NEEDS_DECISION`. Delegating choices does not waive
+   mandatory constraints or authorize locking an unjudgeable contract. A round 3 needs the user's explicit approval and is never started by the
    controller on its own.
+
+Runtime dispatch:
+
+- `oracle-stage.mjs begin --dir <dir>` before authoring/independent inputs; `status` is read-only and
+  reports `iterations.round`, `limit`, `mode` and `exhausted`.
+- `oracle-adequacy.mjs model-input`, `explore-input` for a staged card, and
+  `oracle-discovery.mjs mapping-input` register their input digests. Cold-read/source-aware dispatch
+  registers its permitted raw input with `oracle-stage.mjs review-input --dir <dir> --kind cold-read|source-aware --input <file> --attempt <dispatch-id>`.
+  Before every analyst or reviewer
+  dispatch, including a resumed session, register its kind/input with a distinct `--attempt`. Reuse the
+  attempt only for transport redelivery, not new analysis. This counts repeated analysis of unchanged
+  sources too. Keep procedural metadata separate from blind task inputs.
+- A role's first pass is `full`; subsequent passes are `confirm-fixes`. A changed input already reviewed in the
+  current round starts the next round; different roles' first updates share that repair batch.
+  Identical input and an identical retried rewind do not consume another round, nor permit a fresh hunt.
+- `ITERATION_BUDGET_EXHAUSTED` refuses the operation before stage/output changes. Preserve the remaining
+  findings and stop. Legacy rewind history counts on upgrade; it is never silently reset.
+- Only after an actual explicit approval, use `oracle-stage.mjs extend --dir <dir> --approval <file>`.
+  The JSON records `decision: "approve-one-more-round"`, `phase: "authoring"`, the exact next `round`,
+  `source` pointing to that user message, and `reason`. It grants one additional round, not a reset,
+  policy approval, permission to unlock, or a waiver. The source is auditable self-report, not proof
+  of human identity; never fabricate it or treat blanket delegation as that approval.
 
 ### 1. Cold read — a reader who was not in the conversation
 
 The author cannot un-see the conversation and is therefore the worst judge of whether the card
 stands on its own. Hand the card to an independent reviewer surface that has no session context.
 
-- Pass **the card bytes only.** No repo path, no conversation, no rationale, no intended reading,
+- Round 1: Pass **the card bytes only.** No repo path, no conversation, no rationale, no intended reading,
   no statement of what the card is supposed to mean. The Draft text is the entire input.
-- Frame the read as a premortem stated as fact, not a possibility: **"this card was locked and
-  shipped, and one defect escaped it — name that defect, pointing at the row, cell, or missing
-  dimension that let it through."** Certainty framing measurably widens the reasons a reviewer
-  generates; a worry that cannot point at a location is discarded rather than recorded.
+- Ask for supported counterexamples to the agreed rows, not a guaranteed defect. **"No supported defect"**
+  is a valid result with the checked scope and limits. A worry needs a concrete row/cell, source and
+  observable consequence. A merely possible extra world is a scope candidate, not an automatic repair.
 - Then ask for three things: what this card contracts, in the reviewer's own words; every place the
   reviewer had to guess in order to answer; every `Then`·`Never`·side-effect count it could satisfy
   in a way the author plainly did not intend.

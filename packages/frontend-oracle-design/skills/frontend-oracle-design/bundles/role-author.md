@@ -159,6 +159,34 @@ report. Cite each runId once. Design-only work reports the card/approval state w
 test execution; unavailable evidence is unverified, never PASS. File creation is not execution,
 and `IMPLEMENTED_GREEN` is not `REVIEW_VERIFIED`. Progress summaries cannot create ledger states.
 
+## Convergent planning
+
+The goal is an implementable, verifiable plan, not a claim that every possible world is covered.
+Separate success criteria, non-goals, unresolved policy and risky assumptions in the existing Outcome
+Brief, Open questions and PLAN/journal. Proposed scope becomes fixed only through the existing human
+confirmation. Do not turn reviewer suggestions or plausible extra scenarios into approved requirements.
+
+Before expensive model/proof construction, identify the premise most likely to invalidate the design
+and run the cheapest authorized disconfirming check. Record the premise, its source, observed result
+and what would reopen it. Read-only source/API investigation or a small model counterexample may be
+enough for that premise, not for final verification. Design-only still cannot execute consumer tests,
+edit production or install target dependencies. An unavailable check stays unverified, never assumed
+true; decide its scope/capability consequence before investing in the full design.
+
+Collect the applicable first-pass reviews before repairing, classify their findings and group shared
+causes. Repair each group once. Separate a defect in agreed behavior from a proposed new requirement:
+the former needs evidence and a fix, the latter needs the existing scope decision, not automatic model
+growth. Second-pass work confirms the listed fixes and their regressions, not a new search for defects.
+Security, privacy, accessibility and data integrity are never downgraded to keep the work moving.
+
+The authoring budget is shared by model/analyst, translation, card review and stage rewinds, not a
+fresh allowance for each role. Delivery review has its own existing two-round limit and does not
+borrow authoring, policy, harness or product allowances. Scripts persist both in existing artifacts;
+restarting a role, regenerating a packet or rewinding never resets them. At exhaustion stop with the
+remaining findings, not a false pass. A new revision is not a budget-reset trick. The selected
+profile's authoring and Delivery procedures own dispatch commands; do not load another profile's
+procedures for their budget instructions.
+
 ## Authority priority
 
 Priority of material the user provided or the repo designated as an approved standard. A lower
@@ -932,10 +960,10 @@ not a re-review, so this gate is the last cheap place to find a defect.
 
 ### Review round budget — at most 2
 
-Card review (cold read, reverse-impossible, source-aware) runs at most 2 rounds per revision, and the
-count is recorded in `journal.md`. A reviewer asked for a defect always returns one, and every fix
-that adds a state, message or event gives the next round a new surface, so unbounded rounds do not
-converge.
+Card review (cold read, reverse-impossible, source-aware), analyst/model revision, translation and
+stage rewind share at most 2 authoring rounds per revision. The runtime keeps the count in `stage.json`;
+the journal explains findings and scope decisions. A fresh defect hunt after every repair can keep
+expanding the modeled world rather than verify the agreed outcome.
 
 1. **Round 1** is the full review. Group its findings by shared root cause and repair each group
    once, in one pass, before round 2.
@@ -949,22 +977,42 @@ converge.
    scope to `NEEDS_DECISION`, since the user owns widening the modeled world.
 5. The same row in the findings of both rounds is a card design defect, not a wording defect. Return
    a decision to narrow that row's scope instead of repairing it a third time.
-6. After round 2, a user who delegated the remaining choices ("decide everything and implement")
-   takes the surviving blockers as residual risks into the lock. Without that delegation, stop at
-   `NEEDS_DECISION`. A round 3 needs the user's explicit approval and is never started by the
+6. After round 2, unresolved blockers stop at `NEEDS_DECISION`. Delegating choices does not waive
+   mandatory constraints or authorize locking an unjudgeable contract. A round 3 needs the user's explicit approval and is never started by the
    controller on its own.
+
+Runtime dispatch:
+
+- `oracle-stage.mjs begin --dir <dir>` before authoring/independent inputs; `status` is read-only and
+  reports `iterations.round`, `limit`, `mode` and `exhausted`.
+- `oracle-adequacy.mjs model-input`, `explore-input` for a staged card, and
+  `oracle-discovery.mjs mapping-input` register their input digests. Cold-read/source-aware dispatch
+  registers its permitted raw input with `oracle-stage.mjs review-input --dir <dir> --kind cold-read|source-aware --input <file> --attempt <dispatch-id>`.
+  Before every analyst or reviewer
+  dispatch, including a resumed session, register its kind/input with a distinct `--attempt`. Reuse the
+  attempt only for transport redelivery, not new analysis. This counts repeated analysis of unchanged
+  sources too. Keep procedural metadata separate from blind task inputs.
+- A role's first pass is `full`; subsequent passes are `confirm-fixes`. A changed input already reviewed in the
+  current round starts the next round; different roles' first updates share that repair batch.
+  Identical input and an identical retried rewind do not consume another round, nor permit a fresh hunt.
+- `ITERATION_BUDGET_EXHAUSTED` refuses the operation before stage/output changes. Preserve the remaining
+  findings and stop. Legacy rewind history counts on upgrade; it is never silently reset.
+- Only after an actual explicit approval, use `oracle-stage.mjs extend --dir <dir> --approval <file>`.
+  The JSON records `decision: "approve-one-more-round"`, `phase: "authoring"`, the exact next `round`,
+  `source` pointing to that user message, and `reason`. It grants one additional round, not a reset,
+  policy approval, permission to unlock, or a waiver. The source is auditable self-report, not proof
+  of human identity; never fabricate it or treat blanket delegation as that approval.
 
 ### 1. Cold read — a reader who was not in the conversation
 
 The author cannot un-see the conversation and is therefore the worst judge of whether the card
 stands on its own. Hand the card to an independent reviewer surface that has no session context.
 
-- Pass **the card bytes only.** No repo path, no conversation, no rationale, no intended reading,
+- Round 1: Pass **the card bytes only.** No repo path, no conversation, no rationale, no intended reading,
   no statement of what the card is supposed to mean. The Draft text is the entire input.
-- Frame the read as a premortem stated as fact, not a possibility: **"this card was locked and
-  shipped, and one defect escaped it — name that defect, pointing at the row, cell, or missing
-  dimension that let it through."** Certainty framing measurably widens the reasons a reviewer
-  generates; a worry that cannot point at a location is discarded rather than recorded.
+- Ask for supported counterexamples to the agreed rows, not a guaranteed defect. **"No supported defect"**
+  is a valid result with the checked scope and limits. A worry needs a concrete row/cell, source and
+  observable consequence. A merely possible extra world is a scope candidate, not an automatic repair.
 - Then ask for three things: what this card contracts, in the reviewer's own words; every place the
   reviewer had to guess in order to answer; every `Then`·`Never`·side-effect count it could satisfy
   in a way the author plainly did not intend.
@@ -3337,6 +3385,9 @@ whatever is already loaded.
    [`model-package.example.json`](../model-package.example.json), never from MODEL.bend or a hand-written
    card. Use package-authoring and model-authoring reference routes with their dependencies.
    Write Terms, the finite world, assumptions/owners/falsifiers and source goals from confirmed axes.
+   Before full model/proof construction, check the intake's highest-risk premise within current
+   permissions. Preserve confirmed success criteria and non-goals. Do not discover basic product policy
+   by repeatedly rewriting the proof. Begin the stage record before the first independent input.
    Read [`card/case-space.md`](../card/case-space.md) and [input families](case-space-inputs-formal.md) to decide
    all seven input families, inherited dispositions and possible cases. Unknown combinations stay in.
 4. Use supported, authorized native delegation with capacity for an independent model analyst.
@@ -3350,8 +3401,9 @@ whatever is already loaded.
    delays, staleness, error kinds, remounts and request counts: time as events, attempts, error sum types,
    and separate request/fetch/effect counts, not one collapsed event. Check each Bend file with
    `scripts/oracle-model.mjs check --file <file>` before `prove`; a failure carries its fix in `hint`.
-6. Run `oracle-package.mjs derive` and `oracle-adequacy.mjs check --package` until each counterexample is
-   resolved or becomes an Open question. Read [`discovery.md`](../discovery.md) before
+6. Run `oracle-package.mjs derive` and `oracle-adequacy.mjs check --package`, collect the available
+   counterexamples, and repair shared causes in one batch within the shared authoring iteration budget.
+   Unresolved policy becomes an Open question, never an unbounded fix/check loop. Read [`discovery.md`](../discovery.md) before
    `oracle-discovery.mjs cross-check --package` and bring each candidate back to the interview.
    New-axis/cross-term uses the A/B question and silent-decision uses the policy question.
 7. Run `oracle-package.mjs project-card`. Rows, axes and formal sections are projected, never
@@ -3365,11 +3417,18 @@ whatever is already loaded.
    Consumer test generation/writes belong to the explicitly invoked $test role only after approval/lock,
    not to this pre-lock authoring role.
 
-The controller walks `scripts/oracle-stage.mjs`: begin, then advance --to MODELED | CHECKED | DRAFTED
+The controller walks `scripts/oracle-stage.mjs`: begin before independent inputs, then advance --to MODELED | CHECKED | DRAFTED
 once each gate passes. Return actual artifacts and gate results for those transitions.
 oracle-lock.mjs create refuses a package oracle that is not at DRAFTED on the same package bytes,
 and only that script path's stage runtime writes stage.json. The lock still runs card lint itself,
 so a hand-written record skips no check. Authoring never fabricates stage acceptance.
+`status` reports the shared authoring round. `model-input` and `mapping-input` register their permitted
+input bytes automatically. Re-emitting identical input is idempotent, not permission to dispatch another
+fresh defect hunt. Changed inputs and rewind share one repair batch; a third batch requires an explicit
+user-approved extension. Do not rename the run, reset stage.json or restart the analyst to evade it.
+Before every actual analyst dispatch or resumed analysis, register `review-input --kind model-analyst
+--input <permitted-source-input> --attempt <dispatch-id>`. A transport retry reuses the same ID; a new
+analysis does not, even when its source bytes are unchanged.
 
 ## Complete the Draft, without rewriting generated policy
 
