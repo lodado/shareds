@@ -1,6 +1,6 @@
 // Pure detectors for lint-guard. No Claude Code API here, so `node --test` can exercise them.
 
-const CODE_FILE = /\.(?:[cm]?[jt]sx?|vue|svelte|astro)$/
+const CODE_FILE = /\.(?:[cm]?[jt]sx?|vue|svelte|astro)$/i
 
 // A diagnostic hidden instead of fixed. Each pattern runs against one added line.
 const EVASIONS = [
@@ -11,14 +11,16 @@ const EVASIONS = [
   { id: 'void-promise', re: /^\s*void\s+(?!0\b)[A-Za-z_$]/, hint: 'await or handle the promise' },
   {
     id: 'test-skip',
-    re: /\b(?:it|test|describe)\.(?:skip|only)\s*\(|\bx(?:it|describe)\s*\(/,
+    re: /\b(?:it|test|describe)(?:\.\w+)*\.(?:skip|only|fixme)\b|\bx(?:it|describe)\s*\(/,
     hint: 'fix or delete the test only when its behavior is confirmed wrong',
   },
 ]
 
+const MULTILINE = new Set(['as-any', 'as-unknown-as'])
+
 // Waiting on the clock in a test guesses when state settles. `waitForTimeout` is always a guess.
 // The rest have legitimate uses (fake timers, a negative assertion), so the user decides.
-const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$|(?:^|\/)(?:e2e|e2e-live|__tests__)\//
+const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$|(?:^|\/)(?:e2e|e2e-live|__tests__)\//i
 const TEST_WAIT_DENIED = [
   {
     id: 'wait-for-timeout',
@@ -43,11 +45,11 @@ const TSCONFIG_WEAKENING =
   /"(?:strict|noImplicit\w+|strict\w+|noUnchecked\w+|noUnused\w+)"\s*:\s*false|"(?:exclude|skipLibCheck|checkJs)"/
 
 const BYPASSES = [
-  { id: 'no-verify', re: /\bgit\s+(?:commit|push|merge|rebase|cherry-pick|am)\b[^|;&\n]*--no-verify\b/ },
+  { id: 'no-verify', re: /\bgit\s+(?:commit|push|merge|rebase|cherry-pick|am)\b[^|;&\n]*--no-ve\w*/ },
   { id: 'commit-n', re: /\bgit\s+commit\b[^|;&\n]*\s-[A-Za-z]*n[A-Za-z]*(?=\s|$)/ },
   { id: 'husky-off', re: /\bHUSKY\s*=\s*0\b/ },
   { id: 'skip-hooks', re: /\b(?:SKIP|HUSKY_SKIP_HOOKS)\s*=/ },
-  { id: 'hooks-path', re: /\bgit\s+config\b[^|;&\n]*\bcore\.hooksPath\b/ },
+  { id: 'hooks-path', re: /\bgit\b[^|;&\n]*\bcore\.hooksPath\b/ },
 ]
 const SHELL_WRITE = /\bsed\s+-[A-Za-z]*i|\bperl\s+-[A-Za-z]*i|\btee\b|>>?\s*\S|\b(?:mv|cp|rm)\s/
 
@@ -76,6 +78,16 @@ export function findEvasions(lines, path = '') {
       if (evasion.re.test(text)) hits.push({ id: evasion.id, hint: evasion.hint, line: index + 1, text: text.trim() })
     }
   })
+  // A type assertion may break across lines (`as\n  any`), which no single-line pattern sees.
+  const joined = lines.join('\n')
+  for (const evasion of EVASIONS.filter((entry) => MULTILINE.has(entry.id))) {
+    for (const match of joined.matchAll(new RegExp(evasion.re.source, 'g'))) {
+      const line = joined.slice(0, match.index).split('\n').length
+      if (!hits.some((hit) => hit.id === evasion.id && hit.line === line)) {
+        hits.push({ id: evasion.id, hint: evasion.hint, line, text: lines[line - 1].trim() })
+      }
+    }
+  }
   return hits
 }
 
@@ -137,9 +149,28 @@ export function evasionsInDiff(diff) {
     )
 }
 
-export function isGitCommit(command) {
-  return /(?:^|[;&|(]\s*|&&\s*)git\s+(?:-[Cc]\s+\S+\s+)*commit\b/.test(command ?? '')
+// `FOO=1 git commit`, `env`, `sudo`, `time` and the like in front of the command.
+const ASSIGNMENT = /^(?:[A-Za-z_]\w*=\S*\s+)+/
+const WRAPPER = /^(?:(?:env|command|time|sudo|nice|nohup|exec|builtin)(?:\s+-\S+(?:\s+\d+)?)*\s+)+/
+const GIT_COMMIT = /^git\s+(?:-{1,2}[\w-]+(?:=\S*)?(?:\s+(?!commit\b)\S+)?\s+)*commit\b/
+const SHELL_C = /-c\s+(['"])([\s\S]*?)\1/g
+
+export function isGitCommit(command = '') {
+  const inner = [...command.matchAll(SHELL_C)].map((match) => match[2])
+  return [command, ...inner].some((text) =>
+    text.split(/[;&|()\n]+/).some((segment) => {
+      let rest = segment.trim()
+      for (let next = ''; next !== rest; ) {
+        next = rest
+        rest = rest.replace(ASSIGNMENT, '').replace(WRAPPER, '')
+      }
+      return GIT_COMMIT.test(rest)
+    }),
+  )
 }
+
+// `git add . && git commit` stages after the guard runs, so new untracked files must be read too.
+export const stagesInSameCommand = (command = '') => /\bgit\b[^;&|\n]*\badd\b/.test(command)
 
 // Why a tool call should wait for the user, or null. Evasion is handled separately and denied.
 export function weakeningReason(e) {

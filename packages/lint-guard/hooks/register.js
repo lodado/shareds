@@ -5,6 +5,7 @@ import {
   isCodeFile,
   isGitCommit,
   slowTestReason,
+  stagesInSameCommand,
   weakeningReason,
 } from './detect.js'
 import { diagnosticsInRanges, eslintUnavailable, formatDiagnostics, writtenRanges } from './lint.js'
@@ -25,6 +26,21 @@ async function diffAgainstHead($) {
   throw new Error(staged.stderr.trim() || 'git diff failed')
 }
 
+const MAX_UNTRACKED = 200
+
+// New files `git add` is about to stage are not in `git diff HEAD`; read them as all-added.
+async function untrackedAsDiff($) {
+  const listed = await $.process.run(['git', 'ls-files', '--others', '--exclude-standard'])
+  if (listed.exitCode !== 0) throw new Error(listed.stderr.trim() || 'git ls-files failed')
+  const files = listed.stdout.split('\n').filter(isCodeFile).slice(0, MAX_UNTRACKED)
+  const parts = []
+  for (const file of files) {
+    const lines = (await $.fs.read(file)).split('\n')
+    parts.push(`+++ b/${file}`, `@@ -0,0 +1,${lines.length} @@`, ...lines.map((line) => `+${line}`))
+  }
+  return parts.join('\n')
+}
+
 async function guardToolCall($, e, next) {
   const hits = evasionsInToolCall(e)
   if (hits.length > 0) return { deny: `${EVASION_MESSAGE}\n${describeHits(hits)}` }
@@ -33,6 +49,7 @@ async function guardToolCall($, e, next) {
     let diff
     try {
       diff = await diffAgainstHead($)
+      if (stagesInSameCommand(e.command)) diff += `\n${await untrackedAsDiff($)}`
     } catch (error) {
       return { deny: `lint-guard: cannot inspect the diff before commit (${error.message})` }
     }
@@ -109,6 +126,11 @@ export function register(on) {
     if (next.called) return next(e)
     return { deny: `lint-guard failed (${next.error.kind}), so this ${e.tool} call was not run` }
   })
-  on('tool.check', reviewPermission)
+  // Same reasoning as above: if the review fails, ask the user rather than keep the earlier decision.
+  on('tool.check', { tool: ['Edit', 'Write', 'MultiEdit', 'Bash'] }, reviewPermission).catch(async ($, e, next) => {
+    // The review may fail after next(e) already answered; a deny from the rules still stands.
+    const decided = await next(e)
+    return decided?.decision === 'deny' ? decided : { decision: 'ask' }
+  })
   on('session.append', joinNotes)
 }

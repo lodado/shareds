@@ -33,7 +33,7 @@ test('a clean Edit reaches the tool', async ($, on) => {
 test('git commit is denied when the diff adds an evasion', async ($, on) => {
   on('tool.call', () => ({ result: 'tool ran' }))
   on('process.run', () => ({ value: { exitCode: 0, stdout: DIFF_WITH_EVASION, stderr: '' } }))
-  const result = await $.tool.call({ tool: 'Bash', command: 'git add . && git commit -m "feat: x"' })
+  const result = await $.tool.call({ tool: 'Bash', command: 'git commit -m "feat: x"' })
   expect(result.deny).toContain('src/a.ts:3 as-any')
 })
 
@@ -154,4 +154,36 @@ test('waitForTimeout in a spec file is denied; waitFor asks', async ($, on) => {
     input: { file_path: 'src/a.test.tsx', content: 'await waitFor(() => expect(x).toBe(1))' },
   })
   expect(asked).toEqual({ decision: 'ask' })
+})
+
+test('git add && git commit also scans untracked files', async ($, on) => {
+  on('tool.call', () => ({ result: 'tool ran' }))
+  on('process.run', ($, e) => {
+    const argv = e.argv.join(' ')
+    if (argv.startsWith('git ls-files')) return { value: { exitCode: 0, stdout: 'src/new.ts\nnotes.md\n', stderr: '' } }
+    return { value: { exitCode: 0, stdout: '', stderr: '' } }
+  })
+  on('fs.read', () => ({ value: 'const ok = 1\nconst bad = value as any\n' }))
+  const result = await $.tool.call({ tool: 'Bash', command: 'git add . && git commit -m "feat: x"' })
+  expect(result.deny).toContain('src/new.ts:2 as-any')
+})
+
+test('untracked files are not read when the commit does not stage them', async ($, on) => {
+  on('tool.call', () => ({ result: 'tool ran' }))
+  on('process.run', () => ({ value: { exitCode: 0, stdout: '', stderr: '' } }))
+  const result = await $.tool.call({ tool: 'Bash', command: 'git commit -m "feat: x"' })
+  expect(result).toEqual({ result: 'tool ran' })
+})
+
+test('a failing permission review asks instead of silently allowing', async ($, on) => {
+  on('tool.check', () => ({ decision: 'allow' }))
+  // `edits` is not a list, so the review throws while reading the call
+  const decision = await $.tool.check({ tool: 'MultiEdit', input: { file_path: '/repo/src/a.ts', edits: 5 } })
+  expect(decision).toEqual({ decision: 'ask' })
+})
+
+test('a failing review keeps a deny from the rules', async ($, on) => {
+  on('tool.check', () => ({ decision: 'deny' }))
+  const decision = await $.tool.check({ tool: 'MultiEdit', input: { file_path: '/repo/src/a.ts', edits: 5 } })
+  expect(decision).toEqual({ decision: 'deny' })
 })

@@ -12,11 +12,11 @@ Claude Code **mod** (needs Claude Code 2.1.287+). It enforces, with regexes and 
 
 Only lines the call **adds** are scanned, so an existing match that an edit leaves in place is not blamed on the agent. Markdown and other non-code files are ignored.
 
-The hook fails closed: if the guard throws or times out on an Edit, Write, MultiEdit or Bash call, that call is denied rather than silently unguarded.
+The hooks fail closed: if the edit guard throws or times out on an Edit, Write, MultiEdit or Bash call, that call is denied; if the permission review fails, the user is asked (a deny from the rules still stands).
 
 ## Limits
 
-- Tools that write files without a `file_path`/`new_string` shape (MCP editors, shell redirects) bypass the edit guard. The commit guard still catches what they add to tracked files; a new untracked file is only seen once it is staged.
+- Tools that write files without a `file_path`/`new_string` shape (MCP editors, shell redirects) bypass the edit guard. The commit guard still catches what they add to tracked files; when the same command runs `git add`, untracked code files are scanned too. A file created by one command and committed by a later one without `git add` in it is only seen once staged.
 - A regex match inside a string or comment is still a hit. Approved exceptions: approve the `ask`, or start with `--safe-mode`.
 - Post-edit lint runs `npx --no-install eslint` on the edited file from the session directory, with a 45 second timeout. A project without ESLint or an ESLint config is skipped silently; any other failure is reported to Claude. It never runs `--fix`. Only findings on the lines the call wrote are shown, so existing problems do not become the agent's. Whole-repo lint stays in `pnpm lint` and the pre-push gate.
 - The edit lint blocks the next step while it runs, so a slow typed config makes every edit slower.
@@ -36,3 +36,5 @@ Install at user scope only, like every plugin in this repository:
 claude plugin marketplace update my-vibe-coding-helper
 claude plugin install lint-guard@my-vibe-coding-helper --scope user
 ```
+
+- Regexes, not a parser: a pattern built at run time (`eval`, variables assembled into a command) or an alias such as `git ci` is not recognised. Writing a whole existing file with Write counts every line as added, so a pre-existing match in it is reported.

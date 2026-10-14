@@ -138,3 +138,63 @@ test('commit diff denies waitForTimeout in test files only', () => {
   assert.deepEqual(ids(evasionsInDiff(diff('e2e/a.spec.ts'))), ['wait-for-timeout'])
   assert.deepEqual(evasionsInDiff(diff('src/a.ts')), [])
 })
+
+// Bypasses found by auditing the guards with hostile input.
+test('a TypeScript assertion split across lines is still reported', () => {
+  const edit = (new_string) => ({ tool: 'Edit', file_path: 'src/a.ts', old_string: '', new_string })
+  assert.deepEqual(ids(evasionsInToolCall(edit('const a = b as\n  any'))), ['as-any'])
+  assert.deepEqual(ids(evasionsInToolCall(edit('const a = b as unknown\n  as Foo'))), ['as-unknown-as'])
+  assert.equal(evasionsInToolCall(edit('const a = b as\n  const'))?.length, 0)
+})
+
+test('skipped or focused tests are reported through describe, test and fixme chains', () => {
+  const line = (text) => evasionsInToolCall({ tool: 'Write', file_path: 'src/a.test.ts', content: text })
+  for (const text of ['test.describe.only("x", () => {})', 'describe.skip.each([1])("x", () => {})', 'test.fixme("x", () => {})', 'it.concurrent.skip("x", () => {})', 'test.skip(isCI, "why")']) {
+    assert.ok(line(text).some((hit) => hit.id === 'test-skip'), text)
+  }
+  assert.equal(line('it("skips nothing", () => {})').length, 0)
+})
+
+test('extensions match regardless of case', () => {
+  assert.deepEqual(ids(evasionsInToolCall({ tool: 'Write', file_path: 'src/A.TS', content: 'x as any' })), ['as-any'])
+})
+
+test('git commit is recognised behind wrappers, subshells and bash -c', () => {
+  for (const command of [
+    'env FOO=1 git commit -m x',
+    'FOO=1 git commit -m x',
+    'time git commit -m x',
+    'command git commit -m x',
+    'sudo -E git commit -m x',
+    '(cd repo && git commit -m x)',
+    'bash -c "git commit -m x"',
+    "sh -c 'git add . && git commit -m x'",
+    'git --no-pager commit -m x',
+    'git -c user.name=a commit -m x',
+    'echo hi\ngit commit -m x',
+  ]) {
+    assert.equal(isGitCommit(command), true, command)
+  }
+  for (const command of ['git log --grep=commit', 'echo "git commit"', 'git status', 'npm run commit']) {
+    assert.equal(isGitCommit(command), false, command)
+  }
+})
+
+test('git hook bypasses survive abbreviation and -c core.hooksPath', () => {
+  for (const command of [
+    'git commit --no-verif -m x',
+    'git commit --no-ve -m x',
+    'git -c core.hooksPath=/dev/null commit -m x',
+    'git commit -m x --no-verify',
+  ]) {
+    assert.ok(weakeningReason({ tool: 'Bash', command }), command)
+  }
+})
+
+test('a commit that stages in the same command also scans untracked files', async () => {
+  const { stagesInSameCommand } = await import('./detect.js')
+  assert.equal(stagesInSameCommand('git add . && git commit -m x'), true)
+  assert.equal(stagesInSameCommand('git add -A; git commit -m x'), true)
+  assert.equal(stagesInSameCommand('git commit -m x'), false)
+  assert.equal(stagesInSameCommand('git commit -am x'), false)
+})
