@@ -6,6 +6,41 @@ structure — the product keeps the shape [`types/state-ladder.md`](types/state-
 (retry count, delay, error kind, staleness bound) comes from an approved source or an Open question —
 never from the pattern.
 
+## Short feedback loops and cohesive modules
+
+Separate authoring time from kernel time and finite-Space runtime before optimizing. A long
+`card` run is not evidence that proving a law is slow. `ORACLE_TIMING=1` on
+`oracle-verify.mjs card` separates regeneration from cross-check time. Profile the slow phase on
+unchanged inputs, not a smaller bound presented as the same workload.
+
+- **One responsibility per module.** Keep the registered MODEL, LAWS and PROOF entrypoints.
+  Where the domain needs helpers, use Bend file imports for cohesive state operations or reusable
+  proof lemmas rather than one giant transition/proof or one file per arbitrary case. MODEL owns
+  transitions, LAWS owns the approved statements, PROOF owns their derivations. Keep the world
+  and source goals independent as adequacy requires. Do not duplicate a model rule in a classifier.
+- **Check the smallest changed unit first.** Run `oracle-model.mjs check --file <changed-file>`
+  after a model/helper edit, then the affected proof entry with the registered laws through the
+  normal `prove` path. Fix quantities, types and decreasing recursion arguments before another
+  full derive/adequacy/cross-check cycle. Helpers matching computed values and reusable induction
+  lemmas reduce repeated debugging; they do not replace the complete proof verdict.
+- **Factor a rule, not the guarantee.** Use structural recursion and lemmas over the actual domain.
+  A finite case proof may be generated, but do not hand-maintain its Cartesian answer table or
+  replace an unbounded law with a finite sample. Splitting proofs must retain cross-field and
+  ordering obligations, not turn coupled axes into assumed-independent ones.
+- **Keep revision boundaries intact.** Imported files participate in source/input digests. An
+  imported helper change still needs the applicable derivation, review and lock invalidation.
+  Use the shared authoring repair budget; a new module is not permission for another review round.
+- **Do not trade coverage for speed.** Ordered prefixes and observations remain distinct. Adding
+  branching choices or a larger bound can multiply traces; measure that separately from per-step
+  copying. Do not drop events, merge histories by final state, reduce bounds or skip proofs to
+  obtain a faster result. The JS target is sequential, so Bend parallel-call syntax alone does
+  not accelerate this tool's compiled-JS cross-check.
+
+The pinned [Bend 2.0.34 guide](https://github.com/bendlang/bend/blob/v2.0.34/guide/GUIDE.md)
+explains modules, quantities, structural termination, proof verdicts and JS interop. Its JS
+interop passes arrays without defensive copies. Keep runtime input isolation even for pure
+Bend code: an affine array update may mutate the supplied JS array.
+
 ## Rules, not answer tables
 
 People review `MODEL.bend` and `LAWS.bend`; only the kernel reads `PROOF.bend`. Cases are enumerated by

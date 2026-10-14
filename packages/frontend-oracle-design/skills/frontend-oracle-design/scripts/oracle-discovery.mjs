@@ -14,7 +14,6 @@ import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { isDeepStrictEqual, parseArgs } from 'node:util'
-import { deserialize, serialize } from 'node:v8'
 import { ensureBend } from './ensure-bend.mjs'
 import {
   anchoredSection,
@@ -28,6 +27,7 @@ import {
   searchAdequacy,
   triageCandidates,
 } from './oracle-adequacy.mjs'
+import { isolatedClassifier, memoizeClassifier } from './oracle-classifier.mjs'
 import { parseCaseSpace } from './oracle-frames.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
 import {
@@ -55,6 +55,8 @@ import {
 } from './oracle-package.mjs'
 import { recordAuthoringInput } from './oracle-stage.mjs'
 import { defSignature, parseBendTypes, toPlain, toRuntime, typeIR } from './oracle-types.mjs'
+
+export { isolatedClassifier } from './oracle-classifier.mjs'
 
 export const DISCOVERY_VERSION = 1
 const SCRIPT = fileURLToPath(import.meta.url)
@@ -273,28 +275,7 @@ export function crossLookup({ caseSpace, mapping, worlds, traces, classify, coor
   const worldHas = (world, dimension, value) => world.plain[maps[dimension.dimension].world] === target(dimension, value)
   // 한 trace가 보인 선언 값 — 단계마다 분류 def가 그 단계의 값을 말한다
   const behavior = dimensions.filter((dimension) => kindOf(dimension) === 'behavior')
-  // Classifiers are pure functions of their full inputs, not the trace history.
-  // Keep defs and argument lists separate. Digests only select a bucket; raw equality checks types and signed zero.
-  const keys = new WeakMap()
-  const keyOf = (value) => {
-    const digest = () => sha256(stableStringify(toPlain(value)))
-    if (value === null || typeof value !== 'object') return digest()
-    if (!keys.has(value)) keys.set(value, digest())
-    return keys.get(value)
-  }
-  const classifications = new Map()
-  const classifyOnce = (def, ...args) => {
-    if (!classifications.has(def)) classifications.set(def, new Map())
-    const results = classifications.get(def)
-    const key = args.map(keyOf).join(':')
-    if (!results.has(key)) results.set(key, [])
-    const bucket = results.get(key)
-    const known = bucket.find((entry) => isDeepStrictEqual(entry.args, args))
-    if (known) return known.value
-    const value = classify(def, ...args)
-    bucket.push({ args, value })
-    return value
-  }
+  const classifyOnce = memoizeClassifier(classify)
   const shown = traces.map((trace) => new Set(trace.steps.flatMap(({ before, event }) => behavior.map(
     (dimension) => `${dimension.dimension}=${classifyOnce(maps[dimension.dimension].classify, before, event)}`,
   ))))
@@ -611,25 +592,6 @@ export function crossCheckSpace({ caseSpace, stateModel = null, mapping = {}, wo
     candidates: [...values, ...pairList, ...machine.findings].map(([cls, key, summary, evidence]) =>
       candidate({ operator: 'space-cross-check', cls, key, summary, evidence }),
     ),
-  }
-}
-
-/**
- * Inputs are immutable stepper snapshots for one cross-check run. Consecutive axes inspect the same
- * arguments, so encode those once but still give every def (and argument) its own defensive copy.
- * Keep only the latest tuple, not an encoding for every reached state. Bytes are never equality keys.
- */
-export function isolatedClassifier(exported, source) {
-  let previous = null
-  let encoded = []
-  return (def, ...args) => {
-    if (typeof exported[def] !== 'function')
-      throw Object.assign(new Error(`${source} does not define ${def}`), { code: 'CROSS_CHECK_DEF' })
-    if (!previous || previous.length !== args.length || args.some((arg, index) => !Object.is(arg, previous[index]))) {
-      encoded = args.map((arg) => serialize(arg))
-      previous = args
-    }
-    return exported[def](...encoded.map((value) => deserialize(value)))?.$ ?? null
   }
 }
 

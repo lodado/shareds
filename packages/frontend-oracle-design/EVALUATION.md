@@ -1,3 +1,103 @@
+# 0.100.3: isolate classifier reuse and replay normalized snapshots
+
+## Validation
+
+- `ORACLE_REQUIRE_BEND=1 pnpm --filter @lodado/frontend-oracle-design-plugin test`:
+  **1,153 passed, 0 failed, 0 skipped**, using real Bend 2.0.34.
+- Package lint: exit 0, **0 errors, 405 package-wide warnings**. The new classifier module,
+  its regression tests and the benchmark harness also passed focused lint with no warnings.
+- Generated reference bundles (22), converted evals, workflow documentation and
+  `git diff --check`: passed. Independent read-only review found no blocking defect.
+- Advisory `knip --workspace packages/frontend-oracle-design --no-progress --no-config-hints`:
+  exit 1 for the unchanged `scripts/profile-public-failures.test.mjs:249` cached `type-fest`
+  dependency that is not declared in this workspace. No dependency or suppression was added
+  to hide that pre-existing finding.
+
+## Diagnosis and module boundary
+
+The earlier mailbox profile below identifies argument copying in the compiled-JS cross-check,
+not kernel proof search, as the dominant measured cost. This release does not claim faster Bend
+proof authoring or alter the ordered finite Space. Trace growth and repeated per-step copying
+are separate costs. Copying remains linear in the copied representation size per invocation
+(including sparse-array length); this change reduces its constant cost, not the exponential growth
+of an expanding trace space.
+
+`oracle-classifier.mjs` now owns both reuse boundaries: a run-local exact-result cache and the
+last immutable argument tuple's isolated snapshots. Discovery owns traversal and candidate
+judgment, not clone machinery. The existing discovery export remains compatible. Result-cache
+hashes still only select buckets and raw deep equality still decides reuse. No persisted cache,
+new dependency, dynamic code generation or trusted-pure shortcut is introduced.
+
+The first call uses V8 normalization. The second builds a graph plan for plain records and
+index-only arrays; subsequent calls shallow-copy templates and reconnect edges. Cycles, aliasing
+within an argument, holes, BigInt, signed zero and own prototype-named properties survive. Each
+argument and invocation owns fresh mutable nodes. Single-use tuples pay no planning cost.
+Unsupported descendants keep the V8 fallback, including arrays with extra properties.
+
+A new regression reproduced an existing defect before the fix: a decoded typed view could
+alias cached serialization bytes, so classifier mutation poisoned the next call. Each fallback
+decode now owns a dedicated `Uint8Array` of encoded bytes, including the cold path. Tests mutate
+both typed elements and the entire backing buffer. A real Bend-compiled in-place array update
+also confirms that removing isolation would be incorrect.
+
+## Reproducible local measurement, 2026-10-14
+
+Run `node packages/frontend-oracle-design/scripts/benchmark-classifier.mjs [baseline-scripts-dir]`.
+`--safe-v8` selects a reference with independent decode bytes but no graph plan. The harness uses
+Node v26.7.0, one warm-up plus five measured rounds within each process, new run-local caches
+each round and identical inputs. Every result digest and classifier count matched the preserved
+0.100.2 implementation and safe reference. These are synthetic calls through the real
+`crossCheckSpace`, not a consumer
+acceptance or a measurement of kernel proofs. Medians in milliseconds from the first sequential run:
+
+| Workload                                       | 0.100.2 | Safe V8 reference | 0.100.3 |
+| ---------------------------------------------- | ------: | ----------------: | ------: |
+| 1 classifier, 1,024 records, 256 unique tuples |  225.40 |            207.50 |  204.42 |
+| 2 classifiers, same tuple churn                |  266.90 |            281.26 |  284.09 |
+| 3 classifiers, same tuple churn                |  308.36 |            316.59 |  312.53 |
+| 17 classifiers, same tuple churn               |  885.03 |            841.93 |  383.01 |
+| 17 classifiers, one-record state               |   55.92 |             61.66 |   46.63 |
+| Sparse array, length 8,192                     |   26.59 |             29.15 |   19.91 |
+| Linked ADT, 128 nodes                          |  109.68 |            113.21 |   63.40 |
+| Late typed-array descendant, V8 fallback       |  429.21 |            431.51 |  449.38 |
+
+The repeated-record workload used 4,352 classifier calls and took 54.5% less elapsed time than
+the safe reference. Low-reuse inputs show no established benefit; the late fallback was 4.1%
+slower because its one unsuccessful plan scan is extra work. A reverse-order run retained the
+candidate's 389.06 ms repeated-record median, but the reference developed large timing dispersion
+(for example, 1,172–2,133 ms on that workload). Do not use that noisy comparison to inflate the
+reported gain. This live-machine observation is not an SLA or a full-pipeline speedup.
+
+Post-workload RSS is reported, not peak allocation. It varied across runs and sometimes increased
+(the first repeated-record result was 193.81 MB for the safe reference and 219.32 MB for the
+candidate). No memory reduction is claimed. Releasing the old encoding after planning is a
+bounded-retention choice, not evidence of lower peak RSS.
+
+The existing real Bend `stale-search` fixture passed the public `oracle-verify.mjs card` command
+in both versions: `CARD_LINT_OK 5 rows`, with every copied fixture input byte unchanged. Alternating
+versions, one warm-up and five measured runs gave 241.92 ms before and 240.18 ms after. Its cross-check
+is only about 2 ms, so there is no meaningful end-to-end speedup claim for this small fixture.
+The historical mailbox directory was no longer present on this machine. Its new full-card runtime,
+32,000-trace acceptance and peak memory were **not revalidated**; the older measurements below remain
+historical evidence only.
+
+## References and authoring guidance
+
+- [Bend 2.0.34 guide](https://github.com/bendlang/bend/blob/v2.0.34/guide/GUIDE.md): modules,
+  quantities, structural termination and laws/proofs inform the cohesive-helper and small-unit
+  authoring guidance in `references/model-patterns.md`. JS interop passes arrays without copying,
+  and the JS target runs sequentially, so isolation cannot be removed or fixed by parallel syntax.
+- [Node v26.7.0 V8 API](https://github.com/nodejs/node/blob/v26.7.0/doc/api/v8.md): serialization
+  follows structured-clone semantics and equal values need not have equal serialized bytes.
+  It supplies normalization, not a replacement for exact equality in result-cache buckets.
+- [Node v26.7.0 V8 implementation](https://github.com/nodejs/node/blob/v26.7.0/lib/v8.js):
+  `DefaultDeserializer._readHostObject` may create typed views into the serialized input buffer.
+  That source and the failing mutation regression motivate dedicated decode bytes.
+
+All proof, adequacy, approval, lock, cross-term, bound and product-conformance gates remain intact.
+The added authoring guidance aims to shorten feedback loops without allowing a new module to reset the
+shared review budget or bypass import-digest invalidation.
+
 # 0.100.2: retain classifier isolation while reusing snapshot encoding
 
 ## Measured bottleneck and rejected hypothesis
