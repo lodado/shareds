@@ -151,6 +151,18 @@
       "category": "development",
       "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
       "tags": ["agents", "fsd", "clean-architecture", "ddd"]
+    },
+    {
+      "name": "lint-guard",
+      "description": "Claude Code mod that blocks lint and type-check evasion (disable comments, any casts, skipped tests, waitForTimeout), asks before lint or hook configuration is weakened, and reports ESLint findings on the lines an edit wrote.",
+      "version": "0.2.0",
+      "author": {
+        "name": "lodado"
+      },
+      "source": "./packages/lint-guard",
+      "category": "development",
+      "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+      "tags": ["mod", "eslint", "guard", "determinism"]
     }
   ]
 }
