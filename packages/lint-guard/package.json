@@ -1,6 +1,6 @@
 {
   "name": "@lodado/lint-guard-plugin",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Deterministic guards that stop an agent from hiding lint and type diagnostics instead of fixing them.",
   "private": true,
   "type": "module",

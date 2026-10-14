@@ -137,21 +137,35 @@ export function parseDiff(diff) {
   const files = []
   let file = null
   let line = 0
+  // Rows still owed to the current hunk. Inside a hunk every `+`/`-` row is content, even one
+  // that reads `+++ b/other` (an added line `++ b/other`), so headers are only read outside it.
+  let added = 0
+  let removed = 0
   for (const row of diff.split('\n')) {
+    if (added > 0 && row.startsWith('+')) {
+      file?.added.push({ line, text: row.slice(1) })
+      line += 1
+      added -= 1
+      continue
+    }
+    if (removed > 0 && row.startsWith('-')) {
+      removed -= 1
+      continue
+    }
+    if (row.startsWith('\\')) continue
+    added = 0
+    removed = 0
     if (row.startsWith('+++ ')) {
       const target = row.slice(4)
       file = target === '/dev/null' ? null : { path: diffPath(target), added: [] }
       if (file) files.push(file)
       continue
     }
-    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(row)
+    const hunk = /^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(row)
     if (hunk) {
-      line = Number(hunk[1])
-      continue
-    }
-    if (file && row.startsWith('+') && !row.startsWith('+++')) {
-      file.added.push({ line, text: row.slice(1) })
-      line += 1
+      removed = hunk[1] === undefined ? 1 : Number(hunk[1])
+      line = Number(hunk[2])
+      added = hunk[3] === undefined ? 1 : Number(hunk[3])
     }
   }
   return files

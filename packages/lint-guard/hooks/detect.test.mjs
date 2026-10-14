@@ -210,3 +210,29 @@ test('diff paths that git quotes are decoded, not skipped', () => {
     assert.deepEqual(evasionsInDiff(diff(target)).map((hit) => hit.file), [path], target)
   }
 })
+
+test('added lines that look like diff headers do not redirect the scan', () => {
+  // The first added line is `++ b/README.md`, which a diff shows as `+++ b/README.md`.
+  const diff = [
+    '+++ b/src/a.ts',
+    '@@ -0,0 +1,3 @@',
+    '+++ b/README.md',
+    '++@@ -0,0 +1 @@',
+    '+const bad = x as any',
+  ].join('\n')
+  const hits = evasionsInDiff(diff)
+  assert.deepEqual(hits.map((hit) => [hit.file, hit.line, hit.id]), [['src/a.ts', 3, 'as-any']])
+  assert.deepEqual(parseDiff(diff).map((file) => file.path), ['src/a.ts'])
+})
+
+test('hunk counts keep removed lines and a /dev/null look-alike inside their hunk', () => {
+  const diff = [
+    '+++ b/src/a.ts',
+    '@@ -4,2 +4,2 @@',
+    '-old one',
+    '-old two',
+    '+++ /dev/null',
+    '+const bad = x as any',
+  ].join('\n')
+  assert.deepEqual(evasionsInDiff(diff).map((hit) => [hit.file, hit.line]), [['src/a.ts', 5]])
+})
