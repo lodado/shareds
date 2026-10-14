@@ -160,7 +160,7 @@ test('git add && git commit also scans untracked files', async ($, on) => {
   on('tool.call', () => ({ result: 'tool ran' }))
   on('process.run', ($, e) => {
     const argv = e.argv.join(' ')
-    if (argv.startsWith('git ls-files')) return { value: { exitCode: 0, stdout: 'src/new.ts\nnotes.md\n', stderr: '' } }
+    if (argv.startsWith('git ls-files')) return { value: { exitCode: 0, stdout: 'src/new.ts\0notes.md\0', stderr: '' } }
     return { value: { exitCode: 0, stdout: '', stderr: '' } }
   })
   on('fs.read', () => ({ value: 'const ok = 1\nconst bad = value as any\n' }))
@@ -186,4 +186,25 @@ test('a failing review keeps a deny from the rules', async ($, on) => {
   on('tool.check', () => ({ decision: 'deny' }))
   const decision = await $.tool.check({ tool: 'MultiEdit', input: { file_path: '/repo/src/a.ts', edits: 5 } })
   expect(decision).toEqual({ decision: 'deny' })
+})
+
+test('a commit that stages more untracked code files than the scan reads is denied', async ($, on) => {
+  on('tool.call', () => ({ result: 'tool ran' }))
+  const names = Array.from({ length: 201 }, (_, i) => `src/f${i}.ts`).join('\0')
+  on('process.run', ($, e) => ({
+    value: { exitCode: 0, stdout: e.argv.includes('ls-files') ? names : '', stderr: '' },
+  }))
+  on('fs.read', () => ({ value: 'const ok = 1' }))
+  const result = await $.tool.call({ tool: 'Bash', command: 'git add -A && git commit -m x' })
+  expect(result.deny).toContain('untracked')
+})
+
+test('untracked paths are read NUL-separated, so unusual names are not mangled', async ($, on) => {
+  on('tool.call', () => ({ result: 'tool ran' }))
+  on('process.run', ($, e) => ({
+    value: { exitCode: 0, stdout: e.argv.includes('ls-files') ? 'src/é ü.ts\0' : '', stderr: '' },
+  }))
+  on('fs.read', ($, e) => ({ value: e.path.endsWith('src/é ü.ts') ? 'const bad = x as any' : '' }))
+  const result = await $.tool.call({ tool: 'Bash', command: 'git add -A && git commit -m x' })
+  expect(result.deny).toContain('as-any')
 })

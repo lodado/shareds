@@ -1,6 +1,6 @@
 {
   "name": "lint-guard",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Deterministic guards that stop an agent from hiding lint and type diagnostics instead of fixing them.",
   "author": {
     "name": "lodado",

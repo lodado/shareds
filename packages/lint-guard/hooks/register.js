@@ -30,9 +30,15 @@ const MAX_UNTRACKED = 200
 
 // New files `git add` is about to stage are not in `git diff HEAD`; read them as all-added.
 async function untrackedAsDiff($) {
-  const listed = await $.process.run(['git', 'ls-files', '--others', '--exclude-standard'])
+  // NUL-separated: without -z git quotes unusual names, which would not open.
+  const listed = await $.process.run(['git', 'ls-files', '-z', '--others', '--exclude-standard'])
   if (listed.exitCode !== 0) throw new Error(listed.stderr.trim() || 'git ls-files failed')
-  const files = listed.stdout.split('\n').filter(isCodeFile).slice(0, MAX_UNTRACKED)
+  const files = listed.stdout.split('\0').filter(isCodeFile)
+  if (files.length > MAX_UNTRACKED) {
+    throw new Error(
+      `${files.length} untracked code files exceed the ${MAX_UNTRACKED} the guard reads; commit in smaller steps`,
+    )
+  }
   const parts = []
   for (const file of files) {
     const lines = (await $.fs.read(file)).split('\n')

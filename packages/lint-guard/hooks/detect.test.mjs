@@ -198,3 +198,15 @@ test('a commit that stages in the same command also scans untracked files', asyn
   assert.equal(stagesInSameCommand('git commit -m x'), false)
   assert.equal(stagesInSameCommand('git commit -am x'), false)
 })
+
+test('diff paths that git quotes are decoded, not skipped', () => {
+  const diff = (target) => [`+++ ${target}`, '@@ -0,0 +1,1 @@', '+const bad = x as any'].join('\n')
+  for (const [target, path] of [
+    ['"b/\\303\\251.ts"', 'é.ts'],
+    ['"b/with\\ttab.ts"', 'with\ttab.ts'],
+    ['"b/quo\\"te.ts"', 'quo"te.ts'],
+    ['b/my file.ts\t', 'my file.ts'],
+  ]) {
+    assert.deepEqual(evasionsInDiff(diff(target)).map((hit) => hit.file), [path], target)
+  }
+})

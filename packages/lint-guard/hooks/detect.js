@@ -109,6 +109,29 @@ export function evasionsInToolCall(e) {
   return findEvasions(written.lines, written.path).map((hit) => ({ ...hit, file: written.path }))
 }
 
+const SIMPLE_ESCAPES = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13, '"': 34, '\\': 92 }
+
+// git quotes a path with non-ASCII bytes, tabs or quotes as a C string: "b/\303\251.ts".
+function diffPath(target) {
+  const raw = target.endsWith('\t') ? target.slice(0, -1) : target
+  if (!raw.startsWith('"')) return raw.replace(/^b\//, '')
+  const inner = raw.slice(1, -1)
+  const bytes = []
+  for (let at = 0; at < inner.length; at += 1) {
+    const octal = /^\\([0-3][0-7]{2})/.exec(inner.slice(at, at + 4))
+    if (octal) {
+      bytes.push(parseInt(octal[1], 8))
+      at += 3
+    } else if (inner[at] === '\\' && inner[at + 1] in SIMPLE_ESCAPES) {
+      bytes.push(SIMPLE_ESCAPES[inner[at + 1]])
+      at += 1
+    } else {
+      bytes.push(...Buffer.from(inner[at]))
+    }
+  }
+  return Buffer.from(bytes).toString('utf8').replace(/^b\//, '')
+}
+
 // Added lines per file from `git diff -U0`, with the new-file line number of each.
 export function parseDiff(diff) {
   const files = []
@@ -117,7 +140,7 @@ export function parseDiff(diff) {
   for (const row of diff.split('\n')) {
     if (row.startsWith('+++ ')) {
       const target = row.slice(4)
-      file = target === '/dev/null' ? null : { path: target.replace(/^b\//, ''), added: [] }
+      file = target === '/dev/null' ? null : { path: diffPath(target), added: [] }
       if (file) files.push(file)
       continue
     }
