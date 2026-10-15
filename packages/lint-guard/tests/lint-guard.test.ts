@@ -51,7 +51,7 @@ test('git commit is denied when the diff cannot be read', async ($, on) => {
   expect(result.deny).toContain('fatal: broken')
 })
 
-test('editing lint configuration asks the user', async ($, on) => {
+test('loosening lint configuration asks the user', async ($, on) => {
   on('tool.check', () => ({ decision: 'allow' }))
   on('ui.toast', () => ({ value: undefined }))
   const decision = await $.tool.check({
@@ -59,6 +59,28 @@ test('editing lint configuration asks the user', async ($, on) => {
     input: { file_path: '/repo/eslint.config.mjs', old_string: "'error'", new_string: "'off'" },
   })
   expect(decision).toEqual({ decision: 'ask' })
+})
+
+test('tightening lint configuration keeps the decision the rules reached', async ($, on) => {
+  on('tool.check', () => ({ decision: 'allow' }))
+  const decision = await $.tool.check({
+    tool: 'Edit',
+    input: { file_path: '/repo/eslint.config.mjs', old_string: "'warn'", new_string: "'error'" },
+  })
+  expect(decision).toEqual({ decision: 'allow' })
+})
+
+test('a Write of a hook file asks only when it drops a step the file had', async ($, on) => {
+  on('tool.check', () => ({ decision: 'allow' }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('fs.read', () => ({ value: 'npm run lint\nnpm test\n' }))
+  const added = await $.tool.check({
+    tool: 'Write',
+    input: { file_path: '/repo/.husky/pre-push', content: 'npm run lint\nnpm run typecheck\nnpm test\n' },
+  })
+  expect(added).toEqual({ decision: 'allow' })
+  const dropped = await $.tool.check({ tool: 'Write', input: { file_path: '/repo/.husky/pre-push', content: 'npm test\n' } })
+  expect(dropped).toEqual({ decision: 'ask' })
 })
 
 test('an ordinary edit keeps the decision the rules reached', async ($, on) => {
@@ -139,21 +161,35 @@ test('a note is delivered once, to its own tool call only', async ($, on) => {
   expect(await storedRow($)).toBe('edited')
 })
 
-test('waitForTimeout in a spec file is denied; waitFor asks', async ($, on) => {
+test('waitForTimeout in a spec file is denied; waitFor runs without asking', async ($, on) => {
   on('tool.call', () => ({ result: 'tool ran' }))
   on('tool.check', () => ({ decision: 'allow' }))
-  on('ui.toast', () => ({ value: undefined }))
   const denied = await $.tool.call({
     tool: 'Write',
     file_path: 'e2e/a.spec.ts',
     content: 'await page.waitForTimeout(500)',
   })
   expect(denied.deny).toContain('wait-for-timeout')
-  const asked = await $.tool.check({
+  const checked = await $.tool.check({
     tool: 'Write',
     input: { file_path: 'src/a.test.tsx', content: 'await waitFor(() => expect(x).toBe(1))' },
   })
-  expect(asked).toEqual({ decision: 'ask' })
+  expect(checked).toEqual({ decision: 'allow' })
+})
+
+test('a clock wait in a test reaches the tool result Claude reads as a hint', async ($, on) => {
+  on('tool.call', () => TOOL_RESULT)
+  on('fs.read', () => ({ value: 'unrelated' }))
+  await $.tool.call({
+    tool: 'Edit',
+    tool_use_id: 'toolu_1',
+    file_path: '/repo/src/a.test.tsx',
+    old_string: 'x',
+    new_string: 'await waitFor(() => expect(x).toBe(1))',
+  })
+  const content = await storedRow($)
+  expect(content).toContain('edited')
+  expect(content).toContain('(wait-for) in /repo/src/a.test.tsx')
 })
 
 test('git add && git commit also scans untracked files', async ($, on) => {

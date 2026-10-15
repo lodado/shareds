@@ -1,4 +1,4 @@
 {
-  "description": "lint-guard mod: blocks lint evasion, asks before lint configuration is weakened",
+  "description": "lint-guard mod: blocks lint evasion, asks only when lint configuration is loosened",
   "modules": ["./register.js"]
 }

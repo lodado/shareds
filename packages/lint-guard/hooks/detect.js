@@ -40,6 +40,12 @@ const GATE_CONFIG =
   /(?:^|\/)(?:eslint\.config\.[cm]?[jt]s|\.eslintrc(?:\.[\w]+)?|\.eslintignore|(?:vitest|jest)\.(?:config|workspace)[\w.-]*|\.lintstagedrc[\w.]*|lint-staged\.config[\w.]*|commitlint\.config[\w.]*|\.husky\/[^\s'"]+)$/
 const GATE_CONFIG_IN_COMMAND =
   /eslint\.config\.[cm]?[jt]s|\.eslintrc|\.eslintignore|(?:vitest|jest)\.(?:config|workspace)|\.lintstagedrc|lint-staged\.config|commitlint\.config|\.husky\//
+// A line that loosens a gate: a rule turned off or down, a path ignored, a step that cannot fail.
+// Adding one asks the user; removing one tightens the gate. Adding a check never asks.
+// Rule options (`['error', { allow: [...] }]`, `max: 900`) can loosen in ways no word list covers,
+// so any severity followed by an options object counts.
+const GATE_LOOSENING =
+  /["'](?:off|warn)["']|:\s*\[?\s*[01]\b|\[\s*(?:["'](?:error|warn)["']|[012])\s*,\s*\{|\b(?:ignore|allow|skip|except)\w*|\bexclude\b|passWithNoTests|\bbail\b|testTimeout|\.(?:skip|only)\b|--no-[\w-]+|\|\|\s*(?:true|:)|\bexit\s+0\b/
 const TSCONFIG = /(?:^|\/)tsconfig[\w.-]*\.json$/
 const TSCONFIG_WEAKENING =
   /"(?:strict|noImplicit\w+|strict\w+|noUnchecked\w+|noUnused\w+)"\s*:\s*false|"(?:exclude|skipLibCheck|checkJs)"/
@@ -54,6 +60,7 @@ const BYPASSES = [
 const SHELL_WRITE = /\bsed\s+-[A-Za-z]*i|\bperl\s+-[A-Za-z]*i|\btee\b|>>?\s*\S|\b(?:mv|cp|rm)\s/
 
 export const isCodeFile = (path) => CODE_FILE.test(path ?? '')
+export const isGateConfig = (path) => GATE_CONFIG.test(path ?? '')
 export const isTestFile = (path) => TEST_FILE.test(path ?? '')
 
 // Lines of `next` that `previous` does not already contain, so an untouched
@@ -209,8 +216,27 @@ export function isGitCommit(command = '') {
 // `git add . && git commit` stages after the guard runs, so new untracked files must be read too.
 export const stagesInSameCommand = (command = '') => /\bgit\b[^;&|\n]*\badd\b/.test(command)
 
+// Lines an edit tool call takes out. A Write needs the file it replaces: `previous` is '' for a
+// new file and undefined when it could not be read. null when the removed lines are unknown.
+function removedByToolCall(e, previous) {
+  if (e.tool === 'Edit') return addedLines(e.new_string, e.old_string)
+  if (e.tool === 'MultiEdit') return (e.edits ?? []).flatMap((edit) => addedLines(edit.new_string, edit.old_string))
+  if (e.tool === 'Write' && typeof previous === 'string') return addedLines(e.content, previous)
+  return null
+}
+
+function gateLoosening(e, added, previous) {
+  const loose = added.find((line) => GATE_LOOSENING.test(line))
+  if (loose) return `adds "${loose.trim()}"`
+  const removed = removedByToolCall(e, previous)
+  if (!removed) return 'replaces a file it could not read first'
+  // Brackets and blank lines move when a block is reshaped; they hold no check.
+  const dropped = removed.find((line) => /\w/.test(line) && !GATE_LOOSENING.test(line))
+  return dropped ? `removes "${dropped.trim()}"` : null
+}
+
 // Why a tool call should wait for the user, or null. Evasion is handled separately and denied.
-export function weakeningReason(e) {
+export function weakeningReason(e, previous) {
   if (e.tool === 'Bash') {
     const command = e.command ?? ''
     const bypass = BYPASSES.find((entry) => entry.re.test(command))
@@ -221,7 +247,10 @@ export function weakeningReason(e) {
   }
   const written = addedByToolCall(e)
   if (!written?.path) return null
-  if (GATE_CONFIG.test(written.path)) return `edits lint/test/hook configuration (${written.path})`
+  if (GATE_CONFIG.test(written.path)) {
+    const loosening = gateLoosening(e, written.lines, previous)
+    return loosening ? `loosens lint/test/hook configuration (${written.path}): ${loosening}` : null
+  }
   if (TSCONFIG.test(written.path) && written.lines.some((line) => TSCONFIG_WEAKENING.test(line))) {
     return `loosens TypeScript checking (${written.path})`
   }

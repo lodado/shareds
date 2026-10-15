@@ -3,6 +3,7 @@ import {
   evasionsInDiff,
   evasionsInToolCall,
   isCodeFile,
+  isGateConfig,
   isGitCommit,
   slowTestReason,
   stagesInSameCommand,
@@ -63,7 +64,12 @@ async function guardToolCall($, e, next) {
     if (committed.length > 0) return { deny: `${EVASION_MESSAGE}\n${describeHits(committed)}` }
   }
   const result = await next(e)
-  return EDIT_TOOLS.has(e.tool) ? withLintFeedback($, e, result) : result
+  if (!EDIT_TOOLS.has(e.tool)) return result
+  // A clock wait has legitimate uses (fake timers, a negative assertion), so Claude gets the hint
+  // and decides; the user is not asked.
+  const wait = slowTestReason(e)
+  if (wait) addNote($, e, `lint-guard: ${wait}. Keep it only when no element, event or barrier marks the moment.`)
+  return withLintFeedback($, e, result)
 }
 
 // Queues ESLint findings on the lines this call wrote for what Claude reads back. Never blocks:
@@ -98,8 +104,9 @@ const firstLine = (text) => text.trim().split('\n')[0] || 'no output'
 const pendingNotes = new Map()
 
 function addNote($, e, note) {
-  if (e.tool_use_id) pendingNotes.set(e.tool_use_id, note)
-  else $.ui.toast(note)
+  if (!e.tool_use_id) return $.ui.toast(note)
+  const earlier = pendingNotes.get(e.tool_use_id)
+  pendingNotes.set(e.tool_use_id, earlier === undefined ? note : `${earlier}\n\n${note}`)
 }
 
 async function joinNotes($, e, next) {
@@ -119,10 +126,22 @@ async function reviewPermission($, e, next) {
   const decision = await next(e)
   // Unlike tool.call, tool.check keeps the tool's arguments under `input`.
   const call = { tool: e.tool, ...e.input }
-  const reason = weakeningReason(call) ?? slowTestReason(call)
-  if (!reason || decision?.decision === 'deny') return decision
+  if (decision?.decision === 'deny') return decision
+  const reason = weakeningReason(call, await replacedContent($, call))
+  if (!reason) return decision
   $.ui.toast(`lint-guard: ${reason}`)
   return { decision: 'ask' }
+}
+
+// The configuration a Write is about to replace: '' when the file does not exist yet, undefined
+// when it exists but cannot be read (the guard then asks, since it cannot see what is dropped).
+async function replacedContent($, call) {
+  if (call.tool !== 'Write' || !isGateConfig(call.file_path)) return undefined
+  try {
+    return await $.fs.read(call.file_path)
+  } catch (error) {
+    return /ENOENT|no such file/i.test(String(error?.message)) ? '' : undefined
+  }
 }
 
 export function register(on) {

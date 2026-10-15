@@ -96,13 +96,48 @@ test('weakening: git hook bypasses', () => {
   assert.equal(weakeningReason({ tool: 'Bash', command: 'git commit -m "fix: x"' }), null)
 })
 
-test('weakening: lint configuration edits', () => {
-  assert.ok(weakeningReason({ tool: 'Edit', file_path: '/r/eslint.config.mjs', old_string: 'a', new_string: 'b' }))
-  assert.ok(weakeningReason({ tool: 'Write', file_path: '/r/.husky/pre-push', content: 'x' }))
-  assert.ok(weakeningReason({ tool: 'Edit', file_path: '/r/vitest.config.ts', old_string: 'a', new_string: 'b' }))
+test('weakening: lint configuration edits that loosen a gate', () => {
+  const edit = (file_path, old_string, new_string) => ({ tool: 'Edit', file_path, old_string, new_string })
+  for (const call of [
+    edit('/r/eslint.config.mjs', "'eqeqeq': 'error',", "'eqeqeq': 'off',"),
+    edit('/r/eslint.config.mjs', 'rules: {', "rules: {\n  'no-console': 'warn',"),
+    edit('/r/eslint.config.mjs', 'export default [', "export default [\n  { ignores: ['src/legacy/**'] },"),
+    edit('/r/eslint.config.mjs', "rules: {\n  'eqeqeq': 'error',", 'rules: {'),
+    edit('/r/eslint.config.mjs', 'rules: {', "rules: {\n  '@typescript-eslint/no-explicit-any': ['error', { ignoreRestArgs: true }],"),
+    edit('/r/eslint.config.mjs', 'rules: {', "rules: {\n  'no-console': ['error', { allow: ['warn'] }],"),
+    edit('/r/eslint.config.mjs', 'rules: {', "rules: {\n  'max-lines': ['error', { max: 900, skipComments: true }],"),
+    edit('/r/vitest.config.ts', 'test: {', "test: {\n  exclude: ['src/slow/**'],"),
+    edit('/r/.husky/pre-push', 'npm test', 'npm test || true'),
+    edit('/r/.husky/pre-push', 'npm run lint\nnpm test', 'npm test'),
+  ]) {
+    assert.ok(weakeningReason(call), `${call.file_path}: ${call.new_string}`)
+  }
   assert.ok(weakeningReason({ tool: 'Bash', command: "sed -i 's/error/off/' eslint.config.mjs" }))
   assert.equal(weakeningReason({ tool: 'Bash', command: 'cat eslint.config.mjs' }), null)
-  assert.equal(weakeningReason({ tool: 'Edit', file_path: 'src/a.ts', old_string: 'a', new_string: 'b' }), null)
+  assert.equal(weakeningReason(edit('src/a.ts', 'a', 'b')), null)
+})
+
+test('weakening: lint configuration edits that only add or tighten checks pass', () => {
+  const edit = (file_path, old_string, new_string) => ({ tool: 'Edit', file_path, old_string, new_string })
+  for (const call of [
+    edit('/r/eslint.config.mjs', 'rules: {', "rules: {\n  'eqeqeq': 'error',"),
+    edit('/r/eslint.config.mjs', "'no-console': 'warn',", "'no-console': 'error',"),
+    edit('/r/eslint.config.mjs', "  { ignores: ['src/legacy/**'] },\n]", ']'),
+    edit('/r/.husky/pre-push', 'npm test', 'npm run lint\nnpm test'),
+    edit('/r/vitest.config.ts', '  },\n})', "    setupFiles: ['./setup.ts'],\n  },\n})"),
+  ]) {
+    assert.equal(weakeningReason(call), null, `${call.file_path}: ${call.new_string}`)
+  }
+})
+
+test('weakening: a Write of lint configuration is compared with the file it replaces', () => {
+  const write = (content) => ({ tool: 'Write', file_path: '/r/.husky/pre-push', content })
+  assert.equal(weakeningReason(write('npm test'), ''), null)
+  assert.equal(weakeningReason(write('npm run lint\nnpm test'), 'npm test'), null)
+  assert.ok(weakeningReason(write('npm test'), 'npm run lint\nnpm test'))
+  assert.ok(weakeningReason(write('exit 0'), ''))
+  // An existing file that could not be read may be losing checks the guard cannot see.
+  assert.ok(weakeningReason(write('npm test')))
 })
 
 test('weakening: tsconfig only when it loosens checking', () => {

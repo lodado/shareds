@@ -154,8 +154,8 @@
     },
     {
       "name": "lint-guard",
-      "description": "Claude Code mod that blocks lint and type-check evasion (disable comments, any casts, skipped tests, waitForTimeout), asks before lint or hook configuration is weakened, and reports ESLint findings on the lines an edit wrote.",
-      "version": "0.2.3",
+      "description": "Claude Code mod that blocks lint and type-check evasion (disable comments, any casts, skipped tests, waitForTimeout), asks only when lint or hook configuration is loosened, hints at clock waits in tests, and reports ESLint findings on the lines an edit wrote.",
+      "version": "0.3.0",
       "author": {
         "name": "lodado"
       },
