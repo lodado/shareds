@@ -2,6 +2,7 @@ import {
   describeHits,
   evasionsInDiff,
   evasionsInToolCall,
+  hookBypass,
   isCodeFile,
   isGateConfig,
   isGitCommit,
@@ -16,6 +17,13 @@ const LINT_TIMEOUT_MS = 45_000
 
 const EVASION_MESSAGE =
   'lint-guard: do not hide a diagnostic. Fix its cause. If an exception is truly needed, ask the user and let them approve it.'
+
+const bypassMessage = (id) =>
+  [
+    `lint-guard: the command skips git hooks (${id}). Run it without that, and let the hooks check it.`,
+    'If a hook fails, fix what it reports, even a failure that predates your change, then commit or push again.',
+    'If a hook is slow because it checks the whole repo, change it to check only the changed files instead of skipping it.',
+  ].join('\n')
 
 // `git diff HEAD` also covers `git add . && git commit` in one command, where nothing is staged yet.
 async function diffAgainstHead($) {
@@ -51,6 +59,10 @@ async function untrackedAsDiff($) {
 async function guardToolCall($, e, next) {
   const hits = evasionsInToolCall(e)
   if (hits.length > 0) return { deny: `${EVASION_MESSAGE}\n${describeHits(hits)}` }
+
+  // Denied, not asked: an approved prompt still ships code the hooks never checked.
+  const bypass = e.tool === 'Bash' ? hookBypass(e.command) : null
+  if (bypass) return { deny: bypassMessage(bypass) }
 
   if (e.tool === 'Bash' && isGitCommit(e.command)) {
     let diff

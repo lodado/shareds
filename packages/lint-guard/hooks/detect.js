@@ -59,6 +59,9 @@ const BYPASSES = [
 ]
 const SHELL_WRITE = /\bsed\s+-[A-Za-z]*i|\bperl\s+-[A-Za-z]*i|\btee\b|>>?\s*\S|\b(?:mv|cp|rm)\s/
 
+// The id of the git hook bypass in a shell command, or null.
+export const hookBypass = (command) => BYPASSES.find((entry) => entry.re.test(command ?? ''))?.id ?? null
+
 export const isCodeFile = (path) => CODE_FILE.test(path ?? '')
 export const isGateConfig = (path) => GATE_CONFIG.test(path ?? '')
 export const isTestFile = (path) => TEST_FILE.test(path ?? '')
@@ -239,8 +242,6 @@ function gateLoosening(e, added, previous) {
 export function weakeningReason(e, previous) {
   if (e.tool === 'Bash') {
     const command = e.command ?? ''
-    const bypass = BYPASSES.find((entry) => entry.re.test(command))
-    if (bypass) return `command skips git hooks (${bypass.id})`
     const touched = GATE_CONFIG_IN_COMMAND.exec(command)
     if (touched && SHELL_WRITE.test(command)) return `shell command writes lint/test/hook configuration (${touched[0]})`
     return null

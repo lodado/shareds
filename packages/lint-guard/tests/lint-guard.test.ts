@@ -51,6 +51,26 @@ test('git commit is denied when the diff cannot be read', async ($, on) => {
   expect(result.deny).toContain('fatal: broken')
 })
 
+test('git commit --no-verify is denied before the tool runs', async ($, on) => {
+  on('tool.call', () => ({ result: 'tool ran' }))
+  on('process.run', () => ({ value: { exitCode: 0, stdout: '', stderr: '' } }))
+  const result = await $.tool.call({ tool: 'Bash', command: 'git commit --no-verify -m "feat: x"' })
+  expect(result.deny).toContain('skips git hooks (no-verify)')
+})
+
+test('git push --no-verify is denied before the tool runs', async ($, on) => {
+  on('tool.call', () => ({ result: 'tool ran' }))
+  const result = await $.tool.call({ tool: 'Bash', command: 'git push --no-verify origin HEAD:main' })
+  expect(result.deny).toContain('skips git hooks (no-verify)')
+})
+
+test('a hook bypass does not ask the user', async ($, on) => {
+  on('tool.check', () => ({ decision: 'allow' }))
+  on('ui.toast', () => ({ value: undefined }))
+  const decision = await $.tool.check({ tool: 'Bash', input: { command: 'git push --no-verify' } })
+  expect(decision).toEqual({ decision: 'allow' })
+})
+
 test('loosening lint configuration asks the user', async ($, on) => {
   on('tool.check', () => ({ decision: 'allow' }))
   on('ui.toast', () => ({ value: undefined }))

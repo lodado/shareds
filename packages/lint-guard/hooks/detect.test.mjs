@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { addedLines, evasionsInDiff, evasionsInToolCall, isGitCommit, parseDiff, weakeningReason } from './detect.js'
+import {
+  addedLines,
+  evasionsInDiff,
+  evasionsInToolCall,
+  hookBypass,
+  isGitCommit,
+  parseDiff,
+  weakeningReason,
+} from './detect.js'
 
 const ids = (hits) => hits.map((hit) => hit.id).sort()
 
@@ -81,19 +89,20 @@ test('git commit detection', () => {
   assert.equal(isGitCommit('git log --oneline'), false)
 })
 
-test('weakening: git hook bypasses', () => {
-  for (const command of [
-    'git commit --no-verify -m x',
-    'git push --no-verify',
-    'git commit -nm x',
-    'HUSKY=0 git commit -m x',
-    'SKIP=lint git commit -m x',
-    'git config core.hooksPath /dev/null',
+test('git hook bypasses are named, and are not a weakening to ask about', () => {
+  for (const [command, id] of [
+    ['git commit --no-verify -m x', 'no-verify'],
+    ['git push --no-verify', 'no-verify'],
+    ['git commit -nm x', 'commit-n'],
+    ['HUSKY=0 git commit -m x', 'husky-off'],
+    ['SKIP=lint git commit -m x', 'skip-hooks'],
+    ['git config core.hooksPath /dev/null', 'hooks-path'],
   ]) {
-    assert.ok(weakeningReason({ tool: 'Bash', command }), command)
+    assert.equal(hookBypass(command), id, command)
+    assert.equal(weakeningReason({ tool: 'Bash', command }), null, command)
   }
-  assert.equal(weakeningReason({ tool: 'Bash', command: 'git push -n' }), null)
-  assert.equal(weakeningReason({ tool: 'Bash', command: 'git commit -m "fix: x"' }), null)
+  assert.equal(hookBypass('git push -n'), null)
+  assert.equal(hookBypass('git commit -m "fix: x"'), null)
 })
 
 test('weakening: lint configuration edits that loosen a gate', () => {
@@ -222,7 +231,7 @@ test('git hook bypasses survive abbreviation and -c core.hooksPath', () => {
     'git -c core.hooksPath=/dev/null commit -m x',
     'git commit -m x --no-verify',
   ]) {
-    assert.ok(weakeningReason({ tool: 'Bash', command }), command)
+    assert.notEqual(hookBypass(command), null, command)
   }
 })
 
