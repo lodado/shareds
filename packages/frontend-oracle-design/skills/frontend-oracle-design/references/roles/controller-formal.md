@@ -12,6 +12,7 @@ The core entry owns scope and mode. Common prohibitions apply throughout. At eac
 2. Invoke $oracle-author for the source-bound model package, independent analyst inputs, checks and projected
    Draft with all manual duties. Walk the stages with `scripts/oracle-stage.mjs`: `begin`, then
    `advance --to MODELED | CHECKED | DRAFTED` once each gate passes. Read acceptance back.
+   A walk back is `rewind --to <stage> --reason <cause>` with the cause that sent it back.
    `oracle-lock.mjs create` refuses a package oracle that is not at DRAFTED on the same package bytes,
    and only the stage runtime writes stage.json. The lock still runs card lint itself, so a hand-written
    record skips no check. A role return does not advance a stage.
@@ -20,9 +21,11 @@ The core entry owns scope and mode. Common prohibitions apply throughout. At eac
    (SendMessage on Claude Code). It already holds its references and re-reads only changed run files.
    Dispatch a fresh author only when that context is unavailable or for a new revision; its packet names
    the run directory and the open findings. The Delivery test worker is continued the same way.
-   Reviewers and analysts keep their own independence rules.
+   Reviewers and analysts keep their own independence rules. A round-2 confirmation continues the
+   round-1 reviewer the same way, with only its finding IDs and the repair diff, under a new `--attempt`.
 3. Before showing the Draft, run the cold-read gate by invoking $oracle-review in a context-free context
-   with card bytes alone. Apply five questions per row, collapse to one root and its cheapest first nail.
+   with card bytes alone: `oracle-review-view.mjs card --oracle <card>` as the reading view plus a byte
+   copy of the card, both written outside the run directory. Apply five questions per row, collapse to one root and its cheapest first nail.
    Drive that nail and record root, falsifying observation and result in journal.md. In the same gate,
    run the reverse two-sample read once per card: extract impossible dispositions with
    `scripts/oracle-verify.mjs card --ir`, hand them with the witness falsifier table from

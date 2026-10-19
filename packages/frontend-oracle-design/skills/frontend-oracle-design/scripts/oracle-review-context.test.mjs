@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { sha256 } from './oracle-fs.mjs'
 import { contextGaps, REVIEW_DIMENSIONS, snapshotContext, validateContextManifest, validateContextReview } from './oracle-review-context.mjs'
+import { foldCard, foldPacket } from './oracle-review-view.mjs'
 
 function manifest() {
   return {
@@ -106,4 +109,95 @@ test('context review validates all dimensions and rejects unknown refs and selec
   input.selections[0].missingContext = []
   input.budget.exhausted = true
   assert.equal(contextGaps(input), true)
+})
+
+// 리뷰어가 읽는 보기 — 생성 영역의 칸 패딩을 걷고 긴 칸만 접는다. 잠긴 카드와 패킷 파일은 그대로 기준이다.
+const longDomain = Array.from({ length: 60 }, (_, index) => `{"$":"Obs","n":${index}}`).join(' ')
+const card = [
+  '# Oracle: fold',
+  '',
+  '<!-- oracle:generated:begin generator=oracle-package@1.1 package=p.json inputs-sha256=abc -->',
+  '',
+  '## Behavior Contract',
+  '',
+  '| ID  | Then                       |',
+  '| --- | -------------------------- |',
+  '| O1  | exactly one POST /orders   |',
+  `| O2  | ${'one receipt per order and no second charge, '.repeat(10)}UNLESS the cart is empty |`,
+  '',
+  '## Derived Axes',
+  '',
+  '| Axis    | Domain |',
+  '| ------- | ------ |',
+  `| obs     | ${longDomain} |`,
+  '',
+  '<!-- oracle:generated:end -->',
+  '',
+  '## User Confirmation',
+  '',
+  `- Note: ${'hand-written '.repeat(60)}`,
+  '',
+].join('\n')
+
+test('a review view folds only long generated cells and keeps every hand-written byte', () => {
+  const view = foldCard(card)
+  assert.ok(card.length - view.length > longDomain.length - 300, 'the long domain cell is what shrinks')
+  assert.match(view, /^\| ID \| Then \|$/m)
+  assert.match(view, /^\| O1 \| exactly one POST \/orders \|$/m, 'contract rows stay whole, only padding goes')
+  const folded = view.split('\n').find((line) => line.startsWith('| obs |'))
+  assert.match(folded, /^\| obs \| \{"\$":"Obs","n":0\}.*… \[folded \d+ chars · sha256:[a-f0-9]{16} · oracle\.md line 16\] \|$/)
+  assert.ok(view.includes(`- Note: ${'hand-written '.repeat(60)}`), 'outside the generated region nothing is folded')
+  assert.match(view, /UNLESS the cart is empty \|$/m, 'a long contract cell outside Derived Axes is never folded')
+  assert.ok(view.includes('<!-- oracle:generated:begin') && view.includes('<!-- oracle:generated:end -->'))
+  assert.equal(foldCard('# no generated region\n'), '# no generated region\n')
+})
+
+test('a packet view keeps the tests of runs the state cites and summarizes the rest', () => {
+  const tests = (statuses) => statuses.map((status, index) => ({ name: `t${index}`, status }))
+  const packet = {
+    oracle: { path: 'oracle.md', content: card },
+    state: { history: [{ state: 'VALID_RED', runId: 'r-1' }, { state: 'IMPLEMENTED_GREEN', runId: 'r-3' }] },
+    ledger: [
+      { type: 'run', runId: 'r-1', tests: tests(['failed']) },
+      { type: 'run', runId: 'r-2', label: 'mutation', tests: tests(['passed', 'passed', 'failed']) },
+      { type: 'budget', budget: 'harness', reason: 'fixture' },
+      { type: 'run', runId: 'r-3', tests: tests(['passed']) },
+    ],
+    diff: 'diff --git a/x b/x',
+  }
+  const before = JSON.stringify(packet)
+  const view = foldPacket(packet, { packetSha256: 'f'.repeat(64) })
+  assert.equal(JSON.stringify(packet), before, 'the packet object is not mutated')
+  assert.equal(view.view.packetSha256, 'f'.repeat(64))
+  assert.match(view.view.note, /receipts bind the packet file/)
+  assert.deepEqual(view.ledger[0].tests, packet.ledger[0].tests)
+  assert.deepEqual(view.ledger[3].tests, packet.ledger[3].tests)
+  assert.equal(view.ledger[1].tests, undefined)
+  // which test a mutation killed or a milestone RED failed stays visible; only passing entries fold
+  assert.deepEqual(view.ledger[1].testsFolded, {
+    total: 3,
+    byStatus: { passed: 2, failed: 1 },
+    sha256: sha256(JSON.stringify(packet.ledger[1].tests)),
+    notPassed: [{ name: 't2', status: 'failed' }],
+  })
+  assert.deepEqual(view.ledger[2], packet.ledger[2])
+  assert.equal(view.oracle.content, foldCard(card))
+  assert.equal(view.diff, packet.diff)
+})
+
+test('review-view prints the card or packet view and binds the packet bytes it read', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'review-view-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const script = fileURLToPath(new URL('./oracle-review-view.mjs', import.meta.url))
+  const run = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' })
+  await writeFile(join(root, 'oracle.md'), card)
+  const printed = run('card', '--oracle', join(root, 'oracle.md'))
+  assert.equal(printed.status, 0, printed.stderr)
+  assert.equal(printed.stdout, foldCard(card))
+  const raw = JSON.stringify({ oracle: { content: card }, state: { history: [] }, ledger: [] })
+  await writeFile(join(root, 'packet.json'), raw)
+  const view = JSON.parse(run('packet', '--packet', join(root, 'packet.json')).stdout)
+  assert.equal(view.view.packetSha256, sha256(raw))
+  assert.equal(run('lint', '--oracle', 'x').status, 2)
+  assert.equal(run('card').status, 2)
 })

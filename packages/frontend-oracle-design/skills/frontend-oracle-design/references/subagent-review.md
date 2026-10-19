@@ -130,6 +130,8 @@ Keep the common packet input intact: locked card and sources, lock verification,
 diff, Implementation Decision, `targetRevision`, and `targetSnapshot`. Supporting context cannot hide
 or selectively summarize these inputs. Review-point files remain criteria links with SHA-256 and
 must be read in full; supporting code context is a separate input, not replacement criteria.
+Hand reviewers the packet file together with `oracle-review-view.mjs packet --packet <file>` output.
+The view is a reading aid derived from the packet, not a summary input: the packet stays complete and bound.
 
 Start at changed symbols using existing file search, git, and installed TS/LSP tools. Inspect direct
 imports, calls, public re-exports and consumers; identify state creation/update/disposal, request and

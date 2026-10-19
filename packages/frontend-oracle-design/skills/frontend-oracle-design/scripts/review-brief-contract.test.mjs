@@ -52,3 +52,17 @@ test('review metrics require measurement and preserve safety gates', async () =>
   assert.match(retro, /unmeasured, not zero/)
   assert.match(retro, /No metric moves a gate/)
 })
+
+test('reviewers read folded views while the locked card and packet stay the bound inputs', async () => {
+  const review = await read('roles/review-formal.md')
+  assert.match(review, /`oracle-review-view\.mjs card`\s+reading view plus a byte copy of the card, both outside the run directory/)
+  const card = await read('card/card-format.md')
+  assert.match(card, /both written outside the run directory so no path leads to the journal or package/)
+  assert.match(review, /Round 2\s+continues the round-1 reviewer context with the prior finding IDs and repair diff/)
+  assert.match(review, /`oracle-review-view\.mjs packet` view first/)
+  assert.match(review, /the packet file stays the bound input for every lookup/)
+  const controller = await read('roles/controller-formal.md')
+  assert.match(controller, /round-2 confirmation continues the\s+round-1 reviewer the same way, with only its finding IDs and the repair diff, under a new `--attempt`/)
+  const packet = await read('subagent-review.md')
+  assert.match(packet, /reading aid derived from the packet, not a summary input: the packet stays complete and bound/)
+})

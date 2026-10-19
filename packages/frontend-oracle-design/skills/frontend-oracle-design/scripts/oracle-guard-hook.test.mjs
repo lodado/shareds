@@ -53,6 +53,7 @@ test('denies a hand write of the pre-lock stage record, before any run-state exi
   const denied = hook(write(root, '.ai/oracles/sample/stage.json', '{"stage":"DRAFTED"}\n'))
   assert.equal(denied.decision?.permissionDecision, 'deny')
   assert.match(denied.decision.permissionDecisionReason, /^STAGE_PROTECTED: stage\.json moves only through oracle-stage\.mjs/)
+  assert.match(denied.decision.permissionDecisionReason, /rewind --reason <cause>/)
   // another stage.json outside an oracle folder is not ours
   assert.equal(hook(write(root, 'src/stage.json', '{}\n')).decision, null)
 })

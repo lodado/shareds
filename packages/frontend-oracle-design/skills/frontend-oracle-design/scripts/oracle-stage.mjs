@@ -26,6 +26,9 @@ export const STAGE_FILE = 'stage.json'
 const PACKAGE_FILE = 'oracle.package.json'
 const packageScript = join(fileURLToPath(new URL('.', import.meta.url)), 'oracle-package.mjs')
 const REVIEW_KINDS = new Set(['model-analyst', 'translation', 'cold-read', 'reverse-impossible', 'source-aware'])
+// 되돌린 이유 — oracle-reflect.mjs가 run을 가로질러 같은 원인을 센다. 자유 서술은 note 한 줄로만 붙는다.
+export const REWIND_REASONS = Object.freeze(['review-finding', 'gate-failure', 'user-answer', 'source-change'])
+const NOTE_LIMIT = 200
 
 class StageError extends Error {
   constructor(code, message, exitCode = 1) {
@@ -117,7 +120,7 @@ export async function assertReadyToLock(directory, requestedProfile) {
   if (!['DRAFTED', 'ORACLE_READY'].includes(record.stage))
     throw new StageError('STAGE_NOT_DRAFTED', `the oracle is at ${record.stage}; the lock needs DRAFTED`)
   if (record.packageSha256 !== sha256(bytes))
-    throw new StageError('STAGE_STALE', `${PACKAGE_FILE} changed after ${record.stage} — oracle-stage.mjs rewind, then advance again`)
+    throw new StageError('STAGE_STALE', `${PACKAGE_FILE} changed after ${record.stage} — oracle-stage.mjs rewind --to <stage> --reason <cause>, then advance again`)
   return binding
 }
 
@@ -216,7 +219,7 @@ async function advance(directory, target, options) {
   if (!bytes) throw new StageError('STAGE_NO_PACKAGE', `${PACKAGE_FILE} is not in ${directory}`)
   const digest = contract ? record.cardSha256 : record.packageSha256
   if (digest && digest !== sha256(bytes))
-    throw new StageError('STAGE_STALE', contract ? 'whole approved card changed after CHECKED - rewind, then advance again' : `${PACKAGE_FILE} changed after ${record.stage} — rewind, then advance again`)
+    throw new StageError('STAGE_STALE', contract ? 'whole approved card changed after CHECKED - rewind --to <stage> --reason <cause>, then advance again' : `${PACKAGE_FILE} changed after ${record.stage} — rewind --to <stage> --reason <cause>, then advance again`)
   const evidence = await gate(directory, target, { ...options, profile: binding.profile })
   if (contract && sha256(await cardBytes(directory)) !== sha256(bytes)) throw new StageError('STAGE_STALE', 'whole Contract card changed during gate')
   const result = moved(record, target, sha256(bytes), evidence)
@@ -230,7 +233,14 @@ function rewoundDigest(target, bytes) {
   return sha256(bytes)
 }
 
-async function rewind(directory, target) {
+function rewindReason(reason, note) {
+  if (!REWIND_REASONS.includes(reason)) throw new StageError('USAGE', `rewind requires --reason ${REWIND_REASONS.join('|')}`, 2)
+  if (note !== undefined && (!note.trim() || /[\r\n]/.test(note) || note.length > NOTE_LIMIT))
+    throw new StageError('USAGE', `--note is one non-empty line of at most ${NOTE_LIMIT} characters`, 2)
+  return note === undefined ? { reason } : { reason, note: note.trim() }
+}
+
+async function rewind(directory, target, explanation) {
   const record = await readStage(directory)
   if (!record) throw new StageError('STAGE_MISSING', `no ${STAGE_FILE} — run begin first`)
   const binding = await bindingAt(directory, record)
@@ -240,6 +250,9 @@ async function rewind(directory, target) {
   const contract = binding.profile === 'contract/v1'
   const bytes = contract ? await cardBytes(directory) : await packageBytes(directory)
   if (contract && target !== 'DISCOVERING' && record.cardSha256 !== sha256(bytes)) throw new StageError('STAGE_STALE', 'changed Contract must rewind to DISCOVERING for approval and strict Space recheck')
+  // 바뀐 패키지를 MODELED·CHECKED로 되돌려 기록하면 그 단계의 관문을 건너뛴 채 새 바이트가 통과로 남는다 — 처음부터 다시 걷는다
+  if (!contract && target !== 'DISCOVERING' && record.packageSha256 !== (bytes ? sha256(bytes) : null))
+    throw new StageError('STAGE_STALE', `${PACKAGE_FILE} changed after ${record.stage} — a changed package walks back to DISCOVERING; only unchanged package bytes resume at ${target}`)
   const inputSha256 = sha256(JSON.stringify([bytes?.toString('utf8'), (await cardBytes(directory))?.toString('utf8')]))
   const previous = record.history.at(-1)
   if (record.stage === target && previous?.evidence === 'rewind' && previous.inputSha256 === inputSha256) return record
@@ -248,7 +261,7 @@ async function rewind(directory, target) {
   }
   const iterations = observeIteration(budget, 'stage', inputSha256, { force: true })
   const result = moved({ ...record, iterations }, target, rewoundDigest(target, bytes), 'rewind')
-  result.history.at(-1).inputSha256 = inputSha256
+  Object.assign(result.history.at(-1), { inputSha256, ...explanation })
   await writeStage(directory, result)
   return result
 }
@@ -294,7 +307,7 @@ function parse(args) {
   const options = {}
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index]?.replace(/^--/, '')
-    if (!['dir', 'to', 'timeout-ms', 'profile', 'kind', 'input', 'approval', 'attempt'].includes(name) || args[index + 1] === undefined)
+    if (!['dir', 'to', 'timeout-ms', 'profile', 'kind', 'input', 'approval', 'attempt', 'reason', 'note'].includes(name) || args[index + 1] === undefined)
       throw new StageError('USAGE', `Unknown or incomplete option: ${args[index]}`, 2)
     options[name] = args[index + 1]
   }
@@ -304,7 +317,7 @@ function parse(args) {
 const USAGE = `usage:
   oracle-stage.mjs begin --dir <.ai/oracles/<id>>
   oracle-stage.mjs advance --dir <dir> --to MODELED|CHECKED|DRAFTED [--timeout-ms <n>]
-  oracle-stage.mjs rewind --dir <dir> --to DISCOVERING|MODELED|CHECKED|DRAFTED
+  oracle-stage.mjs rewind --dir <dir> --to DISCOVERING|MODELED|CHECKED|DRAFTED --reason ${REWIND_REASONS.join('|')} [--note <one line>]
   oracle-stage.mjs review-input --dir <dir> --kind <review-kind> --input <raw-input> --attempt <dispatch-id>
   oracle-stage.mjs extend --dir <dir> --approval <explicit-user-approval.json>
   oracle-stage.mjs status --dir <dir>`
@@ -326,14 +339,17 @@ async function main() {
     process.stdout.write(`${JSON.stringify({ iterations })}\n`)
     return
   }
+  const explanation = command === 'rewind' ? rewindReason(options.reason, options.note) : undefined
   if (command === 'begin') await mkdir(directory, { recursive: true })
   const result = await withDirectoryLock(directory, 'stage', async () => {
     if (command === 'begin') return begin(directory, options.profile)
     if (command === 'advance') return advance(directory, options.to, { timeoutMs, requestedProfile: options.profile })
     if (command === 'extend') return extend(directory, options.approval)
-    return rewind(directory, options.to)
+    return rewind(directory, options.to, explanation)
   })
-  process.stdout.write(`${JSON.stringify({ stage: result.stage, evidence: result.history.at(-1).evidence, iterations: iterationStatus(result.iterations) })}\n`)
+  // rewind는 기록된 이유를 돌려준다 — 같은 되돌림의 재시도는 처음 이유를 유지하므로 호출자가 그것을 본다(undefined는 출력에서 빠진다)
+  const { evidence, reason } = result.history.at(-1)
+  process.stdout.write(`${JSON.stringify({ stage: result.stage, evidence, reason: command === 'rewind' ? reason : undefined, iterations: iterationStatus(result.iterations) })}\n`)
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

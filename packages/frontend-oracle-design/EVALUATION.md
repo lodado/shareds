@@ -1,3 +1,72 @@
+# 0.101.0: record why a stage walks back, close a gate-skipping rewind, and fold reviewer reading
+
+## Validation
+
+- `ORACLE_REQUIRE_BEND=1 pnpm --filter @lodado/frontend-oracle-design-plugin test`:
+  **1,164 passed, 0 failed, 0 skipped**, using real Bend.
+- Package lint: exit 0, **0 errors, 405 package-wide warnings** (unchanged from 0.100.3). The new
+  `oracle-reflect.mjs` has no warnings; the remaining ones in `oracle-stage.mjs` and
+  `oracle-guard-hook.mjs` sit in functions this release did not change.
+- Generated reference bundles (22), converted evals, workflow documentation and
+  `git diff --check`: passed. An independent read-only review found no blocking defect. Its one
+  medium and four low findings (a torn ledger line dropping a run's rewinds, a `null` ledger line
+  crashing the report, harness advice for policy/product budgets, a retried rewind hiding its
+  kept reason, hints naming a bare `rewind`) are each fixed with a regression test.
+
+## Diagnosis
+
+Stage rewinds recorded only an input digest, so a repeated cause, such as the same review
+finding sending several runs back to DISCOVERING, could not be counted across runs. Before this
+release no skill-level structure (sweep check, card lint, intake question) could be traced to
+evidence of recurrence. This release adopts the "encode repeated lessons in structure" idea from
+cursor/plugins `pstack` (`correct`, `reflect`). Its playbook routing, surface gates, pause state
+and agent files were not adopted: the workflow graph already splits design-only from Delivery,
+GREEN already refuses skipped/flaky evidence, the guard hook already ignores runs left by earlier
+sessions, and agent files would serve Claude only, not Codex or JCode.
+
+## Change
+
+- `oracle-stage.mjs rewind` requires `--reason review-finding|gate-failure|user-answer|source-change`
+  and accepts one optional `--note` line of at most 200 characters. Both are written onto the
+  rewind history entry. Validation runs before the directory lock, so a refused rewind writes
+  nothing and spends no round. An identical retry keeps the first reason and echoes it.
+- New read-only `oracle-reflect.mjs --root <dir> [--min-runs n]` reads `.ai/oracles/*/stage.json`
+  and `runs.jsonl`. It counts rewinds by reason and by walk, non-duplicate budget spends and
+  FAIL/NEEDS_DECISION stops, and proposes signals that recur in at least `n` runs (default 2) with
+  `applied: false`. Rewinds from before 0.101.0 count as `unrecorded`. A broken stage record skips
+  that run, and a broken ledger skips only that ledger.
+- Scripts only: behavior is identical on Claude, Codex and JCode. The guard hook changes only
+  its hint text.
+- A rewind with changed package bytes to MODELED or CHECKED recorded the new bytes as passed
+  without running that stage's gate (reproduced: emptied `sources`, `rewind --to CHECKED`, `status`
+  reported `stale: false`). Changed package bytes now walk back to DISCOVERING; a card-only repair on
+  unchanged bytes still resumes at CHECKED or DRAFTED.
+- New `oracle-review-view.mjs card|packet` prints a reading view. In the card it collapses table
+  padding in the generated region and folds only Derived Axes cells over 400 characters to a head,
+  length, hash and original line; contract, requirement and term rows are never folded. In the packet
+  it keeps full test lists for runs the state history cites, and for every other run the counts plus
+  each test that did not pass, so mutation kills and earlier REDs stay visible. The locked card and the
+  packet file stay the bound inputs. Cold-read receives the view and a byte copy of the card, both
+  outside the run directory. Round-2 confirmation continues the round-1 reviewer with the finding IDs
+  and repair diff under a new `--attempt`; a fresh context gets the same input when the host cannot
+  continue one.
+- A second independent review of this part found no blocking defect. Its findings are fixed with
+  regression tests: long Behavior Contract cells were folded (a closing `UNLESS` clause disappeared), the
+  cold-read input conflicted with "card bytes only", folded runs hid which test a mutation killed, and
+  a deleted package raised a type error instead of `STAGE_STALE`.
+
+## Measurement (adapter-isomorphism, a real 2026-10-08 run, copied)
+
+- Stage gates with the current scripts: MODELED 0 s, CHECKED 5 s (derive, cross-check, adequacy over
+  3072 worlds), card lint 5 s. The same calls took 3–10 minutes each in the 10-08 transcript, so
+  script time is no longer what makes two review rounds slow.
+- Reviewer input: card 431 KB → 42 KB view (372 KB was one derived-axes domain listing); Delivery
+  packet 3,687 KB → 867 KB view (2.2 MB was repeated per-run test lists). The rest of the packet
+  view is the code diff (408 KB) and locked sources (114 KB).
+- The 10-08 reviewer outputs record that two of five reviews skipped the derived-axes data lines and
+  one left seven items unresolved because it could not read them. One round-1 finding (F8) used an
+  observation-domain value, which is why long cells are folded with their line, not dropped.
+
 # 0.100.3: isolate classifier reuse and replay normalized snapshots
 
 ## Validation

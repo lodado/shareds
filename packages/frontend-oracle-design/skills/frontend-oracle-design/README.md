@@ -419,6 +419,32 @@ node skills/scripts/oracle-run.mjs status \
 다음 합법 전이를 기존 artifact에서 재계산합니다. resume은 이 출력으로 다음 action을
 고르는 절차이며, `run-state.json`이나 `runs.jsonl`을 직접 편집하지 않습니다.
 
+### 되풀이된 원인 모으기
+
+```bash
+node skills/scripts/oracle-reflect.mjs --root . [--min-runs 2]
+```
+
+`rewind`는 `--reason review-finding|gate-failure|user-answer|source-change`와 선택 `--note`로
+되돌린 이유를 `stage.json` history에 남깁니다. `oracle-reflect.mjs`는 `.ai/oracles/*/`의 이
+이유와 `runs.jsonl`의 budget 보정을 모아, 두 run 이상에서 되풀이된 원인을 후보로 냅니다.
+읽기만 하며 제안을 적용하지 않습니다(`applied: false`). 후보를 사전 잠금 스윕, 카드 lint,
+intake 질문으로 옮기는 일은 유지보수자가 합니다. 0.101.0 이전 rewind는 `unrecorded`로만 셉니다.
+
+### 리뷰어용 읽기 보기
+
+```bash
+node skills/scripts/oracle-review-view.mjs card --oracle .ai/oracles/<id>/oracle.md
+node skills/scripts/oracle-review-view.mjs packet --packet .ai/oracles/<id>/review-input.json
+```
+
+잠긴 카드와 리뷰 패킷은 그대로 기준입니다. 보기는 읽는 분량만 줄입니다. 카드에서는 생성 영역 표의
+칸 패딩을 걷고 `Derived Axes` 절에서 400자를 넘는 칸만 접어 원래 줄 번호와 해시를 남깁니다. 계약·요구·
+용어 행과 손으로 쓴 영역은 접지 않습니다. 패킷에서는 상태 기록이 인용한 런의 테스트 목록만 온전히
+남기고, 나머지 런은 개수와 통과하지 못한 테스트만 남깁니다. 실측한 실제 run에서는 카드가
+431KB → 42KB, 패킷이 3.7MB → 867KB로 줄었습니다. cold-read에는 보기와 카드 사본을 run 폴더 밖에
+두고 넘깁니다. 2차 확인 리뷰는 1차 리뷰어 컨텍스트를 이어서 finding ID와 수리 diff만 받습니다.
+
 ### Black-box eval corpus
 
 ### Artifact roles and early Delivery checks

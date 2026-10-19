@@ -1133,7 +1133,8 @@ Unresolved dispositions block lock. Before confirmation no consumer tests, produ
 Preflight checks do not advance DISCOVERING. After approval strict Space check and full-card lint bind
 the same unchanged bytes. User Confirmation is part of those bytes, never a hash-excluded field.
 Use existing stage/lock tools, verify lock before each stage, never relock to pass mismatches.
-Changed policy/source set requires confirmed new revision. Changed CHECKED bytes rewind for rechecking.
+Changed policy/source set requires confirmed new revision. Changed CHECKED bytes rewind for rechecking
+(`oracle-stage.mjs rewind --dir <dir> --to DISCOVERING --reason <cause> [--note <one line>]`).
 Design-only has no consumer execution. Delivery initialization preserves scope/milestones, labels,
 source/target identity and one ledger, never resets budgets or grants production edits before VALID_RED.
 

@@ -51,7 +51,7 @@ test('Contract public stage and lock bind approved whole card without a package'
     assert.equal(checked.cardSha256, digest(card))
     assert.equal(checked.verificationProfile, 'contract/v1')
     writeFileSync(oracle, `${card}\n`)
-    assert.notEqual(run(stage, 'rewind', '--dir', directory, '--to', 'CHECKED').status, 0)
+    assert.notEqual(run(stage, 'rewind', '--dir', directory, '--to', 'CHECKED', '--reason', 'source-change').status, 0)
     assert.notEqual(advance('DRAFTED').status, 0)
     writeFileSync(oracle, card)
     result = advance('DRAFTED')

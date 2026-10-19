@@ -29,7 +29,7 @@ async function repository(t) {
 }
 
 const stage = (root, directory, command, to) =>
-  node(root, 'oracle-stage.mjs', [command, '--dir', directory, ...(to ? ['--to', to] : [])])
+  node(root, 'oracle-stage.mjs', [command, '--dir', directory, ...(to ? ['--to', to] : []), ...(command === 'rewind' ? ['--reason', 'gate-failure'] : [])])
 const lock = (root, directory) =>
   node(root, 'oracle-lock.mjs', ['create', '--oracle', join(directory, 'oracle.md'), '--lock', join(directory, 'oracle.lock.json')])
 
@@ -51,6 +51,35 @@ test('authoring iterations stop a third repair and a restart cannot reset the sh
   assert.equal(current.iterations.round, 2)
   assert.equal(current.iterations.limit, 2)
   assert.equal(current.iterations.mode, 'confirm-fixes')
+})
+
+test('a rewind names why it walks back, so repeated causes across runs can be counted', async (t) => {
+  const { root, directory } = await repository(t)
+  const rewind = (...extra) => node(root, 'oracle-stage.mjs', ['rewind', '--dir', directory, '--to', 'DISCOVERING', ...extra])
+  assert.equal(stage(root, directory, 'begin').status, 0)
+  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  const before = await readFile(join(directory, 'stage.json'))
+
+  const unexplained = rewind()
+  assert.equal(unexplained.status, 2)
+  assert.match(unexplained.stderr, /^USAGE: rewind requires --reason review-finding\|gate-failure\|user-answer\|source-change/)
+  assert.equal(rewind('--reason', 'tired').status, 2)
+  assert.equal(rewind('--reason', 'review-finding', '--note', 'two\nlines').status, 2)
+  assert.deepEqual(await readFile(join(directory, 'stage.json')), before, 'a refused rewind spends no round')
+
+  const walked = rewind('--reason', 'review-finding', '--note', 'cold-read: retry after expiry is unmodeled')
+  assert.equal(walked.status, 0)
+  assert.equal(JSON.parse(walked.stdout).reason, 'review-finding')
+  const entry = (await readStage(directory)).history.at(-1)
+  assert.equal(entry.evidence, 'rewind')
+  assert.equal(entry.reason, 'review-finding')
+  assert.equal(entry.note, 'cold-read: retry after expiry is unmodeled')
+
+  // a retried rewind is the same walk back: it keeps the first reason and says so instead of dropping the new one silently
+  const retried = rewind('--reason', 'user-answer')
+  assert.equal(retried.status, 0)
+  assert.equal(JSON.parse(retried.stdout).reason, 'review-finding')
+  assert.equal((await readStage(directory)).history.filter((step) => step.evidence === 'rewind').length, 1)
 })
 
 test('analyst, mapping, card review and rewind share one repair round instead of multiplying their allowances', async (t) => {
@@ -222,13 +251,44 @@ test('the stage machine moves one step at a time, never writes ORACLE_READY by h
   // the package changed after MODELED — the record is stale until the oracle walks back and forward again
   const packagePath = join(directory, 'oracle.package.json')
   await writeFile(packagePath, `${await readFile(packagePath, 'utf8')}\n`)
-  assert.match(stage(root, directory, 'advance', 'CHECKED').stderr, /^STAGE_STALE: oracle\.package\.json changed after MODELED/)
+  assert.match(stage(root, directory, 'advance', 'CHECKED').stderr, /^STAGE_STALE: oracle\.package\.json changed after MODELED — rewind --to <stage> --reason <cause>/)
   assert.equal(JSON.parse(stage(root, directory, 'status').stdout).stale, true)
 
   assert.match(stage(root, directory, 'rewind', 'CHECKED').stderr, /^STAGE_REWIND: /)
   assert.equal(stage(root, directory, 'rewind', 'DISCOVERING').status, 0)
   assert.equal(JSON.parse(stage(root, directory, 'status').stdout).stage, 'DISCOVERING')
   assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+})
+
+test('changed package bytes walk back to DISCOVERING so neither the MODELED nor the CHECKED gate is skipped', async (t) => {
+  const { root, directory } = await repository(t)
+  const packagePath = join(directory, 'oracle.package.json')
+  assert.equal(stage(root, directory, 'begin').status, 0)
+  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  assert.equal(stage(root, directory, 'advance', 'CHECKED').status, 0)
+  const checked = await readStage(directory)
+
+  // a package that no longer passes MODELED must not be recorded as CHECKED by walking back to CHECKED
+  const pkg = JSON.parse(await readFile(packagePath, 'utf8'))
+  await writeFile(packagePath, JSON.stringify({ ...pkg, sources: [] }))
+  for (const target of ['CHECKED', 'MODELED']) {
+    const refused = stage(root, directory, 'rewind', target)
+    assert.equal(refused.status, 1)
+    assert.match(refused.stderr, /^STAGE_STALE: oracle\.package\.json changed after CHECKED — a changed package walks back to DISCOVERING/)
+  }
+  assert.deepEqual(await readStage(directory), checked, 'a refused rewind writes nothing and spends no round')
+  await rm(packagePath)
+  assert.match(stage(root, directory, 'rewind', 'CHECKED').stderr, /^STAGE_STALE: oracle\.package\.json changed after CHECKED/)
+  await writeFile(packagePath, JSON.stringify({ ...pkg, sources: [] }))
+  assert.equal(stage(root, directory, 'rewind', 'DISCOVERING').status, 0)
+  assert.match(stage(root, directory, 'advance', 'MODELED').stderr, /^STAGE_GATE: package is not model-complete/)
+
+  // the repaired package walks forward through every gate again (a card-only repair resuming at CHECKED is the DRAFTED test below)
+  await writeFile(packagePath, JSON.stringify(pkg))
+  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  const rechecked = stage(root, directory, 'advance', 'CHECKED')
+  assert.equal(rechecked.status, 0, rechecked.stderr)
+  assert.match(JSON.parse(rechecked.stdout).evidence, /^derive /)
 })
 
 test('a package that is not model-complete cannot leave DISCOVERING', async (t) => {
@@ -348,4 +408,117 @@ test('a forged DRAFTED record skips no gate: the lock still lints the card again
   assert.equal(locked.status, 1)
   assert.doesNotMatch(locked.stderr, /^STAGE_/)
   assert.match(locked.stderr, /^CARD_LINT_FAILED: /)
+})
+
+const reflect = (cwd, ...args) => node(cwd, 'oracle-reflect.mjs', args)
+const walk = (...steps) => ({
+  schemaVersion: 1,
+  stage: steps.at(-1).stage,
+  packageSha256: null,
+  history: steps.map((step) => ({ packageSha256: null, ...step })),
+})
+
+/** 종결된 run 셋과 읽을 수 없는 run 하나 — reflect는 손으로 쓴 기록도 읽기만 한다. */
+async function reflectedRuns(t) {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-reflect-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const run = async (id, record, ledger) => {
+    const directory = join(root, '.ai', 'oracles', id)
+    await mkdir(directory, { recursive: true })
+    await writeFile(join(directory, 'stage.json'), typeof record === 'string' ? record : JSON.stringify(record))
+    if (ledger) await writeFile(join(directory, 'runs.jsonl'), `${ledger.map((entry) => JSON.stringify(entry)).join('\n')}\n`)
+  }
+  await run('checkout', walk(
+    { stage: 'DISCOVERING', evidence: 'begin' },
+    { stage: 'MODELED', evidence: 'package validate --stage model' },
+    { stage: 'CHECKED', evidence: 'derive' },
+    { stage: 'DISCOVERING', evidence: 'rewind', reason: 'review-finding', note: 'retry after session expiry is unmodeled' },
+    { stage: 'MODELED', evidence: 'package validate --stage model' },
+  ), [
+    { type: 'budget', budget: 'harness', reason: 'fixture lacked an auth cookie' },
+    { type: 'budget', budget: 'harness', reason: 'fixture lacked an auth cookie', duplicate: true },
+    { type: 'transition', state: 'FAIL', reason: 'abandoned' },
+  ])
+  await run('pagination', walk(
+    { stage: 'DISCOVERING', evidence: 'begin' },
+    { stage: 'MODELED', evidence: 'package validate --stage model' },
+    { stage: 'MODELED', evidence: 'rewind', reason: 'review-finding', note: 'empty page after delete is unmodeled' },
+    { stage: 'DISCOVERING', evidence: 'rewind', reason: 'user-answer' },
+  ), [{ type: 'budget', budget: 'harness', reason: 'dev server port taken' }])
+  await run('legacy', walk(
+    { stage: 'DISCOVERING', evidence: 'begin' },
+    { stage: 'MODELED', evidence: 'package validate --stage model' },
+    { stage: 'DISCOVERING', evidence: 'rewind' },
+  ))
+  await run('broken', '{ not json')
+  return root
+}
+
+test('reflect counts walk-back causes across runs and proposes only the ones that recur', async (t) => {
+  const root = await reflectedRuns(t)
+  const result = reflect(root, '--root', root)
+  assert.equal(result.status, 0, result.stderr)
+  const report = JSON.parse(result.stdout)
+
+  assert.equal(report.runs, 3)
+  assert.deepEqual(report.skipped.map((entry) => entry.run), ['broken'])
+  assert.equal(report.rewinds.total, 4)
+  assert.equal(report.rewinds.unrecorded, 1, 'a rewind from before 0.101 has no reason and is not guessed')
+  assert.deepEqual(report.rewinds.byReason, { 'review-finding': 2, 'user-answer': 1 })
+  assert.deepEqual(report.rewinds.byWalk, { 'CHECKED→DISCOVERING': 1, 'MODELED→MODELED': 1, 'MODELED→DISCOVERING': 2 })
+  assert.deepEqual(report.budgets, { harness: 2 }, 'a duplicate spend is not a second correction')
+  assert.deepEqual(report.stops, { FAIL: 1 })
+
+  // review findings and harness corrections each recur in two runs; the user answer sent back one run only
+  assert.deepEqual(report.candidates.map((candidate) => candidate.signal), ['rewind:review-finding', 'budget:harness'])
+  const [finding, harness] = report.candidates
+  assert.deepEqual(finding.runs, ['checkout', 'pagination'])
+  assert.deepEqual(finding.notes, ['retry after session expiry is unmodeled', 'empty page after delete is unmodeled'])
+  assert.match(finding.suggest, /pre-lock/)
+  assert.equal(finding.applied, false)
+  assert.deepEqual(harness.notes, ['fixture lacked an auth cookie', 'dev server port taken'])
+})
+
+test('reflect lowers the recurrence bar on request and writes nothing into the runs', async (t) => {
+  const root = await reflectedRuns(t)
+  const stageBefore = await readFile(join(root, '.ai', 'oracles', 'checkout', 'stage.json'))
+  const report = JSON.parse(reflect(root, '--root', root, '--min-runs', '1').stdout)
+  assert.deepEqual(report.candidates.map((candidate) => candidate.signal), ['rewind:review-finding', 'budget:harness', 'rewind:user-answer'])
+  assert.deepEqual(await readFile(join(root, '.ai', 'oracles', 'checkout', 'stage.json')), stageBefore)
+})
+
+test('a torn or non-object ledger line costs only that ledger, never the run\'s rewinds or the whole report', async (t) => {
+  const root = await reflectedRuns(t)
+  const ledger = (id) => join(root, '.ai', 'oracles', id, 'runs.jsonl')
+  await writeFile(ledger('checkout'), `${await readFile(ledger('checkout'), 'utf8')}{"type":"bud`)
+  await writeFile(ledger('pagination'), 'null\n')
+  const result = reflect(root, '--root', root)
+  assert.equal(result.status, 0, result.stderr)
+  const report = JSON.parse(result.stdout)
+  assert.equal(report.runs, 3)
+  assert.deepEqual(report.rewinds.byReason, { 'review-finding': 2, 'user-answer': 1 })
+  assert.deepEqual(report.budgets, {})
+  assert.deepEqual(report.skipped.map((entry) => entry.run), ['broken', 'checkout', 'pagination'])
+  assert.match(report.skipped.find((entry) => entry.run === 'pagination').error, /^runs\.jsonl: /)
+  assert.deepEqual(report.candidates.map((candidate) => candidate.signal), ['rewind:review-finding'])
+})
+
+test('reflect points each budget kind at the place that owns its fix', async (t) => {
+  const root = await reflectedRuns(t)
+  for (const id of ['checkout', 'pagination'])
+    await writeFile(join(root, '.ai', 'oracles', id, 'runs.jsonl'), `${JSON.stringify({ type: 'budget', budget: 'policy', reason: 'refund window unsourced' })}\n`)
+  const report = JSON.parse(reflect(root, '--root', root).stdout)
+  const policy = report.candidates.find((candidate) => candidate.signal === 'budget:policy')
+  assert.doesNotMatch(policy.suggest, /harness/)
+  assert.match(policy.suggest, /before lock/)
+})
+
+test('reflect refuses a root without oracle runs and a bad bar instead of reporting zero', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-reflect-empty-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const empty = reflect(root, '--root', root)
+  assert.equal(empty.status, 1)
+  assert.match(empty.stderr, /^REFLECT_NO_RUNS: /)
+  assert.equal(reflect(root, '--root', root, '--min-runs', '0').status, 2)
+  assert.equal(reflect(root, '--unknown', 'x').status, 2)
 })

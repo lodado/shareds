@@ -1209,6 +1209,11 @@ Runtime dispatch:
 
 - `oracle-stage.mjs begin --dir <dir>` before authoring/independent inputs; `status` is read-only and
   reports `iterations.round`, `limit`, `mode` and `exhausted`.
+- Every walk back names its cause: `oracle-stage.mjs rewind --dir <dir> --to <stage> --reason
+review-finding|gate-failure|user-answer|source-change [--note <one line>]`. The reason is recorded in
+  `stage.json` history for cross-run reflection; it never changes the budget or the gate. Changed
+  package bytes walk back to DISCOVERING; only a card-only repair on unchanged package bytes resumes
+  at CHECKED or DRAFTED.
 - `oracle-adequacy.mjs model-input`, `explore-input` for a staged card, and
   `oracle-discovery.mjs mapping-input` register their input digests. Cold-read/source-aware dispatch
   registers its permitted raw input with `oracle-stage.mjs review-input --dir <dir> --kind cold-read|source-aware --input <file> --attempt <dispatch-id>`.
@@ -1233,7 +1238,9 @@ The author cannot un-see the conversation and is therefore the worst judge of wh
 stands on its own. Hand the card to an independent reviewer surface that has no session context.
 
 - Round 1: Pass **the card bytes only.** No repo path, no conversation, no rationale, no intended reading,
-  no statement of what the card is supposed to mean. The Draft text is the entire input.
+  no statement of what the card is supposed to mean. The Draft text is the entire input. Pass it as the
+  `oracle-review-view.mjs card` reading view plus a byte copy of the card for folded Derived Axes cells,
+  both written outside the run directory so no path leads to the journal or package.
 - Ask for supported counterexamples to the agreed rows, not a guaranteed defect. **"No supported defect"**
   is a valid result with the checked scope and limits. A worry needs a concrete row/cell, source and
   observable consequence. A merely possible extra world is a scope candidate, not an automatic repair.

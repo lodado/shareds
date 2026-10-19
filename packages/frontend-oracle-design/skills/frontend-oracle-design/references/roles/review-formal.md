@@ -10,9 +10,12 @@ perform transitions or approve the card/delivery. The controller owns acceptance
 ## Contract cold-read
 
 Read the Cold-read gate criteria in [`card/card-format.md`](../card/card-format.md), with procedural
-dependencies. Round 1 receives the card bytes alone as task input. Round 2 receives the prior finding
-IDs and repair diff for confirmation only. No repo path, conversation, rationale or
-intended reading. A forced guess is a card defect, not a reader failure. Apply the five questions per row.
+dependencies. Round 1 receives the card bytes alone as task input: the `oracle-review-view.mjs card`
+reading view plus a byte copy of the card, both outside the run directory; a folded Derived Axes cell
+is looked up in the copy by its line. Round 2
+continues the round-1 reviewer context with the prior finding IDs and repair diff for confirmation only;
+a fresh context gets the same input only when the host cannot continue it. No repo path, conversation,
+rationale or intended reading. A forced guess is a card defect, not a reader failure. Apply the five questions per row.
 Collapse to one root assumption plus the first nail, the cheapest falsifying observation. Return both,
 not a list of opinions. The controller must drive that nail and record the observation/result in journal.md
 before presenting the Draft. Do not claim naming the nail proves it was driven.
@@ -45,6 +48,8 @@ Before adjudication read [`subagent-review.md`](../subagent-review.md), its depe
 [`review-checklist.md`](../review-checklist.md) in this independent context. The primary agent does not
 load reviewer-only criteria. Receive the generated oracle-run.mjs review-packet, raw locked artifacts,
 source hashes, target snapshot, ledger, evidence mapping and actual diff. Do not repair packet bytes.
+Read the `oracle-review-view.mjs packet` view first; it folds only long generated card cells and the test
+lists of runs the state does not cite, and the packet file stays the bound input for every lookup.
 Matching criteria arrive as reference file links via review-packet --review-point, never pasted criteria
 or a controller's hand-written conclusion. Conditional --context artifacts remain bound to the snapshot.
 Supporting context does not replace common inputs, five-axis judgments or independent reviews.
