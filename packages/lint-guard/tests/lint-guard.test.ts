@@ -64,58 +64,6 @@ test('git push --no-verify is denied before the tool runs', async ($, on) => {
   expect(result.deny).toContain('skips git hooks (no-verify)')
 })
 
-test('a hook bypass does not ask the user', async ($, on) => {
-  on('tool.check', () => ({ decision: 'allow' }))
-  on('ui.toast', () => ({ value: undefined }))
-  const decision = await $.tool.check({ tool: 'Bash', input: { command: 'git push --no-verify' } })
-  expect(decision).toEqual({ decision: 'allow' })
-})
-
-test('loosening lint configuration asks the user', async ($, on) => {
-  on('tool.check', () => ({ decision: 'allow' }))
-  on('ui.toast', () => ({ value: undefined }))
-  const decision = await $.tool.check({
-    tool: 'Edit',
-    input: { file_path: '/repo/eslint.config.mjs', old_string: "'error'", new_string: "'off'" },
-  })
-  expect(decision).toEqual({ decision: 'ask' })
-})
-
-test('tightening lint configuration keeps the decision the rules reached', async ($, on) => {
-  on('tool.check', () => ({ decision: 'allow' }))
-  const decision = await $.tool.check({
-    tool: 'Edit',
-    input: { file_path: '/repo/eslint.config.mjs', old_string: "'warn'", new_string: "'error'" },
-  })
-  expect(decision).toEqual({ decision: 'allow' })
-})
-
-test('a Write of a hook file asks only when it drops a step the file had', async ($, on) => {
-  on('tool.check', () => ({ decision: 'allow' }))
-  on('ui.toast', () => ({ value: undefined }))
-  on('fs.read', () => ({ value: 'npm run lint\nnpm test\n' }))
-  const added = await $.tool.check({
-    tool: 'Write',
-    input: { file_path: '/repo/.husky/pre-push', content: 'npm run lint\nnpm run typecheck\nnpm test\n' },
-  })
-  expect(added).toEqual({ decision: 'allow' })
-  const dropped = await $.tool.check({ tool: 'Write', input: { file_path: '/repo/.husky/pre-push', content: 'npm test\n' } })
-  expect(dropped).toEqual({ decision: 'ask' })
-})
-
-test('an ordinary edit keeps the decision the rules reached', async ($, on) => {
-  on('tool.check', () => ({ decision: 'allow' }))
-  const decision = await $.tool.check({ tool: 'Edit', input: { file_path: 'src/a.ts', old_string: 'a', new_string: 'b' } })
-  expect(decision).toEqual({ decision: 'allow' })
-})
-
-test('a deny from the rules is not softened to ask', async ($, on) => {
-  on('tool.check', () => ({ decision: 'deny' }))
-  on('ui.toast', () => ({ value: undefined }))
-  const decision = await $.tool.check({ tool: 'Bash', input: { command: 'git commit --no-verify -m x' } })
-  expect(decision).toEqual({ decision: 'deny' })
-})
-
 const FILE_AFTER_EDIT = ['const a = 1', 'if (a == 1) {}', 'const b = 2'].join('\n')
 const EDIT = { tool: 'Edit', tool_use_id: 'toolu_1', file_path: '/repo/src/a.ts', old_string: 'x', new_string: 'if (a == 1) {}' }
 const TOOL_RESULT = { ref: 1, result: { type: 'update' }, text: 'edited' }
@@ -181,20 +129,14 @@ test('a note is delivered once, to its own tool call only', async ($, on) => {
   expect(await storedRow($)).toBe('edited')
 })
 
-test('waitForTimeout in a spec file is denied; waitFor runs without asking', async ($, on) => {
+test('waitForTimeout in a spec file is denied', async ($, on) => {
   on('tool.call', () => ({ result: 'tool ran' }))
-  on('tool.check', () => ({ decision: 'allow' }))
   const denied = await $.tool.call({
     tool: 'Write',
     file_path: 'e2e/a.spec.ts',
     content: 'await page.waitForTimeout(500)',
   })
   expect(denied.deny).toContain('wait-for-timeout')
-  const checked = await $.tool.check({
-    tool: 'Write',
-    input: { file_path: 'src/a.test.tsx', content: 'await waitFor(() => expect(x).toBe(1))' },
-  })
-  expect(checked).toEqual({ decision: 'allow' })
 })
 
 test('a clock wait in a test reaches the tool result Claude reads as a hint', async ($, on) => {
@@ -229,19 +171,6 @@ test('untracked files are not read when the commit does not stage them', async (
   on('process.run', () => ({ value: { exitCode: 0, stdout: '', stderr: '' } }))
   const result = await $.tool.call({ tool: 'Bash', command: 'git commit -m "feat: x"' })
   expect(result).toEqual({ result: 'tool ran' })
-})
-
-test('a failing permission review asks instead of silently allowing', async ($, on) => {
-  on('tool.check', () => ({ decision: 'allow' }))
-  // `edits` is not a list, so the review throws while reading the call
-  const decision = await $.tool.check({ tool: 'MultiEdit', input: { file_path: '/repo/src/a.ts', edits: 5 } })
-  expect(decision).toEqual({ decision: 'ask' })
-})
-
-test('a failing review keeps a deny from the rules', async ($, on) => {
-  on('tool.check', () => ({ decision: 'deny' }))
-  const decision = await $.tool.check({ tool: 'MultiEdit', input: { file_path: '/repo/src/a.ts', edits: 5 } })
-  expect(decision).toEqual({ decision: 'deny' })
 })
 
 test('a commit that stages more untracked code files than the scan reads is denied', async ($, on) => {

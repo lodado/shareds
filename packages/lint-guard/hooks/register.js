@@ -4,11 +4,9 @@ import {
   evasionsInToolCall,
   hookBypass,
   isCodeFile,
-  isGateConfig,
   isGitCommit,
   slowTestReason,
   stagesInSameCommand,
-  weakeningReason,
 } from './detect.js'
 import { diagnosticsInRanges, eslintUnavailable, formatDiagnostics, writtenRanges } from './lint.js'
 
@@ -134,40 +132,12 @@ async function joinNotes($, e, next) {
   return next({ ...e, message: { ...e.message, content } })
 }
 
-async function reviewPermission($, e, next) {
-  const decision = await next(e)
-  // Unlike tool.call, tool.check keeps the tool's arguments under `input`.
-  const call = { tool: e.tool, ...e.input }
-  if (decision?.decision === 'deny') return decision
-  const reason = weakeningReason(call, await replacedContent($, call))
-  if (!reason) return decision
-  $.ui.toast(`lint-guard: ${reason}`)
-  return { decision: 'ask' }
-}
-
-// The configuration a Write is about to replace: '' when the file does not exist yet, undefined
-// when it exists but cannot be read (the guard then asks, since it cannot see what is dropped).
-async function replacedContent($, call) {
-  if (call.tool !== 'Write' || !isGateConfig(call.file_path)) return undefined
-  try {
-    return await $.fs.read(call.file_path)
-  } catch (error) {
-    return /ENOENT|no such file/i.test(String(error?.message)) ? '' : undefined
-  }
-}
-
 export function register(on) {
   // A throwing hook is skipped by default, which would silently switch the guard off.
   // Fail closed for the calls it guards; other tools are never held up by a guard bug.
   on('tool.call', { tool: ['Edit', 'Write', 'MultiEdit', 'Bash'] }, guardToolCall).catch(async ($, e, next) => {
     if (next.called) return next(e)
     return { deny: `lint-guard failed (${next.error.kind}), so this ${e.tool} call was not run` }
-  })
-  // Same reasoning as above: if the review fails, ask the user rather than keep the earlier decision.
-  on('tool.check', { tool: ['Edit', 'Write', 'MultiEdit', 'Bash'] }, reviewPermission).catch(async ($, e, next) => {
-    // The review may fail after next(e) already answered; a deny from the rules still stands.
-    const decided = await next(e)
-    return decided?.decision === 'deny' ? decided : { decision: 'ask' }
   })
   on('session.append', joinNotes)
 }
