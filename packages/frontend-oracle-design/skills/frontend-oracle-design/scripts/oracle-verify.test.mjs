@@ -454,6 +454,32 @@ test('O17: 새 카드의 사용자 확인 근거가 없으면 lock 전 lint를 �
   assert.match(draft.stderr, /user-confirmation-status/)
 })
 
+test('card --draft runs the whole lint before approval and lists what waits on the user\'s answer as pending', async (t) => {
+  const draft = VALID_CARD.replace('- Status: approved\n- Source: user message Q-confirmation', '- Status: draft\n- Source:')
+  const oracle = await cardFile(t, draft)
+  assert.match(run('card', '--oracle', oracle).stderr, /user-confirmation-status/)
+  const linted = run('card', '--oracle', oracle, '--draft')
+  assert.equal(linted.status, 0, linted.stderr)
+  assert.match(linted.stdout, /^CARD_DRAFT_OK \d+ rows; 2 waiting on the user's answer\n {2}pending user-confirmation-status: .+\n {2}pending user-confirmation-source: /)
+  // a structural defect still fails the draft, and the pending lines stay out of its way
+  const unsourced = run('card', '--oracle', await cardFile(t, draft.replace(' (출처: S1)', '')), '--draft')
+  assert.equal(unsourced.status, 1)
+  assert.match(unsourced.stderr, /policy-source: /)
+  assert.doesNotMatch(unsourced.stderr, /user-confirmation/)
+  // a source still waiting for the user's approval is pending too: a Draft labels proposed policy and sources
+  const proposed = run('card', '--oracle', await cardFile(t, draft.replace('| repo:docs/save.md#v3 | approved  |', '| repo:docs/save.md#v3 | proposed  |')), '--draft')
+  assert.equal(proposed.status, 0, proposed.stderr)
+  assert.match(proposed.stdout, /^ {2}pending source-unapproved: S1: /m)
+  assert.match(proposed.stdout, /^ {2}pending policy-source-unapproved: S1: /m)
+  // a malformed pre-authorization is the author's to fix, not something the user still owes
+  const preauthorized = draft.replace('- Status: draft\n- Source:', '- Status: approved\n- Source: pre-authorized — message 3')
+  const malformed = run('card', '--oracle', await cardFile(t, preauthorized), '--draft')
+  assert.equal(malformed.status, 1)
+  assert.match(malformed.stderr, /user-confirmation-preauthorized: /)
+  // gates and the lock never lint a draft, and a data view is not a lint
+  for (const flag of ['--locked', '--case-space', '--ir', '--delta', '--repo-policies']) assert.equal(run('card', '--oracle', oracle, '--draft', flag).status, 2, flag)
+})
+
 test('a pre-authorized card approval names its first yes and states that the proof raised no new question or changed meaning', async (t) => {
   const approval = (source) => VALID_CARD.replace('- Source: user message Q-confirmation', `- Source: ${source}`)
   const lint = async (source, ...flags) => run('card', '--oracle', await cardFile(t, approval(source)), ...flags)
@@ -3486,6 +3512,16 @@ test('full-product: applicability, exclusions and unresolved expectations retain
   const ready = run('card', '--oracle', await cardFile(t, openCard))
   assert.equal(ready.status, 1)
   assert.match(ready.stderr, /disposition-open/)
+  // a draft waits for the answer to Q1, but not for a frame the author must investigate first
+  const waiting = run('card', '--draft', '--oracle', await cardFile(t, openCard))
+  assert.match(waiting.stdout, /^ {2}pending disposition-open: full-product has needs-decision frames awaiting the user$/m, waiting.stderr)
+  assert.doesNotMatch(waiting.stderr, /disposition-open/)
+  const investigate = await fullProductFixture()
+  investigate.records[0].disposition = 'needs-evidence: does the API accept a cursor? — docs(api#cursor)'
+  investigate.records[0].scenario = null
+  const unchecked = run('card', '--draft', '--oracle', await cardFile(t, investigate.render()))
+  assert.equal(unchecked.status, 1)
+  assert.match(unchecked.stderr, /disposition-open: full-product has 1 needs-evidence frames to investigate/)
   const lockPath = await cardFile(t, openCard)
   const locked = spawnSync(process.execPath, [join(dirname(script), 'oracle-lock.mjs'), 'create', '--oracle', lockPath, '--lock', join(dirname(lockPath), 'oracle.lock.json')], { encoding: 'utf8' })
   assert.equal(locked.status, 1)
@@ -4067,6 +4103,27 @@ test('a needs-decision cell that survives on an approved card fails the lock as 
   // 다른 구조 결함은 없다 — 열린 셀 하나만 lock을 막는다
   const issues = linted.stderr.split('\n').filter((line) => /^\s+[a-z-]+:/.test(line))
   assert.deepEqual(issues.map((line) => line.trim().split(':')[0]), ['disposition-open'], linted.stderr)
+})
+
+test('card --draft keeps a needs-decision cell pending but fails a needs-evidence cell the author must investigate first', async (t) => {
+  const decision = SWEEP_SECTION.replace('covered(O7)', 'needs-decision: 저장 pending 중 목록 갱신이 도착하면 어느 쪽이 이기나?')
+  const waiting = run('card', '--oracle', await cardFile(t, SWEEPLESS_CARD + decision), '--draft')
+  assert.equal(waiting.status, 0, waiting.stderr)
+  assert.match(waiting.stdout, /^ {2}pending disposition-open: "P3 × P1": needs-decision survives/m)
+  const evidence = run('card', '--oracle', await cardFile(t, SWEEPLESS_CARD + R1_SWEEP), '--draft')
+  assert.equal(evidence.status, 1)
+  assert.match(evidence.stderr, /disposition-open: "P3 × P1": needs-evidence survives/)
+  // the cell's own type decides, so a label that reads like a decision cannot hide an investigation
+  const mimic = `${SWEEPLESS_CARD}${decision}
+## Dependency landmines — example-lib
+
+| Landmine   | Citation | Disposition                                                        |
+| ---------- | -------- | ------------------------------------------------------------------ |
+| x: needs-decision survives | docs/api#initialoffset | needs-evidence: 리마운트 시 적용되나 — docs(example-lib#initialoffset) |
+`
+  const hidden = run('card', '--oracle', await cardFile(t, mimic), '--draft')
+  assert.equal(hidden.status, 1, hidden.stdout)
+  assert.match(hidden.stderr, /needs-decision survives": needs-evidence survives on an approved card/)
 })
 
 test('R1: needs-evidence is grammatically accepted in every family, blocks the lock as open, and is rejected without a lookup token', async (t) => {

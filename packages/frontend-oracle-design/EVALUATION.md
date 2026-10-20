@@ -1,3 +1,96 @@
+# 0.105.0: lint the Draft before the user reads it, reuse a CHECKED pass, name the missing-case Bend fix, sweep before the lock
+
+## Validation
+
+- `ORACLE_REQUIRE_BEND=1 pnpm --filter @lodado/frontend-oracle-design-plugin test`:
+  **1,187 passed, 0 failed, 0 skipped**, using real Bend.
+- Package lint: exit 0, **0 errors, 404 package-wide warnings** (one fewer: `gate()` is split).
+- Generated reference bundles (22), workflow docs and converted evals: passed. The `role-author` cap fell
+  from 282,000 to 278,000 bytes (the bundle is now 277,857): two padded tables became lists.
+- Mutation checks on the receipt test: leaving the registered sources out of the key, writing without the
+  post-gate recheck, comparing keys without file stamps, stamping links only, and storing an unjudged
+  pass or an incomplete derive each make it fail.
+- On the stale-search fixture a cold CHECKED took 331 ms and a receipt hit 70 ms. The fixture is small;
+  the saving grows with the Bend enumeration a real model needs.
+- An independent Opus 5.5 review found one high, three medium and four low findings, all fixed with tests:
+  - High: a receipt could store a pass its key's bytes had not earned. The key was taken before the gate,
+    so a file changed during the gate was judged under the old key; and one failed Bend spawn left
+    adequacy unjudged, a pass every later walk would replay.
+  - Medium: `--draft` listed needs-evidence cells and a malformed pre-authorization as pending; the
+    pre-lock sweep contradicted the closed list of pre-lock checks and four Design-only rules; the stage
+    tests read and wrote receipts in the user's default directory.
+  - Low: the missing-case hint misled in `match a b:`; `--draft` was silently ignored with a data view;
+    no README section; `gate()` grew past its complexity limit.
+- A follow-up Opus 5.5 review approved with one medium and four low findings, all fixed with tests:
+  - Medium: the stamps used `lstat`, so a symlinked input whose target changed and was restored during
+    the gate still stored a pass.
+  - Low: a derive whose world count failed softly stored a digest these bytes do not give; a label that
+    read like a decision could hide a needs-evidence cell from `--draft`; nothing exercised the stamp
+    comparison (the swap was never restored); the Design-only line still said "no test writes".
+  - It asked whether sources awaiting approval should fail a Draft. `card-format.md` lets a Draft carry
+    proposed policy and unresolved sources, so they are pending now.
+
+## Diagnosis
+
+From the transcripts measured for 0.102.0:
+
+- 75 failed lint and gate calls printed issue codes. 33 of them carried `user-confirmation-status`: a
+  Draft linted as if it were the final card. Authors had no way to lint a Draft without that noise.
+- Bend checks printed `SOME PROOFS FAIL` 42 times. The most frequent failure text without a hint was a
+  match missing constructors (`cases for MODEL.Refresh`, `cases for MODEL.RdApple, MODEL.RdOther`), 5
+  times.
+- 24 rewinds were recorded. After one, every advance re-ran CHECKED, even when nothing it reads had
+  changed.
+- Mismatches between the model and existing product code surfaced only after the lock, one revision each,
+  because the sweep ran only in Delivery.
+
+## Change
+
+- `oracle-verify.mjs card --draft` runs the whole card lint before approval. Only what waits on the user's
+  answer prints as `pending` and does not fail: `user-confirmation-status`, `user-confirmation-source`,
+  `visual-qa-authorization`, sources awaiting approval (`source-unapproved`, `policy-source-unapproved`, and
+  `visual-source` when the cited source is not an implementation reference) and needs-decision cells,
+  chosen by the cell's parsed type. Needs-evidence cells and a malformed pre-authorization still fail. It does not combine with `--locked`, `--case-space` or a data view, and no gate or lock
+  passes it. The full-product open-cell issue now names needs-evidence and needs-decision frames
+  separately. `author-formal.md` runs `--draft` before the Draft is shown; `contract/authoring.md` names
+  it for the Contract preflight.
+- CHECKED receipt (`oracle-stage.mjs` `checkedGate`):
+  - A pass is remembered under a key of the package and its Bend files (transitive imports included),
+    every `repo:` source the package registers, the harness digest, node and the Bend binary. The same key
+    passes at once with the stored evidence plus `receipt: these exact inputs passed before`.
+  - A receipt is written only when the verdict follows from the bytes: derive read the model and counted
+    the worlds, and adequacy was judged, or derive and adequacy give the same bytes-decided reason for not
+    judging (infinite fields, too many worlds). Never after a Bend spawn failure.
+  - After the gate the package is reloaded and the key and the input file stamps (size, times, inode, of
+    both a link and its target) are taken again; any difference skips the write.
+  - Failures leave no receipt. It shares the card-lint receipt directory and rules (`ORACLE_LINT_CACHE`,
+    `off` disables); `oracle-lock.mjs` exports the shared helpers.
+- `oracle-model.mjs` hints `cases for X[, Y]` (add a case for each missing constructor, one pattern per
+  value in `match a b:`, rather than `case _:`) and `N patterns (one per scrutinee)`. `model-patterns.md`
+  lists both.
+- The author may run the sweep before the lock when product code exists, after `project-card`, so its model
+  gaps become questions in the same revision. The adapter and output stay in a temporary directory or a
+  git-ignored path, never a repository file. The report is not a consumer test or evidence, so Design-only
+  may run it; if the repository's runner cannot reach that path, the sweep is recorded as not run instead
+  of changing runner configuration. `bend-cross-verification.md`, the closed list of pre-lock checks in
+  `controller-formal.md`, `SKILL.md`, `controller-entry-formal.md` and `author-formal.md` say so.
+- `controller-formal.md` notes the receipt; the README explains all three. The Bend failure table
+  (`model-patterns.md`) and the operator table (`discovery.md`) are lists now; their content is unchanged.
+- `oracle-stage.test.mjs` turns receipts off for its children unless a test names its own directory.
+
+## Not changed
+
+- A changed input still runs every gate. The receipt only skips a CHECKED run whose inputs, harness, node
+  and Bend are byte-identical to an earlier pass.
+- Review verdicts are not carried across revisions by row hash (the plan's W3-1 second half): that would
+  change what a review gate accepts, so it is left out.
+
+## Open
+
+- `stage.json` still pins only the package bytes. A Bend edit after CHECKED, followed by a re-projection,
+  reaches the lock without CHECKED running again. The review noted this existing gap; it is not changed
+  here.
+
 # 0.104.0: name High's trigger, route Medium work by its core, let the first yes pre-authorize post-proof approval
 
 ## Validation

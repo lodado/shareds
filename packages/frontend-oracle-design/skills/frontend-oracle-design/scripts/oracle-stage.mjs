@@ -8,11 +8,11 @@
 // 자기 신고다), 단계를 건너뛰는 가장 쉬운 길을 닫는다 — 위조는 hook이 stage.json 직접 쓰기를 막고 리뷰가 본다.
 
 import { spawnSync } from 'node:child_process'
-import { mkdir, readFile, realpath, rename, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { elapsedLabel, sha256, withDirectoryLock } from './oracle-fs.mjs'
+import { elapsedLabel, sha256, stableStringify, withDirectoryLock } from './oracle-fs.mjs'
 import { assertIterationAvailable, extendIterations, iterationBudget, iterationStatus, observeIteration } from './oracle-iterations.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import { isEmptyCell, markdownLines, sectionLines } from './oracle-space.mjs'
@@ -154,33 +154,14 @@ async function gate(directory, target, { timeoutMs, profile } = {}) {
     return target === 'CHECKED' ? 'approved strict Contract Space' : 'whole Contract card lint'
   }
   const packagePath = join(directory, PACKAGE_FILE)
-  const { asyncCellIssues, loadPackage, packageIssues, derivePackage } = await import('./oracle-package.mjs')
+  const { asyncCellIssues, loadPackage, packageIssues } = await import('./oracle-package.mjs')
   const loaded = await loadPackage(packagePath, { root: process.cwd() })
   if (target === 'MODELED') {
     const issues = [...packageIssues(loaded.pkg, { stage: 'model' }), ...asyncCellIssues(loaded.pkg, { required: true })]
     if (issues.length > 0) throw new StageError('STAGE_GATE', `package is not model-complete: ${issues.join('; ')}`)
     return 'package validate --stage model'
   }
-  if (target === 'CHECKED') {
-    const { ensureBend } = await import('./ensure-bend.mjs')
-    const { crossCheckIssues } = await import('./oracle-discovery.mjs')
-    const { bin } = await ensureBend()
-    const { derived } = await derivePackage(loaded, { bin, timeoutMs })
-    if (derived.status !== 'derived') throw new StageError('STAGE_GATE', `derive returned ${derived.status}`)
-    const open = await crossCheckIssues({ loaded, bin, timeoutMs })
-    if (open.length > 0) throw new StageError('STAGE_GATE', `cross-check is not settled: ${open.join('; ')}`)
-    // 모델만으로 아는 결함은 잠그기 전에 막는다 — 잠근 뒤에 라벨 런이 알려 주면 그 모델은 고칠 수 없고 새 revision이 든다
-    const { preLockIssues } = await import('./oracle-adequacy.mjs')
-    const adequacy = await preLockIssues({ package: packagePath, bin, cwd: process.cwd(), timeoutMs })
-    if (adequacy.issues.length > 0)
-      throw new StageError(
-        'STAGE_GATE',
-        `the model has defects the lock would freeze: ${adequacy.issues.join('; ')} — fix them in the package or world, then run oracle-adequacy.mjs check --package for the full report`,
-      )
-    return `derive ${derived.digest}; cross-check settled; ${
-      adequacy.checked ? `adequacy found no refuted check or unsatisfiable setting over ${adequacy.worlds} worlds` : `adequacy not judged (${adequacy.reason})`
-    }`
-  }
+  if (target === 'CHECKED') return checkedGate(loaded, packagePath, timeoutMs)
   // DRAFTED — 카드의 생성 영역이 패키지에서 다시 만든 것과 같다
   // 카드의 투영 다이제스트가 패키지 경로 표기를 품는다 — 저장소 루트 기준 상대 경로로 project-card한 카드와 같은 표기로 비교한다
   const checked = spawnSync(
@@ -191,6 +172,94 @@ async function gate(directory, target, { timeoutMs, profile } = {}) {
   if (checked.status !== 0)
     throw new StageError('STAGE_GATE', `check-card failed: ${(checked.stdout + checked.stderr).trim().split('\n')[0]}`)
   return 'check-card'
+}
+
+/** CHECKED — 파생, 교차검증, 잠그기 전 적정성. 같은 입력으로 이미 통과했으면 영수증으로 넘어간다(checkedReceipt). */
+async function checkedGate(loaded, packagePath, timeoutMs) {
+  const { ensureBend } = await import('./ensure-bend.mjs')
+  const { crossCheckIssues } = await import('./oracle-discovery.mjs')
+  const { derivePackage } = await import('./oracle-package.mjs')
+  const { readReceipt } = await import('./oracle-lock.mjs')
+  const { bin } = await ensureBend()
+  // 키를 못 만들면(읽을 수 없는 입력 등) 영수증 없이 관문을 돈다 — 그 실패는 아래 검사가 제 문장으로 알린다
+  const receipt = await checkedReceipt(loaded, bin).catch(() => null)
+  const remembered = receipt ? await readReceipt(receipt) : null
+  if (remembered) return `${remembered}; receipt: these exact inputs passed before`
+  const { derived } = await derivePackage(loaded, { bin, timeoutMs })
+  if (derived.status !== 'derived') throw new StageError('STAGE_GATE', `derive returned ${derived.status}`)
+  const open = await crossCheckIssues({ loaded, bin, timeoutMs })
+  if (open.length > 0) throw new StageError('STAGE_GATE', `cross-check is not settled: ${open.join('; ')}`)
+  // 모델만으로 아는 결함은 잠그기 전에 막는다 — 잠근 뒤에 라벨 런이 알려 주면 그 모델은 고칠 수 없고 새 revision이 든다
+  const { preLockIssues } = await import('./oracle-adequacy.mjs')
+  const adequacy = await preLockIssues({ package: packagePath, bin, cwd: process.cwd(), timeoutMs })
+  if (adequacy.issues.length > 0)
+    throw new StageError(
+      'STAGE_GATE',
+      `the model has defects the lock would freeze: ${adequacy.issues.join('; ')} — fix them in the package or world, then run oracle-adequacy.mjs check --package for the full report`,
+    )
+  const verdict = adequacy.checked ? `adequacy found no refuted check or unsatisfiable setting over ${adequacy.worlds} worlds` : `adequacy not judged (${adequacy.reason})`
+  const evidence = `derive ${derived.digest}; cross-check settled; ${verdict}`
+  if (receipt && settledByBytes(derived, adequacy)) await rememberChecked(receipt, packagePath, bin, evidence)
+  return evidence
+}
+
+/**
+ * 키의 바이트만으로 이 판정 문장이 다시 나오는가. 판정하지 못한 이유가 환경이면(Bend 실행 실패 → not-run) 같은 바이트도
+ * 다음엔 판정될 수 있고, 파생이 조용히 덜 돈 경우(모델을 못 읽음, 세계 수를 못 셈)는 문장의 digest가 바이트의 것이 아니다.
+ * 무한 필드·세계 상한(unknown)은 바이트가 정하므로, 파생과 적정성이 같은 이유를 댈 때만 남긴다.
+ */
+function settledByBytes(derived, adequacy) {
+  if (derived.diagnostics?.some(({ code }) => code === 'behavior-unread' || code === 'order-unchecked')) return false
+  if (adequacy.checked) return derived.worlds?.status === 'enumerated'
+  return adequacy.status === 'unknown' && derived.worlds?.status === 'unknown' && derived.worlds.reason === adequacy.reason
+}
+
+/**
+ * CHECKED 영수증 — 파생·교차검증·적정성은 패키지와 그 Bend 파일(전이 import 포함), 패키지가 등록한 `repo:` 출처, 하네스, node,
+ * bend만 읽는다. 그 바이트가 모두 같으면 같은 판정이 나오므로, 통과한 조합은 판정 문장과 함께 기억해 rewind 뒤 다시 걷는 길에서
+ * 같은 관문(큰 모델에서는 Bend 열거)을 다시 돌지 않는다. 위치·규칙은 카드 lint 영수증과 같다(ORACLE_LINT_CACHE, `off`면 끔).
+ * 실패는 남기지 않는다. `stamp`는 키에 들지 않는 파일 표식(크기·시각·inode)으로, 관문 전후를 비교하는 데만 쓴다 — 링크 자신과
+ * 그 대상을 둘 다 잰다(키는 대상의 바이트를 해시하므로, 대상만 바꿨다 되돌려도 드러나야 한다).
+ */
+async function checkedReceipt(loaded, bin) {
+  const { harnessDigest, receiptDirectory } = await import('./oracle-lock.mjs')
+  const directory = receiptDirectory()
+  if (!directory) return null
+  const { packageInputs, sourcePath } = await import('./oracle-package.mjs')
+  const portable = (path) => relative(loaded.root, path).split('\\').join('/')
+  const inputs = await packageInputs(loaded)
+  const sources = []
+  const paths = inputs.map(({ path }) => resolve(loaded.root, path))
+  for (const { id } of loaded.pkg.sources ?? []) {
+    const path = sourcePath(loaded, id)
+    if (!path) continue
+    const bytes = await readFile(path).catch(() => null)
+    sources.push([portable(path), bytes === null ? null : sha256(bytes)])
+    paths.push(path)
+  }
+  const stamps = []
+  const mark = (entry) => entry && [entry.size, entry.mtimeMs, entry.ctimeMs, entry.ino]
+  for (const path of [...new Set(paths)].sort()) {
+    // 없는 파일은 표식 없음(null)으로 남는다 — 생기거나 사라지면 전후가 달라진다
+    const [link, target] = await Promise.all([lstat(path).catch(() => null), stat(path).catch(() => null)])
+    stamps.push([portable(path), mark(link), mark(target)])
+  }
+  const key = sha256(stableStringify({ gate: 'CHECKED', harness: await harnessDigest(), node: process.version, bend: bin, inputs, sources }))
+  return { directory, key, stamp: stableStringify(stamps) }
+}
+
+/**
+ * 관문이 도는 동안 입력이 바뀌었으면(고쳤다가 되돌린 것까지) 그 판정은 키의 바이트가 낸 것이 아니다 — 패키지를 다시 읽어 키와
+ * 파일 표식을 다시 재고, 둘 다 같을 때만 영수증을 남긴다.
+ */
+async function rememberChecked(receipt, packagePath, bin, evidence) {
+  const { loadPackage } = await import('./oracle-package.mjs')
+  const { writeReceipt } = await import('./oracle-lock.mjs')
+  // 다시 잴 수 없으면 남기지 않는다 — 다음 advance가 관문을 다시 돌 뿐이다
+  const again = await loadPackage(packagePath, { root: process.cwd() }).then((reloaded) => checkedReceipt(reloaded, bin)).catch(() => null)
+  if (again?.key !== receipt.key || again.stamp !== receipt.stamp) return
+  // 영수증은 속도를 위한 캐시다 — 쓸 수 없는 위치(읽기 전용 tmpdir, 샌드박스)는 다음 advance가 관문을 다시 돌게 둘 뿐이다
+  await writeReceipt(receipt, evidence).catch(() => {})
 }
 
 async function begin(directory, requestedProfile) {

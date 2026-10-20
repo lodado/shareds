@@ -1014,6 +1014,11 @@ test('bend failure hints name one fix for each check failure seen in real runs',
     ["- message  : a declared constructor (unknown: Ui.Marks)", /type block/],
     ["- expected : a filled definition (an unfilled law is a dead claim: live code cannot", /def f/],
     ["- expected : an import ('import Base', or 'import <path> as <Name>')", /import Base/],
+    // the missing constructors, one or several, as real runs printed them
+    ['- expected : cases for MODEL.Refresh\n- observed : \\{}', /no case for MODEL\.Refresh: add a case for each \(in `match a b:` one pattern per value/],
+    ['- expected : cases for MODEL.RdApple, MODEL.RdOther', /no case for MODEL\.RdApple, MODEL\.RdOther:/],
+    // following a one-pattern fix inside `match s m:` (Bend 2.0.34 output)
+    ["- expected : 2 patterns (one per scrutinee)\n- observed : 'Refresh{}'", /takes 2 values: give every case 2 patterns in order/],
   ]
   for (const [output, fix] of cases) assert.match(bendFailureHint(`SOME PROOFS FAIL\nError:\n${output}`), fix, output)
   assert.equal(bendFailureHint('SOME PROOFS FAIL\nError:\n- expected : Nat'), null)

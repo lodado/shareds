@@ -46,7 +46,8 @@ only for the current stage, not every future phase.
 3. Invoke [`$oracle-review`](../oracle-review/SKILL.md) in independent review contexts with permitted inputs.
    Preserve findings, drive the falsifying nail, obtain actual human approval (common's pre-authorized one
    counts), then lint/lock through tools.
-4. Design-only never writes/executes consumer tests or edits production/dependencies.
+4. Design-only never writes/executes consumer tests or edits production/dependencies (a temporary pre-lock
+   sweep report is not a consumer test).
 5. Explicit Delivery invokes `$test` before tests and uses the current `oracle-run.mjs guide` and ledger.
    Only accepted VALID_RED permits [`$oracle-implement`](../oracle-implement/SKILL.md) production work.
    ALREADY_SATISFIED is zero-production verification only.

@@ -485,12 +485,25 @@ JSON이 아니면 아무것도 쓰지 않고, 내용이 같으면 다시 쓰지 
 Outcome Brief의 `Risk:` 줄에 그 트리거를 적고, 없으면 많아야 Medium입니다(비동기 로딩·순서·재시도·캐시만으로는
 High가 아닙니다). 순서·비동기·동시성 핵심이 없는 새 Medium 요청(폼 검증, 추적·설정 주입)은 Formal 범위 관문에서
 intake 전에 `Status: HANDED_OFF — frontend-contract-design`을 찍고 `frontend-contract-design`(contract/v1, Bend
-없음)으로 넘깁니다. guard hook은 이 표시 뒤에 켠 컨트롤러로 세션의 프로필을 정합니다. 핵심이 있는 Medium은 그
+없음)으로 넘깁니다. guard hook은 이 표시가 넘긴 대상과 그 뒤에 켠 컨트롤러로 세션의 프로필을 정합니다. 핵심이 있는 Medium은 그
 핵심만 Bend로 모델링하고, 나머지 입력 계열은 첫 응답에서 `excluded: outside the Medium core`로 제안해 사용자의
 `yes`를 근거로 제외하며 그 정책은 테스트 행(Not formalized)으로 남깁니다. Formal에서만, 첫 `yes`에서 "끝까지,
 묻지 말고"라고 하면 증명 뒤 반례·새 축·새 Open question·뜻 바뀜이 없을 때 카드 승인을 다시 묻지 않습니다
 (`- Source: pre-authorized — <위치>; post-proof: no new question or changed meaning`, lint가 꼴을 확인하고
 Contract 카드에서는 거부).
+
+### Draft lint, CHECKED 영수증, lock 전 sweep
+
+0.105.0부터 작성자는 Draft를 보여 주기 전에 `oracle-verify.mjs card --oracle <card> --draft`를 돌립니다. lint 전체를
+돌리되 사용자의 답을 기다리는 것(확인 상태·출처, Visual QA 허가, needs-decision 칸, 승인을 기다리는 출처)만 `pending`으로 찍고 나머지는
+그대로 실패합니다. needs-evidence 칸과 사전 위임 표시의 꼴은 작성자가 고칠 일이라 실패로 남고, 관문과 lock은 이
+플래그를 쓰지 않습니다. `advance --to CHECKED`는 패키지·Bend 파일·등록 출처·하네스·node·Bend가 모두 같은 통과를
+영수증으로 기억했다가 그대로 통과시키고, 판정 문장 끝에 `receipt: these exact inputs passed before`를 붙입니다.
+실패, Bend 실행 실패로 판정하지 못하거나 파생이 덜 돈 통과, 관문이 도는 동안 입력 파일의 내용이나 표식(크기·시각·inode,
+링크와 그 대상 모두)이 바뀐 통과는 남기지 않습니다
+(`ORACLE_LINT_CACHE=off`로 끔). 제품 코드가 이미 있으면 작성자는 `project-card` 뒤, lock 전에도 sweep을 돌려 모델
+결함을 같은 revision의 질문으로 올립니다. adapter와 출력은 임시 디렉터리나 git이 무시하는 경로에만 두고, 보고서일 뿐
+테스트나 증거가 아니라서 Design-only도 돌릴 수 있습니다.
 
 ### 리뷰어용 읽기 보기
 

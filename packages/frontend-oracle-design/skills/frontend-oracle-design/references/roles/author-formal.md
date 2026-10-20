@@ -66,7 +66,7 @@ whatever is already loaded.
    rows against source goals in Terms/Adequacy. `scripts/oracle-package.mjs` derives axes and projects the
    card, and `scripts/oracle-projection.mjs` generates fast-check conformance tests from that model.
    Consumer test generation/writes belong to the explicitly invoked $test role only after approval/lock,
-   not to this pre-lock authoring role.
+   not to this pre-lock authoring role; its temporary pre-lock sweep report is not a consumer test.
 
 The controller walks `scripts/oracle-stage.mjs`: begin before independent inputs, then advance --to MODELED | CHECKED | DRAFTED
 once each gate passes. Return actual artifacts and gate results for those transitions.
@@ -90,6 +90,9 @@ Keep every surviving Grill question as an Open question, candidate rows plus a r
 Add source-backed BVA, then sweep new × inherited × runtime interactions after drafting rows and before
 showing the Draft. Every needs-decision cell/frame cites an Open question. Resolve every needs-evidence
 cell by investigation in the same pass; only needs-decision reaches the user.
+Before showing the Draft, run `scripts/oracle-verify.mjs card --oracle <card> --draft`. It is the whole
+lint, except that what waits on the user's answer (confirmation, Visual QA authorization, needs-decision
+cells, sources awaiting approval) is listed as pending; fix every other issue before the user reads it.
 
 Before drafting, run `scripts/oracle-dimensions.mjs --path <touched files>` and
 `scripts/oracle-verify.mjs card --repo-policies`. Dimension candidates, side-effect inventory and sibling

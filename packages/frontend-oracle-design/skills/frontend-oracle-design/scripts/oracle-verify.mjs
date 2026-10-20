@@ -71,9 +71,15 @@ const FLAG_NAMES = [
 /**
  * 값 없는 플래그 — `card --ir`, `card --delta`, `card --repo-policies`, `scan --side-effects`. `card --locked`는 이미 잠긴
  * 카드를 다시 읽는 lock verify용이다: lock 생성만 막는 검사(witness 파일 실재, risk-below-floor)를 건너뛰어, 이후 버전의
- * 규칙이나 구현 중 바뀐 코드가 기존 잠금을 매 exec마다 깨뜨리지 않게 한다.
+ * 규칙이나 구현 중 바뀐 코드가 기존 잠금을 매 exec마다 깨뜨리지 않게 한다. `card --draft`는 승인 전 Draft용이다: 사용자의
+ * 답을 기다리는 검사만 실패 대신 대기로 보이고 나머지는 그대로 실패한다. 관문과 lock은 이 플래그를 넘기지 않는다.
  */
-const BOOLEAN_FLAGS = new Set(['ir', 'delta', 'repo-policies', 'side-effects', 'case-space', 'locked'])
+const BOOLEAN_FLAGS = new Set(['ir', 'delta', 'repo-policies', 'side-effects', 'case-space', 'locked', 'draft'])
+
+// 승인 전 Draft에서는 사용자의 답이 아직 없어서 당연히 남는 검사 — 확인 상태·출처, Visual QA 허가, 승인을 기다리는 출처
+// (card-format: Draft는 제안된 정책과 승인 전 출처를 그렇다고 밝혀 싣는다). needs-decision 칸은 lintCard가 칸 종류로 고른다.
+// needs-evidence 칸은 Draft 전에 조사로 닫을 일이고 사전 위임 표시의 꼴은 작성자 몫이라, 둘 다 실패로 남는다
+const DRAFT_PENDING = /^(?:user-confirmation-(?:status|source)|visual-qa-authorization|source-unapproved|policy-source-unapproved):/
 
 const CLASSIFICATIONS = [
   'POLICY_GAP',
@@ -532,6 +538,10 @@ function preauthorizationIssues(source, card) {
 
 async function lintCard(options) {
   if (!options.oracle) throw new CliError('USAGE', 'card requires --oracle', 2)
+  if (options.draft && ['locked', 'case-space', 'ir', 'delta', 'repo-policies'].some((flag) => options[flag]))
+    throw new CliError('USAGE', '--draft lints a card before approval; it does not combine with --locked, --case-space or a data view', 2)
+  // `--draft`가 대기로 보이는, 문장만으로는 가를 수 없는 issue — 칸 종류나 출처 상태를 아는 검사가 직접 넣는다
+  const awaitingAnswer = new Set()
 
   const card = await readFile(options.oracle, 'utf8').catch((error) => {
     throw new CliError('CARD_UNREADABLE', `Cannot read ${options.oracle}: ${error.message}`)
@@ -888,11 +898,11 @@ async function lintCard(options) {
           isApproved(columnOf(registered, SOURCE_COLUMNS.approval))
         )
       })
-      if (!approvedAuthority) {
-        issues.push(
-          `visual-source: ${row.id}: visual contract requires an approved non-implementation Source Registry source`,
-        )
-      }
+      const unauthorized = `visual-source: ${row.id}: visual contract requires an approved non-implementation Source Registry source`
+      if (!approvedAuthority) issues.push(unauthorized)
+      // 인용한 비구현 출처가 승인만 기다리면 Draft에서는 사용자의 답을 기다리는 것이다 — 구현 출처뿐이면 작성자 몫이다
+      const awaitingApproval = cited.some((id) => sourceById.get(id) && sourceById.get(id).Kind !== 'implementation-reference')
+      if (!approvedAuthority && awaitingApproval) awaitingAnswer.add(unauthorized)
       for (const id of cited) {
         if (!sourceIds.has(id)) issues.push(`unknown-source: ${row.id}: ${id} is not in Source Registry`)
       }
@@ -1073,12 +1083,13 @@ async function lintCard(options) {
     rootDirectory,
     witnessesLocked: Boolean(options.locked),
   }
-  // lint는 승인된 최종 카드에만 돈다 — 살아남은 needs-decision·needs-evidence는 lock 차단(disposition-open)
+  // lint는 승인된 최종 카드에만 돈다 — 살아남은 needs-decision·needs-evidence는 lock 차단(disposition-open).
+  // `--draft`는 그중 사용자의 답을 기다리는 칸(needs-decision)만 대기로 본다 — 문장 대신 칸 종류로 고른다
   const openCells = []
   const checkCell = async (value, context) => {
     const parsed = parseDisposition(value)
     if (parsed.type === 'needs-decision' || parsed.type === 'needs-evidence') {
-      openCells.push(`${context.label}: ${parsed.type}`)
+      openCells.push({ label: context.label, type: parsed.type })
     }
     return checkDisposition(parsed, context)
   }
@@ -1240,7 +1251,14 @@ async function lintCard(options) {
   if (generated?.caseSpace.coverage === 'full-product') {
     const report = auditFullProduct(card, generated, { scenarioShape })
     issues.push(...report.issues)
-    if (report.N_unresolved || report.questions.length) issues.push('disposition-open: full-product has unresolved expectations')
+    // 조사로 닫을 칸(needs-evidence)과 사용자의 답을 기다리는 칸(needs-decision)을 따로 알린다 — Draft lint가 앞의 것만 실패로 본다
+    const evidenceOpen = report.unresolved.filter((record) => /^needs-evidence\b/.test(record.disposition)).length
+    if (evidenceOpen) issues.push(`disposition-open: full-product has ${evidenceOpen} needs-evidence frames to investigate`)
+    if (report.unresolved.length > evidenceOpen || report.questions.length) {
+      const issue = 'disposition-open: full-product has needs-decision frames awaiting the user'
+      issues.push(issue)
+      awaitingAnswer.add(issue)
+    }
   }
 
   if (!generated) {
@@ -1370,9 +1388,9 @@ async function lintCard(options) {
   }
 
   for (const cell of openCells) {
-    issues.push(
-      `disposition-open: ${cell} survives on an approved card — resolve it to covered/impossible, or the card ends NEEDS_DECISION`,
-    )
+    const issue = `disposition-open: ${cell.label}: ${cell.type} survives on an approved card — resolve it to covered/impossible, or the card ends NEEDS_DECISION`
+    issues.push(issue)
+    if (cell.type === 'needs-decision') awaitingAnswer.add(issue)
   }
 
   const contractText = rows.flatMap(contractCells).join(' ')
@@ -1386,8 +1404,16 @@ async function lintCard(options) {
     }
   }
 
-  if (issues.length > 0) {
-    throw new CliError('CARD_LINT_FAILED', `card structure is incomplete:\n  ${issues.join('\n  ')}`)
+  const waits = (issue) => DRAFT_PENDING.test(issue) || awaitingAnswer.has(issue)
+  const pending = options.draft ? issues.filter(waits) : []
+  const failing = options.draft ? issues.filter((issue) => !waits(issue)) : issues
+  if (failing.length > 0) {
+    throw new CliError('CARD_LINT_FAILED', `card structure is incomplete:\n  ${failing.join('\n  ')}`)
+  }
+  if (options.draft) {
+    process.stdout.write(`CARD_DRAFT_OK ${rows.length} rows; ${pending.length} waiting on the user's answer\n`)
+    for (const issue of pending) process.stdout.write(`  pending ${issue}\n`)
+    return
   }
 
   process.stdout.write(`CARD_LINT_OK ${rows.length} rows\n`)

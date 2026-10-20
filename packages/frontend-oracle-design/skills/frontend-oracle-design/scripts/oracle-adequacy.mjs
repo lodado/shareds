@@ -1089,7 +1089,8 @@ function detailOf({ reason, counterexample, pair }) {
  */
 export async function preLockIssues({ card, package: packagePath, bin, cwd = process.cwd(), maxWorlds = MAX_WORLDS, timeoutMs = 120_000 }) {
   const loaded = await loadWorld({ card, package: packagePath, bin, cwd, maxWorlds, timeoutMs })
-  if (loaded.result) return { checked: false, reason: loaded.result.reason, issues: [] }
+  // status는 판정하지 못한 까닭의 종류다 — unknown(무한 필드·세계 상한)은 입력이 정하고, not-run(Bend 실행 실패)은 환경이 정한다
+  if (loaded.result) return { checked: false, status: loaded.result.status, reason: loaded.result.reason, issues: [] }
   const { spec, model } = loaded
   const worlds = evaluateWorlds(model, spec)
   const issues = searchAdequacy(model, spec, worlds)

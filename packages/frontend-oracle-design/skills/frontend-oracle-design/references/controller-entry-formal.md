@@ -94,7 +94,8 @@ when coordinating the selected stages; read only current-step dependencies, not 
 4. Present the full new Draft or semantic delta and Open questions. Obtain human confirmation, then lint
    and lock through the existing scripts. Under common's pre-authorized approval, lint and lock without
    presenting the card again. No lock, target tests, production or dependency edits before confirmation.
-   Design-only ends ORACLE_READY, NEEDS_DECISION or tool-failure FAIL. Write/execute no consumer tests or production.
+   Design-only ends ORACLE_READY, NEEDS_DECISION or tool-failure FAIL. Write/execute no consumer tests or production;
+   the author's temporary pre-lock sweep report ([bend-cross-verification](bend-cross-verification.md)) is not one.
 5. For explicit Delivery, explicitly load and invoke `$test` on entry and immediately before target test writes.
    If it cannot be invoked, FAIL. Read delivery/ledger, initialize real required labels and follow the current
    guide. `$test` owns test writing/judgment; its standalone Low exemption never waives this Oracle run's rules.

@@ -63,24 +63,40 @@ stopped it), `not-run`, `undeclared`, `stale` or `invalid`. Only the first four 
 source `n/a` replaces only `not-run` and `undeclared`: an operator that ran, was cut short or is invalid
 keeps its status, and an AI operator's recorded runs are read whatever its disposition.
 
-| Operator                                                                                   | Layer         | Attacks                                                                                                                                                     | Finds                                                                                                                                                     |
-| ------------------------------------------------------------------------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `requirement-coverage`                                                                     | deterministic | sentences of an approved source that no requirement quotes                                                                                                  | `requirement-gap`                                                                                                                                         |
-| `space-cross-check`                                                                        | deterministic | the declared space against the Bend space: unmapped or unreached values, pairs split across the world and the behavior model, transitions only one side has | `new-axis`, `cross-term`, `silent-decision`, `assumption-risk`                                                                                            |
-| `observation-sufficiency`                                                                  | deterministic | two worlds alike on every coordinate and observation that a goal judges differently                                                                         | `observation-gap`                                                                                                                                         |
-| `goal-implication`                                                                         | deterministic | worlds every row allows that break a goal; flipped approved examples; open terms                                                                            | `weak-contract` and others                                                                                                                                |
-| `goal-witness`                                                                             | deterministic | a contract that forbids the normal path, or contradicts itself                                                                                              | `vacuous-contract`, `contradiction`                                                                                                                       |
-| `assumption-sensitivity`                                                                   | deterministic | "what if false" for each assumption: goals only it supports, worlds only it hides                                                                           | `assumption-risk`, `goal-gap-review`, `assumption-hides-goal`                                                                                             |
-| `temporal-order`                                                                           | deterministic | order obligations of the behavior model while the world declares `order-timing` n/a                                                                         | `new-axis`                                                                                                                                                |
-| `trace-extension`                                                                          | deterministic | behaviour patterns (event kind × kind of observation change) that exist only past the bound; sampled patterns count as covered                              | `range`                                                                                                                                                   |
-| `boundary-perturbation`                                                                    | deterministic | event field values 0 and one past the largest the space uses, where the environment forbids them                                                            | `unspecified-behavior`, `unhandled-event`                                                                                                                 |
-| `order-perturbation`                                                                       | deterministic | duplicated, swapped and early events the environment forbids                                                                                                | `unspecified-behavior`, `unhandled-event`                                                                                                                 |
-| `projection-residue`                                                                       | deterministic | product state that varies under one observation                                                                                                             | `hidden-state`                                                                                                                                            |
-| `world-model-gap`                                                                          | deterministic | product results the world calls impossible                                                                                                                  | `new-axis`                                                                                                                                                |
-| `mutation`                                                                                 | deterministic | the declared fault model F, each mutant run in a child process against every check                                                                          | `oracle-weakness`                                                                                                                                         |
-| `metamorphic`                                                                              | deterministic | `R(obs(t), obs(T(t)))` on every in-space pair, on the model and on the product                                                                              | `relation-invalid`                                                                                                                                        |
-| `dependency-failure`, `latency`, `environment-variation`, `malformed-input`, `concurrency` | declared      | families no generic tool can synthesize                                                                                                                     | `modeled: <axis>` is checked: the axis is an input (a world coordinate or an event) with at least two values; the claim itself is listed as residual risk |
-| `ai-explorer`, `cross-agent`                                                               | ai            | breaking the card; hidden assumptions and axes a domain expert adds                                                                                         | triaged candidates                                                                                                                                        |
+Operator (layer) → what it attacks → what it finds:
+
+- `requirement-coverage` (deterministic) → sentences of an approved source that no requirement quotes →
+  `requirement-gap`.
+- `space-cross-check` (deterministic) → the declared space against the Bend space: unmapped or unreached
+  values, pairs split across the world and the behavior model, transitions only one side has → `new-axis`,
+  `cross-term`, `silent-decision`, `assumption-risk`.
+- `observation-sufficiency` (deterministic) → two worlds alike on every coordinate and observation that a
+  goal judges differently → `observation-gap`.
+- `goal-implication` (deterministic) → worlds every row allows that break a goal; flipped approved
+  examples; open terms → `weak-contract` and others.
+- `goal-witness` (deterministic) → a contract that forbids the normal path, or contradicts itself →
+  `vacuous-contract`, `contradiction`.
+- `assumption-sensitivity` (deterministic) → "what if false" for each assumption: goals only it supports,
+  worlds only it hides → `assumption-risk`, `goal-gap-review`, `assumption-hides-goal`.
+- `temporal-order` (deterministic) → order obligations of the behavior model while the world declares
+  `order-timing` n/a → `new-axis`.
+- `trace-extension` (deterministic) → behaviour patterns (event kind × kind of observation change) that
+  exist only past the bound; sampled patterns count as covered → `range`.
+- `boundary-perturbation` (deterministic) → event field values 0 and one past the largest the space uses,
+  where the environment forbids them → `unspecified-behavior`, `unhandled-event`.
+- `order-perturbation` (deterministic) → duplicated, swapped and early events the environment forbids →
+  `unspecified-behavior`, `unhandled-event`.
+- `projection-residue` (deterministic) → product state that varies under one observation → `hidden-state`.
+- `world-model-gap` (deterministic) → product results the world calls impossible → `new-axis`.
+- `mutation` (deterministic) → the declared fault model F, each mutant run in a child process against
+  every check → `oracle-weakness`.
+- `metamorphic` (deterministic) → `R(obs(t), obs(T(t)))` on every in-space pair, on the model and on the
+  product → `relation-invalid`.
+- `dependency-failure`, `latency`, `environment-variation`, `malformed-input`, `concurrency` (declared) →
+  families no generic tool can synthesize → `modeled: <axis>` is checked: the axis is an input (a world
+  coordinate or an event) with at least two values; the claim itself is listed as residual risk.
+- `ai-explorer`, `cross-agent` (ai) → breaking the card; hidden assumptions and axes a domain expert adds →
+  triaged candidates.
 
 Perturbations use only events the environment excludes — inside the space the conformance run already
 judges them. A changed observation on such an event is behaviour the model says nothing about; it is a

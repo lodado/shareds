@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { chmod, cp, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
@@ -13,7 +13,9 @@ import { installedBend } from './oracle-test-bend.mjs'
 const FIXTURE = fileURLToPath(new URL('../../../test-fixtures/stale-search/', import.meta.url))
 const PAGINATION = fileURLToPath(new URL('../../../test-fixtures/pagination/', import.meta.url))
 const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
-const { NODE_TEST_CONTEXT: _parent, ...CHILD_ENV } = process.env
+const { NODE_TEST_CONTEXT: _parent, ...INHERITED_ENV } = process.env
+// 영수증은 테스트마다 따로 둔다 — 다른 테스트나 앞선 실행이 남긴 CHECKED 영수증이 관문을 대신 통과시키지 않게
+const CHILD_ENV = { ...INHERITED_ENV, ORACLE_LINT_CACHE: 'off' }
 const node = (cwd, script, args) =>
   spawnSync(process.execPath, [join(SCRIPTS, script), ...args], { cwd, encoding: 'utf8', env: CHILD_ENV })
 
@@ -366,6 +368,137 @@ test('CHECKED refuses a model the lock would freeze with a defect: a row that no
   const checked = stage(root, directory, 'advance', 'CHECKED')
   assert.equal(checked.status, 0, checked.stderr)
   assert.match((await readStage(directory)).history.at(-1).evidence, /adequacy found no refuted check or unsatisfiable setting over \d+ worlds/)
+})
+
+test('CHECKED remembers a pass by its exact inputs: a registered source or Bend byte runs the gate again, an unrelated file does not, a failure leaves none', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const receipts = await mkdtemp(join(tmpdir(), 'oracle-checked-receipts-'))
+  t.after(() => rm(receipts, { recursive: true, force: true }))
+  const walk = async (change, cache = receipts, extra = {}) => {
+    const { root, directory } = await repository(t)
+    await change?.(root)
+    const env = { ...CHILD_ENV, ORACLE_LINT_CACHE: cache, ...extra }
+    const run = (...args) => spawnSync(process.execPath, [join(SCRIPTS, 'oracle-stage.mjs'), ...args, '--dir', directory], { cwd: root, encoding: 'utf8', env })
+    assert.equal(run('begin').status, 0)
+    assert.equal(run('advance', '--to', 'MODELED').status, 0)
+    const checked = run('advance', '--to', 'CHECKED')
+    return { stderr: checked.stderr, evidence: checked.status === 0 ? JSON.parse(checked.stdout).evidence : null }
+  }
+  const kept = async () => (await readdir(receipts)).filter((name) => !name.startsWith('.')).length
+  const append = (file, text) => async (root) => writeFile(join(root, file), `${await readFile(join(root, file), 'utf8')}${text}`)
+
+  const first = await walk()
+  assert.doesNotMatch(first.evidence, /receipt/, first.stderr)
+  assert.equal(await kept(), 1)
+  // a fresh copy of the same bytes passes on the receipt and keeps the judged evidence
+  const again = await walk()
+  assert.equal(again.evidence, `${first.evidence}; receipt: these exact inputs passed before`)
+  // a file the package does not read is not an input
+  assert.match((await walk(append('search-reducer.mts', '\n// unrelated\n'))).evidence, /receipt/)
+  // a registered source (S1) and a Bend file the package reads are inputs
+  for (const [file, text] of [['README.md', '\n'], ['LAWS.bend', '\n# comment\n']]) {
+    const changed = await walk(append(file, text))
+    assert.doesNotMatch(changed.evidence ?? 'failed', /receipt|failed/, `${file}: ${changed.stderr}`)
+  }
+  assert.equal(await kept(), 3)
+
+  // a failing gate leaves no receipt, so the same failing bytes fail again
+  const forbid = async (root) => {
+    const world = join(root, 'World.bend')
+    await writeFile(world, (await readFile(world, 'utf8')).replace('      Race.imp(n, Race.isNew(f))\n', '      Race.imp(n, Bool.not(Race.isNew(f)))\n'))
+  }
+  for (const attempt of [1, 2]) assert.match((await walk(forbid)).stderr, /^STAGE_GATE: the model has defects the lock would freeze/, `attempt ${attempt}`)
+  assert.equal(await kept(), 3)
+  // ORACLE_LINT_CACHE=off neither reads nor writes a receipt
+  assert.doesNotMatch((await walk(undefined, 'off')).evidence, /receipt/)
+  assert.equal(await kept(), 3)
+
+  // a pass the keyed bytes did not earn is never stored: an input replaced while the gate runs …
+  const preloads = await mkdtemp(join(tmpdir(), 'oracle-checked-preloads-'))
+  t.after(() => rm(preloads, { recursive: true, force: true }))
+  const fixed = join(preloads, 'World.fixed.bend')
+  await writeFile(fixed, await readFile(join(FIXTURE, 'World.bend'), 'utf8'))
+  const swap = join(preloads, 'swap.mjs')
+  await writeFile(swap, [
+    "import fsp from 'node:fs/promises'",
+    "import { syncBuiltinESMExports } from 'node:module'",
+    'const original = fsp.readFile',
+    'let swapped = false',
+    'fsp.readFile = async function (path, ...rest) {',
+    "  if (!swapped && String(path).endsWith('/World.bend') && new Error().stack.includes('derivePackage')) {",
+    '    swapped = true',
+    '    await fsp.writeFile(String(path), await original(process.env.SWAP_TEXT_FILE, "utf8"))',
+    '  }',
+    '  return original.call(this, path, ...rest)',
+    '}',
+    'syncBuiltinESMExports()',
+  ].join('\n'))
+  const swapped = await walk(forbid, receipts, { NODE_OPTIONS: `--import ${swap}`, SWAP_TEXT_FILE: fixed })
+  assert.match(swapped.evidence ?? swapped.stderr, /^derive /, 'the gate judged the replaced bytes')
+  assert.equal(await kept(), 3)
+  assert.match((await walk(forbid)).stderr, /^STAGE_GATE: the model has defects the lock would freeze/)
+  // … or adequacy left unjudged by one failed Bend spawn
+  const eagain = join(preloads, 'eagain.mjs')
+  await writeFile(eagain, [
+    "import cp from 'node:child_process'",
+    "import { syncBuiltinESMExports } from 'node:module'",
+    'const original = cp.spawnSync',
+    'let failed = false',
+    'cp.spawnSync = function (command, args, options) {',
+    "  if (!failed && Array.isArray(args) && args[0] === 'World.bend' && args.includes('-o') && new Error().stack.includes('preLockIssues')) {",
+    '    failed = true',
+    "    return { pid: 0, output: [], stdout: '', stderr: '', status: null, signal: null, error: Object.assign(new Error('spawnSync EAGAIN'), { code: 'EAGAIN' }) }",
+    '  }',
+    '  return original.call(this, command, args, options)',
+    '}',
+    'syncBuiltinESMExports()',
+  ].join('\n'))
+  const unjudged = await walk(append('search-reducer.mts', '\n// another unrelated edit\n'), join(preloads, 'cache'), { NODE_OPTIONS: `--import ${eagain}` })
+  assert.match(unjudged.evidence ?? unjudged.stderr, /adequacy not judged/)
+  assert.deepEqual(await readdir(join(preloads, 'cache')).catch(() => []), [])
+  // … or a derive whose world count timed out (its digest is not these bytes' digest)
+  const worlds = join(preloads, 'worlds.mjs')
+  await writeFile(worlds, (await readFile(eagain, 'utf8')).replace("stack.includes('preLockIssues')", "stack.includes('possibleWorlds')"))
+  const partial = await walk(undefined, join(preloads, 'cache'), { NODE_OPTIONS: `--import ${worlds}` })
+  assert.match(partial.evidence ?? partial.stderr, /^derive /)
+  assert.deepEqual(await readdir(join(preloads, 'cache')).catch(() => []), [])
+  // … or an input changed and restored while the gate ran: the key matches again, only the file stamps differ
+  const restore = join(preloads, 'restore.mjs')
+  await writeFile(restore, [
+    "import fsp from 'node:fs/promises'",
+    "import { syncBuiltinESMExports } from 'node:module'",
+    'const original = fsp.readFile',
+    'let world = null',
+    'let saved = null',
+    'fsp.readFile = async function (path, ...rest) {',
+    '  const name = String(path)',
+    '  const stack = new Error().stack',
+    "  if (saved === null && name.endsWith('/World.bend') && stack.includes('derivePackage')) {",
+    '    world = name',
+    "    saved = await original(name, 'utf8')",
+    "    await fsp.writeFile(name, await original(process.env.SWAP_TEXT_FILE, 'utf8'))",
+    "  } else if (world && name.endsWith('oracle.package.json') && stack.includes('rememberChecked')) {",
+    '    await fsp.writeFile(world, saved)',
+    '    world = null',
+    '  }',
+    '  return original.call(this, path, ...rest)',
+    '}',
+    'syncBuiltinESMExports()',
+  ].join('\n'))
+  const restored = await walk(forbid, join(preloads, 'cache'), { NODE_OPTIONS: `--import ${restore}`, SWAP_TEXT_FILE: fixed })
+  assert.match(restored.evidence ?? restored.stderr, /^derive /, 'the gate judged the replaced bytes')
+  assert.deepEqual(await readdir(join(preloads, 'cache')).catch(() => []), [])
+  // … also through a symlinked input, where only the target changes and the link itself does not
+  const linked = async (root) => {
+    await forbid(root)
+    await mkdir(join(root, 'real'))
+    await rename(join(root, 'World.bend'), join(root, 'real', 'World.bend'))
+    await symlink(join(root, 'real', 'World.bend'), join(root, 'World.bend'))
+  }
+  const throughLink = await walk(linked, join(preloads, 'cache'), { NODE_OPTIONS: `--import ${restore}`, SWAP_TEXT_FILE: fixed })
+  assert.match(throughLink.evidence ?? throughLink.stderr, /^derive /, 'the gate judged the replaced bytes')
+  assert.deepEqual(await readdir(join(preloads, 'cache')).catch(() => []), [])
 })
 
 test('MODELED needs every async cell decided when Async is in a version 2 space — the open cells are asked before the model', async (t) => {

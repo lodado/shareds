@@ -23,7 +23,7 @@ const BUNDLE_BYTE_CAPS = {
   'contract-types-lane-continued': 6000,
   'contract-frontend-lane-continued': 33000,
   'role-intake': 105000,
-  'role-author': 282000,
+  'role-author': 278000,
   'role-implement': 123000,
   'role-review': 62000,
   'contract-role-intake': 79000,

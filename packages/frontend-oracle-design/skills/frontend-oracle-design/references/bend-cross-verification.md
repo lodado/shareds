@@ -302,7 +302,8 @@ environment, bound and observation line as part of the card. Lock with `--source
 `LAWS.bend` and every local file they import. A later change to any of them is a new revision with
 reconfirmation, never an in-place relock. Design-only stops here at `ORACLE_READY` with the card and the three `.bend` files; it performs and
 records `prove`, complete `space` and Adequacy checks, plus type-fest/static/fast-check plans and
-availability, but writes or executes no target tests or production code. Delivery executes the
+availability, but writes or executes no target tests or production code (the pre-lock sweep below is a
+report, not a target test). Delivery executes the
 consumer checks under the four required labels.
 
 ## 4. Delivery: RED, conformance and the proof label
@@ -361,6 +362,13 @@ differing observation path with the shortest trace of each group. Feed each trac
 --adapter`: the verdicts sort the groups into product fixes (make them together), model gaps and
 `POLICY_GAP`. Open **one** revision for all model gaps and decisions at once. A sweep is a report,
 never mapped in `evidence.json` and never cited as GREEN.
+
+**Sweep before the lock, too.** When product code already exists, the author runs the same sweep with
+`--package` after `project-card` (`--row` names an O\* row), so its model gaps become questions in this
+revision instead of the next one. Keep the
+adapter and `--out` in a temporary directory or a git-ignored path, never a repository file. The report
+is not a consumer test or evidence, so Design-only may run it. If the repository's runner cannot reach
+that path, record the sweep as not run rather than changing runner configuration.
 
 The model is the oracle, not the product's design. Write the product by the state ladder
 ([`types/state-ladder.md`](types/state-ladder.md)): never mirror the model's message union, `step` or

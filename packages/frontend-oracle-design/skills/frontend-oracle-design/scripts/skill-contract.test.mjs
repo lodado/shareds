@@ -2954,3 +2954,21 @@ test('authors read the Draft nodes after project-card and Bend files go through 
   assert.match(loading, /a worker reads the plain output/)
   assert.match(controller, /this skill's `scripts\/`\s+directory and every file it may write/)
 })
+
+test('0.105.0: the Draft is linted before the user reads it, and a pre-lock sweep stays on temporary paths', async () => {
+  const [author, contractAuthor, patterns, bend, controller] = await Promise.all([
+    read('references/roles/author-formal.md'),
+    read('references/contract/authoring.md'),
+    read('references/model-patterns.md'),
+    read('references/bend-cross-verification.md'),
+    read('references/roles/controller-formal.md'),
+  ])
+  // the most common card lint failure in recorded runs was a Draft linted as a final card
+  assert.match(author, /Before showing the Draft, run `scripts\/oracle-verify\.mjs card --oracle <card> --draft`/)
+  assert.match(contractAuthor, /`card --draft` lists what waits on approval as pending/)
+  assert.match(patterns, /`cases for M\.X` → a `match` leaves out constructor `X`/)
+  assert.match(bend, /\*\*Sweep before the lock, too\.\*\*/)
+  assert.match(bend, /temporary directory or a git-ignored path, never a repository file/)
+  assert.match(bend, /record the sweep as not run rather than changing runner configuration/)
+  assert.match(controller, /CHECKED passes\s+at once on a receipt/)
+})

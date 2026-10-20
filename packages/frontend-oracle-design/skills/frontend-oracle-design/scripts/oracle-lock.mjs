@@ -231,10 +231,10 @@ const skillRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 let harness
 
 /**
- * 하네스의 지문 — 카드 lint는 카드·출처 말고는 이 스크립트(테스트 제외)와 참조 문서만 읽는다(bend는 버전이 고정이다). 하네스가
- * 바뀌면 영수증이 맞지 않는다. 프로세스당 한 번 계산한다.
+ * 하네스의 지문 — 카드 lint와 CHECKED 관문은 입력 말고는 이 스크립트(테스트 제외)와 참조 문서만 읽는다(bend는 버전이 고정이다).
+ * 하네스가 바뀌면 영수증이 맞지 않는다. 프로세스당 한 번 계산한다.
  */
-function harnessDigest() {
+export function harnessDigest() {
   harness ??= (async () => {
     const files = []
     const collect = async (directory, include) => {
@@ -267,8 +267,8 @@ function harnessDigest() {
  * 다른 사용자·심볼릭 링크·빈 파일은 거른다. 카드·출처 해시와 lock 대조는 영수증을 보기 전에 끝난다.
  */
 async function lintReceipt(oracle, sources, rootDirectory) {
-  const setting = process.env.ORACLE_LINT_CACHE
-  if (setting === 'off') return null
+  const directory = receiptDirectory()
+  if (!directory) return null
   const bend = await lintBend(oracle)
   const key = sha256(
     stableStringify({
@@ -279,7 +279,14 @@ async function lintReceipt(oracle, sources, rootDirectory) {
       sources: sources.map((source) => [portablePath(rootDirectory, source.realPath), source.sha256]),
     }),
   )
-  return { directory: setting || join(tmpdir(), `oracle-lint-receipts-${process.getuid?.() ?? 'user'}`), key }
+  return { directory, key }
+}
+
+/** 영수증 위치 — ORACLE_LINT_CACHE(기본 os tmpdir 아래 사용자별 디렉터리), `off`면 null(영수증을 쓰지도 읽지도 않는다). */
+export function receiptDirectory() {
+  const setting = process.env.ORACLE_LINT_CACHE
+  if (setting === 'off') return null
+  return setting || join(tmpdir(), `oracle-lint-receipts-${process.getuid?.() ?? 'user'}`)
 }
 
 /**
@@ -313,28 +320,35 @@ async function ownDirectory(directory) {
   }
 }
 
-/** 영수증이 있고 내 것이며(일반 파일, 같은 사용자) 내용이 키와 같을 때만 맞은 것이다. */
-async function hasReceipt({ directory, key }) {
+/**
+ * 영수증이 있고 내 것이며(일반 파일, 같은 사용자) 첫 줄이 키와 같을 때만 맞은 것이다 — 그 뒤 줄(통과한 판정 문장)을 돌려준다.
+ * 내용 없는 lint 영수증은 빈 문자열, 맞지 않으면 null.
+ */
+export async function readReceipt({ directory, key }) {
   try {
-    if (!(await ownDirectory(directory))) return false
+    if (!(await ownDirectory(directory))) return null
     const path = join(directory, key)
     const entry = await lstat(path)
-    if (!entry.isFile() || (process.getuid && entry.uid !== process.getuid())) return false
-    return (await readFile(path, 'utf8')).trim() === key
+    if (!entry.isFile() || (process.getuid && entry.uid !== process.getuid())) return null
+    const [first, ...rest] = (await readFile(path, 'utf8')).split('\n')
+    return first.trim() === key ? rest.join('\n').trim() : null
   } catch {
-    return false
+    return null
   }
 }
 
+const hasReceipt = async (receipt) => (await readReceipt(receipt)) !== null
+
 /**
  * 영수증을 쓴다 — 내 디렉터리에만, 임시 파일(`wx`: 이미 있으면 실패하고 링크를 따르지 않는다)에 쓴 뒤 이름을 바꿔 놓는다. 이름 자리에
- * 링크나 엉뚱한 파일이 있어도 바꿔치기할 뿐 그 가리키는 곳에는 쓰지 않는다.
+ * 링크나 엉뚱한 파일이 있어도 바꿔치기할 뿐 그 가리키는 곳에는 쓰지 않는다. 내용은 키와, 있으면 그 뒤 줄의 판정 문장이다.
  */
-async function writeReceipt({ directory, key }) {
+export async function writeReceipt({ directory, key }, value = '') {
   await mkdir(directory, { recursive: true, mode: 0o700 })
   if (!(await ownDirectory(directory))) return
   const temporary = join(directory, `.${key}.${process.pid}.${randomBytes(4).toString('hex')}`)
-  await writeFile(temporary, `${key}\n`, { flag: 'wx', mode: 0o600 })
+  const lines = value ? [key, value] : [key]
+  await writeFile(temporary, `${lines.join('\n')}\n`, { flag: 'wx', mode: 0o600 })
   await rename(temporary, join(directory, key))
 }
 

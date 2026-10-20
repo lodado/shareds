@@ -820,8 +820,15 @@ export function verdictOf(run, { bin, timeoutMs }) {
   return { status: 'failed', failedAt }
 }
 
-// 실제 실행에서 반복된 Bend 검사 실패 → 고치는 한 가지 방법. model-patterns.md "Bend check failures" 표와 같은 내용이다.
+// 실제 실행에서 반복된 Bend 검사 실패 → 고치는 한 가지 방법. model-patterns.md "Bend check failures" 목록과 같은 내용이다.
 const BEND_FAILURE_HINTS = [
+  [
+    // match가 생성자를 빠뜨렸다 — Bend는 빠진 것을 `cases for M.A, M.B`로 모두 적는다
+    /expected\s*:\s*cases for ([\w.]+(?:,\s*[\w.]+)*)/,
+    (names) =>
+      `the match has no case for ${names}: add a case for each (in \`match a b:\` one pattern per value, \`case S{…} <Name>{…}:\`), naming every constructor instead of \`case _:\` so a new one fails here`,
+  ],
+  [/expected\s*:\s*(\d+) patterns \(one per scrutinee\)/, (count) => `this match takes ${count} values: give every case ${count} patterns in order, \`case S{…} <Name>{…}:\``],
   [
     /duplicate declaration: ([\w.]+)/,
     (name) => `${name} is already declared (Base or an import): rename it to a domain name; check with \`bend base | grep -w ${name}\``,

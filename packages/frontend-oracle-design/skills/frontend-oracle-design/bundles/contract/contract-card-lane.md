@@ -938,7 +938,8 @@ completion barrier and observe plan. A plausible fixture is not approved policy 
 Sweep new × inherited × runtime interactions and source-open cells. Each required case has approved
 outcomes, every unresolved disposition remains visible and blocks lock. Include surviving questions with
 candidate rows/options and recommendation, new Draft in full or existing revision's semantic delta.
-Preflight enumeration/lint may run before approval without advancing beyond DISCOVERING.
+Preflight enumeration/lint (`card --draft` lists what waits on approval as pending) may run before
+approval without advancing beyond DISCOVERING.
 Return raw review inputs for card-only cold-read/reverse-impossible and conditional source-aware review.
 Only the controller obtains actual user approval before CHECKED whole-card hashing and later lock.
 Never write consumer tests/production or claim a preflight as product RED/GREEN.

@@ -2012,7 +2012,8 @@ environment, bound and observation line as part of the card. Lock with `--source
 `LAWS.bend` and every local file they import. A later change to any of them is a new revision with
 reconfirmation, never an in-place relock. Design-only stops here at `ORACLE_READY` with the card and the three `.bend` files; it performs and
 records `prove`, complete `space` and Adequacy checks, plus type-fest/static/fast-check plans and
-availability, but writes or executes no target tests or production code. Delivery executes the
+availability, but writes or executes no target tests or production code (the pre-lock sweep below is a
+report, not a target test). Delivery executes the
 consumer checks under the four required labels.
 
 ## 4. Delivery: RED, conformance and the proof label
@@ -2071,6 +2072,13 @@ differing observation path with the shortest trace of each group. Feed each trac
 --adapter`: the verdicts sort the groups into product fixes (make them together), model gaps and
 `POLICY_GAP`. Open **one** revision for all model gaps and decisions at once. A sweep is a report,
 never mapped in `evidence.json` and never cited as GREEN.
+
+**Sweep before the lock, too.** When product code already exists, the author runs the same sweep with
+`--package` after `project-card` (`--row` names an O\* row), so its model gaps become questions in this
+revision instead of the next one. Keep the
+adapter and `--out` in a temporary directory or a git-ignored path, never a repository file. The report
+is not a consumer test or evidence, so Design-only may run it. If the repository's runner cannot reach
+that path, record the sweep as not run rather than changing runner configuration.
 
 The model is the oracle, not the product's design. Write the product by the state ladder
 ([`types/state-ladder.md`](types/state-ladder.md)): never mirror the model's message union, `step` or
@@ -3086,14 +3094,24 @@ Check with `scripts/oracle-model.mjs check --file <file>` (`bend <file> --check-
 `prove` print the matching fix below as `hint`. Read the failure's `Location:` line, apply the fix once,
 and rerun the same file. Do not rewrite the whole model to fix one reported line.
 
-| Failure text                                | Cause                                                  | Fix                                                                                        |
-| ------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| `a fresh name (duplicate declaration: X)`   | Base or another import already declares `X`            | rename to a domain name (`FeedEvent`, `AttemptFailed`)                                     |
-| `X (consumed more than once)`               | a plain `x = v` or parameter is affine: one use only   | bind it reusable (`+x = v`, `+x: T`), type it `+D<A>`, or destructure once and reuse parts |
-| `a match on a parameter or field`           | the matched name is a def or a bind already consumed   | match the value before its first other use, or bind it with `+`                            |
-| `a declared constructor (unknown: M.X)`     | `X` is not in that type, or the module prefix is wrong | use a constructor from the type's `type` block under its import alias                      |
-| `a filled definition (an unfilled law ...)` | a `law f` has no `def f` with the same name            | add `def f` that proves it, or remove a law the card does not claim                        |
-| `an import ('import Base', ...)`            | the file does not open with its imports                | first line `import Base`, then `import ./file.bend as M`                                   |
+Failure text → cause → fix:
+
+- `a fresh name (duplicate declaration: X)` → Base or another import already declares `X` → rename it
+  to a domain name (`FeedEvent`, `AttemptFailed`).
+- `X (consumed more than once)` → a plain `x = v` or parameter is affine, one use only → bind it reusable
+  (`+x = v`, `+x: T`), type it `+D<A>`, or destructure once and reuse parts.
+- `a match on a parameter or field` → the matched name is a def or a bind already consumed → match the
+  value before its first other use, or bind it with `+`.
+- `a declared constructor (unknown: M.X)` → `X` is not in that type, or the module prefix is wrong → use
+  a constructor from the type's `type` block under its import alias.
+- `a filled definition (an unfilled law ...)` → a `law f` has no `def f` with the same name → add `def f`
+  that proves it, or remove a law the card does not claim.
+- `an import ('import Base', ...)` → the file does not open with its imports → first line `import Base`,
+  then `import ./file.bend as M`.
+- `cases for M.X` → a `match` leaves out constructor `X` (every missing one is listed) → add a case for
+  each; name every constructor rather than `case _:`, so a constructor added later fails here.
+- `N patterns (one per scrutinee)` → a case of `match a b:` has fewer patterns than values → give every
+  case one pattern per value, in order: `case S{…} Refresh{}:`.
 
 <!-- node:model-package-example path:references/model-package.example.json -->
 
@@ -3282,24 +3300,40 @@ stopped it), `not-run`, `undeclared`, `stale` or `invalid`. Only the first four 
 source `n/a` replaces only `not-run` and `undeclared`: an operator that ran, was cut short or is invalid
 keeps its status, and an AI operator's recorded runs are read whatever its disposition.
 
-| Operator                                                                                   | Layer         | Attacks                                                                                                                                                     | Finds                                                                                                                                                     |
-| ------------------------------------------------------------------------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `requirement-coverage`                                                                     | deterministic | sentences of an approved source that no requirement quotes                                                                                                  | `requirement-gap`                                                                                                                                         |
-| `space-cross-check`                                                                        | deterministic | the declared space against the Bend space: unmapped or unreached values, pairs split across the world and the behavior model, transitions only one side has | `new-axis`, `cross-term`, `silent-decision`, `assumption-risk`                                                                                            |
-| `observation-sufficiency`                                                                  | deterministic | two worlds alike on every coordinate and observation that a goal judges differently                                                                         | `observation-gap`                                                                                                                                         |
-| `goal-implication`                                                                         | deterministic | worlds every row allows that break a goal; flipped approved examples; open terms                                                                            | `weak-contract` and others                                                                                                                                |
-| `goal-witness`                                                                             | deterministic | a contract that forbids the normal path, or contradicts itself                                                                                              | `vacuous-contract`, `contradiction`                                                                                                                       |
-| `assumption-sensitivity`                                                                   | deterministic | "what if false" for each assumption: goals only it supports, worlds only it hides                                                                           | `assumption-risk`, `goal-gap-review`, `assumption-hides-goal`                                                                                             |
-| `temporal-order`                                                                           | deterministic | order obligations of the behavior model while the world declares `order-timing` n/a                                                                         | `new-axis`                                                                                                                                                |
-| `trace-extension`                                                                          | deterministic | behaviour patterns (event kind × kind of observation change) that exist only past the bound; sampled patterns count as covered                              | `range`                                                                                                                                                   |
-| `boundary-perturbation`                                                                    | deterministic | event field values 0 and one past the largest the space uses, where the environment forbids them                                                            | `unspecified-behavior`, `unhandled-event`                                                                                                                 |
-| `order-perturbation`                                                                       | deterministic | duplicated, swapped and early events the environment forbids                                                                                                | `unspecified-behavior`, `unhandled-event`                                                                                                                 |
-| `projection-residue`                                                                       | deterministic | product state that varies under one observation                                                                                                             | `hidden-state`                                                                                                                                            |
-| `world-model-gap`                                                                          | deterministic | product results the world calls impossible                                                                                                                  | `new-axis`                                                                                                                                                |
-| `mutation`                                                                                 | deterministic | the declared fault model F, each mutant run in a child process against every check                                                                          | `oracle-weakness`                                                                                                                                         |
-| `metamorphic`                                                                              | deterministic | `R(obs(t), obs(T(t)))` on every in-space pair, on the model and on the product                                                                              | `relation-invalid`                                                                                                                                        |
-| `dependency-failure`, `latency`, `environment-variation`, `malformed-input`, `concurrency` | declared      | families no generic tool can synthesize                                                                                                                     | `modeled: <axis>` is checked: the axis is an input (a world coordinate or an event) with at least two values; the claim itself is listed as residual risk |
-| `ai-explorer`, `cross-agent`                                                               | ai            | breaking the card; hidden assumptions and axes a domain expert adds                                                                                         | triaged candidates                                                                                                                                        |
+Operator (layer) → what it attacks → what it finds:
+
+- `requirement-coverage` (deterministic) → sentences of an approved source that no requirement quotes →
+  `requirement-gap`.
+- `space-cross-check` (deterministic) → the declared space against the Bend space: unmapped or unreached
+  values, pairs split across the world and the behavior model, transitions only one side has → `new-axis`,
+  `cross-term`, `silent-decision`, `assumption-risk`.
+- `observation-sufficiency` (deterministic) → two worlds alike on every coordinate and observation that a
+  goal judges differently → `observation-gap`.
+- `goal-implication` (deterministic) → worlds every row allows that break a goal; flipped approved
+  examples; open terms → `weak-contract` and others.
+- `goal-witness` (deterministic) → a contract that forbids the normal path, or contradicts itself →
+  `vacuous-contract`, `contradiction`.
+- `assumption-sensitivity` (deterministic) → "what if false" for each assumption: goals only it supports,
+  worlds only it hides → `assumption-risk`, `goal-gap-review`, `assumption-hides-goal`.
+- `temporal-order` (deterministic) → order obligations of the behavior model while the world declares
+  `order-timing` n/a → `new-axis`.
+- `trace-extension` (deterministic) → behaviour patterns (event kind × kind of observation change) that
+  exist only past the bound; sampled patterns count as covered → `range`.
+- `boundary-perturbation` (deterministic) → event field values 0 and one past the largest the space uses,
+  where the environment forbids them → `unspecified-behavior`, `unhandled-event`.
+- `order-perturbation` (deterministic) → duplicated, swapped and early events the environment forbids →
+  `unspecified-behavior`, `unhandled-event`.
+- `projection-residue` (deterministic) → product state that varies under one observation → `hidden-state`.
+- `world-model-gap` (deterministic) → product results the world calls impossible → `new-axis`.
+- `mutation` (deterministic) → the declared fault model F, each mutant run in a child process against
+  every check → `oracle-weakness`.
+- `metamorphic` (deterministic) → `R(obs(t), obs(T(t)))` on every in-space pair, on the model and on the
+  product → `relation-invalid`.
+- `dependency-failure`, `latency`, `environment-variation`, `malformed-input`, `concurrency` (declared) →
+  families no generic tool can synthesize → `modeled: <axis>` is checked: the axis is an input (a world
+  coordinate or an event) with at least two values; the claim itself is listed as residual risk.
+- `ai-explorer`, `cross-agent` (ai) → breaking the card; hidden assumptions and axes a domain expert adds →
+  triaged candidates.
 
 Perturbations use only events the environment excludes — inside the space the conformance run already
 judges them. A changed observation on such an event is behaviour the model says nothing about; it is a
@@ -3501,7 +3535,7 @@ whatever is already loaded.
    rows against source goals in Terms/Adequacy. `scripts/oracle-package.mjs` derives axes and projects the
    card, and `scripts/oracle-projection.mjs` generates fast-check conformance tests from that model.
    Consumer test generation/writes belong to the explicitly invoked $test role only after approval/lock,
-   not to this pre-lock authoring role.
+   not to this pre-lock authoring role; its temporary pre-lock sweep report is not a consumer test.
 
 The controller walks `scripts/oracle-stage.mjs`: begin before independent inputs, then advance --to MODELED | CHECKED | DRAFTED
 once each gate passes. Return actual artifacts and gate results for those transitions.
@@ -3525,6 +3559,9 @@ Keep every surviving Grill question as an Open question, candidate rows plus a r
 Add source-backed BVA, then sweep new × inherited × runtime interactions after drafting rows and before
 showing the Draft. Every needs-decision cell/frame cites an Open question. Resolve every needs-evidence
 cell by investigation in the same pass; only needs-decision reaches the user.
+Before showing the Draft, run `scripts/oracle-verify.mjs card --oracle <card> --draft`. It is the whole
+lint, except that what waits on the user's answer (confirmation, Visual QA authorization, needs-decision
+cells, sources awaiting approval) is listed as pending; fix every other issue before the user reads it.
 
 Before drafting, run `scripts/oracle-dimensions.mjs --path <touched files>` and
 `scripts/oracle-verify.mjs card --repo-policies`. Dimension candidates, side-effect inventory and sibling

@@ -21,7 +21,9 @@ execution roles: they keep the session's effort and their own model rules (subag
 2. Invoke $oracle-author for the source-bound model package, independent analyst inputs, checks and projected
    Draft with all manual duties. Walk the stages with `scripts/oracle-stage.mjs`: `begin`, then
    `advance --to MODELED | CHECKED | DRAFTED` once each gate passes. Read acceptance back.
-   A walk back is `rewind --to <stage> --reason <cause>` with the cause that sent it back.
+   A walk back is `rewind --to <stage> --reason <cause>` with the cause that sent it back. CHECKED passes
+   at once on a receipt when the same package, Bend files, registered sources, harness, node and Bend
+   passed it before; its evidence says so (`ORACLE_LINT_CACHE=off` turns receipts off).
    `oracle-lock.mjs create` refuses a package oracle that is not at DRAFTED on the same package bytes,
    and only the stage runtime writes stage.json. The lock still runs card lint itself, so a hand-written
    record skips no check. A role return does not advance a stage.
@@ -62,10 +64,12 @@ execution roles: they keep the session's effort and their own model rules (subag
    Never relock to pass a mismatch. A policy change is a new revision, never a locked-file edit.
 
 Before confirmation: no lock, no target tests, no production or dependency edits. Only named pre-lock
-checks run: prove, space, derive, adequacy check, `card --repo-policies`, cross-check, --case-space and
-frame dispositions. Model checks are not consumer tests or product VALID_RED.
-Design-only ends ORACLE_READY, NEEDS_DECISION or tool-failure FAIL, with no test or production writes
-and no consumer test execution. Tool preparation follows mandatory verification and target dependency rules.
+checks run: prove, space, derive, adequacy check, `card --draft`,
+`card --repo-policies`, cross-check, --case-space, frame dispositions and the author's temporary pre-lock
+sweep report ([bend-cross-verification](../bend-cross-verification.md)). Model checks and that report are
+not consumer tests or product VALID_RED.
+Design-only ends ORACLE_READY, NEEDS_DECISION or tool-failure FAIL, with no target-test or production
+writes and no consumer test execution. Tool preparation follows mandatory verification and target dependency rules.
 
 If Delivery was known from the start, defer the lock until architecture/backend source decisions are
 made. Conditional architecture-contract/backend reads belong to the deciding role. Design Intent never

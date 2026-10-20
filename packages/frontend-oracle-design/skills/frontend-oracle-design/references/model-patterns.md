@@ -374,11 +374,21 @@ Check with `scripts/oracle-model.mjs check --file <file>` (`bend <file> --check-
 `prove` print the matching fix below as `hint`. Read the failure's `Location:` line, apply the fix once,
 and rerun the same file. Do not rewrite the whole model to fix one reported line.
 
-| Failure text                                | Cause                                                  | Fix                                                                                        |
-| ------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| `a fresh name (duplicate declaration: X)`   | Base or another import already declares `X`            | rename to a domain name (`FeedEvent`, `AttemptFailed`)                                     |
-| `X (consumed more than once)`               | a plain `x = v` or parameter is affine: one use only   | bind it reusable (`+x = v`, `+x: T`), type it `+D<A>`, or destructure once and reuse parts |
-| `a match on a parameter or field`           | the matched name is a def or a bind already consumed   | match the value before its first other use, or bind it with `+`                            |
-| `a declared constructor (unknown: M.X)`     | `X` is not in that type, or the module prefix is wrong | use a constructor from the type's `type` block under its import alias                      |
-| `a filled definition (an unfilled law ...)` | a `law f` has no `def f` with the same name            | add `def f` that proves it, or remove a law the card does not claim                        |
-| `an import ('import Base', ...)`            | the file does not open with its imports                | first line `import Base`, then `import ./file.bend as M`                                   |
+Failure text → cause → fix:
+
+- `a fresh name (duplicate declaration: X)` → Base or another import already declares `X` → rename it
+  to a domain name (`FeedEvent`, `AttemptFailed`).
+- `X (consumed more than once)` → a plain `x = v` or parameter is affine, one use only → bind it reusable
+  (`+x = v`, `+x: T`), type it `+D<A>`, or destructure once and reuse parts.
+- `a match on a parameter or field` → the matched name is a def or a bind already consumed → match the
+  value before its first other use, or bind it with `+`.
+- `a declared constructor (unknown: M.X)` → `X` is not in that type, or the module prefix is wrong → use
+  a constructor from the type's `type` block under its import alias.
+- `a filled definition (an unfilled law ...)` → a `law f` has no `def f` with the same name → add `def f`
+  that proves it, or remove a law the card does not claim.
+- `an import ('import Base', ...)` → the file does not open with its imports → first line `import Base`,
+  then `import ./file.bend as M`.
+- `cases for M.X` → a `match` leaves out constructor `X` (every missing one is listed) → add a case for
+  each; name every constructor rather than `case _:`, so a constructor added later fails here.
+- `N patterns (one per scrutinee)` → a case of `match a b:` has fewer patterns than values → give every
+  case one pattern per value, in order: `case S{…} Refresh{}:`.
