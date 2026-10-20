@@ -3,6 +3,11 @@
 Controller-only procedure. Specialists load their own role procedures, not this whole sequence.
 The core entry owns scope and mode. Common prohibitions apply throughout. At each stage re-read disk.
 
+Start each Progress message (common's table) and every answer to a progress question with the one line
+from `oracle-stage.mjs status --dir <dir> --brief` before init or `oracle-run.mjs status --dir <dir> --brief`
+after it, then add the newly established fact and next action. Register each independent dispatch with
+`oracle-stage.mjs review-input --attempt <id>`, adding `--model` and `--effort` when known.
+
 ## Draft, review, confirmation and lock
 
 1. Invoke $oracle-intake for approved source investigation and risk/capability discovery, then send the
@@ -124,6 +129,8 @@ Supporting context never replaces common inputs, five-axis judgments or independ
 Low and Design-only retain mandatory verification; contextual artifacts remain conditional by mode.
 Dispatch $oracle-review in required fresh contexts, issue review-receipt only from actual returned evidence,
 and re-run stack/repo checks on the current snapshot after findings. No reviewer approves its own return.
+Run each reviewer's "reproduction not run" command once, as a job, on the final snapshot; a failure joins
+that reviewer's findings.
 
 With a model package, dispatch $oracle-author for conditional discovery closure after IMPLEMENTED_GREEN
 and again before final report, and at the anomaly/operator triggers in its entry. Verdict/residual risks

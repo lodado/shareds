@@ -29,6 +29,17 @@ export function sha256(value) {
   return createHash('sha256').update(value).digest('hex')
 }
 
+/** 지난 시간을 사람이 읽는 짧은 꼴로 — 45s, 12m, 2h05m. 시각이 없거나 읽을 수 없는 옛 기록은 null이다. */
+export function elapsedLabel(at, nowMs = Date.now()) {
+  const started = Date.parse(at ?? '')
+  if (!Number.isFinite(started)) return null
+  const seconds = Math.max(0, Math.round((nowMs - started) / 1000))
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m`
+  return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`
+}
+
 /** ORACLE_TIMING이 켜져 있으면 단계 시간을 stderr에 한 줄로 남긴다 — 느린 단계를 로그에서 바로 찾는다. */
 export function reportTiming(label, started) {
   if (process.env.ORACLE_TIMING) process.stderr.write(`TIMING ${label} ${Math.round(performance.now() - started)}ms\n`)

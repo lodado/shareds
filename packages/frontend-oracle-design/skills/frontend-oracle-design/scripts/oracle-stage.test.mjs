@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
@@ -521,4 +521,254 @@ test('reflect refuses a root without oracle runs and a bad bar instead of report
   assert.match(empty.stderr, /^REFLECT_NO_RUNS: /)
   assert.equal(reflect(root, '--root', root, '--min-runs', '0').status, 2)
   assert.equal(reflect(root, '--unknown', 'x').status, 2)
+})
+
+test('stage steps record when they happened and how long the gate took; status --brief reads them as one line', async (t) => {
+  const { root, directory } = await repository(t)
+  assert.equal(stage(root, directory, 'begin').status, 0)
+  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  const [begun, modeled] = (await readStage(directory)).history
+  for (const step of [begun, modeled]) assert.ok(Number.isFinite(Date.parse(step.at)), `${step.evidence} records an ISO time`)
+  assert.equal(begun.durationMs, undefined, 'begin runs no gate')
+  assert.equal(Number.isSafeInteger(modeled.durationMs) && modeled.durationMs >= 0, true, 'advance records its gate time in whole ms')
+
+  const input = join(root, 'sources.md')
+  await writeFile(input, 'approved sources\n')
+  const review = (...extra) => node(root, 'oracle-stage.mjs', ['review-input', '--dir', directory, '--kind', 'model-analyst', '--input', input, ...extra])
+  assert.equal(review('--attempt', 'analyst-1', '--model', 'claude-opus-5-5', '--effort', 'xhigh').status, 0)
+  assert.equal(review('--attempt', 'analyst-1').status, 0, 'a transport retry of the same dispatch')
+  assert.equal(review('--attempt', 'analyst-2', '--model', 'two\nlines').status, 2)
+  const { dispatches } = await readStage(directory)
+  assert.deepEqual(dispatches.map(({ at: _at, ...rest }) => rest), [{ kind: 'model-analyst', attempt: 'analyst-1', model: 'claude-opus-5-5', effort: 'xhigh' }],
+    'a retry keeps the first dispatch time and a refused one records nothing')
+
+  const brief = () => node(root, 'oracle-stage.mjs', ['status', '--dir', directory, '--brief'])
+  const line = brief()
+  assert.equal(line.status, 0, line.stderr)
+  assert.match(line.stdout, /^stage MODELED 2\/5 · \d+s in stage · authoring round 1\/2 · dispatched: model-analyst \d+s ago · next: CHECKED → DRAFTED → lock\n$/)
+  assert.equal(node(root, 'oracle-stage.mjs', ['advance', '--dir', directory, '--to', 'CHECKED', '--brief']).status, 2, '--brief belongs to status')
+
+  const packagePath = join(directory, 'oracle.package.json')
+  await writeFile(packagePath, `${await readFile(packagePath, 'utf8')}\n`)
+  assert.match(brief().stdout, / · STALE: the recorded bytes changed since this stage — rewind\n$/)
+})
+
+test('reflect --timing measures authoring and Delivery lead time from recorded times and lists untimed runs apart', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-reflect-timing-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const minute = (count) => new Date(Date.UTC(2026, 9, 21, 0, count)).toISOString()
+  const run = async (id, record, ledger) => {
+    const directory = join(root, '.ai', 'oracles', id)
+    await mkdir(directory, { recursive: true })
+    await writeFile(join(directory, 'stage.json'), JSON.stringify(record))
+    if (ledger) await writeFile(join(directory, 'runs.jsonl'), `${ledger.map((entry) => JSON.stringify(entry)).join('\n')}\n`)
+  }
+  await run('checkout', {
+    ...walk(
+      { stage: 'DISCOVERING', evidence: 'begin', at: minute(0) },
+      { stage: 'MODELED', evidence: 'package validate --stage model', at: minute(10), durationMs: 2000 },
+      { stage: 'CHECKED', evidence: 'derive', at: minute(30), durationMs: 60000 },
+      { stage: 'DISCOVERING', evidence: 'rewind', reason: 'review-finding', at: minute(40) },
+      { stage: 'MODELED', evidence: 'package validate --stage model', at: minute(45), durationMs: 1000 },
+      { stage: 'CHECKED', evidence: 'derive', at: minute(55), durationMs: 30000 },
+      { stage: 'DRAFTED', evidence: 'check-card', at: minute(60), durationMs: 5000 },
+      { stage: 'ORACLE_READY', evidence: 'lock', at: minute(70) },
+    ),
+    dispatches: [{ kind: 'cold-read', attempt: 'cold-1', at: minute(61) }, { kind: 'reverse-impossible', attempt: 'reverse-1', at: minute(61) }],
+  }, [
+    { type: 'init', state: 'ORACLE_READY', at: minute(72) },
+    { type: 'run', runId: 'r-001', label: 'red', commandMs: 30000, wrapperMs: 2000, at: minute(80) },
+    { type: 'transition', state: 'VALID_RED', at: minute(81) },
+    { type: 'run', runId: 'r-002', label: 'green', commandMs: 90000, wrapperMs: 3000, at: minute(100) },
+    { type: 'run', runId: 'r-003', label: 'green', commandMs: 60000, wrapperMs: 3000, at: minute(102) },
+    { type: 'transition', state: 'IMPLEMENTED_GREEN', at: minute(103) },
+    { type: 'review-round', at: minute(104) },
+    { type: 'transition', state: 'REVIEW_VERIFIED', at: minute(130) },
+  ])
+  await run('legacy', walk({ stage: 'DISCOVERING', evidence: 'begin' }, { stage: 'MODELED', evidence: 'package validate --stage model' }))
+
+  const result = reflect(root, '--root', root, '--timing')
+  assert.equal(result.status, 0, result.stderr)
+  const report = JSON.parse(result.stdout)
+  assert.deepEqual(report.untimed, ['legacy'], 'a record from before timestamps is listed, never guessed')
+  const [checkout] = report.runs
+  assert.equal(checkout.run, 'checkout')
+  assert.equal(checkout.authoring.ms, 70 * 60_000)
+  assert.deepEqual(checkout.authoring.stages, {
+    DISCOVERING: { visits: 2, ms: 15 * 60_000, gateMs: 0 },
+    MODELED: { visits: 2, ms: 30 * 60_000, gateMs: 3000 },
+    CHECKED: { visits: 2, ms: 15 * 60_000, gateMs: 90000 },
+    DRAFTED: { visits: 1, ms: 10 * 60_000, gateMs: 5000 },
+    ORACLE_READY: { visits: 1, ms: 0, gateMs: 0 },
+  })
+  assert.equal(checkout.authoring.partial, false)
+  assert.deepEqual(checkout.authoring.rewinds, [
+    { left: 'CHECKED', furthest: 'CHECKED', to: 'DISCOVERING', reason: 'review-finding', at: minute(40), regainMs: 15 * 60_000 },
+  ], 'regain runs from the walk back to the first return to the furthest stage reached before it')
+  assert.deepEqual(checkout.delivery.states.map(({ state, ms }) => [state, ms]), [
+    ['ORACLE_READY', 9 * 60_000], ['VALID_RED', 22 * 60_000], ['IMPLEMENTED_GREEN', 27 * 60_000], ['REVIEW_VERIFIED', null],
+  ])
+  assert.equal(checkout.delivery.ms, 58 * 60_000)
+  assert.deepEqual(checkout.delivery.runsByLabel, { red: { runs: 1, commandMs: 30000 }, green: { runs: 2, commandMs: 150000 } })
+  assert.equal(checkout.delivery.reviewRounds, 1)
+  assert.deepEqual(checkout.dispatches, { 'cold-read': 1, 'reverse-impossible': 1 })
+  assert.deepEqual(report.totals, {
+    authoringMs: 70 * 60_000, partialRuns: [], regainMs: 15 * 60_000, rewinds: 1, deliveryMs: 58 * 60_000, commandMs: 180000, dispatches: 2,
+  })
+})
+
+test('reflect --timing counts overlapping walk-backs once and keeps partly timed histories out of the totals', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-reflect-overlap-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const minute = (count) => new Date(Date.UTC(2026, 9, 21, 0, count)).toISOString()
+  const run = async (id, record) => {
+    const directory = join(root, '.ai', 'oracles', id)
+    await mkdir(directory, { recursive: true })
+    await writeFile(join(directory, 'stage.json'), JSON.stringify(record))
+  }
+  // a second walk-back while still recovering from the first: 40→65 and 50→65 share one 25-minute span
+  await run('overlap', walk(
+    { stage: 'DISCOVERING', evidence: 'begin', at: minute(0) },
+    { stage: 'MODELED', evidence: 'package validate --stage model', at: minute(10) },
+    { stage: 'CHECKED', evidence: 'derive', at: minute(30) },
+    { stage: 'DISCOVERING', evidence: 'rewind', reason: 'gate-failure', at: minute(40) },
+    { stage: 'MODELED', evidence: 'package validate --stage model', at: minute(45) },
+    { stage: 'DISCOVERING', evidence: 'rewind', reason: 'review-finding', at: minute(50) },
+    { stage: 'MODELED', evidence: 'package validate --stage model', at: minute(55) },
+    { stage: 'CHECKED', evidence: 'derive', at: minute(65) },
+  ))
+  // upgraded mid-run: the untimed start still decides how far the run had come before the first timed walk-back
+  await run('upgraded', walk(
+    { stage: 'DISCOVERING', evidence: 'begin' },
+    { stage: 'MODELED', evidence: 'package validate --stage model' },
+    { stage: 'CHECKED', evidence: 'derive' },
+    { stage: 'DISCOVERING', evidence: 'rewind', reason: 'user-answer', at: minute(100) },
+    { stage: 'MODELED', evidence: 'package validate --stage model', at: minute(105) },
+    { stage: 'CHECKED', evidence: 'derive', at: minute(120) },
+    { stage: 'DRAFTED', evidence: 'check-card', at: minute(125) },
+    { stage: 'ORACLE_READY', evidence: 'lock', at: minute(130) },
+  ))
+
+  const report = JSON.parse(reflect(root, '--root', root, '--timing').stdout)
+  const overlap = report.runs.find((entry) => entry.run === 'overlap').authoring
+  assert.deepEqual(overlap.rewinds.map(({ furthest, regainMs }) => [furthest, regainMs]), [['CHECKED', 25 * 60_000], ['CHECKED', 15 * 60_000]])
+  assert.equal(overlap.regainMs, 25 * 60_000, 'the overlapping recovery is one span of wall time')
+
+  const upgraded = report.runs.find((entry) => entry.run === 'upgraded').authoring
+  assert.equal(upgraded.partial, true)
+  assert.equal(upgraded.ms, null, 'the start is unknown, so the authoring time is not invented')
+  assert.equal(upgraded.startedAt, null)
+  assert.deepEqual(upgraded.rewinds.map(({ left, furthest, regainMs }) => [left, furthest, regainMs]), [['CHECKED', 'CHECKED', 20 * 60_000]])
+  assert.deepEqual(report.totals.partialRuns, ['upgraded'])
+  assert.equal(report.totals.authoringMs, 0)
+  assert.equal(report.totals.regainMs, 45 * 60_000)
+})
+
+const job = (env, ...args) =>
+  spawnSync(process.execPath, [join(SCRIPTS, 'oracle-job.mjs'), ...args], { encoding: 'utf8', env: { ...CHILD_ENV, ...env }, cwd: env.CWD })
+const jobId = (started) => started.stdout.match(/^JOB_STARTED (j-\S+) · /)?.[1]
+/** 테스트가 풀어 줄 때까지 붙잡혀 있는 명령 — 시간 대신 장벽 파일이 끝을 정한다. */
+const heldCommand = (barrier, release, code) => `const fs = require('fs'); console.log('held')
+const go = () => { if (fs.existsSync(${JSON.stringify(release)})) process.exit(${code}) }
+go(); fs.watch(${JSON.stringify(barrier)}, go)`
+const jobDirectory = async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'oracle-jobs-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  return directory
+}
+
+test('a long command runs as a job: wait blocks up to its limit, then hands back the log tail and the command\'s own exit code', async (t) => {
+  const env = { ORACLE_JOB_DIR: await jobDirectory(t) }
+  // the job holds until the test releases a barrier file — the first wait's limit, not a guessed delay, ends it while still running
+  const barrier = await jobDirectory(t)
+  const release = join(barrier, 'release')
+  const held = `const fs = require('fs'); console.log('first')
+const go = () => { if (fs.existsSync(${JSON.stringify(release)})) { console.log('last'); process.exit(3) } }
+go(); fs.watch(${JSON.stringify(barrier)}, go)`
+  const started = job(env, 'start', '--name', 'slow-suite', '--', process.execPath, '-e', held)
+  assert.equal(started.status, 0, started.stderr)
+  const id = started.stdout.match(/^JOB_STARTED (j-\S+) · /)?.[1]
+  assert.match(id ?? '', /^j-\d{8}t\d{6}-[0-9a-f]{6}$/)
+
+  const early = job(env, 'wait', '--job', id, '--max-seconds', '1')
+  assert.equal(early.status, 75)
+  assert.match(early.stdout, new RegExp(`^JOB_RUNNING ${id} after \\d+s · log .* — run oracle-job\\.mjs wait --job ${id} again\\n$`))
+
+  await writeFile(release, '')
+  const done = job(env, 'wait', '--job', id, '--max-seconds', '30')
+  assert.equal(done.status, 3, 'wait exits with the command\'s own exit code')
+  assert.match(done.stdout, new RegExp(`^first\\nlast\\nJOB_DONE ${id} exit:3 after \\d+s · full log `))
+  const record = JSON.parse(job(env, 'status', '--job', id).stdout)
+  assert.deepEqual([record.state, record.exitCode, record.name], ['done', 3, 'slow-suite'])
+})
+
+test('a single job argument is one shell line; bad ids, limits past the host cap and a shared job directory are refused', async (t) => {
+  const directory = await jobDirectory(t)
+  const env = { ORACLE_JOB_DIR: directory }
+  const started = job(env, 'start', '--', 'echo hello && exit 4')
+  assert.equal(started.status, 0, started.stderr)
+  const id = started.stdout.match(/^JOB_STARTED (j-\S+) · /)?.[1]
+  const done = job(env, 'wait', '--job', id, '--max-seconds', '30')
+  assert.equal(done.status, 4)
+  assert.match(done.stdout, /^hello\nJOB_DONE /)
+
+  assert.equal(job(env, 'wait', '--job', 'nope').status, 2)
+  const unknown = job(env, 'wait', '--job', 'j-20260101t000000-abcdef')
+  assert.equal(unknown.status, 1)
+  assert.match(unknown.stderr, /^JOB_UNKNOWN: /)
+  assert.equal(job(env, 'wait', '--job', id, '--max-seconds', '600').status, 2, 'a wait past a 10-minute host limit would lose its own result')
+  assert.equal(job(env, 'start').status, 2, 'start needs a command after --')
+
+  await chmod(directory, 0o777)
+  const shared = job(env, 'start', '--', 'true')
+  assert.equal(shared.status, 1)
+  assert.match(shared.stderr, /^JOB_DIR_UNSAFE: /)
+})
+
+test('a job that cannot spawn or exits at once still records its exit, and a command\'s own 75 never reads as still running', async (t) => {
+  const env = { ORACLE_JOB_DIR: await jobDirectory(t) }
+  const missing = job(env, 'start', '--', 'no-such-command-oracle-job', 'x')
+  assert.equal(missing.status, 0, missing.stderr)
+  const failed = job(env, 'wait', '--job', jobId(missing), '--max-seconds', '30')
+  assert.equal(failed.status, 127)
+  assert.match(failed.stdout, /JOB_DONE j-\S+ exit:127 \(spawn failed: [^)]+\) after \d+s/)
+
+  // many quick jobs at once: each exit is recorded even when the command ends before the supervisor writes its pid
+  const quick = Array.from({ length: 8 }, (_, index) => [index, jobId(job(env, 'start', '--', `exit ${index + 2}`))])
+  for (const [index, id] of quick) assert.equal(job(env, 'wait', '--job', id, '--max-seconds', '30').status, index + 2)
+
+  const ambiguous = job(env, 'wait', '--job', jobId(job(env, 'start', '--', 'exit 75')), '--max-seconds', '30')
+  assert.equal(ambiguous.status, 1)
+  assert.match(ambiguous.stdout, /JOB_DONE j-\S+ exit:75 \(reported as 1: 75 means still running\)/)
+
+  const nowhere = job(env, 'start', '--cwd', join(env.ORACLE_JOB_DIR, 'missing'), '--', 'true')
+  assert.equal(nowhere.status, 2)
+  assert.doesNotMatch(nowhere.stdout, /JOB_STARTED/)
+})
+
+test('a stuck job stops at its time limit or on cancel, and a relative job directory still finds its records', async (t) => {
+  const env = { ORACLE_JOB_DIR: await jobDirectory(t) }
+  const barrier = await jobDirectory(t)
+  const release = join(barrier, 'never')
+
+  const limited = job(env, 'start', '--timeout-seconds', '1', '--', process.execPath, '-e', heldCommand(barrier, release, 0))
+  const stopped = job(env, 'wait', '--job', jobId(limited), '--max-seconds', '60')
+  assert.equal(stopped.status, 1)
+  assert.match(stopped.stdout, /^held\nJOB_DONE j-\S+ exit:signal SIGTERM \(timed out after 1s\)/)
+
+  const stuck = job(env, 'start', '--', process.execPath, '-e', heldCommand(barrier, release, 0))
+  assert.equal(job(env, 'wait', '--job', jobId(stuck), '--max-seconds', '1').status, 75)
+  const cancelled = job(env, 'cancel', '--job', jobId(stuck))
+  assert.equal(cancelled.status, 0, cancelled.stderr)
+  assert.match(cancelled.stdout, /^JOB_CANCELLED j-\S+\n$/)
+  assert.match(job(env, 'wait', '--job', jobId(stuck), '--max-seconds', '30').stdout, /JOB_DONE j-\S+ exit:signal SIGTERM/)
+
+  const base = await jobDirectory(t)
+  const elsewhere = await jobDirectory(t)
+  const relative = { ORACLE_JOB_DIR: 'jobs-relative', CWD: base }
+  const started = job(relative, 'start', '--cwd', elsewhere, '--', 'exit 6')
+  assert.equal(started.status, 0, started.stderr)
+  assert.equal(job(relative, 'wait', '--job', jobId(started), '--max-seconds', '30').status, 6)
+  // the start resolved the relative directory against its own cwd (realpath: macOS /var is /private/var)
+  assert.equal(JSON.parse(job(relative, 'status', '--job', jobId(started)).stdout).log, join(await realpath(base), 'jobs-relative', `${jobId(started)}.log`))
 })

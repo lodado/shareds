@@ -12,7 +12,7 @@ import { mkdir, readFile, realpath, rename, writeFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { sha256, withDirectoryLock } from './oracle-fs.mjs'
+import { elapsedLabel, sha256, withDirectoryLock } from './oracle-fs.mjs'
 import { assertIterationAvailable, extendIterations, iterationBudget, iterationStatus, observeIteration } from './oracle-iterations.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import { isEmptyCell, markdownLines, sectionLines } from './oracle-space.mjs'
@@ -29,6 +29,12 @@ const REVIEW_KINDS = new Set(['model-analyst', 'translation', 'cold-read', 'reve
 // 되돌린 이유 — oracle-reflect.mjs가 run을 가로질러 같은 원인을 센다. 자유 서술은 note 한 줄로만 붙는다.
 export const REWIND_REASONS = Object.freeze(['review-finding', 'gate-failure', 'user-answer', 'source-change'])
 const NOTE_LIMIT = 200
+// 독립 디스패치 기록은 최근 것만 둔다 — 시간 보고(oracle-reflect --timing)와 진행 한 줄(status --brief)이 읽는다
+const DISPATCH_LIMIT = 100
+const DETAIL_LIMIT = 80
+
+// 단계 기록의 시각 — 판정에는 쓰지 않고, 단계별 리드타임과 진행 한 줄만 이것으로 계산한다
+const now = () => new Date().toISOString() // oracle:nondeterminism 기록은 실제 시각을 남긴다
 
 class StageError extends Error {
   constructor(code, message, exitCode = 1) {
@@ -80,14 +86,14 @@ async function bindingAt(directory, record, requestedProfile) {
   return resolveProfileBinding({ requestedProfile, bindings })
 }
 
-function moved(record, stage, digest, evidence) {
+function moved(record, stage, digest, evidence, timing = {}) {
   const iterations = record.iterations
   return {
     ...record,
     stage,
     ...(record.verificationProfile === 'contract/v1' ? { cardSha256: digest } : { packageSha256: digest }),
     iterations: { ...iterations, inputs: { ...iterations.inputs, stage: { digest: digest ?? sha256(evidence), round: iterations.round } } },
-    history: [...record.history, { stage, ...(record.verificationProfile === 'contract/v1' ? { cardSha256: digest } : { packageSha256: digest }), evidence, iterationRound: iterations.round }],
+    history: [...record.history, { stage, ...(record.verificationProfile === 'contract/v1' ? { cardSha256: digest } : { packageSha256: digest }), evidence, iterationRound: iterations.round, at: now(), ...timing }],
   }
 }
 
@@ -191,13 +197,13 @@ async function begin(directory, requestedProfile) {
   const binding = await bindingAt(directory, null, requestedProfile)
   if (binding.profile !== 'contract/v1' && !(await packageBytes(directory))) throw new StageError('STAGE_NO_PACKAGE', `${PACKAGE_FILE} is not in ${directory}`)
   if (await readStage(directory)) throw new StageError('STAGE_EXISTS', `${STAGE_FILE} already exists — use rewind to revisit a stage`)
-  const record = { schemaVersion: 1, stage: 'DISCOVERING', packageSha256: null, iterations: iterationBudget(), history: [{ stage: 'DISCOVERING', packageSha256: null, evidence: 'begin' }] }
+  const record = { schemaVersion: 1, stage: 'DISCOVERING', packageSha256: null, iterations: iterationBudget(), history: [{ stage: 'DISCOVERING', packageSha256: null, evidence: 'begin', at: now() }] }
   if (binding.kind === 'explicit') {
     record.verificationProfile = binding.profile
     if (binding.profile === 'contract/v1') {
       delete record.packageSha256
       record.cardSha256 = null
-      record.history = [{ stage: 'DISCOVERING', cardSha256: null, evidence: 'begin' }]
+      record.history = [{ stage: 'DISCOVERING', cardSha256: null, evidence: 'begin', at: record.history[0].at }]
     }
   }
   await mkdir(directory, { recursive: true })
@@ -220,9 +226,10 @@ async function advance(directory, target, options) {
   const digest = contract ? record.cardSha256 : record.packageSha256
   if (digest && digest !== sha256(bytes))
     throw new StageError('STAGE_STALE', contract ? 'whole approved card changed after CHECKED - rewind --to <stage> --reason <cause>, then advance again' : `${PACKAGE_FILE} changed after ${record.stage} — rewind --to <stage> --reason <cause>, then advance again`)
+  const started = performance.now()
   const evidence = await gate(directory, target, { ...options, profile: binding.profile })
   if (contract && sha256(await cardBytes(directory)) !== sha256(bytes)) throw new StageError('STAGE_STALE', 'whole Contract card changed during gate')
-  const result = moved(record, target, sha256(bytes), evidence)
+  const result = moved(record, target, sha256(bytes), evidence, { durationMs: Math.round(performance.now() - started) })
   await writeStage(directory, result)
   return result
 }
@@ -266,16 +273,31 @@ async function rewind(directory, target, explanation) {
   return result
 }
 
+/** 디스패치에 붙이는 모델·effort는 선택이다 — 한 줄짜리 짧은 이름만 받는다. */
+function dispatchDetails({ model, effort } = {}) {
+  const details = {}
+  for (const [name, value] of Object.entries({ model, effort })) {
+    if (value === undefined) continue
+    if (!value.trim() || /[\r\n]/.test(value) || value.length > DETAIL_LIMIT) throw new StageError('USAGE', `--${name} is one non-empty line of at most ${DETAIL_LIMIT} characters`, 2)
+    details[name] = value.trim()
+  }
+  return details
+}
+
 /** Pure review-input builders stay pure; public dispatch commands register their final bytes here. */
-export async function recordAuthoringInput(directory, kind, text, attempt) {
+export async function recordAuthoringInput(directory, kind, text, attempt, details = {}) {
   if (!REVIEW_KINDS.has(kind)) throw new StageError('USAGE', `unknown review kind: ${kind}`, 2)
   if (attempt !== undefined && !attempt.trim()) throw new StageError('USAGE', '--attempt must name one dispatch', 2)
+  const described = dispatchDetails(details)
   return withDirectoryLock(directory, 'stage', async () => {
     const record = await readStage(directory) ?? await begin(directory)
     if (record.stage === 'ORACLE_READY') throw new StageError('STAGE_LOCKED', 'authoring review cannot reopen a locked revision')
     let iterations = observeIteration(record.iterations, kind, sha256(text))
     if (attempt !== undefined) iterations = observeIteration(iterations, `${kind}:dispatch`, sha256(attempt))
-    if (iterations !== record.iterations) await writeStage(directory, { ...record, iterations })
+    // 같은 디스패치의 재전송은 시각을 다시 찍지 않는다 — 처음 보낸 시각이 그 리뷰의 시작이다
+    const seen = attempt === undefined || (record.dispatches ?? []).some((entry) => entry.kind === kind && entry.attempt === attempt)
+    const dispatches = seen ? record.dispatches : [...(record.dispatches ?? []), { kind, attempt, at: now(), ...described }].slice(-DISPATCH_LIMIT)
+    if (iterations !== record.iterations || dispatches !== record.dispatches) await writeStage(directory, { ...record, iterations, ...(dispatches ? { dispatches } : {}) })
     const result = iterationStatus(iterations)
     if (!record.iterations.inputs[kind]) result.mode = 'full'
     return result
@@ -293,23 +315,62 @@ async function extend(directory, path) {
   return result
 }
 
+/** 기록한 바이트와 지금 바이트가 다르면 그 단계 기록은 낡았다(Contract는 카드, Formal은 패키지). */
+async function isStale(directory, record, binding) {
+  const contract = binding.profile === 'contract/v1'
+  const bytes = contract ? await cardBytes(directory) : await packageBytes(directory)
+  const digest = contract ? record.cardSha256 : record.packageSha256
+  return Boolean(digest) && (!bytes || digest !== sha256(bytes))
+}
+
 async function status(directory) {
   const record = await readStage(directory)
   if (!record) return { stage: null }
   const binding = await bindingAt(directory, record)
-  const contract = binding.profile === 'contract/v1'
-  const bytes = contract ? await cardBytes(directory) : await packageBytes(directory)
-  const digest = contract ? record.cardSha256 : record.packageSha256
-  return { stage: record.stage, ...(binding.kind === 'explicit' ? { verificationProfile: binding.profile } : {}), stale: Boolean(digest) && (!bytes || digest !== sha256(bytes)), iterations: iterationStatus(record.iterations), history: record.history }
+  return { stage: record.stage, ...(binding.kind === 'explicit' ? { verificationProfile: binding.profile } : {}), stale: await isStale(directory, record, binding), iterations: iterationStatus(record.iterations), history: record.history }
 }
+
+/**
+ * 진행 한 줄 — 사용자가 "언제 끝남"을 묻기 전에 컨트롤러가 찍는다: 지금 단계와 자리, 그 단계에 머문 시간, 저작 예산,
+ * 이 단계에서 보낸 독립 디스패치와 경과, 남은 단계. 판정을 대신하지 않는다 — 관문은 advance·lock이 연다.
+ */
+async function briefStatus(directory, nowMs = Date.now()) {
+  const record = await readStage(directory)
+  if (!record) return 'stage none · next: oracle-stage.mjs begin'
+  const binding = await bindingAt(directory, record)
+  const stages = AUTHORING_STAGES[binding.profile] ?? STAGES
+  const position = stages.indexOf(record.stage)
+  const entered = record.history.at(-1)?.at
+  const iterations = iterationStatus(record.iterations)
+  const dispatched = (record.dispatches ?? [])
+    .filter((entry) => !entered || Date.parse(entry.at) >= Date.parse(entered))
+    .map((entry) => `${entry.kind} ${elapsedLabel(entry.at, nowMs)} ago`)
+  const remaining = stages.slice(position + 1).map((stage) => (stage === 'ORACLE_READY' ? 'lock' : stage))
+  const place = [`stage ${record.stage}`, `${position + 1}/${stages.length}`, binding.profile].filter(Boolean).join(' ')
+  return [
+    place,
+    entered ? `${elapsedLabel(entered, nowMs)} in stage` : null,
+    `authoring round ${iterations.round}/${iterations.limit}${iterations.exhausted ? ' exhausted' : ''}`,
+    dispatched.length ? `dispatched: ${dispatched.join(', ')}` : null,
+    remaining.length ? `next: ${remaining.join(' → ')}` : 'next: oracle-run.mjs init',
+    (await isStale(directory, record, binding)) ? 'STALE: the recorded bytes changed since this stage — rewind' : null,
+  ].filter(Boolean).join(' · ')
+}
+
+const FLAGS = new Set(['brief'])
+const VALUED = ['dir', 'to', 'timeout-ms', 'profile', 'kind', 'input', 'approval', 'attempt', 'reason', 'note', 'model', 'effort']
 
 function parse(args) {
   const options = {}
-  for (let index = 0; index < args.length; index += 2) {
+  for (let index = 0; index < args.length; index += 1) {
     const name = args[index]?.replace(/^--/, '')
-    if (!['dir', 'to', 'timeout-ms', 'profile', 'kind', 'input', 'approval', 'attempt', 'reason', 'note'].includes(name) || args[index + 1] === undefined)
-      throw new StageError('USAGE', `Unknown or incomplete option: ${args[index]}`, 2)
+    if (FLAGS.has(name)) {
+      options[name] = true
+      continue
+    }
+    if (!VALUED.includes(name) || args[index + 1] === undefined) throw new StageError('USAGE', `Unknown or incomplete option: ${args[index]}`, 2)
     options[name] = args[index + 1]
+    index += 1
   }
   return options
 }
@@ -318,9 +379,9 @@ const USAGE = `usage:
   oracle-stage.mjs begin --dir <.ai/oracles/<id>>
   oracle-stage.mjs advance --dir <dir> --to MODELED|CHECKED|DRAFTED [--timeout-ms <n>]
   oracle-stage.mjs rewind --dir <dir> --to DISCOVERING|MODELED|CHECKED|DRAFTED --reason ${REWIND_REASONS.join('|')} [--note <one line>]
-  oracle-stage.mjs review-input --dir <dir> --kind <review-kind> --input <raw-input> --attempt <dispatch-id>
+  oracle-stage.mjs review-input --dir <dir> --kind <review-kind> --input <raw-input> --attempt <dispatch-id> [--model <id>] [--effort <level>]
   oracle-stage.mjs extend --dir <dir> --approval <explicit-user-approval.json>
-  oracle-stage.mjs status --dir <dir>`
+  oracle-stage.mjs status --dir <dir> [--brief]`
 
 async function main() {
   const [command, ...args] = process.argv.slice(2)
@@ -329,13 +390,14 @@ async function main() {
   // cwd는 realpath로 보고된다(macOS /var → /private/var) — 같은 표기로 저장소 루트 기준 상대 경로를 만든다
   const directory = await realpath(resolve(options.dir)).catch(() => resolve(options.dir))
   const timeoutMs = options['timeout-ms'] ? Number(options['timeout-ms']) : undefined
+  if (options.brief && command !== 'status') throw new StageError('USAGE', '--brief belongs to status', 2)
   if (command === 'status') {
-    process.stdout.write(`${JSON.stringify(await status(directory))}\n`)
+    process.stdout.write(options.brief ? `${await briefStatus(directory)}\n` : `${JSON.stringify(await status(directory))}\n`)
     return
   }
   if (command === 'review-input') {
     if (!options.input) throw new StageError('USAGE', 'review-input requires --input', 2)
-    const iterations = await recordAuthoringInput(directory, options.kind, await readFile(resolve(options.input), 'utf8'), options.attempt)
+    const iterations = await recordAuthoringInput(directory, options.kind, await readFile(resolve(options.input), 'utf8'), options.attempt, { model: options.model, effort: options.effort })
     process.stdout.write(`${JSON.stringify({ iterations })}\n`)
     return
   }

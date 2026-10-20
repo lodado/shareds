@@ -3175,6 +3175,26 @@ test('status without --json prints compact advisory state and every next action'
   assert.equal(await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8'), beforeLedger)
 })
 
+test('status --brief is one read-only progress line: state, time in it, last run, budgets, next states, blockers', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { risk: 'high' })
+  const ready = run(['status', '--dir', oracleDirectory, '--brief'])
+  assert.equal(ready.status, 0, ready.stderr)
+  assert.match(
+    ready.stdout,
+    /^run \S+ · state ORACLE_READY · \d+s in state · budgets policy 0\/2 harness 0\/2 product 0\/3 · next: VALID_RED \| IMPLEMENTED_GREEN \| NEEDS_DECISION \| FAIL · blockers: none\n$/,
+  )
+
+  await reachValidRed(oracleDirectory, root)
+  const beforeState = await readFile(join(oracleDirectory, 'run-state.json'), 'utf8')
+  const beforeLedger = await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8')
+  const red = run(['status', '--dir', oracleDirectory, '--brief'])
+  assert.equal(red.status, 0, red.stderr)
+  assert.match(red.stdout, /^run \S+ · state VALID_RED · \d+s in state · last run r-\d{3} \S+ exit 1 \(\d+s\) \d+s ago · /)
+  assert.equal(red.stdout.split('\n').length, 2, 'one line, not the multi-line action list')
+  assert.equal(await readFile(join(oracleDirectory, 'run-state.json'), 'utf8'), beforeState)
+  assert.equal(await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8'), beforeLedger)
+})
+
 test('status source errors remain read-only without changing rejection codes', async (t) => {
   const { oracleDirectory } = await workspace(t)
   const stateFile = join(oracleDirectory, 'run-state.json')

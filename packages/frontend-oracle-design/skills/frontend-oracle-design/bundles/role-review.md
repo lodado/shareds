@@ -503,6 +503,16 @@ Card-only cold-read, reverse-impossible, source-aware and Delivery reviews keep 
 High requires its existing independent hardening and review obligations. Never claim independence from
 a same-context role switch. Record scope, holds, pending observations and honest verification limits.
 
+A command that can outlive the host's command limit (`oracle-run.mjs exec` or `red`, `emit-trace`,
+`oracle-model.mjs space`, `cross-check`, a full suite) runs as a job: `scripts/oracle-job.mjs start -- <command>`,
+then `oracle-job.mjs wait --job <id>`. Wait prints `JOB_DONE` with the command's own exit code and log
+tail, or `JOB_RUNNING` (exit 75) when its limit passes first; call wait again. The default wait (110 s)
+fits Claude Code's default Bash limit; for longer waits give the call `timeout: 600000` and pass
+`--max-seconds 540`. A stuck job stops at `--timeout-seconds` (default 3600) or with
+`oracle-job.mjs cancel --job <id>`. The job log is the tool's output channel in its private temp
+directory; never copy it into the run directory. Never hand-roll `until`/`sleep` loops, poll output
+files or coordinate parallel workers through mailbox files; the controller relays.
+
 <!-- node:mandatory-verification path:references/mandatory-verification.md -->
 
 # Mandatory verification stack — Bend · type-fest · TypeScript · fast-check
@@ -717,6 +727,10 @@ applicable real proof, type-fest consumer/static witnesses/checker environment, 
 or finite-world correspondence, with actual reported evidence, source mapping and freshness. A label or
 successful file generation is insufficient. Read [`adequacy.md`](../adequacy.md) for Terms/Adequacy cards.
 Verify required High consecutive GREEN, mutation kill/revert/re-GREEN and post-review reruns from evidence.
+Judge from the packet's recorded runs. A reviewer reproduction is the narrowest command for the disputed
+row (one test file or a name filter) and stays under two minutes; never copy the test config or rerun the
+whole suite. A reproduction that would take longer is reported as "reproduction not run" with its exact
+command, never as EVIDENCE_GAP; the controller runs it once on the final snapshot.
 Low follows the mandatory verification stack, not a standalone test exemption. Design-only has no
 Delivery contextual artifact obligation or implied product test execution.
 

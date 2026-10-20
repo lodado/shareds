@@ -34,6 +34,7 @@ import { deliveryGuidance, renderGuidance } from './oracle-delivery-guidance.mjs
 import { generateFromDocument, parseCaseSpace } from './oracle-frames.mjs'
 import {
   assertSnapshotUnchanged,
+  elapsedLabel,
   FAILURE_CAUSES,
   sha256 as fsSha256,
   HOST_RECEIPTS_FILE,
@@ -121,7 +122,7 @@ const FLAG_NAMES = [
   'approval',
 ]
 
-const BOOLEAN_FLAGS = new Set(['json', 'changed-files'])
+const BOOLEAN_FLAGS = new Set(['json', 'changed-files', 'brief'])
 
 const REQUIRED_CONSECUTIVE_PASSES = { low: 1, medium: 2, high: 3 }
 
@@ -4484,6 +4485,38 @@ async function collectStatus(directory, state, ledger) {
   }
 }
 
+/** 신호로 끝난 실행은 종료 코드가 없다 — 그때는 신호를 보인다. */
+function exitLabel(run) {
+  if (run.exitCode === null || run.exitCode === undefined) return `signal ${run.signal ?? 'unknown'}`
+  return String(run.exitCode)
+}
+
+/**
+ * 진행 한 줄 — 컨트롤러가 단계를 넘을 때와 사용자가 진행을 물을 때 찍는다: 상태와 그 상태에 머문 시간, 마지막 실행, 리뷰 라운드,
+ * 남은 예산, 다음에 갈 수 있는 상태, 막힌 이유. 판정은 바꾸지 않는다 — transition이 연다.
+ */
+function briefStatusLine(directory, state, ledger, statusResult) {
+  // 옛 원장의 실행 기록에는 type이 없다 — collectStatus와 같은 판정으로 실행을 고른다
+  const runs = ledger.filter((entry) => (entry.type ?? 'run') === 'run')
+  const last = runs.at(-1)
+  const entered = state.history?.at(-1)?.at
+  const budgets = Object.entries(statusResult.remainingBudgets).map(([name, budget]) => `${name} ${budget.spent}/${budget.limit}`)
+  const rounds = ledger.filter((entry) => entry.type === 'review-round').length
+  const lastRun = last
+    ? [`last run ${last.runId}`, last.label, `exit ${exitLabel(last)} (${Math.round((last.commandMs ?? 0) / 1000)}s)`, last.at ? `${elapsedLabel(last.at)} ago` : null].filter(Boolean).join(' ')
+    : null
+  return [
+    `run ${basename(directory)}`,
+    `state ${statusResult.currentState}`,
+    entered ? `${elapsedLabel(entered)} in state` : null,
+    lastRun,
+    rounds ? `review rounds ${rounds}` : null,
+    budgets.length ? `budgets ${budgets.join(' ')}` : null,
+    `next: ${statusResult.nextLegalActions.join(' | ') || 'none'}`,
+    `blockers: ${statusResult.blockers.join(', ') || 'none'}`,
+  ].filter(Boolean).join(' · ')
+}
+
 async function reportStatus(options) {
   if (!options.dir) {
     throw new CliError('USAGE', 'status requires --dir', 2)
@@ -4512,6 +4545,10 @@ async function reportStatus(options) {
   const statusResult = await collectStatus(directory, state, ledger)
   if (options.json) {
     process.stdout.write(`${JSON.stringify(statusResult, null, 2)}\n`)
+    return
+  }
+  if (options.brief) {
+    process.stdout.write(`${briefStatusLine(directory, state, ledger, statusResult)}\n`)
     return
   }
   const graph = await loadGraph()

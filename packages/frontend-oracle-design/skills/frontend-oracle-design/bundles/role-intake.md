@@ -503,6 +503,16 @@ Card-only cold-read, reverse-impossible, source-aware and Delivery reviews keep 
 High requires its existing independent hardening and review obligations. Never claim independence from
 a same-context role switch. Record scope, holds, pending observations and honest verification limits.
 
+A command that can outlive the host's command limit (`oracle-run.mjs exec` or `red`, `emit-trace`,
+`oracle-model.mjs space`, `cross-check`, a full suite) runs as a job: `scripts/oracle-job.mjs start -- <command>`,
+then `oracle-job.mjs wait --job <id>`. Wait prints `JOB_DONE` with the command's own exit code and log
+tail, or `JOB_RUNNING` (exit 75) when its limit passes first; call wait again. The default wait (110 s)
+fits Claude Code's default Bash limit; for longer waits give the call `timeout: 600000` and pass
+`--max-seconds 540`. A stuck job stops at `--timeout-seconds` (default 3600) or with
+`oracle-job.mjs cancel --job <id>`. The job log is the tool's output channel in its private temp
+directory; never copy it into the run directory. Never hand-roll `until`/`sleep` loops, poll output
+files or coordinate parallel workers through mailbox files; the controller relays.
+
 <!-- node:card-policy-sources path:references/card/policy-sources.md -->
 
 # Oracle Card — external standards and policy sources

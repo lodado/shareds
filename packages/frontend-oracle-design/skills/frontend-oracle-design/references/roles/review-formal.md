@@ -67,6 +67,10 @@ applicable real proof, type-fest consumer/static witnesses/checker environment, 
 or finite-world correspondence, with actual reported evidence, source mapping and freshness. A label or
 successful file generation is insufficient. Read [`adequacy.md`](../adequacy.md) for Terms/Adequacy cards.
 Verify required High consecutive GREEN, mutation kill/revert/re-GREEN and post-review reruns from evidence.
+Judge from the packet's recorded runs. A reviewer reproduction is the narrowest command for the disputed
+row (one test file or a name filter) and stays under two minutes; never copy the test config or rerun the
+whole suite. A reproduction that would take longer is reported as "reproduction not run" with its exact
+command, never as EVIDENCE_GAP; the controller runs it once on the final snapshot.
 Low follows the mandatory verification stack, not a standalone test exemption. Design-only has no
 Delivery contextual artifact obligation or implied product test execution.
 

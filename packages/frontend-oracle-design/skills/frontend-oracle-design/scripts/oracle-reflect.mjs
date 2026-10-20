@@ -66,7 +66,7 @@ async function collect(root) {
     } catch (error) {
       skipped.push({ run: id, error: `runs.jsonl: ${error.message}` })
     }
-    if (stage || ledger.length) runs.push({ id, history: stage?.history ?? [], ledger })
+    if (stage || ledger.length) runs.push({ id, history: stage?.history ?? [], dispatches: stage?.dispatches ?? [], ledger })
   }
   return { runs, skipped }
 }
@@ -127,25 +127,158 @@ export function reflectRuns(runs, { minRuns = 2 } = {}) {
   return { runs: runs.length, rewinds, budgets, stops, candidates }
 }
 
-const USAGE = 'usage: oracle-reflect.mjs [--root <repository root>] [--min-runs <n ≥ 1, default 2>]'
+const STAGE_ORDER = ['DISCOVERING', 'MODELED', 'CHECKED', 'DRAFTED', 'ORACLE_READY']
+const at = (entry) => Date.parse(entry?.at ?? '')
+const sum = (values) => values.reduce((total, value) => total + value, 0)
+
+/** 두 기록 사이 시간 — 끝 기록이 없으면(아직 잠그지 않았다) null이다. */
+function spanMs(start, end) {
+  if (!end) return null
+  return at(end) - at(start)
+}
+
+/** 겹치는 구간은 한 번만 센다 — 복구 중에 또 되감기면 두 복구 시간이 같은 벽시계를 두 번 세지 않게 한다. */
+function unionMs(spans) {
+  let total = 0
+  let end = -Infinity
+  for (const [start, stop] of [...spans].sort((left, right) => left[0] - right[0])) {
+    if (stop <= end) continue
+    total += stop - Math.max(start, end)
+    end = stop
+  }
+  return total
+}
+
+/**
+ * lock 전 저작 시간 — 시각이 찍힌 stage 기록만 센다(0.102 이전 기록은 시각이 없어 untimed). 단계마다 머문 시간, advance 관문이 쓴
+ * 시간, 그리고 rewind마다 되감기 전 가장 앞선 단계(furthest, 시각 없이 전체 기록에서)로 다시 돌아오기까지 걸린 시간(regain)을
+ * 낸다. 앞부분만 시각이 없는 기록은 partial로 표시하고 시작을 모르므로 전체 저작 시간을 내지 않는다.
+ */
+function authoringTiming(history) {
+  const stamped = history.filter((entry) => Number.isFinite(at(entry)))
+  if (stamped.length === 0) return null
+  const partial = stamped.length < history.length
+  const stages = {}
+  stamped.forEach((entry, index) => {
+    const next = stamped[index + 1]
+    const slot = (stages[entry.stage] ??= { visits: 0, ms: 0, gateMs: 0 })
+    slot.visits += 1
+    if (next) slot.ms += at(next) - at(entry)
+    if (typeof entry.durationMs === 'number') slot.gateMs += entry.durationMs
+  })
+  const rewinds = []
+  const spans = []
+  history.forEach((entry, index) => {
+    if (entry.evidence !== 'rewind' || !Number.isFinite(at(entry))) return
+    const before = history.slice(0, index).map((step) => STAGE_ORDER.indexOf(step.stage))
+    const furthest = before.length > 0 ? Math.max(...before) : STAGE_ORDER.indexOf(entry.stage)
+    const regained = history
+      .slice(index + 1)
+      .find((step) => step.evidence !== 'rewind' && Number.isFinite(at(step)) && STAGE_ORDER.indexOf(step.stage) >= furthest)
+    if (regained) spans.push([at(entry), at(regained)])
+    rewinds.push({
+      left: history[index - 1]?.stage ?? null,
+      furthest: STAGE_ORDER[furthest] ?? null,
+      to: entry.stage,
+      reason: entry.reason ?? null,
+      at: entry.at,
+      regainMs: regained ? at(regained) - at(entry) : null,
+    })
+  })
+  const locked = stamped.find((entry) => entry.stage === 'ORACLE_READY')
+  return {
+    partial,
+    startedAt: partial ? null : stamped[0].at,
+    lockedAt: locked?.at ?? null,
+    ms: partial ? null : spanMs(stamped[0], locked),
+    stages,
+    rewinds,
+    regainMs: unionMs(spans),
+  }
+}
+
+/** lock 뒤 Delivery 시간 — 원장은 처음부터 시각을 남긴다: 상태마다 머문 시간, 실행 명령 시간, 리뷰 라운드·예산 사용 횟수. */
+function deliveryTiming(ledger) {
+  const marks = ledger.filter((event) => (event.type === 'init' || event.type === 'transition') && Number.isFinite(at(event)))
+  if (marks.length === 0) return null
+  const states = marks.map((event, index) => ({ state: event.state, at: event.at, ms: marks[index + 1] ? at(marks[index + 1]) - at(event) : null }))
+  const runs = ledger.filter((event) => event.type === 'run')
+  const byLabel = {}
+  for (const run of runs) {
+    const slot = (byLabel[run.label ?? 'unlabeled'] ??= { runs: 0, commandMs: 0 })
+    slot.runs += 1
+    slot.commandMs += run.commandMs ?? 0
+  }
+  const timed = ledger.filter((event) => Number.isFinite(at(event)))
+  return {
+    initAt: marks[0].at,
+    lastAt: timed.at(-1).at,
+    ms: at(timed.at(-1)) - at(marks[0]),
+    states,
+    commandMs: sum(runs.map((run) => run.commandMs ?? 0)),
+    wrapperMs: sum(runs.map((run) => run.wrapperMs ?? 0)),
+    runsByLabel: byLabel,
+    reviewRounds: ledger.filter((event) => event.type === 'review-round').length,
+    budgetSpends: ledger.filter((event) => event.type === 'budget' && !event.duplicate).length,
+  }
+}
+
+/** run별 리드타임 — 저작(stage 기록)과 Delivery(원장)를 따로 재고, 독립 디스패치는 종류별로 센다. 읽기만 한다. */
+export function timingRuns(runs) {
+  const timed = []
+  const untimed = []
+  for (const run of runs) {
+    const authoring = authoringTiming(run.history)
+    const delivery = deliveryTiming(run.ledger)
+    if (!authoring && !delivery) {
+      untimed.push(run.id)
+      continue
+    }
+    const dispatches = {}
+    for (const entry of run.dispatches ?? []) bump(dispatches, entry.kind)
+    timed.push({ run: run.id, authoring, delivery, dispatches })
+  }
+  return {
+    runs: timed,
+    untimed,
+    totals: {
+      // partial 기록은 시작을 몰라 ms가 null이다 — 합계에 넣지 않는다
+      authoringMs: sum(timed.map((entry) => entry.authoring?.ms ?? 0)),
+      partialRuns: timed.filter((entry) => entry.authoring?.partial).map((entry) => entry.run),
+      regainMs: sum(timed.map((entry) => entry.authoring?.regainMs ?? 0)),
+      rewinds: sum(timed.map((entry) => entry.authoring?.rewinds.length ?? 0)),
+      deliveryMs: sum(timed.map((entry) => entry.delivery?.ms ?? 0)),
+      commandMs: sum(timed.map((entry) => entry.delivery?.commandMs ?? 0)),
+      dispatches: sum(timed.map((entry) => sum(Object.values(entry.dispatches)))),
+    },
+  }
+}
+
+const USAGE = 'usage: oracle-reflect.mjs [--root <repository root>] [--min-runs <n ≥ 1, default 2>] [--timing]'
 
 function parse(args) {
   const options = {}
-  for (let index = 0; index < args.length; index += 2) {
+  for (let index = 0; index < args.length; index += 1) {
     const name = args[index]?.replace(/^--/, '')
+    if (name === 'timing') {
+      options.timing = true
+      continue
+    }
     if (!['root', 'min-runs'].includes(name) || args[index + 1] === undefined) throw new CliError('USAGE', USAGE, 2)
     options[name] = args[index + 1]
+    index += 1
   }
   const minRuns = options['min-runs'] === undefined ? 2 : Number(options['min-runs'])
   if (!Number.isSafeInteger(minRuns) || minRuns < 1) throw new CliError('USAGE', USAGE, 2)
-  return { root: resolve(options.root ?? process.cwd()), minRuns }
+  return { root: resolve(options.root ?? process.cwd()), minRuns, timing: options.timing === true }
 }
 
 async function main() {
-  const { root, minRuns } = parse(process.argv.slice(2))
+  const { root, minRuns, timing } = parse(process.argv.slice(2))
   const { runs, skipped } = await collect(root)
   if (runs.length === 0) throw new CliError('REFLECT_NO_RUNS', `no readable .ai/oracles/<id>/ run under ${root}`)
-  process.stdout.write(`${JSON.stringify({ ...reflectRuns(runs, { minRuns }), skipped }, null, 2)}\n`)
+  const report = timing ? timingRuns(runs) : reflectRuns(runs, { minRuns })
+  process.stdout.write(`${JSON.stringify({ ...report, skipped }, null, 2)}\n`)
 }
 
 runCli(import.meta, main, { CliError, fallback: 'REFLECT_FAILED' })

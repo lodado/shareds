@@ -1,3 +1,63 @@
+# 0.102.0: time every stage and dispatch, run long commands as jobs, print one-line progress
+
+## Validation
+
+- `ORACLE_REQUIRE_BEND=1 pnpm --filter @lodado/frontend-oracle-design-plugin test`:
+  **1,172 passed, 0 failed, 0 skipped**, using real Bend.
+- Package lint: exit 0, **0 errors, 405 package-wide warnings** (unchanged from 0.101.0). The new
+  `oracle-job.mjs` and the new code in `oracle-stage.mjs`, `oracle-reflect.mjs`, `oracle-run.mjs` and
+  `oracle-fs.mjs` add no warnings.
+- Generated reference bundles (22), converted evals and workflow documentation: passed.
+- An independent Opus 5.5 review found one high defect: the job supervisor attached its exit listeners
+  only after writing its pid record, so a command that failed to spawn or exited during that write was
+  reported `JOB_LOST` (the shell-line test failed 5 of 10 times under parallel load). It also found four
+  medium and seven low issues. All were fixed. Regression tests cover a missing command (exit 127), eight
+  quick jobs at once, a command's own exit 75, a missing `--cwd`, the time limit, cancel and a relative job
+  directory. Those job tests passed 10 of 10 when run in ten parallel processes.
+
+## Diagnosis
+
+Transcripts of 11 Claude and 5 Codex runs (2026-10-08 to 10-20, Side-Projects, playwright-spec-for-AI-Agent,
+deep-agent-uiux-nextjs, kdl-website) showed that after 0.96.1 the harness scripts took only 3.5% of the
+controller's time. The controller spent 40–47% waiting for subagents. `until … sleep` polling was the
+largest Bash class (7.9 h across eight runs), and 33 calls were cut off at the 601 s Bash limit. A
+Delivery reviewer spent 69 of 77 minutes re-running the suite in two 28-minute vitest reproductions.
+About one user message in ten asked when the run would end. No run record held pre-lock timestamps, so
+all of this had to be reconstructed from transcripts.
+
+## Change
+
+- `oracle-stage.mjs`: every history entry records `at`, and `advance` also records its gate `durationMs`.
+  `review-input --attempt` records `{kind, attempt, at, model?, effort?}` in `dispatches` (last 100). A
+  retry neither re-stamps nor spends, and a refused `--model` writes nothing. `status --brief` prints one
+  line: stage and position, time in stage, authoring round, dispatches since the stage began, remaining
+  stages, and stale bytes.
+- `oracle-reflect.mjs --timing` reports authoring and Delivery separately for each run:
+  - Authoring: time per stage visit, gate time, and each rewind with the stage it left, the furthest
+    stage reached before it, and the time to regain that stage. Overlapping recoveries are counted once.
+    Partly timed histories are flagged and left out of the totals.
+  - Delivery: time per state, command time by label, review rounds and budget spends.
+  - Untimed runs are listed rather than estimated.
+- `oracle-run.mjs status --brief` prints one line: state and time in it, last run, review rounds,
+  budgets, next legal states and blockers.
+- New `oracle-job.mjs start|wait|cancel|status|list` runs a command under a detached supervisor.
+  - Records and logs live in a private per-user tmp directory (`ORACLE_JOB_DIR`), with the ownership
+    checks used for lint receipts.
+  - `wait` prints `JOB_DONE` with the command's exit code and a capped log tail, or `JOB_RUNNING` with
+    exit 75. A command that itself exits 75 is reported as 1.
+  - The default wait (110 s) fits Claude Code's default Bash limit; the maximum is 570 s.
+  - `--timeout-seconds` (default 3600) and `cancel` stop the whole process group.
+- Docs:
+  - `verification-common`: run long commands as jobs; no hand-rolled polling loops or mailbox files.
+  - `controller-formal`: each progress message starts with the brief line; register dispatches with model
+    and effort; rerun a reviewer's "reproduction not run" once on the final snapshot.
+  - `review-formal`: a reviewer reproduction is the narrowest command and stays under two minutes;
+    anything longer is reported as "reproduction not run", never as EVIDENCE_GAP.
+  - `lifecycle-adaptation`: slice workers never wait on each other through shared files.
+  - README.
+- Scripts only: behavior is identical on Claude, Codex and JCode. No gate changed. Timings are recorded,
+  never used for a verdict.
+
 # 0.101.0: record why a stage walks back, close a gate-skipping rewind, and fold reviewer reading
 
 ## Validation

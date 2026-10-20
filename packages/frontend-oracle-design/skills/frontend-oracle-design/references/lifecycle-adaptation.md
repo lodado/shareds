@@ -16,7 +16,8 @@ current-profile realization plans. Independent GREENs do not establish combined-
 Proposed independent slices need explicit ownership and integration obligations, not an automatic team
 or aggregate terminal state. Each authorized slice retains profile, approval/lock, tests, accepted
 VALID_RED and implementation order, its own scan root and honest scope/hold report. Held rows receive
-no test or production edits. No slice's lock authorizes another's writes.
+no test or production edits. No slice's lock authorizes another's writes. Parallel slice workers never
+wait on each other through shared files; one owner writes a shared input and the controller relays it.
 
 Detailed implementation decisions remain after VALID_RED. Changed source set or outcome requires
 actual human confirmation/new revision, never expansion of an old lock. Re-read disk on resume.

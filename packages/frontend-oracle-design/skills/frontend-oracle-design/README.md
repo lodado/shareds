@@ -431,6 +431,35 @@ node skills/scripts/oracle-reflect.mjs --root . [--min-runs 2]
 읽기만 하며 제안을 적용하지 않습니다(`applied: false`). 후보를 사전 잠금 스윕, 카드 lint,
 intake 질문으로 옮기는 일은 유지보수자가 합니다. 0.101.0 이전 rewind는 `unrecorded`로만 셉니다.
 
+### 리드타임과 진행 한 줄
+
+```bash
+node skills/scripts/oracle-reflect.mjs --root . --timing
+node skills/scripts/oracle-stage.mjs status --dir .ai/oracles/<id> --brief
+node skills/scripts/oracle-run.mjs status --dir .ai/oracles/<id> --brief
+```
+
+0.102.0부터 `stage.json` history의 걸음마다 시각(`at`)이, advance에는 관문 시간(`durationMs`)이
+남고, `review-input --attempt`는 디스패치 시각(선택 `--model`·`--effort`)을 남깁니다. `--timing`은
+run마다 저작(단계별 머문 시간·관문 시간·rewind 복귀 시간)과 Delivery(상태별 시간·실행 명령 시간·리뷰
+라운드)를 따로 잽니다. 시각이 없는 옛 기록은 `untimed`로만 셉니다. `status --brief`는 지금 단계, 머문
+시간, 예산, 보낸 디스패치, 남은 단계를 한 줄로 찍습니다. 판정은 바꾸지 않습니다.
+
+### 긴 명령은 job으로
+
+```bash
+node skills/scripts/oracle-job.mjs start [--name <label>] [--timeout-seconds 3600] -- <command…>
+node skills/scripts/oracle-job.mjs wait --job <id> [--max-seconds 110]
+node skills/scripts/oracle-job.mjs cancel --job <id>
+```
+
+호스트 명령 한도(Claude Bash 기본 2분, 최대 10분)를 넘을 수 있는 실행은 `until … sleep` 루프 대신 job으로
+돌립니다. `wait`는 끝났으면 `JOB_DONE`과 로그 꼬리, 그 명령의 종료 코드를, 아직이면 `JOB_RUNNING`(종료 코드 75)을 돌려줍니다. 명령 자신이 75로 끝나면 1로 바꿔 돌려주므로 75는 언제나 "아직"입니다. 기본 wait 110초는
+Claude Code 기본 한도 안에서 돌아오고, 길게 막을 때는 Bash `timeout: 600000`과 `--max-seconds 540`을 함께
+줍니다. 멈춘 명령은 `--timeout-seconds`(기본 1시간)에 프로세스 그룹째 멈추고, `cancel`로도 멈춥니다. 인자가
+하나면 셸 한 줄로 실행합니다. 기록과 로그는 사용자 전용 tmp 디렉터리(`ORACLE_JOB_DIR`로 바꿈)에 두고 run
+디렉터리에는 아무것도 만들지 않습니다.
+
 ### 리뷰어용 읽기 보기
 
 ```bash
