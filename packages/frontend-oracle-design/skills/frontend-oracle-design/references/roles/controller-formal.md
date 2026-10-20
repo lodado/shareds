@@ -7,6 +7,10 @@ Start each Progress message (common's table) and every answer to a progress ques
 from `oracle-stage.mjs status --dir <dir> --brief` before init or `oracle-run.mjs status --dir <dir> --brief`
 after it, then add the newly established fact and next action. Register each independent dispatch with
 `oracle-stage.mjs review-input --attempt <id>`, adding `--model` and `--effort` when known.
+Where the host sets effort per dispatch (Claude Code's Agent `effort`), cap execution roles at `high`, never
+above the session's effort: a worker that runs given commands and records results, packet assembly, a
+repair spelled out by exact findings. Author, analyst, every reviewer and the blind mapper are not
+execution roles: they keep the session's effort and their own model rules (subagent-review, discovery).
 
 ## Draft, review, confirmation and lock
 

@@ -460,6 +460,23 @@ Claude Code 기본 한도 안에서 돌아오고, 길게 막을 때는 Bash `tim
 하나면 셸 한 줄로 실행합니다. 기록과 로그는 사용자 전용 tmp 디렉터리(`ORACLE_JOB_DIR`로 바꿈)에 두고 run
 디렉터리에는 아무것도 만들지 않습니다.
 
+### 패키지 부분 읽기·고치기
+
+```bash
+node skills/scripts/oracle-package.mjs get --package .ai/oracles/<id>/oracle.package.json [--pointer '/sources/[id=S2]']
+node skills/scripts/oracle-package.mjs patch --package .ai/oracles/<id>/oracle.package.json \
+  --set '/requirements/[id=R5]/quote="..."' --append '/sources={"id":"S9",...}' --remove '/aiRuns/0'
+```
+
+0.103.0부터 패키지를 Python heredoc으로 고치지 않습니다. `get`은 포인터가 없으면 맨 위 키의 모양만, 있으면
+그 값을 JSON으로 찍습니다. `patch`는 JSON pointer에 `[<필드>=<값>]` 조각(배열에서 그 필드가 그 값인 원소, 예:
+`[id=S2]`, `[key=…]`)을 더해 set·append·remove를 차례로 적용하고 한 번에 씁니다. zsh가 `[...]`를 glob으로 읽지
+않게 포인터는 작은따옴표로 감쌉니다. 값은 JSON이라 문자열도 따옴표가 있어야 합니다. 중간 가지가 없거나 값이
+JSON이 아니면 아무것도 쓰지 않고, 내용이 같으면 다시 쓰지 않습니다(`PACKAGE_UNCHANGED`). 객체에 없던 키를 만들면
+`(new key)`로 알립니다. `stage.json`이 ORACLE_READY이거나 읽을 수 없거나, 패키지 옆에 `oracle.lock.json`이 있으면
+`PACKAGE_LOCKED`(또는 `STAGE_INVALID`)로 거부하고, 심볼릭 링크는 따라가지 않습니다. 쓴 뒤에는 MODELED 관문과 같은
+구조 검사 결과를 보여 주기만 하고 막지는 않습니다.
+
 ### 리뷰어용 읽기 보기
 
 ```bash

@@ -8,12 +8,13 @@
 // meaning instead of three hand copies. The package never records user approval by itself: approval values are
 // copied verbatim from what the author recorded, and User Confirmation stays a human-edited card section.
 
-import { readFile, writeFile } from 'node:fs/promises'
-import { dirname, relative, resolve } from 'node:path'
+import { lstat, readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { isDeepStrictEqual } from 'node:util'
 import { automatonSummary, finiteAutomaton } from './oracle-automaton.mjs'
-import { sha256, stableStringify } from './oracle-fs.mjs'
+import { sha256, stableStringify, withDirectoryLock } from './oracle-fs.mjs'
 import { parseBendTypesStrict, typeIR } from './oracle-types.mjs'
 
 // 2: the axes were confirmed with the user (Space discovery) and every input family is decided at the model stage.
@@ -1825,6 +1826,133 @@ async function possibleWorlds(loaded, { bin, timeoutMs }) {
   }
 }
 
+/**
+ * JSON pointer(RFC 6901)에 `[<field>=<값>]` 조각을 더한다 — 배열에서 그 필드가 그 값인 원소를 고른다(`[id=S2]`, `[key=…]`,
+ * `[candidate=…]`). 패키지 배열은 이름으로 찾는 일이 대부분이라 위치 번호를 먼저 읽어 올 필요가 없게 한다. `__proto__` 조각은
+ * 받지 않는다 — 대입이 키 대신 프로토타입을 바꿔, 보고한 검사와 쓴 파일이 달라진다.
+ */
+export function parsePointer(pointer) {
+  if (pointer === '') return []
+  if (!pointer.startsWith('/')) throw new PackageError('USAGE', `a pointer starts with /: ${pointer}`, 2)
+  const tokens = pointer.slice(1).split('/').map((token) => token.replaceAll('~1', '/').replaceAll('~0', '~'))
+  if (tokens.includes('__proto__')) throw new PackageError('USAGE', `${pointer}: __proto__ is not a package key`, 2)
+  return tokens
+}
+
+const SELECTOR = /^\[([a-z_][\w-]*)=(.+)\]$/i
+
+function pointerKey(container, token, pointer) {
+  const selector = SELECTOR.exec(token)
+  if (Array.isArray(container)) {
+    if (selector) {
+      const [, field, value] = selector
+      const index = container.findIndex((entry) => entry !== null && typeof entry === 'object' && Object.hasOwn(entry, field) && String(entry[field]) === value)
+      if (index < 0) throw new PackageError('PATCH_NO_TARGET', `${pointer}: no element with ${field} ${value}`)
+      return index
+    }
+    if (token === '-') return container.length
+    if (!/^(?:0|[1-9]\d*)$/.test(token)) throw new PackageError('PATCH_NO_TARGET', `${pointer}: ${token} is not an array index`)
+    return Number(token)
+  }
+  if (container !== null && typeof container === 'object' && !selector) return token
+  throw new PackageError('PATCH_NO_TARGET', `${pointer}: cannot step into ${JSON.stringify(token)} here`)
+}
+
+const present = (container, key) => (Array.isArray(container) ? key < container.length : Object.hasOwn(container, key))
+
+/** 포인터가 가리키는 값 — 없으면 멈춘다. */
+export function pointerGet(document, pointer) {
+  let node = document
+  for (const token of parsePointer(pointer)) {
+    const key = pointerKey(node, token, pointer)
+    if (!present(node, key)) throw new PackageError('PATCH_NO_TARGET', `${pointer}: nothing at ${token}`)
+    node = node[key]
+  }
+  return node
+}
+
+// 연산마다 부모와 마지막 키를 받는다 — 경로의 끝이 어디를 가리키는지는 pointerKey가 이미 풀었다. set은 객체에 없던 키를 만들었는지
+// 돌려준다: 마지막 키의 오타는 새 필드가 되어 조용히 무시되므로 출력에 `(new key)`로 드러낸다.
+const PATCH_OPERATIONS = {
+  set(parent, key, value, pointer) {
+    if (Array.isArray(parent) && key > parent.length) throw new PackageError('PATCH_NO_TARGET', `${pointer}: index past the end`)
+    const created = !Array.isArray(parent) && !Object.hasOwn(parent, key)
+    parent[key] = value
+    return created
+  },
+  append(parent, key, value, pointer) {
+    if (!Array.isArray(parent[key])) throw new PackageError('PATCH_NO_TARGET', `${pointer}: append needs an array`)
+    parent[key].push(value)
+    return false
+  },
+  remove(parent, key, _value, pointer) {
+    if (!present(parent, key)) throw new PackageError('PATCH_NO_TARGET', `${pointer}: nothing to remove`)
+    if (Array.isArray(parent)) parent.splice(key, 1)
+    else delete parent[key]
+    return false
+  },
+}
+
+/** 마지막 조각의 부모까지 걷는다 — 중간 가지가 없으면 멈춘다(오타 난 경로가 새 가지를 만들지 않는다). */
+function parentOf(document, tokens, pointer) {
+  let parent = document
+  for (const token of tokens.slice(0, -1)) {
+    const key = pointerKey(parent, token, pointer)
+    if (!present(parent, key)) throw new PackageError('PATCH_NO_TARGET', `${pointer}: nothing at ${token}`)
+    parent = parent[key]
+  }
+  return parent
+}
+
+/**
+ * set·append·remove를 차례로 적용한 새 문서와 새로 만든 키를 돌려준다(원본은 그대로). 중간 가지는 있어야 한다 — 오타 난 경로가 새
+ * 가지를 만들지 않는다. append는 배열 끝에 넣고, set의 `-`도 같다.
+ */
+export function applyPatch(document, operations) {
+  const result = structuredClone(document)
+  const created = []
+  for (const { op, pointer, value } of operations) {
+    if (!Object.hasOwn(PATCH_OPERATIONS, op)) throw new PackageError('USAGE', `unknown patch operation: ${op}`, 2)
+    const tokens = parsePointer(pointer)
+    if (tokens.length === 0) throw new PackageError('USAGE', 'a patch never replaces the whole package', 2)
+    const parent = parentOf(result, tokens, pointer)
+    if (PATCH_OPERATIONS[op](parent, pointerKey(parent, tokens.at(-1), pointer), value, pointer)) created.push(pointer)
+  }
+  return { document: result, created }
+}
+
+/** `<pointer>=<json>`의 경계 — `[id=…]` 조각 안의 `=`는 경계가 아니다. 없으면 -1. */
+function assignmentSplit(argument) {
+  let depth = 0
+  for (let index = 0; index < argument.length; index += 1) {
+    const char = argument[index]
+    if (char === '[') depth += 1
+    if (char === ']') depth -= 1
+    if (char === '=' && depth === 0) return index
+  }
+  return -1
+}
+
+/** 문자열 값도 JSON 따옴표가 있어야 한다 — 숫자·불리언·객체와 섞이지 않게 값의 종류를 명시한다. */
+function patchOperation(op, argument) {
+  if (op === 'remove') return { op, pointer: argument }
+  const split = assignmentSplit(argument)
+  if (split < 0) throw new PackageError('USAGE', `--${op} takes <pointer>=<json>: ${argument}`, 2)
+  const raw = argument.slice(split + 1)
+  try {
+    return { op, pointer: argument.slice(0, split), value: JSON.parse(raw) }
+  } catch {
+    throw new PackageError('PATCH_VALUE_INVALID', `--${op} value is not JSON (a string needs quotes, '"text"'): ${raw.slice(0, 80)}`, 2)
+  }
+}
+
+/** 값이 크면 모양만 — 맨 위 키와 그 종류·길이로 패키지를 둘러본다(통째로 읽지 않아도 된다). */
+function outline(value) {
+  if (Array.isArray(value)) return `array(${value.length})`
+  if (value !== null && typeof value === 'object') return `object(${Object.keys(value).length})`
+  return JSON.stringify(value)
+}
+
 function parseOptions(args) {
   const options = {}
   for (let index = 0; index < args.length; index += 1) {
@@ -1843,10 +1971,80 @@ function parseOptions(args) {
 }
 
 const USAGE = `usage:
+  oracle-package.mjs get --package <oracle.package.json> [--pointer '/path' | '/sources/[id=S2]']
+  oracle-package.mjs patch --package <oracle.package.json> (--set '<pointer>=<json>' | --append '<pointer>=<json>' | --remove '<pointer>')…
   oracle-package.mjs validate --package <oracle.package.json> [--stage model|project]
   oracle-package.mjs derive --package <oracle.package.json> [--out <derived.json>] [--no-bend]
   oracle-package.mjs project-card --package <oracle.package.json> --out <oracle.md> [--title <text>] [--no-bend]
   oracle-package.mjs check-card --package <oracle.package.json> --card <oracle.md> [--no-bend]`
+
+function parseGetOrPatch(command, args) {
+  const operations = []
+  const options = {}
+  for (let index = 0; index < args.length; index += 2) {
+    const name = args[index]?.replace(/^--/, '')
+    const value = args[index + 1]
+    if (value === undefined) throw new PackageError('USAGE', USAGE, 2)
+    if (command === 'patch' && Object.hasOwn(PATCH_OPERATIONS, name)) operations.push(patchOperation(name, value))
+    else if (name === 'package' || (command === 'get' && name === 'pointer')) options[name] = value
+    else throw new PackageError('USAGE', USAGE, 2)
+  }
+  if (!options.package) throw new PackageError('USAGE', USAGE, 2)
+  if (command === 'patch' && operations.length === 0) throw new PackageError('USAGE', 'patch needs at least one --set, --append or --remove', 2)
+  return { options, operations }
+}
+
+/** 포인터가 없으면 맨 위 키의 모양만, 있으면 그 값을 JSON으로. */
+function getCommand(loaded, pointer) {
+  if (pointer === undefined) return Object.entries(loaded.pkg).map(([key, value]) => `${key}: ${outline(value)}`).join('\n')
+  return JSON.stringify(pointerGet(loaded.pkg, pointer), null, 2)
+}
+
+/** set이 객체에 없던 키를 만들었으면 그렇다고 적는다 — 마지막 키의 오타가 새 필드로 숨지 않게. */
+function newKeyMark(op, pointer, created) {
+  if (op !== 'set' || !created.includes(pointer)) return null
+  return '(new key)'
+}
+
+/**
+ * 잠긴 revision은 고치지 않는다 — stage.json이 ORACLE_READY거나 읽을 수 없으면, 또는 패키지 옆에 oracle.lock.json이 있으면 멈춘다
+ * (새 revision은 늘 새 경로라 패키지 옆의 lock은 곧 잠김이다). 심볼릭 링크는 따라가지 않는다. 디렉터리 잠금 안에서 다시 읽고
+ * 고쳐 써서 동시에 고친 둘 중 하나를 잃지 않는다. 내용이 같으면 쓰지 않는다. 쓴 뒤에는 MODELED 관문과 같은 구조 검사를 보고만 한다.
+ */
+async function patchCommand(path, operations) {
+  const absolute = resolve(path)
+  if ((await lstat(absolute).catch(() => null))?.isSymbolicLink()) throw new PackageError('PACKAGE_LINK', `${path} is a symbolic link — patch the real file`)
+  const directory = dirname(absolute)
+  const { readStage } = await import('./oracle-stage.mjs')
+  return withDirectoryLock(directory, 'package', async () => {
+    const record = await readStage(directory)
+    if (record?.stage === 'ORACLE_READY') throw new PackageError('PACKAGE_LOCKED', 'this revision is locked — a change is a new revision, never an edit')
+    if (await stat(join(directory, 'oracle.lock.json')).catch(() => null))
+      throw new PackageError('PACKAGE_LOCKED', 'oracle.lock.json sits next to this package — a locked revision changes only as a new revision')
+    const loaded = await loadPackage(absolute)
+    const { document, created } = applyPatch(loaded.pkg, operations)
+    if (isDeepStrictEqual(document, loaded.pkg)) return `PACKAGE_UNCHANGED ${path} · the operations leave the package as it is`
+    const text = `${JSON.stringify(document, null, 2)}\n`
+    const temporary = `${absolute}.${process.pid}.tmp`
+    await writeFile(temporary, text)
+    await rename(temporary, absolute)
+    const written = JSON.parse(text)
+    const issues = [...packageIssues(written, { stage: 'model' }), ...asyncCellIssues(written, { required: true })]
+    const done = operations.map(({ op, pointer }) => [op, pointer, newKeyMark(op, pointer, created)].filter(Boolean).join(' '))
+    const lines = [`PACKAGE_PATCHED ${path} · ${done.join(', ')} · MODELED-gate issues: ${issues.length}`, ...issues.slice(0, 5).map((issue) => `  ${issue}`)]
+    if (record?.packageSha256 && record.packageSha256 !== sha256(text)) {
+      const where = relative(process.cwd(), directory) || '.'
+      lines.push(`stage ${record.stage} recorded other package bytes — oracle-stage.mjs rewind --dir ${where} --to DISCOVERING --reason review-finding|gate-failure|user-answer|source-change`)
+    }
+    return lines.join('\n')
+  })
+}
+
+async function getOrPatch(command, args) {
+  const { options, operations } = parseGetOrPatch(command, args)
+  const text = command === 'get' ? getCommand(await loadPackage(options.package), options.pointer) : await patchCommand(options.package, operations)
+  process.stdout.write(`${text}\n`)
+}
 
 async function binFor(options) {
   if (options['no-bend']) return null
@@ -1856,6 +2054,10 @@ async function binFor(options) {
 
 async function main() {
   const [command, ...args] = process.argv.slice(2)
+  if (command === 'get' || command === 'patch') {
+    await getOrPatch(command, args)
+    return
+  }
   if (!['validate', 'derive', 'project-card', 'check-card'].includes(command)) throw new PackageError('USAGE', USAGE, 2)
   const options = parseOptions(args)
   if (!options.package) throw new PackageError('USAGE', USAGE, 2)

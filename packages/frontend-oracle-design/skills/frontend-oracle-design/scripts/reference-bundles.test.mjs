@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { Buffer } from 'node:buffer'
 import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
@@ -9,6 +10,43 @@ import { bundlePath, loadGraph, referenceDependencies, referenceProfile, renderB
 
 const skillDirectory = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (relative) => readFile(join(skillDirectory, relative), 'utf8')
+
+// 번들 크기 상한(바이트, 0.103.0 크기를 1KB 단위로 올림) — 새 에이전트는 자기 역할 번들을 통째로 읽는다. 고칠 때마다 규칙이 붙기만
+// 하면 읽기 비용이 계속 는다(0.91에서 243KB로 줄인 role-author가 0.101에 273KB로 돌아왔다). 상한을 올리려면 같은 커밋에서 다른
+// 문장을 지우거나 EVALUATION.md에 이유를 남긴다.
+const BUNDLE_BYTE_CAPS = {
+  'contract-card-lane': 85000,
+  'contract-delivery-lane': 28000,
+  'contract-types-lane': 31000,
+  'contract-frontend-lane': 58000,
+  'contract-delivery-lane-continued': 3000,
+  'contract-types-lane-continued': 6000,
+  'contract-frontend-lane-continued': 33000,
+  'role-intake': 105000,
+  'role-author': 282000,
+  'role-implement': 123000,
+  'role-review': 62000,
+  'contract-role-intake': 79000,
+  'contract-role-author': 87000,
+  'contract-role-implement': 72000,
+  'contract-role-review': 45000,
+  'card-lane': 137000,
+  'delivery-lane': 47000,
+  'types-lane': 99000,
+  'frontend-lane': 86000,
+  'delivery-lane-continued': 22000,
+  'types-lane-continued': 75000,
+  'frontend-lane-continued': 61000,
+}
+
+test('every bundle stays under its byte cap, so a new rule replaces text instead of only adding it', async () => {
+  const graph = await loadGraph()
+  assert.deepEqual(Object.keys(BUNDLE_BYTE_CAPS).sort(), graph.bundles.map((bundle) => bundle.id).sort(), 'every bundle has a cap and every cap a bundle')
+  for (const bundle of graph.bundles) {
+    const size = Buffer.byteLength(await readFile(bundlePath(bundle), 'utf8'))
+    assert.ok(size <= BUNDLE_BYTE_CAPS[bundle.id], `bundle ${bundle.id} is ${size} bytes, over its ${BUNDLE_BYTE_CAPS[bundle.id]} cap — remove text elsewhere or record why the cap rises`)
+  }
+})
 
 test('every declared bundle is on disk and byte-identical to its nodes', async () => {
   const graph = await loadGraph()

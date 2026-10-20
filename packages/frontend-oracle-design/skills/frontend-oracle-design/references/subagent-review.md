@@ -43,9 +43,8 @@ Review is LLM judgment, so it wavers even on the same input. Pin it with two dev
    overlapping citation is insufficient. Identical summaries with different evidence or corrections
    are not the same finding key.
    A finding that overlaps two on the other side, or cites nothing, is not paired. Medium risk requires only a single
-   review and schema verification. A Medium single review may run on a faster model·lower reasoning
-   effort if the surface supports it — the judgment criteria are owned by the review packet files and
-   the findings are verified by schema. Do not lower the High risk two-review requirement.
+   review and schema verification, on the same newest model as any review. Do not lower the High risk
+   two-review requirement.
 
 ## Review Criteria Priority
 

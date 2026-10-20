@@ -1737,7 +1737,8 @@ narrowed to fit Bend, and a phenomenon the model cannot express is never declare
   otherwise it downloads the GitHub release, checks it against the sha256 pinned in the script and
   unpacks it into the skill's own cache. It never pipes `curl` to a shell or edits PATH and shell
   files. Call the absolute path it prints with `BEND_NO_TELEMETRY=1`. Read `bend guide` before
-  writing Bend; Bend 2 is not the old HVM runtime.
+  writing Bend; Bend 2 is not the old HVM runtime. `oracle-model.mjs check|prove|space` already call it
+  that way, so their commands need no env or path preamble.
 - `ensure-bend.mjs` provides Bend only. `bend --verdict` builds its Lean kernel on first use and needs
   the Lean toolchain Bend names (Lean v4.34.0 for Bend 2.0.34, via elan); installing it follows the same
   environment rules. Without it every proof and adequacy verdict is `unavailable`.
@@ -3466,6 +3467,10 @@ whatever is already loaded.
    delays, staleness, error kinds, remounts and request counts: time as events, attempts, error sum types,
    and separate request/fetch/effect counts, not one collapsed event. Check each Bend file with
    `scripts/oracle-model.mjs check --file <file>` before `prove`; a failure carries its fix in `hint`.
+   Grow a Bend file in small sections: scaffold it, add one def or law group at a time, check after each
+   (about a second), and change it with small edits, never by rewriting or regenerating the whole file.
+   Change the package with `oracle-package.mjs patch --set|--append|--remove '<pointer>'` (`'/sources/[id=S2]'`
+   selects by a field; quote it) and read parts with `get --pointer`, never with a one-off script.
 6. Run `oracle-package.mjs derive` and `oracle-adequacy.mjs check --package`, collect the available
    counterexamples, and repair shared causes in one batch within the shared authoring iteration budget.
    Unresolved policy becomes an Open question, never an unbounded fix/check loop. Read [`discovery.md`](../discovery.md) before

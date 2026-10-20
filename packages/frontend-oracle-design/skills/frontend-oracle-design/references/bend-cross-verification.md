@@ -43,7 +43,8 @@ narrowed to fit Bend, and a phenomenon the model cannot express is never declare
   otherwise it downloads the GitHub release, checks it against the sha256 pinned in the script and
   unpacks it into the skill's own cache. It never pipes `curl` to a shell or edits PATH and shell
   files. Call the absolute path it prints with `BEND_NO_TELEMETRY=1`. Read `bend guide` before
-  writing Bend; Bend 2 is not the old HVM runtime.
+  writing Bend; Bend 2 is not the old HVM runtime. `oracle-model.mjs check|prove|space` already call it
+  that way, so their commands need no env or path preamble.
 - `ensure-bend.mjs` provides Bend only. `bend --verdict` builds its Lean kernel on first use and needs
   the Lean toolchain Bend names (Lean v4.34.0 for Bend 2.0.34, via elan); installing it follows the same
   environment rules. Without it every proof and adequacy verdict is `unavailable`.

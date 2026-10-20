@@ -48,6 +48,10 @@ whatever is already loaded.
    delays, staleness, error kinds, remounts and request counts: time as events, attempts, error sum types,
    and separate request/fetch/effect counts, not one collapsed event. Check each Bend file with
    `scripts/oracle-model.mjs check --file <file>` before `prove`; a failure carries its fix in `hint`.
+   Grow a Bend file in small sections: scaffold it, add one def or law group at a time, check after each
+   (about a second), and change it with small edits, never by rewriting or regenerating the whole file.
+   Change the package with `oracle-package.mjs patch --set|--append|--remove '<pointer>'` (`'/sources/[id=S2]'`
+   selects by a field; quote it) and read parts with `get --pointer`, never with a one-off script.
 6. Run `oracle-package.mjs derive` and `oracle-adequacy.mjs check --package`, collect the available
    counterexamples, and repair shared causes in one batch within the shared authoring iteration budget.
    Unresolved policy becomes an Open question, never an unbounded fix/check loop. Read [`discovery.md`](../discovery.md) before

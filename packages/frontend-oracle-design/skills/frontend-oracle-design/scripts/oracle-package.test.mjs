@@ -11,6 +11,7 @@ import { generateFromDocument } from './oracle-frames.mjs'
 import { sha256 } from './oracle-fs.mjs'
 import { enumerateSpace, verdictOf } from './oracle-model.mjs'
 import {
+  applyPatch,
   assignRows,
   ASYNC_CELLS,
   asyncCellIssues,
@@ -25,6 +26,8 @@ import {
   orderObligations,
   packageInputs,
   packageIssues,
+  parsePointer,
+  pointerGet,
   projectCard,
   regenerateAtRoot,
   renderGenerated,
@@ -1259,4 +1262,125 @@ test('[bend] card lint refuses a version-2 card while a cross-check candidate is
   // the declaration changed under the review, so the mapping review is stale as well
   assert.deepEqual(issueCodes(gated.stderr), ['cross-check-unreviewed', 'cross-check-undecided', 'user-confirmation-status'])
   assert.match(gated.stderr, /cross-check-undecided: C-[a-f0-9]{10} new-axis — longSession=expired has no counterpart/)
+})
+
+/** 패키지 하나를 임시 디렉터리에 — get·patch는 그 바이트만 바꾼다. */
+async function patchable(t) {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-package-patch-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const directory = join(root, '.ai', 'oracles', 'stale-search')
+  await mkdir(directory, { recursive: true })
+  await cp(join(FIXTURE, 'oracle.package.json'), join(directory, 'oracle.package.json'))
+  return { root, directory, path: join(directory, 'oracle.package.json') }
+}
+
+test('get outlines the package or prints one part by pointer, finding array elements by id', async (t) => {
+  const { root, path } = await patchable(t)
+  const outline = node(root, 'oracle-package.mjs', ['get', '--package', path])
+  assert.equal(outline.status, 0, outline.stderr)
+  assert.match(outline.stdout, /^sources: array\(6\)$/m)
+  assert.match(outline.stdout, /^id: "stale-search"$/m)
+  const source = node(root, 'oracle-package.mjs', ['get', '--package', path, '--pointer', '/sources/[id=S1]'])
+  assert.equal(source.status, 0, source.stderr)
+  assert.equal(JSON.parse(source.stdout).jurisdiction, 'search response ordering')
+  const missing = node(root, 'oracle-package.mjs', ['get', '--package', path, '--pointer', '/sources/[id=S99]'])
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /^PATCH_NO_TARGET: \/sources\/\[id=S99\]: no element with id S99/)
+})
+
+test('patch applies set, append and remove in order, writes once and reports the model-stage issues', async (t) => {
+  const { root, path } = await patchable(t)
+  const before = JSON.parse(await readFile(path, 'utf8'))
+  const patched = node(root, 'oracle-package.mjs', ['patch', '--package', path,
+    '--set', '/sources/[id=S1]/standard="clarified fixture policy"',
+    '--append', '/assumptions={"id":"A9","statement":"x"}',
+    '--remove', '/aiRuns/0'])
+  assert.equal(patched.status, 0, patched.stderr)
+  assert.match(patched.stdout, /^PACKAGE_PATCHED \S+\/oracle\.package\.json · set \/sources\/\[id=S1\]\/standard, append \/assumptions, remove \/aiRuns\/0 · MODELED-gate issues: \d+/)
+  const after = JSON.parse(await readFile(path, 'utf8'))
+  assert.equal(after.sources.find((source) => source.id === 'S1').standard, 'clarified fixture policy')
+  assert.deepEqual(after.assumptions, [{ id: 'A9', statement: 'x' }])
+  assert.deepEqual(after.aiRuns, before.aiRuns.slice(1))
+  assert.deepEqual({ ...after, sources: before.sources, assumptions: before.assumptions, aiRuns: before.aiRuns }, before, 'nothing else changed')
+})
+
+test('a bad patch writes nothing: a missing branch, a value that is not JSON, or a locked revision', async (t) => {
+  const { root, directory, path } = await patchable(t)
+  const bytes = await readFile(path)
+  const patch = (...args) => node(root, 'oracle-package.mjs', ['patch', '--package', path, ...args])
+  const branch = patch('--set', '/sources/[id=S1]/standard="ok"', '--set', '/nope/deeper="x"')
+  assert.equal(branch.status, 1)
+  assert.match(branch.stderr, /^PATCH_NO_TARGET: \/nope\/deeper: nothing at nope/)
+  const unquoted = patch('--set', '/sources/[id=S1]/standard=plain text')
+  assert.equal(unquoted.status, 2)
+  assert.match(unquoted.stderr, /^PATCH_VALUE_INVALID: --set value is not JSON/)
+  assert.deepEqual(await readFile(path), bytes, 'an earlier valid operation in a refused call is not written either')
+
+  await writeFile(join(directory, 'stage.json'), JSON.stringify({ schemaVersion: 1, stage: 'ORACLE_READY', packageSha256: sha256(bytes), history: [] }))
+  const locked = patch('--set', '/sources/[id=S1]/standard="ok"')
+  assert.equal(locked.status, 1)
+  assert.match(locked.stderr, /^PACKAGE_LOCKED: /)
+  assert.deepEqual(await readFile(path), bytes)
+
+  await writeFile(join(directory, 'stage.json'), JSON.stringify({ schemaVersion: 1, stage: 'MODELED', packageSha256: sha256(bytes), history: [] }))
+  const stale = patch('--set', '/sources/[id=S1]/standard="ok"')
+  assert.equal(stale.status, 0, stale.stderr)
+  assert.match(stale.stdout, /^stage MODELED recorded other package bytes — oracle-stage\.mjs rewind --dir \S+ --to DISCOVERING --reason review-finding\|gate-failure\|user-answer\|source-change$/m)
+})
+
+test('patch refuses an unreadable stage, a lock beside the package and a linked package, and skips a no-op write', async (t) => {
+  const { root, directory, path } = await patchable(t)
+  const bytes = await readFile(path)
+  const patch = (...args) => node(root, 'oracle-package.mjs', ['patch', '--package', path, ...args])
+
+  await writeFile(join(directory, 'stage.json'), '{"schemaVersion":1,"stage":"ORACLE_RE')
+  const torn = patch('--set', '/sources/[id=S1]/standard="ok"')
+  assert.equal(torn.status, 1)
+  assert.match(torn.stderr, /^STAGE_INVALID: /, 'an unreadable stage is never read as unlocked')
+  await rm(join(directory, 'stage.json'))
+
+  // revisions locked before the stage machine have a lock and no stage.json
+  await writeFile(join(directory, 'oracle.lock.json'), '{}')
+  const locked = patch('--set', '/sources/[id=S1]/standard="ok"')
+  assert.equal(locked.status, 1)
+  assert.match(locked.stderr, /^PACKAGE_LOCKED: oracle\.lock\.json sits next to this package/)
+  await rm(join(directory, 'oracle.lock.json'))
+  assert.deepEqual(await readFile(path), bytes)
+
+  const same = patch('--set', `/id=${JSON.stringify(JSON.parse(bytes.toString('utf8')).id)}`)
+  assert.equal(same.status, 0, same.stderr)
+  assert.match(same.stdout, /^PACKAGE_UNCHANGED /)
+  assert.deepEqual(await readFile(path), bytes, 'a patch that changes nothing does not rewrite the bytes')
+
+  const linked = join(directory, 'linked.package.json')
+  await symlink(path, linked)
+  const viaLink = node(root, 'oracle-package.mjs', ['patch', '--package', linked, '--set', '/sources/[id=S1]/standard="ok"'])
+  assert.equal(viaLink.status, 1)
+  assert.match(viaLink.stderr, /^PACKAGE_LINK: /)
+  assert.deepEqual(await readFile(path), bytes)
+
+  const typo = patch('--set', '/sources/[id=S1]/standrad="ok"')
+  assert.equal(typo.status, 0, typo.stderr)
+  assert.match(typo.stdout, /set \/sources\/\[id=S1\]\/standrad \(new key\)/, 'a new last key is shown, not silently accepted')
+})
+
+test('pointers decode escapes, select array elements by any field and refuse __proto__ and unknown operations', () => {
+  assert.deepEqual(parsePointer('/a~1b/c~0d/~01'), ['a/b', 'c~d', '~1'])
+  const document = { list: [{ key: 'k1', n: 1 }, { key: 'k2', n: 2 }], tags: [] }
+  assert.equal(pointerGet(document, '/list/[key=k2]/n'), 2)
+  assert.equal(pointerGet(document, '/list/[n=1]/key'), 'k1', 'a number field matches its text')
+  const { document: next, created } = applyPatch(document, [
+    { op: 'set', pointer: '/tags/-', value: 'first' },
+    { op: 'append', pointer: '/tags', value: 'second' },
+    { op: 'set', pointer: '/list/[key=k1]/note', value: 'x' },
+    { op: 'remove', pointer: '/list/1' },
+  ])
+  assert.deepEqual(next, { list: [{ key: 'k1', n: 1, note: 'x' }], tags: ['first', 'second'] })
+  assert.deepEqual(created, ['/list/[key=k1]/note'])
+  assert.deepEqual(document.tags, [], 'the input document is never changed')
+  assert.throws(() => applyPatch(document, [{ op: 'set', pointer: '/list/5', value: 1 }]), /index past the end/)
+  assert.throws(() => applyPatch(document, [{ op: 'append', pointer: '/list/0', value: 1 }]), /append needs an array/)
+  assert.throws(() => applyPatch(document, [{ op: 'set', pointer: '/__proto__', value: {} }]), /__proto__ is not a package key/)
+  assert.throws(() => applyPatch(document, [{ op: 'toString', pointer: '/tags', value: 1 }]), /unknown patch operation/)
+  assert.equal(Object.prototype.polluted, undefined)
 })

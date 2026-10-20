@@ -1,3 +1,62 @@
+# 0.103.0: edit the package with get/patch, grow Bend files in checked sections, cap bundle growth
+
+## Validation
+
+- `ORACLE_REQUIRE_BEND=1 pnpm --filter @lodado/frontend-oracle-design-plugin test`:
+  **1,178 passed, 0 failed, 0 skipped**, using real Bend.
+- Package lint: exit 0, **0 errors, 405 package-wide warnings** (unchanged). `oracle-package.mjs` has the
+  same 33 warnings as 0.102.0; none are on the new code.
+- Generated reference bundles (22) and converted evals: passed.
+- An independent Opus 5.5 review approved with three medium and six low findings, all fixed with tests:
+  - `patch` treated an unreadable `stage.json` as unlocked and ignored a lock next to the package.
+  - It printed a rewind hint even when the bytes were unchanged, and the hint had a placeholder reason.
+  - The effort-routing line contradicted the reviewer model rules.
+  - Low: unquoted `[id=…]` pointers glob in zsh; a typo in the last key silently created a field; a
+    trailing `__proto__` made the report differ from the file; the issue count missed the MODELED
+    gate's async-cell check; symlinks and concurrent patches; there was no selector for arrays
+    keyed by fields other than `id`.
+
+## Diagnosis
+
+In the same transcripts, inline scripts made up about a third of agent tool-input characters:
+
+- Python or Node heredocs: the controller wrote 1,541 of them (3.13M characters) and the authors 1,113
+  (2.27M characters).
+- About 400 of these read or edited `oracle.package.json`.
+- Bend files were rewritten whole: one `MODEL.bend` was written five times for 109 KB in total.
+- Authors wrote one-off generators (`buildpkg2.py` 50 KB, `gen_laws.py` 38 KB).
+
+Model latency is about 2.1 s plus 7.4 ms per output token, so every generated character costs wall time.
+Separately, the `role-author` bundle that each new author reads had grown back from 243 KB (0.91) to 273 KB.
+
+## Change
+
+- `oracle-package.mjs get --package <p> [--pointer <ptr>]` prints the top-level keys with their kind and
+  length, or one value as JSON.
+- `oracle-package.mjs patch --package <p> (--set <ptr>=<json> | --append <ptr>=<json> | --remove <ptr>)…`
+  applies the operations in order and writes once.
+  - Pointers are RFC 6901 plus a `[<field>=<value>]` segment that selects an array element by any field
+    (`[id=S2]`, `[key=…]`, `[candidate=…]`). `__proto__` segments are refused.
+  - Values must be JSON. Parents must exist. A key that `set` creates is marked `(new key)`.
+  - A refused call writes nothing, and a call that changes nothing writes nothing (`PACKAGE_UNCHANGED`).
+  - It refuses with `PACKAGE_LOCKED` when `stage.json` is at ORACLE_READY or an `oracle.lock.json` sits
+    next to the package. It refuses an unreadable stage with `STAGE_INVALID` and a symlinked package
+    with `PACKAGE_LINK`. It reads, edits and writes under a directory lock.
+  - After writing, it reports the issues the MODELED gate checks (structure and async cells). When the
+    stage record's package digest no longer matches, it prints the exact `oracle-stage.mjs rewind`
+    command.
+- `subagent-review.md`: a Medium single review runs on the same newest model as any review. The clause
+  allowing a faster model or lower effort is removed, as the reviewer model rule requires.
+- `roles/author-formal.md`: grow Bend files in small sections, checked after each, and change them with
+  small edits. Use `patch` and `get` instead of one-off scripts. `bend-cross-verification.md`: the
+  `oracle-model` wrappers already set `BEND_NO_TELEMETRY`, so no env preamble is needed.
+- `roles/controller-formal.md`: where the host sets effort per dispatch, execution roles are capped at
+  `high` and never run above the session's effort. Execution roles are a worker running given commands,
+  packet assembly, and a repair spelled out by exact findings. Author, analyst, every reviewer and the
+  blind mapper are not execution roles: they keep the session's effort and their own model rules.
+- `reference-bundles.test.mjs` caps every generated bundle at its current size rounded up to 1 KB. A
+  larger bundle fails the test until text is removed elsewhere or the cap is raised with a reason here.
+
 # 0.102.0: time every stage and dispatch, run long commands as jobs, print one-line progress
 
 ## Validation
