@@ -17,7 +17,7 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { devNull, tmpdir } from 'node:os'
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
@@ -34,6 +34,7 @@ import { deliveryGuidance, renderGuidance } from './oracle-delivery-guidance.mjs
 import { generateFromDocument, parseCaseSpace } from './oracle-frames.mjs'
 import {
   assertSnapshotUnchanged,
+  codeCitation,
   elapsedLabel,
   FAILURE_CAUSES,
   sha256 as fsSha256,
@@ -95,6 +96,7 @@ const FLAG_NAMES = [
   'evidence',
   'findings',
   'intersect',
+  'closure',
   'mutation-run',
   'mutation-row',
   'reason',
@@ -158,6 +160,8 @@ const NEXT_ACTIONS = {
     'stop reusing evidence for this revision, preserve history, and confirm a new revision with the changed source set — never relock',
   LOCK_INVALID: 'FAIL — the determinism judgment is impossible; do not substitute LLM judgment',
   RUN_NOT_GREEN: 'produce an actually passing run with `exec --label <label>` and cite that runId',
+  REVIEW_CLOSURE_INVALID:
+    'the closure does not apply — send the confirm-fixes packet to the round-2 reviewers and pass their --findings',
   RUN_NOT_RED: 'the cited run must fail on the mapped row — write the test, run `red --row <row>`',
   EVIDENCE_REQUIRED:
     'generate `oracle-verify.mjs evidence-scaffold --oracle <card> > evidence.json`, fill the slots, pass --evidence',
@@ -1815,6 +1819,12 @@ async function execute(options) {
     worktreeSha256: sha256(JSON.stringify(worktree)),
     productionSha256: productionSha256(worktree, state.harnessPaths),
     harnessSha256: selectedDigests(worktree, state.harnessPaths ?? []),
+    // init 뒤 바뀐 테스트 파일의 digest — 2차 closure가 재현 테스트가 이 run 뒤로 그대로인지 가린다. 지운 파일은 null
+    changedTests: Object.fromEntries(
+      changedPaths(state.snapshot ?? {}, worktree)
+        .filter(isTestPath)
+        .map((path) => [path, worktree[path] ?? null]),
+    ),
     provenance: await provenance(options, state, revision, worktree),
     commandMs,
     wrapperMs: Date.now() - wrapperStartedAt - commandMs, // oracle:nondeterminism wrapper 소요 시간 계측
@@ -2543,6 +2553,285 @@ async function assertBlindMappingEvidence(directory, state, options, expected) {
   }
 }
 
+/** 이번 라운드 리뷰어의 findings(그리고 High의 두 번째) — 패킷·리비전에 묶인 원장 영수증이 있어야 한다. */
+async function roundReviewers(directory, state, { options, allLedger, packetSha256 }) {
+  const findingsSnapshot = await snapshotRegularFile(resolve(options.findings), {
+    base: directory,
+    allowHardlinks: false,
+    label: 'review findings',
+    fail: (message) => new CliError('FINDINGS_INVALID', message),
+  })
+  const findingsDocument = JSON.parse(findingsSnapshot.bytes.toString('utf8'))
+  await assertArtifactIdentity(directory, state, findingsDocument)
+  await assertArtifactIdentity(directory, state, findingsDocument?.orchestrationReceipt ?? {})
+  const receipt = findingsDocument?.orchestrationReceipt
+  const receiptEvent = allLedger.find(
+    (entry) =>
+      entry.type === 'review-receipt' &&
+      entry.receiptId === receipt?.receiptId &&
+      entry.packetSha256 === packetSha256 &&
+      entry.targetRevision === options.revision &&
+      entry.findingsSha256 === findingsSnapshot.sha256,
+  )
+  if (!receiptEvent) {
+    throw new CliError('REVIEWER_EVIDENCE_INVALID', 'review findings require a pre-verification ledger receipt')
+  }
+  await assertArtifactIdentity(directory, state, receiptEvent)
+  const intersectDocument = options.intersect ? JSON.parse(await readFile(resolve(options.intersect), 'utf8')) : null
+  if (intersectDocument) {
+    await assertArtifactIdentity(directory, state, intersectDocument)
+    await assertArtifactIdentity(directory, state, intersectDocument.orchestrationReceipt ?? {})
+  }
+  const documents = [findingsDocument, ...(intersectDocument ? [intersectDocument] : [])]
+  return {
+    reviewerIds: documents.map((document) => document?.reviewerId).filter(Boolean),
+    taskIds: documents.map((document) => document?.orchestrationReceipt?.taskId).filter(Boolean),
+    artifacts: [['findings', findingsDocument], ...(intersectDocument ? [['intersect findings', intersectDocument]] : [])],
+  }
+}
+
+/** 결정적 closure — 2차 리뷰어 대신 1차 findings와 재현 run으로 닫는다. 블라인드 독립성은 1차 리뷰어 기준이다. */
+async function closureReviewers(directory, state, { options, packet, allLedger, run, current, scanRoot, revision }) {
+  const closed = await assertReviewClosure(directory, state, {
+    closurePath: resolve(options.closure),
+    packet,
+    allLedger,
+    reviewRun: run,
+    current,
+    scanRoot,
+    lockManifestSha256: revision.lockManifestSha256,
+    targetRevision: options.revision,
+  })
+  return {
+    closure: closed,
+    reviewerIds: closed.reviewerIds,
+    taskIds: closed.taskIds,
+    artifacts: closed.documents.map((document, index) => [`round-1 findings ${index + 1}`, document]),
+  }
+}
+
+/**
+ * 2차 리뷰를 결정적으로 닫는다 — Low·Medium에서, 1차의 모든 지적(NON_ORACLE_OPINION 제외)이 `path#La-Lb`를 인용한
+ * PRODUCT_DEFECT이고, 지적마다 재현 테스트가 고치기 전 1차가 본 production에서 assertion으로 실패했고, 그 run과 리뷰 런이
+ * production만 다르며(같은 명령·환경·harness·테스트 파일), 리뷰 런에서 같은 파일의 그 테스트가 통과하고, 수리가 인용한 파일을
+ * 바꾸되 그 밖의 production은 건드리지 않았다면 확인 리뷰어를 다시 부르지 않는다. 테스트가 지적을 재현한다는 판단은 하지 않는다 —
+ * 그 신뢰가 남는 위험이라 High는 닫지 않는다. 차단 판정을 다시 구현하지 않으려고 모든 지적을 닫는다(차단 지적의 상위 집합).
+ * 하나라도 어긋나면 기존 2차 리뷰로 간다.
+ */
+async function assertReviewClosure(directory, state, options) {
+  const { closurePath, packet, allLedger, reviewRun, current, scanRoot, lockManifestSha256, targetRevision } = options
+  const invalid = (message) => new CliError('REVIEW_CLOSURE_INVALID', message)
+  if (state.risk === 'high') throw invalid('a High round 2 stays with its two reviewers')
+  const { closure, sha256: closureSha256 } = await readClosure(directory, closurePath, invalid)
+  const { scope, previousIndex, previousRound, documents } = await closureRound(directory, { packet, allLedger, targetRevision, invalid })
+  // harness가 바뀌었으면 테스트의 뜻이 바뀌었을 수 있어 리뷰어가 본다
+  const harnessPaths = state.harnessPaths ?? []
+  const changed = changedPaths(previousRound.snapshot, current)
+  const harness = changed.filter((path) => harnessPaths.includes(path))
+  if (harness.length > 0) throw invalid(`the repair changed harness files a reviewer must confirm: ${harness.join(', ')}`)
+  const root = await realpath(scanRoot)
+  const closed = await closeFindings(scope, closure.reproductions, {
+    invalid,
+    allLedger,
+    previousIndex,
+    previousProduction: productionSha256(previousRound.snapshot, state.harnessPaths),
+    previousSnapshot: previousRound.snapshot,
+    scanPrefix: folderPrefix(portablePath(commonAncestor(await realpath(directory), root), root)),
+    lockManifestSha256,
+    reviewRun,
+    root,
+    current,
+    harnessPaths,
+    reproductionNames: new Set(closure.reproductions.map((entry) => entry.test)),
+  })
+  await assertRepairScope(state, { changed, closed, scanRoot, invalid })
+  const receipts = scope.previousFindings.map((previous) =>
+    allLedger.find((entry) => entry.type === 'review-receipt' && entry.findingsSha256 === previous.sha256 && entry.reviewerId === previous.reviewerId),
+  )
+  return {
+    path: portablePath(directory, closurePath),
+    sha256: closureSha256,
+    reviewerIds: scope.previousFindings.map((previous) => previous.reviewerId),
+    taskIds: receipts.map((receipt) => receipt?.taskId).filter(Boolean),
+    documents,
+  }
+}
+
+/** closure 파일 — `{ schemaVersion: 1, reproductions: [{ reviewerId, finding, test, redRun }] }` 꼴만 받는다. */
+async function readClosure(directory, closurePath, invalid) {
+  const snapshot = await snapshotRegularFile(closurePath, { base: directory, allowHardlinks: false, label: 'review closure', fail: invalid })
+  let closure
+  try {
+    closure = JSON.parse(snapshot.bytes.toString('utf8'))
+  } catch (error) {
+    throw invalid(`Cannot read review closure: ${error.message}`)
+  }
+  const entryShape = (entry) => ['reviewerId', 'finding', 'test', 'redRun'].every((field) => typeof entry?.[field] === 'string' && entry[field])
+  if (closure?.schemaVersion !== 1 || !Array.isArray(closure.reproductions) || !closure.reproductions.every(entryShape))
+    throw invalid('a closure is { schemaVersion: 1, reproductions: [{ reviewerId, finding, test, redRun }] }')
+  return { closure, sha256: snapshot.sha256 }
+}
+
+/**
+ * closure가 답하는 1차 — 패킷은 자신이 적은 리비전을 겨누고, 그 confirm-fixes 범위가 원장의 마지막 리뷰 라운드이며, 이 패킷에
+ * 2차 리뷰어가 아직 답하지 않았다(답했으면 그 findings가 판정한다). 1차가 본 snapshot과 findings 파일은 그대로다.
+ */
+async function closureRound(directory, { packet, allLedger, targetRevision, invalid }) {
+  const scope = packet.reviewScope
+  if (scope?.mode !== 'confirm-fixes' || !Array.isArray(scope.previousFindings) || scope.previousFindings.length === 0)
+    throw invalid('a closure answers round 1 inside a confirm-fixes packet')
+  if (packet.targetRevision !== targetRevision || packet.targetSnapshot?.worktreeSha256 !== targetRevision)
+    throw invalid('the packet must target the revision it names')
+  const latest = allLedger.filter((entry) => entry.type === 'review-round').at(-1)
+  if (latest?.targetRevision !== packet.targetRevision || stableStringify(latest.scope) !== stableStringify(scope))
+    throw new CliError('REVIEW_SCOPE_INVALID', 'a closure answers the latest recorded review round and its confirmation task')
+  if (allLedger.some((entry) => entry.type === 'review-receipt' && entry.role !== 'blind-mapper' && entry.targetRevision === packet.targetRevision))
+    throw invalid('round-2 reviewers already answered this packet — their findings decide, not a closure')
+  const previousIndex = allLedger.findLastIndex((entry) => entry.type === 'review-round' && entry.targetRevision === scope.previousRevision)
+  const previousRound = allLedger[previousIndex]
+  if (!previousRound?.snapshot) throw invalid('the snapshot round 1 reviewed is not in the ledger')
+  const documents = []
+  for (const previous of scope.previousFindings) {
+    const bytes = await readFile(resolve(directory, previous.path)).catch(() => null)
+    if (!bytes || sha256(bytes) !== previous.sha256) throw invalid(`${previous.path} changed after the round-2 packet bound it`)
+    documents.push(JSON.parse(bytes.toString('utf8')))
+  }
+  // 2차 리뷰어가 답하고 원장에 묶지 않았어도 host 영수증에는 남는다 — 라운드가 시작된 뒤의 리뷰어 findings가 있으면 그것이 판정한다
+  if (await laterReviewerOutputs(directory, latest.at, documents))
+    throw invalid('a reviewer answered after this round began (host receipt) — pass those findings, not a closure')
+  return { scope, previousIndex, previousRound, documents }
+}
+
+/** 라운드가 시작된 뒤 host가 기록한 리뷰어 findings 중 1차 문서가 아닌 것이 있는가. 영수증 파일이 없는 호스트면 알 수 없다(false). */
+async function laterReviewerOutputs(directory, since, documents) {
+  // 없는 파일은 영수증을 남기지 않는 호스트다 — 원장 영수증 검사만 남는다
+  const raw = await readFile(join(directory, HOST_RECEIPTS_FILE), 'utf8').catch(() => '')
+  const known = new Set(documents.map((document) => reviewOutputDigest(document)?.sha256))
+  return raw
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+    .some((receipt) => receipt.kind === 'findings' && typeof receipt.at === 'string' && receipt.at > since && !known.has(receipt.sha256))
+}
+
+/**
+ * 1차의 지적마다 재현이 하나씩 — 인용된 PRODUCT_DEFECT만 닫고, 1차에 없는 지적 이름은 거부한다. 인용은 1차 snapshot에 있던
+ * 파일이어야 한다(scan root 기준과 저장소 루트 기준 둘 다 받는다). 인용한 파일과 재현이 든 테스트 파일을 돌려준다.
+ */
+async function closeFindings(scope, reproductions, context) {
+  const { invalid } = context
+  const entries = new Map(reproductions.map((entry) => [`${entry.reviewerId}\0${entry.finding}`, entry]))
+  if (entries.size !== reproductions.length) throw invalid('each round-1 finding has at most one reproduction')
+  const claims = scope.previousFindings.flatMap((previous) =>
+    (previous.findings ?? []).filter((finding) => finding?.classification !== 'NON_ORACLE_OPINION').map((finding) => ({ previous, finding })),
+  )
+  if (claims.length === 0) throw invalid('round 1 raised no claim to close — a changed snapshot goes to the round-2 reviewers')
+  const cited = new Set()
+  const files = new Set()
+  const answered = new Set()
+  for (const { previous, finding } of claims) {
+    const key = `${previous.reviewerId}\0${finding.id}`
+    const label = `${previous.reviewerId} ${finding.id}`
+    if (typeof finding.id !== 'string' || !finding.id || answered.has(key)) throw invalid(`${label} needs one unique finding id`)
+    if (!entries.has(key)) throw invalid(`${label} has no reproduction — confirm it with the round-2 reviewers`)
+    cited.add(citedFile(finding, label, context))
+    files.add(await assertReproduction(entries.get(key), context))
+    answered.add(key)
+  }
+  const unknown = [...entries.keys()].filter((key) => !answered.has(key))
+  if (unknown.length > 0)
+    throw invalid(`reproductions name findings round 1 did not raise: ${unknown.map((key) => key.replace('\0', ' ')).join(', ')}`)
+  return { cited, files }
+}
+
+/** 지적이 인용한 파일(scan root 기준) — PRODUCT_DEFECT의 `path#La-Lb`만, 그리고 1차 snapshot에 있던 파일만. */
+function citedFile(finding, label, { invalid, previousSnapshot, scanPrefix }) {
+  const citation = finding.classification === 'PRODUCT_DEFECT' ? codeCitation(finding) : null
+  if (!citation) throw invalid(`${label} is not a PRODUCT_DEFECT citing path#La-Lb — only a reviewer can confirm it`)
+  const path = withinScanRoot(posix.normalize(citation.path), scanPrefix)
+  if (previousSnapshot[path] === undefined) throw invalid(`${label} cites ${citation.path}, a file round 1 did not have`)
+  return path
+}
+
+/** 저장소 루트에서 scan root까지의 접두사 — 같은 폴더면 없다. */
+function folderPrefix(relativePath) {
+  if (relativePath === '' || relativePath === '.') return ''
+  return `${relativePath}/`
+}
+
+/** 인용은 scan root 기준일 수도 저장소 루트 기준일 수도 있다(oracle-verify reviewRoots와 같은 두 뿌리) — scan root 기준으로 맞춘다. */
+function withinScanRoot(path, scanPrefix) {
+  if (!scanPrefix || !path.startsWith(scanPrefix)) return path
+  return path.slice(scanPrefix.length)
+}
+
+/**
+ * 수리 범위 — 1차 뒤 바뀐 테스트 파일은 재현이 든 파일뿐이고 약해진 테스트가 없으며, 바뀐 production은 인용한 파일뿐이되 인용한
+ * 파일은 모두 바뀌었다(아무것도 고치지 않은 closure는 없다).
+ */
+async function assertRepairScope(state, { changed, closed, scanRoot, invalid }) {
+  const harnessPaths = state.harnessPaths ?? []
+  const strayTests = changed.filter((path) => isTestPath(path) && !harnessPaths.includes(path) && !closed.files.has(path))
+  if (strayTests.length > 0) throw invalid(`test files changed since round 1 outside the reproductions: ${strayTests.join(', ')}`)
+  await assertTestsNotWeakened(state, scanRoot)
+  const production = changed.filter((path) => !isTestPath(path) && !harnessPaths.includes(path))
+  const outside = production.filter((path) => !closed.cited.has(path))
+  if (outside.length > 0) throw invalid(`the repair changed production outside the cited files: ${outside.join(', ')}`)
+  const untouched = [...closed.cited].filter((path) => !production.includes(path))
+  if (untouched.length > 0) throw invalid(`the repair left a cited file unchanged: ${untouched.join(', ')}`)
+}
+
+/**
+ * 한 지적의 재현 — 1차 뒤, 1차가 본 production에서 그 테스트가 assertion으로 실패했고, 그 run과 리뷰 런은 production만 다르며
+ * (명령·cwd·환경·adapter·harness·init 뒤 바뀐 테스트 파일이 같다), 리뷰 런에서 같은 파일의 그 테스트가 통과한다. 재현이 든
+ * 테스트 파일(scan root 기준)을 돌려준다.
+ */
+async function assertReproduction(entry, context) {
+  const { invalid, allLedger, previousIndex, previousProduction, lockManifestSha256, reviewRun, root, current, harnessPaths } = context
+  const redIndex = allLedger.findIndex((record) => record.type === 'run' && record.runId === entry.redRun)
+  const red = allLedger[redIndex]
+  if (!red || redIndex < previousIndex) throw invalid(`${entry.redRun} is not a run recorded after round 1`)
+  if (red.grade !== 'reported' || red.lockManifestSha256 !== lockManifestSha256 || red.productionSha256 !== previousProduction)
+    throw invalid(`${entry.redRun} must be a reported run on the production round 1 reviewed, before the repair`)
+  assertOnlyProductionDiffers(entry, red, context)
+  const failed = await onlyTest(red, entry.test, root, invalid)
+  if (failed.status !== 'failed' || failed.cause !== 'assertion') throw invalid(`"${entry.test}" did not fail on its assertion in ${entry.redRun}`)
+  const passed = await onlyTest(reviewRun, entry.test, root, invalid)
+  // 테스트 파일이 두 run에서 같고 이름이 하나뿐이면 파일도 같다 — 규칙을 드러내려고 그대로 적는다
+  if (passed.status !== 'passed' || !failed.file || passed.file !== failed.file)
+    throw invalid(`"${entry.test}" does not pass from the same file in the review run ${reviewRun.runId}`)
+  // snapshot이 담지 않는 곳(무시 경로·build/·scan root 밖)의 재현은 두 run 사이 변경이 드러나지 않는다
+  if (current[failed.file] === undefined || !(isTestPath(failed.file) || harnessPaths.includes(failed.file)))
+    throw invalid(`"${entry.test}" must live in a test file inside the scan snapshot, not ${failed.file}`)
+  return failed.file
+}
+
+/**
+ * red run과 리뷰 런이 production만 다른가 — 명령·cwd·환경·adapter·harness·init 뒤 바뀐 테스트 파일이 같아야 실패에서 통과로 바뀐
+ * 까닭이 수리다. 재현이 아닌 테스트가 red run에서 실패했으면 잠긴 행의 테스트가 바뀐 것일 수 있어 그 수리는 리뷰어가 본다.
+ */
+function assertOnlyProductionDiffers(entry, red, { invalid, reviewRun, reproductionNames }) {
+  // 0.106.0 전 run에는 테스트 파일 digest가 없다 — 비교할 수 없으면 닫지 않는다
+  if (!red.changedTests || !reviewRun.changedTests)
+    throw invalid(`${entry.redRun} or ${reviewRun.runId} predates test-file digests — rerun both with this version`)
+  const same = (left, right) => stableStringify(left ?? null) === stableStringify(right ?? null)
+  const differs = ['command', 'cwd', 'env', 'adapter'].filter((field) => !same(red[field], reviewRun[field]))
+  if (differs.length > 0) throw invalid(`${entry.redRun} must run the review command of ${reviewRun.runId} unchanged (${differs.join(', ')} differ)`)
+  if (!sameDigests(red.harnessSha256 ?? {}, reviewRun.harnessSha256 ?? {}) || !same(red.changedTests, reviewRun.changedTests))
+    throw invalid(`${entry.redRun} and ${reviewRun.runId} must differ only in production — harness or test files changed between them`)
+  const stray = (red.tests ?? []).filter((test) => test.status === 'failed' && !reproductionNames.has(test.name))
+  if (stray.length > 0) throw invalid(`${entry.redRun} also failed tests that are not reproductions: ${stray.map((test) => test.name).join(', ')}`)
+}
+
+/** run에서 그 이름의 테스트 하나 — 같은 이름이 둘이면 어느 것이 재현인지 알 수 없다. 러너가 적은 실경로를 scan root 기준으로 맞춘다. */
+async function onlyTest(record, name, root, invalid) {
+  const matches = (record.tests ?? []).filter((test) => test.name === name)
+  if (matches.length !== 1) throw invalid(`${record.runId} must report exactly one test named "${name}"`)
+  const [test] = matches
+  const file = typeof test.file === 'string' ? portablePath(root, await realpath(test.file).catch(() => resolve(test.file))) : null
+  return { ...test, file }
+}
+
 /**
  * hold(답을 미룬 정책 질문)가 열려 있으면 완전한 REVIEW_VERIFIED는 없다. 같은 리뷰 관문을 거치되 PARTIAL_VERIFIED로 끝나고,
  * 남은 hold ID가 원장에 기록된다 — hold가 풀리면 새 리비전으로 그 행만 다시 돈다. 반대로 열린 hold가 없는데 PARTIAL을
@@ -2600,6 +2889,7 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
   let implementationRevision = null
   let blindMapping = null
   let reviewAttestation = null
+  let closure = null
 
   if (isEscapeTransition(options.to)) {
     if (missingProtocolFlags(options, state, 'stop-reason'))
@@ -2866,11 +3156,16 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
       )
     }
 
-    if (missingProtocolFlags(options, state, 'review-evidence')) {
-      throw new CliError('EVIDENCE_REQUIRED', 'REVIEW_VERIFIED requires --evidence and --findings')
+    // 결정적 closure(--closure)는 2차 리뷰어의 findings만 대신한다 — 증거·변이·블라인드·재실행·패킷 관문은 그대로다
+    if (options.closure && (options.findings || options.intersect)) {
+      throw new CliError('USAGE', '--closure replaces the round-2 --findings and --intersect', 2)
     }
 
-    if (missingProtocolFlags(options, state, 'review-intersect')) {
+    if (options.closure ? !options.evidence : missingProtocolFlags(options, state, 'review-evidence')) {
+      throw new CliError('EVIDENCE_REQUIRED', 'REVIEW_VERIFIED requires --evidence and --findings (or --closure)')
+    }
+
+    if (!options.closure && missingProtocolFlags(options, state, 'review-intersect')) {
       throw new CliError('REVIEW_EVIDENCE_REQUIRED', 'High risk REVIEW_VERIFIED requires --intersect')
     }
 
@@ -3029,39 +3324,15 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
     ) {
       throw new CliError('REVIEW_PACKET_STALE', 'review packet does not target the current snapshot')
     }
-    const findingsSnapshot = await snapshotRegularFile(resolve(options.findings), {
-      base: directory,
-      allowHardlinks: false,
-      label: 'review findings',
-      fail: (message) => new CliError('FINDINGS_INVALID', message),
-    })
-    const findingsDocument = JSON.parse(findingsSnapshot.bytes.toString('utf8'))
-    await assertArtifactIdentity(directory, state, findingsDocument)
-    await assertArtifactIdentity(directory, state, findingsDocument?.orchestrationReceipt ?? {})
-    const receipt = findingsDocument?.orchestrationReceipt
-    const receiptEvent = allLedger.find(
-      (entry) =>
-        entry.type === 'review-receipt' &&
-        entry.receiptId === receipt?.receiptId &&
-        entry.packetSha256 === packetSha256 &&
-        entry.targetRevision === options.revision &&
-        entry.findingsSha256 === findingsSnapshot.sha256,
-    )
-    if (!receiptEvent) {
-      throw new CliError('REVIEWER_EVIDENCE_INVALID', 'review findings require a pre-verification ledger receipt')
-    }
-    await assertArtifactIdentity(directory, state, receiptEvent)
+    // 리뷰어 산출물 — 2차 리뷰어의 findings, 또는 결정적 closure가 기대는 1차 findings. 블라인드 독립성과 host 영수증이 이것을 본다
+    const reviewers = options.closure
+      ? await closureReviewers(directory, state, { options, packet, allLedger, run, current, scanRoot, revision })
+      : await roundReviewers(directory, state, { options, allLedger, packetSha256 })
+    if (reviewers.closure) closure = reviewers.closure
 
     // 블라인드 행↔테스트 매핑 — 필요 여부는 검증된 런의 risk와 증거 매핑에서 파생한다. 호출자가 옵션을
     // 빼는 것으로는 우회할 수 없다. 판정은 마지막 게이트인 여기서만 하고, 앞선 단계는 조기에 잠그지 않는다.
     const evidenceDocument = JSON.parse(await readFile(resolve(options.evidence), 'utf8'))
-    const intersectDocument = options.intersect ? JSON.parse(await readFile(resolve(options.intersect), 'utf8')) : null
-    if (intersectDocument) {
-      await assertArtifactIdentity(directory, state, intersectDocument)
-      await assertArtifactIdentity(directory, state, intersectDocument.orchestrationReceipt ?? {})
-    }
-    const intersectReviewerId = intersectDocument?.reviewerId ?? null
-    const intersectTaskId = intersectDocument?.orchestrationReceipt?.taskId ?? null
     blindMapping = blindMappingApplicability(state.risk, evidenceDocument)
     if (blindMapping.required) {
       // High은 무조건 요구된다. 테스트 증거가 하나도 없다면 면제가 아니라 증거가 잘못된 것이다.
@@ -3088,14 +3359,13 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
           oracleSha256: revision.oracleSha256,
           lockManifestSha256: revision.lockManifestSha256,
           ledger: allLedger,
-          reviewerIds: [findingsDocument?.reviewerId, intersectReviewerId].filter(Boolean),
-          taskIds: [findingsDocument?.orchestrationReceipt?.taskId, intersectTaskId].filter(Boolean),
+          reviewerIds: reviewers.reviewerIds,
+          taskIds: reviewers.taskIds,
         })),
       }
     }
 
-    const reviewArtifacts = [['findings', findingsDocument]]
-    if (intersectDocument) reviewArtifacts.push(['intersect findings', intersectDocument])
+    const reviewArtifacts = [...reviewers.artifacts]
     if (blindMapping?.required) reviewArtifacts.push(['blind map', await readJsonFile(resolve(options.blindMap))])
     reviewAttestation = await assertHostReceipts(directory, state, reviewArtifacts)
 
@@ -3103,8 +3373,7 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
       'review',
       '--oracle',
       oracle,
-      '--file',
-      resolve(options.findings),
+      ...(options.closure ? ['--closure'] : ['--file', resolve(options.findings)]),
       '--packet',
       packetPath,
       '--revision',
@@ -3131,6 +3400,7 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
     row: options.row ?? null,
     evidence: options.evidence ? portablePath(directory, resolve(options.evidence)) : null,
     findings: options.findings ? portablePath(directory, resolve(options.findings)) : null,
+    ...(closure ? { closure: closure.path, closureSha256: closure.sha256 } : {}),
     packet: options.packet ? portablePath(directory, resolve(options.packet)) : null,
     packetSha256,
     targetRevision: options.revision ?? null,
@@ -3155,6 +3425,7 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
     row: options.row ?? null,
     evidence: historyEntry.evidence,
     findings: historyEntry.findings,
+    ...(closure ? { closure: closure.path, closureSha256: closure.sha256 } : {}),
     packet: historyEntry.packet,
     packetSha256: historyEntry.packetSha256,
     targetRevision: historyEntry.targetRevision,

@@ -4468,6 +4468,372 @@ test('review iterations bind High reviewers to one round, require prior findings
   assert.equal(run(['review-extend', '--dir', oracleDirectory, '--approval', approval]).status, 1)
 })
 
+/**
+ * 2차 직전 상태 — 1차 리뷰어가 src/save.mjs#L1의 결함 하나(F1)를 냈고, 재현 테스트가 고치기 전 1차 production에서 assertion으로
+ * 실패했고(redRun), 고친 뒤 같은 명령이 통과했고(reviewRun), 1차 findings로 2차 패킷을 만들었다. 옵션은 그 흐름을 하나씩 비튼다.
+ */
+async function closableRound(t, { findings = [], extraRepair = {}, editAfterRed = false, harness = false, strayTest = false, body = 'assert.equal(save, 2)' } = {}) {
+  const harnessFiles = harness ? { 'oracle-harness.mjs': 'export const setup = 1\n' } : {}
+  const { root, oracleDirectory } = await workspace(t, { harnessFiles })
+  await reachGreen(oracleDirectory, root, { product: true })
+  const round1 = join(oracleDirectory, 'packet-round-1.json')
+  const { packet, packetSha256 } = strictPacket(oracleDirectory, round1)
+  const findingsPath = join(oracleDirectory, 'round-1.json')
+  const cited = { id: 'F1', row: 'O1', severity: 'high', classification: 'PRODUCT_DEFECT', finding: 'save exports 1 where the card needs 2',
+    evidence: 'src/save.mjs#L1 exports the old value', quote: 'export const save = 1', fix: 'export 2' }
+  await writeFile(findingsPath, JSON.stringify({ ...CLEAR_REVIEW, findings: [cited, ...findings] }))
+  bindReviewDocument(findingsPath, packetSha256, packet.targetRevision)
+  const receipt = issueReviewReceipt(oracleDirectory, round1, findingsPath, packet.targetRevision)
+  assert.equal(receipt.status, 0, receipt.stderr)
+  const fixture = join(root, 'oracle-green-fixture.test.mjs')
+  const reproduction = (body) => [
+    "import test from 'node:test'",
+    "import assert from 'node:assert/strict'",
+    "import { save } from './src/save.mjs'",
+    "test('save > pending', () => {})",
+    `test('save > reproduces F1', () => ${body})`,
+    '',
+  ].join('\n')
+  const lastRun = async () => (await ledgerLines(oracleDirectory)).map(JSON.parse).filter((entry) => entry.type === 'run').at(-1).runId
+  if (strayTest) {
+    await mkdir(join(root, '__tests__'), { recursive: true })
+    await writeFile(join(root, '__tests__', 'helper.mjs'), 'export const helper = 1\n')
+  }
+  await writeFile(fixture, reproduction(body))
+  greenRun(oracleDirectory, 'reproduce-f1')
+  const redRun = await lastRun()
+  if (editAfterRed) await writeFile(fixture, reproduction('{ assert.equal(save, 2) }'))
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 2\n')
+  for (const [path, content] of Object.entries({ ...extraRepair, ...(harness ? { 'oracle-harness.mjs': 'export const setup = 2\n' } : {}) }))
+    await writeFile(join(root, path), content)
+  greenRun(oracleDirectory, 'after-repair')
+  const reviewRun = await lastRun()
+  const round2 = join(oracleDirectory, 'packet-round-2.json')
+  const second = run([...strictReviewPacketArgs(oracleDirectory, round2), '--findings', findingsPath])
+  assert.equal(second.status, 0, second.stderr)
+  const { targetRevision } = JSON.parse(await readFile(round2, 'utf8'))
+  const closurePath = join(oracleDirectory, 'closure.json')
+  const close = (reproductions, extra = []) => {
+    writeFileSync(closurePath, JSON.stringify({ schemaVersion: 1, reproductions }))
+    return run(['transition', '--dir', oracleDirectory, '--to', 'REVIEW_VERIFIED', '--run', reviewRun,
+      '--evidence', join(oracleDirectory, 'evidence.json'), '--packet', round2, '--revision', targetRevision, '--closure', closurePath, ...extra])
+  }
+  const entry = { reviewerId: CLEAR_REVIEW.reviewerId, finding: 'F1', test: 'save > reproduces F1', redRun }
+  return { oracleDirectory, findingsPath, reviewRun, close, entry }
+}
+
+test('round 2 closes without reviewers when every round-1 claim was reproduced before the repair and passes after it', async (t) => {
+  const round = await closableRound(t)
+  const refused = (reproductions, pattern, extra = [], status = 1) => {
+    const result = round.close(reproductions, extra)
+    assert.equal(result.status, status, result.stderr)
+    assert.match(result.stderr, pattern)
+  }
+  // the run named as the reproduction must be the red one, on the production round 1 reviewed
+  refused([{ ...round.entry, redRun: round.reviewRun }], /^REVIEW_CLOSURE_INVALID: r-\d+ must be a reported run on the production round 1 reviewed/)
+  refused([], /^REVIEW_CLOSURE_INVALID: primary-code-reviewer F1 has no reproduction — confirm it with the round-2 reviewers/)
+  refused([round.entry, { ...round.entry, finding: 'F9' }], /^REVIEW_CLOSURE_INVALID: reproductions name findings round 1 did not raise: primary-code-reviewer F9/)
+  // naming a test that passed leaves the real reproduction as a stray failure of the red run
+  refused([{ ...round.entry, test: 'save > pending' }], /^REVIEW_CLOSURE_INVALID: r-\d+ also failed tests that are not reproductions: save > reproduces F1/)
+  refused([round.entry], /^USAGE: --closure replaces the round-2 --findings and --intersect/, ['--findings', round.findingsPath], 2)
+  assert.equal((await state(round.oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+
+  const closed = round.close([round.entry])
+  assert.equal(closed.status, 0, closed.stderr)
+  const recorded = (await state(round.oracleDirectory)).history.at(-1)
+  assert.equal(recorded.state, 'REVIEW_VERIFIED')
+  assert.equal(recorded.findings, null)
+  assert.equal(recorded.closure, 'closure.json')
+  assert.match(recorded.closureSha256, /^[a-f0-9]{64}$/)
+})
+
+test('a closure stays with the reviewers when the repair reached production the findings did not cite, or harness files', async (t) => {
+  const wider = await closableRound(t, { extraRepair: { 'src/other.mjs': 'export const other = 1\n' } })
+  const outside = wider.close([wider.entry])
+  assert.equal(outside.status, 1)
+  assert.match(outside.stderr, /^REVIEW_CLOSURE_INVALID: the repair changed production outside the cited files: src\/other\.mjs/)
+  const harnessed = await closableRound(t, { harness: true })
+  const harness = harnessed.close([harnessed.entry])
+  assert.equal(harness.status, 1)
+  assert.match(harness.stderr, /^REVIEW_CLOSURE_INVALID: the repair changed harness files a reviewer must confirm: oracle-harness\.mjs/)
+  // a test helper added before the red run is the same in both runs, but nothing reviewed it
+  const helper = await closableRound(t, { strayTest: true })
+  const stray = helper.close([helper.entry])
+  assert.equal(stray.status, 1)
+  assert.match(stray.stderr, /^REVIEW_CLOSURE_INVALID: test files changed since round 1 outside the reproductions: __tests__\/helper\.mjs/)
+})
+
+test('a closure stays with the reviewers for a claim that is not a cited product defect, or a reproduction edited after its red run', async (t) => {
+  const gap = { id: 'F2', row: 'O1', severity: 'medium', classification: 'EVIDENCE_GAP', finding: 'no test pins the boundary',
+    evidence: 'the O1 boundary has no test', fix: 'add a boundary test' }
+  const uncited = await closableRound(t, { findings: [gap] })
+  const evidenceGap = uncited.close([uncited.entry, { ...uncited.entry, finding: 'F2' }])
+  assert.equal(evidenceGap.status, 1)
+  assert.match(evidenceGap.stderr, /^REVIEW_CLOSURE_INVALID: primary-code-reviewer F2 is not a PRODUCT_DEFECT citing path#La-Lb/)
+  const edited = await closableRound(t, { editAfterRed: true })
+  const changed = edited.close([edited.entry])
+  assert.equal(changed.status, 1)
+  assert.match(changed.stderr, /^REVIEW_CLOSURE_INVALID: r-\d+ and r-\d+ must differ only in production — harness or test files changed between them/)
+  // round-1 findings drive the gate, so one reproduction cannot answer a duplicated id, and a citation must name a file round 1 had
+  const duplicated = await closableRound(t, { findings: [{ id: 'F1', row: 'O1', severity: 'high', classification: 'PRODUCT_DEFECT',
+    finding: 'a second claim under the same id', evidence: 'src/save.mjs#L1 again', quote: 'export const save = 1', fix: 'export 2' }] })
+  const twice = duplicated.close([duplicated.entry])
+  assert.equal(twice.status, 1)
+  assert.match(twice.stderr, /^REVIEW_CLOSURE_INVALID: primary-code-reviewer F1 needs one unique finding id/)
+  // a reproduction that crashes instead of failing an assertion proves nothing about the claim
+  const crashing = await closableRound(t, { body: "{ if (save !== 2) throw new TypeError('not repaired') }" })
+  const crashed = crashing.close([crashing.entry])
+  assert.equal(crashed.status, 1)
+  assert.match(crashed.stderr, /^REVIEW_CLOSURE_INVALID: "save > reproduces F1" did not fail on its assertion/)
+  const invented = await closableRound(t, { findings: [{ id: 'F2', row: 'O1', severity: 'high', classification: 'PRODUCT_DEFECT',
+    finding: 'a defect in a file that did not exist', evidence: 'src/missing.mjs#L1 is wrong', quote: 'x', fix: 'fix it' }] })
+  const missing = invented.close([invented.entry, { ...invented.entry, finding: 'F2' }])
+  assert.equal(missing.status, 1)
+  assert.match(missing.stderr, /^REVIEW_CLOSURE_INVALID: primary-code-reviewer F2 cites src\/missing\.mjs, a file round 1 did not have/)
+})
+
+// ── closure bypasses an independent review found (0.106.0): each must stay with the round-2 reviewers ──
+
+const CLOSURE_F1 = { id: 'F1', row: 'O1', severity: 'high', classification: 'PRODUCT_DEFECT', finding: 'save exports 1 where the card needs 2',
+  evidence: 'src/save.mjs#L1 exports the old value', quote: 'export const save = 1', fix: 'export 2' }
+const CLOSURE_HEAD = "import test from 'node:test'\nimport assert from 'node:assert/strict'\n"
+const CLOSURE_PENDING = "test('save > pending', () => {})\n"
+
+/** 1차 리뷰(F1 하나, High면 두 번째 리뷰어는 빈 findings)를 원장에 묶고 findings 경로를 돌려준다. */
+async function closureRoundOne(oracleDirectory, findings, second = null) {
+  const round1 = join(oracleDirectory, 'packet-round-1.json')
+  const { packet, packetSha256 } = strictPacket(oracleDirectory, round1)
+  const documents = [[join(oracleDirectory, 'round-1.json'), { ...CLEAR_REVIEW, findings }]]
+  if (second) documents.push([join(oracleDirectory, 'round-1-second.json'),
+    { ...CLEAR_REVIEW, reviewer: 'second-code-reviewer', reviewerId: 'second-code-reviewer', findings: second }])
+  for (const [path, document] of documents) {
+    await writeFile(path, JSON.stringify(document))
+    bindReviewDocument(path, packetSha256, packet.targetRevision)
+    const receipt = issueReviewReceipt(oracleDirectory, round1, path, packet.targetRevision)
+    assert.equal(receipt.status, 0, receipt.stderr)
+  }
+  return documents.map(([path]) => path)
+}
+
+async function lastRunRecord(oracleDirectory) {
+  return (await ledgerLines(oracleDirectory)).map(JSON.parse).filter((entry) => entry.type === 'run').at(-1)
+}
+
+/** 2차 패킷을 만들고 closure로 닫아 본다 — 결과와 상태를 돌려준다. */
+async function closeRoundTwo(oracleDirectory, paths, reviewRun, reproductions, extra = []) {
+  const round2 = join(oracleDirectory, 'packet-round-2.json')
+  const second = run([...strictReviewPacketArgs(oracleDirectory, round2), '--findings', paths[0], ...(paths[1] ? ['--intersect', paths[1]] : [])])
+  assert.equal(second.status, 0, second.stderr)
+  const { targetRevision } = JSON.parse(await readFile(round2, 'utf8'))
+  const closurePath = join(oracleDirectory, 'closure.json')
+  await writeFile(closurePath, JSON.stringify({ schemaVersion: 1, reproductions }))
+  return run(['transition', '--dir', oracleDirectory, '--to', 'REVIEW_VERIFIED', '--run', reviewRun, '--evidence',
+    join(oracleDirectory, 'evidence.json'), '--packet', round2, '--revision', targetRevision, '--closure', closurePath, ...extra])
+}
+
+const closureEntry = (redRun) => ({ reviewerId: CLEAR_REVIEW.reviewerId, finding: 'F1', test: 'save > reproduces F1', redRun })
+
+async function assertStillOpen(result, oracleDirectory, pattern) {
+  assert.equal(result.status, 1, result.stderr)
+  assert.match(result.stderr, pattern)
+  assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+}
+
+test('a closure refuses a red run from another command, a harness or test helper that differs between the runs, and a same-name test', async (t) => {
+  // red in a file the review command never runs, a same-named empty test in the review command, production untouched
+  const collision = await workspace(t)
+  await reachGreen(collision.oracleDirectory, collision.root, { product: true })
+  const collisionPaths = await closureRoundOne(collision.oracleDirectory, [CLOSURE_F1])
+  const repro = join(collision.root, 'repro.test.mjs')
+  await writeFile(repro, `${CLOSURE_HEAD}import { save } from './src/save.mjs'\ntest('save > reproduces F1', () => assert.equal(save, 2))\n`)
+  run(['exec', '--dir', collision.oracleDirectory, '--label', 'reproduce', '--adapter', 'node-test',
+    '--report', join(collision.oracleDirectory, 'reproduce.ndjson'), '--', process.execPath, '--test', repro])
+  const separate = await lastRunRecord(collision.oracleDirectory)
+  await writeFile(join(collision.root, 'oracle-green-fixture.test.mjs'), `import test from 'node:test'\n${CLOSURE_PENDING}test('save > reproduces F1', () => {})\n`)
+  greenRun(collision.oracleDirectory, 'after')
+  const collided = await closeRoundTwo(collision.oracleDirectory, collisionPaths, (await lastRunRecord(collision.oracleDirectory)).runId, [closureEntry(separate.runId)])
+  await assertStillOpen(collided, collision.oracleDirectory, /^REVIEW_CLOSURE_INVALID: r-\d+ must run the review command of r-\d+ unchanged/)
+
+  // the harness edited only for the red run, then restored
+  const harnessed = await workspace(t, { harnessFiles: { 'oracle-harness.mjs': 'export const setup = 1\n' } })
+  await reachGreen(harnessed.oracleDirectory, harnessed.root, { product: true })
+  const harnessPaths = await closureRoundOne(harnessed.oracleDirectory, [CLOSURE_F1])
+  await writeFile(join(harnessed.root, 'oracle-green-fixture.test.mjs'),
+    `${CLOSURE_HEAD}import { setup } from './oracle-harness.mjs'\n${CLOSURE_PENDING}test('save > reproduces F1', () => assert.equal(setup, 1))\n`)
+  await writeFile(join(harnessed.root, 'oracle-harness.mjs'), 'export const setup = 2\n')
+  greenRun(harnessed.oracleDirectory, 'reproduce')
+  const harnessRed = await lastRunRecord(harnessed.oracleDirectory)
+  await writeFile(join(harnessed.root, 'oracle-harness.mjs'), 'export const setup = 1\n')
+  greenRun(harnessed.oracleDirectory, 'after')
+  const harness = await closeRoundTwo(harnessed.oracleDirectory, harnessPaths, (await lastRunRecord(harnessed.oracleDirectory)).runId, [closureEntry(harnessRed.runId)])
+  await assertStillOpen(harness, harnessed.oracleDirectory, /^REVIEW_CLOSURE_INVALID: r-\d+ and r-\d+ must differ only in production/)
+
+  // the expected value lives in a __tests__ helper that changes after the red run
+  const helper = await workspace(t)
+  await reachGreen(helper.oracleDirectory, helper.root, { product: true })
+  const helperPaths = await closureRoundOne(helper.oracleDirectory, [CLOSURE_F1])
+  await mkdir(join(helper.root, '__tests__'), { recursive: true })
+  await writeFile(join(helper.root, '__tests__', 'expected.mjs'), 'export const expected = 2\n')
+  await writeFile(join(helper.root, 'oracle-green-fixture.test.mjs'), `${CLOSURE_HEAD}import { save } from './src/save.mjs'\n` +
+    `import { expected } from './__tests__/expected.mjs'\n${CLOSURE_PENDING}test('save > reproduces F1', () => assert.equal(save, expected))\n`)
+  greenRun(helper.oracleDirectory, 'reproduce')
+  const helperRed = await lastRunRecord(helper.oracleDirectory)
+  await writeFile(join(helper.root, '__tests__', 'expected.mjs'), 'export const expected = 1\n')
+  greenRun(helper.oracleDirectory, 'after')
+  const helped = await closeRoundTwo(helper.oracleDirectory, helperPaths, (await lastRunRecord(helper.oracleDirectory)).runId, [closureEntry(helperRed.runId)])
+  await assertStillOpen(helped, helper.oracleDirectory, /^REVIEW_CLOSURE_INVALID: r-\d+ and r-\d+ must differ only in production/)
+
+  // two tests share the reproduction's name inside the review command: which one reproduced is unknown
+  const twice = await workspace(t)
+  await reachGreen(twice.oracleDirectory, twice.root, { product: true })
+  const twicePaths = await closureRoundOne(twice.oracleDirectory, [CLOSURE_F1])
+  await writeFile(join(twice.root, 'oracle-green-fixture.test.mjs'), `${CLOSURE_HEAD}import { save } from './src/save.mjs'\n${CLOSURE_PENDING}` +
+    "test('save > reproduces F1', () => assert.equal(save, 2))\ntest('save > reproduces F1', () => {})\n")
+  greenRun(twice.oracleDirectory, 'reproduce')
+  const twiceRed = await lastRunRecord(twice.oracleDirectory)
+  await writeFile(join(twice.root, 'src', 'save.mjs'), 'export const save = 2\n')
+  greenRun(twice.oracleDirectory, 'after')
+  const ambiguous = await closeRoundTwo(twice.oracleDirectory, twicePaths, (await lastRunRecord(twice.oracleDirectory)).runId, [closureEntry(twiceRed.runId)])
+  await assertStillOpen(ambiguous, twice.oracleDirectory, /^REVIEW_CLOSURE_INVALID: r-\d+ must report exactly one test named "save > reproduces F1"/)
+})
+
+test('a closure refuses a reproduction that flips without a repair, a round 1 with nothing to close, and High risk', async (t) => {
+  // the test flips on a marker outside the scan root while production stays as round 1 reviewed it
+  const flaky = await workspace(t)
+  await reachGreen(flaky.oracleDirectory, flaky.root, { product: true })
+  const flakyPaths = await closureRoundOne(flaky.oracleDirectory, [CLOSURE_F1])
+  const marker = join(flaky.repository, 'flip-marker')
+  await writeFile(join(flaky.root, 'oracle-green-fixture.test.mjs'), `${CLOSURE_HEAD}import { existsSync, writeFileSync } from 'node:fs'\n${CLOSURE_PENDING}` +
+    `test('save > reproduces F1', () => { const seen = existsSync(${JSON.stringify(marker)}); writeFileSync(${JSON.stringify(marker)}, ''); assert.equal(seen, true) })\n`)
+  greenRun(flaky.oracleDirectory, 'reproduce')
+  const flakyRed = await lastRunRecord(flaky.oracleDirectory)
+  greenRun(flaky.oracleDirectory, 'after')
+  const flipped = await closeRoundTwo(flaky.oracleDirectory, flakyPaths, (await lastRunRecord(flaky.oracleDirectory)).runId, [closureEntry(flakyRed.runId)])
+  await assertStillOpen(flipped, flaky.oracleDirectory, /^REVIEW_CLOSURE_INVALID: the repair left a cited file unchanged: src\/save\.mjs/)
+
+  // a clean round 1 followed by a test-only edit has nothing to close
+  const clean = await workspace(t)
+  await reachGreen(clean.oracleDirectory, clean.root, { product: true })
+  const cleanPaths = await closureRoundOne(clean.oracleDirectory, [])
+  await writeFile(join(clean.root, 'oracle-green-fixture.test.mjs'), `import test from 'node:test'\n${CLOSURE_PENDING}test('save > extra', () => {})\n`)
+  greenRun(clean.oracleDirectory, 'after')
+  const empty = await closeRoundTwo(clean.oracleDirectory, cleanPaths, (await lastRunRecord(clean.oracleDirectory)).runId, [])
+  await assertStillOpen(empty, clean.oracleDirectory, /^REVIEW_CLOSURE_INVALID: round 1 raised no claim to close/)
+
+  // High keeps its two round-2 reviewers: the refusal comes before any reproduction is read
+  const high = await workspace(t, { risk: 'high', initialFiles: { 'src/save.mjs': 'export const save = 1\n' } })
+  await reachGreen(high.oracleDirectory, high.root, { greens: 3 })
+  const highPaths = await closureRoundOne(high.oracleDirectory, [CLOSURE_F1], [])
+  await writeFile(join(high.root, 'src', 'save.mjs'), 'export const save = 0\n')
+  redRun(high.oracleDirectory)
+  const mutation = await lastRunRecord(high.oracleDirectory)
+  await writeFile(join(high.root, 'src', 'save.mjs'), 'export const save = 1\n')
+  greenRun(high.oracleDirectory, 'after')
+  const review = await lastRunRecord(high.oracleDirectory)
+  const blind = blindMappingEvidence(high.oracleDirectory, () => ({ 'save > pending': ['O1'] }))
+  assert.equal(blind.receipt?.status, 0, blind.receipt?.stderr ?? blind.derived.stderr)
+  const highClosed = await closeRoundTwo(high.oracleDirectory, highPaths, review.runId, [closureEntry(review.runId)],
+    ['--mutation-run', mutation.runId, '--mutation-row', 'O1', ...blind.args])
+  await assertStillOpen(highClosed, high.oracleDirectory, /^REVIEW_CLOSURE_INVALID: a High round 2 stays with its two reviewers/)
+})
+
+test('a closure never overrides a round-2 reviewer who already answered, nor a packet that names another revision', async (t) => {
+  // the round-2 reviewer already recorded a critical finding on this packet
+  const answered = await closableRound(t)
+  const round2 = join(answered.oracleDirectory, 'packet-round-2.json')
+  const raw = await readFile(round2, 'utf8')
+  const packet = JSON.parse(raw)
+  const followup = join(answered.oracleDirectory, 'round-2.json')
+  await writeFile(followup, JSON.stringify({ ...CLEAR_REVIEW, findings: [{ ...CLOSURE_F1, id: 'F5', severity: 'critical',
+    finding: 'the repair drops unsaved input', quote: 'export const save = 2' }] }))
+  bindReviewDocument(followup, createHash('sha256').update(raw).digest('hex'), packet.targetRevision)
+  assert.equal(issueReviewReceipt(answered.oracleDirectory, round2, followup, packet.targetRevision).status, 0)
+  await assertStillOpen(answered.close([answered.entry]), answered.oracleDirectory, /^REVIEW_CLOSURE_INVALID: round-2 reviewers already answered this packet/)
+
+  // a round-2 packet copied onto a later snapshot (round 3 was refused) cannot be closed
+  const forged = await closableRound(t)
+  const root = resolve(forged.oracleDirectory, '../../../packages')
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = 2 // edited after round 2\n')
+  greenRun(forged.oracleDirectory, 'after-round-2')
+  const later = await lastRunRecord(forged.oracleDirectory)
+  const third = run([...strictReviewPacketArgs(forged.oracleDirectory, join(forged.oracleDirectory, 'packet-round-3.json')), '--findings', forged.findingsPath])
+  assert.match(third.stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
+  const genuine = JSON.parse(await readFile(join(forged.oracleDirectory, 'packet-round-2.json'), 'utf8'))
+  const ledger = (await allLedgerLines(forged.oracleDirectory)).map((line) => JSON.parse(line))
+  const targetSnapshot = { worktreeSha256: later.worktreeSha256, productionSha256: later.productionSha256, harnessSha256: later.harnessSha256,
+    lockManifestSha256: later.lockManifestSha256 }
+  const copied = join(forged.oracleDirectory, 'packet-copied.json')
+  await writeFile(copied, JSON.stringify({ ...genuine, ledger, targetSnapshot }))
+  await writeFile(join(forged.oracleDirectory, 'closure.json'), JSON.stringify({ schemaVersion: 1, reproductions: [forged.entry] }))
+  const reused = run(['transition', '--dir', forged.oracleDirectory, '--to', 'REVIEW_VERIFIED', '--run', later.runId, '--evidence',
+    join(forged.oracleDirectory, 'evidence.json'), '--packet', copied, '--revision', later.worktreeSha256, '--closure', join(forged.oracleDirectory, 'closure.json')])
+  await assertStillOpen(reused, forged.oracleDirectory, /^REVIEW_CLOSURE_INVALID: the packet must target the revision it names/)
+})
+
+test('a closure refuses a red run where a locked row also failed, a reproduction outside the scan snapshot, and a reviewer who answered unrecorded', async (t) => {
+  // O1's own test is rewritten to expect a regression inside the reproduction file, so the red run fails it too
+  const rewritten = await workspace(t)
+  const fixture = join(rewritten.root, 'oracle-green-fixture.test.mjs')
+  await writeFile(fixture, `${CLOSURE_HEAD}import * as mod from './src/save.mjs'\ntest('save > pending', () => assert.deepEqual({ draft: mod.draft }, { draft: 'kept' }))\n`)
+  await reachValidRed(rewritten.oracleDirectory, rewritten.root)
+  await writeFile(join(rewritten.root, 'src', 'save.mjs'), "export const save = 1\nexport const draft = 'kept'\n")
+  greenRun(rewritten.oracleDirectory, 'green-1')
+  greenRun(rewritten.oracleDirectory, 'green-2')
+  assert.equal(transition(rewritten.oracleDirectory, 'IMPLEMENTED_GREEN', (await lastRunRecord(rewritten.oracleDirectory)).runId).status, 0)
+  const rewrittenPaths = await closureRoundOne(rewritten.oracleDirectory, [CLOSURE_F1])
+  await writeFile(fixture, `${CLOSURE_HEAD}import * as mod from './src/save.mjs'\ntest('save > pending', () => assert.deepEqual({ draft: mod.draft }, { draft: undefined }))\n` +
+    "test('save > reproduces F1', () => assert.equal(mod.save, 2))\n")
+  greenRun(rewritten.oracleDirectory, 'reproduce')
+  const rewrittenRed = await lastRunRecord(rewritten.oracleDirectory)
+  await writeFile(join(rewritten.root, 'src', 'save.mjs'), 'export const save = 2\n')
+  greenRun(rewritten.oracleDirectory, 'after')
+  const regressed = await closeRoundTwo(rewritten.oracleDirectory, rewrittenPaths, (await lastRunRecord(rewritten.oracleDirectory)).runId, [closureEntry(rewrittenRed.runId)])
+  await assertStillOpen(regressed, rewritten.oracleDirectory, /^REVIEW_CLOSURE_INVALID: r-\d+ also failed tests that are not reproductions: save > pending/)
+
+  // the GREEN command also runs a test under build/, which the snapshot skips, so its edits after the red run never show
+  const hidden = await workspace(t)
+  const files = [join(hidden.root, 'oracle-green-fixture.test.mjs'), join(hidden.root, 'build', 'repro.test.mjs')]
+  const exec = () => {
+    reportSequence += 1
+    return run(['exec', '--dir', hidden.oracleDirectory, '--label', 'behavior', '--adapter', 'node-test',
+      '--report', join(hidden.oracleDirectory, `hidden-${reportSequence}.ndjson`), '--', process.execPath, '--test', ...files])
+  }
+  await reachValidRed(hidden.oracleDirectory, hidden.root)
+  await writeFile(join(hidden.root, 'src', 'save.mjs'), 'export const save = 1\n')
+  await mkdir(join(hidden.root, 'build'), { recursive: true })
+  await writeFile(files[1], "import test from 'node:test'\ntest('save > extra', () => {})\n")
+  for (const attempt of [1, 2]) assert.equal(exec().status, 0, `green ${attempt}`)
+  assert.equal(transition(hidden.oracleDirectory, 'IMPLEMENTED_GREEN', (await lastRunRecord(hidden.oracleDirectory)).runId).status, 0)
+  const hiddenPaths = await closureRoundOne(hidden.oracleDirectory, [CLOSURE_F1])
+  await writeFile(files[1], `${CLOSURE_HEAD}import { save } from '../src/save.mjs'\ntest('save > reproduces F1', () => assert.equal(save, 2))\n`)
+  exec()
+  const hiddenRed = await lastRunRecord(hidden.oracleDirectory)
+  await writeFile(files[1], "import test from 'node:test'\ntest('save > reproduces F1', () => {})\n")
+  await writeFile(join(hidden.root, 'src', 'save.mjs'), 'export const save = 1 // touched\n')
+  assert.equal(exec().status, 0)
+  const outside = await closeRoundTwo(hidden.oracleDirectory, hiddenPaths, (await lastRunRecord(hidden.oracleDirectory)).runId, [closureEntry(hiddenRed.runId)])
+  await assertStillOpen(outside, hidden.oracleDirectory, /^REVIEW_CLOSURE_INVALID: "save > reproduces F1" must live in a test file inside the scan snapshot, not build\/repro\.test\.mjs/)
+
+  // a round-2 reviewer's findings the host recorded after the round began, but nobody bound to the ledger
+  const unrecorded = await closableRound(t)
+  await writeFile(join(unrecorded.oracleDirectory, HOST_RECEIPTS_FILE),
+    `${JSON.stringify({ agentId: 'round-2', kind: 'findings', sha256: 'f'.repeat(64), at: new Date().toISOString() })}\n`)
+  await assertStillOpen(unrecorded.close([unrecorded.entry]), unrecorded.oracleDirectory, /^REVIEW_CLOSURE_INVALID: a reviewer answered after this round began/)
+})
+
+test('a closure attests the round-1 findings through host receipts when the host records them', async (t) => {
+  const round = await closableRound(t)
+  const digest = reviewOutputDigest(JSON.parse(await readFile(round.findingsPath, 'utf8')))
+  const receipts = join(round.oracleDirectory, HOST_RECEIPTS_FILE)
+  await writeFile(receipts, `${JSON.stringify({ kind: 'findings', sha256: '0'.repeat(64), agentId: 'a1' })}\n`)
+  const unattested = round.close([round.entry])
+  assert.equal(unattested.status, 1)
+  assert.match(unattested.stderr, /^REVIEW_RECEIPT_UNATTESTED:/)
+  await writeFile(receipts, `${JSON.stringify({ kind: digest.kind, sha256: digest.sha256, agentId: 'a1' })}\n`)
+  const attested = round.close([round.entry])
+  assert.equal(attested.status, 0, attested.stderr)
+})
+
 test('O11: review packets require post-GREEN state decision and canonical review points', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
   const output = join(oracleDirectory, 'packet.json')

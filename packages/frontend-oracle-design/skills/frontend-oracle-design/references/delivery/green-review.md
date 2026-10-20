@@ -305,6 +305,46 @@ post-review fix changes the snapshot and can otherwise restart the defect hunt.
    choices does not waive it. A round 3 needs the user's explicit approval and is never started by
    the controller on its own.
 
+**Closing round 2 without reviewers (Low and Medium only).** When every round-1 claim
+(`NON_ORACLE_OPINION` aside) is a `PRODUCT_DEFECT` citing `path#La-Lb`, round 2 can be a machine check
+instead of a dispatch:
+
+1. Before the repair, `$test` adds a test that reproduces each claim to a file the GREEN command already
+   runs, with a name no other test uses, and runs that GREEN command unchanged through `exec`. Each
+   reproduction must fail on its assertion while production is still what round 1 reviewed.
+2. Repair only the cited files, rerun the labels and generate the round-2 packet with the round-1
+   `--findings` as usual. Do not dispatch the round-2 reviewers.
+3. Pass `--closure <file>` to `transition --to REVIEW_VERIFIED` in place of round-2 findings. The file is
+   `{ "schemaVersion": 1, "reproductions": [{ "reviewerId", "finding", "test", "redRun" }] }`, one entry
+   per claim.
+
+The runner refuses the closure (`REVIEW_CLOSURE_INVALID`) unless:
+
+- the risk is not High, the packet targets the revision it names and is the latest recorded round, and no
+  round-2 reviewer has answered it;
+- each red run came after round 1, on the production round 1 reviewed, failed its test on the assertion,
+  and failed no other test;
+- the red run and the review run are the same command with the same working directory, environment (Node,
+  TZ, locale, `--env-note`), harness and test files, so production is their only difference inside the
+  scan snapshot; each reproduction is the only test with its name in both runs, lives in a test file the
+  snapshot records, and passes from that file in the review run;
+- since round 1, test files changed only where the reproductions live, no harness file changed, no test
+  lost strength, and production changed in every cited file and nowhere else.
+
+Only adapters that record a test's file and failure cause (node-test, vitest) can close. A refused closure
+goes to the round-2 reviewers as before. The packet, evidence, mutation, blind-mapping and rerun gates are
+unchanged, and a closure cannot carry an evidence row a reviewer finding owns.
+
+What a closure does not check:
+
+- that the reproduction tests what the claim describes;
+- the repair diff itself, including an assertion elsewhere in the reproduction file loosened so it still
+  passes on round 1's code;
+- what lies outside the scan snapshot: dependencies, files outside the scan root, time, network, and
+  environment beyond the fingerprint.
+
+Those rest on the test worker, which is why High keeps its two reviewers.
+
 Round 2 packet generation requires the preceding raw receipt-bound `--findings` and, for High,
 `--intersect`. It includes their IDs/original findings and the repair diff under
 `reviewScope.mode: "confirm-fixes"`; preserve that scope in both reviewer tasks. The runtime refuses a

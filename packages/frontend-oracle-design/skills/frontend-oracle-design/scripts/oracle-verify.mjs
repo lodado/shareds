@@ -11,6 +11,7 @@ import { mineDimensions } from './oracle-dimensions.mjs'
 import { canonicalTuple, generateFromDocument, MAX_STATE_PATHS, TAXONOMY_FAMILIES } from './oracle-frames.mjs'
 import {
   assertSnapshotUnchanged,
+  codeCitation,
   isPathInside,
   reportTiming,
   scanSideEffects,
@@ -74,7 +75,7 @@ const FLAG_NAMES = [
  * 규칙이나 구현 중 바뀐 코드가 기존 잠금을 매 exec마다 깨뜨리지 않게 한다. `card --draft`는 승인 전 Draft용이다: 사용자의
  * 답을 기다리는 검사만 실패 대신 대기로 보이고 나머지는 그대로 실패한다. 관문과 lock은 이 플래그를 넘기지 않는다.
  */
-const BOOLEAN_FLAGS = new Set(['ir', 'delta', 'repo-policies', 'side-effects', 'case-space', 'locked', 'draft'])
+const BOOLEAN_FLAGS = new Set(['ir', 'delta', 'repo-policies', 'side-effects', 'case-space', 'locked', 'draft', 'closure'])
 
 // 승인 전 Draft에서는 사용자의 답이 아직 없어서 당연히 남는 검사 — 확인 상태·출처, Visual QA 허가, 승인을 기다리는 출처
 // (card-format: Draft는 제안된 정책과 승인 전 출처를 그렇다고 밝혀 싣는다). needs-decision 칸은 lintCard가 칸 종류로 고른다.
@@ -2366,27 +2367,6 @@ async function reviewRoots(options) {
  * 코드 위치를 주장하는 PRODUCT_DEFECT가 `path#La-Lb`를 인용하면, 그 근처(±3줄)에 `quote`가 실제로 있어야 한다.
  * 없는 행동("두 번째 클릭에 dedupe 없음")은 인용할 줄이 없으니 path#L 인용이 없는 finding은 검사하지 않는다.
  */
-/** 문장 속 인용의 가장자리 괄호·마침표만 뗀다 — 경로 안의 괄호는 route group일 수 있어 남긴다. */
-function citationToken(token) {
-  let start = 0
-  let end = token.length
-  while (start < end && '(<['.includes(token[start])) start += 1
-  while (end > start && ')>].:'.includes(token[end - 1])) end -= 1
-  return token.slice(start, end)
-}
-
-/** finding의 첫 `path#La-Lb` 인용 — 없으면 null. */
-function codeCitation(finding) {
-  // 경로에 route group `(shop)`·동적 세그먼트 `[id]`·`+page`가 올 수 있어 괄호로 자르지 않는다 — 가장자리 괄호만 뗀다
-  const cited = String(finding.evidence)
-    .split(/[\s,;`'"]+/)
-    .map((token) => citationToken(token).match(/^([\w@./()[\]+-]+)#L(\d+)(?:-L?(\d+))?$/))
-    .find(Boolean)
-  if (!cited) return null
-  const [reference, path, from, to] = cited
-  return { reference, path, from: Number(from), to: Number(to ?? from) }
-}
-
 async function citationProblem(finding, roots) {
   if (finding.classification !== 'PRODUCT_DEFECT') return null
   const cited = codeCitation(finding)
@@ -2521,6 +2501,102 @@ async function verifyFindings(options) {
       ? `${JSON.stringify({ blocking: result.blocking, advisory: result.advisory })}\n`
       : `${result.lines.join('\n')}\n`,
   )
+}
+
+/** 이번 라운드 리뷰어 findings의 결속 — 패킷·리비전·주문 영수증·원장 영수증·독립성. 행이 인용할 finding ID와 그 역할을 돌려준다. */
+async function assertFindingsBinding(options, { base, snapshots, packet, packetSha256, oracleSha256, externalLedger, assertIdentity }) {
+  const findingSnapshots = [
+    await snapshotOracleFile(options.file, base, 'FINDINGS_INVALID', 'review findings', snapshots),
+  ]
+  if (options.intersect)
+    findingSnapshots.push(
+      await snapshotOracleFile(options.intersect, base, 'FINDINGS_INVALID', 'intersected review findings', snapshots),
+    )
+  const documents = findingSnapshots.map((snapshot) => parseSnapshotJson(snapshot, 'FINDINGS_INVALID'))
+  if (!packet.reviewContext && documents.some((document) => Object.hasOwn(document, 'contextReview'))) {
+    throw new CliError('FINDINGS_INVALID', 'contextReview requires a contextualized review packet')
+  }
+  if (packet.reviewContext) {
+    const contextRefs = new Set((packet.reviewContext.files ?? []).map((file) => file.path))
+    for (const document of documents) {
+      if (document.reviewerRole !== 'code-reviewer' && !Object.hasOwn(document, 'contextReview')) continue
+      const errors = validateContextReview(document.contextReview, {
+        contextRefs, reviewPointRefs: new Set(packet.reviewPoints.map((point) => point.path)),
+        selections: packet.reviewContext.selections,
+      })
+      if (errors.length) throw new CliError('FINDINGS_INVALID', `contextReview: ${errors.join('; ')}`)
+    }
+  }
+  const allFindings = documents.flatMap((document) => document.findings ?? [])
+  const ids = new Set(allFindings.map((finding) => finding.id))
+  if (ids.size !== allFindings.length) throw new CliError('FINDINGS_INVALID', 'duplicate finding id')
+  for (const document of documents) {
+    if (document.schemaVersion !== 2)
+      throw new CliError('FINDINGS_INVALID', 'new review verification requires findings schemaVersion 2')
+    if (!REVIEWER_ROLES.includes(document.reviewerRole) || !document.reviewerId)
+      throw new CliError('FINDINGS_INVALID', 'new review verification requires reviewerRole and reviewerId')
+    if (document.packetSha256 !== packetSha256)
+      throw new CliError('REVIEW_PACKET_INVALID', 'findings must cite the review packet sha256')
+    if (document.targetRevision !== options.revision) {
+      throw new CliError('REVIEW_REVISION_MISMATCH', 'findings must cite the target implementation worktree')
+    }
+    const receipt = document.orchestrationReceipt
+    assertIdentity(document)
+    assertIdentity(receipt)
+    const output = { ...document }
+    delete output.orchestrationReceipt
+    if (
+      !receipt ||
+      typeof receipt !== 'object' ||
+      receipt.packetSha256 !== packetSha256 ||
+      receipt.targetRevision !== options.revision ||
+      receipt.role !== document.reviewerRole ||
+      typeof receipt.taskId !== 'string' ||
+      !receipt.taskId ||
+      !isDigest(receipt.outputSha256) ||
+      receipt.outputSha256 !== sha256(stableStringify(output))
+    ) {
+      throw new CliError('REVIEWER_EVIDENCE_INVALID', 'review findings require a bound orchestration receipt')
+    }
+    const receiptEvent = externalLedger.records.find(
+      (event) =>
+        event.type === 'review-receipt' && event.taskId === receipt.taskId && event.reviewerId === document.reviewerId,
+    )
+    assertIdentity(receiptEvent)
+    if (
+      !receiptEvent ||
+      receiptEvent.packetSha256 !== packetSha256 ||
+      receiptEvent.targetRevision !== options.revision ||
+      receiptEvent.role !== document.reviewerRole ||
+      receiptEvent.taskId !== receipt.taskId ||
+      receiptEvent.outputSha256 !== receipt.outputSha256 ||
+      receiptEvent.findingsSha256 !== sha256(findingSnapshots[documents.indexOf(document)].bytes) ||
+      receiptEvent.oracleSha256 !== oracleSha256 ||
+      receiptEvent.adapter !== 'controller'
+    ) {
+      throw new CliError(
+        'REVIEWER_EVIDENCE_INVALID',
+        'review findings require an independently ledger-bound review receipt',
+      )
+    }
+  }
+  if (documents.length > 1 && documents[0].reviewerId === documents[1].reviewerId)
+    throw new CliError('REVIEWER_NOT_INDEPENDENT', 'intersected review samples require distinct reviewer identities')
+  if (
+    documents.length > 1 &&
+    documents.some((document) => document.sampleRisk === 'High') &&
+    (documents[0].orchestrationReceipt.taskId === documents[1].orchestrationReceipt.taskId ||
+      documents[0].orchestrationReceipt.outputSha256 === documents[1].orchestrationReceipt.outputSha256 ||
+      documents[0].reviewerRole === documents[1].reviewerRole)
+  )
+    throw new CliError(
+      'REVIEWER_NOT_INDEPENDENT',
+      'High-risk intersected reviews require distinct receipt task identities',
+    )
+  const byId = new Map(
+    documents.flatMap((document) => (document.findings ?? []).map((finding) => [finding.id, document.reviewerRole])),
+  )
+  return { ids, byId }
 }
 
 async function assertReviewBinding(options) {
@@ -2661,104 +2737,19 @@ async function assertReviewBinding(options) {
     throw new CliError('REVIEW_PACKET_INVALID', 'review packet does not target the implementation worktree')
   }
 
-  const findingSnapshots = [
-    await snapshotOracleFile(options.file, base, 'FINDINGS_INVALID', 'review findings', snapshots),
-  ]
-  if (options.intersect)
-    findingSnapshots.push(
-      await snapshotOracleFile(options.intersect, base, 'FINDINGS_INVALID', 'intersected review findings', snapshots),
-    )
-  const documents = findingSnapshots.map((snapshot) => parseSnapshotJson(snapshot, 'FINDINGS_INVALID'))
-  if (!packet.reviewContext && documents.some((document) => Object.hasOwn(document, 'contextReview'))) {
-    throw new CliError('FINDINGS_INVALID', 'contextReview requires a contextualized review packet')
-  }
-  if (packet.reviewContext) {
-    const contextRefs = new Set((packet.reviewContext.files ?? []).map((file) => file.path))
-    for (const document of documents) {
-      if (document.reviewerRole !== 'code-reviewer' && !Object.hasOwn(document, 'contextReview')) continue
-      const errors = validateContextReview(document.contextReview, {
-        contextRefs, reviewPointRefs: new Set(packet.reviewPoints.map((point) => point.path)),
-        selections: packet.reviewContext.selections,
-      })
-      if (errors.length) throw new CliError('FINDINGS_INVALID', `contextReview: ${errors.join('; ')}`)
-    }
-  }
-  const allFindings = documents.flatMap((document) => document.findings ?? [])
-  const ids = new Set(allFindings.map((finding) => finding.id))
-  if (ids.size !== allFindings.length) throw new CliError('FINDINGS_INVALID', 'duplicate finding id')
-  for (const document of documents) {
-    if (document.schemaVersion !== 2)
-      throw new CliError('FINDINGS_INVALID', 'new review verification requires findings schemaVersion 2')
-    if (!REVIEWER_ROLES.includes(document.reviewerRole) || !document.reviewerId)
-      throw new CliError('FINDINGS_INVALID', 'new review verification requires reviewerRole and reviewerId')
-    if (document.packetSha256 !== packetSha256)
-      throw new CliError('REVIEW_PACKET_INVALID', 'findings must cite the review packet sha256')
-    if (document.targetRevision !== options.revision) {
-      throw new CliError('REVIEW_REVISION_MISMATCH', 'findings must cite the target implementation worktree')
-    }
-    const receipt = document.orchestrationReceipt
-    assertIdentity(document)
-    assertIdentity(receipt)
-    const output = { ...document }
-    delete output.orchestrationReceipt
-    if (
-      !receipt ||
-      typeof receipt !== 'object' ||
-      receipt.packetSha256 !== packetSha256 ||
-      receipt.targetRevision !== options.revision ||
-      receipt.role !== document.reviewerRole ||
-      typeof receipt.taskId !== 'string' ||
-      !receipt.taskId ||
-      !isDigest(receipt.outputSha256) ||
-      receipt.outputSha256 !== sha256(stableStringify(output))
-    ) {
-      throw new CliError('REVIEWER_EVIDENCE_INVALID', 'review findings require a bound orchestration receipt')
-    }
-    const receiptEvent = externalLedger.records.find(
-      (event) =>
-        event.type === 'review-receipt' && event.taskId === receipt.taskId && event.reviewerId === document.reviewerId,
-    )
-    assertIdentity(receiptEvent)
-    if (
-      !receiptEvent ||
-      receiptEvent.packetSha256 !== packetSha256 ||
-      receiptEvent.targetRevision !== options.revision ||
-      receiptEvent.role !== document.reviewerRole ||
-      receiptEvent.taskId !== receipt.taskId ||
-      receiptEvent.outputSha256 !== receipt.outputSha256 ||
-      receiptEvent.findingsSha256 !== sha256(findingSnapshots[documents.indexOf(document)].bytes) ||
-      receiptEvent.oracleSha256 !== oracleSha256 ||
-      receiptEvent.adapter !== 'controller'
-    ) {
-      throw new CliError(
-        'REVIEWER_EVIDENCE_INVALID',
-        'review findings require an independently ledger-bound review receipt',
-      )
-    }
-  }
-  if (documents.length > 1 && documents[0].reviewerId === documents[1].reviewerId)
-    throw new CliError('REVIEWER_NOT_INDEPENDENT', 'intersected review samples require distinct reviewer identities')
-  if (
-    documents.length > 1 &&
-    documents.some((document) => document.sampleRisk === 'High') &&
-    (documents[0].orchestrationReceipt.taskId === documents[1].orchestrationReceipt.taskId ||
-      documents[0].orchestrationReceipt.outputSha256 === documents[1].orchestrationReceipt.outputSha256 ||
-      documents[0].reviewerRole === documents[1].reviewerRole)
-  )
-    throw new CliError(
-      'REVIEWER_NOT_INDEPENDENT',
-      'High-risk intersected reviews require distinct receipt task identities',
-    )
-  const byId = new Map(
-    documents.flatMap((document) => (document.findings ?? []).map((finding) => [finding.id, document.reviewerRole])),
-  )
+  // 결정적 closure(oracle-run)는 2차 리뷰어 findings 없이 패킷 결속만 본다 — 리뷰어가 맡은 행은 그 findings가 있어야 한다
+  const { ids, byId } = options.closure
+    ? { ids: new Set(), byId: new Map() }
+    : await assertFindingsBinding(options, { base, snapshots, packet, packetSha256, oracleSha256, externalLedger, assertIdentity })
   const map = parseSnapshotJson(mapSnapshot, 'EVIDENCE_INVALID')
   if (stableJson(packet.evidence) !== stableJson(map)) {
     throw new CliError('REVIEW_EVIDENCE_STALE', 'review evidence map must match the review packet evidence')
   }
 
-  for (const entry of Object.values(map?.rows ?? {})) {
+  for (const [row, entry] of Object.entries(map?.rows ?? {})) {
     if (entry?.kind === 'reviewer') {
+      if (options.closure)
+        throw new CliError('REVIEW_CLOSURE_INVALID', `${row} is owned by a reviewer finding — a closure carries no round-2 findings`)
       if (!ids.has(entry.finding))
         throw new CliError('REVIEW_FINDING_UNKNOWN', `${entry.finding} is not in review findings`)
       if (byId.get(entry.finding) !== entry.role)
@@ -2803,6 +2794,10 @@ async function assertBlindMapping(options) {
 async function verifyReview(options) {
   if (options['blind-map']) await assertBlindMapping(options)
   await assertReviewBinding(options)
+  if (options.closure) {
+    process.stdout.write('REVIEW_PACKET_BOUND closure\n')
+    return
+  }
   const result = await findingsResult(options)
 
   if (result.blocking.length > 0) {

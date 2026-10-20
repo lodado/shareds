@@ -117,6 +117,27 @@ export function reviewOutputDigest(document) {
   return { kind: 'blind-map', sha256: sha256(stableStringify(document)) }
 }
 
+/** 문장 속 인용의 가장자리 괄호·마침표만 뗀다 — 경로 안의 괄호는 route group일 수 있어 남긴다. */
+function citationToken(token) {
+  let start = 0
+  let end = token.length
+  while (start < end && '(<['.includes(token[start])) start += 1
+  while (end > start && ')>].:'.includes(token[end - 1])) end -= 1
+  return token.slice(start, end)
+}
+
+/** finding의 첫 `path#La-Lb` 인용 — 없으면 null. 리뷰 판정(oracle-verify)과 2차 closure(oracle-run)가 같이 쓴다. */
+export function codeCitation(finding) {
+  // 경로에 route group `(shop)`·동적 세그먼트 `[id]`·`+page`가 올 수 있어 괄호로 자르지 않는다 — 가장자리 괄호만 뗀다
+  const cited = String(finding.evidence)
+    .split(/[\s,;`'"]+/)
+    .map((token) => citationToken(token).match(/^([\w@./()[\]+-]+)#L(\d+)(?:-L?(\d+))?$/))
+    .find(Boolean)
+  if (!cited) return null
+  const [reference, path, from, to] = cited
+  return { reference, path, from: Number(from), to: Number(to ?? from) }
+}
+
 export const HOST_RECEIPTS_FILE = 'host-receipts.jsonl'
 
 /** 실행 없이는 닿지 않는 상태 — 최종 보고가 이 상태를 주장하면 인용한 run이 있어야 원장과 대조할 수 있다. */

@@ -68,8 +68,9 @@ export function foldPacket(packet, { packetSha256 } = {}) {
   const cited = new Set((packet.state?.history ?? []).map((entry) => entry.runId).filter(Boolean))
   const ledger = (packet.ledger ?? []).map((entry) => {
     if (!Array.isArray(entry?.tests) || cited.has(entry.runId)) return entry
-    const { tests, ...rest } = entry
-    return { ...rest, testsFolded: testsSummary(tests) }
+    // 인용하지 않은 run의 테스트 파일 digest(closure용)는 개수만 남긴다
+    const { tests, changedTests, ...rest } = entry
+    return { ...rest, testsFolded: testsSummary(tests), ...(changedTests ? { changedTestsFolded: Object.keys(changedTests).length } : {}) }
   })
   const oracle = packet.oracle && { ...packet.oracle, content: foldCard(packet.oracle.content ?? '', { name: basename(packet.oracle.path ?? 'oracle.md') }) }
   return {

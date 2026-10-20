@@ -505,6 +505,24 @@ Contract 카드에서는 거부).
 결함을 같은 revision의 질문으로 올립니다. adapter와 출력은 임시 디렉터리나 git이 무시하는 경로에만 두고, 보고서일 뿐
 테스트나 증거가 아니라서 Design-only도 돌릴 수 있습니다.
 
+### 2차 리뷰를 기계로 닫기
+
+0.106.0부터 Low·Medium에서 1차 리뷰의 지적이 전부 `path#La-Lb`를 인용한 `PRODUCT_DEFECT`이면 2차 확인 리뷰어를
+다시 부르지 않고 닫을 수 있습니다. 고치기 전에 지적마다 재현 테스트를 GREEN 명령이 이미 돌리는 파일에 겹치지 않는
+이름으로 넣고, 그 명령을 그대로 `exec`로 돌려 assertion으로 실패하게 합니다(1차가 본 production 그대로). 인용한
+파일만 고치고 라벨을 다시 돌려 2차 패킷을 평소처럼 만든 다음, `transition --to REVIEW_VERIFIED`에 2차 findings 대신
+`--closure <file>`(`{ "schemaVersion": 1, "reproductions": [{ "reviewerId", "finding", "test", "redRun" }] }`)을
+넘깁니다. 러너는 red run과 리뷰 런이 같은 명령·환경·harness·테스트 파일이라 production만 다른지, 재현이 두 run에서
+같은 파일의 유일한 그 이름 테스트인지, 1차 뒤 테스트 파일은 재현이 든 파일만 바뀌었는지, 수리가 인용한 파일을 모두
+바꾸고 다른 production은 건드리지 않았는지, 이 패킷이 마지막 라운드이고 2차 리뷰어가 아직 답하지 않았는지 봅니다.
+하나라도 어긋나면 `REVIEW_CLOSURE_INVALID`이고 지금처럼 2차 리뷰어에게 갑니다. red run에서 재현 말고 다른 테스트가
+실패했거나, 재현이 snapshot이 담지 않는 곳(무시 경로, `build/`, scan root 밖)에 있거나, 라운드가 시작된 뒤 리뷰어 산출물이
+host 영수증에 있어도 닫지 않습니다. 파일과 실패 원인을 적는 adapter(node-test, vitest)만 닫을 수 있습니다. 패킷·증거·변이·
+블라인드 매핑·재실행 관문은 그대로입니다. closure는 재현이 지적을 정말 시험하는지, 수리 diff 자체(재현 파일 안의 다른
+단언을 1차 코드에서도 통과하게 느슨하게 한 것 포함), snapshot 밖(의존성, 시간, 네트워크)을 보지 않습니다. 그 몫을 테스트
+작성자에게 맡기므로 High는 리뷰어를 유지합니다. 이를 위해 run 기록에 init 뒤 바뀐 테스트 파일의 digest(`changedTests`)가
+남습니다.
+
 ### 리뷰어용 읽기 보기
 
 ```bash

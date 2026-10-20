@@ -2955,6 +2955,16 @@ test('authors read the Draft nodes after project-card and Bend files go through 
   assert.match(controller, /this skill's `scripts\/`\s+directory and every file it may write/)
 })
 
+test('0.106.0: round 2 closes on reproductions instead of reviewers only for cited product defects', async () => {
+  const [green, controller] = await Promise.all([read('references/delivery/green-review.md'), read('references/roles/controller-formal.md')])
+  assert.match(green, /\*\*Closing round 2 without reviewers \(Low and Medium only\)\.\*\*/)
+  assert.match(green, /the red run and the review run are the same command with the same working directory, environment/)
+  assert.match(green, /What a closure does not check:/)
+  assert.match(green, /is\s+a\s+`PRODUCT_DEFECT`\s+citing\s+`path#La-Lb`/)
+  assert.match(green, /A\s+refused\s+closure\s+goes\s+to\s+the\s+round-2\s+reviewers\s+as\s+before/)
+  assert.match(controller, /close round 2 with `--closure`/)
+})
+
 test('0.105.0: the Draft is linted before the user reads it, and a pre-lock sweep stays on temporary paths', async () => {
   const [author, contractAuthor, patterns, bend, controller] = await Promise.all([
     read('references/roles/author-formal.md'),

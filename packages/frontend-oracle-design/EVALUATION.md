@@ -1,3 +1,100 @@
+# 0.106.0: close the round-2 review on reproductions when every round-1 claim is a cited product defect (Low and Medium)
+
+## Validation
+
+- `ORACLE_REQUIRE_BEND=1 pnpm --filter @lodado/frontend-oracle-design-plugin test`:
+  **1,196 passed, 0 failed, 0 skipped**, using real Bend.
+- Package lint: exit 0, **0 errors, 405 package-wide warnings**. Splitting `assertReviewBinding` left
+  two functions over the complexity limit where there was one.
+- Generated reference bundles (22), workflow docs and converted evals: passed.
+- Mutation checks on the closure tests: removing any of 19 guards makes a test fail:
+  - the High refusal, an already-answered packet, a reviewer output the host recorded after the round
+    began, the packet revision, an empty round 1, unique ids, a citation of a file round 1 had;
+  - the red run's production, its command match, its harness-and-test-file match, the assertion failure,
+    no other failing test, a single test per name, a reproduction inside the scan snapshot;
+  - stray test files, the harness change, the PRODUCT_DEFECT requirement, the production scope, a cited
+    file left unchanged.
+    The same-file and latest-round checks have no mutation of their own (other checks fail first in these
+    tests), and the refusal of runs recorded before 0.106.0 has no test. A "reproduction file unchanged since its red run" check was removed, because the test-file match
+    between the two runs already implies it.
+- An independent Opus 5.5 review of the first version blocked the release with two critical, three high,
+  two medium and three low findings. It recorded REVIEW_VERIFIED with the cited defect still in the code
+  and over a critical round-2 finding already in the ledger. All are fixed, and its probes are now
+  regression tests:
+  - Critical: nothing tied the failing-to-passing change to the repair. A red run from another command, a
+    harness changed only for the red run, a test helper edited after it, or a same-named test in the review
+    command each closed a defect that was never repaired. Now the two runs must share the command,
+    environment, harness and test files, so production is their only difference. The reproduction must be
+    the only test with its name in each run, from the same file. Every cited file must change, and nothing
+    else may.
+  - Critical: a closure overrode round-2 reviewers who had already answered. It now refuses a packet with
+    any round-2 review receipt.
+  - High: closure-mode packets were bound to nothing, so a round-2 packet copied onto a later snapshot
+    skipped the round-3 approval. Now the packet must target the revision it names and be the latest
+    recorded round. High closures could succeed only with an unrepaired defect (the mutation rule), and
+    nothing ties a reproduction to its claim, so High is refused.
+  - Medium: a clean round 1 plus test edits closed with no reproductions. A closure now needs at least one
+    claim, and test files may change since round 1 only where the reproductions live. Round-1 findings
+    drove the gate unvalidated; ids must be unique and cited files must exist in round 1's snapshot.
+  - Low: `REVIEW_CLOSURE_INVALID` has a next action, the reviewer view folds `changedTests` for uncited
+    runs, and the bypasses have tests.
+- A follow-up Opus 5.5 review found no critical issue, but one high, two medium and three low findings,
+  all fixed:
+  - High: a locked row's own test could be rewritten inside the reproduction file to expect a regression;
+    the red run showed it failing too. A red run that fails any test other than the named reproductions is
+    now refused.
+  - Medium: a reproduction under `build/` or outside the scan root is not in the snapshot, so its edits
+    after the red run never showed. It must now live in a test file the snapshot records. The docs now list
+    what a closure does not check.
+  - Low: runs recorded before `changedTests` existed are refused; the command mismatch names the field
+    that differs; a reviewer output the host recorded after the round began refuses the closure.
+
+## Diagnosis
+
+In the transcripts measured for 0.102.0, review rounds took 20–90 minutes of wall time each, while the
+reviewers were active a median of 3 minutes. Delivery round 2 re-dispatches the same reviewers to confirm
+repairs, with a fresh packet and receipts. When a claim names the defective line, a test that failed
+before the repair and passes after it already shows what round 2 confirms. In the slowest measured run,
+round 2 took only 7 minutes, so the plan recommended waiting for more data; the user chose to build it now
+(decision Q6 = A).
+
+## Change
+
+- `oracle-run.mjs transition --to REVIEW_VERIFIED ... --closure <file>` replaces round-2 `--findings` and
+  `--intersect` for Low and Medium. The file holds one entry per round-1 claim:
+  `{ "schemaVersion": 1, "reproductions": [{ "reviewerId", "finding", "test", "redRun" }] }`.
+  The runner refuses it with `REVIEW_CLOSURE_INVALID` unless:
+  - the packet targets the revision it names, is the latest recorded confirm-fixes round, no round-2
+    reviewer has answered it, and the round-1 findings files still match it;
+  - every claim except `NON_ORACLE_OPINION` (a superset of the blocking ones) is a `PRODUCT_DEFECT` with a
+    unique id citing a file round 1 had, and has exactly one entry;
+  - each red run came after round 1 on the production round 1 reviewed, runs the review command unchanged
+    (working directory, environment, harness and test files equal), failed its test on the assertion and no
+    other test. The test is the only one with its name in both runs, lives in a test file the snapshot
+    records, and passes from that file in the review run;
+  - since round 1, test files changed only where the reproductions live, no harness file changed, no test
+    lost strength against the VALID_RED baseline, and production changed in every cited file and nowhere
+    else.
+- The packet, evidence, mutation, blind-mapping and rerun gates are unchanged. Blind-mapping independence
+  uses the round-1 reviewers, host receipts attest the round-1 findings, and `oracle-verify review
+--closure` checks the packet binding and the blind map without round-2 findings. It refuses evidence
+  rows a reviewer finding owns.
+- Every `exec` run record now carries `changedTests`, the digests of test files changed since init.
+- `codeCitation` moved to `oracle-fs.mjs` so the runner and the verifier share one parser.
+- `delivery/green-review.md` documents the procedure, `controller-formal.md` skips the round-2 dispatch
+  below High when it applies, and the README explains it.
+
+## Not changed
+
+- The runner checks that the repair turned the reproduction from failing to passing. It does not check
+  that the reproduction tests what the claim describes (a test that reads the cited file's text would pass
+  after a comment edit), the repair diff itself (an assertion elsewhere in the reproduction file loosened
+  so it still passes on round 1's code), or anything outside the scan snapshot (dependencies, time,
+  network). That trust rests on the test worker, which is why High keeps its two reviewers. Only the
+  node-test and vitest adapters record the file and cause a closure needs.
+- A High round 2 after a production repair still cannot pass the mutation rule (review production must
+  equal GREEN's, and GREEN cannot be re-entered). That predates this release.
+
 # 0.105.0: lint the Draft before the user reads it, reuse a CHECKED pass, name the missing-case Bend fix, sweep before the lock
 
 ## Validation

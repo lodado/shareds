@@ -34,6 +34,8 @@ execution roles: they keep the session's effort and their own model rules (subag
    the run directory and the open findings. The Delivery test worker is continued the same way.
    Reviewers and analysts keep their own independence rules. A round-2 confirmation continues the
    round-1 reviewer the same way, with only its finding IDs and the repair diff, under a new `--attempt`.
+   Below High, when every round-1 claim is a cited product defect reproduced before the repair, skip that
+   dispatch and close round 2 with `--closure` (delivery/green-review).
 3. Before showing the Draft, run the cold-read gate by invoking $oracle-review in a context-free context
    with card bytes alone: `oracle-review-view.mjs card --oracle <card>` as the reading view plus a byte
    copy of the card, both written outside the run directory. Apply five questions per row, collapse to one root and its cheapest first nail.
