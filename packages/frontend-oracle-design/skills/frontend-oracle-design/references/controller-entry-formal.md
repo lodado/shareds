@@ -40,7 +40,17 @@ One canonical runtime, reference graph and ledger serve all roles. No role has i
      classes, randomness is an environment choice in `next(history)`; see
      [model patterns](model-patterns.md#time-is-an-event). `NEEDS_DECISION` only when the sources leave the
      boundary, precision or duration undecided — the same as any other open policy question.
-   - Mixed: model the stateful part and list the rest as Not formalized/Out of scope with its owner.
+   - A new request (no existing Oracle run) for Medium behavior that depends on no event order, async
+     lifecycle or concurrency (form validation, analytics or config injection): here, before
+     `$oracle-intake`, print `Status: HANDED_OFF — frontend-contract-design` and invoke
+     `$frontend-contract-design` with the request as S1. Choosing the controller before any artifact
+     exists is not a profile downgrade. The Contract run follows its own rules, and its intake hands the
+     request back with `Status: HANDED_OFF — frontend-oracle-design` when it finds such a core or a High
+     trigger. Medium work with such a core models only that core: the first response proposes the other
+     input families as `excluded: outside the Medium core`, naming any touched file the family was mined
+     from ([case space](card/case-space.md)). The confirming `yes` becomes the S\* their package
+     exclusions cite, and their policies stay tested rows (Not formalized).
+   - Mixed: model the stateful part (for Medium, its core) and list the rest as Not formalized/Out of scope with its owner.
      Report that Oracle did not verify it. If the core requirement can only be stated by the unmodelable
      part (UI, CSS, I/O), NEEDS_DECISION. Test whether a state machine can express it, not whether Bend
      has a native type (a string can be abstracted to valid/invalid), and never narrow
@@ -81,8 +91,9 @@ when coordinating the selected stages; read only current-step dependencies, not 
    Drive the first nail and record the result before showing the projected Draft for lock. Same-context switching is not independence.
    Card review shares the authoring budget of 2 rounds per revision; round 2 only confirms round 1's repairs
    ([budget](card/card-format.md#review-round-budget--at-most-2)). Never start a round 3 without the user's approval.
-4. Present the full new Draft or semantic delta and Open questions. Obtain human confirmation, lint and lock
-   through the existing scripts. No lock, target tests, production or dependency edits before confirmation.
+4. Present the full new Draft or semantic delta and Open questions. Obtain human confirmation, then lint
+   and lock through the existing scripts. Under common's pre-authorized approval, lint and lock without
+   presenting the card again. No lock, target tests, production or dependency edits before confirmation.
    Design-only ends ORACLE_READY, NEEDS_DECISION or tool-failure FAIL. Write/execute no consumer tests or production.
 5. For explicit Delivery, explicitly load and invoke `$test` on entry and immediately before target test writes.
    If it cannot be invoked, FAIL. Read delivery/ledger, initialize real required labels and follow the current

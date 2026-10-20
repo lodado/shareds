@@ -70,6 +70,7 @@ test('a tool result quoting a specialist slash command does not activate Oracle'
 })
 
 const activationEntry = (skill) => ({ type: 'assistant', timestamp: '2026-10-04T12:00:00.000Z', message: { content: [{ type: 'tool_use', name: 'Skill', input: { skill } }] } })
+const handoffEntry = (target) => ({ type: 'assistant', timestamp: '2026-10-04T12:00:00.000Z', message: { content: [{ type: 'text', text: `risk=Medium lane=oracle nodes=[common]\nStatus: HANDED_OFF — ${target}` }] } })
 
 async function contextFixture(t, profile = 'contract/v1') {
   const root = await mkdtemp(join(tmpdir(), 'oracle-profile-guard-'))
@@ -101,7 +102,7 @@ async function contextFixture(t, profile = 'contract/v1') {
   await writeFile(ledger, '')
   const check = async (skills, file = 'src/save.test.ts', options = {}) => {
     const transcript = join(root, 'session.jsonl')
-    await writeFile(transcript, `${skills.map((skill) => JSON.stringify(activationEntry(skill))).join('\n')}\n`)
+    await writeFile(transcript, `${skills.map((skill) => JSON.stringify(typeof skill === 'string' ? activationEntry(skill) : skill)).join('\n')}\n`)
     const result = spawnSync(process.execPath, [script], { ...options, encoding: 'utf8', input: JSON.stringify({
       hook_event_name: 'PreToolUse', cwd: root, transcript_path: transcript,
       tool_name: 'Write', tool_input: { file_path: join(root, file), content: 'test("save", () => {})' },
@@ -155,6 +156,24 @@ test('real approved Contract card/stage/lock resolves shared roles without selec
   assert.match(formal.permissionDecisionReason, /frontend-oracle-design profile/)
   assert.equal((await fixture.check(controllers))?.permissionDecision, 'deny')
   assert.deepEqual(await readFile(fixture.lock), locked)
+  assert.equal(await readFile(fixture.ledger, 'utf8'), '')
+})
+
+test('a recorded scope-gate handoff gives the session to the second controller; two controllers without one still conflict', async (t) => {
+  const fixture = await contextFixture(t)
+  const toContract = handoffEntry('frontend-contract-design')
+  assert.equal(await fixture.check(['frontend-oracle-design', toContract, 'frontend-contract-design']), null)
+  assert.equal((await fixture.check(['frontend-oracle-design', 'frontend-contract-design']))?.permissionDecision, 'deny')
+  // handing back to the Formal controller makes the Contract lock foreign again, even before Formal is re-invoked
+  const back = await fixture.check(['frontend-oracle-design', toContract, 'frontend-contract-design', handoffEntry('frontend-oracle-design'), 'frontend-oracle-design'])
+  assert.equal(back?.permissionDecision, 'deny')
+  const backOnly = await fixture.check(['frontend-oracle-design', toContract, 'frontend-contract-design', handoffEntry('frontend-oracle-design')])
+  assert.equal(backOnly?.permissionDecision, 'deny')
+  // the named target counts as a controller: activating the other one after it is a conflict
+  assert.equal((await fixture.check(['frontend-oracle-design', handoffEntry('frontend-oracle-design'), 'frontend-contract-design']))?.permissionDecision, 'deny')
+  // a marker quoted in tool output is not the assistant's handoff
+  const quoted = { type: 'user', timestamp: '2026-10-04T12:00:00.000Z', message: { content: [{ type: 'tool_result', content: 'Status: HANDED_OFF — frontend-contract-design' }] } }
+  assert.equal((await fixture.check(['frontend-oracle-design', quoted, 'frontend-contract-design']))?.permissionDecision, 'deny')
   assert.equal(await readFile(fixture.ledger, 'utf8'), '')
 })
 

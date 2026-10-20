@@ -28,6 +28,7 @@ If reads/invocation are unavailable, stop and return the blocker, not a substitu
 guessed sources). The request text is `S1`; an empty repo is `no code observation`, never a blocker.
 
 Scope without behavioral state/order/count/permission/effect stops OUT_OF_SCOPE, not a fake contract.
+Medium work without an order, async or concurrency core goes to `$frontend-contract-design` before any model.
 Unsupported outcome-changing scope is NEEDS_DECISION, not a skipped verification obligation.
 Formal-specific scope, mandatory stack and original entry obligations are owned by
 [Formal controller requirements](references/controller-entry-formal.md).
@@ -43,7 +44,8 @@ only for the current stage, not every future phase.
 2. Invoke [`$oracle-author`](../oracle-author/SKILL.md) after approved-source/axis prerequisites.
    Its selected Formal procedures own specialized authoring and checks.
 3. Invoke [`$oracle-review`](../oracle-review/SKILL.md) in independent review contexts with permitted inputs.
-   Preserve findings, drive the falsifying nail, obtain actual human approval, then lint/lock through tools.
+   Preserve findings, drive the falsifying nail, obtain actual human approval (common's pre-authorized one
+   counts), then lint/lock through tools.
 4. Design-only never writes/executes consumer tests or edits production/dependencies.
 5. Explicit Delivery invokes `$test` before tests and uses the current `oracle-run.mjs guide` and ledger.
    Only accepted VALID_RED permits [`$oracle-implement`](../oracle-implement/SKILL.md) production work.

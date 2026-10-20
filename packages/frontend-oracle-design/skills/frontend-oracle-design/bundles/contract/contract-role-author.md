@@ -36,8 +36,8 @@ the same Oracle entry and mandatory verification as every other risk.
 
 Emit progress only when the stage, evidence, scope, or blocker changes. Do not invent percentages or ETAs.
 Put the short result first; for detail, link files the workflow already keeps (card, journal, ledger
-reports) instead of dumping raw tool logs, and never create a file just to hold tool output.
-Never claim a linked file exists without checking it. No new progress artifact is required.
+reports) instead of dumping raw tool logs, and never create a file just to hold tool output or progress.
+Never claim a linked file exists without checking it.
 
 ### Keep going after `yes`
 
@@ -50,6 +50,11 @@ recommendations") answers every current and later question that has a recommenda
 the user's words as the approval location and list the adopted `Q<n>` in the next message instead of
 asking. Delegation never answers a question without a recommendation, never turns Design-only into
 Delivery and never waives review, lint, lock or mandatory verification.
+In the Formal profile only, a first `yes` that also says not to ask again ("끝까지 해", "묻지 말고 진행")
+pre-authorizes the post-proof card approval when the projected card raises no proof counterexample, new
+axis, new Open question or changed meaning. Record `- Source: pre-authorized — <first yes location>;
+post-proof: no new question or changed meaning`. These words are not delegation: any of them still stops
+for the user's answer.
 
 ### First response — one message, one confirmation
 
@@ -103,7 +108,7 @@ Shape (placeholders; the sweep is its own list, never a sentence about t-way red
 ```text
 risk=High lane=oracle nodes=[common, …]
 Status: NEEDS_DECISION — Draft awaits one confirmation
-## Outcome Brief · Source Registry   Risk: High — <worst regression>
+## Outcome Brief · Source Registry   Risk: High — trigger: <canonical trigger>; <worst regression>
                                     S1 | conversation: request | "<verbatim>" | approved
 ## Proposed axes                     <family>: <values> ★<recommended> | <unnamed value> (Q<n>) | excluded: <reason>
 ## Provisional Draft
@@ -173,19 +178,14 @@ enough for that premise, not for final verification. Design-only still cannot ex
 edit production or install target dependencies. An unavailable check stays unverified, never assumed
 true; decide its scope/capability consequence before investing in the full design.
 
-Collect the applicable first-pass reviews before repairing, classify their findings and group shared
-causes. Repair each group once. Separate a defect in agreed behavior from a proposed new requirement:
-the former needs evidence and a fix, the latter needs the existing scope decision, not automatic model
-growth. Second-pass work confirms the listed fixes and their regressions, not a new search for defects.
-Security, privacy, accessibility and data integrity are never downgraded to keep the work moving.
+Collect first-pass reviews before repairing and fix each group of shared causes once; a proposed new
+requirement needs the scope decision, not automatic model growth, and second-pass work confirms only the
+listed fixes and their regressions. Security, privacy, accessibility and data integrity are never downgraded.
 
-The authoring budget is shared by model/analyst, translation, card review and stage rewinds, not a
-fresh allowance for each role. Delivery review has its own existing two-round limit and does not
-borrow authoring, policy, harness or product allowances. Scripts persist both in existing artifacts;
-restarting a role, regenerating a packet or rewinding never resets them. At exhaustion stop with the
-remaining findings, not a false pass. A new revision is not a budget-reset trick. The selected
-profile's authoring and Delivery procedures own dispatch commands; do not load another profile's
-procedures for their budget instructions.
+One persisted authoring budget covers model/analyst, translation, card review and stage rewinds; Delivery
+review keeps its own two-round limit. No role restart, regenerated packet, rewind or new revision resets
+either, and exhaustion stops with the remaining findings, never a false pass. Each profile's own
+procedures own their dispatch commands.
 
 ## Authority priority
 
@@ -209,14 +209,26 @@ alternative, then `NEEDS_DECISION`.
 
 ## Risk taxonomy — canonical
 
-Risk judgment is canonical in this document. Other documents point to this table and add only their
-lane procedure.
+Risk judgment is canonical in this document. Other documents point here and add only their lane
+procedure. Every risk takes the `oracle` lane.
 
-| Risk     | Entry criteria                                                                                                                                                                        | Lane     | Default evidence                                                                                                                     |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `Low`    | no new policy·architecture decisions; a clear regression fix inside an existing approved finite behavior contract                                                                     | `oracle` | common + selected-profile requirements, actual case evidence and applicable type/property evidence; same approval and Delivery gates |
-| `Medium` | needs a contract — new UI states·forms·responsive structure·async ordering·local/identity visual intent beside modelable behavior — but not payment·permission·data-loss-scale damage | `oracle` | Oracle Card, `VALID_RED`, required-label GREEN, one independent review                                                               |
-| `High`   | payment·permissions·destructive actions·data loss·legal/security/privacy/financial/complex concurrency, where a false GREEN is costly                                                 | `oracle` | Medium evidence + consecutive-GREEN hardening, mutation kill·revert·re-GREEN, 2-sample independent review                            |
+- `Low`: no new policy·architecture decisions; a clear regression fix inside an existing approved finite
+  behavior contract. Evidence: common + selected-profile requirements, actual case evidence and applicable
+  type/property evidence; same approval and Delivery gates.
+- `Medium`: needs a contract — new UI states·forms·responsive structure·async ordering·local/identity
+  visual intent beside modelable behavior — but not payment·permission·data-loss-scale damage. Evidence:
+  Oracle Card, `VALID_RED`, required-label GREEN, one independent review.
+- `High`: a named trigger — money is charged, refunded or owed, including a stored payment instrument or
+  a computed amount owed · a permission, tenant or auth boundary decides access · destructive or
+  irreversible data change, or loss of user-entered data · legal/security/privacy exposure · the same
+  state written concurrently by more than one actor, where a lost update or double effect cannot be
+  undone. Evidence: Medium evidence + consecutive-GREEN hardening, mutation kill·revert·re-GREEN, 2-sample
+  independent review.
+
+Name High's trigger on the `Risk:` line (`Risk: High — trigger: money charged`). Without one, behavior
+work is at most Medium (Low keeps its criterion); async loading, ordering, retries or caching alone never
+make it High. New Medium work with no order, async or concurrency core goes to the Contract controller at
+the Formal scope gate.
 
 Risk judgment may take one optional evidence input: `scripts/oracle-twr.mjs` scores the target
 files' time-weighted bug-fix history from git. A high score is grounds to raise the lane or spend
@@ -1150,6 +1162,10 @@ At current-stage intake, investigate exposed type boundaries and record exact in
 a grounded no-boundary rationale and its approved source before proposing omission of type evidence.
 Unknown applicability requires further investigation; unavailable required tools are an actual environment
 failure, not N/A. Hand the determination and unresolved gaps to authoring, not an approval.
+A request the Formal controller handed over (`Status: HANDED_OFF — frontend-contract-design`) goes back
+before any Contract artifact when intake finds an event order, async or concurrency core or a High
+trigger: print `Status: HANDED_OFF — frontend-oracle-design` and invoke `$frontend-oracle-design` with
+the same S1. A request that asked for this profile stays here.
 
 <!-- node:card-interaction-sweep path:references/contract/interaction-sweep.md -->
 

@@ -52,7 +52,8 @@ execution roles: they keep the session's effort and their own model rules (subag
    re-confirms only if a new needs-decision appears. Record approval location in User Confirmation.
    A change request requires Draft repair and re-confirmation; no answer means NEEDS_DECISION.
    This re-presents the projected card after proof; only proof counterexamples, new axes or a changed
-   meaning since the provisional Draft need a new question. Questions go ahead of the Draft only when
+   meaning since the provisional Draft need a new question. Under common's pre-authorized approval,
+   record it without re-presenting when none of them appeared. Questions go ahead of the Draft only when
    their answer changes the lane, the actor or the side-effect class; discovery axes ride the Draft.
 6. Read [`card/confirmation-lock.md`](../card/confirmation-lock.md) before confirmation/lock/init.
    Lint with `scripts/oracle-verify.mjs card --path <touched files>`; `--case-space` is structural

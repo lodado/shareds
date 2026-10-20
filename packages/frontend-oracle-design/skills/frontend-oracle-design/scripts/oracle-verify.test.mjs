@@ -454,6 +454,28 @@ test('O17: 새 카드의 사용자 확인 근거가 없으면 lock 전 lint를 �
   assert.match(draft.stderr, /user-confirmation-status/)
 })
 
+test('a pre-authorized card approval names its first yes and states that the proof raised no new question or changed meaning', async (t) => {
+  const approval = (source) => VALID_CARD.replace('- Source: user message Q-confirmation', `- Source: ${source}`)
+  const lint = async (source, ...flags) => run('card', '--oracle', await cardFile(t, approval(source)), ...flags)
+  const condition = 'post-proof: no new question or changed meaning'
+  for (const source of ['pre-authorized — first yes, message 3', `pre-authorized; ${condition}`, 'pre-authorized — message 3; post-proof: no new question',
+    // a respelled marker is judged too, and only the exact form passes
+    `preauthorized — message 3; ${condition}`, `Pre-Authorised — message 3; ${condition}`]) {
+    const refused = await lint(source)
+    assert.equal(refused.status, 1, source)
+    assert.match(refused.stderr, /user-confirmation-preauthorized: write `pre-authorized — <first yes location>; post-proof: no new question or changed meaning`/, source)
+  }
+  const stated = await lint(`pre-authorized — first yes, message 3; ${condition}`)
+  assert.equal(stated.status, 0, stated.stderr)
+  // the location may quote the user's words, semicolon included; the condition is what follows the last one
+  const quoted = await lint(`pre-authorized — "끝까지 해; 묻지 말고 진행", message 3; ${condition}`)
+  assert.equal(quoted.status, 0, quoted.stderr)
+  // only a Source that starts as a pre-authorization is judged: a quoted mention elsewhere is ordinary text
+  assert.equal((await lint('user message 7 (not pre-authorized)')).status, 0)
+  // a locked card is re-linted on every verify; its recorded wording is not judged again
+  assert.equal((await lint('pre-authorized — message 3', '--locked')).stderr.includes('user-confirmation-preauthorized'), false)
+})
+
 test('O17: 출처 없는 정책 줄을 위치와 함께 거부한다', async (t) => {
   const oracle = await cardFile(t, VALID_CARD.replace(' (출처: S1)', ''))
 

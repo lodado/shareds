@@ -1,3 +1,97 @@
+# 0.104.0: name High's trigger, route Medium work by its core, let the first yes pre-authorize post-proof approval
+
+## Validation
+
+- `ORACLE_REQUIRE_BEND=1 pnpm --filter @lodado/frontend-oracle-design-plugin test`:
+  **1,183 passed, 0 failed, 0 skipped**, using real Bend.
+- Package lint: exit 0, **0 errors, 405 package-wide warnings** (unchanged).
+- Generated reference bundles (22), workflow docs and converted evals: passed. No bundle cap was raised.
+  The risk taxonomy table became a list and the Convergent planning section was shortened to make room.
+- An independent Opus 5.5 review found one high, seven medium and five low findings. All are fixed with
+  tests except L2 (below):
+  - High: after a scope-gate handoff the guard saw two controllers and denied every write.
+  - Medium: the handoff had no protocol, `mandatory-verification.md` still required Bend for every
+    behavior change, and a Medium core-only exclusion had no source to cite. Pre-authorization reached
+    Contract cards, ignored a changed meaning, and its record was not linted. The High triggers missed
+    amounts owed, stored payment instruments and loss of entered data. No eval covered the new routes.
+  - Low: the new lint relied on a fragile regex, High's evidence dropped "2-sample independent review",
+    and `risk-grill.md` still said "table". `common.md` pointed Contract readers at Formal requirements,
+    and only FOD's description length was tested.
+- A follow-up Opus 5.5 review of those fixes approved with two medium and four low findings, all fixed:
+  - Medium: a handoff line with no later activation left the session without a profile, so any valid
+    lock opened writes. The hand-back rule lived only in the Formal entry, which the Contract controller
+    never reads.
+  - Low: a respelled marker (`preauthorized`) skipped the pre-authorization lint, and a `;` quoted in the
+    location was refused. No test covered the Contract refusal. Medium exclusions did not say to name a
+    touched file the family was mined from. Step 4 and the delegation rule left the pre-authorized stop
+    ambiguous.
+
+## Diagnosis
+
+From the transcripts measured for 0.102.0:
+
+- Every Claude run that printed a risk line (10) and every Codex thread (13) classified its work High.
+  The Medium relief (one review) was never used.
+- So every run paid for two independent reviews, blind mapping, mutation kill·revert·re-GREEN and three
+  consecutive GREEN runs. The fixed `formal-bend/v1` profile also put a Bend model on everything,
+  including env-injected ad tracking.
+- Users cut the procedure themselves: "bend 넣지말고 TDD 테스트로 구현하자", "모두 알아서해,
+  다할때까지 묻지마". Of 387 user messages in these runs, 64 were bare approvals, and runs still stopped
+  for the card approval after a proof that raised nothing new.
+
+## Change
+
+- `common.md` risk taxonomy:
+  - High needs a named trigger:
+    - money is charged, refunded or owed, including a stored payment instrument or a computed amount owed;
+    - a permission, tenant or auth boundary decides access;
+    - a destructive or irreversible data change, or loss of user-entered data;
+    - legal, security or privacy exposure;
+    - concurrent writes by more than one actor where a lost update or double effect cannot be undone.
+  - Without a trigger, work is at most Medium, and Low keeps its criterion. Async loading, ordering,
+    retries or caching alone never make work High.
+  - The first response names the trigger: `Risk: High — trigger: <trigger>; <worst regression>`.
+- Medium routing at the Formal scope gate (`controller-entry-formal.md`):
+  - New Medium work with no order, async or concurrency core goes to the Contract controller before
+    `$oracle-intake`. The controller prints `Status: HANDED_OFF — frontend-contract-design` and continues
+    under `$frontend-contract-design` with the request as S1. This is a choice of controller, not a
+    downgrade.
+  - `contract/risk-grill.md`, which Contract intake reads, sends a handed-over request back before any
+    Contract artifact when it finds such a core or a High trigger. It prints
+    `Status: HANDED_OFF — frontend-oracle-design` and invokes `$frontend-oracle-design` with the same S1.
+    A request that asked for the Contract profile stays there.
+  - Medium work with such a core models only the core. Space discovery proposes every other input family
+    as `excluded: outside the Medium core`, naming any touched file the family was mined from, and the
+    confirming `yes` is the S\* those exclusions cite.
+- Pre-authorized post-proof approval (Formal only, `common.md` Keep going):
+  - A first `yes` that also says not to ask again ("끝까지 해", "묻지 말고 진행") counts as the post-proof
+    card approval. It applies only when the projected card raises no proof counterexample, new axis, new
+    Open question or changed meaning. These words are not delegation, so any of those still stops for the
+    user's answer.
+  - The card records
+    `- Source: pre-authorized — <first yes location>; post-proof: no new question or changed meaning`.
+    `oracle-verify.mjs card` judges any spelling of the marker. It refuses the marker on a `contract/v1`
+    card (the Contract stage stops at DRAFTED) and when either part is missing.
+- `oracle-guard-hook.mjs`: after the last `Status: HANDED_OFF — frontend-(oracle|contract)-design` line,
+  the session's profile comes from that line's target plus the controllers activated after it. A handoff
+  no longer reads as two controllers, and a hand-back closes the other profile's lock before the target
+  is re-invoked.
+- The `frontend-contract-design` description accepts the handoff. `mandatory-verification.md` names the
+  Medium handoff, made before any Formal artifact exists, as Entry's one route away from the stack. The
+  README explains risk levels and profile choice.
+- Evals: three manual boundary cases (Medium handoff, Medium core only, pre-authorization stopped by a
+  counterexample).
+- `skill-contract.test.mjs` checks all six skill descriptions against the 1,024-character limit and pins
+  both sides of the handoff.
+
+## Open
+
+- Low work that reaches the Formal controller still records the mandatory Bend
+  (`card/confirmation-lock.md`), while Medium work with no core is handed off without it. The Formal
+  controller does not auto-invoke on low-risk work, so this appears only when a user asks for an Oracle on
+  Low work. It is left for a policy decision.
+- The Contract description is 1,021 of 1,024 characters.
+
 # 0.103.0: edit the package with get/patch, grow Bend files in checked sections, cap bundle growth
 
 ## Validation

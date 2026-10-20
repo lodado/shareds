@@ -65,7 +65,8 @@ record the location of the user's Design Change Confirmation answer in the same 
 
 The Draft stage keeps `Status: draft`. Only after the user has reviewed the full card·delta and
 explicitly approved it, record `approved` and the actual response location. Do not use an agent
-recommendation or the inference that "the user would want it" as the Source.
+recommendation or the inference that "the user would want it" as the Source. The one exception is
+common's pre-authorized approval (Formal only), whose Source is the first `yes` and its marker.
 
 | ID  | Policy | Given | When | Then | Never | Side effects (kind×count) | BVA |
 | --- | ------ | ----- | ---- | ---- | ----- | ------------------------- | --- |

@@ -15,9 +15,9 @@ Visual scope does not replace functional Risk. Record the two judgments separate
 ## Risk judgment
 
 Judge by the **worst damage from a false GREEN**, not by code complexity. Even when the UI is
-simple, it is High if the side effects are dangerous.
+simple, it is High when a canonical High trigger applies; name that trigger on the Risk line.
 
-The entry criteria are the [canonical risk table](../common.md#risk-taxonomy--canonical); this
+The entry criteria are the [canonical risk list](../common.md#risk-taxonomy--canonical); this
 section only shows how to read them. A word in the request is not the damage: "save" can be a label
 fix inside an approved form or an irreversible overwrite. Weigh the approved contract, what changes
 from current behavior, and whether a wrong result can be recovered.
@@ -31,7 +31,7 @@ from current behavior, and whether a wrong result can be recovered.
 
 - Low → record risk and reason, then use the Oracle card and mandatory verification stack. Low risk does not waive a tool or the approval/lock procedure.
 - Medium and High → write the card, which passes the one Draft confirmation in
-  [`confirmation-lock.md`](confirmation-lock.md); High adds the High evidence of the canonical table.
+  [`confirmation-lock.md`](confirmation-lock.md); High adds the High evidence of the canonical list.
 - A `mandatory-constraint` or a High entry criterion is never lowered because the UI looks simple.
 
 ## Policy Grill — system design interview

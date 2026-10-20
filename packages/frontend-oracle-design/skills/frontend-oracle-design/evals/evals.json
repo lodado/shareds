@@ -731,6 +731,48 @@
     },
     {
       "id": 51,
+      "name": "fod-sem-medium-handoff",
+      "category": "boundary-semantic",
+      "manualReviewOnly": true,
+      "prompt": "문의 폼을 제출할 때 네이버 유입 광고 전환 스크립트를 붙여 줘. URL은 나중에 바뀌니 .env로 주입하고, 구현까지 해 줘.",
+      "expected_output": "Classify Medium with no High trigger and no order, async or concurrency core. At the Formal scope gate, before $oracle-intake, print `Status: HANDED_OFF — frontend-contract-design` and continue under $frontend-contract-design with the request as S1: finite contract rows and tests, no Bend package or model files.",
+      "files": [],
+      "assertions": [
+        "The handoff line appears at the scope gate, before any Formal intake, axes or model work.",
+        "No oracle.package.json, MODEL.bend, LAWS.bend or Bend proof is created or planned for this request.",
+        "The Contract controller continues in the same response with its own header and intake, using the request text as S1."
+      ]
+    },
+    {
+      "id": 52,
+      "name": "fod-sem-medium-core-only",
+      "category": "boundary-semantic",
+      "manualReviewOnly": true,
+      "prompt": "결제가 없는 설문 폼에서 제출 버튼을 연타하거나 응답이 늦을 때 중복 제출을 막아 줘. 이메일 형식 검증도 같이 해 줘.",
+      "expected_output": "Stay in the Formal controller: the submit lifecycle is an async/order core. Risk is Medium (no High trigger). Model only that core; propose the email Value family as `excluded: outside the Medium core` with a recommendation, keep the email rows as tested rows listed under Not formalized, and report them as tested, not proven.",
+      "files": [],
+      "assertions": [
+        "Risk is Medium and no High trigger is claimed; repeated clicks and slow responses alone do not make it High.",
+        "The model and proof cover the submit lifecycle (pending, response order, duplicate submit), not the email format rules.",
+        "The email format rules stay as tested card rows marked Not formalized, with the exclusion confirmed by the user rather than assumed."
+      ]
+    },
+    {
+      "id": 53,
+      "name": "fod-sem-preauthorized-stop",
+      "category": "boundary-semantic",
+      "manualReviewOnly": true,
+      "prompt": "The first reply was \"yes — 끝까지 해, 묻지 말고 진행\". The Bend proof then produced a counterexample: a retry after a timeout can send the payment request twice. Continue the Formal run.",
+      "expected_output": "The pre-authorized post-proof approval does not apply because the proof raised a counterexample. Present the counterexample as an Open question with a recommendation and stop for the user's answer; do not record `pre-authorized` in User Confirmation or lock.",
+      "files": [],
+      "assertions": [
+        "The response stops and asks about the retry-after-timeout counterexample instead of locking.",
+        "User Confirmation is not written as `pre-authorized`, and no lock or Delivery step follows in this response.",
+        "The question carries candidate rows and exactly one recommended option."
+      ]
+    },
+    {
+      "id": 54,
       "name": "error-empty-defect",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -745,7 +787,7 @@
       ]
     },
     {
-      "id": 52,
+      "id": 55,
       "name": "error-empty-allow",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -760,7 +802,7 @@
       ]
     },
     {
-      "id": 53,
+      "id": 56,
       "name": "stale-response-defect",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -775,7 +817,7 @@
       ]
     },
     {
-      "id": 54,
+      "id": 57,
       "name": "stale-response-allow",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -790,7 +832,7 @@
       ]
     },
     {
-      "id": 55,
+      "id": 58,
       "name": "disabled-mutation-defect",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -805,7 +847,7 @@
       ]
     },
     {
-      "id": 56,
+      "id": 59,
       "name": "disabled-mutation-allow",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -820,7 +862,7 @@
       ]
     },
     {
-      "id": 57,
+      "id": 60,
       "name": "shared-api-defect",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -835,7 +877,7 @@
       ]
     },
     {
-      "id": 58,
+      "id": 61,
       "name": "shared-api-allow",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -850,7 +892,7 @@
       ]
     },
     {
-      "id": 59,
+      "id": 62,
       "name": "repeat-dedup-defect",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -865,7 +907,7 @@
       ]
     },
     {
-      "id": 60,
+      "id": 63,
       "name": "repeat-dedup-allow",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -880,7 +922,7 @@
       ]
     },
     {
-      "id": 61,
+      "id": 64,
       "name": "commonization-defect",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -895,7 +937,7 @@
       ]
     },
     {
-      "id": 62,
+      "id": 65,
       "name": "commonization-allow",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -910,7 +952,7 @@
       ]
     },
     {
-      "id": 63,
+      "id": 66,
       "name": "ownership-boundary-defect",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,
@@ -925,7 +967,7 @@
       ]
     },
     {
-      "id": 64,
+      "id": 67,
       "name": "ownership-boundary-allow",
       "category": "contextual-review-fixture",
       "manualReviewOnly": true,

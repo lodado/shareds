@@ -519,6 +519,17 @@ function chooseContract(card) {
   return true
 }
 
+/** 사전 위임 승인 — Contract는 최종 카드의 실제 승인이 필요하고, Formal은 위치와 조건을 정해진 꼴로 적는다. */
+function preauthorizationIssues(source, card) {
+  if (readCardProfile(card) === 'contract/v1') return ["user-confirmation-preauthorized: the Contract profile needs the user's actual approval of the final card"]
+  // 위치가 사용자의 말을 인용하면 `;`가 들어갈 수 있다 — 조건은 마지막 `;` 뒤에만 있다
+  const split = source.lastIndexOf(';')
+  const located = split > 0 && /^pre-authorized\s+[—-]\s+\S/i.test(source.slice(0, split).trim())
+  const conditioned = /^post-proof:\s*no new question or changed meaning$/i.test(source.slice(split + 1).trim())
+  if (located && conditioned) return []
+  return ["user-confirmation-preauthorized: write `pre-authorized — <first yes location>; post-proof: no new question or changed meaning`; any new question or changed meaning needs the user's answer"]
+}
+
 async function lintCard(options) {
   if (!options.oracle) throw new CliError('USAGE', 'card requires --oracle', 2)
 
@@ -755,6 +766,10 @@ async function lintCard(options) {
     if (!source || isEmptyCell(source)) {
       issues.push('user-confirmation-source: final card must cite the approving user response')
     }
+    // 첫 yes의 사전 위임은 Formal 카드에서, 증명 뒤 새 질문·뜻 바뀜이 없을 때만 승인이다 — 위치와 그 조건을 기록에 적게 한다.
+    // 잠긴 카드는 건너뛴다: verify가 잠긴 카드를 다시 lint하므로, 옛 기록 문구가 새 규칙으로 실패하지 않게 한다
+    // 철자를 조금 바꾼 표시(preauthorized, pre authorised)도 같은 검사를 받는다 — 정확한 형식이 아니면 거부된다
+    if (source && !options.locked && /^pre[-\s\u2011]?authori[sz]ed\b/i.test(source)) issues.push(...preauthorizationIssues(source, card))
   }
 
   if (rows.some((row) => cellOf(row, '증거 계층', 'Evidence tier') === 'RELATIONAL')) {

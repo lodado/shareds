@@ -477,6 +477,21 @@ JSON이 아니면 아무것도 쓰지 않고, 내용이 같으면 다시 쓰지 
 `PACKAGE_LOCKED`(또는 `STAGE_INVALID`)로 거부하고, 심볼릭 링크는 따라가지 않습니다. 쓴 뒤에는 MODELED 관문과 같은
 구조 검사 결과를 보여 주기만 하고 막지는 않습니다.
 
+### 위험 등급과 프로필 선택
+
+0.104.0부터 High는 이름 붙은 트리거가 있을 때만입니다: 돈의 결제·환불·채무(저장된 결제 수단이나 계산된 청구액
+포함), 권한·테넌트·인증 경계가 접근을 정함, 파괴적이거나 되돌릴 수 없는 데이터 변경 또는 사용자가 입력한 데이터의
+손실, 법·보안·개인정보 노출, 둘 이상이 같은 상태를 동시에 써서 잃어버린 갱신이나 이중 효과를 되돌릴 수 없음.
+Outcome Brief의 `Risk:` 줄에 그 트리거를 적고, 없으면 많아야 Medium입니다(비동기 로딩·순서·재시도·캐시만으로는
+High가 아닙니다). 순서·비동기·동시성 핵심이 없는 새 Medium 요청(폼 검증, 추적·설정 주입)은 Formal 범위 관문에서
+intake 전에 `Status: HANDED_OFF — frontend-contract-design`을 찍고 `frontend-contract-design`(contract/v1, Bend
+없음)으로 넘깁니다. guard hook은 이 표시 뒤에 켠 컨트롤러로 세션의 프로필을 정합니다. 핵심이 있는 Medium은 그
+핵심만 Bend로 모델링하고, 나머지 입력 계열은 첫 응답에서 `excluded: outside the Medium core`로 제안해 사용자의
+`yes`를 근거로 제외하며 그 정책은 테스트 행(Not formalized)으로 남깁니다. Formal에서만, 첫 `yes`에서 "끝까지,
+묻지 말고"라고 하면 증명 뒤 반례·새 축·새 Open question·뜻 바뀜이 없을 때 카드 승인을 다시 묻지 않습니다
+(`- Source: pre-authorized — <위치>; post-proof: no new question or changed meaning`, lint가 꼴을 확인하고
+Contract 카드에서는 거부).
+
 ### 리뷰어용 읽기 보기
 
 ```bash

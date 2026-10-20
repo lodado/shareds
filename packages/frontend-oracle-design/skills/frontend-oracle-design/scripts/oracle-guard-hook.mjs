@@ -138,6 +138,9 @@ function transcriptParts(line) {
 const activatesSkill = ({ type, name, input }) =>
   type === 'slash' || (type === 'tool_use' && name === 'Skill' && SKILL_ACTIVATION.test(input?.skill ?? ''))
 const routesOut = ({ type, text }) => type === 'text' && /^Status:\s*OUT_OF_SCOPE\b/m.test(text ?? '')
+// 범위 관문에서 다른 컨트롤러로 넘긴 기록 — 넘긴 대상과 그 뒤에 켠 컨트롤러만 이 세션의 프로필을 정한다(두 컨트롤러가 겹친 것이 아니다)
+const HANDOFF = /^Status:\s*HANDED_OFF\s*[—-]+\s*(?:frontend-oracle-design:)?(frontend-(?:oracle|contract)-design)\b/m
+const handsOff = ({ type, text }) => type === 'text' && HANDOFF.test(text ?? '')
 
 /**
  * 이 세션이 스킬을 처음 켠 시각(ms) — 세션 기록의 Skill 호출로 본다. 그 뒤 `Status: OUT_OF_SCOPE`로 넘겼으면 null.
@@ -152,9 +155,13 @@ async function skillActivation(transcriptPath) {
     .flatMap(transcriptParts)
   const first = parts.findIndex(({ part }) => activatesSkill(part))
   if (first === -1 || parts.slice(first).some(({ part }) => routesOut(part))) return null
-  const controllers = parts.slice(first).filter(({ part }) => activatesSkill(part))
+  const handoff = parts.findLastIndex(({ part }) => handsOff(part))
+  // 넘긴 대상도 컨트롤러로 센다 — 대상을 다시 켜기 전에 남은 쪽의 lock이 열리지 않고, 대상과 다른 컨트롤러를 켜면 겹친 것이다
+  const target = handoff > first ? parts[handoff].part.text.match(HANDOFF)[1] : null
+  const activated = parts.slice(Math.max(first, handoff + 1)).filter(({ part }) => activatesSkill(part))
     .map(({ part }) => part.skill ?? part.input?.skill)
     .filter((name) => /^(?:frontend-oracle-design:)?frontend-(?:oracle|contract)-design$/.test(name))
+  const controllers = target ? [target, ...activated] : activated
   const profiles = [...new Set(controllers.map(profileForController))]
   return { at: parts[first].at, profile: profiles.length === 1 ? profiles[0] : undefined, conflicting: profiles.length > 1 }
 }

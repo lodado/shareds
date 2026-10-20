@@ -23,7 +23,8 @@ by the user.
    has a budget of 2 review rounds per revision ([`card-format.md`](card-format.md#review-round-budget--at-most-2)).
 4. Show the full card and the delta to the user and ask for one confirmation: `yes` adopts every
    recommended option and approves the card; `Q<n>=<option>` swaps one option. Resolution is
-   mechanical and needs no second confirmation unless it creates a new `needs-decision`.
+   mechanical and needs no second confirmation unless it creates a new `needs-decision`. Under
+   common's pre-authorized approval (Formal only), step 5 follows without showing the card again.
 5. On approval, resolve the Open questions, change `User Confirmation` to `approved`, and record the
    actual response location.
 6. On a modification request, fix the Draft and re-confirm.
@@ -169,7 +170,7 @@ node <skill-dir>/scripts/oracle-run.mjs init \
 - The card does not omit·distort the external standard's states·copy·interaction·side effects
 - Every policy has an accepted source
 - `User Confirmation` is `approved` and has the actual user response location that approved the new
-  card or the semantic delta
+  card or the semantic delta, or common's pre-authorized marker
 - No `## Open questions` content remains and no policy cites a `Q*` source
 - No sweep·deviation·frame·landmine cell remains `needs-decision` or `needs-evidence`, and every
   `impossible` carries a witness the lint could resolve

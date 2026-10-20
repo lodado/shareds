@@ -592,6 +592,23 @@ test('routes bug reports, new oracle paths and conflicting sources from the trig
   assert.equal(controller, description)
 })
 
+test('the Medium handoff and its hand-back are each written where that controller reads them', async () => {
+  // 0.104.0: the Contract controller never reads the Formal entry, so its way back lives in its own intake reference
+  const entry = await read('references/controller-entry-formal.md')
+  const contract = await read('references/contract/risk-grill.md')
+  assert.match(entry, /before\s+`\$oracle-intake`,\s+print\s+`Status: HANDED_OFF — frontend-contract-design`/)
+  assert.match(contract, /print\s+`Status: HANDED_OFF — frontend-oracle-design`\s+and\s+invoke\s+`\$frontend-oracle-design`/)
+  assert.match(contract, /before\s+any\s+Contract\s+artifact/)
+})
+
+test('every skill description in the package fits the 1024-character trigger limit', async () => {
+  // 0.104.0: the Contract description grew with the Medium handoff; a longer one is cut off by hosts that cap descriptions
+  for (const name of ['frontend-oracle-design', 'frontend-contract-design', 'oracle-intake', 'oracle-author', 'oracle-implement', 'oracle-review']) {
+    const description = (await read(`../${name}/SKILL.md`)).match(/^description: ([^\n]+)$/m)?.[1] ?? ''
+    assert.ok(description.length > 0 && description.length <= 1024, `${name} description is ${description.length} chars`)
+  }
+})
+
 test('O29: gives reviewers raw run evidence and a validated finding schema', async () => {
   const subagentReview = await readReview()
 

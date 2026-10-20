@@ -169,6 +169,37 @@ test('Contract public stage and lock bind approved whole card without a package'
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
 
+test('a Contract card cannot carry the Formal pre-authorized approval: lint refuses it and the stage stops before DRAFTED', () => {
+  const root = mkdtempSync(join(tmpdir(), 'oracle-contract-preauthorized-'))
+  const directory = join(root, '.ai', 'oracles', 'contract')
+  mkdirSync(directory, { recursive: true })
+  const stage = new URL('../skills/frontend-oracle-design/scripts/oracle-stage.mjs', import.meta.url).pathname
+  const lock = new URL('../skills/frontend-oracle-design/scripts/oracle-lock.mjs', import.meta.url).pathname
+  const fixture = fullProductFixture()
+  for (const record of fixture.records) record.scenario.given = { enabled: false }
+  const preauthorized = `${fixture.render()}${profileSection}`.replace(
+    '- Source: synthetic test fixture approval; not a real consumer user confirmation',
+    '- Source: pre-authorized — first yes, message 3; post-proof: no new question or changed meaning',
+  )
+  const oracle = join(directory, 'oracle.md')
+  const run = (script, ...args) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' })
+  try {
+    writeFileSync(oracle, preauthorized)
+    const linted = run(verifier.pathname, 'card', '--oracle', oracle)
+    assert.equal(linted.status, 1)
+    assert.match(linted.stderr, /user-confirmation-preauthorized: the Contract profile needs the user's actual approval of the final card/)
+    // full-product CHECKED audits only the Space, so the refusal lands at DRAFTED, still before any lock
+    assert.equal(run(stage, 'begin', '--dir', directory, '--profile', 'contract/v1').status, 0)
+    const checked = run(stage, 'advance', '--dir', directory, '--to', 'CHECKED')
+    assert.equal(checked.status, 0, checked.stderr)
+    const drafted = run(stage, 'advance', '--dir', directory, '--to', 'DRAFTED')
+    assert.equal(drafted.status, 1)
+    assert.match(drafted.stderr, /^STAGE_GATE:[\s\S]*user-confirmation-preauthorized/)
+    assert.notEqual(run(lock, 'create', '--oracle', oracle, '--lock', join(directory, 'oracle.lock.json')).status, 0)
+    assert.equal(existsSync(join(directory, 'oracle.lock.json')), false)
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
 test('Contract public init requires approved investigated type N/A and Async reporting', () => {
   const root = mkdtempSync(join(tmpdir(), 'oracle-contract-applicability-'))
   const scripts = new URL('../skills/frontend-oracle-design/scripts/', import.meta.url)

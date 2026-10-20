@@ -177,7 +177,9 @@ test('the scope gate stops work with no modelable behavior before the stack inst
   assert.match(contract, /not an opt-out for work that does/)
   assert.match(contract, /Behavior no model can state is stopped by the scope gate/)
   // Low has no card-free path: only its modelable regression fixes remain, and CSS/copy/token work is the gate's
-  const lowRow = common.split('\n').find((line) => line.startsWith('| `Low`'))
+  // the taxonomy is a list since 0.104.0: the Low entry runs from its bullet to the next bullet or blank line
+  const lowRow = /^- `Low`:[^\n]*(?:\n {2}[^\n]+)*/m.exec(common)?.[0]
+  assert.match(lowRow ?? '', /regression fix inside an existing approved finite/)
   assert.doesNotMatch(lowRow, /isolated CSS/)
   assert.match(common, /Copy, token and isolated-CSS work without a behavioral contract stops at the controller's scope gate/)
   // visual-only work is no trigger either
