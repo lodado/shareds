@@ -164,6 +164,10 @@ importers:
         specifier: 8.20.0
         version: 8.20.0
 
+  packages/harness-team: {}
+
+  packages/lint-guard: {}
+
   packages/reference-driven-3d-character: {}
 
   packages/test: {}

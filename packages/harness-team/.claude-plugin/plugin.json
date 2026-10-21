@@ -1,0 +1,13 @@
+{
+  "name": "harness-team",
+  "version": "0.1.0",
+  "description": "Run every work task as a five-role harness team: a lead who never asks the goal and fixes the last task's mistakes first, an obsessive perfectionist final reviewer, and a carry-over ledger.",
+  "author": {
+    "name": "lodado",
+    "url": "https://github.com/lodado"
+  },
+  "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "repository": "https://github.com/lodado/my-Vibe-Coding-Helper",
+  "license": "MIT",
+  "keywords": ["agents", "team", "review", "workflow"]
+}
