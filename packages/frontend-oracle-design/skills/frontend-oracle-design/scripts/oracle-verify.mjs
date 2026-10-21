@@ -13,6 +13,7 @@ import {
   assertSnapshotUnchanged,
   codeCitation,
   isPathInside,
+  isTestPath,
   reportTiming,
   scanSideEffects,
   sha256,
@@ -170,6 +171,8 @@ const TEST_ENV_PATTERNS = [
   /__vitest_worker__|\btypeof\s+(?:vi|jest)\s*[!=]==?/,
   /navigator\.webdriver\b/,
   /\basymmetricMatch\b/,
+  // node --test가 자식 프로세스에 넣는 표식 — production이 읽을 까닭이 없다
+  /\bNODE_TEST_CONTEXT\b/,
 ]
 
 const TEST_ENV_EXEMPTION_MARKER = 'oracle:test-env'
@@ -2258,6 +2261,9 @@ function normalizeFindings(document, rows, source) {
       throw new CliError('FINDINGS_INVALID', `${source}: finding ${finding.id} cites unknown card row ${finding.row}`)
     }
 
+    const reproduction = reproductionIssue(finding)
+    if (reproduction) throw new CliError('FINDINGS_INVALID', `${source}: finding ${finding.id}: ${reproduction}`)
+
     const mandatory = finding.severity === 'critical' || finding.severity === 'high'
     if (!finding.row && !mandatory && !['POLICY_GAP', 'NON_ORACLE_OPINION'].includes(finding.classification)) {
       throw new CliError('FINDINGS_INVALID', `${source}: finding ${finding.id} requires an affected row; investigate missing policy or keep an unconfirmed candidate in the journal — absence of a row does not establish preference`)
@@ -2269,6 +2275,23 @@ function normalizeFindings(document, rows, source) {
       downgraded: false,
     }
   })
+}
+
+/**
+ * 리뷰어가 쓴 재현(`reproduction`) — PRODUCT_DEFECT에만 붙고, `{ file, test, code }`가 모두 비지 않은 문자열이며 file은 저장소 안의
+ * 상대 경로다. 형식만 본다: 재현이 그 지적을 시험하는지는 지적한 리뷰어의 판단이고, 러너의 closure가 바이트를 대조한다.
+ */
+function reproductionIssue(finding) {
+  const reproduction = finding.reproduction
+  if (reproduction === undefined) return null
+  if (finding.classification !== 'PRODUCT_DEFECT') return 'reproduction belongs to a PRODUCT_DEFECT'
+  const strings = Boolean(reproduction) && typeof reproduction === 'object' &&
+    ['file', 'test', 'code'].every((field) => typeof reproduction[field] === 'string' && reproduction[field].trim())
+  if (!strings) return 'reproduction is { file, test, code }, each a non-empty string'
+  const file = reproduction.file.split('\\').join('/')
+  if (/^[a-z]:/i.test(file) || posix.isAbsolute(file) || file.split('/').includes('..') || !isTestPath(file))
+    return `reproduction.file ${reproduction.file} must be a repository-relative test path`
+  return null
 }
 
 function assertEmbeddedLedger(ledger) {

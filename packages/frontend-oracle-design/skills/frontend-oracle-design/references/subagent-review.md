@@ -271,6 +271,16 @@ not `NON_ORACLE_OPINION`: missing evidence does not prove preference. A finding 
 no line to quote; cite the row or run instead and the check does not apply. Each axis judgment records `axis`, `status`, `evidence`, and a
 `findingId` when it reports a finding.
 
+Below High, a `PRODUCT_DEFECT` that cites `path#La-Lb` may also record `reproduction: { file, test, code }`
+so round 2 can close without a confirmation dispatch. The controller appends `code` byte for byte to
+`file` with `oracle-run.mjs reproduce`: a test file the GREEN command already runs, or a new one its
+pattern picks up. `code` defines exactly one test named `test`, fails on its assertion against the cited
+lines, passes once they are repaired, and changes nothing else. It may import (ESM imports may follow
+existing code), but never a name the file already binds: a second `import assert` is a SyntaxError that
+stops the whole file, so reuse the file's bindings, pick another local name, or `await import()` inside
+the test. Write it in the file's style; nobody reformats it. Leave it out when the packet does not let
+you write it.
+
 `changeabilityReview` judges the five axes exactly once each as `PASS | FINDING | N/A`. Every
 judgment needs path·line or packet field evidence. `FINDING` cites a real ID from the `findings`
 below, and `N/A` writes the reason it does not apply into evidence. schema v1 is allowed only for

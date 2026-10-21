@@ -234,7 +234,8 @@ detected `Date.now`·`Math.random`·`crypto.randomUUID`·`toLocale`·`new Intl.`
 record an exemption with an `oracle:nondeterminism <reason>` comment. The same scan fails
 `TEST_ENV_BRANCH` on production that branches on the test environment (`process.env.VITEST*` or
 `import.meta.env.VITEST`, `JEST_WORKER_ID`, `NODE_ENV`/`MODE` compared with `'test'` in dot or bracket
-form, `__vitest_worker__`, `typeof vi`/`typeof jest`, `navigator.webdriver`, `asymmetricMatch`) — a
+form, `__vitest_worker__`, `typeof vi`/`typeof jest`, `navigator.webdriver`, `asymmetricMatch`,
+`NODE_TEST_CONTEXT`) — a
 test that passes on a path users never run. The token list is finite, like the side-effect list. A real need is exempted with `oracle:test-env <reason>`; a bare marker is not.
 
 ### Final review transition
@@ -243,8 +244,9 @@ After `IMPLEMENTED_GREEN`, if reviewer findings are reflected, re-run the test r
 the same command used at GREEN. Quoting a pre-GREEN run as-is is `REVIEW_RERUN_REQUIRED`.
 For the remaining required labels, reuse the existing passing run if the lock·worktree·production·harness
 digests are the same as at GREEN, and if bytes changed from reflecting findings, `SNAPSHOT_STALE`
-demands a re-run — re-running the same bytes does not add evidence. The review artifact must have no
-blocking finding.
+demands a re-run — re-running the same bytes does not add evidence. When reflected findings changed the
+worktree after GREEN, the review run needs the risk's consecutive passes of the GREEN command on the new
+bytes, as GREEN did (`FLAKINESS_GATE`). The review artifact must have no blocking finding.
 
 Validate findings with `oracle-verify.mjs review`, then use the `REVIEW_VERIFIED` action printed
 by `status`. Pass each findings file and blind mapping exactly as the reviewer subagent returned it:
@@ -258,10 +260,15 @@ receipt; [`subagent-review.md`](../subagent-review.md) owns reviewer and blind-m
 
 High risk passes the reported failing run with the guard removed after GREEN and the affected card row
 via `--mutation-run`·`--mutation-row`, and after restoring the guard makes the same GREEN command pass
-again as the review run. The runner also inspects whether the production digest changed at the mutation
-relative to GREEN and returned exactly before the review. If either of the two is missing it is
-`MUTATION_EVIDENCE_REQUIRED`, and if the order·failure·reporter·digest conditions do not hold it is
-`MUTATION_EVIDENCE_INVALID`. The mutation run must cover at least the GREEN run's tests, and the kill
+again as the review run. The mutation run is that review command with the same working directory,
+environment fingerprint (Node, platform, TZ, locale, `--env-note`), adapter, harness and test files, so
+production is its only recorded difference (a preload or variable outside the fingerprint is not
+compared). It starts from the production of
+the last run before it on another production (a retry on the same mutated bytes keeps that baseline) and
+returns to it exactly before the review run, so after a round-1 repair it is taken again from the
+repaired production; one taken at GREEN no longer counts. If either of the two is missing it is
+`MUTATION_EVIDENCE_REQUIRED`, and if the order·failure·reporter·digest·command conditions do not hold it
+is `MUTATION_EVIDENCE_INVALID`. The mutation run must cover at least the review run's tests, and the kill
 must be targeted: the row's test fails on its own assertion, or a test mapped to another row still
 passes — a mutation that crashes the module kills the row test without proving its guard
 (`MUTATION_NOT_TARGETED`). When rows share one test, `--mutation-row`
@@ -306,17 +313,22 @@ post-review fix changes the snapshot and can otherwise restart the defect hunt.
    the controller on its own.
 
 **Closing round 2 without reviewers (Low and Medium only).** When every round-1 claim
-(`NON_ORACLE_OPINION` aside) is a `PRODUCT_DEFECT` citing `path#La-Lb`, round 2 can be a machine check
-instead of a dispatch:
+(`NON_ORACLE_OPINION` aside) is a `PRODUCT_DEFECT` citing `path#La-Lb` and carries the `reproduction`
+its reviewer wrote ([subagent-review](../subagent-review.md)), round 2 can be a machine check instead of
+a dispatch:
 
-1. Before the repair, `$test` adds a test that reproduces each claim to a file the GREEN command already
-   runs, with a name no other test uses, and runs that GREEN command unchanged through `exec`. Each
-   reproduction must fail on its assertion while production is still what round 1 reviewed.
-2. Repair only the cited files, rerun the labels and generate the round-2 packet with the round-1
-   `--findings` as usual. Do not dispatch the round-2 reviewers.
+1. Before the repair, `oracle-run.mjs reproduce --dir <dir> --findings <round-1 findings>` (add
+   `--intersect` for a second reviewer) appends each reviewer's `code` byte for byte to its `file`, the
+   same code once; never edit or reformat those files. It refuses, before writing anything, a file that
+   changed since round 1, that the scan snapshot skips, or a JavaScript file Node could parse that the
+   reproductions would break. Run the GREEN command unchanged through
+   `exec`: each reproduction must fail on its assertion while production is still what round 1 reviewed.
+2. Repair only the cited files, rerun the labels (the GREEN command to the risk's consecutive passes) and
+   generate the round-2 packet with the round-1 `--findings` as usual. Do not dispatch the round-2
+   reviewers.
 3. Pass `--closure <file>` to `transition --to REVIEW_VERIFIED` in place of round-2 findings. The file is
    `{ "schemaVersion": 1, "reproductions": [{ "reviewerId", "finding", "test", "redRun" }] }`, one entry
-   per claim.
+   per claim, where `test` is the reviewer's reproduction test.
 
 The runner refuses the closure (`REVIEW_CLOSURE_INVALID`) unless:
 
@@ -329,7 +341,14 @@ The runner refuses the closure (`REVIEW_CLOSURE_INVALID`) unless:
   scan snapshot; each reproduction is the only test with its name in both runs, lives in a test file the
   snapshot records, and passes from that file in the review run;
 - since round 1, test files changed only where the reproductions live, no harness file changed, no test
-  lost strength, and production changed in every cited file and nowhere else.
+  lost strength, and production changed in every cited file and nowhere else;
+- each reproduction is the one its claim's reviewer wrote: the closure names its test, it ran from the
+  reviewer's file, and that file holds round 1's bytes (none for a new file) followed by the reviewers'
+  reproductions, unchanged;
+- no cited file loads an assertion or test-runner module (import, require, `getBuiltinModule`,
+  `createRequire`), calls a test runner's global API (`expect.extend`, `vi.stubGlobal`, …), or writes to
+  `globalThis` or a standard built-in such as `Object.is`: the plain ways a production repair can switch
+  off the reproduction's own assertion.
 
 Only adapters that record a test's file and failure cause (node-test, vitest) can close. A refused closure
 goes to the round-2 reviewers as before. The packet, evidence, mutation, blind-mapping and rerun gates are
@@ -337,13 +356,14 @@ unchanged, and a closure cannot carry an evidence row a reviewer finding owns.
 
 What a closure does not check:
 
-- that the reproduction tests what the claim describes;
-- the repair diff itself, including an assertion elsewhere in the reproduction file loosened so it still
-  passes on round 1's code;
+- that the reviewer's reproduction tests what the claim describes: the reviewer judged that with the claim;
+- the production repair beyond what the tests run: a new defect in a cited file that no test reaches, or a
+  repair that changes how the test process judges in a way the scans above do not name;
 - what lies outside the scan snapshot: dependencies, files outside the scan root, time, network, and
   environment beyond the fingerprint.
 
-Those rest on the test worker, which is why High keeps its two reviewers.
+Those rest on the round-1 reviewers and the existing tests, which is why High keeps its two round-2
+reviewers.
 
 Round 2 packet generation requires the preceding raw receipt-bound `--findings` and, for High,
 `--intersect`. It includes their IDs/original findings and the repair diff under

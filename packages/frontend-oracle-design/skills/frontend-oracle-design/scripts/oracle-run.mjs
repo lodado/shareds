@@ -162,6 +162,8 @@ const NEXT_ACTIONS = {
   RUN_NOT_GREEN: 'produce an actually passing run with `exec --label <label>` and cite that runId',
   REVIEW_CLOSURE_INVALID:
     'the closure does not apply — send the confirm-fixes packet to the round-2 reviewers and pass their --findings',
+  REPRODUCTION_INVALID:
+    'a reproduction must name a test file inside the scan root; otherwise confirm that claim with the round-2 reviewers',
   RUN_NOT_RED: 'the cited run must fail on the mapped row — write the test, run `red --row <row>`',
   EVIDENCE_REQUIRED:
     'generate `oracle-verify.mjs evidence-scaffold --oracle <card> > evidence.json`, fill the slots, pass --evidence',
@@ -1909,6 +1911,31 @@ function assertConsecutivePasses(
   }
 }
 
+/**
+ * 리뷰 인용 run의 연속 통과 — 리뷰 반영으로 worktree가 GREEN과 달라졌으면 GREEN의 연속 통과는 그 바이트의 것이 아니다. 리뷰
+ * 런의 바이트에서 같은 명령의 연속 통과를 risk만큼 다시 요구한다(Low는 리뷰 런 자신). status도 같은 규칙으로 막힘을 보인다.
+ */
+function assertReviewPasses(state, ledger, run, greenEntry) {
+  if (run.worktreeSha256 === findRun(ledger, greenEntry.runId).worktreeSha256) return
+  assertConsecutivePasses(state, ledger, run, greenEntry.runCount, run.worktreeSha256, run.lockManifestSha256)
+}
+
+/**
+ * 변이 run은 리뷰 런과 production만 다르다 — 같은 명령·cwd·환경 지문(TZ·locale 등)·adapter·harness·init 뒤 바뀐 테스트 파일.
+ * 늘 실패하는 다른 명령이나 그 run에만 바꾼 환경·harness·테스트로는 가드를 지운 production이 리뷰 명령에서 죽었다는 증거가
+ * 되지 않는다.
+ */
+function assertMutationLikeReview(mutationRun, run) {
+  const same = (left, right) => stableStringify(left ?? null) === stableStringify(right ?? null)
+  const differs = ['command', 'cwd', 'env', 'adapter'].filter((field) => !same(mutationRun[field], run[field]))
+  if (!sameDigests(mutationRun.harnessSha256 ?? {}, run.harnessSha256 ?? {})) differs.push('harness')
+  // 0.106.0 전 run에는 테스트 파일 digest가 없다 — 비교할 수 없으면 같은 테스트라고 볼 수 없다
+  if (!mutationRun.changedTests || !run.changedTests || !same(mutationRun.changedTests, run.changedTests)) differs.push('test files')
+  if (differs.length > 0) {
+    throw new CliError('MUTATION_EVIDENCE_INVALID', `${mutationRun.runId} must be the review command of ${run.runId} on mutated production only (${differs.join(', ')} differ)`)
+  }
+}
+
 function harnessRedIndex(state, ledger, started, run, current) {
   if (!state.harnessAtValidRed || sameDigests(state.harnessAtValidRed, current)) return null
 
@@ -2630,13 +2657,14 @@ async function assertReviewClosure(directory, state, options) {
   const harness = changed.filter((path) => harnessPaths.includes(path))
   if (harness.length > 0) throw invalid(`the repair changed harness files a reviewer must confirm: ${harness.join(', ')}`)
   const root = await realpath(scanRoot)
+  const scanPrefix = folderPrefix(portablePath(commonAncestor(await realpath(directory), root), root))
   const closed = await closeFindings(scope, closure.reproductions, {
     invalid,
     allLedger,
     previousIndex,
     previousProduction: productionSha256(previousRound.snapshot, state.harnessPaths),
     previousSnapshot: previousRound.snapshot,
-    scanPrefix: folderPrefix(portablePath(commonAncestor(await realpath(directory), root), root)),
+    scanPrefix,
     lockManifestSha256,
     reviewRun,
     root,
@@ -2645,6 +2673,8 @@ async function assertReviewClosure(directory, state, options) {
     reproductionNames: new Set(closure.reproductions.map((entry) => entry.test)),
   })
   await assertRepairScope(state, { changed, closed, scanRoot, invalid })
+  await assertReviewerReproductions(closed.claims, { invalid, previousSnapshot: previousRound.snapshot, current, root, scanPrefix })
+  await assertRepairLeavesTestsAlone(closed.cited, { invalid, root })
   const receipts = scope.previousFindings.map((previous) =>
     allLedger.find((entry) => entry.type === 'review-receipt' && entry.findingsSha256 === previous.sha256 && entry.reviewerId === previous.reviewerId),
   )
@@ -2729,19 +2759,108 @@ async function closeFindings(scope, reproductions, context) {
   const cited = new Set()
   const files = new Set()
   const answered = new Set()
+  const closedClaims = []
   for (const { previous, finding } of claims) {
     const key = `${previous.reviewerId}\0${finding.id}`
     const label = `${previous.reviewerId} ${finding.id}`
     if (typeof finding.id !== 'string' || !finding.id || answered.has(key)) throw invalid(`${label} needs one unique finding id`)
     if (!entries.has(key)) throw invalid(`${label} has no reproduction — confirm it with the round-2 reviewers`)
     cited.add(citedFile(finding, label, context))
-    files.add(await assertReproduction(entries.get(key), context))
+    const file = await assertReproduction(entries.get(key), context)
+    files.add(file)
+    closedClaims.push({ label, finding, entry: entries.get(key), file })
     answered.add(key)
   }
   const unknown = [...entries.keys()].filter((key) => !answered.has(key))
   if (unknown.length > 0)
     throw invalid(`reproductions name findings round 1 did not raise: ${unknown.map((key) => key.replace('\0', ' ')).join(', ')}`)
-  return { cited, files }
+  return { cited, files, claims: closedClaims }
+}
+
+/**
+ * 재현은 그 지적을 낸 1차 리뷰어가 썼다 — 지적마다 `reproduction`이 있고, closure가 대는 테스트가 그 이름이며 리뷰어가 적은
+ * 파일에서 돌았다. 재현이 든 파일은 1차의 바이트(없던 파일이면 빈 바이트) 뒤에 리뷰어들의 code를 붙인 그대로다
+ * (reproductionSuffix). 그래서 재현이 지적을 시험한다는 판단은 지적한 리뷰어의 것이고, 테스트 작업자는 재현도 같은 파일의
+ * 다른 테스트도 고칠 수 없다.
+ */
+async function assertReviewerReproductions(claims, { invalid, previousSnapshot, current, root, scanPrefix }) {
+  const written = new Map()
+  for (const { label, finding, entry, file } of claims) {
+    const reproduction = reproductionShape(finding)
+    if (!reproduction) throw invalid(`${label} carries no reproduction its reviewer wrote — confirm it with the round-2 reviewers`)
+    if (entry.test !== reproduction.test) throw invalid(`${label}: the closure names "${entry.test}" but its reviewer wrote "${reproduction.test}"`)
+    if (reproductionPath(reproduction.file, scanPrefix) !== file) throw invalid(`${label}: "${entry.test}" ran from ${file}, not the reviewer's ${reproduction.file}`)
+    written.set(file, [...(written.get(file) ?? []), reproduction.code])
+  }
+  for (const [file, codes] of written) {
+    const bytes = await readFile(join(root, file)).catch(() => Buffer.alloc(0))
+    const suffix = Buffer.from(reproductionSuffix(codes), 'utf8')
+    const prefix = bytes.subarray(0, Math.max(0, bytes.length - suffix.length))
+    const before = previousSnapshot[file]
+    const intact = before === undefined ? prefix.length === 0 : sha256(prefix) === before
+    // 리뷰 런의 snapshot과 같은 바이트여야 그 run이 돌린 파일이다
+    if (sha256(bytes) !== current[file] || !bytes.subarray(prefix.length).equals(suffix) || !intact)
+      throw invalid(`${file} must hold round 1's bytes followed by its reviewers' reproductions, exactly as \`oracle-run.mjs reproduce\` writes them`)
+  }
+}
+
+// 수리한 production이 테스트 프로세스의 단언·test runner·전역·내장을 건드리면 재현이 통과해도 수리가 아니다 — 흔한 꼴만
+// 막고, 막지 못한 꼴은 문서의 "closure가 보지 않는 것"에 남는다. 단언 모듈을 부르는 길(import·require·동적 import·
+// getBuiltinModule·createRequire, 따옴표·백틱)과 test runner 전역 API(globals 설정에서는 import 없이 부른다)
+const TEST_RUNNER_REACH = [
+  /\b(?:import|from|require)[\s(]*['"`](?:node:)?(?:assert(?:\/strict)?|test)['"`]/,
+  /\b(?:import|from|require)[\s(]*['"`](?:vitest|jest|chai|expect|mocha|ava|uvu)['"`]/,
+  /\b(?:import|from|require)[\s(]*['"`]@(?:vitest|jest)\//,
+  /\b(?:getBuiltinModule|createRequire)\s*\(/,
+  /\b(?:expect|vi|jest)\s*\??\.\s*(?:extend|spyOn|stubGlobal|stubEnv|mock|fn|useFakeTimers|setSystemTime)\b/,
+]
+// 단언 라이브러리는 Object.is 같은 내장으로 비교한다 — 전역 객체와 표준 내장(과 그 prototype)을 고치는 쓰기
+const SHARED_BUILTINS = new Set(['globalThis', 'global', 'Object', 'Array', 'String', 'Number', 'Boolean', 'JSON', 'Math', 'Promise',
+  'Function', 'Map', 'Set', 'Date', 'RegExp', 'Reflect', 'Symbol'])
+// `X.y = …`·`X.prototype.y = …`·`X[k] = …` — 앞이 속성 접근(`i18n.global.locale`)이면 전역이 아니다
+const DOT_WRITE = /(?<![.\w$])([a-z_$][\w$]*)(?:\s*\.\s*[\w$]+)+\s*=(?!=)/gi
+const BRACKET_WRITE = /(?<![.\w$])([a-z_$][\w$]*)(?:\s*\.\s*[\w$]+)*\s*\[[^\]\n]+\]\s*=(?!=)/gi
+const DEFINE_ON = /\b(?:Object\.(?:defineProperty|defineProperties|assign|setPrototypeOf)|Reflect\.(?:set|defineProperty))\s*\(\s*([a-z_$][\w$]*)/gi
+
+function reachesIntoTests(text) {
+  if (TEST_RUNNER_REACH.some((pattern) => pattern.test(text))) return true
+  const writes = [...text.matchAll(DOT_WRITE), ...text.matchAll(BRACKET_WRITE), ...text.matchAll(DEFINE_ON)]
+  return writes.some(([, name]) => SHARED_BUILTINS.has(name))
+}
+
+/** 인용한 파일(수리한 production)이 단언·test runner에 닿거나 전역·표준 내장을 고치면 그 수리는 리뷰어가 본다. */
+async function assertRepairLeavesTestsAlone(cited, { invalid, root }) {
+  for (const file of cited) {
+    const text = await readFile(join(root, file), 'utf8').catch(() => '')
+    if (reachesIntoTests(text))
+      throw invalid(`${file} reaches into the test process (assertions, the test runner, globals or built-ins) — a reviewer must confirm that repair`)
+  }
+}
+
+/** 리뷰어가 쓴 재현 `{ file, test, code }` — 셋 다 비지 않은 문자열일 때만. */
+function reproductionShape(finding) {
+  const reproduction = finding?.reproduction
+  if (!reproduction || typeof reproduction !== 'object') return null
+  const complete = ['file', 'test', 'code'].every((field) => typeof reproduction[field] === 'string' && reproduction[field].trim())
+  return complete ? reproduction : null
+}
+
+/** 재현 파일(scan root 기준) — 인용처럼 scan root 기준도 저장소 루트 기준도 받는다. 절대 경로와 `..`는 받지 않는다. */
+function reproductionPath(file, scanPrefix) {
+  const normalized = posix.normalize(file.split('\\').join('/'))
+  if (/^[a-z]:/i.test(normalized) || posix.isAbsolute(normalized) || normalized.split('/').includes('..')) return null
+  return withinScanRoot(normalized, scanPrefix)
+}
+
+const compareText = (left, right) => Number(left > right) - Number(left < right)
+
+/**
+ * 한 파일에 붙일 재현 바이트 — 같은 code는 한 번만, 정렬해 각각 앞에 줄바꿈을 두고, 끝에 줄바꿈이 없으면 붙인다. 원래 파일이
+ * 줄바꿈 없이 끝나도 문장이 이어 붙지 않고, reproduce와 closure가 순서까지 같은 바이트를 기대한다.
+ */
+function reproductionSuffix(codes) {
+  const terminated = (code) => (code.endsWith('\n') ? code : `${code}\n`)
+  return [...new Set(codes)].sort(compareText).map((code) => `\n${terminated(code)}`).join('')
 }
 
 /** 지적이 인용한 파일(scan root 기준) — PRODUCT_DEFECT의 `path#La-Lb`만, 그리고 1차 snapshot에 있던 파일만. */
@@ -3227,20 +3346,24 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
       const mutationRun = findRun(ledger, options.mutationRun)
       const mutationIndex = ledger.findIndex((entry) => entry.runId === mutationRun.runId)
       const reviewIndex = ledger.findIndex((entry) => entry.runId === run.runId)
+      // 변이의 기준은 그보다 앞서 production이 달랐던 마지막 run이다(같은 변이를 다시 돌린 run은 건너뛴다). 리뷰 런의
+      // production이 그것이어야 정확히 되돌린 것이고, 1차 리뷰 뒤 수리했으면 변이도 수리한 production에서 다시 뜬다(GREEN에는
+      // 다시 들어갈 수 없다). 변이 run은 리뷰 런과 production만 다르다(assertMutationLikeReview).
+      const baseline = ledger.slice(0, mutationIndex).findLast((entry) => entry.productionSha256 !== mutationRun.productionSha256)
       if (
         mutationIndex < greenEntry.runCount ||
         reviewIndex <= mutationIndex ||
         mutationRun.exitCode === 0 ||
         mutationRun.grade !== 'reported' ||
-        !greenRun.productionSha256 ||
-        mutationRun.productionSha256 === greenRun.productionSha256 ||
-        run.productionSha256 !== greenRun.productionSha256
+        !baseline?.productionSha256 ||
+        run.productionSha256 !== baseline.productionSha256
       ) {
         throw new CliError(
           'MUTATION_EVIDENCE_INVALID',
-          `${mutationRun.runId} must change production after GREEN, fail with a reporter, and be exactly restored before review`,
+          `${mutationRun.runId} must mutate the production the review run verifies (the last run before it on another production is ${baseline?.runId ?? 'none'}), after GREEN, fail with a reporter, and be exactly restored before review`,
         )
       }
+      assertMutationLikeReview(mutationRun, run)
       runVerifier([
         'red',
         '--oracle',
@@ -3267,12 +3390,12 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
       const killedByAssertion = mutationTests.some((test) => test.name === mutatedName && test.cause === 'assertion')
       const otherRowSurvived = mutationTests.some((test) => otherMapped.has(test.name) && test.status === 'passed')
       if (
-        mutationTests.length < (greenRun.tests?.length ?? 0) ||
+        mutationTests.length < (run.tests?.length ?? 0) ||
         (!killedByAssertion && otherMapped.size > 0 && !otherRowSurvived)
       ) {
         throw new CliError(
           'MUTATION_NOT_TARGETED',
-          `${mutationRun.runId} must run the full GREEN suite (${greenRun.tests?.length ?? 0} tests) and kill the ${
+          `${mutationRun.runId} must run the full review suite (${run.tests?.length ?? 0} tests) and kill the ${
             options.mutationRow
           } test on its assertion or while another row's test still passes`,
         )
@@ -3387,6 +3510,7 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
     // 블라인드 매핑 대조는 같은 review 호출에 붙인다 — 같은 패킷 검증을 두 번 하지 않는다.
     if (blindMapping?.required) reviewArgs.push('--blind-map', resolve(options.blindMap))
     runVerifier(reviewArgs)
+    assertReviewPasses(state, ledger, run, greenEntry)
   }
 
   const finalState = partialHolds ? 'PARTIAL_VERIFIED' : options.to
@@ -4388,6 +4512,18 @@ function transitionPacket(to, { state, runEntries, staleRunIds, blockers, eviden
       if (candidateRuns.length > 0 && !satisfied) packetBlockers.push(`FLAKINESS_GATE_${required}_CONSECUTIVE`)
     }
     if (isReviewTransition(to)) {
+      // 리뷰가 바꾼 바이트의 연속 통과 — transition과 같은 assertReviewPasses로 판정한다
+      const greenEntry = lastEntryFor(state, 'IMPLEMENTED_GREEN')
+      const passes = (runId) => {
+        try {
+          assertReviewPasses(state, runEntries, findRun(runEntries, runId), greenEntry)
+          return true
+        } catch {
+          return false
+        }
+      }
+      if (greenEntry && candidateRuns.length > 0 && !candidateRuns.some(passes))
+        packetBlockers.push(`FLAKINESS_GATE_${REQUIRED_CONSECUTIVE_PASSES[state.risk] ?? 1}_CONSECUTIVE`)
       // transitionUnderLock이 실제로 쓰는 것과 같은 규칙에서 파생한다 — 규칙 사본을 유지하지 않는다.
       if (blindMapping?.required) {
         // 영수증이 아예 없으면 증거가 없는 것이 확실하다. 있더라도 transition은 결속을 다시 판정한다 —
@@ -5557,6 +5693,119 @@ async function workerRun(options) {
   })
 }
 
+/**
+ * 1차 리뷰어가 쓴 재현을 그대로 쓴다 — 옮겨 적으면 바이트가 바뀔 수 있고(포매터 hook 등) closure는 리뷰어가 쓴 바이트를
+ * 요구한다. 파일마다 1차가 본 바이트 끝에 재현을 붙이고(없던 파일이면 만든다), 이미 그대로 붙어 있으면 둔다. 1차 뒤 바뀐
+ * 파일은 closure가 거부할 것이라 쓰기 전에 거부한다. scan root 안에서 snapshot이 담는 테스트 파일만 쓰고, harness·오라클
+ * 디렉터리·링크는 거부한다. 모든 파일을 먼저 판정하고 쓴다 — 하나라도 거부되면 아무것도 쓰지 않는다.
+ */
+async function writeReproductions(options) {
+  if (!options.dir || !options.findings) {
+    throw new CliError('USAGE', 'reproduce requires --dir and the round-1 --findings (and --intersect for the second reviewer)', 2)
+  }
+  const directory = resolve(options.dir)
+  await withDirectoryLock(directory, 'state', async () => {
+    const state = await readConsistentState(directory)
+    if (state.state !== 'IMPLEMENTED_GREEN') {
+      throw new CliError('REPRODUCTION_INVALID', 'reproductions are written between review rounds, in IMPLEMENTED_GREEN')
+    }
+    const round = (await readLedger(directory)).filter((entry) => entry.type === 'review-round').at(-1)
+    if (!round?.snapshot) throw new CliError('REPRODUCTION_INVALID', 'no review round is recorded — reproductions answer round-1 findings')
+    const directoryReal = await realpath(directory)
+    const root = await realpath(resolve(directory, state.scanRoot))
+    const scanPrefix = folderPrefix(portablePath(commonAncestor(directoryReal, root), root))
+    const codes = await reviewerReproductions([options.findings, options.intersect].filter(Boolean), { scanPrefix, harnessPaths: state.harnessPaths ?? [], root })
+    if (codes.size === 0) throw new CliError('REPRODUCTION_INVALID', 'no PRODUCT_DEFECT in these findings carries a reproduction')
+    const plans = []
+    for (const [file, list] of [...codes].sort(([left], [right]) => compareText(left, right))) {
+      plans.push(await reproductionPlan(file, reproductionSuffix(list), { root, directoryReal, before: round.snapshot[file] }))
+    }
+    for (const plan of plans.filter(({ bytes }) => bytes)) {
+      await mkdir(dirname(plan.target), { recursive: true })
+      const staging = `${plan.target}.${process.pid}.reproduce`
+      await writeFile(staging, plan.bytes)
+      await rename(staging, plan.target)
+    }
+    const summary = plans.map(({ file, outcome }) => `${file} (${outcome})`).join(', ')
+    process.stdout.write(`REPRODUCTIONS_WRITTEN ${summary}\n`)
+  })
+}
+
+/** findings 파일들의 PRODUCT_DEFECT 재현을 파일(scan root 기준)별 code 목록으로 — snapshot이 담는 테스트 파일이 아니거나 harness면 거부한다. */
+async function reviewerReproductions(paths, { scanPrefix, harnessPaths, root }) {
+  const codes = new Map()
+  for (const path of paths) {
+    const document = await readJsonFile(resolve(path)).catch((error) => {
+      throw new CliError('REPRODUCTION_INVALID', `Cannot read ${path}: ${error.message}`)
+    })
+    if (!Array.isArray(document?.findings)) throw new CliError('REPRODUCTION_INVALID', `${path} is not a findings document`)
+    for (const finding of document.findings) {
+      const reproduction = finding?.classification === 'PRODUCT_DEFECT' && reproductionShape(finding)
+      if (!reproduction) continue
+      const file = reproductionPath(reproduction.file, scanPrefix)
+      if (!file || !isTestPath(file) || harnessPaths.includes(file) || snapshotSkips(root, file)) {
+        throw new CliError('REPRODUCTION_INVALID', `${finding.id}: ${reproduction.file} is not a test file inside the scan root`)
+      }
+      codes.set(file, [...(codes.get(file) ?? []), reproduction.code])
+    }
+  }
+  return codes
+}
+
+/** snapshot이 담지 않을 자리 — 무시하는 디렉터리 아래이거나 git이 무시하는 경로. 거기 쓴 재현은 두 run 사이 변경이 드러나지 않는다. */
+function snapshotSkips(root, file) {
+  if (file.split('/').some((segment) => IGNORED_DIRECTORIES.has(segment))) return true
+  return spawnGit(['-C', root, 'check-ignore', '-q', '--', file]).status === 0
+}
+
+/**
+ * 한 파일의 계획 — 1차 바이트(없던 파일이면 빈 바이트) 그대로면 재현을 붙이고, 이미 1차 바이트에 이 재현을 붙인 그대로면 두고,
+ * 그 밖은 거부한다. 가장 가까운 기존 조상의 실경로가 scan root 안이고 오라클 디렉터리 밖이어야 하며, 파일은 링크가 아니다.
+ */
+async function reproductionPlan(file, suffix, { root, directoryReal, before }) {
+  const target = join(root, file)
+  let existing = dirname(target)
+  while (!(await lstat(existing).catch(() => null))) existing = dirname(existing)
+  const ancestor = await realpath(existing)
+  if (!isPathInside(root, ancestor) || isPathInside(directoryReal, ancestor)) throw new CliError('REPRODUCTION_INVALID', `${file} leaves the scan root`)
+  const metadata = await lstat(target).catch(() => null)
+  if (metadata && !metadata.isFile()) throw new CliError('REPRODUCTION_INVALID', `${file} is not a regular file`)
+  const bytes = metadata ? await readFile(target) : Buffer.alloc(0)
+  const added = Buffer.from(suffix, 'utf8')
+  const roundOne = (content) => (before === undefined ? content.length === 0 : sha256(content) === before)
+  if (roundOne(bytes)) {
+    const planned = Buffer.concat([bytes, added])
+    const broken = await breaksSyntax(target, bytes, planned)
+    if (broken) throw new CliError('REPRODUCTION_INVALID', `${file} would stop parsing with these reproductions (${broken}) — a code must not re-bind a name the file already has`)
+    return { file, target, bytes: planned, outcome: metadata ? 'appended' : 'new' }
+  }
+  const prefix = bytes.subarray(0, Math.max(0, bytes.length - added.length))
+  if (bytes.subarray(prefix.length).equals(added) && roundOne(prefix)) return { file, target, bytes: null, outcome: 'already written' }
+  throw new CliError('REPRODUCTION_INVALID', `${file} changed since round 1 — the closure would refuse it, so confirm these claims with the round-2 reviewers`)
+}
+
+/**
+ * node가 읽던 JS 파일이 재현을 붙여 문법 오류가 되는가(같은 이름을 두 번 import 등) — 같은 디렉터리에 같은 확장자로 써서
+ * `node --check`로 본다(package의 module 종류가 같다). node가 못 읽는 파일(JSX·TS)은 판정하지 않고, 새 파일은 .mjs·.cjs만 본다.
+ */
+async function breaksSyntax(target, original, planned) {
+  if (!/\.[cm]?js$/.test(target) || (original.length === 0 && !/\.[cm]js$/.test(target))) return null
+  const check = async (bytes) => {
+    // 확장자만 지닌다 — 이름에 `.test.`가 남으면 지우기 전에 끊긴 probe를 테스트 러너가 집는다
+    const probe = join(dirname(target), `.reproduce-check-${process.pid}${target.match(/\.[cm]?js$/)[0]}`)
+    await mkdir(dirname(probe), { recursive: true })
+    await writeFile(probe, bytes)
+    try {
+      return spawnSync(process.execPath, ['--check', probe], { encoding: 'utf8' })
+    } finally {
+      await rm(probe, { force: true })
+    }
+  }
+  if (original.length > 0 && (await check(original)).status !== 0) return null
+  const result = await check(planned)
+  return result.status === 0 ? null : (result.stderr.split('\n').find((line) => /Error/.test(line)) ?? 'syntax error').trim()
+}
+
 async function main() {
   deliveryProtocol = compileDeliveryProtocol(
     JSON.parse(await readFile(join(scriptDirectory, '../references/delivery.protocol.json'), 'utf8')),
@@ -5584,12 +5833,13 @@ async function main() {
   else if (command === 'review-extend') await extendReview(options)
   else if (command === 'review-brief') await reviewBrief(options)
   else if (command === 'blind-input') await blindInput(options)
+  else if (command === 'reproduce') await writeReproductions(options)
   else if (command === 'worker-packet') await workerPacket(options)
   else if (command === 'worker-run') await workerRun(options)
   else
     throw new CliError(
       'USAGE',
-      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, budget, status, guide, metrics, review-packet, review-extend, review-brief, blind-input, worker-packet or worker-run',
+      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, budget, status, guide, metrics, review-packet, review-extend, review-brief, blind-input, reproduce, worker-packet or worker-run',
       2,
     )
 }

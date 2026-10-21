@@ -2963,7 +2963,30 @@ test('0.106.0: round 2 closes on reproductions instead of reviewers only for cit
   assert.match(green, /What a closure does not check:/)
   assert.match(green, /is\s+a\s+`PRODUCT_DEFECT`\s+citing\s+`path#La-Lb`/)
   assert.match(green, /A\s+refused\s+closure\s+goes\s+to\s+the\s+round-2\s+reviewers\s+as\s+before/)
-  assert.match(controller, /close round 2 with `--closure`/)
+  assert.match(controller, /close\s+round\s+2\s+with\s+`--closure`/)
+})
+
+test('0.108.0: the claim\'s reviewer writes the reproduction, and a repaired High re-earns its mutation and passes', async () => {
+  const [green, review, controller] = await Promise.all([
+    read('references/delivery/green-review.md'),
+    read('references/subagent-review.md'),
+    read('references/roles/controller-formal.md'),
+  ])
+  // the closure's trust in what a reproduction tests moves from the test worker to the reviewer who raised the claim
+  assert.match(review, /may\s+also\s+record\s+`reproduction:\s+\{\s+file,\s+test,\s+code\s+\}`/)
+  assert.match(review, /appends\s+`code`\s+byte\s+for\s+byte\s+to\s+`file`\s+with\s+`oracle-run\.mjs\s+reproduce`/)
+  assert.match(green, /`oracle-run\.mjs\s+reproduce\s+--dir\s+<dir>\s+--findings\s+<round-1\s+findings>`/)
+  assert.match(green, /each\s+reproduction\s+is\s+the\s+one\s+its\s+claim's\s+reviewer\s+wrote/)
+  assert.match(controller, /whose\s+reviewer\s+wrote\s+its\s+reproduction,\s+written\s+with\s+`reproduce`/)
+  // the reviewer's own assertion cannot be switched off by the plain production tricks, and imports must not collide
+  assert.match(green, /no\s+cited\s+file\s+loads\s+an\s+assertion\s+or\s+test-runner\s+module/)
+  assert.match(green, /writes\s+to\s+`globalThis`\s+or\s+a\s+standard\s+built-in\s+such\s+as\s+`Object\.is`/)
+  assert.match(green, /a\s+repair\s+that\s+changes\s+how\s+the\s+test\s+process\s+judges/)
+  assert.match(review, /never\s+a\s+name\s+the\s+file\s+already\s+binds/)
+  // a round-1 repair used to leave High unable to pass round 2; the mutation is the review command on mutated production
+  assert.match(green, /The\s+mutation\s+run\s+is\s+that\s+review\s+command\s+with\s+the\s+same\s+working\s+directory,\s+environment\s+fingerprint/)
+  assert.match(green, /the\s+last\s+run\s+before\s+it\s+on\s+another\s+production/)
+  assert.match(green, /the\s+review\s+run\s+needs\s+the\s+risk's\s+consecutive\s+passes\s+of\s+the\s+GREEN\s+command\s+on\s+the\s+new\s+bytes/)
 })
 
 test('0.105.0: the Draft is linted before the user reads it, and a pre-lock sweep stays on temporary paths', async () => {

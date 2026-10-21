@@ -524,10 +524,25 @@ Contract 카드에서는 거부).
 하나라도 어긋나면 `REVIEW_CLOSURE_INVALID`이고 지금처럼 2차 리뷰어에게 갑니다. red run에서 재현 말고 다른 테스트가
 실패했거나, 재현이 snapshot이 담지 않는 곳(무시 경로, `build/`, scan root 밖)에 있거나, 라운드가 시작된 뒤 리뷰어 산출물이
 host 영수증에 있어도 닫지 않습니다. 파일과 실패 원인을 적는 adapter(node-test, vitest)만 닫을 수 있습니다. 패킷·증거·변이·
-블라인드 매핑·재실행 관문은 그대로입니다. closure는 재현이 지적을 정말 시험하는지, 수리 diff 자체(재현 파일 안의 다른
-단언을 1차 코드에서도 통과하게 느슨하게 한 것 포함), snapshot 밖(의존성, 시간, 네트워크)을 보지 않습니다. 그 몫을 테스트
-작성자에게 맡기므로 High는 리뷰어를 유지합니다. 이를 위해 run 기록에 init 뒤 바뀐 테스트 파일의 digest(`changedTests`)가
+블라인드 매핑·재실행 관문은 그대로입니다. 이를 위해 run 기록에 init 뒤 바뀐 테스트 파일의 digest(`changedTests`)가
 남습니다.
+
+0.106.0의 closure는 재현이 지적을 정말 시험하는지와, 재현 파일 안의 다른 단언을 느슨하게 한 수리를 테스트 작성자에게
+맡겼습니다. 0.108.0부터는 지적을 낸 1차 리뷰어가 재현을 findings에 직접 씁니다(`reproduction: { file, test, code }`).
+컨트롤러는 고치기 전에 `oracle-run.mjs reproduce --dir <dir> --findings <1차 findings> [--intersect <두 번째>]`로 그
+code를 바이트 그대로 파일 끝에 붙이고(포매터를 거치지 않게), closure는 재현이 리뷰어가 적은 파일과 이름으로 돌았는지,
+그 파일이 1차 바이트 뒤에 리뷰어들의 재현만 붙인 그대로인지 봅니다. 재현이 지적을 시험하는지는 지적한 리뷰어가 판단하고,
+재현 파일 안의 다른 테스트는 고칠 수 없습니다. `reproduce`는 1차 뒤 바뀐 파일이나 snapshot이 담지 않는 자리(무시
+경로)에는 아무것도 쓰지 않고, 같은 code는 한 번만 쓰며, node가 읽던 JS 파일을 문법 오류로 만드는 재현(같은 이름을
+두 번 import)도 쓰지 않습니다. 인용한 파일이 단언·test runner 모듈을 부르거나(`getBuiltinModule`·`createRequire`
+포함) test runner 전역 API를 부르거나 `globalThis`·`Object.is` 같은 표준 내장을 고치면(production에서 재현의 단언을
+끄는 흔한 꼴) closure를 거부합니다. 남는 것은 테스트가 닿지 않는
+수리 결함, 스캔이 이름 붙이지 못한 방식으로 테스트 판정을 바꾸는 수리, snapshot 밖(의존성, 시간, 네트워크)이라
+High는 2차 리뷰어를 유지합니다. 리뷰 반영으로 worktree가 GREEN과 달라지면 리뷰 런은 그 바이트에서
+risk만큼의 연속 통과(Medium 2, High 3)가 다시 필요하고, status도 그 막힘을 보여 줍니다. High의 mutation run은 리뷰
+명령과 같은 명령·harness·테스트 파일이어야 하고(production만 다름), 그보다 앞서 production이 달랐던 마지막 run에서 떠서
+리뷰 런 전에 되돌립니다. 그래서 1차 리뷰 뒤 수리했으면 수리한 production에서 다시 뜹니다(0.107.0까지는 수리한 High가
+2라운드를 통과할 수 없었습니다). production이 `NODE_TEST_CONTEXT`를 읽으면 `TEST_ENV_BRANCH`입니다.
 
 ### 리뷰어용 읽기 보기
 

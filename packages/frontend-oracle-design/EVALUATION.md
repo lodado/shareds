@@ -1,3 +1,106 @@
+# 0.108.0: the claim's reviewer writes the reproduction a closure trusts; a repaired High re-earns its mutation and passes
+
+## Validation
+
+- `ORACLE_REQUIRE_BEND=1 pnpm --filter @lodado/frontend-oracle-design-plugin test`: **1,205 passed, 0 failed, 0 skipped**,
+  using real Bend.
+- Package lint: exit 0, **0 errors, 405 package-wide warnings** (unchanged).
+- Generated reference bundles (22), workflow docs and converted evals: passed.
+- Mutation checks: removing any of 31 guards makes a test fail. They cover the mutation baseline, retry and
+  command/environment match, the consecutive passes and their status blocker, the reviewer-reproduction checks
+  (presence, test name, file, appended bytes before and after, tamper scan forms and the property-chain
+  exception), every `reproduce` refusal (state, review round, findings shape, non-test, harness, ignored path,
+  `..`/absolute, link out of the scan root, linked file, round-1 bytes, syntax break, all-or-nothing writes,
+  duplicate code), the `NODE_TEST_CONTEXT` scan token and the non-test reproduction file in findings.
+- An independent Opus 5.5 review returned WARNING with one high, two medium and four low findings, all fixed:
+  - High: a production "repair" that switched off the reproduction's assertion (`assert.equal = function () {}`
+    in the cited file, or a branch on `NODE_TEST_CONTEXT`) closed round 2 with the defect still in place, and
+    the draft docs claimed only an untested repair defect remained. A closure now refuses when a cited file
+    imports an assertion or test-runner module or writes to `globalThis`; the production scan treats
+    `NODE_TEST_CONTEXT` as a test-environment branch; the docs list a repair that changes how the test process
+    judges among what a closure does not check.
+  - Medium: the new mutation baseline (the run right before the mutation) refused a mutation run retried on the
+    same mutated bytes. The baseline is now the last earlier run on another production, the error names it,
+    and the targeted-kill count compares with the review run's tests.
+  - Medium: the documented reproduction form could re-declare a name the file already imports (a SyntaxError
+    that stops the file), and `reproduce` appended a duplicate code twice. The docs say never to re-bind a
+    name, identical code is written once, and `reproduce` refuses, before writing anything, a file that
+    changed since round 1 or that the snapshot skips.
+  - Low: `status` shows the review run's consecutive-pass blocker; `reproduce` takes a directory lock, checks
+    every file before writing any, refuses a document without `findings`, git-ignored and ignored-directory
+    paths and links; findings refuse a drive-letter or non-test reproduction file; tests cover a retried
+    mutation, a harness file, a linked target and a grown reproduction set.
+  - Older gap the reviewer named separately, fixed because this release rewrites the same condition: a High
+    mutation run could be any failing reported command (the always-failing fixture passed as a mutation). It
+    must now be the review command with the same working directory, adapter, harness and test files.
+- The same reviewer's second pass found the tamper scan still missed plain forms (`process.getBuiltinModule`,
+  `createRequire`, backtick specifiers, `Object.is = …` that vitest's matchers rely on, and vitest globals such
+  as `expect.extend`/`vi.stubGlobal`) and that a mutation run under another time zone passed. The scan now
+  names those forms and writes to standard built-ins, while a property chain such as `i18n().global.locale`
+  is not the global object; the mutation must share the review run's environment fingerprint. `reproduce` takes
+  the state lock, writes through a staging file, and refuses bytes that would make a JavaScript file stop
+  parsing (two codes importing the same name). Its third pass approved. The syntax-check probe no longer keeps
+  the `.test.` part of the name, so a probe left behind by a killed process is not a test file.
+
+## Diagnosis
+
+0.106.0 closed round 2 on reproductions the test worker wrote. The runner checked that a reproduction failed
+before the repair and passed after it, but not that it tested what the claim described, and it let the
+worker edit other tests in the reproduction file as long as both runs saw the same bytes. Those were the
+documented residual risks, and the reason High kept its reviewers.
+
+A High round 2 after a production repair could never pass: the mutation rule required the review run's
+production to equal GREEN's, and GREEN cannot be re-entered. The same rule meant a repaired production shipped
+on one review run, while GREEN had needed the risk's consecutive passes (Medium 2, High 3).
+
+## Change
+
+- A round-1 `PRODUCT_DEFECT` that cites `path#La-Lb` may carry `reproduction: { file, test, code }` written by
+  its reviewer. `oracle-verify.mjs findings` checks the shape (`PRODUCT_DEFECT` only, three non-empty strings, a
+  repository-relative test file).
+- `oracle-run.mjs reproduce --dir <dir> --findings <round-1> [--intersect <second>]` (IMPLEMENTED_GREEN, after a
+  recorded review round) appends each reviewer's `code` byte for byte to its file: identical code once, sorted,
+  each after a newline. It writes only test files the scan snapshot records inside the scan root, never a
+  harness file, a link, or the Oracle directory, only onto round 1's bytes, and nothing at all when any file
+  is refused. A rerun writes nothing. The controller does not retype the code, so no formatter changes it.
+- `--closure` additionally requires, per claim, the reviewer's `reproduction`, the closure's `test` equal to
+  the reviewer's, the red run's test file equal to the reviewer's file, each reproduction file equal to round
+  1's bytes (none for a new file) followed by exactly the reviewers' reproductions, and no cited file that
+  loads an assertion or test-runner module, calls a test runner's global API, or writes to `globalThis` or a
+  standard built-in.
+- A High mutation run is the review command with the same working directory, environment fingerprint, adapter,
+  harness and test files.
+  Its baseline is the last earlier run on another production, and the review run's production must equal it:
+  after a round-1 repair the mutation is taken again from the repaired production; one taken at GREEN no
+  longer counts.
+- When findings changed the worktree after GREEN, `REVIEW_VERIFIED` requires the risk's consecutive passes of
+  the GREEN command on the review bytes (`FLAKINESS_GATE`), for closures and reviewer rounds alike, and `status`
+  shows the blocker.
+- The production scan's test-environment tokens add `NODE_TEST_CONTEXT`.
+- green-review.md, subagent-review.md (the reproduction field and its import rule), controller-formal.md and the
+  README describe the flow; `REPRODUCTION_INVALID` has a next action.
+
+## Not changed
+
+- High keeps its two round-2 reviewers; a closure still refuses High. A closure does not check a repair defect
+  no test reaches, a repair that changes how the test process judges in a way the scans do not name, or
+  anything outside the scan snapshot.
+- The runner cannot judge whether a reviewer's reproduction tests the claim; that judgment is the reviewer's,
+  made with the claim and attested by the same receipts.
+- `reproduce` checks syntax only for JavaScript files Node can read; a TypeScript or JSX test file needs the
+  repository's toolchain, so a reproduction that does not load there fails the red run and round 2 goes to the
+  reviewers.
+- The tamper scan reads the whole cited file and names only plain forms, so it can refuse a legitimate repair
+  (a server module that already imports `node:assert`, an `Array.prototype` polyfill) and miss an indirect
+  one. The third review named forms it still misses and that stay open by decision (the scan is an arms race,
+  and the user asked to stop the review loop): `window`/`self`/`top`/`parent` as the root of a write in a
+  jsdom environment (`window.Object.is = …`), compound and logical assignments (`Object.is &&= …`), and test
+  runner APIs outside the list (`expect.addEqualityTesters`, `vi.doMock`). Such a repair rests on the
+  documented residual risk, which is why High keeps its reviewers.
+- TypeScript, TSX and JSX test files get no syntax check before `reproduce` writes them.
+- A High mutation is still identified only by digests: a mutation taken from an older production and restored
+  to the reviewed one is accepted if the runs line up.
+
 # 0.107.0: keep Bend for Medium work, pin the Bend files and sources CHECKED judged
 
 ## Validation

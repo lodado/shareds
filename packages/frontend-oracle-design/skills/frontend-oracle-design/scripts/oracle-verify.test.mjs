@@ -4498,7 +4498,8 @@ test('scan: a production branch on the test environment fails as TEST_ENV_BRANCH
   assert.match(branched.stderr, /^TEST_ENV_BRANCH: /)
   assert.match(branched.stderr, /save\.ts:2: process\.env\.VITEST/)
 
-  for (const line of ["if (process.env.NODE_ENV === 'test') skip()", 'if (navigator.webdriver) skip()', 'value.asymmetricMatch = () => true']) {
+  for (const line of ["if (process.env.NODE_ENV === 'test') skip()", 'if (navigator.webdriver) skip()', 'value.asymmetricMatch = () => true',
+    'export const save = process.env.NODE_TEST_CONTEXT ? 2 : 1']) {
     await writeFile(path, `${line}\n`)
     const found = run('scan', '--path', path)
     assert.equal(found.status, 1, line)
@@ -4533,6 +4534,28 @@ test('risk floor: a DELETE side effect under Medium fails unless the Risk line c
     await cardFile(t, deleting.replace(/^- Risk: Medium.*$/m, '- Risk: Medium — soft delete, restorable for 30 days per S1')),
   )
   assert.doesNotMatch(sourced.stderr, /risk-below-floor/)
+})
+
+test('findings: a reproduction rides only a PRODUCT_DEFECT, as { file, test, code } with a repository-relative file', async (t) => {
+  const oracle = await cardFile(t, EVIDENCE_CARD)
+  const defect = { id: 'f-1', row: 'O1', classification: 'PRODUCT_DEFECT', severity: 'high', finding: 'a second click posts again',
+    evidence: 'no dedupe on the second click (r-003)', fix: 'keep the pending guard' }
+  const reproduction = { file: 'src/save.test.ts', test: 'save > posts once', code: "test('save > posts once', () => {})\n" }
+  const accepted = run('findings', '--file', await findingsFile(t, [{ ...defect, reproduction }]), '--oracle', oracle)
+  assert.equal(accepted.status, 0, accepted.stderr)
+  for (const [finding, message] of [
+    [{ ...defect, classification: 'EVIDENCE_GAP', reproduction }, /finding f-1: reproduction belongs to a PRODUCT_DEFECT/],
+    [{ ...defect, reproduction: { ...reproduction, code: ' ' } }, /finding f-1: reproduction is \{ file, test, code \}, each a non-empty string/],
+    [{ ...defect, reproduction: { ...reproduction, file: '../escape.test.ts' } }, /reproduction\.file \.\.\/escape\.test\.ts must be a repository-relative test path/],
+    [{ ...defect, reproduction: { ...reproduction, file: '/abs/save.test.ts' } }, /reproduction\.file \/abs\/save\.test\.ts must be a repository-relative test path/],
+    [{ ...defect, reproduction: { ...reproduction, file: 'C:\\repo\\save.test.ts' } }, /must be a repository-relative test path/],
+    [{ ...defect, reproduction: { ...reproduction, file: 'src/save.ts' } }, /reproduction\.file src\/save\.ts must be a repository-relative test path/],
+  ]) {
+    const rejected = run('findings', '--file', await findingsFile(t, [finding]), '--oracle', oracle)
+    assert.equal(rejected.status, 1, rejected.stdout)
+    assert.match(rejected.stderr, /^FINDINGS_INVALID: /)
+    assert.match(rejected.stderr, message)
+  }
 })
 
 test('findings: invalid PRODUCT_DEFECT code citations require correction at every severity, not opinion reclassification', async (t) => {
