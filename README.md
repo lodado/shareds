@@ -55,7 +55,7 @@
 | [`threejs-game-wireframe`](packages/game-interface-design/skills/threejs-game-wireframe/SKILL.md)                       | 기획을 받아 FSD·헤드리스 ECS 구조의 Three.js 프로토타입을 만들고 검증해요.      |
 | [`ux-flow-diagram`](packages/ux-flow-diagram/skills/ux-flow-diagram/SKILL.md)                                           | 명시적으로 호출하면 Figma·코드·요구사항에서 근거 있는 사용자 흐름도를 추출해요. |
 | [`agent-graph-engineering`](packages/agent-graph-engineering/skills/agent-graph-engineering/SKILL.md)                   | 여러 에이전트와 도구의 분기·병렬 작업·재시도를 그래프로 설계하고 실행해요.      |
-| [`harness-team`](packages/harness-team/skills/harness-team/SKILL.md)                                                    | 모든 작업을 5인 하네스팀으로 돌리고, 남은 실수는 다음 작업에서 먼저 고쳐요.     |
+| [`harness-team`](packages/harness-team/skills/harness-team/SKILL.md)                                                    | 에이전트에 기합을 넣어 5인 하네스팀으로 일하고 지난 실수부터 고치게 해요.       |
 | [`agent-memory-recall`](packages/agent-memory/skills/agent-memory-recall/SKILL.md)                                      | 현재 작업에 필요한 과거 기록을 Agent Memory에서 읽기 전용으로 찾아요.           |
 | [`agent-memory-log`](packages/agent-memory/skills/agent-memory-log/SKILL.md)                                            | 요청한 작업 기록을 Obsidian Agent Memory에 저장해요.                            |
 | [`agent-memory-todayilearned`](packages/agent-memory/skills/agent-memory-todayilearned/SKILL.md)                        | 요청한 배움을 날짜별 TIL 노트로 정리해요.                                       |
@@ -93,9 +93,15 @@ harness-team
 패키지 안에 `.claude-plugin/plugin.json`이랑 `.codex-plugin/plugin.json`이 같이 들어 있어요.
 둘 다 같은 `skills/` 디렉터리를 읽어요. 스킬 하나 만들면 두 에이전트가 같이 써요.
 
-`harness-team`은 매 작업에 쓰는 스킬이에요. 항상 적용하려면 전역 지침(`~/.claude/CLAUDE.md` 같은)에 작업을
-시작할 때 이 스킬을 따르라는 절을 넣어 두세요. 플러그인이 없는 호스트도 같은 지침을 읽는다면 그 절에 핵심
-규칙(다섯 역할, 목표를 묻지 않는 팀장, 별도 에이전트 검수관, 다음 작업의 carry-over 수정)도 같이 적어 두세요.
+`harness-team`은 매 작업에 쓰는 기합 스킬이에요. Claude Code에서 항상 적용하려면 전역 `~/.claude/CLAUDE.md`에
+마켓플레이스 클론 경로를 한 줄로 import하세요. 버전이 들어간 캐시 경로는 업데이트하면 끊겨요.
+
+```text
+@~/.claude/plugins/marketplaces/my-vibe-coding-helper/packages/harness-team/skills/harness-team/SKILL.md
+```
+
+매 세션, 그리고 서브에이전트에도 로드돼요. 내용은 `claude plugin marketplace update` 뒤에 바뀌어요. import를 읽지
+않는 호스트에는 같은 파일을 작업 시작 때 읽으라고 적어 두세요.
 
 ### UX Flow Diagram
 
@@ -315,7 +321,7 @@ npm으로 나갈 것들이에요.
 | [`reference-driven-3d-character`](packages/reference-driven-3d-character) | 레퍼런스 해석, 형태·변형·동작 설계, 편집 가능한 3D 캐릭터의 단계별 제작·검증                                                                      |
 | [`game-interface-design`](packages/game-interface-design)                 | 모바일 웹게임 기획 → 선택형 Figma UI → FSD·ECS Three.js 그레이박스                                                                                |
 | [`developer-agents`](packages/developer-agents)                           | Claude Code 서브에이전트 두 개: FSD로 UI와 비즈니스 로직을 나누는 `frontend-developer`, 3계층·클린 아키텍처·DDD로 서버를 짜는 `backend-developer` |
-| [`harness-team`](packages/harness-team)                                   | 매 작업을 다섯 역할 하네스팀으로: 목표를 묻지 않는 팀장, 집착하는 완벽주의 검수관, 다음 작업에서 먼저 고치는 carry-over                           |
+| [`harness-team`](packages/harness-team)                                   | 에이전트 기합: 목표를 묻지 않는 팀장, 집착하는 완벽주의 검수관(리뷰 1회, 즉시 반영), 다음 작업에서 먼저 고치는 carry-over                         |
 
 ## 개발
 

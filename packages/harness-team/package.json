@@ -1,6 +1,6 @@
 {
   "name": "@lodado/harness-team-plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Claude Code / Codex plugin that runs every work task as a five-role harness team with a perfectionist final review and carry-over fixes.",
   "private": true,
   "scripts": {
