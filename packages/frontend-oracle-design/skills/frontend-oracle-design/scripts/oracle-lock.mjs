@@ -11,12 +11,13 @@ import {
   assertSnapshotUnchanged,
   isPathInside,
   reportTiming,
+  repositoryRoot,
   sha256,
   snapshotRegularFile,
   stableStringify,
 } from './oracle-fs.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
-import { assertReadyToLock, markLocked, readStage } from './oracle-stage.mjs'
+import { assertReadyToLock, assertRelockPinned, markLocked, readStage } from './oracle-stage.mjs'
 
 const verifyScript = join(dirname(fileURLToPath(import.meta.url)), 'oracle-verify.mjs')
 
@@ -77,12 +78,6 @@ function sameDependencies(left = [], right = []) {
   const sortedLeft = [...left].sort(byName)
   const sortedRight = [...right].sort(byName)
   return sortedLeft.every((entry, index) => entry.name === sortedRight[index].name && entry.version === sortedRight[index].version)
-}
-
-function repositoryRoot(lockDirectory) {
-  const marker = `${sep}.ai${sep}oracles${sep}`
-  const index = lockDirectory.indexOf(marker)
-  return index === -1 ? lockDirectory : lockDirectory.slice(0, index)
 }
 
 function portablePath(from, to) {
@@ -506,6 +501,12 @@ export async function createLock(options) {
   }
 
   const presentLock = await existingLock(lockPath, lockDirectory, rootDirectory)
+  // lock을 지우고 다시 만드는 ORACLE_READY 재잠금은 멱등이 아니다 — CHECKED가 판정한 입력 그대로인지 stage가 다시 잰다
+  if (!presentLock) {
+    await assertRelockPinned(canonicalLockDirectory).catch((error) => {
+      throw new CliError(error.code ?? 'STAGE_GATE', error.message)
+    })
+  }
   if (presentLock) resolveProfileBinding({ requestedProfile: options.profile, bindings: [{ artifact: 'card/stage', profile: binding.profile }, { artifact: 'lock', profile: presentLock.manifest.verificationProfile }] })
   const sourceInputs = [...new Set(options.sources)]
   if (sourceInputs.some(isAbsolute)) throw new CliError('INPUT_UNREADABLE', 'Sources must be repository-relative')

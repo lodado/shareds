@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- plugin contracts run through node --test.
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { fullProductFixture } from '../test-fixtures/full-product/fixture.mjs'
 
@@ -91,11 +91,13 @@ async function contextFixture(t, profile = 'contract/v1') {
     cli('oracle-stage.mjs', 'begin', '--dir', directory, '--profile', profile)
     for (const to of ['CHECKED', 'DRAFTED']) cli('oracle-stage.mjs', 'advance', '--dir', directory, '--to', to)
   } else {
-    // Prepared stage fixture exercises the lock/guard boundary, not execution of Formal proof.
+    // Prepared stage fixture exercises the lock/guard boundary, not execution of Formal proof; since 0.107.0 a DRAFTED record
+    // also carries the pin of the inputs CHECKED judged
     const bytes = '{}\n'
     await writeFile(join(directory, 'oracle.package.json'), bytes)
+    const { inputsPin } = await import(pathToFileURL(join(dirname(script), 'oracle-stage.mjs')).href)
     await writeFile(join(directory, 'stage.json'), JSON.stringify({ schemaVersion: 1, stage: 'DRAFTED', verificationProfile: profile,
-      packageSha256: createHash('sha256').update(bytes).digest('hex'), history: [] }))
+      packageSha256: createHash('sha256').update(bytes).digest('hex'), inputsSha256: await inputsPin(directory), history: [] }))
   }
   cli('oracle-lock.mjs', 'create', '--oracle', oracle, '--lock', lock)
   const ledger = join(directory, 'runs.jsonl')
@@ -159,21 +161,12 @@ test('real approved Contract card/stage/lock resolves shared roles without selec
   assert.equal(await readFile(fixture.ledger, 'utf8'), '')
 })
 
-test('a recorded scope-gate handoff gives the session to the second controller; two controllers without one still conflict', async (t) => {
+test('a HANDED_OFF line gives the session to no controller: two controllers conflict with or without it', async (t) => {
+  // 0.107.0 removed the Medium handoff (Medium keeps the Bend model), so the marker is plain text to the guard
   const fixture = await contextFixture(t)
   const toContract = handoffEntry('frontend-contract-design')
-  assert.equal(await fixture.check(['frontend-oracle-design', toContract, 'frontend-contract-design']), null)
+  assert.equal((await fixture.check(['frontend-oracle-design', toContract, 'frontend-contract-design']))?.permissionDecision, 'deny')
   assert.equal((await fixture.check(['frontend-oracle-design', 'frontend-contract-design']))?.permissionDecision, 'deny')
-  // handing back to the Formal controller makes the Contract lock foreign again, even before Formal is re-invoked
-  const back = await fixture.check(['frontend-oracle-design', toContract, 'frontend-contract-design', handoffEntry('frontend-oracle-design'), 'frontend-oracle-design'])
-  assert.equal(back?.permissionDecision, 'deny')
-  const backOnly = await fixture.check(['frontend-oracle-design', toContract, 'frontend-contract-design', handoffEntry('frontend-oracle-design')])
-  assert.equal(backOnly?.permissionDecision, 'deny')
-  // the named target counts as a controller: activating the other one after it is a conflict
-  assert.equal((await fixture.check(['frontend-oracle-design', handoffEntry('frontend-oracle-design'), 'frontend-contract-design']))?.permissionDecision, 'deny')
-  // a marker quoted in tool output is not the assistant's handoff
-  const quoted = { type: 'user', timestamp: '2026-10-04T12:00:00.000Z', message: { content: [{ type: 'tool_result', content: 'Status: HANDED_OFF — frontend-contract-design' }] } }
-  assert.equal((await fixture.check(['frontend-oracle-design', quoted, 'frontend-contract-design']))?.permissionDecision, 'deny')
   assert.equal(await readFile(fixture.ledger, 'utf8'), '')
 })
 

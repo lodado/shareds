@@ -15,8 +15,8 @@ edits or production work: the projected card is still re-presented and approved 
    Code, test and browser observations are investigation evidence, not approved policy. Label an inferred
    axis Assumption and a missing fact Unknown. Unknown is not excluded. Give each axis a recommended
    choice; an actual human `yes` accepts the proposal, and an axis the user names as missing or
-   unnecessary is a change request. For Medium kept for its order, async or concurrency core,
-   propose every other input family as `excluded: outside the Medium core` (recommended).
+   unnecessary is a change request. For Medium with an order, async or concurrency core, propose
+   every other input family as `excluded: outside the Medium core` (recommended).
 2. **Pose counterexamples.** Find two situations the proposed axes cannot tell apart, one correct and
    one a bug, and put each in the first response as a numbered Open question with a recommendation:
 

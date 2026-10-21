@@ -344,8 +344,10 @@ Runtime dispatch:
 - Every walk back names its cause: `oracle-stage.mjs rewind --dir <dir> --to <stage> --reason
 review-finding|gate-failure|user-answer|source-change [--note <one line>]`. The reason is recorded in
   `stage.json` history for cross-run reflection; it never changes the budget or the gate. Changed
-  package bytes walk back to DISCOVERING; only a card-only repair on unchanged package bytes resumes
-  at CHECKED or DRAFTED.
+  package bytes walk back to DISCOVERING; Bend files or registered sources changed after CHECKED are judged
+  again in place by `advance --to CHECKED` (no round spent; it takes the same `--reason` and `--note`, and
+  reflection counts it as rework), and only a card-only repair on unchanged inputs resumes at CHECKED or
+  DRAFTED by rewind.
 - `oracle-adequacy.mjs model-input`, `explore-input` for a staged card, and
   `oracle-discovery.mjs mapping-input` register their input digests. Cold-read/source-aware dispatch
   registers its permitted raw input with `oracle-stage.mjs review-input --dir <dir> --kind cold-read|source-aware --input <file> --attempt <dispatch-id>`.

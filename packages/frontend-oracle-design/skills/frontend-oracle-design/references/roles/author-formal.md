@@ -70,8 +70,8 @@ whatever is already loaded.
 
 The controller walks `scripts/oracle-stage.mjs`: begin before independent inputs, then advance --to MODELED | CHECKED | DRAFTED
 once each gate passes. Return actual artifacts and gate results for those transitions.
-oracle-lock.mjs create refuses a package oracle that is not at DRAFTED on the same package bytes,
-and only that script path's stage runtime writes stage.json. The lock still runs card lint itself,
+oracle-lock.mjs create refuses a package oracle that is not at DRAFTED on the same package bytes and
+the Bend files and registered sources CHECKED judged, and only that script path's stage runtime writes stage.json. The lock still runs card lint itself,
 so a hand-written record skips no check. Authoring never fabricates stage acceptance.
 `status` reports the shared authoring round. `model-input` and `mapping-input` register their permitted
 input bytes automatically. Re-emitting identical input is idempotent, not permission to dispatch another

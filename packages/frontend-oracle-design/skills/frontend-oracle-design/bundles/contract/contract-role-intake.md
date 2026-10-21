@@ -227,8 +227,8 @@ procedure. Every risk takes the `oracle` lane.
 
 Name High's trigger on the `Risk:` line (`Risk: High — trigger: money charged`). Without one, behavior
 work is at most Medium (Low keeps its criterion); async loading, ordering, retries or caching alone never
-make it High. New Medium work with no order, async or concurrency core goes to the Contract controller at
-the Formal scope gate.
+make it High. Risk sets evidence depth, never the profile: the Formal controller models Medium work with
+Bend.
 
 Risk judgment may take one optional evidence input: `scripts/oracle-twr.mjs` scores the target
 files' time-weighted bug-fix history from git. A high score is grounds to raise the lane or spend
@@ -462,10 +462,6 @@ At current-stage intake, investigate exposed type boundaries and record exact in
 a grounded no-boundary rationale and its approved source before proposing omission of type evidence.
 Unknown applicability requires further investigation; unavailable required tools are an actual environment
 failure, not N/A. Hand the determination and unresolved gaps to authoring, not an approval.
-A request the Formal controller handed over (`Status: HANDED_OFF — frontend-contract-design`) goes back
-before any Contract artifact when intake finds an event order, async or concurrency core or a High
-trigger: print `Status: HANDED_OFF — frontend-oracle-design` and invoke `$frontend-oracle-design` with
-the same S1. A request that asked for this profile stays here.
 
 <!-- node:bva path:references/bva.md -->
 

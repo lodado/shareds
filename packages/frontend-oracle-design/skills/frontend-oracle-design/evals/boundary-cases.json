@@ -364,14 +364,14 @@
       ]
     },
     {
-      "id": "fod-sem-medium-handoff",
+      "id": "fod-sem-medium-no-core-bend",
       "manualReviewOnly": true,
       "prompt": "문의 폼을 제출할 때 네이버 유입 광고 전환 스크립트를 붙여 줘. URL은 나중에 바뀌니 .env로 주입하고, 구현까지 해 줘.",
-      "expected_output": "Classify Medium with no High trigger and no order, async or concurrency core. At the Formal scope gate, before $oracle-intake, print `Status: HANDED_OFF — frontend-contract-design` and continue under $frontend-contract-design with the request as S1: finite contract rows and tests, no Bend package or model files.",
+      "expected_output": "Classify Medium with no High trigger and no order, async or concurrency core, and stay in the Formal controller: Medium keeps the Bend model and no `Status: HANDED_OFF` line is printed. Model the decision rule (a successful submit fires the conversion exactly once with the injected URL; a failed or invalid submit fires none) and continue with intake, axes and the provisional Draft.",
       "assertions": [
-        "The handoff line appears at the scope gate, before any Formal intake, axes or model work.",
-        "No oracle.package.json, MODEL.bend, LAWS.bend or Bend proof is created or planned for this request.",
-        "The Contract controller continues in the same response with its own header and intake, using the request text as S1."
+        "The response stays under $frontend-oracle-design: no `Status: HANDED_OFF` line and no $frontend-contract-design invocation.",
+        "The plan includes a Bend model of the decision rule (conversion count per submit outcome), not finite rows alone.",
+        "Risk is Medium with no High trigger claimed; the missing order, async or concurrency core does not lower the stack."
       ]
     },
     {

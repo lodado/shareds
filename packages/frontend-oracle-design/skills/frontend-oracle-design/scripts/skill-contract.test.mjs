@@ -592,13 +592,14 @@ test('routes bug reports, new oracle paths and conflicting sources from the trig
   assert.equal(controller, description)
 })
 
-test('the Medium handoff and its hand-back are each written where that controller reads them', async () => {
-  // 0.104.0: the Contract controller never reads the Formal entry, so its way back lives in its own intake reference
+test('Medium keeps the Bend model: no document hands it to the Contract controller', async () => {
+  // 0.107.0 removed the 0.104.0 Medium handoff — a Low run in Formal needed Bend while coreless Medium skipped it
   const entry = await read('references/controller-entry-formal.md')
-  const contract = await read('references/contract/risk-grill.md')
-  assert.match(entry, /before\s+`\$oracle-intake`,\s+print\s+`Status: HANDED_OFF — frontend-contract-design`/)
-  assert.match(contract, /print\s+`Status: HANDED_OFF — frontend-oracle-design`\s+and\s+invoke\s+`\$frontend-oracle-design`/)
-  assert.match(contract, /before\s+any\s+Contract\s+artifact/)
+  assert.match(entry, /Medium\s+work\s+keeps\s+the\s+Bend\s+model;\s+no\s+risk\s+hands\s+it\s+to\s+the\s+Contract\s+controller/)
+  assert.match(entry, /Medium\s+work\s+without\s+such\s+a\s+core\s+\(form\s+validation,\s+analytics\s+or\s+config\s+injection\)\s+models\s+its\s+decision\s+rule/)
+  assert.match(await read('references/common.md'), /Risk\s+sets\s+evidence\s+depth,\s+never\s+the\s+profile/)
+  for (const path of ['SKILL.md', 'references/controller-entry-formal.md', 'references/contract/risk-grill.md', 'references/mandatory-verification.md', '../frontend-contract-design/SKILL.md'])
+    assert.doesNotMatch(await read(path), /HANDED_OFF|hands\s+over\s+Medium/, path)
 })
 
 test('every skill description in the package fits the 1024-character trigger limit', async () => {
@@ -2740,7 +2741,7 @@ test('the docs name the pre-lock stage machine, the hold and the partial state t
   )
   assert.match(
     skill,
-    /refuses a package oracle that is not at DRAFTED on the same package bytes,\s+and only the stage runtime writes stage\.json/,
+    /refuses a package oracle that is not at DRAFTED on the same package bytes and\s+the Bend files and registered sources CHECKED judged \(after a Bend edit, `advance --to CHECKED` judges\s+them again, even with a re-projected card\), and only the stage runtime writes stage\.json/,
   )
   assert.match(
     skill,

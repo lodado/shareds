@@ -24,8 +24,9 @@ execution roles: they keep the session's effort and their own model rules (subag
    A walk back is `rewind --to <stage> --reason <cause>` with the cause that sent it back. CHECKED passes
    at once on a receipt when the same package, Bend files, registered sources, harness, node and Bend
    passed it before; its evidence says so (`ORACLE_LINT_CACHE=off` turns receipts off).
-   `oracle-lock.mjs create` refuses a package oracle that is not at DRAFTED on the same package bytes,
-   and only the stage runtime writes stage.json. The lock still runs card lint itself, so a hand-written
+   `oracle-lock.mjs create` refuses a package oracle that is not at DRAFTED on the same package bytes and
+   the Bend files and registered sources CHECKED judged (after a Bend edit, `advance --to CHECKED` judges
+   them again, even with a re-projected card), and only the stage runtime writes stage.json. The lock still runs card lint itself, so a hand-written
    record skips no check. A role return does not advance a stage.
    Send every repair of the same revision (review findings, lint or proof failures, a user answer) to
    the author context that wrote the package, continued with only the findings and changed inputs

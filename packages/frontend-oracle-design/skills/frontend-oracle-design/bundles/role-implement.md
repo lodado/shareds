@@ -227,8 +227,8 @@ procedure. Every risk takes the `oracle` lane.
 
 Name High's trigger on the `Risk:` line (`Risk: High — trigger: money charged`). Without one, behavior
 work is at most Medium (Low keeps its criterion); async loading, ordering, retries or caching alone never
-make it High. New Medium work with no order, async or concurrency core goes to the Contract controller at
-the Formal scope gate.
+make it High. Risk sets evidence depth, never the profile: the Formal controller models Medium work with
+Bend.
 
 Risk judgment may take one optional evidence input: `scripts/oracle-twr.mjs` scores the target
 files' time-weighted bug-fix history from git. A high score is grounds to raise the lane or spend
@@ -1456,9 +1456,8 @@ This contract applies to every risk, including Low, and to both Design-only and 
 Risk changes verification depth, not whether this stack is used. There is no opt-out, low-risk
 fast path, sourceless N/A, or silent substitution for any member of the stack. The scope gate in
 `SKILL.md` Entry decides whether the work belongs to Oracle at all — state, ordering, counts,
-permissions or effects a model can state — and is not an opt-out for work that does. Its one route
-away is the Medium handoff to the Contract controller before any Formal artifact exists, which picks
-the controller for new work without an order, async or concurrency core. type-fest and
+permissions or effects a model can state — and is not an opt-out for work that does; no risk routes
+work out of it. type-fest and
 TypeScript apply when the card has an exposed type boundary (exported Props, a shared/package API,
 a client state union, a trust-boundary type); a card with none declares `typeContract` not applicable
 with the files it investigated and never adds an unused utility to fill the slot. The behavior model

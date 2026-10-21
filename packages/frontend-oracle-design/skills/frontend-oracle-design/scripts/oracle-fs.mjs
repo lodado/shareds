@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { constants } from 'node:fs'
 import { lstat, mkdir, open, readFile, realpath, rm, stat } from 'node:fs/promises'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 
 export const ZERO_DIGEST = '0'.repeat(64)
@@ -230,6 +230,13 @@ export function scanSideEffects(path, content) {
   })
 
   return { hits, exemptions, invalid }
+}
+
+/** `<root>/.ai/oracles/<id>`의 저장소 루트 — 오라클 디렉터리가 그 자리에 없으면 디렉터리 자신이다. */
+export function repositoryRoot(lockDirectory) {
+  const marker = `${sep}.ai${sep}oracles${sep}`
+  const index = lockDirectory.indexOf(marker)
+  return index === -1 ? lockDirectory : lockDirectory.slice(0, index)
 }
 
 export function isPathInside(base, target) {

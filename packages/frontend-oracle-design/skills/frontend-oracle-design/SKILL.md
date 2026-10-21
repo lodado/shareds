@@ -28,7 +28,6 @@ If reads/invocation are unavailable, stop and return the blocker, not a substitu
 guessed sources). The request text is `S1`; an empty repo is `no code observation`, never a blocker.
 
 Scope without behavioral state/order/count/permission/effect stops OUT_OF_SCOPE, not a fake contract.
-Medium work without an order, async or concurrency core goes to `$frontend-contract-design` before any model.
 Unsupported outcome-changing scope is NEEDS_DECISION, not a skipped verification obligation.
 Formal-specific scope, mandatory stack and original entry obligations are owned by
 [Formal controller requirements](references/controller-entry-formal.md).

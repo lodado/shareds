@@ -483,11 +483,12 @@ JSON이 아니면 아무것도 쓰지 않고, 내용이 같으면 다시 쓰지 
 포함), 권한·테넌트·인증 경계가 접근을 정함, 파괴적이거나 되돌릴 수 없는 데이터 변경 또는 사용자가 입력한 데이터의
 손실, 법·보안·개인정보 노출, 둘 이상이 같은 상태를 동시에 써서 잃어버린 갱신이나 이중 효과를 되돌릴 수 없음.
 Outcome Brief의 `Risk:` 줄에 그 트리거를 적고, 없으면 많아야 Medium입니다(비동기 로딩·순서·재시도·캐시만으로는
-High가 아닙니다). 순서·비동기·동시성 핵심이 없는 새 Medium 요청(폼 검증, 추적·설정 주입)은 Formal 범위 관문에서
-intake 전에 `Status: HANDED_OFF — frontend-contract-design`을 찍고 `frontend-contract-design`(contract/v1, Bend
-없음)으로 넘깁니다. guard hook은 이 표시가 넘긴 대상과 그 뒤에 켠 컨트롤러로 세션의 프로필을 정합니다. 핵심이 있는 Medium은 그
-핵심만 Bend로 모델링하고, 나머지 입력 계열은 첫 응답에서 `excluded: outside the Medium core`로 제안해 사용자의
-`yes`를 근거로 제외하며 그 정책은 테스트 행(Not formalized)으로 남깁니다. Formal에서만, 첫 `yes`에서 "끝까지,
+High가 아닙니다). 위험 등급은 증거의 깊이만 정하고 프로필은 바꾸지 않습니다. 0.107.0부터 Medium도 늘 Bend로
+모델링합니다(0.104.0의 Contract 이관은 없앴습니다. Formal로 온 Low는 Bend가 필수인데 핵심 없는 Medium은 Bend를
+건너뛰는 역전이 있었습니다). 순서·비동기·동시성 핵심이 있는 Medium은 그 핵심만 Bend로 모델링하고, 나머지 입력
+계열은 첫 응답에서 `excluded: outside the Medium core`로 제안해 사용자의 `yes`를 근거로 제외하며 그 정책은 테스트
+행(Not formalized)으로 남깁니다. 핵심이 없는 Medium(폼 검증, 추적·설정 주입)은 어떤 입력이 어떤 결과·효과를 몇
+번 내는지의 결정 규칙을 모델링합니다. Formal에서만, 첫 `yes`에서 "끝까지,
 묻지 말고"라고 하면 증명 뒤 반례·새 축·새 Open question·뜻 바뀜이 없을 때 카드 승인을 다시 묻지 않습니다
 (`- Source: pre-authorized — <위치>; post-proof: no new question or changed meaning`, lint가 꼴을 확인하고
 Contract 카드에서는 거부).
@@ -501,7 +502,12 @@ Contract 카드에서는 거부).
 영수증으로 기억했다가 그대로 통과시키고, 판정 문장 끝에 `receipt: these exact inputs passed before`를 붙입니다.
 실패, Bend 실행 실패로 판정하지 못하거나 파생이 덜 돈 통과, 관문이 도는 동안 입력 파일의 내용이나 표식(크기·시각·inode,
 링크와 그 대상 모두)이 바뀐 통과는 남기지 않습니다
-(`ORACLE_LINT_CACHE=off`로 끔). 제품 코드가 이미 있으면 작성자는 `project-card` 뒤, lock 전에도 sweep을 돌려 모델
+(`ORACLE_LINT_CACHE=off`로 끔). 0.107.0부터 `stage.json`은 CHECKED가 판정한 Bend 파일과 등록 출처의 digest
+(`inputsSha256`)도 고정합니다. 패키지를 그대로 두고 Bend만 고친 뒤 카드를 다시 투영해도 DRAFTED와 lock은
+`STAGE_STALE`로 거부하고, `advance --to CHECKED`로 그 자리에서 CHECKED를 다시 돌아야 합니다(되돌림이 아니라서
+저작 라운드를 쓰지 않습니다). 0.107.0 전에 고정 없이 기록된 CHECKED·DRAFTED도 같은 명령으로 다시 검사합니다.
+관문이 도는 동안 입력이 바뀐 통과는 CHECKED로 기록하지 않고, lock 파일을 지우고 ORACLE_READY를 다시 잠글 때도
+고정을 다시 잽니다. 제품 코드가 이미 있으면 작성자는 `project-card` 뒤, lock 전에도 sweep을 돌려 모델
 결함을 같은 revision의 질문으로 올립니다. adapter와 출력은 임시 디렉터리나 git이 무시하는 경로에만 두고, 보고서일 뿐
 테스트나 증거가 아니라서 Design-only도 돌릴 수 있습니다.
 

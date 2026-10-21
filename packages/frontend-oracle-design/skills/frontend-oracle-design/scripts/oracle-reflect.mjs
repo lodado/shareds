@@ -90,7 +90,8 @@ export function reflectRuns(runs, { minRuns = 2 } = {}) {
   }
   for (const run of runs) {
     run.history.forEach((step, index) => {
-      if (step.evidence !== 'rewind') return
+      // CHECKED를 그 자리에서 다시 돈 걸음(0.107.0)도 재작업이다 — 되돌림과 같이 센다
+      if (step.evidence !== 'rewind' && !step.recheck) return
       rewinds.total += 1
       bump(rewinds.byWalk, `${run.history[index - 1]?.stage ?? '?'}→${step.stage}`)
       if (!step.reason) {

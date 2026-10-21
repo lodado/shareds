@@ -227,8 +227,8 @@ procedure. Every risk takes the `oracle` lane.
 
 Name High's trigger on the `Risk:` line (`Risk: High — trigger: money charged`). Without one, behavior
 work is at most Medium (Low keeps its criterion); async loading, ordering, retries or caching alone never
-make it High. New Medium work with no order, async or concurrency core goes to the Contract controller at
-the Formal scope gate.
+make it High. Risk sets evidence depth, never the profile: the Formal controller models Medium work with
+Bend.
 
 Risk judgment may take one optional evidence input: `scripts/oracle-twr.mjs` scores the target
 files' time-weighted bug-fix history from git. A high score is grounds to raise the lane or spend

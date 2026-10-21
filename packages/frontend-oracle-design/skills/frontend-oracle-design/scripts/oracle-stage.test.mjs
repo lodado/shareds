@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { chmod, cp, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -7,7 +8,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { sha256 } from './oracle-fs.mjs'
-import { assertReadyToLock, markLocked, readStage } from './oracle-stage.mjs'
+import { assertReadyToLock, inputsPin, markLocked, readStage } from './oracle-stage.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 
 const FIXTURE = fileURLToPath(new URL('../../../test-fixtures/stale-search/', import.meta.url))
@@ -345,6 +346,133 @@ test('DRAFTED opens the lock gate for the package bytes it was recorded on, and 
   await assert.rejects(() => assertReadyToLock(directory), { code: 'STAGE_STALE' })
 })
 
+test('a Bend file or registered source edited after CHECKED reaches neither DRAFTED nor the lock, even with a re-projected card', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const { root, directory } = await repository(t)
+  const project = () => node(root, 'oracle-package.mjs', ['project-card', '--package', '.ai/oracles/stale-search/oracle.package.json', '--out', '.ai/oracles/stale-search/oracle.md'])
+  assert.equal(project().status, 0)
+  assert.equal(stage(root, directory, 'begin').status, 0)
+  for (const step of ['MODELED', 'CHECKED']) assert.equal(stage(root, directory, 'advance', step).status, 0, step)
+  const checked = await readStage(directory)
+  assert.match(checked.inputsSha256, /^[a-f0-9]{64}$/)
+  assert.equal(checked.history.at(-1).inputsSha256, checked.inputsSha256)
+
+  // the model changes after CHECKED and the card is projected from it again: the package bytes stay the same (0.107.0)
+  const world = join(root, 'World.bend')
+  const judged = await readFile(world, 'utf8')
+  await writeFile(world, `${judged}\n# edited after CHECKED\n`)
+  assert.equal(project().status, 0)
+  const drafted = stage(root, directory, 'advance', 'DRAFTED')
+  assert.equal(drafted.status, 1)
+  assert.match(drafted.stderr, /^STAGE_STALE: the Bend files or registered sources changed after CHECKED — advance --to CHECKED to judge the current inputs/)
+  assert.equal(JSON.parse(stage(root, directory, 'status').stdout).stale, true)
+  // resuming at CHECKED by rewind would keep a pass the gate never gave these bytes
+  assert.match(stage(root, directory, 'rewind', 'CHECKED').stderr, /^STAGE_STALE: the Bend files or registered sources changed after CHECKED/)
+  // CHECKED runs again in place: no walk back, no authoring round. From another working directory, too: the gate and the
+  // pin both resolve `repo:` sources from the repository root above `.ai/oracles/`
+  const recheck = node(directory, 'oracle-stage.mjs', ['advance', '--dir', directory, '--to', 'CHECKED', '--reason', 'review-finding', '--note', 'World.bend edited after CHECKED'])
+  assert.equal(recheck.status, 0, recheck.stderr)
+  const rechecked = await readStage(directory)
+  // the re-check names its cause like a rewind, so reflection counts it as rework
+  assert.equal(rechecked.history.at(-1).recheck, true)
+  assert.equal(rechecked.history.at(-1).reason, 'review-finding')
+  assert.equal(rechecked.stage, 'CHECKED')
+  assert.notEqual(rechecked.inputsSha256, checked.inputsSha256)
+  assert.deepEqual(rechecked.iterations, checked.iterations)
+  // a current pin has nothing to judge again
+  assert.match(stage(root, directory, 'advance', 'CHECKED').stderr, /^STAGE_SKIP: CHECKED can only advance to DRAFTED, not CHECKED/)
+  // a step forward has no cause to name
+  const reasoned = node(root, 'oracle-stage.mjs', ['advance', '--dir', directory, '--to', 'DRAFTED', '--reason', 'review-finding'])
+  assert.equal(reasoned.status, 2)
+  assert.match(reasoned.stderr, /^USAGE: --reason belongs to rewind or to advance --to CHECKED judging changed inputs again/)
+  assert.equal(stage(root, directory, 'advance', 'DRAFTED').status, 0)
+  await assertReadyToLock(directory)
+
+  // a registered source that changes after DRAFTED stops the lock the same way
+  const readme = join(root, 'README.md')
+  const source = await readFile(readme, 'utf8')
+  await writeFile(readme, `${source}\nedited after DRAFTED\n`)
+  await assert.rejects(() => assertReadyToLock(directory), { code: 'STAGE_STALE', message: /registered sources changed after CHECKED/ })
+  assert.match(lock(root, directory).stderr, /^STAGE_STALE: the Bend files or registered sources changed after CHECKED/)
+  await writeFile(readme, source)
+  // the lock carries the pin to ORACLE_READY (the projected card is unapproved, so the record moves the way the lock moves it)
+  await markLocked(directory)
+  assert.equal((await readStage(directory)).stage, 'ORACLE_READY')
+  assert.equal((await readStage(directory)).inputsSha256, rechecked.inputsSha256)
+
+  // without its lock file, a locked revision is not relockable over a model CHECKED never judged (0.107.0 review)
+  await writeFile(world, `${judged}\n# edited after the lock\n`)
+  assert.equal(project().status, 0)
+  const relocked = lock(root, directory)
+  assert.equal(relocked.status, 1)
+  assert.match(relocked.stderr, /^STAGE_STALE: the Bend files or registered sources changed after CHECKED — rewind --to MODELED/)
+  assert.equal(existsSync(join(directory, 'oracle.lock.json')), false)
+  // nor does a rewind that resumes at DRAFTED; MODELED walks through CHECKED again
+  assert.match(stage(root, directory, 'rewind', 'DRAFTED').stderr, /^STAGE_STALE: the Bend files or registered sources changed after CHECKED — rewind --to MODELED/)
+  assert.equal(stage(root, directory, 'rewind', 'MODELED').status, 0)
+})
+
+test('a CHECKED or DRAFTED record from before the Bend pin is judged again in place, even with the authoring rounds spent', async (t) => {
+  const { root, directory } = await repository(t)
+  const packageBytes = await readFile(join(directory, 'oracle.package.json'))
+  const legacy = { schemaVersion: 1, stage: 'DRAFTED', packageSha256: sha256(packageBytes),
+    history: ['DISCOVERING', 'MODELED', 'CHECKED', 'DRAFTED'].map((step) => ({ stage: step, packageSha256: sha256(packageBytes), evidence: step.toLowerCase() })) }
+  await writeFile(join(directory, 'stage.json'), `${JSON.stringify(legacy)}\n`)
+  await assert.rejects(() => assertReadyToLock(directory), { code: 'STAGE_STALE', message: /DRAFTED was recorded without the Bend pin \(before 0\.107\.0\) — advance --to CHECKED/ })
+  assert.equal(JSON.parse(stage(root, directory, 'status').stdout).stale, true)
+  for (const target of ['DRAFTED', 'CHECKED']) assert.match(stage(root, directory, 'rewind', target).stderr, /^STAGE_STALE: DRAFTED was recorded without the Bend pin/)
+
+  // a run that already spent its second round still re-checks: the harness upgrade is not a repair the user made
+  const bin = await installedBend(t)
+  if (!bin) return
+  const spent = await repository(t)
+  assert.equal(stage(spent.root, spent.directory, 'begin').status, 0)
+  assert.equal(stage(spent.root, spent.directory, 'advance', 'MODELED').status, 0)
+  assert.equal(stage(spent.root, spent.directory, 'rewind', 'DISCOVERING').status, 0)
+  for (const step of ['MODELED', 'CHECKED']) assert.equal(stage(spent.root, spent.directory, 'advance', step).status, 0, step)
+  const { inputsSha256: _pin, ...unpinned } = await readStage(spent.directory)
+  await writeFile(join(spent.directory, 'stage.json'), `${JSON.stringify(unpinned)}\n`)
+  assert.equal(JSON.parse(stage(spent.root, spent.directory, 'status').stdout).iterations.round, 2)
+  assert.match(stage(spent.root, spent.directory, 'advance', 'DRAFTED').stderr, /^STAGE_STALE: CHECKED was recorded without the Bend pin/)
+  const recheck = stage(spent.root, spent.directory, 'advance', 'CHECKED')
+  assert.equal(recheck.status, 0, recheck.stderr)
+  const repinned = await readStage(spent.directory)
+  assert.match(repinned.inputsSha256, /^[a-f0-9]{64}$/)
+  assert.equal(repinned.iterations.round, 2)
+  assert.equal(JSON.parse(stage(spent.root, spent.directory, 'status').stdout).stale, false)
+})
+
+test('a Bend file changed while the DRAFTED gate ran is not recorded as DRAFTED', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const { root, directory } = await repository(t)
+  assert.equal(node(root, 'oracle-package.mjs', ['project-card', '--package', '.ai/oracles/stale-search/oracle.package.json', '--out', '.ai/oracles/stale-search/oracle.md']).status, 0)
+  assert.equal(stage(root, directory, 'begin').status, 0)
+  for (const step of ['MODELED', 'CHECKED']) assert.equal(stage(root, directory, 'advance', step).status, 0, step)
+  // check-card passes on the judged bytes; the model changes before the stage records DRAFTED
+  const preloads = await mkdtemp(join(tmpdir(), 'oracle-drafted-preload-'))
+  t.after(() => rm(preloads, { recursive: true, force: true }))
+  const edit = join(preloads, 'edit.mjs')
+  await writeFile(edit, [
+    "import cp from 'node:child_process'",
+    "import fs from 'node:fs'",
+    "import { syncBuiltinESMExports } from 'node:module'",
+    'const original = cp.spawnSync',
+    'cp.spawnSync = function (command, args, options) {',
+    '  const result = original.call(this, command, args, options)',
+    "  if (Array.isArray(args) && args.includes('check-card')) fs.appendFileSync(process.env.EDIT_FILE, '\\n# edited during check-card\\n')",
+    '  return result',
+    '}',
+    'syncBuiltinESMExports()',
+  ].join('\n'))
+  const drafted = spawnSync(process.execPath, [join(SCRIPTS, 'oracle-stage.mjs'), 'advance', '--dir', directory, '--to', 'DRAFTED'],
+    { cwd: root, encoding: 'utf8', env: { ...CHILD_ENV, NODE_OPTIONS: `--import ${edit}`, EDIT_FILE: join(root, 'World.bend') } })
+  assert.equal(drafted.status, 1, drafted.stdout)
+  assert.match(drafted.stderr, /^STAGE_STALE: the Bend files or registered sources changed after CHECKED/)
+  assert.equal((await readStage(directory)).stage, 'CHECKED')
+})
+
 test('CHECKED refuses a model the lock would freeze with a defect: a row that no longer implies its goal is named with a counterexample before the lock', async (t) => {
   const bin = await installedBend(t)
   if (!bin) return
@@ -435,7 +563,8 @@ test('CHECKED remembers a pass by its exact inputs: a registered source or Bend 
     'syncBuiltinESMExports()',
   ].join('\n'))
   const swapped = await walk(forbid, receipts, { NODE_OPTIONS: `--import ${swap}`, SWAP_TEXT_FILE: fixed })
-  assert.match(swapped.evidence ?? swapped.stderr, /^derive /, 'the gate judged the replaced bytes')
+  // 0.107.0: the stage no longer records CHECKED for bytes that changed under the gate, and the receipt stays unwritten
+  assert.match(swapped.stderr, /^STAGE_STALE: the Bend files or registered sources changed while the CHECKED gate ran/, 'the gate judged the replaced bytes')
   assert.equal(await kept(), 3)
   assert.match((await walk(forbid)).stderr, /^STAGE_GATE: the model has defects the lock would freeze/)
   // … or adequacy left unjudged by one failed Bend spawn
@@ -487,7 +616,7 @@ test('CHECKED remembers a pass by its exact inputs: a registered source or Bend 
     'syncBuiltinESMExports()',
   ].join('\n'))
   const restored = await walk(forbid, join(preloads, 'cache'), { NODE_OPTIONS: `--import ${restore}`, SWAP_TEXT_FILE: fixed })
-  assert.match(restored.evidence ?? restored.stderr, /^derive /, 'the gate judged the replaced bytes')
+  assert.match(restored.stderr, /^STAGE_STALE: the Bend files or registered sources changed while the CHECKED gate ran/, 'the gate judged the replaced bytes, then they were restored')
   assert.deepEqual(await readdir(join(preloads, 'cache')).catch(() => []), [])
   // … also through a symlinked input, where only the target changes and the link itself does not
   const linked = async (root) => {
@@ -497,7 +626,7 @@ test('CHECKED remembers a pass by its exact inputs: a registered source or Bend 
     await symlink(join(root, 'real', 'World.bend'), join(root, 'World.bend'))
   }
   const throughLink = await walk(linked, join(preloads, 'cache'), { NODE_OPTIONS: `--import ${restore}`, SWAP_TEXT_FILE: fixed })
-  assert.match(throughLink.evidence ?? throughLink.stderr, /^derive /, 'the gate judged the replaced bytes')
+  assert.match(throughLink.stderr, /^STAGE_STALE: the Bend files or registered sources changed while the CHECKED gate ran/, 'the link target was replaced and restored under the gate')
   assert.deepEqual(await readdir(join(preloads, 'cache')).catch(() => []), [])
 })
 
@@ -533,9 +662,10 @@ test('MODELED needs every async cell decided when Async is in a version 2 space 
 test('a forged DRAFTED record skips no gate: the lock still lints the card against the package', async (t) => {
   const { root, directory } = await repository(t)
   // a host without the hook can write stage.json by hand; the lock re-runs card lint, which regenerates the card from
-  // the package and checks the cross-check decisions, so the forgery buys nothing
+  // the package and checks the cross-check decisions, so the forgery buys nothing — even one that carries a correct pin
   const bytes = await readFile(join(directory, 'oracle.package.json'))
-  await writeFile(join(directory, 'stage.json'), JSON.stringify({ schemaVersion: 1, stage: 'DRAFTED', packageSha256: sha256(bytes), history: [] }))
+  await writeFile(join(directory, 'stage.json'), JSON.stringify({ schemaVersion: 1, stage: 'DRAFTED', packageSha256: sha256(bytes),
+    inputsSha256: await inputsPin(directory), history: [] }))
   await cp(join(FIXTURE, 'oracle.md'), join(directory, 'oracle.md'))
   const locked = lock(root, directory)
   assert.equal(locked.status, 1)
@@ -644,6 +774,28 @@ test('reflect points each budget kind at the place that owns its fix', async (t)
   const policy = report.candidates.find((candidate) => candidate.signal === 'budget:policy')
   assert.doesNotMatch(policy.suggest, /harness/)
   assert.match(policy.suggest, /before lock/)
+})
+
+test('reflect counts a CHECKED judged again in place as rework, with or without its reason', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-reflect-recheck-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const directory = join(root, '.ai', 'oracles', 'recheck')
+  await mkdir(directory, { recursive: true })
+  await writeFile(join(directory, 'stage.json'), JSON.stringify(walk(
+    { stage: 'DISCOVERING', evidence: 'begin' },
+    { stage: 'MODELED', evidence: 'package validate --stage model' },
+    { stage: 'CHECKED', evidence: 'derive' },
+    { stage: 'DRAFTED', evidence: 'check-card' },
+    { stage: 'CHECKED', evidence: 'derive', recheck: true, reason: 'review-finding', note: 'cold-read: expiry is unmodeled' },
+    { stage: 'CHECKED', evidence: 'derive', recheck: true },
+  )))
+  const result = reflect(root, '--root', root)
+  assert.equal(result.status, 0, result.stderr)
+  const report = JSON.parse(result.stdout)
+  assert.equal(report.rewinds.total, 2)
+  assert.equal(report.rewinds.unrecorded, 1)
+  assert.deepEqual(report.rewinds.byReason, { 'review-finding': 1 })
+  assert.deepEqual(report.rewinds.byWalk, { 'DRAFTED→CHECKED': 1, 'CHECKED→CHECKED': 1 })
 })
 
 test('reflect refuses a root without oracle runs and a bad bar instead of reporting zero', async (t) => {

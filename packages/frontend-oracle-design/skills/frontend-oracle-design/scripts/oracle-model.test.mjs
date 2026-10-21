@@ -34,6 +34,7 @@ import {
   scanBendSource,
   transitionCover,
 } from './oracle-model.mjs'
+import { inputsPin } from './oracle-stage.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 
 const FIXTURE = fileURLToPath(new URL('../../../test-fixtures/stale-search/', import.meta.url))
@@ -773,11 +774,11 @@ test('card lint runs the Formal Model checks on the fixture card and on a broken
 test('the lock covers the model and laws: a changed law fails verify, a changed proof candidate does not', async (t) => {
   const root = await fixtureCopy(t)
   // this test is about what the lock covers, not the pre-lock stages (oracle-stage.test.mjs): the package sits beside the
-  // card here, so record it as DRAFTED on its current bytes
+  // card here, so record it as DRAFTED on its current bytes and the inputs CHECKED would have judged
   const packageBytes = await readFile(join(root, 'oracle.package.json'))
   await writeFile(
     join(root, 'stage.json'),
-    JSON.stringify({ schemaVersion: 1, stage: 'DRAFTED', packageSha256: sha256(packageBytes), history: [] }),
+    JSON.stringify({ schemaVersion: 1, stage: 'DRAFTED', packageSha256: sha256(packageBytes), inputsSha256: await inputsPin(root, { root }), history: [] }),
   )
   const lock = (...args) =>
     spawnSync(process.execPath, [join(SCRIPTS, 'oracle-lock.mjs'), ...args], { cwd: root, encoding: 'utf8' })

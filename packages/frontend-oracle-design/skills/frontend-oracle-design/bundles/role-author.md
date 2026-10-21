@@ -227,8 +227,8 @@ procedure. Every risk takes the `oracle` lane.
 
 Name High's trigger on the `Risk:` line (`Risk: High — trigger: money charged`). Without one, behavior
 work is at most Medium (Low keeps its criterion); async loading, ordering, retries or caching alone never
-make it High. New Medium work with no order, async or concurrency core goes to the Contract controller at
-the Formal scope gate.
+make it High. Risk sets evidence depth, never the profile: the Formal controller models Medium work with
+Bend.
 
 Risk judgment may take one optional evidence input: `scripts/oracle-twr.mjs` scores the target
 files' time-weighted bug-fix history from git. A high score is grounds to raise the lane or spend
@@ -1011,8 +1011,10 @@ Runtime dispatch:
 - Every walk back names its cause: `oracle-stage.mjs rewind --dir <dir> --to <stage> --reason
 review-finding|gate-failure|user-answer|source-change [--note <one line>]`. The reason is recorded in
   `stage.json` history for cross-run reflection; it never changes the budget or the gate. Changed
-  package bytes walk back to DISCOVERING; only a card-only repair on unchanged package bytes resumes
-  at CHECKED or DRAFTED.
+  package bytes walk back to DISCOVERING; Bend files or registered sources changed after CHECKED are judged
+  again in place by `advance --to CHECKED` (no round spent; it takes the same `--reason` and `--note`, and
+  reflection counts it as rework), and only a card-only repair on unchanged inputs resumes at CHECKED or
+  DRAFTED by rewind.
 - `oracle-adequacy.mjs model-input`, `explore-input` for a staged card, and
   `oracle-discovery.mjs mapping-input` register their input digests. Cold-read/source-aware dispatch
   registers its permitted raw input with `oracle-stage.mjs review-input --dir <dir> --kind cold-read|source-aware --input <file> --attempt <dispatch-id>`.
@@ -1400,8 +1402,8 @@ edits or production work: the projected card is still re-presented and approved 
    Code, test and browser observations are investigation evidence, not approved policy. Label an inferred
    axis Assumption and a missing fact Unknown. Unknown is not excluded. Give each axis a recommended
    choice; an actual human `yes` accepts the proposal, and an axis the user names as missing or
-   unnecessary is a change request. For Medium kept for its order, async or concurrency core,
-   propose every other input family as `excluded: outside the Medium core` (recommended).
+   unnecessary is a change request. For Medium with an order, async or concurrency core, propose
+   every other input family as `excluded: outside the Medium core` (recommended).
 2. **Pose counterexamples.** Find two situations the proposed axes cannot tell apart, one correct and
    one a bug, and put each in the first response as a numbered Open question with a recommendation:
 
@@ -1570,9 +1572,8 @@ This contract applies to every risk, including Low, and to both Design-only and 
 Risk changes verification depth, not whether this stack is used. There is no opt-out, low-risk
 fast path, sourceless N/A, or silent substitution for any member of the stack. The scope gate in
 `SKILL.md` Entry decides whether the work belongs to Oracle at all — state, ordering, counts,
-permissions or effects a model can state — and is not an opt-out for work that does. Its one route
-away is the Medium handoff to the Contract controller before any Formal artifact exists, which picks
-the controller for new work without an order, async or concurrency core. type-fest and
+permissions or effects a model can state — and is not an opt-out for work that does; no risk routes
+work out of it. type-fest and
 TypeScript apply when the card has an exposed type boundary (exported Props, a shared/package API,
 a client state union, a trust-boundary type); a card with none declares `typeContract` not applicable
 with the files it investigated and never adds an unused utility to fill the slot. The behavior model
@@ -3539,8 +3540,8 @@ whatever is already loaded.
 
 The controller walks `scripts/oracle-stage.mjs`: begin before independent inputs, then advance --to MODELED | CHECKED | DRAFTED
 once each gate passes. Return actual artifacts and gate results for those transitions.
-oracle-lock.mjs create refuses a package oracle that is not at DRAFTED on the same package bytes,
-and only that script path's stage runtime writes stage.json. The lock still runs card lint itself,
+oracle-lock.mjs create refuses a package oracle that is not at DRAFTED on the same package bytes and
+the Bend files and registered sources CHECKED judged, and only that script path's stage runtime writes stage.json. The lock still runs card lint itself,
 so a hand-written record skips no check. Authoring never fabricates stage acceptance.
 `status` reports the shared authoring round. `model-input` and `mapping-input` register their permitted
 input bytes automatically. Re-emitting identical input is idempotent, not permission to dispatch another

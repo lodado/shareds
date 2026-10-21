@@ -1,3 +1,79 @@
+# 0.107.0: keep Bend for Medium work, pin the Bend files and sources CHECKED judged
+
+## Validation
+
+- `ORACLE_REQUIRE_BEND=1 pnpm --filter @lodado/frontend-oracle-design-plugin test`: **1,200 passed, 0 failed, 0 skipped**,
+  using real Bend.
+- Package lint: exit 0, **0 errors, 405 package-wide warnings** (unchanged).
+- Generated reference bundles (22), workflow docs and converted evals: passed.
+- Mutation checks on the stage guards: removing any of 12 makes a test fail. They are the pin check before and
+  after the DRAFTED gate, the lock gate at DRAFTED, the rewind check, the during-gate digest and stamp checks,
+  the refusal of unpinned records, stale status, the re-check in place, the relock check without a lock file,
+  the pin carried to ORACLE_READY, and the gate resolving `repo:` sources from the repository root. The error
+  for an input the pin cannot measure while the gate passes has no test.
+- An independent Opus 5.5 review returned WARNING with one high, one medium and three low findings, all fixed:
+  - High: deleting `oracle.lock.json` and locking an ORACLE_READY record again skipped the pin, so a model
+    CHECKED never judged could be locked under the old approval. That predates this release. `create` now
+    measures the pin whenever no lock exists for an ORACLE_READY record.
+  - Medium: the walk back to MODELED that stale and unpinned records needed spent an authoring round, so a run
+    with both rounds spent stuck until the user approved an extension. A CHECKED or DRAFTED record with a stale
+    or missing pin now runs CHECKED again in place with `advance --to CHECKED`, spending no round (MODELED only
+    reads the package, which must be unchanged).
+  - Low: the gate now resolves `repo:` sources from the same repository root as the pin, so the stage works
+    from any working directory; an input the pin cannot measure is reported as such instead of "changed while
+    the gate ran"; the tests now cover the pin carried to ORACLE_READY, a rewind from ORACLE_READY, the check
+    after the DRAFTED gate, and the forged-DRAFTED case without Bend; controller-entry's Mixed bullet covers
+    coreless Medium.
+- The same reviewer then approved the fixes and probed the re-check: it cannot skip MODELED after a package
+  change, record bytes the gate did not judge, run from ORACLE_READY, or reset a spent budget. Of its three low
+  follow-ups, two are fixed: a re-check takes `--reason`/`--note` like a rewind (a forward step refuses them)
+  and `oracle-reflect` counts it as rework; the ORACLE_READY hint adds "or start a new revision" for a spent
+  budget. `status` still shows no STALE at ORACLE_READY, because registered sources may change during Delivery
+  and the lock and the card marker already refuse a changed model.
+
+## Diagnosis
+
+0.104.0 sent new Medium work with no order, async or concurrency core to the Contract controller, which has no
+Bend. A Low regression fix that entered the Formal controller still needed a Bend model, so the lower risk
+carried the heavier stack. The user decided that Medium work keeps Bend.
+
+`stage.json` pinned only `oracle.package.json`. The CHECKED gate also reads the package's Bend files (with their
+imports) and the sources its cross-check registers, and the card's generated block records the Bend inputs it
+was projected from. A Bend edit after CHECKED, followed by `project-card`, therefore passed DRAFTED's
+`check-card` and the lock while CHECKED never judged the new model. The same hole let a Bend file changed and
+restored while the CHECKED gate ran be recorded as CHECKED: 0.105.0 kept such a pass out of the receipt, but the
+stage still recorded it, because the package bytes never changed.
+
+## Change
+
+- Medium work stays with the Formal controller and its Bend model. With an order, async or concurrency core the
+  model covers that core, as before; without one it covers the decision rule (which inputs yield which result or
+  effect, and how many times). The scope-gate handoff, the Contract intake's hand-back, the guard hook's
+  `HANDED_OFF` parsing and the Contract description's handoff clause are removed; the guard is byte-identical
+  to 0.103.0 again, and a `Status: HANDED_OFF` line now leaves two activated controllers in conflict. common.md
+  says risk sets evidence depth, never the profile.
+- `oracle-stage.mjs advance --to CHECKED` measures the gate's inputs (the package, its Bend files with imports,
+  and every registered `repo:` source) before and after the gate, and records their digest as `inputsSha256`
+  only when neither the bytes nor the file stamps changed. Otherwise it refuses with `STAGE_STALE`.
+- DRAFTED (before and after its gate), the lock gate on a DRAFTED record, a relock of an ORACLE_READY record
+  with no lock file, and a rewind that resumes at CHECKED or DRAFTED require the same digest. `status` reports
+  a mismatch as stale. A CHECKED or DRAFTED record whose inputs changed, or that was written before 0.107.0,
+  runs CHECKED again in place; a locked record walks back to MODELED. While a lock exists, the lock and the
+  card's `inputs-sha256` marker keep guarding Bend, so an idempotent relock does not measure again.
+- The gate and the pin resolve `repo:` sources from the repository root above `.ai/oracles/` (cwd elsewhere).
+  `repositoryRoot` moved to `oracle-fs.mjs`: the lock calls the stage inside its own top-level await, so the
+  stage cannot import `oracle-lock.mjs` back. `inputsPin` is exported for tests that forge stage records.
+- The Medium eval case `fod-sem-medium-handoff` became `fod-sem-medium-no-core-bend` and expects Bend.
+
+## Not changed
+
+- The Contract controller still runs when the user asks for `contract/v1` or the run already is one.
+- The CHECKED receipt keeps its key; the pin uses the same input list without the harness, Node and Bend
+  fields, so a harness upgrade reruns the gate but does not invalidate a pin.
+- The pin covers every registered `repo:` source, a superset of what the gate reads, so editing a requirements
+  document after CHECKED costs one CHECKED run (not a round).
+- An oracle directory outside `.ai/oracles/` resolves sources from each process's working directory, as before.
+
 # 0.106.0: close the round-2 review on reproductions when every round-1 claim is a cited product defect (Low and Medium)
 
 ## Validation

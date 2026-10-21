@@ -40,17 +40,14 @@ One canonical runtime, reference graph and ledger serve all roles. No role has i
      classes, randomness is an environment choice in `next(history)`; see
      [model patterns](model-patterns.md#time-is-an-event). `NEEDS_DECISION` only when the sources leave the
      boundary, precision or duration undecided — the same as any other open policy question.
-   - A new request (no existing Oracle run) for Medium behavior that depends on no event order, async
-     lifecycle or concurrency (form validation, analytics or config injection): here, before
-     `$oracle-intake`, print `Status: HANDED_OFF — frontend-contract-design` and invoke
-     `$frontend-contract-design` with the request as S1. Choosing the controller before any artifact
-     exists is not a profile downgrade. The Contract run follows its own rules, and its intake hands the
-     request back with `Status: HANDED_OFF — frontend-oracle-design` when it finds such a core or a High
-     trigger. Medium work with such a core models only that core: the first response proposes the other
-     input families as `excluded: outside the Medium core`, naming any touched file the family was mined
-     from ([case space](card/case-space.md)). The confirming `yes` becomes the S\* their package
-     exclusions cite, and their policies stay tested rows (Not formalized).
-   - Mixed: model the stateful part (for Medium, its core) and list the rest as Not formalized/Out of scope with its owner.
+   - Medium work keeps the Bend model; no risk hands it to the Contract controller. Medium work with an
+     event order, async lifecycle or concurrency core models only that core: the first response proposes
+     the other input families as `excluded: outside the Medium core`, naming any touched file the family
+     was mined from ([case space](card/case-space.md)). The confirming `yes` becomes the S\* their package
+     exclusions cite, and their policies stay tested rows (Not formalized). Medium work without such a
+     core (form validation, analytics or config injection) models its decision rule: which inputs yield
+     which result or effect, and how many times.
+   - Mixed: model the stateful part (for Medium, its core or its decision rule) and list the rest as Not formalized/Out of scope with its owner.
      Report that Oracle did not verify it. If the core requirement can only be stated by the unmodelable
      part (UI, CSS, I/O), NEEDS_DECISION. Test whether a state machine can express it, not whether Bend
      has a native type (a string can be abstracted to valid/invalid), and never narrow
