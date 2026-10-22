@@ -1,6 +1,6 @@
 {
   "status": "not_executed",
-  "description": "Routing and fidelity expectations for the game-interface-design entry and threejs-game-wireframe. Rubrics for a model-behavior run, not results.",
+  "description": "Routing and fidelity expectations for the game-interface-design entry, threejs-game-wireframe and pixel-sprite-animation. Rubrics for a model-behavior run, not results.",
   "cases": [
     {
       "id": "plan-only",
@@ -155,6 +155,29 @@
         "mount every screen hidden",
         "hide loaded models with visible=false"
       ]
+    },
+    {
+      "id": "pixel-attack-sprite",
+      "prompt": "32x32 기사 캐릭터 검 베기 공격 도트 애니메이션 만들어줘.",
+      "expect": { "skill": "pixel-sprite-animation", "mode": "PIXEL_SPRITE", "level": null, "ecs": "n/a" },
+      "must_not": ["scaffold a Three.js project", "claim the hit feels good without a playtest"]
+    },
+    {
+      "id": "pixel-retime-sheet",
+      "prompt": "LPC 생성기에서 받은 슬래시 시트가 뻣뻣해. 역동적으로 리타이밍해줘.",
+      "expect": { "skill": "pixel-sprite-animation", "mode": "PIXEL_SPRITE", "level": null, "ecs": "n/a" },
+      "must_not": ["drop the source credits", "redraw every frame from scratch"]
+    },
+    {
+      "id": "sprites-into-prototype",
+      "prompt": "기획한 게임에 이 스프라이트 시트 넣어서 플레이 가능하게 만들어줘.",
+      "expect": {
+        "skill": "threejs-game-wireframe",
+        "mode": "THREEJS_WIREFRAME",
+        "level": "PLAYABLE_GREYBOX",
+        "ecs": "required"
+      },
+      "must_not": ["redraw the sprites", "rerun the full planning interview"]
     }
   ]
 }

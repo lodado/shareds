@@ -27,13 +27,19 @@ TARGET_DIR: ./my-game
 
 사용자는 주요 단계마다 **결정 → 확인한 레퍼런스와 관찰 → 이 게임에 적용한 방식 → 대안/트레이드오프 → 검증 결과 또는 미검증 가정**을 받는다. 근거 없는 수치는 제안으로 표시하고, 출처를 못 읽었다면 확인한 것처럼 쓰지 않는다. 기록은 기존 Reference Log나 코드 블루프린트에 유지한다.
 
-## 스킬 세 개
+## 스킬 네 개
 
-| 스킬                           | 하는 일                                                                                                 |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `game-interface-design`        | 진입점. 요청을 `PLAN_ONLY` · `FIGMA` · `THREEJS_WIREFRAME` 중 하나로 보낸다.                            |
-| `reference-driven-game-design` | 핵심 규칙, 초보자/숙련자 판단, 첫 플레이, 실패·재시작, HUD 와이어프레임, 손맛, 수익화 가설, 구현 인계.  |
-| `threejs-game-wireframe`       | 기획을 받아 로컬 Three.js 프로토타입을 만든다. 규칙은 FSD 페이지 슬라이스 안의 헤드리스 ECS가 계산한다. |
+| 스킬                           | 하는 일                                                                                                       |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `game-interface-design`        | 진입점. 요청을 `PLAN_ONLY` · `FIGMA` · `THREEJS_WIREFRAME` · `PIXEL_SPRITE` 중 하나로 보낸다.                 |
+| `reference-driven-game-design` | 핵심 규칙, 초보자/숙련자 판단, 첫 플레이, 실패·재시작, HUD 와이어프레임, 손맛, 수익화 가설, 구현 인계.        |
+| `threejs-game-wireframe`       | 기획을 받아 로컬 Three.js 프로토타입을 만든다. 규칙은 FSD 페이지 슬라이스 안의 헤드리스 ECS가 계산한다.       |
+| `pixel-sprite-animation`       | 기준 프레임 + diff로 도트 스프라이트 애니메이션을 만들고, 타이밍·스미어·타격감 린트와 컨택트 시트로 검사한다. |
+
+`pixel-sprite-animation`의 하네스는 스킬 폴더(`skills/pixel-sprite-animation/`)에서 `node scripts/pixel-sprite.mjs build <spec.json>`으로 돈다.
+사용자가 파일을 주면 `attach`로 스펙에 베이스·프레임·파트로 합치고(팔레트 맞춤, 출처 기록, `.bak` 보관) diff로 이어서 작업한다.
+베이스 스프라이트는 `candidates`로 무료 에셋 후보를 라이선스 등급과 함께 보드로 비교한 뒤 사용자가 고른다.
+린트 통과는 예쁜 그림이나 좋은 타격감의 증거가 아니다. 컨택트 시트 검토는 판단으로, 게임 안 손맛과 기기 검증은 `NOT_RUN`으로 보고한다.
 
 ## 요청 예시
 
@@ -139,5 +145,12 @@ game-interface-design/
       examples/stack-greybox/               실제 검증 결과로 채운 보고서
       evals/boundary-cases.json             라우팅 기대값 (미실행 루브릭)
       starter/                              Stack 그레이박스
+    pixel-sprite-animation/
+      SKILL.md
+      references/                           원리, 타이밍·손맛, 스펙 형식, 린트 규칙, 파이프라인
+      scripts/pixel-sprite.mjs              하네스 CLI (build, lint, show, import, colors, attach, candidates, blender)
+      scripts/lib/                          PNG 코덱·GIF 인코더, 합성, 린트, 후보 보드, Blender 렌더
+      examples/knight-slash/sprite.json     기준 프레임 + diff 예제 (린트 통과)
+      evals/behavior-cases.json             행동 기대값 (미실행 루브릭)
   scripts/                                  검사기, 스캐폴드, 테스트
 ```

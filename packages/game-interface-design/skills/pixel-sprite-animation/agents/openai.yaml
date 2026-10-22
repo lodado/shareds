@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Pixel Sprite Animation'
+  short_description: 'Base-plus-diff pixel sprite animation gated by lint'
+  default_prompt: 'Use $pixel-sprite-animation to animate a 32x32 player sword slash from a base frame plus diffs, pass the lint gates, and review the contact sheet honestly.'

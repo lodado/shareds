@@ -10,13 +10,14 @@ const SKILLS = fileURLToPath(new URL('../skills/', import.meta.url))
 const read = (rel) => readFileSync(path.join(SKILLS, rel), 'utf8')
 const cases = JSON.parse(read('threejs-game-wireframe/evals/boundary-cases.json'))
 
-const MODES = new Set(['PLAN_ONLY', 'FIGMA', 'THREEJS_WIREFRAME'])
+const MODES = new Set(['PLAN_ONLY', 'FIGMA', 'THREEJS_WIREFRAME', 'PIXEL_SPRITE'])
 const LEVELS = new Set([null, 'LAYOUT_ONLY', 'FLOW_PROTOTYPE', 'PLAYABLE_GREYBOX'])
 const ECS = new Set(['n/a', 'optional', 'required'])
 const SKILL_FOR_MODE = {
   PLAN_ONLY: 'reference-driven-game-design',
   FIGMA: 'reference-driven-game-design',
   THREEJS_WIREFRAME: 'threejs-game-wireframe',
+  PIXEL_SPRITE: 'pixel-sprite-animation',
 }
 const ECS_FOR_LEVEL = { LAYOUT_ONLY: 'n/a', FLOW_PROTOTYPE: 'optional', PLAYABLE_GREYBOX: 'required' }
 
@@ -38,9 +39,10 @@ test('routing rubric is declared unexecuted and well formed', () => {
       `no case covers ${level}`,
     )
   }
+  for (const mode of MODES) assert.ok(cases.cases.some((c) => c.expect.mode === mode), `no case covers ${mode}`)
 })
 
-test('router names every mode and links both target skills', () => {
+test('router names every mode and links every target skill', () => {
   const router = read('game-interface-design/SKILL.md')
   for (const mode of MODES) assert.match(router, new RegExp(`\`${mode}\``))
   for (const skill of new Set(Object.values(SKILL_FOR_MODE))) {
@@ -80,6 +82,22 @@ test('review requests stay read-only in the skill that owns the artifact', () =>
   for (const [name, skill] of Object.entries({ wireframe, design })) assert.match(skill, /ordered P0–P3/, name)
   assert.match(wireframe, /edits nothing until the user asks/)
   assert.match(design, /changes no document or Figma node until the user asks/)
+})
+
+// Low risk: static instruction routing for the sprite lane; the harness itself is tested in pixel-sprite.test.mjs.
+test('sprite requests route to the pixel lane, which owns its review and links its references', () => {
+  const router = read('game-interface-design/SKILL.md')
+  const pixel = read('pixel-sprite-animation/SKILL.md')
+  assert.match(router, /A review request[^\n]*sprite spec → Pixel Sprite Animation[^\n]*stays read-only/)
+  assert.match(router, /finished sprites into a playable prototype is `THREEJS_WIREFRAME`/)
+  assert.match(pixel, /ordered P0–P3/)
+  assert.match(pixel, /without editing until asked/)
+  for (const ref of ['principles', 'timing-and-feel', 'spec-format', 'lint-rules', 'pipelines']) {
+    assert.match(pixel, new RegExp(`\\(references/${ref}\\.md\\)`), ref)
+  }
+  assert.match(pixel, /\(examples\/knight-slash\/sprite\.json\)/)
+  assert.match(pixel, /`BASE_DIFF` \(default\)/)
+  assert.match(pixel, /Never claim fun without a playtest/)
 })
 
 test('product copy rules ship byte-identical to the frontend-interface-design copy', () => {

@@ -6,7 +6,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { checkPackage } from './check-contract.mjs'
+import { checkPackage, codexPromptErrors } from './check-contract.mjs'
 import { validateReport } from './validate-design.mjs'
 
 // Regression tests of validators, not actual agent behavior or game execution.
@@ -125,4 +125,22 @@ test('behavior rubrics are declared unexecuted', () => {
   assert.equal(cases.status, 'not_executed')
   assert.equal(cases.cases.length, 24)
   assert.equal(new Set(cases.cases.map((c) => c.id)).size, 24)
+})
+
+test('pixel sprite behavior rubrics are declared unexecuted with unique ids', () => {
+  const cases = JSON.parse(
+    readFileSync(path.join(ROOT, 'skills/pixel-sprite-animation/evals/behavior-cases.json'), 'utf8'),
+  )
+  assert.equal(cases.status, 'not_executed')
+  assert.equal(cases.cases.length, 7)
+  assert.equal(new Set(cases.cases.map((c) => c.id)).size, 7)
+})
+
+test('codex starter prompts: at most three, each at most 128 characters', () => {
+  const prompts = (defaultPrompt) => codexPromptErrors({ interface: { defaultPrompt } })
+  assert.deepEqual(prompts(['a', 'b', 'c']), [])
+  assert.deepEqual(prompts(['a', 'b', 'c', 'd']), ['codex defaultPrompt has 4 entries; at most 3'])
+  assert.deepEqual(prompts(['x'.repeat(128)]), [])
+  assert.deepEqual(prompts(['x'.repeat(129)]), ['codex defaultPrompt[0] is not a string of at most 128 characters'])
+  assert.deepEqual(prompts('one prompt'), ['codex defaultPrompt is not an array'])
 })

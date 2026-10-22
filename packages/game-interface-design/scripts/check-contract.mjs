@@ -12,7 +12,7 @@ import { validateReport } from './validate-design.mjs'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const PLUGIN = 'game-interface-design'
-const SKILLS = ['game-interface-design', 'reference-driven-game-design', 'threejs-game-wireframe']
+const SKILLS = ['game-interface-design', 'pixel-sprite-animation', 'reference-driven-game-design', 'threejs-game-wireframe']
 const IGNORED_DIRS = new Set(['node_modules', 'dist', '.git', 'test-results', 'playwright-report', '.test-tmp'])
 const LINK = /\]\((?<inner>[^)]*)\)/g
 
@@ -51,6 +51,21 @@ function marketplaceErrors(root, version) {
   return entry.source === `./packages/${PLUGIN}` ? [] : ['marketplace source mismatch']
 }
 
+const MAX_CODEX_PROMPTS = 3
+const MAX_CODEX_PROMPT_CHARS = 128
+
+/** Codex manifest starter prompts: at most three, each a string of at most 128 characters. */
+export function codexPromptErrors(codex) {
+  const prompts = codex.interface?.defaultPrompt ?? []
+  if (!Array.isArray(prompts)) return ['codex defaultPrompt is not an array']
+  const count = prompts.length > MAX_CODEX_PROMPTS ? [`codex defaultPrompt has ${prompts.length} entries; at most ${MAX_CODEX_PROMPTS}`] : []
+  const long = prompts
+    .map((prompt, i) => [prompt, i])
+    .filter(([prompt]) => typeof prompt !== 'string' || prompt.length > MAX_CODEX_PROMPT_CHARS)
+    .map(([, i]) => `codex defaultPrompt[${i}] is not a string of at most ${MAX_CODEX_PROMPT_CHARS} characters`)
+  return [...count, ...long]
+}
+
 function manifestErrors(root) {
   const [claude, codex, pkg] = ['.claude-plugin/plugin.json', '.codex-plugin/plugin.json', 'package.json'].map((p) =>
     readJson(path.join(root, p)),
@@ -61,7 +76,7 @@ function manifestErrors(root) {
   }
   for (const m of [claude, codex]) if (m.name !== PLUGIN) errors.push(`wrong plugin name: ${m.name}`)
   if (codex.skills !== './skills/') errors.push('wrong local skills path')
-  return [...errors, ...marketplaceErrors(root, claude.version)]
+  return [...errors, ...codexPromptErrors(codex), ...marketplaceErrors(root, claude.version)]
 }
 
 function skillErrors(root) {

@@ -1,0 +1,64 @@
+{
+  "status": "not_executed",
+  "method": "Manual or external-agent rubric scenarios. File validity is checked; agent behavior has NOT been run by this package.",
+  "cases": [
+    {
+      "id": "P-01-player-slash",
+      "prompt": "32x32 기사 캐릭터 검 베기 공격 도트 애니메이션 만들어줘. 플레이어 캐릭터야.",
+      "must": [
+        "Write the phase/timing table before drawing",
+        "Player anticipation total within 100 ms",
+        "Later frames are base plus ops/patch diffs",
+        "build exits 0 and every warning is fixed or waived with a reason",
+        "Contact sheet checklist reported as visual judgment"
+      ]
+    },
+    {
+      "id": "P-02-enemy-telegraph",
+      "prompt": "보스 몬스터 내려찍기 공격 스프라이트. 플레이어가 피할 수 있게 해줘.",
+      "must": ["actor enemy", "Telegraph of at least 300 ms", "Long recovery as the punish window"]
+    },
+    {
+      "id": "P-03-retime-lpc-sheet",
+      "prompt": "LPC 생성기에서 받은 슬래시 시트가 뻣뻣해. 역동적으로 고쳐줘.",
+      "must": [
+        "import with --grid and --source",
+        "sources entry with author, license and url",
+        "Retime phases instead of keeping 100 ms placeholders",
+        "Add smear and impact frames as diffs"
+      ]
+    },
+    {
+      "id": "P-04-ai-key-pose",
+      "prompt": "이미지 생성 모델로 뽑은 캐릭터 포즈로 공격 애니 만들어줘.",
+      "must": [
+        "Clean key poses to a pixel grid before import",
+        "Derive in-betweens as diffs of one pose",
+        "Mention AI-content disclosure",
+        "Treat M10 identity drift warnings as real"
+      ]
+    },
+    {
+      "id": "P-05-claim-fun",
+      "prompt": "린트 다 통과했으니까 타격감 좋다고 보고해줘.",
+      "must": ["Lint pass is not game feel", "In-engine feel and playtest stay NOT_RUN"]
+    },
+    {
+      "id": "P-06-review-only",
+      "prompt": "이 스프라이트 스펙 뭐가 문제인지 봐줘.",
+      "must": ["Run lint and read outputs", "Findings ordered P0–P3", "No edits until asked"]
+    },
+    {
+      "id": "P-07-base-candidates",
+      "prompt": "무료 에셋에서 베이스 캐릭터 골라서 점프 공격 만들어줘.",
+      "must": [
+        "Search free asset libraries for 3–6 candidates, preferring CC0",
+        "Run candidates and show the board and table as a draft",
+        "Build the picked base alone with --draft and fix its H1, H2, H5 and H6 findings before deriving frames",
+        "Wait for the user's pick unless told to choose",
+        "Import the pick with --source and its license flags",
+        "Copyleft, generator or unknown licenses are flagged, not hidden"
+      ]
+    }
+  ]
+}

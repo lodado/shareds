@@ -1,7 +1,7 @@
 {
   "name": "game-interface-design",
-  "version": "0.3.0",
-  "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, and FSD/ECS Three.js greybox prototypes.",
+  "version": "0.4.0",
+  "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, FSD/ECS Three.js greybox prototypes, and lint-gated pixel sprite animation.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
@@ -9,5 +9,17 @@
   "homepage": "https://github.com/lodado/shareds",
   "repository": "https://github.com/lodado/shareds",
   "license": "MIT",
-  "keywords": ["game-design", "mobile-web", "threejs", "game-feel", "figma", "ux", "ecs", "fsd", "prototype"]
+  "keywords": [
+    "game-design",
+    "mobile-web",
+    "threejs",
+    "game-feel",
+    "figma",
+    "ux",
+    "ecs",
+    "fsd",
+    "prototype",
+    "pixel-art",
+    "sprite-animation"
+  ]
 }

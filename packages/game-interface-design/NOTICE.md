@@ -17,6 +17,15 @@ or grants of rights. New synthetic examples are proposals, not observed real gam
 
 No original remote file was changed or published during creation of this archive.
 
+## Pixel sprite animation (0.4.0)
+
+The knight-slash example, its palette, the contact-sheet digit glyphs and the Blender demo scene are
+original work for this package. No third-party sprite, palette, font or generator output is bundled.
+The skill names asset libraries and tools only as places to search or run (free asset libraries, the
+LPC generator, rigged 3D packs, image-model cleanup tools, sprite generators); their assets are not
+redistributed here. `candidates` downloads only the URLs a user's manifest lists, into that user's
+output folder, and the tests use a local server and synthetic images.
+
 ## Starter dependencies (0.2.0)
 
 The starter lists npm dependencies but bundles none of them; they download on `npm ci`.

@@ -1,7 +1,7 @@
 {
   "name": "game-interface-design",
-  "version": "0.3.0",
-  "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, and FSD/ECS Three.js greybox prototypes.",
+  "version": "0.4.0",
+  "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, FSD/ECS Three.js greybox prototypes, and lint-gated pixel sprite animation.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
@@ -11,16 +11,16 @@
   "license": "MIT",
   "skills": "./skills/",
   "interface": {
-    "displayName": "Reference-Driven Game Design",
-    "shortDescription": "Plan games, then build FSD/ECS Three.js prototypes",
-    "longDescription": "Plan meaningful play, failure and replay, HUDs, game feel and business hypotheses; optionally produce editable Figma game UI; then turn the plan into a local Three.js prototype whose rules run in a headless ECS inside an FSD page slice, with typecheck, Steiger, headless, build and browser verification.",
+    "displayName": "Game Design, Prototypes and Sprites",
+    "shortDescription": "Plan games, build Three.js prototypes, animate pixel sprites",
+    "longDescription": "Plan meaningful play, failure and replay, HUDs, game feel and business hypotheses; optionally produce editable Figma game UI; then turn the plan into a local Three.js prototype whose rules run in a headless ECS inside an FSD page slice, with typecheck, Steiger, headless, build and browser verification. Animate pixel sprites from a base frame plus diffs, gated by palette, phase, timing, smear and hit-feel lint with a contact-sheet review.",
     "developerName": "lodado",
     "category": "Productivity",
     "capabilities": ["Research", "Figma", "Write", "Code"],
     "defaultPrompt": [
       "Design a one-handed mobile web game from its core decisions through player flows and a testable handoff.",
-      "Design a merge puzzle with meaningful placement choices, clear failure feedback, and rapid replay.",
-      "Build a playable Three.js greybox of the approved game plan with its rules in a headless ECS."
+      "Build a playable Three.js greybox of the approved game plan with its rules in a headless ECS.",
+      "Animate a 32x32 player sword slash as pixel art with anticipation, smear and hitstop, passing the sprite lint."
     ],
     "websiteURL": "https://github.com/lodado/shareds"
   }

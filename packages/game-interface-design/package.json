@@ -1,11 +1,11 @@
 {
   "name": "@lodado/game-interface-design-plugin",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
-  "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, and FSD/ECS Three.js greybox prototypes.",
+  "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, FSD/ECS Three.js greybox prototypes, and lint-gated pixel sprite animation.",
   "license": "MIT",
   "scripts": {
-    "lint": "eslint scripts",
+    "lint": "eslint scripts skills/pixel-sprite-animation/scripts",
     "test": "node --test scripts/*.test.mjs",
     "check": "node scripts/check-contract.mjs",
     "validate:example": "node scripts/validate-design.mjs skills/reference-driven-game-design/examples/merge-garden/delivery.json",

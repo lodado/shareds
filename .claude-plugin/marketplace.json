@@ -106,8 +106,8 @@
     },
     {
       "name": "game-interface-design",
-      "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, and FSD/ECS Three.js greybox prototypes.",
-      "version": "0.3.0",
+      "description": "Mobile-web game planning, player flows, HUDs, game feel, optional Figma UI, FSD/ECS Three.js greybox prototypes, and lint-gated pixel sprite animation.",
+      "version": "0.4.0",
       "author": {
         "name": "lodado"
       },

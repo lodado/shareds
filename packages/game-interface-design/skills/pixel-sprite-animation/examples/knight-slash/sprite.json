@@ -1,0 +1,445 @@
+{
+  "version": 1,
+  "name": "knight-slash",
+  "canvas": [32, 32],
+  "palette": {
+    ".": null,
+    "k": "#1d1a2f",
+    "n": "#3c3f6b",
+    "s": "#7a87bd",
+    "w": "#dfe8f7",
+    "r": "#6e1f3a",
+    "c": "#b8323c",
+    "o": "#ec7a4f",
+    "g": "#f0b43c",
+    "b": "#5c3b2e",
+    "e": "#f4f8ff",
+    "l": "#6f80bb",
+    "v": "#8fc7f5",
+    "x": "#f8fcff",
+    "y": "#ffe066"
+  },
+  "maxColors": 16,
+  "actor": "player",
+  "kind": "action",
+  "baseline": 30,
+  "outline": "k",
+  "outlineAlt": ["n", "r", "b"],
+  "scale": 8,
+  "fps": 60,
+  "parts": {
+    "sword": {
+      "pivot": [8, 8],
+      "outline": false,
+      "rows": [
+        "e.........",
+        "le........",
+        ".le.......",
+        "..le......",
+        "...le.....",
+        "....le....",
+        ".....le.g.",
+        ".......g..",
+        "......g.b.",
+        ".........b"
+      ]
+    },
+    "sword-level": {
+      "pivot": [0, 1],
+      "outline": false,
+      "rows": [".g.....", "bgeeee.", ".glllll"]
+    },
+    "smear": {
+      "pivot": [0, 0],
+      "rows": [
+        "........xxxxxxx.......",
+        ".....vvvvxxxxxxxxx....",
+        "...vvvvvvvvvvvvxxxxx..",
+        "..vvvv......vvvvxxxxx.",
+        ".vv............xxxxx..",
+        "vv..............xxx...",
+        "v................x...."
+      ]
+    },
+    "spark": {
+      "pivot": [3, 3],
+      "rows": ["...y...", ".y.y.y.", "..yxy..", "yyxxxyy", "..yxy..", ".y.y.y.", "...y..."]
+    }
+  },
+  "frames": [
+    {
+      "id": "ready",
+      "phase": "anticipation",
+      "ms": 50,
+      "tags": ["key"],
+      "rows": [
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "................................",
+        "...............kkkk.............",
+        "..........ksskkwwssk............",
+        "...........kskwwsssnk...........",
+        "...........knkwsskkkk...........",
+        "...........knksssssnk...........",
+        "...........knknsssnnk...........",
+        "............kkknnnnk............",
+        "..........krkkkkkkkk............",
+        ".........krckwwssssnk...........",
+        "........krcckwssssnnk...........",
+        "........kccoksssssnnk...........",
+        ".......krccokgggggggk...........",
+        ".......krccoknsssnnnk...........",
+        "......krccok.knnknnk............",
+        "......kkrcckknsk..ksnk..........",
+        ".......kkkkknsk....ksnk.........",
+        "...........knk......ksk.........",
+        "..........knsk......kssk........",
+        "..........kbbk......kbbk........",
+        ".........kbbbk......kbbbk.......",
+        ".........kkkkk......kkkkkk......",
+        "................................"
+      ],
+      "layers": [
+        {
+          "part": "sword",
+          "at": [10, 9]
+        }
+      ],
+      "patch": [
+        {
+          "at": [9, 9],
+          "rows": ["kss", "knsk"]
+        }
+      ]
+    },
+    {
+      "id": "windup",
+      "phase": "anticipation",
+      "ms": 50,
+      "tags": ["squash"],
+      "base": "ready",
+      "ops": [
+        {
+          "op": "move",
+          "rect": [0, 0, 22, 24],
+          "by": [-1, 1]
+        },
+        {
+          "op": "move",
+          "rect": [0, 0, 13, 13],
+          "by": [-1, 0]
+        }
+      ]
+    },
+    {
+      "id": "swing",
+      "phase": "smear",
+      "ms": 33,
+      "base": "ready",
+      "layers": [
+        {
+          "part": "smear",
+          "at": [5, 1],
+          "fx": true
+        },
+        {
+          "part": "sword",
+          "at": [21, 10],
+          "rot": 90
+        }
+      ],
+      "ops": [
+        {
+          "op": "recolor",
+          "rect": [1, 0, 12, 11],
+          "from": "e",
+          "to": "."
+        },
+        {
+          "op": "recolor",
+          "rect": [1, 0, 12, 11],
+          "from": "l",
+          "to": "."
+        },
+        {
+          "op": "recolor",
+          "rect": [1, 0, 12, 11],
+          "from": "g",
+          "to": "."
+        },
+        {
+          "op": "erase",
+          "rect": [9, 9, 4, 8]
+        },
+        {
+          "op": "erase",
+          "rect": [13, 11, 1, 1]
+        },
+        {
+          "op": "move",
+          "rect": [5, 10, 16, 14],
+          "by": [1, 1]
+        }
+      ],
+      "patch": [
+        {
+          "at": [20, 9],
+          "rows": ["kss", "knsk"]
+        },
+        {
+          "at": [22, 11],
+          "rows": ["sk", "sk", "nk", "nk", "nk", "nk"]
+        }
+      ]
+    },
+    {
+      "id": "hit",
+      "phase": "impact",
+      "ms": 50,
+      "tags": ["key"],
+      "base": "ready",
+      "layers": [
+        {
+          "part": "sword",
+          "at": [23, 17],
+          "rot": 180
+        },
+        {
+          "part": "spark",
+          "at": [28, 21],
+          "fx": true
+        }
+      ],
+      "ops": [
+        {
+          "op": "recolor",
+          "rect": [1, 0, 12, 11],
+          "from": "e",
+          "to": "."
+        },
+        {
+          "op": "recolor",
+          "rect": [1, 0, 12, 11],
+          "from": "l",
+          "to": "."
+        },
+        {
+          "op": "recolor",
+          "rect": [1, 0, 12, 11],
+          "from": "g",
+          "to": "."
+        },
+        {
+          "op": "erase",
+          "rect": [9, 9, 4, 8]
+        },
+        {
+          "op": "erase",
+          "rect": [13, 11, 1, 1]
+        },
+        {
+          "op": "move",
+          "rect": [18, 24, 8, 7],
+          "by": [2, 0]
+        },
+        {
+          "op": "move",
+          "rect": [5, 10, 16, 14],
+          "by": [2, 1]
+        }
+      ],
+      "patch": [
+        {
+          "at": [22, 16],
+          "rows": ["kss", "knsk"]
+        }
+      ]
+    },
+    {
+      "id": "follow",
+      "phase": "follow-through",
+      "ms": 66,
+      "base": "ready",
+      "layers": [
+        {
+          "part": "sword",
+          "at": [22, 19],
+          "rot": 180
+        }
+      ],
+      "ops": [
+        {
+          "op": "recolor",
+          "rect": [1, 0, 12, 11],
+          "from": "e",
+          "to": "."
+        },
+        {
+          "op": "recolor",
+          "rect": [1, 0, 12, 11],
+          "from": "l",
+          "to": "."
+        },
+        {
+          "op": "recolor",
+          "rect": [1, 0, 12, 11],
+          "from": "g",
+          "to": "."
+        },
+        {
+          "op": "erase",
+          "rect": [9, 9, 4, 8]
+        },
+        {
+          "op": "erase",
+          "rect": [13, 11, 1, 1]
+        },
+        {
+          "op": "move",
+          "rect": [18, 24, 8, 7],
+          "by": [2, 0]
+        },
+        {
+          "op": "move",
+          "rect": [5, 10, 16, 14],
+          "by": [2, 1]
+        }
+      ],
+      "patch": [
+        {
+          "at": [21, 18],
+          "rows": ["kss", "knsk"]
+        }
+      ]
+    },
+    {
+      "id": "recover",
+      "phase": "recovery",
+      "ms": 83,
+      "base": "ready",
+      "layers": [
+        {
+          "part": "sword-level",
+          "at": [25, 19]
+        }
+      ],
+      "ops": [
+        {
+          "op": "recolor",
+          "rect": [1, 0, 12, 11],
+          "from": "e",
+          "to": "."
+        },
+        {
+          "op": "recolor",
+          "rect": [1, 0, 12, 11],
+          "from": "l",
+          "to": "."
+        },
+        {
+          "op": "recolor",
+          "rect": [1, 0, 12, 11],
+          "from": "g",
+          "to": "."
+        },
+        {
+          "op": "erase",
+          "rect": [9, 9, 4, 8]
+        },
+        {
+          "op": "erase",
+          "rect": [13, 11, 1, 1]
+        },
+        {
+          "op": "move",
+          "rect": [18, 24, 8, 7],
+          "by": [1, 0]
+        },
+        {
+          "op": "move",
+          "rect": [5, 10, 16, 14],
+          "by": [1, 0]
+        }
+      ],
+      "patch": [
+        {
+          "at": [23, 18],
+          "rows": ["kss", "knsk"]
+        }
+      ]
+    },
+    {
+      "id": "guard",
+      "phase": "hold",
+      "ms": 100,
+      "base": "ready",
+      "layers": [
+        {
+          "part": "sword",
+          "at": [23, 17],
+          "rot": 90
+        }
+      ],
+      "ops": [
+        {
+          "op": "recolor",
+          "rect": [1, 0, 12, 11],
+          "from": "e",
+          "to": "."
+        },
+        {
+          "op": "recolor",
+          "rect": [1, 0, 12, 11],
+          "from": "l",
+          "to": "."
+        },
+        {
+          "op": "recolor",
+          "rect": [1, 0, 12, 11],
+          "from": "g",
+          "to": "."
+        },
+        {
+          "op": "erase",
+          "rect": [9, 9, 4, 8]
+        },
+        {
+          "op": "erase",
+          "rect": [13, 11, 1, 1]
+        }
+      ],
+      "patch": [
+        {
+          "at": [22, 16],
+          "rows": ["kss", "knsk"]
+        }
+      ]
+    }
+  ],
+  "feel": {
+    "hitstop": {
+      "ms": 83,
+      "scope": "presentation"
+    },
+    "shake": {
+      "px": 2,
+      "ms": 120
+    },
+    "flash": {
+      "frames": 1
+    },
+    "knockbackPx": 6,
+    "reduced": {
+      "hitstopMs": 50,
+      "shakePx": 0,
+      "flashFrames": 0
+    }
+  }
+}
