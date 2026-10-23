@@ -11,16 +11,18 @@ import type { SlackClient } from '../slack/client.ts'
 import type { Connect } from '../socket/socket.ts'
 import type { Store } from '../store/store.ts'
 import type { WorkerConfig } from '../work/worker.ts'
+import type { StatusServer, StatusSnapshot } from './status.ts'
 import { mergePr, readGate } from '../github/github.ts'
 import { ingestMentions } from '../ingest/ingest.ts'
 import { listRepos } from '../orca/repos.ts'
 import { startSocket } from '../socket/socket.ts'
-import { logEvent } from '../store/store.ts'
-import { cancelOrphanRuns, getWorkspace } from '../store/work.ts'
+import { logEvent, stageCounts } from '../store/store.ts'
+import { cancelOrphanRuns, countActiveRuns, getWorkspace } from '../store/work.ts'
 import { createWorker, retriesLeft } from '../work/worker.ts'
 import { createSplitAgent, createTriageAgent } from './agents.ts'
 import { dispatchEnvelope } from './dispatch.ts'
 import { every } from './loop.ts'
+import { startStatusServer } from './status.ts'
 import { loadThreadText } from './threads.ts'
 
 export interface AppDeps {
@@ -38,6 +40,8 @@ export interface AppDeps {
   scratchDir: string
   // Looks at the pages a build changed before its pull request is opened.
   qa: RunQa
+  // The port of the read-only status address on this machine; null for none.
+  statusPort?: number | null
   connect?: Connect
   // How often the worker looks for something to start.
   tickMs?: number
@@ -77,6 +81,22 @@ function startOfDay(now: Date, daysBack: number): Date {
 }
 
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error))
+
+// The status address is a convenience: a port that is taken must not keep the service from running.
+async function startStatus(
+  deps: AppDeps,
+  log: (event: string, detail?: unknown) => void,
+  snapshot: () => StatusSnapshot,
+): Promise<StatusServer | null> {
+  const port = deps.statusPort ?? null
+  if (port === null) return null
+  try {
+    return await startStatusServer({ port, snapshot })
+  } catch (error) {
+    log('status_server_failed', errorText(error))
+    return null
+  }
+}
 
 export async function createApp(deps: AppDeps): Promise<App> {
   const { store, slack, run, ownerId, config } = deps
@@ -152,24 +172,43 @@ export async function createApp(deps: AppDeps): Promise<App> {
     log,
   })
 
+  // What the status address says about polling.
+  const poll: { at: string | null; error: string | null } = { at: null, error: null }
   const pollMentions = async (): Promise<void> => {
-    repos = await listRepos(run)
-    await ingestMentions(
-      {
-        store,
-        slack,
-        ownerId,
-        route: { knownRepos: repos.map((repo) => repo.name), channelRepos: deps.channelRepos() },
-        analyze,
-      },
-      { since: startOfDay(deps.now(), config.ingestDays), dryRun: false },
-    )
+    try {
+      repos = await listRepos(run)
+      await ingestMentions(
+        {
+          store,
+          slack,
+          ownerId,
+          route: { knownRepos: repos.map((repo) => repo.name), channelRepos: deps.channelRepos() },
+          analyze,
+        },
+        { since: startOfDay(deps.now(), config.ingestDays), dryRun: false },
+      )
+      poll.at = deps.now().toISOString()
+      poll.error = null
+    } catch (error) {
+      poll.error = errorText(error)
+      throw error
+    }
   }
 
   const stops = [
     every(deps.tickMs ?? DEFAULT_TICK_MS, () => worker.tick(), reportError('worker_tick')),
     every(config.pollIntervalMs, pollMentions, reportError('poll')),
   ]
+
+  const startedAt = deps.now().toISOString()
+  const statusServer = await startStatus(deps, log, () => ({
+    ok: true,
+    startedAt,
+    stages: Object.fromEntries(stageCounts(store)),
+    activeRuns: countActiveRuns(store),
+    lastPollAt: poll.at,
+    lastPollError: poll.error,
+  }))
 
   return {
     ready: socket.ready,
@@ -178,6 +217,7 @@ export async function createApp(deps: AppDeps): Promise<App> {
       socket.stop()
       worker.stop()
       await worker.idle()
+      await statusServer?.stop()
     },
   }
 }

@@ -14,6 +14,7 @@ import {
   pendingForDigest,
   setAnalysis,
   setDigestSlackRef,
+  stageCounts,
   UnknownItemError,
 } from './store'
 
@@ -271,5 +272,32 @@ describe('setAnalysis as what the cheapest model made of an item', () => {
     applyEvent(store, key('web-app'), { type: 'triage', handled: false, confident: false })
     setAnalysis(store, key('web-app'), analysis)
     expect(pendingForDigest(store)[0]?.meta.analysis).toStrictEqual(analysis)
+  })
+})
+
+describe('stageCounts as how many items are in each stage', () => {
+  it('to be a count for every stage, zero where nothing is, and the right number where something is', () => {
+    const store = memoryStore()
+    createItems(store, 'slack:C1:1', ['web-app'])
+    createItems(store, 'slack:C1:2', ['web-app'])
+    createItems(store, 'slack:C1:3', ['web-app'])
+    applyEvent(store, key('web-app', 'slack:C1:2'), { type: 'triage', handled: false, confident: true })
+    applyEvent(store, key('web-app', 'slack:C1:3'), { type: 'triage', handled: true, confident: false })
+    expect(Object.fromEntries(stageCounts(store))).toStrictEqual({
+      ingested: 1,
+      notified: 0,
+      planning: 1,
+      planned: 0,
+      implementing: 0,
+      pr_open: 0,
+      merged: 0,
+      skipped: 1,
+      declined: 0,
+      failed: 0,
+    })
+  })
+
+  it('to be all zero for a store with nothing in it', () => {
+    expect([...stageCounts(memoryStore()).values()].every((n) => n === 0)).toBe(true)
   })
 })

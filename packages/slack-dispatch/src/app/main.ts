@@ -63,6 +63,7 @@ export async function startApp(env: Env): Promise<App> {
       run,
       agent,
       qa,
+      statusPort: config.statusPort,
       store: openStore(config.dbPath),
       newSessionId: randomUUID,
       now: () => new Date(),

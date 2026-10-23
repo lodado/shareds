@@ -2,7 +2,7 @@ import type { Card, ItemEvent, Outcome, Stage } from '../machine/machine.ts'
 import type { Analysis } from '../triage/analysis.ts'
 import type { EventKind, ItemSource } from './schema.ts'
 import { DatabaseSync } from 'node:sqlite'
-import { decide, INITIAL_STAGE, isStage, nextStage } from '../machine/machine.ts'
+import { decide, INITIAL_STAGE, isStage, nextStage, STAGES } from '../machine/machine.ts'
 import { readAnalysis } from '../triage/analysis.ts'
 import { redact } from './redact.ts'
 import { isEventKind, isItemSource, SCHEMA, SCHEMA_VERSION } from './schema.ts'
@@ -404,6 +404,16 @@ export function listItems(store: Store, filter: { stage?: Stage; limit?: number 
           .prepare(`SELECT ${ITEM_COLUMNS} FROM items WHERE stage = ? ORDER BY created_at, key LIMIT ?`)
           .all(filter.stage, limit)
   return rows.map(toItemRow)
+}
+
+// How many items are in each stage, with a zero for a stage nothing is in.
+export function stageCounts(store: Store): Map<Stage, number> {
+  const counts = new Map<Stage, number>(STAGES.map((stage) => [stage, 0]))
+  for (const row of store.db.prepare('SELECT stage, COUNT(*) AS n FROM items GROUP BY stage').all()) {
+    const stage = text(row, 'stage')
+    if (isStage(stage)) counts.set(stage, integer(row, 'n'))
+  }
+  return counts
 }
 
 // The items in any of these stages, oldest first. Finished items are left out in SQL, so a long history cannot push

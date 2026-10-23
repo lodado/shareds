@@ -15,7 +15,10 @@
     "proofs:machine": "node scripts/gen-proofs.mjs machine",
     "proofs:run": "node scripts/gen-proofs.mjs run",
     "start": "node --env-file-if-exists=.env --no-warnings scripts/dispatch.ts",
-    "dry-run": "node --env-file-if-exists=.env --no-warnings scripts/dry-run.ts"
+    "dry-run": "node --env-file-if-exists=.env --no-warnings scripts/dry-run.ts",
+    "service:install": "node --no-warnings scripts/service.ts install",
+    "service:uninstall": "node --no-warnings scripts/service.ts uninstall",
+    "service:status": "node --no-warnings scripts/service.ts status"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

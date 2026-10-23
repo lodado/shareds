@@ -46,6 +46,7 @@ describe('loadConfig as the places the bot keeps its state', () => {
       pollIntervalMs: 300_000,
       ingestDays: 0,
       prEnabled: false,
+      statusPort: 9814,
     })
   })
 
@@ -63,6 +64,7 @@ describe('loadConfig as the places the bot keeps its state', () => {
       pollIntervalMs: 300_000,
       ingestDays: 0,
       prEnabled: false,
+      statusPort: 9814,
     })
   })
 
@@ -169,4 +171,27 @@ describe('loadBaseBranches as the repos with a branch of their own', () => {
     expect(loadBaseBranches(tempFile('{"channels":{}}'))).toStrictEqual({})
     expect(loadBaseBranches(tempFile('{"baseBranches":["x"]}'))).toStrictEqual({})
   })
+})
+
+describe('loadConfig as the port of the status address', () => {
+  it('to be 9814 unless told otherwise', () => {
+    expect(loadConfig({}, '/h').statusPort).toBe(9814)
+  })
+
+  it('to be the port in STATUS_PORT when it is one the owner may use', () => {
+    expect(loadConfig({ STATUS_PORT: '9000' }, '/h').statusPort).toBe(9000)
+    expect(loadConfig({ STATUS_PORT: '1024' }, '/h').statusPort).toBe(1024)
+    expect(loadConfig({ STATUS_PORT: '65535' }, '/h').statusPort).toBe(65_535)
+  })
+
+  it('to be switched off by 0', () => {
+    expect(loadConfig({ STATUS_PORT: '0' }, '/h').statusPort).toBeNull()
+  })
+
+  it.each(['', 'x', '80', '1023', '65536', '99999', '-1', '9000.5'])(
+    'to be 9814 for %j, which is not a port to use',
+    (value) => {
+      expect(loadConfig({ STATUS_PORT: value }, '/h').statusPort).toBe(9814)
+    },
+  )
 })

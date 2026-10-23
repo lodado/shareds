@@ -21,6 +21,18 @@ pnpm dry-run        # read-only look at today's mentions; sends nothing
 pnpm lint && pnpm test
 ```
 
+### Start at login (macOS)
+
+```sh
+pnpm service:install     # a LaunchAgent: starts when you log in, restarts after a crash
+pnpm service:status
+pnpm service:uninstall
+```
+
+Log: `~/.slack-dispatch/service.log`. While it runs, `http://localhost:9814/health` and `/status` (stage counts, active
+runs, last poll) answer on this machine only; `STATUS_PORT=0` turns that off. The agent file holds absolute paths (node,
+the repository), so run `service:install` again after changing the node version or moving the folder.
+
 Slack tokens (`xoxb-`, `xoxp-`, `xapp-`) are read from the macOS keychain, never from files. `claude` is the one installed on
 this machine and uses its own login; no API key or sign-in variable is handed to it or to any program it starts. State lives in `~/.slack-dispatch`.
 A lock file keeps a second service from starting on the same folder.

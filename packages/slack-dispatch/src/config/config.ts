@@ -18,6 +18,8 @@ export interface Config {
   ingestDays: number
   // Whether a finished build is pushed and opened as a pull request. Off by default: the work stays a local commit.
   prEnabled: boolean
+  // The port of the read-only status address on this machine; null turns it off.
+  statusPort: number | null
 }
 
 type Env = Readonly<Record<string, string | undefined>>
@@ -32,6 +34,16 @@ function wholeNumber(value: string | undefined, min: number, fallback: number): 
   return parsed
 }
 
+const DEFAULT_STATUS_PORT = 9814
+
+// A port from 1024 up, or 0 to switch the address off; anything else is the default.
+function statusPortOf(value: string | undefined): number | null {
+  if (value === '0') return null
+  return wholeNumber(value, 1024, DEFAULT_STATUS_PORT) > 65_535
+    ? DEFAULT_STATUS_PORT
+    : wholeNumber(value, 1024, DEFAULT_STATUS_PORT)
+}
+
 export function loadConfig(env: Env, home = homedir()): Config {
   const stateDir = env.STATE_DIR || join(home, '.slack-dispatch')
   return {
@@ -42,6 +54,7 @@ export function loadConfig(env: Env, home = homedir()): Config {
     pollIntervalMs: wholeNumber(env.POLL_INTERVAL_SECONDS, 10, DEFAULT_POLL_SECONDS) * 1000,
     ingestDays: wholeNumber(env.INGEST_DAYS, 0, 0),
     prEnabled: env.ENABLE_PR === '1',
+    statusPort: statusPortOf(env.STATUS_PORT),
   }
 }
 
