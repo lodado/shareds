@@ -1,9 +1,12 @@
 // The digest DM: every item that is new since the last digest, one section per item with what was asked, the likely
 // cause, a plan and a recommendation, and a check box on it. The recommended ones arrive already checked, so the
-// owner only has to uncheck what they do not want. Pure functions only — sending the message and reading the click
-// belong to the worker.
+// owner only has to uncheck what they do not want. Under the items the owner picks a model and either starts the
+// usual plan step or builds the plan shown here at once. Pure functions only — sending the message and reading the
+// click belong to the worker.
 
+import type { AgentModel } from '../agent/claude.ts'
 import type { Analysis } from '../triage/analysis.ts'
+import { DEFAULT_MODEL, isAgentModel } from '../agent/claude.ts'
 import { clip, escapeMrkdwn, firstAction, fitText, matchAction } from '../slack/blocks.ts'
 
 export interface DigestEntry {
@@ -41,8 +44,22 @@ interface Checkboxes {
   initial_options?: CheckboxOption[]
 }
 
+interface ModelOption {
+  text: PlainText
+  value: AgentModel
+}
+
+interface ModelSelect {
+  type: 'static_select'
+  action_id: string
+  placeholder: PlainText
+  options: ModelOption[]
+  initial_option: ModelOption
+}
+
 export type ActionElement =
   | Checkboxes
+  | ModelSelect
   | { type: 'button'; action_id: string; text: PlainText; style?: 'primary' | 'danger'; value: string }
 
 export type Block =
@@ -66,10 +83,27 @@ const REPO_SHOWN = 40
 const ROUTE_SHOWN = 60
 const SUMMARY_SHOWN = 300
 
-const ACTION_PATTERN = /^digest\.(plan_selected|plan_all|reject_rest):(\d+)$/
+const ACTION_PATTERN = /^digest\.(plan_selected|build_selected|plan_all|reject_rest):(\d+)$/
 const PICK_PREFIX = 'digest.pick:'
+const MODEL_PREFIX = 'digest.model:'
 
-type DigestAction = 'plan_selected' | 'plan_all' | 'reject_rest'
+type DigestAction = 'plan_selected' | 'build_selected' | 'plan_all' | 'reject_rest'
+
+// The short name of a model in a message to the owner.
+export const MODEL_NAME: Readonly<Record<AgentModel, string>> = {
+  opusplan: '자동',
+  opus: 'Opus',
+  sonnet: 'Sonnet',
+  haiku: 'Haiku',
+}
+
+// What each model choice means, in the words the owner reads in the menu.
+const MODEL_LABEL: Readonly<Record<AgentModel, string>> = {
+  opusplan: '자동 (플랜 Opus, 구현 Sonnet)',
+  opus: 'Opus (플랜과 구현 모두)',
+  sonnet: 'Sonnet (플랜과 구현 모두)',
+  haiku: 'Haiku (플랜과 구현 모두)',
+}
 
 function chunk<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = []
@@ -89,19 +123,42 @@ function recommendation(analysis: Analysis): string {
   return analysis.why === '' ? mark : `${mark} — ${escapeMrkdwn(analysis.why)}`
 }
 
-function bodyLines(entry: DigestEntry): string[] {
+// A paragraph is a label and its lines, each as a bullet, so the owner can read the item at a glance.
+function paragraph(label: string, text: string, maxLines = Number.POSITIVE_INFINITY): string[] {
+  return [
+    `*${label}*`,
+    ...text
+      .split('\n')
+      .slice(0, maxLines)
+      .map((line) => `• ${escapeMrkdwn(line)}`),
+  ]
+}
+
+// How many lines of the request and of the cause an item shows, from all to the least. The plan is never cut: it is
+// what a build at once builds, so the owner must have seen all of it.
+const SHOWN_LINES: readonly { request: number; cause: number }[] = [
+  { request: 4, cause: 4 },
+  { request: 3, cause: 4 },
+  { request: 2, cause: 4 },
+  { request: 1, cause: 4 },
+  { request: 1, cause: 3 },
+  { request: 1, cause: 2 },
+  { request: 1, cause: 1 },
+]
+
+function bodyLines(entry: DigestEntry, shown: { request: number; cause: number }): string[] {
   const { analysis } = entry
   if (analysis === undefined) {
     return [
-      `*요청사항:* ${escapeMrkdwn(clip(entry.summary, SUMMARY_SHOWN))}`,
+      ...paragraph('요청사항', clip(entry.summary, SUMMARY_SHOWN)),
       '_분석을 못 했어요. 원본을 확인해 주세요._',
       '*구현 추천:* X',
     ]
   }
   return [
-    `*요청사항:* ${escapeMrkdwn(analysis.request)}`,
-    `*원인:* ${escapeMrkdwn(analysis.cause)}`,
-    `*개선 플랜:* ${escapeMrkdwn(analysis.plan)}`,
+    ...paragraph('요청사항', analysis.request, shown.request),
+    ...paragraph('원인', analysis.cause, shown.cause),
+    ...paragraph('개선 플랜', analysis.plan),
     `*구현 추천:* ${recommendation(analysis)}`,
   ]
 }
@@ -122,7 +179,10 @@ function checkedWhenRecommended(entry: DigestEntry, option: CheckboxOption): { i
 function itemBlock(digestId: number, index: number, entry: DigestEntry): Block {
   if (entry.itemKey.length > OPTION_VALUE_LIMIT) throw new RangeError(`item key is longer than ${OPTION_VALUE_LIMIT}`)
   const option: CheckboxOption = { text: { type: 'mrkdwn', text: '플랜 시작' }, value: entry.itemKey }
-  const text = [headLine(entry, index + 1), ...bodyLines(entry)].join('\n')
+  const sections = SHOWN_LINES.map((shown) => [headLine(entry, index + 1), ...bodyLines(entry, shown)].join('\n'))
+  // The first that fits; the last one is cut only when even the shortest does not fit, which the limits of the lines
+  // and of the head make impossible for a plan.
+  const text = sections.find((candidate) => candidate.length <= SECTION_TEXT_LIMIT) ?? sections.at(-1) ?? ''
   return {
     type: 'section',
     block_id: `digest:${digestId}:item:${index}`,
@@ -149,6 +209,20 @@ const button = (
   value: String(digestId),
 })
 
+const MODELS: readonly AgentModel[] = ['opusplan', 'opus', 'sonnet', 'haiku']
+
+function modelOption(model: AgentModel): ModelOption {
+  return { text: { type: 'plain_text', text: MODEL_LABEL[model] }, value: model }
+}
+
+const modelSelect = (digestId: number): ModelSelect => ({
+  type: 'static_select',
+  action_id: `${MODEL_PREFIX}${digestId}`,
+  placeholder: { type: 'plain_text', text: '모델 선택' },
+  options: MODELS.map(modelOption),
+  initial_option: modelOption(DEFAULT_MODEL),
+})
+
 export function buildDigest(digestId: number, entries: readonly DigestEntry[]): DigestMessage {
   if (entries.length === 0) throw new RangeError('a digest needs at least one entry')
   if (entries.length > MAX_ENTRIES_PER_DIGEST) {
@@ -166,7 +240,9 @@ export function buildDigest(digestId: number, entries: readonly DigestEntry[]): 
       type: 'actions',
       block_id: `digest:${digestId}:decide`,
       elements: [
+        modelSelect(digestId),
         button('plan_selected', digestId, '선택한 항목 플랜 시작', 'primary'),
+        button('build_selected', digestId, '선택한 항목 바로 구현'),
         button('plan_all', digestId, '전체 플랜 시작'),
         button('reject_rest', digestId, '선택 안 한 항목 기각', 'danger'),
       ],
@@ -176,7 +252,7 @@ export function buildDigest(digestId: number, entries: readonly DigestEntry[]): 
       elements: [
         {
           type: 'mrkdwn',
-          text: '구현을 추천한 항목은 미리 체크해 두었어요. 체크를 바꾼 뒤 "선택한 항목 플랜 시작"을 누르세요. 고르지 않은 항목은 그대로 대기하고, DM에 "대기"라고 보내면 다시 볼 수 있어요.',
+          text: '구현 추천 항목은 미리 체크해 두었어요. 체크와 모델을 고른 뒤 버튼을 누르세요.\n• 플랜 시작: 플랜 모드로 플랜을 만들고, 확인한 뒤 구현\n• 바로 구현: 위 개선 플랜대로 플랜 단계 없이 바로 구현\n고르지 않은 항목은 대기하고, DM에 "대기"라고 보내면 다시 볼 수 있어요.',
         },
       ],
     },
@@ -190,14 +266,14 @@ export function splitDigest(entries: readonly DigestEntry[]): DigestEntry[][] {
 }
 
 export type ParsedAction =
-  | { ok: true; action: DigestAction; digestId: number; selected: string[] }
+  | { ok: true; action: DigestAction; digestId: number; selected: string[]; model: AgentModel }
   | { ok: false; error: string }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
 function isDigestAction(value: string): value is DigestAction {
-  return value === 'plan_selected' || value === 'plan_all' || value === 'reject_rest'
+  return value === 'plan_selected' || value === 'build_selected' || value === 'plan_all' || value === 'reject_rest'
 }
 
 function optionValue(option: unknown): string[] {
@@ -210,20 +286,33 @@ function selectedOptions(element: unknown): string[] {
   return element.selected_options.flatMap(optionValue)
 }
 
+// Every element of the message state whose action id the filter accepts.
+function stateElements(payload: Record<string, unknown>, wanted: (actionId: string) => boolean): unknown[] {
+  const state = payload.state
+  if (!isRecord(state) || !isRecord(state.values)) return []
+  return Object.values(state.values).flatMap((block) =>
+    isRecord(block) ? Object.entries(block).flatMap(([actionId, element]) => (wanted(actionId) ? [element] : [])) : [],
+  )
+}
+
 // What the owner ticked, read from the message state of this digest only. The values are untrusted: the worker
 // must check each one against the items stored for the digest before applying anything.
 function pickedItems(payload: Record<string, unknown>, digestId: number): string[] {
-  const state = payload.state
-  if (!isRecord(state) || !isRecord(state.values)) return []
   const prefix = `${PICK_PREFIX}${digestId}:`
-  const picked = Object.values(state.values).flatMap((block) =>
-    isRecord(block)
-      ? Object.entries(block).flatMap(([actionId, element]) =>
-          actionId.startsWith(prefix) ? selectedOptions(element) : [],
-        )
-      : [],
-  )
+  const picked = stateElements(payload, (actionId) => actionId.startsWith(prefix)).flatMap(selectedOptions)
   return [...new Set(picked)]
+}
+
+function menuValue(element: unknown): unknown {
+  if (!isRecord(element) || !isRecord(element.selected_option)) return undefined
+  return element.selected_option.value
+}
+
+// The model chosen in the menu; the default when the menu was never touched or holds anything unknown.
+function pickedModel(payload: Record<string, unknown>, digestId: number): AgentModel {
+  const [element] = stateElements(payload, (actionId) => actionId === `${MODEL_PREFIX}${digestId}`)
+  const value = menuValue(element)
+  return isAgentModel(value) ? value : DEFAULT_MODEL
 }
 
 export function parseDigestAction(payload: unknown): ParsedAction {
@@ -232,12 +321,18 @@ export function parseDigestAction(payload: unknown): ParsedAction {
   const matched = matchAction(first.actionId, ACTION_PATTERN, isDigestAction, 'a digest action')
   if (!matched.ok) return matched
   const digestId = Number(matched.id)
-  return { ok: true, action: matched.action, digestId, selected: pickedItems(first.payload, digestId) }
+  return {
+    ok: true,
+    action: matched.action,
+    digestId,
+    selected: pickedItems(first.payload, digestId),
+    model: pickedModel(first.payload, digestId),
+  }
 }
 
-// A click on a check box only changes what is ticked; the buttons are what act on it. Told apart here so such a click
-// can be let through without a log row for each tick.
-export function isPickClick(payload: unknown): boolean {
+// A click on a check box or the model menu only changes what is chosen; the buttons are what act on it. Told apart
+// here so such a click can be let through without a log row for each change.
+export function isSelectionClick(payload: unknown): boolean {
   const first = firstAction(payload)
-  return first.ok && first.actionId.startsWith(PICK_PREFIX)
+  return first.ok && (first.actionId.startsWith(PICK_PREFIX) || first.actionId.startsWith(MODEL_PREFIX))
 }

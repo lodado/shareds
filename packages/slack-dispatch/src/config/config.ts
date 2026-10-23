@@ -20,6 +20,8 @@ export interface Config {
   prEnabled: boolean
   // The port of the read-only status address on this machine; null turns it off.
   statusPort: number | null
+  // Whether the plan and the build run with the owner's own claude setup. On unless OWN_SETUP=0.
+  ownSetup: boolean
 }
 
 type Env = Readonly<Record<string, string | undefined>>
@@ -55,6 +57,8 @@ export function loadConfig(env: Env, home = homedir()): Config {
     ingestDays: wholeNumber(env.INGEST_DAYS, 0, 0),
     prEnabled: env.ENABLE_PR === '1',
     statusPort: statusPortOf(env.STATUS_PORT),
+    // Only an exact 1 turns it on: it gives up the protection of `--restricted`, so a typo must not enable it.
+    ownSetup: env.OWN_SETUP === '1',
   }
 }
 

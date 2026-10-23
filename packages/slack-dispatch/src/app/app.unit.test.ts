@@ -268,7 +268,7 @@ describe('createApp as a mention that tags the owner', () => {
     expect(r.agentCalls.map((call) => [call.model, call.mode])).toStrictEqual([['haiku', 'plan']])
     expect(r.agentCalls[0]?.cwd).toBe('/repos/web-app')
     const digest = JSON.stringify(r.posted[0]?.blocks)
-    expect(digest).toContain('*요청사항:* 푸터 링크가 깨졌어요')
+    expect(digest).toContain('• 푸터 링크가 깨졌어요')
     expect(digest).toContain('*구현 추천:* O — 작은 수정')
     expect(digest).toContain('"initial_options"')
 
@@ -279,7 +279,7 @@ describe('createApp as a mention that tags the owner', () => {
     expect(r.agentCalls[1]?.prompt).toContain('<thread>\n[UKIM]')
     expect(r.posted.map((message) => message.text)).toStrictEqual([
       '새 항목 1개 · 구현 추천 1개',
-      '플랜 시작 1개',
+      '플랜 시작 1개 (모델 자동)',
       '플랜: web-app',
     ])
   })

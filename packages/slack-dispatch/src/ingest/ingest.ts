@@ -40,6 +40,8 @@ export interface IngestDeps {
 export interface IngestOptions {
   // Only mentions at or after this moment count.
   since: Date
+  // And only those before this one, when it is given: a look at one past day.
+  until?: Date
   // Do everything except make and send digests. Give it a scratch store: the items it creates stay there.
   dryRun: boolean
   // Automated posts (alerts, reports, reminders) are skipped unless this is set.
@@ -63,10 +65,23 @@ interface Counts {
   skippedUnreadable: number
 }
 
+// A thread that was found and left out of the digest, with the reason, so the owner can still see that it exists.
+export type SkipReason = 'bot' | 'answered' | 'unreadable' | 'known'
+
+export interface SkippedThread {
+  url: string
+  summary: string
+  reason: SkipReason
+}
+
 export interface IngestSummary extends Counts {
+  // Every thread that was found but is not in a digest of this pass.
+  skipped: SkippedThread[]
   mentions: number
   threads: number
   failedThreads: number
+  // Threads found beyond the limit of a pass, left for the next one.
+  cutThreads: number
   sent: SentDigest[]
   // What would have been sent, in a dry run.
   preview: DigestMessage[]
@@ -116,6 +131,23 @@ function groupByThread(matches: readonly MentionMatch[]): Thread[] {
     threads.set(key, thread)
   }
   return [...threads.values()]
+}
+
+const SKIPPED_REASON: Partial<Record<ThreadOutcome, SkipReason>> = {
+  skippedBots: 'bot',
+  handledByOwner: 'answered',
+  skippedUnreadable: 'unreadable',
+  alreadyKnown: 'known',
+}
+
+function skippedOf(thread: Thread, reason: SkipReason): SkippedThread {
+  const first = thread.mentions[0]
+  return { url: first?.permalink ?? '', summary: clip(cleanSlackText(first?.text ?? ''), SUMMARY_LENGTH), reason }
+}
+
+function isInWindow(match: MentionMatch, options: IngestOptions): boolean {
+  const at = Number(match.ts) * 1000
+  return at >= options.since.getTime() && (options.until === undefined || at < options.until.getTime())
 }
 
 // Whether the message that tagged the owner was posted by a program. A search hit has no bot flag, but the thread read
@@ -262,20 +294,30 @@ export async function ingestMentions(deps: IngestDeps, options: IngestOptions): 
     skippedBots: 0,
     skippedUnreadable: 0,
     failedThreads: 0,
+    cutThreads: 0,
+    skipped: [],
     sent: [],
     preview: [],
   }
-  const query = `<@${ownerId}> after:${dateOf(new Date(options.since.getTime() - DAY_MS))}`
+  // A past day is asked for with both ends: a search answers the newest 300 matches, so without `before:` a day long ago
+  // would be looked for among the matches of every day since.
+  const upper = options.until === undefined ? '' : ` before:${dateOf(new Date(options.until.getTime() + DAY_MS))}`
+  const query = `<@${ownerId}> after:${dateOf(new Date(options.since.getTime() - DAY_MS))}${upper}`
   const matches = (await slack.searchMentions(query))
-    .filter((match) => Number(match.ts) * 1000 >= options.since.getTime() && match.user !== ownerId)
+    .filter((match) => isInWindow(match, options) && match.user !== ownerId)
     .toSorted((a, b) => Number(a.ts) - Number(b.ts))
   summary.mentions = matches.length
-  const threads = groupByThread(matches).slice(0, options.maxThreads ?? DEFAULT_MAX_THREADS)
+  const grouped = groupByThread(matches)
+  const threads = grouped.slice(0, options.maxThreads ?? DEFAULT_MAX_THREADS)
   summary.threads = threads.length
+  summary.cutThreads = grouped.length - threads.length
 
   for (const thread of threads) {
     try {
-      summary[await ingestThread(deps, thread, options.includeBots ?? false)] += 1
+      const outcome = await ingestThread(deps, thread, options.includeBots ?? false)
+      summary[outcome] += 1
+      const reason = SKIPPED_REASON[outcome]
+      if (reason !== undefined) summary.skipped.push(skippedOf(thread, reason))
     } catch (error) {
       summary.failedThreads += 1
       logEvent(store, {

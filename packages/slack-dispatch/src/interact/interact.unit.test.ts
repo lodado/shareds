@@ -2,6 +2,7 @@ import type { ItemEvent } from '../machine/machine'
 import type { Store } from '../store/store'
 import type { InteractDeps } from './interact'
 import { afterEach, describe, expect, it } from 'vitest'
+import { redact } from '../store/redact'
 import {
   applyEvent,
   closeStore,
@@ -13,16 +14,21 @@ import {
   listEvents,
   openStore,
 } from '../store/store'
-import { setCardSlackRef } from '../store/work'
+import { beginRun, endRun, saveWorkspace, setCardSlackRef } from '../store/work'
 import { describeQueue, handleInteractive, handleMessage } from './interact'
 
 const OWNER = 'UOWNER'
 const OTHER = 'UOTHER'
 const HEAD = '0123456789abcdef0123456789abcdef01234567'
+const SESSION = '11111111-1111-4111-8111-111111111111'
 const DM = 'D1'
+
+// The time the service sees, in milliseconds; a test moves it to let a run get older.
+const clock = { now: Date.parse('2026-10-23T07:00:00.000Z') }
 
 const opened: Store[] = []
 afterEach(() => {
+  clock.now = Date.parse('2026-10-23T07:00:00.000Z')
   for (const store of opened.splice(0)) closeStore(store)
 })
 
@@ -48,10 +54,11 @@ interface Overrides {
   checkGate?: InteractDeps['checkGate']
   mergePr?: InteractDeps['mergePr']
   retries?: boolean
+  catchUp?: InteractDeps['catchUp']
 }
 
 function harness(overrides: Overrides = {}): Harness {
-  const store = openStore(':memory:')
+  const store = openStore(':memory:', { now: () => new Date(clock.now) })
   opened.push(store)
   const posted: Posted[] = []
   const aborted: string[] = []
@@ -82,7 +89,9 @@ function harness(overrides: Overrides = {}): Harness {
     abortWork: (itemKey) => {
       aborted.push(itemKey)
     },
+    catchUp: overrides.catchUp ?? (() => Promise.reject(new Error('no catch-up in this test'))),
     locks: new Set(),
+    now: () => clock.now,
   }
   return { deps, store, posted, aborted, merged, pinned }
 }
@@ -113,7 +122,15 @@ function waiting(store: Store, repo: string, n = 1): string {
   return key(repo, n)
 }
 
-function digestClick(action: string, digestId: number, picked: readonly string[], user = OWNER): unknown {
+// `model` is what the model menu of the digest holds; the menu is left untouched when it is not given.
+function digestClick(
+  action: string,
+  digestId: number,
+  picked: readonly string[],
+  user = OWNER,
+  model?: string,
+): unknown {
+  const menu = model === undefined ? {} : { [`digest.model:${digestId}`]: { selected_option: { value: model } } }
   return {
     type: 'block_actions',
     user: { id: user },
@@ -124,9 +141,31 @@ function digestClick(action: string, digestId: number, picked: readonly string[]
         block: {
           [`digest.pick:${digestId}:0`]: { type: 'checkboxes', selected_options: picked.map((value) => ({ value })) },
         },
+        decide: menu,
       },
     },
   }
+}
+
+const ANALYSIS = {
+  request: '푸터 링크 클릭해도 이동 안 함',
+  cause: 'footer.tsx의 href 오타',
+  plan: 'footer.tsx의 href 수정',
+  recommend: true,
+  why: '',
+}
+
+// A mention waiting in a digest that the cheapest model has read.
+function analysed(store: Store, repo: string, n = 1): string {
+  createItems(store, thread(n), [repo], { meta: { [repo]: { summary: `summary ${repo} ${n}`, analysis: ANALYSIS } } })
+  advance(store, key(repo, n), TO_NOTIFIED)
+  return key(repo, n)
+}
+
+// The choice saved on an item; a field that was never saved is left out.
+const metaOf = (store: Store, itemKey: string): Record<string, unknown> => {
+  const { model, direct } = getItem(store, itemKey)?.meta ?? {}
+  return Object.fromEntries(Object.entries({ model, direct }).filter(([, value]) => value !== undefined))
 }
 
 function itemClick(action: string, cardId: number, itemKey: string, user = OWNER): unknown {
@@ -155,7 +194,7 @@ describe('handleInteractive as a click on a digest', () => {
     const id = createDigest(store, [a, b])
     await handleInteractive(deps, digestClick('plan_selected', id, [a]))
     expect([stageOf(store, a), stageOf(store, b)]).toStrictEqual(['planning', 'notified'])
-    expect(posted).toStrictEqual([{ channel: DM, text: '플랜 시작 1개', threadTs: '9.9' }])
+    expect(posted).toStrictEqual([{ channel: DM, text: '플랜 시작 1개 (모델 자동)', threadTs: '9.9' }])
   })
 
   it('to be unmoved by a tick for an item that is in another digest', async () => {
@@ -166,7 +205,7 @@ describe('handleInteractive as a click on a digest', () => {
     createDigest(store, [b])
     await handleInteractive(deps, digestClick('plan_selected', first, [a, b]))
     expect([stageOf(store, a), stageOf(store, b)]).toStrictEqual(['planning', 'notified'])
-    expect(posted[0]?.text).toBe('플랜 시작 1개')
+    expect(posted[0]?.text).toBe('플랜 시작 1개 (모델 자동)')
     const logged = listEvents(store).find((event) => event.type === 'digest_plan_selected')
     expect(JSON.parse(logged?.payload ?? '{}')).toMatchObject({ selected: [a], ignored: 1 })
   })
@@ -178,7 +217,7 @@ describe('handleInteractive as a click on a digest', () => {
     const id = createDigest(store, [a, b])
     await handleInteractive(deps, digestClick('plan_all', id, []))
     expect([stageOf(store, a), stageOf(store, b)]).toStrictEqual(['planning', 'notified'])
-    expect(posted[0]?.text).toBe('플랜 시작 1개, 레포를 못 정해서 대기 1개 (DM으로 레포를 알려주세요)')
+    expect(posted[0]?.text).toBe('플랜 시작 1개 (모델 자동), 레포를 못 정해서 대기 1개 (DM으로 레포를 알려주세요)')
   })
 
   it('to be a hint and no change when nothing was ticked', async () => {
@@ -198,9 +237,107 @@ describe('handleInteractive as a click on a digest', () => {
     await handleInteractive(deps, digestClick('plan_selected', id, [a]))
     expect(stageOf(store, a)).toBe('planning')
     expect(posted.map((message) => message.text)).toStrictEqual([
-      '플랜 시작 1개',
-      '플랜 시작 0개, 이미 처리된 항목 1개',
+      '플랜 시작 1개 (모델 자동)',
+      '플랜 시작 0개 (모델 자동), 이미 처리된 항목 1개',
     ])
+  })
+
+  it('to be the model from the menu saved on the item before it starts planning', async () => {
+    const { deps, store, posted } = harness()
+    const a = waiting(store, 'web-app')
+    const id = createDigest(store, [a])
+    await handleInteractive(deps, digestClick('plan_selected', id, [a], OWNER, 'sonnet'))
+    expect(metaOf(store, a)).toStrictEqual({ model: 'sonnet', direct: false })
+    expect(stageOf(store, a)).toBe('planning')
+    expect(posted[0]?.text).toBe('플랜 시작 1개 (모델 Sonnet)')
+  })
+
+  it('to be the automatic model when the menu holds one that is not on offer', async () => {
+    const { deps, store } = harness()
+    const a = waiting(store, 'web-app')
+    const id = createDigest(store, [a])
+    await handleInteractive(deps, digestClick('plan_selected', id, [a], OWNER, 'gpt-9'))
+    expect(metaOf(store, a)).toStrictEqual({ model: 'opusplan', direct: false })
+  })
+
+  it('to be the model on every item that plan_all starts', async () => {
+    const { deps, store } = harness()
+    const a = waiting(store, 'web-app', 1)
+    const b = waiting(store, 'api-server', 2)
+    const id = createDigest(store, [a, b])
+    await handleInteractive(deps, digestClick('plan_all', id, [], OWNER, 'opus'))
+    expect([metaOf(store, a), metaOf(store, b)]).toStrictEqual([
+      { model: 'opus', direct: false },
+      { model: 'opus', direct: false },
+    ])
+  })
+
+  it('to be a build at once for the ticked item: it plans, and the digest plan is what gets built', async () => {
+    const { deps, store, posted } = harness()
+    const a = analysed(store, 'web-app', 1)
+    const b = analysed(store, 'api-server', 2)
+    const id = createDigest(store, [a, b])
+    await handleInteractive(deps, digestClick('build_selected', id, [a], OWNER, 'haiku'))
+    expect(metaOf(store, a)).toStrictEqual({ model: 'haiku', direct: true })
+    expect(metaOf(store, b)).toStrictEqual({})
+    expect([stageOf(store, a), stageOf(store, b)]).toStrictEqual(['planning', 'notified'])
+    expect(posted[0]?.text).toBe('바로 구현 1개 (모델 Haiku)')
+  })
+
+  it('to be the usual plan step, and a note, for an item the model could not read', async () => {
+    const { deps, store, posted } = harness()
+    const a = waiting(store, 'web-app')
+    const id = createDigest(store, [a])
+    await handleInteractive(deps, digestClick('build_selected', id, [a]))
+    expect(metaOf(store, a)).toStrictEqual({ model: 'opusplan', direct: false })
+    expect(stageOf(store, a)).toBe('planning')
+    expect(posted[0]?.text).toBe('바로 구현 0개 (모델 자동), 분석된 플랜이 없어 플랜부터 시작 1개')
+  })
+
+  it('to be counted per item: one built at once and one that plans first, each only when it moved', async () => {
+    const { deps, store, posted } = harness()
+    const read = analysed(store, 'web-app', 1)
+    const unread = waiting(store, 'api-server', 2)
+    const id = createDigest(store, [read, unread])
+    await handleInteractive(deps, digestClick('build_selected', id, [read, unread]))
+    expect(posted[0]?.text).toBe('바로 구현 1개 (모델 자동), 분석된 플랜이 없어 플랜부터 시작 1개')
+    // The same click again: both are settled, and the one without a plan is not counted as starting.
+    await handleInteractive(deps, digestClick('build_selected', id, [read, unread]))
+    expect(posted[1]?.text).toBe('바로 구현 0개 (모델 자동), 이미 처리된 항목 2개')
+  })
+
+  it('to be the choice of the first click kept when a second click names another model', async () => {
+    const { deps, store } = harness()
+    const a = analysed(store, 'web-app')
+    const id = createDigest(store, [a])
+    await handleInteractive(deps, digestClick('build_selected', id, [a], OWNER, 'haiku'))
+    await handleInteractive(deps, digestClick('plan_selected', id, [a], OWNER, 'opus'))
+    expect(metaOf(store, a)).toStrictEqual({ model: 'haiku', direct: true })
+  })
+
+  it('to be a hint and no change when nothing was ticked for a build at once', async () => {
+    const { deps, store, posted } = harness()
+    const a = analysed(store, 'web-app')
+    const id = createDigest(store, [a])
+    await handleInteractive(deps, digestClick('build_selected', id, []))
+    expect(stageOf(store, a)).toBe('notified')
+    expect(posted[0]?.text).toBe('고른 항목이 없어요. 체크박스로 항목을 고른 뒤 눌러주세요.')
+  })
+
+  it('to be unlogged and unanswered for a choice in the model menu', async () => {
+    const { deps, store, posted } = harness()
+    const a = waiting(store, 'web-app')
+    const id = createDigest(store, [a])
+    const before = listEvents(store).length
+    await handleInteractive(deps, {
+      type: 'block_actions',
+      user: { id: OWNER },
+      container: { channel_id: DM, message_ts: '9.9' },
+      actions: [{ action_id: `digest.model:${id}`, selected_option: { value: 'opus' } }],
+    })
+    expect(posted).toHaveLength(0)
+    expect(listEvents(store)).toHaveLength(before)
+    expect(stageOf(store, a)).toBe('notified')
   })
 
   it('to be a message for a digest that does not exist', async () => {
@@ -276,6 +413,21 @@ describe('handleInteractive as a click on an item card', () => {
     await handleInteractive(deps, itemClick('approve_plan', card, a))
     expect(stageOf(store, a)).toBe('implementing')
     expect(posted[0]?.text).toBe('구현을 시작할게요.')
+  })
+
+  it('to be told where the work happens when the build starts and the item has a workspace', async () => {
+    const { deps, store, posted } = harness()
+    const a = key('web-app')
+    createItems(store, thread(1), ['web-app'])
+    advance(store, a, TO_PLANNED)
+    saveWorkspace(store, a, {
+      sessionId: SESSION,
+      path: '/wt/dispatch-a',
+      branch: 'me/dispatch-a',
+      baseRef: 'origin/develop',
+    })
+    await handleInteractive(deps, itemClick('approve_plan', issueCard(store, a, 'plan'), a))
+    expect(posted[0]?.text).toBe('구현을 시작할게요.\n• 작업 위치: `/wt/dispatch-a`\n• 브랜치: `me/dispatch-a`')
   })
 
   it('to be refused as old when a newer plan card exists', async () => {
@@ -474,6 +626,109 @@ describe('handleMessage as a DM to the bot', () => {
   })
 })
 
+const summaryOf = (overrides: Partial<Awaited<ReturnType<InteractDeps['catchUp']>>['summary']> = {}) => ({
+  created: 0,
+  alreadyKnown: 0,
+  handledByOwner: 0,
+  skippedBots: 0,
+  skippedUnreadable: 0,
+  failedThreads: 0,
+  cutThreads: 0,
+  skipped: [],
+  mentions: 0,
+  threads: 0,
+  sent: [],
+  preview: [],
+  ...overrides,
+})
+
+describe('handleMessage as a DM that asks for a past day', () => {
+  function asking(
+    result: Awaited<ReturnType<InteractDeps['catchUp']>> | Error = { day: '10/22', summary: summaryOf() },
+  ) {
+    const days: number[] = []
+    const h = harness({
+      catchUp: (daysAgo) => {
+        days.push(daysAgo)
+        return result instanceof Error ? Promise.reject(result) : Promise.resolve(result)
+      },
+    })
+    return { ...h, days }
+  }
+
+  it.each([
+    ['오늘', 0],
+    ['어제', 1],
+    ['그제', 2],
+    ['그저께', 2],
+    ['3일 전', 3],
+    ['3 일 전', 3],
+    ['30일 전', 30],
+  ])('to be %s looked at as %i days ago', async (text, days) => {
+    const h = asking()
+    await handleMessage(h.deps, dm(` ${text} `))
+    expect(h.days).toStrictEqual([days])
+  })
+
+  it.each(['31일 전', '99일 전', '어제 거', '일 전', '-1일 전', '어제?'])('to be no command: %j', async (text) => {
+    const h = asking()
+    await handleMessage(h.deps, dm(text))
+    expect(h.days).toStrictEqual([])
+  })
+
+  it('to be a note before the search and a count after it, with the new items said first', async () => {
+    const h = asking({ day: '10/22', summary: summaryOf({ created: 2, threads: 5, skipped: [], sent: [] }) })
+    await handleMessage(h.deps, dm('어제'))
+    expect(h.posted.map((message) => message.text)).toStrictEqual([
+      '그날 태그된 쓰레드를 찾는 중이에요. 항목마다 읽어서 정리하느라 몇 분 걸릴 수 있어요.',
+      '10/22에 태그된 쓰레드 5개: 새 항목 2개는 위 목록에 있어요, 뺀 쓰레드 0개.',
+    ])
+  })
+
+  it('to be "nothing new" when no item was made, even if an older digest went out again', async () => {
+    const sent = [{ digestId: 1, count: 1, slackRef: 'D1:1.5' }]
+    const h = asking({ day: '10/22', summary: summaryOf({ created: 0, threads: 1, sent }) })
+    await handleMessage(h.deps, dm('어제'))
+    expect(h.posted[1]?.text).toBe('10/22에 태그된 쓰레드 1개: 새로 판단할 항목은 없어요, 뺀 쓰레드 0개.')
+  })
+
+  it('to be the failure said without a token in it', async () => {
+    const secret = 'xoxb-123456789-abcdefghij'
+    const message = `search failed with ${secret}`
+    const h = asking(new Error(message))
+    await handleMessage(h.deps, dm('어제'))
+    expect(h.posted[1]?.text).toBe(`찾지 못했어요: ${redact(message)}`)
+    expect(h.posted[1]?.text).not.toContain(secret)
+  })
+})
+
+describe('handleInteractive as the retry of a failed item', () => {
+  const failedItem = (store: Store, direct: boolean): string => {
+    const a = key('web-app')
+    createItems(store, thread(1), ['web-app'], { meta: { 'web-app': { summary: 's', direct } } })
+    advance(store, a, [{ type: 'triage', handled: false, confident: true }, { type: 'abort' }])
+    return a
+  }
+
+  it.each([
+    [false, '다시 플랜부터 시작할게요.'],
+    [true, '다시 구현할게요.'],
+  ])('to be said as it goes on: direct=%s', async (direct, text) => {
+    const { deps, store, posted } = harness()
+    const a = failedItem(store, direct)
+    await handleInteractive(deps, itemClick('retry', 0, a))
+    expect(stageOf(store, a)).toBe('planning')
+    expect(posted[0]?.text).toBe(text)
+  })
+
+  it('to be refused when no tries are left', async () => {
+    const { deps, store, posted } = harness({ retries: false })
+    const a = failedItem(store, true)
+    await handleInteractive(deps, itemClick('retry', 0, a))
+    expect(posted[0]?.text).toBe('다시 시도할 수 없어요.')
+  })
+})
+
 describe('handleMessage as a reply under a plan card', () => {
   function plannedWithCard(h: Harness): string {
     const a = key('web-app')
@@ -501,7 +756,49 @@ describe('handleMessage as a reply under a plan card', () => {
     await handleMessage(h.deps, dm('too late', { thread_ts: '50.5' }))
     expect(stageOf(h.store, a)).toBe('implementing')
     expect(h.aborted).toStrictEqual([])
-    expect(h.posted[0]?.text).toBe('이 플랜은 지금 수정할 수 없어요.')
+    expect(h.posted[0]?.text).toContain("지금은 '구현 중' 단계라 플랜을 수정할 수 없어요.")
+  })
+
+  it('to be the progress of the build: minutes so far, the folder, the branch and the cost', async () => {
+    const h = harness()
+    const a = plannedWithCard(h)
+    saveWorkspace(h.store, a, {
+      sessionId: SESSION,
+      path: '/wt/dispatch-a',
+      branch: 'me/dispatch-a',
+      baseRef: 'origin/develop',
+    })
+    beginRun(h.store, a, 'plan', { registered: true, allowed: true, valid: true })
+    endRun(h.store, 1, { type: 'finish', ok: true, valid: true }, { costUsd: 0.63 })
+    advance(h.store, a, [{ type: 'approve', owner: true, card: 'plan', fresh: true }])
+    beginRun(h.store, a, 'build', { registered: true, allowed: true, valid: true })
+    clock.now += 29 * 60_000
+    await handleMessage(h.deps, dm('구현다됨?', { thread_ts: '50.5' }))
+    expect(h.posted[0]?.text).toBe(
+      [
+        "지금은 '구현 중' 단계라 플랜을 수정할 수 없어요.",
+        '• 구현 29분째 진행 중',
+        '• 지금까지 쓴 비용: $0.63',
+        '• 작업 위치: `/wt/dispatch-a`',
+        '• 브랜치: `me/dispatch-a`',
+        '끝나면 DM에 새 메시지로 알려드려요.',
+      ].join('\n'),
+    )
+  })
+
+  it.each([
+    ['pr_open', 'PR 머지 대기'],
+    ['failed', '실패'],
+    ['declined', '기각됨'],
+  ] as const)('to be said as a state, with nothing to wait for, when the item is %s', async (stage, label) => {
+    const h = harness()
+    const a = plannedWithCard(h)
+    const rows = h.store.db.prepare('UPDATE items SET stage = ? WHERE key = ?')
+    rows.run(stage, a)
+    await handleMessage(h.deps, dm('어떻게 됐어?', { thread_ts: '50.5' }))
+    const text = h.posted[0]?.text ?? ''
+    expect(text).toContain(`이 항목은 지금 '${label}' 상태라 플랜을 수정할 수 없어요.`)
+    expect(text).not.toContain('끝나면 DM에')
   })
 
   it('to be a hint when the thread is not a plan card', async () => {
@@ -627,7 +924,7 @@ describe('handleMessage as a reply under a plan card that cannot be revised', ()
     advance(h.store, a, [...TO_PLANNED, { type: 'approve', owner: true, card: 'plan', fresh: true }])
     setCardSlackRef(h.store, issueCard(h.store, a, 'plan'), `${DM}:50.5`)
     await handleMessage(h.deps, dm('too late', { thread_ts: '50.5' }))
-    expect(h.posted[0]?.text).toBe('이 플랜은 지금 수정할 수 없어요.')
+    expect(h.posted[0]?.text).toContain('플랜을 수정할 수 없어요.')
     expect(listEvents(h.store, { itemKey: a }).filter((event) => event.type === 'revise_text')).toStrictEqual([])
   })
 })

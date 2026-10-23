@@ -1,11 +1,11 @@
-import type { Block, DigestEntry } from './digest'
+import type { ActionElement, Block, DigestEntry } from './digest'
 import { describe, expect, it } from 'vitest'
-import { buildDigest, isPickClick, MAX_ENTRIES_PER_DIGEST, parseDigestAction, splitDigest } from './digest'
+import { buildDigest, isSelectionClick, MAX_ENTRIES_PER_DIGEST, parseDigestAction, splitDigest } from './digest'
 
 const analysis = {
-  request: '푸터 링크가 깨져서 눌러도 이동하지 않아요',
-  cause: 'footer.tsx의 href 오타로 보여요',
-  plan: 'href를 고치고 링크 테스트를 추가해요',
+  request: '푸터 링크 클릭해도 이동 안 함\n모바일과 데스크톱 모두 발생',
+  cause: 'footer.tsx의 href 오타',
+  plan: 'footer.tsx의 href 수정\n링크 이동 테스트 추가',
   recommend: true,
   why: '작고 분명한 수정이에요',
 }
@@ -33,6 +33,11 @@ const many = (count: number, overrides: Partial<DigestEntry> = {}): DigestEntry[
 type Section = Extract<Block, { type: 'section' }>
 
 const sectionsOf = (blocks: Block[]): Section[] => blocks.flatMap((block) => (block.type === 'section' ? [block] : []))
+
+const optionValues = (element: ActionElement | undefined): string[] => {
+  if (element?.type !== 'static_select') return []
+  return element.options.map((option) => option.value)
+}
 
 const buttonsOf = (blocks: Block[]): { action_id: string; style: string | null; label: string }[] =>
   blocks.flatMap((block) =>
@@ -65,16 +70,26 @@ describe('buildDigest as three new items, two of them recommended', () => {
     expect(sectionsOf(message.blocks).map((section) => section.text.text)).toStrictEqual([
       [
         '*1. web-app*  <https://example.slack.com/archives/C1/p1|원본 쓰레드>  _the PR link names web-app_',
-        '*요청사항:* 푸터 링크가 깨져서 눌러도 이동하지 않아요',
-        '*원인:* footer.tsx의 href 오타로 보여요',
-        '*개선 플랜:* href를 고치고 링크 테스트를 추가해요',
+        '*요청사항*',
+        '• 푸터 링크 클릭해도 이동 안 함',
+        '• 모바일과 데스크톱 모두 발생',
+        '*원인*',
+        '• footer.tsx의 href 오타',
+        '*개선 플랜*',
+        '• footer.tsx의 href 수정',
+        '• 링크 이동 테스트 추가',
         '*구현 추천:* O — 작고 분명한 수정이에요',
       ].join('\n'),
       [
         '*2. web-app*  <https://example.slack.com/archives/C1/p2|원본 쓰레드>  _the PR link names web-app_',
-        '*요청사항:* 푸터 링크가 깨져서 눌러도 이동하지 않아요',
-        '*원인:* footer.tsx의 href 오타로 보여요',
-        '*개선 플랜:* href를 고치고 링크 테스트를 추가해요',
+        '*요청사항*',
+        '• 푸터 링크 클릭해도 이동 안 함',
+        '• 모바일과 데스크톱 모두 발생',
+        '*원인*',
+        '• footer.tsx의 href 오타',
+        '*개선 플랜*',
+        '• footer.tsx의 href 수정',
+        '• 링크 이동 테스트 추가',
         '*구현 추천:* X — 제품 결정이 필요해요',
       ].join('\n'),
       expect.stringContaining('*3. web-app* :rotating_light:  <https://example.slack.com/archives/C1/p3|원본 쓰레드>'),
@@ -110,14 +125,26 @@ describe('buildDigest as three new items, two of them recommended', () => {
     ])
   })
 
-  it('to be three buttons that name the digest, then a note about the boxes that arrived checked', () => {
+  it('to be four buttons that name the digest, then a note about the boxes that arrived checked', () => {
     expect(buttonsOf(message.blocks)).toStrictEqual([
       { action_id: 'digest.plan_selected:4', style: 'primary', label: '선택한 항목 플랜 시작' },
+      { action_id: 'digest.build_selected:4', style: null, label: '선택한 항목 바로 구현' },
       { action_id: 'digest.plan_all:4', style: null, label: '전체 플랜 시작' },
       { action_id: 'digest.reject_rest:4', style: 'danger', label: '선택 안 한 항목 기각' },
     ])
     const note = message.blocks.at(-1)
-    expect(JSON.stringify(note)).toContain('구현을 추천한 항목은 미리 체크해 두었어요')
+    expect(JSON.stringify(note)).toContain('구현 추천 항목은 미리 체크해 두었어요')
+  })
+
+  it('to be a model menu in front of the buttons that starts on the automatic choice and offers four models', () => {
+    const actions = message.blocks.find((block) => block.type === 'actions')
+    const menu = actions?.elements[0]
+    expect(menu).toMatchObject({
+      type: 'static_select',
+      action_id: 'digest.model:4',
+      initial_option: { value: 'opusplan' },
+    })
+    expect(optionValues(menu)).toStrictEqual(['opusplan', 'opus', 'sonnet', 'haiku'])
   })
 })
 
@@ -144,7 +171,8 @@ describe('buildDigest as an item the model could not read', () => {
 
   it('to be the plain summary with a note, recommended as no', () => {
     expect(section?.text.text.split('\n').slice(1)).toStrictEqual([
-      '*요청사항:* The footer link is broken',
+      '*요청사항*',
+      '• The footer link is broken',
       '_분석을 못 했어요. 원본을 확인해 주세요._',
       '*구현 추천:* X',
     ])
@@ -172,9 +200,9 @@ describe('buildDigest as text that must stay text', () => {
     ])
     const text = sectionsOf(message.blocks)[0]?.text.text ?? ''
     expect(text).toContain('*1. &lt;!here&gt;*')
-    expect(text).toContain('*요청사항:* &lt;!channel&gt; &amp; &lt;@U1&gt;')
-    expect(text).toContain('*원인:* &lt;https://evil.test|x&gt;')
-    expect(text).toContain('*개선 플랜:* &gt;quote')
+    expect(text).toContain('• &lt;!channel&gt; &amp; &lt;@U1&gt;')
+    expect(text).toContain('• &lt;https://evil.test|x&gt;')
+    expect(text).toContain('• &gt;quote')
     expect(text).toContain('*구현 추천:* O — &lt;b&gt;')
     expect(text).not.toContain('<!')
     expect(text).not.toContain('<@')
@@ -182,7 +210,7 @@ describe('buildDigest as text that must stay text', () => {
 
   it('to be a fallback summary that cannot make a link either', () => {
     const message = buildDigest(1, [unread(1, { summary: 'see <https://evil.test|here>' })])
-    expect(sectionsOf(message.blocks)[0]?.text.text).toContain('*요청사항:* see &lt;https://evil.test|here&gt;')
+    expect(sectionsOf(message.blocks)[0]?.text.text).toContain('• see &lt;https://evil.test|here&gt;')
   })
 
   it('to be an item with no thread: no link, and no route when there is none', () => {
@@ -198,15 +226,43 @@ describe('buildDigest as text that must stay text', () => {
         route: worst,
         summary: worst,
         analysis: {
-          request: '<'.repeat(150),
-          cause: '<'.repeat(180),
-          plan: '<'.repeat(250),
+          request: Array.from({ length: 4 }, () => '<'.repeat(70)).join('\n'),
+          cause: Array.from({ length: 4 }, () => '<'.repeat(70)).join('\n'),
+          plan: Array.from({ length: 4 }, () => '<'.repeat(70)).join('\n'),
           recommend: true,
           why: '<'.repeat(80),
         },
       }),
     ])
     expect(sectionsOf(message.blocks)[0]?.text.text.length).toBeLessThanOrEqual(3000)
+  })
+})
+
+describe('buildDigest as paragraphs that together do not fit a section', () => {
+  const lines = (text: string): string => Array.from({ length: 4 }, () => text.repeat(70)).join('\n')
+
+  it.each(['&', '<', '>'])(
+    'to be the whole plan, with lines of the request and the cause dropped, for %s everywhere',
+    (mark) => {
+      const full = {
+        request: lines(mark),
+        cause: lines(mark),
+        plan: lines(mark),
+        recommend: true,
+        why: mark.repeat(80),
+      }
+      const text = sectionsOf(buildDigest(1, [entry(1, { analysis: full })]).blocks)[0]?.text.text ?? ''
+      expect(text.length).toBeLessThanOrEqual(3000)
+      expect(text).not.toContain('이하 생략')
+      const plan = text.split('*개선 플랜*\n')[1]?.split('\n*구현 추천:*')[0] ?? ''
+      expect(plan.split('\n')).toHaveLength(4)
+    },
+  )
+
+  it('to be every line of everything when it fits', () => {
+    const text = sectionsOf(buildDigest(1, [entry(1)]).blocks)[0]?.text.text ?? ''
+    expect(text).toContain('• 모바일과 데스크톱 모두 발생')
+    expect(text).toContain('• 링크 이동 테스트 추가')
   })
 })
 
@@ -242,14 +298,16 @@ describe('splitDigest as items that arrived in one poll', () => {
   })
 })
 
-describe('isPickClick as a tick in a check box', () => {
-  it('to be true for a click on a pick box and false for a button or anything else', () => {
+describe('isSelectionClick as a tick in a check box or a choice in the model menu', () => {
+  it('to be true for a click on a pick box or the model menu and false for a button or anything else', () => {
     const click = (actionId: unknown): unknown => ({ type: 'block_actions', actions: [{ action_id: actionId }] })
-    expect(isPickClick(click('digest.pick:7:2'))).toBe(true)
-    expect(isPickClick(click('digest.plan_all:7'))).toBe(false)
-    expect(isPickClick(click('item.merge:0'))).toBe(false)
-    expect(isPickClick(click(5))).toBe(false)
-    expect(isPickClick(null)).toBe(false)
+    expect(isSelectionClick(click('digest.pick:7:2'))).toBe(true)
+    expect(isSelectionClick(click('digest.model:7'))).toBe(true)
+    expect(isSelectionClick(click('digest.build_selected:7'))).toBe(false)
+    expect(isSelectionClick(click('digest.plan_all:7'))).toBe(false)
+    expect(isSelectionClick(click('item.merge:0'))).toBe(false)
+    expect(isSelectionClick(click(5))).toBe(false)
+    expect(isSelectionClick(null)).toBe(false)
   })
 })
 
@@ -277,6 +335,7 @@ describe('parseDigestAction as the click on a digest button', () => {
       action: 'plan_selected',
       digestId: 7,
       selected: ['T1#web-app', 'T2#web-app', 'T3#api-server'],
+      model: 'opusplan',
     })
   })
 
@@ -297,6 +356,7 @@ describe('parseDigestAction as the click on a digest button', () => {
       action: 'reject_rest',
       digestId: 8,
       selected: ['NEW#web-app'],
+      model: 'opusplan',
     })
   })
 
@@ -306,13 +366,43 @@ describe('parseDigestAction as the click on a digest button', () => {
       action: 'plan_all',
       digestId: 3,
       selected: [],
+      model: 'opusplan',
     })
     expect(parseDigestAction({ type: 'block_actions', actions: [{ action_id: 'digest.plan_all:3' }] })).toEqual({
       ok: true,
       action: 'plan_all',
       digestId: 3,
       selected: [],
+      model: 'opusplan',
     })
+  })
+
+  it('to be the build-now action with the model chosen in the menu of that digest', () => {
+    const payload = clickPayload('digest.build_selected:7', {
+      'digest:7:decide': { 'digest.model:7': { type: 'static_select', selected_option: { value: 'sonnet' } } },
+    })
+    expect(parseDigestAction(payload)).toMatchObject({
+      ok: true,
+      action: 'build_selected',
+      digestId: 7,
+      model: 'sonnet',
+    })
+  })
+
+  it.each([
+    ['a model nobody offered', { selected_option: { value: 'gpt-9' } }],
+    ['a value that is not text', { selected_option: { value: 5 } }],
+    ['a menu with nothing chosen', { selected_option: null }],
+  ])('to be the automatic model for %s', (_name, element) => {
+    const payload = clickPayload('digest.plan_all:7', { 'digest:7:decide': { 'digest.model:7': element } })
+    expect(parseDigestAction(payload)).toMatchObject({ ok: true, model: 'opusplan' })
+  })
+
+  it('to be the model of the clicked digest only, not one whose id starts the same', () => {
+    const payload = clickPayload('digest.plan_all:7', {
+      'digest:70:decide': { 'digest.model:70': { selected_option: { value: 'haiku' } } },
+    })
+    expect(parseDigestAction(payload)).toMatchObject({ ok: true, model: 'opusplan' })
   })
 
   it('to be ticks that are strings only', () => {

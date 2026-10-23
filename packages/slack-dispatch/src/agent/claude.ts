@@ -12,7 +12,14 @@ import { redact } from '../store/redact.ts'
 type AgentMode = 'plan' | 'build' | 'text' | 'qa'
 
 // opusplan plans on the strongest model and builds on the cheaper one inside the same session.
-type AgentModel = 'opusplan' | 'sonnet' | 'haiku'
+const AGENT_MODELS = ['opusplan', 'opus', 'sonnet', 'haiku'] as const
+export type AgentModel = (typeof AGENT_MODELS)[number]
+
+export const DEFAULT_MODEL: AgentModel = 'opusplan'
+
+const MODEL_NAMES: ReadonlySet<unknown> = new Set(AGENT_MODELS)
+
+export const isAgentModel = (value: unknown): value is AgentModel => MODEL_NAMES.has(value)
 
 export interface AgentCall {
   cwd: string
@@ -25,6 +32,8 @@ export interface AgentCall {
   maxBudgetUsd: number
   timeoutMs: number
   signal?: AbortSignal
+  // Run with the owner's own claude setup: their CLAUDE.md, skills, plugins, hooks and MCP servers, and the repository's.
+  ownSetup?: boolean
 }
 
 export interface AgentResult {
@@ -75,19 +84,65 @@ const BUILD_TOOLS = [
 // pull request, run anything, so a change there is for the owner to make.
 const NEVER_CHANGED = ['Edit(.husky/**)', 'Write(.husky/**)', 'Edit(.github/**)', 'Write(.github/**)']
 
-const MODE_FLAGS: Record<AgentMode, readonly string[]> = {
-  plan: ['--permission-mode', 'plan', '--allowedTools', READ_TOOLS.join(',')],
-  build: [
-    '--permission-mode',
-    'acceptEdits',
-    '--allowedTools',
-    BUILD_TOOLS.join(','),
-    '--disallowedTools',
-    NEVER_CHANGED.join(','),
-  ],
-  text: ['--permission-mode', 'plan', '--allowedTools', READ_TOOLS.join(',')],
-  qa: ['--permission-mode', 'plan', '--allowedTools', 'Read'],
+const MODE_TOOLS: Record<AgentMode, readonly string[]> = {
+  plan: READ_TOOLS,
+  build: BUILD_TOOLS,
+  text: READ_TOOLS,
+  qa: ['Read'],
 }
+
+const MODE_PERMISSION: Record<AgentMode, 'plan' | 'acceptEdits'> = {
+  plan: 'plan',
+  build: 'acceptEdits',
+  text: 'plan',
+  qa: 'plan',
+}
+
+// With the owner's own setup the model may use the owner's skills and start helpers, and in a headless run a tool that
+// is not listed is refused, so both have to be.
+const OWN_SETUP_TOOLS = ['Skill', 'Agent']
+
+// Commands that reach a remote, the keychain or another program's windows. Only a second line of defence: with the
+// owner's own setup the owner's settings are loaded, and a rule there such as `allow: ["Bash"]` lets every command run
+// no matter what `--allowedTools` says (checked live, 2026-10-23). A deny rule beats an allow rule, but any program
+// that runs what it is given gets around a list of names, so this is no boundary.
+const OWN_SETUP_DENY = [
+  'Bash(git push:*)',
+  'Bash(git remote:*)',
+  'Bash(gh:*)',
+  'Bash(curl:*)',
+  'Bash(wget:*)',
+  'Bash(ssh:*)',
+  'Bash(scp:*)',
+  'Bash(security:*)',
+  'Bash(osascript:*)',
+]
+
+function modeFlags(call: AgentCall): string[] {
+  const own = call.ownSetup === true
+  const tools = [...MODE_TOOLS[call.mode], ...(own ? OWN_SETUP_TOOLS : [])]
+  const denied = [...(call.mode === 'build' ? NEVER_CHANGED : []), ...(own ? OWN_SETUP_DENY : [])]
+  return [
+    '--permission-mode',
+    MODE_PERMISSION[call.mode],
+    '--allowedTools',
+    tools.join(','),
+    ...(denied.length > 0 ? ['--disallowedTools', denied.join(',')] : []),
+  ]
+}
+
+// `Bash(git commit:*)` is the tool `Bash`: the tools a mode may have, without their patterns.
+const toolNames = (tools: readonly string[]): string[] => [
+  ...new Set(tools.map((tool) => tool.split('(', 1)[0] ?? tool)),
+]
+
+// By default the run is cut off from the owner: `--safe-mode` loads no CLAUDE.md, plugin, hook, skill or MCP server, and
+// `--restricted` ignores the settings files of the owner, the repository and the folder, removes every tool that runs
+// commands except the ones named by `--tools`, and keeps the file tools inside the working folder. The owner's own
+// settings matter here: `allow: ["Bash"]` in them made every command run despite the exact list below, in safe mode too
+// (checked live, 2026-10-23). The runs that need the owner's skills ask for `ownSetup` and give that protection up.
+const setupFlags = (call: AgentCall): string[] =>
+  call.ownSetup === true ? [] : ['--safe-mode', '--restricted', '--tools', toolNames(MODE_TOOLS[call.mode]).join(',')]
 
 export function claudeArgs(call: AgentCall): string[] {
   return [
@@ -98,13 +153,11 @@ export function claudeArgs(call: AgentCall): string[] {
     call.model,
     '--max-budget-usd',
     String(call.maxBudgetUsd),
-    // None of the owner's own setup (global rules, plugins, hooks, MCP servers, skills) is loaded: it would only add
-    // tokens and side effects to a run that has one job. The repository's own rules are read by the agent itself.
-    '--safe-mode',
-    // Nobody answers a permission prompt here, so anything not allowed above is denied at once.
+    ...setupFlags(call),
+    // Nobody answers a permission prompt here, so anything not allowed below is denied at once.
     '--permission-prompts',
     'none',
-    ...MODE_FLAGS[call.mode],
+    ...modeFlags(call),
     ...(call.resume ? ['--resume', call.sessionId] : ['--session-id', call.sessionId]),
   ]
 }

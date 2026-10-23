@@ -88,6 +88,39 @@ export function buildPlanCard(input: PlanCardInput): DigestMessage {
   return { text: title, blocks }
 }
 
+export interface DirectStartCardInput {
+  itemKey: string
+  cardId: number
+  repo: string
+  // The plan the owner read in the digest, which is what gets built.
+  plan: string
+  threadUrl: string
+  // Where the work happens, shown so the owner can open it.
+  path: string
+  branch: string
+}
+
+const PROGRESS_HINT = '진행 상황이 궁금하면 이 메시지의 스레드에 답글로 물어보세요. 끝나면 DM에 새 메시지로 알려드려요.'
+
+// A build that starts without a plan step has no plan card, and so no button to stop it: this card has one.
+export function buildDirectStartCard(input: DirectStartCardInput): DigestMessage {
+  const title = `바로 구현 시작: ${clip(input.repo, TITLE_LIMIT)}`
+  const source = input.threadUrl === '' ? '' : `<${input.threadUrl}|원본 쓰레드>`
+  const where = `작업 위치: \`${input.path.replaceAll('`', "'")}\`\n브랜치: \`${input.branch.replaceAll('`', "'")}\``
+  const blocks: Block[] = [
+    { type: 'header', text: { type: 'plain_text', text: title } },
+    section(escapeMrkdwn(shownPlan(input.plan))),
+    context(`${where}\n${PROGRESS_HINT}`),
+    {
+      type: 'actions',
+      block_id: `direct:${input.cardId}`,
+      elements: [button('reject', input.cardId, input.itemKey, '기각 (구현 중단)', 'danger')],
+    },
+    ...(source === '' ? [] : [context(source)]),
+  ]
+  return { text: title, blocks }
+}
+
 export interface PrCardInput {
   itemKey: string
   repo: string

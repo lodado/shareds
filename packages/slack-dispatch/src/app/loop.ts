@@ -20,3 +20,13 @@ export function every(ms: number, job: () => Promise<void>, onError: (error: unk
     clearTimeout(timer)
   }
 }
+
+// Runs jobs one at a time, in the order they were asked for. A job that fails does not stop the ones after it.
+export function createSerial(): <T>(job: () => Promise<T>) => Promise<T> {
+  let last: Promise<unknown> = Promise.resolve()
+  return <T>(job: () => Promise<T>): Promise<T> => {
+    const result = last.then(job, job)
+    last = result.catch(() => undefined)
+    return result
+  }
+}

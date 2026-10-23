@@ -4,35 +4,47 @@
 // only writes the plan and the change, and its own report is taken as its word. Items run in parallel, within the
 // caps.
 
-import type { Agent, AgentResult } from '../agent/claude.ts'
+import type { Agent, AgentModel, AgentResult } from '../agent/claude.ts'
+import type { BuildInput } from '../agent/prompts.ts'
 import type { DigestMessage } from '../digest/digest.ts'
 import type { Run } from '../exec/exec.ts'
 import type { QaOutcome, RunQa } from '../qa/qa.ts'
 import type { SlackClient } from '../slack/client.ts'
 import type { ItemRow, Store } from '../store/store.ts'
 import type { WorkspaceRow } from '../store/work.ts'
-import { AgentAborted } from '../agent/claude.ts'
+import { AgentAborted, DEFAULT_MODEL } from '../agent/claude.ts'
 import {
   buildPrompt,
   parseBuildResult,
   parseQaRoutes,
+  parseQaSpec,
   planPrompt,
   replanPrompt,
   revisePrompt,
 } from '../agent/prompts.ts'
-import { buildFailedCard, buildPlanCard, buildPrCard, shownPlan, shownReport } from '../cards/cards.ts'
+import {
+  buildDirectStartCard,
+  buildFailedCard,
+  buildPlanCard,
+  buildPrCard,
+  shownPlan,
+  shownReport,
+} from '../cards/cards.ts'
 import { openPr, pushBranch } from '../github/github.ts'
 import {
+  closeLiveView,
   commitProblem,
   createWorktree,
   installDependencies,
+  openLiveView,
   removeWorktree,
   resolveBaseBranch,
   setWorkspaceStatus,
   statusForStage,
   worktreeNameFor,
 } from '../orca/worktree.ts'
-import { clip } from '../slack/blocks.ts'
+import { clip, escapeMrkdwn } from '../slack/blocks.ts'
+import { redact } from '../store/redact.ts'
 import { applyEvent, getItem, issueCard, listItems, logEvent } from '../store/store.ts'
 import {
   beginRun,
@@ -66,6 +78,8 @@ export interface WorkerConfig {
   maxAttempts: number
   // Whether a finished build is pushed and opened as a pull request. Off: the work stays a local commit.
   prEnabled: boolean
+  // Whether the plan and the build run with the owner's own claude setup (skills, CLAUDE.md, plugins, hooks, MCP).
+  ownSetup: boolean
   // Per-repo base branch, for a repo that does not branch from develop, main or master.
   baseOverrides: Readonly<Record<string, string>>
 }
@@ -120,6 +134,8 @@ interface RunInfo {
   signal: AbortSignal
   // Set as soon as the agent has answered, so every way out of the job charges what the run really cost.
   costUsd?: number
+  // A run that starts no agent and so cannot cost anything: even its failure is charged nothing.
+  free?: boolean
 }
 
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error))
@@ -149,6 +165,19 @@ function lastFailure(store: Store, itemKey: string): string {
   const since = runs.filter((run) => run.id > (lastPlan?.id ?? 0) && isRealFailure(run))
   return since.at(-1)?.detail ?? ''
 }
+
+// What went wrong in the last build of an item that builds the plan from the digest. Such an item has no plan step that
+// takes the failure in, so the next build is told directly.
+function lastBuildFailure(store: Store, itemKey: string): string {
+  const failed = listRuns(store, itemKey).filter((run) => run.kind === 'build' && isRealFailure(run))
+  return failed.at(-1)?.detail ?? ''
+}
+
+const modelOf = (item: ItemRow): AgentModel => item.meta.model ?? DEFAULT_MODEL
+
+// The owner started the item with "build now": the plan is the one the digest showed.
+const digestPlanOf = (item: ItemRow): string | undefined =>
+  item.meta.direct === true ? item.meta.analysis?.plan : undefined
 
 // A session exists once an earlier run of the item was billed; before that there is nothing to resume. The runner
 // switches by itself if the session on disk says otherwise.
@@ -242,9 +271,14 @@ async function failItem(ctx: Ctx, itemKey: string, reason: string): Promise<void
 
 // Ends the run as failed and fails the item. A run that cost nothing the agent reported (a timeout, a crash) is
 // charged its whole budget, because what it spent is unknown.
-async function failRun(ctx: Ctx, info: RunInfo, result: AgentResult | undefined, reason: string): Promise<void> {
+function chargedFor(info: RunInfo, result: AgentResult | undefined): number {
+  if (info.free === true) return 0
   const known = result?.costUsd ?? info.costUsd ?? 0
-  const costUsd = known > 0 ? known : info.budget
+  return known > 0 ? known : info.budget
+}
+
+async function failRun(ctx: Ctx, info: RunInfo, result: AgentResult | undefined, reason: string): Promise<void> {
+  const costUsd = chargedFor(info, result)
   endRun(ctx.deps.store, info.runId, { type: 'finish', ok: false, valid: true }, { costUsd, detail: reason })
   await failItem(ctx, info.item.key, reason)
 }
@@ -280,9 +314,57 @@ async function finishPlan(ctx: Ctx, info: RunInfo, result: AgentResult, answered
   await syncBoard(ctx, item.key)
 }
 
+// The plan the owner approved from the digest is the plan: no agent writes another, and the item goes straight on to its
+// build. Nothing is billed, so a stop costs nothing either.
+async function directPlanJob(ctx: Ctx, info: RunInfo, plan: string): Promise<void> {
+  const { store } = ctx.deps
+  const { item } = info
+  info.costUsd = 0
+  info.free = true
+  const workspace = await ensureWorkspace(ctx, item)
+  if (info.signal.aborted) throw new AgentAborted()
+  setPlan(store, item.key, plan)
+  endRun(store, info.runId, { type: 'finish', ok: true, valid: true }, { costUsd: 0, detail: 'plan from the digest' })
+  applyEvent(store, item.key, { type: 'plan_ready', current: true })
+  const started = applyEvent(store, item.key, { type: 'approve', owner: true, card: 'plan', fresh: true })
+  // The owner may have called the item off while the workspace was made: the machine refused both events.
+  if (started.outcome.kind !== 'moved') return
+  await announceDirectStart(ctx, item, workspace, plan)
+  await syncBoard(ctx, item.key)
+}
+
+// The card of a build that starts at once: the plan, where it runs, and the button that stops it. Replies under it
+// answer with the progress, like under a plan card. Only a convenience for the owner, so a Slack outage is logged.
+async function announceDirectStart(ctx: Ctx, item: ItemRow, workspace: WorkspaceRow, plan: string): Promise<void> {
+  const { store } = ctx.deps
+  const cardId = issueCard(store, item.key, 'plan')
+  try {
+    const ref = await post(
+      ctx,
+      buildDirectStartCard({
+        itemKey: item.key,
+        cardId,
+        repo: item.repo,
+        plan,
+        threadUrl: item.meta.url ?? '',
+        path: workspace.path,
+        branch: workspace.branch,
+      }),
+    )
+    setCardSlackRef(store, cardId, ref)
+  } catch (error) {
+    logEvent(store, { itemKey: item.key, kind: 'system', type: 'notify_failed', payload: { error: errorText(error) } })
+  }
+}
+
 async function planJob(ctx: Ctx, info: RunInfo): Promise<void> {
   const { store, agent, config } = ctx.deps
   const { item } = info
+  const digestPlan = digestPlanOf(item)
+  if (digestPlan !== undefined) {
+    await directPlanJob(ctx, info, digestPlan)
+    return
+  }
   const workspace = await ensureWorkspace(ctx, item)
   const thread = await ctx.deps.loadThread(item)
   const answeredRequest = pendingInstruction(store, item.key)?.id ?? 0
@@ -292,10 +374,11 @@ async function planJob(ctx: Ctx, info: RunInfo): Promise<void> {
     sessionId: workspace.sessionId,
     resume: sessionStarted(store, item.key),
     mode: 'plan',
-    model: 'opusplan',
+    model: modelOf(item),
     maxBudgetUsd: info.budget,
     timeoutMs: config.planTimeoutMs,
     signal: info.signal,
+    ownSetup: config.ownSetup,
   })
   info.costUsd = result.costUsd
   if (!result.ok || result.text.trim() === '') {
@@ -364,6 +447,50 @@ async function deliver(
   return url
 }
 
+// `slack:<channel>:<thread>` is a mention in a channel and `dm:<channel>:<message>` a request typed to the bot; both
+// name the thread the owner wrote in.
+const ORIGIN_THREAD = /^(?:slack|dm):([A-Z0-9]+):(\d+\.\d+)$/
+
+const urlIsSafeToPost = (url: string): boolean => /^https:\/\/[^\s<>|]+$/.test(url)
+
+// Says in the thread the work came from that it is done, with the link of the pull request. Only fixed words and the
+// address are sent: that thread may be read by other people, so nothing the agent wrote goes there. A failure is
+// logged and told to the owner, because the bot may not be allowed to write in that channel.
+async function replyInOrigin(ctx: Ctx, item: ItemRow, prUrl: string | null): Promise<void> {
+  if (prUrl === null || !urlIsSafeToPost(prUrl)) return
+  const match = ORIGIN_THREAD.exec(item.threadKey)
+  const channel = match?.[1]
+  const threadTs = match?.[2]
+  if (channel === undefined || threadTs === undefined) return
+  const { store, slack } = ctx.deps
+  try {
+    await slack.postMessage({ channel, text: `구현을 마쳤어요. PR: ${prUrl}`, threadTs })
+    logEvent(store, { itemKey: item.key, kind: 'system', type: 'thread_reply_sent', payload: { channel, threadTs } })
+  } catch (error) {
+    logEvent(store, {
+      itemKey: item.key,
+      kind: 'system',
+      type: 'thread_reply_failed',
+      payload: { error: errorText(error) },
+    })
+    await notifyOwner(
+      ctx,
+      item,
+      `원본 쓰레드에 완료 댓글을 달지 못했어요: ${escapeMrkdwn(clip(redact(errorText(error)), REASON_LENGTH))}`,
+    )
+  }
+}
+
+// A plain message to the owner, for what is not a card. A Slack outage only costs the message.
+async function notifyOwner(ctx: Ctx, item: ItemRow, text: string): Promise<void> {
+  const { store, slack } = ctx.deps
+  try {
+    await slack.postMessage({ channel: await ctx.channel(), text })
+  } catch (error) {
+    logEvent(store, { itemKey: item.key, kind: 'system', type: 'notify_failed', payload: { error: errorText(error) } })
+  }
+}
+
 async function finishBuild(ctx: Ctx, info: RunInfo, result: AgentResult, report: string, qa: QaNote): Promise<void> {
   const { store } = ctx.deps
   const { item } = info
@@ -389,6 +516,7 @@ async function finishBuild(ctx: Ctx, info: RunInfo, result: AgentResult, report:
   } catch (error) {
     logEvent(store, { itemKey: item.key, kind: 'system', type: 'notify_failed', payload: { error: errorText(error) } })
   }
+  await replyInOrigin(ctx, item, prUrl)
 }
 
 // Visual QA of what the build changed, before anything is pushed. It gets what is left of the item's money.
@@ -397,7 +525,7 @@ function checkVisually(
   info: RunInfo,
   workspace: WorkspaceRow,
   result: AgentResult,
-  routes: readonly string[],
+  asked: { routes: readonly string[]; spec: string | null },
 ): Promise<QaOutcome> {
   const { store, config } = ctx.deps
   const left = config.maxCostPerItemUsd - spentOnItem(store, info.item.key) - result.costUsd
@@ -406,29 +534,103 @@ function checkVisually(
     worktreePath: workspace.path,
     baseRef: workspace.baseRef,
     plan: workspace.plan,
-    routes: routes.length > 0 ? routes : ['/'],
+    routes: asked.routes.length > 0 ? asked.routes : ['/'],
+    spec: asked.spec,
     budgetUsd: Math.min(config.qaBudgetUsd, left),
     signal: info.signal,
   })
 }
 
-async function buildJob(ctx: Ctx, info: RunInfo): Promise<void> {
+const COMMIT_ID = /^[0-9a-f]{7,40}$/
+
+// The commit the branch started from. A script of the repository that tests only what changed against a base is given
+// this one: the remote branch may have moved, and a base that differs from the branch makes such a script run every
+// test. A hint for the agent, so failing to find it is logged and nothing more.
+async function startingCommit(ctx: Ctx, itemKey: string, workspace: WorkspaceRow): Promise<string | undefined> {
+  try {
+    const { stdout } = await ctx.deps.run('git', ['-C', workspace.path, 'merge-base', 'HEAD', workspace.baseRef])
+    const commit = stdout.trim()
+    if (COMMIT_ID.test(commit)) return commit
+    throw new Error('git merge-base printed no commit')
+  } catch (error) {
+    logEvent(ctx.deps.store, {
+      itemKey,
+      kind: 'system',
+      type: 'base_commit_unknown',
+      payload: { error: errorText(error) },
+    })
+    return undefined
+  }
+}
+
+// What the owner read next to the plan in the digest. Not the Slack thread: anything written there after the owner's click
+// must not reach the agent, and the thread is read again at every try.
+function digestContextOf(item: ItemRow): string {
+  const analysis = item.meta.analysis
+  if (analysis === undefined) return ''
+  return `요청사항:\n${analysis.request}\n\n원인:\n${analysis.cause}`
+}
+
+// A build that continues the plan's session has the plan and the thread already. One that follows the digest's plan has
+// no session yet, so it gets the plan and the thread in its prompt.
+async function buildInput(ctx: Ctx, item: ItemRow, workspace: WorkspaceRow): Promise<BuildInput> {
+  const { store } = ctx.deps
+  const base = await startingCommit(ctx, item.key, workspace)
+  const common = { branch: workspace.branch, ...(base === undefined ? {} : { base }) }
+  if (digestPlanOf(item) === undefined) {
+    return { ...common, lastFailure: lastFailure(store, item.key) }
+  }
+  return {
+    ...common,
+    lastFailure: lastBuildFailure(store, item.key),
+    direct: { plan: workspace.plan, context: digestContextOf(item) },
+  }
+}
+
+// A terminal tab in Orca that shows what the build changes. Only a convenience, so a failure is logged and nothing more.
+async function showLive(ctx: Ctx, itemKey: string, path: string): Promise<string | undefined> {
+  try {
+    return await openLiveView(ctx.deps.run, path)
+  } catch (error) {
+    logEvent(ctx.deps.store, {
+      itemKey,
+      kind: 'system',
+      type: 'live_view_failed',
+      payload: { error: errorText(error) },
+    })
+    return undefined
+  }
+}
+
+// The tab is closed when the build is over: left open it would keep refreshing, and a retry would add a second one.
+async function hideLive(ctx: Ctx, itemKey: string, handle: string | undefined): Promise<void> {
+  if (handle === undefined) return
+  try {
+    await closeLiveView(ctx.deps.run, handle)
+  } catch (error) {
+    logEvent(ctx.deps.store, {
+      itemKey,
+      kind: 'system',
+      type: 'live_view_close_failed',
+      payload: { error: errorText(error) },
+    })
+  }
+}
+
+async function buildAndDeliver(ctx: Ctx, info: RunInfo, workspace: WorkspaceRow): Promise<void> {
   const { store, run, agent, config } = ctx.deps
   const { item } = info
-  const workspace = getWorkspace(store, item.key)
-  if (workspace === undefined) throw new Error(`item ${item.key} has no workspace`)
-  // The worktree has the repository's files but not its installed packages; the build and the QA both need them.
-  await installDependencies(run, workspace.path, info.signal)
   const result = await agent({
     cwd: workspace.path,
-    prompt: buildPrompt({ branch: workspace.branch, lastFailure: lastFailure(store, item.key) }),
+    prompt: buildPrompt(await buildInput(ctx, item, workspace)),
     sessionId: workspace.sessionId,
-    resume: true,
+    resume: sessionStarted(store, item.key),
     mode: 'build',
-    model: 'opusplan',
+    model: modelOf(item),
     maxBudgetUsd: info.budget,
     timeoutMs: config.buildTimeoutMs,
     signal: info.signal,
+    ownSetup: config.ownSetup,
   })
   info.costUsd = result.costUsd
   const verdict = parseBuildResult(result.text)
@@ -443,18 +645,34 @@ async function buildJob(ctx: Ctx, info: RunInfo): Promise<void> {
     return
   }
   const asked = parseQaRoutes(verdict.report)
-  const qa = await checkVisually(ctx, info, workspace, result, asked.routes)
+  const spec = parseQaSpec(asked.report)
+  const qa = await checkVisually(ctx, info, workspace, result, { routes: asked.routes, spec: spec.spec })
   info.costUsd = result.costUsd + qa.costUsd
   if (qa.status === 'failed') {
     await failRun(ctx, info, undefined, `Visual QA 실패: ${qa.reason}`)
     return
   }
   try {
-    await finishBuild(ctx, info, result, asked.report, qaNote(qa))
+    await finishBuild(ctx, info, result, spec.report, qaNote(qa))
   } catch (error) {
     if (error instanceof AgentAborted) throw error
     // The build passed but the push or the pull request did not; the commit is still in the worktree.
     await failRun(ctx, info, undefined, errorText(error))
+  }
+}
+
+async function buildJob(ctx: Ctx, info: RunInfo): Promise<void> {
+  const { store, run } = ctx.deps
+  const { item } = info
+  const workspace = getWorkspace(store, item.key)
+  if (workspace === undefined) throw new Error(`item ${item.key} has no workspace`)
+  // The worktree has the repository's files but not its installed packages; the build and the QA both need them.
+  await installDependencies(run, workspace.path, info.signal)
+  const live = await showLive(ctx, item.key, workspace.path)
+  try {
+    await buildAndDeliver(ctx, info, workspace)
+  } finally {
+    await hideLive(ctx, item.key, live)
   }
 }
 

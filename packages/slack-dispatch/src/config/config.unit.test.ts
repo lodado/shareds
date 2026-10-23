@@ -47,6 +47,7 @@ describe('loadConfig as the places the bot keeps its state', () => {
       ingestDays: 0,
       prEnabled: false,
       statusPort: 9814,
+      ownSetup: false,
     })
   })
 
@@ -65,6 +66,7 @@ describe('loadConfig as the places the bot keeps its state', () => {
       ingestDays: 0,
       prEnabled: false,
       statusPort: 9814,
+      ownSetup: false,
     })
   })
 
@@ -194,4 +196,17 @@ describe('loadConfig as the port of the status address', () => {
       expect(loadConfig({ STATUS_PORT: value }, '/h').statusPort).toBe(9814)
     },
   )
+})
+
+describe('loadConfig as the use of the owner own claude setup', () => {
+  it.each([undefined, '', '0', 'true', 'yes', 'on', ' 1', '11'])(
+    'to be off for OWN_SETUP %j: it must be switched on on purpose',
+    (value) => {
+      expect(loadConfig(value === undefined ? {} : { OWN_SETUP: value }, '/h').ownSetup).toBe(false)
+    },
+  )
+
+  it('to be on only for OWN_SETUP exactly 1', () => {
+    expect(loadConfig({ OWN_SETUP: '1' }, '/h').ownSetup).toBe(true)
+  })
 })

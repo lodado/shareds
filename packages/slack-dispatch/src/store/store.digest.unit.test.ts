@@ -14,6 +14,7 @@ import {
   pendingForDigest,
   setAnalysis,
   setDigestSlackRef,
+  setRunChoice,
   stageCounts,
   UnknownItemError,
 } from './store'
@@ -272,6 +273,44 @@ describe('setAnalysis as what the cheapest model made of an item', () => {
     applyEvent(store, key('web-app'), { type: 'triage', handled: false, confident: false })
     setAnalysis(store, key('web-app'), analysis)
     expect(pendingForDigest(store)[0]?.meta.analysis).toStrictEqual(analysis)
+  })
+})
+
+describe('setRunChoice as what the owner chose when starting an item', () => {
+  const analysis = { request: '푸터 링크가 깨짐', cause: 'href 오타', plan: '고친다', recommend: true, why: '작음' }
+
+  it('to be kept next to the analysis and the other digest fields, and logged', () => {
+    const store = memoryStore()
+    const waiting = unsureMention(store, THREAD, 'web-app')
+    setAnalysis(store, waiting, analysis)
+    expect(setRunChoice(store, waiting, { model: 'sonnet', direct: true })).toBe(true)
+    expect(getItem(store, waiting)?.meta).toStrictEqual({ analysis, model: 'sonnet', direct: true })
+    const logged = listEvents(store, { itemKey: waiting }).filter((event) => event.type === 'run_choice_saved')
+    expect(logged.map((event) => event.payload)).toStrictEqual(['{"model":"sonnet","direct":true}'])
+  })
+
+  it('to be refused for an item that already left the digest, which keeps the choice it started with', () => {
+    const store = memoryStore()
+    const waiting = unsureMention(store, THREAD, 'web-app')
+    expect(setRunChoice(store, waiting, { model: 'haiku', direct: false })).toBe(true)
+    applyEvent(store, waiting, { type: 'approve', owner: true, card: 'assign', fresh: true })
+    expect(setRunChoice(store, waiting, { model: 'opus', direct: true })).toBe(false)
+    expect(getItem(store, waiting)?.meta).toStrictEqual({ model: 'haiku', direct: false })
+  })
+
+  it('to be an error for an item that does not exist', () => {
+    expect(() => setRunChoice(memoryStore(), 'slack:none#nothing', { model: 'opus', direct: false })).toThrow(
+      UnknownItemError,
+    )
+  })
+
+  it('to be dropped when the stored model is not one that is offered', () => {
+    const store = memoryStore()
+    createItems(store, THREAD, ['web-app'])
+    store.db
+      .prepare('UPDATE items SET meta = ? WHERE key = ?')
+      .run('{"model":"gpt-9","direct":"yes","summary":"s"}', key('web-app'))
+    expect(getItem(store, key('web-app'))?.meta).toStrictEqual({ summary: 's' })
   })
 })
 
