@@ -733,7 +733,10 @@ async function startReady(ctx: Ctx, stage: 'planning' | 'implementing'): Promise
 async function cleanOne(ctx: Ctx, item: ItemRow, workspace: WorkspaceRow): Promise<void> {
   const { store, run } = ctx.deps
   try {
-    const removal = await removeWorktree(run, workspace.path, { discard: item.stage === 'declined' })
+    const removal = await removeWorktree(run, workspace.path, {
+      discard: item.stage === 'declined',
+      merged: item.stage === 'merged',
+    })
     ctx.cleanupRetryAt.delete(item.key)
     logEvent(store, {
       itemKey: item.key,

@@ -95,6 +95,8 @@ interface RigOptions {
   failChannel?: string
   // What `git merge-base` prints: the commit the branch started from.
   mergeBase?: string
+  // The branch has no upstream (the host deleted it after the merge): comparing with it fails.
+  noUpstream?: boolean
   // The agent left no commit on top of the base.
   noCommit?: boolean
   // The branch the worktree is on after the agent ran; the worktree's own branch when not given.
@@ -107,6 +109,29 @@ interface RigOptions {
   openDmFailures?: number
   // What Visual QA answers; skipped when not given.
   qa?: (input: QaInput) => Promise<QaOutcome>
+}
+
+// What the commands of orca, git and gh print in the rig, as far as the worker reads them.
+function commandOutput(line: string, args: readonly string[], options: RigOptions): string {
+  if (line.includes('worktree create')) {
+    const name = args[args.indexOf('--name') + 1] ?? 'x'
+    const worktree = { id: `r::/wt/${name}`, path: `/wt/${name}`, branch: `refs/heads/${name}` }
+    return JSON.stringify({ result: { worktree } })
+  }
+  if (line.startsWith('orca terminal create')) {
+    const terminal = { handle: 'term_5b70a478-6623-408a-8919-d4eced9eb295', title: 'x' }
+    return JSON.stringify({ result: { terminal } })
+  }
+  if (line.includes('merge-base')) return `${options.mergeBase ?? ''}\n`
+  if (line.includes('symbolic-ref')) return `${options.branchNow ?? 'dispatch-a'}\n`
+  if (line.includes('status --porcelain')) return options.dirty ? ' M a.ts\n' : ''
+  if (line.includes('rev-list')) {
+    // `@{upstream}..HEAD` is the unpushed-work check of a cleanup; `<base>..HEAD` is the commit check of a build.
+    const nothingNew = line.includes('@{upstream}') || options.noCommit === true
+    return nothingNew ? '0\n' : '1\n'
+  }
+  if (line.includes('pr create')) return `${PR_URL}\n`
+  return ''
 }
 
 function rig(options: RigOptions = {}): Rig {
@@ -127,27 +152,10 @@ function rig(options: RigOptions = {}): Rig {
     if (options.failCommand !== undefined && line.includes(options.failCommand)) {
       return Promise.reject(new CommandError(file, 1, 'it failed'))
     }
-    if (line.includes('worktree create')) {
-      const name = args[args.indexOf('--name') + 1] ?? 'x'
-      const worktree = { id: `r::/wt/${name}`, path: `/wt/${name}`, branch: `refs/heads/${name}` }
-      return Promise.resolve({ stdout: JSON.stringify({ result: { worktree } }), stderr: '' })
+    if (options.noUpstream === true && line.includes('@{upstream}')) {
+      return Promise.reject(new CommandError(file, 128, 'no upstream configured'))
     }
-    if (line.startsWith('orca terminal create')) {
-      const terminal = { handle: 'term_5b70a478-6623-408a-8919-d4eced9eb295', title: 'x' }
-      return Promise.resolve({ stdout: JSON.stringify({ result: { terminal } }), stderr: '' })
-    }
-    if (line.includes('merge-base')) return Promise.resolve({ stdout: `${options.mergeBase ?? ''}\n`, stderr: '' })
-    if (line.includes('symbolic-ref'))
-      return Promise.resolve({ stdout: `${options.branchNow ?? 'dispatch-a'}\n`, stderr: '' })
-    if (line.includes('status --porcelain'))
-      return Promise.resolve({ stdout: options.dirty ? ' M a.ts\n' : '', stderr: '' })
-    if (line.includes('rev-list')) {
-      // `@{upstream}..HEAD` is the unpushed-work check of a cleanup; `<base>..HEAD` is the commit check of a build.
-      const nothingNew = line.includes('@{upstream}') || options.noCommit === true
-      return Promise.resolve({ stdout: nothingNew ? '0\n' : '1\n', stderr: '' })
-    }
-    if (line.includes('pr create')) return Promise.resolve({ stdout: `${PR_URL}\n`, stderr: '' })
-    return Promise.resolve({ stdout: '', stderr: '' })
+    return Promise.resolve({ stdout: commandOutput(line, args, options), stderr: '' })
   }
   const agent: Agent = (call) => {
     calls.push(call)
@@ -617,6 +625,19 @@ describe('worker as the cleanup of finished work', () => {
     const kept = listEvents(r.store, { itemKey: key }).filter((event) => event.type === 'workspace_kept')
     expect(kept).toHaveLength(1)
     expect(JSON.parse(kept[0]?.payload ?? '{}')).toMatchObject({ reason: 'there are uncommitted changes' })
+  })
+
+  it('to be removed for a merged item although the host deleted its branch: the work is in the merged pull request', async () => {
+    const r = rig({ noUpstream: true })
+    withWorkspace(r, [
+      ...TO_IMPLEMENTING,
+      { type: 'built', ok: true },
+      { type: 'merge', owner: true, ci: true, review: true },
+    ])
+    await settle(r)
+    expect(r.commands.filter((c) => c.includes('worktree rm'))).toStrictEqual([
+      'orca worktree rm --worktree path:/wt/a --json',
+    ])
   })
 
   it('to be removed for a merged item when everything is saved', async () => {
@@ -1241,7 +1262,7 @@ describe('worker as an item the owner builds at once from the plan in the digest
     const call = r.calls[0]
     expect(call).toMatchObject({ mode: 'build', model: 'haiku', resume: false, ownSetup: true })
     expect(call?.sessionId).toBe(getWorkspace(r.store, key)?.sessionId)
-    expect(call?.prompt).toContain('Approved plan:\nfooter.tsx의 href 수정\n링크 이동 테스트 추가')
+    expect(call?.prompt).toContain('exactly this text):\nfooter.tsx의 href 수정\n링크 이동 테스트 추가')
     expect(call?.prompt).toContain(
       '<thread>\n요청사항:\n푸터 링크 클릭해도 이동 안 함\n\n원인:\nfooter.tsx의 href 오타\n</thread>',
     )

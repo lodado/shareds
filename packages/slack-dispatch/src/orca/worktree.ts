@@ -155,9 +155,12 @@ export interface Removal {
 }
 
 // Work that exists only in this worktree is not thrown away unless the owner declined it.
-async function unsavedWork(run: Run, path: string): Promise<string | undefined> {
+async function unsavedWork(run: Run, path: string, merged: boolean): Promise<string | undefined> {
   const dirty = await run('git', ['-C', path, 'status', '--porcelain'])
   if (dirty.stdout.trim() !== '') return 'there are uncommitted changes'
+  // The commits of a merged item are in the merged pull request. The host may delete the branch on merge, and the
+  // branch then has no upstream to compare with, which would keep the worktree for ever.
+  if (merged) return undefined
   try {
     const ahead = await run('git', ['-C', path, 'rev-list', '--count', '@{upstream}..HEAD'])
     return ahead.stdout.trim() === '0' ? undefined : 'there are commits that were not pushed'
@@ -167,9 +170,13 @@ async function unsavedWork(run: Run, path: string): Promise<string | undefined> 
   }
 }
 
-export async function removeWorktree(run: Run, path: string, options: { discard: boolean }): Promise<Removal> {
+export async function removeWorktree(
+  run: Run,
+  path: string,
+  options: { discard: boolean; merged?: boolean },
+): Promise<Removal> {
   if (!options.discard) {
-    const reason = await unsavedWork(run, path)
+    const reason = await unsavedWork(run, path, options.merged === true)
     if (reason !== undefined) return { removed: false, reason }
   }
   await run('orca', ['worktree', 'rm', '--worktree', `path:${path}`, ...(options.discard ? ['--force'] : []), '--json'])
