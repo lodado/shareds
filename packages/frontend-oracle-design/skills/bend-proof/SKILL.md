@@ -12,8 +12,8 @@ allowed-tools:
 First read [bend-proof](../frontend-oracle-design/references/bend-proof.md) without offset or limit. Read
 [model-patterns](../frontend-oracle-design/references/model-patterns.md) when the model has retries,
 delays, staleness, error kinds, remounts, request counts, counters, collections or identities.
-Scripts in `../frontend-oracle-design/scripts/`: `oracle-model.mjs` (`check`, `laws`, `prove`, `space`);
-`ensure-bend.mjs` installs a missing Bend.
+Scripts in `../frontend-oracle-design/scripts/`: `oracle-model.mjs` (`check`, `laws`, `prove`,
+`prove-reach`, `space`); `ensure-bend.mjs` installs a missing Bend.
 
 ## Modes
 
@@ -30,13 +30,13 @@ Scripts in `../frontend-oracle-design/scripts/`: `oracle-model.mjs` (`check`, `l
 
 1. Collect the cells the requirement leaves open: ask the person (standalone) or return them to the
    controller before any Bend.
-2. In an Oracle run the analyst's independent State Model comes from the controller; standalone has none.
+2. In an Oracle run the analyst's independent State Model comes from the controller.
 3. Write the machine: states, events, a total `step`, the outcome in the state, the environment.
 4. Translate each requirement sentence with bend-proof's table; keep the frame laws.
-5. Check each file, run `laws` (counterexamples and free cells), then `prove --dir` (it generates
-   finite cell proofs) and `space`.
+5. Check each file; run `laws` (counterexamples, free cells), `prove-reach` (finite machine),
+   `prove --dir` (it generates finite cells) and `space`.
 6. Report each law's scope (cell, every trace, witness or rank) and what is not proven: the product is
-   tested, not proven.
+   only tested.
 
 ## Never
 

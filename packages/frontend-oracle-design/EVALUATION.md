@@ -1,3 +1,34 @@
+# 0.111.0: the CHECKED gate judges proofs and laws; `prove-reach` certifies a finite machine; the stage machine is modelled
+
+## Validation
+
+- Real Bend 2.0.34 under `ORACLE_REQUIRE_BEND=1`: oracle-model (84 passed), oracle-stage (41 passed: 8 new gate
+  tests plus the no-target regression), oracle-stage-machine (3 passed, 384 of 384 stage-and-event runs match the
+  model).
+  `bundles:check`, `workflow-docs:check` pass.
+- Stage machine fixture: 29 cell laws over 3,360 cells, all pinned, no counterexample, closed in 81 configurations,
+  diameter 6.
+
+## Change
+
+- CHECKED gate: a `prove` that is `failed`, `open` or `unsafe` and a `laws` counterexample (or an induction failure
+  on a trace the space reaches, refolded through the law's own `run` and counted past the listed cells) block with
+  `STAGE_GATE`; free and empty cells only report, and the evidence says how many laws `laws` computed. The gate
+  installs a missing Bend through `ensureBend` first; only an installed Bend that cannot run (timeout, failed spawn)
+  gives `undecided`, which neither blocks nor is kept as a receipt. `inputsSha256` is unchanged, so running locks
+  keep their pins; only the receipt key takes PROOF.bend.
+- `oracle-model.mjs prove-reach`: BFS reachable set, explicit-arm invariant checked by the kernel in a temporary
+  copy, shortest counterexample trace on a violation; finite types only (`NOT_FINITE`, `REACH_TOO_LARGE`).
+- `test-fixtures/stage`: the authoring stage machine as a Bend model. Comparing it with `oracle-stage.mjs` found a
+  real defect: `advance` with no `--to` at ORACLE_READY passed the skip check and wrote a record without a stage.
+  `advance` and `rewind` with no `--to` are now `USAGE` (exit 2) before the record is read; a name that is no stage
+  stays `STAGE_SKIP`.
+- `prove-reach` gives `REACH_TOO_LARGE` for a finite type whose value count overflows a number.
+
+## Not changed
+
+- Free cells never block. DRAFTED and the lock do not re-run `prove`.
+
 # 0.110.0: `laws` reports counterexamples, pinned and free cells and induction failures; `prove` generates cell proofs
 
 ## Validation

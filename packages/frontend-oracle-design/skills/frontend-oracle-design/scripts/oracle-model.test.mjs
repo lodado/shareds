@@ -16,9 +16,10 @@ import {
 import { adapterFor } from '../../../test-fixtures/stale-search/search.adapter.mjs'
 import { BEND_VERSION } from './ensure-bend.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
-import { cellProof, lawReport } from './oracle-laws.mjs'
+import { cellProof, lawReport, MAX_REACH_CELLS, reachPlan, reachProof } from './oracle-laws.mjs'
 import {
   bendFailureHint,
+  bendInputs,
   checkBendFiles,
   checkConformance,
   classifyTrace,
@@ -32,10 +33,12 @@ import {
   minimalCover,
   parseFormalModel,
   proveLaws,
+  proveReach,
   reachedStates,
   scaffoldWorld,
   scanBendSource,
   transitionCover,
+  verdictBeside,
 } from './oracle-model.mjs'
 import { inputsPin } from './oracle-stage.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
@@ -1504,6 +1507,30 @@ test('lawReport lists the counterexamples to induction and, with the reachable s
   assert.equal(enumerated, 1)
 })
 
+test('lawReport counts the reached counterexamples to induction apart from the list, and with run only those the fold still breaks', () => {
+  const ring = ringModel()
+  const reach = () => reachedStates(ring, enumerateSpace(ring, { bound: 2 }))
+  const witness = { state: 'M.Ring{2n}', command: 'M.R{}', after: 'M.Ring{3n}', reached: ['M.R{}', 'M.R{}'] }
+  const counted = ringLaws({ invariant: 'below_three', reach })
+  assert.deepEqual([counted.invariant.reachedCount, counted.invariant.firstReached], [1, witness])
+  // no reach, no count
+  assert.equal('reachedCount' in ringLaws({ invariant: 'below_three' }).invariant, false)
+
+  // the trace law folds with its own run from init: a fold that steps confirms the cell, one that ignores the events does not
+  const fold = (step) => (events, state) => {
+    let at = state
+    for (let cursor = events; cursor.$ === 'Con'; cursor = cursor.tail) at = step(at, cursor.head)
+    return at
+  }
+  const withRun = (run) => ({ ...RING, 'Ring.init': ring.init, 'Ring.run': run })
+  const stepping = ringLaws({ invariant: 'below_three', reach, run: 'run', exported: withRun(fold(ring.step)) })
+  assert.deepEqual([stepping.invariant.reachedCount, stepping.invariant.firstReached], [1, witness])
+  const ignoring = ringLaws({ invariant: 'below_three', reach, run: 'run', exported: withRun(fold((state) => state)) })
+  assert.deepEqual([ignoring.invariant.ctiCount, ignoring.invariant.reachedCount, ignoring.invariant.firstReached], [1, 0, null])
+  // a named run the model does not export is refused before any cell is computed
+  assertRefused(() => ringLaws({ invariant: 'below_three', reach, run: 'run' }), { code: 'MODEL_INTERFACE' })
+})
+
 test('reachedStates maps each state a space reaches to the shortest trace, the first in case order on a tie', () => {
   const ring = ringModel()
   const space = enumerateSpace(ring, { bound: 2 })
@@ -2145,6 +2172,8 @@ test('[bend] the laws command lists the one CTI of pay and whether the space at 
     ctiCount: 1,
     ctis: [{ state: 'M.Pay{M.Pending{}, 1n}', command: 'M.Resolve{}', after: 'M.Pay{M.Paid{}, 2n}', reached: null }],
     reach: { bound: 4, complete: true },
+    reachedCount: 0,
+    firstReached: null,
   })
   assert.match(report.hint, /^1 counterexample to induction of Pay\.at_most_one/)
   assert.deepEqual(report.bend, { bin, version: BEND_VERSION })
@@ -2170,6 +2199,8 @@ test('[bend] the laws command lists the one CTI of pay and whether the space at 
     ctiCount: 1,
     ctis: [{ state: 'M.Pay{M.Pending{}, 0n}', command: 'M.Resolve{}', after: 'M.Pay{M.Paid{}, 1n}', reached: ['M.Submit{}'] }],
     reach: { bound: 4, complete: true },
+    reachedCount: 1,
+    firstReached: { state: 'M.Pay{M.Pending{}, 0n}', command: 'M.Resolve{}', after: 'M.Pay{M.Paid{}, 1n}', reached: ['M.Submit{}'] },
   })
 
   // options of other commands are refused rather than dropped, and --bound means nothing without --invariant
@@ -2391,4 +2422,304 @@ test('oracle-model usage lists laws, and prove-cells is not a command: prove gen
   const gone = spawnSync(process.execPath, [join(SCRIPTS, 'oracle-model.mjs'), 'prove-cells', '--dir', SCRIPTS], { encoding: 'utf8' })
   assert.equal(gone.status, 2)
   assert.match(gone.stderr, /^USAGE: usage:/)
+})
+
+// ── prove-reach: 유한 상태 기계의 도달 집합을 불변식으로 써서 모든 trace의 안전을 커널이 검사한다 ──────────────
+
+test.describe('prove-reach', () => {
+  const PAY_FINITE = fileURLToPath(new URL('../../../test-fixtures/pay-finite/', import.meta.url))
+  const PAY_FINITE_MODEL = join(PAY_FINITE, 'MODEL.bend')
+  const payKey = (state, charges) => stableStringify({ $: 'Pay', state: { $: state }, charges: { $: charges } })
+  // Idle, Pending and Errored without a charge, Paid with one
+  const PAY_REACHED = [payKey('Idle', 'NoCharge'), payKey('Pending', 'NoCharge'), payKey('Paid', 'OneCharge'), payKey('Errored', 'NoCharge')]
+  const reach = (...args) => oracleModel('prove-reach', '--model', ...args)
+  // A response comes only while the request is pending, and each response charges once.
+  const REQUEST = [
+    'import Base',
+    '',
+    'type Phase is Data:',
+    '  Idle{}',
+    '  Waiting{}',
+    '  Finished{}',
+    '',
+    'type Msg is Data:',
+    '  Request{}',
+    '  Respond{}',
+    '',
+    'type Charges is Data:',
+    '  NoCharge{}',
+    '  OneCharge{}',
+    '  ManyCharges{}',
+    '',
+    'type Rr is Data:',
+    '  Rr{phase: Phase, charges: Charges}',
+    '',
+    'def Rr.more(c: Charges) -> Charges:',
+    '  match c:',
+    '    case NoCharge{}:',
+    '      OneCharge{}',
+    '    case OneCharge{}:',
+    '      ManyCharges{}',
+    '    case ManyCharges{}:',
+    '      ManyCharges{}',
+    '',
+    'def Rr.init() -> Rr:',
+    '  Rr{Idle{}, NoCharge{}}',
+    '',
+    'def Rr.step(s: Rr, m: Msg) -> Rr:',
+    '  match s m:',
+    '    case Rr{Idle{}, c} Request{}:',
+    '      Rr{Waiting{}, c}',
+    '    case Rr{Waiting{}, c} Request{}:',
+    '      Rr{Waiting{}, c}',
+    '    case Rr{Finished{}, c} Request{}:',
+    '      Rr{Finished{}, c}',
+    '    case Rr{p, c} Respond{}:',
+    '      Rr{Finished{}, Rr.more(c)}',
+    '',
+    'def Rr.enabled(s: Rr) -> List<Msg>:',
+    '  match s:',
+    '    case Rr{Waiting{}, c}:',
+    '      [Request{}, Respond{}]',
+    '    case Rr{Idle{}, c}:',
+    '      [Request{}]',
+    '    case Rr{Finished{}, c}:',
+    '      [Request{}]',
+    '',
+    'def Rr.safe(s: Rr) -> Bool:',
+    '  match s:',
+    '    case Rr{p, ManyCharges{}}:',
+    '      False{}',
+    '    case Rr{p, NoCharge{}}:',
+    '      True{}',
+    '    case Rr{p, OneCharge{}}:',
+    '      True{}',
+    '',
+  ].join('\n')
+  // the same environment read from the history by next, with no enabled export
+  const REQUEST_NEXT = [
+    REQUEST.replace('def Rr.enabled(', 'def Rr.allowed('),
+    'def Rr.run(h: List<Msg>, s: Rr) -> Rr:',
+    '  match h:',
+    '    case Nil{}:',
+    '      s',
+    '    case Con{m, rest}:',
+    '      Rr.run(rest, Rr.step(s, m))',
+    '',
+    'def Rr.next(h: List<Msg>) -> List<Msg>:',
+    '  Rr.allowed(Rr.run(h, Rr.init()))',
+    '',
+  ].join('\n')
+
+  test('reachPlan reads the state and event types from step and refuses a malformed init, safety def, enabled or limit', async () => {
+    const source = await readFile(PAY_FINITE_MODEL, 'utf8')
+    const plan = reachPlan({ source, prefix: 'Pay', safe: 'at_most_one' })
+    assert.deepEqual(
+      { state: plan.state, command: plan.command, safe: plan.safe, states: plan.stateCount, events: plan.commandCount, cells: plan.cells, enabled: plan.enabled },
+      { state: 'Pay', command: 'Msg', safe: 'Pay.at_most_one', states: 12, events: 3, cells: 36, enabled: false },
+    )
+    const refused = (text, options, code) =>
+      assert.throws(
+        () => reachPlan({ source: text, prefix: 'Pay', safe: 'at_most_one', ...options }),
+        (error) => error.code === code,
+        code,
+      )
+    refused(source, { prefix: 'pay' }, 'USAGE')
+    refused(source, { safe: 'Pay.at_most_one' }, 'USAGE')
+    refused(source, { maxCells: 0 }, 'USAGE')
+    // observe returns the state, not a Bool
+    refused(source, { safe: 'observe' }, 'SAFE_INVALID')
+    refused(source.replace('def Pay.init() -> Pay:', 'def Pay.init(c: Charges) -> Pay:'), {}, 'INIT_INVALID')
+    refused(source.replace('def Pay.step(s: Pay, m: Msg) -> Pay:', 'def Pay.step(s: Pay, m: Msg) -> Bool:'), {}, 'STEP_INVALID')
+    refused(`${source}\ndef Pay.enabled(s: Pay) -> List<State>:\n  []\n`, {}, 'ENABLED_INVALID')
+    const enabled = reachPlan({ source: `${source}\ndef Pay.enabled(s: Pay) -> List<Msg>:\n  []\n`, prefix: 'Pay', safe: 'at_most_one' })
+    assert.equal(enabled.enabled, true)
+  })
+
+  test('refuses an infinite state or event type as NOT_FINITE and a domain over --max-cells, before running Bend', async (t) => {
+    const missing = join(await workspace(t), 'no-such-bend')
+    // the pay fixture counts charges in a Nat
+    await assert.rejects(
+      proveReach({ model: join(PAY, 'MODEL.bend'), prefix: 'Pay', safe: 'at_most_one', bin: missing }),
+      (error) => error.code === 'NOT_FINITE' && /the state type Pay is infinite \(Pay\.Pay\.charges is a Nat\)/.test(error.message),
+    )
+    await assert.rejects(
+      proveReach({ model: PAY_FINITE_MODEL, prefix: 'Pay', safe: 'at_most_one', bin: missing, maxCells: 35 }),
+      (error) =>
+        error.code === 'REACH_TOO_LARGE' && error.exitCode === 2 && /12 states × 3 events = 36 cells, more than --max-cells 35/.test(error.message),
+    )
+    // at the limit the plan passes, and only then is Bend needed
+    await assert.rejects(
+      proveReach({ model: PAY_FINITE_MODEL, prefix: 'Pay', safe: 'at_most_one', bin: missing, maxCells: 36 }),
+      (error) => error.code === 'BEND_UNAVAILABLE',
+    )
+    assert.equal(MAX_REACH_CELLS, 100_000)
+    const machine = (types, initial) =>
+      `import Base\n${types}\ndef S.init() -> S:\n  ${initial}\n\ndef S.step(s: S, m: Msg) -> S:\n  s\n\ndef S.ok(s: S) -> Bool:\n  True{}\n`
+    const notFinite = (types, initial, reason) =>
+      assert.throws(
+        () => reachPlan({ source: machine(types, initial), prefix: 'S', safe: 'ok' }),
+        (error) => error.code === 'NOT_FINITE' && reason.test(error.message),
+        String(reason),
+      )
+    notFinite('type Msg is Data:\n  Respond{id: Nat}\n\ntype S is Data:\n  S{on: Bool}\n', 'S{False{}}', /the event type Msg is infinite \(Msg\.Respond\.id is a Nat\)/)
+    notFinite('type Msg is Data:\n  Go{}\n\ntype S is Data:\n  Leaf{}\n  Node{next: S}\n', 'Leaf{}', /the state type S is recursive/)
+    notFinite('type Msg is Data:\n  Go{}\n\ntype S is Data:\n  S{seen: List<Msg>}\n', 'S{[]}', /S\.S\.seen is a List/)
+    // finite, but 2^(32 × 40) values overflow a number: too large, not a crash on the missing infinite field
+    const fields = (type, count) => Array.from({ length: count }, (_, at) => `f${at}: ${type}`).join(', ')
+    const wide = `type Msg is Data:\n  Go{}\n\ntype W is Data:\n  W{${fields('Bool', 32)}}\n\ntype S is Data:\n  S{${fields('W', 40)}}\n`
+    assert.throws(
+      () => reachPlan({ source: machine(wide, 'S{}'), prefix: 'S', safe: 'ok' }),
+      (error) =>
+        error.code === 'REACH_TOO_LARGE' && error.exitCode === 2 && /the state type S has more values than a number can count/.test(error.message),
+    )
+  })
+
+  test('reachProof writes an arm per state, event arms only under reached states, and the stutter step only with enabled', async () => {
+    const plan = reachPlan({ source: await readFile(PAY_FINITE_MODEL, 'utf8'), prefix: 'Pay', safe: 'at_most_one' })
+    const { text, arms } = reachProof(plan, new Set(PAY_REACHED), './MODEL.bend')
+    // inv, the outer inv_step match and inv_safe have 12 arms each; the 4 reached states match the 3 events
+    assert.equal(arms, 12 * 3 + 4 * 3)
+    assert.match(text, /^import \.\/MODEL\.bend as M$/m)
+    assert.match(text, /^ {4}case M\.Pay\{M\.Paid\{\}, M\.OneCharge\{\}\}:\n {6}True\{\}$/m)
+    assert.match(text, /^ {4}case M\.Pay\{M\.Paid\{\}, M\.ManyCharges\{\}\}:\n {6}False\{\}$/m)
+    assert.match(text, /^ {6}Reach\.no_step\(M\.Pay\{M\.Paid\{\}, M\.ManyCharges\{\}\}, m, h\)$/m)
+    assert.match(text, /^ {6}Reach\.no_safe\(M\.Pay\{M\.Paid\{\}, M\.ManyCharges\{\}\}, h\)$/m)
+    assert.equal(text.match(/^ {6}match m:$/gm).length, 4)
+    // a wildcard arm does not refine the goal, so every arm names its state
+    assert.doesNotMatch(text, /case _:/)
+    assert.match(text, /^def Reach\.step\(s: M\.Pay, m: M\.Msg\) -> M\.Pay:\n {2}M\.Pay\.step\(s, m\)$/m)
+    assert.match(text, /^law reach_safe:\n {2}for t: List<M\.Msg>\n {2}\{M\.Pay\.at_most_one\(Reach\.run\(t, M\.Pay\.init\(\)\)\) == True\{\} : Bool\}$/m)
+    assert.match(text, /^def reach_safe\(t\):\n {2}Reach\.safe_run\(t, M\.Pay\.init\(\), \{==\}\)$/m)
+    const stutter = reachProof({ ...plan, enabled: true }, new Set(PAY_REACHED), './MODEL.bend')
+    assert.match(stutter.text, /^ {2}Reach\.keep\(Reach\.has\(M\.Pay\.enabled\(s\), m\), s, M\.Pay\.step\(s, m\)\)$/m)
+    // one equality arm per event and the fallback
+    assert.equal(stutter.arms, arms + 3 + 1)
+  })
+
+  test('the usage lists prove-reach, which refuses a missing --safe and another command option before looking for Bend', () => {
+    const help = spawnSync(process.execPath, [MODEL_SCRIPT, '--help'], { encoding: 'utf8' })
+    assert.match(help.stdout, /oracle-model\.mjs prove-reach --model <MODEL\.bend> --prefix <Prefix> --safe <def> \[--max-cells <n>\]/)
+    const noSafe = reach(PAY_FINITE_MODEL, '--prefix', 'Pay')
+    assert.equal(noSafe.status, 2)
+    assert.match(noSafe.stderr, /^USAGE: usage:/)
+    const foreign = reach(PAY_FINITE_MODEL, '--prefix', 'Pay', '--safe', 'at_most_one', '--bound', '3')
+    assert.equal(foreign.status, 2)
+    assert.match(foreign.stderr, /^USAGE: prove-reach does not take --bound/)
+  })
+
+  test('[bend] certifies pay-finite over every trace in a temporary copy and leaves the directory as it was', async (t) => {
+    const bin = await installedBend(t)
+    if (!bin) return
+    const before = await listing(PAY_FINITE)
+    const run = reach(PAY_FINITE_MODEL, '--prefix', 'Pay', '--safe', 'at_most_one')
+    assert.equal(run.status, 0, `${run.stdout}${run.stderr}`)
+    const result = JSON.parse(run.stdout)
+    assert.equal(result.status, 'proven', result.output)
+    assert.equal(result.safe, 'Pay.at_most_one')
+    assert.equal(result.allowed, 'every event')
+    assert.match(result.claim, /^for every t: List<Msg>, Pay\.at_most_one\(run\(t, Pay\.init\(\)\)\) is True, where run folds Pay\.step over t$/)
+    assert.deepEqual(result.domain, { states: 12, events: 3, cells: 36 })
+    // Submit · Resolve reaches the farthest of the four states
+    assert.equal(result.reachable, 4)
+    assert.equal(result.diameter, 2)
+    assert.equal(result.proof.temporaryCopy, true)
+    assert.equal(result.proof.arms, 12 * 3 + 4 * 3)
+    assert.match(result.inputDigest, /^[0-9a-f]{64}$/)
+    assert.deepEqual(result.inputs.map(({ path }) => path), ['MODEL.bend'])
+    assert.equal(result.bend.version, BEND_VERSION)
+    assert.deepEqual(await listing(PAY_FINITE), before)
+    // the same input gives the same digest
+    assert.equal(JSON.parse(reach(PAY_FINITE_MODEL, '--prefix', 'Pay', '--safe', 'at_most_one').stdout).inputDigest, result.inputDigest)
+
+    // the fixture laws, the safety law proven by hand, close under prove with the generated cell law
+    const proved = await proveLaws({ dir: PAY_FINITE, bin, require: PAY_LAWS })
+    assert.equal(proved.status, 'proven', `${proved.stdout}${proved.stderr}`)
+    assert.deepEqual(proved.cells.generated, [{ law: 'pending_resolve_pays', cases: 3 }])
+  })
+
+  test('[bend] a model that charges again on a duplicate Resolve gets its shortest counterexample, and the kernel is not run', async (t) => {
+    const bin = await installedBend(t)
+    if (!bin) return
+    const root = await fixtureCopy(t, PAY_FINITE)
+    await edit(
+      join(root, 'MODEL.bend'),
+      'case Pay{Paid{}, c} Resolve{}:\n      Pay{Paid{}, c}',
+      'case Pay{Paid{}, c} Resolve{}:\n      Pay{Paid{}, Pay.more(c)}',
+    )
+    const before = await listing(root)
+    const run = reach(join(root, 'MODEL.bend'), '--prefix', 'Pay', '--safe', 'at_most_one')
+    assert.equal(run.status, 1, run.stderr)
+    const result = JSON.parse(run.stdout)
+    assert.equal(result.status, 'counterexample')
+    assert.equal(result.violations, 1)
+    // breadth first: Paid with two charges is first reached after three events
+    assert.deepEqual(result.counterexample, {
+      length: 3,
+      label: 'Submit · Resolve · Resolve',
+      trace: [{ $: 'Submit' }, { $: 'Resolve' }, { $: 'Resolve' }],
+      events: '[M.Submit{}, M.Resolve{}, M.Resolve{}]',
+      state: 'M.Pay{M.Paid{}, M.ManyCharges{}}',
+      allowedByNext: true,
+    })
+    assert.match(result.hint, /POLICY_GAP/)
+    assert.equal(result.proof, undefined)
+    assert.deepEqual(await listing(root), before)
+    const fixture = JSON.parse(reach(PAY_FINITE_MODEL, '--prefix', 'Pay', '--safe', 'at_most_one').stdout)
+    assert.notEqual(result.inputDigest, fixture.inputDigest)
+  })
+
+  test('[bend] the kernel, not the tool, decides: an invariant missing a reached state or holding an unsafe one is refused', async (t) => {
+    const bin = await installedBend(t)
+    if (!bin) return
+    const plan = reachPlan({ source: await readFile(PAY_FINITE_MODEL, 'utf8'), prefix: 'Pay', safe: 'at_most_one' })
+    const inputs = await bendInputs(PAY_FINITE_MODEL)
+    const verdictFor = (members) =>
+      verdictBeside({ entry: PAY_FINITE_MODEL, inputs, fileName: 'REACH.bend', text: reachProof(plan, new Set(members), './MODEL.bend').text, bin })
+    assert.equal((await verdictFor(PAY_REACHED)).status, 'proven')
+    // Errored is reached by Submit · Reject: without it a step leaves the invariant
+    assert.deepEqual(await verdictFor(PAY_REACHED.filter((key) => key !== payKey('Errored', 'NoCharge'))), {
+      status: 'failed',
+      failedAt: 'Reach.inv_step',
+    })
+    // Paid with two charges is closed under every step but breaks the safety def
+    assert.deepEqual(await verdictFor([...PAY_REACHED, payKey('Paid', 'ManyCharges')]), { status: 'failed', failedAt: 'Reach.inv_safe' })
+  })
+
+  test('[bend] with enabled, only allowed events count: an event the environment does not send keeps the state', async (t) => {
+    const bin = await installedBend(t)
+    if (!bin) return
+    const root = await workspace(t)
+    const model = join(root, 'MODEL.bend')
+    await writeFile(model, REQUEST)
+    const allowed = await proveReach({ model, prefix: 'Rr', safe: 'safe', bin })
+    assert.equal(allowed.status, 'proven', allowed.output)
+    assert.equal(allowed.allowed, 'Rr.enabled')
+    assert.match(allowed.claim, /and keeps the state on an event Rr\.enabled does not list$/)
+    // Idle, Waiting, then Finished with one charge
+    assert.equal(allowed.reachable, 3)
+    // every event counts without enabled: two responses charge twice, a trace next never allows
+    await writeFile(model, REQUEST_NEXT)
+    const every = await proveReach({ model, prefix: 'Rr', safe: 'safe', bin })
+    assert.equal(every.status, 'counterexample')
+    assert.equal(every.allowed, 'every event')
+    assert.equal(every.counterexample.label, 'Respond · Respond')
+    assert.equal(every.counterexample.allowedByNext, false)
+    assert.match(every.hint, /export enabled\(state\)/)
+    assert.deepEqual(await listing(root), ['MODEL.bend'])
+  })
+
+  test('[bend] never checks the generated proof under the name of a file the model imports', async (t) => {
+    const bin = await installedBend(t)
+    if (!bin) return
+    const root = await fixtureCopy(t, PAY_FINITE)
+    await writeFile(join(root, 'REACH.bend'), 'import Base\n\ndef keep(b: Bool) -> Bool:\n  b\n')
+    await edit(join(root, 'MODEL.bend'), 'import Base\n', 'import Base\nimport ./REACH.bend as Helper\n')
+    const before = await readFile(join(root, 'REACH.bend'), 'utf8')
+    const result = await proveReach({ model: join(root, 'MODEL.bend'), prefix: 'Pay', safe: 'at_most_one', bin })
+    assert.equal(result.status, 'failed')
+    assert.match(result.reason, /REACH\.bend beside the model is in its import closure/)
+    assert.equal(result.proof, undefined)
+    assert.equal(await readFile(join(root, 'REACH.bend'), 'utf8'), before)
+  })
 })

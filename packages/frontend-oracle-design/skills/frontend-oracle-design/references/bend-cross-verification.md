@@ -257,14 +257,13 @@ to `Bound` messages from `init` that `next` allows; each prefix's `observe` valu
 observation. Case IDs hash the trace, so the same model, bound and generator version give the same
 cases and `spaceDigest`; no time or runId enters them. A budget stop keeps the explored cases and
 reports `complete: false` — never trim cases to finish.
-`Bound` has no fixed depth ceiling and trace enumeration has no default case-count ceiling.
-Use `--max-cases <n>` to opt into a case budget; metadata records `maxCases: null` when unlimited.
-World/configuration/perturbation budgets and Bend execution timeouts remain in force.
-Enumeration still uses recursive DFS and fast-check allocates sampled index arrays up front; extreme
-depths can exhaust the JavaScript stack or memory before a case budget is reached.
+`Bound` has no fixed depth ceiling and enumeration no default case ceiling: `--max-cases <n>` opts into
+one (`maxCases: null` when unlimited). World, configuration and perturbation budgets and Bend timeouts stay.
+Enumeration is a recursive DFS and fast-check allocates sampled index arrays up front, so extreme depths can
+exhaust the JavaScript stack or memory before a case budget does.
 The report lists the first 200 cases in label order and always carries `caseCount` and `spaceDigest`;
 `--cases <n>` lists more (pass `caseCount` for all). A card and a lock quote the count, never the trace list:
-the space multiplies per depth (about ×3 per event in a request-id model), so a listing grows past what a
+the space multiplies per depth, so a listing grows past what a
 reader or a model context can hold. Read a required scenario's trace from `--cases`, not from a full dump.
 It also reports the transition cover: every configuration the model can reach (its state plus the events the
 environment allows) takes every allowed event once, through the shortest trace that reaches it. A finite
@@ -298,7 +297,8 @@ and counted (`illegal`, `unplaced`).
 
 With a behavior model, lock only when `prove` is `proven` and the space is complete; show the case count and the traces for
 the required scenarios with the law statements. `open`/`failed` means the model, laws or proof need
-work or a question; `timeout`/`unavailable` follows the §1 failure rule. The user approves the laws,
+work or a question; `timeout`/`unavailable` follows the §1 failure rule. CHECKED reruns `prove` and
+`laws`; free cells only report. The user approves the laws,
 environment, bound and observation line as part of the card. Lock with `--source` for `MODEL.bend`,
 `LAWS.bend` and every local file they import. A later change to any of them is a new revision with
 reconfirmation, never an in-place relock. Design-only stops here at `ORACLE_READY` with the card and the three `.bend` files; it performs and

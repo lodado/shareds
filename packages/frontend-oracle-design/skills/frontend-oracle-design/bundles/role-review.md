@@ -534,8 +534,7 @@ This contract applies to every risk, including Low, and to both Design-only and 
 Risk changes verification depth, not whether this stack is used. There is no opt-out, low-risk
 fast path, sourceless N/A, or silent substitution for any member of the stack. The scope gate in
 `SKILL.md` Entry decides whether the work belongs to Oracle at all — state, ordering, counts,
-permissions or effects a model can state — and is not an opt-out for work that does; no risk routes
-work out of it. type-fest and
+permissions or effects a model can state — and is not an opt-out for work that does. type-fest and
 TypeScript apply when the card has an exposed type boundary (exported Props, a shared/package API,
 a client state union, a trust-boundary type); a card with none declares `typeContract` not applicable
 with the files it investigated and never adds an unused utility to fill the slot. The behavior model
@@ -584,9 +583,10 @@ copies of the policy.
    and lock. Preserve their actual results. These pre-lock model checks do not authorize writing
    target tests or production code. The card, MODEL, LAWS, world and imported local sources are
    confirmed and locked together; PROOF remains a repairable proof candidate. The CHECKED stage of
-   `oracle-stage.mjs` runs the adequacy search itself and refuses a refuted check or a coordinate
+   `oracle-stage.mjs` runs `prove`, `laws` and the adequacy search itself. It refuses a `failed`, `open` or
+   `unsafe` proof (without PROOF.bend none is judged), a law the model breaks, a refuted check and a coordinate
    setting no product can pass (`settings.dead` in `oracle-adequacy.mjs check`; `emit-world` refuses
-   the same with `WORLD_SETTING_UNSATISFIABLE`): exclude it with a sourced assumption or fix the row
+   the same with `WORLD_SETTING_UNSATISFIABLE`): exclude that setting with a sourced assumption or fix the row
    before the lock, never skip its test.
 5. Design-only stops at the approved, checked and locked `ORACLE_READY` contract. It uses the
    formal checks and records the type-fest/static/fast-check plans and capability results, but
@@ -639,8 +639,8 @@ trace projection, pass a stated `--max-length` greater than Bound; the generated
 executed runs and the length each trace actually reached, and fails when fewer runs executed than
 requested or when the environment allows traces past the bound but no sample reached one. For state
 projection, the useful exhaustive check on small domains stays and a separate fast-check property of
-`--runs` runs is always added and counted; the earlier small-domain generator that skipped sampling
-whenever it stayed exhaustive is gone — regenerate files it produced. Do not reduce exhaustive coverage
+`--runs` runs is always added and counted; regenerate files from the earlier small-domain generator,
+which skipped sampling. Do not reduce exhaustive coverage
 to obtain a library import.
 
 Model proof, adequacy, static rejection and harness failure are not a product `VALID_RED`. Record a

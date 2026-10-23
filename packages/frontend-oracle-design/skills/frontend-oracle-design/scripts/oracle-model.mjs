@@ -5,6 +5,7 @@
 // 잠긴 MODEL.bend를 `bend -o *.mjs`로 컴파일해 선언 범위의 trace를 결정적으로 열거하고, 구현 adapter의 관측값을 같은
 // trace에서 대조한다. 기대값은 증명된 그 모델 코드가 계산한다 — JS로 옮겨 적은 두 번째 의미를 두지 않는다.
 
+import { Buffer } from 'node:buffer'
 import { spawnSync } from 'node:child_process'
 import { copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -15,9 +16,9 @@ import { isDeepStrictEqual } from 'node:util'
 import { ensureBend, reportedVersion } from './ensure-bend.mjs'
 import { runCli } from './oracle-cli.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
-import { cellProof, lawReport } from './oracle-laws.mjs'
+import { cellProof, lawReport, MAX_REACH_CELLS, reachPlan, reachProof } from './oracle-laws.mjs'
 import { analyzeConfigurations } from './oracle-quotient.mjs'
-import { scanBendSource, toPlain } from './oracle-types.mjs'
+import { bendLiteral, scanBendSource, toPlain, valuesOf } from './oracle-types.mjs'
 
 export { scanBendSource, toPlain } from './oracle-types.mjs'
 
@@ -323,6 +324,18 @@ export function reachedStates(model, space) {
     }
   }
   return { bound: space.bound, complete: space.complete, traces }
+}
+
+/**
+ * 이미 컴파일한 모델(compileBend)로 bound의 공간이 닿는 상태를 여는 함수 — 다시 컴파일하지 않는다. 모델이 init·step·next·observe
+ * 중 하나라도 내보내지 않으면 공간이 없으므로 null이다.
+ */
+export function compiledReach({ entry, prefix, bin, compiled, bound }) {
+  if (!MODEL_EXPORTS.every((name) => typeof compiled.exported[`${prefix}.${name}`] === 'function')) return null
+  return () => {
+    const loaded = modelOf({ entry, prefix, bin, ...compiled })
+    return reachedStates(loaded, enumerateSpace(loaded, { bound }))
+  }
 }
 
 export const MAX_COVER_CONFIGURATIONS = 2000
@@ -858,6 +871,141 @@ export async function proveLaws({ dir, bin, require = [], timeoutMs = 120_000 })
     : { ...observed, bend: { bin, version: reportedVersion(bin) }, ...verdict, ...(hint ? { hint } : {}) }
 }
 
+/**
+ * 닫힌 계의 도달 상태 — init에서 허용 사건으로 닿는 상태마다, 처음 닿은 가장 짧은 trace를 가진 구성 노드 하나. 구성
+ * BFS(configurationGraph)를 그대로 쓴다: 허용 사건은 사건 도메인 전부이거나 enabled(state)라 상태만의 함수이므로 구성
+ * 하나가 상태 하나이고, 유한 도메인이라 maxStates(도메인 크기)를 넘지 않는다. 빠뜨린 상태가 있어도 커널이 닫힘에서 거부한다.
+ */
+function closedReach({ init, step, events, enabled }, maxStates) {
+  const every = listOf(events)
+  // BFS는 같은 이력 앞부분을 거듭 묻는다(한 걸음 뒤 비교 포함). 이력의 사건은 앞 구성이 받은 그 객체라, 사건 객체로 이은
+  // trie에 상태를 두면 사건마다 step을 한 번만 부른다. 같은 값의 다른 객체는 새 가지가 될 뿐 결과는 같다.
+  const root = { state: init(), after: new Map() }
+  const stateOf = (history) => {
+    let at = root
+    for (const event of listItems(history)) {
+      if (!at.after.has(event)) at.after.set(event, { state: step(at.state, event), after: new Map() })
+      at = at.after.get(event)
+    }
+    return at.state
+  }
+  const system = {
+    init,
+    step,
+    observe: (state) => state,
+    next: enabled === null ? () => every : (history) => enabled(stateOf(history)),
+  }
+  return configurationGraph(system, maxStates).nodes
+}
+
+/**
+ * 반례 trace의 사건마다 모델의 next(history)가 그 사건을 허용하는가 — 모든 사건을 셌을 때(enabled 없음) 환경이 막는
+ * 사건으로 만든 거짓 반례인지 본다. enabled가 있거나 next가 없으면 null이다.
+ */
+function allowedByNext(plan, exported, raw) {
+  const next = exported[`${plan.prefix}.next`]
+  if (plan.enabled || typeof next !== 'function') return null
+  return raw.every((event, index) => {
+    const key = stableStringify(toPlain(event))
+    const choices = listItems(next(structuredClone(listOf(raw.slice(0, index)))))
+    return choices.some((choice) => stableStringify(toPlain(choice)) === key)
+  })
+}
+
+const REACH_GENERATOR = 1
+const REACH_HINTS = {
+  reached:
+    'a trace from init reaches a state that breaks the safety def: the model or the requirement is wrong — check the source, then fix the model or ask a POLICY_GAP question; never weaken the def to obtain a proof',
+  outside:
+    'the model next does not allow this trace, so the environment cannot produce it: export enabled(state) so only allowed events count, or make step keep the state on an event the environment does not allow',
+}
+
+/**
+ * `prove-reach`(Certify): 유한 상태 기계의 도달 집합 R을 BFS로 구해, R을 불변식으로 쓴 증명 파일(reachProof)을 커널로
+ * 검사한다 — 모든 trace에서 `<prefix>.<safe>`가 참이라는 `law reach_safe`. 파일은 모델 import 전부의 임시 사본에서만
+ * 검사하고 사용자 디렉터리에는 아무것도 쓰지 않는다. R의 상태가 safe를 깨면 커널 없이 그 상태의 BFS trace(가장 짧은
+ * 반례)를 돌려준다. enabled(state)가 있으면 허용 사건만 센다(그 밖의 사건은 상태를 그대로 둔다). 무한 타입·상한 초과는
+ * reachPlan이 컴파일 전에 거절한다.
+ */
+export async function proveReach({ model, prefix, safe, bin, timeoutMs = 120_000, maxCells = MAX_REACH_CELLS }) {
+  const entry = resolve(model)
+  const source = await readFile(entry, 'utf8').catch((error) => {
+    throw new CliError('MODEL_UNREADABLE', `${entry}: ${error.message}`)
+  })
+  const plan = reachPlan({ source, prefix, safe, maxCells })
+  const { exported, inputs } = await compileBend({ entry, bin, timeoutMs })
+  const names = ['init', 'step', safe, ...(plan.enabled ? ['enabled'] : [])].map((name) => `${prefix}.${name}`)
+  const missing = names.filter((name) => typeof exported[name] !== 'function')
+  if (missing.length > 0) throw new CliError('MODEL_INTERFACE', `${basename(entry)} does not export ${missing.join(', ')}`)
+  const call =
+    (name) =>
+    (...args) =>
+      exported[name](...args.map((argument) => structuredClone(argument)))
+  const nodes = closedReach(
+    {
+      init: call(`${prefix}.init`),
+      step: call(`${prefix}.step`),
+      events: valuesOf(plan.commandIR),
+      enabled: plan.enabled ? call(`${prefix}.enabled`) : null,
+    },
+    plan.stateCount,
+  )
+  const keeps = plan.enabled ? ` and keeps the state on an event ${prefix}.enabled does not list` : ''
+  const digestOf = { generator: REACH_GENERATOR, model: inputDigest(inputs, dirname(entry)), prefix, safe: plan.safe, enabled: plan.enabled }
+  const base = {
+    prefix,
+    state: plan.state,
+    command: plan.command,
+    safe: plan.safe,
+    allowed: plan.enabled ? `${prefix}.enabled` : 'every event',
+    claim: `for every t: List<${plan.command}>, ${plan.safe}(run(t, ${prefix}.init())) is True, where run folds ${prefix}.step over t${keeps}`,
+    domain: { states: plan.stateCount, events: plan.commandCount, cells: plan.cells },
+    reachable: nodes.length,
+    diameter: nodes.reduce((longest, { trace }) => Math.max(longest, trace.length), 0),
+    inputDigest: sha256(stableStringify(digestOf)),
+    inputs: inputs.map(({ path, sha256: digest }) => ({ path: relative(dirname(entry), path), sha256: digest })),
+    bend: { bin, version: reportedVersion(bin) },
+  }
+
+  const isSafe = call(plan.safe)
+  const broken = nodes.filter(({ state }) => toPlain(isSafe(state)) !== true)
+  if (broken.length > 0) {
+    // 너비 우선이라 처음 깨진 구성의 trace가 가장 짧은 반례다
+    const [first] = broken
+    const allowed = allowedByNext(plan, exported, first.raw)
+    return {
+      ...base,
+      status: 'counterexample',
+      violations: broken.length,
+      counterexample: {
+        length: first.trace.length,
+        label: first.trace.map(eventLabel).join(' · '),
+        trace: first.trace,
+        events: `[${first.trace.map((event) => bendLiteral(event, plan.commandIR)).join(', ')}]`,
+        state: bendLiteral(toPlain(first.state), plan.stateIR),
+        allowedByNext: allowed,
+      },
+      hint: allowed === false ? REACH_HINTS.outside : REACH_HINTS.reached,
+    }
+  }
+  // 생성한 진입 파일은 사본의 모델 옆 REACH.bend다 — closure의 그 파일을 덮어쓰지 않는다
+  if (inputs.some(({ path }) => path === join(dirname(entry), 'REACH.bend')))
+    return {
+      ...base,
+      status: 'failed',
+      reason: 'REACH.bend beside the model is in its import closure, but the generated proof is checked under that name: rename that file',
+    }
+  const members = new Set(nodes.map(({ state }) => stableStringify(toPlain(state))))
+  const { text, arms } = reachProof(plan, members, `./${basename(entry)}`)
+  const run = await runBeside({ entry, inputs, fileName: 'REACH.bend', text, bin, timeoutMs })
+  const proof = { file: 'REACH.bend', arms, bytes: Buffer.byteLength(text), temporaryCopy: true }
+  const verdict = verdictOf(run, { bin, timeoutMs })
+  if (verdict.status === 'proven') return { ...base, status: 'proven', proof }
+  const output = bendOutput(run)
+  const hint = bendFailureHint(output)
+  return { ...base, ...verdict, proof, output, ...(hint ? { hint } : {}) }
+}
+
 /** `bend <file> --verdict` 실행 결과 → 상태. proven은 exit 0·신호 없음·정확한 `ALL PROOFS CHECK` 줄이 함께일 때뿐이다. */
 export function verdictOf(run, { bin, timeoutMs }) {
   if (run.error?.code === 'ETIMEDOUT') return { status: 'timeout', reason: `no verdict in ${timeoutMs}ms` }
@@ -1212,6 +1360,8 @@ const OPTION_NAMES = [
   'nat-max',
   'list-max',
   'max-evals',
+  'safe',
+  'max-cells',
 ]
 const LIST_OPTIONS = ['require', 'file', 'field', 'relation']
 
@@ -1235,7 +1385,8 @@ const USAGE = `usage:
   oracle-model.mjs prove --dir <dir with LAWS.bend and PROOF.bend> [--require <law>]... [--timeout-ms <n>]
   oracle-model.mjs space --model <MODEL.bend> --prefix <Name> --bound <n> [--max-cases <n>] [--cases <listed>] [--order-ways <t>]
   oracle-model.mjs conform --model <MODEL.bend> --prefix <Name> --bound <n> --impl <adapter.mjs> [--max-cases <n>]
-  oracle-model.mjs laws --model <MODEL.bend> --prefix <Prefix> --state <Type> --command <Type> [--relation <def>]... [--observe <def>] [--invariant <def>] [--bound <n>] [--nat-max <n>] [--list-max <n>] [--max-evals <n>]`
+  oracle-model.mjs laws --model <MODEL.bend> --prefix <Prefix> --state <Type> --command <Type> [--relation <def>]... [--observe <def>] [--invariant <def>] [--bound <n>] [--nat-max <n>] [--list-max <n>] [--max-evals <n>]
+  oracle-model.mjs prove-reach --model <MODEL.bend> --prefix <Prefix> --safe <def> [--max-cells <n>] [--timeout-ms <n>]`
 
 const integerOption = (value) => (value === undefined ? undefined : Number(value))
 
@@ -1255,17 +1406,48 @@ const LAWS_OPTIONS = [
   'timeout-ms',
 ]
 
+/** 명령이 받지 않는 옵션(다른 명령의 것)을 조용히 버리지 않고 거절한다. */
+function refuseForeign(command, options, accepted) {
+  const given = Object.keys(options).filter((name) => !LIST_OPTIONS.includes(name) || options[name].length > 0)
+  const foreign = given.filter((name) => !accepted.includes(name)).map((name) => `--${name}`)
+  if (foreign.length > 0) throw new CliError('USAGE', `${command} does not take ${foreign.join(', ')}\n${USAGE}`, 2)
+}
+
 function lawsUsage(options) {
   const { model, prefix, state, command, relation: relations, invariant } = options
   if ([model, prefix, state, command].some((value) => !value)) throw new CliError('USAGE', USAGE, 2)
   if (relations.length === 0 && !invariant) throw new CliError('USAGE', USAGE, 2)
-  const given = Object.keys(options).filter((name) => !LIST_OPTIONS.includes(name) || options[name].length > 0)
-  const flag = (name) => `--${name}`
-  const foreign = given.filter((name) => !LAWS_OPTIONS.includes(name)).map(flag)
-  if (foreign.length > 0) throw new CliError('USAGE', `laws does not take ${foreign.join(', ')}\n${USAGE}`, 2)
+  refuseForeign('laws', options, LAWS_OPTIONS)
   if (options.bound !== undefined && !invariant)
     throw new CliError('USAGE', '--bound sets the space that reaches counterexamples to induction: pass it with --invariant', 2)
 }
+
+const PROVE_REACH_OPTIONS = ['model', 'prefix', 'safe', 'max-cells', 'timeout-ms']
+
+// Bend를 찾기 전에 — 잘못 쓴 명령이 내려받기를 부르지 않게 한다
+function reachUsage(options) {
+  if (!options.model || !options.prefix || !options.safe) throw new CliError('USAGE', USAGE, 2)
+  refuseForeign('prove-reach', options, PROVE_REACH_OPTIONS)
+}
+
+/** `prove-reach`: 결과 JSON 한 줄, proven일 때만 exit 0. */
+async function runReach(options, { bin, timeoutMs }) {
+  const maxCells = integerOption(options['max-cells'])
+  const result = await proveReach({
+    model: options.model,
+    prefix: options.prefix,
+    safe: options.safe,
+    bin,
+    timeoutMs,
+    ...(maxCells === undefined ? {} : { maxCells }),
+  })
+  process.stdout.write(`${JSON.stringify(result)}\n`)
+  process.exitCode = result.status === 'proven' ? 0 : 1
+}
+
+// 명령별 사용법 검사 중 Bend를 찾기 전에 하는 것, 그리고 결과를 스스로 쓰는 명령(오류는 relayed가 이 모듈의 CliError로 옮긴다)
+const EARLY_USAGE = { 'prove-reach': reachUsage }
+const RUNNERS = { laws: runLaws, 'prove-reach': runReach }
 
 /**
  * `laws`: 관계·불변식을 모델의 모든 칸에서 계산한다(oracle-laws.mjs). --invariant·--bound이고 모델이 init·step·next·observe를
@@ -1279,14 +1461,7 @@ async function runLaws(options, { bin, timeoutMs }) {
   const compiled = await compileBend({ entry, bin, timeoutMs })
   const { exported, inputs } = compiled
   const source = await readFile(entry, 'utf8')
-  const spaced =
-    options.bound !== undefined && MODEL_EXPORTS.every((name) => typeof exported[`${prefix}.${name}`] === 'function')
-  const reach = spaced
-    ? () => {
-        const loaded = modelOf({ entry, prefix, bin, ...compiled })
-        return reachedStates(loaded, enumerateSpace(loaded, { bound: Number(options.bound) }))
-      }
-    : null
+  const reach = options.bound === undefined ? null : compiledReach({ entry, prefix, bin, compiled, bound: Number(options.bound) })
   const natMax = integerOption(options['nat-max'])
   const listMax = integerOption(options['list-max'])
   const report = lawReport({
@@ -1322,13 +1497,16 @@ async function main() {
     process.stdout.write(`${USAGE}\n`)
     return
   }
-  if (!['scaffold', 'check', 'prove', 'space', 'conform', 'laws'].includes(command)) throw new CliError('USAGE', USAGE, 2)
+  if (!['scaffold', 'check', 'prove', 'space', 'conform', 'laws', 'prove-reach'].includes(command))
+    throw new CliError('USAGE', USAGE, 2)
   const options = parseOptions(args)
+  EARLY_USAGE[command]?.(options)
   const timeoutMs = options['timeout-ms'] ? Number(options['timeout-ms']) : undefined
   const { bin } = await ensureBend()
 
-  if (command === 'laws') {
-    await relayed(() => runLaws(options, { bin, timeoutMs }))
+  const runner = RUNNERS[command]
+  if (runner) {
+    await relayed(() => runner(options, { bin, timeoutMs }))
     return
   }
 

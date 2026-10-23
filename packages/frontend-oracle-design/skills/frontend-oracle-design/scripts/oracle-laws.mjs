@@ -1,14 +1,17 @@
-// 법칙을 커널 전에 계산으로 점검하고(lawReport), 유한한 `for` 법칙의 칸 증명을 만든다(cellProof). 둘 다 컴파일된 def와
-// Bend 원문만 받는다 — Bend를 부르지 않는다. 값은 oracle-types의 런타임 표현이고, 같음은 plain 값의 stableStringify다.
+// 법칙을 커널 전에 계산으로 점검하고(lawReport), 유한한 `for` 법칙의 칸 증명을 만들고(cellProof), 유한 상태 기계의 도달
+// 집합으로 모든 trace의 안전 증명을 만든다(reachPlan·reachProof). 모두 컴파일된 def·Bend 원문·도달 상태만 받는다 — Bend를
+// 부르지 않는다. 값은 oracle-types의 런타임 표현이고, 같음은 plain 값의 stableStringify다.
 
 import { stableStringify } from './oracle-fs.mjs'
 import {
   bendLiteral,
+  bendTypeName,
   cardinality,
   defSignature,
   parseBendTypes,
   scanBendSource,
   toPlain,
+  toRuntime,
   typeIR,
   valuesOf,
 } from './oracle-types.mjs'
@@ -83,7 +86,7 @@ function checkLimits({ prefix, bounds, maxEvals }) {
     throw new CliError('USAGE', 'max-evals must be a positive safe integer', 2)
 }
 
-function checkDefs({ source, exported, prefix, state, command, relations, observe, invariant }) {
+function checkDefs({ source, exported, prefix, state, command, relations, observe, invariant, run }) {
   const full = (name) => `${prefix}.${name}`
   for (const name of relations.map(full)) {
     if (!typed(source, name, [state, command, state], 'Bool'))
@@ -100,7 +103,8 @@ function checkDefs({ source, exported, prefix, state, command, relations, observ
   // 관계가 없는 불변식 점검에서도 --command가 모델의 사건 타입인지 여기서 걸린다
   if (!typed(source, full('step'), [state, command], state))
     throw new CliError('STEP_INVALID', `${full('step')} must be def ${full('step')}(s: ${state}, c: ${command}) -> ${state}`, 2)
-  const needed = [...relations, observe, invariant, 'step'].filter(Boolean).map(full)
+  // run은 trace 법칙의 fold — 닿은 귀납 반례를 다시 접는 데 init과 함께 쓴다
+  const needed = [...relations, observe, invariant, 'step', ...(run ? [run, 'init'] : [])].filter(Boolean).map(full)
   const missing = needed.filter((name) => typeof exported[name] !== 'function')
   if (missing.length > 0)
     throw new CliError('MODEL_INTERFACE', `the compiled model does not export ${missing.join(', ')}`, 2)
@@ -160,7 +164,7 @@ function recordFields({ source, scope, stateIR, types, bounds }) {
 
 /** 검사를 모두 통과한 뒤에만 도메인을 펼친다 — 서명·도메인·비용 오류는 어떤 def도 부르기 전에 난다. */
 function lawPlan(input) {
-  const { exported, prefix, relations, invariant, maxEvals } = input
+  const { exported, prefix, relations, invariant, run, maxEvals } = input
   checkLimits(input)
   checkDefs(input)
   const { types, stateIR, commandIR, used } = domainsOf(input)
@@ -178,6 +182,7 @@ function lawPlan(input) {
     )
   }
   const call = (name) => cloned(exported[`${prefix}.${name}`])
+  const folding = Boolean(invariant && run)
   const states = valuesOf(stateIR)
   const plainOf = states.map(toPlain)
   const keys = plainOf.map(stableStringify)
@@ -200,6 +205,8 @@ function lawPlan(input) {
     relations: relations.map((name) => ({ name: `${prefix}.${name}`, fn: call(name) })),
     invariantName: invariant ? `${prefix}.${invariant}` : null,
     invariant: invariant ? call(invariant) : null,
+    run: folding ? call(run) : null,
+    init: folding ? call('init') : null,
     scope,
     observed,
     obsPlain,
@@ -273,17 +280,26 @@ function relationCell(plan, tallies, cell) {
   strengthCell(plan, tallies, cell, candidates, singles)
 }
 
+/** 닿은 trace에 사건을 이은 trace를 법칙 자신의 fold로 다시 접어도 불변식이 깨지는가. fold가 없으면 step으로 접은 것과 같다고 본다. */
+function brokenAlongTrace(plan, trace, cell) {
+  if (plan.run === null) return true
+  const events = toRuntime([...trace, toPlain(cell.command)], { kind: 'list', of: plan.commandIR, maxLength: null })
+  return !isTrue(plan.invariant(plan.run(events, plan.init())))
+}
+
 function invariantCell(plan, tallies, cell, holding, reached) {
   const kept = cell.afterIndex === undefined ? isTrue(plan.invariant(cell.after)) : holding[cell.afterIndex]
   if (kept) return
-  note(tallies.ctis, () => ({
+  const trace = reached?.traces.get(plan.keys[cell.index]) ?? null
+  const witness = () => ({
     ...cellLiterals(plan, cell),
-    ...(reached === null
-      ? {}
-      : {
-          reached: reached.traces.get(plan.keys[cell.index])?.map((event) => bendLiteral(event, plan.commandIR)) ?? null,
-        }),
-  }))
+    ...(reached === null ? {} : { reached: trace?.map((event) => bendLiteral(event, plan.commandIR)) ?? null }),
+  })
+  note(tallies.ctis, witness)
+  // 목록 밖의 칸도 센다 — 닿는 반례 하나가 목록 뒤에 있어도 빠지지 않는다
+  if (trace === null || !brokenAlongTrace(plan, trace, cell)) return
+  tallies.reached.first ??= witness()
+  tallies.reached.count += 1
 }
 
 function evaluateCells(plan, reached) {
@@ -291,6 +307,7 @@ function evaluateCells(plan, reached) {
     counterexamples: listing(),
     free: listing(),
     ctis: listing(),
+    reached: { count: 0, first: null },
     pinned: 0,
     empty: 0,
     alternatives: 0,
@@ -390,6 +407,7 @@ function reportOf(input, plan, tallies, reached) {
             ctiCount: tallies.ctis.count,
             ctis: tallies.ctis.listed,
             reach: reached === null ? null : { bound: reached.bound, complete: reached.complete },
+            ...(reached === null ? {} : { reachedCount: tallies.reached.count, firstReached: tallies.reached.first }),
           },
   }
 }
@@ -399,6 +417,8 @@ function reportOf(input, plan, tallies, reached) {
  * 귀납 반례를 본다. 이름은 `emit-state --relation`처럼 접두 없는 def 이름(`R_x` → `<prefix>.R_x`)이고 보고는 전체 이름이다.
  * 같은 관계를 두 번 주면 한 번으로 센다. reach: 서명·도메인·비용 검사가 모두 통과한 뒤에만 한 번 부르는 함수 —
  * `{ bound, complete, traces }`(공간이 닿은 상태의 키(plain 값의 stableStringify) → 처음 닿은 plain 사건 목록)를 준다.
+ * reach가 있으면 닿은 귀납 반례를 목록과 따로 전부 센다(reachedCount, 첫 칸 firstReached). run(trace 법칙
+ * `I(run(t, init()))`의 fold, 접두 없는 이름)을 주면 그중 닿은 trace에 사건을 이어 run으로 접어도 I가 깨지는 칸만 센다.
  */
 export function lawReport({
   source,
@@ -409,6 +429,7 @@ export function lawReport({
   relations = [],
   observe = null,
   invariant = null,
+  run = null,
   bounds = {},
   maxEvals = MAX_EVALS,
   reach = null,
@@ -422,6 +443,7 @@ export function lawReport({
     relations: [...new Set(relations)],
     observe,
     invariant,
+    run,
     bounds,
     maxEvals,
   }
@@ -503,4 +525,223 @@ export function cellProof({ laws, model, names, maxCases = MAX_CELL_CASES }) {
     generated: generated.map(({ block, irs }) => ({ law: block.name, cases: caseCount(irs) })),
     skipped: planned.filter(({ skip }) => skip).map(({ block, skip }) => ({ law: block.name, ...skip })),
   }
+}
+
+// prove-reach: 상태 도메인 × 사건 도메인 칸 수 상한 — 증명 파일은 상태마다, 도달 상태에서는 사건마다 arm 하나다.
+// Bend 2.0.34 실측(사건 둘): 상태 1만 = 2.8MB·3초, 10만 = 32MB·36초로 선형이다.
+export const MAX_REACH_CELLS = 100_000
+
+/** IR 안에서 처음 만나는 무한 자리(Nat·List)의 경로 — `Pay.Pay.charges`처럼 타입·생성자·필드. 없으면 null. */
+function infiniteSlot(ir, path) {
+  if (ir.kind === 'nat') return { path, type: 'Nat' }
+  if (ir.kind === 'list') return { path, type: 'List' }
+  if (ir.kind === 'maybe') return infiniteSlot(ir.of, path)
+  if (ir.kind !== 'data') return null
+  for (const { name, fields } of ir.constructors) {
+    for (const field of fields) {
+      const found = infiniteSlot(field.type, `${path}.${name}.${field.name}`)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+/** 도달 집합 증명의 도메인 하나. 무한이면 NOT_FINITE — 와일드카드 arm은 목표를 정제하지 못해 비멤버를 덮을 수 없다. */
+function finiteDomain(type, types, role) {
+  let ir
+  try {
+    ir = typeIR(type, types)
+  } catch (error) {
+    if (error.message.startsWith('recursive type'))
+      throw new CliError('NOT_FINITE', `the ${role} type ${type} is recursive, so it has infinitely many values: ${error.message}`)
+    throw new CliError('TYPE_UNSUPPORTED', error.message, 2)
+  }
+  if (!Number.isFinite(cardinality(ir))) {
+    const slot = infiniteSlot(ir, bareType(type))
+    // 무한 자리가 없는데 무한이면 유한한 곱이 수의 범위를 넘었다
+    if (slot === null)
+      throw new CliError(
+        'REACH_TOO_LARGE',
+        `the ${role} type ${type} has more values than a number can count: model coarser classes`,
+        2,
+      )
+    throw new CliError(
+      'NOT_FINITE',
+      `the ${role} type ${type} is infinite (${slot.path} is a ${slot.type}): prove-reach needs finite types — model the field in finite classes (a saturated counter) or prove the law with an invariant`,
+    )
+  }
+  return ir
+}
+
+/**
+ * prove-reach의 입력 점검 — 어떤 def도 컴파일하기 전에 원문만으로. 상태·사건 타입은 `<prefix>.step(s: S, m: E) -> S`
+ * 서명에서 읽고, `<prefix>.init() -> S`, `<prefix>.<safe>(s: S) -> Bool`, 있으면 `<prefix>.enabled(s: S) -> List<E>`를
+ * 확인한다. 두 타입이 유한하고 칸 수(상태 × 사건)가 maxCells 이하일 때만 도메인을 돌려준다.
+ */
+export function reachPlan({ source, prefix, safe, maxCells = MAX_REACH_CELLS }) {
+  if (!/^[A-Z]\w*$/.test(prefix ?? ''))
+    throw new CliError('USAGE', 'prefix must name the model namespace, e.g. Pay', 2)
+  if (!/^\w+$/.test(safe ?? ''))
+    throw new CliError('USAGE', '--safe names a def under the prefix without it, e.g. at_most_one for Pay.at_most_one', 2)
+  if (!Number.isSafeInteger(maxCells) || maxCells < 1)
+    throw new CliError('USAGE', 'max-cells must be a positive safe integer', 2)
+  const full = (name) => `${prefix}.${name}`
+  const signature = defSignature(source, full('step'))
+  if (signature?.params.length !== 2 || bareType(signature.returns) !== bareType(signature.params[0].type))
+    throw new CliError('STEP_INVALID', `${full('step')} must be def ${full('step')}(s: <State>, m: <Event>) -> <State>`, 2)
+  const [state, command] = signature.params.map(({ type }) => type.replace(/^\+/, '').trim())
+  if (!typed(source, full('init'), [], state))
+    throw new CliError('INIT_INVALID', `${full('init')} must be def ${full('init')}() -> ${state}`, 2)
+  if (!typed(source, full(safe), [state], 'Bool'))
+    throw new CliError('SAFE_INVALID', `${full(safe)} must be def ${full(safe)}(s: ${state}) -> Bool`, 2)
+  const enabled = defSignature(source, full('enabled')) !== null
+  if (enabled && !typed(source, full('enabled'), [state], `List<${command}>`))
+    throw new CliError('ENABLED_INVALID', `${full('enabled')} must be def ${full('enabled')}(s: ${state}) -> List<${command}>`, 2)
+
+  const types = parseBendTypes(source)
+  const stateIR = finiteDomain(state, types, 'state')
+  const commandIR = finiteDomain(command, types, 'event')
+  const empty = [state, command].filter((_type, index) => cardinality([stateIR, commandIR][index]) === 0)
+  if (empty.length > 0)
+    throw new CliError('TYPE_EMPTY', `${empty.join(' and ')} has no value: a proof over it would hold vacuously`, 2)
+  const stateCount = cardinality(stateIR)
+  const commandCount = cardinality(commandIR)
+  const cells = stateCount * commandCount
+  if (cells > maxCells)
+    throw new CliError(
+      'REACH_TOO_LARGE',
+      `${stateCount} states × ${commandCount} events = ${cells} cells, more than --max-cells ${maxCells}: the proof has an arm per state and per reached state and event — model coarser classes or raise --max-cells`,
+      2,
+    )
+  return { prefix, safe: full(safe), state, command, stateIR, commandIR, stateCount, commandCount, cells, enabled }
+}
+
+const REACH_HEADER = (importPath) => [
+  'import Base',
+  `import ${importPath} as M`,
+  '',
+  '# Generated by oracle-model.mjs prove-reach: Reach.inv is the set of states reached from init, one arm per state',
+  '# of the domain. The kernel checks that every step keeps it and that it implies the safety def. It is checked in a',
+  '# temporary copy and never written beside the model.',
+  '',
+  'def Reach.clash(b: Bool) -> Type:',
+  '  match b:',
+  '    case False{}:',
+  '      Empty',
+  '    case True{}:',
+  '      Unit',
+  '',
+  'def Reach.absurd(e: {False{} == True{} : Bool}) -> Empty:',
+  '  %Equal.sym(Bool, False{}, True{}, e) : Reach.clash(_)',
+  '  Unit{}',
+  '',
+]
+
+/**
+ * `Reach.step` — 모델의 step. enabled가 있으면 enabled가 내지 않는 사건에서 상태를 그대로 둔다(stutter): 그러면 모든
+ * trace에 대한 법칙이 환경이 허용하는 trace의 안전과 같고, 닫힘은 허용 사건에 대해서만 검사된다. 사건이 목록에 있는지는
+ * 사건 도메인의 값마다 한 arm인 같음(`Reach.same`)으로 계산한다.
+ */
+function reachStep({ prefix, enabled }, S, E, events) {
+  if (!enabled) return [`def Reach.step(s: ${S}, m: ${E}) -> ${S}:`, `  M.${prefix}.step(s, m)`, '']
+  return [
+    `def Reach.same(a: ${E}, b: ${E}) -> Bool:`,
+    '  match a b:',
+    ...events.flatMap((event) => [`    case ${event} ${event}:`, '      True{}']),
+    '    case _ _:',
+    '      False{}',
+    '',
+    `def Reach.has(xs: List<${E}>, +m: ${E}) -> Bool:`,
+    '  match xs:',
+    '    case Nil{}:',
+    '      False{}',
+    '    case Con{x, rest}:',
+    '      Bool.or(Reach.same(x, m), Reach.has(rest, m))',
+    '',
+    `def Reach.keep(allowed: Bool, s: ${S}, t: ${S}) -> ${S}:`,
+    '  match allowed:',
+    '    case True{}:',
+    '      t',
+    '    case False{}:',
+    '      s',
+    '',
+    `def Reach.step(+s: ${S}, +m: ${E}) -> ${S}:`,
+    `  Reach.keep(Reach.has(M.${prefix}.enabled(s), m), s, M.${prefix}.step(s, m))`,
+    '',
+  ]
+}
+
+/**
+ * 도달 집합 R의 Certify 증명 파일 한 장. `Reach.inv`는 상태 도메인 전체의 명시 arm(멤버 True, 비멤버 False)이고,
+ * `inv_step`은 멤버마다 사건 arm을 `{==}`로, 비멤버는 가정 `False == True`의 모순으로 닫는다 — 와일드카드 arm은 목표를
+ * 정제하지 못한다. 그 뒤 `inv_safe`와 귀납 하나(`safe_run`)로 `law reach_safe`(모든 trace에서 safe)를 증명한다.
+ * members: 도달 상태의 plain 키 집합. arms: 생성한 match arm 수(상태 도메인 × 3 + 도달 상태 × 사건 [+ 같음 arm]).
+ */
+export function reachProof(plan, members, importPath) {
+  const { prefix, safe, stateIR, commandIR, enabled } = plan
+  const S = bendTypeName(stateIR)
+  const E = bendTypeName(commandIR)
+  const literal = (value, ir) => bendLiteral(toPlain(value), ir)
+  const states = valuesOf(stateIR).map((value) => ({
+    text: literal(value, stateIR),
+    member: members.has(stableStringify(toPlain(value))),
+  }))
+  const events = valuesOf(commandIR).map((value) => literal(value, commandIR))
+  // 도메인이 크면 arm이 수십만 줄이다 — 인자 펼치기(push(...xs))는 호출 스택을 넘으므로 한 줄씩 넣는다
+  const lines = REACH_HEADER(importPath)
+  const add = (...items) => {
+    for (const item of items) lines.push(item)
+  }
+  add(`def Reach.inv(s: ${S}) -> Bool:`, '  match s:')
+  for (const { text, member } of states) add(`    case ${text}:`, `      ${member ? 'True{}' : 'False{}'}`)
+  add('')
+  for (const line of reachStep(plan, S, E, events)) add(line)
+  const kept = (s) => `{Reach.inv(Reach.step(${s}, m)) == True{} : Bool}`
+  const safeOf = (s) => `{M.${safe}(${s}) == True{} : Bool}`
+  add(
+    `def Reach.run(t: List<${E}>, s: ${S}) -> ${S}:`,
+    '  match t:',
+    '    case Nil{}:',
+    '      s',
+    '    case Con{m, rest}:',
+    '      Reach.run(rest, Reach.step(s, m))',
+    '',
+    `def Reach.no_step(s: ${S}, m: ${E}, h: {False{} == True{} : Bool}) -> ${kept('s')}:`,
+    `  Empty.absurd(${kept('s')}, Reach.absurd(h))`,
+    '',
+    `def Reach.no_safe(s: ${S}, h: {False{} == True{} : Bool}) -> ${safeOf('s')}:`,
+    `  Empty.absurd(${safeOf('s')}, Reach.absurd(h))`,
+    '',
+    `def Reach.inv_step(s: ${S}, m: ${E}, h: {Reach.inv(s) == True{} : Bool}) -> ${kept('s')}:`,
+    '  match s:',
+  )
+  const memberArms = ['      match m:', ...events.flatMap((event) => [`        case ${event}:`, '          {==}'])]
+  for (const { text, member } of states) {
+    add(`    case ${text}:`)
+    if (member) for (const line of memberArms) add(line)
+    else add(`      Reach.no_step(${text}, m, h)`)
+  }
+  add('', `def Reach.inv_safe(s: ${S}, h: {Reach.inv(s) == True{} : Bool}) -> ${safeOf('s')}:`, '  match s:')
+  for (const { text, member } of states) add(`    case ${text}:`, member ? '      {==}' : `      Reach.no_safe(${text}, h)`)
+  const fromInit = `Reach.run(t, M.${prefix}.init())`
+  add(
+    '',
+    `def Reach.safe_run(t: List<${E}>, +s: ${S}, h: {Reach.inv(s) == True{} : Bool}) -> ${safeOf('Reach.run(t, s)')}:`,
+    '  match t:',
+    '    case Nil{}:',
+    '      Reach.inv_safe(s, h)',
+    '    case Con{+m, rest}:',
+    '      Reach.safe_run(rest, Reach.step(s, m), Reach.inv_step(s, m, h))',
+    '',
+    'law reach_safe:',
+    `  for t: List<${E}>`,
+    `  ${safeOf(fromInit)}`,
+    '',
+    'def reach_safe(t):',
+    `  Reach.safe_run(t, M.${prefix}.init(), {==})`,
+    '',
+  )
+  const reached = states.filter(({ member }) => member).length
+  const sameArms = enabled ? events.length + 1 : 0
+  return { text: lines.join('\n'), arms: states.length * 3 + reached * events.length + sameArms }
 }
