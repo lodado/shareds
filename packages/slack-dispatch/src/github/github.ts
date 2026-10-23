@@ -67,6 +67,25 @@ export function parseGate(json: string): Gate {
   }
 }
 
+export type PrState = 'open' | 'merged' | 'closed'
+
+const PR_STATES: Readonly<Record<string, PrState>> = { OPEN: 'open', MERGED: 'merged', CLOSED: 'closed' }
+
+function prStateOf(value: unknown): PrState | undefined {
+  if (typeof value !== 'string' || !Object.hasOwn(PR_STATES, value)) return undefined
+  return PR_STATES[value]
+}
+
+// Where a pull request stands on the host now: still open, merged, or closed without a merge. Read from GitHub each
+// time, because it can change without this service: a person may merge it there.
+export async function readPrState(run: Run, prUrl: string): Promise<PrState> {
+  const { stdout } = await run('gh', ['pr', 'view', prUrl, '--json', 'state'])
+  const parsed: unknown = JSON.parse(stdout)
+  const known = prStateOf(isRecord(parsed) ? parsed.state : undefined)
+  if (known === undefined) throw new Error('gh pr view did not say whether the pull request is open')
+  return known
+}
+
 export async function readGate(run: Run, prUrl: string): Promise<Gate> {
   const { stdout } = await run('gh', ['pr', 'view', prUrl, '--json', 'statusCheckRollup,reviewDecision,headRefOid'])
   return parseGate(stdout)

@@ -8,6 +8,7 @@ import type { Agent, AgentModel, AgentResult } from '../agent/claude.ts'
 import type { BuildInput } from '../agent/prompts.ts'
 import type { DigestMessage } from '../digest/digest.ts'
 import type { Run } from '../exec/exec.ts'
+import type { PrState } from '../github/github.ts'
 import type { QaOutcome, RunQa } from '../qa/qa.ts'
 import type { SlackClient } from '../slack/client.ts'
 import type { ItemRow, Store } from '../store/store.ts'
@@ -101,6 +102,8 @@ export interface WorkerDeps {
   qa: RunQa
   // Milliseconds since the epoch, for the pause between two tries to clean up.
   now: () => number
+  // Where a pull request stands on the host; it can be merged or closed there without this service.
+  prState: (prUrl: string) => Promise<PrState>
 }
 
 export interface Worker {
@@ -119,6 +122,8 @@ const MIN_RUN_BUDGET_USD = 0.25
 // still run into the spending cap.
 const STOPPED_CHARGE = 0.25
 const CLEANUP_RETRY_MS = 5 * 60_000
+// How often an open pull request is asked about. Only the items waiting in pr_open are, so this stays a few calls.
+const PR_CHECK_MS = 10 * 60_000
 const BRANCH_PREFIX = /^origin\//
 const TITLE_LENGTH = 70
 const REASON_LENGTH = 500
@@ -195,6 +200,8 @@ interface Ctx {
   channel: () => Promise<string>
   // When an item whose worktree could not be removed may be tried again.
   cleanupRetryAt: Map<string, number>
+  // When an item with an open pull request may be asked about next.
+  prCheckAt: Map<string, number>
 }
 
 async function post(ctx: Ctx, message: DigestMessage): Promise<string> {
@@ -730,6 +737,47 @@ async function startReady(ctx: Ctx, stage: 'planning' | 'implementing'): Promise
   }
 }
 
+// What the host says about the pull request of an item that waits in pr_open. A merge made there (or a close) is the
+// fact, so the item follows it: merged items and closed ones are cleaned up like any other. Asked about every ten
+// minutes per item, and a failed question is only logged and asked again later.
+async function checkPullRequest(ctx: Ctx, item: ItemRow, prUrl: string): Promise<void> {
+  const { store } = ctx.deps
+  let state: PrState
+  try {
+    state = await ctx.deps.prState(prUrl)
+  } catch (error) {
+    logEvent(store, {
+      itemKey: item.key,
+      kind: 'system',
+      type: 'pr_state_failed',
+      payload: { error: errorText(error) },
+    })
+    return
+  }
+  if (state === 'open') return
+  const event =
+    state === 'merged'
+      ? ({ type: 'merge', owner: true, ci: true, review: true } as const)
+      : ({ type: 'reject', owner: true } as const)
+  if (applyEvent(store, item.key, event).outcome.kind !== 'moved') return
+  logEvent(store, { itemKey: item.key, kind: 'system', type: `pr_${state}_on_host`, payload: { prUrl } })
+  await syncBoard(ctx, item.key)
+  const said = state === 'merged' ? 'PR이 머지된 걸 확인했어요' : 'PR이 머지 없이 닫힌 걸 확인했어요'
+  await notifyOwner(ctx, item, `${said}: ${item.repo}. 워크트리는 정리할게요.`)
+}
+
+async function syncPullRequests(ctx: Ctx): Promise<void> {
+  const { store } = ctx.deps
+  const now = ctx.deps.now()
+  for (const item of listItems(store, { stage: 'pr_open' })) {
+    const prUrl = getWorkspace(store, item.key)?.prUrl ?? null
+    // A build that was only committed locally has no pull request to ask about.
+    if (prUrl === null || (ctx.prCheckAt.get(item.key) ?? 0) > now) continue
+    ctx.prCheckAt.set(item.key, now + PR_CHECK_MS)
+    await checkPullRequest(ctx, item, prUrl)
+  }
+}
+
 async function cleanOne(ctx: Ctx, item: ItemRow, workspace: WorkspaceRow): Promise<void> {
   const { store, run } = ctx.deps
   try {
@@ -774,11 +822,13 @@ export function createWorker(deps: WorkerDeps): Worker {
     })
     return dm
   }
-  const ctx: Ctx = { deps, jobs: new Map(), channel, cleanupRetryAt: new Map() }
+  const ctx: Ctx = { deps, jobs: new Map(), channel, cleanupRetryAt: new Map(), prCheckAt: new Map() }
   return {
     async tick() {
       await startReady(ctx, 'planning')
       await startReady(ctx, 'implementing')
+      // Before the cleanup, so a pull request merged on the host is cleaned up in the same tick.
+      await syncPullRequests(ctx)
       await cleanUp(ctx, 'declined')
       await cleanUp(ctx, 'merged')
     },

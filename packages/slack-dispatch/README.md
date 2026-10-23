@@ -15,6 +15,8 @@ Turns the Slack threads that tag you into reviewed pull requests, with you appro
    the agent itself is a background process Orca cannot show.
 5. **Pull request** only when `ENABLE_PR=1`; merging needs your click, passing CI and an approved review. When it is
    open, the bot answers in the thread the work came from: the Slack thread, or your DM for a DM request.
+   Every 10 minutes the bot asks GitHub about each pull request that is waiting: one merged there (not only by the
+   button) finishes the item and its worktree is removed; one closed without a merge is called off.
 
 You can also DM the bot a free-form request; it is split per repository and goes straight to planning. DM `대기` for the
 open items, or `어제`, `그제`, `3일 전` (up to 30 days) to list what tagged you that day: new items arrive as a digest,

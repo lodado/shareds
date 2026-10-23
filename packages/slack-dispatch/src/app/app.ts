@@ -13,7 +13,7 @@ import type { Connect } from '../socket/socket.ts'
 import type { Store } from '../store/store.ts'
 import type { WorkerConfig } from '../work/worker.ts'
 import type { StatusServer, StatusSnapshot } from './status.ts'
-import { mergePr, readGate } from '../github/github.ts'
+import { mergePr, readGate, readPrState } from '../github/github.ts'
 import { catchUp } from '../ingest/catch-up.ts'
 import { ingestMentions } from '../ingest/ingest.ts'
 import { listRepos } from '../orca/repos.ts'
@@ -140,6 +140,7 @@ export async function createApp(deps: AppDeps): Promise<App> {
     newSessionId: deps.newSessionId,
     qa: deps.qa,
     now: () => deps.now().getTime(),
+    prState: (prUrl) => readPrState(run, prUrl),
   })
 
   const prOf = (itemKey: string): string | null => getWorkspace(store, itemKey)?.prUrl ?? null

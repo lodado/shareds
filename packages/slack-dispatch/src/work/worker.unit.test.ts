@@ -1,5 +1,6 @@
 import type { Agent, AgentCall, AgentResult } from '../agent/claude'
 import type { Run } from '../exec/exec'
+import type { PrState } from '../github/github'
 import type { ItemEvent } from '../machine/machine'
 import type { QaInput, QaOutcome } from '../qa/qa'
 import type { ItemMeta, Store } from '../store/store'
@@ -82,6 +83,8 @@ interface Rig {
   openDmCalls: () => number
   // How many times the Slack thread of an item was read.
   threadReads: () => number
+  // The pull requests the worker asked the host about, in order.
+  prAsks: string[]
 }
 
 interface RigOptions {
@@ -97,6 +100,8 @@ interface RigOptions {
   mergeBase?: string
   // The branch has no upstream (the host deleted it after the merge): comparing with it fails.
   noUpstream?: boolean
+  // What the host says about each pull request, by address; open when not given. An Error is a failed question.
+  prStates?: Readonly<Record<string, PrState | Error>>
   // The agent left no commit on top of the base.
   noCommit?: boolean
   // The branch the worktree is on after the agent ran; the worktree's own branch when not given.
@@ -144,6 +149,7 @@ function rig(options: RigOptions = {}): Rig {
   const order: string[] = []
   let openDmCalls = 0
   let threadReads = 0
+  const prAsks: string[] = []
   const run: Run = (file, args) => {
     const line = `${file} ${args.join(' ')}`
     commands.push(line)
@@ -196,6 +202,11 @@ function rig(options: RigOptions = {}): Rig {
       )
     },
     now: () => clock.now,
+    prState: (prUrl) => {
+      prAsks.push(prUrl)
+      const answer = options.prStates?.[prUrl] ?? 'open'
+      return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer)
+    },
   })
   return {
     store,
@@ -207,6 +218,7 @@ function rig(options: RigOptions = {}): Rig {
     qaInputs,
     openDmCalls: () => openDmCalls,
     threadReads: () => threadReads,
+    prAsks,
   }
 }
 
@@ -1516,5 +1528,101 @@ describe('worker as the commit a build is told its branch started from', () => {
     approvedInWorktree(r)
     await settle(r)
     expect(r.calls[0]?.prompt).not.toContain('the commit this branch started from')
+  })
+})
+
+describe('worker as a pull request that is merged or closed on the host', () => {
+  const PR = 'https://github.com/acme/web-app/pull/9'
+
+  // An item waiting in pr_open with a pull request, like the build of an item leaves it.
+  function waitingWithPr(r: Rig, n = 1, prUrl: string | null = PR): string {
+    const key = item(r.store, 'web-app', [...TO_IMPLEMENTING, { type: 'built', ok: true }], n)
+    saveWorkspace(r.store, key, {
+      sessionId: 's',
+      path: `/wt/${n}`,
+      branch: `dispatch-${n}`,
+      baseRef: 'origin/develop',
+    })
+    if (prUrl !== null) setPrUrl(r.store, key, prUrl)
+    return key
+  }
+
+  it('to be merged, the board and the owner told, and the worktree removed in the same tick', async () => {
+    const r = rig({ prStates: { [PR]: 'merged' } })
+    const key = waitingWithPr(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('merged')
+    expect(r.posted.map((message) => message.text)).toStrictEqual([
+      'PR이 머지된 걸 확인했어요: web-app. 워크트리는 정리할게요.',
+    ])
+    expect(r.commands).toContain('orca worktree rm --worktree path:/wt/1 --json')
+    const found = listEvents(r.store, { itemKey: key }).find((event) => event.type === 'pr_merged_on_host')
+    expect(JSON.parse(found?.payload ?? '{}')).toStrictEqual({ prUrl: PR })
+    expect(r.commands.some((line) => line.includes('--workspace-status completed'))).toBe(true)
+  })
+
+  it('to be declined when it was closed without a merge, and the worktree thrown away', async () => {
+    const r = rig({ prStates: { [PR]: 'closed' } })
+    const key = waitingWithPr(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('declined')
+    expect(r.posted.map((message) => message.text)).toStrictEqual([
+      'PR이 머지 없이 닫힌 걸 확인했어요: web-app. 워크트리는 정리할게요.',
+    ])
+    expect(r.commands).toContain('orca worktree rm --worktree path:/wt/1 --force --json')
+  })
+
+  it('to be left alone while the pull request is open, and not asked again for ten minutes', async () => {
+    const r = rig()
+    const key = waitingWithPr(r)
+    await settle(r)
+    await settle(r)
+    expect(r.prAsks).toStrictEqual([PR])
+    clock.now += 9 * 60_000
+    await settle(r)
+    expect(r.prAsks).toHaveLength(1)
+    clock.now += 61_000
+    await settle(r)
+    expect(r.prAsks).toStrictEqual([PR, PR])
+    expect(stageOf(r.store, key)).toBe('pr_open')
+    expect(r.posted).toStrictEqual([])
+  })
+
+  it('to be logged, and asked again after the pause, when the host cannot be asked', async () => {
+    const r = rig({ prStates: { [PR]: new Error('gh is not logged in') } })
+    const key = waitingWithPr(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('pr_open')
+    const failed = listEvents(r.store, { itemKey: key }).filter((event) => event.type === 'pr_state_failed')
+    expect(failed).toHaveLength(1)
+    await settle(r)
+    expect(r.prAsks).toHaveLength(1)
+    clock.now += 10 * 60_000 + 1
+    await settle(r)
+    expect(r.prAsks).toHaveLength(2)
+  })
+
+  it('to be only the items waiting in pr_open that are asked about, and only those with a pull request', async () => {
+    const r = rig({ prStates: { [PR]: 'merged' } })
+    waitingWithPr(r, 1, null)
+    // Items in other stages that keep an address (a plan that waits, a build that failed) are not asked about.
+    const planned = item(r.store, 'web-app', [...TO_PLANNING, { type: 'plan_ready', current: true }], 2)
+    const failed = item(r.store, 'web-app', [...TO_IMPLEMENTING, { type: 'built', ok: false }], 3)
+    for (const key of [planned, failed]) {
+      saveWorkspace(r.store, key, { sessionId: 's', path: '/wt/x', branch: 'dispatch-x', baseRef: 'origin/develop' })
+      setPrUrl(r.store, key, PR)
+    }
+    await r.worker.tick()
+    expect(r.prAsks).toStrictEqual([])
+    expect([stageOf(r.store, planned), stageOf(r.store, failed)]).toStrictEqual(['planned', 'failed'])
+  })
+
+  it('to be each item asked about on its own, with the merged one finished and the open one left', async () => {
+    const other = 'https://github.com/acme/web-app/pull/10'
+    const r = rig({ prStates: { [PR]: 'merged', [other]: 'open' } })
+    const first = waitingWithPr(r, 1, PR)
+    const second = waitingWithPr(r, 2, other)
+    await settle(r)
+    expect([stageOf(r.store, first), stageOf(r.store, second)]).toStrictEqual(['merged', 'pr_open'])
   })
 })
