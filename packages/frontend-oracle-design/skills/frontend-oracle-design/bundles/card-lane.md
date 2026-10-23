@@ -1166,18 +1166,21 @@ replaces the `O*`·`D*` row that owns a specific scenario outcome.
 
 ## Mandatory verification stack
 
-Every card, including Low and Design-only, must also record the real type-fest utility and the
-source-backed relation it protects, TypeScript positive/negative compiler witnesses, and a positive
-fast-check sampling plan. See [`mandatory-verification.md`](../mandatory-verification.md). A mention,
-dummy import, unrelated fixture or `runs=0` is not evidence; unresolved capability is `NEEDS_DECISION`
-and missing tools or failed execution is `FAIL`.
+Record the members of the stack that [`mandatory-verification.md`](../mandatory-verification.md) applies to
+this card: the real type-fest utility, the source-backed relation it protects and TypeScript positive/negative
+compiler witnesses when the card has an exposed type boundary (otherwise `typeContract` not applicable with
+the files investigated), and a positive fast-check sampling plan when the Order or Async family is mapped. A
+mention, dummy import, unrelated fixture or `runs=0` is not evidence; unresolved capability is
+`NEEDS_DECISION` and missing tools or failed execution is `FAIL`.
 
-## Formal Model — required
+## Formal Model — required with a behavior model
 
-Every card must include the section and its locked `MODEL.bend`/`LAWS.bend` sources and imports.
-`PROOF.bend` is required as a checked proof candidate but remains unlocked and repairable.
-The checks are owned by [`bend-cross-verification.md`](../bend-cross-verification.md); absence is a
-`FAIL`, including Low and Design-only.
+A card whose space maps the Order or Async family includes the section and its locked
+`MODEL.bend`/`LAWS.bend` sources and imports. `PROOF.bend` is required as a checked proof candidate but
+remains unlocked and repairable. A card whose source excludes both is decided by its world (Terms, Adequacy
+and world conformance), as mandatory-verification says. The checks are owned by
+[`bend-cross-verification.md`](../bend-cross-verification.md); a required section that is absent is a `FAIL`,
+including Low and Design-only.
 
 ## Terms and Adequacy — required
 

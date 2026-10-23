@@ -1,3 +1,110 @@
+# 0.109.0: a separate `bend-proof` skill reads the model as a state·event·transition machine and proves safety over every trace
+
+## Validation
+
+- `ORACLE_REQUIRE_BEND=1 node --test --test-concurrency=4 scripts/*.test.mjs`: **196 passed, 0 failed, 0 skipped**.
+- `ORACLE_REQUIRE_BEND=1 node --test --test-concurrency=4 skills/frontend-oracle-design/scripts/*.test.mjs`: **1,028
+  passed, 0 failed, 0 skipped**, using real Bend.
+- `ORACLE_REQUIRE_BEND=1 node --test skills/frontend-oracle-design/scripts/oracle-model.test.mjs`: **49 passed**, all 10
+  `[bend]` tests ran (5 new), none skipped.
+- Repo-root `node --test .claude/hooks/skill-tool-frontmatter.test.mjs`: passed (26 skill entries).
+- Package lint: exit 0, **0 errors, 405 package-wide warnings** (unchanged). Generated reference bundles (22), workflow
+  docs and converted evals: passed. Bundle sizes are under Change.
+- Kernel: `bend PROOF.bend --verdict` prints `ALL PROOFS CHECK` for both new fixtures (about 0.08 s each).
+- Mutation checks: 53 single-fault mutations on scratch copies, each killed by the intended test. They cover the new
+  skill's frontmatter, trigger phrases, byte budgets, links, graph node, excerpts, citations and Contract
+  unreachability; the guard hook's activation names; the install-acceptance message; and the fixtures behind the five
+  new `[bend]` tests (invariant arms, step arms, lemma names, the environment's offered events, the toggle relations).
+- An independent Opus 5.5 review returned not PERFECT with no blocker, 3 major, 10 minor and 11 nit findings, all
+  applied without a second review:
+  - Major: the failure guide read a stopped proof arm as a false claim. It now prints the arm's goal first, proves the
+    missing lemma when the goal holds for every value, and sends only a kernel-checked counterexample to the
+    reachability question.
+  - Major: `$bend-proof` read all of `model-patterns.md`, and this entry had no per-path read sizes. The read is now
+    conditional and the sizes are under Change.
+  - Major: `card-format.md` contradicted `mandatory-verification.md`; it is aligned (Change).
+  - Minor: four new Markdown files failed prettier; the cell example came from a fixture no test proved (now
+    session-expiry's `Laws.expired_blocks`, and a toggle `[bend]` test guards the frame-law example); the
+    environment section over-claimed; the reviewer checklist flagged the doc's own fixtures; `last` breaks the
+    `emit-state` round trip unless the product exposes it; Bend proof requests had two named owners; nothing pinned
+    `bend-proof` out of the guard's activation names, and standalone mode had no stop rule for locked files; this
+    entry's accuracy; the entry's two modes were mixed; two tests were weaker than they could be.
+  - Nits: README cell widths and wording, the controller pointer, the padded Bend arm marker, Entry as a first event
+    only when it changes behaviour, "finite classes or counters", the `check --file` reference, `+s` and `+m`, the
+    computed install-acceptance message, two unclear law rows and the missing frame-law example.
+  - It accepted both test deviations: the new checks live in `modular-skills.test.mjs`, because a separate file would
+    need a new lint exception, and `oracle-space.test.mjs` judges paths inside the skill.
+
+## Diagnosis
+
+- Laws were one-step cell laws plus witnesses. No template or tool proved a safety property over every trace, and the
+  trace space and derived axes stop at `Bound`.
+- `next(history)` re-reads the whole history, so an induction over traces would carry the history as well.
+- Law strength was a prose rule ("pin every result"). A throwaway counter over compiled models, not part of this
+  release, measured it under the three-argument relation form:
+  - A 330-cell state machine from another repository (10 stages × 33 events), with 70 candidate after-states (10
+    stages × the 7 outcomes other than the initial `Began`) and the outcome read from `last`: 33 laws pin every cell, a
+    minimal set is 21 (14 forward, 5 refusal reasons, 2 frame laws), and without the two frame laws the same 19 laws
+    leave all 330 cells free. That model is untracked here, so these numbers cannot be reproduced from this
+    repository.
+  - On the toggle and session-expiry fixtures, relations written for one command leave 32 of 48 and 4 of 8 cells open
+    on the observed field.
+- The Bend method was spread over documents every Formal author reads; the role-author bundle had 51 bytes left.
+
+## Change
+
+- New skill `skills/bend-proof/SKILL.md`: a Formal-only helper, standalone or invoked by the Formal author, never
+  reachable from the Contract controller; the Formal reviewer reads only its checklist. It reads one new reference
+  node, `bend-proof` (`references/bend-proof.md`): the model read as a machine, requirement sentences mapped to laws,
+  cell, every-trace, witness and rank templates, the environment kept in the state, how to read a failure and a
+  reviewer checklist. It reads `model-patterns.md` only when the model has retries, delays, staleness, error kinds,
+  remounts, request counts, counters, collections or identities. The node has no route and sits outside every
+  closure, so no bundle contains it.
+- Bytes read per path, base → this release:
+  - Formal controller entry (`SKILL.md`, every Formal invocation): 5,183 → 5,286 (+103).
+  - Formal author, `role-author` bundle: 277,949 → 277,811 (−138). Invoking `$bend-proof` adds its `SKILL.md` (2,592)
+    and `bend-proof.md` (11,757), 14,349 in all; `model-patterns.md` is already in the bundle.
+  - Formal card authoring, `card-lane` bundle: 136,416 → 136,778 (+362), from the `card-format.md` alignment below.
+  - Formal independent review, `role-review` bundle: 61,062 → 61,179 (+117). A review that judges laws also reads
+    `bend-proof.md` for its checklist (+11,757).
+  - Independent analyst (the `model-input` file only), Formal implementation and Delivery bundles: unchanged.
+  - Contract paths: unchanged, apart from 4 fewer bytes in the Contract controller's description.
+  - Standalone `$bend-proof`: 14,349, plus the `model-patterns.md` sections the model needs (23,496 in full).
+- Every code example in that node is cut from a fixture a `[bend]` test proves with the kernel: two new ones below and
+  three existing ones (`session-expiry/PROOF.bend` for the cell proof, `toggle/MODEL.bend` for the frame law,
+  `stale-search/MODEL.bend` for the history-reading environment):
+  - `test-fixtures/pay`: `never_double_charge` over every trace through one induction (`safe_run`), with a
+    kernel-checked counterexample to induction for the weaker invariant `charges ≤ 1`.
+  - `test-fixtures/stale-search-env`: the stale-search environment kept in the model state; `shown ≤ latest` over every
+    trace, and the same cases and `spaceDigest` as stale-search at bounds 3 to 5.
+- Pointers in `SKILL.md` (Mode selection 2), `roles/author-formal.md` (step 5) and `roles/review-formal.md`.
+- Citations removed: the Bend guide URL and the attribution in `model-patterns.md`, and the documentation links in
+  `bend-cross-verification.md` (the section is now "Bend version" and keeps its version-binding sentence).
+- `card/card-format.md` now says what `mandatory-verification.md` and the package lint say: type-fest and TypeScript
+  witnesses when the card has an exposed type boundary, the behavior model and a fast-check plan when the Order or
+  Async family is mapped, and otherwise the world decides. It had required all of them on every card.
+- The Contract controller's description says the Formal profile, not `frontend-oracle-design` alone, owns Bend proof
+  requests, since `bend-proof` now serves them too.
+- Tests: seven skill entries (names, install acceptance, frontmatter, root hook count 26), the owner link for the new
+  node, the Contract profile's reject list, and `bend-proof` kept out of the guard hook's activation names (a
+  standalone session has no lock, so the guard would deny every test write). Eight checks of the new skill inside
+  `modular-skills.test.mjs`: frontmatter and trigger phrases, byte budgets, links, the node's shape, code excerpts
+  against the fixtures, citations (and no URL left in `model-patterns.md` or `bend-cross-verification.md`), Contract
+  unreachability, and the `Never` list with the standalone stop rule; a separate file would need a new lint
+  exception. Five `[bend]` tests: pay, stale-search-env and toggle prove; a model that charges twice fails at the
+  `inv_step` arm for `Paid` and `Resolve`; both stale-search models give the same space. `oracle-space.test.mjs` now
+  judges module paths inside the skill instead of the absolute checkout path, which failed in any directory whose
+  name contains "bend".
+
+## Not changed
+
+- No tool behaviour, law kind, package field, lock input or stage gate changed. `bend-cross-verification.md` and
+  `model-patterns.md` keep their paths and text apart from the removed citations.
+- Space discovery, the seven input families, their dispositions and their lint are unchanged; the new node only says
+  where each family lands in the machine.
+- The `laws` checks (falsify, strength, bounded counterexamples to induction), `prove-cells` and the diameter report are
+  the next release.
+
 # 0.108.0: the claim's reviewer writes the reproduction a closure trusts; a repaired High re-earns its mutation and passes
 
 ## Validation

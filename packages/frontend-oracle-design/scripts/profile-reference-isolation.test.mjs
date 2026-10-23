@@ -106,7 +106,7 @@ for (const profile of [formal, contract]) {
 }
 
 test('actual canonical graph rejects Formal manual includes in Contract CLI', () => {
-  for (const id of ['mandatory-verification', 'bend-cross-verification', 'model-patterns', 'model-package-example', 'adequacy', 'discovery', 'role-author-formal']) {
+  for (const id of ['mandatory-verification', 'bend-cross-verification', 'bend-proof', 'model-patterns', 'model-package-example', 'adequacy', 'discovery', 'role-author-formal']) {
     assert.throws(() => execFileSync(process.execPath, [script, '--profile', contract, '--point', 'scope-decision', '--include', id, '--json'], { stdio: 'pipe' }), /wrong-profile/)
   }
 })

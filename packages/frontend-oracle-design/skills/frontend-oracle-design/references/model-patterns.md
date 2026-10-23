@@ -36,8 +36,7 @@ unchanged inputs, not a smaller bound presented as the same workload.
   obtain a faster result. The JS target is sequential, so Bend parallel-call syntax alone does
   not accelerate this tool's compiled-JS cross-check.
 
-The pinned [Bend 2.0.34 guide](https://github.com/bendlang/bend/blob/v2.0.34/guide/GUIDE.md)
-explains modules, quantities, structural termination, proof verdicts and JS interop. Its JS
+`bend guide` explains modules, quantities, structural termination, proof verdicts and JS interop. Its JS
 interop passes arrays without defensive copies. Keep runtime input isolation even for pure
 Bend code: an affine array update may mutate the supplied JS array.
 
@@ -251,8 +250,6 @@ reaches the terminal one and its `witness`.
   wall-clock deadlines remain `Not formalized` unless separate evidence establishes them. Reuse existing
   conformance tests where they observe the required behavior, add product-boundary checks where they do not.
 
-Terminology follows Leslie Lamport's _A High-Level View of TLA+_ (next-state actions versus fairness)
-and _PlusCal Tutorial_, Session 9 (weak and strong fairness), rather than treating a generator as a scheduler.
 The rank argument assumes a well-founded order and strict decrease on the transitions being claimed.
 
 ## Error kinds are a sum type

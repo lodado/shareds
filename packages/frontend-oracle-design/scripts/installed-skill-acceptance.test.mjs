@@ -86,7 +86,7 @@ for (const [label, text] of [
     writeFileSync(join(f.jcodeSkillsRoot, 'SKILL.md'), text)
   }, (result, f) => {
     assert.equal(result.ok, false)
-    assert.ok(result.errors.some(error => error.includes('Expected exactly six SKILL.md entries')))
+    assert.ok(result.errors.some(error => error.includes(`Expected exactly ${SKILLS.length} SKILL.md entries`)))
     assert.equal(result.uncheckedUnrelated.jcode.includes('SKILL.md'), false)
     assert.equal(readFileSync(join(f.jcodeSkillsRoot, 'SKILL.md'), 'utf8'), text)
   })
@@ -111,7 +111,7 @@ for (const name of SKILLS) {
   })
 }
 scenario('flat discoverable SKILL fails', f => { writeFileSync(join(f.jcodeSkillsRoot, 'SKILL.md'), 'old core') }, result => assert.equal(result.ok, false))
-scenario('extra Jcode duplicate core outside six roots fails', f => {
+scenario('extra Jcode duplicate core outside the owned skill roots fails', f => {
   mkdirSync(join(f.jcodeSkillsRoot, 'old-core'), { recursive: true })
   writeFileSync(join(f.jcodeSkillsRoot, 'old-core/SKILL.md'), '---\nname: frontend-oracle-design\n---\n')
 }, result => {
@@ -151,7 +151,7 @@ scenario('owned Jcode asset symlink remains rejected', f => {
   assert.equal(result.ok, false)
   assert.ok(result.errors.some(error => error.includes('Symlink rejected:') && error.endsWith('asset-link')))
 })
-scenario('outside-six SKILL symlink remains rejected', f => {
+scenario('SKILL symlink outside the owned skill roots remains rejected', f => {
   mkdirSync(join(f.jcodeSkillsRoot, 'alias'))
   symlinkSync(join(f.source, 'skills', SKILLS[0], 'SKILL.md'), join(f.jcodeSkillsRoot, 'alias/SKILL.md'))
 }, result => {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 // eslint-disable-next-line test/no-import-node-test -- this contract intentionally runs with node --test.
@@ -20,7 +20,9 @@ const ceilings = {
 }
 const controllers = ['frontend-oracle-design', 'frontend-contract-design']
 const specialists = ['oracle-intake', 'oracle-author', 'oracle-implement', 'oracle-review']
-const names = [...controllers, ...specialists]
+// Discoverable but not a role: every controller must link `specialists`, while the Contract controller must not link this Formal-only helper.
+const formalHelpers = ['bend-proof']
+const names = [...controllers, ...specialists, ...formalHelpers]
 const entryPath = (name) => join(skills, name, 'SKILL.md')
 
 function entry(name) {
@@ -129,7 +131,7 @@ test('Markdown link validation handles relative definitions and balanced paths w
   )
 })
 
-test('exactly six named skill entries are discoverable, with no flat duplicate', () => {
+test('exactly seven named skill entries are discoverable, with no flat duplicate', () => {
   for (const name of names) entry(name)
   assert.equal(existsSync(join(skills, 'SKILL.md')), false, 'flat SKILL.md must not remain discoverable')
   const discovered = files(skills).filter((path) => path.endsWith('/SKILL.md')).map((path) => relative(skills, path)).sort()
@@ -278,7 +280,7 @@ test('controllers fix profile identity while bare shared roles never default a p
 })
 
 test('shared role bodies and Contract Markdown closure do not load Formal procedures', () => {
-  const specialized = /mandatory-verification\.md|bend-cross-verification\.md|ensure-bend|MODEL\.bend|LAWS\.bend|PROOF\.bend|oracle-adequacy|project-card/
+  const specialized = /mandatory-verification\.md|bend-cross-verification\.md|bend-proof\.md|ensure-bend|MODEL\.bend|LAWS\.bend|PROOF\.bend|oracle-adequacy|project-card/
   const shared = ['common.md', 'verification-common.md', 'lifecycle-adaptation.md', 'graph-orchestration.md', 'type-environment.md',
     'changeability.md', 'performance.md', 'review-checklist.md', 'subagent-review.md',
     ...['loading', 'controller', 'intake', 'author', 'author-closure', 'implement', 'review', 'reporting', 'space-discovery', 'case-space-inputs'].map((name) => `roles/${name}.md`)]
@@ -387,5 +389,141 @@ test('real public reference CLI works from the relocated core with conservative 
     for (const node of [...result[bucket], ...result.manualConditions[bucket]]) {
       assert.ok(existsSync(resolve(core, node.path)), `CLI references must resolve from the new core: ${node.path}`)
     }
+  }
+})
+
+// bend-proof is a Formal-only helper: the Formal author and reviewer point to it; no route and no Contract document does.
+const helperEntry = entryPath('bend-proof')
+const helperReference = join(core, 'references', 'bend-proof.md')
+const helperDocuments = [helperEntry, helperReference]
+const descriptionOf = (name) => entry(name).match(/^description: ([^\n]+)$/m)?.[1] ?? ''
+
+function reachableFrom(start) {
+  const seen = new Set()
+  const visit = (path) => {
+    if (seen.has(path) || !path.endsWith('.md')) return
+    seen.add(path)
+    for (const target of localLinks(path, readFileSync(path, 'utf8'))) visit(target)
+  }
+  visit(start)
+  return seen
+}
+
+// Fenced blocks with the path of the `<!-- excerpt: path -->` line above each. A blank line may intervene: prettier puts
+// one between an HTML comment and the fence that follows it. Any other line between them drops the marker.
+function fencedBlocks(text) {
+  const blocks = []
+  let path = null
+  let open = null
+  for (const line of text.split('\n')) {
+    const fence = line.trimStart().startsWith('```')
+    if (open) {
+      if (fence) open = null
+      else open.body.push(line)
+    } else if (fence) {
+      open = { path, body: [] }
+      blocks.push(open)
+      path = null
+    } else {
+      // A blank line keeps the marker; any other line is the next marker or ends it.
+      path = line.trim() === '' ? path : (line.match(/^<!-- excerpt: (\S+) -->$/)?.[1] ?? null)
+    }
+  }
+  return blocks
+}
+
+// Every place the id appears as a value, as a path: a node that is only pointed to appears once, as its own `id`.
+function mentions(value, id, path = '$') {
+  if (value === id) return [path]
+  if (Array.isArray(value)) return value.flatMap((item, index) => mentions(item, id, `${path}[${index}]`))
+  if (value && typeof value === 'object') return Object.entries(value).flatMap(([key, item]) => mentions(item, id, `${path}.${key}`))
+  return []
+}
+
+test('bend-proof entry names itself, permits only Bash in block form and borrows no controller trigger', () => {
+  const frontmatter = entry('bend-proof').match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1]
+  assert.ok(frontmatter, 'bend-proof: YAML frontmatter is required')
+  assert.match(frontmatter, /^name: bend-proof\s*$/m)
+  assert.equal(frontmatter.match(/^allowed-tools:\r?\n((?: {2}- [^\r\n]+\r?\n?)+)/m)?.[1].trim(), '- Bash')
+  const own = descriptionOf('bend-proof').toLowerCase()
+  assert.ok(own.length > 0 && own.length <= 1024, `bend-proof description is ${own.length} chars`)
+  // The Formal roles call the helper; if its description carried the controller's triggers a plain bug report would load it.
+  const controller = descriptionOf('frontend-oracle-design').toLowerCase()
+  for (const phrase of ['state, order, count, permission or money', 'double charge', 'tenant cache', '.ai/oracles']) {
+    assert.ok(controller.includes(phrase), `the controller description no longer carries "${phrase}"; update this list`)
+    assert.ok(!own.includes(phrase), `bend-proof description must not carry the controller trigger "${phrase}"`)
+  }
+})
+
+test('bend-proof keeps its Never rule and its standalone stop rule for lock sources', () => {
+  const text = entry('bend-proof').replace(/\s+/g, ' ')
+  // Pinned in the Never section, not in the whole entry: other sections name locks and approvals without prohibiting them.
+  const never = text.split('## Never ')[1]?.split(' ## ')[0]
+  assert.ok(never, 'bend-proof: a `## Never` section is required')
+  for (const subject of [/\bcard/i, /\block/i, /\bapproval/i, /stage\s+transition/i, /\breceipt/i, /consumer\s+test/i, /production\s+edit/i]) {
+    forbids(never, subject, 'bend-proof')
+  }
+  // A standalone run can find that the files it would write are sources of an Oracle lock; it stops and only the proof is free.
+  const standalone = text.split('**Standalone**')[1]?.split(' ## ')[0]
+  assert.ok(standalone, 'bend-proof: a **Standalone** mode is required')
+  assert.match(standalone, /sources?\s+of\s+an\s+Oracle\s+lock/i)
+  assert.match(standalone, /\bstop\b/i)
+  assert.match(standalone, /only\s+`PROOF\.bend`\s+is\s+free/i)
+})
+
+test('bend-proof entry stays within 2,600 bytes and its reference within 12,288', () => {
+  assert.ok(statSync(helperEntry).size <= 2600, `bend-proof SKILL.md is ${statSync(helperEntry).size} bytes`)
+  assert.ok(statSync(helperReference).size <= 12_288, `bend-proof.md is ${statSync(helperReference).size} bytes`)
+})
+
+test('bend-proof entry and reference link only to existing files, and the entry links its reference', () => {
+  const [entryLinks] = helperDocuments.map((path) => localLinks(path, readFileSync(path, 'utf8')))
+  assert.ok(entryLinks.includes(helperReference), 'the entry must link the reference it tells its reader to read')
+})
+
+test('the bend-proof graph node is Formal-only, unrouted, not loaded on every invocation and required by nobody', () => {
+  const graph = JSON.parse(readFileSync(join(core, 'references', 'reference-graph.json'), 'utf8'))
+  const index = graph.nodes.findIndex(({ id }) => id === 'bend-proof')
+  assert.notEqual(index, -1, 'bend-proof must be a graph node')
+  const node = graph.nodes[index]
+  assert.equal(node.path, 'references/bend-proof.md')
+  assert.deepEqual(node.profiles, ['formal-bend/v1'])
+  assert.deepEqual(node.requires, ['common'])
+  assert.equal(Object.hasOwn(node, 'route'), false, 'a route would load the helper without a Formal role asking for it')
+  assert.equal(Object.hasOwn(node, 'loader'), false)
+  assert.doesNotMatch(node.when, /every invocation/i)
+  // No other node, lane, bundle or review point names it: the pointers in the Formal documents are its only entry.
+  assert.deepEqual(mentions(graph, 'bend-proof'), [`$.nodes[${index}].id`])
+})
+
+test('every excerpt in the bend-proof reference is a verbatim part of its fixture', () => {
+  const reference = readFileSync(helperReference, 'utf8')
+  const blocks = fencedBlocks(reference)
+  // Every fenced block follows a marker and every marker opens a block, so no code in the reference goes unchecked.
+  assert.ok(blocks.length > 0, 'the reference must carry checked excerpts')
+  assert.ok(blocks.every(({ path }) => path), 'a fenced block has no excerpt marker above it')
+  assert.equal(reference.split('\n').filter((line) => line.startsWith('<!-- excerpt: ')).length, blocks.length, 'an excerpt marker is not followed by a fenced block')
+  for (const { path, body } of blocks) {
+    assert.ok(existsSync(join(plugin, path)), `excerpt names a missing file: ${path}`)
+    assert.ok(readFileSync(join(plugin, path), 'utf8').includes(body.join('\n')), `excerpt is not a verbatim part of ${path}:\n${body.join('\n')}`)
+  }
+})
+
+test('no bend-proof document cites an outside source, and the removed citations stay removed', () => {
+  for (const path of helperDocuments) assert.doesNotMatch(readFileSync(path, 'utf8'), /https?:\/\//, relative(plugin, path))
+  const reference = (name) => readFileSync(join(core, 'references', name), 'utf8')
+  for (const name of ['model-patterns.md', 'bend-cross-verification.md']) assert.doesNotMatch(reference(name), /https?:\/\//, name)
+  assert.doesNotMatch(reference('model-patterns.md'), /Lamport|PlusCal|bendlang\/bend\/blob/)
+  assert.doesNotMatch(reference('bend-cross-verification.md'), /bendlang\/bend\/blob/)
+})
+
+test('the Contract controller never reaches bend-proof, while the Formal controller does', () => {
+  // Positive control: the same walk finds the helper where its pointers are, so a miss below is not a broken walk.
+  const formal = reachableFrom(entryPath('frontend-oracle-design'))
+  const contract = reachableFrom(entryPath('frontend-contract-design'))
+  assert.ok(contract.has(entryPath('oracle-author')), 'the walk must cross into the shared roles')
+  for (const path of helperDocuments) {
+    assert.ok(formal.has(path), `the Formal controller must reach ${relative(plugin, path)}`)
+    assert.ok(!contract.has(path), `the Contract controller must not reach ${relative(plugin, path)}`)
   }
 })
