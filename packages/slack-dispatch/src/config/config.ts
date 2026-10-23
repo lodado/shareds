@@ -20,7 +20,7 @@ export interface Config {
   prEnabled: boolean
   // The port of the read-only status address on this machine; null turns it off.
   statusPort: number | null
-  // Whether the plan and the build run with the owner's own claude setup. On unless OWN_SETUP=0.
+  // Whether the plan and the build run with the owner's own claude setup. Off unless OWN_SETUP is exactly 1.
   ownSetup: boolean
 }
 

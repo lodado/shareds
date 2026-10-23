@@ -62,7 +62,7 @@ describe('renderPlist as the file that makes macOS start the service', () => {
 
 describe('labelFor as the name of the job', () => {
   it('to be com.<user>.slack-dispatch, like the other agents of the same user', () => {
-    expect(labelFor('chungheon')).toBe('com.chungheon.slack-dispatch')
+    expect(labelFor('alice')).toBe('com.alice.slack-dispatch')
   })
 
   it.each([
