@@ -6,7 +6,7 @@ import type { Stage } from '../machine/machine.ts'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { repoCodeEnv } from '../exec/env.ts'
+import { programEnv } from '../exec/env.ts'
 import { CommandError } from '../exec/exec.ts'
 
 export interface Worktree {
@@ -189,7 +189,7 @@ export async function installDependencies(
   await run(installer.file, installer.args, {
     cwd: path,
     timeoutMs: INSTALL_TIMEOUT_MS,
-    inheritEnv: repoCodeEnv,
+    inheritEnv: programEnv,
     signal,
   })
   return 'installed'

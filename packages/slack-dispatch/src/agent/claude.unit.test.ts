@@ -189,14 +189,26 @@ const succeeding = (text: string) => (): Promise<{ stdout: string; stderr: strin
   Promise.resolve({ stdout: success(text), stderr: '' })
 
 describe('createClaudeAgent as the call to claude', () => {
-  it.each(['PATH', 'HOME', 'LANG', 'TMPDIR', 'HTTPS_PROXY', 'ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'])(
-    'to be started with %s, which it needs to work and to sign in',
+  it.each(['PATH', 'HOME', 'LANG', 'TMPDIR', 'HTTPS_PROXY'])(
+    'to be started with %s, which it needs to run and to find the login of the claude on this machine',
     async (name) => {
       const { run, seen } = fakeRun(() => Promise.resolve({ stdout: success('plan'), stderr: '' }))
       await createClaudeAgent(run)(call())
       expect(seen[0]?.options?.inheritEnv?.(name)).toBe(true)
     },
   )
+
+  it.each([
+    'ANTHROPIC_API_KEY',
+    'ANTHROPIC_AUTH_TOKEN',
+    'CLAUDE_CODE_OAUTH_TOKEN',
+    'CLAUDE_CONFIG_DIR',
+    'ANTHROPIC_MODEL',
+  ])('to be started without %s: the claude on this machine signs in by itself', async (name) => {
+    const { run, seen } = fakeRun(() => Promise.resolve({ stdout: success('plan'), stderr: '' }))
+    await createClaudeAgent(run)(call())
+    expect(seen[0]?.options?.inheritEnv?.(name)).toBe(false)
+  })
 
   it.each([
     'SLACK_BOT_TOKEN',

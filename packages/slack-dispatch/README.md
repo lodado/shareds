@@ -21,7 +21,8 @@ pnpm dry-run        # read-only look at today's mentions; sends nothing
 pnpm lint && pnpm test
 ```
 
-Tokens (`xoxb-`, `xoxp-`, `xapp-`) are read from the macOS keychain, never from files. State lives in `~/.slack-dispatch`.
+Slack tokens (`xoxb-`, `xoxp-`, `xapp-`) are read from the macOS keychain, never from files. `claude` is the one installed on
+this machine and uses its own login; no API key or sign-in variable is handed to it or to any program it starts. State lives in `~/.slack-dispatch`.
 A lock file keeps a second service from starting on the same folder.
 
 ## How it stays safe

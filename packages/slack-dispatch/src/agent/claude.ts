@@ -3,7 +3,7 @@
 // forget them. The prompt goes in through standard input, never on the command line.
 
 import type { Run } from '../exec/exec.ts'
-import { claudeEnv } from '../exec/env.ts'
+import { programEnv } from '../exec/env.ts'
 import { CommandError } from '../exec/exec.ts'
 import { redact } from '../store/redact.ts'
 
@@ -148,7 +148,7 @@ export function createClaudeAgent(run: Run): Agent {
         input: call.prompt,
         timeoutMs: call.timeoutMs,
         signal: call.signal,
-        inheritEnv: claudeEnv,
+        inheritEnv: programEnv,
       })
       const result = parseAgentOutput(stdout)
       if (result === null) return { ok: false, text: 'claude printed no result', costUsd: 0, subtype: 'no_result' }
