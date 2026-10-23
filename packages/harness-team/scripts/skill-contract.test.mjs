@@ -39,42 +39,98 @@ test('describes a single review everywhere the plugin is listed', async () => {
   assert.doesNotMatch(text, /two rounds|round 2|re-review/i)
 })
 
-test('keeps the drill aimed at the agent with the five roles, the goal rule, the review cap and the carry-over', async () => {
+test('keeps the English workflow scoped with five roles, risk-based staffing, one review and carry-over', async () => {
   const skill = await read('skills/harness-team/SKILL.md')
 
   assert.match(skill, /^name: harness-team$/m)
-  assert.match(skill, /^description: 기합 \(discipline\) drill for the agent on every work task/m)
-  assert.match(skill, /when it is not already loaded through a global import/)
+  assert.doesNotMatch(skill.replaceAll('아쎄이!', '').replaceAll('악!', ''), /[\uAC00-\uD7A3]/)
+  assert.match(skill, /Recruit!\s+\(아쎄이!\)/)
+  assert.match(skill, /Aye,\s+sir!\s+\(악!\)/)
   assert.match(
     skill,
-    /^> ai 5명이 하네스팀으로 작업하고 마지막 검수는 집착이 심한 완벽함을 추구하는 성격이야 팀장은 목표를 묻지 않고\n> 완결후에 다음작업에서 전 작업에서 실수한거 수정하는 성격으로해$/m,
+    /^description: Use for implementation, bug fixes, refactoring, documentation changes, and reviews\./m,
   )
-  assert.match(skill, /사용자에게\s+쓰는\s+말투는\s+바꾸지\s+않는다/)
-  assert.match(skill, /잡담과\s+개념\s+설명에는\s+적용하지\s+않는다/)
-  assert.match(skill, /서브에이전트로\s+띄워졌으면\s+이\s+기합에서\s+맡은\s+역할의\s+규칙만\s+따른다/)
-  assert.match(skill, /`Carry-over`\s+절은\s+팀장\s+몫이다/)
+  assert.match(skill, /Load\s+once\s+per\s+task\s+unless\s+globally\s+imported/)
+  assert.match(skill, /Host\s+and\s+repository\s+rules\s+take\s+precedence/)
+  assert.match(skill, /does\s+not\s+change\s+the\s+user-facing\s+tone/)
+  assert.match(skill, /Skip\s+conversation\s+and\s+conceptual\s+explanations/)
+  assert.match(
+    skill,
+    /Subagents\s+perform\s+only\s+their\s+assigned\s+role;\s+they\s+do\s+not\s+recruit\s+agents\s+or\s+run\s+this\s+workflow/,
+  )
+  assert.match(skill, /The\s+lead\s+owns\s+coordination,\s+carry-over,\s+and\s+reporting/)
   for (const role of ['Lead', 'Scout', 'Builder', 'Verifier', 'Final Reviewer']) {
-    assert.match(skill, new RegExp(`^\\d\\. \\*\\*[^*]+ \\(${role}\\)\\*\\*`, 'm'), role)
+    assert.match(skill, new RegExp(`^\\d\\. \\*\\*${role}\\*\\*`, 'm'), role)
   }
-  assert.match(skill, /^## 기합 1\. 목표를 묻지 마라$/m)
-  assert.match(skill, /^## 기합 2\. 지난 실수부터 고쳐라$/m)
-  assert.match(skill, /집착하는\s+완벽주의자/)
-  assert.match(skill, /항상\s+별도\s+에이전트로,\s+독립\s+컨텍스트에서,\s+호스트가\s+띄울\s+수\s+있는\s+최신\s+모델로/)
-  assert.match(skill, /변경\s+작성자가\s+아니고/)
-  assert.match(skill, /그\s+역할은\s+네가\s+맡는다/)
-  assert.match(skill, /보고에\s+독립\s+검수가\s+아니라고\s+적는다/)
-  assert.match(skill, /한\s+파일\s+안에서\s+원인과\s+수정이\s+분명한\s+작업/)
-  assert.match(skill, /그\s+외\s+전부/)
-  assert.match(skill, /리뷰만\s+요청받았으면\s+고치지\s+말고\s+보고만/)
-  assert.match(skill, /리뷰만\s+요청받았으면\s+아무도\s+파일을\s+고치지\s+않는다/)
-  assert.match(skill, /서브에이전트는\s+작업당\s+최대\s+넷/)
-  assert.match(skill, /검수는\s+한\s+번이다/)
-  assert.match(skill, /지적은\s+받는\s+즉시\s+전부\s+반영한다/)
-  assert.match(skill, /재검수는\s+하지\s+않는다/)
-  assert.match(skill, /리뷰만\s+요청받은\s+작업은\s+검수관의\s+지적이\s+결과물이라\s+반영하지\s+않는다/)
-  assert.doesNotMatch(skill, /2라운드|라운드는\s+둘|두\s+라운드|두\s+번|재리뷰|round\s*2|two\s+rounds|re-review/i)
-  assert.match(skill, /속으로\s+복창한다\.\s+이\s+목록은\s+답변에\s+출력하지\s+않는다/)
-  assert.match(skill, /남은\s+게\s+없을\s+때만\s+`PERFECT`/)
-  assert.match(skill, /이름\s+`harness-carry-over`로/)
-  assert.match(skill, /^## 복창$/m)
+  assert.match(skill, /Infer\s+the\s+goal\s+from\s+the\s+request/)
+  assert.match(skill, /still\s+ask\s+when\s+host\s+rules\s+require\s+it/)
+  assert.match(
+    skill,
+    /Verify\s+previous\s+carry-over\s+findings\s+and\s+mistakes\s+against\s+the\s+current\s+code\s+first/,
+  )
+  assert.match(
+    skill,
+    /Design,\s+architecture,\s+building\s+risky\s+work,\s+and\s+the\s+final\s+review\s+require\s+the\s+most\s+capable\s+latest-generation\s+reasoning\s+model\s+available,\s+regardless\s+of\s+cost/,
+  )
+  assert.match(skill, /For\s+other\s+subagent\s+roles,\s+use\s+the\s+cheapest\s+suitable\s+latest-generation\s+model/)
+  assert.match(skill, /never\s+choose\s+an\s+older\s+model\s+just\s+to\s+save\s+money/)
+  assert.match(
+    skill,
+    /psychopathic\s+drill-instructor\s+persona:\s+zero\s+tolerance\s+for\s+even\s+the\s+smallest\s+confirmed\s+mistake/,
+  )
+  assert.match(skill, /obsessive\s+perfectionist\s+who\s+cannot\s+approve\s+work\s+with\s+even\s+the\s+smallest\s+flaw/)
+  assert.match(skill, /separate\s+read-only\s+agent,\s+not\s+the\s+author,\s+with\s+independent\s+context/)
+  assert.doesNotMatch(skill, /model\s+family/i)
+  assert.match(skill, /the\s+lead\s+fills\s+that\s+role/)
+  assert.match(skill, /disclose\s+that\s+review\s+was\s+not\s+independent/)
+  assert.match(skill, /touches\s+state,\s+ordering,\s+permission,\s+or\s+money\s+logic,\s+authentication,\s+payments/)
+  assert.match(
+    skill,
+    /data\s+migration\s+or\s+deletion,\s+concurrency\s+or\s+retries,\s+or\s+irreversible\s+side\s+effects/,
+  )
+  assert.match(skill, /or\s+needs\s+unknown-cause\s+debugging\s+or\s+a\s+design\s+call/)
+  assert.match(skill, /risky\s+regardless\s+of\s+file\s+count/)
+  assert.match(
+    skill,
+    /Every\s+task\s+gets\s+a\s+delegated\s+Final\s+Reviewer\s+unless\s+a\s+domain\s+workflow\s+supplies\s+its\s+review/,
+  )
+  assert.match(skill, /first\s+match:\s+-\s+Risky\s+work:\s+delegate\s+all\s+four\s+roles\.\s+-\s+Single-file/)
+  assert.match(skill, /Single-file\s+changes\s+that\s+are\s+not\s+risky,\s+or\s+documentation-only\s+work:/)
+  assert.match(skill, /the\s+lead\s+also\s+scouts,\s+builds,\s+and\s+verifies\.\s+-\s+Everything\s+else:/)
+  assert.match(skill, /Everything\s+else:\s+delegate\s+Scout\s+and\s+Builder;\s+the\s+lead\s+verifies\./)
+  assert.match(skill, /Review-only\s+tasks\s+make\s+no\s+edits\s+and\s+delegate\s+no\s+Builder/)
+  assert.match(skill, /at\s+most\s+four\s+subagents\s+per\s+task\s+within\s+host\s+concurrency\s+limits/)
+  assert.match(skill, /Review\s+the\s+complete\s+change\s+once,\s+exhaustively/)
+  assert.match(
+    skill,
+    /its\s+role\s+and\s+persona\s+from\s+Roles,\s+the\s+requirements,\s+the\s+complete\s+diff,\s+the\s+check\s+results/,
+  )
+  assert.match(skill, /do\s+not\s+pass\s+the\s+builder's\s+conclusions\s+as\s+facts/)
+  assert.match(skill, /Apply\s+every\s+finding\s+immediately,\s+including\s+nits,\s+then\s+rerun\s+affected\s+checks/)
+  assert.match(skill, /do\s+not\s+request\s+another\s+review/)
+  assert.match(
+    skill,
+    /If\s+a\s+fix\s+adds\s+behavior\s+the\s+review\s+did\s+not\s+see,\s+run\s+the\s+checks\s+that\s+behavior\s+needs\s+and\s+say\s+so\s+in\s+the\s+report/,
+  )
+  assert.match(
+    skill,
+    /Reject\s+incorrect\s+findings\s+only\s+with\s+evidence,\s+and\s+give\s+that\s+evidence\s+in\s+the\s+report/,
+  )
+  assert.match(
+    skill,
+    /Carry\s+forward\s+only\s+findings\s+blocked\s+by\s+scope,\s+authority,\s+or\s+a\s+required\s+user\s+decision/,
+  )
+  assert.match(skill, /Unresolved\s+blockers\s+mean\s+incomplete\s+work,\s+not\s+completion\s+with\s+carry-over/)
+  assert.match(skill, /`blocker`\s+\(ships\s+broken\s+or\s+unsafe,\s+or\s+a\s+required\s+check\s+fails\)/)
+  assert.match(skill, /Review-only\s+tasks\s+return\s+findings\s+without\s+applying\s+them/)
+  assert.match(
+    skill,
+    /domain\s+workflow\s+fills\s+equivalent\s+roles\s+and\s+controls\s+its\s+own\s+review\s+procedure/,
+  )
+  assert.match(skill, /Return\s+`PERFECT`\s+only\s+when\s+no\s+findings\s+remain/)
+  assert.match(skill, /`unknown`\s+if\s+the\s+host\s+does\s+not\s+say/)
+  assert.match(skill, /subagent\s+token\s+counts\s+on\s+one\s+line\s+when\s+the\s+host\s+reports\s+them/)
+  assert.match(skill, /Never\s+invent\s+runs,\s+reviewers,\s+or\s+savings/)
+  assert.match(skill, /project\s+memory\s+named\s+`harness-carry-over`/)
+  assert.doesNotMatch(skill, /round\s*2|two\s+rounds|re-review/i)
 })
