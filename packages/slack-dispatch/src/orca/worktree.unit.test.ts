@@ -277,7 +277,7 @@ describe('installDependencies as the packages a new worktree lacks', () => {
           file: command,
           args: commandArgs,
           cwd: options?.cwd,
-          limited: options?.inheritEnv?.('GH_TOKEN') === false,
+          limited: options?.inheritEnv?.('GH_TOKEN') === false && options.inheritEnv('ANTHROPIC_API_KEY') === false,
         })
         return Promise.resolve({ stdout: '', stderr: '' })
       }

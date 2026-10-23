@@ -6,7 +6,7 @@ import type { DevServerDeps, ServerProcess } from './devserver.ts'
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
 import process from 'node:process'
-import { agentEnv } from '../exec/env.ts'
+import { repoCodeEnv } from '../exec/env.ts'
 
 const PROBE_TIMEOUT_MS = 5000
 
@@ -15,7 +15,7 @@ function startProcess(
   args: readonly string[],
   options: { cwd: string; env: Readonly<Record<string, string>> },
 ): ServerProcess {
-  const inherited = Object.fromEntries(Object.entries(process.env).filter(([name]) => agentEnv(name)))
+  const inherited = Object.fromEntries(Object.entries(process.env).filter(([name]) => repoCodeEnv(name)))
   // Its own process group, so that stopping it also stops what a package script started.
   const child = spawn(command, [...args], {
     cwd: options.cwd,

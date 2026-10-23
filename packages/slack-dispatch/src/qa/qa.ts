@@ -7,7 +7,7 @@ import type { Run } from '../exec/exec.ts'
 import type { StartDevServer } from './devserver.ts'
 import { join } from 'node:path'
 import { judgePrompt, parseBuildResult } from '../agent/prompts.ts'
-import { agentEnv } from '../exec/env.ts'
+import { repoCodeEnv } from '../exec/env.ts'
 import { worktreeNameFor } from '../orca/worktree.ts'
 import { DevServerError } from './devserver.ts'
 
@@ -147,7 +147,7 @@ async function takeShots(
           url,
           file,
         ],
-        { cwd: input.worktreePath, timeoutMs: SHOT_TIMEOUT_MS, inheritEnv: agentEnv, signal: input.signal },
+        { cwd: input.worktreePath, timeoutMs: SHOT_TIMEOUT_MS, inheritEnv: repoCodeEnv, signal: input.signal },
       )
       shots.push({ route, viewport: viewport.name, file, status })
     }

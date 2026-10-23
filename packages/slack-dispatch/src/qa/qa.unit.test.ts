@@ -38,6 +38,8 @@ interface Rig {
   stops: number
   judgeCalls: AgentCall[]
   madeDirs: string[]
+  // For each screenshot: whether it sees PATH, the claude sign-in key, and a GitHub token.
+  shotEnv: (boolean | undefined)[][]
 }
 
 function rig(options: Options = {}): Rig {
@@ -45,10 +47,15 @@ function rig(options: Options = {}): Rig {
   const serverStarts: DevServerOptions[] = []
   const judgeCalls: AgentCall[] = []
   const madeDirs: string[] = []
+  const shotEnv: (boolean | undefined)[][] = []
   const state = { stops: 0 }
-  const run: Run = (file, args) => {
+  const run: Run = (file, args, runOptions) => {
     const line = `${file} ${args.join(' ')}`
     commands.push(line)
+    if (line.includes(' screenshot ')) {
+      const sees = runOptions?.inheritEnv
+      shotEnv.push([sees?.('PATH'), sees?.('ANTHROPIC_API_KEY'), sees?.('GH_TOKEN')])
+    }
     if (line.startsWith('git '))
       return Promise.resolve({ stdout: options.changed ?? 'src/footer.tsx\nREADME.md\n', stderr: '' })
     if (options.shotFails === true) return Promise.reject(new CommandError(file, 1, 'browser is missing'))
@@ -90,6 +97,7 @@ function rig(options: Options = {}): Rig {
     serverStarts,
     judgeCalls,
     madeDirs,
+    shotEnv,
     get stops() {
       return state.stops
     },
@@ -155,6 +163,15 @@ describe('createQaRunner as a build whose screens are looked at', () => {
     expect(r.judgeCalls[0]?.prompt).toContain(`${shotsDir}/2-mobile.png (/settings, mobile, HTTP 200)`)
     expect(r.judgeCalls[0]?.prompt).toContain('<thread>\n1. fix the footer link\n</thread>')
     expect(r.stops).toBe(1)
+  })
+
+  it('to be taken by a browser that sees what a program needs and none of the sign-in variables', async () => {
+    const r = rig()
+    await r.qa(input({ routes: ['/'] }))
+    expect(r.shotEnv).toStrictEqual([
+      [true, false, false],
+      [true, false, false],
+    ])
   })
 
   it.each([

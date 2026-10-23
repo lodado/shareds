@@ -6,7 +6,7 @@ import type { Stage } from '../machine/machine.ts'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { agentEnv } from '../exec/env.ts'
+import { repoCodeEnv } from '../exec/env.ts'
 import { CommandError } from '../exec/exec.ts'
 
 export interface Worktree {
@@ -176,7 +176,7 @@ function installerFor(path: string, exists: (file: string) => boolean): Installe
 }
 
 // A new worktree has the repository's files but not its installed packages, and a build or a QA run needs them.
-// The install runs the repository's own scripts, so it gets the same limited environment as the agent.
+// The install runs the repository's own scripts, so it gets the environment of repository code: nothing that signs in.
 export async function installDependencies(
   run: Run,
   path: string,
@@ -186,6 +186,11 @@ export async function installDependencies(
   if (exists(join(path, 'node_modules'))) return 'present'
   const installer = installerFor(path, exists)
   if (installer === undefined) return 'none'
-  await run(installer.file, installer.args, { cwd: path, timeoutMs: INSTALL_TIMEOUT_MS, inheritEnv: agentEnv, signal })
+  await run(installer.file, installer.args, {
+    cwd: path,
+    timeoutMs: INSTALL_TIMEOUT_MS,
+    inheritEnv: repoCodeEnv,
+    signal,
+  })
   return 'installed'
 }

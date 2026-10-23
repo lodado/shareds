@@ -1,8 +1,8 @@
 // Which of the service's environment variables the agent, and any repository code it or the service starts, may see.
-
-// The agent, and the repository code it runs, get only the environment they need to work and to sign in to claude.
-// Everything else the service has (a GitHub or cloud token, say) stays out of reach.
-const AGENT_ENV: ReadonlySet<string> = new Set([
+// Repository code (installing packages, a dev server, a browser run) gets only what a program needs to work. Nothing
+// that signs in anywhere: not Slack, not GitHub, not a cloud, and not claude. Everything else the service has stays out
+// of reach.
+const BASE_ENV: ReadonlySet<string> = new Set([
   'PATH',
   'HOME',
   'USER',
@@ -25,11 +25,16 @@ const AGENT_ENV: ReadonlySet<string> = new Set([
   'http_proxy',
   'https_proxy',
   'no_proxy',
-  // How claude itself signs in, when it is not the keychain.
+])
+
+// How claude itself signs in, when it does not use the keychain. Only the claude process gets these.
+const SIGN_IN_ENV: ReadonlySet<string> = new Set([
   'ANTHROPIC_API_KEY',
   'ANTHROPIC_BASE_URL',
   'CLAUDE_CODE_OAUTH_TOKEN',
   'CLAUDE_CONFIG_DIR',
 ])
 
-export const agentEnv = (name: string): boolean => AGENT_ENV.has(name)
+export const repoCodeEnv = (name: string): boolean => BASE_ENV.has(name)
+
+export const claudeEnv = (name: string): boolean => BASE_ENV.has(name) || SIGN_IN_ENV.has(name)
