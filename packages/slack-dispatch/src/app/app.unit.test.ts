@@ -205,7 +205,9 @@ describe('createApp as the owner who types a task in the bot DM', () => {
     r.connection.receive(click('env-approve', 'item.approve_plan:1', key))
     await until(() => stageOf(r.store, key) === 'pr_open')
 
-    expect(r.agentCalls.at(-1)).toMatchObject({ mode: 'build', resume: true })
+    // The limits the owner chose: a plan may spend 2 dollars, a build 15 (of 24 for all the runs of one item).
+    expect(r.agentCalls[1]).toMatchObject({ mode: 'plan', maxBudgetUsd: 2 })
+    expect(r.agentCalls.at(-1)).toMatchObject({ mode: 'build', resume: true, maxBudgetUsd: 15 })
     expect(r.posted.at(-1)?.text).toBe('구현 완료: web-app')
     expect(r.commands.some((command) => command.includes('push') || command.includes('pr create'))).toBe(false)
     expect(listEvents(r.store, { itemKey: key }).map((event) => event.stageAfter)).toContain('pr_open')

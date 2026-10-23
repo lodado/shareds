@@ -69,9 +69,11 @@ function workerConfig(
   return {
     maxTotal: 3,
     maxPerRepo: 1,
-    maxCostPerItemUsd: 8,
+    // All the runs of one item together. Three times what it was (8 and 5), at the owner's request: a build in a large
+    // repository runs its whole test suite more than once.
+    maxCostPerItemUsd: 24,
     planBudgetUsd: 2,
-    buildBudgetUsd: 5,
+    buildBudgetUsd: 15,
     qaBudgetUsd: 1,
     planTimeoutMs: 15 * 60_000,
     // A repository's own test run can take a quarter of an hour; the money cap, not the clock, is what limits a build.
