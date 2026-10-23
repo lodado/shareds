@@ -73,40 +73,32 @@ const skipped = (reason: SkippedThread['reason'], n = 1): SkippedThread => ({
 
 describe('describeSkipped as the list of threads left out of the digest', () => {
   it('to be a count, then one line per thread with its link and the reason', () => {
-    expect(
-      describeSkipped('10/22', [
-        skipped('bot', 1),
-        skipped('answered', 2),
-        skipped('unreadable', 3),
-        skipped('known', 4),
-      ]),
-    ).toBe(
+    expect(describeSkipped('10/22', [skipped('answered', 1), skipped('unreadable', 2), skipped('known', 3)])).toBe(
       [
-        '10/22에 목록에서 뺀 쓰레드 4개',
-        '• <https://example.slack.com/archives/C1/p1|Thread 1> — 봇이 올린 알림',
-        '• <https://example.slack.com/archives/C1/p2|Thread 2> — 이미 직접 답함',
-        '• <https://example.slack.com/archives/C1/p3|Thread 3> — 읽을 권한이 없는 대화',
-        '• <https://example.slack.com/archives/C1/p4|Thread 4> — 이전 알림에 이미 있음',
+        '10/22에 목록에서 뺀 쓰레드 3개',
+        '• <https://example.slack.com/archives/C1/p1|Thread 1> — 이미 직접 답함',
+        '• <https://example.slack.com/archives/C1/p2|Thread 2> — 읽을 권한이 없는 대화',
+        '• <https://example.slack.com/archives/C1/p3|Thread 3> — 이전 알림에 이미 있음',
       ].join('\n'),
     )
   })
 
   it('to be a line without a link when the thread has no address, and a note when it has no text', () => {
-    expect(describeSkipped('10/22', [{ url: '', summary: '', reason: 'bot' }])).toBe(
-      '10/22에 목록에서 뺀 쓰레드 1개\n• (내용 없음) — 봇이 올린 알림',
+    expect(describeSkipped('10/22', [{ url: '', summary: '', reason: 'answered' }])).toBe(
+      '10/22에 목록에서 뺀 쓰레드 1개\n• (내용 없음) — 이미 직접 답함',
     )
   })
 
   it('to be a text that cannot make a link, a mention or a channel call', () => {
     const text = describeSkipped('10/22', [
-      { url: 'https://x.test/t', summary: '<!channel> a|b <@U1> & more', reason: 'bot' },
+      { url: 'https://x.test/t', summary: '<!channel> a|b <@U1> & more', reason: 'answered' },
     ])
     expect(text).toContain('<https://x.test/t|&lt;!channel&gt; a b &lt;@U1&gt; &amp; more>')
     expect(text).not.toContain('<!channel>')
   })
 
   it('to be whole lines within 3500 characters, with the rest counted', () => {
-    const many = Array.from({ length: 200 }, (_, i) => skipped('bot', i + 1))
+    const many = Array.from({ length: 200 }, (_, i) => skipped('answered', i + 1))
     const text = describeSkipped('10/22', many)
     expect(text.length).toBeLessThanOrEqual(3500)
     expect(text.split('\n').at(-1)).toMatch(/^… 외 \d+개$/)
@@ -114,7 +106,7 @@ describe('describeSkipped as the list of threads left out of the digest', () => 
       text
         .split('\n')
         .slice(1, -1)
-        .every((line) => line.endsWith('— 봇이 올린 알림')),
+        .every((line) => line.endsWith('— 이미 직접 답함')),
     ).toBe(true)
   })
 })
@@ -145,15 +137,29 @@ describe('catchUp as a look at one past day', () => {
     expect(posted[0]?.threadTs).toBeUndefined()
     // The reply goes under the digest message, which was the first one posted.
     expect(posted[1]?.threadTs).toBe('1.5')
-    expect(posted[1]?.text.split('\n')[0]).toBe('10/22에 목록에서 뺀 쓰레드 2개')
+    // A post by a bot is ignored: it is counted, but it is not in the list the owner reads.
+    expect(posted[1]?.text.split('\n')[0]).toBe('10/22에 목록에서 뺀 쓰레드 1개')
     expect(posted[1]?.text).toContain('이미 직접 답함')
-    expect(posted[1]?.text).toContain('봇이 올린 알림')
+    expect(posted[1]?.text).not.toContain('봇')
   })
 
-  it('to be a list on its own, not in a thread, when nothing is new', async () => {
+  it('to be nothing sent for a day whose only threads are posts by bots', async () => {
     const bot = mention(7)
     const { deps, posted } = setup([bot], {
       [`C1:${bot.threadTs}`]: [{ ts: bot.ts, threadTs: null, user: null, text: 'alert', botId: 'B1' }],
+    })
+    const result = await catchUp(deps, DAY)
+    expect(result.summary).toMatchObject({ threads: 1, skippedBots: 1, created: 0, skipped: [] })
+    expect(posted).toStrictEqual([])
+  })
+
+  it('to be a list on its own, not in a thread, when nothing is new', async () => {
+    const answered = mention(7)
+    const { deps, posted } = setup([answered], {
+      [`C1:${answered.threadTs}`]: [
+        { ts: answered.ts, threadTs: null, user: 'U_OTHER', text: 'hi', botId: null },
+        { ts: at(7.5), threadTs: null, user: OWNER, text: 'on it', botId: null },
+      ],
     })
     const result = await catchUp(deps, DAY)
     expect(result.summary.sent).toStrictEqual([])
@@ -185,7 +191,7 @@ describe('describeSkipped as the list of what was left out', () => {
   const thread = (n: number, summary: string): SkippedThread => ({
     url: `https://example.slack.com/archives/C1/p${n}`,
     summary,
-    reason: 'bot',
+    reason: 'answered',
   })
 
   it('to be within the limit of a message even with the closing lines, whatever the number of threads', () => {

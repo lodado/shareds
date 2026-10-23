@@ -15,7 +15,6 @@ const TEXT_LIMIT = 3500
 const FOOTER_ROOM = 200
 
 const REASON_TEXT: Record<SkipReason, string> = {
-  bot: '봇이 올린 알림',
   answered: '이미 직접 답함',
   unreadable: '읽을 권한이 없는 대화',
   known: '이전 알림에 이미 있음',

@@ -66,7 +66,7 @@ interface Counts {
 }
 
 // A thread that was found and left out of the digest, with the reason, so the owner can still see that it exists.
-export type SkipReason = 'bot' | 'answered' | 'unreadable' | 'known'
+export type SkipReason = 'answered' | 'unreadable' | 'known'
 
 export interface SkippedThread {
   url: string
@@ -134,7 +134,6 @@ function groupByThread(matches: readonly MentionMatch[]): Thread[] {
 }
 
 const SKIPPED_REASON: Partial<Record<ThreadOutcome, SkipReason>> = {
-  skippedBots: 'bot',
   handledByOwner: 'answered',
   skippedUnreadable: 'unreadable',
   alreadyKnown: 'known',
