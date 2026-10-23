@@ -1,0 +1,26 @@
+{
+  "name": "@lodado/slack-dispatch",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Slack mention triage and dispatch: item state machine, event store, planner and builder worker",
+  "exports": {
+    ".": "./src/index.ts",
+    "./store": "./src/store/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json && eslint \"src/**/*.ts\" \"src/**/*.adapter.mjs\" scripts",
+    "test": "vitest run",
+    "proofs:machine": "node scripts/gen-proofs.mjs machine",
+    "proofs:run": "node scripts/gen-proofs.mjs run",
+    "start": "node --env-file-if-exists=.env --no-warnings scripts/dispatch.ts",
+    "dry-run": "node --env-file-if-exists=.env --no-warnings scripts/dry-run.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "fast-check": "4.10.2",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
+  }
+}

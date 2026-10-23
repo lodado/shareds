@@ -11,6 +11,7 @@
     "**/skills/bundles/**",
     "**/dist/**",
     "**/*.test.*",
+    "**/__test__/formal/*.model.mjs",
     "**/tests/**"
   ],
   "reporters": ["console"],

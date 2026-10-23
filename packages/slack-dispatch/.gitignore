@@ -1,0 +1,7 @@
+# local state and secrets: tokens live in the macOS keychain, never in the repo
+.slack-dispatch/
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.tsbuildinfo

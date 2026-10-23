@@ -1,0 +1,183 @@
+// Puts the parts together: the socket listens for the owner, the worker plans and builds, and a polling job finds new
+// mentions. Every outside thing (Slack, the programs, the agent, the clock) is passed in, so the same code runs in
+// the real service and in the tests that drive it with fakes.
+
+import type { Agent } from '../agent/claude.ts'
+import type { Config } from '../config/config.ts'
+import type { Run } from '../exec/exec.ts'
+import type { InteractDeps } from '../interact/interact.ts'
+import type { RunQa } from '../qa/qa.ts'
+import type { SlackClient } from '../slack/client.ts'
+import type { Connect } from '../socket/socket.ts'
+import type { Store } from '../store/store.ts'
+import type { WorkerConfig } from '../work/worker.ts'
+import { mergePr, readGate } from '../github/github.ts'
+import { ingestMentions } from '../ingest/ingest.ts'
+import { listRepos } from '../orca/repos.ts'
+import { startSocket } from '../socket/socket.ts'
+import { logEvent } from '../store/store.ts'
+import { cancelOrphanRuns, getWorkspace } from '../store/work.ts'
+import { createWorker, retriesLeft } from '../work/worker.ts'
+import { createSplitAgent, createTriageAgent } from './agents.ts'
+import { dispatchEnvelope } from './dispatch.ts'
+import { every } from './loop.ts'
+import { loadThreadText } from './threads.ts'
+
+export interface AppDeps {
+  config: Config
+  ownerId: string
+  slack: SlackClient
+  run: Run
+  agent: Agent
+  store: Store
+  newSessionId: () => string
+  now: () => Date
+  baseBranches: Readonly<Record<string, string>>
+  channelRepos: () => Record<string, string[]>
+  // A folder with nothing in it, where the agent that cuts DM prompts runs.
+  scratchDir: string
+  // Looks at the pages a build changed before its pull request is opened.
+  qa: RunQa
+  connect?: Connect
+  // How often the worker looks for something to start.
+  tickMs?: number
+  log?: (event: string, detail?: unknown) => void
+}
+
+export interface App {
+  // Resolves once Slack said hello on the socket.
+  ready: Promise<void>
+  // Stops the loops, the socket and the agents, and waits for the jobs to end.
+  stop: () => Promise<void>
+}
+
+const DEFAULT_TICK_MS = 3000
+const DAY_MS = 86_400_000
+
+function workerConfig(prEnabled: boolean, baseOverrides: Readonly<Record<string, string>>): WorkerConfig {
+  return {
+    maxTotal: 3,
+    maxPerRepo: 1,
+    maxCostPerItemUsd: 8,
+    planBudgetUsd: 2,
+    buildBudgetUsd: 5,
+    qaBudgetUsd: 1,
+    planTimeoutMs: 15 * 60_000,
+    buildTimeoutMs: 45 * 60_000,
+    maxAttempts: 3,
+    prEnabled,
+    baseOverrides,
+  }
+}
+
+function startOfDay(now: Date, daysBack: number): Date {
+  const day = new Date(now)
+  day.setHours(0, 0, 0, 0)
+  return new Date(day.getTime() - daysBack * DAY_MS)
+}
+
+const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error))
+
+export async function createApp(deps: AppDeps): Promise<App> {
+  const { store, slack, run, ownerId, config } = deps
+  const log = deps.log ?? (() => undefined)
+  const reportError = (where: string) => (error: unknown) => {
+    log(where, errorText(error))
+    try {
+      logEvent(store, { kind: 'system', type: `${where}_failed`, payload: { error: errorText(error) } })
+    } catch {
+      // The log itself is down; the line above is all that is left.
+    }
+  }
+
+  const settings = workerConfig(config.prEnabled, deps.baseBranches)
+  // Nothing from an earlier process is still running, so runs it left in progress are called off first, each charged
+  // the most it could have spent.
+  cancelOrphanRuns(store, { plan: settings.planBudgetUsd, build: settings.buildBudgetUsd })
+  let repos = await listRepos(run)
+  const repoPath = (name: string): Promise<string | undefined> =>
+    Promise.resolve(repos.find((repo) => repo.name === name)?.path)
+
+  const loadThread = (item: Parameters<typeof loadThreadText>[1]): Promise<string> => loadThreadText(slack, item)
+  const worker = createWorker({
+    store,
+    run,
+    agent: deps.agent,
+    slack,
+    ownerId,
+    config: settings,
+    repoPath,
+    loadThread,
+    newSessionId: deps.newSessionId,
+    qa: deps.qa,
+    now: () => deps.now().getTime(),
+  })
+
+  const prOf = (itemKey: string): string | null => getWorkspace(store, itemKey)?.prUrl ?? null
+  const small = {
+    agent: deps.agent,
+    newSessionId: deps.newSessionId,
+    onCost: (what: 'split' | 'triage', costUsd: number) => {
+      logEvent(store, { kind: 'run', type: `${what}_agent`, payload: { costUsd } })
+    },
+  }
+  const interact: InteractDeps = {
+    store,
+    slack,
+    ownerId,
+    knownRepos: () => repos.map((repo) => repo.name),
+    splitPrompt: createSplitAgent(small, deps.scratchDir),
+    checkGate: async (item) => {
+      const url = prOf(item.key)
+      return url === null ? { ci: false, review: false, headOid: '' } : readGate(run, url)
+    },
+    mergePr: async (item, headOid) => {
+      const url = prOf(item.key)
+      if (url === null) throw new Error(`item ${item.key} has no pull request`)
+      await mergePr(run, url, headOid)
+    },
+    retriesLeft: (itemKey) => retriesLeft(store, itemKey, settings),
+    abortWork: (itemKey) => {
+      worker.abort(itemKey)
+    },
+    locks: new Set(),
+  }
+
+  const analyze = createTriageAgent(small, deps.scratchDir, repoPath, loadThread)
+
+  const socket = startSocket({
+    getUrl: () => slack.socketUrl(),
+    onEnvelope: (envelope) => dispatchEnvelope(interact, envelope),
+    connect: deps.connect,
+    log,
+  })
+
+  const pollMentions = async (): Promise<void> => {
+    repos = await listRepos(run)
+    await ingestMentions(
+      {
+        store,
+        slack,
+        ownerId,
+        route: { knownRepos: repos.map((repo) => repo.name), channelRepos: deps.channelRepos() },
+        analyze,
+      },
+      { since: startOfDay(deps.now(), config.ingestDays), dryRun: false },
+    )
+  }
+
+  const stops = [
+    every(deps.tickMs ?? DEFAULT_TICK_MS, () => worker.tick(), reportError('worker_tick')),
+    every(config.pollIntervalMs, pollMentions, reportError('poll')),
+  ]
+
+  return {
+    ready: socket.ready,
+    async stop() {
+      for (const stopLoop of stops) stopLoop()
+      socket.stop()
+      worker.stop()
+      await worker.idle()
+    },
+  }
+}
