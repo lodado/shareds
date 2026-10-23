@@ -182,8 +182,9 @@ that pin every result.
   bookkeeping) and the environment `<Prefix>.next(history)`: every message the environment can
   produce after `history`.
 - `LAWS.bend` — imports the model and states each approved law as an open claim.
-- `PROOF.bend` — imports `./LAWS.bend` and proves each law with `def Laws.<name>`. It is a proof
-  candidate: never locked, freely repaired, and never a place to restate laws.
+- `PROOF.bend` — imports `./LAWS.bend` and proves each law with `def Laws.<name>`; `prove` adds the finite cell
+  laws it omits, in a temporary copy. It is a proof candidate: never locked, freely repaired, and never a place
+  to restate laws.
 
 Translate precisely and record what is not translated. Check numbers and units, negation, "every"
 versus "some", temporal order, "may" versus "must", and request count versus effect count: "sends one
@@ -245,7 +246,7 @@ node <skill-dir>/scripts/oracle-model.mjs space --model <model-dir>/MODEL.bend -
 ```
 
 `prove` runs `bend PROOF.bend --verdict` without a shell under a timeout and returns `proven`, `open`
-(a `?TODO` or a law without a def), `unsafe`, `failed` (with the failing law), `timeout` or
+(a `?TODO` or a law without a def `prove` cannot generate), `unsafe`, `failed` (with the failing law), `timeout` or
 `unavailable`, plus the command, exit status, raw output, law list and input digests. Only exit 0,
 no signal and an exact `ALL PROOFS CHECK` line is `proven`; it refuses a `PROOF.bend` that does not
 import `./LAWS.bend` or laws missing a required name before running. `proven` here means the model

@@ -1896,8 +1896,9 @@ that pin every result.
   bookkeeping) and the environment `<Prefix>.next(history)`: every message the environment can
   produce after `history`.
 - `LAWS.bend` — imports the model and states each approved law as an open claim.
-- `PROOF.bend` — imports `./LAWS.bend` and proves each law with `def Laws.<name>`. It is a proof
-  candidate: never locked, freely repaired, and never a place to restate laws.
+- `PROOF.bend` — imports `./LAWS.bend` and proves each law with `def Laws.<name>`; `prove` adds the finite cell
+  laws it omits, in a temporary copy. It is a proof candidate: never locked, freely repaired, and never a place
+  to restate laws.
 
 Translate precisely and record what is not translated. Check numbers and units, negation, "every"
 versus "some", temporal order, "may" versus "must", and request count versus effect count: "sends one
@@ -1959,7 +1960,7 @@ node <skill-dir>/scripts/oracle-model.mjs space --model <model-dir>/MODEL.bend -
 ```
 
 `prove` runs `bend PROOF.bend --verdict` without a shell under a timeout and returns `proven`, `open`
-(a `?TODO` or a law without a def), `unsafe`, `failed` (with the failing law), `timeout` or
+(a `?TODO` or a law without a def `prove` cannot generate), `unsafe`, `failed` (with the failing law), `timeout` or
 `unavailable`, plus the command, exit status, raw output, law list and input digests. Only exit 0,
 no signal and an exact `ALL PROOFS CHECK` line is `proven`; it refuses a `PROOF.bend` that does not
 import `./LAWS.bend` or laws missing a required name before running. `proven` here means the model
@@ -2774,10 +2775,10 @@ or the laws.
   unless the source allows several (state those as `emit-state` relations). Cover what changes, what
   stays and what is kept: a count or membership law alone allows any reshuffle.
 - **Prove by the domain.** A bounded product domain (two or three columns) is quantified as finite
-  inputs and proven case by case; that case list in `PROOF.bend` is generated and kernel-checked, never
-  reviewed. An unbounded one (a list of any length, a counter) is proven by structural induction — a
-  recursive proof def whose recursive call is the hypothesis (`bend guide`, Laws and Proofs). Never
-  shrink an unbounded product domain to avoid an induction.
+  inputs and proven case by case; `prove` generates that case list in a temporary copy, never in `PROOF.bend`;
+  it is kernel-checked, never reviewed. An unbounded one (a list of any length, a counter) is proven by
+  structural induction — a recursive proof def whose recursive call is the hypothesis (`bend guide`, Laws and
+  Proofs). Never shrink an unbounded product domain to avoid an induction.
 
 Column reordering. The rejected model gave each order a constructor and typed 128 answers; its only
 move law compared the column count:
@@ -2847,10 +2848,10 @@ law lands_on_target:
   {M.Cols.index(M.Cols.move([x, y, z], a, b), a) == M.Cols.index([x, y, z], b) : Nat}
 ```
 
-`PROOF.bend` proves them with one generated case per input combination; a case whose hypothesis
-computes to `False{}` closes with `Empty.absurd(<goal>, false_is_not_true(h))`, as in the stale-search
-fixture. The equality type spells the quantity the def returns (`+List<M.Ver>`), or the kernel reports
-`List<&1, …>` against `List<&2, …>`.
+`PROOF.bend` proves them with one case per input combination (`prove` cannot generate a law with a
+hypothesis); a case whose hypothesis computes to `False{}` closes with
+`Empty.absurd(<goal>, false_is_not_true(h))`, as in the stale-search fixture. The equality type spells the
+quantity the def returns (`+List<M.Ver>`), or the kernel reports `List<&1, …>` against `List<&2, …>`.
 
 A model that folds these axes into one event (`Failed` meaning "every retry failed") is not wrong, but
 the folded part leaves the proof and the generated conformance and becomes a hand-written test or a

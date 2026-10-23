@@ -55,10 +55,10 @@ or the laws.
   unless the source allows several (state those as `emit-state` relations). Cover what changes, what
   stays and what is kept: a count or membership law alone allows any reshuffle.
 - **Prove by the domain.** A bounded product domain (two or three columns) is quantified as finite
-  inputs and proven case by case; that case list in `PROOF.bend` is generated and kernel-checked, never
-  reviewed. An unbounded one (a list of any length, a counter) is proven by structural induction — a
-  recursive proof def whose recursive call is the hypothesis (`bend guide`, Laws and Proofs). Never
-  shrink an unbounded product domain to avoid an induction.
+  inputs and proven case by case; `prove` generates that case list in a temporary copy, never in `PROOF.bend`;
+  it is kernel-checked, never reviewed. An unbounded one (a list of any length, a counter) is proven by
+  structural induction — a recursive proof def whose recursive call is the hypothesis (`bend guide`, Laws and
+  Proofs). Never shrink an unbounded product domain to avoid an induction.
 
 Column reordering. The rejected model gave each order a constructor and typed 128 answers; its only
 move law compared the column count:
@@ -128,10 +128,10 @@ law lands_on_target:
   {M.Cols.index(M.Cols.move([x, y, z], a, b), a) == M.Cols.index([x, y, z], b) : Nat}
 ```
 
-`PROOF.bend` proves them with one generated case per input combination; a case whose hypothesis
-computes to `False{}` closes with `Empty.absurd(<goal>, false_is_not_true(h))`, as in the stale-search
-fixture. The equality type spells the quantity the def returns (`+List<M.Ver>`), or the kernel reports
-`List<&1, …>` against `List<&2, …>`.
+`PROOF.bend` proves them with one case per input combination (`prove` cannot generate a law with a
+hypothesis); a case whose hypothesis computes to `False{}` closes with
+`Empty.absurd(<goal>, false_is_not_true(h))`, as in the stale-search fixture. The equality type spells the
+quantity the def returns (`+List<M.Ver>`), or the kernel reports `List<&1, …>` against `List<&2, …>`.
 
 A model that folds these axes into one event (`Failed` meaning "every retry failed") is not wrong, but
 the folded part leaves the proof and the generated conformance and becomes a hand-written test or a

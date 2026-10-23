@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
-// Bend 참조 모델을 오라클 공간으로 쓴다. 법칙 증명(`bend PROOF.bend --verdict`)의 결과를 분류하고, 잠긴 MODEL.bend를
-// `bend -o *.mjs`로 컴파일해 선언 범위의 trace를 결정적으로 열거하고, 구현 adapter의 관측값을 같은 trace에서 대조한다.
-// 기대값은 증명된 그 모델 코드가 계산한다 — JS로 옮겨 적은 두 번째 의미를 두지 않는다.
+// Bend 참조 모델을 오라클 공간으로 쓴다. 법칙 증명(`bend PROOF.bend --verdict`)의 결과를 분류하고 — PROOF.bend가 비운
+// 유한 칸 법칙은 증명을 만들어 임시 사본에서 함께 검사한다 —, 커널 전에 관계·불변식을 모든 칸에서 계산하고(`laws`),
+// 잠긴 MODEL.bend를 `bend -o *.mjs`로 컴파일해 선언 범위의 trace를 결정적으로 열거하고, 구현 adapter의 관측값을 같은
+// trace에서 대조한다. 기대값은 증명된 그 모델 코드가 계산한다 — JS로 옮겨 적은 두 번째 의미를 두지 않는다.
 
 import { spawnSync } from 'node:child_process'
 import { copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
@@ -14,10 +15,11 @@ import { isDeepStrictEqual } from 'node:util'
 import { ensureBend, reportedVersion } from './ensure-bend.mjs'
 import { runCli } from './oracle-cli.mjs'
 import { sha256, stableStringify } from './oracle-fs.mjs'
+import { cellProof, lawReport } from './oracle-laws.mjs'
 import { analyzeConfigurations } from './oracle-quotient.mjs'
-import { toPlain } from './oracle-types.mjs'
+import { scanBendSource, toPlain } from './oracle-types.mjs'
 
-export { toPlain } from './oracle-types.mjs'
+export { scanBendSource, toPlain } from './oracle-types.mjs'
 
 export const GENERATOR_VERSION = 1
 // safety: 나쁜 일이 일어나지 않는다 · effect: 요구된 일이 일어난다 · witness: `exs`로 그 일이 init에서 도달 가능함을 보인다
@@ -41,34 +43,6 @@ class CliError extends Error {
     super(message)
     this.code = code
     this.exitCode = exitCode
-  }
-}
-
-/** Bend 파일 한 장의 구조 — 로컬·hub import, foreign·unsafe 코드, law 이름과 witness(`exs`) 여부. */
-export function scanBendSource(text) {
-  const lines = text.split('\n')
-  const imports = []
-  const external = []
-  for (const line of lines) {
-    const target = line.match(/^import\s+(\S+)/)?.[1]
-    if (!target || target === 'Base') continue
-    if (target.startsWith('./') || target.startsWith('../')) imports.push(target)
-    else external.push(target)
-  }
-  const laws = []
-  lines.forEach((line, index) => {
-    const name = line.match(/^law\s+([\w.]+)\s*:/)?.[1]
-    if (!name) return
-    let end = index + 1
-    while (end < lines.length && (lines[end].startsWith(' ') || lines[end].trim() === '')) end += 1
-    laws.push({ name, witness: lines.slice(index + 1, end).some((body) => /^\s+exs\s/.test(body)) })
-  })
-  return {
-    imports,
-    external,
-    laws,
-    foreign: /^[ \t]+import[ \t]+"/m.test(text),
-    unsafe: /^@unsafe\b|^def\s+[\w.]+\?\(/m.test(text),
   }
 }
 
@@ -161,10 +135,10 @@ function commonDirectory(directories) {
 }
 
 /**
- * 생성한 Bend 파일(text)을 진입 파일 옆에 두고 `bend <fileName> --verdict`를 돌린다. 진입 파일의 import 전부를
+ * 생성한 Bend 파일(text)을 진입 파일 옆에 두고 `bend <fileName> --verdict`를 돌린 실행 결과. 진입 파일의 import 전부를
  * 임시 디렉터리에 복사해 원본 트리에는 아무것도 쓰지 않는다.
  */
-export async function verdictBeside({ entry, inputs, fileName, text, bin, timeoutMs = 120_000 }) {
+async function runBeside({ entry, inputs, fileName, text, bin, timeoutMs }) {
   const directory = await mkdtemp(join(tmpdir(), 'oracle-kernel-'))
   try {
     const root = commonDirectory(inputs.map(({ path }) => dirname(path)))
@@ -175,17 +149,21 @@ export async function verdictBeside({ entry, inputs, fileName, text, bin, timeou
     }
     const cwd = join(directory, relative(root, dirname(entry)))
     await writeFile(join(cwd, fileName), text)
-    const run = spawnSync(bin, [fileName, '--verdict'], {
+    return spawnSync(bin, [fileName, '--verdict'], {
       cwd,
       encoding: 'utf8',
       env: { ...process.env, BEND_NO_TELEMETRY: '1' },
       timeout: timeoutMs,
       maxBuffer: 64 * 1024 * 1024,
     })
-    return verdictOf(run, { bin, timeoutMs })
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
+}
+
+/** runBeside의 실행 결과 → 상태(verdictOf). */
+export async function verdictBeside({ timeoutMs = 120_000, ...options }) {
+  return verdictOf(await runBeside({ ...options, timeoutMs }), { bin: options.bin, timeoutMs })
 }
 
 /**
@@ -227,7 +205,11 @@ export async function loadModel({ model, prefix, bin, timeoutMs = 120_000 }) {
 }
 
 async function compileModel({ entry, prefix, bin, timeoutMs }) {
-  const { exported, inputs } = await compileBend({ entry, bin, timeoutMs })
+  return modelOf({ entry, prefix, bin, ...(await compileBend({ entry, bin, timeoutMs })) })
+}
+
+/** 컴파일된 def(compileBend) → 오라클 공간을 만드는 init·step·next·observe. 하나라도 없으면 MODEL_INTERFACE다. */
+function modelOf({ entry, prefix, bin, exported, inputs }) {
   const api = {}
   for (const name of MODEL_EXPORTS) {
     const fn = exported[`${prefix}.${name}`]
@@ -320,6 +302,27 @@ export function listedSpace(space, listed = LISTED_CASES) {
   if (!Number.isSafeInteger(listed) || listed < 0)
     throw new CliError('USAGE', 'cases must be a non-negative safe integer', 2)
   return { ...space, caseCount: space.cases.length, cases: space.cases.slice(0, listed) }
+}
+
+/**
+ * 공간의 각 case trace와 그 prefix를 init에서 step으로 접어, 닿은 상태(plain 값의 stableStringify) → 처음 닿은 trace.
+ * 짧은 trace가 먼저이고 같은 길이면 공간의 case 순서다. trace는 plain이라 사건은 classifyTrace처럼 그 자리 next의
+ * 선택지에서 되찾는다. `laws --invariant`가 귀납 반례의 상태에 공간이 닿는지 이것으로 본다.
+ */
+export function reachedStates(model, space) {
+  const traces = new Map([[stableStringify(toPlain(model.init())), []]])
+  for (const { trace } of space.cases) {
+    const raw = []
+    let state = model.init()
+    for (const event of trace) {
+      const match = listItems(model.next(listOf(raw))).find((choice) => isDeepStrictEqual(toPlain(choice), event))
+      raw.push(match)
+      state = model.step(state, match)
+      const key = stableStringify(toPlain(state))
+      if ((traces.get(key)?.length ?? Infinity) > raw.length) traces.set(key, trace.slice(0, raw.length))
+    }
+  }
+  return { bound: space.bound, complete: space.complete, traces }
 }
 
 export const MAX_COVER_CONFIGURATIONS = 2000
@@ -435,6 +438,8 @@ export function transitionCover(model, space, { maxConfigurations = MAX_COVER_CO
     basis: COVER_BASIS,
     configurations: expanded,
     pairs,
+    // 너비 우선이라 구성마다 trace가 가장 짧은 접근이다 — 그중 가장 긴 것 안에 모든 구성이 닿는다. capped면 모른다
+    diameter: capped === null ? nodes.reduce((longest, { trace }) => Math.max(longest, trace.length), 0) : null,
     ...(capped === null
       ? {}
       : {
@@ -748,16 +753,69 @@ export function observeTrace(adapter, trace) {
   return observed
 }
 
+/** 파일 text가 target(절대 경로)을 부르는 import의 별칭들. */
+function aliasesOf(text, path, target) {
+  return [...text.matchAll(/^import\s+(\.{1,2}\/\S+)\s+as\s+(\w+)/gm)]
+    .filter(([, file]) => resolve(dirname(path), file) === target)
+    .map(([, , alias]) => alias)
+}
+
+/**
+ * PROOF.bend의 import closure가 채우지 않은 law. LAWS.bend 안에서는 `def <law>(`가, 다른 파일에서는 그 파일이 LAWS.bend를
+ * 부르는 별칭 A의 `def A.<law>(`가 law를 채운다 — 커널은 나머지를 TODO로 센다.
+ */
+async function undefinedLaws(inputs, lawsFile) {
+  const names = lawsFile.laws.map(({ name }) => name)
+  const defined = new Set()
+  for (const { path } of inputs) {
+    const text = await readFile(path, 'utf8')
+    const qualifiers = path === lawsFile.path ? [''] : aliasesOf(text, path, lawsFile.path).map((alias) => `${alias}.`)
+    for (const name of names) {
+      const heads = qualifiers.map((qualifier) => `${qualifier}${name}`.replaceAll('.', String.raw`\.`))
+      if (heads.some((head) => new RegExp(String.raw`^def\s+${head}\s*\(`, 'm').test(text))) defined.add(name)
+    }
+  }
+  return names.filter((name) => !defined.has(name))
+}
+
+const noCells = () => ({ text: null, generated: [], skipped: [] })
+
+/** 채우지 않은 law의 칸 증명(cellProof). 칸 리터럴이 `M.` 별칭이라 LAWS.bend가 옆의 MODEL.bend를 부를 때만 만든다. */
+async function missingCells(cwd, inputs, lawsFile) {
+  const names = await undefinedLaws(inputs, lawsFile)
+  if (names.length === 0) return noCells()
+  const beside = lawsFile.imports.includes('./MODEL.bend')
+  return cellProof({
+    laws: await readFile(lawsFile.path, 'utf8'),
+    model: beside ? await readFile(join(cwd, 'MODEL.bend'), 'utf8') : null,
+    names,
+  })
+}
+
+/** 커널을 부르기 전에 거절하는 이유 — PROOF.bend가 다른 법칙을 검사하거나, 요구된 law를 LAWS.bend가 말하지 않는다. */
+function refusalOf(inputs, laws, required) {
+  if (!inputs[0].imports.includes('./LAWS.bend')) return 'PROOF.bend does not import ./LAWS.bend'
+  const missing = required.filter((name) => !laws.includes(name))
+  return missing.length > 0 ? `LAWS.bend does not state required laws: ${missing.join(', ')}` : null
+}
+
 /**
  * `bend PROOF.bend --verdict` 결과 분류. `proven`은 exit 0·신호 없음·정확한 `ALL PROOFS CHECK` 줄이 함께일 때뿐이다.
  * 열린 law(채우지 않은 구멍·def 없는 law)·unsafe·foreign·timeout·도구 부재는 각각의 상태로 남고 통과로 바뀌지 않는다.
+ * closure가 채우지 않은 law 중 `for` 타입이 유한한 law는 칸 증명을 만들어(cells.generated) closure의 임시 사본에서
+ * PROOF.bend를 부르는 CELLS.bend로 함께 검사한다 — 사용자 디렉터리에는 아무것도 쓰지 않는다. 그때 `cells.temporaryCopy`가
+ * true이고 command의 CELLS.bend는 그 사본에만 있다. 만들 law가 없으면 예전 그대로다.
  */
 export async function proveLaws({ dir, bin, require = [], timeoutMs = 120_000 }) {
   const cwd = resolve(dir)
-  const command = [bin, 'PROOF.bend', '--verdict']
-  const inputs = await bendInputs(join(cwd, 'PROOF.bend'))
+  const entry = join(cwd, 'PROOF.bend')
+  const inputs = await bendInputs(entry)
   const lawsFile = inputs.find(({ path }) => path === join(cwd, 'LAWS.bend'))
   const laws = lawsFile?.laws.map(({ name }) => name) ?? []
+  const refusal = refusalOf(inputs, laws, require)
+  const cells = refusal === null ? await missingCells(cwd, inputs, lawsFile) : noCells()
+  const generated = cells.text !== null
+  const command = [bin, generated ? 'CELLS.bend' : 'PROOF.bend', '--verdict']
   const base = {
     command,
     cwd,
@@ -765,22 +823,27 @@ export async function proveLaws({ dir, bin, require = [], timeoutMs = 120_000 })
     lawImports: lawsFile?.imports ?? [],
     inputs: inputs.map(({ path, sha256: digest }) => ({ path: relative(cwd, path), sha256: digest })),
     untrusted: untrustedInputs(inputs),
+    cells: { generated: cells.generated, skipped: cells.skipped, temporaryCopy: generated },
   }
-  if (!inputs[0].imports.includes('./LAWS.bend')) {
-    return { ...base, status: 'failed', reason: 'PROOF.bend does not import ./LAWS.bend' }
-  }
-  const missing = require.filter((name) => !laws.includes(name))
-  if (missing.length > 0) {
-    return { ...base, status: 'failed', reason: `LAWS.bend does not state required laws: ${missing.join(', ')}` }
-  }
+  if (refusal !== null) return { ...base, status: 'failed', reason: refusal }
+  // 생성한 진입 파일은 사본의 PROOF.bend 옆 CELLS.bend다 — closure의 그 파일을 덮어쓰지 않는다
+  if (generated && inputs.some(({ path }) => path === join(cwd, 'CELLS.bend')))
+    return {
+      ...base,
+      status: 'failed',
+      reason:
+        'CELLS.bend beside PROOF.bend is in its import closure, but the generated cell proofs are checked under that name: rename that file',
+    }
 
-  const run = spawnSync(bin, command.slice(1), {
-    cwd,
-    encoding: 'utf8',
-    env: { ...process.env, BEND_NO_TELEMETRY: '1' },
-    timeout: timeoutMs,
-    maxBuffer: 16 * 1024 * 1024,
-  })
+  const run = generated
+    ? await runBeside({ entry, inputs, fileName: 'CELLS.bend', text: cells.text, bin, timeoutMs })
+    : spawnSync(bin, command.slice(1), {
+        cwd,
+        encoding: 'utf8',
+        env: { ...process.env, BEND_NO_TELEMETRY: '1' },
+        timeout: timeoutMs,
+        maxBuffer: 16 * 1024 * 1024,
+      })
   const observed = {
     ...base,
     exitCode: run.status,
@@ -1126,20 +1189,41 @@ function relationIssues(fields, structures, lawsPath) {
   return issues
 }
 
+// 이름·값 쌍만 받는다. 여러 번 줄 수 있는 것은 배열이다.
+const OPTION_NAMES = [
+  'dir',
+  'require',
+  'timeout-ms',
+  'model',
+  'prefix',
+  'bound',
+  'max-cases',
+  'cases',
+  'impl',
+  'file',
+  'field',
+  'out',
+  'order-ways',
+  'state',
+  'command',
+  'relation',
+  'observe',
+  'invariant',
+  'nat-max',
+  'list-max',
+  'max-evals',
+]
+const LIST_OPTIONS = ['require', 'file', 'field', 'relation']
+
 function parseOptions(args) {
-  const options = { require: [], file: [], field: [] }
+  const options = Object.fromEntries(LIST_OPTIONS.map((name) => [name, []]))
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index]?.replace(/^--/, '')
     const value = args[index + 1]
-    if (
-      !['dir', 'require', 'timeout-ms', 'model', 'prefix', 'bound', 'max-cases', 'cases', 'impl', 'file', 'field', 'out', 'order-ways'].includes(
-        name,
-      ) ||
-      value === undefined
-    ) {
+    if (!OPTION_NAMES.includes(name) || value === undefined) {
       throw new CliError('USAGE', `Unknown or incomplete option: ${args[index]}`, 2)
     }
-    if (['require', 'file', 'field'].includes(name)) options[name].push(value)
+    if (LIST_OPTIONS.includes(name)) options[name].push(value)
     else options[name] = value
   }
   return options
@@ -1150,7 +1234,87 @@ const USAGE = `usage:
   oracle-model.mjs check --file <x.bend> [--file <y.bend>]... [--timeout-ms <n>]
   oracle-model.mjs prove --dir <dir with LAWS.bend and PROOF.bend> [--require <law>]... [--timeout-ms <n>]
   oracle-model.mjs space --model <MODEL.bend> --prefix <Name> --bound <n> [--max-cases <n>] [--cases <listed>] [--order-ways <t>]
-  oracle-model.mjs conform --model <MODEL.bend> --prefix <Name> --bound <n> --impl <adapter.mjs> [--max-cases <n>]`
+  oracle-model.mjs conform --model <MODEL.bend> --prefix <Name> --bound <n> --impl <adapter.mjs> [--max-cases <n>]
+  oracle-model.mjs laws --model <MODEL.bend> --prefix <Prefix> --state <Type> --command <Type> [--relation <def>]... [--observe <def>] [--invariant <def>] [--bound <n>] [--nat-max <n>] [--list-max <n>] [--max-evals <n>]`
+
+const integerOption = (value) => (value === undefined ? undefined : Number(value))
+
+// `laws`가 받는 옵션 — 다른 명령의 옵션(--max-cases 등)은 조용히 버리지 않고 거절한다
+const LAWS_OPTIONS = [
+  'model',
+  'prefix',
+  'state',
+  'command',
+  'relation',
+  'observe',
+  'invariant',
+  'bound',
+  'nat-max',
+  'list-max',
+  'max-evals',
+  'timeout-ms',
+]
+
+function lawsUsage(options) {
+  const { model, prefix, state, command, relation: relations, invariant } = options
+  if ([model, prefix, state, command].some((value) => !value)) throw new CliError('USAGE', USAGE, 2)
+  if (relations.length === 0 && !invariant) throw new CliError('USAGE', USAGE, 2)
+  const given = Object.keys(options).filter((name) => !LIST_OPTIONS.includes(name) || options[name].length > 0)
+  const flag = (name) => `--${name}`
+  const foreign = given.filter((name) => !LAWS_OPTIONS.includes(name)).map(flag)
+  if (foreign.length > 0) throw new CliError('USAGE', `laws does not take ${foreign.join(', ')}\n${USAGE}`, 2)
+  if (options.bound !== undefined && !invariant)
+    throw new CliError('USAGE', '--bound sets the space that reaches counterexamples to induction: pass it with --invariant', 2)
+}
+
+/**
+ * `laws`: 관계·불변식을 모델의 모든 칸에서 계산한다(oracle-laws.mjs). --invariant·--bound이고 모델이 init·step·next·observe를
+ * 모두 내보내면, 검사가 모두 통과한 뒤 같은 컴파일 결과로 그 bound의 공간을 열거해 귀납 반례마다 공간이 그 상태에 닿는지(처음
+ * 닿는 trace)를 붙인다. 하나라도 없으면 reach는 null이다.
+ */
+async function runLaws(options, { bin, timeoutMs }) {
+  lawsUsage(options)
+  const { model, prefix, state, command, relation: relations, invariant } = options
+  const entry = resolve(model)
+  const compiled = await compileBend({ entry, bin, timeoutMs })
+  const { exported, inputs } = compiled
+  const source = await readFile(entry, 'utf8')
+  const spaced =
+    options.bound !== undefined && MODEL_EXPORTS.every((name) => typeof exported[`${prefix}.${name}`] === 'function')
+  const reach = spaced
+    ? () => {
+        const loaded = modelOf({ entry, prefix, bin, ...compiled })
+        return reachedStates(loaded, enumerateSpace(loaded, { bound: Number(options.bound) }))
+      }
+    : null
+  const natMax = integerOption(options['nat-max'])
+  const listMax = integerOption(options['list-max'])
+  const report = lawReport({
+    source,
+    exported,
+    prefix,
+    state,
+    command,
+    relations,
+    observe: options.observe ?? null,
+    invariant: invariant ?? null,
+    bounds: { ...(natMax === undefined ? {} : { nat: natMax }), ...(listMax === undefined ? {} : { list: listMax }) },
+    maxEvals: integerOption(options['max-evals']),
+    reach,
+  })
+  const sources = inputs.map(({ path, sha256: digest }) => ({ path: relative(dirname(entry), path), sha256: digest }))
+  process.stdout.write(`${JSON.stringify({ ...report, bend: { bin, version: reportedVersion(bin) }, inputs: sources })}\n`)
+  process.exitCode = report.status === 'ok' ? 0 : 1
+}
+
+/** oracle-laws.mjs는 이 모듈을 부르지 않아 자기 오류를 던진다 — 그 코드와 exit code(사용법 2)를 이 모듈의 CliError로 옮긴다. */
+async function relayed(work) {
+  try {
+    await work()
+  } catch (error) {
+    throw new CliError(error.code ?? 'MODEL_FAILED', error.message ?? String(error), error.exitCode ?? 1)
+  }
+}
 
 async function main() {
   const [command, ...args] = process.argv.slice(2)
@@ -1158,10 +1322,15 @@ async function main() {
     process.stdout.write(`${USAGE}\n`)
     return
   }
-  if (!['scaffold', 'check', 'prove', 'space', 'conform'].includes(command)) throw new CliError('USAGE', USAGE, 2)
+  if (!['scaffold', 'check', 'prove', 'space', 'conform', 'laws'].includes(command)) throw new CliError('USAGE', USAGE, 2)
   const options = parseOptions(args)
   const timeoutMs = options['timeout-ms'] ? Number(options['timeout-ms']) : undefined
   const { bin } = await ensureBend()
+
+  if (command === 'laws') {
+    await relayed(() => runLaws(options, { bin, timeoutMs }))
+    return
+  }
 
   if (command === 'scaffold') {
     if (!options.out) throw new CliError('USAGE', USAGE, 2)

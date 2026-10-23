@@ -1,3 +1,27 @@
+# 0.110.0: `laws` reports counterexamples, pinned and free cells and induction failures; `prove` generates cell proofs
+
+## Validation
+
+- `ORACLE_REQUIRE_BEND=1 node --test oracle-model.test.mjs`: 74 passed, 0 failed, 0 skipped (real Bend 2.0.34).
+  modular-skills, skill-contract, reference-bundles and workflow-docs: 157 passed. `bundles:check`,
+  `workflow-docs:check` and the package lint pass (0 errors). Opus 5.5 review: 0 blocker, 1 major, 7 minor, 7 nit,
+  all applied.
+
+## Change
+
+- `oracle-model.mjs laws` checks each relation against the compiled model (counterexamples), counts the cells the
+  relations pin and leave free at observation level (with the fields the step keeps and a hint when frame laws are
+  missing), and with `--invariant` lists the induction failures with the shortest trace that reaches each.
+- `prove` writes the case split of every finite `for` law that PROOF.bend leaves undefined into a temporary copy and
+  checks it there; nothing is written into the directory and `cells.temporaryCopy` says so.
+- `space` cover reports the `diameter` of a closed system; a capped one has none.
+- Measured: toggle 16 pinned / 32 free, session-expiry 4 / 4, cells 160 pinned (140 free without the frame laws),
+  pagination diameter 5.
+
+## Not changed
+
+- No law kind, package field, lock input or stage gate changed. Strength is a report, not a gate.
+
 # 0.109.0: a separate `bend-proof` skill reads the model as a state·event·transition machine and proves safety over every trace
 
 ## Validation
@@ -102,8 +126,8 @@
   `model-patterns.md` keep their paths and text apart from the removed citations.
 - Space discovery, the seven input families, their dispositions and their lint are unchanged; the new node only says
   where each family lands in the machine.
-- The `laws` checks (falsify, strength, bounded counterexamples to induction), `prove-cells` and the diameter report are
-  the next release.
+- The `laws` checks (falsify, strength, bounded counterexamples to induction), generated cell proofs and the diameter
+  report are the next release.
 
 # 0.108.0: the claim's reviewer writes the reproduction a closure trusts; a repaired High re-earns its mutation and passes
 
