@@ -75,6 +75,7 @@ export async function startApp(env: Env): Promise<App> {
     })
     return {
       ready: app.ready,
+      statusPort: app.statusPort,
       async stop() {
         await app.stop()
         release()

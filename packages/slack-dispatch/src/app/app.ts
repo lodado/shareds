@@ -22,7 +22,7 @@ import { createWorker, retriesLeft } from '../work/worker.ts'
 import { createSplitAgent, createTriageAgent } from './agents.ts'
 import { dispatchEnvelope } from './dispatch.ts'
 import { every } from './loop.ts'
-import { startStatusServer } from './status.ts'
+import { describeError, startStatusServer } from './status.ts'
 import { loadThreadText } from './threads.ts'
 
 export interface AppDeps {
@@ -51,6 +51,8 @@ export interface AppDeps {
 export interface App {
   // Resolves once Slack said hello on the socket.
   ready: Promise<void>
+  // The port the status address listens on, or null when it is off or the port was taken.
+  statusPort: number | null
   // Stops the loops, the socket and the agents, and waits for the jobs to end.
   stop: () => Promise<void>
 }
@@ -190,7 +192,7 @@ export async function createApp(deps: AppDeps): Promise<App> {
       poll.at = deps.now().toISOString()
       poll.error = null
     } catch (error) {
-      poll.error = errorText(error)
+      poll.error = describeError(error)
       throw error
     }
   }
@@ -212,6 +214,7 @@ export async function createApp(deps: AppDeps): Promise<App> {
 
   return {
     ready: socket.ready,
+    statusPort: statusServer?.port ?? null,
     async stop() {
       for (const stopLoop of stops) stopLoop()
       socket.stop()

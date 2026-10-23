@@ -25,6 +25,7 @@ pnpm lint && pnpm test
 
 ```sh
 pnpm service:install     # a LaunchAgent: starts when you log in, restarts after a crash
+pnpm service:restart     # run the code as it is now (after you changed it)
 pnpm service:status
 pnpm service:uninstall
 ```

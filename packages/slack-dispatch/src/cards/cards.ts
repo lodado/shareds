@@ -13,7 +13,9 @@ const TITLE_LIMIT = 100
 // The report shares its section with a line above it.
 const REPORT_LIMIT = 2500
 
-const REVISE_HINT = '고치고 싶은 점은 이 메시지의 스레드에 답글로 적어주세요.'
+// Shown between the plan and the buttons, because a reply in the thread is the only way to ask for a change.
+const REVISE_HINT =
+  '*✏️ 플랜을 고치고 싶으면* 이 메시지의 *스레드에 답글*로 지시를 적어 주세요. 같은 세션이 플랜을 고쳐서 새 카드로 다시 보내요.'
 
 const ITEM_ACTIONS: ReadonlySet<string> = new Set(['approve_plan', 'reject', 'merge', 'retry', 'cancel'])
 
@@ -72,6 +74,7 @@ export function buildPlanCard(input: PlanCardInput): DigestMessage {
   const blocks: Block[] = [
     { type: 'header', text: { type: 'plain_text', text: title } },
     section(escapeMrkdwn(shownPlan(input.plan))),
+    section(REVISE_HINT),
     {
       type: 'actions',
       block_id: `plan:${input.cardId}`,
@@ -80,7 +83,7 @@ export function buildPlanCard(input: PlanCardInput): DigestMessage {
         button('reject', input.cardId, input.itemKey, '기각', 'danger'),
       ],
     },
-    context(source === '' ? REVISE_HINT : `${source} · ${REVISE_HINT}`),
+    ...(source === '' ? [] : [context(source)]),
   ]
   return { text: title, blocks }
 }

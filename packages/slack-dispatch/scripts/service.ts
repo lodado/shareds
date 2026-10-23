@@ -1,4 +1,4 @@
-// Has macOS start the service when the owner logs in. Run: node --no-warnings scripts/service.ts install|uninstall|status
+// Has macOS start the service when the owner logs in. Run: node --no-warnings scripts/service.ts install|uninstall|restart|status
 // It only touches one file, ~/Library/LaunchAgents/com.<user>.slack-dispatch.plist, and the launchd job of that name.
 
 import { execFile } from 'node:child_process'
@@ -67,6 +67,14 @@ async function uninstall(): Promise<void> {
   console.warn(`removed ${plistPath}`)
 }
 
+// Starts the running service again, so it runs the code as it is now. A clean stop is not followed by a start on its
+// own (that is what KeepAlive leaves out), so the job is kicked: killed if it runs, started if it does not.
+async function restart(): Promise<void> {
+  if (!existsSync(plistPath)) throw new Error('not installed; run service:install first')
+  await launchctl('kickstart', '-k', `${domain}/${label}`)
+  console.warn(`restarted ${label}`)
+}
+
 async function status(): Promise<void> {
   console.warn(existsSync(plistPath) ? `installed: ${plistPath}` : 'not installed')
   try {
@@ -84,10 +92,10 @@ async function status(): Promise<void> {
   }
 }
 
-const commands: Record<string, () => Promise<void>> = { install, uninstall, status }
+const commands: Record<string, () => Promise<void>> = { install, uninstall, restart, status }
 const command = commands[process.argv[2] ?? '']
 if (command === undefined) {
-  console.warn('usage: node --no-warnings scripts/service.ts install|uninstall|status')
+  console.warn('usage: node --no-warnings scripts/service.ts install|uninstall|restart|status')
   process.exitCode = 1
 } else {
   await command()

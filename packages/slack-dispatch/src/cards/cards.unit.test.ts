@@ -50,6 +50,19 @@ describe('buildPlanCard as a plan waiting for the owner', () => {
     ])
   })
 
+  it('to be telling the owner, above the buttons, to ask for changes by replying in the thread', () => {
+    const kinds = card.blocks.map((block) => block.type)
+    expect(kinds).toStrictEqual(['header', 'section', 'section', 'actions', 'context'])
+    const hint = card.blocks[2]
+    expect(hint?.type === 'section' && hint.text.text).toContain('스레드에 답글')
+    expect(hint?.type === 'section' && hint.text.text).toContain('같은 세션이 플랜을 고쳐서 새 카드로 다시 보내요')
+  })
+
+  it('to be without a link line, and nothing else changed, when the item has no thread', () => {
+    const own = buildPlanCard({ itemKey: KEY, cardId: 1, repo: 'web-app', plan: 'p', threadUrl: '' })
+    expect(own.blocks.map((block) => block.type)).toStrictEqual(['header', 'section', 'section', 'actions'])
+  })
+
   it('to be titled with the repo and linked to the thread', () => {
     expect(card.text).toBe('플랜: web-app')
     expect(JSON.stringify(card.blocks)).toContain('<https://x.test/t|원본 쓰레드>')
