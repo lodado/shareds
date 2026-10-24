@@ -1,6 +1,6 @@
 ---
 name: harness-team
-description: Use for implementation, bug fixes, refactoring, documentation changes, and reviews. Coordinate five roles, a final review the lead calls for (always for risky work), and carry-over fixes. Skip conversation and conceptual explanations.
+description: Use for implementation, bug fixes, refactoring, documentation changes, and reviews. Coordinate five roles, a final review for risky work or on request, and carry-over fixes. Skip conversation and conceptual explanations.
 allowed-tools:
   - Bash
 ---
@@ -24,11 +24,10 @@ agents or run this workflow. The lead owns coordination, carry-over, and reporti
 
 ## Model selection
 
-Follow host routing. Design, architecture, unknown-cause debugging, and building risky work require the most capable
-latest-generation reasoning model available, regardless of cost. The lead picks the Final Reviewer's model from
-latest-generation models; reviewing risky work or a review the user asked for requires the most capable one. For other
-subagent roles, use the cheapest suitable latest-generation model; never choose an older model just to save money. Match
-capability to the task; never trade required correctness for price.
+Follow host routing. Design, architecture, unknown-cause debugging, building risky work, and the final review require
+the most capable latest-generation reasoning model available, regardless of cost. For other subagent roles, use the
+cheapest suitable latest-generation model; never choose an older model just to save money. Match capability to the
+task; never trade required correctness for price.
 
 ## Roles
 
@@ -43,20 +42,19 @@ capability to the task; never trade required correctness for price.
    read-only agent, not the author, with independent context. Review the complete change once, exhaustively.
 
 Work is risky when it touches state, ordering, permission, or money logic, authentication, payments, data migration or
-deletion, concurrency or retries, or irreversible side effects, regardless of file count. Work is trivial when it only
-changes styling (CSS, design tokens, class names), copy, formatting, comments (not lint, type, coverage, or build
-directives), or typos, with no change to logic, data, or agent instructions. The lead decides whether to delegate a
-Final Reviewer and which model it runs on; trivial work that is not risky gets none unless the lead asks for one, and
-risky work always gets one unless a domain workflow supplies its review. Staff the other roles by the first match:
+deletion, concurrency or retries, or irreversible side effects, regardless of file count. A Final Reviewer runs only
+for risky work, review-only tasks, or a review the user asked for, unless a domain workflow supplies its review. Staff
+the other roles by the first match:
 
-- Work the lead judges simple that is not risky: the lead scouts, builds, and verifies, and reads the final diff.
-- Everything else: delegate Scout, Builder, and Verifier.
+- Risky work: delegate Scout, Builder, and Verifier.
+- Everything else: the lead scouts, builds, and verifies, and reads the final diff; delegate Scout only for bulk reading
+  that needs just a conclusion.
 
 Use at most four subagents per task within host concurrency limits; replacements occupy the same role. Put the assigned
 role first in each delegation.
 
 Run Scout → Builder → Verifier → Final Reviewer (when one runs); failed checks return to Builder. If delegation or
-child edits are unavailable, the lead fills that role. If the lead calls for a review and an independent reviewer is
+child edits are unavailable, the lead fills that role. If a review is required and an independent reviewer is
 unavailable, reread the on-disk diff in a separate pass using the checklist below and disclose that review was not
 independent. Review-only tasks make no edits and delegate no Builder; their review is the deliverable, so the lead
 always delegates a Final Reviewer. An existing domain workflow fills equivalent roles and controls its own review
@@ -87,7 +85,7 @@ Review-only tasks return findings without applying them.
 ## Report and carry-over
 
 Report the outcome, key files, actual check commands with `PASS`, `FAIL`, `NOT_RUN`, or `N/A`, the reviewer's exact
-model (`unknown` if the host does not say) and verdict, or that the lead skipped review and why, and subagent token
+model (`unknown` if the host does not say) and verdict, or that no review was required, and subagent token
 counts on one line when the host reports them. Never invent runs, reviewers, or savings. End with `Carry-over`:
 unapplied findings and your own mistakes, or `none`.
 

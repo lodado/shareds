@@ -1,7 +1,7 @@
 {
   "name": "@lodado/harness-team-plugin",
-  "version": "0.4.0",
-  "description": "Claude Code / Codex plugin that runs every work task as a five-role harness team with a lead-called perfectionist final review (always for risky work) and carry-over fixes.",
+  "version": "0.5.0",
+  "description": "Claude Code / Codex plugin that runs every work task as a five-role harness team with a perfectionist final review for risky work and carry-over fixes.",
   "private": true,
   "scripts": {
     "test": "node --test scripts/*.test.mjs"
