@@ -8,11 +8,12 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { sha256 } from './oracle-fs.mjs'
-import { assertReadyToLock, inputsPin, markLocked, readStage } from './oracle-stage.mjs'
+import { assertReadyToLock, inputsPin, markLocked, preLockProof, readStage } from './oracle-stage.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 
 const FIXTURE = fileURLToPath(new URL('../../../test-fixtures/stale-search/', import.meta.url))
 const PAGINATION = fileURLToPath(new URL('../../../test-fixtures/pagination/', import.meta.url))
+const PAY = fileURLToPath(new URL('../../../test-fixtures/pay/', import.meta.url))
 const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
 const { NODE_TEST_CONTEXT: _parent, ...INHERITED_ENV } = process.env
 // 영수증은 테스트마다 따로 둔다 — 다른 테스트나 앞선 실행이 남긴 CHECKED 영수증이 관문을 대신 통과시키지 않게
@@ -339,6 +340,17 @@ test('DRAFTED opens the lock gate for the package bytes it was recorded on, and 
   assert.equal(stage(root, directory, 'advance', 'DRAFTED').status, 0)
   await markLocked(directory)
   assert.equal((await readStage(directory)).stage, 'ORACLE_READY')
+  // an advance or rewind with no target is a usage error before the record is read, not a pass that erases its stage
+  const before = await readFile(join(directory, 'stage.json'), 'utf8')
+  const untargeted = stage(root, directory, 'advance')
+  assert.equal(untargeted.status, 2)
+  assert.match(untargeted.stderr, /^USAGE: advance requires --to <stage>/)
+  const unwound = stage(root, directory, 'rewind')
+  assert.equal(unwound.status, 2)
+  assert.match(unwound.stderr, /^USAGE: rewind requires --to <stage>/)
+  // a name that is no stage is still a skip
+  assert.match(stage(root, directory, 'advance', 'NOT_A_STAGE').stderr, /^STAGE_SKIP: ORACLE_READY can only advance to nothing, not NOT_A_STAGE/)
+  assert.equal(await readFile(join(directory, 'stage.json'), 'utf8'), before)
   // an idempotent relock of the same bytes still passes the gate; changed bytes do not
   await assertReadyToLock(directory)
   const packagePath = join(directory, 'oracle.package.json')
@@ -628,6 +640,274 @@ test('CHECKED remembers a pass by its exact inputs: a registered source or Bend 
   const throughLink = await walk(linked, join(preloads, 'cache'), { NODE_OPTIONS: `--import ${restore}`, SWAP_TEXT_FILE: fixed })
   assert.match(throughLink.stderr, /^STAGE_STALE: the Bend files or registered sources changed while the CHECKED gate ran/, 'the link target was replaced and restored under the gate')
   assert.deepEqual(await readdir(join(preloads, 'cache')).catch(() => []), [])
+})
+
+// stale-search 모델에 붙이는 시험용 def — 다음 상태의 latest를 못 박는 거짓 관계, 아무것도 못 박지 않는 참 관계, 두 번째
+// Issue에서 깨지는 trace 술어. 각 law는 아래 변형이 LAWS.bend에 붙인다
+const LAW_DEFS = `
+def Search.latest_of(s: Search) -> Nat:
+  match s:
+    case Search{latest, shown}:
+      latest
+
+def Search.R_latest_kept(+s: Search, +m: Msg, +t: Search) -> Bool:
+  Nat.is_eq(Search.latest_of(t), Search.latest_of(s))
+
+def Search.R_anything(s: Search, m: Msg, t: Search) -> Bool:
+  True{}
+
+def Search.below_two(s: Search) -> Bool:
+  Nat.is_lt(Search.latest_of(s), 2n)
+`
+const cellLaw = (name, relation) => `\nlaw ${name}:\n  for s: M.Search\n  for m: M.Msg\n  {M.Search.${relation}(s, m, M.Search.step(s, m)) == True{} : Bool}\n`
+const appended = async (path, text) => writeFile(path, `${await readFile(path, 'utf8')}${text}`)
+const replaced = async (path, from, to) => {
+  const text = await readFile(path, 'utf8')
+  assert.ok(text.includes(from), `${path} has the text to replace`)
+  await writeFile(path, text.replace(from, to))
+}
+const withLaw = (law, proof) => async (root) => {
+  await appended(join(root, 'MODEL.bend'), LAW_DEFS)
+  await appended(join(root, 'LAWS.bend'), law)
+  if (proof) await appended(join(root, 'PROOF.bend'), proof)
+}
+// 모든 칸에서 참이고 아무 칸도 못 박지 않는 law와 계산으로 닫는 증명
+const freeLaw = withLaw(cellLaw('anything', 'R_anything'), '\ndef Laws.anything(s, m):\n  {==}\n')
+
+/** 바꾼 사본으로 MODELED까지 걷고 CHECKED를 한 번 — 관문의 결과와 그 뒤의 단계. */
+async function checkedWalk(t, change, env = {}) {
+  const { root, directory } = await repository(t)
+  await change?.(root)
+  const run = (...args) => spawnSync(process.execPath, [join(SCRIPTS, 'oracle-stage.mjs'), ...args, '--dir', directory], { cwd: root, encoding: 'utf8', env: { ...CHILD_ENV, ...env } })
+  assert.equal(run('begin').status, 0)
+  assert.equal(run('advance', '--to', 'MODELED').status, 0)
+  const checked = run('advance', '--to', 'CHECKED')
+  return { root, directory, status: checked.status, stderr: checked.stderr, evidence: checked.status === 0 ? JSON.parse(checked.stdout).evidence : null, stage: (await readStage(directory)).stage }
+}
+
+test('CHECKED proves the laws itself: a law PROOF.bend leaves open or proves wrong stops the stage, a proven one is named in the evidence', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const proven = await checkedWalk(t)
+  assert.equal(proven.status, 0, proven.stderr)
+  // none of the four stale-search laws has the cell or trace form, so only prove judges them — the evidence says so
+  assert.match(proven.evidence, /; cross-check settled; adequacy found no refuted check or unsatisfiable setting over \d+ worlds; laws computed 0 of 4 laws; prove proven \(4 laws\)$/)
+
+  const open = await checkedWalk(t, (root) => replaced(join(root, 'PROOF.bend'), 'def Laws.issue_advances(latest, shown):\n  {==}\n', ''))
+  assert.equal(open.status, 1)
+  assert.match(open.stderr, /^STAGE_GATE: the laws or their proof have defects the lock would freeze: prove open \(no def and no generated cell proof: issue_advances not-finite\) — fix the model, the law or PROOF\.bend/)
+  assert.equal(open.stage, 'MODELED')
+
+  // the witness trace stops before the response, so the kernel rejects it
+  const wrong = await checkedWalk(t, (root) => replaced(join(root, 'PROOF.bend'), '([M.Issue{}, M.Respond{1n}], {==})', '([M.Issue{}], {==})'))
+  assert.equal(wrong.status, 1)
+  assert.match(wrong.stderr, /^STAGE_GATE: the laws or their proof have defects the lock would freeze: prove failed/)
+  assert.equal(wrong.stage, 'MODELED')
+})
+
+test('CHECKED stops a cell law the model breaks and names its first counterexample cell', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  // every Issue moves latest, so the relation is false on each of the 36 states cut at the bound 5
+  const broken = await checkedWalk(t, withLaw(cellLaw('latest_kept', 'R_latest_kept')))
+  assert.equal(broken.status, 1)
+  assert.match(
+    broken.stderr,
+    /^STAGE_GATE: the laws or their proof have defects the lock would freeze: laws counterexample: Search\.R_latest_kept is false at M\.Search\{0n, 0n\} M\.Issue\{\} \(step gives M\.Search\{1n, 0n\}\) and 35 more; prove open/,
+  )
+  assert.equal(broken.stage, 'MODELED')
+})
+
+test('CHECKED stops a trace law broken at a state the space reaches; a counterexample to induction the space does not reach is only reported', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const traced = withLaw('\nlaw below_two:\n  for t: List<M.Msg>\n  {M.Search.below_two(M.Search.run(t, M.Search.init())) == True{} : Bool}\n')
+  const broken = await checkedWalk(t, traced)
+  assert.equal(broken.status, 1)
+  assert.match(
+    broken.stderr,
+    /^STAGE_GATE: the laws or their proof have defects the lock would freeze: laws: Search\.below_two breaks at a reached state: M\.Search\{1n, 0n\} M\.Issue\{\} gives M\.Search\{2n, 0n\}, reached by \[M\.Issue\{\}\] and 1 more; prove open/,
+  )
+  assert.equal(broken.stage, 'MODELED')
+
+  // charges ≤ 1 is not inductive at Pay{Pending, 1} with Resolve, a state no trace reaches: PROOF.bend proves the law with a
+  // stronger invariant, so the gate passes it
+  const pay = await preLockProof({ model: join(PAY, 'MODEL.bend'), laws: join(PAY, 'LAWS.bend'), required: ['never_double_charge'], bound: 4, bin })
+  assert.deepEqual(pay, {
+    issues: [],
+    notes: [
+      'laws computed 1 of 3 laws',
+      'laws: Pay.at_most_one has 1 counterexample to induction, none breaks the law on a trace reached at bound 4 (report only)',
+      'prove proven (3 laws)',
+    ],
+    settled: true,
+  })
+})
+
+// 세 사건이 모두 c를 올리는 모델 — c = 0인 36개 상태 × 3 사건이 귀납 반례이고, 공간이 닿는 것은 init S{5, 5, 0}의 셋뿐이다.
+// 상태 순서에서 init은 c = 0의 마지막이라 그 셋은 목록 100개 밖이다
+const RAISING_MODEL = `import Base
+
+type Msg is Data:
+  Inc1{}
+  Inc2{}
+  Inc3{}
+
+type S is Data:
+  S{a: Nat, b: Nat, c: Nat}
+
+def S.init() -> S:
+  S{5n, 5n, 0n}
+
+def S.step(s: S, m: Msg) -> S:
+  match s:
+    case S{a, b, c}:
+      S{a, b, 1n+c}
+
+def S.ok(s: S) -> Bool:
+  match s:
+    case S{a, b, c}:
+      Nat.is_eq(c, 0n)
+
+def S.observe(s: S) -> S:
+  s
+
+def S.run(ms: List<Msg>, s: S) -> S:
+  match ms:
+    case Nil{}:
+      s
+    case Con{m, rest}:
+      S.run(rest, S.step(s, m))
+`
+const RAISING_NEXT = 'def S.next(h: List<Msg>) -> List<Msg>:\n  [Inc1{}, Inc2{}, Inc3{}]\n'
+// 점 있는 law 이름과 줄 끝 주석도 trace 법칙으로 읽는다
+const RAISING_LAWS = `import Base
+import ./MODEL.bend as M
+
+law S.stays_ok:  # c stays 0 on every trace
+  for t: List<M.Msg>  # any events
+  {M.S.ok(M.S.run(t, M.S.init())) == True{} : Bool}  # read from init
+`
+
+async function behaviorCopy(t, model, laws = RAISING_LAWS) {
+  const directory = await mkdtemp(join(tmpdir(), 'oracle-pre-lock-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  await writeFile(join(directory, 'MODEL.bend'), model)
+  await writeFile(join(directory, 'LAWS.bend'), laws)
+  return { model: join(directory, 'MODEL.bend'), laws: join(directory, 'LAWS.bend') }
+}
+
+test('a counterexample to induction the space reaches stops the gate even past the listed cells, unless the law\'s own run keeps the invariant', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const reached = await preLockProof({ ...(await behaviorCopy(t, `${RAISING_MODEL}\n${RAISING_NEXT}`)), bound: 5, bin })
+  assert.deepEqual(reached, {
+    issues: ['laws: S.ok breaks at a reached state: M.S{5n, 5n, 0n} M.Inc1{} gives M.S{5n, 5n, 1n}, reached by [] and 2 more'],
+    notes: ['laws computed 1 of 1 law', 'prove not judged (no PROOF.bend beside LAWS.bend)'],
+    settled: true,
+  })
+
+  // a run that ignores the events keeps init, so the reached cells do not break the law: they are only reported
+  const ignoring = RAISING_MODEL.replace('    case Con{m, rest}:\n      S.run(rest, S.step(s, m))\n', '    case Con{m, rest}:\n      S.run(rest, s)\n')
+  assert.notEqual(ignoring, RAISING_MODEL)
+  const kept = await preLockProof({ ...(await behaviorCopy(t, `${ignoring}\n${RAISING_NEXT}`)), bound: 5, bin })
+  assert.deepEqual(kept.issues, [])
+  assert.deepEqual(kept.notes, [
+    'laws computed 1 of 1 law',
+    'laws: S.ok has 108 counterexamples to induction, none breaks the law on a trace reached at bound 5 (report only)',
+    'prove not judged (no PROOF.bend beside LAWS.bend)',
+  ])
+
+  // with no next there is no space, so whether a CTI is reached is not known: reported, not blocked
+  const unspaced = await preLockProof({ ...(await behaviorCopy(t, RAISING_MODEL)), bound: 5, bin })
+  assert.deepEqual(unspaced.issues, [])
+  assert.equal(unspaced.notes[1], 'laws: S.ok has 108 counterexamples to induction, reach not computed (report only)')
+  assert.equal(unspaced.settled, true)
+})
+
+test('laws a target cannot judge, a law of another form and a Bend that times out are notes: only the timeout leaves the gate unsettled', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  // no bound: the Nat fields have no cut, so the trace law is not judged — the bytes decide that, so it is settled
+  const unbounded = await preLockProof({ ...(await behaviorCopy(t, `${RAISING_MODEL}\n${RAISING_NEXT}`)), bin })
+  assert.deepEqual(unbounded.issues, [])
+  assert.match(unbounded.notes[1], /^laws not judged for S\.ok \(SAMPLING_BOUND_REQUIRED: S×Msg has an unbounded Nat/)
+  assert.equal(unbounded.settled, true)
+
+  // a law with a concrete constructor is not computed; the count says so and nothing is compiled
+  const concrete = `import Base\nimport ./MODEL.bend as M\n\nlaw init_ok:\n  {M.S.ok(M.S.init()) == True{} : Bool}\n`
+  const other = await preLockProof({ ...(await behaviorCopy(t, RAISING_MODEL, concrete)), bound: 5, bin })
+  assert.deepEqual(other, { issues: [], notes: ['laws computed 0 of 1 law', 'prove not judged (no PROOF.bend beside LAWS.bend)'], settled: true })
+
+  // a Bend that cannot finish is undecided for both checks: neither blocks, and the gate keeps no receipt
+  const timedOut = await preLockProof({ model: join(PAY, 'MODEL.bend'), laws: join(PAY, 'LAWS.bend'), required: ['never_double_charge'], bound: 4, bin, timeoutMs: 1 })
+  assert.deepEqual(timedOut, {
+    issues: [],
+    notes: ['laws undecided (MODEL_TIMEOUT: bend -o did not finish in 1ms)', 'prove undecided (timeout: no verdict in 1ms)'],
+    settled: false,
+  })
+})
+
+test('CHECKED reports free cells without stopping: a law that pins no next state still passes', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const free = await checkedWalk(t, freeLaw)
+  assert.equal(free.status, 0, free.stderr)
+  assert.match(free.evidence, /; laws: no counterexample to 1 relation over 252 cells with Nat and List cut at 5; pinned 0, free 252, empty 0 \(report only\); prove proven \(5 laws\)$/)
+  assert.equal(free.stage, 'CHECKED')
+})
+
+test('CHECKED leaves prove and laws undecided when Bend cannot run them: the stage advances on that report and keeps no receipt', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const preloads = await mkdtemp(join(tmpdir(), 'oracle-proof-preload-'))
+  t.after(() => rm(preloads, { recursive: true, force: true }))
+  const unavailable = join(preloads, 'unavailable.mjs')
+  // only the kernel run of prove and the compile of laws fail to spawn — derive, cross-check and adequacy still run
+  await writeFile(unavailable, [
+    "import cp from 'node:child_process'",
+    "import { syncBuiltinESMExports } from 'node:module'",
+    'const original = cp.spawnSync',
+    'cp.spawnSync = function (command, args, options) {',
+    '  const stack = new Error().stack',
+    "  if (Array.isArray(args) && (args.includes('--verdict') || (args.includes('-o') && stack.includes('lawChecks'))))",
+    "    return { pid: 0, output: [], stdout: '', stderr: '', status: null, signal: null, error: Object.assign(new Error('spawnSync EAGAIN'), { code: 'EAGAIN' }) }",
+    '  return original.call(this, command, args, options)',
+    '}',
+    'syncBuiltinESMExports()',
+  ].join('\n'))
+  const cache = join(preloads, 'cache')
+  const undecided = await checkedWalk(t, freeLaw, { NODE_OPTIONS: `--import ${unavailable}`, ORACLE_LINT_CACHE: cache })
+  assert.equal(undecided.status, 0, undecided.stderr)
+  assert.match(undecided.evidence, /; laws undecided \(BEND_UNAVAILABLE: [^)]*spawnSync EAGAIN\); prove undecided \(unavailable: [^)]*spawnSync EAGAIN\)$/)
+  assert.doesNotMatch(undecided.evidence, /proven|no counterexample/)
+  assert.equal(undecided.stage, 'CHECKED')
+  assert.deepEqual(await readdir(cache).catch(() => []), [])
+})
+
+test('the CHECKED receipt weighs PROOF.bend but the pin does not: a proof edit runs the gate again and leaves a recorded pin current', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const receipts = await mkdtemp(join(tmpdir(), 'oracle-proof-receipts-'))
+  t.after(() => rm(receipts, { recursive: true, force: true }))
+  const env = { ORACLE_LINT_CACHE: receipts }
+  const first = await checkedWalk(t, undefined, env)
+  assert.doesNotMatch(first.evidence, /receipt/, first.stderr)
+  assert.equal((await checkedWalk(t, undefined, env)).evidence, `${first.evidence}; receipt: these exact inputs passed before`)
+  // a proof that still proves, with other bytes, is judged again
+  const edited = await checkedWalk(t, (root) => appended(join(root, 'PROOF.bend'), '\n# edited proof\n'), env)
+  assert.equal(edited.status, 0, edited.stderr)
+  assert.doesNotMatch(edited.evidence, /receipt/)
+
+  // the pin stays what it measured: in-flight runs keep their pins when only PROOF.bend changes
+  const { root, directory } = first
+  const recorded = (await readStage(directory)).inputsSha256
+  assert.equal(await inputsPin(directory), recorded)
+  await appended(join(root, 'PROOF.bend'), '\n# edited after CHECKED\n')
+  assert.equal(await inputsPin(directory), recorded)
+  assert.equal(JSON.parse(stage(root, directory, 'status').stdout).stale, false)
+  await appended(join(root, 'LAWS.bend'), '\n# edited after CHECKED\n')
+  assert.notEqual(await inputsPin(directory), recorded)
 })
 
 test('MODELED needs every async cell decided when Async is in a version 2 space — the open cells are asked before the model', async (t) => {

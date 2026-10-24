@@ -1575,8 +1575,7 @@ This contract applies to every risk, including Low, and to both Design-only and 
 Risk changes verification depth, not whether this stack is used. There is no opt-out, low-risk
 fast path, sourceless N/A, or silent substitution for any member of the stack. The scope gate in
 `SKILL.md` Entry decides whether the work belongs to Oracle at all — state, ordering, counts,
-permissions or effects a model can state — and is not an opt-out for work that does; no risk routes
-work out of it. type-fest and
+permissions or effects a model can state — and is not an opt-out for work that does. type-fest and
 TypeScript apply when the card has an exposed type boundary (exported Props, a shared/package API,
 a client state union, a trust-boundary type); a card with none declares `typeContract` not applicable
 with the files it investigated and never adds an unused utility to fill the slot. The behavior model
@@ -1625,9 +1624,10 @@ copies of the policy.
    and lock. Preserve their actual results. These pre-lock model checks do not authorize writing
    target tests or production code. The card, MODEL, LAWS, world and imported local sources are
    confirmed and locked together; PROOF remains a repairable proof candidate. The CHECKED stage of
-   `oracle-stage.mjs` runs the adequacy search itself and refuses a refuted check or a coordinate
+   `oracle-stage.mjs` runs `prove`, `laws` and the adequacy search itself. It refuses a `failed`, `open` or
+   `unsafe` proof (without PROOF.bend none is judged), a law the model breaks, a refuted check and a coordinate
    setting no product can pass (`settings.dead` in `oracle-adequacy.mjs check`; `emit-world` refuses
-   the same with `WORLD_SETTING_UNSATISFIABLE`): exclude it with a sourced assumption or fix the row
+   the same with `WORLD_SETTING_UNSATISFIABLE`): exclude that setting with a sourced assumption or fix the row
    before the lock, never skip its test.
 5. Design-only stops at the approved, checked and locked `ORACLE_READY` contract. It uses the
    formal checks and records the type-fest/static/fast-check plans and capability results, but
@@ -1680,8 +1680,8 @@ trace projection, pass a stated `--max-length` greater than Bound; the generated
 executed runs and the length each trace actually reached, and fails when fewer runs executed than
 requested or when the environment allows traces past the bound but no sample reached one. For state
 projection, the useful exhaustive check on small domains stays and a separate fast-check property of
-`--runs` runs is always added and counted; the earlier small-domain generator that skipped sampling
-whenever it stayed exhaustive is gone — regenerate files it produced. Do not reduce exhaustive coverage
+`--runs` runs is always added and counted; regenerate files from the earlier small-domain generator,
+which skipped sampling. Do not reduce exhaustive coverage
 to obtain a library import.
 
 Model proof, adequacy, static rejection and harness failure are not a product `VALID_RED`. Record a
@@ -1896,8 +1896,9 @@ that pin every result.
   bookkeeping) and the environment `<Prefix>.next(history)`: every message the environment can
   produce after `history`.
 - `LAWS.bend` — imports the model and states each approved law as an open claim.
-- `PROOF.bend` — imports `./LAWS.bend` and proves each law with `def Laws.<name>`. It is a proof
-  candidate: never locked, freely repaired, and never a place to restate laws.
+- `PROOF.bend` — imports `./LAWS.bend` and proves each law with `def Laws.<name>`; `prove` adds the finite cell
+  laws it omits, in a temporary copy. It is a proof candidate: never locked, freely repaired, and never a place
+  to restate laws.
 
 Translate precisely and record what is not translated. Check numbers and units, negation, "every"
 versus "some", temporal order, "may" versus "must", and request count versus effect count: "sends one
@@ -1959,7 +1960,7 @@ node <skill-dir>/scripts/oracle-model.mjs space --model <model-dir>/MODEL.bend -
 ```
 
 `prove` runs `bend PROOF.bend --verdict` without a shell under a timeout and returns `proven`, `open`
-(a `?TODO` or a law without a def), `unsafe`, `failed` (with the failing law), `timeout` or
+(a `?TODO` or a law without a def `prove` cannot generate), `unsafe`, `failed` (with the failing law), `timeout` or
 `unavailable`, plus the command, exit status, raw output, law list and input digests. Only exit 0,
 no signal and an exact `ALL PROOFS CHECK` line is `proven`; it refuses a `PROOF.bend` that does not
 import `./LAWS.bend` or laws missing a required name before running. `proven` here means the model
@@ -1970,14 +1971,13 @@ to `Bound` messages from `init` that `next` allows; each prefix's `observe` valu
 observation. Case IDs hash the trace, so the same model, bound and generator version give the same
 cases and `spaceDigest`; no time or runId enters them. A budget stop keeps the explored cases and
 reports `complete: false` — never trim cases to finish.
-`Bound` has no fixed depth ceiling and trace enumeration has no default case-count ceiling.
-Use `--max-cases <n>` to opt into a case budget; metadata records `maxCases: null` when unlimited.
-World/configuration/perturbation budgets and Bend execution timeouts remain in force.
-Enumeration still uses recursive DFS and fast-check allocates sampled index arrays up front; extreme
-depths can exhaust the JavaScript stack or memory before a case budget is reached.
+`Bound` has no fixed depth ceiling and enumeration no default case ceiling: `--max-cases <n>` opts into
+one (`maxCases: null` when unlimited). World, configuration and perturbation budgets and Bend timeouts stay.
+Enumeration is a recursive DFS and fast-check allocates sampled index arrays up front, so extreme depths can
+exhaust the JavaScript stack or memory before a case budget does.
 The report lists the first 200 cases in label order and always carries `caseCount` and `spaceDigest`;
 `--cases <n>` lists more (pass `caseCount` for all). A card and a lock quote the count, never the trace list:
-the space multiplies per depth (about ×3 per event in a request-id model), so a listing grows past what a
+the space multiplies per depth, so a listing grows past what a
 reader or a model context can hold. Read a required scenario's trace from `--cases`, not from a full dump.
 It also reports the transition cover: every configuration the model can reach (its state plus the events the
 environment allows) takes every allowed event once, through the shortest trace that reaches it. A finite
@@ -2011,7 +2011,8 @@ and counted (`illegal`, `unplaced`).
 
 With a behavior model, lock only when `prove` is `proven` and the space is complete; show the case count and the traces for
 the required scenarios with the law statements. `open`/`failed` means the model, laws or proof need
-work or a question; `timeout`/`unavailable` follows the §1 failure rule. The user approves the laws,
+work or a question; `timeout`/`unavailable` follows the §1 failure rule. CHECKED reruns `prove` and
+`laws`; free cells only report. The user approves the laws,
 environment, bound and observation line as part of the card. Lock with `--source` for `MODEL.bend`,
 `LAWS.bend` and every local file they import. A later change to any of them is a new revision with
 reconfirmation, never an in-place relock. Design-only stops here at `ORACLE_READY` with the card and the three `.bend` files; it performs and
@@ -2774,10 +2775,10 @@ or the laws.
   unless the source allows several (state those as `emit-state` relations). Cover what changes, what
   stays and what is kept: a count or membership law alone allows any reshuffle.
 - **Prove by the domain.** A bounded product domain (two or three columns) is quantified as finite
-  inputs and proven case by case; that case list in `PROOF.bend` is generated and kernel-checked, never
-  reviewed. An unbounded one (a list of any length, a counter) is proven by structural induction — a
-  recursive proof def whose recursive call is the hypothesis (`bend guide`, Laws and Proofs). Never
-  shrink an unbounded product domain to avoid an induction.
+  inputs and proven case by case; `prove` generates that case list in a temporary copy, never in `PROOF.bend`;
+  it is kernel-checked, never reviewed. An unbounded one (a list of any length, a counter) is proven by
+  structural induction — a recursive proof def whose recursive call is the hypothesis (`bend guide`, Laws and
+  Proofs). Never shrink an unbounded product domain to avoid an induction.
 
 Column reordering. The rejected model gave each order a constructor and typed 128 answers; its only
 move law compared the column count:
@@ -2847,10 +2848,10 @@ law lands_on_target:
   {M.Cols.index(M.Cols.move([x, y, z], a, b), a) == M.Cols.index([x, y, z], b) : Nat}
 ```
 
-`PROOF.bend` proves them with one generated case per input combination; a case whose hypothesis
-computes to `False{}` closes with `Empty.absurd(<goal>, false_is_not_true(h))`, as in the stale-search
-fixture. The equality type spells the quantity the def returns (`+List<M.Ver>`), or the kernel reports
-`List<&1, …>` against `List<&2, …>`.
+`PROOF.bend` proves them with one case per input combination (`prove` cannot generate a law with a
+hypothesis); a case whose hypothesis computes to `False{}` closes with
+`Empty.absurd(<goal>, false_is_not_true(h))`, as in the stale-search fixture. The equality type spells the
+quantity the def returns (`+List<M.Ver>`), or the kernel reports `List<&1, …>` against `List<&2, …>`.
 
 A model that folds these axes into one event (`Failed` meaning "every retry failed") is not wrong, but
 the folded part leaves the proof and the generated conformance and becomes a hand-written test or a

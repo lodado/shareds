@@ -471,9 +471,9 @@ test('bend-proof keeps its Never rule and its standalone stop rule for lock sour
   assert.match(standalone, /only\s+`PROOF\.bend`\s+is\s+free/i)
 })
 
-test('bend-proof entry stays within 2,600 bytes and its reference within 12,288', () => {
+test('bend-proof entry stays within 2,600 bytes and its reference within 16,384', () => {
   assert.ok(statSync(helperEntry).size <= 2600, `bend-proof SKILL.md is ${statSync(helperEntry).size} bytes`)
-  assert.ok(statSync(helperReference).size <= 12_288, `bend-proof.md is ${statSync(helperReference).size} bytes`)
+  assert.ok(statSync(helperReference).size <= 16_384, `bend-proof.md is ${statSync(helperReference).size} bytes`)
 })
 
 test('bend-proof entry and reference link only to existing files, and the entry links its reference', () => {

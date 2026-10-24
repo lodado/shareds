@@ -24,6 +24,12 @@ execution roles: they keep the session's effort and their own model rules (subag
    A walk back is `rewind --to <stage> --reason <cause>` with the cause that sent it back. CHECKED passes
    at once on a receipt when the same package, Bend files, registered sources, harness, node and Bend
    passed it before; its evidence says so (`ORACLE_LINT_CACHE=off` turns receipts off).
+   CHECKED also runs `prove` and `laws` (relation and trace laws in [bend-proof](../bend-proof.md) form, Nat and
+   List cut at the bound): `open`, `failed`, `unsafe`, a false relation cell or a trace law that the law's own
+   `run` breaks from a state the space reaches stops it, counted past the listed cells; free cells, unreached
+   counterexamples to induction and laws of another form (the evidence says how many laws `laws` computed) are a
+   report, and an installed Bend that cannot run leaves them undecided. Without `PROOF.bend` the proof is not
+   judged. Its receipt also keys `PROOF.bend`, which the pin below leaves out.
    `oracle-lock.mjs create` refuses a package oracle that is not at DRAFTED on the same package bytes and
    the Bend files and registered sources CHECKED judged (after a Bend edit, `advance --to CHECKED` judges
    them again, even with a re-projected card), and only the stage runtime writes stage.json. The lock still runs card lint itself, so a hand-written

@@ -349,6 +349,42 @@ export function bendTypeName(ir) {
   return `M.${ir.name}`
 }
 
+/**
+ * Bend 파일 한 장의 구조 — 로컬·hub import, foreign·unsafe 코드, law마다 이름, witness(`exs`) 여부와 `for` 묶음(순서대로,
+ * 수량 표식 없는 이름과 타입 원문).
+ */
+export function scanBendSource(text) {
+  const lines = text.split('\n')
+  const imports = []
+  const external = []
+  for (const line of lines) {
+    const target = line.match(/^import\s+(\S+)/)?.[1]
+    if (!target || target === 'Base') continue
+    if (target.startsWith('./') || target.startsWith('../')) imports.push(target)
+    else external.push(target)
+  }
+  const laws = []
+  lines.forEach((line, index) => {
+    const name = line.match(/^law\s+([\w.]+)\s*:/)?.[1]
+    if (!name) return
+    let end = index + 1
+    while (end < lines.length && (lines[end].startsWith(' ') || lines[end].trim() === '')) end += 1
+    const body = lines.slice(index + 1, end)
+    const binders = body.flatMap((entry) => {
+      const binder = entry.match(/^\s+for\s+[+-]?(\w+)\s*:([^#]*)/)
+      return binder ? [{ name: binder[1], type: binder[2].trim() }] : []
+    })
+    laws.push({ name, witness: body.some((entry) => /^\s+exs\s/.test(entry)), binders })
+  })
+  return {
+    imports,
+    external,
+    laws,
+    foreign: /^[ \t]+import[ \t]+"/m.test(text),
+    unsafe: /^@unsafe\b|^def\s+[\w.]+\?\(/m.test(text),
+  }
+}
+
 /** `def Prefix.name(a: A, b: B) -> R:` 서명 → 인자·반환 타입 원문. 없으면 null. */
 export function defSignature(text, name) {
   const escaped = name.replaceAll('.', String.raw`\.`)

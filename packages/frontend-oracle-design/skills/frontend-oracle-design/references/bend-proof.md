@@ -55,6 +55,34 @@ def Toggle.R_blocked_keeps(+s: Toggle, +c: Cmd, t: Toggle) -> Bool:
   Toggle.imp(Bool.and(Toggle.blocked(s), Toggle.is_set(c)), Toggle.same(Toggle.checked(t), Toggle.checked(s)))
 ```
 
+### Check the laws first
+
+Before the kernel runs, `laws` computes every relation on every cell `(s, c)` of the domain:
+`laws --model <MODEL.bend> --prefix <Prefix> --state <State> --command <Command> --relation <R>...`. Relations are
+named as for `emit-state --relation` (`R_x` for `<Prefix>.R_x`); the report uses full names and writes each
+listed cell as `M.` literals a witness can paste. A list stops at 100 entries; its count is complete. `laws`
+refuses another command's option and `--bound` without `--invariant`. With both, it enumerates the space at that
+bound only when `MODEL.bend` exports `init`, `step`, `next` and `observe`; otherwise `invariant.reach` is `null`
+and no counterexample to induction has `reached`.
+
+- `counterexamples`: each cell and relation where `R(s, c, step(s, c))` is false, and `status: counterexample`.
+  The model breaks the law or the law misstates its sentence; check the source before changing either.
+- `strength`: a cell's candidates are the next states that satisfy every relation, read through `scope`
+  (`--observe <def>`, else `<Prefix>.observe`, else the whole state). The cell is pinned when they give one
+  observed value (`pinnedCount`), free when they give more (`freeCount`; `alternatives` counts the extra values)
+  and empty when none does (`emptyCount`).
+- `marginal`: per relation, the pinned cells that come loose without it; 0 means it pins no cell the other
+  relations leave open.
+- `freeFields`: when the observed value is a one-constructor record, a free cell lists the fields its candidates
+  differ on and whether the model's own step keeps each one; `keptFields` counts the kept ones per field.
+- `bounded: true` with `bounds`: a `Nat` or `List` was cut at `--nat-max` or `--list-max`, so the results hold
+  only inside the bound. Without the bound an unbounded type stops the run.
+- `hint`: one next step from the first matching case: a counterexample, a counterexample to induction, a free
+  field the step keeps, a free cell, then an empty cell.
+
+Free is a report, not a failure: a property relation may leave a cell open on purpose, and `laws` exits 0 unless
+it finds a counterexample or a counterexample to induction. Without the frame laws most cells come out free.
+
 ## Proof templates
 
 ### Cell
@@ -84,6 +112,15 @@ def Laws.expired_blocks(s, c):
     case M.Session{False{}, False{}} M.Expire{}:
       {==}
 ```
+
+`prove --dir <dir>` closes with these arms every law whose `for` types are finite and that `PROOF.bend` leaves
+undefined. It generates them only when `LAWS.bend` imports `./MODEL.bend` and each binder type is `Bool`, `Maybe`
+of a finite type or a non-recursive data type declared in `MODEL.bend`. It checks them with `PROOF.bend` in a
+temporary copy of its imports; nothing is written, and `cells.temporaryCopy: true` says that the command ran
+there. The output lists those laws under `cells.generated` and the undefined laws it could not generate under
+`cells.skipped`, each with its reason: `witness` (an `exs` law), `no-binders`, `no-model`, `not-finite` (a `Nat`
+or `List`), `unsupported-type`, `empty-domain` or `too-many-cases` (over 4,096). Write a cell proof by hand only
+for a law it skips: without a def that law stays `open`.
 
 A `Nat` or `List` field makes the domain infinite: prove such a law by cases on constructors and induction
 ([rules, not answer tables](model-patterns.md#rules-not-answer-tables)).
@@ -137,8 +174,10 @@ def Laws.never_double_charge(t):
 - `+s` and `Con{+m, rest}` mark values the body uses twice; `for t` in `LAWS.bend` needs no `+` because the
   induction uses `t` once.
 - An invariant is often not inductive at first. A step that leaves it from a state where it holds is a
-  counterexample to induction. `charges ≤ 1` fails at `Pay{Pending, 1}` with `Resolve`, a state no trace
-  reaches. Add the missing conjunct; never weaken the law. The kernel checks such a counterexample as a witness:
+  counterexample to induction. `laws --invariant <def> --bound <n>` lists each one and whether the space at that
+  bound reaches its state: `charges ≤ 1` (`--invariant at_most_one --nat-max 2 --bound 4`) fails at
+  `Pay{Pending, 1}` with `Resolve`, a state no trace reaches (`reached: null`). Add the missing conjunct; never
+  weaken the law. The kernel checks such a counterexample as a witness:
 
 <!-- excerpt: test-fixtures/pay/PROOF.bend -->
 
@@ -175,6 +214,27 @@ def respond_ok(b: Bool, +id: Nat, +latest: Nat, shown: Nat, e: {Nat.is_eq(id, la
 - A law over every list also covers traces the environment cannot produce. When such a trace breaks the law,
   either make `step` leave the state unchanged on an event the environment does not allow, or add the
   hypothesis that the trace is allowed and pass it through the induction.
+
+### Every trace of a finite machine
+
+When the state and event types have no `Nat` or `List`, `prove-reach` proves a safety def over every trace
+with no invariant written; otherwise it stops with `NOT_FINITE`. Count in finite classes:
+
+<!-- excerpt: test-fixtures/pay-finite/MODEL.bend -->
+
+```python
+type Charges is Data:
+  NoCharge{}
+  OneCharge{}
+  ManyCharges{}
+```
+
+`prove-reach --model <MODEL.bend> --prefix Pay --safe at_most_one` takes the types from `step` and has the
+kernel check, in a temporary copy, that the states reached from `init` are closed under `step` and satisfy
+the def. `proven` carries its own `claim` and an `inputDigest`; `prove` still needs a proof of the law. A
+reached state that breaks the def gives the shortest `counterexample`, its events as `M.` literals. With
+`<Prefix>.enabled(s) -> List<Event>` an event it does not list keeps the state; without it,
+`allowedByNext: false` marks a counterexample `next` never allows.
 
 ### The environment in the state
 
@@ -229,10 +289,10 @@ A witness is an `exs` law with a trace taken from `space --cases`. A progress cl
   still be true. Print the arm's goal with `?name`.
 - The goal holds for every value the arm allows: a lemma is missing. Prove it (`le_succ`, `eq_le` and
   `respond_ok` are examples).
-- A concrete state and event break the invariant: a counterexample to induction. Check it as an `exs` law like
-  `weak_is_not_inductive`. If replaying a `space --cases` trace prefix through `run` reaches that state, the
-  model or the requirement is wrong: fix the model or ask a `POLICY_GAP` question. If no trace within the bound
-  reaches it, the invariant is probably too weak: add the missing conjunct.
+- A concrete state and event break the invariant: a counterexample to induction, which `laws --invariant` lists
+  with `reached`. Check it as an `exs` law like `weak_is_not_inductive`. If a trace reaches it, the model or the
+  requirement is wrong: fix the model or ask a `POLICY_GAP` question. If `reached` is `null`, no trace within
+  the bound reaches it and the invariant is probably too weak: add the missing conjunct.
 - A state that moves while claiming `Refused` passes every law: the frame laws are missing.
 - The law is proven but says less than the requirement: the reviewer decides; never fit the law to the model.
 
@@ -253,4 +313,7 @@ Failing to build a proof never shows a product defect by itself.
 `scripts/oracle-model.mjs check --file <file>` ([model-patterns](model-patterns.md#bend-check-failures) lists its
 failures and fixes), and `prove --dir <dir> --require <law>...` and
 `space --model <MODEL.bend> --prefix <Prefix> --bound <n>` as
-[bend-cross-verification](bend-cross-verification.md) §3 describes.
+[bend-cross-verification](bend-cross-verification.md) §3 describes, and `laws` and `prove-reach` as above:
+`--max-evals` (default 1,000,000) caps the evaluations of `laws`, `--max-cells` (default 100,000 states ×
+events) the domain of `prove-reach`. A `closed` `space` cover's `diameter` is the longest of the shortest
+traces to each configuration; a `capped` cover has `diameter: null`.

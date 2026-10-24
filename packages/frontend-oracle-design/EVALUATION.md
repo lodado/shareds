@@ -1,3 +1,58 @@
+# 0.111.0: the CHECKED gate judges proofs and laws; `prove-reach` certifies a finite machine; the stage machine is modelled
+
+## Validation
+
+- Real Bend 2.0.34 under `ORACLE_REQUIRE_BEND=1`: oracle-model (84 passed), oracle-stage (41 passed: 8 new gate
+  tests plus the no-target regression), oracle-stage-machine (3 passed, 384 of 384 stage-and-event runs match the
+  model).
+  `bundles:check`, `workflow-docs:check` pass.
+- Stage machine fixture: 29 cell laws over 3,360 cells, all pinned, no counterexample, closed in 81 configurations,
+  diameter 6.
+
+## Change
+
+- CHECKED gate: a `prove` that is `failed`, `open` or `unsafe` and a `laws` counterexample (or an induction failure
+  on a trace the space reaches, refolded through the law's own `run` and counted past the listed cells) block with
+  `STAGE_GATE`; free and empty cells only report, and the evidence says how many laws `laws` computed. The gate
+  installs a missing Bend through `ensureBend` first; only an installed Bend that cannot run (timeout, failed spawn)
+  gives `undecided`, which neither blocks nor is kept as a receipt. `inputsSha256` is unchanged, so running locks
+  keep their pins; only the receipt key takes PROOF.bend.
+- `oracle-model.mjs prove-reach`: BFS reachable set, explicit-arm invariant checked by the kernel in a temporary
+  copy, shortest counterexample trace on a violation; finite types only (`NOT_FINITE`, `REACH_TOO_LARGE`).
+- `test-fixtures/stage`: the authoring stage machine as a Bend model. Comparing it with `oracle-stage.mjs` found a
+  real defect: `advance` with no `--to` at ORACLE_READY passed the skip check and wrote a record without a stage.
+  `advance` and `rewind` with no `--to` are now `USAGE` (exit 2) before the record is read; a name that is no stage
+  stays `STAGE_SKIP`.
+- `prove-reach` gives `REACH_TOO_LARGE` for a finite type whose value count overflows a number.
+
+## Not changed
+
+- Free cells never block. DRAFTED and the lock do not re-run `prove`.
+
+# 0.110.0: `laws` reports counterexamples, pinned and free cells and induction failures; `prove` generates cell proofs
+
+## Validation
+
+- `ORACLE_REQUIRE_BEND=1 node --test oracle-model.test.mjs`: 74 passed, 0 failed, 0 skipped (real Bend 2.0.34).
+  modular-skills, skill-contract, reference-bundles and workflow-docs: 157 passed. `bundles:check`,
+  `workflow-docs:check` and the package lint pass (0 errors). Opus 5.5 review: 0 blocker, 1 major, 7 minor, 7 nit,
+  all applied.
+
+## Change
+
+- `oracle-model.mjs laws` checks each relation against the compiled model (counterexamples), counts the cells the
+  relations pin and leave free at observation level (with the fields the step keeps and a hint when frame laws are
+  missing), and with `--invariant` lists the induction failures with the shortest trace that reaches each.
+- `prove` writes the case split of every finite `for` law that PROOF.bend leaves undefined into a temporary copy and
+  checks it there; nothing is written into the directory and `cells.temporaryCopy` says so.
+- `space` cover reports the `diameter` of a closed system; a capped one has none.
+- Measured: toggle 16 pinned / 32 free, session-expiry 4 / 4, cells 160 pinned (140 free without the frame laws),
+  pagination diameter 5.
+
+## Not changed
+
+- No law kind, package field, lock input or stage gate changed. Strength is a report, not a gate.
+
 # 0.109.0: a separate `bend-proof` skill reads the model as a state·event·transition machine and proves safety over every trace
 
 ## Validation
@@ -102,8 +157,8 @@
   `model-patterns.md` keep their paths and text apart from the removed citations.
 - Space discovery, the seven input families, their dispositions and their lint are unchanged; the new node only says
   where each family lands in the machine.
-- The `laws` checks (falsify, strength, bounded counterexamples to induction), `prove-cells` and the diameter report are
-  the next release.
+- The `laws` checks (falsify, strength, bounded counterexamples to induction), generated cell proofs and the diameter
+  report are the next release.
 
 # 0.108.0: the claim's reviewer writes the reproduction a closure trusts; a repaired High re-earns its mutation and passes
 

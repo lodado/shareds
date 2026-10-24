@@ -509,7 +509,10 @@ Contract 카드에서는 거부).
 `STAGE_STALE`로 거부하고, `advance --to CHECKED`로 그 자리에서 CHECKED를 다시 돌아야 합니다(되돌림이 아니라서
 저작 라운드를 쓰지 않습니다). 0.107.0 전에 고정 없이 기록된 CHECKED·DRAFTED도 같은 명령으로 다시 검사합니다.
 관문이 도는 동안 입력이 바뀐 통과는 CHECKED로 기록하지 않고, lock 파일을 지우고 ORACLE_READY를 다시 잠글 때도
-고정을 다시 잽니다. 제품 코드가 이미 있으면 작성자는 `project-card` 뒤, lock 전에도 sweep을 돌려 모델
+고정을 다시 잽니다. CHECKED는 `prove`와 `laws`도 직접 돌립니다. 증명하지 못한 law(`open`·`failed`·`unsafe`), 승인한
+관계가 거짓인 칸, 공간이 닿는 상태에서 깨지는 trace 법칙은 막고, 자유 칸과 공간이 닿지 않는 귀납 반례는 보고만 합니다.
+`laws`는 Nat·List를 패키지의 bound에서 자르고, Bend가 돌지 못하면 둘 다 undecided로 남깁니다. `PROOF.bend`는 영수증
+키에만 들고 고정에는 들지 않아서, 증명만 고쳐도 진행 중인 run의 고정은 그대로입니다. 제품 코드가 이미 있으면 작성자는 `project-card` 뒤, lock 전에도 sweep을 돌려 모델
 결함을 같은 revision의 질문으로 올립니다. adapter와 출력은 임시 디렉터리나 git이 무시하는 경로에만 두고, 보고서일 뿐
 테스트나 증거가 아니라서 Design-only도 돌릴 수 있습니다.
 
