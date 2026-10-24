@@ -1,7 +1,7 @@
 {
   "name": "harness-team",
-  "version": "0.3.0",
-  "description": "Run every work task as a five-role harness team: a lead who never asks what the goal is and fixes the last task's mistakes first, an obsessive perfectionist final reviewer, and a carry-over ledger.",
+  "version": "0.4.0",
+  "description": "Run every work task as a five-role harness team: a lead who never asks what the goal is, fixes the last task's mistakes first and keeps simple work itself, an obsessive perfectionist final reviewer it calls in (always for risky work), and a carry-over ledger.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"

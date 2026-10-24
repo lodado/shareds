@@ -322,7 +322,7 @@ npm으로 나갈 것들이에요.
 | [`reference-driven-3d-character`](packages/reference-driven-3d-character) | 레퍼런스 해석, 형태·변형·동작 설계, 편집 가능한 3D 캐릭터의 단계별 제작·검증                                                                      |
 | [`game-interface-design`](packages/game-interface-design)                 | 모바일 웹게임 기획 → 선택형 Figma UI → FSD·ECS Three.js 그레이박스, 린트로 검사하는 도트 스프라이트 애니메이션                                    |
 | [`developer-agents`](packages/developer-agents)                           | Claude Code 서브에이전트 두 개: FSD로 UI와 비즈니스 로직을 나누는 `frontend-developer`, 3계층·클린 아키텍처·DDD로 서버를 짜는 `backend-developer` |
-| [`harness-team`](packages/harness-team)                                   | 에이전트 기합: 목표를 묻지 않는 팀장, 집착하는 완벽주의 검수관(리뷰 1회, 즉시 반영), 다음 작업에서 먼저 고치는 carry-over                         |
+| [`harness-team`](packages/harness-team)                                   | 에이전트 기합: 간단한 일은 직접 하는 팀장, 팀장이 부르는 완벽주의 검수관(위험 작업은 항상, 리뷰 1회), 먼저 고치는 carry-over                      |
 
 ## 개발
 

@@ -1,7 +1,7 @@
 {
   "name": "harness-team",
-  "version": "0.3.0",
-  "description": "Run every work task as a five-role harness team: a lead who never asks what the goal is and fixes the last task's mistakes first, an obsessive perfectionist final reviewer, and a carry-over ledger.",
+  "version": "0.4.0",
+  "description": "Run every work task as a five-role harness team: a lead who never asks what the goal is, fixes the last task's mistakes first and keeps simple work itself, an obsessive perfectionist final reviewer it calls in (always for risky work), and a carry-over ledger.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
@@ -12,8 +12,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Harness Team",
-    "shortDescription": "Five-role team with a perfectionist final review and carry-over fixes",
-    "longDescription": "A lead infers the goal without asking and first fixes the previous task's mistakes; a scout, builder and verifier do the work; an obsessive perfectionist reviews it once and every finding is applied right away; findings that cannot be applied and the lead's own mistakes carry over.",
+    "shortDescription": "Five-role team with a lead-called perfectionist review and carry-over fixes",
+    "longDescription": "A lead infers the goal without asking and first fixes the previous task's mistakes; simple work stays with the lead, other work goes to a scout, builder and verifier; when the lead calls for review (always for risky work), an obsessive perfectionist reviews it once and every finding is applied right away; findings that cannot be applied and the lead's own mistakes carry over.",
     "developerName": "lodado",
     "category": "productivity",
     "capabilities": ["Agent orchestration", "Independent review"],

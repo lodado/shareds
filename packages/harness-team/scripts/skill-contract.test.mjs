@@ -39,7 +39,7 @@ test('describes a single review everywhere the plugin is listed', async () => {
   assert.doesNotMatch(text, /two rounds|round 2|re-review/i)
 })
 
-test('keeps the English workflow scoped with five roles, risk-based staffing, one review and carry-over', async () => {
+test('keeps the English workflow scoped with lead-judged staffing, a risky-work guard, at most one review and carry-over', async () => {
   const skill = await read('skills/harness-team/SKILL.md')
 
   assert.match(skill, /^name: harness-team$/m)
@@ -70,7 +70,11 @@ test('keeps the English workflow scoped with five roles, risk-based staffing, on
   )
   assert.match(
     skill,
-    /Design,\s+architecture,\s+building\s+risky\s+work,\s+and\s+the\s+final\s+review\s+require\s+the\s+most\s+capable\s+latest-generation\s+reasoning\s+model\s+available,\s+regardless\s+of\s+cost/,
+    /Design,\s+architecture,\s+unknown-cause\s+debugging,\s+and\s+building\s+risky\s+work\s+require\s+the\s+most\s+capable\s+latest-generation\s+reasoning\s+model\s+available,\s+regardless\s+of\s+cost/,
+  )
+  assert.match(
+    skill,
+    /The\s+lead\s+picks\s+the\s+Final\s+Reviewer's\s+model\s+from\s+latest-generation\s+models;\s+reviewing\s+risky\s+work\s+or\s+a\s+review\s+the\s+user\s+asked\s+for\s+requires\s+the\s+most\s+capable\s+one\./,
   )
   assert.match(skill, /For\s+other\s+subagent\s+roles,\s+use\s+the\s+cheapest\s+suitable\s+latest-generation\s+model/)
   assert.match(skill, /never\s+choose\s+an\s+older\s+model\s+just\s+to\s+save\s+money/)
@@ -88,17 +92,28 @@ test('keeps the English workflow scoped with five roles, risk-based staffing, on
     skill,
     /data\s+migration\s+or\s+deletion,\s+concurrency\s+or\s+retries,\s+or\s+irreversible\s+side\s+effects/,
   )
-  assert.match(skill, /or\s+needs\s+unknown-cause\s+debugging\s+or\s+a\s+design\s+call/)
-  assert.match(skill, /risky\s+regardless\s+of\s+file\s+count/)
+  assert.match(skill, /or\s+irreversible\s+side\s+effects,\s+regardless\s+of\s+file\s+count/)
   assert.match(
     skill,
-    /Every\s+task\s+gets\s+a\s+delegated\s+Final\s+Reviewer\s+unless\s+a\s+domain\s+workflow\s+supplies\s+its\s+review/,
+    /Work\s+is\s+trivial\s+when\s+it\s+only\s+changes\s+styling\s+\(CSS,\s+design\s+tokens,\s+class\s+names\),\s+copy,\s+formatting,\s+comments\s+\(not\s+lint,\s+type,\s+coverage,\s+or\s+build\s+directives\),\s+or\s+typos,\s+with\s+no\s+change\s+to\s+logic,\s+data,\s+or\s+agent\s+instructions\./,
   )
-  assert.match(skill, /first\s+match:\s+-\s+Risky\s+work:\s+delegate\s+all\s+four\s+roles\.\s+-\s+Single-file/)
-  assert.match(skill, /Single-file\s+changes\s+that\s+are\s+not\s+risky,\s+or\s+documentation-only\s+work:/)
-  assert.match(skill, /the\s+lead\s+also\s+scouts,\s+builds,\s+and\s+verifies\.\s+-\s+Everything\s+else:/)
-  assert.match(skill, /Everything\s+else:\s+delegate\s+Scout\s+and\s+Builder;\s+the\s+lead\s+verifies\./)
-  assert.match(skill, /Review-only\s+tasks\s+make\s+no\s+edits\s+and\s+delegate\s+no\s+Builder/)
+  assert.match(
+    skill,
+    /The\s+lead\s+decides\s+whether\s+to\s+delegate\s+a\s+Final\s+Reviewer\s+and\s+which\s+model\s+it\s+runs\s+on;\s+trivial\s+work\s+that\s+is\s+not\s+risky\s+gets\s+none\s+unless\s+the\s+lead\s+asks\s+for\s+one,\s+and\s+risky\s+work\s+always\s+gets\s+one\s+unless\s+a\s+domain\s+workflow\s+supplies\s+its\s+review\.\s+Staff\s+the\s+other\s+roles\s+by\s+the\s+first\s+match:/,
+  )
+  assert.match(
+    skill,
+    /first\s+match:\s+-\s+Work\s+the\s+lead\s+judges\s+simple\s+that\s+is\s+not\s+risky:\s+the\s+lead\s+scouts,\s+builds,\s+and\s+verifies,\s+and\s+reads\s+the\s+final\s+diff\.\s+-\s+Everything\s+else:\s+delegate\s+Scout,\s+Builder,\s+and\s+Verifier\.\n/,
+  )
+  assert.match(skill, /Final\s+Reviewer\s+\(when\s+one\s+runs\)/)
+  assert.match(
+    skill,
+    /If\s+the\s+lead\s+calls\s+for\s+a\s+review\s+and\s+an\s+independent\s+reviewer\s+is\s+unavailable/,
+  )
+  assert.match(
+    skill,
+    /Review-only\s+tasks\s+make\s+no\s+edits\s+and\s+delegate\s+no\s+Builder;\s+their\s+review\s+is\s+the\s+deliverable,\s+so\s+the\s+lead\s+always\s+delegates\s+a\s+Final\s+Reviewer\./,
+  )
   assert.match(skill, /at\s+most\s+four\s+subagents\s+per\s+task\s+within\s+host\s+concurrency\s+limits/)
   assert.match(skill, /Review\s+the\s+complete\s+change\s+once,\s+exhaustively/)
   assert.match(
@@ -129,6 +144,7 @@ test('keeps the English workflow scoped with five roles, risk-based staffing, on
   )
   assert.match(skill, /Return\s+`PERFECT`\s+only\s+when\s+no\s+findings\s+remain/)
   assert.match(skill, /`unknown`\s+if\s+the\s+host\s+does\s+not\s+say/)
+  assert.match(skill, /or\s+that\s+the\s+lead\s+skipped\s+review\s+and\s+why/)
   assert.match(skill, /subagent\s+token\s+counts\s+on\s+one\s+line\s+when\s+the\s+host\s+reports\s+them/)
   assert.match(skill, /Never\s+invent\s+runs,\s+reviewers,\s+or\s+savings/)
   assert.match(skill, /project\s+memory\s+named\s+`harness-carry-over`/)
