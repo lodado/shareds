@@ -33,7 +33,9 @@ function deps(): { deps: InteractDeps; store: Store; posted: string[] } {
       mergePr: () => Promise.resolve(),
       retriesLeft: () => true,
       abortWork: () => undefined,
+      catchUp: () => Promise.reject(new Error('unused')),
       locks: new Set(),
+      now: () => 0,
     },
   }
 }

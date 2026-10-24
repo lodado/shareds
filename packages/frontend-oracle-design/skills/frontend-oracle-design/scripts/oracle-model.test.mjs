@@ -38,6 +38,9 @@ import { inputsPin } from './oracle-stage.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 
 const FIXTURE = fileURLToPath(new URL('../../../test-fixtures/stale-search/', import.meta.url))
+const PAY = fileURLToPath(new URL('../../../test-fixtures/pay/', import.meta.url))
+const SEARCH_ENV = fileURLToPath(new URL('../../../test-fixtures/stale-search-env/', import.meta.url))
+const TOGGLE = fileURLToPath(new URL('../../../test-fixtures/toggle/', import.meta.url))
 const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
 
 async function workspace(t) {
@@ -47,9 +50,9 @@ async function workspace(t) {
 }
 
 /** fixture를 임시 디렉터리에 복사한다 — 모델·증명 변형은 여기서만 하고 원본은 건드리지 않는다. */
-async function fixtureCopy(t) {
+async function fixtureCopy(t, source = FIXTURE) {
   const root = await workspace(t)
-  await cp(FIXTURE, root, { recursive: true })
+  await cp(source, root, { recursive: true })
   return root
 }
 
@@ -929,6 +932,51 @@ test('[bend] a wrong model, an open proof and an unsafe helper are each refused 
   assert.equal((await proveLaws({ dir: FIXTURE, bin })).status, 'proven')
 })
 
+const PAY_LAWS = ['never_double_charge', 'pending_resolve_pays', 'paid_reachable']
+
+test('[bend] the pay fixture proves a safety law over every trace', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const result = await proveLaws({ dir: PAY, bin, require: PAY_LAWS })
+  assert.equal(result.status, 'proven', `${result.stdout}${result.stderr}`)
+  assert.deepEqual(result.untrusted, [])
+})
+
+test('[bend] a model that charges twice fails at the broken step arm', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await fixtureCopy(t, PAY)
+  // A duplicate Resolve after payment now charges again: the proof that every step keeps the invariant breaks at that arm.
+  await edit(
+    join(root, 'MODEL.bend'),
+    'case Pay{Paid{}, c} Resolve{}:\n      Pay{Paid{}, c}',
+    'case Pay{Paid{}, c} Resolve{}:\n      Pay{Paid{}, 1n+c}',
+  )
+  const result = await proveLaws({ dir: root, bin, require: PAY_LAWS })
+  const output = `${result.stdout}${result.stderr}`
+  assert.equal(result.status, 'failed', output)
+  assert.equal(result.failedAt, 'inv_step')
+  // Bend prints the failing arm's head above the marked line; a failure at a neighbouring arm prints another head.
+  assert.match(output, /case M\.Pay\{M\.Paid\{\}, c\} M\.Resolve\{\}:\n[ \t]*\d+>\|/)
+})
+
+test('[bend] the stale-search-env fixture proves shown ≤ latest over every trace', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const result = await proveLaws({ dir: SEARCH_ENV, bin, require: ['shown_le_latest'] })
+  assert.equal(result.status, 'proven', `${result.stdout}${result.stderr}`)
+  assert.deepEqual(result.untrusted, [])
+})
+
+// bend-proof.md cuts its relation example from this model, so the kernel must prove the relations it states.
+test("[bend] the toggle fixture's relation laws are proven by the verdict kernel", async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const result = await proveLaws({ dir: TOGGLE, bin, require: ['blocked_keeps', 'free_applies'] })
+  assert.equal(result.status, 'proven', `${result.stdout}${result.stderr}`)
+  assert.deepEqual(result.untrusted, [])
+})
+
 test('[bend] loading an unchanged model returns the one compiled model, and a changed file returns another', async (t) => {
   const bin = await installedBend(t)
   if (!bin) return
@@ -975,6 +1023,22 @@ test('[bend] the compiled model yields the same 10-case space every time, with e
     space.cases.some(({ label }) => label.split('Respond{id:1}').length > 2),
     false,
   )
+})
+
+test('[bend] moving the environment into the state keeps the oracle space', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const fromHistory = await loadModel({ model: join(FIXTURE, 'MODEL.bend'), prefix: 'Search', bin })
+  const fromState = await loadModel({ model: join(SEARCH_ENV, 'MODEL.bend'), prefix: 'Search', bin })
+  // Bound 4 has the 10 cases pinned above; the other bounds are observed from the compiled models.
+  for (const [bound, caseCount] of [[3, 4], [4, 10], [5, 26]]) {
+    const before = enumerateSpace(fromHistory, { bound })
+    const after = enumerateSpace(fromState, { bound })
+    assert.equal(before.complete && after.complete, true, `bound ${bound}`)
+    assert.equal(before.cases.length, caseCount, `bound ${bound}`)
+    assert.equal(after.cases.length, caseCount, `bound ${bound}`)
+    assert.equal(after.spaceDigest, before.spaceDigest, `bound ${bound}`)
+  }
 })
 
 test('[bend] the reducer conforms on the space, and each wrong reducer fails with a concrete counterexample', async (t) => {

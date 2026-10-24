@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { relative } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { fullProductFixture } from '../../../test-fixtures/full-product/fixture.mjs'
 import { generateFromDocument } from './oracle-frames.mjs'
 import { auditFullProduct, auditIdCoverage, fullProductRecords } from './oracle-space.mjs'
@@ -194,11 +196,13 @@ test('neutral Space import graph has no verifier cycle, Formal, Bend, installer 
     '/install-tools/neutral.MJS', '/neutral/bend.js', '/Oracle-Model.mjs',
   ]) assert.doesNotThrow(() => assertNeutralPath(pathname), pathname)
 
+  // Judge each module by its path inside this skill: a checkout directory named after Bend is not a dependency.
+  const scripts = fileURLToPath(new URL('.', import.meta.url))
   const seen = new Set()
   function visit(url) {
     if (seen.has(url.href)) return
     seen.add(url.href)
-    assertNeutralPath(url.pathname)
+    assertNeutralPath(`/${relative(scripts, fileURLToPath(url))}`)
     const source = readFileSync(url, 'utf8')
     for (const match of source.matchAll(/(?:from\s+|import\s*\()(['"])([^'"]+)\1/g)) {
       const specifier = match[2]

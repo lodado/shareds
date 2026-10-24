@@ -213,6 +213,22 @@ describe('removeWorktree as the cleanup of finished work', () => {
     })
   })
 
+  it('to be removed after a merge even when the branch has no upstream any more: the host deleted it', async () => {
+    const { run, calls } = scripted([['rev-list', 128]])
+    expect(await removeWorktree(run, '/work/wt', { discard: false, merged: true })).toStrictEqual({ removed: true })
+    expect(calls.at(-1)).toStrictEqual(['orca', ['worktree', 'rm', '--worktree', 'path:/work/wt', '--json']])
+    expect(calls.some(([, args]) => args.includes('rev-list'))).toBe(false)
+  })
+
+  it('to be kept after a merge when there are uncommitted changes: the merge does not make them safe', async () => {
+    const { run, calls } = scripted([['status', { stdout: ' M file.ts\n' }]])
+    expect(await removeWorktree(run, '/work/wt', { discard: false, merged: true })).toStrictEqual({
+      removed: false,
+      reason: 'there are uncommitted changes',
+    })
+    expect(calls.some(([file]) => file === 'orca')).toBe(false)
+  })
+
   it('to be removed by force, with no check, when the owner declined the work', async () => {
     const { run, calls } = scripted([['status', { stdout: ' M file.ts\n' }]])
     expect(await removeWorktree(run, '/work/wt', { discard: true })).toStrictEqual({ removed: true })

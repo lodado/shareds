@@ -5,7 +5,11 @@ import process from 'node:process'
 import { startApp } from '../src/app/main.ts'
 
 const app = await startApp(process.env)
-process.stderr.write(`${new Date().toISOString()} started\n`)
+process.stderr.write(
+  `${new Date().toISOString()} started${
+    app.statusPort === null ? '' : `, status on http://localhost:${app.statusPort}/status`
+  }\n`,
+)
 
 let stopping = false
 async function shutDown(): Promise<void> {

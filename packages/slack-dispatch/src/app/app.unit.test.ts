@@ -37,6 +37,7 @@ interface Rig {
   posted: Posted[]
   agentCalls: AgentCall[]
   commands: string[]
+  statusPort: number | null
 }
 
 const apps: App[] = []
@@ -50,6 +51,8 @@ afterEach(async () => {
 
 interface RigOptions {
   mentions?: MentionMatch[]
+  // Makes the search for mentions fail with this error.
+  searchError?: Error
   replies?: SlackMessage[]
 }
 
@@ -83,7 +86,8 @@ async function rig(options: RigOptions = {}): Promise<Rig> {
   const commands: string[] = []
   const slack: SlackClient = {
     authUserId: () => Promise.resolve(OWNER),
-    searchMentions: () => Promise.resolve(options.mentions ?? []),
+    searchMentions: () =>
+      options.searchError === undefined ? Promise.resolve(options.mentions ?? []) : Promise.reject(options.searchError),
     threadReplies: () => Promise.resolve(options.replies ?? []),
     openDm: () => Promise.resolve('D1'),
     postMessage: (args) => {
@@ -126,6 +130,7 @@ async function rig(options: RigOptions = {}): Promise<Rig> {
     channelRepos: () => ({ 'dev-web': ['web-app'] }),
     scratchDir: '/scratch',
     qa: () => Promise.resolve({ status: 'skipped', reason: 'UI 파일 변경 없음', costUsd: 0 }),
+    statusPort: 0,
     connect: () => {
       connection = new FakeConnection()
       return connection
@@ -137,7 +142,7 @@ async function rig(options: RigOptions = {}): Promise<Rig> {
   if (connection === undefined) throw new Error('the socket never connected')
   connection.receive({ type: 'hello' })
   await app.ready
-  return { store, app, connection, posted, agentCalls, commands }
+  return { store, app, connection, posted, agentCalls, commands, statusPort: app.statusPort }
 }
 
 // Work goes on through several awaits, so the clock moves in small steps until what the test needs has happened.
@@ -200,7 +205,9 @@ describe('createApp as the owner who types a task in the bot DM', () => {
     r.connection.receive(click('env-approve', 'item.approve_plan:1', key))
     await until(() => stageOf(r.store, key) === 'pr_open')
 
-    expect(r.agentCalls.at(-1)).toMatchObject({ mode: 'build', resume: true })
+    // The limits the owner chose: a plan may spend 2 dollars, a build 15 (of 24 for all the runs of one item).
+    expect(r.agentCalls[1]).toMatchObject({ mode: 'plan', maxBudgetUsd: 2 })
+    expect(r.agentCalls.at(-1)).toMatchObject({ mode: 'build', resume: true, maxBudgetUsd: 15 })
     expect(r.posted.at(-1)?.text).toBe('구현 완료: web-app')
     expect(r.commands.some((command) => command.includes('push') || command.includes('pr create'))).toBe(false)
     expect(listEvents(r.store, { itemKey: key }).map((event) => event.stageAfter)).toContain('pr_open')
@@ -263,7 +270,7 @@ describe('createApp as a mention that tags the owner', () => {
     expect(r.agentCalls.map((call) => [call.model, call.mode])).toStrictEqual([['haiku', 'plan']])
     expect(r.agentCalls[0]?.cwd).toBe('/repos/web-app')
     const digest = JSON.stringify(r.posted[0]?.blocks)
-    expect(digest).toContain('*요청사항:* 푸터 링크가 깨졌어요')
+    expect(digest).toContain('• 푸터 링크가 깨졌어요')
     expect(digest).toContain('*구현 추천:* O — 작은 수정')
     expect(digest).toContain('"initial_options"')
 
@@ -274,7 +281,7 @@ describe('createApp as a mention that tags the owner', () => {
     expect(r.agentCalls[1]?.prompt).toContain('<thread>\n[UKIM]')
     expect(r.posted.map((message) => message.text)).toStrictEqual([
       '새 항목 1개 · 구현 추천 1개',
-      '플랜 시작 1개',
+      '플랜 시작 1개 (모델 자동)',
       '플랜: web-app',
     ])
   })
@@ -330,5 +337,63 @@ describe('createApp as a process that restarts', () => {
     })
     apps.push(app)
     expect(listRuns(store, key)[0]).toMatchObject({ state: 'failed', detail: 'the worker restarted' })
+  })
+})
+
+describe('createApp as the status address of the running service', () => {
+  it('to be a snapshot with the stage counts and the time of the last poll', async () => {
+    const r = await rig()
+    await vi.advanceTimersByTimeAsync(10)
+    vi.useRealTimers()
+    const body = await (await fetch(`http://127.0.0.1:${r.statusPort}/status`)).json()
+    expect(body).toMatchObject({
+      ok: true,
+      activeRuns: 0,
+      lastPollError: null,
+      lastPollAt: NOW.toISOString(),
+      stages: { planning: 0, notified: 0 },
+    })
+  })
+
+  it('to be the last poll error with any secret removed, and the service still running', async () => {
+    // built at run time so no token-shaped literal sits in the source
+    const botToken = ['xoxb', '1234567890', 'abcdefABCDEF'].join('-')
+    const r = await rig({ searchError: new Error(`search failed for ${botToken}`) })
+    await vi.advanceTimersByTimeAsync(10)
+    vi.useRealTimers()
+    const body = await (await fetch(`http://127.0.0.1:${r.statusPort}/status`)).json()
+    expect(body).toMatchObject({ lastPollAt: null, lastPollError: 'search failed for [REDACTED]' })
+    expect(JSON.stringify(body)).not.toContain('abcdefABCDEF')
+  })
+
+  it('to be off when no port is given', async () => {
+    vi.useFakeTimers({ now: NOW })
+    const store = openStore(':memory:')
+    stores.push(store)
+    const app = await createApp({
+      config: { ...loadConfig({}, '/h'), ownerId: OWNER },
+      ownerId: OWNER,
+      slack: {
+        authUserId: () => Promise.resolve(OWNER),
+        searchMentions: () => Promise.resolve([]),
+        threadReplies: () => Promise.resolve([]),
+        openDm: () => Promise.resolve('D1'),
+        postMessage: () => Promise.resolve({ channel: 'D1', ts: '1.1' }),
+        updateMessage: () => Promise.resolve(),
+        socketUrl: () => Promise.resolve('wss://example.test/socket'),
+      },
+      run: () => Promise.resolve({ stdout: JSON.stringify({ result: { repos: [] } }), stderr: '' }),
+      agent: () => Promise.resolve({ ok: true, text: '', costUsd: 0, subtype: 'success' }),
+      store,
+      newSessionId: () => 'x',
+      now: () => NOW,
+      baseBranches: {},
+      channelRepos: () => ({}),
+      scratchDir: '/scratch',
+      qa: () => Promise.resolve({ status: 'skipped', reason: 'UI 파일 변경 없음', costUsd: 0 }),
+      connect: () => new FakeConnection(),
+    })
+    apps.push(app)
+    expect(app.statusPort).toBeNull()
   })
 })

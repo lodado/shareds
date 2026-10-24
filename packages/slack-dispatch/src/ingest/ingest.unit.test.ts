@@ -281,6 +281,30 @@ describe('ingestMentions as one polling pass', () => {
   })
 })
 
+describe('ingestMentions as a search for one past day', () => {
+  const day = new Date(2026, 9, 22)
+  const dayAfter = new Date(2026, 9, 23)
+
+  it('to be a search with both ends, so a day long ago is not looked for among the newest matches only', async () => {
+    const fake = fakeSlack([])
+    await ingestMentions(setup(fake), { since: day, until: dayAfter, dryRun: false })
+    expect(fake.searches).toStrictEqual([`<@${OWNER}> after:2026-10-21 before:2026-10-24`])
+  })
+
+  it('to be a search with no upper end when no end was asked for', async () => {
+    const fake = fakeSlack([])
+    await ingestMentions(setup(fake), { since: day, dryRun: false })
+    expect(fake.searches[0]).not.toContain('before:')
+  })
+
+  it('to be told how many threads were left beyond the limit of the pass', async () => {
+    const fake = fakeSlack([mention(1), mention(2), mention(3)])
+    const summary = await ingestMentions(setup(fake), { ...real, maxThreads: 2 })
+    expect(summary).toMatchObject({ threads: 2, cutThreads: 1 })
+    expect((await ingestMentions(setup(fakeSlack([mention(1)])), real)).cutThreads).toBe(0)
+  })
+})
+
 describe('ingestMentions as a dry run', () => {
   it('to be the digest it would send, with nothing listed and nothing posted', async () => {
     const fake = fakeSlack([mention(5), mention(15)])
@@ -379,7 +403,7 @@ describe('ingestMentions as new items that the cheapest model reads before the d
     expect(asked).toHaveLength(2)
     expect(summary.sent).toEqual([{ digestId: 1, count: 2, slackRef: 'D_OWNER:99.1' }])
     const blocks = sentBlocks(fake)
-    expect(blocks).toContain('*요청사항:* 푸터 링크 수정 요청')
+    expect(blocks).toContain('• 푸터 링크 수정 요청')
     expect(blocks).toContain('*구현 추천:* X — 제품 결정이 필요해요')
     expect(blocks.match(/"initial_options"/g)).toHaveLength(1)
     expect(getItem(deps.store, asked[0] ?? '')?.meta.analysis).toBeDefined()
@@ -457,7 +481,7 @@ describe('ingestMentions as new items that the cheapest model reads before the d
     const again = await ingestMentions(deps, real)
     expect(calls).toBe(1)
     expect(again.sent).toEqual([{ digestId: 1, count: 1, slackRef: 'D_OWNER:99.1' }])
-    expect(sentBlocks(fake)).toContain('*요청사항:* 푸터 링크 수정 요청')
+    expect(sentBlocks(fake)).toContain('• 푸터 링크 수정 요청')
   })
 
   it('to be no model call in a dry run, which only shows what would be sent', async () => {

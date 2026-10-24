@@ -1,6 +1,6 @@
 # Frontend Oracle / Contract Design
 
-이 플러그인은 **두 컨트롤러와 네 공유 전문 스킬**을 제공합니다. 기존
+이 플러그인은 **두 컨트롤러, 네 공유 전문 스킬, Formal 전용 도우미**(`bend-proof`)를 제공합니다. 기존
 [`frontend-oracle-design`](SKILL.md)은 `formal-bend/v1`으로 Bend 모델·증명·Adequacy를
 필수로 유지합니다. 새 [`frontend-contract-design`](../frontend-contract-design/SKILL.md)은
 `contract/v1`으로 Bend 없이 출처가 있는 유한 Space(기본 t-way `Strength: 2`, High는 3, 명시적 opt-in일 때만 `full-product`)와 실제 실행 증거를
@@ -234,6 +234,7 @@ flowchart LR
   graph_orchestration["graph-orchestration"]
   bend_cross_verification["bend-cross-verification"]
   model_patterns["model-patterns"]
+  bend_proof["bend-proof"]
   model_package_example["model-package-example"]
   oracle_workflow_graph["oracle-workflow-graph"]
 
@@ -381,6 +382,7 @@ flowchart LR
   graph_orchestration_formal -. "formal-bend/v1" .-> graph_orchestration
   common --> bend_cross_verification
   common --> model_patterns
+  common --> bend_proof
   common --> adequacy
   common --> discovery
   IND["delivery-protocol · delivery-protocol-spec · type-environment · fsd · backend · performance<br/><i>독립 노드 — 조건 충족 시에만</i>"]

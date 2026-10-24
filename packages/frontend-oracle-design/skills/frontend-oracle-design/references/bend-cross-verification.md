@@ -688,12 +688,7 @@ policy conflict → `POLICY_GAP`; missing proof or conformance evidence → `EVI
 demonstrated product mismatch → `PRODUCT_DEFECT`; tool or adapter failure → the environment/harness
 route. Failing to construct a proof alone does not demonstrate a product defect.
 
-## Official references
+## Bend version
 
 Checked against Bend v2.0.34, the version `scripts/ensure-bend.mjs` pins; a version bump updates its
 checksums and this page together.
-
-- [Laws, proofs and trust boundary](https://github.com/bendlang/bend/blob/v2.0.34/guide/GUIDE.md#laws-and-proofs)
-- [JS module output of non-IO defs](https://github.com/bendlang/bend/blob/v2.0.34/guide/GUIDE.md#io-and-concurrency)
-- [CLI verdict and exit behavior](https://github.com/bendlang/bend/blob/v2.0.34/bend2/main.ts)
-- [Language limitations](https://github.com/bendlang/bend/blob/v2.0.34/README.md#limitations)

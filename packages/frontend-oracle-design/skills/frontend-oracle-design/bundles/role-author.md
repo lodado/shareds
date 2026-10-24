@@ -952,18 +952,21 @@ replaces the `O*`·`D*` row that owns a specific scenario outcome.
 
 ## Mandatory verification stack
 
-Every card, including Low and Design-only, must also record the real type-fest utility and the
-source-backed relation it protects, TypeScript positive/negative compiler witnesses, and a positive
-fast-check sampling plan. See [`mandatory-verification.md`](../mandatory-verification.md). A mention,
-dummy import, unrelated fixture or `runs=0` is not evidence; unresolved capability is `NEEDS_DECISION`
-and missing tools or failed execution is `FAIL`.
+Record the members of the stack that [`mandatory-verification.md`](../mandatory-verification.md) applies to
+this card: the real type-fest utility, the source-backed relation it protects and TypeScript positive/negative
+compiler witnesses when the card has an exposed type boundary (otherwise `typeContract` not applicable with
+the files investigated), and a positive fast-check sampling plan when the Order or Async family is mapped. A
+mention, dummy import, unrelated fixture or `runs=0` is not evidence; unresolved capability is
+`NEEDS_DECISION` and missing tools or failed execution is `FAIL`.
 
-## Formal Model — required
+## Formal Model — required with a behavior model
 
-Every card must include the section and its locked `MODEL.bend`/`LAWS.bend` sources and imports.
-`PROOF.bend` is required as a checked proof candidate but remains unlocked and repairable.
-The checks are owned by [`bend-cross-verification.md`](../bend-cross-verification.md); absence is a
-`FAIL`, including Low and Design-only.
+A card whose space maps the Order or Async family includes the section and its locked
+`MODEL.bend`/`LAWS.bend` sources and imports. `PROOF.bend` is required as a checked proof candidate but
+remains unlocked and repairable. A card whose source excludes both is decided by its world (Terms, Adequacy
+and world conformance), as mandatory-verification says. The checks are owned by
+[`bend-cross-verification.md`](../bend-cross-verification.md); a required section that is absent is a `FAIL`,
+including Low and Design-only.
 
 ## Terms and Adequacy — required
 
@@ -2399,15 +2402,10 @@ policy conflict → `POLICY_GAP`; missing proof or conformance evidence → `EVI
 demonstrated product mismatch → `PRODUCT_DEFECT`; tool or adapter failure → the environment/harness
 route. Failing to construct a proof alone does not demonstrate a product defect.
 
-## Official references
+## Bend version
 
 Checked against Bend v2.0.34, the version `scripts/ensure-bend.mjs` pins; a version bump updates its
 checksums and this page together.
-
-- [Laws, proofs and trust boundary](https://github.com/bendlang/bend/blob/v2.0.34/guide/GUIDE.md#laws-and-proofs)
-- [JS module output of non-IO defs](https://github.com/bendlang/bend/blob/v2.0.34/guide/GUIDE.md#io-and-concurrency)
-- [CLI verdict and exit behavior](https://github.com/bendlang/bend/blob/v2.0.34/bend2/main.ts)
-- [Language limitations](https://github.com/bendlang/bend/blob/v2.0.34/README.md#limitations)
 
 <!-- node:adequacy path:references/adequacy.md -->
 
@@ -2757,8 +2755,7 @@ unchanged inputs, not a smaller bound presented as the same workload.
   obtain a faster result. The JS target is sequential, so Bend parallel-call syntax alone does
   not accelerate this tool's compiled-JS cross-check.
 
-The pinned [Bend 2.0.34 guide](https://github.com/bendlang/bend/blob/v2.0.34/guide/GUIDE.md)
-explains modules, quantities, structural termination, proof verdicts and JS interop. Its JS
+`bend guide` explains modules, quantities, structural termination, proof verdicts and JS interop. Its JS
 interop passes arrays without defensive copies. Keep runtime input isolation even for pure
 Bend code: an affine array update may mutate the supplied JS array.
 
@@ -2972,8 +2969,6 @@ reaches the terminal one and its `witness`.
   wall-clock deadlines remain `Not formalized` unless separate evidence establishes them. Reuse existing
   conformance tests where they observe the required behavior, add product-boundary checks where they do not.
 
-Terminology follows Leslie Lamport's _A High-Level View of TLA+_ (next-state actions versus fairness)
-and _PlusCal Tutorial_, Session 9 (weak and strong fairness), rather than treating a generator as a scheduler.
 The rank argument assumes a well-founded order and strict decrease on the transitions being claimed.
 
 ## Error kinds are a sum type
@@ -3516,8 +3511,11 @@ whatever is already loaded.
 5. Write the Bend world, behavior model and laws according to stack applicability. Read
    [`model-patterns.md`](../model-patterns.md) while writing/revising MODEL, LAWS or PROOF, especially retries,
    delays, staleness, error kinds, remounts and request counts: time as events, attempts, error sum types,
-   and separate request/fetch/effect counts, not one collapsed event. Check each Bend file with
-   `scripts/oracle-model.mjs check --file <file>` before `prove`; a failure carries its fix in `hint`.
+   and separate request/fetch/effect counts, not one collapsed event. For the machine reading, the
+   requirement-to-law table and the cell, every-trace, witness and rank templates, invoke
+   [`$bend-proof`](../../../bend-proof/SKILL.md), which reads [`bend-proof.md`](../bend-proof.md).
+   Check each Bend file with `scripts/oracle-model.mjs check --file <file>` before `prove`; a failure carries
+   its fix in `hint`.
    Grow a Bend file in small sections: scaffold it, add one def or law group at a time, check after each
    (about a second), and change it with small edits, never by rewriting or regenerating the whole file.
    Change the package with `oracle-package.mjs patch --set|--append|--remove '<pointer>'` (`'/sources/[id=S2]'`

@@ -2,7 +2,7 @@ import type { StatusServer, StatusSnapshot } from './status'
 import { request } from 'node:http'
 import { networkInterfaces } from 'node:os'
 import { afterEach, describe, expect, it } from 'vitest'
-import { startStatusServer } from './status'
+import { describeError, startStatusServer } from './status'
 
 const snapshot: StatusSnapshot = {
   ok: true,
@@ -114,5 +114,27 @@ describe('startStatusServer as the read-only look at the service', () => {
     await server.stop()
     await expect(fetch(`${base}/health`)).rejects.toThrow()
     running.length = 0
+  })
+})
+
+describe('describeError as an error shown on the status address', () => {
+  // built at run time so no token-shaped literal sits in the source
+  const botToken = ['xoxb', '1234567890', 'abcdefABCDEF'].join('-')
+
+  it('to be the message with any secret removed', () => {
+    expect(describeError(new Error(`slack said no to ${botToken} today`))).toBe('slack said no to [REDACTED] today')
+  })
+
+  it('to be one line, cut to 200 characters', () => {
+    const shown = describeError(new Error(`first line\nsecond line ${'x'.repeat(500)}`))
+    expect(shown.startsWith('first line second line xxx')).toBe(true)
+    expect(shown).toHaveLength(200)
+    expect(shown).not.toContain('\n')
+  })
+
+  it('to be text for anything that is not an Error', () => {
+    expect(describeError('plain text')).toBe('plain text')
+    expect(describeError(42)).toBe('42')
+    expect(describeError(null)).toBe('null')
   })
 })

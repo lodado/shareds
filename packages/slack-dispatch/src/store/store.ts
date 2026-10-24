@@ -1,7 +1,9 @@
+import type { AgentModel } from '../agent/claude.ts'
 import type { Card, ItemEvent, Outcome, Stage } from '../machine/machine.ts'
 import type { Analysis } from '../triage/analysis.ts'
 import type { EventKind, ItemSource } from './schema.ts'
 import { DatabaseSync } from 'node:sqlite'
+import { isAgentModel } from '../agent/claude.ts'
 import { decide, INITIAL_STAGE, isStage, nextStage, STAGES } from '../machine/machine.ts'
 import { readAnalysis } from '../triage/analysis.ts'
 import { redact } from './redact.ts'
@@ -39,6 +41,10 @@ export interface ItemMeta {
   urgent?: boolean
   // What the cheapest model made of the thread, once it was asked.
   analysis?: Analysis
+  // What the owner chose when starting the item: the model for its plan and build, and whether to build the plan
+  // the digest showed instead of making a new one.
+  model?: AgentModel
+  direct?: boolean
 }
 
 export interface NewItemOptions {
@@ -333,7 +339,7 @@ function parseMeta(json: string): ItemMeta {
     return {}
   }
   if (!isRecord(parsed)) return {}
-  const { summary, url, route, urgent, analysis } = parsed
+  const { summary, url, route, urgent, analysis, model, direct } = parsed
   const read = readAnalysis(analysis)
   return {
     ...(typeof summary === 'string' ? { summary } : {}),
@@ -341,6 +347,8 @@ function parseMeta(json: string): ItemMeta {
     ...(typeof route === 'string' ? { route } : {}),
     ...(typeof urgent === 'boolean' ? { urgent } : {}),
     ...(read === undefined ? {} : { analysis: read }),
+    ...(isAgentModel(model) ? { model } : {}),
+    ...(typeof direct === 'boolean' ? { direct } : {}),
   }
 }
 
@@ -363,22 +371,45 @@ function toItemRow(row: Row): ItemRow {
   }
 }
 
+// Changes some fields of an item's meta and leaves the rest as it is.
+function mergeMeta(store: Store, itemKey: string, patch: Readonly<Record<string, unknown>>): void {
+  const row = store.db.prepare('SELECT meta FROM items WHERE key = ?').get(itemKey)
+  if (!row) throw new UnknownItemError(itemKey)
+  let current: unknown
+  try {
+    current = JSON.parse(text(row, 'meta'))
+  } catch {
+    current = {}
+  }
+  const meta = { ...(isRecord(current) ? current : {}), ...patch }
+  store.db
+    .prepare('UPDATE items SET meta = ?, updated_at = ? WHERE key = ?')
+    .run(serialize(meta), timestamp(store), itemKey)
+}
+
 // Keeps what the cheapest model made of an item next to its other digest fields.
 export function setAnalysis(store: Store, itemKey: string, analysis: Analysis): void {
   inTransaction(store, () => {
-    const row = store.db.prepare('SELECT meta FROM items WHERE key = ?').get(itemKey)
-    if (!row) throw new UnknownItemError(itemKey)
-    let current: unknown
-    try {
-      current = JSON.parse(text(row, 'meta'))
-    } catch {
-      current = {}
-    }
-    const meta = { ...(isRecord(current) ? current : {}), analysis }
-    store.db
-      .prepare('UPDATE items SET meta = ?, updated_at = ? WHERE key = ?')
-      .run(serialize(meta), timestamp(store), itemKey)
+    mergeMeta(store, itemKey, { analysis })
     logEvent(store, { itemKey, kind: 'system', type: 'analysis_saved', payload: { recommend: analysis.recommend } })
+  })
+}
+
+export interface RunChoice {
+  model: AgentModel
+  direct: boolean
+}
+
+// What the owner chose when starting the item. Only an item that still waits for the owner takes it: one that is
+// already planning or building keeps the model it started with.
+export function setRunChoice(store: Store, itemKey: string, choice: RunChoice): boolean {
+  return inTransaction(store, () => {
+    const row = store.db.prepare('SELECT stage FROM items WHERE key = ?').get(itemKey)
+    if (!row) throw new UnknownItemError(itemKey)
+    if (text(row, 'stage') !== 'notified') return false
+    mergeMeta(store, itemKey, { model: choice.model, direct: choice.direct })
+    logEvent(store, { itemKey, kind: 'system', type: 'run_choice_saved', payload: { ...choice } })
+    return true
   })
 }
 

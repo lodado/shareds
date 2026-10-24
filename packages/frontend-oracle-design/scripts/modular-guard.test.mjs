@@ -65,6 +65,16 @@ for (const name of ['frontend-oracle-designer', 'frontend-oracle-design-notes', 
   }
 }
 
+// bend-proof is a Formal helper, not an Oracle activation name: a standalone bend-proof session has no lock, so
+// activating the guard would deny every test write (TEST_BEFORE_LOCK).
+for (const name of ['bend-proof', 'frontend-oracle-design:bend-proof']) {
+  for (const via of ['tool', 'slash']) {
+    test(`${via} activation of the Formal helper ${name} does not activate Oracle`, async (t) => {
+      assert.equal(await runWrite(t, name, via), null)
+    })
+  }
+}
+
 test('a tool result quoting a specialist slash command does not activate Oracle', async (t) => {
   assert.equal(await runWrite(t, 'oracle-author', 'slash', 'tool'), null)
 })

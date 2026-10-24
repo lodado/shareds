@@ -48,6 +48,8 @@ describe('createSplitAgent as the cutter of a DM prompt', () => {
     })
     expect(calls[0]?.prompt).toContain('Known repositories: web-app, api')
     expect(costs).toStrictEqual([['split', 0.1]])
+    // A small job with a fixed answer: the owner own setup would only cost more and could change the answer.
+    expect(calls[0]?.ownSetup).not.toBe(true)
   })
 
   it('to be an error when the agent stopped', async () => {
@@ -110,6 +112,7 @@ describe('createTriageAgent as the reading of a new mention', () => {
     expect(calls[0]?.prompt).toContain('Repository: web-app')
     expect(calls[0]?.prompt).toContain('<thread>\n[U1] footer broken\n</thread>')
     expect(costs).toStrictEqual([['triage', 0.1]])
+    expect(calls[0]?.ownSetup).not.toBe(true)
   })
 
   it('to be read from the thread alone, never recommended, when the item has no repo', async () => {

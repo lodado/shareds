@@ -45,6 +45,7 @@
 | [`eslint-setup`](packages/vibe-coding-helper/skills/eslint-setup/SKILL.md)                                              | 프로젝트에 맞는 ESLint 프리셋을 선택하고 설정해요.                              |
 | [`frontend-oracle-design`](packages/frontend-oracle-design/skills/frontend-oracle-design/SKILL.md)                      | Bend 모델·증명까지 필수인 동작 계약과 테스트·구현·리뷰를 조율해요.              |
 | [`frontend-contract-design`](packages/frontend-oracle-design/skills/frontend-contract-design/SKILL.md)                  | Bend 없이 유한 Space를 정의하고 실제 테스트·타입·속성 증거로 검수해요.          |
+| [`bend-proof`](packages/frontend-oracle-design/skills/bend-proof/SKILL.md)                                              | 요구사항을 Bend 모델·법칙·증명으로 옮기는 Formal 전용 도우미예요.               |
 | [`frontend-system-design`](packages/frontend-system-design/skills/SKILL.md)                                             | Oracle 설계에 검색·채팅·결제 같은 기능의 구현 선택지와 실패 대응을 보태요.      |
 | [`test`](packages/test/skills/test/SKILL.md)                                                                            | 프론트엔드 동작과 회귀 오류를 확인하는 자동화 테스트를 작성·실행해요.           |
 | [`frontend-visual-qa`](packages/frontend-visual-qa/skills/frontend-visual-qa/SKILL.md)                                  | 승인된 화면 기준과 실제 브라우저 동작을 비교해 시각적 오류를 찾아요.            |
@@ -204,6 +205,7 @@ Contract도 승인·lock·VALID_RED·Medium 연속 통과·독립 리뷰를 생�
 | [`oracle-author`](packages/frontend-oracle-design/skills/oracle-author/SKILL.md)                       | Formal 모델·투영 Draft 또는 Contract Space·카드 작성         |
 | [`oracle-implement`](packages/frontend-oracle-design/skills/oracle-implement/SKILL.md)                 | lock과 VALID_RED 이후 허용된 제품 코드 구현                  |
 | [`oracle-review`](packages/frontend-oracle-design/skills/oracle-review/SKILL.md)                       | 독립 컨텍스트의 계약·구현·근거 리뷰                          |
+| [`bend-proof`](packages/frontend-oracle-design/skills/bend-proof/SKILL.md)                             | Formal author가 쓰는 Bend 모델·법칙·증명 도우미(Formal 전용) |
 
 테스트 작성은 기존 `$test`를 재사용해요. 전문 스킬을 직접 호출해도 승인이나 선행 검증을
 건너뛸 수 없어요. 선행조건이 없으면 컨트롤러로 돌아와요.
@@ -313,7 +315,7 @@ npm으로 나갈 것들이에요.
 | 플러그인                                                                  | 설명                                                                                                                                              |
 | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`vibe-coding-helper`](packages/vibe-coding-helper)                       | ESLint 도입이랑 레포 컨벤션                                                                                                                       |
-| [`frontend-oracle-design`](packages/frontend-oracle-design)               | Formal Oracle·Bend 없는 Contract 두 컨트롤러와 네 공유 전문 스킬, TDD·근거·리뷰                                                                   |
+| [`frontend-oracle-design`](packages/frontend-oracle-design)               | Formal Oracle·Bend 없는 Contract 두 컨트롤러와 네 공유 전문 스킬, Formal 전용 `bend-proof`, TDD·근거·리뷰                                         |
 | [`agent-graph-engineering`](packages/agent-graph-engineering)             | 에이전트 워크플로 그래프 설계랑 실행                                                                                                              |
 | [`frontend-system-design`](packages/frontend-system-design)               | 잘 알려진 프론트엔드 문제의 설계 패턴                                                                                                             |
 | [`test`](packages/test)                                                   | Oracle 기반 결정론적 행동 테스트                                                                                                                  |

@@ -1,8 +1,9 @@
 import type { Agent, AgentCall, AgentResult } from '../agent/claude'
 import type { Run } from '../exec/exec'
+import type { PrState } from '../github/github'
 import type { ItemEvent } from '../machine/machine'
 import type { QaInput, QaOutcome } from '../qa/qa'
-import type { Store } from '../store/store'
+import type { ItemMeta, Store } from '../store/store'
 import type { WorkerConfig } from './worker'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -10,6 +11,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AgentAborted } from '../agent/claude'
 import { CommandError } from '../exec/exec'
+import { worktreeNameFor } from '../orca/worktree'
 import {
   applyEvent,
   closeStore,
@@ -22,6 +24,7 @@ import {
 } from '../store/store'
 import {
   beginRun,
+  cardAt,
   countActiveRuns,
   endRun,
   getWorkspace,
@@ -51,6 +54,7 @@ const CONFIG: WorkerConfig = {
   buildTimeoutMs: 2000,
   maxAttempts: 2,
   prEnabled: false,
+  ownSetup: true,
   baseOverrides: {},
 }
 
@@ -72,11 +76,15 @@ interface Rig {
   worker: ReturnType<typeof createWorker>
   calls: AgentCall[]
   commands: string[]
-  posted: { text: string; blocks: readonly unknown[] | undefined }[]
+  posted: { text: string; blocks: readonly unknown[] | undefined; channel: string; threadTs: string | undefined }[]
   qaInputs: QaInput[]
   // Every command and agent call, in the order they happened.
   order: string[]
   openDmCalls: () => number
+  // How many times the Slack thread of an item was read.
+  threadReads: () => number
+  // The pull requests the worker asked the host about, in order.
+  prAsks: string[]
 }
 
 interface RigOptions {
@@ -86,6 +94,14 @@ interface RigOptions {
   dirty?: boolean
   noRepo?: string
   postFails?: boolean
+  // Posting to this channel fails; every other channel works.
+  failChannel?: string
+  // What `git merge-base` prints: the commit the branch started from.
+  mergeBase?: string
+  // The branch has no upstream (the host deleted it after the merge): comparing with it fails.
+  noUpstream?: boolean
+  // What the host says about each pull request, by address; open when not given. An Error is a failed question.
+  prStates?: Readonly<Record<string, PrState | Error>>
   // The agent left no commit on top of the base.
   noCommit?: boolean
   // The branch the worktree is on after the agent ran; the worktree's own branch when not given.
@@ -100,6 +116,29 @@ interface RigOptions {
   qa?: (input: QaInput) => Promise<QaOutcome>
 }
 
+// What the commands of orca, git and gh print in the rig, as far as the worker reads them.
+function commandOutput(line: string, args: readonly string[], options: RigOptions): string {
+  if (line.includes('worktree create')) {
+    const name = args[args.indexOf('--name') + 1] ?? 'x'
+    const worktree = { id: `r::/wt/${name}`, path: `/wt/${name}`, branch: `refs/heads/${name}` }
+    return JSON.stringify({ result: { worktree } })
+  }
+  if (line.startsWith('orca terminal create')) {
+    const terminal = { handle: 'term_5b70a478-6623-408a-8919-d4eced9eb295', title: 'x' }
+    return JSON.stringify({ result: { terminal } })
+  }
+  if (line.includes('merge-base')) return `${options.mergeBase ?? ''}\n`
+  if (line.includes('symbolic-ref')) return `${options.branchNow ?? 'dispatch-a'}\n`
+  if (line.includes('status --porcelain')) return options.dirty ? ' M a.ts\n' : ''
+  if (line.includes('rev-list')) {
+    // `@{upstream}..HEAD` is the unpushed-work check of a cleanup; `<base>..HEAD` is the commit check of a build.
+    const nothingNew = line.includes('@{upstream}') || options.noCommit === true
+    return nothingNew ? '0\n' : '1\n'
+  }
+  if (line.includes('pr create')) return `${PR_URL}\n`
+  return ''
+}
+
 function rig(options: RigOptions = {}): Rig {
   const store = openStore(':memory:')
   opened.push(store)
@@ -109,6 +148,8 @@ function rig(options: RigOptions = {}): Rig {
   const qaInputs: QaInput[] = []
   const order: string[] = []
   let openDmCalls = 0
+  let threadReads = 0
+  const prAsks: string[] = []
   const run: Run = (file, args) => {
     const line = `${file} ${args.join(' ')}`
     commands.push(line)
@@ -117,22 +158,10 @@ function rig(options: RigOptions = {}): Rig {
     if (options.failCommand !== undefined && line.includes(options.failCommand)) {
       return Promise.reject(new CommandError(file, 1, 'it failed'))
     }
-    if (line.includes('worktree create')) {
-      const name = args[args.indexOf('--name') + 1] ?? 'x'
-      const worktree = { id: `r::/wt/${name}`, path: `/wt/${name}`, branch: `refs/heads/${name}` }
-      return Promise.resolve({ stdout: JSON.stringify({ result: { worktree } }), stderr: '' })
+    if (options.noUpstream === true && line.includes('@{upstream}')) {
+      return Promise.reject(new CommandError(file, 128, 'no upstream configured'))
     }
-    if (line.includes('symbolic-ref'))
-      return Promise.resolve({ stdout: `${options.branchNow ?? 'dispatch-a'}\n`, stderr: '' })
-    if (line.includes('status --porcelain'))
-      return Promise.resolve({ stdout: options.dirty ? ' M a.ts\n' : '', stderr: '' })
-    if (line.includes('rev-list')) {
-      // `@{upstream}..HEAD` is the unpushed-work check of a cleanup; `<base>..HEAD` is the commit check of a build.
-      const nothingNew = line.includes('@{upstream}') || options.noCommit === true
-      return Promise.resolve({ stdout: nothingNew ? '0\n' : '1\n', stderr: '' })
-    }
-    if (line.includes('pr create')) return Promise.resolve({ stdout: `${PR_URL}\n`, stderr: '' })
-    return Promise.resolve({ stdout: '', stderr: '' })
+    return Promise.resolve({ stdout: commandOutput(line, args, options), stderr: '' })
   }
   const agent: Agent = (call) => {
     calls.push(call)
@@ -154,13 +183,17 @@ function rig(options: RigOptions = {}): Rig {
       },
       postMessage: (args) => {
         if (options.postFails) return Promise.reject(new Error('slack is down'))
+        if (options.failChannel === args.channel) return Promise.reject(new Error('not_in_channel'))
         if (options.onPost?.index === posted.length) options.onPost.run()
-        posted.push({ text: args.text, blocks: args.blocks })
+        posted.push({ text: args.text, blocks: args.blocks, channel: args.channel, threadTs: args.threadTs })
         return Promise.resolve({ channel: args.channel, ts: `${posted.length}.5` })
       },
     },
     repoPath: (repo) => Promise.resolve(repo === options.noRepo ? undefined : `/repos/${repo}`),
-    loadThread: () => Promise.resolve('thread text'),
+    loadThread: () => {
+      threadReads += 1
+      return Promise.resolve('thread text')
+    },
     newSessionId: () => '11111111-1111-4111-8111-111111111111',
     qa: (input) => {
       qaInputs.push(input)
@@ -169,8 +202,24 @@ function rig(options: RigOptions = {}): Rig {
       )
     },
     now: () => clock.now,
+    prState: (prUrl) => {
+      prAsks.push(prUrl)
+      const answer = options.prStates?.[prUrl] ?? 'open'
+      return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer)
+    },
   })
-  return { store, worker, calls, commands, order, posted, qaInputs, openDmCalls: () => openDmCalls }
+  return {
+    store,
+    worker,
+    calls,
+    commands,
+    order,
+    posted,
+    qaInputs,
+    openDmCalls: () => openDmCalls,
+    threadReads: () => threadReads,
+    prAsks,
+  }
 }
 
 const TO_PLANNING: ItemEvent[] = [{ type: 'triage', handled: false, confident: true }]
@@ -189,6 +238,29 @@ function item(store: Store, repo: string, events: readonly ItemEvent[], n = 1): 
   })
   const key = itemKeyOf(thread, repo)
   for (const event of events) applyEvent(store, key, event)
+  return key
+}
+
+// An item with more in its meta than `item` gives: what the owner chose, or what the digest showed.
+function itemWithMeta(store: Store, repo: string, events: readonly ItemEvent[], extra: ItemMeta): string {
+  const thread = `${THREAD}7`
+  // A mention, like the items a digest build starts from.
+  createItems(store, thread, [repo], { meta: { [repo]: { summary: 'Fix it', url: 'https://x.test/t', ...extra } } })
+  const key = itemKeyOf(thread, repo)
+  for (const event of events) applyEvent(store, key, event)
+  return key
+}
+
+// An item whose plan was approved, with a worktree, ready for its build.
+function approvedInWorktree(r: Rig): string {
+  const key = item(r.store, 'web-app', TO_IMPLEMENTING)
+  saveWorkspace(r.store, key, {
+    sessionId: '11111111-1111-4111-8111-111111111111',
+    path: '/wt/a',
+    branch: 'dispatch-a',
+    baseRef: 'origin/develop',
+  })
+  setPlan(r.store, key, 'the plan')
   return key
 }
 
@@ -567,6 +639,19 @@ describe('worker as the cleanup of finished work', () => {
     expect(JSON.parse(kept[0]?.payload ?? '{}')).toMatchObject({ reason: 'there are uncommitted changes' })
   })
 
+  it('to be removed for a merged item although the host deleted its branch: the work is in the merged pull request', async () => {
+    const r = rig({ noUpstream: true })
+    withWorkspace(r, [
+      ...TO_IMPLEMENTING,
+      { type: 'built', ok: true },
+      { type: 'merge', owner: true, ci: true, review: true },
+    ])
+    await settle(r)
+    expect(r.commands.filter((c) => c.includes('worktree rm'))).toStrictEqual([
+      'orca worktree rm --worktree path:/wt/a --json',
+    ])
+  })
+
   it('to be removed for a merged item when everything is saved', async () => {
     const r = rig()
     withWorkspace(r, [
@@ -899,6 +984,28 @@ describe('worker as the Visual QA between the build and the pull request', () =>
   const withRoutes = (): Promise<AgentResult> =>
     Promise.resolve(ok('Changed it.\nQA-ROUTES: /settings /billing\nRESULT: PASS'))
 
+  it('to be given the spec the build wrote, with its line left out of the report and the pull request', async () => {
+    const withSpec = (): Promise<AgentResult> =>
+      Promise.resolve(ok('Changed it.\nQA-SPEC: e2e/footer.spec.ts\nRESULT: PASS'))
+    const r = rig({ config: { prEnabled: true }, agent: withSpec, qa: () => Promise.resolve(QA_PASSED) })
+    approved(r)
+    await settle(r)
+    expect(r.qaInputs[0]?.spec).toBe('e2e/footer.spec.ts')
+    expect(r.commands.find((line) => line.startsWith('gh pr create')) ?? '').not.toContain('QA-SPEC')
+    expect(JSON.stringify(r.posted[0]?.blocks)).not.toContain('QA-SPEC')
+  })
+
+  it.each(['../outside.spec.ts', '/etc/x.spec.ts', '--config=x.spec.ts', 'run.sh'])(
+    'to be no spec for the line QA-SPEC: %s, which would become an argument of a program',
+    async (path) => {
+      const bad = (): Promise<AgentResult> => Promise.resolve(ok(`Changed it.\nQA-SPEC: ${path}\nRESULT: PASS`))
+      const r = rig({ agent: bad, qa: () => Promise.resolve(QA_PASSED) })
+      approved(r)
+      await settle(r)
+      expect(r.qaInputs[0]?.spec).toBeNull()
+    },
+  )
+
   it('to be asked after the build, with the pages the build named, the plan, and what is left of the money', async () => {
     const r = rig({ agent: withRoutes, qa: () => Promise.resolve(QA_PASSED) })
     const key = approved(r)
@@ -1022,7 +1129,10 @@ describe('worker as the packages a new worktree lacks', () => {
     const key = approved(r, 1, dir)
     await settle(r)
     expect(stageOf(r.store, key)).toBe('pr_open')
-    expect(r.order.slice(0, 2)).toStrictEqual(['pnpm install --frozen-lockfile --prefer-offline', '<agent>'])
+    expect(r.order.filter((line) => line === '<agent>' || line.startsWith('pnpm install')).slice(0, 2)).toStrictEqual([
+      'pnpm install --frozen-lockfile --prefer-offline',
+      '<agent>',
+    ])
   })
 
   it('to be a failed item, with no agent run, when the install fails', async () => {
@@ -1042,5 +1152,477 @@ describe('worker as the packages a new worktree lacks', () => {
     approved(r, 1, dir)
     await settle(r)
     expect(r.commands.some((command) => command.includes('install'))).toBe(false)
+  })
+})
+
+describe('worker as the owner own claude setup', () => {
+  it('to be used by the plan and by the build, with the same session', async () => {
+    const r = rig({
+      agent: (_call, index) => Promise.resolve(index === 0 ? ok('the plan') : ok('Done.\nRESULT: PASS')),
+    })
+    const key = item(r.store, 'web-app', TO_PLANNING)
+    await settle(r)
+    applyEvent(r.store, key, { type: 'approve', owner: true, card: 'plan', fresh: true })
+    await settle(r)
+    expect(r.calls.map((call) => [call.mode, call.ownSetup])).toStrictEqual([
+      ['plan', true],
+      ['build', true],
+    ])
+    expect(r.calls[1]).toMatchObject({ resume: true, sessionId: r.calls[0]?.sessionId })
+  })
+
+  it('to be left out of the plan and the build when the owner turned it off', async () => {
+    const r = rig({
+      config: { ownSetup: false },
+      agent: (_call, index) => Promise.resolve(index === 0 ? ok('the plan') : ok('Done.\nRESULT: PASS')),
+    })
+    const key = item(r.store, 'web-app', TO_PLANNING)
+    await settle(r)
+    applyEvent(r.store, key, { type: 'approve', owner: true, card: 'plan', fresh: true })
+    await settle(r)
+    expect(r.calls.map((call) => call.ownSetup)).toStrictEqual([false, false])
+  })
+})
+
+const DIGEST_ANALYSIS = {
+  request: '푸터 링크 클릭해도 이동 안 함',
+  cause: 'footer.tsx의 href 오타',
+  plan: 'footer.tsx의 href 수정\n링크 이동 테스트 추가',
+  recommend: true,
+  why: '작고 분명함',
+}
+
+const APPROVE_PLAN: ItemEvent = { type: 'approve', owner: true, card: 'plan', fresh: true }
+
+describe('worker as the model the owner chose in the digest', () => {
+  it('to be the model of the plan and of the build, each in its own mode', async () => {
+    const r = rig({
+      agent: (_call, index) => Promise.resolve(index === 0 ? ok('the plan') : ok('Done.\nRESULT: PASS')),
+    })
+    const key = itemWithMeta(r.store, 'web-app', TO_PLANNING, { model: 'sonnet' })
+    await settle(r)
+    applyEvent(r.store, key, APPROVE_PLAN)
+    await settle(r)
+    expect(r.calls.map((call) => [call.mode, call.model])).toStrictEqual([
+      ['plan', 'sonnet'],
+      ['build', 'sonnet'],
+    ])
+  })
+
+  it('to be plan mode for every model on offer, so a plan never edits files', async () => {
+    for (const model of ['opusplan', 'opus', 'sonnet', 'haiku'] as const) {
+      const r = rig()
+      itemWithMeta(r.store, 'web-app', TO_PLANNING, { model })
+      await settle(r)
+      expect(r.calls.map((call) => [call.mode, call.model])).toStrictEqual([['plan', model]])
+    }
+  })
+
+  it('to be opusplan when the owner chose nothing', async () => {
+    const r = rig()
+    item(r.store, 'web-app', TO_PLANNING)
+    await settle(r)
+    expect(r.calls[0]?.model).toBe('opusplan')
+  })
+})
+
+describe('worker as an item the owner builds at once from the plan in the digest', () => {
+  const direct: ItemMeta = { direct: true, model: 'haiku', analysis: DIGEST_ANALYSIS }
+  // The worktree of `itemWithMeta` is made on a branch named after the item; the agent stays on it.
+  const branchNow = worktreeNameFor(itemKeyOf(`${THREAD}7`, 'web-app'))
+
+  it('to be planned without an agent: the digest plan is the plan, the item goes on to implementing', async () => {
+    const r = rig()
+    const key = itemWithMeta(r.store, 'web-app', TO_PLANNING, direct)
+    await settle(r)
+    expect(r.calls).toHaveLength(0)
+    expect(stageOf(r.store, key)).toBe('implementing')
+    expect(getWorkspace(r.store, key)?.plan).toBe(DIGEST_ANALYSIS.plan)
+    expect(listRuns(r.store, key).map((run) => [run.kind, run.state, run.costUsd])).toStrictEqual([
+      ['plan', 'succeeded', 0],
+    ])
+  })
+
+  it('to be announced by a card with the plan, where it runs and a button that stops it', async () => {
+    const r = rig()
+    const key = itemWithMeta(r.store, 'web-app', TO_PLANNING, direct)
+    await settle(r)
+    expect(r.posted).toHaveLength(1)
+    expect(r.posted[0]?.text).toBe('바로 구현 시작: web-app')
+    const card = JSON.stringify(r.posted[0]?.blocks)
+    expect(card).toContain('footer.tsx의 href 수정')
+    expect(card).toContain('작업 위치: ')
+    expect(buttonIds(r.posted[0]?.blocks)).toStrictEqual(['item.reject:1'])
+    // A reply under it is answered with the progress, like a reply under a plan card.
+    expect(cardAt(r.store, `${r.posted[0]?.channel}:1.5`)).toMatchObject({ itemKey: key, kind: 'plan' })
+  })
+
+  it('to be built even when the card cannot be posted, with the failure logged', async () => {
+    const r = rig({ postFails: true })
+    const key = itemWithMeta(r.store, 'web-app', TO_PLANNING, direct)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('implementing')
+    expect(listEvents(r.store, { itemKey: key }).some((event) => event.type === 'notify_failed')).toBe(true)
+  })
+
+  it('to be built next with the plan and what the digest showed, a new session and the chosen model', async () => {
+    const r = rig({ branchNow, agent: () => Promise.resolve(ok('Done.\nRESULT: PASS')) })
+    const key = itemWithMeta(r.store, 'web-app', TO_PLANNING, direct)
+    await settle(r)
+    await settle(r)
+    expect(r.calls).toHaveLength(1)
+    const call = r.calls[0]
+    expect(call).toMatchObject({ mode: 'build', model: 'haiku', resume: false, ownSetup: true })
+    expect(call?.sessionId).toBe(getWorkspace(r.store, key)?.sessionId)
+    expect(call?.prompt).toContain('exactly this text):\nfooter.tsx의 href 수정\n링크 이동 테스트 추가')
+    expect(call?.prompt).toContain(
+      '<thread>\n요청사항:\n푸터 링크 클릭해도 이동 안 함\n\n원인:\nfooter.tsx의 href 오타\n</thread>',
+    )
+    expect(stageOf(r.store, key)).toBe('pr_open')
+  })
+
+  it('to be built without reading the Slack thread: what was written after the click must not reach the agent', async () => {
+    const r = rig({ branchNow, agent: () => Promise.resolve(ok('Done.\nRESULT: PASS')) })
+    itemWithMeta(r.store, 'web-app', TO_PLANNING, direct)
+    await settle(r)
+    await settle(r)
+    expect(r.threadReads()).toBe(0)
+    expect(r.calls[0]?.prompt).not.toContain('thread text')
+  })
+
+  it('to be charged nothing when it fails: it started no agent, and the later build has no session to resume', async () => {
+    const r = rig({ failCommand: 'worktree create' })
+    const key = itemWithMeta(r.store, 'web-app', TO_PLANNING, direct)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('failed')
+    expect(listRuns(r.store, key).map((run) => [run.state, run.costUsd])).toStrictEqual([['failed', 0]])
+    expect(spentOnItem(r.store, key)).toBe(0)
+  })
+
+  it('to be stopped for nothing when the owner stops it while the workspace is made', async () => {
+    const holder: { r?: Rig; key?: string } = {}
+    const r = rig({
+      onCommand: {
+        includes: 'worktree create',
+        run: () => {
+          if (holder.r !== undefined && holder.key !== undefined) holder.r.worker.abort(holder.key)
+        },
+      },
+    })
+    holder.r = r
+    const key = itemWithMeta(r.store, 'web-app', TO_PLANNING, direct)
+    holder.key = key
+    await settle(r)
+    expect(listRuns(r.store, key).map((run) => [run.detail, run.costUsd])).toStrictEqual([[STOPPED_DETAIL, 0]])
+    expect(r.calls).toHaveLength(0)
+  })
+
+  it('to be told what the last build got wrong when the owner retries, and to continue its session', async () => {
+    const r = rig({
+      branchNow,
+      agent: (_call, index) =>
+        Promise.resolve(index === 0 ? ok('Tried.\nRESULT: FAIL lint broke', 0.4) : ok('Done.\nRESULT: PASS')),
+    })
+    const key = itemWithMeta(r.store, 'web-app', TO_PLANNING, direct)
+    await settle(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('failed')
+    applyEvent(r.store, key, { type: 'retry', owner: true, allowed: true })
+    await settle(r)
+    await settle(r)
+    expect(r.calls).toHaveLength(2)
+    expect(r.calls[1]?.prompt).toContain('lint broke')
+    expect(r.calls[1]).toMatchObject({ mode: 'build', resume: true })
+    expect(stageOf(r.store, key)).toBe('pr_open')
+  })
+
+  it('to be left alone when the owner calls the item off while its worktree is made', async () => {
+    const holder: { store?: Store; key?: string } = {}
+    const r = rig({
+      onCommand: {
+        includes: 'worktree create',
+        run: () => {
+          if (holder.store !== undefined && holder.key !== undefined) {
+            applyEvent(holder.store, holder.key, { type: 'reject', owner: true })
+          }
+        },
+      },
+    })
+    holder.store = r.store
+    holder.key = itemWithMeta(r.store, 'web-app', TO_PLANNING, direct)
+    await settle(r)
+    await settle(r)
+    expect(stageOf(r.store, holder.key)).toBe('declined')
+    expect(r.calls).toHaveLength(0)
+  })
+
+  it('to be planned the usual way, in plan mode, when the digest gave no plan for the item', async () => {
+    const r = rig()
+    const key = itemWithMeta(r.store, 'web-app', TO_PLANNING, { direct: true })
+    await settle(r)
+    expect(r.calls.map((call) => call.mode)).toStrictEqual(['plan'])
+    expect(stageOf(r.store, key)).toBe('planned')
+  })
+
+  it('to be planned the usual way for an item that was not started with build now', async () => {
+    const r = rig()
+    const key = itemWithMeta(r.store, 'web-app', TO_PLANNING, { direct: false, analysis: DIGEST_ANALYSIS })
+    await settle(r)
+    expect(r.calls.map((call) => call.mode)).toStrictEqual(['plan'])
+    expect(stageOf(r.store, key)).toBe('planned')
+  })
+})
+
+describe('worker as the live view of a build in Orca', () => {
+  it('to be a terminal tab in the worktree, opened after the packages are installed and before the agent starts', async () => {
+    const r = rig({ agent: () => Promise.resolve(ok('Done.\nRESULT: PASS')) })
+    approvedInWorktree(r)
+    await settle(r)
+    const opening = r.order.findIndex((line) => line.startsWith('orca terminal create'))
+    expect(opening).toBeGreaterThanOrEqual(0)
+    expect(r.order[opening]).toContain('--worktree path:/wt/a --title 구현 진행 보기 --command for i in')
+    expect(opening).toBeLessThan(r.order.indexOf('<agent>'))
+    // The owner is working in Orca: the tab opens in the background and never takes the focus.
+    expect(r.order[opening]).not.toContain('--focus')
+    expect(r.order.filter((line) => line.startsWith('orca terminal create'))).toHaveLength(1)
+  })
+
+  it('to be closed when the build is over, so it does not keep refreshing and a retry does not add a second one', async () => {
+    const r = rig({ agent: () => Promise.resolve(ok('Done.\nRESULT: PASS')) })
+    approvedInWorktree(r)
+    await settle(r)
+    const closing = r.order.findIndex((line) => line.startsWith('orca terminal close'))
+    expect(r.order[closing]).toBe(
+      'orca terminal close --terminal term_5b70a478-6623-408a-8919-d4eced9eb295 --tab --json',
+    )
+    expect(closing).toBeGreaterThan(r.order.indexOf('<agent>'))
+  })
+
+  it('to be closed also when the build fails, and a failure to close is only logged', async () => {
+    const failing = rig({ agent: () => Promise.resolve(ok('RESULT: FAIL tests are red')) })
+    approvedInWorktree(failing)
+    await settle(failing)
+    expect(failing.order.some((line) => line.startsWith('orca terminal close'))).toBe(true)
+    const stuck = rig({ failCommand: 'terminal close', agent: () => Promise.resolve(ok('Done.\nRESULT: PASS')) })
+    const key = approvedInWorktree(stuck)
+    await settle(stuck)
+    expect(stageOf(stuck.store, key)).toBe('pr_open')
+    expect(listEvents(stuck.store, { itemKey: key }).some((event) => event.type === 'live_view_close_failed')).toBe(
+      true,
+    )
+  })
+
+  it('to be only a convenience: a build still passes when the tab cannot be opened, and the failure is logged', async () => {
+    const r = rig({ failCommand: 'terminal create', agent: () => Promise.resolve(ok('Done.\nRESULT: PASS')) })
+    const key = approvedInWorktree(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('pr_open')
+    expect(listEvents(r.store, { itemKey: key }).some((event) => event.type === 'live_view_failed')).toBe(true)
+  })
+})
+
+describe('worker as the thread the work came from', () => {
+  const MENTION = 'slack:C09ABC:1730000000.000100'
+
+  // An item that was asked for in a channel thread and whose plan was approved.
+  function building(r: Rig, threadKey = MENTION): string {
+    createItems(r.store, threadKey, ['web-app'], {
+      meta: { 'web-app': { summary: 'Fix it', url: 'https://x.test/t' } },
+    })
+    const key = itemKeyOf(threadKey, 'web-app')
+    for (const event of TO_IMPLEMENTING) applyEvent(r.store, key, event)
+    saveWorkspace(r.store, key, {
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      path: '/wt/a',
+      branch: 'dispatch-a',
+      baseRef: 'origin/develop',
+    })
+    setPlan(r.store, key, 'the plan')
+    return key
+  }
+
+  const pass = (): Promise<AgentResult> => Promise.resolve(ok('Secret-looking report text.\nRESULT: PASS'))
+
+  it('to be told, in that thread, that the work is done with the link of the pull request', async () => {
+    const r = rig({ config: { prEnabled: true }, agent: pass })
+    building(r)
+    await settle(r)
+    expect(r.posted.map((message) => [message.channel, message.threadTs, message.text])).toStrictEqual([
+      ['D1', undefined, 'PR 준비됨: web-app'],
+      ['C09ABC', '1730000000.000100', `구현을 마쳤어요. PR: ${PR_URL}`],
+    ])
+  })
+
+  it('to be only fixed words and the address: nothing the agent wrote goes into a thread others may read', async () => {
+    const r = rig({ config: { prEnabled: true }, agent: pass })
+    building(r)
+    await settle(r)
+    expect(r.posted[1]?.text).not.toContain('Secret')
+    expect(r.posted[1]?.blocks).toBeUndefined()
+  })
+
+  it('to be the DM message the owner typed when the request came from a DM', async () => {
+    const r = rig({ config: { prEnabled: true }, agent: pass })
+    building(r, 'dm:D7:1730000000.000200')
+    await settle(r)
+    expect(r.posted[1]).toMatchObject({ channel: 'D7', threadTs: '1730000000.000200' })
+  })
+
+  it('to be no reply when nothing was pushed, because there is no pull request to point to', async () => {
+    const r = rig({ agent: pass })
+    building(r)
+    await settle(r)
+    expect(r.posted.map((message) => message.text)).toStrictEqual(['구현 완료: web-app'])
+  })
+
+  it('to be told to the owner, with the build kept, when the thread cannot be written in', async () => {
+    const r = rig({ config: { prEnabled: true }, failChannel: 'C09ABC', agent: pass })
+    const key = building(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('pr_open')
+    expect(r.posted.map((message) => message.text)).toStrictEqual([
+      'PR 준비됨: web-app',
+      '원본 쓰레드에 완료 댓글을 달지 못했어요: not_in_channel',
+    ])
+    expect(listEvents(r.store, { itemKey: key }).some((event) => event.type === 'thread_reply_failed')).toBe(true)
+  })
+
+  it('to be no reply when the stored address could carry markup into the thread', async () => {
+    const r = rig({ config: { prEnabled: true }, agent: pass })
+    const key = building(r)
+    // An address from an earlier try, kept in the workspace: it is used as it is, so it is checked before it is posted.
+    setPrUrl(r.store, key, 'https://github.com/acme/web-app/pull/7|<!channel>')
+    await settle(r)
+    expect(r.posted.map((message) => message.channel)).toStrictEqual(['D1'])
+  })
+
+  it('to be no reply for a thread key that names no Slack thread', async () => {
+    const r = rig({ config: { prEnabled: true }, agent: pass })
+    building(r, 'cli:somewhere')
+    await settle(r)
+    expect(r.posted.map((message) => message.text)).toStrictEqual(['PR 준비됨: web-app'])
+  })
+})
+
+describe('worker as the commit a build is told its branch started from', () => {
+  const START = '00bae28a9c1d2e3f4a5b6c7d8e9f001122334455'
+
+  it('to be the merge base of the branch and its base, so a script that tests what changed does not run every test', async () => {
+    const r = rig({ mergeBase: START, agent: () => Promise.resolve(ok('Done.\nRESULT: PASS')) })
+    approvedInWorktree(r)
+    await settle(r)
+    expect(r.commands).toContain('git -C /wt/a merge-base HEAD origin/develop')
+    expect(r.calls[0]?.prompt).toContain(`pass ${START}, the commit this branch started from`)
+  })
+
+  it('to be left out of the prompt, and logged, when git cannot tell', async () => {
+    const r = rig({ failCommand: 'merge-base', agent: () => Promise.resolve(ok('Done.\nRESULT: PASS')) })
+    const key = approvedInWorktree(r)
+    await settle(r)
+    expect(r.calls[0]?.prompt).not.toContain('the commit this branch started from')
+    expect(listEvents(r.store, { itemKey: key }).some((event) => event.type === 'base_commit_unknown')).toBe(true)
+  })
+
+  it.each(['', 'not-a-commit', '--upload-pack=x'])('to be left out of the prompt for the answer %j', async (answer) => {
+    const r = rig({ mergeBase: answer, agent: () => Promise.resolve(ok('Done.\nRESULT: PASS')) })
+    approvedInWorktree(r)
+    await settle(r)
+    expect(r.calls[0]?.prompt).not.toContain('the commit this branch started from')
+  })
+})
+
+describe('worker as a pull request that is merged or closed on the host', () => {
+  const PR = 'https://github.com/acme/web-app/pull/9'
+
+  // An item waiting in pr_open with a pull request, like the build of an item leaves it.
+  function waitingWithPr(r: Rig, n = 1, prUrl: string | null = PR): string {
+    const key = item(r.store, 'web-app', [...TO_IMPLEMENTING, { type: 'built', ok: true }], n)
+    saveWorkspace(r.store, key, {
+      sessionId: 's',
+      path: `/wt/${n}`,
+      branch: `dispatch-${n}`,
+      baseRef: 'origin/develop',
+    })
+    if (prUrl !== null) setPrUrl(r.store, key, prUrl)
+    return key
+  }
+
+  it('to be merged, the board and the owner told, and the worktree removed in the same tick', async () => {
+    const r = rig({ prStates: { [PR]: 'merged' } })
+    const key = waitingWithPr(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('merged')
+    expect(r.posted.map((message) => message.text)).toStrictEqual([
+      'PR이 머지된 걸 확인했어요: web-app. 워크트리는 정리할게요.',
+    ])
+    expect(r.commands).toContain('orca worktree rm --worktree path:/wt/1 --json')
+    const found = listEvents(r.store, { itemKey: key }).find((event) => event.type === 'pr_merged_on_host')
+    expect(JSON.parse(found?.payload ?? '{}')).toStrictEqual({ prUrl: PR })
+    expect(r.commands.some((line) => line.includes('--workspace-status completed'))).toBe(true)
+  })
+
+  it('to be declined when it was closed without a merge, and the worktree thrown away', async () => {
+    const r = rig({ prStates: { [PR]: 'closed' } })
+    const key = waitingWithPr(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('declined')
+    expect(r.posted.map((message) => message.text)).toStrictEqual([
+      'PR이 머지 없이 닫힌 걸 확인했어요: web-app. 워크트리는 정리할게요.',
+    ])
+    expect(r.commands).toContain('orca worktree rm --worktree path:/wt/1 --force --json')
+  })
+
+  it('to be left alone while the pull request is open, and not asked again for ten minutes', async () => {
+    const r = rig()
+    const key = waitingWithPr(r)
+    await settle(r)
+    await settle(r)
+    expect(r.prAsks).toStrictEqual([PR])
+    clock.now += 9 * 60_000
+    await settle(r)
+    expect(r.prAsks).toHaveLength(1)
+    clock.now += 61_000
+    await settle(r)
+    expect(r.prAsks).toStrictEqual([PR, PR])
+    expect(stageOf(r.store, key)).toBe('pr_open')
+    expect(r.posted).toStrictEqual([])
+  })
+
+  it('to be logged, and asked again after the pause, when the host cannot be asked', async () => {
+    const r = rig({ prStates: { [PR]: new Error('gh is not logged in') } })
+    const key = waitingWithPr(r)
+    await settle(r)
+    expect(stageOf(r.store, key)).toBe('pr_open')
+    const failed = listEvents(r.store, { itemKey: key }).filter((event) => event.type === 'pr_state_failed')
+    expect(failed).toHaveLength(1)
+    await settle(r)
+    expect(r.prAsks).toHaveLength(1)
+    clock.now += 10 * 60_000 + 1
+    await settle(r)
+    expect(r.prAsks).toHaveLength(2)
+  })
+
+  it('to be only the items waiting in pr_open that are asked about, and only those with a pull request', async () => {
+    const r = rig({ prStates: { [PR]: 'merged' } })
+    waitingWithPr(r, 1, null)
+    // Items in other stages that keep an address (a plan that waits, a build that failed) are not asked about.
+    const planned = item(r.store, 'web-app', [...TO_PLANNING, { type: 'plan_ready', current: true }], 2)
+    const failed = item(r.store, 'web-app', [...TO_IMPLEMENTING, { type: 'built', ok: false }], 3)
+    for (const key of [planned, failed]) {
+      saveWorkspace(r.store, key, { sessionId: 's', path: '/wt/x', branch: 'dispatch-x', baseRef: 'origin/develop' })
+      setPrUrl(r.store, key, PR)
+    }
+    await r.worker.tick()
+    expect(r.prAsks).toStrictEqual([])
+    expect([stageOf(r.store, planned), stageOf(r.store, failed)]).toStrictEqual(['planned', 'failed'])
+  })
+
+  it('to be each item asked about on its own, with the merged one finished and the open one left', async () => {
+    const other = 'https://github.com/acme/web-app/pull/10'
+    const r = rig({ prStates: { [PR]: 'merged', [other]: 'open' } })
+    const first = waitingWithPr(r, 1, PR)
+    const second = waitingWithPr(r, 2, other)
+    await settle(r)
+    expect([stageOf(r.store, first), stageOf(r.store, second)]).toStrictEqual(['merged', 'pr_open'])
   })
 })

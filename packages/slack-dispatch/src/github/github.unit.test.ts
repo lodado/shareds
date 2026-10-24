@@ -1,6 +1,6 @@
 import type { Run } from '../exec/exec'
 import { describe, expect, it } from 'vitest'
-import { mergePr, openPr, parseGate, pushBranch, readGate } from './github'
+import { mergePr, openPr, parseGate, pushBranch, readGate, readPrState } from './github'
 
 type Call = [string, readonly string[], string | undefined]
 
@@ -123,5 +123,34 @@ describe('readGate and mergePr as the calls to gh', () => {
     const { run, calls } = recording()
     await mergePr(run, PR, HEAD)
     expect(calls).toStrictEqual([['gh', ['pr', 'merge', PR, '--squash', '--match-head-commit', HEAD], undefined]])
+  })
+})
+
+describe('readPrState as what the host says about a pull request', () => {
+  it.each([
+    ['OPEN', 'open'],
+    ['MERGED', 'merged'],
+    ['CLOSED', 'closed'],
+  ])('to be %s read as %s, asked with the address and only the state', async (state, expected) => {
+    const { run, calls } = recording(JSON.stringify({ state }))
+    expect(await readPrState(run, PR)).toBe(expected)
+    expect(calls).toStrictEqual([['gh', ['pr', 'view', PR, '--json', 'state'], undefined]])
+  })
+
+  it.each([
+    JSON.stringify({ state: 'DRAFT' }),
+    JSON.stringify({ state: 'merged' }),
+    JSON.stringify({ state: 5 }),
+    JSON.stringify({}),
+    JSON.stringify([]),
+    JSON.stringify({ state: '__proto__' }),
+  ])('to be an error, not a guess, for the answer %s', async (answer) => {
+    const { run } = recording(answer)
+    await expect(readPrState(run, PR)).rejects.toThrow('did not say whether the pull request is open')
+  })
+
+  it('to be an error for an answer that is not JSON', async () => {
+    const { run } = recording('not json')
+    await expect(readPrState(run, PR)).rejects.toThrow()
   })
 })

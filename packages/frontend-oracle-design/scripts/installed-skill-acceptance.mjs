@@ -9,7 +9,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
-export const SKILLS = Object.freeze(['frontend-contract-design', 'frontend-oracle-design', 'oracle-author', 'oracle-implement', 'oracle-intake', 'oracle-review'])
+export const SKILLS = Object.freeze(['bend-proof', 'frontend-contract-design', 'frontend-oracle-design', 'oracle-author', 'oracle-implement', 'oracle-intake', 'oracle-review'])
 const PACKAGE = 'packages/frontend-oracle-design'
 const METADATA = ['package.json', '.claude-plugin/plugin.json', '.codex-plugin/plugin.json']
 const DEFAULT_REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -68,7 +68,7 @@ function metadata(root, version) {
 function entries(root, files, prefix) {
   const actual = files.filter(path => path.split(sep).at(-1) === 'SKILL.md').sort()
   const expected = SKILLS.map(name => join(prefix, name, 'SKILL.md')).sort()
-  if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`Expected exactly six SKILL.md entries at ${root}: ${JSON.stringify(actual)}`)
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`Expected exactly ${SKILLS.length} SKILL.md entries at ${root}: ${JSON.stringify(actual)}`)
   for (const name of SKILLS) {
     const text = readFileSync(safePath(root, join(prefix, name, 'SKILL.md')), 'utf8')
     if (!text.startsWith('---\n') || !new RegExp(`^name: ['"]?${name}['"]?\\s*$`, 'm').test(text.split('\n---')[0])) {

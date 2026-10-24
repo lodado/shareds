@@ -604,7 +604,7 @@ test('Medium keeps the Bend model: no document hands it to the Contract controll
 
 test('every skill description in the package fits the 1024-character trigger limit', async () => {
   // 0.104.0: the Contract description grew with the Medium handoff; a longer one is cut off by hosts that cap descriptions
-  for (const name of ['frontend-oracle-design', 'frontend-contract-design', 'oracle-intake', 'oracle-author', 'oracle-implement', 'oracle-review']) {
+  for (const name of ['frontend-oracle-design', 'frontend-contract-design', 'oracle-intake', 'oracle-author', 'oracle-implement', 'oracle-review', 'bend-proof']) {
     const description = (await read(`../${name}/SKILL.md`)).match(/^description: ([^\n]+)$/m)?.[1] ?? ''
     assert.ok(description.length > 0 && description.length <= 1024, `${name} description is ${description.length} chars`)
   }
@@ -2170,7 +2170,7 @@ test('covers every reference through typed routing or an explicit role owner wit
     'references/roles/author-formal.md': [
       'role-case-space-inputs-formal', 'bva', 'card-risk-grill', 'card-format', 'card-interaction-sweep',
       'card-case-space', 'card-case-space-frames', 'types-state-ladder', 'types-authoring',
-      'types-api-surface', 'types-advanced-contracts', 'type-environment', 'bend-cross-verification', 'adequacy',
+      'types-api-surface', 'types-advanced-contracts', 'type-environment', 'bend-cross-verification', 'bend-proof', 'adequacy',
       'role-author-draft-formal',
     ],
     'references/roles/space-discovery.md': ['role-case-space-inputs'],

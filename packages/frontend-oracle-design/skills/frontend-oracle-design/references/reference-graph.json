@@ -659,6 +659,13 @@
       "requires": ["common"]
     },
     {
+      "id": "bend-proof",
+      "profiles": ["formal-bend/v1"],
+      "path": "references/bend-proof.md",
+      "when": "writing, proving or repairing MODEL.bend, LAWS.bend or PROOF.bend from requirements through $bend-proof — the machine reading, the requirement-to-law table and the cell, every-trace, witness and rank templates; a failed proof or laws too weak to pin the model",
+      "requires": ["common"]
+    },
+    {
       "id": "adequacy",
       "profiles": ["formal-bend/v1"],
       "path": "references/adequacy.md",

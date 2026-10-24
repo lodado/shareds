@@ -46,8 +46,11 @@ whatever is already loaded.
 5. Write the Bend world, behavior model and laws according to stack applicability. Read
    [`model-patterns.md`](../model-patterns.md) while writing/revising MODEL, LAWS or PROOF, especially retries,
    delays, staleness, error kinds, remounts and request counts: time as events, attempts, error sum types,
-   and separate request/fetch/effect counts, not one collapsed event. Check each Bend file with
-   `scripts/oracle-model.mjs check --file <file>` before `prove`; a failure carries its fix in `hint`.
+   and separate request/fetch/effect counts, not one collapsed event. For the machine reading, the
+   requirement-to-law table and the cell, every-trace, witness and rank templates, invoke
+   [`$bend-proof`](../../../bend-proof/SKILL.md), which reads [`bend-proof.md`](../bend-proof.md).
+   Check each Bend file with `scripts/oracle-model.mjs check --file <file>` before `prove`; a failure carries
+   its fix in `hint`.
    Grow a Bend file in small sections: scaffold it, add one def or law group at a time, check after each
    (about a second), and change it with small edits, never by rewriting or regenerating the whole file.
    Change the package with `oracle-package.mjs patch --set|--append|--remove '<pointer>'` (`'/sources/[id=S2]'`

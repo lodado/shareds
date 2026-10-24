@@ -62,7 +62,8 @@ hunt or a demand that a defect must exist. Preserve serious blockers and all req
 An unchanged row may refer to still-current earlier evidence; scope narrowing never waives a gate.
 
 Re-read [`mandatory-verification.md`](../mandatory-verification.md) and
-[`bend-cross-verification.md`](../bend-cross-verification.md) before verification/review. Review all
+[`bend-cross-verification.md`](../bend-cross-verification.md) before verification/review. Judge whether each
+law says what its policy says with the reviewer checklist in [`bend-proof.md`](../bend-proof.md). Review all
 applicable real proof, type-fest consumer/static witnesses/checker environment, fast-check positive runs
 or finite-world correspondence, with actual reported evidence, source mapping and freshness. A label or
 successful file generation is insufficient. Read [`adequacy.md`](../adequacy.md) for Terms/Adequacy cards.

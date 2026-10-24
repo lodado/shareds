@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { every } from './loop'
+import { createSerial, every } from './loop'
 
 afterEach(() => {
   vi.useRealTimers()
@@ -105,5 +105,46 @@ describe('every as a job that repeats', () => {
     gates[0]?.()
     await vi.advanceTimersByTimeAsync(1000)
     expect(runs).toBe(1)
+  })
+})
+
+describe('createSerial as jobs that must not overlap', () => {
+  it('to be one job at a time, in the order they were asked for', async () => {
+    const serial = createSerial()
+    const events: string[] = []
+    let releaseFirst: () => void = () => undefined
+    const first = serial(
+      () =>
+        new Promise<string>((resolve) => {
+          events.push('first starts')
+          releaseFirst = () => {
+            events.push('first ends')
+            resolve('one')
+          }
+        }),
+    )
+    const second = serial(() => {
+      events.push('second starts')
+      return Promise.resolve('two')
+    })
+    await Promise.resolve()
+    expect(events).toStrictEqual(['first starts'])
+    releaseFirst()
+    expect(await Promise.all([first, second])).toStrictEqual(['one', 'two'])
+    expect(events).toStrictEqual(['first starts', 'first ends', 'second starts'])
+  })
+
+  it('to be a failure for the one who asked, and no stop for the jobs after it', async () => {
+    const serial = createSerial()
+    const failing = serial(() => Promise.reject(new Error('boom')))
+    const after = serial(() => Promise.resolve('still runs'))
+    await expect(failing).rejects.toThrow('boom')
+    expect(await after).toBe('still runs')
+  })
+
+  it('to be the value of the job, whatever its type', async () => {
+    const serial = createSerial()
+    expect(await serial(() => Promise.resolve(42))).toBe(42)
+    expect(await serial(() => Promise.resolve({ ok: true }))).toStrictEqual({ ok: true })
   })
 })

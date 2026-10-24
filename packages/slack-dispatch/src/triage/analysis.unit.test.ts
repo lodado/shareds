@@ -14,14 +14,41 @@ describe('parseAnalysis as the answer of the cheapest model', () => {
     expect(parseAnalysis(good)).toStrictEqual(good)
   })
 
-  it('to be each text cut to its limit and flattened to one line', () => {
+  it('to be a paragraph of at most four lines, each line cut to 70 characters', () => {
     const long = 'x'.repeat(500)
-    const parsed = parseAnalysis({ ...good, request: `a\nb ${long}`, cause: long, plan: long, why: long })
-    expect(parsed.request.startsWith('a b x')).toBe(true)
-    expect([parsed.request.length, parsed.cause.length, parsed.plan.length, parsed.why.length]).toStrictEqual([
-      150, 180, 250, 80,
-    ])
-    expect(parsed.request).not.toContain('\n')
+    const parsed = parseAnalysis({
+      ...good,
+      request: ['a', 'b', 'c', 'd', 'e', 'f'],
+      cause: long,
+      plan: `1줄\n2줄\n${long}\n4줄\n5줄`,
+      why: long,
+    })
+    expect(parsed.request).toBe('a\nb\nc\nd')
+    expect(parsed.cause.split('\n').map((line) => line.length)).toStrictEqual([70])
+    expect(parsed.plan.split('\n').map((line) => line.length)).toStrictEqual([2, 2, 70, 2])
+    expect(parsed.why).toHaveLength(80)
+  })
+
+  it('to be a line without the bullet or number the model put in front, and without blank lines', () => {
+    const parsed = parseAnalysis({
+      ...good,
+      plan: ['- 파일 수정', '', '2) 테스트 추가', '• 린트 실행', '2.5배 느림'],
+    })
+    expect(parsed.plan).toBe('파일 수정\n테스트 추가\n린트 실행\n2.5배 느림')
+  })
+
+  it.each([['  - foo'], ['- 1. foo'], ['• - 2) foo'], ['  1. 2. foo']])(
+    'to be one clean line for %j, the same when parsed again',
+    (line) => {
+      const once = parseAnalysis({ ...good, plan: [line] })
+      expect(once.plan).toBe('foo')
+      expect(parseAnalysis(once).plan).toBe('foo')
+    },
+  )
+
+  it('to be the same analysis when it is parsed again, so one read back from the store does not change', () => {
+    const once = parseAnalysis({ ...good, request: ['첫째 줄', '- 둘째 줄'] })
+    expect(parseAnalysis(once)).toStrictEqual(once)
   })
 
   it.each(['true', 1, 'yes', null, undefined, [], {}])(

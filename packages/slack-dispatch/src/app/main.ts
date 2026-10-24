@@ -3,7 +3,7 @@
 
 import type { App } from './app.ts'
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { createClaudeAgent } from '../agent/claude.ts'
@@ -55,6 +55,10 @@ export async function startApp(env: Env): Promise<App> {
       },
       fileExists: existsSync,
       readText: (path) => readFileSync(path, 'utf8'),
+      listShots: (dir) =>
+        readdirSync(dir)
+          .filter((name) => name.endsWith('.png'))
+          .toSorted((a, b) => a.localeCompare(b)),
     })
     const app = await createApp({
       config,
@@ -75,6 +79,7 @@ export async function startApp(env: Env): Promise<App> {
     })
     return {
       ready: app.ready,
+      statusPort: app.statusPort,
       async stop() {
         await app.stop()
         release()

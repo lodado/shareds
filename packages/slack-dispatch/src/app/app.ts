@@ -5,6 +5,7 @@
 import type { Agent } from '../agent/claude.ts'
 import type { Config } from '../config/config.ts'
 import type { Run } from '../exec/exec.ts'
+import type { IngestDeps } from '../ingest/ingest.ts'
 import type { InteractDeps } from '../interact/interact.ts'
 import type { RunQa } from '../qa/qa.ts'
 import type { SlackClient } from '../slack/client.ts'
@@ -12,7 +13,8 @@ import type { Connect } from '../socket/socket.ts'
 import type { Store } from '../store/store.ts'
 import type { WorkerConfig } from '../work/worker.ts'
 import type { StatusServer, StatusSnapshot } from './status.ts'
-import { mergePr, readGate } from '../github/github.ts'
+import { mergePr, readGate, readPrState } from '../github/github.ts'
+import { catchUp } from '../ingest/catch-up.ts'
 import { ingestMentions } from '../ingest/ingest.ts'
 import { listRepos } from '../orca/repos.ts'
 import { startSocket } from '../socket/socket.ts'
@@ -21,8 +23,8 @@ import { cancelOrphanRuns, countActiveRuns, getWorkspace } from '../store/work.t
 import { createWorker, retriesLeft } from '../work/worker.ts'
 import { createSplitAgent, createTriageAgent } from './agents.ts'
 import { dispatchEnvelope } from './dispatch.ts'
-import { every } from './loop.ts'
-import { startStatusServer } from './status.ts'
+import { createSerial, every } from './loop.ts'
+import { describeError, startStatusServer } from './status.ts'
 import { loadThreadText } from './threads.ts'
 
 export interface AppDeps {
@@ -51,6 +53,8 @@ export interface AppDeps {
 export interface App {
   // Resolves once Slack said hello on the socket.
   ready: Promise<void>
+  // The port the status address listens on, or null when it is off or the port was taken.
+  statusPort: number | null
   // Stops the loops, the socket and the agents, and waits for the jobs to end.
   stop: () => Promise<void>
 }
@@ -58,18 +62,25 @@ export interface App {
 const DEFAULT_TICK_MS = 3000
 const DAY_MS = 86_400_000
 
-function workerConfig(prEnabled: boolean, baseOverrides: Readonly<Record<string, string>>): WorkerConfig {
+function workerConfig(
+  config: Pick<Config, 'prEnabled' | 'ownSetup'>,
+  baseOverrides: Readonly<Record<string, string>>,
+): WorkerConfig {
   return {
     maxTotal: 3,
     maxPerRepo: 1,
-    maxCostPerItemUsd: 8,
+    // All the runs of one item together. Three times what it was (8 and 5), at the owner's request: a build in a large
+    // repository runs its whole test suite more than once.
+    maxCostPerItemUsd: 24,
     planBudgetUsd: 2,
-    buildBudgetUsd: 5,
+    buildBudgetUsd: 15,
     qaBudgetUsd: 1,
     planTimeoutMs: 15 * 60_000,
-    buildTimeoutMs: 45 * 60_000,
+    // A repository's own test run can take a quarter of an hour; the money cap, not the clock, is what limits a build.
+    buildTimeoutMs: 90 * 60_000,
     maxAttempts: 3,
-    prEnabled,
+    prEnabled: config.prEnabled,
+    ownSetup: config.ownSetup,
     baseOverrides,
   }
 }
@@ -110,7 +121,7 @@ export async function createApp(deps: AppDeps): Promise<App> {
     }
   }
 
-  const settings = workerConfig(config.prEnabled, deps.baseBranches)
+  const settings = workerConfig(config, deps.baseBranches)
   // Nothing from an earlier process is still running, so runs it left in progress are called off first, each charged
   // the most it could have spent.
   cancelOrphanRuns(store, { plan: settings.planBudgetUsd, build: settings.buildBudgetUsd })
@@ -131,6 +142,7 @@ export async function createApp(deps: AppDeps): Promise<App> {
     newSessionId: deps.newSessionId,
     qa: deps.qa,
     now: () => deps.now().getTime(),
+    prState: (prUrl) => readPrState(run, prUrl),
   })
 
   const prOf = (itemKey: string): string | null => getWorkspace(store, itemKey)?.prUrl ?? null
@@ -141,6 +153,16 @@ export async function createApp(deps: AppDeps): Promise<App> {
       logEvent(store, { kind: 'run', type: `${what}_agent`, payload: { costUsd } })
     },
   }
+  const analyze = createTriageAgent(small, deps.scratchDir, repoPath, loadThread)
+  // One pass over Slack at a time: the regular poll and a look at a past day would otherwise list the same new items twice.
+  const serial = createSerial()
+  const ingestDeps = (): IngestDeps => ({
+    store,
+    slack,
+    ownerId,
+    route: { knownRepos: repos.map((repo) => repo.name), channelRepos: deps.channelRepos() },
+    analyze,
+  })
   const interact: InteractDeps = {
     store,
     slack,
@@ -160,10 +182,10 @@ export async function createApp(deps: AppDeps): Promise<App> {
     abortWork: (itemKey) => {
       worker.abort(itemKey)
     },
+    catchUp: (daysAgo) => serial(() => catchUp(ingestDeps(), startOfDay(deps.now(), daysAgo))),
     locks: new Set(),
+    now: () => deps.now().getTime(),
   }
-
-  const analyze = createTriageAgent(small, deps.scratchDir, repoPath, loadThread)
 
   const socket = startSocket({
     getUrl: () => slack.socketUrl(),
@@ -177,20 +199,13 @@ export async function createApp(deps: AppDeps): Promise<App> {
   const pollMentions = async (): Promise<void> => {
     try {
       repos = await listRepos(run)
-      await ingestMentions(
-        {
-          store,
-          slack,
-          ownerId,
-          route: { knownRepos: repos.map((repo) => repo.name), channelRepos: deps.channelRepos() },
-          analyze,
-        },
-        { since: startOfDay(deps.now(), config.ingestDays), dryRun: false },
+      await serial(() =>
+        ingestMentions(ingestDeps(), { since: startOfDay(deps.now(), config.ingestDays), dryRun: false }),
       )
       poll.at = deps.now().toISOString()
       poll.error = null
     } catch (error) {
-      poll.error = errorText(error)
+      poll.error = describeError(error)
       throw error
     }
   }
@@ -212,6 +227,7 @@ export async function createApp(deps: AppDeps): Promise<App> {
 
   return {
     ready: socket.ready,
+    statusPort: statusServer?.port ?? null,
     async stop() {
       for (const stopLoop of stops) stopLoop()
       socket.stop()

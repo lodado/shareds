@@ -2,7 +2,7 @@ import type { Run, RunOptions } from '../exec/exec'
 import type { AgentCall } from './claude'
 import { describe, expect, it } from 'vitest'
 import { CommandError } from '../exec/exec'
-import { AgentAborted, claudeArgs, createClaudeAgent, parseAgentOutput } from './claude'
+import { AgentAborted, claudeArgs, createClaudeAgent, isAgentModel, parseAgentOutput } from './claude'
 
 const SESSION = '0b6a6a50-3e51-4c93-9a0a-0d1c2a3b4c5d'
 
@@ -32,6 +32,9 @@ describe('claudeArgs as the command line of a call', () => {
       '--max-budget-usd',
       '1.5',
       '--safe-mode',
+      '--restricted',
+      '--tools',
+      'Read,Glob,Grep',
       '--permission-prompts',
       'none',
       '--permission-mode',
@@ -97,6 +100,57 @@ describe('claudeArgs as the command line of a call', () => {
     expect(claudeArgs(call({ mode: 'plan' }))).not.toContain('--disallowedTools')
   })
 
+  it('to be run with the owner own setup when asked: no safe mode, and the skill and helper tools allowed', () => {
+    for (const mode of ['plan', 'build'] as const) {
+      const args = claudeArgs(call({ mode, ownSetup: true }))
+      expect(args).not.toContain('--safe-mode')
+      const allowed = args[args.indexOf('--allowedTools') + 1]?.split(',') ?? []
+      expect(allowed).toEqual(expect.arrayContaining(['Skill', 'Agent', 'Read']))
+    }
+  })
+
+  it('to be kept from commands that reach a remote, as a second line of defence, with the owner own setup', () => {
+    // Not a boundary: the owner's settings are loaded, and `allow: ["Bash"]` there lets every command run.
+    for (const mode of ['plan', 'build'] as const) {
+      const args = claudeArgs(call({ mode, ownSetup: true }))
+      const denied = args[args.indexOf('--disallowedTools') + 1]?.split(',') ?? []
+      expect(denied).toEqual(expect.arrayContaining(['Bash(git push:*)', 'Bash(gh:*)', 'Bash(curl:*)']))
+      expect(args[args.indexOf('--permission-prompts') + 1]).toBe('none')
+    }
+  })
+
+  it('to be without that second line when the run is cut off from the owner, which has the real boundary', () => {
+    expect(claudeArgs(call({ mode: 'plan' }))).not.toContain('--disallowedTools')
+  })
+
+  it('to be without the owner own setup unless it is asked for', () => {
+    for (const args of [claudeArgs(call({ mode: 'plan' })), claudeArgs(call({ mode: 'plan', ownSetup: false }))]) {
+      expect(args).toContain('--safe-mode')
+      expect(args).toContain('--restricted')
+    }
+  })
+
+  it.each([
+    ['plan', 'Read,Glob,Grep'],
+    ['text', 'Read,Glob,Grep'],
+    ['qa', 'Read'],
+    ['build', 'Read,Glob,Grep,Edit,Write,Bash'],
+  ] as const)(
+    'to be cut off from the owner settings, with only the tools %s needs: %s (no command runs without a rule)',
+    (mode, tools) => {
+      // Without --restricted the owner's `allow: ["Bash"]` ran any command, with or without --safe-mode.
+      const args = claudeArgs(call({ mode }))
+      expect(args).toEqual(expect.arrayContaining(['--safe-mode', '--restricted']))
+      expect(args[args.indexOf('--tools') + 1]).toBe(tools)
+    },
+  )
+
+  it('to be neither restricted nor limited to a tool list when the owner own setup is asked for', () => {
+    const args = claudeArgs(call({ mode: 'build', ownSetup: true }))
+    expect(args).not.toContain('--restricted')
+    expect(args).not.toContain('--tools')
+  })
+
   it('to be run without anything of the owner own setup', () => {
     for (const mode of ['plan', 'build', 'text'] as const) {
       const args = claudeArgs(call({ mode }))
@@ -110,6 +164,22 @@ describe('claudeArgs as the command line of a call', () => {
     expect(args).toContain('plan')
     expect(args).not.toContain('Edit')
     expect(args[args.indexOf('--model') + 1]).toBe('haiku')
+  })
+})
+
+describe('claudeArgs as the model the owner picked', () => {
+  it.each(['opusplan', 'opus', 'sonnet', 'haiku'] as const)(
+    'to be %s passed on, with plan mode kept for a plan',
+    (model) => {
+      const args = claudeArgs(call({ mode: 'plan', model }))
+      expect(args[args.indexOf('--model') + 1]).toBe(model)
+      expect(args[args.indexOf('--permission-mode') + 1]).toBe('plan')
+    },
+  )
+
+  it('to be a name from the list of models only', () => {
+    expect(['opusplan', 'opus', 'sonnet', 'haiku'].every(isAgentModel)).toBe(true)
+    for (const other of ['gpt-9', '', 'OPUS', 5, null, undefined]) expect(isAgentModel(other)).toBe(false)
   })
 })
 

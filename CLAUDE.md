@@ -23,3 +23,18 @@ A flat layout (`packages/<plugin>/skills/SKILL.md`, e.g. frontend-oracle-design)
 `skills/` to `~/.jcode/skills/<plugin>/`. Run this only after the push succeeds. The rsync does
 not delete host-local files; verify each install against the repository source and preserve
 local-only data. Restart Claude to load the new plugin version.
+
+## slack-dispatch service
+
+`packages/slack-dispatch` runs on the owner's machine, from this checkout, as a macOS LaunchAgent (see its README). A
+running service keeps the old code, so after a change under `packages/slack-dispatch/src` or
+`packages/slack-dispatch/scripts` passes `pnpm lint` and `pnpm test` there, bring it up to date and check that it is back:
+
+```sh
+pnpm --filter @lodado/slack-dispatch service:restart
+pnpm --filter @lodado/slack-dispatch service:status   # job state running, health: 200
+```
+
+Run `service:install` instead when the node version or the folder changed (the agent file holds absolute paths). Never
+start a second copy by hand: a lock file in `~/.slack-dispatch` refuses it. Restart only when no run is in progress
+(`/status` on `localhost:9814` shows `activeRuns`); a run cut off by a restart is charged its whole budget.

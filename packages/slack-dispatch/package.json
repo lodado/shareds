@@ -18,7 +18,8 @@
     "dry-run": "node --env-file-if-exists=.env --no-warnings scripts/dry-run.ts",
     "service:install": "node --no-warnings scripts/service.ts install",
     "service:uninstall": "node --no-warnings scripts/service.ts uninstall",
-    "service:status": "node --no-warnings scripts/service.ts status"
+    "service:status": "node --no-warnings scripts/service.ts status",
+    "service:restart": "node --no-warnings scripts/service.ts restart"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

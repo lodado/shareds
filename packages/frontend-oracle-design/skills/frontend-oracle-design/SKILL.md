@@ -41,7 +41,8 @@ only for the current stage, not every future phase.
 1. Invoke `$oracle-intake` for sources, risk/capability and proposed Space axes. The first response shows
    axes, a provisional Draft and Open questions under one `yes` ([first response](references/common.md#first-response--one-message-one-confirmation)).
 2. Invoke [`$oracle-author`](../oracle-author/SKILL.md) after approved-source/axis prerequisites.
-   Its selected Formal procedures own specialized authoring and checks.
+   Its selected Formal procedures own specialized authoring and checks. The Formal author invokes
+   [`$bend-proof`](../bend-proof/SKILL.md) for Bend models, laws and proofs.
 3. Invoke [`$oracle-review`](../oracle-review/SKILL.md) in independent review contexts with permitted inputs.
    Preserve findings, drive the falsifying nail, obtain actual human approval (common's pre-authorized one
    counts), then lint/lock through tools.

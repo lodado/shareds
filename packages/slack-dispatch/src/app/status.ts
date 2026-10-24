@@ -3,6 +3,8 @@
 
 import type { RequestListener, Server, ServerResponse } from 'node:http'
 import { createServer } from 'node:http'
+import { clip } from '../slack/blocks.ts'
+import { redact } from '../store/redact.ts'
 
 export interface StatusSnapshot {
   ok: true
@@ -28,6 +30,13 @@ export interface StatusOptions {
 }
 
 const HOST = '127.0.0.1'
+const ERROR_SHOWN = 200
+
+// An error as the status address may show it: secrets removed, on one line, short. The full text stays in the log,
+// which redacts it too.
+export function describeError(error: unknown): string {
+  return clip(redact(error instanceof Error ? error.message : String(error)), ERROR_SHOWN)
+}
 
 function reply(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
