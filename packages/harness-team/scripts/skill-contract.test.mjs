@@ -62,6 +62,22 @@ test('keeps the English workflow scoped with risk-based staffing, a risky-work g
   for (const role of ['Lead', 'Scout', 'Builder', 'Verifier', 'Final Reviewer']) {
     assert.match(skill, new RegExp(`^\\d\\. \\*\\*${role}\\*\\*`, 'm'), role)
   }
+  assert.match(
+    skill,
+    /Every\s+call\s+rereads\s+the\s+whole\s+session,\s+and\s+every\s+subagent\s+reloads\s+the\s+host\s+instructions,\s+this\s+skill,\s+and\s+the\s+files\s+it\s+reads\./,
+  )
+  assert.match(
+    skill,
+    /When\s+the\s+user\s+moves\s+to\s+an\s+unrelated\s+task\s+in\s+a\s+session\s+that\s+already\s+holds\s+a\s+long\s+finished\s+one,\s+say\s+in\s+one\s+line\s+that\s+a\s+fresh\s+session\s+\(in\s+Claude\s+Code,\s+`\/clear`\)\s+costs\s+less,\s+then\s+continue\s+unless\s+the\s+user\s+stops\s+you\./,
+  )
+  assert.match(
+    skill,
+    /For\s+a\s+large\s+request,\s+write\s+the\s+plan\s+to\s+a\s+file\s+where\s+repository\s+rules\s+put\s+plans\s+before\s+building,\s+and\s+offer\s+to\s+build\s+in\s+a\s+fresh\s+session\s+that\s+reads\s+only\s+that\s+file\./,
+  )
+  assert.match(
+    skill,
+    /Delegate,\s+run\s+parallel\s+agents,\s+or\s+start\s+workflows\s+only\s+when\s+the\s+staffing\s+rule\s+or\s+the\s+user\s+calls\s+for\s+them;\s+do\s+not\s+fan\s+out\s+for\s+convenience\./,
+  )
   assert.match(skill, /Infer\s+the\s+goal\s+from\s+the\s+request/)
   assert.match(skill, /still\s+ask\s+when\s+host\s+rules\s+require\s+it/)
   assert.match(

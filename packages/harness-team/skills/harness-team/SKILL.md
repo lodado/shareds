@@ -22,6 +22,18 @@ agents or run this workflow. The lead owns coordination, carry-over, and reporti
 - State the goal, observable completion criteria, scope, reuse candidates, verification commands, and agent roles/count.
   Finish the requested scope, not just a plan.
 
+## Context budget
+
+Every call rereads the whole session, and every subagent reloads the host instructions, this skill, and the files it
+reads.
+
+- When the user moves to an unrelated task in a session that already holds a long finished one, say in one line that a
+  fresh session (in Claude Code, `/clear`) costs less, then continue unless the user stops you.
+- For a large request, write the plan to a file where repository rules put plans before building, and offer to build in
+  a fresh session that reads only that file.
+- Delegate, run parallel agents, or start workflows only when the staffing rule or the user calls for them; do not fan
+  out for convenience.
+
 ## Model selection
 
 Follow host routing. Design, architecture, unknown-cause debugging, building risky work, and the final review require
