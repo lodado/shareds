@@ -126,6 +126,8 @@ interface Start {
   model: AgentModel
   // Build the plan the digest showed, without a plan step of its own.
   direct: boolean
+  // The plan the owner typed in the digest; empty for none.
+  ownPlan: string
 }
 
 // An item the router could not place has no repo to plan in, so it keeps waiting.
@@ -133,10 +135,10 @@ function planItems(deps: InteractDeps, items: readonly ItemRow[], start: Start):
   const routable = items.filter((item) => item.repo !== UNROUTED)
   const tally: Tally = { done: 0, settled: 0, needsRepo: items.length - routable.length, noPlan: 0 }
   for (const item of routable) {
-    // Without the digest's plan there is nothing to build at once, so that item plans first.
-    const hasPlan = item.meta.analysis !== undefined
+    // Without a plan, the owner's or the digest's, there is nothing to build at once, so that item plans first.
+    const hasPlan = start.ownPlan !== '' || item.meta.analysis !== undefined
     // The choice is saved before the event: the worker starts the item as soon as it is planning.
-    setRunChoice(deps.store, item.key, { model: start.model, direct: start.direct && hasPlan })
+    setRunChoice(deps.store, item.key, { model: start.model, direct: start.direct && hasPlan, ownPlan: start.ownPlan })
     // An item sits in at most one digest, so the digest the owner clicked is always the latest card for it.
     const moved =
       applyEvent(deps.store, item.key, { type: 'approve', owner: true, card: 'assign', fresh: true }).outcome.kind ===
@@ -176,7 +178,7 @@ async function handleDigestClick(
     await say(
       deps,
       where,
-      tallyText('플랜 시작', planItems(deps, items, { model: click.model, direct: false }), click.model),
+      tallyText('플랜 시작', planItems(deps, items, { model: click.model, direct: false, ownPlan: '' }), click.model),
     )
     return
   }
@@ -191,8 +193,9 @@ async function handleDigestClick(
     return
   }
   const direct = click.action === 'build_selected'
-  const tally = planItems(deps, chosen, { model: click.model, direct })
-  await say(deps, where, tallyText(direct ? '바로 구현' : '플랜 시작', tally, click.model))
+  const tally = planItems(deps, chosen, { model: click.model, direct, ownPlan: click.ownPlan })
+  const label = direct ? '바로 구현' : '플랜 시작'
+  await say(deps, where, tallyText(click.ownPlan === '' ? label : `${label} (내 플랜)`, tally, click.model))
 }
 
 function refusalText(decision: ReturnType<typeof decide>): string {

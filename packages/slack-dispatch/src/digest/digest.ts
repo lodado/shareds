@@ -67,6 +67,14 @@ export type Block =
   | { type: 'section'; text: MarkdownText; block_id?: string; accessory?: Checkboxes }
   | { type: 'context'; elements: MarkdownText[] }
   | { type: 'actions'; block_id: string; elements: ActionElement[] }
+  | {
+      type: 'input'
+      block_id: string
+      optional: true
+      label: PlainText
+      hint: PlainText
+      element: { type: 'plain_text_input'; action_id: string; multiline: true; max_length: number; placeholder: PlainText }
+    }
 
 export interface DigestMessage {
   // Shown in notifications and by clients that cannot render blocks.
@@ -74,8 +82,8 @@ export interface DigestMessage {
   blocks: Block[]
 }
 
-// Slack limits: 50 blocks per message (a header, one per item, the buttons and a note make 43 at most), 3000
-// characters per section, 150 per option value.
+// Slack limits: 50 blocks per message (a header, one per item, the plan box, the buttons and a note make 44 at most),
+// 3000 characters per section, 150 per option value.
 export const MAX_ENTRIES_PER_DIGEST = 40
 const OPTION_VALUE_LIMIT = 150
 const SECTION_TEXT_LIMIT = 3000
@@ -86,6 +94,9 @@ const SUMMARY_SHOWN = 300
 const ACTION_PATTERN = /^digest\.(plan_selected|build_selected|plan_all|reject_rest):(\d+)$/
 const PICK_PREFIX = 'digest.pick:'
 const MODEL_PREFIX = 'digest.model:'
+const OWN_PLAN_PREFIX = 'digest.ownplan:'
+// The most the owner's own plan may hold; Slack's own limit for a text box is 3000.
+export const OWN_PLAN_LIMIT = 3000
 
 type DigestAction = 'plan_selected' | 'build_selected' | 'plan_all' | 'reject_rest'
 
@@ -223,6 +234,24 @@ const modelSelect = (digestId: number): ModelSelect => ({
   initial_option: modelOption(DEFAULT_MODEL),
 })
 
+const ownPlanInput = (digestId: number): Block => ({
+  type: 'input',
+  block_id: `digest:${digestId}:ownplan`,
+  optional: true,
+  label: { type: 'plain_text', text: '내 플랜 (선택)' },
+  hint: {
+    type: 'plain_text',
+    text: '비워두면 에이전트가 알아서 플랜을 만들어요. 적으면 고른 항목 모두에 이 플랜을 따르게 해요.',
+  },
+  element: {
+    type: 'plain_text_input',
+    action_id: `${OWN_PLAN_PREFIX}${digestId}`,
+    multiline: true,
+    max_length: OWN_PLAN_LIMIT,
+    placeholder: { type: 'plain_text', text: '예: Header.tsx에 예약 탭 추가, 업로드 팝업은 기존 FileUpload 재사용' },
+  },
+})
+
 export function buildDigest(digestId: number, entries: readonly DigestEntry[]): DigestMessage {
   if (entries.length === 0) throw new RangeError('a digest needs at least one entry')
   if (entries.length > MAX_ENTRIES_PER_DIGEST) {
@@ -236,6 +265,7 @@ export function buildDigest(digestId: number, entries: readonly DigestEntry[]): 
   const blocks: Block[] = [
     { type: 'header', text: { type: 'plain_text', text: title } },
     ...groupedByRepo(entries).map((entry, index) => itemBlock(digestId, index, entry)),
+    ownPlanInput(digestId),
     {
       type: 'actions',
       block_id: `digest:${digestId}:decide`,
@@ -252,7 +282,7 @@ export function buildDigest(digestId: number, entries: readonly DigestEntry[]): 
       elements: [
         {
           type: 'mrkdwn',
-          text: '구현 추천 항목은 미리 체크해 두었어요. 체크와 모델을 고른 뒤 버튼을 누르세요.\n• 플랜 시작: 플랜 모드로 플랜을 만들고, 확인한 뒤 구현\n• 바로 구현: 위 개선 플랜대로 플랜 단계 없이 바로 구현\n고르지 않은 항목은 대기하고, DM에 "대기"라고 보내면 다시 볼 수 있어요.',
+          text: '구현 추천 항목은 미리 체크해 두었어요. 체크와 모델을 고른 뒤 버튼을 누르세요.\n• 플랜 시작: 플랜 모드로 플랜을 만들고, 확인한 뒤 구현 (내 플랜을 적으면 그걸 따라서)\n• 바로 구현: 내 플랜(없으면 위 개선 플랜)대로 플랜 단계 없이 바로 구현\n고르지 않은 항목은 대기하고, DM에 "대기"라고 보내면 다시 볼 수 있어요.',
         },
       ],
     },
@@ -266,7 +296,7 @@ export function splitDigest(entries: readonly DigestEntry[]): DigestEntry[][] {
 }
 
 export type ParsedAction =
-  | { ok: true; action: DigestAction; digestId: number; selected: string[]; model: AgentModel }
+  | { ok: true; action: DigestAction; digestId: number; selected: string[]; model: AgentModel; ownPlan: string }
   | { ok: false; error: string }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -315,6 +345,13 @@ function pickedModel(payload: Record<string, unknown>, digestId: number): AgentM
   return isAgentModel(value) ? value : DEFAULT_MODEL
 }
 
+// What the owner typed in the plan box, trimmed and cut to the limit; empty when the box was left alone.
+function pickedOwnPlan(payload: Record<string, unknown>, digestId: number): string {
+  const [element] = stateElements(payload, (actionId) => actionId === `${OWN_PLAN_PREFIX}${digestId}`)
+  if (!isRecord(element) || typeof element.value !== 'string') return ''
+  return element.value.trim().slice(0, OWN_PLAN_LIMIT)
+}
+
 export function parseDigestAction(payload: unknown): ParsedAction {
   const first = firstAction(payload)
   if (!first.ok) return first
@@ -327,6 +364,7 @@ export function parseDigestAction(payload: unknown): ParsedAction {
     digestId,
     selected: pickedItems(first.payload, digestId),
     model: pickedModel(first.payload, digestId),
+    ownPlan: pickedOwnPlan(first.payload, digestId),
   }
 }
 

@@ -1,6 +1,6 @@
 import type { ActionElement, Block, DigestEntry } from './digest'
 import { describe, expect, it } from 'vitest'
-import { buildDigest, isSelectionClick, MAX_ENTRIES_PER_DIGEST, parseDigestAction, splitDigest } from './digest'
+import { buildDigest, isSelectionClick, MAX_ENTRIES_PER_DIGEST, OWN_PLAN_LIMIT, parseDigestAction, splitDigest } from './digest'
 
 const analysis = {
   request: '푸터 링크 클릭해도 이동 안 함\n모바일과 데스크톱 모두 발생',
@@ -273,7 +273,7 @@ describe('buildDigest as an empty or oversized list', () => {
 
   it('to be a message with at most 50 blocks at the largest size, so Slack accepts it', () => {
     const message = buildDigest(1, many(MAX_ENTRIES_PER_DIGEST))
-    expect(message.blocks).toHaveLength(MAX_ENTRIES_PER_DIGEST + 3)
+    expect(message.blocks).toHaveLength(MAX_ENTRIES_PER_DIGEST + 4)
     expect(message.blocks.length).toBeLessThanOrEqual(50)
   })
 
@@ -336,6 +336,7 @@ describe('parseDigestAction as the click on a digest button', () => {
       digestId: 7,
       selected: ['T1#web-app', 'T2#web-app', 'T3#api-server'],
       model: 'opusplan',
+      ownPlan: '',
     })
   })
 
@@ -357,6 +358,7 @@ describe('parseDigestAction as the click on a digest button', () => {
       digestId: 8,
       selected: ['NEW#web-app'],
       model: 'opusplan',
+      ownPlan: '',
     })
   })
 
@@ -367,6 +369,7 @@ describe('parseDigestAction as the click on a digest button', () => {
       digestId: 3,
       selected: [],
       model: 'opusplan',
+      ownPlan: '',
     })
     expect(parseDigestAction({ type: 'block_actions', actions: [{ action_id: 'digest.plan_all:3' }] })).toEqual({
       ok: true,
@@ -374,6 +377,21 @@ describe('parseDigestAction as the click on a digest button', () => {
       digestId: 3,
       selected: [],
       model: 'opusplan',
+      ownPlan: '',
+    })
+  })
+
+  it('to be the plan the owner typed in the box of that digest, trimmed and cut to the limit', () => {
+    const typed = (value: unknown): unknown =>
+      clickPayload('digest.plan_selected:7', {
+        'digest:7:ownplan': { 'digest.ownplan:7': { type: 'plain_text_input', value } },
+        'digest:6:ownplan': { 'digest.ownplan:6': { type: 'plain_text_input', value: 'old digest' } },
+      })
+    expect(parseDigestAction(typed('  탭 추가\n팝업 재사용  '))).toMatchObject({ ok: true, ownPlan: '탭 추가\n팝업 재사용' })
+    expect(parseDigestAction(typed(null))).toMatchObject({ ok: true, ownPlan: '' })
+    expect(parseDigestAction(typed('x'.repeat(OWN_PLAN_LIMIT + 10)))).toMatchObject({
+      ok: true,
+      ownPlan: 'x'.repeat(OWN_PLAN_LIMIT),
     })
   })
 

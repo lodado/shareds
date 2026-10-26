@@ -129,8 +129,10 @@ function digestClick(
   picked: readonly string[],
   user = OWNER,
   model?: string,
+  ownPlan?: string,
 ): unknown {
   const menu = model === undefined ? {} : { [`digest.model:${digestId}`]: { selected_option: { value: model } } }
+  const box = ownPlan === undefined ? {} : { [`digest.ownplan:${digestId}`]: { type: 'plain_text_input', value: ownPlan } }
   return {
     type: 'block_actions',
     user: { id: user },
@@ -142,6 +144,7 @@ function digestClick(
           [`digest.pick:${digestId}:0`]: { type: 'checkboxes', selected_options: picked.map((value) => ({ value })) },
         },
         decide: menu,
+        ownplan: box,
       },
     },
   }
@@ -195,6 +198,17 @@ describe('handleInteractive as a click on a digest', () => {
     await handleInteractive(deps, digestClick('plan_selected', id, [a]))
     expect([stageOf(store, a), stageOf(store, b)]).toStrictEqual(['planning', 'notified'])
     expect(posted).toStrictEqual([{ channel: DM, text: '플랜 시작 1개 (모델 자동)', threadTs: '9.9' }])
+  })
+
+  it('to be a plan started with the plan the owner typed, kept on the item', async () => {
+    const { deps, store, posted } = harness()
+    const a = waiting(store, 'web-app', 1)
+    const id = createDigest(store, [a])
+    const click = digestClick('plan_selected', id, [a], OWNER, undefined, '예약 탭만 추가')
+    await handleInteractive(deps, click)
+    expect(stageOf(store, a)).toBe('planning')
+    expect(getItem(store, a)?.meta).toMatchObject({ ownPlan: '예약 탭만 추가', direct: false })
+    expect(posted[0]?.text).toBe('플랜 시작 (내 플랜) 1개 (모델 자동)')
   })
 
   it('to be unmoved by a tick for an item that is in another digest', async () => {

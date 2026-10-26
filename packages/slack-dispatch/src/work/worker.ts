@@ -180,9 +180,9 @@ function lastBuildFailure(store: Store, itemKey: string): string {
 
 const modelOf = (item: ItemRow): AgentModel => item.meta.model ?? DEFAULT_MODEL
 
-// The owner started the item with "build now": the plan is the one the digest showed.
+// The owner started the item with "build now": the plan is the one the owner typed, or else the one the digest showed.
 const digestPlanOf = (item: ItemRow): string | undefined =>
-  item.meta.direct === true ? item.meta.analysis?.plan : undefined
+  item.meta.direct === true ? (item.meta.ownPlan ?? item.meta.analysis?.plan) : undefined
 
 // A session exists once an earlier run of the item was billed; before that there is nothing to resume. The runner
 // switches by itself if the session on disk says otherwise.
@@ -296,7 +296,13 @@ function planText(ctx: Ctx, item: ItemRow, workspace: WorkspaceRow, thread: stri
   const asked = pendingInstruction(store, item.key)
   if (asked !== undefined) return revisePrompt(asked.text, thread)
   if (workspace.plan !== '') return replanPrompt(thread, lastFailure(store, item.key))
-  return planPrompt({ repo: item.repo, base: workspace.baseRef, thread, task: item.task })
+  return planPrompt({
+    repo: item.repo,
+    base: workspace.baseRef,
+    thread,
+    task: item.task,
+    ownPlan: item.meta.ownPlan ?? '',
+  })
 }
 
 async function finishPlan(ctx: Ctx, info: RunInfo, result: AgentResult, answeredRequest: number): Promise<void> {

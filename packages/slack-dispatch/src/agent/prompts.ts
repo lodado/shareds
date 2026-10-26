@@ -110,11 +110,18 @@ export interface PlanInput {
   thread: string
   // What the owner asked for in a DM; empty for a mention.
   task: string
+  // The plan the owner typed in the digest; empty when the agent plans on its own.
+  ownPlan?: string
 }
 
 export function planPrompt(input: PlanInput): string {
   const task = input.task === '' ? '' : `The owner's own words for this repository: ${input.task}`
-  return renderPrompt(PLAN_TEMPLATE, { repo: input.repo, base: input.base, task }, input.thread)
+  const ownPlan = (input.ownPlan ?? '').trim()
+  const guide =
+    ownPlan === ''
+      ? ''
+      : `\nThe owner already wrote the plan below. Follow it: keep its approach and steps, check them against the code, fill in the files and checks, and list anything in it that does not fit the code under risks.\n${ownPlan}`
+  return renderPrompt(PLAN_TEMPLATE, { repo: input.repo, base: input.base, task: `${task}${guide}` }, input.thread)
 }
 
 export function revisePrompt(instruction: string, thread: string): string {

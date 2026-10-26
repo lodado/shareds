@@ -45,6 +45,9 @@ export interface ItemMeta {
   // the digest showed instead of making a new one.
   model?: AgentModel
   direct?: boolean
+  // The plan the owner typed when starting the item. With it the plan step follows the owner's plan, and a direct
+  // build builds it instead of the digest's plan.
+  ownPlan?: string
 }
 
 export interface NewItemOptions {
@@ -329,6 +332,8 @@ const ITEM_COLUMNS = 'key, thread_key, repo, stage, source, task, meta, created_
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
+const isText = (value: unknown): value is string => typeof value === 'string' && value !== ''
+
 // Only the known fields with the right type are kept, so a damaged or hand-edited row cannot put anything else into
 // a message.
 function parseMeta(json: string): ItemMeta {
@@ -339,7 +344,7 @@ function parseMeta(json: string): ItemMeta {
     return {}
   }
   if (!isRecord(parsed)) return {}
-  const { summary, url, route, urgent, analysis, model, direct } = parsed
+  const { summary, url, route, urgent, analysis, model, direct, ownPlan } = parsed
   const read = readAnalysis(analysis)
   return {
     ...(typeof summary === 'string' ? { summary } : {}),
@@ -349,6 +354,7 @@ function parseMeta(json: string): ItemMeta {
     ...(read === undefined ? {} : { analysis: read }),
     ...(isAgentModel(model) ? { model } : {}),
     ...(typeof direct === 'boolean' ? { direct } : {}),
+    ...(isText(ownPlan) ? { ownPlan } : {}),
   }
 }
 
@@ -398,6 +404,8 @@ export function setAnalysis(store: Store, itemKey: string, analysis: Analysis): 
 export interface RunChoice {
   model: AgentModel
   direct: boolean
+  // Empty when the owner left the plan box alone.
+  ownPlan?: string
 }
 
 // What the owner chose when starting the item. Only an item that still waits for the owner takes it: one that is
@@ -407,8 +415,13 @@ export function setRunChoice(store: Store, itemKey: string, choice: RunChoice): 
     const row = store.db.prepare('SELECT stage FROM items WHERE key = ?').get(itemKey)
     if (!row) throw new UnknownItemError(itemKey)
     if (text(row, 'stage') !== 'notified') return false
-    mergeMeta(store, itemKey, { model: choice.model, direct: choice.direct })
-    logEvent(store, { itemKey, kind: 'system', type: 'run_choice_saved', payload: { ...choice } })
+    mergeMeta(store, itemKey, { model: choice.model, direct: choice.direct, ownPlan: choice.ownPlan ?? '' })
+    logEvent(store, {
+      itemKey,
+      kind: 'system',
+      type: 'run_choice_saved',
+      payload: { model: choice.model, direct: choice.direct, ownPlan: (choice.ownPlan ?? '') !== '' },
+    })
     return true
   })
 }

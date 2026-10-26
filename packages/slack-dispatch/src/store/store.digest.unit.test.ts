@@ -286,7 +286,17 @@ describe('setRunChoice as what the owner chose when starting an item', () => {
     expect(setRunChoice(store, waiting, { model: 'sonnet', direct: true })).toBe(true)
     expect(getItem(store, waiting)?.meta).toStrictEqual({ analysis, model: 'sonnet', direct: true })
     const logged = listEvents(store, { itemKey: waiting }).filter((event) => event.type === 'run_choice_saved')
-    expect(logged.map((event) => event.payload)).toStrictEqual(['{"model":"sonnet","direct":true}'])
+    expect(logged.map((event) => event.payload)).toStrictEqual(['{"model":"sonnet","direct":true,"ownPlan":false}'])
+  })
+
+  it('to keep the plan the owner typed, and to drop an empty one', () => {
+    const store = memoryStore()
+    const typed = unsureMention(store, THREAD, 'web-app')
+    const blank = unsureMention(store, 'slack:C1:2.000001', 'web-app')
+    setRunChoice(store, typed, { model: 'opus', direct: false, ownPlan: '탭 추가' })
+    setRunChoice(store, blank, { model: 'opus', direct: false, ownPlan: '' })
+    expect(getItem(store, typed)?.meta.ownPlan).toBe('탭 추가')
+    expect(getItem(store, blank)?.meta.ownPlan).toBeUndefined()
   })
 
   it('to be refused for an item that already left the digest, which keeps the choice it started with', () => {
