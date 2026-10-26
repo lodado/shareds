@@ -206,6 +206,37 @@ export async function createApp(deps: AppDeps): Promise<App> {
     log,
   })
 
+  // Reads the tracker's issues into items. A tracker that is down must not stop the mentions, so it reports and says
+  // nothing was created.
+  const ingestTrackerIssues = async (since: Date): Promise<number> => {
+    if (tracker === undefined) return 0
+    try {
+      const summary = await ingestIssues(
+        {
+          tracker,
+          items: createSqliteItemRepository(store),
+          route: { knownRepos: repos.map((repo) => repo.name) },
+          projectRepos: deps.projectRepos?.() ?? {},
+        },
+        { since },
+      )
+      return summary.created
+    } catch (error) {
+      reportError('issue_poll')(error)
+      return 0
+    }
+  }
+
+  // The tracker cannot call in, so it is asked more often than Slack is. A new issue sends its digest right away
+  // instead of waiting for the next mention pass.
+  const pollIssues = async (): Promise<void> => {
+    if (repos.length === 0) repos = await listRepos(run)
+    const since = startOfDay(deps.now(), config.ingestDays)
+    await serial(async () => {
+      if ((await ingestTrackerIssues(since)) > 0) await ingestMentions(ingestDeps(), { since, dryRun: false })
+    })
+  }
+
   // What the status address says about polling.
   const poll: { at: string | null; error: string | null } = { at: null, error: null }
   const pollMentions = async (): Promise<void> => {
@@ -213,23 +244,8 @@ export async function createApp(deps: AppDeps): Promise<App> {
       repos = await listRepos(run)
       const since = startOfDay(deps.now(), config.ingestDays)
       await serial(async () => {
-        // The tracker's issues go in first, so the digest the mention pass sends lists them with the mentions, with the
-        // same analysis and plan. A tracker that is down must not stop the mentions.
-        if (tracker !== undefined) {
-          try {
-            await ingestIssues(
-              {
-                tracker,
-                items: createSqliteItemRepository(store),
-                route: { knownRepos: repos.map((repo) => repo.name) },
-                projectRepos: deps.projectRepos?.() ?? {},
-              },
-              { since },
-            )
-          } catch (error) {
-            reportError('issue_poll')(error)
-          }
-        }
+        // The tracker's issues go in first, so the digest the mention pass sends lists them with the mentions.
+        await ingestTrackerIssues(since)
         return ingestMentions(ingestDeps(), { since, dryRun: false })
       })
       poll.at = deps.now().toISOString()
@@ -243,6 +259,7 @@ export async function createApp(deps: AppDeps): Promise<App> {
   const stops = [
     every(deps.tickMs ?? DEFAULT_TICK_MS, () => worker.tick(), reportError('worker_tick')),
     every(config.pollIntervalMs, pollMentions, reportError('poll')),
+    ...(tracker === undefined ? [] : [every(config.issuePollIntervalMs, pollIssues, reportError('issue_poll'))]),
   ]
 
   const startedAt = deps.now().toISOString()

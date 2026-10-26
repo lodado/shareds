@@ -14,6 +14,8 @@ export interface Config {
   // null until it is read from Slack with the user token
   ownerId: string | null
   pollIntervalMs: number
+  // How often the issue tracker is asked for new issues, which cannot be pushed here.
+  issuePollIntervalMs: number
   // How many days before today a mention may be and still be picked up; 0 is today only.
   ingestDays: number
   // Whether a finished build is pushed and opened as a pull request. Off by default: the work stays a local commit.
@@ -27,6 +29,7 @@ export interface Config {
 type Env = Readonly<Record<string, string | undefined>>
 
 const DEFAULT_POLL_SECONDS = 300
+const DEFAULT_ISSUE_POLL_SECONDS = 60
 
 // A whole number of at least `min`; anything else (missing, empty, text, a fraction) is the fallback.
 function wholeNumber(value: string | undefined, min: number, fallback: number): number {
@@ -54,6 +57,7 @@ export function loadConfig(env: Env, home = homedir()): Config {
     routesPath: env.ROUTES_PATH || join(stateDir, 'routes.json'),
     ownerId: env.OWNER_SLACK_USER_ID || null,
     pollIntervalMs: wholeNumber(env.POLL_INTERVAL_SECONDS, 10, DEFAULT_POLL_SECONDS) * 1000,
+    issuePollIntervalMs: wholeNumber(env.JIRA_POLL_INTERVAL_SECONDS, 30, DEFAULT_ISSUE_POLL_SECONDS) * 1000,
     ingestDays: wholeNumber(env.INGEST_DAYS, 0, 0),
     prEnabled: env.ENABLE_PR === '1',
     statusPort: statusPortOf(env.STATUS_PORT),
