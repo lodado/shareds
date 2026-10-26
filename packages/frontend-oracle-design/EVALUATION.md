@@ -1,3 +1,25 @@
+# 0.112.0: the Draft names its loading mechanism, so a query view cannot silently skip the Suspense default
+
+## Validation
+
+- Package `pnpm run lint` (0 errors, bundles and evals match) and `pnpm run test` pass after the change.
+- Budgets: the added `Loading mechanism:` rule is about 440 bytes in `common.md`, which every bundle containing it
+  carries. `role-intake` (104,851 of 105,000), `role-author` (278,0xx of 278,000), `card-lane` and `types-lane` were
+  at their caps, and the Formal Delivery closure was 444,5xx of 445,000. Each cap rises by 1 KB: `role-intake`
+  106,000, `role-author` 279,000, `card-lane` 138,000, `types-lane` 100,000, Delivery closure 446,000. No existing
+  rule was deleted: nothing in `common.md` duplicates another node.
+
+## Change
+
+- `references/common.md`: a first-response Draft whose rows show data from an async query carries one
+  `Loading mechanism:` line naming the loading decision-table row it follows (default Suspense and Error Boundary,
+  `startTransition` to keep old content). Plain `useQuery`, `keepPreviousData` or an in-component `status` branch
+  names its exception, otherwise it is a `FINDING`. The shape block shows the line.
+- Reason: an orders-table Draft read the decision table, then drafted `useQuery` + `keepPreviousData` with
+  `firstLoad`/`failure` branches and no recorded exception. The Draft template had no place for the choice, so the
+  skip left no trace until the user noticed. No link to `frontend/decisions.md` is added: a link makes it part of every
+  profile's always-read closure (the isolation and budget tests reject it).
+
 # 0.111.0: the CHECKED gate judges proofs and laws; `prove-reach` certifies a finite machine; the stage machine is modelled
 
 ## Validation

@@ -91,6 +91,9 @@ data-loss work is `risk=High`. The rest of that message carries, in this order:
    Rows whose correctness depends on response order also carry a planned verification line: the
    consumer under test, the deferred response it holds, the barrier it waits on, the exact visible
    data and request count, and both release orders. Label it planned, not run.
+   A Draft with an async-query view carries one `Loading mechanism:` line naming the loading decision-table row
+   it follows (default: Suspense and Error Boundary, `startTransition` to keep old content); plain `useQuery`,
+   `keepPreviousData` or an in-component `status` branch names its exception, otherwise a `FINDING`.
 4. Numbered Open questions `Q1..Qn`, each with at least two options and exactly one recommended.
    Outcome-changing A/B counterexamples ride here too, not in a round before the Draft.
 5. One confirmation request: a bare `yes` adopts every recommendation and confirms the axes and the
@@ -119,6 +122,7 @@ Status: NEEDS_DECISION — Draft awaits one confirmation
 Planned verification (not run), R1–R3: <consumer> under test, deferred POST response, barrier on the
   second activation, visible pending state and exact POST count, both release orders
 Case space: Async{idle,pending,ok,fail,unknown} × Repeat{click,Enter,tap} × Entry{fresh,reload}
+Loading mechanism (only with an async query view): <decisions.md §3 row>; exception: <reason> | none
 Interaction sweep:
 - pending × click → covered(R1)
 - pending × {Enter,tap} → covered(R2)

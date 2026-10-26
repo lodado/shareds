@@ -150,7 +150,7 @@ test('the always-read reference closure stays inside its byte budget and never p
       assert.equal(delivery.has(id), false, `${profile}: ${id}`)
     }
     assert.ok((await bytes(designOnly, profile)) <= 245_000, `${profile}: Design-only closure is ${await bytes(designOnly, profile)} bytes`)
-    assert.ok((await bytes(delivery, profile)) <= 445_000, `${profile}: Delivery closure is ${await bytes(delivery, profile)} bytes`)
+    assert.ok((await bytes(delivery, profile)) <= 446_000, `${profile}: Delivery closure is ${await bytes(delivery, profile)} bytes`)
     if (profile === 'contract/v1') {
       for (const id of [...designOnly, ...delivery]) assert.ok(byId.get(id).profiles.includes('contract/v1'), `${id} must not import Formal`)
       assert.equal(delivery.has('mandatory-verification'), false)
