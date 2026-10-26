@@ -29,7 +29,7 @@ export interface Config {
 type Env = Readonly<Record<string, string | undefined>>
 
 const DEFAULT_POLL_SECONDS = 300
-const DEFAULT_ISSUE_POLL_SECONDS = 60
+const DEFAULT_ISSUE_POLL_SECONDS = 300
 
 // A whole number of at least `min`; anything else (missing, empty, text, a fraction) is the fallback.
 function wholeNumber(value: string | undefined, min: number, fallback: number): number {

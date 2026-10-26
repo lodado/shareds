@@ -44,7 +44,7 @@ describe('loadConfig as the places the bot keeps its state', () => {
       routesPath: '/home/me/.slack-dispatch/routes.json',
       ownerId: null,
       pollIntervalMs: 300_000,
-      issuePollIntervalMs: 60_000,
+      issuePollIntervalMs: 300_000,
       ingestDays: 0,
       prEnabled: false,
       statusPort: 9814,
@@ -64,7 +64,7 @@ describe('loadConfig as the places the bot keeps its state', () => {
       routesPath: '/r.json',
       ownerId: 'U1',
       pollIntervalMs: 300_000,
-      issuePollIntervalMs: 60_000,
+      issuePollIntervalMs: 300_000,
       ingestDays: 0,
       prEnabled: false,
       statusPort: 9814,
@@ -148,10 +148,10 @@ describe('loadConfig as the pace and the switches of the worker', () => {
     expect([config.pollIntervalMs, config.ingestDays]).toStrictEqual([60_000, 2])
   })
 
-  it('to be asking Jira every minute by default, and never under 30 seconds', () => {
-    expect(loadConfig({}, '/h').issuePollIntervalMs).toBe(60_000)
+  it('to be asking Jira every five minutes by default, and never under 30 seconds', () => {
+    expect(loadConfig({}, '/h').issuePollIntervalMs).toBe(300_000)
     expect(loadConfig({ JIRA_POLL_INTERVAL_SECONDS: '45' }, '/h').issuePollIntervalMs).toBe(45_000)
-    expect(loadConfig({ JIRA_POLL_INTERVAL_SECONDS: '5' }, '/h').issuePollIntervalMs).toBe(60_000)
+    expect(loadConfig({ JIRA_POLL_INTERVAL_SECONDS: '5' }, '/h').issuePollIntervalMs).toBe(300_000)
   })
 
   it.each(['', 'soon', '5', '1.5', '-60'])('to be the default interval for %j', (value) => {
