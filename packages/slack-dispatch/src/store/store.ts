@@ -426,6 +426,48 @@ export function setRunChoice(store: Store, itemKey: string, choice: RunChoice): 
   })
 }
 
+// Moves a waiting item to another repo the owner named. A key holds its repo and the log keeps its history, so the
+// item is not renamed: a new item in that repo takes its place in the same digest, and the old one is declined.
+// Returns the key to act on, or null when the item no longer waits for the owner.
+export function moveToRepo(store: Store, itemKey: string, repo: string): string | null {
+  if (repo === '' || repo.includes('#')) throw new Error('a repo name must be non-empty and must not contain "#"')
+  return inTransaction(store, () => {
+    const row = store.db.prepare(`SELECT ${ITEM_COLUMNS} FROM items WHERE key = ?`).get(itemKey)
+    if (!row) throw new UnknownItemError(itemKey)
+    const item = toItemRow(row)
+    if (item.repo === repo) return item.key
+    if (item.stage !== 'notified') return null
+    const key = itemKeyOf(item.threadKey, repo)
+    const now = timestamp(store)
+    // The analysis comes along: it is about the request, and the owner already read it in the digest.
+    const meta = { ...item.meta, route: `직접 지정: ${repo}` }
+    const inserted = store.db
+      .prepare(
+        'INSERT OR IGNORE INTO items (key, thread_key, repo, stage, source, task, meta, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      )
+      .run(key, item.threadKey, repo, 'notified', item.source, item.task, serialize(meta), now, now)
+    if (Number(inserted.changes) === 1) {
+      logEvent(store, {
+        itemKey: key,
+        kind: 'item_created',
+        type: 'item_created',
+        payload: { threadKey: item.threadKey, repo, source: item.source, movedFrom: item.key },
+        stageAfter: 'notified',
+      })
+    }
+    // The new item answers the same digest, so a later click there finds it and no second digest is sent for it.
+    const digest = store.db.prepare('SELECT digest_id FROM digest_items WHERE item_key = ?').get(item.key)
+    if (digest) {
+      store.db
+        .prepare('INSERT OR IGNORE INTO digest_items (digest_id, item_key) VALUES (?, ?)')
+        .run(integer(digest, 'digest_id'), key)
+    }
+    applyInTransaction(store, item.key, { type: 'reject', owner: true })
+    logEvent(store, { itemKey: item.key, kind: 'system', type: 'repo_moved', payload: { to: repo, newKey: key } })
+    return key
+  })
+}
+
 export function getItem(store: Store, itemKey: string): ItemRow | undefined {
   const row = store.db.prepare(`SELECT ${ITEM_COLUMNS} FROM items WHERE key = ?`).get(itemKey)
   return row ? toItemRow(row) : undefined

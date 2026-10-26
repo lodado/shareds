@@ -272,8 +272,8 @@ describe('buildDigest as an empty or oversized list', () => {
   })
 
   it('to be a message with at most 50 blocks at the largest size, so Slack accepts it', () => {
-    const message = buildDigest(1, many(MAX_ENTRIES_PER_DIGEST))
-    expect(message.blocks).toHaveLength(MAX_ENTRIES_PER_DIGEST + 4)
+    const message = buildDigest(1, many(MAX_ENTRIES_PER_DIGEST), ['web-app', 'api'])
+    expect(message.blocks).toHaveLength(MAX_ENTRIES_PER_DIGEST + 6)
     expect(message.blocks.length).toBeLessThanOrEqual(50)
   })
 
@@ -337,6 +337,7 @@ describe('parseDigestAction as the click on a digest button', () => {
       selected: ['T1#web-app', 'T2#web-app', 'T3#api-server'],
       model: 'opusplan',
       ownPlan: '',
+      repo: '',
     })
   })
 
@@ -359,6 +360,7 @@ describe('parseDigestAction as the click on a digest button', () => {
       selected: ['NEW#web-app'],
       model: 'opusplan',
       ownPlan: '',
+      repo: '',
     })
   })
 
@@ -370,6 +372,7 @@ describe('parseDigestAction as the click on a digest button', () => {
       selected: [],
       model: 'opusplan',
       ownPlan: '',
+      repo: '',
     })
     expect(parseDigestAction({ type: 'block_actions', actions: [{ action_id: 'digest.plan_all:3' }] })).toEqual({
       ok: true,
@@ -378,6 +381,7 @@ describe('parseDigestAction as the click on a digest button', () => {
       selected: [],
       model: 'opusplan',
       ownPlan: '',
+      repo: '',
     })
   })
 
@@ -393,6 +397,33 @@ describe('parseDigestAction as the click on a digest button', () => {
       ok: true,
       ownPlan: 'x'.repeat(OWN_PLAN_LIMIT),
     })
+  })
+
+  it('to be the typed repo over the menu, the menu when nothing is typed, and empty when neither was used', () => {
+    const chosen = (typedRepo: unknown, menuRepo?: string): unknown =>
+      clickPayload('digest.plan_selected:7', {
+        'digest:7:repotext': { 'digest.repotext:7': { type: 'plain_text_input', value: typedRepo } },
+        'digest:7:repo': {
+          'digest.repo:7': { type: 'static_select', selected_option: menuRepo === undefined ? null : { value: menuRepo } },
+        },
+      })
+    expect(parseDigestAction(chosen('  Deep-Agent ', 'web-app'))).toMatchObject({ ok: true, repo: 'Deep-Agent' })
+    expect(parseDigestAction(chosen('   ', 'web-app'))).toMatchObject({ ok: true, repo: 'web-app' })
+    expect(parseDigestAction(chosen(null))).toMatchObject({ ok: true, repo: '' })
+  })
+
+  it('to be a menu of the known repos and a box to type one, and only the box when none are known', () => {
+    const ids = (message: ReturnType<typeof buildDigest>): (string | undefined)[] =>
+      message.blocks.map((block) => ('block_id' in block ? block.block_id : undefined))
+    expect(ids(buildDigest(7, many(1), ['web-app']))).toEqual(
+      expect.arrayContaining(['digest:7:repo', 'digest:7:repotext']),
+    )
+    expect(ids(buildDigest(7, many(1)))).not.toContain('digest:7:repo')
+    expect(ids(buildDigest(7, many(1)))).toContain('digest:7:repotext')
+  })
+
+  it('to be a choice in the repo menu treated as a selection, not an action', () => {
+    expect(isSelectionClick(clickPayload('digest.repo:7', {}))).toBe(true)
   })
 
   it('to be the build-now action with the model chosen in the menu of that digest', () => {

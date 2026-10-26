@@ -23,6 +23,7 @@ import {
   isLatestCard,
   listOpenItems,
   logEvent,
+  moveToRepo,
   setRunChoice,
 } from '../store/store.ts'
 import { cardAt, getWorkspace, listRuns, spentOnItem } from '../store/work.ts'
@@ -107,7 +108,7 @@ function tallyText(label: string, tally: Tally, model?: AgentModel): string {
   const parts = [`${label} ${tally.done}개${modelNote}`]
   if (tally.noPlan > 0) parts.push(`분석된 플랜이 없어 플랜부터 시작 ${tally.noPlan}개`)
   if (tally.settled > 0) parts.push(`이미 처리된 항목 ${tally.settled}개`)
-  if (tally.needsRepo > 0) parts.push(`레포를 못 정해서 대기 ${tally.needsRepo}개 (DM으로 레포를 알려주세요)`)
+  if (tally.needsRepo > 0) parts.push(`레포를 못 정해서 대기 ${tally.needsRepo}개 (다이제스트의 레포 지정에서 고르거나 적어주세요)`)
   return parts.join(', ')
 }
 
@@ -193,9 +194,38 @@ async function handleDigestClick(
     return
   }
   const direct = click.action === 'build_selected'
-  const tally = planItems(deps, chosen, { model: click.model, direct, ownPlan: click.ownPlan })
+  const moved = moveChosen(deps, chosen, click.repo)
+  if (moved.error !== null) {
+    await say(deps, where, moved.error)
+    return
+  }
+  const tally = planItems(deps, moved.items, { model: click.model, direct, ownPlan: click.ownPlan })
   const label = direct ? '바로 구현' : '플랜 시작'
-  await say(deps, where, tallyText(click.ownPlan === '' ? label : `${label} (내 플랜)`, tally, click.model))
+  const withPlan = click.ownPlan === '' ? label : `${label} (내 플랜)`
+  const withRepo = moved.repo === null ? withPlan : `${withPlan} → ${moved.repo}`
+  await say(deps, where, tallyText(withRepo, tally, click.model))
+}
+
+// Moves the ticked items to the repo the owner named, if any. The name must be a repo Orca knows, matched without
+// regard to case, since it is where the agent will work.
+function moveChosen(
+  deps: InteractDeps,
+  chosen: readonly ItemRow[],
+  named: string,
+): { items: ItemRow[]; repo: string | null; error: string | null } {
+  if (named === '') return { items: [...chosen], repo: null, error: null }
+  const known = deps.knownRepos()
+  const repo = known.find((candidate) => candidate.toLowerCase() === named.toLowerCase())
+  if (repo === undefined) {
+    const shown = known.slice(0, 20).join(', ')
+    return { items: [], repo: null, error: `모르는 레포예요: ${named}\n쓸 수 있는 레포: ${shown === '' ? '(없음)' : shown}` }
+  }
+  const items = chosen.flatMap((item) => {
+    const key = moveToRepo(deps.store, item.key, repo)
+    // An item that no longer waits keeps where it is; planItems counts it as settled.
+    return key === null ? [item] : (getItem(deps.store, key) ?? [])
+  })
+  return { items, repo, error: null }
 }
 
 function refusalText(decision: ReturnType<typeof decide>): string {

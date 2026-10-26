@@ -8,6 +8,7 @@ import {
   closeStore,
   createDigest,
   createItems,
+  digestItems,
   getItem,
   issueCard,
   itemKeyOf,
@@ -130,9 +131,12 @@ function digestClick(
   user = OWNER,
   model?: string,
   ownPlan?: string,
+  repo?: string,
 ): unknown {
   const menu = model === undefined ? {} : { [`digest.model:${digestId}`]: { selected_option: { value: model } } }
   const box = ownPlan === undefined ? {} : { [`digest.ownplan:${digestId}`]: { type: 'plain_text_input', value: ownPlan } }
+  const repoBox =
+    repo === undefined ? {} : { [`digest.repotext:${digestId}`]: { type: 'plain_text_input', value: repo } }
   return {
     type: 'block_actions',
     user: { id: user },
@@ -145,6 +149,7 @@ function digestClick(
         },
         decide: menu,
         ownplan: box,
+        repotext: repoBox,
       },
     },
   }
@@ -231,7 +236,30 @@ describe('handleInteractive as a click on a digest', () => {
     const id = createDigest(store, [a, b])
     await handleInteractive(deps, digestClick('plan_all', id, []))
     expect([stageOf(store, a), stageOf(store, b)]).toStrictEqual(['planning', 'notified'])
-    expect(posted[0]?.text).toBe('플랜 시작 1개 (모델 자동), 레포를 못 정해서 대기 1개 (DM으로 레포를 알려주세요)')
+    expect(posted[0]?.text).toBe(
+      '플랜 시작 1개 (모델 자동), 레포를 못 정해서 대기 1개 (다이제스트의 레포 지정에서 고르거나 적어주세요)',
+    )
+  })
+
+  it('to be the ticked unrouted item moved to the repo the owner typed, in the same digest, and planned there', async () => {
+    const { deps, store, posted } = harness()
+    const lost = waiting(store, 'unrouted', 1)
+    const id = createDigest(store, [lost])
+    await handleInteractive(deps, digestClick('plan_selected', id, [lost], OWNER, undefined, undefined, 'WEB-APP'))
+    const moved = lost.replace('#unrouted', '#web-app')
+    expect([stageOf(store, lost), stageOf(store, moved)]).toStrictEqual(['declined', 'planning'])
+    expect(digestItems(store, id)).toContain(moved)
+    expect(getItem(store, moved)?.meta.route).toBe('직접 지정: web-app')
+    expect(posted[0]?.text).toBe('플랜 시작 → web-app 1개 (모델 자동)')
+  })
+
+  it('to be a refusal naming the known repos, and no change, for a repo the bot does not know', async () => {
+    const { deps, store, posted } = harness()
+    const lost = waiting(store, 'unrouted', 1)
+    const id = createDigest(store, [lost])
+    await handleInteractive(deps, digestClick('plan_selected', id, [lost], OWNER, undefined, undefined, 'nope'))
+    expect(stageOf(store, lost)).toBe('notified')
+    expect(posted[0]?.text).toBe('모르는 레포예요: nope\n쓸 수 있는 레포: web-app, api-server')
   })
 
   it('to be a hint and no change when nothing was ticked', async () => {

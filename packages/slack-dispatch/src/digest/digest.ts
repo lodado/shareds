@@ -49,6 +49,11 @@ interface ModelOption {
   value: AgentModel
 }
 
+interface RepoOption {
+  text: PlainText
+  value: string
+}
+
 interface ModelSelect {
   type: 'static_select'
   action_id: string
@@ -72,8 +77,10 @@ export type Block =
       block_id: string
       optional: true
       label: PlainText
-      hint: PlainText
-      element: { type: 'plain_text_input'; action_id: string; multiline: true; max_length: number; placeholder: PlainText }
+      hint?: PlainText
+      element:
+        | { type: 'plain_text_input'; action_id: string; multiline?: true; max_length: number; placeholder: PlainText }
+        | { type: 'static_select'; action_id: string; placeholder: PlainText; options: RepoOption[] }
     }
 
 export interface DigestMessage {
@@ -95,6 +102,11 @@ const ACTION_PATTERN = /^digest\.(plan_selected|build_selected|plan_all|reject_r
 const PICK_PREFIX = 'digest.pick:'
 const MODEL_PREFIX = 'digest.model:'
 const OWN_PLAN_PREFIX = 'digest.ownplan:'
+const REPO_PICK_PREFIX = 'digest.repo:'
+const REPO_TEXT_PREFIX = 'digest.repotext:'
+// Slack takes at most 100 options in a menu.
+const MAX_REPO_OPTIONS = 100
+const REPO_NAME_LIMIT = 100
 // The most the owner's own plan may hold; Slack's own limit for a text box is 3000.
 export const OWN_PLAN_LIMIT = 3000
 
@@ -252,7 +264,54 @@ const ownPlanInput = (digestId: number): Block => ({
   },
 })
 
-export function buildDigest(digestId: number, entries: readonly DigestEntry[]): DigestMessage {
+const repoOption = (repo: string): RepoOption => ({
+  text: { type: 'plain_text', text: clip(repo, 75) },
+  value: repo,
+})
+
+// Where the ticked items go, when the router got it wrong or found nothing. Typing wins over the menu, so a repo
+// that is not listed can still be named.
+const repoInputs = (digestId: number, repos: readonly string[]): Block[] => {
+  const menu: Block[] =
+    repos.length === 0
+      ? []
+      : [
+          {
+            type: 'input',
+            block_id: `digest:${digestId}:repo`,
+            optional: true,
+            label: { type: 'plain_text', text: '레포 지정 (선택)' },
+            element: {
+              type: 'static_select',
+              action_id: `${REPO_PICK_PREFIX}${digestId}`,
+              placeholder: { type: 'plain_text', text: '레포 선택' },
+              options: repos.slice(0, MAX_REPO_OPTIONS).map(repoOption),
+            },
+          },
+        ]
+  return [
+    ...menu,
+    {
+      type: 'input',
+      block_id: `digest:${digestId}:repotext`,
+      optional: true,
+      label: { type: 'plain_text', text: '레포 직접 입력 (선택)' },
+      hint: { type: 'plain_text', text: '고르거나 적으면 체크한 항목을 이 레포에서 작업해요. 적은 값이 메뉴보다 우선이에요.' },
+      element: {
+        type: 'plain_text_input',
+        action_id: `${REPO_TEXT_PREFIX}${digestId}`,
+        max_length: REPO_NAME_LIMIT,
+        placeholder: { type: 'plain_text', text: '예: Deep-Agent' },
+      },
+    },
+  ]
+}
+
+export function buildDigest(
+  digestId: number,
+  entries: readonly DigestEntry[],
+  repos: readonly string[] = [],
+): DigestMessage {
   if (entries.length === 0) throw new RangeError('a digest needs at least one entry')
   if (entries.length > MAX_ENTRIES_PER_DIGEST) {
     throw new RangeError(`a digest holds at most ${MAX_ENTRIES_PER_DIGEST} entries; split it first`)
@@ -265,6 +324,7 @@ export function buildDigest(digestId: number, entries: readonly DigestEntry[]): 
   const blocks: Block[] = [
     { type: 'header', text: { type: 'plain_text', text: title } },
     ...groupedByRepo(entries).map((entry, index) => itemBlock(digestId, index, entry)),
+    ...repoInputs(digestId, repos),
     ownPlanInput(digestId),
     {
       type: 'actions',
@@ -282,7 +342,7 @@ export function buildDigest(digestId: number, entries: readonly DigestEntry[]): 
       elements: [
         {
           type: 'mrkdwn',
-          text: '구현 추천 항목은 미리 체크해 두었어요. 체크와 모델을 고른 뒤 버튼을 누르세요.\n• 플랜 시작: 플랜 모드로 플랜을 만들고, 확인한 뒤 구현 (내 플랜을 적으면 그걸 따라서)\n• 바로 구현: 내 플랜(없으면 위 개선 플랜)대로 플랜 단계 없이 바로 구현\n고르지 않은 항목은 대기하고, DM에 "대기"라고 보내면 다시 볼 수 있어요.',
+          text: '구현 추천 항목은 미리 체크해 두었어요. 체크와 모델을 고른 뒤 버튼을 누르세요.\n• 플랜 시작: 플랜 모드로 플랜을 만들고, 확인한 뒤 구현 (내 플랜을 적으면 그걸 따라서)\n• 바로 구현: 내 플랜(없으면 위 개선 플랜)대로 플랜 단계 없이 바로 구현\n레포가 틀렸거나 미정이면 레포 지정에서 고르거나 적으세요.\n고르지 않은 항목은 대기하고, DM에 "대기"라고 보내면 다시 볼 수 있어요.',
         },
       ],
     },
@@ -296,7 +356,16 @@ export function splitDigest(entries: readonly DigestEntry[]): DigestEntry[][] {
 }
 
 export type ParsedAction =
-  | { ok: true; action: DigestAction; digestId: number; selected: string[]; model: AgentModel; ownPlan: string }
+  | {
+      ok: true
+      action: DigestAction
+      digestId: number
+      selected: string[]
+      model: AgentModel
+      ownPlan: string
+      // The repo the owner named for the ticked items; empty to keep each item's own.
+      repo: string
+    }
   | { ok: false; error: string }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -352,6 +421,18 @@ function pickedOwnPlan(payload: Record<string, unknown>, digestId: number): stri
   return element.value.trim().slice(0, OWN_PLAN_LIMIT)
 }
 
+// The repo typed in the box, else the one chosen in the menu; empty when neither was used. Untrusted: the handler
+// checks it against the repos the bot knows.
+function pickedRepo(payload: Record<string, unknown>, digestId: number): string {
+  const [typed] = stateElements(payload, (actionId) => actionId === `${REPO_TEXT_PREFIX}${digestId}`)
+  if (isRecord(typed) && typeof typed.value === 'string' && typed.value.trim() !== '') {
+    return typed.value.trim().slice(0, REPO_NAME_LIMIT)
+  }
+  const [menu] = stateElements(payload, (actionId) => actionId === `${REPO_PICK_PREFIX}${digestId}`)
+  const value = menuValue(menu)
+  return typeof value === 'string' ? value.slice(0, REPO_NAME_LIMIT) : ''
+}
+
 export function parseDigestAction(payload: unknown): ParsedAction {
   const first = firstAction(payload)
   if (!first.ok) return first
@@ -365,6 +446,7 @@ export function parseDigestAction(payload: unknown): ParsedAction {
     selected: pickedItems(first.payload, digestId),
     model: pickedModel(first.payload, digestId),
     ownPlan: pickedOwnPlan(first.payload, digestId),
+    repo: pickedRepo(first.payload, digestId),
   }
 }
 
@@ -372,5 +454,8 @@ export function parseDigestAction(payload: unknown): ParsedAction {
 // here so such a click can be let through without a log row for each change.
 export function isSelectionClick(payload: unknown): boolean {
   const first = firstAction(payload)
-  return first.ok && (first.actionId.startsWith(PICK_PREFIX) || first.actionId.startsWith(MODEL_PREFIX))
+  return (
+    first.ok &&
+    [PICK_PREFIX, MODEL_PREFIX, REPO_PICK_PREFIX].some((prefix) => first.actionId.startsWith(prefix))
+  )
 }

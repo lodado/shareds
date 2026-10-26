@@ -238,7 +238,7 @@ async function ingestThread(deps: IngestDeps, thread: Thread, includeBots: boole
 }
 
 async function sendDigest(deps: IngestDeps, digestId: number, entries: DigestEntry[]): Promise<SentDigest> {
-  const message = buildDigest(digestId, entries)
+  const message = buildDigest(digestId, entries, deps.route.knownRepos)
   const channel = await deps.slack.openDm(deps.ownerId)
   const sent = await deps.slack.postMessage({ channel, text: message.text, blocks: message.blocks })
   const slackRef = `${sent.channel}:${sent.ts}`
