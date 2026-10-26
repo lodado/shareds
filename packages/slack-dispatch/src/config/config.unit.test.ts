@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { loadBaseBranches, loadChannelRepos, loadConfig, loadTokens } from './config'
+import { loadBaseBranches, loadChannelRepos, loadConfig, loadTokens, parseJiraProjectRepos } from './config'
 
 const directories: string[] = []
 afterEach(() => {
@@ -216,5 +216,18 @@ describe('loadConfig as the use of the owner own claude setup', () => {
 
   it('to be on only for OWN_SETUP exactly 1', () => {
     expect(loadConfig({ OWN_SETUP: '1' }, '/h').ownSetup).toBe(true)
+  })
+})
+
+describe('parseJiraProjectRepos as the project map written in .env', () => {
+  it('to be each project with its repos, skipping broken pairs', () => {
+    expect(parseJiraProjectRepos(' JUNGLETFT:Deep-Agent , OPS:infra|tools ,bad, :x, Y: ')).toStrictEqual({
+      JUNGLETFT: ['Deep-Agent'],
+      OPS: ['infra', 'tools'],
+    })
+  })
+
+  it('to be empty when unset', () => {
+    expect(parseJiraProjectRepos(undefined)).toStrictEqual({})
   })
 })

@@ -160,6 +160,21 @@ export async function loadJiraSettings(env: Env, run: Run, account = env.USER ??
   return { baseUrl, email, apiToken, extraJql: env.JIRA_JQL ?? '' }
 }
 
+// JIRA_PROJECT_REPOS="PROJ:web-app,OPS:infra|tools" — the same map kept in .env. A project named here wins over
+// routes.json.
+export function parseJiraProjectRepos(value: string | undefined): Record<string, string[]> {
+  const table: Record<string, string[]> = {}
+  for (const pair of (value ?? '').split(',')) {
+    const [project = '', repos = ''] = pair.split(':').map((part) => part.trim())
+    const names = repos
+      .split('|')
+      .map((repo) => repo.trim())
+      .filter((repo) => repo !== '')
+    if (project !== '' && names.length > 0) table[project] = names
+  }
+  return table
+}
+
 // { "jiraProjects": { "PROJ": ["web-app"] } } — which repos a Jira project is about.
 export function loadJiraProjectRepos(path: string): Record<string, string[]> {
   if (!existsSync(path)) return {}

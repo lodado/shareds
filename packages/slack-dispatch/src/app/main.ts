@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { createClaudeAgent } from '../agent/claude.ts'
-import { loadBaseBranches, loadChannelRepos, loadConfig, loadJiraProjectRepos, loadJiraSettings, loadTokens } from '../config/config.ts'
+import { loadBaseBranches, loadChannelRepos, loadConfig, loadJiraProjectRepos, loadJiraSettings, loadTokens, parseJiraProjectRepos } from '../config/config.ts'
 import { run } from '../exec/exec.ts'
 import { createJiraIssueTracker } from '../infra/jira.ts'
 import { createDevServerStarter } from '../qa/devserver.ts'
@@ -80,7 +80,10 @@ export async function startApp(env: Env): Promise<App> {
         ? {}
         : {
             issueTracker: createJiraIssueTracker(jira, { extraJql: jira.extraJql }),
-            projectRepos: () => loadJiraProjectRepos(config.routesPath),
+            projectRepos: () => ({
+              ...loadJiraProjectRepos(config.routesPath),
+              ...parseJiraProjectRepos(env.JIRA_PROJECT_REPOS),
+            }),
           }),
       scratchDir,
       log: logLine,
