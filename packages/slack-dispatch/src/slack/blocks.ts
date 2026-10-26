@@ -11,6 +11,17 @@ export function escapeMrkdwn(text: string): string {
   return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 }
 
+// The link back to where a request came from, named for the place: a Jira issue or a Slack thread. An item with no
+// link (the owner's own DM) has nothing to show.
+export function sourceLink(url: string): string {
+  if (url === '') return ''
+  const name = /\.atlassian\.net\/browse\//.test(url) ? '원본: Jira 이슈' : '원본: Slack 쓰레드'
+  return `<${url}|${name}>`
+}
+
+// How a repo is shown: the placeholder for "not decided yet" reads as that, not as a repo name.
+export const repoLabel = (repo: string): string => (repo === 'unrouted' ? '레포 미정' : repo)
+
 // Whole lines only, so a code span or a link is not cut in the middle; what does not fit is said, not hidden.
 export function fitText(text: string, limit: number): string {
   if (text.length <= limit) return text

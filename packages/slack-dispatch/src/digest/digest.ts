@@ -7,7 +7,7 @@
 import type { AgentModel } from '../agent/claude.ts'
 import type { Analysis } from '../triage/analysis.ts'
 import { DEFAULT_MODEL, isAgentModel } from '../agent/claude.ts'
-import { clip, escapeMrkdwn, firstAction, fitText, matchAction } from '../slack/blocks.ts'
+import { clip, escapeMrkdwn, firstAction, fitText, matchAction, repoLabel, sourceLink } from '../slack/blocks.ts'
 
 export interface DigestEntry {
   itemKey: string
@@ -176,10 +176,10 @@ function bodyLines(entry: DigestEntry, shown: { request: number; cause: number }
 
 function headLine(entry: DigestEntry, number: number): string {
   const urgent = entry.urgent ? ' :rotating_light:' : ''
-  // An item without a thread (the owner's own DM) has nothing to link to.
-  const link = entry.threadUrl === '' ? '' : `  <${entry.threadUrl}|원본 쓰레드>`
+  const source = sourceLink(entry.threadUrl)
+  const link = source === '' ? '' : `  ${source}`
   const route = entry.route === '' ? '' : `  _${escapeMrkdwn(clip(entry.route, ROUTE_SHOWN))}_`
-  return `*${number}. ${escapeMrkdwn(clip(entry.repo, REPO_SHOWN))}*${urgent}${link}${route}`
+  return `*${number}. ${escapeMrkdwn(clip(repoLabel(entry.repo), REPO_SHOWN))}*${urgent}${link}${route}`
 }
 
 function checkedWhenRecommended(entry: DigestEntry, option: CheckboxOption): { initial_options?: CheckboxOption[] } {

@@ -69,7 +69,7 @@ describe('buildDigest as three new items, two of them recommended', () => {
   it('to be one section per item with the request, the cause, the plan and the recommendation', () => {
     expect(sectionsOf(message.blocks).map((section) => section.text.text)).toStrictEqual([
       [
-        '*1. web-app*  <https://example.slack.com/archives/C1/p1|원본 쓰레드>  _the PR link names web-app_',
+        '*1. web-app*  <https://example.slack.com/archives/C1/p1|원본: Slack 쓰레드>  _the PR link names web-app_',
         '*요청사항*',
         '• 푸터 링크 클릭해도 이동 안 함',
         '• 모바일과 데스크톱 모두 발생',
@@ -81,7 +81,7 @@ describe('buildDigest as three new items, two of them recommended', () => {
         '*구현 추천:* O — 작고 분명한 수정이에요',
       ].join('\n'),
       [
-        '*2. web-app*  <https://example.slack.com/archives/C1/p2|원본 쓰레드>  _the PR link names web-app_',
+        '*2. web-app*  <https://example.slack.com/archives/C1/p2|원본: Slack 쓰레드>  _the PR link names web-app_',
         '*요청사항*',
         '• 푸터 링크 클릭해도 이동 안 함',
         '• 모바일과 데스크톱 모두 발생',
@@ -92,7 +92,7 @@ describe('buildDigest as three new items, two of them recommended', () => {
         '• 링크 이동 테스트 추가',
         '*구현 추천:* X — 제품 결정이 필요해요',
       ].join('\n'),
-      expect.stringContaining('*3. web-app* :rotating_light:  <https://example.slack.com/archives/C1/p3|원본 쓰레드>'),
+      expect.stringContaining('*3. web-app* :rotating_light:  <https://example.slack.com/archives/C1/p3|원본: Slack 쓰레드>'),
     ])
   })
 

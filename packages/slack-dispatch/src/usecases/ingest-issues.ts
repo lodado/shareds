@@ -46,7 +46,8 @@ function routeIssue(issue: Issue, deps: IssueIngestDeps): { repo: string; reason
   if (fromProject !== undefined) return { repo: fromProject, reason: `Jira 프로젝트 ${issue.project}: ${fromProject}` }
   const text = `${issue.summary}\n${issue.description}`
   const found = routeThread({ text, links: extractLinks(text) }, deps.route)
-  return { repo: found.repo ?? UNROUTED, reason: found.reason }
+  if (found.repo !== null) return { repo: found.repo, reason: found.reason }
+  return { repo: UNROUTED, reason: `Jira 프로젝트 ${issue.project}에 연결된 레포 없음 (routes.json jiraProjects)` }
 }
 
 function ingestIssue(deps: IssueIngestDeps, issue: Issue): 'created' | 'alreadyKnown' {

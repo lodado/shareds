@@ -2,7 +2,7 @@
 // pure functions live here — what a click does belongs to the interaction handler.
 
 import type { ActionElement, Block, DigestMessage } from '../digest/digest.ts'
-import { clip, escapeMrkdwn, firstAction, fitText, matchAction } from '../slack/blocks.ts'
+import { clip, escapeMrkdwn, firstAction, fitText, matchAction, sourceLink } from '../slack/blocks.ts'
 
 type ItemAction = 'approve_plan' | 'reject' | 'merge' | 'retry' | 'cancel'
 
@@ -70,7 +70,7 @@ export interface PlanCardInput {
 
 export function buildPlanCard(input: PlanCardInput): DigestMessage {
   const title = `플랜: ${clip(input.repo, TITLE_LIMIT)}`
-  const source = input.threadUrl === '' ? '' : `<${input.threadUrl}|원본 쓰레드>`
+  const source = sourceLink(input.threadUrl)
   const blocks: Block[] = [
     { type: 'header', text: { type: 'plain_text', text: title } },
     section(escapeMrkdwn(shownPlan(input.plan))),
@@ -105,7 +105,7 @@ const PROGRESS_HINT = '진행 상황이 궁금하면 이 메시지의 스레드�
 // A build that starts without a plan step has no plan card, and so no button to stop it: this card has one.
 export function buildDirectStartCard(input: DirectStartCardInput): DigestMessage {
   const title = `바로 구현 시작: ${clip(input.repo, TITLE_LIMIT)}`
-  const source = input.threadUrl === '' ? '' : `<${input.threadUrl}|원본 쓰레드>`
+  const source = sourceLink(input.threadUrl)
   const where = `작업 위치: \`${input.path.replaceAll('`', "'")}\`\n브랜치: \`${input.branch.replaceAll('`', "'")}\``
   const blocks: Block[] = [
     { type: 'header', text: { type: 'plain_text', text: title } },

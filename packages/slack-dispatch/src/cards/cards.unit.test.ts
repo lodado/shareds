@@ -65,12 +65,23 @@ describe('buildPlanCard as a plan waiting for the owner', () => {
 
   it('to be titled with the repo and linked to the thread', () => {
     expect(card.text).toBe('플랜: web-app')
-    expect(JSON.stringify(card.blocks)).toContain('<https://x.test/t|원본 쓰레드>')
+    expect(JSON.stringify(card.blocks)).toContain('<https://x.test/t|원본: Slack 쓰레드>')
+  })
+
+  it('to be naming a Jira issue as the source when the item came from Jira', () => {
+    const fromJira = buildPlanCard({
+      itemKey: KEY,
+      cardId: 1,
+      repo: 'web-app',
+      plan: 'p',
+      threadUrl: 'https://acme.atlassian.net/browse/PROJ-1',
+    })
+    expect(JSON.stringify(fromJira.blocks)).toContain('<https://acme.atlassian.net/browse/PROJ-1|원본: Jira 이슈>')
   })
 
   it('to be without a link line when the item has no thread', () => {
     const own = buildPlanCard({ itemKey: KEY, cardId: 1, repo: 'web-app', plan: 'p', threadUrl: '' })
-    expect(JSON.stringify(own.blocks)).not.toContain('원본 쓰레드')
+    expect(JSON.stringify(own.blocks)).not.toContain('원본')
   })
 
   it('to be a section of at most 3000 characters whatever the plan length', () => {
