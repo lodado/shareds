@@ -2103,7 +2103,9 @@ Instead of hand-writing the conformance test, generate it from the locked model 
 second meaning: inputs come from the Bend types, expected values from the compiled model, judgments
 from compiled relation defs. The generated file starts `AUTO-GENERATED — DO NOT EDIT`, ships the
 compiled model beside it (the product's CI needs no Bend), and carries the SHA-256 of every model
-source: a changed source fails the file with `STALE_GENERATED_TESTS` until it is regenerated.
+source: a changed source fails the file with `STALE_GENERATED_TESTS` until it is regenerated. A source under
+`.ai/` (the card, package or a declared record) is never read when the test runs: its digest is a comment, and
+`oracle-projection.mjs verify-generated` is what notices it changed.
 
 #### Placement — laws and tests next to the code, the run in the Oracle directory
 
@@ -3502,6 +3504,9 @@ whatever is already loaded.
    [`model-package.example.json`](../model-package.example.json), never from MODEL.bend or a hand-written
    card. Use package-authoring and model-authoring reference routes with their dependencies.
    Write Terms, the finite world, assumptions/owners/falsifiers and source goals from confirmed axes.
+   Write the file once; after that every change is `oracle-package.mjs patch` and every read is
+   `get --pointer` (step 5). A script that loads and re-dumps the whole package JSON is a defect: it costs a
+   model turn per edit and drops anything it did not model.
    Before full model/proof construction, check the intake's highest-risk premise within current
    permissions. Preserve confirmed success criteria and non-goals. Do not discover basic product policy
    by repeatedly rewriting the proof. Begin the stage record before the first independent input.

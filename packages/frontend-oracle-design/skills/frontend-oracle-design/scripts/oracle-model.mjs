@@ -15,7 +15,7 @@ import { pathToFileURL } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 import { ensureBend, reportedVersion } from './ensure-bend.mjs'
 import { runCli } from './oracle-cli.mjs'
-import { sha256, stableStringify } from './oracle-fs.mjs'
+import { sha256, stableStringify, stableStringifyShared } from './oracle-fs.mjs'
 import { cellProof, lawReport, MAX_REACH_CELLS, reachPlan, reachProof } from './oracle-laws.mjs'
 import { analyzeConfigurations } from './oracle-quotient.mjs'
 import { bendLiteral, scanBendSource, toPlain, valuesOf } from './oracle-types.mjs'
@@ -228,6 +228,55 @@ function modelOf({ entry, prefix, bin, exported, inputs }) {
   }
 }
 
+const tables = new WeakMap()
+
+/**
+ * (상태, 사건) → 다음 상태·관측값의 표. `step`과 `observe`는 순수하다 — 같은 상태에서 같은 사건이면 같은 결과이므로, 같은 상태에
+ * 닿는 접두가 수천 개여도 모델은 한 번만 부른다. 상태·사건은 plain 값의 키로 묶고 원래 값이 `isDeepStrictEqual`일 때만 같은 것으로
+ * 센다(수 타입·페이로드를 합치지 않는다). 접두를 공유하는 쪽이 같은 상태·사건·관측 객체를 받으므로, 객체 참조로 캐시하는 소비자도
+ * 접두마다가 아니라 상태마다 한 번만 일한다. 이력을 읽는 `next`는 여기 없다 — 호출자가 이력 그대로 부른다.
+ */
+export function transitionTable(model) {
+  if (tables.has(model)) return tables.get(model)
+  const byContent = new Map()
+  const canonical = (state) => {
+    const key = stableStringify(toPlain(state))
+    const bucket = byContent.get(key) ?? []
+    byContent.set(key, bucket)
+    let found = bucket.find((entry) => isDeepStrictEqual(entry.state, state))
+    if (!found) {
+      found = { state, moves: new Map(), seen: false, observation: null }
+      bucket.push(found)
+    }
+    return found
+  }
+  const table = {
+    start: () => canonical(model.init()),
+    /** `key`는 사건의 plain 값 키다. 같은 키라도 원래 값이 다르면 따로 센다. */
+    move(from, event, key) {
+      const candidates = from.moves.get(key) ?? []
+      from.moves.set(key, candidates)
+      let found = candidates.find((candidate) => isDeepStrictEqual(candidate.event, event))
+      if (!found) {
+        found = { event, to: canonical(model.step(from.state, event)), step: null }
+        candidates.push(found)
+      }
+      return found
+    },
+    observation(entry) {
+      if (!entry.seen) {
+        entry.observation = toPlain(model.observe(entry.state))
+        entry.seen = true
+      }
+      return entry.observation
+    },
+  }
+  tables.set(model, table)
+  return table
+}
+
+const enumerated = new WeakMap()
+
 /**
  * 선언 범위의 오라클 공간: `init`에서 시작해 환경 `next(history)`가 허용하는 사건을 `bound`개까지 이은 모든 trace.
  * 모든 prefix의 관측값이 기대값이다. 같은 모델·범위·생성기 버전이면 같은 case ID·순서가 나온다 — 시각·runId는 섞지 않는다.
@@ -240,16 +289,26 @@ export function enumerateSpace(model, { bound, maxCases = null }) {
   }
   if (maxCases !== null && (!Number.isSafeInteger(maxCases) || maxCases < 1))
     throw new CliError('USAGE', 'max-cases must be a positive safe integer', 2)
+  // 한 프로세스에서 파생·교차 점검·카드 lint가 같은 모델의 같은 범위를 각자 열거했다. 결과는 읽기만 한다.
+  const spaces = enumerated.get(model) ?? new Map()
+  enumerated.set(model, spaces)
+  const request = `${bound}:${maxCases}`
+  if (!spaces.has(request)) spaces.set(request, computeSpace(model, bound, maxCases))
+  return spaces.get(request)
+}
 
-  const initialState = model.init()
+function computeSpace(model, bound, maxCases) {
+  const table = transitionTable(model)
+  const initialState = table.start()
   const collected = []
   let stopped = null
-  const walk = (raw, trace, state, observations) => {
+  // 접두를 공유하는 trace는 키·라벨도 공유한다 — 사건마다 한 번 만들어 이어 붙인다(trace 전체를 case마다 다시 직렬화하지 않는다).
+  const walk = (raw, trace, state, observations, keys, labels) => {
     if (stopped) return
     const choices = raw.length < bound ? listItems(model.next(listOf(raw))) : []
     if (choices.length === 0) {
       if (maxCases !== null && collected.length >= maxCases) stopped = 'budget'
-      else collected.push({ trace, observations })
+      else collected.push({ trace, observations, keys, labels })
       return
     }
     const seen = new Set()
@@ -258,19 +317,24 @@ export function enumerateSpace(model, { bound, maxCases = null }) {
       const key = stableStringify(plain)
       if (seen.has(key)) continue
       seen.add(key)
-      const nextState = model.step(state, event)
-      walk([...raw, event], [...trace, plain], nextState, [...observations, toPlain(model.observe(nextState))])
+      const { to } = table.move(state, event, key)
+      walk(
+        [...raw, event],
+        [...trace, plain],
+        to,
+        [...observations, table.observation(to)],
+        trace.length === 0 ? key : `${keys},${key}`,
+        trace.length === 0 ? eventLabel(plain) : `${labels} · ${eventLabel(plain)}`,
+      )
     }
   }
-  walk([], [], initialState, [])
+  walk([], [], initialState, [], '', '')
 
   const cases = collected
-    .map(({ trace, observations }) => ({
-      id: `M${sha256(stableStringify(trace)).slice(0, 12)}`,
-      label: trace.map(eventLabel).join(' · '),
-      trace,
-      observations,
-    }))
+    .map(({ trace, observations, keys, labels }) => {
+      const traceKey = `[${keys}]`
+      return { id: `M${sha256(traceKey).slice(0, 12)}`, label: labels, trace, observations }
+    })
     .sort((left, right) => (left.label < right.label ? -1 : Number(left.label > right.label)))
   const inputs = {
     generator: GENERATOR_VERSION,
@@ -282,13 +346,13 @@ export function enumerateSpace(model, { bound, maxCases = null }) {
   return {
     ...inputs,
     inputDigest: sha256(stableStringify(inputs)),
-    spaceDigest: sha256(stableStringify({ initial: toPlain(model.observe(initialState)), cases })),
+    spaceDigest: sha256(stableStringifyShared({ initial: table.observation(initialState), cases })),
     complete: stopped === null,
     stopped,
     scope: `traces of up to ${bound} events from ${inputs.prefix ?? 'the model'}.init that ${
       inputs.prefix ?? 'the model'
     }.next allows; every prefix is observed`,
-    initial: toPlain(model.observe(initialState)),
+    initial: table.observation(initialState),
     cases,
   }
 }

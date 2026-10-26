@@ -26,6 +26,7 @@ import {
   compileBend,
   configurationGraph,
   enumerateSpace,
+  eventLabel,
   formalModelIssues,
   LISTED_CASES,
   listedSpace,
@@ -42,6 +43,7 @@ import {
 } from './oracle-model.mjs'
 import { inputsPin } from './oracle-stage.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
+import { toPlain } from './oracle-types.mjs'
 
 const FIXTURE = fileURLToPath(new URL('../../../test-fixtures/stale-search/', import.meta.url))
 const PAY = fileURLToPath(new URL('../../../test-fixtures/pay/', import.meta.url))
@@ -246,6 +248,77 @@ test('space enumeration is deterministic and its case IDs do not depend on the e
   assert.equal(reversed.spaceDigest, first.spaceDigest)
   assert.match(first.cases[0].id, /^M[a-f0-9]{12}$/)
   assert.deepEqual(first.cases.find(({ label }) => label === 'A · B · A').observations, [1, 1, 2])
+})
+
+test('a model enumerates one range once per process, and a case id is the digest of its serialized trace', () => {
+  const model = handModel()
+  let calls = 0
+  const next = model.next
+  model.next = (history) => {
+    calls += 1
+    return next(history)
+  }
+  const first = enumerateSpace(model, { bound: 3 })
+  const used = calls
+  assert.ok(used > 0)
+  assert.equal(enumerateSpace(model, { bound: 3 }), first)
+  assert.equal(calls, used)
+  // another range, or a budget, is another space
+  assert.notEqual(enumerateSpace(model, { bound: 2 }), first)
+  assert.notEqual(enumerateSpace(model, { bound: 3, maxCases: 3 }), first)
+  // the id and label are built incrementally from shared prefixes; they equal the ones built from the whole trace
+  for (const entry of first.cases) {
+    assert.equal(entry.id, `M${sha256(stableStringify(entry.trace)).slice(0, 12)}`)
+    assert.equal(entry.label, entry.trace.map(eventLabel).join(' · '))
+  }
+})
+
+test('the transition table calls step once per state and event, and a case still equals folding its trace through the model', () => {
+  const model = handModel()
+  const steps = []
+  const step = model.step
+  model.step = (state, event) => {
+    steps.push(`${state.a}:${event.$}`)
+    return step(state, event)
+  }
+  const space = enumerateSpace(model, { bound: 4 })
+  // a counts the A events: the states that can still move at bound 4 are a = 0..3, two events each, however many traces reach them
+  assert.equal(space.cases.length, 16)
+  assert.equal(new Set(steps).size, steps.length)
+  assert.equal(steps.length, 8, steps.join(' '))
+  // a case equals what folding its trace through the model gives
+  for (const { trace, observations } of space.cases) {
+    let state = model.init()
+    const seen = trace.map((event) => {
+      state = step(state, event)
+      return toPlain(model.observe(state))
+    })
+    assert.deepEqual(observations, seen)
+  }
+})
+
+test('the transition table keeps states apart whose plain values agree but whose values are not strictly equal', () => {
+  const steps = []
+  const model = {
+    prefix: 'Typed',
+    digest: 'typed-model',
+    init: () => ({ $: 'State', v: 0 }),
+    step: (state, event) => {
+      steps.push(`${typeof state.v}${state.v}:${event.$}`)
+      if (event.$ === 'P') return { $: 'State', v: 1 }
+      if (event.$ === 'Q') return { $: 'State', v: 1n }
+      return { $: 'State', v: 5 }
+    },
+    observe: (state) => state.v,
+    next: (history) => {
+      const events = history.$ === 'Nil' ? [{ $: 'P' }, { $: 'Q' }] : [{ $: 'R' }]
+      return events.reduceRight((tail, head) => ({ $: 'Con', head, tail }), { $: 'Nil' })
+    },
+  }
+  const space = enumerateSpace(model, { bound: 2 })
+  assert.equal(space.cases.length, 2)
+  // R runs from {v: 1} and from {v: 1n}: the plain values are both 1, the values are not strictly equal
+  assert.deepEqual(steps.filter((entry) => entry.endsWith(':R')).sort(), ['bigint1:R', 'number1:R'])
 })
 
 test('space follows the declared environment and removes duplicate events it offers', () => {

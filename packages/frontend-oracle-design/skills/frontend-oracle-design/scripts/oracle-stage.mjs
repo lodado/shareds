@@ -632,8 +632,42 @@ async function advance(directory, target, options) {
     inputsSha256,
     ...(recheck ? { recheck: true, ...options.explanation } : {}),
   })
+  // 판정한 패키지의 뜻 — 되돌림이 뜻이 같은 수정(출처 위치)인지 가른다
+  if (!contract) result.meaningSha256 = meaningOf(bytes)
   await writeStage(directory, result)
   return result
+}
+
+/**
+ * 패키지의 뜻의 지문 — 출처의 위치(`sources[].location`)만 뺀 나머지다. 위치는 같은 출처를 가리키는 자리라, 옮겨도 행·정책·모델은
+ * 그대로다(고정할 출처 바이트는 lock이 따로 잰다). 읽을 수 없으면 null이라 뜻이 같다고 보지 않는다.
+ */
+function meaningOf(bytes) {
+  try {
+    const document = JSON.parse(bytes.toString('utf8'))
+    if (Array.isArray(document.sources)) document.sources = document.sources.map(withoutLocation)
+    return sha256(stableStringify(document))
+  } catch {
+    return null
+  }
+}
+
+function withoutLocation(source) {
+  if (source === null || typeof source !== 'object') return source
+  return { ...source, location: null }
+}
+
+/** 판정한 뒤 바뀐 것이 출처 위치뿐인가 — 바이트는 다르고 뜻의 지문은 같다. 지문이 없는 옛 기록은 그렇게 보지 않는다. */
+function onlyMetadataChanged(record, bytes) {
+  if (!bytes || record.packageSha256 === null || record.packageSha256 === sha256(bytes)) return false
+  return record.meaningSha256 !== undefined && record.meaningSha256 === meaningOf(bytes)
+}
+
+/** 마지막 되돌림(없으면 시작) 뒤에 보낸 독립 리뷰의 종류 — 그 결과가 돌아왔는지는 기록에 없다. */
+function dispatchedSinceLastRewind(record) {
+  const lastWalk = [...record.history].reverse().find((entry) => entry.evidence === 'rewind' || entry.evidence === 'begin')
+  const since = lastWalk ? Date.parse(lastWalk.at) : 0
+  return [...new Set((record.dispatches ?? []).filter((entry) => Date.parse(entry.at) >= since).map((entry) => entry.kind))].sort()
 }
 
 /**
@@ -718,9 +752,12 @@ async function rewind(directory, target, explanation) {
   const budget = record.iterations.inputs.stage ? record.iterations : {
     ...record.iterations, inputs: { ...record.iterations.inputs, stage: { digest: sha256('begin'), round: record.iterations.round } },
   }
-  const iterations = observeIteration(budget, 'stage', inputSha256, { force: true })
+  // 판정한 뒤 바뀐 것이 출처 위치뿐이면 리뷰가 읽은 뜻은 그대로다 — 저작 라운드를 쓰지 않는다(관문은 DISCOVERING부터 다시 돈다)
+  const metadataOnly = !contract && onlyMetadataChanged(record, bytes)
+  const iterations = metadataOnly ? budget : observeIteration(budget, 'stage', inputSha256, { force: true })
+  const dispatched = explanation.reason === 'review-finding' ? [] : dispatchedSinceLastRewind(record)
   const result = moved({ ...record, iterations }, target, rewoundDigest(target, bytes), 'rewind', { inputsSha256: keepsPin ? record.inputsSha256 : undefined })
-  Object.assign(result.history.at(-1), { inputSha256, ...explanation })
+  Object.assign(result.history.at(-1), { inputSha256, ...explanation, ...(metadataOnly ? { metadataOnly: true } : {}), ...(dispatched.length > 0 ? { dispatchedBefore: dispatched } : {}) })
   await writeStage(directory, result)
   return result
 }
@@ -874,8 +911,10 @@ async function main() {
     return rewind(directory, options.to, explanation)
   })
   // rewind는 기록된 이유를 돌려준다 — 같은 되돌림의 재시도는 처음 이유를 유지하므로 호출자가 그것을 본다(undefined는 출력에서 빠진다)
-  const { evidence, reason } = result.history.at(-1)
-  process.stdout.write(`${JSON.stringify({ stage: result.stage, evidence, reason: command === 'rewind' ? reason : undefined, iterations: iterationStatus(result.iterations) })}\n`)
+  const { evidence, reason, metadataOnly, dispatchedBefore } = result.history.at(-1)
+  const rewound = command === 'rewind'
+  const unsettled = dispatchedBefore ? `reviews dispatched since the last rewind (${dispatchedBefore.join(', ')}) — a rewind drops what they read; check their results are back before changing the package again` : undefined
+  process.stdout.write(`${JSON.stringify({ stage: result.stage, evidence, reason: rewound ? reason : undefined, metadataOnly: rewound ? metadataOnly : undefined, warning: rewound ? unsettled : undefined, iterations: iterationStatus(result.iterations) })}\n`)
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

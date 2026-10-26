@@ -1050,16 +1050,23 @@ function witnessTraces(members, kind, witnesses) {
  * (`history-sensitive`). 모델이 계산한 것이다(model-checked) — 선언한 bound 안의 trace에 대해서만.
  */
 export function orderObligations(space, { limit = 50, witnesses = ORDER_WITNESSES } = {}) {
+  // trace는 접두의 사건 객체를 공유한다 — 사건 문자열도 객체마다 한 번만 만든다
+  const keys = new Map()
+  const keyOf = (event) => {
+    if (!keys.has(event)) keys.set(event, stableStringify(event))
+    return keys.get(event)
+  }
   const groups = new Map()
   for (const entry of space.cases) {
-    const bag = stableStringify(entry.trace.map((event) => stableStringify(event)).sort())
-    groups.set(bag, [...(groups.get(bag) ?? []), entry])
+    const bag = stableStringify(entry.trace.map(keyOf).sort())
+    if (groups.has(bag)) groups.get(bag).push(entry)
+    else groups.set(bag, [entry])
   }
   const obligations = []
   for (const members of groups.values()) {
     if (members.length < 2) continue
-    const finals = new Set(members.map((entry) => stableStringify(entry.observations.at(-1))))
-    const histories = new Set(members.map((entry) => stableStringify(entry.observations)))
+    const finals = new Set(members.map((entry) => keyOf(entry.observations.at(-1))))
+    const histories = new Set(members.map((entry) => `[${entry.observations.map((seen) => keyOf(seen) ?? 'null').join(',')}]`))
     if (histories.size < 2) continue
     const kind = finals.size > 1 ? 'order-sensitive' : 'history-sensitive'
     const traces = members.map((entry) => entry.id).sort()
@@ -1067,7 +1074,7 @@ export function orderObligations(space, { limit = 50, witnesses = ORDER_WITNESSE
       id: `ORD-${sha256(stableStringify(traces)).slice(0, 10)}`,
       kind,
       derivation: 'model-checked',
-      events: members[0].trace.map((event) => stableStringify(event)).sort(),
+      events: members[0].trace.map(keyOf).sort(),
       ...witnessTraces(members, kind, witnesses),
       claim:
         kind === 'order-sensitive'
@@ -1095,15 +1102,29 @@ function enumeratedBySpace(axes, space) {
     set.set(stableStringify(value), value)
     seen.set(id, set)
   }
-  for (const entry of space.cases) {
-    for (const event of entry.trace) {
-      for (const axis of axes.filter((candidate) => candidate.id.startsWith('event.') && !candidate.conditionalOn)) {
-        note(axis.id, event.$)
-        for (const [key, value] of Object.entries(event)) if (key !== '$') note(`${axis.id}.${event.$}.${key}`, value)
-      }
+  const eventAxes = axes.filter((candidate) => candidate.id.startsWith('event.') && !candidate.conditionalOn)
+  const observationAxes = axes.filter((candidate) => candidate.id.startsWith('observation.'))
+  // note는 같은 값을 다시 적어도 그대로다 — trace·관찰 객체는 접두를 공유하므로 객체마다 한 번만 센다
+  const noted = new WeakSet()
+  const noteOnce = (value, record) => {
+    if (value !== null && typeof value === 'object') {
+      if (noted.has(value)) return
+      noted.add(value)
     }
-    for (const value of [space.initial, ...entry.observations])
-      for (const axis of axes.filter((candidate) => candidate.id.startsWith('observation.'))) note(axis.id, value)
+    record()
+  }
+  const noteEvent = (event) => {
+    for (const axis of eventAxes) {
+      note(axis.id, event.$)
+      for (const [key, value] of Object.entries(event)) if (key !== '$') note(`${axis.id}.${event.$}.${key}`, value)
+    }
+  }
+  const noteObservation = (value) => {
+    for (const axis of observationAxes) note(axis.id, value)
+  }
+  for (const entry of space.cases) {
+    for (const event of entry.trace) noteOnce(event, () => noteEvent(event))
+    for (const value of [space.initial, ...entry.observations]) noteOnce(value, () => noteObservation(value))
   }
   for (const axis of axes) {
     if (axis.domain.enumerated || !seen.has(axis.id)) continue
@@ -1789,20 +1810,23 @@ export async function derivePackage(loaded, { bin = null, timeoutMs } = {}) {
   }
   const { enumerateSpace, loadModel } = await import('./oracle-model.mjs')
   const inputs = await packageInputs(loaded)
-  let space = null
-  let automaton = null
-  if (bin && modelPath && texts.model) {
-    const model = await loadModel({ model: modelPath, prefix: pkg.behavior.prefix, bin, timeoutMs })
-    space = enumerateSpace(model, { bound: pkg.behavior.bound })
-    automaton = automatonSummary(finiteAutomaton(space))
-  }
-  const worlds = bin ? await possibleWorlds(loaded, { bin, timeoutMs }) : null
-  return {
-    derived: derive(pkg, texts, { space, inputs, worlds, automaton }),
-    texts,
-    inputs,
-    inputsDigest: inputsDigestOf(inputs),
-  }
+  const inputsDigest = inputsDigestOf(inputs)
+  // 같은 입력·하네스·bend면 파생도 같다 — validate·project-card·card lint·cross-check·advance·lock이 명령마다 처음부터 다시 열거했다.
+  const { withResultReceipt } = await import('./oracle-result-receipt.mjs')
+  // 세계를 다 센 파생만 적는다 — Bend가 환경 때문에 못 돌아 "모름"으로 끝난 것은 다음 명령에서 달라질 수 있다
+  const complete = (result) => result.worlds?.status === 'enumerated'
+  const derived = await withResultReceipt({ kind: 'derive', bin, inputs: inputsDigest, cacheable: complete }, async () => {
+    let space = null
+    let automaton = null
+    if (bin && modelPath && texts.model) {
+      const model = await loadModel({ model: modelPath, prefix: pkg.behavior.prefix, bin, timeoutMs })
+      space = enumerateSpace(model, { bound: pkg.behavior.bound })
+      automaton = automatonSummary(finiteAutomaton(space))
+    }
+    const worlds = bin ? await possibleWorlds(loaded, { bin, timeoutMs }) : null
+    return derive(pkg, texts, { space, inputs, worlds, automaton })
+  })
+  return { derived, texts, inputs, inputsDigest }
 }
 
 /**

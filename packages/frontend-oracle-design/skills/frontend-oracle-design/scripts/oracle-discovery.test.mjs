@@ -12,6 +12,7 @@ import {
   aiInput,
   applyDispositions,
   applyFault,
+  bendExcerpt,
   candidateId,
   closure,
   crossCheckAtRoot,
@@ -1340,6 +1341,33 @@ test('[bend] the mapping review input shows the declared tables, the types, the 
   // the review record names the reviewer and the digest of exactly this input; the record itself is not part of it
   const pkg = JSON.parse(await readFile(join(root, 'oracle.package.json'), 'utf8'))
   assert.equal(pkg.crossCheck.reviewedBy.inputDigest, createHash('sha256').update(input).digest('hex'))
+})
+
+test('the mapping review excerpt carries the defs a classifier calls, however deep, and still none of the step logic', () => {
+  const model = [
+    'type Grid is Data:',
+    '  Ready',
+    '',
+    'def Grid.arrival(grid):',
+    '  return Grid.overtaken(grid)',
+    '',
+    'def Grid.overtaken(grid):',
+    '  return Grid.rank(grid)',
+    '',
+    'def Grid.rank(grid):',
+    '  return 1',
+    '',
+    'def Grid.step(grid):',
+    '  return Grid.rank(grid)',
+    '',
+    'def Grid.next(grid):',
+    '  return Grid.step(grid)',
+  ].join('\n')
+  const excerpt = bendExcerpt(model, ['Grid.arrival'])
+  for (const shown of ['type Grid is Data:', 'def Grid.arrival(', 'def Grid.overtaken(', 'def Grid.rank('])
+    assert.ok(excerpt.includes(shown), shown)
+  for (const hidden of ['def Grid.step(', 'def Grid.next('])
+    assert.ok(!excerpt.includes(hidden), `${hidden} leaked into the excerpt`)
 })
 
 test('[bend] the gate needs a current review of the translation table, and reads the analyst state table from its own source', async (t) => {

@@ -46,18 +46,46 @@ export function reportTiming(label, started) {
 }
 
 export function stableStringify(value) {
-  if (Array.isArray(value)) {
-    return `[${value.map((entry) => stableStringify(entry) ?? 'null').join(',')}]`
+  return serialize(value, null)
+}
+
+/**
+ * 같은 결과, 한 번의 호출 안에서 같은 객체 참조를 한 번만 직렬화한다 — 공간의 trace·관찰은 접두를 공유하므로 수십만 case가
+ * 같은 객체를 가리킨다. 호출 중에는 값을 바꾸지 않는다는 전제다(캐시는 호출이 끝나면 사라진다).
+ */
+export function stableStringifyShared(value) {
+  return serialize(value, new WeakMap())
+}
+
+function serializeArray(value, memo) {
+  let text = '['
+  for (let index = 0; index < value.length; index += 1) {
+    if (index > 0) text += ','
+    // 구멍은 Array#map·join이 빈 문자열로 내던 그대로 둔다
+    if (index in value) text += serialize(value[index], memo) ?? 'null'
   }
-  if (value !== null && typeof value === 'object') {
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => [key, stableStringify(value[key])])
-      .filter(([, serialized]) => serialized !== undefined)
-      .map(([key, serialized]) => `${JSON.stringify(key)}:${serialized}`)
-      .join(',')}}`
+  return `${text}]`
+}
+
+function serializeObject(value, memo) {
+  let text = '{'
+  let first = true
+  for (const key of Object.keys(value).sort()) {
+    const serialized = serialize(value[key], memo)
+    if (serialized === undefined) continue
+    text += `${first ? '' : ','}${JSON.stringify(key)}:${serialized}`
+    first = false
   }
-  return JSON.stringify(value)
+  return `${text}}`
+}
+
+function serialize(value, memo) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  const known = memo?.get(value)
+  if (known !== undefined) return known
+  const text = Array.isArray(value) ? serializeArray(value, memo) : serializeObject(value, memo)
+  memo?.set(value, text)
+  return text
 }
 
 /**

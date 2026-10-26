@@ -688,7 +688,8 @@ async function lintCard(options) {
         isAbsolute(sourcePortable)
       ) {
         issues.push(`source-repo-path: ${source.ID}: repo: source must stay under the repository root`)
-      } else if (enforceSourceLock) {
+      } else if (enforceSourceLock || options.draft) {
+        // Draft도 잠금이 요구하는 모양(레포 안의 일반 파일 하나)은 미리 본다 — `--source`를 안 줘도 잠금 직전에야 드러나던 칸이다
         let stat = await lstat(sourcePath).catch(() => null)
         let realSource = stat ? await realpath(sourcePath).catch(() => null) : null
         const suffix = `/${repoSource}`
@@ -701,7 +702,7 @@ async function lintCard(options) {
         const realPortable = realSource ? relative(realRoot, realSource) : '..'
         if (stat?.isSymbolicLink() || !stat?.isFile() || realPortable.startsWith('..') || isAbsolute(realPortable)) {
           issues.push(`source-repo-path: ${source.ID}: repo: source must be a regular file under the repository root`)
-        } else if (!lockedSources.has(realSource ?? sourcePath)) {
+        } else if (enforceSourceLock && !lockedSources.has(realSource ?? sourcePath)) {
           issues.push(`source-lock-missing: ${source.ID}: local source ${repoSource} must be passed with --source`)
         }
       }

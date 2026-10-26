@@ -32,6 +32,9 @@ whatever is already loaded.
    [`model-package.example.json`](../model-package.example.json), never from MODEL.bend or a hand-written
    card. Use package-authoring and model-authoring reference routes with their dependencies.
    Write Terms, the finite world, assumptions/owners/falsifiers and source goals from confirmed axes.
+   Write the file once; after that every change is `oracle-package.mjs patch` and every read is
+   `get --pointer` (step 5). A script that loads and re-dumps the whole package JSON is a defect: it costs a
+   model turn per edit and drops anything it did not model.
    Before full model/proof construction, check the intake's highest-risk premise within current
    permissions. Preserve confirmed success criteria and non-goals. Do not discover basic product policy
    by repeatedly rewriting the proof. Begin the stage record before the first independent input.

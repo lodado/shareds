@@ -18,6 +18,8 @@ const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
 const { NODE_TEST_CONTEXT: _parent, ...INHERITED_ENV } = process.env
 // 영수증은 테스트마다 따로 둔다 — 다른 테스트나 앞선 실행이 남긴 CHECKED 영수증이 관문을 대신 통과시키지 않게
 const CHILD_ENV = { ...INHERITED_ENV, ORACLE_LINT_CACHE: 'off' }
+// 이 테스트들이 세는 것은 관문이 남기는 lint 영수증이다 — 완전히 센 파생·교차 점검 결과 영수증(`derive-…`, `cross-check-…`)은 따로 센다
+const gateReceipts = async (directory) => (await readdir(directory).catch(() => [])).filter((name) => !/^(?:derive|cross-check)-/.test(name))
 const node = (cwd, script, args) =>
   spawnSync(process.execPath, [join(SCRIPTS, script), ...args], { cwd, encoding: 'utf8', env: CHILD_ENV })
 
@@ -84,6 +86,61 @@ test('a rewind names why it walks back, so repeated causes across runs can be co
   assert.equal(retried.status, 0)
   assert.equal(JSON.parse(retried.stdout).reason, 'review-finding')
   assert.equal((await readStage(directory)).history.filter((step) => step.evidence === 'rewind').length, 1)
+})
+
+test('moving a source location after a stage was judged walks back without spending a round; a changed meaning still spends one', async (t) => {
+  const { root, directory } = await repository(t)
+  const packagePath = join(directory, 'oracle.package.json')
+  const edit = async (change) => {
+    const document = JSON.parse(await readFile(packagePath, 'utf8'))
+    change(document)
+    await writeFile(packagePath, `${JSON.stringify(document, null, 2)}\n`)
+  }
+  assert.equal(stage(root, directory, 'begin').status, 0)
+  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  assert.equal((await readStage(directory)).iterations.round, 1)
+
+  await edit((document) => {
+    document.sources.find((source) => source.id === 'S1').location = 'repo:README.md#fixture-policy-moved'
+  })
+  const moved = stage(root, directory, 'rewind', 'DISCOVERING')
+  assert.equal(moved.status, 0, moved.stderr)
+  assert.equal(JSON.parse(moved.stdout).metadataOnly, true)
+  assert.equal(JSON.parse(moved.stdout).iterations.round, 1, 'a location move reviewers never read spends no round')
+  assert.equal((await readStage(directory)).history.at(-1).metadataOnly, true)
+
+  // the gates still walk again from DISCOVERING, and the walk records the meaning it judged
+  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  await edit((document) => {
+    document.intent.nonGoals = `${document.intent.nonGoals}, and one more`
+  })
+  const changed = stage(root, directory, 'rewind', 'DISCOVERING')
+  assert.equal(changed.status, 0, changed.stderr)
+  assert.equal(JSON.parse(changed.stdout).metadataOnly, undefined)
+  assert.equal(JSON.parse(changed.stdout).iterations.round, 2)
+})
+
+test('a rewind says which reviews were dispatched since the last walk, unless a review finding is what sends it back', async (t) => {
+  const rewindAfterDispatch = async (reason) => {
+    const { root, directory } = await repository(t)
+    const input = join(root, 'review-input.md')
+    await writeFile(input, 'approved source v1\n')
+    assert.equal(stage(root, directory, 'begin').status, 0)
+    assert.equal(node(root, 'oracle-stage.mjs', ['review-input', '--dir', directory, '--kind', 'translation', '--input', input, '--attempt', 'translation-1']).status, 0)
+    assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+    const walked = node(root, 'oracle-stage.mjs', ['rewind', '--dir', directory, '--to', 'DISCOVERING', '--reason', reason])
+    assert.equal(walked.status, 0, walked.stderr)
+    return { output: JSON.parse(walked.stdout), entry: (await readStage(directory)).history.at(-1) }
+  }
+
+  const gate = await rewindAfterDispatch('gate-failure')
+  assert.match(gate.output.warning, /dispatched since the last rewind \(translation\)/)
+  assert.deepEqual(gate.entry.dispatchedBefore, ['translation'])
+
+  // a review finding means its result is back, so the walk back is what that review asked for
+  const finding = await rewindAfterDispatch('review-finding')
+  assert.equal(finding.output.warning, undefined)
+  assert.equal(finding.entry.dispatchedBefore, undefined)
 })
 
 test('analyst, mapping, card review and rewind share one repair round instead of multiplying their allowances', async (t) => {
@@ -525,7 +582,8 @@ test('CHECKED remembers a pass by its exact inputs: a registered source or Bend 
     const checked = run('advance', '--to', 'CHECKED')
     return { stderr: checked.stderr, evidence: checked.status === 0 ? JSON.parse(checked.stdout).evidence : null }
   }
-  const kept = async () => (await readdir(receipts)).filter((name) => !name.startsWith('.')).length
+  // 이 테스트가 세는 것은 CHECKED가 남기는 lint 영수증이다 — 파생·교차 점검 결과 영수증(`derive-…`, `cross-check-…`)은 따로 센다
+  const kept = async () => (await gateReceipts(receipts)).filter((name) => !name.startsWith('.')).length
   const append = (file, text) => async (root) => writeFile(join(root, file), `${await readFile(join(root, file), 'utf8')}${text}`)
 
   const first = await walk()
@@ -597,13 +655,13 @@ test('CHECKED remembers a pass by its exact inputs: a registered source or Bend 
   ].join('\n'))
   const unjudged = await walk(append('search-reducer.mts', '\n// another unrelated edit\n'), join(preloads, 'cache'), { NODE_OPTIONS: `--import ${eagain}` })
   assert.match(unjudged.evidence ?? unjudged.stderr, /adequacy not judged/)
-  assert.deepEqual(await readdir(join(preloads, 'cache')).catch(() => []), [])
+  assert.deepEqual(await gateReceipts(join(preloads, 'cache')), [])
   // … or a derive whose world count timed out (its digest is not these bytes' digest)
   const worlds = join(preloads, 'worlds.mjs')
   await writeFile(worlds, (await readFile(eagain, 'utf8')).replace("stack.includes('preLockIssues')", "stack.includes('possibleWorlds')"))
-  const partial = await walk(undefined, join(preloads, 'cache'), { NODE_OPTIONS: `--import ${worlds}` })
+  const partial = await walk(undefined, join(preloads, 'cache'), { NODE_OPTIONS: `--import ${worlds}`, ORACLE_RESULT_CACHE: 'off' })
   assert.match(partial.evidence ?? partial.stderr, /^derive /)
-  assert.deepEqual(await readdir(join(preloads, 'cache')).catch(() => []), [])
+  assert.deepEqual(await gateReceipts(join(preloads, 'cache')), [])
   // … or an input changed and restored while the gate ran: the key matches again, only the file stamps differ
   const restore = join(preloads, 'restore.mjs')
   await writeFile(restore, [
@@ -629,7 +687,7 @@ test('CHECKED remembers a pass by its exact inputs: a registered source or Bend 
   ].join('\n'))
   const restored = await walk(forbid, join(preloads, 'cache'), { NODE_OPTIONS: `--import ${restore}`, SWAP_TEXT_FILE: fixed })
   assert.match(restored.stderr, /^STAGE_STALE: the Bend files or registered sources changed while the CHECKED gate ran/, 'the gate judged the replaced bytes, then they were restored')
-  assert.deepEqual(await readdir(join(preloads, 'cache')).catch(() => []), [])
+  assert.deepEqual(await gateReceipts(join(preloads, 'cache')), [])
   // … also through a symlinked input, where only the target changes and the link itself does not
   const linked = async (root) => {
     await forbid(root)
@@ -639,7 +697,7 @@ test('CHECKED remembers a pass by its exact inputs: a registered source or Bend 
   }
   const throughLink = await walk(linked, join(preloads, 'cache'), { NODE_OPTIONS: `--import ${restore}`, SWAP_TEXT_FILE: fixed })
   assert.match(throughLink.stderr, /^STAGE_STALE: the Bend files or registered sources changed while the CHECKED gate ran/, 'the link target was replaced and restored under the gate')
-  assert.deepEqual(await readdir(join(preloads, 'cache')).catch(() => []), [])
+  assert.deepEqual(await gateReceipts(join(preloads, 'cache')), [])
 })
 
 // stale-search 모델에 붙이는 시험용 def — 다음 상태의 latest를 못 박는 거짓 관계, 아무것도 못 박지 않는 참 관계, 두 번째
@@ -882,7 +940,7 @@ test('CHECKED leaves prove and laws undecided when Bend cannot run them: the sta
   assert.match(undecided.evidence, /; laws undecided \(BEND_UNAVAILABLE: [^)]*spawnSync EAGAIN\); prove undecided \(unavailable: [^)]*spawnSync EAGAIN\)$/)
   assert.doesNotMatch(undecided.evidence, /proven|no counterexample/)
   assert.equal(undecided.stage, 'CHECKED')
-  assert.deepEqual(await readdir(cache).catch(() => []), [])
+  assert.deepEqual(await gateReceipts(cache), [])
 })
 
 test('the CHECKED receipt weighs PROOF.bend but the pin does not: a proof edit runs the gate again and leaves a recorded pin current', async (t) => {

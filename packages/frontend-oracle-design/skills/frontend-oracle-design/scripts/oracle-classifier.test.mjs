@@ -6,7 +6,9 @@ import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { deserialize, serialize } from 'node:v8'
+import { memoizeClassifier } from './oracle-classifier.mjs'
 import { isolatedClassifier } from './oracle-discovery.mjs'
+import { stableStringify, stableStringifyShared } from './oracle-fs.mjs'
 import { compileBend } from './oracle-model.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 
@@ -136,4 +138,82 @@ def Probe.mutate(xs: Array<U32>) -> Tag:
     assert.equal(classify('Probe.mutate', source), 'Seen')
     assert.deepEqual(source, [1, 2, 3, 4])
   }
+})
+
+// The serializer every digest in a package, a card and a lock is built from. Its output must not move.
+function referenceStringify(value) {
+  if (Array.isArray(value)) return `[${value.map((entry) => referenceStringify(entry) ?? 'null').join(',')}]`
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => [key, referenceStringify(value[key])])
+      .filter(([, serialized]) => serialized !== undefined)
+      .map(([key, serialized]) => `${JSON.stringify(key)}:${serialized}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(value)
+}
+
+const sparse = [1]
+sparse[3] = 4
+
+// a property that is present and holds undefined — the serializer must skip it like JSON.stringify does
+const [PRESENT_UNDEFINED] = []
+
+const SAMPLES = [
+  null,
+  0,
+  -0,
+  'text "quoted" \u2028',
+  true,
+  undefined,
+  [],
+  {},
+  [undefined, null, () => 1, Symbol('s'), 'x'],
+  { b: 1, a: { d: [3, { z: PRESENT_UNDEFINED, y: 2 }], c: PRESENT_UNDEFINED }, '': 'empty key', é: 'non-ascii key' },
+  { $: 'Lead', fields: { b: [1, 2], a: [] }, list: [{ $: 'Nil' }] },
+  sparse,
+  new Date(0),
+]
+
+test('stableStringify keeps the exact output of the original serializer', () => {
+  for (const sample of SAMPLES) assert.equal(stableStringify(sample), referenceStringify(sample))
+})
+
+test('stableStringifyShared equals stableStringify, including values that share object references', () => {
+  const shared = { $: 'Event', n: [1, 2, 3] }
+  const sharing = { cases: [{ trace: [shared, shared], observations: [shared] }, { trace: [shared], observations: [] }], shared }
+  for (const sample of [...SAMPLES, sharing]) assert.equal(stableStringifyShared(sample), referenceStringify(sample))
+})
+
+test('the memoizing classifier answers a repeated object identity without calling the def again, and equal content once', () => {
+  let calls = 0
+  const classify = memoizeClassifier((def, state, event) => {
+    calls += 1
+    return `${def}:${state.n}:${event.$}`
+  })
+  const state = { n: 1 }
+  const event = { $: 'Go' }
+  assert.equal(classify('phase', state, event), 'phase:1:Go')
+  assert.equal(classify('phase', state, event), 'phase:1:Go')
+  assert.equal(calls, 1)
+  // another object with the same content is the same input
+  assert.equal(classify('phase', { n: 1 }, { $: 'Go' }), 'phase:1:Go')
+  assert.equal(calls, 1)
+  // other content and another def are other inputs
+  assert.equal(classify('phase', { n: 2 }, event), 'phase:2:Go')
+  assert.equal(classify('step', state, event), 'step:1:Go')
+  assert.equal(calls, 3)
+})
+
+test('a failing classifier is not remembered', () => {
+  let calls = 0
+  const classify = memoizeClassifier(() => {
+    calls += 1
+    if (calls === 1) throw new Error('first call fails')
+    return 'ok'
+  })
+  const state = { n: 1 }
+  assert.throws(() => classify('phase', state), /first call fails/)
+  assert.equal(classify('phase', state), 'ok')
 })

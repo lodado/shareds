@@ -385,7 +385,9 @@ Instead of hand-writing the conformance test, generate it from the locked model 
 second meaning: inputs come from the Bend types, expected values from the compiled model, judgments
 from compiled relation defs. The generated file starts `AUTO-GENERATED — DO NOT EDIT`, ships the
 compiled model beside it (the product's CI needs no Bend), and carries the SHA-256 of every model
-source: a changed source fails the file with `STALE_GENERATED_TESTS` until it is regenerated.
+source: a changed source fails the file with `STALE_GENERATED_TESTS` until it is regenerated. A source under
+`.ai/` (the card, package or a declared record) is never read when the test runs: its digest is a comment, and
+`oracle-projection.mjs verify-generated` is what notices it changed.
 
 #### Placement — laws and tests next to the code, the run in the Oracle directory
 
