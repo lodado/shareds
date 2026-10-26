@@ -287,9 +287,26 @@ function mentions(terms, text) {
   return terms.ko.some((term) => koreanMatch(term, compact)) || terms.en.some((term) => englishMatch(term, tokens))
 }
 
-const ruleMatches = (rule, subject) => {
-  if (rule.unless && mentions(rule.unless, subject)) return false
-  return mentions(rule, subject) || Boolean(rule.price && PRICE.some((pattern) => pattern.test(subject)))
+// Only the control's own words can exempt it (`unless`); dialog text or id words must never cancel a match.
+// A price is checked on everything, exempt or not.
+const ruleMatches = (rule, own, subject) => {
+  if (rule.price && PRICE.some((pattern) => pattern.test(subject))) return true
+  if (rule.unless && mentions(rule.unless, own)) return false
+  return mentions(rule, subject)
+}
+
+// A decline label cancels nothing, unless the id or the dialog says it cancels an order, a plan or an account.
+const CANCELLATION = {
+  ko: ['취소+주문', '취소+구독', '취소+예약', '취소+멤버십', '해지+구독', '해지+멤버십', '해지+계정'],
+  en: [
+    'cancel*+order*',
+    'cancel*+subscription*',
+    'cancel*+booking*',
+    'cancel*+reservation*',
+    'cancel*+membership*',
+    'cancel*+account*',
+    'cancel*+plan*',
+  ],
 }
 
 function idWordsOf(id) {
@@ -320,6 +337,14 @@ function isConfirmatory(text, words) {
 }
 
 const blockedBy = (category, humanAction, reason) => ({ category, humanAction, reason })
+
+const isDecline = (text) => SAFE_DECLINE.has(tokensOf(text).join(' '))
+
+/** A decline label stays safe only while its id and the dialog do not point at a commit. */
+function declineIsSafe({ words, id, dialog }) {
+  if (idStemCategory(id) || mentions(CANCELLATION, `${words} ${dialog}`)) return false
+  return !RULES.some((rule) => ruleMatches(rule, words, words))
+}
 
 function identifyTarget({ action, text, id, words }) {
   if (!TARGET_ACTIONS.has(action)) return null
@@ -353,9 +378,14 @@ export function classify({ action, label = '', id = '', role = '', context = '' 
     identifyTarget({ action, text, id, words }) ?? credentialRule({ action, role, label, id, text, words })
   if (problem) return problem
   const dialog = fold(context)
-  if (SAFE_DECLINE.has(tokensOf(text).join(' '))) return null
+  const decline = isDecline(text)
+  if (decline && declineIsSafe({ words, id, dialog })) return null
   const subject = `${text} ${words} ${dialog}`
-  const category = RULES.find((candidate) => ruleMatches(candidate, subject))?.category ?? idStemCategory(id)
+  const own = text || words
+  const category =
+    RULES.find((candidate) => ruleMatches(candidate, own, subject))?.category ??
+    idStemCategory(id) ??
+    (decline ? 'destructive' : undefined)
   if (!category) {
     if (!isConfirmatory(text, words) || dialog) return null
     return blockedBy(

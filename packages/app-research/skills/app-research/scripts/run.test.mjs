@@ -38,7 +38,7 @@ test('initRun as a minimal request', async () => {
       testSession: 'none',
     },
   )
-  assert.equal(await readFile(join(runDir, '.gitignore'), 'utf8'), 'screenshots/\nsnapshots/\n')
+  assert.equal(await readFile(join(runDir, '.gitignore'), 'utf8'), '*\n!.gitignore\n')
   assert.deepEqual(JSON.parse(await readFile(join(runDir, 'run.json'), 'utf8')), run)
   assert.deepEqual((await loadRun(runDir)).screens, [])
 })

@@ -47,6 +47,8 @@ node scripts/cli.mjs render --run <dir>
 
 `identify` previews where a snapshot would land without writing anything; use it to decide `--screen-id` or `--new-screen` before `observe`, because the choice is remembered as an alias. `--scope custom` needs `--scope-note`.
 
+A run folder ignores everything in git, because labels and screens can hold personal data. To share a report, review `report/` for personal data first, then add it with `git add -f`.
+
 `public` and `static` modes record no device observations; their claims rest on documents or code evidence.
 
 ## Gate is a floor, not the ceiling

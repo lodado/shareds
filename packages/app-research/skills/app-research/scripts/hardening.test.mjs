@@ -591,3 +591,20 @@ test('observe as a budget cut after the receipt was issued', async () => {
     /Action budget is spent/,
   )
 })
+
+test('classify as a payment label whose dialog or id words carry an exempt word', () => {
+  assert.equal(category({ label: 'Pay now', context: 'Review your payment history first' }), 'payment')
+  assert.equal(category({ label: 'Pay now', id: 'payment_history_pay' }), 'payment')
+  assert.equal(category({ label: 'Payment history' }), null, 'the exemption still works on the label itself')
+  assert.equal(category({ label: 'Payment methods', context: 'Total $9.99' }), 'payment', 'a price is never exempt')
+})
+
+test('classify as a decline label whose id or dialog names a commit', () => {
+  assert.equal(category({ label: 'Cancel', id: 'cancel_subscription_btn' }), 'destructive')
+  assert.equal(category({ label: 'Cancel', context: 'Cancel your subscription?' }), 'destructive')
+  assert.equal(category({ label: '취소', context: '주문을 취소할까요?' }), 'payment', '주문 is already a payment term')
+  assert.equal(category({ label: '취소', context: '구독을 취소할까요?' }), 'destructive')
+  assert.equal(category({ label: 'Close', id: 'delete_account_close' }), 'account-deletion')
+  assert.equal(category({ label: 'Cancel', id: 'dialog_cancel' }), null, 'a plain decline stays safe')
+  assert.equal(category({ label: 'Cancel', context: 'Delete account' }), null, 'declining a deletion is safe')
+})

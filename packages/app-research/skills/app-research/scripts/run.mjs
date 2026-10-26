@@ -42,8 +42,9 @@ export async function initRun(input, now = new Date()) {
   const dir = resolve(input['output-dir'] ?? 'research', app, runId)
   await mkdir(join(dir, 'screenshots'), { recursive: true })
   await mkdir(join(dir, 'snapshots'))
-  // Screens and accessibility trees can contain personal data; keep them out of version control by default.
-  await writeFile(join(dir, '.gitignore'), 'screenshots/\nsnapshots/\n')
+  // Labels, screens and accessibility trees can contain personal data; keep the whole run out of version control
+  // until a person decides what to share.
+  await writeFile(join(dir, '.gitignore'), '*\n!.gitignore\n')
   const run = {
     schemaVersion: 1,
     runId,
