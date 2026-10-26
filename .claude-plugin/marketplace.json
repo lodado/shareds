@@ -175,6 +175,18 @@
       "category": "development",
       "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
       "tags": ["mod", "eslint", "guard", "determinism"]
+    },
+    {
+      "name": "app-research",
+      "description": "Evidence-first app research: gated device exploration, a screen and transition graph, and feature and policy claims bound to evidence.",
+      "version": "0.1.0",
+      "author": {
+        "name": "lodado"
+      },
+      "source": "./packages/app-research",
+      "category": "development",
+      "homepage": "https://github.com/lodado/my-Vibe-Coding-Helper",
+      "tags": ["app-research", "ux", "policy", "evidence"]
     }
   ]
 }

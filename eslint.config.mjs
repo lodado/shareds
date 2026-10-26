@@ -9,4 +9,9 @@ export default [
   ...quality,
   ...strictTypes,
   ...localRules,
+  {
+    files: ['packages/app-research/**/*.test.mjs'],
+    // This package runs its tests with Node's built-in runner, not Vitest.
+    rules: { 'test/no-import-node-test': 'off' },
+  },
 ]

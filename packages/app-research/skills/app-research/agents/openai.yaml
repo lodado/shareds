@@ -1,0 +1,6 @@
+interface:
+  display_name: App Research
+  short_description: Research an app's screens, flows, features and policies with evidence
+  default_prompt: Use $app-research to explore the target app through gated steps and report screens, flows, features and policies with the evidence behind each claim.
+policy:
+  allow_implicit_invocation: false
