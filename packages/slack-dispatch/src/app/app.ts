@@ -7,6 +7,7 @@ import type { Config } from '../config/config.ts'
 import type { Run } from '../exec/exec.ts'
 import type { IngestDeps } from '../ingest/ingest.ts'
 import type { InteractDeps } from '../interact/interact.ts'
+import type { IssueTrackerPort } from '../ports/issue-tracker.ts'
 import type { RunQa } from '../qa/qa.ts'
 import type { SlackClient } from '../slack/client.ts'
 import type { Connect } from '../socket/socket.ts'
@@ -14,12 +15,14 @@ import type { Store } from '../store/store.ts'
 import type { WorkerConfig } from '../work/worker.ts'
 import type { StatusServer, StatusSnapshot } from './status.ts'
 import { mergePr, readGate, readPrState } from '../github/github.ts'
+import { createSqliteItemRepository } from '../infra/sqlite-item-repository.ts'
 import { catchUp } from '../ingest/catch-up.ts'
 import { ingestMentions } from '../ingest/ingest.ts'
 import { listRepos } from '../orca/repos.ts'
 import { startSocket } from '../socket/socket.ts'
 import { logEvent, stageCounts } from '../store/store.ts'
 import { cancelOrphanRuns, countActiveRuns, getWorkspace } from '../store/work.ts'
+import { ingestIssues, loadIssueText, parseIssueSourceKey } from '../usecases/ingest-issues.ts'
 import { createWorker, retriesLeft } from '../work/worker.ts'
 import { createSplitAgent, createTriageAgent } from './agents.ts'
 import { dispatchEnvelope } from './dispatch.ts'
@@ -38,6 +41,10 @@ export interface AppDeps {
   now: () => Date
   baseBranches: Readonly<Record<string, string>>
   channelRepos: () => Record<string, string[]>
+  // The issue tracker whose issues assigned to the owner are listed with the mentions. Left out, none are.
+  issueTracker?: IssueTrackerPort
+  // Which repos a tracker project is about, read again at every poll.
+  projectRepos?: () => Record<string, string[]>
   // A folder with nothing in it, where the agent that cuts DM prompts runs.
   scratchDir: string
   // Looks at the pages a build changed before its pull request is opened.
@@ -129,7 +136,12 @@ export async function createApp(deps: AppDeps): Promise<App> {
   const repoPath = (name: string): Promise<string | undefined> =>
     Promise.resolve(repos.find((repo) => repo.name === name)?.path)
 
-  const loadThread = (item: Parameters<typeof loadThreadText>[1]): Promise<string> => loadThreadText(slack, item)
+  const tracker = deps.issueTracker
+  // An item from the tracker is read from its issue; one from Slack, from its thread.
+  const loadThread = (item: Parameters<typeof loadThreadText>[1]): Promise<string> => {
+    if (tracker === undefined || parseIssueSourceKey(item.threadKey) === null) return loadThreadText(slack, item)
+    return loadIssueText(tracker, item.threadKey)
+  }
   const worker = createWorker({
     store,
     run,
@@ -199,9 +211,27 @@ export async function createApp(deps: AppDeps): Promise<App> {
   const pollMentions = async (): Promise<void> => {
     try {
       repos = await listRepos(run)
-      await serial(() =>
-        ingestMentions(ingestDeps(), { since: startOfDay(deps.now(), config.ingestDays), dryRun: false }),
-      )
+      const since = startOfDay(deps.now(), config.ingestDays)
+      await serial(async () => {
+        // The tracker's issues go in first, so the digest the mention pass sends lists them with the mentions, with the
+        // same analysis and plan. A tracker that is down must not stop the mentions.
+        if (tracker !== undefined) {
+          try {
+            await ingestIssues(
+              {
+                tracker,
+                items: createSqliteItemRepository(store),
+                route: { knownRepos: repos.map((repo) => repo.name) },
+                projectRepos: deps.projectRepos?.() ?? {},
+              },
+              { since },
+            )
+          } catch (error) {
+            reportError('issue_poll')(error)
+          }
+        }
+        return ingestMentions(ingestDeps(), { since, dryRun: false })
+      })
       poll.at = deps.now().toISOString()
       poll.error = null
     } catch (error) {

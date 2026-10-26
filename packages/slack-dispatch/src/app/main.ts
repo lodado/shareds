@@ -7,8 +7,9 @@ import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { createClaudeAgent } from '../agent/claude.ts'
-import { loadBaseBranches, loadChannelRepos, loadConfig, loadTokens } from '../config/config.ts'
+import { loadBaseBranches, loadChannelRepos, loadConfig, loadJiraProjectRepos, loadJiraSettings, loadTokens } from '../config/config.ts'
 import { run } from '../exec/exec.ts'
+import { createJiraIssueTracker } from '../infra/jira.ts'
 import { createDevServerStarter } from '../qa/devserver.ts'
 import { createQaRunner } from '../qa/qa.ts'
 import { freePort, realDevServerDeps } from '../qa/spawn.ts'
@@ -40,6 +41,7 @@ export async function startApp(env: Env): Promise<App> {
     const slack = createSlackClient(tokens)
     const ownerId = config.ownerId ?? (await slack.authUserId())
     const agent = createClaudeAgent(run)
+    const jira = await loadJiraSettings(env, run)
     const qaDir = join(config.stateDir, 'qa')
     mkdirSync(qaDir, { recursive: true, mode: PRIVATE_DIR_MODE })
     const qa = createQaRunner({
@@ -74,6 +76,12 @@ export async function startApp(env: Env): Promise<App> {
       baseBranches: loadBaseBranches(config.routesPath),
       // Read again at every poll, so a new channel route needs no restart.
       channelRepos: () => loadChannelRepos(config.routesPath),
+      ...(jira === null
+        ? {}
+        : {
+            issueTracker: createJiraIssueTracker(jira, { extraJql: jira.extraJql }),
+            projectRepos: () => loadJiraProjectRepos(config.routesPath),
+          }),
       scratchDir,
       log: logLine,
     })

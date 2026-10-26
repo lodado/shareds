@@ -127,3 +127,44 @@ export function loadBaseBranches(path: string): Record<string, string> {
   }
   return table
 }
+
+// Jira is on only when the site, the email and the API token are all there; the token, like the Slack ones, comes from
+// the environment or the keychain and is never written anywhere.
+export interface JiraSettings {
+  baseUrl: string
+  email: string
+  apiToken: string
+  // Extra JQL joined with AND, such as `project = PROJ`.
+  extraJql: string
+}
+
+export async function loadJiraSettings(env: Env, run: Run, account = env.USER ?? ''): Promise<JiraSettings | null> {
+  const baseUrl = env.JIRA_BASE_URL ?? ''
+  const email = env.JIRA_EMAIL ?? ''
+  if (baseUrl === '' || email === '') return null
+  let apiToken = env.JIRA_API_TOKEN ?? ''
+  if (apiToken === '') {
+    try {
+      const service = env.KEYCHAIN_SERVICE_JIRA || 'slack-dispatch-jira'
+      const { stdout } = await run('security', ['find-generic-password', '-a', account, '-s', service, '-w'])
+      apiToken = stdout.trim()
+    } catch {
+      apiToken = ''
+    }
+  }
+  if (apiToken === '') return null
+  return { baseUrl, email, apiToken, extraJql: env.JIRA_JQL ?? '' }
+}
+
+// { "jiraProjects": { "PROJ": ["web-app"] } } — which repos a Jira project is about.
+export function loadJiraProjectRepos(path: string): Record<string, string[]> {
+  if (!existsSync(path)) return {}
+  const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'))
+  const projects = isRecord(parsed) ? parsed.jiraProjects : null
+  if (!isRecord(projects)) return {}
+  const table: Record<string, string[]> = {}
+  for (const [name, repos] of Object.entries(projects)) {
+    if (Array.isArray(repos) && repos.every((repo) => typeof repo === 'string')) table[name] = repos
+  }
+  return table
+}
