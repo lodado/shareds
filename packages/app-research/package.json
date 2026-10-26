@@ -1,6 +1,6 @@
 {
   "name": "@lodado/app-research-plugin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Evidence-first research of a mobile or web app's screens, flows, features and policies into a reviewable specification.",
   "license": "MIT",

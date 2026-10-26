@@ -1,6 +1,6 @@
 {
   "name": "app-research",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Evidence-first app research: gated exploration, a screen and transition graph, and feature and policy claims that cannot outrun their evidence.",
   "author": {
     "name": "lodado",
