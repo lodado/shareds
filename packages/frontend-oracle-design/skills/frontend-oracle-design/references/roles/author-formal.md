@@ -32,15 +32,17 @@ whatever is already loaded.
    [`model-package.example.json`](../model-package.example.json), never from MODEL.bend or a hand-written
    card. Use package-authoring and model-authoring reference routes with their dependencies.
    Write Terms, the finite world, assumptions/owners/falsifiers and source goals from confirmed axes.
-   Write the file once; after that every change is `oracle-package.mjs patch` and every read is
-   `get --pointer` (step 5). A script that loads and re-dumps the whole package JSON is a defect: it costs a
-   model turn per edit and drops anything it did not model.
+   Write the file once; change it only with `oracle-package.mjs patch --set|--append|--remove '<pointer>'`
+   (`'/sources/[id=S2]'` selects by a field; quote it) and read it with `get --pointer`. A script that
+   re-dumps the package costs a model turn per edit and is a defect.
    Before full model/proof construction, check the intake's highest-risk premise within current
    permissions. Preserve confirmed success criteria and non-goals. Do not discover basic product policy
    by repeatedly rewriting the proof. Begin the stage record before the first independent input.
    Read [`card/case-space.md`](../card/case-space.md) and [input families](case-space-inputs-formal.md) to decide
    all seven input families, inherited dispositions and possible cases. Unknown combinations stay in.
 4. Use supported, authorized native delegation with capacity for an independent model analyst.
+   Dispatch it once the package registers the sources, before the model is written; keep writing while it
+   runs and join it at step 6, which needs its world model, goals and State Model.
    Prepare `oracle-adequacy.mjs model-input --package` and pass only that path's permitted source-bound
    inputs. Keep analyst input independence from the candidate model/author conclusions as adequacy
    specifies. A same-context role switch does not create independence. Report a concrete reason for any
@@ -55,10 +57,10 @@ whatever is already loaded.
    Check each Bend file with `scripts/oracle-model.mjs check --file <file>` before `prove`; a failure carries
    its fix in `hint`.
    Grow a Bend file in small sections: scaffold it, add one def or law group at a time, check after each
-   (about a second), and change it with small edits, never by rewriting or regenerating the whole file.
-   Change the package with `oracle-package.mjs patch --set|--append|--remove '<pointer>'` (`'/sources/[id=S2]'`
-   selects by a field; quote it) and read parts with `get --pointer`, never with a one-off script.
-6. Run `oracle-package.mjs derive` and `oracle-adequacy.mjs check --package`, collect the available
+   (about a second), and change it with small edits, never by regenerating the whole file.
+6. Continue the analyst for the translation review once `crossCheck` is written; run the checks below while
+   it reads and collect it before `cross-check`.
+   Run `oracle-package.mjs derive` and `oracle-adequacy.mjs check --package`, collect the available
    counterexamples, and repair shared causes in one batch within the shared authoring iteration budget.
    Unresolved policy becomes an Open question, never an unbounded fix/check loop. Read [`discovery.md`](../discovery.md) before
    `oracle-discovery.mjs cross-check --package` and bring each candidate back to the interview.

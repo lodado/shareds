@@ -1,3 +1,22 @@
+# 0.114.0: the independent analyst starts before the model is written, and its translation review overlaps the checks
+
+## Validation
+
+- Package `pnpm run lint` (0 errors, bundles and evals match) and `pnpm run test` pass after the change; the
+  `role-author` bundle stays under its 279,000-byte cap without raising it.
+
+## Change
+
+- `references/roles/author-formal.md`: step 4 dispatches the model analyst once the package registers the sources,
+  before the model is written, and joins it only at step 6; step 6 continues the same analyst for the translation
+  review as soon as `crossCheck` is written, so `prove`, `derive` and the adequacy check run while it reads. The
+  `patch`/`get` rule moved into step 3, merged with the one in step 5.
+- Reason: in the measured 118-minute design phase the analyst took 65 minutes of wall time for 7.5 minutes of model
+  work, and the translation review came after the proofs. No check was removed or relaxed. A lighter path that skips
+  the analyst, the translation review and `cross-check` was considered and not built: the run that motivated it maps
+  the Order family (17,409 order obligations), so the condition "no Order or Async family" does not cover it, and a
+  condition that does would drop independent review where order matters.
+
 # 0.113.0: the design phase stops recomputing the same space, a draft sees an unpinnable source early, and generated tests never read `.ai/`
 
 ## Validation
