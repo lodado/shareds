@@ -154,8 +154,8 @@
     },
     {
       "name": "harness-team",
-      "description": "Five-role harness team for every work task: a lead who never asks what the goal is, fixes the last task's mistakes first and does non-risky work itself, and an obsessive perfectionist final reviewer for risky work and on request.",
-      "version": "0.6.0",
+      "description": "Direct execution with carry-over fixes and a separate self-review for risky work or on request.",
+      "version": "0.7.0",
       "author": {
         "name": "lodado"
       },

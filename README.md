@@ -58,7 +58,7 @@
 | [`ux-flow-diagram`](packages/ux-flow-diagram/skills/ux-flow-diagram/SKILL.md)                                           | 명시적으로 호출하면 Figma·코드·요구사항에서 근거 있는 사용자 흐름도를 추출해요. |
 | [`app-research`](packages/app-research/skills/app-research/SKILL.md)                                                    | 명시적으로 호출하면 앱을 게이트로 탐색해 화면·기능·정책을 근거와 함께 정리해요. |
 | [`agent-graph-engineering`](packages/agent-graph-engineering/skills/agent-graph-engineering/SKILL.md)                   | 여러 에이전트와 도구의 분기·병렬 작업·재시도를 그래프로 설계하고 실행해요.      |
-| [`harness-team`](packages/harness-team/skills/harness-team/SKILL.md)                                                    | 에이전트에 기합을 넣어 5인 하네스팀으로 일하고 지난 실수부터 고치게 해요.       |
+| [`harness-team`](packages/harness-team/skills/harness-team/SKILL.md)                                                    | 직접 일하고 지난 실수부터 고치며 위험 작업은 별도 검토해요.                     |
 | [`agent-memory-recall`](packages/agent-memory/skills/agent-memory-recall/SKILL.md)                                      | 현재 작업에 필요한 과거 기록을 Agent Memory에서 읽기 전용으로 찾아요.           |
 | [`agent-memory-log`](packages/agent-memory/skills/agent-memory-log/SKILL.md)                                            | 요청한 작업 기록을 Obsidian Agent Memory에 저장해요.                            |
 | [`agent-memory-todayilearned`](packages/agent-memory/skills/agent-memory-todayilearned/SKILL.md)                        | 요청한 배움을 날짜별 TIL 노트로 정리해요.                                       |
@@ -326,7 +326,7 @@ npm으로 나갈 것들이에요.
 | [`reference-driven-3d-character`](packages/reference-driven-3d-character) | 레퍼런스 해석, 형태·변형·동작 설계, 편집 가능한 3D 캐릭터의 단계별 제작·검증                                                                      |
 | [`game-interface-design`](packages/game-interface-design)                 | 모바일 웹게임 기획 → 선택형 Figma UI → FSD·ECS Three.js 그레이박스, 린트로 검사하는 도트 스프라이트 애니메이션                                    |
 | [`developer-agents`](packages/developer-agents)                           | Claude Code 서브에이전트 두 개: FSD로 UI와 비즈니스 로직을 나누는 `frontend-developer`, 3계층·클린 아키텍처·DDD로 서버를 짜는 `backend-developer` |
-| [`harness-team`](packages/harness-team)                                   | 에이전트 기합: 위험하지 않은 일은 직접 하는 팀장, 위험 작업·요청 시 완벽주의 검수관(리뷰 1회), 먼저 고치는 carry-over                             |
+| [`harness-team`](packages/harness-team)                                   | 직접 실행, 위험 작업·요청 시 별도 자기 검토, 먼저 고치는 carry-over                                                                               |
 | [`app-research`](packages/app-research)                                   | 앱 조사: 게이트를 거친 기기 탐색, 화면·전이 그래프, 근거에 묶인 기능·정책                                                                         |
 
 ## 개발

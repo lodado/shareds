@@ -1,7 +1,7 @@
 {
   "name": "harness-team",
-  "version": "0.6.0",
-  "description": "Run every work task as a five-role harness team: a lead who never asks what the goal is, fixes the last task's mistakes first and does non-risky work itself, an obsessive perfectionist final reviewer for risky work and on request, and a carry-over ledger.",
+  "version": "0.7.0",
+  "description": "Work directly, fix carry-over first, and review risky work or requested reviews in a separate pass.",
   "author": {
     "name": "lodado",
     "url": "https://github.com/lodado"
@@ -12,11 +12,11 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Harness Team",
-    "shortDescription": "Five-role team with a perfectionist review for risky work and carry-over fixes",
-    "longDescription": "A lead infers the goal without asking and first fixes the previous task's mistakes; non-risky work stays with the lead, risky work goes to a scout, builder and verifier; for risky work or on request, an obsessive perfectionist reviews it once and every finding is applied right away; findings that cannot be applied and the lead's own mistakes carry over.",
+    "shortDescription": "Direct work, risk-based self-review, and carry-over fixes",
+    "longDescription": "The agent infers the goal, fixes carry-over first, and works directly; for risky work or on request, it reviews it in a separate pass and applies findings right away. This review is not independent; findings that cannot be applied and the agent's own mistakes carry over.",
     "developerName": "lodado",
     "category": "productivity",
-    "capabilities": ["Agent orchestration", "Independent review"],
+    "capabilities": ["Direct execution", "Self-review"],
     "websiteURL": "https://github.com/lodado/my-Vibe-Coding-Helper",
     "defaultPrompt": ["Run this task as the harness team."]
   }
