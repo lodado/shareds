@@ -9,6 +9,12 @@ function prefixTree(space) {
     fail('SPACE_INVALID', 'Space needs a positive safe bound and at least the initial trace')
   }
   const root = nodeFor(space.initial, 0)
+  // Traces of one Space share the event and observation objects of their common prefixes: key each object once.
+  const keys = new Map()
+  const keyOf = (value) => {
+    if (!keys.has(value)) keys.set(value, stableStringify(value))
+    return keys.get(value)
+  }
   for (const { trace, observations } of space.cases) {
     if (!Array.isArray(trace) || !Array.isArray(observations) || trace.length !== observations.length || trace.length > space.bound) {
       fail('SPACE_INVALID', 'each trace must fit the bound and have one observation per event')
@@ -16,9 +22,9 @@ function prefixTree(space) {
     let node = root
     for (let index = 0; index < trace.length; index += 1) {
       const event = trace[index]
-      const key = stableStringify(event)
+      const key = keyOf(event)
       const found = node.children.get(key)
-      if (found && stableStringify(found.node.observation) !== stableStringify(observations[index])) {
+      if (found && found.node.observation !== observations[index] && keyOf(found.node.observation) !== keyOf(observations[index])) {
         fail('SPACE_INCONSISTENT', 'one event prefix has contradictory observations')
       }
       if (!found) node.children.set(key, { key, event, node: nodeFor(observations[index], index + 1) })

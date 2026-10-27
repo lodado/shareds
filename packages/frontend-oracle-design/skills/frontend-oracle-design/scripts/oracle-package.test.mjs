@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { chmod, cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
@@ -35,6 +35,7 @@ import {
   stackLabelsFor,
 } from './oracle-package.mjs'
 import { emitTrace } from './oracle-projection.mjs'
+import { withResultReceipt } from './oracle-result-receipt.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 
 const PACKAGE_DIR = fileURLToPath(new URL('../../../', import.meta.url))
@@ -1383,4 +1384,94 @@ test('pointers decode escapes, select array elements by any field and refuse __p
   assert.throws(() => applyPatch(document, [{ op: 'set', pointer: '/__proto__', value: {} }]), /__proto__ is not a package key/)
   assert.throws(() => applyPatch(document, [{ op: 'toString', pointer: '/tags', value: 1 }]), /unknown patch operation/)
   assert.equal(Object.prototype.polluted, undefined)
+})
+
+async function withReceiptDirectory(setting, work) {
+  const previous = process.env.ORACLE_LINT_CACHE
+  process.env.ORACLE_LINT_CACHE = setting
+  try {
+    await work()
+  } finally {
+    if (previous === undefined) delete process.env.ORACLE_LINT_CACHE
+    else process.env.ORACLE_LINT_CACHE = previous
+  }
+}
+
+test('a result receipt computes once for the same inputs, again when they change, and never crosses kinds', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'oracle-result-receipt-'))
+  try {
+    await withReceiptDirectory(directory, async () => {
+      let calls = 0
+      const compute = async () => {
+        calls += 1
+        return { calls, nested: [{ a: 1 }] }
+      }
+      const first = await withResultReceipt({ kind: 'unit', bin: null, inputs: 'one' }, compute)
+      assert.deepEqual(await withResultReceipt({ kind: 'unit', bin: null, inputs: 'one' }, compute), first)
+      assert.equal(calls, 1)
+      assert.equal((await withResultReceipt({ kind: 'unit', bin: null, inputs: 'two' }, compute)).calls, 2)
+      assert.equal((await withResultReceipt({ kind: 'unit-other', bin: null, inputs: 'one' }, compute)).calls, 3)
+    })
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('a result JSON would change is returned as computed and never cached; a failing compute caches nothing', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'oracle-result-receipt-'))
+  try {
+    await withReceiptDirectory(directory, async () => {
+      let calls = 0
+      const compute = async () => {
+        calls += 1
+        return { present: 1, lossy: new Map([[1, 2]]) }
+      }
+      const first = await withResultReceipt({ kind: 'unit', bin: null, inputs: 'x' }, compute)
+      assert.equal(first.lossy instanceof Map, true)
+      await withResultReceipt({ kind: 'unit', bin: null, inputs: 'x' }, compute)
+      assert.equal(calls, 2)
+      // a result the caller calls unsettled (a tool that could not run) is not remembered either
+      let unsettled = 0
+      const refused = { kind: 'unit', bin: null, inputs: 'unsettled', cacheable: (result) => result.settled }
+      const computeUnsettled = async () => {
+        unsettled += 1
+        return { settled: false, n: unsettled }
+      }
+      await withResultReceipt(refused, computeUnsettled)
+      assert.equal((await withResultReceipt(refused, computeUnsettled)).n, 2)
+      assert.deepEqual(await readdir(directory), [])
+      await assert.rejects(
+        withResultReceipt({ kind: 'unit', bin: null, inputs: 'boom' }, async () => {
+          throw new Error('compute failed')
+        }),
+        /compute failed/,
+      )
+      assert.deepEqual(await readdir(directory), [])
+    })
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('ORACLE_LINT_CACHE=off computes every time, and receipts of one kind are pruned to the newest thirty', async () => {
+  await withReceiptDirectory('off', async () => {
+    let calls = 0
+    const compute = async () => {
+      calls += 1
+      return { calls }
+    }
+    await withResultReceipt({ kind: 'unit', bin: null, inputs: 'x' }, compute)
+    await withResultReceipt({ kind: 'unit', bin: null, inputs: 'x' }, compute)
+    assert.equal(calls, 2)
+  })
+  const directory = await mkdtemp(join(tmpdir(), 'oracle-result-receipt-'))
+  try {
+    await withReceiptDirectory(directory, async () => {
+      for (let index = 0; index < 33; index += 1)
+        await withResultReceipt({ kind: 'unit', bin: null, inputs: index }, async () => ({ index }))
+      assert.equal((await readdir(directory)).filter((name) => name.startsWith('unit-')).length, 30)
+    })
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })

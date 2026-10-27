@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 // eslint-disable-next-line test/no-import-node-test -- package test script intentionally uses node --test.
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -1165,6 +1165,37 @@ test('[bend] emit-world: every possible setting runs once with the outcomes the 
   const stale = runGenerated(testFile)
   assert.equal(stale.status, 1)
   assert.match(stale.output, /STALE_GENERATED_TESTS: \.\.\/World\.bend changed since generation/)
+})
+
+test('[bend] a generated test never reads a file under .ai/ while it runs, yet regeneration still sees the file change', async (t) => {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const root = await workspace(t)
+  const dir = join(root, 'doc-save')
+  const record = join(dir, '.ai', 'oracles', 'save', 'oracle.md')
+  await mkdir(dirname(record), { recursive: true })
+  await writeFile(record, await readFile(join(dir, 'oracle.md'), 'utf8'))
+  const emit = (options) =>
+    emitWorld({ card: record, cwd: dir, adapter: join(dir, 'doc-save.adapter.mjs'), out: join(dir, 'generated'), row: 'O1', bin, regenerate: 'test', ...options })
+  await emit({})
+  const testFile = join(dir, 'generated', 'save.world.test.mjs')
+  const text = await readFile(testFile, 'utf8')
+  const sourcesLine = text.split('\n').find((line) => line.startsWith('const SOURCES = '))
+  assert.doesNotMatch(sourcesLine, /\.ai/)
+  assert.match(text, /^\/\/ Run record [a-f0-9]{64} \S*\.ai\/oracles\/save\/oracle\.md \(checked when regenerated, never read here\)$/m)
+  // the run record is not part of the product: the test passes without it
+  await rm(join(dir, '.ai'), { recursive: true, force: true })
+  const clean = runGenerated(testFile)
+  assert.equal(clean.status, 0, clean.output)
+  // regenerating against the record is what notices a change to it
+  const original = await readFile(join(dir, 'oracle.md'), 'utf8')
+  await mkdir(dirname(record), { recursive: true })
+  await writeFile(record, original)
+  assert.equal(verifyOutput(testFile).status, 0)
+  await writeFile(record, `${original}\n<!-- edited after generation -->\n`)
+  const drifted = verifyOutput(testFile)
+  assert.equal(drifted.status, 1)
+  assert.match(drifted.stderr, /GENERATED_TESTS_DRIFT/)
 })
 
 test('[bend] emit-world refuses a setting no product can pass instead of writing a test that cannot go green', async (t) => {

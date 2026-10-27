@@ -235,6 +235,11 @@ function header({
   row,
 }) {
   const audit = auditAdapterSource.toString()
+  // `.ai/` 아래 파일은 제품 CI에 없을 수 있다 — 생성 테스트가 실행 중에 읽지 않는다. digest는 주석으로만 남아 `--verify` 재생성이
+  // 그 파일의 변경을 잡는다.
+  const isRunRecord = ({ path }) => path.split('/').includes('.ai')
+  const runtimeSources = sources.filter((source) => !isRunRecord(source))
+  const recordedSources = sources.filter(isRunRecord)
   // world 모드는 컴파일된 모델을 싣지 않는다 — 기대값은 생성할 때 세계 def로 계산한 데이터다
   const proven = modelFile
     ? `// Model ${prefix}. The laws are proven about the model (\`oracle-model.mjs prove\`); this file is conformance`
@@ -245,6 +250,7 @@ function header({
     `// Regenerate: ${regenerate}`,
     proven,
     `// evidence for the implementation, ${scope}. Passing it is not a proof about the implementation.`,
+    ...recordedSources.map(({ path, sha256: digest }) => `// Run record ${digest} ${path} (checked when regenerated, never read here)`),
     '',
     "import assert from 'node:assert/strict'",
     "import { createHash } from 'node:crypto'",
@@ -256,7 +262,7 @@ function header({
     '',
     `const ROW = ${JSON.stringify(row)}`,
     `const PREFIX = ${JSON.stringify(prefix)}`,
-    `const SOURCES = ${JSON.stringify(sources)}`,
+    `const SOURCES = ${JSON.stringify(runtimeSources)}`,
     ...(modelFile
       ? [
           'const call = (name, ...args) => model[PREFIX + "." + name](...args.map((argument) => structuredClone(argument)))',

@@ -16,7 +16,9 @@ export function memoizeClassifier(classify) {
     return keys.get(value)
   }
   const classifications = new Map()
-  return (def, ...args) => {
+  // 같은 객체 참조로 다시 부르면 같은 결과다(분류기는 순수하다) — 스테퍼가 접두의 상태·사건을 공유해 넘기므로 대부분 여기서 끝난다.
+  const byIdentity = new Map()
+  const classifyByContent = (def, args) => {
     if (!classifications.has(def)) classifications.set(def, new Map())
     const results = classifications.get(def)
     const key = args.map(keyOf).join(':')
@@ -27,6 +29,19 @@ export function memoizeClassifier(classify) {
     const value = classify(def, ...args)
     bucket.push({ args, value })
     return value
+  }
+  return (def, ...args) => {
+    if (!byIdentity.has(def)) byIdentity.set(def, { next: new Map() })
+    let node = byIdentity.get(def)
+    for (const argument of args) {
+      if (!node.next.has(argument)) node.next.set(argument, { next: new Map() })
+      node = node.next.get(argument)
+    }
+    if (!node.done) {
+      node.value = classifyByContent(def, args)
+      node.done = true
+    }
+    return node.value
   }
 }
 

@@ -1,3 +1,60 @@
+# 0.114.0: the independent analyst starts before the model is written, and its translation review overlaps the checks
+
+## Validation
+
+- Package `pnpm run lint` (0 errors, bundles and evals match) and `pnpm run test` pass after the change; the
+  `role-author` bundle stays under its 279,000-byte cap without raising it.
+
+## Change
+
+- `references/roles/author-formal.md`: step 4 dispatches the model analyst once the package registers the sources,
+  before the model is written, and joins it only at step 6; step 6 continues the same analyst for the translation
+  review as soon as `crossCheck` is written, so `prove`, `derive` and the adequacy check run while it reads. The
+  `patch`/`get` rule moved into step 3, merged with the one in step 5.
+- Reason: in the measured 118-minute design phase the analyst took 65 minutes of wall time for 7.5 minutes of model
+  work, and the translation review came after the proofs. No check was removed or relaxed. A lighter path that skips
+  the analyst, the translation review and `cross-check` was considered and not built: the run that motivated it maps
+  the Order family (17,409 order obligations), so the condition "no Order or Async family" does not cover it, and a
+  condition that does would drop independent review where order matters.
+
+# 0.113.0: the design phase stops recomputing the same space, a draft sees an unpinnable source early, and generated tests never read `.ai/`
+
+## Validation
+
+- Package tests: 1285 passed, 0 failed (`pnpm test`, real Bend). `eslint skills scripts` reports 0 errors;
+  `bundles:check` and `evals --check` match.
+- Byte-identical outputs on a real run copy (kdl-website): `derive`, `project-card`, `cross-check` and
+  `card --draft` print the same bytes as before, so `spaceDigest`, case ids (`M…`) and labels do not move.
+- Same copy, wall time (machine load 3–4, so noisy): derive 17s → 5s, project-card 16s → 5s, cross-check 27s → 7s,
+  card --draft 57s → 11s. With result receipts on, the second run of each command takes 0–1s.
+- Profile of that run: of the 3.8s `enumerateSpace` took, only 1.1s was Bend (`step` 326,958 calls, `observe` 326,960);
+  the rest was converting and serializing the same 151 states once per prefix (313,303 traces).
+
+## Change
+
+- Scripts: `stableStringify` serializes in one pass and `stableStringifyShared` reuses shared sub-objects;
+  `enumerateSpace` memoizes one range per model object and builds case ids from incremental trace keys;
+  `orderObligations`, `stepper`, `prefixTree` and `memoizeClassifier` cache event keys and classifier results by
+  identity. `transitionTable` (oracle-model.mjs) calls `step` and `observe` once per (state, event) and hands every
+  prefix in one state the same state, event, observation and step objects; two states are one only when their
+  plain values agree and the raw values are `isDeepStrictEqual`, so a `1` and a `1n` stay apart. `next` still reads
+  the whole history, so the trace list, case ids, `spaceDigest` and the `ORD-` obligations are unchanged. `oracle-result-receipt.mjs` reuses `derive` and `cross-check` results across commands for the same
+  harness, node, Bend and inputs (`ORACLE_RESULT_CACHE=off` turns only this off; a degraded result is never cached).
+- Rounds: `card --draft` checks that a `repo:` source is a regular file under the root before the lock; a rewind
+  that changes only `sources[].location` keeps the round count; a rewind while a dispatched review has not
+  returned prints a warning.
+- Guidance: `author-formal.md` says the package is written once and then changed only with `oracle-package.mjs
+patch` and read with `get --pointer`.
+- Translation review input: `bendExcerpt` also carries the defs a classifier calls, so the reviewer can read the
+  classifier. This changes the review input bytes, so a `crossCheck.reviewedBy.inputDigest` recorded before 0.113.0
+  reads as stale once; the `pagination` fixture digest is updated.
+- Generated tests: a source under `.ai/` is no longer in `SOURCES` and is never read when the test runs; its digest
+  is a `// Run record` comment, so `verify-generated` still reports a change to it.
+- Tests changed: three `card --draft` tests in `oracle-verify.test.mjs` now cite `repo:package.json` instead of the
+  non-existent `repo:docs/save.md` through `pinnableSource`; their assertions are unchanged.
+- Not done: a lighter path for small changes without Order/Async. It would reverse the "no opt-out, low-risk fast
+  path" rule and the 0.107 decision that medium risk also needs Bend, so it waits for an explicit decision.
+
 # 0.112.0: the Draft names its loading mechanism, so a query view cannot silently skip the Suspense default
 
 ## Validation

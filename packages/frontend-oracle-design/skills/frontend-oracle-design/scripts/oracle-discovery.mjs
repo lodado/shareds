@@ -39,6 +39,7 @@ import {
   observeTrace,
   proveLaws,
   transitionCover,
+  transitionTable,
 } from './oracle-model.mjs'
 import {
   AI_OPERATORS,
@@ -226,26 +227,42 @@ export function declaredStateModel(text) {
  * 나누므로 접두마다 한 번만 걷는다: 사건 하나를 걸 때마다 `next`가 지금까지의 이력 전체를 읽는다.
  */
 export function stepper(model) {
-  const root = { children: new Map(), raw: [], state: model.init() }
+  // 같은 상태에 닿는 접두는 같은 상태·사건·단계 객체를 받는다 — 분류기가 접두마다가 아니라 상태마다 한 번만 일한다
+  const table = transitionTable(model)
+  const root = { children: new Map(), raw: [], entry: table.start() }
+  // 공간의 trace는 접두의 사건 객체를 공유한다 — 사건 키는 객체마다 한 번만 만든다
+  const keys = new Map()
+  const keyOf = (event) => {
+    if (!keys.has(event)) keys.set(event, stableStringify(event))
+    return keys.get(event)
+  }
   return (trace) => {
     let node = root
     return trace.map((event) => {
-      const key = stableStringify(event)
+      const key = keyOf(event)
       if (!node.children.has(key)) {
-        node.choices ??= listItems(model.next(listOf(node.raw)))
-        const match = node.choices.find((choice) => isDeepStrictEqual(toPlain(choice), event))
-        const after = model.step(node.state, match)
-        node.children.set(key, {
-          children: new Map(),
-          raw: [...node.raw, match],
-          state: after,
-          step: { before: node.state, event: match, after, label: label(event) },
-        })
+        // 선택지의 plain 값과 키는 노드마다 한 번만 — 자식마다 모든 선택지를 다시 plain으로 바꿔 훑지 않는다
+        node.choices ??= indexChoices(listItems(model.next(listOf(node.raw))))
+        const match = (node.choices.get(key) ?? []).find((choice) => isDeepStrictEqual(choice.plain, event))?.raw
+        const move = table.move(node.entry, match, key)
+        move.step ??= { before: node.entry.state, event: move.event, after: move.to.state, label: label(event) }
+        node.children.set(key, { children: new Map(), raw: [...node.raw, match], entry: move.to, step: move.step })
       }
       node = node.children.get(key)
       return node.step
     })
   }
+}
+
+/** 사건 키 → 그 키의 선택지들(원래 순서). 같은 키라도 plain 값이 `isDeepStrictEqual`일 때만 같은 사건이다. */
+function indexChoices(choices) {
+  const byKey = new Map()
+  for (const raw of choices) {
+    const plain = toPlain(raw)
+    const key = stableStringify(plain)
+    byKey.set(key, [...(byKey.get(key) ?? []), { raw, plain }])
+  }
+  return byKey
 }
 
 /** 가정이 지운 세계에서 거짓이 된 가정 — 쌍·값이 왜 빠졌는지의 근거. */
@@ -616,6 +633,24 @@ export async function spaceCrossCheck({ loaded, bin, timeoutMs, includeTransitio
     return { status: 'invalid', reason: 'the declared source has no ## Case space table of the confirmed axes', candidates: [] }
   const world = await loadWorld({ package: relative(loaded.root, loaded.path), cwd: loaded.root, bin, timeoutMs })
   if (world.result) return { status: 'not-run', reason: `the world cannot be enumerated: ${world.result.reason}`, candidates: [] }
+  // 상태표는 분석 에이전트가 따로 읽은 것일 수 있다(crossCheck.states) — 그러면 모델과 두 독립 해석을 비교한다
+  const statesPath = pkg.crossCheck.states ? sourcePath(loaded, pkg.crossCheck.states) : declaredPath
+  const statesText = statesPath === declaredPath ? text : await readFile(statesPath, 'utf8').catch(() => '')
+  // 같은 입력·하네스·bend면 결과도 같다 — 패키지·모델 바이트와 선언 문서가 키다. 카드 lint·advance·lock이 명령마다 다시 열거했다.
+  const { withResultReceipt } = await import('./oracle-result-receipt.mjs')
+  const keyed = {
+    package: inputsDigestOf(await packageInputs(loaded)),
+    declared: sha256(text),
+    states: sha256(statesText),
+    includeTransitionCover,
+  }
+  return withResultReceipt({ kind: 'cross-check', bin, inputs: keyed, cacheable: (result) => result.status === 'run' }, () =>
+    crossCheckAgainstModel({ loaded, bin, timeoutMs, includeTransitionCover, caseSpace, statesText, world }),
+  )
+}
+
+async function crossCheckAgainstModel({ loaded, bin, timeoutMs, includeTransitionCover, caseSpace, statesText, world }) {
+  const { pkg } = loaded
   let traces = []
   let classify = () => null
   if (pkg.behavior) {
@@ -635,9 +670,6 @@ export async function spaceCrossCheck({ loaded, bin, timeoutMs, includeTransitio
     const { exported } = await compileBend({ entry: modelPath, bin, timeoutMs })
     classify = isolatedClassifier(exported, basename(modelPath))
   }
-  // 상태표는 분석 에이전트가 따로 읽은 것일 수 있다(crossCheck.states) — 그러면 모델과 두 독립 해석을 비교한다
-  const statesPath = pkg.crossCheck.states ? sourcePath(loaded, pkg.crossCheck.states) : declaredPath
-  const statesText = statesPath === declaredPath ? text : await readFile(statesPath, 'utf8').catch(() => '')
   try {
     const result = crossCheckSpace({
       caseSpace,
@@ -657,12 +689,27 @@ export async function spaceCrossCheck({ loaded, bin, timeoutMs, includeTransitio
   }
 }
 
-/** 행동 모델 원문에서 타입 선언과 이름이 붙은 def만 — step·next·환경 로직은 싣지 않는다. */
-function bendExcerpt(text, defs) {
+/**
+ * 행동 모델 원문에서 타입 선언과 이름이 붙은 def만 — step·next·환경 로직은 싣지 않는다. 분류 def가 부르는 다른 def도
+ * 함께 싣는다: 본문이 잘려 나가면 검토자가 분류의 뜻을 읽을 수 없다.
+ */
+export function bendExcerpt(text, defs) {
   const blocks = text.split(/\n(?=\S)/)
-  const wanted = (block) =>
-    /^type\s/.test(block) || defs.some((def) => block.startsWith(`def ${def}(`) || block.startsWith(`def ${def}Of(`))
-  return blocks.filter(wanted).join('\n').trimEnd()
+  const defNameOf = (block) => /^def\s+([\w.]+)\(/.exec(block)?.[1]
+  const named = new Map(blocks.flatMap((block) => (defNameOf(block) ? [[defNameOf(block), block]] : [])))
+  const wanted = new Set(
+    blocks.filter(
+      (block) =>
+        /^type\s/.test(block) || defs.some((def) => block.startsWith(`def ${def}(`) || block.startsWith(`def ${def}Of(`)),
+    ),
+  )
+  for (const block of wanted) {
+    if (!defNameOf(block)) continue
+    for (const [name] of block.slice(block.indexOf('\n') + 1).matchAll(/[a-z_][\w.]*/gi)) {
+      if (named.has(name)) wanted.add(named.get(name))
+    }
+  }
+  return blocks.filter((block) => wanted.has(block)).join('\n').trimEnd()
 }
 
 /**

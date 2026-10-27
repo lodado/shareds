@@ -221,7 +221,7 @@
     },
     "reviewedBy": {
       "agent": "fixture stand-in: ocx-gpt-5-6-sol, fresh context (this fixture has no analyst run to continue)",
-      "inputDigest": "b62c3fd1dd4e1865448cc69d1c08200ea2e7cea9dd99499051abae4046dde469",
+      "inputDigest": "1a1e061e66a70b6e6f11e9c364a96b546787792310b3a611d10a604c9f322a47",
       "disputes": [
         "response=success -> Answered: Grid.response answers any Arrive without a success status; it cannot tell success from failure",
         "response=http-5xx has no mapping",
