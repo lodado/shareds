@@ -1,3 +1,34 @@
+# 0.115.0: reduce late harness repairs and defer Draft-only reference loading
+
+## Changes and evidence
+
+- `emit-trace --package` records the resolved behavior bound in its generation recipe. The CLI regression
+  immediately runs `verify-generated`; package generation no longer produces a `bound: null` recipe.
+- Controller entry settles mixed-work scope before sibling write dispatch. The session-wide pre-lock hook
+  is unchanged: disjoint task labels, shell writes and a new session do not grant a bypass.
+- Formal adapter semantic review moves before RED/ALREADY_SATISFIED acceptance in controller, reviewer and
+  graph instructions. Existing final independent review, High mutation, budgets and runtime gates remain.
+  This is a procedural ordering requirement, not a new machine-enforced receipt or ledger state.
+- Initial `role-author` reference loading defers Draft-only card documents. Model-stage disposition and
+  hold rules remain in the author procedure before projection. The entry bundle fell from 278,995 bytes
+  to about 210 KB (about 25%); all bundle byte caps remain unchanged. This is not a measured time saving.
+- Three synthetic adapter pairs use identical faulty product bytes: a circular clock, unobserved extra
+  writes/removes and missing duplicate-parameter coverage. Each defective harness accepts the mutant;
+  the corrected harness rejects it and accepts a correct product. Two semantic scenarios cover dispatch
+  ordering and existing patch/get plus small-section checks. Model evaluation remains `NOT_RUN`.
+
+## Validation (2026-10-29)
+
+- Package `pnpm run test`: **1,288 passed, 0 failed, 0 skipped**, final frozen-input run.
+- Package `pnpm run lint`: **0 errors, 404 warnings**; final changed-JS lint: 0 errors, 5 warnings.
+- `workflow-docs:check`, `bundles:check` and eval generation consistency: **PASS**.
+- Independent review identified fixture self-implementation and a deferred model-rule dependency; both
+  were corrected, with same-product counterexamples and model-phase reference tests.
+- The first full run had 1 failure because bundle regeneration overlapped a test copying the skill tree.
+  Generation was finished before rerunning the full suite; the final result above is that rerun.
+- Not run: baseline/candidate Claude trajectories, five real consumer jobs and time/cost comparisons.
+  No release, commit, push or installed-plugin refresh was performed by this change.
+
 # 0.114.0: the independent analyst starts before the model is written, and its translation review overlaps the checks
 
 ## Validation

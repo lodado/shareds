@@ -14,42 +14,15 @@ The canonical interview is [roles/space-discovery.md](../roles/space-discovery.m
 Intake-only discovery loads that scoped node, not this authoring wrapper or `card-format`.
 Confirmed axes never replace Draft confirmation or authorize a lock, test edits or production work.
 
-## Holds — a question that blocks only part of the scope
-
-A policy question found while modelling that the user has not answered does not stop the run when the rest can
-be modelled without it. Record it in the package: `holds: [{ id: "H1", question, blocks: [the rows, terms, goals
-or behaviours it keeps out], status: "open" }]`. The model, laws, card and tests cover only what no hold blocks,
-and no test or production code is written for the blocked part. A discovery candidate that waits on the answer
-is decided `held` (`hold: H1`). While a hold is open the run ends `PARTIAL_VERIFIED`, never `REVIEW_VERIFIED`
-(`HOLDS_OPEN`). Ask every open hold in one batch once the model work is done (the A/B form above); the answer
-becomes `status: resolved` with the `answer` and an approved authoritative `S*`, each `held` candidate is then
-promoted, scoped out or rejected, and a new revision adds the blocked rows. A question that leaves nothing to
-model — the axes themselves — still stops the run.
-
 ## Family taxonomy — imported, not invented
 
 Read [roles/case-space-inputs.md](../roles/case-space-inputs.md), node `role-case-space-inputs`,
-for the eight-family taxonomy and its seven driven input families. The shared taxonomy serves both
-intake discovery and authoring. The following dispositions belong only to model-package authoring.
-
-A version-2 model package decides every input family at the model stage, in one of three ways:
-
-- **mapped** — a `controllable` term names the family (`terms[].family`). An observable term tagged with a
-  family observes it but does not map it (`package-family-observation-only`).
-- **`modeled: behavior`** — the behavior model's events drive it: the temporal families Order and Async, or
-  any family whose values are event fields.
-- **`excluded: <reason citing an S*>`** — the source text allows leaving it out. A model file is not such a
-  source, and "the model did not produce it" is not a reason.
-
-Inherited needs a disposition before the card is projected. The audit lists each family as `mapped` (with
-its axes), `excluded` or `undispositioned`; the projection never writes an exclusion the author did not, and
-an undispositioned family fails `family-undispositioned`. A family `oracle-dimensions.mjs` mined from a
-touched file cannot be excluded silently: `oracle-verify.mjs card --path <file>` fails
-`dimension-candidate-undeclared` unless the family declares a dimension or its exclusion reason cites that
-file.
+for the eight-family taxonomy and its seven driven input families. Model-package dispositions and holds are
+canonical in [the Formal author procedure](../roles/author-formal.md#model-package-input-dispositions). The card
+wrapper consumes those decisions after projection; it does not redefine the model-stage rules.
 
 Choices come from [`bva.md`](../bva.md): value boundaries become Value choices, state boundaries
-become Async choices, time·order boundaries become Order choices, count boundaries become Data
+become Async choices, time·order boundaries become Order choices and count boundaries become Data
 choices. Only real boundaries of approved policy — the bva rule against mechanical 0/1 padding
 applies unchanged. Do not add assertion criteria (accessibility, visual quality, success invariants)
 as though they were independent input dimensions.

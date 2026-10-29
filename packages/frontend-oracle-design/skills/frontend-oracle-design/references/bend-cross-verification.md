@@ -98,7 +98,7 @@ the seven keys `late-success-after-cancel`, `late-failure-after-success`, `older
 `duplicate-completion`, `lost-response`, `retry-while-pending`, `unmount-before-settle`; each cell is
 `{decision: source | default | n/a, ref: S*}` or `{decision: question, ref: Q* | H*}`. When Async is in a version 2
 space, `oracle-stage.mjs advance --to MODELED` refuses a package that leaves any cell undecided. Questions that kill a model branch go out together as one A/B batch;
-the rest become holds ([`card/case-space.md`](card/case-space.md#holds--a-question-that-blocks-only-part-of-the-scope)).
+the rest become holds ([author procedure](roles/author-formal.md#holds--a-question-that-blocks-only-part-of-the-scope)).
 A project default is a policy set the user approved once — for example newest request wins, no rollback after a
 newer completed mutation, one success notice per logical operation. Save the approved text verbatim as a source
 and cite its `S*`; a recommendation the user did not approve is never a default, and a default stays visible on
@@ -439,7 +439,8 @@ the expected results — during the harness step, then it passes two gates befor
   later edit fails the test. The audit is a static heuristic, not a proof of honesty: an adapter that
   re-implements product logic inline, or hides a model behind an innocent-looking product import, is
   still found only by the review checklist below.
-- Review: the existing independent review reads the adapter against the card, using this checklist —
+- Review: before VALID_RED (or ALREADY_SATISFIED), the existing independent review role reads the adapter
+  in `adapter-pre-red` mode against the locked card, using this checklist —
   each model event or command maps to exactly the product call its term's `Path` names; each
   observation is read through the product path its term names (no test double, no internal field the
   Path does not name); no product logic or expected value is re-implemented in the adapter; unknown
@@ -453,6 +454,12 @@ the expected results — during the harness step, then it passes two gates befor
   harness defect and goes through the existing harness-repair budget; it never changes the locked
   model, laws or observation meaning. A missing Playwright test for such a row is `EVIDENCE_GAP`
   instead: the generated test then shows only that the product agrees with the fake.
+  Expected time comes from the input/event clock, never from a timestamp written by the product;
+  promised write/remove counts are observed separately from visible state. Check that declared boundary
+  cases, including duplicate URL parameters when applicable, actually occur in the generated/manual cases.
+  Use existing `replay --adapter` or `conform` residue only where executable; neither replaces this review.
+  Preserve findings and reviewed input hashes in the journal. Post-GREEN review checks their freshness,
+  changed mappings and actual delivery evidence, rather than first discovering these harness defects then.
 
 - `emit-trace (--package <pkg> | --model --prefix --bound) --adapter --out --row --runs N [--max-length L]`
   (differential): the minimum cover (`[O*] [T…]`, expectations from the model) — the fewest traces, each

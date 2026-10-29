@@ -48,6 +48,37 @@ async function readAll(relativePaths) {
 
 const REVIEW_NODE_FILES = ['references/subagent-review.md', 'references/review-checklist.md']
 
+test('mixed work settles session-wide Oracle activation before sibling writers are dispatched', async () => {
+  const entry = await read('references/controller-entry-formal.md')
+  const skill = await read('SKILL.md')
+  assert.match(entry, /Before dispatching any write-capable sibling/)
+  assert.match(entry, /shared state owner/)
+  assert.match(entry, /overlap or unknown ownership/)
+  assert.match(entry, /join already-running writers/)
+  assert.match(entry, /not a write authorization/)
+  assert.match(skill, /before dispatching sibling writers/)
+})
+
+test('Formal adapter semantic review precedes RED without becoming a delivery receipt', async () => {
+  const [red, controller, reviewer, bend, green] = await Promise.all([
+    read('references/delivery/red.md'), read('references/roles/controller-formal.md'),
+    read('references/roles/review-formal.md'), read('references/bend-cross-verification.md'),
+    read('references/delivery/green-review.md'),
+  ])
+  assert.ok(red.indexOf('adapter-pre-red') < red.indexOf('5. Actually run'))
+  assert.match(controller, /write tests → adapter-pre-red review → run tests/)
+  assert.match(reviewer, /## Adapter pre-RED/)
+  assert.match(reviewer, /Never issue a Delivery review receipt/)
+  assert.match(bend, /input\/event clock, never from a timestamp written by the product/)
+  assert.match(bend, /write\/remove counts/)
+  assert.match(bend, /duplicate URL parameters/)
+  assert.match(red, /verify-generated/)
+  assert.match(green, /pre-RED adapter findings/)
+  assert.match(green, /High mutation/)
+  const graph = JSON.parse(await read('references/oracle-workflow.graph.json'))
+  assert.match(graph.nodes.find(({ id }) => id === 'valid-red').task, /Before RED or ALREADY_SATISFIED acceptance.*adapter-pre-red/)
+})
+
 test('shared author closure retains conditional current-profile authority without a second state machine', async () => {
   const closure = await read('references/roles/author-closure.md')
   assert.match(closure, /Load only on a selected-profile closure trigger after GREEN/)
@@ -2054,8 +2085,8 @@ test('enumerates the declared case space by machine and dispositions every gener
   assert.match(inputFamilies, /choices derived from the repo's browserslist\/engines, never from recall/)
   // 모델 카드의 공간은 세계에서 투영되고 프레임이 없다 — 일곱 입력 계열은 모델 단계에서 정해진다
   assert.match(inputFamilies, /The first seven are input families: the\s+test drives them/)
-  assert.match(caseSpace, /`excluded: <reason citing an S\*>`/)
-  assert.match(caseSpace, /package-family-observation-only/)
+  assert.match(skill, /`excluded: <reason citing an S\*>`/)
+  assert.match(skill, /package-family-observation-only/)
   assert.match(caseSpace, /The\s+raw product of the axes is never run and never the claim/)
   assert.match(caseSpace, /`oracle-frames\.mjs`\s+generates no frames for `Coverage: model`/)
   assert.match(frames, /caseSpace\.coverage === 'model' \? \{ frames: \[\], errorFrames: \[\] \}/)
@@ -2733,7 +2764,7 @@ test('two readings: the analyst writes its own state table, a reviewer on the ne
 
 test('the docs name the pre-lock stage machine, the hold and the partial state the scripts enforce', async () => {
   const skill = await read('references/roles/controller-formal.md')
-  const space = await read('references/card/case-space.md')
+  const space = await read('references/roles/author-formal.md')
   const discovery = await read('references/discovery.md')
   assert.match(
     skill,

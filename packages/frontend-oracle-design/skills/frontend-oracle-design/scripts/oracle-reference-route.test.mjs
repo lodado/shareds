@@ -346,7 +346,8 @@ test('the Formal author entry closure leaves Draft-completion reads to role-auth
   const ids = (profile, include) =>
     routeReferences(GRAPH, { point: 'package-authoring', facts: FALSE, include, profile }).agent.map(({ id }) => id)
   const entry = ids('formal-bend/v1', ['role-author'])
-  for (const id of ['card-risk-grill', 'card-interaction-sweep']) assert.equal(entry.includes(id), false, id)
+  for (const id of ['card-case-space', 'card-format', 'card-risk-grill', 'card-interaction-sweep'])
+    assert.equal(entry.includes(id), false, id)
   assert.ok(entry.includes('model-patterns') && entry.includes('bend-cross-verification'))
   const draft = ids('formal-bend/v1', ['role-author-draft-formal'])
   for (const id of ['card-policy-sources', 'card-risk-grill', 'bva', 'card-format', 'card-interaction-sweep'])
@@ -354,4 +355,16 @@ test('the Formal author entry closure leaves Draft-completion reads to role-auth
   const contract = ids('contract/v1', ['role-author'])
   for (const id of ['card-policy-sources', 'card-risk-grill', 'card-format', 'card-interaction-sweep'])
     assert.ok(contract.includes(id), `contract author keeps ${id}`)
+})
+
+test('Formal model authoring keeps dispositions and holds before card projection', () => {
+  const modelInputs = readFileSync(new URL('../references/roles/author-formal.md', import.meta.url), 'utf8')
+  const cardSpace = readFileSync(new URL('../references/card/case-space.md', import.meta.url), 'utf8')
+  assert.match(modelInputs, /## Model-package input dispositions/)
+  assert.match(modelInputs, /family-undispositioned/)
+  assert.match(modelInputs, /## Holds — a question that blocks only part of the scope/)
+  assert.match(modelInputs, /case-space-inputs-formal\.md/)
+  assert.match(cardSpace, /canonical in \[the Formal author procedure\]/)
+  assert.doesNotMatch(cardSpace, /## Holds — a question that blocks only part of the scope/)
+  assert.doesNotMatch(cardSpace, /A version-2 model package decides every input family/)
 })

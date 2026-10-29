@@ -1,11 +1,9 @@
 # Formal-only independent review modes
 
-Use only the dispatched mode and its permitted task inputs. Common/mandatory/loading references define
-procedure, not permission to inspect excluded task context. Fresh reviewers load their own dependencies.
-Do not inherit a parent's bundle assumptions. Missing inputs return to the controller without invented
-approval, state or runId. A same-context skill switch is not an independent context.
-Return findings only. Never edit product/production, tests, models, policy or locks, issue receipts,
-perform transitions or approve the card/delivery. The controller owns acceptance and human decisions.
+Use only the dispatched mode and permitted inputs. Procedure reads grant no access to excluded context.
+Fresh reviewers load their own dependencies; a same-context switch is not independence. Missing inputs
+return to the controller without invented approval, state or runId. Return findings only: no product/test/
+model/policy/lock edits, receipts, transitions or approvals. The controller owns acceptance and human decisions.
 
 ## Contract cold-read
 
@@ -41,6 +39,12 @@ summary. It supplements, never replaces, card-only cold-read and reverse-impossi
 If independence is unavailable, record the same-context fallback and limitation where that source review
 contract permits it. Unresolved policy findings return to the author/controller as Draft Open questions.
 Neither reviewer inference nor production observations become product policy authority.
+
+## Adapter pre-RED
+
+After lock, apply the [adapter checklist](../bend-cross-verification.md#the-adapter--written-by-the-ai-reviewed)
+before VALID_RED/ALREADY_SATISFIED. Use [delivery/red](../delivery/red.md) for inputs, repairs and absent targets.
+Never issue a Delivery review receipt or require GREEN. Final Delivery review and High mutation remain required.
 
 ## Delivery review
 

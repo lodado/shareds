@@ -395,6 +395,28 @@
         "User Confirmation is not written as `pre-authorized`, and no lock or Delivery step follows in this response.",
         "The question carries candidate rows and exactly one recommended option."
       ]
+    },
+    {
+      "id": "fod-sem-scope-before-dispatch",
+      "manualReviewOnly": true,
+      "prompt": "An implementation worker is already preparing tests for task 1.2. Five seconds later, the controller activates frontend-oracle-design for task 1.3 in the same app. Decide how to proceed before either worker writes.",
+      "expected_output": "Determine concrete changed-file and shared-state-owner scope before dispatch. Serialize overlapping or unknown scope (or group it under one Oracle flow) before activating Oracle; even proven-disjoint writers in the same session remain subject to the valid lock and must not be treated as an automatic pre-lock bypass. Do not let a later activation retroactively discover the conflict at the first denied write, and do not weaken the guard.",
+      "assertions": [
+        "A semantic reviewer confirms scope and shared state are checked before dispatch, not after the first denied write.",
+        "Overlapping or unknown scope is serialized or grouped; disjointness does not grant a same-session pre-lock write bypass without a valid lock.",
+        "The response does not propose .ai deletion, a new session, shell bypass, or a simple allow rule as a safety fix."
+      ]
+    },
+    {
+      "id": "fod-sem-author-small-edit",
+      "manualReviewOnly": true,
+      "prompt": "During Oracle model authoring, a package pointer needs one metadata change. The author has existing oracle-package patch/get commands and small-section model checks. Decide the least wasteful repair and what evidence proves it.",
+      "expected_output": "Use the existing pointer patch and get commands, then run the relevant section-level check and record the real tool output. Do not rewrite or re-dump the whole package, regenerate the entire model, or claim the fix from prose alone; preserve the existing gate and verify the changed bytes.",
+      "assertions": [
+        "A semantic reviewer confirms patch/get and section-level checks are reused rather than a new wrapper or full JSON rewrite.",
+        "The plan distinguishes an initial file generation from a repair and requires actual command evidence.",
+        "The response does not weaken lock, source, approval, or proof gates to save time."
+      ]
     }
   ],
   "guardrails": [

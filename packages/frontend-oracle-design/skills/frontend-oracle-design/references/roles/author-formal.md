@@ -38,8 +38,10 @@ whatever is already loaded.
    Before full model/proof construction, check the intake's highest-risk premise within current
    permissions. Preserve confirmed success criteria and non-goals. Do not discover basic product policy
    by repeatedly rewriting the proof. Begin the stage record before the first independent input.
-   Read [`card/case-space.md`](../card/case-space.md) and [input families](case-space-inputs-formal.md) to decide
-   all seven input families, inherited dispositions and possible cases. Unknown combinations stay in.
+   Read [input families](case-space-inputs-formal.md) to decide all seven input families, inherited dispositions
+   and possible cases. The full card case-space procedure is a Draft-completion read: load
+   [`card/case-space.md`](../card/case-space.md) with `role-author-draft-formal` after `project-card`, not in
+   this initial model-author context. Unknown combinations stay in.
 4. Use supported, authorized native delegation with capacity for an independent model analyst.
    Dispatch it once the package registers the sources, before the model is written; keep writing while it
    runs and join it at step 6, which needs its world model, goals and State Model.
@@ -88,6 +90,36 @@ user-approved extension. Do not rename the run, reset stage.json or restart the 
 Before every actual analyst dispatch or resumed analysis, register `review-input --kind model-analyst
 --input <permitted-source-input> --attempt <dispatch-id>`. A transport retry reuses the same ID; a new
 analysis does not, even when its source bytes are unchanged.
+
+## Model-package input dispositions
+
+These rules apply while authoring the package, before the card is projected. A version-2 model package decides
+every input family in one of three ways:
+
+- **mapped** — a `controllable` term names the family (`terms[].family`). An observable term tagged with a
+  family observes it but does not map it (`package-family-observation-only`).
+- **`modeled: behavior`** — the behavior model's events drive it: the temporal families Order and Async, or
+  any family whose values are event fields.
+- **`excluded: <reason citing an S*>`** — the source text allows leaving it out. A model file is not such a
+  source, and "the model did not produce it" is not a reason.
+
+Inherited needs a disposition before the card is projected. The audit lists each family as `mapped` (with its
+axes), `excluded` or `undispositioned`; the projection never writes an exclusion the author did not, and an
+undispositioned family fails `family-undispositioned`. A family `oracle-dimensions.mjs` mined from a touched
+file cannot be excluded silently: `oracle-verify.mjs card --path <file>` fails
+`dimension-candidate-undeclared` unless the family declares a dimension or its exclusion reason cites that file.
+
+## Holds — a question that blocks only part of the scope
+
+A policy question found while modelling that the user has not answered does not stop the run when the rest can
+be modelled without it. Record it in the package: `holds: [{ id: "H1", question, blocks: [the rows, terms, goals
+or behaviours it keeps out], status: "open" }]`. The model, laws, card and tests cover only what no hold blocks,
+and no test or production code is written for the blocked part. A discovery candidate that waits on the answer
+is decided `held` (`hold: H1`). While a hold is open the run ends `PARTIAL_VERIFIED`, never `REVIEW_VERIFIED`
+(`HOLDS_OPEN`). Ask every open hold in one batch once the model work is done (the A/B form above); the answer
+becomes `status: resolved` with the `answer` and an approved authoritative `S*`, each `held` candidate is then
+promoted, scoped out or rejected, and a new revision adds the blocked rows. A question that leaves nothing to
+model — the axes themselves — still stops the run.
 
 ## Complete the Draft, without rewriting generated policy
 

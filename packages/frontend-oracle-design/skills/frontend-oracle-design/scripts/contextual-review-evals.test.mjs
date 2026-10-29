@@ -39,6 +39,7 @@ async function runFixture(fixture) {
   if (fixture.runtime.action === 'render') return mod.render(mod.getUser())
   if (fixture.runtime.action === 'load') { let count = 0; await mod.loadAll(async () => { count += 1 }, [1, 1]); return { count } }
   if (fixture.runtime.action === 'modes') return mod.modes()
+  if (fixture.runtime.action === 'adapterSensitivity') return mod.check()
   if (fixture.runtime.action === 'ownership') {
     return {
       success: mod.submit({ name: ' Ada ' }),
@@ -54,13 +55,22 @@ async function runFixture(fixture) {
 test('O16 contextual review fixtures expose defects and counterexamples', async () => {
   const corpus = await load()
   assert.match(corpus.purpose, /Synthetic development fixtures/)
-  assert.equal(corpus.cases.length, 14)
+  assert.equal(corpus.cases.length, 20)
   for (const pairId of new Set(corpus.cases.map((entry) => entry.pairId))) {
     const pair = corpus.cases.filter((entry) => entry.pairId === pairId)
     assert.deepEqual(pair.map((entry) => entry.disposition).sort(), ['mustAllow', 'mustPrevent'])
     const prevented = pair.find((entry) => entry.disposition === 'mustPrevent')
     const allowed = pair.find((entry) => entry.disposition === 'mustAllow')
     assert.equal(allowed.counterexampleOf, prevented.id)
+    if (allowed.runtime.action === 'adapterSensitivity') {
+      assert.equal(allowed.files['product.mjs'], prevented.files['product.mjs'])
+      assert.equal(allowed.files['contract.md'], prevented.files['contract.md'])
+      assert.equal(typeof allowed.runtime.correctProduct, 'string')
+      assert.deepEqual(await runFixture(prevented), { passed: true })
+      assert.deepEqual(await runFixture(allowed), { passed: false })
+      const corrected = { ...allowed, files: { ...allowed.files, 'product.mjs': allowed.runtime.correctProduct } }
+      assert.deepEqual(await runFixture(corrected), { passed: true })
+    }
     if (pairId !== 'ownership-boundary') {
       assert.notDeepEqual(await runFixture(prevented), await runFixture(allowed))
     }
@@ -103,7 +113,7 @@ test('O17 contextual evaluation distinguishes structural evidence from unrun mod
   assert.equal(corpus.liveEvaluation.costTime, 'unmeasured')
   assert.equal(corpus.liveEvaluation.attempted, 0)
   assert.equal(corpus.liveEvaluation.completed, 0)
-  assert.equal(corpus.liveEvaluation.availableCases, 14)
+  assert.equal(corpus.liveEvaluation.availableCases, 20)
   assert.deepEqual(Object.keys(corpus.liveEvaluation.metrics), ['actionableFindings', 'falsePositives', 'duplicates', 'missingEvidence', 'knownDefectMisses', 'filesRead', 'inputBytes', 'cost', 'time', 'tokens'])
   assert.equal(Object.values(corpus.liveEvaluation.metrics).every((value) => value === 'unmeasured'), true)
   for (const entry of corpus.cases) {

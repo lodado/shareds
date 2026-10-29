@@ -86,7 +86,7 @@
       "id": "valid-red",
       "kind": "agent",
       "owner": "test-engineer",
-      "task": "Load $test immediately before writing test files, then write and run the failure-first tests of the locked card. Only when the oracle-run.mjs ledger and oracle-verify.mjs red accept it, first record oracle-run.mjs transition --to VALID_RED and only then return VALID_RED. If the tests are not red because the locked card rows are already satisfied, return ALREADY_SATISFIED and do not modify production. Otherwise return POLICY_GAP with a structured decision, HARNESS_DEFECT, or FAIL with the actual error, and do not modify production. On POLICY_GAP, record oracle-run.mjs transition --to NEEDS_DECISION. Do not use INVALID_RED.",
+      "task": "Load $test immediately before writing test files. Before RED or ALREADY_SATISFIED acceptance, obtain controller-coordinated independent adapter-pre-red findings for Formal adapters as delivery/red requires; this is not a Delivery receipt or a new state. Then run the failure-first tests of the locked card. Only when the oracle-run.mjs ledger and oracle-verify.mjs red accept it, first record oracle-run.mjs transition --to VALID_RED and only then return VALID_RED. If the tests are not red because the locked card rows are already satisfied, return ALREADY_SATISFIED and do not modify production. Otherwise return POLICY_GAP with a structured decision, HARNESS_DEFECT, or FAIL with the actual error, and do not modify production. On POLICY_GAP, record oracle-run.mjs transition --to NEEDS_DECISION. Do not use INVALID_RED.",
       "input": ["oraclePath", "oracleSha256", "runState"],
       "output": ["classification", "runId", "evidence", "decision", "error"],
       "writeScope": ["**", "!.ai/agent-graphs/**"],

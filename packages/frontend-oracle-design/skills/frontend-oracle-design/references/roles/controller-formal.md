@@ -104,11 +104,14 @@ Transition rechecks every gate, and rejection recovery remains in delivery/ledge
 evidence to bypass a gate. Read accepted status after composite commands so an already accepted target
 is not recorded twice. The controller owns transition intent, not a second execution engine.
 
-Before tests/RED read [`delivery/red.md`](../delivery/red.md). TDD default: ORACLE_READY → write/run tests
+Before tests/RED read [`delivery/red.md`](../delivery/red.md). TDD default: ORACLE_READY → write tests → adapter-pre-red review → run tests
 → `oracle-run.mjs transition --to VALID_RED` → classify VALID_RED. No production writing/editing before
 accepted product RED. The ORACLE_READY → IMPLEMENTED_GREEN ALREADY_SATISFIED path is zero-production
 verification and approves no production edits. After VALID_RED dispatch $oracle-implement with the current
 lock/snapshot and scoped task. Implementation decisions and bounded simplification live in that role.
+The bounded adapter check uses `$oracle-review` with the locked Terms, adapter/test bytes and inspected
+product paths, not a post-GREEN packet. Findings and input identities go in the existing journal; no
+Delivery review-receipt or transition is issued. Follow delivery/red for changed inputs and missing targets.
 An optional fresh implementation context uses the existing
 [task-scoped worker path](../delivery/ledger.md#optional-task-scoped-implementation-worker), independent
 of graph opt-in and never replacing review/mandatory verification.

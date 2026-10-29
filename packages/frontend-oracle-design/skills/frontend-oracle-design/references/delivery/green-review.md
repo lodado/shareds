@@ -2,6 +2,10 @@
 
 **Last Updated:** 2026-09-23
 
+At review, verify the pre-RED adapter findings and reviewed input hashes remain current. Recheck changed
+adapter mappings/cases and previously unexecutable checks, not an unchanged checklist from scratch.
+This earlier harness check never replaces independent Delivery review, High mutation or final reruns.
+
 ## Minimal implementation·self-feedback
 
 At most 3 rounds. One round:

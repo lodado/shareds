@@ -24,7 +24,9 @@ Read [review modes](../frontend-oracle-design/references/roles/review.md), then 
 selected-profile mode-specific additions. No future-phase prerequisites or primary-worker criterion leaks.
 Card-only cold-read sees card bytes alone, not sources/code/author conclusions/Delivery packets.
 Reverse-impossible sees impossible dispositions and witness/falsifier table only. Source-aware review
-separately compares approved excerpts/answers with affected decisions. Delivery review sees matching locked
+separately compares approved excerpts/answers with affected decisions. Formal-only `adapter-pre-red`
+reviews locked Terms, adapter/cases and mapped product paths before RED, without a Delivery packet/receipt.
+Delivery review sees matching locked
 packet, raw reported evidence and final target snapshot. A same-context switch is not independence.
 Return findings only: exact cases/rows/sources/evidence, checked scope, cheapest falsifying nail where
 applicable, remaining uncertainty, residual limits and next controller action. Never edit product or tests.

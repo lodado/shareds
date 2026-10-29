@@ -8,7 +8,8 @@ Card-only cold-read sees card bytes alone, not sources, implementation, author c
 packets. Apply five questions per row and return one root and cheapest falsifying nail.
 Reverse-impossible sees only impossible dispositions and the approved witness/falsifier table, asks
 for a counterexample, and returns disagreements without deciding policy. Source-aware review sees
-approved source excerpts and card decisions, distinct from blind review. Delivery review sees only
+approved source excerpts and card decisions, distinct from blind review. Formal `adapter-pre-red` follows
+delivery/red without a Delivery packet/receipt. Delivery review sees only
 the matching locked packet, raw reported evidence, final snapshot and mode-appropriate criteria.
 Do not mix these contexts or claim independent judgment from a same-context skill switch.
 

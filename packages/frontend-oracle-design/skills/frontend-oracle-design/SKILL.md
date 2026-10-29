@@ -35,6 +35,8 @@ Formal-specific scope, mandatory stack and original entry obligations are owned 
 ## Mode selection and explicit role invocation
 
 Design-only is default. Delivery needs an explicit implementation/self-verification/review request.
+For mixed work, settle Oracle scope and session-wide activation before dispatching sibling writers;
+follow the [dispatch ordering](references/controller-entry-formal.md#dispatch-ordering) rules.
 Read [controller](references/roles/controller.md) and [Formal coordination](references/roles/controller-formal.md)
 only for the current stage, not every future phase.
 
@@ -49,6 +51,7 @@ only for the current stage, not every future phase.
 4. Design-only never writes/executes consumer tests or edits production/dependencies (a temporary pre-lock
    sweep report is not a consumer test).
 5. Explicit Delivery invokes `$test` before tests and uses the current `oracle-run.mjs guide` and ledger.
+   Review the Formal adapter in `adapter-pre-red` mode before accepting RED; see [RED](references/delivery/red.md).
    Only accepted VALID_RED permits [`$oracle-implement`](../oracle-implement/SKILL.md) production work.
    ALREADY_SATISFIED is zero-production verification only.
 6. Record GREEN once, dispatch independent Delivery review, rerun on final snapshots and apply conditional

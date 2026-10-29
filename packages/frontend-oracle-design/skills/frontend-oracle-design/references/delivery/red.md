@@ -26,6 +26,18 @@ world` and every `HARD` `D*` row) gets a hand-written test through `$test`: vite
    owns the boundary, and FSD placement follows the `__mocks__/` rule of [`fsd.md`](../fsd.md).
 4. Assert each row's `Then`, `Never`, and side-effect kind·count together. Observe request
    count·order in the handler.
+   For Formal adapters, after lock and before RED acceptance, dispatch `$oracle-review` in independent
+   `adapter-pre-red` mode for the existing [adapter checklist](../bend-cross-verification.md#the-adapter--written-by-the-ai-reviewed).
+   Review only the locked Terms/observations, adapter, generated/manual cases and product paths it calls.
+   Run `oracle-projection.mjs verify-generated --file <generated-test>` for every generated file before
+   judging its failure. Record the review findings, lock hash and reviewed file hashes in journal.md;
+   this is evidence, not a Delivery receipt, new state or extra whole-product review round.
+   Repair harness defects through `$test` within its existing budget. Changed adapter, mapped product
+   paths or cases reopen only the affected checklist items; changed policy returns to the controller.
+   The same check applies before ALREADY_SATISFIED acceptance. An intended missing product target may
+   still satisfy the existing new-feature RED exception: inspect its contract mapping and verify the
+   rest of the harness, record unexecutable checks, never invent a passing `conform`/replay result.
+   If independent review or necessary harness evidence is unavailable, report FAIL before production.
 5. Actually run the tests with `exec`, including a positive `fast-check` sample (`--runs N`, N > 0);
    `runs=0` or omitted sampling is not evidence.
 6. If the failure satisfies `$test`'s `VALID_RED` predicate, confirm the reported test failure of the

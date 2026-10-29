@@ -9,5 +9,6 @@ Value boundaries become Value choices, state boundaries become Async choices, ti
 become Order choices and count boundaries become Data choices. Only real boundaries of approved policy
 are valid. Do not add assertion criteria (accessibility, visual quality, success invariants) as though
 they were independent input dimensions. Unknown is not excluded. Production, test and browser observations
-are investigation evidence, not approved policy. Package-specific mapped/behavior/excluded dispositions
-are author duties in card/case-space.md, not a reason for intake to load projected-card instructions.
+are investigation evidence, not approved policy. Package-specific dispositions and holds belong to
+[`author-formal.md`](author-formal.md#model-package-input-dispositions), not this intake taxonomy;
+intake does not load that author procedure or projected-card instructions.

@@ -334,7 +334,7 @@
       "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/roles/author.md",
       "when": "oracle-author invocation after human-confirmed axes to author the current-profile source-bound Draft and required verification artifacts",
-      "requires": ["role-loading", "verification-common", "card-case-space"],
+      "requires": ["role-loading", "verification-common"],
       "requiresByProfile": {
         "formal-bend/v1": ["role-author-formal"],
         "contract/v1": [
@@ -342,7 +342,8 @@
           "card-policy-sources",
           "card-risk-grill",
           "card-format",
-          "card-interaction-sweep"
+          "card-interaction-sweep",
+          "card-case-space"
         ]
       }
     },
@@ -373,7 +374,7 @@
       "id": "role-review",
       "profiles": ["formal-bend/v1", "contract/v1"],
       "path": "references/roles/review.md",
-      "when": "oracle-review invocation in its independent reviewer context for the assigned cold-read, reverse-impossible, source-aware or delivery review mode",
+      "when": "oracle-review invocation in its independent reviewer context for the assigned cold-read, reverse-impossible, source-aware, Formal adapter-pre-red or delivery review mode",
       "loader": "reviewer",
       "requires": ["role-loading", "verification-common"],
       "requiresByProfile": {

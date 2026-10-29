@@ -67,6 +67,18 @@ One canonical runtime, reference graph and ledger serve all roles. No role has i
    is intake work. An empty repository or no code in Design-only is recorded as `no code observation`
    and never blocks intake or the Draft ([common](common.md#the-request-text-is-s1)).
 
+## Dispatch ordering
+
+Before dispatching any write-capable sibling, classify the whole currently requested scope: touched
+files, shared state owner, effects and the Oracle slices they belong to. With overlap or unknown ownership,
+group the work under one approved Oracle or finish one slice before starting the next; task numbers do
+not establish independence. The pre-lock hook observes session-wide activation, not per-task permissions,
+so even disjoint paths in one activated session are not automatically safe to dispatch as plain writers.
+If further Oracle work appears later, join already-running writers before activating another slice;
+preserve their changes and evidence, then reassess scope. If activation already occurred, respect the deny
+and resolve the authorized workflow rather than retrying through shell writes, deleting `.ai`, or opening
+a new session as a bypass. A scope description is not a write authorization or a replacement for lock/RED.
+
 ## Mode selection and explicit role invocation
 
 Design-only is the default. Delivery requires an explicit implementation/self-verification/review request.
@@ -96,6 +108,8 @@ when coordinating the selected stages; read only current-step dependencies, not 
 5. For explicit Delivery, explicitly load and invoke `$test` on entry and immediately before target test writes.
    If it cannot be invoked, FAIL. Read delivery/ledger, initialize real required labels and follow the current
    guide. `$test` owns test writing/judgment; its standalone Low exemption never waives this Oracle run's rules.
+   Before accepting RED, dispatch the existing adapter checklist in `adapter-pre-red` mode as specified
+   in [delivery/red](delivery/red.md); this is not a Delivery review receipt or a new ledger state.
 6. Only after accepted VALID_RED, explicitly load and invoke [`$oracle-implement`](../../oracle-implement/SKILL.md)
    for scoped production changes and implementation decisions. ALREADY_SATISFIED is zero-production verification.
    Return harness work to `$test`. Read actual acceptance after composite commands, never double-transition.

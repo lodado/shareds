@@ -312,13 +312,13 @@ flowchart LR
   contract_space -. "contract/v1" .-> role_intake
   role_loading --> role_author
   verification_common --> role_author
-  card_case_space --> role_author
   role_author_formal -. "formal-bend/v1" .-> role_author
   contract_authoring -. "contract/v1" .-> role_author
   card_policy_sources -. "contract/v1" .-> role_author
   card_risk_grill -. "contract/v1" .-> role_author
   card_format -. "contract/v1" .-> role_author
   card_interaction_sweep -. "contract/v1" .-> role_author
+  card_case_space -. "contract/v1" .-> role_author
   role_loading --> role_author_closure
   verification_common --> role_author_closure
   role_author_closure_formal -. "formal-bend/v1" .-> role_author_closure

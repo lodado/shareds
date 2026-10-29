@@ -880,7 +880,7 @@ export async function emitTrace(options) {
       '})',
     )
   }
-  await writeProjection('trace', options, join(outDir, testFile), lines)
+  await writeProjection('trace', { ...options, bound }, join(outDir, testFile), lines)
   return {
     files: [join(outDir, modelFile), join(outDir, testFile)],
     spaceDigest: space.spaceDigest,
