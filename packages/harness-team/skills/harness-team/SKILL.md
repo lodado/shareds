@@ -67,10 +67,18 @@ Review-only tasks return findings without applying them.
 ## Report and carry-over
 
 Report the outcome, key files, actual check commands with `PASS`, `FAIL`, `NOT_RUN`, or `N/A`, and the review verdict
-and whether it was independent, or that no review was required. Never invent runs, reviewers, or savings. End with `Carry-over`:
-unapplied findings and your own mistakes, or `none`.
+and whether it was independent, or that no review was required. Never invent runs, reviewers, or savings.
 
-If persistent repository memory exists, maintain one project memory named `harness-carry-over` and its `MEMORY.md`
-entry. Record each open item with date, branch, commit, severity, `file:line`, and issue; update rather than duplicate.
-Remove resolved items and delete the file/index entry when empty. Otherwise disclose that the final report is the only
-ledger.
+When persistent repository memory exists, the carry-over ledger lives there, not in the final report:
+
+- Write to it only when the user points out your mistake, when a finding or defect stays unfixed because it is out of
+  scope or needs a user decision, or when you notice a wrong assumption likely to recur in other work. Do not record
+  what the code or git history already shows, or one-off slips with no chance of recurring.
+- Open defects go in one project memory named `harness-carry-over` and its `MEMORY.md` entry, one line per item with
+  date, branch, commit, severity, `file:line`, and issue. Update rather than duplicate; delete a line once it is fixed,
+  and the file and its index entry when the list is empty.
+- Corrections to your own behavior go in a feedback memory: the rule, why, and how to apply it.
+- The final report has no `Carry-over` section; add one line saying what was written to the ledger, if anything.
+
+Without persistent repository memory, end the report with `Carry-over`: unapplied findings and your own mistakes, or
+`none`, and disclose that the final report is the only ledger.

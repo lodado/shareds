@@ -63,5 +63,8 @@ test('keeps the direct workflow, review boundaries, and carry-over', async () =>
   assert.match(skill, /Return\s+`PERFECT`\s+only\s+when\s+no\s+findings\s+remain/)
   assert.match(skill, /Never\s+invent\s+runs,\s+reviewers,\s+or\s+savings/)
   assert.match(skill, /project\s+memory\s+named\s+`harness-carry-over`/)
+  assert.match(skill, /The\s+final\s+report\s+has\s+no\s+`Carry-over`\s+section/)
+  assert.match(skill, /Corrections\s+to\s+your\s+own\s+behavior\s+go\s+in\s+a\s+feedback\s+memory/)
+  assert.match(skill, /Without\s+persistent\s+repository\s+memory,\s+end\s+the\s+report\s+with\s+`Carry-over`/)
   assert.doesNotMatch(skill, /round\s*2|two\s+rounds|re-review/i)
 })

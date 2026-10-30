@@ -155,7 +155,7 @@
     {
       "name": "harness-team",
       "description": "Direct execution with carry-over fixes and a separate self-review for risky work or on request.",
-      "version": "0.7.0",
+      "version": "0.8.0",
       "author": {
         "name": "lodado"
       },

@@ -1,6 +1,6 @@
 {
   "name": "harness-team",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Work directly, fix carry-over first, and review risky work or requested reviews in a separate pass.",
   "author": {
     "name": "lodado",
