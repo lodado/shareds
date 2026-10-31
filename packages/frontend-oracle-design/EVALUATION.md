@@ -1,3 +1,30 @@
+# 0.116.0: one-call authoring loop (`oracle-cycle.mjs fast|walk`) cuts the fix-run round trips
+
+## Why
+
+Claude Code session logs (21 days, `scripts/oracle-session-stats.mjs`) showed about 56 Oracle script calls per
+session. Bend itself takes 0.2-1 s per file; the time went to one model turn per `check`, `validate`,
+`advance`, `project-card` and `rewind`, plus STAGE_STALE restarts and USAGE retries.
+
+## Change
+
+- `scripts/oracle-cycle.mjs fast --dir <dir>`: checks every folder and `repo:`-registered Bend file plus
+  `validate --stage model` in one call (about a second). Unproven `TODO` laws are reported as `todo`, not failures.
+- `scripts/oracle-cycle.mjs walk --dir <dir> [--to <stage>] [--reason <cause>]`: runs `fast`, every remaining
+  `advance` and the DRAFTED `project-card`, stopping at the first failure with `failed.code`, `detail` and `next`.
+  A stale stage rewinds to DISCOVERING only when `--reason` is given (it spends the authoring round as rewind does).
+  It calls the existing CLIs, so every gate, pin and budget is unchanged; lock stays outside the loop.
+  Measured on `test-fixtures/stale-search`: DISCOVERING to DRAFTED in one call, 1.8 s (previously six calls).
+- `references/roles/author-formal.md` and `controller-formal.md` route the edit loop through `fast` and the stage
+  walk through `walk`; below High, intake and authoring run in the controller context instead of fresh subagents.
+- `scripts/oracle-session-stats.mjs`: per-script calls, time and failures from local Claude Code logs, for
+  before/after comparison.
+
+## Validation
+
+- `oracle-cycle.test.mjs` (5 tests), package `pnpm run test` and `pnpm run lint` pass; `role-author` stays under its
+  279,000-byte cap without raising it.
+
 # 0.115.0: reduce late harness repairs and defer Draft-only reference loading
 
 ## Changes and evidence

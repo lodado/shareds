@@ -1245,6 +1245,13 @@ test('[bend] space-cross-check on the paging fixture finds the split pairs, the 
 test('[bend] card cross-check never asks for successors beyond the declared bound while discovery keeps its extended cover', async (t) => {
   const bin = await installedBend(t)
   if (!bin) return
+  // 앞선 실행이 남긴 cross-check 영수증이 Bend 호출을 건너뛰게 하면 아래 `calls > 0`이 거짓으로 실패한다 — 이 테스트에선 끈다
+  const cache = process.env.ORACLE_LINT_CACHE
+  process.env.ORACLE_LINT_CACHE = 'off'
+  t.after(() => {
+    if (cache === undefined) delete process.env.ORACLE_LINT_CACHE
+    else process.env.ORACLE_LINT_CACHE = cache
+  })
   const root = await mkdtemp(join(tmpdir(), 'oracle-bounded-cross-check-'))
   t.after(() => rm(root, { recursive: true, force: true }))
   await cp(fileURLToPath(new URL('../../../test-fixtures/pagination/', import.meta.url)), root, { recursive: true })

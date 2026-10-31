@@ -21,6 +21,10 @@ execution roles: they keep the session's effort and their own model rules (subag
 2. Invoke $oracle-author for the source-bound model package, independent analyst inputs, checks and projected
    Draft with all manual duties. Walk the stages with `scripts/oracle-stage.mjs`: `begin`, then
    `advance --to MODELED | CHECKED | DRAFTED` once each gate passes. Read acceptance back.
+   Walk them in one call with `scripts/oracle-cycle.mjs walk --dir <dir> [--to <stage>]`: it runs the
+   fast Bend/package check, every remaining `advance` and the DRAFTED `project-card`, stopping at the first
+   failure with `failed.code`, `detail` and `next`. A stale stage stops as STAGE_STALE; rerun with
+   `--reason <cause>` to rewind to DISCOVERING and re-walk (that spends the authoring round, as rewind does).
    A walk back is `rewind --to <stage> --reason <cause>` with the cause that sent it back. CHECKED passes
    at once on a receipt when the same package, Bend files, registered sources, harness, node and Bend
    passed it before; its evidence says so (`ORACLE_LINT_CACHE=off` turns receipts off).
@@ -39,6 +43,9 @@ execution roles: they keep the session's effort and their own model rules (subag
    (SendMessage on Claude Code). It already holds its references and re-reads only changed run files.
    Dispatch a fresh author only when that context is unavailable or for a new revision; its packet names
    the run directory and the open findings. The Delivery test worker is continued the same way.
+   Intake and authoring are not independence roles: below High run them in this controller context
+   instead of fresh subagents, so references load once. Fresh contexts stay required only where an
+   independence rule names them (analyst, cold-read, reverse-impossible, source-aware, delivery review).
    Reviewers and analysts keep their own independence rules. A round-2 confirmation continues the
    round-1 reviewer the same way, with only its finding IDs and the repair diff, under a new `--attempt`.
    Below High, when every round-1 claim is a cited product defect whose reviewer wrote its reproduction,

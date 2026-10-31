@@ -56,10 +56,9 @@ whatever is already loaded.
    and separate request/fetch/effect counts, not one collapsed event. For the machine reading, the
    requirement-to-law table and the cell, every-trace, witness and rank templates, invoke
    [`$bend-proof`](../../../bend-proof/SKILL.md), which reads [`bend-proof.md`](../bend-proof.md).
-   Check each Bend file with `scripts/oracle-model.mjs check --file <file>` before `prove`; a failure carries
-   its fix in `hint`.
-   Grow a Bend file in small sections: scaffold it, add one def or law group at a time, check after each
-   (about a second), and change it with small edits, never by regenerating the whole file.
+   Check Bend with `scripts/oracle-model.mjs check --file <file>` before `prove`, or all folder and `repo:`
+   Bend files plus `validate --stage model` in about a second with `scripts/oracle-cycle.mjs fast --dir <dir>`
+   (`TODO` laws as `todo`). Grow a file one def or law group at a time, `fast` after each.
 6. Continue the analyst for the translation review once `crossCheck` is written; run the checks below while
    it reads and collect it before `cross-check`.
    Run `oracle-package.mjs derive` and `oracle-adequacy.mjs check --package`, collect the available
@@ -79,7 +78,7 @@ whatever is already loaded.
    not to this pre-lock authoring role; its temporary pre-lock sweep report is not a consumer test.
 
 The controller walks `scripts/oracle-stage.mjs`: begin before independent inputs, then advance --to MODELED | CHECKED | DRAFTED
-once each gate passes. Return actual artifacts and gate results for those transitions.
+once each gate passes, or in one `oracle-cycle.mjs walk --dir <dir>` call. Return artifacts and gate results.
 oracle-lock.mjs create refuses a package oracle that is not at DRAFTED on the same package bytes and
 the Bend files and registered sources CHECKED judged, and only that script path's stage runtime writes stage.json. The lock still runs card lint itself,
 so a hand-written record skips no check. Authoring never fabricates stage acceptance.
