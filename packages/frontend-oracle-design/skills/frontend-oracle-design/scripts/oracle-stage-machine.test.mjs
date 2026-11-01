@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { spawn, spawnSync } from 'node:child_process'
-import { appendFile, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { spawnSync } from 'node:child_process'
+import { appendFile, cp, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -8,10 +8,22 @@ import process from 'node:process'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
-import { sha256 } from './oracle-fs.mjs'
+import {
+  authoringMachineCases,
+  CHILD_ENV,
+  failingGate,
+  inputsAgainst,
+  lockStage,
+  MODEL_STAGE,
+  ORDER,
+  pool,
+  runNode,
+  STAGE_NAME,
+  template,
+} from './oracle-authoring-machine.cases.mjs'
 import { compileBend } from './oracle-model.mjs'
 import { deliveryMachineCases } from './oracle-run-machine.cases.mjs'
-import { assertReadyToLock, assertRelockPinned, inputsPin, markLocked, readStage } from './oracle-stage.mjs'
+import { readStage } from './oracle-stage.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 import { parseBendTypes, toPlain, typeIR, valuesOf } from './oracle-types.mjs'
 
@@ -19,11 +31,7 @@ import { parseBendTypes, toPlain, typeIR, valuesOf } from './oracle-types.mjs'
 // check that the laws pin every cell, and drive the real stage commands from every stage the model reaches to see that
 // each event ends where the model says.
 const STAGE = fileURLToPath(new URL('../../../test-fixtures/stage/', import.meta.url))
-const SEARCH = fileURLToPath(new URL('../../../test-fixtures/stale-search/', import.meta.url))
 const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
-const { NODE_TEST_CONTEXT: _parent, ...INHERITED_ENV } = process.env
-// no CHECKED receipt from another test or run passes a gate for these runs
-const CHILD_ENV = { ...INHERITED_ENV, ORACLE_LINT_CACHE: 'off' }
 const PROOF_IMPORTS = 'import Base\nimport ./MODEL.bend as M\nimport ./LAWS.bend as Laws\n'
 
 const oracleModel = (...args) =>
@@ -82,9 +90,6 @@ test('[bend] laws pins all 3360 cells of the stage machine with no counterexampl
 
 // ---- the model against oracle-stage.mjs
 
-const ORDER = ['Discovering', 'Modeled', 'Checked', 'Drafted', 'Ready']
-const STAGE_NAME = { Discovering: 'DISCOVERING', Modeled: 'MODELED', Checked: 'CHECKED', Drafted: 'DRAFTED', Ready: 'ORACLE_READY' }
-const MODEL_STAGE = Object.fromEntries(Object.entries(STAGE_NAME).map(([model, name]) => [name, model]))
 // how the CLI spells each target; a target that names no stage is a name that is no stage, or no --to at all (null),
 // which the CLI refuses as usage before it reads the record (see `expected`)
 const SPELLINGS = {
@@ -119,73 +124,6 @@ function reachedPairs(step, init, messages) {
   return [...new Set([...seen.values()].map(({ at, inputs }) => `${at.$}/${inputs.$}`))].sort()
 }
 
-/**
- * An advance whose gate fails, set up without touching what the record took: a package that is not model-complete
- * before MODELED took its digest, a World.bend row that breaks adequacy where no pin covers it or the pin is already
- * stale, a card edit. Elsewhere the failing gate cannot be set up, and the cell runs with a passing gate.
- */
-function failingGate({ kind, pass, to, at, inputs }) {
-  if (kind !== 'Advance' || pass) return null
-  if (to === 'ToModeled' && at === 'Discovering') return 'model'
-  if (to === 'ToChecked' && (ORDER.indexOf(at) < 2 || inputs !== 'Judged')) return 'world'
-  if (to === 'ToDrafted') return 'card'
-  return null
-}
-
-function runNode(cwd, script, args) {
-  return new Promise((resolve) => {
-    const child = spawn(process.execPath, [join(SCRIPTS, script), ...args], { cwd, env: CHILD_ENV })
-    let stdout = ''
-    let stderr = ''
-    child.stdout.on('data', (chunk) => (stdout += chunk))
-    child.stderr.on('data', (chunk) => (stderr += chunk))
-    child.on('close', (status) => resolve({ status, stdout, stderr }))
-  })
-}
-
-async function pool(items, size, work) {
-  const results = Array.from({ length: items.length })
-  let next = 0
-  const worker = async () => {
-    while (next < items.length) {
-      const index = next
-      next += 1
-      results[index] = await work(items[index], index)
-    }
-  }
-  await Promise.all(Array.from({ length: size }, worker))
-  return results
-}
-
-/** A repository with the stale-search package under `.ai/oracles/` and the card projected from it. */
-async function template(root) {
-  const base = join(root, 'template')
-  await cp(SEARCH, base, { recursive: true })
-  const directory = join(base, '.ai', 'oracles', 'stale-search')
-  await mkdir(directory, { recursive: true })
-  await cp(join(SEARCH, 'oracle.package.json'), join(directory, 'oracle.package.json'))
-  const projected = await runNode(base, 'oracle-package.mjs', [
-    'project-card',
-    '--package',
-    '.ai/oracles/stale-search/oracle.package.json',
-    '--out',
-    '.ai/oracles/stale-search/oracle.md',
-  ])
-  assert.equal(projected.status, 0, projected.stderr)
-  const world = await readFile(join(base, 'World.bend'), 'utf8')
-  // the row forbids the newer answer being shown: adequacy refutes a goal, so the CHECKED gate fails
-  const forbidding = world.replace('      Race.imp(n, Race.isNew(f))\n', '      Race.imp(n, Bool.not(Race.isNew(f)))\n')
-  assert.notEqual(forbidding, world)
-  const pkg = JSON.parse(await readFile(join(directory, 'oracle.package.json'), 'utf8'))
-  return {
-    base,
-    packageSha256: sha256(await readFile(join(directory, 'oracle.package.json'))),
-    pin: await inputsPin(directory),
-    forbidding,
-    incomplete: JSON.stringify({ ...pkg, sources: [] }),
-  }
-}
-
 /** A copy of the template whose stage record is at `at`, taken on the template's files, and whose files are then `inputs`. */
 async function place(fixture, repo, { at, inputs }, failing) {
   await cp(fixture.base, repo, { recursive: true })
@@ -204,28 +142,6 @@ async function place(fixture, repo, { at, inputs }, failing) {
     await writeFile(card, (await readFile(card, 'utf8')).replace('Search', 'Searches'))
   }
   return directory
-}
-
-/** The inputs as the stage record judges them: its package digest, then the pin CHECKED took. */
-async function inputsAgainst(directory, record) {
-  const bytes = await readFile(join(directory, 'oracle.package.json'))
-  if (record.packageSha256 && record.packageSha256 !== sha256(bytes)) return 'PackageEdited'
-  if (ORDER.indexOf(MODEL_STAGE[record.stage]) < 2) return 'Judged'
-  // a record without the pin, or a pin that cannot be measured, is stale like a changed pin
-  const pin = await inputsPin(directory).catch(() => null)
-  return record.inputsSha256 === pin ? 'Judged' : 'BendEdited'
-}
-
-async function lockStage(directory) {
-  // the stage calls of oracle-lock.mjs create when no lock file exists yet
-  try {
-    await assertReadyToLock(directory)
-    await assertRelockPinned(directory)
-    await markLocked(directory)
-    return { status: 0, stderr: '' }
-  } catch (error) {
-    return { status: 1, stderr: `${error.code}: ${error.message}` }
-  }
 }
 
 async function command(repo, directory, cell) {
@@ -351,3 +267,6 @@ test('[bend] every stage the model reaches answers every event the way oracle-st
 
 // the Delivery run machine of oracle-run.mjs, proven and driven the same way
 for (const args of deliveryMachineCases) test(...args)
+
+// the authoring machine: stage record, round budget, walk and the stage half of the lock, proven and driven the same way
+for (const args of authoringMachineCases) test(...args)

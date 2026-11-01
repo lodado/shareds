@@ -15,7 +15,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { elapsedLabel, repositoryRoot, sha256, stableStringify, withDirectoryLock } from './oracle-fs.mjs'
-import { assertIterationAvailable, extendIterations, iterationBudget, iterationStatus, observeIteration } from './oracle-iterations.mjs'
+import { assertIterationAvailable, extendIterations, iterationBudget, iterationStatus, observeIteration, roundCeiling } from './oracle-iterations.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import { isEmptyCell, markdownLines, sectionLines } from './oracle-space.mjs'
 
@@ -57,6 +57,21 @@ export const REWIND_REASONS = Object.freeze(['review-finding', 'gate-failure', '
 const NOTE_LIMIT = 200
 // 독립 디스패치 기록은 최근 것만 둔다 — 시간 보고(oracle-reflect --timing)와 진행 한 줄(status --brief)이 읽는다
 const DISPATCH_LIMIT = 100
+// 되감기 상한 — 리뷰 입력 없이 rewind→advance→rewind가 끝없이 도는 것을 막는다. 실측(실기록 17개) 최대 9회의 바로 위다.
+// 되감기와 CHECKED 재검사가 센다. extend가 받아들여지면 지금 횟수에서 이만큼 더 허용한다
+export const REWIND_CAP = 10
+
+/** 쓰이는 상한 — 테스트는 ORACLE_REWIND_CAP으로 낮출 수만 있다. */
+export function rewindCap() {
+  const lowered = Number(process.env.ORACLE_REWIND_CAP)
+  if (!Number.isSafeInteger(lowered) || lowered < 1 || lowered >= REWIND_CAP) return REWIND_CAP
+  return lowered
+}
+
+const isCount = (value) => Number.isSafeInteger(value) && value >= 0
+// 되감기 횟수는 이력에서 다시 셀 수 있다 — 되감기 항목과 CHECKED 재검사 항목
+const countedRewinds = (history) => history.filter((entry) => entry.evidence === 'rewind' || entry.recheck === true).length
+const rewindAllowance = (record) => record.rewindAllowance ?? rewindCap()
 const DETAIL_LIMIT = 80
 
 // 단계 기록의 시각 — 판정에는 쓰지 않고, 단계별 리드타임과 진행 한 줄만 이것으로 계산한다
@@ -86,6 +101,10 @@ export async function readStage(directory) {
   }
   // Old histories remain evidence. Upgrading must not grant eight completed rewinds a fresh allowance.
   record.iterations = iterationBudget(record.iterations, 1 + record.history.filter((entry) => entry.evidence === 'rewind').length)
+  if ((record.rewinds !== undefined && !isCount(record.rewinds)) || (record.rewindAllowance !== undefined && !isCount(record.rewindAllowance)))
+    throw new StageError('STAGE_INVALID', 'rewinds and rewindAllowance are counts')
+  // 저장한 횟수는 줄지 않는다 — 이력이 더 많이 세면 그것을 쓴다(옛 기록)
+  record.rewinds = Math.max(record.rewinds ?? 0, countedRewinds(record.history))
   return record
 }
 
@@ -656,6 +675,7 @@ async function advance(directory, target, options) {
     inputsSha256,
     ...(recheck ? { recheck: true, ...options.explanation } : {}),
   })
+  result.rewinds = record.rewinds + Number(recheck)
   // 판정한 패키지의 뜻 — 되돌림이 뜻이 같은 수정(출처 위치)인지 가른다
   if (!contract) result.meaningSha256 = meaningOf(bytes)
   await writeStage(directory, result)
@@ -715,6 +735,8 @@ async function rechecks(directory, record, target, binding, explanation) {
   const recheck = target !== next && (await recheckable(directory, record, target, binding))
   if (target !== next && !recheck) throw new StageError('STAGE_SKIP', `${record.stage} can only advance to ${next ?? 'nothing'}, not ${target}`)
   if (explanation && !recheck) throw new StageError('USAGE', '--reason belongs to rewind or to advance --to CHECKED judging changed inputs again', 2)
+  // 재검사는 되감기처럼 센다
+  if (recheck) assertRewindAvailable(record)
   return recheck
 }
 
@@ -776,10 +798,12 @@ async function rewind(directory, target, explanation) {
   // 저작 라운드는 리뷰 왕복을 센다 — 고친 바이트를 review-input으로 다시 보낼 때 다음 라운드가 된다. 되감기는 그 수리의
   // 일부라 라운드를 쓰지 않는다. 이미 소진된 기록(옛 이력 승계)은 되감기도 NEEDS_DECISION으로 멈춘다
   assertIterationAvailable(record.iterations)
+  assertRewindAvailable(record)
   // 판정한 뒤 바뀐 것이 출처 위치뿐이면 리뷰가 읽은 뜻은 그대로다 — 이력에 표시만 남긴다(관문은 DISCOVERING부터 다시 돈다)
   const metadataOnly = !contract && onlyMetadataChanged(record, bytes)
   const dispatched = explanation.reason === 'review-finding' ? [] : dispatchedSinceLastRewind(record)
   const result = moved(record, target, rewoundDigest(target, bytes), 'rewind', { inputsSha256: keepsPin ? record.inputsSha256 : undefined })
+  result.rewinds = record.rewinds + 1
   Object.assign(result.history.at(-1), { inputSha256, ...explanation, ...(metadataOnly ? { metadataOnly: true } : {}), ...(dispatched.length > 0 ? { dispatchedBefore: dispatched } : {}) })
   await writeStage(directory, result)
   return result
@@ -822,9 +846,28 @@ async function extend(directory, path) {
   if (!record) throw new StageError('STAGE_MISSING', `no ${STAGE_FILE}`)
   if (record.stage === 'ORACLE_READY') throw new StageError('STAGE_LOCKED', 'an extension cannot unlock an approved revision')
   const approval = JSON.parse(await readFile(resolve(path), 'utf8'))
-  const result = { ...record, iterations: extendIterations(record.iterations, approval, 'authoring') }
+  // 받아들여진 extend는 지금 횟수에서 상한만큼 더 되감게 한다 — 되감기를 위한 별도 명령은 없다
+  const result = { ...record, iterations: extendIterations(record.iterations, approval, 'authoring'), rewindAllowance: Math.max(rewindAllowance(record), record.rewinds + rewindCap()) }
   await writeStage(directory, result)
   return result
+}
+
+/** extend가 받아들여질 수 있는 기록 — 잠기지 않았고, 다음 라운드가 상한을 넘지 않는다. */
+function canExtend(record) {
+  return record.stage !== 'ORACLE_READY' && Math.max(record.iterations.round, record.iterations.limit) + 1 <= roundCeiling()
+}
+
+/** extend도 거절되는 기록의 다음 걸음 — 계약이 틀렸으니 사용자가 출처를 고치고 새 run으로 시작한다. */
+const REVISE_NEXT = 'NEEDS_DECISION: the user rewrites the sources, then oracle-stage.mjs begin --dir <new run dir>'
+
+/** 되감기 허용치를 다 쓴 기록은 더 되감지 않는다 — 앞으로 가거나, 사용자 승인으로 extend해야 한다. */
+function assertRewindAvailable(record) {
+  if (record.rewinds < rewindAllowance(record)) return
+  const back = canExtend(record)
+    ? `ask the user, then oracle-stage.mjs extend --approval <explicit-user-approval.json> allows ${rewindCap()} more`
+    : `extend is refused here (locked, or round ${roundCeiling()} reached): ${REVISE_NEXT}`
+  throw new StageError('REWIND_CAP_REACHED',
+    `${record.rewinds} rewinds and rechecks reach this revision's allowance of ${rewindAllowance(record)}: go forward (walk, lock), or ${back}`)
 }
 
 /** 기록한 바이트와 지금 바이트가 다르면 그 단계 기록은 낡았다(Contract는 카드, Formal은 패키지와 CHECKED 뒤의 고정 입력). */
@@ -841,7 +884,7 @@ async function status(directory) {
   const record = await readStage(directory)
   if (!record) return { stage: null }
   const binding = await bindingAt(directory, record)
-  return { stage: record.stage, ...(binding.kind === 'explicit' ? { verificationProfile: binding.profile } : {}), stale: await isStale(directory, record, binding), iterations: iterationStatus(record.iterations), history: record.history }
+  return { stage: record.stage, ...(binding.kind === 'explicit' ? { verificationProfile: binding.profile } : {}), stale: await isStale(directory, record, binding), iterations: iterationStatus(record.iterations), rewinds: { count: record.rewinds, allowance: rewindAllowance(record) }, history: record.history }
 }
 
 /**
@@ -865,22 +908,40 @@ async function briefStatus(directory, nowMs = Date.now()) {
   const stale = await isStale(directory, record, binding)
   // 잠금 뒤 init까지 했으면 진행은 run 쪽 한 줄이 말한다
   const initialized = record.stage === 'ORACLE_READY' && (await stat(join(directory, 'run-state.json')).then(() => true, () => false))
-  const next = initialized ? `oracle-run.mjs status --brief --dir ${dir}` : stageCommand(record.stage, binding.profile, dir, stages[position + 1], stale)
+  const next = initialized ? `oracle-run.mjs status --brief --dir ${dir}` : stageCommand(record.stage, binding.profile, dir, stages[position + 1], staleStep(record, stale))
   return [
     phaseLine(record.stage, next),
     place,
     entered ? `${elapsedLabel(entered, nowMs)} in stage` : null,
     `authoring round ${iterations.round}/${iterations.limit}${iterations.exhausted ? ' exhausted' : ''}`,
+    `rewinds ${record.rewinds}/${rewindAllowance(record)}`,
     dispatched.length ? `dispatched: ${dispatched.join(', ')}` : null,
     remaining.length ? `remaining: ${remaining.join(' → ')}` : null,
     stale ? 'STALE: the recorded bytes changed since this stage — rewind' : null,
   ].filter(Boolean).join(' · ')
 }
 
+/**
+ * 낡은 기록의 다음 걸음 — 되감기(rewind), 되감기 허용치를 다 썼으면 extend, extend도 막혔으면(잠긴 기록, 라운드 상한)
+ * 새 revision이다. 낡지 않았으면 null.
+ */
+function staleStep(record, stale) {
+  if (!stale) return null
+  if (record.rewinds < rewindAllowance(record)) return 'rewind'
+  return canExtend(record) ? 'extend' : 'revise'
+}
+
+
+const STALE_NEXT = {
+  extend: (dir) => `oracle-stage.mjs extend --dir ${dir} --approval <explicit-user-approval.json>`,
+  revise: () => REVISE_NEXT,
+}
+
 /** 이 작성 단계의 명령 하나 — Formal은 walk 한 번이 DRAFTED까지 가고, Contract는 advance를 한 칸씩 부른다. */
-function stageCommand(stage, profile, dir, following, stale) {
+function stageCommand(stage, profile, dir, following, staleNext) {
   const contract = profile === 'contract/v1'
-  if (stale) return contract ? `oracle-stage.mjs rewind --dir ${dir} --to DISCOVERING --reason <cause>` : `oracle-cycle.mjs walk --dir ${dir} --reason <cause>`
+  if (STALE_NEXT[staleNext]) return STALE_NEXT[staleNext](dir)
+  if (staleNext) return contract ? `oracle-stage.mjs rewind --dir ${dir} --to DISCOVERING --reason <cause>` : `oracle-cycle.mjs walk --dir ${dir} --reason <cause>`
   if (stage === 'DRAFTED') return `oracle-lock.mjs create --oracle ${dir}/oracle.md --lock ${dir}/oracle.lock.json --source <approved-source>`
   // init이 카드의 스택 라벨(proof·adequacy·type·fast-check·contract-cases)을 스스로 더한다 — 손으로는 저장소 검사만 적는다
   if (stage === 'ORACLE_READY') return `oracle-run.mjs init --dir ${dir} --lock ${dir}/oracle.lock.json --scan-root <scan-root> --required-label <repo-check>`

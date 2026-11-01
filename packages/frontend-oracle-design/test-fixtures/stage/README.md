@@ -23,6 +23,8 @@ finite state machine and the real stage commands can be compared with it. It dec
   event, `init`, `next`, `observe`, `stale`, and 29 relations: forward, refusal, frame, environment and safety.
 - `LAWS.bend`: one cell law per relation: it holds for every state and event of the model.
 - `PROOF.bend`: imports `./LAWS.bend` and defines no law.
+- `authoring/`: the larger model this one is the stage part of, with `begin`, the authoring round budget,
+  `review-input`, `extend` and `walk` (its own README).
 
 The proof is generated: `oracle-model.mjs prove --dir test-fixtures/stage` generates the cell arms of the 29 laws,
 one case per state and event (120 × 28 = 3,360 each), and checks them in a temporary copy. It writes nothing here.

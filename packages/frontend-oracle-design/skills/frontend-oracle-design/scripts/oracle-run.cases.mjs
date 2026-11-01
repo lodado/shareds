@@ -9,6 +9,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { HOST_RECEIPTS_FILE, reviewOutputDigest, stableStringify } from './oracle-fs.mjs'
+import { extendIterations, iterationBudget, ROUND_CEILING } from './oracle-iterations.mjs'
 import { emitWorld } from './oracle-projection.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 import { resolveExecutable, spawnGit } from './resolve-executable.mjs'
@@ -4780,6 +4781,18 @@ test('review iterations bind High reviewers to one round, require prior findings
   assert.equal(extended.reviewScope.mode, 'confirm-fixes')
   assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN', 'an extension is not delivery approval')
   assert.equal(run(['review-extend', '--dir', oracleDirectory, '--approval', approval]).status, 1)
+})
+
+// a unit case only: delivery review rounds are not in the Delivery Bend model
+test('delivery review approvals stop at the round ceiling: no approval opens round 7', () => {
+  const approval = (round) => ({ decision: 'approve-one-more-round', phase: 'delivery-review', round,
+    source: 'conversation: user approved one more round', reason: 'one more review lap' })
+  let budget = iterationBudget(undefined)
+  for (const round of [3, 4, 5, 6]) budget = extendIterations(budget, approval(round), 'delivery-review')
+  assert.equal(ROUND_CEILING, 6)
+  assert.equal(budget.limit, 6)
+  assert.throws(() => extendIterations(budget, approval(7), 'delivery-review'),
+    { code: 'ITERATION_CEILING_REACHED', message: /contract itself is wrong.*new run id starts at round 1/ })
 })
 
 /** 1차 리뷰어가 F1에 붙이는 재현 code — GREEN 명령이 이미 돌리는 파일 끝에 붙는다(ESM import는 어디에 있어도 끌어올려진다). */

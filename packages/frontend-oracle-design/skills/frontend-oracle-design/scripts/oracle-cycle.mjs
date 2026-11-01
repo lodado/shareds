@@ -40,6 +40,7 @@ const NEXT = {
   STAGE_GATE: 'fix the package/Bend issue named in detail, then rerun walk',
   STAGE_ITERATIONS: 'authoring budget exhausted: ask the user, then oracle-stage.mjs extend --approval <file>',
   STAGE_MISSING: 'run oracle-stage.mjs begin --dir <dir> first',
+  REWIND_CAP_REACHED: 'rewind allowance spent: oracle-stage.mjs status --brief names the next step (extend after the user approves, or NEEDS_DECISION when extend is refused)',
   PACKAGE_INVALID: 'fix the listed package issues, then rerun fast',
   BEND_CHECK: 'fix the Bend file named in detail (hint included when known), then rerun fast',
   CARD_NOT_GENERATED: 'oracle.md is hand-written: project the card into a new file and merge by hand',

@@ -9,7 +9,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { sha256 } from './oracle-fs.mjs'
 import { extendIterations, iterationBudget } from './oracle-iterations.mjs'
-import { assertReadyToLock, inputsPin, markLocked, preLockProof, readStage } from './oracle-stage.mjs'
+import { assertReadyToLock, inputsPin, markLocked, preLockProof, readStage, REWIND_CAP } from './oracle-stage.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 
 const FIXTURE = fileURLToPath(new URL('../../../test-fixtures/stale-search/', import.meta.url))
@@ -269,11 +269,55 @@ test('a recorded standing delegation raises authoring rounds once, at most to fi
   const explicit = node(root, 'oracle-stage.mjs', ['extend', '--dir', directory, '--approval', approval])
   assert.equal(explicit.status, 0, explicit.stderr)
   assert.equal(JSON.parse(explicit.stdout).iterations.limit, 6)
+  // round 6 is the ceiling: no approval opens round 7, and the refusal writes nothing
+  const before = await readFile(join(directory, 'stage.json'))
+  await writeFile(approval, JSON.stringify({ decision: 'approve-one-more-round', phase: 'authoring', round: 7,
+    source: 'conversation: explicit approval of round 7', reason: 'still one more lap' }))
+  const ceiling = node(root, 'oracle-stage.mjs', ['extend', '--dir', directory, '--approval', approval])
+  assert.equal(ceiling.status, 1)
+  assert.match(ceiling.stderr, /^ITERATION_CEILING_REACHED: .*contract itself is wrong.*new run id starts at round 1/)
+  assert.deepEqual(await readFile(join(directory, 'stage.json')), before)
 
   const delegation = { decision: 'delegated-rounds', phase: 'authoring', upTo: 5, source: 'conversation', reason: 'no policy change' }
   assert.throws(() => extendIterations(iterationBudget(undefined), delegation, 'delivery-review'), { code: 'ITERATION_APPROVAL_REQUIRED' })
   assert.throws(() => extendIterations(iterationBudget(undefined), { ...delegation, phase: 'delivery-review' }, 'delivery-review'),
     { code: 'ITERATION_APPROVAL_REQUIRED' })
+})
+
+test('rewinds and rechecks stop at the rewind cap until an accepted extend, and the count rebuilds from history', async (t) => {
+  const { root, directory } = await repository(t)
+  const record = join(directory, 'stage.json')
+  assert.equal(stage(root, directory, 'begin').status, 0)
+  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  for (let lap = 0; lap < REWIND_CAP; lap += 1) {
+    assert.equal(stage(root, directory, 'rewind', 'DISCOVERING').status, 0, `rewind ${lap + 1}`)
+    assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  }
+  const before = await readFile(record)
+  const capped = stage(root, directory, 'rewind', 'DISCOVERING')
+  assert.equal(capped.status, 1)
+  assert.match(capped.stderr, /^REWIND_CAP_REACHED: 10 rewinds .*allowance of 10: go forward .*oracle-stage\.mjs extend --approval/)
+  assert.deepEqual(await readFile(record), before)
+  assert.match(node(root, 'oracle-stage.mjs', ['status', '--brief', '--dir', directory]).stdout, /· rewinds 10\/10 ·/)
+  // the count is the history's: a record that lost the field still stops
+  const { rewinds: _dropped, ...withoutCount } = JSON.parse(before.toString('utf8'))
+  await writeFile(record, JSON.stringify(withoutCount))
+  assert.match(stage(root, directory, 'rewind', 'DISCOVERING').stderr, /^REWIND_CAP_REACHED:/)
+  // where extend would be refused (round 6 already allowed) the refusal names NEEDS_DECISION, not extend
+  const atCeiling = JSON.parse(before.toString('utf8'))
+  await writeFile(record, JSON.stringify({ ...atCeiling, iterations: { ...atCeiling.iterations, limit: 6 } }))
+  const revise = stage(root, directory, 'rewind', 'DISCOVERING')
+  assert.match(revise.stderr, /^REWIND_CAP_REACHED: .*extend is refused here .*NEEDS_DECISION: the user rewrites the sources/)
+  assert.doesNotMatch(revise.stderr, /extend --approval/)
+  await writeFile(record, before)
+  // the user's explicit approval of one more round allows ten more rewinds from here
+  const approval = join(root, 'approval.json')
+  await writeFile(approval, JSON.stringify({ decision: 'approve-one-more-round', phase: 'authoring', round: 3,
+    source: 'conversation: explicit approval of round 3', reason: 'the walk back needs another pass' }))
+  assert.equal(node(root, 'oracle-stage.mjs', ['extend', '--dir', directory, '--approval', approval]).status, 0)
+  assert.equal(stage(root, directory, 'rewind', 'DISCOVERING').status, 0)
+  const extended = JSON.parse(await readFile(record, 'utf8'))
+  assert.deepEqual({ rewinds: extended.rewinds, rewindAllowance: extended.rewindAllowance }, { rewinds: 11, rewindAllowance: 20 })
 })
 
 test('new analyst dispatches spend rounds even with identical source input while transport retries do not', async (t) => {
@@ -1214,7 +1258,7 @@ test('stage steps record when they happened and how long the gate took; status -
   const brief = () => node(root, 'oracle-stage.mjs', ['status', '--dir', directory, '--brief'])
   const line = brief()
   assert.equal(line.status, 0, line.stderr)
-  assert.match(line.stdout, /^phase 2\/6 Model · next: oracle-cycle\.mjs walk --dir \S+ · stage MODELED 2\/5 · \d+s in stage · authoring round 1\/2 · dispatched: model-analyst \d+s ago · remaining: CHECKED → DRAFTED → lock\n$/)
+  assert.match(line.stdout, /^phase 2\/6 Model · next: oracle-cycle\.mjs walk --dir \S+ · stage MODELED 2\/5 · \d+s in stage · authoring round 1\/2 · rewinds 0\/10 · dispatched: model-analyst \d+s ago · remaining: CHECKED → DRAFTED → lock\n$/)
   assert.equal(node(root, 'oracle-stage.mjs', ['advance', '--dir', directory, '--to', 'CHECKED', '--brief']).status, 2, '--brief belongs to status')
 
   const packagePath = join(directory, 'oracle.package.json')

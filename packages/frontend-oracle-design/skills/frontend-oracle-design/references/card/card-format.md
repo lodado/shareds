@@ -360,13 +360,14 @@ review-finding|gate-failure|user-answer|source-change [--note <one line>]`. The 
 - A role's first pass is `full`; subsequent passes are `confirm-fixes`. A changed input already reviewed in the
   current round starts the next round; different roles' first updates share that repair batch.
   Identical input consumes no round and permits no fresh hunt.
-- `ITERATION_BUDGET_EXHAUSTED` refuses the operation before stage/output changes. Preserve the remaining
-  findings and stop. Legacy rewind history counts on upgrade; it is never silently reset.
-- Only after an actual explicit approval, use `oracle-stage.mjs extend --dir <dir> --approval <file>`.
-  The JSON records `decision: "approve-one-more-round"`, `phase: "authoring"`, the exact next `round`,
-  `source` pointing to that user message, and `reason`. It grants one additional round, not a reset,
-  policy approval, permission to unlock, or a waiver. The source is auditable self-report, not proof
-  of human identity; never fabricate it or treat blanket delegation as that approval. A user who
+- `ITERATION_BUDGET_EXHAUSTED` refuses before any write: keep the findings, stop. Old rewinds count.
+  Ten rewinds/rechecks end in `REWIND_CAP_REACHED`.
+- Only after explicit approval, use `oracle-stage.mjs extend --dir <dir> --approval <file>`.
+  It records `decision: "approve-one-more-round"`, `phase: "authoring"`, the next `round`,
+  `source` (that user message) and `reason`: one round plus ten rewinds (no reset, policy
+  approval, unlock or waiver), none past round 6 (`ITERATION_CEILING_REACHED`: contract wrong;
+  new sources, new run id), so at most 50 rewinds a revision. The source is self-report, not proof of
+  identity: never fabricate it or call blanket delegation that. A user who
   delegated the choices ("알아서 해") gets one `decision: "delegated-rounds"` record per revision
   (`phase: "authoring"`, `upTo` at most 5, the user's words as `source`, `reason`); policy changes still ask.
 

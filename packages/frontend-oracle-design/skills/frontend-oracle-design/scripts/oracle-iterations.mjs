@@ -1,3 +1,4 @@
+import process from 'node:process'
 import { sha256, stableStringify } from './oracle-fs.mjs'
 
 export class IterationError extends Error {
@@ -61,11 +62,28 @@ export function assertReviewIterationEvent(event) {
 /** Highest authoring limit a standing delegation ("don't ask, handle it") can grant; past it the user is asked. */
 export const DELEGATED_ROUND_CAP = 5
 
+/**
+ * No approval in any phase opens a round past this, one past the delegation cap; there is no override. A limit stored
+ * above it before the ceiling existed stays usable; only further extensions are refused.
+ */
+export const ROUND_CEILING = 6
+
+/** The ceiling in force: tests may lower it (ORACLE_ROUND_CEILING, from the delegation cap up), never raise it. */
+export function roundCeiling() {
+  const lowered = Number(process.env.ORACLE_ROUND_CEILING)
+  if (!Number.isSafeInteger(lowered) || lowered < DELEGATED_ROUND_CAP || lowered >= ROUND_CEILING) return ROUND_CEILING
+  return lowered
+}
+
 /** A source reference records human authority, it does not authenticate it. Never manufacture this document. */
 export function extendIterations(value, approval, phase) {
   const budget = iterationBudget(value)
   if (approval?.decision === 'delegated-rounds') return delegateRounds(budget, approval, phase)
   const round = Math.max(budget.round, budget.limit) + 1
+  if (round > roundCeiling()) {
+    throw new IterationError('ITERATION_CEILING_REACHED',
+      `round ${round} is past the ceiling of ${roundCeiling()} review rounds: the contract itself is wrong. Stop at NEEDS_DECISION; the user rewrites the sources and a new run id starts at round 1`)
+  }
   if (approval?.decision !== 'approve-one-more-round' || approval.phase !== phase || approval.round !== round ||
       typeof approval.source !== 'string' || !approval.source.trim() ||
       typeof approval.reason !== 'string' || !approval.reason.trim()) {

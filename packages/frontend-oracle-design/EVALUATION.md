@@ -1,3 +1,127 @@
+# 0.122.0: authoring is a proven machine, rewinds have a cap and review rounds a ceiling
+
+## Why
+
+Wave F2 of the self-FSM plan. The stage fixture covered stage moves only; `begin`, the authoring round budget,
+`review-input`, `extend`, `oracle-cycle.mjs walk` and the stage half of the lock had example tests only. The first
+version of the new model proved one finding outright (`rewind_cycle_returns`): rewind from ORACLE_READY, walk and lock
+returned to the same state with the same budget, so rewind loops had no bound. Two user decisions followed during the
+wave: cap that loop, and give review rounds an absolute ceiling (`approve-one-more-round` could repeat forever, and
+the user reported "review → oh right → review → oh right" laps).
+
+## Change
+
+- `test-fixtures/stage/authoring` (prefix `Auth`): stage, inputs (judged, Bend edited, package edited), the budget
+  (round 1–5, limit 2–5, delegation recorded, the review text and dispatch keys as unseen / this round / earlier),
+  the rewinds since the allowance was set, and whether the last entry is a repeatable rewind. 40 commands: begin,
+  every advance and rewind target with and without a passing gate or reason, lock, status, package and Bend edits,
+  four review-input kinds, right and wrong explicit approvals, three delegations, walk with and without a reason.
+  Walk is the composite (rewind when stale, then up to three advances). Left out (model header): contract/v1, other
+  review kinds, review-input without `--attempt`, legacy records without `iterations`, walk with a failing gate, the
+  lock file and its sources, history and output fields.
+- 22 relations, proven with `prove-reach --prefix Auth --safe safe` on all 2,527 reachable states (domain
+  25,920 × 40, diameter 12). Among them: a refusal changes nothing; rounds rise by at most one and only on
+  review-input; the limit never falls and moves only on extend; exhaustion is refused only on review-input; ORACLE_READY
+  refuses review-input and extend; a delegation is accepted once; an approval adds exactly one round and never opens
+  one past the ceiling; the rewind count rises by one only on a back edge within the allowance and falls only on an
+  accepted extend; REWIND_CAP_REACHED refuses only back edges past the allowance; and `Q_ranked`, now without
+  exemptions: every accepted command or edit keeps the state or raises the rank (review potential, limit, rewind
+  count, stage, edits), so no cycle returns to a state. That holds because file edits are modelled one-way (judged →
+  Bend edited → package edited, no revert): a real revert of the package bytes returns a record to a judged state
+  without a command, and the replay only appends, so it never tests one. `Auth.safe` adds the invariants: round ≤ limit ≤ ceiling,
+  rewinds ≤ cap, no record means a fresh budget, every reached state ends (finish, or past the allowance one approval
+  then finish, or a new revision where extend is refused), and the phase line names an accepted command.
+  `LAWS.bend`: two cell laws, five witnesses (ORACLE_READY, an exhausted budget, limit 5, REWIND_CAP_REACHED,
+  ITERATION_CEILING_REACHED), `approval_reopens`, `approval_rewinds_again`, and `rewind_cycle_spends` (the old
+  finding, now false).
+- `oracle-authoring-machine.cases.mjs` (registered from `oracle-stage-machine.test.mjs`, which now imports its shared
+  workspace helpers): the kernel proofs; the stage part refines the stage fixture on every reached record (except the
+  cap refusals it has no count for); outcomes per command kind and four groups of commands no reached state tells
+  apart; a replay of 72 model traces (2,012 steps, 1,470 items: stage, inputs, budget class, rewind class, command,
+  outcome) on the real CLI, comparing outcome, stage, inputs, budget, rewind count and repeatability after every step,
+  that a refusal writes nothing, that the top-level stage fields equal the last history entry, and `status --brief`;
+  and a recovery case (a stray temporary file is ignored; a torn record stops every command without a write, walk
+  calls it STAGE_MISSING, and only deleting it goes on, at round 1).
+- Rewind cap. Measured first: 22 `stage.json` under the home directory, 17 real revisions (5 scratch or Trash copies
+  left out). Rewinds per revision: 0 ×6, 1 ×3, 2 ×2, 4 ×3, 7 ×1, 9 ×2; CHECKED rechecks 0 in all. `REWIND_CAP` is 10
+  (oracle-stage.mjs). Rewinds and rechecks both count (a recheck is the in-place walk back to CHECKED; without it a
+  Bend edit → recheck → advance cycle stays open). `stage.json` keeps `rewinds`; reading takes the larger of it and
+  the history's count, so it never falls and rebuilds from history. Past the allowance, rewind, the CHECKED recheck
+  and walk's rewind refuse REWIND_CAP_REACHED before any write; the hint says go forward, or ask the user and
+  `extend`, or, where extend is refused (ORACLE_READY, the round ceiling), NEEDS_DECISION. walk's next step points
+  at `status --brief`. The no-op repeat of the last rewind stays accepted. The way past it reuses `extend`: an
+  accepted explicit approval or delegation sets `rewindAllowance` to the count + 10. No new command, so the two
+  budgets are coupled: more rewinds need an approved review round (which also opens that round and uses one of the
+  at most four extensions under the ceiling), and every approved round adds 10 rewinds. A revision therefore has at
+  most 10 + 4 × 10 = 50 counted rewinds and rechecks. `status` reports
+  `rewinds: {count, allowance}`, the brief line `rewinds n/m`; a stale record past the allowance names `extend`, or,
+  when extend is refused (ORACLE_READY, the round ceiling), NEEDS_DECISION and a new run directory.
+- Round ceiling. `ROUND_CEILING` is 6 (oracle-iterations.mjs, every phase: authoring and delivery review, one past
+  DELEGATED_ROUND_CAP). No approval opens a round past 6: `extendIterations` refuses it with
+  ITERATION_CEILING_REACHED. It does not apply backwards: a run already extended past 6 before this change keeps
+  those rounds, and only further `extend` calls are refused. The contract itself is wrong, stop at NEEDS_DECISION, the user rewrites the sources, a new
+  run id starts at round 1. No override flag. `ORACLE_REWIND_CAP` and `ORACLE_ROUND_CEILING` can only lower the two
+  values (the replay runs the CLI at the model's cap 1 and ceiling 5).
+- Regression cases: oracle-stage.test.mjs "rewinds and rechecks stop at the rewind cap until an accepted extend, and
+  the count rebuilds from history" (ten rewinds, the eleventh refused without a write, the brief line, the field
+  dropped and still refused, an approval allows 20); the delegation case now ends with round 7 refused as
+  ITERATION_CEILING_REACHED without a write; oracle-run.cases.mjs "delivery review approvals stop at the round
+  ceiling". Delivery review rounds are NOT in the F1 Delivery model; the delivery-side check is that unit case only.
+- `references/card/card-format.md`: the budget paragraph names both codes, the coupling, the 50-rewind bound, and
+  keeps "no policy approval" and "not proof of identity"; the file is 1 byte smaller than before (29,848 → 29,847).
+
+- Review fixes (independent Opus review, applied once): the rewind/round coupling and the 50-rewind bound stated;
+  edits modelled one-way named in the model header, README and the `Q_ranked` claim; the edit-and-retry loop listed
+  as an open fact; the ceiling worded as "no approval opens a round past 6"; the REWIND_CAP_REACHED hint names
+  NEEDS_DECISION where extend is refused (new assertion in the rewind-cap case) and walk points at `status --brief`;
+  card-format.md keeps "no policy approval" and "not proof of identity"; the replay derives the rewind class from
+  `ORACLE_REWIND_CAP`.
+
+## Findings left for F3 (not fixed)
+
+- Exhaustion guards that a record `begin` wrote never reach: advance, rewind and lock (oracle-stage.mjs:659, :800,
+  :160, :176) and `iterationStatus().exhausted` (oracle-iterations.mjs:47, brief ' exhausted' oracle-stage.mjs:905);
+  only a legacy record rebuilt as round 1 + rewinds (oracle-stage.mjs:103) gets there. ITERATION_APPROVAL_REUSED for an
+  explicit approval (oracle-iterations.mjs:93) is unreachable, argued from code: the round check comes first.
+- `iterations.inputs.stage` is written (oracle-stage.mjs:144) and never read; `NEXT.STAGE_ITERATIONS`
+  (oracle-cycle.mjs:41) is dead.
+- walk reports an unreadable record as STAGE_MISSING (oracle-cycle.mjs:116); walk rewinds to DISCOVERING on a
+  Bend-only change where `advance --to CHECKED` would recheck in place; a walk whose gate fails keeps its rewind
+  (oracle-cycle.mjs:120, :143; not modelled).
+- STAGE_LOCKED on review-input and extend (oracle-stage.mjs:830, :847) is passed by rewinding from ORACLE_READY (now
+  counted against the cap).
+- review-input `--attempt` is optional in code (oracle-stage.mjs:826) and required in USAGE (:962).
+- The budget is not in history (review-input and extend write none: 368 such writes in the replay), so it cannot be
+  rebuilt; a torn record is recovered only by deleting it, and delete + begin starts round 1 (oracle-stage.mjs:638;
+  the guard hook blocks only Write/Edit of `stage.json`, oracle-guard-hook.mjs:423).
+
+## Open facts (not fixed)
+
+- Review loops run outside `review-input` / `review-packet` (a conversational reviewer spawned again and again) are
+  not counted by any FOD mechanism.
+- `extend` approval `source` strings are unauthenticated self-report.
+- A new `.ai/oracles/<id>` directory starts at round 1 and rewind 0 by construction (oracle-stage.mjs `begin`).
+- Edit and retry at a failing gate has no bound: at DISCOVERING, edit → walk (MODELED gate fails) → edit → walk, and
+  so on. A rewound DISCOVERING record has no digest, so it is never stale and nothing is counted. A refusal is a
+  self-loop, not a back edge, so `Q_ranked` still holds.
+
+## Verification
+
+- `prove --dir test-fixtures/stage/authoring`: proven, cells `potential_rises` 1,440 and `delegation_raises` 1,080.
+  `prove-reach --prefix Auth --safe safe`: proven, 2,527 reachable of 25,920 states × 40 commands, diameter 12.
+  Kernel case ~320 s in the suite (106 s in the kernel, the rest in the tool's reach exploration), conformance case
+  ~99 s (72 traces, 2,012 steps, all 1,470 items, `status --brief` after each step), refinement case ~4 s.
+- Rewind cap measured on 17 real `stage.json` records (5 scratch or Trash copies left out): rewinds per revision
+  0 ×6, 1 ×3, 2 ×2, 4 ×3, 7 ×1, 9 ×2; rechecks 0. The cap is 10, just above the most seen.
+- Byte budgets (no cap raised): card-format.md is 1 byte smaller than at HEAD (29,848 → 29,847); the closure
+  tests pass.
+- `pnpm bundles:generate`: 22 bundles; `npx prettier --check` (repo root) on card-format.md, the bundles, this file
+  and the fixture README: clean.
+- `pnpm lint` (frontend-oracle-design): 0 errors (406 existing warnings), bundles and evals checks ok.
+- `pnpm test`: 1320 pass, 0 fail, 0 skipped (1314 before: the authoring machine cases and the rewind-cap
+  and delivery-ceiling regression cases), about 12 minutes. The first run failed one case whose `status --brief` pattern predates
+  the `rewinds n/m` field; the pattern now includes it.
+
 # 0.121.0: the Delivery run is a proven state machine, and VALID_RED needs failing runs on the current bytes
 
 ## Why
