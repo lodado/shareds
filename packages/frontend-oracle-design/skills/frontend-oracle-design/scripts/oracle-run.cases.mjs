@@ -3049,6 +3049,49 @@ test('O10: 허용치를 낮추거나 유지하면 GREEN을 막지 않는다', as
   assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
 })
 
+test('O10: harness-path를 등록해도 RED 후 테스트 바이트 변경은 RED 전 지출과 겹치지 않는 새 harness 지출이다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, {
+    harnessFiles: { 'vitest.config.mjs': 'export default { setup: 1 }\n' },
+  })
+  const before = run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'setup before RED'])
+  assert.equal(before.status, 0, before.stderr)
+  await reachValidRed(oracleDirectory, root)
+
+  // 등록한 harness(vitest.config.mjs)는 그대로, 묶인 테스트 파일만 바뀐다
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n// helper retyped\n")
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  const latest = (await ledgerLines(oracleDirectory)).map(JSON.parse).at(-1).runId
+
+  const withoutBudget = transition(oracleDirectory, 'IMPLEMENTED_GREEN', latest)
+  assert.match(withoutBudget.stderr, /^HARNESS_BUDGET_REQUIRED: /)
+
+  const spent = run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'test helper retyped after RED'])
+  assert.equal(spent.status, 0, spent.stderr)
+  assert.match(spent.stdout, /^BUDGET_SPENT harness 2\//)
+  const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', latest)
+  assert.match(transitioned.stderr, /^EVIDENCE_STALE: /)
+})
+
+test('O10: 테스트 바이트 변경 지출은 VALID_RED를 새로 고친 뒤 다시 해도 중복이다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, {
+    harnessFiles: { 'vitest.config.mjs': 'export default { setup: 1 }\n' },
+  })
+  await reachValidRed(oracleDirectory, root)
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n// helper retyped\n")
+  const first = run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'test helper retyped'])
+  assert.match(first.stdout, /^BUDGET_SPENT harness 1\//)
+
+  redRun(oracleDirectory)
+  const latest = (await ledgerLines(oracleDirectory)).map(JSON.parse).at(-1).runId
+  const refreshed = transition(oracleDirectory, 'VALID_RED', latest)
+  assert.equal(refreshed.status, 0, refreshed.stderr)
+
+  // 바이트는 그대로, 새 binding만 그 바이트를 담는다 — 충돌 후 재시도 같은 같은 변경의 두 번째 지출
+  const replay = run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'retry, nothing changed'])
+  assert.match(replay.stdout, /^BUDGET_SPENT harness 1\//)
+})
+
 test('O10: PATH·시퀀스 증거 매핑도 VALID_RED 시점에 얼린다', async (t) => {
   const { root, oracleDirectory } = await workspace(t, {
     evidence: {

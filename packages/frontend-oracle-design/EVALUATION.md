@@ -1,3 +1,29 @@
+# 0.116.1: a post-RED test-byte change is a new harness spend when harness paths are registered
+
+## Why
+
+A Delivery run (asset-lab gesture-state-machine, 2026-11-01) registered `vitest.config.ts` as its harness path,
+spent the harness budget once before RED, then retyped a test helper after VALID_RED. The IMPLEMENTED_GREEN gate
+compares every test file with the RED binding and asked for a harness spend, but `budget --spend harness` hashed
+only the registered harness paths and the evidence file, both unchanged, so each spend was recorded as a duplicate
+of the pre-RED one and the gate could never open.
+
+## Change
+
+- `budgetDigest` (harness, after RED): when the test files differ from `testBindings.tests`, the digest includes
+  those test digests, so the spend counts. Once a refreshed RED binds those bytes, a repeated spend of the same change
+  keeps that identity and stays a duplicate. While the tests still match the binding and no such spend exists, the
+  digest is unchanged, so existing ledgers keep their deduplication. Without registered harness paths the file digest
+  already covers every test file, so that case is unchanged.
+- Regressions in `oracle-run.cases.mjs`: `O10: harness-path를 등록해도 RED 후 테스트 바이트 변경은 …` (failed with
+  `BUDGET_SPENT harness 1/2` before the fix) and `O10: 테스트 바이트 변경 지출은 VALID_RED를 새로 고친 뒤 다시 해도 중복이다`
+  (an independent review found the first fix counted that retry, `2/2`).
+
+## Verification
+
+- `node --test --test-concurrency=4 scripts/*.test.mjs skills/frontend-oracle-design/scripts/*.test.mjs`: 1,295 pass, 0 fail.
+- eslint on the two changed files: 0 errors, warning counts unchanged (61 and 5); bundle and eval checks ok.
+
 # 0.116.0: one-call authoring loop (`oracle-cycle.mjs fast|walk`) cuts the fix-run round trips
 
 ## Why

@@ -3579,21 +3579,36 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
 async function budgetDigest(directory, state, name) {
   const scanRoot = resolve(directory, state.scanRoot)
   const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
-  if (name === 'harness') {
-    let paths = state.harnessPaths ?? []
-    if (paths.length === 0) paths = Object.keys(current).filter(isTestPath)
-    const filesDigest = sha256(JSON.stringify(selectedDigests(current, paths.sort())))
-    // Before RED there is no frozen evidence binding; keep the existing file-only identity.
-    if (!state.testBindings?.evidenceSha256) return filesDigest
-    const evidenceDigest = await testEvidenceDigest(evidencePathFor(directory, state))
-    // Legacy spends have file-only digests. Preserve their deduplication only while the binding is unchanged.
+  if (name === 'harness') return harnessBudgetDigest(directory, state, current)
+  if (name === 'policy') return verifyLock(directory, state).lockManifestSha256
+  return productionSha256(current, state.harnessPaths)
+}
+
+async function harnessBudgetDigest(directory, state, current) {
+  let paths = state.harnessPaths ?? []
+  if (paths.length === 0) paths = Object.keys(current).filter(isTestPath)
+  const filesDigest = sha256(JSON.stringify(selectedDigests(current, paths.sort())))
+  // Before RED there is no frozen evidence binding; keep the existing file-only identity.
+  if (!state.testBindings?.evidenceSha256) return filesDigest
+  const evidenceDigest = await testEvidenceDigest(evidencePathFor(directory, state))
+  const evidenceIdentity = sha256(stableStringify({ filesDigest, evidenceDigest }))
+  // Without registered paths filesDigest already covers every test file.
+  if ((state.harnessPaths ?? []).length === 0) {
     if (evidenceDigest === state.testBindings.evidenceSha256 && state.budgets.harness.digests?.includes(filesDigest)) {
       return filesDigest
     }
-    return sha256(stableStringify({ filesDigest, evidenceDigest }))
+    return evidenceIdentity
   }
-  if (name === 'policy') return verifyLock(directory, state).lockManifestSha256
-  return productionSha256(current, state.harnessPaths)
+  // The GREEN gate also compares every test file with the RED binding, and registered harness paths need not cover
+  // them, so a test-byte change must be a new spend even when the harness files are unchanged.
+  const tests = Object.fromEntries(Object.keys(current).filter(isTestPath).map((path) => [path, current[path]]))
+  const testsIdentity = sha256(stableStringify({ filesDigest, evidenceDigest, tests }))
+  const spent = state.budgets.harness.digests ?? []
+  // A refreshed RED binds the spent bytes, so the same change keeps its test-including identity.
+  if (!sameDigests(tests, state.testBindings.tests ?? tests) || spent.includes(testsIdentity)) return testsIdentity
+  // Legacy spends have file-only digests. Preserve their deduplication only while the binding is unchanged.
+  if (evidenceDigest === state.testBindings.evidenceSha256 && spent.includes(filesDigest)) return filesDigest
+  return evidenceIdentity
 }
 
 async function spendBudget(options) {
