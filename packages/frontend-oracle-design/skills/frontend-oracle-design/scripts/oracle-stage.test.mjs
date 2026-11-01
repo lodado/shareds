@@ -436,8 +436,14 @@ test('DRAFTED opens the lock gate for the package bytes it was recorded on, and 
   assert.equal(stage(root, directory, 'rewind', 'CHECKED').status, 0)
   assert.equal(node(root, 'oracle-package.mjs', ['project-card', '--package', '.ai/oracles/stale-search/oracle.package.json', '--out', '.ai/oracles/stale-search/oracle.md']).status, 0)
   assert.equal(stage(root, directory, 'advance', 'DRAFTED').status, 0)
+  const brief = () => node(root, 'oracle-stage.mjs', ['status', '--dir', directory, '--brief']).stdout
+  assert.match(brief(), /^phase 3\/6 Card review and lock · next: oracle-lock\.mjs create --oracle \S+\/oracle\.md --lock \S+\/oracle\.lock\.json --source <approved-source> · stage DRAFTED 4\/5 /)
   await markLocked(directory)
   assert.equal((await readStage(directory)).stage, 'ORACLE_READY')
+  assert.match(brief(), /^phase 4\/6 RED · next: oracle-run\.mjs init --dir \S+ --lock \S+\/oracle\.lock\.json --scan-root <scan-root> --required-label <label> · stage ORACLE_READY 5\/5 /)
+  await writeFile(join(directory, 'run-state.json'), '{}\n')
+  assert.match(brief(), /^phase 4\/6 RED · next: oracle-run\.mjs status --brief --dir \S+ · stage ORACLE_READY 5\/5 /, 'after init the run line takes over')
+  await rm(join(directory, 'run-state.json'))
   // an advance or rewind with no target is a usage error before the record is read, not a pass that erases its stage
   const before = await readFile(join(directory, 'stage.json'), 'utf8')
   const untargeted = stage(root, directory, 'advance')
@@ -1208,12 +1214,20 @@ test('stage steps record when they happened and how long the gate took; status -
   const brief = () => node(root, 'oracle-stage.mjs', ['status', '--dir', directory, '--brief'])
   const line = brief()
   assert.equal(line.status, 0, line.stderr)
-  assert.match(line.stdout, /^stage MODELED 2\/5 · \d+s in stage · authoring round 1\/2 · dispatched: model-analyst \d+s ago · next: CHECKED → DRAFTED → lock\n$/)
+  assert.match(line.stdout, /^phase 2\/6 Model · next: oracle-cycle\.mjs walk --dir \S+ · stage MODELED 2\/5 · \d+s in stage · authoring round 1\/2 · dispatched: model-analyst \d+s ago · remaining: CHECKED → DRAFTED → lock\n$/)
   assert.equal(node(root, 'oracle-stage.mjs', ['advance', '--dir', directory, '--to', 'CHECKED', '--brief']).status, 2, '--brief belongs to status')
 
   const packagePath = join(directory, 'oracle.package.json')
   await writeFile(packagePath, `${await readFile(packagePath, 'utf8')}\n`)
   assert.match(brief().stdout, / · STALE: the recorded bytes changed since this stage — rewind\n$/)
+  assert.match(brief().stdout, /^phase 2\/6 Model · next: oracle-cycle\.mjs walk --dir \S+ --reason <cause> · /, 'a stale stage points at the re-walk')
+})
+
+test('stage status --brief before begin is phase 1 Intake with begin as its one command', async (t) => {
+  const { root, directory } = await repository(t)
+  const brief = node(root, 'oracle-stage.mjs', ['status', '--dir', directory, '--brief'])
+  assert.equal(brief.status, 0, brief.stderr)
+  assert.match(brief.stdout, /^phase 1\/6 Intake · next: oracle-stage\.mjs begin --dir \S+\n$/)
 })
 
 test('reflect --timing measures authoring and Delivery lead time from recorded times and lists untimed runs apart', async (t) => {

@@ -2182,6 +2182,78 @@ test('O6: init 수정은 init 뒤 바뀐 production 파일을 harness로 옮겨 
   assert.match(registered.stdout, /^HARNESS_ADDED_BY_AMEND src\/save\.mjs /m)
 })
 
+test('O6: init 수정은 init 뒤 새로 만든 production 파일을 harness로 숨기지 못하고, 새 설정 파일만 받는다', async (t) => {
+  const { root, oracleDirectory, lock } = await workspace(t)
+  const reinit = (...extra) =>
+    run(['init', '--dir', oracleDirectory, '--lock', lock, '--risk', 'medium', '--scan-root', root, '--required-label', 'behavior', ...extra])
+
+  await writeFile(join(root, 'src', 'extra.mjs'), 'export const extra = 1\n')
+  const refused = reinit('--harness-path', 'src/extra.mjs', '--reason', 'hide a new source file from the TDD order check')
+  assert.equal(refused.status, 1)
+  assert.match(refused.stderr, /^HARNESS_PATH_NEW_SOURCE: .*src\/extra\.mjs/)
+  assert.match(refused.stderr, /next: a new non-test, non-config file is production/)
+  assert.deepEqual((await state(oracleDirectory)).harnessPaths, [])
+  assert.ok(!(await allLedgerLines(oracleDirectory)).some((line) => JSON.parse(line).type === 'amend'))
+
+  // 제품 설정은 도구 설정이 아니다 — 이름이 *.config.*여도 패키지 루트의 도구 설정만 받는다
+  await mkdir(join(root, 'src', 'checkout'), { recursive: true })
+  await writeFile(join(root, 'src', 'checkout', 'pricing.config.ts'), 'export const fee = 3\n')
+  const product = reinit('--harness-path', 'src/checkout/pricing.config.ts', '--reason', 'register a config-named product file')
+  assert.equal(product.status, 1)
+  assert.match(product.stderr, /^HARNESS_PATH_NEW_SOURCE: .*src\/checkout\/pricing\.config\.ts/)
+
+  // 새 러너 설정이 setupFiles로 가리킨다고 새 production 파일이 harness가 되지는 않는다
+  await writeFile(join(root, 'src', 'pay.ts'), 'export const pay = () => 1\n')
+  await writeFile(join(root, 'vitest.config.ts'), "export default { test: { setupFiles: ['./src/pay.ts'] } }\n")
+  const viaSetup = reinit('--reason', 'the runner config came after init')
+  assert.equal(viaSetup.status, 1)
+  assert.match(viaSetup.stderr, /^HARNESS_PATH_NEW_SOURCE: .*src\/pay\.ts/)
+  assert.doesNotMatch(viaSetup.stderr, /vitest\.config\.ts/, 'the runner config itself may be registered')
+  assert.deepEqual((await state(oracleDirectory)).harnessPaths, [])
+  assert.ok(!(await allLedgerLines(oracleDirectory)).some((line) => JSON.parse(line).type === 'amend'))
+  await rm(join(root, 'vitest.config.ts'))
+
+  // 실런 사례: 뼈대가 init 뒤에 만든 package.json·tsconfig·eslint 설정은 등록할 수 있다
+  await writeFile(join(root, 'package.json'), '{}\n')
+  await writeFile(join(root, 'tsconfig.json'), '{}\n')
+  await writeFile(join(root, 'eslint.config.mjs'), 'export default []\n')
+  const harness = ['package.json', 'tsconfig.json', 'eslint.config.mjs']
+  const accepted = reinit(...harness.flatMap((path) => ['--harness-path', path]), '--reason', 'the scaffold came after init')
+  assert.equal(accepted.status, 0, accepted.stderr)
+  for (const path of harness) assert.ok(accepted.stdout.includes(`\nHARNESS_ADDED_AFTER_INIT ${path} `), path)
+  assert.deepEqual([...(await state(oracleDirectory)).harnessPaths].sort(), [...harness].sort())
+})
+
+test('O6: 체크포인트 앞 legacy 구간의 전이 뒤에 이어 붙인 amend도 원장이 읽지 못한다', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  const ledger = async (legacyRecord) => {
+    const prefix = `${JSON.stringify(legacyRecord)}\n`
+    const chain = []
+    for (const record of [
+      { schemaVersion: 3, type: 'checkpoint', prefixSha256: createHash('sha256').update(prefix).digest('hex'), at: new Date().toISOString() },
+      {
+        schemaVersion: 3,
+        type: 'amend',
+        state: 'ORACLE_READY',
+        reason: 'forged after a legacy transition',
+        stateDelta: { harnessPaths: [], milestones: [], requiredLabels: [] },
+        at: new Date().toISOString(),
+      },
+    ]) {
+      const unsigned = { ...record, previousDigest: chain.at(-1)?.digest ?? '0'.repeat(64) }
+      chain.push({ ...unsigned, digest: createHash('sha256').update(stableStringify(unsigned)).digest('hex') })
+    }
+    await writeFile(join(oracleDirectory, 'runs.jsonl'), [JSON.stringify(legacyRecord), ...chain.map((entry) => JSON.stringify(entry)), ''].join('\n'))
+    return run(['status', '--dir', oracleDirectory, '--json'])
+  }
+
+  const afterTransition = await ledger({ type: 'transition', state: 'VALID_RED' })
+  assert.equal(afterTransition.status, 1)
+  assert.match(afterTransition.stderr, /^LEDGER_INVALID: .*amend after a transition/)
+  const afterRun = await ledger({ type: 'run', runId: 'r-001' })
+  assert.doesNotMatch(afterRun.stderr, /amend after a transition/, 'only a transition in the legacy prefix closes amend')
+})
+
 test('O6: 전이 뒤에 이어 붙인 amend 기록은 원장이 읽지 못한다', async (t) => {
   const { root, oracleDirectory } = await workspace(t)
   await reachValidRed(oracleDirectory, root)
@@ -3342,13 +3414,13 @@ test('status without --json prints compact advisory state and every next action'
   assert.equal(await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8'), beforeLedger)
 })
 
-test('status --brief is one read-only progress line: state, time in it, last run, budgets, next states, blockers', async (t) => {
+test('status --brief is one read-only progress line: phase and its one command, state, time in it, last run, budgets, targets, blockers', async (t) => {
   const { root, oracleDirectory } = await workspace(t, { risk: 'high' })
   const ready = run(['status', '--dir', oracleDirectory, '--brief'])
   assert.equal(ready.status, 0, ready.stderr)
   assert.match(
     ready.stdout,
-    /^run \S+ · state ORACLE_READY · \d+s in state · budgets policy 0\/2 harness 0\/2 product 0\/3 · next: VALID_RED \| IMPLEMENTED_GREEN \| NEEDS_DECISION \| FAIL · blockers: none\n$/,
+    /^phase 4\/6 RED · next: oracle-run\.mjs red --dir \S+ --label <label> --evidence <evidence> --row <row> -- <command> · run \S+ · state ORACLE_READY · \d+s in state · budgets policy 0\/2 harness 0\/2 product 0\/3 · targets: VALID_RED \| IMPLEMENTED_GREEN \| NEEDS_DECISION \| FAIL · blockers: none\n$/,
   )
 
   await reachValidRed(oracleDirectory, root)
@@ -3356,7 +3428,10 @@ test('status --brief is one read-only progress line: state, time in it, last run
   const beforeLedger = await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8')
   const red = run(['status', '--dir', oracleDirectory, '--brief'])
   assert.equal(red.status, 0, red.stderr)
-  assert.match(red.stdout, /^run \S+ · state VALID_RED · \d+s in state · last run r-\d{3} \S+ exit 1 \(\d+s\) \d+s ago · /)
+  assert.match(
+    red.stdout,
+    /^phase 5\/6 GREEN · next: oracle-run\.mjs green --dir \S+ --label <label> --evidence <evidence> -- <command> · run \S+ · state VALID_RED · \d+s in state · last run r-\d{3} \S+ exit 1 \(\d+s\) \d+s ago · /,
+  )
   assert.equal(red.stdout.split('\n').length, 2, 'one line, not the multi-line action list')
   assert.equal(await readFile(join(oracleDirectory, 'run-state.json'), 'utf8'), beforeState)
   assert.equal(await readFile(join(oracleDirectory, 'runs.jsonl'), 'utf8'), beforeLedger)
@@ -6994,6 +7069,44 @@ test('guide as entry or a selected step is read-only and reuses the existing act
   assert.equal(rejected.status, 1)
   assert.match(rejected.stderr, /^RUN_NOT_FOUND: /)
   assert.deepEqual(await snapshotOf(repository), before)
+})
+
+test('guide text opens with the phase and one command for the state or the selected target, and JSON stays unchanged', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { risk: 'low' })
+  const firstLine = (...flags) => {
+    const guided = run(['guide', '--dir', oracleDirectory, ...flags])
+    assert.equal(guided.status, 0, guided.stderr)
+    return guided.stdout.split('\n')[0]
+  }
+  assert.match(firstLine(), /^phase 4\/6 RED · next: oracle-run\.mjs red --dir \S+ --label <label> --evidence <evidence> --row <row> -- <command>$/)
+  assert.match(
+    firstLine('--to', 'IMPLEMENTED_GREEN'),
+    /^phase 4\/6 RED · next: oracle-run\.mjs green --dir \S+ --label <label> --evidence <evidence> --reason <reason> -- <command>$/,
+  )
+  assert.match(firstLine('--to', 'FAIL'), /^phase 4\/6 RED · next: oracle-run\.mjs transition --dir \S+ --to FAIL --reason <reason>$/)
+  assert.equal(Object.hasOwn(JSON.parse(run(['guide', '--dir', oracleDirectory, '--json']).stdout), 'phase'), false)
+  assert.equal(run(['guide', '--rejection', 'STATE_INVALID']).stdout.startsWith('authority: advisory'), true, 'no run, no phase')
+
+  await reachGreen(oracleDirectory, root)
+  assert.match(
+    firstLine(),
+    /^phase 6\/6 Review and close · next: oracle-run\.mjs review-packet --dir \S+ --output <packet> --decision <implementation-decision\.md> --review-point <point>$/,
+  )
+  assert.equal(run(['transition', '--dir', oracleDirectory, '--to', 'FAIL', '--reason', 'environment unavailable']).status, 0)
+  assert.match(firstLine(), /^phase 6\/6 Review and close · next: oracle-run\.mjs status --dir \S+ --check-report <report>$/)
+})
+
+test('phase line sends a blocker the phase command cannot clear (lock drift) to guide --to instead of red', async (t) => {
+  const { oracleDirectory } = await workspace(t)
+  const card = join(oracleDirectory, 'oracle.md')
+  await writeFile(card, `${await readFile(card, 'utf8')}\nedited after the lock\n`)
+  const brief = run(['status', '--dir', oracleDirectory, '--brief'])
+  assert.equal(brief.status, 0, brief.stderr)
+  assert.match(brief.stdout, /^phase 4\/6 RED · next: oracle-run\.mjs guide --dir \S+ --to VALID_RED · .* · blockers: ORACLE_CHANGED\n$/)
+  const selected = run(['guide', '--dir', oracleDirectory, '--to', 'VALID_RED'])
+  assert.equal(selected.status, 0, selected.stderr)
+  assert.match(selected.stdout, /^phase 4\/6 RED · next: oracle-run\.mjs red /, 'the selected target already lists its blockers below')
+  assert.match(selected.stdout, /^blockers: .*ORACLE_CHANGED/m)
 })
 
 test('guide as GREEN distinguishes already-satisfied verification from authorized implementation', async (t) => {

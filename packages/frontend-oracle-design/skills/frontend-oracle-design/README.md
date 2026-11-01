@@ -444,8 +444,9 @@ node skills/scripts/oracle-run.mjs status --dir .ai/oracles/<id> --brief
 0.102.0부터 `stage.json` history의 걸음마다 시각(`at`)이, advance에는 관문 시간(`durationMs`)이
 남고, `review-input --attempt`는 디스패치 시각(선택 `--model`·`--effort`)을 남깁니다. `--timing`은
 run마다 저작(단계별 머문 시간·관문 시간·rewind 복귀 시간)과 Delivery(상태별 시간·실행 명령 시간·리뷰
-라운드)를 따로 잽니다. 시각이 없는 옛 기록은 `untimed`로만 셉니다. `status --brief`는 지금 단계, 머문
-시간, 예산, 보낸 디스패치, 남은 단계를 한 줄로 찍습니다. 판정은 바꾸지 않습니다.
+라운드)를 따로 잽니다. 시각이 없는 옛 기록은 `untimed`로만 셉니다. `status --brief`는 6단계 중 어디인지와
+다음 명령 하나(`phase 4/6 RED · next: oracle-run.mjs red ...`, 0.118.0부터 `guide` 첫 줄도 같음)를 먼저,
+이어서 지금 단계, 머문 시간, 예산, 보낸 디스패치, 남은 단계를 한 줄로 찍습니다. 판정은 바꾸지 않습니다.
 
 ### 긴 명령은 job으로
 

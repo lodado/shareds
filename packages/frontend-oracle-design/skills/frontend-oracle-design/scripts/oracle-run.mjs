@@ -66,6 +66,7 @@ import {
 
 import { assertProfileReviewReferences, snapshotContext } from './oracle-review-context.mjs'
 import { approvedSourceIds, auditFullProduct, markdownLines, sectionLines, tWaySummary } from './oracle-space.mjs'
+import { phaseLine } from './oracle-stage.mjs'
 import { redRefreshBlocker, reviewHoldBlocker } from './oracle-transition-guards.mjs'
 import { claudeWorkerInvocation, parseWorkerSubmission } from './oracle-worker.mjs'
 import { spawnGit } from './resolve-executable.mjs'
@@ -220,6 +221,8 @@ const NEXT_ACTIONS = {
   RUN_ARTIFACTS_EXIST:
     'after VALID_RED, or without the run state, a new revision gets a new <oracle-id> directory — never re-init to reset the baseline',
   HARNESS_PATH_MODIFIED: 'revert the production edit made before RED; only test and runner files can be registered as harness',
+  HARNESS_PATH_NEW_SOURCE:
+    'a new non-test, non-config file is production — write it after VALID_RED, or put test support under a test path',
   AMEND_SCOPE_CHANGED: 're-run init with the same --lock and --scan-root — another lock or scan root is a new revision',
   LABEL_NOT_REQUIRED:
     're-run with the exact required label `status` shows — a run under another name never satisfies the gate',
@@ -814,7 +817,8 @@ async function readLedger(directory) {
       throw new Error('schema-v2 ledger requires migrate-ledger')
     }
     let previousDigest = ZERO_DIGEST
-    let transitioned = false
+    // 체크포인트 앞 legacy 구간의 전이도 센다 — oracle-verify와 같은 기준이어야 한다
+    let transitioned = entries.slice(0, Math.max(checkpointIndex, 0)).some((entry) => entry?.type === 'transition')
     const chainedEntries = entries.slice(Math.max(checkpointIndex, 0))
     for (const [index, entry] of chainedEntries.entries()) {
       assertLedgerSchema(entry)
@@ -1668,15 +1672,25 @@ async function amendInit(directory, scanRoot, harnessPaths, options) {
     }
     const previousPaths = state.harnessPaths ?? []
     const added = paths.filter((path) => !previousPaths.includes(path))
-    const runnerPaths = new Set(runnerHarness.paths)
-    // init 뒤 바뀐 기준선 production 파일을 harness로 옮기면 TDD 순서 판정에서 빠진다 — 테스트·러너 입력만 옮길 수 있다
+    // init 뒤 바뀐 기준선 production 파일을 harness로 옮기면 TDD 순서 판정에서 빠진다 — 테스트와 러너 설정 파일만 옮길 수 있다.
+    // 러너 설정이 setupFiles로 가리키는 파일은 면제하지 않는다: 설정 한 줄로 production 파일을 harness로 끌어들일 수 있다
     const changedProduction = added.filter(
-      (path) => path in state.snapshot && current[path] !== state.snapshot[path] && !isTestPath(path) && !runnerPaths.has(path),
+      (path) => path in state.snapshot && current[path] !== state.snapshot[path] && !isTestPath(path) && !RUNNER_CONFIG.test(path),
     )
     if (changedProduction.length > 0) {
       throw new CliError(
         'HARNESS_PATH_MODIFIED',
         `changed since init, so it cannot become harness: ${changedProduction.join(', ')} — revert it, or start a new <oracle-id>`,
+      )
+    }
+    // init 뒤 새로 만든 파일도 같다 — 테스트·러너 설정·패키지 루트의 도구 설정이 아니면 production이라 harness로 숨기지 못한다
+    const newSource = added.filter(
+      (path) => !(path in state.snapshot) && !isTestPath(path) && !RUNNER_CONFIG.test(path) && !isManifestOrConfigPath(path, current),
+    )
+    if (newSource.length > 0) {
+      throw new CliError(
+        'HARNESS_PATH_NEW_SOURCE',
+        `created after init and neither a test, a runner config nor a package-root manifest/tool config, so it is production: ${newSource.join(', ')}`,
       )
     }
     const removed = [
@@ -1712,6 +1726,24 @@ async function amendInit(directory, scanRoot, harnessPaths, options) {
       ].join('\n'),
     )
   })
+}
+
+// init 뒤에 생겨도 harness로 등록할 수 있는 매니페스트·도구 설정 파일 이름(뼈대가 init 뒤에 만드는 package.json·tsconfig·eslint 설정).
+// `*.config.*`는 도구 이름만 받는다 — `pricing.config.ts` 같은 제품 설정은 production이다
+const MANIFEST_OR_CONFIG = [
+  /^(?:package\.json|pnpm-workspace\.yaml|\.npmrc|\.nvmrc)$/,
+  /^[jt]sconfig(?:\..+)?\.json$/,
+  /^(?:vitest|vite|vitest\.workspace|jest|playwright|eslint|prettier|babel|tsup|rollup|webpack|postcss|tailwind|next|storybook)\.config\.(?:[cm]?[jt]s|json)$/,
+  /^(?:eslint|babel)\.config\..+$/,
+  /^\.(?:eslintrc|babelrc)/,
+]
+
+/** 패키지 루트(스캔 루트, 또는 package.json이 있는 폴더)에 놓인 매니페스트·도구 설정 파일인가. */
+function isManifestOrConfigPath(path, worktree) {
+  const folder = dirname(path)
+  if (folder !== '.' && !(`${folder}/package.json` in worktree)) return false
+  const name = basename(path)
+  return MANIFEST_OR_CONFIG.some((pattern) => pattern.test(name))
 }
 
 /** VALID_RED를 한 번이라도 기록했나 — 그 전에는 얼린 harness·테스트 binding이 없다. */
@@ -5102,15 +5134,42 @@ function briefStatusLine(directory, state, ledger, statusResult) {
     ? [`last run ${last.runId}`, last.label, `exit ${exitLabel(last)} (${Math.round((last.commandMs ?? 0) / 1000)}s)`, last.at ? `${elapsedLabel(last.at)} ago` : null].filter(Boolean).join(' ')
     : null
   return [
+    deliveryPhaseLine(directory, statusResult),
     `run ${basename(directory)}`,
     `state ${statusResult.currentState}`,
     entered ? `${elapsedLabel(entered)} in state` : null,
     lastRun,
     rounds ? `review rounds ${rounds}` : null,
     budgets.length ? `budgets ${budgets.join(' ')}` : null,
-    `next: ${statusResult.nextLegalActions.join(' | ') || 'none'}`,
+    `targets: ${statusResult.nextLegalActions.join(' | ') || 'none'}`,
     `blockers: ${statusResult.blockers.join(', ') || 'none'}`,
   ].filter(Boolean).join(' · ')
+}
+
+// 단계마다 정상 경로의 목표 하나 — 다른 목표(ALREADY_SATISFIED·NEEDS_DECISION·FAIL)는 guide --to로 고른다
+const PHASE_TARGET = { ORACLE_READY: 'VALID_RED', VALID_RED: 'IMPLEMENTED_GREEN', IMPLEMENTED_GREEN: 'REVIEW_VERIFIED' }
+// 그 단계의 명령(red·green 실행, 리뷰 작업)이 스스로 푸는 막힘 — 그 밖의 막힘(잠금 어긋남, 빠진 증거 행, 열린 hold…)이면 guide로 보낸다
+const PHASE_WORK_BLOCKER = /^(?:NO_FRESH_(?:RED|GREEN)_RUN|FLAKINESS_GATE_\d+_CONSECUTIVE|BLIND_MAP_REQUIRED)$/
+
+/**
+ * `phase N/6 <name> · next: <command>` — 지금 상태(또는 guide가 고른 목표)의 명령 하나. 플래그는 그 전이 패킷의 requires에서
+ * 가져온다. 안내일 뿐이다: 고르는 일과 판정은 그대로 guide --to와 transition 몫이다.
+ */
+function deliveryPhaseLine(directory, statusResult, to) {
+  const target = to ?? PHASE_TARGET[statusResult.currentState]
+  const packet = statusResult.nextActions.find((action) => action.to === target)
+  const dir = portablePath(process.cwd(), directory)
+  let next
+  if (!packet) next = `oracle-run.mjs status --dir ${dir} --check-report <report>`
+  // guide --to가 이미 그 목표를 펼쳤으면 막힘은 바로 아래 blockers에 있다 — 같은 guide를 다시 권하지 않는다
+  else if (!to && packet.blockers.some((blocker) => !PHASE_WORK_BLOCKER.test(blocker))) next = `oracle-run.mjs guide --dir ${dir} --to ${target}`
+  else if (target === 'VALID_RED' || target === 'IMPLEMENTED_GREEN') {
+    const flags = packet.requires.filter((flag) => flag !== '--run').map((flag) => `${flag} <${flag.slice(2)}>`)
+    next = [`oracle-run.mjs ${target === 'VALID_RED' ? 'red' : 'green'} --dir ${dir} --label <label>`, ...flags, '-- <command>'].join(' ')
+  } else if (isReviewTransition(target)) {
+    next = `oracle-run.mjs review-packet --dir ${dir} --output <packet> --decision <implementation-decision.md> --review-point <point>`
+  } else next = packet.example
+  return phaseLine(statusResult.currentState, next)
 }
 
 async function reportStatus(options) {
@@ -5185,6 +5244,7 @@ async function reportGuide(options) {
   }
 
   let status
+  let phase = ''
   if (options.dir) {
     const directory = resolve(options.dir)
     const ledger = await readLedger(directory)
@@ -5193,6 +5253,7 @@ async function reportGuide(options) {
     if (options.to && !status.nextLegalActions.includes(options.to)) {
       throw new CliError('TRANSITION_NOT_ALLOWED', `${status.currentState} cannot move to ${options.to}`)
     }
+    phase = `${deliveryPhaseLine(directory, status, options.to)}\n`
   }
   const guide = deliveryGuidance({
     status,
@@ -5201,7 +5262,7 @@ async function reportGuide(options) {
     rejection,
     protocol: deliveryProtocol,
   })
-  process.stdout.write(options.json ? `${JSON.stringify(guide, null, 2)}\n` : renderGuidance(guide))
+  process.stdout.write(options.json ? `${JSON.stringify(guide, null, 2)}\n` : `${phase}${renderGuidance(guide)}`)
 }
 
 async function reviewBrief(options) {

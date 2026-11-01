@@ -1,3 +1,68 @@
+# 0.118.0: one 6-phase map and one next command — phase line in status --brief and guide, new-source amend refusal
+
+## Why
+
+The controller's procedure reads as 29 steps over 11 states and about 40 subcommands, so at every point the agent
+re-reads documents to pick the next command, and the order slips that followed (rounds spent, `init` order) were the
+main FAIL causes measured for 0.117.0. Wave W1 of the process-compression plan gives the agent one map of six phases
+and one next command without touching the state machine. Separately, an `init` amend before VALID_RED accepted any
+file created after init as harness (only printed `HARNESS_ADDED_AFTER_INIT`), so a new production source file could
+be hidden from the TDD-order check; and `readLedger` ignored transitions in a migrated ledger's legacy prefix, so an
+`amend` after such a transition still read as valid.
+
+## Change
+
+- Phases: `oracle-stage.mjs` exports one mapping (`PHASES`, `phaseLine`) from stage and Delivery states to six
+  phases — 1 Intake (no stage record), 2 Model (DISCOVERING, MODELED, CHECKED), 3 Card review and lock (DRAFTED),
+  4 RED (ORACLE_READY), 5 GREEN (VALID_RED), 6 Review and close (IMPLEMENTED_GREEN and the end states). It is a view;
+  no state, transition, budget or gate changed.
+- `oracle-stage.mjs status --brief` and `oracle-run.mjs status --brief` now start with
+  `phase N/6 <name> · next: <command>`. Stage commands: `begin`, `oracle-cycle.mjs walk` (Contract: `advance --to`
+  the next stage; a stale record: walk `--reason` / rewind), `oracle-lock.mjs create`, `oracle-run.mjs init --scan-root
+<scan-root>` (once `run-state.json` exists: `oracle-run.mjs status --brief`). Run commands come from the existing
+  transition packet's `requires`: `red`/`green` for VALID*RED/IMPLEMENTED_GREEN, `review-packet` for the review
+  targets, the packet example for NEEDS_DECISION/FAIL, and `status --check-report` in REVIEW_VERIFIED,
+  PARTIAL_VERIFIED, NEEDS_DECISION and FAIL. When the packet has a blocker the phase command does not clear (anything
+  but `NO_FRESH*_*RUN`, `FLAKINESS_GATE*_`, `BLIND_MAP_REQUIRED`: lock drift, missing evidence rows, open holds), the
+line points at `guide --dir <dir> --to <target>`instead. In the run line the old`next:`list of legal states is
+renamed`targets:`; in the stage line the remaining stages are `remaining:`.
+- `oracle-run.mjs guide --dir` text output opens with the same phase line, for the selected `--to` target when given
+  (then without the blocker redirect, since the blockers follow below). `guide --json` and rejection-only `guide`
+  are unchanged.
+- `init` amend: a harness path created after init is accepted only when it is a test path, a runner config file
+  (vitest/jest/playwright config, vitest workspace), or a manifest/tool config at a package root (scan root, or a
+  folder with `package.json`): `package.json`, `pnpm-workspace.yaml`, `tsconfig*.json`, `jsconfig*.json`,
+  `<tool>.config.{js,cjs,mjs,ts,cts,mts,json}` for vitest, vite, vitest.workspace, jest, playwright, eslint, prettier,
+  babel, tsup, rollup, webpack, postcss, tailwind, next, storybook, `eslint.config.*`, `.eslintrc*`, `babel.config.*`,
+  `.babelrc*`, `.npmrc`, `.nvmrc`. Any other new file is refused before anything is written with
+  `HARNESS_PATH_NEW_SOURCE` and a next action; allowed ones still print `HARNESS_ADDED_AFTER_INIT`. Setup files a
+  runner config names are no longer exempt in either amend check: an edited baseline setup file that is not a test
+  path is `HARNESS_PATH_MODIFIED`, a new one `HARNESS_PATH_NEW_SOURCE`, so a config line cannot pull production in.
+- `readLedger` counts transitions in the legacy prefix before a checkpoint, the same rule `oracle-verify` uses, so an
+  `amend` after them is `LEDGER_INVALID`.
+- Docs: `roles/controller-formal.md` opens with the six-phase map (phase → states → command → the only user
+  touchpoint); the Progress rule names the phase line, and "Read acceptance back" was dropped (walk prints it). README
+  progress-line paragraph.
+- Tests changed on purpose: the `status --brief` case (oracle-run) and the stage `status --brief` case now expect the
+  phase prefix and the `targets:` / `remaining:` names. New: guide phase line per state and target, stage phase line
+  before begin, at DRAFTED and after the lock (with and without a run state), lock drift sends the line to `guide`,
+  `HARNESS_PATH_NEW_SOURCE` for `src/extra.mjs`, `src/checkout/pricing.config.ts` and a production file named by a
+  new `vitest.config.ts` `setupFiles`, acceptance of `package.json`, `tsconfig.json` and `eslint.config.mjs` created
+  after init, legacy-prefix transition then `amend` is `LEDGER_INVALID`. The new-source and legacy-ledger cases fail
+  without their fixes.
+
+## Verification
+
+- `pnpm bundles:generate`: 22 bundles, unchanged. `pnpm lint` (frontend-oracle-design): 0 errors (406 existing
+  warnings), bundles and evals checks ok. `pnpm test`: 1306 pass, 0 fail. Byte budgets: Formal delivery closure and
+  every bundle cap hold without raising a cap (`controller-formal.md` is outside both).
+- Independent review (read-only, Opus 5.5, one round): 2 major, 2 minor, 2 nit, all applied — `init` command lacked
+  `--scan-root` (and pointed at init after init), runner `setupFiles` targets were exempt from both amend checks,
+  `*.config.*` accepted any product file by basename, blocked packets still printed red/green/review-packet, the
+  check-report wording, and a long doc line. Kept by choice: `FLAKINESS_GATE_*` and `BLIND_MAP_REQUIRED` count as
+  phase work (another run or the review clears them), so a High-risk IMPLEMENTED_GREEN still points at
+  `review-packet`.
+
 # 0.117.0: fewer self-inflicted FAILs and rubber-stamp questions — init corrections, exact labels, free pre-RED repairs
 
 ## Why

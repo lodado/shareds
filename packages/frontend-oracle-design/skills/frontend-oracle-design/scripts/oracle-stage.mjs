@@ -25,6 +25,30 @@ export const AUTHORING_STAGES = Object.freeze({
   'contract/v1': Object.freeze(['DISCOVERING', 'CHECKED', 'DRAFTED', 'ORACLE_READY']),
 })
 export const STAGE_FILE = 'stage.json'
+// 컨트롤러가 보여 주는 6단계 — 작성 단계(stage.json)와 Delivery 상태(run-state.json) 위의 보기일 뿐 상태 기계가 아니다.
+// 관문은 그대로 advance·lock·transition이 연다. 진행 한 줄(두 스크립트의 status --brief, guide)이 이 표 하나를 같이 쓴다.
+export const PHASES = Object.freeze(['Intake', 'Model', 'Card review and lock', 'RED', 'GREEN', 'Review and close'])
+const PHASE_OF_STATE = Object.freeze({
+  DISCOVERING: 2,
+  MODELED: 2,
+  CHECKED: 2,
+  DRAFTED: 3,
+  ORACLE_READY: 4,
+  VALID_RED: 5,
+  IMPLEMENTED_GREEN: 6,
+  REVIEW_VERIFIED: 6,
+  PARTIAL_VERIFIED: 6,
+  NEEDS_DECISION: 6,
+  FAIL: 6,
+})
+
+/** `phase N/6 <name> · next: <command>` — 작성 기록이 없으면(첫 `yes` 전) Intake다. */
+export function phaseLine(state, next) {
+  const index = state === null ? 1 : PHASE_OF_STATE[state]
+  if (!index) throw new Error(`no phase for state ${state}`)
+  return `phase ${index}/${PHASES.length} ${PHASES[index - 1]} · next: ${next}`
+}
+
 const PACKAGE_FILE = 'oracle.package.json'
 const packageScript = join(fileURLToPath(new URL('.', import.meta.url)), 'oracle-package.mjs')
 const REVIEW_KINDS = new Set(['model-analyst', 'translation', 'cold-read', 'reverse-impossible', 'source-aware'])
@@ -825,8 +849,9 @@ async function status(directory) {
  * 이 단계에서 보낸 독립 디스패치와 경과, 남은 단계. 판정을 대신하지 않는다 — 관문은 advance·lock이 연다.
  */
 async function briefStatus(directory, nowMs = Date.now()) {
+  const dir = relative(process.cwd(), directory) || '.'
   const record = await readStage(directory)
-  if (!record) return 'stage none · next: oracle-stage.mjs begin'
+  if (!record) return phaseLine(null, `oracle-stage.mjs begin --dir ${dir}`)
   const binding = await bindingAt(directory, record)
   const stages = AUTHORING_STAGES[binding.profile] ?? STAGES
   const position = stages.indexOf(record.stage)
@@ -837,14 +862,28 @@ async function briefStatus(directory, nowMs = Date.now()) {
     .map((entry) => `${entry.kind} ${elapsedLabel(entry.at, nowMs)} ago`)
   const remaining = stages.slice(position + 1).map((stage) => (stage === 'ORACLE_READY' ? 'lock' : stage))
   const place = [`stage ${record.stage}`, `${position + 1}/${stages.length}`, binding.profile].filter(Boolean).join(' ')
+  const stale = await isStale(directory, record, binding)
+  // 잠금 뒤 init까지 했으면 진행은 run 쪽 한 줄이 말한다
+  const initialized = record.stage === 'ORACLE_READY' && (await stat(join(directory, 'run-state.json')).then(() => true, () => false))
+  const next = initialized ? `oracle-run.mjs status --brief --dir ${dir}` : stageCommand(record.stage, binding.profile, dir, stages[position + 1], stale)
   return [
+    phaseLine(record.stage, next),
     place,
     entered ? `${elapsedLabel(entered, nowMs)} in stage` : null,
     `authoring round ${iterations.round}/${iterations.limit}${iterations.exhausted ? ' exhausted' : ''}`,
     dispatched.length ? `dispatched: ${dispatched.join(', ')}` : null,
-    remaining.length ? `next: ${remaining.join(' → ')}` : 'next: oracle-run.mjs init',
-    (await isStale(directory, record, binding)) ? 'STALE: the recorded bytes changed since this stage — rewind' : null,
+    remaining.length ? `remaining: ${remaining.join(' → ')}` : null,
+    stale ? 'STALE: the recorded bytes changed since this stage — rewind' : null,
   ].filter(Boolean).join(' · ')
+}
+
+/** 이 작성 단계의 명령 하나 — Formal은 walk 한 번이 DRAFTED까지 가고, Contract는 advance를 한 칸씩 부른다. */
+function stageCommand(stage, profile, dir, following, stale) {
+  const contract = profile === 'contract/v1'
+  if (stale) return contract ? `oracle-stage.mjs rewind --dir ${dir} --to DISCOVERING --reason <cause>` : `oracle-cycle.mjs walk --dir ${dir} --reason <cause>`
+  if (stage === 'DRAFTED') return `oracle-lock.mjs create --oracle ${dir}/oracle.md --lock ${dir}/oracle.lock.json --source <approved-source>`
+  if (stage === 'ORACLE_READY') return `oracle-run.mjs init --dir ${dir} --lock ${dir}/oracle.lock.json --scan-root <scan-root> --required-label <label>`
+  return contract ? `oracle-stage.mjs advance --dir ${dir} --to ${following}` : `oracle-cycle.mjs walk --dir ${dir}`
 }
 
 const FLAGS = new Set(['brief'])

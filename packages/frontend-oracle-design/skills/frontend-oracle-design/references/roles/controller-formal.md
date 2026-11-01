@@ -3,10 +3,24 @@
 Controller-only procedure. Specialists load their own role procedures, not this whole sequence.
 The core entry owns scope and mode. Common prohibitions apply throughout. At each stage re-read disk.
 
-Start each Progress message (common's table) and every answer to a progress question with the one line
-from `oracle-stage.mjs status --dir <dir> --brief` before init or `oracle-run.mjs status --dir <dir> --brief`
-after it, then add the newly established fact and next action. Register each independent dispatch with
-`oracle-stage.mjs review-input --attempt <id>`, adding `--model` and `--effort` when known.
+## Phases
+
+Six phases group the steps below: a view over the stage and Delivery states, not new states, budgets or
+gates. Each is states → command → the only user touchpoint.
+
+1. Intake: no stage record → $oracle-intake, then `oracle-stage.mjs begin` → the first `yes`.
+2. Model: DISCOVERING, MODELED, CHECKED → `oracle-cycle.mjs walk` → none.
+3. Card review and lock: DRAFTED → `oracle-lock.mjs create` → card approval.
+4. RED: ORACLE_READY → `oracle-run.mjs init --scan-root <scan-root>`, then `red` → none.
+5. GREEN: VALID_RED → `oracle-run.mjs green` → none.
+6. Review and close: IMPLEMENTED_GREEN to REVIEW_VERIFIED, or PARTIAL_VERIFIED, NEEDS_DECISION, FAIL →
+   `review-packet`, then `status --check-report` → NEEDS_DECISION only.
+
+Start each Progress message (common's table) and every answer to a progress question with the line from
+`oracle-stage.mjs status --dir <dir> --brief` before init or `oracle-run.mjs status --dir <dir> --brief`
+after it (`guide` opens with the same phase): `phase N/6 <name> · next: <command>`, then the newly
+established fact. Register each independent dispatch with `oracle-stage.mjs review-input --attempt <id>`,
+adding `--model` and `--effort` when known.
 Where the host sets effort per dispatch (Claude Code's Agent `effort`), cap execution roles at `high`, never
 above the session's effort: a worker that runs given commands and records results, packet assembly, a
 repair spelled out by exact findings. Author, analyst, every reviewer and the blind mapper are not
@@ -20,7 +34,7 @@ execution roles: they keep the session's effort and their own model rules (subag
    actual `yes` (axis confirmation) before dispatching any model authoring. A source the user cannot provide is not an agent assumption. Hold only separable blocked scope.
 2. Invoke $oracle-author for the source-bound model package, independent analyst inputs, checks and projected
    Draft with all manual duties. Walk the stages with `scripts/oracle-stage.mjs`: `begin`, then
-   `advance --to MODELED | CHECKED | DRAFTED` once each gate passes. Read acceptance back.
+   `advance --to MODELED | CHECKED | DRAFTED` once each gate passes.
    Walk them in one call with `scripts/oracle-cycle.mjs walk --dir <dir> [--to <stage>]`: it runs the
    fast Bend/package check, every remaining `advance` and the DRAFTED `project-card`, stopping at the first
    failure with `failed.code`, `detail` and `next`. A stale stage stops as STAGE_STALE; rerun with
