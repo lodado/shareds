@@ -776,7 +776,7 @@ explicitly chosen `orchestration-only`. Do not select it automatically by LOC or
    actually installed version. **Name explicitly** render-local primitives in the approved `allow`,
    and external orchestration hooks such as lifecycle·navigation·query·form in the approved `block`.
    Do not assume the plugin's default list or automatic recognition of the latest React/Next hooks.
-4. Run the pinned lint command with `oracle-run.mjs exec --label hook-encapsulation`, and after
+4. Run the pinned lint command with `oracle-run.mjs exec --label hook-encapsulation:exit`, and after
    GREEN·independent review re-run it with the same required label.
 
 This gate proves only the structural fact that there is **no direct call** to a forbidden hook. It

@@ -24,7 +24,7 @@ execution roles: they keep the session's effort and their own model rules (subag
    Walk them in one call with `scripts/oracle-cycle.mjs walk --dir <dir> [--to <stage>]`: it runs the
    fast Bend/package check, every remaining `advance` and the DRAFTED `project-card`, stopping at the first
    failure with `failed.code`, `detail` and `next`. A stale stage stops as STAGE_STALE; rerun with
-   `--reason <cause>` to rewind to DISCOVERING and re-walk (that spends the authoring round, as rewind does).
+   `--reason <cause>` to rewind to DISCOVERING and re-walk (no authoring round; review laps spend them).
    A walk back is `rewind --to <stage> --reason <cause>` with the cause that sent it back. CHECKED passes
    at once on a receipt when the same package, Bend files, registered sources, harness, node and Bend
    passed it before; its evidence says so (`ORACLE_LINT_CACHE=off` turns receipts off).

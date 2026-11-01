@@ -186,7 +186,7 @@ Collect first-pass reviews before repairing and fix each group of shared causes 
 requirement needs the scope decision, not automatic model growth, and second-pass work confirms only the
 listed fixes and their regressions. Security, privacy, accessibility and data integrity are never downgraded.
 
-One persisted authoring budget covers model/analyst, translation, card review and stage rewinds; Delivery
+One persisted authoring budget covers model/analyst, translation and card review laps; Delivery
 review keeps its own two-round limit. No role restart, regenerated packet, rewind or new revision resets
 either, and exhaustion stops with the remaining findings, never a false pass. Each profile's own
 procedures own their dispatch commands.
@@ -1204,10 +1204,10 @@ not a re-review, so this gate is the last cheap place to find a defect.
 
 ### Review round budget — at most 2
 
-Card review (cold read, reverse-impossible, source-aware), analyst/model revision, translation and
-stage rewind share at most 2 authoring rounds per revision. The runtime keeps the count in `stage.json`;
-the journal explains findings and scope decisions. A fresh defect hunt after every repair can keep
-expanding the modeled world rather than verify the agreed outcome.
+Card review (cold read, reverse-impossible, source-aware), analyst/model revision and translation share
+at most 2 authoring rounds per revision, counted in review laps (a rewind spends none). The runtime keeps
+the count in `stage.json`; the journal explains findings and scope decisions. A fresh defect hunt after
+every repair can keep expanding the modeled world rather than verify the agreed outcome.
 
 1. **Round 1** is the full review. Group its findings by shared root cause and repair each group
    once, in one pass, before round 2.
@@ -1230,12 +1230,11 @@ Runtime dispatch:
 - `oracle-stage.mjs begin --dir <dir>` before authoring/independent inputs; `status` is read-only and
   reports `iterations.round`, `limit`, `mode` and `exhausted`.
 - Every walk back names its cause: `oracle-stage.mjs rewind --dir <dir> --to <stage> --reason
-review-finding|gate-failure|user-answer|source-change [--note <one line>]`. The reason is recorded in
-  `stage.json` history for cross-run reflection; it never changes the budget or the gate. Changed
+review-finding|gate-failure|user-answer|source-change [--note <one line>]`. The reason is kept in
+  `stage.json` history for reflection and never changes the gate. Changed
   package bytes walk back to DISCOVERING; Bend files or registered sources changed after CHECKED are judged
-  again in place by `advance --to CHECKED` (no round spent; it takes the same `--reason` and `--note`, and
-  reflection counts it as rework), and only a card-only repair on unchanged inputs resumes at CHECKED or
-  DRAFTED by rewind.
+  again in place by `advance --to CHECKED` (same `--reason` and `--note`; reflection counts it as rework),
+  and only a card-only repair on unchanged inputs resumes at CHECKED or DRAFTED by rewind.
 - `oracle-adequacy.mjs model-input`, `explore-input` for a staged card, and
   `oracle-discovery.mjs mapping-input` register their input digests. Cold-read/source-aware dispatch
   registers its permitted raw input with `oracle-stage.mjs review-input --dir <dir> --kind cold-read|source-aware --input <file> --attempt <dispatch-id>`.
@@ -1245,14 +1244,16 @@ review-finding|gate-failure|user-answer|source-change [--note <one line>]`. The 
   sources too. Keep procedural metadata separate from blind task inputs.
 - A role's first pass is `full`; subsequent passes are `confirm-fixes`. A changed input already reviewed in the
   current round starts the next round; different roles' first updates share that repair batch.
-  Identical input and an identical retried rewind do not consume another round, nor permit a fresh hunt.
+  Identical input consumes no round and permits no fresh hunt.
 - `ITERATION_BUDGET_EXHAUSTED` refuses the operation before stage/output changes. Preserve the remaining
   findings and stop. Legacy rewind history counts on upgrade; it is never silently reset.
 - Only after an actual explicit approval, use `oracle-stage.mjs extend --dir <dir> --approval <file>`.
   The JSON records `decision: "approve-one-more-round"`, `phase: "authoring"`, the exact next `round`,
   `source` pointing to that user message, and `reason`. It grants one additional round, not a reset,
   policy approval, permission to unlock, or a waiver. The source is auditable self-report, not proof
-  of human identity; never fabricate it or treat blanket delegation as that approval.
+  of human identity; never fabricate it or treat blanket delegation as that approval. A user who
+  delegated the choices ("알아서 해") gets one `decision: "delegated-rounds"` record per revision
+  (`phase: "authoring"`, `upTo` at most 5, the user's words as `source`, `reason`); policy changes still ask.
 
 ### 1. Cold read — a reader who was not in the conversation
 

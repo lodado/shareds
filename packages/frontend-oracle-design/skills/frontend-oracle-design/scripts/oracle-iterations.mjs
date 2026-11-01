@@ -58,19 +58,40 @@ export function assertReviewIterationEvent(event) {
   }
 }
 
+/** Highest authoring limit a standing delegation ("don't ask, handle it") can grant; past it the user is asked. */
+export const DELEGATED_ROUND_CAP = 5
+
 /** A source reference records human authority, it does not authenticate it. Never manufacture this document. */
 export function extendIterations(value, approval, phase) {
   const budget = iterationBudget(value)
+  if (approval?.decision === 'delegated-rounds') return delegateRounds(budget, approval, phase)
   const round = Math.max(budget.round, budget.limit) + 1
   if (approval?.decision !== 'approve-one-more-round' || approval.phase !== phase || approval.round !== round ||
       typeof approval.source !== 'string' || !approval.source.trim() ||
       typeof approval.reason !== 'string' || !approval.reason.trim()) {
+    const delegation = phase === 'authoring' ? `, or a recorded standing delegation (decision delegated-rounds, upTo at most ${DELEGATED_ROUND_CAP})` : ''
     throw new IterationError('ITERATION_APPROVAL_REQUIRED',
-      `requires the user's explicit approval of ${phase} round ${round}: decision, phase, round, source and reason; blanket delegation is not approval`)
+      `requires the user's explicit approval of ${phase} round ${round}: decision, phase, round, source and reason${delegation}`)
   }
   const digest = sha256(stableStringify(approval))
   if (budget.approvals.some((entry) => entry.digest === digest)) {
     throw new IterationError('ITERATION_APPROVAL_REUSED', 'an approval grants exactly one additional round')
   }
   return { ...budget, limit: round, approvals: [...budget.approvals, { ...approval, digest }] }
+}
+
+/** The user's own standing delegation raises the authoring limit once, up to the cap; it never covers a policy change. */
+function delegateRounds(budget, approval, phase) {
+  if (budget.approvals.some((entry) => entry.decision === 'delegated-rounds')) {
+    throw new IterationError('ITERATION_APPROVAL_REUSED', 'a standing delegation is recorded once per revision; past it, ask the user for one more round')
+  }
+  if (phase !== 'authoring' || approval.phase !== 'authoring' || !Number.isSafeInteger(approval.upTo) ||
+      approval.upTo <= budget.limit || approval.upTo > DELEGATED_ROUND_CAP ||
+      typeof approval.source !== 'string' || !approval.source.trim() ||
+      typeof approval.reason !== 'string' || !approval.reason.trim()) {
+    throw new IterationError('ITERATION_APPROVAL_REQUIRED',
+      `a standing delegation raises authoring rounds above the current limit ${budget.limit} and at most to ${DELEGATED_ROUND_CAP}: decision delegated-rounds, phase authoring, upTo, source (the user's words) and reason`)
+  }
+  const digest = sha256(stableStringify(approval))
+  return { ...budget, limit: approval.upTo, approvals: [...budget.approvals, { ...approval, digest }] }
 }

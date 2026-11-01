@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { sha256 } from './oracle-fs.mjs'
+import { extendIterations, iterationBudget } from './oracle-iterations.mjs'
 import { assertReadyToLock, inputsPin, markLocked, preLockProof, readStage } from './oracle-stage.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 
@@ -38,18 +39,29 @@ const stage = (root, directory, command, to) =>
   node(root, 'oracle-stage.mjs', [command, '--dir', directory, ...(to ? ['--to', to] : []), ...(command === 'rewind' ? ['--reason', 'gate-failure'] : [])])
 const lock = (root, directory) =>
   node(root, 'oracle-lock.mjs', ['create', '--oracle', join(directory, 'oracle.md'), '--lock', join(directory, 'oracle.lock.json')])
+/** One review lap: changed bytes sent to a reviewer. Authoring rounds count these laps, never the walks back. */
+const reviewLap = async (root, directory, text, kind = 'cold-read') => {
+  const input = join(root, `review-input-${kind}.md`)
+  await writeFile(input, text)
+  return node(root, 'oracle-stage.mjs', ['review-input', '--dir', directory, '--kind', kind, '--input', input])
+}
 
-test('authoring iterations stop a third repair and a restart cannot reset the shared budget', async (t) => {
+test('authoring rounds count review laps, not rewinds, and a restart cannot reset the shared budget', async (t) => {
   const { root, directory } = await repository(t)
   assert.equal(stage(root, directory, 'begin').status, 0)
+  assert.equal((await reviewLap(root, directory, 'card v1\n')).status, 0)
   assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
-  assert.equal(stage(root, directory, 'rewind', 'DISCOVERING').status, 0)
-  // A retried delivery of the same rewind is not another repair.
-  assert.equal(stage(root, directory, 'rewind', 'DISCOVERING').status, 0)
-  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  // walking back is part of a repair, not another lap: three walks back leave round 1
+  for (let walk = 0; walk < 3; walk += 1) {
+    assert.equal(stage(root, directory, 'rewind', 'DISCOVERING').status, 0)
+    assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  }
+  assert.equal(JSON.parse(stage(root, directory, 'status').stdout).iterations.round, 1)
+  // sending the repaired bytes back to review is the second lap
+  assert.equal(JSON.parse((await reviewLap(root, directory, 'card v2\n')).stdout).iterations.round, 2)
   const before = await readFile(join(directory, 'stage.json'))
-  const third = stage(root, directory, 'rewind', 'DISCOVERING')
-  assert.equal(third.status, 1, 'a third authoring cycle must not start automatically')
+  const third = await reviewLap(root, directory, 'card v3\n')
+  assert.equal(third.status, 1, 'a third review lap must not start automatically')
   assert.match(third.stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
   assert.deepEqual(await readFile(join(directory, 'stage.json')), before)
   assert.match(stage(root, directory, 'begin').stderr, /^STAGE_EXISTS:/)
@@ -88,7 +100,7 @@ test('a rewind names why it walks back, so repeated causes across runs can be co
   assert.equal((await readStage(directory)).history.filter((step) => step.evidence === 'rewind').length, 1)
 })
 
-test('moving a source location after a stage was judged walks back without spending a round; a changed meaning still spends one', async (t) => {
+test('a walk back spends no round, marks a location-only move as metadata and judges a changed meaning again from DISCOVERING', async (t) => {
   const { root, directory } = await repository(t)
   const packagePath = join(directory, 'oracle.package.json')
   const edit = async (change) => {
@@ -117,7 +129,8 @@ test('moving a source location after a stage was judged walks back without spend
   const changed = stage(root, directory, 'rewind', 'DISCOVERING')
   assert.equal(changed.status, 0, changed.stderr)
   assert.equal(JSON.parse(changed.stdout).metadataOnly, undefined)
-  assert.equal(JSON.parse(changed.stdout).iterations.round, 2)
+  assert.equal(JSON.parse(changed.stdout).iterations.round, 1, 'the next review lap, not the walk back, spends the round')
+  assert.equal((await readStage(directory)).stage, 'DISCOVERING')
 })
 
 test('a rewind says which reviews were dispatched since the last walk, unless a review finding is what sends it back', async (t) => {
@@ -143,7 +156,7 @@ test('a rewind says which reviews were dispatched since the last walk, unless a 
   assert.equal(finding.entry.dispatchedBefore, undefined)
 })
 
-test('analyst, mapping, card review and rewind share one repair round instead of multiplying their allowances', async (t) => {
+test('analyst, mapping and card review share one repair round instead of multiplying their allowances', async (t) => {
   const { root, directory } = await repository(t)
   assert.equal(stage(root, directory, 'begin').status, 0)
   const input = join(root, 'review-input.md')
@@ -215,9 +228,7 @@ test('public model-input uses the same budget and refuses before overwriting out
 test('one explicit authoring approval extends exactly one round, never unlocks or grants a blanket waiver', async (t) => {
   const { root, directory } = await repository(t)
   assert.equal(stage(root, directory, 'begin').status, 0)
-  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
-  assert.equal(stage(root, directory, 'rewind', 'DISCOVERING').status, 0)
-  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
+  for (const text of ['card v1\n', 'card v2\n']) assert.equal((await reviewLap(root, directory, text)).status, 0)
   const approval = join(root, 'approval.json')
   const extend = () => node(root, 'oracle-stage.mjs', ['extend', '--dir', directory, '--approval', approval])
   await writeFile(approval, JSON.stringify({ decision: 'do-everything', source: 'conversation: delegated choices' }))
@@ -229,10 +240,40 @@ test('one explicit authoring approval extends exactly one round, never unlocks o
   const granted = extend()
   assert.equal(granted.status, 0, granted.stderr)
   assert.equal(JSON.parse(granted.stdout).iterations.limit, 3)
-  assert.equal(stage(root, directory, 'rewind', 'DISCOVERING').status, 0)
-  assert.equal(stage(root, directory, 'advance', 'MODELED').status, 0)
-  assert.match(stage(root, directory, 'rewind', 'DISCOVERING').stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
+  assert.equal((await reviewLap(root, directory, 'card v3\n')).status, 0)
+  assert.match((await reviewLap(root, directory, 'card v4\n')).stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
   assert.equal(extend().status, 1, 'an old approval cannot buy another round')
+})
+
+test('a recorded standing delegation raises authoring rounds once, at most to five, and never extends delivery review', async (t) => {
+  const { root, directory } = await repository(t)
+  const approval = join(root, 'delegation.json')
+  const delegate = async (fields) => {
+    await writeFile(approval, JSON.stringify({ decision: 'delegated-rounds', phase: 'authoring',
+      source: 'conversation: "do it all, stop asking"', reason: 'repairs that change no policy', ...fields }))
+    return node(root, 'oracle-stage.mjs', ['extend', '--dir', directory, '--approval', approval])
+  }
+  assert.equal(stage(root, directory, 'begin').status, 0)
+  assert.match((await delegate({ upTo: 6 })).stderr, /^ITERATION_APPROVAL_REQUIRED: .*at most to 5/)
+  assert.match((await delegate({ upTo: 2 })).stderr, /^ITERATION_APPROVAL_REQUIRED:/, 'it must raise the current limit')
+  assert.match((await delegate({ upTo: 5, source: ' ' })).stderr, /^ITERATION_APPROVAL_REQUIRED:/, "the user's words are the source")
+  const granted = await delegate({ upTo: 5 })
+  assert.equal(granted.status, 0, granted.stderr)
+  assert.equal(JSON.parse(granted.stdout).iterations.limit, 5)
+  assert.match((await delegate({ upTo: 5, reason: 'a second standing delegation' })).stderr, /^ITERATION_APPROVAL_REUSED:/)
+  for (let lap = 1; lap <= 5; lap += 1) assert.equal((await reviewLap(root, directory, `card v${lap}\n`)).status, 0, `lap ${lap}`)
+  assert.match((await reviewLap(root, directory, 'card v6\n')).stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
+  // past the cap only the user's explicit approval of the next round extends it
+  await writeFile(approval, JSON.stringify({ decision: 'approve-one-more-round', phase: 'authoring', round: 6,
+    source: 'conversation: explicit approval of round 6', reason: 'the listed contradiction needs one more lap' }))
+  const explicit = node(root, 'oracle-stage.mjs', ['extend', '--dir', directory, '--approval', approval])
+  assert.equal(explicit.status, 0, explicit.stderr)
+  assert.equal(JSON.parse(explicit.stdout).iterations.limit, 6)
+
+  const delegation = { decision: 'delegated-rounds', phase: 'authoring', upTo: 5, source: 'conversation', reason: 'no policy change' }
+  assert.throws(() => extendIterations(iterationBudget(undefined), delegation, 'delivery-review'), { code: 'ITERATION_APPROVAL_REQUIRED' })
+  assert.throws(() => extendIterations(iterationBudget(undefined), { ...delegation, phase: 'delivery-review' }, 'delivery-review'),
+    { code: 'ITERATION_APPROVAL_REQUIRED' })
 })
 
 test('new analyst dispatches spend rounds even with identical source input while transport retries do not', async (t) => {
@@ -497,8 +538,7 @@ test('a CHECKED or DRAFTED record from before the Bend pin is judged again in pl
   if (!bin) return
   const spent = await repository(t)
   assert.equal(stage(spent.root, spent.directory, 'begin').status, 0)
-  assert.equal(stage(spent.root, spent.directory, 'advance', 'MODELED').status, 0)
-  assert.equal(stage(spent.root, spent.directory, 'rewind', 'DISCOVERING').status, 0)
+  for (const text of ['card v1\n', 'card v2\n']) assert.equal((await reviewLap(spent.root, spent.directory, text)).status, 0)
   for (const step of ['MODELED', 'CHECKED']) assert.equal(stage(spent.root, spent.directory, 'advance', step).status, 0, step)
   const { inputsSha256: _pin, ...unpinned } = await readStage(spent.directory)
   await writeFile(join(spent.directory, 'stage.json'), `${JSON.stringify(unpinned)}\n`)

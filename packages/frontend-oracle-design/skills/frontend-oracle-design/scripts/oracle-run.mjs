@@ -130,6 +130,9 @@ const REQUIRED_CONSECUTIVE_PASSES = { low: 1, medium: 2, high: 3 }
 
 const BUDGET_LIMITS = { policy: 2, harness: 2, product: 3 }
 
+/** VALID_RED 전 init 재실행이 고칠 수 있는 설정 — 기준선·예산·이력은 여기에 없다(정렬된 순서). */
+const AMENDABLE_FIELDS = ['harnessPaths', 'milestones', 'requiredLabels']
+
 // Compile once before dispatch, inside the CLI error boundary and before any mutation.
 let deliveryProtocol
 
@@ -214,7 +217,12 @@ const NEXT_ACTIONS = {
   REPORT_MISSING: 'pass `--report <path>` and let the adapter write it',
   REPORT_STALE: 'the report predates the run — re-run with a fresh --report path',
   REPORT_PATH_EXISTS: 'choose a new --report path; an existing file cannot vouch for this run',
-  RUN_ARTIFACTS_EXIST: 'a new revision gets a new <oracle-id> directory — never re-init to reset the baseline',
+  RUN_ARTIFACTS_EXIST:
+    'after VALID_RED, or without the run state, a new revision gets a new <oracle-id> directory — never re-init to reset the baseline',
+  HARNESS_PATH_MODIFIED: 'revert the production edit made before RED; only test and runner files can be registered as harness',
+  AMEND_SCOPE_CHANGED: 're-run init with the same --lock and --scan-root — another lock or scan root is a new revision',
+  LABEL_NOT_REQUIRED:
+    're-run with the exact required label `status` shows — a run under another name never satisfies the gate',
   STACK_LABELS_REQUIRED:
     'register every mandatory-stack label: bend-proof:reported, bend-adequacy:reported, fast-check:reported and — unless the card declares ## Type Contract not applicable — type-contract:reported',
   PACKAGE_UNLOCKED: 'recreate the lock with --source <package> — the model package is part of the approved meaning',
@@ -673,6 +681,17 @@ function assertLedgerSchema(entry) {
   } else if (entry.type === 'transition') {
     if (!strings(['state', 'at']) || !entry.stateDelta || typeof entry.stateDelta !== 'object')
       throw new Error('invalid transition event')
+  } else if (entry.type === 'amend') {
+    const delta = entry.stateDelta
+    if (
+      entry.state !== 'ORACLE_READY' ||
+      !strings(['reason', 'at']) ||
+      !delta ||
+      typeof delta !== 'object' ||
+      Object.keys(delta).sort().join() !== AMENDABLE_FIELDS.join() ||
+      !AMENDABLE_FIELDS.every((field) => Array.isArray(delta[field]))
+    )
+      throw new Error('invalid amend event')
   } else if (entry.type === 'review-receipt') {
     if (
       !strings(['receiptId', 'role', 'reviewerId', 'taskId', 'at']) ||
@@ -795,9 +814,13 @@ async function readLedger(directory) {
       throw new Error('schema-v2 ledger requires migrate-ledger')
     }
     let previousDigest = ZERO_DIGEST
+    let transitioned = false
     const chainedEntries = entries.slice(Math.max(checkpointIndex, 0))
     for (const [index, entry] of chainedEntries.entries()) {
       assertLedgerSchema(entry)
+      // init는 첫 전이 전에만 고칠 수 있다 — 전이 뒤의 amend는 원장을 손으로 이어 붙인 것이다
+      if (entry.type === 'transition') transitioned = true
+      if (entry.type === 'amend' && transitioned) throw new Error(`amend after a transition at ${index}`)
       if (entry.previousDigest !== previousDigest) {
         throw new Error(`schema-v3 digest chain is invalid at ${index}:${entry.type}`)
       }
@@ -877,6 +900,10 @@ async function migrateLedger(options) {
 
 function replayState(state, ledger) {
   for (const entry of ledger) {
+    // VALID_RED 전 init 수정 — 그 세 필드만 덮는다. 원장 순서대로 다시 적용하므로 마지막 수정이 남는다
+    if (entry.type === 'amend') {
+      for (const field of AMENDABLE_FIELDS) state[field] = entry.stateDelta[field]
+    }
     if (entry.type === 'review-round' || entry.type === 'review-extension') {
       state.reviewIterations = iterationBudget(entry.iterations)
       if (entry.type === 'review-round') {
@@ -1468,8 +1495,17 @@ async function initialize(options) {
   await mkdir(directory, { recursive: true })
 
   // run-state를 지우고 다시 init해 기준선·예산을 되살리는 우회를 막는다.
-  // append-only ledger가 남아 있으면 이 oracle-id의 판정은 이미 시작된 것이다.
+  // append-only ledger가 남아 있으면 이 oracle-id의 판정은 이미 시작된 것이다 — run-state가 있고 VALID_RED 전이면
+  // 같은 명령이 설정만 고친다(amendInit).
   if ((await readLedger(directory)).length > 0) {
+    const stateExists = await lstat(statePath(directory)).then(
+      () => true,
+      () => false,
+    )
+    if (stateExists) {
+      await amendInit(directory, scanRoot, harnessPaths, options)
+      return
+    }
     throw new CliError(
       'RUN_ARTIFACTS_EXIST',
       `${portablePath(
@@ -1479,18 +1515,7 @@ async function initialize(options) {
     )
   }
 
-  const requiredLabels = [...new Set(options.requiredLabels.map((label) => label.trim()).filter(Boolean))]
-  if (requiredLabels.length === 0) {
-    throw new CliError(
-      'REQUIRED_LABEL_REQUIRED',
-      'init requires at least one --required-label from the repository checks',
-    )
-  }
-  for (const label of requiredLabels) {
-    if (label.includes(':') && !/^.+:(?:reported|exit)$/.test(label)) {
-      throw new CliError('REQUIRED_LABEL_INVALID', `${label}: expected <label>:reported or <label>:exit`)
-    }
-  }
+  const requiredLabels = parseRequiredLabels(options.requiredLabels)
 
   const state = {
     schemaVersion: 3,
@@ -1518,32 +1543,10 @@ async function initialize(options) {
   const binding = await resolveRunProfile(directory, state)
   if (binding.kind === 'explicit') state.verificationProfile = binding.profile
   state.risk = resolveRisk(options.risk, oracle)
-  if (binding.profile === 'contract/v1') {
-    if (!requiredLabels.includes('contract-cases:reported')) {
-      throw new CliError('CONTRACT_CASES_LABEL_REQUIRED', 'Contract init requires --required-label contract-cases:reported')
-    }
-    const lines = markdownLines(oracle)
-    const typeContract = sectionLines(lines, 'Type Contract').join('\n')
-    const approved = approvedSourceIds(lines)
-    const notApplicable = /^- Not applicable: (.+)$/m.exec(typeContract)?.[1]
-    const investigated = /^- Investigated: (.+)$/m.exec(typeContract)?.[1]
-    const substantiveDeclaration = (value) => Boolean(value?.trim()) && !/^(?:[-\u2010-\u2015]+|TBD)$/i.test(value.trim())
-    const reason = notApplicable?.replace(/\(source: [^)]+\)/g, '').trim()
-    const noTypeBoundary = substantiveDeclaration(reason) && substantiveDeclaration(investigated)
-      && [...approved].some((id) => notApplicable.includes(`(source: ${id})`))
-    if (!noTypeBoundary && !requiredLabels.includes('type-contract:reported')) {
-      throw new CliError('TYPE_CONTRACT_LABEL_REQUIRED', 'Contract init requires --required-label type-contract:reported unless the approved card declares Type Contract not applicable')
-    }
-    const caseSpace = parseCaseSpace(oracle)
-    // Default t-way carries Async/Order as evidence.json `sequence`; only explicit full-product requires the producer label.
-    const temporal = caseSpace?.coverage === 'full-product' && caseSpace.families.some((entry) => ['Async', 'Order'].includes(entry.family) && !entry.excluded)
-    if (temporal && !requiredLabels.includes('fast-check:reported')) {
-      throw new CliError('FAST_CHECK_LABEL_REQUIRED', 'Contract full-product Async/Order requires --required-label fast-check:reported')
-    }
-  } else {
-    await validateFormalInit(directory, state, oracle, requiredLabels, binding)
-  }
+  await assertProfileLabels(directory, state, oracle, binding, requiredLabels)
   state.milestones = parseMilestones(options.milestones, contractRowIds(oracle))
+  // exec는 낡은 생성 테스트가 하나라도 있으면 모든 라벨을 거부한다 — 아무것도 쓰기 전인 init에서 먼저 막는다
+  await assertGeneratedOutputs(scanRoot)
   state.snapshot = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
   // RED 전 기존 테스트 변경을 as-is → to-be로만 허용하는 기준선 — 코드 테스트만 잰다(스크린샷 바이트는 재지 않는다)
   state.testFilesAtInit = {}
@@ -1586,14 +1589,163 @@ async function initialize(options) {
   process.stdout.write(
     [
       `RUN_STATE_INITIALIZED sha256:${revision.oracleSha256} state:ORACLE_READY`,
-      ...runnerHarness.paths.map((path) => `HARNESS_AUTO ${path}`),
-      ...runnerHarness.unresolved.map((entry) => `HARNESS_SETUP_UNRESOLVED ${entry} — register it with --harness-path`),
-      ...runnerHarness.suggested
-        .filter((path) => !harnessPaths.includes(path))
-        .map((path) => `HARNESS_SUGGESTED ${path} — register it with --harness-path if it carries the test config`),
+      ...harnessNotices(runnerHarness, harnessPaths),
       '',
     ].join('\n'),
   )
+}
+
+function parseRequiredLabels(values) {
+  const requiredLabels = [...new Set(values.map((label) => label.trim()).filter(Boolean))]
+  if (requiredLabels.length === 0) {
+    throw new CliError(
+      'REQUIRED_LABEL_REQUIRED',
+      'init requires at least one --required-label from the repository checks',
+    )
+  }
+  for (const label of requiredLabels) {
+    if (label.includes(':') && !/^.+:(?:reported|exit)$/.test(label)) {
+      throw new CliError('REQUIRED_LABEL_INVALID', `${label}: expected <label>:reported or <label>:exit`)
+    }
+  }
+  return requiredLabels
+}
+
+function harnessNotices(runnerHarness, harnessPaths) {
+  return [
+    ...runnerHarness.paths.map((path) => `HARNESS_AUTO ${path}`),
+    ...runnerHarness.unresolved.map((entry) => `HARNESS_SETUP_UNRESOLVED ${entry} — register it with --harness-path`),
+    ...runnerHarness.suggested
+      .filter((path) => !harnessPaths.includes(path))
+      .map((path) => `HARNESS_SUGGESTED ${path} — register it with --harness-path if it carries the test config`),
+  ]
+}
+
+/**
+ * VALID_RED 전에는 같은 init 명령이 설정(필수 라벨·마일스톤·harness 경로)만 고쳐 다시 적는다. 기준선(스냅숏·RED 전 테스트
+ * 측정)·예산·이력·잠금은 그대로라 기준선을 되살리는 우회가 되지 않는다. 잘못 적은 설정 하나로 run 전체를 FAIL하고 새
+ * revision을 여는 일을 막는다.
+ */
+async function amendInit(directory, scanRoot, harnessPaths, options) {
+  if (!options.reason?.trim()) {
+    throw new CliError(
+      'USAGE',
+      'this oracle already has a run state — before VALID_RED, re-run init with --reason <why> to correct its required labels, milestones and harness paths',
+      2,
+    )
+  }
+  const requiredLabels = parseRequiredLabels(options.requiredLabels)
+  await withDirectoryLock(directory, 'state', async () => {
+    const state = await readConsistentState(directory)
+    if (state.state !== 'ORACLE_READY' || redRecorded(state)) {
+      throw new CliError(
+        'RUN_ARTIFACTS_EXIST',
+        `init can only be corrected before VALID_RED (the run is at ${state.state}) — start a new <oracle-id> directory for a new revision`,
+      )
+    }
+    const [lockReal, stateLockReal, scanRootReal, stateScanRootReal] = await Promise.all(
+      [resolve(options.lock), resolve(directory, state.lock), scanRoot, resolve(directory, state.scanRoot)].map((path) =>
+        realpath(path).catch(() => path),
+      ),
+    )
+    if (lockReal !== stateLockReal || scanRootReal !== stateScanRootReal) {
+      throw new CliError('AMEND_SCOPE_CHANGED', 'a correction keeps the lock and the scan root of the run')
+    }
+    if (options.risk !== undefined && options.risk !== state.risk) {
+      throw new CliError('RISK_MISMATCH', `--risk ${options.risk} disagrees with the run's risk: ${state.risk}`)
+    }
+    verifyLock(directory, state)
+    const oracle = await readFile(await lockedOraclePath(directory, state), 'utf8')
+    const binding = await resolveRunProfile(directory, state, true)
+    await assertProfileLabels(directory, state, oracle, binding, requiredLabels)
+    const milestones = parseMilestones(options.milestones, contractRowIds(oracle))
+    const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+    const runnerHarness = await runnerHarnessPaths(scanRoot, current)
+    const paths = [...harnessPaths, ...runnerHarness.paths.filter((path) => !harnessPaths.includes(path))]
+    const untracked = paths.filter((path) => !(path in current))
+    if (untracked.length > 0) {
+      throw new CliError('HARNESS_PATH_INVALID', `harness path is outside the tracked scan snapshot: ${untracked.join(', ')}`)
+    }
+    const previousPaths = state.harnessPaths ?? []
+    const added = paths.filter((path) => !previousPaths.includes(path))
+    const runnerPaths = new Set(runnerHarness.paths)
+    // init 뒤 바뀐 기준선 production 파일을 harness로 옮기면 TDD 순서 판정에서 빠진다 — 테스트·러너 입력만 옮길 수 있다
+    const changedProduction = added.filter(
+      (path) => path in state.snapshot && current[path] !== state.snapshot[path] && !isTestPath(path) && !runnerPaths.has(path),
+    )
+    if (changedProduction.length > 0) {
+      throw new CliError(
+        'HARNESS_PATH_MODIFIED',
+        `changed since init, so it cannot become harness: ${changedProduction.join(', ')} — revert it, or start a new <oracle-id>`,
+      )
+    }
+    const removed = [
+      ...previousPaths.filter((path) => !paths.includes(path)).map((path) => `harness ${path}`),
+      ...(state.milestones ?? [])
+        .filter((old) => !milestones.some((kept) => kept.name === old.name))
+        .map((old) => `milestone ${old.name}`),
+      ...(state.requiredLabels ?? []).filter((value) => !requiredLabels.includes(value)).map((value) => `label ${value}`),
+    ]
+    const stateDelta = { harnessPaths: paths, milestones, requiredLabels }
+    const amended = await appendLedger(directory, {
+      type: 'amend',
+      state: 'ORACLE_READY',
+      reason: options.reason.trim(),
+      stateDelta,
+      at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 수정 시각을 기록한다
+    })
+    Object.assign(state, stateDelta)
+    state.ledgerHead = amended.digest
+    await writeState(directory, state)
+    process.stdout.write(
+      [
+        `RUN_STATE_AMENDED state:ORACLE_READY labels:${requiredLabels.join(',')} milestones:${milestones.length} harness:${paths.length}`,
+        ...harnessNotices(runnerHarness, paths),
+        ...removed.map((item) => `AMEND_REMOVED ${item}`),
+        // 새로 harness가 된 파일은 production 비교에서 빠진다 — 리뷰어가 원장에서 볼 수 있게 이름을 남긴다
+        ...added.map((path) =>
+          path in state.snapshot
+            ? `HARNESS_ADDED_BY_AMEND ${path} — unchanged since init; the ledger records it for review`
+            : `HARNESS_ADDED_AFTER_INIT ${path} — not in the init baseline; the ledger records it for review`,
+        ),
+        '',
+      ].join('\n'),
+    )
+  })
+}
+
+/** VALID_RED를 한 번이라도 기록했나 — 그 전에는 얼린 harness·테스트 binding이 없다. */
+function redRecorded(state) {
+  return state.harnessAtValidRed != null || (state.history ?? []).some((entry) => entry.state === 'VALID_RED')
+}
+
+/** 필수 라벨이 프로필 요구(Contract의 cases·type·fast-check, Formal의 proof·adequacy·stack)를 덮는가 — init과 수정이 같이 쓴다. */
+async function assertProfileLabels(directory, state, oracle, binding, requiredLabels) {
+  if (binding.profile === 'contract/v1') {
+    if (!requiredLabels.includes('contract-cases:reported')) {
+      throw new CliError('CONTRACT_CASES_LABEL_REQUIRED', 'Contract init requires --required-label contract-cases:reported')
+    }
+    const lines = markdownLines(oracle)
+    const typeContract = sectionLines(lines, 'Type Contract').join('\n')
+    const approved = approvedSourceIds(lines)
+    const notApplicable = /^- Not applicable: (.+)$/m.exec(typeContract)?.[1]
+    const investigated = /^- Investigated: (.+)$/m.exec(typeContract)?.[1]
+    const substantiveDeclaration = (value) => Boolean(value?.trim()) && !/^(?:[-\u2010-\u2015]+|TBD)$/i.test(value.trim())
+    const reason = notApplicable?.replace(/\(source: [^)]+\)/g, '').trim()
+    const noTypeBoundary = substantiveDeclaration(reason) && substantiveDeclaration(investigated)
+      && [...approved].some((id) => notApplicable.includes(`(source: ${id})`))
+    if (!noTypeBoundary && !requiredLabels.includes('type-contract:reported')) {
+      throw new CliError('TYPE_CONTRACT_LABEL_REQUIRED', 'Contract init requires --required-label type-contract:reported unless the approved card declares Type Contract not applicable')
+    }
+    const caseSpace = parseCaseSpace(oracle)
+    // Default t-way carries Async/Order as evidence.json `sequence`; only explicit full-product requires the producer label.
+    const temporal = caseSpace?.coverage === 'full-product' && caseSpace.families.some((entry) => ['Async', 'Order'].includes(entry.family) && !entry.excluded)
+    if (temporal && !requiredLabels.includes('fast-check:reported')) {
+      throw new CliError('FAST_CHECK_LABEL_REQUIRED', 'Contract full-product Async/Order requires --required-label fast-check:reported')
+    }
+  } else {
+    await validateFormalInit(directory, state, oracle, requiredLabels, binding)
+  }
 }
 
 async function validateFormalInit(directory, state, oracle, requiredLabels, binding) {
@@ -1702,6 +1854,7 @@ async function execute(options) {
 
   const directory = resolve(options.dir)
   const state = await readConsistentState(directory)
+  assertLabelNotNearMiss(state.requiredLabels ?? [], options.label)
   const revision = verifyLock(directory, state)
   const generatedBefore = await assertGeneratedOutputs(resolve(directory, state.scanRoot))
   await assertReportPathAllowed(directory, state, options.report)
@@ -1994,6 +2147,19 @@ export async function assertCurrentContractRuns(directory, oracle, runs) {
 // 재사용 판정은 시간이 아니라 bytes다 — lock/worktree/production/harness digest가 모두 현재와 같으면
 // 그 label을 다시 돌려도 같은 결과다. 전이 이후 재실행 요구는 변경된 bytes에 대해서만 의미가 있고,
 // 그 경우는 아래 assertRunFresh가 SNAPSHOT_STALE로 잡는다.
+/**
+ * gate는 필수 라벨을 글자 그대로 찾는다. 등급 접미사를 빠뜨린 라벨(`bend-proof` ↔ `bend-proof:reported`)로 돌린 실행은
+ * gate에서야 REQUIRED_RUN_MISSING이 되어 필수 검사를 전부 다시 돌리게 만든다 — 실행 전에 거부한다. 접미사를 직접 적은
+ * 라벨과 필수 라벨과 이름이 겹치지 않는 라벨(RED·탐색 실행)은 그대로 받는다.
+ */
+function assertLabelNotNearMiss(requiredLabels, label) {
+  if (requiredLabels.includes(label) || /:(?:reported|exit)$/.test(label)) return
+  const intended = requiredLabels.find((required) => required === `${label}:reported` || required === `${label}:exit`)
+  if (intended) {
+    throw new CliError('LABEL_NOT_REQUIRED', `"${label}" is not a required label — the gate looks for "${intended}"`)
+  }
+}
+
 function assertRequiredRuns(state, ledger, currentWorktree, currentProduction, currentHarness, currentLockManifest) {
   for (const label of state.requiredLabels ?? []) {
     const grade = label.endsWith(':exit') ? 'exit-only' : 'reported'
@@ -3588,7 +3754,7 @@ async function harnessBudgetDigest(directory, state, current) {
   let paths = state.harnessPaths ?? []
   if (paths.length === 0) paths = Object.keys(current).filter(isTestPath)
   const filesDigest = sha256(JSON.stringify(selectedDigests(current, paths.sort())))
-  // Before RED there is no frozen evidence binding; keep the existing file-only identity.
+  // Without a frozen evidence binding (a legacy pre-RED spend, or a run that skipped RED) keep the file-only identity.
   if (!state.testBindings?.evidenceSha256) return filesDigest
   const evidenceDigest = await testEvidenceDigest(evidencePathFor(directory, state))
   const evidenceIdentity = sha256(stableStringify({ filesDigest, evidenceDigest }))
@@ -3623,6 +3789,14 @@ async function spendBudget(options) {
 
     if (!budget) {
       throw new CliError('USAGE', `Unknown budget: ${options.spend}`, 2)
+    }
+    // ORACLE_READY에서 VALID_RED 전에는 얼린 테스트·harness binding이 없다 — tsc·fixture·adapter 수리는 RED를 만드는
+    // 작업의 일부라 예산을 쓰지 않는다. 기록하지 않으므로 RED 뒤 예산 2회가 그대로 남는다. RED 없이 GREEN으로 간 run은 센다.
+    if (options.spend === 'harness' && state.state === 'ORACLE_READY' && !redRecorded(state)) {
+      process.stdout.write(
+        `BUDGET_NOT_NEEDED harness ${budget.spent}/${budget.limit} — nothing is frozen before VALID_RED, so test and harness repairs are free\n`,
+      )
+      return
     }
 
     const sourceDigest = await budgetDigest(directory, state, options.spend)

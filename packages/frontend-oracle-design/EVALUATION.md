@@ -1,3 +1,54 @@
+# 0.117.0: fewer self-inflicted FAILs and rubber-stamp questions — init corrections, exact labels, free pre-RED repairs
+
+## Why
+
+28 real FOD sessions (2026-10-03 to 11-01) and 11 run states: 8 runs ended FAIL. Most causes were controller slips
+the harness could not undo: a milestone row that was already satisfied, a required label left out, `init` run
+before the package scaffold existed, a short `exec --label bend-proof` that the gate (`bend-proof:reported`)
+ignored until 11 required checks had to be rerun, and type/URL fixture bugs before RED that used up the harness
+budget. All 7 authoring-round extension requests were approved with "ㄱㄱ"-style one-liners, which the runtime
+refused as blanket delegation.
+
+## Change
+
+- `init` re-run before VALID_RED: with the run state present, the same `init` (same `--lock`, `--scan-root`,
+  `--risk`) plus `--reason` replaces only `requiredLabels`, `milestones` and `harnessPaths`, re-checking the
+  profile's required labels. The ledger records a new `amend` entry (schema-checked in `oracle-run.mjs` and
+  `oracle-verify.mjs`, replayed by `readConsistentState`; a ledger with an `amend` after a transition is invalid);
+  baseline, test baseline, budgets and history are kept. Anything the correction drops is printed (`AMEND_REMOVED`),
+  every newly registered harness file is printed (`HARNESS_ADDED_BY_AMEND`, or `HARNESS_ADDED_AFTER_INIT` when it is
+  absent from the init baseline), and a baseline production file edited since init cannot be registered
+  (`HARNESS_PATH_MODIFIED`), so the correction cannot hide a pre-RED edit. After VALID_RED, or with the run state
+  deleted, it stays `RUN_ARTIFACTS_EXIST`. A fresh `init` now refuses stale generated tests before writing.
+- `exec` refuses a required label written without its `:reported`/`:exit` suffix (`LABEL_NOT_REQUIRED`, names the
+  label the gate looks for) before the command runs. Labels with an explicit suffix and unrelated labels still run.
+- `budget --spend harness` while the run is ORACLE_READY and before VALID_RED answers `BUDGET_NOT_NEEDED` and records
+  nothing; a run that skipped RED (ALREADY_SATISFIED) still counts its harness spends.
+- Authoring rounds count review laps: `oracle-stage.mjs rewind` no longer spends a round (a record already exhausted by
+  legacy rewind history still stops). `extend` accepts the user's standing delegation once per revision
+  (`decision: "delegated-rounds"`, authoring only, `upTo` above the current limit and at most 5); past it, the
+  explicit one-round approval still applies.
+- Docs: `common.md`, `card/card-format.md`, `contract/confirmation-lock.md`, `roles/controller-formal.md`,
+  `roles/author-formal.md`, `delivery/red.md`, `delivery/ledger.md`, `bend-cross-verification.md`, `SKILL.md`; the
+  lint gate label is `hook-encapsulation:exit` in `architecture-contract.md` and `frontend/authoring.md`; test
+  plugin 0.10.1 `SKILL.md` (harness corrections count from VALID_RED).
+- Tests changed on purpose: oracle-stage tests that spent rounds by rewinding now spend them by review laps; the
+  pre-RED harness spend cases (`O10`, `O11`, `harness budget: … legacy`) now assert `BUDGET_NOT_NEEDED`. The legacy
+  pre-RED file-only spend identity can no longer be produced through the CLI, so its dedup branch has no new
+  coverage. New: amend, stale-generated-test init refusal, label near-miss, delegated rounds.
+
+## Verification
+
+- `pnpm lint` (frontend-oracle-design): 0 errors (406 existing warnings). `pnpm test`: 1301 pass, 0 fail. `pnpm test`
+  (test plugin): 6 pass. Byte budgets: Formal delivery closure and every bundle cap hold without raising a cap.
+- Independent review (read-only, Opus 5.5, one round): 1 major, 6 minor, 4 nit. Applied: an `amend` cannot register a
+  production file edited since init (`HARNESS_PATH_MODIFIED`) and every newly registered harness file is printed;
+  dropped labels, milestones and harness paths are printed (`AMEND_REMOVED`); free harness spends end when the run
+  leaves ORACLE_READY; both ledger readers reject an `amend` after a transition and check all three list fields;
+  `oracle-verify` keeps reading labels from the `init` record only; stale comments, test title and lint-label docs
+  fixed. Not applied: a test for the legacy pre-RED harness dedup branch (it needs a hand-forged hash-chained
+  ledger) and one for the skip-RED spend counting; both stay open risks.
+
 # 0.116.1: a post-RED test-byte change is a new harness spend when harness paths are registered
 
 ## Why

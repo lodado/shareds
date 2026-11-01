@@ -230,7 +230,7 @@ reviewer taste. Leave the following values in the approval document as exact val
   misses aliases and hidden hooks.
 - Do not leave `allow` and `block` to the plugin defaults. Check the target runtime's
   React·router·query·form hooks in the actually installed versions and state them explicitly.
-- Lock the config source as an Oracle local source and add `hook-encapsulation` to the required
+- Lock the config source as an Oracle local source and add `hook-encapsulation:exit` to the required
   labels of `oracle-run.mjs init`. Run the lint command pinned after GREEN and review under the same label.
 - This contract is a structural gate that blocks forbidden direct calls. The cohesion and the
   behavior contract of a custom hook are handled by tests and independent review.

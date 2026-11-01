@@ -185,11 +185,12 @@ Verify it at another layer, return to Oracle with a sourced N/A, or report `FAIL
 When running inside the Delivery orchestration of `frontend-oracle-design`, run the judging command
 with `scripts/oracle-run.mjs exec`. The run is recorded in the append-only ledger with a runId, and
 the run evidence in the report cites that runId. When you also pass the reporter output path (`--report`),
-test names and statuses are recorded too, so card row evidence can be cross-checked by machine. Each time
-you use one correction, count it with `oracle-run.mjs budget --spend harness --reason ...`.
+test names and statuses are recorded too, so card row evidence can be cross-checked by machine. After
+`VALID_RED`, count each correction with `oracle-run.mjs budget --spend harness --reason ...`. Corrections
+before `VALID_RED` are free there: nothing is frozen yet, and the command answers `BUDGET_NOT_NEEDED`.
 
-On FAIL, classify the cause. **Only machinery problems can be corrected** — 2 times total, and
-1 time = one bundle of allowed fixes + a rerun of that failure:
+On FAIL, classify the cause. **Only machinery problems can be corrected** — 2 times total (under that
+orchestration, counted from `VALID_RED`), and 1 time = one bundle of allowed fixes + a rerun of that failure:
 
 - Allowed: a wrong import / supplying a fixture's **missing premise** / a semantically identical locator
   (same role·name kept, resolving to a single element) / connecting the pending barrier / starting the dev server

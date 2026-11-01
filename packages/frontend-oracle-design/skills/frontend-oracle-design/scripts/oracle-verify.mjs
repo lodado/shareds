@@ -1712,8 +1712,10 @@ async function ledgerRun(options, base, snapshots) {
   const receiptIdentities = new Set()
   let previousDigest = '0'.repeat(64)
   let checkpointSeen = false
+  let transitioned = false
   let legacyPrefix = Buffer.alloc(0)
   for (const [index, record] of records.entries()) {
+    if (record?.type === 'transition') transitioned = true
     if (!record || typeof record !== 'object' || Array.isArray(record)) {
       throw new CliError('LEDGER_INVALID', `ledger record ${index} must be an object`)
     }
@@ -1744,9 +1746,18 @@ async function ledgerRun(options, base, snapshots) {
         record.type !== 'review-round' &&
         record.type !== 'review-extension' &&
         record.type !== 'transition' &&
-        record.type !== 'budget'
+        record.type !== 'budget' &&
+        record.type !== 'amend'
       ) {
         throw new CliError('LEDGER_INVALID', `ledger record ${index} has an unknown type`)
+      }
+      if (
+        record.type === 'amend' &&
+        (transitioned || record.state !== 'ORACLE_READY' ||
+          !['requiredLabels', 'harnessPaths', 'milestones'].every((field) => Array.isArray(record.stateDelta?.[field])) ||
+          typeof record.reason !== 'string' || typeof record.at !== 'string' || !record.at)
+      ) {
+        throw new CliError('LEDGER_INVALID', `ledger amend ${index} is malformed`)
       }
       if (record.type === 'review-round' || record.type === 'review-extension') {
         try { assertReviewIterationEvent(record) }

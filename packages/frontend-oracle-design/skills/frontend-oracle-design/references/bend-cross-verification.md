@@ -451,7 +451,7 @@ the expected results — during the harness step, then it passes two gates befor
   browser API (IntersectionObserver, ResizeObserver, `matchMedia`, layout, scroll or focus under
   jsdom) also has one Playwright test of the same journey in a real browser, named in the review
   brief. A finding is a
-  harness defect and goes through the existing harness-repair budget; it never changes the locked
+  harness defect, repaired before `VALID_RED` without spending the harness budget; it never changes the locked
   model, laws or observation meaning. A missing Playwright test for such a row is `EVIDENCE_GAP`
   instead: the generated test then shows only that the product agrees with the fake.
   Expected time comes from the input/event clock, never from a timestamp written by the product;

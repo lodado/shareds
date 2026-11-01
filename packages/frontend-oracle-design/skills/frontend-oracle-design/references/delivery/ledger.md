@@ -106,7 +106,8 @@ sanitized metadata into `--capability-context`. A run that is not in the ledger 
 Use `exec --dir <dir> --label <label> --adapter <node-test|vitest> --report <path> -- <repo command>`
 for reported tests. For an immediate execution/transition pair, `red` or `green` performs the same
 checks in one call; add `--evidence <map>` and RED's `--row <row>`. Discover flags through the
-selected target's `guide --dir <dir> --to <target>` and the runner's usage.
+selected target's `guide --dir <dir> --to <target>` and the runner's usage. `exec` refuses a bare
+label that needs `:reported`/`:exit` (`LABEL_NOT_REQUIRED`).
 
 - Only a run that passes a trusted `--adapter` together with `--report` becomes `grade: reported`.
   The trusted adapters are the entries of `TRUSTED_ADAPTERS` in `scripts/oracle-adapters.mjs`:
@@ -115,15 +116,13 @@ selected target's `guide --dir <dir> --to <target>` and the runner's usage.
   destination, so the command being run cannot forge the result. If the user passes reporter or
   destination arguments directly (`--test-reporter` family, vitest `--reporter`·`--outputFile`), it
   is rejected with `ADAPTER_COMMAND_INVALID`.
-- Every other run is `exit-only`. If a jest `--reporter=json --outputFile`, Playwright
-  `--reporter=json`, or a vitest JSON result that the command wrote itself is passed via
-  `--report` without the adapter, it is parsed and used for `reportError` diagnostics but is not
-  given the `reported` grade — the executed command itself can write that file, so the Oracle cannot
-  vouch for its origin.
+- Every other run is `exit-only`. A jest/Playwright/vitest JSON result that the command wrote itself
+  and passed via `--report` without the adapter is parsed for `reportError` diagnostics but never
+  gets the `reported` grade — the command can write that file, so the Oracle cannot vouch for it.
 - An `exit-only` run passes neither the `VALID_RED` transition nor test-name-based evidence
-  verification. If a repo whose only runners have no trusted adapter (jest, standalone Playwright,
-  another language) is blocked by this gate, it is `ENVIRONMENT_DEFECT` rather than
-  `HARNESS_DEFECT`, and you `FAIL` with the actual cause without touching production.
+  verification. A repo whose only runners have no trusted adapter (jest, standalone Playwright,
+  another language) is `ENVIRONMENT_DEFECT`, not `HARNESS_DEFECT`: `FAIL` with the cause without
+  touching production.
 - Reported behavior evidence and certifiable visual evidence are separate capabilities. A reported
   `vitest` run is row evidence; the visual producer stays the `node-test` run in SKILL.md.
 - A node:test repo uses the bundled `scripts/oracle-node-reporter.mjs`, and a vitest repo the bundled
@@ -132,14 +131,16 @@ selected target's `guide --dir <dir> --to <target>` and the runner's usage.
 - Record state transitions only with `oracle-run.mjs transition`. The script inspects TDD ordering,
   per-row RED/GREEN evidence, `--required-label` runs, consecutive pass counts, test weakening, the
   review artifact, and the lock, and prints the rejection reason as a code.
-- The baseline for adjudicating TDD ordering = the worktree at `init` time. A repo where editor
-  cache·agent runtime files keep changing should clean the worktree before `init` or narrow the scope
-  to the target package with `--scan-root`. If an unrelated change produces
-  `PRODUCTION_TOUCHED_BEFORE_RED`, narrow the scope and start again; do not turn the check off.
+- The baseline for adjudicating TDD ordering = the worktree at `init` time. Where editor cache·agent
+  runtime files keep changing, clean the worktree before `init` or narrow it with `--scan-root`. If an
+  unrelated change produces `PRODUCTION_TOUCHED_BEFORE_RED`, narrow the scope and start again; never
+  turn the check off.
 - Adjudication scope: a git repo uses `git ls-files -c -o --exclude-standard`, otherwise a
   `node_modules`·build-output exclusion list. **A gitignored path is not counted as a production
   change.** If something is real production but gitignored, clean up `--scan-root` or the ignore
   settings first.
+- Run `init` once scaffold, runner config and test dependencies exist. Before `VALID_RED`, `init --reason`
+  again replaces only labels, milestones and harness paths (the ledger records an `amend`).
 
 ## Current-step guide and resume
 
@@ -155,7 +156,7 @@ After a rejection, pass the actual code to `guide --dir <dir> --to <target> --re
 runner's recovery hints, including its generic status advice when no specific hint exists. The
 code is caller-supplied, never a stored or inferred last rejection; advice does not prove it occurred.
 Use `--json` on either form for machine output. Guide creates no artifacts and changes no budgets;
-it is advisory, never approval, a PASS or a transition. `transition` repeats the gates. A
+it is advisory, never approval or a transition. `transition` repeats the gates. A
 `NEEDS_DECISION` or `FAIL` stop can record observed lock faults without accepting the changed
 revision; progress and resume remain blocked by drift. Listing an escape does not recommend
 abandoning recoverable work. Never relock or edit evidence to force acceptance.
@@ -179,10 +180,11 @@ runId. State writes use temp file + atomic rename; never hand-edit `run-state.js
   evidence of integrity.
 - Call `oracle-run.mjs budget --spend policy|harness|product --reason ...` on every budget use.
   If `BUDGET_EXHAUSTED`, do not route around it with another budget; report `FAIL`.
+  Before `VALID_RED`, harness repairs are free (`BUDGET_NOT_NEEDED`).
   After RED, harness identity includes the frozen test-binding semantics (`rows`, `paths`, `frames`,
   `sequence`) from the selected evidence map as well as the existing test/harness file digest.
   A mapping-only correction counts once; formatting and non-binding notes do not count again.
-  Pre-RED file-only identities and unchanged legacy spends remain compatible. An unreadable bound
+  Legacy pre-RED spends keep their file-only identity. An unreadable bound
   map is an error, not a reason to omit it from identity. Spending still requires fresh RED→GREEN
   for changed bindings; it neither increases the two-round limit nor reopens terminal `FAIL`.
 

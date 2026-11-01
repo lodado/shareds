@@ -84,8 +84,8 @@ the Bend files and registered sources CHECKED judged, and only that script path'
 so a hand-written record skips no check. Authoring never fabricates stage acceptance.
 `status` reports the shared authoring round. `model-input` and `mapping-input` register their permitted
 input bytes automatically. Re-emitting identical input is idempotent, not permission to dispatch another
-fresh defect hunt. Changed inputs and rewind share one repair batch; a third batch requires an explicit
-user-approved extension. Do not rename the run, reset stage.json or restart the analyst to evade it.
+fresh defect hunt. Changed inputs share one repair batch (a rewind spends none); a third
+batch requires an explicit user-approved extension. Do not rename the run, reset stage.json or restart the analyst to evade it.
 Before every actual analyst dispatch or resumed analysis, register `review-input --kind model-analyst
 --input <permitted-source-input> --attempt <dispatch-id>`. A transport retry reuses the same ID; a new
 analysis does not, even when its source bytes are unchanged.

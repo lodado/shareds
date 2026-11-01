@@ -186,7 +186,7 @@ Collect first-pass reviews before repairing and fix each group of shared causes 
 requirement needs the scope decision, not automatic model growth, and second-pass work confirms only the
 listed fixes and their regressions. Security, privacy, accessibility and data integrity are never downgraded.
 
-One persisted authoring budget covers model/analyst, translation, card review and stage rewinds; Delivery
+One persisted authoring budget covers model/analyst, translation and card review laps; Delivery
 review keeps its own two-round limit. No role restart, regenerated packet, rewind or new revision resets
 either, and exhaustion stops with the remaining findings, never a false pass. Each profile's own
 procedures own their dispatch commands.
@@ -1128,7 +1128,7 @@ the expected results — during the harness step, then it passes two gates befor
   browser API (IntersectionObserver, ResizeObserver, `matchMedia`, layout, scroll or focus under
   jsdom) also has one Playwright test of the same journey in a real browser, named in the review
   brief. A finding is a
-  harness defect and goes through the existing harness-repair budget; it never changes the locked
+  harness defect, repaired before `VALID_RED` without spending the harness budget; it never changes the locked
   model, laws or observation meaning. A missing Playwright test for such a row is `EVIDENCE_GAP`
   instead: the generated test then shows only that the product agrees with the fake.
   Expected time comes from the input/event clock, never from a timestamp written by the product;
@@ -2522,8 +2522,8 @@ the Bend files and registered sources CHECKED judged, and only that script path'
 so a hand-written record skips no check. Authoring never fabricates stage acceptance.
 `status` reports the shared authoring round. `model-input` and `mapping-input` register their permitted
 input bytes automatically. Re-emitting identical input is idempotent, not permission to dispatch another
-fresh defect hunt. Changed inputs and rewind share one repair batch; a third batch requires an explicit
-user-approved extension. Do not rename the run, reset stage.json or restart the analyst to evade it.
+fresh defect hunt. Changed inputs share one repair batch (a rewind spends none); a third
+batch requires an explicit user-approved extension. Do not rename the run, reset stage.json or restart the analyst to evade it.
 Before every actual analyst dispatch or resumed analysis, register `review-input --kind model-analyst
 --input <permitted-source-input> --attempt <dispatch-id>`. A transport retry reuses the same ID; a new
 analysis does not, even when its source bytes are unchanged.

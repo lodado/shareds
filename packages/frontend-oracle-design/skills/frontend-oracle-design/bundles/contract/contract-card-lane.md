@@ -186,7 +186,7 @@ Collect first-pass reviews before repairing and fix each group of shared causes 
 requirement needs the scope decision, not automatic model growth, and second-pass work confirms only the
 listed fixes and their regressions. Security, privacy, accessibility and data integrity are never downgraded.
 
-One persisted authoring budget covers model/analyst, translation, card review and stage rewinds; Delivery
+One persisted authoring budget covers model/analyst, translation and card review laps; Delivery
 review keeps its own two-round limit. No role restart, regenerated packet, rewind or new revision resets
 either, and exhaustion stops with the remaining findings, never a false pass. Each profile's own
 procedures own their dispatch commands.
@@ -1166,7 +1166,7 @@ Design-only has no consumer execution. Delivery initialization preserves scope/m
 source/target identity and one ledger, never resets budgets or grants production edits before VALID_RED.
 
 Common's convergent planning applies before detailed authoring. The stage runtime shares two authoring
-rounds across card reviews and rewinds. Register each independent dispatch with
+rounds across card review laps; a rewind spends none. Register each independent dispatch with
 `oracle-stage.mjs review-input --dir <dir> --kind cold-read|source-aware --input <raw-input> --attempt <dispatch-id>`.
 Only transport redelivery reuses an attempt. New analysis is another attempt even on unchanged input.
 At `ITERATION_BUDGET_EXHAUSTED`, stop with the remaining findings, never reset the record or weaken approval.

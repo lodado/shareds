@@ -749,14 +749,13 @@ async function rewind(directory, target, explanation) {
   const inputSha256 = sha256(JSON.stringify([bytes?.toString('utf8'), (await cardBytes(directory))?.toString('utf8')]))
   const previous = record.history.at(-1)
   if (record.stage === target && previous?.evidence === 'rewind' && previous.inputSha256 === inputSha256) return record
-  const budget = record.iterations.inputs.stage ? record.iterations : {
-    ...record.iterations, inputs: { ...record.iterations.inputs, stage: { digest: sha256('begin'), round: record.iterations.round } },
-  }
-  // 판정한 뒤 바뀐 것이 출처 위치뿐이면 리뷰가 읽은 뜻은 그대로다 — 저작 라운드를 쓰지 않는다(관문은 DISCOVERING부터 다시 돈다)
+  // 저작 라운드는 리뷰 왕복을 센다 — 고친 바이트를 review-input으로 다시 보낼 때 다음 라운드가 된다. 되감기는 그 수리의
+  // 일부라 라운드를 쓰지 않는다. 이미 소진된 기록(옛 이력 승계)은 되감기도 NEEDS_DECISION으로 멈춘다
+  assertIterationAvailable(record.iterations)
+  // 판정한 뒤 바뀐 것이 출처 위치뿐이면 리뷰가 읽은 뜻은 그대로다 — 이력에 표시만 남긴다(관문은 DISCOVERING부터 다시 돈다)
   const metadataOnly = !contract && onlyMetadataChanged(record, bytes)
-  const iterations = metadataOnly ? budget : observeIteration(budget, 'stage', inputSha256, { force: true })
   const dispatched = explanation.reason === 'review-finding' ? [] : dispatchedSinceLastRewind(record)
-  const result = moved({ ...record, iterations }, target, rewoundDigest(target, bytes), 'rewind', { inputsSha256: keepsPin ? record.inputsSha256 : undefined })
+  const result = moved(record, target, rewoundDigest(target, bytes), 'rewind', { inputsSha256: keepsPin ? record.inputsSha256 : undefined })
   Object.assign(result.history.at(-1), { inputSha256, ...explanation, ...(metadataOnly ? { metadataOnly: true } : {}), ...(dispatched.length > 0 ? { dispatchedBefore: dispatched } : {}) })
   await writeStage(directory, result)
   return result

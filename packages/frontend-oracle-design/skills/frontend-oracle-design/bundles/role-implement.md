@@ -186,7 +186,7 @@ Collect first-pass reviews before repairing and fix each group of shared causes 
 requirement needs the scope decision, not automatic model growth, and second-pass work confirms only the
 listed fixes and their regressions. Security, privacy, accessibility and data integrity are never downgraded.
 
-One persisted authoring budget covers model/analyst, translation, card review and stage rewinds; Delivery
+One persisted authoring budget covers model/analyst, translation and card review laps; Delivery
 review keeps its own two-round limit. No role restart, regenerated packet, rewind or new revision resets
 either, and exhaustion stops with the remaining findings, never a false pass. Each profile's own
 procedures own their dispatch commands.
@@ -1291,7 +1291,7 @@ explicitly chosen `orchestration-only`. Do not select it automatically by LOC or
    actually installed version. **Name explicitly** render-local primitives in the approved `allow`,
    and external orchestration hooks such as lifecycle·navigation·query·form in the approved `block`.
    Do not assume the plugin's default list or automatic recognition of the latest React/Next hooks.
-4. Run the pinned lint command with `oracle-run.mjs exec --label hook-encapsulation`, and after
+4. Run the pinned lint command with `oracle-run.mjs exec --label hook-encapsulation:exit`, and after
    GREEN·independent review re-run it with the same required label.
 
 This gate proves only the structural fact that there is **no direct call** to a forbidden hook. It

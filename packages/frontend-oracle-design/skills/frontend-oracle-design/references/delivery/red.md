@@ -30,16 +30,16 @@ world` and every `HARD` `D*` row) gets a hand-written test through `$test`: vite
    `adapter-pre-red` mode for the existing [adapter checklist](../bend-cross-verification.md#the-adapter--written-by-the-ai-reviewed).
    Review only the locked Terms/observations, adapter, generated/manual cases and product paths it calls.
    Run `oracle-projection.mjs verify-generated --file <generated-test>` for every generated file before
-   judging its failure. Record the review findings, lock hash and reviewed file hashes in journal.md;
-   this is evidence, not a Delivery receipt, new state or extra whole-product review round.
-   Repair harness defects through `$test` within its existing budget. Changed adapter, mapped product
+   judging its failure. Record the findings, lock hash and reviewed file hashes in journal.md;
+   this is evidence, not a receipt, new state or extra whole-product review round.
+   Repair harness defects through `$test` (free before VALID_RED). Changed adapter, mapped product
    paths or cases reopen only the affected checklist items; changed policy returns to the controller.
    The same check applies before ALREADY_SATISFIED acceptance. An intended missing product target may
    still satisfy the existing new-feature RED exception: inspect its contract mapping and verify the
    rest of the harness, record unexecutable checks, never invent a passing `conform`/replay result.
    If independent review or necessary harness evidence is unavailable, report FAIL before production.
 5. Actually run the tests with `exec`, including a positive `fast-check` sample (`--runs N`, N > 0);
-   `runs=0` or omitted sampling is not evidence.
+   `runs=0` or omitted sampling is not evidence. Typecheck and run each new test file once first.
 6. If the failure satisfies `$test`'s `VALID_RED` predicate, confirm the reported test failure of the
    designated row with `oracle-verify.mjs red`. Record the transition with that runId·row, and modify
    production only after the transition passes.
@@ -70,19 +70,17 @@ re-shot after `VALID_RED` is a test change, not a free update.
 
 The bundled reporters record why a failed test failed. `RED_CAUSE_INFRA` rejects a mapped test that
 failed on a reference error, a test or hook timeout, or (node:test only) a failing setup hook —
-`$test`'s predicate 4, decided by the reporter instead of by reading. A file with broken syntax never
-gets this far: it fails collection, so the mapped name is missing. A `TypeError` or a `SyntaxError`
-thrown inside the test stays acceptable, because the missing-target exception (`save is not a
-function`) and a parse of a malformed response look exactly like them. A throwing vitest hook is
-indistinguishable from a test error and is not detected.
+`$test`'s predicate 4, decided by the reporter. Broken syntax fails collection, so the mapped name is
+missing. A `TypeError` or `SyntaxError` thrown inside the test stays acceptable: the missing-target
+exception (`save is not a function`) and a malformed-response parse look the same. A throwing vitest
+hook is not detected.
 
-`init` registers the runner's own inputs as harness without being asked: every tracked
-`vitest`·`playwright`·`jest` config plus each setup file those configs name as a string literal. It
-prints them as `HARNESS_AUTO`, names a non-literal setup as `HARNESS_SETUP_UNRESOLVED`, and only
-suggests a `vite` config (`HARNESS_SUGGESTED`), because its aliases and plugins are production input
-too; register what applies with `--harness-path`. A `retry`, `exclude`, or global mock added after
-`VALID_RED` therefore meets the same harness gate as a test edit, and a runner flag that loads another
-config or preload must name a registered harness file.
+`init` registers the runner's own inputs as harness: every tracked `vitest`·`playwright`·`jest` config
+plus each setup file those configs name as a string literal (`HARNESS_AUTO`). It names a non-literal
+setup (`HARNESS_SETUP_UNRESOLVED`) and only suggests a `vite` config (`HARNESS_SUGGESTED`), whose aliases
+and plugins are production input too; register what applies with `--harness-path`. A `retry`, `exclude`
+or global mock added after `VALID_RED` meets the same harness gate as a test edit, and a runner flag
+that loads another config or preload must name a registered harness file.
 
 A file registered with `--harness-path` can be changed until a reported RED is recorded with those
 bytes. If it is changed again after `VALID_RED`, completion is blocked with `HARNESS_BUDGET_REQUIRED`

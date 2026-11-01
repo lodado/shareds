@@ -3,12 +3,12 @@ import { Buffer } from 'node:buffer'
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
-import { chmod, cp, link, mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { appendFile, chmod, cp, link, mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { HOST_RECEIPTS_FILE, reviewOutputDigest } from './oracle-fs.mjs'
+import { HOST_RECEIPTS_FILE, reviewOutputDigest, stableStringify } from './oracle-fs.mjs'
 import { emitWorld } from './oracle-projection.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 import { resolveExecutable, spawnGit } from './resolve-executable.mjs'
@@ -2113,9 +2113,125 @@ test('O11: exec 없이 예산만 쓴 뒤 run-state를 지워도 예산을 되살
   assert.match(reinitialized.stderr, /^RUN_ARTIFACTS_EXIST: /)
 })
 
+test('O6: VALID_RED 전에는 같은 init을 --reason과 다시 돌려 라벨·마일스톤·harness 경로만 고치고 기준선·예산은 그대로 둔다', async (t) => {
+  // 실런 사고: 이미 충족된 행을 마일스톤에 넣었고, 필수 라벨 하나를 빠뜨렸고, 뼈대 설정 파일은 init 뒤에 생겼다
+  const { root, oracleDirectory, lock } = await workspace(t, { milestones: ['satisfied:O1'] })
+  assert.equal((await state(oracleDirectory)).milestones.length, 1)
+  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'p1']).status, 0)
+  const before = await state(oracleDirectory)
+  await writeFile(join(root, 'vitest.config.mjs'), 'export default { setup: 1 }\n')
+  const reinit = (...extra) =>
+    run(['init', '--dir', oracleDirectory, '--lock', lock, '--risk', 'medium', '--scan-root', root, ...extra])
+  const labels = ['--required-label', 'behavior', '--required-label', 'lint:exit']
+
+  const unexplained = reinit(...labels)
+  assert.equal(unexplained.status, 2)
+  assert.match(unexplained.stderr, /^USAGE: this oracle already has a run state — before VALID_RED, re-run init with --reason/)
+  const elsewhere = run(['init', '--dir', oracleDirectory, '--lock', lock, '--scan-root', join(root, 'src'), ...labels, '--reason', 'narrow the scan root'])
+  assert.equal(elsewhere.status, 1)
+  assert.match(elsewhere.stderr, /^AMEND_SCOPE_CHANGED: /)
+
+  const amended = reinit(...labels, '--harness-path', 'vitest.config.mjs', '--reason', 'lint was left out; O1 was already satisfied')
+  assert.equal(amended.status, 0, amended.stderr)
+  assert.match(amended.stdout, /^RUN_STATE_AMENDED state:ORACLE_READY labels:behavior,lint:exit milestones:0 harness:1\n/)
+  assert.match(amended.stdout, /^HARNESS_ADDED_AFTER_INIT vitest\.config\.mjs /m)
+  assert.match(amended.stdout, /^AMEND_REMOVED milestone satisfied$/m, 'a dropped milestone is named, not silently removed')
+  const after = await state(oracleDirectory)
+  assert.deepEqual(after.requiredLabels, ['behavior', 'lint:exit'])
+  assert.deepEqual(after.milestones, [])
+  assert.deepEqual(after.harnessPaths, ['vitest.config.mjs'])
+  assert.deepEqual(after.snapshot, before.snapshot, 'the baseline stays the init baseline')
+  assert.deepEqual(after.testFilesAtInit, before.testFilesAtInit)
+  assert.deepEqual(after.budgets, before.budgets)
+  assert.deepEqual(after.history, before.history)
+  const recorded = (await ledgerLines(oracleDirectory)).map(JSON.parse).at(-1)
+  assert.equal(recorded.type, 'amend')
+  assert.equal(recorded.reason, 'lint was left out; O1 was already satisfied')
+  assert.deepEqual(recorded.stateDelta.requiredLabels, ['behavior', 'lint:exit'])
+
+  // 원장이 정본이다 — 끊긴 state 쓰기는 수정 기록을 재생해 되살린다
+  await writeFile(join(oracleDirectory, 'run-state.json'), `${JSON.stringify(before, null, 2)}\n`)
+  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'p1']).status, 0)
+  assert.deepEqual((await state(oracleDirectory)).requiredLabels, ['behavior', 'lint:exit'])
+
+  await reachValidRed(oracleDirectory, root)
+  const late = reinit('--required-label', 'behavior', '--reason', 'drop lint after RED')
+  assert.equal(late.status, 1)
+  assert.match(late.stderr, /^RUN_ARTIFACTS_EXIST: init can only be corrected before VALID_RED \(the run is at VALID_RED\)/)
+  assert.deepEqual((await state(oracleDirectory)).requiredLabels, ['behavior', 'lint:exit'])
+})
+
+test('O6: init 수정은 init 뒤 바뀐 production 파일을 harness로 옮겨 TDD 순서 판정에서 빼지 못한다', async (t) => {
+  const original = 'export const save = () => 0\n'
+  const { root, oracleDirectory, lock } = await workspace(t, { initialFiles: { 'src/save.mjs': original } })
+  const before = await state(oracleDirectory)
+  assert.ok('src/save.mjs' in before.snapshot)
+  const reinit = (...extra) =>
+    run(['init', '--dir', oracleDirectory, '--lock', lock, '--risk', 'medium', '--scan-root', root, '--required-label', 'behavior', ...extra])
+
+  await writeFile(join(root, 'src', 'save.mjs'), 'export const save = () => 1\n')
+  const refused = reinit('--harness-path', 'src/save.mjs', '--reason', 'move the edited file out of the production comparison')
+  assert.equal(refused.status, 1)
+  assert.match(refused.stderr, /^HARNESS_PATH_MODIFIED: /)
+  assert.deepEqual((await state(oracleDirectory)).harnessPaths, [])
+  assert.ok(!(await allLedgerLines(oracleDirectory)).some((line) => JSON.parse(line).type === 'amend'))
+
+  await writeFile(join(root, 'src', 'save.mjs'), original)
+  const registered = reinit('--harness-path', 'src/save.mjs', '--reason', 'the file is test support after all')
+  assert.equal(registered.status, 0, registered.stderr)
+  assert.match(registered.stdout, /^HARNESS_ADDED_BY_AMEND src\/save\.mjs /m)
+})
+
+test('O6: 전이 뒤에 이어 붙인 amend 기록은 원장이 읽지 못한다', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await reachValidRed(oracleDirectory, root)
+  const last = JSON.parse((await allLedgerLines(oracleDirectory)).at(-1))
+  const unsigned = {
+    type: 'amend',
+    schemaVersion: 3,
+    state: 'ORACLE_READY',
+    reason: 'forged after RED',
+    stateDelta: { harnessPaths: [], milestones: [], requiredLabels: [] },
+    at: new Date().toISOString(),
+    previousDigest: last.digest,
+  }
+  const forged = { ...unsigned, digest: createHash('sha256').update(stableStringify(unsigned)).digest('hex') }
+  await appendFile(join(oracleDirectory, 'runs.jsonl'), `${JSON.stringify(forged)}\n`)
+  const status = run(['status', '--dir', oracleDirectory, '--json'])
+  assert.equal(status.status, 1)
+  assert.match(status.stderr, /^LEDGER_INVALID: .*amend after a transition/)
+})
+
+test('O6: init은 낡은 생성 테스트가 있으면 run-state·원장을 만들기 전에 거부한다', async (t) => {
+  const { root, oracleDirectory, lock } = await workspace(t, { initialize: false })
+  await writeFile(join(root, 'real.mjs'), 'export {}\n')
+  await symlink(join(root, 'real.mjs'), join(root, 'src', 'save.oracle.test.mjs'))
+  const refused = run(['init', '--dir', oracleDirectory, '--lock', lock, '--risk', 'medium', '--scan-root', root, '--required-label', 'behavior'])
+  assert.equal(refused.status, 1)
+  assert.match(refused.stderr, /^GENERATED_TESTS_DRIFT: .*generated test must not be a symbolic link/)
+  assert.equal(existsSync(join(oracleDirectory, 'run-state.json')), false)
+  assert.equal((await allLedgerLines(oracleDirectory)).length, 0)
+})
+
+test('O1: exec는 등급 접미사를 빠뜨린 필수 라벨을 실행 전에 거부하고 gate가 찾는 이름을 알려 준다', async (t) => {
+  const { oracleDirectory, marker } = await workspace(t, { requiredLabels: ['behavior:reported', 'lint:exit'] })
+  const runLabelled = (label) =>
+    run(['exec', '--dir', oracleDirectory, '--label', label, '--', process.execPath, ...appendMarker(marker, 0)])
+
+  const refused = runLabelled('lint')
+  assert.equal(refused.status, 1)
+  assert.match(refused.stderr, /^LABEL_NOT_REQUIRED: "lint" is not a required label — the gate looks for "lint:exit"\nnext: re-run with the exact required label/)
+  assert.equal(await markerCount(marker), 0, 'the command never ran')
+  assert.equal((await ledgerLines(oracleDirectory)).length, 0)
+  // 정확한 필수 라벨, 접미사를 직접 적은 다른 등급, 필수 라벨과 무관한 RED 라벨은 그대로 돈다
+  for (const label of ['lint:exit', 'behavior:exit', 'red-1']) assert.equal(runLabelled(label).status, 0, label)
+  assert.equal(await markerCount(marker), 3)
+})
+
 test('O11: 예산 기록은 run 번호를 소비하지 않는다', async (t) => {
   const { oracleDirectory } = await workspace(t)
-  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'h1']).status, 0)
+  // harness는 VALID_RED 전에 기록하지 않으므로(BUDGET_NOT_NEEDED) RED 전에도 기록되는 product 예산으로 잰다
+  assert.equal(run(['budget', '--dir', oracleDirectory, '--spend', 'product', '--reason', 'p1']).status, 0)
 
   const executed = run([
     'exec',
@@ -3049,12 +3165,16 @@ test('O10: 허용치를 낮추거나 유지하면 GREEN을 막지 않는다', as
   assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
 })
 
-test('O10: harness-path를 등록해도 RED 후 테스트 바이트 변경은 RED 전 지출과 겹치지 않는 새 harness 지출이다', async (t) => {
+test('O10: RED 전 harness 수리는 예산을 쓰지 않고, harness-path를 등록해도 RED 후 테스트 바이트 변경은 첫 harness 지출이다', async (t) => {
   const { root, oracleDirectory } = await workspace(t, {
     harnessFiles: { 'vitest.config.mjs': 'export default { setup: 1 }\n' },
   })
+  // RED 전에는 얼린 binding이 없다 — 수리는 RED를 만드는 작업의 일부라 기록도 지출도 없다
   const before = run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'setup before RED'])
   assert.equal(before.status, 0, before.stderr)
+  assert.match(before.stdout, /^BUDGET_NOT_NEEDED harness 0\/2 /)
+  assert.equal((await ledgerLines(oracleDirectory)).map(JSON.parse).filter((entry) => entry.type === 'budget').length, 0)
+  assert.equal((await state(oracleDirectory)).budgets.harness.spent, 0)
   await reachValidRed(oracleDirectory, root)
 
   // 등록한 harness(vitest.config.mjs)는 그대로, 묶인 테스트 파일만 바뀐다
@@ -3068,7 +3188,7 @@ test('O10: harness-path를 등록해도 RED 후 테스트 바이트 변경은 RE
 
   const spent = run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'test helper retyped after RED'])
   assert.equal(spent.status, 0, spent.stderr)
-  assert.match(spent.stdout, /^BUDGET_SPENT harness 2\//)
+  assert.match(spent.stdout, /^BUDGET_SPENT harness 1\//)
   const transitioned = transition(oracleDirectory, 'IMPLEMENTED_GREEN', latest)
   assert.match(transitioned.stderr, /^EVIDENCE_STALE: /)
 })
@@ -3459,7 +3579,9 @@ test('O11: policy와 implicit harness budget은 stable digest별로만 spend된�
   )
   assert.equal((await state(oracleDirectory)).budgets.policy.spent, 1)
 
-  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
+  // harness 예산은 VALID_RED 뒤에만 쓴다 — 얼린 binding이 생긴 다음 바뀐 테스트만 지출이다
+  await reachValidRed(oracleDirectory, root)
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n// harness changed\n")
   assert.equal(
     run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'test harness changed']).status,
     0,
@@ -3482,17 +3604,19 @@ test('O11: policy와 implicit harness budget은 stable digest별로만 spend된�
 })
 
 test('harness budget: evidence-only repair spends once and still needs fresh RED before GREEN', async (t) => {
-  for (const mode of ['implicit', 'registered', 'legacy']) {
+  for (const mode of ['implicit', 'registered', 'pre-red']) {
     await t.test(mode, async (t) => {
       const harnessFiles = mode === 'registered' ? { 'src/harness.mjs': 'export const marker = 1\n' } : {}
       const { root, oracleDirectory } = await workspace(t, { harnessFiles })
       const spend = () =>
         run(['budget', '--dir', oracleDirectory, '--spend', 'harness', '--reason', 'fixture binding repair'])
-      if (mode === 'legacy') {
-        // Pre-RED spends retain the historical file-only identity; no fabricated ledger migration.
+      if (mode === 'pre-red') {
+        // A repair before VALID_RED is free: nothing is recorded, so the post-RED budget starts untouched.
         await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
         redRun(oracleDirectory)
-        assert.equal(spend().status, 0)
+        const free = spend()
+        assert.equal(free.status, 0, free.stderr)
+        assert.match(free.stdout, /^BUDGET_NOT_NEEDED harness 0\/2 /)
         const red = transition(oracleDirectory, 'VALID_RED', 'r-001')
         assert.equal(red.status, 0, red.stderr)
       } else {
