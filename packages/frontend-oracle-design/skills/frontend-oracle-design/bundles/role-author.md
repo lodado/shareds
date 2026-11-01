@@ -612,8 +612,8 @@ the domain, replace type-fest with a custom equivalent, or replace fast-check wi
 
 ## Delivery — actual execution, not a checklist claim
 
-Register these required, reported labels at `oracle-run.mjs init`, in addition to the target repo's
-real behavior, impact, lint, typecheck and build labels:
+These required, reported labels are registered at `oracle-run.mjs init` (it adds those the card implies),
+in addition to the target repo's real behavior, impact, lint, typecheck and build labels:
 
 ```text
 bend-proof:reported
@@ -654,8 +654,8 @@ current snapshot at GREEN and again after independent review.
 
 The existing runner enforces the labels registered at initialization, lock drift and reported run
 evidence; it does not infer arbitrary library use from a label's spelling. For a card projected from a
-model package, `init` also refuses unless every label above that applies is registered (`STACK_LABELS_REQUIRED`)
-and the lock covers the package (`PACKAGE_UNLOCKED`); a legacy card keeps its earlier gates. The operator and
+model package, `init` adds every label above that applies (`LABEL_AUTO`) and refuses unless the lock covers
+the package (`PACKAGE_UNLOCKED`); a legacy card gets only its proof and adequacy labels. The operator and
 independent reviewers must check the consumer path, commands, reporter cases and artifacts. A
 label alone proves neither a proof nor a compiler rejection nor fast-check execution.
 
@@ -986,18 +986,16 @@ consumer checks under the four required labels.
 
 ## 4. Delivery: RED, conformance and the proof label
 
-At `init`, register `--required-label bend-proof:reported`, `--required-label bend-adequacy:reported`,
-`--required-label type-contract:reported` and `--required-label fast-check:reported` for every
-card with a Formal Model; a card without one registers `bend-adequacy:reported`,
+At `init`, register `bend-proof:reported`, `bend-adequacy:reported`, `type-contract:reported` and
+`fast-check:reported` for every card with a Formal Model; a card without one registers `bend-adequacy:reported`,
 `world-conformance:reported` and `type-contract:reported`, and generates its product tests with
 `oracle-projection.mjs emit-world (--package <pkg> | --card <oracle.md>) --adapter <world adapter> --out
 <formal dir> --row <O*>`: one test per coordinate setting the assumptions allow, judged by the outcomes
-the compiled world allows (`violates O*` or `MODEL_GAP`), run under `world-conformance:reported`. For a card projected from a model package, `init` enforces it: it refuses with
-`STACK_LABELS_REQUIRED` unless all four are registered and with `PACKAGE_UNLOCKED` unless the lock
-covers the package named in the generated region. A legacy card without a generated region keeps the
-earlier gates (`FORMAL_PROOF_LABEL_REQUIRED` with a Formal Model, `ADEQUACY_LABEL_REQUIRED` with an
-Adequacy section); for it, registering all four remains an operating contract the runner does not
-infer. A card that declares `## Type Contract` not applicable registers the other three labels only.
+the compiled world allows (`violates O*` or `MODEL_GAP`), run under `world-conformance:reported`. For a card projected from a model package, `init` adds every
+label of that stack not typed (`LABEL_AUTO`) and refuses with `PACKAGE_UNLOCKED` unless the lock covers
+the package named in the generated region. A legacy card without a generated region gets only
+`bend-proof:reported` with a Formal Model and `bend-adequacy:reported` with an Adequacy section; for it,
+registering all four remains an operating contract the runner does not infer. A card that declares `## Type Contract` not applicable registers the other three labels only.
 Through the approved `$test` flow, write in the target
 repository's existing test runner. Recommend `vitest` with `fast-check`: `vitest` runs TypeScript, JSX
 and a per-file `jsdom` environment, so one projected model can drive both the pure core and the real
@@ -1549,7 +1547,7 @@ concrete world or pair), `kernel-computation` (one evaluated example) or `enumer
 them in the Human review brief as plain situations; approved pairs become `Example` rows. The exit
 code is 0 only for `proven`.
 
-A card with `## Adequacy` needs `--required-label bend-adequacy:reported` at `init`; its node-test run
+A card with `## Adequacy` needs `bend-adequacy:reported`, which `init` adds; its node-test run
 asserts that the check reports `proven` for the locked card and world. The lock covers the card (Terms
 included) and the world file with its imports, so a changed definition invalidates the evidence even
 when a law's text is unchanged.

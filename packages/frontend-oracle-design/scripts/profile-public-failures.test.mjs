@@ -380,11 +380,11 @@ test('explicit Formal real pinned Bend package projection and initialization pre
   const witnesses = prepareFormalWitnesses(w, packagePath, formalTests)
   ok(w.cli('lock', 'create', '--oracle', w.oracle, '--lock', w.lock, '--profile', 'formal-bend/v1', ...['README.md', 'MODEL.bend', 'LAWS.bend', 'World.bend', 'Metamorphic.bend', packagePath].flatMap((path) => ['--source', path])))
   const init = (...labels) => w.cli('run', 'init', '--dir', w.directory, '--lock', w.lock, '--scan-root', w.source, ...['__test__/formal/search.oracle.test.mjs', ...witnesses.paths.map((path) => relative(w.source, path))].flatMap((path) => ['--harness-path', path]), ...labels.flatMap((label) => ['--required-label', label]))
-  const partial = init('behavior', 'bend-proof:reported', 'bend-adequacy:reported')
-  assert.notEqual(partial.status, 0)
-  assert.match(partial.stderr, /STACK_LABELS_REQUIRED.*type-contract:reported.*fast-check:reported/)
-  assert.equal(existsSync(w.state), false)
-  ok(init('behavior', 'bend-proof:reported', 'bend-adequacy:reported', 'type-contract:reported', 'fast-check:reported'))
+  // the projected card implies the stack labels: init adds the ones not typed, so the agent types only its repository check
+  const initialized = init('behavior')
+  ok(initialized)
+  assert.deepEqual(initialized.stdout.match(/^LABEL_AUTO .+$/gm), ['bend-proof:reported', 'bend-adequacy:reported', 'type-contract:reported', 'fast-check:reported'].map((label) => `LABEL_AUTO ${label}`))
+  assert.deepEqual(json(w.state).requiredLabels, ['behavior', 'bend-proof:reported', 'bend-adequacy:reported', 'type-contract:reported', 'fast-check:reported'])
   assert.equal(json(w.state).verificationProfile, 'formal-bend/v1')
   assert.equal(json(w.state).state, 'ORACLE_READY')
   const lateCase = '[O4] [T8e56dbd72890] Issue · Issue · Respond{id:2} · Respond{id:1}'

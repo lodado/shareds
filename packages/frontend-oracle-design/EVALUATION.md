@@ -1,3 +1,85 @@
+# 0.119.0: init derives the card's stack labels, and one `close` command for phase 6
+
+## Why
+
+Wave W2 of the process-compression plan. A required stack label left out of `init` was one of the controller slips
+behind the measured FAILs: the card already says which proof, adequacy, type and fast-check runs it needs, yet the
+agent had to type each `--required-label` and met `STACK_LABELS_REQUIRED` (or the Contract `*_LABEL_REQUIRED`
+codes) when one was missing. Phase 6 was still six to eight hand-ordered commands (review-packet, blind-input, a
+review-receipt per reviewer output, the transition, the report check), and the W1 phase line kept showing
+`review-packet` after a packet existed.
+
+## Change
+
+- `init` (and its `--reason` correction before VALID_RED) adds every label the locked card and profile imply and
+  that was not typed, printing `LABEL_AUTO <label>` for each: Contract `contract-cases:reported`,
+  `type-contract:reported` unless the card has an approved, investigated Type Contract N/A, `fast-check:reported`
+  for explicit full-product Async/Order; Formal `bend-proof:reported` with a Formal Model,
+  `bend-adequacy:reported` with an Adequacy section, and the whole projected-package stack (`stackLabelsFor`).
+  Typed labels come first and keep working; derived ones are stored in `requiredLabels` like typed ones. The old
+  label refusals still run after the merge, malformed labels still fail `REQUIRED_LABEL_INVALID`, and an init with no
+  typed label still fails `REQUIRED_LABEL_REQUIRED` even when the card derives some: a derived label never stands in
+  for the repository check. The derivation is the same predicate the refusals check, so an init that passed before
+  gets no new label.
+- New `oracle-run.mjs close --dir <dir>`: at IMPLEMENTED_GREEN it calls, in this order, `review-packet` (only when
+  `--packet` does not exist; `--decision`, `--review-point`, `--context` and, for round 2, the prior `--findings`/
+  `--intersect` go to it), `blind-input` (only when the blind mapping applies and `--blind-input` does not exist),
+  `review-receipt` for `--findings` (`--task-id`) and `--intersect` (`--intersect-task-id`) unless the file already
+  carries a receipt — role and reviewer come from the file, revision from the packet, and a file whose
+  `packetSha256`/`targetRevision` do not name this packet stays `CLOSE_PENDING` instead of being bound — and for
+  `--blind-map` (`--blind-reviewer`, `--blind-task-id`) unless the ledger holds that input/map pair, at the packet's
+  revision (a blind input from another revision is refused with `BLIND_INPUT_INVALID` before any receipt), then
+  the REVIEW_VERIFIED transition (PARTIAL_VERIFIED when a hold is open; `--to` may name either) with `--run`, `--evidence`,
+  `--mutation-*`, `--closure`, and last `status --check-report`. At REVIEW_VERIFIED, PARTIAL_VERIFIED,
+  NEEDS_DECISION or FAIL it runs only the report check; at any other state `TRANSITION_NOT_ALLOWED`. Each step is
+  the existing function with its own gates, and the first refusal stops `close` with that step's code. Reviewer
+  output is never written or reused: when a findings, intersect or blind-map file is absent, or the packet or blind
+  input was written in this same call, `close` stops with `CLOSE_PENDING` and one `next:` naming the dispatch and
+  the flags to add (exit 1), and when it wrote a round-2 packet it says the `--findings`/`--intersect` given were
+  round 1's; a missing `--check-report`, or a report path not written yet, stops the same way after the transition.
+  Whether the blind mapping applies is decided from the `--evidence` handed to `close` (the file the transition
+  judges), falling back to the recorded evidence path. With `--closure` the
+  `--findings`/`--intersect` are only packet inputs and are not passed to the transition. No state, transition,
+  budget or gate changed.
+- Phase line: phase 6 now points at `close` (with `--mutation-run`, `--mutation-row`, `--blind-input` when the
+  packet requires them) both before and after the packet exists, and at `close --check-report <report>` in the end
+  states. The stage line's init command reads `--required-label <repo-check>`. `guide` review steps name `close`.
+- Docs (text replaced, no cap raised): controller-formal phase map, label pinning and the review paragraph;
+  green-review final transition example and round-2 closure steps; subagent-review receipt and blind-mapper text;
+  ledger, bend-cross-verification, mandatory-verification and adequacy label lines; reporting-formal check-report.
+- Tests changed on purpose (their asserted output changed): the Formal Model, Adequacy, projected-package (oracle-
+  package and profile-public-failures) and Contract (contract-profile ×2, contract-public-runner) init cases now
+  expect `LABEL_AUTO` and the merged `requiredLabels` instead of `FORMAL_PROOF_LABEL_REQUIRED`,
+  `ADEQUACY_LABEL_REQUIRED`, `STACK_LABELS_REQUIRED`, `CONTRACT_CASES_LABEL_REQUIRED`,
+  `TYPE_CONTRACT_LABEL_REQUIRED` and `FAST_CHECK_LABEL_REQUIRED`; the Formal Model case also covers the `--reason`
+  correction; the guide phase-line case expects `close` and the stage brief case `<repo-check>`. New: `close` low
+  risk end to end (pending with a pre-existing findings file, missing `--task-id`, `REVIEW_RERUN_REQUIRED` passed
+  through, receipt skip on rerun, report pending, `REPORT_CLAIM_MISMATCH`, `CLOSED`) and High (blind input asked
+  for before any write, two reviewers plus blind mapper recorded and verified in one call). All of these fail on
+  0.118.0 code.
+- Review fixes (independent Opus review, applied once): stale findings bound on a plain rerun (now pending until the
+  file names this packet), the typed-label floor restored (contract-profile and contract-public-runner now assert the
+  zero-typed refusal, then type one label), blind-mapper receipt takes the packet's revision, an unwritten
+  `--check-report` path is pending rather than `INPUT_UNREADABLE`, blind applicability from `--evidence`, the
+  round-2 `--findings` note in `CLOSE_PENDING` and controller-formal, graph-orchestration-formal and the workflow
+  graph name `close`, and a unit case that the derived labels are exactly the ones `init` checks (Contract, Contract
+  with type N/A, Formal Model, Adequacy; `profileLabels`/`assertProfileLabels` are exported for it).
+
+## Verification
+
+- `pnpm bundles:generate`: 22 bundles regenerated. `pnpm lint` (frontend-oracle-design): 0 errors (406 existing
+  warnings), bundles and evals checks ok. `pnpm test`: 1310 pass, 0 fail, 0 skipped. Byte budgets: Formal delivery
+  closure and every bundle cap hold without raising a cap (drafts ran 64 and then 152 bytes over the 446,000
+  closure cap and were cut back; the blind-map limit sentence moved to controller-formal, outside the closure).
+- Fail-without-change check: with 0.118.0's `oracle-run.mjs` and `oracle-stage.mjs` restored, the two new `close`
+  cases, the guide phase-line case and every changed init case fail; with this change they pass. Each review fix was
+  reverted alone and its test failed: echo check (close low case), typed-label floor (contract-profile,
+  contract-public-runner), blind revision (close High case), unwritten report (close low case), `--evidence`
+  applicability (new Medium N:1 case), round-2 note (close low case), label coverage (new unit case).
+- Independent review (Opus, one round) ran on the first draft; all nine findings applied, no re-review.
+- Open risk: two `close` calls at once on the same new `--packet` path both try to write it; the second fails closed
+  with the packet writer's own refusal, and nothing is bound twice.
+
 # 0.118.0: one 6-phase map and one next command — phase line in status --brief and guide, new-source amend refusal
 
 ## Why

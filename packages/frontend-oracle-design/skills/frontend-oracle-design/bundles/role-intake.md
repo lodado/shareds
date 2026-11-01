@@ -1256,8 +1256,8 @@ the domain, replace type-fest with a custom equivalent, or replace fast-check wi
 
 ## Delivery — actual execution, not a checklist claim
 
-Register these required, reported labels at `oracle-run.mjs init`, in addition to the target repo's
-real behavior, impact, lint, typecheck and build labels:
+These required, reported labels are registered at `oracle-run.mjs init` (it adds those the card implies),
+in addition to the target repo's real behavior, impact, lint, typecheck and build labels:
 
 ```text
 bend-proof:reported
@@ -1298,8 +1298,8 @@ current snapshot at GREEN and again after independent review.
 
 The existing runner enforces the labels registered at initialization, lock drift and reported run
 evidence; it does not infer arbitrary library use from a label's spelling. For a card projected from a
-model package, `init` also refuses unless every label above that applies is registered (`STACK_LABELS_REQUIRED`)
-and the lock covers the package (`PACKAGE_UNLOCKED`); a legacy card keeps its earlier gates. The operator and
+model package, `init` adds every label above that applies (`LABEL_AUTO`) and refuses unless the lock covers
+the package (`PACKAGE_UNLOCKED`); a legacy card gets only its proof and adequacy labels. The operator and
 independent reviewers must check the consumer path, commands, reporter cases and artifacts. A
 label alone proves neither a proof nor a compiler rejection nor fast-check execution.
 

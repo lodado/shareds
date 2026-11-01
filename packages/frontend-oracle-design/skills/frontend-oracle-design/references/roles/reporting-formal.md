@@ -16,8 +16,9 @@ from artifacts on disk is a FAIL, not a judgment call.
 4. **The recorded state agrees.** oracle-run.mjs status --json reports the same terminal state the
    report claims. On disagreement the artifact wins and the report is wrong.
 
-Checks 2 and 4 are also a command: `oracle-run.mjs status --dir <dir> --check-report <report|->`
-compares Status and every cited r-NNN exit <n> with the ledger, failing REPORT_CLAIM_MISMATCH.
+Checks 2 and 4 are also a command, which `close --check-report` runs last: `oracle-run.mjs status --dir
+
+<dir> --check-report <report|->` compares Status and every cited r-NNN exit <n> with the ledger, failing REPORT_CLAIM_MISMATCH.
 A VALID_RED, IMPLEMENTED_GREEN or REVIEW_VERIFIED Status with no runId fails the same way.
 Claude Code's Stop hook runs this against the final message. Never manufacture a runId before init.
 Design-only reports the actual contract/approval state without implying consumer test execution.

@@ -412,7 +412,7 @@ test('the model analyst input carries the source text and hazards, never the row
   assert.doesNotMatch(input, /^## Files$/m)
 })
 
-test('card lint runs the adequacy checks on the fixture and init needs the adequacy run label', async (t) => {
+test('card lint runs the adequacy checks on the fixture and init derives the adequacy run label', async (t) => {
   const repository = await fixtureCopy(t)
   const node = (script, args) =>
     spawnSync(process.execPath, [join(SCRIPTS, script), ...args], { cwd: repository, encoding: 'utf8' })
@@ -449,10 +449,13 @@ test('card lint runs the adequacy checks on the fixture and init needs the adequ
       join(repository, 'src'),
       ...labels.flatMap((label) => ['--required-label', label]),
     ])
-  const refused = init('behavior')
-  assert.equal(refused.status, 1)
-  assert.match(refused.stderr, /^ADEQUACY_LABEL_REQUIRED: /)
-  assert.equal(init('behavior', 'bend-adequacy:reported').status, 0)
+  const derived = init('behavior')
+  assert.equal(derived.status, 0, derived.stderr)
+  assert.match(derived.stdout, /^LABEL_AUTO bend-adequacy:reported$/m)
+  assert.deepEqual(
+    JSON.parse(await readFile(join(oracleDirectory, 'run-state.json'), 'utf8')).requiredLabels,
+    ['behavior', 'bend-adequacy:reported'],
+  )
 
   // 잠긴 세계 파일이 바뀌면 그 위에서 낸 결론은 더 이상 이 카드의 증거가 아니다
   await edit(join(repository, 'World.bend'), 'Save.imp(h, s)', 'Save.imp(s, h)')

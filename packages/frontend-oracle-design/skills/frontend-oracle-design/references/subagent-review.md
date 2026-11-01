@@ -290,8 +290,8 @@ reading past artifacts. New review verification requires v2, `reviewerRole`, `re
 
 Use `oracle-verify.mjs findings --file <findings> --oracle <card>` for shape/classification, then
 `oracle-verify.mjs review` with the current packet, revision and evidence map for binding and
-blocking checks. High risk supplies the second raw findings file through `--intersect`. The
-Controller records `oracle-run.mjs review-receipt`; final `transition` rechecks receipt and inputs.
+blocking checks. High risk supplies the second raw findings file through `--intersect`. `oracle-run.mjs close`
+records `oracle-run.mjs review-receipt` for findings naming this packet, and its final transition rechecks receipt and inputs.
 
 The classification is one of the upstream feedback router's `POLICY_GAP`, `EVIDENCE_GAP`,
 `HARNESS_DEFECT`, `PRODUCT_DEFECT`, `ENVIRONMENT_DEFECT`, `NON_ORACLE_OPINION`. Any other
@@ -393,12 +393,11 @@ frozen test sources (plus the registered harness helpers), with the mapping boun
 It does not claim complete dependency resolution: only registered harness paths travel with the
 tests, never arbitrary relative imports, so production modules stay out of the blind read.
 
-Generate with `oracle-run.mjs blind-input --dir <dir> --output <input>`. The blind reviewer reads
-only that file and returns the mapping JSON as its final message; the Controller saves it unchanged, as
-it does each code reviewer's findings JSON, because a host hook digests what the subagent returned
-(`host-receipts.jsonl`) and the transition compares the saved file with it. The Controller then records `review-receipt` with
-`--role blind-mapper`, the actual `--reviewer` and `--task-id`, that input as `--packet`, the mapping
-as `--findings`, and the input's `--revision`.
+`oracle-run.mjs close` derives it at `--blind-input` (via `blind-input`). The blind reviewer reads only that file and returns the mapping JSON as its final message; the
+Controller saves it unchanged, as it does each code reviewer's findings JSON, because a host hook digests
+what the subagent returned (`host-receipts.jsonl`) and the transition compares the saved file with it.
+`close` then records `review-receipt --role blind-mapper` with the actual `--blind-reviewer` and
+`--blind-task-id`, that input at the packet's revision, and the mapping as `--blind-map`.
 
 **The blind mapping is a gate, not an option.** High risk always requires it; Medium requires it when
 two or more rows share one test. Applicability is derived at the final `REVIEW_VERIFIED` transition
@@ -438,6 +437,6 @@ and the `--to REVIEW_VERIFIED` transition is recorded with that runId. `REVIEW_V
 that no blocking finding exists or that all are resolved and the mandatory re-verification passes.
 The card test command to be cited is run again after GREEN, and the remaining mandatory labels are
 reused when their digest is unchanged. Pass the reported run and clear findings to
-`oracle-run.mjs transition --to REVIEW_VERIFIED --evidence ... --findings ...`. High risk also passes
+`oracle-run.mjs close --run ... --evidence ... --findings ...`. High risk also passes
 the second reviewer file with `--intersect`, and records the mutation kill run after GREEN and its
 row together with `--mutation-run`·`--mutation-row`.

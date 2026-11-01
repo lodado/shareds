@@ -440,7 +440,7 @@ test('DRAFTED opens the lock gate for the package bytes it was recorded on, and 
   assert.match(brief(), /^phase 3\/6 Card review and lock · next: oracle-lock\.mjs create --oracle \S+\/oracle\.md --lock \S+\/oracle\.lock\.json --source <approved-source> · stage DRAFTED 4\/5 /)
   await markLocked(directory)
   assert.equal((await readStage(directory)).stage, 'ORACLE_READY')
-  assert.match(brief(), /^phase 4\/6 RED · next: oracle-run\.mjs init --dir \S+ --lock \S+\/oracle\.lock\.json --scan-root <scan-root> --required-label <label> · stage ORACLE_READY 5\/5 /)
+  assert.match(brief(), /^phase 4\/6 RED · next: oracle-run\.mjs init --dir \S+ --lock \S+\/oracle\.lock\.json --scan-root <scan-root> --required-label <repo-check> · stage ORACLE_READY 5\/5 /)
   await writeFile(join(directory, 'run-state.json'), '{}\n')
   assert.match(brief(), /^phase 4\/6 RED · next: oracle-run\.mjs status --brief --dir \S+ · stage ORACLE_READY 5\/5 /, 'after init the run line takes over')
   await rm(join(directory, 'run-state.json'))

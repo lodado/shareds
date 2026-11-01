@@ -7088,12 +7088,196 @@ test('guide text opens with the phase and one command for the state or the selec
   assert.equal(run(['guide', '--rejection', 'STATE_INVALID']).stdout.startsWith('authority: advisory'), true, 'no run, no phase')
 
   await reachGreen(oracleDirectory, root)
-  assert.match(
-    firstLine(),
-    /^phase 6\/6 Review and close · next: oracle-run\.mjs review-packet --dir \S+ --output <packet> --decision <implementation-decision\.md> --review-point <point>$/,
-  )
+  const reviewLine = /^phase 6\/6 Review and close · next: oracle-run\.mjs close --dir \S+ --packet <packet> --decision <implementation-decision\.md> --review-point <point> --run <runId> --evidence <evidence> --check-report <report>$/
+  assert.match(firstLine(), reviewLine)
+  // the same command resumes after the packet exists — phase 6 no longer points back at review-packet
+  const packetPath = join(oracleDirectory, 'review-input.json')
+  assert.equal(run(strictReviewPacketArgs(oracleDirectory, packetPath)).status, 0)
+  assert.match(firstLine(), reviewLine)
   assert.equal(run(['transition', '--dir', oracleDirectory, '--to', 'FAIL', '--reason', 'environment unavailable']).status, 0)
-  assert.match(firstLine(), /^phase 6\/6 Review and close · next: oracle-run\.mjs status --dir \S+ --check-report <report>$/)
+  assert.match(firstLine(), /^phase 6\/6 Review and close · next: oracle-run\.mjs close --dir \S+ --check-report <report>$/)
+})
+
+function closeArgs(oracleDirectory, packetPath, ...extra) {
+  return [
+    'close',
+    '--dir',
+    oracleDirectory,
+    '--packet',
+    packetPath,
+    '--decision',
+    join(oracleDirectory, 'implementation-decision.md'),
+    '--review-point',
+    checklistReviewPoint,
+    '--review-point',
+    changeabilityReviewPoint,
+    '--evidence',
+    join(oracleDirectory, 'evidence.json'),
+    ...extra,
+  ]
+}
+
+test('close chains packet, receipt, REVIEW_VERIFIED and the report check, waits for reviewer output it never writes, and keeps each step code', async (t) => {
+  const { oracleDirectory } = await workspace(t, { risk: 'low' })
+  const notYet = run(['close', '--dir', oracleDirectory, '--check-report', '-'])
+  assert.equal(notYet.status, 1)
+  assert.match(notYet.stderr, /^TRANSITION_NOT_ALLOWED: close starts at IMPLEMENTED_GREEN; the run is at ORACLE_READY\n/)
+  greenRun(oracleDirectory, 'green')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-001', ['--reason', 'existing behavior']).status, 0)
+  greenRun(oracleDirectory, 'review')
+  const packetPath = join(oracleDirectory, 'review-close.json')
+  const findings = join(oracleDirectory, 'findings.json')
+  const close = (...extra) => run(closeArgs(oracleDirectory, packetPath, ...extra))
+
+  // a findings file that predates this packet cannot answer it: close writes the packet and stops for the reviewer
+  const first = close('--run', 'r-002', '--findings', findings, '--task-id', 'review-1')
+  assert.equal(first.status, 1)
+  assert.match(first.stdout, /^REVIEW_PACKET_WRITTEN review-close\.json\n$/)
+  assert.match(
+    first.stderr,
+    /^CLOSE_PENDING: waiting for reviewer output: --findings\nnext: dispatch \$oracle-review in a fresh context with \S*review-close\.json, save each return unchanged, then rerun the same close adding --findings <file> --task-id <id>; the --findings given now answered the previous packet, so name the new returns there\n$/,
+  )
+  assert.equal(JSON.parse(readFileSync(findings, 'utf8')).orchestrationReceipt, undefined)
+  assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+  // the same call again: the packet exists now, but findings.json still names another packet (packet-a), so close keeps waiting
+  const again = close('--run', 'r-002', '--findings', findings, '--task-id', 'review-1')
+  assert.equal(again.status, 1)
+  assert.match(again.stdout, /^CLOSE_SKIP review-packet: \S*review-close\.json exists\n$/)
+  assert.match(
+    again.stderr,
+    /^CLOSE_PENDING: \S*findings\.json does not answer \S*review-close\.json\nnext: dispatch \$oracle-review with \S*review-close\.json, save its return unchanged, then rerun the same close with --findings naming that file\n$/,
+  )
+  assert.equal(JSON.parse(readFileSync(findings, 'utf8')).orchestrationReceipt, undefined)
+  assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+
+  const packetRaw = readFileSync(packetPath, 'utf8')
+  bindReviewDocument(findings, createHash('sha256').update(packetRaw).digest('hex'), JSON.parse(packetRaw).targetRevision)
+  const untasked = close('--run', 'r-002', '--findings', findings)
+  assert.equal(untasked.status, 2)
+  assert.match(untasked.stderr, /^USAGE: close needs --task-id <id> — the reviewer task that returned /)
+
+  // the transition gate refuses with its own code: the GREEN run is not a re-run after GREEN
+  const stale = close('--run', 'r-001', '--findings', findings, '--task-id', 'review-1')
+  assert.equal(stale.status, 1)
+  assert.match(stale.stdout, /^CLOSE_SKIP review-packet: \S*review-close\.json exists\nREVIEW_RECEIPT [a-f0-9]{64} digest:[a-f0-9]{64}\n$/)
+  assert.match(stale.stderr, /^REVIEW_RERUN_REQUIRED: /)
+  assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
+
+  const reviewed = close('--run', 'r-002', '--findings', findings, '--task-id', 'review-1')
+  assert.equal(reviewed.status, 1)
+  assert.match(reviewed.stdout, /^CLOSE_SKIP review-receipt: \S*findings\.json already carries one$/m)
+  assert.match(reviewed.stdout, /^STATE_REVIEW_VERIFIED run:r-002$/m)
+  assert.match(reviewed.stderr, /^CLOSE_PENDING: REVIEW_VERIFIED is recorded; the final report is not checked yet\nnext: write the report from `status --json` and run `oracle-run\.mjs close --dir \S+ --check-report <report>`\n$/)
+  const verified = await state(oracleDirectory)
+  assert.equal(verified.state, 'REVIEW_VERIFIED')
+  assert.equal(verified.history.at(-1).packet, 'review-close.json')
+  assert.equal(verified.history.at(-1).targetRevision, JSON.parse(packetRaw).targetRevision)
+
+  const report = join(oracleDirectory, 'report.md')
+  // a report path not written yet waits like a missing --check-report, naming that path
+  const unwritten = run(['close', '--dir', oracleDirectory, '--check-report', report])
+  assert.equal(unwritten.status, 1)
+  assert.match(unwritten.stderr, /^CLOSE_PENDING: REVIEW_VERIFIED is recorded; the final report is not checked yet\nnext: write the report from `status --json` and run `oracle-run\.mjs close --dir \S+ --check-report \S*report\.md`\n$/)
+  await writeFile(report, 'Status: PARTIAL_VERIFIED\nr-002 exit 0\n')
+  const mismatch = run(['close', '--dir', oracleDirectory, '--check-report', report])
+  assert.equal(mismatch.status, 1)
+  assert.match(mismatch.stderr, /^REPORT_CLAIM_MISMATCH: /)
+  await writeFile(report, 'Status: REVIEW_VERIFIED\nr-002 exit 0\n')
+  const closed = run(['close', '--dir', oracleDirectory, '--check-report', report])
+  assert.equal(closed.status, 0, closed.stderr)
+  assert.equal(closed.stdout, 'CLOSE_SKIP review: the run is already at REVIEW_VERIFIED\nREPORT_CONSISTENT state:REVIEW_VERIFIED runs:1\nCLOSED state:REVIEW_VERIFIED\n')
+})
+
+test('close on High asks for the blind input before writing anything, then records two reviewers and the blind mapper in one call', async (t) => {
+  const fixture = await highRiskReviewReady(t)
+  const dir = fixture.oracleDirectory
+  const packetPath = join(dir, 'review-close.json')
+  const blindPath = join(dir, 'blind-close.json')
+  const close = (...extra) => run(closeArgs(dir, packetPath, '--run', fixture.reviewRunId, '--mutation-run', 'r-005', '--mutation-row', 'O1', ...extra))
+
+  const unasked = close()
+  assert.equal(unasked.status, 1)
+  assert.match(unasked.stderr, /^CLOSE_PENDING: this run needs a blind row mapping\nnext: rerun the same close adding --blind-input </)
+  assert.equal(existsSync(packetPath), false)
+
+  const pending = close('--blind-input', blindPath)
+  assert.equal(pending.status, 1)
+  assert.match(pending.stdout, /^REVIEW_PACKET_WRITTEN review-close\.json\nBLIND_INPUT_WRITTEN blind-close\.json required:true /)
+  assert.match(
+    pending.stderr,
+    /^CLOSE_PENDING: waiting for reviewer output: --findings, --intersect, --blind-map\nnext: dispatch \$oracle-review in two fresh contexts with \S*review-close\.json and a blind mapper with only \S*blind-close\.json, save each return unchanged, then rerun the same close adding --findings <file> --task-id <id> --intersect <file> --intersect-task-id <id> --blind-map <file> --blind-reviewer <id> --blind-task-id <id>\n$/,
+  )
+
+  const packetRaw = readFileSync(packetPath, 'utf8')
+  const packetSha256 = createHash('sha256').update(packetRaw).digest('hex')
+  const findings = join(dir, 'findings.json')
+  const second = join(dir, 'findings-second.json')
+  for (const path of [findings, second]) bindReviewDocument(path, packetSha256, JSON.parse(packetRaw).targetRevision)
+  const map = join(dir, 'blind-map.json')
+  writeFileSync(map, JSON.stringify({ 'save > pending': ['O1'] }))
+  const report = join(dir, 'report.md')
+  await writeFile(report, `Status: REVIEW_VERIFIED\n${fixture.reviewRunId} exit 0\n`)
+  const outputs = [
+    '--blind-input', blindPath,
+    '--findings', findings, '--task-id', 'review-a',
+    '--intersect', second, '--intersect-task-id', 'review-b',
+    '--blind-map', map, '--blind-reviewer', 'blind-reader', '--blind-task-id', 'blind-1',
+    '--check-report', report,
+  ]
+  // a blind input from another revision is refused before any receipt: its mapping did not read this revision's tests
+  const blindRaw = readFileSync(blindPath, 'utf8')
+  writeFileSync(blindPath, JSON.stringify({ ...JSON.parse(blindRaw), targetRevision: 'f'.repeat(64) }))
+  const staleBlind = close(...outputs)
+  assert.equal(staleBlind.status, 1)
+  assert.match(staleBlind.stderr, /^BLIND_INPUT_INVALID: \S*blind-close\.json was written for another revision than \S*review-close\.json\nnext: rerun the same close with a new --blind-input path, then have a blind mapper map that new file\n$/)
+  assert.doesNotMatch(staleBlind.stdout, /RECEIPT/)
+  writeFileSync(blindPath, blindRaw)
+  const closed = close(...outputs)
+  assert.equal(closed.status, 0, closed.stderr)
+  assert.equal(closed.stdout.match(/^REVIEW_RECEIPT /gm).length, 2)
+  assert.match(closed.stdout, /^BLIND_MAP_RECEIPT [a-f0-9]{64} /m)
+  assert.match(closed.stdout, new RegExp(`^STATE_REVIEW_VERIFIED run:${fixture.reviewRunId}\n(?:.*\n)*REPORT_CONSISTENT state:REVIEW_VERIFIED runs:1\nCLOSED state:REVIEW_VERIFIED\n$`, 'm'))
+  assert.equal((await state(dir)).state, 'REVIEW_VERIFIED')
+})
+
+test('close decides the blind mapping from the --evidence the transition will judge, not the recorded evidence path', async (t) => {
+  const { oracleDirectory, root } = await workspace(t, { risk: 'medium' })
+  await reachValidRed(oracleDirectory, root)
+  greenRun(oracleDirectory, 'green-1')
+  greenRun(oracleDirectory, 'green-2')
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+  greenRun(oracleDirectory, 'review')
+  // the recorded evidence maps one row per test; the evidence handed to close shares one test between two rows (N:1)
+  const shared = join(oracleDirectory, 'evidence-shared.json')
+  writeFileSync(shared, JSON.stringify({ schemaVersion: 1, rows: { O1: { kind: 'test', name: 'save > pending' }, O2: { kind: 'test', name: 'save > pending' } } }))
+  const packetPath = join(oracleDirectory, 'review-close.json')
+  const result = run(['close', '--dir', oracleDirectory, '--packet', packetPath, '--run', 'r-004', '--evidence', shared])
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /^CLOSE_PENDING: this run needs a blind row mapping\n/)
+  assert.equal(existsSync(packetPath), false)
+})
+
+test('derived profile labels are exactly the labels init checks: each card passes with them and fails without any one', async () => {
+  const { assertProfileLabels, profileLabels } = await import('./oracle-run.mjs')
+  const fixtures = join(scriptDirectory, '../../../test-fixtures')
+  const { fullProductFixture } = await import(join(fixtures, 'full-product/fixture.mjs'))
+  const contract = fullProductFixture().render()
+  const typeFree = `${contract}\n## Type Contract\n\n- Not applicable: inspected fixture has no public type boundary. (source: S1)\n- Investigated: src/toggle.mjs\n`
+  const legacy = { profile: null }
+  const cards = [
+    ['Contract', { profile: 'contract/v1' }, contract, ['contract-cases:reported', 'type-contract:reported', 'fast-check:reported']],
+    ['Contract with type N/A', { profile: 'contract/v1' }, typeFree, ['contract-cases:reported', 'fast-check:reported']],
+    ['Formal Model', legacy, readFileSync(join(fixtures, 'stale-search/oracle.md'), 'utf8'), ['bend-proof:reported']],
+    ['Adequacy', legacy, readFileSync(join(fixtures, 'doc-save/oracle.md'), 'utf8'), ['bend-adequacy:reported']],
+  ]
+  for (const [name, binding, card, expected] of cards) {
+    const derived = await profileLabels(card, binding)
+    assert.deepEqual(derived, expected, name)
+    await assertProfileLabels(null, null, card, binding, derived)
+    for (const label of derived) {
+      await assert.rejects(assertProfileLabels(null, null, card, binding, derived.filter((other) => other !== label)), (error) => /_LABELS?_REQUIRED$/.test(error.code), `${name} without ${label}`)
+    }
+  }
 })
 
 test('phase line sends a blocker the phase command cannot clear (lock drift) to guide --to instead of red', async (t) => {

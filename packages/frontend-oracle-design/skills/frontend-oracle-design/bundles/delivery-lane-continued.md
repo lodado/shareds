@@ -87,8 +87,8 @@ removes or N/As the row: it stays the visual owner's `pending`, which may stop a
 Every run performs the mandatory Bend discovery with `scripts/ensure-bend.mjs` and records its
 `BEND_READY <path>` line or actual failure code. A missing tool, failed installation, type-fest/compiler
 check or fast-check runner is `ENVIRONMENT_DEFECT` → `FAIL`; never skip or fall back. Every locked
-card needs `--required-label bend-proof:reported`, `--required-label bend-adequacy:reported`,
-`--required-label type-contract:reported` and `--required-label fast-check:reported` at `init`.
+card needs `bend-proof:reported`, `bend-adequacy:reported`, `type-contract:reported` and
+`fast-check:reported` at `init`, which adds each one the locked card implies (`LABEL_AUTO`).
 `type-contract:reported` is dropped only when the card declares `## Type Contract` not applicable.
 A card without a `## Formal Model` registers `bend-adequacy:reported`, `world-conformance:reported` and
 `type-contract:reported` instead (`mandatory-verification.md`).

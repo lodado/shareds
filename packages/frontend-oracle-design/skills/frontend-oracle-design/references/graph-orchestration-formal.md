@@ -50,7 +50,7 @@ graph verifier cannot be found, `FAIL` instead of falling back to sequential exe
   `primary-review` when `STANDARD`, and activates the independent `primary-review` and
   `secondary-review` together when `HIGH`. Reviewers do not read each other's results and return
   only finding artifacts. Even when a High-risk reviewer is BLOCKED, both branches arrive at
-  `high-review-join` and activate `evidence-repair` only once. The Controller/join calls
+  `high-review-join` and activate `evidence-repair` only once. The Controller/join's `close` calls
   `oracle-run.mjs review-receipt` for both High-risk findings to create two ledger-bound receipts
   containing `packetSha256`, `targetRevision`, `role`, `taskId`, `outputSha256`, `reviewerId`,
   `findingsSha256`, `previousDigest`, and `digest`. The new run record and the receipts state the

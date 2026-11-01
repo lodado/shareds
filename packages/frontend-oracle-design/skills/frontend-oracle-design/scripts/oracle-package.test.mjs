@@ -805,18 +805,17 @@ test('[bend] end to end: lock the projected card, RED on the wrong reducer, VALI
       join(repository, 'src'),
       ...labels.flatMap((label) => ['--required-label', label]),
     ])
-  const partial = init(['behavior', 'bend-proof:reported', 'bend-adequacy:reported'])
-  assert.equal(partial.status, 1)
-  assert.match(partial.stderr, /^STACK_LABELS_REQUIRED: .*type-contract:reported.*fast-check:reported/)
-  const stack = [
+  // the projected card implies the whole mandatory stack — init adds the labels nobody typed and names each
+  const initialized = init(['behavior', 'bend-proof:reported', 'bend-adequacy:reported'])
+  assert.equal(initialized.status, 0, initialized.stderr)
+  assert.deepEqual(initialized.stdout.match(/^LABEL_AUTO .+$/gm), ['LABEL_AUTO type-contract:reported', 'LABEL_AUTO fast-check:reported'])
+  assert.deepEqual(JSON.parse(await readFile(join(oracleDirectory, 'run-state.json'), 'utf8')).requiredLabels, [
     'behavior',
     'bend-proof:reported',
     'bend-adequacy:reported',
     'type-contract:reported',
     'fast-check:reported',
-  ]
-  const initialized = init(stack)
-  assert.equal(initialized.status, 0, initialized.stderr)
+  ])
 
   // tests first: generate the conformance test from the locked model (test files only, under __test__)
   await emitTrace({

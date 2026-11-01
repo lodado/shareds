@@ -83,12 +83,14 @@ test('actual Contract toggle public RED and two reported Medium passes preserve 
     for (const to of ['CHECKED', 'DRAFTED']) ok(cli('stage', 'advance', '--dir', directory, '--to', to, '--profile', 'contract/v1'))
     ok(cli('lock', 'create', '--oracle', oracle, '--lock', lock, '--source', 'packages/frontend-oracle-design/test-fixtures/contract-v1/policy.md', '--profile', 'contract/v1'))
     const locked = readFileSync(lock)
-    const refused = cli('run', 'init', '--dir', directory, '--lock', lock, '--scan-root', source, '--required-label', 'unit:reported')
+    // the Contract card implies contract-cases, but a derived label is not a repository check: with nothing typed, init refuses
+    const refused = cli('run', 'init', '--dir', directory, '--lock', lock, '--scan-root', source, '--harness-path', 'product.test.mjs')
     assert.notEqual(refused.status, 0)
-    assert.match(refused.stderr, /CONTRACT_CASES_LABEL_REQUIRED/)
+    assert.match(refused.stderr, /REQUIRED_LABEL_REQUIRED/)
     assert.equal(existsSync(state), false)
     assert.equal(existsSync(ledger), false)
     ok(cli('run', 'init', '--dir', directory, '--lock', lock, '--scan-root', source, '--required-label', 'contract-cases:reported', '--harness-path', 'product.test.mjs'))
+    assert.deepEqual(json(state).requiredLabels, ['contract-cases:reported'])
     const card = immutable[oracle].toString()
     const records = card.split('\n').filter((line) => /^\| F[0-9a-f]+ \|/.test(line)).map((line) => {
       const [frame, , tuple, scenario] = line.split('|').slice(1, -1).map((cell) => cell.trim())

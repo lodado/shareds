@@ -915,7 +915,7 @@ test('the lock covers the model and laws: a changed law fails verify, a changed 
   assert.match(weakened.stderr, /SOURCE_CHANGED/)
 })
 
-test('init refuses a locked Formal Model card unless the law proof run is a required label', async (t) => {
+test('init derives the law proof label from a locked Formal Model card, and its --reason correction keeps it', async (t) => {
   const repository = await workspace(t)
   await cp(FIXTURE, repository, { recursive: true })
   const oracleDirectory = join(repository, '.ai', 'oracles', 'stale-search')
@@ -941,7 +941,7 @@ test('init refuses a locked Formal Model card unless the law proof run is a requ
   ])
   assert.equal(locked.status, 0, locked.stderr)
 
-  const init = (...labels) =>
+  const init = (labels, reason = null) =>
     node('oracle-run.mjs', [
       'init',
       '--dir',
@@ -951,13 +951,26 @@ test('init refuses a locked Formal Model card unless the law proof run is a requ
       '--scan-root',
       join(repository, 'src'),
       ...labels.flatMap((label) => ['--required-label', label]),
+      ...(reason ? ['--reason', reason] : []),
     ])
-  const refused = init('behavior')
-  assert.equal(refused.status, 1)
-  assert.match(refused.stderr, /^FORMAL_PROOF_LABEL_REQUIRED: /)
+  const labels = async () => JSON.parse(await readFile(join(oracleDirectory, 'run-state.json'), 'utf8')).requiredLabels
+  // the card implies the proof run: init adds it and names it, the agent types only the repository check
+  const derived = init(['behavior'])
+  assert.equal(derived.status, 0, derived.stderr)
+  assert.match(derived.stdout, /^LABEL_AUTO bend-proof:reported$/m)
+  assert.deepEqual(await labels(), ['behavior', 'bend-proof:reported'])
 
-  const accepted = init('behavior', 'bend-proof:reported')
-  assert.equal(accepted.status, 0, accepted.stderr)
+  const corrected = init(['lint:exit'], 'lint was left out')
+  assert.equal(corrected.status, 0, corrected.stderr)
+  assert.match(corrected.stdout, /^RUN_STATE_AMENDED state:ORACLE_READY labels:lint:exit,bend-proof:reported /)
+  assert.match(corrected.stdout, /^LABEL_AUTO bend-proof:reported$/m)
+  assert.deepEqual(await labels(), ['lint:exit', 'bend-proof:reported'])
+
+  // a typed proof label is kept as typed and not announced again
+  const typed = init(['behavior', 'bend-proof:reported'], 'behavior is the card test')
+  assert.equal(typed.status, 0, typed.stderr)
+  assert.doesNotMatch(typed.stdout, /LABEL_AUTO/)
+  assert.deepEqual(await labels(), ['behavior', 'bend-proof:reported'])
 })
 
 // ── laws: 관계·불변식을 모든 칸에서 계산 (가짜 컴파일 def, mock) ───────────────────────────────

@@ -309,18 +309,16 @@ consumer checks under the four required labels.
 
 ## 4. Delivery: RED, conformance and the proof label
 
-At `init`, register `--required-label bend-proof:reported`, `--required-label bend-adequacy:reported`,
-`--required-label type-contract:reported` and `--required-label fast-check:reported` for every
-card with a Formal Model; a card without one registers `bend-adequacy:reported`,
+At `init`, register `bend-proof:reported`, `bend-adequacy:reported`, `type-contract:reported` and
+`fast-check:reported` for every card with a Formal Model; a card without one registers `bend-adequacy:reported`,
 `world-conformance:reported` and `type-contract:reported`, and generates its product tests with
 `oracle-projection.mjs emit-world (--package <pkg> | --card <oracle.md>) --adapter <world adapter> --out
 <formal dir> --row <O*>`: one test per coordinate setting the assumptions allow, judged by the outcomes
-the compiled world allows (`violates O*` or `MODEL_GAP`), run under `world-conformance:reported`. For a card projected from a model package, `init` enforces it: it refuses with
-`STACK_LABELS_REQUIRED` unless all four are registered and with `PACKAGE_UNLOCKED` unless the lock
-covers the package named in the generated region. A legacy card without a generated region keeps the
-earlier gates (`FORMAL_PROOF_LABEL_REQUIRED` with a Formal Model, `ADEQUACY_LABEL_REQUIRED` with an
-Adequacy section); for it, registering all four remains an operating contract the runner does not
-infer. A card that declares `## Type Contract` not applicable registers the other three labels only.
+the compiled world allows (`violates O*` or `MODEL_GAP`), run under `world-conformance:reported`. For a card projected from a model package, `init` adds every
+label of that stack not typed (`LABEL_AUTO`) and refuses with `PACKAGE_UNLOCKED` unless the lock covers
+the package named in the generated region. A legacy card without a generated region gets only
+`bend-proof:reported` with a Formal Model and `bend-adequacy:reported` with an Adequacy section; for it,
+registering all four remains an operating contract the runner does not infer. A card that declares `## Type Contract` not applicable registers the other three labels only.
 Through the approved `$test` flow, write in the target
 repository's existing test runner. Recommend `vitest` with `fast-check`: `vitest` runs TypeScript, JSX
 and a per-file `jsdom` environment, so one projected model can drive both the pure core and the real

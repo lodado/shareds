@@ -88,23 +88,20 @@ test('Contract public stage and lock bind approved whole card without a package'
     assert.notEqual(run(lock, 'verify', '--lock', manifest).status, 0)
     writeFileSync(manifest, lockedBytes)
     const runtime = new URL('../skills/frontend-oracle-design/scripts/oracle-run.mjs', import.meta.url).pathname
-    const missingLabel = run(runtime, 'init', '--dir', directory, '--lock', manifest, '--scan-root', scanRoot, '--required-label', 'ordinary:reported')
-    assert.notEqual(missingLabel.status, 0)
-    assert.match(missingLabel.stderr, /CONTRACT_CASES_LABEL_REQUIRED/)
-    assert.deepEqual(readFileSync(manifest), lockedBytes)
     const init = (...labels) => run(runtime, 'init', '--dir', directory, '--lock', manifest, '--scan-root', scanRoot, ...labels.flatMap((label) => ['--required-label', label]))
-    const missingType = init('contract-cases:reported')
-    assert.notEqual(missingType.status, 0)
-    assert.match(missingType.stderr, /TYPE_CONTRACT_LABEL_REQUIRED/)
-    const missingTemporal = init('contract-cases:reported', 'type-contract:reported')
-    assert.notEqual(missingTemporal.status, 0)
-    assert.match(missingTemporal.stderr, /FAST_CHECK_LABEL_REQUIRED/)
+    // derived labels never stand in for the repository check: with none typed, init refuses and writes nothing
+    result = init()
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /^REQUIRED_LABEL_REQUIRED: /m)
     assert.equal(existsSync(join(directory, 'run-state.json')), false)
-    assert.equal(existsSync(join(directory, 'runs.jsonl')), false)
-    assert.deepEqual(readFileSync(manifest), lockedBytes)
-    result = init('contract-cases:reported', 'type-contract:reported', 'fast-check:reported')
+    // the card implies contract-cases, type-contract (no Not applicable declaration) and fast-check (full-product Async/Order):
+    // init adds each one nobody typed after the typed repository check, names it, and stores it like a typed label
+    result = init('card-tests:reported')
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /RUN_STATE_INITIALIZED/)
+    assert.deepEqual(result.stdout.match(/^LABEL_AUTO .+$/gm), ['contract-cases:reported', 'type-contract:reported', 'fast-check:reported'].map((label) => `LABEL_AUTO ${label}`))
+    assert.deepEqual(JSON.parse(readFileSync(join(directory, 'run-state.json'))).requiredLabels, ['card-tests:reported', 'contract-cases:reported', 'type-contract:reported', 'fast-check:reported'])
+    assert.deepEqual(readFileSync(manifest), lockedBytes)
     const statePath = join(directory, 'run-state.json')
     const ledgerPath = join(directory, 'runs.jsonl')
     const stateBytes = readFileSync(statePath)
@@ -200,7 +197,7 @@ test('a Contract card cannot carry the Formal pre-authorized approval: lint refu
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
 
-test('Contract public init requires approved investigated type N/A and Async reporting', () => {
+test('Contract public init derives type-contract unless an approved investigated N/A, and fast-check for Async', () => {
   const root = mkdtempSync(join(tmpdir(), 'oracle-contract-applicability-'))
   const scripts = new URL('../skills/frontend-oracle-design/scripts/', import.meta.url)
   const loader = `data:text/javascript,${encodeURIComponent("export async function resolve(s,c,n){if(/oracle-(package|model|adequacy|discovery)\\.mjs$|ensure-bend\\.mjs$/.test(s))throw Error('FORMAL_IMPORT_DENIED:'+s);return n(s,c)}")}`
@@ -231,23 +228,12 @@ test('Contract public init requires approved investigated type N/A and Async rep
       assert.equal(locked.status, 0, `${mode}: ${locked.stderr}`)
       const lockBytes = readFileSync(lock)
       const init = (...labels) => run('oracle-run.mjs', 'init', '--dir', directory, '--lock', lock, '--scan-root', scanRoot, ...labels.flatMap((label) => ['--required-label', label]))
-      const labels = ['contract-cases:reported', 'fast-check:reported']
-      if (!['investigated', 'async'].includes(mode)) {
-        const rejected = init(...labels)
-        assert.notEqual(rejected.status, 0)
-        assert.match(rejected.stderr, /\bTYPE_CONTRACT_LABEL_REQUIRED\b/)
-        assert.equal(existsSync(join(directory, 'run-state.json')), false)
-        assert.equal(existsSync(join(directory, 'runs.jsonl')), false)
-        assert.deepEqual(readFileSync(lock), lockBytes)
-        labels.push('type-contract:reported')
-      }
-      if (mode === 'async') {
-        const rejected = init('contract-cases:reported')
-        assert.notEqual(rejected.status, 0)
-        assert.match(rejected.stderr, /FAST_CHECK_LABEL_REQUIRED/)
-      }
-      const initialized = init(...labels)
+      // an accepted Not applicable declaration drops type-contract; any weaker one leaves it derived, like Async/Order fast-check
+      const initialized = init('contract-cases:reported')
       assert.equal(initialized.status, 0, `${mode}: ${initialized.stderr}`)
+      const expected = ['contract-cases:reported', ...(['investigated', 'async'].includes(mode) ? [] : ['type-contract:reported']), 'fast-check:reported']
+      assert.deepEqual(JSON.parse(readFileSync(join(directory, 'run-state.json'))).requiredLabels, expected, mode)
+      assert.deepEqual(initialized.stdout.match(/^LABEL_AUTO .+$/gm), expected.slice(1).map((label) => `LABEL_AUTO ${label}`), mode)
       assert.equal(JSON.parse(readFileSync(join(directory, 'run-state.json'))).verificationProfile, 'contract/v1')
       assert.deepEqual(readFileSync(lock), lockBytes)
     }

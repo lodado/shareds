@@ -14,7 +14,7 @@ gates. Each is states → command → the only user touchpoint.
 4. RED: ORACLE_READY → `oracle-run.mjs init --scan-root <scan-root>`, then `red` → none.
 5. GREEN: VALID_RED → `oracle-run.mjs green` → none.
 6. Review and close: IMPLEMENTED_GREEN to REVIEW_VERIFIED, or PARTIAL_VERIFIED, NEEDS_DECISION, FAIL →
-   `review-packet`, then `status --check-report` → NEEDS_DECISION only.
+   `oracle-run.mjs close`, rerun after each `CLOSE_PENDING` → NEEDS_DECISION only.
 
 Start each Progress message (common's table) and every answer to a progress question with the line from
 `oracle-stage.mjs status --dir <dir> --brief` before init or `oracle-run.mjs status --dir <dir> --brief`
@@ -114,8 +114,8 @@ Right after entering Delivery, explicitly load and invoke the installed `$test` 
 [`delivery/ledger.md`](../delivery/ledger.md). Immediately before writing test files, explicitly load
 and invoke the `$test` skill by name; if it cannot be invoked, FAIL. Invoking a file is not a skill call.
 The test skill owns test writing/judgment. Standalone Low/card exemptions cannot waive an Oracle run.
-Pin real required command labels with `oracle-run.mjs init --required-label`, including applicable
-mandatory stack labels and actual target verification commands. No label alone proves the evidence.
+`oracle-run.mjs init` adds the stack labels the locked card implies (`LABEL_AUTO`); pin the actual target
+verification commands with `--required-label`. No label alone proves the evidence.
 
 After init or on resume, run `oracle-run.mjs guide --dir <dir>`, select a legal target and request
 `guide --dir <dir> --to <target>`. Use the current-step guide at entry, resume, and after each transition.
@@ -162,16 +162,24 @@ with shell writes.
 Read [`delivery/green-review.md`](../delivery/green-review.md) for self-feedback/GREEN.
 Re-read [`mandatory-verification.md`](../mandatory-verification.md) and
 [`bend-cross-verification.md`](../bend-cross-verification.md) before verification and review.
-After GREEN use the review target's guide for High mutation kill/revert/re-GREEN, independent review,
-Controller-issued review-receipt records and post-GREEN reruns. Reviewers return findings only.
+After GREEN use the review target's guide for High mutation kill/revert/re-GREEN and post-GREEN reruns.
+Reviewers return findings only.
 Before contextual packet collection and independent review after implementation/test verification,
 read [`subagent-review.md`](../subagent-review.md) for --context selection and snapshot binding.
-Generate `oracle-run.mjs review-packet` with only matching criteria reference files via
-`review-packet --review-point`; never paste criteria into prompts or replace raw artifacts with a summary.
+Close with one command, rerun until it ends: `oracle-run.mjs close --dir <dir> --packet <packet> --decision
+<decision> --review-point <point> --run <runId> --evidence <evidence> --check-report <report>` (High adds
+`--mutation-run`·`--mutation-row`; a blind mapping `--blind-input`). It calls `oracle-run.mjs review-packet`
+(only matching criteria via `--review-point`) when the packet is absent, `review-receipt` for each output
+not yet bound whose `packetSha256`·`targetRevision` name this packet (a blind map names none, so only its
+input's revision is checked), the REVIEW_VERIFIED transition (PARTIAL_VERIFIED with an open hold) and the report check, in
+order with their own gates, stopping at the first refusal with its code. It never writes reviewer output:
+`CLOSE_PENDING` names the dispatch ($oracle-review in required fresh contexts, the blind mapper) and the
+flags to add. Never paste criteria into prompts or replace raw artifacts with a summary.
 Supporting context never replaces common inputs, five-axis judgments or independent reviews.
 Low and Design-only retain mandatory verification; contextual artifacts remain conditional by mode.
-Dispatch $oracle-review in required fresh contexts, issue review-receipt only from actual returned evidence,
-and re-run stack/repo checks on the current snapshot after findings. No reviewer approves its own return.
+Re-run stack/repo checks on the current snapshot after findings, and give round 2 a new `--packet` path;
+the `--findings` that build it are round 1's, so rerun with round 2's returns in their place.
+No reviewer approves its own return.
 Run each reviewer's "reproduction not run" command once, as a job, on the final snapshot; a failure joins
 that reviewer's findings.
 

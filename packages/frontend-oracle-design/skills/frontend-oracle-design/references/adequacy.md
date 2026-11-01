@@ -165,7 +165,7 @@ concrete world or pair), `kernel-computation` (one evaluated example) or `enumer
 them in the Human review brief as plain situations; approved pairs become `Example` rows. The exit
 code is 0 only for `proven`.
 
-A card with `## Adequacy` needs `--required-label bend-adequacy:reported` at `init`; its node-test run
+A card with `## Adequacy` needs `bend-adequacy:reported`, which `init` adds; its node-test run
 asserts that the check reports `proven` for the locked card and world. The lock covers the card (Terms
 included) and the world file with its imports, so a changed definition invalidates the evidence even
 when a law's text is unchanged.

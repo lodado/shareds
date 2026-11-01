@@ -24,9 +24,9 @@ const INSTRUCTIONS = {
     objective: 'Obtain independent review and fresh verification of the locked scope.',
     writeBoundary: 'locked-scope-corrections',
     steps: [
-      'Generate review-packet; give independent reviewers the raw packet and their separately assigned references.',
-      'Record reviewer receipts, classify findings and route policy changes to a new confirmed revision.',
-      'Re-run GREEN and required verification after review; supply the packet, findings and applicable blind or mutation evidence.',
+      'Run `oracle-run.mjs close`: it writes the packet when absent; give independent reviewers the raw packet and their separately assigned references.',
+      'Rerun close with each returned output to record receipts; classify findings and route policy changes to a new confirmed revision.',
+      'Re-run GREEN and required verification after review; close supplies the packet, findings and applicable blind or mutation evidence to the transition.',
       'Pending visual evidence is not approval. Open holds require PARTIAL_VERIFIED rather than REVIEW_VERIFIED.',
     ],
   },

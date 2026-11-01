@@ -882,7 +882,8 @@ function stageCommand(stage, profile, dir, following, stale) {
   const contract = profile === 'contract/v1'
   if (stale) return contract ? `oracle-stage.mjs rewind --dir ${dir} --to DISCOVERING --reason <cause>` : `oracle-cycle.mjs walk --dir ${dir} --reason <cause>`
   if (stage === 'DRAFTED') return `oracle-lock.mjs create --oracle ${dir}/oracle.md --lock ${dir}/oracle.lock.json --source <approved-source>`
-  if (stage === 'ORACLE_READY') return `oracle-run.mjs init --dir ${dir} --lock ${dir}/oracle.lock.json --scan-root <scan-root> --required-label <label>`
+  // init이 카드의 스택 라벨(proof·adequacy·type·fast-check·contract-cases)을 스스로 더한다 — 손으로는 저장소 검사만 적는다
+  if (stage === 'ORACLE_READY') return `oracle-run.mjs init --dir ${dir} --lock ${dir}/oracle.lock.json --scan-root <scan-root> --required-label <repo-check>`
   return contract ? `oracle-stage.mjs advance --dir ${dir} --to ${following}` : `oracle-cycle.mjs walk --dir ${dir}`
 }
 

@@ -252,8 +252,8 @@ demands a re-run — re-running the same bytes does not add evidence. When refle
 worktree after GREEN, the review run needs the risk's consecutive passes of the GREEN command on the new
 bytes, as GREEN did (`FLAKINESS_GATE`). The review artifact must have no blocking finding.
 
-Validate findings with `oracle-verify.mjs review`, then use the `REVIEW_VERIFIED` action printed
-by `status`. Pass each findings file and blind mapping exactly as the reviewer subagent returned it:
+`oracle-run.mjs close` records the receipts and the transition, whose `oracle-verify.mjs review`
+validates the findings. Pass each findings file and blind mapping exactly as the reviewer subagent returned it:
 on a host whose hook recorded those outputs in `host-receipts.jsonl`, a file that matches none is
 `REVIEW_RECEIPT_UNATTESTED`, and two artifacts from the same subagent are `REVIEWER_NOT_INDEPENDENT`.
 Without that file the transition records `reviewAttestation: self-reported`; if the hook created the
@@ -280,15 +280,12 @@ must be one of them, since that mapping is the least proven (`MUTATION_ROW_NOT_W
 A critical/high finding blocks the review even if it exists on only one side.
 
 ```bash
-node <skill-dir>/scripts/oracle-run.mjs transition \
-  --dir .ai/oracles/<oracle-id> \
-  --to REVIEW_VERIFIED \
-  --run r-012 \
-  --evidence .ai/oracles/<oracle-id>/evidence.json \
-  --findings .ai/oracles/<oracle-id>/findings-code-reviewer.json \
-  --intersect .ai/oracles/<oracle-id>/findings-second-reviewer.json \
-  --mutation-run r-011 \
-  --mutation-row O3
+node <skill-dir>/scripts/oracle-run.mjs close --dir <dir> --packet <dir>/review-input.json \
+  --run r-012 --evidence <dir>/evidence.json --mutation-run r-011 --mutation-row O3 \
+  --findings <dir>/findings-code-reviewer.json --task-id <task> \
+  --intersect <dir>/findings-second-reviewer.json --intersect-task-id <task> \
+  --blind-input <dir>/blind-input.json --blind-map <dir>/blind-map.json \
+  --blind-reviewer <id> --blind-task-id <task> --check-report <report>
 ```
 
 ### Delivery review round budget — at most 2
@@ -327,10 +324,10 @@ a dispatch:
    changed since round 1, that the scan snapshot skips, or a JavaScript file Node could parse that the
    reproductions would break. Run the GREEN command unchanged through
    `exec`: each reproduction must fail on its assertion while production is still what round 1 reviewed.
-2. Repair only the cited files, rerun the labels (the GREEN command to the risk's consecutive passes) and
-   generate the round-2 packet with the round-1 `--findings` as usual. Do not dispatch the round-2
-   reviewers.
-3. Pass `--closure <file>` to `transition --to REVIEW_VERIFIED` in place of round-2 findings. The file is
+2. Repair only the cited files and rerun the labels (the GREEN command to the risk's consecutive passes).
+   Do not dispatch the round-2 reviewers.
+3. Run `close` with a new `--packet`, the round-1 `--findings` and `--closure <file>` in place of
+   round-2 findings. The file is
    `{ "schemaVersion": 1, "reproductions": [{ "reviewerId", "finding", "test", "redRun" }] }`, one entry
    per claim, where `test` is the reviewer's reproduction test.
 

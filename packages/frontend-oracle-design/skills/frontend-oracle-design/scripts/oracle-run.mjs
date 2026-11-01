@@ -114,6 +114,9 @@ const FLAG_NAMES = [
   'role',
   'reviewer',
   'task-id',
+  'intersect-task-id',
+  'blind-reviewer',
+  'blind-task-id',
   'blind-map',
   'blind-input',
   'context',
@@ -202,7 +205,8 @@ const NEXT_ACTIONS = {
     'record the blind mapping with `review-receipt --role blind-mapper` against this input and revision',
   BLIND_INPUT_INVALID:
     'generate the blind input with `blind-input` — it carries only the contract rows and the test sources',
-  REVIEW_PACKET_STALE: 'the input changed since the packet — regenerate `review-packet`, never edit it',
+  REVIEW_PACKET_STALE: 'the input changed since the packet — generate a new one at a new `close --packet` path, never edit it',
+  CLOSE_PENDING: 'supply the reviewer output or report named above, then rerun the same `close`',
   REVIEW_RERUN_REQUIRED: 're-run the GREEN command after applying findings and cite the new run',
   SNAPSHOT_STALE: 'bytes changed since GREEN — re-run the required labels and cite the new runs',
   REVIEW_RUN_STALE: 're-run the cited command against the current bytes',
@@ -1519,7 +1523,7 @@ async function initialize(options) {
     )
   }
 
-  const requiredLabels = parseRequiredLabels(options.requiredLabels)
+  const explicitLabels = parseRequiredLabels(options.requiredLabels)
 
   const state = {
     schemaVersion: 3,
@@ -1527,7 +1531,8 @@ async function initialize(options) {
     scanRoot: portablePath(directory, scanRoot),
     // 잠긴 카드를 읽은 뒤 resolveRisk가 정한다.
     risk: null,
-    requiredLabels,
+    // 잠긴 카드를 읽은 뒤 withDerivedLabels가 정한다.
+    requiredLabels: explicitLabels,
     milestones: [],
     harnessPaths,
     harnessAtValidRed: null,
@@ -1547,7 +1552,9 @@ async function initialize(options) {
   const binding = await resolveRunProfile(directory, state)
   if (binding.kind === 'explicit') state.verificationProfile = binding.profile
   state.risk = resolveRisk(options.risk, oracle)
-  await assertProfileLabels(directory, state, oracle, binding, requiredLabels)
+  const labels = await withDerivedLabels(oracle, binding, explicitLabels)
+  state.requiredLabels = labels.requiredLabels
+  await assertProfileLabels(directory, state, oracle, binding, state.requiredLabels)
   state.milestones = parseMilestones(options.milestones, contractRowIds(oracle))
   // exec는 낡은 생성 테스트가 하나라도 있으면 모든 라벨을 거부한다 — 아무것도 쓰기 전인 init에서 먼저 막는다
   await assertGeneratedOutputs(scanRoot)
@@ -1593,6 +1600,7 @@ async function initialize(options) {
   process.stdout.write(
     [
       `RUN_STATE_INITIALIZED sha256:${revision.oracleSha256} state:ORACLE_READY`,
+      ...labels.notices,
       ...harnessNotices(runnerHarness, harnessPaths),
       '',
     ].join('\n'),
@@ -1601,18 +1609,68 @@ async function initialize(options) {
 
 function parseRequiredLabels(values) {
   const requiredLabels = [...new Set(values.map((label) => label.trim()).filter(Boolean))]
-  if (requiredLabels.length === 0) {
-    throw new CliError(
-      'REQUIRED_LABEL_REQUIRED',
-      'init requires at least one --required-label from the repository checks',
-    )
-  }
   for (const label of requiredLabels) {
     if (label.includes(':') && !/^.+:(?:reported|exit)$/.test(label)) {
       throw new CliError('REQUIRED_LABEL_INVALID', `${label}: expected <label>:reported or <label>:exit`)
     }
   }
   return requiredLabels
+}
+
+/**
+ * 잠긴 카드와 프로필이 요구하는 라벨 중 손으로 적지 않은 것을 더한다 — 사람이 빠뜨려 init이 거부되던 라벨을 카드에서 읽는다.
+ * 적은 라벨이 먼저, 파생 라벨은 그 뒤에 붙고 state.requiredLabels에 똑같이 들어간다. 뒤따르는 assertProfileLabels는 그대로
+ * 같은 검사를 한다. 카드가 함의하지 않는 저장소 검사(카드 테스트·lint 명령)는 여전히 --required-label 몫이라, 손으로 적은
+ * 라벨이 하나도 없으면 파생 라벨이 있어도 거부한다 — 파생 라벨만으로는 제품 저장소의 검사가 GREEN 계약에 들어가지 않는다.
+ */
+async function withDerivedLabels(oracle, binding, explicit) {
+  const derived = (await profileLabels(oracle, binding)).filter((label) => !explicit.includes(label))
+  const requiredLabels = [...explicit, ...derived]
+  if (explicit.length === 0) {
+    throw new CliError(
+      'REQUIRED_LABEL_REQUIRED',
+      'init requires at least one --required-label from the repository checks',
+    )
+  }
+  return { requiredLabels, notices: derived.map((label) => `LABEL_AUTO ${label}`) }
+}
+
+/** 프로필 요구(Contract의 cases·type·fast-check, Formal의 proof·adequacy·stack) 중 잠긴 카드가 함의하는 라벨. */
+export async function profileLabels(oracle, binding) {
+  const labels = []
+  if (binding.profile === 'contract/v1') {
+    labels.push('contract-cases:reported')
+    if (!declaresNoTypeBoundary(oracle)) labels.push('type-contract:reported')
+    if (contractTemporalFullProduct(oracle)) labels.push('fast-check:reported')
+    return labels
+  }
+  const { parseFormalModel } = await import('./oracle-model.mjs')
+  const { parseAdequacy } = await import('./oracle-adequacy.mjs')
+  const { generatedBlock, stackLabelsFor } = await import('./oracle-package.mjs')
+  if (parseFormalModel(oracle.split('\n'))) labels.push('bend-proof:reported')
+  if (parseAdequacy(oracle.split('\n'))) labels.push('bend-adequacy:reported')
+  const generated = generatedBlock(oracle)
+  if (generated.present) labels.push(...stackLabelsFor(generated.content))
+  return [...new Set(labels)]
+}
+
+/** Contract 카드가 출처 있는 조사와 함께 Type Contract 해당 없음을 선언했나 — 그러면 type-contract 라벨이 필요 없다. */
+function declaresNoTypeBoundary(oracle) {
+  const lines = markdownLines(oracle)
+  const typeContract = sectionLines(lines, 'Type Contract').join('\n')
+  const approved = approvedSourceIds(lines)
+  const notApplicable = /^- Not applicable: (.+)$/m.exec(typeContract)?.[1]
+  const investigated = /^- Investigated: (.+)$/m.exec(typeContract)?.[1]
+  const substantiveDeclaration = (value) => Boolean(value?.trim()) && !/^(?:[-\u2010-\u2015]+|TBD)$/i.test(value.trim())
+  const reason = notApplicable?.replace(/\(source: [^)]+\)/g, '').trim()
+  return substantiveDeclaration(reason) && substantiveDeclaration(investigated)
+    && [...approved].some((id) => notApplicable.includes(`(source: ${id})`))
+}
+
+/** Default t-way carries Async/Order as evidence.json `sequence`; only explicit full-product requires the producer label. */
+function contractTemporalFullProduct(oracle) {
+  const caseSpace = parseCaseSpace(oracle)
+  return caseSpace?.coverage === 'full-product' && caseSpace.families.some((entry) => ['Async', 'Order'].includes(entry.family) && !entry.excluded)
 }
 
 function harnessNotices(runnerHarness, harnessPaths) {
@@ -1638,7 +1696,7 @@ async function amendInit(directory, scanRoot, harnessPaths, options) {
       2,
     )
   }
-  const requiredLabels = parseRequiredLabels(options.requiredLabels)
+  const explicitLabels = parseRequiredLabels(options.requiredLabels)
   await withDirectoryLock(directory, 'state', async () => {
     const state = await readConsistentState(directory)
     if (state.state !== 'ORACLE_READY' || redRecorded(state)) {
@@ -1661,6 +1719,7 @@ async function amendInit(directory, scanRoot, harnessPaths, options) {
     verifyLock(directory, state)
     const oracle = await readFile(await lockedOraclePath(directory, state), 'utf8')
     const binding = await resolveRunProfile(directory, state, true)
+    const { requiredLabels, notices: labelNotices } = await withDerivedLabels(oracle, binding, explicitLabels)
     await assertProfileLabels(directory, state, oracle, binding, requiredLabels)
     const milestones = parseMilestones(options.milestones, contractRowIds(oracle))
     const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
@@ -1714,6 +1773,7 @@ async function amendInit(directory, scanRoot, harnessPaths, options) {
     process.stdout.write(
       [
         `RUN_STATE_AMENDED state:ORACLE_READY labels:${requiredLabels.join(',')} milestones:${milestones.length} harness:${paths.length}`,
+        ...labelNotices,
         ...harnessNotices(runnerHarness, paths),
         ...removed.map((item) => `AMEND_REMOVED ${item}`),
         // 새로 harness가 된 파일은 production 비교에서 빠진다 — 리뷰어가 원장에서 볼 수 있게 이름을 남긴다
@@ -1752,27 +1812,15 @@ function redRecorded(state) {
 }
 
 /** 필수 라벨이 프로필 요구(Contract의 cases·type·fast-check, Formal의 proof·adequacy·stack)를 덮는가 — init과 수정이 같이 쓴다. */
-async function assertProfileLabels(directory, state, oracle, binding, requiredLabels) {
+export async function assertProfileLabels(directory, state, oracle, binding, requiredLabels) {
   if (binding.profile === 'contract/v1') {
     if (!requiredLabels.includes('contract-cases:reported')) {
       throw new CliError('CONTRACT_CASES_LABEL_REQUIRED', 'Contract init requires --required-label contract-cases:reported')
     }
-    const lines = markdownLines(oracle)
-    const typeContract = sectionLines(lines, 'Type Contract').join('\n')
-    const approved = approvedSourceIds(lines)
-    const notApplicable = /^- Not applicable: (.+)$/m.exec(typeContract)?.[1]
-    const investigated = /^- Investigated: (.+)$/m.exec(typeContract)?.[1]
-    const substantiveDeclaration = (value) => Boolean(value?.trim()) && !/^(?:[-\u2010-\u2015]+|TBD)$/i.test(value.trim())
-    const reason = notApplicable?.replace(/\(source: [^)]+\)/g, '').trim()
-    const noTypeBoundary = substantiveDeclaration(reason) && substantiveDeclaration(investigated)
-      && [...approved].some((id) => notApplicable.includes(`(source: ${id})`))
-    if (!noTypeBoundary && !requiredLabels.includes('type-contract:reported')) {
+    if (!declaresNoTypeBoundary(oracle) && !requiredLabels.includes('type-contract:reported')) {
       throw new CliError('TYPE_CONTRACT_LABEL_REQUIRED', 'Contract init requires --required-label type-contract:reported unless the approved card declares Type Contract not applicable')
     }
-    const caseSpace = parseCaseSpace(oracle)
-    // Default t-way carries Async/Order as evidence.json `sequence`; only explicit full-product requires the producer label.
-    const temporal = caseSpace?.coverage === 'full-product' && caseSpace.families.some((entry) => ['Async', 'Order'].includes(entry.family) && !entry.excluded)
-    if (temporal && !requiredLabels.includes('fast-check:reported')) {
+    if (contractTemporalFullProduct(oracle) && !requiredLabels.includes('fast-check:reported')) {
       throw new CliError('FAST_CHECK_LABEL_REQUIRED', 'Contract full-product Async/Order requires --required-label fast-check:reported')
     }
   } else {
@@ -5160,14 +5208,22 @@ function deliveryPhaseLine(directory, statusResult, to) {
   const packet = statusResult.nextActions.find((action) => action.to === target)
   const dir = portablePath(process.cwd(), directory)
   let next
-  if (!packet) next = `oracle-run.mjs status --dir ${dir} --check-report <report>`
+  if (!packet) next = `oracle-run.mjs close --dir ${dir} --check-report <report>`
   // guide --to가 이미 그 목표를 펼쳤으면 막힘은 바로 아래 blockers에 있다 — 같은 guide를 다시 권하지 않는다
   else if (!to && packet.blockers.some((blocker) => !PHASE_WORK_BLOCKER.test(blocker))) next = `oracle-run.mjs guide --dir ${dir} --to ${target}`
   else if (target === 'VALID_RED' || target === 'IMPLEMENTED_GREEN') {
     const flags = packet.requires.filter((flag) => flag !== '--run').map((flag) => `${flag} <${flag.slice(2)}>`)
     next = [`oracle-run.mjs ${target === 'VALID_RED' ? 'red' : 'green'} --dir ${dir} --label <label>`, ...flags, '-- <command>'].join(' ')
   } else if (isReviewTransition(target)) {
-    next = `oracle-run.mjs review-packet --dir ${dir} --output <packet> --decision <implementation-decision.md> --review-point <point>`
+    // close가 패킷·영수증·revision을 스스로 잇는다 — 리뷰어가 돌려줄 파일(findings·intersect·blind-map)은 close가 멈춰 말한다
+    const later = new Set(['--run', '--evidence', '--findings', '--packet', '--revision', '--intersect', '--blind-map'])
+    const flags = packet.requires.filter((flag) => !later.has(flag)).map((flag) => `${flag} <${flag.slice(2)}>`)
+    next = [
+      `oracle-run.mjs close --dir ${dir} --packet <packet> --decision <implementation-decision.md> --review-point <point>`,
+      `--run ${packet.candidateRuns[0] ?? '<runId>'} --evidence <evidence>`,
+      ...flags,
+      '--check-report <report>',
+    ].join(' ')
   } else next = packet.example
   return phaseLine(statusResult.currentState, next)
 }
@@ -5263,6 +5319,218 @@ async function reportGuide(options) {
     protocol: deliveryProtocol,
   })
   process.stdout.write(options.json ? `${JSON.stringify(guide, null, 2)}\n` : `${phase}${renderGuidance(guide)}`)
+}
+
+// close가 리뷰 단계를 건너뛰고 보고서 검사로 가는 상태 — 단계 6의 끝 상태들이다
+const CLOSED_STATES = new Set(['REVIEW_VERIFIED', 'PARTIAL_VERIFIED', 'NEEDS_DECISION', 'FAIL'])
+
+/** 리뷰어·사람의 산출물이 아직 없어 멈춘다 — 거부가 아니라 대기이고, 다음 행동 하나를 같이 낸다. */
+function closePending(message, next) {
+  const error = new CliError('CLOSE_PENDING', message)
+  error.next = next
+  return error
+}
+
+async function fileExists(path) {
+  return lstat(resolve(path)).then(
+    () => true,
+    () => false,
+  )
+}
+
+const shownPath = (path) => portablePath(process.cwd(), resolve(path))
+
+/** --check-report를 지금 검사할 수 있나 — `-`(stdin)는 언제나, 파일은 있을 때만. */
+async function reportReady(path) {
+  if (!path) return false
+  if (path === '-') return true
+  return fileExists(path)
+}
+
+function reportPlaceholder(path) {
+  if (!path || path === '-') return '<report>'
+  return shownPath(path)
+}
+
+/**
+ * 단계 6의 명령 하나 — IMPLEMENTED_GREEN 뒤 컨트롤러가 하나씩 부르던 마감 단계를 같은 함수로 같은 순서에 부른다:
+ * review-packet(없을 때) → blind-input(필요하고 없을 때) → 리뷰어 산출물마다 review-receipt(없을 때) → transition
+ * (열린 hold가 있으면 PARTIAL_VERIFIED) → status --check-report. 관문은 각 함수가 그대로 검사하고 첫 거부에서 그 코드로 멈춘다.
+ * 리뷰어 산출물은 만들지 않는다 — 아직 없으면 CLOSE_PENDING과 다음 행동 하나로 멈추고, 같은 명령을 다시 부르면 이어 간다.
+ */
+async function closeOut(options) {
+  if (!options.dir) throw new CliError('USAGE', 'close requires --dir', 2)
+  if (options.to !== undefined && !isReviewTransition(options.to)) {
+    throw new CliError('USAGE', 'close records only REVIEW_VERIFIED or PARTIAL_VERIFIED — record a stop with `transition --reason`', 2)
+  }
+  const directory = resolve(options.dir)
+  const replay = async () => replayState(await readState(directory), await readLedger(directory))
+  let current = await replay()
+  if (current.state === 'IMPLEMENTED_GREEN') {
+    await closeReview(options, directory)
+    current = await replay()
+  } else if (CLOSED_STATES.has(current.state)) {
+    process.stdout.write(`CLOSE_SKIP review: the run is already at ${current.state}\n`)
+  } else {
+    throw new CliError('TRANSITION_NOT_ALLOWED', `close starts at IMPLEMENTED_GREEN; the run is at ${current.state}`)
+  }
+  // 보고서는 전이가 기록된 뒤에 쓴다 — 아직 없는 경로는 거부가 아니라 대기다
+  if (!(await reportReady(options.checkReport))) {
+    throw closePending(
+      `${current.state} is recorded; the final report is not checked yet`,
+      `write the report from \`status --json\` and run \`oracle-run.mjs close --dir ${portablePath(process.cwd(), directory)} --check-report ${reportPlaceholder(options.checkReport)}\``,
+    )
+  }
+  await checkReport(current, await readLedger(directory), options.checkReport, directory)
+  process.stdout.write(`CLOSED state:${current.state}\n`)
+}
+
+async function closeReview(options, directory) {
+  if (!options.packet) {
+    throw new CliError('USAGE', 'close at IMPLEMENTED_GREEN requires --packet <file inside the Oracle directory>', 2)
+  }
+  const inputs = await closeInputs(options, directory)
+  await assertReviewerOutputs(options, inputs)
+  let packetBytes
+  let packetDocument
+  try {
+    packetBytes = await readFile(resolve(options.packet))
+    packetDocument = JSON.parse(packetBytes.toString('utf8'))
+  } catch (error) {
+    throw new CliError('REVIEW_PACKET_INVALID', `Cannot read review packet: ${error.message}`)
+  }
+  const revision = options.revision ?? packetDocument?.targetSnapshot?.worktreeSha256
+  if (!revision) throw new CliError('REVIEW_REVISION_MISMATCH', 'review receipt revision must match canonical schema-v2 packet')
+  const packet = { sha256: sha256(packetBytes), revision }
+  // blind 입력도 이 패킷의 리비전이어야 한다 — 영수증을 하나라도 쓰기 전에 확인한다
+  if (inputs.blindRequired) await assertBlindInputRevision(options, revision)
+  if (!options.closure) {
+    await closeReviewerReceipt(options, packet, { path: options.findings, flag: '--findings', taskId: options.taskId, taskFlag: '--task-id' })
+    if (options.intersect) {
+      await closeReviewerReceipt(options, packet, { path: options.intersect, flag: '--intersect', taskId: options.intersectTaskId, taskFlag: '--intersect-task-id' })
+    }
+  }
+  if (inputs.blindRequired) await closeBlindReceipt(options, directory, revision)
+  const to = options.to ?? ((await openHolds(directory)).length > 0 ? 'PARTIAL_VERIFIED' : 'REVIEW_VERIFIED')
+  // --closure는 2차 리뷰어 findings를 대신한다 — 그때 --findings·--intersect는 패킷을 만든 직전 라운드 입력이라 전이에 넘기지 않는다
+  const { findings, intersect, ...rest } = options
+  await transition({ ...rest, ...(options.closure ? {} : { findings, intersect }), to, revision })
+}
+
+/**
+ * 패킷과(필요하면) blind 입력을 없을 때만 만든다. 이 호출에서 만든 입력에는 아직 리뷰어 답이 있을 수 없어서, 만들었다는
+ * 사실을 돌려준다 — 같은 호출에서 기존 findings를 새 입력에 묶지 않는다. 패킷을 만들 때의 --findings·--intersect는
+ * review-packet과 같이 직전 라운드의 findings다.
+ */
+async function closeInputs(options, directory) {
+  const state = await readConsistentState(directory)
+  const blindRequired = await closeBlindRequired(options, directory, state)
+  if (blindRequired && !options.blindInput) {
+    throw closePending('this run needs a blind row mapping', 'rerun the same close adding --blind-input <file inside the Oracle directory>')
+  }
+  const packetWritten = !(await fileExists(options.packet))
+  if (packetWritten) await reviewPacket({ ...options, output: options.packet })
+  else process.stdout.write(`CLOSE_SKIP review-packet: ${shownPath(options.packet)} exists\n`)
+  const blindWritten = blindRequired && !(await fileExists(options.blindInput))
+  if (blindWritten) await blindInput({ dir: options.dir, output: options.blindInput })
+  return { state, blindRequired, packetWritten, blindWritten }
+}
+
+/** transition이 판정할 증거로 blind 매핑 필요 여부를 정한다 — --evidence가 있으면 그 파일, 없으면 기록된 증거 경로. */
+async function closeBlindRequired(options, directory, state) {
+  if (!options.evidence) return Boolean((await blindMappingStatus(directory, state, await readLedger(directory)))?.required)
+  try {
+    return blindMappingApplicability(state.risk, JSON.parse(await readFile(resolve(options.evidence), 'utf8'))).required
+  } catch {
+    // 읽을 수 없는 증거는 transition이 자기 코드로 거부한다 — 증거 없이 정해지는 것은 High뿐이다
+    return state.risk === 'high'
+  }
+}
+
+/** 아직 없는 리뷰어 산출물을 모아 다음 행동 하나로 멈춘다 — 만들지도, 다른 파일로 대신하지도 않는다. */
+async function assertReviewerOutputs(options, { state, blindRequired, packetWritten, blindWritten }) {
+  const absent = async (path, fresh) => fresh || !path || !(await fileExists(path))
+  const reviewers = !options.closure
+  const high = state.risk === 'high'
+  const missing = []
+  if (reviewers && (await absent(options.findings, packetWritten))) missing.push('--findings <file> --task-id <id>')
+  if (reviewers && high && (await absent(options.intersect, packetWritten))) missing.push('--intersect <file> --intersect-task-id <id>')
+  const blindMissing = blindRequired && (await absent(options.blindMap, blindWritten))
+  if (blindMissing) missing.push('--blind-map <file> --blind-reviewer <id> --blind-task-id <id>')
+  if (missing.length === 0) return
+  const dispatch = []
+  if (reviewers) dispatch.push(`$oracle-review in ${high ? 'two fresh contexts' : 'a fresh context'} with ${shownPath(options.packet)}`)
+  if (blindMissing) dispatch.push(`a blind mapper with only ${shownPath(options.blindInput)}`)
+  // 이 호출에서 만든 패킷 앞에 받은 --findings·--intersect는 직전 라운드의 답이다(review-packet 입력) — 같은 경로로 다시 부르지 않게 한다
+  throw closePending(
+    `waiting for reviewer output: ${missing.map((flags) => flags.split(' ')[0]).join(', ')}`,
+    `dispatch ${dispatch.join(' and ')}, save each return unchanged, then rerun the same close adding ${missing.join(' ')}${previousRoundNote(options, reviewers && packetWritten)}`,
+  )
+}
+
+/** 이 호출에서 만든 패킷 앞에 받은 --findings·--intersect는 직전 라운드의 답이다(review-packet 입력) — 같은 경로로 다시 부르지 않게 한다. */
+function previousRoundNote(options, packetWrittenForReviewers) {
+  if (!packetWrittenForReviewers) return ''
+  const previous = ['--findings', '--intersect'].filter((flag) => options[flag.slice(2)])
+  if (previous.length === 0) return ''
+  return `; the ${previous.join(' and ')} given now answered the previous packet, so name the new returns there`
+}
+
+/** 리뷰어 findings 하나의 영수증 — 이 패킷의 답이 아니면 기다리고, 이미 묶였으면 건너뛰고, 아니면 그 파일의 리뷰어 이름으로 review-receipt를 부른다. */
+async function closeReviewerReceipt(options, packet, { path, flag, taskId, taskFlag }) {
+  let document
+  try {
+    document = JSON.parse(await readFile(resolve(path), 'utf8'))
+  } catch (error) {
+    throw new CliError('FINDINGS_INVALID', `Cannot read ${shownPath(path)}: ${error.message}`)
+  }
+  // 리뷰어는 자기가 답한 패킷의 packetSha256·targetRevision을 적어 온다. review-receipt는 그 두 칸을 덮어쓰므로 여기서 먼저 대조한다 —
+  // 다른 패킷(직전 라운드·옛 파일)의 답을 이 패킷에 묶지 않는다.
+  if (document?.packetSha256 !== packet.sha256 || document?.targetRevision !== packet.revision) {
+    throw closePending(
+      `${shownPath(path)} does not answer ${shownPath(options.packet)}`,
+      `dispatch $oracle-review with ${shownPath(options.packet)}, save its return unchanged, then rerun the same close with ${flag} naming that file`,
+    )
+  }
+  if (document.orchestrationReceipt) {
+    process.stdout.write(`CLOSE_SKIP review-receipt: ${shownPath(path)} already carries one\n`)
+    return
+  }
+  if (!document?.reviewerRole || !document?.reviewerId) {
+    throw new CliError('FINDINGS_INVALID', `${shownPath(path)} must name its reviewerRole and reviewerId`)
+  }
+  if (!taskId) throw new CliError('USAGE', `close needs ${taskFlag} <id> — the reviewer task that returned ${shownPath(path)}`, 2)
+  await reviewReceipt({ dir: options.dir, packet: options.packet, revision: packet.revision, findings: path, role: document.reviewerRole, reviewer: document.reviewerId, taskId })
+}
+
+/** blind 입력이 이 패킷과 같은 리비전에서 나왔나 — 옛 입력의 매핑은 이 리비전의 테스트를 읽은 것이 아니다. */
+async function assertBlindInputRevision(options, revision) {
+  let input
+  try {
+    input = JSON.parse(await readFile(resolve(options.blindInput), 'utf8'))
+  } catch (error) {
+    throw new CliError('BLIND_INPUT_INVALID', `Cannot read the blind input: ${error.message}`)
+  }
+  if (input?.targetRevision === revision) return
+  const error = new CliError('BLIND_INPUT_INVALID', `${shownPath(options.blindInput)} was written for another revision than ${shownPath(options.packet)}`)
+  error.next = 'rerun the same close with a new --blind-input path, then have a blind mapper map that new file'
+  throw error
+}
+
+/** blind 매핑 영수증 — 같은 입력·매핑 바이트의 영수증이 원장에 있으면 건너뛴다. 영수증의 리비전은 패킷의 리비전이다. */
+async function closeBlindReceipt(options, directory, revision) {
+  const [input, map] = await Promise.all([readFile(resolve(options.blindInput)), readFile(resolve(options.blindMap))])
+  const recorded = (await readLedger(directory)).some(
+    (entry) => entry.type === 'review-receipt' && entry.role === 'blind-mapper' && entry.packetSha256 === sha256(input) && entry.findingsSha256 === sha256(map),
+  )
+  if (recorded) {
+    process.stdout.write(`CLOSE_SKIP blind-mapper receipt: ${shownPath(options.blindMap)} is recorded\n`)
+    return
+  }
+  if (!options.blindReviewer || !options.blindTaskId) {
+    throw new CliError('USAGE', `close needs --blind-reviewer <id> --blind-task-id <id> — the blind mapper that returned ${shownPath(options.blindMap)}`, 2)
+  }
+  await reviewReceipt({ dir: options.dir, packet: options.blindInput, revision, findings: options.blindMap, role: 'blind-mapper', reviewer: options.blindReviewer, taskId: options.blindTaskId })
 }
 
 async function reviewBrief(options) {
@@ -6071,6 +6339,7 @@ async function main() {
   if (command === 'init') await initialize(options)
   else if (command === 'migrate-ledger') await migrateLedger(options)
   else if (command === 'review-receipt') await reviewReceipt(options)
+  else if (command === 'close') await closeOut(options)
   else if (command === 'status') await reportStatus(options)
   else if (command === 'guide') await reportGuide(options)
   else if (command === 'metrics') await reportMetrics(options)
@@ -6089,7 +6358,7 @@ async function main() {
   else
     throw new CliError(
       'USAGE',
-      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, budget, status, guide, metrics, review-packet, review-extend, review-brief, blind-input, reproduce, worker-packet or worker-run',
+      'Expected init, migrate-ledger, exec, red, green, transition, review-receipt, close, budget, status, guide, metrics, review-packet, review-extend, review-brief, blind-input, reproduce, worker-packet or worker-run',
       2,
     )
 }
@@ -6107,6 +6376,7 @@ if (process.argv[1] && (await realpath(resolve(process.argv[1])).catch(() => nul
   } catch {
     dirOption = null
   }
-  process.stderr.write(`${cliError.code}: ${cliError.message}\n${nextActionLine(cliError.code, { dir: dirOption })}`)
+  const next = cliError.next ? `next: ${cliError.next}\n` : nextActionLine(cliError.code, { dir: dirOption })
+  process.stderr.write(`${cliError.code}: ${cliError.message}\n${next}`)
   process.exitCode = cliError.exitCode
 }
