@@ -175,8 +175,7 @@ listed fixes and their regressions. Security, privacy, accessibility and data in
 
 One persisted authoring budget covers model/analyst, translation and card review laps; Delivery
 review keeps its own two-round limit. No role restart, regenerated packet, rewind or new revision resets
-either, and exhaustion stops with the remaining findings, never a false pass. Each profile's own
-procedures own their dispatch commands.
+either, and exhaustion stops with the remaining findings, never a false pass.
 
 ## Authority priority
 
@@ -277,7 +276,7 @@ and reviewer preference are classification evidence, not policy sources.
 | -------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | `POLICY_GAP`         | approved source requirement omitted from the card, or an outcome-changing policy decision is needed | print the current card and questions, then `NEEDS_DECISION`                 |
 | `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope                                                 | add only the missing test·reviewer mapping                                  |
-| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-round budget (`budget --spend harness`) |
+| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-spend budget (`budget --spend harness`) |
 | `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation                                             | production improvement budget after a deterministic `VALID_RED`             |
 | `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                                                                  | `FAIL` with the actual cause, production untouched                          |
 | `NON_ORACLE_OPINION` | sourceless preference·taste                                                                         | record with rationale; never blocks completion or changes policy            |

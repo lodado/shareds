@@ -351,10 +351,10 @@ review-finding|gate-failure|user-answer|source-change [--note <one line>]`. The 
   again in place by `advance --to CHECKED` (same `--reason` and `--note`; reflection counts it as rework),
   and only a card-only repair on unchanged inputs resumes at CHECKED or DRAFTED by rewind.
 - `oracle-adequacy.mjs model-input`, `explore-input` for a staged card, and
-  `oracle-discovery.mjs mapping-input` register their input digests. Cold-read/source-aware dispatch
-  registers its permitted raw input with `oracle-stage.mjs review-input --dir <dir> --kind cold-read|source-aware --input <file> --attempt <dispatch-id>`.
-  Before every analyst or reviewer
-  dispatch, including a resumed session, register its kind/input with a distinct `--attempt`. Reuse the
+  `oracle-discovery.mjs mapping-input` register their input digests. Every analyst or reviewer dispatch,
+  a resumed session's too, registers its permitted raw input with
+  `oracle-stage.mjs review-input --dir <dir> --kind <kind> --input <file> --attempt <dispatch-id>` and a
+  distinct `--attempt` (reverse-impossible: the `explore-input` file). Reuse the
   attempt only for transport redelivery, not new analysis. This counts repeated analysis of unchanged
   sources too. Keep procedural metadata separate from blind task inputs.
 - A role's first pass is `full`; subsequent passes are `confirm-fixes`. A changed input already reviewed in the

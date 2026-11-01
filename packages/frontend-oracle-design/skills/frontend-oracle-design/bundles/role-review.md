@@ -188,8 +188,7 @@ listed fixes and their regressions. Security, privacy, accessibility and data in
 
 One persisted authoring budget covers model/analyst, translation and card review laps; Delivery
 review keeps its own two-round limit. No role restart, regenerated packet, rewind or new revision resets
-either, and exhaustion stops with the remaining findings, never a false pass. Each profile's own
-procedures own their dispatch commands.
+either, and exhaustion stops with the remaining findings, never a false pass.
 
 ## Authority priority
 
@@ -290,7 +289,7 @@ and reviewer preference are classification evidence, not policy sources.
 | -------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | `POLICY_GAP`         | approved source requirement omitted from the card, or an outcome-changing policy decision is needed | print the current card and questions, then `NEEDS_DECISION`                 |
 | `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope                                                 | add only the missing test·reviewer mapping                                  |
-| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-round budget (`budget --spend harness`) |
+| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-spend budget (`budget --spend harness`) |
 | `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation                                             | production improvement budget after a deterministic `VALID_RED`             |
 | `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                                                                  | `FAIL` with the actual cause, production untouched                          |
 | `NON_ORACLE_OPINION` | sourceless preference·taste                                                                         | record with rationale; never blocks completion or changes policy            |
@@ -701,15 +700,16 @@ presented as actual independence or substitute for High delivery's independent s
 ## Reverse-impossible
 
 In a second context-free review once per card, receive the impossible dispositions extracted with
-`scripts/oracle-verify.mjs card --ir` and the witness falsifier table from
-[`card/interaction-sweep.md`](../card/interaction-sweep.md). The framing is "one of these is wrong:
+`scripts/oracle-verify.mjs card --ir`, the witness falsifier table from
+[`card/interaction-sweep.md`](../card/interaction-sweep.md) and the `oracle-adequacy.mjs explore-input`
+file. The framing is "one of these is wrong:
 build the counterexample". Do not import author rationale to defend an exclusion. Return counterexamples
 and disagreements. Every disagreement is promoted to needs-decision, not dismissed as taste.
-This reverse two-sample read supplements, never replaces, the card-only cold-read gate.
+It supplements, never replaces, the cold-read gate.
 
 ## Source-aware fresh review
 
-When [`card/policy-sources.md`](../card/policy-sources.md)'s trigger applies before approval, compare
+When [`card/policy-sources.md`](../card/policy-sources.md)'s trigger applies before the Draft is shown, compare
 verbatim user messages and approved source excerpts with every affected card decision. Record each item
 as a linked P/O/D row, Open question or justified N/A. Preserve the raw source inputs, not an author's
 summary. It supplements, never replaces, card-only cold-read and reverse-impossible review.

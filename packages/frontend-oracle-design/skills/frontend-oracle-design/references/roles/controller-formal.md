@@ -5,202 +5,25 @@ The core entry owns scope and mode. Common prohibitions apply throughout. At eac
 
 ## Phases
 
-Six phases group the steps below: a view over the stage and Delivery states, not new states, budgets or
-gates. Each is states → command → the only user touchpoint.
-
-1. Intake: no stage record → $oracle-intake, then `oracle-stage.mjs begin` → the first `yes`.
-2. Model: DISCOVERING, MODELED, CHECKED → `oracle-cycle.mjs walk` → none.
-3. Card review and lock: DRAFTED → `oracle-lock.mjs create` → card approval.
-4. RED: ORACLE_READY → `oracle-run.mjs init --scan-root <scan-root>`, then `red` → none.
-5. GREEN: VALID_RED → `oracle-run.mjs green` → none.
-6. Review and close: IMPLEMENTED_GREEN to REVIEW_VERIFIED, or PARTIAL_VERIFIED, NEEDS_DECISION, FAIL →
-   `oracle-run.mjs close`, rerun after each `CLOSE_PENDING` → NEEDS_DECISION only.
-
-Start each Progress message (common's table) and every answer to a progress question with the line from
+Six phases group the stage and Delivery states: a view, not new states, budgets or gates. Start each
+Progress message (common's table) and every answer to a progress question with the line from
 `oracle-stage.mjs status --dir <dir> --brief` before init or `oracle-run.mjs status --dir <dir> --brief`
 after it (`guide` opens with the same phase): `phase N/6 <name> · next: <command>`, then the newly
 established fact. Register each independent dispatch with `oracle-stage.mjs review-input --attempt <id>`,
 adding `--model` and `--effort` when known.
-Where the host sets effort per dispatch (Claude Code's Agent `effort`), cap execution roles at `high`, never
-above the session's effort: a worker that runs given commands and records results, packet assembly, a
-repair spelled out by exact findings. Author, analyst, every reviewer and the blind mapper are not
-execution roles: they keep the session's effort and their own model rules (subagent-review, discovery).
+Where the host sets effort per dispatch (Claude Code's Agent `effort`), cap execution roles (a worker
+running given commands, packet assembly, a repair spelled out by exact findings) at `high`, never above
+the session's; author, analyst, every reviewer and the blind mapper keep the session's effort and their
+own model rules (subagent-review, discovery).
 
-## Draft, review, confirmation and lock
-
-1. Invoke $oracle-intake for approved source investigation and risk/capability discovery, then send the
-   first response: proposed axes, a provisional Draft on their recommendations and Open questions under one
-   confirmation ([first response](../common.md#first-response--one-message-one-confirmation)). Obtain that
-   actual `yes` (axis confirmation) before dispatching any model authoring. A source the user cannot provide is not an agent assumption. Hold only separable blocked scope.
-2. Invoke $oracle-author for the source-bound model package, independent analyst inputs, checks and projected
-   Draft with all manual duties. Walk the stages with `scripts/oracle-stage.mjs`: `begin`, then
-   `advance --to MODELED | CHECKED | DRAFTED` once each gate passes.
-   Walk them in one call with `scripts/oracle-cycle.mjs walk --dir <dir> [--to <stage>]`: it runs the
-   fast Bend/package check, every remaining `advance` and the DRAFTED `project-card`, stopping at the first
-   failure with `failed.code`, `detail` and `next`. A stale stage stops as STAGE_STALE; rerun with
-   `--reason <cause>` to rewind to DISCOVERING and re-walk (no authoring round; review laps spend them).
-   A walk back is `rewind --to <stage> --reason <cause>` with the cause that sent it back. CHECKED passes
-   at once on a receipt when the same package, Bend files, registered sources, harness, node and Bend
-   passed it before; its evidence says so (`ORACLE_LINT_CACHE=off` turns receipts off).
-   CHECKED also runs `prove` and `laws` (relation and trace laws in [bend-proof](../bend-proof.md) form, Nat and
-   List cut at the bound): `open`, `failed`, `unsafe`, a false relation cell or a trace law that the law's own
-   `run` breaks from a state the space reaches stops it, counted past the listed cells; free cells, unreached
-   counterexamples to induction and laws of another form (the evidence says how many laws `laws` computed) are a
-   report, and an installed Bend that cannot run leaves them undecided. Without `PROOF.bend` the proof is not
-   judged. Its receipt also keys `PROOF.bend`, which the pin below leaves out.
-   `oracle-lock.mjs create` refuses a package oracle that is not at DRAFTED on the same package bytes and
-   the Bend files and registered sources CHECKED judged (after a Bend edit, `advance --to CHECKED` judges
-   them again, even with a re-projected card), and only the stage runtime writes stage.json. The lock still runs card lint itself, so a hand-written
-   record skips no check. A role return does not advance a stage.
-   Send every repair of the same revision (review findings, lint or proof failures, a user answer) to
-   the author context that wrote the package, continued with only the findings and changed inputs
-   (SendMessage on Claude Code). It already holds its references and re-reads only changed run files.
-   Dispatch a fresh author only when that context is unavailable or for a new revision; its packet names
-   the run directory and the open findings. The Delivery test worker is continued the same way.
-   Intake and authoring are not independence roles: below High run them in this controller context
-   instead of fresh subagents, so references load once. Fresh contexts stay required only where an
-   independence rule names them (analyst, cold-read, reverse-impossible, source-aware, delivery review).
-   Reviewers and analysts keep their own independence rules. A round-2 confirmation continues the
-   round-1 reviewer the same way, with only its finding IDs and the repair diff, under a new `--attempt`.
-   Below High, when every round-1 claim is a cited product defect whose reviewer wrote its reproduction,
-   written with `reproduce` and failing before the repair, skip that dispatch and close round 2 with
-   `--closure` (delivery/green-review).
-3. Before showing the Draft, run the cold-read gate by invoking $oracle-review in a context-free context
-   with card bytes alone: `oracle-review-view.mjs card --oracle <card>` as the reading view plus a byte
-   copy of the card, both written outside the run directory. Apply five questions per row, collapse to one root and its cheapest first nail.
-   Drive that nail and record root, falsifying observation and result in journal.md. In the same gate,
-   run the reverse two-sample read once per card: extract impossible dispositions with
-   `scripts/oracle-verify.mjs card --ir`, hand them with the witness falsifier table from
-   [`card/interaction-sweep.md`](../card/interaction-sweep.md) to a second context-free reviewer.
-   Frame it as "one of these is wrong: build the counterexample". Promote every disagreement to needs-decision.
-   The matching reviewer procedure is owned by the review role, not loaded into this controller's context.
-4. When [`card/policy-sources.md`](../card/policy-sources.md)'s trigger applies, obtain a source-aware fresh
-   review before approval: verbatim user messages/approved excerpts against every affected card decision,
-   linked P/O/D, Open question or justified N/A. It supplements, never replaces, card-only cold-read and
-   reverse-impossible review. If independence is unavailable, record only the contract-permitted
-   same-context fallback and limitation. Never claim this satisfies a required independent High review.
-5. Show existing revisions as semantic delta and new cards in full with Open questions. Every surviving
-   question carries candidate rows and recommendation, so a single `yes` both answers and confirms.
-   `yes` adopts every recommendation and approves the card; `Q<n>=<option>` swaps one option and
-   re-confirms only if a new needs-decision appears. Record approval location in User Confirmation.
-   A change request requires Draft repair and re-confirmation; no answer means NEEDS_DECISION.
-   This re-presents the projected card after proof; only proof counterexamples, new axes or a changed
-   meaning since the provisional Draft need a new question. Under common's pre-authorized approval,
-   record it without re-presenting when none of them appeared. Questions go ahead of the Draft only when
-   their answer changes the lane, the actor or the side-effect class; discovery axes ride the Draft.
-6. Read [`card/confirmation-lock.md`](../card/confirmation-lock.md) before confirmation/lock/init.
-   Lint with `scripts/oracle-verify.mjs card --path <touched files>`; `--case-space` is structural
-   preapproval checking only, never user approval. After card lint passes, lock through
-   `scripts/oracle-lock.mjs`. The revision lock is auto-verified immediately before each stage.
-   Never relock to pass a mismatch. A policy change is a new revision, never a locked-file edit.
-
-Before confirmation: no lock, no target tests, no production or dependency edits. Only named pre-lock
-checks run: prove, space, derive, adequacy check, `card --draft`,
-`card --repo-policies`, cross-check, --case-space, frame dispositions and the author's temporary pre-lock
-sweep report ([bend-cross-verification](../bend-cross-verification.md)). Model checks and that report are
-not consumer tests or product VALID_RED.
-Design-only ends ORACLE_READY, NEEDS_DECISION or tool-failure FAIL, with no target-test or production
-writes and no consumer test execution. Tool preparation follows mandatory verification and target dependency rules.
-
-If Delivery was known from the start, defer the lock until architecture/backend source decisions are
-made. Conditional architecture-contract/backend reads belong to the deciding role. Design Intent never
-proceeds without recorded Design Change Confirmation. After all outcome-changing architecture/backend
-decisions and local source finalization, card lint then create the final lock once with the same source
-set. Never extend an existing lock. Confirm and lock a new revision when the source set changes.
-
-## Delivery and evidence
-
-Right after entering Delivery, explicitly load and invoke the installed `$test` skill by name and read
-[`delivery/ledger.md`](../delivery/ledger.md). Immediately before writing test files, explicitly load
-and invoke the `$test` skill by name; if it cannot be invoked, FAIL. Invoking a file is not a skill call.
-The test skill owns test writing/judgment. Standalone Low/card exemptions cannot waive an Oracle run.
-`oracle-run.mjs init` adds the stack labels the locked card implies (`LABEL_AUTO`); pin the actual target
-verification commands with `--required-label`. No label alone proves the evidence.
-
-After init or on resume, run `oracle-run.mjs guide --dir <dir>`, select a legal target and request
-`guide --dir <dir> --to <target>`. Use the current-step guide at entry, resume, and after each transition.
-Read missing primary references with dependencies. Reviewer reads belong in the independent context.
-Do not load every future step. Guide is read-only advice, not approval, PASS or transition.
-Transition rechecks every gate, and rejection recovery remains in delivery/ledger. Never edit state or
-evidence to bypass a gate. Read accepted status after composite commands so an already accepted target
-is not recorded twice. The controller owns transition intent, not a second execution engine.
-
-Before tests/RED read [`delivery/red.md`](../delivery/red.md). TDD default: ORACLE_READY → write tests → adapter-pre-red review → run tests
-→ `oracle-run.mjs transition --to VALID_RED` → classify VALID_RED. No production writing/editing before
-accepted product RED. The ORACLE_READY → IMPLEMENTED_GREEN ALREADY_SATISFIED path is zero-production
-verification and approves no production edits. After VALID_RED dispatch $oracle-implement with the current
-lock/snapshot and scoped task. Implementation decisions and bounded simplification live in that role.
-The bounded adapter check uses `$oracle-review` with the locked Terms, adapter/test bytes and inspected
-product paths, not a post-GREEN packet. Findings and input identities go in the existing journal; no
-Delivery review-receipt or transition is issued. Follow delivery/red for changed inputs and missing targets.
-An optional fresh implementation context uses the existing
-[task-scoped worker path](../delivery/ledger.md#optional-task-scoped-implementation-worker), independent
-of graph opt-in and never replacing review/mandatory verification.
-
-Judgment commands run through `scripts/oracle-run.mjs exec`. Results are recorded in the append-only
-ledger and reports cite runIds instead of free-form claims. Never report an execution that is not in
-the ledger as passing. When transition immediately follows execution, red/green subcommands bundle exec
-and transition into one call. Independent judgment execs and read-only investigation run as parallel
-tool calls in one message, not separate turns, on supported stable inputs. Approval, RED and adjudication
-stay serial. Delivery transitions are recorded only via `scripts/oracle-run.mjs transition` or composite
-commands invoking that same transition machinery. Iteration budgets are counted by `oracle-run.mjs budget`.
-Card-row evidence goes into evidence.json and is checked against actual run results with
-`scripts/oracle-verify.mjs evidence`. Record IMPLEMENTED_GREEN exactly once; resume from it, never record it again.
-
-On Claude Code the PreToolUse hook denies premature production writes, TEST_BEFORE_LOCK test writes
-without a lock from that activated session, and weakening tokens in tests after VALID_RED. The transition
-gate stays authority and hosts without hooks rely on it alone. The hook records reviewer subagent returns
-in host-receipts.jsonl, and Stop checks the final report against the ledger. Hook absence is not an exemption.
-
-When delegating to a subagent, give it the absolute path of the Oracle's worktree, this skill's `scripts/`
-directory and every file it may write, inside the Oracle's scan root. The hook finds the lock from the cwd and the target
-file's ancestors, so a relative path or another worktree's cwd reads as no lock. Never route around a deny
-with shell writes.
-
-## GREEN and independent delivery review
-
-Read [`delivery/green-review.md`](../delivery/green-review.md) for self-feedback/GREEN.
-Re-read [`mandatory-verification.md`](../mandatory-verification.md) and
-[`bend-cross-verification.md`](../bend-cross-verification.md) before verification and review.
-After GREEN use the review target's guide for High mutation kill/revert/re-GREEN and post-GREEN reruns.
-Reviewers return findings only.
-Before contextual packet collection and independent review after implementation/test verification,
-read [`subagent-review.md`](../subagent-review.md) for --context selection and snapshot binding.
-Close with one command, rerun until it ends: `oracle-run.mjs close --dir <dir> --packet <packet> --decision
-<decision> --review-point <point> --run <runId> --evidence <evidence> --check-report <report>` (High adds
-`--mutation-run`·`--mutation-row`; a blind mapping `--blind-input`). It calls `oracle-run.mjs review-packet`
-(only matching criteria via `--review-point`) when the packet is absent, `review-receipt` for each output
-not yet bound whose `packetSha256`·`targetRevision` name this packet (a blind map names none, so only its
-input's revision is checked), the REVIEW_VERIFIED transition (PARTIAL_VERIFIED with an open hold) and the report check, in
-order with their own gates, stopping at the first refusal with its code. It never writes reviewer output:
-`CLOSE_PENDING` names the dispatch ($oracle-review in required fresh contexts, the blind mapper) and the
-flags to add. Never paste criteria into prompts or replace raw artifacts with a summary.
-Supporting context never replaces common inputs, five-axis judgments or independent reviews.
-Low and Design-only retain mandatory verification; contextual artifacts remain conditional by mode.
-Re-run stack/repo checks on the current snapshot after findings, and give round 2 a new `--packet` path;
-the `--findings` that build it are round 1's, so rerun with round 2's returns in their place.
-No reviewer approves its own return.
-Run each reviewer's "reproduction not run" command once, as a job, on the final snapshot; a failure joins
-that reviewer's findings.
-
-With a model package, dispatch $oracle-author for conditional discovery closure after IMPLEMENTED_GREEN
-and again before final report, and at the anomaly/operator triggers in its entry. Verdict/residual risks
-are evidence, not another state or policy decision. Changed policy requires human decision/new revision.
-After GREEN, oracle-run.mjs review-brief derives a read-only evidence index from current packet and
-ledger-bound findings. It never approves policy, proves usability or advances delivery. Read its command
-and limitations in delivery/green-review. Lead attention briefs with outcome, evidence and decisions.
-
-For RELATIONAL/JUDGMENT rows or UI-shaping interactions, leave one browser journey using an existing
-repo/installed tool. No tool or user-declined QA without locked source-backed N/A blocks REVIEW_VERIFIED,
-not implementation: stop at IMPLEMENTED_GREEN. Screenshot comparison and direct browser QA run only on
-explicit request by invoking $frontend-visual-qa by name. The only certifiable visual PASS producer is a
-trusted `oracle-run --adapter node-test` run whose locked test drives Playwright and emits schema-v3.
-A standalone Playwright adapter is unsupported. Browser MCP observations are pending/non-verifying, never PASS.
-
-## Recovery and actual terminal states
-
-Use common's feedback classifications and shared policy 2, harness 2, product 3 budgets, never per role.
-Harness repairs remain within $test allowances. Exhaustion is FAIL with the last actual failure.
+A refusal prints its code and next step and advances nothing, nor does a role return; never edit state,
+evidence or stage.json, or relock, to pass one.
+Use common's feedback classifications and Delivery's shared policy 2, harness 2, product 3 budgets,
+never per role: they live in the run state `init` creates, each use is one `oracle-run.mjs budget
+--spend <name> --reason ...`, and the same change never spends twice. Spend `policy` before the NEEDS_DECISION
+transition a POLICY_GAP after init needs (keyed on the lock: once per revision; review blockers left after
+round 2 spend none), and `harness` per test or harness change after VALID_RED. Harness repairs remain
+within $test allowances. Exhaustion is FAIL with the last actual failure, its decision preserved.
 Check confirmation-lock on revision mismatch. In Delivery only, check delivery/ledger before an uncertain
 command or scope-changing recovery; delivery/red before test/harness correction on RED-to-GREEN;
 delivery/green-review before reporting completion with missing or failed evidence. These are existing
@@ -210,6 +33,201 @@ not runtime instructions. For reusable execution observations, read
 routing. Load it after lock for escapes and REVIEW_VERIFIED metrics, never while writing the card.
 None of those metrics/candidates is a gate. Low follows the same applicable conditions.
 
+## 1. Intake
+
+States: no stage record. Command: $oracle-intake, then `oracle-stage.mjs begin`. Touchpoint: the first
+`yes`. Refusal: ask for a source the user has not given, never assume it; hold only separable blocked scope.
+
+Invoke $oracle-intake for approved source investigation and risk/capability discovery, then send the
+[first response](../common.md#first-response--one-message-one-confirmation): proposed axes, a provisional
+Draft and Open questions under one confirmation, whose actual `yes` precedes any model authoring.
+Intake and authoring are not independence roles: below High run them in this controller context
+instead of fresh subagents, so references load once. Fresh contexts stay required only where an
+independence rule names them (analyst, cold-read, reverse-impossible, source-aware, delivery review).
+
+## 2. Model
+
+States: DISCOVERING, MODELED, CHECKED. Command: `oracle-cycle.mjs walk --dir <dir> [--to <stage>]`.
+Touchpoint: none. Refusal: the walk stops at the first failure with `failed.code`, `detail` and `next`;
+a stale stage stops as STAGE_STALE, so rerun with `--reason <cause>` to rewind to DISCOVERING and re-walk
+(no authoring round; review laps spend them).
+
+Invoke $oracle-author for the source-bound model package, independent analyst inputs, checks and projected
+Draft with all manual duties. Walk the stages with `scripts/oracle-stage.mjs`: `begin`, then
+`advance --to MODELED | CHECKED | DRAFTED` once each gate passes; `walk` runs the fast Bend/package check,
+every remaining `advance` and the DRAFTED `project-card` in one call. A walk back is
+`rewind --to <stage> --reason <cause>` with the cause that sent it back. CHECKED passes
+at once on a receipt when the same package, Bend files, registered sources, harness, node and Bend
+passed it before; its evidence says so (`ORACLE_LINT_CACHE=off` turns receipts off).
+CHECKED also runs `prove` and `laws` ([bend-proof](../bend-proof.md) forms, Nat and List cut at the bound):
+`open`, `failed`, `unsafe`, a false relation cell or a trace law its own `run` breaks from a reachable state
+stops it; free cells, unreached counterexamples to induction and other law forms are a report, undecided
+when an installed Bend cannot run. Without `PROOF.bend` the proof is not judged; the receipt keys it too.
+
+The model analyst is dispatched once per revision, in a fresh context that is never the author's, and that same
+context is continued for its translation review ([discovery](../discovery.md)), not redispatched.
+Send every repair of the same revision (review findings, lint or proof failures, a user answer) to
+the author context that wrote the package, continued with only the findings and changed inputs
+(SendMessage on Claude Code). It already holds its references and re-reads only changed run files.
+Dispatch a fresh author only when that context is unavailable or for a new revision; its packet names
+the run directory and the open findings. The Delivery test worker is continued the same way.
+
+## 3. Card review and lock
+
+States: DRAFTED. Command: `oracle-lock.mjs create`. Touchpoint: card approval, none under common's
+pre-authorized approval. Refusal: `oracle-lock.mjs create` refuses a package oracle that is not at DRAFTED on the same package bytes and
+the Bend files and registered sources CHECKED judged (after a Bend edit, `advance --to CHECKED` judges
+them again, even with a re-projected card), and only the stage runtime writes stage.json. The lock still runs card lint itself, so a hand-written
+record skips no check; repair a refusal in the author context.
+
+1. Before showing the Draft, run the cold-read gate by invoking $oracle-review in a context-free context
+   with card bytes alone: `oracle-review-view.mjs card --oracle <card>` as the reading view plus a byte
+   copy of the card, both written outside the run directory. Apply five questions per row, collapse to one root and its cheapest first nail.
+   Drive that nail and record root, falsifying observation and result in journal.md. In the same gate,
+   run the reverse two-sample read once per card: extract impossible dispositions with
+   `scripts/oracle-verify.mjs card --ir`, hand them with the witness falsifier table from
+   [`card/interaction-sweep.md`](../card/interaction-sweep.md) and the `oracle-adequacy.mjs explore-input`
+   file to a second context-free reviewer; its dispatch registers with `review-input --kind
+reverse-impossible --input <that file>` (other bytes start a new round).
+   Frame it as "one of these is wrong: build the counterexample". Promote every disagreement to needs-decision.
+   The review role owns the reviewer procedure; do not load it here.
+2. When [`card/policy-sources.md`](../card/policy-sources.md)'s trigger applies, obtain a source-aware fresh
+   review before the Draft is shown (pre-authorized: before the lock), so its findings become Open questions:
+   verbatim user messages/approved excerpts against every affected card decision,
+   linked P/O/D, Open question or justified N/A. It supplements, never replaces, card-only cold-read and
+   reverse-impossible review. If independence is unavailable, record only the contract-permitted
+   same-context fallback and limitation. Never claim this satisfies a required independent High review.
+3. These reviews share the authoring budget of 2 rounds per revision. A round-2 confirmation continues the
+   round-1 reviewer the same way, with only its finding IDs and the repair diff, under a new `--attempt`.
+4. Show existing revisions as semantic delta and new cards in full with Open questions. Every surviving
+   question carries candidate rows and recommendation, so a single `yes` both answers and confirms.
+   `yes` adopts every recommendation and approves the card; `Q<n>=<option>` swaps one option and
+   re-confirms only if a new needs-decision appears. Record approval location in User Confirmation.
+   A change request requires Draft repair and re-confirmation; no answer means NEEDS_DECISION.
+   This re-presents the projected card after proof; only proof counterexamples, new axes or a changed
+   meaning since the provisional Draft need a new question. Under common's pre-authorized approval,
+   record it without re-presenting when none of them appeared.
+5. Read [`card/confirmation-lock.md`](../card/confirmation-lock.md) before confirmation/lock/init.
+   Mine the touched files with `scripts/oracle-verify.mjs card --oracle <card> --path <touched files>` (the lock's
+   lint does not); `--case-space` is structural preapproval checking only, never user approval. After it
+   passes, lock through `scripts/oracle-lock.mjs`. The revision lock is auto-verified immediately before each stage.
+   Never relock to pass a mismatch. A policy change is a new revision, never a locked-file edit.
+
+Before confirmation: no lock, no target tests, no production or dependency edits. Only named pre-lock
+checks run: prove, space, derive, adequacy check, `card --draft`,
+`card --repo-policies`, cross-check, --case-space, frame dispositions and the author's temporary pre-lock
+sweep report ([bend-cross-verification](../bend-cross-verification.md)). Model checks and that report are
+not consumer tests or product VALID_RED. Tool preparation follows mandatory verification and target
+dependency rules.
+
+If Delivery was known from the start, defer the lock until architecture/backend source decisions are
+made. Conditional architecture-contract/backend reads belong to the deciding role. Design Intent never
+proceeds without recorded Design Change Confirmation. After all outcome-changing architecture/backend
+decisions and local source finalization, run that `--path` lint, then create the final lock once with the same source
+set. Never extend an existing lock. Confirm and lock a new revision when the source set changes.
+
+## 4. RED
+
+States: ORACLE_READY. Command: `oracle-run.mjs init --scan-root <scan-root> --required-label <repo-check>`,
+then `oracle-run.mjs red`. Touchpoint: none. Refusal: follow its next step and delivery/red; tests and
+harness stay free to fix until VALID_RED.
+
+Right after entering Delivery, explicitly load and invoke the installed `$test` skill by name and read
+[`delivery/ledger.md`](../delivery/ledger.md). Immediately before writing test files, explicitly load
+and invoke the `$test` skill by name; if it cannot be invoked, FAIL. Invoking a file is not a skill call.
+The test skill owns test writing/judgment. Standalone Low/card exemptions cannot waive an Oracle run.
+`init` adds the stack labels the locked card implies (`LABEL_AUTO`); pin the actual target
+verification commands with `--required-label`. No label alone proves the evidence.
+
+After init or on resume, run `oracle-run.mjs guide --dir <dir>`, pick a legal target and request
+`guide --dir <dir> --to <target>`. Use the current-step guide at entry, resume, and after each transition,
+reading its missing primary references with dependencies (reviewer reads stay in the independent
+context). Guide is read-only advice, not approval, PASS or transition.
+Transition rechecks every gate. Read accepted status after composite commands so an already accepted
+target is not recorded twice. The controller owns transition intent, not a second execution engine.
+
+Before tests/RED read [`delivery/red.md`](../delivery/red.md). TDD default: ORACLE_READY → write tests → adapter-pre-red review → run tests
+→ `oracle-run.mjs transition --to VALID_RED` → classify VALID_RED. No production writing/editing before
+accepted product RED. The ORACLE_READY → IMPLEMENTED_GREEN ALREADY_SATISFIED path is zero-production
+verification and approves no production edits.
+The adapter-pre-red check runs `$oracle-review` on the locked Terms, adapter/test bytes and inspected
+product paths, not a post-GREEN packet; its findings and input identities go in the journal, never a
+review-receipt or transition. Follow delivery/red for changed inputs and missing targets.
+
+On Claude Code the PreToolUse hook denies premature production writes, TEST_BEFORE_LOCK test writes
+without a lock from that activated session, and weakening tokens in tests after VALID_RED. The transition
+gate stays authority and hosts without hooks rely on it alone. The hook records reviewer subagent returns
+in host-receipts.jsonl, and Stop checks the final report against the ledger. Hook absence is not an exemption.
+When delegating to a subagent, give it the absolute path of the Oracle's worktree, this skill's `scripts/`
+directory and every file it may write, inside the Oracle's scan root. The hook finds the lock from the cwd and the target
+file's ancestors, so a relative path or another worktree's cwd reads as no lock. Never route around a deny
+with shell writes.
+
+## 5. GREEN
+
+States: VALID_RED. Command: `oracle-run.mjs green`. Touchpoint: none. Refusal: a product repair spends
+`product`; a test or harness change needs a `harness` spend and a new reported RED→GREEN.
+
+After VALID_RED dispatch $oracle-implement with the current lock/snapshot and scoped task.
+Implementation decisions and bounded simplification live in that role. An optional fresh
+implementation context uses the existing
+[task-scoped worker path](../delivery/ledger.md#optional-task-scoped-implementation-worker), independent
+of graph opt-in and never replacing review/mandatory verification.
+
+Judgment commands run through `scripts/oracle-run.mjs exec`. Results are recorded in the append-only
+ledger and reports cite runIds instead of free-form claims. Never report an execution that is not in
+the ledger as passing; `red`/`green` bundle exec and transition into one call. Independent judgment execs and read-only investigation run as parallel
+tool calls in one message, not separate turns, on supported stable inputs. Approval, RED and adjudication
+stay serial. Delivery transitions are recorded only via `scripts/oracle-run.mjs transition` or composite
+commands invoking that same transition machinery. Iteration budgets are counted by `oracle-run.mjs budget`.
+Card-row evidence goes into evidence.json and is checked against actual run results with
+`scripts/oracle-verify.mjs evidence`. Record IMPLEMENTED_GREEN exactly once; resume from it, never record it again.
+
+## 6. Review and close
+
+States: IMPLEMENTED_GREEN and the end states. Command: `oracle-run.mjs close`. Touchpoint: NEEDS_DECISION
+only. Refusal: `CLOSE_PENDING` names the dispatch and flags to add, then rerun; any other code is that
+step's own gate.
+
+Read [`delivery/green-review.md`](../delivery/green-review.md) for self-feedback/GREEN.
+Re-read [`mandatory-verification.md`](../mandatory-verification.md) and
+[`bend-cross-verification.md`](../bend-cross-verification.md) before verification and review.
+After GREEN use the review target's guide for High mutation kill/revert/re-GREEN and post-GREEN reruns.
+Before contextual packet collection and independent review after implementation/test verification,
+read [`subagent-review.md`](../subagent-review.md) for --context selection and snapshot binding.
+Close with `oracle-run.mjs close --dir <dir> --packet <packet> --decision
+<decision> --review-point <point> --run <runId> --evidence <evidence> --check-report <report>` (High adds
+`--mutation-run`·`--mutation-row`; a blind mapping `--blind-input`). In order, each with its own gate, it
+runs `oracle-run.mjs review-packet` (only matching criteria via `--review-point`) when the packet is
+absent, `review-receipt` for each unbound output naming this packet, the REVIEW_VERIFIED transition
+(PARTIAL_VERIFIED with an open hold) and the report check. It never writes reviewer output; the
+dispatches are $oracle-review in required fresh contexts and the blind mapper. Reviewers return findings only; no reviewer approves its own return. Never paste criteria
+into prompts or replace raw artifacts with a summary. Supporting context never replaces common inputs,
+five-axis judgments or independent reviews. Low and Design-only retain mandatory verification;
+contextual artifacts remain conditional by mode.
+
+Delivery review runs at most 2 rounds per lock revision. Re-run stack/repo checks on the current snapshot
+after findings, and give round 2 a new `--packet` path; the `--findings` that build it are round 1's, so
+rerun with round 2's returns in their place. Round 2 continues the round-1 reviewers like card review.
+Below High, when every round-1 claim is a cited product defect whose reviewer wrote its reproduction,
+written with `reproduce` and failing before the repair, skip that dispatch and close round 2 with
+`--closure` (delivery/green-review). Blockers that survive round 2 stop at NEEDS_DECISION; a round 3 runs
+only after the user's explicit approval recorded with `oracle-run.mjs review-extend`.
+Run each reviewer's "reproduction not run" command once, as a job, on the final snapshot; a failure joins
+that reviewer's findings.
+
+With a model package, dispatch $oracle-author for conditional discovery closure after IMPLEMENTED_GREEN
+and again before final report, and at the anomaly/operator triggers in its entry. Verdict/residual risks
+are evidence, not another state or policy decision. Changed policy requires human decision/new revision.
+`oracle-run.mjs review-brief` is a read-only evidence index that approves and advances nothing
+(delivery/green-review); lead attention briefs with outcome, evidence and decisions.
+
+For RELATIONAL/JUDGMENT rows or UI-shaping interactions, leave one browser journey using an existing
+repo/installed tool. No tool or user-declined QA without locked source-backed N/A blocks REVIEW_VERIFIED,
+not implementation: stop at IMPLEMENTED_GREEN. The only certifiable visual PASS producer is a
+trusted `oracle-run --adapter node-test` run whose locked test drives Playwright and emits schema-v3.
+A standalone Playwright adapter is unsupported. Browser MCP observations are pending/non-verifying, never PASS.
+
 | State             | Meaning                                                                     |
 | ----------------- | --------------------------------------------------------------------------- |
 | IMPLEMENTED_GREEN | card tests and required repo verification actually passed                   |
@@ -218,11 +236,9 @@ None of those metrics/candidates is a gate. Low follows the same applicable cond
 | NEEDS_DECISION    | outcome-changing policy unresolved, print the current card and questions    |
 | FAIL              | judgment impossible: environment/harness/tool failure or budget exhausted   |
 
-Normal Delivery completion is REVIEW_VERIFIED. Visual pending or declined without source-backed N/A
-ends resumably at IMPLEMENTED_GREEN. On resume complete pending visual evidence then review, never call
-this intermediate state REVIEW_VERIFIED. With an open hold REVIEW_VERIFIED is refused (HOLDS_OPEN):
+Normal Delivery completion is REVIEW_VERIFIED; a resumed visual-pending run completes the evidence, then
+review. With an open hold REVIEW_VERIFIED is refused (HOLDS_OPEN):
 finish at PARTIAL_VERIFIED after its actual review, report holds and write no test or production code for
 held rows. Resolve them in a new revision (NEEDS_DECISION → ORACLE_READY) adding only those rows.
-Unresolved policy after init requires a structured decision and NEEDS_DECISION transition/runId even if
-the user forbids revising the card or asking questions. Recording it neither reopens nor edits the locked
-card. Before init preserve decision/evidence without inventing a runId. Impossible judgment is actual-cause FAIL.
+Unresolved policy after init follows the core entry's stop/resume rules: a structured decision and a real
+NEEDS_DECISION transition/runId. Impossible judgment is actual-cause FAIL.

@@ -188,8 +188,7 @@ listed fixes and their regressions. Security, privacy, accessibility and data in
 
 One persisted authoring budget covers model/analyst, translation and card review laps; Delivery
 review keeps its own two-round limit. No role restart, regenerated packet, rewind or new revision resets
-either, and exhaustion stops with the remaining findings, never a false pass. Each profile's own
-procedures own their dispatch commands.
+either, and exhaustion stops with the remaining findings, never a false pass.
 
 ## Authority priority
 
@@ -290,7 +289,7 @@ and reviewer preference are classification evidence, not policy sources.
 | -------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | `POLICY_GAP`         | approved source requirement omitted from the card, or an outcome-changing policy decision is needed | print the current card and questions, then `NEEDS_DECISION`                 |
 | `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope                                                 | add only the missing test·reviewer mapping                                  |
-| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-round budget (`budget --spend harness`) |
+| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-spend budget (`budget --spend harness`) |
 | `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation                                             | production improvement budget after a deterministic `VALID_RED`             |
 | `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                                                                  | `FAIL` with the actual cause, production untouched                          |
 | `NON_ORACLE_OPINION` | sourceless preference·taste                                                                         | record with rationale; never blocks completion or changes policy            |
@@ -1607,7 +1606,7 @@ sources at the four edges of the space and treat what they find as candidates:
 ### AI explorer
 
 Extend the existing reverse-impossible review; do not add a subagent. For a card with `## Adequacy`,
-hand the reviewer only `oracle-adequacy.mjs explore-input --card <oracle.md> --output <file>`: the
+add `oracle-adequacy.mjs explore-input --card <oracle.md> --output <file>` to its input: the
 source text, the Outcome Brief, the rows, Terms and Adequacy, the sensitivity and the declared
 out-of-world list, with a JSON schema. Unlike the model analyst, the explorer sees the card — its job
 is to break it. It returns candidates where every row passes and the user is still harmed:

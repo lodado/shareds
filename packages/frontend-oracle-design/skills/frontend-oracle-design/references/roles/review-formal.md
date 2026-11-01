@@ -24,15 +24,16 @@ presented as actual independence or substitute for High delivery's independent s
 ## Reverse-impossible
 
 In a second context-free review once per card, receive the impossible dispositions extracted with
-`scripts/oracle-verify.mjs card --ir` and the witness falsifier table from
-[`card/interaction-sweep.md`](../card/interaction-sweep.md). The framing is "one of these is wrong:
+`scripts/oracle-verify.mjs card --ir`, the witness falsifier table from
+[`card/interaction-sweep.md`](../card/interaction-sweep.md) and the `oracle-adequacy.mjs explore-input`
+file. The framing is "one of these is wrong:
 build the counterexample". Do not import author rationale to defend an exclusion. Return counterexamples
 and disagreements. Every disagreement is promoted to needs-decision, not dismissed as taste.
-This reverse two-sample read supplements, never replaces, the card-only cold-read gate.
+It supplements, never replaces, the cold-read gate.
 
 ## Source-aware fresh review
 
-When [`card/policy-sources.md`](../card/policy-sources.md)'s trigger applies before approval, compare
+When [`card/policy-sources.md`](../card/policy-sources.md)'s trigger applies before the Draft is shown, compare
 verbatim user messages and approved source excerpts with every affected card decision. Record each item
 as a linked P/O/D row, Open question or justified N/A. Preserve the raw source inputs, not an author's
 summary. It supplements, never replaces, card-only cold-read and reverse-impossible review.

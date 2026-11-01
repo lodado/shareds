@@ -1,3 +1,91 @@
+# 0.120.0: the Formal controller docs follow the six phases, and six doc conflicts resolved from the code
+
+## Why
+
+Wave W3 of the process-compression plan. W1 gave the controller a six-phase map and W2 the `init` label
+derivation and `close`, but `roles/controller-formal.md` still read as three long sections of numbered steps that
+the map only pointed into, `controller-entry-formal.md` repeated the same role steps a second time, and six places
+in the docs disagreed with each other (listed below). An agent that rereads the docs at every step to choose a
+command meets both readings and has to guess.
+
+## Change
+
+- `roles/controller-formal.md` is now a short shared preamble (phase line, effort caps, refusals, budgets, recovery
+  load conditions) and six sections in phase order: 1 Intake, 2 Model, 3 Card review and lock, 4 RED, 5 GREEN,
+  6 Review and close. Each opens with its states, its one command (the one `phaseLine` prints), its only user
+  touchpoint and what to do on a refusal; the existing text moved into the section that runs it. Steps the scripts
+  now do were cut (the close paragraph no longer narrates every receipt rule `close` enforces, the label sentence
+  relies on `LABEL_AUTO`, the review-brief paragraph points at green-review). 19,833 → 19,787 bytes.
+- `controller-entry-formal.md`: "Mode selection" is the same six phases in one short step each (role invocation
+  order unchanged), and "Controller authority" drops the classification routes and hold rules it copied from
+  common and controller-formal. 13,499 → 11,760 bytes.
+- The plan's note to drop the separate `card --path` lint before the lock was wrong and is not applied:
+  `oracle-lock.mjs create` runs `oracle-verify.mjs card --oracle` (and `--locked`) without `--path`
+  (oracle-lock.mjs:391), and only `--path` mines the touched files for undeclared input families
+  (oracle-verify.mjs:1330). Phase 3 keeps that one call and says why.
+- Conflicts, each resolved to the reading the code supports (or, where the code has no opinion, the stricter one),
+  and every doc now says the same:
+  1. Model analyst, fresh or continued: the code only records `crossCheck.reviewedBy {agent, inputDigest}` and
+     checks the digest (oracle-discovery.mjs:766-772, oracle-package.mjs:501-503); it has no opinion on contexts.
+     Stricter reading kept: one fresh context that is never the author's, continued (not redispatched) for its
+     translation review. discovery.md and author-formal already said this; controller-formal now does too.
+  2. Reverse-impossible input, `card --ir` vs `explore-input`: both. `explore-input` is the input the code
+     registers as that review's round (oracle-adequacy.mjs:1703-1707 records kind `reverse-impossible`), while
+     `card --ir` is the only output that carries the impossible dispositions the sweep falsifier table attacks
+     (oracle-verify.mjs:568-571). adequacy.md's "hand the reviewer only" became "add … to its input";
+     controller-formal and review-formal list both.
+  3. Harness unit: spends. `BUDGET_LIMITS.harness` is 2 (oracle-run.mjs:135), each distinct change adds one
+     (:3903-3912), the same change records no new spend (:3886) and repairs before VALID_RED spend nothing
+     (:3874-3879). common's "2-round", ledger's "two-round limit" and green-review's "2-use" now say "2-spend" /
+     "two-spend limit". Delivery review rounds stay rounds.
+  4. Policy budget scope and trigger: Delivery only, shared by every role in it. The budgets exist only in the
+     run state `init` creates (oracle-run.mjs:1542); the policy spend keys on the lock manifest (:3829), so one
+     revision spends it once; no gate spends it for the controller. controller-formal now states the trigger: spend
+     `policy` when a POLICY_GAP after init sends the run to NEEDS_DECISION, and `harness` for each test or harness
+     change after VALID_RED. SKILL.md and the entry say "Delivery's shared … budgets", and SKILL.md no longer says
+     shared budgets serve "all roles" from the runtime line.
+  5. Source-aware timing: the code only stops it at the lock (oracle-stage.mjs:54 lists the kind, :805 refuses
+     any review input at ORACLE_READY). Stricter reading: before the projected Draft is shown (with pre-authorized
+     approval, before the lock), so its findings become Open questions. controller-formal, review-formal and
+     policy-sources now say so; author-formal already did.
+  6. `oracle-workflow.graph.json`: `delivery-init` required `fast-check:reported` (and the whole Formal stack)
+     unconditionally, while `init` derives `bend-proof`/`fast-check` only with a Formal Model,
+     `world-conformance` without one, and drops `type-contract` on its N/A (oracle-package.mjs:34-49,
+     oracle-run.mjs:1649-1653); the node now describes that derivation and the typed repository label floor.
+     `primary-review` names the Standard round-2 reproduction closure (`close --closure`, oracle-run.mjs:3524-3530)
+     and `review-dispatch` the two-round limit with `review-extend` (oracle-run.mjs:4224-4228). Text only: nodes,
+     edges and terminals are unchanged and `graph-verify` still prints `GRAPH_VALID`.
+- Review fixes (independent Opus review, applied once): the lint-before-lock rule restored (phase 3 locks only after
+  the `--path` lint passes, and the deferred Delivery lock runs that lint first); the reverse-impossible dispatch
+  registers `review-input --kind reverse-impossible --input <the explore-input file>`, since other bytes change the
+  digest and `observeIteration` (oracle-iterations.mjs:32-37) would open round 2, and card-format's registration
+  line now covers every analyst and reviewer kind with that note; the workflow graph's `review-dispatch` sends
+  blockers that survive round 2 to NEEDS_DECISION with their findings, not as a POLICY_GAP, and says they spend no
+  policy budget (controller-formal says the same); the policy spend comes before the NEEDS_DECISION transition and
+  BUDGET_EXHAUSTED is FAIL with the decision preserved; the analyst is dispatched once per revision. Phase 1 no
+  longer repeats author-formal's "questions ahead of the Draft" rule.
+- Bytes cut elsewhere so the totals fall: common's tautology "Each profile's own procedures own their dispatch
+  commands." and SKILL.md's duplicate "shared budgets" clause; review-formal's reverse paragraph is shorter.
+- Pin changed on purpose: skill-contract "gates the draft card on a context-free read…" sliced controller-formal
+  between `## Draft, review` and `## Delivery`; those headings are now `## 3. Card review and lock` and `## 4. RED`,
+  so the slice uses them (and asserts the heading exists). The asserted sentences and their order are unchanged.
+  Every other pinned sentence moved verbatim.
+- No script behavior changed.
+
+## Verification
+
+- Byte budgets (no cap raised): Formal Design-only closure 234,820 → 234,721 and Delivery closure 445,988 → 445,891
+  (cap 446,000); Contract 81,244 → 81,185 and 156,220 → 156,161. Every bundle shrank or stayed, 1,545,514 →
+  1,544,568 bytes in all (role-review 61,950 → 61,911 under its 62,000 cap; role-author 210,107 → 210,042; card-lane
+  135,398 → 135,312). `oracle-workflow.graph.json` grew 25,685 → 26,611 (graph mode only, outside every closure).
+- `pnpm bundles:generate`: 22 bundles regenerated. Doc-pin suites (skill-contract, communication-contract,
+  execution-guardrails, mandatory-verification, review-brief-contract, reference-bundles, modular-skills,
+  profile-reference-isolation, profile-packets): 225 pass, 0 fail.
+- `pnpm lint` (frontend-oracle-design): 0 errors (406 existing warnings), bundles and evals checks ok.
+- `pnpm test`: 1310 pass, 0 fail, 0 skipped. The doc-pin suites were rerun after the last entry edit: 225 pass, 0
+  fail, bundles check ok.
+- Review: one independent Opus review, 1 major 2 minor 3 nit, all applied; no re-review.
+
 # 0.119.0: init derives the card's stack labels, and one `close` command for phase 6
 
 ## Why

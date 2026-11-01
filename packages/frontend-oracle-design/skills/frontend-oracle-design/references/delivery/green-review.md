@@ -31,7 +31,7 @@ The canonical definition of classification·routing is the feedback routing in
 
 - `POLICY_GAP` → print the current card and the question, then `NEEDS_DECISION`
 - `EVIDENCE_GAP` → add only the missing tests·evidence within the locked card scope
-- `HARNESS_DEFECT` → correct only within the sibling `test` skill's allowed items and the shared 2-use budget
+- `HARNESS_DEFECT` → correct only within the sibling `test` skill's allowed items and the shared 2-spend budget
 - `PRODUCT_DEFECT` → keep the same card row, make the minimal fix, and re-run
 - `ENVIRONMENT_DEFECT` → `FAIL` without touching production
 - `NON_ORACLE_OPINION` → record it but do not change policy·assertions·completion state

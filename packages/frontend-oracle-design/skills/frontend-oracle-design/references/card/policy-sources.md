@@ -160,7 +160,7 @@ Rules:
 
 ## Source-aware intent audit — conditional, fresh, and non-authoritative
 
-Run one fresh audit before approval only when jurisdictions are combined into one journey, an
+Run one fresh audit before the Draft is shown, only when jurisdictions are combined into one journey, an
 approved policy or `identity-shaping` Design Intent changes, investigation exposes a requirement
 not accounted for by P/O/D or an Open question, or the problem-definition review above applies.
 Give the reviewer the relevant user messages verbatim with message locations, actual task and

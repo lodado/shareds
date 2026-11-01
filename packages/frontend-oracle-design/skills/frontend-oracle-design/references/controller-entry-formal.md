@@ -84,39 +84,31 @@ a new session as a bypass. A scope description is not a write authorization or a
 Design-only is the default. Delivery requires an explicit implementation/self-verification/review request.
 At entry or resume read current disk state. Read [controller procedure](roles/controller.md)
 when coordinating the selected stages; read only current-step dependencies, not all future role procedures.
+Its Formal coordination runs six phases, each with one command and at most one user touchpoint:
 
-1. Explicitly load and invoke [`$oracle-intake`](../../oracle-intake/SKILL.md) for sources, Outcome Brief,
-   risk/capability and Space discovery. The first response carries the proposed axes, a provisional Draft
-   on their recommendations and the Open questions under one confirmation
-   ([first response](common.md#first-response--one-message-one-confirmation)). Its actual `yes` confirms
-   axes and source-open cells before any model. Missing/unsupported sources follow common routing.
-2. Explicitly load and invoke [`$oracle-author`](../../oracle-author/SKILL.md) after source/axis prerequisites.
-   First apply common's convergent planning: settle scope and check the highest-risk premise before
-   expensive authoring. Begin the shared stage budget before model/analyst/translation dispatch.
-   Obtain source-bound package, independent analyst inputs, proof/adequacy/cross-check and projected Draft,
-   with manual sections, realization plan, interaction sweep and semantic delta. Controller owns stage intent.
-3. Explicitly load and invoke [`$oracle-review`](../../oracle-review/SKILL.md) in the required independent
-   contexts for card-only cold-read, second reverse-impossible read and conditional source-aware review.
-   Drive the first nail and record the result before showing the projected Draft for lock. Same-context switching is not independence.
-   Card review shares the authoring budget of 2 rounds per revision; round 2 only confirms round 1's repairs
+1. Intake: explicitly load and invoke [`$oracle-intake`](../../oracle-intake/SKILL.md) for sources, Outcome
+   Brief, risk/capability and Space discovery. Its first response's actual `yes`
+   ([first response](common.md#first-response--one-message-one-confirmation)) confirms axes and
+   source-open cells before any model. Missing/unsupported sources follow common routing.
+2. Model: explicitly load and invoke [`$oracle-author`](../../oracle-author/SKILL.md) after source/axis
+   prerequisites. First apply common's convergent planning: settle scope and check the highest-risk premise
+   before expensive authoring. Controller owns stage intent.
+3. Card review and lock: explicitly load and invoke [`$oracle-review`](../../oracle-review/SKILL.md) in the
+   required independent contexts; same-context switching is not independence. Card review shares the
+   authoring budget of 2 rounds per revision; round 2 only confirms round 1's repairs
    ([budget](card/card-format.md#review-round-budget--at-most-2)). Never start a round 3 without the user's approval.
-4. Present the full new Draft or semantic delta and Open questions. Obtain human confirmation, then lint
-   and lock through the existing scripts. Under common's pre-authorized approval, lint and lock without
-   presenting the card again. No lock, target tests, production or dependency edits before confirmation.
+   Obtain human confirmation (common's pre-authorized approval counts), then lock through the existing scripts.
+   No lock, target tests, production or dependency edits before confirmation.
    Design-only ends ORACLE_READY, NEEDS_DECISION or tool-failure FAIL. Write/execute no consumer tests or production;
    the author's temporary pre-lock sweep report ([bend-cross-verification](bend-cross-verification.md)) is not one.
-5. For explicit Delivery, explicitly load and invoke `$test` on entry and immediately before target test writes.
-   If it cannot be invoked, FAIL. Read delivery/ledger, initialize real required labels and follow the current
-   guide. `$test` owns test writing/judgment; its standalone Low exemption never waives this Oracle run's rules.
-   Before accepting RED, dispatch the existing adapter checklist in `adapter-pre-red` mode as specified
-   in [delivery/red](delivery/red.md); this is not a Delivery review receipt or a new ledger state.
-6. Only after accepted VALID_RED, explicitly load and invoke [`$oracle-implement`](../../oracle-implement/SKILL.md)
-   for scoped production changes and implementation decisions. ALREADY_SATISFIED is zero-production verification.
-   Return harness work to `$test`. Read actual acceptance after composite commands, never double-transition.
-7. After accepted IMPLEMENTED_GREEN, invoke `$oracle-author` for applicable discovery closure and
-   `$oracle-review` for independent delivery review. Controller issues receipts and records transitions,
-   requiring current lock/source hashes/target snapshots, High independence and post-review reruns.
-8. Before final reporting invoke applicable closure again, read [reporting](roles/reporting.md),
+4. RED, explicit Delivery only: explicitly load and invoke `$test` on entry and immediately before target test
+   writes; if it cannot be invoked, FAIL. `$test` owns test writing/judgment; its standalone Low exemption never
+   waives this Oracle run's rules. Review the Formal adapter in `adapter-pre-red` mode before accepting RED
+   ([delivery/red](delivery/red.md)); this is not a Delivery review receipt or a new ledger state.
+5. GREEN: only after accepted VALID_RED, explicitly load and invoke [`$oracle-implement`](../../oracle-implement/SKILL.md)
+   for scoped production changes. ALREADY_SATISFIED is zero-production verification. Return harness work to `$test`.
+6. Review and close: after accepted IMPLEMENTED_GREEN invoke `$oracle-author` for applicable discovery closure and `$oracle-review` for
+   independent delivery review. Before final reporting read [reporting](roles/reporting.md),
    perform its four artifact-backed checks and report the actual ledger state with runIds, not role claims.
 
 ## Controller authority and stop/resume
@@ -125,18 +117,9 @@ Only existing scripts advance stages/ledger state. The controller owns transitio
 readback, human questions/approval, receipts, evidence freshness and truthful final reporting.
 Specialist returns are artifacts/findings, never approval, a fabricated runId or permission to bypass a gate.
 Direct invocation with missing prerequisites returns here. Fresh specialists read their own dependencies.
+After init, on resume and after each accepted transition follow `guide --dir <dir> --to <target>`.
 
-After init/on resume and after each accepted transition, run `oracle-run.mjs guide --dir <dir>`, select a
-legal target, then `guide --dir <dir> --to <target>`. Follow only that step's missing primary references
-with dependencies, and deliver reviewer references in the independent context. Guide is read-only advice.
-A rejected transition advances nothing. Never edit state/evidence or relock to bypass rejection.
-
-Use common.md's Feedback routing and shared budgets: policy 2, harness 2, product 3, not per skill.
-POLICY_GAP requires human decision/new revision; EVIDENCE_GAP goes to $test/independent reviewer;
-HARNESS_DEFECT goes to $test's permitted repairs; PRODUCT_DEFECT requires applicable RED;
-ENVIRONMENT_DEFECT is actual-cause FAIL; NON_ORACLE_OPINION is recorded, never new policy or a blocker.
-Open holds exclude held rows and block REVIEW_VERIFIED; use PARTIAL_VERIFIED only after its actual review.
-Visual pending/declined without locked source-backed N/A stops resumably at IMPLEMENTED_GREEN.
+Use common.md's Feedback routing and Delivery's shared budgets: policy 2, harness 2, product 3, not per skill.
 Policy unresolved after init needs structured NEEDS_DECISION and a real transition/runId, even if the user
 forbids questions or card revision. Recording it neither reopens nor edits the locked card.
 Before init preserve decision/evidence without inventing a runId. Impossible judgment is FAIL.

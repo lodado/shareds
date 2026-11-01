@@ -188,8 +188,7 @@ listed fixes and their regressions. Security, privacy, accessibility and data in
 
 One persisted authoring budget covers model/analyst, translation and card review laps; Delivery
 review keeps its own two-round limit. No role restart, regenerated packet, rewind or new revision resets
-either, and exhaustion stops with the remaining findings, never a false pass. Each profile's own
-procedures own their dispatch commands.
+either, and exhaustion stops with the remaining findings, never a false pass.
 
 ## Authority priority
 
@@ -290,7 +289,7 @@ and reviewer preference are classification evidence, not policy sources.
 | -------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | `POLICY_GAP`         | approved source requirement omitted from the card, or an outcome-changing policy decision is needed | print the current card and questions, then `NEEDS_DECISION`                 |
 | `EVIDENCE_GAP`       | missing tests·mappings inside the locked card scope                                                 | add only the missing test·reviewer mapping                                  |
-| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-round budget (`budget --spend harness`) |
+| `HARNESS_DEFECT`     | test machinery defect: locator·fixture·barrier                                                      | repair allowed items only, shared 2-spend budget (`budget --spend harness`) |
 | `PRODUCT_DEFECT`     | mismatch between the locked contract and implementation                                             | production improvement budget after a deterministic `VALID_RED`             |
 | `ENVIRONMENT_DEFECT` | tools/environment prevent judgment                                                                  | `FAIL` with the actual cause, production untouched                          |
 | `NON_ORACLE_OPINION` | sourceless preference·taste                                                                         | record with rationale; never blocks completion or changes policy            |
@@ -517,7 +516,7 @@ Rules:
 
 ## Source-aware intent audit — conditional, fresh, and non-authoritative
 
-Run one fresh audit before approval only when jurisdictions are combined into one journey, an
+Run one fresh audit before the Draft is shown, only when jurisdictions are combined into one journey, an
 approved policy or `identity-shaping` Design Intent changes, investigation exposes a requirement
 not accounted for by P/O/D or an Open question, or the problem-definition review above applies.
 Give the reviewer the relevant user messages verbatim with message locations, actual task and
@@ -1236,10 +1235,10 @@ review-finding|gate-failure|user-answer|source-change [--note <one line>]`. The 
   again in place by `advance --to CHECKED` (same `--reason` and `--note`; reflection counts it as rework),
   and only a card-only repair on unchanged inputs resumes at CHECKED or DRAFTED by rewind.
 - `oracle-adequacy.mjs model-input`, `explore-input` for a staged card, and
-  `oracle-discovery.mjs mapping-input` register their input digests. Cold-read/source-aware dispatch
-  registers its permitted raw input with `oracle-stage.mjs review-input --dir <dir> --kind cold-read|source-aware --input <file> --attempt <dispatch-id>`.
-  Before every analyst or reviewer
-  dispatch, including a resumed session, register its kind/input with a distinct `--attempt`. Reuse the
+  `oracle-discovery.mjs mapping-input` register their input digests. Every analyst or reviewer dispatch,
+  a resumed session's too, registers its permitted raw input with
+  `oracle-stage.mjs review-input --dir <dir> --kind <kind> --input <file> --attempt <dispatch-id>` and a
+  distinct `--attempt` (reverse-impossible: the `explore-input` file). Reuse the
   attempt only for transport redelivery, not new analysis. This counts repeated analysis of unchanged
   sources too. Keep procedural metadata separate from blind task inputs.
 - A role's first pass is `full`; subsequent passes are `confirm-fixes`. A changed input already reviewed in the

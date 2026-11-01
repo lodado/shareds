@@ -1941,7 +1941,8 @@ test('gates the draft card on a context-free read that collapses to one root and
   assert.doesNotMatch(lock, /adversarial self-review/)
 
   // Controller ordering retains the gate before presentation, regardless of role extraction.
-  const designOnly = skill.slice(skill.indexOf('## Draft, review'), skill.indexOf('## Delivery'))
+  const designOnly = skill.slice(skill.indexOf('## 3. Card review and lock'), skill.indexOf('## 4. RED'))
+  assert.ok(skill.indexOf('## 3. Card review and lock') > 0)
   assert.match(designOnly, /Before showing the Draft, run the cold-read gate/)
   assert.ok(
     designOnly.indexOf('Before showing the Draft') < designOnly.indexOf('Show existing revisions'),

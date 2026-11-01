@@ -225,7 +225,7 @@ sources at the four edges of the space and treat what they find as candidates:
 ### AI explorer
 
 Extend the existing reverse-impossible review; do not add a subagent. For a card with `## Adequacy`,
-hand the reviewer only `oracle-adequacy.mjs explore-input --card <oracle.md> --output <file>`: the
+add `oracle-adequacy.mjs explore-input --card <oracle.md> --output <file>` to its input: the
 source text, the Outcome Brief, the rows, Terms and Adequacy, the sensitivity and the declared
 out-of-world list, with a JSON schema. Unlike the model analyst, the explorer sees the card — its job
 is to break it. It returns candidates where every row passes and the user is still harmed:

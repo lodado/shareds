@@ -204,7 +204,7 @@ runId. State writes use temp file + atomic rename; never hand-edit `run-state.js
   A mapping-only correction counts once; formatting and non-binding notes do not count again.
   Legacy pre-RED spends keep their file-only identity. An unreadable bound
   map is an error, not a reason to omit it from identity. Spending still requires fresh RED→GREEN
-  for changed bindings; it neither increases the two-round limit nor reopens terminal `FAIL`.
+  for changed bindings; it neither increases the two-spend limit nor reopens terminal `FAIL`.
 
 ## Optional task-scoped implementation worker
 
