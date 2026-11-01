@@ -250,7 +250,7 @@ function run(args, environment) {
   })
 }
 
-function runAsync(args, environment) {
+export function runAsync(args, environment) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [script, ...args], {
       env: isolatedEnvironment(environment),
@@ -315,7 +315,7 @@ async function markerCount(markerPath) {
   }
 }
 
-async function workspace(
+export async function workspace(
   t,
   {
     risk = 'medium',
@@ -1048,7 +1048,7 @@ test('review-brief exposes mandatory High-risk review work even when supplied fi
   assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
 })
 
-function strictReviewPacketArgs(oracleDirectory, output) {
+export function strictReviewPacketArgs(oracleDirectory, output) {
   return [
     'review-packet',
     '--dir',
@@ -1064,7 +1064,7 @@ function strictReviewPacketArgs(oracleDirectory, output) {
   ]
 }
 
-function bindReviewDocument(path, packetSha256, targetRevision) {
+export function bindReviewDocument(path, packetSha256, targetRevision) {
   const document = JSON.parse(readFileSync(path, 'utf8'))
   if (document.schemaVersion !== 2) return
   document.packetSha256 = packetSha256
@@ -2066,6 +2066,43 @@ test('O6: 모든 milestone의 red:<name> reported RED 후에만 전역 VALID_RED
   assert.equal((await state(oracleDirectory)).state, 'VALID_RED')
 })
 
+test('O6: milestone VALID_RED refuses a milestone RED older than the test bytes it binds', async (t) => {
+  const { root, oracleDirectory } = await milestoneWorkspace(t)
+  const failing = async (label, name, body = '') => {
+    const target = join(root, `${label.replace(':', '-')}.test.mjs`)
+    await writeFile(target, `import test from 'node:test'\ntest(${JSON.stringify(name)}, () => { ${body}throw new Error('RED') })\n`)
+    reportSequence += 1
+    const report = join(oracleDirectory, `${label.replace(':', '-')}-${reportSequence}.ndjson`)
+    const executed = run(['exec', '--dir', oracleDirectory, '--label', label, '--adapter', 'node-test', '--report', report, '--', process.execPath, '--test', target])
+    assert.equal(executed.status, 0, executed.stderr)
+  }
+  const validRed = (runId) => run(['transition', '--dir', oracleDirectory, '--to', 'VALID_RED', '--run', runId, '--evidence', join(oracleDirectory, 'evidence.json')])
+
+  await failing('red:list', 'list > shown')
+  // the list test changes after its RED — the bytes VALID_RED would bind never failed as red:list
+  const listTest = join(root, 'red-list.test.mjs')
+  await writeFile(listTest, (await readFile(listTest, 'utf8')).replace("throw new Error('RED')", "void 0; throw new Error('RED')"))
+  await failing('red:detail', 'detail > shown')
+  const before = await allLedgerLines(oracleDirectory)
+
+  const stale = validRed('r-002')
+  assert.equal(stale.status, 1)
+  assert.match(stale.stderr, /^SNAPSHOT_STALE: r-001 predates the current test bytes \(red-list\.test\.mjs\)/)
+  assert.equal((await state(oracleDirectory)).state, 'ORACLE_READY')
+  assert.deepEqual(await allLedgerLines(oracleDirectory), before)
+
+  // a test file added after the last milestone RED was never part of a failing run either
+  await failing('red:list', 'list > shown', 'void 0; ')
+  await writeFile(join(root, 'src', 'late.test.mjs'), "import 'node:assert'\n")
+  const unseen = validRed('r-003')
+  assert.equal(unseen.status, 1)
+  assert.match(unseen.stderr, /^SNAPSHOT_STALE: r-003 predates the current test bytes \(src\/late\.test\.mjs\)/)
+
+  await rm(join(root, 'src', 'late.test.mjs'))
+  const transitioned = validRed('r-003')
+  assert.equal(transitioned.status, 0, transitioned.stderr)
+})
+
 test('O6: git 레포에서 gitignore된 파일은 production 변경으로 세지 않는다', async (t) => {
   const created = await workspace(t, { git: true })
   if (!created) {
@@ -2890,6 +2927,28 @@ test('O8: required label run이 current snapshot보다 오래되면 GREEN을 거
   assert.equal(transitioned.status, 1)
   assert.match(transitioned.stderr, /^SNAPSHOT_STALE: /)
   assert.match(transitioned.stderr, /r-002/)
+})
+
+test('VALID_RED refuses a failing run older than the test bytes it binds', async (t) => {
+  const { root, oracleDirectory } = await workspace(t)
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(1, 1)\n")
+  redRun(oracleDirectory)
+  const failing = (await ledgerLines(oracleDirectory)).map(JSON.parse).at(-1).runId
+  // the test changes after its failure was recorded — the bytes VALID_RED would bind never failed
+  await writeFile(join(root, 'src', 'save.test.mjs'), "import assert from 'node:assert'\nassert.equal(2, 2)\n")
+  const before = await allLedgerLines(oracleDirectory)
+
+  const stale = transition(oracleDirectory, 'VALID_RED', failing)
+
+  assert.equal(stale.status, 1)
+  assert.match(stale.stderr, /^SNAPSHOT_STALE: .*predates the current worktree bytes/)
+  assert.equal((await state(oracleDirectory)).state, 'ORACLE_READY')
+  assert.deepEqual(await allLedgerLines(oracleDirectory), before)
+
+  redRun(oracleDirectory)
+  const fresh = (await ledgerLines(oracleDirectory)).map(JSON.parse).at(-1).runId
+  const transitioned = transition(oracleDirectory, 'VALID_RED', fresh)
+  assert.equal(transitioned.status, 0, transitioned.stderr)
 })
 
 test('O9: consecutive GREEN passes must be for the same current worktree snapshot', async (t) => {

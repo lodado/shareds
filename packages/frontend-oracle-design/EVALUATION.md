@@ -1,3 +1,85 @@
+# 0.121.0: the Delivery run is a proven state machine, and VALID_RED needs failing runs on the current bytes
+
+## Why
+
+Wave F1 of the self-FSM plan. The authoring stages already had a Bend model checked against `oracle-stage.mjs`
+(`test-fixtures/stage`), but the Delivery run in `oracle-run.mjs`, where budgets, RED, GREEN and review gates live,
+had only example tests. Nothing showed that its guards together keep FAIL closed, keep budgets bounded, let every run
+stop, or what the phase line names in each state.
+
+## Change
+
+- `test-fixtures/delivery`: a Bend model of the Delivery run (`MODEL.bend`, README). The state is what the guards
+  read: run state with the GREEN visit's packet (none, unbound, receipt-bound), VALID_RED ever recorded, production
+  touched since init, the latest run (passed, fresh, after the state's gate baseline), test bytes changed since the
+  RED binding, the harness budget (spent 0–2, renewed since RED, current bytes already spent) and GREEN ever
+  recorded. 19 commands: exec pass/fail, production and test edits, harness spend, `init --reason`, every
+  `transition`, `review-packet`, `review-receipt`. Left out (listed in the model header): risk (Low), lock and source
+  drift, milestones, harness paths, report errors, test weakening, product and policy budgets, the review repair loop
+  after GREEN, the findings verdict, a production revert, and the read-only `close`/`status`/`guide`.
+- 26 relations, proven with `prove-reach --prefix Del --safe safe` on all 1,295 reachable states (domain 15,552 ×
+  19): FAIL refuses every transition; FAIL and NEEDS_DECISION with a reason are accepted from every state before
+  them; a refusal keeps the state; VALID_RED needs a fresh failing run and untouched production, its refresh a renewed
+  spend; GREEN needs a fresh passing run after the RED; review needs a receipt bound to the current packet, and a new
+  packet unbinds it; amend only at ORACLE_READY before RED; pre-RED spends are free, spends never lower the count and
+  the third is BUDGET_EXHAUSTED; history flags never reset; an accepted transition other than the resume keeps the
+  phase rank (a VALID_RED refresh) or raises it; the refresh credit `2·(2 − spent) + renewed` never rises and falls on
+  each refresh; a resume, refresh or amend never lowers the budget or forgets history; the phase line names a protocol
+  edge of the state (not necessarily an accepted command). `LAWS.bend`: two cell laws, four witnesses (VERIFIED,
+  PARTIAL, a refresh, an exhausted budget) and `red_cycle_returns`.
+- Progress, counted over the reachable graph in the test (not a kernel proof): every reached state can reach FAIL;
+  276 non-FAIL states cannot reach a reviewed state: 147 ORACLE_READY and 124 NEEDS_DECISION with production touched
+  (a resume after a production edit; VALID_RED and GREEN refuse with PRODUCTION_TOUCHED_BEFORE_RED, the intended TDD
+  gate, and the model has no revert), and 5 VALID_RED with test edits on an exhausted harness budget.
+- `oracle-run-machine.cases.mjs` (registered from `oracle-stage-machine.test.mjs`): the kernel proofs, the progress
+  count, and a conformance replay. 31 traces (636 steps, walked to the nearest uncovered item) cover all 364 (run
+  state + packet, VALID_RED recorded, command, outcome) items the model reaches; each step runs the real CLI in a
+  temporary Low-risk workspace and compares the outcome (error code → refusal class), run state, RED/GREEN history,
+  spent count and renewal with the model. After every step it also checks that the ledger only grows, that a refusal
+  leaves `run-state.json` and `runs.jsonl` byte-identical, that `status` replayed from the ledger on the init
+  `run-state.json` gives the same state and spent count after every accepted ledger write, and that `status --brief`
+  names exactly the phase's command (`red`, `green`, `close --packet`, else `close --check-report`). At ORACLE_READY
+  with production touched it still names `red`, which is refused.
+- Bug fixed (found by the replay): a first VALID_RED (ORACLE_READY, no milestones) cited a failing run without
+  checking that the worktree was unchanged since it, so the test bytes VALID_RED binds might never have failed; the
+  refresh path already checked this. It now runs `assertRunFresh(..., 'SNAPSHOT_STALE')` after the RUN_NOT_RED and
+  HARNESS_RED_REQUIRED checks (oracle-run.mjs:3384-3392). Regression case "VALID_RED refuses a failing run older than
+  the test bytes it binds".
+- Bug fixed (found by the review), same class: milestone VALID_RED never compared the `red:<name>` runs with the
+  current test bytes, so a milestone test edited after its RED was bound unfailed. `assertMilestoneTestsFresh`
+  (oracle-run.mjs:497-511, called at :3362) refuses SNAPSHOT_STALE when a test file a milestone run recorded in
+  `changedTests` now has other bytes, or a test file changed since init is missing from the last milestone run (a
+  run from before `changedTests` existed is stale too). Rerunning the stale `red:<name>` on the current bytes
+  clears it. Regression case "O6: milestone VALID_RED refuses a milestone RED older than the test bytes it binds";
+  both cases fail without their fix.
+- The SNAPSHOT_STALE hint (oracle-run.mjs:211) now reads "re-run the cited label on the current bytes and cite the
+  new run" (it said "since GREEN"), and `references/delivery/red.md` names the code and its recovery in the milestone
+  paragraph, whose first sentence got shorter to make room.
+- Findings left for F3 (no code change): NEEDS_DECISION → ORACLE_READY → VALID_RED → NEEDS_DECISION is an
+  unbounded cycle with no budget spent (`red_cycle_returns`), and `init --reason` repeats without limit; a resume
+  after a production change cannot progress without reverting production, while the phase line still names `red`;
+  `exec` and `budget --spend` are still accepted at FAIL and at REVIEW_VERIFIED/PARTIAL_VERIFIED (ledger and budget
+  change after close); deleting `run-state.json` cannot be recovered from `runs.jsonl` (the init entry lacks the
+  baseline); the resume's `--run` is only checked for existence.
+- Review fixes (independent Opus review, applied once): the milestone freshness gap above; "no stuck state" replaced
+  by what is proven plus the progress count; the rank wording (here and the `Q_forward` comment); the SNAPSHOT_STALE
+  hint and red.md line; the phase line checked after every step against one exact command per state, and
+  `hint_legal` described as a protocol edge only; a clear failure when the workspace cannot be made, and the replay
+  pool stops taking traces after the first failure.
+
+## Verification
+
+- `prove --dir test-fixtures/delivery`: proven, cells `hint_legal` 9 and `spend_monotone` 24. `prove-reach`: proven,
+  1,295 reachable, diameter 16. Kernel case ~25–36 s, conformance case ~50 s (6 workspaces in parallel, 636 steps
+  plus a `status --brief` after each).
+- Every refusal class of the model (17) is reached; the replay found only the VALID_RED freshness gap above.
+- Byte budgets (no cap raised): the first red.md wording put the Formal Delivery closure at 446,009 bytes, over its
+  446,000 cap; the sentence was shortened and the closure test passes.
+- `pnpm bundles:generate`: 22 bundles regenerated; `npx prettier --check` (repo root) on bundles, red.md, this file
+  and the fixture README: clean.
+- `pnpm lint` (frontend-oracle-design): 0 errors (406 existing warnings), bundles and evals checks ok.
+- `pnpm test`: 1314 pass, 0 fail, 0 skipped (1310 before: two regression cases and the two delivery machine cases).
+
 # 0.120.0: the Formal controller docs follow the six phases, and six doc conflicts resolved from the code
 
 ## Why

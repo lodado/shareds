@@ -1,0 +1,426 @@
+import assert from 'node:assert/strict'
+import { Buffer } from 'node:buffer'
+import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { readFile, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import process from 'node:process'
+import { fileURLToPath } from 'node:url'
+import { isDeepStrictEqual } from 'node:util'
+import { compileBend } from './oracle-model.mjs'
+import { bindReviewDocument, runAsync, strictReviewPacketArgs, workspace } from './oracle-run.cases.mjs'
+import { installedBend } from './oracle-test-bend.mjs'
+import { toPlain } from './oracle-types.mjs'
+
+// The delivery fixture models the Delivery run of oracle-run.mjs: its run state, the facts its guards read and the
+// commands that change them. These cases prove its laws with the kernel and drive the real CLI along traces that
+// cover every (run state, VALID_RED recorded, command, outcome) the model reaches, checking each step against the
+// model. oracle-stage-machine.test.mjs registers them next to the stage machine.
+const DELIVERY = fileURLToPath(new URL('../../../test-fixtures/delivery/', import.meta.url))
+const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
+const { NODE_TEST_CONTEXT: _parent, ...CHILD_ENV } = process.env
+
+const oracleModel = (...args) =>
+  spawnSync(process.execPath, [join(SCRIPTS, 'oracle-model.mjs'), ...args], { encoding: 'utf8', env: CHILD_ENV, maxBuffer: 1 << 26 })
+
+async function provenLaws(t) {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const cells = oracleModel('prove', '--dir', DELIVERY, '--timeout-ms', '300000')
+  assert.equal(cells.status, 0, cells.stderr)
+  const proven = JSON.parse(cells.stdout)
+  assert.equal(proven.status, 'proven', `${proven.stdout}${proven.stderr}`)
+  assert.deepEqual(proven.cells, { generated: [{ law: 'hint_legal', cases: 9 }, { law: 'spend_monotone', cases: 24 }], skipped: [], temporaryCopy: true })
+
+  // 15,552 states of the type × 19 commands; the proof has an arm per state of the type and per reached cell
+  const reach = oracleModel('prove-reach', '--model', join(DELIVERY, 'MODEL.bend'), '--prefix', 'Del', '--safe', 'safe', '--max-cells', '300000', '--timeout-ms', '600000')
+  assert.equal(reach.status, 0, reach.stderr)
+  const reached = JSON.parse(reach.stdout)
+  assert.equal(reached.status, 'proven', reach.stdout.slice(0, 2000))
+  assert.deepEqual({ domain: reached.domain, reachable: reached.reachable, diameter: reached.diameter }, {
+    domain: { states: 15552, events: 19, cells: 295488 },
+    reachable: 1295,
+    diameter: 16,
+  })
+}
+
+// ---- the model against oracle-run.mjs
+
+const STATE = {
+  ORACLE_READY: 'AtReady',
+  VALID_RED: 'AtRed',
+  IMPLEMENTED_GREEN: 'AtGreen',
+  REVIEW_VERIFIED: 'AtVerified',
+  PARTIAL_VERIFIED: 'AtPartial',
+  NEEDS_DECISION: 'AtDecision',
+  FAIL: 'AtFail',
+}
+// each error code the commands report, by the model's refusal class
+const WHY = {
+  TRANSITION_NOT_ALLOWED: 'NotAllowed',
+  HOLDS_OPEN: 'HoldsMismatch',
+  NO_OPEN_HOLDS: 'HoldsMismatch',
+  RUN_NOT_FOUND: 'RunMissing',
+  RUN_NOT_RED: 'NotRed',
+  RUN_NOT_GREEN: 'NotGreen',
+  PRODUCTION_TOUCHED_BEFORE_RED: 'ProdTouched',
+  SNAPSHOT_STALE: 'Stale',
+  REVIEW_RUN_STALE: 'Stale',
+  FLAKINESS_GATE: 'Flaky',
+  REVIEW_RERUN_REQUIRED: 'Rerun',
+  REVIEW_PACKET_REQUIRED: 'PacketMissing',
+  REVIEW_PACKET_INVALID: 'PacketMissing',
+  REVIEWER_EVIDENCE_INVALID: 'ReceiptMissing',
+  HARNESS_BUDGET_REQUIRED: 'BudgetRequired',
+  EVIDENCE_STALE: 'EvidenceStale',
+  BUDGET_EXHAUSTED: 'Exhausted',
+  RUN_ARTIFACTS_EXIST: 'AmendClosed',
+  REVIEW_PACKET_STATE: 'WrongState',
+  REVIEW_RECEIPT_STATE: 'WrongState',
+  MISSING_REASON: 'NoReason',
+}
+// The command `status --brief` names next (deliveryPhaseLine) after every step, by run state. It is the phase's own
+// command, not one that would be accepted: at ORACLE_READY with production touched it still names `red`, which
+// PRODUCTION_TOUCHED_BEFORE_RED refuses until production is reverted.
+const HINT = {
+  AtReady: 'red',
+  AtRed: 'green',
+  AtGreen: 'close --packet',
+  AtVerified: 'close --check-report',
+  AtPartial: 'close --check-report',
+  AtDecision: 'close --check-report',
+  AtFail: 'close --check-report',
+}
+const expectedHint = (state) => HINT[toPlain(state).at.$]
+/** `red`, `green`, `guide --to <state>`, `close --packet` or `close --check-report` from a phase line. */
+function hintOf(line) {
+  const match = /· next: oracle-run\.mjs (\w+) --dir \S+( --to \w+| --packet| --check-report)?/.exec(line)
+  if (!match) return line
+  if (match[1] === 'red' || match[1] === 'green') return match[1]
+  return `${match[1]}${match[2] ?? ''}`
+}
+const RED_TEST = "import test from 'node:test'\ntest('save > pending', () => { throw new Error('expected RED') })\n"
+// file edits change no ledger; every other accepted command writes the ledger except a free pre-RED spend
+const EDITS = new Set(['EditProd', 'EditTest'])
+// coverage items the model reaches and the traces that cover them
+const ITEMS = 364
+const TRACES = 31
+
+const listItems = (list) => {
+  const items = []
+  for (let cursor = list; cursor?.$ === 'Con'; cursor = cursor.tail) items.push(cursor.head)
+  return items
+}
+const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex')
+const readOr = (path) => readFile(path).catch(() => Buffer.alloc(0))
+
+function loadModel(exported) {
+  const call =
+    (name) =>
+    (...args) =>
+      exported[`Del.${name}`](...args.map((argument) => structuredClone(argument)))
+  const enabled = call('enabled')
+  return { init: call('init'), step: call('step'), decide: call('decide'), enabled: (state) => listItems(enabled(state)) }
+}
+
+/** One coverage item per cell: the run state (with the packet of a GREEN visit), whether VALID_RED was ever recorded, the command and its outcome. */
+function itemOf(model, state, message) {
+  const s = toPlain(state)
+  const o = toPlain(model.decide(state, message))
+  const at = s.at.packet ? `${s.at.$}.${s.at.packet.$}` : s.at.$
+  return `${at}|red:${s.red}|${JSON.stringify(toPlain(message))}|${o.$ === 'Took' ? 'Took' : o.why.$}`
+}
+
+function reachableItems(model) {
+  const items = new Set()
+  const seen = new Set()
+  const queue = [model.init()]
+  while (queue.length > 0) {
+    const state = queue.shift()
+    const key = JSON.stringify(toPlain(state))
+    if (seen.has(key)) continue
+    seen.add(key)
+    for (const message of model.enabled(state)) {
+      items.add(itemOf(model, state, message))
+      queue.push(model.step(state, message))
+    }
+  }
+  return { reachable: seen.size, items }
+}
+
+/**
+ * Progress over the reachable graph (not a kernel proof): how many reached states cannot reach FAIL, and which
+ * non-FAIL states cannot reach REVIEW_VERIFIED or PARTIAL_VERIFIED, by run state.
+ */
+function progress(model) {
+  const successors = new Map()
+  const at = new Map()
+  const queue = [model.init()]
+  while (queue.length > 0) {
+    const state = queue.shift()
+    const key = JSON.stringify(toPlain(state))
+    if (successors.has(key)) continue
+    at.set(key, toPlain(state).at.$)
+    const next = model.enabled(state).map((message) => model.step(state, message))
+    successors.set(key, next.map((after) => JSON.stringify(toPlain(after))))
+    queue.push(...next)
+  }
+  const reaching = (goal) => {
+    const reached = new Set([...at].filter(([, phase]) => goal.has(phase)).map(([key]) => key))
+    for (let grew = true; grew; ) {
+      grew = false
+      for (const [key, next] of successors) {
+        if (reached.has(key) || !next.some((after) => reached.has(after))) continue
+        reached.add(key)
+        grew = true
+      }
+    }
+    return reached
+  }
+  const fail = reaching(new Set(['AtFail']))
+  const reviewed = reaching(new Set(['AtVerified', 'AtPartial']))
+  const stuck = {}
+  for (const [key, phase] of at) if (phase !== 'AtFail' && !reviewed.has(key)) stuck[phase] = (stuck[phase] ?? 0) + 1
+  return { cannotFail: at.size - fail.size, stuck }
+}
+
+/** The shortest path from `start` to a cell whose item is still uncovered, ending with that cell's command. */
+function nearestUncovered(model, start, left) {
+  const frontier = [[start, []]]
+  const visited = new Set()
+  while (frontier.length > 0) {
+    const [state, path] = frontier.shift()
+    const key = JSON.stringify(toPlain(state))
+    if (visited.has(key)) continue
+    visited.add(key)
+    for (const message of model.enabled(state)) {
+      if (left.has(itemOf(model, state, message))) return [...path, message]
+      frontier.push([model.step(state, message), [...path, message]])
+    }
+  }
+  return null
+}
+
+/** Traces from init that cover every reachable item: each walks to the nearest uncovered item until none is left or it is `cap` long. */
+function coveringTraces(model, cap = 30) {
+  const { reachable, items } = reachableItems(model)
+  const left = new Set(items)
+  const traces = []
+  while (left.size > 0) {
+    let state = model.init()
+    const trace = []
+    for (let path = nearestUncovered(model, state, left); path && trace.length < cap; path = nearestUncovered(model, state, left)) {
+      for (const message of path) {
+        left.delete(itemOf(model, state, message))
+        state = model.step(state, message)
+        trace.push(message)
+      }
+    }
+    traces.push(trace)
+  }
+  return { reachable, items: items.size, traces }
+}
+
+/** The facts of the run state a guard reads, as run-state.json records them. */
+async function observe(directory) {
+  const state = JSON.parse(await readFile(join(directory, 'run-state.json'), 'utf8'))
+  const history = state.history ?? []
+  const spent = state.budgets.harness.spent
+  return {
+    at: STATE[state.state],
+    red: state.harnessAtValidRed != null || history.some((entry) => entry.state === 'VALID_RED'),
+    greened: history.some((entry) => entry.state === 'IMPLEMENTED_GREEN'),
+    spent,
+    renewed: spent > (state.harnessBudgetAtValidRed ?? 0),
+  }
+}
+
+function expectedOf(model, state, message) {
+  const outcome = toPlain(model.decide(state, message))
+  const after = toPlain(model.step(state, message))
+  return {
+    outcome: outcome.$ === 'Took' ? 'Took' : outcome.why.$,
+    at: after.at.$,
+    red: after.red,
+    greened: after.greened,
+    spent: Number(after.harness.spent.$.slice(-1)),
+    renewed: after.harness.renewed,
+  }
+}
+
+/** The CLI commands of each model event on one Low-risk workspace. */
+function deliveryCommands({ root, dir, lock }, session) {
+  const evidence = join(dir, 'evidence.json')
+  const findings = join(dir, 'findings.json')
+  const counter = { report: 0, prod: 0, test: 0, packet: 0, task: 0 }
+  const done = { status: 0, stdout: '', stderr: '' }
+  const latestRun = async () => {
+    const lines = (await readOr(join(dir, 'runs.jsonl'))).toString('utf8').split('\n').filter(Boolean)
+    return lines.map((line) => JSON.parse(line)).filter((entry) => entry.type === 'run').at(-1)?.runId ?? 'r-999'
+  }
+  const transition = async (to, ...rest) => runAsync(['transition', '--dir', dir, '--to', to, '--run', await latestRun(), ...rest])
+  const cited = () => (session.packet ? ['--packet', session.packet.path, '--revision', session.packet.revision] : [])
+  return {
+    Exec: ({ pass }) => {
+      counter.report += 1
+      const testFile = join(root, pass ? 'oracle-green-fixture.test.mjs' : 'oracle-red-fixture.test.mjs')
+      const report = join(dir, `report-${counter.report}.ndjson`)
+      return runAsync(['exec', '--dir', dir, '--label', 'behavior', '--adapter', 'node-test', '--report', report, '--', process.execPath, '--test', testFile])
+    },
+    EditProd: async () => {
+      counter.prod += 1
+      await writeFile(join(root, 'src', 'save.mjs'), `export const save = ${counter.prod}\n`)
+      return done
+    },
+    EditTest: async () => {
+      counter.test += 1
+      await writeFile(join(root, 'src', 'extra.test.mjs'), `import assert from 'node:assert'\n${'assert.equal(1, 1)\n'.repeat(counter.test)}`)
+      return done
+    },
+    Spend: () => runAsync(['budget', '--dir', dir, '--spend', 'harness', '--reason', 'harness repair']),
+    Amend: () => runAsync(['init', '--dir', dir, '--lock', lock, '--risk', 'low', '--scan-root', root, '--required-label', 'behavior', '--reason', 'correct the labels']),
+    MarkRed: () => transition('VALID_RED', '--evidence', evidence, '--row', 'O1'),
+    MarkGreen: () => transition('IMPLEMENTED_GREEN', '--evidence', evidence, '--reason', 'existing behavior'),
+    Review: async ({ to, holds }) => {
+      const holdsFile = join(dir, 'oracle.package.json')
+      if (holds) await writeFile(holdsFile, JSON.stringify({ holds: [{ id: 'H1', question: 'late success?', blocks: ['O1'], status: 'open' }] }))
+      const target = to.$ === 'ToVerified' ? 'REVIEW_VERIFIED' : 'PARTIAL_VERIFIED'
+      const result = await transition(target, '--evidence', evidence, '--findings', findings, ...cited())
+      await rm(holdsFile, { force: true })
+      return result
+    },
+    MakePacket: async () => {
+      counter.packet += 1
+      const path = join(dir, `packet-${counter.packet}.json`)
+      const result = await runAsync(strictReviewPacketArgs(dir, path))
+      if (result.status === 0) {
+        const bytes = await readFile(path)
+        session.packet = { path, revision: JSON.parse(bytes.toString('utf8')).targetSnapshot.worktreeSha256, sha256: sha256(bytes) }
+      }
+      return result
+    },
+    Attest: () => {
+      counter.task += 1
+      if (session.packet) bindReviewDocument(findings, session.packet.sha256, session.packet.revision)
+      const packet = session.packet ? cited() : ['--packet', join(dir, 'no-packet.json'), '--revision', 'none']
+      return runAsync(['review-receipt', '--dir', dir, ...packet, '--findings', findings, '--role', 'code-reviewer', '--reviewer', 'primary-code-reviewer', '--task-id', `review-${counter.task}`])
+    },
+    Stop: ({ to, reason }) =>
+      runAsync(['transition', '--dir', dir, '--to', to.$ === 'StopFail' ? 'FAIL' : 'NEEDS_DECISION', ...(reason ? ['--reason', 'stop here'] : [])]),
+    Resume: () => transition('ORACLE_READY'),
+  }
+}
+
+async function deliveryRun(t) {
+  const fixture = await workspace(t, { risk: 'low', initialFiles: { 'oracle-red-fixture.test.mjs': RED_TEST } })
+  assert.ok(fixture, 'workspace() could not create the temporary Delivery run')
+  const dir = fixture.oracleDirectory
+  const statePath = join(dir, 'run-state.json')
+  // a packet belongs to one GREEN visit: leaving IMPLEMENTED_GREEN drops it
+  const session = { packet: null }
+  const commands = deliveryCommands({ root: fixture.root, dir, lock: fixture.lock }, session)
+  const initialState = await readFile(statePath)
+  return {
+    dir,
+    async perform(message) {
+      const result = await commands[message.$](message)
+      if ((await observe(dir)).at !== 'AtGreen') session.packet = null
+      return result
+    },
+    /** status replayed from the ledger on the run-state.json init wrote — the ledger alone carries every later change. */
+    async replayed() {
+      const current = await readFile(statePath)
+      await writeFile(statePath, initialState)
+      try {
+        const status = await runAsync(['status', '--dir', dir, '--json'])
+        assert.equal(status.status, 0, status.stderr)
+        const parsed = JSON.parse(status.stdout)
+        return { at: STATE[parsed.currentState], spent: parsed.remainingBudgets.harness.spent }
+      } finally {
+        await writeFile(statePath, current)
+      }
+    },
+    brief: () => runAsync(['status', '--dir', dir, '--brief']),
+  }
+}
+
+/** What one step did beyond its outcome: a rewritten ledger, a refusal that wrote, a state the ledger alone does not give back. */
+async function sideEffects(run, message, observed, before) {
+  const found = []
+  const ledger = await readOr(join(run.dir, 'runs.jsonl'))
+  if (!ledger.subarray(0, before.ledger.length).equals(before.ledger)) found.push({ ledger: 'rewritten' })
+  if (observed.outcome !== 'Took' && (!ledger.equals(before.ledger) || !(await readOr(join(run.dir, 'run-state.json'))).equals(before.state)))
+    found.push({ refusal: 'wrote' })
+  if (observed.outcome === 'Took' && !EDITS.has(message.$) && !ledger.equals(before.ledger)) {
+    const replayed = await run.replayed()
+    if (!isDeepStrictEqual(replayed, { at: observed.at, spent: observed.spent })) found.push({ replayed, observed })
+  }
+  return found
+}
+
+/** Replay one trace on the CLI; every step must end where the model says. Returns the differences. */
+async function replayTrace(t, model, trace) {
+  const run = await deliveryRun(t)
+  const differences = []
+  let state = model.init()
+  for (const [index, message] of trace.entries()) {
+    const before = { state: await readOr(join(run.dir, 'run-state.json')), ledger: await readOr(join(run.dir, 'runs.jsonl')) }
+    const plain = toPlain(message)
+    const result = await run.perform(plain)
+    const code = result.stderr.split(':')[0]
+    const observed = { outcome: result.status === 0 ? 'Took' : (WHY[code] ?? `${code} ${result.stderr.slice(0, 300)}`), ...(await observe(run.dir)) }
+    const wanted = expectedOf(model, state, message)
+    const where = { step: index, event: JSON.stringify(plain), after: trace.slice(0, index).map((entry) => JSON.stringify(toPlain(entry))).join(' ') }
+    if (!isDeepStrictEqual(observed, wanted)) differences.push({ ...where, observed, wanted })
+    for (const effect of await sideEffects(run, plain, observed, before)) differences.push({ ...where, ...effect })
+    if (differences.length > 0) return differences
+    state = model.step(state, message)
+    const brief = await run.brief()
+    const hint = brief.status === 0 ? hintOf(brief.stdout) : brief.stderr
+    if (hint !== expectedHint(state)) return [{ ...where, phaseLine: hint, wanted: expectedHint(state), state: toPlain(state) }]
+  }
+  return differences
+}
+
+async function pool(items, size, work) {
+  const results = Array.from({ length: items.length })
+  let next = 0
+  // after one worker throws, the others take no new item: the test is failing and its workspaces are being removed
+  let failed = false
+  const worker = async () => {
+    while (next < items.length && !failed) {
+      const index = next
+      next += 1
+      try {
+        results[index] = await work(items[index], index)
+      } catch (error) {
+        failed = true
+        throw error
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: size }, worker))
+  return results
+}
+
+async function conformance(t) {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const { exported } = await compileBend({ entry: join(DELIVERY, 'MODEL.bend'), bin })
+  const model = loadModel(exported)
+  const { reachable, items, traces } = coveringTraces(model)
+  assert.equal(reachable, 1295)
+  assert.equal(items, ITEMS)
+  assert.equal(traces.length, TRACES)
+  // every reached state can still reach FAIL; 276 cannot reach a reviewed state: ORACLE_READY or NEEDS_DECISION with
+  // production touched (the model has no revert, and VALID_RED and GREEN refuse a touched production), and VALID_RED
+  // with test edits and an exhausted harness budget
+  assert.deepEqual(progress(model), { cannotFail: 0, stuck: { AtReady: 147, AtDecision: 124, AtRed: 5 } })
+  const differences = (await pool(traces, 6, (trace) => replayTrace(t, model, trace))).flat()
+  assert.deepEqual(differences, [])
+}
+
+export const deliveryMachineCases = [
+  ['[bend] the delivery laws are proven by the kernel: cells, witnesses, and every law on every reached state', provenLaws],
+  ['[bend] the CLI answers every (run state, VALID_RED recorded, command, outcome) the model reaches the way the model does', conformance],
+]

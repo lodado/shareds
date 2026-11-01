@@ -47,8 +47,9 @@ world` and every `HARD` `D*` row) gets a hand-written test through `$test`: vite
 If the card is large and milestones were declared at init, run a reported RED with the `red:<name>`
 label immediately after writing each bundle. After every bundle has actually failed, quote the last
 milestone run with `--run` and transition to the global `VALID_RED`. If even one is missing it is
-`MILESTONE_RED_MISSING`, and no independent lock·state is created. A milestone only pulls initial RED
-feedback earlier; GREEN·review stay on the existing global gates.
+`MILESTONE_RED_MISSING`, and no independent lock·state is created. Milestones only move RED feedback
+earlier; GREEN·review keep the global gates. `SNAPSHOT_STALE`: a test changed after the cited or a
+milestone RED; rerun that RED and cite the new run.
 
 Use the current `status --dir <dir>` action's command. When no work separates execution and
 transition, `oracle-run.mjs red` combines exec·verify·transition with identical checks; see

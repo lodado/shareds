@@ -208,7 +208,7 @@ const NEXT_ACTIONS = {
   REVIEW_PACKET_STALE: 'the input changed since the packet — generate a new one at a new `close --packet` path, never edit it',
   CLOSE_PENDING: 'supply the reviewer output or report named above, then rerun the same `close`',
   REVIEW_RERUN_REQUIRED: 're-run the GREEN command after applying findings and cite the new run',
-  SNAPSHOT_STALE: 'bytes changed since GREEN — re-run the required labels and cite the new runs',
+  SNAPSHOT_STALE: 're-run the cited label on the current bytes and cite the new run',
   REVIEW_RUN_STALE: 're-run the cited command against the current bytes',
   FINDINGS_BLOCKING: 'fix the PRODUCT_DEFECT findings and re-verify, or route a POLICY_GAP to NEEDS_DECISION',
   FINDINGS_INVALID: 'findings must use the six classifications and cite real card rows — regenerate the findings file',
@@ -492,6 +492,21 @@ function requiredMilestoneRuns(milestones, ledger) {
     }
     return { ...milestone, index, run }
   })
+}
+
+/**
+ * VALID_RED binds the test bytes on disk now: no test file may differ from what each milestone RED ran on, and the
+ * last milestone RED must have seen every test file changed since init.
+ */
+function assertMilestoneTestsFresh(milestoneRuns, lastRun, changedTestsNow, current) {
+  const unseen = changedTestsNow.find((path) => !Object.hasOwn(lastRun.changedTests ?? {}, path))
+  if (unseen) throw new CliError('SNAPSHOT_STALE', `${lastRun.runId} predates the current test bytes (${unseen})`)
+  for (const { run } of milestoneRuns) {
+    const edited = Object.entries(run.changedTests ?? {}).find(([path, digest]) => (current[path] ?? null) !== digest)
+    if (!run.changedTests || edited) {
+      throw new CliError('SNAPSHOT_STALE', `${run.runId} predates the current test bytes (${edited?.[0] ?? 'no test digests'})`)
+    }
+  }
 }
 
 function countOccurrences(content, token) {
@@ -3344,6 +3359,7 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
       if (run.runId !== last.run.runId) {
         throw new CliError('MILESTONE_RUN_INVALID', `--run must cite the last milestone RED: ${last.run.runId}`)
       }
+      assertMilestoneTestsFresh(milestoneRuns, last.run, changedPaths(state.snapshot ?? {}, current).filter(isTestPath), current)
 
       for (const milestone of milestoneRuns) {
         if ((state.harnessPaths ?? []).length > 0 && !sameDigests(milestone.run.harnessSha256, currentHarness)) {
@@ -3365,6 +3381,15 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
       if ((state.harnessPaths ?? []).length > 0 && !sameDigests(run.harnessSha256, currentHarness)) {
         throw new CliError('HARNESS_RED_REQUIRED', 'the selected RED predates the current harness bytes')
       }
+      // VALID_RED binds the test bytes on disk now, so the cited failure must have run on these bytes
+      assertRunFresh(
+        run,
+        sha256(JSON.stringify(current)),
+        productionSha256(current, state.harnessPaths),
+        currentHarness,
+        revision.lockManifestSha256,
+        'SNAPSHOT_STALE',
+      )
 
       verifyRedRow(options.row, run.runId)
     }

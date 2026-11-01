@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 import { sha256 } from './oracle-fs.mjs'
 import { compileBend } from './oracle-model.mjs'
+import { deliveryMachineCases } from './oracle-run-machine.cases.mjs'
 import { assertReadyToLock, assertRelockPinned, inputsPin, markLocked, readStage } from './oracle-stage.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 import { parseBendTypes, toPlain, typeIR, valuesOf } from './oracle-types.mjs'
@@ -347,3 +348,6 @@ test('[bend] every stage the model reaches answers every event the way oracle-st
     .filter(({ actual, wanted }) => !isDeepStrictEqual(actual, wanted))
   assert.deepEqual(differ, [])
 })
+
+// the Delivery run machine of oracle-run.mjs, proven and driven the same way
+for (const args of deliveryMachineCases) test(...args)
