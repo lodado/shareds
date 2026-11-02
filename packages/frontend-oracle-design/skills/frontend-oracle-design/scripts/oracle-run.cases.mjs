@@ -7441,6 +7441,71 @@ test("the review line asks for a rerun when a required label's latest run fails,
   assert.match(run(['guide', '--dir', oracleDirectory, '--to', 'REVIEW_VERIFIED']).stdout, /^blockers: .*NO_FRESH_GREEN_RUN/m)
 })
 
+test('status does not call GREEN ready while a bare required label passed only exit-only, and guide says what to rerun', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { risk: 'low', requiredLabels: ['behavior', 'repo-test'] })
+  const greenAction = () => JSON.parse(run(['status', '--dir', oracleDirectory, '--json']).stdout).nextActions.find((action) => action.to === 'IMPLEMENTED_GREEN')
+  await reachValidRed(oracleDirectory, root)
+  for (const label of ['green-1', 'green-2']) assert.equal(greenRun(oracleDirectory, label).status, 0)
+  // `npm test` under the bare label `repo-test`: it passes, exit-only — the transition refuses that grade
+  const exitOnly = run(['exec', '--dir', oracleDirectory, '--label', 'repo-test', '--', process.execPath, '-e', 'process.exit(0)'])
+  assert.equal(exitOnly.status, 0, exitOnly.stderr)
+  const blocked = greenAction()
+  assert.equal(blocked.ready, false)
+  assert.ok(blocked.blockers.includes('REQUIRED_LABEL_GRADE'), blocked.blockers.join(', '))
+  const refused = transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003')
+  assert.match(
+    refused.stderr,
+    /^REQUIRED_LABEL_GRADE: required label "repo-test" needs a passing reported run for the current snapshot: its latest run r-\d+ passed as exit-only, and the label takes reported\nnext: make that label pass on the current bytes and rerun it with the grade it asks for: a bare label needs a reported run/,
+  )
+  // the phase line sends the agent to guide, which names the fix instead of a green that would be refused again
+  assert.match(run(['status', '--dir', oracleDirectory, '--brief']).stdout, /· next: oracle-run\.mjs guide --dir \S+ --to IMPLEMENTED_GREEN /)
+  assert.match(run(['guide', '--dir', oracleDirectory, '--to', 'IMPLEMENTED_GREEN']).stdout, /^fix REQUIRED_LABEL_GRADE: make that label pass/m)
+  // the same code for a reported run that failed: the message says it did not pass, not that its grade is wrong
+  const failingTest = resolve(oracleDirectory, '../../../packages/oracle-red-fixture.test.mjs')
+  const reportPath = join(oracleDirectory, 'repo-test-failing.ndjson')
+  run(['exec', '--dir', oracleDirectory, '--label', 'repo-test', '--adapter', 'node-test', '--report', reportPath, '--', process.execPath, '--test', failingTest])
+  assert.match(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').stderr, /^REQUIRED_LABEL_GRADE: required label "repo-test" needs a passing reported run for the current snapshot: its latest run r-\d+ did not pass\n/)
+  // a reported run of the same label clears it
+  assert.equal(reportedLabelRun(oracleDirectory, 'repo-test').status, 0)
+  assert.equal(greenAction().ready, true)
+  assert.equal(transition(oracleDirectory, 'IMPLEMENTED_GREEN', 'r-003').status, 0)
+})
+
+test('a node-test command with a bare node or a missing report folder is refused before a run id, with the fix it needs', async (t) => {
+  const { root, oracleDirectory } = await workspace(t, { risk: 'low' })
+  const testPath = join(root, 'oracle-green-fixture.test.mjs')
+  const exec = (command, report) =>
+    run(['exec', '--dir', oracleDirectory, '--label', 'behavior', '--adapter', 'node-test', '--report', report, '--', ...command])
+  const bare = exec(['node', '--test', testPath], join(oracleDirectory, 'bare.ndjson'))
+  assert.equal(bare.status, 1)
+  assert.equal(
+    bare.stderr,
+    `ADAPTER_COMMAND_INVALID: node-test adapter requires node --test\nnext: start the command with this node's absolute path, not "node": ${process.execPath} --test <test files> (oracle-step.mjs rewrites a bare node)\n`,
+  )
+  const report = join(oracleDirectory, 'reports', 'behavior.ndjson')
+  const unplaced = exec([process.execPath, '--test', testPath], report)
+  assert.equal(unplaced.status, 1)
+  assert.match(unplaced.stderr, /^REPORT_DIRECTORY_MISSING: \S+reports does not exist; no run id was used\nnext: create the --report folder first/)
+  // neither refusal reserved a run id: the first run that executes is r-001
+  await mkdir(dirname(report), { recursive: true })
+  const placed = exec([process.execPath, '--test', testPath], report)
+  assert.equal(placed.status, 0, placed.stderr)
+  assert.match(placed.stdout, /^RUN_RECORDED r-001 /)
+})
+
+test("the node-test remedy quotes this node's path, so a path with a space reads back as one word", async () => {
+  const { TRUSTED_ADAPTERS } = await import('./oracle-adapters.mjs')
+  const execPath = "/opt/my tools/it's/node"
+  for (const command of [['node', '--test', 'a.test.mjs'], [execPath, 'a.test.mjs']]) {
+    const remedy = TRUSTED_ADAPTERS['node-test'].remedy(command, { execPath })
+    const shown = /: (.+) --test <test files>/.exec(remedy)[1]
+    // the shell reads the printed word back as the path itself
+    const echoed = spawnSync('/bin/sh', ['-c', `printf '%s\\n' ${shown}`], { encoding: 'utf8' })
+    assert.equal(echoed.stdout, `${execPath}\n`, remedy)
+  }
+  assert.match(TRUSTED_ADAPTERS['node-test'].remedy(['node'], { execPath: '/usr/bin/node' }), /: \/usr\/bin\/node --test <test files>/)
+})
+
 function closeArgs(oracleDirectory, packetPath, ...extra) {
   return [
     'close',

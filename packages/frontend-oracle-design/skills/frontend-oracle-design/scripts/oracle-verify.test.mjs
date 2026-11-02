@@ -2419,6 +2419,24 @@ test('O23: review 명령은 v2 findings를 packet·revision·evidence map에 묶
   )
   assert.equal(rejected.status, 1)
   assert.match(rejected.stderr, /^FINDINGS_BLOCKING: /)
+  // the remedy names the blocking findings by their class
+  assert.match(rejected.stderr, /\nnext: f-1 PRODUCT_DEFECT: fix production for the same row, rerun the GREEN labels and close again\n$/)
+
+  // no PRODUCT_DEFECT among them: the remedy routes each class it has (repair the evidence, ask the user) and never says
+  // to fix product defects that are not there
+  const gaps = await reviewFixture(t, [
+    { ...blockingFinding, id: 'e-1', classification: 'EVIDENCE_GAP', finding: 'onError arguments are never asserted' },
+    { ...blockingFinding, id: 'p-1', classification: 'POLICY_GAP', finding: 'a throwing onError is not decided' },
+    { ...blockingFinding, id: 'e-2', classification: 'EVIDENCE_GAP', finding: 'the exhaustive claim is a sample' },
+  ], { name: 'gaps.json' })
+  const routed = run('review', '--file', gaps.findingsPath, '--oracle', gaps.oracle, '--packet', gaps.packetPath, '--revision', gaps.revision, '--map', gaps.map)
+  assert.equal(routed.status, 1)
+  const next = routed.stderr.split('\n').find((line) => line.startsWith('next: '))
+  assert.equal(
+    next,
+    'next: e-1, e-2 EVIDENCE_GAP: add only the missing tests·evidence within the locked card (a test change after VALID_RED spends harness), rerun and close again; p-1 POLICY_GAP: the card does not decide it: transition to NEEDS_DECISION with the card and the question for the user',
+  )
+  assert.equal(routed.stderr.split('\n').filter((line) => line.startsWith('next: ')).length, 1)
 
   const accepted = run(
     'review',

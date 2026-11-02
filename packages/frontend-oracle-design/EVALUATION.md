@@ -1,3 +1,113 @@
+# 0.126.0: step names the gates in order, holds what a gate would refuse, and lists late package issues before the walk
+
+## Why
+
+Wave S1.1. Two Sonnet runs of 0.125.0 against the 0.124.0 baseline: case 1 took 34 min (was 49), 253 tool calls
+(382), about 8 refusals (12) and reached REVIEW_VERIFIED; case 2 took 51 min (55), about 284 calls (367), 8 refusals
+(22) and ended in a correct NEEDS_DECISION on a POLICY_GAP. The call counts are the agent runtime's tool-use counts;
+case 1's own friction log, which had no counter, estimated about 215. OHRIGHT moments: 7 and 7 (baseline 5 and 8). Authoring
+took about 60% of each run, and each used 5 of its 10 rewinds, mostly on package issues a gate after MODELED found one
+at a time. The refusals that remained had causes step could see.
+
+## Change
+
+- After DRAFTED, step runs two read-only checks itself, `oracle-cycle.mjs card-lint` (the lock's `card --draft`) and
+  `card --repo-policies`, then prints in order: the cold-read review with its `review-input --kind cold-read`, the
+  reverse-impossible review (`--ir`, `explore-input`), the source-aware review, repair and relint, `card --path`, the
+  user's approval, and `oracle-lock.mjs create` with each source once (the package file was listed twice). A review
+  stage.json lists as dispatched since the last rewind is not named again (`dispatchedSinceLastRewind`).
+- `card-lint` splits a failed Draft lint by where each issue is fixed: it lints a copy holding only the generated
+  region (`--root` keeps `code()` witnesses resolving against the repository); an issue that copy also raises is a
+  package patch (re-projected, then a gate-failure rewind) unless the rule takes a hand-written line, and one only the
+  hand-written sections raise is a card edit outside the markers, which check-card does not read: no rewind.
+- A Formal run's first RED waits for the adapter-pre-red review: step prints the dispatch (lock digest, files, the
+  journal line to add) until journal.md has an `adapter-pre-red` line naming this lock, and dispatches nothing.
+- A bare required label with a command no trusted adapter reports is not run (it would pass exit-only and be refused
+  REQUIRED_LABEL_GRADE): step names the `node --test` or `vitest run` form. `status` shows REQUIRED_LABEL_GRADE as a
+  blocker when the latest fresh run of a label passed on the wrong grade, and `guide` names the rerun.
+- `init` is printed with `repo-test` when package.json's test script is `node --test` or vitest, else `repo-test:exit`
+  with the reason.
+- step never attaches an adapter to a `:exit` label: a reported run of it would be refused REQUIRED_LABEL_GRADE.
+- ADAPTER_COMMAND_INVALID's next names this node's absolute path, shell-quoted (`'<exec path>' --test …`), or the
+  missing `--test`/`run`. REQUIRED_LABEL_GRADE says whether the latest run failed or passed on the wrong grade, and its
+  next fits both.
+  An adapter run whose `--report` folder is missing is refused REPORT_DIRECTORY_MISSING before a run id is used (it was
+  INPUT_UNREADABLE after the run).
+- FINDINGS_BLOCKING's next lists each blocking finding with the route of its class (PRODUCT_DEFECT fix, EVIDENCE_GAP add
+  evidence, HARNESS_DEFECT harness budget, ENVIRONMENT_DEFECT FAIL, POLICY_GAP NEEDS_DECISION). oracle-run passes the
+  verifier's `next:` line through.
+- The Inherited family is decided at the model stage with the others (MODELED refuses it); it was found only by the
+  projection. The model-package example declares it.
+- `oracle-cycle.mjs preflight --dir` (read-only): the projection-stage package issues, the cross-check's Bend-free
+  inputs (`crossCheckReadiness`: undeclared, no Case space, missing or stale translation review) and the lock's Draft
+  lint of oracle.md re-projected from the package in a scratch folder (its hand-written sections kept, linted with
+  `--root`), listed together. step runs it before every walk; with issues the walk does not run and step prints them
+  as one patch. Hand-written-only lint issues are listed (`handWritten`) and do not stop the walk.
+- Measured (three runs each, warm): preflight 0.47–0.57 s and card-lint 0.12–0.21 s on the largest package at hand
+  (stale-search fixture, 46.7 KB package, 28.6 KB card), including a failing lint that runs the second, generated-only
+  lint; 0.53 s and 0.21 s on case 2 (27.3 KB package), 1.34 s for its first, cold preflight. No skip cache was added.
+- The model analyst's input withholds the Space discovery record's `## State Model`, so the analyst writes its own
+  reading for `crossCheck.states`.
+
+## Tests
+
+- oracle-step.cases.mjs: authoringToLock now checks the DRAFTED checks, the gate order, one package source, a
+  registered cold-read left out of the list, a hand-written sweep issue (card edit, no rewind, stage stays DRAFTED) and
+  a card without its region (package remedy); new preRedReview, reportedLabels (with `:exit` given `node --test` and
+  `vitest run`: no adapter), initLabel, preflightFirst (two hazards on non-world fields: both listed, stage stays
+  DISCOVERING) and preflightSeesHandWritten (a package without N/A lines fails `missing-auto-tc`; a hand-written sourced
+  N/A in oracle.md clears it in the preflight, a hand-written sweep is listed without stopping the walk; before the
+  first projection step names `oracle-cycle.mjs walk`). oracle-run.cases.mjs: a misgraded label shows REQUIRED_LABEL_GRADE in status
+  and guide, a failed reported run is told apart from a misgraded one, and a reported rerun clears it; a bare `node`
+  and a missing report folder are refused with their fix and no run id; the remedy's node path with a space and a
+  quote reads back through `sh` as one word. oracle-verify.test.mjs: the PRODUCT_DEFECT next line and a mixed EVIDENCE_GAP/POLICY_GAP next line.
+  oracle-package.test.mjs: the model stage reports Inherited (the old assertion said it did not: changed on purpose);
+  the analyst input withholds the State Model.
+- Each new or changed test was run against a HEAD copy in the scratchpad: all fail there on an assertion.
+  failedGreenBytes only got realistic fixture runs (adapter and node path) and passes on both.
+- Independent Opus review round 1 (0 blocker, 0 major, 4 minor, 3 nit groups, 1 unverified risk): all applied, with the
+  cases above.
+
+## Open facts (not fixed)
+
+- Not moved to MODELED: policies, contract, self, typeContract and behavior checks are optional at the model stage by
+  design; the preflight lists them instead. The proofs, world enumeration and cross-check candidates need Bend and stay
+  CHECKED's. The card lint needs a projection, so with package issues the preflight lists those first and the lint
+  issues on the next call.
+- A package whose Space discovery record has a State Model now gets different model-input bytes: re-registering them
+  on an old run is a changed digest of an already-registered kind, which observeIteration counts as authoring round +1
+  (of 2).
+- A test command that creates its own `--report` folder used to work (the report was moved after the command); it is
+  now refused REPORT_DIRECTORY_MISSING before the run.
+- Preflight and the lock share one predicate and one input for the Draft lint: the same `oracle-verify.mjs card --draft`
+  from the repository root, on oracle.md's hand-written sections plus the generated region re-projected from the
+  package. Inside lintCard only `rootDirectory` came from the card's path; `--root` now sets it. The preflight is laxer
+  in one direction only: a hand-edited generated region (drift) is replaced by the fresh projection, so drift shows at
+  DRAFTED, not before. The cross-check readiness is CHECKED's own `declaredSpace` and `mappingReviewIssues`; the
+  projection issues are `packageIssues` at the project stage, as project-card runs them.
+- Before the first projection there is no card to hold a hand-written line, so a rule that one satisfies (sourced N/A
+  for `missing-auto-tc`, the Interaction sweep, an Open question `### Q<n>` that a hazard cites) is listed with the
+  others and step names `oracle-cycle.mjs walk`, which runs no preflight. Not audited rule by rule: which other
+  draft-lint rules read lines outside the generated region; with a card present the merged lint makes that moot.
+- oracle-step.mjs is 757 lines (578 before).
+- 0.125.0 round-2 proposals: none touched. Of its open facts, the `init` label is fixed.
+- Round 2 improvement proposals, left as they are: a repair made in a hand-written `oracle.md` section causes no
+  rewind, so `dispatchedSinceLastRewind` still lists cold-read and step never asks for the round-2 review of the
+  repaired card (key the record to the card digest); `byRegion` splits generated from hand-written lint issues by
+  comparing issue strings between two lint runs, so an issue whose text differs between the runs would be filed as
+  hand-written and not stop the walk (compare codes); the round-1 repair tests were not rerun against pre-fix code.
+
+## Verification
+
+- `node --test oracle-stage-machine.test.mjs` (Bend replays and the step cases): 27 pass, 0 fail; authoring 72
+  traces, 2,012 steps, 452 states checked; Delivery 182 of 1,295.
+- `node --test oracle-run.shard-*.test.mjs`: 230 pass, 0 fail.
+- package, verify, adequacy, cycle, discovery and stage tests: 322 pass, 0 fail.
+- skill-contract, mandatory-verification, reference-bundles and workflow-docs: 136 pass, 0 fail (Formal Delivery
+  closure inside 446,000 bytes). Bundles regenerated: role-author.md only.
+- `pnpm lint`: 0 errors, 405 warnings (same as 0.125.0); the changed files have the same per-file warning counts as at
+  HEAD. `prettier --check EVALUATION.md` passes.
+
 # 0.125.0: one entry point, `oracle-step.mjs`, runs the mechanical next command and prints the rest
 
 ## Why

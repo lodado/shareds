@@ -472,8 +472,10 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
       ]
     return family === 'Inherited' && tagged.length > 0 ? null : ['package-family', `${family}: ${form}`]
   }
+  // every family, Inherited included: the disposition reads only families and terms, so MODELED can refuse what the
+  // projection would — found after MODELED, its repair cost a rewind
   if (confirmedAxes)
-    for (const family of INPUT_FAMILIES) {
+    for (const family of FAMILIES) {
       const issue = familyIssue(family)
       if (issue) push(...issue)
     }
@@ -557,10 +559,7 @@ export function packageIssues(pkg, { stage = 'project' } = {}) {
     citeRequirements('notApplicable', entry?.requirements)
   }
 
-  if (confirmedAxes) {
-    const issue = familyIssue('Inherited')
-    if (issue) push(...issue)
-  } else {
+  if (!confirmedAxes) {
     for (const family of FAMILIES) {
       const declared = families[family]
       if (declared !== undefined && !familyDisposition(declared))

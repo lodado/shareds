@@ -5,7 +5,8 @@
  * stage) and runs the `next:` command itself when it is mechanical (AUTO), assembling every argument from the oracle
  * directory and the ledger; then it reads the phase line again and repeats. It stops with one instruction when the next
  * step is the agent's work (a file to write, a reviewer to dispatch, a choice between files), the user's approval or
- * decision, or a refusal. It never runs lock, extend, init, rewind, budget or `walk --reason`. Besides the reports/
+ * decision, or a refusal. At DRAFTED it runs the read-only card lints before it prints the reviews, the approval and the
+ * lock in order. It never runs lock, extend, init, rewind, budget or `walk --reason`. Besides the reports/
  * folder for the test reports it names, it writes only what the commands it runs write. At most MAX_AUTO_STEPS
  * commands per call; a refusal, or a phase line already seen in this call, stops it.
  *
@@ -26,7 +27,7 @@ import { TRUSTED_ADAPTERS } from './oracle-adapters.mjs'
 import { HOST_RECEIPTS_FILE, reviewOutputDigest } from './oracle-fs.mjs'
 import { nextCommandOf, nextOf } from './oracle-next.mjs'
 import { canonicalReviewPoints, deliveryBrief, requiredLabelsNotPassing, sameDigests } from './oracle-run.mjs'
-import { briefStatus } from './oracle-stage.mjs'
+import { briefStatus, dispatchedSinceLastRewind, STAGE_FILE } from './oracle-stage.mjs'
 
 const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
 export const MAX_AUTO_STEPS = 8
@@ -105,6 +106,16 @@ function sourceOf(phase, label, given) {
   return run ? { command: run.command, adapter: run.adapter ?? null, cwd: run.cwd, note: run.env?.note ?? '' } : null
 }
 
+/**
+ * A label without `:exit` is graded on a reported run: a command no trusted adapter reports (`npm test`) would pass
+ * exit-only and the transition would refuse it as REQUIRED_LABEL_GRADE. Step says so instead of spending the run.
+ */
+function unreported(directory, label, source) {
+  if (label.endsWith(':exit') || source.adapter) return null
+  const shown = source.command.map((word) => (word === process.execPath ? 'node' : word)).join(' ')
+  return { say: `${label} is graded on a reported run and \`${shown}\` reports no test results to the oracle: rerun ${rerun(directory)} --label ${label} -- <node --test <test files> | npx vitest run <test files>>` }
+}
+
 /** A path `<stem>-<n>.<extension>` in `folder` that does not exist yet — a trusted adapter refuses an existing report. */
 async function freshPath(folder, stem, extension, start) {
   let n = start
@@ -115,7 +126,8 @@ async function freshPath(folder, stem, extension, start) {
 /** One exec, red or green call with the label's recorded command, adapter, working directory and environment note. */
 async function testCall(directory, phase, sub, label, source, extra, index) {
   const flags = ['--dir', directory, '--label', label]
-  if (source.adapter) {
+  // a `:exit` label is graded on the exit code alone: a reported run of it is refused REQUIRED_LABEL_GRADE
+  if (source.adapter && !label.endsWith(':exit')) {
     const stem = `step-${label.replaceAll(/[^\w.-]+/g, '-')}`
     const report = await freshPath(join(directory, 'reports'), stem, TRUSTED_ADAPTERS[source.adapter].extension, runsOf(phase.ledger).length + index + 1)
     flags.push('--adapter', source.adapter, '--report', report)
@@ -141,6 +153,8 @@ async function labelCalls(directory, phase, labels, given) {
   for (const label of labels) {
     const source = sourceOf(phase, label, given)
     if (!source) return { say: askCommand(directory, [label]) }
+    const graded = unreported(directory, label, source)
+    if (graded) return graded
     calls.push(await testCall(directory, phase, 'exec', label, source, [], calls.length))
   }
   return { calls }
@@ -154,6 +168,29 @@ async function redRow(evidence, phase, packet) {
   return (rows.find(([, entry]) => failed.has(entry.name)) ?? rows[0])?.[0] ?? null
 }
 
+// a card with a Formal Model or an Adequacy derives these labels at init (oracle-run.mjs profileLabels): its RED runs a Formal adapter
+const FORMAL_LABELS = new Set(['bend-proof:reported', 'bend-adequacy:reported'])
+
+/**
+ * A Formal run's first RED waits for the adapter-pre-red review (delivery/red.md step 4): after the lock, before RED is
+ * accepted, while a harness repair is still free. Its record is a journal.md line naming the mode and the lock digest.
+ */
+async function preRedReviewMissing(directory, phase) {
+  if (phase.state.state !== 'ORACLE_READY' || !(phase.state.requiredLabels ?? []).some((label) => FORMAL_LABELS.has(label))) return false
+  const journal = await readFile(join(directory, 'journal.md'), 'utf8').catch(() => '')
+  return !journal.split('\n').some((line) => line.includes('adapter-pre-red') && line.includes(phase.state.lockSha256))
+}
+
+function preRedReview(directory, phase, given) {
+  const again = given.command ? ` --label ${given.label} -- ${given.command.map(sh).join(' ')}` : ''
+  return [
+    'before the first RED, dispatch $oracle-review in adapter-pre-red mode in a fresh context with the locked Terms and observations,',
+    'the adapter, the generated and hand-written tests and the product paths they call (run oracle-projection.mjs verify-generated --file <generated test> on each generated file first);',
+    `repair harness defects now (free before VALID_RED), then add a ${q(join(directory, 'journal.md'))} line naming adapter-pre-red,`,
+    `lock sha256:${phase.state.lockSha256}, its findings and the reviewed file hashes, and rerun ${rerun(directory)}${again}`,
+  ].join(' ')
+}
+
 async function planRed(directory, phase, given) {
   const evidence = evidenceOf(directory, phase)
   if (!(await exists(evidence))) return { say: `write ${q(evidence)} mapping each card row to its test ({"schemaVersion":1,"rows":{"O1":{"kind":"test","name":"<test name>"}}}), then rerun ${rerun(directory)}` }
@@ -162,6 +199,9 @@ async function planRed(directory, phase, given) {
   const label = given.label ?? red?.label ?? (labels.length === 1 ? labels[0] : null)
   const source = label ? sourceOf(phase, label, given) : null
   if (!source) return { say: askCommand(directory, labels) }
+  const graded = unreported(directory, label, source)
+  if (graded) return graded
+  if (await preRedReviewMissing(directory, phase)) return { say: preRedReview(directory, phase, given) }
   const packet = action(phase, 'VALID_RED')
   const extra = ['--evidence', evidence]
   if (packet?.requires.includes('--row')) {
@@ -191,6 +231,8 @@ async function planGreen(directory, phase, given) {
   if (failed) return { say: `${failed.runId} failed on these bytes: edit production so the RED tests pass, then rerun ${rerun(directory)}` }
   const source = label ? sourceOf(phase, label, given) : null
   if (!source) return { say: askCommand(directory, phase.state.requiredLabels ?? []) }
+  const graded = unreported(directory, label, source)
+  if (graded) return graded
   // GREEN checks every required label on these bytes; the others run first, GREEN's own command last
   const others = await labelCalls(directory, phase, notPassing(phase).filter((name) => name !== label), given)
   if (others.say) return others
@@ -361,31 +403,148 @@ async function packageSources(directory) {
   const present = []
   for (const path of paths) if (await exists(join(root, path))) present.push(join(root, path))
   const tops = [...new Set(paths.filter((path) => !path.startsWith('.ai/')).map((path) => path.split('/')[0]))]
-  return { sources: present, scanRoot: tops.length === 1 ? q(join(root, tops[0])) : '<scan-root outside .ai/>' }
+  return { root, sources: present, scanRoot: tops.length === 1 ? q(join(root, tops[0])) : '<scan-root outside .ai/>' }
 }
 
-/** Each next of the table: what step runs (`calls`) or the one instruction it prints (`say`). */
+/**
+ * The repository test command's required label. A bare label is graded on a reported run, which only a trusted adapter
+ * gives (`node --test`, `vitest run`); any other test script (`npm test` → a bundler, jest…) passes on its exit code, so
+ * its label is `:exit`. Guessing a bare label for it made GREEN refuse REQUIRED_LABEL_GRADE after the run passed.
+ */
+async function repoTestLabel(root) {
+  const script = (await readJson(join(root, 'package.json')))?.scripts?.test ?? ''
+  if (/\bvitest\b/.test(script)) return { label: 'repo-test', how: 'a reported run: give step `npx vitest run` for it, never watch mode' }
+  if (/\bnode\b.*\s--test\b/.test(script)) return { label: 'repo-test', how: 'a reported run: give step `node --test <test files>` for it, not `npm test`' }
+  const command = script ? `\`${script}\`` : 'the repository test command'
+  return { label: 'repo-test:exit', how: `${command} reports no test results to the oracle, so its exit code is the grade` }
+}
+
+/**
+ * The DRAFTED card checks step runs itself, both read-only: the lock's Draft lint with each failure placed in the generated
+ * region or a hand-written section (oracle-cycle.mjs card-lint), and the repository policy candidates a reviewer reads.
+ */
+function draftChecks(directory, root) {
+  const card = join(directory, 'oracle.md')
+  return [
+    { script: 'oracle-cycle.mjs', args: ['card-lint', '--dir', directory] },
+    { script: 'oracle-verify.mjs', args: ['card', '--oracle', card, '--repo-policies'], cwd: root, label: 'repo-policies' },
+  ]
+}
+
+/** The `failed` record of an oracle-cycle.mjs result, or null when the output is not its JSON (another check failed). */
+function failedOf(result) {
+  try {
+    return JSON.parse(result.stdout || 'null')?.failed ?? null
+  } catch {
+    return null
+  }
+}
+
+const numberedList = (issues) => issues.map((issue, index) => `${index + 1}) ${issue}`).join('; ')
+
+/**
+ * A failed DRAFTED lint as one instruction. An issue of the generated region is a package patch (re-projected, so the
+ * walk asks for --reason) unless the rule takes a hand-written line; one only the hand-written sections raise is a card
+ * edit outside the markers, which check-card does not read: no rewind.
+ */
+function cardLintSay(directory, result) {
+  const failed = failedOf(result)
+  if (failed?.code !== 'CARD_LINT_FAILED') return failed?.next ?? `fix the cause above, then rerun ${rerun(directory)}`
+  const card = q(join(directory, 'oracle.md'))
+  const parts = []
+  if (failed.generated.length > 0)
+    parts.push(
+      `in the package, one patch (re-projected; the walk then asks for --reason gate-failure), or where the rule takes a hand-written line (a sourced N/A, the Interaction sweep) in ${card} outside the generated markers: ${numberedList(failed.generated)}`,
+    )
+  if (failed.handWritten.length > 0) parts.push(`in ${card} outside the generated markers, no rewind: ${numberedList(failed.handWritten)}`)
+  return `the lock would refuse the card: fix ${parts.join('; and ')}; then rerun ${rerun(directory)}`
+}
+
+/** The review kinds stage.json lists as dispatched since the last rewind (none before the first stage record). */
+async function reviewsSent(directory) {
+  const record = await readJson(join(directory, STAGE_FILE))
+  if (!Array.isArray(record?.history)) return []
+  return dispatchedSinceLastRewind(record)
+}
+
+/**
+ * What comes after DRAFTED, in order: the card reviews, the touched-file lint, the user's approval, then the lock. A
+ * review stage.json lists as dispatched since the last rewind is not named again: a second dispatch of the same card
+ * counts as another dispatch, and a repair (a rewind) makes the next one the round-2 review it should be.
+ */
+async function lockSay(directory) {
+  const { sources } = await packageSources(directory)
+  const card = q(join(directory, 'oracle.md'))
+  const dir = q(directory)
+  const sent = new Set(await reviewsSent(directory))
+  // the self source of the package is the package file itself: list each path once
+  const paths = [...new Set([...sources, join(directory, 'oracle.package.json')])]
+  const sourceFlags = paths.map((path) => `--source ${q(path)}`).join(' ')
+  const reviews = [
+    [
+      'cold-read',
+      `cold-read: $oracle-review in a fresh context with only \`oracle-review-view.mjs card --oracle ${card}\` and a byte copy of the card, both outside the run directory, registered with oracle-stage.mjs review-input --dir ${dir} --kind cold-read --input <that file> --attempt <dispatch id>;`,
+    ],
+    [
+      'reverse-impossible',
+      `reverse-impossible: a second fresh $oracle-review with \`oracle-verify.mjs card --oracle ${card} --ir\` and \`oracle-adequacy.mjs explore-input --card ${card} --output <file outside the repository>\`, registered with --kind reverse-impossible;`,
+    ],
+    ['source-aware', 'source-aware review when card/policy-sources.md applies (--kind source-aware);'],
+  ].filter(([kind]) => !sent.has(kind))
+  const steps = [
+    ...reviews.map(([, text]) => text),
+    'repair findings in the package, rerun this step to lint the repair before any round-2 input;',
+    `oracle-verify.mjs card --oracle ${card} --path <files the change touches>;`,
+    'show the user the card and get explicit approval;',
+    `oracle-lock.mjs create --oracle ${card} --lock ${q(join(directory, 'oracle.lock.json'))} ${sourceFlags}`,
+  ]
+  const numbered = steps.map((text, index) => `(${index + 1}) ${text}`).join(' ')
+  const done = sent.size > 0 ? ` (dispatched since the last rewind, not again: ${[...sent].join(', ')})` : ''
+  return `before the user sees ${card}, in order${done}: ${numbered}`
+}
+
+/** The preflight's issues as one instruction: all of them in one patch, before the walk records a gate. */
+function preflightSay(directory, result) {
+  const failed = failedOf(result)
+  if (failed?.code !== 'PREFLIGHT_ISSUES') return failed?.next ?? `fix the cause above, then rerun ${rerun(directory)}`
+  // before the first projection a rule a hand-written card line satisfies cannot be satisfied: the walk itself projects the card
+  const beforeCard = failed.beforeCard
+    ? `; if only issues a hand-written card line settles are left (a sourced N/A, the Interaction sweep, an Open question), run oracle-cycle.mjs walk --dir ${q(directory)} yourself: it projects oracle.md, then write those lines there`
+    : ''
+  return `the walk has not run: fix all ${failed.issues.length} in one package patch (a card-lint issue may instead take a hand-written line in oracle.md outside the generated markers), each refused by a gate after MODELED (repaired after that gate passes, one costs a rewind): ${numberedList(failed.issues)}; then rerun ${rerun(directory)}${beforeCard}`
+}
+
+/** Each next of the table: what step runs (`calls`), the one instruction it prints (`say`), and the read-only `checks` it runs first. */
 const PLANS = {
   async begin(directory) {
     if ((await exists(join(directory, 'oracle.package.json'))) || (await exists(join(directory, 'oracle.md')))) return { calls: [{ script: 'oracle-stage.mjs', args: ['begin', '--dir', directory] }] }
     return { say: `write ${q(join(directory, 'oracle.package.json'))} with $oracle-intake (sources, requirements, Space discovery), then rerun ${rerun(directory)}` }
   },
-  walk: (directory) => ({ calls: [{ script: 'oracle-cycle.mjs', args: ['walk', '--dir', directory] }] }),
+  // preflight first: every issue a gate after MODELED would refuse, while a package patch still costs no rewind
+  walk: (directory) => ({
+    checks: [{ script: 'oracle-cycle.mjs', args: ['preflight', '--dir', directory] }],
+    calls: [{ script: 'oracle-cycle.mjs', args: ['walk', '--dir', directory] }],
+    failed: (result) => preflightSay(directory, result),
+  }),
   walkReason: (directory) => ({ say: `the package or Bend inputs changed after a passed gate: run oracle-cycle.mjs walk --dir ${q(directory)} --reason ${REASONS} naming why` }),
+  // the lock is the user's approval: step runs the card lints, then prints the reviews, the approval and the lock in order
   async lock(directory) {
-    const paths = [...(await packageSources(directory)).sources, join(directory, 'oracle.package.json')]
-    const sources = paths.map((path) => `--source ${q(path)}`).join(' ')
-    const card = join(directory, 'oracle.md')
-    return { say: `show the user ${q(card)} and get explicit approval, then run oracle-lock.mjs create --oracle ${q(card)} --lock ${q(join(directory, 'oracle.lock.json'))} ${sources}` }
+    const { root } = await packageSources(directory)
+    return {
+      checks: draftChecks(directory, root),
+      say: await lockSay(directory),
+      failed: (result) => cardLintSay(directory, result),
+    }
   },
   extend: (directory) => {
     const approval = q(join(directory, 'explicit-user-approval.json'))
     return { say: `ask the user to approve more authoring rounds, save it as ${approval}, then run oracle-stage.mjs extend --dir ${q(directory)} --approval ${approval}` }
   },
   async init(directory) {
-    const { scanRoot } = await packageSources(directory)
+    const { root, scanRoot } = await packageSources(directory)
     const lock = q(join(directory, 'oracle.lock.json'))
-    return { say: `start the Delivery run: oracle-run.mjs init --dir ${q(directory)} --lock ${lock} --scan-root ${scanRoot} --required-label repo-test (repo-test: your repository's test command), then rerun ${rerun(directory)}` }
+    const { label, how } = await repoTestLabel(root)
+    return { say: `start the Delivery run: oracle-run.mjs init --dir ${q(directory)} --lock ${lock} --scan-root ${scanRoot} --required-label ${label} (${label}: ${how}), then rerun ${rerun(directory)}` }
   },
   // NEEDS_DECISION is the user's: step names the choice and runs nothing
   revise: () => ({ say: 'NEEDS_DECISION, the user decides: rewrite the sources and start the revision in a new oracle directory (oracle-stage.mjs begin on it), or stop here' }),
@@ -503,6 +662,22 @@ function stopAfter(directory, { step, phase, after, seen, call, result }) {
 }
 
 /**
+ * After read-only checks that move no phase: a failed check is the refusal with the plan's own remedy; passing checks
+ * go on to the plan's calls, or hand over its instruction led by the repository policy candidates the last check listed.
+ */
+function checked(directory, phase, step, ran, last) {
+  if (!last) return { ran, phase, say: `${ran.length} commands ran, the most one call runs; rerun ${rerun(directory)} to go on` }
+  if (last.result.status !== 0) {
+    const say = typeof step.failed === 'function' ? step.failed(last.result) : step.failed
+    return { ran, phase, ...refusal(directory, phase, last.call, last.result), say }
+  }
+  if (step.calls) return null
+  const candidates = Number(/^REPO_POLICY_CANDIDATES (\d+)/m.exec(last.result.stdout ?? '')?.[1] ?? 0)
+  const lead = candidates > 0 ? `disposition the ${candidates} repository policy candidates \`${commandText(last.call)}\` lists as sweep counterparts; then ` : ''
+  return { ran, phase, say: `${lead}${step.say}` }
+}
+
+/**
  * The loop: plan, run the calls, read the phase line again — until an instruction, a stop, a line already seen in
  * this call, or `limit` commands. Calling step again and again is the agent's loop; step keeps no state between calls.
  */
@@ -512,6 +687,10 @@ export async function drive({ directory, read, plan, run, limit = MAX_AUTO_STEPS
   const seen = new Set([phaseOf(phase.line)])
   for (;;) {
     const step = await plan(phase)
+    if (step.checks) {
+      const stop = checked(directory, phase, step, ran, await runCalls(step.checks, run, ran, limit))
+      if (stop) return stop
+    }
     if (step.say) return { ran, phase, say: step.say, shown: step.shown }
     if (step.calls.length === 0) return { ran, phase, say: `step found nothing to run for this next step: read ${readNext(directory, phase)} and do what it names` }
     const last = await runCalls(step.calls, run, ran, limit)

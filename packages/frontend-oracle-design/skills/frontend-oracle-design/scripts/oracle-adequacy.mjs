@@ -1385,6 +1385,15 @@ async function sourceTexts(lines, cwd) {
   return { registry, sources }
 }
 
+/** `text` without the section under `heading` (to the next `## ` heading). */
+function withoutSection(text, heading) {
+  const lines = text.split('\n')
+  const start = lines.findIndex((line) => line.trim() === heading)
+  if (start === -1) return text
+  const end = lines.findIndex((line, index) => index > start && line.startsWith('## '))
+  return [...lines.slice(0, start), ...(end === -1 ? [] : lines.slice(end))].join('\n')
+}
+
 /**
  * 패키지에서 분석가 입력 — 원문(승인된 비구현 출처의 본문)과 위험 목록·작성 규칙만. 주 작성자의 해석(Outcome 요약·정책
  * 문장·용어·목표·계약·모델 파일)은 넣지 않는다: 분석가가 그 해석으로 유도되면 두 읽기의 차이가 사라진다.
@@ -1399,11 +1408,17 @@ async function packageModelInput({ package: packagePath, cwd }) {
     const [repoPath, anchor] = location.startsWith('repo:') ? location.slice('repo:'.length).split('#') : [null, null]
     if (source.self || source.kind === 'implementation-reference' || repoPath?.endsWith('.bend')) continue
     registry.push(`- ${source.id} ${source.kind} · ${source.jurisdiction} · ${location} · ${source.approval}`)
-    const text = repoPath ? await readFile(resolve(loaded.root, repoPath), 'utf8').catch(() => null) : null
+    const read = repoPath ? await readFile(resolve(loaded.root, repoPath), 'utf8').catch(() => null) : null
+    // the analyst writes its own State Model from the source (crossCheck.states): the record's reading of the flow
+    // states would make the two readings one, so it is withheld here and only here
+    const discovery = source.id === loaded.pkg.spaceDiscovery && read !== null
+    const text = discovery ? withoutSection(read, '## State Model') : read
+    const withheld = text !== read
     texts.push(
       `### ${source.id} ${location}`,
       '',
       text === null ? '(not a readable repo: file — read it at its location)' : anchoredSection(text, anchor).trimEnd(),
+      ...(withheld ? ['', '(its ## State Model is withheld: write your own from the source text)'] : []),
       '',
     )
   }

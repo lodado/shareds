@@ -52,7 +52,7 @@ import {
   withDirectoryLock,
   ZERO_DIGEST,
 } from './oracle-fs.mjs'
-import { assertReviewIterationEvent, iterationBudget, IterationError, iterationStatus, observeIteration, REVIEW_ROUND_LIMIT, samePath } from './oracle-iterations.mjs'
+import { assertReviewIterationEvent, FINDINGS_BLOCKING_NEXT, iterationBudget, IterationError, iterationStatus, observeIteration, REVIEW_ROUND_LIMIT, samePath } from './oracle-iterations.mjs'
 import { invalidatedWitnesses } from './oracle-lock.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import {
@@ -213,7 +213,7 @@ const NEXT_ACTIONS = {
   REVIEW_RERUN_REQUIRED: 're-run the GREEN command after applying findings and cite the new run',
   SNAPSHOT_STALE: 're-run the cited label on the current bytes and cite the new run',
   REVIEW_RUN_STALE: 're-run the cited command against the current bytes',
-  FINDINGS_BLOCKING: 'fix the PRODUCT_DEFECT findings and re-verify, or route a POLICY_GAP to NEEDS_DECISION',
+  FINDINGS_BLOCKING: FINDINGS_BLOCKING_NEXT,
   REVIEW_ROUNDS_CLOSED:
     'repair the round-2 blockers, rerun the required labels, then `close --packet <round-2 packet>` with its findings records PARTIAL_VERIFIED with the repair unreviewed; or stop at NEEDS_DECISION',
   FINDINGS_INVALID: 'findings must use the six classifications and cite real card rows — regenerate the findings file',
@@ -227,6 +227,9 @@ const NEXT_ACTIONS = {
   REPORT_MISSING: 'pass `--report <path>` and let the adapter write it',
   REPORT_STALE: 'the report predates the run — re-run with a fresh --report path',
   REPORT_PATH_EXISTS: 'choose a new --report path; an existing file cannot vouch for this run',
+  REPORT_DIRECTORY_MISSING: 'create the --report folder first (mkdir -p), or pass a --report path in an existing folder, then rerun the same command',
+  REQUIRED_LABEL_GRADE:
+    'make that label pass on the current bytes and rerun it with the grade it asks for: a bare label needs a reported run (`--adapter node-test` with `<this node> --test …` or `--adapter vitest` with `vitest run …`), a `:exit` label an exit-only run (no --adapter)',
   RUN_ARTIFACTS_EXIST:
     'after VALID_RED, or without the run state, a new revision gets a new <oracle-id> directory — never re-init to reset the baseline',
   HARNESS_PATH_MODIFIED: 'revert the production edit made before RED; only test and runner files can be registered as harness',
@@ -1094,8 +1097,13 @@ function runVerifier(args, { cwd } = {}) {
   const verified = spawnSync(process.execPath, [verifyScript, ...args], { encoding: 'utf8', ...(cwd ? { cwd } : {}) })
 
   if (verified.status !== 0) {
-    const [code, ...message] = (verified.stderr || 'VERIFY_FAILED: oracle-verify failed').split(': ')
-    throw new CliError(code.trim(), message.join(': ').trim() || 'oracle-verify failed')
+    // the verifier's own `next:` line knows the refusal (FINDINGS_BLOCKING names its finding classes): it is the one printed
+    const lines = (verified.stderr || 'VERIFY_FAILED: oracle-verify failed').split('\n')
+    const next = lines.find((line) => line.startsWith('next: '))
+    const [code, ...message] = lines.filter((line) => line !== next).join('\n').split(': ')
+    const error = new CliError(code.trim(), message.join(': ').trim() || 'oracle-verify failed')
+    if (next) error.next = next.slice('next: '.length)
+    throw error
   }
 
   return verified.stdout.trim()
@@ -1967,7 +1975,10 @@ async function execute(options) {
   if (adapter) {
     if (!options.report) throw new CliError('REPORT_REQUIRED', `${options.adapter} adapter requires --report`)
     if (!adapter.matches(options.command, { execPath: process.execPath })) {
-      throw new CliError('ADAPTER_COMMAND_INVALID', adapter.expectation)
+      // 인자 처방(리포터·목적지 빼기)이 아니라 명령 모양의 처방이다 — 이 거부에만 맞는 다음 걸음을 단다
+      const error = new CliError('ADAPTER_COMMAND_INVALID', adapter.expectation)
+      error.next = adapter.remedy(options.command, { execPath: process.execPath })
+      throw error
     }
     if (forbiddenArgument(adapter, options.command)) {
       throw new CliError(
@@ -1988,6 +1999,10 @@ async function execute(options) {
         )}: a preload·config·setup file must be a registered harness path (init --harness-path)`,
       )
     }
+  }
+  // 어댑터는 실행 뒤 보고서를 --report로 옮긴다 — 폴더가 없으면 그 이동이 실패하고 예약한 run id가 버려진다. 예약 전에 막는다.
+  if (adapter && !(await stat(dirname(resolve(options.report))).then((entry) => entry.isDirectory(), () => false))) {
+    throw new CliError('REPORT_DIRECTORY_MISSING', `${dirname(resolve(options.report))} does not exist; no run id was used`)
   }
   const reportBefore = await reportSignature(options.report)
   if (options.adapter && reportBefore) {
@@ -2289,10 +2304,10 @@ function assertRequiredRuns(state, ledger, currentWorktree, currentProduction, c
       !latest.signal &&
       (grade === 'reported' ? latest.grade === 'reported' && hasOnlyPassedTests(latest) : latest.grade === 'exit-only')
     if (!valid) {
-      throw new CliError(
-        'REQUIRED_LABEL_GRADE',
-        `required label "${label}" needs a passing run for the current snapshot`,
-      )
+      // one code for both: a failed run and a passing run on the wrong grade; the message says which
+      const passed = latest.exitCode === 0 && !latest.signal
+      const why = passed ? `its latest run ${latest.runId} passed as ${latest.grade}, and the label takes ${grade}` : `its latest run ${latest.runId} did not pass`
+      throw new CliError('REQUIRED_LABEL_GRADE', `required label "${label}" needs a passing ${grade} run for the current snapshot: ${why}`)
     }
     assertRunFresh(latest, currentWorktree, currentProduction, currentHarness, currentLockManifest, 'SNAPSHOT_STALE')
   }
@@ -4899,13 +4914,28 @@ function requiredRunNotPassing(to, state, runEntries, stale) {
   return requiredLabelsNotPassing(state, runEntries, stale).length > 0
 }
 
+/** Whether a run carries the grade its label asks for (assertRequiredRuns): `:exit` an exit code, any other label a reported pass. */
+const gradedFor = (label, run) => (label.endsWith(':exit') ? run.grade === 'exit-only' : run.grade === 'reported' && hasOnlyPassedTests(run))
+
 /** The required labels whose latest run is missing, stale or not a pass — oracle-step.mjs reruns them before GREEN and review. */
 export function requiredLabelsNotPassing(state, runEntries, stale) {
   return (state.requiredLabels ?? []).filter((label) => {
     const latest = runEntries.filter((entry) => entry.label === label).at(-1)
     if (!latest || stale.has(latest.runId)) return true
-    const graded = label.endsWith(':exit') ? latest.grade === 'exit-only' : latest.grade === 'reported' && hasOnlyPassedTests(latest)
-    return latest.exitCode !== 0 || Boolean(latest.signal) || !graded
+    return latest.exitCode !== 0 || Boolean(latest.signal) || !gradedFor(label, latest)
+  })
+}
+
+/**
+ * The required labels whose latest fresh run passed on the wrong grade — `npm test` under a bare label is exit-only, and the
+ * GREEN and review transitions refuse it as REQUIRED_LABEL_GRADE. status shows it as a blocker so `ready` never promises them.
+ */
+function requiredLabelsMisgraded(state, runEntries, stale) {
+  return (state.requiredLabels ?? []).filter((label) => {
+    const latest = runEntries.filter((entry) => entry.label === label).at(-1)
+    if (!latest || stale.has(latest.runId)) return false
+    const passed = latest.exitCode === 0 && !latest.signal
+    return passed && !gradedFor(label, latest)
   })
 }
 
@@ -4940,6 +4970,8 @@ function transitionPacket(to, { state, runEntries, staleRunIds, blockers, eviden
     }
     candidateRuns = entries.map((entry) => entry.runId).reverse()
     if (candidateRuns.length === 0 || requiredRunNotPassing(to, state, runEntries, stale)) packetBlockers.push(wantsFailing ? 'NO_FRESH_RED_RUN' : 'NO_FRESH_GREEN_RUN')
+    // a required label that passed on a grade the gate does not take: rerunning the same command cannot clear it
+    if (!wantsFailing && requiredLabelsMisgraded(state, runEntries, stale).length > 0) packetBlockers.push('REQUIRED_LABEL_GRADE')
     if (
       evidence.status === 'pending' &&
       evidence.missingRows?.length > 0 &&

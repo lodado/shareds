@@ -741,10 +741,10 @@ Registry, so the same string names the same file in the package, the projected c
 Source text that exists only in the conversation is saved verbatim under `.ai/oracles/<id>/sources/`,
 never in the product tree.
 
-| Stage   | Package content the tools require                                                                                                                                                            | Command                                     |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| model   | sources (verbatim, located), the Outcome reading, the Space discovery record (`spaceDiscovery`), the world record and its terms, each input family decided, goals with their author, hazards | `oracle-package.mjs validate --stage model` |
-| project | policies, contract predicates named by model symbol, notApplicable, the Inherited disposition, behavior model and law rows                                                                   | `oracle-package.mjs validate`               |
+| Stage   | Package content the tools require                                                                                                                                                      | Command                                     |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| model   | sources (verbatim, located), the Outcome reading, the Space discovery record (`spaceDiscovery`), the world record and its terms, each family decided, goals with their author, hazards | `oracle-package.mjs validate --stage model` |
+| project | policies, contract predicates named by model symbol, notApplicable, behavior model and law rows                                                                                        | `oracle-package.mjs validate`               |
 
 The model stage needs no card, no `O*` row and no contract: the analyst and the adequacy check start from
 the sources and the axes the user confirmed in the Space discovery interview of
@@ -2195,7 +2195,8 @@ Failure text → cause → fix:
     "Async": "excluded: S4 the save response is not awaited by this policy; only the presses before it count",
     "Entry": "excluded: S4 one form opened fresh",
     "Environment": "excluded: S4 no viewport or theme rule",
-    "Platform": "excluded: S1 any browser the repo supports behaves alike"
+    "Platform": "excluded: S1 any browser the repo supports behaves alike",
+    "Inherited": "excluded: S4 the form opens fresh, nothing from an earlier screen reaches it"
   }
 }
 
@@ -2537,7 +2538,7 @@ every input family in one of three ways:
 - **`excluded: <reason citing an S*>`** — the source text allows leaving it out. A model file is not such a
   source, and "the model did not produce it" is not a reason.
 
-Inherited needs a disposition before the card is projected. The audit lists each family as `mapped` (with its
+Inherited is decided with them, at the model stage. The audit lists each family as `mapped` (with its
 axes), `excluded` or `undispositioned`; the projection never writes an exclusion the author did not, and an
 undispositioned family fails `family-undispositioned`. A family `oracle-dimensions.mjs` mined from a touched
 file cannot be excluded silently: `oracle-verify.mjs card --path <file>` fails

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import process from 'node:process'
@@ -20,6 +20,7 @@ import { installedBend } from './oracle-test-bend.mjs'
 // turn and closes with the arguments a person would assemble. oracle-stage-machine.test.mjs registers them; the model
 // replays check step's plan on every state they reach (stepPlanDifference in oracle-run-machine.cases.mjs).
 const STEP = fileURLToPath(new URL('oracle-step.mjs', import.meta.url))
+const SCRIPTS = fileURLToPath(new URL('.', import.meta.url))
 const { NODE_TEST_CONTEXT: _parent, ...CHILD_ENV } = process.env
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex')
 
@@ -269,7 +270,7 @@ async function failedGreenBytes(t) {
   // the harness digests are per-file maps, built as the ledger and the status build them: a fresh object each time
   const harness = ['save.test.mjs']
   const digests = (test) => selectedDigests({ 'save.test.mjs': test, 'src/save.mjs': 'ignored' }, harness)
-  const run = (runId, productionSha256) => ({ type: 'run', runId, label: 'behavior', command: ['node', 'x'], exitCode: 1, grade: 'reported', productionSha256, harnessSha256: digests('t1') })
+  const run = (runId, productionSha256) => ({ type: 'run', runId, label: 'behavior', command: [process.execPath, '--test', 'x'], adapter: 'node-test', exitCode: 1, grade: 'reported', productionSha256, harnessSha256: digests('t1') })
   const phase = (production, test) => ({
     kind: 'delivery', key: 'green', line: phaseLine(SAMPLE_NEXT.green),
     state: { risk: 'low', requiredLabels: ['behavior'], harnessPaths: harness, history: [{ state: 'VALID_RED', runId: 'r-001' }] },
@@ -281,6 +282,95 @@ async function failedGreenBytes(t) {
   for (const [production, test] of [['p2', 't1'], ['p1', 't2']]) {
     const edited = await planStep(dir, phase(production, test))
     assert.deepEqual(edited.calls?.map((item) => item.args[0]), ['green'], `${production} ${test}`)
+  }
+}
+
+const LOCKED = 'c'.repeat(64)
+
+/** An ORACLE_READY phase as planRed reads it: `labels` required, an evidence map written, nothing run yet. */
+async function readyFixture(t, labels) {
+  const dir = await mkdtemp(join(tmpdir(), 'oracle-step-ready-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  await writeFile(join(dir, 'evidence.json'), JSON.stringify({ schemaVersion: 1, rows: { O1: { kind: 'test', name: 'save > pending' } } }))
+  const phase = {
+    kind: 'delivery', key: 'red', line: phaseLine(SAMPLE_NEXT.red),
+    state: { state: 'ORACLE_READY', risk: 'low', requiredLabels: labels, lockSha256: LOCKED, history: [] },
+    ledger: [],
+    status: { staleOrMissingRuns: [], nextActions: [{ to: 'VALID_RED', requires: ['--evidence', '--row'], candidateRuns: [], blockers: [] }] },
+  }
+  return { dir, phase }
+}
+const NODE_TEST = ['node', '--test', 'save.test.mjs']
+
+async function preRedReview(t) {
+  // a Formal run (its card derived bend-proof/bend-adequacy labels) does not run its first RED before the adapter-pre-red
+  // review: step prints the dispatch and the journal record it waits for, and runs nothing
+  const formal = await readyFixture(t, ['repo-test', 'bend-proof:reported', 'bend-adequacy:reported', 'fast-check:reported'])
+  const given = { label: 'fast-check:reported', command: NODE_TEST }
+  const waiting = await planStep(formal.dir, formal.phase, given)
+  assert.equal(waiting.calls, undefined)
+  assert.match(waiting.say, /^before the first RED, dispatch \$oracle-review in adapter-pre-red mode in a fresh context/)
+  assert.ok(waiting.say.includes(`lock sha256:${LOCKED}`), waiting.say)
+  assert.match(waiting.say, /--label fast-check:reported -- node --test save\.test\.mjs$/)
+  // a journal line for another lock, or one that does not name the mode, is not the record
+  await writeFile(join(formal.dir, 'journal.md'), `- adapter-pre-red: no findings, lock sha256:${'d'.repeat(64)}\n- review of lock sha256:${LOCKED}\n`)
+  assert.equal((await planStep(formal.dir, formal.phase, given)).calls, undefined)
+  await writeFile(join(formal.dir, 'journal.md'), `- adapter-pre-red: no findings, lock sha256:${LOCKED}, adapter sha256:e1\n`)
+  const red = await planStep(formal.dir, formal.phase, given)
+  assert.deepEqual(red.calls.map((item) => item.args[0]), ['red'])
+  // a refreshed RED after VALID_RED and a run without a Formal adapter are not held
+  const refresh = await planStep(formal.dir, { ...formal.phase, state: { ...formal.phase.state, state: 'VALID_RED' } }, given)
+  assert.deepEqual(refresh.calls.map((item) => item.args[0]), ['red'])
+  const plain = await readyFixture(t, ['behavior'])
+  assert.deepEqual((await planStep(plain.dir, plain.phase, { label: 'behavior', command: NODE_TEST })).calls.map((item) => item.args[0]), ['red'])
+}
+
+async function reportedLabels(t) {
+  // a bare label is graded on a reported run: `npm test` under it would pass exit-only and GREEN would refuse it, so step
+  // says which command it needs and runs nothing; a `:exit` label takes the same command
+  const { dir, phase } = await readyFixture(t, ['behavior', 'repo-test', 'repo-test:exit'])
+  for (const label of ['behavior', 'repo-test']) {
+    const plan = await planStep(dir, phase, { label, command: ['npm', 'test'] })
+    assert.equal(plan.calls, undefined, label)
+    assert.match(plan.say, new RegExp(`^${label} is graded on a reported run and \`npm test\` reports no test results to the oracle: rerun .* --label ${label} -- <node --test`))
+  }
+  const exit = {
+    ...phase,
+    key: 'exec',
+    state: { ...phase.state, state: 'IMPLEMENTED_GREEN', history: [], requiredLabels: ['repo-test:exit'] },
+    ledger: [{ type: 'run', runId: 'r-001', label: 'repo-test:exit', command: ['npm', 'test'], adapter: null, exitCode: 1, grade: 'exit-only' }],
+    status: { ...phase.status, nextActions: [] },
+  }
+  const plan = await planStep(dir, exit)
+  assert.deepEqual(plan.calls.map((item) => [item.args[0], item.label]), [['exec', 'repo-test:exit']])
+  // a `:exit` label given a command a trusted adapter would report runs without the adapter: a reported run of it is
+  // refused REQUIRED_LABEL_GRADE, exit-only is its grade
+  for (const command of [NODE_TEST, ['npx', 'vitest', 'run']]) {
+    const [call] = (await planStep(dir, exit, { label: 'repo-test:exit', command })).calls
+    assert.ok(!call.args.includes('--adapter') && !call.args.includes('--report'), call.args.join(' '))
+  }
+  // a ledger run of a bare label that no adapter reported is not run again either
+  exit.ledger = [{ ...exit.ledger[0], label: 'repo-test', grade: 'exit-only', exitCode: 0 }]
+  exit.state.requiredLabels = ['repo-test']
+  assert.match((await planStep(dir, exit)).say, /^repo-test is graded on a reported run and `npm test` reports/)
+}
+
+async function initLabel(t) {
+  // init names the repository test label with the grade its command can give: node --test and vitest run report, any
+  // other script passes on its exit code alone
+  const root = await mkdtemp(join(tmpdir(), 'oracle-step-init-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const dir = join(root, '.ai', 'oracles', 'save')
+  await mkdir(dir, { recursive: true })
+  const phase = { kind: 'stage', line: phaseLine(SAMPLE_NEXT.init), key: 'init' }
+  const cases = [
+    ['node --test src/', /--required-label repo-test \(repo-test: a reported run: give step `node --test <test files>`/],
+    ['vitest', /--required-label repo-test \(repo-test: a reported run: give step `npx vitest run`/],
+    ['react-scripts test', /--required-label repo-test:exit \(repo-test:exit: `react-scripts test` reports no test results/],
+  ]
+  for (const [script, wanted] of cases) {
+    await writeFile(join(root, 'package.json'), JSON.stringify({ scripts: { test: script } }))
+    assert.match((await planStep(dir, phase)).say, wanted, script)
   }
 }
 
@@ -317,10 +407,107 @@ async function authoringToLock(t) {
   const result = step(base, ['--dir', '.ai/oracles/stale-search'])
   assert.equal(result.status, 0, result.stderr)
   const lines = answer(result)
-  assert.deepEqual(lines.slice(0, 2), ['ran: oracle-stage.mjs begin ok; oracle-cycle.mjs walk ok', 'phase 3/6 Card review and lock'])
-  // the lock is the user's approval: step prints it and does not run it
-  assert.match(lines[2], /^NEXT FOR YOU: show the user \.ai\/oracles\/stale-search\/oracle\.md and get explicit approval, then run oracle-lock\.mjs create /)
-  assert.equal(JSON.parse(await readFile(join(base, '.ai/oracles/stale-search/stage.json'), 'utf8')).stage, 'DRAFTED')
+  // the preflight finds nothing a later gate would refuse, so the walk runs; at DRAFTED step runs the read-only card
+  // lints itself before it hands the card to the reviewers
+  const lints = 'oracle-cycle.mjs card-lint ok; oracle-verify.mjs card repo-policies ok'
+  assert.deepEqual(lines.slice(0, 2), [`ran: oracle-stage.mjs begin ok; oracle-cycle.mjs preflight ok; oracle-cycle.mjs walk ok; ${lints}`, 'phase 3/6 Card review and lock'])
+  // the lock is the user's approval: step prints the pre-approval gates in order, then the approval, then the lock, and
+  // runs none of them
+  const say = lines[2]
+  const order = ['(1) cold-read', '--kind cold-read', '(2) reverse-impossible', '--ir', 'explore-input --card', '(3) source-aware', '(4) repair findings', '(5) oracle-verify.mjs card --oracle', '--path', '(6) show the user', '(7) oracle-lock.mjs create']
+  const at = order.map((text) => say.indexOf(text))
+  assert.ok(at.every((index, n) => index > (at[n - 1] ?? -1)), say)
+  assert.match(say, /^NEXT FOR YOU: before the user sees \.ai\/oracles\/stale-search\/oracle\.md, in order: /)
+  // the package file is the self source: it is listed once
+  assert.equal(say.split('--source .ai/oracles/stale-search/oracle.package.json').length, 2, say)
+  const stagePath = join(base, '.ai/oracles/stale-search/stage.json')
+  assert.equal(JSON.parse(await readFile(stagePath, 'utf8')).stage, 'DRAFTED')
+
+  // a review stage.json records as dispatched since the last rewind is not named again; the rest keep their order
+  const registered = spawnSync(process.execPath, [join(SCRIPTS, 'oracle-stage.mjs'), 'review-input', '--dir', '.ai/oracles/stale-search', '--kind', 'cold-read', '--input', 'README.md', '--attempt', 'cold-1'], { cwd: base, encoding: 'utf8', env: CHILD_ENV })
+  assert.equal(registered.status, 0, registered.stderr)
+  const after = answer(step(base, ['--dir', '.ai/oracles/stale-search'])).at(-1)
+  assert.ok(!after.includes('--kind cold-read'), after)
+  assert.match(after, /in order \(dispatched since the last rewind, not again: cold-read\): \(1\) reverse-impossible: .*\(2\) source-aware .*\(6\) oracle-lock\.mjs create/)
+
+  // an issue only a hand-written section raises is fixed in the card outside the markers: no package patch, no rewind
+  const cardPath = join(base, '.ai/oracles/stale-search/oracle.md')
+  const card = await readFile(cardPath, 'utf8')
+  await writeFile(cardPath, `${card}\n## Interaction sweep\n\nno pairs yet\n`)
+  const swept = step(base, ['--dir', '.ai/oracles/stale-search'])
+  assert.equal(swept.status, 1, swept.stdout)
+  const sweptLines = answer(swept)
+  assert.equal(sweptLines[0], 'ran: oracle-cycle.mjs card-lint CARD_LINT_FAILED')
+  assert.match(sweptLines.at(-1), /^NEXT FOR YOU: the lock would refuse the card: fix in \S+oracle\.md outside the generated markers, no rewind: 1\) sweep-rows: Interaction sweep must include a Pair\/Disposition table; 2\) sweep-policy-missing: P1 .*; then rerun /)
+  assert.ok(!/package|--reason/.test(sweptLines.at(-1)), sweptLines.at(-1))
+  assert.equal(JSON.parse(await readFile(stagePath, 'utf8')).stage, 'DRAFTED')
+
+  // a card without its generated region fails as a whole: that is the package's projection, so the remedy names the package
+  await writeFile(cardPath, '# not a card\n')
+  const failed = step(base, ['--dir', '.ai/oracles/stale-search'])
+  assert.equal(failed.status, 1, failed.stdout)
+  const refused = answer(failed)
+  assert.equal(refused[0], 'ran: oracle-cycle.mjs card-lint CARD_LINT_FAILED')
+  assert.match(refused.at(-1), /^NEXT FOR YOU: the lock would refuse the card: fix in the package, one patch \(re-projected; the walk then asks for --reason gate-failure\)/)
+}
+
+async function preflightSeesHandWritten(t) {
+  if (!(await installedBend(t))) return
+  // the preflight lints the card the lock would lint: oracle.md re-projected from the package, its hand-written sections
+  // kept. A rule a hand-written line satisfies (a sourced N/A for the auto test cases) is satisfied there too, and an
+  // issue only a hand-written section raises is listed without stopping the walk.
+  const root = await mkdtemp(join(tmpdir(), 'oracle-step-handwritten-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const { base } = await template(root)
+  const dir = join(base, '.ai/oracles/stale-search')
+  const preflight = () => {
+    const result = spawnSync(process.execPath, [join(SCRIPTS, 'oracle-cycle.mjs'), 'preflight', '--dir', dir], { cwd: base, encoding: 'utf8', env: CHILD_ENV })
+    return JSON.parse(result.stdout)
+  }
+  const pkg = JSON.parse(await readFile(join(dir, 'oracle.package.json'), 'utf8'))
+  pkg.notApplicable = []
+  await writeFile(join(dir, 'oracle.package.json'), JSON.stringify(pkg, null, 2))
+  const without = preflight()
+  const autoCases = without.failed.issues.filter((issue) => issue.startsWith('missing-auto-tc: '))
+  assert.ok(autoCases.length > 0, JSON.stringify(without))
+  assert.equal(without.failed.beforeCard, undefined)
+  const card = await readFile(join(dir, 'oracle.md'), 'utf8')
+  // before the first projection no hand-written line can exist: step names the walk that projects the card
+  await rm(join(dir, 'oracle.md'))
+  const first = step(base, ['--dir', '.ai/oracles/stale-search'])
+  assert.equal(first.status, 1, first.stdout)
+  const firstLines = answer(first)
+  assert.equal(firstLines[0], 'ran: oracle-stage.mjs begin ok; oracle-cycle.mjs preflight PREFLIGHT_ISSUES')
+  assert.match(firstLines.at(-1), /missing-auto-tc: .*; if only issues a hand-written card line settles are left .*run oracle-cycle\.mjs walk --dir \S+ yourself: it projects oracle\.md/)
+  const sourced = '- N/A: loading, error, retry, duplicate, empty, cancel and out-of-order are outside this policy (source: S1)'
+  await writeFile(join(dir, 'oracle.md'), `${card}\n## Outside the policy\n\n${sourced}\n\n## Interaction sweep\n\nno pairs yet\n`)
+  const handWritten = preflight()
+  assert.deepEqual(handWritten.failed?.issues?.filter((issue) => issue.startsWith('missing-auto-tc: ')) ?? [], [], JSON.stringify(handWritten))
+  assert.deepEqual(handWritten.handWritten, [
+    'sweep-rows: Interaction sweep must include a Pair/Disposition table',
+    ...['P1', 'P2', 'P3'].map((policy) => `sweep-policy-missing: ${policy} does not appear in any sweep pair`),
+  ])
+}
+
+async function preflightFirst(t) {
+  if (!(await installedBend(t))) return
+  const root = await mkdtemp(join(tmpdir(), 'oracle-step-preflight-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const { base } = await template(root)
+  const dir = join(base, '.ai/oracles/stale-search')
+  // two hazards modeled by fields the world does not have: only the card lint names them, after MODELED and CHECKED
+  // passed — each repair then cost a rewind. The preflight lists both before the walk records any gate.
+  const pkg = JSON.parse(await readFile(join(dir, 'oracle.package.json'), 'utf8'))
+  pkg.hazards['display-vs-commit'] = 'modeled: notAField'
+  pkg.hazards['carry-over'] = 'modeled: ghost'
+  await writeFile(join(dir, 'oracle.package.json'), JSON.stringify(pkg, null, 2))
+  const result = step(base, ['--dir', '.ai/oracles/stale-search'])
+  assert.equal(result.status, 1, result.stdout)
+  const lines = answer(result)
+  assert.equal(lines[0], 'ran: oracle-stage.mjs begin ok; oracle-cycle.mjs preflight PREFLIGHT_ISSUES')
+  assert.match(lines.at(-1), /^NEXT FOR YOU: the walk has not run: fix all 2 in one package patch .*1\) adequacy-hazard: display-vs-commit: notAField is not a field of \w+; 2\) adequacy-hazard: carry-over: ghost is not a field of \w+; then rerun /)
+  // no gate passed: the patch is free
+  assert.equal(JSON.parse(await readFile(join(dir, 'stage.json'), 'utf8')).stage, 'DISCOVERING')
 }
 
 const SAVE_TEST = "import test from 'node:test'\nimport assert from 'node:assert/strict'\nimport { save } from './src/save.mjs'\ntest('save > pending', () => assert.ok(save > 0))\n"
@@ -405,7 +592,12 @@ export const stepCases = [
   ['step prints the close with a new packet path for an unwitnessed packet and does not run it', unwitnessedPacket],
   ['step does not rerun GREEN on the bytes a GREEN already failed on', failedGreenBytes],
   ['step binds a saved blind mapping and prints a High risk close with its mutation flags', blindAndMutation],
+  ['step holds a Formal first RED until the journal records the adapter-pre-red review of this lock', preRedReview],
+  ['step does not run a bare label with a command no trusted adapter reports; a :exit label takes it', reportedLabels],
+  ['step names the repository test label with the grade its test script can give', initLabel],
   ['[bend] step walks a package from no stage record to DRAFTED and prints the lock for the user', authoringToLock],
+  ['[bend] step lists every issue a gate after MODELED would refuse before the walk records any gate', preflightFirst],
+  ['[bend] the preflight lints oracle.md re-projected with its hand-written sections: a sourced N/A there counts, a hand-written issue does not stop the walk', preflightSeesHandWritten],
   ['step takes a Delivery run from ORACLE_READY to a checked report, stopping only for the agent, with the close a person would assemble', deliveryToClose],
   ['a refused command stops step after one run with one action', refusalOnce],
 ]

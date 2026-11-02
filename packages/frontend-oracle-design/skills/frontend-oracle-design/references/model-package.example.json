@@ -112,6 +112,7 @@
     "Async": "excluded: S4 the save response is not awaited by this policy; only the presses before it count",
     "Entry": "excluded: S4 one form opened fresh",
     "Environment": "excluded: S4 no viewport or theme rule",
-    "Platform": "excluded: S1 any browser the repo supports behaves alike"
+    "Platform": "excluded: S1 any browser the repo supports behaves alike",
+    "Inherited": "excluded: S4 the form opens fresh, nothing from an earlier screen reaches it"
   }
 }

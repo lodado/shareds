@@ -10,7 +10,8 @@
  *          DRAFTED 전에는 생성 카드를 다시 투영한다. lock은 사람 승인이 들어 이 루프에 넣지 않는다.
  */
 import { spawnSync } from 'node:child_process'
-import { readdir, readFile } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -24,6 +25,8 @@ const TODO_ONLY = /^SOME PROOFS FAIL\nError: \d+ TODOs? found\.\nThe code is inc
 
 export const USAGE = `usage:
   oracle-cycle.mjs fast --dir <.ai/oracles/<id>>
+  oracle-cycle.mjs preflight --dir <dir>
+  oracle-cycle.mjs card-lint --dir <dir>
   oracle-cycle.mjs walk --dir <dir> [--to MODELED|CHECKED|DRAFTED] [--reason ${REWIND_REASONS.join('|')}] [--note <one line>] [--timeout-ms <n>]`
 
 class CycleError extends Error {
@@ -44,6 +47,9 @@ const NEXT = {
   PACKAGE_INVALID: 'fix the listed package issues, then rerun fast',
   BEND_CHECK: 'fix the Bend file named in detail (hint included when known), then rerun fast',
   CARD_NOT_GENERATED: 'oracle.md is hand-written: project the card into a new file and merge by hand',
+  PREFLIGHT_ISSUES: 'fix every listed issue in one package patch, then rerun preflight; walk records each gate it passes, so a repair after it is a rewind',
+  CARD_LINT_FAILED:
+    'fix `generated` in one package patch (the walk then asks for --reason gate-failure) or, where the rule takes a hand-written line (a sourced N/A, the Interaction sweep), in oracle.md outside the generated markers; fix `handWritten` in oracle.md outside the markers, no rewind',
 }
 
 function run(script, args, cwd) {
@@ -96,6 +102,118 @@ async function fast(directory, root) {
   if (await readFile(packagePath).then(() => true, () => false))
     steps.push(run('oracle-package.mjs', ['validate', '--package', relative(root, packagePath), '--stage', 'model'], root))
   return steps
+}
+
+/** The issues a card lint prints, one per line after its first: the `--draft` failures, without the ones that wait on the user. */
+const lintIssues = (output) =>
+  output
+    .split('\n')
+    .slice(1)
+    .filter((line) => /^ {2}\S/.test(line) && !line.startsWith('  pending '))
+    .map((line) => line.trim())
+
+/** In a scratch folder outside the repository: `work(folder)`, then the folder is removed. */
+async function inScratch(work) {
+  const scratch = await mkdtemp(join(tmpdir(), 'oracle-preflight-'))
+  try {
+    return await work(scratch)
+  } finally {
+    await rm(scratch, { recursive: true, force: true })
+  }
+}
+
+/**
+ * The `--draft` failures of a card file, linted from the repository root the way the lock lints oracle.md: `--root` makes
+ * a scratch copy resolve its `code()` witnesses and sources against the repository, not against the scratch folder.
+ */
+function draftLint(card, root) {
+  const linted = run('oracle-verify.mjs', ['card', '--oracle', card, '--draft', '--root', root], root)
+  if (linted.ok) return []
+  const issues = lintIssues(linted.output)
+  return issues.length > 0 ? issues : [`card-lint: ${linted.output.split('\n')[0]}`]
+}
+
+/** The card with its generated region and none of the hand-written sections a projection carries over. */
+function generatedOnly(text, generatedBlock) {
+  const found = generatedBlock(text)
+  if (!found.present || found.malformed) return null
+  const title = text.split('\n')[0]
+  return [title, '', text.slice(found.start, found.end), '', '## User Confirmation', '', '- Status: pending', '- Source: none yet', ''].join('\n')
+}
+
+/**
+ * `issues` of `text` split by where they are fixed. One the generated region alone also raises comes from the package
+ * (or wants a hand-written line a rule accepts, a sourced N/A or the Interaction sweep); one only the hand-written sections
+ * raise is fixed in oracle.md outside the markers, an edit check-card does not read and that leaves the stage as it is.
+ */
+async function byRegion(text, issues, root) {
+  if (issues.length === 0) return { generated: [], handWritten: [] }
+  const { generatedBlock } = await import('./oracle-package.mjs')
+  const bare = generatedOnly(text, generatedBlock)
+  if (bare === null) return { generated: issues, handWritten: [] }
+  const fromRegion = new Set(
+    await inScratch(async (scratch) => {
+      await writeFile(join(scratch, 'oracle.md'), bare)
+      return draftLint(join(scratch, 'oracle.md'), root)
+    }),
+  )
+  return { generated: issues.filter((issue) => fromRegion.has(issue)), handWritten: issues.filter((issue) => !fromRegion.has(issue)) }
+}
+
+/**
+ * The Draft lint the lock would run on a card projected from the package now. oracle.md is copied first, so the
+ * projection keeps its hand-written sections exactly as `project-card --out oracle.md` does in the walk, and a rule a
+ * hand-written line satisfies (a sourced N/A, the Interaction sweep, an Open question) is satisfied here too. Before the
+ * first projection there is no card to write such a line in: those issues carry `beforeCard`, and step says that
+ * `oracle-cycle.mjs walk` (which runs no preflight) projects the card when only such issues are left.
+ */
+async function cardPreview(directory, root) {
+  const existing = await readFile(join(directory, 'oracle.md'), 'utf8').catch(() => null)
+  return inScratch(async (scratch) => {
+    const card = join(scratch, 'oracle.md')
+    if (existing !== null) await writeFile(card, existing)
+    const projected = run('oracle-package.mjs', ['project-card', '--package', relative(root, join(directory, PACKAGE_FILE)), '--out', card], root)
+    if (!projected.ok) return { generated: [`card-projection: ${projected.output.split('\n')[0]}`], handWritten: [] }
+    const issues = draftLint(card, root)
+    if (existing === null) return { generated: issues, handWritten: [], beforeCard: issues.length > 0 }
+    return byRegion(await readFile(card, 'utf8'), issues, root)
+  })
+}
+
+/**
+ * preflight — read-only: what the gates after MODELED would refuse, listed at once before the walk passes any gate. A
+ * package patch after a passed gate is a rewind each time; found here it is none. It judges nothing new: the package's
+ * projection stage, the cross-check's Bend-free inputs (oracle-discovery.mjs crossCheckReadiness) and, once oracle.md
+ * exists, the lock's Draft lint of that card re-projected from the package now are the checks project-card, CHECKED
+ * and the lock run on the same bytes. Only the issues a package patch fixes stop the walk; the hand-written ones are
+ * listed (`handWritten`) and do not. The proofs, the world enumeration and the cross-check candidates stay CHECKED's.
+ */
+async function preflight(directory, root) {
+  const none = { generated: [], handWritten: [] }
+  const steps = await fast(directory, root)
+  const stopped = steps.find(({ ok }) => !ok)
+  if (stopped) return { steps, issues: [], handWritten: [] }
+  if (!(await readFile(join(directory, PACKAGE_FILE)).then(() => true, () => false))) return { steps, issues: [], handWritten: [] }
+  const { loadPackage, packageIssues } = await import('./oracle-package.mjs')
+  const { crossCheckReadiness } = await import('./oracle-discovery.mjs')
+  const loaded = await loadPackage(join(directory, PACKAGE_FILE), { root })
+  const projection = packageIssues(loaded.pkg, { stage: 'project' })
+  // the card projects only from a package the projection stage accepts: its lint waits for those repairs
+  const card = projection.length === 0 ? await cardPreview(directory, root) : none
+  // the card lint runs the cross-check too: an issue both name is listed once
+  const issues = [...new Set([...projection, ...(await crossCheckReadiness(loaded)), ...card.generated])]
+  return { steps, issues, handWritten: card.handWritten, beforeCard: Boolean(card.beforeCard) }
+}
+
+/**
+ * card-lint — read-only: the lock's Draft lint of oracle.md (`card --draft` from the repository root), its failures
+ * split by where they are fixed (byRegion), so the remedy for each is a package patch or a card edit, not always a rewind.
+ */
+async function cardLint(directory, root) {
+  const card = join(directory, 'oracle.md')
+  const text = await readFile(card, 'utf8').catch(() => null)
+  if (text === null) return { generated: [`card-unreadable: ${card}`], handWritten: [] }
+  return byRegion(text, draftLint(card, root), root)
 }
 
 async function stageOf(directory, root) {
@@ -166,11 +284,39 @@ function failure({ step, code, detail, output }) {
   return { step, code, detail: detail ?? output.split('\n').slice(0, 30).join('\n'), next: NEXT[code] ?? 'read detail, fix, rerun' }
 }
 
+/** card-lint's answer: the Draft lint's failures, split by region. */
+async function cardLintResult(directory, root, started) {
+  const { generated, handWritten } = await cardLint(directory, root)
+  const count = generated.length + handWritten.length
+  if (count === 0) return { ok: true, ms: Math.round(performance.now() - started) }
+  const failed = { step: 'card-lint', code: 'CARD_LINT_FAILED', detail: `${count} issues the lock would refuse`, generated, handWritten, next: NEXT.CARD_LINT_FAILED }
+  return { ok: false, ms: Math.round(performance.now() - started), failed }
+}
+
+/** preflight's answer: a failed check, or the issues the gates after MODELED would refuse, as one record. */
+async function preflightResult(directory, root, started) {
+  const { steps, issues, handWritten, beforeCard } = await preflight(directory, root)
+  const failed = steps.find(({ ok }) => !ok)
+  const detail = `${issues.length} issues the gates after MODELED would refuse`
+  const listed = issues.length > 0 ? { step: 'preflight', code: 'PREFLIGHT_ISSUES', detail, issues, ...(beforeCard ? { beforeCard } : {}), next: NEXT.PREFLIGHT_ISSUES } : null
+  return {
+    ok: !failed && !listed,
+    ms: Math.round(performance.now() - started),
+    steps: steps.map(summary),
+    // fixed in oracle.md outside the generated markers: they do not stop the walk
+    ...(handWritten.length > 0 ? { handWritten } : {}),
+    ...(failed ? { failed: failure(failed) } : {}),
+    ...(listed ? { failed: listed } : {}),
+  }
+}
+
 export async function cycle(command, options) {
-  if (!['fast', 'walk'].includes(command) || !options.dir) throw new CycleError('USAGE', USAGE)
+  if (!['fast', 'walk', 'preflight', 'card-lint'].includes(command) || !options.dir) throw new CycleError('USAGE', USAGE)
   const directory = resolve(options.dir)
   const root = repositoryRoot(directory)
   const started = performance.now()
+  if (command === 'card-lint') return cardLintResult(directory, root, started)
+  if (command === 'preflight') return preflightResult(directory, root, started)
   const steps = command === 'fast' ? await fast(directory, root) : await walk(directory, root, options)
   const failed = steps.find(({ ok }) => !ok)
   const after = command === 'walk' ? (await stageOf(directory, root))?.stage ?? null : undefined

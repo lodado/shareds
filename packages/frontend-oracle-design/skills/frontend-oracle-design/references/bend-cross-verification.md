@@ -65,10 +65,10 @@ Registry, so the same string names the same file in the package, the projected c
 Source text that exists only in the conversation is saved verbatim under `.ai/oracles/<id>/sources/`,
 never in the product tree.
 
-| Stage   | Package content the tools require                                                                                                                                                            | Command                                     |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| model   | sources (verbatim, located), the Outcome reading, the Space discovery record (`spaceDiscovery`), the world record and its terms, each input family decided, goals with their author, hazards | `oracle-package.mjs validate --stage model` |
-| project | policies, contract predicates named by model symbol, notApplicable, the Inherited disposition, behavior model and law rows                                                                   | `oracle-package.mjs validate`               |
+| Stage   | Package content the tools require                                                                                                                                                      | Command                                     |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| model   | sources (verbatim, located), the Outcome reading, the Space discovery record (`spaceDiscovery`), the world record and its terms, each family decided, goals with their author, hazards | `oracle-package.mjs validate --stage model` |
+| project | policies, contract predicates named by model symbol, notApplicable, behavior model and law rows                                                                                        | `oracle-package.mjs validate`               |
 
 The model stage needs no card, no `O*` row and no contract: the analyst and the adequacy check start from
 the sources and the axes the user confirmed in the Space discovery interview of

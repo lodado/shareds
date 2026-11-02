@@ -102,7 +102,7 @@ every input family in one of three ways:
 - **`excluded: <reason citing an S*>`** — the source text allows leaving it out. A model file is not such a
   source, and "the model did not produce it" is not a reason.
 
-Inherited needs a disposition before the card is projected. The audit lists each family as `mapped` (with its
+Inherited is decided with them, at the model stage. The audit lists each family as `mapped` (with its
 axes), `excluded` or `undispositioned`; the projection never writes an exclusion the author did not, and an
 undispositioned family fails `family-undispositioned`. A family `oracle-dimensions.mjs` mined from a touched
 file cannot be excluded silently: `oracle-verify.mjs card --path <file>` fails

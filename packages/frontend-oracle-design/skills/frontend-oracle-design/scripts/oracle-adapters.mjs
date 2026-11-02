@@ -46,6 +46,10 @@ function optionName(argument) {
   return name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase()).replace(/^-([a-z])/, '--$1')
 }
 
+/** One shell word as a POSIX shell reads it back — a node path with a space is one argument. */
+const QUOTE_ESCAPE = String.raw`'\''`
+const shellWord = (word) => (/^[\w./@:+=-]+$/.test(word) ? word : `'${word.replaceAll("'", QUOTE_ESCAPE)}'`)
+
 function hasArgument(command, names) {
   const wanted = new Set(names.map(optionName))
   return command.some((argument) => wanted.has(optionName(argument)))
@@ -59,6 +63,11 @@ export const TRUSTED_ADAPTERS = {
     forbidden: [...FORBIDDEN_SHARED, '--test-reporter', '--test-reporter-destination', ...LENIENCY_FLAGS['node-test']],
     matches: (command, { execPath }) => command[0] === execPath && command.includes('--test'),
     expectation: 'node-test adapter requires node --test',
+    // 어긋난 명령의 처방 — 첫 단어는 이 node의 절대 경로다(`node`라는 이름만으로는 어느 node인지 정해지지 않는다)
+    remedy: (command, { execPath }) =>
+      command[0] === execPath
+        ? `add --test: ${shellWord(execPath)} --test <test files>`
+        : `start the command with this node's absolute path, not "${command[0]}": ${shellWord(execPath)} --test <test files> (oracle-step.mjs rewrites a bare node)`,
     build: (command, { reporter, destination }) => {
       const index = command.indexOf('--test')
 
@@ -85,6 +94,7 @@ export const TRUSTED_ADAPTERS = {
       command.some((argument) => argument === 'vitest' || /[/\\]vitest(?:\.[cm]?js)?$/.test(argument)) &&
       command.includes('run'),
     expectation: 'vitest adapter requires a `vitest run` command (watch mode cannot be judged)',
+    remedy: () => 'run `vitest run <test files>` (or `npx vitest run …`); watch mode never ends',
     build: (command, { reporter, destination }) => ({
       command: [...command, `--reporter=${reporter}`],
       env: { ORACLE_REPORT_DESTINATION: destination },

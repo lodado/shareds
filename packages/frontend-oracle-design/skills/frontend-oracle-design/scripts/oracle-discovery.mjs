@@ -616,7 +616,8 @@ export function crossCheckSpace({ caseSpace, stateModel = null, mapping = {}, wo
  * space-cross-check 실행: 버전 2 패키지의 선언 공간(spaceDiscovery 기록의 `## Case space`·`## State Model`)을 세계 열거와,
  * 행동 모델의 trace(bound까지의 공간, 기본 discovery 경로에서는 추가 전이 커버)에 비춘다. 카드 lint는 선언 bound만 쓴다.
  */
-export async function spaceCrossCheck({ loaded, bin, timeoutMs, includeTransitionCover = true }) {
+/** The cross-check's inputs as the package declares them, read without Bend — or the status that stops it before the world. */
+async function declaredSpace(loaded) {
   const { pkg } = loaded
   if ((pkg.packageVersion ?? 1) < 2)
     return { status: 'not-applicable', reason: 'a version-1 package has no Space discovery record to compare', candidates: [] }
@@ -631,6 +632,30 @@ export async function spaceCrossCheck({ loaded, bin, timeoutMs, includeTransitio
   const caseSpace = text === null ? null : parseCaseSpace(text)
   if (!caseSpace)
     return { status: 'invalid', reason: 'the declared source has no ## Case space table of the confirmed axes', candidates: [] }
+  return { declaredPath, text, caseSpace }
+}
+
+/**
+ * What crossCheckIssues (the CHECKED gate) would refuse that needs no Bend: an undeclared mapping, a declared record
+ * without a Case space, a missing or stale translation review. oracle-cycle.mjs preflight lists them before the walk
+ * passes MODELED, where a repair still costs no rewind; the world and the candidates stay CHECKED's.
+ */
+export async function crossCheckReadiness(loaded) {
+  const declared = await declaredSpace(loaded)
+  if (declared.status === 'not-applicable') return []
+  if (declared.status === 'undeclared') {
+    const writtenOff = loaded.pkg.operators?.['space-cross-check']?.startsWith('n/a:')
+    return writtenOff ? [] : [`cross-check-undeclared: ${declared.reason}`]
+  }
+  if (declared.status) return [`cross-check-${declared.status}: ${declared.reason}`]
+  return mappingReviewIssues(loaded)
+}
+
+export async function spaceCrossCheck({ loaded, bin, timeoutMs, includeTransitionCover = true }) {
+  const { pkg } = loaded
+  const declared = await declaredSpace(loaded)
+  if (declared.status) return declared
+  const { declaredPath, text, caseSpace } = declared
   const world = await loadWorld({ package: relative(loaded.root, loaded.path), cwd: loaded.root, bin, timeoutMs })
   if (world.result) return { status: 'not-run', reason: `the world cannot be enumerated: ${world.result.reason}`, candidates: [] }
   // 상태표는 분석 에이전트가 따로 읽은 것일 수 있다(crossCheck.states) — 그러면 모델과 두 독립 해석을 비교한다

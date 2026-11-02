@@ -176,6 +176,28 @@ export function splitConfirmFindings(blocking, scope) {
   return { blocking: kept, proposals }
 }
 
+/** The route of each finding class (delivery/green-review.md); a blocking review is answered class by class. */
+const FINDING_ROUTES = {
+  PRODUCT_DEFECT: 'fix production for the same row, rerun the GREEN labels and close again',
+  EVIDENCE_GAP: 'add only the missing tests·evidence within the locked card (a test change after VALID_RED spends harness), rerun and close again',
+  HARNESS_DEFECT: 'repair the harness within the shared harness budget, record a fresh RED→GREEN and close again',
+  ENVIRONMENT_DEFECT: 'record FAIL with the cause; never touch production',
+  POLICY_GAP: 'the card does not decide it: transition to NEEDS_DECISION with the card and the question for the user',
+}
+/** The remedy a FINDINGS_BLOCKING refusal prints when it does not know the findings. */
+export const FINDINGS_BLOCKING_NEXT = `answer each blocking finding by its class — ${Object.entries(FINDING_ROUTES)
+  .map(([kind, route]) => `${kind}: ${route}`)
+  .join('; ')}`
+
+/** The remedy for these blocking findings: one route per class present, naming its findings, in the routes' order. */
+export function blockingRemedy(blocking) {
+  const routes = Object.entries(FINDING_ROUTES).flatMap(([kind, route]) => {
+    const ids = blocking.filter((finding) => finding.classification === kind).map((finding) => finding.id)
+    return ids.length > 0 ? [`${ids.join(', ')} ${kind}: ${route}`] : []
+  })
+  return routes.length > 0 ? routes.join('; ') : FINDINGS_BLOCKING_NEXT
+}
+
 /** Highest authoring limit a standing delegation ("don't ask, handle it") can grant; past it the user is asked. */
 export const DELEGATED_ROUND_CAP = 5
 

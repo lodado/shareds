@@ -226,6 +226,26 @@ test('the analyst input from a package carries the source text only — no contr
     assert.ok(!input.includes(leaked), `${leaked} leaked into the analyst input`)
 })
 
+test("the analyst input withholds the Space discovery record's State Model: the analyst writes its own reading", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'oracle-model-input-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  await cp(FIXTURE, root, { recursive: true })
+  const record = '# Space discovery\n\n## Case space\n\n| Family | Dimension | Choices |\n| --- | --- | --- |\n| Order | arrival | inOrder, reversed |\n\n## State Model\n\n- States: Idle, Waiting\n- Events: Type, Answer\n\n## Answers\n\nQ1: the older answer never shows.\n'
+  await mkdir(join(root, 'sources'), { recursive: true })
+  await writeFile(join(root, 'sources', 'space-discovery.md'), record)
+  const pkg = clone(PKG)
+  pkg.sources.push({ id: 'S7', kind: 'product-policy', jurisdiction: 'confirmed axes', standard: 'user answers', location: 'repo:sources/space-discovery.md', approval: 'approved' })
+  pkg.spaceDiscovery = 'S7'
+  await writeFile(join(root, 'oracle.package.json'), JSON.stringify(pkg))
+  const input = await modelInput({ package: 'oracle.package.json', cwd: root })
+  // the confirmed axes and the answers stay; the record's flow states do not reach the independent reading
+  assert.match(input, /\| Order \| arrival \| inOrder, reversed \|/)
+  assert.match(input, /Q1: the older answer never shows\./)
+  // (the authoring rules below the sources name the `## State Model` heading themselves)
+  assert.doesNotMatch(input, /- States: Idle, Waiting|- Events: Type, Answer/)
+  assert.match(input, /\(its ## State Model is withheld: write your own from the source text\)/)
+})
+
 // ── stage B: 축은 모델에서 도출된다 ────────────────────────────────────────────────────────────────────
 
 test('axes are derived from the world record and the behavior types, with roles from the terms and no silent gaps', () => {
@@ -1019,10 +1039,11 @@ test('a version-2 package names the Space discovery record and disposes every in
   for (const term of modeled.terms) if (term.family === 'Order') delete term.family
   modeled.families.Order = 'modeled: behavior'
   assert.deepEqual(packageIssues(modeled), [])
-  // Inherited belongs to the interaction sweep: required by the projection, not by the model stage
+  // Inherited is decided with the others at the model stage (MODELED refuses it): found only at the projection, after
+  // MODELED had passed, its repair cost a rewind.
   const noInherited = clone(ready)
   delete noInherited.families.Inherited
-  assert.ok(!codesAt(noInherited).includes('package-family'))
+  assert.ok(issuesAt(noInherited).some((issue) => issue.startsWith('package-family: Inherited')))
   assert.ok(issuesAt(noInherited, 'project').some((issue) => issue.startsWith('package-family: Inherited')))
   // an unknown family or disposition is refused
   const unknown = clone(ready)

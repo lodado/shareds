@@ -708,7 +708,7 @@ function onlyMetadataChanged(record, bytes) {
 }
 
 /** 마지막 되돌림(없으면 시작) 뒤에 보낸 독립 리뷰의 종류 — 그 결과가 돌아왔는지는 기록에 없다. */
-function dispatchedSinceLastRewind(record) {
+export function dispatchedSinceLastRewind(record) {
   const lastWalk = [...record.history].reverse().find((entry) => entry.evidence === 'rewind' || entry.evidence === 'begin')
   const since = lastWalk ? Date.parse(lastWalk.at) : 0
   return [...new Set((record.dispatches ?? []).filter((entry) => Date.parse(entry.at) >= since).map((entry) => entry.kind))].sort()

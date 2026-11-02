@@ -22,7 +22,7 @@ import {
   snapshotRegularFile,
   stableStringify,
 } from './oracle-fs.mjs'
-import { assertReviewIterationEvent, splitConfirmFindings } from './oracle-iterations.mjs'
+import { assertReviewIterationEvent, blockingRemedy, FINDINGS_BLOCKING_NEXT, splitConfirmFindings } from './oracle-iterations.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import { assertProfileReviewReferences, contextGaps, snapshotContext, validateContextReview } from './oracle-review-context.mjs'
 import {
@@ -69,6 +69,8 @@ const FLAG_NAMES = [
   'blind-map',
   'baseline-root',
   'repaired',
+  // card: the repository root a card outside it is linted against (oracle-cycle.mjs lints a scratch copy)
+  'root',
 ]
 
 /**
@@ -211,7 +213,7 @@ const NEXT_ACTIONS = {
   RUN_NOT_FOUND: 'cite a runId that exists in runs.jsonl — run `exec` again if needed',
   RUN_NOT_RED: 'the cited run must fail on the mapped row — write the test, run `red --row <row>`',
   FINDINGS_INVALID: 'findings must use the six classifications and cite real card rows — regenerate the findings file',
-  FINDINGS_BLOCKING: 'fix the PRODUCT_DEFECT findings and re-verify, or route a POLICY_GAP to NEEDS_DECISION',
+  FINDINGS_BLOCKING: FINDINGS_BLOCKING_NEXT,
   REVIEW_PACKET_STALE: 'regenerate `review-packet` — the input changed since the packet was built',
   REVIEW_REVISION_MISMATCH: 'pass the targetRevision printed in review-input.json',
   REVIEWER_NOT_INDEPENDENT: 'High risk needs two artifacts from different reviewerIds',
@@ -599,7 +601,7 @@ async function lintCard(options) {
   const lines = markdownLines(card)
   const rows = parseRows(lines)
   const issues = []
-  const rootDirectory = oracleRootDirectory(options.oracle)
+  const rootDirectory = options.root ? resolve(options.root) : oracleRootDirectory(options.oracle)
 
   // 모델 패키지에서 투영한 카드 — 생성 영역을 패키지에서 다시 만들어 비교한다: 손으로 고쳤거나(drift) 패키지·Bend 파일이
   // 바뀐 뒤 다시 투영하지 않았으면(stale) 막고, 다시 만들 수 없으면(unverified) 통과시키지 않는다. 생성 영역이 없는 기존
@@ -2846,12 +2848,15 @@ async function verifyReview(options) {
   const result = await findingsResult(options)
 
   if (result.blocking.length > 0) {
-    throw new CliError(
+    const error = new CliError(
       'FINDINGS_BLOCKING',
       `${result.blocking.length} blocking findings remain:\n  ${result.blocking
         .map((finding) => `${finding.id} ${finding.row} ${finding.severity} ${finding.finding}`)
         .join('\n  ')}`,
     )
+    // the remedy follows the classes these findings carry, not the PRODUCT_DEFECT default
+    error.next = blockingRemedy(result.blocking)
+    throw error
   }
 
   // --ir hands oracle-run the improvement proposals it records with the transition
@@ -3159,6 +3164,7 @@ try {
   let code = 'INPUT_UNREADABLE'
   if (error.code?.startsWith('CASE_SPACE_')) code = error.code
   const cliError = error instanceof CliError ? error : new CliError(code, error.message ?? String(error))
-  process.stderr.write(`${cliError.code}: ${cliError.message}\n${nextActionLine(cliError.code)}`)
+  const next = cliError.next ? `next: ${cliError.next}\n` : nextActionLine(cliError.code)
+  process.stderr.write(`${cliError.code}: ${cliError.message}\n${next}`)
   process.exitCode = cliError.exitCode
 }
