@@ -22,7 +22,7 @@ import {
   snapshotRegularFile,
   stableStringify,
 } from './oracle-fs.mjs'
-import { assertReviewIterationEvent } from './oracle-iterations.mjs'
+import { assertReviewIterationEvent, splitConfirmFindings } from './oracle-iterations.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import { assertProfileReviewReferences, contextGaps, snapshotContext, validateContextReview } from './oracle-review-context.mjs'
 import {
@@ -68,6 +68,7 @@ const FLAG_NAMES = [
   'lock',
   'blind-map',
   'baseline-root',
+  'repaired',
 ]
 
 /**
@@ -240,7 +241,7 @@ function nextActionLine(code) {
 }
 
 function parseOptions(args) {
-  const options = { path: [], source: [] }
+  const options = { path: [], source: [], repaired: [] }
 
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index]
@@ -257,6 +258,7 @@ function parseOptions(args) {
 
     if (name === 'path') options.path.push(value)
     else if (name === 'source') options.source.push(value)
+    else if (name === 'repaired') options.repaired.push(value)
     else options[name] = value
     index += 1
   }
@@ -2402,13 +2404,17 @@ async function reviewRoots(options) {
  * 코드 위치를 주장하는 PRODUCT_DEFECT가 `path#La-Lb`를 인용하면, 그 근처(±3줄)에 `quote`가 실제로 있어야 한다.
  * 없는 행동("두 번째 클릭에 dedupe 없음")은 인용할 줄이 없으니 path#L 인용이 없는 finding은 검사하지 않는다.
  */
-async function citationProblem(finding, roots) {
+async function citationProblem(finding, roots, repaired = []) {
   if (finding.classification !== 'PRODUCT_DEFECT') return null
   const cited = codeCitation(finding)
   if (!cited) return null
   const { reference, path, from, to } = cited
   if (isAbsolute(path) || path.split('/').includes('..')) return `cites ${reference} outside the repository — cite a repository-relative path`
   if (typeof finding.quote !== 'string' || !finding.quote.trim()) return `cites ${reference} without a \`quote\` of the line`
+  // a repair after the last review round rewrote this file: the quote names bytes the reviewer saw, no longer on disk
+  // (repaired paths are scan-root relative; a repository-relative citation carries the scan root's folder in front)
+  const cites = posix.normalize(path)
+  if (repaired.some((entry) => cites === posix.normalize(entry) || cites.endsWith(`/${posix.normalize(entry)}`))) return null
   const normalize = (text) => text.replace(/\s+/g, ' ').trim()
   for (const root of roots) {
     const content = await readFile(resolve(root, path), 'utf8').catch(() => null)
@@ -2462,7 +2468,7 @@ async function findingsResult(options) {
   // 부정확한 인용은 증거 보정 대상이지 취향이라는 의미 판정이 아니다. 원본은 그대로 둔다.
   const roots = await reviewRoots(options)
   for (const finding of [...primary, ...(secondary ?? [])]) {
-    const problem = await citationProblem(finding, roots)
+    const problem = await citationProblem(finding, roots, options.repaired)
     if (!problem) continue
     throw new CliError('FINDINGS_INVALID', `finding ${finding.id}: ${problem} — re-emit it with the exact line; an unverified citation is not a preference`)
   }
@@ -2512,9 +2518,15 @@ async function findingsResult(options) {
     advisory = opinions(primary)
   }
 
-  const lines = [`FINDINGS_OK blocking:${blocking.length} advisory:${advisory.length}`]
+  // round 2 (confirm-fixes): only a backed previous·regression·security claim keeps blocking, the rest are proposals
+  const packet = options.packet ? await readJson(options.packet, 'REVIEW_PACKET_INVALID').catch(() => null) : null
+  const split = splitConfirmFindings(blocking, packet?.reviewScope)
+  blocking = split.blocking
+  const proposals = split.proposals
+  const proposalCount = proposals ? ` proposals:${proposals.length}` : ''
+  const lines = [`FINDINGS_OK blocking:${blocking.length} advisory:${advisory.length}${proposalCount}`]
 
-  if (secondary) {
+  if (secondary || proposals?.length) {
     lines.push(
       ...blocking.map(
         (finding) =>
@@ -2523,19 +2535,17 @@ async function findingsResult(options) {
           }`,
       ),
       ...advisory.map((finding) => `ADVISORY ${finding.row} ${finding.classification} ${finding.finding}`),
+      ...(proposals ?? []).map((finding) => [`PROPOSAL ${finding.id} ${finding.severity} ${finding.finding}`, finding.demoted && `(demoted: ${finding.demoted})`].filter(Boolean).join(' ')),
     )
   }
 
-  return { blocking, advisory, lines }
+  return { blocking, advisory, ...(proposals ? { proposals } : {}), lines }
 }
 
 async function verifyFindings(options) {
   const result = await findingsResult(options)
-  process.stdout.write(
-    options.ir
-      ? `${JSON.stringify({ blocking: result.blocking, advisory: result.advisory })}\n`
-      : `${result.lines.join('\n')}\n`,
-  )
+  const ir = { blocking: result.blocking, advisory: result.advisory, ...(result.proposals ? { proposals: result.proposals } : {}) }
+  process.stdout.write(options.ir ? `${JSON.stringify(ir)}\n` : `${result.lines.join('\n')}\n`)
 }
 
 /** 이번 라운드 리뷰어 findings의 결속 — 패킷·리비전·주문 영수증·원장 영수증·독립성. 행이 인용할 finding ID와 그 역할을 돌려준다. */
@@ -2844,7 +2854,14 @@ async function verifyReview(options) {
     )
   }
 
-  process.stdout.write(`REVIEW_CLEAR advisory:${result.advisory.length}\n`)
+  // --ir hands oracle-run the improvement proposals it records with the transition
+  if (options.ir) {
+    process.stdout.write(`${JSON.stringify({ advisory: result.advisory, proposals: result.proposals ?? [] })}\n`)
+    return
+  }
+  const proposals = result.proposals ? [`proposals:${result.proposals.length}`] : []
+  const line = ['REVIEW_CLEAR', `advisory:${result.advisory.length}`, ...proposals].join(' ')
+  process.stdout.write(`${line}\n`)
 }
 
 // 잠긴 카드의 행을 그대로 옮긴 빈 manifest를 만든다 — 행 ID를 손으로 옮기다 생기는

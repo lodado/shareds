@@ -211,8 +211,8 @@ after findings, and give round 2 a new `--packet` path; the `--findings` that bu
 rerun with round 2's returns in their place. Round 2 continues the round-1 reviewers like card review.
 Below High, when every round-1 claim is a cited product defect whose reviewer wrote its reproduction,
 written with `reproduce` and failing before the repair, skip that dispatch and close round 2 with
-`--closure` (delivery/green-review). Blockers that survive round 2 stop at NEEDS_DECISION; a round 3 runs
-only after the user's explicit approval recorded with `oracle-run.mjs review-extend`.
+`--closure` (delivery/green-review). There is no round 3. Copy the improvement proposals `close` prints
+into the report; repaired round-2 blockers close as PARTIAL_VERIFIED with the repair unreviewed.
 Run each reviewer's "reproduction not run" command once, as a job, on the final snapshot; a failure joins
 that reviewer's findings.
 

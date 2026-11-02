@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
+import { repairHunks } from './oracle-iterations.mjs'
 import { compileBend } from './oracle-model.mjs'
 import { bindReviewDocument, runAsync, strictReviewPacketArgs, workspace } from './oracle-run.cases.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
@@ -114,21 +115,24 @@ const listItems = (list) => {
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex')
 const readOr = (path) => readFile(path).catch(() => Buffer.alloc(0))
 
-function loadModel(exported) {
+/** One coverage item per cell: the run state (with the packet of a GREEN visit), whether VALID_RED was ever recorded, the command and its outcome. */
+function deliveryItem(s, message, outcome) {
+  const at = s.at.packet ? `${s.at.$}.${s.at.packet.$}` : s.at.$
+  return `${at}|red:${s.red}|${JSON.stringify(message)}|${outcome}`
+}
+
+function loadModel(exported, prefix = 'Del', item = deliveryItem) {
   const call =
     (name) =>
     (...args) =>
-      exported[`Del.${name}`](...args.map((argument) => structuredClone(argument)))
+      exported[`${prefix}.${name}`](...args.map((argument) => structuredClone(argument)))
   const enabled = call('enabled')
-  return { init: call('init'), step: call('step'), decide: call('decide'), enabled: (state) => listItems(enabled(state)) }
+  return { init: call('init'), step: call('step'), decide: call('decide'), enabled: (state) => listItems(enabled(state)), item }
 }
 
-/** One coverage item per cell: the run state (with the packet of a GREEN visit), whether VALID_RED was ever recorded, the command and its outcome. */
 function itemOf(model, state, message) {
-  const s = toPlain(state)
   const o = toPlain(model.decide(state, message))
-  const at = s.at.packet ? `${s.at.$}.${s.at.packet.$}` : s.at.$
-  return `${at}|red:${s.red}|${JSON.stringify(toPlain(message))}|${o.$ === 'Took' ? 'Took' : o.why.$}`
+  return model.item(toPlain(state), toPlain(message), o.$ === 'Took' ? 'Took' : o.why.$)
 }
 
 function reachableItems(model) {
@@ -420,7 +424,207 @@ async function conformance(t) {
   assert.deepEqual(differences, [])
 }
 
+// ---- the review lap: IMPLEMENTED_GREEN to a review verdict, with the round and the class of round-2 findings
+
+const LAP = fileURLToPath(new URL('../../../test-fixtures/review-lap/', import.meta.url))
+
+async function provenLapLaws(t) {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const cells = oracleModel('prove', '--dir', LAP, '--timeout-ms', '300000')
+  assert.equal(cells.status, 0, cells.stderr)
+  const proven = JSON.parse(cells.stdout)
+  assert.equal(proven.status, 'proven', `${proven.stdout}${proven.stderr}`)
+  assert.deepEqual(proven.cells, { generated: [{ law: 'round_two_split', cases: 14 }, { law: 'security_every_round', cases: 6 }], skipped: [], temporaryCopy: true })
+  const reach = oracleModel('prove-reach', '--model', join(LAP, 'MODEL.bend'), '--prefix', 'Lap', '--safe', 'safe', '--timeout-ms', '300000')
+  assert.equal(reach.status, 0, reach.stderr)
+  const reached = JSON.parse(reach.stdout)
+  assert.equal(reached.status, 'proven', reach.stdout.slice(0, 2000))
+  assert.deepEqual({ domain: reached.domain, reachable: reached.reachable, diameter: reached.diameter }, {
+    domain: { states: 3072, events: 13, cells: 39936 },
+    reachable: 229,
+    diameter: 9,
+  })
+}
+
+// each error code the review lap reports, by the model's refusal class
+const LAP_WHY = {
+  REVIEW_PACKET_STATE: 'WrongState',
+  REVIEW_RECEIPT_STATE: 'WrongState',
+  REVIEW_PACKET_INVALID: 'PacketMissing',
+  REVIEW_PACKET_REQUIRED: 'PacketMissing',
+  REVIEW_FOLLOWUP_REQUIRED: 'Followup',
+  REVIEW_ROUNDS_CLOSED: 'Closed',
+  NO_OPEN_HOLDS: 'NoHold',
+  TRANSITION_NOT_ALLOWED: 'NotAllowed',
+  REVIEW_RUN_STALE: 'Stale',
+  REVIEW_RERUN_REQUIRED: 'Rerun',
+  REVIEW_PACKET_STALE: 'PacketStale',
+  REVIEWER_EVIDENCE_INVALID: 'ReceiptMissing',
+  FINDINGS_BLOCKING: 'Blocking',
+}
+// the verifier refuses a packet made before a passing run on its bytes with the same code as an unreadable packet
+const lapWhy = (code, stderr) => (stderr.startsWith('REVIEW_PACKET_INVALID: review packet does not target the implementation worktree') ? 'Unwitnessed' : LAP_WHY[code])
+const ROUND = { R0: 0, R1: 1, R2: 2 }
+// coverage: the stage, round and every review fact but the run freshness and the noted proposal, the command, its outcome
+const lapItem = (s, message, outcome) =>
+  `${s.at.$}|${s.round.$}|c:${s.current}|b:${s.bound}|k:${s.blocked}|p:${s.prior}|${JSON.stringify(message)}|${outcome}`
+const LAP_ITEMS = 572
+const LAP_TRACES = 46
+
+/** One finding of the class a model claim names; regression lines come from the hunks of the cited packet's repair diff. */
+function lapFindings(find, hunks) {
+  if (find.$ === 'Clear') return []
+  const base = { id: 'F1', row: 'O1', severity: 'medium', classification: 'PRODUCT_DEFECT', finding: 'lap finding', evidence: 'seen in the packet', fix: 'adjust it' }
+  const kind = find.kind
+  if (kind.$ === 'Previous') return [{ ...base, confirm: { class: 'previous', finding: 'F1' } }]
+  if (kind.$ === 'Security') return [{ ...base, severity: kind.backed ? 'high' : 'medium', confirm: { class: 'security', category: 'permission' } }]
+  if (kind.$ === 'Plain') return [base]
+  const [path, spans] = [...hunks][0] ?? ['src/none.mjs', [[1, 1]]]
+  return [{ ...base, confirm: { class: 'regression', path, line: kind.inside ? spans[0][0] : spans[0][1] + 50 } }]
+}
+
+/** A Low run driven to IMPLEMENTED_GREEN, and the CLI commands of each lap event on it. */
+async function lapRun(t) {
+  const fixture = await workspace(t, { risk: 'low', git: true, initialFiles: { 'oracle-red-fixture.test.mjs': RED_TEST } })
+  assert.ok(fixture, 'git is required for the repair diff')
+  const { root, oracleDirectory: dir } = fixture
+  const statePath = join(dir, 'run-state.json')
+  const initialState = await readFile(statePath)
+  const setup = deliveryCommands({ root, dir, lock: fixture.lock }, { packet: null })
+  for (const message of [{ $: 'Exec', pass: false }, { $: 'MarkRed' }, { $: 'EditProd' }, { $: 'Exec', pass: true }, { $: 'MarkGreen' }]) {
+    const result = await setup[message.$](message)
+    assert.equal(result.status, 0, `${message.$}: ${result.stderr}`)
+  }
+  const template = JSON.parse(await readFile(join(dir, 'findings.json'), 'utf8'))
+  // the packet of the latest round (a repeat on the same bytes keeps it) and the findings bound to it
+  const lap = { packet: null, findings: null }
+  const counter = { report: 0, edit: 0, packet: 0, task: 0 }
+  const latestRun = async () => {
+    const lines = (await readOr(join(dir, 'runs.jsonl'))).toString('utf8').split('\n').filter(Boolean)
+    return lines.map((line) => JSON.parse(line)).filter((entry) => entry.type === 'run').at(-1).runId
+  }
+  const commands = {
+    Exec: () => {
+      counter.report += 1
+      const report = join(dir, `lap-report-${counter.report}.ndjson`)
+      return runAsync(['exec', '--dir', dir, '--label', 'behavior', '--adapter', 'node-test', '--report', report, '--', process.execPath, '--test', join(root, 'oracle-green-fixture.test.mjs')])
+    },
+    // a repair adds a file and rewrites the one a regression claim on the latest packet cites, so a repair after round 2
+    // always touches its blockers' files (the CLI refuses one that does not; the model leaves that out)
+    Edit: async () => {
+      counter.edit += 1
+      const content = `export const retries = ${counter.edit}\nexport const delay = 0\nexport const limit = 2\n`
+      await writeFile(join(root, 'src', `repair-${counter.edit}.mjs`), content)
+      const [cited] = [...(lap.packet?.hunks ?? new Map()).keys()]
+      if (cited) await writeFile(join(root, cited), content)
+      return { status: 0, stdout: '', stderr: '' }
+    },
+    Packet: async () => {
+      counter.packet += 1
+      const path = join(dir, `lap-packet-${counter.packet}.json`)
+      const result = await runAsync([...strictReviewPacketArgs(dir, path), ...(lap.findings ? ['--findings', lap.findings] : [])])
+      if (result.status !== 0) return result
+      const bytes = await readFile(path)
+      const packet = JSON.parse(bytes.toString('utf8'))
+      if (packet.targetRevision !== lap.packet?.revision) {
+        lap.packet = { path, revision: packet.targetRevision, sha256: sha256(bytes), hunks: repairHunks(packet.reviewScope.repairDiff) }
+        lap.findings = null
+      }
+      return result
+    },
+    Attest: async ({ find }) => {
+      counter.task += 1
+      const path = join(dir, `lap-findings-${counter.task}.json`)
+      await writeFile(path, JSON.stringify({ ...template, findings: lapFindings(find, lap.packet?.hunks ?? new Map()) }))
+      if (lap.packet) bindReviewDocument(path, lap.packet.sha256, lap.packet.revision)
+      const cited = lap.packet ? ['--packet', lap.packet.path, '--revision', lap.packet.revision] : ['--packet', join(dir, 'no-packet.json'), '--revision', 'none']
+      const result = await runAsync(['review-receipt', '--dir', dir, ...cited, '--findings', path, '--role', 'code-reviewer', '--reviewer', 'primary-code-reviewer', '--task-id', `lap-${counter.task}`])
+      if (result.status === 0) lap.findings = path
+      return result
+    },
+    Review: async ({ to }) => {
+      const cited = lap.packet ? ['--packet', lap.packet.path, '--revision', lap.packet.revision] : []
+      return runAsync(['transition', '--dir', dir, '--to', to.$ === 'ToVerified' ? 'REVIEW_VERIFIED' : 'PARTIAL_VERIFIED', '--run', await latestRun(),
+        '--evidence', join(dir, 'evidence.json'), '--findings', lap.findings ?? join(dir, 'findings.json'), ...cited])
+    },
+    Stop: () => runAsync(['transition', '--dir', dir, '--to', 'NEEDS_DECISION', '--reason', 'stop here']),
+  }
+  return {
+    dir,
+    perform: (message) => commands[message.$](message),
+    /** status --brief on the run-state.json init wrote: the ledger alone must give back the verdict and its record. */
+    async replayedBrief() {
+      const current = await readFile(statePath)
+      await writeFile(statePath, initialState)
+      try {
+        return await runAsync(['status', '--dir', dir, '--brief'])
+      } finally {
+        await writeFile(statePath, current)
+      }
+    },
+  }
+}
+
+async function observeLap(directory) {
+  const state = JSON.parse(await readFile(join(directory, 'run-state.json'), 'utf8'))
+  return { state, at: STATE[state.state], round: state.reviewIterations?.inputs?.snapshot?.round ?? 0 }
+}
+
+/** Replay one lap trace on the CLI; every step must end where the model says, and an accepted verdict must record what the model says. */
+async function replayLap(t, model, trace) {
+  const run = await lapRun(t)
+  let state = model.init()
+  for (const [index, message] of trace.entries()) {
+    const before = { state: await readOr(join(run.dir, 'run-state.json')), ledger: await readOr(join(run.dir, 'runs.jsonl')) }
+    const plain = toPlain(message)
+    const result = await run.perform(plain)
+    const code = result.stderr.split(':')[0]
+    const { state: recorded, ...observed } = { outcome: result.status === 0 ? 'Took' : (lapWhy(code, result.stderr) ?? `${code} ${result.stderr.slice(0, 300)}`), ...(await observeLap(run.dir)) }
+    const outcome = toPlain(model.decide(state, message))
+    const s = toPlain(state)
+    const after = toPlain(model.step(state, message))
+    const wanted = { outcome: outcome.$ === 'Took' ? 'Took' : outcome.why.$, at: after.at.$, round: ROUND[after.round.$] }
+    const where = { step: index, event: JSON.stringify(plain), after: trace.slice(0, index).map((entry) => JSON.stringify(toPlain(entry))).join(' ') }
+    if (!isDeepStrictEqual(observed, wanted)) return [{ ...where, observed, wanted }]
+    if (observed.outcome !== 'Took' && (!(await readOr(join(run.dir, 'runs.jsonl'))).equals(before.ledger) || !(await readOr(join(run.dir, 'run-state.json'))).equals(before.state)))
+      return [{ ...where, refusal: 'wrote' }]
+    const verdict = await verdictDifference(run, s, plain, observed.outcome === 'Took' ? recorded : null)
+    if (verdict) return [{ ...where, ...verdict }]
+    state = model.step(state, message)
+  }
+  return []
+}
+
+/** An accepted verdict records the proposals exactly when the model noted one, and an unreviewed repair (with its blockers) exactly on PARTIAL_VERIFIED. */
+async function verdictDifference(run, s, plain, recorded) {
+  if (!recorded || plain.$ !== 'Review') return null
+  const entry = recorded.history.at(-1)
+  const partial = plain.to.$ === 'ToPartial'
+  const record = { proposals: (entry.proposals?.length ?? 0) > 0, unreviewed: entry.unreviewedRepair != null, blockers: (entry.unreviewedRepair?.blockers?.length ?? 0) > 0 }
+  const expected = { proposals: s.noted, unreviewed: partial, blockers: partial && s.blocked }
+  if (!isDeepStrictEqual(record, expected)) return { record, expected }
+  const brief = await run.replayedBrief()
+  const lines = { proposals: /\nimprovement proposals \(not fixed, not blocking\): 1\n/.test(brief.stdout), unreviewed: /\nunreviewed repair after round 2: /.test(brief.stdout) }
+  return isDeepStrictEqual(lines, { proposals: s.noted, unreviewed: partial }) ? null : { brief: brief.stdout || brief.stderr }
+}
+
+async function lapConformance(t) {
+  const bin = await installedBend(t)
+  if (!bin) return
+  const { exported } = await compileBend({ entry: join(LAP, 'MODEL.bend'), bin })
+  const model = loadModel(exported, 'Lap', lapItem)
+  const { reachable, items, traces } = coveringTraces(model)
+  assert.equal(reachable, 229)
+  assert.equal(items, LAP_ITEMS)
+  assert.equal(traces.length, LAP_TRACES)
+  const differences = (await pool(traces, 6, (trace) => replayLap(t, model, trace))).flat()
+  assert.deepEqual(differences, [])
+}
+
 export const deliveryMachineCases = [
   ['[bend] the delivery laws are proven by the kernel: cells, witnesses, and every law on every reached state', provenLaws],
   ['[bend] the CLI answers every (run state, VALID_RED recorded, command, outcome) the model reaches the way the model does', conformance],
+  ['[bend] the review-lap laws are proven by the kernel: round-2 classes, no third round, and every law on every reached state', provenLapLaws],
+  ['[bend] the CLI answers every (stage, round, review facts, command, outcome) the review-lap model reaches the way the model does', lapConformance],
 ]

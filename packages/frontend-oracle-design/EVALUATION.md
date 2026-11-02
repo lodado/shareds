@@ -1,3 +1,98 @@
+# 0.123.0: delivery review ends at round 2, and round 2 blocks only on what its packet backs
+
+## Why
+
+Wave F3-a of the self-FSM plan ("oh right" loops). The 2-round rule for Delivery review was prose: a round-2
+reviewer could raise any new finding as a blocker, the controller repaired it, and `review-extend` opened round 3 on
+an approval, up to the ceiling of 6.
+
+## Change
+
+- Classification (oracle-iterations.mjs `confirmClass`, `splitConfirmFindings`; applied in oracle-verify.mjs
+  `findingsResult` from the packet's `reviewScope`). In a `confirm-fixes` round a blocking finding keeps blocking only
+  with a `confirm` claim the packet backs: `previous` (an ID of a round-1 claim, NON_ORACLE_OPINION excluded),
+  `regression` (a line the repair diff adds in the cited file; context lines do not count; a repaired file the diff
+  has no lines for, such as an untracked baseline or a repo without git, backs any line of it), `security` (category
+  security|permission|data-loss, severity critical/high, evidence). Everything else is an improvement proposal, with
+  the reason when a claim was demoted. Round 1 is unchanged, so security blocks in every round.
+- Proposals are recorded on the review transition (ledger event and history, replayed from the ledger), printed by
+  `close` and `status --brief` as `improvement proposals (not fixed, not blocking): n` and a list, and
+  `close --check-report` refuses a report that leaves one out. They change no round and no budget.
+- No round 3. `review-packet` on changed bytes after round 2 is REVIEW_ROUNDS_CLOSED (also for a ledger extended
+  before this version), and `review-extend` refuses without a write. Post-round-2 path: repair the blockers, rerun
+  the labels, and close with the round-2 packet and findings. That records PARTIAL_VERIFIED with `unreviewedRepair`
+  (round, reviewed revision, repaired paths, the round-2 blockers and the files they name). REVIEW_VERIFIED still
+  needs a packet on the current bytes, so a stale receipt never reaches it. Chosen over NEEDS_DECISION-only because
+  PARTIAL_VERIFIED already means "not fully reviewed" and needs no new command or state. The repair must change a
+  file each located blocker names (REVIEW_REPAIR_UNRELATED otherwise). Citations into repaired files skip the quote
+  check (`oracle-verify.mjs --repaired`), since they quote bytes the reviewer saw. A closure over such a repair is
+  refused before any receipt is written. The report must name every repaired path.
+- `test-fixtures/review-lap` (prefix `Lap`), a sibling of the Delivery model, which has no rounds: stage, round 0–2,
+  packet current, receipt bound, blocked, proposal noted, round-1 claim carried, run after GREEN, run fresh, packet
+  witnessed; 13 commands. 12 relations, proven with `prove-reach --prefix Lap --safe safe` on all 229 reachable
+  states (3,072 × 13, diameter 9): a refusal changes nothing; only an accepted packet raises the round, by one; a
+  packet on changed bytes after round 2 is refused as closed; an unbacked round-2 finding ends where a clear one ends
+  except for the proposal mark and never blocks; a backed security finding blocks in every round; REVIEW_VERIFIED
+  needs the current, witnessed packet, a bound receipt, no blocker and a fresh run; PARTIAL_VERIFIED without a hold
+  needs the repair after round 2, the round-2 receipt and a fresh run; NEEDS_DECISION is always open. Cells
+  `round_two_split` 14 and `security_every_round` 6; witnesses: REVIEW_VERIFIED after round 2 with a proposal,
+  PARTIAL_VERIFIED after a round-2 repair, a refused third round.
+- Conformance (oracle-run-machine.cases.mjs, registered from oracle-stage-machine.test.mjs): 46 model traces replayed
+  on the real CLI, covering all 572 (stage, round, current, bound, blocked, round-1 claim, command, outcome) items;
+  outcome, state and round after every step, refusals write nothing, and an accepted verdict records proposals and
+  the unreviewed repair exactly where the model says, also from the ledger alone. The first replay found a guard the
+  model lacked: a packet made before a passing run on its bytes is accepted, but the transition later refuses it
+  (REVIEW_PACKET_INVALID "does not target the implementation worktree"); the model now has `witnessed`.
+- Docs: delivery/green-review.md (round budget items 3 and 6, the round-2 packet paragraph, `review-extend`),
+  subagent-review.md (`confirm`), roles/controller-formal.md, roles/review-formal.md, contract/green-review.md, and
+  the round-2 reviewer instruction in `reviewScope`. Card review (authoring) is not mechanized: `review-input` carries
+  free text the runtime never parses; card-format.md item 3 only says an unsupported round-2 finding is not fixed and
+  opens no round. Authoring keeps `approve-one-more-round`, `delegated-rounds` and the ceiling.
+- Intentional test changes: the High round test and the closure round test expected ITERATION_BUDGET_EXHAUSTED and an
+  accepted `review-extend`; both now expect REVIEW_ROUNDS_CLOSED. The skill-contract pins follow the new wording.
+
+## Extension paths no review lap reaches (deletion candidates, kept for old ledgers)
+
+- `extendIterations(..., 'delivery-review')`: oracle-run.mjs no longer imports it; `extendReview` throws
+  REVIEW_ROUNDS_CLOSED before reading the approval. Its only caller is oracle-stage.mjs (authoring).
+- ITERATION_BUDGET_EXHAUSTED for delivery: `nextReviewRound` turns it into REVIEW_ROUNDS_CLOSED.
+- ROUND_CEILING / `roundCeiling()` and `delegated-rounds` for delivery: reachable only through `extendIterations`.
+- `review-extension` ledger events are still read (oracle-run.mjs replay, oracle-verify.mjs ledger checks,
+  `assertReviewIterationEvent`), so ledgers that already hold one still verify; none is written any more.
+
+## Open facts (not fixed)
+
+- Regression backing is HEAD-based: the repair diff is `git diff HEAD` of the repaired files, so in a repaired file
+  uncommitted implementation lines from before round 1 also count as added.
+- A reviewer can label a finding `security` with critical/high severity and a category; the runtime cannot check that
+  it is one. A critical/high finding with no `confirm` becomes a proposal (printed, and required in the report).
+- Proposals are recorded only on an accepted review transition, not on a NEEDS_DECISION stop.
+- Authoring-side card review stays free text; review loops outside `review-input` / `review-packet` are not counted.
+- `extend` approval sources are unauthenticated self-report.
+- High risk with an unreviewed repair (blind mapping on the repaired bytes, `--intersect`, mutation), holds together
+  with a repair, and `--closure` with a repair have no dedicated test; the lap model is Low only, and its replay edits
+  only untracked files.
+
+## Verification
+
+- `prove --dir test-fixtures/review-lap`: proven. `prove-reach --prefix Lap --safe safe`: proven, 229 reachable of
+  3,072 states × 13 commands. Added suite time: kernel case ~2.8 s, conformance case ~28 s (46 traces, 572 items).
+- Formal Delivery closure 445,974 → 445,976 bytes (cap 446,000, not raised); green-review.md −394,
+  subagent-review.md +376, card-format.md +20, review-formal.md +83 (role-review bundle 61,911 → 61,994, cap 62,000), controller-formal.md +9.
+- `pnpm bundles:generate`: 22 bundles; `npx prettier --check` on the changed markdown, the bundles, this file and
+  the fixture README: clean.
+- `pnpm lint`: 0 errors, 405 warnings (406 at HEAD).
+- `pnpm test` (1325 tests: 1320 at 0.122.0, plus 3 round-2 cases and 2 review-lap cases): run
+  1 1324 pass, 1 fail (role-review bundle 62,012 over its 62,000 cap; review-formal.md text shortened, the bundle
+  test then passes). Run 2 1324 pass, 1 fail: "worker fresh transport executes the existing GREEN gate" timed out
+  after 600 s spawning the fake `claude` binary. That test passed in run 1 and passes alone in 1.7 s, and it does not
+  touch review code. No run had every test green on the final bytes.
+- Independent review (Opus, read-only, one round): 3 major, 3 minor, 1 nit, all applied except one minor (a
+  critical/high finding without `confirm` stays a proposal, as the rule says; it is printed and must be in the
+  report). Applied: citations into repaired files, added-line hunks plus path-level backing, the repair must touch the
+  blockers' files, exact bare names and C-quoted git paths, the report names ids by word and every repaired path, a
+  refused closure writes no receipt.
+
 # 0.122.0: authoring is a proven machine, rewinds have a cap and review rounds a ceiling
 
 ## Why

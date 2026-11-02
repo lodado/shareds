@@ -331,7 +331,7 @@ every repair can keep expanding the modeled world rather than verify the agreed 
    a request for a fresh defect hunt.
 3. A new round 2 finding blocks only when it contradicts an approved policy row or forces an
    implementer to choose an expected value. Any other "this world is also possible" finding is
-   recorded as a residual risk in the card and does not block.
+   recorded as a residual risk in the card: not fixed, not blocking, no new round.
 4. A repair that adds more than 3 model states or message kinds is not a repair: stop and return the
    scope to `NEEDS_DECISION`, since the user owns widening the modeled world.
 5. The same row in the findings of both rounds is a card design defect, not a wording defect. Return

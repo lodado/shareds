@@ -292,8 +292,7 @@ node <skill-dir>/scripts/oracle-run.mjs close --dir <dir> --packet <dir>/review-
 
 Delivery review (both High reviewers count as one round) runs at most 2 rounds per lock revision.
 `review-packet` persists the round in the existing ledger/run-state, with a `reviewScope` bound to the
-target snapshot. Re-emitting the same snapshot is idempotent, not a new full review. Every unrelated
-post-review fix changes the snapshot and can otherwise restart the defect hunt.
+target snapshot. Re-emitting the same snapshot is idempotent, not a new full review.
 
 1. **Round 1** is the full review. Group its blocking findings by shared root cause, fix each group
    once in one pass inside the product budget, and rerun the labels above before round 2.
@@ -301,17 +300,18 @@ post-review fix changes the snapshot and can otherwise restart the defect hunt.
    no locked row. Hand the same reviewers (High: both) round 1's finding IDs, the fix diff and the
    raw rerun evidence, not a request for a fresh defect hunt. The packet is regenerated for the
    current snapshot; the narrowed task changes, the gate does not.
-3. A new round 2 finding blocks only when it is a `PRODUCT_DEFECT` that contradicts a locked row's
-   `Then`/`Never`, or a critical/high security·permission·data-loss finding. Every other new finding
-   is recorded as advisory in the report and is not fixed: fixing it would change the snapshot and
-   restart the loop.
+3. In round 2 the runner blocks only on a finding whose `confirm` claim the packet backs
+   ([subagent-review](../subagent-review.md)): a round-1 claim ID, a line the repair added, or
+   critical/high security·permission·data-loss. Every other new finding
+   is recorded as an improvement proposal: not fixed, not blocking, no new round. `close` and
+   `status --brief` print them; copy them into the report.
 4. A fix that needs a new state, message kind or row is `POLICY_GAP` → `NEEDS_DECISION`, not a repair.
 5. The same row blocking in both rounds is a card design defect, not a wording defect. Return a
    decision to narrow that row instead of repairing it a third time.
-6. If blockers survive round 2, stop at `NEEDS_DECISION` (or `FAIL` for an environment cause) with the
-   surviving findings; `REVIEW_VERIFIED` is not recorded over a blocking finding, and delegating
-   choices does not waive it. A round 3 needs the user's explicit approval and is never started by
-   the controller on its own.
+6. There is no round 3: a packet on changed bytes after round 2 is `REVIEW_ROUNDS_CLOSED`. If blockers
+   survive round 2, stop at `NEEDS_DECISION` (or `FAIL` for an environment cause), or repair them in their files,
+   rerun the labels and `close` with the round-2 packet and findings: that records `PARTIAL_VERIFIED`
+   with the repair unreviewed, never `REVIEW_VERIFIED`, and the report names it.
 
 **Closing round 2 without reviewers (Low and Medium only).** When every round-1 claim
 (`NON_ORACLE_OPINION` aside) is a `PRODUCT_DEFECT` citing `path#La-Lb` and carries the `reproduction`
@@ -368,16 +368,10 @@ reviewers.
 
 Round 2 packet generation requires the preceding raw receipt-bound `--findings` and, for High,
 `--intersect`. It includes their IDs/original findings and the repair diff under
-`reviewScope.mode: "confirm-fixes"`; preserve that scope in both reviewer tasks. The runtime refuses a
-third changed snapshot with `ITERATION_BUDGET_EXHAUSTED`, missing/changed/non-independent previous
-findings with `REVIEW_FOLLOWUP_REQUIRED`, and rewritten task scope with `REVIEW_SCOPE_INVALID`.
-The existing blocker, independence, mutation, rerun and final transition gates are unchanged.
-
-An actual explicit approval of one additional round is recorded by
-`oracle-run.mjs review-extend --dir <dir> --approval <file>`. The JSON uses the same approval fields as
-the card budget with `phase: "delivery-review"`. It extends only that limit, never clears findings,
-resets product/harness budgets, or records REVIEW_VERIFIED. The source reference is self-reported,
-not authenticated user identity. Keep the original user message, never manufacture it.
+`reviewScope.mode: "confirm-fixes"`; preserve that scope in both reviewer tasks. The runtime refuses
+missing/changed/non-independent previous findings with `REVIEW_FOLLOWUP_REQUIRED` and rewritten task
+scope with `REVIEW_SCOPE_INVALID`. The other gates are unchanged. `review-extend` refuses delivery
+review (`REVIEW_ROUNDS_CLOSED`); a ledger that already records an extension still replays.
 
 ## Forbidden
 

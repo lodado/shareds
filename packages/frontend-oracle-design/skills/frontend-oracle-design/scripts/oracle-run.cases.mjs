@@ -9,7 +9,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { HOST_RECEIPTS_FILE, reviewOutputDigest, stableStringify } from './oracle-fs.mjs'
-import { extendIterations, iterationBudget, ROUND_CEILING } from './oracle-iterations.mjs'
+import { confirmClass, extendIterations, iterationBudget, repairHunks, ROUND_CEILING } from './oracle-iterations.mjs'
 import { emitWorld } from './oracle-projection.mjs'
 import { installedBend } from './oracle-test-bend.mjs'
 import { resolveExecutable, spawnGit } from './resolve-executable.mjs'
@@ -4761,26 +4761,26 @@ test('review iterations bind High reviewers to one round, require prior findings
   const beforePacket = await readFile(repaired)
   const third = run(args)
   assert.equal(third.status, 1)
-  assert.match(third.stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
+  assert.match(third.stderr, /^REVIEW_ROUNDS_CLOSED:/)
   assert.deepEqual(await readFile(join(oracleDirectory, 'run-state.json')), beforeState)
   assert.deepEqual(await readFile(join(oracleDirectory, 'runs.jsonl')), beforeLedger)
   assert.deepEqual(await readFile(repaired), beforePacket)
   // Recovery replays the same budget from the real ledger even if the state cache write was lost.
   await writeFile(join(oracleDirectory, 'run-state.json'), preReviewState)
-  assert.match(run(args).stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
+  assert.match(run(args).stderr, /^REVIEW_ROUNDS_CLOSED:/)
+  // 0.123.0: an approval no longer opens round 3 — review-extend refuses and writes nothing
   const approval = join(oracleDirectory, 'round-3-approval.json')
   await writeFile(approval, JSON.stringify({ decision: 'approve-one-more-round', phase: 'delivery-review', round: 3,
     source: 'conversation: user explicitly approved round 3', reason: 'resolve the surviving locked-row defect' }))
+  const ledgerBefore = await readFile(join(oracleDirectory, 'runs.jsonl'))
   const extension = run(['review-extend', '--dir', oracleDirectory, '--approval', approval])
-  assert.equal(extension.status, 0, extension.stderr)
-  const allowed = run([...strictReviewPacketArgs(oracleDirectory, join(oracleDirectory, 'packet-round-3.json')),
+  assert.equal(extension.status, 1)
+  assert.match(extension.stderr, /^REVIEW_ROUNDS_CLOSED:/)
+  assert.deepEqual(await readFile(join(oracleDirectory, 'runs.jsonl')), ledgerBefore)
+  const refused = run([...strictReviewPacketArgs(oracleDirectory, join(oracleDirectory, 'packet-round-3.json')),
     '--findings', followupPaths[0], '--intersect', followupPaths[1]])
-  assert.equal(allowed.status, 0, allowed.stderr)
-  const extended = JSON.parse(await readFile(join(oracleDirectory, 'packet-round-3.json'), 'utf8'))
-  assert.equal(extended.reviewScope.round, 3)
-  assert.equal(extended.reviewScope.mode, 'confirm-fixes')
-  assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN', 'an extension is not delivery approval')
-  assert.equal(run(['review-extend', '--dir', oracleDirectory, '--approval', approval]).status, 1)
+  assert.match(refused.stderr, /^REVIEW_ROUNDS_CLOSED:/)
+  assert.equal((await state(oracleDirectory)).state, 'IMPLEMENTED_GREEN')
 })
 
 // a unit case only: delivery review rounds are not in the Delivery Bend model
@@ -4793,6 +4793,170 @@ test('delivery review approvals stop at the round ceiling: no approval opens rou
   assert.equal(budget.limit, 6)
   assert.throws(() => extendIterations(budget, approval(7), 'delivery-review'),
     { code: 'ITERATION_CEILING_REACHED', message: /contract itself is wrong.*new run id starts at round 1/ })
+})
+
+/**
+ * A Low run through round 1 (claim F1) and its repair (a new file src/repair.mjs, so the round-2 packet carries its
+ * hunk) to a round-2 packet. `attest(name, findings)` binds a round-2 findings file to that packet with a receipt;
+ * `verify(to, path, packet)` is the review transition citing the latest run.
+ */
+async function roundTwo(t) {
+  const created = await workspace(t, { risk: 'low', git: true })
+  assert.ok(created, 'git is required for the repair diff')
+  const { root, oracleDirectory: dir } = created
+  await reachGreen(dir, root, { greens: 1 })
+  const round1 = join(dir, 'packet-round-1.json')
+  assert.equal(run(strictReviewPacketArgs(dir, round1)).status, 0)
+  const claim = { id: 'F1', row: 'O1', severity: 'medium', classification: 'PRODUCT_DEFECT', finding: 'save never retries',
+    evidence: 'the card row O1 needs a retry', fix: 'retry once' }
+  const firstFindings = join(dir, 'round-1.json')
+  await writeFile(firstFindings, JSON.stringify({ ...CLEAR_REVIEW, findings: [claim] }))
+  const bindTo = async (path, packetPath) => {
+    const raw = await readFile(packetPath, 'utf8')
+    const revision = JSON.parse(raw).targetRevision
+    bindReviewDocument(path, createHash('sha256').update(raw).digest('hex'), revision)
+    assert.equal(issueReviewReceipt(dir, packetPath, path, revision).status, 0)
+    return revision
+  }
+  await bindTo(firstFindings, round1)
+  await writeFile(join(root, 'src', 'repair.mjs'), 'export const retries = 1\nexport const delay = 0\nexport const limit = 2\n')
+  greenRun(dir, 'repair-one')
+  const round2 = join(dir, 'packet-round-2.json')
+  const packeted = run([...strictReviewPacketArgs(dir, round2), '--findings', firstFindings])
+  assert.equal(packeted.status, 0, packeted.stderr)
+  const latestRun = async () => (await allLedgerLines(dir)).map((line) => JSON.parse(line)).filter((entry) => entry.type === 'run').at(-1).runId
+  return {
+    root,
+    dir,
+    round2,
+    async attest(name, findings) {
+      const path = join(dir, `${name}.json`)
+      await writeFile(path, JSON.stringify({ ...CLEAR_REVIEW, findings }))
+      await bindTo(path, round2)
+      return path
+    },
+    async verify(to, path, packet = round2) {
+      const revision = JSON.parse(await readFile(packet, 'utf8')).targetRevision
+      return run(['transition', '--dir', dir, '--to', to, '--run', await latestRun(), '--evidence', join(dir, 'evidence.json'),
+        '--findings', path, '--packet', packet, '--revision', revision])
+    },
+  }
+}
+
+test('a round-2 class is backed only by the packet: round-1 claim ids, new-side repair hunks, security category and severity', () => {
+  // an added line that reads like a header stays content: only `+++` right after `---` names a file
+  const diff = ['diff --git a/src/a.mjs b/src/a.mjs', '--- a/src/a.mjs', '+++ b/src/a.mjs', '@@ -1,2 +1,3 @@', ' x', '+++ b/src/fake.mjs', ' y',
+    '@@ -10,2 +11,0 @@', '-gone', '-gone', '--- /dev/null', '+++ b/src/new.mjs', '@@ -0,0 +1 @@', '+n'].join('\n')
+  // only added lines count (not context); a hunk that only deletes marks both sides of the gap
+  assert.deepEqual([...repairHunks(diff)], [['src/a.mjs', [[2, 2], [11, 12]]], ['src/new.mjs', [[1, 1]]]])
+  assert.deepEqual([...repairHunks(['--- a/x', '+++ "b/src/\\303\\251.mjs"', '@@ -1 +1 @@', '-a', '+b'].join('\n'))], [['src/é.mjs', [[1, 1]]]])
+  const scope = { mode: 'confirm-fixes', repairDiff: diff, previousFindings: [{ reviewerId: 'a', findings: [{ id: 'F1', classification: 'PRODUCT_DEFECT' }, { id: 'N1', classification: 'NON_ORACLE_OPINION' }] }] }
+  const verdict = (confirm, severity = 'medium') => confirmClass({ severity, evidence: 'seen', confirm }, scope).class
+  assert.equal(verdict({ class: 'previous', finding: 'F1' }), 'previous')
+  assert.equal(verdict({ class: 'previous', finding: 'N1' }), 'proposal', 'an opinion never blocked, so it cannot come back as a blocker')
+  assert.equal(verdict({ class: 'previous', finding: 'F1', reviewerId: 'b' }), 'proposal')
+  assert.equal(verdict({ class: 'regression', path: 'packages/src/a.mjs', line: 11 }), 'regression')
+  assert.equal(verdict({ class: 'regression', path: 'src/a.mjs', line: 4 }), 'proposal')
+  assert.equal(verdict({ class: 'regression', path: 'src/a.mjs', line: 1 }), 'proposal', 'a context line is not a line the repair added')
+  assert.equal(verdict({ class: 'regression', path: 'a.mjs', line: 11 }), 'proposal', 'a bare file name does not stand for src/a.mjs')
+  // a repaired file the diff has no lines for (untracked baseline, no git) backs any line of it
+  const unlined = { ...scope, repairPaths: ['src/a.mjs', 'src/b.mjs'] }
+  assert.equal(confirmClass({ severity: 'medium', confirm: { class: 'regression', path: 'src/b.mjs', line: 40 } }, unlined).class, 'regression')
+  assert.equal(confirmClass({ severity: 'medium', confirm: { class: 'regression', path: 'src/c.mjs', line: 40 } }, unlined).class, 'proposal')
+  assert.equal(verdict({ class: 'regression', path: 'src/fake.mjs', line: 1 }), 'proposal')
+  assert.equal(verdict({ class: 'security', category: 'data-loss' }, 'critical'), 'security')
+  assert.equal(verdict({ class: 'security', category: 'style' }, 'critical'), 'proposal')
+  assert.equal(verdict({ class: 'blocker' }), 'proposal')
+  assert.equal(verdict(undefined), 'proposal')
+})
+
+const roundTwoFinding = (id, confirm, extra = {}) => ({ id, row: 'O1', severity: 'medium', classification: 'PRODUCT_DEFECT',
+  finding: `round-2 finding ${id}`, evidence: 'seen in the repair diff', fix: 'adjust it', ...(confirm ? { confirm } : {}), ...extra })
+
+test('round 2 blocks only a backed previous, regression or security finding; every other finding is a recorded improvement proposal', async (t) => {
+  const lap = await roundTwo(t)
+  // a regression must cite a line inside a repair hunk, a security claim needs critical/high severity: unbacked, both are proposals
+  const backed = [
+    ['previous', roundTwoFinding('P1', { class: 'previous', finding: 'F1' })],
+    ['regression', roundTwoFinding('R1', { class: 'regression', path: 'src/repair.mjs', line: 2 })],
+    ['security', roundTwoFinding('S1', { class: 'security', category: 'permission' }, { severity: 'high' })],
+  ]
+  for (const [label, finding] of backed) {
+    const before = await readFile(join(lap.dir, 'runs.jsonl'))
+    const blocked = await lap.verify('REVIEW_VERIFIED', await lap.attest(`blocked-${label}`, [finding]))
+    assert.match(blocked.stderr, /^FINDINGS_BLOCKING: 1 blocking/, `${label}: ${blocked.stderr}`)
+    const after = await readFile(join(lap.dir, 'runs.jsonl'))
+    assert.equal(after.subarray(before.length).toString('utf8').split('\n').filter(Boolean).every((line) => JSON.parse(line).type === 'review-receipt'), true)
+  }
+  const proposals = [
+    roundTwoFinding('X1'),
+    roundTwoFinding('X2', { class: 'regression', path: 'src/repair.mjs', line: 99 }),
+    roundTwoFinding('X3', { class: 'regression', path: 'src/save.mjs', line: 1 }),
+    roundTwoFinding('X4', { class: 'previous', finding: 'F9' }),
+    roundTwoFinding('X5', { class: 'security', category: 'permission' }),
+  ]
+  const clear = await lap.verify('REVIEW_VERIFIED', await lap.attest('proposals', proposals))
+  assert.equal(clear.status, 0, clear.stderr)
+  const recorded = (await state(lap.dir)).history.at(-1)
+  assert.equal(recorded.state, 'REVIEW_VERIFIED')
+  assert.deepEqual(recorded.proposals.map((entry) => [entry.id, entry.confirmClass]), proposals.map(({ id }) => [id, 'proposal']))
+  assert.match(recorded.proposals[1].demoted, /src\/repair\.mjs:99 is not a line the repair added/)
+  // the ledger alone gives the proposals back, and status --brief prints them
+  await writeFile(join(lap.dir, 'run-state.json'), JSON.stringify({ ...(await state(lap.dir)), history: (await state(lap.dir)).history.slice(0, -1), state: 'IMPLEMENTED_GREEN' }))
+  const brief = run(['status', '--dir', lap.dir, '--brief'])
+  assert.equal(brief.status, 0, brief.stderr)
+  assert.match(brief.stdout, /\nimprovement proposals \(not fixed, not blocking\): 5\n- X1 medium O1 round-2 finding X1\n/)
+  const report = join(lap.dir, 'report.md')
+  const runId = recorded.runId
+  await writeFile(report, `Status: REVIEW_VERIFIED\n${runId} exit 0\nImprovement proposals: X1, X2, X3, X4\n`)
+  const omitted = run(['close', '--dir', lap.dir, '--check-report', report])
+  assert.match(omitted.stderr, /^REPORT_CLAIM_MISMATCH: it omits improvement proposal X5/)
+  await writeFile(report, `Status: REVIEW_VERIFIED\n${runId} exit 0\nImprovement proposals: X1, X2, X3, X4, X5\n`)
+  const closed = run(['close', '--dir', lap.dir, '--check-report', report])
+  assert.equal(closed.status, 0, closed.stderr)
+  assert.match(closed.stdout, /CLOSED state:REVIEW_VERIFIED\nimprovement proposals \(not fixed, not blocking\): 5\n/)
+})
+
+test('after round 2 there is no round 3: repaired bytes close only as PARTIAL_VERIFIED with the repair recorded unreviewed', async (t) => {
+  const lap = await roundTwo(t)
+  // the blocker quotes the line the repair below rewrites
+  const blocker = roundTwoFinding('R1', { class: 'regression', path: 'src/repair.mjs', line: 1 },
+    { evidence: 'src/repair.mjs#L1 retries once', quote: 'export const retries = 1' })
+  const findings = await lap.attest('round-2', [blocker, roundTwoFinding('X1')])
+  assert.match((await lap.verify('REVIEW_VERIFIED', findings)).stderr, /^FINDINGS_BLOCKING: 1 blocking/)
+  // no hold is open and nothing was repaired yet: PARTIAL_VERIFIED has nothing to close
+  assert.match((await lap.verify('PARTIAL_VERIFIED', findings)).stderr, /^NO_OPEN_HOLDS:/)
+  // a change that leaves the blocker's file alone repairs nothing: refused, and nothing is written
+  await writeFile(join(lap.root, 'src', 'other.mjs'), 'export const other = 1\n')
+  greenRun(lap.dir, 'unrelated')
+  const before = [await readFile(join(lap.dir, 'runs.jsonl')), await readFile(join(lap.dir, 'run-state.json'))]
+  assert.match((await lap.verify('PARTIAL_VERIFIED', findings)).stderr, /^REVIEW_REPAIR_UNRELATED: round-2 blocker R1 names src\/repair\.mjs/)
+  assert.deepEqual([await readFile(join(lap.dir, 'runs.jsonl')), await readFile(join(lap.dir, 'run-state.json'))], before)
+  await writeFile(join(lap.root, 'src', 'repair.mjs'), 'export const retries = 2\nexport const delay = 0\nexport const limit = 2\n')
+  // the repair is fresh bytes no reviewer saw: no new round, and REVIEW_VERIFIED on the round-2 receipt is stale
+  const third = run([...strictReviewPacketArgs(lap.dir, join(lap.dir, 'packet-round-3.json')), '--findings', findings])
+  assert.match(third.stderr, /^REVIEW_ROUNDS_CLOSED:/)
+  assert.match((await lap.verify('PARTIAL_VERIFIED', findings)).stderr, /^REVIEW_RUN_STALE:/)
+  greenRun(lap.dir, 'repair-two')
+  const stale = await lap.verify('REVIEW_VERIFIED', findings)
+  assert.match(stale.stderr, /^REVIEW_PACKET_STALE:/)
+  const partial = await lap.verify('PARTIAL_VERIFIED', findings)
+  assert.equal(partial.status, 0, partial.stderr)
+  const recorded = (await state(lap.dir)).history.at(-1)
+  assert.equal(recorded.state, 'PARTIAL_VERIFIED')
+  assert.equal(recorded.holds, undefined)
+  assert.equal(recorded.unreviewedRepair.round, 2)
+  assert.deepEqual(recorded.unreviewedRepair.repaired, ['src/other.mjs', 'src/repair.mjs'])
+  assert.deepEqual(recorded.unreviewedRepair.blockers.map((entry) => [entry.id, entry.confirmClass, entry.paths]), [['R1', 'regression', ['src/repair.mjs']]])
+  assert.deepEqual(recorded.proposals.map((entry) => entry.id), ['X1'])
+  const brief = run(['status', '--dir', lap.dir, '--brief'])
+  assert.match(brief.stdout, /\nunreviewed repair after round 2: src\/other\.mjs, src\/repair\.mjs \(1 round-2 blockers repaired, never reviewed\)\nimprovement proposals/)
+  const report = join(lap.dir, 'report.md')
+  await writeFile(report, `Status: PARTIAL_VERIFIED\n${recorded.runId} exit 0\nImprovement proposals: X1.\nNo unreviewed repair of src/repair.mjs.\n`)
+  assert.match(run(['close', '--dir', lap.dir, '--check-report', report]).stderr, /^REPORT_CLAIM_MISMATCH: it does not name src\/other\.mjs, repaired after the last review round/)
+  await writeFile(report, `Status: PARTIAL_VERIFIED\n${recorded.runId} exit 0\nImprovement proposals: X1.\nUnreviewed repair after round 2: src/other.mjs, src/repair.mjs.\n`)
+  const consistent = run(['close', '--dir', lap.dir, '--check-report', report])
+  assert.equal(consistent.status, 0, consistent.stderr)
 })
 
 /** 1차 리뷰어가 F1에 붙이는 재현 code — GREEN 명령이 이미 돌리는 파일 끝에 붙는다(ESM import는 어디에 있어도 끌어올려진다). */
@@ -5285,7 +5449,7 @@ test('a closure never overrides a round-2 reviewer who already answered, nor a p
   greenRun(forged.oracleDirectory, 'after-round-2')
   const later = await lastRunRecord(forged.oracleDirectory)
   const third = run([...strictReviewPacketArgs(forged.oracleDirectory, join(forged.oracleDirectory, 'packet-round-3.json')), '--findings', forged.findingsPath])
-  assert.match(third.stderr, /^ITERATION_BUDGET_EXHAUSTED:/)
+  assert.match(third.stderr, /^REVIEW_ROUNDS_CLOSED:/)
   const genuine = JSON.parse(await readFile(join(forged.oracleDirectory, 'packet-round-2.json'), 'utf8'))
   const ledger = (await allLedgerLines(forged.oracleDirectory)).map((line) => JSON.parse(line))
   const targetSnapshot = { worktreeSha256: later.worktreeSha256, productionSha256: later.productionSha256, harnessSha256: later.harnessSha256,

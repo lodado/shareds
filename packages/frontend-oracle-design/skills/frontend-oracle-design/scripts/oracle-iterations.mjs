@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import process from 'node:process'
 import { sha256, stableStringify } from './oracle-fs.mjs'
 
@@ -57,6 +58,122 @@ export function assertReviewIterationEvent(event) {
   if (!valid || typeof event.at !== 'string' || !event.at) {
     throw new IterationError('ITERATION_INVALID', 'invalid review iteration ledger event')
   }
+}
+
+/** Delivery review ends at the confirm-fixes round: no review-packet opens a round past it. */
+export const REVIEW_ROUND_LIMIT = 2
+
+const SECURITY_CATEGORIES = ['security', 'permission', 'data-loss']
+
+const GIT_ESCAPES = { n: '\n', t: '\t' }
+
+/** A path as git prints it: C-quoted when it holds unusual bytes (`"b/\\303\\251.mjs"`), with its `b/` side prefix. */
+function gitPath(raw) {
+  const quoted = /^"(.*)"$/.exec(raw.trim())
+  const path = quoted
+    ? quoted[1].replace(/((?:\\[0-7]{3})+)|\\(.)/g, (_, octal, char) =>
+      octal ? Buffer.from(octal.split('\\').slice(1).map((digits) => Number.parseInt(digits, 8))).toString('utf8') : (GIT_ESCAPES[char] ?? char))
+    : raw.trim()
+  return path === '/dev/null' ? null : path.replace(/^b\//, '')
+}
+
+// how each line of a unified diff moves the parse: `next` is the new-side number of the next context or added line
+const DIFF_STEP = {
+  file: ({ line }) => ({ path: gitPath(line.slice(4)), next: 0 }),
+  '@': ({ path, line, mark }) => {
+    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line)
+    if (!hunk) return { path, next: 0 }
+    const from = Number(hunk[1])
+    if (hunk[2] !== '0') return { path, next: from }
+    if (path) mark(path, Math.max(from, 1), from + 1)
+    return { path, next: from + 1 }
+  },
+  '+': ({ path, next, mark }) => {
+    if (path && next > 0) mark(path, next, next)
+    return { path, next: next > 0 ? next + 1 : 0 }
+  },
+  ' ': ({ path, next }) => ({ path, next: next > 0 ? next + 1 : 0 }),
+}
+
+function lineKind(previous, line) {
+  if (previous.startsWith('--- ') && line.startsWith('+++ ')) return 'file'
+  return line.slice(0, 1)
+}
+
+/**
+ * The new-side lines a unified diff adds, per path: each `+` line inside a hunk (context lines do not count), and for a
+ * hunk that only deletes, the lines on both sides of the gap. A file header is the `+++` line right after a `---` line.
+ */
+export function repairHunks(diff) {
+  const hunks = new Map()
+  const mark = (path, from, to) => hunks.set(path, [...(hunks.get(path) ?? []), [from, to]])
+  let cursor = { path: null, next: 0 }
+  let previous = ''
+  for (const line of String(diff ?? '').split('\n')) {
+    const kind = lineKind(previous, line)
+    previous = line
+    cursor = DIFF_STEP[kind]?.({ ...cursor, line, mark }) ?? cursor
+  }
+  return hunks
+}
+
+// git prints paths from its own root, a reviewer from the scan root: one may carry a folder prefix of the other. A bare
+// file name matches only itself, so `index.mjs` never stands for every changed `*/index.mjs`.
+export const samePath = (left, right) => {
+  const [a, b] = [left, right].map((path) => String(path).split('\\').join('/').replace(/^\.\//, ''))
+  if (a === b) return true
+  const [shorter, longer] = a.length < b.length ? [a, b] : [b, a]
+  return shorter.includes('/') && longer.endsWith(`/${shorter}`)
+}
+
+/**
+ * What a confirm-fixes finding may block as, from its `confirm` claim and evidence the packet already holds:
+ * `previous` cites a round-1 claim id, `regression` a path and line inside a repair hunk, `security` a category
+ * with critical/high severity and evidence. A claim it cannot back, or no claim, is a `proposal`.
+ */
+export function confirmClass(finding, scope) {
+  const claim = finding?.confirm
+  if (claim?.class === 'security') {
+    if (SECURITY_CATEGORIES.includes(claim.category) && ['critical', 'high'].includes(finding.severity) && String(finding.evidence ?? '').trim())
+      return { class: 'security' }
+    return { class: 'proposal', demoted: `security needs category ${SECURITY_CATEGORIES.join('|')} and severity critical|high` }
+  }
+  if (claim?.class === 'previous') {
+    const raised = (scope.previousFindings ?? [])
+      .filter((previous) => claim.reviewerId === undefined || previous.reviewerId === claim.reviewerId)
+      .flatMap((previous) => (previous.findings ?? []).filter((entry) => entry?.classification !== 'NON_ORACLE_OPINION').map((entry) => entry.id))
+    if (typeof claim.finding === 'string' && raised.includes(claim.finding)) return { class: 'previous' }
+    return { class: 'proposal', demoted: `${claim.finding ?? '?'} is not a round-1 claim` }
+  }
+  if (claim?.class === 'regression') return regressionClass(claim, scope)
+  if (claim?.class === undefined) return { class: 'proposal' }
+  return { class: 'proposal', demoted: `unknown confirm class ${claim.class}` }
+}
+
+/**
+ * A regression is backed by a line the repair added in the cited file. A repaired file the diff has no lines for (an
+ * untracked baseline, no git, a binary file) backs any line of it: the runner cannot tell, so the claim keeps blocking.
+ */
+function regressionClass(claim, scope) {
+  const hunks = [...repairHunks(scope.repairDiff)].filter(([path]) => samePath(path, claim.path))
+  const ranges = hunks.flatMap(([, spans]) => spans)
+  if (Number.isSafeInteger(claim.line) && ranges.some(([from, to]) => claim.line >= from && claim.line <= to)) return { class: 'regression' }
+  const unlined = hunks.length === 0 && (scope.repairPaths ?? []).some((path) => samePath(path, claim.path))
+  if (Number.isSafeInteger(claim.line) && unlined) return { class: 'regression' }
+  return { class: 'proposal', demoted: `${claim.path ?? '?'}:${claim.line ?? '?'} is not a line the repair added` }
+}
+
+/** In a confirm-fixes round only a backed class keeps blocking; every other blocking finding becomes an improvement proposal. */
+export function splitConfirmFindings(blocking, scope) {
+  if (scope?.mode !== 'confirm-fixes') return { blocking, proposals: null }
+  const kept = []
+  const proposals = []
+  for (const finding of blocking) {
+    const verdict = confirmClass(finding, scope)
+    if (verdict.class === 'proposal') proposals.push({ ...finding, confirmClass: 'proposal', ...(verdict.demoted ? { demoted: verdict.demoted } : {}) })
+    else kept.push({ ...finding, confirmClass: verdict.class })
+  }
+  return { blocking: kept, proposals }
 }
 
 /** Highest authoring limit a standing delegation ("don't ask, handle it") can grant; past it the user is asked. */

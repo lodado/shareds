@@ -281,6 +281,11 @@ stops the whole file, so reuse the file's bindings, pick another local name, or 
 the test. Write it in the file's style; nobody reformats it. Leave it out when the packet does not let
 you write it.
 
+In a `confirm-fixes` round a finding blocks only with a `confirm` claim the packet backs:
+`{ "class": "previous", "finding": "<round-1 ID>" }`, `{ "class": "regression", "path", "line" }` on a
+line `reviewScope.repairDiff` adds, or `{ "class": "security", "category" }`
+(`security|permission|data-loss`, severity critical/high). Any other finding is an improvement proposal.
+
 `changeabilityReview` judges the five axes exactly once each as `PASS | FINDING | N/A`. Every
 judgment needs path·line or packet field evidence. `FINDING` cites a real ID from the `findings`
 below, and `N/A` writes the reason it does not apply into evidence. schema v1 is allowed only for

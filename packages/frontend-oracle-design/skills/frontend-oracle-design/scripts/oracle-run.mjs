@@ -52,7 +52,7 @@ import {
   withDirectoryLock,
   ZERO_DIGEST,
 } from './oracle-fs.mjs'
-import { assertReviewIterationEvent, extendIterations, iterationBudget, IterationError, iterationStatus, observeIteration } from './oracle-iterations.mjs'
+import { assertReviewIterationEvent, iterationBudget, IterationError, iterationStatus, observeIteration, REVIEW_ROUND_LIMIT, samePath } from './oracle-iterations.mjs'
 import { invalidatedWitnesses } from './oracle-lock.mjs'
 import { readCardProfile, resolveProfileBinding } from './oracle-profile.mjs'
 import {
@@ -211,6 +211,8 @@ const NEXT_ACTIONS = {
   SNAPSHOT_STALE: 're-run the cited label on the current bytes and cite the new run',
   REVIEW_RUN_STALE: 're-run the cited command against the current bytes',
   FINDINGS_BLOCKING: 'fix the PRODUCT_DEFECT findings and re-verify, or route a POLICY_GAP to NEEDS_DECISION',
+  REVIEW_ROUNDS_CLOSED:
+    'repair the round-2 blockers, rerun the required labels, then `close --packet <round-2 packet>` with its findings records PARTIAL_VERIFIED with the repair unreviewed; or stop at NEEDS_DECISION',
   FINDINGS_INVALID: 'findings must use the six classifications and cite real card rows — regenerate the findings file',
   REVIEWER_NOT_INDEPENDENT: 'High risk needs two artifacts from different reviewerIds',
   BUDGET_EXHAUSTED: 'report FAIL with the last actual failure — never route around via another budget',
@@ -974,6 +976,8 @@ function replayState(state, ledger) {
         ...(entry.lockStop ? { lockStop: entry.lockStop } : {}),
         ...(entry.blindMapping ? { blindMapping: entry.blindMapping } : {}),
         ...(entry.reviewAttestation ? { reviewAttestation: entry.reviewAttestation } : {}),
+        ...(entry.proposals ? { proposals: entry.proposals } : {}),
+        ...(entry.unreviewedRepair ? { unreviewedRepair: entry.unreviewedRepair } : {}),
         runCount: entry.runCount ?? 0,
         at: entry.at,
         ledgerDigest: entry.digest,
@@ -3229,8 +3233,9 @@ async function transitionUnderLock(options, directory) {
     )
   }
   if (options.to !== 'PARTIAL_VERIFIED') return reviewGatedTransition(options, directory)
-  if (blocker === 'NO_OPEN_HOLDS')
-    throw new CliError('NO_OPEN_HOLDS', 'PARTIAL_VERIFIED needs an open hold; use REVIEW_VERIFIED')
+  // with no hold, PARTIAL_VERIFIED is the close of a repair after the last review round — the gate checks its packet
+  if (blocker === 'NO_OPEN_HOLDS' && !(await repairAfterLastRound(directory, await readState(directory), await readLedger(directory))))
+    throw new CliError('NO_OPEN_HOLDS', 'PARTIAL_VERIFIED needs an open hold or a repair after the last review round; use REVIEW_VERIFIED')
   return reviewGatedTransition(
     options,
     directory,
@@ -3270,6 +3275,8 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
   let blindMapping = null
   let reviewAttestation = null
   let closure = null
+  let unreviewedRepair = null
+  let proposals = []
 
   if (isEscapeTransition(options.to)) {
     if (missingProtocolFlags(options, state, 'stop-reason'))
@@ -3708,14 +3715,19 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
         'REVIEW_VERIFIED revision must match the review packet target snapshot',
       )
     }
-    if (
-      !targetSnapshot ||
+    // a repair after the last review round closes on that round's packet as PARTIAL_VERIFIED; REVIEW_VERIFIED keeps the fresh-packet gate
+    unreviewedRepair = options.to === 'PARTIAL_VERIFIED' ? lastRoundRepair(packet, allLedger, current) : null
+    if (options.to === 'PARTIAL_VERIFIED' && !partialHolds?.length && !unreviewedRepair)
+      throw new CliError('NO_OPEN_HOLDS', 'PARTIAL_VERIFIED without a hold closes only a repair after the last review round, on that round\'s packet')
+    if (unreviewedRepair && options.closure)
+      throw new CliError('REVIEW_CLOSURE_INVALID', 'a closure confirms the bytes round 2 reviews, not a repair after it')
+    const lockStale = !targetSnapshot ||
       targetSnapshot.lockManifestSha256 !== revision.lockManifestSha256 ||
-      packet.state?.lockManifestSha256 !== revision.lockManifestSha256 ||
-      targetSnapshot.worktreeSha256 !== currentWorktree ||
-      targetSnapshot.productionSha256 !== currentProduction ||
-      !sameDigests(targetSnapshot.harnessSha256 ?? {}, currentHarness)
-    ) {
+      packet.state?.lockManifestSha256 !== revision.lockManifestSha256
+    const bytesStale = targetSnapshot?.worktreeSha256 !== currentWorktree ||
+      targetSnapshot?.productionSha256 !== currentProduction ||
+      !sameDigests(targetSnapshot?.harnessSha256 ?? {}, currentHarness)
+    if (lockStale || (bytesStale && !unreviewedRepair)) {
       throw new CliError('REVIEW_PACKET_STALE', 'review packet does not target the current snapshot')
     }
     // 리뷰어 산출물 — 2차 리뷰어의 findings, 또는 결정적 closure가 기대는 1차 findings. 블라인드 독립성과 host 영수증이 이것을 본다
@@ -3749,7 +3761,8 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
         ...blindMapping,
         ...(await assertBlindMappingEvidence(directory, state, options, {
           evidencePath: resolve(options.evidence),
-          targetRevision: options.revision,
+          // a repair after the last round changed the tests the blind reader maps: the read binds the current bytes
+          targetRevision: unreviewedRepair ? currentWorktree : options.revision,
           oracleSha256: revision.oracleSha256,
           lockManifestSha256: revision.lockManifestSha256,
           ledger: allLedger,
@@ -3780,7 +3793,11 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
     if (options.intersect) reviewArgs.push('--intersect', resolve(options.intersect))
     // 블라인드 매핑 대조는 같은 review 호출에 붙인다 — 같은 패킷 검증을 두 번 하지 않는다.
     if (blindMapping?.required) reviewArgs.push('--blind-map', resolve(options.blindMap))
-    runVerifier(reviewArgs)
+    // a repair after the last round rewrote the files it lists: their citations quote bytes no longer on disk
+    for (const path of unreviewedRepair?.repaired ?? []) reviewArgs.push('--repaired', path)
+    const verdict = reviewVerdict(reviewArgs, { closure: options.closure, unreviewedRepair, oracle, packetPath, scope: packet.reviewScope, options })
+    proposals = verdict.proposals
+    if (unreviewedRepair) unreviewedRepair = { ...unreviewedRepair, blockers: verdict.blockers }
     assertReviewPasses(state, ledger, run, greenEntry)
   }
 
@@ -3788,7 +3805,7 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
   state.state = finalState
   const historyEntry = {
     state: finalState,
-    ...(partialHolds ? { holds: partialHolds } : {}),
+    ...holdsField(partialHolds),
     ...(options.workerAttemptId ? { workerAttemptId: options.workerAttemptId } : {}),
     runId: run?.runId ?? null,
     reason: options.reason ?? null,
@@ -3805,6 +3822,8 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
     ...(lockStop ? { lockStop } : {}),
     ...(blindMapping ? { blindMapping } : {}),
     ...(reviewAttestation ? { reviewAttestation } : {}),
+    ...(proposals.length ? { proposals } : {}),
+    ...(unreviewedRepair ? { unreviewedRepair } : {}),
     runCount: ledger.length,
     at: new Date().toISOString(), // oracle:nondeterminism ledger는 실제 실행 시각을 기록한다
   }
@@ -3813,7 +3832,7 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
   const transitionEvent = await appendLedger(directory, {
     type: 'transition',
     state: finalState,
-    ...(partialHolds ? { holds: partialHolds } : {}),
+    ...holdsField(partialHolds),
     ...(options.workerAttemptId ? { workerAttemptId: options.workerAttemptId } : {}),
     evidenceRunId: run?.runId ?? null,
     reason: options.reason ?? null,
@@ -3827,6 +3846,8 @@ async function reviewGatedTransition(options, directory, partialHolds = null) {
     ...(lockStop ? { lockStop } : {}),
     ...(blindMapping ? { blindMapping } : {}),
     ...(reviewAttestation ? { reviewAttestation } : {}),
+    ...(historyEntry.proposals ? { proposals: historyEntry.proposals } : {}),
+    ...(historyEntry.unreviewedRepair ? { unreviewedRepair: historyEntry.unreviewedRepair } : {}),
     stateDelta: {
       state: finalState,
       testFiles: state.testFiles,
@@ -4245,18 +4266,111 @@ async function reviewFollowup(options, directory, state, ledger, previousRevisio
   return previousFindings
 }
 
+/**
+ * The round a review packet for this snapshot belongs to. Delivery review ends at REVIEW_ROUND_LIMIT whatever limit an
+ * older review-extension recorded; only re-emitting an already recorded round (repeat) stays open.
+ */
+function nextReviewRound(budget, targetRevision, repeat) {
+  const closed = () =>
+    new CliError('REVIEW_ROUNDS_CLOSED', `delivery review ends at round ${REVIEW_ROUND_LIMIT}; this snapshot changed after round ${budget.round} was recorded`)
+  let iterations
+  try {
+    iterations = observeIteration(budget, 'snapshot', targetRevision)
+  } catch (error) {
+    if (error.code === 'ITERATION_BUDGET_EXHAUSTED') throw closed()
+    throw error
+  }
+  if (!repeat && iterations.round > REVIEW_ROUND_LIMIT) throw closed()
+  return iterations
+}
+
+/**
+ * The repair after the last review round: the latest recorded round is the confirm-fixes round and the worktree moved
+ * since its packet. Those bytes were never reviewed, so they close only as PARTIAL_VERIFIED.
+ */
+async function repairAfterLastRound(directory, state, ledger) {
+  const latest = ledger.filter((entry) => entry.type === 'review-round').at(-1)
+  if ((latest?.scope?.round ?? 0) < REVIEW_ROUND_LIMIT) return null
+  const scanRoot = resolve(directory, state.scanRoot)
+  const current = await snapshot(scanRoot, `${portablePath(scanRoot, directory)}/`)
+  const revision = sha256(JSON.stringify(current))
+  return revision === latest.targetRevision ? null : { latest, current, revision }
+}
+
+/** An empty hold list is not recorded: a PARTIAL_VERIFIED over an unreviewed repair holds no rows. */
+function holdsField(holds) {
+  if (!holds?.length) return {}
+  return { holds }
+}
+
+/** The repair after the last recorded round, on that round's own packet: the worktree moved since the packet's revision. */
+function lastRoundRepair(packet, ledger, current) {
+  const latest = ledger.filter((entry) => entry.type === 'review-round').at(-1)
+  if ((latest?.scope?.round ?? 0) < REVIEW_ROUND_LIMIT || latest.targetRevision !== packet.targetRevision) return null
+  if (stableStringify(latest.scope) !== stableStringify(packet.reviewScope) || sha256(JSON.stringify(current)) === latest.targetRevision) return null
+  return { round: latest.scope.round, reviewedRevision: latest.targetRevision, repaired: changedPaths(latest.snapshot, current) }
+}
+
+/** What the report keeps of a finding the review recorded but did not block on. */
+const findingRecord = (finding) => ({
+  id: finding.id,
+  severity: finding.severity,
+  classification: finding.classification,
+  row: finding.row,
+  finding: finding.finding,
+  fix: finding.fix,
+  ...(finding.confirmClass ? { confirmClass: finding.confirmClass } : {}),
+  ...(finding.demoted ? { demoted: finding.demoted } : {}),
+})
+
+/** The files a blocker names: its regression path, its `path#L` citation, or for `previous` the round-1 claim's citation. */
+function blockerPaths(finding, scope) {
+  const cited = (entry) => String(entry?.evidence ?? '').split(/\s+/).filter((token) => /#L\d/.test(token))
+    .map((token) => token.slice(0, token.indexOf('#L')).replace(/^[`'"(]+/, ''))
+  const previous = (scope?.previousFindings ?? []).flatMap((reviewer) => reviewer.findings ?? [])
+    .filter((entry) => finding.confirm?.class === 'previous' && entry.id === finding.confirm.finding)
+  return [...new Set([finding.confirm?.path, ...cited(finding), ...previous.flatMap(cited)].filter(Boolean))]
+}
+
+/**
+ * A repair after the last round must change a file each located blocker names; a blocker that names no file (a global
+ * security finding, a missing behavior) is recorded as it is. Otherwise "repaired" would only be a label.
+ */
+function repairedBlockers(blocking, scope, repaired) {
+  return blocking.map((finding) => {
+    const paths = blockerPaths(finding, scope)
+    if (paths.length > 0 && !paths.some((path) => repaired.some((entry) => samePath(entry, path)))) {
+      throw new CliError('REVIEW_REPAIR_UNRELATED',
+        `round-${scope.round} blocker ${finding.id} names ${paths.join(', ')} and the repair after it changed none of them: repair it there, or stop at NEEDS_DECISION`)
+    }
+    return { ...findingRecord(finding), ...(paths.length > 0 ? { paths } : {}) }
+  })
+}
+
+/**
+ * The review verdict with the improvement proposals to record. A repair after the last round closes over the blockers
+ * that round left: they are recorded as repaired but unreviewed, never cleared.
+ */
+function reviewVerdict(reviewArgs, { closure, unreviewedRepair, oracle, packetPath, scope, options }) {
+  if (closure) {
+    runVerifier(reviewArgs)
+    return { proposals: [], blockers: [] }
+  }
+  try {
+    return { proposals: JSON.parse(runVerifier([...reviewArgs, '--ir'])).proposals.map(findingRecord), blockers: [] }
+  } catch (error) {
+    if (!unreviewedRepair || error.code !== 'FINDINGS_BLOCKING') throw error
+  }
+  const intersect = options.intersect ? ['--intersect', resolve(options.intersect)] : []
+  const repaired = unreviewedRepair.repaired.flatMap((path) => ['--repaired', path])
+  const result = JSON.parse(runVerifier(['findings', '--oracle', oracle, '--file', resolve(options.findings), ...intersect, '--packet', packetPath, ...repaired, '--ir']))
+  return { proposals: (result.proposals ?? []).map(findingRecord), blockers: repairedBlockers(result.blocking, scope, unreviewedRepair.repaired) }
+}
+
+/** Old ledgers keep their review-extension entries and replay them; no new delivery round is granted. */
 async function extendReview(options) {
   if (!options.dir || !options.approval) throw new CliError('USAGE', 'review-extend requires --dir --approval <explicit-user-approval.json>', 2)
-  const directory = resolve(options.dir)
-  await withDirectoryLock(directory, 'state', async () => {
-    const state = await readConsistentState(directory)
-    if (state.state !== 'IMPLEMENTED_GREEN') throw new CliError('REVIEW_PACKET_STATE', 'review-extend requires IMPLEMENTED_GREEN')
-    const approval = JSON.parse(await readFile(resolve(options.approval), 'utf8'))
-    const iterations = extendIterations(reviewBudget(state, await readLedger(directory)), approval, 'delivery-review')
-    const event = await appendLedger(directory, { type: 'review-extension', iterations, at: new Date().toISOString() })
-    await writeState(directory, { ...state, reviewIterations: iterations, ledgerHead: event.digest })
-    process.stdout.write(`REVIEW_EXTENDED ${iterations.limit}\n`)
-  })
+  throw new CliError('REVIEW_ROUNDS_CLOSED', `delivery review ends at round ${REVIEW_ROUND_LIMIT}; review-extend grants no further round`)
 }
 
 async function reviewPacket(options) {
@@ -4551,8 +4665,8 @@ async function reviewPacketUnderLock(options) {
   const evidenceArtifacts = await collectEvidenceArtifacts(directoryReal, evidenceSnapshot, inputSnapshots)
   const targetRevision = targetSnapshot.worktreeSha256
   const beforeIterations = reviewBudget(state, fullLedger)
-  const iterations = observeIteration(beforeIterations, 'snapshot', targetRevision)
   const repeat = state.reviewScope && beforeIterations.inputs.snapshot?.digest === targetRevision
+  const iterations = nextReviewRound(beforeIterations, targetRevision, repeat)
   const previousFindings = !repeat && iterations.round > 1
     ? await reviewFollowup(options, directory, state, fullLedger, beforeIterations.inputs.snapshot?.digest, inputSnapshots) : []
   const reviewScope = repeat ? state.reviewScope : {
@@ -4560,9 +4674,10 @@ async function reviewPacketUnderLock(options) {
     previousRevision: beforeIterations.inputs.snapshot?.digest ?? null,
     previousFindings,
     repairDiff: state.reviewSnapshot ? gitDiff(scanRoot, changedPaths(state.reviewSnapshot, current), state.reviewSnapshot, current) : null,
+    repairPaths: state.reviewSnapshot ? changedPaths(state.reviewSnapshot, current) : [],
     instruction: iterations.round === 1
       ? 'Review the agreed scope once. Collect all supported findings, group shared causes, and distinguish contract defects from proposed scope.'
-      : 'Confirm prior finding IDs and regressions in the repair diff, not a fresh defect hunt. Do not fix advisory suggestions. Preserve locked-row violations and critical/high security, permission or data-loss blockers.',
+      : 'Confirm prior finding IDs and regressions in the repair diff, not a fresh defect hunt. A finding blocks only with a confirm claim the packet backs: previous (a round-1 finding ID), regression (path and line inside a repairDiff hunk) or security (critical/high, category security|permission|data-loss). Every other finding is an improvement proposal: recorded, not fixed, no new round.',
   }
   const pending = Object.entries(evidence.rows ?? {})
     .filter(([, entry]) => entry.kind === 'pending')
@@ -5000,6 +5115,11 @@ async function checkReport(state, ledger, source, directory) {
     if (run && run.exitCode !== Number(exit))
       problems.push(`${runId} exit ${exit}, the ledger records exit ${run.exitCode}`)
   }
+  // the review's record travels into the report: each improvement proposal by id, and an unreviewed repair by name
+  const record = lastReviewRecord(state)
+  const names = (word) => new RegExp(`(?<![\\w.-])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\.\\w)`).test(text)
+  for (const proposal of record?.proposals ?? []) if (!names(proposal.id)) problems.push(`it omits improvement proposal ${proposal.id}`)
+  for (const path of record?.unreviewedRepair?.repaired ?? []) if (!names(path)) problems.push(`it does not name ${path}, repaired after the last review round and never reviewed`)
   if (problems.length > 0) throw new CliError('REPORT_CLAIM_MISMATCH', problems.join('; '))
   process.stdout.write(`REPORT_CONSISTENT state:${state.state} runs:${cited.size}\n`)
 }
@@ -5206,7 +5326,7 @@ function briefStatusLine(directory, state, ledger, statusResult) {
   const lastRun = last
     ? [`last run ${last.runId}`, last.label, `exit ${exitLabel(last)} (${Math.round((last.commandMs ?? 0) / 1000)}s)`, last.at ? `${elapsedLabel(last.at)} ago` : null].filter(Boolean).join(' ')
     : null
-  return [
+  const line = [
     deliveryPhaseLine(directory, statusResult),
     `run ${basename(directory)}`,
     `state ${statusResult.currentState}`,
@@ -5217,6 +5337,31 @@ function briefStatusLine(directory, state, ledger, statusResult) {
     `targets: ${statusResult.nextLegalActions.join(' | ') || 'none'}`,
     `blockers: ${statusResult.blockers.join(', ') || 'none'}`,
   ].filter(Boolean).join(' · ')
+  return [line, ...reviewRecordLines(state)].join('\n')
+}
+
+/** The last review transition's record: the review it skipped (unreviewed repair) and its improvement proposals. */
+function lastReviewRecord(state) {
+  return [...(state.history ?? [])].reverse().find((entry) => ['REVIEW_VERIFIED', 'PARTIAL_VERIFIED'].includes(entry.state)) ?? null
+}
+
+/** What `status --brief` and `close` print after the state line; the final report copies both. */
+function reviewRecordLines(state) {
+  const record = lastReviewRecord(state)
+  const lines = []
+  const repair = record?.unreviewedRepair
+  if (repair) {
+    const blockers = repair.blockers?.length ?? 0
+    lines.push(`unreviewed repair after round ${repair.round}: ${repair.repaired.join(', ') || 'no file'} (${blockers} round-${repair.round} blockers repaired, never reviewed)`)
+  }
+  const proposals = record?.proposals ?? []
+  if (proposals.length > 0) {
+    lines.push(
+      `improvement proposals (not fixed, not blocking): ${proposals.length}`,
+      ...proposals.map((proposal) => `- ${proposal.id} ${proposal.severity} ${proposal.row} ${proposal.finding}`),
+    )
+  }
+  return lines
 }
 
 // 단계마다 정상 경로의 목표 하나 — 다른 목표(ALREADY_SATISFIED·NEEDS_DECISION·FAIL)는 guide --to로 고른다
@@ -5407,7 +5552,7 @@ async function closeOut(options) {
     )
   }
   await checkReport(current, await readLedger(directory), options.checkReport, directory)
-  process.stdout.write(`CLOSED state:${current.state}\n`)
+  process.stdout.write([`CLOSED state:${current.state}`, ...reviewRecordLines(current), ''].join('\n'))
 }
 
 async function closeReview(options, directory) {
@@ -5427,16 +5572,22 @@ async function closeReview(options, directory) {
   const revision = options.revision ?? packetDocument?.targetSnapshot?.worktreeSha256
   if (!revision) throw new CliError('REVIEW_REVISION_MISMATCH', 'review receipt revision must match canonical schema-v2 packet')
   const packet = { sha256: sha256(packetBytes), revision }
+  // after round 2 a repair closes on the round-2 packet as PARTIAL_VERIFIED; its blind read binds the repaired bytes
+  const repair = await repairAfterLastRound(directory, inputs.state, await readLedger(directory))
+  const blindRevision = repair?.revision ?? revision
+  // the transition refuses this too; refusing here keeps the receipts below from being written for a refused close
+  if (repair && options.closure) throw new CliError('REVIEW_CLOSURE_INVALID', 'a closure confirms the bytes round 2 reviews, not a repair after it')
   // blind 입력도 이 패킷의 리비전이어야 한다 — 영수증을 하나라도 쓰기 전에 확인한다
-  if (inputs.blindRequired) await assertBlindInputRevision(options, revision)
+  if (inputs.blindRequired) await assertBlindInputRevision(options, blindRevision)
   if (!options.closure) {
     await closeReviewerReceipt(options, packet, { path: options.findings, flag: '--findings', taskId: options.taskId, taskFlag: '--task-id' })
     if (options.intersect) {
       await closeReviewerReceipt(options, packet, { path: options.intersect, flag: '--intersect', taskId: options.intersectTaskId, taskFlag: '--intersect-task-id' })
     }
   }
-  if (inputs.blindRequired) await closeBlindReceipt(options, directory, revision)
-  const to = options.to ?? ((await openHolds(directory)).length > 0 ? 'PARTIAL_VERIFIED' : 'REVIEW_VERIFIED')
+  if (inputs.blindRequired) await closeBlindReceipt(options, directory, blindRevision)
+  const partial = repair || (await openHolds(directory)).length > 0
+  const to = options.to ?? (partial ? 'PARTIAL_VERIFIED' : 'REVIEW_VERIFIED')
   // --closure는 2차 리뷰어 findings를 대신한다 — 그때 --findings·--intersect는 패킷을 만든 직전 라운드 입력이라 전이에 넘기지 않는다
   const { findings, intersect, ...rest } = options
   await transition({ ...rest, ...(options.closure ? {} : { findings, intersect }), to, revision })
@@ -5630,7 +5781,8 @@ async function reviewBrief(options) {
     // A blocked review is useful navigation, not permission to weaken its gate.
     if (error.code !== 'FINDINGS_BLOCKING') throw error
   }
-  const findings = JSON.parse(runVerifier(['findings', ...findingArgs, '--ir']))
+  // with the packet, a round-2 finding that backs no class lands with the advisory ones as an improvement proposal
+  const findings = JSON.parse(runVerifier(['findings', ...findingArgs, '--packet', packetSnapshot.path, '--ir']))
   const withSource = (entries) =>
     entries.map((entry) => ({
       ...entry,
@@ -5686,7 +5838,7 @@ async function reviewBrief(options) {
     pending: Object.entries(evidence.rows ?? {})
       .filter(([, entry]) => entry.kind === 'pending')
       .map(([row, entry]) => ({ row, ...entry })),
-    advisory: withSource(findings.advisory),
+    advisory: withSource([...findings.advisory, ...(findings.proposals ?? [])]),
     evidence: { path: portablePath(directory, evidencePath), rows: evidence.rows, artifacts: evidenceArtifacts },
     raw: { oracle: packet.oracle.path, findings: reviewers.map(({ path }) => path), reviewPoints: packet.reviewPoints },
     limitations: [

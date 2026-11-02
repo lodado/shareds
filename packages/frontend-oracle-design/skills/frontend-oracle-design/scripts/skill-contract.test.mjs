@@ -2857,8 +2857,10 @@ test('delivery review is capped at two rounds and round two only confirms round 
   ])
   assert.match(greenReview, /### Delivery review round budget\s+—\s+at most 2/)
   assert.match(greenReview, /Round 2\*\* only confirms that round 1's blocking findings are resolved/)
-  assert.match(greenReview, /Every other new finding\s+is recorded as advisory in the report and is not fixed/)
-  assert.match(greenReview, /A round 3 needs the user's explicit approval/)
+  assert.match(greenReview, /Every other new finding\s+is recorded as an improvement proposal: not fixed, not blocking, no new round/)
+  assert.match(greenReview, /There is no round 3: a packet on changed bytes after round 2 is `REVIEW_ROUNDS_CLOSED`/)
+  assert.match(greenReview, /records `PARTIAL_VERIFIED`\s+with the repair unreviewed, never `REVIEW_VERIFIED`/)
+  assert.match(subagentReview, /In a `confirm-fixes` round a finding blocks only with a `confirm` claim the packet backs/)
   assert.match(subagentReview, /Delivery review stops after 2 rounds/)
 })
 

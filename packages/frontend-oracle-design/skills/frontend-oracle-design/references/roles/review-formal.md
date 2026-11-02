@@ -63,7 +63,8 @@ samples remain independent, not two passes in one context. Reviewers never issue
 
 Use the packet's ledger-bound `reviewScope`. `confirm-fixes` receives the preceding finding IDs/raw
 findings, repair diff and rerun evidence. Confirm those fixes and regressions only, not a fresh defect
-hunt or a demand that a defect must exist. Preserve serious blockers and all required evidence checks.
+hunt or a demand that a defect must exist. Only a `confirm` claim the packet backs blocks (subagent-review);
+other findings are improvement proposals. Keep all required evidence checks.
 An unchanged row may refer to still-current earlier evidence; scope narrowing never waives a gate.
 
 Re-read [`mandatory-verification.md`](../mandatory-verification.md) and
